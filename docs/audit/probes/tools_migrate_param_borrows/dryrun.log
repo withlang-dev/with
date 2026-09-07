@@ -1,0 +1,4 @@
+.audit/probes/tools_migrate_param_borrows/fixture.w: shout(s)
+.audit/probes/tools_migrate_param_borrows/fixture.w: echo2(s)
+.audit/probes/tools_migrate_param_borrows/fixture.w: echo2(t)
+total: 3

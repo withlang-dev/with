@@ -1,0 +1,55 @@
+error: expected declaration (fn, type, enum, let, use, extern)
+ --> tools/insert_std_uses.w:66:1
+66 | for i in 1..argv.len():
+  | ^^^
+
+error: expected declaration (fn, type, enum, let, use, extern)
+ --> tools/insert_std_uses.w:68:5
+68 |     if a == "--apply": apply = true
+  |     ^^
+
+error: expected declaration (fn, type, enum, let, use, extern)
+ --> tools/insert_std_uses.w:79:1
+79 | for line in diags.split("\n"):
+  | ^^^
+
+error: expected declaration (fn, type, enum, let, use, extern)
+ --> tools/insert_std_uses.w:85:9
+85 |         if path.len() > 0:
+  |         ^^
+
+error: expected declaration (fn, type, enum, let, use, extern)
+ --> tools/insert_std_uses.w:88:13
+88 |             for pi in 0..pair_paths.len() as i32:
+  |             ^^^
+
+error: expected declaration (fn, type, enum, let, use, extern)
+ --> tools/insert_std_uses.w:99:1
+99 | for fi in 0..pair_paths.len() as i32:
+  | ^^^
+
+error: expected declaration (fn, type, enum, let, use, extern)
+ --> tools/insert_std_uses.w:101:5
+101 |     if vec_contains(&done_paths, path):
+  |     ^^
+
+error: expected declaration (fn, type, enum, let, use, extern)
+ --> tools/insert_std_uses.w:105:5
+105 |     for li in 0..pair_paths.len() as i32:
+  |     ^^^
+
+error: expected declaration (fn, type, enum, let, use, extern)
+ --> tools/insert_std_uses.w:113:5
+113 |     if text.len() == 0:
+  |     ^^
+
+error: expected declaration (fn, type, enum, let, use, extern)
+ --> tools/insert_std_uses.w:118:5
+118 |     for line in block.split("\n"):
+  |     ^^^
+
+error: expected declaration (fn, type, enum, let, use, extern)
+ --> tools/insert_std_uses.w:125:5
+125 |     if with_fs_write_file(path, updated) != 0:
+  |     ^^
+error: check failed during compilation

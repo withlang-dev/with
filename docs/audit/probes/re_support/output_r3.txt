@@ -1,0 +1,34 @@
+capcount what=4 rc=0 val=3
+minlen what=16 rc=0 val=1
+namecount what=17 rc=0 val=1
+nameentrysize what=18 rc=0 val=5
+firstcu what=5 rc=0 val=97
+firsttype what=6 rc=0 val=1
+lastcu what=11 rc=0 val=0
+lasttype what=12 rc=0 val=0
+backrefmax what=2 rc=0 val=0
+hascrrorlf what=8 rc=0 val=0
+matchempty what=13 rc=0 val=0
+hasbslashc what=23 rc=0 val=0
+alloptions what=0 rc=0 val=0
+nametable rc=0 null=0
+size rc=0 val=195
+numfrom nm=3 bad=-49
+badwhat rc=-34 nullcode rc=4
+capcount what=4 rc=0 val=0
+minlen what=16 rc=0 val=3
+namecount what=17 rc=0 val=0
+nameentrysize what=18 rc=0 val=0
+firstcu what=5 rc=0 val=97
+firsttype what=6 rc=0 val=1
+lastcu what=11 rc=0 val=99
+lasttype what=12 rc=0 val=1
+backrefmax what=2 rc=0 val=0
+hascrrorlf what=8 rc=0 val=0
+matchempty what=13 rc=0 val=0
+hasbslashc what=23 rc=0 val=0
+alloptions what=0 rc=0 val=0
+nametable rc=0 null=0
+size rc=0 val=165
+numfrom nm=-49 bad=-49
+badwhat rc=-34 nullcode rc=4

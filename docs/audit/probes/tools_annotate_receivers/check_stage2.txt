@@ -1,0 +1,130 @@
+error: if would need to copy a `str`, which is not Copy
+ --> tools/annotate_receivers.w:59:22
+59 |     if nearest >= 0: facts.modes.get(nearest as i64) else: ""
+  |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: return type mismatch
+ --> tools/annotate_receivers.w:51:13
+51 |             return facts.modes.get(i as i64)
+  |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: use of moved value: `text` is moved inside a loop and not reinitialized before the loop repeats
+ --> tools/annotate_receivers.w:142:13
+142 |             continue
+  |             ^^^^^^^^
+  = help: reinitialize `text` on every path before the loop repeats, or move it only on a path that exits the loop
+
+error: use of moved value: `text` is moved inside a loop and not reinitialized before the loop repeats
+ --> tools/annotate_receivers.w:149:13
+149 |             continue
+  |             ^^^^^^^^
+  = help: reinitialize `text` on every path before the loop repeats, or move it only on a path that exits the loop
+
+error: use of moved value: `text` is moved inside a loop and not reinitialized before the loop repeats
+ --> tools/annotate_receivers.w:157:13
+157 |             continue
+  |             ^^^^^^^^
+  = help: reinitialize `text` on every path before the loop repeats, or move it only on a path that exits the loop
+
+error: use of moved value
+ --> tools/annotate_receivers.w:175:60
+175 |         let mode = exact_mode(exact_facts, line_for_offset(text, tokens.get_start(i)), column_for_offset(text, tokens.get_start(i)))
+  |                                                            ^^^^
+  = help: a moved value cannot be used again; if it is moved on only some control-flow paths, reinitialize it on every path before this use, or clone it before the move
+
+error: use of moved value
+ --> tools/annotate_receivers.w:175:106
+175 |         let mode = exact_mode(exact_facts, line_for_offset(text, tokens.get_start(i)), column_for_offset(text, tokens.get_start(i)))
+  |                                                                                                          ^^^^
+  = help: a moved value cannot be used again; if it is moved on only some control-flow paths, reinitialize it on every path before this use, or clone it before the move
+
+error: use of moved value: `text` is moved inside a loop and not reinitialized before the loop repeats
+ --> tools/annotate_receivers.w:178:13
+178 |             continue
+  |             ^^^^^^^^
+  = help: reinitialize `text` on every path before the loop repeats, or move it only on a path that exits the loop
+
+error: use of moved value: `text` is moved inside a loop and not reinitialized before the loop repeats
+ --> tools/annotate_receivers.w:107:5
+107 |     while i < n:
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  = help: reinitialize `text` on every path before the loop repeats, or move it only on a path that exits the loop
+
+error: use of moved value
+ --> tools/annotate_receivers.w:204:34
+204 |         result = result ++ slice(text, prev, starts.get(e as i64)) ++ repls.get(e as i64)
+  |                                  ^^^^
+  = help: a moved value cannot be used again; if it is moved on only some control-flow paths, reinitialize it on every path before this use, or clone it before the move
+
+error: use of moved value
+ --> tools/annotate_receivers.w:206:30
+206 |     result = result ++ slice(text, prev, tlen)
+  |                              ^^^^
+  = help: a moved value cannot be used again; if it is moved on only some control-flow paths, reinitialize it on every path before this use, or clone it before the move
+
+error: use of moved value: `text` is moved inside a loop and not reinitialized before the loop repeats
+ --> tools/annotate_receivers.w:218:5
+218 |     while i < tokens.len():
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  = help: reinitialize `text` on every path before the loop repeats, or move it only on a path that exits the loop
+
+error: use of moved value
+ --> tools/annotate_receivers.w:264:73
+264 |     if path_excluded(path, excludes) or not file_has_mode_less_receiver(path):
+  |                                                                         ^^^^
+  = help: a moved value cannot be used again; if it is moved on only some control-flow paths, reinitialize it on every path before this use, or clone it before the move
+
+error: use of moved value
+ --> tools/annotate_receivers.w:266:41
+266 |     let facts = compiler_receiver_modes(path)
+  |                                         ^^^^
+  = help: a moved value cannot be used again; if it is moved on only some control-flow paths, reinitialize it on every path before this use, or clone it before the move
+
+error: use of moved value
+ --> tools/annotate_receivers.w:268:25
+268 |         print(f"error: {path}: compiler found {facts.unproven} mode-less receiver declarations without finalized signatures; file left unchanged")
+  |                         ^^^^
+  = help: a moved value cannot be used again; if it is moved on only some control-flow paths, reinitialize it on every path before this use, or clone it before the move
+
+error: use of moved value
+ --> tools/annotate_receivers.w:271:25
+271 |         print(f"error: {path}: token audit found a mode-less receiver but compiler produced no declaration fact; file left unchanged")
+  |                         ^^^^
+  = help: a moved value cannot be used again; if it is moved on only some control-flow paths, reinitialize it on every path before this use, or clone it before the move
+
+error: use of moved value
+ --> tools/annotate_receivers.w:273:19
+273 |     annotate_file(path, &facts)
+  |                   ^^^^
+  = help: a moved value cannot be used again; if it is moved on only some control-flow paths, reinitialize it on every path before this use, or clone it before the move
+
+error: use of moved value: `listing` is moved inside a loop and not reinitialized before the loop repeats
+ --> tools/annotate_receivers.w:282:5
+282 |     for i in 0..listing.len() as i32 + 1:
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  = help: reinitialize `listing` on every path before the loop repeats, or move it only on a path that exits the loop
+
+error: wrong argument type in call to 'Vec.push'
+ --> tools/annotate_receivers.w:313:27
+313 |             excludes.push(argv.get(arg as i64))
+  |                           ^^^^^^^^^^^^^^^^^^^^
+  = label @313:27 argument expression 'argv.get(arg as i64)' has type &str
+  = note: argument 1 expects str
+  = note: actual type: &str
+
+error: wrong argument type in call to 'Vec.push'
+ --> tools/annotate_receivers.w:315:24
+315 |             paths.push(argv.get(arg as i64))
+  |                        ^^^^^^^^^^^^^^^^^^^^
+  = label @315:24 argument expression 'argv.get(arg as i64)' has type &str
+  = note: argument 1 expects str
+  = note: actual type: &str
+
+error: wrong argument type in call to 'annotate_integrated_path'
+ --> tools/annotate_receivers.w:323:48
+323 |         let changed = annotate_integrated_path(paths.get(i as i64), &excludes)
+  |                                                ^^^^^^^^^^^^^^^^^^^
+  = label @323:48 argument expression 'paths.get(i as i64)' has type &str
+  = note: parameter 'path' expects str
+  = note: actual type: &str
+error: check failed during compilation

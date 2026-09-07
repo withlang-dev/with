@@ -1,0 +1,30 @@
+error: expected declaration (fn, type, enum, let, use, extern)
+ --> tools/materialize_predicate.w:16:1
+16 | if argv.len() < 5:
+  | ^^
+
+error: expected declaration (fn, type, enum, let, use, extern)
+ --> tools/materialize_predicate.w:21:1
+21 | for i in 3..argv.len() as i32:
+  | ^^^
+
+error: expected declaration (fn, type, enum, let, use, extern)
+ --> tools/materialize_predicate.w:31:1
+31 | if unsafe { with_fs_write_file(materialized, candidate) } != 0:
+  | ^^
+
+error: expected declaration (fn, type, enum, let, use, extern)
+ --> tools/materialize_predicate.w:36:1
+36 | for i in separator + 1..argv.len() as i32:
+  | ^^^
+
+error: expected declaration (fn, type, enum, let, use, extern)
+ --> tools/materialize_predicate.w:38:5
+38 |     child.push(if arg == "{file}": materialized else: arg)
+  |     ^^^^^
+
+error: expected declaration (fn, type, enum, let, use, extern)
+ --> tools/materialize_predicate.w:41:1
+41 | if remove_status != 0:
+  | ^^
+error: check failed during compilation

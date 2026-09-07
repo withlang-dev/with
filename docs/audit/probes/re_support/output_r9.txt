@@ -1,0 +1,4 @@
+jitcompile=-45 jitmatch=-45 mdrc=-45
+jitfree-ok=1 jitstack-assign-null=1
+plain rc=1
+ctx-tables-bad=0

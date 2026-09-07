@@ -1,0 +1,4498 @@
+// Mir — Wave 7 MIR data model, builders, and deterministic dump rendering.
+//
+// This module owns the MIR in-memory representation used after semantic
+// analysis. MIR is intentionally explicit and deterministic.
+
+use Ast
+use InternPool
+use Sema
+use std.collections.HashMap
+
+type BlockId = distinct i32
+impl Copy for BlockId
+impl Copy for TermKind
+
+extern fn with_str_clone_ref(s: &str) -> str
+extern fn with_i64_to_str(n: i64) -> str
+extern fn with_getenv_str(name: &str) -> str
+extern fn with_eprint(s: &str) -> Unit
+extern fn str_from_byte(b: i32) -> str
+extern fn with_write(s: &str) -> Unit
+extern fn with_alloc(size: i64) -> *mut u8
+
+fn lbrace -> str:
+    str_from_byte(123)
+
+fn rbrace -> str:
+    str_from_byte(125)
+
+// ── Statement kinds ──────────────────────────────────────────────
+
+enum StmtKind: i32:
+    Assign = 0
+    StorageLive = 1
+    StorageDead = 2
+    Drop = 3
+    Nop = 4
+
+// ── Terminator kinds ─────────────────────────────────────────────
+
+enum TermKind: i32:
+    TK_GOTO = 0
+    TK_RETURN = 1
+    TK_UNREACHABLE = 2
+    TK_SWITCH_INT = 3
+    TK_CALL = 4
+    TK_DROP_AND_GOTO = 5
+    // Temporary terminator used only before generator lowering. Backends must
+    // not receive MIR containing TK_YIELD.
+    TK_YIELD = 6
+
+// ── Rvalue kinds ─────────────────────────────────────────────────
+
+enum RvalueKind: i32:
+    RK_USE = 0
+    RK_BIN_OP = 1
+    RK_UN_OP = 2
+    RK_REF = 3
+    RK_ADDR_OF = 4
+    RK_AGGREGATE = 5
+    RK_DISCRIMINANT = 6
+    RK_CAST = 7
+    RK_LEN = 8
+    RK_ARRAY_FILL = 9
+    RK_STR_CONCAT_N = 10
+    RK_SLICE = 11
+
+// ── Operand kinds ────────────────────────────────────────────────
+
+enum OperandKind: i32:
+    OK_COPY = 0
+    OK_MOVE = 1
+    OK_CONSTANT = 2
+
+// ── Constant kinds ───────────────────────────────────────────────
+
+enum ConstKind: i32:
+    CK_INT = 0
+    CK_BOOL = 1
+    CK_STR = 2
+    CK_UNIT = 3
+    CK_FLOAT = 4
+    CK_ZERO_SIZED = 5
+    CK_FN = 6
+    CK_CLOSURE = 7
+    CK_ASYNC_BLOCK = 8
+    CK_INT_EXACT = 9
+    CK_REGEX_LIT = 10
+    CK_C_STR = 11
+
+// ── Call intrinsic kinds ─────────────────────────────────────────
+// Attached to TermKind.TK_CALL terminators to mark known container/builtin
+// operations. Both LLVM and C backends read these instead of
+// inferring builtin kind from method names at codegen time.
+
+enum MirIntrinsic: i32:
+    NONE
+    VEC_NEW
+    FIXED_STRING_NEW
+    FIXED_STRING_LEN
+    FIXED_STRING_LEN32
+    FIXED_STRING_LEN64
+    FIXED_STRING_CAPACITY
+    FIXED_STRING_IS_EMPTY
+    FIXED_STRING_CLEAR
+    FIXED_STRING_PUSH_BYTE
+    FIXED_STRING_PUSH_STR
+    FIXED_STRING_AS_VIEW
+    FIXED_STRING_EQUALS
+    VEC_PUSH
+    VEC_GET
+    VEC_LEN
+    VEC_IS_EMPTY
+    VEC_SET
+    VEC_REMOVE
+    VEC_CLEAR
+    VEC_POP
+    MAP_NEW
+    MAP_INSERT
+    MAP_GET
+    MAP_CONTAINS
+    MAP_LEN
+    MAP_REMOVE
+    COLLECTION_LITERAL
+    MAP_LITERAL
+    OPT_IS_SOME
+    OPT_UNWRAP
+    OPT_EXPECT
+    STR_LEN
+    STR_BYTE_AT
+    STR_SLICE
+    STR_CONTAINS
+    STR_CONTAINS_CHAR
+    STR_STARTS_WITH
+    STR_ENDS_WITH
+    STR_FIND
+    MAP_CLEAR
+    VECITER_NEXT
+    VEC_ITER
+    OPT_IS_NONE
+    STR_SPLIT
+    STR_TRIM
+    STR_TO_UPPER
+    STR_TO_LOWER
+    STR_REPLACE
+    STR_INDEX_OF
+    MAP_INCREMENT
+    MAP_DECREMENT
+    MAP_UPDATE
+    VEC_MAP
+    VEC_FILTER
+    VEC_FOLD
+    ITER_MAP
+    ITER_FILTER
+    ITER_FILTER_MAP
+    ITER_TAKE
+    ITER_DROP
+    ITER_TAKE_WHILE
+    ITER_DROP_WHILE
+    ITER_ZIP
+    ITER_ENUMERATE
+    ITER_CHAIN
+    ITER_ZIP_WITH
+    ITER_STEP_BY
+    ITER_FLAT_MAP
+    ITER_FOLD
+    ITER_REDUCE
+    ITER_SUM
+    ITER_PRODUCT
+    ITER_MIN
+    ITER_MAX
+    ITER_MIN_BY
+    ITER_MAX_BY
+    ITER_FIND
+    ITER_POSITION
+    ITER_ANY
+    ITER_ALL
+    ITER_NONE
+    ITER_FOR_EACH
+    ITER_COUNT
+    ITER_COLLECT
+    ITER_PARTITION
+    ITER_UNZIP
+    MAPITER_NEXT
+    FILTERITER_NEXT
+    FILTERMAPITER_NEXT
+    TAKEITER_NEXT
+    DROPITER_NEXT
+    TAKEWHILEITER_NEXT
+    DROPWHILEITER_NEXT
+    ZIPITER_NEXT
+    ENUMERATEITER_NEXT
+    CHAINITER_NEXT
+    ZIPWITHITER_NEXT
+    STEPBYITER_NEXT
+    FLATMAPITER_NEXT
+    VEC_CONTAINS
+    STR_REPEAT
+    ARR_LEN
+    GENERIC_CALL
+    VEC_JOIN
+    DYN_VTABLE_CMP
+    DYN_DOWNCAST
+    OPT_FILTER
+    ROTATE_LEFT
+    ROTATE_RIGHT
+    VEC_WITH_CAPACITY
+    FMT_TO_STR
+    FMT_DEBUG_STR
+    FMT_DEBUG
+    FMT_SPEC
+    INT_SWAP_BYTES
+    MAP_KEYS
+    MAP_VALUES
+    MAP_ITEMS
+    POPCOUNT
+    CLZ
+    CTZ
+    BITREVERSE
+    MIN
+    MAX
+    ABS
+    FMA
+    ASM
+    MULTI_INDEX
+    MULTI_INDEX_SET
+    FIBER_SPAWN
+    FIBER_AWAIT
+    FIBER_SELECT
+    FIBER_CANCEL
+    CHAN_CREATE
+    CHAN_SEND
+    CHAN_RECV
+    CHAN_CLOSE
+    ASYNC_BLOCK_SPAWN
+    FIBER_IS_DONE
+    FIBER_IS_CANCELLED
+    FIBER_WAS_CANCELLED_RETURN
+    FIBER_SET_CANCELLED_RETURN
+    FIBER_CLEANUP_AWAIT
+    SCOPE_CREATE
+    SCOPE_AWAIT_ALL
+    SCOPE_DESTROY
+    THREAD_SCOPE_CREATE
+    THREAD_SCOPE_JOIN_ALL
+    THREAD_SCOPE_DESTROY
+    ATOMIC_LOAD
+    ATOMIC_STORE
+    ATOMIC_SWAP
+    ATOMIC_FETCH_ADD
+    ATOMIC_FETCH_SUB
+    ATOMIC_FETCH_AND
+    ATOMIC_FETCH_OR
+    ATOMIC_FETCH_XOR
+    ATOMIC_FETCH_MIN
+    ATOMIC_FETCH_MAX
+    ATOMIC_CAS
+    ATOMIC_CAS_WEAK
+    ATOMIC_FENCE
+    FMT_BUF_NEW
+    FMT_BUF_WRITE_STR
+    FMT_BUF_WRITE_FMT
+    FMT_BUF_FINISH
+    VEC_SLOT
+    VECSLOT_GET
+    VECSLOT_SET
+    VEC_ITER_PLACE
+    VECITERPLACE_NEXT
+    MAP_ENTRY
+    ENTRY_OR_INSERT
+    ENTRY_GET
+    ENTRY_SET
+    VEC_GET_DISJOINT
+    VEC_RANGE
+    SPLIT_AT
+    SPLIT_AT_MUT
+    VECRANGE_GET
+    VECRANGE_SET
+    VECRANGE_LEN
+    VEC_ITER_REF
+    VECITERREF_NEXT
+    VEC_GET_REF
+    DYN_CALL
+    SLOTMAP_NEW
+    SLOTMAP_INSERT
+    SLOTMAP_GET
+    SLOTMAP_SLOT
+    SLOTMAP_REMOVE
+    SLOTMAP_REPLACE
+    SLOTMAP_CONTAINS
+    SLOTMAP_LEN
+    SLOTMAP_GET_DISJOINT
+    SLOTMAPSLOT_GET
+    SLOTMAPSLOT_SET
+    FIBER_SELECT_BIASED
+    FIBER_DETACH
+    FIBER_DETACH_CANCEL
+    VEC_LEN32
+    VEC_LEN64
+    VEC_ULEN32
+    MAP_LEN32
+    MAP_LEN64
+    MAP_ULEN32
+    STR_LEN32
+    STR_LEN64
+    STR_ULEN32
+    ARR_LEN32
+    ARR_LEN64
+    ARR_ULEN32
+    VECRANGE_LEN32
+    VECRANGE_LEN64
+    VECRANGE_ULEN32
+    SLOTMAP_LEN32
+    SLOTMAP_LEN64
+    SLOTMAP_ULEN32
+    FMT_BUF_WRITE_STR_REF
+    STR_CLONE_REF
+
+// Copy: MirIntrinsic is a lightweight integer tag passed by value, stored in
+// Vec/HashMap, and compared throughout MIR lowering and codegen.
+impl Copy for MirIntrinsic
+
+fn mir_len_method_intrinsic(base: MirIntrinsic, method_name: &str) -> MirIntrinsic:
+    if method_name == "len":
+        return base
+    if base == MirIntrinsic.VEC_LEN:
+        if method_name == "len32": return MirIntrinsic.VEC_LEN32
+        if method_name == "len64": return MirIntrinsic.VEC_LEN64
+        if method_name == "ulen32": return MirIntrinsic.VEC_ULEN32
+    if base == MirIntrinsic.MAP_LEN:
+        if method_name == "len32": return MirIntrinsic.MAP_LEN32
+        if method_name == "len64": return MirIntrinsic.MAP_LEN64
+        if method_name == "ulen32": return MirIntrinsic.MAP_ULEN32
+    if base == MirIntrinsic.STR_LEN:
+        if method_name == "len32": return MirIntrinsic.STR_LEN32
+        if method_name == "len64": return MirIntrinsic.STR_LEN64
+        if method_name == "ulen32": return MirIntrinsic.STR_ULEN32
+    if base == MirIntrinsic.ARR_LEN:
+        if method_name == "len32": return MirIntrinsic.ARR_LEN32
+        if method_name == "len64": return MirIntrinsic.ARR_LEN64
+        if method_name == "ulen32": return MirIntrinsic.ARR_ULEN32
+    if base == MirIntrinsic.VECRANGE_LEN:
+        if method_name == "len32": return MirIntrinsic.VECRANGE_LEN32
+        if method_name == "len64": return MirIntrinsic.VECRANGE_LEN64
+        if method_name == "ulen32": return MirIntrinsic.VECRANGE_ULEN32
+    if base == MirIntrinsic.SLOTMAP_LEN:
+        if method_name == "len32": return MirIntrinsic.SLOTMAP_LEN32
+        if method_name == "len64": return MirIntrinsic.SLOTMAP_LEN64
+        if method_name == "ulen32": return MirIntrinsic.SLOTMAP_ULEN32
+    MirIntrinsic.NONE
+
+fn mir_intrinsic_is_len32(intrinsic: MirIntrinsic) -> bool:
+    intrinsic == MirIntrinsic.VEC_LEN32 or intrinsic == MirIntrinsic.MAP_LEN32 or intrinsic == MirIntrinsic.STR_LEN32 or intrinsic == MirIntrinsic.ARR_LEN32 or intrinsic == MirIntrinsic.VECRANGE_LEN32 or intrinsic == MirIntrinsic.SLOTMAP_LEN32
+
+fn mir_intrinsic_is_len64(intrinsic: MirIntrinsic) -> bool:
+    intrinsic == MirIntrinsic.VEC_LEN64 or intrinsic == MirIntrinsic.MAP_LEN64 or intrinsic == MirIntrinsic.STR_LEN64 or intrinsic == MirIntrinsic.ARR_LEN64 or intrinsic == MirIntrinsic.VECRANGE_LEN64 or intrinsic == MirIntrinsic.SLOTMAP_LEN64
+
+fn mir_intrinsic_is_ulen32(intrinsic: MirIntrinsic) -> bool:
+    intrinsic == MirIntrinsic.VEC_ULEN32 or intrinsic == MirIntrinsic.MAP_ULEN32 or intrinsic == MirIntrinsic.STR_ULEN32 or intrinsic == MirIntrinsic.ARR_ULEN32 or intrinsic == MirIntrinsic.VECRANGE_ULEN32 or intrinsic == MirIntrinsic.SLOTMAP_ULEN32
+
+// ── Projection kinds ─────────────────────────────────────────────
+
+enum ProjKind: i32:
+    PK_FIELD = 0
+    PK_INDEX = 1
+    PK_DEREF = 2
+    PK_DOWNCAST = 3
+    PK_TUPLE_INDEX = 4
+
+// ── Drop kind tags for scope scheduling ──────────────────────────
+
+enum DropKind: i32:
+    DK_VALUE = 0
+    DK_STORAGE = 1
+    DK_TASK_DETACHED = 2
+    DK_TASK_EPHEMERAL = 3
+    DK_WITH_GUARD = 4
+    DK_WITH_GUARD_MUT = 5
+    DK_ASYNC_SCOPE = 6
+    DK_THREAD_SCOPE = 7
+
+// Copy: DropKind is a lightweight integer tag passed by value.
+impl Copy for DropKind
+
+// ── Data records ─────────────────────────────────────────────────
+
+type MirLocalInfo {
+    type_id: i32,
+    is_mutable: i32,
+    name_sym: i32,
+    is_user_var: i32,
+}
+
+type MirBody {
+    fn_sym: i32,
+    lowering_failed: i32,
+
+    // Locals
+    local_type_ids: Vec[i32],
+    local_mutables: Vec[i32],
+    local_names: Vec[i32],
+    local_is_user_var: Vec[i32],
+    n_params: i32,
+    // Blocks ending in mutual tail calls (marked by mutual TCO pass).
+    mutual_tail_bbs: Vec[i32],
+
+    // Basic blocks
+    bb_stmt_starts: Vec[i32],
+    bb_stmt_counts: Vec[i32],
+    bb_term_kinds: Vec[i32],
+    bb_term_d0: Vec[i32],
+    bb_term_d1: Vec[i32],
+    bb_term_d2: Vec[i32],
+    bb_term_d3: Vec[i32],
+    bb_is_cleanup: Vec[i32],
+    bb_term_spans: Vec[i32],
+    bb_no_suspend_nodes: Vec[i32],
+
+    // Statements
+    stmt_kinds: Vec[i32],
+    stmt_d0: Vec[i32],
+    stmt_d1: Vec[i32],
+    stmt_spans: Vec[i32],
+
+    // Places
+    place_locals: Vec[i32],
+    place_sema_types: Vec[i32],
+    place_proj_starts: Vec[i32],
+    place_proj_counts: Vec[i32],
+    proj_kinds: Vec[i32],
+    proj_d0: Vec[i32],
+
+    // Rvalues
+    rval_kinds: Vec[i32],
+    rval_d0: Vec[i32],
+    rval_d1: Vec[i32],
+    rval_d2: Vec[i32],
+
+    // Operands
+    operand_kinds: Vec[i32],
+    operand_d0: Vec[i32],
+
+    // Constants
+    const_kinds: Vec[i32],
+    const_d0: Vec[i32],
+    const_d1: Vec[i32],
+    const_d2: Vec[i32],
+    const_types: Vec[i32],
+
+    // Switch tables
+    switch_table_starts: Vec[i32],
+    switch_table_counts: Vec[i32],
+    switch_table_vals: Vec[i32],
+    switch_table_targets: Vec[i32],
+
+    // Aggregate field tables
+    agg_field_starts: Vec[i32],
+    agg_field_counts: Vec[i32],
+    agg_field_operands: Vec[i32],
+    agg_field_name_syms: Vec[i32],
+
+    // Call argument tables
+    call_arg_starts: Vec[i32],
+    call_arg_counts: Vec[i32],
+    call_arg_operands: Vec[i32],
+
+    // Call intrinsic markers (parallel to call_arg_starts)
+    call_intrinsic_kinds: Vec[MirIntrinsic],
+    // AST call node for generic calls (parallel to call_arg_starts, 0 if N/A)
+    call_ast_nodes: Vec[i32],
+    // Concrete semantic contract captured at lowering time. AST call nodes are
+    // shared by every generic specialization and their Sema sidecars are
+    // overwritten; MIR must retain its own specialization-specific values.
+    call_sig_indices: Vec[i32],
+    call_mono_syms: Vec[i32],
+    // User-defined generic calls must carry the concrete contract above.
+    // Builtin generic dispatch shares MirIntrinsic.GENERIC_CALL but does not.
+    call_contract_required: Vec[i32],
+    // D21: for a Unit-returning `mut self` pipeline stage, the exact receiver
+    // place carried after this call. -1 for ordinary return-value calls.
+    call_pipeline_receiver_places: Vec[i32],
+
+    // Stage 4 (spec §2.5.2): locals that are ever moved — and therefore
+    // reset-on-move (§2.5.1) — recorded at the single pending_reset_locals.push
+    // site during lowering. A drop of a local NOT in this set can never observe
+    // the reset sentinel, so codegen elides its null guard and emits an
+    // unconditional drop (the zero-cost common case).
+    ever_moved_locals: Vec[i32],
+}
+
+type MirModule {
+    bodies: Vec[MirBody],
+    body_fn_syms: Vec[i32],
+    body_index_by_fn_sym: HashMap[i32, i32],
+    // Snapshot of sema type tables at lowering time.
+    // MirLower takes sema by value; its Vec reallocs can free
+    // the shared buffer that the caller's sema copy points to.
+    // Codegen reads these instead of sema.type_kinds/d0/d1.
+    sema_type_kinds: Vec[i32],
+    sema_type_d0: Vec[i32],
+    sema_type_d1: Vec[i32],
+    sema_type_d2: Vec[i32],
+    sema_type_extra: Vec[i32],
+    sema_bitpacked_types: HashMap[i32, i32],
+    sema_disc_repr_types: HashMap[i32, i32],
+    sema_distinct_type_names: HashMap[i32, i32],
+    // std Box's name sym when the std-box module verdict holds (else 0) —
+    // lets the typed validator mirror sema's Box[Concrete] -> Box[dyn Trait]
+    // coercion arm exactly instead of approximating it.
+    sema_box_sym: i32,
+    sema_option_sym: i32,
+}
+
+// ── MirModule helpers ────────────────────────────────────────────
+
+fn MirModule.init -> MirModule:
+    MirModule {
+        bodies: Vec.new(),
+        body_fn_syms: Vec.new(),
+        body_index_by_fn_sym: HashMap.new(),
+        sema_type_kinds: Vec.new(),
+        sema_type_d0: Vec.new(),
+        sema_type_d1: Vec.new(),
+        sema_type_d2: Vec.new(),
+        sema_type_extra: Vec.new(),
+        sema_bitpacked_types: HashMap.new(),
+        sema_disc_repr_types: HashMap.new(),
+        sema_distinct_type_names: HashMap.new(),
+        sema_box_sym: 0,
+        sema_option_sym: 0,
+    }
+
+impl MirModule:
+    mut fn snapshot_sema_types(sema: &Sema):
+        for i in 0..sema.type_kinds.len() as i32:
+            self.sema_type_kinds.push(sema.type_kinds.get(i as i64))
+        for i in 0..sema.type_d0.len() as i32:
+            self.sema_type_d0.push(sema.type_d0.get(i as i64))
+        for i in 0..sema.type_d1.len() as i32:
+            self.sema_type_d1.push(sema.type_d1.get(i as i64))
+        for i in 0..sema.type_d2.len() as i32:
+            self.sema_type_d2.push(sema.type_d2.get(i as i64))
+        for i in 0..sema.type_extra.len() as i32:
+            self.sema_type_extra.push(sema.type_extra.get(i as i64))
+        // Deep-copy like the type-table Vecs above: assigning the handle would
+        // leave sema and this module as two owners of one map, and both drop.
+        let bitpacked_tids = sema.bitpacked_types.keys()
+        for i in 0..bitpacked_tids.len() as i32:
+            let tid = bitpacked_tids.get(i as i64)
+            self.sema_bitpacked_types.insert(tid, sema.bitpacked_types.get(tid).unwrap())
+        let disc_repr_tids = sema.disc_repr_types.keys()
+        for i in 0..disc_repr_tids.len() as i32:
+            let tid = disc_repr_tids.get(i as i64)
+            self.sema_disc_repr_types.insert(tid, sema.disc_repr_types.get(tid).unwrap())
+        let distinct_type_syms = sema.distinct_type_names.keys()
+        for i in 0..distinct_type_syms.len() as i32:
+            let sym = distinct_type_syms.get(i as i64)
+            self.sema_distinct_type_names.insert(sym, sema.distinct_type_names.get(sym).unwrap())
+        if sema.type_symbol_is_std_box(sema.syms.box) != 0:
+            self.sema_box_sym = sema.syms.box
+            self.sema_option_sym = sema.syms.option
+
+    fn mir_is_bitpacked(tid: i32) -> bool:
+        self.sema_bitpacked_types.contains(tid)
+
+    fn mir_get_type_kind(tid: i32) -> i32:
+        if tid < 0 or tid >= self.sema_type_kinds.len() as i32:
+            return 0
+        self.sema_type_kinds.get(tid as i64)
+
+    fn mir_get_type_d0(tid: i32) -> i32:
+        if tid < 0 or tid >= self.sema_type_d0.len() as i32:
+            return 0
+        self.sema_type_d0.get(tid as i64)
+
+    fn mir_get_type_d1(tid: i32) -> i32:
+        if tid < 0 or tid >= self.sema_type_d1.len() as i32:
+            return 0
+        self.sema_type_d1.get(tid as i64)
+
+    fn mir_get_type_d2(tid: i32) -> i32:
+        if tid < 0 or tid >= self.sema_type_d2.len() as i32:
+            return 0
+        self.sema_type_d2.get(tid as i64)
+
+    fn mir_get_type_extra(idx: i32) -> i32:
+        if idx < 0 or idx >= self.sema_type_extra.len() as i32:
+            return 0
+        self.sema_type_extra.get(idx as i64)
+
+    fn mir_resolve_alias(tid: i32) -> i32:
+        var cur = tid
+        var depth = 0
+        while depth < 20:
+            let k = self.mir_get_type_kind(cur)
+            if k != TypeKind.TY_ALIAS:
+                return cur
+            let target = self.mir_get_type_d0(cur)
+            if target <= 0 or target == cur:
+                return cur
+            cur = target
+            depth = depth + 1
+        cur
+
+    fn mir_get_type_name(tid: i32) -> i32:
+        let resolved = self.mir_resolve_alias(tid)
+        let tk = self.mir_get_type_kind(resolved)
+        if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF:
+            return self.mir_get_type_name(self.mir_get_type_d0(resolved))
+        if tk == TypeKind.TY_STRUCT or tk == TypeKind.TY_ENUM or tk == TypeKind.TY_GENERIC_INST:
+            return self.mir_get_type_d0(resolved)
+        0
+
+    // No-op: reserved for future manual memory management.
+    mut fn deinit():
+        return
+
+    mut fn add_body(body: MirBody):
+        let body_idx = self.bodies.len() as i32
+        let fn_sym = body.fn_sym
+        self.bodies.push(move body)
+        self.body_fn_syms.push(fn_sym)
+        if fn_sym != 0:
+            self.body_index_by_fn_sym.insert(fn_sym, body_idx)
+
+    fn body_count() -> i32:
+        self.bodies.len() as i32
+
+    fn find_body(fn_sym: i32) -> i32:
+        if fn_sym == 0:
+            return -1
+        let body_idx = self.body_index_by_fn_sym.get(fn_sym)
+        if body_idx.is_some():
+            return body_idx.unwrap()
+        -1
+
+// ── MirBody builders ─────────────────────────────────────────────
+
+fn MirBody.init_for_fn(fn_sym: i32) -> MirBody:
+    var body = MirBody {
+        fn_sym,
+        lowering_failed: 0,
+        local_type_ids: Vec.new(),
+        local_mutables: Vec.new(),
+        local_names: Vec.new(),
+        local_is_user_var: Vec.new(),
+        n_params: 0,
+        mutual_tail_bbs: Vec.new(),
+        bb_stmt_starts: Vec.new(),
+        bb_stmt_counts: Vec.new(),
+        bb_term_kinds: Vec.new(),
+        bb_term_d0: Vec.new(),
+        bb_term_d1: Vec.new(),
+        bb_term_d2: Vec.new(),
+        bb_term_d3: Vec.new(),
+        bb_is_cleanup: Vec.new(),
+        bb_term_spans: Vec.new(),
+        bb_no_suspend_nodes: Vec.new(),
+        stmt_kinds: Vec.new(),
+        stmt_d0: Vec.new(),
+        stmt_d1: Vec.new(),
+        stmt_spans: Vec.new(),
+        place_locals: Vec.new(),
+        place_sema_types: Vec.new(),
+        place_proj_starts: Vec.new(),
+        place_proj_counts: Vec.new(),
+        proj_kinds: Vec.new(),
+        proj_d0: Vec.new(),
+        rval_kinds: Vec.new(),
+        rval_d0: Vec.new(),
+        rval_d1: Vec.new(),
+        rval_d2: Vec.new(),
+        operand_kinds: Vec.new(),
+        operand_d0: Vec.new(),
+        const_kinds: Vec.new(),
+        const_d0: Vec.new(),
+        const_d1: Vec.new(),
+        const_d2: Vec.new(),
+        const_types: Vec.new(),
+        switch_table_starts: Vec.new(),
+        switch_table_counts: Vec.new(),
+        switch_table_vals: Vec.new(),
+        switch_table_targets: Vec.new(),
+        agg_field_starts: Vec.new(),
+        agg_field_counts: Vec.new(),
+        agg_field_operands: Vec.new(),
+        agg_field_name_syms: Vec.new(),
+        call_arg_starts: Vec.new(),
+        call_arg_counts: Vec.new(),
+        call_arg_operands: Vec.new(),
+        call_intrinsic_kinds: Vec.new(),
+        call_ast_nodes: Vec.new(),
+        call_sig_indices: Vec.new(),
+        call_mono_syms: Vec.new(),
+        call_contract_required: Vec.new(),
+        call_pipeline_receiver_places: Vec.new(),
+        ever_moved_locals: Vec.new(),
+    }
+
+    // Local 0 is always the return place.
+    body.new_local(0, 1, 0, 0)
+    body
+
+// Stage 4 (spec §2.5.2): record/query whether a local is ever moved (and thus
+// reset-on-move). Recorded at the single pending_reset_locals.push site during
+// lowering; read by codegen to decide whether a drop needs its null guard.
+impl MirBody:
+    mut fn mark_local_ever_moved(local_id: i32) -> Unit:
+        var i = 0
+        while i < self.ever_moved_locals.len() as i32:
+            if self.ever_moved_locals.get(i as i64) == local_id:
+                return
+            i = i + 1
+        self.ever_moved_locals.push(local_id)
+
+    fn local_ever_moved(local_id: i32) -> bool:
+        var i = 0
+        while i < self.ever_moved_locals.len() as i32:
+            if self.ever_moved_locals.get(i as i64) == local_id:
+                return true
+            i = i + 1
+        false
+
+fn MirBody.init(fn_sym: i32, sema: &Sema) -> MirBody:
+    var body = MirBody.init_for_fn(fn_sym)
+    if sema.ty_void != 0:
+        body.local_type_ids.set_i32(0, sema.ty_void)
+    body
+
+impl MirBody:
+    mut fn new_block() -> BlockId:
+        let id = self.bb_stmt_starts.len() as i32
+        self.bb_stmt_starts.push(self.stmt_kinds.len() as i32)
+        self.bb_stmt_counts.push(0)
+        self.bb_term_kinds.push(TermKind.TK_UNREACHABLE)
+        self.bb_term_d0.push(0)
+        self.bb_term_d1.push(0)
+        self.bb_term_d2.push(0)
+        self.bb_term_d3.push(0)
+        self.bb_is_cleanup.push(0)
+        self.bb_term_spans.push(0)
+        self.bb_no_suspend_nodes.push(0)
+        BlockId(id)
+
+    mut fn push_stmt(bb: i32, kind: i32, d0: i32, d1: i32, span: i32):
+        let stmt_id = self.stmt_kinds.len() as i32
+        self.stmt_kinds.push(kind)
+        self.stmt_d0.push(d0)
+        self.stmt_d1.push(d1)
+        self.stmt_spans.push(span)
+
+        if bb >= 0 and bb < self.bb_stmt_counts.len() as i32:
+            let old_count: i32 = self.bb_stmt_counts.get(bb as i64)
+            if old_count == 0:
+                self.bb_stmt_starts.set_i32(bb, stmt_id)
+            self.bb_stmt_counts.set_i32(bb, old_count + 1)
+
+    mut fn set_terminator(bb: i32, kind: i32, d0: i32, d1: i32, d2: i32, d3: i32, span: i32):
+        if bb < 0 or bb >= self.bb_term_kinds.len() as i32:
+            return
+        self.bb_term_kinds.set_i32(bb, kind)
+        self.bb_term_d0.set_i32(bb, d0)
+        self.bb_term_d1.set_i32(bb, d1)
+        self.bb_term_d2.set_i32(bb, d2)
+        self.bb_term_d3.set_i32(bb, d3)
+        self.bb_term_spans.set_i32(bb, span)
+
+    mut fn set_term_no_suspend_node(bb: i32, node: i32):
+        if bb < 0 or bb >= self.bb_no_suspend_nodes.len() as i32:
+            return
+        self.bb_no_suspend_nodes.set_i32(bb, node)
+
+    mut fn new_local(type_id: i32, mutable: i32, name: i32, is_user_var: i32) -> i32:
+        let id = self.local_type_ids.len() as i32
+        self.local_type_ids.push(type_id)
+        self.local_mutables.push(mutable)
+        self.local_names.push(name)
+        self.local_is_user_var.push(is_user_var)
+        id
+
+    mut fn new_temp(type_id: i32) -> i32:
+        self.new_local(type_id, 1, 0, 0)
+
+    mut fn new_place(local_id: i32) -> i32:
+        let id = self.place_locals.len() as i32
+        self.place_locals.push(local_id)
+        // Sema type defaults to the local's type (overridden by projected places)
+        let sema_ty = if local_id >= 0 and local_id < self.local_type_ids.len() as i32: self.local_type_ids.get(local_id as i64) else: 0
+        self.place_sema_types.push(sema_ty)
+        self.place_proj_starts.push(self.proj_kinds.len() as i32)
+        self.place_proj_counts.push(0)
+        id
+
+    mut fn new_place_typed(local_id: i32, sema_ty: i32) -> i32:
+        let id = self.place_locals.len() as i32
+        self.place_locals.push(local_id)
+        self.place_sema_types.push(sema_ty)
+        self.place_proj_starts.push(self.proj_kinds.len() as i32)
+        self.place_proj_counts.push(0)
+        id
+
+    mut fn new_place_with_projection(base: i32, proj_kind: i32, proj_data: i32, sema_ty: i32) -> i32:
+        if base < 0 or base >= self.place_locals.len() as i32:
+            return self.new_place(0)
+
+        let base_local = self.place_locals.get(base as i64)
+        let base_proj_start: i32 = self.place_proj_starts.get(base as i64)
+        let base_proj_count = self.place_proj_counts.get(base as i64)
+
+        let new_proj_start = self.proj_kinds.len() as i32
+        for i in 0..base_proj_count:
+            self.proj_kinds.push(self.proj_kinds.get((base_proj_start + i) as i64))
+            self.proj_d0.push(self.proj_d0.get((base_proj_start + i) as i64))
+
+        self.proj_kinds.push(proj_kind)
+        self.proj_d0.push(proj_data)
+
+        let id = self.place_locals.len() as i32
+        self.place_locals.push(base_local)
+        self.place_sema_types.push(sema_ty)
+        self.place_proj_starts.push(new_proj_start)
+        self.place_proj_counts.push(base_proj_count + 1)
+        id
+
+    mut fn new_field_place(base: i32, field_idx: i32, sema_ty: i32) -> i32:
+        self.new_place_with_projection(base, ProjKind.PK_FIELD, field_idx, sema_ty)
+
+    mut fn new_tuple_index_place(base: i32, elem_idx: i32, sema_ty: i32) -> i32:
+        self.new_place_with_projection(base, ProjKind.PK_TUPLE_INDEX, elem_idx, sema_ty)
+
+    mut fn new_index_place(base: i32, idx_local: i32, sema_ty: i32) -> i32:
+        self.new_place_with_projection(base, ProjKind.PK_INDEX, idx_local, sema_ty)
+
+    mut fn new_deref_place(base: i32, sema_ty: i32): self.new_place_with_projection(base, ProjKind.PK_DEREF, 0, sema_ty)
+
+    mut fn new_downcast_place(base: i32, variant_idx: i32, sema_ty: i32) -> i32:
+        self.new_place_with_projection(base, ProjKind.PK_DOWNCAST, variant_idx, sema_ty)
+
+    mut fn new_rvalue(kind: i32, d0: i32, d1: i32, d2: i32) -> i32:
+        let id = self.rval_kinds.len() as i32
+        self.rval_kinds.push(kind)
+        self.rval_d0.push(d0)
+        self.rval_d1.push(d1)
+        self.rval_d2.push(d2)
+        id
+
+    mut fn new_operand(kind: i32, d0: i32) -> i32:
+        let id = self.operand_kinds.len() as i32
+        if kind == 1 and with_getenv_str("WITH_TRACE_RESETS").len() > 0:
+            with_eprint(f"[new-move-op] id={id} place={d0}")
+        self.operand_kinds.push(kind)
+        self.operand_d0.push(d0)
+        id
+
+    mut fn new_const(kind: i32, d0: i32, d1: i32, d2: i32, type_id: i32) -> i32:
+        let id = self.const_kinds.len() as i32
+        self.const_kinds.push(kind)
+        self.const_d0.push(d0)
+        self.const_d1.push(d1)
+        self.const_d2.push(d2)
+        self.const_types.push(type_id)
+        id
+
+fn mir_const_int_value(body: &MirBody, const_id: i32) -> i64:
+    ast_int_from_parts(
+        body.const_d0.get(const_id as i64),
+        body.const_d1.get(const_id as i64),
+        body.const_d2.get(const_id as i64),
+    )
+
+impl MirBody:
+    mut fn new_switch_table(vals: &Vec[i32], targets: &Vec[i32]) -> i32:
+        let id = self.switch_table_starts.len() as i32
+        let start = self.switch_table_vals.len() as i32
+        let count = vals.len() as i32
+        self.switch_table_starts.push(start)
+        self.switch_table_counts.push(count)
+
+        for i in 0..count:
+            self.switch_table_vals.push(vals.get(i as i64))
+            if i < targets.len() as i32:
+                self.switch_table_targets.push(targets.get(i as i64))
+            else:
+                self.switch_table_targets.push(0)
+
+        id
+
+    mut fn new_agg_fields(operands: &Vec[i32], name_syms: &Vec[i32]) -> i32:
+        let id = self.agg_field_starts.len() as i32
+        let start = self.agg_field_operands.len() as i32
+        let count = operands.len() as i32
+        self.agg_field_starts.push(start)
+        self.agg_field_counts.push(count)
+        for i in 0..count:
+            self.agg_field_operands.push(operands.get(i as i64))
+            self.agg_field_name_syms.push(name_syms.get(i as i64))
+        id
+
+    mut fn new_call_args(operands: &Vec[i32]) -> i32:
+        if with_getenv_str("WITH_TRACE_RESETS").len() > 0:
+            for __i in 0..operands.len() as i32:
+                let __op = operands.get(__i as i64)
+                with_eprint(f"[call-arg] op={__op} kind={self.operand_kinds.get(__op as i64)} place={self.operand_d0.get(__op as i64)}")
+        let id = self.call_arg_starts.len() as i32
+        let start = self.call_arg_operands.len() as i32
+        let count = operands.len() as i32
+        self.call_arg_starts.push(start)
+        self.call_arg_counts.push(count)
+        self.call_intrinsic_kinds.push(MirIntrinsic.NONE)
+        self.call_ast_nodes.push(0)
+        self.call_sig_indices.push(-1)
+        self.call_mono_syms.push(0)
+        self.call_contract_required.push(0)
+        self.call_pipeline_receiver_places.push(-1)
+        for i in 0..count:
+            self.call_arg_operands.push(operands.get(i as i64))
+        id
+
+    mut fn set_call_intrinsic(call_id: i32, kind: MirIntrinsic):
+        if call_id >= 0 and call_id < self.call_intrinsic_kinds.len() as i32:
+            let call_idx = call_id as i64
+            with self.call_intrinsic_kinds.slot(call_idx) as mut slot:
+                slot.set(kind)
+
+    fn call_intrinsic(call_id: i32) -> MirIntrinsic:
+        if call_id < 0 or call_id >= self.call_intrinsic_kinds.len() as i32:
+            return MirIntrinsic.NONE
+        self.call_intrinsic_kinds.get(call_id as i64)
+
+    mut fn set_call_ast_node(call_id: i32, node: i32):
+        if call_id >= 0 and call_id < self.call_ast_nodes.len() as i32:
+            self.call_ast_nodes.set_i32(call_id, node)
+
+    fn call_ast_node(call_id: i32) -> i32:
+        if call_id < 0 or call_id >= self.call_ast_nodes.len() as i32:
+            return 0
+        self.call_ast_nodes.get(call_id as i64)
+
+    mut fn set_call_contract(call_id: i32, sig_idx: i32, mono_sym: i32):
+        if call_id < 0 or call_id >= self.call_sig_indices.len() as i32:
+            return
+        self.call_sig_indices.set_i32(call_id, sig_idx)
+        self.call_mono_syms.set_i32(call_id, mono_sym)
+
+    mut fn require_call_contract(call_id: i32):
+        if call_id < 0 or call_id >= self.call_contract_required.len() as i32:
+            return
+        self.call_contract_required.set_i32(call_id, 1)
+
+    fn call_requires_contract(call_id: i32) -> bool:
+        if call_id < 0 or call_id >= self.call_contract_required.len() as i32:
+            return false
+        self.call_contract_required.get(call_id as i64) != 0
+
+    mut fn set_call_pipeline_receiver_place(call_id: i32, place_id: i32):
+        if call_id < 0 or call_id >= self.call_pipeline_receiver_places.len() as i32:
+            return
+        self.call_pipeline_receiver_places.set_i32(call_id, place_id)
+
+    fn call_pipeline_receiver_place(call_id: i32) -> i32:
+        if call_id < 0 or call_id >= self.call_pipeline_receiver_places.len() as i32:
+            return -1
+        self.call_pipeline_receiver_places.get(call_id as i64)
+
+    fn call_sig_index(call_id: i32) -> i32:
+        if call_id < 0 or call_id >= self.call_sig_indices.len() as i32:
+            return -1
+        self.call_sig_indices.get(call_id as i64)
+
+    fn call_mono_sym(call_id: i32) -> i32:
+        if call_id < 0 or call_id >= self.call_mono_syms.len() as i32:
+            return 0
+        self.call_mono_syms.get(call_id as i64)
+
+    // ── Query helpers ────────────────────────────────────────────────
+
+    fn local_count() -> i32:
+        self.local_type_ids.len() as i32
+
+    fn block_count() -> i32:
+        self.bb_stmt_starts.len() as i32
+
+    fn stmt_count() -> i32:
+        self.stmt_kinds.len() as i32
+
+    fn get_local(idx: i32) -> MirLocalInfo:
+        if idx < 0 or idx >= self.local_type_ids.len() as i32:
+            return MirLocalInfo { type_id: 0, is_mutable: 0, name_sym: 0, is_user_var: 0 }
+        MirLocalInfo {
+            type_id: self.local_type_ids.get(idx as i64),
+            is_mutable: self.local_mutables.get(idx as i64),
+            name_sym: self.local_names.get(idx as i64),
+            is_user_var: self.local_is_user_var.get(idx as i64),
+        }
+
+    fn stmt_kind(idx: i32) -> i32:
+        if idx < 0 or idx >= self.stmt_kinds.len() as i32:
+            return StmtKind.Nop
+        self.stmt_kinds.get(idx as i64)
+
+    fn stmt_data0(idx: i32) -> i32:
+        if idx < 0 or idx >= self.stmt_d0.len() as i32:
+            return 0
+        self.stmt_d0.get(idx as i64)
+
+    fn stmt_data1(idx: i32) -> i32:
+        if idx < 0 or idx >= self.stmt_d1.len() as i32:
+            return 0
+        self.stmt_d1.get(idx as i64)
+
+    fn term_kind(bb: i32) -> i32:
+        if bb < 0 or bb >= self.bb_term_kinds.len() as i32:
+            return TermKind.TK_UNREACHABLE
+        self.bb_term_kinds.get(bb as i64)
+
+    fn term_data0(bb: i32) -> i32:
+        if bb < 0 or bb >= self.bb_term_d0.len() as i32:
+            return 0
+        self.bb_term_d0.get(bb as i64)
+
+    fn term_data1(bb: i32) -> i32:
+        if bb < 0 or bb >= self.bb_term_d1.len() as i32:
+            return 0
+        self.bb_term_d1.get(bb as i64)
+
+    fn term_data2(bb: i32) -> i32:
+        if bb < 0 or bb >= self.bb_term_d2.len() as i32:
+            return 0
+        self.bb_term_d2.get(bb as i64)
+
+    fn term_data3(bb: i32) -> i32:
+        if bb < 0 or bb >= self.bb_term_d3.len() as i32:
+            return 0
+        self.bb_term_d3.get(bb as i64)
+
+    fn term_no_suspend_node(bb: i32) -> i32:
+        if bb < 0 or bb >= self.bb_no_suspend_nodes.len() as i32:
+            return 0
+        self.bb_no_suspend_nodes.get(bb as i64)
+
+// ── Deterministic dump rendering ─────────────────────────────────
+
+fn dump_mir_module(mir_mod: &MirModule, pool: &InternPool, sema: &Sema) -> str:
+    var out = ""
+    out = out ++ f"mir module functions={mir_mod.bodies.len() as i32}\n"
+    for i in 0..mir_mod.bodies.len() as i32:
+        if i > 0:
+            out = out ++ "\n"
+        let body = &mir_mod.bodies[i as i64]
+        out = out ++ dump_mir_body(body, pool, sema)
+    out
+
+// Streaming variant of dump_mir_module to avoid quadratic whole-module
+// concatenation when dumping large MIR corpora.
+fn print_mir_module(mir_mod: &MirModule, pool: &InternPool, sema: &Sema):
+    with_write(f"mir module functions={mir_mod.bodies.len() as i32}\n")
+    for i in 0..mir_mod.bodies.len() as i32:
+        if i > 0:
+            with_write("\n")
+        let body = &mir_mod.bodies[i as i64]
+        with_write(dump_mir_body(body, pool, sema))
+
+fn mir_clip_text(s: &str, max_len: i32) -> str:
+    if max_len <= 0:
+        return ""
+    if s.len() as i32 <= max_len:
+        return with_str_clone_ref(s)
+    if max_len <= 3:
+        return s.slice(0, max_len as i64)
+    s.slice(0, (max_len - 3) as i64) ++ "..."
+
+pub fn dump_mir_body(body: &MirBody, pool: &InternPool, sema: &Sema) -> str:
+    var out = ""
+    let fn_name = if body.fn_sym != 0:
+        f"sym{body.fn_sym}({pool.resolve(body.fn_sym)})"
+    else:
+        "<anon>"
+    out = out ++ "fn " ++ fn_name ++ " " ++ lbrace() ++ "\n"
+    out = out ++ "  locals:\n"
+
+    let local_total = body.local_type_ids.len() as i32
+    let bb_total = body.bb_stmt_starts.len() as i32
+    let stmt_total = body.stmt_kinds.len() as i32
+    if local_total > 50000 or bb_total > 20000 or stmt_total > 500000:
+        out = out ++ f"    <mir dump omitted: body too large locals={local_total} bbs={bb_total} stmts={stmt_total}>\n"
+        out = out ++ rbrace() ++ "\n"
+        return out
+
+    var local_count = local_total
+    if local_count > 1024:
+        local_count = 1024
+    for li in 0..local_count:
+        let tid = body.local_type_ids.get(li as i64)
+        let ty_name = if tid != 0: f"ty{tid}" else: "<inferred>"
+        var line = f"    _{li}: " ++ ty_name
+        if li == 0:
+            line = line ++ "  // return"
+        let name_sym = body.local_names.get(li as i64)
+        if body.local_is_user_var.get(li as i64) != 0 and name_sym != 0:
+            line = line ++ f"  // sym{name_sym}"
+        if body.local_mutables.get(li as i64) != 0:
+            line = line ++ " [mut]"
+        out = out ++ line ++ "\n"
+    if local_total > local_count:
+        out = out ++ f"    ... locals truncated ({local_total - local_count} more)\n"
+
+    var bb_count = bb_total
+    if bb_count > 512:
+        bb_count = 512
+    for bb in 0..bb_count:
+        out = out ++ "\n"
+        out = out ++ f"  bb{bb}: " ++ lbrace() ++ "\n"
+
+        let stmt_start = body.bb_stmt_starts.get(bb as i64)
+        let raw_stmt_count = body.bb_stmt_counts.get(bb as i64)
+        var stmt_count: i32 = raw_stmt_count
+        if stmt_start < 0 or raw_stmt_count < 0 or stmt_start > stmt_total:
+            out = out ++ "    <invalid statement span>\n"
+            stmt_count = 0
+        else if stmt_start + raw_stmt_count > stmt_total:
+            stmt_count = stmt_total - stmt_start
+            out = out ++ "    <statement span truncated>\n"
+        if stmt_count > 2048:
+            stmt_count = 2048
+            out = out ++ "    <statement dump capped>\n"
+        for si in 0..stmt_count:
+            let stmt_id = stmt_start + si
+            out = out ++ "    " ++ mir_stmt_text(body, stmt_id, pool, sema) ++ "\n"
+
+        out = out ++ "    " ++ mir_term_text(body, bb, pool, sema) ++ "\n"
+        out = out ++ "  " ++ rbrace() ++ "\n"
+    if bb_total > bb_count:
+        out = out ++ f"\n  ... blocks truncated ({bb_total - bb_count} more)\n"
+
+    out = out ++ rbrace() ++ "\n"
+    out
+
+fn mir_stmt_text(body: &MirBody, stmt_id: i32, pool: &InternPool, sema: &Sema) -> str:
+    let kind = body.stmt_kind(stmt_id)
+    let d0 = body.stmt_data0(stmt_id)
+    let d1 = body.stmt_data1(stmt_id)
+
+    if kind == StmtKind.Assign:
+        return mir_place_text_named(body, d0, pool, sema) ++ " = " ++ mir_rvalue_text(body, d1, pool, sema) ++ ";"
+    if kind == StmtKind.StorageLive:
+        return f"StorageLive(_{d0});"
+    if kind == StmtKind.StorageDead:
+        return f"StorageDead(_{d0});"
+    if kind == StmtKind.Drop:
+        if d1 != 0:
+            return "drop(" ++ mir_place_text_named(body, d0, pool, sema) ++ ") @ " ++ pool.resolve(d1) ++ ";"
+        return "drop(" ++ mir_place_text_named(body, d0, pool, sema) ++ ");"
+    if kind == StmtKind.Nop:
+        return "nop;"
+
+    f"stmt<{kind}>({d0}, {d1});"
+
+fn mir_term_text(body: &MirBody, bb: i32, pool: &InternPool, sema: &Sema) -> str:
+    let kind = body.term_kind(bb)
+    let d0 = body.term_data0(bb)
+    let d1 = body.term_data1(bb)
+    let d2 = body.term_data2(bb)
+    let d3 = body.term_data3(bb)
+
+    if kind == TermKind.TK_GOTO:
+        return f"goto -> bb{d0};"
+
+    if kind == TermKind.TK_RETURN:
+        return "return;"
+
+    if kind == TermKind.TK_UNREACHABLE:
+        return "unreachable;"
+
+    if kind == TermKind.TK_SWITCH_INT:
+        let op_text = mir_operand_text(body, d0, pool, sema)
+        var table_text = ""
+        if d1 >= 0 and d1 < body.switch_table_starts.len() as i32:
+            let start = body.switch_table_starts.get(d1 as i64)
+            let raw_count = body.switch_table_counts.get(d1 as i64)
+            var count: i32 = raw_count
+            let vals_len = body.switch_table_vals.len() as i32
+            let tgts_len = body.switch_table_targets.len() as i32
+            if start < 0 or raw_count < 0 or start > vals_len or start > tgts_len:
+                count = 0
+                table_text = "<invalid switch table>"
+            else:
+                let max_len = if vals_len < tgts_len: vals_len else: tgts_len
+                if start + raw_count > max_len:
+                    count = max_len - start
+            if count > 256:
+                count = 256
+            for i in 0..count:
+                if i > 0:
+                    table_text = table_text ++ ", "
+                table_text = table_text ++ f"{body.switch_table_vals.get((start + i) as i64)}"
+                table_text = table_text ++ f": bb{body.switch_table_targets.get((start + i) as i64)}"
+            if raw_count > count:
+                if table_text.len() > 0:
+                    table_text = table_text ++ ", "
+                table_text = table_text ++ "..."
+        if d2 != 0 or table_text.len() == 0:
+            if table_text.len() > 0:
+                table_text = table_text ++ ", "
+            table_text = table_text ++ f"otherwise: bb{d2}"
+        return "switchInt(" ++ op_text ++ ") -> [" ++ table_text ++ "];"
+
+    if kind == TermKind.TK_CALL:
+        let fn_text = mir_operand_text(body, d0, pool, sema)
+        let args_text = mir_call_args_text(body, d1, pool, sema)
+        let dest_text = mir_place_text_named(body, d2, pool, sema)
+        return f"call {fn_text}({args_text}) -> [return: {dest_text}, next: bb{d3}];"
+
+    if kind == TermKind.TK_DROP_AND_GOTO:
+        return f"drop({mir_place_text_named(body, d0, pool, sema)}) -> bb{d1};"
+
+    f"term<{kind}>({d0}, {d1}, {d2}, {d3});"
+
+// Display twin of mir_place_text: renders PK_FIELD tokens as field NAMES
+// (`_1.buf`, not `_1.f354`) so dump fixtures never pin pool-order-dependent
+// sym ids — any stdlib intern change shifted them and flapped the phase
+// lane. Token disambiguation follows tuple_index_from_field_token's rule:
+// a token below the base type's field count is an index, otherwise an
+// interned sym (either pool). Nested generic-inst field types degrade to
+// the raw `.f{token}` spelling rather than risk the frozen query's phase
+// bug in a formatter. The raw mir_place_text stays the drop-state KEY
+// spelling — do not switch key/hot-path callers to this.
+fn mir_place_text_named(body: &MirBody, place_id: i32, pool: &InternPool, sema: &Sema) -> str:
+    if place_id < 0 or place_id >= body.place_locals.len() as i32:
+        return "_?"
+    let p_start = body.place_proj_starts.get(place_id as i64)
+    let p_count = body.place_proj_counts.get(place_id as i64)
+    let local = body.place_locals.get(place_id as i64) as i32
+    if p_count == 0:
+        return mir_drop_state_local_key(local)
+    var out = mir_drop_state_local_key(local)
+    var cur_ty = if local >= 0 and local < body.local_type_ids.len() as i32: body.local_type_ids.get(local as i64) else: 0
+    for i in 0..p_count:
+        let pk = body.proj_kinds.get((p_start + i) as i64)
+        let pd = body.proj_d0.get((p_start + i) as i64)
+        if pk == ProjKind.PK_FIELD:
+            var rendered = ""
+            var next_ty = 0
+            if cur_ty != 0:
+                let resolved = sema.resolve_alias(cur_ty as TypeId)
+                let fcount = sema.type_reflection_field_count(resolved as i32)
+                if pd >= 0 and pd < fcount:
+                    let fname = sema.type_reflection_field_name(resolved as i32, pd)
+                    let ftext = sema.pool_resolve_symbol(fname)
+                    if ftext.len() > 0:
+                        rendered = "." ++ ftext
+                else:
+                    var ftext = pool.resolve_symbol(pd)
+                    if ftext.len() == 0:
+                        ftext = sema.pool_resolve_symbol(pd)
+                    if ftext.len() > 0:
+                        rendered = "." ++ ftext
+                    if sema.get_type_kind(resolved) == TypeKind.TY_STRUCT:
+                        next_ty = sema.struct_field_type_frozen(resolved as i32, pd)
+            if rendered.len() == 0:
+                rendered = f".f{pd}"
+            out = out ++ rendered
+            cur_ty = next_ty
+            continue
+        if pk == ProjKind.PK_TUPLE_INDEX:
+            out = out ++ f".{pd}"
+            cur_ty = 0
+            continue
+        if pk == ProjKind.PK_INDEX:
+            out = out ++ f"[_{pd}]"
+            cur_ty = 0
+            continue
+        if pk == ProjKind.PK_DEREF:
+            out = out ++ ".*"
+            if cur_ty != 0:
+                let deref_resolved = sema.resolve_alias(cur_ty as TypeId)
+                let deref_tk = sema.get_type_kind(deref_resolved)
+                cur_ty = if deref_tk == TypeKind.TY_REF or deref_tk == TypeKind.TY_PTR: sema.get_type_d0(deref_resolved) else: 0
+            continue
+        if pk == ProjKind.PK_DOWNCAST:
+            out = out ++ f"<as v{pd}>"
+            cur_ty = 0
+            continue
+        out = out ++ f"<p{pk}:{pd}>"
+        cur_ty = 0
+    out
+
+fn mir_place_text(body: &MirBody, place_id: i32) -> str:
+    if place_id < 0 or place_id >= body.place_locals.len() as i32:
+        return "_?"
+
+    let p_start = body.place_proj_starts.get(place_id as i64)
+    let p_count = body.place_proj_counts.get(place_id as i64)
+
+    // Whole-local place (the common case): reuse the memoized local key instead of
+    // building a fresh "_{local}" string on every call (#614 drop-state hot path).
+    if p_count == 0:
+        return mir_drop_state_local_key(body.place_locals.get(place_id as i64) as i32)
+
+    var out = mir_drop_state_local_key(body.place_locals.get(place_id as i64) as i32)
+
+    for i in 0..p_count:
+        let pk = body.proj_kinds.get((p_start + i) as i64)
+        let pd = body.proj_d0.get((p_start + i) as i64)
+
+        if pk == ProjKind.PK_FIELD:
+            out = out ++ f".f{pd}"
+            continue
+        if pk == ProjKind.PK_TUPLE_INDEX:
+            out = out ++ f".{pd}"
+            continue
+        if pk == ProjKind.PK_INDEX:
+            out = out ++ f"[_{pd}]"
+            continue
+        if pk == ProjKind.PK_DEREF:
+            out = out ++ ".*"
+            continue
+        if pk == ProjKind.PK_DOWNCAST:
+            out = out ++ f"<as v{pd}>"
+            continue
+
+        out = out ++ f"<p{pk}:{pd}>"
+
+    out
+
+fn mir_rvalue_text(body: &MirBody, rval_id: i32, pool: &InternPool, sema: &Sema) -> str:
+    if rval_id < 0 or rval_id >= body.rval_kinds.len() as i32:
+        return "<rvalue?>"
+
+    let k = body.rval_kinds.get(rval_id as i64)
+    let d0 = body.rval_d0.get(rval_id as i64)
+    let d1 = body.rval_d1.get(rval_id as i64)
+    let d2 = body.rval_d2.get(rval_id as i64)
+
+    if k == RvalueKind.RK_USE:
+        return mir_operand_text(body, d0, pool, sema)
+
+    if k == RvalueKind.RK_BIN_OP:
+        return "binop(" ++ mir_binop_name(d0) ++ ", " ++ mir_operand_text(body, d1, pool, sema) ++ ", " ++ mir_operand_text(body, d2, pool, sema) ++ ")"
+
+    if k == RvalueKind.RK_UN_OP:
+        return "unop(" ++ mir_unop_name(d0) ++ ", " ++ mir_operand_text(body, d1, pool, sema) ++ ")"
+
+    if k == RvalueKind.RK_REF:
+        let borrow = if d0 == BorrowKind.EXCLUSIVE: "mut" else: "shared"
+        return "ref(" ++ borrow ++ ", " ++ mir_place_text_named(body, d1, pool, sema) ++ ")"
+
+    if k == RvalueKind.RK_ADDR_OF:
+        return "addr_of(" ++ mir_place_text_named(body, d0, pool, sema) ++ ")"
+
+    if k == RvalueKind.RK_AGGREGATE:
+        return f"aggregate(kind={d0}, tag={d2}, fields=[{mir_agg_fields_text(body, d1, pool, sema)}])"
+
+    if k == RvalueKind.RK_DISCRIMINANT:
+        return "discriminant(" ++ mir_place_text_named(body, d0, pool, sema) ++ ")"
+
+    if k == RvalueKind.RK_CAST:
+        let ty = if d1 != 0: f"ty{d1}" else: "<inferred>"
+        return "cast(" ++ mir_operand_text(body, d0, pool, sema) ++ " as " ++ ty ++ ")"
+
+    if k == RvalueKind.RK_LEN:
+        return "len(" ++ mir_place_text_named(body, d0, pool, sema) ++ ")"
+
+    if k == RvalueKind.RK_ARRAY_FILL:
+        return f"array_fill({mir_operand_text(body, d0, pool, sema)}, count={d1})"
+
+    if k == RvalueKind.RK_STR_CONCAT_N:
+        return f"str_concat_n([{mir_call_args_text(body, d0, pool, sema)}])"
+
+    if k == RvalueKind.RK_SLICE:
+        return "slice(" ++ mir_place_text_named(body, d0, pool, sema) ++ ", " ++ mir_operand_text(body, d1, pool, sema) ++ ", " ++ mir_operand_text(body, d2, pool, sema) ++ ")"
+
+    return f"rvalue<{k}>({d0}, {d1}, {d2})"
+
+fn mir_operand_text(body: &MirBody, operand_id: i32, pool: &InternPool, sema: &Sema) -> str:
+    if operand_id < 0 or operand_id >= body.operand_kinds.len() as i32:
+        return "<op?>"
+
+    let k = body.operand_kinds.get(operand_id as i64)
+    let d0 = body.operand_d0.get(operand_id as i64)
+
+    if k == OperandKind.OK_COPY:
+        return "copy " ++ mir_place_text_named(body, d0, pool, sema)
+    if k == OperandKind.OK_MOVE:
+        return "move " ++ mir_place_text_named(body, d0, pool, sema)
+    if k == OperandKind.OK_CONSTANT:
+        return mir_const_text(body, d0, pool, sema)
+
+    f"op<{k}>({d0})"
+
+fn mir_exact_int_text(ast: &AstPool, node: i32) -> str:
+    if node == 0:
+        return "<exact-int>"
+    let kind = ast.kind(node)
+    if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_COMPTIME or kind == NodeKind.NK_CAST:
+        return mir_exact_int_text(ast, ast.get_data0(node))
+    if kind == NodeKind.NK_UNARY and ast.get_data0(node) == UnaryOp.UOP_NEGATE:
+        return "-" ++ mir_exact_int_text(ast, ast.get_data1(node))
+    if kind == NodeKind.NK_INT_LIT and ast.has_int_literal_exact(node as NodeId):
+        let digits = ast.int_literal_digits(node as NodeId)
+        let radix = ast.int_literal_radix(node as NodeId)
+        if radix == 16:
+            return "0x" ++ digits
+        if radix == 8:
+            return "0o" ++ digits
+        if radix == 2:
+            return "0b" ++ digits
+        return digits
+    if kind == NodeKind.NK_INT_LIT:
+        return with_i64_to_str(ast.int_lit_value(node as NodeId))
+    "<exact-int>"
+
+fn mir_const_text(body: &MirBody, const_id: i32, pool: &InternPool, sema: &Sema) -> str:
+    if const_id < 0 or const_id >= body.const_kinds.len() as i32:
+        return "const<?>"
+
+    let k = body.const_kinds.get(const_id as i64)
+    let d0 = body.const_d0.get(const_id as i64)
+    let ty = body.const_types.get(const_id as i64)
+
+    if k == ConstKind.CK_INT:
+        let ty_name = if ty != 0: f"ty{ty}" else: "i32"
+        return f"const {with_i64_to_str(mir_const_int_value(body, const_id))}{ty_name}"
+
+    if k == ConstKind.CK_INT_EXACT:
+        let ty_name = if ty != 0: f"ty{ty}" else: "int"
+        return "const " ++ mir_exact_int_text(sema.ast, d0) ++ ty_name
+
+    if k == ConstKind.CK_BOOL:
+        return if d0 != 0: "const true" else: "const false"
+
+    if k == ConstKind.CK_STR:
+        if d0 == 0:
+            return "const \"\""
+        return f"const \"sym{d0}\""
+
+    if k == ConstKind.CK_C_STR:
+        if d0 == 0:
+            return "const c\"\""
+        return f"const c\"sym{d0}\""
+
+    if k == ConstKind.CK_UNIT:
+        return "const ()"
+
+    if k == ConstKind.CK_FLOAT:
+        if d0 != 0:
+            return f"const sym{d0}"
+        return "const 0.0"
+
+    if k == ConstKind.CK_ZERO_SIZED:
+        let ty_name = if ty != 0: f"ty{ty}" else: "<zst>"
+        return "const zst(" ++ ty_name ++ ")"
+
+    if k == ConstKind.CK_FN:
+        if d0 != 0:
+            return f"const fn sym{d0}"
+        return "const fn <unknown>"
+
+    if k == ConstKind.CK_CLOSURE:
+        return f"const closure(node{d0})"
+
+    if k == ConstKind.CK_ASYNC_BLOCK:
+        return f"const async_block(node{d0})"
+
+    if k == ConstKind.CK_REGEX_LIT:
+        return f"const regex(sym{d0}, flags=sym{body.const_d1.get(const_id as i64)}, node{body.const_d2.get(const_id as i64)})"
+
+    f"const<{k}>({d0})"
+
+fn mir_agg_fields_text(body: &MirBody, fields_id: i32, pool: &InternPool, sema: &Sema) -> str:
+    if fields_id < 0 or fields_id >= body.agg_field_starts.len() as i32:
+        return ""
+
+    let start = body.agg_field_starts.get(fields_id as i64)
+    let raw_count = body.agg_field_counts.get(fields_id as i64)
+    let ops_len = body.agg_field_operands.len() as i32
+    if start < 0 or raw_count < 0 or start > ops_len:
+        return "<invalid aggregate fields>"
+    let count = if start + raw_count > ops_len: ops_len - start else: raw_count
+    let capped = if count > 256: 256 else: count
+    var out = ""
+    for i in 0..capped:
+        if i > 0:
+            out = out ++ ", "
+        out = out ++ mir_operand_text(body, body.agg_field_operands.get((start + i) as i64), pool, sema)
+    if raw_count > capped:
+        if out.len() > 0:
+            out = out ++ ", "
+        out = out ++ "..."
+    out
+
+fn mir_call_args_text(body: &MirBody, args_id: i32, pool: &InternPool, sema: &Sema) -> str:
+    if args_id < 0 or args_id >= body.call_arg_starts.len() as i32:
+        return ""
+
+    let start = body.call_arg_starts.get(args_id as i64)
+    let raw_count = body.call_arg_counts.get(args_id as i64)
+    let ops_len = body.call_arg_operands.len() as i32
+    if start < 0 or raw_count < 0 or start > ops_len:
+        return "<invalid call args>"
+    let count = if start + raw_count > ops_len: ops_len - start else: raw_count
+    let capped = if count > 256: 256 else: count
+    var out = ""
+    for i in 0..capped:
+        if i > 0:
+            out = out ++ ", "
+        out = out ++ mir_operand_text(body, body.call_arg_operands.get((start + i) as i64), pool, sema)
+    if raw_count > capped:
+        if out.len() > 0:
+            out = out ++ ", "
+        out = out ++ "..."
+    out
+
+// ── Drop-state dump (--dump-drop-state) ──────────────────────────
+
+enum MirDropState: i32:
+    Uninit = 0
+    Init = 1
+    Moved = 2
+    Maybe = 3
+    // Some path reaching here never touched the place at all — not even the
+    // reset-on-move blank — so its memory is stack garbage there. A drop of
+    // a MaybeGarbage place is the #729 class (join-block temp drop).
+    MaybeGarbage = 4
+
+type MirDropStateMapState {
+    keys: Vec[str],
+    states: Vec[i32],
+    // Parallel int hash of each key (#614 perf): map_find compares this cheap int
+    // before the expensive string equality, so the linear scan does O(P) int
+    // comparisons instead of O(P) string comparisons (which dominated huge-function
+    // drop-state at ~67% via rt str-equality).
+    key_hashes: Vec[i32],
+    // 1 once any projection key ("_N.fM", "_N[_K]", …) has been inserted. While 0,
+    // a local has no descendants, so mark_local can skip its O(P) descendant scan
+    // — the dominant cost on large drop-free-of-projections bodies (#614 perf).
+    has_projections: i32,
+    // Chained hash index over the keys (#614 perf): bucket_heads[hash % BUCKETS] is
+    // the head entry index of a bucket; bucket_next[i] chains entries in the same
+    // bucket. Turns map_find from an O(P) linear scan into ~O(P/BUCKETS) — the now-
+    // dominant drop-state cost on large bodies. bucket_next is parallel to keys.
+    bucket_heads: Vec[i32],
+    bucket_next: Vec[i32],
+}
+
+type MirDropStateMap {
+    state: *mut MirDropStateMapState,
+}
+impl Copy for MirDropStateMap
+
+const MIR_DROP_STATE_BUCKETS: i32 = 64
+
+fn mir_drop_state_map_new() -> MirDropStateMap:
+    let ptr = with_alloc(256) as *mut MirDropStateMapState
+    unsafe *ptr = MirDropStateMapState { keys: Vec.new(), states: Vec.new(), key_hashes: Vec.new(), has_projections: 0, bucket_heads: Vec.new(), bucket_next: Vec.new() }
+    var b = 0
+    while b < MIR_DROP_STATE_BUCKETS:
+        unsafe { ptr.bucket_heads.push(-1) }
+        b = b + 1
+    MirDropStateMap { state: ptr }
+
+// Overflow-safe rolling hash (compiler builds with overflow checking, so no
+// wrapping FNV). h stays < 1e9, h*31 < 3.1e10 < i64 max, result fits i32.
+fn mir_drop_state_key_hash(key: &str) -> i32:
+    var h: i64 = 0
+    var i = 0
+    let n = key.len() as i32
+    while i < n:
+        h = (h * 31 + (key.byte_at(i as i64) as i64)) % 1000000007
+        i = i + 1
+    h as i32
+
+fn mir_drop_state_map_len(map: MirDropStateMap) -> i32:
+    let st = map.state
+    unsafe { st.keys.len() as i32 }
+
+fn mir_drop_state_map_key(map: MirDropStateMap, idx: i32) -> str:
+    let st = map.state
+    with_str_clone_ref(unsafe { st.keys.get(idx as i64) })
+
+fn mir_drop_state_map_state(map: MirDropStateMap, idx: i32) -> i32:
+    let st = map.state
+    unsafe { st.states.get(idx as i64) }
+
+fn mir_drop_state_map_find(map: MirDropStateMap, key: &str) -> i32:
+    let h = mir_drop_state_key_hash(key)
+    let st = map.state
+    let b = h % MIR_DROP_STATE_BUCKETS
+    var idx = unsafe { st.bucket_heads.get(b as i64) }
+    while idx >= 0:
+        if unsafe { st.key_hashes.get(idx as i64) } == h:
+            if mir_drop_state_map_key(map, idx) == key:
+                return idx
+        idx = unsafe { st.bucket_next.get(idx as i64) }
+    -1
+
+fn mir_drop_state_map_set(map: MirDropStateMap, key: &str, state: i32):
+    let st = map.state
+    let idx = mir_drop_state_map_find(map, key)
+    if idx >= 0:
+        unsafe { st.states.set_i32(idx as i64, state) }
+        return
+    let h = mir_drop_state_key_hash(key)
+    let new_idx = mir_drop_state_map_len(map)
+    unsafe { st.keys.push(with_str_clone_ref(key)) }
+    unsafe { st.states.push(state) }
+    unsafe { st.key_hashes.push(h) }
+    let b = h % MIR_DROP_STATE_BUCKETS
+    unsafe { st.bucket_next.push(st.bucket_heads.get(b as i64)) }
+    unsafe { st.bucket_heads.set_i32(b as i64, new_idx) }
+
+fn mir_drop_state_map_clone(map: MirDropStateMap) -> MirDropStateMap:
+    // Source keys are already unique, so copy the parallel arrays directly — O(P) —
+    // instead of per-entry map_set, which re-runs the O(P) find on every insert
+    // (O(P^2) per clone, the dominant drop-state dataflow cost on large bodies).
+    let out = mir_drop_state_map_new()
+    let src = map.state
+    let dst = out.state
+    let count = mir_drop_state_map_len(map)
+    for i in 0..count:
+        unsafe:
+            dst.keys.push(with_str_clone_ref(src.keys.get(i as i64)))
+            dst.states.push(src.states.get(i as i64))
+            dst.key_hashes.push(src.key_hashes.get(i as i64))
+            dst.bucket_next.push(src.bucket_next.get(i as i64))
+    var bk = 0
+    while bk < MIR_DROP_STATE_BUCKETS:
+        unsafe { dst.bucket_heads.set_i32(bk as i64, src.bucket_heads.get(bk as i64)) }
+        bk = bk + 1
+    unsafe { dst.has_projections = src.has_projections }
+    out
+
+fn mir_drop_state_join(a: i32, b: i32) -> i32:
+    if a == b:
+        return a
+    if a == MirDropState.MaybeGarbage or b == MirDropState.MaybeGarbage:
+        return MirDropState.MaybeGarbage
+    MirDropState.Maybe
+
+fn mir_drop_state_join_into(dst: MirDropStateMap, src: MirDropStateMap):
+    // A key absent from one predecessor means that path never touched the
+    // place — not even a blanking reset — so its memory is garbage there.
+    // Absence therefore joins as MaybeGarbage, never as keep-the-other-side
+    // (the old behavior, which is why --validate-all missed #729).
+    let dst_count = mir_drop_state_map_len(dst)
+    for di in 0..dst_count:
+        let dkey = mir_drop_state_map_key(dst, di)
+        if dkey.len() == 0:
+            continue
+        if mir_drop_state_map_find(src, dkey) < 0:
+            let dstate = mir_drop_state_map_state(dst, di)
+            if dstate != MirDropState.Uninit:
+                mir_drop_state_map_set(dst, dkey, MirDropState.MaybeGarbage)
+    let count = mir_drop_state_map_len(src)
+    for i in 0..count:
+        let key = mir_drop_state_map_key(src, i)
+        let state = mir_drop_state_map_state(src, i)
+        let existing = mir_drop_state_map_find(dst, key)
+        if existing < 0:
+            mir_drop_state_map_set(dst, key, if state == MirDropState.Uninit: MirDropState.Uninit else: MirDropState.MaybeGarbage)
+        else:
+            mir_drop_state_map_set(dst, key, mir_drop_state_join(mir_drop_state_map_state(dst, existing), state))
+
+fn mir_drop_state_name(state: i32) -> str:
+    if state == MirDropState.Init:
+        return "Init"
+    if state == MirDropState.Moved:
+        return "Moved"
+    if state == MirDropState.Maybe:
+        return "Maybe"
+    if state == MirDropState.MaybeGarbage:
+        return "MaybeGarbage"
+    "Uninit"
+
+// Memoized: "_{local_id}" is a pure function of local_id (body-independent), so
+// cache it globally to avoid reconstructing the same key string — and re-running
+// the owned-buffer ownership check inside string construction — on every drop-state
+// transfer. This is the #614 perf hot path (rt_payload_start_is_owned ~67%). Pure
+// memo of a deterministic function → no effect on compiler output/fixpoint.
+var mir_local_key_cache: Vec[str] = Vec.new()
+var mir_local_key_cache_lock: Atomic[i32]
+
+fn mir_drop_state_local_key(local_id: i32) -> str:
+    if local_id < 0:
+        return f"_{local_id}"
+    // Comptime parallel() lowers MIR on concurrent threads that share this global
+    // cache; an unguarded push races vec_grow (double free of the old buffer,
+    // #617), and a get during another thread's grow reads a freed buffer, so the
+    // lock must bracket both. The returned str stays valid across grows — the Vec
+    // buffer holds handles, not the string bytes.
+    while mir_local_key_cache_lock.swap(1, .Acquire) != 0:
+        let _ = 0
+    while mir_local_key_cache.len() as i32 <= local_id:
+        let n = mir_local_key_cache.len() as i32
+        mir_local_key_cache.push(f"_{n}")
+    let key = mir_local_key_cache.get(local_id as i64)
+    mir_local_key_cache_lock.store(0, .Release)
+    with_str_clone_ref(key)
+
+fn mir_drop_state_key_is_descendant(key: &str, local_key: &str) -> bool:
+    if key == local_key:
+        return true
+    if not key.starts_with(local_key):
+        return false
+    if key.len() <= local_key.len():
+        return false
+    let ch = key.byte_at(local_key.len() as i64)
+    ch == 46 or ch == 91 or ch == 60
+
+fn mir_drop_state_mark_local(map: MirDropStateMap, local_id: i32, state: i32):
+    let key = mir_drop_state_local_key(local_id)
+    mir_drop_state_map_set(map, key, state)
+    // No projection keys exist yet → this local has no descendants → skip the O(P)
+    // descendant scan (the dominant per-statement cost on large bodies, #614 perf).
+    if unsafe { map.state.has_projections } == 0:
+        return
+    let count = mir_drop_state_map_len(map)
+    for i in 0..count:
+        let child = mir_drop_state_map_key(map, i)
+        if mir_drop_state_key_is_descendant(child, key):
+            mir_drop_state_map_set(map, child, state)
+
+fn mir_drop_state_place_base_local(body: &MirBody, place_id: i32) -> i32:
+    if place_id < 0 or place_id >= body.place_locals.len() as i32:
+        return -1
+    body.place_locals.get(place_id as i64)
+
+fn mir_drop_state_mark_place(map: MirDropStateMap, body: &MirBody, place_id: i32, state: i32):
+    if place_id < 0 or place_id >= body.place_locals.len() as i32:
+        return
+    let key = mir_place_text(body, place_id)
+    mir_drop_state_map_set(map, key, state)
+    let base_local = mir_drop_state_place_base_local(body, place_id)
+    if base_local < 0:
+        return
+    let proj_count = body.place_proj_counts.get(place_id as i64)
+    if proj_count == 0:
+        mir_drop_state_mark_local(map, base_local, state)
+    else:
+        unsafe { map.state.has_projections = 1 }
+        let base_key = mir_drop_state_local_key(base_local)
+        let old_idx = mir_drop_state_map_find(map, base_key)
+        let old_state = if old_idx >= 0: mir_drop_state_map_state(map, old_idx) else: MirDropState.Uninit
+        mir_drop_state_map_set(map, base_key, mir_drop_state_join(old_state, state))
+
+fn mir_drop_state_initial(body: &MirBody) -> MirDropStateMap:
+    let map = mir_drop_state_map_new()
+    let local_count = body.local_count()
+    for li in 0..local_count:
+        let state = if li > 0 and li <= body.n_params: MirDropState.Init else: MirDropState.Uninit
+        mir_drop_state_map_set(map, mir_drop_state_local_key(li), state)
+    map
+
+fn mir_drop_state_note_operand(map: MirDropStateMap, body: &MirBody, operand_id: i32):
+    if operand_id < 0 or operand_id >= body.operand_kinds.len() as i32:
+        return
+    let kind = body.operand_kinds.get(operand_id as i64)
+    if kind != OperandKind.OK_MOVE:
+        return
+    let place = body.operand_d0.get(operand_id as i64)
+    mir_drop_state_mark_place(map, body, place, MirDropState.Moved)
+
+fn mir_drop_state_note_call_args(map: MirDropStateMap, body: &MirBody, args_id: i32):
+    if args_id < 0 or args_id >= body.call_arg_starts.len() as i32:
+        return
+    let start = body.call_arg_starts.get(args_id as i64)
+    let count = body.call_arg_counts.get(args_id as i64)
+    for i in 0..count:
+        mir_drop_state_note_operand(map, body, body.call_arg_operands.get((start + i) as i64))
+
+fn mir_drop_state_note_agg_fields(map: MirDropStateMap, body: &MirBody, fields_id: i32):
+    if fields_id < 0 or fields_id >= body.agg_field_starts.len() as i32:
+        return
+    let start = body.agg_field_starts.get(fields_id as i64)
+    let count = body.agg_field_counts.get(fields_id as i64)
+    for i in 0..count:
+        mir_drop_state_note_operand(map, body, body.agg_field_operands.get((start + i) as i64))
+
+fn mir_drop_state_note_rvalue(map: MirDropStateMap, body: &MirBody, rval_id: i32):
+    if rval_id < 0 or rval_id >= body.rval_kinds.len() as i32:
+        return
+    let kind = body.rval_kinds.get(rval_id as i64)
+    let d0 = body.rval_d0.get(rval_id as i64)
+    let d1 = body.rval_d1.get(rval_id as i64)
+    let d2 = body.rval_d2.get(rval_id as i64)
+    if kind == RvalueKind.RK_USE:
+        mir_drop_state_note_operand(map, body, d0)
+    else if kind == RvalueKind.RK_BIN_OP:
+        mir_drop_state_note_operand(map, body, d1)
+        mir_drop_state_note_operand(map, body, d2)
+    else if kind == RvalueKind.RK_UN_OP:
+        mir_drop_state_note_operand(map, body, d1)
+    else if kind == RvalueKind.RK_CAST:
+        mir_drop_state_note_operand(map, body, d0)
+    else if kind == RvalueKind.RK_AGGREGATE:
+        mir_drop_state_note_agg_fields(map, body, d1)
+    else if kind == RvalueKind.RK_STR_CONCAT_N:
+        mir_drop_state_note_call_args(map, body, d0)
+    else if kind == RvalueKind.RK_SLICE:
+        mir_drop_state_note_operand(map, body, d1)
+        mir_drop_state_note_operand(map, body, d2)
+
+fn mir_drop_state_transfer_stmt(map: MirDropStateMap, body: &MirBody, stmt_id: i32):
+    let kind = body.stmt_kind(stmt_id)
+    let d0 = body.stmt_data0(stmt_id)
+    let d1 = body.stmt_data1(stmt_id)
+    if kind == StmtKind.StorageLive:
+        mir_drop_state_mark_local(map, d0, MirDropState.Uninit)
+    else if kind == StmtKind.StorageDead:
+        mir_drop_state_mark_local(map, d0, MirDropState.Uninit)
+    else if kind == StmtKind.Assign:
+        mir_drop_state_note_rvalue(map, body, d1)
+        mir_drop_state_mark_place(map, body, d0, MirDropState.Init)
+    else if kind == StmtKind.Drop:
+        mir_drop_state_mark_place(map, body, d0, MirDropState.Uninit)
+
+fn mir_drop_state_transfer_term(map: MirDropStateMap, body: &MirBody, bb: i32):
+    let kind = body.term_kind(bb)
+    let d0 = body.term_data0(bb)
+    let d1 = body.term_data1(bb)
+    let d2 = body.term_data2(bb)
+    if kind == TermKind.TK_SWITCH_INT:
+        mir_drop_state_note_operand(map, body, d0)
+    else if kind == TermKind.TK_CALL:
+        mir_drop_state_note_operand(map, body, d0)
+        mir_drop_state_note_call_args(map, body, d1)
+        mir_drop_state_mark_place(map, body, d2, MirDropState.Init)
+    else if kind == TermKind.TK_DROP_AND_GOTO:
+        mir_drop_state_mark_place(map, body, d0, MirDropState.Uninit)
+
+fn mir_drop_state_block_has_successor(body: &MirBody, pred: i32, target: i32) -> bool:
+    let kind = body.term_kind(pred)
+    let d0 = body.term_data0(pred)
+    let d1 = body.term_data1(pred)
+    let d2 = body.term_data2(pred)
+    let d3 = body.term_data3(pred)
+    if kind == TermKind.TK_GOTO:
+        return d0 == target
+    if kind == TermKind.TK_SWITCH_INT:
+        if d2 == target:
+            return true
+        if d1 >= 0 and d1 < body.switch_table_starts.len() as i32:
+            let start = body.switch_table_starts.get(d1 as i64)
+            let count = body.switch_table_counts.get(d1 as i64)
+            for i in 0..count:
+                if body.switch_table_targets.get((start + i) as i64) == target:
+                    return true
+        return false
+    if kind == TermKind.TK_CALL:
+        return d3 == target
+    if kind == TermKind.TK_DROP_AND_GOTO:
+        return d1 == target
+    false
+
+type MirDropStateBlocksState {
+    starts: Vec[i32],
+    counts: Vec[i32],
+    keys: Vec[str],
+    states: Vec[i32],
+}
+
+type MirDropStateBlocks {
+    state: *mut MirDropStateBlocksState,
+}
+impl Copy for MirDropStateBlocks
+
+fn mir_drop_state_blocks_new(bb_count: i32) -> MirDropStateBlocks:
+    let ptr = with_alloc(256) as *mut MirDropStateBlocksState
+    unsafe *ptr = MirDropStateBlocksState {
+        starts: Vec.new(),
+        counts: Vec.new(),
+        keys: Vec.new(),
+        states: Vec.new(),
+    }
+    for _ in 0..bb_count:
+        unsafe { ptr.starts.push(0) }
+        unsafe { ptr.counts.push(0) }
+    MirDropStateBlocks { state: ptr }
+
+fn mir_drop_state_store_block(blocks: MirDropStateBlocks, bb: i32, map: MirDropStateMap):
+    let st = blocks.state
+    unsafe { st.starts.set_i32(bb as i64, st.keys.len() as i32) }
+    unsafe { st.counts.set_i32(bb as i64, mir_drop_state_map_len(map)) }
+    for i in 0..mir_drop_state_map_len(map):
+        unsafe { st.keys.push(mir_drop_state_map_key(map, i)) }
+        unsafe { st.states.push(mir_drop_state_map_state(map, i)) }
+
+fn mir_drop_state_load_block(blocks: MirDropStateBlocks, bb: i32) -> MirDropStateMap:
+    let map = mir_drop_state_map_new()
+    let st = blocks.state
+    if bb < 0 or bb >= unsafe { st.starts.len() as i32 }:
+        return map
+    let start = unsafe { st.starts.get(bb as i64) }
+    let count = unsafe { st.counts.get(bb as i64) }
+    for i in 0..count:
+        mir_drop_state_map_set(map, unsafe { st.keys.get((start + i) as i64) }, unsafe { st.states.get((start + i) as i64) })
+    map
+
+fn mir_drop_state_block_input(body: &MirBody, blocks: MirDropStateBlocks, bb: i32) -> MirDropStateMap:
+    if bb == 0:
+        return mir_drop_state_initial(body)
+    var seen = 0
+    var out = mir_drop_state_map_new()
+    for pred in 0..bb:
+        if not mir_drop_state_block_has_successor(body, pred, bb):
+            continue
+        let pred_map = mir_drop_state_load_block(blocks, pred)
+        if seen == 0:
+            out = mir_drop_state_map_clone(pred_map)
+            seen = 1
+        else:
+            mir_drop_state_join_into(out, pred_map)
+    if seen == 0:
+        return mir_drop_state_initial(body)
+    out
+
+fn mir_drop_state_format(map: MirDropStateMap) -> str:
+    var out = ""
+    let count = mir_drop_state_map_len(map)
+    var emitted = 0
+    for i in 0..count:
+        let key = mir_drop_state_map_key(map, i)
+        if key.len() == 0:
+            continue
+        if emitted > 0:
+            out = out ++ ", "
+        out = out ++ key ++ "=" ++ mir_drop_state_name(mir_drop_state_map_state(map, i))
+        emitted = emitted + 1
+        if emitted >= 96 and count > emitted:
+            out = out ++ ", ..."
+            break
+    if out.len() == 0:
+        return "<empty>"
+    out
+
+fn dump_drop_state_body(body: &MirBody, pool: &InternPool) -> str:
+    var out = ""
+    let fn_name = if body.fn_sym != 0:
+        f"sym{body.fn_sym}({pool.resolve(body.fn_sym)})"
+    else:
+        "<anon>"
+    out = out ++ "fn " ++ fn_name ++ " " ++ lbrace() ++ "\n"
+    let bb_count = body.block_count()
+    let blocks = mir_drop_state_blocks_new(bb_count)
+    for bb in 0..bb_count:
+        let state = mir_drop_state_block_input(body, blocks, bb)
+        out = out ++ f"  bb{bb} in: " ++ mir_drop_state_format(state) ++ "\n"
+        let stmt_start = body.bb_stmt_starts.get(bb as i64)
+        let stmt_count = body.bb_stmt_counts.get(bb as i64)
+        for si in 0..stmt_count:
+            mir_drop_state_transfer_stmt(state, body, stmt_start + si)
+        mir_drop_state_transfer_term(state, body, bb)
+        out = out ++ f"  bb{bb} out: " ++ mir_drop_state_format(state) ++ "\n"
+        mir_drop_state_store_block(blocks, bb, state)
+    out ++ rbrace() ++ "\n"
+
+fn dump_drop_state_module(mir_mod: &MirModule, pool: &InternPool, sema: &Sema) -> str:
+    let _ = sema
+    var out = f"drop-state module functions={mir_mod.bodies.len() as i32}\n"
+    for i in 0..mir_mod.bodies.len() as i32:
+        if i > 0:
+            out = out ++ "\n"
+        let body = &mir_mod.bodies[i as i64]
+        out = out ++ dump_drop_state_body(body, pool)
+    out
+
+fn mir_drop_state_get_key(map: MirDropStateMap, key: &str) -> i32:
+    let idx = mir_drop_state_map_find(map, key)
+    if idx < 0:
+        return MirDropState.Uninit
+    mir_drop_state_map_state(map, idx)
+
+fn mir_drop_state_get_place(map: MirDropStateMap, body: &MirBody, place_id: i32) -> i32:
+    mir_drop_state_get_key(map, mir_place_text(body, place_id))
+
+fn mir_ownership_key_matches(key: &str, target: &str) -> bool:
+    if target.len() == 0:
+        return true
+    if key == target:
+        return true
+    mir_drop_state_key_is_descendant(key, target)
+
+fn mir_drop_state_selected_format(map: MirDropStateMap, target: &str) -> str:
+    if target.len() == 0:
+        return mir_drop_state_format(map)
+    var out = ""
+    var emitted = 0
+    let count = mir_drop_state_map_len(map)
+    for i in 0..count:
+        let key = mir_drop_state_map_key(map, i)
+        if not mir_ownership_key_matches(key, target):
+            continue
+        if emitted > 0:
+            out = out ++ ", "
+        out = out ++ key ++ "=" ++ mir_drop_state_name(mir_drop_state_map_state(map, i))
+        emitted = emitted + 1
+    if emitted == 0:
+        return target ++ "=" ++ mir_drop_state_name(MirDropState.Uninit)
+    out
+
+fn mir_ownership_place_matches(body: &MirBody, place_id: i32, target: &str) -> bool:
+    if target.len() == 0:
+        return true
+    mir_ownership_key_matches(mir_place_text(body, place_id), target)
+
+fn mir_ownership_operand_move_matches(body: &MirBody, operand_id: i32, target: &str) -> bool:
+    if operand_id < 0 or operand_id >= body.operand_kinds.len() as i32:
+        return false
+    if body.operand_kinds.get(operand_id as i64) != OperandKind.OK_MOVE:
+        return false
+    mir_ownership_place_matches(body, body.operand_d0.get(operand_id as i64), target)
+
+fn mir_ownership_call_args_move_matches(body: &MirBody, args_id: i32, target: &str) -> bool:
+    if args_id < 0 or args_id >= body.call_arg_starts.len() as i32:
+        return false
+    let start = body.call_arg_starts.get(args_id as i64)
+    let count = body.call_arg_counts.get(args_id as i64)
+    for i in 0..count:
+        if mir_ownership_operand_move_matches(body, body.call_arg_operands.get((start + i) as i64), target):
+            return true
+    false
+
+fn mir_ownership_agg_fields_move_matches(body: &MirBody, fields_id: i32, target: &str) -> bool:
+    if fields_id < 0 or fields_id >= body.agg_field_starts.len() as i32:
+        return false
+    let start = body.agg_field_starts.get(fields_id as i64)
+    let count = body.agg_field_counts.get(fields_id as i64)
+    for i in 0..count:
+        if mir_ownership_operand_move_matches(body, body.agg_field_operands.get((start + i) as i64), target):
+            return true
+    false
+
+fn mir_ownership_rvalue_move_matches(body: &MirBody, rval_id: i32, target: &str) -> bool:
+    if rval_id < 0 or rval_id >= body.rval_kinds.len() as i32:
+        return false
+    let kind = body.rval_kinds.get(rval_id as i64)
+    let d0 = body.rval_d0.get(rval_id as i64)
+    let d1 = body.rval_d1.get(rval_id as i64)
+    let d2 = body.rval_d2.get(rval_id as i64)
+    if kind == RvalueKind.RK_USE:
+        return mir_ownership_operand_move_matches(body, d0, target)
+    if kind == RvalueKind.RK_BIN_OP:
+        return mir_ownership_operand_move_matches(body, d1, target) or mir_ownership_operand_move_matches(body, d2, target)
+    if kind == RvalueKind.RK_UN_OP:
+        return mir_ownership_operand_move_matches(body, d1, target)
+    if kind == RvalueKind.RK_CAST:
+        return mir_ownership_operand_move_matches(body, d0, target)
+    if kind == RvalueKind.RK_AGGREGATE:
+        return mir_ownership_agg_fields_move_matches(body, d1, target)
+    if kind == RvalueKind.RK_STR_CONCAT_N:
+        return mir_ownership_call_args_move_matches(body, d0, target)
+    if kind == RvalueKind.RK_SLICE:
+        return mir_ownership_operand_move_matches(body, d1, target) or mir_ownership_operand_move_matches(body, d2, target)
+    false
+
+fn mir_ownership_stmt_event(body: &MirBody, stmt_id: i32, target: &str) -> str:
+    let kind = body.stmt_kind(stmt_id)
+    if kind == StmtKind.Assign:
+        if mir_ownership_rvalue_move_matches(body, body.stmt_data1(stmt_id), target):
+            return "move"
+        return "assign"
+    if kind == StmtKind.StorageLive:
+        return "storage-live"
+    if kind == StmtKind.StorageDead:
+        return "storage-dead"
+    if kind == StmtKind.Drop:
+        return "drop"
+    "nop"
+
+fn mir_ownership_term_event(body: &MirBody, bb: i32, target: &str) -> str:
+    let kind = body.term_kind(bb)
+    if kind == TermKind.TK_CALL:
+        if mir_ownership_operand_move_matches(body, body.term_data0(bb), target) or mir_ownership_call_args_move_matches(body, body.term_data1(bb), target):
+            return "move"
+        return "call"
+    if kind == TermKind.TK_DROP_AND_GOTO:
+        return "drop"
+    if kind == TermKind.TK_SWITCH_INT:
+        if mir_ownership_operand_move_matches(body, body.term_data0(bb), target):
+            return "move"
+        return "switch"
+    if kind == TermKind.TK_RETURN:
+        return "return"
+    if kind == TermKind.TK_GOTO:
+        return "goto"
+    "term"
+
+fn mir_drop_state_compute_blocks(body: &MirBody) -> MirDropStateBlocks:
+    let bb_count = body.block_count()
+    let blocks = mir_drop_state_blocks_new(bb_count)
+    for bb in 0..bb_count:
+        let state = mir_drop_state_block_input(body, blocks, bb)
+        let stmt_start = body.bb_stmt_starts.get(bb as i64)
+        let stmt_count = body.bb_stmt_counts.get(bb as i64)
+        for si in 0..stmt_count:
+            mir_drop_state_transfer_stmt(state, body, stmt_start + si)
+        mir_drop_state_transfer_term(state, body, bb)
+        mir_drop_state_store_block(blocks, bb, state)
+    blocks
+
+fn trace_ownership_body(body: &MirBody, pool: &InternPool, sema: &Sema, spec: &str, target: &str) -> str:
+    var out = ""
+    out = out ++ "fn " ++ mir_debug_body_label(body, pool) ++ "\n"
+    var hits = 0
+    let blocks = mir_drop_state_blocks_new(body.block_count())
+    for bb in 0..body.block_count():
+        let state = mir_drop_state_block_input(body, blocks, bb)
+        let stmt_start = body.bb_stmt_starts.get(bb as i64)
+        let stmt_count = body.bb_stmt_counts.get(bb as i64)
+        for si in 0..stmt_count:
+            let stmt_id = stmt_start + si
+            let before = mir_drop_state_selected_format(state, target)
+            let text = mir_stmt_text(body, stmt_id, pool, sema)
+            let event = mir_ownership_stmt_event(body, stmt_id, target)
+            mir_drop_state_transfer_stmt(state, body, stmt_id)
+            let after = mir_drop_state_selected_format(state, target)
+            if before != after or mir_debug_mentions(text, target):
+                out = out ++ f"  bb{bb}.stmt{stmt_id} event={event} before=" ++ before ++ " after=" ++ after ++ " text=\"" ++ text ++ "\"\n"
+                hits = hits + 1
+        let before_term = mir_drop_state_selected_format(state, target)
+        let term_text = mir_term_text(body, bb, pool, sema)
+        let term_event = mir_ownership_term_event(body, bb, target)
+        mir_drop_state_transfer_term(state, body, bb)
+        let after_term = mir_drop_state_selected_format(state, target)
+        if before_term != after_term or mir_debug_mentions(term_text, target):
+            out = out ++ f"  bb{bb}.term event={term_event} before=" ++ before_term ++ " after=" ++ after_term ++ " text=\"" ++ term_text ++ "\"\n"
+            hits = hits + 1
+        mir_drop_state_store_block(blocks, bb, state)
+    if hits == 0:
+        out = out ++ "  <no ownership transitions>\n"
+    out
+
+fn trace_ownership_module(mir_mod: &MirModule, pool: &InternPool, sema: &Sema, spec: &str) -> str:
+    let wanted_fn = mir_debug_spec_fn(spec)
+    let target = mir_debug_spec_target(spec)
+    var out = "trace-ownership " ++ spec ++ "\n"
+    var hits = 0
+    for bi in 0..mir_mod.bodies.len() as i32:
+        let body = &mir_mod.bodies[bi as i64]
+        if not mir_debug_body_matches(body, pool, wanted_fn):
+            continue
+        out = out ++ trace_ownership_body(body, pool, sema, spec, target)
+        hits = hits + 1
+    if hits == 0:
+        out = out ++ "  <no matching function>\n"
+    out
+
+fn mir_drop_plan_action(state: i32) -> str:
+    if state == MirDropState.Init:
+        return "drop"
+    if state == MirDropState.Maybe:
+        return "conditional"
+    if state == MirDropState.Moved:
+        return "skip"
+    "skip"
+
+fn mir_drop_plan_place_line(body: &MirBody, pool: &InternPool, sema: &Sema, place_id: i32, state: i32, label: &str, text: &str) -> str:
+    let ty = if place_id >= 0 and place_id < body.place_sema_types.len() as i32: body.place_sema_types.get(place_id as i64) else: 0
+    label ++ " place=" ++ mir_place_text(body, place_id) ++ f" ty=ty{ty} state_before=" ++ mir_drop_state_name(state) ++ " action=" ++ mir_drop_plan_action(state) ++ " text=\"" ++ text ++ "\"\n"
+
+fn dump_drop_plan_body(body: &MirBody, pool: &InternPool, sema: &Sema) -> str:
+    var out = "fn " ++ mir_debug_body_label(body, pool) ++ "\n"
+    var hits = 0
+    let blocks = mir_drop_state_blocks_new(body.block_count())
+    for bb in 0..body.block_count():
+        let state = mir_drop_state_block_input(body, blocks, bb)
+        let stmt_start = body.bb_stmt_starts.get(bb as i64)
+        let stmt_count = body.bb_stmt_counts.get(bb as i64)
+        for si in 0..stmt_count:
+            let stmt_id = stmt_start + si
+            let kind = body.stmt_kind(stmt_id)
+            if kind == StmtKind.Drop:
+                let place_id = body.stmt_data0(stmt_id)
+                out = out ++ mir_drop_plan_place_line(body, pool, sema, place_id, mir_drop_state_get_place(state, body, place_id), f"  bb{bb}.stmt{stmt_id}", mir_stmt_text(body, stmt_id, pool, sema))
+                hits = hits + 1
+            else if kind == StmtKind.StorageDead:
+                let local_key = mir_drop_state_local_key(body.stmt_data0(stmt_id))
+                out = out ++ f"  bb{bb}.stmt{stmt_id} storage-dead local=" ++ local_key ++ " remaining=" ++ mir_drop_state_selected_format(state, local_key) ++ "\n"
+                hits = hits + 1
+            mir_drop_state_transfer_stmt(state, body, stmt_id)
+        if body.term_kind(bb) == TermKind.TK_DROP_AND_GOTO:
+            let place_id = body.term_data0(bb)
+            out = out ++ mir_drop_plan_place_line(body, pool, sema, place_id, mir_drop_state_get_place(state, body, place_id), f"  bb{bb}.term", mir_term_text(body, bb, pool, sema))
+            hits = hits + 1
+        mir_drop_state_transfer_term(state, body, bb)
+        mir_drop_state_store_block(blocks, bb, state)
+    if hits == 0:
+        out = out ++ "  <no drop sites>\n"
+    out
+
+fn dump_drop_plan_module(mir_mod: &MirModule, pool: &InternPool, sema: &Sema) -> str:
+    var out = f"drop-plan module functions={mir_mod.bodies.len() as i32}\n"
+    for i in 0..mir_mod.bodies.len() as i32:
+        if i > 0:
+            out = out ++ "\n"
+        let body = &mir_mod.bodies[i as i64]
+        out = out ++ dump_drop_plan_body(body, pool, sema)
+    out
+
+// Drop elaboration — the "Dead" arm (#614, docs/drop-elaboration-soundness.md).
+// A `StmtKind.Drop` whose place is statically `Moved` at that point is provably
+// dead: the value was moved out, so emitting the drop double-drops it. Rewrite it
+// to `StmtKind.Nop` (codegen already treats Nop as a no-op). This is the analogue
+// of rustc's `DropStyle::Dead` in `elaborate_drops`.
+//
+// `Init` drops are left unchanged (always drop — correct). `Maybe` (conditional)
+// drops are left unchanged: their runtime drop-flag / branch structure (the M7
+// conditional-move feature) already gates them, and Nopping them would leak.
+//
+// The decision is computed read-only first — using the exact dataflow walk the
+// `--dump-drop-plan` diagnostic rides on — so the transfer functions observe the
+// original drops; the Nops are applied afterward.
+pub fn mir_elaborate_dead_drops(body: MirBody) -> MirBody:
+    // Cheap pre-scan: a body with no Drop statements has nothing to elaborate, so
+    // skip the dataflow entirely (#614 perf — avoids the per-body walk for the
+    // overwhelming majority of functions, which have no drops).
+    var has_drop = false
+    var pre = 0
+    while pre < body.stmt_kinds.len() as i32:
+        if body.stmt_kinds.get(pre as i64) == StmtKind.Drop:
+            has_drop = true
+            break
+        pre = pre + 1
+    if not has_drop:
+        return body
+    var to_nop: Vec[i32] = Vec.new()
+    let blocks = mir_drop_state_blocks_new(body.block_count())
+    for bb in 0..body.block_count():
+        let state = mir_drop_state_block_input(&body, blocks, bb)
+        let stmt_start = body.bb_stmt_starts.get(bb as i64)
+        let stmt_count = body.bb_stmt_counts.get(bb as i64)
+        for si in 0..stmt_count:
+            let stmt_id = stmt_start + si
+            if body.stmt_kind(stmt_id) == StmtKind.Drop:
+                if mir_drop_state_get_place(state, &body, body.stmt_data0(stmt_id)) == MirDropState.Moved:
+                    to_nop.push(stmt_id)
+            mir_drop_state_transfer_stmt(state, &body, stmt_id)
+        mir_drop_state_transfer_term(state, &body, bb)
+        mir_drop_state_store_block(blocks, bb, state)
+    for i in 0..to_nop.len() as i32:
+        body.stmt_kinds.set_i32(to_nop.get(i as i64) as i64, StmtKind.Nop)
+    body
+
+fn mir_projection_debug_name(mir_mod: &MirModule, current_ty: i32, proj_kind: i32, proj_data: i32) -> str:
+    if proj_kind == ProjKind.PK_TUPLE_INDEX:
+        return f"TupleIndex({proj_data})"
+    if proj_kind == ProjKind.PK_FIELD:
+        let resolved = mir_mod.mir_resolve_alias(current_ty)
+        if mir_mod.mir_get_type_kind(resolved) == TypeKind.TY_TUPLE:
+            return f"TupleIndex({proj_data})"
+        return f"Field({proj_data})"
+    if proj_kind == ProjKind.PK_INDEX:
+        return f"Index(_{proj_data})"
+    if proj_kind == ProjKind.PK_DEREF:
+        return "Deref"
+    if proj_kind == ProjKind.PK_DOWNCAST:
+        return f"Downcast({proj_data})"
+    f"Projection({proj_kind},{proj_data})"
+
+fn mir_projection_next_type(mir_mod: &MirModule, current_ty: i32, proj_kind: i32, proj_data: i32) -> i32:
+    let resolved = mir_mod.mir_resolve_alias(current_ty)
+    if proj_kind == ProjKind.PK_TUPLE_INDEX:
+        return mir_validate_tuple_elem_type(mir_mod, resolved, proj_data)
+    if proj_kind == ProjKind.PK_FIELD:
+        if mir_mod.mir_get_type_kind(resolved) == TypeKind.TY_TUPLE:
+            return mir_validate_tuple_elem_type(mir_mod, resolved, proj_data)
+        return mir_validate_struct_field_type(mir_mod, resolved, proj_data)
+    if proj_kind == ProjKind.PK_INDEX:
+        return mir_validate_indexed_element_type(mir_mod, resolved)
+    if proj_kind == ProjKind.PK_DEREF:
+        if mir_mod.mir_get_type_kind(resolved) == TypeKind.TY_PTR or mir_mod.mir_get_type_kind(resolved) == TypeKind.TY_REF:
+            return mir_mod.mir_get_type_d0(resolved)
+    if proj_kind == ProjKind.PK_DOWNCAST:
+        return current_ty
+    0
+
+fn mir_place_projection_debug_list(mir_mod: &MirModule, body: &MirBody, place_id: i32) -> str:
+    if place_id < 0 or place_id >= body.place_locals.len() as i32:
+        return "[]"
+    var out = "["
+    let p_start = body.place_proj_starts.get(place_id as i64)
+    let p_count = body.place_proj_counts.get(place_id as i64)
+    let local_id = body.place_locals.get(place_id as i64)
+    var current_ty = if local_id >= 0 and local_id < body.local_type_ids.len() as i32: body.local_type_ids.get(local_id as i64) else: 0
+    for i in 0..p_count:
+        if i > 0:
+            out = out ++ ", "
+        let pk = body.proj_kinds.get((p_start + i) as i64)
+        let pd = body.proj_d0.get((p_start + i) as i64)
+        out = out ++ mir_projection_debug_name(mir_mod, current_ty, pk, pd)
+        current_ty = mir_projection_next_type(mir_mod, current_ty, pk, pd)
+    out ++ "]"
+
+fn dump_place_map_body(mir_mod: &MirModule, body: &MirBody, pool: &InternPool) -> str:
+    var out = "fn " ++ mir_debug_body_label(body, pool) ++ "\n"
+    for place_id in 0..body.place_locals.len() as i32:
+        let local_id = body.place_locals.get(place_id as i64)
+        let ty = body.place_sema_types.get(place_id as i64)
+        out = out ++ f"  place#{place_id} path=" ++ mir_place_text(body, place_id) ++ f" base=_{local_id} ty=ty{ty} projections=" ++ mir_place_projection_debug_list(mir_mod, body, place_id) ++ "\n"
+    out
+
+fn dump_place_map_module(mir_mod: &MirModule, pool: &InternPool, sema: &Sema) -> str:
+    let _ = sema
+    var out = f"place-map module functions={mir_mod.bodies.len() as i32}\n"
+    for i in 0..mir_mod.bodies.len() as i32:
+        if i > 0:
+            out = out ++ "\n"
+        let body = &mir_mod.bodies[i as i64]
+        out = out ++ dump_place_map_body(mir_mod, body, pool)
+    out
+
+fn mir_parse_positive_i32(text: &str) -> i32:
+    if text.len() == 0:
+        return -1
+    var out = 0
+    for i in 0..text.len() as i32:
+        let ch = text.byte_at(i as i64)
+        if ch < 48 or ch > 57:
+            return -1
+        out = out * 10 + (ch - 48)
+    out
+
+fn mir_parse_block_id(text: &str) -> i32:
+    if text.starts_with("bb"):
+        return mir_parse_positive_i32(text.slice(2, text.len()))
+    mir_parse_positive_i32(text)
+
+fn mir_cleanup_edge_from(target: &str) -> i32:
+    for i in 0..target.len() as i32:
+        if target.byte_at(i as i64) == 45 and i + 1 < target.len() as i32 and target.byte_at((i + 1) as i64) == 62:
+            return mir_parse_block_id(target.slice(0, i as i64))
+    -1
+
+fn mir_cleanup_edge_to(target: &str) -> i32:
+    for i in 0..target.len() as i32:
+        if target.byte_at(i as i64) == 45 and i + 1 < target.len() as i32 and target.byte_at((i + 1) as i64) == 62:
+            return mir_parse_block_id(target.slice((i + 2) as i64, target.len()))
+    -1
+
+// #760: the CLI validates the spec BEFORE compiling, so a typo'd edge is
+// a hard error instead of a five-minute compile ending in marker text
+// and rc=0. One parser: this reuses the exact from/to readers below.
+pub fn mir_cleanup_edge_spec_ok(spec: &str) -> i32:
+    let target = mir_debug_spec_target(spec)
+    if mir_cleanup_edge_from(target) < 0 or mir_cleanup_edge_to(target) < 0:
+        return 0
+    1
+
+fn trace_cleanup_edge_module(mir_mod: &MirModule, pool: &InternPool, sema: &Sema, spec: &str) -> str:
+    let wanted_fn = mir_debug_spec_fn(spec)
+    let target = mir_debug_spec_target(spec)
+    let from_bb = mir_cleanup_edge_from(target)
+    let to_bb = mir_cleanup_edge_to(target)
+    var out = "trace-cleanup-edge " ++ spec ++ "\n"
+    if from_bb < 0 or to_bb < 0:
+        return out ++ "  <invalid edge spec; expected fn:from->to>\n"
+    var hits = 0
+    for bi in 0..mir_mod.bodies.len() as i32:
+        let body = &mir_mod.bodies[bi as i64]
+        if not mir_debug_body_matches(body, pool, wanted_fn):
+            continue
+        if from_bb >= body.block_count() or to_bb >= body.block_count():
+            continue
+        if not mir_drop_state_block_has_successor(body, from_bb, to_bb):
+            continue
+        let blocks = mir_drop_state_compute_blocks(body)
+        let from_out = mir_drop_state_load_block(blocks, from_bb)
+        let to_in = mir_drop_state_block_input(body, blocks, to_bb)
+        out = out ++ "fn " ++ mir_debug_body_label(body, pool) ++ f" edge=bb{from_bb}->bb{to_bb}\n"
+        out = out ++ "  from_out: " ++ mir_drop_state_format(from_out) ++ "\n"
+        out = out ++ "  to_in: " ++ mir_drop_state_format(to_in) ++ "\n"
+        out = out ++ "  term: " ++ mir_term_text(body, from_bb, pool, sema) ++ "\n"
+        if body.term_kind(from_bb) == TermKind.TK_DROP_AND_GOTO and body.term_data1(from_bb) == to_bb:
+            let place_id = body.term_data0(from_bb)
+            out = out ++ "  edge_drop: " ++ mir_drop_plan_place_line(body, pool, sema, place_id, mir_drop_state_get_place(from_out, body, place_id), f"bb{from_bb}.term", mir_term_text(body, from_bb, pool, sema))
+        hits = hits + 1
+    if hits == 0:
+        out = out ++ "  <no matching cleanup edge>\n"
+    out
+
+fn validate_ownership_body(mir_mod: &MirModule, body: &MirBody) -> str:
+    let blocks = mir_drop_state_blocks_new(body.block_count())
+    for bb in 0..body.block_count():
+        let state = mir_drop_state_block_input(body, blocks, bb)
+        let stmt_start = body.bb_stmt_starts.get(bb as i64)
+        let stmt_count = body.bb_stmt_counts.get(bb as i64)
+        for si in 0..stmt_count:
+            let stmt_id = stmt_start + si
+            let kind = body.stmt_kind(stmt_id)
+            let d0 = body.stmt_data0(stmt_id)
+            let span = body.stmt_spans.get(stmt_id as i64)
+            if kind == StmtKind.Assign or kind == StmtKind.Drop:
+                if d0 < 0 or d0 >= body.place_locals.len() as i32:
+                    return f"fn sym{body.fn_sym} stmt{stmt_id} span={span}: ownership target place out of range"
+                if mir_validate_place_type(mir_mod, body, d0) == 0:
+                    return f"fn sym{body.fn_sym} stmt{stmt_id} span={span}: ownership target has no concrete MIR type"
+            if kind == StmtKind.Drop and body.place_proj_counts.get(d0 as i64) == 0:
+                // #729 class: a drop must only reach places every path has at
+                // least blanked. MaybeGarbage means some predecessor never
+                // touched the place at all — the join-block temp drop that
+                // freed uninitialized stack passed this validator before the
+                // absence-aware join existed.
+                let drop_key = mir_place_text(body, d0)
+                let drop_idx = mir_drop_state_map_find(state, drop_key)
+                let drop_state = if drop_idx >= 0: mir_drop_state_map_state(state, drop_idx) else: MirDropState.Uninit
+                if drop_state == MirDropState.MaybeGarbage:
+                    return f"fn sym{body.fn_sym} stmt{stmt_id} span={span}: drop of {drop_key} reaches a path that never initialized it (MaybeGarbage)"
+            mir_drop_state_transfer_stmt(state, body, stmt_id)
+        if body.term_kind(bb) == TermKind.TK_CALL or body.term_kind(bb) == TermKind.TK_DROP_AND_GOTO:
+            let place_id = if body.term_kind(bb) == TermKind.TK_CALL: body.term_data2(bb) else: body.term_data0(bb)
+            if place_id < 0 or place_id >= body.place_locals.len() as i32:
+                return f"fn sym{body.fn_sym} bb{bb}: ownership terminator place out of range"
+            if mir_validate_place_type(mir_mod, body, place_id) == 0:
+                return f"fn sym{body.fn_sym} bb{bb}: ownership terminator place has no concrete MIR type"
+        mir_drop_state_transfer_term(state, body, bb)
+        mir_drop_state_store_block(blocks, bb, state)
+    ""
+
+fn validate_ownership_mir_module(mir_mod: &MirModule) -> str:
+    let shape = validate_mir_module(mir_mod)
+    if shape.len() > 0:
+        return "MIR shape: " ++ shape
+    for bi in 0..mir_mod.bodies.len() as i32:
+        let body = &mir_mod.bodies[bi as i64]
+        if body.lowering_failed != 0:
+            continue
+        let err = validate_ownership_body(mir_mod, body)
+        if err.len() > 0:
+            return err
+    ""
+
+fn mir_debug_spec_fn(spec: &str) -> str:
+    for i in 0..spec.len() as i32:
+        if spec.byte_at(i as i64) == 58:
+            return spec.slice(0, i as i64)
+    ""
+
+fn mir_debug_spec_target(spec: &str) -> str:
+    for i in 0..spec.len() as i32:
+        if spec.byte_at(i as i64) == 58:
+            return spec.slice((i + 1) as i64, spec.len())
+    with_str_clone_ref(spec)
+
+fn mir_debug_body_name(body: &MirBody, pool: &InternPool) -> str:
+    if body.fn_sym != 0:
+        return with_str_clone_ref(pool.resolve(body.fn_sym))
+    "<anon>"
+
+fn mir_debug_body_label(body: &MirBody, pool: &InternPool) -> str:
+    if body.fn_sym != 0:
+        return f"sym{body.fn_sym}(" ++ pool.resolve(body.fn_sym) ++ ")"
+    "<anon>"
+
+fn mir_debug_body_matches(body: &MirBody, pool: &InternPool, wanted_fn: &str) -> bool:
+    if wanted_fn.len() == 0:
+        return true
+    let name = mir_debug_body_name(body, pool)
+    if name == wanted_fn:
+        return true
+    if body.fn_sym != 0 and f"sym{body.fn_sym}" == wanted_fn:
+        return true
+    false
+
+fn mir_debug_mentions(text: &str, target: &str) -> bool:
+    target.len() == 0 or text.contains(target)
+
+fn trace_place_module(mir_mod: &MirModule, pool: &InternPool, sema: &Sema, spec: &str) -> str:
+    let wanted_fn = mir_debug_spec_fn(spec)
+    let target = mir_debug_spec_target(spec)
+    var out = "trace-place " ++ spec ++ "\n"
+    var hits = 0
+    for bi in 0..mir_mod.bodies.len() as i32:
+        let body = &mir_mod.bodies[bi as i64]
+        if not mir_debug_body_matches(body, pool, wanted_fn):
+            continue
+        var body_header_emitted = false
+        for bb in 0..body.block_count():
+            let stmt_start = body.bb_stmt_starts.get(bb as i64)
+            let stmt_count = body.bb_stmt_counts.get(bb as i64)
+            for si in 0..stmt_count:
+                let stmt_id = stmt_start + si
+                let text = mir_stmt_text(body, stmt_id, pool, sema)
+                if mir_debug_mentions(text, target):
+                    if not body_header_emitted:
+                        out = out ++ "fn " ++ mir_debug_body_label(body, pool) ++ "\n"
+                        body_header_emitted = true
+                    out = out ++ f"  bb{bb}.stmt{stmt_id}: " ++ text ++ "\n"
+                    hits = hits + 1
+            let term_text = mir_term_text(body, bb, pool, sema)
+            if mir_debug_mentions(term_text, target):
+                if not body_header_emitted:
+                    out = out ++ "fn " ++ mir_debug_body_label(body, pool) ++ "\n"
+                    body_header_emitted = true
+                out = out ++ f"  bb{bb}.term: " ++ term_text ++ "\n"
+                hits = hits + 1
+    if hits == 0:
+        out = out ++ "  <no matching MIR events>\n"
+    out
+
+fn explain_mir_origin_module(mir_mod: &MirModule, pool: &InternPool, sema: &Sema, spec: &str) -> str:
+    let wanted_fn = mir_debug_spec_fn(spec)
+    let target = mir_debug_spec_target(spec)
+    var out = "mir-origin " ++ spec ++ "\n"
+    var hits = 0
+    for bi in 0..mir_mod.bodies.len() as i32:
+        let body = &mir_mod.bodies[bi as i64]
+        if not mir_debug_body_matches(body, pool, wanted_fn):
+            continue
+        for li in 0..body.local_count():
+            let local_label = f"_{li}"
+            if mir_debug_mentions(local_label, target):
+                out = out ++ "fn " ++ mir_debug_body_label(body, pool) ++ f" local _{li}"
+                let info = body.get_local(li)
+                out = out ++ f" type=ty{info.type_id}"
+                if info.name_sym != 0:
+                    out = out ++ " name=" ++ pool.resolve(info.name_sym)
+                out = out ++ "\n"
+                hits = hits + 1
+        for bb in 0..body.block_count():
+            let stmt_start = body.bb_stmt_starts.get(bb as i64)
+            let stmt_count = body.bb_stmt_counts.get(bb as i64)
+            for si in 0..stmt_count:
+                let stmt_id = stmt_start + si
+                let text = mir_stmt_text(body, stmt_id, pool, sema)
+                let span = body.stmt_spans.get(stmt_id as i64)
+                if mir_debug_mentions(text, target) or target == f"stmt{stmt_id}":
+                    out = out ++ "fn " ++ mir_debug_body_label(body, pool) ++ f" bb{bb}.stmt{stmt_id} span={span}: " ++ text ++ "\n"
+                    hits = hits + 1
+            let term_text = mir_term_text(body, bb, pool, sema)
+            let term_span = body.bb_term_spans.get(bb as i64)
+            if mir_debug_mentions(term_text, target) or target == f"term{bb}":
+                out = out ++ "fn " ++ mir_debug_body_label(body, pool) ++ f" bb{bb}.term span={term_span}: " ++ term_text ++ "\n"
+                hits = hits + 1
+    if hits == 0:
+        out = out ++ "  <no matching MIR origin>\n"
+    out
+
+// Use-after-kill (#719 class): a local that has been killed — StorageDead, or
+// blanked by a reset-on-move `_x = <zero>` — must not be read again before it is
+// re-initialized. A body that does read it computes from zeroed storage; #719 is
+// exactly this (a binding killed by an inner scope pop, then consumed by a later
+// aggregate). Scanning blocks in index order only reports a kill that DOMINATES
+// the use in the emitted order, which is the shape lowering bugs produce; a use
+// reached only by a back edge is never flagged.
+fn mir_local_of_operand(body: &MirBody, operand: i32) -> i32:
+    if operand < 0 or operand >= body.operand_kinds.len() as i32:
+        return -1
+    let k = body.operand_kinds.get(operand as i64)
+    if k != OperandKind.OK_COPY and k != OperandKind.OK_MOVE:
+        return -1
+    let place = body.operand_d0.get(operand as i64)
+    if place < 0 or place >= body.place_locals.len() as i32:
+        return -1
+    body.place_locals.get(place as i64)
+
+fn mir_rvalue_is_zero_fill(body: &MirBody, rv: i32) -> i32:
+    if rv < 0 or rv >= body.rval_kinds.len() as i32:
+        return 0
+    if body.rval_kinds.get(rv as i64) != RvalueKind.RK_USE:
+        return 0
+    let op = body.rval_d0.get(rv as i64)
+    if op < 0 or op >= body.operand_kinds.len() as i32:
+        return 0
+    if body.operand_kinds.get(op as i64) != OperandKind.OK_CONSTANT:
+        return 0
+    let cid = body.operand_d0.get(op as i64)
+    if cid < 0 or cid >= body.const_kinds.len() as i32:
+        return 0
+    if body.const_kinds.get(cid as i64) == ConstKind.CK_ZERO_SIZED: 1 else: 0
+
+// The only successor of `bb`, or -1 when it branches / ends. A chain of
+// single-successor blocks is the one case where "the blank happens before the
+// read" is provable without a dominator tree — and it is exactly the shape a
+// synthesized straight-line body has. Anything with a branch or a loop is left
+// alone rather than guessed at (a blank in one arm is not a blank on the path
+// that reaches the join).
+fn mir_block_single_successor(body: &MirBody, bb: i32) -> i32:
+    let tk = body.term_kind(bb)
+    if tk == TermKind.TK_GOTO:
+        return body.term_data0(bb)
+    if tk == TermKind.TK_CALL:
+        return body.term_data3(bb)
+    -1
+
+fn mir_block_reaches_linearly(body: &MirBody, from_bb: i32, to_bb: i32) -> i32:
+    if from_bb == to_bb:
+        return 1
+    var cur = from_bb
+    var hops = 0
+    while hops < 4096:
+        let nxt = mir_block_single_successor(body, cur)
+        if nxt < 0 or nxt >= body.block_count():
+            return 0
+        if nxt == to_bb:
+            return 1
+        if nxt <= cur:
+            return 0
+        cur = nxt
+        hops = hops + 1
+    0
+
+fn validate_use_after_kill_body(body: &MirBody, pool: &InternPool) -> str:
+    let local_count = body.local_type_ids.len() as i32
+    if local_count <= 0 or local_count > 20000:
+        return ""
+    let killed: Vec[i32] = Vec.new()
+    let killed_bb: Vec[i32] = Vec.new()
+    for _i in 0..local_count:
+        killed.push(0)
+        killed_bb.push(-1)
+    let fn_name = if body.fn_sym != 0: with_str_clone_ref(pool.resolve(body.fn_sym)) else: "<anon>"
+    for bb in 0..body.block_count():
+        let stmt_start = body.bb_stmt_starts.get(bb as i64)
+        let stmt_count = body.bb_stmt_counts.get(bb as i64)
+        for si in 0..stmt_count:
+            let sid = stmt_start + si
+            if sid < 0 or sid >= body.stmt_kinds.len() as i32:
+                continue
+            let sk = body.stmt_kinds.get(sid as i64)
+            let d0 = body.stmt_d0.get(sid as i64)
+            let d1 = body.stmt_d1.get(sid as i64)
+            if sk == StmtKind.StorageLive:
+                if d0 >= 0 and d0 < local_count:
+                    killed.set_i32(d0 as i64, 0)
+                continue
+            if sk == StmtKind.StorageDead:
+                // A marker, not a write: the storage still holds the value and a
+                // later read is valid (proven by the single-container control,
+                // which has StorageDead before its aggregate read and runs fine).
+                // Only an actual zero-fill blank destroys the value.
+                continue
+            if sk != StmtKind.Assign:
+                continue
+            // Reads first: an operand of the rvalue must not be a killed local.
+            let used = mir_local_of_operand(body, body.rval_d0.get(d1 as i64))
+            if used >= 0 and used < local_count and killed.get(used as i64) != 0 and mir_block_reaches_linearly(body, killed_bb.get(used as i64), bb) != 0:
+                return f"{fn_name}: local _{used} is read at bb{bb} after its reset-on-move blank zeroed it"
+            if d1 >= 0 and d1 < body.rval_kinds.len() as i32 and body.rval_kinds.get(d1 as i64) == RvalueKind.RK_AGGREGATE:
+                let fid = body.rval_d1.get(d1 as i64)
+                if fid >= 0 and fid < body.agg_field_starts.len() as i32:
+                    let fstart = body.agg_field_starts.get(fid as i64)
+                    let fcount = body.agg_field_counts.get(fid as i64)
+                    for fi in 0..fcount:
+                        let opi = fstart + fi
+                        if opi < 0 or opi >= body.agg_field_operands.len() as i32:
+                            continue
+                        let agg_used = mir_local_of_operand(body, body.agg_field_operands.get(opi as i64))
+                        if agg_used >= 0 and agg_used < local_count and killed.get(agg_used as i64) != 0 and mir_block_reaches_linearly(body, killed_bb.get(agg_used as i64), bb) != 0:
+                            return f"{fn_name}: local _{agg_used} is read by an aggregate at bb{bb} after its reset-on-move blank zeroed it"
+            // Then the write: a zero fill kills, any other write revives.
+            if d0 >= 0 and d0 < body.place_locals.len() as i32 and body.place_proj_counts.get(d0 as i64) == 0:
+                let dst = body.place_locals.get(d0 as i64)
+                if dst >= 0 and dst < local_count:
+                    let is_blank = mir_rvalue_is_zero_fill(body, d1)
+                    killed.set_i32(dst as i64, is_blank)
+                    killed_bb.set_i32(dst as i64, if is_blank != 0: bb else: -1)
+    ""
+
+pub fn validate_use_after_kill(body: &MirBody, pool: &InternPool) -> str:
+    validate_use_after_kill_body(body, pool)
+
+fn validate_all_mir_module(mir_mod: &MirModule) -> str:
+    let shape = validate_mir_module(mir_mod)
+    if shape.len() > 0:
+        return "MIR shape: " ++ shape
+    let typed = validate_typed_mir_module(mir_mod)
+    if mir_validation_has_error(typed):
+        return "typed MIR: " ++ typed.message
+    let ownership = validate_ownership_mir_module(mir_mod)
+    if ownership.len() > 0:
+        return "ownership MIR: " ++ ownership
+    ""
+
+fn mir_binop_name(op: i32) -> str:
+    if op == BinaryOp.OP_ADD: return "add"
+    if op == BinaryOp.OP_SUB: return "sub"
+    if op == BinaryOp.OP_MUL: return "mul"
+    if op == BinaryOp.OP_DIV: return "div"
+    if op == BinaryOp.OP_MOD: return "mod"
+    if op == BinaryOp.OP_EQ: return "eq"
+    if op == BinaryOp.OP_NEQ: return "neq"
+    if op == BinaryOp.OP_LT: return "lt"
+    if op == BinaryOp.OP_GT: return "gt"
+    if op == BinaryOp.OP_LTE: return "lte"
+    if op == BinaryOp.OP_GTE: return "gte"
+    if op == BinaryOp.OP_AND: return "and"
+    if op == BinaryOp.OP_OR: return "or"
+    if op == BinaryOp.OP_BIT_AND: return "bit_and"
+    if op == BinaryOp.OP_BIT_OR: return "bit_or"
+    if op == BinaryOp.OP_BIT_XOR: return "bit_xor"
+    if op == BinaryOp.OP_SHL: return "shl"
+    if op == BinaryOp.OP_SHR: return "shr"
+    if op == BinaryOp.OP_DEFAULT: return "default"
+    if op == BinaryOp.OP_CONCAT: return "concat"
+    if op == BinaryOp.OP_ADD_WRAP: return "add_wrap"
+    if op == BinaryOp.OP_SUB_WRAP: return "sub_wrap"
+    if op == BinaryOp.OP_MUL_WRAP: return "mul_wrap"
+    if op == BinaryOp.OP_IN: return "in"
+    if op == BinaryOp.OP_NOT_IN: return "not_in"
+    f"op{op}"
+
+fn mir_unop_name(op: i32) -> str:
+    if op == UnaryOp.UOP_NEGATE: return "neg"
+    if op == UnaryOp.UOP_NOT: return "not"
+    if op == UnaryOp.UOP_REF: return "ref"
+    if op == UnaryOp.UOP_RAW_REF_CONST: return "raw_const_ref"
+    if op == UnaryOp.UOP_RAW_REF_MUT: return "raw_mut_ref"
+    if op == UnaryOp.UOP_DEREF: return "deref"
+    if op == UnaryOp.UOP_TRY: return "try"
+    f"uop{op}"
+
+// ── MIR validation (Wave 10 backend contract) ───────────────────
+
+fn mir_index_in_range(idx: i32, len: i32) -> bool:
+    idx >= 0 and idx < len
+
+fn mir_span_in_range(start: i32, count: i32, len: i32) -> bool:
+    start >= 0 and count >= 0 and start + count <= len
+
+fn validate_mir_module(mir_mod: &MirModule) -> str:
+    let body_count = mir_mod.bodies.len() as i32
+    if body_count != mir_mod.body_fn_syms.len() as i32:
+        return "bodies/body_fn_syms length mismatch"
+
+    let seen_fn_syms: HashMap[i32, i32] = HashMap.new()
+    for bi in 0..body_count:
+        let body = &mir_mod.bodies[bi as i64]
+        let fn_sym = mir_mod.body_fn_syms.get(bi as i64)
+        if body.fn_sym != fn_sym:
+            return f"body_fn_syms mismatch at body index {bi}"
+        if fn_sym != 0 and seen_fn_syms.contains(fn_sym):
+            return f"duplicate MIR body for fn symbol {fn_sym}"
+        if fn_sym != 0:
+            seen_fn_syms.insert(fn_sym, 1)
+            if not mir_mod.body_index_by_fn_sym.contains(fn_sym):
+                return f"missing body index for fn symbol {fn_sym}"
+            if mir_mod.body_index_by_fn_sym.get(fn_sym).unwrap() != bi:
+                return f"body index map mismatch for fn symbol {fn_sym}"
+
+        let body_err = validate_mir_body(body)
+        if body_err.len() > 0:
+            let body_label = if fn_sym != 0: f"{fn_sym}" else: f"{bi}"
+            return "body[" ++ body_label ++ "]: " ++ body_err
+
+    ""
+
+fn validate_mir_body(body: &MirBody) -> str:
+    let local_count = body.local_type_ids.len() as i32
+    if local_count <= 0:
+        return "missing return local"
+    if local_count != body.local_mutables.len() as i32:
+        return "locals/local_mutables length mismatch"
+    if local_count != body.local_names.len() as i32:
+        return "locals/local_names length mismatch"
+    if local_count != body.local_is_user_var.len() as i32:
+        return "locals/local_is_user_var length mismatch"
+    if body.n_params < 0 or body.n_params > local_count:
+        return "invalid n_params"
+
+    let bb_count = body.bb_stmt_starts.len() as i32
+    if bb_count <= 0:
+        return "missing basic blocks"
+    if bb_count != body.bb_stmt_counts.len() as i32:
+        return "bb_stmt_starts/bb_stmt_counts length mismatch"
+    if bb_count != body.bb_term_kinds.len() as i32:
+        return "bb_stmt_starts/bb_term_kinds length mismatch"
+    if bb_count != body.bb_term_d0.len() as i32 or
+       bb_count != body.bb_term_d1.len() as i32 or
+       bb_count != body.bb_term_d2.len() as i32 or
+       bb_count != body.bb_term_d3.len() as i32:
+        return "bb terminator payload length mismatch"
+    if bb_count != body.bb_is_cleanup.len() as i32:
+        return "bb cleanup flag length mismatch"
+    if bb_count != body.bb_term_spans.len() as i32:
+        return "bb_term_spans length mismatch"
+    if bb_count != body.bb_no_suspend_nodes.len() as i32:
+        return "bb_no_suspend_nodes length mismatch"
+
+    let stmt_count = body.stmt_kinds.len() as i32
+    if stmt_count != body.stmt_d0.len() as i32 or
+       stmt_count != body.stmt_d1.len() as i32 or
+       stmt_count != body.stmt_spans.len() as i32:
+        return "statement table length mismatch"
+
+    let place_count = body.place_locals.len() as i32
+    if place_count != body.place_proj_starts.len() as i32 or
+       place_count != body.place_proj_counts.len() as i32:
+        return "place table length mismatch"
+
+    let proj_count = body.proj_kinds.len() as i32
+    if proj_count != body.proj_d0.len() as i32:
+        return "projection table length mismatch"
+
+    let rval_count = body.rval_kinds.len() as i32
+    if rval_count != body.rval_d0.len() as i32 or
+       rval_count != body.rval_d1.len() as i32 or
+       rval_count != body.rval_d2.len() as i32:
+        return "rvalue table length mismatch"
+
+    let operand_count = body.operand_kinds.len() as i32
+    if operand_count != body.operand_d0.len() as i32:
+        return "operand table length mismatch"
+
+    let const_count = body.const_kinds.len() as i32
+    if const_count != body.const_d0.len() as i32 or
+       const_count != body.const_d1.len() as i32 or
+       const_count != body.const_d2.len() as i32 or
+       const_count != body.const_types.len() as i32:
+        return "constant table length mismatch"
+
+    let switch_count = body.switch_table_starts.len() as i32
+    if switch_count != body.switch_table_counts.len() as i32:
+        return "switch table length mismatch"
+    if body.switch_table_vals.len() as i32 != body.switch_table_targets.len() as i32:
+        return "switch value/target table length mismatch"
+
+    let agg_count = body.agg_field_starts.len() as i32
+    if agg_count != body.agg_field_counts.len() as i32:
+        return "aggregate field table length mismatch"
+
+    let call_args_count = body.call_arg_starts.len() as i32
+    if call_args_count != body.call_arg_counts.len() as i32:
+        return "call args table length mismatch"
+    if call_args_count != body.call_pipeline_receiver_places.len() as i32:
+        return "call args/pipeline receiver place length mismatch"
+
+    for bb in 0..bb_count:
+        let stmt_start = body.bb_stmt_starts.get(bb as i64)
+        let stmt_span_count = body.bb_stmt_counts.get(bb as i64)
+        if not mir_span_in_range(stmt_start, stmt_span_count, stmt_count):
+            return f"bb{bb}: statement span out of range (start={stmt_start}, count={stmt_span_count}, total={stmt_count})"
+
+        let term_kind = body.bb_term_kinds.get(bb as i64)
+        let d0 = body.bb_term_d0.get(bb as i64)
+        let d1 = body.bb_term_d1.get(bb as i64)
+        let d2 = body.bb_term_d2.get(bb as i64)
+        let d3 = body.bb_term_d3.get(bb as i64)
+
+        if term_kind == TermKind.TK_GOTO:
+            if not mir_index_in_range(d0, bb_count):
+                return f"bb{bb}: goto target out of range"
+            continue
+        if term_kind == TermKind.TK_RETURN or term_kind == TermKind.TK_UNREACHABLE:
+            continue
+        if term_kind == TermKind.TK_SWITCH_INT:
+            if not mir_index_in_range(d0, operand_count):
+                return f"bb{bb}: switch operand out of range"
+            if not mir_index_in_range(d1, switch_count):
+                return f"bb{bb}: switch table id out of range"
+            if d2 != 0 and not mir_index_in_range(d2, bb_count):
+                return f"bb{bb}: switch default target out of range"
+            continue
+        if term_kind == TermKind.TK_CALL:
+            if not mir_index_in_range(d0, operand_count):
+                return f"bb{bb}: call callee operand out of range"
+            if not mir_index_in_range(d1, call_args_count):
+                return f"bb{bb}: call arg table id out of range"
+            if not mir_index_in_range(d2, place_count):
+                return f"bb{bb}: call destination place out of range"
+            if not mir_index_in_range(d3, bb_count):
+                return f"bb{bb}: call next block out of range"
+            continue
+        if term_kind == TermKind.TK_DROP_AND_GOTO:
+            if not mir_index_in_range(d0, place_count):
+                return f"bb{bb}: drop place out of range"
+            if not mir_index_in_range(d1, bb_count):
+                return f"bb{bb}: drop target out of range"
+            continue
+
+        return f"bb{bb}: unknown terminator kind {term_kind}"
+
+    for si in 0..stmt_count:
+        let stmt_kind = body.stmt_kinds.get(si as i64)
+        let d0 = body.stmt_d0.get(si as i64)
+        let d1 = body.stmt_d1.get(si as i64)
+
+        if stmt_kind == StmtKind.Assign:
+            if not mir_index_in_range(d0, place_count):
+                return f"stmt{si}: assign destination out of range"
+            if not mir_index_in_range(d1, rval_count):
+                return f"stmt{si}: assign rvalue out of range"
+            continue
+        if stmt_kind == StmtKind.StorageLive or stmt_kind == StmtKind.StorageDead:
+            if not mir_index_in_range(d0, local_count):
+                return f"stmt{si}: storage local out of range"
+            continue
+        if stmt_kind == StmtKind.Drop:
+            if not mir_index_in_range(d0, place_count):
+                return f"stmt{si}: drop place out of range"
+            continue
+        if stmt_kind == StmtKind.Nop:
+            continue
+        return f"stmt{si}: unknown statement kind {stmt_kind}"
+
+    for pi in 0..place_count:
+        let local_id = body.place_locals.get(pi as i64)
+        if not mir_index_in_range(local_id, local_count):
+            return f"place{pi}: base local out of range"
+
+        let proj_start = body.place_proj_starts.get(pi as i64)
+        let proj_span_count = body.place_proj_counts.get(pi as i64)
+        if not mir_span_in_range(proj_start, proj_span_count, proj_count):
+            return f"place{pi}: projection span out of range"
+
+        for ji in 0..proj_span_count:
+            let proj_idx = proj_start + ji
+            let proj_kind = body.proj_kinds.get(proj_idx as i64)
+            let proj_d0 = body.proj_d0.get(proj_idx as i64)
+
+            if proj_kind == ProjKind.PK_FIELD:
+                if proj_d0 < 0:
+                    return f"place{pi}: field projection has negative index"
+                continue
+            if proj_kind == ProjKind.PK_TUPLE_INDEX:
+                if proj_d0 < 0:
+                    return f"place{pi}: tuple projection has negative index"
+                continue
+            if proj_kind == ProjKind.PK_INDEX:
+                if not mir_index_in_range(proj_d0, local_count):
+                    return f"place{pi}: index projection local out of range"
+                continue
+            if proj_kind == ProjKind.PK_DEREF:
+                continue
+            if proj_kind == ProjKind.PK_DOWNCAST:
+                if proj_d0 < 0:
+                    return f"place{pi}: downcast projection has negative variant index"
+                continue
+
+            return f"place{pi}: unknown projection kind {proj_kind}"
+
+    for oi in 0..operand_count:
+        let op_kind = body.operand_kinds.get(oi as i64)
+        let d0 = body.operand_d0.get(oi as i64)
+        if op_kind == OperandKind.OK_COPY or op_kind == OperandKind.OK_MOVE:
+            if not mir_index_in_range(d0, place_count):
+                return f"operand{oi}: place out of range"
+            continue
+        if op_kind == OperandKind.OK_CONSTANT:
+            if not mir_index_in_range(d0, const_count):
+                return f"operand{oi}: const out of range"
+            continue
+        return f"operand{oi}: unknown operand kind {op_kind}"
+
+    for ri in 0..rval_count:
+        let rv_kind = body.rval_kinds.get(ri as i64)
+        let d0 = body.rval_d0.get(ri as i64)
+        let d1 = body.rval_d1.get(ri as i64)
+        let d2 = body.rval_d2.get(ri as i64)
+
+        if rv_kind == RvalueKind.RK_USE:
+            if not mir_index_in_range(d0, operand_count):
+                return f"rvalue{ri}: use operand out of range (idx={d0}, total={operand_count})"
+            continue
+        if rv_kind == RvalueKind.RK_BIN_OP:
+            if not mir_index_in_range(d1, operand_count) or not mir_index_in_range(d2, operand_count):
+                return f"rvalue{ri}: binop operand out of range"
+            continue
+        if rv_kind == RvalueKind.RK_UN_OP:
+            if not mir_index_in_range(d1, operand_count):
+                return f"rvalue{ri}: unop operand out of range"
+            continue
+        if rv_kind == RvalueKind.RK_REF:
+            if d0 != BorrowKind.SHARED and d0 != BorrowKind.EXCLUSIVE:
+                return f"rvalue{ri}: invalid borrow kind"
+            if not mir_index_in_range(d1, place_count):
+                return f"rvalue{ri}: ref place out of range"
+            continue
+        if rv_kind == RvalueKind.RK_ADDR_OF:
+            if not mir_index_in_range(d0, place_count):
+                return f"rvalue{ri}: addr_of place out of range"
+            continue
+        if rv_kind == RvalueKind.RK_AGGREGATE:
+            if not mir_index_in_range(d1, agg_count):
+                return f"rvalue{ri}: aggregate field table out of range"
+            continue
+        if rv_kind == RvalueKind.RK_DISCRIMINANT:
+            if not mir_index_in_range(d0, place_count):
+                return f"rvalue{ri}: discriminant place out of range"
+            continue
+        if rv_kind == RvalueKind.RK_CAST:
+            if not mir_index_in_range(d0, operand_count):
+                return f"rvalue{ri}: cast operand out of range"
+            continue
+        if rv_kind == RvalueKind.RK_LEN:
+            if not mir_index_in_range(d0, place_count):
+                return f"rvalue{ri}: len place out of range"
+            continue
+        if rv_kind == RvalueKind.RK_ARRAY_FILL:
+            if not mir_index_in_range(d0, operand_count):
+                return f"rvalue{ri}: array_fill operand out of range"
+            continue
+        if rv_kind == RvalueKind.RK_STR_CONCAT_N:
+            if not mir_index_in_range(d0, call_args_count):
+                return f"rvalue{ri}: str_concat_n args out of range"
+            continue
+        if rv_kind == RvalueKind.RK_SLICE:
+            if not mir_index_in_range(d0, place_count):
+                return f"rvalue{ri}: slice base place out of range"
+            if not mir_index_in_range(d1, operand_count) or not mir_index_in_range(d2, operand_count):
+                return f"rvalue{ri}: slice bounds operand out of range"
+            continue
+
+        return f"rvalue{ri}: unknown rvalue kind {rv_kind}"
+
+    for ci in 0..const_count:
+        let ck = body.const_kinds.get(ci as i64)
+        if ck == ConstKind.CK_INT or ck == ConstKind.CK_BOOL or ck == ConstKind.CK_STR or ck == ConstKind.CK_C_STR or ck == ConstKind.CK_UNIT or ck == ConstKind.CK_FLOAT or ck == ConstKind.CK_ZERO_SIZED or ck == ConstKind.CK_FN or ck == ConstKind.CK_CLOSURE or ck == ConstKind.CK_ASYNC_BLOCK or ck == ConstKind.CK_INT_EXACT or ck == ConstKind.CK_REGEX_LIT:
+            continue
+        return f"const{ci}: unknown const kind {ck}"
+
+    for ti in 0..switch_count:
+        let start = body.switch_table_starts.get(ti as i64)
+        let count = body.switch_table_counts.get(ti as i64)
+        let total = body.switch_table_vals.len() as i32
+        if not mir_span_in_range(start, count, total):
+            return f"switch table{ti}: span out of range"
+        for i in 0..count:
+            let target = body.switch_table_targets.get((start + i) as i64)
+            if not mir_index_in_range(target, bb_count):
+                return f"switch table{ti}: target out of range"
+
+    for ai in 0..agg_count:
+        let start = body.agg_field_starts.get(ai as i64)
+        let count = body.agg_field_counts.get(ai as i64)
+        let total = body.agg_field_operands.len() as i32
+        if not mir_span_in_range(start, count, total):
+            return f"aggregate table{ai}: span out of range"
+        for i in 0..count:
+            let op_idx = body.agg_field_operands.get((start + i) as i64)
+            if not mir_index_in_range(op_idx, operand_count):
+                return f"aggregate table{ai}: operand out of range"
+
+    for ai in 0..call_args_count:
+        let start = body.call_arg_starts.get(ai as i64)
+        let count = body.call_arg_counts.get(ai as i64)
+        let total = body.call_arg_operands.len() as i32
+        if not mir_span_in_range(start, count, total):
+            return f"call args table{ai}: span out of range"
+        for i in 0..count:
+            let op_idx = body.call_arg_operands.get((start + i) as i64)
+            if not mir_index_in_range(op_idx, operand_count):
+                return f"call args table{ai}: operand out of range"
+
+    ""
+
+type MirValidationError {
+    fn_sym: i32,
+    span: i32,
+    message: str,
+}
+
+fn mir_validation_ok -> MirValidationError:
+    MirValidationError {
+        fn_sym: 0,
+        span: 0,
+        message: "",
+    }
+
+fn mir_validation_fail(fn_sym: i32, span: i32, message: &str) -> MirValidationError:
+    MirValidationError {
+        fn_sym: fn_sym,
+        span: span,
+        message: with_str_clone_ref(message),
+    }
+
+fn mir_validation_has_error(err: &MirValidationError) -> bool:
+    err.message.len() > 0
+
+fn mir_validate_find_named_type(mir_mod: &MirModule, type_sym: i32) -> i32:
+    for ti in 0..mir_mod.sema_type_kinds.len() as i32:
+        let tk = mir_mod.sema_type_kinds.get(ti as i64)
+        // Only match TY_STRUCT and TY_ENUM — their d0 stores the name symbol.
+        // TY_ALIAS d0 stores the alias TARGET, not the name.
+        if tk != TypeKind.TY_STRUCT and tk != TypeKind.TY_ENUM:
+            continue
+        if mir_mod.sema_type_d0.get(ti as i64) == type_sym:
+            return ti
+    0
+
+fn mir_validate_find_int_type(mir_mod: &MirModule, bits: i32, signed: i32) -> i32:
+    for ti in 0..mir_mod.sema_type_kinds.len() as i32:
+        if mir_mod.sema_type_kinds.get(ti as i64) != TypeKind.TY_INT:
+            continue
+        if mir_mod.sema_type_d0.get(ti as i64) == bits and mir_mod.sema_type_d1.get(ti as i64) == signed:
+            return ti
+    0
+
+fn mir_validate_get_generic_inst_arg_count(mir_mod: &MirModule, tid: i32) -> i32:
+    mir_mod.mir_get_type_d2(tid)
+
+fn mir_validate_get_generic_inst_arg(mir_mod: &MirModule, tid: i32, index: i32) -> i32:
+    let extra_start = mir_mod.mir_get_type_d1(tid)
+    mir_mod.mir_get_type_extra(extra_start + index)
+
+fn mir_validate_struct_field_type(mir_mod: &MirModule, struct_tid: i32, field_sym: i32) -> i32:
+    let resolved = mir_mod.mir_resolve_alias(struct_tid)
+    let tk = mir_mod.mir_get_type_kind(resolved)
+    if tk == TypeKind.TY_REF or tk == TypeKind.TY_PTR:
+        let inner = mir_mod.mir_get_type_d0(resolved)
+        return mir_validate_struct_field_type(mir_mod, inner, field_sym)
+    if tk == TypeKind.TY_GENERIC_INST:
+        let base_sym = mir_mod.mir_get_type_d0(resolved)
+        let base_tid = mir_validate_find_named_type(mir_mod, base_sym)
+        if base_tid > 0:
+            return mir_validate_struct_field_type(mir_mod, base_tid, field_sym)
+        return 0
+    if tk != TypeKind.TY_STRUCT:
+        return 0
+    let extra_start = mir_mod.mir_get_type_d1(resolved)
+    let field_count = mir_mod.mir_get_type_d2(resolved)
+    for fi in 0..field_count:
+        let f_name = mir_mod.mir_get_type_extra(extra_start + fi * 3)
+        if f_name == field_sym:
+            return mir_mod.mir_get_type_extra(extra_start + fi * 3 + 1)
+    0
+
+fn mir_validate_tuple_elem_type(mir_mod: &MirModule, tuple_tid: i32, field_idx: i32) -> i32:
+    let resolved = mir_mod.mir_resolve_alias(tuple_tid)
+    if mir_mod.mir_get_type_kind(resolved) != TypeKind.TY_TUPLE:
+        return 0
+    let elem_start = mir_mod.mir_get_type_d0(resolved)
+    let elem_count = mir_mod.mir_get_type_d1(resolved)
+    if field_idx < 0 or field_idx >= elem_count:
+        return 0
+    mir_mod.mir_get_type_extra(elem_start + field_idx)
+
+fn mir_validate_indexed_element_type(mir_mod: &MirModule, collection_tid: i32) -> i32:
+    let resolved = mir_mod.mir_resolve_alias(collection_tid)
+    let tk = mir_mod.mir_get_type_kind(resolved)
+    if tk == TypeKind.TY_ARRAY or tk == TypeKind.TY_SLICE:
+        return mir_mod.mir_get_type_d0(resolved)
+    if tk == TypeKind.TY_STR:
+        return mir_validate_find_int_type(mir_mod, 32, 1)
+    if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF:
+        return mir_mod.mir_get_type_d0(resolved)
+    if tk == TypeKind.TY_GENERIC_INST:
+        let base_sym = mir_mod.mir_get_type_d0(resolved)
+        if base_sym != 0 and mir_validate_get_generic_inst_arg_count(mir_mod, resolved) > 0:
+            return mir_validate_get_generic_inst_arg(mir_mod, resolved, 0)
+    0
+
+fn mir_validate_variant_exists(mir_mod: &MirModule, enum_tid: i32, variant_idx: i32) -> bool:
+    if variant_idx < 0:
+        return false
+    let resolved = mir_mod.mir_resolve_alias(enum_tid)
+    let tk = mir_mod.mir_get_type_kind(resolved)
+    if tk == TypeKind.TY_ENUM:
+        return variant_idx < mir_mod.mir_get_type_d2(resolved)
+    if tk == TypeKind.TY_GENERIC_INST:
+        let base_sym = mir_mod.mir_get_type_d0(resolved)
+        let base_tid = mir_validate_find_named_type(mir_mod, base_sym)
+        if base_tid > 0 and mir_mod.mir_get_type_kind(base_tid) == TypeKind.TY_ENUM:
+            return variant_idx < mir_mod.mir_get_type_d2(base_tid)
+    false
+
+fn mir_validate_enum_payload_type(mir_mod: &MirModule, enum_tid: i32, variant_idx: i32, field_idx: i32) -> i32:
+    let resolved = mir_mod.mir_resolve_alias(enum_tid)
+    let tk = mir_mod.mir_get_type_kind(resolved)
+    if variant_idx < 0 or field_idx < 0:
+        return 0
+
+    if tk == TypeKind.TY_ENUM:
+        let te_start = mir_mod.mir_get_type_d1(resolved)
+        let variant_count = mir_mod.mir_get_type_d2(resolved)
+        var pos = te_start
+        for vi in 0..variant_count:
+            let payload_count = mir_mod.mir_get_type_extra(pos + 1)
+            if vi == variant_idx:
+                if field_idx < payload_count:
+                    return mir_mod.mir_get_type_extra(pos + 2 + field_idx)
+                return 0
+            pos = pos + 2 + payload_count
+        return 0
+
+    if tk == TypeKind.TY_GENERIC_INST:
+        let base_sym = mir_mod.mir_get_type_d0(resolved)
+        let base_tid = mir_validate_find_named_type(mir_mod, base_sym)
+        if base_tid <= 0 or mir_mod.mir_get_type_kind(base_tid) != TypeKind.TY_ENUM:
+            return 0
+        let arg_count = mir_validate_get_generic_inst_arg_count(mir_mod, resolved)
+        let te_start = mir_mod.mir_get_type_d1(base_tid)
+        let variant_count = mir_mod.mir_get_type_d2(base_tid)
+
+        // Option[T]: one generic arg, exactly one payload-bearing variant.
+        if arg_count == 1 and field_idx == 0:
+            var pos = te_start
+            var payload_variant = -1
+            for vi in 0..variant_count:
+                let payload_count = mir_mod.mir_get_type_extra(pos + 1)
+                if payload_count == 1:
+                    payload_variant = vi
+                    break
+                pos = pos + 2 + payload_count
+            if payload_variant == variant_idx:
+                return mir_validate_get_generic_inst_arg(mir_mod, resolved, 0)
+        // Result[T, E]: two generic args, both variants carry one payload in declaration order.
+        if arg_count == 2 and variant_count == 2 and field_idx == 0:
+            return mir_validate_get_generic_inst_arg(mir_mod, resolved, variant_idx)
+
+        // Fallback to the erased base payload type for non-substituted generic enums.
+        return mir_validate_enum_payload_type(mir_mod, base_tid, variant_idx, field_idx)
+    0
+
+fn mir_validate_type_compatible_fast(mir_mod: &MirModule, expected: i32, actual: i32) -> i32:
+    if expected <= 0 or actual <= 0:
+        return 0
+    if expected == actual:
+        return 1
+    let exp_r = mir_mod.mir_resolve_alias(expected)
+    let act_r = mir_mod.mir_resolve_alias(actual)
+    if exp_r == act_r:
+        return 1
+    let exp_k = mir_mod.mir_get_type_kind(exp_r)
+    let act_k = mir_mod.mir_get_type_kind(act_r)
+    if act_k == TypeKind.TY_NEVER:
+        return 1
+    if exp_k == TypeKind.TY_STRUCT and act_k == TypeKind.TY_STRUCT:
+        return if mir_mod.mir_get_type_d0(exp_r) == mir_mod.mir_get_type_d0(act_r): 1 else: 0
+    if exp_k == TypeKind.TY_ENUM and act_k == TypeKind.TY_ENUM:
+        return if mir_mod.mir_get_type_d0(exp_r) == mir_mod.mir_get_type_d0(act_r): 1 else: 0
+    if (exp_k == TypeKind.TY_FN and act_k == TypeKind.TY_FN) or (exp_k == TypeKind.TY_EXTERN_FN and act_k == TypeKind.TY_EXTERN_FN) or (exp_k == TypeKind.TY_FN and act_k == TypeKind.TY_EXTERN_FN) or (exp_k == TypeKind.TY_EXTERN_FN and act_k == TypeKind.TY_FN):
+        // Sema does not intern fn types canonically; mirror its structural
+        // fn_types_compatible rule (d0=params extra, d1=count, d2=ret).
+        if mir_mod.mir_get_type_d1(exp_r) != mir_mod.mir_get_type_d1(act_r):
+            return 0
+        let fn_param_count = mir_mod.mir_get_type_d1(exp_r)
+        let exp_ps = mir_mod.mir_get_type_d0(exp_r)
+        let act_ps = mir_mod.mir_get_type_d0(act_r)
+        for fpi in 0..fn_param_count:
+            if mir_validate_type_compatible_fast(mir_mod, mir_mod.mir_get_type_extra(exp_ps + fpi), mir_mod.mir_get_type_extra(act_ps + fpi)) == 0:
+                return 0
+        return mir_validate_type_compatible_fast(mir_mod, mir_mod.mir_get_type_d2(exp_r), mir_mod.mir_get_type_d2(act_r))
+    if exp_k == TypeKind.TY_GENERIC_INST and act_k == TypeKind.TY_GENERIC_INST:
+        if mir_mod.mir_get_type_d0(exp_r) == mir_mod.mir_get_type_d0(act_r):
+            let arg_count = mir_validate_get_generic_inst_arg_count(mir_mod, exp_r)
+            if arg_count == mir_validate_get_generic_inst_arg_count(mir_mod, act_r):
+                for ai in 0..arg_count:
+                    let exp_arg = mir_validate_get_generic_inst_arg(mir_mod, exp_r, ai)
+                    let act_arg = mir_validate_get_generic_inst_arg(mir_mod, act_r, ai)
+                    if mir_validate_type_compatible_fast(mir_mod, exp_arg, act_arg) == 0:
+                        return 0
+                return 1
+        return 0
+    if exp_k == TypeKind.TY_GENERIC_INST and (act_k == TypeKind.TY_STRUCT or act_k == TypeKind.TY_ENUM):
+        return if mir_mod.mir_get_type_d0(exp_r) == mir_mod.mir_get_type_d0(act_r): 1 else: 0
+    if (exp_k == TypeKind.TY_STRUCT or exp_k == TypeKind.TY_ENUM) and act_k == TypeKind.TY_GENERIC_INST:
+        return if mir_mod.mir_get_type_d0(exp_r) == mir_mod.mir_get_type_d0(act_r): 1 else: 0
+    if exp_k == TypeKind.TY_PTR and act_k == TypeKind.TY_PTR:
+        return mir_validate_type_compatible_fast(mir_mod, mir_mod.mir_get_type_d0(exp_r), mir_mod.mir_get_type_d0(act_r))
+    if exp_k == TypeKind.TY_PTR and act_k == TypeKind.TY_REF:
+        return mir_validate_type_compatible_fast(mir_mod, mir_mod.mir_get_type_d0(exp_r), mir_mod.mir_get_type_d0(act_r))
+    if exp_k == TypeKind.TY_REF and act_k == TypeKind.TY_REF:
+        return mir_validate_type_compatible_fast(mir_mod, mir_mod.mir_get_type_d0(exp_r), mir_mod.mir_get_type_d0(act_r))
+    if exp_k == TypeKind.TY_REF and act_k == TypeKind.TY_PTR:
+        return mir_validate_type_compatible_fast(mir_mod, mir_mod.mir_get_type_d0(exp_r), mir_mod.mir_get_type_d0(act_r))
+    if exp_k == TypeKind.TY_SLICE and act_k == TypeKind.TY_SLICE:
+        return mir_validate_type_compatible_fast(mir_mod, mir_mod.mir_get_type_d0(exp_r), mir_mod.mir_get_type_d0(act_r))
+    if exp_k == TypeKind.TY_ARRAY and act_k == TypeKind.TY_ARRAY:
+        if mir_mod.mir_get_type_d1(exp_r) != mir_mod.mir_get_type_d1(act_r):
+            return 0
+        return mir_validate_type_compatible_fast(mir_mod, mir_mod.mir_get_type_d0(exp_r), mir_mod.mir_get_type_d0(act_r))
+    if exp_k == TypeKind.TY_TUPLE and act_k == TypeKind.TY_TUPLE:
+        let exp_count = mir_mod.mir_get_type_d1(exp_r)
+        let act_count = mir_mod.mir_get_type_d1(act_r)
+        if exp_count != act_count:
+            return 0
+        let exp_start = mir_mod.mir_get_type_d0(exp_r)
+        let act_start = mir_mod.mir_get_type_d0(act_r)
+        for ei in 0..exp_count:
+            if mir_validate_type_compatible_fast(mir_mod, mir_mod.mir_get_type_extra(exp_start + ei), mir_mod.mir_get_type_extra(act_start + ei)) == 0:
+                return 0
+        return 1
+    // Primitive types: same kind means compatible (str, int, bool, float, void)
+    if exp_k == act_k:
+        if exp_k == TypeKind.TY_STR or exp_k == TypeKind.TY_BOOL or exp_k == TypeKind.TY_VOID:
+            return 1
+        if exp_k == TypeKind.TY_INT:
+            // Same width and signedness
+            return if mir_mod.mir_get_type_d0(exp_r) == mir_mod.mir_get_type_d0(act_r) and mir_mod.mir_get_type_d1(exp_r) == mir_mod.mir_get_type_d1(act_r): 1 else: 0
+        if exp_k == TypeKind.TY_FLOAT:
+            return if mir_mod.mir_get_type_d0(exp_r) == mir_mod.mir_get_type_d0(act_r): 1 else: 0
+    0
+
+fn mir_validate_use_assign_compatible(mir_mod: &MirModule, expected: i32, actual: i32) -> bool:
+    if mir_validate_type_compatible_fast(mir_mod, expected, actual) != 0:
+        return true
+    let expected_inner = mir_validate_distinct_inner(mir_mod, expected)
+    if expected_inner > 0 and expected_inner != expected:
+        if mir_validate_use_assign_compatible(mir_mod, expected_inner, actual):
+            return true
+    let actual_inner = mir_validate_distinct_inner(mir_mod, actual)
+    if actual_inner > 0 and actual_inner != actual:
+        if mir_validate_use_assign_compatible(mir_mod, expected, actual_inner):
+            return true
+    let expected_kind = mir_mod.mir_get_type_kind(mir_mod.mir_resolve_alias(expected))
+    let actual_kind = mir_mod.mir_get_type_kind(mir_mod.mir_resolve_alias(actual))
+    if expected_kind == TypeKind.TY_INT and actual_kind == TypeKind.TY_ENUM:
+        let actual_repr = mir_validate_enum_repr_type(mir_mod, actual)
+        return actual_repr > 0 and mir_validate_type_compatible_fast(mir_mod, expected, actual_repr) != 0
+    if expected_kind == TypeKind.TY_ENUM and actual_kind == TypeKind.TY_INT:
+        let expected_repr = mir_validate_enum_repr_type(mir_mod, expected)
+        return expected_repr > 0 and mir_validate_type_compatible_fast(mir_mod, expected_repr, actual) != 0
+    // §10.6/§10.8: a shared ref to a CONCRETE type may assign into a
+    // ref-to-dyn destination — the RK_REF/use of `&x` in ref-to-dyn position
+    // is the fat-pointer build (codegen keys on the DESTINATION type; sema
+    // vetted the impl). The validator undermodeled the documented coercion
+    // and rejected `accept(&eng)` for `fn accept(g: &dyn Greet)`.
+    if expected_kind == TypeKind.TY_REF and actual_kind == TypeKind.TY_REF:
+        let expected_pointee = mir_mod.mir_resolve_alias(mir_mod.mir_get_type_d0(mir_mod.mir_resolve_alias(expected)))
+        if mir_mod.mir_get_type_kind(expected_pointee) == TypeKind.TY_TRAIT_OBJ:
+            return true
+    // §3.9: Box[Concrete] use into a Box[dyn Trait] destination — the vetted
+    // box-dyn coercion (sema's std-box arm in types_compatible; codegen keys
+    // the fat build on the destination type). Mirror sema's rule: std-Box
+    // base on both sides, one argument, destination argument a trait object.
+    if expected_kind == TypeKind.TY_GENERIC_INST and actual_kind == TypeKind.TY_GENERIC_INST and mir_mod.sema_box_sym != 0:
+        let box_exp_r = mir_mod.mir_resolve_alias(expected)
+        let box_act_r = mir_mod.mir_resolve_alias(actual)
+        if mir_mod.mir_get_type_d0(box_exp_r) == mir_mod.sema_box_sym and mir_mod.mir_get_type_d0(box_act_r) == mir_mod.sema_box_sym:
+            if mir_validate_get_generic_inst_arg_count(mir_mod, box_exp_r) == 1 and mir_validate_get_generic_inst_arg_count(mir_mod, box_act_r) == 1:
+                let box_exp_arg = mir_mod.mir_resolve_alias(mir_validate_get_generic_inst_arg(mir_mod, box_exp_r, 0))
+                if mir_mod.mir_get_type_kind(box_exp_arg) == TypeKind.TY_TRAIT_OBJ:
+                    return true
+    // §16.10: a raw pointer (or extern-fn pointer) use into an
+    // Option[pointer] destination — the vetted option-pointer coercion
+    // (sema's is_option_pointer_type arm; niche-encoded, codegen stores the
+    // pointer bits directly). Mirror sema's rule.
+    if expected_kind == TypeKind.TY_GENERIC_INST and (actual_kind == TypeKind.TY_PTR or actual_kind == TypeKind.TY_EXTERN_FN) and mir_mod.sema_option_sym != 0:
+        let opt_exp_r = mir_mod.mir_resolve_alias(expected)
+        if mir_mod.mir_get_type_d0(opt_exp_r) == mir_mod.sema_option_sym and mir_validate_get_generic_inst_arg_count(mir_mod, opt_exp_r) == 1:
+            let opt_payload = mir_mod.mir_resolve_alias(mir_validate_get_generic_inst_arg(mir_mod, opt_exp_r, 0))
+            let opt_pk = mir_mod.mir_get_type_kind(opt_payload)
+            if opt_pk == TypeKind.TY_PTR or opt_pk == TypeKind.TY_EXTERN_FN:
+                return true
+    let expected_numeric = expected_kind == TypeKind.TY_INT or expected_kind == TypeKind.TY_FLOAT
+    let actual_numeric = actual_kind == TypeKind.TY_INT or actual_kind == TypeKind.TY_FLOAT
+    expected_numeric and actual_numeric
+
+fn mir_validate_enum_repr_type(mir_mod: &MirModule, tid: i32) -> i32:
+    let resolved = mir_mod.mir_resolve_alias(tid)
+    if mir_mod.mir_get_type_kind(resolved) != TypeKind.TY_ENUM:
+        return 0
+    let repr = mir_mod.sema_disc_repr_types.get(resolved)
+    if repr.is_some(): repr.unwrap() else: 0
+
+fn mir_validate_distinct_inner(mir_mod: &MirModule, tid: i32) -> i32:
+    let resolved = mir_mod.mir_resolve_alias(tid)
+    if mir_mod.mir_get_type_kind(resolved) != TypeKind.TY_STRUCT:
+        return 0
+    let name_sym = mir_mod.mir_get_type_d0(resolved)
+    if name_sym == 0 or not mir_mod.sema_distinct_type_names.contains(name_sym):
+        return 0
+    if mir_mod.mir_get_type_d2(resolved) != 1:
+        return 0
+    let extra_start = mir_mod.mir_get_type_d1(resolved)
+    mir_mod.mir_get_type_extra(extra_start + 1)
+
+fn mir_validate_single_field_inner(mir_mod: &MirModule, tid: i32) -> i32:
+    let resolved = mir_mod.mir_resolve_alias(tid)
+    if mir_mod.mir_get_type_kind(resolved) != TypeKind.TY_STRUCT:
+        return 0
+    if mir_mod.mir_get_type_d2(resolved) != 1:
+        return 0
+    let extra_start = mir_mod.mir_get_type_d1(resolved)
+    mir_mod.mir_get_type_extra(extra_start + 1)
+
+pub fn mir_validate_place_type(mir_mod: &MirModule, body: &MirBody, place_id: i32) -> i32:
+    if place_id < 0 or place_id >= body.place_locals.len() as i32:
+        return 0
+    if place_id < body.place_sema_types.len() as i32:
+        let stored = body.place_sema_types.get(place_id as i64)
+        if stored > 0:
+            return stored
+    let local_id = body.place_locals.get(place_id as i64)
+    if local_id < 0 or local_id >= body.local_type_ids.len() as i32:
+        return 0
+    var current_ty: i32 = body.local_type_ids.get(local_id as i64)
+    let proj_start = body.place_proj_starts.get(place_id as i64)
+    let proj_count = body.place_proj_counts.get(place_id as i64)
+    if proj_count <= 0:
+        return current_ty
+    var active_variant_idx = -1
+
+    for pi in 0..proj_count:
+        let proj_kind = body.proj_kinds.get((proj_start + pi) as i64)
+        let proj_d0 = body.proj_d0.get((proj_start + pi) as i64)
+        let resolved = mir_mod.mir_resolve_alias(current_ty)
+        let tk = mir_mod.mir_get_type_kind(resolved)
+
+        if proj_kind == ProjKind.PK_DOWNCAST:
+            if not mir_validate_variant_exists(mir_mod, current_ty, proj_d0):
+                return 0
+            active_variant_idx = proj_d0
+            continue
+
+        if proj_kind == ProjKind.PK_FIELD:
+            var field_ty = 0
+            if active_variant_idx >= 0:
+                field_ty = mir_validate_enum_payload_type(mir_mod, current_ty, active_variant_idx, proj_d0)
+            else if tk == TypeKind.TY_TUPLE:
+                field_ty = mir_validate_tuple_elem_type(mir_mod, current_ty, proj_d0)
+            else if tk == TypeKind.TY_ARRAY or tk == TypeKind.TY_SLICE:
+                // Constant-index element projection: slice-pattern lowering
+                // spells array elements as field places (proj_d0 = index).
+                field_ty = mir_mod.mir_get_type_d0(resolved)
+            else:
+                field_ty = mir_validate_struct_field_type(mir_mod, current_ty, proj_d0)
+            if field_ty == 0:
+                return 0
+            current_ty = field_ty
+            active_variant_idx = -1
+            continue
+
+        if proj_kind == ProjKind.PK_TUPLE_INDEX:
+            let field_ty = mir_validate_tuple_elem_type(mir_mod, current_ty, proj_d0)
+            if field_ty == 0:
+                return 0
+            current_ty = field_ty
+            active_variant_idx = -1
+            continue
+
+        if proj_kind == ProjKind.PK_INDEX:
+            let elem_ty = mir_validate_indexed_element_type(mir_mod, current_ty)
+            if elem_ty == 0:
+                return 0
+            current_ty = elem_ty
+            active_variant_idx = -1
+            continue
+
+        if proj_kind == ProjKind.PK_DEREF:
+            if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF:
+                current_ty = mir_mod.mir_get_type_d0(resolved)
+                active_variant_idx = -1
+                continue
+            return 0
+
+        return 0
+
+    current_ty
+
+fn mir_validate_operand_type(mir_mod: &MirModule, body: &MirBody, operand_id: i32) -> i32:
+    if operand_id < 0 or operand_id >= body.operand_kinds.len() as i32:
+        return 0
+    let op_kind = body.operand_kinds.get(operand_id as i64)
+    let d0 = body.operand_d0.get(operand_id as i64)
+    if op_kind == OperandKind.OK_CONSTANT:
+        if d0 >= 0 and d0 < body.const_types.len() as i32:
+            return body.const_types.get(d0 as i64)
+        return 0
+    if op_kind == OperandKind.OK_COPY or op_kind == OperandKind.OK_MOVE:
+        return mir_validate_place_type(mir_mod, body, d0)
+    0
+
+fn mir_validate_is_compare_op(op: i32) -> bool:
+    op == BinaryOp.OP_EQ or op == BinaryOp.OP_NEQ or op == BinaryOp.OP_LT or op == BinaryOp.OP_GT or op == BinaryOp.OP_LTE or op == BinaryOp.OP_GTE
+
+fn mir_validate_compare_sensitive_type(mir_mod: &MirModule, tid: i32) -> bool:
+    if tid <= 0:
+        return false
+    let resolved = mir_mod.mir_resolve_alias(tid)
+    let tk = mir_mod.mir_get_type_kind(resolved)
+    tk == TypeKind.TY_STR or tk == TypeKind.TY_STRUCT or tk == TypeKind.TY_ENUM or tk == TypeKind.TY_GENERIC_INST or tk == TypeKind.TY_ARRAY or tk == TypeKind.TY_SLICE or tk == TypeKind.TY_TUPLE
+
+fn mir_validate_cast_supported(mir_mod: &MirModule, src_ty: i32, dst_ty: i32) -> bool:
+    if src_ty <= 0 or dst_ty <= 0:
+        return true
+    let src_inner = mir_validate_single_field_inner(mir_mod, src_ty)
+    if src_inner > 0 and src_inner != src_ty:
+        if mir_validate_cast_supported(mir_mod, src_inner, dst_ty):
+            return true
+    let dst_inner = mir_validate_single_field_inner(mir_mod, dst_ty)
+    if dst_inner > 0 and dst_inner != dst_ty:
+        if mir_validate_cast_supported(mir_mod, src_ty, dst_inner):
+            return true
+    if mir_validate_type_compatible_fast(mir_mod, dst_ty, src_ty) != 0 or
+       mir_validate_type_compatible_fast(mir_mod, src_ty, dst_ty) != 0:
+        return true
+    let src_resolved = mir_mod.mir_resolve_alias(src_ty)
+    let dst_resolved = mir_mod.mir_resolve_alias(dst_ty)
+    let src_kind = mir_mod.mir_get_type_kind(src_resolved)
+    let dst_kind = mir_mod.mir_get_type_kind(dst_resolved)
+    if src_kind == TypeKind.TY_NEVER:
+        return true
+    if (src_kind == TypeKind.TY_ENUM and dst_kind == TypeKind.TY_INT) or
+       (src_kind == TypeKind.TY_INT and dst_kind == TypeKind.TY_ENUM):
+        return true
+    if src_kind == TypeKind.TY_PTR or src_kind == TypeKind.TY_REF or
+       dst_kind == TypeKind.TY_PTR or dst_kind == TypeKind.TY_REF:
+        return true
+    if src_kind == TypeKind.TY_STR:
+        return dst_kind == TypeKind.TY_PTR or dst_kind == TypeKind.TY_REF or dst_kind == TypeKind.TY_STR
+    if src_kind == TypeKind.TY_STRUCT or src_kind == TypeKind.TY_ENUM or src_kind == TypeKind.TY_GENERIC_INST or src_kind == TypeKind.TY_ARRAY or src_kind == TypeKind.TY_SLICE or src_kind == TypeKind.TY_TUPLE:
+        // Allow bitpacked struct ↔ integer casts
+        if src_kind == TypeKind.TY_STRUCT and dst_kind == TypeKind.TY_INT:
+            if mir_mod.mir_is_bitpacked(src_resolved as i32):
+                return true
+        if dst_kind == TypeKind.TY_STRUCT and src_kind == TypeKind.TY_INT:
+            if mir_mod.mir_is_bitpacked(dst_resolved as i32):
+                return true
+        return false
+    true
+
+fn validate_typed_mir_body(mir_mod: &MirModule, body: &MirBody) -> MirValidationError:
+    let stmt_count = body.stmt_count()
+    for si in 0..stmt_count:
+        let stmt_kind = body.stmt_kinds.get(si as i64)
+        let d0 = body.stmt_d0.get(si as i64)
+        let d1 = body.stmt_d1.get(si as i64)
+        let span = body.stmt_spans.get(si as i64)
+
+        if stmt_kind == StmtKind.Assign:
+            let dest_ty = mir_validate_place_type(mir_mod, body, d0)
+            if dest_ty == 0:
+                return mir_validation_fail(body.fn_sym, span, "assign destination does not resolve to a concrete MIR type")
+            if d1 < 0 or d1 >= body.rval_kinds.len() as i32:
+                return mir_validation_fail(body.fn_sym, span, "assign rvalue is out of range during typed MIR verification")
+            let rk = body.rval_kinds.get(d1 as i64)
+            let rv_d0 = body.rval_d0.get(d1 as i64)
+            let rv_d1 = body.rval_d1.get(d1 as i64)
+            let rv_d2 = body.rval_d2.get(d1 as i64)
+
+            if rk == RvalueKind.RK_USE:
+                let src_ty = mir_validate_operand_type(mir_mod, body, rv_d0)
+                if src_ty == 0:
+                    var src_detail = "non-place operand"
+                    let src_op_kind = if rv_d0 >= 0 and rv_d0 < body.operand_kinds.len() as i32: body.operand_kinds.get(rv_d0 as i64) else: -1
+                    if src_op_kind == OperandKind.OK_COPY or src_op_kind == OperandKind.OK_MOVE:
+                        let sp = body.operand_d0.get(rv_d0 as i64)
+                        let sl = body.place_locals.get(sp as i64)
+                        let slt = if sl >= 0 and sl < body.local_type_ids.len() as i32: body.local_type_ids.get(sl as i64) else: -1
+                        let spc = body.place_proj_counts.get(sp as i64)
+                        let pk0 = if spc > 0: body.proj_kinds.get(body.place_proj_starts.get(sp as i64) as i64) else: -1
+                        src_detail = f"place local={sl} local_ty={slt} projs={spc} proj0_kind={pk0}"
+                    return mir_validation_fail(body.fn_sym, span, f"use rvalue does not resolve to a concrete MIR type ({src_detail})")
+                if not mir_validate_use_assign_compatible(mir_mod, dest_ty, src_ty):
+                    let dk = mir_mod.mir_get_type_kind(mir_mod.mir_resolve_alias(dest_ty)) as i32
+                    let sk = mir_mod.mir_get_type_kind(mir_mod.mir_resolve_alias(src_ty)) as i32
+                    return mir_validation_fail(body.fn_sym, span, f"use rvalue type is incompatible with assign destination (dest ty={dest_ty} kind={dk}, src ty={src_ty} kind={sk})")
+            else if rk == RvalueKind.RK_REF:
+                if mir_validate_place_type(mir_mod, body, rv_d1) == 0:
+                    return mir_validation_fail(body.fn_sym, span, "ref rvalue does not resolve to a concrete place type")
+            else if rk == RvalueKind.RK_ADDR_OF or rk == RvalueKind.RK_DISCRIMINANT or rk == RvalueKind.RK_LEN:
+                if mir_validate_place_type(mir_mod, body, rv_d0) == 0:
+                    return mir_validation_fail(body.fn_sym, span, "place-based rvalue does not resolve to a concrete place type")
+            else if rk == RvalueKind.RK_SLICE:
+                if mir_validate_place_type(mir_mod, body, rv_d0) == 0:
+                    return mir_validation_fail(body.fn_sym, span, "slice base does not resolve to a concrete place type")
+                if mir_validate_operand_type(mir_mod, body, rv_d1) == 0 or mir_validate_operand_type(mir_mod, body, rv_d2) == 0:
+                    return mir_validation_fail(body.fn_sym, span, "slice bounds do not resolve to concrete MIR types")
+
+            if rk == RvalueKind.RK_BIN_OP and (rv_d0 == BinaryOp.OP_IN or rv_d0 == BinaryOp.OP_NOT_IN):
+                return mir_validation_fail(body.fn_sym, span, "membership operator must be lowered before MIR codegen")
+
+            if rk == RvalueKind.RK_BIN_OP and mir_validate_is_compare_op(rv_d0):
+                let lhs_ty = mir_validate_operand_type(mir_mod, body, rv_d1)
+                let rhs_ty = mir_validate_operand_type(mir_mod, body, rv_d2)
+                if lhs_ty > 0 and rhs_ty > 0 and
+                   mir_validate_compare_sensitive_type(mir_mod, lhs_ty) and
+                   mir_validate_compare_sensitive_type(mir_mod, rhs_ty) and
+                   mir_validate_type_compatible_fast(mir_mod, lhs_ty, rhs_ty) == 0 and
+                   mir_validate_type_compatible_fast(mir_mod, rhs_ty, lhs_ty) == 0:
+                    let __lk = mir_mod.mir_get_type_kind(mir_mod.mir_resolve_alias(lhs_ty)) as i32
+                    let __rk = mir_mod.mir_get_type_kind(mir_mod.mir_resolve_alias(rhs_ty)) as i32
+                    with_eprint(f"DEBUG cmp fail: lhs_ty={lhs_ty} lhs_kind={__lk} rhs_ty={rhs_ty} rhs_kind={__rk}")
+                    return mir_validation_fail(body.fn_sym, span, "comparison operands have incompatible MIR types")
+
+            if rk == RvalueKind.RK_CAST:
+                let src_ty = if rv_d2 > 0: rv_d2 else: mir_validate_operand_type(mir_mod, body, rv_d0)
+                let cast_ty = if rv_d1 > 0: rv_d1 else: dest_ty
+                if src_ty > 0 and cast_ty > 0 and not mir_validate_cast_supported(mir_mod, src_ty, cast_ty):
+                    return mir_validation_fail(body.fn_sym, span, "unsupported cast in MIR")
+            continue
+
+        if stmt_kind == StmtKind.Drop:
+            if mir_validate_place_type(mir_mod, body, d0) == 0:
+                return mir_validation_fail(body.fn_sym, span, "drop target does not resolve to a concrete MIR type")
+
+    let bb_count = body.block_count()
+    for bb in 0..bb_count:
+        let term_kind = body.bb_term_kinds.get(bb as i64)
+        let d0 = body.bb_term_d0.get(bb as i64)
+        let d1 = body.bb_term_d1.get(bb as i64)
+        let d2 = body.bb_term_d2.get(bb as i64)
+        let span = body.bb_term_spans.get(bb as i64)
+
+        if term_kind == TermKind.TK_SWITCH_INT:
+            if mir_validate_operand_type(mir_mod, body, d0) == 0:
+                return mir_validation_fail(body.fn_sym, span, "switch operand does not resolve to a concrete MIR type")
+            continue
+
+        if term_kind == TermKind.TK_CALL:
+            let dest_ty = mir_validate_place_type(mir_mod, body, d2)
+            let resolved_dest = mir_mod.mir_resolve_alias(dest_ty)
+            let dest_is_unit = dest_ty > 0 and mir_mod.mir_get_type_kind(resolved_dest) == TypeKind.TY_VOID
+            if body.call_intrinsic(d1) == MirIntrinsic.VEC_PUSH and not dest_is_unit:
+                return mir_validation_fail(body.fn_sym, span, "Vec.push call destination must be Unit")
+
+            let carrier_place = body.call_pipeline_receiver_place(d1)
+            if carrier_place >= 0:
+                if not dest_is_unit:
+                    return mir_validation_fail(body.fn_sym, span, "D21 receiver-place pipeline call destination must be Unit")
+                if carrier_place >= body.place_locals.len() as i32:
+                    return mir_validation_fail(body.fn_sym, span, "D21 pipeline carrier place is out of range")
+                let arg_start = body.call_arg_starts.get(d1 as i64)
+                let arg_count = body.call_arg_counts.get(d1 as i64)
+                if arg_count <= 0:
+                    return mir_validation_fail(body.fn_sym, span, "D21 receiver-place pipeline call has no receiver argument")
+                let recv_operand = body.call_arg_operands.get(arg_start as i64)
+                let recv_kind = body.operand_kinds.get(recv_operand as i64)
+                if recv_kind != OperandKind.OK_COPY and recv_kind != OperandKind.OK_MOVE:
+                    return mir_validation_fail(body.fn_sym, span, "D21 pipeline receiver argument is not a place operand")
+                if body.operand_d0.get(recv_operand as i64) != carrier_place:
+                    return mir_validation_fail(body.fn_sym, span, "D21 pipeline carrier is not the call receiver place")
+            continue
+
+    mir_validation_ok()
+
+fn validate_typed_mir_module(mir_mod: &MirModule) -> MirValidationError:
+    let shape_err = validate_mir_module(mir_mod)
+    if shape_err.len() > 0:
+        return mir_validation_fail(0, 0, shape_err)
+    for bi in 0..mir_mod.bodies.len() as i32:
+        let body = &mir_mod.bodies[bi as i64]
+        if body.lowering_failed != 0:
+            continue
+        let err = validate_typed_mir_body(mir_mod, body)
+        if mir_validation_has_error(err):
+            return err
+    mir_validation_ok()
+
+fn audit_probe_expect(case_name: &str, expected: &str, actual: &str) -> i32:
+    let matched = if expected == "<accept>": actual.len() == 0 else: actual.contains(expected)
+    let status = if matched: "PASS" else: "FAIL"
+    print(status ++ "|" ++ case_name ++ "|expected=" ++ expected ++ "|actual=" ++ actual)
+    if matched: 0 else: 1
+
+fn audit_probe_base_body(fn_sym: i32) -> MirBody:
+    var body = MirBody.init_for_fn(fn_sym)
+    body.local_type_ids.set_i32(0, 1)
+    let bb = body.new_block()
+    body.set_terminator(bb as i32, TermKind.TK_RETURN, 0, 0, 0, 0, 0)
+    let _place = body.new_place(0)
+    body
+
+fn audit_probe_module_from_body(body: MirBody) -> MirModule:
+    var mir_mod = MirModule.init()
+    mir_mod.sema_type_kinds.push(TypeKind.TY_ERR)
+    mir_mod.sema_type_d0.push(0)
+    mir_mod.sema_type_d1.push(0)
+    mir_mod.sema_type_d2.push(0)
+    mir_mod.sema_type_kinds.push(TypeKind.TY_VOID)
+    mir_mod.sema_type_d0.push(0)
+    mir_mod.sema_type_d1.push(0)
+    mir_mod.sema_type_d2.push(0)
+    mir_mod.sema_type_kinds.push(TypeKind.TY_INT)
+    mir_mod.sema_type_d0.push(32)
+    mir_mod.sema_type_d1.push(1)
+    mir_mod.sema_type_d2.push(0)
+    mir_mod.sema_type_kinds.push(TypeKind.TY_BOOL)
+    mir_mod.sema_type_d0.push(0)
+    mir_mod.sema_type_d1.push(0)
+    mir_mod.sema_type_d2.push(0)
+    mir_mod.sema_type_kinds.push(TypeKind.TY_STR)
+    mir_mod.sema_type_d0.push(0)
+    mir_mod.sema_type_d1.push(0)
+    mir_mod.sema_type_d2.push(0)
+    mir_mod.sema_type_kinds.push(TypeKind.TY_ARRAY)
+    mir_mod.sema_type_d0.push(2)
+    mir_mod.sema_type_d1.push(4)
+    mir_mod.sema_type_d2.push(0)
+    mir_mod.add_body(move body)
+    mir_mod
+
+impl MirBody:
+    mut fn audit_probe_const_operand(type_id: i32) -> i32:
+        let cid = self.new_const(ConstKind.CK_INT, 1, 0, 0, type_id)
+        self.new_operand(OperandKind.OK_CONSTANT, cid)
+
+    mut fn audit_probe_zero_rvalue(type_id: i32) -> i32:
+        let cid = self.new_const(ConstKind.CK_ZERO_SIZED, 0, 0, 0, type_id)
+        let operand = self.new_operand(OperandKind.OK_CONSTANT, cid)
+        self.new_rvalue(RvalueKind.RK_USE, operand, 0, 0)
+
+    mut fn audit_probe_use_rvalue(type_id: i32) -> i32:
+        let operand = self.audit_probe_const_operand(type_id)
+        self.new_rvalue(RvalueKind.RK_USE, operand, 0, 0)
+
+    mut fn audit_probe_empty_call() -> i32:
+        let call_id = self.call_arg_starts.len() as i32
+        self.call_arg_starts.push(self.call_arg_operands.len() as i32)
+        self.call_arg_counts.push(0)
+        self.call_intrinsic_kinds.push(MirIntrinsic.NONE)
+        self.call_ast_nodes.push(0)
+        self.call_sig_indices.push(-1)
+        self.call_mono_syms.push(0)
+        self.call_contract_required.push(0)
+        self.call_pipeline_receiver_places.push(-1)
+        call_id
+
+fn audit_probe_shape_module_case(case_id: i32) -> str:
+    if case_id == 0:
+        var mismatch = MirModule.init()
+        mismatch.body_fn_syms.push(0)
+        return validate_mir_module(mismatch)
+    if case_id == 1:
+        var mismatch2 = audit_probe_module_from_body(audit_probe_base_body(0))
+        mismatch2.body_fn_syms.set_i32(0, 41)
+        return validate_mir_module(mismatch2)
+    if case_id == 2:
+        var duplicate = MirModule.init()
+        duplicate.bodies.push(audit_probe_base_body(41))
+        duplicate.body_fn_syms.push(41)
+        duplicate.bodies.push(audit_probe_base_body(41))
+        duplicate.body_fn_syms.push(41)
+        duplicate.body_index_by_fn_sym.insert(41, 0)
+        return validate_mir_module(duplicate)
+    if case_id == 3:
+        var missing_index = MirModule.init()
+        missing_index.bodies.push(audit_probe_base_body(41))
+        missing_index.body_fn_syms.push(41)
+        return validate_mir_module(missing_index)
+    var wrong_index = audit_probe_module_from_body(audit_probe_base_body(41))
+    wrong_index.body_index_by_fn_sym.insert(41, 7)
+    validate_mir_module(wrong_index)
+
+fn audit_probe_shape_module_expected(case_id: i32) -> str:
+    if case_id == 0: return "bodies/body_fn_syms length mismatch"
+    if case_id == 1: return "body_fn_syms mismatch"
+    if case_id == 2: return "duplicate MIR body"
+    if case_id == 3: return "missing body index"
+    "body index map mismatch"
+
+fn audit_probe_shape_body_case(case_id: i32) -> str:
+    var body = audit_probe_base_body(0)
+    if case_id == 0:
+        let _ = body.local_type_ids.pop()
+    else if case_id == 1:
+        body.local_mutables.push(0)
+    else if case_id == 2:
+        body.local_names.push(0)
+    else if case_id == 3:
+        body.local_is_user_var.push(0)
+    else if case_id == 4:
+        body.n_params = 2
+    else if case_id == 5:
+        let _ = body.bb_stmt_starts.pop()
+    else if case_id == 6:
+        body.bb_stmt_counts.push(0)
+    else if case_id == 7:
+        body.bb_term_kinds.push(TermKind.TK_RETURN)
+    else if case_id == 8:
+        body.bb_term_d0.push(0)
+    else if case_id == 9:
+        body.bb_is_cleanup.push(0)
+    else if case_id == 10:
+        body.bb_term_spans.push(0)
+    else if case_id == 11:
+        body.bb_no_suspend_nodes.push(0)
+    else if case_id == 12:
+        body.stmt_kinds.push(StmtKind.Nop)
+    else if case_id == 13:
+        body.place_locals.push(0)
+    else if case_id == 14:
+        body.proj_kinds.push(ProjKind.PK_DEREF)
+    else if case_id == 15:
+        body.rval_kinds.push(RvalueKind.RK_USE)
+    else if case_id == 16:
+        body.operand_kinds.push(OperandKind.OK_CONSTANT)
+    else if case_id == 17:
+        body.const_kinds.push(ConstKind.CK_UNIT)
+    else if case_id == 18:
+        body.switch_table_starts.push(0)
+    else if case_id == 19:
+        body.switch_table_vals.push(0)
+    else if case_id == 20:
+        body.agg_field_starts.push(0)
+    else if case_id == 21:
+        body.call_arg_starts.push(0)
+    else if case_id == 22:
+        body.call_arg_starts.push(0)
+        body.call_arg_counts.push(0)
+    else if case_id == 23:
+        body.bb_stmt_starts.set_i32(0, 1)
+    else if case_id == 24:
+        body.set_terminator(0, TermKind.TK_GOTO, 9, 0, 0, 0, 0)
+    else if case_id >= 25 and case_id <= 27:
+        let switch_operand = body.audit_probe_const_operand(3)
+        body.switch_table_starts.push(0)
+        body.switch_table_counts.push(0)
+        let switch_d0 = if case_id == 25: 9 else: switch_operand
+        let switch_d1 = if case_id == 26: 9 else: 0
+        let switch_d2 = if case_id == 27: 9 else: 0
+        body.set_terminator(0, TermKind.TK_SWITCH_INT, switch_d0, switch_d1, switch_d2, 0, 0)
+    else if case_id >= 28 and case_id <= 31:
+        let next = body.new_block()
+        body.set_terminator(next as i32, TermKind.TK_RETURN, 0, 0, 0, 0, 0)
+        let callee = body.audit_probe_const_operand(2)
+        let call_id = body.audit_probe_empty_call()
+        let call_d0 = if case_id == 28: 99 else: callee
+        let call_d1 = if case_id == 29: 99 else: call_id
+        let call_d2 = if case_id == 30: 99 else: 0
+        let call_d3 = if case_id == 31: 99 else: next as i32
+        body.set_terminator(0, TermKind.TK_CALL, call_d0, call_d1, call_d2, call_d3, 0)
+    else if case_id == 32 or case_id == 33:
+        let next2 = body.new_block()
+        body.set_terminator(next2 as i32, TermKind.TK_RETURN, 0, 0, 0, 0, 0)
+        let drop_place = if case_id == 32: 99 else: 0
+        let drop_target = if case_id == 33: 99 else: next2 as i32
+        body.set_terminator(0, TermKind.TK_DROP_AND_GOTO, drop_place, drop_target, 0, 0, 0)
+    else if case_id == 34:
+        body.bb_term_kinds.set_i32(0, 999)
+    else if case_id == 35 or case_id == 36:
+        let valid_rvalue = body.audit_probe_use_rvalue(1)
+        let assign_place = if case_id == 35: 99 else: 0
+        let assign_rvalue = if case_id == 36: 99 else: valid_rvalue
+        body.push_stmt(0, StmtKind.Assign, assign_place, assign_rvalue, 0)
+    else if case_id == 37:
+        body.push_stmt(0, StmtKind.StorageLive, 99, 0, 0)
+    else if case_id == 38:
+        body.push_stmt(0, StmtKind.Drop, 99, 0, 0)
+    else if case_id == 39:
+        body.push_stmt(0, 999, 0, 0, 0)
+    else if case_id == 40:
+        body.place_locals.set_i32(0, 99)
+    else if case_id == 41:
+        body.place_proj_starts.set_i32(0, 1)
+        body.place_proj_counts.set_i32(0, 1)
+    else if case_id >= 42 and case_id <= 46:
+        let projection_kind = if case_id == 42: ProjKind.PK_FIELD else if case_id == 43: ProjKind.PK_TUPLE_INDEX else if case_id == 44: ProjKind.PK_INDEX else if case_id == 45: ProjKind.PK_DOWNCAST else: 999
+        let projection_data = if case_id == 44: 99 else: -1
+        let _ = body.new_place_with_projection(0, projection_kind, projection_data, 1)
+    else if case_id >= 47 and case_id <= 49:
+        let operand_kind = if case_id == 47: OperandKind.OK_COPY else if case_id == 48: OperandKind.OK_CONSTANT else: 999
+        let operand_data = 99
+        let _ = body.new_operand(operand_kind, operand_data)
+    else if case_id >= 50 and case_id <= 64:
+        if case_id == 50: let _ = body.new_rvalue(RvalueKind.RK_USE, 99, 0, 0)
+        else if case_id == 51: let _ = body.new_rvalue(RvalueKind.RK_BIN_OP, BinaryOp.OP_ADD, 99, 99)
+        else if case_id == 52: let _ = body.new_rvalue(RvalueKind.RK_UN_OP, UnaryOp.UOP_NEGATE, 99, 0)
+        else if case_id == 53: let _ = body.new_rvalue(RvalueKind.RK_REF, 99, 0, 0)
+        else if case_id == 54: let _ = body.new_rvalue(RvalueKind.RK_REF, BorrowKind.SHARED, 99, 0)
+        else if case_id == 55: let _ = body.new_rvalue(RvalueKind.RK_ADDR_OF, 99, 0, 0)
+        else if case_id == 56: let _ = body.new_rvalue(RvalueKind.RK_AGGREGATE, 0, 99, 0)
+        else if case_id == 57: let _ = body.new_rvalue(RvalueKind.RK_DISCRIMINANT, 99, 0, 0)
+        else if case_id == 58: let _ = body.new_rvalue(RvalueKind.RK_CAST, 99, 0, 0)
+        else if case_id == 59: let _ = body.new_rvalue(RvalueKind.RK_LEN, 99, 0, 0)
+        else if case_id == 60: let _ = body.new_rvalue(RvalueKind.RK_ARRAY_FILL, 99, 0, 0)
+        else if case_id == 61: let _ = body.new_rvalue(RvalueKind.RK_STR_CONCAT_N, 99, 0, 0)
+        else if case_id == 62: let _ = body.new_rvalue(RvalueKind.RK_SLICE, 99, 0, 0)
+        else if case_id == 63: let _ = body.new_rvalue(RvalueKind.RK_SLICE, 0, 99, 99)
+        else: let _ = body.new_rvalue(999, 0, 0, 0)
+    else if case_id == 65:
+        let _ = body.new_const(999, 0, 0, 0, 1)
+    else if case_id == 66 or case_id == 67:
+        body.switch_table_starts.push(if case_id == 66: 1 else: 0)
+        body.switch_table_counts.push(1)
+        body.switch_table_vals.push(0)
+        body.switch_table_targets.push(if case_id == 67: 99 else: 0)
+    else if case_id == 68 or case_id == 69:
+        body.agg_field_starts.push(if case_id == 68: 1 else: 0)
+        body.agg_field_counts.push(1)
+        body.agg_field_operands.push(99)
+    else if case_id == 70 or case_id == 71:
+        body.call_arg_starts.push(if case_id == 70: 1 else: 0)
+        body.call_arg_counts.push(1)
+        body.call_arg_operands.push(99)
+        body.call_intrinsic_kinds.push(MirIntrinsic.NONE)
+        body.call_ast_nodes.push(0)
+        body.call_sig_indices.push(-1)
+        body.call_mono_syms.push(0)
+        body.call_contract_required.push(0)
+        body.call_pipeline_receiver_places.push(-1)
+    validate_mir_body(body)
+
+fn audit_probe_shape_body_expected(case_id: i32) -> str:
+    if case_id == 0: return "missing return local"
+    if case_id == 1: return "locals/local_mutables length mismatch"
+    if case_id == 2: return "locals/local_names length mismatch"
+    if case_id == 3: return "locals/local_is_user_var length mismatch"
+    if case_id == 4: return "invalid n_params"
+    if case_id == 5: return "missing basic blocks"
+    if case_id == 6: return "bb_stmt_starts/bb_stmt_counts length mismatch"
+    if case_id == 7: return "bb_stmt_starts/bb_term_kinds length mismatch"
+    if case_id == 8: return "bb terminator payload length mismatch"
+    if case_id == 9: return "bb cleanup flag length mismatch"
+    if case_id == 10: return "bb_term_spans length mismatch"
+    if case_id == 11: return "bb_no_suspend_nodes length mismatch"
+    if case_id == 12: return "statement table length mismatch"
+    if case_id == 13: return "place table length mismatch"
+    if case_id == 14: return "projection table length mismatch"
+    if case_id == 15: return "rvalue table length mismatch"
+    if case_id == 16: return "operand table length mismatch"
+    if case_id == 17: return "constant table length mismatch"
+    if case_id == 18: return "switch table length mismatch"
+    if case_id == 19: return "switch value/target table length mismatch"
+    if case_id == 20: return "aggregate field table length mismatch"
+    if case_id == 21: return "call args table length mismatch"
+    if case_id == 22: return "call args/pipeline receiver place length mismatch"
+    if case_id == 23: return "statement span out of range"
+    if case_id == 24: return "goto target out of range"
+    if case_id == 25: return "switch operand out of range"
+    if case_id == 26: return "switch table id out of range"
+    if case_id == 27: return "switch default target out of range"
+    if case_id == 28: return "call callee operand out of range"
+    if case_id == 29: return "call arg table id out of range"
+    if case_id == 30: return "call destination place out of range"
+    if case_id == 31: return "call next block out of range"
+    if case_id == 32: return "drop place out of range"
+    if case_id == 33: return "drop target out of range"
+    if case_id == 34: return "unknown terminator kind"
+    if case_id == 35: return "assign destination out of range"
+    if case_id == 36: return "assign rvalue out of range"
+    if case_id == 37: return "storage local out of range"
+    if case_id == 38: return "drop place out of range"
+    if case_id == 39: return "unknown statement kind"
+    if case_id == 40: return "base local out of range"
+    if case_id == 41: return "projection span out of range"
+    if case_id == 42: return "field projection has negative index"
+    if case_id == 43: return "tuple projection has negative index"
+    if case_id == 44: return "index projection local out of range"
+    if case_id == 45: return "downcast projection has negative variant index"
+    if case_id == 46: return "unknown projection kind"
+    if case_id == 47: return "place out of range"
+    if case_id == 48: return "const out of range"
+    if case_id == 49: return "unknown operand kind"
+    if case_id == 50: return "use operand out of range"
+    if case_id == 51: return "binop operand out of range"
+    if case_id == 52: return "unop operand out of range"
+    if case_id == 53: return "invalid borrow kind"
+    if case_id == 54: return "ref place out of range"
+    if case_id == 55: return "addr_of place out of range"
+    if case_id == 56: return "aggregate field table out of range"
+    if case_id == 57: return "discriminant place out of range"
+    if case_id == 58: return "cast operand out of range"
+    if case_id == 59: return "len place out of range"
+    if case_id == 60: return "array_fill operand out of range"
+    if case_id == 61: return "str_concat_n args out of range"
+    if case_id == 62: return "slice base place out of range"
+    if case_id == 63: return "slice bounds operand out of range"
+    if case_id == 64: return "unknown rvalue kind"
+    if case_id == 65: return "unknown const kind"
+    if case_id == 66: return "switch table0: span out of range"
+    if case_id == 67: return "switch table0: target out of range"
+    if case_id == 68: return "aggregate table0: span out of range"
+    if case_id == 69: return "aggregate table0: operand out of range"
+    if case_id == 70: return "call args table0: span out of range"
+    "call args table0: operand out of range"
+
+fn audit_probe_run_shape_matrix() -> i32:
+    var failures = 0
+    for case_id in 0..5:
+        failures = failures + audit_probe_expect(f"shape.module.{case_id}", audit_probe_shape_module_expected(case_id), audit_probe_shape_module_case(case_id))
+    for body_case in 0..72:
+        failures = failures + audit_probe_expect(f"shape.body.{body_case}", audit_probe_shape_body_expected(body_case), audit_probe_shape_body_case(body_case))
+    failures
+
+fn audit_probe_typed_body_case(case_id: i32) -> str:
+    var body = audit_probe_base_body(0)
+    if case_id == 0:
+        let local = body.new_local(0, 1, 0, 0)
+        let place = body.new_place(local)
+        let rvalue = body.audit_probe_use_rvalue(2)
+        body.push_stmt(0, StmtKind.Assign, place, rvalue, 0)
+    else if case_id == 1:
+        body.push_stmt(0, StmtKind.Assign, 0, 99, 0)
+    else if case_id == 2:
+        let local2 = body.new_local(0, 1, 0, 0)
+        let place2 = body.new_place(local2)
+        let operand = body.new_operand(OperandKind.OK_COPY, place2)
+        let rvalue2 = body.new_rvalue(RvalueKind.RK_USE, operand, 0, 0)
+        body.push_stmt(0, StmtKind.Assign, 0, rvalue2, 0)
+    else if case_id == 3:
+        let dest_local = body.new_local(4, 1, 0, 0)
+        let src_local = body.new_local(5, 1, 0, 0)
+        let dest_place = body.new_place(dest_local)
+        let src_place = body.new_place(src_local)
+        let src_operand = body.new_operand(OperandKind.OK_COPY, src_place)
+        let use_rvalue = body.new_rvalue(RvalueKind.RK_USE, src_operand, 0, 0)
+        body.push_stmt(0, StmtKind.Assign, dest_place, use_rvalue, 0)
+    else if case_id >= 4 and case_id <= 7:
+        let invalid_local = body.new_local(0, 1, 0, 0)
+        let invalid_place = body.new_place(invalid_local)
+        let kind = if case_id == 4: RvalueKind.RK_REF else if case_id == 5: RvalueKind.RK_ADDR_OF else if case_id == 6: RvalueKind.RK_DISCRIMINANT else: RvalueKind.RK_LEN
+        let typed_rvalue = if case_id == 4: body.new_rvalue(kind, BorrowKind.SHARED, invalid_place, 0) else: body.new_rvalue(kind, invalid_place, 0, 0)
+        body.push_stmt(0, StmtKind.Assign, 0, typed_rvalue, 0)
+    else if case_id == 8 or case_id == 9:
+        let invalid_local2 = body.new_local(0, 1, 0, 0)
+        let invalid_place2 = body.new_place(invalid_local2)
+        let bound = body.audit_probe_const_operand(2)
+        let slice_base = if case_id == 8: invalid_place2 else: 0
+        let slice_bound = if case_id == 9: body.new_operand(OperandKind.OK_COPY, invalid_place2) else: bound
+        let slice_rvalue = body.new_rvalue(RvalueKind.RK_SLICE, slice_base, slice_bound, bound)
+        body.push_stmt(0, StmtKind.Assign, 0, slice_rvalue, 0)
+    else if case_id == 10:
+        let left = body.audit_probe_const_operand(2)
+        let right = body.audit_probe_const_operand(2)
+        let membership = body.new_rvalue(RvalueKind.RK_BIN_OP, BinaryOp.OP_IN, left, right)
+        body.push_stmt(0, StmtKind.Assign, 0, membership, 0)
+    else if case_id == 11:
+        let str_local = body.new_local(4, 1, 0, 0)
+        let array_local = body.new_local(5, 1, 0, 0)
+        let bool_local = body.new_local(3, 1, 0, 0)
+        let str_place = body.new_place(str_local)
+        let array_place = body.new_place(array_local)
+        let bool_place = body.new_place(bool_local)
+        let left2 = body.new_operand(OperandKind.OK_COPY, str_place)
+        let right2 = body.new_operand(OperandKind.OK_COPY, array_place)
+        let comparison = body.new_rvalue(RvalueKind.RK_BIN_OP, BinaryOp.OP_EQ, left2, right2)
+        body.push_stmt(0, StmtKind.Assign, bool_place, comparison, 0)
+    else if case_id == 12:
+        let dest_local2 = body.new_local(4, 1, 0, 0)
+        let src_local2 = body.new_local(5, 1, 0, 0)
+        let dest_place2 = body.new_place(dest_local2)
+        let src_place2 = body.new_place(src_local2)
+        let cast_operand = body.new_operand(OperandKind.OK_COPY, src_place2)
+        let cast = body.new_rvalue(RvalueKind.RK_CAST, cast_operand, 4, 5)
+        body.push_stmt(0, StmtKind.Assign, dest_place2, cast, 0)
+    else if case_id == 13:
+        let invalid_drop_local = body.new_local(0, 1, 0, 0)
+        let invalid_drop_place = body.new_place(invalid_drop_local)
+        body.push_stmt(0, StmtKind.Drop, invalid_drop_place, 0, 0)
+    else if case_id == 14:
+        let invalid_switch_local = body.new_local(0, 1, 0, 0)
+        let invalid_switch_place = body.new_place(invalid_switch_local)
+        let invalid_switch_operand = body.new_operand(OperandKind.OK_COPY, invalid_switch_place)
+        body.switch_table_starts.push(0)
+        body.switch_table_counts.push(0)
+        body.set_terminator(0, TermKind.TK_SWITCH_INT, invalid_switch_operand, 0, 0, 0, 0)
+    else:
+        let next = body.new_block()
+        body.set_terminator(next as i32, TermKind.TK_RETURN, 0, 0, 0, 0, 0)
+        let callee = body.audit_probe_const_operand(2)
+        let call_id = body.audit_probe_empty_call()
+        var dest_place3 = 0
+        if case_id == 15 or case_id == 16:
+            let dest_local3 = body.new_local(2, 1, 0, 0)
+            dest_place3 = body.new_place(dest_local3)
+        if case_id == 15:
+            body.set_call_intrinsic(call_id, MirIntrinsic.VEC_PUSH)
+        else:
+            let carrier = if case_id == 17: 99 else: 0
+            body.set_call_pipeline_receiver_place(call_id, carrier)
+            if case_id == 16 or case_id == 20:
+                let receiver_place = if case_id == 20:
+                    let other_local = body.new_local(2, 1, 0, 0)
+                    body.new_place(other_local)
+                else:
+                    0
+                let receiver_operand = body.new_operand(OperandKind.OK_COPY, receiver_place)
+                body.call_arg_counts.set_i32(call_id, 1)
+                body.call_arg_operands.push(receiver_operand)
+            else if case_id == 19:
+                let receiver_constant = body.audit_probe_const_operand(2)
+                body.call_arg_counts.set_i32(call_id, 1)
+                body.call_arg_operands.push(receiver_constant)
+        body.set_terminator(0, TermKind.TK_CALL, callee, call_id, dest_place3, next as i32, 0)
+    let mir_mod = audit_probe_module_from_body(move body)
+    validate_typed_mir_body(mir_mod, &mir_mod.bodies[0]).message.clone()
+
+fn audit_probe_typed_expected(case_id: i32) -> str:
+    if case_id == 0: return "assign destination does not resolve to a concrete MIR type"
+    if case_id == 1: return "assign rvalue is out of range during typed MIR verification"
+    if case_id == 2: return "use rvalue does not resolve to a concrete MIR type"
+    if case_id == 3: return "use rvalue type is incompatible with assign destination"
+    if case_id == 4: return "ref rvalue does not resolve to a concrete place type"
+    if case_id == 5 or case_id == 6 or case_id == 7: return "place-based rvalue does not resolve to a concrete place type"
+    if case_id == 8: return "slice base does not resolve to a concrete place type"
+    if case_id == 9: return "slice bounds do not resolve to concrete MIR types"
+    if case_id == 10: return "membership operator must be lowered before MIR codegen"
+    if case_id == 11: return "comparison operands have incompatible MIR types"
+    if case_id == 12: return "unsupported cast in MIR"
+    if case_id == 13: return "drop target does not resolve to a concrete MIR type"
+    if case_id == 14: return "switch operand does not resolve to a concrete MIR type"
+    if case_id == 15: return "Vec.push call destination must be Unit"
+    if case_id == 16: return "D21 receiver-place pipeline call destination must be Unit"
+    if case_id == 17: return "D21 pipeline carrier place is out of range"
+    if case_id == 18: return "D21 receiver-place pipeline call has no receiver argument"
+    if case_id == 19: return "D21 pipeline receiver argument is not a place operand"
+    "D21 pipeline carrier is not the call receiver place"
+
+fn audit_probe_typed_blind_case(case_id: i32) -> str:
+    var body = audit_probe_base_body(0)
+    if case_id == 0 or case_id == 1:
+        let dest_local = body.new_local(4, 1, 0, 0)
+        let src_local = body.new_local(5, 1, 0, 0)
+        let dest_place = body.new_place(dest_local)
+        let src_place = body.new_place(src_local)
+        let operand = body.new_operand(OperandKind.OK_COPY, src_place)
+        let rvalue = if case_id == 0: body.new_rvalue(RvalueKind.RK_BIN_OP, BinaryOp.OP_ADD, operand, operand) else: body.new_rvalue(RvalueKind.RK_UN_OP, UnaryOp.UOP_NEGATE, operand, 0)
+        body.push_stmt(0, StmtKind.Assign, dest_place, rvalue, 0)
+    else if case_id == 2:
+        let dest_local2 = body.new_local(4, 1, 0, 0)
+        let dest_place2 = body.new_place(dest_local2)
+        let field_operand = body.audit_probe_const_operand(2)
+        body.agg_field_starts.push(0)
+        body.agg_field_counts.push(1)
+        body.agg_field_operands.push(field_operand)
+        body.agg_field_name_syms.push(0)
+        let aggregate = body.new_rvalue(RvalueKind.RK_AGGREGATE, 0, 0, 0)
+        body.push_stmt(0, StmtKind.Assign, dest_place2, aggregate, 0)
+    else if case_id == 3:
+        let dest_local3 = body.new_local(4, 1, 0, 0)
+        let dest_place3 = body.new_place(dest_local3)
+        let fill_operand = body.audit_probe_const_operand(2)
+        let fill = body.new_rvalue(RvalueKind.RK_ARRAY_FILL, fill_operand, 4, 0)
+        body.push_stmt(0, StmtKind.Assign, dest_place3, fill, 0)
+    else if case_id == 4:
+        let dest_local4 = body.new_local(4, 1, 0, 0)
+        let dest_place4 = body.new_place(dest_local4)
+        let concat_arg = body.audit_probe_const_operand(2)
+        let concat_call = body.audit_probe_empty_call()
+        body.call_arg_counts.set_i32(concat_call, 1)
+        body.call_arg_operands.push(concat_arg)
+        let concat = body.new_rvalue(RvalueKind.RK_STR_CONCAT_N, concat_call, 0, 0)
+        body.push_stmt(0, StmtKind.Assign, dest_place4, concat, 0)
+    else if case_id == 5 or case_id == 6:
+        let next = body.new_block()
+        body.set_terminator(next as i32, TermKind.TK_RETURN, 0, 0, 0, 0, 0)
+        let callee = body.audit_probe_const_operand(2)
+        let call_id = body.audit_probe_empty_call()
+        let bad_arg = body.audit_probe_const_operand(4)
+        body.call_arg_counts.set_i32(call_id, 1)
+        body.call_arg_operands.push(bad_arg)
+        let dest_local5 = body.new_local(if case_id == 5: 1 else: 4, 1, 0, 0)
+        let dest_place5 = body.new_place(dest_local5)
+        body.set_terminator(0, TermKind.TK_CALL, callee, call_id, dest_place5, next as i32, 0)
+    else if case_id == 7:
+        body.local_type_ids.set_i32(0, 2)
+        body.place_sema_types.set_i32(0, 2)
+    else if case_id == 9:
+        let skipped_local = body.new_local(0, 1, 0, 0)
+        let skipped_place = body.new_place(skipped_local)
+        let skipped_rvalue = body.audit_probe_use_rvalue(2)
+        body.push_stmt(0, StmtKind.Assign, skipped_place, skipped_rvalue, 0)
+        body.lowering_failed = 1
+    let mir_mod = audit_probe_module_from_body(move body)
+    if case_id == 8:
+        let _ = mir_mod.sema_type_d0.pop()
+        return validate_typed_mir_module(mir_mod).message.clone()
+    if case_id == 9:
+        return validate_typed_mir_module(mir_mod).message.clone()
+    validate_typed_mir_body(mir_mod, &mir_mod.bodies[0]).message.clone()
+
+fn audit_probe_run_typed_matrix() -> i32:
+    var failures = 0
+    for case_id in 0..21:
+        failures = failures + audit_probe_expect(f"typed.reject.{case_id}", audit_probe_typed_expected(case_id), audit_probe_typed_body_case(case_id))
+    for blind_case in 0..10:
+        failures = failures + audit_probe_expect(f"typed.accepts-unchecked.{blind_case}", "<accept>", audit_probe_typed_blind_case(blind_case))
+    let valid = audit_probe_module_from_body(audit_probe_base_body(0))
+    failures = failures + audit_probe_expect("typed.valid", "<accept>", validate_typed_mir_module(valid).message)
+    failures
+
+fn audit_probe_ownership_join_body(forward_join: bool) -> MirBody:
+    var body = audit_probe_base_body(0)
+    let tracked_local = body.new_local(2, 1, 0, 0)
+    let tracked_place = body.new_place(tracked_local)
+    let branch1 = body.new_block()
+    let branch2 = body.new_block()
+    let join = body.new_block()
+    let init_rvalue = body.audit_probe_use_rvalue(2)
+    let switch_operand = body.audit_probe_const_operand(3)
+    body.switch_table_starts.push(0)
+    body.switch_table_counts.push(1)
+    if forward_join:
+        body.switch_table_vals.push(1)
+        body.switch_table_targets.push(branch1 as i32)
+        body.set_terminator(0, TermKind.TK_SWITCH_INT, switch_operand, 0, branch2 as i32, 0, 0)
+        body.push_stmt(branch1 as i32, StmtKind.Assign, tracked_place, init_rvalue, 0)
+        body.set_terminator(branch1 as i32, TermKind.TK_GOTO, join as i32, 0, 0, 0, 0)
+        body.set_terminator(branch2 as i32, TermKind.TK_GOTO, join as i32, 0, 0, 0, 0)
+        body.push_stmt(join as i32, StmtKind.Drop, tracked_place, 0, 0)
+        body.set_terminator(join as i32, TermKind.TK_RETURN, 0, 0, 0, 0, 0)
+        return body
+    body.switch_table_vals.push(1)
+    body.switch_table_targets.push(branch2 as i32)
+    body.set_terminator(0, TermKind.TK_SWITCH_INT, switch_operand, 0, join as i32, 0, 0)
+    body.push_stmt(branch1 as i32, StmtKind.Drop, tracked_place, 0, 0)
+    body.set_terminator(branch1 as i32, TermKind.TK_RETURN, 0, 0, 0, 0, 0)
+    body.push_stmt(branch2 as i32, StmtKind.Assign, tracked_place, init_rvalue, 0)
+    body.set_terminator(branch2 as i32, TermKind.TK_GOTO, branch1 as i32, 0, 0, 0, 0)
+    body.set_terminator(join as i32, TermKind.TK_GOTO, branch1 as i32, 0, 0, 0, 0)
+    body
+
+fn audit_probe_ownership_reject_case(case_id: i32) -> str:
+    if case_id == 4:
+        let join_body = audit_probe_ownership_join_body(true)
+        let join_mod = audit_probe_module_from_body(move join_body)
+        return validate_ownership_body(join_mod, &join_mod.bodies[0])
+    var body = audit_probe_base_body(0)
+    if case_id == 0 or case_id == 1 or case_id == 2 or case_id == 3:
+        var target_place = 99
+        if case_id == 1 or case_id == 3:
+            let target_local = body.new_local(0, 1, 0, 0)
+            target_place = body.new_place(target_local)
+        if case_id == 0 or case_id == 1:
+            let rvalue = body.audit_probe_use_rvalue(2)
+            body.push_stmt(0, StmtKind.Assign, target_place, rvalue, 0)
+        else:
+            body.push_stmt(0, StmtKind.Drop, target_place, 0, 0)
+    else:
+        let next = body.new_block()
+        body.set_terminator(next as i32, TermKind.TK_RETURN, 0, 0, 0, 0, 0)
+        var target_place2 = 99
+        if case_id == 6 or case_id == 8:
+            let target_local2 = body.new_local(0, 1, 0, 0)
+            target_place2 = body.new_place(target_local2)
+        if case_id == 5 or case_id == 6:
+            let callee = body.audit_probe_const_operand(2)
+            let call_id = body.audit_probe_empty_call()
+            body.set_terminator(0, TermKind.TK_CALL, callee, call_id, target_place2, next as i32, 0)
+        else:
+            body.set_terminator(0, TermKind.TK_DROP_AND_GOTO, target_place2, next as i32, 0, 0, 0)
+    let mir_mod = audit_probe_module_from_body(move body)
+    validate_ownership_body(mir_mod, &mir_mod.bodies[0])
+
+fn audit_probe_ownership_expected(case_id: i32) -> str:
+    if case_id == 0 or case_id == 2: return "ownership target place out of range"
+    if case_id == 1 or case_id == 3: return "ownership target has no concrete MIR type"
+    if case_id == 4: return "<accept>"
+    if case_id == 5 or case_id == 7: return "ownership terminator place out of range"
+    "ownership terminator place has no concrete MIR type"
+
+fn audit_probe_ownership_join_state(forward_join: bool) -> str:
+    let body = audit_probe_ownership_join_body(forward_join)
+    let blocks = mir_drop_state_compute_blocks(body)
+    let join_bb = if forward_join: 3 else: 1
+    let state = mir_drop_state_block_input(body, blocks, join_bb)
+    mir_drop_state_name(mir_drop_state_get_place(state, body, 1))
+
+fn audit_probe_ownership_blind_case(case_id: i32) -> str:
+    if case_id == 1:
+        let backward_body = audit_probe_ownership_join_body(false)
+        let backward_mod = audit_probe_module_from_body(move backward_body)
+        return validate_ownership_body(backward_mod, &backward_mod.bodies[0])
+    var body = audit_probe_base_body(0)
+    let local = body.new_local(2, 1, 0, 0)
+    let place = body.new_place(local)
+    if case_id == 0:
+        body.push_stmt(0, StmtKind.Drop, place, 0, 0)
+    else:
+        let zero = body.audit_probe_zero_rvalue(2)
+        let killed_operand = body.new_operand(OperandKind.OK_COPY, place)
+        let killed_use = body.new_rvalue(RvalueKind.RK_USE, killed_operand, 0, 0)
+        let dest_local = body.new_local(2, 1, 0, 0)
+        let dest_place = body.new_place(dest_local)
+        body.push_stmt(0, StmtKind.Assign, place, zero, 0)
+        body.push_stmt(0, StmtKind.Assign, dest_place, killed_use, 0)
+    let mir_mod = audit_probe_module_from_body(move body)
+    validate_ownership_body(mir_mod, &mir_mod.bodies[0])
+
+fn audit_probe_run_ownership_matrix() -> i32:
+    var failures = 0
+    for case_id in 0..9:
+        let label = if case_id == 4: "ownership.accepts-forward-conditional-init-drop" else: f"ownership.reject.{case_id}"
+        failures = failures + audit_probe_expect(label, audit_probe_ownership_expected(case_id), audit_probe_ownership_reject_case(case_id))
+    failures = failures + audit_probe_expect("ownership.forward-conditional-init-state", "Maybe", audit_probe_ownership_join_state(true))
+    failures = failures + audit_probe_expect("ownership.later-predecessor-state", "Uninit", audit_probe_ownership_join_state(false))
+    failures = failures + audit_probe_expect("ownership.accepts-uninit-drop", "<accept>", audit_probe_ownership_blind_case(0))
+    failures = failures + audit_probe_expect("ownership.accepts-later-predecessor-join", "<accept>", audit_probe_ownership_blind_case(1))
+    failures = failures + audit_probe_expect("ownership.accepts-use-after-kill", "<accept>", audit_probe_ownership_blind_case(2))
+    let shape_bad = audit_probe_module_from_body(audit_probe_base_body(0))
+    shape_bad.body_fn_syms.push(0)
+    failures = failures + audit_probe_expect("ownership.module-shape-gate", "MIR shape: bodies/body_fn_syms length mismatch", validate_ownership_mir_module(shape_bad))
+    var skipped_body = audit_probe_base_body(0)
+    let skipped_local = skipped_body.new_local(0, 1, 0, 0)
+    let skipped_place = skipped_body.new_place(skipped_local)
+    skipped_body.push_stmt(0, StmtKind.Drop, skipped_place, 0, 0)
+    skipped_body.lowering_failed = 1
+    let skipped_mod = audit_probe_module_from_body(move skipped_body)
+    failures = failures + audit_probe_expect("ownership.module-lowering-failed-skip", "<accept>", validate_ownership_mir_module(skipped_mod))
+    let valid = audit_probe_module_from_body(audit_probe_base_body(0))
+    failures = failures + audit_probe_expect("ownership.valid", "<accept>", validate_ownership_mir_module(valid))
+    failures
+
+fn audit_probe_uak_simple_case(case_id: i32) -> MirBody:
+    var body = audit_probe_base_body(0)
+    let tracked_local = body.new_local(2, 1, 0, 0)
+    let dest_local = body.new_local(2, 1, 0, 0)
+    let tracked_place = body.new_place(tracked_local)
+    let dest_place = body.new_place(dest_local)
+    let zero = body.audit_probe_zero_rvalue(2)
+    let tracked_operand = body.new_operand(OperandKind.OK_COPY, tracked_place)
+    body.push_stmt(0, StmtKind.Assign, tracked_place, zero, 0)
+    if case_id == 0:
+        let use_rvalue = body.new_rvalue(RvalueKind.RK_USE, tracked_operand, 0, 0)
+        body.push_stmt(0, StmtKind.Assign, dest_place, use_rvalue, 0)
+    else if case_id == 1:
+        body.agg_field_starts.push(0)
+        body.agg_field_counts.push(1)
+        body.agg_field_operands.push(tracked_operand)
+        body.agg_field_name_syms.push(0)
+        let aggregate = body.new_rvalue(RvalueKind.RK_AGGREGATE, 0, 0, 0)
+        body.push_stmt(0, StmtKind.Assign, dest_place, aggregate, 0)
+    else if case_id == 2:
+        let revival = body.audit_probe_use_rvalue(2)
+        let use_after_revival = body.new_rvalue(RvalueKind.RK_USE, tracked_operand, 0, 0)
+        body.push_stmt(0, StmtKind.Assign, tracked_place, revival, 0)
+        body.push_stmt(0, StmtKind.Assign, dest_place, use_after_revival, 0)
+    else if case_id == 3:
+        let live_use = body.new_rvalue(RvalueKind.RK_USE, tracked_operand, 0, 0)
+        body.push_stmt(0, StmtKind.StorageLive, tracked_local, 0, 0)
+        body.push_stmt(0, StmtKind.Assign, dest_place, live_use, 0)
+    else if case_id == 4:
+        let bin_rhs = body.audit_probe_const_operand(2)
+        let binop = body.new_rvalue(RvalueKind.RK_BIN_OP, BinaryOp.OP_ADD, tracked_operand, bin_rhs)
+        body.push_stmt(0, StmtKind.Assign, dest_place, binop, 0)
+    else if case_id == 5:
+        let unop = body.new_rvalue(RvalueKind.RK_UN_OP, UnaryOp.UOP_NEGATE, tracked_operand, 0)
+        body.push_stmt(0, StmtKind.Assign, dest_place, unop, 0)
+    else if case_id == 6:
+        let concat_call = body.audit_probe_empty_call()
+        body.call_arg_counts.set_i32(concat_call, 1)
+        body.call_arg_operands.push(tracked_operand)
+        let concat = body.new_rvalue(RvalueKind.RK_STR_CONCAT_N, concat_call, 0, 0)
+        body.push_stmt(0, StmtKind.Assign, dest_place, concat, 0)
+    else if case_id == 7:
+        let bound = body.audit_probe_const_operand(2)
+        let slice = body.new_rvalue(RvalueKind.RK_SLICE, 0, tracked_operand, bound)
+        body.push_stmt(0, StmtKind.Assign, dest_place, slice, 0)
+    else if case_id == 8:
+        let next = body.new_block()
+        body.set_terminator(next as i32, TermKind.TK_RETURN, 0, 0, 0, 0, 0)
+        let callee = body.audit_probe_const_operand(2)
+        let call_id = body.audit_probe_empty_call()
+        body.call_arg_counts.set_i32(call_id, 1)
+        body.call_arg_operands.push(tracked_operand)
+        body.set_terminator(0, TermKind.TK_CALL, callee, call_id, dest_place, next as i32, 0)
+    else if case_id == 9:
+        body.switch_table_starts.push(0)
+        body.switch_table_counts.push(0)
+        body.set_terminator(0, TermKind.TK_SWITCH_INT, tracked_operand, 0, 0, 0, 0)
+    else if case_id == 10:
+        body.push_stmt(0, StmtKind.Drop, tracked_place, 0, 0)
+    body
+
+fn audit_probe_uak_storage_dead_body() -> MirBody:
+    var body = audit_probe_base_body(0)
+    let tracked_local = body.new_local(2, 1, 0, 0)
+    let dest_local = body.new_local(2, 1, 0, 0)
+    let tracked_place = body.new_place(tracked_local)
+    let dest_place = body.new_place(dest_local)
+    let tracked_operand = body.new_operand(OperandKind.OK_COPY, tracked_place)
+    let tracked_use = body.new_rvalue(RvalueKind.RK_USE, tracked_operand, 0, 0)
+    body.push_stmt(0, StmtKind.StorageDead, tracked_local, 0, 0)
+    body.push_stmt(0, StmtKind.Assign, dest_place, tracked_use, 0)
+    body
+
+fn audit_probe_uak_local_threshold_body(local_count: i32) -> MirBody:
+    var body = audit_probe_uak_simple_case(0)
+    while body.local_count() < local_count:
+        let _ = body.new_local(2, 1, 0, 0)
+    body
+
+fn audit_probe_uak_branch_body(join_use: bool) -> MirBody:
+    var body = audit_probe_base_body(0)
+    let tracked_local = body.new_local(2, 1, 0, 0)
+    let dest_local = body.new_local(2, 1, 0, 0)
+    let tracked_place = body.new_place(tracked_local)
+    let dest_place = body.new_place(dest_local)
+    let branch1 = body.new_block()
+    let branch2 = body.new_block()
+    let join = body.new_block()
+    let switch_operand = body.audit_probe_const_operand(3)
+    body.switch_table_starts.push(0)
+    body.switch_table_counts.push(1)
+    body.switch_table_vals.push(1)
+    body.switch_table_targets.push(branch1 as i32)
+    body.set_terminator(0, TermKind.TK_SWITCH_INT, switch_operand, 0, branch2 as i32, 0, 0)
+    let zero = body.audit_probe_zero_rvalue(2)
+    body.push_stmt(branch1 as i32, StmtKind.Assign, tracked_place, zero, 0)
+    body.set_terminator(branch1 as i32, TermKind.TK_GOTO, join as i32, 0, 0, 0, 0)
+    let use_operand = body.new_operand(OperandKind.OK_COPY, tracked_place)
+    let use_rvalue = body.new_rvalue(RvalueKind.RK_USE, use_operand, 0, 0)
+    if not join_use:
+        body.push_stmt(branch2 as i32, StmtKind.Assign, dest_place, use_rvalue, 0)
+    body.set_terminator(branch2 as i32, TermKind.TK_GOTO, join as i32, 0, 0, 0, 0)
+    if join_use:
+        body.push_stmt(join as i32, StmtKind.Assign, dest_place, use_rvalue, 0)
+    body.set_terminator(join as i32, TermKind.TK_RETURN, 0, 0, 0, 0, 0)
+    body
+
+fn audit_probe_uak_backedge_body() -> MirBody:
+    var body = audit_probe_base_body(0)
+    let tracked_local = body.new_local(2, 1, 0, 0)
+    let dest_local = body.new_local(2, 1, 0, 0)
+    let tracked_place = body.new_place(tracked_local)
+    let dest_place = body.new_place(dest_local)
+    let loop_bb = body.new_block()
+    let tracked_operand = body.new_operand(OperandKind.OK_COPY, tracked_place)
+    let tracked_use = body.new_rvalue(RvalueKind.RK_USE, tracked_operand, 0, 0)
+    body.push_stmt(0, StmtKind.Assign, dest_place, tracked_use, 0)
+    body.set_terminator(0, TermKind.TK_GOTO, loop_bb as i32, 0, 0, 0, 0)
+    let zero = body.audit_probe_zero_rvalue(2)
+    body.push_stmt(loop_bb as i32, StmtKind.Assign, tracked_place, zero, 0)
+    body.set_terminator(loop_bb as i32, TermKind.TK_GOTO, 0, 0, 0, 0, 0)
+    body
+
+fn audit_probe_uak_linear_body(target_bb: i32) -> MirBody:
+    var body = audit_probe_base_body(0)
+    let tracked_local = body.new_local(2, 1, 0, 0)
+    let dest_local = body.new_local(2, 1, 0, 0)
+    let tracked_place = body.new_place(tracked_local)
+    let dest_place = body.new_place(dest_local)
+    while body.block_count() <= target_bb:
+        let _ = body.new_block()
+    let zero = body.audit_probe_zero_rvalue(2)
+    body.push_stmt(0, StmtKind.Assign, tracked_place, zero, 0)
+    for bb in 0..target_bb:
+        body.set_terminator(bb, TermKind.TK_GOTO, bb + 1, 0, 0, 0, 0)
+    let operand = body.new_operand(OperandKind.OK_COPY, tracked_place)
+    let use_rvalue = body.new_rvalue(RvalueKind.RK_USE, operand, 0, 0)
+    body.push_stmt(target_bb, StmtKind.Assign, dest_place, use_rvalue, 0)
+    body.set_terminator(target_bb, TermKind.TK_RETURN, 0, 0, 0, 0, 0)
+    body
+
+fn audit_probe_uak_invalid_stmt_span_body() -> MirBody:
+    var body = audit_probe_base_body(0)
+    body.bb_stmt_counts.set_i32(0, 1)
+    body
+
+fn audit_probe_uak_no_locals_body() -> MirBody:
+    var body = audit_probe_base_body(0)
+    let _ = body.local_type_ids.pop()
+    body
+
+fn audit_probe_uak(case_id: i32, pool: &InternPool) -> str:
+    if case_id <= 10:
+        let body = audit_probe_uak_simple_case(case_id)
+        return validate_use_after_kill(body, pool)
+    if case_id == 11:
+        let body2 = audit_probe_uak_storage_dead_body()
+        return validate_use_after_kill(body2, pool)
+    if case_id == 12 or case_id == 13:
+        let body3 = audit_probe_uak_local_threshold_body(if case_id == 12: 20000 else: 20001)
+        return validate_use_after_kill(body3, pool)
+    if case_id == 14 or case_id == 15:
+        let body4 = audit_probe_uak_branch_body(case_id == 14)
+        return validate_use_after_kill(body4, pool)
+    if case_id == 16:
+        let body5 = audit_probe_uak_backedge_body()
+        return validate_use_after_kill(body5, pool)
+    if case_id == 17 or case_id == 18:
+        let body6 = audit_probe_uak_linear_body(if case_id == 17: 4096 else: 4097)
+        return validate_use_after_kill(body6, pool)
+    if case_id == 19:
+        let body7 = audit_probe_uak_invalid_stmt_span_body()
+        return validate_use_after_kill(body7, pool)
+    let body8 = audit_probe_uak_no_locals_body()
+    validate_use_after_kill(body8, pool)
+
+fn audit_probe_uak_expected(case_id: i32) -> str:
+    if case_id == 0 or case_id == 12 or case_id == 17: return "is read at"
+    if case_id == 1: return "read by an aggregate"
+    if case_id == 14: return "is read at"
+    "<accept>"
+
+fn audit_probe_validate_all_uak_module() -> MirModule:
+    let body = audit_probe_uak_simple_case(0)
+    audit_probe_module_from_body(move body)
+
+fn audit_probe_run_uak_matrix() -> i32:
+    var failures = 0
+    let pool = InternPool.init()
+    for case_id in 0..21:
+        let label = if case_id == 14: "uak.false-positive-branch-join" else: f"uak.case.{case_id}"
+        failures = failures + audit_probe_expect(label, audit_probe_uak_expected(case_id), audit_probe_uak(case_id, pool))
+    let aggregate_mod = audit_probe_validate_all_uak_module()
+    failures = failures + audit_probe_expect("aggregate.validate-all-omits-uak", "<accept>", validate_all_mir_module(aggregate_mod))
+    let shape_bad = audit_probe_module_from_body(audit_probe_base_body(0))
+    shape_bad.body_fn_syms.push(0)
+    failures = failures + audit_probe_expect("aggregate.validate-all-shape", "MIR shape: bodies/body_fn_syms length mismatch", validate_all_mir_module(shape_bad))
+    var typed_bad_body = audit_probe_base_body(0)
+    let typed_bad_local = typed_bad_body.new_local(0, 1, 0, 0)
+    let typed_bad_place = typed_bad_body.new_place(typed_bad_local)
+    let typed_bad_rvalue = typed_bad_body.audit_probe_use_rvalue(2)
+    typed_bad_body.push_stmt(0, StmtKind.Assign, typed_bad_place, typed_bad_rvalue, 0)
+    let typed_bad_mod = audit_probe_module_from_body(move typed_bad_body)
+    failures = failures + audit_probe_expect("aggregate.validate-all-typed", "typed MIR: assign destination does not resolve", validate_all_mir_module(typed_bad_mod))
+    var ownership_bad_body = audit_probe_base_body(0)
+    let ownership_bad_local = ownership_bad_body.new_local(0, 1, 0, 0)
+    let ownership_bad_place = ownership_bad_body.new_place(ownership_bad_local)
+    let ownership_next = ownership_bad_body.new_block()
+    ownership_bad_body.set_terminator(ownership_next as i32, TermKind.TK_RETURN, 0, 0, 0, 0, 0)
+    let ownership_callee = ownership_bad_body.audit_probe_const_operand(2)
+    let ownership_call = ownership_bad_body.audit_probe_empty_call()
+    ownership_bad_body.set_terminator(0, TermKind.TK_CALL, ownership_callee, ownership_call, ownership_bad_place, ownership_next as i32, 0)
+    let ownership_bad_mod = audit_probe_module_from_body(move ownership_bad_body)
+    failures = failures + audit_probe_expect("aggregate.validate-all-ownership", "ownership MIR: fn sym0 bb0: ownership terminator place has no concrete MIR type", validate_all_mir_module(ownership_bad_mod))
+    failures
+
+pub fn mir_validator_probe_smoke() -> i32:
+    var failures = audit_probe_run_shape_matrix()
+    failures = failures + audit_probe_run_typed_matrix()
+    failures = failures + audit_probe_run_ownership_matrix()
+    failures = failures + audit_probe_run_uak_matrix()
+    let valid_module = audit_probe_module_from_body(audit_probe_base_body(0))
+    failures = failures + audit_probe_expect("shape.valid", "<accept>", validate_mir_module(valid_module))
+    print(f"SUMMARY|failures={failures}")
+    if failures == 0: 0 else: 1

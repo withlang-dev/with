@@ -1,0 +1,25 @@
+error: expected declaration (fn, type, enum, let, use, extern)
+ --> tools/sweep_gate_corpus.w:26:1
+26 | if argv.len() < 4:
+  | ^^
+
+error: expected declaration (fn, type, enum, let, use, extern)
+ --> tools/sweep_gate_corpus.w:37:1
+37 | for f in with_fs_read_file(list_file).split("\n"):
+  | ^^^
+
+error: expected declaration (fn, type, enum, let, use, extern)
+ --> tools/sweep_gate_corpus.w:41:5
+41 |     if n == 0: continue
+  |     ^^
+
+error: expected declaration (fn, type, enum, let, use, extern)
+ --> tools/sweep_gate_corpus.w:46:5
+46 |     while n > 0 and pass < 4:
+  |     ^^^^^
+
+error: expected declaration (fn, type, enum, let, use, extern)
+ --> tools/sweep_gate_corpus.w:49:9
+49 |         n = gate_count(diag_tmp)
+  |         ^
+error: check failed during compilation

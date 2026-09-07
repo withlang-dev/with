@@ -1,0 +1,8 @@
+swap-global rc=2 blen=19 out=world hello bar foo
+lower-second rc=1 blen=11 out=world Hello
+unset-empty rc=1 blen=8 out=[aaa][b]
+unset-default rc=1 blen=8 out=[aaa][b]
+single rc=1 blen=4 out=heLo
+literal rc=1 blen=4 out=<$1>
+unset-err rc=-55 blen=7 out=[aaa][
+unset-ok rc=1 blen=7 out=[aaa][]

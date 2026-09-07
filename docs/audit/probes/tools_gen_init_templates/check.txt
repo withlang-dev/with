@@ -1,0 +1,25 @@
+error: expected declaration (fn, type, enum, let, use, extern)
+ --> tools/gen_init_templates.w:29:1
+29 | if doc.len() == 0:
+  | ^^
+
+error: expected declaration (fn, type, enum, let, use, extern)
+ --> tools/gen_init_templates.w:36:1
+36 | while pos < doc.len():
+  | ^^^^^
+
+error: expected declaration (fn, type, enum, let, use, extern)
+ --> tools/gen_init_templates.w:38:5
+38 |     if end > doc.len():
+  |     ^^
+
+error: expected declaration (fn, type, enum, let, use, extern)
+ --> tools/gen_init_templates.w:41:5
+41 |     if first != 0:
+  |     ^^
+
+error: expected declaration (fn, type, enum, let, use, extern)
+ --> tools/gen_init_templates.w:52:1
+52 | if with_fs_write_file("src/InitTemplates.w", out) != 0:
+  | ^^
+error: check failed during compilation

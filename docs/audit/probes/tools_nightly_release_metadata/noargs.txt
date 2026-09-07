@@ -1,0 +1,1 @@
+usage: nightly_release_metadata <event> <requested-channel> <yyyymmdd> <yyyy-mm-dd> <run-id> <attempt> <sha> <server-url> <repository> <version> <github-output> <notes-output> <platforms>

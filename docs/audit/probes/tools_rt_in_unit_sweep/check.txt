@@ -1,0 +1,5 @@
+error: expected declaration (fn, type, enum, let, use, extern)
+ --> tools/rt_in_unit_sweep.w:50:1
+50 | exit_code(sweep(out_path))
+  | ^^^^^^^^^
+error: check failed during compilation

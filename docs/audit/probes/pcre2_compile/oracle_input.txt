@@ -1,0 +1,58 @@
+/((a)(b(c)))/
+    abc
+/(a|b)\1/
+    aa
+/(a|b)\1/
+    ab
+/(?=abc)abc/
+    abc
+/(?!foo)bar/
+    bar
+/(?<=ab)c/
+    abc
+/a{64}/
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+/x{1,200}/
+    xxxx
+/[a-z]+/
+    hello
+/[^abc]+/
+    xyz
+/[[:alpha:]]+/
+    hello
+/(a|b)*abb/
+    aababb
+/a+?b/
+    aaab
+/(?<word>ab)c/
+    abc
+/(?<w>a|b)k(?P=w)/
+    aka
+/a++b/
+    aaab
+/(?>a+)b/
+    aaab
+/(a)?(?(1)b|c)/
+    ab
+/(a)?(?(1)b|c)/
+    c
+/^\d{3}-\d{4}$/
+    123-4567
+/((((((((((a))))))))))/
+    a
+/(abc/
+    abc
+/[abc/
+    abc
+/*abc/
+    abc
+/(a)\2/
+    aa
+/a{3,2}/
+    aaa
+/abc\/
+    abc
+/(?<=a*)b/
+    ab
+/(?P<n>a)(?P<n>b)/
+    ab

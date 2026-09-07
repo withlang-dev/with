@@ -1,0 +1,25 @@
+error: expected declaration (fn, type, enum, let, use, extern)
+ --> tools/rt_decl_audit.w:147:1
+147 | roots.push("rt")
+  | ^^^^^
+
+error: expected declaration (fn, type, enum, let, use, extern)
+ --> tools/rt_decl_audit.w:157:1
+157 | for di in 0..defs.len() as i32:
+  | ^^^
+
+error: expected declaration (fn, type, enum, let, use, extern)
+ --> tools/rt_decl_audit.w:161:5
+161 |     for ei in 0..decls.len() as i32:
+  |     ^^^
+
+error: expected declaration (fn, type, enum, let, use, extern)
+ --> tools/rt_decl_audit.w:163:9
+163 |         if ename != dname: continue
+  |         ^^
+
+error: expected declaration (fn, type, enum, let, use, extern)
+ --> tools/rt_decl_audit.w:165:9
+165 |         if esig == dsig: continue
+  |         ^^
+error: check failed during compilation

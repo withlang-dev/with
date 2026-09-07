@@ -1,0 +1,17 @@
+cell	expect	candidate	verdict
+before_loop_continue/drop	OK	OK	pass
+before_loop_plain/drop	OK	OK	pass
+inside_continue/drop	MOVE-ERR	MOVE-ERR	pass
+inside_fallthrough/drop	MOVE-ERR	MOVE-ERR	pass
+inside_then_reinit/drop	OK	OK	pass
+inside_then_break/drop	OK	OK	pass
+before_used_inside/drop	MOVE-ERR	MOVE-ERR	pass
+before_while_continue/drop	OK	OK	pass
+before_loopkw_continue/drop	OK	OK	pass
+divergent_branch/drop	OK	OK	pass
+before_loop_continue/vec	OK	OK	pass
+inside_continue/vec[FLIPPED:#691]	MOVE-ERR	MOVE-ERR	pass
+inside_fallthrough/vec[FLIPPED:#691]	MOVE-ERR	MOVE-ERR	pass
+before_used_inside/vec	MOVE-ERR	MOVE-ERR	pass
+divergent_branch/vec	OK	OK	pass
+move-audit: 15 cells, 0 vs-expected FAIL, 0 candidate-vs-baseline DIFF

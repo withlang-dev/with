@@ -1,0 +1,6 @@
+error: use of moved value: `x` is moved inside a loop and not reinitialized before the loop repeats
+ --> /tmp/ma_err.w:8:5
+8 |     for i in 0..n:
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  = help: reinitialize `x` on every path before the loop repeats, or move it only on a path that exits the loop
+error: check failed during compilation

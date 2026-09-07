@@ -1,0 +1,41 @@
+error: manual extern function call requires unsafe context
+ --> tools/sweep_gate_corpus.w:21:17
+21 |     for line in with_fs_read_file(diag_path).split("\n"):
+  |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: manual extern function call requires unsafe context
+ --> tools/sweep_gate_corpus.w:21:17
+21 |     for line in with_fs_read_file(diag_path).split("\n"):
+  |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: if would need to copy a `str`, which is not Copy
+ --> tools/sweep_gate_corpus.w:32:35
+32 | let d_corpus = if argv.len() > 4: argv.get(4) else: ""
+  |                                   ^^^^^^^^^^^
+
+error: manual extern function call requires unsafe context
+ --> tools/sweep_gate_corpus.w:37:10
+37 | for f in with_fs_read_file(list_file).split("\n"):
+  |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: manual extern function call requires unsafe context
+ --> tools/sweep_gate_corpus.w:37:10
+37 | for f in with_fs_read_file(list_file).split("\n"):
+  |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: wrong argument type in call to 'gate_count'
+ --> tools/sweep_gate_corpus.w:40:24
+40 |     var n = gate_count(diag_tmp)
+  |                        ^^^^^^^^
+  = label @40:24 argument expression 'diag_tmp' has type &str
+  = note: parameter 'diag_path' expects str
+  = note: actual type: &str
+
+error: wrong argument type in call to 'gate_count'
+ --> tools/sweep_gate_corpus.w:49:24
+49 |         n = gate_count(diag_tmp)
+  |                        ^^^^^^^^
+  = label @49:24 argument expression 'diag_tmp' has type &str
+  = note: parameter 'diag_path' expects str
+  = note: actual type: &str
+error: run failed

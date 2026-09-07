@@ -1,0 +1,1 @@
+.audit/probes/tools_rename_rt_libc_externs/work.w: renamed 3 tokens across 2 externs

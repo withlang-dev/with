@@ -1,0 +1,3 @@
+file:line:col	root	shape	spellable	liveness	loop	callee	param
+<embedded-std>/std/regex.w:124:25	pattern	ident	yes	last-use	-	Regex.compile_flags	0
+move-sites: 1 owned-param sites — 1 last-use (keyword), 0 design (live-after/in-loop), 0 unknown

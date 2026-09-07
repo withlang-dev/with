@@ -1,0 +1,12 @@
+perl-nested rc=1 span=0..1
+perl-diff compile-fail ec=209 off=10
+alt-diff-y rc=1 span=0..1
+alt-diff-n rc=-1
+alt-neg rc=1 span=0..1
+neg-digit rc=-1
+neg-letter rc=1 span=0..1
+uplu rc=1 span=0..2
+x-nfd rc=1 span=0..3
+x-nfc rc=1 span=0..2
+sr-same rc=1 span=0..3
+sr-mixed rc=1 span=0..3

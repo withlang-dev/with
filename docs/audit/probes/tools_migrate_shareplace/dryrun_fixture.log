@@ -1,0 +1,4 @@
+targets: 1 share-place free parameters
+target: .audit/probes/tools_migrate_shareplace/fixture.w:sum parameter 0
+.audit/probes/tools_migrate_shareplace/fixture.w: 1 parameters
+total: 1 parameters to annotate (dry run)

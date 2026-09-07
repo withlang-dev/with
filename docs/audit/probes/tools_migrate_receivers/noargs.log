@@ -1,0 +1,1 @@
+usage: migrate_receivers [--exclude file.w ...] <file-or-dir> [file-or-dir ...]

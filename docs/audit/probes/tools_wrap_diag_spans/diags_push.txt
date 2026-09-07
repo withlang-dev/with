@@ -1,0 +1,5 @@
+error: wrong argument type in call to 'Vec.push'
+ --> .audit/probes/tools_wrap_diag_spans/push.w:3:13
+    xs.push(name)
+            ^^^^
+  = note: argument has type &str
