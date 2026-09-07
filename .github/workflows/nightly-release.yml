@@ -168,6 +168,35 @@ jobs:
       - name: Verify fixpoint
         run: ./out/release/bin/with build :fixpoint
 
+      - name: Green battery (build :test)
+        # The release UAT gate requires last-green, and last-green requires the
+        # test-green evidence `:test` records: the asset this job publishes is
+        # the one the battery blessed, not merely the one that fixpointed.
+        run: ./out/release/bin/with build :test
+
+      - name: Record last-green (the release UAT gate reads it)
+        run: ./out/release/bin/with build :last-green
+
+      - name: Provide a display and software OpenGL (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          # xvfb: a virtual X display. libgl1-mesa-dri: Mesa's llvmpipe, the
+          # software OpenGL 4.5 the raylib spiral UAT renders through.
+          sudo apt-get install -y --no-install-recommends xvfb libgl1-mesa-dri
+
+      - name: Release UAT (Linux, under Xvfb)
+        if: runner.os == 'Linux'
+        env:
+          LIBGL_ALWAYS_SOFTWARE: "1"
+        run: xvfb-run -a -s "-screen 0 1280x800x24" ./out/release/bin/with build :release-uat
+
+      - name: Release UAT (macOS)
+        # The runner's session has a WindowServer; the spiral opens a real window.
+        if: runner.os == 'macOS'
+        run: ./out/release/bin/with build :release-uat
+
       - name: Package fixpoint-verified release asset
         run: |
           set -euo pipefail
@@ -333,6 +362,33 @@ jobs:
         # no member imports, so a poison binary aborts and this step fails instead
         # of packaging it green.
         run: ./out/release/bin/with.exe check test/behavior/behav_regex_language_semantics.w
+
+      - name: Green battery (build :test)
+        # last-green requires the test-green evidence `:test` records; driven
+        # with the seed as the selfhost lane does.
+        run: ./src/main.exe build :test
+
+      - name: Record last-green (the release UAT gate reads it)
+        run: ./out/release/bin/with.exe build :last-green
+
+      - name: Provide software OpenGL (Mesa llvmpipe)
+        # The runner's stock driver stops at OpenGL 1.1; raylib needs 3.3. The
+        # spiral UAT places this opengl32.dll beside the program it builds
+        # (WITH_UAT_OPENGL32_DLL; Windows loads a DLL from the program's own
+        # directory first). Pinned llvmpipe build from mmozeiko/build-mesa.
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/mesa-llvmpipe-x64-26.2.2.7z"
+          curl -fL -o "$archive" \
+            "https://github.com/mmozeiko/build-mesa/releases/download/26.2.2/mesa-llvmpipe-x64-26.2.2.7z"
+          printf '%s  %s\n' "418f1938dc48d401538cf6440d3c718e2f456ef2023e44133105263f483e903f" "$archive" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/mesa"
+          7z x -y -o"$RUNNER_TEMP/mesa" "$archive" opengl32.dll > /dev/null
+          test -f "$RUNNER_TEMP/mesa/opengl32.dll"
+          echo "WITH_UAT_OPENGL32_DLL=$(cygpath -m "$RUNNER_TEMP/mesa/opengl32.dll")" >> "$GITHUB_ENV"
+
+      - name: Release UAT
+        run: ./out/release/bin/with.exe build :release-uat
 
       - name: Package fixpoint-verified release asset
         run: |
@@ -511,6 +567,26 @@ jobs:
       - name: Verify fixpoint
         run: ./src/main build :fixpoint
 
+      - name: Green battery (build :test)
+        # last-green requires the test-green evidence `:test` records.
+        run: ./src/main build :test
+
+      - name: Record last-green (the release UAT gate reads it)
+        run: ./out/release/bin/with build :last-green
+
+      - name: Provide a display and software OpenGL
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          # xvfb: a virtual X display. libgl1-mesa-dri: Mesa's llvmpipe, the
+          # software OpenGL 4.5 the raylib spiral UAT renders through.
+          sudo apt-get install -y --no-install-recommends xvfb libgl1-mesa-dri
+
+      - name: Release UAT (under Xvfb)
+        env:
+          LIBGL_ALWAYS_SOFTWARE: "1"
+        run: xvfb-run -a -s "-screen 0 1280x800x24" ./out/release/bin/with build :release-uat
+
       - name: Package fixpoint-verified release asset
         run: |
           set -euo pipefail
@@ -656,6 +732,32 @@ jobs:
 
       - name: Verify fixpoint
         run: ./src/main.exe build :fixpoint
+
+      - name: Green battery (build :test)
+        # last-green requires the test-green evidence `:test` records; driven
+        # with the seed as the selfhost lane does.
+        run: ./src/main.exe build :test
+
+      - name: Record last-green (the release UAT gate reads it)
+        run: ./out/release/bin/with.exe build :last-green
+
+      - name: Provide software OpenGL (Mesa llvmpipe, arm64)
+        # As on windows-x86_64: the spiral UAT places this opengl32.dll beside
+        # the program it builds (WITH_UAT_OPENGL32_DLL). Pinned arm64 llvmpipe
+        # build from mmozeiko/build-mesa.
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/mesa-llvmpipe-arm64-26.2.2.7z"
+          curl -fL -o "$archive" \
+            "https://github.com/mmozeiko/build-mesa/releases/download/26.2.2/mesa-llvmpipe-arm64-26.2.2.7z"
+          printf '%s  %s\n' "bd1c00a49504b3efe20037cf29fa437380cfb5cbe73f196272624b94938330f1" "$archive" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/mesa"
+          7z x -y -o"$RUNNER_TEMP/mesa" "$archive" opengl32.dll > /dev/null
+          test -f "$RUNNER_TEMP/mesa/opengl32.dll"
+          echo "WITH_UAT_OPENGL32_DLL=$(cygpath -m "$RUNNER_TEMP/mesa/opengl32.dll")" >> "$GITHUB_ENV"
+
+      - name: Release UAT
+        run: ./out/release/bin/with.exe build :release-uat
 
       - name: Package fixpoint-verified release asset
         run: |
