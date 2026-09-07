@@ -8,6 +8,13 @@
 // every block shape we have). `with build :seed-compat` refuses while any
 // pin disagrees with the lock, so bumping a seed is: edit seed.lock, run
 // this, commit both.
+//
+// Line endings are not content: a file is compared and written as LF (the
+// tree's form; the pins are content-hashed across platforms), and a file
+// whose pins already match is left alone whatever its endings. #1088: on a
+// Windows checkout with CRLF workflow files the rewritten pin lines lost
+// their `\r` while the rest kept it, every such file was reported "bumped"
+// with no pin changed, and the result had mixed endings.
 use std.fs
 use std.process
 use std.builtins.write
@@ -47,10 +54,29 @@ fn block_asset(lines: &Vec[str], i: i64) -> str:
         j = j + 1
     ""
 
+/// The file's lines without their terminators: LF or CRLF, one form.
+fn pin_lines(text: &str) -> Vec[str]:
+    var out: Vec[str] = Vec.new()
+    for line in text.split("\n"):
+        if line.ends_with("\r"): out.push(line.slice(0, line.len() - 1))
+        else: out.push(line ++ "")
+    out
+
+/// The file as LF text: what `rewrite` is compared against, so that a CRLF
+/// checkout with matching pins is "unchanged".
+fn lf_text(text: &str) -> str:
+    var out = ""
+    var first = true
+    for line in pin_lines(text):
+        if not first: out = out ++ "\n"
+        out = out ++ line
+        first = false
+    out
+
 /// The file with its pins rewritten, or "" when a digest line names an asset
 /// the lock does not carry (reported on stderr).
 fn rewrite(path: &str, text: &str, lock: &str) -> str:
-    let lines = text.split("\n")
+    let lines = pin_lines(text)
     var pending_asset = ""
     var out = ""
     for i in 0..lines.len():
@@ -92,7 +118,7 @@ for path in list_files_text(".github/workflows").split("\n"):
     if out.len() == 0:
         failed = failed + 1
         continue
-    if out != text:
+    if out != lf_text(text):
         if write_file(path, out) != 0:
             eprint("could not write " ++ path)
             exit_code(1)
