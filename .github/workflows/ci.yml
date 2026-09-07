@@ -1,4 +1,4 @@
-name: selfhost+tests
+name: macOS arm64
 
 on:
   # Restrict push to main so a PR-branch push does not trigger BOTH a push run
@@ -9,9 +9,9 @@ on:
   pull_request:
 
 # Cancel a superseded in-progress run when the same PR branch is re-pushed.
-# Hardcode the platform token (not ${{ github.workflow }}) so the three
-# same-named "selfhost+tests" workflows get distinct groups and do not cancel
-# each other across platforms.
+# Hardcode the platform token (not ${{ github.workflow }}) so a workflow
+# rename can never merge two platforms into one group and cancel each
+# other.
 concurrency:
   group: selfhost-tests-macos-${{ github.head_ref || github.ref }}
   cancel-in-progress: true
