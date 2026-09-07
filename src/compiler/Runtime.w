@@ -103,3 +103,46 @@ pub fn runtime_sysinfo_os() -> str:
 
 pub fn runtime_sysinfo_arch() -> str:
     with_sysinfo_arch()
+
+// A POSIX root (`/`), a UNC path (`\server\share`), or a Windows drive
+// (`C:/`, `C:\`). Every "join onto the root unless absolute" and "reject a
+// path that escapes the project" decision in the compiler and the build
+// graph reads this one predicate. With only the POSIX form, a drive path was
+// "relative" on Windows: joined onto the root into a path that does not
+// exist, or accepted as project-contained (#1082's with.toml walk, the build
+// graph's `compiler=C:/...` test-target argument).
+pub fn runtime_path_is_absolute(path: &str) -> bool:
+    if path.len() == 0:
+        return false
+    // A lone leading `\` is drive-root-relative on Windows: never a path
+    // inside the project, so it counts as absolute here (UNC starts so too).
+    if path[0] == 47 or path[0] == 92:
+        return true
+    let drive = path[0]
+    let is_letter = (drive >= 65 and drive <= 90) or (drive >= 97 and drive <= 122)
+    path.len() >= 3 and is_letter and path[1] == 58 and (path[2] == 47 or path[2] == 92)
+
+fn runtime_path_is_unc(path: &str) -> bool:
+    path.len() >= 2 and (path[0] == 92 or path[0] == 47) and (path[1] == 92 or path[1] == 47) and path[0] == path[1]
+
+// What a lexical normalizer must keep in front of a `..`: nothing for a
+// POSIX root, the drive (`C:`) for a drive path, server and share for UNC.
+pub fn runtime_path_root_part_count(path: &str) -> i32:
+    if not runtime_path_is_absolute(path):
+        return 0
+    if runtime_path_is_unc(path):
+        return 2
+    if path[0] == 47 or path[0] == 92:
+        return 0
+    1
+
+// The separator prefix the normalizer writes back: `/`, `//` for UNC, and
+// nothing for a drive path (its root is the `C:` part).
+pub fn runtime_path_root_prefix(path: &str) -> str:
+    if not runtime_path_is_absolute(path):
+        return ""
+    if runtime_path_is_unc(path):
+        return "//"
+    if path[0] == 47 or path[0] == 92:
+        return "/"
+    ""

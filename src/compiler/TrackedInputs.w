@@ -69,10 +69,7 @@ fn tracked_dirname(path: &str) -> str:
         return "/"
     path.slice(0, last_slash as i64)
 
-fn tracked_path_is_absolute(path: &str) -> bool:
-    if path.len() > 0 and path[0] == 47:
-        return true
-    path.len() >= 3 and path[1] == 58 and (path[2] == 47 or path[2] == 92)
+fn tracked_path_is_absolute(path: &str) -> bool: runtime_path_is_absolute(path)
 
 fn tracked_path_has_parent_segment(path: &str) -> bool:
     path == ".." or path.starts_with("../") or path.starts_with("..\\") or
@@ -108,7 +105,8 @@ fn tracked_inside_root(path: &str, root: &str) -> bool:
 fn tracked_normalize_path(path: &str) -> str:
     if path.len() == 0:
         return with_str_clone_ref(path)
-    let is_abs = path.len() > 0 and path[0] == 47
+    let is_abs = runtime_path_is_absolute(path)
+    let root_parts = runtime_path_root_part_count(path)
     let parts: Vec[str] = Vec.new()
     var start = 0
     for i in 0..(path.len() as i32 + 1):
@@ -126,7 +124,7 @@ fn tracked_normalize_path(path: &str) -> str:
                     keep = false
                 if part == "..":
                     keep = false
-                    if parts.len() > 0 and parts.get(parts.len() - 1) != "..":
+                    if parts.len() > root_parts and parts.get(parts.len() - 1) != "..":
                         parts.pop()
                     else if not is_abs:
                         parts.push(with_str_clone_ref(part))
@@ -135,9 +133,9 @@ fn tracked_normalize_path(path: &str) -> str:
             start = i + 1
     if parts.len() == 0:
         if is_abs:
-            return "/"
+            return runtime_path_root_prefix(path)
         return "."
-    var result = if is_abs: "/" else: ""
+    var result = runtime_path_root_prefix(path)
     for pi in 0..parts.len() as i32:
         if pi > 0:
             result = result ++ "/"

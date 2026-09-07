@@ -35,7 +35,7 @@ pub fn build_graph_object_output_path(root: &str, target: &BuildGraphTarget, out
     resolve_join(resolve_join(root, "out/obj"), target.name ++ ".o")
 
 pub fn build_graph_resolve_project_path(root: &str, path: &str) -> str:
-    if path.len() > 0 and path[0] == 47:
+    if runtime_path_is_absolute(path):
         return with_str_clone_ref(path)
     resolve_join(root, path)
 
@@ -107,7 +107,7 @@ pub fn build_graph_path_for_child_process(root: &str, path: &str) -> str:
 pub fn build_graph_generated_path_valid(path: &str) -> bool:
     if path.len() == 0:
         return false
-    if path[0] == 47:
+    if runtime_path_is_absolute(path):
         return false
     if path.contains(".."):
         return false
@@ -120,7 +120,7 @@ pub fn build_graph_generated_path_valid(path: &str) -> bool:
 pub fn build_graph_manifest_relative_path_valid(path: &str) -> bool:
     if path.len() == 0:
         return false
-    if path[0] == 47:
+    if runtime_path_is_absolute(path):
         return false
     if path.contains(".."):
         return false
@@ -148,7 +148,7 @@ pub fn build_graph_process_arg_valid(arg: &str) -> bool:
 pub fn build_graph_path_project_contained(path: &str) -> bool:
     if path.len() == 0:
         return true
-    if path[0] == 47:
+    if runtime_path_is_absolute(path):
         return false
     if path.contains(".."):
         return false

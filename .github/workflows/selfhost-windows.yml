@@ -37,9 +37,9 @@ jobs:
       # regex literal at comptime. build/:fixpoint never compile a regex, so that
       # poison shipped green -- but it reds this job's battery the moment #798/#825
       # un-skip the regex tests. The regex smoke-test step below is the backstop.
-      WITH_SEED_VERSION: v0.15.1.8
+      WITH_SEED_VERSION: v0.15.2.1
       WITH_SEED_ASSET: with-windows-x86_64.exe
-      WITH_SEED_SHA256: 6f00a9e3a26751404f671f10ef7b61b345886c6d73a96c95df9086e6df6607fd
+      WITH_SEED_SHA256: 8f4817f2c4a3a916515ec93fd8a8f228bc9cfcd423689c5977dc564efc02a115
       WITH_SDK_REPO: withlang-dev/with
       WITH_SDK_VERSION: v0.15.1
       WITH_SDK_ASSET: with-llvm-sdk-22.1.6-windows-x86_64.tar.zst

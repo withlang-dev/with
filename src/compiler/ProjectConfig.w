@@ -700,22 +700,10 @@ fn project_config_resolve_path(root_dir: &str, path: &str) -> str:
         return project_config_absolutize_path(path)
     resolve_join(root_dir, path)
 
-// A POSIX root, a Windows drive (`C:/` or `C:\`), or a UNC path (`\\`).
-// This predicate decides whether a source path is joined onto PWD before
-// the with.toml walk: with only the POSIX form, every Windows drive path was
-// "relative", the join produced garbage, the walk never found with.toml, and
-// every [build] setting -- overflow mode among them -- was dropped on
-// Windows without a word (behav_project_overflow_modes, #1082).
-fn project_config_is_absolute_path(path: &str) -> bool:
-    if path.len() == 0:
-        return false
-    if path[0] == 47:
-        return true
-    if path.len() >= 2 and path[0] == 92 and path[1] == 92:
-        return true
-    let drive = path[0]
-    let is_letter = (drive >= 65 and drive <= 90) or (drive >= 97 and drive <= 122)
-    path.len() >= 3 and is_letter and path[1] == 58 and (path[2] == 47 or path[2] == 92)
+// Decides whether a source path is joined onto PWD before the with.toml
+// walk; the predicate itself is the compiler's one (runtime_path_is_absolute,
+// #1082: a POSIX-only test here dropped every [build] setting on Windows).
+fn project_config_is_absolute_path(path: &str) -> bool: runtime_path_is_absolute(path)
 
 fn project_config_normalize_absolute_path(path: &str) -> str:
     var out = with_str_clone_ref(path)
