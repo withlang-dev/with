@@ -397,6 +397,20 @@ pub fn run_release_raylib_spiral_uat_action(ctx: ActionCtx) -> i32:
     if ctx.fs().write_text(ruat_join(workdir, "src/main.w"), spiral_source) != 0:
         return ruat_fail(ctx, "could not write spiral UAT source")
 
+    // A headless Windows host has no OpenGL past 1.1 and raylib needs 3.3.
+    // WITH_UAT_OPENGL32_DLL names a software driver (Mesa llvmpipe); it goes
+    // beside the program `with run` builds (out/bin under the project), the
+    // first place Windows looks for a DLL, so the spiral renders through it.
+    // Proven on a GL-less Windows box: the same binary fails with "WGL: the
+    // driver does not appear to support OpenGL" without it and passes with it.
+    let gl_dll = ctx.env_input("WITH_UAT_OPENGL32_DLL")
+    if gl_dll.len() > 0:
+        let bin_dir = ruat_join(workdir, "out/bin")
+        if ctx.fs().mkdir_all(bin_dir) != 0:
+            return ruat_fail(ctx, "could not create " ++ bin_dir)
+        if ctx.fs().copy_file(gl_dll, ruat_join(bin_dir, "opengl32.dll")) != 0:
+            return ruat_fail(ctx, "could not copy WITH_UAT_OPENGL32_DLL (" ++ gl_dll ++ ") beside the spiral program")
+
     rc = ruat_expect_stdout(ctx, ruat_run_capture_cwd(ctx, compiler, workdir, "check", ruat_argv2(compiler, "check", "src/main.w"), 120000), "ok", "with check spiral")
     if rc != 0:
         return rc

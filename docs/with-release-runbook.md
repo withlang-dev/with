@@ -220,7 +220,18 @@ publishable binary, so run packaging after the final `:release-uat`; if UAT is
 re-run afterwards, the asset is regenerated unstripped and packaging must be
 redone before upload.
 
-`:release-uat` is mandatory for every release. It includes:
+`:release-uat` is mandatory for every release, and the nightly release
+workflow runs it on every platform it publishes (darwin-aarch64,
+linux-x86_64, linux-aarch64, windows-x86_64, windows-aarch64) after fixpoint
+and before packaging, so a red UAT blocks that platform's asset. The gate
+needs the last-green manifest (`with build :last-green`, recorded after
+fixpoint) and a display with OpenGL 3.3 for the spiral: the macOS runner's
+session has one; Linux runs under `xvfb-run` with Mesa's llvmpipe
+(`LIBGL_ALWAYS_SOFTWARE=1`); Windows names a Mesa llvmpipe `opengl32.dll`
+in `WITH_UAT_OPENGL32_DLL`, which the spiral UAT places beside the program
+it builds. A pass on one platform says nothing about another: the Windows
+gate found a C-runtime mismatch (prebuilt Conan libraries expect the DLL
+runtime) that macOS could never show. It includes:
 
 - `:release-artifact-smoke-uat`, which runs the platform-named release binary
   asset (`out/release/with-darwin-aarch64`, `with-linux-x86_64`, or
@@ -246,13 +257,16 @@ redone before upload.
   `curl_easy_setopt`, `curl_version_info`, and cleanup without network access.
 - `:release-install-layout-uat`, which copies the platform asset into a
   local install-style `bin/with` layout and runs it from there.
-- `:release-raylib-spiral-uat`, which must run on a GUI-capable Darwin release
-  host. It validates the user-facing C interop happy path end to end:
-  `with init`, `with get c.raylib`, writing the spiral program to the
-  initialized project's `src/main.w`, and `with run`. The generated raylib app
-  renders a deterministic spiral, reads back the rendered framebuffer, counts
-  bright non-background samples in the spiral annulus, and exits non-zero if the
-  visual check fails.
+- `:release-raylib-spiral-uat`, which needs a display with OpenGL 3.3 (a
+  headed host, or the software GL provisions above). It validates the
+  user-facing C interop path end to end: `with init`, `with get c.raylib`,
+  writing the spiral program to the initialized project's `src/main.w`, and
+  `with run`. The generated raylib app renders a deterministic spiral, reads
+  back the rendered framebuffer, counts bright non-background samples in the
+  spiral annulus, and exits non-zero if the visual check fails, or loudly if
+  no window could be created. raylib has no contract overlay, so its
+  `const char*` parameters are the raw surface (§16.3c, #379): the fixture
+  calls `InitWindow` and `DrawText` under `unsafe` with `c"..."` literals.
 - `:release-one-liner-uat`, which validates real shell one-liner workflows:
   `seq 100 | with -n 'if line =~ /^[0-9]$/: print(line)'`,
   `cat names.txt | with -p 'line = line.upper()'`, regex captures, numbered
