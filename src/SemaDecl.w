@@ -1815,6 +1815,7 @@ impl Sema:
     mut fn collect_extern_var(node: i32, is_local: i32):
         let name = self.ast.get_data0(node)
         self.record_decl_visibility(name, node, 1)
+        self.extern_var_texts.insert(sema_owned_text(self.pool_resolve(name)), 1)
         let type_node = self.ast.get_data1(node)
         let tid = self.resolve_type_expr(type_node)
         if self.is_opaque_value_type(tid) != 0:

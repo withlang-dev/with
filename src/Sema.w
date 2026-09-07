@@ -464,6 +464,8 @@ type Sema {
 
     // Function signatures (parallel arrays)
     sig_names: Vec[i32],
+    sig_text_index: HashMap[str, i32],  // resolved name text → newest signature; older ones chain through sig_text_prev
+    sig_text_prev: Vec[i32],
     sig_type_ids: Vec[i32],
     sig_ret_types: Vec[i32],
     sig_param_starts: Vec[i32],
@@ -560,6 +562,7 @@ type Sema {
 
     // Extern fn names
     extern_fn_names: HashMap[i32, i32],
+    extern_var_texts: HashMap[str, i32],  // every collected extern var by name text (has_extern_var_decl)
     // #602: c_import/extern params that RETAIN a passed C-string pointer past
     // the call (§16.3c). Keyed by fn name sym → bitmask of retained param
     // indices. Such a param is modeled as a C-string input (cstr_in) but
@@ -1198,6 +1201,9 @@ type Sema {
     decl_visibility_paths: Vec[str],           // parallel declaring module path
     decl_visibility_pub: Vec[i32],             // parallel public flag
     decl_visibility_nodes: Vec[i32],           // parallel declaration node
+    decl_visibility_index: HashMap[i32, i32],  // symbol → its newest record; older records chain through decl_visibility_prev
+    decl_visibility_prev: Vec[i32],
+    decl_visibility_node_index: HashMap[i32, i32], // declaration node → its record
     // c_import scoping: tracks which symbols are c_import-origin
     ci_syms: HashMap[i32, i32],      // sym → 1 for c_import-origin symbols
     ci_raw_syms: HashMap[i32, i32],  // sym → 1 for c_import raw ABI calls
@@ -1806,6 +1812,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
     let pretty_symbol_names = sema_new_map_i32_str()
     let sig_lookup = sema_new_map_i32_i32()
     let extern_fn_names = sema_new_map_i32_i32()
+    let extern_var_texts = sema_new_map_str_i32()
     let retained_extern_params = sema_new_map_i32_i32()
     let fn_decl_nodes = sema_new_map_i32_i32()
     let fn_decl_effective_syms = sema_new_map_i32_i32()
@@ -1915,6 +1922,8 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         cycle_dep_nodes: Vec.new(),
         pretty_symbol_names,
         sig_names: Vec.new(),
+        sig_text_index: sema_new_map_str_i32(),
+        sig_text_prev: Vec.new(),
         sig_type_ids: Vec.new(),
         sig_ret_types: Vec.new(),
         sig_param_starts: Vec.new(),
@@ -1949,6 +1958,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         effect_prov: HashMap.new(),
         effect_note_origin_node: 0,
         extern_fn_names,
+        extern_var_texts,
         retained_extern_params,
         fn_decl_nodes,
         fn_decl_effective_syms,
@@ -2370,6 +2380,9 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         decl_visibility_paths: sema_new_vec_str(),
         decl_visibility_pub: Vec.new(),
         decl_visibility_nodes: Vec.new(),
+        decl_visibility_index: sema_new_map_i32_i32(),
+        decl_visibility_prev: Vec.new(),
+        decl_visibility_node_index: sema_new_map_i32_i32(),
         ci_syms: sema_new_map_i32_i32(),
         ci_raw_syms: sema_new_map_i32_i32(),
         ci_omitted_symbols: HashMap.new(),
@@ -2603,11 +2616,18 @@ impl Sema:
     fn record_decl_visibility(sym: i32, node: i32, is_pub: i32) -> Unit:
         if sym == 0:
             return
+        let record = self.decl_visibility_syms.len() as i32
         self.decl_visibility_syms.push(sym)
         let path = if self.current_module_path.len() > 0: self.current_module_path else: ""
         self.decl_visibility_paths.push(sema_owned_text(path))
         self.decl_visibility_pub.push(is_pub)
         self.decl_visibility_nodes.push(node)
+        // Indexed: a lookup walks this symbol's records newest-first, never
+        // the whole table (it scanned every declaration per identifier).
+        self.decl_visibility_prev.push(if self.decl_visibility_index.contains(sym): self.decl_visibility_index.get(sym).unwrap() else: -1)
+        self.decl_visibility_index.insert(sym, record)
+        if node != 0:
+            self.decl_visibility_node_index.insert(node, record)
 
     fn decl_visible_from_current(target_path: &str, is_pub: i32) -> i32:
         if target_path.len() == 0:
@@ -2721,15 +2741,14 @@ impl Sema:
         if self.ci_syms.contains(sym) and self.is_ci_visible(sym) != 0:
             return 1
         var saw_candidate = 0
-        var i = self.decl_visibility_syms.len() as i32 - 1
+        var i = if self.decl_visibility_index.contains(sym): self.decl_visibility_index.get(sym).unwrap() else: -1
         while i >= 0:
-            if self.decl_visibility_syms[i] == sym:
-                saw_candidate = 1
-                let path = self.decl_visibility_paths[i]
-                let is_pub = self.decl_visibility_pub[i]
-                if self.decl_visible_from_current_gated(path, is_pub, sym) != 0:
-                    return 1
-            i = i - 1
+            saw_candidate = 1
+            let path = self.decl_visibility_paths[i]
+            let is_pub = self.decl_visibility_pub[i]
+            if self.decl_visible_from_current_gated(path, is_pub, sym) != 0:
+                return 1
+            i = self.decl_visibility_prev[i]
         if saw_candidate == 0:
             return 1
         0
@@ -2737,34 +2756,23 @@ impl Sema:
     fn decl_node_visible_from_current(node: i32) -> i32:
         if node == 0:
             return 1
-        var i = self.decl_visibility_nodes.len() as i32 - 1
-        while i >= 0:
-            if self.decl_visibility_nodes[i] == node:
-                return self.decl_visible_from_current(self.decl_visibility_paths[i], self.decl_visibility_pub[i])
-            i = i - 1
+        let record = self.decl_visibility_node_index.get(node)
+        if record.is_some():
+            let i: i32 = record.unwrap()
+            return self.decl_visible_from_current(self.decl_visibility_paths[i], self.decl_visibility_pub[i])
         1
 
     fn has_extern_var_decl(sym: i32) -> i32:
-        let target_name = self.pool_resolve(sym)
-        for di in 0..self.ast.decl_count():
-            let decl = self.ast.get_decl(di)
-            if self.ast.kind(decl) != NodeKind.NK_EXTERN_VAR:
-                continue
-            let extern_sym = self.ast.get_data0(decl)
-            if extern_sym != sym and self.pool_resolve(extern_sym) != target_name:
-                continue
-            return 1
-        0
+        if self.extern_var_texts.contains(self.pool_resolve(sym)): 1 else: 0
 
     fn private_symbol_path_from_current(sym: i32) -> str:
-        var i = self.decl_visibility_syms.len() as i32 - 1
+        var i = if self.decl_visibility_index.contains(sym): self.decl_visibility_index.get(sym).unwrap() else: -1
         while i >= 0:
-            if self.decl_visibility_syms[i] == sym:
-                let path = self.decl_visibility_paths[i]
-                let is_pub = self.decl_visibility_pub[i]
-                if path.len() > 0 and path != self.current_module_path and is_pub == 0 and self.module_is_visible_from_current(path) != 0:
-                    return with_str_clone_ref(path)
-            i = i - 1
+            let path = self.decl_visibility_paths[i]
+            let is_pub = self.decl_visibility_pub[i]
+            if path.len() > 0 and path != self.current_module_path and is_pub == 0 and self.module_is_visible_from_current(path) != 0:
+                return with_str_clone_ref(path)
+            i = self.decl_visibility_prev[i]
         ""
 
     // D29 scaffolding (#750): when a name failed resolution only because the
@@ -5800,6 +5808,11 @@ impl Sema:
     fn add_sig(name: i32, fn_tid: i32, ret: i32, param_start: i32, param_count: i32, variadic: i32):
         let idx = self.sig_names.len() as i32
         self.sig_names.push(name)
+        // get_visible_sig matches by resolved text; chain the signatures
+        // sharing one, newest first.
+        let text = sema_owned_text(self.pool_resolve(name))
+        self.sig_text_prev.push(if self.sig_text_index.contains(text): self.sig_text_index.get(text).unwrap() else: -1)
+        self.sig_text_index.insert(text, idx)
         self.sig_type_ids.push(fn_tid)
         self.sig_ret_types.push(ret)
         self.sig_param_starts.push(param_start)
@@ -6417,13 +6430,11 @@ impl Sema:
         let target = self.pool_resolve_symbol(name)
         if target.len() == 0:
             return -1
-        var i = self.sig_names.len() as i32 - 1
+        var i = if self.sig_text_index.contains(target): self.sig_text_index.get(target).unwrap() else: -1
         while i >= 0:
-            let sig_sym = self.sig_names[i]
-            if sig_sym == name or self.pool_resolve_symbol(sig_sym) == target:
-                if self.symbol_visible_from_current(sig_sym) != 0:
-                    return i
-            i = i - 1
+            if self.symbol_visible_from_current(self.sig_names[i]) != 0:
+                return i
+            i = self.sig_text_prev[i]
         -1
 
     fn generic_fn_node_matches_symbol(node: i32, sym: i32, target: &str) -> i32:
