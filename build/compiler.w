@@ -465,6 +465,12 @@ fn comp_run_compiler_capture(ctx: &ActionCtx, label: &str, argv: Vec[str], stdou
     let win_um_libdir = env("WITH_WINDOWS_UM_LIBDIR")
     if win_um_libdir.len() > 0:
         process_env = process_env.set("WITH_WINDOWS_UM_LIBDIR", win_um_libdir)
+    // The compiler is a self-contained binary: its stage links carry the
+    // static CRT (libcmt) in llvm_ld.rsp, so the child's Link.w must not add
+    // the DLL runtime it gives programs (msvcrt beside libcmt: "duplicate
+    // symbol: _invalid_parameter_noinfo" on stage2, nightly-release proving
+    // run of #1094).
+    process_env = process_env.set("WITH_WINDOWS_CRT_STATIC", "1")
     // Windows SDK / MSVC CRT include dirs, read by the child compiler's c_import
     // (ClangBridge with_cimport_add_windows_system_includes) so libclang can
     // resolve system headers. Include-side analog of the *_LIBDIR forwarding.
