@@ -238,7 +238,13 @@ jobs:
       - name: Build windows-aarch64 cross runtime/bridge objects (:cross-rt-windows-aarch64)
         working-directory: src-tree
         env:
-          WITH: ${{ github.workspace }}/with-seed
+          # The freshly built compiler, not the downloaded seed: the embed
+          # action (EmbedObjectFiles, src/BuildGraphOps.w) runs inside whichever
+          # driver executes this target, and the seed's list of platform slots
+          # is the seed's, not this tree's -- with the v0.15.2.0 seed the cross
+          # link failed on with_embedded_rt_linux_aarch64_o_start even after
+          # the source carried the slot. The next step already uses this binary.
+          WITH: ${{ github.workspace }}/src-tree/out/release/bin/with
         run: |
           set -euo pipefail
           export PATH="$GITHUB_WORKSPACE/.link-shim:$LLVM_PREFIX/bin:$PATH"
