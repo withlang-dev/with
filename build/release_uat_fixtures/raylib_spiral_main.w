@@ -21,7 +21,13 @@ fn is_spiral_sample(c: Color) -> bool:
     (r > 70 or g > 70 or b > 70) and (r + g + b > 170)
 
 fn main:
-    InitWindow(900, 600, "with raylib spiral uat")
+    unsafe { InitWindow(900, 600, c"with raylib spiral uat".ptr) }
+    // No window means no GL context: every later call would run on nothing
+    // (LoadImageFromScreen crashed with exit 139 on a host whose driver stops
+    // at OpenGL 1.1). Say so and fail; a headless host needs a software GL.
+    if not IsWindowReady():
+        print("raylib spiral UAT failed: window not created (no OpenGL 3.3 context)")
+        return 1
     SetTargetFPS(60)
 
     let bg = Color { r: 14, g: 16, b: 26, a: 255 }
@@ -34,7 +40,7 @@ fn main:
         BeginDrawing()
         ClearBackground(bg)
         draw_spiral(cx, cy, t)
-        DrawText("with raylib spiral uat", 20, 20, 20, LIGHTGRAY)
+        unsafe { DrawText(c"with raylib spiral uat".ptr, 20, 20, 20, LIGHTGRAY) }
         EndDrawing()
         frame = frame + 1
 
