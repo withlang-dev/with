@@ -264,6 +264,10 @@ jobs:
           # out/gen/main.w is the version-stamped CLI entry produced by `with build`;
           # it `use`s the src/ modules, so the full compiler is compiled in.
           test -f out/gen/main.w || { echo "out/gen/main.w missing (expected after build)"; exit 1; }
+          # The seed is self-contained: static CRT (libcmt), as the native
+          # compiler link in build/compiler.w. Programs link the DLL runtime
+          # by default (Link.w) because prebuilt Windows libraries expect it.
+          export WITH_WINDOWS_CRT_STATIC=1
           out/release/bin/with build --target "$CROSS_TRIPLE" out/gen/main.w -O1 \
             -o "$GITHUB_WORKSPACE/$SEED_ASSET"
 

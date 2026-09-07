@@ -562,6 +562,8 @@ fn link_stage_windows_libpath(var_name: &str, fallback: &str) -> str:
 // dropped on the Windows link, not turned into a nonexistent `m.lib`.
 fn link_stage_windows_lib_is_crt_implicit(name: &str): name == "m" or name == "c"
 
+fn link_stage_windows_crt_static(): with_getenv_str("WITH_WINDOWS_CRT_STATIC") == "1"
+
 fn link_stage_make_windows_llvm_link_command(llvm_ld: &str, obj_path: &str, bin_path: &str, extras: &Vec[str], link_libs: &Vec[str], link_args: &Vec[str]) -> LinkStageCommand:
     let args: Vec[str] = Vec.new()
     let env: Vec[LinkStageEnvVar] = Vec.new()
@@ -608,8 +610,25 @@ fn link_stage_make_windows_llvm_link_command(llvm_ld: &str, obj_path: &str, bin_
         // genuinely missing library fails loudly rather than silently vanishing.
     for i in 0..link_args.len() as i32:
         args.push(with_str_clone_ref(link_args[i]))
-    args.push("libcpmt.lib")
-    args.push("libcmt.lib")
+    // The C runtime. A program links the DLL runtime (msvcrt + ucrt +
+    // vcruntime import libs, MSVC's own /MD default and Rust's on
+    // *-pc-windows-msvc) because that is the runtime every prebuilt Windows
+    // library expects: ConanCenter ships msvc binaries only as
+    // compiler.runtime=dynamic, and such a library's `__imp_realloc` /
+    // `__imp_fopen` references cannot resolve against the static libcmt
+    // (release-raylib-spiral-uat, and every `with get c.*` package, on
+    // Windows). The static runtime remains for a self-contained binary that
+    // links no such library, the cross-built compiler above all:
+    // WITH_WINDOWS_CRT_STATIC=1 selects libcmt, as build/compiler.w does for
+    // the native compiler's own link.
+    if link_stage_windows_crt_static():
+        args.push("libcpmt.lib")
+        args.push("libcmt.lib")
+    else:
+        args.push("msvcprt.lib")
+        args.push("msvcrt.lib")
+        args.push("ucrt.lib")
+        args.push("vcruntime.lib")
     // UCRT exports printf/scanf-family functions such as sprintf and
     // vfprintf only through this archive (they are inline in the headers
     // since VS 2015); Darwin-migrated C (pcre2test.w) calls them by name.
