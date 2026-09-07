@@ -4738,7 +4738,7 @@ impl ComptimeEvaluator:
             return comptime_workspace_compile_plan_invalid()
         var final_output = output_path
         if final_output.len() == 0:
-            final_output = "out/bin/" ++ record.name
+            final_output = runtime_program_path("out/bin/" ++ record.name)
             if output_kind == 1:
                 final_output = "out/obj/" ++ record.name ++ ".o"
             else if output_kind == 2:
@@ -4904,7 +4904,7 @@ impl ComptimeEvaluator:
 
         var final_output = output_path
         if final_output.len() == 0:
-            final_output = "out/bin/" ++ out.name
+            final_output = runtime_program_path("out/bin/" ++ out.name)
         let absolute_output = self.workspace_path(capability.project_root, final_output)
         let obj_path = absolute_output ++ ".o"
         let output_dir = link_stage_dirname(absolute_output)

@@ -2870,7 +2870,7 @@ fn run_build_command(options: BuildCommandOptions, graph_options: &BuildGraphCom
         actual_source = if with_fs_file_exists(root_main) != 0: root_main else: root ++ "/src/main.w"
         actual_options.source_path = actual_source
         if actual_options.output_path == "" and cfg.package_name.len() > 0:
-            actual_options.output_path = "out/bin/" ++ cfg.package_name
+            actual_options.output_path = runtime_program_path("out/bin/" ++ cfg.package_name)
     else:
         let cfg = project_config_load_for_source(actual_source)
         if cfg.manifest_error.len() > 0:

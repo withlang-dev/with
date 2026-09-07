@@ -146,3 +146,12 @@ pub fn runtime_path_root_prefix(path: &str) -> str:
     if path[0] == 47 or path[0] == 92:
         return "/"
     ""
+
+// A program's path on this host: Windows shells run a file only by its
+// extension (`out\bin\app` is "not recognized as an internal or external
+// command" to cmd.exe and PowerShell), so a default executable output gets
+// `.exe` there. An explicit `-o` or `output:` is the user's and is kept.
+pub fn runtime_program_path(path: &str) -> str:
+    if runtime_sysinfo_os() == "Windows" and not path.ends_with(".exe"):
+        return path ++ ".exe"
+    path ++ ""
