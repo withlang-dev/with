@@ -93,6 +93,26 @@ fn build_graph_external_test_argv(root: &str, target: &BuildGraphTarget, compile
 fn build_graph_external_test_job_new(test_path: &str, stdout_path: &str, stderr_path: &str, pid: i32) -> BuildGraphExternalTestJob:
     BuildGraphExternalTestJob { test_path: with_str_clone_ref(test_path), stdout_path: with_str_clone_ref(stdout_path), stderr_path: with_str_clone_ref(stderr_path), pid }
 
+// The captured stream's last lines, so a failed test names its own cause in
+// the log. The path alone is useless where the log is all that survives: a
+// CI lane reported "exit code 1; stderr=D:/a/with/with/out/..." and nothing
+// else (#1086, windows x86_64).
+fn build_graph_eprint_capture_tail(label: &str, path: &str) -> Unit:
+    var text = build_graph_rt_read_file(path)
+    if text.len() == 0:
+        build_graph_rt_eprint("  " ++ label ++ ": (empty)")
+        return
+    if text[text.len() - 1] == 10:
+        text = text.slice(0, text.len() - 1)
+    let lines = text.split("\n")
+    let n = lines.len() as i32
+    var start = n - 40
+    if start < 0: start = 0
+    let shown = n - start
+    build_graph_rt_eprint("  " ++ label ++ f" (last {shown} of {n} lines):")
+    for i in start..n:
+        build_graph_rt_eprint("  | " ++ lines[i])
+
 pub fn build_graph_run_external_test_file(root: &str, target: &BuildGraphTarget, compiler_path: &str, test_path: &str) -> i32:
     let capture_dir = resolve_join(resolve_join(root, "out/test-graph"), target.name)
     if build_graph_rt_mkdir_p(capture_dir) != 0:
@@ -108,6 +128,7 @@ pub fn build_graph_run_external_test_file(root: &str, target: &BuildGraphTarget,
         return 124
     if rc != 0:
         build_graph_rt_eprint("error: build.w test target '" ++ target.name ++ "' failed in '" ++ test_path ++ f"' with exit code {rc}; stdout=" ++ stdout_path ++ " stderr=" ++ stderr_path)
+        build_graph_eprint_capture_tail("stderr", stderr_path)
         return rc
     let _remove_stdout = build_graph_rt_remove_file(stdout_path)
     let _remove_stderr = build_graph_rt_remove_file(stderr_path)
@@ -120,6 +141,7 @@ fn build_graph_wait_external_test_job(target: &BuildGraphTarget, job: &BuildGrap
         return 124
     if rc != 0:
         build_graph_rt_eprint("error: build.w test target '" ++ target.name ++ "' failed in '" ++ job.test_path ++ f"' with exit code {rc}; stdout=" ++ job.stdout_path ++ " stderr=" ++ job.stderr_path)
+        build_graph_eprint_capture_tail("stderr", job.stderr_path)
         return rc
     let _remove_stdout = build_graph_rt_remove_file(job.stdout_path)
     let _remove_stderr = build_graph_rt_remove_file(job.stderr_path)

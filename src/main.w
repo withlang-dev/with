@@ -32,6 +32,7 @@ use BuildGraphRuntime
 use BuildGraphCache
 use compiler.DriverOptions
 use compiler.AbiStamp
+use compiler.Runtime
 use Analysis
 use ReceiverMigration
 use TargetSpec
@@ -1118,7 +1119,7 @@ fn cleanup_binary_artifacts(bin_path: &str):
 // of the fixture has no test main. A red run keeps it and says where it is
 // and how the runner invoked it; `--keep-binary` keeps it on green too.
 fn test_binary_absolute_path(bin_path: &str) -> str:
-    if bin_path.starts_with("/"):
+    if runtime_path_is_absolute(bin_path):
         return bin_path ++ ""
     let cwd = with_getenv_str("PWD")
     if cwd.len() == 0:
@@ -3615,7 +3616,13 @@ fn run_test_compiler_command(target: &str, command_name: &str, directives: &Test
         argv = build_graph_argv_append(argv, capture_dir ++ "/out")
     argv = test_append_extra_args(argv, directives.extra_args)
     argv = build_graph_argv_append(argv, target)
-    let rc = with_exec_argv_capture(argv, stdout_path, stderr_path, 60000)
+    // The same ceiling as the build graph gives a whole test file (300s): a
+    // lower one here is not a guard, it is a second, invisible verdict. A
+    // `--dump-typed` of the compiler's Frontend (700k lines) runs 19s idle on
+    // a 2-core box and 47s with three siblings beside it; on a slow CI runner
+    // with four workers it crossed a 60s limit and reported as a plain check
+    // failure (#1086, windows x86_64).
+    let rc = with_exec_argv_capture(argv, stdout_path, stderr_path, 300000)
     let stdout = with_fs_read_file(stdout_path)
     let stderr = with_fs_read_file(stderr_path)
     let _remove_stdout = with_fs_remove_file(stdout_path)
@@ -3628,6 +3635,27 @@ fn run_test_compiler_command(target: &str, command_name: &str, directives: &Test
 
 fn test_output_contains_expected(actual: &str, expected: &str) -> bool:
     expected.len() == 0 or actual.contains(expected)
+
+// 124 is the capture's own verdict (the child was killed at the ceiling),
+// not the compiler's; name it so a slow run never reads as a compile error.
+fn test_check_failure_message(rc: i32) -> str:
+    if rc == 124: return "check timed out after 300s"
+    f"check failed with exit code {rc}"
+
+// The child's own words follow the verdict: "check failed with exit code 1"
+// alone hid the diagnostic (or panic) behind it.
+fn emit_test_child_stderr(stderr: &str):
+    var text = with_str_clone_ref(stderr)
+    if text.len() == 0:
+        return
+    if text[text.len() - 1] == 10:
+        text = text.slice(0, text.len() - 1)
+    let lines = text.split("\n")
+    let n = lines.len() as i32
+    var start = n - 40
+    if start < 0: start = 0
+    for i in start..n:
+        with_eprint(" | " ++ lines[i])
 
 fn run_test_directive_command(target: &str, directives: &TestDirectives, quiet: bool) -> i32:
     // #795: malformed platform gates fail loudly on every host.
@@ -3660,7 +3688,8 @@ fn run_test_directive_command(target: &str, directives: &TestDirectives, quiet: 
     if directives.expect_check_stdout.len() > 0 or directives.expect_check_stdout_not.len() > 0:
         let result = run_test_compiler_command(target, "check", directives)
         if result.rc != 0:
-            emit_test_stage_error(f"check failed with exit code {result.rc}", target, "check", "")
+            emit_test_stage_error(test_check_failure_message(result.rc), target, "check", "")
+            emit_test_child_stderr(result.stderr)
             return 1
         for i in 0..directives.expect_check_stdout.len() as i32:
             let expected = directives.expect_check_stdout[i]
@@ -3677,7 +3706,8 @@ fn run_test_directive_command(target: &str, directives: &TestDirectives, quiet: 
         let result = run_test_compiler_command(target, "check", directives)
         if result.rc == 0:
             return 0
-        emit_test_stage_error(f"check failed with exit code {result.rc}", target, "check", "")
+        emit_test_stage_error(test_check_failure_message(result.rc), target, "check", "")
+        emit_test_child_stderr(result.stderr)
         return 1
     let _ = quiet
     -1
