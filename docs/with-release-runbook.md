@@ -224,8 +224,9 @@ redone before upload.
 workflow runs it on every platform it publishes (darwin-aarch64,
 linux-x86_64, linux-aarch64, windows-x86_64, windows-aarch64) after fixpoint
 and before packaging, so a red UAT blocks that platform's asset. The gate
-needs the last-green manifest (`with build :last-green`, recorded after
-fixpoint) and a display with OpenGL 3.3 for the spiral: the macOS runner's
+needs the last-green manifest (`with build :last-green`, which requires the
+test-green evidence `with build :test` records, so each job runs the battery
+first) and a display with OpenGL 3.3 for the spiral: the macOS runner's
 session has one; Linux runs under `xvfb-run` with Mesa's llvmpipe
 (`LIBGL_ALWAYS_SOFTWARE=1`); Windows names a Mesa llvmpipe `opengl32.dll`
 in `WITH_UAT_OPENGL32_DLL`, which the spiral UAT places beside the program

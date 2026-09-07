@@ -168,6 +168,12 @@ jobs:
       - name: Verify fixpoint
         run: ./out/release/bin/with build :fixpoint
 
+      - name: Green battery (build :test)
+        # The release UAT gate requires last-green, and last-green requires the
+        # test-green evidence `:test` records: the asset this job publishes is
+        # the one the battery blessed, not merely the one that fixpointed.
+        run: ./out/release/bin/with build :test
+
       - name: Record last-green (the release UAT gate reads it)
         run: ./out/release/bin/with build :last-green
 
@@ -356,6 +362,11 @@ jobs:
         # no member imports, so a poison binary aborts and this step fails instead
         # of packaging it green.
         run: ./out/release/bin/with.exe check test/behavior/behav_regex_language_semantics.w
+
+      - name: Green battery (build :test)
+        # last-green requires the test-green evidence `:test` records; driven
+        # with the seed as the selfhost lane does.
+        run: ./src/main.exe build :test
 
       - name: Record last-green (the release UAT gate reads it)
         run: ./out/release/bin/with.exe build :last-green
@@ -556,6 +567,10 @@ jobs:
       - name: Verify fixpoint
         run: ./src/main build :fixpoint
 
+      - name: Green battery (build :test)
+        # last-green requires the test-green evidence `:test` records.
+        run: ./src/main build :test
+
       - name: Record last-green (the release UAT gate reads it)
         run: ./out/release/bin/with build :last-green
 
@@ -717,6 +732,11 @@ jobs:
 
       - name: Verify fixpoint
         run: ./src/main.exe build :fixpoint
+
+      - name: Green battery (build :test)
+        # last-green requires the test-green evidence `:test` records; driven
+        # with the seed as the selfhost lane does.
+        run: ./src/main.exe build :test
 
       - name: Record last-green (the release UAT gate reads it)
         run: ./out/release/bin/with.exe build :last-green
