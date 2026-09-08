@@ -1707,7 +1707,7 @@ impl Zcu:
             let pending_texts = move self.pending_iface_texts
             self.pending_iface_paths = frontend_new_vec_str()
             self.pending_iface_texts = frontend_new_vec_str()
-            pool = self.merge_interface_sections_on_demand(pool, &pending_paths, &pending_texts)
+            pool = self.merge_interface_sections_on_demand(pool, &pending_paths, &pending_texts, root_local_decl_count)
         let t_cimport = runtime_clock_nanos()
         self.trace_c_import_cache = self.read_trace_c_import_cache_frontend()
         pool = self.expand_c_imports_frontend(pool)
@@ -1912,8 +1912,9 @@ impl Zcu:
     // newly demanded. A compile that names nothing from a bundle parses
     // none of it; Sema's collection then sees only these declarations. A
     // line the classifier cannot name is always parsed.
-    mut fn merge_interface_sections_on_demand(pool: AstPool, paths: &Vec[str], texts: &Vec[str]) -> AstPool:
+    mut fn merge_interface_sections_on_demand(pool: AstPool, paths: &Vec[str], texts: &Vec[str], root_tail: i32) -> AstPool:
         var out = pool
+        let base = out.decl_count()
         let t_start = runtime_clock_nanos()
         self.iface_mentioned = HashMap.new()
         self.note_interface_mentions(&out, 0, out.node_count())
@@ -1959,6 +1960,38 @@ impl Zcu:
                 chunk = chunk ++ line_texts[li] ++ "\n"
                 line_done[li] = 1
                 chunk_lines = chunk_lines + 1
+        // The root's declarations stay the pool's tail: after the import
+        // merge the order is prelude → imports → root, and is_local_decl
+        // takes the last root_tail entries. The chunks go before them.
+        let total = out.decl_count()
+        if root_tail > 0 and total > base and base >= root_tail:
+            let order: Vec[i32] = Vec.new()
+            for di in 0..(base - root_tail):
+                order.push(di)
+            for di in base..total:
+                order.push(di)
+            for di in (base - root_tail)..base:
+                order.push(di)
+            let decls: Vec[i32] = Vec.new()
+            for di in 0..total:
+                decls.push(out.get_decl(di) as i32)
+            let ordered: Vec[i32] = Vec.new()
+            let ordered_paths = frontend_new_vec_str()
+            let ordered_file_ids: Vec[i32] = Vec.new()
+            let ordered_ci: Vec[i32] = Vec.new()
+            for oi in 0..total:
+                let di = order[oi]
+                ordered.push(decls[di])
+                ordered_paths.push(frontend_owned_text(self.decl_source_path_frontend(di)))
+                ordered_file_ids.push(self.decl_source_file_id_frontend(di))
+                ordered_ci.push(if di < self.decl_is_c_import.len() as i32: self.decl_is_c_import[di] else: 0)
+            while out.decl_count() > 0:
+                out.state.decls.pop()
+            for oi in 0..total:
+                out.add_decl(ordered[oi])
+            self.decl_source_paths = ordered_paths
+            self.decl_source_file_ids = ordered_file_ids
+            self.decl_is_c_import = ordered_ci
         if runtime_getenv("WITH_PROFILE").len() > 0:
             let ns = runtime_clock_nanos() - t_start
             runtime_eprint(f"[profile] frontend.interface  {ns / 1000000}.{(ns % 1000000) / 1000} ms  sections={paths.len() as i32} lines={parsed_lines} of {decl_lines}")
