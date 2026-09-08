@@ -103,6 +103,7 @@ type Zcu {
     iface_mentioned: HashMap[i32, i32],
     pending_iface_paths: Vec[str],
     pending_iface_texts: Vec[str],
+    import_path_memo: HashMap[str, str],   // "name|dir" → resolved module path (the sections' 937 use lines name ~35 modules)
     // The owned globals the last bundle build could not fold to data
     // (Codegen.bundle_unlowered_globals), for the interface emitter.
     last_bundle_unlowered_globals: Vec[str],
@@ -175,6 +176,7 @@ fn Zcu.init -> Zcu:
         iface_mentioned: HashMap.new(),
         pending_iface_paths: zcu_new_vec_str(),
         pending_iface_texts: zcu_new_vec_str(),
+        import_path_memo: HashMap.new(),
         last_bundle_unlowered_globals: zcu_new_vec_str(),
         project_config: project_config_default(),
         trace_c_import_cache: 0,

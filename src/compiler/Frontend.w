@@ -2712,19 +2712,45 @@ impl Zcu:
         if full_text.len() == 0:
             return target_pool
 
-        // D39: a registered interface section gives the import worklist its
-        // `use` lines now (they head the section, so their spans hold) and
-        // its declarations on demand, once every source module is in.
+        // D39: a registered interface section is not parsed here: its `use`
+        // lines, read as text, put its imports on the worklist, and its
+        // declarations are parsed on demand once every source module is in.
         let on_demand = src.interface and not (self.interface_eager or self.bundle_corpus.len() > 0)
-        let text = if on_demand: resolve_interface_use_lines(full_text) else: with_str_clone_ref(full_text)
+        if on_demand:
+            let section_file_id = self.next_file_id
+            self.next_file_id = self.next_file_id + 1
+            self.add_source_text_mapping(section_file_id, path, full_text)
+            // Path and text go in together, before the imports below recurse
+            // and push their own sections (an interleaved pair once attributed
+            // pcre2_compile_8 to pcre2_compile_cgroup.w).
+            let use_lines = resolve_interface_use_lines(full_text)
+            self.pending_iface_paths.push(frontend_owned_text(path))
+            self.pending_iface_texts.push(full_text)
+            var out = target_pool
+            let dir = frontend_dirname(path)
+            let lines = use_lines.split("\n")
+            for i in 0..lines.len() as i32:
+                let line = lines[i]
+                if not line.starts_with("use "):
+                    continue
+                let upname = line.slice(4, line.len()).trim()
+                let memo_key = upname ++ "|" ++ dir
+                var upfpath = ""
+                if self.import_path_memo.contains(memo_key):
+                    upfpath = with_str_clone_ref(self.import_path_memo.get(memo_key).unwrap())
+                else:
+                    upfpath = self.resolve_module_path_frontend(upname, dir)
+                    self.import_path_memo.insert(memo_key, with_str_clone_ref(upfpath))
+                if upfpath.len() > 0 and self.has_imported_path(upfpath) == 0:
+                    self.add_imported_path(upfpath)
+                    out = self.parse_imported_file_frontend(upfpath, out)
+            return out
+        let text = full_text
 
         let before = target_pool.decl_count()
         let file_id = self.next_file_id
         self.next_file_id = self.next_file_id + 1
-        self.add_source_text_mapping(file_id, path, full_text)
-        if on_demand:
-            self.pending_iface_paths.push(frontend_owned_text(path))
-            self.pending_iface_texts.push(full_text)
+        self.add_source_text_mapping(file_id, path, text)
 
         var lexer = Lexer.init(text, file_id)
         let tokens = lexer.tokenize()
