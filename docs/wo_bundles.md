@@ -553,15 +553,58 @@ compiler unless noted):
 | | before | after |
 |---|---|---|
 | release compiler binary | 109,229,696 B | 108,695,600 B (−534,096) |
-| hello-world `with check` | 0.03 s | 0.23 s |
-| behavior-tests lane | 144 s | 414 s (≈1,000 checks × the interface's Sema) |
+| hello-world `with check` | 0.03 s | 0.23 s with the shim retired; **0.04–0.05 s** with the interface on demand (below) |
+| behavior-tests lane | 144 s | 414 s with the shim retired; 177 s with lazy collection; the on-demand figure is measured on a quiet box before landing (gate ≤ 158 s) |
 | `with build` from a clean `out/` (bundle in the store; a battery was running on the same box) | 251.8 s (59 targets; regex-runtime-ir 5.7 s + bootstrap 5.5 s + objects) | 295.8 s (55 targets; stage1 +9 s, stage2 +25 s, link-compiler +29 s — every stage now Semas the interface; re-measure idle) |
 
-The per-program cost is Sema over the 4.4k-line interface (33 sections,
-`check_bodies` and field-default checks dominate; parsing is twice per
-module, not per import, so caching parsed sections would not recover it).
-Bringing hello world back under 0.1 s needs a mechanism — lazy Sema of
-interface sections, or D29 campaign B — and is Eric's call.
+**The interface on demand** (Eric's ruling: the cost above "is a bug; we
+must fix it now before landing it"; hard gates — hello-world within
+0.05 s of the seed, the lane within 10% of 144 s — on an idle box, first
+cold run excluded). Profiled with `WITH_PROFILE=1` (which now splits
+`frontend.comptime` into prepare/transform and `check_module` into
+`[profile] sema.<phase>`), the 0.20 s was `Sema.collect_declarations` run
+three times per compile (comptime pre-Sema, the transform's Sema, the
+frontend's) over the 3,828 interface declarations — 97 ms each — plus the
+87 types' field defaults (70 ms) and per-identifier linear scans of
+4k-entry visibility vectors in `check_bodies` (46 ms); after those, the
+`.wi`'s own lex+parse ×2 (Resolve, then the import worklist) and its 937
+`use` lines. Five mechanisms, each its own commit:
+
+1. *Lazy collection* (`SemaDecl.prepare_interface_demand`): S is every
+   symbol a non-interface node carries (every node records its file id);
+   an interface declaration is demanded when its name — a method's bare
+   name, an impl's target type — is in S, its subtree's symbols join S,
+   to a fixpoint. Every whole-module pass and codegen loop skips an
+   undemanded interface declaration (`decl_is_lazy_skipped`); field
+   defaults skip every interface type. A `.wi` root and `--bundle-corpus`
+   collect everything (`Zcu.interface_eager`: the emitter, the fingerprint
+   and the check-wi pass read the full tables). `astpool_clone_deep` now
+   keeps each node's file id.
+2. *Indexed lookups*: `decl_visibility_*` chained by symbol and by node,
+   `sig_names` chained by resolved text, an `extern_var_texts` set — the
+   scans walked every declaration per identifier.
+3. *Source wins a flat name whatever the order* (D29-B is pending):
+   pcre2's `is_alpha`/`is_digit`/… beside std.string's, its
+   `pub extern fn abort` beside every module's. `collect_fn_decl`,
+   `collect_extern_fn` and codegen's `declare_function_at_inner` let an
+   interface declaration yield to a source one.
+4. *Sections parsed on demand*: Resolve and the import worklist read a
+   section's imports from its `use` lines as text (no use declaration of
+   a section enters the pool); once every source module is in,
+   `merge_interface_sections_on_demand` parses declaration *lines* by
+   demand as chunks with their own file ids, to a fixpoint, and places
+   them before the root's declarations (`is_local_decl` takes the pool's
+   tail). `[profile] frontend.interface 3.4 ms sections=32 lines=59 of
+   3405`; parse decls 4771 → 463.
+5. Sema's lazy layer stays underneath: it sees only the parsed lines and
+   demands them all.
+
+Measured on this box (stage1/release, idle, cold run excluded):
+hello-world check 0.46 → 0.07 (lazy) → 0.05 (on demand) → 0.04 s (text
+imports); `behav_derive_clone.w` check 21 ms on the seed, 40 ms here
+(parse 5.5, resolve 10.3, imports 0.5, interface 4.7, comptime ~8,
+sema ~5); `test` of it 0.40 s vs the seed's 0.39–0.54 s and the
+shim-retired compiler's 0.81 s.
 
 ## Non-goals
 
