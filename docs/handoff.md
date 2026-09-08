@@ -92,18 +92,43 @@ declaration whatever the order.
 | + lazy interface collection | 0.07 s | 177 s (green) | hello over, lane over |
 | + lookup indexes | 0.07 s | 177 s (no change — expected; it is the fix for large units) | — |
 | + on-demand merge, first run | **0.05 s ✓** (`decls` 4771→1366; interface parses 59 of 3,405 lines) | 306.8 s **RED**, 14/980 failed | invalid |
-| + root-tail rotation, rerun | — | **282.2 s**, likely RED (the `test-pass` marker was not refreshed) | **not a gate measurement** |
+| + root-tail rotation, rerun | 0.05 s ✓ | 282.2 s, **GREEN** (980/980) — but **invalid**: the box carried a full core of foreign load (Steam ~99% of a core, WindowServer, VS Code, a VM; load 3.0–3.5) | not a gate measurement |
 
-The 14 failures were a real ordering bug: the merge appended interface
-chunks *after* the root's declarations, but `Sema.is_local_decl` takes the
-**last N** declarations of the merged pool as the root's, so the root's own
-types read as imported (`derive` generation, sealed-trait locality and
-`copy` all failed). `2fe8ecb9` rotates the chunks in before the root tail.
+**Neither 177 s nor 282 s is admissible** — both were taken on a loaded box.
+Per-test timings on `behav_derive_clone.w`, same box state, three binaries:
+pre-C4 seed check/build/test 0.03/0.09/0.39–0.54 s; eager C4 0.45/0.54/0.81 s;
+on-demand C4 **0.05/0.12/0.40 s** — parity with the seed on `test`, half of
+eager C4. On that arithmetic the lane on a quiet box lands near **150–160 s**,
+i.e. at the gate. So the "regression" was load, not the merge.
+
+The 14 failures in the first run were a real ordering bug: the merge
+appended interface chunks *after* the root's declarations, but
+`Sema.is_local_decl` takes the **last N** declarations of the merged pool as
+the root's, so the root's own types read as imported (`derive` generation,
+sealed-trait locality and `copy` all failed). `2fe8ecb9` rotates the chunks
+in before the root tail; the rerun above proves it (980/980).
+
+**The remaining per-compile residue is measured** (phase profile of `check`
+on `behav_derive_clone.w`, on-demand release vs seed, ms): parse 9.7 vs 3.5,
+resolve 9.9 vs 3.8, imports 4.2 vs 0.3, interface 4.2 (new), comptime 9.9
+vs 4.4, sema 4.9 vs 3.9, MIR 3.5 vs 2.8 — **48 vs 21 ms**. About 16 of the
+extra 27 ms is the interface sections' **937 `use` lines**: parsed as `use`
+declarations twice (Resolve, then the import worklist — `decls` 1368 vs
+447, the 920 extra are those use decls), each resolved to a module path
+individually (`resolve_module_path_frontend` × 937 for ~35 distinct
+modules), then carried through the comptime transform's pool clone before
+being stripped. The chunk fixpoint itself is 4.2 ms (two passes); the
+rotation is sub-millisecond. **The fix is in the `c4p` tree** (type-checks;
+stage1 rebuilding as of this handoff): Resolve turns a section's `use` lines
+into import edges directly from text (`process_interface_module`,
+`resolve_use_file_dotted`), and the worklist enqueues a section's imports
+from the same text with a per-compile name→path memo — no use declarations
+enter the pool at all.
 
 ### What you must do next (in order)
-1. **Get the truth on the 282 s rerun.** In `c4p`: was it green? (`out/.build-state/behavior-tests.test-pass` freshness; the lane's captured output under `out/test-graph/behavior-tests/`.) If red, the failure list and cause first.
-2. **Root-cause the lane cost.** Even if green, 282 s is ~100 s *worse* than lazy collection alone — roughly 100 ms per compile, more than the 40 ms parse×2 the merge was meant to remove. Profile a **representative behavior test, not hello** (`WITH_PROFILE=1` breaks `frontend.comptime` into prepare/transform and reports `[profile] frontend.interface lines=N of M`). Name the mechanism and its ms. Suspects, unmeasured: the rotation copying the decl list + three per-decl vectors on every compile; the on-demand fixpoint re-parsing sections per iteration; chunks re-lexed per file. **Measure, don't guess** — the parse×2 finding was made exactly this way.
-3. Iterate until the lane is **green and ≤ 158 s on the `c4p` base.** Every mechanism you add: report its measured delta.
+1. **Finish the `use`-lines fix** now in `c4p`: let the stage1 rebuild complete, re-run the phase profile on `behav_derive_clone.w` (the 48 ms should drop by ~16), then the regression set (the ten formerly-failing derive/sealed/copy tests, hello, the regex and abort repros, the compiler self-check).
+2. **Measure the lane on a QUIET box — this is the whole point.** The prior agent armed a lane that waits for load average < 1.2 and no builds before running; use that discipline. `uptime` before and after; if a foreign process (Steam, a VM, VS Code indexing) is burning a core, the number is void — do not report it as a gate figure. Three runs, idle, cold run excluded, release compiler.
+3. Iterate until the lane is **green and ≤ 158 s on the `c4p` base.** If the quiet-box number lands above the gate, profile a representative behavior test (not hello) with `WITH_PROFILE=1` and name the next mechanism with its ms, as above. Every mechanism you add: report its measured delta.
 4. **Port to `c4r`**, re-measure the lane once on the rebased tree (main's changes can shift it), then the full battery **with the move and drop audits** (C4 touches MIR): `with build`, then with the fresh `out/release/bin/with`: `:fixpoint`, `:move-audit`, `:drop-audit`, `:test`, `:seed-compat`, `analyze src/main.w audit:all`, `:test-green`, `:last-green`. Report all numbers. Only then push, reseed (`:update-seed`, `:install-user`), close #955.
 5. Update `docs/wo_bundles.md` §"Shim retired (batch C4)" with the final measured table (the branch's copy has the 0.23 s / 414 s pre-fix numbers and the placeholder).
 
