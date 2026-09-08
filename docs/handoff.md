@@ -1,5 +1,15 @@
 # Handoff — the .wo bundles / stdlib-sourcing campaign (2026-09-08)
 
+**C4 landing update:** the local A/B performance gate is now green on the
+rebased landing tree. After excluding the initial pair, the two uncached
+warm pairs were 263.9/268.7 s (C4/baseline 1.018) and 275.6/284.3 s
+(1.032); baseline passed 985 files and C4 passed 986 in every run.
+`docs/wo_bundles.md` records the measured table. Main's handoff-only changes
+have been merged into `wo-c4`; the next step is the full battery, using
+`out/release/bin/with` for every post-build step. Do not repeat the gate or
+use the earlier quiet-box requirement below; the local ratio ruling
+supersedes it. C4 is not yet merged or reseeded.
+
 You are picking up a campaign mid-flight. This note is self-contained: it
 tells you where every thread stands, exactly what is next, the gates that
 must hold, and the traps that cost days this week. Read `CLAUDE.md` first —

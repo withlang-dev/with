@@ -554,13 +554,15 @@ compiler unless noted):
 |---|---|---|
 | release compiler binary | 109,229,696 B | 108,695,600 B (−534,096) |
 | hello-world `with check` | 0.03 s | 0.23 s with the shim retired; **0.04–0.05 s** with the interface on demand (below) |
-| behavior-tests lane | 144 s | 414 s with the shim retired; 177 s with lazy collection; the on-demand figure is measured on a quiet box before landing (gate ≤ 158 s) |
+| behavior-tests lane | 144 s | 414 s with the shim retired; 177 s with lazy collection; final on-demand A/B ratios **1.018 and 1.032**, below the 1.10 gate (below) |
 | `with build` from a clean `out/` (bundle in the store; a battery was running on the same box) | 251.8 s (59 targets; regex-runtime-ir 5.7 s + bootstrap 5.5 s + objects) | 295.8 s (55 targets; stage1 +9 s, stage2 +25 s, link-compiler +29 s — every stage now Semas the interface; re-measure idle) |
 
 **The interface on demand** (Eric's ruling: the cost above "is a bug; we
 must fix it now before landing it"; hard gates — hello-world within
-0.05 s of the seed, the lane within 10% of 144 s — on an idle box, first
-cold run excluded). Profiled with `WITH_PROFILE=1` (which now splits
+0.05 s for hello-world; the lane within 10% of the pre-C4 baseline).
+Eric's subsequent ruling is to measure the lane locally as an interleaved
+A/B ratio under normal laptop activity, with the first cold pair excluded;
+an idle box is not required. Profiled with `WITH_PROFILE=1` (which now splits
 `frontend.comptime` into prepare/transform and `check_module` into
 `[profile] sema.<phase>`), the 0.20 s was `Sema.collect_declarations` run
 three times per compile (comptime pre-Sema, the transform's Sema, the
@@ -605,6 +607,25 @@ imports); `behav_derive_clone.w` check 21 ms on the seed, 40 ms here
 (parse 5.5, resolve 10.3, imports 0.5, interface 4.7, comptime ~8,
 sema ~5); `test` of it 0.40 s vs the seed's 0.39–0.54 s and the
 shim-retired compiler's 0.81 s.
+
+**Final local behavior gate (2026-09-08).** Pre-C4 main `79d523f4`
+(`main79`) versus rebased C4 `973a738a` (`c4r`), using each tree's release
+compiler. Runs were sequential A/B/A/B on the same laptop; each tree used
+its own `out/wo-store-test` via `WITH_WO_DIR`. Test-pass and per-file verdict
+caches were cleared before each measured lane. Timings below are the
+runner's `[time] behavior-tests` wall times, excluding build dependencies.
+
+| pair | pre-C4 | C4 | C4 / pre-C4 | result |
+|---|---:|---:|---:|---|
+| initial pair, excluded | 254.8 s | 261.3 s | 1.026 | green |
+| warm pair 1 | 263.9 s | 268.7 s | **1.018** | green |
+| warm pair 2 | 275.6 s | 284.3 s | **1.032** | green |
+
+Every measured baseline run passed 985 files; C4 passed 986, including
+the added corpus-import regression fixture. All had zero cached files.
+Both warm pairs pass the **ratio ≤ 1.10** gate on the landing tree. This
+establishes the performance gate; the full build/fixpoint/audit/test and
+seed-compatibility battery remains a separate landing requirement.
 
 ## Non-goals
 
