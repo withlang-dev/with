@@ -60,10 +60,10 @@ facade. Tracked by #955 (also covers the emit-C lane after the bundle).
 Two worktrees under `~/.local/with-staging/`:
 
 - **`c4r` — the landing tree.** Branch `wo-c4` rebased onto main
-  `79d523f4`: **head `2fe8ecb9`, 30 commits**, ABI hash re-recorded for the
+  `79d523f4`: **head `973a738a`, 32 commits**, ABI hash re-recorded for the
   merged tree, `with check src/main.w` passes with the seed. This is what
   eventually merges to main.
-- **`c4p` — the measuring tree.** Head `5ac74456` (same fixes, on the older
+- **`c4p` — the measuring tree.** Head `980a12e0` (same fixes, on the older
   base), working tree clean. Lane measurements were taken here because the
   box must be quiet for a valid number.
 
@@ -118,16 +118,25 @@ declarations twice (Resolve, then the import worklist — `decls` 1368 vs
 individually (`resolve_module_path_frontend` × 937 for ~35 distinct
 modules), then carried through the comptime transform's pool clone before
 being stripped. The chunk fixpoint itself is 4.2 ms (two passes); the
-rotation is sub-millisecond. **The fix is in the `c4p` tree** (type-checks;
-stage1 rebuilding as of this handoff): Resolve turns a section's `use` lines
-into import edges directly from text (`process_interface_module`,
-`resolve_use_file_dotted`), and the worklist enqueues a section's imports
-from the same text with a per-compile name→path memo — no use declarations
-enter the pool at all.
+rotation is sub-millisecond. **That fix is done and committed** (`c4p`
+`980a12e0`, ported to `c4r` as `4d775b12`): Resolve turns a section's `use`
+lines into import edges directly from text (`process_interface_module`),
+and the worklist enqueues a section's imports from the same text with a
+per-compile name→path memo (35 distinct modules) — no use declaration of a
+section enters the pool. Same check: **48 → 40 ms** (seed 21), `decls=463`,
+imports 0.5 ms. The same commit fixes a latent pairing bug it exposed: a
+section's path was pushed to the pending list before its imports recursed
+and its text after, so `pcre2_compile_8` was attributed to
+`pcre2_compile_cgroup.w`, its link name hashed the wrong module and the
+bundle went unlinked (caught by the regex tests). With it: check 0.04 s ×3
+(seed 0.03), hello-world **0.04–0.05 s ×4** — the hello gate is met; the 14
+derive/sealed/copy tests, the three regex behavior tests, the regex/abort
+repros, the compiler self-check and both fixtures all pass. The branch's
+`docs/wo_bundles.md` (`973a738a`) documents all five mechanisms with their
+figures.
 
 ### What you must do next (in order)
-1. **Finish the `use`-lines fix** now in `c4p`: let the stage1 rebuild complete, re-run the phase profile on `behav_derive_clone.w` (the 48 ms should drop by ~16), then the regression set (the ten formerly-failing derive/sealed/copy tests, hello, the regex and abort repros, the compiler self-check).
-2. **Measure the lane on a QUIET box — this is the whole point.** The prior agent armed a lane that waits for load average < 1.2 and no builds before running; use that discipline. `uptime` before and after; if a foreign process (Steam, a VM, VS Code indexing) is burning a core, the number is void — do not report it as a gate figure. Three runs, idle, cold run excluded, release compiler.
+1. **Measure the lane on a QUIET box — this is the only thing left before landing.** Every mechanism is done; per-test arithmetic (`test` 0.40 s vs the seed's 0.39–0.54) puts the lane at or under the seed's own 144 s on an idle box, but the gate takes the *measured* figure, not the estimate. The prior agent armed `c4p_quiet_lane.sh` (monitor attached): it runs the full build + `behavior-tests` only after the load average has been < 1.2 for two consecutive minutes with no builds, and records load before and after. **The box has not been quiet**: Steam at ~99% of a core, then a load average of 9.2 → 5.7 with nothing of ours running, then WindowServer/codex/Docker at ~9% each. Close those, then let the waiter fire. Three runs, idle, cold run excluded, release compiler; if a foreign process is burning a core the number is void — do not report it as a gate figure.
 3. Iterate until the lane is **green and ≤ 158 s on the `c4p` base.** If the quiet-box number lands above the gate, profile a representative behavior test (not hello) with `WITH_PROFILE=1` and name the next mechanism with its ms, as above. Every mechanism you add: report its measured delta.
 4. **Port to `c4r`**, re-measure the lane once on the rebased tree (main's changes can shift it), then the full battery **with the move and drop audits** (C4 touches MIR): `with build`, then with the fresh `out/release/bin/with`: `:fixpoint`, `:move-audit`, `:drop-audit`, `:test`, `:seed-compat`, `analyze src/main.w audit:all`, `:test-green`, `:last-green`. Report all numbers. Only then push, reseed (`:update-seed`, `:install-user`), close #955.
 5. Update `docs/wo_bundles.md` §"Shim retired (batch C4)" with the final measured table (the branch's copy has the 0.23 s / 414 s pre-fix numbers and the placeholder).
