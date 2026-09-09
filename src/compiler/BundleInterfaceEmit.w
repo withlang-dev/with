@@ -504,9 +504,12 @@ impl BundleEmitter:
         if (flags / FnFlags.ASYNC) % 2 != 0 or (flags / FnFlags.GEN) % 2 != 0 or (flags / FnFlags.COMPTIME) % 2 != 0:
             self.refuse("is async, gen or comptime; a bundle boundary is Level 0 (docs/abi_roadmap.md)")
             return ""
-        if (flags / FnFlags.VARIADIC) % 2 != 0:
-            self.refuse("is variadic; no interface spelling")
-            return ""
+        // A variadic function crosses the boundary spelled as in source
+        // (`..., ...`): §18.5c makes a .wi ordinary declaration syntax, and
+        // Sema gives the declaration a variadic signature exactly as it gives
+        // one to the source (a migrated C corpus keeps its C-shaped entries,
+        // zlib's gzprintf). The fingerprint row carries the marker.
+        let is_variadic = (flags / FnFlags.VARIADIC) % 2 != 0
         if (flags / FnFlags.ENTRY) % 2 != 0 or (flags / FnFlags.PANIC_HANDLER) % 2 != 0 or (flags / FnFlags.NO_MAIN) % 2 != 0 or (flags / FnFlags.TEST) % 2 != 0 or (flags / FnFlags.BEFORE) % 2 != 0 or (flags / FnFlags.AFTER) % 2 != 0 or (flags / FnFlags.BENCH) % 2 != 0:
             self.refuse("carries an entry/test/panic-handler attribute; not interface material")
             return ""
@@ -586,6 +589,9 @@ impl BundleEmitter:
             params_row = params_row ++ pname ++ ":" ++ spelling ++ f":{vra}:{eff}" ++ (if noalias: ":noalias" else: "") ++ ";"
             printed = printed + 1
             self.note_effect_disagreement(sema, node, sig, pi, full, pname, eff, origin)
+        if is_variadic:
+            params = params ++ (if printed > 0: ", ..." else: "...")
+            params_row = params_row ++ "...;"
         let ret = self.spell(sema, sema.sig_return_type(sig))
         if self.failed:
             return ""

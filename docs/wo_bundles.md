@@ -162,24 +162,30 @@ program's undefined symbols need it (`Link.w`'s
 compiler itself (SemaCheck 12 call sites, CCodegen 10, CiMigrate 3,
 CodegenDispatch 1) call the shim.
 
-**zlib today.** `lib/std/zlib/` holds the migrated modules; `std.zlib`
-imports them directly (the model facade). Nothing prebuilt: every consumer
-(`std.build`, `build/zlib_gzip.w`, `build/zlib_gunzip.w`) compiles the
-corpus in-unit.
+**zlib today.** `lib/std/zl/` holds the migrated modules (package
+`std.zl`); `std.zlib` imports them directly (the model facade). Nothing
+prebuilt: every consumer (`std.build`, `build/zlib_gzip.w`,
+`build/zlib_gunzip.w`) compiles the corpus in-unit.
+
+The corpus package and the facade never share a dotted path (`std.re` /
+`std.regex`, `std.zl` / `std.zlib`): the frontend resolves a dotted
+import's parent module as a fallback, so a `lib/std/zlib.w` beside a
+`lib/std/zlib/` corpus would be pulled into the `--no-prelude` bundle build
+and fail there. `build/wo.w` refuses such a corpus by name.
 
 **After.**
 - `pcre2.wo` = `lib/std/re/` (source) + its migrated tests + one object per
   target × ABI version, built by a `pcre2-wo` target from a bundle root that
   imports every module (today that root is the shim's `use` list), keyed
   and stored per §"How the compiler build uses `.wo`s", built only when
-  absent. `zlib.wo` likewise from `lib/std/zlib/`.
+  absent. `zlib.wo` likewise from `lib/std/zl/`.
 - The embed generator and `Link.w`'s name→slice table become data-driven
   over the set of bundles instead of three hardcoded objects; on-demand
   linking generalizes from "needs regex runtime" to "an undefined symbol
   belongs to bundle X" using each bundle's manifest symbol list (this is
   also the link-time interface check).
 - `std.regex` imports `std.re` directly, exactly as `std.zlib` imports
-  `std.zlib.*`; the compiler's internal callers move onto `std.regex`;
+  `std.zl.*`; the compiler's internal callers move onto `std.regex`;
   `rt/regex_runtime.w` and the `with_regex_*` seam are deleted (D30).
 - Each bootstrap stage links the store's objects; stage1 (built by the
   seed) receives them as plain link inputs from `build.w`, stage2 and the
@@ -406,8 +412,12 @@ type. A generic function is corpus-internal at Level 0 (its body
 instantiates at each use site, and an interface carries no bodies): it is
 omitted from the interface, named there by a note line and in the
 manifest's `omitted` lines, and the build warns — a migrated C corpus
-exports its macro helpers this way. Refused: generic types and impls,
-async/gen/comptime/variadic/`@[c_export]`
+exports its macro helpers this way. A variadic function crosses the
+boundary spelled as in source (`..., ...`): a .wi is ordinary declaration
+syntax (§18.5c) and Sema gives the declaration the same variadic signature
+it gives the source, so a migrated corpus keeps its C-shaped entries
+(zlib's `gzprintf`); the fingerprint row carries the `...` marker. Refused:
+generic types and impls, async/gen/comptime/`@[c_export]`
 functions, extension methods, default parameter values, destructured
 parameters, a type with a `drop` method, a droppable mutable global, a
 const whose folded value is not a literal, an ambiguous returned
