@@ -481,7 +481,7 @@ fn wo_drift_run_harness(ctx: &ActionCtx, compiler: &str, harness: &str, harness_
     0
 
 // "" when the slot holds a coherent bundle of this corpus, else why not.
-fn wo_slot_status(fs: &ToolFs, store_prefix: &str, corpus_sha: &str, target: &str, abi_sha: &str) -> str:
+fn wo_slot_status(fs: &ToolFs, store_prefix: &str, corpus_sha: &str, target: &str, abi_sha: &str, compiler_src_sha: &str) -> str:
     let exts: Vec[str] = Vec.new()
     exts.push("o")
     exts.push("wi")
@@ -495,6 +495,14 @@ fn wo_slot_status(fs: &ToolFs, store_prefix: &str, corpus_sha: &str, target: &st
         return store_prefix ++ ".manifest was built from corpus " ++ wo_manifest_field(manifest, "corpus-sha") ++ ", the tree's is " ++ corpus_sha
     if wo_manifest_field(manifest, "target") != target or wo_manifest_field(manifest, "abi-sha") != abi_sha:
         return store_prefix ++ ".manifest names target " ++ wo_manifest_field(manifest, "target") ++ " and ABI " ++ wo_manifest_field(manifest, "abi-sha") ++ ", not this slot's"
+    // The object is what this compiler generation's codegen makes of the
+    // corpus, not only what the ABI fixes (D30: a compiler-generated
+    // object is a (compiler, target)-keyed cache): a slot built by other
+    // compiler sources is stale even when corpus, target and ABI agree —
+    // battery #2 of the zlib bundle linked a stored object that predated
+    // the carried-copy rule and failed on symbols the new codegen defines.
+    if wo_manifest_field(manifest, "compiler-src-sha") != compiler_src_sha:
+        return store_prefix ++ ".manifest was built by compiler sources " ++ wo_manifest_field(manifest, "compiler-src-sha") ++ ", the tree's are " ++ compiler_src_sha
     let wi_sha = wo_sha256_text(fs, fs.host_read_text(store_prefix ++ ".wi"))
     if wo_manifest_field(manifest, "interface-sha") != wi_sha:
         return store_prefix ++ ".wi (sha256 " ++ wi_sha ++ ") is not the interface the stored manifest was built with"
@@ -542,10 +550,14 @@ pub fn run_wo_bundle_build_action(ctx: ActionCtx) -> i32:
     if fs.exists(same_named_module):
         return wo_fail(ctx, "corpus " ++ corpus ++ " shares its package name with the module " ++ same_named_module ++ "; the frontend would load that module into the bundle. Name the corpus package apart from its facade (pcre2's facade std.regex sits over the std.re corpus).")
     let corpus_sha = wo_corpus_sha(fs, corpus_dir)
-    let key = wo_sha256_text(fs, corpus_sha ++ "|" ++ target ++ "|" ++ abi_sha)
+    // The compiler generation that makes the object: the tree's compiler
+    // sources (the same for every stage of one build; a stage binary's
+    // bytes are not, the seed builds stage1).
+    let compiler_src_sha = wo_corpus_sha(fs, "src")
+    let key = wo_sha256_text(fs, corpus_sha ++ "|" ++ target ++ "|" ++ abi_sha ++ "|" ++ compiler_src_sha)
 
     // Present: the slot holds this corpus, coherently — copy it in.
-    let missing = wo_slot_status(fs, store_prefix, corpus_sha, target, abi_sha)
+    let missing = wo_slot_status(fs, store_prefix, corpus_sha, target, abi_sha, compiler_src_sha)
     if missing.len() == 0:
         let exts: Vec[str] = Vec.new()
         exts.push("o")
@@ -555,7 +567,7 @@ pub fn run_wo_bundle_build_action(ctx: ActionCtx) -> i32:
             let ext = exts[ei]
             if fs.write_text(prefix ++ "." ++ ext, fs.host_read_text(store_prefix ++ "." ++ ext)) != 0:
                 return wo_fail(ctx, "could not copy " ++ store_prefix ++ "." ++ ext ++ " into " ++ tree_dir)
-        print("[" ++ ctx.target_name() ++ "] " ++ store_prefix ++ ".{o,wi,manifest} holds key " ++ key ++ " (corpus, target and ABI unchanged): compiled nothing")
+        print("[" ++ ctx.target_name() ++ "] " ++ store_prefix ++ ".{o,wi,manifest} holds key " ++ key ++ " (corpus, target, ABI and compiler sources unchanged): compiled nothing")
         return 0
     print("[" ++ ctx.target_name() ++ "] " ++ missing ++ "; building " ++ name ++ " for " ++ target ++ " key " ++ key ++ " with " ++ compiler)
 
@@ -647,6 +659,7 @@ pub fn run_wo_bundle_build_action(ctx: ActionCtx) -> i32:
     manifest = manifest ++ "name " ++ name ++ "\n"
     manifest = manifest ++ "key " ++ key ++ "\n"
     manifest = manifest ++ "corpus-sha " ++ corpus_sha ++ "\n"
+    manifest = manifest ++ "compiler-src-sha " ++ compiler_src_sha ++ "\n"
     manifest = manifest ++ "object-sha " ++ wo_sha256_text(fs, fs.read_text(tmp_o)) ++ "\n"
 
     // Into the tree copy: object, interface, then the manifest.

@@ -232,16 +232,23 @@ module another bundle provides stays declared-only. A carried module's
 globals are never duplicated (that would fork state per bundle): they
 stay declared-only, and a corpus reaching one fails at link naming it.
 
-**Key.** `key = sha256(corpus_sha | target | abi_sha)` where `corpus_sha`
-is the content hash of the bundle's `src/` (the build cache's
-`build_cache_hash_directory_w_files` shape), `target` the triple, and
+**Key.** `key = sha256(corpus_sha | target | abi_sha | compiler_src_sha)`
+where `corpus_sha` is the content hash of the bundle's `src/` (the build
+cache's `build_cache_hash_directory_w_files` shape), `target` the triple,
 `abi_sha = sha256(docs/with-abi.sha256)`, the recorded hashes of the
-ABI-defining sources. The compiler bakes its own `abi_sha` in at link
-time (a second post-link sentinel beside the version stamp; `with version
---abi-sha` prints it), so a bundle built by compiler X carries X's ABI
-identity, and a compiler that links a bundle checks the manifest's
-`abi_sha` against its own — a mismatch is a hard error, never a silent
-link (#761).
+ABI-defining sources, and `compiler_src_sha` the same content hash over
+the tree's `src/` — the compiler generation whose codegen made the
+object (D30: a compiler-generated object is a (compiler, target)-keyed
+cache). The ABI identity alone is not enough: a codegen rule that changes
+what the object *contains* without touching a signature (the carried
+copies above) left a store slot stale under an unchanged ABI, and the
+zlib drift harness linked it. The manifest records `compiler-src-sha`;
+a slot built by other compiler sources is rebuilt. The compiler bakes
+its own `abi_sha` in at link time (a second post-link sentinel beside the
+version stamp; `with version --abi-sha` prints it), so a bundle built by
+compiler X carries X's ABI identity, and a compiler that links a bundle
+checks the manifest's `abi_sha` against its own — a mismatch is a hard
+error, never a silent link (#761).
 
 **Who builds a bundle.** The compiler whose baked `abi_sha` equals the
 key's. In the bootstrap chain that is stage1 (the first compiler carrying
