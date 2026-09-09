@@ -266,6 +266,30 @@ rule now, not a zlib special case):
 - #1102 filed: the migrator now leaks the macOS SDK's `MAC_OS_X_VERSION_*`
   macros into every shared defs (host-dependent corpus output); zlib's
   re-promoted defs carries them, pcre2 was not re-promoted.
+- Windows (#1103's first CI run): the bundle object carries every corpus
+  module, and zlib's gz layer — migrated on macOS with `O_NONBLOCK` /
+  `O_CLOEXEC` resolved — calls `fcntl`, which `std.libc` declared as a
+  bare extern and UCRT does not have. `fcntl` is now a runtime seam like
+  `open`/`read`/`close` (`with_libc_fcntl` → `rt_fcntl`; POSIX forwards
+  through a variadic extern, Windows reports unsupported). Windows linked
+  zlib's object at all because Link.w's undefined-symbol probe fails
+  there and a failed probe silently linked every bundle; it now warns.
+- **#1104 (blocks #1103's linux x86_64 lane): `va_list` is modeled as an
+  8-byte pointer on every target.** The drift harness runs zlib's
+  `gzprintf` → `vsnprintf(va)`; on SysV x86_64 `va_start` writes a
+  24-byte tag into the 8-byte slot and `vsnprintf` expects a pointer to
+  it — exit 139. Verified from the IR (`with ir --target=linux_x86_64`
+  emits the same `alloca ptr` as Darwin). Only variadic *definitions*
+  are affected (pcre2 has none). Fix = a per-target `VaList` type, one
+  `PassMode` rule in `compute_fn_abi`, the migrator emitting `VaList`,
+  zlib re-migrated, and a behavior test on every lane — an ABI batch,
+  alone, with the audits. Landing order: #1101 → #1104 → #1103.
+- macOS CI fails `behav_cli_test_command_args` and the `selfcheck` corpus
+  test on both this branch and #1101, deterministically, while both pass
+  locally; both use `out/stage/bin/with-stage2`, which the CI Fixpoint
+  step rewrites just before the battery. `wo-c4` (7910cf98, merged here)
+  adds a `Failure diagnostics` workflow step that dumps the surviving
+  captures and probes that binary; the next failing run names the cause.
 
 How it was wired (the template for the next corpus):
 - the corpus moved from `lib/std/zlib/` (package `std.zlib`) to

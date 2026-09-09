@@ -124,3 +124,20 @@ jobs:
           export PATH="$PWD/.link-shim:$LLVM_PREFIX/bin:$PATH"
           export LD_LIBRARY_PATH="$PWD/.link-shim:${LD_LIBRARY_PATH:-}"
           "$WITH" build :test
+
+      # A failed test or lane keeps its capture files (the runner removes
+      # them only on success) but the log names them and shows nothing when
+      # the seed driving the battery predates the runner's stderr tail. Dump
+      # every surviving capture so a runner-only failure is diagnosable from
+      # the log (#1103's harness crash on this lane was not).
+      - name: Failure diagnostics
+        if: failure()
+        run: |
+          set +e
+          echo "== out/stage/bin and out/release/bin"
+          ls -la out/stage/bin out/release/bin 2>&1
+          for f in out/test-graph/*/*.stdout out/test-graph/*/*.stderr out/corpus/*/stdout.txt out/corpus/*/stderr.txt out/command/*/*.stdout out/command/*/*.stderr out/tmp/pre-d-p7-capture/*/*.txt; do
+            [ -f "$f" ] || continue
+            echo "== $f ($(wc -l < "$f") lines)"
+            tail -60 "$f"
+          done
