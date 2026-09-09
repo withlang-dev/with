@@ -405,6 +405,17 @@ fn ci_lookup_c_function_return_type(session: i64, name: &str) -> str:
     ret
 
 fn ci_infer_macro_return_type_from_expr(type_session: i64, translated: &str, known_macro_returns: &str, fallback: &str) -> str:
+    let stripped = ci_strip_parens(ci_trim(translated))
+    // A shift has the left operand's type; the count's type does not
+    // become the result type, including when its With spelling is a cast.
+    let shl = ci_find_op_at_depth0(stripped, "<<")
+    let shr = ci_find_op_at_depth0(stripped, ">>")
+    let shift = if shl >= 0: shl else: shr
+    if shift >= 0:
+        return ci_infer_macro_return_type_from_expr(type_session, stripped.slice(0, shift), known_macro_returns, fallback)
+    for suffix in ["i64", "u64", "u32"]:
+        if stripped.ends_with(suffix) and ci_is_int_literal(stripped.slice(0, stripped.len() - suffix.len())):
+            return with_str_clone_ref(suffix)
     let cast_type = ci_infer_cast_return_type(translated)
     if cast_type.len() > 0:
         return cast_type
@@ -416,7 +427,6 @@ fn ci_infer_macro_return_type_from_expr(type_session: i64, translated: &str, kno
         let macro_ret = ci_lookup_known(call_name, known_macro_returns)
         if macro_ret.len() > 0:
             return macro_ret
-    let stripped = ci_strip_parens(ci_trim(translated))
     if ci_is_int_literal(stripped):
         return "c_int"
     with_str_clone_ref(fallback)
@@ -2883,10 +2893,20 @@ fn ci_expand_private_macro_body(session: i64, body: &str, params: &str, disabled
                 pos = end
                 continue
             let close = ci_find_matching_paren(body, open)
-            if close < 0 or replacement.contains("#"): return ""
+            if close < 0: return ""
             let args = ci_split_top_level_items(body.slice(open + 1, close))
             if args.len() != with_cimport_macro_param_count(session, index): return ""
-            replacement = ci_macro_substitute_arguments(session, index, replacement, args)
+            if replacement.contains("#"):
+                // The expression parser already folds supported suffix-paste
+                // calls to typed literals (#945). Keep that call intact:
+                // producing raw 1L here would let general C integer parsing
+                // erase its width. No public SDK declaration is needed.
+                if args.len() != 1 or ci_paste_int_literal(token, args[0]).len() == 0: return ""
+                output = output ++ body.slice(pos, close + 1)
+                pos = close + 1
+                continue
+            else:
+                replacement = ci_macro_substitute_arguments(session, index, replacement, args)
             end = close + 1
         let expanded = ci_expand_private_macro_body(session, replacement, params, disabled ++ "|" ++ token ++ "|", depth + 1)
         if expanded.len() == 0 and replacement.len() > 0: return ""
@@ -3422,7 +3442,12 @@ fn ci_parse_shift_expr(s: &str, params: &str, known: &str) -> str:
         let rhs = ci_parse_add_expr(ci_trim(s.slice((pos + 2) as i64, s.len())), params, known)
         if lhs.len() > 0 and rhs.len() > 0:
             let w_op = ci_map_c_op(op_str)
-            return "(" ++ lhs ++ " " ++ w_op ++ " " ++ rhs ++ ")"
+            // C allows a signed count; With requires an unsigned count.
+            // Every defined C shift fits u32. Preserve already-unsigned
+            // expressions and contextually typed integer literals.
+            let rhs_type = ci_infer_macro_return_type_from_expr(0, rhs, "", "")
+            let count = if ci_is_int_literal(rhs) or rhs_type == "u32" or rhs_type == "u64": rhs else: "(" ++ rhs ++ " as u32)"
+            return "(" ++ lhs ++ " " ++ w_op ++ " " ++ count ++ ")"
     ci_parse_add_expr(s, params, known)
 
 // Level 9: Additive  + -
