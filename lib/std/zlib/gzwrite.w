@@ -207,7 +207,7 @@ pub unsafe fn gzfwrite(__param_buf: *const c_void, __param_size: c_ulong, __para
 }
 
 pub unsafe fn gzprintf(__param_file: *mut gzFile_s, __param_format: *const i8, ...) -> c_int {
-    var __local_va: *mut i8
+    var __local_va: c_va_list
 
     var __local_ret: c_int
 
@@ -493,7 +493,7 @@ pub unsafe fn gzclose_w(__param_file: *mut gzFile_s) -> c_int {
 
 }
 
-pub unsafe fn gzvprintf(__param_file: *mut gzFile_s, __param_format: *const i8, __param_va: *mut i8) -> c_int {
+pub unsafe fn gzvprintf(__param_file: *mut gzFile_s, __param_format: *const i8, __param_va: c_va_list) -> c_int {
     var __local_len: c_int
 
     var __local_ret: c_int
