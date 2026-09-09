@@ -1,18 +1,18 @@
 // Migrated from C
-use std.zlib.defs
-use std.zlib.zutil
-use std.zlib.inflate
-use std.zlib.infback
-use std.zlib.compress
-use std.zlib.uncompr
-use std.zlib.gzlib
-use std.zlib.gzwrite
-use std.zlib.gzread
-use std.zlib.gzclose
-use std.zlib.adler32
-use std.zlib.crc32
-use std.zlib.inftrees
-use std.zlib.trees
+use std.zl.defs
+use std.zl.zutil
+use std.zl.inflate
+use std.zl.infback
+use std.zl.compress
+use std.zl.uncompr
+use std.zl.gzlib
+use std.zl.gzwrite
+use std.zl.gzread
+use std.zl.gzclose
+use std.zl.adler32
+use std.zl.crc32
+use std.zl.inftrees
+use std.zl.trees
 
 pub unsafe fn deflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_int {
     var __local_old_flush: c_int

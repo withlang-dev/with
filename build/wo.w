@@ -531,6 +531,16 @@ pub fn run_wo_bundle_build_action(ctx: ActionCtx) -> i32:
     let capture_dir = "out/command/" ++ ctx.target_name()
     if fs.mkdir_all(tree_dir) != 0 or fs.mkdir_all(capture_dir) != 0:
         return wo_fail(ctx, "could not create " ++ tree_dir)
+    // A corpus is closed: the bundle build resolves imports inside
+    // corpus-dir only. The frontend resolves a dotted import's PARENT
+    // module too (resolve_module_path_frontend's fallback), so a stdlib
+    // module file that shares the corpus package's name — lib/std/zlib.w
+    // beside lib/std/zlib/ — would be pulled into the bundle and fail under
+    // --no-prelude with a screen of "unknown type" errors. The facade must
+    // live under another name (pcre2: std.regex over the std.re corpus).
+    let same_named_module = corpus_dir ++ ".w"
+    if fs.exists(same_named_module):
+        return wo_fail(ctx, "corpus " ++ corpus ++ " shares its package name with the module " ++ same_named_module ++ "; the frontend would load that module into the bundle. Name the corpus package apart from its facade (pcre2's facade std.regex sits over the std.re corpus).")
     let corpus_sha = wo_corpus_sha(fs, corpus_dir)
     let key = wo_sha256_text(fs, corpus_sha ++ "|" ++ target ++ "|" ++ abi_sha)
 

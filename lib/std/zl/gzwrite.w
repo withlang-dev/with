@@ -1,16 +1,16 @@
 // Migrated from C
-use std.zlib.defs
-use std.zlib.zutil
-use std.zlib.deflate
-use std.zlib.inflate
-use std.zlib.infback
-use std.zlib.compress
-use std.zlib.uncompr
-use std.zlib.gzlib
-use std.zlib.gzread
-use std.zlib.gzclose
-use std.zlib.adler32
-use std.zlib.crc32
+use std.zl.defs
+use std.zl.zutil
+use std.zl.deflate
+use std.zl.inflate
+use std.zl.infback
+use std.zl.compress
+use std.zl.uncompr
+use std.zl.gzlib
+use std.zl.gzread
+use std.zl.gzclose
+use std.zl.adler32
+use std.zl.crc32
 use std.libc
 
 pub unsafe fn gzsetparams(__param_file: *mut gzFile_s, __param_level: c_int, __param_strategy: c_int) -> c_int {

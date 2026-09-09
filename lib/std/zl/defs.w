@@ -1,4 +1,4 @@
-// std.zlib.defs — shared definitions for migrated PCRE2
+// std.zl.defs — shared definitions for migrated PCRE2
 
 pub fn is_alpha(c: i32) -> bool {
     (c >= 65 and c <= 90) or (c >= 97 and c <= 122)
@@ -65,6 +65,10 @@ pub extern fn asin(x: f64) -> f64
 pub extern fn acos(x: f64) -> f64
 pub extern fn atan(x: f64) -> f64
 pub extern fn atan2(y: f64, x: f64) -> f64
+
+pub type c_void = opaque
+pub extern fn abort() -> Never
+pub fn __ci_unreachable() -> Never: abort()
 
 pub type c_char = i8
 pub type c_short = i16
@@ -339,6 +343,83 @@ pub type ulg = c_ulong
 
 pub let HAVE_UNISTD_H: c_int = 1
 pub let USE_CLANG_TYPES: c_int = 0
+pub let MAC_OS_X_VERSION_10_0: c_int = 1000
+pub let MAC_OS_X_VERSION_10_1: c_int = 1010
+pub let MAC_OS_X_VERSION_10_2: c_int = 1020
+pub let MAC_OS_X_VERSION_10_3: c_int = 1030
+pub let MAC_OS_X_VERSION_10_4: c_int = 1040
+pub let MAC_OS_X_VERSION_10_5: c_int = 1050
+pub let MAC_OS_X_VERSION_10_6: c_int = 1060
+pub let MAC_OS_X_VERSION_10_7: c_int = 1070
+pub let MAC_OS_X_VERSION_10_8: c_int = 1080
+pub let MAC_OS_X_VERSION_10_9: c_int = 1090
+pub let MAC_OS_X_VERSION_10_10: c_int = 101000
+pub let MAC_OS_X_VERSION_10_10_2: c_int = 101002
+pub let MAC_OS_X_VERSION_10_10_3: c_int = 101003
+pub let MAC_OS_X_VERSION_10_11: c_int = 101100
+pub let MAC_OS_X_VERSION_10_11_2: c_int = 101102
+pub let MAC_OS_X_VERSION_10_11_3: c_int = 101103
+pub let MAC_OS_X_VERSION_10_11_4: c_int = 101104
+pub let MAC_OS_X_VERSION_10_12: c_int = 101200
+pub let MAC_OS_X_VERSION_10_12_1: c_int = 101201
+pub let MAC_OS_X_VERSION_10_12_2: c_int = 101202
+pub let MAC_OS_X_VERSION_10_12_4: c_int = 101204
+pub let MAC_OS_X_VERSION_10_13: c_int = 101300
+pub let MAC_OS_X_VERSION_10_13_1: c_int = 101301
+pub let MAC_OS_X_VERSION_10_13_2: c_int = 101302
+pub let MAC_OS_X_VERSION_10_13_4: c_int = 101304
+pub let MAC_OS_X_VERSION_10_14: c_int = 101400
+pub let MAC_OS_X_VERSION_10_14_1: c_int = 101401
+pub let MAC_OS_X_VERSION_10_14_4: c_int = 101404
+pub let MAC_OS_X_VERSION_10_14_5: c_int = 101405
+pub let MAC_OS_X_VERSION_10_14_6: c_int = 101406
+pub let MAC_OS_X_VERSION_10_15: c_int = 101500
+pub let MAC_OS_X_VERSION_10_15_1: c_int = 101501
+pub let MAC_OS_X_VERSION_10_15_4: c_int = 101504
+pub let MAC_OS_VERSION_11_0: c_int = 110000
+pub let MAC_OS_VERSION_11_1: c_int = 110100
+pub let MAC_OS_VERSION_11_3: c_int = 110300
+pub let MAC_OS_VERSION_11_4: c_int = 110400
+pub let MAC_OS_VERSION_11_5: c_int = 110500
+pub let MAC_OS_VERSION_11_6: c_int = 110600
+pub let MAC_OS_VERSION_12_0: c_int = 120000
+pub let MAC_OS_VERSION_12_1: c_int = 120100
+pub let MAC_OS_VERSION_12_2: c_int = 120200
+pub let MAC_OS_VERSION_12_3: c_int = 120300
+pub let MAC_OS_VERSION_12_4: c_int = 120400
+pub let MAC_OS_VERSION_12_5: c_int = 120500
+pub let MAC_OS_VERSION_12_6: c_int = 120600
+pub let MAC_OS_VERSION_12_7: c_int = 120700
+pub let MAC_OS_VERSION_13_0: c_int = 130000
+pub let MAC_OS_VERSION_13_1: c_int = 130100
+pub let MAC_OS_VERSION_13_2: c_int = 130200
+pub let MAC_OS_VERSION_13_3: c_int = 130300
+pub let MAC_OS_VERSION_13_4: c_int = 130400
+pub let MAC_OS_VERSION_13_5: c_int = 130500
+pub let MAC_OS_VERSION_13_6: c_int = 130600
+pub let MAC_OS_VERSION_13_7: c_int = 130700
+pub let MAC_OS_VERSION_14_0: c_int = 140000
+pub let MAC_OS_VERSION_14_1: c_int = 140100
+pub let MAC_OS_VERSION_14_2: c_int = 140200
+pub let MAC_OS_VERSION_14_3: c_int = 140300
+pub let MAC_OS_VERSION_14_4: c_int = 140400
+pub let MAC_OS_VERSION_14_5: c_int = 140500
+pub let MAC_OS_VERSION_14_6: c_int = 140600
+pub let MAC_OS_VERSION_14_7: c_int = 140700
+pub let MAC_OS_VERSION_15_0: c_int = 150000
+pub let MAC_OS_VERSION_15_1: c_int = 150100
+pub let MAC_OS_VERSION_15_2: c_int = 150200
+pub let MAC_OS_VERSION_15_3: c_int = 150300
+pub let MAC_OS_VERSION_15_4: c_int = 150400
+pub let MAC_OS_VERSION_15_5: c_int = 150500
+pub let MAC_OS_VERSION_15_6: c_int = 150600
+pub let MAC_OS_VERSION_16_0: c_int = 160000
+pub let MAC_OS_VERSION_26_0: c_int = 260000
+pub let MAC_OS_VERSION_26_1: c_int = 260100
+pub let MAC_OS_VERSION_26_2: c_int = 260200
+pub let MAC_OS_VERSION_26_3: c_int = 260300
+pub let MAC_OS_VERSION_26_4: c_int = 260400
+pub let MAC_OS_VERSION_26_5: c_int = 260500
 pub let USE_CLANG_STDDEF: c_int = 0
 pub let USER_ADDR_NULL: c_ulonglong = (0 as c_ulonglong)
 pub let USE_CLANG_STDARG: c_int = 0
@@ -364,6 +445,9 @@ pub let L_ctermid: c_int = 1024
 pub let NULL: *mut c_void = null
 pub let MAX_MEM_LEVEL: c_int = 9
 pub let MAX_WBITS: c_int = 15
+pub fn OF[T](args: T) -> T {
+    args
+}
 pub let USE_CLANG_LIMITS: c_int = 0
 pub let MB_LEN_MAX: c_int = 6
 pub let CHAR_BIT: c_int = 8
@@ -429,6 +513,7 @@ pub let IOV_MAX: c_int = 1024
 pub let LONG_LONG_MAX: c_longlong = 9223372036854775807
 pub let LONG_LONG_MIN: c_longlong = (0 - 9223372036854775807 - 1)
 pub let ULONG_LONG_MAX: c_ulonglong = ((0 as c_ulonglong) -% 1)
+pub let FD_SETSIZE: c_int = 1024
 pub let F_OK: c_int = 0
 pub let X_OK: c_int = (1 << 0)
 pub let W_OK: c_int = (1 << 1)
@@ -783,6 +868,27 @@ pub let MIN_MATCH: c_int = 3
 pub let MAX_MATCH: c_int = 258
 pub let PRESET_DICT: c_int = 0x20
 pub let OS_CODE: c_int = 19
+pub fn zmemzero[T](dest: T, len: T) -> T {
+    unsafe { with_memset(dest as *mut u8, 0, len as i64) }
+}
+pub fn Assert(cond: i32, msg: i32) -> Unit {
+    return
+}
+pub fn Trace(x: i32) -> Unit {
+    return
+}
+pub fn Tracev(x: i32) -> Unit {
+    return
+}
+pub fn Tracevv(x: i32) -> Unit {
+    return
+}
+pub fn Tracec(c: i32, x: i32) -> Unit {
+    return
+}
+pub fn Tracecv(c: i32, x: i32) -> Unit {
+    return
+}
 pub let BASE: c_uint = 65521
 pub let NMAX: c_int = 5552
 pub type z_word_t = c_ulong
@@ -853,6 +959,9 @@ pub let MIN_LOOKAHEAD: c_int = 262
 pub let WIN_INIT: c_int = 258
 pub let NIL: c_int = 0
 pub let TOO_FAR: c_int = 4096
+pub fn check_match(s: i32, start: i32, match_: i32, length: i32) -> Unit {
+    return
+}
 pub let MAX_STORED: c_int = 65535
 pub fn MIN[T](a: T, b: T) -> T {
     (if (a > b): b else: a)

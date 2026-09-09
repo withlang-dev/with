@@ -1,18 +1,18 @@
 // Migrated from C
-use std.zlib.defs
-use std.zlib.zutil
-use std.zlib.deflate
-use std.zlib.inflate
-use std.zlib.infback
-use std.zlib.compress
-use std.zlib.uncompr
-use std.zlib.gzlib
-use std.zlib.gzwrite
-use std.zlib.gzread
-use std.zlib.gzclose
-use std.zlib.adler32
-use std.zlib.crc32
-use std.zlib.inftrees
+use std.zl.defs
+use std.zl.zutil
+use std.zl.deflate
+use std.zl.inflate
+use std.zl.infback
+use std.zl.compress
+use std.zl.uncompr
+use std.zl.gzlib
+use std.zl.gzwrite
+use std.zl.gzread
+use std.zl.gzclose
+use std.zl.adler32
+use std.zl.crc32
+use std.zl.inftrees
 
 pub unsafe fn inflate_fast(__param_strm: *mut z_stream_s, __param_start: c_uint) -> Unit {
     var __local_state__goto_51_31: *mut inflate_state = null
@@ -780,6 +780,6 @@ pub unsafe fn inflate_fast(__param_strm: *mut z_stream_s, __param_start: c_uint)
         goto '__ci_bb_3
     }
 
-    unreachable()
+    __ci_unreachable()
 
 }

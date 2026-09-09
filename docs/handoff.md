@@ -226,18 +226,36 @@ session's memory note `wo-c4-plan.md`.
 
 The bundle machinery is already multi-bundle (bundle *slots*,
 `embedded_bundle_count`, per-bundle link selection in `Link.w`; #946
-closed), so this mirrors pcre2 exactly:
-- a `wo_bundle_plan(ctx, "zlib", "std/zlib", "lib/std/zlib/bundle.w")` in
+closed), so this mirrors pcre2 exactly. In progress in the `zlib-wo`
+branch (worktree `~/.local/with-staging/zlibwo`):
+- the corpus moved from `lib/std/zlib/` (package `std.zlib`) to
+  `lib/std/zl/` (package `std.zl`): the corpus package and the facade
+  `std.zlib` (`lib/std/zlib.w`) may not share a dotted path, because the
+  frontend's parent-module import fallback pulled the facade into the
+  `--no-prelude` bundle build (`docs/wo_bundles.md`; `build/wo.w` now
+  refuses such a corpus by name);
+- a `wo_bundle_plan(ctx, "zlib", "std/zl", "lib/std/zl/bundle.w")` in
   `build.w` beside `pcre2_wo`, wired through `wo_bundle_targets`,
   `target_with_link_bundle` on every stage, and `target_with_wo_blobs`;
-- a generated bundle root over the 18 modules in `lib/std/zlib/` (16 corpus
-  + `example.w`/`minigzip.w` harness), written the way
-  `build/pcre2.w pcre2_bundle_root_text` writes `lib/std/re/bundle.w`;
-- `std.zlib` (`lib/std/zlib.w`, already the model facade importing its
-  modules directly) and the consumers that recompile in-unit today
-  (`std.build`, `build/zlib_gzip.w`, `build/zlib_gunzip.w`) link the bundle
-  instead. Measure compiler build time before/after — the point is that it
-  stops recompiling zlib on every build.
+  `lib/std/zl/` is excluded from the embedded stdlib in BOTH lists
+  (`build.w target_with_embedded_stdlib_inputs` and the generator in
+  `build/runtime.w`; missing the second one is 232 "unknown type c_void"
+  errors at `<embedded-std>/std/zl/…`);
+- a generated bundle root over the 18 modules in `lib/std/zl/` (16 corpus
+  + `example.w`/`minigzip.w` harness), written by
+  `build/zlib.w zlib_bundle_root_text` the way `build/pcre2.w` writes
+  `lib/std/re/bundle.w`, and checked by `zlib-bundle-root-check`;
+- the migrator's prelude-free vocabulary (`type c_void = opaque`, the
+  `__ci_unreachable` shim) is keyed on the migrate workspace's
+  `prelude_mode: None` / `with migrate --no-prelude`
+  (`ci_migrate_output_is_prelude_free`), no longer on the corpus name
+  `std.re`; `build/zlib.w` and `build/pcre2.w` set it on every migrate
+  workspace. The zlib corpus is re-migrated with that compiler
+  (`WITH=<stage1> <stage1> build :zlib-promote`);
+- `std.zlib` and the consumers that recompile in-unit today (`std.build`,
+  `build/zlib_gzip.w`, `build/zlib_gunzip.w`) link the bundle instead.
+  Measure compiler build time before/after — the point is that it stops
+  recompiling zlib on every build.
 
 ## 4. The corpora plan (`docs/stdlib_sourcing_plan.md`)
 

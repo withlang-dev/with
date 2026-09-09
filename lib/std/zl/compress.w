@@ -1,16 +1,16 @@
 // Migrated from C
-use std.zlib.defs
-use std.zlib.zutil
-use std.zlib.deflate
-use std.zlib.inflate
-use std.zlib.infback
-use std.zlib.uncompr
-use std.zlib.gzlib
-use std.zlib.gzwrite
-use std.zlib.gzread
-use std.zlib.gzclose
-use std.zlib.adler32
-use std.zlib.crc32
+use std.zl.defs
+use std.zl.zutil
+use std.zl.deflate
+use std.zl.inflate
+use std.zl.infback
+use std.zl.uncompr
+use std.zl.gzlib
+use std.zl.gzwrite
+use std.zl.gzread
+use std.zl.gzclose
+use std.zl.adler32
+use std.zl.crc32
 
 pub unsafe fn compress(__param_dest: *mut u8, __param_destLen: *mut c_ulong, __param_source: *const u8, __param_sourceLen: c_ulong) -> c_int {
     return compress2(__param_dest, __param_destLen, __param_source, __param_sourceLen, (-1 as c_int))

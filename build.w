@@ -451,9 +451,9 @@ fn target_with_embedded_stdlib_inputs(target: Target, ctx: &BuildCtx) -> Target:
     let files = ctx.fs().list_files("lib/std")
     for i in 0..files.len() as i32:
         let path = files[i]
-        // A bundled corpus (lib/std/re, lib/std/zlib) is provided by its
+        // A bundled corpus (lib/std/re, lib/std/zl) is provided by its
         // .wo, never embedded as source.
-        if path.ends_with(".w") and not path.starts_with("lib/std/re/") and not path.starts_with("lib/std/zlib/"):
+        if path.ends_with(".w") and not path.starts_with("lib/std/re/") and not path.starts_with("lib/std/zl/"):
             out = out.input(build_owned_text(path))
     out
 
@@ -1644,7 +1644,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     // zlib"): the same plan, wiring and lanes; its consumers (std.zlib and
     // the gzip helpers) link the bundle instead of recompiling the corpus
     // in-unit on every build.
-    let zlib_wo = wo_bundle_plan(ctx, "zlib", "std/zlib", "lib/std/zlib/bundle.w")
+    let zlib_wo = wo_bundle_plan(ctx, "zlib", "std/zl", "lib/std/zl/bundle.w")
 
     var compat_runtime = target_new(.Action, "compat-runtime-source", "").output("out/gen/compat_runtime.w")
     compat_runtime = compat_runtime.extra_output("out/gen/compiler/EmbeddedStdlibData.w")
@@ -3022,7 +3022,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     out = out.add_target(zlib_root_check)
     // example.w takes the .gz scratch file as its one argument; it is
     // spelled inside the drift dir so the harness never writes at the root.
-    out = out.add_target(wo_drift_target(ctx, &zlib_wo, release_compiler_bin("with"), "build", "lib/std/zlib/example.w", "out/wo-drift/zlib/example.gz"))
+    out = out.add_target(wo_drift_target(ctx, &zlib_wo, release_compiler_bin("with"), "build", "lib/std/zl/example.w", "out/wo-drift/zlib/example.gz"))
     var wo_drift = target_new(.Group, "wo-drift", "")
     wo_drift = wo_drift.dep("pcre2-bundle-root-check")
     wo_drift = wo_drift.dep(wo_drift_target_name(&pcre2_wo))
@@ -3104,7 +3104,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     zlib_check_generated = zlib_check_generated.dep("zlib-migrate")
     out = out.add_target(zlib_check_generated)
 
-    var zlib_promote = target_new(.Action, "zlib-promote", "").output("lib/std/zlib")
+    var zlib_promote = target_new(.Action, "zlib-promote", "").output("lib/std/zl")
     zlib_promote.action = run_zlib_promote_action
     zlib_promote = zlib_promote.write_scope("out/tmp/action-scratch/zlib-promote")
     zlib_promote = zlib_promote.input("out/zlib_migrated")

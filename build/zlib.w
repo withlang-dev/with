@@ -164,7 +164,7 @@ fn zlib_migrate_options(source_path: &str, output_path: &str, source_dir: &str) 
         convert_goto_to_structured: false,
         block_style: 2,
         width_slice: 8,
-        shared_defs: "std.zlib.defs",
+        shared_defs: "std.zl.defs",
         migrate_one: "",
         shared_fragment: "",
         ir_roundtrip: false,
@@ -176,8 +176,17 @@ fn zlib_migrate_one_options(source_dir: &str, output_dir: &str, basename: &str, 
     options.shared_fragment = zlib_owned_text(shared_fragment)
     options
 
+// The corpus is a .wo bundle: build/wo.w compiles it --no-prelude, so the
+// migration runs prelude-free too and its defs carry the prelude-only
+// vocabulary (c_void, the unreachable shim) the translation reaches for.
+fn zlib_migrate_prelude_free(workspace: &Workspace):
+    var options = workspace.options()
+    options.prelude_mode = PreludeMode.None
+    workspace.set_options(options)
+
 fn zlib_migrate_file(ctx: &ActionCtx, workspace_name: &str, source_path: &str, output_path: &str, source_dir: &str) -> i32:
     let workspace = ctx.create_workspace(workspace_name)
+    zlib_migrate_prelude_free(workspace)
     workspace.set_migrate_options(zlib_migrate_options(source_path, output_path, source_dir))
     let result = workspace.compile()
     if result.rc != 0:
@@ -188,6 +197,7 @@ fn zlib_migrate_file(ctx: &ActionCtx, workspace_name: &str, source_path: &str, o
 
 fn zlib_migrate_one_file(ctx: &ActionCtx, workspace_name: &str, source_dir: &str, output_dir: &str, basename: &str, output_path: &str) -> i32:
     let workspace = ctx.create_workspace(workspace_name)
+    zlib_migrate_prelude_free(workspace)
     let fragment_path = zlib_join(zlib_scratch_dir(ctx), workspace_name ++ ".shared-fragment")
     workspace.set_migrate_options(zlib_migrate_one_options(source_dir, output_dir, basename, fragment_path))
     let result = workspace.compile()
@@ -321,6 +331,7 @@ pub fn run_zlib_migrate_action(ctx: ActionCtx) -> i32:
     if fs.mkdir_all(zlib_dirname(tmp_dir)) != 0:
         return zlib_fail(ctx, "could not create generated parent: " ++ zlib_dirname(tmp_dir))
     let workspace = ctx.create_workspace("zlib-migrate")
+    zlib_migrate_prelude_free(workspace)
     workspace.set_migrate_options(zlib_migrate_options(source_dir, tmp_dir, source_dir))
     let migrate_result = workspace.compile()
     if migrate_result.rc != 0:
@@ -359,7 +370,7 @@ pub fn run_zlib_migrate_action(ctx: ActionCtx) -> i32:
 // module, bytewise by name, so the bundle build reaches every module.
 // example and minigzip are the harness, never the bundle. The text is a
 // pure function of the module listing; zlib-bundle-root-check checks the
-// promoted lib/std/zlib/bundle.w against it, exactly as pcre2's.
+// promoted lib/std/zl/bundle.w against it, exactly as pcre2's.
 fn zlib_module_name(path: &str) -> str:
     var start: i64 = 0
     for i in 0..path.len():
@@ -392,11 +403,11 @@ pub fn zlib_bundle_root_text(module_paths: &Vec[str]) -> str:
         let mod_name = zlib_module_name(path)
         if mod_name != "bundle" and mod_name != "example" and mod_name != "minigzip":
             names.push(mod_name)
-    var text = "// lib/std/zlib/bundle.w — the zlib .wo bundle root (docs/wo_bundles.md).\n"
+    var text = "// lib/std/zl/bundle.w — the zlib .wo bundle root (docs/wo_bundles.md).\n"
     text = text ++ "// Written by build/zlib.w (zlib-migrate) from the migrated module list:\n"
     text = text ++ "// one `use` per corpus module; example and minigzip are the harness.\n"
     for name in zlib_sorted_strings(move names):
-        text = text ++ "use std.zlib." ++ name ++ "\n"
+        text = text ++ "use std.zl." ++ name ++ "\n"
     text
 
 fn zlib_write_bundle_root(ctx: &ActionCtx, generated_dir: &str) -> i32:
@@ -437,7 +448,7 @@ pub fn run_zlib_build_action(ctx: ActionCtx) -> i32:
     if not fs.is_dir(migrated_dir):
         return zlib_fail(ctx, "missing migrated zlib directory: " ++ migrated_dir ++ " - run zlib-migrate deliberately")
     let tmp_dir = zlib_join(zlib_scratch_dir(ctx), "build")
-    let zlib_dir = zlib_join(zlib_join(zlib_join(tmp_dir, "lib"), "std"), "zlib")
+    let zlib_dir = zlib_join(zlib_join(zlib_join(tmp_dir, "lib"), "std"), "zl")
     let bin_dir = zlib_join(tmp_dir, "bin")
     var rc = zlib_remove_tree_if_exists(ctx, tmp_dir)
     if rc != 0: return rc
