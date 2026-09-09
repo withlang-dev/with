@@ -1724,8 +1724,18 @@ impl Sema:
         let fn_tid = self.add_type(TypeKind.TY_FN, fn_extra_start, param_count, sig_ret_type)
 
         let is_variadic = (flags / FnFlags.VARIADIC) % 2
+        // The flat signature index follows fn_decl_nodes: when an interface
+        // declaration yields to a source definition of the same name, the
+        // name keeps resolving to the source's signature whatever the
+        // collection order (std.zlib's `compress` beside the zlib corpus's
+        // C `compress`); the interface's signature stays reachable through
+        // the visibility-gated text chain. Without this the source body was
+        // checked against the interface's parameters.
+        let prior_sig = if interface_yields: self.get_sig(fn_name) else: -1
         self.add_sig(fn_name, fn_tid, sig_ret_type, sig_param_start, param_count, is_variadic)
-        let fn_sig_idx = self.get_sig(fn_name)
+        let fn_sig_idx = self.sig_names.len() as i32 - 1
+        if interface_yields and prior_sig >= 0:
+            self.sig_lookup.insert(fn_name, prior_sig)
         if fn_sig_idx >= 0:
             self.set_sig_receiver_mode(fn_sig_idx, self.receiver_mode_from_param(param_start, param_count))
             for pi in 0..param_count:
