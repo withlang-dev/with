@@ -1731,6 +1731,8 @@ impl Sema:
             for pi in 0..param_count:
                 if self.fn_param_uses_value_ref_abi(param_start, pi, method_owner_sym, self_type_id) != 0:
                     self.set_sig_param_value_ref_abi(fn_sig_idx, pi, 1)
+                if self.sig_param_is_c_va_list_by_place(fn_sig_idx, pi) != 0:
+                    self.set_sig_param_value_ref_abi(fn_sig_idx, pi, 1)
         if dispatch_fn_name != 0:
             let dispatch_sig = self.get_sig(dispatch_fn_name)
             let clause_sig = self.get_sig(fn_name)
@@ -1826,6 +1828,9 @@ impl Sema:
         let sig_idx = self.get_sig(name)
         if sig_idx >= 0:
             self.apply_declared_effects_to_extern_sig(node, sig_idx, param_start, param_count)
+            for pi in 0..param_count:
+                if self.sig_param_is_c_va_list_by_place(sig_idx, pi) != 0:
+                    self.set_sig_param_value_ref_abi(sig_idx, pi, 1)
         self.extern_fn_names.insert(name, 1)
 
     mut fn collect_extern_var(node: i32, is_local: i32):

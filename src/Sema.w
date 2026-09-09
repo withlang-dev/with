@@ -13,6 +13,7 @@ use Diagnostic
 use InternPool
 use render
 use Overflow
+use TargetSpec
 use compiler.TrackedInputs
 use compiler.BundleInterfaces
 use FnAbi
@@ -1137,6 +1138,7 @@ type Sema {
     ty_cstr_view: TypeId,
     ty_usize: TypeId,
     ty_isize: TypeId,
+    ty_c_va_list: TypeId,
     ty_const_i8_ptr: TypeId,
     ty_field_info: TypeId,
     ty_variant_info: TypeId,
@@ -2320,7 +2322,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         ty_f32: 0, ty_f64: 0, ty_bool: 0, ty_void: 0,
         ty_never: 0, ty_str: 0, ty_str_view: 0,
         ty_cstr: 0, ty_cstr_view: 0,
-        ty_usize: 0, ty_isize: 0, ty_const_i8_ptr: 0,
+        ty_usize: 0, ty_isize: 0, ty_c_va_list: 0, ty_const_i8_ptr: 0,
         ty_field_info: 0, ty_variant_info: 0,
         decl_source_paths: sema_new_vec_str(),
         decl_source_file_ids: Vec.new(),
@@ -2480,6 +2482,7 @@ fn Sema.init(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Sema:
     // Pointer-width integers: d2=1 marks them as usize/isize (64-bit on arm64)
     s.ty_usize = s.add_type(TypeKind.TY_INT, 64, 0, 1)
     s.ty_isize = s.add_type(TypeKind.TY_INT, 64, 1, 1)
+    s.ty_c_va_list = s.add_type(TypeKind.TY_VA_LIST, 0, 0, 0)
     s.ty_const_i8_ptr = s.add_type(TypeKind.TY_PTR, s.ty_i8, 0, 0)
     let cstr_field_names: Vec[str] = Vec.new()
     cstr_field_names.push("ptr")
@@ -2522,6 +2525,7 @@ fn Sema.init(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Sema:
     s.register_prim("CStr", s.ty_cstr)
     s.register_prim("usize", s.ty_usize)
     s.register_prim("isize", s.ty_isize)
+    s.register_prim("c_va_list", s.ty_c_va_list)
     s.init_builtin_reflection_types()
     s.discard_sym = s.pool_intern("_")
 
@@ -4408,6 +4412,23 @@ impl Sema:
         if type_decl_sub_kind(self.ast.get_data2(decl)) == TypeDeclKind.Opaque:
             return 1
         0
+
+    fn type_is_c_va_list(tid: i32) -> i32:
+        if tid == 0:
+            return 0
+        if self.get_type_kind(self.resolve_alias(tid as TypeId)) == TypeKind.TY_VA_LIST: 1 else: 0
+
+    // #1104: a c_va_list parameter is passed the way the target's C passes
+    // va_list. On SysV x86_64 the array type decays to a pointer to the
+    // CALLER's __va_list_tag; on AAPCS64 Linux the 32-byte struct goes by
+    // reference; both are the share-place ABI (a pointer to the place, no
+    // copy) — one PassMode verdict read by MIR (the caller passes the
+    // address) and by codegen (the callee binds the place). Darwin and
+    // Windows pass the pointer-sized value directly (TypeLayout, Codegen).
+    fn sig_param_is_c_va_list_by_place(sig_idx: i32, pi: i32) -> i32:
+        if self.type_is_c_va_list(self.sig_param_type(sig_idx, pi)) == 0:
+            return 0
+        if target_spec_os() == "Linux": 1 else: 0
 
     fn is_c_void_like_type(tid: i32) -> i32:
         if tid == 0:
@@ -7334,6 +7355,10 @@ impl Sema:
         if tk == TypeKind.TY_STR:
             return 0
         if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF or tk == TypeKind.TY_FN or tk == TypeKind.TY_EXTERN_FN or tk == TypeKind.TY_GENERIC_FN:
+            return 1
+        // c_va_list is C's va_list: opaque bytes a migrated body hands on
+        // (gzprintf passes it to gzvprintf, then va_ends it) — Copy, as in C.
+        if tk == TypeKind.TY_VA_LIST:
             return 1
         if tk == TypeKind.TY_STRUCT:
             let name = self.get_type_d0(resolved)

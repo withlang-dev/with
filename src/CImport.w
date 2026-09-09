@@ -977,6 +977,7 @@ fn ci_type_decl_name_exists(session: i64, name: &str, count: i32) -> bool:
 
 fn ci_translated_builtin_type_name(name: &str) -> bool:
     if name == "c_void": return true
+    if name == "c_va_list": return true
     if name == "c_char": return true
     if name == "c_short": return true
     if name == "c_ushort": return true
@@ -2538,7 +2539,11 @@ fn ci_map_builtin_typedef(name: &str) -> str:
     if name == "off_t": return "i64"
     if name == "time_t": return "i64"
     if name == "wchar_t": return "i32"
-    if name == "va_list": return "opaque"
+    // #1104: C's va_list is the compiler's c_va_list on every target — a
+    // pointer on Darwin/Windows, a byte buffer on Linux (TypeLayout) —
+    // never the migration host's canonical spelling, so a corpus migrated
+    // on macOS runs its variadic definitions on Linux too.
+    if name == "va_list" or name == "__builtin_va_list" or name == "__gnuc_va_list": return "c_va_list"
     ""
 
 fn ci_normalize_translated_type_name(name: &str) -> str:
@@ -6620,21 +6625,15 @@ impl CiTypePool:
                 i = i + 1
             return self.ty_fn_ptr(ret_ty, params_start, arg_count)
 
-        // Aggregate `va_list` has no spellable field layout, so the bridge
-        // demotes it to `c_void` — which `check` rejects as a value type,
-        // breaking every migrated variadic function. LLVM's
-        // `llvm.va_start`/`va_end` only need correctly-sized storage, so lower
-        // it to a `[u8; N]` buffer sized to the target's actual va_list.
-        // Detection is structural over the canonical type: glibc/x86_64 spells
-        // it `__va_list_tag[N]`, AAPCS64 Linux spells it `struct __va_list`.
-        // Darwin's `char*` va_list never reaches here (it lowers through the
-        // CXT_Pointer path above).
+        // Aggregate `va_list` (glibc/x86_64 spells it `__va_list_tag[N]`,
+        // AAPCS64 Linux `struct __va_list`) has no spellable field layout.
+        // #1104: it is the compiler's c_va_list, whose storage and passing
+        // TypeLayout and FnAbi decide per TARGET — never a host-sized byte
+        // buffer, which pinned the migration host's ABI into the corpus.
         let va_canon = with_ci_type_canonical(session, cxtype)
         if va_canon >= 0 and ci_canonical_is_aggregate_va_list(session, va_canon):
-            let va_size = with_ci_type_sizeof(session, cxtype) as i32
-            if va_size > 0:
-                let u8_idx = self.add_string("u8")
-                return self.ty_array(self.ty_named(u8_idx), va_size)
+            let va_idx = self.add_string("c_va_list")
+            return self.ty_named(va_idx)
 
         // Typedef, elaborated, atomic, and other named wrappers.
         // Normalize builtin typedef spellings so C names like size_t do

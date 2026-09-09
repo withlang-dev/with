@@ -1,5 +1,15 @@
 use Sema
 use Ast
+use TargetSpec
+
+// #1104: C's va_list has the target's own size — a pointer on Darwin and
+// Windows (char *), 24 bytes on SysV x86_64 (__va_list_tag[1]), 32 bytes on
+// AAPCS64 Linux (struct __va_list). The one layout query codegen and Sema
+// share; llvm.va_start writes exactly this many bytes.
+pub fn type_layout_c_va_list_size() -> i64:
+    if target_spec_os() != "Linux":
+        return 8
+    if target_spec_arch() == "x86_64": 24 else: 32
 
 fn type_layout_align_up(offset: i64, align: i64) -> i64:
     if align <= 1:
@@ -305,6 +315,8 @@ impl Sema:
             return 1
         if tk == TypeKind.TY_STR or tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF or tk == TypeKind.TY_FN or tk == TypeKind.TY_EXTERN_FN or tk == TypeKind.TY_GENERIC_FN or tk == TypeKind.TY_TRAIT_OBJ:
             return 8
+        if tk == TypeKind.TY_VA_LIST:
+            return 8
         if tk == TypeKind.TY_ARRAY:
             return self.type_layout_align_of(self.get_type_d0(resolved))
         if tk == TypeKind.TY_SLICE:
@@ -358,6 +370,8 @@ impl Sema:
             return 16
         if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF or tk == TypeKind.TY_EXTERN_FN or tk == TypeKind.TY_GENERIC_FN or tk == TypeKind.TY_TRAIT_OBJ:
             return 8
+        if tk == TypeKind.TY_VA_LIST:
+            return type_layout_c_va_list_size()
         if tk == TypeKind.TY_ARRAY:
             return self.type_layout_size_of(self.get_type_d0(resolved)) * self.get_type_d1(resolved) as i64
         if tk == TypeKind.TY_TUPLE:

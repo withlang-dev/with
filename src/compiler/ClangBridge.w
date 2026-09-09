@@ -769,6 +769,19 @@ unsafe fn get_type_spelling(s: *mut CImportSession, ty: CXType) -> str:
 unsafe fn translate_type_recursive_mode(s: *mut CImportSession, ty: CXType, depth: i32, is_last_struct_field: i32, preserve_incomplete_arrays: i32) -> *mut u8:
     if depth > MAX_TYPE_DEPTH:
         return session_strdup(s, "__UNSUPPORTED:type too complex\0" as *const u8)
+    // #1104: C's va_list is the compiler's per-target `c_va_list`, spelled the
+    // same on every host — never the canonical shape, which is `char *` on
+    // Darwin, `__va_list_tag[1]` on SysV x86_64 and `struct __va_list` on
+    // AAPCS64. Detect it from the PRE-canonical spelling (the typedef name
+    // `va_list`/`__builtin_va_list`, or the decayed `__va_list_tag *` a
+    // parameter shows), so a corpus migrated on one host runs its variadic
+    // definitions on the others.
+    let raw_spelling = clang_getTypeSpelling(ty)
+    let raw_cstr = clang_getCString(raw_spelling)
+    let is_va_list = raw_cstr as i64 != 0 and c_strstr(raw_cstr, "va_list\0" as *const u8) as i64 != 0
+    clang_disposeString(raw_spelling)
+    if is_va_list:
+        return session_strdup(s, "c_va_list\0" as *const u8)
     let canonical = clang_getCanonicalType(ty)
     let kind = canonical.kind
 

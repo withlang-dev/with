@@ -18,6 +18,7 @@ use Resolve
 use compiler.LlvmBridge.*
 use Overflow
 use TargetSpec
+use TypeLayout
 use FnAbi
 use compiler.EmbeddedBundles
 use compiler.BundleInterfaces
@@ -3344,6 +3345,14 @@ impl Codegen:
             return self.resolve_named_type(str_sym)
         if tk == TypeKind.TY_VOID or tk == TypeKind.TY_NEVER:
             return wl_void_type(self.context)
+        // #1104: the target's own va_list storage — a pointer where C's
+        // va_list is `char *` (Darwin, Windows), a byte buffer of the tag's
+        // size on Linux; llvm.va_start fills exactly this.
+        if tk == TypeKind.TY_VA_LIST:
+            let va_size = type_layout_c_va_list_size()
+            if va_size == 8:
+                return wl_ptr_type(self.context)
+            return wl_array_type(wl_i8_type(self.context), va_size)
         if tk == TypeKind.TY_STRUCT or tk == TypeKind.TY_ENUM:
             let sym = self.sema.get_type_d0(resolved_tid)
             // Distinct types are transparent: same LLVM type as inner type
@@ -5342,7 +5351,13 @@ impl Codegen:
         let orig_param_types: Vec[i64] = Vec.new()
         for pi in 0..param_count:
             let p_type_node = self.pool.fn_param_type(param_start, pi)
-            orig_param_types.push(self.resolve_type(p_type_node))
+            // #1104: a share-place parameter of an extern (a c_va_list on
+            // Linux) is declared as the pointer MIR passes — the address of
+            // the caller's va_list, as C's array decay hands vsnprintf.
+            if sema_sig_idx >= 0 and self.sema.sig_param_uses_value_ref_abi(sema_sig_idx, pi) != 0:
+                orig_param_types.push(wl_ptr_type(self.context))
+            else:
+                orig_param_types.push(self.resolve_type(p_type_node))
             if (sema_sig_idx >= 0 and self.sig_param_is_explicit_ref(sema_sig_idx, pi)) or
                (sema_sig_idx < 0 and self.pool.kind(p_type_node) == NodeKind.NK_TYPE_REF):
                 self.record_ref_param(name_sym, pi, param_count)
