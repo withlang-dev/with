@@ -132,6 +132,9 @@ unsafe fn regex_compile_code(pattern: &str, options: i32, err_code: *mut i32, er
     ccontext.bsr_convention = 0
     ccontext.optimization_flags = 4294967295
     ccontext.tables = pcre2_maketables_8(gcontext)
+    if ccontext.tables == null:
+        pcre2_general_context_free_8(gcontext)
+        with_panic("Regex.compile: character table allocation failed", "", 0)
     let c_pattern = regex_cstr(pattern)
     var raw_err_code: c_int = 0
     var raw_err_offset: c_ulong = 0
@@ -144,12 +147,27 @@ unsafe fn regex_compile_code(pattern: &str, options: i32, err_code: *mut i32, er
         &raw mut ccontext
     )
     with_free(c_pattern as *mut u8)
+    // The compile context lends its tables to the code. Give the returned
+    // pattern PCRE2-managed tables, shared safely by subsequent code copies.
+    var owned = compiled
+    if compiled != null:
+        owned = pcre2_code_copy_with_tables_8(compiled)
+        pcre2_code_free_8(compiled)
+        if owned == null:
+            raw_err_code = PCRE2_ERROR_HEAP_FAILED
+    pcre2_maketables_free_8(gcontext, ccontext.tables)
     pcre2_general_context_free_8(gcontext)
     if err_code as i64 != 0:
         *err_code = raw_err_code
     if err_offset as i64 != 0:
         *err_offset = raw_err_offset as i32
-    compiled as *const i8
+    owned as *const i8
+
+fn regex_copy_code(code: *const i8, what: &str):
+    let copied = unsafe { pcre2_code_copy_8(code as *const pcre2_real_code_8) }
+    if copied == null:
+        with_panic(what ++ ": pattern copy failed", "", 0)
+    copied as *const i8
 
 fn regex_pattern_info(code: *const i8, what: c_int, where_: *mut c_void, label: &str):
     let rc = unsafe { pcre2_pattern_info_8(code as *const pcre2_real_code_8, what as c_uint, where_) }
@@ -275,11 +293,8 @@ fn regex_compile_flags(flags: &str) -> Result[RegexFlags, RegexError]:
 
 impl Regex:
     pub fn clone() -> Self:
-        let copied = unsafe { pcre2_code_copy_8(self.ptr as *const pcre2_real_code_8) }
-        if copied as i64 == 0:
-            with_panic("Regex.clone(): pcre2_code_copy_8 failed", "", 0)
         Regex {
-            ptr: copied as *const i8,
+            ptr: regex_copy_code(self.ptr, "Regex.clone"),
             pattern_text: with_str_clone_ref(self.pattern_text),
             flags_text: with_str_clone_ref(self.flags_text),
             options: self.options,
@@ -291,12 +306,17 @@ impl Regex:
             global_subject_len: null,
         }
 
-    move fn drop():
-        if self.owned != 0 and self.ptr as i64 != 0:
-            unsafe { pcre2_code_free_8(self.ptr as *mut pcre2_real_code_8) }
-
     pub fn is_global() -> bool:
         (self.flags & REGEX_FLAG_GLOBAL) != 0
+
+impl Drop for Regex:
+    move fn drop():
+        if self.owned != 0 and self.ptr != null:
+            unsafe { pcre2_code_free_8(self.ptr as *mut pcre2_real_code_8) }
+
+impl Drop for Captures:
+    move fn drop():
+        unsafe { pcre2_code_free_8(self.regex_ptr as *mut pcre2_real_code_8) }
 
 pub fn Regex.compile(pattern: str) -> Result[Regex, RegexError]:
     Regex.compile_flags(pattern, "")
@@ -385,7 +405,13 @@ impl Regex:
         let spans = regex_match_spans_at(self.ptr, text, start_offset)
         if spans.len() == 0:
             return None
-        Some(Captures { regex_ptr: self.ptr, subject: with_str_clone_ref(text), spans: spans, })
+        // Captures is owned output: named lookup must remain valid after
+        // the Regex dies, including when it was a temporary (#1098).
+        Some(Captures {
+            regex_ptr: regex_copy_code(self.ptr, "Regex.captures"),
+            subject: with_str_clone_ref(text),
+            spans: spans,
+        })
 
     pub fn is_match(text: &str) -> bool:
         self.captures(text).is_some()

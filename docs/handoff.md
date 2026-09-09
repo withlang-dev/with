@@ -24,8 +24,35 @@ impls by their target. The development compiler (78.9 s) passes the
 reduced import and original consumer. Expanded fixtures verify an unused
 attributed type and a demanded packed type: emitted interface and
 source/interface fingerprints agree, and the consumer reads 42 from a
-five-byte packed value. The next step is a fresh battery on this committed
-correction, using `out/release/bin/with` for every post-build step.
+five-byte packed value. The full interface lane then passed (18.5 s action,
+246.8 s total), fixpoint passed (298.2 s), and `audit:all` reported
+2,505,391 facts / zero violations. The full emit-C lane exposed #1043's
+two const-field resets as a native MIR bug too: `var text = h.text` through
+`&Holder` printed `abc` then an empty source. LLDB observed
+`lower_let_binding` restore expected_type to Unit (14) before revisiting
+the original AST and queuing a reset for borrowed field place 7.
+`90d4858c` removes that redundant cancellation; assignment already consumes
+the actual lowered operand. Native output is now `abc` twice, emitted C
+passes syntax checking, and all 15 move / 115 drop audit cells pass.
+The silent read-only-store audit gap is #1096; the documented but ignored
+`--emit-llvm` flag is #1097 (use LLDB disassembly until it exists).
+
+The same review resolved #1036's exact allocation sites: the 2048-byte
+table comes from `pcre2_maketables_8`, the 256-byte code from
+`pcre2_compile_8`. LLDB observed `detect_drop_functions` skip Regex's
+ordinary impl (trait 0 versus Drop 78). The facade now registers
+`impl Drop for Regex`, uses PCRE2-managed table ownership, and releases
+temporary compile tables on success and failure. #1098 was exposed in the
+same path: LLDB saw code free and named capture lookup use the identical
+pointer after explicit `re.drop()`. Captures now own a code copy and have
+their own Drop. The new lifetime fixture goes from 16 leaks to zero;
+escaped clones/captures and both existing regex behavior suites pass with
+stage1 (109.5 s development build).
+
+The next step is the final battery on the committed corrections, including
+the full `:emit-c-test` lane, using `out/release/bin/with` for every
+post-build step. Logs are under `out/c4-validation/` in `c4r`; `STATUS.md`
+there distinguishes current results from prior batteries.
 Debugger launches now work; a disabled DevToolsSecurity status did not
 establish an authorization blocker, and no approval popup was seen.
 Do not repeat the performance gate or
