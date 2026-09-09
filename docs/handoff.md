@@ -49,6 +49,21 @@ their own Drop. The new lifetime fixture goes from 16 leaks to zero;
 escaped clones/captures and both existing regex behavior suites pass with
 stage1 (109.5 s development build).
 
+The `6d54088b` battery then passed build (289.4 s), fixpoint (322.6 s),
+audit:all (2,505,774 facts / zero violations), the full emitted-C bootstrap
+(356.1 s, including C compiler version and hello execution), 15 move cells,
+and 115 drop cells. Its full test survey (1132.0 s) failed only
+`behav_d27_view_nll_before_owner_consume.w` among 987 behavior files; other
+targets passed. #1099 is the exact cause: function setup and closure
+rollback popped six borrow columns but omitted scope-depth and creation-
+site metadata. LLDB saw refs/depth/site lengths 1/1/1 become 0/1/1, then
+the NLL expiration branch skip stale depth 2 in current scope 3. Both
+cleanup loops now use complete-row removal, and a column-length invariant
+catches this corruption. Stage1 (95.4 s) passes the original regression,
+NLL scoping, closure capture, and genuine dangling-view rejection. A With
+comparison reducer predicate kept baseline acceptance while minimizing;
+the diagnostic-only reducer's noisy result is tracked as #1100.
+
 The next step is the final battery on the committed corrections, including
 the full `:emit-c-test` lane, using `out/release/bin/with` for every
 post-build step. Logs are under `out/c4-validation/` in `c4r`; `STATUS.md`

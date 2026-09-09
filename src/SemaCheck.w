@@ -2063,14 +2063,10 @@ impl Sema:
 
         let ret_type = self.sig_return_type(sig_idx)
 
-        // Active borrows are per-function state.
+        // Active borrows are per-function state. Remove complete rows,
+        // including scope depth and creation site, before checking a new body.
         while self.borrow_kinds.len() > 0:
-            self.borrow_kinds.pop()
-            self.borrow_places.pop()
-            self.borrow_fields.pop()
-            self.borrow_refs.pop()
-            self.borrow_path_starts.pop()
-            self.borrow_path_counts.pop()
+            self.remove_borrow_at(self.borrow_refs.len() as i32 - 1)
 
         // Push function scope
         self.push_scope()
@@ -14008,12 +14004,7 @@ impl Sema:
 
         // Restore borrow state — discard borrows created inside closure body.
         while self.borrow_kinds.len() as i32 > saved_borrow_len:
-            self.borrow_kinds.pop()
-            self.borrow_places.pop()
-            self.borrow_fields.pop()
-            self.borrow_refs.pop()
-            self.borrow_path_starts.pop()
-            self.borrow_path_counts.pop()
+            self.remove_borrow_at(self.borrow_refs.len() as i32 - 1)
 
         // Mark non-escaping if this closure is a direct call argument whose
         // receiving parameter does not let the closure escape the call.
@@ -22134,7 +22125,13 @@ impl Sema:
         self.borrow_scope_depths.push(self.scope_starts.len() as i32)
         self.borrow_creation_nodes.push(err_node)
 
+    fn validate_borrow_rows():
+        let count = self.borrow_refs.len()
+        if self.borrow_kinds.len() != count or self.borrow_places.len() != count or self.borrow_fields.len() != count or self.borrow_path_starts.len() != count or self.borrow_path_counts.len() != count or self.borrow_scope_depths.len() != count or self.borrow_creation_nodes.len() != count:
+            sema_phase_bug("BUG: borrow table columns have different lengths")
+
     mut fn remove_borrow_at(idx: i32):
+        self.validate_borrow_rows()
         let last = self.borrow_refs.len() as i32 - 1
         if idx < 0 or idx > last:
             return
@@ -23185,6 +23182,7 @@ impl Sema:
             self.collect_capture_fields(self.ast.get_data0(node), sym)
 
     mut fn expire_dead_borrows_in_block(block_extra_start: i32, stmt_count: i32, next_stmt_index: i32, tail_node: i32):
+        self.validate_borrow_rows()
         let current_depth = self.scope_starts.len() as i32
         var bi = 0
         while bi < self.borrow_refs.len() as i32:
