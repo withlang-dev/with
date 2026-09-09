@@ -222,12 +222,52 @@ went idle twice without reporting a lane number — if you resume it, demand
 the number first. Its regression-found-then-fixed history is in this
 session's memory note `wo-c4-plan.md`.
 
-## 3. zlib → `zlib.wo` (next after C4; one mechanical batch)
+## 3. zlib → `zlib.wo` (DONE on branch `zlib-wo`; PR after #1101)
 
-The bundle machinery is already multi-bundle (bundle *slots*,
-`embedded_bundle_count`, per-bundle link selection in `Link.w`; #946
-closed), so this mirrors pcre2 exactly. In progress in the `zlib-wo`
-branch (worktree `~/.local/with-staging/zlibwo`):
+**State (2026-09-09).** Branch `zlib-wo` = `wo-c4` (C4, PR #1101) + the
+zlib batch, in worktree `~/.local/with-staging/zlibwo`. Battery #3
+fully green there (build 195 s, fixpoint 289 s, test 1006 s,
+seed-compat, test-green, last-green; both drift lanes byte-identical,
+both harnesses run). Not reseeded: reseed from main once #1101 and this
+PR have merged. The second bundle was not "mechanical": it exposed five
+consumer-side defects and one build-cache defect, all fixed in the batch
+(commits `af9fd36c` migrator, `59012470` variadic interface,
+`c8835444` corpus, `ca40e7f5` Sema, `f6b82ba0` codegen, `0da6940b`
+build-layer, `ab30b320` store key) — see `docs/wo_bundles.md` and the
+notes below. **Measured** (interleaved A/B, `WITH_PROFILE=1`, release
+compilers of `wo-c4` vs `zlib-wo`, 3 rounds): a program importing
+`std.zlib` (`test/behavior/behav_zlib_std.w`) spends ~800 ms in the
+compiler's phases with the corpus in-unit and ~160 ms with the bundle
+(imports 48→1.3 ms, comptime 75→11 ms, mir.lower 30→4 ms, llvm
+gen/optimize/emit 570→115 ms; link unchanged at 26 ms). `with check
+build.w` is unchanged (57 ms comptime either way) and the compiler's
+own build is unchanged: the compiler binary never reaches zlib, so
+"stop recompiling zlib on every build" is a per-consumer win, not a
+compiler-build win.
+
+What the batch had to fix beyond the pcre2 template (each is a general
+rule now, not a zlib special case):
+- Sema flat namespace (D29-B pending): an interface declaration collected
+  after a same-named source definition kept `fn_decl_nodes` but
+  overwrote `sig_lookup` (std.zlib's `compress` vs the corpus's C
+  `compress`); interface globals were keyed by name alone (pcre2's
+  `UINT_MAX` hid zlib's). Both per-module now.
+- Codegen: unions were never predeclared, so the alphabetical `.wi`
+  (struct before the unions it holds) failed layout; a bundle build now
+  carries the non-corpus With functions its corpus reaches (std.libc's
+  gz I/O wrappers) as internal copies, because a whole-program consumer
+  never defines module-link-named symbols.
+- The bundle interface spells variadic functions (`gzprintf(..., ...)`).
+- The store slot is keyed by the compiler sources too (`compiler-src-sha`):
+  battery #2 linked a stale object under an unchanged ABI.
+- ToolFs accepted only project-relative paths, hiding the real error on
+  the helper-programs failure path; `std.zl` is an internal module for
+  the spec inventory.
+- #1102 filed: the migrator now leaks the macOS SDK's `MAC_OS_X_VERSION_*`
+  macros into every shared defs (host-dependent corpus output); zlib's
+  re-promoted defs carries them, pcre2 was not re-promoted.
+
+How it was wired (the template for the next corpus):
 - the corpus moved from `lib/std/zlib/` (package `std.zlib`) to
   `lib/std/zl/` (package `std.zl`): the corpus package and the facade
   `std.zlib` (`lib/std/zlib.w`) may not share a dotted path, because the
@@ -253,9 +293,16 @@ branch (worktree `~/.local/with-staging/zlibwo`):
   workspace. The zlib corpus is re-migrated with that compiler
   (`WITH=<stage1> <stage1> build :zlib-promote`);
 - `std.zlib` and the consumers that recompile in-unit today (`std.build`,
-  `build/zlib_gzip.w`, `build/zlib_gunzip.w`) link the bundle instead.
-  Measure compiler build time before/after — the point is that it stops
-  recompiling zlib on every build.
+  `build/zlib_gzip.w`, `build/zlib_gunzip.w`) link the bundle instead
+  (measured above).
+
+Landing order: #1101 (C4) merges first; then open the zlib PR onto
+main (the branch already contains C4, so its diff against main is only
+the zlib commits once C4 is in), merge, sync local main, reseed
+(`:update-seed` + `:install-user`), close #1102 when the migrator fix
+lands. Fast consumer test without a release build:
+`out/bootstrap/bin/with-stage1 build X.w --link-bundle out/wo/zlib
+--link-bundle out/wo/pcre2`.
 
 ## 4. The corpora plan (`docs/stdlib_sourcing_plan.md`)
 
