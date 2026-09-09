@@ -816,12 +816,16 @@ fn tool_glob_sort(items: Vec[str]) -> Vec[str]:
 
 fn ToolFs.resolve_path(self: &Self, path: &str) -> str:
     tool_capability_require(self.token, "ToolFs")
-    tool_path_require_project_relative(path)
+    // An absolute path under the project root is the same project path
+    // spelled the way an action's capture files are (ProcessRunner
+    // normalizes the same way); only a path outside the root escapes.
+    let rel = self.project_relative_path(path)
+    tool_path_require_project_relative(rel)
     if self.root.len() == 0 or self.root == ".":
-        return with_str_clone_ref(path)
+        return rel
     if self.root.ends_with("/"):
-        return self.root ++ path
-    self.root ++ "/" ++ path
+        return self.root ++ rel
+    self.root ++ "/" ++ rel
 
 fn tool_path_is_same_or_child(path: &str, root: &str) -> bool:
     if path == root:
