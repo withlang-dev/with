@@ -1316,6 +1316,16 @@ impl Codegen:
             return false
         path != self.source_file
 
+    // The function form: a bundle build defines the FUNCTIONS of a
+    // non-corpus module it reaches as carried internal copies
+    // (Codegen.decl_path_is_bundle_carried); its globals stay declared-only
+    // through path_is_imported_module_symbol.
+    fn path_is_imported_module_fn(path: &str) -> bool:
+        self.path_is_imported_module_symbol(path) and not self.decl_path_is_bundle_carried(path)
+
+    fn current_decl_is_imported_module_fn() -> bool:
+        self.path_is_imported_module_fn(self.current_decl_source_file)
+
     fn find_module_let_decl_index(sym: i32) -> i32:
         for di in 0..self.pool.decl_count():
             let decl = self.pool.get_decl(di)

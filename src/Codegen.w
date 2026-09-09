@@ -4212,6 +4212,21 @@ impl Codegen:
     fn decl_path_is_bundle_owned(source_path: &str) -> bool:
         self.bundle_corpus.len() > 0 and bundle_corpus_contains(self.bundle_corpus, codegen_canonical_module_path(source_path))
 
+    // A bundle build CARRIES the functions of a non-corpus With module its
+    // corpus reaches (std.libc's open/read/write/close/lseek wrappers, which
+    // zlib's gz modules call): defined in this object under their module
+    // link names with internal linkage. A consumer compiles the stdlib
+    // whole-program and never defines a module-link-named symbol, so a
+    // declared-only reference from the object would never link; internal
+    // linkage lets every bundle carry its own copy and globaldce drop the
+    // unreached ones. A module another bundle provides stays declared-only,
+    // and a carried module's GLOBALS stay declared-only too (state is never
+    // duplicated per bundle): a corpus reaching one fails at link, naming it.
+    fn decl_path_is_bundle_carried(source_path: &str) -> bool:
+        if self.bundle_corpus.len() == 0 or source_path.len() == 0 or source_path == "<unknown>":
+            return false
+        not self.decl_path_is_bundle_owned(source_path) and not self.path_is_bundle_provided(source_path)
+
     // D38: does an embedded .wo bundle provide this module? Then this unit
     // declares its functions and the bundle's object defines them.
     fn path_is_bundle_provided(source_path: &str) -> bool:
@@ -4655,6 +4670,9 @@ impl Codegen:
                     wl_set_value_name(function, promoted)
                 else:
                     wl_set_linkage(function, wl_internal_linkage())
+        else if self.decl_path_is_bundle_carried(self.current_decl_source_file):
+            // A carried copy of a non-corpus function (decl_path_is_bundle_carried).
+            wl_set_linkage(function, wl_internal_linkage())
 
         // @[weak] — set weak linkage (LLVMWeakAnyLinkage = 5)
         // Must be checked before c_export which also sets linkage.
@@ -4825,6 +4843,9 @@ impl Codegen:
                     wl_set_value_name(function, promoted_mo)
                 else:
                     wl_set_linkage(function, wl_internal_linkage())
+        else if self.decl_path_is_bundle_carried(self.current_decl_source_file):
+            // A carried copy of a non-corpus function (decl_path_is_bundle_carried).
+            wl_set_linkage(function, wl_internal_linkage())
 
         self.fn_values.insert(cg_sym, function)
         self.fn_fn_types.insert(cg_sym, fn_type)
@@ -4913,7 +4934,7 @@ impl Codegen:
             // dispatcher, say) is that module's to define, never this
             // object's bare external duplicate (D38 batch C3).
             let decl_index = self.generated_body_decl_index(body_sym)
-            if decl_index >= 0 and self.path_is_imported_module_symbol(self.decl_source_path(decl_index)):
+            if decl_index >= 0 and self.path_is_imported_module_fn(self.decl_source_path(decl_index)):
                 continue
             let body = self.mir_body_at(bi as i64)
             if body.lowering_failed != 0 or body.block_count() == 0:
@@ -6219,6 +6240,14 @@ impl Codegen:
             if sub_kind == TypeDeclKind.Opaque:
                 self.predeclare_struct_type(name_sym)
                 continue
+            if sub_kind == TypeDeclKind.Union:
+                // A union is a named LLVM struct like any struct type; its
+                // name must resolve before pass 0b lays out a struct that
+                // holds it by value, whatever the declaration order — a
+                // bundle interface is canonical (alphabetical), so zlib's
+                // ct_data_s precedes its ct_data_s_fc / ct_data_s_dl unions.
+                self.predeclare_struct_type(name_sym)
+                continue
 
         // Pass 0b: define struct/enum bodies and type aliases.
         for i in 0..self.pool.decl_count():
@@ -6351,7 +6380,7 @@ impl Codegen:
             let decl = self.pool.get_decl(i)
             let kind = self.pool.kind(decl)
             if kind == NodeKind.NK_FN_DECL:
-                if self.current_decl_is_imported_module_symbol():
+                if self.current_decl_is_imported_module_fn():
                     continue
                 let name_sym = self.sema.fn_decl_semantic_symbol_at(decl as i32, self.pool.get_data0(decl), i)
                 if name_sym == 0:
