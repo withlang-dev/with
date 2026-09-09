@@ -340,6 +340,8 @@ pub fn run_zlib_migrate_action(ctx: ActionCtx) -> i32:
         return zlib_fail(ctx, f"only generated {generated_count} .w files; expected at least 18")
     if zlib_reject_c_exports(ctx, tmp_dir) != 0:
         return 1
+    rc = zlib_write_bundle_root(ctx, tmp_dir)
+    if rc != 0: return rc
     rc = zlib_remove_tree_if_exists(ctx, generated_dir)
     if rc != 0: return rc
     if fs.rename(tmp_dir, generated_dir) != 0:
@@ -351,6 +353,77 @@ pub fn run_zlib_migrate_action(ctx: ActionCtx) -> i32:
     if fs.write_text(stamp_path, "ok\n") != 0:
         return zlib_fail(ctx, "could not write stamp: " ++ stamp_path)
     print(f"migrated zlib: {generated_count} .w files in " ++ zlib_abs(root, generated_dir))
+    0
+
+// The .wo bundle root (docs/wo_bundles.md "Root"): one `use` per corpus
+// module, bytewise by name, so the bundle build reaches every module.
+// example and minigzip are the harness, never the bundle. The text is a
+// pure function of the module listing; zlib-bundle-root-check checks the
+// promoted lib/std/zlib/bundle.w against it, exactly as pcre2's.
+fn zlib_module_name(path: &str) -> str:
+    var start: i64 = 0
+    for i in 0..path.len():
+        if path[i] == '/': start = i + 1
+    var end = path.len()
+    for j in start..path.len():
+        if path[j] == '.':
+            end = j
+            break
+    zlib_owned_text(path.slice(start, end))
+
+fn zlib_sorted_strings(items: Vec[str]) -> Vec[str]:
+    var sorted: Vec[str] = Vec.new()
+    for item in items:
+        var placed = false
+        var next: Vec[str] = Vec.new()
+        for existing in sorted:
+            if not placed and item < existing:
+                next.push(item ++ "")
+                placed = true
+            next.push(existing ++ "")
+        if not placed: next.push(item ++ "")
+        sorted = next
+    sorted
+
+pub fn zlib_bundle_root_text(module_paths: &Vec[str]) -> str:
+    var names: Vec[str] = Vec.new()
+    for path in module_paths:
+        if not path.ends_with(".w"): continue
+        let mod_name = zlib_module_name(path)
+        if mod_name != "bundle" and mod_name != "example" and mod_name != "minigzip":
+            names.push(mod_name)
+    var text = "// lib/std/zlib/bundle.w — the zlib .wo bundle root (docs/wo_bundles.md).\n"
+    text = text ++ "// Written by build/zlib.w (zlib-migrate) from the migrated module list:\n"
+    text = text ++ "// one `use` per corpus module; example and minigzip are the harness.\n"
+    for name in zlib_sorted_strings(move names):
+        text = text ++ "use std.zlib." ++ name ++ "\n"
+    text
+
+fn zlib_write_bundle_root(ctx: &ActionCtx, generated_dir: &str) -> i32:
+    let fs = ctx.fs()
+    let path = zlib_join(generated_dir, "bundle.w")
+    let text = zlib_bundle_root_text(fs.list_files(generated_dir))
+    if fs.exists(path) and fs.read_text(path) == text:
+        return 0
+    if fs.write_text(path, text) != 0:
+        return zlib_fail(ctx, "could not write the bundle root " ++ path)
+    0
+
+// The promoted bundle root is exactly what the migrate action writes for
+// the corpus listing — a module added without regenerating it, or a hand
+// edit, fails here. Input: the root; arg: the corpus directory.
+pub fn run_zlib_bundle_root_check_action(ctx: ActionCtx) -> i32:
+    let inputs = ctx.inputs()
+    let args = ctx.args()
+    if inputs.len() == 0 or args.len() == 0 or ctx.output().len() == 0:
+        return zlib_fail(ctx, "requires the bundle root input, the corpus directory arg and a stamp output")
+    let fs = ctx.fs()
+    let root = inputs.get(0)
+    let expected = zlib_bundle_root_text(fs.list_files(args.get(0)))
+    if fs.read_text(root) != expected:
+        return zlib_fail(ctx, root ++ " is not the bundle root the migrate action writes for " ++ args.get(0) ++ " (one `use` per corpus module, sorted; example and minigzip excluded)")
+    if fs.mkdir_all(zlib_dirname(ctx.output())) != 0 or fs.write_text(ctx.output(), "ok\n") != 0:
+        return zlib_fail(ctx, "could not write " ++ ctx.output())
     0
 
 pub fn run_zlib_build_action(ctx: ActionCtx) -> i32:
