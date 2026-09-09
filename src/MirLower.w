@@ -5740,11 +5740,10 @@ impl MirBuilder:
             self.expected_type = bind_ty
             let rhs_op = self.lower_expr(rhs_expr)
             self.expected_type = saved_expected
+            // The lowered operand owns the transfer decision. A borrowed
+            // field may have materialized an independent value, so revisiting
+            // its AST here would consume the original field as well (#1043).
             self.assign_operand_to_place(place, rhs_op, self.ast.get_start(node))
-            // Ordinary assignment-move transfers a non-Copy RHS place into the
-            // binding. Cancel the source's value drop after the value has been
-            // captured; projected moves also queue their D17 reset below.
-            self.cancel_scheduled_value_drop_for_receiver_expr(rhs_expr)
             // #747 (03g): a pure-view if-result (all result arms place-reads
             // of named storage or constants) binds as a VIEW — cancel the
             // scheduled scope-exit drop so the binding does not free storage
