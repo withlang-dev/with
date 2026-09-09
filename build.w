@@ -1744,11 +1744,6 @@ pub fn build(ctx: BuildCtx) -> Build:
         if bsym2 != host_runtime.platform_symbol:
             bootstrap_embedded_objects = bootstrap_embedded_objects.input(empty_platform_blob_path("out/bootstrap-lib", bsym2))
             bootstrap_embedded_objects = bootstrap_embedded_objects.arg(build_owned_text(bsym2))
-    // stage1, stage2 and stage3 link this object: the bundle slot stays
-    // unfilled here (stage1 builds the tree's bundle; the stages after it
-    // take it through --link-bundle).
-    out = add_empty_wo_blob_targets(move out, "bootstrap-", "out/bootstrap-lib", pcre2_wo.name)
-    bootstrap_embedded_objects = target_with_empty_wo_blobs(move bootstrap_embedded_objects, "bootstrap-", "out/bootstrap-lib", pcre2_wo.name)
     // Every consumed object's producer, declared (#680 edge audit).
     bootstrap_embedded_objects = bootstrap_embedded_objects.dep("bootstrap-cimport-stubs-object")
     bootstrap_embedded_objects = bootstrap_embedded_objects.dep("bootstrap-compat-runtime-object")
@@ -1764,6 +1759,26 @@ pub fn build(ctx: BuildCtx) -> Build:
         let bsym3 = bootstrap_empty_syms[bi3]
         if bsym3 != host_runtime.platform_symbol:
             bootstrap_embedded_objects = bootstrap_embedded_objects.dep(empty_platform_blob_target("bootstrap-empty-", bsym3))
+    // Stage2 and stage3 use the same bootstrap runtime blobs, but embed the
+    // bundle stage1 built. --link-bundle links code into a compiler; it does
+    // not embed the object/interface/manifest for that compiler's consumers.
+    var stage_embedded_objects = target_new(.EmbedObjectFiles, "stage-embedded-objects-asm", "").output("out/stage/lib/embedded_objects.s")
+    for i in 0..bootstrap_embedded_objects.inputs.len() as i32:
+        stage_embedded_objects = stage_embedded_objects.input(build_owned_text(bootstrap_embedded_objects.inputs[i]))
+    for i in 0..bootstrap_embedded_objects.args.len() as i32:
+        stage_embedded_objects = stage_embedded_objects.arg(build_owned_text(bootstrap_embedded_objects.args[i]))
+    for i in 0..bootstrap_embedded_objects.deps.len() as i32:
+        stage_embedded_objects = stage_embedded_objects.dep(build_owned_text(bootstrap_embedded_objects.deps[i]))
+    stage_embedded_objects = target_with_wo_blobs(move stage_embedded_objects, &pcre2_wo)
+    out = out.add_target(stage_embedded_objects)
+    var stage_embedded_objects_obj = target_new(.CompileAsmObject, "stage-embedded-objects-object", "out/stage/lib/embedded_objects.s").output("out/stage/lib/embedded_objects.o")
+    stage_embedded_objects_obj = stage_embedded_objects_obj.dep("stage-embedded-objects-asm")
+    out = out.add_target(stage_embedded_objects_obj)
+
+    // Stage1 precedes the tree's bundle, so only its embedding keeps empty
+    // slots. The populated stage object has its own producer and output.
+    out = add_empty_wo_blob_targets(move out, "bootstrap-", "out/bootstrap-lib", pcre2_wo.name)
+    bootstrap_embedded_objects = target_with_empty_wo_blobs(move bootstrap_embedded_objects, "bootstrap-", "out/bootstrap-lib", pcre2_wo.name)
     out = out.add_target(bootstrap_embedded_objects)
     var bootstrap_embedded_objects_obj = target_new(.CompileAsmObject, "bootstrap-embedded-objects-object", "out/bootstrap-lib/embedded_objects.s").output("out/bootstrap-lib/embedded_objects.o")
     bootstrap_embedded_objects_obj = bootstrap_embedded_objects_obj.dep("bootstrap-embedded-objects-asm")
@@ -1864,6 +1879,9 @@ pub fn build(ctx: BuildCtx) -> Build:
     stage2 = stage2.dep("compat-runtime-source")
     stage2 = stage2.dep("embedded-clang-resource-source")
     stage2 = target_with_link_bundle(move stage2, ctx, &pcre2_wo)
+    stage2 = stage2.input("out/stage/lib/embedded_objects.o")
+    stage2 = stage2.arg("embedded-object=out/stage/lib/embedded_objects.o")
+    stage2 = stage2.dep("stage-embedded-objects-object")
     out = out.add_target(stage2)
 
     var stage3 = target_new(.Action, "stage3", "").output(stage_compiler_bin("with-stage3"))
@@ -1881,6 +1899,9 @@ pub fn build(ctx: BuildCtx) -> Build:
     stage3 = stage3.dep("compat-runtime-source")
     stage3 = stage3.dep("embedded-clang-resource-source")
     stage3 = target_with_link_bundle(move stage3, ctx, &pcre2_wo)
+    stage3 = stage3.input("out/stage/lib/embedded_objects.o")
+    stage3 = stage3.arg("embedded-object=out/stage/lib/embedded_objects.o")
+    stage3 = stage3.dep("stage-embedded-objects-object")
     out = out.add_target(stage3)
 
     var stage2_fixpoint = target_new(.Action, "stage2-fixpoint-object", "").output(stage_compiler_obj("with-stage2-fixpoint.o"))

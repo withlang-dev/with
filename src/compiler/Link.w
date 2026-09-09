@@ -1550,10 +1550,15 @@ fn link_stage_link_object_to_binary_plan_with_units(obj_path: &str, extra_object
             let rsp_path = variant ++ "/llvm_ld.rsp"
             let ld_path = link_stage_read_file_trimmed(root ++ "/llvm_ld")
             extras.push(static_bridge)
-            // Include embedded runtime objects for self-contained binary
-            let embedded_path = variant ++ "/embedded_objects.o"
-            if runtime_read_file(embedded_path).len() > 0:
-                extras.push(embedded_path)
+            // The build supplies the stage's embedding object independently
+            // of the bridge/runtime root: stage2 needs populated bundle blobs
+            // while its bootstrap root still carries stage1's empty slots.
+            let embedded_override = runtime_getenv("WITH_COMPILER_EMBEDDED_OBJECT")
+            let embedded_path = if embedded_override.len() > 0: embedded_override else: variant ++ "/embedded_objects.o"
+            if runtime_read_file(embedded_path).len() == 0:
+                with_eprint("error: missing or empty compiler embedding object: " ++ embedded_path)
+                return link_stage_plan_fail()
+            extras.push(embedded_path)
             // Include clang bridge for c_import support
             let clang_bridge_path = variant ++ "/clang_bridge.o"
             if runtime_read_file(clang_bridge_path).len() > 0:
