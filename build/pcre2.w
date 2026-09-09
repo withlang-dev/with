@@ -660,6 +660,14 @@ pub fn run_pcre2_reference_action(ctx: ActionCtx) -> i32:
         return pcre2_fail(ctx, "could not write ready stamp: " ++ ready_stamp)
     0
 
+// The corpus is a .wo bundle: build/wo.w compiles it --no-prelude, so the
+// migration runs prelude-free too and its defs carry the prelude-only
+// vocabulary (c_void, the unreachable shim) the translation reaches for.
+fn pcre2_migrate_prelude_free(workspace: &Workspace):
+    var options = workspace.options()
+    options.prelude_mode = PreludeMode.None
+    workspace.set_options(options)
+
 pub fn run_pcre2_migrate_action(ctx: ActionCtx) -> i32:
     let fs = ctx.fs()
     let inputs = ctx.inputs()
@@ -693,6 +701,7 @@ pub fn run_pcre2_migrate_action(ctx: ActionCtx) -> i32:
         excludes.push(pcre2_owned_text(args[exclude_i]))
         exclude_i = exclude_i + 1
     let workspace = ctx.create_workspace("pcre2-migrate")
+    pcre2_migrate_prelude_free(workspace)
     workspace.set_migrate_options(pcre2_migrate_options(source_dir, tmp_dir, source_dir, move excludes))
     let migrate_result = workspace.compile()
     if migrate_result.rc != 0:
@@ -743,6 +752,7 @@ pub fn run_pcre2_migrate_smoke_action(ctx: ActionCtx) -> i32:
     let out_w = pcre2_join(output_dir, "pcre2_compile.w")
     let excludes: Vec[str] = Vec.new()
     let workspace = ctx.create_workspace("pcre2-migrate-smoke")
+    pcre2_migrate_prelude_free(workspace)
     workspace.set_migrate_options(pcre2_migrate_options(compile_c, out_w, source_dir, move excludes))
     let result = workspace.compile()
     if result.rc != 0:

@@ -4183,6 +4183,10 @@ fn run_migrate_command(argc: i32) -> i32:
             migrate_set_no_c_export(1)
             ai = ai + 1
             continue
+        if arg == "--no-prelude":
+            migrate_set_prelude_free(1)
+            ai = ai + 1
+            continue
         if arg == "--c-export-functions":
             migrate_set_export_function_defs(1)
             ai = ai + 1

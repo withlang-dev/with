@@ -4650,6 +4650,11 @@ fn comptime_execute_workspace_migrate_plan(plan: &ComptimeWorkspaceCompilePlan) 
         migrate_set_export_function_defs(1)
     if plan.migrate_convert_goto_to_structured:
         migrate_set_convert_goto_to_structured(1)
+    // The workspace's prelude mode is the migration's too: output for a
+    // --no-prelude compile (a .wo bundle corpus) carries its own c_void and
+    // unreachable shim (CiMigrate ci_migrate_output_is_prelude_free).
+    if plan.prelude_mode == PRELUDE_NONE():
+        migrate_set_prelude_free(1)
     migrate_set_block_style(plan.migrate_block_style)
     migrate_set_width_slice(plan.migrate_width_slice)
     if plan.migrate_shared_defs.len() > 0:
@@ -4705,7 +4710,9 @@ impl ComptimeEvaluator:
                 runtime_available: true,
                 debug_info: false,
                 compiler_hooks_enabled: false,
-                prelude_mode: 0,
+                // The migration honors the workspace's prelude mode: a
+                // .wo corpus is migrated for a --no-prelude compile.
+                prelude_mode: self.workspace_i32_option(options, "prelude_mode", 0),
                 overflow_mode: -1,
                 migrate_is_dir,
                 migrate_source,

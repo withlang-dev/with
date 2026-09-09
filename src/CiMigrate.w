@@ -125,16 +125,26 @@ pub fn migrate_reset_options() -> Unit:
     g_migrate_export_function_defs = 0
     g_migrate_block_style = 0
     g_migrate_convert_goto_to_structured = 0
+    g_migrate_prelude_free = 0
     g_migrate_fn_translated = 0
     g_migrate_fn_translated_total = 0
 
 fn ci_migrate_shared_defs_active() -> bool:
     g_migrate_shared_defs_prefix.len() > 0
 
+// True when the output compiles without the prelude: a .wo bundle corpus
+// (build/wo.w builds every corpus `--no-prelude`), or `with migrate
+// --no-prelude`. The preamble then carries the prelude-only vocabulary the
+// translation reaches for (c_void, unreachable) — see ci_migrate_preamble_text.
+fn ci_migrate_output_is_prelude_free() -> bool:
+    g_migrate_prelude_free != 0
+
 // True when the shared-defs migration targets the lib/std/re modeled-C zone
 // (pcre2 uses `--shared-defs std.re.defs`). Only there does the compiler exempt
-// cross-module manual-extern calls from the unsafe requirement, so only there is
-// dropping the migrator's `unsafe` wrap around a modeled-libc call correct.
+// cross-module manual-extern calls from the unsafe requirement
+// (sema_path_is_migrated_regex_implementation), so only there is dropping the
+// migrator's `unsafe` wrap around a modeled-libc call correct. The prelude-free
+// vocabulary is NOT keyed on this: that is ci_migrate_output_is_prelude_free.
 fn ci_migrate_shared_defs_targets_regex_zone() -> bool:
     ci_starts_with(g_migrate_shared_defs_prefix, "std.re")
 
@@ -644,15 +654,18 @@ fn ci_migrate_preamble_text() -> str:
     // c_void comes from the prelude's builtins; re-declaring it here would
     // shadow the foundation module out of the program (#750).
     //
-    // #880 exception: the regex zone (lib/std/re) is ALSO compiled with
-    // --no-prelude for the pcre2 bundle (build/wo.w), where no builtin
-    // c_void exists — its defs must carry the declaration, as the
-    // pre-#750 promotion always did (both modes built green with it for
-    // months). Zone-scoped so ordinary migrations keep #750's protection.
-    if ci_migrate_shared_defs_active() and ci_migrate_shared_defs_targets_regex_zone():
+    // Exception (#880, generalized for every .wo corpus): output that
+    // compiles WITHOUT the prelude — a bundled corpus (build/wo.w builds
+    // std.re, std.zl, ... `--no-prelude`) — has no builtin c_void, so its
+    // preamble must carry the declaration, as the pre-#750 promotion always
+    // did (both modes built green with it for months). Keyed on the migrate
+    // workspace's prelude mode, never on a corpus name, so ordinary
+    // migrations keep #750's protection and a new corpus needs no new rule.
+    if ci_migrate_output_is_prelude_free():
         p = p ++ "\ntype c_void = opaque\n"
-        // `unreachable()` is also prelude-only; give the zone a self-contained
-        // Never shim (abort matches the builtin's crash-loudly semantics).
+        // `unreachable()` is also prelude-only; give the output a
+        // self-contained Never shim (abort matches the builtin's crash-loudly
+        // semantics).
         p = p ++ "extern fn abort() -> Never\n"
         p = p ++ "fn __ci_unreachable() -> Never: abort()\n"
     p = p ++ "\ntype c_char = i8\n"
@@ -1958,6 +1971,15 @@ var g_migrate_no_c_export: i32 = 0
 
 pub fn migrate_set_no_c_export(val: i32) -> Unit:
     g_migrate_no_c_export = val
+
+// When true, the output compiles without the prelude (a .wo bundle corpus,
+// or `with migrate --no-prelude`): the preamble carries the prelude-only
+// vocabulary (c_void, the unreachable shim). Set from the migrate
+// workspace's prelude_mode (ComptimeEval) or the CLI flag.
+var g_migrate_prelude_free: i32 = 0
+
+pub fn migrate_set_prelude_free(val: i32) -> Unit:
+    g_migrate_prelude_free = val
 
 // Keep local-definition behavior for globals while preserving C ABI symbols
 // for translated function definitions. Used by promoted migrated libraries
