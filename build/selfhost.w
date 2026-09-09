@@ -8191,7 +8191,7 @@ fn bs_check_bundle_interface(ctx: &ActionCtx, compiler_path: &str, nm_tool: &str
     // attributes and impl bodies unparsed too (the reduced orphan-method
     // regression was just `use std.wi_demo`).
     let unused_src = bs_join(case_dir, "unused.w")
-    rc = bs_write_fixture(ctx, unused_src, "use std.wi_demo\nfn main: print(1)\n", "unused interface consumer")
+    rc = bs_write_fixture(ctx, unused_src, "use std.wi_demo\nfn main: print(\"unused\")\n", "unused interface consumer")
     if rc != 0: return rc
     let unused = bs_run_cli_capture(ctx, compiler_path, "bundle-interface-unused-build", bs_bundle_build_args(unused_src, bundle, bs_join(case_dir, "unused"), false), 120000)
     if unused.rc != 0: return bs_fail(ctx, f"consumer with no demanded bundle declarations failed with exit code {unused.rc}")
