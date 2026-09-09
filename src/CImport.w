@@ -2811,6 +2811,108 @@ fn ci_record_untranslated_object_macro(name: &str, is_system: i32):
     else:
         ci_record_untranslated_macro_always(name)
 
+fn ci_macro_is_migration_private(session: i64, index: i32):
+    with_cimport_macro_is_system(session, index) != 0 or cimport_macro_is_from_input(session, index) != 0
+
+// Token boundaries for a C macro replacement list. In particular, parameters
+// never substitute inside strings, character literals, or preprocessing numbers.
+fn ci_macro_token_end(text: &str, start: i32):
+    let first = text[start]
+    var end = start + 1
+    if first == 34 or first == 39:
+        while end < text.len():
+            let ch = text[end]
+            end += 1
+            if ch == 92 and end < text.len(): end += 1
+            else if ch == first: break
+    else if ci_is_ident_start(first):
+        while end < text.len() and ci_is_ident_char(text[end]): end += 1
+    else if (first >= 48 and first <= 57) or (first == 46 and end < text.len() and text[end] >= 48 and text[end] <= 57):
+        while end < text.len():
+            let ch = text[end]
+            let prev = text[end - 1]
+            if ci_is_ident_char(ch) or ch == 46 or ((ch == 43 or ch == 45) and (prev == 69 or prev == 101 or prev == 80 or prev == 112)):
+                end += 1
+            else: break
+    end
+
+fn ci_macro_substitute_arguments(session: i64, index: i32, body: &str, args: &Vec[str]):
+    var output = ""
+    var pos = 0
+    while pos < body.len():
+        let end = ci_macro_token_end(body, pos)
+        let token = body.slice(pos, end)
+        var replacement = token.to_owned()
+        if ci_is_ident_start(body[pos]):
+            for pi in 0..args.len() as i32:
+                if token == with_cimport_macro_param_name(session, index, pi):
+                    replacement = args[pi].to_owned()
+                    break
+        output = output ++ replacement
+        pos = end
+    output
+
+// Expand private dependencies BEFORE parsing the expression: expanding only
+// a parsed call would change precedence for an unparenthesized C macro body.
+// Public project macros retain their ordinary translated declarations.
+fn ci_expand_private_macro_body(session: i64, body: &str, params: &str, disabled: &str, depth: i32) -> str:
+    if depth > 16: return ""
+    var output = ""
+    var pos = 0
+    while pos < body.len():
+        var end = ci_macro_token_end(body, pos)
+        let token = body.slice(pos, end)
+        var index = -1
+        if ci_is_ident_start(body[pos]) and not params.contains("|" ++ token ++ "|") and not disabled.contains("|" ++ token ++ "|"):
+            var mi = with_cimport_macro_count(session) - 1
+            while mi >= 0:
+                if with_cimport_macro_name(session, mi) == token:
+                    if ci_macro_is_migration_private(session, mi): index = mi
+                    break
+                mi -= 1
+        if index < 0:
+            output = output ++ token
+            pos = end
+            continue
+        var replacement = ci_trim(ci_strip_c_comments(with_cimport_macro_value(session, index)))
+        if with_cimport_macro_is_fn_like(session, index) != 0:
+            var open = end
+            while open < body.len() and ci_is_space(body[open]): open += 1
+            if open >= body.len() or body[open] != 40:
+                output = output ++ token
+                pos = end
+                continue
+            let close = ci_find_matching_paren(body, open)
+            if close < 0 or replacement.contains("#"): return ""
+            let args = ci_split_top_level_items(body.slice(open + 1, close))
+            if args.len() != with_cimport_macro_param_count(session, index): return ""
+            replacement = ci_macro_substitute_arguments(session, index, replacement, args)
+            end = close + 1
+        let expanded = ci_expand_private_macro_body(session, replacement, params, disabled ++ "|" ++ token ++ "|", depth + 1)
+        if expanded.len() == 0 and replacement.len() > 0: return ""
+        output = output ++ expanded
+        pos = end
+    // Rescan across replacement boundaries, e.g. an object alias followed by
+    // arguments that invoke the function-like macro it names.
+    if output != body: return ci_expand_private_macro_body(session, output, params, disabled, depth + 1)
+    output
+
+// An object alias of a function-like macro is still callable after C
+// preprocessing. Emit its function body under the alias, never a global
+// initialized with an unspecialized generic function.
+fn ci_function_macro_alias_target(session: i64, value: &str):
+    var name = ci_trim(value)
+    for depth in 0..16:
+        if not ci_is_c_ident(name): return -1
+        var index = with_cimport_macro_count(session) - 1
+        while index >= 0 and with_cimport_macro_name(session, index) != name: index -= 1
+        if index < 0: return -1
+        if with_cimport_macro_is_fn_like(session, index) != 0: return index
+        let next = ci_trim(ci_strip_c_comments(with_cimport_macro_value(session, index)))
+        if next == name: return -1
+        name = next
+    -1
+
 fn ci_translate_macros(session: i64, type_session: i64, extern_vars: &str, macro_source: &str) -> str:
     let count = with_cimport_macro_count(session)
     var output = ""
@@ -2822,9 +2924,15 @@ fn ci_translate_macros(session: i64, type_session: i64, extern_vars: &str, macro
     for i in 0..count:
         let name = with_cimport_macro_name(session, i)
         let raw_value = with_cimport_macro_value(session, i)
-        let value = ci_trim(ci_strip_c_comments(raw_value))
-        let fn_like = with_cimport_macro_is_fn_like(session, i)
+        var value = ci_trim(ci_strip_c_comments(raw_value))
+        var fn_like = with_cimport_macro_is_fn_like(session, i)
         let macro_is_system = with_cimport_macro_is_system(session, i)
+
+        // #1102: retain all macro values for source-expression expansion,
+        // but migrate declarations only from the corpus and its headers.
+        // c_import still exposes the system header its caller requested.
+        if ci_translate_in_migrate_mode() and ci_macro_is_migration_private(session, i):
+            continue
 
         // Skip self-defined macros: #define FOO FOO (common feature-test pattern)
         if fn_like == 0 and value == name:
@@ -2839,6 +2947,14 @@ fn ci_translate_macros(session: i64, type_session: i64, extern_vars: &str, macro
         if name == "CLITERAL":
             continue
 
+        var fn_index = i
+        if fn_like == 0:
+            let alias_target = ci_function_macro_alias_target(session, value)
+            if alias_target >= 0:
+                fn_index = alias_target
+                fn_like = 1
+                value = ci_trim(ci_strip_c_comments(with_cimport_macro_value(session, fn_index)))
+
         // Try to translate function-like macros; record explicit omissions
         // instead of emitting placeholder functions.
         if fn_like != 0:
@@ -2850,12 +2966,12 @@ fn ci_translate_macros(session: i64, type_session: i64, extern_vars: &str, macro
                 if with_cimport_is_name_emitted(name) == 0:
                     with_cimport_mark_name_emitted(name)
                     let safe_name = ci_escape_reserved(name)
-                    let param_count = with_cimport_macro_param_count(session, i)
+                    let param_count = with_cimport_macro_param_count(session, fn_index)
                     // Detect variadic macros (... params or __VA_ARGS__ in body)
                     var is_variadic_macro = ci_str_contains(value, "__VA_ARGS__")
                     var vpi = 0
                     while vpi < param_count:
-                        let vpname = with_cimport_macro_param_name(session, i, vpi)
+                        let vpname = with_cimport_macro_param_name(session, fn_index, vpi)
                         if vpname == "..." or vpname == "__VA_ARGS__":
                             is_variadic_macro = true
                         vpi = vpi + 1
@@ -2873,7 +2989,7 @@ fn ci_translate_macros(session: i64, type_session: i64, extern_vars: &str, macro
                         while epi < param_count:
                             if epi > 0:
                                 empty_params = empty_params ++ ", "
-                            let epname = ci_escape_reserved(with_cimport_macro_param_name(session, i, epi))
+                            let epname = ci_escape_reserved(with_cimport_macro_param_name(session, fn_index, epi))
                             empty_params = empty_params ++ epname ++ ": i32"
                             epi = epi + 1
                         let r = ci_render_generated_fn_body("fn " ++ safe_name ++ "(" ++ empty_params ++ ") -> Unit", "    return")
@@ -2886,7 +3002,7 @@ fn ci_translate_macros(session: i64, type_session: i64, extern_vars: &str, macro
                     var type_params = ""
                     var pi = 0
                     while pi < param_count:
-                        let pname = ci_escape_reserved(with_cimport_macro_param_name(session, i, pi))
+                        let pname = ci_escape_reserved(with_cimport_macro_param_name(session, fn_index, pi))
                         param_names = param_names ++ "|" ++ pname ++ "|"
                         if pi > 0:
                             param_decl = param_decl ++ ", "
@@ -2908,7 +3024,7 @@ fn ci_translate_macros(session: i64, type_session: i64, extern_vars: &str, macro
 
                     // Identity macro: #define CLITERAL(type) (type)
                     if translated.len() == 0 and param_count == 1:
-                        let original_param = with_cimport_macro_param_name(session, i, 0)
+                        let original_param = with_cimport_macro_param_name(session, fn_index, 0)
                         let safe_param = ci_escape_reserved(original_param)
                         let stripped_identity = ci_strip_parens(ci_trim(work_value))
                         if stripped_identity == original_param:
@@ -2929,7 +3045,7 @@ fn ci_translate_macros(session: i64, type_session: i64, extern_vars: &str, macro
                     if translated.len() == 0 and ci_has_stringify(work_value, param_names):
                         // Simple #x → identity function (returns the string of the expression)
                         if param_count == 1:
-                            let p0 = ci_escape_reserved(with_cimport_macro_param_name(session, i, 0))
+                            let p0 = ci_escape_reserved(with_cimport_macro_param_name(session, fn_index, 0))
                             let body_trimmed = ci_trim(work_value)
                             if body_trimmed == "#" ++ p0 or body_trimmed == "(#" ++ p0 ++ ")":
                                 let r = ci_render_generated_fn_body("fn " ++ safe_name ++ "(x: str) -> str", "    x")
@@ -2942,6 +3058,8 @@ fn ci_translate_macros(session: i64, type_session: i64, extern_vars: &str, macro
                     if translated.len() == 0 and ci_str_contains(work_value, "##"):
                         translated = ci_try_translate_token_paste(work_value, param_names)
                     if translated.len() == 0:
+                        if ci_translate_in_migrate_mode():
+                            work_value = ci_expand_private_macro_body(session, work_value, param_names, "", 0)
                         translated = ci_translate_c_expr(work_value, param_names, known_values)
                     if translated.len() > 0:
                         // Infer return type from cast expression: (x as c_int) → return c_int
@@ -3451,9 +3569,15 @@ fn ci_parse_unary_expr(s: &str, params: &str, known: &str) -> str:
 
 // Level 13: Postfix  .field ->field [idx] (args)  and primary
 fn ci_parse_postfix_expr(s: &str, params: &str, known: &str) -> str:
-    let t = ci_strip_parens(ci_trim(s))
+    let trimmed = ci_trim(s)
+    let t = ci_strip_parens(trimmed)
     if t.len() == 0:
         return ""
+    // A grouped expression restarts at the lowest precedence. Merely
+    // stripping its parentheses here treats a nested binary expression as
+    // a primary token and loses compound macro constants such as INT32_MIN.
+    if t != trimmed:
+        return ci_translate_c_expr(t, params, known)
     // Designated initializer: { .field = val }
     if t[0] == 123:
         let close_brace = ci_find_matching_brace(t, 0)

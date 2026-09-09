@@ -90,6 +90,7 @@ extern fn clang_Cursor_isNull(cursor: CXCursor) -> i32
 extern fn clang_getCursorSpelling(cursor: CXCursor) -> CXString
 extern fn clang_getCursorType(cursor: CXCursor) -> CXType
 extern fn clang_getCursorLocation(cursor: CXCursor) -> CXSourceLocation
+extern fn clang_Location_isFromMainFile(location: CXSourceLocation) -> i32
 extern fn clang_getCursorLinkage(cursor: CXCursor) -> i32
 extern fn clang_Cursor_getStorageClass(cursor: CXCursor) -> i32
 extern fn clang_Cursor_getNumArguments(cursor: CXCursor) -> i32
@@ -417,7 +418,7 @@ type MacroSession:
     values: *mut *mut u8
     locations: *mut *mut u8
     fn_like: *mut i32
-    system_flags: *mut i32
+    origin_flags: *mut i32  // bit 0: system header; bit 1: preprocessing input
     params: *mut *mut *mut u8
     param_counts: *mut i32
     count: i32
@@ -2180,21 +2181,21 @@ unsafe fn macro_session_grow(ms: *mut MacroSession):
         if (*ms).values as i64 != 0: with_memcpy(nv, (*ms).values as *const u8, oc * 8)
         if (*ms).locations as i64 != 0: with_memcpy(nl, (*ms).locations as *const u8, oc * 8)
         if (*ms).fn_like as i64 != 0: with_memcpy(nf, (*ms).fn_like as *const u8, oc * 4)
-        if (*ms).system_flags as i64 != 0: with_memcpy(ns, (*ms).system_flags as *const u8, oc * 4)
+        if (*ms).origin_flags as i64 != 0: with_memcpy(ns, (*ms).origin_flags as *const u8, oc * 4)
         if (*ms).params as i64 != 0: with_memcpy(np, (*ms).params as *const u8, oc * 8)
         if (*ms).param_counts as i64 != 0: with_memcpy(npc, (*ms).param_counts as *const u8, oc * 4)
     if (*ms).names as i64 != 0: with_free((*ms).names as *mut u8)
     if (*ms).values as i64 != 0: with_free((*ms).values as *mut u8)
     if (*ms).locations as i64 != 0: with_free((*ms).locations as *mut u8)
     if (*ms).fn_like as i64 != 0: with_free((*ms).fn_like as *mut u8)
-    if (*ms).system_flags as i64 != 0: with_free((*ms).system_flags as *mut u8)
+    if (*ms).origin_flags as i64 != 0: with_free((*ms).origin_flags as *mut u8)
     if (*ms).params as i64 != 0: with_free((*ms).params as *mut u8)
     if (*ms).param_counts as i64 != 0: with_free((*ms).param_counts as *mut u8)
     (*ms).names = nn as *mut *mut u8
     (*ms).values = nv as *mut *mut u8
     (*ms).locations = nl as *mut *mut u8
     (*ms).fn_like = nf as *mut i32
-    (*ms).system_flags = ns as *mut i32
+    (*ms).origin_flags = ns as *mut i32
     (*ms).params = np as *mut *mut *mut u8
     (*ms).param_counts = npc as *mut i32
 
@@ -2212,7 +2213,7 @@ fn macro_source_is_define_line(source: &str) -> bool:
         i = i + 1
     i + 6 <= source.len() as i32 and source.slice(i as i64, (i + 6) as i64) == "define"
 
-unsafe fn macro_session_add_from_define_line(ms: *mut MacroSession, line_ptr: *const u8, loc_ptr: *const u8, is_system: i32):
+unsafe fn macro_session_add_from_define_line(ms: *mut MacroSession, line_ptr: *const u8, loc_ptr: *const u8, origin_flags: i32):
     if line_ptr as i64 == 0:
         return
     var define_start = line_ptr
@@ -2294,7 +2295,7 @@ unsafe fn macro_session_add_from_define_line(ms: *mut MacroSession, line_ptr: *c
     *(((*ms).values as i64 + ci * 8) as *mut *mut u8) = value
     *(((*ms).locations as i64 + ci * 8) as *mut *mut u8) = c_strdup(loc_ptr)
     *(((*ms).fn_like as i64 + ci * 4) as *mut i32) = is_fn_like
-    *(((*ms).system_flags as i64 + ci * 4) as *mut i32) = is_system
+    (*ms).origin_flags[(*ms).count] = origin_flags
     *(((*ms).params as i64 + ci * 8) as *mut *mut *mut u8) = macro_params
     *(((*ms).param_counts as i64 + ci * 4) as *mut i32) = macro_param_count
     (*ms).count = (*ms).count + 1
@@ -2308,6 +2309,8 @@ unsafe fn collect_macro_def(cursor: CXCursor, parent: CXCursor, data: *mut u8) -
     let ms = (*ctx).macros
     let loc = macro_location_from_cursor(s, cursor)
     let is_system = macro_location_is_system_from_cursor(cursor)
+    let is_input = clang_Location_isFromMainFile(clang_getCursorLocation(cursor))
+    let origin_flags = is_system | (if is_input != 0: 2 else: 0)
     var source = macro_source_line_from_cursor(s, cursor)
     if not macro_source_is_define_line(source):
         source = cursor_source_text_from_cursor(s, cursor)
@@ -2317,7 +2320,7 @@ unsafe fn collect_macro_def(cursor: CXCursor, parent: CXCursor, data: *mut u8) -
             source = "#define " ++ token_text
     let source_ptr = str_to_cstr(source)
     let loc_ptr = str_to_cstr(loc)
-    macro_session_add_from_define_line(ms, source_ptr as *const u8, loc_ptr as *const u8, is_system)
+    macro_session_add_from_define_line(ms, source_ptr as *const u8, loc_ptr as *const u8, origin_flags)
     if source_ptr as i64 != 0:
         with_free(source_ptr)
     if loc_ptr as i64 != 0:
@@ -2597,12 +2600,18 @@ pub fn with_cimport_macro_location(session: i64, idx: i32) -> str:
         if (*ms).locations as i64 == 0: return ""
         make_str(*(((*ms).locations as i64 + idx as i64 * 8) as *const *const u8))
 
-pub fn with_cimport_macro_is_system(session: i64, idx: i32) -> i32:
+fn macro_origin_flags(session: i64, idx: i32):
     unsafe:
         let ms = session as *mut MacroSession
-        if ms as i64 == 0 or idx < 0 or idx >= (*ms).count: return 0
-        if (*ms).system_flags as i64 == 0: return 0
-        *(((*ms).system_flags as i64 + idx as i64 * 4) as *const i32)
+        if session == 0 or idx < 0 or idx >= (*ms).count: return 0
+        if (*ms).origin_flags as i64 == 0: return 0
+        (*ms).origin_flags[idx]
+
+pub fn with_cimport_macro_is_system(session: i64, idx: i32) -> i32: macro_origin_flags(session, idx) & 1
+
+// A migration preprocesses a generated preamble followed by #include of the
+// actual input file. Main-file macros belong to that driver, not the corpus.
+pub fn cimport_macro_is_from_input(session: i64, idx: i32) -> i32: macro_origin_flags(session, idx) & 2
 
 pub fn with_cimport_macro_is_fn_like(session: i64, idx: i32) -> i32:
     unsafe:
@@ -2634,7 +2643,7 @@ pub fn with_cimport_dispose_macros(session: i64) -> Unit:
         if (*ms).values as i64 != 0: with_free((*ms).values as *mut u8)
         if (*ms).locations as i64 != 0: with_free((*ms).locations as *mut u8)
         if (*ms).fn_like as i64 != 0: with_free((*ms).fn_like as *mut u8)
-        if (*ms).system_flags as i64 != 0: with_free((*ms).system_flags as *mut u8)
+        if (*ms).origin_flags as i64 != 0: with_free((*ms).origin_flags as *mut u8)
         if (*ms).params as i64 != 0: with_free((*ms).params as *mut u8)
         if (*ms).param_counts as i64 != 0: with_free((*ms).param_counts as *mut u8)
         with_free(ms as *mut u8)
