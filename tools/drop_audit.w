@@ -49,25 +49,24 @@ fn argv4(a: &str, b: &str, c: &str, d: &str) -> str:
 // R carries a real allocation (over/under-drop shows up as allocator leak or
 // double-free) and bumps *slot by its id on drop (value-level exactly-once).
 
-fn resource_prelude() -> str:
-    // *i8 spelling matches <embedded-std>/std/box.w and std/rc.w's extern
-    // declarations — Box/Rc shape cells pull those modules in, and a *mut u8
-    // redeclaration is a signature clash.
+fn resource_prelude():
+    // Probes are user programs: allocate through std.mem. Redeclaring the
+    // private runtime allocator here replaces imported signatures and can
+    // break unrelated prelude code before the drop checks ever run.
     // D29 (#750): generated probes carry their imports — print_i32 and the
     // Box/Rc shape cells' names are import-gated under the §18.2 prelude.
     "use std.builtins.print_i32\n" ++
     "use std.box\n" ++
     "use std.rc\n" ++
-    "extern fn with_alloc(size: i64) -> *i8\n" ++
-    "extern fn with_free(ptr: *i8) -> Unit\n" ++
+    "use std.mem.alloc\n" ++
+    "use std.mem.free_mem\n" ++
     "type R { id: i32, ptr: *i8, slot: *mut i32 }\n" ++
     "impl Drop for R:\n" ++
     "    fn drop(move self: Self):\n" ++
     "        unsafe:\n" ++
     "            *self.slot = *self.slot + self.id\n" ++
-    "            with_free(self.ptr)\n" ++
-    "fn mk(id: i32, slot: *mut i32) -> R:\n" ++
-    "    unsafe { R { id: id, ptr: with_alloc(16), slot: slot } }\n"
+    "        free_mem(self.ptr)\n" ++
+    "fn mk(id: i32, slot: *mut i32): R { id, ptr: alloc(16), slot }\n"
 
 // A cell: name, generated source, expected final drop-sum printed by main,
 // and whether the allocator must be clean (all cells, post-#691).
@@ -436,19 +435,26 @@ fn main:
         eprint("usage: with run tools/drop_audit.w <candidate-with> [baseline-with]")
         exit_code(2)
     let candidate = argv.get(1)
-    let baseline = if argv.len() as i32 >= 3: argv.get(2) ++ "" else: ""
-    let dir = "/tmp/drop-audit-cells"
-    let _ = mkdirs(dir)
+    let baseline = if argv.len() >= 3: argv.get(2) ++ "" else: ""
+    // Keep both sides' diagnostics; the baseline must not overwrite the
+    // failing candidate's stderr. A separate directory per run also keeps
+    // concurrent invocations from replacing one another's probes.
+    let dir = f"out/drop-audit/cells-{pid()}"
+    let candidate_dir = dir ++ "/candidate"
+    let baseline_dir = dir ++ "/baseline"
+    if mkdirs(candidate_dir) != 0 or mkdirs(baseline_dir) != 0:
+        eprint("drop-audit: could not create probe directories: " ++ dir)
+        exit_code(1)
     let cells = build_cells()
     var failures = 0
     var regressions = 0
     print("cell\tcandidate" ++ (if baseline.len() > 0: "\tbaseline\tclass" else: ""))
-    for i in 0..cells.len() as i32:
+    for i in 0..cells.len():
         let c = cells[i]
-        let cv = run_cell(candidate, dir, i, c.source, c.expect_sum, c.expect_clean)
+        let cv = run_cell(candidate, candidate_dir, i, c.source, c.expect_sum, c.expect_clean)
         var row = c.name ++ "\t" ++ cv
         if baseline.len() > 0:
-            let bv = run_cell(baseline, dir, i, c.source, c.expect_sum, c.expect_clean)
+            let bv = run_cell(baseline, baseline_dir, i, c.source, c.expect_sum, c.expect_clean)
             let klass = if cv == bv: "same" else: "REGRESSION"
             if cv != bv:
                 regressions = regressions + 1
@@ -457,11 +463,13 @@ fn main:
             failures = failures + 1
         print(row)
     if baseline.len() > 0:
-        print(f"drop-audit: {cells.len() as i32} cells, {failures} non-PASS, {regressions} regressions vs baseline")
+        print(f"drop-audit: {cells.len()} cells, {failures} non-PASS, {regressions} regressions vs baseline")
         if regressions > 0:
+            eprint("drop-audit: probes and diagnostics retained: " ++ dir)
             exit_code(1)
     else:
-        print(f"drop-audit: {cells.len() as i32} cells, {failures} non-PASS")
+        print(f"drop-audit: {cells.len()} cells, {failures} non-PASS")
         if failures > 0:
+            eprint("drop-audit: probes and diagnostics retained: " ++ dir)
             exit_code(1)
     exit_code(0)

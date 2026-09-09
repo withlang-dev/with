@@ -5,8 +5,18 @@ rebased landing tree. After excluding the initial pair, the two uncached
 warm pairs were 263.9/268.7 s (C4/baseline 1.018) and 275.6/284.3 s
 (1.032); baseline passed 985 files and C4 passed 986 in every run.
 `docs/wo_bundles.md` records the measured table. Main's handoff-only changes
-have been merged into `wo-c4`; the next step is the full battery, using
-`out/release/bin/with` for every post-build step. Do not repeat the gate or
+have been merged into `wo-c4`. The first battery passed build (164.5 s),
+fixpoint (276.6 s), and move audit (15 cells), then caught an audit-generator
+defect: 113 probes redeclared private allocation symbols with obsolete
+pointer types. LLDB observed the return signature replacement in
+`Sema.collect_extern_fn` → `Sema.add_sig` (symbol 32, return 81 → 20).
+The generator now uses `std.mem.alloc/free_mem` and retains each side's
+diagnostics separately; all 115 drop cells pass against the pinned seed
+(102.6 s). The next step is the remaining battery on the committed
+correction, using `out/release/bin/with` for every post-build step.
+Debugger launches now work; a disabled DevToolsSecurity status did not
+establish an authorization blocker, and no approval popup was seen.
+Do not repeat the performance gate or
 use the earlier quiet-box requirement below; the local ratio ruling
 supersedes it. C4 is not yet merged or reseeded.
 
