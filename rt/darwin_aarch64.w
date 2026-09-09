@@ -24,6 +24,10 @@ extern fn rt_libc_open(path: *const u8, flags: i32, mode: i32) -> i32
 extern fn rt_libc_close(fd: i32) -> i32
 @[link_name("lseek")]
 extern fn rt_libc_lseek(fd: i32, offset: i64, whence: i32) -> i64
+// Variadic as in C: on Apple arm64 the third argument travels on the
+// stack, so a fixed three-parameter prototype would miscall it.
+@[link_name("fcntl")]
+extern fn rt_libc_fcntl(fd: i32, cmd: i32, ...) -> i32
 @[link_name("getcwd")]
 extern fn rt_libc_getcwd(buf: *mut u8, size: u64) -> *mut u8
 @[link_name("mmap")]
@@ -193,6 +197,12 @@ pub fn rt_close(fd: i32) -> i32:
     if r < 0:
         return -get_errno()
     0
+
+pub fn rt_fcntl(fd: i32, cmd: i32, arg: i32) -> i32:
+    let r = rt_libc_fcntl(fd, cmd, arg)
+    if r < 0:
+        return -get_errno()
+    r
 
 pub fn rt_seek(fd: i32, offset: i64, whence: i32) -> i64:
     let r = rt_libc_lseek(fd, offset, whence)

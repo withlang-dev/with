@@ -96,7 +96,14 @@ pub fn lseek(fd: i32, offset: i64, whence: i32) -> i64:
     with_libc_lseek(fd, offset, whence)
 pub fn unlink(path: *const i8) -> i32:
     with_libc_unlink(path)
-pub extern fn fcntl(fd: i32, cmd: i32, ...) -> i32
+// fcntl is modeled like open/read/close: a runtime seam per target, never
+// the bare C symbol (UCRT has none, and zlib's gz layer — migrated with
+// O_NONBLOCK/O_CLOEXEC resolved — calls it from the bundle on every
+// target). POSIX forwards to libc; Windows returns -1, unsupported, which
+// is what zlib's own Windows build would have compiled around.
+extern fn with_libc_fcntl(fd: i32, cmd: i32, arg: i32) -> i32
+pub fn fcntl(fd: i32, cmd: i32, arg: i32 = 0) -> i32:
+    with_libc_fcntl(fd, cmd, arg)
 pub extern fn getrlimit(resource: i32, rlp: *mut rlimit) -> i32
 pub extern fn setrlimit(resource: i32, rlp: *const rlimit) -> i32
 

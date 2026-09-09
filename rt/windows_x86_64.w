@@ -375,6 +375,15 @@ pub fn rt_close(fd: i32) -> i32:
         return win_neg_error()
     0
 
+// No fcntl on Windows: the descriptor flags it would set (O_NONBLOCK,
+// FD_CLOEXEC) have no HANDLE equivalent here, so the call is unsupported
+// and reports -1 (std.libc's fcntl seam; zlib's gz layer ignores it).
+pub fn rt_fcntl(fd: i32, cmd: i32, arg: i32) -> i32:
+    let _ = fd
+    let _ = cmd
+    let _ = arg
+    -1
+
 pub fn rt_seek(fd: i32, offset: i64, whence: i32) -> i64:
     let h = win_handle_for_fd(fd)
     if h == 0 or h == INVALID_HANDLE_VALUE:
