@@ -8184,8 +8184,17 @@ fn bs_check_bundle_interface(ctx: &ActionCtx, compiler_path: &str, nm_tool: &str
     if built.rc != 0: return bs_fail(ctx, f"consumer build against the bundle interface failed with exit code {built.rc}")
     let ran = bs_run_binary_capture(ctx, consumer, "bundle-interface-consumer-run", 120000)
     if ran.rc != 0: return bs_fail(ctx, f"consumer linked against the bundle failed with exit code {ran.rc}")
-    rc = bs_assert_stdout_exact(ctx, ran, "18 7 80 3 7 2 6 200 3 3 5", "bundle interface consumer")
+    rc = bs_assert_stdout_exact(ctx, ran, "18 7 80 3 7 2 6 200 3 3 5 42 5", "bundle interface consumer")
     if rc != 0: return rc
+
+    // Importing a section without demanding its types must leave their
+    // attributes and impl bodies unparsed too (the reduced orphan-method
+    // regression was just `use std.wi_demo`).
+    let unused_src = bs_join(case_dir, "unused.w")
+    rc = bs_write_fixture(ctx, unused_src, "use std.wi_demo\nfn main: print(1)\n", "unused interface consumer")
+    if rc != 0: return rc
+    let unused = bs_run_cli_capture(ctx, compiler_path, "bundle-interface-unused-build", bs_bundle_build_args(unused_src, bundle, bs_join(case_dir, "unused"), false), 120000)
+    if unused.rc != 0: return bs_fail(ctx, f"consumer with no demanded bundle declarations failed with exit code {unused.rc}")
 
     // A tampered interface never pairs with the object (interface-sha).
     let tampered = bs_join(case_dir, "store-tampered/wi_demo")

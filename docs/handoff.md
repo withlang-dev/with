@@ -12,7 +12,19 @@ pointer types. LLDB observed the return signature replacement in
 `Sema.collect_extern_fn` → `Sema.add_sig` (symbol 32, return 81 → 20).
 The generator now uses `std.mem.alloc/free_mem` and retains each side's
 diagnostics separately; all 115 drop cells pass against the pinned seed
-(102.6 s). The next step is the remaining battery on the committed
+(102.6 s). The next battery passed build (157.3 s), fixpoint (266.9 s),
+and `audit:all` (2,504,943 facts, zero violations), but the test survey
+failed only `bundle-interface-tests` (58 other targets green; 728.2 s).
+The reduced consumer was just `use std.wi_demo`: LLDB observed
+`interface_line_name("impl Pair:", 2)` returning an empty string, then
+`parse_interface_chunk` receiving its indented methods without the impl
+header. The merge now demands whole declarations, keeping leading
+attributes and indented bodies with their header, and names inherent
+impls by their target. The development compiler (78.9 s) passes the
+reduced import and original consumer. Expanded fixtures verify an unused
+attributed type and a demanded packed type: emitted interface and
+source/interface fingerprints agree, and the consumer reads 42 from a
+five-byte packed value. The next step is a fresh battery on this committed
 correction, using `out/release/bin/with` for every post-build step.
 Debugger launches now work; a disabled DevToolsSecurity status did not
 establish an authorization blocker, and no approval popup was seen.

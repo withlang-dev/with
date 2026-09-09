@@ -593,11 +593,14 @@ frontend's) over the 3,828 interface declarations — 97 ms each — plus the
 4. *Sections parsed on demand*: Resolve and the import worklist read a
    section's imports from its `use` lines as text (no use declaration of
    a section enters the pool); once every source module is in,
-   `merge_interface_sections_on_demand` parses declaration *lines* by
+   `merge_interface_sections_on_demand` parses whole declarations by
    demand as chunks with their own file ids, to a fixpoint, and places
    them before the root's declarations (`is_local_decl` takes the pool's
    tail). `[profile] frontend.interface 3.4 ms sections=32 lines=59 of
-   3405`; parse decls 4771 → 463.
+   3405`; parse decls 4771 → 463. A declaration includes its leading
+   attributes and indented body; an inherent impl is demanded by its
+   target type. The bundle-interface battery covers method receivers,
+   a packed layout, and an import that demands none of the bundle types.
 5. Sema's lazy layer stays underneath: it sees only the parsed lines and
    demands them all.
 

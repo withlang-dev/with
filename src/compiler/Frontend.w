@@ -71,7 +71,7 @@ fn interface_line_name(line: &str, kind: i32) -> str:
         return interface_name_token(line, if line.starts_with("pub type "): 9 else: 8)
     if kind == INTERFACE_LINE_IMPL:
         let at = line.find(" for ")
-        return if at < 0: "" else: interface_name_token(line, at + 5)
+        return interface_name_token(line, if at < 0: 5 else: at + 5)
     if kind == INTERFACE_LINE_FN:
         let at = line.find("fn ")
         return if at < 0: "" else: interface_name_token(line, at + 3)
@@ -1905,13 +1905,13 @@ impl Zcu:
         self.strip_use_decls_frontend(merged_pool)
 
     // ── D39 on-demand interface sections ─────────────────────────────
-    // A .wi section is one declaration per line. S is every symbol the
-    // source's nodes carry; a line whose name is in S — a method by its
-    // bare name too, an impl by its target type — is parsed as a chunk with
-    // its own file id, and the chunk's nodes extend S, until no line is
-    // newly demanded. A compile that names nothing from a bundle parses
-    // none of it; Sema's collection then sees only these declarations. A
-    // line the classifier cannot name is always parsed.
+    // S is every symbol the source's nodes carry. A declaration whose name
+    // is in S (a method's bare name too, an impl's target type) is parsed,
+    // and its nodes extend S until no declaration is newly demanded.
+    // The emitter puts headers at column zero, with attributes before them
+    // and indented bodies after them. Keep that whole declaration together:
+    // an attribute or method must never be parsed without its owner.
+    // Unclassified declarations are always parsed so errors stay visible.
     mut fn merge_interface_sections_on_demand(pool: AstPool, paths: &Vec[str], texts: &Vec[str], root_tail: i32) -> AstPool:
         var out = pool
         let base = out.decl_count()
@@ -1923,19 +1923,41 @@ impl Zcu:
         let line_names = frontend_new_vec_str()
         let line_kinds: Vec[i32] = Vec.new()
         let line_done: Vec[i32] = Vec.new()
+        let line_counts: Vec[i32] = Vec.new()
         var decl_lines = 0
         for si in 0..paths.len() as i32:
             let lines = texts[si].split("\n")
-            for li in 0..lines.len() as i32:
-                let line = lines[li]
-                let kind = interface_line_kind(line)
+            var li = 0
+            while li < lines.len() as i32:
+                if interface_line_kind(lines[li]) == INTERFACE_LINE_SKIP:
+                    li = li + 1
+                    continue
+                let start = li
+                // Canonical standalone attributes belong to the following
+                // header. Leave a dangling attribute unclassified: parsing
+                // it must diagnose the malformed interface.
+                while li < lines.len() as i32 and (lines[li].starts_with("@[") and lines[li].ends_with("]") or lines[li].len() == 0 or lines[li].starts_with("//")):
+                    li = li + 1
+                let header = if li < lines.len() as i32: frontend_owned_text(lines[li]) else: ""
+                let header_kind = interface_line_kind(header)
+                let kind = if header_kind == INTERFACE_LINE_SKIP: INTERFACE_LINE_ALWAYS else: header_kind
+                if li < lines.len() as i32: li = li + 1
+                while li < lines.len() as i32 and (lines[li].starts_with(" ") or lines[li].starts_with("\t") or lines[li].len() == 0 or lines[li].starts_with("//")):
+                    li = li + 1
+                var declaration = StringBuilder.new()
+                var count = 0
+                for bi in start..li:
+                    declaration.push_str(lines[bi])
+                    declaration.push_str("\n")
+                    if interface_line_kind(lines[bi]) != INTERFACE_LINE_SKIP:
+                        count = count + 1
                 line_section.push(si)
-                line_texts.push(frontend_owned_text(line))
-                line_names.push(interface_line_name(line, kind))
+                line_texts.push(declaration.to_str())
+                line_names.push(interface_line_name(header, kind))
                 line_kinds.push(kind)
-                line_done.push(if kind == INTERFACE_LINE_SKIP: 1 else: 0)
-                if kind != INTERFACE_LINE_SKIP:
-                    decl_lines = decl_lines + 1
+                line_done.push(0)
+                line_counts.push(count)
+                decl_lines = decl_lines + count
         var parsed_lines = 0
         var changed = true
         while changed:
@@ -1957,9 +1979,9 @@ impl Zcu:
                     continue
                 if not self.interface_line_demanded(line_kinds[li], line_names[li]):
                     continue
-                chunk = chunk ++ line_texts[li] ++ "\n"
+                chunk = chunk ++ line_texts[li]
                 line_done[li] = 1
-                chunk_lines = chunk_lines + 1
+                chunk_lines = chunk_lines + line_counts[li]
         // The root's declarations stay the pool's tail: after the import
         // merge the order is prelude → imports → root, and is_local_decl
         // takes the last root_tail entries. The chunks go before them.

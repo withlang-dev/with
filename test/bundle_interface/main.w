@@ -11,4 +11,5 @@ fn main:
     let w = q.into_word()
     let xs: [3]i32 = [1, 2, 3]
     COUNTER = COUNTER + 5
-    print(f"{a} {s} {take(p)} {table_at(2)} {K} {TABLE[1]} {sum_slice(xs)} {level_value(Level.High)} {GREETING.len()} {w} {COUNTER}")
+    let packet = Packet { tag: 7, word: 42 }
+    print(f"{a} {s} {take(p)} {table_at(2)} {K} {TABLE[1]} {sum_slice(xs)} {level_value(Level.High)} {GREETING.len()} {w} {COUNTER} {packet_word(packet)} {sizeof[Packet]()}")

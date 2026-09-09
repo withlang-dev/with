@@ -8,12 +8,16 @@
 // and an escaped string), storage `let` and `var`, free fns with `&T`,
 // `*mut T` (a `&mut T` parameter is not safe With, §15.1), `[]T` and
 // consuming parameters, an `extern "C" fn` pointer field, and an impl block
-// with `fn`, `mut fn` and `move fn` methods.
+// with `fn`, `mut fn` and `move fn` methods. Layout attributes cover both
+// an unused type and a demanded packed type in the on-demand consumer.
 pub type Pair { a: i32, b: i32 }
+@[repr(packed)]
+pub type Packet { tag: u8, word: i32 }
 pub type Word = i32
 pub type Handle = distinct i32
 pub type Bits = union { whole: u32, half: u16 }
 impl Copy for Bits
+@[repr(C)]
 pub type Callback { call: extern "C" fn(i32) -> i32, tag: u8 }
 impl Copy for Callback
 pub enum Color:
@@ -37,6 +41,7 @@ pub fn sum_slice(xs: []i32) -> i32:
     for x in xs: total = total + x
     total
 pub fn level_value(l: Level) -> u8: l as u8
+pub fn packet_word(p: &Packet) -> i32: p.word
 impl Pair:
     pub fn sum() -> i32: self.a + self.b
     pub mut fn scale(k: i32) -> Unit:
