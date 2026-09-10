@@ -7,6 +7,7 @@ use std.zlib.inflate
 
 const ZLIB_MAX_OUTPUT: i64 = 8589934592
 const ZLIB_CHUNK_SIZE: i64 = 4 * 1024 * 1024
+const ZLIB_MAX_INPUT = (0 as c_uint) -% 1
 
 fn bytes_from_str(data: &str) -> Vec[u8]:
     let out: Vec[u8] = Vec.new()
@@ -50,7 +51,7 @@ unsafe fn cleanup_stream(file: *mut c_void, out_ptr: *mut u8, stream: *mut z_str
     if file as i64 != 0:
         let _close = fclose(file)
 
-fn decompress_gzip_to_file(data: &Vec[u8], output_path: &str, max_output_len: i64) -> str:
+fn decompress_gzip_to_file(data: &Vec[u8], output_path: &str, max_output_len: i64):
     if max_output_len < 0:
         return "zlib maximum output length must be non-negative"
     let output_cstr = match output_path.to_cstring():
@@ -64,45 +65,45 @@ fn decompress_gzip_to_file(data: &Vec[u8], output_path: &str, max_output_len: i6
         unsafe { cleanup_stream(file, out_ptr, null, false) }
         return zlib_error_message(Z_MEM_ERROR)
     var stream: z_stream_s
-    let init_rc = unsafe { inflateInit2_(&raw mut stream as *mut z_stream_s, MAX_WBITS + 16, c"1.3.2".ptr, sizeof[z_stream_s]() as c_int) }
+    let init_rc = unsafe { inflateInit2_(&raw mut stream, MAX_WBITS + 16, c"1.3.2".ptr, sizeof[z_stream_s]() as c_int) }
     if init_rc != Z_OK:
-        unsafe { cleanup_stream(file, out_ptr, &raw mut stream as *mut z_stream_s, false) }
+        unsafe { cleanup_stream(file, out_ptr, &raw mut stream, false) }
         return zlib_error_message(init_rc)
     let source = bytes_data(data)
     stream.next_in = source as *mut u8
-    stream.avail_in = 0 as c_uint
+    stream.avail_in = 0
     var source_offset: i64 = 0
     var total_out: i64 = 0
     while true:
         if stream.avail_in == 0 and source_offset < data.len():
             let remaining = data.len() - source_offset
-            let avail = if remaining > UINT_MAX as i64: UINT_MAX as c_uint else: remaining as c_uint
+            let avail = if remaining > ZLIB_MAX_INPUT as i64: ZLIB_MAX_INPUT else: remaining as c_uint
             stream.next_in = (source as i64 + source_offset) as *mut u8
             stream.avail_in = avail
             source_offset = source_offset + avail as i64
         stream.next_out = out_ptr
         stream.avail_out = ZLIB_CHUNK_SIZE as c_uint
-        let err = unsafe { inflate(&raw mut stream as *mut z_stream_s, Z_NO_FLUSH) }
+        let err = unsafe { inflate(&raw mut stream, Z_NO_FLUSH) }
         let produced = ZLIB_CHUNK_SIZE - stream.avail_out as i64
         if produced > 0:
-            if not unsafe { write_all(file, out_ptr as *const u8, produced) }:
-                unsafe { cleanup_stream(file, out_ptr, &raw mut stream as *mut z_stream_s, true) }
+            if not unsafe { write_all(file, out_ptr, produced) }:
+                unsafe { cleanup_stream(file, out_ptr, &raw mut stream, true) }
                 return "could not write output tar"
             total_out = total_out + produced
             if total_out > max_output_len:
-                unsafe { cleanup_stream(file, out_ptr, &raw mut stream as *mut z_stream_s, true) }
+                unsafe { cleanup_stream(file, out_ptr, &raw mut stream, true) }
                 return "zlib decompressed output exceeds maximum length"
         if err == Z_STREAM_END:
-            unsafe { cleanup_stream(file, out_ptr, &raw mut stream as *mut z_stream_s, true) }
+            unsafe { cleanup_stream(file, out_ptr, &raw mut stream, true) }
             return ""
         if err == Z_NEED_DICT:
-            unsafe { cleanup_stream(file, out_ptr, &raw mut stream as *mut z_stream_s, true) }
+            unsafe { cleanup_stream(file, out_ptr, &raw mut stream, true) }
             return zlib_error_message(Z_DATA_ERROR)
         if err != Z_OK:
-            unsafe { cleanup_stream(file, out_ptr, &raw mut stream as *mut z_stream_s, true) }
+            unsafe { cleanup_stream(file, out_ptr, &raw mut stream, true) }
             return zlib_error_message(err)
         if produced == 0 and stream.avail_in == 0 and source_offset >= data.len():
-            unsafe { cleanup_stream(file, out_ptr, &raw mut stream as *mut z_stream_s, true) }
+            unsafe { cleanup_stream(file, out_ptr, &raw mut stream, true) }
             return zlib_error_message(Z_BUF_ERROR)
 
 fn main -> i32:
