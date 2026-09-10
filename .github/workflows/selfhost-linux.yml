@@ -124,3 +124,24 @@ jobs:
           export PATH="$PWD/.link-shim:$LLVM_PREFIX/bin:$PATH"
           export LD_LIBRARY_PATH="$PWD/.link-shim:${LD_LIBRARY_PATH:-}"
           "$WITH" build :test
+
+      - name: Upload test captures on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-x86_64-test-captures
+          path: |
+            out/test-graph/**
+            out/tmp/pre-d-p7-capture/**
+            out/tmp/pre-d-p7/**
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Upload native stage2 for local repro on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-x86_64-native-stage2
+          path: out/stage/bin/with-stage2
+          if-no-files-found: warn
+          retention-days: 7
