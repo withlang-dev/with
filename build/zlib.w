@@ -131,6 +131,17 @@ fn zlib_source_files() -> Vec[str]:
     files.push("zutil.h")
     files
 
+fn zlib_reference_missing(ctx: &ActionCtx, ref_dir: &str) -> str:
+    let fs = ctx.fs()
+    let files = zlib_source_files()
+    files.push("test/example.c")
+    files.push("test/minigzip.c")
+    for file in files:
+        let path = zlib_join(ref_dir, file)
+        if not fs.exists(path) or fs.is_dir(path) or fs.read_text(path).len() == 0:
+            return zlib_owned_text(file)
+    ""
+
 fn zlib_prepare_migration_source(ctx: &ActionCtx, ref_dir: &str, out_dir: &str) -> i32:
     let fs = ctx.fs()
     var rc = zlib_remove_tree_if_exists(ctx, out_dir)
@@ -254,6 +265,13 @@ pub fn run_zlib_reference_action(ctx: ActionCtx) -> i32:
     let fs = ctx.fs()
     let root = ctx.project_info().project_root()
     let scratch_dir = zlib_scratch_dir(ctx)
+    let ready_stamp = if ctx.outputs().len() > 1: zlib_owned_text(ctx.outputs().get(1)) else: zlib_join(ref_dir, ".with-reference-ready")
+    // The runner precreates the stamp's parent. Check every migration input,
+    // including the test programs, before trusting an empty or partial tree.
+    let needs_extract = zlib_reference_missing(ctx, ref_dir).len() != 0
+    if needs_extract:
+        let rc = zlib_remove_file_if_exists(ctx, ready_stamp)
+        if rc != 0: return rc
     let archive_path = zlib_join(scratch_dir, release ++ ".tar.gz")
     if fs.mkdir_all(zlib_dirname(archive_path)) != 0:
         return zlib_fail(ctx, "could not create archive directory")
@@ -273,7 +291,7 @@ pub fn run_zlib_reference_action(ctx: ActionCtx) -> i32:
     let actual_sha = fs.sha256_file(archive_path)
     if actual_sha != ZLIB_SHA256:
         return zlib_fail(ctx, "sha256 mismatch for " ++ archive_path ++ ": expected " ++ ZLIB_SHA256 ++ " got " ++ actual_sha)
-    if not fs.is_dir(ref_dir):
+    if needs_extract:
         let tmp_dir = zlib_join(scratch_dir, release ++ ".extract")
         let extracted_dir = zlib_join(tmp_dir, release)
         if fs.exists(tmp_dir) and fs.remove_tree(tmp_dir) != 0:
@@ -296,16 +314,18 @@ pub fn run_zlib_reference_action(ctx: ActionCtx) -> i32:
             return zlib_fail(ctx, f"zlib gunzip helper failed with exit code {gunzip_result.rc}: " ++ gunzip_result.stdout ++ gunzip_result.stderr)
         if fs.extract_tar(tar_path, tmp_dir) != 0:
             return zlib_fail(ctx, "could not extract tar archive: " ++ tar_path)
-        if not fs.exists(zlib_join(extracted_dir, "zlib.h")):
-            return zlib_fail(ctx, "archive did not contain expected zlib.h: " ++ extracted_dir)
+        let missing = zlib_reference_missing(ctx, extracted_dir)
+        if missing.len() != 0:
+            return zlib_fail(ctx, "archive did not contain required source: " ++ zlib_join(extracted_dir, missing))
         if fs.mkdir_all(zlib_dirname(ref_dir)) != 0:
             return zlib_fail(ctx, "could not create reference parent: " ++ zlib_dirname(ref_dir))
+        if fs.exists(ref_dir) and fs.remove_tree(ref_dir) != 0:
+            return zlib_fail(ctx, "could not remove empty or partial reference tree: " ++ ref_dir)
         if fs.rename(extracted_dir, ref_dir) != 0:
             return zlib_fail(ctx, "could not move extracted tree to: " ++ ref_dir)
         let _remove_extract_root = fs.remove_tree(tmp_dir)
     if fs.write_text(zlib_join(ref_dir, ".with-reference-url"), url ++ "\n") != 0:
         return zlib_fail(ctx, "could not write reference URL marker")
-    let ready_stamp = if ctx.outputs().len() > 1: zlib_owned_text(ctx.outputs().get(1)) else: zlib_join(ref_dir, ".with-reference-ready")
     if fs.write_text(ready_stamp, "ok\n") != 0:
         return zlib_fail(ctx, "could not write ready stamp: " ++ ready_stamp)
     0
