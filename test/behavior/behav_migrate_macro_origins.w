@@ -36,7 +36,7 @@ fn main:
     p7_assert_file_contains(case_dir, "lib/sample/defs.w", "pub let HAVE_UNISTD_H: c_int = 0")
 
     // c_import intentionally exposes the requested header and inline macros.
-    let header = p7_join(case_dir, "input/SDKs/Fake.sdk/usr/include/system.h")
+    let header = p7_join(case_dir, "input/SDKs/Fake.sdk/usr/include/system.h").replace("\\", "/")
     p7_write(case_dir, "src/import.w", "use c_import(\"#include \\\"" ++ header ++ "\\\"\\n#define INLINE_CONSTANT 5\\n\")\nfn main:\n    assert(HOST_SDK_CONSTANT == 43)\n    assert(HOST_SDK_ADD(INLINE_CONSTANT) == 48)\n    assert(HOST_ALIAS(INLINE_CONSTANT) == 48)\n    print(\"import ok\")\n")
     let imported = p7_run(case_dir, "macro_origins_import", "run\0src/import.w\0")
     p7_assert_success(imported, "c_import retains requested macros")

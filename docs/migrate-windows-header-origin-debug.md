@@ -1,5 +1,34 @@
 # Windows header origin filtering (#1109)
 
+## Mixed separators and generated include strings
+
+The next Windows run (34425873898, commit 88eaa3f1) exposed two remaining
+failures. Its synthetic header location was
+`input\Windows Kits/ucrt/system.h:2:12`: neither the all-forward-slash nor
+the all-backslash pattern matched. A local minimal header with this mixed
+spelling reproduces the failure. LLDB observed `ci_is_system_path` return
+`w0=0` to `ci_migrate_decl_is_filtered+80`, PC 0x1001889d8; its `tbz` takes
+the unfiltered branch at +92. Evidence: `/tmp/with-mixed-origin-lldb.log`.
+The shared classifier now normalizes separators before testing path
+components, covering arbitrary mixtures without enumerating spellings.
+The regression adds mixed Windows Kits, MSVC, and SDK paths and executes
+the retained project code for every case.
+
+The macro-origin fixture separately embedded its absolute Windows path in
+a generated With string without escaping backslashes. The captured Clang
+diagnostic names `D:awithwith/...` instead of `D:\a\with\with/...`.
+The fixture now uses forward slashes in that generated include string.
+The migration and import assertions remain unchanged.
+
+The source check, development stage2 build, mixed-header regression and
+macro-origin regression pass locally. Logs:
+`/tmp/with-macro-ci-source-check.log`, `/tmp/with-macro-ci-stage2.log`,
+`/tmp/with-macro-ci-windows-test.log`, `/tmp/with-macro-ci-origins-test.log`.
+Native Windows CI is still required; the earlier local success below did
+not establish Windows correctness.
+
+## Initial shared classifier
+
 Macro PR #1107's Windows x86_64 and AArch64 lanes fail in the two new
 migration regressions before their assertions. The x86 capture from run
 34415160251 attempts to translate UCRT inline formatters, then reports an

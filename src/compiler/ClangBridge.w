@@ -2046,38 +2046,17 @@ pub fn with_cimport_realpath(path: &str) -> str:
 // ── Macro extraction ────────────────────────────────────────
 
 unsafe fn cimport_location_path_is_system(path: *const u8) -> i32:
-    if path as i64 == 0:
-        return 0
-    if c_strncmp(path, "/usr/\0" as *const u8, 5) == 0:
-        return 1
-    if c_strncmp(path, "/Library/\0" as *const u8, 9) == 0:
-        return 1
-    if c_strncmp(path, "/Applications/Xcode\0" as *const u8, 19) == 0:
-        return 1
-    if c_strstr(path, "/usr/include/\0" as *const u8) as i64 != 0:
-        return 1
-    if c_strstr(path, "\\usr\\include\\\0" as *const u8) as i64 != 0:
-        return 1
-    if c_strstr(path, "/SDKs/\0" as *const u8) as i64 != 0:
-        return 1
-    if c_strstr(path, "\\SDKs\\\0" as *const u8) as i64 != 0:
-        return 1
-    if c_strstr(path, "/clang/\0" as *const u8) as i64 != 0:
-        return 1
-    if c_strstr(path, "\\clang\\\0" as *const u8) as i64 != 0:
-        return 1
-    if c_strstr(path, "/lib/clang/\0" as *const u8) as i64 != 0:
-        return 1
-    if c_strstr(path, "\\lib\\clang\\\0" as *const u8) as i64 != 0:
-        return 1
-    if c_strstr(path, "/Windows Kits/\0" as *const u8) as i64 != 0:
-        return 1
-    if c_strstr(path, "\\Windows Kits\\\0" as *const u8) as i64 != 0:
-        return 1
-    if c_strstr(path, "/VC/Tools/MSVC/\0" as *const u8) as i64 != 0:
-        return 1
-    if c_strstr(path, "\\VC\\Tools\\MSVC\\\0" as *const u8) as i64 != 0:
-        return 1
+    if path as i64 == 0: return 0
+    // Clang locations can mix separators even within one header path.
+    let normalized = make_str(path).replace("\\", "/")
+    if normalized.starts_with("/usr/"): return 1
+    if normalized.starts_with("/Library/"): return 1
+    if normalized.starts_with("/Applications/Xcode"): return 1
+    if normalized.contains("/usr/include/"): return 1
+    if normalized.contains("/SDKs/"): return 1
+    if normalized.contains("/clang/"): return 1
+    if normalized.contains("/Windows Kits/"): return 1
+    if normalized.contains("/VC/Tools/MSVC/"): return 1
     0
 
 // Declaration locations and macro cursors use one path classification.
