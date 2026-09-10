@@ -1087,11 +1087,18 @@ impl MirBuilder:
             self.emit_drop_entry(self.drop_local_ids[i], self.drop_kinds[i])
             i = i - 1
 
+    mut fn emit_deferred_body(node: i32):
+        // A cleanup runs on this exit edge. Its temporaries must not escape
+        // into the enclosing statement, which also lowers continuing paths.
+        let frame = self.push_stmt_temp_frame()
+        self.lower_expr_discard(node)
+        self.finish_stmt_temp_frame(frame)
+
     mut fn emit_defers_for_range(start: i32, end: i32):
         var i = end - 1
         while i >= start:
-            let defer_body: i32 = self.defer_nodes[i]
-            let _ = self.lower_expr(defer_body)
+            let defer_body = self.defer_nodes[i]
+            self.emit_deferred_body(defer_body)
             i = i - 1
 
     mut fn emit_drops_for_range(start: i32, end: i32):
@@ -1125,18 +1132,13 @@ impl MirBuilder:
             self.emit_drop_entry(self.drop_local_ids[i], self.drop_kinds[i])
             i = i - 1
 
-    mut fn emit_defers_for_return():
-        var i = self.defer_nodes.len() as i32 - 1
-        while i >= 0:
-            let defer_body: i32 = self.defer_nodes[i]
-            let _ = self.lower_expr(defer_body)
-            i = i - 1
+    mut fn emit_defers_for_return(): self.emit_defers_for_range(0, self.defer_nodes.len() as i32)
 
     mut fn emit_errdefers_for_return():
         var i = self.errdefer_nodes.len() as i32 - 1
         while i >= 0:
-            let errdefer_body: i32 = self.errdefer_nodes[i]
-            let _ = self.lower_expr(errdefer_body)
+            let errdefer_body = self.errdefer_nodes[i]
+            self.emit_deferred_body(errdefer_body)
             i = i - 1
 
     fn push_control_target(label: i32, target_kind: i32, continue_bb: i32, break_bb: i32, result_place: i32) -> Unit:
@@ -6042,11 +6044,7 @@ impl MirBuilder:
         // Emit defers added in this block scope (LIFO order), before popping scope
         let defer_end = self.defer_nodes.len() as i32
         if defer_end > defer_start:
-            var di = defer_end - 1
-            while di >= defer_start:
-                let defer_body: i32 = self.defer_nodes[di]
-                let _ = self.lower_expr(defer_body)
-                di = di - 1
+            self.emit_defers_for_range(defer_start, defer_end)
             // Remove the block's defers from the stack
             while self.defer_nodes.len() > defer_start:
                 self.defer_nodes.pop()

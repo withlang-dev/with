@@ -2038,10 +2038,13 @@ fn mir_drop_state_blocks_new(body: &MirBody) -> MirDropStateBlocks:
 // finite (each place climbs Uninit/Init/Moved → Maybe → MaybeGarbage at most
 // twice), so the bound below is never reached by a converging body; hitting it
 // is a driver bug and fails loudly rather than returning a partial answer.
+fn mir_drop_state_sweep_bound(local_count: i32, block_count: i32) -> i64:
+    3 * (local_count as i64 + 1) * (block_count as i64 + 1) + 2
+
 fn mir_drop_state_compute_blocks(body: &MirBody) -> MirDropStateBlocks:
     let bb_count = body.block_count()
     var blocks = mir_drop_state_blocks_new(body)
-    let sweep_bound = 3 * (body.local_count() + 1) * (bb_count + 1) + 2
+    let sweep_bound = mir_drop_state_sweep_bound(body.local_count(), bb_count)
     // Worklist as a dirty flag per block: a block is recomputed only when one
     // of its predecessors changed (or on the first sweep), so a loop-free body
     // costs one pass plus the blocks that were numbered before their
@@ -2049,7 +2052,7 @@ fn mir_drop_state_compute_blocks(body: &MirBody) -> MirDropStateBlocks:
     var dirty: Vec[i32] = Vec.new()
     for _ in 0..bb_count:
         dirty.push(1)
-    var sweeps = 0
+    var sweeps: i64 = 0
     var changed = true
     while changed:
         changed = false
@@ -2257,7 +2260,7 @@ fn mir_drop_plan_action(state: i32) -> str:
         return "conditional"
     if state == MirDropState.Moved:
         return "skip"
-    "skip"
+    "invalid"
 
 fn mir_drop_plan_place_line(body: &MirBody, pool: &InternPool, sema: &Sema, place_id: i32, state: i32, label: &str, text: &str) -> str:
     let ty = if place_id >= 0 and place_id < body.place_sema_types.len(): body.place_sema_types[place_id] else: 0
@@ -2497,16 +2500,19 @@ fn validate_ownership_body(mir_mod: &MirModule, body: &MirBody) -> str:
                     return f"fn sym{body.fn_sym} stmt{stmt_id} span={span}: ownership target place out of range"
                 if mir_validate_place_type(mir_mod, body, d0) == 0:
                     return f"fn sym{body.fn_sym} stmt{stmt_id} span={span}: ownership target has no concrete MIR type"
-            if kind == StmtKind.Drop and body.place_proj_counts[d0] == 0:
+            if kind == StmtKind.Drop and body.place_proj_counts[d0] == 0 and blocks.computed[bb] != 0:
                 // #729 class: a drop must only reach places every path has at
                 // least blanked. MaybeGarbage means some predecessor never
                 // touched the place at all — the join-block temp drop that
                 // freed uninitialized stack passed this validator before the
-                // absence-aware join existed.
+                // absence-aware join existed. Uninit means every reachable
+                // predecessor missed initialization, as an off-path defer temp
+                // does. Unreachable blocks have no ownership input to check.
                 let drop_key = mir_place_text(body, d0)
                 let drop_state = state.place(blocks.keys, d0)
-                if drop_state == MirDropState.MaybeGarbage:
-                    return f"fn sym{body.fn_sym} stmt{stmt_id} span={span}: drop of {drop_key} reaches a path that never initialized it (MaybeGarbage)"
+                if drop_state == MirDropState.MaybeGarbage or drop_state == MirDropState.Uninit:
+                    let state_name = mir_drop_state_name(drop_state)
+                    return f"fn sym{body.fn_sym} stmt{stmt_id} span={span}: drop of {drop_key} reaches a path that never initialized it ({state_name})"
             state.transfer_stmt(blocks.keys, body, stmt_id)
         if body.term_kind(bb) == TermKind.TK_CALL or body.term_kind(bb) == TermKind.TK_DROP_AND_GOTO:
             let place_id = if body.term_kind(bb) == TermKind.TK_CALL: body.term_data2(bb) else: body.term_data0(bb)
@@ -2514,6 +2520,12 @@ fn validate_ownership_body(mir_mod: &MirModule, body: &MirBody) -> str:
                 return f"fn sym{body.fn_sym} bb{bb}: ownership terminator place out of range"
             if mir_validate_place_type(mir_mod, body, place_id) == 0:
                 return f"fn sym{body.fn_sym} bb{bb}: ownership terminator place has no concrete MIR type"
+            if body.term_kind(bb) == TermKind.TK_DROP_AND_GOTO and body.place_proj_counts[place_id] == 0 and blocks.computed[bb] != 0:
+                let drop_state = state.place(blocks.keys, place_id)
+                if drop_state == MirDropState.MaybeGarbage or drop_state == MirDropState.Uninit:
+                    let drop_key = mir_place_text(body, place_id)
+                    let state_name = mir_drop_state_name(drop_state)
+                    return f"fn sym{body.fn_sym} bb{bb}: drop of {drop_key} reaches a path that never initialized it ({state_name})"
         state.transfer_term(blocks.keys, body, bb)
     ""
 
