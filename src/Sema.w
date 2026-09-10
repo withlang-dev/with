@@ -444,6 +444,8 @@ type Sema {
     sig_variadic: Vec[i32],
     sig_params: Vec[i32],
     sig_lookup: HashMap[i32, i32],
+    // An extern keeps its own signature when a curated wrapper takes its name.
+    extern_decl_sigs: HashMap[i32, i32],
     // docs/mutability.md Phase 4 — per-parameter effect bitsets.
     // sig_param_effects[sig_param_eff_starts[si] + pi] = effect bits for param pi of sig si.
     // Effects: EFF_READ=1, EFF_WRITE=2, EFF_CONSUME=4,
@@ -1903,6 +1905,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         sig_variadic: Vec.new(),
         sig_params: Vec.new(),
         sig_lookup,
+        extern_decl_sigs: sema_new_map_i32_i32(),
         sig_param_effects: Vec.new(),
         sig_param_direct_effects: Vec.new(),
         sig_param_view_origins: Vec.new(),

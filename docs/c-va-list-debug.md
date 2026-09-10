@@ -146,6 +146,31 @@ requires both IR generation and the audit to reject the SysV case.
 
 ## Regression coverage
 
+### Raw declarations retain signature identity
+
+CI at c8f70c19 failed `behav_c_import_overlay_memchr` with an index panic.
+The native compiler reproduces it; `with reduce` preserves four lines:
+the c_import declaration, main, a byte array, and the curated memchr call.
+LLDB stops in `Sema.sig_param_type+208`, reached through
+`Codegen.arg_pass_mode` from `Codegen.declare_extern_fn+372`
+(PC 0x1004ae5d8). The caller registers show raw parameter count 3,
+signature 244, and parameter index 2. The after-MIR semantic facts identify
+signature 244 as the two-parameter curated `memchr`; the original raw
+declaration has signature 200, and `__wc_buf_memchr` has signature 243.
+The name lookup had selected the later wrapper's signature for the earlier
+raw declaration. Evidence: `/tmp/with-memchr-panic-slots.log`,
+`/tmp/with-memchr-sema.log`, and `/tmp/with-memchr-reduce.log`.
+
+Sema now records each extern declaration's signature by AST node, and
+extern codegen reads that identity before consulting FnAbi. It does not
+truncate the parameter loop or infer a replacement calling convention.
+The existing memchr and memcmp execution regressions pass; memchr's full
+analysis audit reports 11,617 facts and zero violations. Both va_list
+regressions also pass with the rebuilt stage2, including all five target
+ABI cases. These are local iteration checks, not a complete battery.
+
+### va_list cases
+
 `behav_migrate_va_list.w` generates C fixtures under out/, verifies an
 unrelated typedef, a va_list alias and an explicit pointer alias, then
 executes mixed integer/floating-point variadic formatting through both

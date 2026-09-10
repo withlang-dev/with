@@ -5352,7 +5352,9 @@ impl Codegen:
         let ret_type_node = self.pool.fn_meta_ret(meta)
         let param_start = self.pool.fn_meta_param_start(meta)
         let param_count = self.pool.fn_meta_param_count(meta)
-        let sema_sig_idx = self.sema.get_sig(name_sym)
+        // The public name may now select a curated With wrapper with a
+        // different arity. FnAbi must read this raw declaration's signature.
+        let sema_sig_idx = self.sema.extern_decl_sigs.get(ext_node) ?? -1
 
         let ret_ty = self.resolve_type(ret_type_node)
         let name_str = self.intern.resolve(name_sym)

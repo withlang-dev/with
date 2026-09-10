@@ -1755,6 +1755,8 @@ impl Sema:
         // LlvmBridge's) would move the symbol into the migrated-C zone and
         // make the source's `unsafe: abort()` a block with no unsafe operation.
         if bundle_interface_text(self.current_module_path).len() > 0 and self.fn_decl_source_paths.contains(name) and bundle_interface_text(self.fn_symbol_source_path(name)).len() == 0:
+            let source_sig = self.get_sig(name)
+            if source_sig >= 0: self.extern_decl_sigs.insert(node, source_sig)
             return
         self.fn_decl_source_paths.insert(name, with_str_clone_ref(self.current_module_path))
 
@@ -1794,6 +1796,7 @@ impl Sema:
         if meta < 0:
             let fn_tid = self.add_type(TypeKind.TY_FN, 0, 0, self.ty_void)
             self.add_sig(name, fn_tid, self.ty_void, 0, 0, is_variadic)
+            self.extern_decl_sigs.insert(node, self.get_sig(name))
             self.extern_fn_names.insert(name, 1)
             return
 
@@ -1827,6 +1830,7 @@ impl Sema:
         self.add_sig(name, fn_tid, ret_type, sig_param_start, param_count, is_variadic)
         let sig_idx = self.get_sig(name)
         if sig_idx >= 0:
+            self.extern_decl_sigs.insert(node, sig_idx)
             self.apply_declared_effects_to_extern_sig(node, sig_idx, param_start, param_count)
             for pi in 0..param_count:
                 if self.sig_param_is_c_va_list_by_place(sig_idx, pi) != 0:
