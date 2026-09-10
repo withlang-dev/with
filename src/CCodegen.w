@@ -1097,7 +1097,7 @@ impl CCodegen:
         if local_id <= 0 or local_id >= body.local_names.len() as i32:
             return 0
         let sym = body.local_names[local_id]
-        if sym == 0:
+        if sym == 0 or body.local_is_global[local_id] == 0:
             return 0
         let decl = self.global_decl_node(sym)
         if decl == 0 as NodeId:
@@ -3017,6 +3017,8 @@ impl CCodegen:
         for di in 0..self.ast.decl_count():
             if self.check_interrupted() != 0:
                 return texts
+            if self.sema.decl_is_lazy_skipped(di):
+                continue
             let decl = self.ast.get_decl(di)
             if self.ast.kind(decl) != NodeKind.NK_LET_DECL:
                 continue
@@ -5752,6 +5754,11 @@ impl CCodegen:
         // compound literal, an addressable lvalue for the call's duration
         // (the LLVM backend's entry-alloca-and-store for the same shape).
         if body.operand_kinds[op_id] != OperandKind.OK_CONSTANT:
+            return "&(" ++ arg_text ++ ")"
+        // A str constant is already the WITH_STR_LIT compound literal, an
+        // lvalue of its own; wrapping it again initializes `ptr` with a
+        // with_str ("initializing 'const char *' with … 'with_str'").
+        if cc_str_starts_with(arg_text, "WITH_STR_LIT(") != 0:
             return "&(" ++ arg_text ++ ")"
         var lit_tid = self.operand_tid(body, op_id)
         if lit_tid == 0 or self.is_void_tid(lit_tid) != 0:
@@ -8778,6 +8785,8 @@ impl CCodegen:
         for di in 0..self.ast.decl_count():
             if self.check_interrupted() != 0:
                 return ""
+            if self.sema.decl_is_lazy_skipped(di):
+                continue
             let decl = self.ast.get_decl(di)
             let kind = self.ast.kind(decl)
             if kind == NodeKind.NK_LET_DECL:
@@ -8791,6 +8800,11 @@ impl CCodegen:
                 let sym = self.ast.get_data0(decl)
                 let tid = self.global_decl_tid(decl)
                 if tid == 0:
+                    continue
+                // stdio's globals are <stdio.h>'s (`FILE *__stdoutp`); a
+                // `void*` redeclaration is a conflicting type, and the
+                // emitted reads convert implicitly.
+                if ci_libc_symbol_allowed_as(cc_intern_resolve(self.intern, sym), CI_LIBC_KIND_VAR):
                     continue
                 out = out ++ "extern " ++ self.c_decl(tid, self.global_c_name(sym)) ++ ";\n"
         if out.len() > 0:
@@ -8827,13 +8841,36 @@ impl CCodegen:
             return "extern " ++ self.c_decl(ret_tid, name) ++ ";\n"
         "extern " ++ self.c_type(ret_tid, 1) ++ " " ++ name ++ ";\n"
 
+    // The with_* names the fixed block (emit_module_prelude's `extern …`
+    // lines below) declares with their C spellings.
+    fn prelude_block_declares(name: &str) -> bool:
+        cc_str_starts_with(name, "with_str_") != 0 or cc_str_starts_with(name, "with_fmt_") != 0 or
+        cc_str_starts_with(name, "with_fiber_") != 0 or cc_str_starts_with(name, "with_println_") != 0 or
+        name == "with_alloc" or name == "with_free" or name == "with_memcpy" or name == "with_memmove" or
+        name == "with_memset" or name == "with_memcmp" or name == "with_hashmap_get_ptr" or
+        name == "with_clock_nanos" or name == "with_nanosleep" or name == "with_sysinfo_os" or
+        name == "with_sysinfo_arch" or name == "with_sysinfo_hostname" or name == "with_eprint" or
+        name == "with_write" or name == "with_ewrite" or name == "with_panic" or name == "with_bool_to_str" or
+        name == "with_i64_to_str" or name == "with_runtime_configure_fibers" or name == "with_str"
+
     fn should_emit_extern_fn_decl(fn_sym: i32, referenced: &HashMap[i32, i32]) -> i32:
         if not referenced.contains(fn_sym):
             return 0
         let name = self.canonical_extern_name(cc_intern_resolve(self.intern, fn_sym))
-        if cc_str_starts_with(name, "with_") != 0:
+        // A with_* runtime function the fixed block below declares (the str,
+        // fmt, memory and fiber entry points) is not redeclared; every other
+        // with_* prototype comes from the With extern declaration itself, so
+        // the emitted C never trusts runtime/with_runtime.h for a signature
+        // the runtime has since changed (#1038: the fs/exec wrappers took
+        // `&str` in 7d8d085e while the header still said `with_str`).
+        if self.prelude_block_declares(name):
             return 0
         if cc_str_starts_with(name, "wl_") != 0:
+            return 0
+        // A name the included libc headers declare is theirs: a With
+        // spelling (`*const i8` for `char*`) never redeclares it. The
+        // migrator's libc knowledge is the list.
+        if ci_libc_symbol_allowed_as(name, CI_LIBC_KIND_FN) or ci_libc_simple_rename(name).len() > 0 or ci_migrate_preamble_name_is_modeled_libc(name):
             return 0
         if name == "malloc" or name == "free":
             return 0
@@ -8887,6 +8924,8 @@ impl CCodegen:
         for di in 0..self.ast.decl_count():
             if self.check_interrupted() != 0:
                 return ""
+            if self.sema.decl_is_lazy_skipped(di):
+                continue
             let decl = self.ast.get_decl(di)
             if self.ast.kind(decl) != NodeKind.NK_EXTERN_FN:
                 continue
@@ -9509,16 +9548,6 @@ impl CCodegen:
         out.write("extern with_str with_sysinfo_arch(void);\n")
         out.write("extern with_str with_sysinfo_hostname(void);\n")
         out.write("extern with_str with_str_trim_ref(const with_str*);\n\n")
-        out.write("extern with_str with_regex_error_message(int32_t);\n")
-        out.write("extern const int8_t* with_regex_compile(const with_str*, int32_t, int32_t*, int32_t*);\n")
-        out.write("extern const int8_t* with_regex_code_copy(const int8_t*);\n")
-        out.write("extern void with_regex_code_free(const int8_t*);\n")
-        out.write("extern int32_t with_regex_capture_count(const int8_t*);\n")
-        out.write("extern const int32_t* with_regex_match_spans_alloc_at(const int8_t*, const with_str*, int32_t, int32_t*);\n")
-        out.write("extern int32_t with_regex_capture_name_count(const int8_t*);\n")
-        out.write("extern with_str with_regex_capture_name_at(const int8_t*, int32_t);\n")
-        out.write("extern int32_t with_regex_group_name_to_index(const int8_t*, const with_str*);\n")
-        out.write("extern with_str with_regex_substitute(const int8_t*, const with_str*, const with_str*, int32_t);\n\n")
         out.write("#ifdef WITH_BOOTSTRAP_TYPES_H\n")
         out.write("extern with_str with_str_concat_ref(const with_str*, const with_str*);\n")
         out.write("extern with_str with_str_concat_n(const with_str*, int64_t);\n")

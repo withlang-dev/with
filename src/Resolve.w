@@ -213,6 +213,12 @@ fn resolve_from_root_pool_with_prefix(root_path: &str, root_text: &str, root_fil
         else:
             let path = state.module_paths[work]
             let src = module_source_read(path)
+            // D39: an interface section's imports are its `use` lines, read
+            // as text; its declarations are parsed on demand by the merge.
+            if src.interface:
+                state.process_interface_module(work, src.text)
+                work = work + 1
+                continue
             let text = resolve_normalize_source_text(src.text)
             if text.len() == 0:
                 state.emit_import_error(work, "failed to read imported module")
@@ -247,6 +253,14 @@ fn resolve_from_root_pool_with_prefix(root_path: &str, root_text: &str, root_fil
             link_libs: move state.result.link_libs,
         },
     }
+
+pub fn resolve_interface_use_lines(text: &str) -> str:
+    var out = ""
+    let lines = text.split("\n")
+    for i in 0..lines.len() as i32:
+        if lines[i].starts_with("use "):
+            out = out ++ lines[i] ++ "\n"
+    out
 
 fn ResolveState.init(pool: InternPool, diags: DiagnosticList, emit_resolve_diags: bool) -> ResolveState:
     ResolveState {
@@ -1031,6 +1045,76 @@ impl ResolveState:
             let seg = resolve_extra_or_zero(pool, path_start + i)
             out = out ++ self.pool.resolve(seg)
         out
+
+    // An interface section (D39): no declarations to resolve, its `use`
+    // lines become the module's import edges — the same records
+    // process_module_with_pool writes for a parsed module.
+    mut fn process_interface_module(module_id: i32, text: &str):
+        self.module_processed[module_id] = 1
+        self.module_decl_counts[module_id] = 0
+        self.module_import_starts[module_id] = self.result.imports.len() as i32
+        let module_scope = self.add_scope(module_id, -1, -1, ScopeKind.SK_MODULE)
+        self.module_scope_ids[module_id] = module_scope
+        var import_index = 0
+        let lines = text.split("\n")
+        for i in 0..lines.len() as i32:
+            let line = lines[i]
+            if not line.starts_with("use "):
+                continue
+            let dotted = line.slice(4, line.len()).trim()
+            let resolved_path = self.resolve_use_file_dotted(module_id, dotted)
+            var target_module = -1
+            if resolved_path.len() > 0:
+                target_module = self.reserve_module(resolved_path, resolve_dirname(resolved_path), -1)
+            else:
+                self.emit_import_decl_error(module_id, 0, 0, import_not_found_message(dotted))
+            self.result.imports.push(ResolvedImport {
+                module_id,
+                index_in_module: import_index,
+                kind: ImportKind.IK_USE,
+                path_text: resolve_owned_text(dotted),
+                target_module,
+                span_start: 0,
+                span_end: 0,
+            })
+            import_index = import_index + 1
+        self.module_import_counts[module_id] = import_index
+
+    // resolve_use_file for a dotted name: the embedded std tree first, then
+    // the module's directory, the root's, and the parent module of the path.
+    fn resolve_use_file_dotted(module_id: i32, dotted: &str) -> str:
+        if dotted.len() == 0:
+            return ""
+        let module_dir = self.module_dirs[module_id]
+        let has_root_fallback = module_dir != self.root_source_dir
+        let rel_primary = dotted.replace(".", "/") ++ ".w"
+        var last_dot = -1
+        for i in 0..dotted.len() as i32:
+            if dotted[i] == '.':
+                last_dot = i
+        let rel_fallback = if last_dot > 0: dotted.slice(0, last_dot).replace(".", "/") ++ ".w" else: ""
+        if rel_primary.starts_with("std/"):
+            let embedded_primary = embedded_std_resolve_path(rel_primary)
+            if embedded_primary.len() > 0:
+                return embedded_primary
+            if rel_fallback.len() > 0:
+                let embedded_fallback = embedded_std_resolve_path(rel_fallback)
+                if embedded_fallback.len() > 0:
+                    return embedded_fallback
+        let path1 = self.resolve_module_rel(module_dir, rel_primary)
+        if path1.len() > 0:
+            return path1
+        if has_root_fallback:
+            let path_root = self.resolve_module_rel(self.root_source_dir, rel_primary)
+            if path_root.len() > 0:
+                return path_root
+        if rel_fallback.len() > 0:
+            let path2 = self.resolve_module_rel(module_dir, rel_fallback)
+            if path2.len() > 0:
+                return path2
+            if has_root_fallback:
+                return self.resolve_module_rel(self.root_source_dir, rel_fallback)
+        ""
 
     fn resolve_use_file(module_id: i32, pool: AstPool, path_start: i32, path_count: i32) -> str:
         if path_count <= 0:

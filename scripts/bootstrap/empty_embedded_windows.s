@@ -11,10 +11,6 @@ with_embedded_compat_runtime_o_end:
 with_embedded_panic_runtime_o_start:
 .globl with_embedded_panic_runtime_o_end
 with_embedded_panic_runtime_o_end:
-.globl with_embedded_regex_runtime_o_start
-with_embedded_regex_runtime_o_start:
-.globl with_embedded_regex_runtime_o_end
-with_embedded_regex_runtime_o_end:
 .globl with_embedded_fiber_stubs_o_start
 with_embedded_fiber_stubs_o_start:
 .globl with_embedded_fiber_stubs_o_end

@@ -396,12 +396,14 @@ pub fn run_wo_drift_action(ctx: ActionCtx) -> i32:
     let stored = "out/wo/" ++ name
     let scratch = dir ++ "/" ++ name
 
-    // The rebuild: same corpus, same ABI, this compiler generation.
+    // The rebuild: same corpus, same ABI, this compiler generation, the
+    // prelude off as in the bundle build.
     var build_args: Vec[str] = Vec.new()
     build_args.push(wo_abs(root, compiler))
     build_args.push("build")
     build_args.push(wo_abs(root, root_path))
     build_args.push("--emit-obj")
+    build_args.push("--no-prelude")
     build_args.push("--bundle-corpus")
     build_args.push(wo_owned_text(corpus))
     build_args.push("--emit-bundle-interface")
@@ -568,11 +570,17 @@ pub fn run_wo_bundle_build_action(ctx: ActionCtx) -> i32:
     let tmp_manifest = tmp ++ "/bundle.manifest"
     let fp_source = tmp ++ "/fingerprint.source"
     let fp_wi = tmp ++ "/fingerprint.wi"
+    // A corpus is migrated C: it compiles without the prelude, as the regex
+    // runtime shim did before it. With the prelude on, the prelude's
+    // std.regex reaches the corpus too and the interface emitter's module
+    // lookup fails (#954); the object and interface are byte-identical
+    // either way.
     var build_args: Vec[str] = Vec.new()
     build_args.push(wo_abs(root, compiler))
     build_args.push("build")
     build_args.push(wo_abs(root, root_path))
     build_args.push("--emit-obj")
+    build_args.push("--no-prelude")
     if triple.len() > 0:
         build_args.push("--target=" ++ triple)
     build_args.push("--bundle-corpus")
@@ -599,6 +607,7 @@ pub fn run_wo_bundle_build_action(ctx: ActionCtx) -> i32:
     check_args.push(wo_abs(root, compiler))
     check_args.push("check")
     check_args.push(wo_abs(root, tmp_wi))
+    check_args.push("--no-prelude")
     if triple.len() > 0:
         check_args.push("--target=" ++ triple)
     check_args.push("--bundle-corpus")

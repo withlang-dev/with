@@ -184,5 +184,11 @@ impl InternPool:
     fn intern(s: &str) -> Symbol:
         self.intern_str(s)
 
+    // The symbol for a text that is already interned, or 0: the on-demand
+    // interface merge asks whether the source could spell a name at all.
+    fn lookup_symbol(s: &str) -> Symbol:
+        let existing = self.state.symbol_map.get(s)
+        if existing.is_some(): existing.unwrap() else: 0
+
     fn resolve(sym: Symbol) -> &str:
         self.resolve_symbol(sym)

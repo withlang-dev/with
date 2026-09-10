@@ -347,6 +347,10 @@ type Compilation {
     bundle_interface_path: str,
     bundle_fingerprint_path: str,
     bundle_corpus: str,
+    // The emit-C lane links no bundle, so no module may be interface-
+    // provided: every embedded bundle's corpus is read from source and
+    // compiled in-unit as C (docs/wo_bundles.md "Retiring the shim", #955).
+    emit_c_in_unit: bool,
 }
 
 type CompilationBinaryLinkPlan {
@@ -378,6 +382,7 @@ pub fn Compilation.init -> Compilation:
         bundle_interface_path: "",
         bundle_fingerprint_path: "",
         bundle_corpus: "",
+        emit_c_in_unit: false,
     }
 
 impl Compilation:
@@ -473,6 +478,9 @@ impl Compilation:
         if not self.load_link_bundles():
             return AstPool.new()
         let _ = bundle_interfaces_register_wi(wi_text)
+        var zcu = move self.zcu
+        zcu.interface_eager = true
+        self.zcu = zcu
         var root_text = "// bundle interface root for " ++ wi_path ++ "\n"
         for si in 0..sections.len() as i32:
             let dotted = bundle_module_dotted_name(sections[si])
@@ -560,6 +568,8 @@ impl Compilation:
     // its source: that is how the wo-drift lane rebuilds an embedded bundle
     // from the tree.
     fn register_embedded_bundle_interfaces() -> bool:
+        if self.emit_c_in_unit:
+            return true
         for bi in 0..embedded_bundle_count():
             if not embedded_bundle_present(bi):
                 continue
@@ -1037,6 +1047,8 @@ impl Compilation:
         self.build_binary_to_path(source_path, output_dir ++ "/" ++ stem)
 
     mut fn compile_source_text(source_path: &str, source_text: &str) -> AstPool:
+        if not self.load_link_bundles():
+            return AstPool.new()
         var zcu = move self.zcu
         let source_dir = frontend_dirname(source_path)
         zcu.reset_for_new_invocation(source_dir, source_path, "")
@@ -1051,6 +1063,8 @@ impl Compilation:
         pool
 
     mut fn compile_source_text_with_config(source_path: &str, source_text: &str, cfg: ProjectConfig) -> AstPool:
+        if not self.load_link_bundles():
+            return AstPool.new()
         var zcu = move self.zcu
         let source_dir = frontend_dirname(source_path)
         zcu.reset_for_new_invocation(source_dir, source_path, "")
@@ -1071,9 +1085,16 @@ impl Compilation:
         source_texts.push(with_str_clone_ref(source_text))
         self.compile_entry_source_texts(source_paths, source_texts)
 
+    // Every compile entry registers the embedded bundle interfaces (and any
+    // --link-bundle) before the first import resolves: the prelude's
+    // std.regex reaches std.re.* in every program, so an entry that skipped
+    // this read the corpus source from the checkout (six seconds of Sema per
+    // test) and found nothing outside one.
     mut fn compile_entry_source_texts(source_paths: &Vec[str], source_texts: &Vec[str]) -> AstPool:
         if source_paths.len() == 0 or source_texts.len() == 0 or source_paths.len() != source_texts.len():
             runtime_eprint("error: compile_entry_source_texts requires matching non-empty source paths and texts")
+            return AstPool.new()
+        if not self.load_link_bundles():
             return AstPool.new()
         var zcu = move self.zcu
         let source_path = source_paths.get(0)
@@ -1461,6 +1482,7 @@ impl Compilation:
         if source_path.ends_with(".wi"):
             runtime_eprint("error: --emit-c needs source bodies; '" ++ source_path ++ "' is an interface (D39)")
             return ""
+        self.emit_c_in_unit = true
         let pool = self.compile_file(source_path)
         if pool.decl_count() == 0:
             return ""

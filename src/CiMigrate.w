@@ -645,8 +645,8 @@ fn ci_migrate_preamble_text() -> str:
     // shadow the foundation module out of the program (#750).
     //
     // #880 exception: the regex zone (lib/std/re) is ALSO compiled with
-    // --no-prelude for the embedded regex runtime (:regex-runtime-ir), where
-    // no builtin c_void exists — its defs must carry the declaration, as the
+    // --no-prelude for the pcre2 bundle (build/wo.w), where no builtin
+    // c_void exists — its defs must carry the declaration, as the
     // pre-#750 promotion always did (both modes built green with it for
     // months). Zone-scoped so ordinary migrations keep #750's protection.
     if ci_migrate_shared_defs_active() and ci_migrate_shared_defs_targets_regex_zone():
@@ -741,14 +741,9 @@ pub fn ci_migrate_c_function_name(name: &str) -> str:
 // place address. This is the single compatibility descriptor for that ABI
 // transition; each bit is a canonical borrowed-with_str parameter index.
 fn ci_migrate_runtime_borrowed_str_param_mask(name: &str) -> i32:
-    if name == "with_regex_compile" or name == "with_str_len" or
-       name == "with_println_str" or name == "with_eprint" or
+    if name == "with_str_len" or name == "with_println_str" or name == "with_eprint" or
        name == "with_write" or name == "with_ewrite":
         return 1
-    if name == "with_regex_match_spans_alloc_at" or name == "with_regex_group_name_to_index":
-        return 2
-    if name == "with_regex_substitute":
-        return 6
     0
 
 fn ci_migrate_runtime_param_is_borrowed_str(mask: i32, param_index: i32) -> bool:

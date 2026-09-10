@@ -3755,8 +3755,8 @@ fn ci_translate_builtin_call(name: &str, args: &str, params: &str, known: &str) 
 
     if name == "__builtin_unreachable":
         // #880: `unreachable()` is a prelude builtin; the regex zone is also
-        // compiled --no-prelude (:regex-runtime-ir), so lower to the zone
-        // preamble's self-contained shim there.
+        // compiled --no-prelude (the pcre2 bundle build, build/wo.w), so lower
+        // to the zone preamble's self-contained shim there.
         if ci_migrate_shared_defs_active() and ci_migrate_shared_defs_targets_regex_zone():
             return "__ci_unreachable()"
         return "unreachable()"
@@ -15713,8 +15713,8 @@ fn ci_goto_cfg_block_ends_noreturn(cfg: &CiGotoCfg, block: i32) -> bool:
 impl CiStmtPool:
     fn native_goto_unreachable_stmt(exprs: CiExprPool) -> CiStmtId:
         // #880: `unreachable()` is a prelude builtin; the regex zone is also
-        // compiled --no-prelude (:regex-runtime-ir), so call the zone
-        // preamble's self-contained shim there.
+        // compiled --no-prelude (the pcre2 bundle build, build/wo.w), so call
+        // the zone preamble's self-contained shim there.
         let name = if ci_migrate_shared_defs_active() and ci_migrate_shared_defs_targets_regex_zone(): exprs.add_string("__ci_unreachable") else: exprs.add_string("unreachable")
         let callee = exprs.ident(name, 0 as CiTypeId)
         let args_start = exprs.extra_len()

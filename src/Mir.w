@@ -399,6 +399,7 @@ type MirBody {
     local_mutables: Vec[i32],
     local_names: Vec[i32],
     local_is_user_var: Vec[i32],
+    local_is_global: Vec[i32],   // 1: MirLower's proxy for module-level storage, never a user local that shares the name
     n_params: i32,
     // Blocks ending in mutual tail calls (marked by mutual TCO pass).
     mutual_tail_bbs: Vec[i32],
@@ -643,6 +644,7 @@ fn MirBody.init_for_fn(fn_sym: i32) -> MirBody:
         local_mutables: Vec.new(),
         local_names: Vec.new(),
         local_is_user_var: Vec.new(),
+        local_is_global: Vec.new(),
         n_params: 0,
         mutual_tail_bbs: Vec.new(),
         bb_stmt_starts: Vec.new(),
@@ -775,7 +777,15 @@ impl MirBody:
         self.local_mutables.push(mutable)
         self.local_names.push(name)
         self.local_is_user_var.push(is_user_var)
+        self.local_is_global.push(0)
         id
+
+    // A local that stands for module-level storage (ensure_global_local).
+    // Both backends bind it to the global's address by this mark, never by
+    // its name: a function's local may share a global's name (§18.1, the
+    // unseen-global shadow), and that local is its own storage.
+    mut fn mark_global_local(local_id: i32):
+        self.local_is_global[local_id] = 1
 
     mut fn new_temp(type_id: i32) -> i32:
         self.new_local(type_id, 1, 0, 0)
@@ -1096,6 +1106,8 @@ pub fn dump_mir_body(body: &MirBody, pool: &InternPool, sema: &Sema) -> str:
         let name_sym = body.local_names[li]
         if body.local_is_user_var[li] != 0 and name_sym != 0:
             line = line ++ f"  // sym{name_sym}"
+        if body.local_is_global[li] != 0:
+            line = line ++ " [global]"
         if body.local_mutables[li] != 0:
             line = line ++ " [mut]"
         out = out ++ line ++ "\n"
@@ -2890,6 +2902,8 @@ fn validate_mir_body(body: &MirBody) -> str:
         return "locals/local_names length mismatch"
     if local_count != body.local_is_user_var.len():
         return "locals/local_is_user_var length mismatch"
+    if local_count != body.local_is_global.len():
+        return "locals/local_is_global length mismatch"
     if body.n_params < 0 or body.n_params > local_count:
         return "invalid n_params"
 

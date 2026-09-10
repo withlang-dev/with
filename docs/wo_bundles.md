@@ -385,9 +385,14 @@ manifest's. `--bundle-corpus std/re` selects `<embedded-std>/std/re/…`;
 The emitter (`src/compiler/BundleInterfaceEmit.w`) prints from Sema's
 finalized tables only, never source text, never a placeholder: a
 declaration it cannot state exactly is a loud error naming it and
-nothing is written. Per section: the module's `use` lines in import order
-(a module holding only `use` lines, as pcre2's migrated table modules do,
-still gets a section), then types, consts, storage globals, extern fns,
+nothing is written. Per section: the `use` lines its declarations need, in
+import order — every corpus sibling, and a module outside the corpus only
+when one of the section's declarations names a type it declares; a
+body's imports are implementation, never interface (pcre2_maketables'
+`use std.libc` stays out of every program's prelude closure, where its
+stdio globals would shadow any local named `stdout`) — (a module holding
+only `use` lines, as pcre2's migrated table modules do, still gets a
+section), then types, consts, storage globals, extern fns,
 free fns and impl blocks, each group bytewise by name. Exported: every
 `pub` declaration plus every corpus type a printed declaration names,
 with its own visibility (a layout needs its field types; a std-tier
@@ -470,6 +475,17 @@ target pairs and the `regex_runtime.o` entries in `Link.w`,
 `build/package.w`, `build/emit_c.w`, `build/runtime.w`, and
 `install-regex-runtime` go away.
 
+Stage2 and stage3 receive `out/stage/lib/embedded_objects.o` explicitly
+through the build action's `embedded-object=` input, forwarded to the
+linker as `WITH_COMPILER_EMBEDDED_OBJECT`. Its producer reuses the
+bootstrap runtime inputs and adds the tree's bundle blobs. Stage1 keeps
+`out/bootstrap-lib/embedded_objects.o`, whose bundle slots are empty.
+These are separate graph outputs: linking a `.wo` with `--link-bundle`
+does not embed its object, interface, or manifest in the resulting
+compiler. The explicit embedding input also prevents a warm `out/lib`
+from masking an empty stage payload. A missing selected embedding object
+is a hard link failure. See [the cold-build diagnosis](macos-stage-bundle-debug.md).
+
 **Root.** `rt/regex_runtime.w`'s `use` list (32 modules; `pcre2test` and
 `pcre2posix` are harness, not bundle) is the bundle root, moved to
 `lib/std/re/bundle.w` and written by the migrate action, which already
@@ -501,6 +517,129 @@ drop. The generator is fixed before the first `wo-drift` run.
 **Ruled** as decisions.md D39 (2026-09-02); the spec projection landed
 the same day with Eric's blessing of the words: specification §3.4 (the
 separate-compilation origin rule) and §18.5c (bundles and interfaces).
+
+## Shim retired (batch C4, 2026-09-04)
+
+`rt/regex_runtime.w` and every `with_regex_*` hook are gone (D30's
+regex seam). `std.regex` imports ten `std.re` modules through the
+embedded interface and calls pcre2 directly; `Regex.__literal_code` and
+`Regex.__capture_count` are the regex-literal entry points codegen calls
+(`CodegenDispatch.regex_facade_fn`); `SemaCheck.validate_regex_literal`
+compiles the literal with `Regex.compile_flags`, so the compiler is one
+more user of the facade and its own link selects the embedded bundle.
+Retired with the shim: the five `regex-runtime-ir`/`-object` lane pairs
+and the `with_ir_target` helpers, the `regex_runtime_o` blob in every
+embedded-objects set, `install-regex-runtime`, Link.w's on-demand
+selection and its transitive probe (no on-demand runtime object references
+a bundle any more; selection reads the program's own undefined symbols),
+CCodegen's prototypes, CiMigrate's borrowed-str mask, emit_c.w's harvest
+and `package.w`'s `regex_runtime.c`. The emit-C lane compiles every
+embedded bundle's corpus in-unit: `--emit-c` registers no interface
+(`Compilation.emit_c_in_unit`), the compiler's own C is emitted by the
+release compiler with `--bundle-corpus std/re` (#955, option a), and the
+C backend no longer redeclares a name the included libc headers own
+(`strchr`, `__stdinp`…) while emitting `with_libc_*` prototypes from
+std.libc's declarations.
+
+**What the prelude reaching a corpus exposed.** Every program now carries
+pcre2's interface (3,057 `pub let` globals, 87 types, 206 functions)
+through `std.regex`, and Sema's global scope is flat (D29 campaign B):
+`PACKAGE`, `NULL`, `BUFSIZ` collided with programs' own declarations,
+std.libc's `stdout` (imported by `pcre2_maketables`'s body) with a local
+`let stdout`, and a prelude function's locals with any top-level global.
+Landed with C4: the ambient tier is the prelude's enumerated list and the
+modules it names, not their closure (`init_module_graph`); an interface
+section carries only the imports its declarations need (the emitter drops
+`use std.libc`; fingerprint unchanged); interface globals live in a side
+table reachable only by an explicit import (`Sema.interface_global_index`,
+`MirLower.ensure_global_local` prefers source declarations); a local may
+take the name of a global its module never imports (`scope_put_at`,
+`scope_put_consuming_rebind_at`, restored by `pop_scope`). An unimported
+interface global is an undefined variable — D29's fallback tier is not
+implemented, and nothing offered these names before C4.
+
+**Measured** (darwin-arm64, main `947b9e79` vs this batch; the release
+compiler unless noted):
+
+| | before | after |
+|---|---|---|
+| release compiler binary | 109,229,696 B | 108,695,600 B (−534,096) |
+| hello-world `with check` | 0.03 s | 0.23 s with the shim retired; **0.04–0.05 s** with the interface on demand (below) |
+| behavior-tests lane | 144 s | 414 s with the shim retired; 177 s with lazy collection; final on-demand A/B ratios **1.018 and 1.032**, below the 1.10 gate (below) |
+| `with build` from a clean `out/` (bundle in the store; a battery was running on the same box) | 251.8 s (59 targets; regex-runtime-ir 5.7 s + bootstrap 5.5 s + objects) | 295.8 s (55 targets; stage1 +9 s, stage2 +25 s, link-compiler +29 s — every stage now Semas the interface; re-measure idle) |
+
+**The interface on demand** (Eric's ruling: the cost above "is a bug; we
+must fix it now before landing it"; hard gates — hello-world within
+0.05 s for hello-world; the lane within 10% of the pre-C4 baseline).
+Eric's subsequent ruling is to measure the lane locally as an interleaved
+A/B ratio under normal laptop activity, with the first cold pair excluded;
+an idle box is not required. Profiled with `WITH_PROFILE=1` (which now splits
+`frontend.comptime` into prepare/transform and `check_module` into
+`[profile] sema.<phase>`), the 0.20 s was `Sema.collect_declarations` run
+three times per compile (comptime pre-Sema, the transform's Sema, the
+frontend's) over the 3,828 interface declarations — 97 ms each — plus the
+87 types' field defaults (70 ms) and per-identifier linear scans of
+4k-entry visibility vectors in `check_bodies` (46 ms); after those, the
+`.wi`'s own lex+parse ×2 (Resolve, then the import worklist) and its 937
+`use` lines. Five mechanisms, each its own commit:
+
+1. *Lazy collection* (`SemaDecl.prepare_interface_demand`): S is every
+   symbol a non-interface node carries (every node records its file id);
+   an interface declaration is demanded when its name — a method's bare
+   name, an impl's target type — is in S, its subtree's symbols join S,
+   to a fixpoint. Every whole-module pass and codegen loop skips an
+   undemanded interface declaration (`decl_is_lazy_skipped`); field
+   defaults skip every interface type. A `.wi` root and `--bundle-corpus`
+   collect everything (`Zcu.interface_eager`: the emitter, the fingerprint
+   and the check-wi pass read the full tables). `astpool_clone_deep` now
+   keeps each node's file id.
+2. *Indexed lookups*: `decl_visibility_*` chained by symbol and by node,
+   `sig_names` chained by resolved text, an `extern_var_texts` set — the
+   scans walked every declaration per identifier.
+3. *Source wins a flat name whatever the order* (D29-B is pending):
+   pcre2's `is_alpha`/`is_digit`/… beside std.string's, its
+   `pub extern fn abort` beside every module's. `collect_fn_decl`,
+   `collect_extern_fn` and codegen's `declare_function_at_inner` let an
+   interface declaration yield to a source one.
+4. *Sections parsed on demand*: Resolve and the import worklist read a
+   section's imports from its `use` lines as text (no use declaration of
+   a section enters the pool); once every source module is in,
+   `merge_interface_sections_on_demand` parses whole declarations by
+   demand as chunks with their own file ids, to a fixpoint, and places
+   them before the root's declarations (`is_local_decl` takes the pool's
+   tail). `[profile] frontend.interface 3.4 ms sections=32 lines=59 of
+   3405`; parse decls 4771 → 463. A declaration includes its leading
+   attributes and indented body; an inherent impl is demanded by its
+   target type. The bundle-interface battery covers method receivers,
+   a packed layout, and an import that demands none of the bundle types.
+5. Sema's lazy layer stays underneath: it sees only the parsed lines and
+   demands them all.
+
+Measured on this box (stage1/release, idle, cold run excluded):
+hello-world check 0.46 → 0.07 (lazy) → 0.05 (on demand) → 0.04 s (text
+imports); `behav_derive_clone.w` check 21 ms on the seed, 40 ms here
+(parse 5.5, resolve 10.3, imports 0.5, interface 4.7, comptime ~8,
+sema ~5); `test` of it 0.40 s vs the seed's 0.39–0.54 s and the
+shim-retired compiler's 0.81 s.
+
+**Final local behavior gate (2026-09-08).** Pre-C4 main `79d523f4`
+(`main79`) versus rebased C4 `973a738a` (`c4r`), using each tree's release
+compiler. Runs were sequential A/B/A/B on the same laptop; each tree used
+its own `out/wo-store-test` via `WITH_WO_DIR`. Test-pass and per-file verdict
+caches were cleared before each measured lane. Timings below are the
+runner's `[time] behavior-tests` wall times, excluding build dependencies.
+
+| pair | pre-C4 | C4 | C4 / pre-C4 | result |
+|---|---:|---:|---:|---|
+| initial pair, excluded | 254.8 s | 261.3 s | 1.026 | green |
+| warm pair 1 | 263.9 s | 268.7 s | **1.018** | green |
+| warm pair 2 | 275.6 s | 284.3 s | **1.032** | green |
+
+Every measured baseline run passed 985 files; C4 passed 986, including
+the added corpus-import regression fixture. All had zero cached files.
+Both warm pairs pass the **ratio ≤ 1.10** gate on the landing tree. This
+establishes the performance gate; the full build/fixpoint/audit/test and
+seed-compatibility battery remains a separate landing requirement.
 
 ## Non-goals
 

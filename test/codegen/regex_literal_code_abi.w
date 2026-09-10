@@ -1,22 +1,20 @@
 //! expect-stdout: ok
 
-extern fn with_regex_compile(pattern: &str, options: i32, err_code: *mut i32, err_offset: *mut i32) -> *const i8
-extern fn with_regex_error_message(code: i32) -> str
-extern fn with_panic(msg: str, file: str, line: i32) -> Never
+// The regex-literal entry points codegen calls (CodegenDispatch
+// .gen_regex_literal_value): `Regex.__literal_code(slot, &str, options)`
+// compiles a literal once into its slot, `Regex.__capture_count(code)` reads
+// the count the literal's value carries. Called here as the facade declares
+// them, so a signature change fails this test before it fails every regex
+// literal — and the literal itself agrees with them.
 
-unsafe fn literal_code(slot: *mut *const i8, pattern: str, options: i32) -> *const i8:
-    if slot as i64 == 0:
-        return null
-    let existing = *slot
-    if existing as i64 != 0:
-        return existing
-    var err_code: i32 = 0
-    var err_offset: i32 = 0
-    let compiled = with_regex_compile(pattern, options, &raw mut err_code, &raw mut err_offset)
-    if compiled as i64 == 0:
-        with_panic("invalid regex literal: " ++ with_regex_error_message(err_code), "", 0)
-    *slot = compiled
-    compiled
+use std.regex
+
+var literal_slot: *const i8 = null
 
 fn main:
-    print("ok")
+    let slot = &raw mut literal_slot
+    let first = unsafe { Regex.__literal_code(slot, "(a)(b)?", 0) }
+    let again = unsafe { Regex.__literal_code(slot, "(a)(b)?", 0) }
+    let literal = /(a)(b)?/
+    if first as i64 != 0 and again as i64 == first as i64 and Regex.__capture_count(first) == 2 and literal.num_captures() == 2:
+        print("ok")

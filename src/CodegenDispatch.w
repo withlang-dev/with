@@ -328,15 +328,11 @@ fn codegen_regex_state_flags(flags: &str) -> i32:
     state_flags
 
 impl Codegen:
-    fn ensure_regex_runtime_fn(name: &str, ret_ty: i64, params: &Vec[i64]) -> i64:
-        var fn_val = wl_get_named_function(self.llmod, name)
-        if fn_val != 0:
-            return fn_val
-        let fn_ty = wl_function_type(ret_ty, vec_data_i64(params), params.len() as i32, 0)
-        wl_add_function(self.llmod, name, fn_ty)
-
-    mut fn regex_literal_code_fn() -> i64:
-        let helper_sym = self.intern.intern("Regex.__literal_code")
+    // A regex-literal entry point of the facade (lib/std/regex.w:
+    // `Regex.__literal_code`, `Regex.__capture_count`) as this unit generated
+    // it; a missing one is a loud error, never a fresh declaration.
+    mut fn regex_facade_fn(name: &str) -> i64:
+        let helper_sym = self.intern.intern(name)
         let fn_opt = self.fn_values.get(helper_sym)
         if fn_opt.is_some():
             return fn_opt.unwrap() as i64
@@ -344,7 +340,7 @@ impl Codegen:
         let found = wl_get_named_function(self.llmod, helper_name)
         if found != 0:
             return found
-        with_eprint("error: regex literal helper Regex.__literal_code was not generated")
+        with_eprint("error: regex literal helper " ++ name ++ " was not generated")
         self.had_error = 1
         0
 
@@ -382,8 +378,9 @@ impl Codegen:
         let subject_ptr_global = self.regex_literal_global(base_name ++ "_subject_ptr", i64_ty, wl_const_int(i64_ty, 0, 0))
         let subject_len_global = self.regex_literal_global(base_name ++ "_subject_len", i64_ty, wl_const_int(i64_ty, -1, 1))
 
-        let literal_fn = self.regex_literal_code_fn()
-        if literal_fn == 0:
+        let literal_fn = self.regex_facade_fn("Regex.__literal_code")
+        let cap_fn = self.regex_facade_fn("Regex.__capture_count")
+        if literal_fn == 0 or cap_fn == 0:
             return self.build_default_value(regex_ty)
         let literal_ft = wl_global_get_value_type(literal_fn)
         let literal_args: Vec[i64] = Vec.new()
@@ -396,9 +393,6 @@ impl Codegen:
         literal_args.push(self.gen_string_literal_ref(pattern))
         literal_args.push(wl_const_int(i32_ty, options as i64, 0))
         let code_ptr = wl_build_call(self.builder, literal_ft, literal_fn, vec_data_i64(&literal_args), 3)
-        let cap_params: Vec[i64] = Vec.new()
-        cap_params.push(ptr_ty)
-        let cap_fn = self.ensure_regex_runtime_fn("with_regex_capture_count", i32_ty, cap_params)
         let cap_ft = wl_global_get_value_type(cap_fn)
         let cap_args: Vec[i64] = Vec.new()
         cap_args.push(code_ptr)
@@ -1061,7 +1055,7 @@ impl Codegen:
         if local_id < 0 or local_id >= body.local_names.len() as i32:
             return false
         let sym = body.local_names[local_id]
-        if sym == 0:
+        if sym == 0 or body.local_is_global[local_id] == 0:
             return false
         let decl_index = self.find_module_let_decl_index(sym)
         if decl_index < 0:
@@ -15813,7 +15807,7 @@ impl Codegen:
         // Pre-populate mir_local_ptrs for global variable proxy locals
         for gli in 0..body.local_names.len() as i32:
             let gl_name = body.local_names[gli]
-            if gl_name != 0:
+            if gl_name != 0 and body.local_is_global[gli] != 0:
                 let gl_mc = self.module_constants.get(gl_name)
                 if gl_mc.is_some():
                     let global_value: i64 = gl_mc.unwrap()
@@ -17512,7 +17506,7 @@ impl Codegen:
         // Pre-populate globals
         for cl_gli in 0..closure_body.local_names.len() as i32:
             let cl_gl_name = closure_body.local_names[cl_gli]
-            if cl_gl_name != 0:
+            if cl_gl_name != 0 and closure_body.local_is_global[cl_gli] != 0:
                 let cl_gl_mc = self.module_constants.get(cl_gl_name)
                 if cl_gl_mc.is_some():
                     let cl_global_value: i64 = cl_gl_mc.unwrap()

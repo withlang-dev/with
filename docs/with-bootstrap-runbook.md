@@ -350,7 +350,6 @@ foreach ($File in @(
 foreach ($File in @(
   "src\rt_core.c",
   "src\panic_runtime.c",
-  "src\regex_runtime.c",
   "src\fiber_stubs.c"
 )) {
   $Name = [IO.Path]::GetFileNameWithoutExtension($File)
@@ -388,7 +387,6 @@ $Objs = @(
   "$Obj\windows_compat_runtime.obj",
   "$Obj\rt_core.obj",
   "$Obj\panic_runtime.obj",
-  "$Obj\regex_runtime.obj",
   "$Obj\fiber_stubs.obj",
   "$Obj\empty_embedded_windows.obj"
 )

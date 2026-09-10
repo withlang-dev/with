@@ -1,6 +1,8 @@
 //! expect-exit: 0
 
 // D27/NLL: after a view's last use, consuming and replacing its owner is legal.
+// #1099: function/closure cleanup must remove scope-depth metadata with
+// each borrow row, or an earlier body's depth keeps this dead view live.
 
 type Item { value: i32 }
 type Owner { items: Vec[Item] }

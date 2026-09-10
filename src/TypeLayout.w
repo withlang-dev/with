@@ -122,7 +122,6 @@ impl Sema:
         if self.layout_field_offset_cache.contains(key):
             return self.layout_field_offset_cache.get(key).unwrap()
         sema_phase_bug("BUG: type_layout_struct_field_offset_frozen miss — field layout not preregistered")
-        0
 
     mut fn type_layout_struct_align_of(tid: i32) -> i64:
         let resolved = self.resolve_alias(tid)
@@ -399,54 +398,45 @@ impl Sema:
 
     // D7 frozen read twins of the layout queries. At codegen the layout tables are filled
     // (preregister_mir_types, before freeze), so these are pure &Self lookups. A miss is a
-    // phase violation (loud); size 0 / align 1 is the conservative fallback.
+    // phase violation (loud: sema_phase_bug aborts).
     fn type_layout_size_of_frozen(tid: i32) -> i64:
         if self.layout_size_cache.contains(tid):
             return self.layout_size_cache.get(tid).unwrap()
         sema_phase_bug("BUG: type_layout_size_of_frozen miss — layout not preregistered")
-        0
 
     fn type_layout_align_of_frozen(tid: i32) -> i64:
         if self.layout_align_cache.contains(tid):
             return self.layout_align_cache.get(tid).unwrap()
         sema_phase_bug("BUG: type_layout_align_of_frozen miss — layout not preregistered")
-        1
 
     // D7 frozen read twin of is_copy. The is_copy_cache is filled for every type in
     // preregister_mir_types (before freeze), so this is a pure &Self lookup — no re-entry
     // into trait selection / the checker. Complete by construction (the eager loop covers
-    // every tid in 0..type_count); a miss is a phase violation (loud). Non-copy default.
+    // every tid in 0..type_count); a miss is a phase violation (loud, aborts).
     fn is_copy_frozen(tid: TypeId) -> i32:
         if self.is_copy_cache.contains(tid as i32):
             return self.is_copy_cache.get(tid as i32).unwrap()
         sema_phase_bug("BUG: is_copy_frozen miss — type not preregistered")
-        0
 
     // D7 frozen read twin of type_needs_drop (filled in preregister_mir_types). Pure &Self
-    // lookup, complete by construction; a miss is a loud phase violation. Default 0 (no drop)
-    // is the memory-safe choice on the dead miss path — at worst a leak, never a spurious
-    // drop / double-free.
+    // lookup, complete by construction; a miss is a loud phase violation (aborts).
     fn type_needs_drop_frozen(tid: i32) -> i32:
         if self.needs_drop_result_cache.contains(tid):
             return self.needs_drop_result_cache.get(tid).unwrap()
         sema_phase_bug("BUG: type_needs_drop_frozen miss — type not preregistered")
-        0
 
     // D7 frozen read twin of try_unwrapped_type (Result/Option payload unwrap), filled in
-    // preregister_mir_types. Pure &Self lookup, complete by construction; miss = loud BUG,
-    // default 0 (= not unwrappable) matches the query's own not-found return.
+    // preregister_mir_types. Pure &Self lookup, complete by construction; miss = loud BUG.
     fn try_unwrapped_type_frozen(tid: i32) -> i32:
         if self.unwrapped_type_cache.contains(tid):
             return self.unwrapped_type_cache.get(tid).unwrap()
         sema_phase_bug("BUG: try_unwrapped_type_frozen miss — type not preregistered")
-        0
 
     // D7 frozen read twin of infer_for_element_type (for-loop element type). The query is a
     // type producer, but by freeze time every element type it would build already exists
     // (preregister filled the cache while types were still mutable), so this is a pure &Self
-    // lookup. Complete by construction; miss = loud BUG, default 0.
+    // lookup. Complete by construction; miss = loud BUG.
     fn infer_for_element_type_frozen(iter_type: i32) -> i32:
         if self.for_element_type_cache.contains(iter_type):
             return self.for_element_type_cache.get(iter_type).unwrap()
         sema_phase_bug("BUG: infer_for_element_type_frozen miss — type not preregistered")
-        0

@@ -13,15 +13,26 @@ use InternPool
 use render
 use Overflow
 use compiler.TrackedInputs
+use compiler.BundleInterfaces
+use FnAbi
 use std.collections.HashMap
 use std.collections.HashSet
 
 extern fn with_write(s: &str) -> Unit
 extern fn with_eprint(s: &str) -> Unit
 extern fn with_getenv_str(name: &str) -> str
+extern fn with_clock_nanos() -> i64
 extern fn with_str_clone_ref(s: &str) -> str
 extern fn i64_to_string(n: i64) -> str
-extern fn abort() -> Unit
+
+// WITH_PROFILE=1: one `[profile] sema.<phase>` line per check_module step,
+// the same switch and format as the frontend's phase lines.
+fn sema_profile_enabled() -> bool: with_getenv_str("WITH_PROFILE").len() > 0
+
+fn sema_profile_report(name: &str, t0: i64):
+    let ns = with_clock_nanos() - t0
+    with_eprint(f"[profile] sema.{name}  {ns / 1000000}.{(ns % 1000000) / 1000} ms")
+extern fn abort() -> Never
 
 fn sema_phase_bug(message: &str, origin_file: &str = __FILE__, origin_line: u32 = __LINE__, origin_fn: &str = __FN__):
     with_eprint(f"{message} [{origin_file}:{origin_line} {origin_fn}]")
@@ -453,6 +464,8 @@ type Sema {
 
     // Function signatures (parallel arrays)
     sig_names: Vec[i32],
+    sig_text_index: HashMap[str, i32],  // resolved name text → newest signature; older ones chain through sig_text_prev
+    sig_text_prev: Vec[i32],
     sig_type_ids: Vec[i32],
     sig_ret_types: Vec[i32],
     sig_param_starts: Vec[i32],
@@ -549,6 +562,7 @@ type Sema {
 
     // Extern fn names
     extern_fn_names: HashMap[i32, i32],
+    extern_var_texts: HashMap[str, i32],  // every collected extern var by name text (has_extern_var_decl)
     // #602: c_import/extern params that RETAIN a passed C-string pointer past
     // the call (§16.3c). Keyed by fn name sym → bitmask of retained param
     // indices. Such a param is modeled as a C-string input (cstr_in) but
@@ -730,6 +744,27 @@ type Sema {
     // here — it's rebindable.
     stable_global_syms: HashMap[i32, i32],
     global_value_decl_kinds: HashMap[i32, i32],
+    // D39: a bundle interface's storage and constants live beside the flat
+    // global scope, not in it — symbol → binding index and declaring module,
+    // consulted by scope_lookup only from a module that imports theirs.
+    interface_global_index: HashMap[i32, i32],
+    interface_global_paths: HashMap[i32, str],
+    // D39 lazy interface collection (SemaDecl.prepare_interface_demand):
+    // per declaration, 1 when its module is a registered .wi section, and
+    // 1 when the source can name it; the symbols the source names.
+    decl_is_iface: Vec[i32],
+    decl_iface_demanded: Vec[i32],
+    iface_mentioned: HashMap[i32, i32],
+    interface_eager: i32,            // 1: a bundle build or a .wi root — collect every interface declaration
+    // every flat-scope global's declaring module and binding index (symbol
+    // → path, symbol → index), and the globals a local binding is standing
+    // in for while its scope lasts — a function's local may take the name
+    // of a global its module cannot see (§18.1); the global's slot returns
+    // when the scope ends
+    global_value_decl_paths: HashMap[i32, str],
+    global_value_decl_bindings: HashMap[i32, i32],
+    shadowed_global_syms: Vec[i32],
+    shadowed_global_indices: Vec[i32],
     global_race_access_syms: Vec[i32],
     global_race_access_nodes: Vec[i32],
     global_race_access_files: Vec[i32],
@@ -1153,6 +1188,7 @@ type Sema {
     module_import_targets: Vec[i32], // flattened target module indices
     module_import_paths: Vec[str],   // flattened import path text aligned with module_import_targets
     module_index_by_path: HashMap[str, i32],   // path -> module index
+    bundle_corpus: str,              // D39: the --bundle-corpus root, "" outside a bundle lane
     global_visible_module_paths: HashMap[str, i32], // prelude-visible modules
     module_visibility_cache: HashMap[str, i32], // "from->to" -> visibility
     named_type_candidate_syms: Vec[i32],       // every registered named type symbol
@@ -1165,6 +1201,9 @@ type Sema {
     decl_visibility_paths: Vec[str],           // parallel declaring module path
     decl_visibility_pub: Vec[i32],             // parallel public flag
     decl_visibility_nodes: Vec[i32],           // parallel declaration node
+    decl_visibility_index: HashMap[i32, i32],  // symbol → its newest record; older records chain through decl_visibility_prev
+    decl_visibility_prev: Vec[i32],
+    decl_visibility_node_index: HashMap[i32, i32], // declaration node → its record
     // c_import scoping: tracks which symbols are c_import-origin
     ci_syms: HashMap[i32, i32],      // sym → 1 for c_import-origin symbols
     ci_raw_syms: HashMap[i32, i32],  // sym → 1 for c_import raw ABI calls
@@ -1223,7 +1262,6 @@ impl Sema:
             if existing != 0:
                 return existing
             sema_phase_bug("BUG: Sema.pool_intern called after symbol freeze: '" ++ name ++ "'")
-            return 0
         let existing = self.pool.state.symbol_map.get(name)
         if existing.is_some():
             return existing.unwrap()
@@ -1774,6 +1812,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
     let pretty_symbol_names = sema_new_map_i32_str()
     let sig_lookup = sema_new_map_i32_i32()
     let extern_fn_names = sema_new_map_i32_i32()
+    let extern_var_texts = sema_new_map_str_i32()
     let retained_extern_params = sema_new_map_i32_i32()
     let fn_decl_nodes = sema_new_map_i32_i32()
     let fn_decl_effective_syms = sema_new_map_i32_i32()
@@ -1819,6 +1858,13 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
     let mutable_global_syms = sema_new_map_i32_i32()
     let stable_global_syms = sema_new_map_i32_i32()
     let global_value_decl_kinds = sema_new_map_i32_i32()
+    let interface_global_index = sema_new_map_i32_i32()
+    let interface_global_paths = sema_new_map_i32_str()
+    let decl_is_iface = sema_new_vec_i32()
+    let decl_iface_demanded = sema_new_vec_i32()
+    let iface_mentioned = sema_new_map_i32_i32()
+    let global_value_decl_paths = sema_new_map_i32_str()
+    let global_value_decl_bindings = sema_new_map_i32_i32()
     let global_race_mutated_syms = sema_new_map_i32_i32()
     let global_race_mutation_nodes = sema_new_map_i32_i32()
     let method_impl_nodes = sema_new_map_i32_i32()
@@ -1876,6 +1922,8 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         cycle_dep_nodes: Vec.new(),
         pretty_symbol_names,
         sig_names: Vec.new(),
+        sig_text_index: sema_new_map_str_i32(),
+        sig_text_prev: Vec.new(),
         sig_type_ids: Vec.new(),
         sig_ret_types: Vec.new(),
         sig_param_starts: Vec.new(),
@@ -1910,6 +1958,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         effect_prov: HashMap.new(),
         effect_note_origin_node: 0,
         extern_fn_names,
+        extern_var_texts,
         retained_extern_params,
         fn_decl_nodes,
         fn_decl_effective_syms,
@@ -2022,6 +2071,16 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         mutable_global_syms,
         stable_global_syms,
         global_value_decl_kinds,
+        interface_global_index,
+        interface_global_paths,
+        decl_is_iface,
+        decl_iface_demanded,
+        iface_mentioned,
+        interface_eager: 0,
+        global_value_decl_paths,
+        global_value_decl_bindings,
+        shadowed_global_syms: Vec.new(),
+        shadowed_global_indices: Vec.new(),
         global_race_access_syms: Vec.new(),
         global_race_access_nodes: Vec.new(),
         global_race_access_files: Vec.new(),
@@ -2308,6 +2367,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         module_import_targets: Vec.new(),
         module_import_paths: sema_new_vec_str(),
         module_index_by_path: sema_new_map_str_i32(),
+        bundle_corpus: "",
         global_visible_module_paths: sema_new_map_str_i32(),
         module_visibility_cache: sema_new_map_str_i32(),
         named_type_candidate_syms: Vec.new(),
@@ -2320,6 +2380,9 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         decl_visibility_paths: sema_new_vec_str(),
         decl_visibility_pub: Vec.new(),
         decl_visibility_nodes: Vec.new(),
+        decl_visibility_index: sema_new_map_i32_i32(),
+        decl_visibility_prev: Vec.new(),
+        decl_visibility_node_index: sema_new_map_i32_i32(),
         ci_syms: sema_new_map_i32_i32(),
         ci_raw_syms: sema_new_map_i32_i32(),
         ci_omitted_symbols: HashMap.new(),
@@ -2553,11 +2616,18 @@ impl Sema:
     fn record_decl_visibility(sym: i32, node: i32, is_pub: i32) -> Unit:
         if sym == 0:
             return
+        let record = self.decl_visibility_syms.len() as i32
         self.decl_visibility_syms.push(sym)
         let path = if self.current_module_path.len() > 0: self.current_module_path else: ""
         self.decl_visibility_paths.push(sema_owned_text(path))
         self.decl_visibility_pub.push(is_pub)
         self.decl_visibility_nodes.push(node)
+        // Indexed: a lookup walks this symbol's records newest-first, never
+        // the whole table (it scanned every declaration per identifier).
+        self.decl_visibility_prev.push(if self.decl_visibility_index.contains(sym): self.decl_visibility_index.get(sym).unwrap() else: -1)
+        self.decl_visibility_index.insert(sym, record)
+        if node != 0:
+            self.decl_visibility_node_index.insert(node, record)
 
     fn decl_visible_from_current(target_path: &str, is_pub: i32) -> i32:
         if target_path.len() == 0:
@@ -2636,6 +2706,10 @@ impl Sema:
             if current == target_idx:
                 self.module_visibility_cache.insert(sema_owned_text(cache_key), 1)
                 return 1
+            // D39 §3.4: a bundle corpus module compiled in-unit (--emit-c,
+            // #955) presents the surface its .wi would — its corpus siblings
+            // reach the importer, its body-only imports (std.libc) do not.
+            let corpus_boundary = current != start_idx and self.module_in_bundle_corpus(current)
             if current >= 0 and current < self.module_import_starts.len() as i32:
                 let edge_start = self.module_import_starts[current]
                 let edge_count = self.module_import_counts[current]
@@ -2645,9 +2719,15 @@ impl Sema:
                         let ip: str = with_str_clone_ref(self.module_import_paths[idx])
                         if ip == "std.prelude" or ip == "std.prelude_core" or ip == "std.prelude_alloc":
                             continue
-                        stack.push(self.module_import_targets[idx])
+                        let target = self.module_import_targets[idx]
+                        if corpus_boundary and not self.module_in_bundle_corpus(target):
+                            continue
+                        stack.push(target)
         self.module_visibility_cache.insert(sema_owned_text(cache_key), 0)
         0
+
+    fn module_in_bundle_corpus(module_idx: i32) -> bool:
+        self.bundle_corpus.len() > 0 and module_idx >= 0 and module_idx < self.module_paths.len() as i32 and bundle_corpus_contains(self.bundle_corpus, codegen_canonical_module_path(self.module_paths[module_idx]))
 
     fn symbol_visible_from_current(sym: i32) -> i32:
         let symbol_name = self.pool_resolve(sym)
@@ -2661,15 +2741,14 @@ impl Sema:
         if self.ci_syms.contains(sym) and self.is_ci_visible(sym) != 0:
             return 1
         var saw_candidate = 0
-        var i = self.decl_visibility_syms.len() as i32 - 1
+        var i = if self.decl_visibility_index.contains(sym): self.decl_visibility_index.get(sym).unwrap() else: -1
         while i >= 0:
-            if self.decl_visibility_syms[i] == sym:
-                saw_candidate = 1
-                let path = self.decl_visibility_paths[i]
-                let is_pub = self.decl_visibility_pub[i]
-                if self.decl_visible_from_current_gated(path, is_pub, sym) != 0:
-                    return 1
-            i = i - 1
+            saw_candidate = 1
+            let path = self.decl_visibility_paths[i]
+            let is_pub = self.decl_visibility_pub[i]
+            if self.decl_visible_from_current_gated(path, is_pub, sym) != 0:
+                return 1
+            i = self.decl_visibility_prev[i]
         if saw_candidate == 0:
             return 1
         0
@@ -2677,34 +2756,23 @@ impl Sema:
     fn decl_node_visible_from_current(node: i32) -> i32:
         if node == 0:
             return 1
-        var i = self.decl_visibility_nodes.len() as i32 - 1
-        while i >= 0:
-            if self.decl_visibility_nodes[i] == node:
-                return self.decl_visible_from_current(self.decl_visibility_paths[i], self.decl_visibility_pub[i])
-            i = i - 1
+        let record = self.decl_visibility_node_index.get(node)
+        if record.is_some():
+            let i: i32 = record.unwrap()
+            return self.decl_visible_from_current(self.decl_visibility_paths[i], self.decl_visibility_pub[i])
         1
 
     fn has_extern_var_decl(sym: i32) -> i32:
-        let target_name = self.pool_resolve(sym)
-        for di in 0..self.ast.decl_count():
-            let decl = self.ast.get_decl(di)
-            if self.ast.kind(decl) != NodeKind.NK_EXTERN_VAR:
-                continue
-            let extern_sym = self.ast.get_data0(decl)
-            if extern_sym != sym and self.pool_resolve(extern_sym) != target_name:
-                continue
-            return 1
-        0
+        if self.extern_var_texts.contains(self.pool_resolve(sym)): 1 else: 0
 
     fn private_symbol_path_from_current(sym: i32) -> str:
-        var i = self.decl_visibility_syms.len() as i32 - 1
+        var i = if self.decl_visibility_index.contains(sym): self.decl_visibility_index.get(sym).unwrap() else: -1
         while i >= 0:
-            if self.decl_visibility_syms[i] == sym:
-                let path = self.decl_visibility_paths[i]
-                let is_pub = self.decl_visibility_pub[i]
-                if path.len() > 0 and path != self.current_module_path and is_pub == 0 and self.module_is_visible_from_current(path) != 0:
-                    return with_str_clone_ref(path)
-            i = i - 1
+            let path = self.decl_visibility_paths[i]
+            let is_pub = self.decl_visibility_pub[i]
+            if path.len() > 0 and path != self.current_module_path and is_pub == 0 and self.module_is_visible_from_current(path) != 0:
+                return with_str_clone_ref(path)
+            i = self.decl_visibility_prev[i]
         ""
 
     // D29 scaffolding (#750): when a name failed resolution only because the
@@ -4437,6 +4505,11 @@ impl Sema:
                 self.pending_generic_binding_decl.remove(removed_sym)
             self.clear_moved_fields_for_binding(removed_sym)
             self.scope_name_map.remove(removed_sym)
+            let shadow_top = self.shadowed_global_syms.len() as i32 - 1
+            if shadow_top >= 0 and self.shadowed_global_syms[shadow_top] == removed_sym:
+                self.scope_name_map.insert(removed_sym, self.shadowed_global_indices[shadow_top])
+                self.shadowed_global_syms.pop()
+                self.shadowed_global_indices.pop()
             self.bind_names.pop()
             self.bind_types.pop()
             self.bind_muts.pop()
@@ -4478,10 +4551,38 @@ impl Sema:
     mut fn scope_put_at(sym: i32, tid: i32, is_mut: i32, node: i32):
         if self.is_discard_binding_symbol(sym) != 0:
             return
+        let existing = self.scope_name_map.get(sym)
+        if existing.is_some():
+            let idx: i32 = existing.unwrap()
+            if self.binding_is_unseen_global(idx, sym):
+                self.shadow_unseen_global(sym, idx, tid, is_mut)
+                return
+            let name: str = with_str_clone_ref(self.pool_resolve(sym))
+            self.emit_error("shadowing is not allowed for '" ++ name ++ "'", node)
+            return
         if self.scope_lookup(sym) >= 0:
             let name: str = with_str_clone_ref(self.pool_resolve(sym))
             self.emit_error("shadowing is not allowed for '" ++ name ++ "'", node)
             return
+        self.scope_insert_at(sym, tid, is_mut)
+
+    // A flat-scope global of a module the current one never imports is not
+    // in scope here (§18.1: the walk over explicit import edges, never the
+    // prelude's closure — through it every program reaches std.regex's
+    // engine), so a local may take its name; with the current module
+    // unknown (the comptime pre-pass) the local wins as well — the main
+    // pass reports a true same-module shadowing. Every other collision — a
+    // local, or a global the module imports — is shadowing.
+    fn binding_is_unseen_global(idx: i32, sym: i32) -> bool:
+        if not self.global_value_decl_bindings.contains(sym) or self.global_value_decl_bindings.get(sym).unwrap() != idx:
+            return false
+        let path = self.global_value_decl_paths.get(sym).unwrap()
+        self.current_module_path.len() == 0 or (path != self.current_module_path and self.module_visible_no_prelude(path) == 0)
+
+    // The local takes the name; pop_scope gives the global its slot back.
+    mut fn shadow_unseen_global(sym: i32, global_idx: i32, tid: i32, is_mut: i32):
+        self.shadowed_global_syms.push(sym)
+        self.shadowed_global_indices.push(global_idx)
         self.scope_insert_at(sym, tid, is_mut)
 
     mut fn scope_put_consuming_rebind_at(sym: i32, tid: i32, is_mut: i32, node: i32) -> i32:
@@ -4492,6 +4593,9 @@ impl Sema:
             self.scope_insert_at(sym, tid, is_mut)
             return 1
         let idx: i32 = existing.unwrap()
+        if self.binding_is_unseen_global(idx, sym):
+            self.shadow_unseen_global(sym, idx, tid, is_mut)
+            return 1
         let current_start = if self.scope_starts.len() > 0: self.scope_starts[(self.scope_starts.len() - 1)] else: 0
         if idx < current_start or self.bind_states[idx] != VarState.MOVED:
             let name: str = with_str_clone_ref(self.pool_resolve(sym))
@@ -4529,10 +4633,33 @@ impl Sema:
     mut fn register_top_level_global_decl(sym: i32, tid: i32, is_mut: i32, node: i32, decl_kind: i32):
         if self.is_discard_binding_symbol(sym) != 0:
             return
+        // A bundle interface's storage and constants (D39) are reachable
+        // only through an import, so they stay out of the flat global scope:
+        // pcre2's NULL, BUFSIZ or CHAR_MAX reach every program through the
+        // prelude's std.regex and would otherwise collide with any program's
+        // own — a c_import's NULL, a local named stdout.
+        let decl_path = self.decl_source_path_for_node(node)
+        if bundle_interface_text(decl_path).len() > 0:
+            if not self.interface_global_index.contains(sym):
+                self.interface_global_index.insert(sym, self.bind_names.len() as i32)
+                self.interface_global_paths.insert(sym, sema_owned_text(decl_path))
+                self.bind_names.push(sym)
+                self.bind_types.push(tid)
+                self.bind_muts.push(is_mut)
+                self.bind_states.push(VarState.LIVE)
+                self.bind_is_task.push(0)
+                self.bind_task_used.push(0)
+                self.bind_is_scoped_task.push(0)
+                self.bind_is_view_bound.push(0)
+                self.bind_provenance.push(binding_provenance_empty())
+                self.global_value_decl_kinds.insert(sym, decl_kind)
+            return
         let existing_opt = self.scope_name_map.get(sym)
         if not existing_opt.is_some():
+            self.global_value_decl_bindings.insert(sym, self.bind_names.len() as i32)
             self.scope_insert_at(sym, tid, is_mut)
             self.global_value_decl_kinds.insert(sym, decl_kind)
+            self.global_value_decl_paths.insert(sym, sema_owned_text(decl_path))
             return
 
         let existing_idx: i32 = existing_opt.unwrap()
@@ -4572,6 +4699,13 @@ impl Sema:
         let opt = self.scope_name_map.get(sym)
         if opt.is_some():
             return self.bind_types[opt.unwrap()]
+        // An interface global resolves only from a known module that
+        // imports its own by an explicit path (never through the prelude's
+        // closure, and never in the comptime pre-pass, where the module is
+        // unknown): a program's const of the same name must win.
+        let iface = self.interface_global_index.get(sym)
+        if iface.is_some() and self.current_module_path.len() > 0 and self.module_visible_no_prelude(self.interface_global_paths.get(sym).unwrap()) != 0:
+            return self.bind_types[iface.unwrap()]
         -1
 
     mut fn scope_update_type(sym: i32, tid: i32):
@@ -5674,6 +5808,11 @@ impl Sema:
     fn add_sig(name: i32, fn_tid: i32, ret: i32, param_start: i32, param_count: i32, variadic: i32):
         let idx = self.sig_names.len() as i32
         self.sig_names.push(name)
+        // get_visible_sig matches by resolved text; chain the signatures
+        // sharing one, newest first.
+        let text = sema_owned_text(self.pool_resolve(name))
+        self.sig_text_prev.push(if self.sig_text_index.contains(text): self.sig_text_index.get(text).unwrap() else: -1)
+        self.sig_text_index.insert(text, idx)
         self.sig_type_ids.push(fn_tid)
         self.sig_ret_types.push(ret)
         self.sig_param_starts.push(param_start)
@@ -6291,13 +6430,11 @@ impl Sema:
         let target = self.pool_resolve_symbol(name)
         if target.len() == 0:
             return -1
-        var i = self.sig_names.len() as i32 - 1
+        var i = if self.sig_text_index.contains(target): self.sig_text_index.get(target).unwrap() else: -1
         while i >= 0:
-            let sig_sym = self.sig_names[i]
-            if sig_sym == name or self.pool_resolve_symbol(sig_sym) == target:
-                if self.symbol_visible_from_current(sig_sym) != 0:
-                    return i
-            i = i - 1
+            if self.symbol_visible_from_current(self.sig_names[i]) != 0:
+                return i
+            i = self.sig_text_prev[i]
         -1
 
     fn generic_fn_node_matches_symbol(node: i32, sym: i32, target: &str) -> i32:
@@ -6537,11 +6674,24 @@ impl Sema:
     // ── Main entry point ─────────────────────────────────────────────
 
     mut fn check_module():
+        let profile = sema_profile_enabled()
+        var t = with_clock_nanos()
         self.prepare_for_comptime_transform()
         self.validate_no_std_requirements()
+        if profile:
+            t = with_clock_nanos()
         self.check_top_level_let_values()
+        if profile:
+            sema_profile_report("top_level_let_values", t)
+            t = with_clock_nanos()
         self.check_type_decl_field_defaults()
+        if profile:
+            sema_profile_report("type_decl_field_defaults", t)
+            t = with_clock_nanos()
         self.check_bodies()
+        if profile:
+            sema_profile_report("bodies", t)
+            t = with_clock_nanos()
         // #D5/P0: with every top-level body checked, complete transitive
         // write/consume/escape_value effects across the call graph so sig_param_effects is
         // final before any share-place decision (lowering/ABI) reads it.
@@ -6552,14 +6702,26 @@ impl Sema:
         // effects — the declared signature is authoritative (&T borrows, T owns).
         self.finalize_call_site_ownership()
         self.check_reachable_comptime_errors()
+        if profile:
+            sema_profile_report("effects_receivers_ownership", t)
 
     mut fn prepare_for_comptime_transform():
+        let profile = sema_profile_enabled()
+        var t = with_clock_nanos()
         self.compute_method_origins()
+        if profile:
+            sema_profile_report("method_origins", t)
+            t = with_clock_nanos()
         self.collect_declarations()
+        if profile:
+            sema_profile_report("collect_declarations", t)
+            t = with_clock_nanos()
         self.build_ci_scoping()
         self.validate_copy_derives()
         self.validate_compiler_hooks()
         self.validate_generic_type_decls()
+        if profile:
+            sema_profile_report("ci_scoping_copy_hooks_generics", t)
 
 // ── Utility functions ────────────────────────────────────────────
 

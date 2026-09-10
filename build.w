@@ -43,36 +43,6 @@ fn with_object_target(name: &str, compiler: &str, source: &str, output: &str, op
         target = target.dep(build_owned_text(dep))
     target
 
-fn with_ir_target(name: &str, compiler: &str, source: &str, output: &str, dep: &str) -> Target:
-    var target = target_new(.Action, build_owned_text(name), "").output(build_owned_text(output))
-    target.action = run_with_compiler_ir_action
-    target = target.compiler(compiler)
-    target = target.input(build_owned_text(source))
-    target = target.arg("--no-prelude")
-    target = target.write_scope(build_project_dirname(output))
-    target = target.write_scope("out/command/" ++ name)
-    target = target.allow_parallel()
-    if dep.len() > 0:
-        target = target.dep(build_owned_text(dep))
-    target
-
-fn with_ir_target_overflow(name: &str, compiler: &str, source: &str, output: &str, dep: &str, overflow: &str) -> Target:
-    var target = with_ir_target(name, compiler, source, output, dep)
-    target = target.arg("overflow=" ++ overflow)
-    target
-
-// The regex runtime shim compiles pcre2 from its source whatever compiler
-// builds it. A compiler that embeds the pcre2 bundle would otherwise
-// resolve the shim's `use std.re.*` to the bundle's interface, and the
-// object would reference the corpus instead of defining it — which the
-// seed, linking stage1 with no bundle, cannot resolve (D38 batch C3).
-// `--bundle-corpus std/re` makes the corpus owned and read from source.
-// Retired with the shim in batch C4.
-fn regex_runtime_ir_target(name: &str, compiler: &str, output: &str, dep: &str) -> Target:
-    var target = with_ir_target_overflow(name, compiler, "rt/regex_runtime.w", output, dep, "wrap")
-    target = target.arg("--bundle-corpus")
-    target.arg("std/re")
-
 fn run_cross_unsupported_action(ctx: ActionCtx) -> i32:
     let args = ctx.args()
     let target = if args.len() > 0: build_owned_text(args.get(0)) else: ""
@@ -165,16 +135,6 @@ fn add_cross_rt_targets(out0: Build, ctx: &BuildCtx, tag: &str, p: &str, group_n
     out = out.add_target(cross_object_target_named(tag, p ++ "llvm-bridge-object", "src/compiler/LlvmBridge.w", "llvm_bridge.o", "-O1"))
     out = out.add_target(cross_object_target_named(tag, p ++ "clang-bridge-object", "src/compiler/ClangBridge.w", "clang_bridge.o", "-O1"))
 
-    // regex: whole-module IR (like the native regex-runtime-ir path) so
-    // the migrated pcre2 modules land in one object; the IR carries the
-    // target triple and CompileLlvmIrObject compiles it as written.
-    var cross_regex_ir = regex_runtime_ir_target(p ++ "regex-runtime-ir", release_compiler_bin("with"), "out/tmp/" ++ tag ++ "_regex_runtime.ll", "build")
-    cross_regex_ir = cross_regex_ir.arg("--target=" ++ triple)
-    out = out.add_target(cross_regex_ir)
-    var cross_regex = target_new(.CompileLlvmIrObject, p ++ "regex-runtime-object", "out/tmp/" ++ tag ++ "_regex_runtime.ll").output(dir ++ "/regex_runtime.o")
-    cross_regex = cross_regex.dep(p ++ "regex-runtime-ir")
-    out = out.add_target(cross_regex)
-
     var cross_fiber_asm = target_new(.CompileAsmObject, p ++ "fiber-asm-object", cross_fiber_asm_source(tag)).output(dir ++ "/fiber_asm.o")
     cross_fiber_asm = cross_fiber_asm.arg("triple=" ++ triple)
     out = out.add_target(cross_fiber_asm)
@@ -186,8 +146,6 @@ fn add_cross_rt_targets(out0: Build, ctx: &BuildCtx, tag: &str, p: &str, group_n
     cross_embedded = cross_embedded.arg("compat_runtime_o")
     cross_embedded = cross_embedded.input(dir ++ "/panic_runtime.o")
     cross_embedded = cross_embedded.arg("panic_runtime_o")
-    cross_embedded = cross_embedded.input(dir ++ "/regex_runtime.o")
-    cross_embedded = cross_embedded.arg("regex_runtime_o")
     cross_embedded = cross_embedded.input(dir ++ "/fiber_stubs.o")
     cross_embedded = cross_embedded.arg("fiber_stubs_o")
     cross_embedded = cross_embedded.input(dir ++ "/channel_runtime.o")
@@ -205,7 +163,6 @@ fn add_cross_rt_targets(out0: Build, ctx: &BuildCtx, tag: &str, p: &str, group_n
     cross_embedded = cross_embedded.dep(p ++ "cimport-stubs-object")
     cross_embedded = cross_embedded.dep(p ++ "compat-runtime-object")
     cross_embedded = cross_embedded.dep(p ++ "panic-runtime-object")
-    cross_embedded = cross_embedded.dep(p ++ "regex-runtime-object")
     cross_embedded = cross_embedded.dep(p ++ "fiber-stubs-object")
     cross_embedded = cross_embedded.dep(p ++ "channel-runtime-object")
     cross_embedded = cross_embedded.dep(p ++ "fiber-runtime-object")
@@ -1600,14 +1557,20 @@ pub fn build(ctx: BuildCtx) -> Build:
     print_version = target_with_version_inputs(move print_version, ctx)
     out = out.add_target(print_version)
 
+    // The release compiler emits the package's C as a subprocess (the
+    // binary under test, never the driver's seed) with the pcre2 corpus
+    // in-unit (build/emit_c.w emitc_build_compiler_c, #955).
     var bootstrap_c_emit_sources = target_new(.Action, "bootstrap-c-emit-sources", "").output("out/bootstrap-c/src/with_compiler.c")
     bootstrap_c_emit_sources.action = run_bootstrap_c_emit_sources_action
+    bootstrap_c_emit_sources = bootstrap_c_emit_sources.arg(release_compiler_bin("with"))
     bootstrap_c_emit_sources = bootstrap_c_emit_sources.extra_output("out/gen/wl_decls.h")
     bootstrap_c_emit_sources = bootstrap_c_emit_sources.extra_output("out/gen/wl_stubs.c")
     bootstrap_c_emit_sources = bootstrap_c_emit_sources.write_scope("out/bootstrap-c/src")
     bootstrap_c_emit_sources = bootstrap_c_emit_sources.write_scope("out/gen")
     bootstrap_c_emit_sources = bootstrap_c_emit_sources.write_scope("out/command/bootstrap-c-emit-sources")
+    bootstrap_c_emit_sources = bootstrap_c_emit_sources.input(release_compiler_bin("with"))
     bootstrap_c_emit_sources = bootstrap_c_emit_sources.input("out/gen/versioned_main.w")
+    bootstrap_c_emit_sources = bootstrap_c_emit_sources.dep("build")
     bootstrap_c_emit_sources = bootstrap_c_emit_sources.dep("compiler-version-sources")
     // The compiler source imports the generated EmbeddedStdlibData and
     // EmbeddedClangResourceData modules (same as stage1/2/3); without these
@@ -1629,7 +1592,6 @@ pub fn build(ctx: BuildCtx) -> Build:
     package_bootstrap_c = package_bootstrap_c.input("out/gen/wl_decls.h")
     package_bootstrap_c = package_bootstrap_c.input("rt/rt_core.w")
     package_bootstrap_c = package_bootstrap_c.input("rt/panic_runtime.w")
-    package_bootstrap_c = package_bootstrap_c.input("rt/regex_runtime.w")
     package_bootstrap_c = package_bootstrap_c.input("rt/fiber_stubs.w")
     package_bootstrap_c = package_bootstrap_c.input("rt/compat_runtime.w")
     package_bootstrap_c = package_bootstrap_c.input("runtime/with_runtime.h")
@@ -1749,10 +1711,6 @@ pub fn build(ctx: BuildCtx) -> Build:
     out = out.add_target(with_object_target("bootstrap-cimport-stubs-object", "seed", "rt/cimport_stubs.w", "out/bootstrap-lib/cimport_stubs.o", "-O1", ""))
     out = out.add_target(with_object_target("bootstrap-compat-runtime-object", "seed", "out/gen/compat_runtime.w", "out/bootstrap-lib/compat_runtime.o", "-O1", "compat-runtime-source"))
     out = out.add_target(with_object_target("bootstrap-panic-runtime-object", "seed", "rt/panic_runtime.w", "out/bootstrap-lib/panic_runtime.o", "-O1", ""))
-    out = out.add_target(regex_runtime_ir_target("bootstrap-regex-runtime-ir", "seed", "out/bootstrap-tmp/regex_runtime.ll", ""))
-    var bootstrap_regex_runtime = target_new(.CompileLlvmIrObject, "bootstrap-regex-runtime-object", "out/bootstrap-tmp/regex_runtime.ll").output("out/bootstrap-lib/regex_runtime.o")
-    bootstrap_regex_runtime = bootstrap_regex_runtime.dep("bootstrap-regex-runtime-ir")
-    out = out.add_target(bootstrap_regex_runtime)
     out = out.add_target(with_object_target("bootstrap-fiber-stubs-object", "seed", "rt/fiber_stubs.w", "out/bootstrap-lib/fiber_stubs.o", "-O1", ""))
     out = out.add_target(with_object_target("bootstrap-channel-runtime-object", "seed", "rt/channel_runtime.w", "out/bootstrap-lib/channel_runtime.o", "-O1", ""))
     out = out.add_target(with_object_target("bootstrap-fiber-runtime-object", "seed", "rt/fiber_runtime.w", "out/bootstrap-lib/fiber_runtime.o", "-O1", ""))
@@ -1767,8 +1725,6 @@ pub fn build(ctx: BuildCtx) -> Build:
     bootstrap_embedded_objects = bootstrap_embedded_objects.arg("compat_runtime_o")
     bootstrap_embedded_objects = bootstrap_embedded_objects.input("out/bootstrap-lib/panic_runtime.o")
     bootstrap_embedded_objects = bootstrap_embedded_objects.arg("panic_runtime_o")
-    bootstrap_embedded_objects = bootstrap_embedded_objects.input("out/bootstrap-lib/regex_runtime.o")
-    bootstrap_embedded_objects = bootstrap_embedded_objects.arg("regex_runtime_o")
     bootstrap_embedded_objects = bootstrap_embedded_objects.input("out/bootstrap-lib/fiber_stubs.o")
     bootstrap_embedded_objects = bootstrap_embedded_objects.arg("fiber_stubs_o")
     bootstrap_embedded_objects = bootstrap_embedded_objects.input("out/bootstrap-lib/channel_runtime.o")
@@ -1788,16 +1744,10 @@ pub fn build(ctx: BuildCtx) -> Build:
         if bsym2 != host_runtime.platform_symbol:
             bootstrap_embedded_objects = bootstrap_embedded_objects.input(empty_platform_blob_path("out/bootstrap-lib", bsym2))
             bootstrap_embedded_objects = bootstrap_embedded_objects.arg(build_owned_text(bsym2))
-    // stage1, stage2 and stage3 link this object: the bundle slot stays
-    // unfilled here (stage1 builds the tree's bundle; the stages after it
-    // take it through --link-bundle).
-    out = add_empty_wo_blob_targets(move out, "bootstrap-", "out/bootstrap-lib", pcre2_wo.name)
-    bootstrap_embedded_objects = target_with_empty_wo_blobs(move bootstrap_embedded_objects, "bootstrap-", "out/bootstrap-lib", pcre2_wo.name)
     // Every consumed object's producer, declared (#680 edge audit).
     bootstrap_embedded_objects = bootstrap_embedded_objects.dep("bootstrap-cimport-stubs-object")
     bootstrap_embedded_objects = bootstrap_embedded_objects.dep("bootstrap-compat-runtime-object")
     bootstrap_embedded_objects = bootstrap_embedded_objects.dep("bootstrap-panic-runtime-object")
-    bootstrap_embedded_objects = bootstrap_embedded_objects.dep("bootstrap-regex-runtime-object")
     bootstrap_embedded_objects = bootstrap_embedded_objects.dep("bootstrap-fiber-stubs-object")
     bootstrap_embedded_objects = bootstrap_embedded_objects.dep("bootstrap-channel-runtime-object")
     bootstrap_embedded_objects = bootstrap_embedded_objects.dep("bootstrap-fiber-runtime-object")
@@ -1809,6 +1759,26 @@ pub fn build(ctx: BuildCtx) -> Build:
         let bsym3 = bootstrap_empty_syms[bi3]
         if bsym3 != host_runtime.platform_symbol:
             bootstrap_embedded_objects = bootstrap_embedded_objects.dep(empty_platform_blob_target("bootstrap-empty-", bsym3))
+    // Stage2 and stage3 use the same bootstrap runtime blobs, but embed the
+    // bundle stage1 built. --link-bundle links code into a compiler; it does
+    // not embed the object/interface/manifest for that compiler's consumers.
+    var stage_embedded_objects = target_new(.EmbedObjectFiles, "stage-embedded-objects-asm", "").output("out/stage/lib/embedded_objects.s")
+    for i in 0..bootstrap_embedded_objects.inputs.len() as i32:
+        stage_embedded_objects = stage_embedded_objects.input(build_owned_text(bootstrap_embedded_objects.inputs[i]))
+    for i in 0..bootstrap_embedded_objects.args.len() as i32:
+        stage_embedded_objects = stage_embedded_objects.arg(build_owned_text(bootstrap_embedded_objects.args[i]))
+    for i in 0..bootstrap_embedded_objects.deps.len() as i32:
+        stage_embedded_objects = stage_embedded_objects.dep(build_owned_text(bootstrap_embedded_objects.deps[i]))
+    stage_embedded_objects = target_with_wo_blobs(move stage_embedded_objects, &pcre2_wo)
+    out = out.add_target(stage_embedded_objects)
+    var stage_embedded_objects_obj = target_new(.CompileAsmObject, "stage-embedded-objects-object", "out/stage/lib/embedded_objects.s").output("out/stage/lib/embedded_objects.o")
+    stage_embedded_objects_obj = stage_embedded_objects_obj.dep("stage-embedded-objects-asm")
+    out = out.add_target(stage_embedded_objects_obj)
+
+    // Stage1 precedes the tree's bundle, so only its embedding keeps empty
+    // slots. The populated stage object has its own producer and output.
+    out = add_empty_wo_blob_targets(move out, "bootstrap-", "out/bootstrap-lib", pcre2_wo.name)
+    bootstrap_embedded_objects = target_with_empty_wo_blobs(move bootstrap_embedded_objects, "bootstrap-", "out/bootstrap-lib", pcre2_wo.name)
     out = out.add_target(bootstrap_embedded_objects)
     var bootstrap_embedded_objects_obj = target_new(.CompileAsmObject, "bootstrap-embedded-objects-object", "out/bootstrap-lib/embedded_objects.s").output("out/bootstrap-lib/embedded_objects.o")
     bootstrap_embedded_objects_obj = bootstrap_embedded_objects_obj.dep("bootstrap-embedded-objects-asm")
@@ -1825,7 +1795,6 @@ pub fn build(ctx: BuildCtx) -> Build:
     bootstrap_runtime = bootstrap_runtime.dep("bootstrap-cimport-stubs-object")
     bootstrap_runtime = bootstrap_runtime.dep("bootstrap-compat-runtime-object")
     bootstrap_runtime = bootstrap_runtime.dep("bootstrap-panic-runtime-object")
-    bootstrap_runtime = bootstrap_runtime.dep("bootstrap-regex-runtime-object")
     bootstrap_runtime = bootstrap_runtime.dep("bootstrap-fiber-stubs-object")
     bootstrap_runtime = bootstrap_runtime.dep("bootstrap-channel-runtime-object")
     bootstrap_runtime = bootstrap_runtime.dep("bootstrap-fiber-runtime-object")
@@ -1910,6 +1879,9 @@ pub fn build(ctx: BuildCtx) -> Build:
     stage2 = stage2.dep("compat-runtime-source")
     stage2 = stage2.dep("embedded-clang-resource-source")
     stage2 = target_with_link_bundle(move stage2, ctx, &pcre2_wo)
+    stage2 = stage2.input("out/stage/lib/embedded_objects.o")
+    stage2 = stage2.arg("embedded-object=out/stage/lib/embedded_objects.o")
+    stage2 = stage2.dep("stage-embedded-objects-object")
     out = out.add_target(stage2)
 
     var stage3 = target_new(.Action, "stage3", "").output(stage_compiler_bin("with-stage3"))
@@ -1927,6 +1899,9 @@ pub fn build(ctx: BuildCtx) -> Build:
     stage3 = stage3.dep("compat-runtime-source")
     stage3 = stage3.dep("embedded-clang-resource-source")
     stage3 = target_with_link_bundle(move stage3, ctx, &pcre2_wo)
+    stage3 = stage3.input("out/stage/lib/embedded_objects.o")
+    stage3 = stage3.arg("embedded-object=out/stage/lib/embedded_objects.o")
+    stage3 = stage3.dep("stage-embedded-objects-object")
     out = out.add_target(stage3)
 
     var stage2_fixpoint = target_new(.Action, "stage2-fixpoint-object", "").output(stage_compiler_obj("with-stage2-fixpoint.o"))
@@ -2036,12 +2011,6 @@ pub fn build(ctx: BuildCtx) -> Build:
     compat_runtime_obj = compat_runtime_obj.dep("compat-runtime-source")
     out = out.add_target(compat_runtime_obj)
     out = out.add_target(with_object_target("panic-runtime-object", stage_compiler_bin("with-stage2"), "rt/panic_runtime.w", "out/lib/panic_runtime.o", "-O1", "stage2"))
-    out = out.add_target(regex_runtime_ir_target("regex-runtime-ir", stage_compiler_bin("with-stage2"), "out/tmp/regex_runtime.ll", "stage2"))
-
-    var regex_runtime = target_new(.CompileLlvmIrObject, "regex-runtime-object", "out/tmp/regex_runtime.ll").output("out/lib/regex_runtime.o")
-    regex_runtime = regex_runtime.dep("regex-runtime-ir")
-    out = out.add_target(regex_runtime)
-
     out = out.add_target(with_object_target("fiber-stubs-object", stage_compiler_bin("with-stage2"), "rt/fiber_stubs.w", "out/lib/fiber_stubs.o", "-O1", "stage2"))
     out = out.add_target(with_object_target("channel-runtime-object", stage_compiler_bin("with-stage2"), "rt/channel_runtime.w", "out/lib/channel_runtime.o", "-O1", "stage2"))
     out = out.add_target(with_object_target("fiber-runtime-object", stage_compiler_bin("with-stage2"), "rt/fiber_runtime.w", "out/lib/fiber_runtime.o", "-O1", "stage2"))
@@ -2057,8 +2026,6 @@ pub fn build(ctx: BuildCtx) -> Build:
     embedded_objects = embedded_objects.arg("compat_runtime_o")
     embedded_objects = embedded_objects.input("out/lib/panic_runtime.o")
     embedded_objects = embedded_objects.arg("panic_runtime_o")
-    embedded_objects = embedded_objects.input("out/lib/regex_runtime.o")
-    embedded_objects = embedded_objects.arg("regex_runtime_o")
     embedded_objects = embedded_objects.input("out/lib/fiber_stubs.o")
     embedded_objects = embedded_objects.arg("fiber_stubs_o")
     embedded_objects = embedded_objects.input("out/lib/channel_runtime.o")
@@ -2084,7 +2051,6 @@ pub fn build(ctx: BuildCtx) -> Build:
     embedded_objects = embedded_objects.dep("cimport-stubs-object")
     embedded_objects = embedded_objects.dep("compat-runtime-object")
     embedded_objects = embedded_objects.dep("panic-runtime-object")
-    embedded_objects = embedded_objects.dep("regex-runtime-object")
     embedded_objects = embedded_objects.dep("fiber-stubs-object")
     embedded_objects = embedded_objects.dep("channel-runtime-object")
     embedded_objects = embedded_objects.dep("fiber-runtime-object")
@@ -2146,13 +2112,6 @@ pub fn build(ctx: BuildCtx) -> Build:
     out = out.add_target(cross_windows_object_target_named("cross-win-llvm-bridge-object", "src/compiler/LlvmBridge.w", "llvm_bridge.o", "-O1"))
     out = out.add_target(cross_windows_object_target_named("cross-win-clang-bridge-object", "src/compiler/ClangBridge.w", "clang_bridge.o", "-O1"))
 
-    var cross_win_regex_ir = regex_runtime_ir_target("cross-win-regex-runtime-ir", release_compiler_bin("with"), "out/tmp/cross_win_regex_runtime.ll", "build")
-    cross_win_regex_ir = cross_win_regex_ir.arg("--target=" ++ cross_windows_triple())
-    out = out.add_target(cross_win_regex_ir)
-    var cross_win_regex = target_new(.CompileLlvmIrObject, "cross-win-regex-runtime-object", "out/tmp/cross_win_regex_runtime.ll").output(cross_windows_dir() ++ "/regex_runtime.o")
-    cross_win_regex = cross_win_regex.dep("cross-win-regex-runtime-ir")
-    out = out.add_target(cross_win_regex)
-
     var cross_win_fiber_asm = target_new(.CompileAsmObject, "cross-win-fiber-asm-object", "runtime/fiber_asm_windows_x86_64.s").output(cross_windows_dir() ++ "/fiber_asm.o")
     cross_win_fiber_asm = cross_win_fiber_asm.arg("triple=" ++ cross_windows_triple())
     out = out.add_target(cross_win_fiber_asm)
@@ -2164,8 +2123,6 @@ pub fn build(ctx: BuildCtx) -> Build:
     cross_win_embedded = cross_win_embedded.arg("compat_runtime_o")
     cross_win_embedded = cross_win_embedded.input(cross_windows_dir() ++ "/panic_runtime.o")
     cross_win_embedded = cross_win_embedded.arg("panic_runtime_o")
-    cross_win_embedded = cross_win_embedded.input(cross_windows_dir() ++ "/regex_runtime.o")
-    cross_win_embedded = cross_win_embedded.arg("regex_runtime_o")
     cross_win_embedded = cross_win_embedded.input(cross_windows_dir() ++ "/fiber_stubs.o")
     cross_win_embedded = cross_win_embedded.arg("fiber_stubs_o")
     cross_win_embedded = cross_win_embedded.input(cross_windows_dir() ++ "/channel_runtime.o")
@@ -2183,7 +2140,6 @@ pub fn build(ctx: BuildCtx) -> Build:
     cross_win_embedded = cross_win_embedded.dep("cross-win-cimport-stubs-object")
     cross_win_embedded = cross_win_embedded.dep("cross-win-compat-runtime-object")
     cross_win_embedded = cross_win_embedded.dep("cross-win-panic-runtime-object")
-    cross_win_embedded = cross_win_embedded.dep("cross-win-regex-runtime-object")
     cross_win_embedded = cross_win_embedded.dep("cross-win-fiber-stubs-object")
     cross_win_embedded = cross_win_embedded.dep("cross-win-channel-runtime-object")
     cross_win_embedded = cross_win_embedded.dep("cross-win-fiber-runtime-object")
@@ -2235,13 +2191,6 @@ pub fn build(ctx: BuildCtx) -> Build:
     out = out.add_target(cross_windows_aarch64_object_target_named("cross-winarm-llvm-bridge-object", "src/compiler/LlvmBridge.w", "llvm_bridge.o", "-O1"))
     out = out.add_target(cross_windows_aarch64_object_target_named("cross-winarm-clang-bridge-object", "src/compiler/ClangBridge.w", "clang_bridge.o", "-O1"))
 
-    var cross_winarm_regex_ir = regex_runtime_ir_target("cross-winarm-regex-runtime-ir", release_compiler_bin("with"), "out/tmp/cross_winarm_regex_runtime.ll", "build")
-    cross_winarm_regex_ir = cross_winarm_regex_ir.arg("--target=" ++ cross_windows_aarch64_triple())
-    out = out.add_target(cross_winarm_regex_ir)
-    var cross_winarm_regex = target_new(.CompileLlvmIrObject, "cross-winarm-regex-runtime-object", "out/tmp/cross_winarm_regex_runtime.ll").output(cross_windows_aarch64_dir() ++ "/regex_runtime.o")
-    cross_winarm_regex = cross_winarm_regex.dep("cross-winarm-regex-runtime-ir")
-    out = out.add_target(cross_winarm_regex)
-
     var cross_winarm_fiber_asm = target_new(.CompileAsmObject, "cross-winarm-fiber-asm-object", "runtime/fiber_asm_windows_aarch64.s").output(cross_windows_aarch64_dir() ++ "/fiber_asm.o")
     cross_winarm_fiber_asm = cross_winarm_fiber_asm.arg("triple=" ++ cross_windows_aarch64_triple())
     out = out.add_target(cross_winarm_fiber_asm)
@@ -2253,8 +2202,6 @@ pub fn build(ctx: BuildCtx) -> Build:
     cross_winarm_embedded = cross_winarm_embedded.arg("compat_runtime_o")
     cross_winarm_embedded = cross_winarm_embedded.input(cross_windows_aarch64_dir() ++ "/panic_runtime.o")
     cross_winarm_embedded = cross_winarm_embedded.arg("panic_runtime_o")
-    cross_winarm_embedded = cross_winarm_embedded.input(cross_windows_aarch64_dir() ++ "/regex_runtime.o")
-    cross_winarm_embedded = cross_winarm_embedded.arg("regex_runtime_o")
     cross_winarm_embedded = cross_winarm_embedded.input(cross_windows_aarch64_dir() ++ "/fiber_stubs.o")
     cross_winarm_embedded = cross_winarm_embedded.arg("fiber_stubs_o")
     cross_winarm_embedded = cross_winarm_embedded.input(cross_windows_aarch64_dir() ++ "/channel_runtime.o")
@@ -2272,7 +2219,6 @@ pub fn build(ctx: BuildCtx) -> Build:
     cross_winarm_embedded = cross_winarm_embedded.dep("cross-winarm-cimport-stubs-object")
     cross_winarm_embedded = cross_winarm_embedded.dep("cross-winarm-compat-runtime-object")
     cross_winarm_embedded = cross_winarm_embedded.dep("cross-winarm-panic-runtime-object")
-    cross_winarm_embedded = cross_winarm_embedded.dep("cross-winarm-regex-runtime-object")
     cross_winarm_embedded = cross_winarm_embedded.dep("cross-winarm-fiber-stubs-object")
     cross_winarm_embedded = cross_winarm_embedded.dep("cross-winarm-channel-runtime-object")
     cross_winarm_embedded = cross_winarm_embedded.dep("cross-winarm-fiber-runtime-object")
@@ -2885,7 +2831,6 @@ pub fn build(ctx: BuildCtx) -> Build:
     out = out.add_target(install_file_target("install-cimport-stubs", "out/lib/cimport_stubs.o", "$INSTALL_LIBDIR/cimport_stubs.o", "0644", "runtime"))
     out = out.add_target(install_file_target("install-compat-runtime", "out/lib/compat_runtime.o", "$INSTALL_LIBDIR/compat_runtime.o", "0644", "runtime"))
     out = out.add_target(install_file_target("install-panic-runtime", "out/lib/panic_runtime.o", "$INSTALL_LIBDIR/panic_runtime.o", "0644", "runtime"))
-    out = out.add_target(install_file_target("install-regex-runtime", "out/lib/regex_runtime.o", "$INSTALL_LIBDIR/regex_runtime.o", "0644", "runtime"))
     out = out.add_target(install_file_target("install-fiber-stubs", "out/lib/fiber_stubs.o", "$INSTALL_LIBDIR/fiber_stubs.o", "0644", "runtime"))
     out = out.add_target(install_file_target("install-channel-runtime", "out/lib/channel_runtime.o", "$INSTALL_LIBDIR/channel_runtime.o", "0644", "runtime"))
     out = out.add_target(install_file_target("install-fiber-runtime", "out/lib/fiber_runtime.o", "$INSTALL_LIBDIR/fiber_runtime.o", "0644", "runtime"))
@@ -2906,7 +2851,6 @@ pub fn build(ctx: BuildCtx) -> Build:
     install = install.dep("install-cimport-stubs")
     install = install.dep("install-compat-runtime")
     install = install.dep("install-panic-runtime")
-    install = install.dep("install-regex-runtime")
     install = install.dep("install-fiber-stubs")
     install = install.dep("install-channel-runtime")
     install = install.dep("install-fiber-runtime")

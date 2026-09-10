@@ -1,5 +1,79 @@
 # Handoff — the .wo bundles / stdlib-sourcing campaign (2026-09-08)
 
+**C4 landing update:** the local A/B performance gate is now green on the
+rebased landing tree. After excluding the initial pair, the two uncached
+warm pairs were 263.9/268.7 s (C4/baseline 1.018) and 275.6/284.3 s
+(1.032); baseline passed 985 files and C4 passed 986 in every run.
+`docs/wo_bundles.md` records the measured table. Main's handoff-only changes
+have been merged into `wo-c4`. The first battery passed build (164.5 s),
+fixpoint (276.6 s), and move audit (15 cells), then caught an audit-generator
+defect: 113 probes redeclared private allocation symbols with obsolete
+pointer types. LLDB observed the return signature replacement in
+`Sema.collect_extern_fn` → `Sema.add_sig` (symbol 32, return 81 → 20).
+The generator now uses `std.mem.alloc/free_mem` and retains each side's
+diagnostics separately; all 115 drop cells pass against the pinned seed
+(102.6 s). The next battery passed build (157.3 s), fixpoint (266.9 s),
+and `audit:all` (2,504,943 facts, zero violations), but the test survey
+failed only `bundle-interface-tests` (58 other targets green; 728.2 s).
+The reduced consumer was just `use std.wi_demo`: LLDB observed
+`interface_line_name("impl Pair:", 2)` returning an empty string, then
+`parse_interface_chunk` receiving its indented methods without the impl
+header. The merge now demands whole declarations, keeping leading
+attributes and indented bodies with their header, and names inherent
+impls by their target. The development compiler (78.9 s) passes the
+reduced import and original consumer. Expanded fixtures verify an unused
+attributed type and a demanded packed type: emitted interface and
+source/interface fingerprints agree, and the consumer reads 42 from a
+five-byte packed value. The full interface lane then passed (18.5 s action,
+246.8 s total), fixpoint passed (298.2 s), and `audit:all` reported
+2,505,391 facts / zero violations. The full emit-C lane exposed #1043's
+two const-field resets as a native MIR bug too: `var text = h.text` through
+`&Holder` printed `abc` then an empty source. LLDB observed
+`lower_let_binding` restore expected_type to Unit (14) before revisiting
+the original AST and queuing a reset for borrowed field place 7.
+`90d4858c` removes that redundant cancellation; assignment already consumes
+the actual lowered operand. Native output is now `abc` twice, emitted C
+passes syntax checking, and all 15 move / 115 drop audit cells pass.
+The silent read-only-store audit gap is #1096; the documented but ignored
+`--emit-llvm` flag is #1097 (use LLDB disassembly until it exists).
+
+The same review resolved #1036's exact allocation sites: the 2048-byte
+table comes from `pcre2_maketables_8`, the 256-byte code from
+`pcre2_compile_8`. LLDB observed `detect_drop_functions` skip Regex's
+ordinary impl (trait 0 versus Drop 78). The facade now registers
+`impl Drop for Regex`, uses PCRE2-managed table ownership, and releases
+temporary compile tables on success and failure. #1098 was exposed in the
+same path: LLDB saw code free and named capture lookup use the identical
+pointer after explicit `re.drop()`. Captures now own a code copy and have
+their own Drop. The new lifetime fixture goes from 16 leaks to zero;
+escaped clones/captures and both existing regex behavior suites pass with
+stage1 (109.5 s development build).
+
+The `6d54088b` battery then passed build (289.4 s), fixpoint (322.6 s),
+audit:all (2,505,774 facts / zero violations), the full emitted-C bootstrap
+(356.1 s, including C compiler version and hello execution), 15 move cells,
+and 115 drop cells. Its full test survey (1132.0 s) failed only
+`behav_d27_view_nll_before_owner_consume.w` among 987 behavior files; other
+targets passed. #1099 is the exact cause: function setup and closure
+rollback popped six borrow columns but omitted scope-depth and creation-
+site metadata. LLDB saw refs/depth/site lengths 1/1/1 become 0/1/1, then
+the NLL expiration branch skip stale depth 2 in current scope 3. Both
+cleanup loops now use complete-row removal, and a column-length invariant
+catches this corruption. Stage1 (95.4 s) passes the original regression,
+NLL scoping, closure capture, and genuine dangling-view rejection. A With
+comparison reducer predicate kept baseline acceptance while minimizing;
+the diagnostic-only reducer's noisy result is tracked as #1100.
+
+The next step is the final battery on the committed corrections, including
+the full `:emit-c-test` lane, using `out/release/bin/with` for every
+post-build step. Logs are under `out/c4-validation/` in `c4r`; `STATUS.md`
+there distinguishes current results from prior batteries.
+Debugger launches now work; a disabled DevToolsSecurity status did not
+establish an authorization blocker, and no approval popup was seen.
+Do not repeat the performance gate or
+use the earlier quiet-box requirement below; the local ratio ruling
+supersedes it. C4 is not yet merged or reseeded.
+
 You are picking up a campaign mid-flight. This note is self-contained: it
 tells you where every thread stands, exactly what is next, the gates that
 must hold, and the traps that cost days this week. Read `CLAUDE.md` first —

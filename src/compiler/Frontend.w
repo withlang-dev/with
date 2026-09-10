@@ -45,6 +45,49 @@ fn frontend_owned_text(text: &str) -> str:
         return ""
     runtime_str_clone(text)
 
+// A .wi line's shape for the on-demand merge: skipped (`use`, `module`,
+// comment, blank), a named declaration, an impl (named by its target), a
+// function (its bare method name answers too), or one the classifier
+// cannot name — always parsed.
+let INTERFACE_LINE_SKIP = 0
+let INTERFACE_LINE_DECL = 1
+let INTERFACE_LINE_IMPL = 2
+let INTERFACE_LINE_FN = 3
+let INTERFACE_LINE_ALWAYS = 4
+
+fn interface_line_kind(line: &str) -> i32:
+    if line.len() == 0 or line.starts_with("//") or line.starts_with("use ") or line.starts_with("module "):
+        return INTERFACE_LINE_SKIP
+    if line.starts_with("impl "):
+        return INTERFACE_LINE_IMPL
+    if line.starts_with("pub let ") or line.starts_with("pub var ") or line.starts_with("pub type "):
+        return INTERFACE_LINE_DECL
+    if line.starts_with("pub ") and line.contains("fn "):
+        return INTERFACE_LINE_FN
+    INTERFACE_LINE_ALWAYS
+
+fn interface_line_name(line: &str, kind: i32) -> str:
+    if kind == INTERFACE_LINE_DECL:
+        return interface_name_token(line, if line.starts_with("pub type "): 9 else: 8)
+    if kind == INTERFACE_LINE_IMPL:
+        let at = line.find(" for ")
+        return interface_name_token(line, if at < 0: 5 else: at + 5)
+    if kind == INTERFACE_LINE_FN:
+        let at = line.find("fn ")
+        return if at < 0: "" else: interface_name_token(line, at + 3)
+    ""
+
+// The dotted identifier starting at `start`.
+fn interface_name_token(line: &str, start: i32) -> str:
+    var end = start
+    while end < line.len() as i32:
+        let ch = line[end]
+        let is_name = (ch >= 'a' and ch <= 'z') or (ch >= 'A' and ch <= 'Z') or (ch >= '0' and ch <= '9') or ch == '_' or ch == '.'
+        if not is_name:
+            break
+        end = end + 1
+    frontend_owned_text(line.slice(start, end))
+
 fn frontend_new_vec_str -> Vec[str]:
     let out: Vec[str] = Vec{ ptr: 0, len: 0, cap: 0, elem_size: 16 }
     out
@@ -261,6 +304,11 @@ impl Sema:
                     continue
                 if imp.path_text == "std.prelude" or imp.path_text == "std.prelude_core" or imp.path_text == "std.prelude_alloc":
                     global_frontier.push(imp.target_module)
+            // The ambient tier is the prelude's enumerated list (§18.2, D29):
+            // the prelude modules and the modules they name. What those
+            // modules import for themselves stays theirs — std.regex reaches
+            // the pcre2 interface through its own `use std.re.*`, and pcre2's
+            // three thousand names are not every program's namespace.
             let seen_global: HashMap[i32, i32] = HashMap.new()
             while global_frontier.len() as i32 > 0:
                 let last = global_frontier.len() as i32 - 1
@@ -273,8 +321,11 @@ impl Sema:
                 self.global_visible_module_paths.insert(frontend_owned_text(mod.path), 1)
                 for ii in 0..mod.import_count:
                     let imp = resolved.imports[(mod.import_start + ii)]
-                    if imp.target_module >= 0:
-                        global_frontier.push(imp.target_module)
+                    if imp.target_module < 0 or seen_global.contains(imp.target_module):
+                        continue
+                    seen_global.insert(imp.target_module, 1)
+                    let named = resolved.modules[imp.target_module]
+                    self.global_visible_module_paths.insert(frontend_owned_text(named.path), 1)
 
 impl Zcu:
     mut fn expand_c_imports_frontend(pool: AstPool) -> AstPool:
@@ -1651,6 +1702,12 @@ impl Zcu:
         if do_profile:
             let imports_ns = runtime_clock_nanos() - t_imports
             runtime_eprint(f"[profile] frontend.imports  {imports_ns / 1000000}.{(imports_ns % 1000000) / 1000} ms")
+        if self.pending_iface_paths.len() as i32 > 0:
+            let pending_paths = move self.pending_iface_paths
+            let pending_texts = move self.pending_iface_texts
+            self.pending_iface_paths = frontend_new_vec_str()
+            self.pending_iface_texts = frontend_new_vec_str()
+            pool = self.merge_interface_sections_on_demand(pool, &pending_paths, &pending_texts, root_local_decl_count)
         let t_cimport = runtime_clock_nanos()
         self.trace_c_import_cache = self.read_trace_c_import_cache_frontend()
         pool = self.expand_c_imports_frontend(pool)
@@ -1697,13 +1754,22 @@ impl Zcu:
             pre_sema.emit_config_warnings = 0
             pre_sema.lint_partial_statement_match = if self.project_config.lint_partial_statement_match: 1 else: 0
             pre_sema.overflow_mode = self.project_config.overflow_mode
+            let profile_comptime = runtime_getenv("WITH_PROFILE").len() > 0
+            let t_prepare = runtime_clock_nanos()
             pre_sema.init_module_graph(&self.last_resolved)
             pre_sema.prepare_for_comptime_transform()
+            if profile_comptime:
+                let prepare_ns = runtime_clock_nanos() - t_prepare
+                runtime_eprint(f"[profile] frontend.comptime.prepare  {prepare_ns / 1000000}.{(prepare_ns % 1000000) / 1000} ms")
             // The comptime transform must run against the same intern pool that
             // pre-sema prepared, otherwise cloned AST symbol ids may be resolved
             // against a stale symbol table in the transform pass.
             self.pool = pre_sema.pool
+            let t_transform = runtime_clock_nanos()
             pool = pre_sema.comptime_transform_module(pool, self.pool)
+            if profile_comptime:
+                let transform_ns = runtime_clock_nanos() - t_transform
+                runtime_eprint(f"[profile] frontend.comptime.transform  {transform_ns / 1000000}.{(transform_ns % 1000000) / 1000} ms")
             self.diagnostics = move pre_sema.diags
             self.decl_source_paths = sema_clone_str_vec(&pre_sema.decl_source_paths)
             self.decl_source_file_ids = sema_clone_i32_vec(&pre_sema.decl_source_file_ids)
@@ -1837,6 +1903,186 @@ impl Zcu:
             self.append_decl_source_paths(merged_pool.decl_count() - before, path, mod.file_id)
 
         self.strip_use_decls_frontend(merged_pool)
+
+    // ── D39 on-demand interface sections ─────────────────────────────
+    // S is every symbol the source's nodes carry. A declaration whose name
+    // is in S (a method's bare name too, an impl's target type) is parsed,
+    // and its nodes extend S until no declaration is newly demanded.
+    // The emitter puts headers at column zero, with attributes before them
+    // and indented bodies after them. Keep that whole declaration together:
+    // an attribute or method must never be parsed without its owner.
+    // Unclassified declarations are always parsed so errors stay visible.
+    mut fn merge_interface_sections_on_demand(pool: AstPool, paths: &Vec[str], texts: &Vec[str], root_tail: i32) -> AstPool:
+        var out = pool
+        let base = out.decl_count()
+        let t_start = runtime_clock_nanos()
+        self.iface_mentioned = HashMap.new()
+        self.note_interface_mentions(&out, 0, out.node_count())
+        let line_section: Vec[i32] = Vec.new()
+        let line_texts = frontend_new_vec_str()
+        let line_names = frontend_new_vec_str()
+        let line_kinds: Vec[i32] = Vec.new()
+        let line_done: Vec[i32] = Vec.new()
+        let line_counts: Vec[i32] = Vec.new()
+        var decl_lines = 0
+        for si in 0..paths.len() as i32:
+            let lines = texts[si].split("\n")
+            var li = 0
+            while li < lines.len() as i32:
+                if interface_line_kind(lines[li]) == INTERFACE_LINE_SKIP:
+                    li = li + 1
+                    continue
+                let start = li
+                // Canonical standalone attributes belong to the following
+                // header. Leave a dangling attribute unclassified: parsing
+                // it must diagnose the malformed interface.
+                while li < lines.len() as i32 and (lines[li].starts_with("@[") and lines[li].ends_with("]") or lines[li].len() == 0 or lines[li].starts_with("//")):
+                    li = li + 1
+                let header = if li < lines.len() as i32: frontend_owned_text(lines[li]) else: ""
+                let header_kind = interface_line_kind(header)
+                let kind = if header_kind == INTERFACE_LINE_SKIP: INTERFACE_LINE_ALWAYS else: header_kind
+                if li < lines.len() as i32: li = li + 1
+                while li < lines.len() as i32 and (lines[li].starts_with(" ") or lines[li].starts_with("\t") or lines[li].len() == 0 or lines[li].starts_with("//")):
+                    li = li + 1
+                var declaration = StringBuilder.new()
+                var count = 0
+                for bi in start..li:
+                    declaration.push_str(lines[bi])
+                    declaration.push_str("\n")
+                    if interface_line_kind(lines[bi]) != INTERFACE_LINE_SKIP:
+                        count = count + 1
+                line_section.push(si)
+                line_texts.push(declaration.to_str())
+                line_names.push(interface_line_name(header, kind))
+                line_kinds.push(kind)
+                line_done.push(0)
+                line_counts.push(count)
+                decl_lines = decl_lines + count
+        var parsed_lines = 0
+        var changed = true
+        while changed:
+            changed = false
+            var chunk = ""
+            var chunk_lines = 0
+            var chunk_section = -1
+            for li in 0..(line_kinds.len() as i32 + 1):
+                let section = if li < line_kinds.len() as i32: line_section[li] else: -1
+                if section != chunk_section:
+                    if chunk_lines > 0:
+                        out = self.parse_interface_chunk(out, paths[chunk_section], chunk)
+                        parsed_lines = parsed_lines + chunk_lines
+                        changed = true
+                    chunk = ""
+                    chunk_lines = 0
+                    chunk_section = section
+                if section < 0 or line_done[li] != 0:
+                    continue
+                if not self.interface_line_demanded(line_kinds[li], line_names[li]):
+                    continue
+                chunk = chunk ++ line_texts[li]
+                line_done[li] = 1
+                chunk_lines = chunk_lines + line_counts[li]
+        // The root's declarations stay the pool's tail: after the import
+        // merge the order is prelude → imports → root, and is_local_decl
+        // takes the last root_tail entries. The chunks go before them.
+        let total = out.decl_count()
+        if root_tail > 0 and total > base and base >= root_tail:
+            let order: Vec[i32] = Vec.new()
+            for di in 0..(base - root_tail):
+                order.push(di)
+            for di in base..total:
+                order.push(di)
+            for di in (base - root_tail)..base:
+                order.push(di)
+            let decls: Vec[i32] = Vec.new()
+            for di in 0..total:
+                decls.push(out.get_decl(di) as i32)
+            let ordered: Vec[i32] = Vec.new()
+            let ordered_paths = frontend_new_vec_str()
+            let ordered_file_ids: Vec[i32] = Vec.new()
+            let ordered_ci: Vec[i32] = Vec.new()
+            for oi in 0..total:
+                let di = order[oi]
+                ordered.push(decls[di])
+                ordered_paths.push(frontend_owned_text(self.decl_source_path_frontend(di)))
+                ordered_file_ids.push(self.decl_source_file_id_frontend(di))
+                ordered_ci.push(if di < self.decl_is_c_import.len() as i32: self.decl_is_c_import[di] else: 0)
+            while out.decl_count() > 0:
+                out.state.decls.pop()
+            for oi in 0..total:
+                out.add_decl(ordered[oi])
+            self.decl_source_paths = ordered_paths
+            self.decl_source_file_ids = ordered_file_ids
+            self.decl_is_c_import = ordered_ci
+        if runtime_getenv("WITH_PROFILE").len() > 0:
+            let ns = runtime_clock_nanos() - t_start
+            runtime_eprint(f"[profile] frontend.interface  {ns / 1000000}.{(ns % 1000000) / 1000} ms  sections={paths.len() as i32} lines={parsed_lines} of {decl_lines}")
+        out
+
+    mut fn parse_interface_chunk(pool: AstPool, path: &str, chunk: &str) -> AstPool:
+        var out = pool
+        let chunk_file_id = self.next_file_id
+        self.next_file_id = self.next_file_id + 1
+        var lexer = Lexer.init(chunk, chunk_file_id)
+        let tokens = lexer.tokenize()
+        let before_decls = out.decl_count()
+        let before_nodes = out.node_count()
+        var parser = Parser.init_with_pool(move tokens, chunk, chunk_file_id, self.pool, move self.diagnostics, out)
+        parser.enable_interface_mode()
+        out = parser.parse_module()
+        self.pool = parser.intern
+        self.diagnostics = move parser.diags
+        self.add_source_text_mapping(chunk_file_id, path, chunk)
+        self.append_decl_source_paths(out.decl_count() - before_decls, path, chunk_file_id)
+        self.note_interface_mentions(&out, before_nodes, out.node_count())
+        out
+
+    fn interface_line_demanded(kind: i32, name: &str) -> bool:
+        if kind == INTERFACE_LINE_ALWAYS:
+            return true
+        if name.len() == 0:
+            return false
+        let sym = self.pool.lookup_symbol(name)
+        if sym != 0 and self.iface_mentioned.contains(sym):
+            return true
+        if kind == INTERFACE_LINE_FN:
+            let dot = name.find(".")
+            if dot > 0:
+                let bare = self.pool.lookup_symbol(name.slice(dot + 1, name.len()))
+                return bare != 0 and self.iface_mentioned.contains(bare)
+        false
+
+    // The symbols nodes [from, to) carry: identifiers, member and type
+    // names, struct, variant, use and declaration names, a method's owner.
+    mut fn note_interface_mentions(pool: &AstPool, from: i32, to: i32):
+        for n in from..to:
+            let node = n as NodeId
+            let kind = pool.kind(node)
+            if kind == NodeKind.NK_IDENT or kind == NodeKind.NK_TYPE_NAMED or kind == NodeKind.NK_TYPE_GENERIC or kind == NodeKind.NK_TYPE_TRAIT_OBJ or kind == NodeKind.NK_STRUCT_LIT or kind == NodeKind.NK_VARIANT_SHORTHAND or kind == NodeKind.NK_TYPE_DECL or kind == NodeKind.NK_LET_DECL or kind == NodeKind.NK_EXTERN_FN or kind == NodeKind.NK_EXTERN_VAR or kind == NodeKind.NK_TRAIT_DECL:
+                self.iface_mentioned.insert(pool.get_data0(node), 1)
+            else if kind == NodeKind.NK_FN_DECL:
+                let name = pool.get_data0(node)
+                self.iface_mentioned.insert(name, 1)
+                let text = self.pool.resolve(name)
+                let dot = text.find(".")
+                if dot > 0:
+                    let owner = self.pool.lookup_symbol(text.slice(0, dot))
+                    if owner != 0:
+                        self.iface_mentioned.insert(owner, 1)
+            else if kind == NodeKind.NK_FIELD_ACCESS or kind == NodeKind.NK_OPTIONAL_CHAIN:
+                self.iface_mentioned.insert(pool.get_data1(node), 1)
+            else if kind == NodeKind.NK_ENUM_VARIANT:
+                self.iface_mentioned.insert(pool.get_data0(node), 1)
+                self.iface_mentioned.insert(pool.get_data1(node), 1)
+            else if kind == NodeKind.NK_IMPL_DECL:
+                self.iface_mentioned.insert(pool.get_data0(node), 1)
+                if pool.get_data2(node) != 0:
+                    self.iface_mentioned.insert(pool.get_data2(node), 1)
+            else if kind == NodeKind.NK_USE_DECL:
+                let path_start = pool.get_data0(node)
+                let count = pool.get_data1(node) + pool.get_data2(node)
+                for i in 0..count:
+                    self.iface_mentioned.insert(pool.get_extra(path_start + i), 1)
 
     mut fn strip_use_decls_frontend(pool: AstPool) -> AstPool:
         var out = pool
@@ -2484,9 +2730,44 @@ impl Zcu:
 
     mut fn parse_imported_file_frontend(path: &str, target_pool: AstPool) -> AstPool:
         let src = module_source_read(path)
-        let text = frontend_normalize_source_text(src.text)
-        if text.len() == 0:
+        let full_text = frontend_normalize_source_text(src.text)
+        if full_text.len() == 0:
             return target_pool
+
+        // D39: a registered interface section is not parsed here: its `use`
+        // lines, read as text, put its imports on the worklist, and its
+        // declarations are parsed on demand once every source module is in.
+        let on_demand = src.interface and not (self.interface_eager or self.bundle_corpus.len() > 0)
+        if on_demand:
+            let section_file_id = self.next_file_id
+            self.next_file_id = self.next_file_id + 1
+            self.add_source_text_mapping(section_file_id, path, full_text)
+            // Path and text go in together, before the imports below recurse
+            // and push their own sections (an interleaved pair once attributed
+            // pcre2_compile_8 to pcre2_compile_cgroup.w).
+            let use_lines = resolve_interface_use_lines(full_text)
+            self.pending_iface_paths.push(frontend_owned_text(path))
+            self.pending_iface_texts.push(full_text)
+            var out = target_pool
+            let dir = frontend_dirname(path)
+            let lines = use_lines.split("\n")
+            for i in 0..lines.len() as i32:
+                let line = lines[i]
+                if not line.starts_with("use "):
+                    continue
+                let upname = line.slice(4, line.len()).trim()
+                let memo_key = upname ++ "|" ++ dir
+                var upfpath = ""
+                if self.import_path_memo.contains(memo_key):
+                    upfpath = with_str_clone_ref(self.import_path_memo.get(memo_key).unwrap())
+                else:
+                    upfpath = self.resolve_module_path_frontend(upname, dir)
+                    self.import_path_memo.insert(memo_key, with_str_clone_ref(upfpath))
+                if upfpath.len() > 0 and self.has_imported_path(upfpath) == 0:
+                    self.add_imported_path(upfpath)
+                    out = self.parse_imported_file_frontend(upfpath, out)
+            return out
+        let text = full_text
 
         let before = target_pool.decl_count()
         let file_id = self.next_file_id

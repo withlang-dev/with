@@ -364,7 +364,7 @@ fn pkg_bootstrap_types_header() -> str:
 fn pkg_readme(version: &str) -> str:
     "# With " ++ version ++ " Bootstrap C Bundle\n\n" ++
     "This bundle is for bootstrapping With on a host that does not already have a native With compiler.\n\n" ++
-    "It contains emitted C for the compiler, LLVM/libclang bridges, runtime core, panic and regex runtime, fiber stubs, compatibility runtime, and temporary Linux and Windows bootstrap platform shims.\n\n" ++
+    "It contains emitted C for the compiler, LLVM/libclang bridges, runtime core, panic runtime, fiber stubs, compatibility runtime, and temporary Linux and Windows bootstrap platform shims.\n\n" ++
     "The bootstrap compiler is temporary. Use it only to run the normal With stage chain on the target platform:\n\n" ++
     "    WITH=/path/to/with-bootstrap with build\n" ++
     "    with build :fixpoint\n" ++
@@ -383,7 +383,7 @@ fn pkg_readme(version: &str) -> str:
     "      -include runtime/wl_decls.h -c src/with_compiler.c -o obj/with_compiler.o\n\n" ++
     "    \"$CLANG\" -std=gnu11 -O2 -D_GNU_SOURCE -Iruntime -I\"$LLVM_PREFIX/include\" \\\n" ++
     "      -c src/linux_platform.c -o obj/linux_platform.o\n\n" ++
-    "    for file in src/rt_core.c src/panic_runtime.c src/regex_runtime.c src/fiber_stubs.c src/compat_runtime.c; do\n" ++
+    "    for file in src/rt_core.c src/panic_runtime.c src/fiber_stubs.c src/compat_runtime.c; do\n" ++
     "      \"$CLANG\" -std=gnu11 -O1 -D_GNU_SOURCE -DWITH_RUNTIME_H -Iruntime -I\"$LLVM_PREFIX/include\" \\\n" ++
     "        -include runtime/bootstrap_types.h -c \"$file\" -o \"obj/$(basename \"$file\" .c).o\"\n" ++
     "    done\n" ++
@@ -519,8 +519,6 @@ pub fn run_package_bootstrap_c_action(ctx: ActionCtx) -> i32:
     rc = pkg_emit_c(ctx, compiler_path, "rt/rt_core.w", pkg_join(stage_root, "src/rt_core.c"), "rt-core")
     if rc != 0: return rc
     rc = pkg_emit_c(ctx, compiler_path, "rt/panic_runtime.w", pkg_join(stage_root, "src/panic_runtime.c"), "panic-runtime")
-    if rc != 0: return rc
-    rc = pkg_emit_c(ctx, compiler_path, "rt/regex_runtime.w", pkg_join(stage_root, "src/regex_runtime.c"), "regex-runtime")
     if rc != 0: return rc
     rc = pkg_emit_c(ctx, compiler_path, "rt/fiber_stubs.w", pkg_join(stage_root, "src/fiber_stubs.c"), "fiber-stubs")
     if rc != 0: return rc

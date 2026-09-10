@@ -810,7 +810,7 @@ fn analysis_collect_mir(report: &AnalysisReport, mir_mod: &MirModule, sema: &Sem
             local.symbol = body.local_names[li]
             local.index = li
             local.type_id = body.local_type_ids[li]
-            local.flags = body.local_mutables[li] | (body.local_is_user_var[li] << 1)
+            local.flags = body.local_mutables[li] | (body.local_is_user_var[li] << 1) | (body.local_is_global[li] << 2)
             local.name = with_str_clone_ref(body_fact.name)
             local.detail = f"_{li} ty={local.type_id} mut={body.local_mutables[li]}"
             report.add(move local)

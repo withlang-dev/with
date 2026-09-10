@@ -12,18 +12,13 @@ use InternPool
 use TypeLayout
 use render
 use std.builtins.int_to_string
+use std.regex.Regex
 
 extern fn with_str_clone_ref(s: &str) -> str
 extern fn with_write(s: &str) -> Unit
 extern fn with_eprint(s: &str) -> Unit
 extern fn with_getenv_str(name: &str) -> str
 extern fn str_from_byte(b: i32) -> str
-extern fn with_regex_compile(pattern: &str, options: i32, err_code: *mut i32, err_offset: *mut i32) -> *const i8
-extern fn with_regex_error_message(code: i32) -> str
-extern fn with_regex_code_free(code: *const i8) -> Unit
-extern fn with_regex_capture_count(code: *const i8) -> i32
-extern fn with_regex_capture_name_count(code: *const i8) -> i32
-extern fn with_regex_capture_name_at(code: *const i8, index: i32) -> str
 
 // docs/mut.md Rev 8 — P12 lockdown active. `&mut T` is rejected.
 const STRICT_NO_MUT_REF: i32 = 1
@@ -1256,11 +1251,9 @@ impl Sema:
         let length = self.int_literal_i64_value(length_node)
         if length.ok == 0 or length.value <= 0 or length.value > 2147483647:
             sema_phase_bug("BUG: frozen FixedString type has invalid length node")
-            return 0
         let storage_tid = self.find_exact_type(TypeKind.TY_ARRAY, self.ty_u8 as i32, length.value as i32, 0) as i32
         if storage_tid == 0:
             sema_phase_bug("BUG: frozen FixedString storage array type not preregistered")
-            return 0
         let args: Vec[i32] = Vec.new()
         args.push(storage_tid)
         self.find_generic_inst_type(self.syms.fixed_string, args, 1) as i32
@@ -1271,7 +1264,6 @@ impl Sema:
             let gi_arg_count = self.ast.get_data2(node)
             if gi_arg_count != 1:
                 sema_phase_bug("BUG: frozen FixedString type has wrong arg count")
-                return 0
             let gi_extra_start = self.ast.get_data1(node)
             return self.fixed_string_type_from_length_node_frozen(self.ast.get_extra(gi_extra_start))
         let range_inclusive = self.canonical_range_type_constructor_inclusive(gi_base_sym)
@@ -1279,7 +1271,6 @@ impl Sema:
             let gi_arg_count2 = self.ast.get_data2(node)
             if gi_arg_count2 != 1:
                 sema_phase_bug("BUG: frozen Range type has wrong arg count")
-                return 0
             let gi_extra_start2 = self.ast.get_data1(node)
             let elem_tid = self.resolve_type_expr_frozen(self.ast.get_extra(gi_extra_start2))
             if elem_tid == 0:
@@ -1302,7 +1293,6 @@ impl Sema:
                 gi_base_tid = self.named_types.get(gi_base_sym).unwrap()
         if gi_base_tid == 0:
             sema_phase_bug("BUG: frozen generic type base not visible")
-            return 0
         let gi_arg_count = self.ast.get_data2(node)
         let gi_extra_start = self.ast.get_data1(node)
         let gi_args: Vec[i32] = Vec.new()
@@ -1314,10 +1304,8 @@ impl Sema:
         if self.pool_resolve_symbol(gi_base_sym) == "Atomic":
             if gi_arg_count != 1:
                 sema_phase_bug("BUG: frozen Atomic type has wrong arg count")
-                return 0
             if self.atomic_payload_type_is_valid(gi_args.get(0)) == 0:
                 sema_phase_bug("BUG: frozen Atomic type has invalid payload")
-                return 0
         self.find_generic_inst_type(gi_base_sym, gi_args, gi_arg_count) as i32
 
     fn resolve_type_expr_frozen(node: i32) -> TypeId:
@@ -1353,7 +1341,6 @@ impl Sema:
             if base_sym == self.syms.self_type and self.assoc_type_bindings.contains(assoc_sym):
                 return self.assoc_type_bindings.get(assoc_sym).unwrap() as TypeId
             sema_phase_bug("BUG: frozen associated type resolution needs preregistered type-node answer")
-            return 0 as TypeId
         if kind == NodeKind.NK_TYPE_GENERIC:
             return self.resolve_generic_type_frozen(node) as TypeId
         if kind == NodeKind.NK_TYPE_PTR:
@@ -1414,7 +1401,6 @@ impl Sema:
             if self.typed_expr_types.contains(expr_node):
                 return self.typed_expr_types.get(expr_node).unwrap()
             sema_phase_bug("BUG: frozen @TypeOf has no checked expression type")
-            return 0
         if kind == NodeKind.NK_UNARY:
             let op = self.ast.get_data0(node)
             let inner = self.resolve_type_level_arg_expr_frozen(self.ast.get_data1(node))
@@ -1457,7 +1443,6 @@ impl Sema:
             if self.is_fixed_string_symbol(base_sym) != 0:
                 if self.ast.get_data2(node) != 0:
                     sema_phase_bug("BUG: frozen FixedString index has wrong arg count")
-                    return 0
                 return self.fixed_string_type_from_length_node_frozen(self.ast.get_data1(node))
             var base_tid = self.lookup_named_type_visible(base_sym)
             if base_tid == 0:
@@ -1562,7 +1547,7 @@ impl Sema:
         var has_global_allocator = 0
 
         for di in 0..self.ast.decl_count():
-            if self.no_std_decl_is_user_code(di) == 0:
+            if self.decl_is_lazy_skipped(di) or self.no_std_decl_is_user_code(di) == 0:
                 continue
             let decl = self.ast.get_decl(di)
             if fallback_node == 0:
@@ -1592,6 +1577,8 @@ impl Sema:
 
     mut fn check_bodies():
         for di in 0..self.ast.decl_count():
+            if self.decl_is_lazy_skipped(di):
+                continue
             self.update_decl_source_context(di)
             let decl = self.ast.get_decl(di)
             if self.ast.kind(decl) == NodeKind.NK_FN_DECL:
@@ -2076,14 +2063,10 @@ impl Sema:
 
         let ret_type = self.sig_return_type(sig_idx)
 
-        // Active borrows are per-function state.
+        // Active borrows are per-function state. Remove complete rows,
+        // including scope depth and creation site, before checking a new body.
         while self.borrow_kinds.len() > 0:
-            self.borrow_kinds.pop()
-            self.borrow_places.pop()
-            self.borrow_fields.pop()
-            self.borrow_refs.pop()
-            self.borrow_path_starts.pop()
-            self.borrow_path_counts.pop()
+            self.remove_borrow_at(self.borrow_refs.len() as i32 - 1)
 
         // Push function scope
         self.push_scope()
@@ -2566,6 +2549,8 @@ impl Sema:
 
     mut fn check_trait_default_method_bodies():
         for di in 0..self.ast.decl_count():
+            if self.decl_is_lazy_skipped(di):
+                continue
             self.update_decl_source_context(di)
             let impl_node = self.ast.get_decl(di)
             if self.ast.kind(impl_node) != NodeKind.NK_IMPL_DECL:
@@ -3180,6 +3165,8 @@ impl Sema:
     fn cheader_generate(guard: &str) -> str:
         let exported: Vec[i32] = Vec.new()
         for di in 0..self.ast.decl_count():
+            if self.decl_is_lazy_skipped(di):
+                continue
             let d = self.ast.get_decl(di)
             if self.ast.kind(d) == NodeKind.NK_FN_DECL and self.fn_decl_has_c_export(d) != 0:
                 exported.push(d as i32)
@@ -3285,6 +3272,8 @@ impl Sema:
         self.reachable_decl_indices = sema_new_map_i32_i32()
 
         for di in 0..self.ast.decl_count():
+            if self.decl_is_lazy_skipped(di):
+                continue
             let decl = self.ast.get_decl(di)
             if self.ast.kind(decl) == NodeKind.NK_FN_DECL:
                 self.reachable_decl_indices.insert(decl, di)
@@ -7241,25 +7230,22 @@ impl Sema:
             self.emit_error("invalid regex flag", node)
             self.regex_capture_counts.insert(node, 0)
             return
-        var err_code: i32 = 0
-        var err_offset: i32 = 0
-        let code = with_regex_compile(pattern, options, &raw mut err_code, &raw mut err_offset)
-        if code as i64 == 0:
-            self.emit_error("invalid regex literal: " ++ with_regex_error_message(err_code), node)
-            self.regex_capture_counts.insert(node, 0)
-            return
-        let capture_count = with_regex_capture_count(code)
-        self.regex_capture_counts.insert(node, capture_count)
-        let name_start = self.regex_capture_name_syms.len() as i32
-        let name_count = with_regex_capture_name_count(code)
-        var ni = 0
-        while ni < name_count:
-            let name = with_regex_capture_name_at(code, ni)
-            self.regex_capture_name_syms.push(self.pool_lookup_symbol("$" ++ name))
-            ni = ni + 1
-        self.regex_capture_name_starts.insert(node, name_start)
-        self.regex_capture_name_counts.insert(node, name_count)
-        with_regex_code_free(code)
+        // The literal compiles through std.regex like any program's pattern;
+        // the compiler is one more user of the facade (D30).
+        match Regex.compile_flags(pattern, flags):
+            Err(err) => {
+                self.emit_error("invalid regex literal: " ++ err.message, node)
+                self.regex_capture_counts.insert(node, 0)
+            }
+            Ok(regex) => {
+                self.regex_capture_counts.insert(node, regex.num_captures())
+                let name_start = self.regex_capture_name_syms.len() as i32
+                let names = regex.capture_names()
+                for ni in 0..names.len() as i32:
+                    self.regex_capture_name_syms.push(self.pool_lookup_symbol("$" ++ names[ni]))
+                self.regex_capture_name_starts.insert(node, name_start)
+                self.regex_capture_name_counts.insert(node, names.len() as i32)
+            }
 
     mut fn regex_bind_capture_scope(regex_node: i32):
         if regex_node == 0:
@@ -7930,16 +7916,13 @@ impl Sema:
             let result_resolved = self.resolve_alias(result_ref_ty as TypeId)
             if self.get_type_kind(result_resolved) != TypeKind.TY_REF:
                 sema_phase_bug("BUG: frozen Deref.deref return type is not a reference")
-                return sema_deref_info_none()
             let pointee = self.get_type_d0(result_resolved)
             if target_ty != 0 and self.types_compatible_frozen(target_ty, pointee) == 0:
                 sema_phase_bug("BUG: frozen Deref.deref return type does not match target")
-                return sema_deref_info_none()
             let concrete_target = if target_ty != 0: target_ty else: pointee
             let concrete_result_ref = if target_ty != 0: self.find_exact_type(TypeKind.TY_REF, target_ty, 0, 0) as i32 else: result_resolved as i32
             if concrete_result_ref == 0:
                 sema_phase_bug("BUG: frozen Deref result reference type not preregistered")
-                return sema_deref_info_none()
             return SemaDerefInfo { ok: 1, target_ty: concrete_target, result_ref_ty: concrete_result_ref, deref_fn }
         sema_deref_info_none()
 
@@ -10940,7 +10923,6 @@ impl Sema:
                 let recv_resolved = self.resolve_alias(recv_type as TypeId)
                 if self.get_type_kind(recv_resolved) == TypeKind.TY_GENERIC_INST:
                     sema_phase_bug("BUG: optional_chain_method_raw_result_type_frozen generic return substitution needs preregistered result")
-                    return 0
                 return ret
         0
 
@@ -11134,7 +11116,6 @@ impl Sema:
                 if self.generic_struct_field_type_cache.contains(twin_ckey):
                     return self.generic_struct_field_type_cache.get(twin_ckey).unwrap()
             sema_phase_bug(f"BUG: struct_field_type_frozen generic-inst field type miss tid={resolved as i32} base={self.pool_resolve_symbol(self.get_type_d0(resolved))} field={self.pool_resolve_symbol(field)}")
-            return 0
 
         0
 
@@ -11363,7 +11344,6 @@ impl Sema:
                 return current
             if sema_autoderef_seen_type(&seen, current as i32) != 0:
                 sema_phase_bug("BUG: auto_deref_method_type_frozen cycle through Deref implementation")
-                return current
             seen.push(current as i32)
             let next = self.autoderef_next_type_frozen(current)
             if next == current:
@@ -11371,7 +11351,6 @@ impl Sema:
             current = next
             depth = depth + 1
         sema_phase_bug("BUG: auto_deref_method_type_frozen exceeded deref depth")
-        current
 
     mut fn field_access_type_no_diagnostic(node: i32) -> i32:
         if node == 0 or self.ast.kind(node) != NodeKind.NK_FIELD_ACCESS:
@@ -12055,6 +12034,9 @@ impl Sema:
         if self.diags.has_errors():
             return
         for di in 0..self.ast.decl_count():
+            // A bundle's own build checked its interface's defaults (D39).
+            if self.decl_is_interface(di):
+                continue
             self.update_decl_source_context(di)
             let decl = self.ast.get_decl(di)
             if self.ast.kind(decl) != NodeKind.NK_TYPE_DECL:
@@ -13227,7 +13209,6 @@ impl Sema:
             if not variant_exists:
                 return result
             sema_phase_bug("BUG: enum_variant_payload_types_frozen generic-inst payload miss")
-            return result
         result
 
 fn sema_accessor_char_lower(ch: i32) -> str:
@@ -14023,12 +14004,7 @@ impl Sema:
 
         // Restore borrow state — discard borrows created inside closure body.
         while self.borrow_kinds.len() as i32 > saved_borrow_len:
-            self.borrow_kinds.pop()
-            self.borrow_places.pop()
-            self.borrow_fields.pop()
-            self.borrow_refs.pop()
-            self.borrow_path_starts.pop()
-            self.borrow_path_counts.pop()
+            self.remove_borrow_at(self.borrow_refs.len() as i32 - 1)
 
         // Mark non-escaping if this closure is a direct call argument whose
         // receiving parameter does not let the closure escape the call.
@@ -17179,7 +17155,6 @@ impl Sema:
             if self.impl_generic_inst.contains(gi_key2):
                 return 1
             sema_phase_bug("BUG: type_implements_trait_frozen generic blanket path needs preregistered answer")
-            return 0
         var type_sym = self.get_type_name(resolved)
         if type_sym == 0:
             type_sym = self.pool_lookup_symbol(self.type_name(resolved as i32))
@@ -17677,6 +17652,8 @@ impl Sema:
             var matched_subst_names: Vec[i32] = Vec.new()
             var matched_subst_types: Vec[i32] = Vec.new()
             for di in 0..self.ast.decl_count():
+                if self.decl_is_lazy_skipped(di):
+                    continue
                 let impl_node = self.ast.get_decl(di)
                 if self.ast.kind(impl_node) != NodeKind.NK_IMPL_DECL or self.ast.get_data2(impl_node) != self.syms.drop:
                     continue
@@ -21541,7 +21518,6 @@ impl Sema:
                 if self.generic_struct_field_index_type_cache.contains(twin_key):
                     return self.generic_struct_field_index_type_cache.get(twin_key).unwrap()
             sema_phase_bug("BUG: type_reflection_field_type_frozen generic-inst field type miss")
-            return 0
         0
 
     fn type_reflection_variant_base(tid: i32) -> i32:
@@ -22149,7 +22125,13 @@ impl Sema:
         self.borrow_scope_depths.push(self.scope_starts.len() as i32)
         self.borrow_creation_nodes.push(err_node)
 
+    fn validate_borrow_rows():
+        let count = self.borrow_refs.len()
+        if self.borrow_kinds.len() != count or self.borrow_places.len() != count or self.borrow_fields.len() != count or self.borrow_path_starts.len() != count or self.borrow_path_counts.len() != count or self.borrow_scope_depths.len() != count or self.borrow_creation_nodes.len() != count:
+            sema_phase_bug("BUG: borrow table columns have different lengths")
+
     mut fn remove_borrow_at(idx: i32):
+        self.validate_borrow_rows()
         let last = self.borrow_refs.len() as i32 - 1
         if idx < 0 or idx > last:
             return
@@ -23200,6 +23182,7 @@ impl Sema:
             self.collect_capture_fields(self.ast.get_data0(node), sym)
 
     mut fn expire_dead_borrows_in_block(block_extra_start: i32, stmt_count: i32, next_stmt_index: i32, tail_node: i32):
+        self.validate_borrow_rows()
         let current_depth = self.scope_starts.len() as i32
         var bi = 0
         while bi < self.borrow_refs.len() as i32:

@@ -84,11 +84,144 @@ impl Sema:
                     return 1
         0
 
+    // ── D39 lazy interface collection ────────────────────────────────
+    // A registered .wi section's declarations are collected only when the
+    // source can name them: S starts as every symbol a non-interface node
+    // carries (identifiers, member and type names, struct, variant and use
+    // names); an interface declaration whose name is in S — a method by its
+    // bare name too, an impl by its target type — is demanded and the
+    // symbols of its own subtree join S, until nothing changes. A compile
+    // that names nothing from a bundle collects none of it. Over-approximation
+    // only reproduces the eager state for that declaration; a
+    // compiler-synthesized name outside S meets the uncollected declaration
+    // as a phase bug, never a silent miss. Every whole-module pass and the
+    // per-declaration codegen loops ask decl_is_lazy_skipped.
+    fn decl_is_lazy_skipped(di: i32) -> bool:
+        di >= 0 and di < self.decl_is_iface.len() as i32 and self.decl_is_iface[di] != 0 and self.decl_iface_demanded[di] == 0
+
+    fn decl_is_interface(di: i32) -> bool:
+        di >= 0 and di < self.decl_is_iface.len() as i32 and self.decl_is_iface[di] != 0
+
+    mut fn prepare_interface_demand():
+        let decl_count = self.ast.decl_count()
+        self.decl_is_iface = sema_new_vec_i32()
+        self.decl_iface_demanded = sema_new_vec_i32()
+        self.iface_mentioned = sema_new_map_i32_i32()
+        let iface_files = sema_new_map_i32_i32()
+        // A bundle build and a .wi root (the emitter, the fingerprint and
+        // the check-wi pass read the full tables) collect everything.
+        let eager = self.interface_eager != 0
+        var iface_count = 0
+        var last_path = ""
+        var last_flag = 0
+        for di in 0..decl_count:
+            var flag = 0
+            if di < self.decl_source_paths.len() as i32:
+                let path = self.decl_source_paths[di]
+                if path == last_path:
+                    flag = last_flag
+                else:
+                    flag = if bundle_interface_text(path).len() > 0: 1 else: 0
+                    last_path = with_str_clone_ref(path)
+                    last_flag = flag
+            self.decl_is_iface.push(flag)
+            self.decl_iface_demanded.push(if flag != 0 and not eager: 0 else: 1)
+            if flag != 0:
+                iface_count = iface_count + 1
+                if di < self.decl_source_file_ids.len() as i32:
+                    iface_files.insert(self.decl_source_file_ids[di], 1)
+        if iface_count == 0 or eager:
+            return
+        // S, and each interface file's contiguous node run (a file's nodes
+        // are appended in one parse; anything after that run is generated).
+        let file_first = sema_new_map_i32_i32()
+        let file_last = sema_new_map_i32_i32()
+        let node_count = self.ast.node_count()
+        for n in 0..node_count:
+            let file = self.ast.file(n as NodeId) as i32
+            if iface_files.contains(file):
+                if not file_first.contains(file):
+                    file_first.insert(file, n)
+                    file_last.insert(file, n)
+                else if file_last.get(file).unwrap() == n - 1:
+                    file_last.insert(file, n)
+                continue
+            self.note_mentioned_syms(n as NodeId)
+        var changed = true
+        while changed:
+            changed = false
+            for di in 0..decl_count:
+                if self.decl_is_iface[di] == 0 or self.decl_iface_demanded[di] != 0:
+                    continue
+                let decl = self.ast.get_decl(di)
+                if not self.interface_decl_is_named(decl):
+                    continue
+                self.decl_iface_demanded[di] = 1
+                changed = true
+                let file = self.ast.file(decl) as i32
+                if not file_first.contains(file):
+                    continue
+                let lo = self.ast.get_start(decl)
+                let hi = self.ast.get_end(decl)
+                let first = file_first.get(file).unwrap()
+                let last = file_last.get(file).unwrap()
+                for n in first..(last + 1):
+                    if self.ast.get_start(n as NodeId) >= lo and self.ast.get_end(n as NodeId) <= hi:
+                        self.note_mentioned_syms(n as NodeId)
+
+    // The names a declaration answers to: its own, a method's bare name, an
+    // impl's target type.
+    fn interface_decl_is_named(decl: NodeId) -> bool:
+        let kind = self.ast.kind(decl)
+        let name = self.ast.get_data0(decl)
+        if kind == NodeKind.NK_USE_DECL:
+            return false
+        if self.iface_mentioned.contains(name):
+            return true
+        if kind == NodeKind.NK_FN_DECL:
+            let bare = self.method_decl_name_symbol(name)
+            return bare != 0 and bare != name and self.iface_mentioned.contains(bare)
+        false
+
+    mut fn note_mentioned_syms(node: NodeId):
+        let kind = self.ast.kind(node)
+        if kind == NodeKind.NK_IDENT or kind == NodeKind.NK_TYPE_NAMED or kind == NodeKind.NK_TYPE_GENERIC or kind == NodeKind.NK_TYPE_TRAIT_OBJ or kind == NodeKind.NK_STRUCT_LIT or kind == NodeKind.NK_VARIANT_SHORTHAND or kind == NodeKind.NK_TYPE_DECL or kind == NodeKind.NK_LET_DECL or kind == NodeKind.NK_EXTERN_FN or kind == NodeKind.NK_EXTERN_VAR or kind == NodeKind.NK_TRAIT_DECL:
+            self.iface_mentioned.insert(self.ast.get_data0(node), 1)
+            return
+        if kind == NodeKind.NK_FN_DECL:
+            let name = self.ast.get_data0(node)
+            self.iface_mentioned.insert(name, 1)
+            let owner = self.method_decl_owner_symbol(node, name)
+            if owner != 0:
+                self.iface_mentioned.insert(owner, 1)
+            return
+        if kind == NodeKind.NK_FIELD_ACCESS or kind == NodeKind.NK_OPTIONAL_CHAIN:
+            self.iface_mentioned.insert(self.ast.get_data1(node), 1)
+            return
+        if kind == NodeKind.NK_ENUM_VARIANT:
+            self.iface_mentioned.insert(self.ast.get_data0(node), 1)
+            self.iface_mentioned.insert(self.ast.get_data1(node), 1)
+            return
+        if kind == NodeKind.NK_IMPL_DECL:
+            self.iface_mentioned.insert(self.ast.get_data0(node), 1)
+            if self.ast.get_data2(node) != 0:
+                self.iface_mentioned.insert(self.ast.get_data2(node), 1)
+            return
+        if kind == NodeKind.NK_USE_DECL:
+            let path_start = self.ast.get_data0(node)
+            let path_count = self.ast.get_data1(node)
+            let selector_count = self.ast.get_data2(node)
+            for i in 0..(path_count + selector_count):
+                self.iface_mentioned.insert(self.ast.get_extra(path_start + i), 1)
+
     mut fn collect_declarations():
+        self.prepare_interface_demand()
         self.collecting_types = 1
         // Pass 1: collect named types and traits first so functions can refer
         // to imported or forward-declared types regardless of declaration order.
         for di in 0..self.ast.decl_count():
+            if self.decl_is_lazy_skipped(di):
+                continue
             self.update_decl_source_context(di)
             let decl = self.ast.get_decl(di)
             let kind = self.ast.kind(decl)
@@ -103,6 +236,8 @@ impl Sema:
 
         // Pass 2: collect impl declarations once trait/type tables exist.
         for di in 0..self.ast.decl_count():
+            if self.decl_is_lazy_skipped(di):
+                continue
             self.update_decl_source_context(di)
             let decl = self.ast.get_decl(di)
             if self.ast.kind(decl) == NodeKind.NK_IMPL_DECL:
@@ -115,6 +250,8 @@ impl Sema:
 
         // Pass 3: collect function signatures and top-level let decls.
         for di in 0..self.ast.decl_count():
+            if self.decl_is_lazy_skipped(di):
+                continue
             self.update_decl_source_context(di)
             let decl = self.ast.get_decl(di)
             let kind = self.ast.kind(decl)
@@ -136,6 +273,8 @@ impl Sema:
 
     mut fn collect_enum_constructor_imports():
         for di in 0..self.ast.decl_count():
+            if self.decl_is_lazy_skipped(di):
+                continue
             self.update_decl_source_context(di)
             let decl = self.ast.get_decl(di)
             if self.ast.kind(decl) != NodeKind.NK_USE_DECL:
@@ -167,6 +306,8 @@ impl Sema:
 
     mut fn resolve_deferred_non_generic_type_decls():
         for di in 0..self.ast.decl_count():
+            if self.decl_is_lazy_skipped(di):
+                continue
             self.update_decl_source_context(di)
             let decl = self.ast.get_decl(di)
             if self.ast.kind(decl) != NodeKind.NK_TYPE_DECL:
@@ -982,6 +1123,8 @@ impl Sema:
         var edge_node: Vec[i32] = Vec.new()
 
         for di in 0..self.ast.decl_count():
+            if self.decl_is_lazy_skipped(di):
+                continue
             let decl = self.ast.get_decl(di)
             if self.ast.kind(decl) != NodeKind.NK_TYPE_DECL:
                 continue
@@ -1055,6 +1198,8 @@ impl Sema:
         var parent_edge: HashMap[i32, i32] = sema_new_map_i32_i32()
 
         for di in 0..self.ast.decl_count():
+            if self.decl_is_lazy_skipped(di):
+                continue
             let decl = self.ast.get_decl(di)
             if self.ast.kind(decl) != NodeKind.NK_TYPE_DECL:
                 continue
@@ -1349,7 +1494,14 @@ impl Sema:
         let fn_flags = self.ast.get_data2(node)
         let decl_is_pub = if (fn_flags / FnFlags.PUB) % 2 == 1: 1 else: 0
         self.record_decl_visibility(fn_name, node, decl_is_pub)
-        if self.fn_decl_nodes.contains(fn_name):
+        // D39: a source definition owns the flat name whatever the
+        // declaration order; an interface declaration of the same name
+        // (pcre2's is_alpha beside std.string's) keeps its signature for
+        // the visibility-gated lookups and never displaces it — a
+        // displaced source body would be skipped as shadowed and its
+        // function left declared without a body.
+        let interface_yields = self.ast.fn_decl_body_is_interface(node) and self.fn_decl_nodes.contains(fn_name) and not self.ast.fn_decl_body_is_interface(self.fn_decl_nodes.get(fn_name).unwrap())
+        if self.fn_decl_nodes.contains(fn_name) and not interface_yields:
             let existing_node: i32 = self.fn_decl_nodes.get(fn_name).unwrap()
             if existing_node != node:
                 let existing_di = self.find_decl_index(existing_node)
@@ -1372,8 +1524,9 @@ impl Sema:
         let meta = self.ast.find_fn_meta(node)
         if meta < 0:
             // No meta available — register with no params
-            self.fn_decl_nodes.insert(fn_name, node)
-            self.fn_decl_source_paths.insert(fn_name, with_str_clone_ref(self.current_module_path))
+            if not interface_yields:
+                self.fn_decl_nodes.insert(fn_name, node)
+                self.fn_decl_source_paths.insert(fn_name, with_str_clone_ref(self.current_module_path))
             let fn_tid = self.add_type(TypeKind.TY_FN, 0, 0, self.ty_void)
             self.add_sig(fn_name, fn_tid, self.ty_void, 0, 0, 0)
             return
@@ -1509,8 +1662,9 @@ impl Sema:
                 self.named_types.remove(self_sym)
             return
 
-        self.fn_decl_nodes.insert(fn_name, node)
-        self.fn_decl_source_paths.insert(fn_name, with_str_clone_ref(self.current_module_path))
+        if not interface_yields:
+            self.fn_decl_nodes.insert(fn_name, node)
+            self.fn_decl_source_paths.insert(fn_name, with_str_clone_ref(self.current_module_path))
 
         // Resolve param types
         let sig_param_start = self.sig_params.len() as i32
@@ -1593,6 +1747,13 @@ impl Sema:
         if is_local != 0:
             self.set_pretty_symbol(name, self.extract_decl_name_after(node, "fn"))
         self.record_decl_visibility(name, node, 1)
+        // D39: an extern names one C symbol in every tier (D29); a source
+        // declaration of it owns the flat name and its source path whatever
+        // the declaration order — an interface's (pcre2's `abort` beside
+        // LlvmBridge's) would move the symbol into the migrated-C zone and
+        // make the source's `unsafe: abort()` a block with no unsafe operation.
+        if bundle_interface_text(self.current_module_path).len() > 0 and self.fn_decl_source_paths.contains(name) and bundle_interface_text(self.fn_symbol_source_path(name)).len() == 0:
+            return
         self.fn_decl_source_paths.insert(name, with_str_clone_ref(self.current_module_path))
 
         // Error if this extern fn shadows a regular function from the same file or
@@ -1670,6 +1831,7 @@ impl Sema:
     mut fn collect_extern_var(node: i32, is_local: i32):
         let name = self.ast.get_data0(node)
         self.record_decl_visibility(name, node, 1)
+        self.extern_var_texts.insert(sema_owned_text(self.pool_resolve(name)), 1)
         let type_node = self.ast.get_data1(node)
         let tid = self.resolve_type_expr(type_node)
         if self.is_opaque_value_type(tid) != 0:
@@ -2188,6 +2350,11 @@ impl Sema:
     mut fn warn_large_copy_type(type_name: i32, type_tid: i32, node: i32):
         if self.emit_config_warnings == 0:
             return
+        // Perf advice for the user's own types; a std or bundle-interface
+        // declaration (pcre2's match blocks reach every program through the
+        // prelude's std.regex) is not theirs to change.
+        if sema_path_is_user_lint_source(self.decl_source_path_for_node(node)) == 0:
+            return
         let threshold = self.copy_warn_threshold
         if threshold <= 0 or type_tid <= 0:
             return
@@ -2702,6 +2869,8 @@ impl Sema:
     mut fn validate_copy_derives():
         let copy_sym = self.syms.copy_trait
         for di in 0..self.ast.decl_count():
+            if self.decl_is_lazy_skipped(di):
+                continue
             let decl = self.ast.get_decl(di)
             if self.ast.kind(decl) != NodeKind.NK_TYPE_DECL:
                 continue
@@ -2768,6 +2937,8 @@ impl Sema:
 
     mut fn validate_generic_type_decls():
         for di in 0..self.ast.decl_count():
+            if self.decl_is_lazy_skipped(di):
+                continue
             let decl = self.ast.get_decl(di)
             if self.ast.kind(decl) != NodeKind.NK_TYPE_DECL:
                 continue

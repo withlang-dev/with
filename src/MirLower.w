@@ -3276,10 +3276,20 @@ impl MirBuilder:
         let existing = self.lookup_local(sym)
         if existing >= 0:
             return existing
-        // Scan module declarations for a mutable let (var) or extern var
-        for di in 0..self.ast.decl_count():
+        // Scan module declarations for a mutable let (var) or extern var.
+        // Two passes: a source declaration first, a bundle interface's
+        // storage (D39) only when no source declares the name — Sema's
+        // order too (the flat scope, then the interface table), so a
+        // program's `const PACKAGE` is never pcre2's `pub let PACKAGE: str`.
+        let decl_count = self.ast.decl_count()
+        for step in 0..(2 * decl_count):
+            let pass = step / decl_count
+            let di = step % decl_count
             let decl = self.ast.get_decl(di)
             let dk = self.ast.kind(decl)
+            let interface_provided = dk == NodeKind.NK_LET_DECL and self.ast.let_decl_is_interface_provided(decl)
+            if (pass == 1) != interface_provided:
+                continue
             if dk == NodeKind.NK_EXTERN_VAR:
                 if self.ast.get_data0(decl) != sym:
                     continue
@@ -3290,6 +3300,7 @@ impl MirBuilder:
                 if ev_ty <= 0:
                     ev_ty = self.sema.ty_i32
                 let local_id = self.body.new_local(ev_ty, ev_is_mut, sym, 1)
+                self.body.mark_global_local(local_id)
                 self.bind_local(sym, local_id)
                 return local_id
             if dk != NodeKind.NK_LET_DECL:
@@ -3321,6 +3332,7 @@ impl MirBuilder:
             if gty == 0:
                 gty = self.sema.ty_i32 as i32
             let local_id = self.body.new_local(gty, is_mut, sym, 1)
+            self.body.mark_global_local(local_id)
             self.bind_local(sym, local_id)
             return local_id
         -1
@@ -5728,11 +5740,10 @@ impl MirBuilder:
             self.expected_type = bind_ty
             let rhs_op = self.lower_expr(rhs_expr)
             self.expected_type = saved_expected
+            // The lowered operand owns the transfer decision. A borrowed
+            // field may have materialized an independent value, so revisiting
+            // its AST here would consume the original field as well (#1043).
             self.assign_operand_to_place(place, rhs_op, self.ast.get_start(node))
-            // Ordinary assignment-move transfers a non-Copy RHS place into the
-            // binding. Cancel the source's value drop after the value has been
-            // captured; projected moves also queue their D17 reset below.
-            self.cancel_scheduled_value_drop_for_receiver_expr(rhs_expr)
             // #747 (03g): a pure-view if-result (all result arms place-reads
             // of named storage or constants) binds as a VIEW — cancel the
             // scheduled scope-exit drop so the binding does not free storage
@@ -14462,6 +14473,8 @@ fn lower_generator_next_body(sema: &Sema, source: &MirBody, fn_node: i32) -> Mir
             source.local_names[li],
             source.local_is_user_var[li],
         )
+        if source.local_is_global[li] != 0:
+            out.mark_global_local(mapped)
         local_map.push(mapped)
 
     for ci in 0..source.const_kinds.len():

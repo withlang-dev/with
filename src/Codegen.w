@@ -4364,6 +4364,13 @@ impl Codegen:
         let flags = self.pool.get_data2(fn_node)
         let meta = self.pool.find_fn_meta(fn_node)
         if meta < 0: return
+        // D39: a source definition owns the symbol's function whatever the
+        // declaration order; a declared-only interface declaration of the
+        // same name (pcre2's is_alpha beside std.string's) never displaces
+        // it — the source body would be emitted into the bundle's symbol and
+        // the source's own function left declared without one.
+        if self.fn_node_is_declared_only(fn_node) and (self.fn_values.contains(name_sym) or (alias_sym != 0 and self.fn_values.contains(alias_sym))):
+            return
 
         // Check if method (has dot in name); for missing symbol text, infer owner
         // from `self: Type` in param 0.
@@ -5526,6 +5533,8 @@ impl Codegen:
 
     fn detect_drop_functions():
         for i in 0..self.pool.decl_count():
+            if self.sema.decl_is_lazy_skipped(i):
+                continue
             let decl = self.pool.get_decl(i)
             if self.pool.kind(decl) != NodeKind.NK_IMPL_DECL:
                 continue
@@ -6178,6 +6187,8 @@ impl Codegen:
 
         // Pass 0a: predeclare all struct/enum names so forward references resolve.
         for i in 0..self.pool.decl_count():
+            if self.sema.decl_is_lazy_skipped(i):
+                continue
             self.sync_decl_context(i)
             let decl = self.pool.get_decl(i)
             let kind = self.pool.kind(decl)
@@ -6211,6 +6222,8 @@ impl Codegen:
 
         // Pass 0b: define struct/enum bodies and type aliases.
         for i in 0..self.pool.decl_count():
+            if self.sema.decl_is_lazy_skipped(i):
+                continue
             self.sync_decl_context(i)
             let decl = self.pool.get_decl(i)
             let kind = self.pool.kind(decl)
@@ -6258,6 +6271,8 @@ impl Codegen:
 
         // Pass 0.5: collect trait declarations
         for i in 0..self.pool.decl_count():
+            if self.sema.decl_is_lazy_skipped(i):
+                continue
             self.sync_decl_context(i)
             let decl = self.pool.get_decl(i)
             if self.pool.kind(decl) == NodeKind.NK_TRAIT_DECL:
@@ -6265,6 +6280,8 @@ impl Codegen:
 
         // Pass 1: declare all functions and externs (forward declarations)
         for i in 0..self.pool.decl_count():
+            if self.sema.decl_is_lazy_skipped(i):
+                continue
             self.sync_decl_context(i)
             let decl = self.pool.get_decl(i)
             let kind = self.pool.kind(decl)
@@ -6314,6 +6331,8 @@ impl Codegen:
         // Function declarations must exist first so global struct initializers can
         // contain function-pointer fields.
         for i in 0..self.pool.decl_count():
+            if self.sema.decl_is_lazy_skipped(i):
+                continue
             self.sync_decl_context(i)
             let decl = self.pool.get_decl(i)
             if self.pool.kind(decl) == NodeKind.NK_LET_DECL:
@@ -6326,6 +6345,8 @@ impl Codegen:
         for i in 0..self.pool.decl_count():
             if self.had_error != 0:
                 break
+            if self.sema.decl_is_lazy_skipped(i):
+                continue
             self.sync_decl_context(i)
             let decl = self.pool.get_decl(i)
             let kind = self.pool.kind(decl)

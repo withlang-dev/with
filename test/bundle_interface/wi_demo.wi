@@ -1,6 +1,7 @@
 module <embedded-std>/std/wi_demo.w
 pub type Bits = union { whole: u32, half: u16 }
 impl Copy for Bits
+@[repr(C)]
 pub type Callback { call: extern "C" fn(i32) -> i32, tag: u8 }
 impl Copy for Callback
 pub enum Color:
@@ -12,6 +13,8 @@ pub enum Level: u8:
     Low = 1
     High = 200
 impl Copy for Level
+@[packed]
+pub type Packet { tag: u8, word: i32 }
 pub type Pair { a: i32, b: i32 }
 pub type Word = i32
 pub const GREETING: str = "hi\n"
@@ -20,6 +23,7 @@ pub var COUNTER: i32
 pub let TABLE: [4]u8
 pub fn add(p: &Pair) -> i32
 pub fn level_value(l: Level) -> u8
+pub fn packet_word(p: &Packet) -> i32
 pub unsafe fn set_first(p: *mut Pair, v: i32) -> Unit
 pub fn sum_slice(xs: []i32) -> i32
 pub fn table_at(i: i64) -> u8

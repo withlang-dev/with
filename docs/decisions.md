@@ -599,7 +599,11 @@ The implementation is deliberately NON-COMPLIANT until the retirement lands
 747-flip `ad053bea`, bridges until then). Supersedes in part D18's extern
 `-> str` ownership-contract bullet (annotated there). The transitional
 `with_*` guidance in CLAUDE.md remains operative until the retirement lands
-and is marked accordingly.
+and is marked accordingly. Status 2026-09-04: the regex seam
+(`rt/regex_runtime.w`, `with_regex_*`) is retired — `std.regex` calls the
+pcre2 bundle through its interface and the compiler's own regex-literal
+validation goes through the facade (batch C4, docs/wo_bundles.md "Shim
+retired"); the `with_*` runtime objects remain.
 
 **Ruling (blessed wording):**
 
