@@ -8741,10 +8741,8 @@ fn ci_lookup_c_function_decl_idx(session: i64, name: &str) -> i32:
 // inline wrapper body that calls such a symbol would lower to a reference
 // nothing defines (SemaCheck: "undefined variable"), so the call lowering
 // must bail and let the wrapper be cleanly omitted+recorded rather than
-// emit a ghost call. The call-site system-symbol guard misses these on
-// Windows: ci_is_system_decl only catches `__`/`_[A-Z]` (not `_[a-z]` UCRT
-// helpers like `_vfwprintf_s_l`) and ci_is_system_path is Unix-only, so
-// this decl-index-driven check is the platform-independent source of truth.
+// emit a ghost call. This declaration-index check also covers user headers,
+// independently of the shared system-header path classification.
 fn ci_fn_decl_is_unemittable(session: i64, decl_idx: i32) -> bool:
     if decl_idx < 0:
         return false
@@ -16362,14 +16360,7 @@ fn ci_get_nth_pipe_entry(entries: &str, n: i32) -> str:
     ""
 
 // Check if a source location path is a system header.
-fn ci_is_system_path(loc: &str) -> bool:
-    if ci_starts_with(loc, "/usr/"): return true
-    if ci_starts_with(loc, "/Library/"): return true
-    if ci_starts_with(loc, "/Applications/Xcode"): return true
-    if ci_str_contains(loc, "/usr/include/"): return true
-    if ci_str_contains(loc, "/SDKs/"): return true
-    if ci_str_contains(loc, "/clang/"): return true
-    false
+fn ci_is_system_path(loc: &str) -> bool: cimport_path_is_system(loc)
 
 let CI_LIBC_KIND_FN: i32 = 1
 let CI_LIBC_KIND_VAR: i32 = 2

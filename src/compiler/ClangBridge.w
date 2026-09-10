@@ -2056,7 +2056,11 @@ unsafe fn cimport_location_path_is_system(path: *const u8) -> i32:
         return 1
     if c_strstr(path, "/usr/include/\0" as *const u8) as i64 != 0:
         return 1
+    if c_strstr(path, "\\usr\\include\\\0" as *const u8) as i64 != 0:
+        return 1
     if c_strstr(path, "/SDKs/\0" as *const u8) as i64 != 0:
+        return 1
+    if c_strstr(path, "\\SDKs\\\0" as *const u8) as i64 != 0:
         return 1
     if c_strstr(path, "/clang/\0" as *const u8) as i64 != 0:
         return 1
@@ -2075,6 +2079,11 @@ unsafe fn cimport_location_path_is_system(path: *const u8) -> i32:
     if c_strstr(path, "\\VC\\Tools\\MSVC\\\0" as *const u8) as i64 != 0:
         return 1
     0
+
+// Declaration locations and macro cursors use one path classification.
+pub fn cimport_path_is_system(path: &str) -> bool:
+    let terminated = path ++ "\0"
+    unsafe { cimport_location_path_is_system(terminated as *const u8) != 0 }
 
 unsafe fn macro_location_from_cursor(s: *mut CImportSession, cursor: CXCursor) -> str:
     let loc = clang_getCursorLocation(cursor)
