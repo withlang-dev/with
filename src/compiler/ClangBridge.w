@@ -2049,6 +2049,14 @@ unsafe fn cimport_location_path_is_system(path: *const u8) -> i32:
     if path as i64 == 0: return 0
     // Clang locations can mix separators even within one header path.
     let normalized = make_str(path).replace("\\", "/")
+    // Embedded builtin headers remain system headers after materialization.
+    // Use the configured resource root, including an explicit override, and
+    // require a path boundary so a neighboring project directory stays public.
+    let resource_dir = get_clang_resource_dir()
+    if resource_dir as i64 != 0:
+        let resource_root = make_str(resource_dir).replace("\\", "/")
+        let prefix = if resource_root.ends_with("/"): resource_root else: resource_root ++ "/"
+        if normalized.starts_with(prefix): return 1
     if normalized.starts_with("/usr/"): return 1
     if normalized.starts_with("/Library/"): return 1
     if normalized.starts_with("/Applications/Xcode"): return 1

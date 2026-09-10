@@ -269,8 +269,6 @@ pub extern fn with_va_start(ap: *mut i8) -> Unit
 pub extern fn with_va_end(ap: *mut i8) -> Unit
 
 
-pub type max_align_t = c_longdouble
-
 pub type z_size_t = c_ulong
 
 pub type Byte = u8
@@ -337,33 +335,11 @@ pub type ushf = c_ushort
 
 pub type ulg = c_ulong
 
-pub let NULL: *mut c_void = null
 pub let MAX_MEM_LEVEL: c_int = 9
 pub let MAX_WBITS: c_int = 15
 pub fn OF[T](args: T) -> T {
     args
 }
-pub let SCHAR_MAX: c_int = 127
-pub let SHRT_MAX: c_int = 32767
-pub let INT_MAX: c_int = 2147483647
-pub let LONG_MAX: c_long = 9223372036854775807
-pub let SCHAR_MIN: c_int = -128
-pub let SHRT_MIN: c_int = -32768
-pub let INT_MIN: c_int = -2147483648
-pub let LONG_MIN: c_long = (0 - 9223372036854775807 - 1)
-pub let UCHAR_MAX: c_int = 255
-pub let USHRT_MAX: c_int = 65535
-pub let UINT_MAX: c_uint = 4294967295
-pub let ULONG_MAX: c_ulong = ((0 as c_ulong) -% 1)
-pub let CHAR_BIT: c_int = 8
-pub let CHAR_MIN: c_int = -128
-pub let CHAR_MAX: c_int = 127
-pub let LLONG_MAX: c_longlong = 9223372036854775807
-pub let LLONG_MIN: c_longlong = (0 - 9223372036854775807 - 1)
-pub let ULLONG_MAX: c_ulonglong = ((0 as c_ulonglong) -% 1)
-pub let LONG_LONG_MAX: c_longlong = 9223372036854775807
-pub let LONG_LONG_MIN: c_longlong = (0 - 9223372036854775807 - 1)
-pub let ULONG_LONG_MAX: c_ulonglong = ((0 as c_ulonglong) -% 1)
 pub let ZLIB_VERSION = "1.3.2"
 pub let ZLIB_VERNUM: c_int = 0x1320
 pub let ZLIB_VER_MAJOR: c_int = 1
