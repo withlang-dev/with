@@ -14,6 +14,7 @@ pub type Pair { a: i32, b: i32 }
 @[repr(packed)]
 pub type Packet { tag: u8, word: i32 }
 pub type Word = i32
+pub type VarArgs = c_va_list
 pub type Handle = distinct i32
 pub type Bits = union { whole: u32, half: u16 }
 impl Copy for Bits
@@ -42,6 +43,7 @@ pub fn sum_slice(xs: []i32) -> i32:
     total
 pub fn level_value(l: Level) -> u8: l as u8
 pub fn packet_word(p: &Packet) -> i32: p.word
+pub fn va_size(args: &c_va_list) -> i64: sizeof[c_va_list]()
 impl Pair:
     pub fn sum() -> i32: self.a + self.b
     pub mut fn scale(k: i32) -> Unit:
