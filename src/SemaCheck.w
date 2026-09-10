@@ -3044,6 +3044,11 @@ impl Sema:
         let k = self.get_type_kind(r)
         if k == TypeKind.TY_INT or k == TypeKind.TY_FLOAT or k == TypeKind.TY_BOOL:
             return 1
+        if k == TypeKind.TY_VA_LIST:
+            // A C array typedef decays in parameter position but cannot be
+            // a C return type. The other target representations can return.
+            if allow_void != 0 and fn_abi_c_va_list_uses_caller_place(target_spec_os(), target_spec_arch()): return 0
+            return 1
         if k == TypeKind.TY_VOID:
             return allow_void
         if k == TypeKind.TY_PTR:
@@ -3079,6 +3084,7 @@ impl Sema:
             return "void"
         let r = self.resolve_alias(tid as TypeId) as i32
         let k = self.get_type_kind(r)
+        if k == TypeKind.TY_VA_LIST: return "va_list"
         if k == TypeKind.TY_VOID:
             return "void"
         if k == TypeKind.TY_BOOL:
@@ -3187,7 +3193,7 @@ impl Sema:
             ordered = self.cheader_collect_struct(self.cheader_struct_ref(self.sig_return_type(sig)), move ordered)
 
         var out = "#ifndef " ++ guard ++ "\n#define " ++ guard ++ "\n\n"
-        out = out ++ "#include <stdint.h>\n#include <stdbool.h>\n#include <stddef.h>\n\n"
+        out = out ++ "#include <stdint.h>\n#include <stdbool.h>\n#include <stddef.h>\n#include <stdarg.h>\n\n"
         out = out ++ "#ifdef __cplusplus\nextern \"C\" {\n#endif\n\n"
         for si in 0..ordered.len() as i32:
             out = out ++ self.cheader_struct_def(ordered[si])

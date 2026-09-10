@@ -204,6 +204,8 @@ impl Codegen:
             return wl_f64_type(self.context)
         if tk == TypeKind.TY_BOOL:
             return wl_i1_type(self.context)
+        if tk == TypeKind.TY_VA_LIST:
+            return self.c_va_list_llvm_type()
         if tk == TypeKind.TY_STR:
             let str_sym = self.intern.intern("str")
             return self.resolve_named_type(str_sym)
@@ -411,6 +413,10 @@ impl Codegen:
         result = wl_build_insert_value(self.builder, result, if state_flags != 0: subject_len_global else: wl_const_null(ptr_ty), 9)
         result
 
+    fn mir_c_va_list_needs_place_callable_abi(sema_ty: i32):
+        self.mir_type_kind_at(self.mir_resolve_alias_at(sema_ty)) == TypeKind.TY_VA_LIST and
+            fn_abi_c_va_list_uses_caller_place(target_spec_os(), target_spec_arch())
+
     mut fn mir_build_closure_fn_type(sema_ty: i32) -> i64:
         var resolved = self.mir_resolve_alias_at(sema_ty)
         var tk = self.mir_type_kind_at(resolved)
@@ -451,6 +457,10 @@ impl Codegen:
                 let te_idx = extra_start + pi
                 if te_idx >= 0 and te_idx < self.sema.type_extra.len() as i32:
                     p_sema_ty = self.sema.type_extra[te_idx]
+            if self.mir_c_va_list_needs_place_callable_abi(p_sema_ty):
+                with_eprint("error: function-value calls with c_va_list require a callable-type ABI descriptor on this target (#1106)")
+                self.had_error = 1
+                return 0
             let p_llvm_ty = self.mir_sema_type_to_llvm(p_sema_ty)
             if p_llvm_ty != 0:
                 if self.internal_abi_needs_indirect_param(p_llvm_ty):
@@ -460,6 +470,9 @@ impl Codegen:
             else:
                 param_types.push(self.type_fallback())
         wl_function_type(llvm_ret, vec_data_i64(&param_types), param_types.len() as i32, 0)
+
+    fn mir_c_va_list_needs_callable_abi(sema_ty: i32):
+        self.mir_type_kind_at(self.mir_resolve_alias_at(sema_ty)) == TypeKind.TY_VA_LIST and type_layout_c_va_list_size() > 8
 
     mut fn mir_build_raw_fn_type(sema_ty: i32) -> i64:
         var resolved = self.mir_resolve_alias_at(sema_ty)
@@ -486,6 +499,10 @@ impl Codegen:
             extra_start = self.sema.get_type_d0(resolved)
             param_count = self.sema.get_type_d1(resolved)
             ret_ty_id = self.sema.get_type_d2(resolved)
+        if tk == TypeKind.TY_EXTERN_FN and self.mir_c_va_list_needs_callable_abi(ret_ty_id):
+            with_eprint("error: C function-pointer calls with c_va_list require a callable-type ABI descriptor on this target (#1106)")
+            self.had_error = 1
+            return 0
         let ret_ty = self.mir_sema_type_to_llvm(ret_ty_id)
         var llvm_ret = if ret_ty != 0: ret_ty else: wl_void_type(self.context)
         let param_types: Vec[i64] = Vec.new()
@@ -499,6 +516,11 @@ impl Codegen:
                 let te_idx = extra_start + pi
                 if te_idx >= 0 and te_idx < self.sema.type_extra.len() as i32:
                     p_sema_ty = self.sema.type_extra[te_idx]
+            if self.mir_c_va_list_needs_place_callable_abi(p_sema_ty) or
+               (tk == TypeKind.TY_EXTERN_FN and self.mir_c_va_list_needs_callable_abi(p_sema_ty)):
+                with_eprint("error: function-value calls with c_va_list require a callable-type ABI descriptor on this target (#1106)")
+                self.had_error = 1
+                return 0
             let p_llvm_ty = self.mir_sema_type_to_llvm(p_sema_ty)
             if p_llvm_ty != 0:
                 if self.internal_abi_needs_indirect_param(p_llvm_ty):
@@ -15281,7 +15303,10 @@ impl Codegen:
                     self.record_codegen_call_argument(body, args_id, operand_id, ai, AnalysisMarshalStrategy.TemporaryAddress, ftmp, ftmp)
                     args.push(ftmp)
                     continue
-                var arg_ptr = self.mir_try_place_ptr_for_ref(body, operand_id)
+                // PM_INDIRECT is a copy, not a borrowed place. On targets
+                // without LLVM's byval attribute we must create that copy
+                // here even when the operand already has an address.
+                var arg_ptr = if codegen_c_abi_needs_byval_attr(): self.mir_try_place_ptr_for_ref(body, operand_id) else: 0
                 var byval_strategy = AnalysisMarshalStrategy.ExistingPointer
                 if arg_ptr == 0:
                     let val = self.mir_eval_operand(body, operand_id, 0)

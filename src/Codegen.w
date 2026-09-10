@@ -767,10 +767,14 @@ impl Codegen:
         let name = if mono != 0: with_str_clone_ref(self.sema.pool_resolve(mono)) else if sig >= 0 and sig < self.sema.sig_names.len() as i32: with_str_clone_ref(self.sema.pool_resolve(self.sema.sig_names[sig])) else: "<unresolved>"
         let op_kind = if operand >= 0 and operand < body.operand_kinds.len() as i32: body.operand_kinds[operand] else: -1
         let share = sig >= 0 and param_index >= 0 and param_index < self.sema.sig_get_param_count(sig) and self.sema.sig_param_uses_value_ref_abi(sig, param_index) != 0
-        // Extern "C" callees marshal per the C ABI, not the With ref-table
-        // contract; keep the fact but exempt them from the failure verdicts.
+        // Extern "C" callees use their recorded C ABI instead of the With
+        // ref table. Their indirect-copy requirement is audited below.
         let sig_sym = if sig >= 0 and sig < self.sema.sig_names.len() as i32: self.sema.sig_names[sig] else: 0
         let callee_is_extern = sig_sym != 0 and self.sema.extern_fn_names.contains(sig_sym)
+        let abi_sym = self.codegen_sym_for_sema_sym(if mono != 0: mono else: sig_sym)
+        let byval = self.extern_fn_byval_params.get(abi_sym)
+        let needs_copy = byval.is_some() and param_index >= 0 and param_index < 64 and
+            (byval.unwrap() & ((1 as i64) << (param_index as u32))) != 0 and not codegen_c_abi_needs_byval_attr()
         let ref_table = mono != 0 and self.is_ref_param(mono, param_index)
         var fact = AnalysisFact.new(AnalysisStage.Codegen, AnalysisFactKind.CodegenArgument)
         fact.id = operand
@@ -787,9 +791,12 @@ impl Codegen:
         // analysis_marshal_strategy_name consumes it.
         let strategy_unmarshaled = strategy == AnalysisMarshalStrategy.DirectValue or strategy == AnalysisMarshalStrategy.MissingSignature
         let strategy_temp_copy = strategy == AnalysisMarshalStrategy.TemporaryAddress and (op_kind == OperandKind.OK_COPY or op_kind == OperandKind.OK_MOVE)
-        fact.detail = analysis_marshal_strategy_name(strategy) ++ f" raw={raw} marshaled={marshaled} sig={sig} sema-share={share} ref-table={ref_table}"
+        let has_copy = strategy == AnalysisMarshalStrategy.TemporaryAddress
+        fact.detail = analysis_marshal_strategy_name(strategy) ++ f" raw={raw} marshaled={marshaled} sig={sig} sema-share={share} ref-table={ref_table} needs-copy={needs_copy}"
         let selected = self.analysis_fact_selected(&fact)
         self.analysis_add(move fact)
+        if selected and needs_copy and not has_copy:
+            self.analysis_fail(f"call {name} body={body.fn_sym} args={args_id} param={param_index}: indirect value parameter requires an explicit caller copy")
         if selected and share and not callee_is_extern and not ref_table:
             self.analysis_fail(f"call {name} body={body.fn_sym} args={args_id} param={param_index}: Sema share-place contract is absent from Codegen ref table")
         if selected and share and not callee_is_extern and strategy_unmarshaled:
@@ -2855,6 +2862,7 @@ impl Codegen:
         if sym == self.sym_never: return wl_void_type(self.context)
         if sym == self.sym_unit: return wl_i32_type(self.context)
         let name = self.intern.resolve(sym)
+        if name == "c_va_list": return self.c_va_list_llvm_type()
         if name == "i32": return wl_i32_type(self.context)
         if name == "i64": return wl_i64_type(self.context)
         if name == "i128": return wl_i128_type(self.context)
@@ -2868,6 +2876,16 @@ impl Codegen:
         if name == "f64": return wl_f64_type(self.context)
         if name == "f32": return wl_f32_type(self.context)
         0
+
+    // Shared by named type expressions (including sizeof/alignof) and
+    // resolved Sema types. An i8 array would lose the C alignment.
+    fn c_va_list_llvm_type() -> i64:
+        let va_size = type_layout_c_va_list_size()
+        if va_size == 8: return wl_ptr_type(self.context)
+        var fields: Vec[i64] = Vec.new()
+        for i in 0..(va_size / 8) as i32:
+            fields.push(wl_i64_type(self.context))
+        wl_struct_type(self.context, vec_data_i64(&fields), fields.len() as i32, 0)
 
     fn resolve_user_named_type(sym: i32) -> i64:
         let de_opt = self.disc_enum_type_map.get(sym)
@@ -3345,14 +3363,8 @@ impl Codegen:
             return self.resolve_named_type(str_sym)
         if tk == TypeKind.TY_VOID or tk == TypeKind.TY_NEVER:
             return wl_void_type(self.context)
-        // #1104: the target's own va_list storage — a pointer where C's
-        // va_list is `char *` (Darwin, Windows), a byte buffer of the tag's
-        // size on Linux; llvm.va_start fills exactly this.
         if tk == TypeKind.TY_VA_LIST:
-            let va_size = type_layout_c_va_list_size()
-            if va_size == 8:
-                return wl_ptr_type(self.context)
-            return wl_array_type(wl_i8_type(self.context), va_size)
+            return self.c_va_list_llvm_type()
         if tk == TypeKind.TY_STRUCT or tk == TypeKind.TY_ENUM:
             let sym = self.sema.get_type_d0(resolved_tid)
             // Distinct types are transparent: same LLVM type as inner type
@@ -5351,10 +5363,9 @@ impl Codegen:
         let orig_param_types: Vec[i64] = Vec.new()
         for pi in 0..param_count:
             let p_type_node = self.pool.fn_param_type(param_start, pi)
-            // #1104: a share-place parameter of an extern (a c_va_list on
-            // Linux) is declared as the pointer MIR passes — the address of
-            // the caller's va_list, as C's array decay hands vsnprintf.
-            if sema_sig_idx >= 0 and self.sema.sig_param_uses_value_ref_abi(sema_sig_idx, pi) != 0:
+            // Read the same place classification as With declarations.
+            // Indirect copies retain their aggregate type for C marshalling.
+            if sema_sig_idx >= 0 and self.arg_pass_mode(sema_sig_idx, pi) == PM_INDIRECT_PLACE:
                 orig_param_types.push(wl_ptr_type(self.context))
             else:
                 orig_param_types.push(self.resolve_type(p_type_node))

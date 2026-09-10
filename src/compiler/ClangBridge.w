@@ -209,12 +209,14 @@ let CXType_Pointer: i32 = 101
 let CXType_BlockPointer: i32 = 102
 let CXType_Record: i32 = 105
 let CXType_Enum: i32 = 106
+let CXType_Typedef: i32 = 107
 let CXType_FunctionNoProto: i32 = 110
 let CXType_FunctionProto: i32 = 111
 let CXType_ConstantArray: i32 = 112
 let CXType_Vector: i32 = 113
 let CXType_IncompleteArray: i32 = 114
 let CXType_VariableArray: i32 = 115
+let CXType_Elaborated: i32 = 119
 let CXType_ExtVector: i32 = 176
 let CXType_Atomic: i32 = 177
 
@@ -766,24 +768,58 @@ unsafe fn get_type_spelling(s: *mut CImportSession, ty: CXType) -> str:
 // Forward declaration pattern: translate_fn_type calls translate_type_recursive and vice versa.
 // In With, both are defined at module scope so mutual recursion works.
 
+unsafe fn cimport_type_decl_named(ty: CXType, name: *const u8):
+    let spelling = clang_getCursorSpelling(clang_getTypeDeclaration(ty))
+    let text = clang_getCString(spelling)
+    let matches = text as i64 != 0 and c_strcmp(text, name) == 0
+    clang_disposeString(spelling)
+    matches
+
+unsafe fn cimport_type_is_va_list(ty: CXType, depth: i32) -> bool:
+    if depth > MAX_TYPE_DEPTH: return false
+    if ty.kind == CXType_Elaborated:
+        return cimport_type_is_va_list(clang_Type_getNamedType(ty), depth + 1)
+    if ty.kind == CXType_Typedef:
+        if cimport_type_decl_named(ty, "va_list\0" as *const u8) or
+           cimport_type_decl_named(ty, "__builtin_va_list\0" as *const u8) or
+           cimport_type_decl_named(ty, "__gnuc_va_list\0" as *const u8):
+            return true
+        return cimport_type_is_va_list(clang_getTypedefDeclUnderlyingType(clang_getTypeDeclaration(ty)), depth + 1)
+    if ty.kind == CXType_ConstantArray and clang_getArraySize(ty) == 1:
+        return cimport_type_decl_named(clang_getArrayElementType(ty), "__va_list_tag\0" as *const u8)
+    ty.kind == CXType_Record and cimport_type_decl_named(ty, "__va_list\0" as *const u8)
+
+unsafe fn cimport_type_is_va_list_parameter(ty: CXType):
+    if cimport_type_is_va_list(ty, 0): return true
+    let canonical = clang_getCanonicalType(ty)
+    // A parameter of the SysV array typedef has already decayed. A
+    // va_list * instead points to an array, so retains its pointer layer.
+    canonical.kind == CXType_Pointer and
+        cimport_type_decl_named(clang_getPointeeType(canonical), "__va_list_tag\0" as *const u8)
+
+unsafe fn translate_parameter_type(s: *mut CImportSession, ty: CXType, depth: i32):
+    if cimport_type_is_va_list_parameter(ty):
+        return session_strdup(s, "c_va_list\0" as *const u8)
+    translate_type_recursive(s, ty, depth, 0)
+
 unsafe fn translate_type_recursive_mode(s: *mut CImportSession, ty: CXType, depth: i32, is_last_struct_field: i32, preserve_incomplete_arrays: i32) -> *mut u8:
     if depth > MAX_TYPE_DEPTH:
         return session_strdup(s, "__UNSUPPORTED:type too complex\0" as *const u8)
-    // #1104: C's va_list is the compiler's per-target `c_va_list`, spelled the
-    // same on every host — never the canonical shape, which is `char *` on
-    // Darwin, `__va_list_tag[1]` on SysV x86_64 and `struct __va_list` on
-    // AAPCS64. Detect it from the PRE-canonical spelling (the typedef name
-    // `va_list`/`__builtin_va_list`, or the decayed `__va_list_tag *` a
-    // parameter shows), so a corpus migrated on one host runs its variadic
-    // definitions on the others.
-    let raw_spelling = clang_getTypeSpelling(ty)
-    let raw_cstr = clang_getCString(raw_spelling)
-    let is_va_list = raw_cstr as i64 != 0 and c_strstr(raw_cstr, "va_list\0" as *const u8) as i64 != 0
-    clang_disposeString(raw_spelling)
-    if is_va_list:
+    // Follow typedef identity before canonicalization erases va_list on
+    // Darwin. A substring in an unrelated name is never a type identity.
+    if cimport_type_is_va_list(ty, depth):
         return session_strdup(s, "c_va_list\0" as *const u8)
+    if ty.kind == CXType_Typedef:
+        return translate_type_recursive_mode(s, clang_getTypedefDeclUnderlyingType(clang_getTypeDeclaration(ty)), depth + 1, is_last_struct_field, preserve_incomplete_arrays)
+    if ty.kind == CXType_Elaborated:
+        return translate_type_recursive_mode(s, clang_Type_getNamedType(ty), depth + 1, is_last_struct_field, preserve_incomplete_arrays)
     let canonical = clang_getCanonicalType(ty)
     let kind = canonical.kind
+    // typeof probes are Unexposed even when their canonical type is an
+    // array or pointer; libclang's decomposition APIs reject that wrapper.
+    // Keep original children whenever its kind exposes the actual shape,
+    // so ordinary pointer/array typedefs retain nested va_list identity.
+    let shape = if ty.kind == kind: ty else: canonical
 
     if kind == CXType_Void: return session_strdup(s, "Unit\0" as *const u8)
     if kind == CXType_Bool: return session_strdup(s, "bool\0" as *const u8)
@@ -811,13 +847,13 @@ unsafe fn translate_type_recursive_mode(s: *mut CImportSession, ty: CXType, dept
     if kind == CXType_Float128: return session_strdup(s, "f128\0" as *const u8)
 
     if kind == CXType_Pointer:
-        let pointee = clang_getPointeeType(canonical)
+        let pointee = clang_getPointeeType(shape)
         let can_pointee = clang_getCanonicalType(pointee)
         let is_const = clang_isConstQualifiedType(pointee)
         let is_volatile = clang_isVolatileQualifiedType(pointee)
         // Function pointer
         if can_pointee.kind == CXType_FunctionProto or can_pointee.kind == CXType_FunctionNoProto:
-            let fn_str = translate_fn_type(s, can_pointee, depth + 1)
+            let fn_str = translate_fn_type(s, pointee, depth + 1)
             if fn_str as i64 == 0: return session_strdup(s, "*const i8\0" as *const u8)
             return fn_str
         let qual = if is_volatile != 0: "volatile\0" as *const u8 else: if is_const != 0: "const\0" as *const u8 else: "mut\0" as *const u8
@@ -851,7 +887,7 @@ unsafe fn translate_type_recursive_mode(s: *mut CImportSession, ty: CXType, dept
 
     if kind == CXType_ConstantArray:
         let size = clang_getArraySize(canonical)
-        let elem = clang_getArrayElementType(canonical)
+        let elem = clang_getArrayElementType(shape)
         let elem_str = translate_type_recursive_mode(s, elem, depth + 1, 0, preserve_incomplete_arrays)
         if elem_str as i64 == 0 or c_strcmp(elem_str as *const u8, "c_void\0" as *const u8) == 0:
             return session_strdup(s, "c_void\0" as *const u8)
@@ -881,7 +917,7 @@ unsafe fn translate_type_recursive_mode(s: *mut CImportSession, ty: CXType, dept
         return session_strdup(s, &buf as *const [2048]u8 as *const u8)
 
     if kind == CXType_FunctionProto or kind == CXType_FunctionNoProto:
-        return translate_fn_type(s, canonical, depth + 1)
+        return translate_fn_type(s, shape, depth + 1)
 
     if kind == CXType_Record:
         let spelling = clang_getTypeSpelling(canonical)
@@ -986,7 +1022,7 @@ unsafe fn translate_fn_type(s: *mut CImportSession, fn_type: CXType, depth: i32)
         if i > 0:
             buf_append_str(&raw mut params as *mut [4096]u8 as *mut u8, &raw mut pos, 4096, ", \0" as *const u8)
         let arg_type = clang_getArgType(fn_type, i as u32)
-        var arg_str = translate_type_recursive(s, arg_type, depth + 1, 0)
+        var arg_str = translate_parameter_type(s, arg_type, depth + 1)
         if arg_str as i64 == 0 or c_strncmp(arg_str as *const u8, "__UNSUPPORTED:\0" as *const u8, 14) == 0:
             arg_str = session_strdup(s, "i32\0" as *const u8)
         buf_append_str(&raw mut params as *mut [4096]u8 as *mut u8, &raw mut pos, 4096, arg_str as *const u8)
@@ -1589,7 +1625,7 @@ pub fn with_cimport_fn_param_type_translated(session: i64, idx: i32, param: i32)
         let cursor = *(((*s).decls as i64 + idx as i64 * 32) as *const CXCursor)
         let arg = clang_Cursor_getArgument(cursor, param as u32)
         let ty = clang_getCursorType(arg)
-        let result = translate_type_recursive(s, ty, 0, 0)
+        let result = translate_parameter_type(s, ty, 0)
         if result as i64 == 0: return ""
         session_make_str(s, result as *const u8)
 
@@ -3131,6 +3167,14 @@ pub fn with_ci_type_translated(session: i64, type_idx: i32) -> str:
         let result = translate_type_recursive(s, ty, 0, 0)
         if result as i64 == 0: return ""
         session_make_str(s, result as *const u8)
+
+pub fn cimport_type_is_va_list_at(session: i64, type_idx: i32, parameter: bool) -> bool:
+    unsafe:
+        let s = session as *mut CImportSession
+        if s as i64 == 0 or type_idx < 0 or type_idx >= (*s).type_count: return false
+        let ty = *(((*s).types as i64 + type_idx as i64 * 24) as *const CXType)
+        if parameter: return cimport_type_is_va_list_parameter(ty)
+        cimport_type_is_va_list(ty, 0)
 
 // ── Cursor extras ───────────────────────────────────────────
 

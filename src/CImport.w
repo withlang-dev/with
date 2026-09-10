@@ -6486,15 +6486,6 @@ fn ci_cxtype_kind_is_int(kind: i32) -> bool:
 fn ci_cxtype_kind_is_float(kind: i32) -> bool:
     kind == CXT_Float or kind == CXT_Double or kind == CXT_LongDouble or kind == CXT_Float128 or kind == CXT_Half or kind == CXT_Float16
 
-// True for the aggregate `va_list` shapes: `__va_list_tag[N]` (glibc/x86_64)
-// and `struct __va_list` (AAPCS64 Linux). Darwin's `char *` va_list is a
-// pointer and never reaches here.
-fn ci_canonical_is_aggregate_va_list(session: i64, canon: i32) -> bool:
-    if with_ci_type_kind(session, canon) == CXT_ConstantArray:
-        let elem = with_ci_type_array_element(session, canon)
-        return elem >= 0 and ci_str_contains(with_ci_type_spelling(session, elem), "__va_list_tag")
-    with_ci_type_kind(session, canon) == CXT_Record and ci_str_contains(with_ci_type_spelling(session, canon), "__va_list")
-
 // ci_type_from_libclang — walks a libclang CXType tree into
 // CiType nodes, preserving structural decomposition for
 // pointers / arrays / function pointers and using CT_NAMED at
@@ -6515,6 +6506,8 @@ impl CiTypePool:
     fn type_from_libclang(session: i64, cxtype: i32) -> CiTypeId:
         if cxtype < 0:
             return 0 as CiTypeId
+        if cimport_type_is_va_list_at(session, cxtype, false):
+            return self.ty_named(self.add_string("c_va_list"))
         let kind = with_ci_type_kind(session, cxtype)
 
         if kind == CXT_Void:
@@ -6618,22 +6611,15 @@ impl CiTypePool:
                 let arg_idx = with_ci_type_arg(session, cxtype, i)
                 if arg_idx < 0:
                     return 0 as CiTypeId
-                let arg_ty = self.type_from_libclang(session, arg_idx)
+                let arg_ty =
+                    if cimport_type_is_va_list_at(session, arg_idx, true):
+                        self.ty_named(self.add_string("c_va_list"))
+                    else: self.type_from_libclang(session, arg_idx)
                 if (arg_ty as i32) == 0:
                     return 0 as CiTypeId
                 let _ = self.add_extra(arg_ty as i32)
                 i = i + 1
             return self.ty_fn_ptr(ret_ty, params_start, arg_count)
-
-        // Aggregate `va_list` (glibc/x86_64 spells it `__va_list_tag[N]`,
-        // AAPCS64 Linux `struct __va_list`) has no spellable field layout.
-        // #1104: it is the compiler's c_va_list, whose storage and passing
-        // TypeLayout and FnAbi decide per TARGET — never a host-sized byte
-        // buffer, which pinned the migration host's ABI into the corpus.
-        let va_canon = with_ci_type_canonical(session, cxtype)
-        if va_canon >= 0 and ci_canonical_is_aggregate_va_list(session, va_canon):
-            let va_idx = self.add_string("c_va_list")
-            return self.ty_named(va_idx)
 
         // Typedef, elaborated, atomic, and other named wrappers.
         // Normalize builtin typedef spellings so C names like size_t do

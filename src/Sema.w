@@ -4418,17 +4418,12 @@ impl Sema:
             return 0
         if self.get_type_kind(self.resolve_alias(tid as TypeId)) == TypeKind.TY_VA_LIST: 1 else: 0
 
-    // #1104: a c_va_list parameter is passed the way the target's C passes
-    // va_list. On SysV x86_64 the array type decays to a pointer to the
-    // CALLER's __va_list_tag; on AAPCS64 Linux the 32-byte struct goes by
-    // reference; both are the share-place ABI (a pointer to the place, no
-    // copy) — one PassMode verdict read by MIR (the caller passes the
-    // address) and by codegen (the callee binds the place). Darwin and
-    // Windows pass the pointer-sized value directly (TypeLayout, Codegen).
+    // Only C's array-decay mode aliases the caller's storage. The indirect
+    // struct mode keeps value semantics and codegen supplies its copy.
     fn sig_param_is_c_va_list_by_place(sig_idx: i32, pi: i32) -> i32:
         if self.type_is_c_va_list(self.sig_param_type(sig_idx, pi)) == 0:
             return 0
-        if target_spec_os() == "Linux": 1 else: 0
+        if fn_abi_c_va_list_uses_caller_place(target_spec_os(), target_spec_arch()): 1 else: 0
 
     fn is_c_void_like_type(tid: i32) -> i32:
         if tid == 0:
