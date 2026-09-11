@@ -41,11 +41,11 @@ fn parameter_verdict(dead: bool) -> str:
     body.set_terminator(entry, TermKind.TK_RETURN, 0, 0, 0, 0, 0)
     validate_ownership_body(mir_mod, body)
 
-fn global_verdict(global: bool) -> str:
+fn global_verdict(is_global: bool) -> str:
     let mir_mod = MirModule.init()
     var body = MirBody.init_for_fn(1)
     let local = body.new_temp(1)
-    if global: body.mark_global_local(local)
+    if is_global: body.mark_global_local(local)
     let place = body.new_place(local)
     let entry = body.new_block()
     body.push_stmt(entry, StmtKind.Drop, place, 0, 0)
