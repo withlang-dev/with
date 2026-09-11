@@ -431,6 +431,14 @@ fn comp_run_compiler_capture(ctx: &ActionCtx, label: &str, argv: Vec[str], stdou
     let root = ctx.project_info().project_root()
     var process_env = process_env()
     process_env = process_env.set("WITH_OUT_DIR", comp_abs(root, "out"))
+    // The frozen seed predates bounded compiler partitions. Give its one
+    // compiler-sized bootstrap invocation the same portable low-memory
+    // layout; ordinary small programs keep the compiler's size gate.
+    if ctx.target_name() == "stage1":
+        if env("WITH_CODEGEN_UNITS").len() == 0:
+            process_env = process_env.set("WITH_CODEGEN_UNITS", "16")
+        if env("WITH_CODEGEN_EMIT_WIDTH").len() == 0:
+            process_env = process_env.set("WITH_CODEGEN_EMIT_WIDTH", "1")
     let embedded_object = comp_arg_value(ctx.args(), "embedded-object=")
     if embedded_object.len() > 0:
         process_env = process_env.set("WITH_COMPILER_EMBEDDED_OBJECT", comp_abs(root, embedded_object))
