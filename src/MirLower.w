@@ -5732,8 +5732,6 @@ impl MirBuilder:
         var scheduled_drop_kind = DropKind.DK_VALUE
         if self.sema.is_copy_frozen(bind_ty) == 0:
             scheduled_drop_kind = self.task_drop_kind_for_binding(node, bind_ty)
-            if is_discard_binding == 0:
-                self.schedule_drop(local_id, scheduled_drop_kind)
 
         var rhs_is_view_if = 0
         if rhs_expr != 0:
@@ -5746,20 +5744,20 @@ impl MirBuilder:
             // field may have materialized an independent value, so revisiting
             // its AST here would consume the original field as well (#1043).
             self.assign_operand_to_place(place, rhs_op, self.ast.get_start(node))
-            // #747 (03g): a pure-view if-result (all result arms place-reads
-            // of named storage or constants) binds as a VIEW — cancel the
-            // scheduled scope-exit drop so the binding does not free storage
-            // its arms merely read.
+            // #747 (03g): a pure-view if-result binds as a VIEW and must not
+            // free storage its arms merely read.
             if mutable == 0 and self.ast.kind(rhs_expr) == NodeKind.NK_IF_EXPR and self.last_if_result_view != 0:
                 rhs_is_view_if = 1
-                if self.sema.is_copy_frozen(bind_ty) == 0 and is_discard_binding == 0:
-                    self.cancel_scheduled_value_drop_for_local(local_id)
         if is_discard_binding != 0:
             if self.sema.is_copy_frozen(bind_ty) == 0 and rhs_is_view_if == 0:
                 self.emit_drop_entry(local_id, scheduled_drop_kind)
             else:
                 self.body.push_stmt(self.cur_bb, StmtKind.StorageDead, local_id, 0, self.ast.get_start(node))
             return
+        // An initializer may return, break, continue, or propagate an error.
+        // Only the edge that acquired the value owns its eventual cleanup.
+        if self.sema.is_copy_frozen(bind_ty) == 0 and rhs_is_view_if == 0:
+            self.schedule_drop(local_id, scheduled_drop_kind)
         self.bind_local(name_sym, local_id)
 
     mut fn lower_tuple_destructure(node: i32):
