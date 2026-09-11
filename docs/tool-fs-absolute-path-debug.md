@@ -23,3 +23,14 @@ checking scope and join it exactly once for I/O. Paths outside the project,
 including Windows drive paths, still fail; undeclared writes and directory
 creation still fail. The action regression exercises both accepted and
 rejected paths without a platform skip.
+
+The first full behavior battery also exercised the compile-time evaluator,
+which has a separate capability implementation. Its retained capture reported
+`ToolFs path escapes project root in read_text` for the same project input.
+Setting WITH_BUILD_ACTION_WORKER=generate and WITH_BUILD_ACTION_FORCE=1
+reproduces that route deterministically. LLDB stopped in
+ComptimeEvaluator.capability_resolve_project_path: at `0x10012f5c0` it passed
+the absolute input directly to comptime_tool_path_is_project_relative.
+The input string and caller are recorded in `/tmp/with-comptime-path-lldb.log`.
+The interpreter now normalizes before resolution and write/mkdir scope checks
+too. The regression explicitly runs both native and interpreted actions.
