@@ -1755,9 +1755,9 @@ impl MirDropStateMap:
         let d0 = body.stmt_data0(stmt_id)
         let d1 = body.stmt_data1(stmt_id)
         if kind == StmtKind.StorageLive:
-            // Parameter storage already contains the caller's value. Its
-            // entry marker must preserve the initialized input state.
-            let initial = if d0 > 0 and d0 <= body.n_params: MirDropState.Init else: MirDropState.Uninit
+            // Parameters contain the caller's value. A nonzero d1 explicitly
+            // initializes ordinary storage to zero in both backends.
+            let initial = if d1 != 0 or (d0 > 0 and d0 <= body.n_params): MirDropState.Init else: MirDropState.Uninit
             self.mark_local(keys, d0, initial)
         else if kind == StmtKind.StorageDead:
             self.mark_local(keys, d0, MirDropState.Uninit)
@@ -2540,14 +2540,16 @@ fn validate_ownership_mir_module(mir_mod: &MirModule) -> str:
     let shape = validate_mir_module(mir_mod)
     if shape.len() > 0:
         return "MIR shape: " ++ shape
+    var errors = ""
     for bi in 0..mir_mod.bodies.len():
         let body = &mir_mod.bodies[bi]
         if body.lowering_failed != 0:
             continue
         let err = validate_ownership_body(mir_mod, body)
         if err.len() > 0:
-            return err
-    ""
+            if errors.len() > 0: errors = errors ++ "\n"
+            errors = errors ++ err
+    errors
 
 fn mir_debug_spec_fn(spec: &str) -> str:
     for i in 0..spec.len():

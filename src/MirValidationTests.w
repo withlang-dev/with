@@ -52,6 +52,29 @@ fn global_verdict(is_global: bool) -> str:
     body.set_terminator(entry, TermKind.TK_RETURN, 0, 0, 0, 0, 0)
     validate_ownership_body(mir_mod, body)
 
+fn zero_storage_verdict() -> str:
+    let mir_mod = MirModule.init()
+    var body = MirBody.init_for_fn(1)
+    let local = body.new_temp(1)
+    let place = body.new_place(local)
+    let entry = body.new_block()
+    body.push_stmt(entry, StmtKind.StorageLive, local, 1, 0)
+    body.push_stmt(entry, StmtKind.Drop, place, 0, 0)
+    body.set_terminator(entry, TermKind.TK_RETURN, 0, 0, 0, 0, 0)
+    validate_ownership_body(mir_mod, body)
+
+fn multiple_body_verdict() -> str:
+    var mir_mod = MirModule.init()
+    for sym in [1, 2]:
+        var body = MirBody.init_for_fn(sym)
+        let local = body.new_temp(1)
+        let place = body.new_place(local)
+        let entry = body.new_block()
+        body.push_stmt(entry, StmtKind.Drop, place, 0, 0)
+        body.set_terminator(entry, TermKind.TK_RETURN, 0, 0, 0, 0, 0)
+        mir_mod.add_body(body)
+    validate_ownership_mir_module(mir_mod)
+
 pub fn mir_test_uninitialized_drop() -> Unit:
     for terminator in [false, true]:
         assert(verdict(true, false, terminator).contains("never initialized it (Uninit)"))
@@ -65,3 +88,7 @@ pub fn mir_test_uninitialized_drop() -> Unit:
     assert(parameter_verdict(true).contains("never initialized it (Uninit)"))
     assert(global_verdict(true) == "")
     assert(global_verdict(false).contains("never initialized it (Uninit)"))
+    assert(zero_storage_verdict() == "")
+    let multiple = multiple_body_verdict()
+    assert(multiple.contains("fn sym1"))
+    assert(multiple.contains("fn sym2"))
