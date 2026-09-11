@@ -689,12 +689,3 @@ fn explain_mir_origin_module(mir_mod: &MirModule, pool: &InternPool, sema: &Sema
     if hits == 0:
         out = out ++ "  <no matching MIR origin>\n"
     out
-
-// Use-after-kill (#719 class): a local that has been killed — StorageDead, or
-// blanked by a reset-on-move `_x = <zero>` — must not be read again before it is
-// re-initialized. A body that does read it computes from zeroed storage; #719 is
-// exactly this (a binding killed by an inner scope pop, then consumed by a later
-// aggregate). Scanning blocks in index order only reports a kill that DOMINATES
-// the use in the emitted order, which is the shape lowering bugs produce; a use
-// reached only by a back edge is never flagged.
-

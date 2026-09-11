@@ -2107,6 +2107,13 @@ fn mir_rvalue_read_locals(body: &MirBody, rv: i32) -> Vec[i32]:
             out.push(local)
     out
 
+// Use-after-kill (#719 class): a local that has been killed — StorageDead, or
+// blanked by a reset-on-move `_x = <zero>` — must not be read again before it is
+// re-initialized. A body that does read it computes from zeroed storage; #719 is
+// exactly this (a binding killed by an inner scope pop, then consumed by a later
+// aggregate). Scanning blocks in index order only reports a kill that DOMINATES
+// the use in the emitted order, which is the shape lowering bugs produce; a use
+// reached only by a back edge is never flagged.
 fn validate_use_after_kill_body(body: &MirBody, pool: &InternPool) -> str:
     let local_count = body.local_type_ids.len() as i32
     if local_count <= 0 or local_count > 20000:
