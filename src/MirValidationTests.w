@@ -1,5 +1,4 @@
-use Mir
-use Compilation
+use MirCore
 
 // Construct malformed MIR directly: testing only corrected source lowering
 // would leave the validator's original false-green result untested.
@@ -12,7 +11,8 @@ fn verdict(reachable: bool, initialized: bool, terminator: bool) -> str:
     let cleanup = body.new_block()
     body.push_stmt(entry, StmtKind.StorageLive, local, 0, 0)
     if initialized:
-        let zero = body.gen_zero_operand(1)
+        let constant = body.new_const(ConstKind.CK_ZERO_SIZED, 0, 0, 0, 1)
+        let zero = body.new_operand(OperandKind.OK_CONSTANT, constant)
         let value = body.new_rvalue(RvalueKind.RK_USE, zero, 0, 0)
         body.push_stmt(entry, StmtKind.Assign, place, value, 0)
     if reachable:
