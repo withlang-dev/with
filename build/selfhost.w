@@ -4789,18 +4789,16 @@ fn bs_check_migrate_builtin_overflow(ctx: &ActionCtx, compiler_path: &str, case_
     bs_expect_absent(ctx, rejected_out, "unsupported compiler builtin rejected output")
 
 // #945: a paste-suffix macro (`#define INTMAX_C(v) (v ## L)`) applied to an
-// integer literal migrates to the suffixed literal, so the globals stdint.h
-// derives from it (INTMAX_MAX, and INTMAX_MIN/PTRDIFF_* through it) are
-// compile-time data a .wo bundle can define — not calls to the generic
-// helper, which stays for non-literal arguments. The system-header path is
-// the one that reaches the expression translator; a user macro (X_C) is
-// folded by the clang probe and stays a bare literal.
+// integer literal migrates to the suffixed literal. SDK macros remain private;
+// project aliases expose their folded values or callable behavior. Calls in
+// the original C fixture still exercise signed/unsigned limits and shifts.
 fn bs_check_migrate_paste_suffix_macros(ctx: &ActionCtx, compiler_path: &str, case_dir: &str):
     let root = ctx.project_info().project_root()
     let src = bs_join(case_dir, "paste_suffix.c")
     let out_w = bs_join(case_dir, "paste_suffix.w")
     let c_text = "#include <stdint.h>\n#include <stddef.h>\n#define X_C(v) (v ## LL)\n#define UX_C(v) (v ## ULL)\n#define X_MAX X_C(9223372036854775807)\n#define UX_MAX UX_C(18446744073709551615)\n#define X_MIN (-X_MAX - 1)\n#define X_SHL(n) (INTMAX_C(1) << (n))\nstatic intmax_t imax(void) { return INTMAX_MAX; }\nstatic intmax_t imin(void) { return INTMAX_MIN; }\nstatic uintmax_t umax(void) { return UINTMAX_MAX; }\nstatic ptrdiff_t pmax(void) { return PTRDIFF_MAX; }\nstatic ptrdiff_t pmin(void) { return PTRDIFF_MIN; }\nstatic long long xmax(void) { return X_MAX; }\nstatic long long xmin(void) { return X_MIN; }\nstatic unsigned long long uxmax(void) { return UX_MAX; }\nstatic intmax_t shl(int n) { return X_SHL(n); }\nint main(void) { return imax() == 9223372036854775807LL && imin() == -9223372036854775807LL - 1 && umax() == 18446744073709551615ULL && pmax() == 9223372036854775807LL && pmin() == -9223372036854775807LL - 1 && xmax() == 9223372036854775807LL && xmin() == -9223372036854775807LL - 1 && uxmax() == 18446744073709551615ULL && shl(3) == 8 ? 0 : 1; }\n"
-    var rc = bs_write_fixture(ctx, src, c_text, "migrate paste-suffix macros")
+    let project_aliases = "\n#define PROJECT_INTMAX_MAX INTMAX_MAX\n#define PROJECT_UINTMAX_MAX UINTMAX_MAX\n#define PROJECT_INTMAX_MIN INTMAX_MIN\n#define PROJECT_INTMAX_C INTMAX_C\n"
+    var rc = bs_write_fixture(ctx, src, c_text ++ project_aliases, "migrate paste-suffix macros")
     if rc != 0: return rc
     var args: Vec[str] = Vec.new()
     args |> push("migrate")
@@ -4811,29 +4809,32 @@ fn bs_check_migrate_paste_suffix_macros(ctx: &ActionCtx, compiler_path: &str, ca
     let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-paste-suffix", args)
     if result.rc != 0: return result.rc
     let out_text = ctx.fs().read_text(out_w)
-    rc = bs_assert_contains(ctx, out_text, "let INTMAX_MAX: c_long = 9223372036854775807i64", "paste_suffix_intmax_max_literal")
+    let signed_type = if os() == "Windows": "c_longlong" else: "c_long"
+    let unsigned_type = if os() == "Windows": "c_ulonglong" else: "c_ulong"
+    rc = bs_assert_contains(ctx, out_text, "let PROJECT_INTMAX_MAX: " ++ signed_type ++ " = 9223372036854775807", "paste_suffix_intmax_max_literal")
     if rc != 0: return rc
-    rc = bs_assert_contains(ctx, out_text, "let UINTMAX_MAX: c_ulong = 18446744073709551615u64", "paste_suffix_uintmax_max_literal")
+    rc = bs_assert_contains(ctx, out_text, "let PROJECT_UINTMAX_MAX: " ++ unsigned_type ++ " = ((0 as " ++ unsigned_type ++ ") -% 1)", "paste_suffix_uintmax_max_literal")
     if rc != 0: return rc
-    // INTMAX_MIN folds to compile-time data either by reading INTMAX_MAX
-    // (darwin's `-INTMAX_MAX - 1`) or by re-pasting the same literal glibc's
-    // `-__INT64_C(9223372036854775807) - 1` spells inline — the system header
-    // decides, and both are the intended fold to i64::MIN, never a helper call.
-    rc = bs_assert_contains_either(ctx, out_text, "let INTMAX_MIN: c_long = ((0 - INTMAX_MAX) - 1)", "let INTMAX_MIN: c_long = ((0 - 9223372036854775807i64) - 1)", "paste_suffix_intmax_min_folds_through_max")
+    rc = bs_assert_contains(ctx, out_text, "let PROJECT_INTMAX_MIN: " ++ signed_type ++ " = (0 - 9223372036854775807 - 1)", "paste_suffix_intmax_min_folds_through_max")
+    if rc != 0: return rc
+    for name in ["INTMAX_MAX", "UINTMAX_MAX", "INTMAX_MIN"]:
+        rc = bs_assert_not_contains(ctx, out_text, "let " ++ name ++ ":", "paste_suffix_sdk_value_private")
+        if rc != 0: return rc
+    rc = bs_assert_not_contains(ctx, out_text, "fn INTMAX_C[", "paste_suffix_sdk_callable_private")
     if rc != 0: return rc
     rc = bs_assert_not_contains(ctx, out_text, "INTMAX_C(9223372036854775807", "paste_suffix_no_helper_call_for_literal")
     if rc != 0: return rc
     rc = bs_assert_not_contains(ctx, out_text, "UINTMAX_C(18446744073709551615", "paste_suffix_no_unsigned_helper_call_for_literal")
     if rc != 0: return rc
     // A use inside a function-like macro body takes the same route.
-    rc = bs_assert_contains(ctx, out_text, "(1i64 << n)", "paste_suffix_literal_in_fn_macro_body")
+    rc = bs_assert_contains(ctx, out_text, "(1i64 << (n as u32))", "paste_suffix_literal_in_fn_macro_body")
     if rc != 0: return rc
     // The generic helper remains the translation for a non-literal argument. Its
     // parameter name is the system header's own macro parameter identifier —
     // darwin spells `INTMAX_C(v)`, glibc spells `INTMAX_C(c)` — so both helper
     // signatures are the identical intended `[T] -> i64` translation, differing
-    // only in that echoed name, never in whether the helper is kept.
-    rc = bs_assert_contains_either(ctx, out_text, "fn INTMAX_C[T](v: T) -> i64", "fn INTMAX_C[T](c: T) -> i64", "paste_suffix_helper_kept")
+    // only in that echoed name. Only the project alias is public.
+    rc = bs_assert_contains_either(ctx, out_text, "fn PROJECT_INTMAX_C[T](v: T) -> i64", "fn PROJECT_INTMAX_C[T](c: T) -> i64", "paste_suffix_project_helper_kept")
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, out_text, "let X_MAX: c_longlong = 9223372036854775807", "paste_suffix_user_macro_probe_folds")
     if rc != 0: return rc
