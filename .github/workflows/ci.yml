@@ -25,7 +25,6 @@ jobs:
       WITH_OUT_DIR: ${{ github.workspace }}/out
       WITH: ${{ github.workspace }}/src/main
       LLVM_PREFIX: ${{ github.workspace }}/.deps/llvm-22.1.6-darwin-arm64
-      WITH_PROFILE: "1"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -104,9 +103,13 @@ jobs:
         run: src/main build :deps
 
       - name: Build
+        env:
+          WITH_PROFILE: "1"
         run: src/main build
 
       - name: Fixpoint
+        env:
+          WITH_PROFILE: "1"
         run: ./out/release/bin/with build :fixpoint
 
       - name: Green battery (build :test)
