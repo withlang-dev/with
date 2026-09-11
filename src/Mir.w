@@ -1573,6 +1573,10 @@ impl MirDropStateKeys:
                 states.push(MirDropState.Absent)
             else if id > 0 and id <= body.n_params:
                 states.push(MirDropState.Init)
+            else if body.local_is_global[id] != 0:
+                // A proxy addresses initialized module storage, not a fresh
+                // stack slot. Replacing it must drop the existing value.
+                states.push(MirDropState.Init)
             else:
                 states.push(MirDropState.Uninit)
         MirDropStateMap { states }
