@@ -10,6 +10,7 @@ fn verdict(reachable: bool, initialized: bool, terminator: bool) -> str:
     let place = body.new_place(local)
     let entry = body.new_block()
     let cleanup = body.new_block()
+    body.push_stmt(entry, StmtKind.StorageLive, local, 0, 0)
     if initialized:
         let zero = body.gen_zero_operand(1)
         let value = body.new_rvalue(RvalueKind.RK_USE, zero, 0, 0)
@@ -27,6 +28,19 @@ fn verdict(reachable: bool, initialized: bool, terminator: bool) -> str:
         body.set_terminator(cleanup, TermKind.TK_RETURN, 0, 0, 0, 0, 0)
     validate_ownership_body(mir_mod, body)
 
+fn parameter_verdict(dead: bool) -> str:
+    let mir_mod = MirModule.init()
+    var body = MirBody.init_for_fn(1)
+    body.n_params = 1
+    let local = body.new_temp(1)
+    let place = body.new_place(local)
+    let entry = body.new_block()
+    body.push_stmt(entry, StmtKind.StorageLive, local, 0, 0)
+    if dead: body.push_stmt(entry, StmtKind.StorageDead, local, 0, 0)
+    body.push_stmt(entry, StmtKind.Drop, place, 0, 0)
+    body.set_terminator(entry, TermKind.TK_RETURN, 0, 0, 0, 0, 0)
+    validate_ownership_body(mir_mod, body)
+
 pub fn mir_test_uninitialized_drop() -> Unit:
     for terminator in [false, true]:
         assert(verdict(true, false, terminator).contains("never initialized it (Uninit)"))
@@ -36,3 +50,5 @@ pub fn mir_test_uninitialized_drop() -> Unit:
     assert(mir_drop_plan_action(MirDropState.MaybeGarbage) == "invalid")
     assert(mir_drop_plan_action(MirDropState.Moved) == "skip")
     assert(mir_drop_state_sweep_bound(50000, 50000) == 7500300005i64)
+    assert(parameter_verdict(false) == "")
+    assert(parameter_verdict(true).contains("never initialized it (Uninit)"))
