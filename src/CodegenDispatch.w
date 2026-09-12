@@ -1030,10 +1030,10 @@ impl Codegen:
         true
 
 
-    fn mir_resolve_field_index(agg_ty: i64, field_token: i32) -> i32:
+    fn mir_resolve_field_index(agg_ty: i64, field_token: i32, source_type: i32 = 0):
         // Arrays use direct numeric index
         if wl_get_type_kind(agg_ty) == wl_array_type_kind():
-            if field_token >= 0 and field_token < wl_get_array_length(agg_ty) as i32:
+            if field_token >= 0 and field_token < wl_get_array_length(agg_ty):
                 return field_token
             return -1
         // Bitpacked structs: look up field by name in the struct registry
@@ -1056,7 +1056,7 @@ impl Codegen:
         // Must do this before the raw range check, because a symbol value (e.g. 132 for "ast")
         // can accidentally pass field_token < elem_count on large structs.
         var normalized_field = field_token
-        var field_text: str = with_str_clone_ref(self.intern.resolve(field_token))
+        var field_text = with_str_clone_ref(self.intern.resolve(field_token))
         if field_text.len() == 0:
             field_text = self.sema_symbol_text(field_token)
         if field_text.len() > 0:
@@ -1068,6 +1068,16 @@ impl Codegen:
                 fi = self.find_field_index(st_sym, normalized_field)
             if fi >= 0 and ((is_union and fi < source_field_count) or ((not is_union) and fi < elem_count)):
                 return fi
+
+        // Compiler-modeled records such as Handle have no LLVM field registry.
+        // Their MIR source owner still identifies each field; an anonymous LLVM
+        // shape alone cannot distinguish their names from an unrelated tuple.
+        if st_sym == 0 and source_type > 0 and field_text.len() > 0:
+            let count = self.sema.type_reflection_field_count(source_type)
+            for fi in 0..count:
+                let name = self.sema.type_reflection_field_name(source_type, fi)
+                if self.sema.pool_resolve_symbol(name) == field_text and fi < elem_count:
+                    return fi
 
         // Vec types are created dynamically and not registered in the struct field
         // registry. Resolve their field names by layout: {ptr, len, cap, elem_size}.
@@ -1085,7 +1095,7 @@ impl Codegen:
         if field_name.len() == 1:
             let ch = field_name[0]
             if ch >= 48 and ch <= 57:
-                let idx = (ch - 48) as i32
+                let idx = ch - 48
                 if idx >= 0 and idx < elem_count:
                     return idx
 
@@ -1147,7 +1157,7 @@ impl Codegen:
                         cur_ty = payload_ty
                         active_variant_idx = -1
                         continue
-                let fi = self.mir_resolve_field_index(cur_ty, pd)
+                let fi = self.mir_resolve_field_index(cur_ty, pd, variant_owner_sema_ty)
                 if fi < 0:
                     return 0
                 let union_idx = self.find_struct_index_by_type(cur_ty)
@@ -1334,7 +1344,7 @@ impl Codegen:
                         cur_ty = payload_ty
                         active_variant_idx = -1
                         continue
-                let fi = self.mir_resolve_field_index(cur_ty, pd)
+                let fi = self.mir_resolve_field_index(cur_ty, pd, variant_owner_sema_ty)
                 if fi < 0:
                     return 0
                 let union_idx = self.find_struct_index_by_type(cur_ty)
@@ -3546,7 +3556,7 @@ impl Codegen:
                         if (agg_start + i) < body.agg_field_name_syms.len() as i32:
                             let name_sym = body.agg_field_name_syms[(agg_start + i)]
                             if name_sym != 0:
-                                let resolved_fi = self.mir_resolve_field_index(struct_ty, name_sym)
+                                let resolved_fi = self.mir_resolve_field_index(struct_ty, name_sym, dest_sema_ty)
                                 if resolved_fi >= 0:
                                     fi = resolved_fi
                         let bp_info = self.get_bitpacked_field_info(struct_ty, fi)
@@ -3582,7 +3592,7 @@ impl Codegen:
                     if (agg_start + i) < body.agg_field_name_syms.len() as i32:
                         let name_sym = body.agg_field_name_syms[(agg_start + i)]
                         if name_sym != 0:
-                            let resolved_fi = self.mir_resolve_field_index(struct_ty, name_sym)
+                            let resolved_fi = self.mir_resolve_field_index(struct_ty, name_sym, dest_sema_ty)
                             if resolved_fi >= 0:
                                 fi = resolved_fi
                     let union_idx = self.find_struct_index_by_type(struct_ty)
@@ -5306,6 +5316,8 @@ impl Codegen:
                     return true
             if dst_ptr == 0:
                 if has_projections:
+                    with_eprint(f"error: cannot lower projected assignment in '{self.intern.resolve(self.current_function_name_sym)}' (MIR place {d0})")
+                    self.had_error = 1
                     return false
                 let value_ty = wl_type_of(value)
                 // When sema type is str but value is a pointer (c_import coercion),
