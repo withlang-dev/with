@@ -8247,57 +8247,11 @@ impl Codegen:
             args.push(is_str_val)
             let fn_val = self.ensure_hm_fn("with_hashmap_insert", void_ty)
 
-            // insert consumes both arguments. On a duplicate, the table keeps
-            // its existing key and replaces only the value, so both displaced
-            // owners need exact typed cleanup: the old stored value before it
-            // is overwritten, and the unused incoming key after the lookup has
-            // finished using it. Copy-only maps can keep the raw runtime path.
             let key_sema = self.mir_hash_collection_arg_sema_type(recv_sema, 0)
             let value_sema = if recv_base_sym == self.sym_hashmap: self.mir_hash_collection_arg_sema_type(recv_sema, 1) else: 0
-            let drop_unused_key = key_sema > 0 and self.sema.type_needs_drop_frozen(key_sema) != 0
-            let drop_replaced_value = value_sema > 0 and self.sema.type_needs_drop_frozen(value_sema) != 0
-            if drop_unused_key or drop_replaced_value:
-                let get_fn = self.ensure_hm_fn("with_hashmap_get_ptr", ptr_ty)
-                let get_params: Vec[i64] = Vec.new()
-                get_params.push(ptr_ty)
-                get_params.push(ptr_ty)
-                get_params.push(i64_ty)
-                let get_ty = wl_function_type(ptr_ty, vec_data_i64(&get_params), 3, 0)
-                let get_args: Vec[i64] = Vec.new()
-                get_args.push(map_ptr)
-                get_args.push(key_alloca)
-                get_args.push(is_str_val)
-                let old_value_ptr = wl_build_call(self.builder, get_ty, get_fn, vec_data_i64(&get_args), 3)
-                let is_duplicate = wl_build_icmp(self.builder, wl_int_ne(), old_value_ptr, wl_const_null(ptr_ty))
-                let replace_bb = wl_append_bb(self.context, self.current_function, "map.insert.replace")
-                let new_bb = wl_append_bb(self.context, self.current_function, "map.insert.new")
-                let done_bb = wl_append_bb(self.context, self.current_function, "map.insert.done")
-                wl_build_cond_br(self.builder, is_duplicate, replace_bb, new_bb)
-
-                wl_position_at_end(self.builder, replace_bb)
-                let value_llvm = if recv_base_sym == self.sym_hashmap: self.mir_hashmap_value_type(body, recv_op) else: 0
-                if recv_base_sym == self.sym_hashmap and value_llvm == 0:
-                    with_eprint("error: internal: HashMap.insert replacement lost its value type")
-                    self.had_error = 1
-                if drop_replaced_value:
-                    self.member_drop_depth = self.member_drop_depth + 1
-                    self.mir_emit_drop_ptr_for_sema_type(old_value_ptr, value_llvm, value_sema)
-                    self.member_drop_depth = self.member_drop_depth - 1
-                if recv_base_sym == self.sym_hashmap and value_llvm != 0:
-                    self.emit_llvm_memcpy(old_value_ptr, val_alloca, self.abi_size_of(value_llvm))
-                if drop_unused_key:
-                    self.member_drop_depth = self.member_drop_depth + 1
-                    self.mir_emit_drop_ptr_for_sema_type(key_alloca, wl_type_of(key), key_sema)
-                    self.member_drop_depth = self.member_drop_depth - 1
-                wl_build_br(self.builder, done_bb)
-
-                wl_position_at_end(self.builder, new_bb)
-                let _ = wl_build_call(self.builder, fn_ty, fn_val, vec_data_i64(&args), 4)
-                wl_build_br(self.builder, done_bb)
-                wl_position_at_end(self.builder, done_bb)
-                result = 0
-            else:
-                result = wl_build_call(self.builder, fn_ty, fn_val, vec_data_i64(&args), 4)
+            let value_llvm = if recv_base_sym == self.sym_hashmap: self.mir_hashmap_value_type(body, recv_op) else: byte_ty
+            self.mir_emit_owned_map_insert(fn_val, fn_ty, args, key_sema, value_sema, wl_type_of(key), value_llvm)
+            result = 0
 
         else if intrinsic == MirIntrinsic.MAP_GET:
             let recv_op = body.call_arg_operands[arg_start]
@@ -10337,6 +10291,45 @@ impl Codegen:
         let second_arg = if arg_count > 1: self.mir_type_extra_at(arg_start + 1) else: 0
         (base_sym, first_arg, second_arg)
 
+    // Ordinary insert and literals transfer the same owners. A duplicate keeps
+    // the stored key, drops the unused incoming key, and replaces the value.
+    mut fn mir_emit_owned_map_insert(insert_fn: i64, insert_ty: i64, args: &Vec[i64], key_sema: i32, value_sema: i32, key_llvm: i64, value_llvm: i64):
+        let drop_key = key_sema > 0 and self.sema.type_needs_drop_frozen(key_sema) != 0
+        let drop_value = value_sema > 0 and self.sema.type_needs_drop_frozen(value_sema) != 0
+        if not drop_key and not drop_value:
+            wl_build_call(self.builder, insert_ty, insert_fn, vec_data_i64(args), 4)
+            return
+        let ptr_ty = wl_ptr_type(self.context)
+        let get_fn = self.ensure_hm_fn("with_hashmap_get_ptr", ptr_ty)
+        let get_params: Vec[i64] = [ptr_ty, ptr_ty, wl_i64_type(self.context)]
+        let get_ty = wl_function_type(ptr_ty, vec_data_i64(get_params), 3, 0)
+        let get_args: Vec[i64] = [args[0], args[1], args[3]]
+        let old_value = wl_build_call(self.builder, get_ty, get_fn, vec_data_i64(get_args), 3)
+        let duplicate = wl_build_icmp(self.builder, wl_int_ne(), old_value, wl_const_null(ptr_ty))
+        let replace_bb = wl_append_bb(self.context, self.current_function, "map.insert.replace")
+        let new_bb = wl_append_bb(self.context, self.current_function, "map.insert.new")
+        let done_bb = wl_append_bb(self.context, self.current_function, "map.insert.done")
+        wl_build_cond_br(self.builder, duplicate, replace_bb, new_bb)
+        wl_position_at_end(self.builder, replace_bb)
+        if value_sema > 0 and value_llvm == 0:
+            with_eprint("error: internal: HashMap.insert replacement lost its value type")
+            self.had_error = 1
+        if drop_value:
+            self.member_drop_depth = self.member_drop_depth + 1
+            self.mir_emit_drop_ptr_for_sema_type(old_value, value_llvm, value_sema)
+            self.member_drop_depth = self.member_drop_depth - 1
+        if value_sema > 0 and value_llvm != 0:
+            self.emit_llvm_memcpy(old_value, args[2], self.abi_size_of(value_llvm))
+        if drop_key:
+            self.member_drop_depth = self.member_drop_depth + 1
+            self.mir_emit_drop_ptr_for_sema_type(args[1], key_llvm, key_sema)
+            self.member_drop_depth = self.member_drop_depth - 1
+        wl_build_br(self.builder, done_bb)
+        wl_position_at_end(self.builder, new_bb)
+        wl_build_call(self.builder, insert_ty, insert_fn, vec_data_i64(args), 4)
+        wl_build_br(self.builder, done_bb)
+        wl_position_at_end(self.builder, done_bb)
+
     mut fn mir_emit_collection_literal_intrinsic_call(body: &MirBody, intrinsic: MirIntrinsic, args_id: i32, dest_place: i32, next_bb: i32) -> bool:
         if intrinsic != MirIntrinsic.COLLECTION_LITERAL and intrinsic != MirIntrinsic.MAP_LITERAL:
             return false
@@ -10360,7 +10353,7 @@ impl Codegen:
             let new_args: Vec[i64] = Vec.new()
             new_args.push(out_ptr)
             new_args.push(wl_const_int(i64_ty, self.abi_size_of(elem_ty), 0))
-            let _new = wl_build_call(self.builder, new_ty, new_fn, vec_data_i64(&new_args), 2)
+            wl_build_call(self.builder, new_ty, new_fn, vec_data_i64(&new_args), 2)
             let push_fn = self.ensure_vec_runtime_fn("with_vec_push", void_ty, 2)
             let push_ty = self.get_vec_fn_type("with_vec_push", void_ty, 2)
             for i in 0..arg_count:
@@ -10371,7 +10364,7 @@ impl Codegen:
                 let push_args: Vec[i64] = Vec.new()
                 push_args.push(out_ptr)
                 push_args.push(elem_alloca)
-                let _push = wl_build_call(self.builder, push_ty, push_fn, vec_data_i64(&push_args), 2)
+                wl_build_call(self.builder, push_ty, push_fn, vec_data_i64(&push_args), 2)
             result = wl_build_load(self.builder, vec_ty, out_ptr)
 
         else if (intrinsic == MirIntrinsic.COLLECTION_LITERAL and base_sym == self.sym_hashset) or (intrinsic == MirIntrinsic.MAP_LITERAL and base_sym == self.sym_hashmap):
@@ -10387,7 +10380,7 @@ impl Codegen:
             new_args2.push(wl_const_int(i64_ty, self.abi_size_of(key_ty), 0))
             new_args2.push(wl_const_int(i64_ty, self.abi_size_of(val_ty), 0))
             let handle = wl_build_call(self.builder, new_ty, new_fn, vec_data_i64(&new_args2), 2)
-            var map_value = wl_build_insert_value(self.builder, self.build_default_value(map_ty), handle, 0)
+            let map_value = wl_build_insert_value(self.builder, self.build_default_value(map_ty), handle, 0)
             let insert_params: Vec[i64] = Vec.new()
             insert_params.push(ptr_ty)
             insert_params.push(ptr_ty)
@@ -10414,7 +10407,8 @@ impl Codegen:
                 insert_args.push(key_alloca)
                 insert_args.push(val_alloca)
                 insert_args.push(wl_const_int(i64_ty, if self.is_str_type(key_ty): 1 else: 0, 0))
-                let _ins = wl_build_call(self.builder, insert_ty, insert_fn, vec_data_i64(&insert_args), 4)
+                let value_sema = if intrinsic == MirIntrinsic.MAP_LITERAL: second_tid else: 0
+                self.mir_emit_owned_map_insert(insert_fn, insert_ty, insert_args, first_tid, value_sema, key_ty, val_ty)
             result = map_value
 
         else:
