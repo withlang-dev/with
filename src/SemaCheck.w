@@ -8339,6 +8339,12 @@ impl Sema:
         let sym = self.ast.get_data0(callee)
         if self.variant_lookup.contains(sym) and self.is_ci_visible(sym) != 0: 1 else: 0
 
+    mut fn null_comparison_expected_type(peer: TypeId) -> TypeId:
+        let pointee = self.shared_copy_pointee(peer as i32)
+        if pointee != 0 and self.null_literal_target_type(pointee as TypeId) != 0:
+            return pointee as TypeId
+        peer
+
     mut fn check_binary(node: i32) -> i32:
         let op = self.ast.get_data0(node)
         let lhs_node = self.ast.get_data1(node)
@@ -8381,10 +8387,12 @@ impl Sema:
                 lhs = self.check_expr_with_expected(lhs_node, rhs)
             else if self.ast.kind(lhs_node) == NodeKind.NK_NULL_LIT:
                 rhs = self.check_expr_value_context(rhs_node)
-                lhs = self.check_expr_with_expected(lhs_node, rhs)
+                let expected_null = self.null_comparison_expected_type(rhs)
+                lhs = self.check_expr_with_expected(lhs_node, expected_null)
             else if self.ast.kind(rhs_node) == NodeKind.NK_NULL_LIT:
                 lhs = self.check_expr_value_context(lhs_node)
-                rhs = self.check_expr_with_expected(rhs_node, lhs)
+                let expected_null = self.null_comparison_expected_type(lhs)
+                rhs = self.check_expr_with_expected(rhs_node, expected_null)
             else:
                 if lhs_is_num_lit and rhs_is_num_lit:
                     lhs = self.check_expr_value_context(lhs_node)
@@ -8783,7 +8791,7 @@ impl Sema:
                     self.typed_expr_types.insert(node, operand as i32)
                     return operand as i32
             self.check_borrow_create(operand_node, BorrowKind.SHARED, node)
-            let ref_result_ty = self.add_type(TypeKind.TY_REF, operand as i32, 0, 0) as i32
+            let ref_result_ty = self.ensure_exact_type(TypeKind.TY_REF, operand as i32, 0, 0) as i32
             if ref_result_ty != 0:
                 self.typed_expr_types.insert(node, ref_result_ty)
             return ref_result_ty

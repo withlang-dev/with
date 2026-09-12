@@ -4,6 +4,26 @@ The corpus is pinned to upstream commit
 `23d453792ed89a28ed7d2c8d4311a4d9f7822edd`. No upstream function body is
 changed to accommodate the migrator.
 
+## Reference types at repeated checks and pointer comparisons
+
+The generic comparator closure is checked during specialization discovery and
+again before MIR lowering. `check_unary` used `add_type` for `&place`, allocating
+new IDs for the same reference type on each pass. LLDB observed `TY_REF(14),
+d0=3, d1=0, d2=0` from `check_unary` into `Sema.add_type`; the repeated pass
+reached `record_contextual_copy_adjustment+420` with context 73, source node
+899, old exact type 137 and new exact type 144. Both types were `&i32`, with
+the same pointee, target and post-copy adjustment. Address-taking now uses
+`ensure_exact_type`, preserving the existing exact-demand conflict check.
+
+Array pointer elements have exact type `&*mut Node` under D27. `check_binary`
+passed that reference type directly as the expected type for the peer `null`.
+LLDB in `check_expr+668` observed expected type 140 (`TY_REF`, pointee 53);
+type 53 was `TY_PTR`. At +728 the null target was zero, entering the diagnostic
+branch. Comparison now uses a shared Copy pointer view's pointee as the null
+expectation. The existing builtin operator demand materializes the pointer;
+ordinary reference bindings still cannot be initialized with null. The matrix
+covers array, Vec and map views and both comparison operand orders.
+
 ## Restoring C scopes
 
 `sortedarray_insert` shadows its `data` parameter in an inner block. The
