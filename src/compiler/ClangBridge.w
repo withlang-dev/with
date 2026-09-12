@@ -931,7 +931,9 @@ unsafe fn translate_type_recursive_mode(s: *mut CImportSession, ty: CXType, dept
             bare = (bare as i64 + 7) as *const u8
         else if bare as i64 != 0 and c_strncmp(bare, "union \0" as *const u8, 6) == 0:
             bare = (bare as i64 + 6) as *const u8
-        if bare as i64 == 0 or *bare == 0 or *bare == 95 or c_strstr(name_str, "(anonymous\0" as *const u8) as i64 != 0:
+        // A leading underscore is a valid tag, not evidence of anonymity.
+        // Ask Clang about the declaration so typedefs retain record identity.
+        if bare as i64 == 0 or *bare == 0 or clang_Cursor_isAnonymous(clang_getTypeDeclaration(canonical)) != 0:
             clang_disposeString(spelling)
             return session_strdup(s, "c_void\0" as *const u8)
         let result = session_strdup(s, bare)

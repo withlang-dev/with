@@ -314,22 +314,30 @@ fn ci_migrate_shared_module_prefix() -> str:
         return g_migrate_shared_defs_prefix.slice(0, g_migrate_shared_defs_prefix.len() - 5)
     g_migrate_shared_defs_prefix
 
-fn ci_migrate_source_module_suffix(path: &str) -> str:
-    var rel = with_str_clone_ref(path)
-    if g_migrate_directory_input_dir.len() > 0 and ci_starts_with(path, g_migrate_directory_input_dir):
-        rel = path.slice(g_migrate_directory_input_dir.len(), path.len())
+// Physical output paths and imports must use the same identifier spelling.
+// A C filename may contain punctuation that is not valid in a With module.
+fn ci_migrate_module_relative_path(input_dir: &str, path: &str) -> str:
+    var rel = path.clone()
+    if input_dir.len() > 0 and ci_starts_with(path, input_dir):
+        rel = path.slice(input_dir.len(), path.len())
     while rel.len() > 0 and rel[0] == 47:
         rel = rel.slice(1, rel.len())
     if rel.ends_with(".c"):
         rel = rel.slice(0, rel.len() - 2)
     var out = ""
-    for i in 0..rel.len() as i32:
-        let ch = rel[i]
-        if ch == 47:
-            out = out ++ "."
-        else:
-            out = out ++ rel.slice(i as i64, (i + 1) as i64)
+    let segments = rel.split("/")
+    for segment in segments:
+        var identifier = ""
+        for i in 0..segment.len():
+            let ch = segment[i] as i32
+            if i == 0 and ch >= 48 and ch <= 57: identifier = identifier ++ "_"
+            identifier = identifier ++ (if ci_is_ident_char(ch): segment.slice(i, i + 1) else: "_")
+        if out.len() > 0: out = out ++ "/"
+        out = out ++ ci_escape_reserved(identifier)
     out
+
+fn ci_migrate_source_module_suffix(path: &str):
+    ci_migrate_module_relative_path(g_migrate_directory_input_dir, path).replace("/", ".")
 
 fn ci_migrate_source_module_path(path: &str) -> str:
     let prefix = ci_migrate_shared_module_prefix()
@@ -1292,17 +1300,21 @@ fn ci_migrate_sorted_files(files: &Vec[str]) -> Vec[str]:
         i = i + 1
     sorted
 
-fn ci_migrate_directory_output_path(input_dir: &str, output_dir: &str, file_path: &str) -> str:
-    var out_path = ""
-    if ci_starts_with(file_path, input_dir):
-        let relative = file_path.slice(input_dir.len(), file_path.len())
-        if relative.len() > 2 and relative.slice(relative.len() - 2, relative.len()) == ".c":
-            out_path = f"{output_dir}{relative.slice(0, relative.len() - 2)}.w"
-        else:
-            out_path = f"{output_dir}{relative}.w"
-    else:
-        out_path = f"{output_dir}/{file_path}.w"
-    out_path
+fn ci_migrate_directory_output_path(input_dir: &str, output_dir: &str, file_path: &str):
+    output_dir ++ "/" ++ ci_migrate_module_relative_path(input_dir, file_path) ++ ".w"
+
+fn ci_migrate_validate_module_paths(input_dir: &str, files: &Vec[str]):
+    var owners: HashMap[str, str] = HashMap.new()
+    for path in files:
+        let module_path = ci_migrate_module_relative_path(input_dir, path)
+        if ci_migrate_shared_defs_active() and module_path == "defs":
+            eprint("migrate: source " ++ path ++ " collides with the shared definitions module")
+            return false
+        if owners.contains(module_path):
+            eprint("migrate: module path collision: " ++ owners.get(module_path).unwrap() ++ " and " ++ path ++ " both map to " ++ module_path)
+            return false
+        owners.insert(module_path, path.clone())
+    true
 
 fn ci_migrate_print_progress(file_path: &str, current: i32, total: i32):
     let base = ci_migrate_path_basename(file_path)
@@ -1406,6 +1418,7 @@ pub fn migrate_c_directory(input_dir: &str, output_dir: &str, exclude_basenames:
         return 1
 
     let sorted_files = ci_migrate_sorted_files(files)
+    if not ci_migrate_validate_module_paths(input_dir, sorted_files): return 1
     let files_scanned = sorted_files.len() as i32
     var files_migrated = 0
 

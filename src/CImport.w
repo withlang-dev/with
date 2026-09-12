@@ -11122,7 +11122,7 @@ impl CiExprPool:
 // Recursive statement lowering helper: produces a CiStmtId from a
 // cursor. Specific handlers build real CIS_* nodes for kinds we
 // own structurally; everything else: returns 0 so callers can bail
-// transactionally. Returns 0 for the empty case (CXK_NULL_STMT).
+// transactionally. An empty statement has valid block IR; zero means failure.
 impl CiStmtPool:
     fn lower_stmt_ir(session: i64, cursor: i32, exprs: CiExprPool, types: CiTypePool, indent: i32, scope: CiScope) -> CiStmtId:
         let kind = with_ci_cursor_kind(session, cursor)
@@ -11138,7 +11138,7 @@ impl CiStmtPool:
         if kind == CXK_CONTINUE_STMT:
             return self.continue_()
         if kind == CXK_NULL_STMT:
-            return 0 as CiStmtId
+            return self.empty_stmt_ir()
 
         if kind == CXK_RETURN_STMT:
             let nc = with_ci_num_children(session, cursor)
