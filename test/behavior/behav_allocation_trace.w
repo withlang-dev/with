@@ -12,7 +12,7 @@ fn allocations(report: &str):
 
 fn main:
     let case_dir = p7_prepare_case("allocation_trace", "allocation_trace")
-    let source = "let values: Vec[i32] = Vec.new()\nvalues.push(42)\nprint(values[0])\n"
+    let source = "let values: Vec[i32] = Vec.new()\nvalues.push(42)\nprint(f\"{values[0]}\")\n"
     p7_write(case_dir, "src/main.w", source)
     let ordinary = p7_run(case_dir, "ordinary", "run\0src/main.w\0")
     p7_assert_success(ordinary, "ordinary allocation fixture")

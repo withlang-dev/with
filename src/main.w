@@ -238,11 +238,11 @@ fn cli_is_implicit_run(argc: i32) -> bool:
     let arg = with_arg_at(1)
     arg.ends_with(".w")
 
-fn cli_has_flag(argc: i32, flag: &str) -> bool:
-    var i = 2
+fn cli_has_flag(argc: i32, flag: &str):
+    // One-liners can begin with a flag before -e/-n/-p.
+    var i = 1
     while i < argc:
-        if with_arg_at(i) == flag:
-            return true
+        if with_arg_at(i) == flag: return true
         i = i + 1
     false
 

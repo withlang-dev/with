@@ -1,7 +1,8 @@
 # Stdlib sourcing: three migrated corpora, one facade
 
-Status: PLAN (2026-09-01). Ruled in direction by Eric; nothing here is
-implemented. Paths are proposals in the repo's existing conventions, not
+Status (2026-09-12): PCRE2 and zlib share the bundle pipeline. Phase 0 is
+implemented with final verification in progress; Phases 1–4 remain planned.
+Ruled in direction by Eric. Proposed facade paths follow existing conventions, not
 part of the ruling. Companion: `docs/harden_migrate.md` (the migrator plan
 this campaign exercises), `docs/harden_plan.md` item 7.
 

@@ -1299,7 +1299,7 @@ fn run_stdlib_complexity_action(ctx: ActionCtx):
         compile_args,
         build_project_abs(root, stdout_rel), build_project_abs(root, stderr_rel), 300000, root)
     if compiled.rc != 0:
-        ctx.diagnostics().error("stdlib-complexity: compile failed\n" ++ fs.read_text(stderr_rel))
+        ctx.diagnostics().error(f"stdlib-complexity: compiler {compiler} exited {compiled.rc}; stdout={stdout_rel} stderr={stderr_rel}\n" ++ fs.read_text(stdout_rel) ++ fs.read_text(stderr_rel))
         return 1
     let timing_out = build_project_join(output, "timing.stdout")
     let timing_err = build_project_join(output, "timing.stderr")
