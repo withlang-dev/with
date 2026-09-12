@@ -277,8 +277,20 @@ corpus contains, `void*`/`elem_size`/callback genericity, raw pointers)
 and adds no ownership modeling, generic lifting, or ergonomics. Every
 With-ism — views, transfers, drops, generic surfaces, complexity
 contracts — is the facade's. Native code is reserved for what migration
-provenance cannot beat: graph algorithms, union-find, SlotMap's free list,
-and the intrinsic-integrated Vec and str.
+provenance cannot beat: graph algorithms, union-find, and SlotMap's free
+list. The original native-Vec exception is superseded by the follow-on
+selection below; With's `str` semantics remain the public contract.
+
+**Follow-on selection (Eric, 2026-09-12).** The
+[facade map](stdlib_sourcing_plan.md#facade-and-engine-selection--erics-ruling-2026-09-12)
+selects STC for everyday containers and algorithms, including `Vec`,
+`hmap`/`hset` for the default owning hash collections, and `smap`/`sset`
+for `OrderedMap`/`OrderedSet`. STC's inline entries and compact Robin Hood
+metadata fit an owning generic map. M*LIB's B+ tree supplies
+`BTreeMap`/`BTreeSet`; c-algorithms supplies classical engines and
+references; TommyDS supplies specialized indexing/storage. Corpus names
+need not become public types. Benchmarks validate these selections and
+compare alternatives; they no longer leave the default engine undecided.
 
 **Context.** #936 (SlotMap O(n) insert, no free list) prompted a survey
 that found the same species in BTreeMap/BTreeSet (#937, linear lookup,
