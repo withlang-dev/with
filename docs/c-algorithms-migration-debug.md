@@ -4,6 +4,21 @@ The corpus is pinned to upstream commit
 `23d453792ed89a28ed7d2c8d4311a4d9f7822edd`. No upstream function body is
 changed to accommodate the migrator.
 
+## Generic record layout
+
+The facade's stable-entry prototype exposed `sizeof[StableEntry[T]]()`
+failing inside a concrete method, although `sizeof[T]()` worked. LLDB on
+the Phase 0 release stopped in `Codegen.resolve_type+948`: node 7425,
+kind 29 (`NK_INDEX`), and frozen Sema result zero. The branch at +952
+returned zero to `gen_sizeof_alignof+176`. This path never used the active
+type bindings that the ordinary `NK_TYPE_GENERIC` path reads.
+
+Both syntax forms now share `resolve_generic_type_nodes`, and struct
+instantiation accepts their explicit argument-node list. The native matrix
+checks scalar and string payloads, two-parameter records, nested records,
+Option, and alignment. It requires the existing resolved type layout;
+the facade does not calculate a struct layout itself.
+
 ## Named record tags (#1124)
 
 `hash_table_iter_next` initializes a `HashTablePair`. Its underlying tag is

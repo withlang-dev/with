@@ -2635,6 +2635,14 @@ impl Codegen:
                 let sema_ty = self.sema_type_to_llvm(sema_tid)
                 if sema_ty != 0:
                     return sema_ty
+            // Type applications parsed in expression position still need the
+            // active monomorphization frame, just like NK_TYPE_GENERIC.
+            let base = self.pool.get_data0(type_node)
+            if self.pool.kind(base) == NodeKind.NK_IDENT:
+                let args: Vec[i32] = Vec.new()
+                args.push(self.pool.get_data1(type_node))
+                if self.pool.get_data2(type_node) != 0: args.push(self.pool.get_data2(type_node))
+                return self.resolve_generic_type_nodes(self.pool.get_data0(base), args, type_node)
             return 0
 
         if kind == NodeKind.NK_TYPE_ARRAY:
@@ -2671,46 +2679,9 @@ impl Codegen:
             let name_sym = self.pool.get_data0(type_node)
             let g_extra = self.pool.get_data1(type_node)
             let g_count = self.pool.get_data2(type_node)
-            // Box[T] is always a pointer (fat pointer for Box[dyn Trait])
-            if self.sema.type_symbol_is_std_box(name_sym) != 0 and g_count == 1:
-                let inner_node = self.pool.get_extra(g_extra)
-                if self.pool.kind(inner_node) == NodeKind.NK_TYPE_TRAIT_OBJ:
-                    return self.get_dyn_fat_ptr_type()
-                return wl_ptr_type(self.context)
-            // ContextError[E] = { message: str, source: E }
-            if name_sym == self.sym_context_error and g_count == 1:
-                let src_node = self.pool.get_extra(g_extra)
-                let src_ty = self.resolve_type(src_node)
-                return self.get_or_create_context_error_type(src_ty)
-            // Codegen-level resolution must run before the Sema fallback when
-            // monomorphizing generic struct fields. Sema does not see Codegen's
-            // active type bindings, so asking it first would turn Vec[(K, V)]
-            // into a fallback type and poison codegen with had_error.
-            if name_sym == self.sym_option and g_count == 1:
-                let opt_arg = self.resolve_type(self.pool.get_extra(g_extra))
-                if opt_arg != 0:
-                    return self.get_or_create_option_type(0, opt_arg)
-            if name_sym == self.sym_vec and g_count == 1:
-                let vec_arg = self.resolve_type(self.pool.get_extra(g_extra))
-                if vec_arg != 0:
-                    return self.get_or_create_vec_type(0, vec_arg)
-            if name_sym == self.sym_result and g_count == 2:
-                let res_ok = self.resolve_type(self.pool.get_extra(g_extra))
-                let res_err = self.resolve_type(self.pool.get_extra(g_extra + 1))
-                if res_ok != 0 and res_err != 0:
-                    return self.get_or_create_result_type(0, res_ok, res_err)
-            // Sema-based path for other builtin containers (HashMap, HashSet)
-            // and fully concrete generic instantiations.
-            let sema_tid = self.sema.resolve_type_expr_frozen(type_node)
-            if sema_tid > 0:
-                let llvm_ty = self.sema_type_to_llvm(sema_tid)
-                if llvm_ty != 0:
-                    return llvm_ty
-            // Monomorphize user-defined generic structs
-            let gs_opt = self.generic_structs.get(name_sym)
-            if gs_opt.is_some():
-                return self.monomorphize_struct(name_sym, g_extra, g_count)
-            return 0
+            let args: Vec[i32] = Vec.new()
+            for i in 0..g_count: args.push(self.pool.get_extra(g_extra + i))
+            return self.resolve_generic_type_nodes(name_sym, args, type_node)
 
         if kind == NodeKind.NK_TYPE_TRAIT_OBJ:
             // dyn Trait → fat pointer {data_ptr, vtable_ptr}
@@ -2754,6 +2725,37 @@ impl Codegen:
         let ctx_owner = if self.current_method_owner_sym != 0: with_str_clone_ref(self.intern.resolve(self.current_method_owner_sym)) else: ""
         with_eprint(f"warning: [type-resolve] unhandled type node kind={kind} node={type_node} span={self.pool.get_start(type_node)}..{self.pool.get_end(type_node)} in={ctx_fn} owner={ctx_owner}")
         self.type_fallback()
+
+    mut fn resolve_generic_type_nodes(name_sym: i32, args: &Vec[i32], type_node: i32) -> i64:
+        let count = args.len()
+        if self.sema.type_symbol_is_std_box(name_sym) != 0 and count == 1:
+            if self.pool.kind(args[0]) == NodeKind.NK_TYPE_TRAIT_OBJ: return self.get_dyn_fat_ptr_type()
+            return wl_ptr_type(self.context)
+        if name_sym == self.sym_context_error and count == 1:
+            let inner = self.resolve_type(args[0])
+            return self.get_or_create_context_error_type(inner)
+        // Resolve arguments against the active frame before asking frozen
+        // Sema, which cannot see codegen's current type-parameter bindings.
+        if name_sym == self.sym_option and count == 1:
+            let inner = self.resolve_type(args[0])
+            if inner != 0: return self.get_or_create_option_type(0, inner)
+        if name_sym == self.sym_vec and count == 1:
+            let inner = self.resolve_type(args[0])
+            if inner != 0: return self.get_or_create_vec_type(0, inner)
+        if name_sym == self.sym_result and count == 2:
+            let ok = self.resolve_type(args[0])
+            let err = self.resolve_type(args[1])
+            if ok != 0 and err != 0: return self.get_or_create_result_type(0, ok, err)
+        let sema_tid = if self.pool.kind(type_node) == NodeKind.NK_INDEX:
+            self.sema.resolve_type_level_arg_expr_frozen(type_node)
+        else:
+            self.sema.resolve_type_expr_frozen(type_node)
+        if sema_tid > 0:
+            let resolved = self.sema_type_to_llvm(sema_tid)
+            if resolved != 0: return resolved
+        if self.generic_structs.contains(name_sym):
+            return self.monomorphize_struct_nodes(name_sym, args)
+        0
 
     fn resolve_primitive_named_type(sym: i32) -> i64:
         if sym == self.sym_bool: return wl_i1_type(self.context)
@@ -5663,6 +5665,12 @@ impl Codegen:
     // ── Monomorphize struct (stub) ────────────────────────────────────
 
     mut fn monomorphize_struct(name_sym: i32, extra_start: i32, arg_count: i32) -> i64:
+        let args: Vec[i32] = Vec.new()
+        for i in 0..arg_count: args.push(self.pool.get_extra(extra_start + i))
+        self.monomorphize_struct_nodes(name_sym, args)
+
+    mut fn monomorphize_struct_nodes(name_sym: i32, args: &Vec[i32]) -> i64:
+        let arg_count = args.len() as i32
         let gs_opt = self.generic_structs.get(name_sym)
         if not gs_opt.is_some():
             return 0
@@ -5686,7 +5694,7 @@ impl Codegen:
         let arg_sema_types: Vec[i32] = Vec.new()
         if arg_count > 0:
             for ai in 0..arg_count:
-                let arg_node = self.pool.get_extra(extra_start + ai)
+                let arg_node = args[ai]
                 let arg_ty = self.resolve_type(arg_node)
                 let arg_sema = self.type_expr_to_sema_type(arg_node)
                 if arg_ty != 0:
