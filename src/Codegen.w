@@ -3277,7 +3277,7 @@ impl Codegen:
                 cg_sym = sym
             // D29 (#750): a shadowed name's tid carries its tier; route the
             // std-tier tid to the aliased LLVM slot.
-            if self.sema.type_sym_is_shadowed(sym) != 0 and self.sema.type_tid_std_tier(resolved_tid as i32) != 0:
+            if self.sema.type_sym_is_shadowed(sym) != 0 and self.sema.type_tid_std_tier(resolved_tid) != 0:
                 cg_sym = self.shadow_alias_for(cg_sym)
             return self.resolve_named_type(cg_sym)
         if tk == TypeKind.TY_TUPLE:
@@ -3309,7 +3309,9 @@ impl Codegen:
             var elem_ty = self.sema_type_to_llvm(elem_tid)
             if elem_ty == 0:
                 elem_ty = self.type_fallback()
-            return wl_array_type(elem_ty, arr_len as i64)
+            return wl_array_type(elem_ty, arr_len)
+        if tk == TypeKind.TY_TRAIT_OBJ:
+            return self.get_dyn_fat_ptr_type()
         if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF:
             let pointee_tid = self.sema.get_type_d0(resolved_tid)
             let pointee_resolved = self.sema.resolve_alias(pointee_tid)
@@ -4512,6 +4514,8 @@ impl Codegen:
     mut fn abi_param_source_type(sig_idx: i32, pi: i32) -> i64:
         var p_ty = self.sema_type_to_llvm(self.sema.sig_param_type(sig_idx, pi))
         if p_ty == 0:
+            let name = self.sema.pool_resolve(self.sema.sig_names[sig_idx])
+            with_eprint(f"error: cannot lower FnAbi parameter {pi + 1} of '{name}' to an LLVM source type")
             p_ty = self.type_fallback()
         // Unit is carried as i32 at the LLVM ABI boundary. LLVM void is legal
         // only as a function result; using it as a parameter or local alloca
@@ -4520,13 +4524,13 @@ impl Codegen:
             p_ty = wl_i32_type(self.context)
         p_ty
 
-    fn sig_param_is_explicit_ref(sig_idx: i32, pi: i32) -> bool:
+    fn sig_param_is_explicit_ref(sig_idx: i32, pi: i32):
         if sig_idx < 0 or pi < 0 or pi >= self.sema.sig_get_param_count(sig_idx):
             return false
         let ty = self.sema.sig_param_type(sig_idx, pi)
         if ty <= 0:
             return false
-        let resolved = self.sema.resolve_alias(ty as TypeId) as i32
+        let resolved = self.sema.resolve_alias(ty)
         self.sema.get_type_kind(resolved) == TypeKind.TY_REF
 
     fn sig_abi_param_flags(sig_idx: i32, pi: i32) -> i32:

@@ -270,7 +270,9 @@ impl Codegen:
             var arr_elem_llvm = self.mir_sema_type_to_llvm(arr_elem_tid)
             if arr_elem_llvm == 0:
                 arr_elem_llvm = self.type_fallback()
-            return wl_array_type(arr_elem_llvm, arr_len as i64)
+            return wl_array_type(arr_elem_llvm, arr_len)
+        if tk == TypeKind.TY_TRAIT_OBJ:
+            return self.get_dyn_fat_ptr_type()
         if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF:
             let pointee_tid = self.mir_type_d0_at(resolved)
             let pointee_resolved = self.mir_resolve_alias_at(pointee_tid)
@@ -440,7 +442,7 @@ impl Codegen:
             let source_ty = self.mir_sema_type_to_llvm(tid)
             let llvm_ty = self.mir_storage_type_for_value(source_ty)
             sources.push(llvm_ty)
-            let reference = self.sema.get_type_kind(self.sema.resolve_alias(tid as TypeId)) == TypeKind.TY_REF
+            let reference = self.sema.get_type_kind(self.sema.resolve_alias(tid)) == TypeKind.TY_REF
             places.push(self.sema.callable_param_uses_value_ref_abi(resolved, pi) | (if reference: 2 else: 0))
         let index = self.compute_fn_abi(ret, sources, places, convention, 0)
         self.fn_abi_callables.insert(key, index)

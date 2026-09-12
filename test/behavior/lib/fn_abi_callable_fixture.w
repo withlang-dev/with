@@ -14,6 +14,15 @@ trait EchoLarge:
 
 impl EchoLarge for Pair
 
+trait ReadFirst:
+    fn first(self: &Self) -> i64
+
+impl ReadFirst for Pair:
+    fn first: self.a
+
+fn read_first(value: dyn ReadFirst): value.first()
+fn with_dyn(cb: fn(dyn ReadFirst) -> i64, value: dyn ReadFirst): cb(value)
+
 @[c_export("pair")]
 fn pair(value: Pair): Pair { a: value.b, b: value.a }
 

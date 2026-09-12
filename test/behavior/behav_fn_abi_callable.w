@@ -68,6 +68,7 @@ fn main:
         "    assert(p.bounce(Pair { a: 17, b: 19 }).a == 17)\n" ++
         "    assert(p.echo(l).d == 7)\n" ++
         "    assert(check_wide_default(p, l).d == 7)\n" ++
+        "    assert(with_dyn(read_first, p) == 13)\n" ++
         "    assert(indirect_Large(wide_Large, l).d == 7)\n" ++
         "    assert(indirect_Pair(wide_Pair, p).b == 29)\n" ++
         "    print(\"native ok\")\n"
