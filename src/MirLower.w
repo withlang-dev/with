@@ -1087,11 +1087,18 @@ impl MirBuilder:
             self.emit_drop_entry(self.drop_local_ids[i], self.drop_kinds[i])
             i = i - 1
 
+    mut fn emit_deferred_body(node: i32):
+        // A cleanup runs on this exit edge. Its temporaries must not escape
+        // into the enclosing statement, which also lowers continuing paths.
+        let frame = self.push_stmt_temp_frame()
+        self.lower_expr_discard(node)
+        self.finish_stmt_temp_frame(frame)
+
     mut fn emit_defers_for_range(start: i32, end: i32):
         var i = end - 1
         while i >= start:
-            let defer_body: i32 = self.defer_nodes[i]
-            let _ = self.lower_expr(defer_body)
+            let defer_body = self.defer_nodes[i]
+            self.emit_deferred_body(defer_body)
             i = i - 1
 
     mut fn emit_drops_for_range(start: i32, end: i32):
@@ -1125,18 +1132,13 @@ impl MirBuilder:
             self.emit_drop_entry(self.drop_local_ids[i], self.drop_kinds[i])
             i = i - 1
 
-    mut fn emit_defers_for_return():
-        var i = self.defer_nodes.len() as i32 - 1
-        while i >= 0:
-            let defer_body: i32 = self.defer_nodes[i]
-            let _ = self.lower_expr(defer_body)
-            i = i - 1
+    mut fn emit_defers_for_return(): self.emit_defers_for_range(0, self.defer_nodes.len() as i32)
 
     mut fn emit_errdefers_for_return():
         var i = self.errdefer_nodes.len() as i32 - 1
         while i >= 0:
-            let errdefer_body: i32 = self.errdefer_nodes[i]
-            let _ = self.lower_expr(errdefer_body)
+            let errdefer_body = self.errdefer_nodes[i]
+            self.emit_deferred_body(errdefer_body)
             i = i - 1
 
     fn push_control_target(label: i32, target_kind: i32, continue_bb: i32, break_bb: i32, result_place: i32) -> Unit:
@@ -5730,8 +5732,6 @@ impl MirBuilder:
         var scheduled_drop_kind = DropKind.DK_VALUE
         if self.sema.is_copy_frozen(bind_ty) == 0:
             scheduled_drop_kind = self.task_drop_kind_for_binding(node, bind_ty)
-            if is_discard_binding == 0:
-                self.schedule_drop(local_id, scheduled_drop_kind)
 
         var rhs_is_view_if = 0
         if rhs_expr != 0:
@@ -5744,20 +5744,20 @@ impl MirBuilder:
             // field may have materialized an independent value, so revisiting
             // its AST here would consume the original field as well (#1043).
             self.assign_operand_to_place(place, rhs_op, self.ast.get_start(node))
-            // #747 (03g): a pure-view if-result (all result arms place-reads
-            // of named storage or constants) binds as a VIEW — cancel the
-            // scheduled scope-exit drop so the binding does not free storage
-            // its arms merely read.
+            // #747 (03g): a pure-view if-result binds as a VIEW and must not
+            // free storage its arms merely read.
             if mutable == 0 and self.ast.kind(rhs_expr) == NodeKind.NK_IF_EXPR and self.last_if_result_view != 0:
                 rhs_is_view_if = 1
-                if self.sema.is_copy_frozen(bind_ty) == 0 and is_discard_binding == 0:
-                    self.cancel_scheduled_value_drop_for_local(local_id)
         if is_discard_binding != 0:
             if self.sema.is_copy_frozen(bind_ty) == 0 and rhs_is_view_if == 0:
                 self.emit_drop_entry(local_id, scheduled_drop_kind)
             else:
                 self.body.push_stmt(self.cur_bb, StmtKind.StorageDead, local_id, 0, self.ast.get_start(node))
             return
+        // An initializer may return, break, continue, or propagate an error.
+        // Only the edge that acquired the value owns its eventual cleanup.
+        if self.sema.is_copy_frozen(bind_ty) == 0 and rhs_is_view_if == 0:
+            self.schedule_drop(local_id, scheduled_drop_kind)
         self.bind_local(name_sym, local_id)
 
     mut fn lower_tuple_destructure(node: i32):
@@ -6042,11 +6042,7 @@ impl MirBuilder:
         // Emit defers added in this block scope (LIFO order), before popping scope
         let defer_end = self.defer_nodes.len() as i32
         if defer_end > defer_start:
-            var di = defer_end - 1
-            while di >= defer_start:
-                let defer_body: i32 = self.defer_nodes[di]
-                let _ = self.lower_expr(defer_body)
-                di = di - 1
+            self.emit_defers_for_range(defer_start, defer_end)
             // Remove the block's defers from the stack
             while self.defer_nodes.len() > defer_start:
                 self.defer_nodes.pop()

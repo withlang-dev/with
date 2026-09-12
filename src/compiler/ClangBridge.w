@@ -90,6 +90,7 @@ extern fn clang_Cursor_isNull(cursor: CXCursor) -> i32
 extern fn clang_getCursorSpelling(cursor: CXCursor) -> CXString
 extern fn clang_getCursorType(cursor: CXCursor) -> CXType
 extern fn clang_getCursorLocation(cursor: CXCursor) -> CXSourceLocation
+extern fn clang_Location_isFromMainFile(location: CXSourceLocation) -> i32
 extern fn clang_getCursorLinkage(cursor: CXCursor) -> i32
 extern fn clang_Cursor_getStorageClass(cursor: CXCursor) -> i32
 extern fn clang_Cursor_getNumArguments(cursor: CXCursor) -> i32
@@ -208,12 +209,14 @@ let CXType_Pointer: i32 = 101
 let CXType_BlockPointer: i32 = 102
 let CXType_Record: i32 = 105
 let CXType_Enum: i32 = 106
+let CXType_Typedef: i32 = 107
 let CXType_FunctionNoProto: i32 = 110
 let CXType_FunctionProto: i32 = 111
 let CXType_ConstantArray: i32 = 112
 let CXType_Vector: i32 = 113
 let CXType_IncompleteArray: i32 = 114
 let CXType_VariableArray: i32 = 115
+let CXType_Elaborated: i32 = 119
 let CXType_ExtVector: i32 = 176
 let CXType_Atomic: i32 = 177
 
@@ -417,7 +420,7 @@ type MacroSession:
     values: *mut *mut u8
     locations: *mut *mut u8
     fn_like: *mut i32
-    system_flags: *mut i32
+    origin_flags: *mut i32  // bit 0: system header; bit 1: preprocessing input
     params: *mut *mut *mut u8
     param_counts: *mut i32
     count: i32
@@ -765,11 +768,58 @@ unsafe fn get_type_spelling(s: *mut CImportSession, ty: CXType) -> str:
 // Forward declaration pattern: translate_fn_type calls translate_type_recursive and vice versa.
 // In With, both are defined at module scope so mutual recursion works.
 
+unsafe fn cimport_type_decl_named(ty: CXType, name: *const u8):
+    let spelling = clang_getCursorSpelling(clang_getTypeDeclaration(ty))
+    let text = clang_getCString(spelling)
+    let matches = text as i64 != 0 and c_strcmp(text, name) == 0
+    clang_disposeString(spelling)
+    matches
+
+unsafe fn cimport_type_is_va_list(ty: CXType, depth: i32) -> bool:
+    if depth > MAX_TYPE_DEPTH: return false
+    if ty.kind == CXType_Elaborated:
+        return cimport_type_is_va_list(clang_Type_getNamedType(ty), depth + 1)
+    if ty.kind == CXType_Typedef:
+        if cimport_type_decl_named(ty, "va_list\0" as *const u8) or
+           cimport_type_decl_named(ty, "__builtin_va_list\0" as *const u8) or
+           cimport_type_decl_named(ty, "__gnuc_va_list\0" as *const u8):
+            return true
+        return cimport_type_is_va_list(clang_getTypedefDeclUnderlyingType(clang_getTypeDeclaration(ty)), depth + 1)
+    if ty.kind == CXType_ConstantArray and clang_getArraySize(ty) == 1:
+        return cimport_type_decl_named(clang_getArrayElementType(ty), "__va_list_tag\0" as *const u8)
+    ty.kind == CXType_Record and cimport_type_decl_named(ty, "__va_list\0" as *const u8)
+
+unsafe fn cimport_type_is_va_list_parameter(ty: CXType):
+    if cimport_type_is_va_list(ty, 0): return true
+    let canonical = clang_getCanonicalType(ty)
+    // A parameter of the SysV array typedef has already decayed. A
+    // va_list * instead points to an array, so retains its pointer layer.
+    canonical.kind == CXType_Pointer and
+        cimport_type_decl_named(clang_getPointeeType(canonical), "__va_list_tag\0" as *const u8)
+
+unsafe fn translate_parameter_type(s: *mut CImportSession, ty: CXType, depth: i32):
+    if cimport_type_is_va_list_parameter(ty):
+        return session_strdup(s, "c_va_list\0" as *const u8)
+    translate_type_recursive(s, ty, depth, 0)
+
 unsafe fn translate_type_recursive_mode(s: *mut CImportSession, ty: CXType, depth: i32, is_last_struct_field: i32, preserve_incomplete_arrays: i32) -> *mut u8:
     if depth > MAX_TYPE_DEPTH:
         return session_strdup(s, "__UNSUPPORTED:type too complex\0" as *const u8)
+    // Follow typedef identity before canonicalization erases va_list on
+    // Darwin. A substring in an unrelated name is never a type identity.
+    if cimport_type_is_va_list(ty, depth):
+        return session_strdup(s, "c_va_list\0" as *const u8)
+    if ty.kind == CXType_Typedef:
+        return translate_type_recursive_mode(s, clang_getTypedefDeclUnderlyingType(clang_getTypeDeclaration(ty)), depth + 1, is_last_struct_field, preserve_incomplete_arrays)
+    if ty.kind == CXType_Elaborated:
+        return translate_type_recursive_mode(s, clang_Type_getNamedType(ty), depth + 1, is_last_struct_field, preserve_incomplete_arrays)
     let canonical = clang_getCanonicalType(ty)
     let kind = canonical.kind
+    // typeof probes are Unexposed even when their canonical type is an
+    // array or pointer; libclang's decomposition APIs reject that wrapper.
+    // Keep original children whenever its kind exposes the actual shape,
+    // so ordinary pointer/array typedefs retain nested va_list identity.
+    let shape = if ty.kind == kind: ty else: canonical
 
     if kind == CXType_Void: return session_strdup(s, "Unit\0" as *const u8)
     if kind == CXType_Bool: return session_strdup(s, "bool\0" as *const u8)
@@ -797,13 +847,13 @@ unsafe fn translate_type_recursive_mode(s: *mut CImportSession, ty: CXType, dept
     if kind == CXType_Float128: return session_strdup(s, "f128\0" as *const u8)
 
     if kind == CXType_Pointer:
-        let pointee = clang_getPointeeType(canonical)
+        let pointee = clang_getPointeeType(shape)
         let can_pointee = clang_getCanonicalType(pointee)
         let is_const = clang_isConstQualifiedType(pointee)
         let is_volatile = clang_isVolatileQualifiedType(pointee)
         // Function pointer
         if can_pointee.kind == CXType_FunctionProto or can_pointee.kind == CXType_FunctionNoProto:
-            let fn_str = translate_fn_type(s, can_pointee, depth + 1)
+            let fn_str = translate_fn_type(s, pointee, depth + 1)
             if fn_str as i64 == 0: return session_strdup(s, "*const i8\0" as *const u8)
             return fn_str
         let qual = if is_volatile != 0: "volatile\0" as *const u8 else: if is_const != 0: "const\0" as *const u8 else: "mut\0" as *const u8
@@ -837,7 +887,7 @@ unsafe fn translate_type_recursive_mode(s: *mut CImportSession, ty: CXType, dept
 
     if kind == CXType_ConstantArray:
         let size = clang_getArraySize(canonical)
-        let elem = clang_getArrayElementType(canonical)
+        let elem = clang_getArrayElementType(shape)
         let elem_str = translate_type_recursive_mode(s, elem, depth + 1, 0, preserve_incomplete_arrays)
         if elem_str as i64 == 0 or c_strcmp(elem_str as *const u8, "c_void\0" as *const u8) == 0:
             return session_strdup(s, "c_void\0" as *const u8)
@@ -867,7 +917,7 @@ unsafe fn translate_type_recursive_mode(s: *mut CImportSession, ty: CXType, dept
         return session_strdup(s, &buf as *const [2048]u8 as *const u8)
 
     if kind == CXType_FunctionProto or kind == CXType_FunctionNoProto:
-        return translate_fn_type(s, canonical, depth + 1)
+        return translate_fn_type(s, shape, depth + 1)
 
     if kind == CXType_Record:
         let spelling = clang_getTypeSpelling(canonical)
@@ -972,7 +1022,7 @@ unsafe fn translate_fn_type(s: *mut CImportSession, fn_type: CXType, depth: i32)
         if i > 0:
             buf_append_str(&raw mut params as *mut [4096]u8 as *mut u8, &raw mut pos, 4096, ", \0" as *const u8)
         let arg_type = clang_getArgType(fn_type, i as u32)
-        var arg_str = translate_type_recursive(s, arg_type, depth + 1, 0)
+        var arg_str = translate_parameter_type(s, arg_type, depth + 1)
         if arg_str as i64 == 0 or c_strncmp(arg_str as *const u8, "__UNSUPPORTED:\0" as *const u8, 14) == 0:
             arg_str = session_strdup(s, "i32\0" as *const u8)
         buf_append_str(&raw mut params as *mut [4096]u8 as *mut u8, &raw mut pos, 4096, arg_str as *const u8)
@@ -1575,7 +1625,7 @@ pub fn with_cimport_fn_param_type_translated(session: i64, idx: i32, param: i32)
         let cursor = *(((*s).decls as i64 + idx as i64 * 32) as *const CXCursor)
         let arg = clang_Cursor_getArgument(cursor, param as u32)
         let ty = clang_getCursorType(arg)
-        let result = translate_type_recursive(s, ty, 0, 0)
+        let result = translate_parameter_type(s, ty, 0)
         if result as i64 == 0: return ""
         session_make_str(s, result as *const u8)
 
@@ -2045,35 +2095,31 @@ pub fn with_cimport_realpath(path: &str) -> str:
 // ── Macro extraction ────────────────────────────────────────
 
 unsafe fn cimport_location_path_is_system(path: *const u8) -> i32:
-    if path as i64 == 0:
-        return 0
-    if c_strncmp(path, "/usr/\0" as *const u8, 5) == 0:
-        return 1
-    if c_strncmp(path, "/Library/\0" as *const u8, 9) == 0:
-        return 1
-    if c_strncmp(path, "/Applications/Xcode\0" as *const u8, 19) == 0:
-        return 1
-    if c_strstr(path, "/usr/include/\0" as *const u8) as i64 != 0:
-        return 1
-    if c_strstr(path, "/SDKs/\0" as *const u8) as i64 != 0:
-        return 1
-    if c_strstr(path, "/clang/\0" as *const u8) as i64 != 0:
-        return 1
-    if c_strstr(path, "\\clang\\\0" as *const u8) as i64 != 0:
-        return 1
-    if c_strstr(path, "/lib/clang/\0" as *const u8) as i64 != 0:
-        return 1
-    if c_strstr(path, "\\lib\\clang\\\0" as *const u8) as i64 != 0:
-        return 1
-    if c_strstr(path, "/Windows Kits/\0" as *const u8) as i64 != 0:
-        return 1
-    if c_strstr(path, "\\Windows Kits\\\0" as *const u8) as i64 != 0:
-        return 1
-    if c_strstr(path, "/VC/Tools/MSVC/\0" as *const u8) as i64 != 0:
-        return 1
-    if c_strstr(path, "\\VC\\Tools\\MSVC\\\0" as *const u8) as i64 != 0:
-        return 1
+    if path as i64 == 0: return 0
+    // Clang locations can mix separators even within one header path.
+    let normalized = make_str(path).replace("\\", "/")
+    // Embedded builtin headers remain system headers after materialization.
+    // Use the configured resource root, including an explicit override, and
+    // require a path boundary so a neighboring project directory stays public.
+    let resource_dir = get_clang_resource_dir()
+    if resource_dir as i64 != 0:
+        let resource_root = make_str(resource_dir).replace("\\", "/")
+        let prefix = if resource_root.ends_with("/"): resource_root else: resource_root ++ "/"
+        if normalized.starts_with(prefix): return 1
+    if normalized.starts_with("/usr/"): return 1
+    if normalized.starts_with("/Library/"): return 1
+    if normalized.starts_with("/Applications/Xcode"): return 1
+    if normalized.contains("/usr/include/"): return 1
+    if normalized.contains("/SDKs/"): return 1
+    if normalized.contains("/clang/"): return 1
+    if normalized.contains("/Windows Kits/"): return 1
+    if normalized.contains("/VC/Tools/MSVC/"): return 1
     0
+
+// Declaration locations and macro cursors use one path classification.
+pub fn cimport_path_is_system(path: &str) -> bool:
+    let terminated = path ++ "\0"
+    unsafe { cimport_location_path_is_system(terminated as *const u8) != 0 }
 
 unsafe fn macro_location_from_cursor(s: *mut CImportSession, cursor: CXCursor) -> str:
     let loc = clang_getCursorLocation(cursor)
@@ -2180,21 +2226,21 @@ unsafe fn macro_session_grow(ms: *mut MacroSession):
         if (*ms).values as i64 != 0: with_memcpy(nv, (*ms).values as *const u8, oc * 8)
         if (*ms).locations as i64 != 0: with_memcpy(nl, (*ms).locations as *const u8, oc * 8)
         if (*ms).fn_like as i64 != 0: with_memcpy(nf, (*ms).fn_like as *const u8, oc * 4)
-        if (*ms).system_flags as i64 != 0: with_memcpy(ns, (*ms).system_flags as *const u8, oc * 4)
+        if (*ms).origin_flags as i64 != 0: with_memcpy(ns, (*ms).origin_flags as *const u8, oc * 4)
         if (*ms).params as i64 != 0: with_memcpy(np, (*ms).params as *const u8, oc * 8)
         if (*ms).param_counts as i64 != 0: with_memcpy(npc, (*ms).param_counts as *const u8, oc * 4)
     if (*ms).names as i64 != 0: with_free((*ms).names as *mut u8)
     if (*ms).values as i64 != 0: with_free((*ms).values as *mut u8)
     if (*ms).locations as i64 != 0: with_free((*ms).locations as *mut u8)
     if (*ms).fn_like as i64 != 0: with_free((*ms).fn_like as *mut u8)
-    if (*ms).system_flags as i64 != 0: with_free((*ms).system_flags as *mut u8)
+    if (*ms).origin_flags as i64 != 0: with_free((*ms).origin_flags as *mut u8)
     if (*ms).params as i64 != 0: with_free((*ms).params as *mut u8)
     if (*ms).param_counts as i64 != 0: with_free((*ms).param_counts as *mut u8)
     (*ms).names = nn as *mut *mut u8
     (*ms).values = nv as *mut *mut u8
     (*ms).locations = nl as *mut *mut u8
     (*ms).fn_like = nf as *mut i32
-    (*ms).system_flags = ns as *mut i32
+    (*ms).origin_flags = ns as *mut i32
     (*ms).params = np as *mut *mut *mut u8
     (*ms).param_counts = npc as *mut i32
 
@@ -2212,7 +2258,7 @@ fn macro_source_is_define_line(source: &str) -> bool:
         i = i + 1
     i + 6 <= source.len() as i32 and source.slice(i as i64, (i + 6) as i64) == "define"
 
-unsafe fn macro_session_add_from_define_line(ms: *mut MacroSession, line_ptr: *const u8, loc_ptr: *const u8, is_system: i32):
+unsafe fn macro_session_add_from_define_line(ms: *mut MacroSession, line_ptr: *const u8, loc_ptr: *const u8, origin_flags: i32):
     if line_ptr as i64 == 0:
         return
     var define_start = line_ptr
@@ -2294,7 +2340,7 @@ unsafe fn macro_session_add_from_define_line(ms: *mut MacroSession, line_ptr: *c
     *(((*ms).values as i64 + ci * 8) as *mut *mut u8) = value
     *(((*ms).locations as i64 + ci * 8) as *mut *mut u8) = c_strdup(loc_ptr)
     *(((*ms).fn_like as i64 + ci * 4) as *mut i32) = is_fn_like
-    *(((*ms).system_flags as i64 + ci * 4) as *mut i32) = is_system
+    (*ms).origin_flags[(*ms).count] = origin_flags
     *(((*ms).params as i64 + ci * 8) as *mut *mut *mut u8) = macro_params
     *(((*ms).param_counts as i64 + ci * 4) as *mut i32) = macro_param_count
     (*ms).count = (*ms).count + 1
@@ -2308,6 +2354,8 @@ unsafe fn collect_macro_def(cursor: CXCursor, parent: CXCursor, data: *mut u8) -
     let ms = (*ctx).macros
     let loc = macro_location_from_cursor(s, cursor)
     let is_system = macro_location_is_system_from_cursor(cursor)
+    let is_input = clang_Location_isFromMainFile(clang_getCursorLocation(cursor))
+    let origin_flags = is_system | (if is_input != 0: 2 else: 0)
     var source = macro_source_line_from_cursor(s, cursor)
     if not macro_source_is_define_line(source):
         source = cursor_source_text_from_cursor(s, cursor)
@@ -2317,7 +2365,7 @@ unsafe fn collect_macro_def(cursor: CXCursor, parent: CXCursor, data: *mut u8) -
             source = "#define " ++ token_text
     let source_ptr = str_to_cstr(source)
     let loc_ptr = str_to_cstr(loc)
-    macro_session_add_from_define_line(ms, source_ptr as *const u8, loc_ptr as *const u8, is_system)
+    macro_session_add_from_define_line(ms, source_ptr as *const u8, loc_ptr as *const u8, origin_flags)
     if source_ptr as i64 != 0:
         with_free(source_ptr)
     if loc_ptr as i64 != 0:
@@ -2597,12 +2645,18 @@ pub fn with_cimport_macro_location(session: i64, idx: i32) -> str:
         if (*ms).locations as i64 == 0: return ""
         make_str(*(((*ms).locations as i64 + idx as i64 * 8) as *const *const u8))
 
-pub fn with_cimport_macro_is_system(session: i64, idx: i32) -> i32:
+fn macro_origin_flags(session: i64, idx: i32):
     unsafe:
         let ms = session as *mut MacroSession
-        if ms as i64 == 0 or idx < 0 or idx >= (*ms).count: return 0
-        if (*ms).system_flags as i64 == 0: return 0
-        *(((*ms).system_flags as i64 + idx as i64 * 4) as *const i32)
+        if session == 0 or idx < 0 or idx >= (*ms).count: return 0
+        if (*ms).origin_flags as i64 == 0: return 0
+        (*ms).origin_flags[idx]
+
+pub fn with_cimport_macro_is_system(session: i64, idx: i32) -> i32: macro_origin_flags(session, idx) & 1
+
+// A migration preprocesses a generated preamble followed by #include of the
+// actual input file. Main-file macros belong to that driver, not the corpus.
+pub fn cimport_macro_is_from_input(session: i64, idx: i32) -> i32: macro_origin_flags(session, idx) & 2
 
 pub fn with_cimport_macro_is_fn_like(session: i64, idx: i32) -> i32:
     unsafe:
@@ -2634,7 +2688,7 @@ pub fn with_cimport_dispose_macros(session: i64) -> Unit:
         if (*ms).values as i64 != 0: with_free((*ms).values as *mut u8)
         if (*ms).locations as i64 != 0: with_free((*ms).locations as *mut u8)
         if (*ms).fn_like as i64 != 0: with_free((*ms).fn_like as *mut u8)
-        if (*ms).system_flags as i64 != 0: with_free((*ms).system_flags as *mut u8)
+        if (*ms).origin_flags as i64 != 0: with_free((*ms).origin_flags as *mut u8)
         if (*ms).params as i64 != 0: with_free((*ms).params as *mut u8)
         if (*ms).param_counts as i64 != 0: with_free((*ms).param_counts as *mut u8)
         with_free(ms as *mut u8)
@@ -3113,6 +3167,14 @@ pub fn with_ci_type_translated(session: i64, type_idx: i32) -> str:
         let result = translate_type_recursive(s, ty, 0, 0)
         if result as i64 == 0: return ""
         session_make_str(s, result as *const u8)
+
+pub fn cimport_type_is_va_list_at(session: i64, type_idx: i32, parameter: bool) -> bool:
+    unsafe:
+        let s = session as *mut CImportSession
+        if s as i64 == 0 or type_idx < 0 or type_idx >= (*s).type_count: return false
+        let ty = *(((*s).types as i64 + type_idx as i64 * 24) as *const CXType)
+        if parameter: return cimport_type_is_va_list_parameter(ty)
+        cimport_type_is_va_list(ty, 0)
 
 // ── Cursor extras ───────────────────────────────────────────
 

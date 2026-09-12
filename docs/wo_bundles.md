@@ -505,6 +505,17 @@ target pairs and the `regex_runtime.o` entries in `Link.w`,
 `build/package.w`, `build/emit_c.w`, `build/runtime.w`, and
 `install-regex-runtime` go away.
 
+Stage2 and stage3 receive `out/stage/lib/embedded_objects.o` explicitly
+through the build action's `embedded-object=` input, forwarded to the
+linker as `WITH_COMPILER_EMBEDDED_OBJECT`. Its producer reuses the
+bootstrap runtime inputs and adds the tree's bundle blobs. Stage1 keeps
+`out/bootstrap-lib/embedded_objects.o`, whose bundle slots are empty.
+These are separate graph outputs: linking a `.wo` with `--link-bundle`
+does not embed its object, interface, or manifest in the resulting
+compiler. The explicit embedding input also prevents a warm `out/lib`
+from masking an empty stage payload. A missing selected embedding object
+is a hard link failure. See [the cold-build diagnosis](macos-stage-bundle-debug.md).
+
 **Root.** `rt/regex_runtime.w`'s `use` list (32 modules; `pcre2test` and
 `pcre2posix` are harness, not bundle) is the bundle root, moved to
 `lib/std/re/bundle.w` and written by the migrate action, which already

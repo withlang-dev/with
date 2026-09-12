@@ -1362,6 +1362,7 @@ impl Sema:
             return "Never"
         if tk == TypeKind.TY_STR:
             return "str"
+        if tk == TypeKind.TY_VA_LIST: return "c_va_list"
         if tk == TypeKind.TY_STRUCT:
             return self.safe_symbol_text(self.get_type_d0(resolved))
         if tk == TypeKind.TY_ENUM:

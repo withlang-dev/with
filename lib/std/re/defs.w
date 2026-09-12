@@ -273,8 +273,6 @@ pub extern fn with_va_start(ap: *mut i8) -> Unit
 pub extern fn with_va_end(ap: *mut i8) -> Unit
 
 
-pub type max_align_t = c_longdouble
-
 pub type BOOL = c_int
 
 pub type PCRE2_UCHAR8 = u8
@@ -900,35 +898,10 @@ impl Copy for match_block_8
 pub type dfa_match_block_8 { memctl: pcre2_memctl, start_code: *const u8 = null, start_subject: *const u8 = null, end_subject: *const u8 = null, start_used_ptr: *const u8 = null, last_used_ptr: *const u8 = null, tables: *const u8 = null, start_offset: c_ulong = 0, heap_limit: c_uint = 0, heap_used: c_ulong = 0, match_limit: c_uint = 0, match_limit_depth: c_uint = 0, match_call_count: c_uint = 0, moptions: c_uint = 0, poptions: c_uint = 0, nltype: c_uint = 0, nllen: c_uint = 0, allowemptypartial: c_int = 0, nl: [4]u8 = [0 as u8; 4], bsr_convention: c_ushort = 0, cb: *mut pcre2_callout_block_8 = null, callout_data: *mut c_void = null, callout: unsafe extern "C" fn(*mut pcre2_callout_block_8, *mut c_void) -> c_int, recursive: *mut dfa_recursion_info = null }
 impl Copy for dfa_match_block_8
 
-pub let PCRE2_CODE_UNIT_WIDTH: c_int = 8
-pub let HAVE_CONFIG_H: c_int = 1
-pub let HAVE_UNISTD_H: c_int = 1
-pub let USE_CLANG_TYPES: c_int = 0
-pub let USE_CLANG_STDDEF: c_int = 0
-pub let USER_ADDR_NULL: c_ulonglong = (0 as c_ulonglong)
-pub let USE_CLANG_STDARG: c_int = 0
-pub let RENAME_SECLUDE: c_int = 0x00000001
-pub let RENAME_SWAP: c_int = 0x00000002
-pub let RENAME_EXCL: c_int = 0x00000004
-pub let RENAME_RESERVED1: c_int = 0x00000008
-pub let RENAME_NOFOLLOW_ANY: c_int = 0x00000010
-pub let RENAME_RESOLVE_BENEATH: c_int = 0x00000020
-pub let SEEK_SET: c_int = 0
-pub let SEEK_CUR: c_int = 1
-pub let SEEK_END: c_int = 2
-pub let SEEK_HOLE: c_int = 3
-pub let SEEK_DATA: c_int = 4
-pub let BUFSIZ: c_int = 1024
-pub let EOF: c_int = -1
-pub let FOPEN_MAX: c_int = 20
-pub let FILENAME_MAX: c_int = 1024
-pub let P_tmpdir = "/var/tmp/"
-pub let L_tmpnam: c_int = 1024
-pub let TMP_MAX: c_int = 308915776
-pub let L_ctermid: c_int = 1024
 pub let WITH_PCRE2_CONFIG_H: c_int = 1
 pub let SUPPORT_PCRE2_8: c_int = 1
 pub let SUPPORT_UNICODE: c_int = 1
+pub let HAVE_UNISTD_H: c_int = 1
 pub let HEAP_LIMIT: c_int = 20000000
 pub let LINK_SIZE: c_int = 2
 pub let LT_OBJDIR = ".libs/"
@@ -949,443 +922,11 @@ pub let PARENS_NEST_LIMIT: c_int = 250
 pub let PCRE2GREP_BUFSIZE: c_int = 20480
 pub let PCRE2GREP_MAX_BUFSIZE: c_int = 1048576
 pub let VERSION = "10.47"
-pub let USE_CLANG_LIMITS: c_int = 0
-pub let MB_LEN_MAX: c_int = 6
-pub let CHAR_BIT: c_int = 8
-pub let SCHAR_MAX: c_int = 127
-pub let SCHAR_MIN: c_int = -128
-pub let UCHAR_MAX: c_int = 255
-pub let CHAR_MAX: c_int = 127
-pub let CHAR_MIN: c_int = -128
-pub let USHRT_MAX: c_int = 65535
-pub let SHRT_MAX: c_int = 32767
-pub let SHRT_MIN: c_int = -32768
-pub let UINT_MAX: c_uint = 0xffffffff
-pub let INT_MAX: c_int = 2147483647
-pub let INT_MIN: c_int = (-2147483647 - 1)
-pub let ULONG_MAX: c_ulong = 0xffffffffffffffff
-pub let LONG_MAX: c_long = 0x7fffffffffffffff
-pub let LONG_MIN: c_long = (-0x7fffffffffffffff - 1)
-pub let ULLONG_MAX: c_ulonglong = 0xffffffffffffffff
-pub let LLONG_MAX: c_longlong = 0x7fffffffffffffff
-pub let LLONG_MIN: c_longlong = (-0x7fffffffffffffff - 1)
-pub let LONG_BIT: c_int = 64
-pub let SSIZE_MAX: c_long = 0x7fffffffffffffff
-pub let WORD_BIT: c_int = 32
-pub let SIZE_T_MAX: c_ulong = 0xffffffffffffffff
-pub let UQUAD_MAX: c_ulonglong = 0xffffffffffffffff
-pub let QUAD_MAX: c_longlong = 0x7fffffffffffffff
-pub let QUAD_MIN = LLONG_MIN
-pub let ARG_MAX: c_int = (1024 * 1024)
-pub let CHILD_MAX: c_int = 266
-pub let GID_MAX: c_uint = 2147483647
-pub let LINK_MAX: c_int = 32767
-pub let MAX_CANON: c_int = 1024
-pub let MAX_INPUT: c_int = 1024
-pub let NAME_MAX: c_int = 255
-pub let NGROUPS_MAX: c_int = 16
-pub let UID_MAX: c_uint = 2147483647
-pub let OPEN_MAX: c_int = 10240
-pub let PATH_MAX: c_int = 1024
-pub let PIPE_BUF: c_int = 512
-pub let BC_BASE_MAX: c_int = 99
-pub let BC_DIM_MAX: c_int = 2048
-pub let BC_SCALE_MAX: c_int = 99
-pub let BC_STRING_MAX: c_int = 1000
-pub let CHARCLASS_NAME_MAX: c_int = 14
-pub let COLL_WEIGHTS_MAX: c_int = 2
-pub let EQUIV_CLASS_MAX: c_int = 2
-pub let EXPR_NEST_MAX: c_int = 32
-pub let LINE_MAX: c_int = 2048
-pub let RE_DUP_MAX: c_int = 255
-pub let NZERO: c_int = 20
-pub let PTHREAD_DESTRUCTOR_ITERATIONS: c_int = 4
-pub let PTHREAD_KEYS_MAX: c_int = 512
-pub let PTHREAD_STACK_MIN: c_int = 16384
-pub let OFF_MIN = LLONG_MIN
-pub let OFF_MAX: c_longlong = 0x7fffffffffffffff
-pub let NL_ARGMAX: c_int = 9
-pub let NL_LANGMAX: c_int = 14
-pub let NL_MSGMAX: c_int = 32767
-pub let NL_NMAX: c_int = 1
-pub let NL_SETMAX: c_int = 255
-pub let NL_TEXTMAX: c_int = 2048
-pub let IOV_MAX: c_int = 1024
-pub let LONG_LONG_MAX: c_longlong = 9223372036854775807
-pub let LONG_LONG_MIN: c_longlong = (0 - 9223372036854775807 - 1)
-pub let ULONG_LONG_MAX: c_ulonglong = ((0 as c_ulonglong) -% 1)
-pub let NULL: *mut c_void = null
-pub let SIGHUP: c_int = 1
-pub let SIGINT: c_int = 2
-pub let SIGQUIT: c_int = 3
-pub let SIGILL: c_int = 4
-pub let SIGTRAP: c_int = 5
-pub let SIGABRT: c_int = 6
-pub let SIGIOT: c_int = 6
-pub let SIGEMT: c_int = 7
-pub let SIGFPE: c_int = 8
-pub let SIGKILL: c_int = 9
-pub let SIGBUS: c_int = 10
-pub let SIGSEGV: c_int = 11
-pub let SIGSYS: c_int = 12
-pub let SIGPIPE: c_int = 13
-pub let SIGALRM: c_int = 14
-pub let SIGTERM: c_int = 15
-pub let SIGURG: c_int = 16
-pub let SIGSTOP: c_int = 17
-pub let SIGTSTP: c_int = 18
-pub let SIGCONT: c_int = 19
-pub let SIGCHLD: c_int = 20
-pub let SIGTTIN: c_int = 21
-pub let SIGTTOU: c_int = 22
-pub let SIGIO: c_int = 23
-pub let SIGXCPU: c_int = 24
-pub let SIGXFSZ: c_int = 25
-pub let SIGVTALRM: c_int = 26
-pub let SIGPROF: c_int = 27
-pub let SIGWINCH: c_int = 28
-pub let SIGINFO: c_int = 29
-pub let SIGUSR1: c_int = 30
-pub let SIGUSR2: c_int = 31
-pub let SIGEV_NONE: c_int = 0
-pub let SIGEV_SIGNAL: c_int = 1
-pub let SIGEV_THREAD: c_int = 3
-pub let SIGEV_KEVENT: c_int = 4
-pub let ILL_NOOP: c_int = 0
-pub let ILL_ILLOPC: c_int = 1
-pub let ILL_ILLTRP: c_int = 2
-pub let ILL_PRVOPC: c_int = 3
-pub let ILL_ILLOPN: c_int = 4
-pub let ILL_ILLADR: c_int = 5
-pub let ILL_PRVREG: c_int = 6
-pub let ILL_COPROC: c_int = 7
-pub let ILL_BADSTK: c_int = 8
-pub let FPE_NOOP: c_int = 0
-pub let FPE_FLTDIV: c_int = 1
-pub let FPE_FLTOVF: c_int = 2
-pub let FPE_FLTUND: c_int = 3
-pub let FPE_FLTRES: c_int = 4
-pub let FPE_FLTINV: c_int = 5
-pub let FPE_FLTSUB: c_int = 6
-pub let FPE_INTDIV: c_int = 7
-pub let FPE_INTOVF: c_int = 8
-pub let SEGV_NOOP: c_int = 0
-pub let SEGV_MAPERR: c_int = 1
-pub let SEGV_ACCERR: c_int = 2
-pub let BUS_NOOP: c_int = 0
-pub let BUS_ADRALN: c_int = 1
-pub let BUS_ADRERR: c_int = 2
-pub let BUS_OBJERR: c_int = 3
-pub let TRAP_BRKPT: c_int = 1
-pub let TRAP_TRACE: c_int = 2
-pub let CLD_NOOP: c_int = 0
-pub let CLD_EXITED: c_int = 1
-pub let CLD_KILLED: c_int = 2
-pub let CLD_DUMPED: c_int = 3
-pub let CLD_TRAPPED: c_int = 4
-pub let CLD_STOPPED: c_int = 5
-pub let CLD_CONTINUED: c_int = 6
-pub let POLL_IN: c_int = 1
-pub let POLL_OUT: c_int = 2
-pub let POLL_MSG: c_int = 3
-pub let POLL_ERR: c_int = 4
-pub let POLL_PRI: c_int = 5
-pub let POLL_HUP: c_int = 6
-pub let SA_ONSTACK: c_int = 0x0001
-pub let SA_RESTART: c_int = 0x0002
-pub let SA_RESETHAND: c_int = 0x0004
-pub let SA_NOCLDSTOP: c_int = 0x0008
-pub let SA_NODEFER: c_int = 0x0010
-pub let SA_NOCLDWAIT: c_int = 0x0020
-pub let SA_SIGINFO: c_int = 0x0040
-pub let SA_USERTRAMP: c_int = 0x0100
-pub let SA_64REGSET: c_int = 0x0200
-pub let SA_USERSPACE_MASK: c_int = 127
-pub let SIG_BLOCK: c_int = 1
-pub let SIG_UNBLOCK: c_int = 2
-pub let SIG_SETMASK: c_int = 3
-pub let SI_USER: c_int = 0x10001
-pub let SI_QUEUE: c_int = 0x10002
-pub let SI_TIMER: c_int = 0x10003
-pub let SI_ASYNCIO: c_int = 0x10004
-pub let SI_MESGQ: c_int = 0x10005
-pub let SS_ONSTACK: c_int = 0x0001
-pub let SS_DISABLE: c_int = 0x0004
-pub let MINSIGSTKSZ: c_int = 32768
-pub let SIGSTKSZ: c_int = 131072
-pub let SV_ONSTACK: c_int = 0x0001
-pub let SV_INTERRUPT: c_int = 0x0002
-pub let SV_RESETHAND: c_int = 0x0004
-pub let SV_NODEFER: c_int = 0x0010
-pub let SV_NOCLDSTOP: c_int = 0x0008
-pub let SV_SIGINFO: c_int = 0x0040
-pub fn INT8_C[T](v: T) -> T {
-    v
-}
-pub fn INT16_C[T](v: T) -> T {
-    v
-}
-pub fn INT32_C[T](v: T) -> T {
-    v
-}
-pub fn INT64_C[T](v: T) -> i64 {
-    (v as i64)
-}
-pub fn UINT8_C[T](v: T) -> T {
-    v
-}
-pub fn UINT16_C[T](v: T) -> T {
-    v
-}
-pub fn UINT32_C[T](v: T) -> u32 {
-    (v as u32)
-}
-pub fn UINT64_C[T](v: T) -> u64 {
-    (v as u64)
-}
-pub fn INTMAX_C[T](v: T) -> i64 {
-    (v as i64)
-}
-pub fn UINTMAX_C[T](v: T) -> u64 {
-    (v as u64)
-}
-pub let INT8_MAX: c_int = 127
-pub let INT16_MAX: c_int = 32767
-pub let INT32_MAX: c_int = 2147483647
-pub let INT64_MAX: c_longlong = 9223372036854775807
-pub let INT8_MIN: c_int = -128
-pub let INT16_MIN: c_int = -32768
-pub let INT32_MIN: c_int = ((0 - 2147483647) - 1)
-pub let INT64_MIN: c_longlong = ((0 - 9223372036854775807) - 1)
-pub let UINT8_MAX: c_int = 255
-pub let UINT16_MAX: c_int = 65535
-pub let UINT32_MAX: c_uint = 4294967295
-pub let UINT64_MAX: c_ulonglong = 18446744073709551615
-pub let INT_LEAST8_MIN: c_int = -128
-pub let INT_LEAST16_MIN: c_int = -32768
-pub let INT_LEAST32_MIN = INT32_MIN
-pub let INT_LEAST64_MIN = INT64_MIN
-pub let INT_LEAST8_MAX: c_int = 127
-pub let INT_LEAST16_MAX: c_int = 32767
-pub let INT_LEAST32_MAX: c_int = 2147483647
-pub let INT_LEAST64_MAX: c_longlong = 9223372036854775807
-pub let UINT_LEAST8_MAX: c_int = 255
-pub let UINT_LEAST16_MAX: c_int = 65535
-pub let UINT_LEAST32_MAX: c_uint = 4294967295
-pub let UINT_LEAST64_MAX: c_ulonglong = 18446744073709551615
-pub let INT_FAST8_MIN: c_int = -128
-pub let INT_FAST16_MIN: c_int = -32768
-pub let INT_FAST32_MIN = INT32_MIN
-pub let INT_FAST64_MIN = INT64_MIN
-pub let INT_FAST8_MAX: c_int = 127
-pub let INT_FAST16_MAX: c_int = 32767
-pub let INT_FAST32_MAX: c_int = 2147483647
-pub let INT_FAST64_MAX: c_longlong = 9223372036854775807
-pub let UINT_FAST8_MAX: c_int = 255
-pub let UINT_FAST16_MAX: c_int = 65535
-pub let UINT_FAST32_MAX: c_uint = 4294967295
-pub let UINT_FAST64_MAX: c_ulonglong = 18446744073709551615
-pub let INTPTR_MAX: c_long = 9223372036854775807
-pub let INTPTR_MIN: c_long = ((0 - 9223372036854775807) - 1)
-pub let UINTPTR_MAX: c_ulong = 18446744073709551615
-pub let INTMAX_MAX: c_long = 9223372036854775807i64
-pub let UINTMAX_MAX: c_ulong = 18446744073709551615u64
-pub let INTMAX_MIN: c_long = ((0 - INTMAX_MAX) - 1)
-pub let PTRDIFF_MIN = INTMAX_MIN
-pub let PTRDIFF_MAX = INTMAX_MAX
-pub let SIZE_MAX: c_ulong = 18446744073709551615
-pub let RSIZE_MAX: c_ulong = (SIZE_MAX >> 1)
-pub let WINT_MIN = INT32_MIN
-pub let WINT_MAX: c_int = 2147483647
-pub let SIG_ATOMIC_MIN = INT32_MIN
-pub let SIG_ATOMIC_MAX: c_int = 2147483647
-pub let PRIO_PROCESS: c_int = 0
-pub let PRIO_PGRP: c_int = 1
-pub let PRIO_USER: c_int = 2
-pub let PRIO_DARWIN_THREAD: c_int = 3
-pub let PRIO_DARWIN_PROCESS: c_int = 4
-pub let PRIO_MIN: c_int = -20
-pub let PRIO_MAX: c_int = 20
-pub let PRIO_DARWIN_BG: c_int = 0x1000
-pub let PRIO_DARWIN_NONUI: c_int = 0x1001
-pub let RUSAGE_SELF: c_int = 0
-pub let RUSAGE_CHILDREN: c_int = -1
-pub let RUSAGE_INFO_V0: c_int = 0
-pub let RUSAGE_INFO_V1: c_int = 1
-pub let RUSAGE_INFO_V2: c_int = 2
-pub let RUSAGE_INFO_V3: c_int = 3
-pub let RUSAGE_INFO_V4: c_int = 4
-pub let RUSAGE_INFO_V5: c_int = 5
-pub let RUSAGE_INFO_V6: c_int = 6
-pub let RUSAGE_INFO_CURRENT: c_int = 6
-pub let RU_PROC_RUNS_RESLIDE: c_int = 0x00000001
-pub let RLIMIT_CPU: c_int = 0
-pub let RLIMIT_FSIZE: c_int = 1
-pub let RLIMIT_DATA: c_int = 2
-pub let RLIMIT_STACK: c_int = 3
-pub let RLIMIT_CORE: c_int = 4
-pub let RLIMIT_AS: c_int = 5
-pub let RLIMIT_RSS: c_int = 5
-pub let RLIMIT_MEMLOCK: c_int = 6
-pub let RLIMIT_NPROC: c_int = 7
-pub let RLIMIT_NOFILE: c_int = 8
-pub let RLIM_NLIMITS: c_int = 9
-pub let RLIMIT_WAKEUPS_MONITOR: c_int = 0x1
-pub let RLIMIT_CPU_USAGE_MONITOR: c_int = 0x2
-pub let RLIMIT_THREAD_CPULIMITS: c_int = 0x3
-pub let RLIMIT_FOOTPRINT_INTERVAL: c_int = 0x4
-pub let WAKEMON_ENABLE: c_int = 0x01
-pub let WAKEMON_DISABLE: c_int = 0x02
-pub let WAKEMON_GET_PARAMS: c_int = 0x04
-pub let WAKEMON_SET_DEFAULTS: c_int = 0x08
-pub let WAKEMON_MAKE_FATAL: c_int = 0x10
-pub let CPUMON_MAKE_FATAL: c_int = 0x1000
-pub let FOOTPRINT_INTERVAL_RESET: c_int = 0x1
-pub let IOPOL_TYPE_DISK: c_int = 0
-pub let IOPOL_TYPE_VFS_ATIME_UPDATES: c_int = 2
-pub let IOPOL_TYPE_VFS_MATERIALIZE_DATALESS_FILES: c_int = 3
-pub let IOPOL_TYPE_VFS_STATFS_NO_DATA_VOLUME: c_int = 4
-pub let IOPOL_TYPE_VFS_TRIGGER_RESOLVE: c_int = 5
-pub let IOPOL_TYPE_VFS_IGNORE_CONTENT_PROTECTION: c_int = 6
-pub let IOPOL_TYPE_VFS_IGNORE_PERMISSIONS: c_int = 7
-pub let IOPOL_TYPE_VFS_SKIP_MTIME_UPDATE: c_int = 8
-pub let IOPOL_TYPE_VFS_ALLOW_LOW_SPACE_WRITES: c_int = 9
-pub let IOPOL_TYPE_VFS_DISALLOW_RW_FOR_O_EVTONLY: c_int = 10
-pub let IOPOL_TYPE_VFS_ENTITLED_RESERVE_ACCESS: c_int = 14
-pub let IOPOL_SCOPE_PROCESS: c_int = 0
-pub let IOPOL_SCOPE_THREAD: c_int = 1
-pub let IOPOL_SCOPE_DARWIN_BG: c_int = 2
-pub let IOPOL_DEFAULT: c_int = 0
-pub let IOPOL_IMPORTANT: c_int = 1
-pub let IOPOL_PASSIVE: c_int = 2
-pub let IOPOL_THROTTLE: c_int = 3
-pub let IOPOL_UTILITY: c_int = 4
-pub let IOPOL_STANDARD: c_int = 5
-pub let IOPOL_APPLICATION: c_int = 5
-pub let IOPOL_NORMAL: c_int = 1
-pub let IOPOL_ATIME_UPDATES_DEFAULT: c_int = 0
-pub let IOPOL_ATIME_UPDATES_OFF: c_int = 1
-pub let IOPOL_MATERIALIZE_DATALESS_FILES_DEFAULT: c_int = 0
-pub let IOPOL_MATERIALIZE_DATALESS_FILES_OFF: c_int = 1
-pub let IOPOL_MATERIALIZE_DATALESS_FILES_ON: c_int = 2
-pub let IOPOL_MATERIALIZE_DATALESS_FILES_ORIG: c_int = 4
-pub let IOPOL_MATERIALIZE_DATALESS_FILES_BASIC_MASK: c_int = 3
-pub let IOPOL_VFS_STATFS_NO_DATA_VOLUME_DEFAULT: c_int = 0
-pub let IOPOL_VFS_STATFS_FORCE_NO_DATA_VOLUME: c_int = 1
-pub let IOPOL_VFS_TRIGGER_RESOLVE_DEFAULT: c_int = 0
-pub let IOPOL_VFS_TRIGGER_RESOLVE_OFF: c_int = 1
-pub let IOPOL_VFS_CONTENT_PROTECTION_DEFAULT: c_int = 0
-pub let IOPOL_VFS_CONTENT_PROTECTION_IGNORE: c_int = 1
-pub let IOPOL_VFS_IGNORE_PERMISSIONS_OFF: c_int = 0
-pub let IOPOL_VFS_IGNORE_PERMISSIONS_ON: c_int = 1
-pub let IOPOL_VFS_SKIP_MTIME_UPDATE_OFF: c_int = 0
-pub let IOPOL_VFS_SKIP_MTIME_UPDATE_ON: c_int = 1
-pub let IOPOL_VFS_SKIP_MTIME_UPDATE_IGNORE: c_int = 2
-pub let IOPOL_VFS_ALLOW_LOW_SPACE_WRITES_OFF: c_int = 0
-pub let IOPOL_VFS_ALLOW_LOW_SPACE_WRITES_ON: c_int = 1
-pub let IOPOL_VFS_DISALLOW_RW_FOR_O_EVTONLY_DEFAULT: c_int = 0
-pub let IOPOL_VFS_DISALLOW_RW_FOR_O_EVTONLY_ON: c_int = 1
-pub let IOPOL_VFS_NOCACHE_WRITE_FS_BLKSIZE_DEFAULT: c_int = 0
-pub let IOPOL_VFS_NOCACHE_WRITE_FS_BLKSIZE_ON: c_int = 1
-pub let IOPOL_VFS_ENTITLED_RESERVE_ACCESS_OFF: c_int = 0
-pub let IOPOL_VFS_ENTITLED_RESERVE_ACCESS_ON: c_int = 1
-pub let WNOHANG: c_int = 0x00000001
-pub let WUNTRACED: c_int = 0x00000002
-pub let WCOREFLAG: c_int = 0200
-pub fn W_EXITCODE[T](ret: T, sig: T) -> T {
-    ((ret << 8) | sig)
-}
-pub let WEXITED: c_int = 0x00000004
-pub let WSTOPPED: c_int = 0x00000008
-pub let WCONTINUED: c_int = 0x00000010
-pub let WNOWAIT: c_int = 0x00000020
-pub let WAIT_ANY: c_int = -1
-pub let WAIT_MYPGRP: c_int = 0
-pub let EXIT_FAILURE: c_int = 1
-pub let EXIT_SUCCESS: c_int = 0
-pub let RAND_MAX: c_int = 0x7fffffff
 pub let FALSE: c_int = 0
 pub let TRUE: c_int = 1
 pub let PCRE2_MAJOR: c_int = 10
 pub let PCRE2_MINOR: c_int = 47
 pub let PCRE2_DATE: c_int = 1994
-pub let PRId16 = "hd"
-pub let PRIi16 = "hi"
-pub let PRIo16 = "ho"
-pub let PRIu16 = "hu"
-pub let PRIx16 = "hx"
-pub let PRIX16 = "hX"
-pub let PRId32 = "d"
-pub let PRIi32 = "i"
-pub let PRIo32 = "o"
-pub let PRIu32 = "u"
-pub let PRIx32 = "x"
-pub let PRIX32 = "X"
-pub let PRIdLEAST16 = PRId16
-pub let PRIiLEAST16 = PRIi16
-pub let PRIoLEAST16 = PRIo16
-pub let PRIuLEAST16 = PRIu16
-pub let PRIxLEAST16 = PRIx16
-pub let PRIXLEAST16 = PRIX16
-pub let PRIdLEAST32 = PRId32
-pub let PRIiLEAST32 = PRIi32
-pub let PRIoLEAST32 = PRIo32
-pub let PRIuLEAST32 = PRIu32
-pub let PRIxLEAST32 = PRIx32
-pub let PRIXLEAST32 = PRIX32
-pub let PRIdFAST16 = PRId16
-pub let PRIiFAST16 = PRIi16
-pub let PRIoFAST16 = PRIo16
-pub let PRIuFAST16 = PRIu16
-pub let PRIxFAST16 = PRIx16
-pub let PRIXFAST16 = PRIX16
-pub let PRIdFAST32 = PRId32
-pub let PRIiFAST32 = PRIi32
-pub let PRIoFAST32 = PRIo32
-pub let PRIuFAST32 = PRIu32
-pub let PRIxFAST32 = PRIx32
-pub let PRIXFAST32 = PRIX32
-pub let PRIdPTR = "ld"
-pub let PRIiPTR = "li"
-pub let PRIoPTR = "lo"
-pub let PRIuPTR = "lu"
-pub let PRIxPTR = "lx"
-pub let PRIXPTR = "lX"
-pub let SCNd16 = "hd"
-pub let SCNi16 = "hi"
-pub let SCNo16 = "ho"
-pub let SCNu16 = "hu"
-pub let SCNx16 = "hx"
-pub let SCNd32 = "d"
-pub let SCNi32 = "i"
-pub let SCNo32 = "o"
-pub let SCNu32 = "u"
-pub let SCNx32 = "x"
-pub let SCNdLEAST16 = SCNd16
-pub let SCNiLEAST16 = SCNi16
-pub let SCNoLEAST16 = SCNo16
-pub let SCNuLEAST16 = SCNu16
-pub let SCNxLEAST16 = SCNx16
-pub let SCNdLEAST32 = SCNd32
-pub let SCNiLEAST32 = SCNi32
-pub let SCNoLEAST32 = SCNo32
-pub let SCNuLEAST32 = SCNu32
-pub let SCNxLEAST32 = SCNx32
-pub let SCNdFAST16 = SCNd16
-pub let SCNiFAST16 = SCNi16
-pub let SCNoFAST16 = SCNo16
-pub let SCNuFAST16 = SCNu16
-pub let SCNxFAST16 = SCNx16
-pub let SCNdFAST32 = SCNd32
-pub let SCNiFAST32 = SCNi32
-pub let SCNoFAST32 = SCNo32
-pub let SCNuFAST32 = SCNu32
-pub let SCNxFAST32 = SCNx32
-pub let SCNdPTR = "ld"
-pub let SCNiPTR = "li"
-pub let SCNoPTR = "lo"
-pub let SCNuPTR = "lu"
-pub let SCNxPTR = "lx"
 pub let PCRE2_ANCHORED: c_uint = 0x80000000
 pub let PCRE2_NO_UTF_CHECK: c_uint = 0x40000000
 pub let PCRE2_ENDANCHORED: c_uint = 0x20000000
@@ -2193,6 +1734,15 @@ pub let MAX_UTF_SINGLE_CU: c_int = 127
 pub fn HAS_EXTRALEN[T](c: T) -> T {
     HASUTF8EXTRALEN(c)
 }
+pub fn NOT_FIRSTCU[T](c: T) -> T {
+    ((c & 0xc0) == 0x80)
+}
+pub fn CU2BYTES[T](x: T) -> T {
+    (x * (8 / 8))
+}
+pub fn BYTES2CU[T](x: T) -> T {
+    (x / (8 / 8))
+}
 pub let LOOKBEHIND_MAX: c_int = 65535
 pub let HEAPFRAME_ALIGNMENT: c_ulong = 8
 pub let _pcre2_default_tables_8: [1088]u8 = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 197, 198, 199, 200, 201, 202, 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 214, 215, 216, 217, 218, 219, 220, 221, 222, 223, 224, 225, 226, 227, 228, 229, 230, 231, 232, 233, 234, 235, 236, 237, 238, 239, 240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250, 251, 252, 253, 254, 255, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 91, 92, 93, 94, 95, 96, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 197, 198, 199, 200, 201, 202, 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 214, 215, 216, 217, 218, 219, 220, 221, 222, 223, 224, 225, 226, 227, 228, 229, 230, 231, 232, 233, 234, 235, 236, 237, 238, 239, 240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250, 251, 252, 253, 254, 255, 0x00, 0x3e, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0x03, 0x7e, 0x00, 0x00, 0x00, 0x7e, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xfe, 0xff, 0xff, 0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xfe, 0xff, 0xff, 0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0x03, 0xfe, 0xff, 0xff, 0x87, 0xfe, 0xff, 0xff, 0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x7f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x7f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xfe, 0xff, 0x00, 0xfc, 0x01, 0x00, 0x00, 0xf8, 0x01, 0x00, 0x00, 0x78, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x01, 0x01, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x00, 0x00, 0x00, 0x00, 0x10, 0x00, 0x16, 0x16, 0x16, 0x16, 0x16, 0x16, 0x16, 0x16, 0x16, 0x16, 0x16, 0x16, 0x16, 0x16, 0x16, 0x16, 0x16, 0x16, 0x16, 0x16, 0x16, 0x16, 0x16, 0x16, 0x16, 0x16, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
@@ -2994,6 +2544,9 @@ pub fn META_CODE[T](x: T) -> T {
 pub fn META_DATA[T](x: T) -> T {
     (x & 0x0000ffff)
 }
+pub fn META_DIFF[T](x: T, y: T) -> T {
+    ((x - y) >> 16)
+}
 pub let SIZEOFFSET: c_int = 2
 pub let CLASS_IS_ECLASS: c_int = 0x1
 pub let MAX_UCHAR_VALUE: c_uint = 0xff
@@ -3426,159 +2979,6 @@ pub let ucd_caseless_sets: [118]c_uint = [0xffffffff, 0x0053, 0x0073, 0x017f, 0x
 
 pub let ucd_turkish_dotted_i_caseset: c_uint = 112
 
-pub let CLOCKS_PER_SEC: c_ulong = (1000000 as c_ulong)
-pub let TIME_UTC: c_int = 1
-pub let LC_COLLATE_MASK: c_int = (1 << 0)
-pub let LC_CTYPE_MASK: c_int = (1 << 1)
-pub let LC_MESSAGES_MASK: c_int = (1 << 2)
-pub let LC_MONETARY_MASK: c_int = (1 << 3)
-pub let LC_NUMERIC_MASK: c_int = (1 << 4)
-pub let LC_TIME_MASK: c_int = (1 << 5)
-pub let LC_GLOBAL_LOCALE: *mut c_void = (-1 as *mut c_void)
-pub let LC_ALL: c_int = 0
-pub let LC_COLLATE: c_int = 1
-pub let LC_CTYPE: c_int = 2
-pub let LC_MONETARY: c_int = 3
-pub let LC_NUMERIC: c_int = 4
-pub let LC_TIME: c_int = 5
-pub let LC_MESSAGES: c_int = 6
-pub let EPERM: c_int = 1
-pub let ENOENT: c_int = 2
-pub let ESRCH: c_int = 3
-pub let EINTR: c_int = 4
-pub let EIO: c_int = 5
-pub let ENXIO: c_int = 6
-pub let E2BIG: c_int = 7
-pub let ENOEXEC: c_int = 8
-pub let EBADF: c_int = 9
-pub let ECHILD: c_int = 10
-pub let EDEADLK: c_int = 11
-pub let ENOMEM: c_int = 12
-pub let EACCES: c_int = 13
-pub let EFAULT: c_int = 14
-pub let ENOTBLK: c_int = 15
-pub let EBUSY: c_int = 16
-pub let EEXIST: c_int = 17
-pub let EXDEV: c_int = 18
-pub let ENODEV: c_int = 19
-pub let ENOTDIR: c_int = 20
-pub let EISDIR: c_int = 21
-pub let EINVAL: c_int = 22
-pub let ENFILE: c_int = 23
-pub let EMFILE: c_int = 24
-pub let ENOTTY: c_int = 25
-pub let ETXTBSY: c_int = 26
-pub let EFBIG: c_int = 27
-pub let ENOSPC: c_int = 28
-pub let ESPIPE: c_int = 29
-pub let EROFS: c_int = 30
-pub let EMLINK: c_int = 31
-pub let EPIPE: c_int = 32
-pub let EDOM: c_int = 33
-pub let ERANGE: c_int = 34
-pub let EAGAIN: c_int = 35
-pub let EWOULDBLOCK: c_int = 35
-pub let EINPROGRESS: c_int = 36
-pub let EALREADY: c_int = 37
-pub let ENOTSOCK: c_int = 38
-pub let EDESTADDRREQ: c_int = 39
-pub let EMSGSIZE: c_int = 40
-pub let EPROTOTYPE: c_int = 41
-pub let ENOPROTOOPT: c_int = 42
-pub let EPROTONOSUPPORT: c_int = 43
-pub let ESOCKTNOSUPPORT: c_int = 44
-pub let ENOTSUP: c_int = 45
-pub let EPFNOSUPPORT: c_int = 46
-pub let EAFNOSUPPORT: c_int = 47
-pub let EADDRINUSE: c_int = 48
-pub let EADDRNOTAVAIL: c_int = 49
-pub let ENETDOWN: c_int = 50
-pub let ENETUNREACH: c_int = 51
-pub let ENETRESET: c_int = 52
-pub let ECONNABORTED: c_int = 53
-pub let ECONNRESET: c_int = 54
-pub let ENOBUFS: c_int = 55
-pub let EISCONN: c_int = 56
-pub let ENOTCONN: c_int = 57
-pub let ESHUTDOWN: c_int = 58
-pub let ETOOMANYREFS: c_int = 59
-pub let ETIMEDOUT: c_int = 60
-pub let ECONNREFUSED: c_int = 61
-pub let ELOOP: c_int = 62
-pub let ENAMETOOLONG: c_int = 63
-pub let EHOSTDOWN: c_int = 64
-pub let EHOSTUNREACH: c_int = 65
-pub let ENOTEMPTY: c_int = 66
-pub let EPROCLIM: c_int = 67
-pub let EUSERS: c_int = 68
-pub let EDQUOT: c_int = 69
-pub let ESTALE: c_int = 70
-pub let EREMOTE: c_int = 71
-pub let EBADRPC: c_int = 72
-pub let ERPCMISMATCH: c_int = 73
-pub let EPROGUNAVAIL: c_int = 74
-pub let EPROGMISMATCH: c_int = 75
-pub let EPROCUNAVAIL: c_int = 76
-pub let ENOLCK: c_int = 77
-pub let ENOSYS: c_int = 78
-pub let EFTYPE: c_int = 79
-pub let EAUTH: c_int = 80
-pub let ENEEDAUTH: c_int = 81
-pub let EPWROFF: c_int = 82
-pub let EDEVERR: c_int = 83
-pub let EOVERFLOW: c_int = 84
-pub let EBADEXEC: c_int = 85
-pub let EBADARCH: c_int = 86
-pub let ESHLIBVERS: c_int = 87
-pub let EBADMACHO: c_int = 88
-pub let ECANCELED: c_int = 89
-pub let EIDRM: c_int = 90
-pub let ENOMSG: c_int = 91
-pub let EILSEQ: c_int = 92
-pub let ENOATTR: c_int = 93
-pub let EBADMSG: c_int = 94
-pub let EMULTIHOP: c_int = 95
-pub let ENODATA: c_int = 96
-pub let ENOLINK: c_int = 97
-pub let ENOSR: c_int = 98
-pub let ENOSTR: c_int = 99
-pub let EPROTO: c_int = 100
-pub let ETIME: c_int = 101
-pub let EOPNOTSUPP: c_int = 102
-pub let ENOPOLICY: c_int = 103
-pub let ENOTRECOVERABLE: c_int = 104
-pub let EOWNERDEAD: c_int = 105
-pub let EQFULL: c_int = 106
-pub let ENOTCAPABLE: c_int = 107
-pub let ELAST: c_int = 107
-pub let F_OK: c_int = 0
-pub let X_OK: c_int = (1 << 0)
-pub let W_OK: c_int = (1 << 1)
-pub let R_OK: c_int = (1 << 2)
-pub let L_SET: c_int = 0
-pub let L_INCR: c_int = 1
-pub let L_XTND: c_int = 2
-pub let ACCESSX_MAX_DESCRIPTORS: c_int = 100
-pub let ACCESSX_MAX_TABLESIZE: c_int = (16 * 1024)
-pub let STDIN_FILENO: c_int = 0
-pub let STDOUT_FILENO: c_int = 1
-pub let STDERR_FILENO: c_int = 2
-pub let F_ULOCK: c_int = 0
-pub let F_LOCK: c_int = 1
-pub let F_TLOCK: c_int = 2
-pub let F_TEST: c_int = 3
-pub let SYNC_VOLUME_FULLSYNC: c_int = 0x01
-pub let SYNC_VOLUME_WAIT: c_int = 0x02
-pub let ITIMER_REAL: c_int = 0
-pub let ITIMER_VIRTUAL: c_int = 1
-pub let ITIMER_PROF: c_int = 2
-pub let DST_NONE: c_int = 0
-pub let DST_USA: c_int = 1
-pub let DST_AUST: c_int = 2
-pub let DST_WET: c_int = 3
-pub let DST_MET: c_int = 4
-pub let DST_EET: c_int = 5
-pub let DST_CAN: c_int = 6
 pub let INPUT_MODE = "rb"
 pub let OUTPUT_MODE = "wb"
 pub let BINARY_INPUT_MODE = "rb"
@@ -3627,11 +3027,12 @@ pub fn CHAR_INPUT[T](c: T) -> T {
 pub fn CHAR_INPUT_HEX[T](c: T) -> T {
     CHAR_INPUT(c)
 }
+pub let PCRE2_CODE_UNIT_WIDTH: c_int = 0
 pub fn U32OVERFLOW[T](x: T) -> T {
     (x > 4294967295)
 }
 pub fn S32OVERFLOW[T](x: T) -> T {
-    ((x > 2147483647) or (x < INT32_MIN))
+    ((x > 2147483647) or (x < (-2147483647 - 1)))
 }
 pub let DEFAULT_TEST_MODE: c_int = 8
 pub let cmdlistcount: c_ulong = 12

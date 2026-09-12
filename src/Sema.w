@@ -6,12 +6,14 @@
 // before — Sema is purely additive validation.
 
 use Ast
+use SemaTypes
 use BorrowCfg
 use Span
 use Diagnostic
 use InternPool
 use render
 use Overflow
+use TargetSpec
 use compiler.TrackedInputs
 use compiler.BundleInterfaces
 use FnAbi
@@ -37,33 +39,6 @@ extern fn abort() -> Never
 fn sema_phase_bug(message: &str, origin_file: &str = __FILE__, origin_line: u32 = __LINE__, origin_fn: &str = __FN__):
     with_eprint(f"{message} [{origin_file}:{origin_line} {origin_fn}]")
     abort()
-
-// ── Type kind constants ──────────────────────────────────────────
-
-enum TypeKind: i32:
-    TY_ERR = 0
-    TY_INT = 1
-    TY_FLOAT = 2
-    TY_BOOL = 3
-    TY_VOID = 4
-    TY_STR = 5
-    TY_STRUCT = 6
-    TY_ENUM = 7
-    TY_ARRAY = 8
-    TY_SLICE = 9
-    TY_TUPLE = 10
-    TY_RANGE = 11
-    TY_FN = 12
-    TY_PTR = 13
-    TY_REF = 14
-    TY_ALIAS = 15
-    TY_GENERIC_FN = 16
-    TY_TRAIT_OBJ = 17
-    TY_NEVER = 18
-    TY_GENERIC_INST = 19
-    TY_EXTERN_FN = 20
-
-type TypeId = i32
 
 type SemaSourceLocation {
     line: i32,
@@ -112,10 +87,6 @@ fn sema_param_origin_mask_contains(mask: i32, pi: i32) -> i32:
     if pi >= 31:
         return 0
     if (mask & sema_param_origin_bit(pi)) != 0: 1 else: 0
-
-enum BorrowKind: i32:
-    SHARED = 0
-    EXCLUSIVE = 1
 
 enum LabelFrameKind: i32:
     LFK_BOUNDARY = 0
@@ -473,6 +444,8 @@ type Sema {
     sig_variadic: Vec[i32],
     sig_params: Vec[i32],
     sig_lookup: HashMap[i32, i32],
+    // An extern keeps its own signature when a curated wrapper takes its name.
+    extern_decl_sigs: HashMap[i32, i32],
     // docs/mutability.md Phase 4 — per-parameter effect bitsets.
     // sig_param_effects[sig_param_eff_starts[si] + pi] = effect bits for param pi of sig si.
     // Effects: EFF_READ=1, EFF_WRITE=2, EFF_CONSUME=4,
@@ -1174,6 +1147,7 @@ type Sema {
     ty_cstr_view: TypeId,
     ty_usize: TypeId,
     ty_isize: TypeId,
+    ty_c_va_list: TypeId,
     ty_const_i8_ptr: TypeId,
     ty_field_info: TypeId,
     ty_variant_info: TypeId,
@@ -1941,6 +1915,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         sig_variadic: Vec.new(),
         sig_params: Vec.new(),
         sig_lookup,
+        extern_decl_sigs: sema_new_map_i32_i32(),
         sig_param_effects: Vec.new(),
         sig_param_direct_effects: Vec.new(),
         sig_param_view_origins: Vec.new(),
@@ -2363,7 +2338,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         ty_f32: 0, ty_f64: 0, ty_bool: 0, ty_void: 0,
         ty_never: 0, ty_str: 0, ty_str_view: 0,
         ty_cstr: 0, ty_cstr_view: 0,
-        ty_usize: 0, ty_isize: 0, ty_const_i8_ptr: 0,
+        ty_usize: 0, ty_isize: 0, ty_c_va_list: 0, ty_const_i8_ptr: 0,
         ty_field_info: 0, ty_variant_info: 0,
         decl_source_paths: sema_new_vec_str(),
         decl_source_file_ids: Vec.new(),
@@ -2523,6 +2498,7 @@ fn Sema.init(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Sema:
     // Pointer-width integers: d2=1 marks them as usize/isize (64-bit on arm64)
     s.ty_usize = s.add_type(TypeKind.TY_INT, 64, 0, 1)
     s.ty_isize = s.add_type(TypeKind.TY_INT, 64, 1, 1)
+    s.ty_c_va_list = s.add_type(TypeKind.TY_VA_LIST, 0, 0, 0)
     s.ty_const_i8_ptr = s.add_type(TypeKind.TY_PTR, s.ty_i8, 0, 0)
     let cstr_field_names: Vec[str] = Vec.new()
     cstr_field_names.push("ptr")
@@ -2565,6 +2541,7 @@ fn Sema.init(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Sema:
     s.register_prim("CStr", s.ty_cstr)
     s.register_prim("usize", s.ty_usize)
     s.register_prim("isize", s.ty_isize)
+    s.register_prim("c_va_list", s.ty_c_va_list)
     s.init_builtin_reflection_types()
     s.discard_sym = s.pool_intern("_")
 
@@ -4451,6 +4428,18 @@ impl Sema:
         if type_decl_sub_kind(self.ast.get_data2(decl)) == TypeDeclKind.Opaque:
             return 1
         0
+
+    fn type_is_c_va_list(tid: i32) -> i32:
+        if tid == 0:
+            return 0
+        if self.get_type_kind(self.resolve_alias(tid as TypeId)) == TypeKind.TY_VA_LIST: 1 else: 0
+
+    // Only C's array-decay mode aliases the caller's storage. The indirect
+    // struct mode keeps value semantics and codegen supplies its copy.
+    fn sig_param_is_c_va_list_by_place(sig_idx: i32, pi: i32) -> i32:
+        if self.type_is_c_va_list(self.sig_param_type(sig_idx, pi)) == 0:
+            return 0
+        if fn_abi_c_va_list_uses_caller_place(target_spec_os(), target_spec_arch()): 1 else: 0
 
     fn is_c_void_like_type(tid: i32) -> i32:
         if tid == 0:
@@ -7400,6 +7389,10 @@ impl Sema:
         if tk == TypeKind.TY_STR:
             return 0
         if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF or tk == TypeKind.TY_FN or tk == TypeKind.TY_EXTERN_FN or tk == TypeKind.TY_GENERIC_FN:
+            return 1
+        // c_va_list is C's va_list: opaque bytes a migrated body hands on
+        // (gzprintf passes it to gzvprintf, then va_ends it) — Copy, as in C.
+        if tk == TypeKind.TY_VA_LIST:
             return 1
         if tk == TypeKind.TY_STRUCT:
             let name = self.get_type_d0(resolved)

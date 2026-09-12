@@ -872,6 +872,11 @@ fn run_cli(argc: i32) -> i32:
         comp.configure(opt_level, no_std, alloc_mode, runtime_available)
         comp.set_prelude_mode(prelude_mode)
         comp.set_overflow_mode(driver_internal_overflow_mode())
+        let analysis_target = driver_parse_build_target(argc)
+        if not analysis_target.ok:
+            with_eprint("error: " ++ analysis_target.error_msg)
+            return 1
+        comp.set_target_kind(analysis_target.kind)
         comp.set_link_bundles(&driver_link_bundle_args(argc))
         let result = comp.analyze_file(source, cli_analysis_request(argc, source))
         with_write(result.text)

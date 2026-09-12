@@ -348,8 +348,8 @@ fn comp_arg_value(args: &Vec[str], prefix: &str) -> str:
             return arg.slice(prefix.len(), arg.len())
     ""
 
-fn comp_arg_allowed_for_compiler(arg: &str) -> bool:
-    not arg.starts_with("compiler=") and not arg.starts_with("overflow=")
+fn comp_arg_allowed_for_compiler(arg: &str):
+    not arg.starts_with("compiler=") and not arg.starts_with("overflow=") and not arg.starts_with("embedded-object=")
 
 // Wall-clock budget for one compiler build/ir step. Cold CI hosts can take
 // more than 10 minutes for stage1; emulated hosts (e.g. an x86_64 bootstrap
@@ -431,6 +431,17 @@ fn comp_run_compiler_capture(ctx: &ActionCtx, label: &str, argv: Vec[str], stdou
     let root = ctx.project_info().project_root()
     var process_env = process_env()
     process_env = process_env.set("WITH_OUT_DIR", comp_abs(root, "out"))
+    // The frozen seed predates bounded compiler partitions. Give its one
+    // compiler-sized bootstrap invocation the same portable low-memory
+    // layout; ordinary small programs keep the compiler's size gate.
+    if ctx.target_name() == "stage1":
+        if env("WITH_CODEGEN_UNITS").len() == 0:
+            process_env = process_env.set("WITH_CODEGEN_UNITS", "16")
+        if env("WITH_CODEGEN_EMIT_WIDTH").len() == 0:
+            process_env = process_env.set("WITH_CODEGEN_EMIT_WIDTH", "1")
+    let embedded_object = comp_arg_value(ctx.args(), "embedded-object=")
+    if embedded_object.len() > 0:
+        process_env = process_env.set("WITH_COMPILER_EMBEDDED_OBJECT", comp_abs(root, embedded_object))
     let llvm_prefix = env("LLVM_PREFIX")
     if llvm_prefix.len() > 0:
         process_env = process_env.set("LLVM_PREFIX", llvm_prefix)

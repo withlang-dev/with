@@ -661,14 +661,16 @@ pub fn Diagnostics.error(self: &Self, message: str) -> Unit:
     with_eprint("error: " ++ message ++ "\n")
     exit(1)
 
-fn tool_path_is_project_relative(path: &str) -> bool:
+fn tool_path_is_project_relative(path: &str):
     if path.len() == 0:
         return false
-    if path[0] == 47:
+    if path[0] == 47 or path[0] == 92:
+        return false
+    if path.len() > 1 and path[1] == 58:
         return false
     if path.contains(".."):
         return false
-    for i in 0..path.len() as i32:
+    for i in 0..path.len():
         let ch = path[i]
         if ch == 0 or ch == 9 or ch == 10 or ch == 13:
             return false
@@ -814,11 +816,8 @@ fn tool_glob_sort(items: Vec[str]) -> Vec[str]:
         sorted = out
     sorted
 
-fn ToolFs.resolve_path(self: &Self, path: &str) -> str:
+fn ToolFs.resolve_path(self: &Self, path: &str):
     tool_capability_require(self.token, "ToolFs")
-    // An absolute path under the project root is the same project path
-    // spelled the way an action's capture files are (ProcessRunner
-    // normalizes the same way); only a path outside the root escapes.
     let rel = self.project_relative_path(path)
     tool_path_require_project_relative(rel)
     if self.root.len() == 0 or self.root == ".":
@@ -857,14 +856,16 @@ fn ToolFs.mkdir_allowed(self: &Self, path: &str) -> bool:
     false
 
 fn ToolFs.require_write_file_allowed(self: &Self, path: &str):
-    tool_path_require_project_relative(path)
-    if not self.write_file_allowed(path):
+    let rel = self.project_relative_path(path)
+    tool_path_require_project_relative(rel)
+    if not self.write_file_allowed(rel):
         with_eprint("error: ToolFs write path is not a declared action output: " ++ path ++ "\n")
         exit(1)
 
 fn ToolFs.require_mkdir_allowed(self: &Self, path: &str):
-    tool_path_require_project_relative(path)
-    if not self.mkdir_allowed(path):
+    let rel = self.project_relative_path(path)
+    tool_path_require_project_relative(rel)
+    if not self.mkdir_allowed(rel):
         with_eprint("error: ToolFs mkdir path is not a declared action output: " ++ path ++ "\n")
         exit(1)
 

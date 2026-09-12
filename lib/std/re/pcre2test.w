@@ -3225,7 +3225,7 @@ unsafe fn colour_end(__param_f: *mut c_void) -> Unit {
 }
 
 unsafe fn cfprintf(__param_clr: c_int, __param_file: *mut c_void, __param_fmt: *const i8, ...) -> c_int {
-    var __local_args: *mut i8
+    var __local_args: c_va_list
 
     var __local_ret: c_int
 
