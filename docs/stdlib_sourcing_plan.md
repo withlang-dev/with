@@ -151,9 +151,8 @@ those two do; nothing is a new mechanism.
    shares its dotted path with the facade (`std.zl` / `std.zlib`,
    `std.re` / `std.regex`): the frontend's parent-module import fallback
    would otherwise pull the facade into the `--no-prelude` bundle build
-   (`docs/wo_bundles.md`). (`std.regex` still reaches pcre2 through the
-   `with_regex_*` runtime shims; that is the D30 transitional seam, not
-   the model. New facades import the corpus.)
+   (`docs/wo_bundles.md`). `std.regex` imports `std.re` through the
+   bundle interface; C4 retired the `with_regex_*` runtime shims in #1101.
 2. *A With error type over engine codes.* `ZlibError { code, message }`
    with `zlib_code_error(Z_DATA_ERROR) -> "invalid or corrupt zlib data"`;
    `RegexError { code, offset, message }`. Engine integers never escape.

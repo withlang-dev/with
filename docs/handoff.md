@@ -1,4 +1,33 @@
-# Handoff — the .wo bundles / stdlib-sourcing campaign (2026-09-08)
+# Handoff — the .wo bundles / stdlib-sourcing campaign
+
+## Current integration (2026-09-12)
+
+PCRE2 C4 (#1101), SDK-macro hygiene (#1107), and target-correct va_list
+(#1108) have merged. Main is `00a2fc9c`. Their old blockers below are
+historical, not current instructions to reproduce them again.
+
+Zlib #1103 is integrated with that main in the `zlib-1103-ready` worktree.
+The merge keeps main's populated stage2/stage3 embedding object and adds
+both bundles to it; only stage1 uses empty bundle slots. The renamed
+`std.zl` corpus retains the macro-hygiene and c_va_list re-promotion.
+The separate follow-ups preserve c_va_list in `.wi` signatures and check
+all required reference files before marking an extracted zlib tree ready.
+Main already contains the newer gunzip ownership and input-limit fixes.
+
+Verification for this integration is recorded in
+`out/zlib-1103-validation/` in the worktree and the #1103 PR description.
+Historical passing batteries below do not certify the integrated commit.
+Required checks: re-migration comparison, full build, fixpoint, compiler
+audit, full tests including both bundle drift lanes, move/drop audits,
+fresh pinned-seed compatibility, test-green and last-green.
+
+The next campaign milestone after #1103 is sourcing Phase 0 (inventory,
+complexity fixtures, SlotMap free list), then c-algorithms, TommyDS, STC,
+and the M*LIB B+ tree subset. #1106 remains the explicit callable-type ABI
+descriptor gap for affected indirect va_list calls; #1113 tracks missing
+seed-compat cache inputs, so use fresh bootstrap evidence.
+
+## Historical investigation (2026-09-08–09)
 
 **C4 landing update:** the local A/B performance gate is now green on the
 rebased landing tree. After excluding the initial pair, the two uncached

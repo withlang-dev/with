@@ -1,9 +1,11 @@
 # `.wo` bundles: compile a migrated corpus once, link it forever
 
-Status: batches A, B and C0 implemented and reseeded (`467aae3e`,
-`8014b8e3`, `22e534c6`, 2026-09-02); batch C (pcre2) is designed below in
-"Implementation notes (batch C)" under Eric's D39 ruling on bundle
-interfaces. Ruled in direction by Eric (decisions.md D38, D39). Companions: `docs/stdlib_sourcing_plan.md`
+Status (2026-09-12): batches A through C4 are implemented; #1101 merged
+the PCRE2 shim retirement and corrected cold stage embedding. The zlib
+bundle is implemented in #1103 and is being verified against main after
+the SDK-macro and target-va_list fixes (#1107, #1108). Historical before/after
+descriptions below explain the transition. Ruled in direction by Eric
+(decisions.md D38, D39). Companions: `docs/stdlib_sourcing_plan.md`
 (the corpora), `docs/harden_migrate.md` (the migrator), decisions.md D30
 (runtime objects as a cache), #761 (the mixed-generation corruption
 class this design must never reintroduce).
