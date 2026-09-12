@@ -4,6 +4,29 @@ The corpus is pinned to upstream commit
 `23d453792ed89a28ed7d2c8d4311a4d9f7822edd`. No upstream function body is
 changed to accommodate the migrator.
 
+## Assertion macros are expressions, not stringification macros
+
+The allocation-testing framework stopped at its two `assert` expressions.
+LLDB on the release compiler observed `ci_is_stringify_macro("assert")`
+returning `1`; the caller was `ci_try_expand_stringify_call + 240`.
+The incorrect branch was `CImport.w`'s `return true` on any isolated `#`
+inside the macro body. Darwin's assertion macro includes `#e` only as an
+argument to its failure reporter. It is not a string-valued expression.
+
+The later failure in `CiStmtPool.lower_value_expr_ir + 10824` rejected an
+argument because this same classification had converted its enclosing
+`assert(...)` source range to text. The debugger showed the alleged callee
+as `"result->magic_number == 0x72ec82d2"`. Local transcripts:
+`out/phase1-drafts/assert-stringify-proof.txt` and
+`out/phase1-drafts/assert-ternary-proof.txt`.
+
+Classification now requires the whole replacement to be `#param`, or one
+forwarding call to such a macro. The regression exercises successful and
+failing assertions, single evaluation, a diagnostic macro containing `#e`,
+and a genuine two-level stringification wrapper. Native verification is
+pending the rebuilt compiler; this change alone does not claim the full
+upstream test pipeline passes.
+
 ## Reference types at repeated checks and pointer comparisons
 
 The generic comparator closure is checked during specialization discovery and

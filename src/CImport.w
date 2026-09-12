@@ -13364,11 +13364,12 @@ fn ci_macro_miss_contains(name: &str) -> bool:
         i = i + 1
     false
 
-// Check if a fn-like macro is a stringify macro (has # in body) or
-// calls another fn-like macro that stringifies (e.g. XSTRING -> STRING -> #a).
+// A stringify macro's entire result must be #param, or a single forwarding
+// call to another stringify macro. A diagnostic macro such as assert uses
+// #param inside a larger expression; replacing that expression with text
+// would discard its condition and effects.
 fn ci_is_stringify_macro(session: i64, name: &str, depth: i32) -> bool:
     if depth > 5: return false
-    let _ = session
     let macro_session = g_migrate_macro_session
     if macro_session == 0:
         return false
@@ -13377,38 +13378,21 @@ fn ci_is_stringify_macro(session: i64, name: &str, depth: i32) -> bool:
     while i < count:
         if with_cimport_macro_is_fn_like(macro_session, i) != 0:
             if with_cimport_macro_name(macro_session, i) == name:
-                let value = with_cimport_macro_value(macro_session, i)
-                // Direct stringify: body contains `#param` (a `#`
-                // not part of a `##` token-paste pair). Walk byte
-                // by byte and skip both `#`s when we see `##` so
-                // we don't misread the second `#` as a stringify.
-                var j = 0
-                while j < value.len() as i32 - 1:
-                    if value[j] == 35:
-                        if value[(j + 1)] == 35:
-                            // `##` token paste — skip both
-                            j = j + 2
-                            continue
-                        // `#` followed by non-`#` — stringify
-                        return true
-                    j = j + 1
-                // Indirect: body calls another fn-like macro, e.g. STRING(s)
-                var k = 0
-                while k < value.len() as i32:
-                    if ci_is_ident_start(value[k]):
-                        var ke = k + 1
-                        while ke < value.len() as i32 and ci_is_ident_char(value[ke]):
-                            ke = ke + 1
-                        if ke < value.len() as i32 and value[ke] == 40:
-                            let callee = value.slice(k as i64, ke as i64)
-                            if ci_is_stringify_macro(macro_session, callee, depth + 1):
-                                return true
-                        k = ke
-                    else:
-                        k = k + 1
-                return false
+                if with_cimport_macro_param_count(macro_session, i) != 1: return false
+                let param = with_cimport_macro_param_name(macro_session, i, 0)
+                let value = ci_strip_parens(ci_trim(ci_strip_c_comments(with_cimport_macro_value(macro_session, i))))
+                if value.starts_with("#"):
+                    return ci_trim(value.slice(1, value.len())) == param
+                let open = ci_find_call_paren(value)
+                if open <= 0: return false
+                let close = ci_find_matching_paren(value, open)
+                if close != value.len() - 1: return false
+                let callee = ci_trim(value.slice(0, open))
+                if not ci_is_c_ident(callee): return false
+                if ci_trim(value.slice(open + 1, close)) != param: return false
+                return ci_is_stringify_macro(session, callee, depth + 1)
         i = i + 1
-	    false
+    false
 
 fn ci_string_text_has_stringify_call(session: i64, s: &str) -> bool:
     var i = 0
