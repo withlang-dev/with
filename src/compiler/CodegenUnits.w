@@ -44,16 +44,8 @@ type CodegenUnitsSysInfo {
 }
 extern fn with_sysinfo(out: *mut u8) -> i32
 
-// Default unit count for the build-to-binary path: split only when the
-// module is large enough for per-unit generation to pay for itself, and
-// scale to cores. Decision policy (and why memory never caps the count)
-// lives in compiler.CodegenUnitsPolicy.
-pub fn codegen_units_default_count(mir_body_count: i32) -> i32:
-    if mir_body_count < 2000:
-        return 1
-    var info = CodegenUnitsSysInfo { cpu_cores: 1, memory_total: 0, page_size: 4096 }
-    let _ = with_sysinfo(&info as *mut u8)
-    codegen_units_count_for(mir_body_count, info.cpu_cores)
+// Partition compiler-sized inputs independently of the available workers.
+pub fn codegen_units_default_count(mir_body_count: i32) -> i32: codegen_units_count_for(mir_body_count)
 
 // Emit-phase concurrency width (#681 windowing) — policy in
 // compiler.CodegenUnitsPolicy; this wrapper reads the env override and

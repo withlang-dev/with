@@ -9,6 +9,7 @@ use std.zlib.uncompr
 use std.zlib.inflate
 
 const ZLIB_DEFAULT_MAX_OUTPUT: i64 = 64 * 1024 * 1024
+const ZLIB_MAX_CHUNK = (0 as c_uint) -% 1
 
 pub type ZlibError {
     code: i32,
@@ -66,27 +67,27 @@ pub fn compress_gzip(data: &Vec[u8]) -> Result[Vec[u8], ZlibError]:
 pub fn compress_gzip_level(data: &Vec[u8], level: i32) -> Result[Vec[u8], ZlibError]:
     if level < Z_DEFAULT_COMPRESSION or level > Z_BEST_COMPRESSION:
         return Err(zlib_error(Z_STREAM_ERROR, "zlib compression level must be -1..9"))
-    if data.len() as c_ulong > UINT_MAX as c_ulong:
+    if data.len() > ZLIB_MAX_CHUNK:
         return Err(zlib_error(Z_BUF_ERROR, "zlib gzip input is too large"))
     var stream: z_stream_s
-    let init_rc = unsafe { deflateInit2_(&raw mut stream as *mut z_stream_s, level as c_int, Z_DEFLATED, MAX_WBITS + 16, 8, Z_DEFAULT_STRATEGY, c"1.3.2".ptr, sizeof[z_stream_s]() as c_int) }
+    let init_rc = unsafe { deflateInit2_(&raw mut stream, level, Z_DEFLATED, MAX_WBITS + 16, 8, Z_DEFAULT_STRATEGY, c"1.3.2".ptr, sizeof[z_stream_s]() as c_int) }
     if init_rc != Z_OK:
         return Err(zlib_code_error(init_rc))
-    let out_len = unsafe { deflateBound(&raw mut stream as *mut z_stream_s, data.len() as c_ulong) }
-    if out_len > UINT_MAX as c_ulong:
-        let _ = unsafe { deflateEnd(&raw mut stream as *mut z_stream_s) }
+    let out_len = unsafe { deflateBound(&raw mut stream, data.len() as c_ulong) }
+    if out_len > ZLIB_MAX_CHUNK:
+        unsafe { deflateEnd(&raw mut stream) }
         return Err(zlib_error(Z_BUF_ERROR, "zlib gzip output is too large"))
-    let out_ptr = with_alloc(out_len as i64) as *mut u8
+    let out_ptr = with_alloc(out_len as i64)
     if out_ptr as i64 == 0:
-        let _ = unsafe { deflateEnd(&raw mut stream as *mut z_stream_s) }
+        unsafe { deflateEnd(&raw mut stream) }
         return Err(zlib_code_error(Z_MEM_ERROR))
     stream.next_in = zlib_vec_data(data) as *mut u8
     stream.avail_in = data.len() as c_uint
     stream.next_out = out_ptr
     stream.avail_out = out_len as c_uint
-    let rc = unsafe { deflate(&raw mut stream as *mut z_stream_s, Z_FINISH) }
+    let rc = unsafe { deflate(&raw mut stream, Z_FINISH) }
     let total_out = stream.total_out
-    let end_rc = unsafe { deflateEnd(&raw mut stream as *mut z_stream_s) }
+    let end_rc = unsafe { deflateEnd(&raw mut stream) }
     if rc != Z_STREAM_END:
         with_free(out_ptr)
         return Err(zlib_code_error(rc))
@@ -138,27 +139,27 @@ fn decompress_window_bits(data: &Vec[u8], max_output_len: i64, window_bits: i32)
 
 unsafe fn zlib_inflate_to_buffer(dest: *mut u8, dest_len: *mut c_ulong, source: *const u8, source_len: c_ulong, window_bits: c_int) -> c_int:
     var stream: z_stream_s
-    var left = unsafe *dest_len
-    unsafe *dest_len = 0 as c_ulong
+    var left = *dest_len
+    *dest_len = 0
     var len = source_len
-    let init_rc = inflateInit2_(&raw mut stream as *mut z_stream_s, window_bits, c"1.3.2".ptr, sizeof[z_stream_s]() as c_int)
+    let init_rc = inflateInit2_(&raw mut stream, window_bits, c"1.3.2".ptr, sizeof[z_stream_s]() as c_int)
     if init_rc != Z_OK:
         return init_rc
     stream.next_out = dest
-    stream.avail_out = 0 as c_uint
+    stream.avail_out = 0
     stream.next_in = source as *mut u8
-    stream.avail_in = 0 as c_uint
+    stream.avail_in = 0
     var err = Z_OK
     while err == Z_OK:
         if stream.avail_out == 0:
-            stream.avail_out = if left > UINT_MAX as c_ulong: UINT_MAX as c_uint else: left as c_uint
+            stream.avail_out = if left > ZLIB_MAX_CHUNK: ZLIB_MAX_CHUNK else: left as c_uint
             left = left - stream.avail_out as c_ulong
         if stream.avail_in == 0:
-            stream.avail_in = if len > UINT_MAX as c_ulong: UINT_MAX as c_uint else: len as c_uint
+            stream.avail_in = if len > ZLIB_MAX_CHUNK: ZLIB_MAX_CHUNK else: len as c_uint
             len = len - stream.avail_in as c_ulong
-        err = inflate(&raw mut stream as *mut z_stream_s, Z_NO_FLUSH)
-    unsafe *dest_len = stream.total_out
-    inflateEnd(&raw mut stream as *mut z_stream_s)
+        err = inflate(&raw mut stream, Z_NO_FLUSH)
+    *dest_len = stream.total_out
+    inflateEnd(&raw mut stream)
     if err == Z_STREAM_END:
         return Z_OK
     if err == Z_NEED_DICT:

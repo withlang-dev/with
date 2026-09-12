@@ -103,13 +103,32 @@ jobs:
         run: src/main build :deps
 
       - name: Build
+        env:
+          WITH_PROFILE: "1"
         run: src/main build
 
       - name: Fixpoint
+        env:
+          WITH_PROFILE: "1"
         run: ./out/release/bin/with build :fixpoint
 
       - name: Green battery (build :test)
         run: src/main build :test
+
+      # A stage timeout keeps its compiler captures. Preserve those profiles
+      # as well as test captures so a build failure identifies its last phase.
+      - name: Upload compiler and test captures on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-build-captures
+          path: |
+            out/command/**
+            out/.build-state/build-times.tsv
+            out/test-graph/**
+            out/corpus/**/stdout.txt
+            out/corpus/**/stderr.txt
+          if-no-files-found: warn
 
       # A failed test keeps its capture files (the runner removes them only
       # on success), but the seed that drives this step predates the

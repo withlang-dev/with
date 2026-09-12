@@ -3460,14 +3460,16 @@ pub fn with_fs_is_dir(path: &str) -> i32:
     cstr_free(cpath)
     rc
 
-fn fs_mkdir_p_c(cpath: *const u8, slen: i64) -> i32:
+fn fs_mkdir_p_c(cpath: *const u8, slen: i64):
     // Create each directory component
+    let windows = rt_sysinfo_os() == "Windows"
     var i: i64 = 1
     while i < slen:
-        if unsafe *((cpath as i64 + i) as *const u8) == 47:  // '/'
+        let separator = unsafe *((cpath as i64 + i) as *const u8)
+        if separator == 47 or (windows and separator == 92):
             unsafe *((cpath as i64 + i) as *mut u8) = 0
             let rc = fs_mkdir_component(cpath, 493)  // 0755
-            unsafe *((cpath as i64 + i) as *mut u8) = 47
+            unsafe *((cpath as i64 + i) as *mut u8) = separator
             if rc != 0:
                 return rc
         i = i + 1

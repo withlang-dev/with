@@ -3837,10 +3837,11 @@ impl ComptimeEvaluator:
         comptime_value_intlike(value) as i32
 
     mut fn capability_resolve_project_path(record: &ComptimeCapabilityRecord, path: &str, method: &str, node: i32) -> str:
-        if not comptime_tool_path_is_project_relative(path):
+        let rel = self.capability_project_relative_path(record, path)
+        if not comptime_tool_path_is_project_relative(rel):
             let _ = self.fail(node, "ToolFs path escapes project root in " ++ method ++ ": " ++ path)
             return ""
-        comptime_tool_join(record.project_root, path)
+        comptime_tool_join(record.project_root, rel)
 
     fn capability_write_file_allowed(record: &ComptimeCapabilityRecord, path: &str) -> bool:
         if record.write_scoped == 0:
@@ -3860,19 +3861,21 @@ impl ComptimeEvaluator:
         false
 
     mut fn capability_require_write_file_allowed(record: &ComptimeCapabilityRecord, path: &str, method: &str, node: i32) -> bool:
-        if not comptime_tool_path_is_project_relative(path):
+        let rel = self.capability_project_relative_path(record, path)
+        if not comptime_tool_path_is_project_relative(rel):
             let _ = self.fail(node, "ToolFs path escapes project root in " ++ method ++ ": " ++ path)
             return false
-        if not self.capability_write_file_allowed(record, path):
+        if not self.capability_write_file_allowed(record, rel):
             let _ = self.fail(node, "ToolFs write path is not a declared action output in " ++ method ++ ": " ++ path)
             return false
         true
 
     mut fn capability_require_mkdir_allowed(record: &ComptimeCapabilityRecord, path: &str, method: &str, node: i32) -> bool:
-        if not comptime_tool_path_is_project_relative(path):
+        let rel = self.capability_project_relative_path(record, path)
+        if not comptime_tool_path_is_project_relative(rel):
             let _ = self.fail(node, "ToolFs path escapes project root in " ++ method ++ ": " ++ path)
             return false
-        if not self.capability_mkdir_allowed(record, path):
+        if not self.capability_mkdir_allowed(record, rel):
             let _ = self.fail(node, "ToolFs mkdir path is not a declared action output in " ++ method ++ ": " ++ path)
             return false
         true

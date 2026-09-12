@@ -2,19 +2,13 @@
 // internals tests can import it (test/internals/codegen_units_count_test.w).
 // The sysinfo-reading wrappers live in compiler.CodegenUnits.
 
-// Unit count: size gate, then cores, clamped at 16. Memory does NOT cap the
-// count — measured peaks are K-independent when every unit optimizes at
-// once (13.2 GB @ K=8, 15.5 GB @ K=16, 15.3 GB @ K=5 on the compiler),
-// because in-flight IR totals the whole program however it is sliced.
-// More, smaller units only shrink the serial-gen spike. Memory instead
-// bounds emit CONCURRENCY — codegen_units_emit_width_for below.
-pub fn codegen_units_count_for(mir_body_count: i32, cpu_cores: i32) -> i32:
-    if mir_body_count < 2000:
-        return 1
-    var k = if cpu_cores > 0: cpu_cores else: 1
-    if k > 16:
-        k = 16
-    k
+// Partition size and worker count are separate decisions. A three-core
+// host still needs small units: the compiler at K=3/W=1 peaked at 13.4 GiB
+// RSS; K=16/W=1 peaked at 5.5 GiB. Capping partitions at the core count
+// cannot be repaired by serializing their emission. Keep small programs
+// single-unit, and use bounded partitions for compiler-sized programs.
+pub fn codegen_units_count_for(mir_body_count: i32) -> i32:
+    if mir_body_count < 2000: 1 else: 16
 
 // Estimated in-memory bytes per MIR statement once a unit's IR is parsed,
 // optimized, and emitted (LLVMContext + module + pass working set).
@@ -27,10 +21,15 @@ pub fn codegen_units_bytes_per_stmt() -> i64: 36000
 // optimize+emit, peak memory ≈ frontend (measured 4.9 GB on the compiler;
 // #682/#685 shrink it) + in-flight units × (total IR / K). Bound the
 // in-flight count so that fits mem_total minus the 5 GiB frontend reserve.
-// Big hosts resolve to W = K (all units concurrent — today's behavior);
-// an 8 GB host runs a few units at a time instead of dying.
+// Big hosts resolve to W = K. Hosts above 8 GiB use the estimated window;
+// smaller hosts serialize units to leave room for their measured peaks.
 pub fn codegen_units_emit_width_for(unit_count: i32, total_mir_cost: i64, mem_total: i64) -> i32:
     if unit_count <= 1:
+        return 1
+    // LLVM's per-function optimization/emission peaks exceed the average
+    // statement estimate. On small hosts retain headroom for that peak;
+    // the 7 GiB macOS runner must not admit two units from the average.
+    if mem_total <= 8 as i64 * 1024 * 1024 * 1024:
         return 1
     let budget = mem_total - 5 as i64 * 1024 * 1024 * 1024
     if budget <= 0:
