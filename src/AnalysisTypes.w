@@ -100,6 +100,7 @@ enum AnalysisMarshalStrategy: i32:
     CalleePlaceAlias = 7
     CalleeOwnedCopy = 8
     CalleeDirectValue = 9
+    CalleeOwnedPlace = 10
 
 impl Copy for AnalysisMarshalStrategy
 
@@ -113,6 +114,7 @@ fn analysis_marshal_strategy_name(strategy: AnalysisMarshalStrategy) -> str:
     if strategy == AnalysisMarshalStrategy.CalleePlaceAlias: return "callee-place-alias"
     if strategy == AnalysisMarshalStrategy.CalleeOwnedCopy: return "callee-owned-copy"
     if strategy == AnalysisMarshalStrategy.CalleeDirectValue: return "callee-direct-value"
+    if strategy == AnalysisMarshalStrategy.CalleeOwnedPlace: return "callee-owned-place"
     "unknown"
 
 pub type AnalysisFact {

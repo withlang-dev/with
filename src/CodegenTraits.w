@@ -309,27 +309,10 @@ impl Codegen:
                 self.had_error = 1
             return 0
 
-        // D6: the reconstructed dispatch type MUST match the real method and its
-        // vtable wrapper (create_dyn_wrapper copies the method's ABI-lowered param
-        // layout). Trait methods use the native (internal) With ABI, so apply the
-        // same sret / indirect-param lowering declare_function does. Without this,
-        // a win64 aggregate return (>8B, e.g. `str`) is reconstructed here by-value
-        // while the wrapper returns via sret — the exact caller/callee ABI
-        // divergence D6 forbids, producing wrong output at every dyn call site.
-        let abi_param_types: Vec[i64] = Vec.new()
-        var actual_ret_ty = ret_ty
-        if self.internal_abi_needs_sret(ret_ty):
-            actual_ret_ty = wl_void_type(self.context)
-            abi_param_types.push(ptr_ty)
-        var api = 0
-        while api < param_types.len() as i32:
-            let src_ty = param_types[api]
-            if self.internal_abi_needs_indirect_param(src_ty):
-                abi_param_types.push(ptr_ty)
-            else:
-                abi_param_types.push(src_ty)
-            api = api + 1
-        wl_function_type(actual_ret_ty, vec_data_i64(&abi_param_types), abi_param_types.len() as i32, 0)
+        let places: Vec[i32] = Vec.new()
+        for api in 0..param_types.len(): places.push(if api == 0: 1 else: 0)
+        let abi_index = self.compute_fn_abi(ret_ty, param_types, places, FN_ABI_WITH, 0)
+        self.fn_abis[abi_index].llvm_ty
 
     fn find_decl_index(node: i32) -> i32:
         for i in 0..self.pool.decl_count():
@@ -615,38 +598,31 @@ impl Codegen:
             with_eprint(f"[dtm] {mangled} method_idx={method_idx} param_start={param_start} param_count={param_count} ret_node={ret_node} body_node={body_node}")
         if param_start < 0:
             return
-        if param_count < 0 or param_count > 64:
+        if param_count < 0:
             return
 
+        let sig_idx = self.sema.lookup_method_sig(impl_type_sym, method_sym)
+        if sig_idx < 0 or self.sema.sig_get_param_count(sig_idx) != param_count:
+            with_eprint(f"error: default method '{mangled}' has no finalized FnAbi signature")
+            self.had_error = 1
+            return
         let param_types: Vec[i64] = Vec.new()
-        var has_ref_param = false
+        let param_flags: Vec[i32] = Vec.new()
         for pi in 0..param_count:
-            let type_slot = param_start + pi * FN_PARAM_STRIDE + 1
-            if type_slot < 0 or type_slot >= self.pool.extra_len():
-                return
-            let p_type_node = self.pool.fn_param_type(param_start, pi)
-            if pi == 0 and p_type_node != 0 and self.pool.kind(p_type_node) == NodeKind.NK_TYPE_NAMED:
-                let p_sym = self.pool.get_data0(p_type_node)
-                if p_sym == impl_type_sym or p_sym == self.sym_Self:
-                    let p_ty = wl_ptr_type(self.context)
-                    has_ref_param = true
-                    param_types.push(p_ty)
-                    continue
-            var p_ty = self.resolve_trait_method_type_for_impl(p_type_node, impl_type_sym)
-            if p_ty == 0:
-                p_ty = self.type_fallback()
-            param_types.push(p_ty)
-
-        let ret_ty = if ret_node != 0:
-            self.resolve_trait_method_type_for_impl(ret_node, impl_type_sym)
-        else:
-            wl_void_type(self.context)
-        let final_ret_ty = if ret_ty != 0: ret_ty else: wl_void_type(self.context)
-        let fn_ty = wl_function_type(final_ret_ty, vec_data_i64(&param_types), param_count, 0)
+            param_types.push(self.abi_param_source_type(sig_idx, pi))
+            param_flags.push(self.sig_abi_param_flags(sig_idx, pi))
+        let final_ret_ty = self.sema_type_to_llvm(self.sema.sig_return_type(sig_idx))
+        let abi_index = self.compute_fn_abi(final_ret_ty, param_types, param_flags, FN_ABI_WITH, 0)
+        let abi: FnAbi = self.fn_abis[abi_index]
+        let param_offset = if abi.ret.pass == PM_INDIRECT: 1 else: 0
+        let fn_ty = abi.llvm_ty
         if fn_ty == 0 or wl_get_type_kind(fn_ty) != wl_function_type_kind():
             return
         let function = wl_add_function(self.llmod, mangled, fn_ty)
-        self.apply_noalias_param_attrs(function, param_start, param_count)
+        self.apply_noalias_param_attrs_with_offset(function, param_start, param_count, param_offset)
+        if param_offset != 0: wl_add_sret_attr(self.context, function, 0, final_ret_ty)
+        let byval_types = self.fn_abi_byval_types(abi_index)
+        self.apply_c_abi_byval_attrs(function, byval_types, param_count, param_offset)
         if function == 0 or wl_get_value_kind(function) != wl_function_value_kind():
             return
         // A module object keeps a default method instantiated for an impl
@@ -658,8 +634,7 @@ impl Codegen:
             wl_set_linkage(function, wl_internal_linkage())
         self.fn_values.insert(fn_sym, function)
         self.fn_fn_types.insert(fn_sym, fn_ty)
-        if has_ref_param:
-            self.record_ref_param(fn_sym, 0, param_count)
+        self.bind_fn_abi(fn_sym, abi_index, function)
 
         let saved_fn = self.current_function
         let saved_fn_name_sym = self.current_function_name_sym
@@ -742,33 +717,22 @@ impl Codegen:
 
         let entry = wl_append_bb(self.context, function, "entry")
         wl_position_at_end(self.builder, entry)
-        var lowered_param_count: i32 = param_count
-        let actual_param_count = wl_count_params(function)
-        if actual_param_count >= 0 and actual_param_count < lowered_param_count:
-            lowered_param_count = actual_param_count
-        if lowered_param_count < 0:
-            lowered_param_count = 0
-        var pi = 0
-        while pi < lowered_param_count:
-            let name_slot = param_start + pi * FN_PARAM_STRIDE
-            let type_slot = param_start + pi * FN_PARAM_STRIDE + 1
-            if name_slot < 0 or type_slot < 0 or type_slot >= self.pool.extra_len():
-                break
+        for pi in 0..param_count:
             let p_name = self.pool.fn_param_name(param_start, pi)
-            let p_type_node = self.pool.fn_param_type(param_start, pi)
-            let p_val = wl_get_param(function, pi)
-            let p_ty = wl_type_of(p_val)
-            let p_alloca = self.create_entry_alloca(p_ty)
-            wl_build_store(self.builder, p_val, p_alloca)
-            self.record_local(p_name, p_alloca, p_ty, 1)
-
-            if pi == 0 and wl_get_type_kind(p_ty) == wl_pointer_type_kind():
+            let p_val = wl_get_param(function, pi + param_offset)
+            let arg = self.fn_abi_arg(abi_index, pi)
+            if arg.pass == PM_INDIRECT_PLACE:
+                self.record_local(p_name, p_val, arg.source_ty, 1)
+            else:
+                let value = if arg.pass == PM_INDIRECT:
+                    wl_build_load(self.builder, arg.source_ty, p_val)
+                else: p_val
+                let p_alloca = self.create_entry_alloca(arg.source_ty)
+                wl_build_store(self.builder, value, p_alloca)
+                self.record_local(p_name, p_alloca, arg.source_ty, 1)
+            self.record_local_sema_type(p_name, self.sema.sig_param_type(sig_idx, pi))
+            if pi == 0 and arg.reference:
                 self.record_local_pointee_struct(p_name, impl_type_sym)
-            if pi == 0 and p_type_node != 0 and self.pool.kind(p_type_node) == NodeKind.NK_TYPE_NAMED:
-                let psym = self.pool.get_data0(p_type_node)
-                if psym == self.sym_Self and wl_get_type_kind(p_ty) == wl_pointer_type_kind():
-                    self.record_local_pointee_struct(p_name, impl_type_sym)
-            pi = pi + 1
 
         // ── MIR-based default trait method body compilation ──
         let saved_mir_locals = self.mir_local_ptrs
@@ -788,7 +752,7 @@ impl Codegen:
 
         var dtm_builder = MirBuilder.init(self.sema, self.pool, self.intern, fn_sym)
         // Set return type
-        let dtm_ret_sema = self.sema_type_of_node(body_node)
+        let dtm_ret_sema = self.sema.sig_return_type(sig_idx)
         if dtm_ret_sema != 0 and dtm_ret_sema != self.sema.ty_void:
             dtm_builder.body.local_type_ids[0] = dtm_ret_sema
         else:
@@ -799,47 +763,19 @@ impl Codegen:
         // Register params as MIR locals
         for dtm_pi in 0..param_count:
             let dtm_p_name = self.pool.fn_param_name(param_start, dtm_pi)
-            let dtm_p_type_node = self.pool.fn_param_type(param_start, dtm_pi)
-            var dtm_p_sema_ty = self.sema.ty_i32 as i32
-            if dtm_p_type_node > 0:
-                if self.sema.typed_expr_types.contains(dtm_p_type_node):
-                    let dtm_tt = self.sema.typed_expr_types.get(dtm_p_type_node).unwrap()
-                    if dtm_tt > 0:
-                        dtm_p_sema_ty = dtm_tt
-                if dtm_p_sema_ty == self.sema.ty_i32:
-                    // `self: &Self` (and `&T` generally) is an NK_TYPE_REF
-                    // wrapper; registering the receiver as ty_i32 made the
-                    // synthesized body's method-call marshalling read the
-                    // receiver through one extra indirection (spec_ss11_6:
-                    // "Ada\0" bytes folded as a str pointer).
-                    var dtm_tn = dtm_p_type_node
-                    var dtm_is_ref = 0
-                    if self.pool.kind(dtm_tn) == NodeKind.NK_TYPE_REF:
-                        dtm_is_ref = 1
-                        dtm_tn = self.pool.get_data0(dtm_tn)
-                    let dtm_pk = self.pool.kind(dtm_tn)
-                    if dtm_pk == NodeKind.NK_TYPE_NAMED or dtm_pk == NodeKind.NK_IDENT:
-                        var dtm_type_sym = self.pool.get_data0(dtm_tn)
-                        if dtm_type_sym == self.sym_Self:
-                            dtm_type_sym = impl_type_sym
-                        let dtm_prim = self.sema.primitive_type_by_sym(dtm_type_sym)
-                        if dtm_prim != 0:
-                            dtm_p_sema_ty = dtm_prim as i32
-                        else if self.sema.named_types.contains(dtm_type_sym):
-                            dtm_p_sema_ty = self.sema.named_types.get(dtm_type_sym).unwrap()
-                        if dtm_is_ref != 0 and dtm_p_sema_ty != self.sema.ty_i32 as i32:
-                            let dtm_ref_ty = self.sema.find_exact_type(TypeKind.TY_REF, dtm_p_sema_ty, self.pool.get_data1(dtm_p_type_node), 0) as i32
-                            if dtm_ref_ty != 0:
-                                dtm_p_sema_ty = dtm_ref_ty
+            let dtm_p_sema_ty = self.sema.sig_param_type(sig_idx, dtm_pi)
             let dtm_p_local = dtm_builder.body.new_local(dtm_p_sema_ty, 1, dtm_p_name, 1)
             dtm_builder.bind_local(dtm_p_name, dtm_p_local)
 
         dtm_builder.expected_type = dtm_builder.body.local_type_ids.get(0)
 
-        // Lower body to MIR
+        // Default-method tails need the same temporary lifetime as ordinary
+        // functions: capture the result, then release borrowed call operands.
+        let body_frame = dtm_builder.push_stmt_temp_frame()
         let dtm_result = dtm_builder.lower_expr(body_node)
         let dtm_ret_place = dtm_builder.place_for_local(0)
         dtm_builder.assign_operand_to_place(dtm_ret_place, dtm_result, self.pool.get_end(body_node))
+        dtm_builder.finish_stmt_temp_frame(body_frame)
         dtm_builder.pop_scope_inline()
         dtm_builder.terminate(TermKind.TK_RETURN, 0, 0, 0, 0)
         let dtm_body = dtm_builder.body
@@ -965,7 +901,12 @@ impl Codegen:
         let method_start: i32 = self.trait_method_starts[trait_idx]
         let method_count = self.trait_method_counts[trait_idx]
         for mi in 0..method_count:
-            self.generate_default_trait_method_for_impl_ext(impl_type_sym, method_start + mi, trait_sym, impl_node)
+            let method_idx = method_start + mi
+            let method_sym = self.codegen_sema_sym_for(self.trait_method_names[method_idx])
+            // A generic override may not have an LLVM function yet. Its
+            // declaration still overrides the default, just as in Sema.
+            if self.sema.impl_decl_has_method(impl_node, method_sym) != 0: continue
+            self.generate_default_trait_method_for_impl_ext(impl_type_sym, method_idx, trait_sym, impl_node)
 
     mut fn generate_default_trait_methods():
         for i in 0..self.pool.decl_count():

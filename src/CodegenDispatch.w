@@ -270,7 +270,9 @@ impl Codegen:
             var arr_elem_llvm = self.mir_sema_type_to_llvm(arr_elem_tid)
             if arr_elem_llvm == 0:
                 arr_elem_llvm = self.type_fallback()
-            return wl_array_type(arr_elem_llvm, arr_len as i64)
+            return wl_array_type(arr_elem_llvm, arr_len)
+        if tk == TypeKind.TY_TRAIT_OBJ:
+            return self.get_dyn_fat_ptr_type()
         if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF:
             let pointee_tid = self.mir_type_d0_at(resolved)
             let pointee_resolved = self.mir_resolve_alias_at(pointee_tid)
@@ -413,123 +415,46 @@ impl Codegen:
         result = wl_build_insert_value(self.builder, result, if state_flags != 0: subject_len_global else: wl_const_null(ptr_ty), 9)
         result
 
-    fn mir_c_va_list_needs_place_callable_abi(sema_ty: i32):
-        self.mir_type_kind_at(self.mir_resolve_alias_at(sema_ty)) == TypeKind.TY_VA_LIST and
-            fn_abi_c_va_list_uses_caller_place(target_spec_os(), target_spec_arch())
+    mut fn callable_fn_abi(sema_ty: i32, closure: bool) -> i32:
+        let resolved = self.sema.callable_type_resolved(sema_ty)
+        if resolved == 0: return -1
+        let key: i64 = resolved * 2 + (if closure: 1 else: 0)
+        let cached = self.fn_abi_callables.get(key)
+        if cached.is_some(): return cached.unwrap()
+        let kind = self.sema.get_type_kind(resolved)
+        let convention = if kind == TypeKind.TY_EXTERN_FN: FN_ABI_C else if closure: FN_ABI_CLOSURE else: FN_ABI_WITH
+        let start = self.sema.get_type_d0(resolved)
+        let count = self.sema.get_type_d1(resolved)
+        let ret_id = self.sema.get_type_d2(resolved)
+        if kind == TypeKind.TY_EXTERN_FN and self.sema.type_uses_c_va_list_place(ret_id) != 0:
+            with_eprint("error: callable return type 'c_va_list' is not C-ABI-expressible on this target")
+            self.had_error = 1
+            return -1
+        let ret = self.mir_sema_type_to_llvm(ret_id)
+        if ret == 0:
+            with_eprint("error: unresolved callable return type in FnAbi")
+            self.had_error = 1
+            return -1
+        let sources: Vec[i64] = Vec.new()
+        let places: Vec[i32] = Vec.new()
+        for pi in 0..count:
+            let tid: i32 = self.sema.type_extra[start + pi]
+            let source_ty = self.mir_sema_type_to_llvm(tid)
+            let llvm_ty = self.mir_storage_type_for_value(source_ty)
+            sources.push(llvm_ty)
+            let reference = self.sema.get_type_kind(self.sema.resolve_alias(tid)) == TypeKind.TY_REF
+            places.push(self.sema.callable_param_uses_value_ref_abi(resolved, pi) | (if reference: 2 else: 0))
+        let index = self.compute_fn_abi(ret, sources, places, convention, 0)
+        self.fn_abi_callables.insert(key, index)
+        index
 
     mut fn mir_build_closure_fn_type(sema_ty: i32) -> i64:
-        var resolved = self.mir_resolve_alias_at(sema_ty)
-        var tk = self.mir_type_kind_at(resolved)
-        // Type created after MIR snapshot — read from sema directly
-        if tk == 0 and resolved >= self.mir_type_kinds_len() as i32 and resolved > 0:
-            resolved = self.sema.resolve_alias(resolved) as i32
-            tk = self.sema.get_type_kind(resolved)
-        if tk != TypeKind.TY_FN:
-            return 0
-        var extra_start = self.mir_type_d0_at(resolved)
-        var param_count = self.mir_type_d1_at(resolved)
-        var ret_ty_id = self.mir_type_d2_at(resolved)
-        // Fallback to sema for types beyond snapshot
-        if resolved >= self.mir_type_kinds_len() as i32:
-            extra_start = self.sema.get_type_d0(resolved)
-            param_count = self.sema.get_type_d1(resolved)
-            ret_ty_id = self.sema.get_type_d2(resolved)
-        let ret_ty = self.mir_sema_type_to_llvm(ret_ty_id)
-        let llvm_ret = if ret_ty != 0: ret_ty else: wl_void_type(self.context)
-        let param_types: Vec[i64] = Vec.new()
-        param_types.push(wl_ptr_type(self.context))
-        // The closure body is always emitted with a by-value direct return:
-        // gen_closure forces the direct-return path (current_function_name_sym
-        // = 0) so a closure never gains an sret param, even for a struct return
-        // >8 bytes on win64. The call type must match — do NOT manually
-        // sret-lower here. LLVM applies the target's aggregate-return ABI
-        // identically to a by-value caller and a by-value callee. Manually
-        // sret-lowering the call while the callee returns by value put the
-        // env pointer and the sret pointer in swapped registers on win64
-        // (callee: implicit sret in RCX, env in RDX; caller: env in RCX, sret
-        // in RDX), so a str-returning closure wrote its result through the env
-        // pointer and left the real destination garbage (#806). Contrast
-        // mir_build_raw_fn_type, whose sret lowering is correct because a named
-        // fn-pointer target is sret-lowered by declare_function too.
-        for pi in 0..param_count:
-            var p_sema_ty = self.mir_type_extra_at(extra_start + pi)
-            if resolved >= self.mir_type_kinds_len() as i32:
-                let te_idx = extra_start + pi
-                if te_idx >= 0 and te_idx < self.sema.type_extra.len() as i32:
-                    p_sema_ty = self.sema.type_extra[te_idx]
-            if self.mir_c_va_list_needs_place_callable_abi(p_sema_ty):
-                with_eprint("error: function-value calls with c_va_list require a callable-type ABI descriptor on this target (#1106)")
-                self.had_error = 1
-                return 0
-            let p_llvm_ty = self.mir_sema_type_to_llvm(p_sema_ty)
-            if p_llvm_ty != 0:
-                if self.internal_abi_needs_indirect_param(p_llvm_ty):
-                    param_types.push(wl_ptr_type(self.context))
-                else:
-                    param_types.push(p_llvm_ty)
-            else:
-                param_types.push(self.type_fallback())
-        wl_function_type(llvm_ret, vec_data_i64(&param_types), param_types.len() as i32, 0)
-
-    fn mir_c_va_list_needs_callable_abi(sema_ty: i32):
-        self.mir_type_kind_at(self.mir_resolve_alias_at(sema_ty)) == TypeKind.TY_VA_LIST and type_layout_c_va_list_size() > 8
+        let abi = self.callable_fn_abi(sema_ty, true)
+        if abi < 0: 0 else: self.fn_abis[abi].llvm_ty
 
     mut fn mir_build_raw_fn_type(sema_ty: i32) -> i64:
-        var resolved = self.mir_resolve_alias_at(sema_ty)
-        var tk = self.mir_type_kind_at(resolved)
-        if tk == 0 and resolved >= self.mir_type_kinds_len() as i32 and resolved > 0:
-            resolved = self.sema.resolve_alias(resolved) as i32
-            tk = self.sema.get_type_kind(resolved)
-
-        if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF:
-            let pointee = if resolved >= self.mir_type_kinds_len() as i32: self.sema.get_type_d0(resolved) else: self.mir_type_d0_at(resolved)
-            resolved = self.mir_resolve_alias_at(pointee)
-            tk = self.mir_type_kind_at(resolved)
-            if tk == 0 and resolved >= self.mir_type_kinds_len() as i32 and resolved > 0:
-                resolved = self.sema.resolve_alias(resolved) as i32
-                tk = self.sema.get_type_kind(resolved)
-
-        if tk != TypeKind.TY_FN and tk != TypeKind.TY_EXTERN_FN:
-            return 0
-
-        var extra_start = self.mir_type_d0_at(resolved)
-        var param_count = self.mir_type_d1_at(resolved)
-        var ret_ty_id = self.mir_type_d2_at(resolved)
-        if resolved >= self.mir_type_kinds_len() as i32:
-            extra_start = self.sema.get_type_d0(resolved)
-            param_count = self.sema.get_type_d1(resolved)
-            ret_ty_id = self.sema.get_type_d2(resolved)
-        if tk == TypeKind.TY_EXTERN_FN and self.mir_c_va_list_needs_callable_abi(ret_ty_id):
-            with_eprint("error: C function-pointer calls with c_va_list require a callable-type ABI descriptor on this target (#1106)")
-            self.had_error = 1
-            return 0
-        let ret_ty = self.mir_sema_type_to_llvm(ret_ty_id)
-        var llvm_ret = if ret_ty != 0: ret_ty else: wl_void_type(self.context)
-        let param_types: Vec[i64] = Vec.new()
-        if self.internal_abi_needs_sret(llvm_ret):
-            param_types.push(wl_ptr_type(self.context))
-            llvm_ret = wl_void_type(self.context)
-
-        for pi in 0..param_count:
-            var p_sema_ty = self.mir_type_extra_at(extra_start + pi)
-            if resolved >= self.mir_type_kinds_len() as i32:
-                let te_idx = extra_start + pi
-                if te_idx >= 0 and te_idx < self.sema.type_extra.len() as i32:
-                    p_sema_ty = self.sema.type_extra[te_idx]
-            if self.mir_c_va_list_needs_place_callable_abi(p_sema_ty) or
-               (tk == TypeKind.TY_EXTERN_FN and self.mir_c_va_list_needs_callable_abi(p_sema_ty)):
-                with_eprint("error: function-value calls with c_va_list require a callable-type ABI descriptor on this target (#1106)")
-                self.had_error = 1
-                return 0
-            let p_llvm_ty = self.mir_sema_type_to_llvm(p_sema_ty)
-            if p_llvm_ty != 0:
-                if self.internal_abi_needs_indirect_param(p_llvm_ty):
-                    param_types.push(wl_ptr_type(self.context))
-                else:
-                    param_types.push(p_llvm_ty)
-            else:
-                param_types.push(self.type_fallback())
-        wl_function_type(llvm_ret, vec_data_i64(&param_types), param_types.len() as i32, 0)
+        let abi = self.callable_fn_abi(sema_ty, false)
+        if abi < 0: 0 else: self.fn_abis[abi].llvm_ty
 
     mut fn mir_storage_type_for_value(ty: i64) -> i64:
         if ty == 0:
@@ -1105,10 +1030,10 @@ impl Codegen:
         true
 
 
-    fn mir_resolve_field_index(agg_ty: i64, field_token: i32) -> i32:
+    fn mir_resolve_field_index(agg_ty: i64, field_token: i32, source_type: i32 = 0):
         // Arrays use direct numeric index
         if wl_get_type_kind(agg_ty) == wl_array_type_kind():
-            if field_token >= 0 and field_token < wl_get_array_length(agg_ty) as i32:
+            if field_token >= 0 and field_token < wl_get_array_length(agg_ty):
                 return field_token
             return -1
         // Bitpacked structs: look up field by name in the struct registry
@@ -1131,7 +1056,7 @@ impl Codegen:
         // Must do this before the raw range check, because a symbol value (e.g. 132 for "ast")
         // can accidentally pass field_token < elem_count on large structs.
         var normalized_field = field_token
-        var field_text: str = with_str_clone_ref(self.intern.resolve(field_token))
+        var field_text = with_str_clone_ref(self.intern.resolve(field_token))
         if field_text.len() == 0:
             field_text = self.sema_symbol_text(field_token)
         if field_text.len() > 0:
@@ -1143,6 +1068,16 @@ impl Codegen:
                 fi = self.find_field_index(st_sym, normalized_field)
             if fi >= 0 and ((is_union and fi < source_field_count) or ((not is_union) and fi < elem_count)):
                 return fi
+
+        // Compiler-modeled records such as Handle have no LLVM field registry.
+        // Their MIR source owner still identifies each field; an anonymous LLVM
+        // shape alone cannot distinguish their names from an unrelated tuple.
+        if st_sym == 0 and source_type > 0 and field_text.len() > 0:
+            let count = self.sema.type_reflection_field_count(source_type)
+            for fi in 0..count:
+                let name = self.sema.type_reflection_field_name(source_type, fi)
+                if self.sema.pool_resolve_symbol(name) == field_text and fi < elem_count:
+                    return fi
 
         // Vec types are created dynamically and not registered in the struct field
         // registry. Resolve their field names by layout: {ptr, len, cap, elem_size}.
@@ -1160,7 +1095,7 @@ impl Codegen:
         if field_name.len() == 1:
             let ch = field_name[0]
             if ch >= 48 and ch <= 57:
-                let idx = (ch - 48) as i32
+                let idx = ch - 48
                 if idx >= 0 and idx < elem_count:
                     return idx
 
@@ -1222,7 +1157,7 @@ impl Codegen:
                         cur_ty = payload_ty
                         active_variant_idx = -1
                         continue
-                let fi = self.mir_resolve_field_index(cur_ty, pd)
+                let fi = self.mir_resolve_field_index(cur_ty, pd, variant_owner_sema_ty)
                 if fi < 0:
                     return 0
                 let union_idx = self.find_struct_index_by_type(cur_ty)
@@ -1409,7 +1344,7 @@ impl Codegen:
                         cur_ty = payload_ty
                         active_variant_idx = -1
                         continue
-                let fi = self.mir_resolve_field_index(cur_ty, pd)
+                let fi = self.mir_resolve_field_index(cur_ty, pd, variant_owner_sema_ty)
                 if fi < 0:
                     return 0
                 let union_idx = self.find_struct_index_by_type(cur_ty)
@@ -2547,27 +2482,10 @@ impl Codegen:
             result = self.build_call_fn_value(concat_sym, fn_value, fn_type, -1, 0, args, 2, concat_name, 0)
         else:
             let param_types: Vec[i64] = Vec.new()
-            var ret_ty = str_ty
-            var has_sret = 0
-            let byval_types: Vec[i64] = Vec.new()
-            let direct_types: Vec[i64] = Vec.new()
-            if self.internal_abi_needs_sret(str_ty):
-                has_sret = 1
-                ret_ty = wl_void_type(self.context)
-                param_types.push(wl_ptr_type(self.context))
             param_types.push(wl_ptr_type(self.context))
-            byval_types.push(0)
-            direct_types.push(0)
             param_types.push(wl_i64_type(self.context))
-            byval_types.push(0)
-            direct_types.push(0)
-            let fn_type = wl_function_type(ret_ty, vec_data_i64(&param_types), param_types.len() as i32, 0)
-            let func = wl_add_function(self.llmod, concat_name, fn_type)
-            if has_sret != 0:
-                wl_add_sret_attr(self.context, func, 0, str_ty)
-                self.record_c_abi_transform(concat_sym, has_sret, str_ty, 0, move byval_types, 0, move direct_types, 0)
-            self.fn_values.insert(concat_sym, func)
-            self.fn_fn_types.insert(concat_sym, fn_type)
+            let func = self.ensure_internal_runtime_fn(concat_name, param_types, 2, str_ty)
+            let fn_type: i64 = self.fn_fn_types.get(concat_sym).unwrap()
             let args: Vec[i64] = Vec.new()
             args.push(parts_ptr)
             args.push(wl_const_int(wl_i64_type(self.context), arg_count as i64, 0))
@@ -2835,37 +2753,19 @@ impl Codegen:
         let fv = self.fn_values.get(sym)
         if fv.is_some():
             return fv.unwrap() as i64
-        let ptr_ty = wl_ptr_type(self.context)
-        let param_types: Vec[i64] = Vec.new()
-        var actual_ret_ty = ret_ty
-        var has_sret = 0
-        var sret_ty: i64 = 0
-        var byval_mask: i64 = 0
-        let byval_types: Vec[i64] = Vec.new()
-        let direct_types: Vec[i64] = Vec.new()
-        if self.internal_abi_needs_sret(ret_ty):
-            has_sret = 1
-            sret_ty = ret_ty
-            actual_ret_ty = wl_void_type(self.context)
-            param_types.push(ptr_ty)
-        for pi in 0..param_count:
-            let orig_ty = orig_param_types[pi]
-            if self.internal_abi_needs_indirect_param(orig_ty):
-                param_types.push(ptr_ty)
-                byval_mask = byval_mask | ((1 as i64) << (pi as u32))
-                byval_types.push(orig_ty)
-                direct_types.push(0)
-            else:
-                param_types.push(orig_ty)
-                byval_types.push(0)
-                direct_types.push(0)
-        let fn_type = wl_function_type(actual_ret_ty, vec_data_i64(&param_types), param_types.len() as i32, 0)
+        let places: Vec[i32] = Vec.new()
+        for pi in 0..param_count: places.push(0)
+        let abi_index = self.compute_fn_abi(ret_ty, orig_param_types, places, FN_ABI_WITH, 0)
+        let abi = self.fn_abis[abi_index]
+        let has_sret = if abi.ret.pass == PM_INDIRECT: 1 else: 0
+        let sret_ty = abi.ret.source_ty
+        let byval_types = self.fn_abi_byval_types(abi_index)
+        let fn_type = abi.llvm_ty
         let func = wl_add_function(self.llmod, name, fn_type)
         if has_sret != 0:
             wl_add_sret_attr(self.context, func, 0, sret_ty)
-        self.apply_c_abi_byval_attrs(func, byval_mask, byval_types, param_count, if has_sret != 0: 1 else: 0)
-        if has_sret != 0 or byval_mask != 0:
-            self.record_c_abi_transform(sym, has_sret, sret_ty, byval_mask, move byval_types, 0, move direct_types, 0)
+        self.apply_c_abi_byval_attrs(func, byval_types, param_count, if has_sret != 0: 1 else: 0)
+        self.bind_fn_abi(sym, abi_index, func)
         self.fn_values.insert(sym, func)
         self.fn_fn_types.insert(sym, fn_type)
         func
@@ -3656,7 +3556,7 @@ impl Codegen:
                         if (agg_start + i) < body.agg_field_name_syms.len() as i32:
                             let name_sym = body.agg_field_name_syms[(agg_start + i)]
                             if name_sym != 0:
-                                let resolved_fi = self.mir_resolve_field_index(struct_ty, name_sym)
+                                let resolved_fi = self.mir_resolve_field_index(struct_ty, name_sym, dest_sema_ty)
                                 if resolved_fi >= 0:
                                     fi = resolved_fi
                         let bp_info = self.get_bitpacked_field_info(struct_ty, fi)
@@ -3692,7 +3592,7 @@ impl Codegen:
                     if (agg_start + i) < body.agg_field_name_syms.len() as i32:
                         let name_sym = body.agg_field_name_syms[(agg_start + i)]
                         if name_sym != 0:
-                            let resolved_fi = self.mir_resolve_field_index(struct_ty, name_sym)
+                            let resolved_fi = self.mir_resolve_field_index(struct_ty, name_sym, dest_sema_ty)
                             if resolved_fi >= 0:
                                 fi = resolved_fi
                     let union_idx = self.find_struct_index_by_type(struct_ty)
@@ -4031,19 +3931,33 @@ impl Codegen:
     // Emit `if not all-zero(value): <user drop>`. An over-skip is at worst a leak,
     // never a fault or double-free (all-zero ⇒ owns nothing ⇒ nothing to drop), so
     // a move-analysis bug can never become memory unsafety.
-    mut fn mir_emit_guarded_user_drop(ptr: i64, ty: i64, drop_fn_val: i64, drop_fn_ty: i64) -> Unit:
+    mut fn mir_call_drop(ptr: i64, ty: i64, function: i64, fn_type: i64):
+        let index = self.fn_abi_values.get(function) ?? -1
+        if index < 0:
+            with_eprint("error: destructor has no FnAbi descriptor")
+            self.had_error = 1
+            return
+        let abi: FnAbi = self.fn_abis[index]
+        if abi.llvm_ty != fn_type or abi.arg_count != 1:
+            with_eprint("error: destructor declaration disagrees with FnAbi")
+            self.had_error = 1
+            return
+        let arg = self.fn_abi_arg(index, 0)
+        let value = if arg.owned_place or arg.pass == PM_INDIRECT_PLACE: 0 else: wl_build_load(self.builder, ty, ptr)
+        let args: Vec[i64] = Vec.new()
+        args.push(self.push_call_arg(index, 0, value, ptr))
+        let call = wl_build_call(self.builder, abi.llvm_ty, function, vec_data_i64(&args), 1)
+        let byval_types = self.fn_abi_byval_types(index)
+        self.apply_c_abi_call_attrs(call, 0, 0, byval_types, 1, 0)
+
+    mut fn mir_emit_guarded_user_drop(ptr: i64, ty: i64, drop_fn_val: i64, drop_fn_ty: i64):
         if not self.current_drop_needs_guard and self.member_drop_depth == 0:
             // Stage 4 (§2.5.2): the move analysis proved the dropped local is never
             // moved, so it can never hold the reset sentinel — drop unconditionally
             // (byte-for-byte the codegen a static-only model would emit). Member
             // drops (#697) never take this elision: a member can be blanked by a
             // callee through a share-place pointer, invisible to this analysis.
-            let u_args: Vec[i64] = Vec.new()
-            if wl_get_type_kind(ty) == wl_struct_type_kind():
-                u_args.push(ptr)
-            else:
-                u_args.push(wl_build_load(self.builder, ty, ptr))
-            let _u = wl_build_call(self.builder, drop_fn_ty, drop_fn_val, vec_data_i64(&u_args), 1)
+            self.mir_call_drop(ptr, ty, drop_fn_val, drop_fn_ty)
             return
         let i64_ty = wl_i64_type(self.context)
         let i32_ty = wl_i32_type(self.context)
@@ -4063,13 +3977,7 @@ impl Codegen:
         let after_bb = wl_append_bb(self.context, self.current_function, "drop.skip")
         wl_build_cond_br(self.builder, run_cond, run_bb, after_bb)
         wl_position_at_end(self.builder, run_bb)
-        let args: Vec[i64] = Vec.new()
-        if wl_get_type_kind(ty) == wl_struct_type_kind():
-            args.push(ptr)
-        else:
-            let value = wl_build_load(self.builder, ty, ptr)
-            args.push(value)
-        let _ = wl_build_call(self.builder, drop_fn_ty, drop_fn_val, vec_data_i64(&args), 1)
+        self.mir_call_drop(ptr, ty, drop_fn_val, drop_fn_ty)
         wl_build_br(self.builder, after_bb)
         wl_position_at_end(self.builder, after_bb)
 
@@ -4091,26 +3999,14 @@ impl Codegen:
         let drop_fn_value: i64 = if has_drop: dfv.unwrap() else: 0
         let drop_fn_type: i64 = if has_drop: dft.unwrap() else: 0
 
-        // Drop methods take self by value in the spec, but the compiler lowers
-        // struct self params as pointers. Pass pointer for struct types.
+        // The descriptor supplies the owned storage shared by the destructor
+        // body and field cleanup, including reset fields moved out by the body.
         if has_drop:
             self.mir_emit_guarded_user_drop(ptr, ty, drop_fn_value, drop_fn_type)
         self.mir_emit_drop_fields_ptr(ptr, ty, type_sym, 0)
 
-    fn mir_call_concrete_drop(ptr: i64, ty: i64, concrete: &ConcreteMirFunction):
-        let args: Vec[i64] = Vec.new()
-        let byval_opt = self.extern_fn_byval_params.get(concrete.sym)
-        let byval_mask = if byval_opt.is_some(): byval_opt.unwrap() as i64 else: 0
-        if self.is_ref_param(concrete.sym, 0) or (byval_mask & 1) != 0:
-            args.push(ptr)
-        else:
-            args.push(wl_build_load(self.builder, ty, ptr))
-        let call = wl_build_call(self.builder, concrete.fn_type, concrete.value, vec_data_i64(&args), 1)
-        var byval_types: Vec[i64] = Vec.new()
-        let byval_types_opt = self.extern_fn_byval_types.get(concrete.sym)
-        if byval_types_opt.is_some():
-            byval_types = vec_copy_i64(byval_types_opt.unwrap())
-        self.apply_c_abi_call_attrs(call, 0, 0, byval_mask, byval_types, 1, 0)
+    mut fn mir_call_concrete_drop(ptr: i64, ty: i64, concrete: &ConcreteMirFunction):
+        self.mir_call_drop(ptr, ty, concrete.value, concrete.fn_type)
 
     mut fn mir_emit_guarded_concrete_drop(ptr: i64, ty: i64, concrete: &ConcreteMirFunction):
         if not self.current_drop_needs_guard and self.member_drop_depth == 0:
@@ -4977,11 +4873,14 @@ impl Codegen:
         if existing != 0:
             return existing
 
-        let ptr_ty = wl_ptr_type(self.context)
         let params: Vec[i64] = Vec.new()
-        params.push(ptr_ty)
-        let fn_ty = wl_function_type(wl_void_type(self.context), vec_data_i64(&params), 1, 0)
+        params.push(llvm_ty)
+        let flags: Vec[i32] = Vec.new()
+        flags.push(4)
+        let abi_index = self.compute_fn_abi(wl_void_type(self.context), params, flags, FN_ABI_WITH, 0)
+        let fn_ty = self.fn_abis[abi_index].llvm_ty
         let drop_fn = wl_add_function(self.llmod, fn_name, fn_ty)
+        self.bind_fn_abi(self.intern.intern(fn_name), abi_index, drop_fn)
         wl_set_linkage(drop_fn, wl_internal_linkage())
 
         let saved_fn = self.current_function
@@ -5417,6 +5316,8 @@ impl Codegen:
                     return true
             if dst_ptr == 0:
                 if has_projections:
+                    with_eprint(f"error: cannot lower projected assignment in '{self.intern.resolve(self.current_function_name_sym)}' (MIR place {d0})")
+                    self.had_error = 1
                     return false
                 let value_ty = wl_type_of(value)
                 // When sema type is str but value is a pointer (c_import coercion),
@@ -8346,57 +8247,11 @@ impl Codegen:
             args.push(is_str_val)
             let fn_val = self.ensure_hm_fn("with_hashmap_insert", void_ty)
 
-            // insert consumes both arguments. On a duplicate, the table keeps
-            // its existing key and replaces only the value, so both displaced
-            // owners need exact typed cleanup: the old stored value before it
-            // is overwritten, and the unused incoming key after the lookup has
-            // finished using it. Copy-only maps can keep the raw runtime path.
             let key_sema = self.mir_hash_collection_arg_sema_type(recv_sema, 0)
             let value_sema = if recv_base_sym == self.sym_hashmap: self.mir_hash_collection_arg_sema_type(recv_sema, 1) else: 0
-            let drop_unused_key = key_sema > 0 and self.sema.type_needs_drop_frozen(key_sema) != 0
-            let drop_replaced_value = value_sema > 0 and self.sema.type_needs_drop_frozen(value_sema) != 0
-            if drop_unused_key or drop_replaced_value:
-                let get_fn = self.ensure_hm_fn("with_hashmap_get_ptr", ptr_ty)
-                let get_params: Vec[i64] = Vec.new()
-                get_params.push(ptr_ty)
-                get_params.push(ptr_ty)
-                get_params.push(i64_ty)
-                let get_ty = wl_function_type(ptr_ty, vec_data_i64(&get_params), 3, 0)
-                let get_args: Vec[i64] = Vec.new()
-                get_args.push(map_ptr)
-                get_args.push(key_alloca)
-                get_args.push(is_str_val)
-                let old_value_ptr = wl_build_call(self.builder, get_ty, get_fn, vec_data_i64(&get_args), 3)
-                let is_duplicate = wl_build_icmp(self.builder, wl_int_ne(), old_value_ptr, wl_const_null(ptr_ty))
-                let replace_bb = wl_append_bb(self.context, self.current_function, "map.insert.replace")
-                let new_bb = wl_append_bb(self.context, self.current_function, "map.insert.new")
-                let done_bb = wl_append_bb(self.context, self.current_function, "map.insert.done")
-                wl_build_cond_br(self.builder, is_duplicate, replace_bb, new_bb)
-
-                wl_position_at_end(self.builder, replace_bb)
-                let value_llvm = if recv_base_sym == self.sym_hashmap: self.mir_hashmap_value_type(body, recv_op) else: 0
-                if recv_base_sym == self.sym_hashmap and value_llvm == 0:
-                    with_eprint("error: internal: HashMap.insert replacement lost its value type")
-                    self.had_error = 1
-                if drop_replaced_value:
-                    self.member_drop_depth = self.member_drop_depth + 1
-                    self.mir_emit_drop_ptr_for_sema_type(old_value_ptr, value_llvm, value_sema)
-                    self.member_drop_depth = self.member_drop_depth - 1
-                if recv_base_sym == self.sym_hashmap and value_llvm != 0:
-                    self.emit_llvm_memcpy(old_value_ptr, val_alloca, self.abi_size_of(value_llvm))
-                if drop_unused_key:
-                    self.member_drop_depth = self.member_drop_depth + 1
-                    self.mir_emit_drop_ptr_for_sema_type(key_alloca, wl_type_of(key), key_sema)
-                    self.member_drop_depth = self.member_drop_depth - 1
-                wl_build_br(self.builder, done_bb)
-
-                wl_position_at_end(self.builder, new_bb)
-                let _ = wl_build_call(self.builder, fn_ty, fn_val, vec_data_i64(&args), 4)
-                wl_build_br(self.builder, done_bb)
-                wl_position_at_end(self.builder, done_bb)
-                result = 0
-            else:
-                result = wl_build_call(self.builder, fn_ty, fn_val, vec_data_i64(&args), 4)
+            let value_llvm = if recv_base_sym == self.sym_hashmap: self.mir_hashmap_value_type(body, recv_op) else: byte_ty
+            self.mir_emit_owned_map_insert(fn_val, fn_ty, args, key_sema, value_sema, wl_type_of(key), value_llvm)
+            result = 0
 
         else if intrinsic == MirIntrinsic.MAP_GET:
             let recv_op = body.call_arg_operands[arg_start]
@@ -10436,6 +10291,45 @@ impl Codegen:
         let second_arg = if arg_count > 1: self.mir_type_extra_at(arg_start + 1) else: 0
         (base_sym, first_arg, second_arg)
 
+    // Ordinary insert and literals transfer the same owners. A duplicate keeps
+    // the stored key, drops the unused incoming key, and replaces the value.
+    mut fn mir_emit_owned_map_insert(insert_fn: i64, insert_ty: i64, args: &Vec[i64], key_sema: i32, value_sema: i32, key_llvm: i64, value_llvm: i64):
+        let drop_key = key_sema > 0 and self.sema.type_needs_drop_frozen(key_sema) != 0
+        let drop_value = value_sema > 0 and self.sema.type_needs_drop_frozen(value_sema) != 0
+        if not drop_key and not drop_value:
+            wl_build_call(self.builder, insert_ty, insert_fn, vec_data_i64(args), 4)
+            return
+        let ptr_ty = wl_ptr_type(self.context)
+        let get_fn = self.ensure_hm_fn("with_hashmap_get_ptr", ptr_ty)
+        let get_params: Vec[i64] = [ptr_ty, ptr_ty, wl_i64_type(self.context)]
+        let get_ty = wl_function_type(ptr_ty, vec_data_i64(get_params), 3, 0)
+        let get_args: Vec[i64] = [args[0], args[1], args[3]]
+        let old_value = wl_build_call(self.builder, get_ty, get_fn, vec_data_i64(get_args), 3)
+        let duplicate = wl_build_icmp(self.builder, wl_int_ne(), old_value, wl_const_null(ptr_ty))
+        let replace_bb = wl_append_bb(self.context, self.current_function, "map.insert.replace")
+        let new_bb = wl_append_bb(self.context, self.current_function, "map.insert.new")
+        let done_bb = wl_append_bb(self.context, self.current_function, "map.insert.done")
+        wl_build_cond_br(self.builder, duplicate, replace_bb, new_bb)
+        wl_position_at_end(self.builder, replace_bb)
+        if value_sema > 0 and value_llvm == 0:
+            with_eprint("error: internal: HashMap.insert replacement lost its value type")
+            self.had_error = 1
+        if drop_value:
+            self.member_drop_depth = self.member_drop_depth + 1
+            self.mir_emit_drop_ptr_for_sema_type(old_value, value_llvm, value_sema)
+            self.member_drop_depth = self.member_drop_depth - 1
+        if value_sema > 0 and value_llvm != 0:
+            self.emit_llvm_memcpy(old_value, args[2], self.abi_size_of(value_llvm))
+        if drop_key:
+            self.member_drop_depth = self.member_drop_depth + 1
+            self.mir_emit_drop_ptr_for_sema_type(args[1], key_llvm, key_sema)
+            self.member_drop_depth = self.member_drop_depth - 1
+        wl_build_br(self.builder, done_bb)
+        wl_position_at_end(self.builder, new_bb)
+        wl_build_call(self.builder, insert_ty, insert_fn, vec_data_i64(args), 4)
+        wl_build_br(self.builder, done_bb)
+        wl_position_at_end(self.builder, done_bb)
+
     mut fn mir_emit_collection_literal_intrinsic_call(body: &MirBody, intrinsic: MirIntrinsic, args_id: i32, dest_place: i32, next_bb: i32) -> bool:
         if intrinsic != MirIntrinsic.COLLECTION_LITERAL and intrinsic != MirIntrinsic.MAP_LITERAL:
             return false
@@ -10459,7 +10353,7 @@ impl Codegen:
             let new_args: Vec[i64] = Vec.new()
             new_args.push(out_ptr)
             new_args.push(wl_const_int(i64_ty, self.abi_size_of(elem_ty), 0))
-            let _new = wl_build_call(self.builder, new_ty, new_fn, vec_data_i64(&new_args), 2)
+            wl_build_call(self.builder, new_ty, new_fn, vec_data_i64(&new_args), 2)
             let push_fn = self.ensure_vec_runtime_fn("with_vec_push", void_ty, 2)
             let push_ty = self.get_vec_fn_type("with_vec_push", void_ty, 2)
             for i in 0..arg_count:
@@ -10470,7 +10364,7 @@ impl Codegen:
                 let push_args: Vec[i64] = Vec.new()
                 push_args.push(out_ptr)
                 push_args.push(elem_alloca)
-                let _push = wl_build_call(self.builder, push_ty, push_fn, vec_data_i64(&push_args), 2)
+                wl_build_call(self.builder, push_ty, push_fn, vec_data_i64(&push_args), 2)
             result = wl_build_load(self.builder, vec_ty, out_ptr)
 
         else if (intrinsic == MirIntrinsic.COLLECTION_LITERAL and base_sym == self.sym_hashset) or (intrinsic == MirIntrinsic.MAP_LITERAL and base_sym == self.sym_hashmap):
@@ -10486,7 +10380,7 @@ impl Codegen:
             new_args2.push(wl_const_int(i64_ty, self.abi_size_of(key_ty), 0))
             new_args2.push(wl_const_int(i64_ty, self.abi_size_of(val_ty), 0))
             let handle = wl_build_call(self.builder, new_ty, new_fn, vec_data_i64(&new_args2), 2)
-            var map_value = wl_build_insert_value(self.builder, self.build_default_value(map_ty), handle, 0)
+            let map_value = wl_build_insert_value(self.builder, self.build_default_value(map_ty), handle, 0)
             let insert_params: Vec[i64] = Vec.new()
             insert_params.push(ptr_ty)
             insert_params.push(ptr_ty)
@@ -10513,7 +10407,8 @@ impl Codegen:
                 insert_args.push(key_alloca)
                 insert_args.push(val_alloca)
                 insert_args.push(wl_const_int(i64_ty, if self.is_str_type(key_ty): 1 else: 0, 0))
-                let _ins = wl_build_call(self.builder, insert_ty, insert_fn, vec_data_i64(&insert_args), 4)
+                let value_sema = if intrinsic == MirIntrinsic.MAP_LITERAL: second_tid else: 0
+                self.mir_emit_owned_map_insert(insert_fn, insert_ty, insert_args, first_tid, value_sema, key_ty, val_ty)
             result = map_value
 
         else:
@@ -12598,28 +12493,9 @@ impl Codegen:
             let str_sym = self.intern.intern("with_str_from_vec_u8")
             var str_fn = wl_get_named_function(self.llmod, "with_str_from_vec_u8")
             if str_fn == 0:
-                // D6: the callee returns `str` (16B), which win64 lowers via sret.
-                // Declare and call through the single FnAbi path so caller and
-                // callee agree instead of hand-rolling a direct return.
                 let str_params: Vec[i64] = Vec.new()
-                var str_ret_ty = str_ty
-                var str_has_sret = 0
-                let str_byval_types: Vec[i64] = Vec.new()
-                let str_direct_types: Vec[i64] = Vec.new()
-                if self.internal_abi_needs_sret(str_ty):
-                    str_has_sret = 1
-                    str_ret_ty = void_ty
-                    str_params.push(ptr_ty)
                 str_params.push(ptr_ty)
-                str_byval_types.push(0)
-                str_direct_types.push(0)
-                let str_fn_ty = wl_function_type(str_ret_ty, vec_data_i64(&str_params), str_params.len() as i32, 0)
-                str_fn = wl_add_function(self.llmod, "with_str_from_vec_u8", str_fn_ty)
-                if str_has_sret != 0:
-                    wl_add_sret_attr(self.context, str_fn, 0, str_ty)
-                    self.record_c_abi_transform(str_sym, str_has_sret, str_ty, 0, move str_byval_types, 0, move str_direct_types, 0)
-                self.fn_values.insert(str_sym, str_fn)
-                self.fn_fn_types.insert(str_sym, str_fn_ty)
+                str_fn = self.ensure_internal_runtime_fn("with_str_from_vec_u8", str_params, 1, str_ty)
             let str_call_ty: i64 = self.fn_fn_types.get(str_sym).unwrap()
             let str_args: Vec[i64] = Vec.new()
             str_args.push(out_ptr)
@@ -15175,13 +15051,6 @@ impl Codegen:
             arg_start = body.call_arg_starts[args_id]
             arg_count = body.call_arg_counts[args_id]
 
-        let param_count = wl_count_param_types(call_ft)
-        let param_types: Vec[i64] = Vec.new()
-        for pi in 0..param_count:
-            param_types.push(wl_i32_type(self.context))
-        if param_count > 0:
-            wl_get_param_types(call_ft, vec_data_i64(&param_types))
-
         // Resolve callee fn_sym for dyn trait parameter lookup.
         // ConstKind.CK_FN syms are from sema pool — translate to codegen intern pool.
         var callee_fn_sym: i32 = 0
@@ -15197,62 +15066,35 @@ impl Codegen:
                     let sym_text = self.sema_symbol_text(raw_sym)
                     if sym_text.len() > 0:
                         callee_fn_sym = self.intern.intern(sym_text)
-                    else if self.fn_values.get(raw_sym).is_some() or self.fn_fn_types.get(raw_sym).is_some() or self.fn_ref_param_starts.get(raw_sym).is_some():
+                    else if self.fn_values.get(raw_sym).is_some() or self.fn_fn_types.get(raw_sym).is_some() or self.fn_abi_symbols.contains(raw_sym):
                         callee_fn_sym = raw_sym
 
-        // Check for extern fn ABI transformations (sret/byval/direct aggregates)
-        var abi_has_sret = 0
-        var abi_byval_mask: i64 = 0
-        var abi_byval_types: Vec[i64] = Vec.new()
-        var abi_direct_mask: i64 = 0
-        var abi_direct_types: Vec[i64] = Vec.new()
-        var abi_direct_ret_ty: i64 = 0
-        var abi_sret_ty: i64 = 0
+        var call_abi = self.fn_abi_symbols.get(callee_fn_sym) ?? -1
+        if call_abi < 0 and callee_sema_ty > 0:
+            call_abi = self.callable_fn_abi(callee_sema_ty, is_indirect)
+        if call_abi < 0:
+            with_eprint(f"error: ordinary call has no FnAbi descriptor: {call_context}")
+            self.had_error = 1
+            return false
+        if self.analysis_enabled != 0:
+            let call_key = (body.fn_sym as i64) * 4294967296 + args_id
+            self.analysis_call_abis.insert(call_key, call_abi)
+
+        // Named and indirect calls consume the same descriptor projections.
+        let abi: FnAbi = self.fn_abis[call_abi]
+        call_ft = abi.llvm_ty
+        let param_count = wl_count_param_types(call_ft)
+        let param_types: Vec[i64] = Vec.new()
+        for pi in 0..param_count: param_types.push(0)
+        if param_count > 0: wl_get_param_types(call_ft, vec_data_i64(&param_types))
+        let abi_has_sret = if abi.ret.pass == PM_INDIRECT: 1 else: 0
+        let abi_sret_ty = abi.ret.source_ty
+        let abi_byval_types = self.fn_abi_byval_types(call_abi)
+        let abi_direct_ret_ty = if abi.ret.pass == PM_DIRECT and abi.ret.llvm_ty != abi.ret.source_ty: abi.ret.source_ty else: 0
         var abi_sret_buf: i64 = 0
-        if callee_fn_sym != 0:
-            let sret_opt = self.extern_fn_has_sret.get(callee_fn_sym)
-            if sret_opt.is_some():
-                abi_has_sret = sret_opt.unwrap()
-            let bv_opt = self.extern_fn_byval_params.get(callee_fn_sym)
-            if bv_opt.is_some():
-                abi_byval_mask = bv_opt.unwrap() as i64
-            let bvt_opt = self.extern_fn_byval_types.get(callee_fn_sym)
-            if bvt_opt.is_some():
-                abi_byval_types = vec_copy_i64(bvt_opt.unwrap())
-            let dp_opt = self.extern_fn_direct_params.get(callee_fn_sym)
-            if dp_opt.is_some():
-                abi_direct_mask = dp_opt.unwrap() as i64
-            let dpt_opt = self.extern_fn_direct_param_types.get(callee_fn_sym)
-            if dpt_opt.is_some():
-                abi_direct_types = vec_copy_i64(dpt_opt.unwrap())
-            let drt_opt = self.extern_fn_direct_ret_type.get(callee_fn_sym)
-            if drt_opt.is_some():
-                abi_direct_ret_ty = drt_opt.unwrap() as i64
-            let srt_opt = self.extern_fn_sret_type.get(callee_fn_sym)
-            if srt_opt.is_some():
-                abi_sret_ty = srt_opt.unwrap() as i64
 
         let sema_sig_idx = if callee_raw_fn_sym != 0: self.sema.get_sig(callee_raw_fn_sym) else: -1
-        let is_c_abi_call = if callee_raw_fn_sym != 0 and self.sema.extern_fn_names.contains(callee_raw_fn_sym): 1 else: 0
-        if abi_has_sret == 0 and dest_place >= 0 and dest_place < body.place_locals.len() as i32:
-            let dst_local_for_sret = body.place_locals[dest_place]
-            if dst_local_for_sret >= 0 and dst_local_for_sret < body.local_type_ids.len() as i32:
-                let dst_sema_ty_for_sret = body.local_type_ids[dst_local_for_sret]
-                let dst_llvm_ty_for_sret = self.mir_sema_type_to_llvm(dst_sema_ty_for_sret)
-                if self.internal_abi_needs_sret(dst_llvm_ty_for_sret):
-                    // An indirect closure/fn-pointer call already consumes param 0
-                    // for the environment pointer, so only a param count that
-                    // exceeds args + the env slot leaves room for a real sret
-                    // slot in call_ft. Without this the env slot is mistaken for
-                    // an sret slot, and a Never-returning closure (`void(env)`,
-                    // no sret) gets a spurious sret arg appended → arg-count
-                    // mismatch against its own type on win64.
-                    let indirect_env_slots = if is_indirect: 1 else: 0
-                    if param_count > arg_count + indirect_env_slots and wl_get_return_type(call_ft) == wl_void_type(self.context):
-                        let first_param_ty = if param_count > 0: param_types.get(0) else: 0
-                        if first_param_ty != 0 and wl_get_type_kind(first_param_ty) == wl_pointer_type_kind():
-                            abi_has_sret = 1
-                            abi_sret_ty = dst_llvm_ty_for_sret
+        let is_c_abi_call = if abi.convention == FN_ABI_C: 1 else: 0
         let args: Vec[i64] = Vec.new()
         let call_temp_cleanups: Vec[i64] = Vec.new()
         if is_indirect:
@@ -15274,6 +15116,10 @@ impl Codegen:
             var expected_sema_ty = 0
             if sema_sig_idx >= 0 and param_offset < self.sema.sig_get_param_count(sema_sig_idx):
                 expected_sema_ty = self.sema.sig_param_type(sema_sig_idx, param_offset)
+            else:
+                let callable_type = self.sema.callable_type_resolved(callee_sema_ty)
+                if callable_type != 0 and ai < self.sema.get_type_d1(callable_type):
+                    expected_sema_ty = self.sema.type_extra[self.sema.get_type_d0(callable_type) + ai]
 
             // Resolve dyn-trait param early: the win64 indirect-aggregate spill
             // paths below must build the fat pointer, not pass the concrete's
@@ -15285,102 +15131,36 @@ impl Codegen:
                 dyn_trait_sym = self.get_raw_fn_dyn_param_trait(callee_raw_fn_sym, ai)
 
             // Byval: large struct param → alloca + store + pass pointer
-            if (abi_byval_mask & ((1 as i64) << (ai as u32))) != 0:
-                var indirect_ty = expected_ty
-                if ai < abi_byval_types.len() as i32 and abi_byval_types[ai] != 0:
-                    indirect_ty = abi_byval_types[ai]
+            if ai < abi.arg_count and self.fn_abi_arg(call_abi, ai).pass == PM_INDIRECT:
                 // A dyn-trait param passed indirectly: the callee reads a fat
                 // pointer {data, vtable} by address, so build the fat value from
                 // the concrete and spill THAT — never pass the concrete's address.
                 if dyn_trait_sym != 0:
                     let fatval = self.mir_build_dyn_arg_fat_value(body, args_id, operand_id, ai, dyn_trait_sym)
-                    var fat_ty = indirect_ty
-                    if fat_ty == 0:
-                        fat_ty = wl_type_of(fatval)
-                    let ftmp = self.create_entry_alloca(fat_ty)
-                    let fstored = self.enforce_coerced_type(fatval, fat_ty, "indirect dyn aggregate argument")
-                    wl_build_store(self.builder, fstored, ftmp)
+                    let ftmp = self.push_call_arg(call_abi, ai, fatval, 0)
                     self.record_codegen_call_argument(body, args_id, operand_id, ai, AnalysisMarshalStrategy.TemporaryAddress, ftmp, ftmp)
                     args.push(ftmp)
                     continue
                 // PM_INDIRECT is a copy, not a borrowed place. On targets
                 // without LLVM's byval attribute we must create that copy
                 // here even when the operand already has an address.
-                var arg_ptr = if codegen_c_abi_needs_byval_attr(): self.mir_try_place_ptr_for_ref(body, operand_id) else: 0
-                var byval_strategy = AnalysisMarshalStrategy.ExistingPointer
-                if arg_ptr == 0:
-                    let val = self.mir_eval_operand(body, operand_id, 0)
-                    if indirect_ty == 0:
-                        indirect_ty = wl_type_of(val)
-                    let tmp = self.create_entry_alloca(indirect_ty)
-                    let stored = self.enforce_coerced_type(val, indirect_ty, "indirect aggregate argument")
-                    wl_build_store(self.builder, stored, tmp)
-                    arg_ptr = tmp
-                    byval_strategy = AnalysisMarshalStrategy.TemporaryAddress
+                let place = if codegen_c_abi_needs_byval_attr(): self.mir_try_place_ptr_for_ref(body, operand_id) else: 0
+                let val = if place == 0: self.mir_eval_operand(body, operand_id, 0) else: 0
+                let arg_ptr = self.push_call_arg(call_abi, ai, val, place)
+                let byval_strategy = self.analysis_last_marshal_strategy
                 self.record_codegen_call_argument(body, args_id, operand_id, ai, byval_strategy, arg_ptr, arg_ptr)
                 args.push(arg_ptr)
                 continue
 
             // Direct aggregate: small Darwin arm64 C structs are passed as integer
             // or homogeneous-float aggregate ABI values, not as LLVM structs.
-            if (abi_direct_mask & ((1 as i64) << (ai as u32))) != 0:
+            if ai < abi.arg_count and self.fn_abi_arg(call_abi, ai).pass == PM_DIRECT and
+                self.fn_abi_arg(call_abi, ai).llvm_ty != self.fn_abi_arg(call_abi, ai).source_ty:
                 let val = self.mir_eval_operand(body, operand_id, 0)
-                let packed = self.c_abi_pack_direct_value(val, expected_ty)
+                let packed = self.push_call_arg(call_abi, ai, val, 0)
                 self.record_codegen_call_argument(body, args_id, operand_id, ai, AnalysisMarshalStrategy.DirectValue, val, packed)
                 args.push(packed)
                 continue
-
-            // Internal-ABI indirect aggregate argument. The callee lowers an
-            // aggregate parameter (win64 struct/array > 8B) to a pointer and reads
-            // it as the aggregate's address; the caller must match by spilling the
-            // value and passing its address. Mirror the CALLEE's own decision —
-            // never re-derive it from the argument's type. A genuine pointer
-            // parameter (`*const fn`, `*mut T`, `&T`) is ALSO lowered to `ptr`, but
-            // it is a direct 8-byte value, not an indirect aggregate. Keying on the
-            // argument's aggregate sema type (e.g. a fn item's fat TY_FN) spilled a
-            // fat closure to the stack and passed its address where the callee reads
-            // a thin function pointer — executing stack data on win64 (0xC0000005).
-            // FnAbi doctrine: one ABI decision, computed from the parameter, read by
-            // both callee prologue and this call site.
-            if expected_ty != 0 and wl_get_type_kind(expected_ty) == wl_pointer_type_kind():
-                // The parameter's pre-ABI aggregate LLVM type: prefer the callee's
-                // declared signature (the same p_sema_ty the prologue lowered), and
-                // fall back to the argument only for an unsignatured indirect
-                // closure call, where no callee signature is available.
-                var agg_ty: i64 = 0
-                if expected_sema_ty != 0:
-                    agg_ty = self.mir_sema_type_to_llvm(expected_sema_ty)
-                else:
-                    let arg_sema_ty = self.mir_operand_sema_type(body, operand_id)
-                    if arg_sema_ty > 0:
-                        agg_ty = self.mir_sema_type_to_llvm(arg_sema_ty)
-                if self.internal_abi_needs_indirect_param(agg_ty):
-                    // A dyn-trait param passed indirectly: build the fat pointer
-                    // from the concrete and spill THAT — matching the byval path.
-                    if dyn_trait_sym != 0:
-                        let fatval = self.mir_build_dyn_arg_fat_value(body, args_id, operand_id, ai, dyn_trait_sym)
-                        var fat_ty = agg_ty
-                        if fat_ty == 0:
-                            fat_ty = wl_type_of(fatval)
-                        let ftmp = self.create_entry_alloca(fat_ty)
-                        let fstored = self.enforce_coerced_type(fatval, fat_ty, "indirect dyn aggregate argument")
-                        wl_build_store(self.builder, fstored, ftmp)
-                        self.record_codegen_call_argument(body, args_id, operand_id, ai, AnalysisMarshalStrategy.TemporaryAddress, ftmp, ftmp)
-                        args.push(ftmp)
-                        continue
-                    var arg_ptr = self.mir_try_place_ptr_for_ref(body, operand_id)
-                    var indirect_strategy = AnalysisMarshalStrategy.ExistingPointer
-                    if arg_ptr == 0:
-                        let val = self.mir_eval_operand(body, operand_id, 0)
-                        let tmp = self.create_entry_alloca(agg_ty)
-                        let stored = self.enforce_coerced_type(val, agg_ty, "indirect aggregate argument")
-                        wl_build_store(self.builder, stored, tmp)
-                        arg_ptr = tmp
-                        indirect_strategy = AnalysisMarshalStrategy.TemporaryAddress
-                    self.record_codegen_call_argument(body, args_id, operand_id, ai, indirect_strategy, arg_ptr, arg_ptr)
-                    args.push(arg_ptr)
-                    continue
-
 
             // Ref param check: pass pointer to place instead of loading value.
             // This handles struct self params where the ABI uses pointer-passing.
@@ -15388,7 +15168,10 @@ impl Codegen:
             if expected_ty != 0 and wl_get_type_kind(expected_ty) == wl_pointer_type_kind():
                 let call_sig = body.call_sig_index(args_id)
                 let sema_share = call_sig >= 0 and ai < self.sema.sig_get_param_count(call_sig) and self.sema.sig_param_uses_value_ref_abi(call_sig, ai) != 0
-                needs_ref = sema_share or (callee_fn_sym != 0 and self.is_ref_param(callee_fn_sym, param_offset))
+                needs_ref = if call_abi >= 0 and ai < self.fn_abis[call_abi].arg_count:
+                    self.fn_abi_arg(call_abi, ai).pass == PM_INDIRECT_PLACE or self.sema.get_type_kind(self.sema.resolve_alias(expected_sema_ty as TypeId)) == TypeKind.TY_REF
+                else:
+                    sema_share or (callee_fn_sym != 0 and self.is_ref_param(callee_fn_sym, param_offset))
 
             // Check for dyn param BEFORE evaluating operand — coercion would
             // mangle the concrete struct into the fat-pointer shape.
@@ -15433,6 +15216,9 @@ impl Codegen:
                 if arg_info.cleanup_ptr != 0:
                     call_temp_cleanups.push(arg_info.cleanup_ptr)
                 self.record_codegen_call_argument(body, args_id, operand_id, ai, AnalysisMarshalStrategy.DirectValue, arg_val, arg_val)
+            if ai < abi.arg_count:
+                let place = if self.fn_abi_arg(call_abi, ai).pass == PM_INDIRECT_PLACE: arg_val else: 0
+                arg_val = self.push_call_arg(call_abi, ai, arg_val, place)
             args.push(arg_val)
 
         let actual_callee = if is_indirect: fn_ptr_val else: callee
@@ -15462,7 +15248,7 @@ impl Codegen:
             return spawn_result
 
         let call_val = wl_build_call(self.builder, call_ft, actual_callee, vec_data_i64(&args), actual_arg_count)
-        self.apply_c_abi_call_attrs(call_val, abi_has_sret, abi_sret_ty, abi_byval_mask, abi_byval_types, arg_count, if is_indirect: 1 else: 0)
+        self.apply_c_abi_call_attrs(call_val, abi_has_sret, abi_sret_ty, abi_byval_types, arg_count, if is_indirect: 1 else: 0)
         // Guaranteed mutual @[tailrec] edges are emitted as musttail.
         if self.mir_emit_mutual_tail_call != 0 and call_val != 0 and call_temp_cleanups.len() == 0:
             wl_set_musttail_call(call_val)
@@ -15583,7 +15369,7 @@ impl Codegen:
             if self.current_ret_type == wl_void_type(self.context):
                 let _ = wl_build_ret_void(self.builder)
                 return true
-            let fn_has_sret_opt = self.extern_fn_has_sret.get(self.current_function_name_sym)
+            let fn_has_sret_opt = self.fn_abi_has_sret(self.current_function_name_sym)
             let fn_has_sret = if fn_has_sret_opt.is_some(): fn_has_sret_opt.unwrap() else: 0
             let ret_ptr_opt = self.mir_local_ptrs.get(0)
             if fn_has_sret != 0:
@@ -15601,7 +15387,7 @@ impl Codegen:
                 wl_build_store(self.builder, sret_val, sret_ptr)
                 let _ = wl_build_ret_void(self.builder)
                 return true
-            let fn_direct_ret_ty_opt = self.extern_fn_direct_ret_type.get(self.current_function_name_sym)
+            let fn_direct_ret_ty_opt = self.fn_abi_direct_ret_type(self.current_function_name_sym)
             let fn_direct_ret_ty = if fn_direct_ret_ty_opt.is_some(): fn_direct_ret_ty_opt.unwrap() as i64 else: 0
             let fn_value_ty = wl_global_get_value_type(self.current_function)
             let fn_abi_ret_ty = if fn_value_ty != 0: wl_get_return_type(fn_value_ty) else: self.current_ret_type
@@ -15749,14 +15535,14 @@ impl Codegen:
         let saved_tb_tys = self.type_binding_types
         let saved_tb_len = self.type_bindings_len
         self.set_mono_type_bindings(name_sym)
-        let fn_has_sret_opt = self.extern_fn_has_sret.get(name_sym)
+        let fn_has_sret_opt = self.fn_abi_has_sret(name_sym)
         let fn_has_sret = if fn_has_sret_opt.is_some(): fn_has_sret_opt.unwrap() else: 0
         if fn_has_sret != 0:
-            let fn_sret_ty_opt = self.extern_fn_sret_type.get(name_sym)
+            let fn_sret_ty_opt = self.fn_abi_sret_type(name_sym)
             if fn_sret_ty_opt.is_some():
                 let fn_sret_ty: i64 = fn_sret_ty_opt.unwrap()
                 self.current_ret_type = fn_sret_ty
-        let fn_direct_ret_ty_opt = self.extern_fn_direct_ret_type.get(name_sym)
+        let fn_direct_ret_ty_opt = self.fn_abi_direct_ret_type(name_sym)
         if fn_direct_ret_ty_opt.is_some():
             let fn_direct_ret_ty: i64 = fn_direct_ret_ty_opt.unwrap()
             self.current_ret_type = fn_direct_ret_ty
@@ -15848,16 +15634,12 @@ impl Codegen:
             has_ast_params = 1
         else:
             param_count = body.n_params
-        let fn_byval_mask_opt = self.extern_fn_byval_params.get(name_sym)
-        let fn_byval_mask = if fn_byval_mask_opt.is_some(): fn_byval_mask_opt.unwrap() as i64 else: 0
         var fn_byval_types: Vec[i64] = Vec.new()
-        let fn_byval_types_opt = self.extern_fn_byval_types.get(name_sym)
+        let fn_byval_types_opt = self.fn_abi_symbol_byval_types(name_sym)
         if fn_byval_types_opt.is_some():
             fn_byval_types = vec_copy_i64(fn_byval_types_opt.unwrap())
-        let fn_direct_mask_opt = self.extern_fn_direct_params.get(name_sym)
-        let fn_direct_mask = if fn_direct_mask_opt.is_some(): fn_direct_mask_opt.unwrap() as i64 else: 0
         var fn_direct_types: Vec[i64] = Vec.new()
-        let fn_direct_types_opt = self.extern_fn_direct_param_types.get(name_sym)
+        let fn_direct_types_opt = self.fn_abi_direct_param_types(name_sym)
         if fn_direct_types_opt.is_some():
             fn_direct_types = vec_copy_i64(fn_direct_types_opt.unwrap())
 
@@ -15883,6 +15665,7 @@ impl Codegen:
             let actual_pi = pi + (if fn_has_sret != 0: 1 else: 0)
             let param_val = wl_get_param(function, actual_pi)
             var param_type = wl_type_of(param_val)
+            if self.bind_fn_abi_owned_place(body, name_sym, pi, p_name, param_val): continue
             let body_sig = self.sema.get_sig(name_sym)
             let sema_share = body_sig >= 0 and pi < self.sema.sig_get_param_count(body_sig) and self.sema.sig_param_uses_value_ref_abi(body_sig, pi) != 0
             if (sema_share or self.is_ref_param(name_sym, pi)) and (p_type_node == 0 or self.pool.kind(p_type_node) != NodeKind.NK_TYPE_REF) and wl_get_type_kind(param_type) == wl_pointer_type_kind():
@@ -15898,7 +15681,7 @@ impl Codegen:
                         self.record_local_pointee_struct(p_name, method_owner_sym)
                     self.record_codegen_param_binding(body, name_sym, pi, AnalysisMarshalStrategy.CalleePlaceAlias, param_val, param_val)
                     continue
-            if (fn_direct_mask & ((1 as i64) << (pi as u32))) != 0:
+            if pi < fn_direct_types.len() and fn_direct_types[pi] != 0:
                 if pi < fn_direct_types.len() as i32 and fn_direct_types[pi] != 0:
                     param_type = fn_direct_types[pi]
                 let direct_alloca = self.create_entry_alloca(param_type)
@@ -15933,7 +15716,7 @@ impl Codegen:
                                 self.current_method_owner_sym = method_owner_sym
                 self.record_codegen_param_binding(body, name_sym, pi, AnalysisMarshalStrategy.CalleeDirectValue, param_val, direct_alloca)
                 continue
-            if (fn_byval_mask & ((1 as i64) << (pi as u32))) != 0:
+            if pi < fn_byval_types.len() and fn_byval_types[pi] != 0:
                 if pi < fn_byval_types.len() as i32 and fn_byval_types[pi] != 0:
                     param_type = fn_byval_types[pi]
                 let byval_alloca = self.create_entry_alloca(param_type)
@@ -16048,7 +15831,7 @@ impl Codegen:
         if self.mir_bb_values.len() as i32 > 0:
             wl_build_br(self.builder, self.mir_bb_values.get(0))
         else:
-            let fallthrough_has_sret_opt = self.extern_fn_has_sret.get(name_sym)
+            let fallthrough_has_sret_opt = self.fn_abi_has_sret(name_sym)
             let fallthrough_has_sret = if fallthrough_has_sret_opt.is_some(): fallthrough_has_sret_opt.unwrap() else: 0
             if fallthrough_has_sret != 0:
                 wl_build_store(self.builder, self.build_default_value(self.current_ret_type), wl_get_param(function, 0))
@@ -16205,14 +15988,14 @@ impl Codegen:
         let saved_tb_tys = self.type_binding_types
         let saved_tb_len = self.type_bindings_len
         self.set_mono_type_bindings(mono_sym)
-        let fn_has_sret_opt = self.extern_fn_has_sret.get(mono_sym)
+        let fn_has_sret_opt = self.fn_abi_has_sret(mono_sym)
         let fn_has_sret = if fn_has_sret_opt.is_some(): fn_has_sret_opt.unwrap() else: 0
         if fn_has_sret != 0:
-            let fn_sret_ty_opt = self.extern_fn_sret_type.get(mono_sym)
+            let fn_sret_ty_opt = self.fn_abi_sret_type(mono_sym)
             if fn_sret_ty_opt.is_some():
                 let fn_sret_ty: i64 = fn_sret_ty_opt.unwrap()
                 self.current_ret_type = fn_sret_ty
-        let fn_direct_ret_ty_opt = self.extern_fn_direct_ret_type.get(mono_sym)
+        let fn_direct_ret_ty_opt = self.fn_abi_direct_ret_type(mono_sym)
         if fn_direct_ret_ty_opt.is_some():
             let fn_direct_ret_ty: i64 = fn_direct_ret_ty_opt.unwrap()
             self.current_ret_type = fn_direct_ret_ty
@@ -16302,16 +16085,12 @@ impl Codegen:
             param_count = self.pool.fn_meta_param_count(meta)
         else:
             param_count = body.n_params
-        let fn_byval_mask_opt = self.extern_fn_byval_params.get(mono_sym)
-        let fn_byval_mask = if fn_byval_mask_opt.is_some(): fn_byval_mask_opt.unwrap() as i64 else: 0
         var fn_byval_types: Vec[i64] = Vec.new()
-        let fn_byval_types_opt = self.extern_fn_byval_types.get(mono_sym)
+        let fn_byval_types_opt = self.fn_abi_symbol_byval_types(mono_sym)
         if fn_byval_types_opt.is_some():
             fn_byval_types = vec_copy_i64(fn_byval_types_opt.unwrap())
-        let fn_direct_mask_opt = self.extern_fn_direct_params.get(mono_sym)
-        let fn_direct_mask = if fn_direct_mask_opt.is_some(): fn_direct_mask_opt.unwrap() as i64 else: 0
         var fn_direct_types: Vec[i64] = Vec.new()
-        let fn_direct_types_opt = self.extern_fn_direct_param_types.get(mono_sym)
+        let fn_direct_types_opt = self.fn_abi_direct_param_types(mono_sym)
         if fn_direct_types_opt.is_some():
             fn_direct_types = vec_copy_i64(fn_direct_types_opt.unwrap())
 
@@ -16340,6 +16119,7 @@ impl Codegen:
             let actual_pi = pi + (if fn_has_sret != 0: 1 else: 0)
             let param_val = wl_get_param(function, actual_pi)
             var param_type = wl_type_of(param_val)
+            if self.bind_fn_abi_owned_place(body, mono_sym, pi, p_name, param_val): continue
             let body_sig = self.sema.get_sig(mono_sym)
             let sema_share = body_sig >= 0 and pi < self.sema.sig_get_param_count(body_sig) and self.sema.sig_param_uses_value_ref_abi(body_sig, pi) != 0
             if (sema_share or self.is_ref_param(mono_sym, pi)) and (p_type_node == 0 or self.pool.kind(p_type_node) != NodeKind.NK_TYPE_REF) and wl_get_type_kind(param_type) == wl_pointer_type_kind():
@@ -16355,7 +16135,7 @@ impl Codegen:
                         self.record_local_pointee_struct(p_name, method_owner_sym)
                     self.record_codegen_param_binding(body, mono_sym, pi, AnalysisMarshalStrategy.CalleePlaceAlias, param_val, param_val)
                     continue
-            if (fn_direct_mask & ((1 as i64) << (pi as u32))) != 0:
+            if pi < fn_direct_types.len() and fn_direct_types[pi] != 0:
                 if pi < fn_direct_types.len() as i32 and fn_direct_types[pi] != 0:
                     param_type = fn_direct_types[pi]
                 let direct_alloca = self.create_entry_alloca(param_type)
@@ -16389,7 +16169,7 @@ impl Codegen:
                                 self.current_method_owner_sym = method_owner_sym
                 self.record_codegen_param_binding(body, mono_sym, pi, AnalysisMarshalStrategy.CalleeDirectValue, param_val, direct_alloca)
                 continue
-            if (fn_byval_mask & ((1 as i64) << (pi as u32))) != 0:
+            if pi < fn_byval_types.len() and fn_byval_types[pi] != 0:
                 if pi < fn_byval_types.len() as i32 and fn_byval_types[pi] != 0:
                     param_type = fn_byval_types[pi]
                 let byval_alloca = self.create_entry_alloca(param_type)
@@ -16501,7 +16281,7 @@ impl Codegen:
         if self.mir_bb_values.len() as i32 > 0:
             wl_build_br(self.builder, self.mir_bb_values.get(0))
         else:
-            let fallthrough_has_sret_opt = self.extern_fn_has_sret.get(mono_sym)
+            let fallthrough_has_sret_opt = self.fn_abi_has_sret(mono_sym)
             let fallthrough_has_sret = if fallthrough_has_sret_opt.is_some(): fallthrough_has_sret_opt.unwrap() else: 0
             if fallthrough_has_sret != 0:
                 wl_build_store(self.builder, self.build_default_value(self.current_ret_type), wl_get_param(function, 0))
@@ -17268,14 +17048,8 @@ impl Codegen:
         // semantic types in lockstep with the LLVM signature so closure-local MIR
         // can recover pointee types for reference parameters.
         let closure_param_sema_types: Vec[i32] = Vec.new()
-        // #D6: for a param passed indirectly on win64 (aggregate >8B), the entry
-        // holds the real by-value LLVM type so the body prologue can load a
-        // callee-owned copy from the incoming pointer; 0 for direct params.
-        let closure_param_real_llvm: Vec[i64] = Vec.new()
         let param_types: Vec[i64] = Vec.new()
-        let closure_param_offset = if is_extern_closure: 0 else: 1
-        if not is_extern_closure:
-            param_types.push(ptr_ty)
+        let closure_places: Vec[i32] = Vec.new()
         for i in 0..param_count:
             let p_type = self.pool.get_extra(extra_start + i * 2 + 1)
             var p_sema_ty = self.sema.ty_i32 as i32
@@ -17294,24 +17068,27 @@ impl Codegen:
                 chosen_ty = p_llvm_ty
             else if p_type != 0:
                 chosen_ty = self.resolve_type(p_type)
-            // #D6: match mir_build_closure_fn_type — a win64 aggregate >8B param
-            // is passed indirectly (pointer), so the callee signature must
-            // declare `ptr` too, or caller and callee disagree on the argument
-            // shape and the aggregate arrives corrupted (#806).
-            if self.internal_abi_needs_indirect_param(chosen_ty):
-                closure_param_real_llvm.push(chosen_ty)
-                param_types.push(ptr_ty)
-            else:
-                closure_param_real_llvm.push(0)
-                param_types.push(chosen_ty)
+            param_types.push(chosen_ty)
+            let reference = self.sema.get_type_kind(self.sema.resolve_alias(p_sema_ty as TypeId)) == TypeKind.TY_REF
+            closure_places.push(self.sema.type_uses_c_va_list_place(p_sema_ty) | (if reference: 2 else: 0))
         // Determine return type (infer from context or use i32)
         var ret_ty = i32_ty
         if closure_fn_ret_tid != 0:
             let expected_ret_ty = self.sema_type_to_llvm(closure_fn_ret_tid)
             if expected_ret_ty != 0:
                 ret_ty = expected_ret_ty
-        let fn_ty = wl_function_type(ret_ty, vec_data_i64(&param_types), param_count + closure_param_offset, 0)
+        let closure_abi_index = self.compute_fn_abi(ret_ty, param_types, closure_places, if is_extern_closure: FN_ABI_C else: FN_ABI_CLOSURE, 0)
+        let closure_abi: FnAbi = self.fn_abis[closure_abi_index]
+        let closure_has_sret = closure_abi.ret.pass == PM_INDIRECT
+        let closure_param_offset = (if is_extern_closure: 0 else: 1) + (if closure_has_sret: 1 else: 0)
+        let fn_ty = closure_abi.llvm_ty
         let closure_fn = wl_add_function(self.llmod, "__closure", fn_ty)
+        let closure_sym = self.intern.intern(f"$closure_abi${self.closure_counter}")
+        self.closure_counter = self.closure_counter + 1
+        self.bind_fn_abi(closure_sym, closure_abi_index, closure_fn)
+        if closure_has_sret: wl_add_sret_attr(self.context, closure_fn, 0, ret_ty)
+        let closure_byval_types = self.fn_abi_byval_types(closure_abi_index)
+        self.apply_c_abi_byval_attrs(closure_fn, closure_byval_types, param_count, closure_param_offset)
         // Save current state
         let saved_fn = self.current_function
         let saved_ret = self.current_ret_type
@@ -17331,16 +17108,9 @@ impl Codegen:
         // Build closure body
         self.current_function = closure_fn
         self.current_ret_type = ret_ty
-        // The synthetic closure is declared with a direct return (its LLVM
-        // signature uses ret_ty by value, never an sret param). Its TK_RETURN
-        // must therefore take the direct-return path. current_function_name_sym
-        // is keyed into extern_fn_has_sret; leaving the enclosing function's sym
-        // here makes the closure inherit that function's sret verdict (true on
-        // Windows for any struct return >8 bytes, e.g. Vec), which would store
-        // the result through param 0 and emit `ret void` in an i32 function.
-        // Sym 0 can never carry an sret entry (record_c_abi_transform ignores
-        // it), so it selects the direct path unconditionally.
-        self.current_function_name_sym = 0
+        // Return lowering reads this closure's descriptor, never the enclosing
+        // function's. With closures return directly; C closures use the C ABI.
+        self.current_function_name_sym = closure_sym
         let entry = wl_append_bb(self.context, closure_fn, "entry")
         wl_position_at_end(self.builder, entry)
 
@@ -17376,15 +17146,19 @@ impl Codegen:
         for i in 0..param_count:
             let p_name = self.pool.get_extra(extra_start + i * 2)
             let param_val = wl_get_param(closure_fn, i + closure_param_offset)
-            let real_ty = if i < closure_param_real_llvm.len() as i32: closure_param_real_llvm[i] else: 0
-            if real_ty != 0:
-                // #D6 indirect param (win64 aggregate >8B): param_val is a pointer
-                // to the caller-materialized value. Load a callee-owned copy so the
-                // body reads its own storage, matching the indirect call ABI.
-                let loaded = wl_build_load(self.builder, real_ty, param_val)
-                let alloca = self.create_entry_alloca(real_ty)
+            let arg = self.fn_abi_arg(closure_abi_index, i)
+            if arg.pass == PM_INDIRECT_PLACE:
+                self.record_local(p_name, param_val, arg.source_ty, 1)
+            else if arg.pass == PM_INDIRECT:
+                let loaded = wl_build_load(self.builder, arg.source_ty, param_val)
+                let alloca = self.create_entry_alloca(arg.source_ty)
                 wl_build_store(self.builder, loaded, alloca)
-                self.record_local(p_name, alloca, real_ty, 1)
+                self.record_local(p_name, alloca, arg.source_ty, 1)
+            else if arg.llvm_ty != arg.source_ty:
+                let unpacked = self.c_abi_unpack_direct_value(param_val, arg.source_ty)
+                let alloca = self.create_entry_alloca(arg.source_ty)
+                wl_build_store(self.builder, unpacked, alloca)
+                self.record_local(p_name, alloca, arg.source_ty, 1)
             else:
                 let param_ty = wl_type_of(param_val)
                 let alloca = self.create_entry_alloca(param_ty)
@@ -17772,27 +17546,25 @@ impl Codegen:
         let meta = self.pool.find_fn_meta(fn_node)
         if meta < 0: return
 
-        let i32_ty = wl_i32_type(self.context)
-
-        let ret_type_node = self.pool.fn_meta_ret(meta)
         let param_start = self.pool.fn_meta_param_start(meta)
         let param_count = self.pool.fn_meta_param_count(meta)
-
-        // Resolve return type (default to i32 when no annotation, matching non-async functions)
-        let ret_ty = if ret_type_node != 0: self.resolve_type(ret_type_node) else: i32_ty
+        let sig_idx = self.sema.get_sig(name_sym)
+        if sig_idx < 0 or self.sema.sig_get_param_count(sig_idx) != param_count:
+            with_eprint(f"error: async declaration {self.intern.resolve(name_sym)} has no finalized FnAbi signature")
+            self.had_error = 1
+            return
+        let ret_ty = self.sema_type_to_llvm(self.sema.unwrap_task_type(self.sema.sig_return_type(sig_idx)))
         self.async_fn_ret_types.insert(name_sym, ret_ty)
         let cc_name = self.fn_callconv_name(meta)
 
-        // Resolve param types
         let param_types: Vec[i64] = Vec.new()
+        let param_flags: Vec[i32] = Vec.new()
         for pi in 0..param_count:
-            let p_type_node = self.pool.fn_param_type(param_start, pi)
-            var p_ty = self.resolve_type(p_type_node)
-            if p_ty == 0:
-                p_ty = i32_ty
-            param_types.push(p_ty)
+            param_types.push(self.abi_param_source_type(sig_idx, pi))
+            param_flags.push(self.sig_abi_param_flags(sig_idx, pi))
 
-        let spawn_fn_type = wl_function_type(ret_ty, vec_data_i64(&param_types), param_count, 0)
+        let abi_index = self.compute_fn_abi(ret_ty, param_types, param_flags, FN_ABI_ASYNC, 0)
+        let spawn_fn_type = self.fn_abis[abi_index].llvm_ty
         var effective_name = self.function_symbol_name(name_sym)
         if self.path_uses_module_link_names(self.current_decl_source_file):
             if not (cc_name.len() > 9 and cc_name.slice(0, 9) == "c_export:"):
@@ -17806,11 +17578,12 @@ impl Codegen:
         self.apply_noalias_param_attrs(spawn_fn, param_start, param_count)
         self.fn_values.insert(name_sym, spawn_fn)
         self.fn_fn_types.insert(name_sym, spawn_fn_type)
+        self.bind_fn_abi(name_sym, abi_index, spawn_fn)
         if self.current_decl_is_imported_module_fn():
             return
 
         // Keep only the metadata the current async spawn path still consumes.
-        var args_struct_type = wl_struct_type(self.context, vec_data_i64(&param_types), param_count, 0)
+        let args_struct_type = wl_struct_type(self.context, vec_data_i64(&param_types), param_count, 0)
         self.async_fn_args_struct_types.insert(name_sym, args_struct_type)
 
     // ── Async expressions ─────────────────────────────────────────────

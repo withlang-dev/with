@@ -238,11 +238,11 @@ fn cli_is_implicit_run(argc: i32) -> bool:
     let arg = with_arg_at(1)
     arg.ends_with(".w")
 
-fn cli_has_flag(argc: i32, flag: &str) -> bool:
-    var i = 2
+fn cli_has_flag(argc: i32, flag: &str):
+    // One-liners can begin with a flag before -e/-n/-p.
+    var i = 1
     while i < argc:
-        if with_arg_at(i) == flag:
-            return true
+        if with_arg_at(i) == flag: return true
         i = i + 1
     false
 
@@ -436,11 +436,11 @@ fn cli_one_liner_mode_name(mode: i32) -> str:
 fn cli_one_liner_known_value_option(arg: &str) -> bool:
     arg == "-o" or arg == "--output" or arg == "--target"
 
-fn cli_one_liner_known_flag(arg: &str) -> bool:
+fn cli_one_liner_known_flag(arg: &str):
     arg == "-O0" or arg == "-O1" or arg == "-O2" or arg == "-O3" or
     arg == "--release" or arg == "--alloc" or arg == "--no-std" or
     arg == "--no-runtime" or arg == "--freestanding" or arg == "--no-prelude" or
-    arg == "--debug-alloc" or
+    arg == "--debug-alloc" or arg == "--trace-alloc" or
     arg == "-g0" or arg == "-h" or arg == "--help"
 
 fn cli_one_liner_scan(argc: i32) -> CliOneLiner:
@@ -773,10 +773,12 @@ fn run_cli(argc: i32) -> i32:
     // in the program we are about to run. Runtime-gated via WITH_DEBUG_ALLOC; the
     // flag is just a discoverable front door that sets it for the child process.
     if cli_has_flag(argc, "--debug-alloc"):
-        let _ = with_setenv_str("WITH_DEBUG_ALLOC", "1")
+        with_setenv_str("WITH_DEBUG_ALLOC", "1")
+    if cli_has_flag(argc, "--trace-alloc"):
+        with_setenv_str("WITH_DEBUG_ALLOC_TRACE", "1")
     let debug_alloc_filter = cli_value_or_prefix(argc, "--debug-alloc-filter", "--debug-alloc-filter=")
     if debug_alloc_filter.len() > 0:
-        let _ = with_setenv_str("WITH_DEBUG_ALLOC_FILTER", debug_alloc_filter)
+        with_setenv_str("WITH_DEBUG_ALLOC_FILTER", debug_alloc_filter)
 
     // Cache source and output paths — scanned once, used by all subcommands.
     let source = find_source_arg(argc)
@@ -4735,6 +4737,8 @@ fn print_usage:
     with_write("  --no-prelude     Disable implicit prelude import\n")
     with_write("  --debug-alloc    Run under the native debug allocator (double-free/leak\n")
     with_write("                   detection; see docs/debug-allocator.md). Also WITH_DEBUG_ALLOC.\n")
+    with_write("  --trace-alloc    Trace allocation requests to stderr while running\n")
+    with_write("                   (also WITH_DEBUG_ALLOC_TRACE=1; see docs/debug-allocator.md).\n")
     with_write("  --debug-alloc-filter=<mode>\n")
     with_write("                   Leak report filter: all, non-root, roots\n")
     with_write("  --prelude=<mode> Select prelude mode: full, alloc, core, none\n")
@@ -4850,6 +4854,7 @@ fn print_test_usage:
     with_write("  --no-prelude     Disable implicit prelude import\n")
     with_write("  --debug-alloc    Run under the native debug allocator (double-free/leak\n")
     with_write("                   detection; see docs/debug-allocator.md). Also WITH_DEBUG_ALLOC.\n")
+    with_write("  --trace-alloc    Trace allocation requests to stderr while running tests\n")
     with_write("  --debug-alloc-filter=<mode>\n")
     with_write("                   Leak report filter: all, non-root, roots\n")
     with_write("  --prelude=<mode> Select prelude mode: full, alloc, core, none\n")

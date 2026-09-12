@@ -10426,6 +10426,7 @@ Additional flags: `--emit-c` (C source backend, used for
 bootstrapping new platforms), `--emit-obj`, `--overflow=<mode>`
 (§4.2.3), `--no-std` (§18.7), `--strict-effects` (§17.1b),
 `--debug-alloc` (run under the native debug allocator),
+`--trace-alloc` (trace allocation requests to standard error while running programs or tests),
 `-O0`..`-O3`. The `--dump-*` family
 (`tokens`, `ast`, `resolved`, `typed`, `mir`, `async-mir`,
 `project-info`) and the `ir`/`ast`/`tokens` subcommands are

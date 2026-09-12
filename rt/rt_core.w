@@ -764,6 +764,27 @@ var dbg_filter_state: i32 = 0      // 0=unread, 1=all, 2=non-root, 3=roots
 var dbg_base: i64 = 0              // mmap'd ledger table, 0 = uninitialised
 var dbg_full_warned: i32 = 0
 
+// Logical allocation requests, including buffers freed before exit. This gate
+// is independent of the leak ledger and is read under the allocator lock.
+var dbg_trace_state = 0
+
+fn dbg_trace_on:
+    if dbg_trace_state == 0:
+        let value = rt_getenv(c"WITH_DEBUG_ALLOC_TRACE".ptr)
+        dbg_trace_state = if value != 0 and (unsafe *value) == 49: 2 else: 1
+    dbg_trace_state == 2
+
+fn dbg_trace_allocation(size: i64, address: i64, origin: i64):
+    // No strings or formatting allocations while the allocator lock is held.
+    // ALLOC <requested bytes> <payload address> <origin token>
+    dbg_puts(c"ALLOC ".ptr, 6)
+    dbg_put_i64(size)
+    dbg_puts(c" ".ptr, 1)
+    dbg_put_i64(address)
+    dbg_puts(c" ".ptr, 1)
+    dbg_put_i64(origin)
+    dbg_puts(c"\n".ptr, 1)
+
 fn dbg_on() -> i32:
     if dbg_state == 0:
         let v = rt_getenv(c"WITH_DEBUG_ALLOC".ptr)
@@ -1300,20 +1321,21 @@ fn rt_alloc_unlocked(size_arg: i64) -> *mut u8:
     alloc_store_small_header(block, cls_size)
     small_block_ptr(block)
 
-fn rt_alloc_with_origin(size_arg: i64, origin: i64) -> *mut u8:
+fn rt_alloc_with_origin(size_arg: i64, origin: i64):
     rt_allocator_lock()
     let ptr = rt_alloc_unlocked(size_arg)
-    if dbg_on() != 0 and ptr as i64 != 0:
-        dbg_record_alloc(ptr as i64, alloc_payload_size(ptr as *const u8), origin)
+    if dbg_trace_on(): dbg_trace_allocation(size_arg, ptr as i64, origin)
+    if dbg_on() != 0 and ptr != 0:
+        dbg_record_alloc(ptr as i64, alloc_payload_size(ptr), origin)
     // The ownership range tables mutate under the lock (rt_record_slab_range
     // shift-insert, rt_forget_large_range swap-remove), so this sanity check must
     // read them while the lock is still held — checked after unlock it reads a
     // torn table mid-mutation and panics on a healthy allocation (#617). Only the
     // panic itself is deferred past unlock so the panic path cannot deadlock.
-    let payload_ok = rt_payload_start_can_be_owned(ptr as *const u8)
+    let payload_ok = rt_payload_start_can_be_owned(ptr)
     rt_allocator_unlock()
     if payload_ok == 0:
-        with_panic_core(make_str("allocator returned invalid payload" as *const u8, 34), make_str("" as *const u8, 0), 0)
+        with_panic_core("allocator returned invalid payload", "", 0)
     dbg_trap_alloc_check(ptr as i64, origin)
     ptr
 
@@ -2780,206 +2802,173 @@ pub fn with_vec_pop_i32(v: *mut u8) -> i32:
     unsafe *((vec_get_ptr_field(v) as i64 + (vlen - 1) * es) as *const i32)
 
 // ── SlotMap operations ────────────────────────────────────────────
-//
-// SlotMap struct layout:
-//   0: values (*mut u8)      8: occupied (*mut u8)
-//  16: generations (*mut u8) 24: len (i64)
-//  32: cap (i64)            40: elem_size (i64)
-// Total: 48 bytes
+// Header: values, next, generations, len, cap, elem_size (six words),
+// followed by the u32 FIFO head and tail. Each next entry is either a free
+// slot index, SM_FREE_END, or SM_OCCUPIED. Retired slots are not enqueued.
+let SM_OFF_NEXT = 8
+let SM_OFF_GENS = 16
+let SM_OFF_LEN = 24
+let SM_OFF_CAP = 32
+let SM_OFF_ESZ = 40
+let SM_OFF_HEAD = 48
+let SM_OFF_TAIL = 52
+let SM_SIZE = 56
+let SM_OCCUPIED: u32 = 4294967294
+let SM_FREE_END: u32 = 4294967295
+let SM_MAX_GENERATION: u32 = 4294967295
 
-let SM_OFF_VALUES: i64 = 0
-let SM_OFF_OCC: i64 = 8
-let SM_OFF_GENS: i64 = 16
-let SM_OFF_LEN: i64 = 24
-let SM_OFF_CAP: i64 = 32
-let SM_OFF_ESZ: i64 = 40
-let SM_SIZE: i64 = 48
+fn sm_values(m: i64): unsafe *(m as *const *mut u8)
+fn sm_next(m: i64): unsafe *((m + SM_OFF_NEXT) as *const *mut u8)
+fn sm_gens(m: i64): unsafe *((m + SM_OFF_GENS) as *const *mut u8)
+fn sm_len(m: i64): unsafe *((m + SM_OFF_LEN) as *const i64)
+fn sm_cap(m: i64): unsafe *((m + SM_OFF_CAP) as *const i64)
+fn sm_elem_size(m: i64): unsafe *((m + SM_OFF_ESZ) as *const i64)
+fn sm_head(m: i64): unsafe *((m + SM_OFF_HEAD) as *const u32)
+fn sm_tail(m: i64): unsafe *((m + SM_OFF_TAIL) as *const u32)
 
-fn sm_values(m: i64) -> *mut u8:
-    unsafe *(m as *const *mut u8)
-fn sm_occ(m: i64) -> *mut u8:
-    unsafe *((m + SM_OFF_OCC) as *const *mut u8)
-fn sm_gens(m: i64) -> *mut u8:
-    unsafe *((m + SM_OFF_GENS) as *const *mut u8)
-fn sm_len(m: i64) -> i64:
-    unsafe *((m + SM_OFF_LEN) as *const i64)
-fn sm_cap(m: i64) -> i64:
-    unsafe *((m + SM_OFF_CAP) as *const i64)
-fn sm_elem_size(m: i64) -> i64:
-    unsafe *((m + SM_OFF_ESZ) as *const i64)
+fn sm_set_values(m: i64, v: *mut u8): unsafe *(m as *mut *mut u8) = v
+fn sm_set_next(m: i64, v: *mut u8): unsafe *((m + SM_OFF_NEXT) as *mut *mut u8) = v
+fn sm_set_gens(m: i64, v: *mut u8): unsafe *((m + SM_OFF_GENS) as *mut *mut u8) = v
+fn sm_set_len(m: i64, v: i64): unsafe *((m + SM_OFF_LEN) as *mut i64) = v
+fn sm_set_cap(m: i64, v: i64): unsafe *((m + SM_OFF_CAP) as *mut i64) = v
+fn sm_set_elem_size(m: i64, v: i64): unsafe *((m + SM_OFF_ESZ) as *mut i64) = v
+fn sm_set_head(m: i64, v: u32): unsafe *((m + SM_OFF_HEAD) as *mut u32) = v
+fn sm_set_tail(m: i64, v: u32): unsafe *((m + SM_OFF_TAIL) as *mut u32) = v
 
-fn sm_set_values(m: i64, v: *mut u8):
-    unsafe *(m as *mut *mut u8) = v
-fn sm_set_occ(m: i64, v: *mut u8):
-    unsafe *((m + SM_OFF_OCC) as *mut *mut u8) = v
-fn sm_set_gens(m: i64, v: *mut u8):
-    unsafe *((m + SM_OFF_GENS) as *mut *mut u8) = v
-fn sm_set_len(m: i64, v: i64):
-    unsafe *((m + SM_OFF_LEN) as *mut i64) = v
-fn sm_set_cap(m: i64, v: i64):
-    unsafe *((m + SM_OFF_CAP) as *mut i64) = v
-fn sm_set_elem_size(m: i64, v: i64):
-    unsafe *((m + SM_OFF_ESZ) as *mut i64) = v
-
-fn sm_occ_at(m: i64, idx: i64) -> i32:
-    unsafe *((sm_occ(m) as i64 + idx) as *const u8) as i32
-fn sm_set_occ_at(m: i64, idx: i64, val: i32):
-    unsafe *((sm_occ(m) as i64 + idx) as *mut u8) = val as u8
-fn sm_generation_at(m: i64, idx: i64) -> u32:
-    unsafe *((sm_gens(m) as i64 + idx * 4) as *const u32)
-fn sm_set_generation_at(m: i64, idx: i64, val: u32):
-    unsafe *((sm_gens(m) as i64 + idx * 4) as *mut u32) = val
-fn sm_value_ptr_at(m: i64, idx: i64) -> *mut u8:
-    (sm_values(m) as i64 + idx * sm_elem_size(m)) as *mut u8
-
-fn sm_normalize_generation(g: u32) -> u32:
-    if g == 0 as u32: 1 as u32 else: g
+fn sm_next_at(m: i64, idx: i64): unsafe *((sm_next(m) as i64 + idx * 4) as *const u32)
+fn sm_set_next_at(m: i64, idx: i64, val: u32): unsafe *((sm_next(m) as i64 + idx * 4) as *mut u32) = val
+fn sm_occ_at(m: i64, idx: i64): if sm_next_at(m, idx) == SM_OCCUPIED: 1 else: 0
+fn sm_generation_at(m: i64, idx: i64): unsafe *((sm_gens(m) as i64 + idx * 4) as *const u32)
+fn sm_set_generation_at(m: i64, idx: i64, val: u32): unsafe *((sm_gens(m) as i64 + idx * 4) as *mut u32) = val
+fn sm_value_ptr_at(m: i64, idx: i64): (sm_values(m) as i64 + idx * sm_elem_size(m)) as *mut u8
 
 fn sm_grow(m: i64):
+    // Called only when the FIFO is empty, including when exhausted generations
+    // have retired slots. Length alone cannot decide whether growth is needed.
     let old_cap = sm_cap(m)
-    let new_cap = if old_cap < 8: 8 as i64 else: old_cap * 2
+    if old_cap >= SM_OCCUPIED:
+        with_panic_core("SlotMap exhausted its handle indices", "", 0)
+    var new_cap = if old_cap < 8: 8 else: old_cap * 2
+    if new_cap > SM_OCCUPIED: new_cap = SM_OCCUPIED
     let es = sm_elem_size(m)
     let old_values = sm_values(m)
-    let old_occ = sm_occ(m)
+    let old_next = sm_next(m)
     let old_gens = sm_gens(m)
     let new_values = rt_alloc(new_cap * es)
-    let new_occ = rt_alloc(new_cap)
+    let new_next = rt_alloc(new_cap * 4)
     let new_gens = rt_alloc(new_cap * 4)
-    rt_memset(new_occ, 0, new_cap)
-    var i: i64 = 0
-    while i < new_cap:
-        unsafe *((new_gens as i64 + i * 4) as *mut u32) = 1 as u32
-        i = i + 1
     if old_cap > 0:
-        rt_memcpy(new_values, old_values as *const u8, old_cap * es)
-        rt_memcpy(new_occ, old_occ as *const u8, old_cap)
-        rt_memcpy(new_gens, old_gens as *const u8, old_cap * 4)
+        rt_memcpy(new_values, old_values, old_cap * es)
+        rt_memcpy(new_next, old_next, old_cap * 4)
+        rt_memcpy(new_gens, old_gens, old_cap * 4)
         rt_free_sized(old_values, old_cap * es)
-        rt_free_sized(old_occ, old_cap)
+        rt_free_sized(old_next, old_cap * 4)
         rt_free_sized(old_gens, old_cap * 4)
     sm_set_values(m, new_values)
-    sm_set_occ(m, new_occ)
+    sm_set_next(m, new_next)
     sm_set_gens(m, new_gens)
     sm_set_cap(m, new_cap)
+    var i = old_cap
+    while i < new_cap:
+        sm_set_generation_at(m, i, 1)
+        sm_set_next_at(m, i, if i + 1 < new_cap: (i + 1) as u32 else: SM_FREE_END)
+        i = i + 1
+    sm_set_head(m, old_cap as u32)
+    sm_set_tail(m, (new_cap - 1) as u32)
 
 fn sm_write_handle(out: *mut u8, idx: u32, generation_value: u32):
     unsafe *(out as *mut u32) = idx
     unsafe *((out as i64 + 4) as *mut u32) = generation_value
 
-fn sm_valid(m: i64, index: u32, generation: u32) -> i32:
-    if m == 0:
-        return 0
-    let idx = index as i64
-    if idx < 0 or idx >= sm_cap(m):
-        return 0
-    if sm_occ_at(m, idx) == 0:
-        return 0
-    if sm_generation_at(m, idx) != generation:
-        return 0
+fn sm_valid(m: i64, index: u32, generation: u32):
+    if m == 0 or index >= sm_cap(m): return 0
+    if sm_occ_at(m, index) == 0: return 0
+    if sm_generation_at(m, index) != generation: return 0
     1
 
 pub fn with_slotmap_new(elem_size: i64) -> *mut u8:
-    let m = rt_alloc(SM_SIZE)
-    sm_set_values(m as i64, 0 as *mut u8)
-    sm_set_occ(m as i64, 0 as *mut u8)
-    sm_set_gens(m as i64, 0 as *mut u8)
-    sm_set_len(m as i64, 0)
-    sm_set_cap(m as i64, 0)
-    sm_set_elem_size(m as i64, elem_size)
-    m
+    let map = rt_alloc(SM_SIZE)
+    let m = map as i64
+    sm_set_values(m, 0 as *mut u8)
+    sm_set_next(m, 0 as *mut u8)
+    sm_set_gens(m, 0 as *mut u8)
+    sm_set_len(m, 0)
+    sm_set_cap(m, 0)
+    sm_set_elem_size(m, elem_size)
+    sm_set_head(m, SM_FREE_END)
+    sm_set_tail(m, SM_FREE_END)
+    map
 
 pub fn with_slotmap_insert_out(map: *mut u8, val: *const u8, out: *mut u8) -> Unit:
     let m = map as i64
-    if sm_len(m) >= sm_cap(m):
-        sm_grow(m)
-    var idx: i64 = 0
-    while idx < sm_cap(m):
-        if sm_occ_at(m, idx) == 0:
-            let generation_value = sm_normalize_generation(sm_generation_at(m, idx))
-            sm_set_generation_at(m, idx, generation_value)
-            rt_memcpy(sm_value_ptr_at(m, idx), val, sm_elem_size(m))
-            sm_set_occ_at(m, idx, 1)
-            sm_set_len(m, sm_len(m) + 1)
-            sm_write_handle(out, idx as u32, generation_value)
-            return
-        idx = idx + 1
-    with_panic_core(make_str("SlotMap insert failed to find a free slot" as *const u8, 41), make_str("" as *const u8, 0), 0)
+    if sm_head(m) == SM_FREE_END: sm_grow(m)
+    let idx = sm_head(m)
+    let next = sm_next_at(m, idx)
+    sm_set_head(m, next)
+    if next == SM_FREE_END: sm_set_tail(m, SM_FREE_END)
+    rt_memcpy(sm_value_ptr_at(m, idx), val, sm_elem_size(m))
+    sm_set_next_at(m, idx, SM_OCCUPIED)
+    sm_set_len(m, sm_len(m) + 1)
+    sm_write_handle(out, idx, sm_generation_at(m, idx))
 
 pub fn with_slotmap_get_ptr(map: *mut u8, index: u32, generation: u32) -> *mut u8:
     let m = map as i64
-    if sm_valid(m, index, generation) == 0:
-        return 0 as *mut u8
-    sm_value_ptr_at(m, index as i64)
+    if sm_valid(m, index, generation) == 0: return 0 as *mut u8
+    sm_value_ptr_at(m, index)
 
-pub fn with_slotmap_contains(map: *mut u8, index: u32, generation: u32) -> i32:
-    sm_valid(map as i64, index, generation)
-
-pub fn with_slotmap_len(map: *mut u8) -> i64:
-    if map as i64 == 0:
-        return 0
-    sm_len(map as i64)
-
-pub fn with_slotmap_capacity(map: *mut u8) -> i64:
-    if map as i64 == 0:
-        return 0
-    sm_cap(map as i64)
+pub fn with_slotmap_contains(map: *mut u8, index: u32, generation: u32) -> i32: sm_valid(map as i64, index, generation)
+pub fn with_slotmap_len(map: *mut u8) -> i64: if map == 0: 0 else: sm_len(map as i64)
+pub fn with_slotmap_capacity(map: *mut u8) -> i64: if map == 0: 0 else: sm_cap(map as i64)
 
 pub fn with_slotmap_slot_occupied(map: *mut u8, index: i64) -> i32:
-    if map as i64 == 0 or index < 0 or index >= sm_cap(map as i64):
-        return 0
+    if map == 0 or index < 0 or index >= sm_cap(map as i64): return 0
     sm_occ_at(map as i64, index)
 
 pub fn with_slotmap_value_ptr_at(map: *mut u8, index: i64) -> *mut u8:
-    if map as i64 == 0 or index < 0 or index >= sm_cap(map as i64):
-        return 0 as *mut u8
+    if map == 0 or index < 0 or index >= sm_cap(map as i64): return 0 as *mut u8
     sm_value_ptr_at(map as i64, index)
 
 pub fn with_slotmap_free(map: *mut u8) -> Unit:
-    if map as i64 == 0:
-        return
+    if map == 0: return
     let m = map as i64
     let cap = sm_cap(m)
     let values = sm_values(m)
-    let occupied = sm_occ(m)
+    let next = sm_next(m)
     let generations = sm_gens(m)
-    if values as i64 != 0:
-        rt_free_sized(values, cap * sm_elem_size(m))
-    if occupied as i64 != 0:
-        rt_free_sized(occupied, cap)
-    if generations as i64 != 0:
-        rt_free_sized(generations, cap * 4)
+    if values != 0: rt_free_sized(values, cap * sm_elem_size(m))
+    if next != 0: rt_free_sized(next, cap * 4)
+    if generations != 0: rt_free_sized(generations, cap * 4)
     rt_free_sized(map, SM_SIZE)
 
 pub fn with_slotmap_remove(map: *mut u8, index: u32, generation: u32, out: *mut u8) -> i32:
     let m = map as i64
-    if sm_valid(m, index, generation) == 0:
-        return 0
-    let idx = index as i64
-    if out as i64 != 0:
-        rt_memcpy(out, sm_value_ptr_at(m, idx) as *const u8, sm_elem_size(m))
-    sm_set_occ_at(m, idx, 0)
-    var next_gen = generation + 1 as u32
-    if next_gen == 0 as u32:
-        next_gen = 1 as u32
-    sm_set_generation_at(m, idx, next_gen)
+    if sm_valid(m, index, generation) == 0: return 0
+    if out != 0: rt_memcpy(out, sm_value_ptr_at(m, index), sm_elem_size(m))
+    sm_set_next_at(m, index, SM_FREE_END)
+    // Never wrap a generation: an exhausted slot is permanently retired,
+    // preventing any previously issued handle from becoming valid again.
+    if generation == SM_MAX_GENERATION:
+        sm_set_generation_at(m, index, 0)
+    else:
+        sm_set_generation_at(m, index, generation + 1)
+        if sm_tail(m) == SM_FREE_END: sm_set_head(m, index)
+        else: sm_set_next_at(m, sm_tail(m), index)
+        sm_set_tail(m, index)
     sm_set_len(m, sm_len(m) - 1)
     1
 
 pub fn with_slotmap_replace(map: *mut u8, index: u32, generation: u32, val: *const u8, out: *mut u8) -> i32:
     let m = map as i64
-    if sm_valid(m, index, generation) == 0:
-        return 0
-    let dst = sm_value_ptr_at(m, index as i64)
-    if out as i64 != 0:
-        rt_memcpy(out, dst as *const u8, sm_elem_size(m))
+    if sm_valid(m, index, generation) == 0: return 0
+    let dst = sm_value_ptr_at(m, index)
+    if out != 0: rt_memcpy(out, dst, sm_elem_size(m))
     rt_memcpy(dst, val, sm_elem_size(m))
     1
 
 pub fn with_slotmap_set(map: *mut u8, index: u32, generation: u32, val: *const u8) -> i32:
     let m = map as i64
-    if sm_valid(m, index, generation) == 0:
-        return 0
-    rt_memcpy(sm_value_ptr_at(m, index as i64), val, sm_elem_size(m))
+    if sm_valid(m, index, generation) == 0: return 0
+    rt_memcpy(sm_value_ptr_at(m, index), val, sm_elem_size(m))
     1
 
 // ── HashMap operations ─────────────────────────────────────────────

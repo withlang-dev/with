@@ -205,6 +205,7 @@ extern fn LLVMCreateTypeAttribute(c: *mut u8, kind: u32, ty: *mut u8) -> *mut u8
 extern fn LLVMAddAttributeAtIndex(v: *mut u8, idx: u32, attr: *mut u8)
 extern fn LLVMAddCallSiteAttribute(call: *mut u8, idx: u32, attr: *mut u8)
 extern fn LLVMGetEnumAttributeAtIndex(v: *mut u8, idx: u32, kind: u32) -> *mut u8
+extern fn LLVMGetCallSiteEnumAttribute(v: *mut u8, idx: u32, kind: u32) -> *mut u8
 extern fn LLVMGetTypeAttributeValue(attr: *mut u8) -> *mut u8
 
 // Basic blocks
@@ -801,6 +802,17 @@ pub fn wl_add_call_param_byval_attr(ctx: i64, call_val: i64, param_idx: i32, ty:
         if kind != 0:
             let attr = LLVMCreateTypeAttribute(ctx as *mut u8, kind, ty as *mut u8)
             LLVMAddCallSiteAttribute(call_val as *mut u8, (param_idx + 1) as u32, attr)
+
+pub fn wl_get_byval_type(value: i64, param_idx: i32, call_site: bool) -> i64:
+    unsafe:
+        let kind = LLVMGetEnumAttributeKindForName(c"byval".ptr, 5)
+        if kind == 0: return 0
+        let index = (param_idx + 1) as u32
+        let attribute = if call_site:
+            LLVMGetCallSiteEnumAttribute(value as *mut u8, index, kind)
+        else: LLVMGetEnumAttributeAtIndex(value as *mut u8, index, kind)
+        if attribute == 0: return 0
+        LLVMGetTypeAttributeValue(attribute) as i64
 
 pub fn wl_add_call_sret_attr(ctx: i64, call_val: i64, param_idx: i32, ty: i64) -> Unit:
     unsafe:

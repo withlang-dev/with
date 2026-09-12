@@ -29,8 +29,10 @@ fn test_remove_replace_invalidates_stale_handle:
         None => assert(true)
 
     let h2 = map.insert(20)
-    assert(h2.index == h1.index)
-    assert(h2.generation != h1.generation)
+    // FIFO reuse may consume unused slots first; behav_slotmap_fifo covers
+    // generation advancement when the removed index comes around again.
+    assert(h2.index != h1.index or h2.generation != h1.generation)
+    assert(not map.contains(h1))
     match map.get(h2):
         Some(v2) => assert(*v2 == 20)
         None => assert(false)

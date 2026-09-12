@@ -2,8 +2,9 @@
 
 Status (2026-09-12): batches A through C4 are implemented; #1101 merged
 the PCRE2 shim retirement and corrected cold stage embedding. The zlib
-bundle is implemented in #1103 and is being verified against main after
-the SDK-macro and target-va_list fixes (#1107, #1108). Historical before/after
+bundle merged in #1103 after full build, fixpoint, tests, and both bundle
+drift lanes passed, including the SDK-macro and target-va_list fixes
+(#1107, #1108). Historical before/after
 descriptions below explain the transition. Ruled in direction by Eric
 (decisions.md D38, D39). Companions: `docs/stdlib_sourcing_plan.md`
 (the corpora), `docs/harden_migrate.md` (the migrator), decisions.md D30

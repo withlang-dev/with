@@ -4214,7 +4214,7 @@ impl MirBuilder:
         self.set_string_place_flags(dest_place, 2)
         dest_place
 
-    mut fn lower_bin_op(op: i32, lhs_expr: i32, rhs_expr: i32, node: i32) -> i32:
+    mut fn lower_bin_op(op: i32, lhs_expr: i32, rhs_expr: i32, node: i32):
         // Short-circuit evaluation for logical and/or
         if op == 11 or op == 12:
             return self.lower_short_circuit(op, lhs_expr, rhs_expr, node)
@@ -4282,28 +4282,31 @@ impl MirBuilder:
             self.expected_type = rhs_ty
         else:
             self.expected_type = saved_expected
-        let lhs = self.lower_expr(lhs_expr)
+        // String comparisons observe places. The opposite operand supplies
+        // type context, but that context does not demand an owned string copy.
+        let observes_strings = is_cmp and self.type_id_is_str(lhs_ty) != 0 and self.type_id_is_str(rhs_ty) != 0
+        let lhs = if observes_strings: self.lower_observer_probe_arg(lhs_expr) else: self.lower_expr(lhs_expr)
         if self.is_bare_none(rhs_expr) and (lhs_tk == TypeKind.TY_PTR or lhs_tk == TypeKind.TY_REF):
             self.expected_type = lhs_ty
         else if is_cmp and lhs_ty != 0:
             self.expected_type = lhs_ty
         else:
             self.expected_type = saved_expected
-        let rhs = self.lower_expr(rhs_expr)
+        let rhs = if observes_strings: self.lower_observer_probe_arg(rhs_expr) else: self.lower_expr(rhs_expr)
         self.expected_type = saved_expected
         let rv = self.body.new_rvalue(RvalueKind.RK_BIN_OP, op, lhs, rhs)
         var ty = self.expr_type(node)
-        if ty == 0 or ty == self.sema.ty_void as i32:
+        if ty == 0 or ty == self.sema.ty_void:
             let lhs_op_ty = self.operand_type(lhs)
             let rhs_op_ty = self.operand_type(rhs)
             if op == BinaryOp.OP_EQ or op == BinaryOp.OP_NEQ or op == BinaryOp.OP_LT or op == BinaryOp.OP_GT or op == BinaryOp.OP_LTE or op == BinaryOp.OP_GTE or op == BinaryOp.OP_AND or op == BinaryOp.OP_OR:
-                ty = self.sema.ty_bool as i32
+                ty = self.sema.ty_bool
             else if op == BinaryOp.OP_SHL or op == BinaryOp.OP_SHR:
                 ty = lhs_op_ty
             else:
-                let arith_ty = self.sema.arithmetic_result_type(lhs_op_ty as TypeId, rhs_op_ty as TypeId)
+                let arith_ty = self.sema.arithmetic_result_type(lhs_op_ty, rhs_op_ty)
                 if arith_ty != 0:
-                    ty = arith_ty as i32
+                    ty = arith_ty
         let temp = self.new_temp(ty)
         let place = self.place_for_local(temp)
         self.body.push_stmt(self.cur_bb, StmtKind.Assign, place, rv, self.ast.get_start(node))
@@ -5297,7 +5300,10 @@ impl MirBuilder:
             return self.body.new_operand(OperandKind.OK_COPY, out_place)
         self.body.new_operand(OperandKind.OK_MOVE, out_place)
 
-    mut fn lower_collection_literal_call(node: i32, intrinsic: MirIntrinsic, operands: &Vec[i32]) -> i32:
+    mut fn lower_collection_literal_call(node: i32, intrinsic: MirIntrinsic, operands: &Vec[i32]):
+        // Literal elements transfer to their collection just like arguments to
+        // consuming calls. Cancel their temporary drops and schedule move resets.
+        for operand in operands: self.consume_moved_operand(operand)
         let fn_op = self.const_operand(ConstKind.CK_FN, self.pool.intern("__collection_literal"), self.sema.ty_void)
         let args_id = self.body.new_call_args(operands)
         let ret_type = self.expr_type(node)
@@ -5622,13 +5628,7 @@ impl MirBuilder:
             return self.place_for_local(0)
 
         if kind == NodeKind.NK_FIELD_ACCESS:
-            let base = self.lower_field_base_place(self.ast.get_data0(node))
-            let field_sym = self.ast.get_data1(node)
-            let field_ty = self.expr_type(node)
-            if field_ty == 0 or field_ty == self.sema.ty_void as i32:
-                self.mark_unsupported()
-                return self.place_for_local(0)
-            return self.new_projected_field_place(base, field_sym, field_ty)
+            return self.lower_field_access(node)
 
         if kind == NodeKind.NK_INDEX:
             if self.vec_literal_type(node) != 0:
@@ -9187,7 +9187,10 @@ impl MirBuilder:
         // a non-share-place param is extern/copy — keep the existing behavior.)
         let arg_kind = self.ast.kind(arg_node)
         let arg_is_copy = arg_kind == NodeKind.NK_COPY_ARG
-        let callee_share_place = sig_idx >= 0 and arg_i >= 0 and self.sema.sig_param_uses_value_ref_abi(sig_idx, arg_i) != 0
+        let callee_share_place = if sig_idx >= 0:
+            arg_i >= 0 and self.sema.sig_param_uses_value_ref_abi(sig_idx, arg_i) != 0
+        else:
+            self.sema.type_uses_c_va_list_place(expected_ty) != 0
         // D16 (rvalue-uniform `move`): `move x` always moves, callee-independent.
         // Into a share-place callee, the moved value becomes a statement
         // temporary — the callee borrows the temporary, the source is reset now
@@ -12863,6 +12866,7 @@ impl MirBuilder:
                     let fb_place = self.place_for_local(fb_tmp)
                     self.body.push_stmt(self.cur_bb, StmtKind.Assign, fb_place, fb_rv, self.ast.get_start(node))
                     self.set_string_local_flags(fb_tmp, 2)
+                    self.register_stmt_temp(fb_tmp, fa_val_ty)
                     return self.body.new_operand(OperandKind.OK_MOVE, fb_place)
                 return self.body.new_operand(OperandKind.OK_MOVE, place)
             return self.body.new_operand(OperandKind.OK_COPY, place)

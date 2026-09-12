@@ -4436,10 +4436,24 @@ impl Sema:
 
     // Only C's array-decay mode aliases the caller's storage. The indirect
     // struct mode keeps value semantics and codegen supplies its copy.
+    fn callable_type_resolved(tid: i32) -> i32:
+        var resolved = self.resolve_alias(tid)
+        var kind = self.get_type_kind(resolved)
+        if kind == TypeKind.TY_PTR or kind == TypeKind.TY_REF:
+            resolved = self.resolve_alias(self.get_type_d0(resolved))
+            kind = self.get_type_kind(resolved)
+        if kind == TypeKind.TY_FN or kind == TypeKind.TY_EXTERN_FN: resolved else: 0
+
+    fn type_uses_c_va_list_place(tid: i32) -> i32:
+        if self.type_is_c_va_list(tid) != 0 and fn_abi_c_va_list_uses_caller_place(target_spec_os(), target_spec_arch()): 1 else: 0
+
+    fn callable_param_uses_value_ref_abi(tid: i32, pi: i32) -> i32:
+        let resolved = self.callable_type_resolved(tid)
+        if resolved == 0 or pi < 0 or pi >= self.get_type_d1(resolved): return 0
+        self.type_uses_c_va_list_place(self.type_extra[self.get_type_d0(resolved) + pi])
+
     fn sig_param_is_c_va_list_by_place(sig_idx: i32, pi: i32) -> i32:
-        if self.type_is_c_va_list(self.sig_param_type(sig_idx, pi)) == 0:
-            return 0
-        if fn_abi_c_va_list_uses_caller_place(target_spec_os(), target_spec_arch()): 1 else: 0
+        self.type_uses_c_va_list_place(self.sig_param_type(sig_idx, pi))
 
     fn is_c_void_like_type(tid: i32) -> i32:
         if tid == 0:
@@ -6180,6 +6194,13 @@ impl Sema:
         if specialization.is_some():
             return self.concrete_specialization_nodes[specialization.unwrap()]
         0
+
+    fn sig_is_drop_body(sig: i32) -> bool:
+        let node = self.receiver_decl_node_for_sig(sig)
+        if node == 0: return false
+        let impl_node = self.impl_node_for_method_decl(node)
+        if impl_node != 0 and self.ast.get_data2(impl_node) == self.syms.drop: return true
+        self.drop_owner_for_fn_symbol(self.sig_names[sig]) != 0
 
     fn receiver_required_effect_for_decl(node: i32) -> i32:
         var required = 0

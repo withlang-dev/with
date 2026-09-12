@@ -1,4 +1,41 @@
-# The FnAbi Descriptor — the missing single source of truth
+# The FnAbi Descriptor — one source of truth
+
+## Implementation snapshot — 2026-09-12
+
+`src/FnAbi.w` defines the immutable `FnAbi` and `ArgAbi` records.
+`Codegen.compute_fn_abi` interns descriptors from finalized source types,
+declared place/reference modes, and calling convention. Named declarations,
+concrete specializations, async declarations, callable types, closures, adapters, and destructor
+entries use this classifier. Symbol aliases and LLVM function values point to
+the same descriptor; callable types cache their descriptor by resolved type and
+convention. No byval/direct parameter masks or parallel reference-ABI tables
+remain.
+
+`push_call_arg` handles physical argument marshalling. Callee parameter binding,
+LLVM function types, aggregate return handling, and call attributes read the
+descriptor. Semantic adjustments such as contextual Copy and constructing a dyn
+value happen before physical ABI marshalling. A fat value's already-built LLVM
+aggregate receives the target's Direct/Indirect mode; `PM_FAT` is reserved, not a
+second classifier. Fixed runtime/intrinsic calls retain the Group A exemption
+described below.
+
+Consuming destructor receivers remain owned, with `Indirect` plus
+`owned_place`: their body and the following compiler-generated field cleanup
+must observe the same storage. This does not turn an owned parameter into a
+borrow. See [the current ABI description](with-abi.md).
+
+Regression coverage includes callable C and With `c_va_list` across all five
+targets, explicit pointers, C aggregate returns, closures and adapters,
+consuming receivers, inferred async returns, and aggregate parameters beyond
+the former 64-bit mask (including default trait methods).
+LLVM declaration and call audits check descriptor shapes and byval attributes.
+`da_trait_default_tail.w` additionally checks the cleanup frame shared in intent
+with ordinary function bodies; broader synthesized-body ownership audit coverage
+is tracked in #1117. Missing/undefined callee coverage in the audit is tracked
+in #1119; native execution also guards the wide default-method regression.
+
+The analysis below records the original architectural finding and proposed
+rewire. Statements that With lacked descriptors describe that earlier compiler.
 
 > **2026-07-23 ownership-mode amendment.** The one-descriptor architecture in
 > this document remains canonical (D6), but its D5 effect-inferred SHARE-PLACE

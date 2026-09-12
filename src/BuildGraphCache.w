@@ -175,15 +175,16 @@ fn build_cache_resolve_executable_path(argv0: &str) -> str:
         i = i + 1
     ""
 
-fn build_cache_current_compiler_fingerprint() -> str:
-    if build_cache_compiler_fingerprint_ready != 0:
-        return build_cache_compiler_fingerprint
-    build_cache_compiler_fingerprint_ready = 1
-    let compiler_path = build_cache_resolve_executable_path(build_graph_rt_arg_at(0))
-    if compiler_path.len() == 0:
-        return build_cache_sha256_text("compiler:unresolved\n")
-    build_cache_compiler_fingerprint = build_cache_fingerprint_file(compiler_path)
-    build_cache_compiler_fingerprint
+fn build_cache_current_compiler_fingerprint():
+    if build_cache_compiler_fingerprint_ready == 0:
+        let compiler_path = build_cache_resolve_executable_path(build_graph_rt_arg_at(0))
+        build_cache_compiler_fingerprint = if compiler_path.len() == 0:
+            build_cache_sha256_text("compiler:unresolved\n")
+        else:
+            build_cache_fingerprint_file(compiler_path)
+        build_cache_compiler_fingerprint_ready = 1
+    // Each key owns its text; returning the cached owner would empty the cache.
+    build_cache_compiler_fingerprint.clone()
 
 fn build_cache_target_uses_current_compiler(target: &BuildGraphTarget) -> bool:
     if target.kind == 0: return true

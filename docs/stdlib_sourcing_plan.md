@@ -1,8 +1,10 @@
 # Stdlib sourcing: three migrated corpora, one facade
 
-Status: PLAN (2026-09-01). Ruled in direction by Eric; nothing here is
-implemented. Paths are proposals in the repo's existing conventions, not
-part of the ruling. Companion: `docs/harden_migrate.md` (the migrator plan
+Status (2026-09-12): PCRE2 and zlib share the bundle pipeline. Phase 0 is
+implemented and locally verified in PR #1129; Phase 1 migration is in
+progress; Phases 2–4 remain planned. Engine selections were ruled on
+2026-09-12; module grouping is provisional.
+Companion: `docs/harden_migrate.md` (the migrator plan
 this campaign exercises), `docs/harden_plan.md` item 7.
 
 ## The ruling
@@ -42,8 +44,9 @@ Three corpora with complementary roles, plus one surgical port:
 
 Outside the corpora, written natively: graph algorithms and union-find
 (too small for migration provenance to beat a native version), SlotMap's
-free list (#936 — no mature C library ships generational slot maps), and the
-intrinsic-integrated Vec and str, which stay as they are.
+free list (#936 — no mature C library ships generational slot maps).
+`Vec` moves to STC's engine while preserving its language integration;
+STC's `cstr` is used selectively without changing With's `str` contract.
 
 **The sourcing rule** (Eric, 2026-09-02). Why we take code from these
 libraries at all: **hardenedness**. ffmpeg, zlib, minicoro, pcre2 have
@@ -65,15 +68,86 @@ To confirm at pin time, not from memory: TommyDS's exact license text (its
 `COPYING`), and that c-algorithms is `void*` + comparator callbacks
 throughout (expected; it determines facade shape).
 
+## Facade and engine selection — Eric's ruling (2026-09-12)
+
+For With’s default `HashMap[K, V]` / `HashSet[T]` engine, we will use
+STC’s `hmap` / `hset`.
+
+STC’s current hash map uses Robin Hood hashing, stores keys/values directly
+in the table, and keeps a compact side table of hash/bucket metadata. That
+shape maps naturally onto the facade With wants: an owning generic
+`HashMap[K, V]`, rather than a C-style intrusive index over separately
+allocated objects.
+
+The facade map is explicit. The corpora are implementation engines; their
+names do not automatically become permanent standard-library API names.
+This ruling supersedes the earlier open engine choices in this plan.
+Benchmarks validate the selected engines and compare alternatives; changing
+a primary engine requires a new ruling.
+
+| `lib/std` facade | Primary engine | Secondary / comparison engine | Notes |
+| --- | --- | --- | --- |
+| `Vec[T]` | **STC `vec`** | TommyDS `array` | General growable contiguous sequence |
+| `Deque[T]` | **STC `deque`** | — | Double-ended queue |
+| `Stack[T]` | **STC `stack`** | — | Can remain a thin facade over the chosen sequence engine |
+| `Queue[T]` | **STC `queue`** | c-algorithms queue | FIFO queue |
+| `PriorityQueue[T]` | **STC `pqueue`** | c-algorithms binary heap | Heap-backed priority queue |
+| `List[T]` | **STC `list`** | c-algorithms list / TommyDS list | General linked list |
+| `HashMap[K, V]` | **STC `hmap`** | TommyDS `hashdyn` / `hashlin`; c-algorithms hash table | Default owning hash map |
+| `HashSet[T]` | **STC `hset`** | TommyDS hashing machinery | Same hash-table family as `HashMap` |
+| `OrderedMap[K, V]` | **STC `smap`** | c-algorithms RB tree / AVL tree | Public ordered associative map |
+| `OrderedSet[T]` | **STC `sset`** | c-algorithms RB tree / AVL tree | Public ordered set |
+| `BTreeMap[K, V]` | **M*LIB `m-bptree`** | — | B+ tree-backed ordered/indexed map |
+| `BTreeSet[T]` | **M*LIB `m-bptree`** | — | B+ tree-backed ordered set |
+| `Trie[V]` | **c-algorithms trie** | TommyDS `trie` / `trie_inplace` | Prefix-keyed lookup |
+| `BitSet` | **STC `cbits`** | — | Dynamic bitset |
+| `Span[T]` | **STC span machinery** | — | Non-owning contiguous view |
+| `String` / internal string engine | **STC `cstr` where useful** | Existing With string implementation | Use STC selectively; With’s existing `str` semantics remain the public contract |
+| `SortedVec[T]` | **c-algorithms sorted array** | STC algorithms + `Vec` | Sorted contiguous collection |
+| `ChunkedVec[T]` / internal block storage | **TommyDS `arrayblk`** | — | Growth without one large contiguous realloc; possibly internal rather than public |
+| `Index[T]` / intrusive object index | **TommyDS `hashtable` / `hashdyn`** | — | Internal/specialized rather than everyday `std` API |
+| `IncrementalHashIndex[T]` | **TommyDS `hashlin`** | — | Specialized incremental-resize hash index; likely internal |
+| `BinaryHeap[T]` | **c-algorithms binary heap** | STC `pqueue` | Could expose separately from `PriorityQueue` if desired |
+| `RbTree[K, V]` | **c-algorithms RB tree** | — | Could stay internal behind `OrderedMap` |
+| `AvlTree[K, V]` | **c-algorithms AVL tree** | — | Alternate/internal ordered-tree engine |
+| `sort` | **STC algorithm layer** | — | With-generic facade over migrated implementation |
+| `stable_sort` | Evaluate / implement separately | — | Only map if upstream provides the required stability contract |
+| `binary_search` | **STC algorithms** | c-algorithms sorted-array logic | Shared generic algorithm |
+| `lower_bound` / `upper_bound` | **STC algorithms** | c-algorithms | Useful with `Vec`, `Span`, sorted collections |
+| `reverse` | **STC algorithms** | — | Generic sequence algorithm |
+| `shuffle` | **STC algorithms** | — | With RNG passed through facade |
+| `find` / search helpers | **STC algorithms** | — | Where available and semantically appropriate |
+| Heap algorithms | **STC `pqueue` / c-algorithms heap** | — | Support `PriorityQueue` and possibly generic heap utilities |
+
+The public surface is grouped roughly as follows:
+
+- `std.collections`: `Vec`, `Deque`, `Stack`, `Queue`, `PriorityQueue`,
+  `List`, `HashMap`, `HashSet`, `OrderedMap`, `OrderedSet`, `BTreeMap`,
+  `BTreeSet`, `Trie`, `BitSet`, and perhaps `SortedVec`.
+- `std.slice` / `std.span`: non-owning sequence/view machinery.
+- `std.algorithms`: `sort`, `binary_search`, bounds searches, `reverse`,
+  `shuffle`, and the other generic sequence algorithms.
+
+Several imported structures remain engines rather than public types.
+TommyDS `hashdyn`, `hashlin`, `arrayblk`, c-algorithms’ AVL/RB trees,
+and perhaps the raw M*LIB B+ tree can sit underneath the public facade
+without forcing their implementation names into the permanent API.
+Optional exposure in the table remains optional.
+
+**STC provides most everyday containers and algorithms; c-algorithms
+supplies the classical trees/heaps/trie and reference implementations;
+TommyDS supplies specialized high-performance indexing/storage engines;
+M*LIB supplies the B+ tree.**
+
 ## Why the un-facaded code is not waste
 
 Everything migrated compiles in the battery whether or not a facade uses
 it. That gives:
 
 - migration regression coverage on real generic C, forever;
-- alternative engines under identical With compilation, so facades choose
-  winners by benchmark, not by reputation (five migrated hash tables
-  underneath, exactly one exposed);
+- alternative engines under identical With compilation, so benchmarks
+  validate the selected primary engines and quantify tradeoffs (several
+  migrated hash tables underneath, exactly one default facade);
 - examples for future facade expansion;
 - a standing corpus for finding migrator bugs;
 - internal assumptions kept intact — no partial fork where `sort.h` came
@@ -123,9 +197,9 @@ bundle's upstream tests, plus the `wo-drift` lane from `docs/wo_bundles.md`.
   `remove` transfers, when elements drop, and how Drop-class elements are
   released when the container drops. The drop audit gains cells per facade
   (fully consumed, partially consumed then dropped, zero elements).
-- **One engine per abstraction**, chosen by benchmark across the corpora
-  under identical compilation; the choice is recorded next to the facade
-  with the numbers.
+- **One primary engine per abstraction**, selected in the facade map above.
+  Benchmark it against comparison engines under identical compilation and
+  record the numbers next to the facade.
 - **A complexity fixture per facade** (insert N descending then ascending,
   lookups, removals; a wall-clock bound an O(n²) cliff cannot meet), run in
   the battery. This is the guard that was missing.
@@ -199,7 +273,7 @@ every `T` the engine indexes.
   empty, full, after partial removal, after a consuming iteration
   abandoned midway (D33: the iterator owns the tail).
 - *Callbacks.* Engines take `int (*cmp)(const void*, const void*)` and
-  hash functions. A generic facade `BTreeMap[K: Ord, V]` supplies a
+  hash functions. A generic engine adapter `RbTree[K: Ord, V]` supplies a
   monomorphized With `fn` per `K` (With generics are monomorphized, so
   `fn(*const u8, *const u8) -> i32` wrapping `K < K` exists per
   instantiation), plus a context pointer where the engine offers one.
@@ -211,29 +285,32 @@ every `T` the engine indexes.
   traversal yielding `&T` views (the `VecIter` shape); `into_iter()`
   transfers elements out in order and its drop releases the rest.
 
-**Sketch: `BTreeMap[K, V]` over c-algorithms' red-black tree**
+**Sketch: an internal `RbTree[K, V]` adapter over c-algorithms**
+
+This illustrates ownership for a comparison engine. The selected public
+`OrderedMap` uses STC's `smap`; `BTreeMap` uses M*LIB's B+ tree.
 
 ```
 use std.c_algorithms.rb_tree        // raw: RBTree, rb_tree_new(cmp), rb_tree_insert(tree, key, value), rb_tree_lookup, rb_tree_remove, rb_tree_free …
 
-pub type BTreeMap[K, V] {
+type RbTree[K, V] {
     tree: *mut RBTree,              // engine handle (raw)
     nodes: EntryArena[K, V],        // facade-owned stable storage for (K, V)
 }
 
-impl[K: Ord, V] BTreeMap[K, V]:
-    pub fn new() -> BTreeMap[K, V]:
-        BTreeMap { tree: rb_tree_new(btree_compare[K]), nodes: EntryArena.new() }
+impl[K: Ord, V] RbTree[K, V]:
+    pub fn new():
+        RbTree { tree: rb_tree_new(rb_compare[K]), nodes: EntryArena.new() }
     pub fn get(key: &K) -> Option[&V]:            // observes: engine pointer typed as a view
         let node = rb_tree_lookup_node(self.tree, key as *const u8)
         if node == null: None else: Some(self.nodes.value_view(node))
     pub mut fn insert(key: K, value: V) -> Option[V]:  // returns the displaced value, if any
         …move (key, value) into the arena; rb_tree_insert with the slot's address…
     pub mut fn remove(key: &K) -> Option[V]:      // transfers out; slot freed; no second copy
-    pub fn iter() -> BTreeIter[K, V]              // ephemeral cursor: rb_tree_root_node → successor walk, yields (&K, &V)
+    pub fn iter() -> RbTreeIter[K, V]             // ephemeral cursor: rb_tree_root_node → successor walk, yields (&K, &V)
     move fn drop():                                // drop every (K, V) in the arena, then rb_tree_free
 
-fn btree_compare[K: Ord](a: *const u8, b: *const u8) -> i32:   // the monomorphized callback
+fn rb_compare[K: Ord](a: *const u8, b: *const u8) -> i32:   // the monomorphized callback
     …view both as &K and compare…
 ```
 
@@ -260,13 +337,14 @@ pub mut fn Vec[T].sort_by(cmp: fn(&T, &T) -> i32) -> Unit:
 §comptime, "dead branches are not instantiated") is the tool. The shape set
 is declared in one place next to the facade, benchmarked, and extended by
 adding an instantiation to the corpus's build inputs — never by editing
-migrated code. Where a byte engine is faster or simpler for all shapes,
-the facade uses it for all shapes; the point is that both answers keep
-the migrator raw.
+migrated code. This earlier sketch illustrates shape adaptation; it does
+not settle arbitrary-`T` support for the selected STC engine. That support
+must be demonstrated in Phase 3 without silently substituting another
+primary engine.
 
-**Sketch: `Deque[T]`, `Heap[T]`, `BitSet`**
+**Sketch: `Deque[T]`, `PriorityQueue[T]`, `BitSet`**
 
-Same anatomy: `Deque[T]` and `Heap[T]` own storage and wrap the engine's
+Same anatomy: `Deque[T]` and `PriorityQueue[T]` own storage and wrap the engine's
 ring buffer / binary heap through the raw modules with the callback per
 `T`; `BitSet` is the simplest case — STC's `cbits` is not generic, so the
 facade is an owning handle plus `mut fn set(i)`, `fn test(i) -> bool`,
@@ -274,45 +352,71 @@ iteration over set bits, and `move fn drop()`, the `Regex` shape exactly.
 
 **Facade surfaces (the contracts the fixtures pin)**
 
-| Facade | Engine candidates | Surface | Complexity contract |
+| Facade | Primary engine | Surface | Complexity contract |
 |---|---|---|---|
-| `HashMap[K, V]` / `HashSet[T]` | `rt_core` (today), c-algorithms hash-table, TommyDS `hashdyn`/`hashlin` | `get(&K) -> Option[&V]`, `insert(K, V) -> Option[V]`, `remove(&K) -> Option[V]`, `iter()` views | O(1) expected; delete O(cluster), no allocation |
-| `BTreeMap[K, V]` / `BTreeSet[T]` | c-algorithms RB/AVL, M*LIB B+ tree | as above plus `first`/`last`, `range(&K, &K)`, ordered `iter()` | O(log n) all ops |
-| `Heap[T]` | c-algorithms binary heap, STC `pqueue` | `push(T)`, `pop() -> Option[T]`, `peek() -> Option[&T]` | O(log n) push/pop, O(1) peek |
+| `HashMap[K, V]` / `HashSet[T]` | STC `hmap` / `hset` | `get` observes, `insert` owns inputs, `remove` transfers, `iter()` views | O(1) expected; delete O(cluster), no allocation |
+| `OrderedMap[K, V]` / `OrderedSet[T]` | STC `smap` / `sset` | ordered lookup, insertion, removal, range traversal | O(log n) lookup/insert/remove |
+| `BTreeMap[K, V]` / `BTreeSet[T]` | M*LIB `m-bptree` | ordered lookup, insertion, removal, range traversal | O(log n) lookup/insert/remove |
+| `PriorityQueue[T]` | STC `pqueue` | `push(T)`, `pop() -> Option[T]`, `peek() -> Option[&T]` | O(log n) push/pop, O(1) peek |
+| `BinaryHeap[T]` (optional public type) | c-algorithms binary heap | owning heap operations | O(log n) push/pop, O(1) peek |
 | `Deque[T]` | STC `deque` | `push_front/back(T)`, `pop_front/back() -> Option[T]`, `get(i) -> &T` | O(1) amortized ends, O(1) index |
 | `BitSet` | STC `cbits` | `set/clear/test`, `count`, `iter()` | O(1) bit ops, O(n/64) count |
-| `Vec[T].sort`, `sort_by`, `binary_search`, `lower_bound` | STC algorithms (shape set), byte engine | in-place, deterministic, stable variant for `sort_by` | O(n log n), O(log n) |
-| `Trie` | c-algorithms trie, TommyDS `trie` | `insert(&str, V)`, `get(&str)`, prefix iteration | O(key length) |
+| `Vec[T].sort`, `sort_by`, `binary_search`, `lower_bound` | STC algorithms | generic sorting and search; stability promised only for a verified `stable_sort` | O(n log n), O(log n) |
+| `Trie[V]` | c-algorithms trie | `insert(&str, V)`, `get(&str)`, prefix iteration | O(key length) |
+| `SortedVec[T]` | c-algorithms sorted array | sorted insertion, lookup, removal, views | O(log n) search, O(n) insert/remove |
 | `SlotMap[T]` (native) | `rt_core` + FIFO free list (#936) | unchanged | O(1) insert/remove/lookup |
 
 Each row gets its complexity fixture in the battery and its drop-audit
-cells; the engine column is decided by the benchmark table, not by this
-document.
+cells. These are facade planning sketches; existing language ownership and
+view contracts remain authoritative. Engine selection follows the ruling
+above, with benchmark evidence recorded during implementation.
 
 ## Phases and gates
 
 **Phase 0 — measure first (small, immediate).**
+Verification completed on Darwin arm64 at `-O1`: full build and test suite,
+byte-identical fixpoint, pinned v0.15.2.0 seed compatibility, compiler analysis
+(2,514,772 facts, zero violations), drop audit (119/119), and move audit
+(15/15). PCRE2 and zlib bundle drift checks passed byte-for-byte.
+
 The complexity-fixture lane and a stdlib inventory (`docs/stdlib_inventory.md`:
 every structure and algorithm we need, its complexity contract, current
-status). Winners cannot be chosen without the yardstick. SlotMap's native
+status). Engine validation needs this yardstick. SlotMap's native
 free list (#936) lands here too. Gate: lane green on today's containers
 with the known cliffs recorded as expected failures.
+
+Implementation (2026-09-12): [the inventory](stdlib_inventory.md) records the
+current engines and planned algorithm families. `with build :stdlib-complexity`
+is part of `:test`; [its fixtures](../test/complexity/README.md) check results,
+N/4N runtime growth, and allocation requests with `--trace-alloc`. The known
+#937/#938/#939 cost cliffs are explicit expected failures; incorrect results,
+crashes, and invalid measurement controls fail the lane.
+
+SlotMap now uses a FIFO free list and retires exhausted generations. Native
+fixtures cover reuse order, growth, stale handles, exhaustion, and exact Drop
+counts. Four SlotMap cells extend the drop audit. The runtime header grows from
+48 to 56 bytes, and each slot uses a four-byte next link instead of a one-byte
+occupancy flag; [ABI v4](with-abi.md) records that internal layout change.
+This phase migrates no new C corpus and chooses no new public API names.
 
 **Phase 1 — c-algorithms, whole.**
 The first container corpus through the pipeline; non-macro C, so the
 migrator work is the facade-shaped `void*` + callback idiom, not templates.
-Facades: `BTreeMap`/`BTreeSet` (RB or AVL, retiring the sorted-Vec
-implementation, #937), `Heap`/`PriorityQueue`, sorted array, trie; the hash
-table as the first alternate engine to benchmark against `rt_core`'s.
+Facades: `Trie`, `SortedVec`, and an owning binary-heap adapter, optionally
+exposed as `BinaryHeap`. RB/AVL trees and the hash table remain internal or
+comparison engines. This phase does not replace the default hash maps,
+`OrderedMap`, `PriorityQueue`, or `BTreeMap` with c-algorithms engines.
 Gate: upstream `test/` passes under With; facades' complexity fixtures
-green; drop audit green; #937 closed.
+green; drop audit green; comparison measurements recorded. #937 is retired
+by the M*LIB-backed `BTreeMap`/`BTreeSet` work in Phase 4.
 
 **Phase 2 — TommyDS, whole.**
-Performance engines: `hashdyn`/`hashlin` benchmarked against the Phase 1
-hash table and `rt_core`'s (#939 becomes "which engine wins", not a patch),
-tries, blocked arrays. The facade design item is node ownership (above).
-Gate: `check.c` passes under With; benchmark table recorded; HashMap
-engine decision made with numbers.
+Specialized indexing/storage engines: `hashtable`, `hashdyn`, `hashlin`,
+tries, and `arrayblk`. Benchmark the hash engines against Phase 1's hash
+table and today's `rt_core` engine; STC remains the selected default owning
+map engine. The facade design item is node ownership (above).
+Gate: `check.c` passes under With; benchmark table recorded; specialized
+adapters have complexity and drop evidence. #939 remains a Phase 3 gate.
 
 **Phase 3 — STC, whole: the macro-migrator campaign.**
 STC is valuable because its template mechanism is nasty: containers are
@@ -333,18 +437,28 @@ POD, `str`, fat views — STC's own instantiation set, extended in the
 corpus's build inputs when a shape is missing), or
 (b) the facade routes arbitrary `T` to a `void*` + `elem_size` engine from
 c-algorithms/TommyDS and keeps the STC engine for the concrete shapes it
-covers. Both keep the migrator raw; both are decided by benchmark and
-recorded next to the facade.
-Facades: `Deque`, `BitSet` (`cbits` is not generic — raw fits it
-directly), `Vec.sort`/`sort_by`/`binary_search`/`lower_bound` (#940),
-sequence algorithms; `VecIntoIter`'s cursor (#938) either from STC's vec
-iteration or native, by benchmark. Gate: STC's own `tests/` pass under
-With with no corpus-specific migrator code; #940 and #938 closed.
+covers. Both keep the migrator raw, but the second approach predates the
+engine-selection ruling above and is a comparison approach, not approval
+to replace STC for arbitrary `T`. Phase 3 must demonstrate how the selected
+STC engines support the generic facade contracts and record that design
+with benchmark evidence.
+Facades: `Vec`, `Deque`, `Stack`, `Queue`, `PriorityQueue`, `List`,
+`HashMap`/`HashSet`, `OrderedMap`/`OrderedSet`, `BitSet`, spans, and
+generic sequence algorithms including sorting and searches (#940).
+Use `cstr` selectively while preserving With's `str` semantics.
+`VecIntoIter` must use a linear cursor (#938); default hash deletion must
+meet the no-allocation complexity contract (#939).
+Gate: STC's own `tests/` pass under With with no corpus-specific migrator
+code; facade complexity fixtures and drop audit green; #938, #939, and
+#940 closed. Evaluate `stable_sort` separately against its stability
+contract before exposing it.
 
 **Phase 4 — M*LIB `m-bptree.h`, surgical.**
-Only the B+ tree, benchmarked against the Phase 1 tree for the ordered-map
-engine; the facade keeps whichever wins. Gate: M*LIB's bptree tests pass;
-decision recorded.
+Only the B+ tree, providing `BTreeMap`/`BTreeSet` and retiring their
+sorted-Vec implementation (#937). Benchmark against Phase 1's RB/AVL
+comparison engines; `OrderedMap`/`OrderedSet` retain STC's `smap`/`sset`.
+Gate: M*LIB's bptree tests pass under With; facade complexity fixtures and
+drop audit green; comparison measurements recorded; #937 closed.
 
 Order is fixed by risk: 1 validates the whole-corpus pipeline on a
 container library, 2 adds the performance yardstick, 3 is the campaign, 4
@@ -355,19 +469,22 @@ is a bounded extra.
 Each phase is done only when: the corpus migrates from its pin with zero
 hand edits; its upstream tests pass under With; every migrator change made
 for it is general (no corpus name in `with migrate`); the facades it feeds
-have complexity fixtures and drop-audit cells; the engine choice is
-recorded with numbers; and the issues it retires are closed with evidence.
+have complexity fixtures and drop-audit cells; the selected engine is
+implemented with benchmark evidence; and the issues it retires are closed
+with evidence.
 A green build with a silently mishandled corpus is 0% done (§"Good enough
 for now").
 
 ## Open questions for Eric
 
-1. (Ruled: D37 — the migrator is raw; generic facades over templated
-   engines choose between a declared instantiation set and a byte-engine
-   in Phase 3, by benchmark.)
+1. D37 settles that the migrator is raw, and the facade map settles primary
+   engines. Phase 3 still needs to demonstrate arbitrary-`T` support over
+   STC's concrete instantiations; comparison engines do not silently
+   become defaults.
 2. Where the corpora live and whether all of them build in every battery
    (proposal: yes, in a `corpora` lane — the coverage is the point; cost is
    build time, measured in Phase 1).
-3. Whether Phase 0's inventory should also rule on names and surfaces now
-   (`Heap` vs `PriorityQueue`, `BitSet` API), or leave that to each facade
-   PR.
+3. The facade map above settles primary engines and the broad public
+   grouping. Optional public types (`BinaryHeap`, `SortedVec`, specialized
+   indexes/storage) and detailed new API signatures remain facade-PR
+   decisions.
