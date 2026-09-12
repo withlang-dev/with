@@ -189,21 +189,13 @@ type Codegen {
     fn_values: HashMap[i32, i64],
     fn_fn_types: HashMap[i32, i64],
     generated_mir_body_syms: HashMap[i32, i32],
-    // C ABI: fns with struct params/returns transformed for C ABI.
-    // Maps fn sym → 1 if the fn has an sret return (first param is hidden sret ptr).
-    extern_fn_has_sret: HashMap[i32, i32],
-    // Maps fn sym → bitmask of param indices that are byval (after sret shift).
-    extern_fn_byval_params: HashMap[i32, i64],
-    // Maps fn sym → original struct types for byval params (parallel arrays).
-    extern_fn_byval_types: HashMap[i32, Vec[i64]],
-    // Maps fn sym → original return struct type (for sret).
-    extern_fn_sret_type: HashMap[i32, i64],
-    // Maps fn sym → bitmask of param indices directly packed for the target C ABI.
-    extern_fn_direct_params: HashMap[i32, i64],
-    // Maps fn sym → original struct types for direct params (parallel arrays).
-    extern_fn_direct_param_types: HashMap[i32, Vec[i64]],
-    // Maps fn sym → original return struct type for direct aggregate returns.
-    extern_fn_direct_ret_type: HashMap[i32, i64],
+    fn_abis: Vec[FnAbi],
+    fn_abi_args: Vec[ArgAbi],
+    fn_abi_cache: HashMap[str, i32],
+    fn_abi_symbols: HashMap[i32, i32],
+    fn_abi_callables: HashMap[i64, i32],
+    fn_abi_values: HashMap[i64, i32],
+    analysis_call_abis: HashMap[i64, i32],
 
     // Struct types: sym → index into struct_type_* arrays
     struct_type_map: HashMap[i32, i32],
@@ -392,8 +384,6 @@ type Codegen {
     fn_dyn_param_data: Vec[i32],
 
     // Fn ref params: fn_sym → start/count in flat array
-    fn_ref_param_starts: HashMap[i32, i32],
-    fn_ref_param_data: Vec[i32],
 
     // Result return tracking
     fn_result_err_symbols: HashMap[i32, i32],
@@ -652,11 +642,11 @@ impl Codegen:
     // declaration. Generic templates without an emitted LLVM function are facts,
     // not failures; every emitted function must have both the ref-table bit and a
     // pointer-shaped incoming parameter.
-    fn audit_declared_share_place_contracts():
+    mut fn audit_declared_share_place_contracts():
         if self.analysis_enabled == 0:
             return
         for si in 0..self.sema.sig_names.len() as i32:
-            let sema_sym = self.sema.sig_names[si]
+            let sema_sym: i32 = self.sema.sig_names[si]
             // Extern "C" callees have no With prologue: the C ABI decides their
             // parameter shape, so the share-place ref-table contract does not
             // apply. value_ref_abi still records caller-retains ownership.
@@ -666,14 +656,32 @@ impl Codegen:
             let fn_raw = self.fn_values.get(sema_sym)
             let fn_cg = self.fn_values.get(cg_sym)
             let function = if fn_raw.is_some(): fn_raw.unwrap() as i64 else if fn_cg.is_some(): fn_cg.unwrap() as i64 else: 0
+            let descriptor = self.fn_abi_symbols.get(sema_sym) ?? (self.fn_abi_symbols.get(cg_sym) ?? -1)
+            if function != 0 and descriptor < 0:
+                self.analysis_fail(f"declaration {self.sema.pool_resolve(sema_sym)} sig={si}: missing FnAbi")
             for pi in 0..self.sema.sig_get_param_count(si):
+                if function != 0 and descriptor >= 0:
+                    let abi: FnAbi = self.fn_abis[descriptor]
+                    if pi >= abi.arg_count:
+                        self.analysis_fail(f"declaration {self.sema.pool_resolve(sema_sym)} sig={si} param={pi}: absent from FnAbi")
+                        continue
+                    let arg = self.fn_abi_arg(descriptor, pi)
+                    let source_ty = self.abi_param_source_type(si, pi)
+                    let incoming = wl_get_param(function, pi + (if abi.ret.pass == PM_INDIRECT: 1 else: 0))
+                    if arg.source_ty != source_ty or incoming == 0 or wl_type_of(incoming) != arg.llvm_ty:
+                        self.analysis_fail(f"declaration {self.sema.pool_resolve(sema_sym)} sig={si} param={pi}: finalized source type or LLVM parameter disagrees with FnAbi")
+                    let expected_byval = if arg.pass == PM_INDIRECT and not arg.owned_place and codegen_c_abi_needs_byval_attr(): arg.source_ty else: 0
+                    if wl_get_byval_type(function, pi + (if abi.ret.pass == PM_INDIRECT: 1 else: 0), false) != expected_byval:
+                        self.analysis_fail(f"declaration {self.sema.pool_resolve(sema_sym)} sig={si} param={pi}: byval attribute disagrees with FnAbi")
+                    if (arg.pass == PM_INDIRECT_PLACE) != (self.sema.sig_param_uses_value_ref_abi(si, pi) != 0):
+                        self.analysis_fail(f"declaration {self.sema.pool_resolve(sema_sym)} sig={si} param={pi}: caller-place mode disagrees with finalized signature")
                 if self.sema.sig_param_uses_value_ref_abi(si, pi) == 0:
                     continue
                 let ref_table = self.is_ref_param(sema_sym, pi) or self.is_ref_param(cg_sym, pi)
                 var llvm_pointer = false
                 if function != 0:
-                    let sret_raw = self.extern_fn_has_sret.get(sema_sym)
-                    let sret_cg = self.extern_fn_has_sret.get(cg_sym)
+                    let sret_raw = self.fn_abi_has_sret(sema_sym)
+                    let sret_cg = self.fn_abi_has_sret(cg_sym)
                     let sret = if sret_raw.is_some(): sret_raw.unwrap() else if sret_cg.is_some(): sret_cg.unwrap() else: 0
                     let incoming = wl_get_param(function, pi + (if sret != 0: 1 else: 0))
                     llvm_pointer = incoming != 0 and wl_get_type_kind(wl_type_of(incoming)) == wl_pointer_type_kind()
@@ -712,8 +720,8 @@ impl Codegen:
             let fn_ty = if fn_ty_raw.is_some(): fn_ty_raw.unwrap() else if fn_ty_cg.is_some(): fn_ty_cg.unwrap() else: 0
             if fn_ty == 0:
                 continue
-            let sret_raw = self.extern_fn_has_sret.get(sema_sym)
-            let sret_cg = self.extern_fn_has_sret.get(cg_sym)
+            let sret_raw = self.fn_abi_has_sret(sema_sym)
+            let sret_cg = self.fn_abi_has_sret(cg_sym)
             let has_sret = (if sret_raw.is_some(): sret_raw.unwrap() else if sret_cg.is_some(): sret_cg.unwrap() else: 0) != 0
             let sema_ret = self.sema.sig_return_type(si)
             if sema_ret <= 0:
@@ -764,17 +772,24 @@ impl Codegen:
             return
         let sig = body.call_sig_index(args_id)
         let mono = body.call_mono_sym(args_id)
+        let call_key = (body.fn_sym as i64) * 4294967296 + args_id
+        let descriptor = self.analysis_call_abis.get(call_key) ?? (self.fn_abi_symbols.get(self.codegen_sym_for_sema_sym(mono)) ?? -1)
         let name = if mono != 0: with_str_clone_ref(self.sema.pool_resolve(mono)) else if sig >= 0 and sig < self.sema.sig_names.len() as i32: with_str_clone_ref(self.sema.pool_resolve(self.sema.sig_names[sig])) else: "<unresolved>"
         let op_kind = if operand >= 0 and operand < body.operand_kinds.len() as i32: body.operand_kinds[operand] else: -1
-        let share = sig >= 0 and param_index >= 0 and param_index < self.sema.sig_get_param_count(sig) and self.sema.sig_param_uses_value_ref_abi(sig, param_index) != 0
+        let has_descriptor = descriptor >= 0 and param_index >= 0 and param_index < self.fn_abis[descriptor].arg_count
+        let share = if has_descriptor: self.fn_abi_arg(descriptor, param_index).pass == PM_INDIRECT_PLACE else:
+            sig >= 0 and param_index >= 0 and param_index < self.sema.sig_get_param_count(sig) and self.sema.sig_param_uses_value_ref_abi(sig, param_index) != 0
         // Extern "C" callees use their recorded C ABI instead of the With
         // ref table. Their indirect-copy requirement is audited below.
         let sig_sym = if sig >= 0 and sig < self.sema.sig_names.len() as i32: self.sema.sig_names[sig] else: 0
         let callee_is_extern = sig_sym != 0 and self.sema.extern_fn_names.contains(sig_sym)
         let abi_sym = self.codegen_sym_for_sema_sym(if mono != 0: mono else: sig_sym)
-        let byval = self.extern_fn_byval_params.get(abi_sym)
-        let needs_copy = byval.is_some() and param_index >= 0 and param_index < 64 and
-            (byval.unwrap() & ((1 as i64) << (param_index as u32))) != 0 and not codegen_c_abi_needs_byval_attr()
+        let named_descriptor = self.fn_abi_symbols.get(abi_sym) ?? -1
+        let indirect = if has_descriptor: self.fn_abi_arg(descriptor, param_index).pass == PM_INDIRECT else:
+            named_descriptor >= 0 and param_index >= 0 and param_index < self.fn_abis[named_descriptor].arg_count and
+                self.fn_abi_arg(named_descriptor, param_index).pass == PM_INDIRECT
+        let owned_place = has_descriptor and self.fn_abi_arg(descriptor, param_index).owned_place
+        let needs_copy = indirect and not owned_place and not codegen_c_abi_needs_byval_attr()
         let ref_table = mono != 0 and self.is_ref_param(mono, param_index)
         var fact = AnalysisFact.new(AnalysisStage.Codegen, AnalysisFactKind.CodegenArgument)
         fact.id = operand
@@ -792,12 +807,14 @@ impl Codegen:
         let strategy_unmarshaled = strategy == AnalysisMarshalStrategy.DirectValue or strategy == AnalysisMarshalStrategy.MissingSignature
         let strategy_temp_copy = strategy == AnalysisMarshalStrategy.TemporaryAddress and (op_kind == OperandKind.OK_COPY or op_kind == OperandKind.OK_MOVE)
         let has_copy = strategy == AnalysisMarshalStrategy.TemporaryAddress
-        fact.detail = analysis_marshal_strategy_name(strategy) ++ f" raw={raw} marshaled={marshaled} sig={sig} sema-share={share} ref-table={ref_table} needs-copy={needs_copy}"
+        fact.detail = analysis_marshal_strategy_name(strategy) ++ f" raw={raw} marshaled={marshaled} sig={sig} fn-abi={descriptor} sema-share={share} ref-table={ref_table} needs-copy={needs_copy}"
         let selected = self.analysis_fact_selected(&fact)
         self.analysis_add(move fact)
+        if selected and has_descriptor and (marshaled == 0 or wl_type_of(marshaled) != self.fn_abi_arg(descriptor, param_index).llvm_ty):
+            self.analysis_fail(f"call {name} body={body.fn_sym} args={args_id} param={param_index}: marshaled LLVM type disagrees with FnAbi")
         if selected and needs_copy and not has_copy:
             self.analysis_fail(f"call {name} body={body.fn_sym} args={args_id} param={param_index}: indirect value parameter requires an explicit caller copy")
-        if selected and share and not callee_is_extern and not ref_table:
+        if selected and share and sig >= 0 and not callee_is_extern and not ref_table:
             self.analysis_fail(f"call {name} body={body.fn_sym} args={args_id} param={param_index}: Sema share-place contract is absent from Codegen ref table")
         if selected and share and not callee_is_extern and strategy_unmarshaled:
             self.analysis_fail(f"call {name} body={body.fn_sym} args={args_id} param={param_index}: share-place parameter was not marshaled as an address")
@@ -888,13 +905,13 @@ fn Codegen.init_with_opt(module_name: &str, opt_level: i32) -> Codegen:
         fn_values: HashMap.new(),
         fn_fn_types: HashMap.new(),
         generated_mir_body_syms: HashMap.new(),
-        extern_fn_has_sret: HashMap.new(),
-        extern_fn_byval_params: HashMap.new(),
-        extern_fn_byval_types: HashMap.new(),
-        extern_fn_sret_type: HashMap.new(),
-        extern_fn_direct_params: HashMap.new(),
-        extern_fn_direct_param_types: HashMap.new(),
-        extern_fn_direct_ret_type: HashMap.new(),
+        fn_abis: Vec.new(),
+        fn_abi_args: Vec.new(),
+        fn_abi_cache: HashMap.new(),
+        fn_abi_symbols: HashMap.new(),
+        fn_abi_callables: HashMap.new(),
+        fn_abi_values: HashMap.new(),
+        analysis_call_abis: HashMap.new(),
         struct_type_map: HashMap.new(),
         shadow_alias_map: HashMap.new(),
         struct_llvm_types: Vec.new(),
@@ -1003,8 +1020,6 @@ fn Codegen.init_with_opt(module_name: &str, opt_level: i32) -> Codegen:
         dyn_fat_ptr_type: 0,
         fn_dyn_param_starts: HashMap.new(),
         fn_dyn_param_data: Vec.new(),
-        fn_ref_param_starts: HashMap.new(),
-        fn_ref_param_data: Vec.new(),
         fn_result_err_symbols: HashMap.new(),
         fn_returns_result: HashMap.new(),
         fn_result_unit_returns: HashMap.new(),
@@ -1548,99 +1563,10 @@ impl Codegen:
         val
 
     mut fn gen_fn_to_fat_ptr_thunk(fn_val: i64, fat_ty: i64) -> i64:
-        // Create a thunk: fn __fn_thunk_N(ctx: ptr, params...) -> ret that calls fn_val(params...)
-        let ptr_ty = wl_ptr_type(self.context)
-        // Get the original function's type to determine params and return type
-        let orig_fn_ty = wl_global_get_value_type(fn_val)
-        if orig_fn_ty == 0:
-            // Can't determine function type — fall back to direct wrap (may mismatch)
-            var fat = wl_get_undef(fat_ty)
-            fat = wl_build_insert_value(self.builder, fat, fn_val, 0)
-            fat = wl_build_insert_value(self.builder, fat, wl_const_null(ptr_ty), 1)
-            return fat
-        let orig_param_count = wl_count_param_types(orig_fn_ty)
-        let orig_ret_ty = wl_get_return_type(orig_fn_ty)
-        // On win64 a concrete function returning an aggregate >8B is physically
-        // sret-lowered by declare_function: `void(ptr sret, real_args...)`. A
-        // closure fn type (mir_build_closure_fn_type), by contrast, is by-value
-        // (`AGG(ptr ctx, real_args...)`) and LLVM inserts the hidden sret pointer
-        // FIRST — so the physical closure convention is `void(sret, ctx, args)`.
-        // Naively prepending ctx to the sret-lowered concrete type yields
-        // `void(ctx, sret, args)`, swapping ctx and sret and corrupting the
-        // result (#806/#819). Rebuild the thunk by-value to match the closure
-        // convention, and let LLVM sret-lower both the thunk definition and the
-        // closure call site identically.
-        let concrete_sret_ty = wl_get_param_sret_type(fn_val, 0)
-        if concrete_sret_ty != 0:
-            let thunk_params: Vec[i64] = Vec.new()
-            thunk_params.push(ptr_ty)
-            // Real args are the concrete params after the leading sret pointer.
-            for pi in 1..orig_param_count:
-                thunk_params.push(wl_get_fn_param_type(orig_fn_ty, pi))
-            let thunk_fn_ty = wl_function_type(concrete_sret_ty, vec_data_i64(&thunk_params), thunk_params.len() as i32, 0)
-            let thunk_id = self.closure_counter
-            self.closure_counter = thunk_id + 1
-            let thunk_name = f"__fn_thunk_{thunk_id}"
-            let thunk_fn = wl_add_function(self.llmod, thunk_name, thunk_fn_ty)
-            wl_set_linkage(thunk_fn, wl_internal_linkage())
-            let saved_bb = wl_get_insert_block(self.builder)
-            let entry = wl_append_bb(self.context, thunk_fn, "entry")
-            wl_position_at_end(self.builder, entry)
-            // Result buffer for the concrete sret call; loaded back and returned
-            // by value so LLVM lowers the thunk return the same way the closure
-            // call site is lowered. Target the thunk explicitly — self.current_function
-            // still names the outer function that triggered the coercion.
-            let result_buf = wl_create_entry_alloca(self.builder, thunk_fn, concrete_sret_ty)
-            let call_args: Vec[i64] = Vec.new()
-            call_args.push(result_buf)
-            for pi in 1..orig_param_count:
-                call_args.push(wl_get_param(thunk_fn, pi))
-            let call = wl_build_call(self.builder, orig_fn_ty, fn_val, vec_data_i64(&call_args), orig_param_count)
-            wl_add_call_sret_attr(self.context, call, 0, concrete_sret_ty)
-            let loaded = wl_build_load(self.builder, concrete_sret_ty, result_buf)
-            wl_build_ret(self.builder, loaded)
-            wl_position_at_end(self.builder, saved_bb)
-            var fat_s = wl_get_undef(fat_ty)
-            fat_s = wl_build_insert_value(self.builder, fat_s, thunk_fn, 0)
-            fat_s = wl_build_insert_value(self.builder, fat_s, wl_const_null(ptr_ty), 1)
-            return fat_s
-        // Build thunk function type: fn(ptr, original_params...) -> original_ret
-        let thunk_params: Vec[i64] = Vec.new()
-        thunk_params.push(ptr_ty)
-        for pi in 0..orig_param_count:
-            thunk_params.push(wl_get_fn_param_type(orig_fn_ty, pi))
-        let thunk_fn_ty = wl_function_type(orig_ret_ty, vec_data_i64(&thunk_params), orig_param_count + 1, 0)
-        let thunk_id = self.closure_counter
-        self.closure_counter = thunk_id + 1
-        let thunk_name = f"__fn_thunk_{thunk_id}"
-        let thunk_fn = wl_add_function(self.llmod, thunk_name, thunk_fn_ty)
-        // Anonymous fat-ptr coercion thunk: referenced only by-address at its
-        // creation site (insert_value below), never by name across units. Give
-        // it internal linkage so globaldce can drop it when the coercion is
-        // dead — otherwise a dead thunk keeps its `call @callee` and breaks the
-        // link on targets without default dead-strip (linux gold, no
-        // --gc-sections). This is what lets a dead extern-fn alias DCE cleanly.
-        wl_set_linkage(thunk_fn, wl_internal_linkage())
-        // Generate thunk body
-        let saved_bb = wl_get_insert_block(self.builder)
-        let entry = wl_append_bb(self.context, thunk_fn, "entry")
-        wl_position_at_end(self.builder, entry)
-        // Call original function with params (skip ctx at index 0)
-        let call_args: Vec[i64] = Vec.new()
-        for pi in 0..orig_param_count:
-            call_args.push(wl_get_param(thunk_fn, pi + 1))
-        let result = wl_build_call(self.builder, orig_fn_ty, fn_val, vec_data_i64(&call_args), orig_param_count)
-        if wl_get_type_kind(orig_ret_ty) == wl_void_type_kind():
-            wl_build_ret_void(self.builder)
-        else:
-            wl_build_ret(self.builder, result)
-        // Restore insertion point
-        wl_position_at_end(self.builder, saved_bb)
-        // Build fat pointer { thunk_fn, null_ctx }
-        var fat = wl_get_undef(fat_ty)
-        fat = wl_build_insert_value(self.builder, fat, thunk_fn, 0)
-        fat = wl_build_insert_value(self.builder, fat, wl_const_null(ptr_ty), 1)
-        fat
+        let abi = self.fn_abi_values.get(fn_val) ?? -1
+        if abi < 0:
+            sema_phase_bug("BUG: function-value adapter has no FnAbi descriptor")
+        self.gen_fn_abi_thunk(fn_val, fat_ty, abi)
 
     fn coerce_struct_value(val: i64, target_ty: i64) -> i64:
         if val == 0 or target_ty == 0:
@@ -2202,24 +2128,18 @@ impl Codegen:
     mut fn coerce_call_args_for_fn_value(fn_sym: i32, fn_val: i64, args_start: i32, arg_node_base_index: i32, args: &Vec[i64], arg_count: i32, call_context: &str, call_node: i32) -> Vec[i64]:
         let out: Vec[i64] = Vec.new()
         let param_count = wl_count_params(fn_val)
-        let sret_opt = self.extern_fn_has_sret.get(fn_sym)
+        let sret_opt = self.fn_abi_has_sret(fn_sym)
         let has_sret = if sret_opt.is_some(): sret_opt.unwrap() else: 0
-        let byval_opt = self.extern_fn_byval_params.get(fn_sym)
-        let byval_mask = if byval_opt.is_some(): byval_opt.unwrap() as i64 else: 0
-        var byval_types: Vec[i64] = Vec.new()
-        let byval_types_opt = self.extern_fn_byval_types.get(fn_sym)
-        if byval_types_opt.is_some():
-            byval_types = vec_copy_i64(byval_types_opt.unwrap())
-        let direct_opt = self.extern_fn_direct_params.get(fn_sym)
-        let direct_mask = if direct_opt.is_some(): direct_opt.unwrap() as i64 else: 0
+        let descriptor = self.fn_abi_symbols.get(fn_sym) ?? -1
         let param_offset = if has_sret != 0: 1 else: 0
         for ai in 0..arg_count:
             var arg_val: i64 = args[ai]
             let actual_ai = ai + param_offset
             if actual_ai < param_count:
                 var param_ty = wl_type_of(wl_get_param(fn_val, actual_ai))
-                if (byval_mask & ((1 as i64) << (ai as u32))) != 0 and ai < byval_types.len() as i32 and byval_types[ai] != 0:
-                    param_ty = byval_types[ai]
+                if descriptor >= 0 and ai < self.fn_abis[descriptor].arg_count:
+                    let arg = self.fn_abi_arg(descriptor, ai)
+                    param_ty = if arg.pass == PM_INDIRECT_PLACE: arg.llvm_ty else: arg.source_ty
                 let arg_node = if args_start >= 0 and ai >= arg_node_base_index:
                     self.pool.get_extra(args_start + ai - arg_node_base_index)
                 else:
@@ -2232,34 +2152,19 @@ impl Codegen:
                             arg_val = self.build_dyn_trait_value_from_ptr(arg_val, info.type_sym, trait_sym)
                         else:
                             arg_val = self.build_dyn_trait_value(arg_val, info.type_sym, trait_sym)
-                // Read the ABI transform recorded when the declaration was made.
-                // A @[link_name] extern can occupy the same canonical symbol as
-                // an internal runtime helper. On Darwin arm64 its small aggregate
-                // parameter is physically an LLVM array, so coercing the native
-                // value directly would reject str -> array. Pack through the one
-                // recorded C-ABI descriptor before ordinary type coercion.
-                if (direct_mask & ((1 as i64) << (ai as u32))) != 0:
-                    out.push(self.c_abi_pack_direct_value(arg_val, param_ty))
-                    continue
                 arg_val = self.coerce_call_arg_to_param(arg_node, arg_val, param_ty, call_context, call_node, ai)
-                if (byval_mask & ((1 as i64) << (ai as u32))) != 0:
-                    var indirect_ty = param_ty
-                    if ai < byval_types.len() as i32 and byval_types[ai] != 0:
-                        indirect_ty = byval_types[ai]
-                    let tmp = self.create_entry_alloca(indirect_ty)
-                    let stored = self.enforce_coerced_type(arg_val, indirect_ty, "indirect aggregate argument")
-                    wl_build_store(self.builder, stored, tmp)
-                    out.push(tmp)
-                    continue
+                if descriptor >= 0 and ai < self.fn_abis[descriptor].arg_count:
+                    let place = if self.fn_abi_arg(descriptor, ai).pass == PM_INDIRECT_PLACE: arg_val else: 0
+                    arg_val = self.push_call_arg(descriptor, ai, arg_val, place)
             out.push(arg_val)
         out
 
     mut fn build_call_fn_value(fn_sym: i32, fn_val: i64, fn_ty: i64, args_start: i32, arg_node_base_index: i32, args: &Vec[i64], arg_count: i32, call_context: &str, call_node: i32) -> i64:
-        let sret_opt = self.extern_fn_has_sret.get(fn_sym)
+        let sret_opt = self.fn_abi_has_sret(fn_sym)
         let has_sret = if sret_opt.is_some(): sret_opt.unwrap() else: 0
         var sret_ty: i64 = 0
         if has_sret != 0:
-            let sret_ty_opt = self.extern_fn_sret_type.get(fn_sym)
+            let sret_ty_opt = self.fn_abi_sret_type(fn_sym)
             if sret_ty_opt.is_some():
                 sret_ty = sret_ty_opt.unwrap() as i64
         let coerced = self.coerce_call_args_for_fn_value(fn_sym, fn_val, args_start, arg_node_base_index, args, arg_count, call_context, call_node)
@@ -2271,19 +2176,15 @@ impl Codegen:
         for i in 0..coerced.len() as i32:
             final_args.push(coerced[i])
         let call_val = wl_build_call(self.builder, fn_ty, fn_val, vec_data_i64(&final_args), final_args.len() as i32)
-        var byval_mask: i64 = 0
         var byval_types: Vec[i64] = Vec.new()
-        let byval_opt = self.extern_fn_byval_params.get(fn_sym)
-        if byval_opt.is_some():
-            byval_mask = byval_opt.unwrap() as i64
-        let byval_types_opt = self.extern_fn_byval_types.get(fn_sym)
+        let byval_types_opt = self.fn_abi_symbol_byval_types(fn_sym)
         if byval_types_opt.is_some():
             byval_types = vec_copy_i64(byval_types_opt.unwrap())
-        self.apply_c_abi_call_attrs(call_val, has_sret, sret_ty, byval_mask, byval_types, arg_count, 0)
+        self.apply_c_abi_call_attrs(call_val, has_sret, sret_ty, byval_types, arg_count, 0)
         if has_sret != 0 and sret_buf != 0 and sret_ty != 0:
             return wl_build_load(self.builder, sret_ty, sret_buf)
         var direct_ret_ty: i64 = 0
-        let direct_ret_opt = self.extern_fn_direct_ret_type.get(fn_sym)
+        let direct_ret_opt = self.fn_abi_direct_ret_type(fn_sym)
         if direct_ret_opt.is_some():
             direct_ret_ty = direct_ret_opt.unwrap() as i64
         if direct_ret_ty != 0:
@@ -4466,172 +4367,35 @@ impl Codegen:
             if self.is_result_unit_return(ret_type_node):
                 self.fn_result_unit_returns.insert(name_sym, 1)
 
-        var has_ref_param = false
-        var pi = 0
-        while pi < param_count:
-            let p_name = self.pool.fn_param_name(param_start, pi)
+        if sema_sig_idx < 0 or self.sema.sig_get_param_count(sema_sig_idx) != param_count:
+            with_eprint(f"error: declaration {name_str} has no finalized FnAbi signature")
+            self.had_error = 1
+            self.current_method_owner_sym = saved_owner
+            return
+        for pi in 0..param_count:
             let p_type_node = self.pool.fn_param_type(param_start, pi)
-            // #D6: final Sema pass mode is authoritative for share-place. This
-            // branch must precede AST type fallbacks (including a missing type node)
-            // so declaration, caller marshalling, and callee binding cannot derive
-            // three different ABIs for the same signature.
-            if sema_sig_idx >= 0 and pi < self.sema.sig_get_param_count(sema_sig_idx) and
-               self.sema.sig_param_uses_value_ref_abi(sema_sig_idx, pi) != 0:
-                param_types.push(wl_ptr_type(self.context))
-                has_ref_param = true
-                self.record_ref_param_aliases(name_sym, alias_sym, method_key_sym, pi, param_count)
-                pi = pi + 1
-                continue
-            if p_type_node == 0:
-                param_types.push(self.type_fallback())
-                pi = pi + 1
-                continue
-
-            let p_kind = self.pool.kind(p_type_node)
-
-            // Method owner-type parameter: lower as pointer for struct types.
-            // Applies to self (pi==0) AND any other param of the same owner type.
-            if p_kind == NodeKind.NK_TYPE_NAMED:
-                let p_sym = self.pool.get_data0(p_type_node)
-                if method_owner_sym == 0 and p_name == self.sym_self and self.struct_type_map.get(p_sym).is_some():
-                    method_owner_sym = p_sym
-                if method_owner_sym != 0 and (p_sym == self.sym_Self or p_sym == method_owner_sym):
-                    // Only lower as pointer for struct/enum types; primitives and str pass by value.
-                    // str is in struct_type_map but has special value semantics (==, compare_str_eq).
-                    let is_str_owner = method_owner_sym == self.sym_str
-                    if not is_str_owner and (self.struct_type_map.get(method_owner_sym).is_some() or self.enum_type_map.get(method_owner_sym).is_some()):
-                        param_types.push(wl_ptr_type(self.context))
-                        has_ref_param = true
-                        self.record_ref_param_aliases(name_sym, alias_sym, method_key_sym, pi, param_count)
-                        pi = pi + 1
-                        continue
-
-            // fn type params → fat pointer
-            if p_kind == NodeKind.NK_TYPE_FN:
-                let ptr_ty = wl_ptr_type(self.context)
-                let fat: Vec[i64] = Vec.new()
-                fat.push(ptr_ty)
-                fat.push(ptr_ty)
-                param_types.push(wl_struct_type(self.context, vec_data_i64(&fat), 2, 0))
-                pi = pi + 1
-                continue
-            if p_kind == NodeKind.NK_TYPE_EXTERN_FN:
-                param_types.push(wl_ptr_type(self.context))
-                pi = pi + 1
-                continue
-
-            // dyn Trait params (plain or wrapped forms: &dyn, *dyn, Box[dyn]).
+            // A finalized signature supplies every source type and ownership
+            // mode. AST spelling must not turn an owned owner-type parameter
+            // (including move self) back into a borrowed pointer.
+            param_types.push(self.abi_param_source_type(sema_sig_idx, pi))
             let trait_sym = self.dyn_trait_from_type_node(p_type_node)
             if trait_sym != 0:
-                var dyn_ty = self.resolve_type(p_type_node)
-                if dyn_ty == 0:
-                    dyn_ty = self.type_fallback()
-                param_types.push(dyn_ty)
                 self.record_dyn_param(name_sym, pi, param_count, trait_sym)
-                if alias_sym != 0:
-                    self.record_dyn_param(alias_sym, pi, param_count, trait_sym)
-                if method_key_sym != 0:
-                    self.record_dyn_param(method_key_sym, pi, param_count, trait_sym)
-                pi = pi + 1
-                continue
-
-            // Reference params. The finalized Sema signature is canonical; the
-            // AST check is only for declarations that have no signature yet.
-            if (sema_sig_idx >= 0 and self.sig_param_is_explicit_ref(sema_sig_idx, pi)) or
-               (sema_sig_idx < 0 and p_kind == NodeKind.NK_TYPE_REF):
-                var ref_ty = self.resolve_type(p_type_node)
-                if ref_ty == 0:
-                    ref_ty = wl_ptr_type(self.context)
-                param_types.push(ref_ty)
-                has_ref_param = true
-                self.record_ref_param_aliases(name_sym, alias_sym, method_key_sym, pi, param_count)
-                pi = pi + 1
-                continue
-
-            var p_ty = self.resolve_type(p_type_node)
-            if p_ty == 0:
-                p_ty = wl_i32_type(self.context)
-            if wl_get_type_kind(p_ty) == wl_void_type_kind():
-                p_ty = wl_i32_type(self.context)
-            param_types.push(p_ty)
-            pi = pi + 1
+                if alias_sym != 0: self.record_dyn_param(alias_sym, pi, param_count, trait_sym)
+                if method_key_sym != 0: self.record_dyn_param(method_key_sym, pi, param_count, trait_sym)
 
         let cc_name = self.fn_callconv_name(meta)
         let uses_c_abi = self.fn_uses_c_abi(cc_name)
-        let actual_param_types: Vec[i64] = Vec.new()
-        let byval_types: Vec[i64] = Vec.new()
-        let direct_types: Vec[i64] = Vec.new()
-        let ptr_ty = wl_ptr_type(self.context)
-        var actual_ret_ty = ret_ty
-        var has_sret = 0
-        var sret_ty: i64 = 0
-        var byval_mask: i64 = 0
-        var direct_mask: i64 = 0
-        var direct_ret_ty: i64 = 0
-        if uses_c_abi:
-            if ret_ty != 0 and wl_get_type_kind(ret_ty) == wl_struct_type_kind():
-                let direct_ret_abi_ty = self.c_abi_direct_struct_return_type(ret_ty)
-                if direct_ret_abi_ty != 0:
-                    direct_ret_ty = ret_ty
-                    actual_ret_ty = direct_ret_abi_ty
-                else if codegen_c_abi_darwin_arm64() and self.c_abi_hfa_info(ret_ty) != 0:
-                    actual_ret_ty = ret_ty
-                else if self.c_abi_needs_sret(ret_ty):
-                    has_sret = 1
-                    sret_ty = ret_ty
-                    actual_ret_ty = wl_void_type(self.context)
-            if has_sret != 0:
-                actual_param_types.push(ptr_ty)
-            for abi_pi in 0..param_count:
-                let source_ty = param_types[abi_pi]
-                if wl_get_type_kind(source_ty) == wl_struct_type_kind():
-                    let direct_param_ty = self.c_abi_direct_struct_param_type(source_ty)
-                    if direct_param_ty != 0:
-                        actual_param_types.push(direct_param_ty)
-                        direct_mask = direct_mask | ((1 as i64) << (abi_pi as u32))
-                        byval_types.push(0)
-                        direct_types.push(source_ty)
-                        continue
-                    if self.c_abi_needs_indirect_param(source_ty):
-                        actual_param_types.push(ptr_ty)
-                        byval_mask = byval_mask | ((1 as i64) << (abi_pi as u32))
-                        byval_types.push(source_ty)
-                        direct_types.push(0)
-                        continue
-                actual_param_types.push(source_ty)
-                byval_types.push(0)
-                direct_types.push(0)
-        else if self.internal_abi_needs_sret(ret_ty):
-            has_sret = 1
-            sret_ty = ret_ty
-            actual_ret_ty = wl_void_type(self.context)
-            actual_param_types.push(ptr_ty)
-            for abi_pi2 in 0..param_count:
-                let source_ty2 = param_types[abi_pi2]
-                if self.internal_abi_needs_indirect_param(source_ty2):
-                    actual_param_types.push(ptr_ty)
-                    byval_mask = byval_mask | ((1 as i64) << (abi_pi2 as u32))
-                    byval_types.push(source_ty2)
-                    direct_types.push(0)
-                else:
-                    actual_param_types.push(source_ty2)
-                    byval_types.push(0)
-                    direct_types.push(0)
-        else:
-            for abi_pi in 0..param_count:
-                let source_ty3 = param_types[abi_pi]
-                if self.internal_abi_needs_indirect_param(source_ty3):
-                    actual_param_types.push(ptr_ty)
-                    byval_mask = byval_mask | ((1 as i64) << (abi_pi as u32))
-                    byval_types.push(source_ty3)
-                    direct_types.push(0)
-                else:
-                    actual_param_types.push(source_ty3)
-                    byval_types.push(0)
-                    direct_types.push(0)
-        let actual_param_count = actual_param_types.len() as i32
         let is_variadic = (flags / FnFlags.VARIADIC) % 2
-        let fn_type = wl_function_type(actual_ret_ty, vec_data_i64(&actual_param_types), actual_param_count, is_variadic)
+        let places: Vec[i32] = Vec.new()
+        for api in 0..param_count:
+            places.push(self.sig_abi_param_flags(sema_sig_idx, api))
+        let abi_index = self.compute_fn_abi(ret_ty, param_types, places, if uses_c_abi: FN_ABI_C else: FN_ABI_WITH, is_variadic)
+        let abi = self.fn_abis[abi_index]
+        let has_sret = if abi.ret.pass == PM_INDIRECT: 1 else: 0
+        let sret_ty = abi.ret.source_ty
+        let byval_types = self.fn_abi_byval_types(abi_index)
+        let fn_type = abi.llvm_ty
 
         // Use "main" for @[entry] functions
         var effective_name = if sema_name_str.len() > 0: sema_name_str else: self.function_symbol_name(name_sym)
@@ -4674,7 +4438,7 @@ impl Codegen:
         self.with_fn_link_names.insert(self.intern.intern(effective_name), 1)
         if has_sret != 0:
             wl_add_sret_attr(self.context, function, 0, sret_ty)
-        self.apply_c_abi_byval_attrs(function, byval_mask, byval_types, param_count, if has_sret != 0: 1 else: 0)
+        self.apply_c_abi_byval_attrs(function, byval_types, param_count, if has_sret != 0: 1 else: 0)
         self.apply_noalias_param_attrs_with_offset(function, param_start, param_count, if has_sret != 0: 1 else: 0)
 
         // Whole-program codegen internalizes non-prelude functions because imported
@@ -4723,12 +4487,9 @@ impl Codegen:
         if (flags / FnFlags.NOINLINE) % 2 == 1:
             wl_add_fn_attr(self.context, function, "noinline")
 
-        if has_sret != 0 or byval_mask != 0 or direct_mask != 0 or direct_ret_ty != 0:
-            self.record_c_abi_transform(name_sym, has_sret, sret_ty, byval_mask, vec_copy_i64(&byval_types), direct_mask, vec_copy_i64(&direct_types), direct_ret_ty)
-            if alias_sym != 0:
-                self.record_c_abi_transform(alias_sym, has_sret, sret_ty, byval_mask, vec_copy_i64(&byval_types), direct_mask, vec_copy_i64(&direct_types), direct_ret_ty)
-            if method_key_sym != 0:
-                self.record_c_abi_transform(method_key_sym, has_sret, sret_ty, byval_mask, move byval_types, direct_mask, move direct_types, direct_ret_ty)
+        self.bind_fn_abi(name_sym, abi_index, function)
+        self.bind_fn_abi(alias_sym, abi_index, function)
+        self.bind_fn_abi(method_key_sym, abi_index, function)
 
         self.fn_values.insert(name_sym, function)
         self.fn_fn_types.insert(name_sym, fn_type)
@@ -4743,12 +4504,9 @@ impl Codegen:
 
 // #D6: PassMode — the per-parameter ABI classification, the SINGLE source of
 // truth; the rule and the PM_* constants live in src/FnAbi.w
-// (docs/with-abi.md §4). `arg_pass_mode` feeds it Sema's share-place
-// verdict and the platform's aggregate rule; both the callee prologue
-// (declare_function_from_sig) and every call site read it, so caller and
-// callee can never disagree on how an argument is passed (that disagreement
-// is exactly the transparent T*/T** bug). Extend the classification THERE,
-// never per-path. See decisions.md D6, docs/fn_abi_descriptor_design.md.
+// (docs/with-abi.md §4). compute_fn_abi combines finalized signature facts
+// with the target's aggregate rules. Declarations, prologues, and calls read
+// the cached descriptor. Extend the classification there, never per-path.
 
 impl Codegen:
     mut fn abi_param_source_type(sig_idx: i32, pi: i32) -> i64:
@@ -4771,12 +4529,179 @@ impl Codegen:
         let resolved = self.sema.resolve_alias(ty as TypeId) as i32
         self.sema.get_type_kind(resolved) == TypeKind.TY_REF
 
-    mut fn arg_pass_mode(sig_idx: i32, pi: i32) -> i32:
-        let uses_value_ref_abi = self.sema.sig_param_uses_value_ref_abi(sig_idx, pi)
-        if uses_value_ref_abi != 0:
-            return fn_abi_pass_mode(uses_value_ref_abi, false)
-        let p_ty = self.abi_param_source_type(sig_idx, pi)
-        fn_abi_pass_mode(0, self.internal_abi_needs_indirect_param(p_ty))
+    fn sig_abi_param_flags(sig_idx: i32, pi: i32) -> i32:
+        self.sema.sig_param_uses_value_ref_abi(sig_idx, pi) |
+            (if self.sig_param_is_explicit_ref(sig_idx, pi): 2 else: 0) |
+            (if pi == 0 and self.sema.sig_is_drop_body(sig_idx): 4 else: 0)
+
+    // The sole physical classifier. The key includes finalized source LLVM
+    // types, declared place modes, and convention, so concrete specializations
+    // cannot reuse a template's descriptor. Pointer handles are lookup-only;
+    // neither hash iteration nor their numeric values affect emitted code.
+    mut fn compute_fn_abi(ret_ty: i64, source_types: &Vec[i64], places: &Vec[i32], convention: i32, variadic: i32) -> i32:
+        var key = f"{convention}:{variadic}:{ret_ty}"
+        for pi in 0..source_types.len():
+            key = key ++ f"/{source_types[pi]}:{places[pi]}"
+        let cached = self.fn_abi_cache.get(key)
+        if cached.is_some(): return cached.unwrap()
+        let ptr_ty = wl_ptr_type(self.context)
+        var ret = ArgAbi { source_ty: ret_ty, llvm_ty: ret_ty, pass: PM_DIRECT, reference: false, owned_place: false }
+        var indirect_return = false
+        if convention == FN_ABI_C:
+            if wl_get_type_kind(ret_ty) == wl_struct_type_kind():
+                let packed = self.c_abi_direct_struct_return_type(ret_ty)
+                if packed != 0:
+                    ret.llvm_ty = packed
+                else if not (codegen_c_abi_darwin_arm64() and self.c_abi_hfa_info(ret_ty) != 0) and self.c_abi_needs_sret(ret_ty):
+                    indirect_return = true
+        else:
+            indirect_return = self.internal_abi_needs_sret(ret_ty)
+        ret.pass = fn_abi_return_pass(convention, wl_get_type_kind(ret_ty) != wl_void_type_kind(), indirect_return)
+        if ret.pass == PM_INDIRECT:
+            ret.llvm_ty = wl_void_type(self.context)
+        let params: Vec[i64] = Vec.new()
+        if convention == FN_ABI_CLOSURE: params.push(ptr_ty)
+        if ret.pass == PM_INDIRECT: params.push(ptr_ty)
+        let classified: Vec[ArgAbi] = Vec.new()
+        for pi in 0..source_types.len():
+            let source_ty = source_types[pi]
+            let kind = wl_get_type_kind(source_ty)
+            let owned_place = fn_abi_owned_place((places[pi] & 4) != 0, kind == wl_struct_type_kind() or kind == wl_array_type_kind())
+            var arg = ArgAbi { source_ty: source_ty, llvm_ty: source_ty, pass: PM_DIRECT, reference: (places[pi] & 2) != 0, owned_place }
+            var indirect = false
+            if convention == FN_ABI_C:
+                if wl_get_type_kind(source_ty) == wl_struct_type_kind():
+                    let packed = self.c_abi_direct_struct_param_type(source_ty)
+                    if packed != 0:
+                        arg.llvm_ty = packed
+                    else if self.c_abi_needs_indirect_param(source_ty):
+                        indirect = true
+            else:
+                indirect = self.internal_abi_needs_indirect_param(source_ty)
+            arg.pass = fn_abi_argument_pass(places[pi] & 1, convention, indirect or owned_place)
+            if arg.pass == PM_INDIRECT or arg.pass == PM_INDIRECT_PLACE:
+                arg.llvm_ty = ptr_ty
+            params.push(arg.llvm_ty)
+            classified.push(arg)
+        let start = self.fn_abi_args.len() as i32
+        for arg in classified: self.fn_abi_args.push(arg)
+        let abi = FnAbi {
+            arg_start: start, arg_count: source_types.len() as i32,
+            ret, convention,
+            llvm_ty: wl_function_type(ret.llvm_ty, vec_data_i64(&params), params.len() as i32, variadic),
+        }
+        let index = self.fn_abis.len() as i32
+        self.fn_abis.push(abi)
+        self.fn_abi_cache.insert(key, index)
+        index
+
+    mut fn gen_fn_abi_thunk(fn_val: i64, fat_ty: i64, target_index: i32) -> i64:
+        let target: FnAbi = self.fn_abis[target_index]
+        let sources: Vec[i64] = Vec.new()
+        let places: Vec[i32] = Vec.new()
+        for pi in 0..target.arg_count:
+            let arg = self.fn_abi_arg(target_index, pi)
+            sources.push(arg.source_ty)
+            places.push((if arg.pass == PM_INDIRECT_PLACE: 1 else: 0) | (if arg.reference: 2 else: 0) | (if arg.owned_place: 4 else: 0))
+        let thunk_index = self.compute_fn_abi(target.ret.source_ty, sources, places, FN_ABI_CLOSURE, 0)
+        let thunk_abi: FnAbi = self.fn_abis[thunk_index]
+        let name = f"__fn_thunk_{self.closure_counter}"
+        self.closure_counter = self.closure_counter + 1
+        let function = wl_add_function(self.llmod, name, thunk_abi.llvm_ty)
+        wl_set_linkage(function, wl_internal_linkage())
+        let thunk_byval = self.fn_abi_byval_types(thunk_index)
+        self.apply_c_abi_byval_attrs(function, thunk_byval, target.arg_count, 1)
+        let saved_fn = self.current_function
+        let saved_bb = wl_get_insert_block(self.builder)
+        self.current_function = function
+        wl_position_at_end(self.builder, wl_append_bb(self.context, function, "entry"))
+        let args: Vec[i64] = Vec.new()
+        var result_buf: i64 = 0
+        let has_sret = if target.ret.pass == PM_INDIRECT: 1 else: 0
+        if has_sret != 0:
+            result_buf = self.create_entry_alloca(target.ret.source_ty)
+            args.push(result_buf)
+        for pi in 0..target.arg_count:
+            let incoming = self.fn_abi_arg(thunk_index, pi)
+            let outgoing = self.fn_abi_arg(target_index, pi)
+            var value = wl_get_param(function, pi + 1)
+            if incoming.pass == PM_INDIRECT:
+                value = wl_build_load(self.builder, incoming.source_ty, value)
+            args.push(self.push_call_arg(target_index, pi, value, if outgoing.pass == PM_INDIRECT_PLACE: value else: 0))
+        let call = wl_build_call(self.builder, target.llvm_ty, fn_val, vec_data_i64(&args), args.len() as i32)
+        let target_byval = self.fn_abi_byval_types(target_index)
+        self.apply_c_abi_call_attrs(call, has_sret, target.ret.source_ty, target_byval, target.arg_count, 0)
+        if target.ret.pass == PM_IGNORE:
+            wl_build_ret_void(self.builder)
+        else:
+            var result = call
+            if has_sret != 0:
+                result = wl_build_load(self.builder, target.ret.source_ty, result_buf)
+            else if target.ret.llvm_ty != target.ret.source_ty:
+                result = self.c_abi_unpack_direct_value(call, target.ret.source_ty)
+            wl_build_ret(self.builder, result)
+        self.current_function = saved_fn
+        wl_position_at_end(self.builder, saved_bb)
+        var fat = wl_get_undef(fat_ty)
+        fat = wl_build_insert_value(self.builder, fat, function, 0)
+        wl_build_insert_value(self.builder, fat, wl_const_null(wl_ptr_type(self.context)), 1)
+
+    fn fn_abi_arg(abi: i32, pi: i32) -> ArgAbi: self.fn_abi_args[self.fn_abis[abi].arg_start + pi]
+
+    // Both MIR operands and synthesized/thunk values arrive here after their
+    // semantic adjustments. Only this routine turns an ArgAbi into a value,
+    // a pointer to a copy, or a pointer to the caller's place.
+    mut fn push_call_arg(abi: i32, pi: i32, value: i64, place: i64) -> i64:
+        let arg = self.fn_abi_arg(abi, pi)
+        self.analysis_last_marshal_strategy = AnalysisMarshalStrategy.DirectValue
+        if arg.owned_place and place != 0:
+            self.analysis_last_marshal_strategy = AnalysisMarshalStrategy.ExistingPointer
+            return place
+        if arg.pass == PM_INDIRECT_PLACE and place != 0:
+            self.analysis_last_marshal_strategy = AnalysisMarshalStrategy.PlaceAddress
+            return place
+        if arg.pass == PM_INDIRECT and place != 0 and codegen_c_abi_needs_byval_attr():
+            self.analysis_last_marshal_strategy = AnalysisMarshalStrategy.ExistingPointer
+            return place
+        if arg.pass == PM_INDIRECT or arg.pass == PM_INDIRECT_PLACE:
+            let stored = self.enforce_coerced_type(value, arg.source_ty, "FnAbi indirect argument")
+            let slot = self.create_entry_alloca(arg.source_ty)
+            wl_build_store(self.builder, stored, slot)
+            self.analysis_last_marshal_strategy = AnalysisMarshalStrategy.TemporaryAddress
+            return slot
+        if arg.llvm_ty != arg.source_ty:
+            return self.c_abi_pack_direct_value(value, arg.llvm_ty)
+        self.enforce_coerced_type(value, arg.llvm_ty, "FnAbi direct argument")
+
+    fn fn_abi_byval_types(abi: i32) -> Vec[i64]:
+        let result: Vec[i64] = Vec.new()
+        for pi in 0..self.fn_abis[abi].arg_count:
+            let arg = self.fn_abi_arg(abi, pi)
+            result.push(if arg.pass == PM_INDIRECT and not arg.owned_place: arg.source_ty else: 0)
+        result
+
+    fn bind_fn_abi_owned_place(body: &MirBody, sym: i32, pi: i32, name: i32, incoming: i64) -> bool:
+        let index = self.fn_abi_symbols.get(sym) ?? -1
+        if index < 0 or not self.fn_abi_arg(index, pi).owned_place: return false
+        let arg = self.fn_abi_arg(index, pi)
+        self.record_local(name, incoming, arg.source_ty, 1)
+        self.record_local_sema_type(name, body.local_type_ids[pi + 1])
+        self.mir_local_ptrs.insert(pi + 1, incoming)
+        self.mir_local_types.insert(pi + 1, arg.source_ty)
+        self.record_codegen_param_binding(body, sym, pi, AnalysisMarshalStrategy.CalleeOwnedPlace, incoming, incoming)
+        true
+
+    fn fn_abi_direct_types(abi: i32) -> Vec[i64]:
+        let result: Vec[i64] = Vec.new()
+        for pi in 0..self.fn_abis[abi].arg_count:
+            let arg = self.fn_abi_arg(abi, pi)
+            result.push(if arg.pass == PM_DIRECT and arg.llvm_ty != arg.source_ty: arg.source_ty else: 0)
+        result
+
+    fn bind_fn_abi(sym: i32, index: i32, function: i64):
+        if sym == 0: return
+        self.fn_abi_symbols.insert(sym, index)
+        if function != 0: self.fn_abi_values.insert(function, index)
 
     mut fn declare_function_from_sig(fn_sym: i32, sig_idx: i32, force_internal: i32):
         if fn_sym == 0 or sig_idx < 0:
@@ -4798,44 +4723,16 @@ impl Codegen:
         let param_count = self.sema.sig_get_param_count(sig_idx)
         let param_types: Vec[i64] = Vec.new()
         for pi in 0..param_count:
-            var p_ty = self.abi_param_source_type(sig_idx, pi)
-            // #D6: the prologue reads the single ABI classifier — an IndirectPlace
-            // param is a pointer to the caller's place (value_ref_abi / share-place).
-            let pass_mode = self.arg_pass_mode(sig_idx, pi)
-            if pass_mode == PM_INDIRECT_PLACE:
-                p_ty = wl_ptr_type(self.context)
-            if pass_mode == PM_INDIRECT_PLACE or self.sig_param_is_explicit_ref(sig_idx, pi):
-                self.record_ref_param(cg_sym, pi, param_count)
-                if cg_sym != fn_sym:
-                    self.record_ref_param(fn_sym, pi, param_count)
+            let p_ty = self.abi_param_source_type(sig_idx, pi)
             param_types.push(p_ty)
 
-        var actual_ret_ty = ret_ty
-        var has_sret = 0
-        var sret_ty: i64 = 0
-        var byval_mask: i64 = 0
-        let byval_types: Vec[i64] = Vec.new()
-        let direct_types: Vec[i64] = Vec.new()
-        let actual_param_types: Vec[i64] = Vec.new()
-        if self.internal_abi_needs_sret(ret_ty):
-            has_sret = 1
-            sret_ty = ret_ty
-            actual_ret_ty = wl_void_type(self.context)
-            actual_param_types.push(wl_ptr_type(self.context))
-        for api in 0..param_count:
-            let source_ty = param_types[api]
-            // #D6: byval indirection is the Indirect pass mode (callee-owned copy).
-            if self.arg_pass_mode(sig_idx, api) == PM_INDIRECT:
-                actual_param_types.push(wl_ptr_type(self.context))
-                byval_mask = byval_mask | ((1 as i64) << (api as u32))
-                byval_types.push(source_ty)
-                direct_types.push(0)
-            else:
-                actual_param_types.push(source_ty)
-                byval_types.push(0)
-                direct_types.push(0)
-
-        let fn_type = wl_function_type(actual_ret_ty, vec_data_i64(&actual_param_types), actual_param_types.len() as i32, self.sema.sig_is_variadic(sig_idx))
+        let places: Vec[i32] = Vec.new()
+        for pi in 0..param_count: places.push(self.sig_abi_param_flags(sig_idx, pi))
+        let abi_index = self.compute_fn_abi(ret_ty, param_types, places, FN_ABI_WITH, self.sema.sig_is_variadic(sig_idx))
+        let abi = self.fn_abis[abi_index]
+        let has_sret = if abi.ret.pass == PM_INDIRECT: 1 else: 0
+        let sret_ty = abi.ret.source_ty
+        let fn_type = abi.llvm_ty
         // #839: reuse only a same-typed entry. A mismatched occupant (e.g. a
         // link_name extern claiming this bare name) keeps the C symbol; the
         // With fn takes an LLVM-uniquified name — resolution is value-keyed.
@@ -4846,10 +4743,8 @@ impl Codegen:
         self.with_fn_link_names.insert(self.intern.intern(effective_name), 1)
         if has_sret != 0:
             wl_add_sret_attr(self.context, function, 0, sret_ty)
-        if has_sret != 0 or byval_mask != 0:
-            self.record_c_abi_transform(cg_sym, has_sret, sret_ty, byval_mask, vec_copy_i64(&byval_types), 0, vec_copy_i64(&direct_types), 0)
-            if cg_sym != fn_sym:
-                self.record_c_abi_transform(fn_sym, has_sret, sret_ty, byval_mask, move byval_types, 0, move direct_types, 0)
+        self.bind_fn_abi(cg_sym, abi_index, function)
+        if cg_sym != fn_sym: self.bind_fn_abi(fn_sym, abi_index, function)
         if force_internal != 0:
             let promoted_fi = self.unit_promoted_name(fn_sym, effective_name)
             if promoted_fi.len() > 0:
@@ -4976,30 +4871,10 @@ impl Codegen:
         false
 
     fn is_ref_param(fn_sym: i32, param_idx: i32) -> bool:
-        let start_opt = self.fn_ref_param_starts.get(fn_sym)
-        if not start_opt.is_some():
-            return false
-        let start = start_opt.unwrap()
-        let slot = start + param_idx
-        if slot < 0 or slot >= self.fn_ref_param_data.len() as i32:
-            return false
-        self.fn_ref_param_data[slot] != 0
-
-    mut fn record_ref_param(fn_sym: i32, idx: i32, count: i32):
-        if not self.fn_ref_param_starts.get(fn_sym).is_some():
-            let start = self.fn_ref_param_data.len() as i32
-            self.fn_ref_param_starts.insert(fn_sym, start)
-            for j in 0..count:
-                self.fn_ref_param_data.push(0)
-        let base: i32 = self.fn_ref_param_starts.get(fn_sym).unwrap()
-        self.fn_ref_param_data[(base + idx)] = 1
-
-    mut fn record_ref_param_aliases(fn_sym: i32, alias_sym: i32, method_key_sym: i32, idx: i32, count: i32):
-        self.record_ref_param(fn_sym, idx, count)
-        if alias_sym != 0:
-            self.record_ref_param(alias_sym, idx, count)
-        if method_key_sym != 0:
-            self.record_ref_param(method_key_sym, idx, count)
+        let index = self.fn_abi_symbols.get(fn_sym) ?? -1
+        if index < 0 or param_idx < 0 or param_idx >= self.fn_abis[index].arg_count: return false
+        let arg = self.fn_abi_arg(index, param_idx)
+        arg.pass == PM_INDIRECT_PLACE or arg.reference
 
     fn apply_noalias_param_attrs(function: i64, param_start: i32, param_count: i32):
         self.apply_noalias_param_attrs_with_offset(function, param_start, param_count, 0)
@@ -5100,27 +4975,22 @@ impl Codegen:
             return false
         fn_abi_platform_aggregate_indirect(true, true, self.abi_size_of(ty))
 
-    // #806/D6: the LLVM param type a fat-closure signature must declare for a
-    // value of `val_ty`. A win64 aggregate >8B is passed indirectly (pointer):
-    // the closure callee (gen_closure / mir_build_closure_fn_type) declares
-    // `ptr` and loads its own copy, so every inline closure-call site must
-    // declare `ptr` too or caller and callee disagree on the argument shape and
-    // the aggregate arrives corrupted (#806). No-op on non-win64.
-    mut fn closure_abi_param_ty(val_ty: i64) -> i64:
-        if self.internal_abi_needs_indirect_param(val_ty):
-            return wl_ptr_type(self.context)
-        val_ty
+    // Intrinsic iterator adapters synthesize one owned argument at a time.
+    // Their declarations and calls still consume the same interned descriptor.
+    mut fn closure_value_arg_abi(val_ty: i64) -> i32:
+        let sources: Vec[i64] = Vec.new()
+        sources.push(val_ty)
+        let places: Vec[i32] = Vec.new()
+        places.push(0)
+        self.compute_fn_abi(wl_void_type(self.context), sources, places, FN_ABI_CLOSURE, 0)
 
-    // #806/D6: marshal a by-value closure argument to match closure_abi_param_ty.
-    // For a win64-indirect param, materialize a caller-owned copy and pass its
-    // address (the callee loads its own copy from it); otherwise pass the value
-    // unchanged. No-op on non-win64.
+    mut fn closure_abi_param_ty(val_ty: i64) -> i64:
+        let abi = self.closure_value_arg_abi(val_ty)
+        self.fn_abi_arg(abi, 0).llvm_ty
+
     mut fn closure_abi_arg(val_ty: i64, val: i64) -> i64:
-        if self.internal_abi_needs_indirect_param(val_ty):
-            let a = self.create_entry_alloca(val_ty)
-            wl_build_store(self.builder, val, a)
-            return a
-        val
+        let abi = self.closure_value_arg_abi(val_ty)
+        self.push_call_arg(abi, 0, val, 0)
 
     mut fn c_abi_needs_sret(ret_ty: i64) -> bool:
         if ret_ty == 0:
@@ -5308,29 +5178,41 @@ impl Codegen:
         self.emit_llvm_memcpy(source_slot, abi_slot, self.abi_size_of(original_ty))
         wl_build_load(self.builder, original_ty, source_slot)
 
-    fn record_c_abi_transform(fn_sym: i32, has_sret: i32, sret_ty: i64, byval_mask: i64, byval_types: Vec[i64], direct_mask: i64, direct_types: Vec[i64], direct_ret_ty: i64):
-        if fn_sym == 0:
-            return
-        if has_sret == 0 and byval_mask == 0 and direct_mask == 0 and direct_ret_ty == 0:
-            return
-        self.extern_fn_has_sret.insert(fn_sym, has_sret)
-        self.extern_fn_byval_params.insert(fn_sym, byval_mask)
-        self.extern_fn_byval_types.insert(fn_sym, move byval_types)
-        self.extern_fn_direct_params.insert(fn_sym, direct_mask)
-        self.extern_fn_direct_param_types.insert(fn_sym, move direct_types)
-        if has_sret != 0:
-            self.extern_fn_sret_type.insert(fn_sym, sret_ty)
-        if direct_ret_ty != 0:
-            self.extern_fn_direct_ret_type.insert(fn_sym, direct_ret_ty)
+    // Compatibility projections for the runtime/intrinsic call builders and
+    // prologues. These read FnAbi; there are no parallel ABI tables to drift.
+    fn fn_abi_has_sret(sym: i32) -> Option[i32]:
+        let index = self.fn_abi_symbols.get(sym) ?? -1
+        if index < 0: return .None
+        .Some(if self.fn_abis[index].ret.pass == PM_INDIRECT: 1 else: 0)
 
-    fn apply_c_abi_byval_attrs(function: i64, byval_mask: i64, byval_types: &Vec[i64], param_count: i32, param_offset: i32):
-        if function == 0 or byval_mask == 0:
+    fn fn_abi_sret_type(sym: i32) -> Option[i64]:
+        let index = self.fn_abi_symbols.get(sym) ?? -1
+        if index < 0 or self.fn_abis[index].ret.pass != PM_INDIRECT: return .None
+        .Some(self.fn_abis[index].ret.source_ty)
+
+    fn fn_abi_symbol_byval_types(sym: i32) -> Option[Vec[i64]]:
+        let index = self.fn_abi_symbols.get(sym) ?? -1
+        if index < 0: return .None
+        .Some(self.fn_abi_byval_types(index))
+
+    fn fn_abi_direct_param_types(sym: i32) -> Option[Vec[i64]]:
+        let index = self.fn_abi_symbols.get(sym) ?? -1
+        if index < 0: return .None
+        .Some(self.fn_abi_direct_types(index))
+
+    fn fn_abi_direct_ret_type(sym: i32) -> Option[i64]:
+        let index = self.fn_abi_symbols.get(sym) ?? -1
+        if index < 0: return .None
+        let ret = self.fn_abis[index].ret
+        if ret.pass != PM_DIRECT or ret.llvm_ty == ret.source_ty: return .None
+        .Some(ret.source_ty)
+
+    fn apply_c_abi_byval_attrs(function: i64, byval_types: &Vec[i64], param_count: i32, param_offset: i32):
+        if function == 0:
             return
         if not codegen_c_abi_needs_byval_attr():
             return
         for pi in 0..param_count:
-            if (byval_mask & ((1 as i64) << (pi as u32))) == 0:
-                continue
             if pi >= byval_types.len() as i32:
                 continue
             let byval_ty = byval_types[pi]
@@ -5338,26 +5220,27 @@ impl Codegen:
                 continue
             wl_add_param_byval_attr(self.context, function, pi + param_offset, byval_ty)
 
-    fn apply_c_abi_call_attrs(call_val: i64, has_sret: i32, sret_ty: i64, byval_mask: i64, byval_types: &Vec[i64], original_arg_count: i32, arg_prefix_count: i32):
+    fn apply_c_abi_call_attrs(call_val: i64, has_sret: i32, sret_ty: i64, byval_types: &Vec[i64], original_arg_count: i32, arg_prefix_count: i32):
         if call_val == 0:
             return
         var byval_offset = arg_prefix_count
         if has_sret != 0 and sret_ty != 0:
             wl_add_call_sret_attr(self.context, call_val, arg_prefix_count, sret_ty)
             byval_offset = byval_offset + 1
-        if byval_mask == 0:
-            return
         if not codegen_c_abi_needs_byval_attr():
             return
         for ai in 0..original_arg_count:
-            if (byval_mask & ((1 as i64) << (ai as u32))) == 0:
-                continue
             if ai >= byval_types.len() as i32:
                 continue
             let byval_ty = byval_types[ai]
             if byval_ty == 0:
                 continue
             wl_add_call_param_byval_attr(self.context, call_val, byval_offset + ai, byval_ty)
+        if self.analysis_enabled != 0:
+            for ai in 0..original_arg_count:
+                let expected = if ai < byval_types.len(): byval_types[ai] else: 0
+                if wl_get_byval_type(call_val, byval_offset + ai, true) != expected:
+                    self.analysis_fail(f"call parameter {ai}: byval attribute disagrees with FnAbi")
 
     // ── Declare extern fn ─────────────────────────────────────────────
 
@@ -5386,81 +5269,21 @@ impl Codegen:
         let orig_param_types: Vec[i64] = Vec.new()
         for pi in 0..param_count:
             let p_type_node = self.pool.fn_param_type(param_start, pi)
-            // Read the same place classification as With declarations.
-            // Indirect copies retain their aggregate type for C marshalling.
-            if sema_sig_idx >= 0 and self.arg_pass_mode(sema_sig_idx, pi) == PM_INDIRECT_PLACE:
-                orig_param_types.push(wl_ptr_type(self.context))
-            else:
-                orig_param_types.push(self.resolve_type(p_type_node))
-            if (sema_sig_idx >= 0 and self.sig_param_is_explicit_ref(sema_sig_idx, pi)) or
-               (sema_sig_idx < 0 and self.pool.kind(p_type_node) == NodeKind.NK_TYPE_REF):
-                self.record_ref_param(name_sym, pi, param_count)
+            orig_param_types.push(self.resolve_type(p_type_node))
 
         // ABI transformation for C interop on aarch64:
         // - Struct params > 16 bytes → ptr (caller passes pointer to copy)
         // - Struct returns > 16 bytes → void return + hidden sret ptr first param
-        let ptr_ty = wl_ptr_type(self.context)
-        var has_sret = 0
-        var sret_ty: i64 = 0
-        var byval_mask: i64 = 0
-        let byval_types: Vec[i64] = Vec.new()
-        var direct_mask: i64 = 0
-        let direct_types: Vec[i64] = Vec.new()
-        var direct_ret_ty: i64 = 0
-
-        // Check return type: direct C ABI aggregate, C sret, or internal With sret.
-        var actual_ret_ty = ret_ty
-        if uses_internal_abi:
-            if self.internal_abi_needs_sret(ret_ty):
-                has_sret = 1
-                sret_ty = ret_ty
-                actual_ret_ty = wl_void_type(self.context)
-        else if ret_ty != 0 and wl_get_type_kind(ret_ty) == wl_struct_type_kind():
-            let direct_ret_abi_ty = self.c_abi_direct_struct_return_type(ret_ty)
-            if direct_ret_abi_ty != 0:
-                direct_ret_ty = ret_ty
-                actual_ret_ty = direct_ret_abi_ty
-            else if codegen_c_abi_darwin_arm64() and self.c_abi_hfa_info(ret_ty) != 0:
-                actual_ret_ty = ret_ty
-            else if self.c_abi_needs_sret(ret_ty):
-                has_sret = 1
-                sret_ty = ret_ty
-                actual_ret_ty = wl_void_type(self.context)
-
-        // Build final param list with ABI transformations
-        let param_types: Vec[i64] = Vec.new()
-        if has_sret != 0:
-            param_types.push(ptr_ty)  // hidden sret param at index 0
-
+        let places: Vec[i32] = Vec.new()
         for pi in 0..param_count:
-            let orig_ty = orig_param_types[pi]
-            if uses_internal_abi:
-                if self.internal_abi_needs_indirect_param(orig_ty):
-                    param_types.push(ptr_ty)
-                    byval_mask = byval_mask | ((1 as i64) << (pi as u32))
-                    byval_types.push(orig_ty)
-                    direct_types.push(0)
-                    continue
-            else if wl_get_type_kind(orig_ty) == wl_struct_type_kind():
-                let direct_param_ty = self.c_abi_direct_struct_param_type(orig_ty)
-                if direct_param_ty != 0:
-                    param_types.push(direct_param_ty)
-                    direct_mask = direct_mask | ((1 as i64) << (pi as u32))
-                    byval_types.push(0)
-                    direct_types.push(orig_ty)
-                    continue
-                if self.c_abi_needs_indirect_param(orig_ty):
-                    param_types.push(ptr_ty)
-                    byval_mask = byval_mask | ((1 as i64) << (pi as u32))
-                    byval_types.push(orig_ty)
-                    direct_types.push(0)
-                    continue
-            param_types.push(orig_ty)
-            byval_types.push(0)
-            direct_types.push(0)
-
-        let actual_param_count = param_types.len() as i32
-        let fn_type = wl_function_type(actual_ret_ty, vec_data_i64(&param_types), actual_param_count, is_variadic)
+            places.push(if sema_sig_idx >= 0: self.sig_abi_param_flags(sema_sig_idx, pi) else:
+                if self.pool.kind(self.pool.fn_param_type(param_start, pi)) == NodeKind.NK_TYPE_REF: 2 else: 0)
+        let abi_index = self.compute_fn_abi(ret_ty, orig_param_types, places, if uses_internal_abi: FN_ABI_WITH else: FN_ABI_C, is_variadic)
+        let abi = self.fn_abis[abi_index]
+        let has_sret = if abi.ret.pass == PM_INDIRECT: 1 else: 0
+        let sret_ty = abi.ret.source_ty
+        let byval_types = self.fn_abi_byval_types(abi_index)
+        let fn_type = abi.llvm_ty
 
         // @[link_name("symbol")] overrides the C symbol this extern links against
         // (stored as a "link_name:" callconv prefix). Otherwise canonicalize the
@@ -5490,11 +5313,9 @@ impl Codegen:
 
         if has_sret != 0:
             wl_add_sret_attr(self.context, function, 0, sret_ty)
-        self.apply_c_abi_byval_attrs(function, byval_mask, byval_types, param_count, if has_sret != 0: 1 else: 0)
+        self.apply_c_abi_byval_attrs(function, byval_types, param_count, if has_sret != 0: 1 else: 0)
 
-        // Record ABI transformations for call sites
-        if has_sret != 0 or byval_mask != 0 or direct_mask != 0 or direct_ret_ty != 0:
-            self.record_c_abi_transform(name_sym, has_sret, sret_ty, byval_mask, vec_copy_i64(&byval_types), direct_mask, vec_copy_i64(&direct_types), direct_ret_ty)
+        self.bind_fn_abi(name_sym, abi_index, function)
 
         self.apply_noalias_param_attrs_with_offset(function, param_start, param_count, if has_sret != 0: 1 else: 0)
 
@@ -5524,7 +5345,7 @@ impl Codegen:
             if not self.fn_values.get(canonical_sym).is_some():
                 self.fn_values.insert(canonical_sym, function)
                 self.fn_fn_types.insert(canonical_sym, actual_fn_type)
-                self.record_c_abi_transform(canonical_sym, has_sret, sret_ty, byval_mask, move byval_types, direct_mask, move direct_types, direct_ret_ty)
+                self.bind_fn_abi(canonical_sym, abi_index, function)
 
     fn resolve_callconv(name: &str) -> i32:
         if name == "c": return wl_cc_c()
@@ -6018,37 +5839,15 @@ impl Codegen:
             self.had_error = 1
             return self.invalid_concrete_mir_function()
         let ret_ty = if ret_sema != 0: self.sema_type_to_llvm(ret_sema) else: wl_void_type(self.context)
-        var actual_ret_ty = ret_ty
-        var has_sret = 0
-        var byval_mask: i64 = 0
-        let byval_types: Vec[i64] = Vec.new()
-        let direct_types: Vec[i64] = Vec.new()
-        let actual_params: Vec[i64] = Vec.new()
-        if not is_async and self.internal_abi_needs_sret(ret_ty):
-            has_sret = 1
-            actual_ret_ty = wl_void_type(self.context)
-            actual_params.push(wl_ptr_type(self.context))
+        let sources: Vec[i64] = Vec.new()
+        let places: Vec[i32] = Vec.new()
         for pi in 0..param_count:
-            let param_ty = self.abi_param_source_type(sig_idx, pi)
-            if self.sema.sig_param_uses_value_ref_abi(sig_idx, pi) != 0:
-                actual_params.push(wl_ptr_type(self.context))
-                byval_types.push(0)
-                direct_types.push(0)
-            else if is_async:
-                actual_params.push(param_ty)
-                byval_types.push(0)
-                direct_types.push(0)
-            else if self.internal_abi_needs_indirect_param(param_ty):
-                actual_params.push(wl_ptr_type(self.context))
-                byval_mask = byval_mask | ((1 as i64) << (pi as u32))
-                byval_types.push(param_ty)
-                direct_types.push(0)
-            else:
-                actual_params.push(param_ty)
-                byval_types.push(0)
-                direct_types.push(0)
-
-        let fn_type = wl_function_type(actual_ret_ty, vec_data_i64(&actual_params), actual_params.len() as i32, 0)
+            sources.push(self.abi_param_source_type(sig_idx, pi))
+            places.push(self.sig_abi_param_flags(sig_idx, pi))
+        let abi_index = self.compute_fn_abi(ret_ty, sources, places, if is_async: FN_ABI_ASYNC else: FN_ABI_WITH, 0)
+        let abi = self.fn_abis[abi_index]
+        let has_sret = if abi.ret.pass == PM_INDIRECT: 1 else: 0
+        let fn_type = abi.llvm_ty
         let name = self.intern.resolve(mono_sym)
         let function = wl_add_function(self.llmod, name, fn_type)
         // A module object keeps every specialization it instantiates — a
@@ -6061,11 +5860,7 @@ impl Codegen:
             wl_set_linkage(function, wl_internal_linkage())
         if has_sret != 0:
             wl_add_sret_attr(self.context, function, 0, ret_ty)
-        if has_sret != 0 or byval_mask != 0:
-            self.record_c_abi_transform(mono_sym, has_sret, ret_ty, byval_mask, move byval_types, 0, move direct_types, 0)
-        for pi in 0..param_count:
-            if self.sema.sig_param_uses_value_ref_abi(sig_idx, pi) != 0:
-                self.record_ref_param(mono_sym, pi, param_count)
+        self.bind_fn_abi(mono_sym, abi_index, function)
         let specialization = self.sema.concrete_specialization_by_sym.get(sema_sym)
         if specialization.is_some():
             let fn_node = self.sema.concrete_specialization_nodes[specialization.unwrap()]

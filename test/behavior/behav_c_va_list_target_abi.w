@@ -14,6 +14,9 @@ fn main:
     p7_write(case_dir, "src/return.w", "@[c_export(\"return_args\")]\npub fn return_args(args: c_va_list) -> c_va_list: args\n")
     p7_write(case_dir, "src/from_pointer.w", "extern fn va_probe(args: c_va_list) -> i32\npub unsafe fn from_pointer(args: *mut c_va_list) -> i32: va_probe(*args)\n")
     p7_write(case_dir, "src/indirect.w", "pub unsafe fn indirect(cb: extern \"C\" fn(c_va_list) -> i32, args: c_va_list) -> i32: cb(args)\n")
+    p7_write(case_dir, "src/indirect_return.w", "pub unsafe fn indirect_return(cb: extern \"C\" fn(c_va_list) -> c_va_list, args: c_va_list) -> c_va_list: cb(args)\n")
+    p7_write(case_dir, "src/indirect_from_pointer.w", "pub unsafe fn indirect_from_pointer(cb: extern \"C\" fn(c_va_list) -> i32, args: *mut c_va_list) -> i32: cb(*args)\n")
+    p7_write(case_dir, "src/explicit_pointer.w", "pub fn explicit_pointer(cb: extern \"C\" fn(*mut c_va_list) -> i32, args: *mut c_va_list) -> i32: cb(args)\n")
     p7_write(case_dir, "src/with_callback.w", "pub fn probe(args: c_va_list) -> i32: 7\npub unsafe fn indirect(cb: fn(c_va_list) -> i32, args: c_va_list) -> i32: cb(args)\npub unsafe fn caller(args: c_va_list) -> i32: indirect(probe, args)\n")
     for target in ["darwin_aarch64", "linux_x86_64", "linux_aarch64", "windows_x86_64", "windows_aarch64"]:
         let flags = "\0--target=" ++ target ++ "\0--no-prelude\0"
@@ -59,21 +62,24 @@ fn main:
         if target == "linux_x86_64":
             assert(forwarded.contains("@va_probe(ptr %0)"))
         let indirect = p7_run(case_dir, "va_list_indirect_" ++ target, "ir\0src/indirect.w" ++ flags)
-        if target.starts_with("linux_"):
-            // #1106 needs a callable-type ABI descriptor. Never silently
-            // substitute an i32 or use the internal aggregate convention.
-            assert(indirect.rc != 0)
-            assert(indirect.stderr.contains("callable-type ABI descriptor"))
-        else:
-            p7_assert_success(indirect, "pointer-sized C va_list callback for " ++ target)
-        let with_callback = p7_run(case_dir, "va_list_with_callback_" ++ target, "ir\0src/with_callback.w" ++ flags)
+        p7_assert_success(indirect, "C va_list callback for " ++ target)
+        let indirect_body = va_ir_body(indirect.stdout, "indirect")
+        if target == "linux_aarch64":
+            assert(indirect_body.contains("alloca { i64, i64, i64, i64 }, align 8"))
         if target == "linux_x86_64":
-            assert(with_callback.rc != 0)
-            assert(with_callback.stderr.contains("callable-type ABI descriptor"))
-            let callback_audit = p7_run(case_dir, "va_list_with_callback_audit", "analyze\0src/with_callback.w\0audit:all" ++ flags)
-            assert(callback_audit.rc != 0)
+            assert(not indirect_body.contains("alloca { i64, i64, i64 }, align 8"))
+        let with_callback = p7_run(case_dir, "va_list_with_callback_" ++ target, "ir\0src/with_callback.w" ++ flags)
+        p7_assert_success(with_callback, "With va_list callback for " ++ target)
+        for source in ["indirect", "with_callback", "indirect_from_pointer", "explicit_pointer"]:
+            let callback_audit = p7_run(case_dir, source ++ "_audit_" ++ target, "analyze\0src/" ++ source ++ ".w\0audit:all" ++ flags)
+            p7_assert_success(callback_audit, source ++ " ABI audit for " ++ target)
+            assert(callback_audit.stdout.contains("violations=0"))
+        let indirect_return = p7_run(case_dir, "va_list_indirect_return_" ++ target, "analyze\0src/indirect_return.w\0audit:all" ++ flags)
+        if target == "linux_x86_64":
+            assert(indirect_return.rc != 0)
+            assert(indirect_return.stderr.contains("not C-ABI-expressible"))
         else:
-            p7_assert_success(with_callback, "value-mode With va_list callback for " ++ target)
+            p7_assert_success(indirect_return, "C va_list callback return for " ++ target)
     let header = p7_run(case_dir, "va_list_header", "emit-c-header\0src/probe.w\0")
     p7_assert_success(header, "C header for va_list parameter")
     assert(header.stdout.contains("#include <stdarg.h>"))

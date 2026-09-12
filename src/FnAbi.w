@@ -20,18 +20,46 @@ extern fn with_getenv_str(name: &str) -> str
 
 // A label for docs/with-abi.md's version history, not the bundle key; it
 // becomes a frozen, normative major version at Level 1 of the roadmap.
-pub const WITH_ABI_VERSION: i32 = 2
+pub const WITH_ABI_VERSION: i32 = 3
 
 // #D6: PassMode — the per-parameter ABI classification, the SINGLE source of
 // truth. fn_abi_pass_mode computes it; both the callee prologue
 // (declare_function_from_sig) and every call site read it, so caller and
 // callee can never disagree on how an argument is passed.
 //   PM_DIRECT         = by value (Copy / scalar / small aggregate)
-//   PM_INDIRECT       = pointer to a callee-owned copy (byval, Windows-x86_64)
+//   PM_INDIRECT       = pointer to an owned value (normally a byval copy;
+//                       owned_place preserves destructor storage through cleanup)
 //   PM_INDIRECT_PLACE = pointer to the CALLER's place (share-place / value_ref_abi)
 pub const PM_DIRECT: i32 = 0
 pub const PM_INDIRECT: i32 = 1
 pub const PM_INDIRECT_PLACE: i32 = 2
+pub const PM_FAT: i32 = 3
+pub const PM_IGNORE: i32 = 4
+
+// Context-owned LLVM handles are data, never classification inputs at a
+// call site. Descriptors are immutable after interning in Codegen.
+pub type ArgAbi {
+    source_ty: i64,
+    llvm_ty: i64,
+    pass: i32,
+    reference: bool,
+    owned_place: bool,
+}
+impl Copy for ArgAbi
+
+pub type FnAbi {
+    arg_start: i32,
+    arg_count: i32,
+    ret: ArgAbi,
+    llvm_ty: i64,
+    convention: i32,
+}
+impl Copy for FnAbi
+
+pub const FN_ABI_WITH: i32 = 0
+pub const FN_ABI_C: i32 = 1
+pub const FN_ABI_CLOSURE: i32 = 2
+pub const FN_ABI_ASYNC: i32 = 3
 
 // The classifier. `uses_value_ref_abi` is Sema's finalized share-place
 // verdict for the parameter; `platform_indirect` is the platform's answer
@@ -42,6 +70,23 @@ pub fn fn_abi_pass_mode(uses_value_ref_abi: i32, platform_indirect: bool) -> i32
     if platform_indirect:
         return PM_INDIRECT
     PM_DIRECT
+
+// Closure returns stay direct in LLVM so its hidden target sret precedes
+// the environment consistently (#806). Async bodies use their in-unit value
+// convention. These exceptions belong to the hashed ABI rules too.
+pub fn fn_abi_return_pass(convention: i32, has_value: bool, platform_indirect: bool) -> i32:
+    if not has_value: return PM_IGNORE
+    if convention == FN_ABI_CLOSURE or convention == FN_ABI_ASYNC: return PM_DIRECT
+    if platform_indirect: PM_INDIRECT else: PM_DIRECT
+
+pub fn fn_abi_argument_pass(place: i32, convention: i32, platform_indirect: bool) -> i32:
+    fn_abi_pass_mode(place, convention != FN_ABI_ASYNC and platform_indirect)
+
+// Destruction owns the value in its existing storage. The body and the
+// compiler's subsequent field cleanup must observe the same moved fields.
+// This is owned Indirect, without byval copying; it is never a borrow.
+pub fn fn_abi_owned_place(drop_receiver: bool, aggregate: bool) -> bool:
+    drop_receiver and aggregate
 
 // The one platform exception in v1: windows-x86_64 passes and returns a
 // struct or array larger than 8 bytes indirectly (byval / sret). Every other

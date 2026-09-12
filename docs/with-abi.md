@@ -1,6 +1,6 @@
-# The With ABI (version 1)
+# The With ABI (version 3)
 
-Status: DRAFT v1 (2026-09-02), the convention as the compiler implements
+Status: DRAFT v3 (2026-09-12), the convention as the compiler implements
 it today, written down so `.wo` bundles (decisions.md D38,
 `docs/wo_bundles.md`) can depend on it. Nothing here is a new rule. The
 sources named in §7 define the ABI; this document describes them, and at
@@ -17,8 +17,10 @@ a With value type, not as a contract With makes with another language.
 
 - `i8/i16/i32/i64`, `u8..u64`, `f32/f64`, `bool` (1 byte), `Unit` (zero
   size) lower to the LLVM integer/float types of that width.
-- Raw pointers (`*const T`, `*mut T`), references (`&T`, `&mut T`), function
-  values (`fn(...)`), and `extern fn` values are one pointer word.
+- Raw pointers (`*const T`, `*mut T`), references (`&T`), and
+  `extern fn` values are one pointer word.
+- Ordinary With function values use `{ function pointer, environment pointer }`.
+  Named functions acquire an adapter thunk when converted to this representation.
 - A reference is a **value of pointer type**: it is passed as that pointer,
   never as the pointee (D5/D6: "an explicit `&T` is a reference value with
   the ABI of that reference type").
@@ -111,6 +113,11 @@ stable across checkouts.
 
 ## 6. Drops
 
+The destructor body's descriptor records aggregate receivers as owned
+indirect storage, without byval copying. The body and subsequent field
+cleanup use that same storage so a field moved out by the body is not
+dropped again. This physical mode does not turn `move self` into a borrow.
+
 Drop glue is generated per type by codegen (`mir_emit_drop_*`): a `str`
 frees its buffer through the runtime allocator; a `Vec[T]` drops each
 element then its buffer; enums drop the live variant's payload; structs
@@ -122,9 +129,9 @@ executable.
 ## 7. ABI-defining sources (what `WITH_ABI_VERSION` stamps)
 
 - `src/TypeLayout.w` — §2 layouts.
-- the pass-mode classifier and function declaration in `src/Codegen.w`
-  (`arg_pass_mode`, `abi_param_source_type`, `declare_function_from_sig`,
-  `internal_abi_needs_sret`, `internal_abi_needs_indirect_param`) and
+- the cached descriptor and function declaration in `src/Codegen.w`
+  (`compute_fn_abi`, `abi_param_source_type`, `declare_function_from_sig`,
+  `push_call_arg`) and
   Sema's `sig_param_uses_value_ref_abi` — §4.
 - symbol naming in `src/Codegen.w` (`module_link_name_for_path`,
   `function_symbol_name`, `codegen_canonical_module_path`) and
@@ -137,6 +144,7 @@ executable.
 
 **Enforcement** (implemented): the §4–5 rules live in `src/FnAbi.w`
 (`WITH_ABI_VERSION`, the `PM_*` modes, `fn_abi_pass_mode`,
+`fn_abi_argument_pass`, `fn_abi_return_pass`, `fn_abi_owned_place`,
 `fn_abi_platform_aggregate_indirect`, the symbol-naming rules), with
 one-line adapters left on `Codegen`; §2 lives in `src/TypeLayout.w`.
 `docs/with-abi.sha256` records both files' sha256 (`shasum -a 256`
@@ -155,6 +163,12 @@ layout change there is caught by the `wo-drift` lane, not by this check.
 
 ## Version history
 
+- **v3** (2026-09-12): declarations use finalized signature types for every
+  parameter, including consuming receivers and parameters of the owner's type.
+  Removes the AST shortcut that passed those owned values as borrowed pointers.
+  Named calls, callable types, closures, and thunks share cached `FnAbi`
+  descriptors; indirect C calls use the same C aggregate classification as
+  named C declarations.
 - **v2** (2026-09-09): adds target-sized, eight-byte-aligned `c_va_list`;
   SysV x86_64 parameters use the caller's place, while other targets retain
   value semantics. The AAPCS64 C call uses the existing aggregate-copy ABI.

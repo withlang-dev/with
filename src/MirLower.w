@@ -9187,7 +9187,10 @@ impl MirBuilder:
         // a non-share-place param is extern/copy — keep the existing behavior.)
         let arg_kind = self.ast.kind(arg_node)
         let arg_is_copy = arg_kind == NodeKind.NK_COPY_ARG
-        let callee_share_place = sig_idx >= 0 and arg_i >= 0 and self.sema.sig_param_uses_value_ref_abi(sig_idx, arg_i) != 0
+        let callee_share_place = if sig_idx >= 0:
+            arg_i >= 0 and self.sema.sig_param_uses_value_ref_abi(sig_idx, arg_i) != 0
+        else:
+            self.sema.type_uses_c_va_list_place(expected_ty) != 0
         // D16 (rvalue-uniform `move`): `move x` always moves, callee-independent.
         // Into a share-place callee, the moved value becomes a statement
         // temporary — the callee borrows the temporary, the source is reset now
