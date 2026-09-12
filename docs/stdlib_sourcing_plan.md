@@ -1,7 +1,7 @@
 # Stdlib sourcing: three migrated corpora, one facade
 
 Status (2026-09-12): PCRE2 and zlib share the bundle pipeline. Phase 0 is
-implemented with final verification in progress; Phase 1 migration is in
+implemented and locally verified in PR #1129; Phase 1 migration is in
 progress; Phases 2–4 remain planned. Engine selections were ruled on
 2026-09-12; module grouping is provisional.
 Companion: `docs/harden_migrate.md` (the migrator plan
@@ -374,6 +374,11 @@ above, with benchmark evidence recorded during implementation.
 ## Phases and gates
 
 **Phase 0 — measure first (small, immediate).**
+Verification completed on Darwin arm64 at `-O1`: full build and test suite,
+byte-identical fixpoint, pinned v0.15.2.0 seed compatibility, compiler analysis
+(2,514,772 facts, zero violations), drop audit (119/119), and move audit
+(15/15). PCRE2 and zlib bundle drift checks passed byte-for-byte.
+
 The complexity-fixture lane and a stdlib inventory (`docs/stdlib_inventory.md`:
 every structure and algorithm we need, its complexity contract, current
 status). Engine validation needs this yardstick. SlotMap's native
