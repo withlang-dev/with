@@ -1,4 +1,33 @@
-# Handoff — the .wo bundles / stdlib-sourcing campaign (2026-09-08)
+# Handoff — the .wo bundles / stdlib-sourcing campaign
+
+## Current integration (2026-09-12)
+
+PCRE2 C4 (#1101), SDK-macro hygiene (#1107), and target-correct va_list
+(#1108) have merged. Main is `00a2fc9c`. Their old blockers below are
+historical, not current instructions to reproduce them again.
+
+Zlib #1103 is integrated with that main in the `zlib-1103-ready` worktree.
+The merge keeps main's populated stage2/stage3 embedding object and adds
+both bundles to it; only stage1 uses empty bundle slots. The renamed
+`std.zl` corpus retains the macro-hygiene and c_va_list re-promotion.
+The separate follow-ups preserve c_va_list in `.wi` signatures and check
+all required reference files before marking an extracted zlib tree ready.
+Main already contains the newer gunzip ownership and input-limit fixes.
+
+Verification for this integration is recorded in
+`out/zlib-1103-validation/` in the worktree and the #1103 PR description.
+Historical passing batteries below do not certify the integrated commit.
+Required checks: re-migration comparison, full build, fixpoint, compiler
+audit, full tests including both bundle drift lanes, move/drop audits,
+fresh pinned-seed compatibility, test-green and last-green.
+
+The next campaign milestone after #1103 is sourcing Phase 0 (inventory,
+complexity fixtures, SlotMap free list), then c-algorithms, TommyDS, STC,
+and the M*LIB B+ tree subset. #1106 remains the explicit callable-type ABI
+descriptor gap for affected indirect va_list calls; #1113 tracks missing
+seed-compat cache inputs, so use fresh bootstrap evidence.
+
+## Historical investigation (2026-09-08–09)
 
 **C4 landing update:** the local A/B performance gate is now green on the
 rebased landing tree. After excluding the initial pair, the two uncached
@@ -222,22 +251,111 @@ went idle twice without reporting a lane number — if you resume it, demand
 the number first. Its regression-found-then-fixed history is in this
 session's memory note `wo-c4-plan.md`.
 
-## 3. zlib → `zlib.wo` (next after C4; one mechanical batch)
+## 3. zlib → `zlib.wo` (DONE on branch `zlib-wo`; PR after #1101)
 
-The bundle machinery is already multi-bundle (bundle *slots*,
-`embedded_bundle_count`, per-bundle link selection in `Link.w`; #946
-closed), so this mirrors pcre2 exactly:
-- a `wo_bundle_plan(ctx, "zlib", "std/zlib", "lib/std/zlib/bundle.w")` in
+**State (2026-09-09).** Branch `zlib-wo` = `wo-c4` (C4, PR #1101) + the
+zlib batch, in worktree `~/.local/with-staging/zlibwo`. Battery #3
+fully green there (build 195 s, fixpoint 289 s, test 1006 s,
+seed-compat, test-green, last-green; both drift lanes byte-identical,
+both harnesses run). Not reseeded: reseed from main once #1101 and this
+PR have merged. The second bundle was not "mechanical": it exposed five
+consumer-side defects and one build-cache defect, all fixed in the batch
+(commits `af9fd36c` migrator, `59012470` variadic interface,
+`c8835444` corpus, `ca40e7f5` Sema, `f6b82ba0` codegen, `0da6940b`
+build-layer, `ab30b320` store key) — see `docs/wo_bundles.md` and the
+notes below. **Measured** (interleaved A/B, `WITH_PROFILE=1`, release
+compilers of `wo-c4` vs `zlib-wo`, 3 rounds): a program importing
+`std.zlib` (`test/behavior/behav_zlib_std.w`) spends ~800 ms in the
+compiler's phases with the corpus in-unit and ~160 ms with the bundle
+(imports 48→1.3 ms, comptime 75→11 ms, mir.lower 30→4 ms, llvm
+gen/optimize/emit 570→115 ms; link unchanged at 26 ms). `with check
+build.w` is unchanged (57 ms comptime either way) and the compiler's
+own build is unchanged: the compiler binary never reaches zlib, so
+"stop recompiling zlib on every build" is a per-consumer win, not a
+compiler-build win.
+
+What the batch had to fix beyond the pcre2 template (each is a general
+rule now, not a zlib special case):
+- Sema flat namespace (D29-B pending): an interface declaration collected
+  after a same-named source definition kept `fn_decl_nodes` but
+  overwrote `sig_lookup` (std.zlib's `compress` vs the corpus's C
+  `compress`); interface globals were keyed by name alone (pcre2's
+  `UINT_MAX` hid zlib's). Both per-module now.
+- Codegen: unions were never predeclared, so the alphabetical `.wi`
+  (struct before the unions it holds) failed layout; a bundle build now
+  carries the non-corpus With functions its corpus reaches (std.libc's
+  gz I/O wrappers) as internal copies, because a whole-program consumer
+  never defines module-link-named symbols.
+- The bundle interface spells variadic functions (`gzprintf(..., ...)`).
+- The store slot is keyed by the compiler sources too (`compiler-src-sha`):
+  battery #2 linked a stale object under an unchanged ABI.
+- ToolFs accepted only project-relative paths, hiding the real error on
+  the helper-programs failure path; `std.zl` is an internal module for
+  the spec inventory.
+- #1102 filed: the migrator now leaks the macOS SDK's `MAC_OS_X_VERSION_*`
+  macros into every shared defs (host-dependent corpus output); zlib's
+  re-promoted defs carries them, pcre2 was not re-promoted.
+- Windows (#1103's first CI run): the bundle object carries every corpus
+  module, and zlib's gz layer — migrated on macOS with `O_NONBLOCK` /
+  `O_CLOEXEC` resolved — calls `fcntl`, which `std.libc` declared as a
+  bare extern and UCRT does not have. `fcntl` is now a runtime seam like
+  `open`/`read`/`close` (`with_libc_fcntl` → `rt_fcntl`; POSIX forwards
+  through a variadic extern, Windows reports unsupported). Windows linked
+  zlib's object at all because Link.w's undefined-symbol probe fails
+  there and a failed probe silently linked every bundle; it now warns.
+- **#1104 (blocks #1103's linux x86_64 lane): `va_list` is modeled as an
+  8-byte pointer on every target.** The drift harness runs zlib's
+  `gzprintf` → `vsnprintf(va)`; on SysV x86_64 `va_start` writes a
+  24-byte tag into the 8-byte slot and `vsnprintf` expects a pointer to
+  it — exit 139. Verified from the IR (`with ir --target=linux_x86_64`
+  emits the same `alloca ptr` as Darwin). Only variadic *definitions*
+  are affected (pcre2 has none). Fix = a per-target `VaList` type, one
+  `PassMode` rule in `compute_fn_abi`, the migrator emitting `VaList`,
+  zlib re-migrated, and a behavior test on every lane — an ABI batch,
+  alone, with the audits. Landing order: #1101 → #1104 → #1103.
+- macOS CI fails `behav_cli_test_command_args` and the `selfcheck` corpus
+  test on both this branch and #1101, deterministically, while both pass
+  locally; both use `out/stage/bin/with-stage2`, which the CI Fixpoint
+  step rewrites just before the battery. `wo-c4` (7910cf98, merged here)
+  adds a `Failure diagnostics` workflow step that dumps the surviving
+  captures and probes that binary; the next failing run names the cause.
+
+How it was wired (the template for the next corpus):
+- the corpus moved from `lib/std/zlib/` (package `std.zlib`) to
+  `lib/std/zl/` (package `std.zl`): the corpus package and the facade
+  `std.zlib` (`lib/std/zlib.w`) may not share a dotted path, because the
+  frontend's parent-module import fallback pulled the facade into the
+  `--no-prelude` bundle build (`docs/wo_bundles.md`; `build/wo.w` now
+  refuses such a corpus by name);
+- a `wo_bundle_plan(ctx, "zlib", "std/zl", "lib/std/zl/bundle.w")` in
   `build.w` beside `pcre2_wo`, wired through `wo_bundle_targets`,
   `target_with_link_bundle` on every stage, and `target_with_wo_blobs`;
-- a generated bundle root over the 18 modules in `lib/std/zlib/` (16 corpus
-  + `example.w`/`minigzip.w` harness), written the way
-  `build/pcre2.w pcre2_bundle_root_text` writes `lib/std/re/bundle.w`;
-- `std.zlib` (`lib/std/zlib.w`, already the model facade importing its
-  modules directly) and the consumers that recompile in-unit today
-  (`std.build`, `build/zlib_gzip.w`, `build/zlib_gunzip.w`) link the bundle
-  instead. Measure compiler build time before/after — the point is that it
-  stops recompiling zlib on every build.
+  `lib/std/zl/` is excluded from the embedded stdlib in BOTH lists
+  (`build.w target_with_embedded_stdlib_inputs` and the generator in
+  `build/runtime.w`; missing the second one is 232 "unknown type c_void"
+  errors at `<embedded-std>/std/zl/…`);
+- a generated bundle root over the 18 modules in `lib/std/zl/` (16 corpus
+  + `example.w`/`minigzip.w` harness), written by
+  `build/zlib.w zlib_bundle_root_text` the way `build/pcre2.w` writes
+  `lib/std/re/bundle.w`, and checked by `zlib-bundle-root-check`;
+- the migrator's prelude-free vocabulary (`type c_void = opaque`, the
+  `__ci_unreachable` shim) is keyed on the migrate workspace's
+  `prelude_mode: None` / `with migrate --no-prelude`
+  (`ci_migrate_output_is_prelude_free`), no longer on the corpus name
+  `std.re`; `build/zlib.w` and `build/pcre2.w` set it on every migrate
+  workspace. The zlib corpus is re-migrated with that compiler
+  (`WITH=<stage1> <stage1> build :zlib-promote`);
+- `std.zlib` and the consumers that recompile in-unit today (`std.build`,
+  `build/zlib_gzip.w`, `build/zlib_gunzip.w`) link the bundle instead
+  (measured above).
+
+Landing order: #1101 (C4) merges first; then open the zlib PR onto
+main (the branch already contains C4, so its diff against main is only
+the zlib commits once C4 is in), merge, sync local main, reseed
+(`:update-seed` + `:install-user`), close #1102 when the migrator fix
+lands. Fast consumer test without a release build:
+`out/bootstrap/bin/with-stage1 build X.w --link-bundle out/wo/zlib
+--link-bundle out/wo/pcre2`.
 
 ## 4. The corpora plan (`docs/stdlib_sourcing_plan.md`)
 

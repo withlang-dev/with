@@ -909,6 +909,11 @@ fn link_stage_undefined_symbols_for_object(obj_path: &str) -> str:
     let probe_rc = runtime_exec_argv_capture(argv, report_path, null_path, 0)
     if probe_rc != 0:
         let _ = runtime_remove_file(report_path)
+        // A failed probe links EVERY embedded bundle (link_stage_bundle_needed
+        // treats it as needed): correct, but the binary carries every corpus
+        // and every corpus's externs must resolve on this target — zlib's
+        // fcntl on Windows (#1103). Say so, so a broken nm never hides.
+        with_eprint(f"warning: link: could not probe {obj_path} for undefined symbols with '{nm_tool}' (exit {probe_rc}); linking every embedded bundle\n")
         return "<probe-failed>"
     let symbols = runtime_read_file(report_path)
     let _ = runtime_remove_file(report_path)

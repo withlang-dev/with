@@ -2,6 +2,7 @@
 // sees only wi_demo.wi (declarations) and links the bundle's object.
 use std.wi_demo
 fn main:
+    assert(sizeof[VarArgs]() == sizeof[c_va_list]())
     var p = Pair { a: 3, b: 4 }
     let s = p.sum()
     p.scale(2)

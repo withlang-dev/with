@@ -1,18 +1,18 @@
 // Migrated from C
-use std.zlib.defs
-use std.zlib.zutil
-use std.zlib.deflate
-use std.zlib.inflate
-use std.zlib.compress
-use std.zlib.uncompr
-use std.zlib.gzlib
-use std.zlib.gzwrite
-use std.zlib.gzread
-use std.zlib.gzclose
-use std.zlib.adler32
-use std.zlib.crc32
-use std.zlib.inftrees
-use std.zlib.inffast
+use std.zl.defs
+use std.zl.zutil
+use std.zl.deflate
+use std.zl.inflate
+use std.zl.compress
+use std.zl.uncompr
+use std.zl.gzlib
+use std.zl.gzwrite
+use std.zl.gzread
+use std.zl.gzclose
+use std.zl.adler32
+use std.zl.crc32
+use std.zl.inftrees
+use std.zl.inffast
 
 pub unsafe fn inflateBack(__param_strm: *mut z_stream_s, __param_in_: unsafe extern "C" fn(*mut c_void, *mut *mut u8) -> c_uint, __param_in_desc: *mut c_void, __param_out: unsafe extern "C" fn(*mut c_void, *mut u8, c_uint) -> c_int, __param_out_desc: *mut c_void) -> c_int {
     var __local_state__goto_193_31: *mut inflate_state = null
@@ -2851,7 +2851,7 @@ pub unsafe fn inflateBack(__param_strm: *mut z_stream_s, __param_in_: unsafe ext
         goto '__ci_bb_436
     }
 
-    unreachable()
+    __ci_unreachable()
 
 }
 

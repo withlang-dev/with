@@ -17806,7 +17806,7 @@ impl Codegen:
         self.apply_noalias_param_attrs(spawn_fn, param_start, param_count)
         self.fn_values.insert(name_sym, spawn_fn)
         self.fn_fn_types.insert(name_sym, spawn_fn_type)
-        if self.current_decl_is_imported_module_symbol():
+        if self.current_decl_is_imported_module_fn():
             return
 
         // Keep only the metadata the current async spawn path still consumes.

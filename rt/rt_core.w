@@ -15,6 +15,7 @@ extern fn rt_read(fd: i32, buf: *mut u8, len: u64) -> i64
 extern fn rt_open(path: *const u8, flags: i32, mode: i32) -> i32
 extern fn rt_close(fd: i32) -> i32
 extern fn rt_seek(fd: i32, offset: i64, whence: i32) -> i64
+extern fn rt_fcntl(fd: i32, cmd: i32, arg: i32) -> i32
 extern fn rt_mmap(size: u64) -> *mut u8
 extern fn rt_munmap(ptr: *mut u8, size: u64)
 @[link_name("malloc")]
@@ -3505,6 +3506,13 @@ pub fn with_libc_close(fd: i32) -> i32:
 
 pub fn with_libc_lseek(fd: i32, offset: i64, whence: i32) -> i64:
     let r = rt_seek(fd, offset, whence)
+    if r < 0: -1 else: r
+
+// std.libc's fcntl: the POSIX platforms forward to libc, Windows has no
+// fcntl and returns -1 (zlib's gz layer ignores the result, as its own
+// Windows build never makes the call).
+pub fn with_libc_fcntl(fd: i32, cmd: i32, arg: i32) -> i32:
+    let r = rt_fcntl(fd, cmd, arg)
     if r < 0: -1 else: r
 
 pub fn with_libc_unlink(path: *const i8) -> i32:

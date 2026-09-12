@@ -722,6 +722,13 @@ type Sema {
     // consulted by scope_lookup only from a module that imports theirs.
     interface_global_index: HashMap[i32, i32],
     interface_global_paths: HashMap[i32, str],
+    // The same name exported by a second bundle (pcre2's and zlib's
+    // UINT_MAX, both from limits.h): every further declaring module gets
+    // its own binding, and scope_lookup picks the one the current module
+    // imports. Parallel rows: symbol, binding index, declaring module.
+    interface_global_alt_syms: Vec[i32],
+    interface_global_alt_binds: Vec[i32],
+    interface_global_alt_paths: Vec[str],
     // D39 lazy interface collection (SemaDecl.prepare_interface_demand):
     // per declaration, 1 when its module is a registered .wi section, and
     // 1 when the source can name it; the symbols the source names.
@@ -1834,6 +1841,9 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
     let global_value_decl_kinds = sema_new_map_i32_i32()
     let interface_global_index = sema_new_map_i32_i32()
     let interface_global_paths = sema_new_map_i32_str()
+    let interface_global_alt_syms = sema_new_vec_i32()
+    let interface_global_alt_binds = sema_new_vec_i32()
+    let interface_global_alt_paths = sema_new_vec_str()
     let decl_is_iface = sema_new_vec_i32()
     let decl_iface_demanded = sema_new_vec_i32()
     let iface_mentioned = sema_new_map_i32_i32()
@@ -2048,6 +2058,9 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         global_value_decl_kinds,
         interface_global_index,
         interface_global_paths,
+        interface_global_alt_syms,
+        interface_global_alt_binds,
+        interface_global_alt_paths,
         decl_is_iface,
         decl_iface_demanded,
         iface_mentioned,
@@ -4629,9 +4642,26 @@ impl Sema:
         // own — a c_import's NULL, a local named stdout.
         let decl_path = self.decl_source_path_for_node(node)
         if bundle_interface_text(decl_path).len() > 0:
-            if not self.interface_global_index.contains(sym):
-                self.interface_global_index.insert(sym, self.bind_names.len() as i32)
-                self.interface_global_paths.insert(sym, sema_owned_text(decl_path))
+            // One binding per declaring module: the first declaring module
+            // takes the primary slot, every other one an alternate row
+            // (pcre2's and zlib's UINT_MAX); a repeat from the same module
+            // is the same declaration collected again.
+            var known = false
+            if self.interface_global_index.contains(sym):
+                known = self.interface_global_paths.get(sym).unwrap() == decl_path
+                if not known:
+                    for ai in 0..self.interface_global_alt_syms.len() as i32:
+                        if self.interface_global_alt_syms[ai] == sym and self.interface_global_alt_paths[ai] == decl_path:
+                            known = true
+            if not known:
+                let bind_index = self.bind_names.len() as i32
+                if not self.interface_global_index.contains(sym):
+                    self.interface_global_index.insert(sym, bind_index)
+                    self.interface_global_paths.insert(sym, sema_owned_text(decl_path))
+                else:
+                    self.interface_global_alt_syms.push(sym)
+                    self.interface_global_alt_binds.push(bind_index)
+                    self.interface_global_alt_paths.push(sema_owned_text(decl_path))
                 self.bind_names.push(sym)
                 self.bind_types.push(tid)
                 self.bind_muts.push(is_mut)
@@ -4693,8 +4723,14 @@ impl Sema:
         // closure, and never in the comptime pre-pass, where the module is
         // unknown): a program's const of the same name must win.
         let iface = self.interface_global_index.get(sym)
-        if iface.is_some() and self.current_module_path.len() > 0 and self.module_visible_no_prelude(self.interface_global_paths.get(sym).unwrap()) != 0:
-            return self.bind_types[iface.unwrap()]
+        if iface.is_some() and self.current_module_path.len() > 0:
+            if self.module_visible_no_prelude(self.interface_global_paths.get(sym).unwrap()) != 0:
+                return self.bind_types[iface.unwrap()]
+            // The same name from another bundle's module (pcre2's and
+            // zlib's UINT_MAX): the one this module imports.
+            for ai in 0..self.interface_global_alt_syms.len() as i32:
+                if self.interface_global_alt_syms[ai] == sym and self.module_visible_no_prelude(self.interface_global_alt_paths[ai]) != 0:
+                    return self.bind_types[self.interface_global_alt_binds[ai]]
         -1
 
     mut fn scope_update_type(sym: i32, tid: i32):

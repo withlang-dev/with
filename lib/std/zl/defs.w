@@ -1,4 +1,4 @@
-// std.zlib.defs — shared definitions for migrated PCRE2
+// std.zl.defs — shared definitions for migrated PCRE2
 
 pub fn is_alpha(c: i32) -> bool {
     (c >= 65 and c <= 90) or (c >= 97 and c <= 122)
@@ -65,6 +65,10 @@ pub extern fn asin(x: f64) -> f64
 pub extern fn acos(x: f64) -> f64
 pub extern fn atan(x: f64) -> f64
 pub extern fn atan2(y: f64, x: f64) -> f64
+
+pub type c_void = opaque
+pub extern fn abort() -> Never
+pub fn __ci_unreachable() -> Never: abort()
 
 pub type c_char = i8
 pub type c_short = i16

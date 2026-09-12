@@ -108,7 +108,7 @@ object and interface (never the source: Sema on a corpus costs seconds
 per program); user programs automatically link the ones they reference.
 
 Layout: each bundle's source is checked in under `lib/std/<corpus>/`
-exactly as pcre2's (`lib/std/re/`) and zlib's (`lib/std/zlib/`) are —
+exactly as pcre2's (`lib/std/re/`) and zlib's (`lib/std/zl/`) are —
 generated, never hand-edited, and under the stdlib tree because a bundle's
 symbols hash the module's canonical `<embedded-std>/…` path, which that
 location names whether or not the source is embedded
@@ -146,10 +146,13 @@ those two do; nothing is a new mechanism.
 **The pattern, as zlib and regex do it today**
 
 1. *Import the raw modules directly.* `std.zlib` is
-   `use std.zlib.defs / compress / deflate / uncompr / inflate` — the
-   migrated corpus as ordinary With modules. (`std.regex` still reaches
-   pcre2 through the `with_regex_*` runtime shims; that is the D30
-   transitional seam, not the model. New facades import the corpus.)
+   `use std.zl.defs / compress / deflate / uncompr / inflate` — the
+   migrated corpus as ordinary With modules. The corpus package never
+   shares its dotted path with the facade (`std.zl` / `std.zlib`,
+   `std.re` / `std.regex`): the frontend's parent-module import fallback
+   would otherwise pull the facade into the `--no-prelude` bundle build
+   (`docs/wo_bundles.md`). `std.regex` imports `std.re` through the
+   bundle interface; C4 retired the `with_regex_*` runtime shims in #1101.
 2. *A With error type over engine codes.* `ZlibError { code, message }`
    with `zlib_code_error(Z_DATA_ERROR) -> "invalid or corrupt zlib data"`;
    `RegexError { code, offset, message }`. Engine integers never escape.
