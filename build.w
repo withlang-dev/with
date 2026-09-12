@@ -1858,6 +1858,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     // re-record re-links (and re-stamps) the stage.
     stage1 = stage1.input("docs/with-abi.sha256")
     stage1 = stage1.write_scope("out/bootstrap/bin")
+    stage1 = stage1.write_scope("out/lib")
     stage1 = stage1.write_scope("out/.build-state")
     stage1 = stage1.dep("compiler-main-source")
     stage1 = stage1.dep("compat-runtime-source")

@@ -4,6 +4,7 @@ use std.build
 use std.process
 use std.sysinfo
 use std.string.StringBuilder
+use build.runtime.prepare_bootstrap_link_root
 fn compiler_owned_text(s: &str): s ++ ""
 
 const COMPILER_LLVM_VERSION: str = "22.1.6"
@@ -1801,6 +1802,9 @@ pub fn run_with_compiler_build_action(ctx: ActionCtx) -> i32:
         let seed_rc = comp_record_seed_input(ctx, compiler_path, capture_dir)
         if seed_rc != 0:
             return seed_rc
+        // Runtime targets can repopulate out/lib after the cached preparation
+        // target ran. Every actual stage1 invocation must select bootstrap-lib.
+        prepare_bootstrap_link_root(ctx)
     let stdout_path = comp_join(capture_dir, "stdout.txt")
     let stderr_path = comp_join(capture_dir, "stderr.txt")
     let rc = comp_run_compiler_capture(ctx, "build", argv, stdout_path, stderr_path, comp_step_timeout_ms())

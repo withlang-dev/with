@@ -27,7 +27,7 @@ pub fn run_write_empty_file_action(ctx: ActionCtx) -> i32:
         return 1
     0
 
-pub fn run_prepare_bootstrap_link_root_action(ctx: ActionCtx) -> i32:
+pub fn prepare_bootstrap_link_root(ctx: &ActionCtx) -> Unit:
     // Old seed compilers may prefer out/lib before out/bootstrap-lib. Remove
     // stale unversioned runtime probes so stage1 selects the freshly generated
     // bootstrap runtime instead of yesterday's out/lib objects.
@@ -47,6 +47,10 @@ pub fn run_prepare_bootstrap_link_root_action(ctx: ActionCtx) -> i32:
     stale_runtime_objects.push("out/lib/fiber_stubs.o")
     for i in 0..stale_runtime_objects.len() as i32:
         let _remove_stale = fs.remove_file(stale_runtime_objects[i])
+
+pub fn run_prepare_bootstrap_link_root_action(ctx: ActionCtx) -> i32:
+    prepare_bootstrap_link_root(ctx)
+    let fs = ctx.fs()
     let output = ctx.output()
     if fs.mkdir_all(br_dirname(output)) != 0:
         ctx.diagnostics().error(ctx.target_name() ++ ": could not create output directory: " ++ br_dirname(output))
