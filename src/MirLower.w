@@ -10252,7 +10252,7 @@ impl MirBuilder:
                 let gc_next = self.new_block()
                 self.terminate(TermKind.TK_CALL, gc_fn_op, gc_args_id, gc_place, gc_next)
                 self.switch_to(gc_next)
-                return self.body.new_operand(OperandKind.OK_COPY, gc_place)
+                return self.call_result_operand(gc_result, gc_place, gc_ret_ty)
 
         let fn_op = self.lower_var(callee_sym, 0, 0)
         let arg_nodes: Vec[i32] = Vec.new()
@@ -12365,6 +12365,10 @@ impl MirBuilder:
         let op_kind = if self.sema.is_copy_frozen(type_id) != 0: OperandKind.OK_COPY else: OperandKind.OK_MOVE
         self.body.new_operand(op_kind, place)
 
+    mut fn call_result_operand(local: i32, place: i32, type_id: i32) -> i32:
+        self.register_stmt_temp(local, type_id)
+        self.operand_for_place(place, type_id)
+
     mut fn lower_call_with_operand_args(fn_op: i32, args: &Vec[i32], ret_type: i32, node: i32) -> i32:
         for ai in 0..args.len():
             self.consume_moved_operand(args[ai])
@@ -13078,7 +13082,7 @@ impl MirBuilder:
                 let gc_next = self.new_block()
                 self.terminate(TermKind.TK_CALL, gc_fn_op, gc_args_id, gc_place, gc_next)
                 self.switch_to(gc_next)
-                return self.body.new_operand(OperandKind.OK_COPY, gc_place)
+                return self.call_result_operand(gc_result, gc_place, gc_ret_ty)
             // Check for enum variant constructor call: Some(v), Ok(v), Err(e), etc.
             if self.ast.kind(callee) == NodeKind.NK_IDENT:
                 var vc_sym = self.ast.get_data0(callee)
@@ -13206,7 +13210,7 @@ impl MirBuilder:
                     let gc_next = self.new_block()
                     self.terminate(TermKind.TK_CALL, gc_fn_op, gc_args_id, gc_place, gc_next)
                     self.switch_to(gc_next)
-                    return self.body.new_operand(OperandKind.OK_COPY, gc_place)
+                    return self.call_result_operand(gc_result, gc_place, gc_ret_ty)
             // Check for builtin calls (embed_file, src, etc.) — no sig, not a local
             if self.ast.kind(callee) == NodeKind.NK_IDENT:
                 let bu_sym = self.ast.get_data0(callee)
@@ -13227,7 +13231,7 @@ impl MirBuilder:
                     let bu_next = self.new_block()
                     self.terminate(TermKind.TK_CALL, bu_fn_op, bu_args_id, bu_place, bu_next)
                     self.switch_to(bu_next)
-                    return self.body.new_operand(OperandKind.OK_COPY, bu_place)
+                    return self.call_result_operand(bu_result, bu_place, bu_ret_ty)
             // Intrinsic free functions: fence(order)
             if self.ast.kind(callee) == NodeKind.NK_IDENT:
                 let ifn_sym = self.ast.get_data0(callee)

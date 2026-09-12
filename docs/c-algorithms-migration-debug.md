@@ -4,6 +4,39 @@ The corpus is pinned to upstream commit
 `23d453792ed89a28ed7d2c8d4311a4d9f7822edd`. No upstream function body is
 changed to accommodate the migrator.
 
+## Restoring C scopes
+
+`sortedarray_insert` shadows its `data` parameter in an inner block. The
+migrated assignment after that block contained `data` followed by eight NUL
+bytes. `ci_scope_restore` borrowed the previous name and type from its log,
+popped and dropped those entries, then cloned the expired views.
+
+Native debug allocation and `WITH_ALLOC_NO_REUSE=1` isolated the payload.
+LLDB stopped at `ci_scope_restore+356`, immediately before the value's
+`with_str_free_drop_origin`. The address trap reported
+`trap-free hit=1 addr=4797918656 origin=drop#enum __drop_enum_8344`.
+At `ci_scope_restore+424`, `with_str_clone_ref` received that same address
+and length 12 (`__local_data`). The caller was `CiStmtPool.lower_stmt_ir`
+restoring a nested block. Both name and type logs now transfer their popped
+entries into the maps. The regression executes nested shadowing with two
+different inputs and rejects NUL bytes in the generated source.
+
+## Discarded generic call results
+
+The stable-entry storage prototype removed three owned records. The explicit
+transfer dropped once; the two results discarded in `clear()` leaked their
+16-byte string allocations. The allocator reported `leak count=2` with
+`drops=1`. This was a compiler cleanup defect, not an arena algorithm defect.
+
+LLDB on the compiler stopped at `MirBuilder.lower_method_call+5488` with
+result local 3, then at +5568 with operand kind zero (`OK_COPY`). Its stack
+ran through `lower_expr_discard`, `lower_while`, and
+`lower_concrete_specialization`. Unlike ordinary calls, this branch neither
+registered cleanup nor classified the result's ownership. Generic methods,
+free functions and builtins now use `call_result_operand` to register the
+temporary and produce a move for an owned result. The allocator regression
+covers discarded, loop, transferred and retained generic results.
+
 ## Generic record layout
 
 The facade's stable-entry prototype exposed `sizeof[StableEntry[T]]()`
@@ -33,6 +66,13 @@ The importer now uses Clang's declaration-anonymity query. A native fixture
 exercises underscore-prefixed structs, a nested typedef, a union, and an
 aggregate return. The cold whole-corpus migration passes hash-table.c with
 this change.
+
+The native fixture then exposed a second filter: `ci_is_system_decl`
+classified `_Pair` as system-owned solely because its second character was
+uppercase. LLDB observed `_Pair` and `w0=1` at +108, branching to the true
+return from `ci_migrate_decl_is_filtered`. The same spelling filter in
+`ci_translate_struct` would also discard it. These filters are removed;
+the existing source-location filter establishes system provenance.
 
 ## Empty statements
 

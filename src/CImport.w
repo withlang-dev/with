@@ -2154,12 +2154,6 @@ fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs: &s
             ci_mark_type_name_emitted(name)
             return ""
 
-    // Skip reserved C internal names (__foo or _Uppercase), keep _lowercase (e.g., _pcre2_*)
-    if name.len() >= 2 and name[0] == 95:
-        let second = name[1]
-        if second == 95 or (second >= 65 and second <= 90):
-            return ""
-
     // Skip already-emitted type names. C struct/union tags live in a separate
     // namespace from variables, and With can represent a type and value with
     // the same spelling, so do not use the value emission table here.
@@ -11752,29 +11746,23 @@ fn ci_scope_restore(scope: CiScope, mark: CiScopeMark) -> CiScope:
         if scope.ptr as i64 == 0:
             return scope
         while (*scope.ptr).name_log_keys.len() > mark.name_log_len:
-            let idx = (*scope.ptr).name_log_keys.len() - 1
-            let key = (*scope.ptr).name_log_keys.get(idx)
-            let value = (*scope.ptr).name_log_values.get(idx)
-            let had = (*scope.ptr).name_log_had.get(idx)
-            let _ = (*scope.ptr).name_log_keys.pop()
-            let _ = (*scope.ptr).name_log_values.pop()
-            let _ = (*scope.ptr).name_log_had.pop()
+            // Pop transfers ownership. Views into these logs expire when the
+            // entries are removed, before the previous bindings are restored.
+            let key = (*scope.ptr).name_log_keys.pop().unwrap()
+            let value = (*scope.ptr).name_log_values.pop().unwrap()
+            let had = (*scope.ptr).name_log_had.pop().unwrap()
             if had != 0:
-                (*scope.ptr).names.insert(with_str_clone_ref(key), with_str_clone_ref(value))
+                (*scope.ptr).names.insert(key, value)
             else:
-                let _ = (*scope.ptr).names.remove(with_str_clone_ref(key))
+                (*scope.ptr).names.remove(key)
         while (*scope.ptr).type_log_keys.len() > mark.type_log_len:
-            let idx = (*scope.ptr).type_log_keys.len() - 1
-            let key = (*scope.ptr).type_log_keys.get(idx)
-            let value = (*scope.ptr).type_log_values.get(idx)
-            let had = (*scope.ptr).type_log_had.get(idx)
-            let _ = (*scope.ptr).type_log_keys.pop()
-            let _ = (*scope.ptr).type_log_values.pop()
-            let _ = (*scope.ptr).type_log_had.pop()
+            let key = (*scope.ptr).type_log_keys.pop().unwrap()
+            let value = (*scope.ptr).type_log_values.pop().unwrap()
+            let had = (*scope.ptr).type_log_had.pop().unwrap()
             if had != 0:
-                (*scope.ptr).types.insert(with_str_clone_ref(key), with_str_clone_ref(value))
+                (*scope.ptr).types.insert(key, value)
             else:
-                let _ = (*scope.ptr).types.remove(with_str_clone_ref(key))
+                (*scope.ptr).types.remove(key)
     scope
 
 fn ci_scope_add(scope: CiScope, name: &str) -> CiScope:
@@ -16476,11 +16464,8 @@ fn ci_is_system_decl(name: &str) -> bool:
     // spelling to avoid collisions with user identifiers. They are still
     // source symbols owned by the translation unit, not system declarations.
     if ci_starts_with(name, "__with_"): return false
-    // Skip system internal names (__ prefix or _[A-Z]) but keep _pcre2_* etc.
-    if name.len() >= 2 and name[0] == 95:
-        let second = name[1]
-        if second == 95 or (second >= 65 and second <= 90):
-            return true
+    // A reserved C spelling does not establish system provenance. Callers
+    // filter system-header locations; corpus-owned _Tag and __Tag survive.
     // Known system types
     if ci_starts_with(name, "malloc_type") or ci_starts_with(name, "malloc_zone"): return true
     if name == "malloc_zone_t" or name == "malloc_type_id_t": return true
