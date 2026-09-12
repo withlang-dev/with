@@ -5628,13 +5628,7 @@ impl MirBuilder:
             return self.place_for_local(0)
 
         if kind == NodeKind.NK_FIELD_ACCESS:
-            let base = self.lower_field_base_place(self.ast.get_data0(node))
-            let field_sym = self.ast.get_data1(node)
-            let field_ty = self.expr_type(node)
-            if field_ty == 0 or field_ty == self.sema.ty_void as i32:
-                self.mark_unsupported()
-                return self.place_for_local(0)
-            return self.new_projected_field_place(base, field_sym, field_ty)
+            return self.lower_field_access(node)
 
         if kind == NodeKind.NK_INDEX:
             if self.vec_literal_type(node) != 0:

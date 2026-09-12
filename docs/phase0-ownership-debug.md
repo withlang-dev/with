@@ -69,3 +69,20 @@ Local transcripts are under `out/fnabi-validation/`: `vec-clone-address-trap.txt
 `vec-clone-free-site.txt`, `vec-literal-lowering-proof.txt`,
 `collection-literal-leak-first-site.txt`, `collection-literal-leak-second-site.txt`,
 `literal-insert-exact.txt`, and `field-comparison-exact.txt`.
+# Box field observation
+
+The final behavior battery found `behav_box_drop.w` failing LLVM verification:
+`icmp eq i32 undef, %str ...` in `test_box_drops_payload_at_scope_exit`.
+MIR placed the string comparison on `_2.id`, where `_2` was `Box[BoxDropGuard]`,
+instead of dereferencing its payload first. `check --validate-all` accepted it.
+
+LLDB stopped at `MirBuilder.lower_field_base_place+196` with type kind 19,
+type ID 435 (the Box), and place 14. Its caller chain was
+`lower_expr_place+288 → lower_observer_probe_arg+148 → lower_bin_op+1272`.
+The branch at +204 returned without a payload projection. This duplicated
+field-place path lacked the Box and user-Deref handling already implemented
+by `lower_field_access` and `lower_field_base_place_for_field`.
+
+`lower_expr_place` now delegates field accesses to that shared implementation.
+The regression exercises all six string comparisons, nested references to a
+Box, a HashSet observer probe, and the payload's exact destructor timing.
