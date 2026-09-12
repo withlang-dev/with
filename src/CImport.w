@@ -977,6 +977,7 @@ fn ci_type_decl_name_exists(session: i64, name: &str, count: i32) -> bool:
 
 fn ci_translated_builtin_type_name(name: &str) -> bool:
     if name == "c_void": return true
+    if name == "c_va_list": return true
     if name == "c_char": return true
     if name == "c_short": return true
     if name == "c_ushort": return true
@@ -2538,7 +2539,11 @@ fn ci_map_builtin_typedef(name: &str) -> str:
     if name == "off_t": return "i64"
     if name == "time_t": return "i64"
     if name == "wchar_t": return "i32"
-    if name == "va_list": return "opaque"
+    // #1104: C's va_list is the compiler's c_va_list on every target — a
+    // pointer on Darwin/Windows, a byte buffer on Linux (TypeLayout) —
+    // never the migration host's canonical spelling, so a corpus migrated
+    // on macOS runs its variadic definitions on Linux too.
+    if name == "va_list" or name == "__builtin_va_list" or name == "__gnuc_va_list": return "c_va_list"
     ""
 
 fn ci_normalize_translated_type_name(name: &str) -> str:
@@ -6481,15 +6486,6 @@ fn ci_cxtype_kind_is_int(kind: i32) -> bool:
 fn ci_cxtype_kind_is_float(kind: i32) -> bool:
     kind == CXT_Float or kind == CXT_Double or kind == CXT_LongDouble or kind == CXT_Float128 or kind == CXT_Half or kind == CXT_Float16
 
-// True for the aggregate `va_list` shapes: `__va_list_tag[N]` (glibc/x86_64)
-// and `struct __va_list` (AAPCS64 Linux). Darwin's `char *` va_list is a
-// pointer and never reaches here.
-fn ci_canonical_is_aggregate_va_list(session: i64, canon: i32) -> bool:
-    if with_ci_type_kind(session, canon) == CXT_ConstantArray:
-        let elem = with_ci_type_array_element(session, canon)
-        return elem >= 0 and ci_str_contains(with_ci_type_spelling(session, elem), "__va_list_tag")
-    with_ci_type_kind(session, canon) == CXT_Record and ci_str_contains(with_ci_type_spelling(session, canon), "__va_list")
-
 // ci_type_from_libclang — walks a libclang CXType tree into
 // CiType nodes, preserving structural decomposition for
 // pointers / arrays / function pointers and using CT_NAMED at
@@ -6510,6 +6506,8 @@ impl CiTypePool:
     fn type_from_libclang(session: i64, cxtype: i32) -> CiTypeId:
         if cxtype < 0:
             return 0 as CiTypeId
+        if cimport_type_is_va_list_at(session, cxtype, false):
+            return self.ty_named(self.add_string("c_va_list"))
         let kind = with_ci_type_kind(session, cxtype)
 
         if kind == CXT_Void:
@@ -6613,28 +6611,15 @@ impl CiTypePool:
                 let arg_idx = with_ci_type_arg(session, cxtype, i)
                 if arg_idx < 0:
                     return 0 as CiTypeId
-                let arg_ty = self.type_from_libclang(session, arg_idx)
+                let arg_ty =
+                    if cimport_type_is_va_list_at(session, arg_idx, true):
+                        self.ty_named(self.add_string("c_va_list"))
+                    else: self.type_from_libclang(session, arg_idx)
                 if (arg_ty as i32) == 0:
                     return 0 as CiTypeId
                 let _ = self.add_extra(arg_ty as i32)
                 i = i + 1
             return self.ty_fn_ptr(ret_ty, params_start, arg_count)
-
-        // Aggregate `va_list` has no spellable field layout, so the bridge
-        // demotes it to `c_void` — which `check` rejects as a value type,
-        // breaking every migrated variadic function. LLVM's
-        // `llvm.va_start`/`va_end` only need correctly-sized storage, so lower
-        // it to a `[u8; N]` buffer sized to the target's actual va_list.
-        // Detection is structural over the canonical type: glibc/x86_64 spells
-        // it `__va_list_tag[N]`, AAPCS64 Linux spells it `struct __va_list`.
-        // Darwin's `char*` va_list never reaches here (it lowers through the
-        // CXT_Pointer path above).
-        let va_canon = with_ci_type_canonical(session, cxtype)
-        if va_canon >= 0 and ci_canonical_is_aggregate_va_list(session, va_canon):
-            let va_size = with_ci_type_sizeof(session, cxtype) as i32
-            if va_size > 0:
-                let u8_idx = self.add_string("u8")
-                return self.ty_array(self.ty_named(u8_idx), va_size)
 
         // Typedef, elaborated, atomic, and other named wrappers.
         // Normalize builtin typedef spellings so C names like size_t do

@@ -20,7 +20,7 @@ extern fn with_getenv_str(name: &str) -> str
 
 // A label for docs/with-abi.md's version history, not the bundle key; it
 // becomes a frozen, normative major version at Level 1 of the roadmap.
-pub const WITH_ABI_VERSION: i32 = 1
+pub const WITH_ABI_VERSION: i32 = 2
 
 // #D6: PassMode — the per-parameter ABI classification, the SINGLE source of
 // truth. fn_abi_pass_mode computes it; both the callee prologue
@@ -48,6 +48,13 @@ pub fn fn_abi_pass_mode(uses_value_ref_abi: i32, platform_indirect: bool) -> i32
 // target passes aggregates by LLVM value and lets LLVM lower them.
 pub fn fn_abi_platform_aggregate_indirect(windows_x86_64: bool, is_aggregate: bool, size: i64) -> bool:
     windows_x86_64 and is_aggregate and size > 8
+
+// C's array typedef on SysV x86_64 decays to the caller's place. Other
+// targets keep value semantics: AAPCS64 uses the ordinary aggregate ABI
+// (including the caller-allocated copy at a foreign C call), and Darwin
+// and Windows represent va_list as a pointer value.
+pub fn fn_abi_c_va_list_uses_caller_place(os: &str, arch: &str) -> bool:
+    os == "Linux" and arch == "x86_64"
 
 // ── Symbols ─────────────────────────────────────────────────────────────
 

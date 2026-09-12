@@ -22,6 +22,11 @@ enum TypeKind: i32:
     TY_NEVER = 18
     TY_GENERIC_INST = 19
     TY_EXTERN_FN = 20
+    // C's va_list, modeled per target (#1104): a pointer on Darwin and
+    // Windows, a 24-byte __va_list_tag on SysV x86_64, a 32-byte
+    // struct on AAPCS64 Linux. Opaque to With code; Copy; passed to a
+    // callee the way the target's C passes va_list (TypeLayout, FnAbi).
+    TY_VA_LIST = 21
 
 type TypeId = i32
 

@@ -155,4 +155,7 @@ layout change there is caught by the `wo-drift` lane, not by this check.
 
 ## Version history
 
+- **v2** (2026-09-09): adds target-sized, eight-byte-aligned `c_va_list`;
+  SysV x86_64 parameters use the caller's place, while other targets retain
+  value semantics. The AAPCS64 C call uses the existing aggregate-copy ABI.
 - **v1** (2026-09-02): the convention as implemented at `23293bf0`.
