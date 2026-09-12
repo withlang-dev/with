@@ -8597,16 +8597,16 @@ impl Sema:
             return lhs as i32
 
         // Concat (++) — both operands must be str
-        // Only reject known non-str types; allow unresolved/generic types
-        // that may be str after monomorphization (Vec[str].get() etc.)
+        // An unresolved type parameter may become str. An instantiated generic
+        // such as Result[str, E] is already a known non-str container.
         if op == BinaryOp.OP_CONCAT:
             let lhs_resolved = self.resolve_alias(lhs)
             let rhs_resolved = self.resolve_alias(rhs)
             let lhs_k = self.get_type_kind(lhs_resolved)
             let rhs_k = self.get_type_kind(rhs_resolved)
-            if lhs_resolved != self.ty_str and (lhs_k == TypeKind.TY_INT or lhs_k == TypeKind.TY_FLOAT or lhs_k == TypeKind.TY_BOOL or lhs_k == TypeKind.TY_STRUCT or lhs_k == TypeKind.TY_ENUM or lhs_k == TypeKind.TY_ARRAY or lhs_k == TypeKind.TY_TUPLE):
+            if lhs_resolved != self.ty_str and (lhs_k == TypeKind.TY_INT or lhs_k == TypeKind.TY_FLOAT or lhs_k == TypeKind.TY_BOOL or lhs_k == TypeKind.TY_STRUCT or lhs_k == TypeKind.TY_ENUM or lhs_k == TypeKind.TY_ARRAY or lhs_k == TypeKind.TY_TUPLE or lhs_k == TypeKind.TY_GENERIC_INST):
                 self.emit_error("left operand of ++ must be str", lhs_node)
-            if rhs_resolved != self.ty_str and (rhs_k == TypeKind.TY_INT or rhs_k == TypeKind.TY_FLOAT or rhs_k == TypeKind.TY_BOOL or rhs_k == TypeKind.TY_STRUCT or rhs_k == TypeKind.TY_ENUM or rhs_k == TypeKind.TY_ARRAY or rhs_k == TypeKind.TY_TUPLE):
+            if rhs_resolved != self.ty_str and (rhs_k == TypeKind.TY_INT or rhs_k == TypeKind.TY_FLOAT or rhs_k == TypeKind.TY_BOOL or rhs_k == TypeKind.TY_STRUCT or rhs_k == TypeKind.TY_ENUM or rhs_k == TypeKind.TY_ARRAY or rhs_k == TypeKind.TY_TUPLE or rhs_k == TypeKind.TY_GENERIC_INST):
                 self.emit_error("right operand of ++ must be str", rhs_node)
             return self.ty_str as i32
 
