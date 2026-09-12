@@ -17538,27 +17538,25 @@ impl Codegen:
         let meta = self.pool.find_fn_meta(fn_node)
         if meta < 0: return
 
-        let i32_ty = wl_i32_type(self.context)
-
-        let ret_type_node = self.pool.fn_meta_ret(meta)
         let param_start = self.pool.fn_meta_param_start(meta)
         let param_count = self.pool.fn_meta_param_count(meta)
-
-        // Resolve return type (default to i32 when no annotation, matching non-async functions)
-        let ret_ty = if ret_type_node != 0: self.resolve_type(ret_type_node) else: i32_ty
+        let sig_idx = self.sema.get_sig(name_sym)
+        if sig_idx < 0 or self.sema.sig_get_param_count(sig_idx) != param_count:
+            with_eprint(f"error: async declaration {self.intern.resolve(name_sym)} has no finalized FnAbi signature")
+            self.had_error = 1
+            return
+        let ret_ty = self.sema_type_to_llvm(self.sema.unwrap_task_type(self.sema.sig_return_type(sig_idx)))
         self.async_fn_ret_types.insert(name_sym, ret_ty)
         let cc_name = self.fn_callconv_name(meta)
 
-        // Resolve param types
         let param_types: Vec[i64] = Vec.new()
+        let param_flags: Vec[i32] = Vec.new()
         for pi in 0..param_count:
-            let p_type_node = self.pool.fn_param_type(param_start, pi)
-            var p_ty = self.resolve_type(p_type_node)
-            if p_ty == 0:
-                p_ty = i32_ty
-            param_types.push(p_ty)
+            param_types.push(self.abi_param_source_type(sig_idx, pi))
+            param_flags.push(self.sig_abi_param_flags(sig_idx, pi))
 
-        let spawn_fn_type = wl_function_type(ret_ty, vec_data_i64(&param_types), param_count, 0)
+        let abi_index = self.compute_fn_abi(ret_ty, param_types, param_flags, FN_ABI_ASYNC, 0)
+        let spawn_fn_type = self.fn_abis[abi_index].llvm_ty
         var effective_name = self.function_symbol_name(name_sym)
         if self.path_uses_module_link_names(self.current_decl_source_file):
             if not (cc_name.len() > 9 and cc_name.slice(0, 9) == "c_export:"):
@@ -17572,11 +17570,12 @@ impl Codegen:
         self.apply_noalias_param_attrs(spawn_fn, param_start, param_count)
         self.fn_values.insert(name_sym, spawn_fn)
         self.fn_fn_types.insert(name_sym, spawn_fn_type)
+        self.bind_fn_abi(name_sym, abi_index, spawn_fn)
         if self.current_decl_is_imported_module_fn():
             return
 
         // Keep only the metadata the current async spawn path still consumes.
-        var args_struct_type = wl_struct_type(self.context, vec_data_i64(&param_types), param_count, 0)
+        let args_struct_type = wl_struct_type(self.context, vec_data_i64(&param_types), param_count, 0)
         self.async_fn_args_struct_types.insert(name_sym, args_struct_type)
 
     // ── Async expressions ─────────────────────────────────────────────

@@ -5,7 +5,7 @@
 `src/FnAbi.w` defines the immutable `FnAbi` and `ArgAbi` records.
 `Codegen.compute_fn_abi` interns descriptors from finalized source types,
 declared place/reference modes, and calling convention. Named declarations,
-concrete specializations, callable types, closures, adapters, and destructor
+concrete specializations, async declarations, callable types, closures, adapters, and destructor
 entries use this classifier. Symbol aliases and LLVM function values point to
 the same descriptor; callable types cache their descriptor by resolved type and
 convention. No byval/direct parameter masks or parallel reference-ABI tables
@@ -26,11 +26,13 @@ borrow. See [the current ABI description](with-abi.md).
 
 Regression coverage includes callable C and With `c_va_list` across all five
 targets, explicit pointers, C aggregate returns, closures and adapters,
-consuming receivers, and aggregate parameters beyond the former 64-bit mask.
+consuming receivers, inferred async returns, and aggregate parameters beyond
+the former 64-bit mask (including default trait methods).
 LLVM declaration and call audits check descriptor shapes and byval attributes.
 `da_trait_default_tail.w` additionally checks the cleanup frame shared in intent
 with ordinary function bodies; broader synthesized-body ownership audit coverage
-is tracked in #1117.
+is tracked in #1117. Missing/undefined callee coverage in the audit is tracked
+in #1119; native execution also guards the wide default-method regression.
 
 The analysis below records the original architectural finding and proposed
 rewire. Statements that With lacked descriptors describe that earlier compiler.

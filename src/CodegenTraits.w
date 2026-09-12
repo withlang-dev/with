@@ -598,7 +598,7 @@ impl Codegen:
             with_eprint(f"[dtm] {mangled} method_idx={method_idx} param_start={param_start} param_count={param_count} ret_node={ret_node} body_node={body_node}")
         if param_start < 0:
             return
-        if param_count < 0 or param_count > 64:
+        if param_count < 0:
             return
 
         let sig_idx = self.sema.lookup_method_sig(impl_type_sym, method_sym)

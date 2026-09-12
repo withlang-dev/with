@@ -27,6 +27,10 @@ fn wide_functions:
             "(" ++ parameters ++ "): p64\nfn indirect_" ++ shape ++
             "(cb: extern \"C\" fn(" ++ types ++ ") -> " ++ shape ++ ", value: " ++ shape ++
             "): cb(" ++ arguments ++ ")\n"
+        if shape == "Large":
+            source = source ++ "trait WideEcho:\n    fn echo_wide(self: &Self, " ++ parameters ++
+                ") -> Large: p64\nimpl WideEcho for Pair\n" ++
+                "fn check_wide_default(receiver: &Pair, value: Large): receiver.echo_wide(" ++ arguments ++ ")\n"
     source
 
 fn main:
@@ -63,6 +67,7 @@ fn main:
         "    assert(captured_large(l).a == 13)\n" ++
         "    assert(p.bounce(Pair { a: 17, b: 19 }).a == 17)\n" ++
         "    assert(p.echo(l).d == 7)\n" ++
+        "    assert(check_wide_default(p, l).d == 7)\n" ++
         "    assert(indirect_Large(wide_Large, l).d == 7)\n" ++
         "    assert(indirect_Pair(wide_Pair, p).b == 29)\n" ++
         "    print(\"native ok\")\n"
