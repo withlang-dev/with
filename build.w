@@ -4,6 +4,7 @@ use build.selfhost
 use build.abi
 use build.pcre2
 use build.zlib
+use build.c_algorithms
 use build.seed
 use build.release_publish
 use build.emit_c
@@ -3211,6 +3212,8 @@ pub fn build(ctx: BuildCtx) -> Build:
     zlib_promote = zlib_promote.input("out/zlib_migrated")
     zlib_promote = zlib_promote.dep("zlib-test")
     out = out.add_target(zlib_promote)
+
+    out = calg_pipeline(move out)
 
     var prune = target_new(.Action, "prune", "").output("out/.build-state/prune.always")
     prune.action = run_prune_action
