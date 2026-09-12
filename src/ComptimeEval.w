@@ -6766,6 +6766,10 @@ impl ComptimeEvaluator:
                 return comptime_control_value(comptime_value_bool(comptime_values_equal(lhs, rhs, self.extra_values)))
             if op == BinaryOp.OP_NEQ:
                 return comptime_control_value(comptime_value_bool(if comptime_values_equal(lhs, rhs, self.extra_values) != 0: 0 else: 1))
+            if op == BinaryOp.OP_LT: return comptime_control_value(comptime_value_bool(if lhs.text < rhs.text: 1 else: 0))
+            if op == BinaryOp.OP_GT: return comptime_control_value(comptime_value_bool(if lhs.text > rhs.text: 1 else: 0))
+            if op == BinaryOp.OP_LTE: return comptime_control_value(comptime_value_bool(if lhs.text <= rhs.text: 1 else: 0))
+            if op == BinaryOp.OP_GTE: return comptime_control_value(comptime_value_bool(if lhs.text >= rhs.text: 1 else: 0))
         if lhs.kind == ComptimeValueKind.CV_BOOL and rhs.kind == ComptimeValueKind.CV_BOOL:
             let lv = lhs.data0
             let rv = rhs.data0
