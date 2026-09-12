@@ -1269,6 +1269,75 @@ fn run_move_audit_action(ctx: ActionCtx) -> i32:
     let _ = report
     0
 
+fn complexity_allocation_count(report: &str, span: &str) -> i32:
+    var state = 0
+    var count = 0
+    for line in report.split("\n"):
+        if line == "complexity: " ++ span ++ " begin":
+            if state != 0: return -1
+            state = 1
+        else if line == "complexity: " ++ span ++ " end":
+            if state != 1: return -1
+            state = 2
+        else if state == 1 and line.starts_with("ALLOC "):
+            count = count + 1
+    if state == 2: count else: -1
+
+fn run_stdlib_complexity_action(ctx: ActionCtx):
+    let fs = ctx.fs()
+    let output = ctx.output()
+    if fs.mkdir_all(output) != 0:
+        ctx.diagnostics().error("stdlib-complexity: cannot create output directory")
+        return 1
+    let root = ctx.project_info().project_root()
+    let compiler = build_project_abs(root, ctx.inputs()[0])
+    let binary = build_project_abs(root, build_project_join(output, host_bin("stdlib-complexity")))
+    let stdout_rel = build_project_join(output, "compile.stdout")
+    let stderr_rel = build_project_join(output, "compile.stderr")
+    let compile_args: Vec[str] = [compiler.clone(), "build", "test/complexity/stdlib.w", "-O1", "-o", binary.clone()]
+    let compiled = ctx.process_runner().run_capture_cwd(
+        compile_args,
+        build_project_abs(root, stdout_rel), build_project_abs(root, stderr_rel), 300000, root)
+    if compiled.rc != 0:
+        ctx.diagnostics().error("stdlib-complexity: compile failed\n" ++ fs.read_text(stderr_rel))
+        return 1
+    let timing_out = build_project_join(output, "timing.stdout")
+    let timing_err = build_project_join(output, "timing.stderr")
+    let timing_args: Vec[str] = [binary]
+    let timed = ctx.process_runner().run_capture_cwd(timing_args,
+        build_project_abs(root, timing_out), build_project_abs(root, timing_err), 120000, root)
+    if timed.rc != 0:
+        ctx.diagnostics().error("stdlib-complexity: result or growth check failed\n" ++
+            fs.read_text(timing_out) ++ fs.read_text(timing_err))
+        return 1
+    let alloc_out = build_project_join(output, "allocation.stdout")
+    let alloc_err = build_project_join(output, "allocation.stderr")
+    // The CLI enables the runtime trace only for this child. Compilation and
+    // process startup fall outside the marked spans, as in the timing probe.
+    let allocation_args: Vec[str] = [compiler, "run", "-O1", "--trace-alloc", "test/complexity/stdlib.w", "allocations"]
+    let allocated = ctx.process_runner().run_capture_cwd(
+        allocation_args,
+        build_project_abs(root, alloc_out), build_project_abs(root, alloc_err), 300000, root)
+    let trace = fs.read_text(alloc_err)
+    if allocated.rc != 0 or not fs.read_text(alloc_out).contains("allocation results ok"):
+        ctx.diagnostics().error("stdlib-complexity: allocation fixture failed\n" ++ trace)
+        return 1
+    let empty = complexity_allocation_count(trace, "empty")
+    let control = complexity_allocation_count(trace, "control")
+    let removal = complexity_allocation_count(trace, "hash-remove")
+    if empty != 0 or control <= 0 or removal < 0:
+        ctx.diagnostics().error(f"stdlib-complexity: invalid allocation trace empty={empty} control={control} removal={removal}\n" ++ trace)
+        return 1
+    if removal == 0:
+        ctx.diagnostics().error("stdlib-complexity: XPASS HashMap removal #939; update its expectation with fix evidence")
+        return 1
+    let report = fs.read_text(timing_out) ++ f"XFAIL hash-remove-allocation #939 allocations={removal}\n"
+    if fs.write_text(build_project_join(output, "report.txt"), report) != 0:
+        ctx.diagnostics().error("stdlib-complexity: cannot write report")
+        return 1
+    if fs.write_text(build_project_join(output, ".stamp"), "ok") != 0: return 1
+    0
+
 fn run_fixpoint_diff_action(ctx: ActionCtx) -> i32:
     let fs = ctx.fs()
     let output = ctx.output()
@@ -2382,6 +2451,14 @@ pub fn build(ctx: BuildCtx) -> Build:
     drop_audit = drop_audit.dep("build")
     drop_audit = drop_audit.write_scope("out/drop-audit")
     out = out.add_target(drop_audit)
+    // Runtime measurements need a quiet worker pool; leave this action serial.
+    var stdlib_complexity = target_new(.Action, "stdlib-complexity", "").output("out/stdlib-complexity")
+    stdlib_complexity.action = run_stdlib_complexity_action
+    stdlib_complexity = stdlib_complexity.input(release_compiler_bin("with"))
+    stdlib_complexity = stdlib_complexity.input("test/complexity/stdlib.w")
+    stdlib_complexity = stdlib_complexity.dep("build")
+    stdlib_complexity = stdlib_complexity.write_scope("out/stdlib-complexity")
+    out = out.add_target(stdlib_complexity)
     var move_audit = target_new(.Action, "move-audit", "").output("out/move-audit")
     move_audit = move_audit.allow_parallel()
     move_audit.action = run_move_audit_action
@@ -2666,6 +2743,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     // two-week-old fixture rot — a lane that exists but never runs is
     // silent debt. 14 s, input-keyed (skips when compiler+fixtures fresh).
     tests = tests.dep("debug-alloc-tests")
+    tests = tests.dep("stdlib-complexity")
     tests = tests.dep("internals-tests")
     tests = tests.dep("lexer-tests")
     tests = tests.dep("parser-tests")

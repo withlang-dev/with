@@ -330,19 +330,29 @@ fn pod_cell(name: str, body: str) -> Cell:
     let src = "use std.builtins.print_i32\n" ++ "fn main:\n" ++ body ++ "    print_i32(0)\n"
     Cell { name: name, source: src, expect_sum: 0, expect_clean: true }
 
-fn build_cells() -> Vec[Cell]:
+fn sc_slotmap(kind: &str):
+    var source = "use std.collections\nfn go(slot: *mut i32):\n    var map = SlotMap[R].new()\n"
+    if kind == "empty": return source
+    source = source ++ "    let handles: Vec[Handle[R]] = Vec.new()\n" ++
+        "    for i in 1..129: handles.push(map.insert(mk(i, slot)))\n"
+    if kind == "partial" or kind == "refill":
+        source = source ++ "    for i in 0..128:\n" ++
+            "        if i % 2 == 0:\n" ++
+            "            let removed = map.remove(handles[i]).unwrap()\n" ++
+            "            assert(removed.id == i + 1)\n" ++
+            "            assert(not map.contains(handles[i]))\n"
+    if kind == "refill":
+        source = source ++ "    for i in 0..64: map.insert(mk(1, slot))\n" ++
+            "    assert(map.len() == 128)\n"
+    source
+
+fn build_cells():
     var cells: Vec[Cell] = Vec.new()
-    let shapes: Vec[str] = Vec.new()
-    shapes.push("bare")
-    shapes.push("field")
-    shapes.push("tuple")
-    shapes.push("option")
-    shapes.push("enum")
-    shapes.push("boxbare")
-    shapes.push("rcbare")
-    shapes.push("boxfield")
-    for si in 0..shapes.len() as i32:
-        let sh = shapes[si]
+    cells.push(cell("slotmap_empty/slotmap", sc_slotmap("empty"), 0))
+    cells.push(cell("slotmap_full/slotmap", sc_slotmap("full"), 8256))
+    cells.push(cell("slotmap_partial/slotmap", sc_slotmap("partial"), 8256))
+    cells.push(cell("slotmap_refill/slotmap", sc_slotmap("refill"), 8320))
+    for sh in ["bare", "field", "tuple", "option", "enum", "boxbare", "rcbare", "boxfield"]:
         cells.push(cell("scope_exit/" ++ sh, sc_scope_exit(sh), 1))
         cells.push(cell("branch_taken/" ++ sh, sc_branch(sh, true), 1))
         cells.push(cell("branch_untaken/" ++ sh, sc_branch(sh, false), 0))

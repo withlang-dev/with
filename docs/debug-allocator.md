@@ -148,6 +148,23 @@ never sets the env), so fixpoint is unaffected.
 *even when runtime-gated* — mechanism (runtime switch) and discoverability (a `--help` flag)
 are independent axes.
 
+## Allocation request tracing
+
+`with run --trace-alloc program.w` writes one record to stderr for each runtime
+allocation request. For an already-built binary, set `WITH_DEBUG_ALLOC_TRACE=1`.
+The record format is `ALLOC <requested bytes> <payload address> <origin token>`.
+Tracing is off by default and independent of `--debug-alloc`; both can be enabled
+together. The switch is cached, and records use the allocator's existing
+non-allocating output helpers while its lock is held.
+
+This counts requests even when their storage is freed before the measured
+operation returns. It therefore detects temporary allocation costs that a leak
+report or a reserved-byte counter misses. Bracket the operation with stderr
+markers and count the records between them; include an empty span and a known
+allocating control. `test/complexity/stdlib.w` does this for HashMap deletion
+(#939). Run tracing separately from timing measurements: writing the records
+changes execution time.
+
 ## Harness driver
 
 `tools/debug_drop.w` (pure `.w`, no shell script): runs a repro or fixture corpus under the

@@ -1,6 +1,6 @@
-# The With ABI (version 3)
+# The With ABI (version 4)
 
-Status: DRAFT v3 (2026-09-12), the convention as the compiler implements
+Status: DRAFT v4 (2026-09-12), the convention as the compiler implements
 it today, written down so `.wo` bundles (decisions.md D38,
 `docs/wo_bundles.md`) can depend on it. Nothing here is a new rule. The
 sources named in §7 define the ABI; this document describes them, and at
@@ -52,7 +52,7 @@ generated code and `rt/rt_core.w`:
 | `str` | `{ ptr: *const u8, len: i64 }` | 16 |
 | `Vec[T]` | `{ ptr: *mut u8, len: i64, cap: i64, elem_size: i64 }` | 32 |
 | `HashMap[K, V]` / `HashSet[T]` | handle: one pointer to a 64-byte runtime header (`keys, vals, occupied, cap, len, key_size, val_size, is_str_key`) | 8 |
-| `SlotMap[T]` | handle: one pointer to a 48-byte runtime header (`values, occupied, generations, len, cap, elem_size`) | 8 |
+| `SlotMap[T]` | handle: one pointer to a 56-byte runtime header (`values, next, generations, len, cap, elem_size, free_head: u32, free_tail: u32`) | 8 |
 | `Handle[T]` | `{ index: u32, generation: u32 }` | 8 |
 | `StringBuilder` / `FmtBuffer` | `{ buf: *mut u8, len: i64, cap: i64 }` | 24 |
 | slices `[]T`, `[]mut T` | fat: `{ ptr, len: i64 }` | 16 |
@@ -163,6 +163,11 @@ layout change there is caught by the `wo-drift` lane, not by this check.
 
 ## Version history
 
+- **v4** (2026-09-12): SlotMap replaces its occupied-byte array with a `u32`
+  free-list link array and adds FIFO head/tail indices to its runtime header.
+  Insertion reuses free slots without scanning capacity. Slots whose generation
+  is exhausted are retired permanently instead of overflowing or reviving stale
+  handles. The public SlotMap and Handle value layouts stay unchanged.
 - **v3** (2026-09-12): declarations use finalized signature types for every
   parameter, including consuming receivers and parameters of the owner's type.
   Removes the AST shortcut that passed those owned values as borrowed pointers.

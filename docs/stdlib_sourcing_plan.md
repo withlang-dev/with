@@ -298,6 +298,20 @@ status). Winners cannot be chosen without the yardstick. SlotMap's native
 free list (#936) lands here too. Gate: lane green on today's containers
 with the known cliffs recorded as expected failures.
 
+Implementation (2026-09-12): [the inventory](stdlib_inventory.md) records the
+current engines and planned algorithm families. `with build :stdlib-complexity`
+is part of `:test`; [its fixtures](../test/complexity/README.md) check results,
+N/4N runtime growth, and allocation requests with `--trace-alloc`. The known
+#937/#938/#939 cost cliffs are explicit expected failures; incorrect results,
+crashes, and invalid measurement controls fail the lane.
+
+SlotMap now uses a FIFO free list and retires exhausted generations. Native
+fixtures cover reuse order, growth, stale handles, exhaustion, and exact Drop
+counts. Four SlotMap cells extend the drop audit. The runtime header grows from
+48 to 56 bytes, and each slot uses a four-byte next link instead of a one-byte
+occupancy flag; [ABI v4](with-abi.md) records that internal layout change.
+This phase migrates no new C corpus and chooses no new public API names.
+
 **Phase 1 — c-algorithms, whole.**
 The first container corpus through the pipeline; non-macro C, so the
 migrator work is the facade-shaped `void*` + callback idiom, not templates.

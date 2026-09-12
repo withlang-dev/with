@@ -20,7 +20,7 @@ extern fn with_getenv_str(name: &str) -> str
 
 // A label for docs/with-abi.md's version history, not the bundle key; it
 // becomes a frozen, normative major version at Level 1 of the roadmap.
-pub const WITH_ABI_VERSION: i32 = 3
+pub const WITH_ABI_VERSION: i32 = 4
 
 // #D6: PassMode — the per-parameter ABI classification, the SINGLE source of
 // truth. fn_abi_pass_mode computes it; both the callee prologue
