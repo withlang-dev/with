@@ -14911,8 +14911,17 @@ fn lower_module(input_sema: Sema, ast_pool: AstPool, pool: InternPool) -> MirLow
             specialization = specialization + 1
         sema.preregister_mir_types()
         let before_drop_registration = sema.concrete_specialization_nodes.len() as i32
+        let types_before_drop_registration = sema.type_kinds.len() as i32
         sema.register_generic_drop_specializations()
         specializations_stable = sema.concrete_specialization_nodes.len() == before_drop_registration
+        // Checking a Drop body here creates its dependent types (a `*mut
+        // Slot[T]` only the drop mentions) AFTER the preregistration above;
+        // lower_concrete_specialization's own refresh compares against a count
+        // taken after this point and would never see them, so the frozen
+        // reads (is_copy_frozen) missed on a generic type whose only use was
+        // being dropped.
+        if sema.type_kinds.len() as i32 != types_before_drop_registration:
+            sema.preregister_mir_types()
 
     mir_mod.validate_generic_call_contracts(&sema)
 
