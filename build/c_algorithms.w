@@ -113,6 +113,7 @@ pub fn run_calg_test_action(ctx: ActionCtx) -> i32:
         workspace.add_file(module_dir ++ "/test_" ++ name.replace("-", "_") ++ ".w")
         var options = workspace.options()
         options.output_path = binary.clone()
+        options.prelude_mode = PreludeMode.None
         workspace.set_options(options)
         let compiled = workspace.compile()
         if compiled.rc != 0: return calg_fail(ctx, "compile test-" ++ name ++ f" exited {compiled.rc}")

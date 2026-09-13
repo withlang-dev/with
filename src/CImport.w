@@ -6690,8 +6690,11 @@ fn ci_type_is_fn_ptr(types: CiTypePool, ty: CiTypeId) -> bool:
         return true
     if types.kind(ty) == CiTypeKind.CT_NAMED:
         let text = types.get_string(types.get_d0(ty))
-        return ci_starts_with(text, "fn(") or ci_starts_with(text, "extern \"C\" fn(") or ci_starts_with(text, "unsafe extern \"C\" fn(")
+        return ci_type_text_is_fn_ptr(text)
     false
+
+fn ci_type_text_is_fn_ptr(text: &str) -> bool:
+    ci_starts_with(text, "fn(") or ci_starts_with(text, "unsafe fn(") or ci_starts_with(text, "extern \"C\" fn(") or ci_starts_with(text, "unsafe extern \"C\" fn(")
 
 impl CiExprPool:
     fn char_array_init_from_string_literal(types: CiTypePool, array_ty: CiTypeId, literal: &str) -> CiExprId:
@@ -10487,7 +10490,8 @@ impl CiStmtPool:
             // can. Declaration identity distinguishes direct function references
             // from pointer values; the spelling of the expression cannot.
             let direct_function = if callee_cursor >= 0: ci_cursor_is_function_ref(session, callee_cursor) else: callee_decl_idx >= 0
-            let indirect_fn_ptr_call = ci_type_is_fn_ptr(types, exprs.get_type(callee.value_expr)) and not direct_function and not g_ci_migrate_in_unsafe_function_body
+            let callee_type = exprs.get_type(callee.value_expr)
+            let indirect_fn_ptr_call = ci_type_is_fn_ptr(types, callee_type) and ci_starts_with(ci_print_type(types, callee_type), "unsafe ") and not direct_function and not g_ci_migrate_in_unsafe_function_body
             if ci_migrate_call_requires_unsafe_wrapper(callee_text) or indirect_fn_ptr_call:
                 call_id = exprs.unsafe_expr(call_id)
             return CiValueExprIR {
@@ -13888,9 +13892,7 @@ fn ci_translate_c_initializer_for_cursor_type(session: i64, init_src: &str, ty: 
     if ci_is_string_literal(trimmed):
         return ci_coerce_init_value_for_type(trimmed, ty)
     if ci_c_initializer_is_null_pointer_cast(ci_strip_parens(trimmed)):
-        if ty.len() > 0 and (ty[0] == 42 or ci_starts_with(ty, "Option[")):
-            return "null"
-        return "0"
+        return ci_coerce_init_value_for_type("0", ty)
     if trimmed[0] != 123:
         let decayed = ci_c_initializer_decay_array_identifier(session, trimmed, ty)
         if decayed.len() > 0:
@@ -16192,7 +16194,7 @@ fn ci_type_field_type(session: i64, ty_name: &str, field_idx: i32) -> str:
     ""
 
 fn ci_coerce_init_value_for_type(value: &str, ty: &str) -> str:
-    if value == "0" and (ci_starts_with(ty, "*") or ci_starts_with(ty, "Option[")):
+    if value == "0" and (ci_starts_with(ty, "*") or ci_starts_with(ty, "Option[") or ci_type_text_is_fn_ptr(ty)):
         return "null"
     if ty.len() > 0 and ty[0] == 91 and (ci_is_string_literal(value) or ci_is_concatenated_string(value)):
         let rendered = ci_render_string_literal_as_byte_array(value, ty)
