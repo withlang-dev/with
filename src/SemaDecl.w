@@ -133,7 +133,10 @@ impl Sema:
             self.decl_iface_demanded.push(if flag != 0 and not eager: 0 else: 1)
             if flag == 0:
                 let source_decl = self.ast.get_decl(di)
-                if self.ast.kind(source_decl) == NodeKind.NK_TYPE_DECL:
+                // An alias (std.libc's `c_int = i32`) coexists with the
+                // interface's identical alias; only a real type declaration
+                // (`Trie[V]`) displaces an interface alias of its name.
+                if self.ast.kind(source_decl) == NodeKind.NK_TYPE_DECL and type_decl_sub_kind(self.ast.get_data2(source_decl)) != TypeDeclKind.Alias:
                     source_type_names.insert(self.ast.get_data0(source_decl), 1)
             if flag != 0:
                 iface_count = iface_count + 1
