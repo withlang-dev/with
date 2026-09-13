@@ -74,6 +74,9 @@ pub extern fn setlocale(category: i32, locale: *const i8) -> *mut i8
 
 // process / time / POSIX
 pub extern fn abort() -> Never
+// Assertion reporters used by the Darwin and glibc assert.h expansions.
+pub extern fn __assert_rtn(function: *const i8, file: *const i8, line: i32, expression: *const i8) -> Never
+pub extern fn __assert_fail(expression: *const i8, file: *const i8, line: u32, function: *const i8) -> Never
 pub extern fn exit(code: i32) -> Never
 pub extern fn clock() -> u64
 pub extern fn time(tloc: *mut i64) -> i64

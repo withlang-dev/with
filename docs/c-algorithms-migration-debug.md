@@ -27,6 +27,55 @@ and a genuine two-level stringification wrapper. Native verification is
 pending the rebuilt compiler; this change alone does not claim the full
 upstream test pipeline passes.
 
+The next native stop, on the rebuilt development compiler, was
+`CiExprPool.reject_builtin_call`: its arguments were `__builtin_expect` and
+`no structural lowering`. The caller was `build_libc_call_value_expr`, whose
+final builtin branch rejected a hint supported only by the legacy text path.
+The structural path now returns the first operand at the Clang result type.
+The hint contract is documented in
+[Clang's language extensions](https://clang.llvm.org/docs/LanguageExtensions.html#builtin-expect).
+
+A second stop in `ci_migrate_set_error`, called from
+`ci_note_filtered_system_symbol_ref_at` and `lower_literal_or_ref`, named
+Darwin's `__assert_rtn` declaration in `_assert.h:63`. The libc surface and
+allowlist now include Darwin's reporter and glibc's `__assert_fail`, both
+non-returning foreign functions. Discarded conditionals lower to effect
+branches, so their void arms never initialize a synthetic value local.
+An untranslatable effectful arm propagates failure rather than becoming an
+empty block. Native transcripts are `assert-builtin-proof.txt` and
+`assert-binding-proof.txt` under `out/phase1-drafts/`; the compiler source
+check passes, with rebuilt migration/runtime verification still pending.
+
+After those repairs, the first invalid value IR returned at
+`lower_value_expr_ir + 6988` was cursor 897, kind 109 (StringLiteral), with
+both result registers zero. Its token text was the enclosing
+`assert ( allocated_bytes >= block_size )`; evaluation returned an empty
+string. Calling the existing `with_ci_cursor_spelling` in LLDB returned
+`"alloc_test_free"`, the real `__func__` literal. Clang 22.1.6's
+`clang/tools/libclang/CIndex.cpp:5407` uses `StringLiteral::outputString`
+for this query. Literal lowering now reads that authoritative escaped
+spelling before attempting source-range recovery. This also preserves
+embedded NULs that a null-terminated evaluation result cannot represent.
+Transcript: `out/phase1-drafts/assert-literal-proof.txt`.
+
+## Closure bodies must retain concrete specialization types
+
+The retained `behav_generic_closure_reference` test binary crashed at
+`rt_memcmp` (`rt_core.w:315`, `ldrb w14, [x11, x10]`, `x11=7`). Its first
+integer comparator had reached `with_str_cmp_ref`: the later string
+specialization had supplied the types for the earlier integer closure.
+The debug allocator reported no invalid free before this wrong-pointer read.
+
+LLDB while compiling the fixture stopped at `MirBuilder.binding_type` for
+node 889 and observed reference-to-string type 17. The call chain reached
+it from `Codegen.gen_closure + 9456`, which constructs a fresh MirBuilder
+during codegen. `lower_concrete_specialization` restores generic AST type
+sidecars only while lowering the enclosing function; `lower_closure`
+currently retains just an AST marker. This is an unfinished architecture
+fix: retain the closure's MIR while that concrete context is active, then
+read it in codegen. Proof: `generic-closure-crash-lldb.txt` and
+`closure-context-proof.txt` under `out/phase1-drafts/`.
+
 ## Reference types at repeated checks and pointer comparisons
 
 The generic comparator closure is checked during specialization discovery and

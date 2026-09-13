@@ -6252,10 +6252,7 @@ impl CiStmtPool:
             return self.merge_ir( lhs_stmt, rhs_stmt)
 
         if kind == CXK_CALL_EXPR or kind == CXK_COMPOUND_ASSIGN_OP or kind == CXK_COND_OP:
-            let stmt = self.lower_effect_expr_ir(session, cursor, exprs, types, scope)
-            if (stmt as i32) != 0:
-                return stmt
-            return self.empty_stmt_ir()
+            return self.lower_effect_expr_ir(session, cursor, exprs, types, scope)
 
         if kind == CXK_BINARY_OP:
             let op = with_ci_binary_op(session, cursor)
@@ -6307,6 +6304,19 @@ impl CiStmtPool:
             let cfp = self.lower_cfprintf_effect_ir(session, cursor, exprs, types, scope)
             if (cfp as i32) != 0:
                 return cfp
+
+        if kind == CXK_COND_OP and nc >= 3:
+            let cond_cursor = with_ci_child(session, cursor, 0)
+            let cond = self.lower_value_expr_ir(session, cond_cursor, exprs, types, scope)
+            if not ci_value_ir_valid(cond): return 0 as CiStmtId
+            let then_body = self.lower_discard_expr_side_effects_ir(session, with_ci_child(session, cursor, 1), exprs, types, scope)
+            let else_body = self.lower_discard_expr_side_effects_ir(session, with_ci_child(session, cursor, 2), exprs, types, scope)
+            if (then_body as i32) == 0 or (else_body as i32) == 0: return 0 as CiStmtId
+            let truthy = exprs.bool_expr_from_value_ir(session, cond_cursor, cond.value_expr, types)
+            if (truthy as i32) == 0: return 0 as CiStmtId
+            // A discarded conditional selects effects; a void arm has no
+            // value to initialize or assign to a synthetic ternary local.
+            return self.merge_ir(cond.setup_stmt, self.if_stmt(truthy, then_body, else_body))
 
         if kind == CXK_BINARY_OP and nc >= 2 and with_ci_binary_op(session, cursor) == BO_COMMA:
             let lhs_stmt = self.lower_effect_expr_ir(session, with_ci_child(session, cursor, 0), exprs, types, scope)
@@ -8804,6 +8814,14 @@ impl CiExprPool:
                 let s = self.add_string(literal_src)
                 return self.add(CiExprKind.CIE_STRING_LIT, s, 0, 0, 0 as CiTypeId)
 
+            // Macro extents can cover the invocation instead of its literal,
+            // including the implicit string child of __func__. Clang prints
+            // the actual StringLiteral with escapes and embedded NULs intact.
+            let cursor_literal = with_ci_cursor_spelling(session, cursor)
+            if ci_is_string_literal(cursor_literal):
+                let s = self.add_string(cursor_literal)
+                return self.add(CiExprKind.CIE_STRING_LIT, s, 0, 0, 0 as CiTypeId)
+
             let expansion_src = with_ci_cursor_expansion_text(session, cursor)
             let expansion_arg = ci_string_macro_arg_from_expansion(session, cursor)
             let spelling_src = with_ci_cursor_spelling_text(session, cursor)
@@ -9856,6 +9874,16 @@ impl CiExprPool:
             return self.int_lit(zero_idx, 0 as CiTypeId)
         if callee_text == "__builtin_offsetof":
             return self.lower_offsetof_value_expr(session, cursor)
+        if callee_text == "__builtin_expect" or callee_text == "__builtin_expect_with_probability":
+            let expected_args = if callee_text == "__builtin_expect": 2 else: 3
+            if arg_ids.len() != expected_args:
+                return self.reject_builtin_call(session, cursor, callee_text, "invalid branch prediction hint arity")
+            // Clang has checked the constant hint operands. The intrinsic
+            // returns its first argument, converted to the C long result type.
+            let result_ty = types.type_from_libclang(session, with_ci_cursor_type(session, cursor))
+            if (result_ty as i32) == 0:
+                return self.reject_builtin_call(session, cursor, callee_text, "missing branch prediction hint result type")
+            return self.cast(result_ty, arg_ids.get(0) as CiExprId)
         if callee_text == "__builtin_add_overflow" or callee_text == "__builtin_sub_overflow" or callee_text == "__builtin_mul_overflow":
             return self.build_overflow_builtin_call(session, cursor, callee_text, arg_ids, types)
         if ci_starts_with(callee_text, "__builtin"):
@@ -16357,6 +16385,7 @@ fn ci_libc_symbol_kind_mask(name: &str) -> i32:
     if name == "tolower" or name == "toupper": return CI_LIBC_KIND_FN
     if ci_is_libm_fn(name): return CI_LIBC_KIND_FN
     if name == "abort" or name == "exit" or name == "clock" or name == "time" or name == "isatty": return CI_LIBC_KIND_FN
+    if name == "__assert_rtn" or name == "__assert_fail": return CI_LIBC_KIND_FN
     if name == "mkstemp" or name == "realpath": return CI_LIBC_KIND_FN
     if name == "open" or name == "read" or name == "write" or name == "close": return CI_LIBC_KIND_FN
     if name == "lseek" or name == "unlink": return CI_LIBC_KIND_FN
