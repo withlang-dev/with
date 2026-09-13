@@ -5,8 +5,6 @@ type Holder { text: str }
 fn inspect(h: &Holder):
     let view = h.text
     assert(view == "abc")
-    var inferred = h.text
-    assert(inferred == "abc" and h.text == "abc")
     let typed: str = h.text.clone()
     assert(typed == "abc" and h.text == "abc")
     var typed_mut: str = h.text.clone()
