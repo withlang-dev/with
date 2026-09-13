@@ -6445,15 +6445,21 @@ fn ci_cursor_is_function_ref(session: i64, cursor: i32) -> bool:
 
 fn ci_callable_cxtype(session: i64, cursor: i32) -> i32:
     let original = with_ci_cursor_type(session, cursor)
-    var callable = with_ci_type_canonical(session, original)
-    if callable < 0: callable = original
-    if with_ci_type_kind(session, callable) == CXT_Pointer:
-        let pointee = with_ci_type_pointee(session, callable)
-        callable = with_ci_type_canonical(session, pointee)
-        if callable < 0: callable = pointee
-    let kind = with_ci_type_kind(session, callable)
-    if kind == CXT_FunctionProto or kind == CXT_FunctionNoProto: callable
-    else: -1
+    // The sugared type first: canonicalization erases the `va_list` typedef
+    // the parameter model keys on (#1104; Darwin's canonical va_list is
+    // `char *`, and a call argument would be cast to `*mut c_char`). The
+    // canonical type only serves a callee whose sugared type is not itself a
+    // function or a pointer to one (a typedef'd function pointer).
+    let canonical = with_ci_type_canonical(session, original)
+    for candidate in [original, canonical]:
+        if candidate < 0: continue
+        var callable = candidate
+        if with_ci_type_kind(session, callable) == CXT_Pointer:
+            let pointee = with_ci_type_pointee(session, callable)
+            if pointee >= 0: callable = pointee
+        let kind = with_ci_type_kind(session, callable)
+        if kind == CXT_FunctionProto or kind == CXT_FunctionNoProto: return callable
+    -1
 
 fn ci_literal_token_text(session: i64, cursor: i32) -> str:
     let token_text = with_ci_cursor_token_text(session, cursor)
