@@ -10259,7 +10259,12 @@ impl MirBuilder:
                     if self.ast.kind(gc_ma_node) != NodeKind.NK_CLOSURE:
                         gc_args.push(self.lower_call_arg(gc_ma_node, gc_sig_idx, 0, gc_mai + gc_param_offset))
                     else:
-                        gc_args.push(self.const_operand(ConstKind.CK_INT, 0, self.sema.ty_i32))
+                        // Codegen reads a closure argument back from the AST
+                        // (the spawn worker, a monomorphized method's callback),
+                        // but its body must already be lowered and retained
+                        // here: gen_closure resolves the node through this
+                        // body's CK_CLOSURE constant, never from the AST.
+                        gc_args.push(self.lower_closure(0, 0, self.ast.get_data1(gc_ma_node), self.ast.get_data2(gc_ma_node), gc_ma_node))
                 let gc_args_id = self.body.new_call_args(gc_args)
                 self.body.set_call_intrinsic(gc_args_id, MirIntrinsic.GENERIC_CALL)
                 self.require_generic_call_contract(gc_args_id, callee_sym, method_sym, self_expr, has_recorded_method_sig, "method-gc")
@@ -12632,7 +12637,13 @@ impl MirBuilder:
         let result = child.lower_expr(body_node)
         if ret_ty != self.sema.ty_void and ret_ty != self.sema.ty_never:
             let return_place = child.place_for_local(0)
-            child.assign_operand_to_place(return_place, result, self.ast.get_end(body_node))
+            // A body that is a statement (`item => xs.push(item)` for an
+            // `fn(i32) -> i32`) returns the implicit default (spec: implicit
+            // default return), exactly as a bare `return` does; a unit operand
+            // in the typed return slot fails the typed-MIR validator.
+            let body_ty = child.expr_type(body_node)
+            let returned = if body_ty == self.sema.ty_void as i32: child.lower_implicit_default_return(ret_ty, self.ast.get_end(body_node)) else: result
+            child.assign_operand_to_place(return_place, returned, self.ast.get_end(body_node))
         child.finish_stmt_temp_frame(frame)
         child.pop_scope_inline()
         child.terminate(TermKind.TK_RETURN, 0, 0, 0, 0)
@@ -12642,7 +12653,7 @@ impl MirBuilder:
             self.anonymous_bodies.push(finished.anonymous_bodies.pop().unwrap())
         body_sym
 
-    mut fn lower_closure(_captured_start: i32, _captured_count: i32, _params_start: i32, _params_count: i32, node: i32):
+    mut fn lower_closure(_captured_start: i32, _captured_count: i32, _params_start: i32, _params_count: i32, node: i32) -> i32:
         let ty = self.expr_type(node)
         if ty == 0:
             return self.unit_operand()
