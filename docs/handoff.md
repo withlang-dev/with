@@ -65,18 +65,52 @@ Issues filed from this work: #1135, #1136, #1137 (all compiler gaps, see §3).
 Complexity lane, stage1 on Eric's laptop (n vs 4n, ns): sorted-vec 399917 →
 1728916; binary-heap 346209 → 1481959; trie 4079708 → 16974792.
 
+## 1b. Verified since the first cut (2026-09-13, this branch)
+
+- Full `with build` and `:fixpoint` pass on the branch tip.
+- The facade tests pass under BOTH stage1 and the release binary after two
+  more fixes: the bundle interface's `pub type Trie = _Trie` /
+  `BinaryHeap = _BinaryHeap` aliases no longer shadow a source type of the
+  same name (`SemaDecl.prepare_interface_demand`), and the #1137 diagnostic
+  fires only for declared struct/enum/instantiation targets.
+- A generic type whose only use is being dropped no longer phase-bugs
+  (`MirLower`: eager caches refreshed after generic Drop registration;
+  fixture `behav_generic_drop_only_use.w`).
+
+## 1c. The branch's own regressions — the blocker for the battery
+
+`with build :test` is red on ~16 fixtures that pass on the Phase 0 base
+(c0a28c6e) and were ALREADY red at the pre-session tip af5d9adb. Bisected
+with stage1 builds in throwaway worktrees (each verdict = the named test
+run against that commit's stage1):
+
+| Culprit commit | Regressed fixtures | Symptom |
+|---|---|---|
+| 31a347d4 mir: retain concrete closure and async bodies before codegen | behav_scope_block_forms, behav_scope_join_vec_join, behav_iter_of_self_independent (pass at c03e93bc, fail at 31a347d4) | `BUG: anonymous expression lacks MIR constant` / `invalid MIR: use rvalue type incompatible` |
+| 88f0ad31 Preserve borrowed dereference places in non-Copy bindings | behav_derive_serialize, behav_derive_deserialize (pass at 92c0c01d, fail at 88f0ad31; ee1884c7/e7ddf116 touch only the migrator and libc) | `cannot take ownership of a non-Copy value through a borrow (str is not Copy)` at json.w `out.value_str(*self)` |
+| 92c0c01d Reject private generic type applications across module boundaries | behav_iter_pipeline_local (pass at b2594539, fail at 92c0c01d); probably err_iter_of_self_vec_iter, borrowed_str_binding_preserves_source, spec_ss14_9/16 | `symbol 'VecIter' is private to module <embedded-std>/std/collections.w` |
+| not attributed | cd_unary (passes at 31a347d4, fails at af5d9adb), behav_migrate_va_list (exit 134), behav_scope_spawn*, test/spec scoped-send | |
+
+These are compiler changes the previous agent made while getting the
+corpus and facade probes to compile; none has a root-cause note in its
+message that explains the regression. Each needs its own root cause (the
+route: `--dump-mir` / `--validate-all` on the fixture at the culprit vs its
+parent; `git show <commit>` is 4–13 lines of Sema/MIR each). Do not revert
+blindly: the corpus tests (all 17) and the facades depend on some of these
+(e.g. 88f0ad31 for `let value: T = unsafe { (*slot).value }`?) — re-run
+`:c-algorithms-test` and the facade tests after each change.
+
 ## 2. What is NOT done
 
-- **The battery.** Nothing on this branch has run `with build` (full),
-  `:fixpoint`, `:test`, `:test-green`, `:last-green`, `:drop-audit` /
-  `:move-audit`. A stage1 behavior-test sweep and a direct
+- **The battery.** `with build` and `:fixpoint` pass; `:test` is red on the
+  §1c regressions (the run was stopped after the behavior lane; wo-drift,
+  pcre2-test and the corpora lane were not reached). `:test-green`,
+  `:last-green`, `:drop-audit`, `:move-audit` not run. A stage1 behavior-test sweep and a direct
   `with run tools/drop_audit.w <stage1> ~/.local/bin/with` were started; check
   their logs before trusting anything (`p7`-harness fixtures pick the stale
   `out/stage/bin/with-stage2` and fail for that reason alone until a full build
   refreshes it — `behav_migrate_incomplete_record_order.w` is one).
-- **Commits.** The facade/wiring/Sema work is uncommitted at the moment of this
-  handoff (see `git status`); commit in the order: corpus+wiring, facades+tests,
-  Sema fix+fixture, docs. Commit BEFORE the battery.
+- **Commits.** Everything above is committed (tip: see `git log`).
 - **Comparison measurements** against comparison engines (RB/AVL vs sorted
   array, etc.) are not recorded; the complexity rows above are the only
   numbers.

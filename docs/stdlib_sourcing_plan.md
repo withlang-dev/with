@@ -443,6 +443,9 @@ by the M*LIB-backed `BTreeMap`/`BTreeSet` work in Phase 4.
   stdlib modules cannot import a corpus `pub let` (#1136); ordering two
   views of a type without an `lt` method silently compared addresses
   (#1137, fixed in this branch: it is now a diagnostic).
+- Not yet green: the branch's pre-facade compiler commits (31a347d4,
+  88f0ad31, 92c0c01d) regress ~16 existing fixtures; bisected and listed in
+  `docs/handoff.md` §1c. The battery is blocked on their root causes.
 - Open for Eric: comparisons of user types. §11.7 dispatches `<` to a
   fixed `lt` method, and `Ord` only carries `cmp(other: Self)`, so a type
   with `Ord` alone has no `<` and a generic `T: Ord` cannot compare two
