@@ -1,4 +1,7 @@
 use std.collections
+use std.collections.sorted_vec.SortedVec
+use std.collections.binary_heap.BinaryHeap
+use std.collections.trie.Trie
 use std.time
 use std.process
 use std.builtins
@@ -101,6 +104,44 @@ fn btree_set_work(n: i32, descending: bool):
     assert(entries.len() == n / 2)
     n
 
+// Phase 1 facades over the c-algorithms corpus (docs/stdlib_sourcing_plan.md).
+// SortedVec: ascending insertion appends (no shifting), lookups are binary
+// searches; a descending fill is O(n) per insert by contract and is not
+// measured here.
+fn sorted_vec_work(n: i32):
+    var sorted = SortedVec[i32].new()
+    for i in 0..n: sorted.insert(i)
+    for i in 0..n: assert(sorted.index_of(&i).unwrap() == i)
+    for i in 0..n: assert(*sorted.get(i) == i)
+    assert(sorted.len() == n)
+    n
+
+fn binary_heap_work(n: i32):
+    var heap = BinaryHeap[i32].new()
+    for i in 0..n: heap.push(if i % 2 == 0: i else: n - i)
+    var previous = n
+    for i in 0..n:
+        let top = heap.pop().unwrap()
+        assert(top <= previous)
+        previous = top
+    assert(heap.is_empty())
+    n
+
+fn trie_work(n: i32):
+    var trie = Trie[i32].new()
+    for i in 0..n: trie.insert(f"key-{i}", i)
+    for i in 0..n: assert(*trie.get(f"key-{i}").unwrap() == i)
+    var under = trie.iter_prefix("key-1")
+    var count = 0
+    while let Some(v) = under.next():
+        assert(*v >= 0)
+        count = count + 1
+    assert(count > 0)
+    for i in 0..n:
+        if i % 2 == 0: assert(trie.remove(f"key-{i}").unwrap() == i)
+    assert(trie.len() == n - n / 2)
+    n
+
 fn btree_map_ascending(n: i32): btree_map_work(n, false)
 fn btree_map_descending(n: i32): btree_map_work(n, true)
 fn btree_set_ascending(n: i32): btree_set_work(n, false)
@@ -171,3 +212,6 @@ else:
     measure("btree-map-descending", btree_map_descending, 128, 937)
     measure("btree-set-ascending", btree_set_ascending, 1000, 937)
     measure("btree-set-descending", btree_set_descending, 1000, 937)
+    measure("sorted-vec", sorted_vec_work, 4000, 0)
+    measure("binary-heap", binary_heap_work, 4000, 0)
+    measure("trie", trie_work, 2000, 0)

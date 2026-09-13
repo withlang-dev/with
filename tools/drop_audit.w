@@ -346,8 +346,62 @@ fn sc_slotmap(kind: &str):
             "    assert(map.len() == 128)\n"
     source
 
+// Phase 1 facade cells (docs/stdlib_sourcing_plan.md "Facade rules"): every
+// value a c-algorithms-backed facade holds drops exactly once — empty,
+// full, after partial transfers, and after a cursor abandoned midway.
+// R orders by id through the §11.7 operator methods the facades compare with.
+fn sc_facade_prelude(facade: &str):
+    "use std.collections." ++ facade ++ "\n" ++
+    "impl R:\n" ++
+    "    fn lt(other: &R) -> bool: self.id < other.id\n" ++
+    "    fn gt(other: &R) -> bool: self.id > other.id\n"
+
+fn sc_sorted_vec(kind: &str):
+    var source = sc_facade_prelude("sorted_vec.SortedVec") ++ "fn go(slot: *mut i32):\n    var sorted = SortedVec[R].new()\n"
+    if kind == "empty": return source
+    source = source ++ "    for i in 1..9: sorted.insert(mk(9 - i, slot))\n" ++
+        "    assert(sorted.get(0).id == 1 and sorted.get(7).id == 8)\n"
+    if kind == "partial":
+        source = source ++ "    for i in 0..4:\n        let removed = sorted.remove(0)\n        assert(removed.id == i + 1)\n" ++
+            "    assert(sorted.len() == 4)\n"
+    if kind == "cursor":
+        source = source ++ "    var cursor = sorted.iter()\n    assert(cursor.next().unwrap().id == 1)\n    assert(cursor.next().unwrap().id == 2)\n"
+    source
+
+fn sc_binary_heap(kind: &str):
+    var source = sc_facade_prelude("binary_heap.BinaryHeap") ++ "fn go(slot: *mut i32):\n    var heap = BinaryHeap[R].new()\n"
+    if kind == "empty": return source
+    source = source ++ "    for i in 1..9: heap.push(mk(i, slot))\n    assert(heap.peek().unwrap().id == 8)\n"
+    if kind == "partial":
+        source = source ++ "    for i in 0..4:\n        let top = heap.pop().unwrap()\n        assert(top.id == 8 - i)\n    assert(heap.len() == 4)\n"
+    source
+
+fn sc_trie(kind: &str):
+    var source = sc_facade_prelude("trie.Trie") ++ "fn go(slot: *mut i32):\n    var trie = Trie[R].new()\n"
+    if kind == "empty": return source
+    source = source ++ "    for i in 1..9: assert(trie.insert(f\"k{i}\", mk(i, slot)).is_none())\n    assert(trie.len() == 8)\n"
+    if kind == "partial":
+        source = source ++ "    for i in 1..5:\n        let removed = trie.remove(f\"k{i}\").unwrap()\n        assert(removed.id == i)\n    assert(trie.len() == 4)\n"
+    if kind == "replace":
+        source = source ++ "    let old = trie.insert(\"k3\", mk(3, slot)).unwrap()\n    assert(old.id == 3)\n"
+    if kind == "cursor":
+        source = source ++ "    var cursor = trie.iter_prefix(\"k\")\n    assert(cursor.next().unwrap().id == 1)\n"
+    source
+
 fn build_cells():
     var cells: Vec[Cell] = Vec.new()
+    cells.push(cell("sorted_vec_empty/facade", sc_sorted_vec("empty"), 0))
+    cells.push(cell("sorted_vec_full/facade", sc_sorted_vec("full"), 36))
+    cells.push(cell("sorted_vec_partial/facade", sc_sorted_vec("partial"), 36))
+    cells.push(cell("sorted_vec_cursor/facade", sc_sorted_vec("cursor"), 36))
+    cells.push(cell("binary_heap_empty/facade", sc_binary_heap("empty"), 0))
+    cells.push(cell("binary_heap_full/facade", sc_binary_heap("full"), 36))
+    cells.push(cell("binary_heap_partial/facade", sc_binary_heap("partial"), 36))
+    cells.push(cell("trie_empty/facade", sc_trie("empty"), 0))
+    cells.push(cell("trie_full/facade", sc_trie("full"), 36))
+    cells.push(cell("trie_partial/facade", sc_trie("partial"), 36))
+    cells.push(cell("trie_replace/facade", sc_trie("replace"), 39))
+    cells.push(cell("trie_cursor/facade", sc_trie("cursor"), 36))
     cells.push(cell("slotmap_empty/slotmap", sc_slotmap("empty"), 0))
     cells.push(cell("slotmap_full/slotmap", sc_slotmap("full"), 8256))
     cells.push(cell("slotmap_partial/slotmap", sc_slotmap("partial"), 8256))
