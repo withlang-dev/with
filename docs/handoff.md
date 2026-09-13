@@ -1,430 +1,119 @@
-# Handoff — the .wo bundles / stdlib-sourcing campaign
+# Handoff — stdlib sourcing Phase 1: the c-algorithms corpus and its facades (2026-09-13)
 
-## Current integration (2026-09-12)
+State dump for the agent picking up `docs/stdlib_sourcing_plan.md` Phase 1.
+The previous handoff (the `.wo` bundle / ABI chain) is history: #1101, #1103,
+#1107 and #1108 merged. Phase 0 is PR #1129 (`fnabi-phase0`); this branch is
+stacked on it.
 
-PCRE2 C4 (#1101), SDK-macro hygiene (#1107), and target-correct va_list
-(#1108) have merged. Main is `00a2fc9c`. Their old blockers below are
-historical, not current instructions to reproduce them again.
+Author/commit rules: commits are `Eric Hartford <eric@quixi.ai>`, no
+attribution trailers. Never `git stash`. No Python/bash/perl/sed/awk
+scripts — With one-liners (`with -p`/`-n`/`-e`) and `with run tool.w`.
+Never `-O0`. Only Eric blesses spec wording. The Bash tool is zsh.
 
-Zlib #1103 is integrated with that main in the `zlib-1103-ready` worktree.
-The merge keeps main's populated stage2/stage3 embedding object and adds
-both bundles to it; only stage1 uses empty bundle slots. The renamed
-`std.zl` corpus retains the macro-hygiene and c_va_list re-promotion.
-The separate follow-ups preserve c_va_list in `.wi` signatures and check
-all required reference files before marking an extracted zlib tree ready.
-Main already contains the newer gunzip ownership and input-limit fixes.
+---
 
-Verification for this integration is recorded in
-`out/zlib-1103-validation/` in the worktree and the #1103 PR description.
-Historical passing batteries below do not certify the integrated commit.
-Required checks: re-migration comparison, full build, fixpoint, compiler
-audit, full tests including both bundle drift lanes, move/drop audits,
-fresh pinned-seed compatibility, test-green and last-green.
+## 0. Where things are
 
-The next campaign milestone after #1103 is sourcing Phase 0 (inventory,
-complexity fixtures, SlotMap free list), then c-algorithms, TommyDS, STC,
-and the M*LIB B+ tree subset. #1106 remains the explicit callable-type ABI
-descriptor gap for affected indirect va_list calls; #1113 tracks missing
-seed-compat cache inputs, so use fresh bootstrap evidence.
+| Branch | Worktree | Meaning |
+|---|---|---|
+| `c-algorithms-phase1` | `~/.local/with-staging/c-algorithms-phase1` | Phase 1, this handoff |
+| `fnabi-phase0` | `~/.local/with-staging/fnabi-phase0` | Phase 0, PR #1129 (CI red on 4 lanes at last look; not touched here) |
+| `main` | `~/with` | origin/main is at 17109853 (#1103 merged); the local `~/with` checkout is behind |
 
-## Historical investigation (2026-09-08–09)
+Issues filed from this work: #1135, #1136, #1137 (all compiler gaps, see §3).
 
-**C4 landing update:** the local A/B performance gate is now green on the
-rebased landing tree. After excluding the initial pair, the two uncached
-warm pairs were 263.9/268.7 s (C4/baseline 1.018) and 275.6/284.3 s
-(1.032); baseline passed 985 files and C4 passed 986 in every run.
-`docs/wo_bundles.md` records the measured table. Main's handoff-only changes
-have been merged into `wo-c4`. The first battery passed build (164.5 s),
-fixpoint (276.6 s), and move audit (15 cells), then caught an audit-generator
-defect: 113 probes redeclared private allocation symbols with obsolete
-pointer types. LLDB observed the return signature replacement in
-`Sema.collect_extern_fn` → `Sema.add_sig` (symbol 32, return 81 → 20).
-The generator now uses `std.mem.alloc/free_mem` and retains each side's
-diagnostics separately; all 115 drop cells pass against the pinned seed
-(102.6 s). The next battery passed build (157.3 s), fixpoint (266.9 s),
-and `audit:all` (2,504,943 facts, zero violations), but the test survey
-failed only `bundle-interface-tests` (58 other targets green; 728.2 s).
-The reduced consumer was just `use std.wi_demo`: LLDB observed
-`interface_line_name("impl Pair:", 2)` returning an empty string, then
-`parse_interface_chunk` receiving its indented methods without the impl
-header. The merge now demands whole declarations, keeping leading
-attributes and indented bodies with their header, and names inherent
-impls by their target. The development compiler (78.9 s) passes the
-reduced import and original consumer. Expanded fixtures verify an unused
-attributed type and a demanded packed type: emitted interface and
-source/interface fingerprints agree, and the consumer reads 42 from a
-five-byte packed value. The full interface lane then passed (18.5 s action,
-246.8 s total), fixpoint passed (298.2 s), and `audit:all` reported
-2,505,391 facts / zero violations. The full emit-C lane exposed #1043's
-two const-field resets as a native MIR bug too: `var text = h.text` through
-`&Holder` printed `abc` then an empty source. LLDB observed
-`lower_let_binding` restore expected_type to Unit (14) before revisiting
-the original AST and queuing a reset for borrowed field place 7.
-`90d4858c` removes that redundant cancellation; assignment already consumes
-the actual lowered operand. Native output is now `abc` twice, emitted C
-passes syntax checking, and all 15 move / 115 drop audit cells pass.
-The silent read-only-store audit gap is #1096; the documented but ignored
-`--emit-llvm` flag is #1097 (use LLDB disassembly until it exists).
+## 1. What landed on the branch (all verified with a stage1 built from the tip)
 
-The same review resolved #1036's exact allocation sites: the 2048-byte
-table comes from `pcre2_maketables_8`, the 256-byte code from
-`pcre2_compile_8`. LLDB observed `detect_drop_functions` skip Regex's
-ordinary impl (trait 0 versus Drop 78). The facade now registers
-`impl Drop for Regex`, uses PCRE2-managed table ownership, and releases
-temporary compile tables on success and failure. #1098 was exposed in the
-same path: LLDB saw code free and named capture lookup use the identical
-pointer after explicit `re.drop()`. Captures now own a code copy and have
-their own Drop. The new lifetime fixture goes from 16 leaks to zero;
-escaped clones/captures and both existing regex behavior suites pass with
-stage1 (109.5 s development build).
+1. **Corpus.** `build/c_algorithms.w`: pin (fragglet/c-algorithms `23d45379`),
+   reference fetch, raw migration (`c-algorithms-migrate`: 19 engine modules +
+   `defs.w` + the harness `alloc_testing.w`/`framework.w`/`test_cpp.w`),
+   `c-algorithms-check-generated` (no `@[c_export]`, no untranslated residue,
+   module floor), `c-algorithms-promote` → `lib/std/c_algorithms/` (generated,
+   never hand-edited; `bundle.w` is the `.wo` root), and
+   `c-algorithms-bundle-root-check`.
+2. **Upstream tests.** `c-algorithms-migrate-tests` migrates each of the 17 test
+   programs as its own whole migration (engine + framework + test, with
+   `ALLOC_TESTING`) into `out/c_algorithms_tests_migrated/tests/<name>/`;
+   `c-algorithms-test` compiles and runs them. All 17 pass. `:test` depends on
+   `c-algorithms-test` (the corpora lane).
+3. **Bundle.** `calg_wo = wo_bundle_plan(ctx, "c_algorithms", "std/c_algorithms",
+   "lib/std/c_algorithms/bundle.w")` wired at every site zlib's plan is (host,
+   stage2/3/fixpoint/release link, cross linux/windows plans, embedded blobs,
+   bootstrap empty slots, wo-drift with `test_cpp.w` as harness).
+   `build/runtime.w` and `build.w` exclude `lib/std/c_algorithms/` from the
+   embedded stdlib; `build/compiler.w` lists `std.c_algorithms` as internal.
+   `with build :c_algorithms-wo` built and installed the host slot.
+4. **Migrator fix** (general): a record forward-declared with no definition in
+   the TU renders `type X = opaque` so another TU's definition upgrades it
+   regardless of file order (`test-trie.c` sorted before `trie.c` and `_Trie`
+   became `{ __pad0 }`). Fixture `behav_migrate_incomplete_record_order.w`.
+5. **Facades.** `lib/std/collections/engine_slot.w` (slot storage + the one C
+   trampoline), `sorted_vec.w` (`SortedVec[T]`), `binary_heap.w`
+   (`BinaryHeap[T]`, max by default, `new_min()`), `trie.w` (`Trie[V]`, keys are
+   `str` bytes, `iter_prefix`). Ownership per the plan: the facade owns every
+   value in a heap slot; `get`/`peek` observe, `remove`/`pop` transfer,
+   `move fn drop` releases every value then the engine. Tests:
+   `behav_sorted_vec.w`, `behav_binary_heap.w`, `behav_trie.w`; complexity rows
+   in `test/complexity/stdlib.w` (sorted-vec, binary-heap, trie — all PASS,
+   numbers below); drop-audit cells `*_facade` in `tools/drop_audit.w`.
+6. **Sema fix for #1137** (`src/SemaCheck.w`, `check_binary`): ordering two
+   views (`&T < &T`) of a type without the operator method is now a diagnostic
+   instead of a silent address comparison. Fixture
+   `test/compile_errors/err_view_order_without_lt.w`.
+7. Docs: plan "Phase 1 status", `docs/wo_bundles.md` note.
 
-The `6d54088b` battery then passed build (289.4 s), fixpoint (322.6 s),
-audit:all (2,505,774 facts / zero violations), the full emitted-C bootstrap
-(356.1 s, including C compiler version and hello execution), 15 move cells,
-and 115 drop cells. Its full test survey (1132.0 s) failed only
-`behav_d27_view_nll_before_owner_consume.w` among 987 behavior files; other
-targets passed. #1099 is the exact cause: function setup and closure
-rollback popped six borrow columns but omitted scope-depth and creation-
-site metadata. LLDB saw refs/depth/site lengths 1/1/1 become 0/1/1, then
-the NLL expiration branch skip stale depth 2 in current scope 3. Both
-cleanup loops now use complete-row removal, and a column-length invariant
-catches this corruption. Stage1 (95.4 s) passes the original regression,
-NLL scoping, closure capture, and genuine dangling-view rejection. A With
-comparison reducer predicate kept baseline acceptance while minimizing;
-the diagnostic-only reducer's noisy result is tracked as #1100.
+Complexity lane, stage1 on Eric's laptop (n vs 4n, ns): sorted-vec 399917 →
+1728916; binary-heap 346209 → 1481959; trie 4079708 → 16974792.
 
-The next step is the final battery on the committed corrections, including
-the full `:emit-c-test` lane, using `out/release/bin/with` for every
-post-build step. Logs are under `out/c4-validation/` in `c4r`; `STATUS.md`
-there distinguishes current results from prior batteries.
-Debugger launches now work; a disabled DevToolsSecurity status did not
-establish an authorization blocker, and no approval popup was seen.
-Do not repeat the performance gate or
-use the earlier quiet-box requirement below; the local ratio ruling
-supersedes it. C4 is not yet merged or reseeded.
+## 2. What is NOT done
 
-You are picking up a campaign mid-flight. This note is self-contained: it
-tells you where every thread stands, exactly what is next, the gates that
-must hold, and the traps that cost days this week. Read `CLAUDE.md` first —
-the self-host discipline is binding, and the memory notes in
-`~/.claude/projects/-Users-eric-with/memory/` (indexed by `MEMORY.md`) hold
-the rulings and traps in more detail than fits here.
+- **The battery.** Nothing on this branch has run `with build` (full),
+  `:fixpoint`, `:test`, `:test-green`, `:last-green`, `:drop-audit` /
+  `:move-audit`. A stage1 behavior-test sweep and a direct
+  `with run tools/drop_audit.w <stage1> ~/.local/bin/with` were started; check
+  their logs before trusting anything (`p7`-harness fixtures pick the stale
+  `out/stage/bin/with-stage2` and fail for that reason alone until a full build
+  refreshes it — `behav_migrate_incomplete_record_order.w` is one).
+- **Commits.** The facade/wiring/Sema work is uncommitted at the moment of this
+  handoff (see `git status`); commit in the order: corpus+wiring, facades+tests,
+  Sema fix+fixture, docs. Commit BEFORE the battery.
+- **Comparison measurements** against comparison engines (RB/AVL vs sorted
+  array, etc.) are not recorded; the complexity rows above are the only
+  numbers.
+- **PR** on top of #1129 (which is itself red on CI).
 
-## 0. Where the repo stands (stable — build on it, don't re-fight it)
+## 3. Rulings and gaps to raise with Eric
 
-- **Main is green on all five CI lanes** (macOS, linux-x86_64, linux-aarch64,
-  windows-x86_64, windows-aarch64) at `79d523f4`. Windows was the last
-  holdout (#1081, a native-Windows `invalid free` in the compiler building
-  the pcre2 bundle); it is closed, and `fix_windows.md` records the route.
-- **Seeds:** `seed.lock` pins Mac/Linux to **v0.15.2.0** and both Windows
-  platforms to **v0.15.2.1**. Every platform bootstraps from a published seed
-  it can use. `with build :seed` reads the lock; `tools/bump_seed_pins.w`
-  rewrites every workflow pin from it.
-- **Never-again guards, all landed:** `seed.lock` + the `:seed-compat` lane
-  (the pinned seed builds stage1 of a tree copy — run it with the FRESH
-  compiler, see §6), D40 seed numbering (`docs/decisions.md`: `Y` is a
-  bootstrap-compatibility group, a breakage bumps `Y` and resets `Z`), and
-  publish-first releases (`with build :publish-release-asset`,
-  `build/release_publish.w`: each platform adds its asset the moment it is
-  verified; nobody waits for the slowest runner).
-- **Open PRs:** only #1078 (Eric's own draft audit evidence; not a review
-  target). Everything mergeable was merged or closed-as-landed on 09-07.
+1. **`<` on user types.** §11.7 dispatches comparison operators to fixed method
+   names (`lt`, `gt`, …); `Ord` carries only `cmp(other: Self)`. So a type
+   with `Ord` has no `<`, and generic `T: Ord` code cannot compare two views
+   without copying. Today's facades therefore require `lt`/`gt` taking `&T`
+   on the element type (the tests' `Tag` defines them). Proposal for a ruling:
+   one `Ord.cmp(other: &Self)` backs all six comparisons (no-ceremony: one
+   method, not six), and views compare values, never addresses.
+2. #1135 — a non-capturing closure inside a generic function coerced to
+   `extern "C" fn` is miscompiled (runs the closure thunk). Blocks handing a
+   monomorphized comparator straight to a C engine; the facades store a
+   With-ABI closure in each slot and route through `slot_compare` instead.
+3. #1136 — a module under `lib/std/collections/` cannot see a corpus `pub let`
+   (`BINARY_HEAP_TYPE_MAX`) and needs item imports for generic types.
+   Workarounds are marked in `binary_heap.w` and the facades' `use` lines.
+4. #1137 — fixed on the branch (diagnostic); the `x < y` on owned 16-byte
+   structs still fails LLVM verification (also in #1137's text).
 
-## 1. The campaign and its sequence
+## 4. Commands
 
-The goal, per `docs/wo_bundles.md`, `docs/with-abi.md`, `docs/abi_roadmap.md`,
-`docs/fn_abi_descriptor_design.md`, and `docs/stdlib_sourcing_plan.md`:
-compile each migrated C corpus **once** into a `.wo` bundle behind a
-versioned With ABI (Level 0), so that bringing in the container/algorithm
-corpora costs nothing per build. The sequence in `wo_bundles.md` §Sequence:
+```
+cd ~/.local/with-staging/c-algorithms-phase1
+WITH=~/.local/bin/with with build :dev            # stage1 from the tree (installed seed, NEVER WITH=<stage1>: #1116)
+B=$PWD/out/bootstrap/bin/with-stage1
+$B test test/behavior/behav_sorted_vec.w test/behavior/behav_binary_heap.w test/behavior/behav_trie.w
+$B build test/complexity/stdlib.w -O1 -o /tmp/cx && /tmp/cx
+WITH=~/.local/bin/with with build :c-algorithms-test   # 17 upstream programs (~4.5 min: 18 migrations)
+WITH=~/.local/bin/with with build :c_algorithms-wo     # the bundle slot
+with run tools/drop_audit.w $B ~/.local/bin/with        # facade cells against the seed baseline
+```
 
-| step | state |
-|---|---|
-| 1. ABI v1 written + ABI-hash check in the battery | **done** |
-| 2. pcre2 → `pcre2.wo`, `with_regex_*` shim retired | mechanism + bundle landed (C1–C3); **shim retirement = C4, built but NOT merged — see §2** |
-| 3. zlib → `zlib.wo` | **not started** — §3 |
-| 4. new corpora arrive as `.wo` from day one | gated on 2 and 3 — §4 |
-
-**The order is not negotiable:** C4 lands, then zlib, then Phase 0 of the
-corpora plan, then c-algorithms. zlib and Phase 0 touch the same
-embed/link wiring C4 touches, so starting them before C4 lands only adds to
-C4's rebase. Phase 0's *docs* (§4) are the one thing that can run in
-parallel.
-
-## 2. C4 — retire the regex shim. THE BLOCKER. Land this first.
-
-### What it is
-`std.regex` calls pcre2 directly through the bundle interface; the
-`with_regex_*` runtime shim and every hook that carried it are deleted
-(D30); the compiler's regex-literal validation and codegen go through the
-facade. Tracked by #955 (also covers the emit-C lane after the bundle).
-
-### Where the code is
-Two worktrees under `~/.local/with-staging/`:
-
-- **`c4r` — the landing tree.** Branch `wo-c4` rebased onto main
-  `79d523f4`: **head `973a738a`, 32 commits**, ABI hash re-recorded for the
-  merged tree, `with check src/main.w` passes with the seed. This is what
-  eventually merges to main.
-- **`c4p` — the measuring tree.** Head `980a12e0` (same fixes, on the older
-  base), working tree clean. Lane measurements were taken here because the
-  box must be quiet for a valid number.
-
-Both carry the full C4 series, in this order: the facade (C4.1), regex-literal
-validation via `std.regex` (C4.2), codegen through the facade, the shim
-deletion (C4.4), the ambient-tier/prelude changes, the bundle-corpus
-in-unit compile for emit-C, the MIR global-proxy mark, then the three
-performance commits: **lazy interface collection** (`fe5d31dd`-class),
-**indexed symbol/signature/extern-var lookups** (`a463244a`), and the
-**on-demand interface merge** (`e331b848` + the root-tail rotation
-`2fe8ecb9`). Plus `1c775d05`: three "source wins" rules (Sema
-`collect_fn_decl`, `collect_extern_fn`, codegen `declare_function_at_inner`)
-so an interface declaration never displaces a same-named source
-declaration whatever the order.
-
-### The gate (Eric's ruling, 2026-09-07: "we are gonna need to fix the perf")
-**Hard. C4 does not land above it.**
-- hello-world `with check` ≤ **0.05 s** (pre-C4 baseline 0.03 s)
-- behavior-tests lane ≤ **158 s** (pre-C4 baseline 144 s; that is +10%)
-- measured on an **idle box**, first cold run excluded, release compiler.
-
-### Where the numbers stand
-| mechanism | hello check | behavior lane | verdict |
-|---|---|---|---|
-| C4 without perf work | 0.23 s | 414 s | the bug Eric ruled on |
-| + lazy interface collection | 0.07 s | 177 s (green) | hello over, lane over |
-| + lookup indexes | 0.07 s | 177 s (no change — expected; it is the fix for large units) | — |
-| + on-demand merge, first run | **0.05 s ✓** (`decls` 4771→1366; interface parses 59 of 3,405 lines) | 306.8 s **RED**, 14/980 failed | invalid |
-| + root-tail rotation, rerun | 0.05 s ✓ | 282.2 s, **GREEN** (980/980) — but **invalid**: the box carried a full core of foreign load (Steam ~99% of a core, WindowServer, VS Code, a VM; load 3.0–3.5) | not a gate measurement |
-
-**Neither 177 s nor 282 s is admissible** — both were taken on a loaded box.
-Per-test timings on `behav_derive_clone.w`, same box state, three binaries:
-pre-C4 seed check/build/test 0.03/0.09/0.39–0.54 s; eager C4 0.45/0.54/0.81 s;
-on-demand C4 **0.05/0.12/0.40 s** — parity with the seed on `test`, half of
-eager C4. On that arithmetic the lane on a quiet box lands near **150–160 s**,
-i.e. at the gate. So the "regression" was load, not the merge.
-
-The 14 failures in the first run were a real ordering bug: the merge
-appended interface chunks *after* the root's declarations, but
-`Sema.is_local_decl` takes the **last N** declarations of the merged pool as
-the root's, so the root's own types read as imported (`derive` generation,
-sealed-trait locality and `copy` all failed). `2fe8ecb9` rotates the chunks
-in before the root tail; the rerun above proves it (980/980).
-
-**The remaining per-compile residue is measured** (phase profile of `check`
-on `behav_derive_clone.w`, on-demand release vs seed, ms): parse 9.7 vs 3.5,
-resolve 9.9 vs 3.8, imports 4.2 vs 0.3, interface 4.2 (new), comptime 9.9
-vs 4.4, sema 4.9 vs 3.9, MIR 3.5 vs 2.8 — **48 vs 21 ms**. About 16 of the
-extra 27 ms is the interface sections' **937 `use` lines**: parsed as `use`
-declarations twice (Resolve, then the import worklist — `decls` 1368 vs
-447, the 920 extra are those use decls), each resolved to a module path
-individually (`resolve_module_path_frontend` × 937 for ~35 distinct
-modules), then carried through the comptime transform's pool clone before
-being stripped. The chunk fixpoint itself is 4.2 ms (two passes); the
-rotation is sub-millisecond. **That fix is done and committed** (`c4p`
-`980a12e0`, ported to `c4r` as `4d775b12`): Resolve turns a section's `use`
-lines into import edges directly from text (`process_interface_module`),
-and the worklist enqueues a section's imports from the same text with a
-per-compile name→path memo (35 distinct modules) — no use declaration of a
-section enters the pool. Same check: **48 → 40 ms** (seed 21), `decls=463`,
-imports 0.5 ms. The same commit fixes a latent pairing bug it exposed: a
-section's path was pushed to the pending list before its imports recursed
-and its text after, so `pcre2_compile_8` was attributed to
-`pcre2_compile_cgroup.w`, its link name hashed the wrong module and the
-bundle went unlinked (caught by the regex tests). With it: check 0.04 s ×3
-(seed 0.03), hello-world **0.04–0.05 s ×4** — the hello gate is met; the 14
-derive/sealed/copy tests, the three regex behavior tests, the regex/abort
-repros, the compiler self-check and both fixtures all pass. The branch's
-`docs/wo_bundles.md` (`973a738a`) documents all five mechanisms with their
-figures.
-
-### What you must do next (in order)
-1. **Measure the gate as a RATIO, LOCALLY — this is the only thing left before landing.** Every mechanism is done; per-test arithmetic (`test` 0.40 s vs the seed's 0.39–0.54) puts the lane at or under the seed's own 144 s. Eric's rulings (2026-09-09): activity on the laptop blocks nothing — do **not** wait for an idle box — and the measurement is **local, not CI**. The gate is *relative* (≤ +10% over the pre-C4 baseline), so measure it on this box under identical conditions where load cancels: run the pre-C4 seed's behavior lane and C4's behavior lane **interleaved, A/B/A/B, at least two full pairs**, same box, release compiler. Report each run's wall time and the ratio C4/seed; **ratio ≤ 1.10 is the gate.** A wall-clock number taken alone on the shared laptop (177 s, 282 s) is load noise and proves nothing either way.
-3. Iterate until the lane is **green and ≤ 158 s on the `c4p` base.** If the quiet-box number lands above the gate, profile a representative behavior test (not hello) with `WITH_PROFILE=1` and name the next mechanism with its ms, as above. Every mechanism you add: report its measured delta.
-4. **Port to `c4r`**, re-measure the lane once on the rebased tree (main's changes can shift it), then the full battery **with the move and drop audits** (C4 touches MIR): `with build`, then with the fresh `out/release/bin/with`: `:fixpoint`, `:move-audit`, `:drop-audit`, `:test`, `:seed-compat`, `analyze src/main.w audit:all`, `:test-green`, `:last-green`. Report all numbers. Only then push, reseed (`:update-seed`, `:install-user`), close #955.
-5. Update `docs/wo_bundles.md` §"Shim retired (batch C4)" with the final measured table (the branch's copy has the 0.23 s / 414 s pre-fix numbers and the placeholder).
-
-### The prior agent
-Session id `aa40516def8194a3f` did all of the above and knows the code
-intimately; it can be resumed with a message if it is still reachable. It
-went idle twice without reporting a lane number — if you resume it, demand
-the number first. Its regression-found-then-fixed history is in this
-session's memory note `wo-c4-plan.md`.
-
-## 3. zlib → `zlib.wo` (DONE on branch `zlib-wo`; PR after #1101)
-
-**State (2026-09-09).** Branch `zlib-wo` = `wo-c4` (C4, PR #1101) + the
-zlib batch, in worktree `~/.local/with-staging/zlibwo`. Battery #3
-fully green there (build 195 s, fixpoint 289 s, test 1006 s,
-seed-compat, test-green, last-green; both drift lanes byte-identical,
-both harnesses run). Not reseeded: reseed from main once #1101 and this
-PR have merged. The second bundle was not "mechanical": it exposed five
-consumer-side defects and one build-cache defect, all fixed in the batch
-(commits `af9fd36c` migrator, `59012470` variadic interface,
-`c8835444` corpus, `ca40e7f5` Sema, `f6b82ba0` codegen, `0da6940b`
-build-layer, `ab30b320` store key) — see `docs/wo_bundles.md` and the
-notes below. **Measured** (interleaved A/B, `WITH_PROFILE=1`, release
-compilers of `wo-c4` vs `zlib-wo`, 3 rounds): a program importing
-`std.zlib` (`test/behavior/behav_zlib_std.w`) spends ~800 ms in the
-compiler's phases with the corpus in-unit and ~160 ms with the bundle
-(imports 48→1.3 ms, comptime 75→11 ms, mir.lower 30→4 ms, llvm
-gen/optimize/emit 570→115 ms; link unchanged at 26 ms). `with check
-build.w` is unchanged (57 ms comptime either way) and the compiler's
-own build is unchanged: the compiler binary never reaches zlib, so
-"stop recompiling zlib on every build" is a per-consumer win, not a
-compiler-build win.
-
-What the batch had to fix beyond the pcre2 template (each is a general
-rule now, not a zlib special case):
-- Sema flat namespace (D29-B pending): an interface declaration collected
-  after a same-named source definition kept `fn_decl_nodes` but
-  overwrote `sig_lookup` (std.zlib's `compress` vs the corpus's C
-  `compress`); interface globals were keyed by name alone (pcre2's
-  `UINT_MAX` hid zlib's). Both per-module now.
-- Codegen: unions were never predeclared, so the alphabetical `.wi`
-  (struct before the unions it holds) failed layout; a bundle build now
-  carries the non-corpus With functions its corpus reaches (std.libc's
-  gz I/O wrappers) as internal copies, because a whole-program consumer
-  never defines module-link-named symbols.
-- The bundle interface spells variadic functions (`gzprintf(..., ...)`).
-- The store slot is keyed by the compiler sources too (`compiler-src-sha`):
-  battery #2 linked a stale object under an unchanged ABI.
-- ToolFs accepted only project-relative paths, hiding the real error on
-  the helper-programs failure path; `std.zl` is an internal module for
-  the spec inventory.
-- #1102 filed: the migrator now leaks the macOS SDK's `MAC_OS_X_VERSION_*`
-  macros into every shared defs (host-dependent corpus output); zlib's
-  re-promoted defs carries them, pcre2 was not re-promoted.
-- Windows (#1103's first CI run): the bundle object carries every corpus
-  module, and zlib's gz layer — migrated on macOS with `O_NONBLOCK` /
-  `O_CLOEXEC` resolved — calls `fcntl`, which `std.libc` declared as a
-  bare extern and UCRT does not have. `fcntl` is now a runtime seam like
-  `open`/`read`/`close` (`with_libc_fcntl` → `rt_fcntl`; POSIX forwards
-  through a variadic extern, Windows reports unsupported). Windows linked
-  zlib's object at all because Link.w's undefined-symbol probe fails
-  there and a failed probe silently linked every bundle; it now warns.
-- **#1104 (blocks #1103's linux x86_64 lane): `va_list` is modeled as an
-  8-byte pointer on every target.** The drift harness runs zlib's
-  `gzprintf` → `vsnprintf(va)`; on SysV x86_64 `va_start` writes a
-  24-byte tag into the 8-byte slot and `vsnprintf` expects a pointer to
-  it — exit 139. Verified from the IR (`with ir --target=linux_x86_64`
-  emits the same `alloca ptr` as Darwin). Only variadic *definitions*
-  are affected (pcre2 has none). Fix = a per-target `VaList` type, one
-  `PassMode` rule in `compute_fn_abi`, the migrator emitting `VaList`,
-  zlib re-migrated, and a behavior test on every lane — an ABI batch,
-  alone, with the audits. Landing order: #1101 → #1104 → #1103.
-- macOS CI fails `behav_cli_test_command_args` and the `selfcheck` corpus
-  test on both this branch and #1101, deterministically, while both pass
-  locally; both use `out/stage/bin/with-stage2`, which the CI Fixpoint
-  step rewrites just before the battery. `wo-c4` (7910cf98, merged here)
-  adds a `Failure diagnostics` workflow step that dumps the surviving
-  captures and probes that binary; the next failing run names the cause.
-
-How it was wired (the template for the next corpus):
-- the corpus moved from `lib/std/zlib/` (package `std.zlib`) to
-  `lib/std/zl/` (package `std.zl`): the corpus package and the facade
-  `std.zlib` (`lib/std/zlib.w`) may not share a dotted path, because the
-  frontend's parent-module import fallback pulled the facade into the
-  `--no-prelude` bundle build (`docs/wo_bundles.md`; `build/wo.w` now
-  refuses such a corpus by name);
-- a `wo_bundle_plan(ctx, "zlib", "std/zl", "lib/std/zl/bundle.w")` in
-  `build.w` beside `pcre2_wo`, wired through `wo_bundle_targets`,
-  `target_with_link_bundle` on every stage, and `target_with_wo_blobs`;
-  `lib/std/zl/` is excluded from the embedded stdlib in BOTH lists
-  (`build.w target_with_embedded_stdlib_inputs` and the generator in
-  `build/runtime.w`; missing the second one is 232 "unknown type c_void"
-  errors at `<embedded-std>/std/zl/…`);
-- a generated bundle root over the 18 modules in `lib/std/zl/` (16 corpus
-  + `example.w`/`minigzip.w` harness), written by
-  `build/zlib.w zlib_bundle_root_text` the way `build/pcre2.w` writes
-  `lib/std/re/bundle.w`, and checked by `zlib-bundle-root-check`;
-- the migrator's prelude-free vocabulary (`type c_void = opaque`, the
-  `__ci_unreachable` shim) is keyed on the migrate workspace's
-  `prelude_mode: None` / `with migrate --no-prelude`
-  (`ci_migrate_output_is_prelude_free`), no longer on the corpus name
-  `std.re`; `build/zlib.w` and `build/pcre2.w` set it on every migrate
-  workspace. The zlib corpus is re-migrated with that compiler
-  (`WITH=<stage1> <stage1> build :zlib-promote`);
-- `std.zlib` and the consumers that recompile in-unit today (`std.build`,
-  `build/zlib_gzip.w`, `build/zlib_gunzip.w`) link the bundle instead
-  (measured above).
-
-Landing order: #1101 (C4) merges first; then open the zlib PR onto
-main (the branch already contains C4, so its diff against main is only
-the zlib commits once C4 is in), merge, sync local main, reseed
-(`:update-seed` + `:install-user`), close #1102 when the migrator fix
-lands. Fast consumer test without a release build:
-`out/bootstrap/bin/with-stage1 build X.w --link-bundle out/wo/zlib
---link-bundle out/wo/pcre2`.
-
-## 4. The corpora plan (`docs/stdlib_sourcing_plan.md`)
-
-Three corpora + one surgical port, each migrated **whole** through pcre2's
-pipeline and arriving as a `.wo`, with native facades choosing engines by
-benchmark (D37): **c-algorithms** (fragglet: RB/AVL, heap, sorted array,
-trie, hash table, list), **TommyDS** (hardened hashing/indexing), **STC**
-(modern breadth: vec/deque/pqueue/hmap/smap/cstr/cbits...), and **M*LIB**
-`m-bptree.h` only. Written natively, not migrated: graph algorithms,
-union-find, SlotMap's free list, and Vec/str.
-
-- **Phase 0 — measure first** (can start in parallel, docs-only until the
-  lane): `docs/stdlib_inventory.md` (every structure/algorithm needed, its
-  complexity contract, status — **not started**), the complexity-fixture
-  lane (**not started**), and SlotMap's native free list (#936, open;
-  Miguel is building SlotMap — keep it single-owner, no built-in locking;
-  see the D22/D27 notes). Gate: lane green with known cliffs recorded.
-- **Phase 1** c-algorithms whole (non-macro C; the `void*` + callback
-  idiom). **Phase 2** TommyDS. **Phase 3** STC (the macro-migrator
-  campaign). **Phase 4** M*LIB bptree, surgical.
-
-**Open questions still Eric's** (plan §"Open questions"): #2 whether every
-corpus builds in every battery (a `corpora` lane); #3 whether Phase 0's
-inventory rules on names now (`Heap` vs `PriorityQueue`, the `BitSet` API)
-or leaves that to each facade PR. #1 was ruled as D37.
-
-## 5. Related, done, don't redo
-- Publish-first release (`build/release_publish.w`, per-job publish in
-  `nightly-release.yml`), proven on CI (create-first and add-later).
-- D40 accepted and applied (v0.15.1.10 renumbered to v0.15.2.0; the
-  transient v0.15.1.9/.11/.12/.13 tags deleted).
-- Rob's #997/#1016/#1029/#1035 landed by cherry-pick (a c_import regression
-  #997 exposed — glibc's `NAN`/`INFINITY`/`HUGE_VALF` emitted as
-  self-referential globals — was caught by the battery and fixed, `1f826ac4`).
-- `with_str_from_cstr` copies (the #1081 root cause), Windows runtime fixes.
-
-## 6. Traps that cost days this week — read before your first battery
-- **Never commit during a battery.** `last-green`'s version stamp tracks
-  HEAD; a commit mid-battery leaves a stale test-pass marker and a red
-  `last-green`. Commit first, then battery, then reseed.
-- **Drive post-build steps with the FRESH compiler** (`./out/release/bin/with`),
-  as CI does. Driver-side rules (cache freshness, the RSS tripwire) live in
-  the compiler; the installed seed lacks them until reseed.
-- **`:seed-compat` is a fresh-compiler check, not a seed-driven `:test`
-  dep.** The pinned seed's 1 GiB RSS tripwire is flaky on its ~1 GiB nested
-  build; that is why it left `:test`. Run it as its own fresh-driver step.
-- **Build-layer API is seed-gated.** `build.w`/`build/*.w`/`lib/std/build.w`
-  are comptime-evaluated by the *pinned seed*; a new `std.build` API or
-  `Target` field used there needs a published seed that has it. Driver-side
-  rules keyed by target name take effect in-batch; a real API addition is a
-  seed-release cycle (land unused → publish seed → bump lock → use).
-- **A seed experiment must set `WITH=<seed>`.** The driver binary is not the
-  seed; unset `WITH` silently uses the installed compiler.
-- **Never revert language surface to appease an old seed** (build-layer
-  `s[i]` included). Cut a newer seed (D40 tells you the number).
-- **No Python/bash/perl/sed/awk for text work; With one-liners and With
-  tools.** Edit tool for edits. Never `git stash`.
-- **Verify by running.** A grep, dump or trace print is a hypothesis; the
-  root cause is the exact line, proven in lldb or the debug allocator.
-- **Isolation:** an ownership/drop/codegen/ABI change is alone in its batch
-  with `:move-audit` and `:drop-audit`. C4 qualifies.
-
-## 7. Worktrees and files
-- `~/.local/with-staging/c4r` (wo-c4 rebased, landing), `c4p` (measuring),
-  `c4` (older detached), `relpub` (rob-lanes, landed — can be removed),
-  `uncast` (wo-hash, landed — can be removed).
-- `build/pcre2.w`, `build/wo.w`, `lib/std/re/bundle.w` — the pcre2 pipeline
-  to mirror for zlib. `build/release_publish.w`, `build/seed.w`,
-  `tools/bump_seed_pins.w` — the release/seed machinery.
-- Issues: #955 (C4/emit-C), #936 (SlotMap free list, Phase 0), #1076/#1077
-  (filed by the C4 agent: silent in-unit corpus fallback; store install dir
-  `$HOME` literal).
+Traps: `with build <target>` needs the colon (`:c-algorithms-test`);
+`WITH=<stage1> <stage1> build …` makes stage1 the seed and its empty bundle
+slots hit #1116 (`stderr` shadowing errors in `out/gen/main.w`).

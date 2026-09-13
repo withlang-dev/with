@@ -1,8 +1,9 @@
 # Stdlib sourcing: three migrated corpora, one facade
 
 Status (2026-09-12): PCRE2 and zlib share the bundle pipeline. Phase 0 is
-implemented and locally verified in PR #1129; Phase 1 migration is in
-progress; Phases 2–4 remain planned. Engine selections were ruled on
+implemented and locally verified in PR #1129; Phase 1 (c-algorithms) is
+implemented on branch `c-algorithms-phase1` — see "Phase 1 status" below;
+Phases 2–4 remain planned. Engine selections were ruled on
 2026-09-12; module grouping is provisional.
 Companion: `docs/harden_migrate.md` (the migrator plan
 this campaign exercises), `docs/harden_plan.md` item 7.
@@ -409,6 +410,45 @@ comparison engines. This phase does not replace the default hash maps,
 Gate: upstream `test/` passes under With; facades' complexity fixtures
 green; drop audit green; comparison measurements recorded. #937 is retired
 by the M*LIB-backed `BTreeMap`/`BTreeSet` work in Phase 4.
+
+**Phase 1 status (2026-09-13, branch `c-algorithms-phase1`).**
+- Corpus: pinned (`build/c_algorithms.w`, revision `23d45379`), migrated
+  raw with `with migrate` (19 engine modules + `defs.w`), promoted to
+  `lib/std/c_algorithms/` as the third `.wo` bundle (`c_algorithms.wo`;
+  `bundle.w` root, `c-algorithms-bundle-root-check`, drift lane with
+  upstream's `test-cpp` as the harness). The build wires it exactly as
+  zlib's bundle at every site (`calg_wo` in `build.w`).
+- Upstream tests: all 17 test programs pass under With with
+  `ALLOC_TESTING` (`with build :c-algorithms-test`, in `:test` as the
+  corpora lane). Each test is its own whole migration (engine + framework +
+  test) because the programs' globals are independent.
+- Migrator fixes made for it, all general: a record forward-declared
+  without a definition in a TU renders `= opaque` so a later TU's
+  definition completes it whatever the file order (`_Trie` lost its body
+  when `test-trie.c` sorted before `trie.c`).
+- Facades (`std.collections.sorted_vec.SortedVec[T]`,
+  `std.collections.binary_heap.BinaryHeap[T]`,
+  `std.collections.trie.Trie[V]`, storage in
+  `std.collections.engine_slot`): the facade owns every value in a heap
+  slot the engine indexes by pointer; `get`/`peek` observe (`&T`),
+  `remove`/`pop` transfer, `move fn drop` releases every held value, then
+  the engine. Behavior tests, complexity fixtures (`test/complexity`) and
+  drop-audit cells (`tools/drop_audit.w`) cover each. The RB/AVL trees,
+  hash table, lists, queue, bloom filter and binomial heap remain internal
+  comparison engines (migrated, tested, not facaded).
+- Comparators: the engines' C callbacks receive one non-generic
+  trampoline; each slot carries the facade's With comparator closure
+  because a closure written in a generic function cannot yet be handed to
+  C directly (#1135). Two more compiler gaps found and filed: nested
+  stdlib modules cannot import a corpus `pub let` (#1136); ordering two
+  views of a type without an `lt` method silently compared addresses
+  (#1137, fixed in this branch: it is now a diagnostic).
+- Open for Eric: comparisons of user types. §11.7 dispatches `<` to a
+  fixed `lt` method, and `Ord` only carries `cmp(other: Self)`, so a type
+  with `Ord` alone has no `<` and a generic `T: Ord` cannot compare two
+  views without a copy. The facades therefore require the six operator
+  methods on `T`, taking `&T`. The With-y alternative is one `cmp(other:
+  &Self)` backing every comparison; that is a spec ruling.
 
 **Phase 2 — TommyDS, whole.**
 Specialized indexing/storage engines: `hashtable`, `hashdyn`, `hashlin`,
