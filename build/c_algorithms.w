@@ -78,16 +78,17 @@ pub fn run_calg_migrate_action(ctx: ActionCtx) -> i32:
                 if calg_copy(ctx, reference ++ "/test/" ++ name ++ extension, source ++ "/" ++ name ++ extension) != 0: return 1
     if calg_migrate(ctx, "c-algorithms-engine", calg_options(source, generated, testing)) != 0: return 1
     if testing:
-        // One main at a time, with all engine and framework declarations in
-        // the project scan. No test body is rewritten or replaced by a facade.
+        // Upstream links each test as a separate program, and their external
+        // globals are independent (list's variable1 is 50, arraylist's is
+        // zero). Each test is therefore its own whole migration of engine,
+        // framework and test, with its own shared definitions module.
         for name in calg_tests():
             let basename = "test-" ++ name ++ ".c"
             let upstream = "test-" ++ name ++ (if name == "cpp": ".cpp" else: ".c")
             if calg_copy(ctx, reference ++ "/test/" ++ upstream, source ++ "/" ++ basename) != 0: return 1
-            var options = calg_options(source, generated, true)
-            options.migrate_one = basename.clone()
-            options.shared_fragment = calg_scratch(ctx) ++ "/" ++ name ++ ".shared-fragment"
-            if calg_migrate(ctx, "c-algorithms-test-" ++ name, options) != 0: return 1
+            let test_output = generated ++ "/tests/" ++ name
+            if fs.mkdir_all(test_output) != 0: return 1
+            if calg_migrate(ctx, "c-algorithms-test-" ++ name, calg_options(source, test_output, true)) != 0: return 1
             if fs.remove_file(source ++ "/" ++ basename) != 0: return calg_fail(ctx, "cannot remove staged test " ++ basename)
     if calg_copy(ctx, reference ++ "/COPYING", generated ++ "/COPYING") != 0: return 1
     if fs.write_text(generated ++ "/UPSTREAM", CALG_REVISION ++ "\nsha256=" ++ CALG_SHA256 ++ "\n") != 0: return 1
@@ -100,17 +101,18 @@ pub fn run_calg_test_action(ctx: ActionCtx) -> i32:
     let generated = ctx.inputs()[0]
     let output = ctx.output()
     if calg_reset(ctx, output) != 0: return 1
-    let module_dir = output ++ "/lib/std/c_algorithms"
-    if fs.mkdir_all(module_dir) != 0: return 1
-    for path in fs.list_files(generated):
-        if not path.ends_with(".w"): continue
-        let parts = path.split("/")
-        if calg_copy(ctx, path, module_dir ++ "/" ++ parts[parts.len() - 1]) != 0: return 1
     var report = "upstream=" ++ CALG_REVISION ++ "\nconfiguration=ALLOC_TESTING\n"
     for name in calg_tests():
+        let module_dir = output ++ "/" ++ name ++ "/lib/std/c_algorithms"
+        if fs.mkdir_all(module_dir) != 0: return 1
+        for path in fs.list_files(generated ++ "/tests/" ++ name):
+            if not path.ends_with(".w"): continue
+            let parts = path.split("/")
+            if calg_copy(ctx, path, module_dir ++ "/" ++ parts[parts.len() - 1]) != 0: return 1
+        let test_name = "test_" ++ name.replace("-", "_") ++ ".w"
         let binary = output ++ "/test-" ++ name
         let workspace = ctx.create_workspace("c-algorithms-test-" ++ name)
-        workspace.add_file(module_dir ++ "/test_" ++ name.replace("-", "_") ++ ".w")
+        workspace.add_file(module_dir ++ "/" ++ test_name)
         var options = workspace.options()
         options.output_path = binary.clone()
         options.prelude_mode = PreludeMode.None
@@ -121,8 +123,9 @@ pub fn run_calg_test_action(ctx: ActionCtx) -> i32:
         let result = ctx.process_runner().run_capture(argv, calg_abs(ctx, binary ++ ".stdout"), calg_abs(ctx, binary ++ ".stderr"), 300000)
         if result.rc != 0: return calg_fail(ctx, "test-" ++ name ++ f" exited {result.rc}\n" ++ result.stdout ++ result.stderr)
         report = report ++ "PASS test-" ++ name ++ "\n"
+        print("PASS test-" ++ name)
     if fs.write_text(output ++ "/report.txt", report) != 0: return 1
-    print(report)
+    print("upstream=" ++ CALG_REVISION ++ " " ++ f"{calg_tests().len()} programs passed")
     0
 
 pub fn calg_pipeline(out: Build) -> Build:
