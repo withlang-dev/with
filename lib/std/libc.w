@@ -67,6 +67,7 @@ pub extern fn strncpy(dst: *mut i8, src: *const i8, n: u64) -> *mut i8
 pub extern fn strrchr(s: *const i8, c: i32) -> *mut i8
 pub extern fn strstr(haystack: *const i8, needle: *const i8) -> *mut i8
 pub extern fn strerror(errnum: i32) -> *mut i8
+pub extern fn atoi(nptr: *const i8) -> i32
 pub extern fn strtol(nptr: *const i8, endptr: *mut *mut i8, base: i32) -> i64
 pub extern fn strtoul(nptr: *const i8, endptr: *mut *mut i8, base: i32) -> u64
 pub extern fn strtod(nptr: *const i8, endptr: *mut *mut i8) -> f64

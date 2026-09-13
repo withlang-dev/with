@@ -16325,7 +16325,7 @@ fn ci_libc_symbol_kind_mask(name: &str) -> i32:
     if name == "fgets" or name == "fgetc" or name == "fputc" or name == "fputs": return CI_LIBC_KIND_FN
     if name == "putc" or name == "perror" or name == "feof" or name == "ferror" or name == "fread" or name == "fwrite": return CI_LIBC_KIND_FN
     if name == "strcpy" or name == "strncpy" or name == "strstr" or name == "strrchr" or name == "strerror": return CI_LIBC_KIND_FN
-    if name == "strtol" or name == "strtoul" or name == "strtod" or name == "setlocale": return CI_LIBC_KIND_FN
+    if name == "atoi" or name == "strtol" or name == "strtoul" or name == "strtod" or name == "setlocale": return CI_LIBC_KIND_FN
     if name == "isalpha" or name == "isdigit" or name == "isalnum" or name == "isspace": return CI_LIBC_KIND_FN
     if name == "isupper" or name == "islower" or name == "isxdigit" or name == "isprint": return CI_LIBC_KIND_FN
     if name == "isgraph" or name == "ispunct" or name == "iscntrl": return CI_LIBC_KIND_FN
