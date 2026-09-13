@@ -33,9 +33,15 @@ Issues filed from this work: #1135, #1136, #1137 (all compiler gaps, see §3).
    `c-algorithms-bundle-root-check`.
 2. **Upstream tests.** `c-algorithms-migrate-tests` migrates each of the 17 test
    programs as its own whole migration (engine + framework + test, with
-   `ALLOC_TESTING`) into `out/c_algorithms_tests_migrated/tests/<name>/`;
-   `c-algorithms-test` compiles and runs them. All 17 pass. `:test` depends on
-   `c-algorithms-test` (the corpora lane).
+   `ALLOC_TESTING`); `c-algorithms-promote-tests` promotes them into
+   `test/corpora/c_algorithms/` (shared `engine/`, per-program `defs.w` +
+   test module); `c-algorithms-test` (in `:test`) assembles each program,
+   compiles it with `out/release/bin/with build --no-prelude` and runs it.
+   All 17 pass. A migrate workspace runs in the DRIVER's compiler, and the
+   battery's driver is the seed (CI: `src/main build :test`), whose migrator
+   bails on Darwin's `assert`; that is why the lane compiles checked-in
+   output and why re-migration is run as
+   `WITH=out/release/bin/with out/release/bin/with build :c-algorithms-promote`.
 3. **Bundle.** `calg_wo = wo_bundle_plan(ctx, "c_algorithms", "std/c_algorithms",
    "lib/std/c_algorithms/bundle.w")` wired at every site zlib's plan is (host,
    stage2/3/fixpoint/release link, cross linux/windows plans, embedded blobs,
@@ -77,7 +83,7 @@ Complexity lane, stage1 on Eric's laptop (n vs 4n, ns): sorted-vec 399917 →
   (`MirLower`: eager caches refreshed after generic Drop registration;
   fixture `behav_generic_drop_only_use.w`).
 
-## 1c. The branch's own regressions — the blocker for the battery
+## 1c. The branch's own regressions — FIXED (2026-09-13, commits 8d3f7785..e132688b)
 
 `with build :test` is red on ~16 fixtures that pass on the Phase 0 base
 (c0a28c6e) and were ALREADY red at the pre-session tip af5d9adb. Bisected
@@ -91,21 +97,31 @@ run against that commit's stage1):
 | 92c0c01d Reject private generic type applications across module boundaries | behav_iter_pipeline_local (pass at b2594539, fail at 92c0c01d); probably err_iter_of_self_vec_iter, borrowed_str_binding_preserves_source, spec_ss14_9/16 | `symbol 'VecIter' is private to module <embedded-std>/std/collections.w` |
 | not attributed | cd_unary (passes at 31a347d4, fails at af5d9adb), behav_migrate_va_list (exit 134), behav_scope_spawn*, test/spec scoped-send | |
 
-These are compiler changes the previous agent made while getting the
-corpus and facade probes to compile; none has a root-cause note in its
-message that explains the regression. Each needs its own root cause (the
-route: `--dump-mir` / `--validate-all` on the fixture at the culprit vs its
-parent; `git show <commit>` is 4–13 lines of Sema/MIR each). Do not revert
-blindly: the corpus tests (all 17) and the facades depend on some of these
-(e.g. 88f0ad31 for `let value: T = unsafe { (*slot).value }`?) — re-run
-`:c-algorithms-test` and the facade tests after each change.
+Root causes and fixes (every formerly red fixture passes under stage1 AND
+the release binary of the fixed tree):
+- 31a347d4: MIR replaced a closure argument to a GENERIC_CALL (spawn worker,
+  monomorphized callback) with a placeholder `const 0`, so the body was never
+  prelowered (`MirLower.w` GENERIC_CALL arg loop). Fixed: the closure is
+  lowered there. A statement-bodied closure with a value-returning type now
+  gets the implicit default return in `prepare_anonymous_body`.
+- 88f0ad31 was right (D22 §13.6, D28: str is not Copy). The non-conforming
+  sources were fixed: `JsonWriter.value_str(&str)`, `cd_unary`'s `Acc` opts
+  into Copy, the #1043 fixture drops its bit-copying `var inferred = h.text`.
+- 92c0c01d was right (privacy). `VecIter` and the adapter types are user
+  surface, so they are `pub`; the three tests naming them import them
+  (D29 staged rule).
+- behav_migrate_va_list (e7ddf116, not in the first table): call parameter
+  types came from the CANONICAL callable type, erasing the `va_list` typedef
+  (#1104); `ci_callable_cxtype` prefers the sugared type.
+- The interface-alias gate from 66049bf5 was narrowed to real type
+  declarations (std.libc's `c_int` alias must coexist with the interface's).
 
 ## 2. What is NOT done
 
-- **The battery.** `with build` and `:fixpoint` pass; `:test` is red on the
-  §1c regressions (the run was stopped after the behavior lane; wo-drift,
-  pcre2-test and the corpora lane were not reached). `:test-green`,
-  `:last-green`, `:drop-audit`, `:move-audit` not run. A stage1 behavior-test sweep and a direct
+- **The battery.** `with build` and `:fixpoint` pass on the fixed tree; the
+  full `:test` → `:test-green` → `:last-green` → `:drop-audit` → `:move-audit`
+  chain was started after e132688b (logs in the session scratchpad; re-run
+  if in doubt). A stage1 behavior-test sweep and a direct
   `with run tools/drop_audit.w <stage1> ~/.local/bin/with` were started; check
   their logs before trusting anything (`p7`-harness fixtures pick the stale
   `out/stage/bin/with-stage2` and fail for that reason alone until a full build

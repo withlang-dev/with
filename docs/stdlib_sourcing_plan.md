@@ -419,9 +419,16 @@ by the M*LIB-backed `BTreeMap`/`BTreeSet` work in Phase 4.
   upstream's `test-cpp` as the harness). The build wires it exactly as
   zlib's bundle at every site (`calg_wo` in `build.w`).
 - Upstream tests: all 17 test programs pass under With with
-  `ALLOC_TESTING` (`with build :c-algorithms-test`, in `:test` as the
-  corpora lane). Each test is its own whole migration (engine + framework +
-  test) because the programs' globals are independent.
+  `ALLOC_TESTING`. Each test is its own whole migration (engine + framework +
+  test) because the programs' globals are independent; the migration is
+  promoted into `test/corpora/c_algorithms/` (one shared `engine/`, a
+  `programs/<name>/` with each program's `defs.w` and test module), and the
+  corpora lane `c-algorithms-test` (in `:test`) compiles those checked-in
+  programs with the release binary and runs them. A migrate workspace runs
+  in the build driver's own compiler, so re-migrating (pin change, migrator
+  fix) needs a tree compiler as the driver:
+  `WITH=out/release/bin/with out/release/bin/with build :c-algorithms-promote`;
+  the seed's migrator is behind the tree and bails on Darwin's `assert`.
 - Migrator fixes made for it, all general: a record forward-declared
   without a definition in a TU renders `= opaque` so a later TU's
   definition completes it whatever the file order (`_Trie` lost its body
@@ -443,9 +450,9 @@ by the M*LIB-backed `BTreeMap`/`BTreeSet` work in Phase 4.
   stdlib modules cannot import a corpus `pub let` (#1136); ordering two
   views of a type without an `lt` method silently compared addresses
   (#1137, fixed in this branch: it is now a diagnostic).
-- Not yet green: the branch's pre-facade compiler commits (31a347d4,
-  88f0ad31, 92c0c01d) regress ~16 existing fixtures; bisected and listed in
-  `docs/handoff.md` §1c. The battery is blocked on their root causes.
+- The branch's pre-facade compiler commits (31a347d4, 88f0ad31, 92c0c01d)
+  regressed ~16 existing fixtures; root-caused and fixed (`docs/handoff.md`
+  §1c), plus the va_list call-site model (e7ddf116).
 - Open for Eric: comparisons of user types. §11.7 dispatches `<` to a
   fixed `lt` method, and `Ord` only carries `cmp(other: Self)`, so a type
   with `Ord` alone has no `<` and a generic `T: Ord` cannot compare two
