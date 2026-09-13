@@ -4019,6 +4019,9 @@ impl Sema:
         if gi_base_tid == 0:
             // D29 scaffolding (#750): a registered-but-gated generic base is an
             // import error, not a silent flat-map fallback.
+            if self.private_symbol_path_from_current(gi_base_sym).len() > 0:
+                self.emit_private_symbol_error(gi_base_sym, node)
+                return 0
             let gi_gate_note = self.std_gated_import_note(gi_base_sym)
             if gi_gate_note.len() > 0:
                 self.emit_error("'" ++ self.pool_resolve_symbol(gi_base_sym) ++ "' requires an explicit import (§18.1)" ++ gi_gate_note, node)
