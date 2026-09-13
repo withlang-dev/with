@@ -16,12 +16,30 @@ fn calg_tests() -> Vec[str]:
      "bloom-filter", "cpp", "list", "slist", "queue", "compare-functions",
      "hash-functions", "hash-table", "rb-tree", "set", "trie", "sortedarray"]
 
+// Upstream's test framework and its smoke program (test-cpp exercises every
+// module once) ride along in the production corpus as the wo-drift harness;
+// they are never part of the bundle root.
+fn calg_is_harness(name: &str) -> bool:
+    for harness in ["alloc_testing", "framework", "test_cpp"]:
+        if name == harness: return true
+    false
+
 fn calg_fail(ctx: &ActionCtx, message: &str):
     ctx.diagnostics().error(ctx.target_name() ++ ": " ++ message)
     1
 
 fn calg_abs(ctx: &ActionCtx, path: &str): ctx.project_info().project_root() ++ "/" ++ path
 fn calg_scratch(ctx: &ActionCtx): "out/tmp/action-scratch/" ++ ctx.target_name()
+
+fn calg_basename(path: &str) -> str:
+    let parts = path.split("/")
+    parts[parts.len() - 1].clone()
+
+fn calg_module_name(path: &str) -> str:
+    let base = calg_basename(path)
+    for i in 0..base.len():
+        if base[i] == '.': return base.slice(0, i)
+    base
 
 fn calg_reset(ctx: &ActionCtx, path: &str):
     let fs = ctx.fs()
@@ -33,6 +51,12 @@ fn calg_reset(ctx: &ActionCtx, path: &str):
 fn calg_copy(ctx: &ActionCtx, source: &str, destination: &str):
     if ctx.fs().copy_file(source, destination) != 0:
         return calg_fail(ctx, "cannot copy " ++ source ++ " to " ++ destination)
+    0
+
+fn calg_copy_test_sources(ctx: &ActionCtx, reference: &str, source: &str):
+    for name in ["alloc-testing", "framework"]:
+        for extension in [".c", ".h"]:
+            if calg_copy(ctx, reference ++ "/test/" ++ name ++ extension, source ++ "/" ++ name ++ extension) != 0: return 1
     0
 
 fn calg_options(source: &str, output: &str, testing: bool) -> MigrateOptions:
@@ -57,6 +81,53 @@ fn calg_migrate(ctx: &ActionCtx, label: &str, options: MigrateOptions):
     if result.rc != 0: return calg_fail(ctx, label ++ f" exited {result.rc}")
     0
 
+// The generated tree carries no foreign ABI surface and no untranslated
+// residue (§No Silent Fallbacks); a migration that lost modules fails the
+// floor rather than promoting a partial corpus.
+fn calg_reject_bad_output(ctx: &ActionCtx, generated: &str) -> i32:
+    let fs = ctx.fs()
+    var errors = 0
+    var modules = 0
+    for path in fs.list_files(generated):
+        if not path.ends_with(".w"): continue
+        modules = modules + 1
+        let text = fs.read_text(path)
+        if text.contains("@[c_export("):
+            ctx.diagnostics().error("c-algorithms generated source contains a forbidden c_export attribute in " ++ path)
+            errors = errors + 1
+        if text.contains("// Bail:") or text.contains("[MIGRATOR_UNTRANSLATED]"):
+            ctx.diagnostics().error("c-algorithms generated source contains untranslatable migrator output in " ++ path)
+            errors = errors + 1
+    let floor = calg_modules().len() + 1
+    if modules < floor:
+        return calg_fail(ctx, f"only {modules} generated .w files under " ++ generated ++ f"; expected at least {floor}")
+    errors
+
+// The .wo bundle root (docs/wo_bundles.md "Root"): one `use` per corpus
+// module, bytewise by name, so the bundle build reaches every module. The
+// text is a pure function of the module listing; c-algorithms-bundle-root-check
+// checks the promoted lib/std/c_algorithms/bundle.w against it.
+pub fn calg_bundle_root_text(module_paths: &Vec[str]) -> str:
+    var names: Vec[str] = Vec.new()
+    for path in module_paths:
+        if not path.ends_with(".w"): continue
+        let name = calg_module_name(path)
+        if name == "bundle" or calg_is_harness(name): continue
+        var placed = false
+        var next: Vec[str] = Vec.new()
+        for existing in names:
+            if not placed and name < existing:
+                next.push(name.clone())
+                placed = true
+            next.push(existing.clone())
+        if not placed: next.push(name.clone())
+        names = next
+    var text = "// lib/std/c_algorithms/bundle.w — the c-algorithms .wo bundle root (docs/wo_bundles.md).\n"
+    text = text ++ "// Written by build/c_algorithms.w (c-algorithms-migrate) from the migrated module list:\n"
+    text = text ++ "// one `use` per corpus module; alloc_testing, framework and test_cpp are the harness.\n"
+    for name in names: text = text ++ "use std.c_algorithms." ++ name ++ "\n"
+    text
+
 // The production and ALLOC_TESTING engines are independent migrations of the
 // same pinned sources. The latter retains upstream's allocation-failure oracle.
 pub fn run_calg_migrate_action(ctx: ActionCtx) -> i32:
@@ -72,10 +143,9 @@ pub fn run_calg_migrate_action(ctx: ActionCtx) -> i32:
             if calg_copy(ctx, reference ++ "/src/" ++ name ++ extension, source ++ "/" ++ name ++ extension) != 0: return 1
     for header in ["alt-value-type.h", "libcalg.h"]:
         if calg_copy(ctx, reference ++ "/src/" ++ header, source ++ "/" ++ header) != 0: return 1
-    if testing:
-        for name in ["alloc-testing", "framework"]:
-            for extension in [".c", ".h"]:
-                if calg_copy(ctx, reference ++ "/test/" ++ name ++ extension, source ++ "/" ++ name ++ extension) != 0: return 1
+    if calg_copy_test_sources(ctx, reference, source) != 0: return 1
+    if not testing:
+        if calg_copy(ctx, reference ++ "/test/test-cpp.cpp", source ++ "/test-cpp.c") != 0: return 1
     if calg_migrate(ctx, "c-algorithms-engine", calg_options(source, generated, testing)) != 0: return 1
     if testing:
         // Upstream links each test as a separate program, and their external
@@ -90,6 +160,9 @@ pub fn run_calg_migrate_action(ctx: ActionCtx) -> i32:
             if fs.mkdir_all(test_output) != 0: return 1
             if calg_migrate(ctx, "c-algorithms-test-" ++ name, calg_options(source, test_output, true)) != 0: return 1
             if fs.remove_file(source ++ "/" ++ basename) != 0: return calg_fail(ctx, "cannot remove staged test " ++ basename)
+    else:
+        if fs.write_text(generated ++ "/bundle.w", calg_bundle_root_text(fs.list_files(generated))) != 0:
+            return calg_fail(ctx, "cannot write the bundle root")
     if calg_copy(ctx, reference ++ "/COPYING", generated ++ "/COPYING") != 0: return 1
     if fs.write_text(generated ++ "/UPSTREAM", CALG_REVISION ++ "\nsha256=" ++ CALG_SHA256 ++ "\n") != 0: return 1
     if fs.exists(output) and fs.remove_tree(output) != 0: return calg_fail(ctx, "cannot replace " ++ output)
@@ -107,8 +180,7 @@ pub fn run_calg_test_action(ctx: ActionCtx) -> i32:
         if fs.mkdir_all(module_dir) != 0: return 1
         for path in fs.list_files(generated ++ "/tests/" ++ name):
             if not path.ends_with(".w"): continue
-            let parts = path.split("/")
-            if calg_copy(ctx, path, module_dir ++ "/" ++ parts[parts.len() - 1]) != 0: return 1
+            if calg_copy(ctx, path, module_dir ++ "/" ++ calg_basename(path)) != 0: return 1
         let test_name = "test_" ++ name.replace("-", "_") ++ ".w"
         let binary = output ++ "/test-" ++ name
         let workspace = ctx.create_workspace("c-algorithms-test-" ++ name)
@@ -126,6 +198,41 @@ pub fn run_calg_test_action(ctx: ActionCtx) -> i32:
         print("PASS test-" ++ name)
     if fs.write_text(output ++ "/report.txt", report) != 0: return 1
     print("upstream=" ++ CALG_REVISION ++ " " ++ f"{calg_tests().len()} programs passed")
+    0
+
+pub fn run_calg_check_generated_action(ctx: ActionCtx) -> i32:
+    let generated = ctx.inputs()[0]
+    if calg_reject_bad_output(ctx, generated) != 0: return 1
+    if ctx.fs().write_text(ctx.output(), "ok\n") != 0: return calg_fail(ctx, "cannot write " ++ ctx.output())
+    0
+
+// Promotion replaces every module under lib/std/c_algorithms with the
+// migration's output: the checked-in corpus is generated, never hand-edited.
+pub fn run_calg_promote_action(ctx: ActionCtx) -> i32:
+    let fs = ctx.fs()
+    let generated = ctx.inputs()[0]
+    let destination = ctx.output()
+    if calg_reject_bad_output(ctx, generated) != 0: return 1
+    if fs.mkdir_all(destination) != 0: return calg_fail(ctx, "cannot create " ++ destination)
+    for path in fs.list_files(destination):
+        if path.ends_with(".w") and fs.remove_file(path) != 0: return calg_fail(ctx, "cannot remove " ++ path)
+    var copied = 0
+    for path in fs.list_files(generated):
+        if not path.ends_with(".w"): continue
+        if calg_copy(ctx, path, destination ++ "/" ++ calg_basename(path)) != 0: return 1
+        copied = copied + 1
+    print(f"promoted {copied} generated c-algorithms modules into " ++ calg_abs(ctx, destination))
+    0
+
+// The promoted bundle root is exactly what the migrate action writes for the
+// corpus listing. Input: the root; arg: the corpus directory.
+pub fn run_calg_bundle_root_check_action(ctx: ActionCtx) -> i32:
+    let fs = ctx.fs()
+    let root = ctx.inputs()[0]
+    let corpus = ctx.args()[0]
+    if fs.read_text(root) != calg_bundle_root_text(fs.list_files(corpus)):
+        return calg_fail(ctx, root ++ " is not the bundle root the migrate action writes for " ++ corpus ++ " (one `use` per corpus module, sorted; the harness excluded)")
+    if fs.write_text(ctx.output(), "ok\n") != 0: return calg_fail(ctx, "cannot write " ++ ctx.output())
     0
 
 pub fn calg_pipeline(out: Build) -> Build:
@@ -149,4 +256,13 @@ pub fn calg_pipeline(out: Build) -> Build:
     var tests = target_new(.Action, "c-algorithms-test", "").output("out/corpus/c-algorithms-test")
     tests.action = run_calg_test_action
     tests = tests.input("out/c_algorithms_tests_migrated").dep("c-algorithms-migrate-tests")
-    graph.add_target(tests)
+    graph = graph.add_target(tests)
+    var check = target_new(.Action, "c-algorithms-check-generated", "").output("out/gen/.c-algorithms-check-generated-stamp")
+    check.action = run_calg_check_generated_action
+    check = check.input("out/c_algorithms_migrated").dep("c-algorithms-migrate")
+    graph = graph.add_target(check)
+    var promote = target_new(.Action, "c-algorithms-promote", "").output("lib/std/c_algorithms")
+    promote.action = run_calg_promote_action
+    promote = promote.write_scope("out/tmp/action-scratch/c-algorithms-promote")
+    promote = promote.input("out/c_algorithms_migrated").dep("c-algorithms-check-generated").dep("c-algorithms-test")
+    graph.add_target(promote)

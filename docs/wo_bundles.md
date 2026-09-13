@@ -151,6 +151,11 @@ linked by G+k), so two checks replace it:
 
 ## Conforming pcre2 and zlib (the first two bundles)
 
+(c-algorithms is the third bundle, 2026-09-13: `lib/std/c_algorithms/`,
+package `std.c_algorithms`, root `bundle.w`, harness `test_cpp.w`; the
+same plan, wiring and lanes as zlib via `calg_wo` in `build.w`. See
+`docs/stdlib_sourcing_plan.md`, "Phase 1 status".)
+
 What each is today, and what changes. Both follow the one pattern; every
 later corpus follows it from day one.
 
