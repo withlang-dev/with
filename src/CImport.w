@@ -2177,6 +2177,18 @@ fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs: &s
             return ""
         return rendered
 
+    // A forward declaration with no definition in this TU is an incomplete
+    // type, not an empty struct: it has no size. Render it opaque so another
+    // TU's definition upgrades it in the shared defs whatever the file order
+    // (c-algorithms' test-trie.c sorts before trie.c, which defines _Trie).
+    if with_cimport_struct_is_opaque(session, idx) != 0:
+        ci_mark_type_name_emitted(name)
+        let safe_name = ci_escape_reserved(name)
+        let rendered = "type " ++ safe_name ++ " = opaque\n"
+        if ci_migrate_shared_decl_add("type", name, rendered):
+            return ""
+        return rendered
+
     let field_count = with_cimport_struct_field_count(session, idx)
     if field_count == 0:
         // Empty struct definition → emit with padding byte for ABI compatibility
