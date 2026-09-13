@@ -5,6 +5,8 @@
 // so the produced VecIter retains shared access to `xs` for the duration of
 // the enclosing call. The sibling closure mutably captures `xs` and conflicts.
 
+use std.collections.VecIter
+
 fn try_extend(iter: VecIter[i32], cb: fn(i32) -> i32) -> i32:
     var sum = 0
     for x in iter:

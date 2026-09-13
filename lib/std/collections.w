@@ -346,23 +346,23 @@ pub type Atomic[T]  {
 ///   with xs.slot(i) as mut s:
 ///       let v = s.get()
 ///       s.set(v + 1)
-type VecSlot[T] ephemeral { data_ptr: i64, index: i64 }
+pub type VecSlot[T] ephemeral { data_ptr: i64, index: i64 }
 
 /// Iterator yielding VecSlot[T] handles for in-place element mutation (§19.5).
 /// Obtain via `vec.iter_place()`. Each `.next()` returns `Option[VecSlot[T]]`.
-type VecIterPlace[T] ephemeral { data_ptr: i64, len: i64, idx: i64 }
+pub type VecIterPlace[T] ephemeral { data_ptr: i64, len: i64, idx: i64 }
 
 /// Scoped handle to a HashMap entry (docs/mut.md Rev 8 §10).
 /// Obtain via `map.entry(key)`. Use with `with`:
 ///   with map.entry(k) as mut e:
 ///       e.or_insert(default)
-type HashMapEntry[K, V] ephemeral { map_ptr: i64, key: K }
+pub type HashMapEntry[K, V] ephemeral { map_ptr: i64, key: K }
 
 // ── Iterators ─────────────────────────────────────────────────────
 
 /// Iterator over Vec[T]. Obtain via `vec.iter()`.
 /// Call `.next()` to get `Option[T]` — `Some(val)` or `None`.
-type VecIter[T] ephemeral { data_ptr: i64, len: i64, idx: i64 }
+pub type VecIter[T] ephemeral { data_ptr: i64, len: i64, idx: i64 }
 
 /// Borrow-iteration capability for allocation-backed collection types
 /// (D33 naming: formerly misnamed `IntoIter`).
@@ -401,43 +401,43 @@ impl[T] Iter[T] for VecIntoIter[T]:
         Some(self.vec.remove(0))
 
 /// Lazy iterator adapter produced by `.map(f)`.
-type MapIter[I, T, U] ephemeral { iter: I, f: fn(T) -> U }
+pub type MapIter[I, T, U] ephemeral { iter: I, f: fn(T) -> U }
 
 /// Lazy iterator adapter produced by `.filter(pred)`.
-type FilterIter[I, T] ephemeral { iter: I, pred: fn(T) -> bool }
+pub type FilterIter[I, T] ephemeral { iter: I, pred: fn(T) -> bool }
 
 /// Lazy iterator adapter produced by `.filter_map(f)`.
-type FilterMapIter[I, T, U] ephemeral { iter: I, f: fn(T) -> Option[U] }
+pub type FilterMapIter[I, T, U] ephemeral { iter: I, f: fn(T) -> Option[U] }
 
 /// Lazy iterator adapter produced by `.take(n)`.
-type TakeIter[I, T] ephemeral { iter: I, remaining: i64 }
+pub type TakeIter[I, T] ephemeral { iter: I, remaining: i64 }
 
 /// Lazy iterator adapter produced by `.drop(n)`.
-type DropIter[I, T] ephemeral { iter: I, remaining: i64 }
+pub type DropIter[I, T] ephemeral { iter: I, remaining: i64 }
 
 /// Lazy iterator adapter produced by `.take_while(pred)`.
-type TakeWhileIter[I, T] ephemeral { iter: I, pred: fn(T) -> bool, done: bool }
+pub type TakeWhileIter[I, T] ephemeral { iter: I, pred: fn(T) -> bool, done: bool }
 
 /// Lazy iterator adapter produced by `.drop_while(pred)`.
-type DropWhileIter[I, T] ephemeral { iter: I, pred: fn(T) -> bool, dropping: bool }
+pub type DropWhileIter[I, T] ephemeral { iter: I, pred: fn(T) -> bool, dropping: bool }
 
 /// Lazy iterator adapter produced by `.zip(other)`.
-type ZipIter[A, B, T, U] ephemeral { left: A, right: B }
+pub type ZipIter[A, B, T, U] ephemeral { left: A, right: B }
 
 /// Lazy iterator adapter produced by `.enumerate()`.
-type EnumerateIter[I, T] ephemeral { iter: I, idx: i64 }
+pub type EnumerateIter[I, T] ephemeral { iter: I, idx: i64 }
 
 /// Lazy iterator adapter produced by `.chain(other)`.
-type ChainIter[A, B, T] ephemeral { left: A, right: B, use_right: bool }
+pub type ChainIter[A, B, T] ephemeral { left: A, right: B, use_right: bool }
 
 /// Lazy iterator adapter produced by `.zip_with(other, f)`.
-type ZipWithIter[A, B, T, U, V] ephemeral { left: A, right: B, f: fn(T, U) -> V }
+pub type ZipWithIter[A, B, T, U, V] ephemeral { left: A, right: B, f: fn(T, U) -> V }
 
 /// Lazy iterator adapter produced by `.step_by(n)`.
-type StepByIter[I, T] ephemeral { iter: I, step: i64, first: bool }
+pub type StepByIter[I, T] ephemeral { iter: I, step: i64, first: bool }
 
 /// Lazy iterator adapter produced by `.flat_map(f)`.
-type FlatMapIter[I, C, J, T, U] ephemeral {
+pub type FlatMapIter[I, C, J, T, U] ephemeral {
     iter: I,
     f: fn(T) -> C,
     current: J,
