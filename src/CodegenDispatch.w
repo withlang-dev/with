@@ -17679,7 +17679,7 @@ impl Codegen:
             with_str_clone_ref(self.current_decl_source_file)
         else:
             self.source_file
-        var source_text = self.source_text
+        var source_text = self.source_text.clone()
         if source_path.len() > 0 and source_path != self.source_file:
             let file_text = with_fs_read_file(source_path)
             if file_text.len() > 0:

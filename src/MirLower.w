@@ -5053,6 +5053,10 @@ impl MirBuilder:
         let kind = self.ast.kind(node)
         if kind == NodeKind.NK_GROUPED:
             return self.lower_binding_alias_place(self.ast.get_data0(node))
+        if kind == NodeKind.NK_UNARY and self.ast.get_data0(node) == UnaryOp.UOP_DEREF and self.sema.view_projection_exprs.contains(node):
+            // Sema recorded a non-owning projection through &T. Copying this
+            // place into an owning local would free the referent at scope exit.
+            return self.lower_expr_place(node)
         if kind == NodeKind.NK_CALL:
             return self.lower_call_place(node)
         if kind == NodeKind.NK_FIELD_ACCESS:

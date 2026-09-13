@@ -8799,7 +8799,13 @@ impl Sema:
             let resolved = self.resolve_alias(operand)
             let tk = self.get_type_kind(resolved)
             if tk == TypeKind.TY_REF:
-                return self.get_type_d0(resolved)
+                let pointee = self.get_type_d0(resolved)
+                // Dereferencing a shared reference exposes its place, not an
+                // independent owner. Keep the same projection/origin facts as
+                // borrowed fields so bindings observe and consumption errors.
+                self.note_view_field_projection(node, operand as i32, pointee)
+                self.record_transparent_view_origins(node, operand_node)
+                return pointee
             if tk == TypeKind.TY_PTR:
                 self.note_raw_pointer_validity_precondition(operand_node)
                 self.require_unsafe_operation("raw pointer dereference requires unsafe context", node)
@@ -9147,7 +9153,8 @@ impl Sema:
         // D32 (§2.2): this demand-site error claims the node so the
         // implicit-field-move error does not double-report it.
         self.field_move_diag_nodes.insert(value_node, 1)
-        self.emit_error("cannot take ownership of a non-Copy field through a borrow (" ++ self.type_name(fty) ++ " is not Copy); borrow the field, clone it, or restructure so the owner transfers it (D22 §13.6) — " ++ context, value_node)
+        let subject = if self.ast.kind(value_node) == NodeKind.NK_FIELD_ACCESS: "field" else: "value"
+        self.emit_error("cannot take ownership of a non-Copy " ++ subject ++ " through a borrow (" ++ self.type_name(fty) ++ " is not Copy); borrow it, clone it, or restructure so the owner transfers it (D22 §13.6) — " ++ context, value_node)
 
     // §2.4 × D22/D27 coherence: inside the owner's own drop body, an
     // unannotated non-mut `let` of a `self` field OBSERVES — MirLower's
@@ -9323,6 +9330,8 @@ impl Sema:
         self.match_in_stmt_pos = saved_match_stmt
         if ann_type != 0:
             self.reject_owned_demand_from_view_projection(value, ann_type as i32, "typed let binding")
+        else if is_mut != 0:
+            self.reject_owned_demand_from_view_projection(value, val_type as i32, "mutable binding")
         var bind_type: TypeId = val_type
         // #725 (§5.2/§2.4): an ephemeral binding whose initializer borrows a
         // statement TEMPORARY outlives its origin — the temp collection dies
