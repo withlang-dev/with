@@ -8881,7 +8881,7 @@ impl MirBuilder:
         self.body.set_call_contract(args_id, sig_idx, mono_sym)
 
     mut fn lower_call(fn_expr: i32, arg_exprs_start: i32, arg_exprs_count: i32, ret_type_id: i32, node: i32) -> i32:
-        let fn_op = self.lower_expr(fn_expr)
+        let fn_op = self.lower_callable_expr(fn_expr)
         var sig_idx = self.call_sig_for_expr(fn_expr)
         let recorded_sig = self.sema.resolved_call_sigs.get(node)
         if recorded_sig.is_some():
@@ -9141,6 +9141,21 @@ impl MirBuilder:
         if expr_tid == 0:
             return 0
         self.sema.callable_any_fn_type(expr_tid as TypeId)
+
+    mut fn lower_callable_expr(node: i32) -> i32:
+        var operand = self.lower_expr(node)
+        var exact_type = self.expr_type(node)
+        if self.sema.callable_any_fn_type(exact_type as TypeId) == 0:
+            return operand
+        // A callable view (including a collection element) addresses the
+        // stored callable. Project through references before invoking it;
+        // passing the reference itself jumps into data instead of code.
+        // FnAbi still owns the complete argument/result convention.
+        while self.sema.get_type_kind(self.sema.resolve_alias(exact_type as TypeId)) == TypeKind.TY_REF:
+            let reference = self.materialize_operand(operand, exact_type, self.ast.get_start(node))
+            operand = self.body.new_operand(OperandKind.OK_COPY, self.new_deref_place(reference))
+            exact_type = self.sema.get_type_d0(self.sema.resolve_alias(exact_type as TypeId))
+        operand
 
     mut fn lower_call_arg(arg_node: i32, sig_idx: i32, callable_fn_tid: i32, arg_i: i32, callee_sym: i32 = 0) -> i32:
         let saved_expected = self.expected_type
