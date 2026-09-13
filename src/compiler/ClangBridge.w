@@ -93,6 +93,7 @@ extern fn clang_getCursorLocation(cursor: CXCursor) -> CXSourceLocation
 extern fn clang_Location_isFromMainFile(location: CXSourceLocation) -> i32
 extern fn clang_getCursorLinkage(cursor: CXCursor) -> i32
 extern fn clang_Cursor_getStorageClass(cursor: CXCursor) -> i32
+extern fn clang_Cursor_getVarDeclInitializer(cursor: CXCursor) -> CXCursor
 extern fn clang_Cursor_getNumArguments(cursor: CXCursor) -> i32
 extern fn clang_Cursor_getArgument(cursor: CXCursor, idx: u32) -> CXCursor
 extern fn clang_Cursor_isFunctionInlined(cursor: CXCursor) -> i32
@@ -1894,66 +1895,25 @@ pub fn with_cimport_var_storage_class(session: i64, idx: i32) -> i32:
         let cursor = *(((*s).decls as i64 + idx as i64 * 32) as *const CXCursor)
         clang_Cursor_getStorageClass(cursor)
 
-unsafe fn cimport_var_decl_has_initializer_text(s: &str) -> i32:
-    let slen = s.len() as i32
-    var paren_depth = 0
-    var bracket_depth = 0
-    var brace_depth = 0
-    var i = 0
-    while i < slen:
-        let c = s[i]
-        if c == 47 and i + 1 < slen:
-            let next = s[(i + 1)]
-            if next == 47:
-                i = i + 2
-                while i < slen and s[i] != 10:
-                    i = i + 1
-                continue
-            if next == 42:
-                i = i + 2
-                while i + 1 < slen:
-                    if s[i] == 42 and s[(i + 1)] == 47:
-                        i = i + 2
-                        break
-                    i = i + 1
-                continue
-        if c == 34 or c == 39:
-            let quote = c
-            i = i + 1
-            while i < slen:
-                let inner = s[i]
-                if inner == 92:
-                    i = i + 2
-                    continue
-                if inner == quote:
-                    break
-                i = i + 1
-            i = i + 1
-            continue
-        if c == 40: paren_depth = paren_depth + 1
-        if c == 41 and paren_depth > 0: paren_depth = paren_depth - 1
-        if c == 91: bracket_depth = bracket_depth + 1
-        if c == 93 and bracket_depth > 0: bracket_depth = bracket_depth - 1
-        if c == 123: brace_depth = brace_depth + 1
-        if c == 125 and brace_depth > 0: brace_depth = brace_depth - 1
-        if c == 61 and paren_depth == 0 and bracket_depth == 0 and brace_depth == 0:
-            let prev = if i > 0: s[(i - 1)] else: 0
-            let next = if i + 1 < slen: s[(i + 1)] else: 0
-            if prev != 61 and prev != 33 and prev != 60 and prev != 62 and next != 61:
-                return 1
-        i = i + 1
-    0
-
 pub fn with_cimport_var_definition_kind(session: i64, idx: i32) -> i32:
     unsafe:
         let s = session as *mut CImportSession
         if s as i64 == 0 or idx < 0 or idx >= (*s).decl_count: return 0
         let cursor = *(((*s).decls as i64 + idx as i64 * 32) as *const CXCursor)
-        if cimport_var_decl_has_initializer_text(cursor_source_text_from_cursor(s, cursor)) != 0:
+        if clang_Cursor_isNull(clang_Cursor_getVarDeclInitializer(cursor)) == 0:
             return 2
         if clang_Cursor_getStorageClass(cursor) == CB_CX_SC_EXTERN:
             return 0
         1
+
+pub fn with_ci_var_initializer(session: i64, cursor_idx: i32) -> i32:
+    unsafe:
+        let s = session as *mut CImportSession
+        if s as i64 == 0 or cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return -1
+        let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
+        let initializer = clang_Cursor_getVarDeclInitializer(cursor)
+        if clang_Cursor_isNull(initializer) != 0: return -1
+        store_cursor(s, initializer)
 
 pub fn with_cimport_var_type_translated(session: i64, idx: i32) -> str:
     unsafe:

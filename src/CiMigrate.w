@@ -1811,7 +1811,7 @@ fn ci_migrate_var_owner_type(session: i64, idx: i32) -> str:
     if ci_starts_with(actual_type, "[0]"):
         let cursor = with_cimport_decl_cursor(session, idx)
         if cursor >= 0:
-            let init_cursor = ci_find_var_init_cursor(session, cursor)
+            let init_cursor = with_ci_var_initializer(session, cursor)
             if init_cursor >= 0:
                 let init_type = with_ci_type_translated(session, with_ci_cursor_type(session, init_cursor))
                 if init_type.len() > 0 and init_type[0] == 91:

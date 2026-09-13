@@ -11495,7 +11495,7 @@ fn ci_try_eval_var_init_for_type(session: i64, idx: i32, target_type: &str) -> s
     if var_cursor >= 0:
         let cursor_type = with_ci_type_translated(session, with_ci_cursor_type(session, var_cursor))
         let init_type = if target_type.len() > 0: with_str_clone_ref(target_type) else: cursor_type
-        let init_cursor = ci_find_var_init_cursor(session, var_cursor)
+        let init_cursor = with_ci_var_initializer(session, var_cursor)
         if init_cursor >= 0:
             let init_peeled = ci_peel_transparent(session, init_cursor)
             let init_kind = with_ci_cursor_kind(session, init_peeled)
@@ -11989,7 +11989,7 @@ impl CiStmtPool:
                     storage_name = mangled
                     new_scope = ci_scope_add_mangled(new_scope, escaped, storage_name)
                     ci_fn_var_names_register(storage_name)
-                let init_cursor = ci_find_var_init_cursor(session, child)
+                let init_cursor = with_ci_var_initializer(session, child)
                 var init_id: CiExprId = 0 as CiExprId
                 var init_setup_id: CiStmtId = 0 as CiStmtId
                 var source_init_expr = ""
@@ -13713,42 +13713,6 @@ fn ci_expand_string_macro_sequence_depth(session: i64, s: &str, depth: i32) -> s
         return ci_concat_strings(segments)
     ""
 
-fn ci_var_decl_has_initializer_text(s: &str) -> bool:
-    let text = ci_strip_c_comments(s)
-    let slen = text.len() as i32
-    var paren_depth = 0
-    var bracket_depth = 0
-    var brace_depth = 0
-    var i = 0
-    while i < slen:
-        let c = text[i]
-        if c == 34 or c == 39:
-            let quote = c
-            i = i + 1
-            while i < slen:
-                let inner = text[i]
-                if inner == 92:
-                    i = i + 2
-                    continue
-                if inner == quote:
-                    break
-                i = i + 1
-            i = i + 1
-            continue
-        if c == 40: paren_depth = paren_depth + 1
-        if c == 41 and paren_depth > 0: paren_depth = paren_depth - 1
-        if c == 91: bracket_depth = bracket_depth + 1
-        if c == 93 and bracket_depth > 0: bracket_depth = bracket_depth - 1
-        if c == 123: brace_depth = brace_depth + 1
-        if c == 125 and brace_depth > 0: brace_depth = brace_depth - 1
-        if c == 61 and paren_depth == 0 and bracket_depth == 0 and brace_depth == 0:
-            let prev = if i > 0: text[(i - 1)] else: 0
-            let next = if i + 1 < slen: text[(i + 1)] else: 0
-            if prev != 61 and prev != 33 and prev != 60 and prev != 62 and next != 61:
-                return true
-        i = i + 1
-    false
-
 fn ci_extract_var_initializer_text(s: &str) -> str:
     let text = ci_strip_c_comments(s)
     let slen = text.len() as i32
@@ -14454,7 +14418,7 @@ fn ci_var_init_expr(session: i64, var_cursor: i32, scope: CiScope) -> str:
     ci_var_init_expr_for_type(session, var_cursor, scope, "")
 
 fn ci_var_init_expr_for_type(session: i64, var_cursor: i32, scope: CiScope, target_type: &str) -> str:
-    let init_cursor = ci_find_var_init_cursor(session, var_cursor)
+    let init_cursor = with_ci_var_initializer(session, var_cursor)
     if init_cursor >= 0:
         var types = CiTypePool.new()
         var exprs = CiExprPool.new()
@@ -16102,23 +16066,6 @@ fn ci_find_var_cursor(session: i64, name: &str) -> i32:
 
 fn ci_cursor_kind_is_expr(kind: i32) -> bool:
     kind >= 100 and kind < 200
-
-fn ci_find_var_init_cursor(session: i64, var_cursor: i32) -> i32:
-    let has_init_text = ci_var_decl_has_initializer_text(with_ci_cursor_source_text(session, var_cursor))
-    if not has_init_text:
-        let var_ty = with_ci_type_translated(session, with_ci_cursor_type(session, var_cursor))
-        if var_ty.len() > 0 and var_ty[0] == 91:
-            return -1
-    let nc = with_ci_num_children(session, var_cursor)
-    var i = nc - 1
-    while i >= 0:
-        let child = with_ci_child(session, var_cursor, i)
-        if ci_cursor_kind_is_expr(with_ci_cursor_kind(session, child)):
-            return child
-        i = i - 1
-    if not has_init_text:
-        return -1
-    -1
 
 fn ci_find_last_expr_child(session: i64, cursor: i32) -> i32:
     let nc = with_ci_num_children(session, cursor)

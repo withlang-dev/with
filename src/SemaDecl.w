@@ -2955,6 +2955,9 @@ impl Sema:
         0
 
     mut fn validate_generic_type_decls():
+        let saved_file_id = self.local_file_id
+        let saved_module_path = move self.current_module_path
+        let saved_module_has_ci = self.current_module_has_ci
         for di in 0..self.ast.decl_count():
             if self.decl_is_lazy_skipped(di):
                 continue
@@ -2965,6 +2968,9 @@ impl Sema:
             let tp_count = self.type_decl_tp_count(decl)
             if tp_count <= 0:
                 continue
+            // A private field type is looked up in its declaring module,
+            // including during this generic-template validation pass.
+            self.update_decl_source_context(di)
             let tp_start = self.type_decl_tp_start(decl)
             let extra_start = self.ast.get_data1(decl)
             let sub_kind = type_decl_sub_kind(self.ast.get_data2(decl))
@@ -3007,6 +3013,10 @@ impl Sema:
 
             if sub_kind == TypeDeclKind.Alias or sub_kind == TypeDeclKind.Distinct:
                 self.validate_type_expr_with_type_params(self.ast.get_extra(extra_start), tp_start, tp_count)
+
+        self.local_file_id = saved_file_id
+        self.current_module_path = saved_module_path
+        self.current_module_has_ci = saved_module_has_ci
 
     fn type_expr_mentions_type_param(type_node: i32, tp_sym: i32) -> i32:
         if type_node == 0:

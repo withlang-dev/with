@@ -4,6 +4,34 @@ The corpus is pinned to upstream commit
 `23d453792ed89a28ed7d2c8d4311a4d9f7822edd`. No upstream function body is
 changed to accommodate the migrator.
 
+## Generic private field types (#1130)
+
+An owning heap facade keeps its generic node type private. A two-file repro
+with private `Entry[T]` and public `Container[T] { entry: *mut Entry[T] }`
+failed even when the importer merely imported the module. Native LLDB stopped
+in `emit_unknown_type_error`, called by `validate_type_expr_with_impl_type_params`
+and `validate_generic_type_decls`. The latter loop checked field types without
+installing each declaration's source context, so the private type was checked
+from the importing module. It now installs the declaration context and restores
+the caller's context afterward. The regression also requires an explicit use
+of `Entry` from the importer to fail. Proof:
+`out/phase1-drafts/private-generic-minimal-proof.txt`.
+
+## Initializers belong to individual declarators
+
+Upstream `test-list.c:31` declares `int variable1 = 50, variable2, ...`.
+LLDB observed `cimport_var_decl_has_initializer_text` receiving
+`int variable1 = 50, variable2` and returning `1`; its caller
+`with_cimport_var_definition_kind` then returned `2` (full definition).
+`variable2` actually has no initializer and requires C's tentative zero
+initialization. The `=` scanner had borrowed the first declarator's initializer.
+
+Definition classification and initializer lookup now use
+`clang_Cursor_getVarDeclInitializer`, available in the pinned Clang 22.1.6
+C API. The two text-based presence checks are removed. The native fixture
+covers mixed initialized/tentative scalars, arrays and pointers in shared
+declarations. Proof: `out/phase1-drafts/global-initializer-proof.txt`.
+
 ## Assertion macros are expressions, not stringification macros
 
 The allocation-testing framework stopped at its two `assert` expressions.
