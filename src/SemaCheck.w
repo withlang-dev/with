@@ -8493,13 +8493,20 @@ impl Sema:
             // A view observes a value; ordering two views orders the values,
             // which needs the target's operator method (§11.7). Without one
             // the operands would fall through as pointer-like and compare
-            // ADDRESSES (#1137): only raw pointers order by address.
+            // ADDRESSES (#1137): only raw pointers order by address. The
+            // target must be a declared type: a template body's `&T` is
+            // checked again per instantiation, where T is concrete.
             if op == BinaryOp.OP_LT or op == BinaryOp.OP_GT or op == BinaryOp.OP_LTE or op == BinaryOp.OP_GTE:
                 if lhs_cmp_kind == TypeKind.TY_REF or rhs_cmp_kind == TypeKind.TY_REF:
                     let ref_ty = if lhs_cmp_kind == TypeKind.TY_REF: lhs else: rhs
-                    let target_name = self.type_name(self.auto_deref_ref_ptr_type(self.resolve_alias(ref_ty as TypeId)) as i32)
-                    self.emit_error("operator '" ++ sema_operator_symbol_text(op) ++ "' on views of " ++ target_name ++ " needs a '" ++ sema_operator_method_name(op) ++ "' method on " ++ target_name ++ "; a view compares the value it observes, and only raw pointers compare by address", node)
-                    return 0
+                    let target = self.auto_deref_ref_ptr_type(self.resolve_alias(ref_ty as TypeId))
+                    let target_kind = self.get_type_kind(target)
+                    let target_sym = if target_kind == TypeKind.TY_GENERIC_INST: self.get_generic_inst_base(target as i32) else: self.get_type_name(target)
+                    let declared = target_kind == TypeKind.TY_STRUCT or target_kind == TypeKind.TY_ENUM or target_kind == TypeKind.TY_GENERIC_INST
+                    if declared and target_sym != 0 and self.type_decl_nodes.contains(target_sym):
+                        let target_name = self.type_name(target as i32)
+                        self.emit_error("operator '" ++ sema_operator_symbol_text(op) ++ "' on views of " ++ target_name ++ " needs a '" ++ sema_operator_method_name(op) ++ "' method on " ++ target_name ++ "; a view compares the value it observes, and only raw pointers compare by address", node)
+                        return 0
             let bool_int_cmp = (lhs_cmp_kind == TypeKind.TY_BOOL and rhs_cmp_kind == TypeKind.TY_INT) or (lhs_cmp_kind == TypeKind.TY_INT and rhs_cmp_kind == TypeKind.TY_BOOL)
             let lhs_option_ptr = self.is_option_pointer_type(lhs as i32) != 0
             let rhs_option_ptr = self.is_option_pointer_type(rhs as i32) != 0

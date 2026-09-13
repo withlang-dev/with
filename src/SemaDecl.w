@@ -108,6 +108,11 @@ impl Sema:
         self.decl_iface_demanded = sema_new_vec_i32()
         self.iface_mentioned = sema_new_map_i32_i32()
         let iface_files = sema_new_map_i32_i32()
+        // Type names the program's own source declares. A mention of such a
+        // name demands the source declaration, never a same-named interface
+        // alias: c-algorithms' `pub type Trie = _Trie` would otherwise shadow
+        // the facade's `Trie[V]` in the flat type namespace (#1116 class).
+        let source_type_names = sema_new_map_i32_i32()
         // A bundle build and a .wi root (the emitter, the fingerprint and
         // the check-wi pass read the full tables) collect everything.
         let eager = self.interface_eager != 0
@@ -126,6 +131,10 @@ impl Sema:
                     last_flag = flag
             self.decl_is_iface.push(flag)
             self.decl_iface_demanded.push(if flag != 0 and not eager: 0 else: 1)
+            if flag == 0:
+                let source_decl = self.ast.get_decl(di)
+                if self.ast.kind(source_decl) == NodeKind.NK_TYPE_DECL:
+                    source_type_names.insert(self.ast.get_data0(source_decl), 1)
             if flag != 0:
                 iface_count = iface_count + 1
                 if di < self.decl_source_file_ids.len() as i32:
@@ -155,6 +164,8 @@ impl Sema:
                     continue
                 let decl = self.ast.get_decl(di)
                 if not self.interface_decl_is_named(decl):
+                    continue
+                if self.ast.kind(decl) == NodeKind.NK_TYPE_DECL and source_type_names.contains(self.ast.get_data0(decl)):
                     continue
                 self.decl_iface_demanded[di] = 1
                 changed = true
