@@ -1,10 +1,11 @@
 // Migrated from C
-use std.c_algorithms.defs
+use std.calg_testing.defs
+use std.calg_testing.alloc_testing
 
 pub fn avl_tree_new(__param_compare_func: unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int) -> *mut _AVLTree {
     var __local_new_tree: *mut _AVLTree
 
-    (__local_new_tree = (((unsafe { with_alloc(((sizeof[_AVLTree]() as c_ulong) as i64)) } as *mut c_void) as *mut _AVLTree)))
+    (__local_new_tree = ((alloc_test_malloc((sizeof[_AVLTree]() as c_ulong)) as *mut _AVLTree)))
 
     if ((if __local_new_tree == null: 1 else: 0) != 0) {
         return ((null as *mut _AVLTree))
@@ -24,7 +25,7 @@ pub fn avl_tree_new(__param_compare_func: unsafe extern "C" fn(*mut c_void, *mut
 pub unsafe fn avl_tree_free(__param_tree: *mut _AVLTree) -> Unit {
     avl_tree_free_subtree(__param_tree, (unsafe *__param_tree).root_node)
 
-    with_free(((__param_tree as *mut c_void) as *mut u8))
+    alloc_test_free((__param_tree as *mut c_void))
 
 }
 
@@ -52,7 +53,7 @@ pub unsafe fn avl_tree_insert(__param_tree: *mut _AVLTree, __param_key: *mut c_v
 
     }
 
-    (__local_new_node = (((with_alloc(((sizeof[_AVLTreeNode]() as c_ulong) as i64)) as *mut c_void) as *mut _AVLTreeNode)))
+    (__local_new_node = ((alloc_test_malloc((sizeof[_AVLTreeNode]() as c_ulong)) as *mut _AVLTreeNode)))
 
     if ((if __local_new_node == null: 1 else: 0) != 0) {
         return ((null as *mut _AVLTreeNode))
@@ -126,7 +127,7 @@ pub unsafe fn avl_tree_remove_node(__param_tree: *mut _AVLTree, __param_node: *m
 
     }
 
-    with_free(((__param_node as *mut c_void) as *mut u8))
+    alloc_test_free((__param_node as *mut c_void))
 
     ((unsafe *__param_tree).num_nodes = ((unsafe *__param_tree).num_nodes -% 1))
 
@@ -246,7 +247,7 @@ pub unsafe fn avl_tree_to_array(__param_tree: *mut _AVLTree) -> *mut *mut c_void
 
     var __local_index: c_int
 
-    (__local_array = (((with_alloc(((((sizeof[usize]() as c_ulong) *% ((unsafe *__param_tree).num_nodes as c_ulong)) as c_ulong) as i64)) as *mut c_void) as *mut *mut c_void)))
+    (__local_array = ((alloc_test_malloc((((sizeof[usize]() as c_ulong) *% ((unsafe *__param_tree).num_nodes as c_ulong)) as c_ulong)) as *mut *mut c_void)))
 
     if ((if __local_array == null: 1 else: 0) != 0) {
         return ((null as *mut *mut c_void))
@@ -276,7 +277,7 @@ unsafe fn avl_tree_free_subtree(__param_tree: *mut _AVLTree, __param_node: *mut 
 
     avl_tree_free_subtree(__param_tree, (unsafe *__param_node).children[AVL_TREE_NODE_RIGHT])
 
-    with_free(((__param_node as *mut c_void) as *mut u8))
+    alloc_test_free((__param_node as *mut c_void))
 
 }
 

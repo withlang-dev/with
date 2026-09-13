@@ -3252,7 +3252,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     zlib_promote = zlib_promote.dep("zlib-test")
     out = out.add_target(zlib_promote)
 
-    out = calg_pipeline(move out)
+    out = calg_pipeline(move out, ctx, release_compiler_bin("with"))
 
     var prune = target_new(.Action, "prune", "").output("out/.build-state/prune.always")
     prune.action = run_prune_action

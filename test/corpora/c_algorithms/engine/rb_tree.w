@@ -1,10 +1,11 @@
 // Migrated from C
-use std.c_algorithms.defs
+use std.calg_testing.defs
+use std.calg_testing.alloc_testing
 
 pub fn rb_tree_new(__param_compare_func: unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int) -> *mut _RBTree {
     var __local_new_tree: *mut _RBTree
 
-    (__local_new_tree = (((unsafe { with_alloc(((sizeof[_RBTree]() as c_ulong) as i64)) } as *mut c_void) as *mut _RBTree)))
+    (__local_new_tree = ((alloc_test_malloc((sizeof[_RBTree]() as c_ulong)) as *mut _RBTree)))
 
     if ((if __local_new_tree == null: 1 else: 0) != 0) {
         return ((null as *mut _RBTree))
@@ -24,7 +25,7 @@ pub fn rb_tree_new(__param_compare_func: unsafe extern "C" fn(*mut c_void, *mut 
 pub unsafe fn rb_tree_free(__param_tree: *mut _RBTree) -> Unit {
     rb_tree_free_subtree((unsafe *__param_tree).root_node)
 
-    with_free(((__param_tree as *mut c_void) as *mut u8))
+    alloc_test_free((__param_tree as *mut c_void))
 
 }
 
@@ -37,7 +38,7 @@ pub unsafe fn rb_tree_insert(__param_tree: *mut _RBTree, __param_key: *mut c_voi
 
     var __local_side: i32
 
-    (__local_node = (((with_alloc(((sizeof[_RBTreeNode]() as c_ulong) as i64)) as *mut c_void) as *mut _RBTreeNode)))
+    (__local_node = ((alloc_test_malloc((sizeof[_RBTreeNode]() as c_ulong)) as *mut _RBTreeNode)))
 
     if ((if __local_node == null: 1 else: 0) != 0) {
         return ((null as *mut _RBTreeNode))
@@ -273,7 +274,7 @@ unsafe fn rb_tree_free_subtree(__param_node: *mut _RBTreeNode) -> Unit {
 
         rb_tree_free_subtree((unsafe *__param_node).children[RB_TREE_NODE_RIGHT])
 
-        with_free(((__param_node as *mut c_void) as *mut u8))
+        alloc_test_free((__param_node as *mut c_void))
 
     }
 

@@ -1,23 +1,23 @@
 // Migrated from C
-use std.c_algorithms.defs
-use std.c_algorithms.arraylist
-use std.c_algorithms.avl_tree
-use std.c_algorithms.binary_heap
-use std.c_algorithms.binomial_heap
-use std.c_algorithms.bloom_filter
-use std.c_algorithms.compare_int
-use std.c_algorithms.compare_pointer
-use std.c_algorithms.compare_string
-use std.c_algorithms.framework
-use std.c_algorithms.hash_int
-use std.c_algorithms.hash_pointer
-use std.c_algorithms.hash_string
-use std.c_algorithms.hash_table
-use std.c_algorithms.list
-use std.c_algorithms.queue
-use std.c_algorithms.set
-use std.c_algorithms.slist
-use std.c_algorithms.trie
+use std.calg_testing.defs
+use std.calg_testing.arraylist
+use std.calg_testing.avl_tree
+use std.calg_testing.binary_heap
+use std.calg_testing.binomial_heap
+use std.calg_testing.bloom_filter
+use std.calg_testing.compare_int
+use std.calg_testing.compare_pointer
+use std.calg_testing.compare_string
+use std.calg_testing.framework
+use std.calg_testing.hash_int
+use std.calg_testing.hash_pointer
+use std.calg_testing.hash_string
+use std.calg_testing.hash_table
+use std.calg_testing.list
+use std.calg_testing.queue
+use std.calg_testing.set
+use std.calg_testing.slist
+use std.calg_testing.trie
 use std.libc
 
 fn test_compare_int() -> Unit {

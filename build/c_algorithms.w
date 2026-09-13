@@ -5,6 +5,21 @@ use std.build
 const CALG_REVISION = "23d453792ed89a28ed7d2c8d4311a4d9f7822edd"
 const CALG_SHA256 = "c2e9f3ba13d5373f79a70fa27d93730de98af314f2476190b156eee2a638a51b"
 
+// The checked-in ALLOC_TESTING migration of upstream's test programs
+// (docs/stdlib_sourcing_plan.md: a corpus's migrated tests live in the tree).
+// engine/ holds the one engine + framework copy every program shares;
+// programs/<name>/ holds the program's own defs.w and test module. Generated
+// by c-algorithms-promote, never hand-edited. The programs migrate under
+// their own package: a compiler that embeds the c_algorithms bundle
+// resolves `std.c_algorithms.*` to the bundle interface before any local
+// module, so a program could never supply its own defs there. It stays a
+// std package: under --no-prelude, std.libc reaches c_void through the
+// std tier's view of the corpus defs (exactly as the bundle builds do), and
+// a user package cannot provide that.
+const CALG_TESTS_DIR = "test/corpora/c_algorithms"
+const CALG_TESTS_PACKAGE = "std.calg_testing"
+fn calg_tests_package_dir(): "lib/" ++ CALG_TESTS_PACKAGE.replace(".", "/")
+
 fn calg_modules() -> Vec[str]:
     ["arraylist", "avl-tree", "binary-heap", "binomial-heap", "bloom-filter",
      "compare-int", "compare-pointer", "compare-string", "hash-int",
@@ -23,6 +38,8 @@ fn calg_is_harness(name: &str) -> bool:
     for harness in ["alloc_testing", "framework", "test_cpp"]:
         if name == harness: return true
     false
+
+fn calg_test_module(name: &str): "test_" ++ name.replace("-", "_") ++ ".w"
 
 fn calg_fail(ctx: &ActionCtx, message: &str):
     ctx.diagnostics().error(ctx.target_name() ++ ": " ++ message)
@@ -53,6 +70,12 @@ fn calg_copy(ctx: &ActionCtx, source: &str, destination: &str):
         return calg_fail(ctx, "cannot copy " ++ source ++ " to " ++ destination)
     0
 
+fn calg_copy_w_files(ctx: &ActionCtx, source_dir: &str, destination: &str) -> i32:
+    for path in ctx.fs().list_files(source_dir):
+        if not path.ends_with(".w"): continue
+        if calg_copy(ctx, path, destination ++ "/" ++ calg_basename(path)) != 0: return 1
+    0
+
 fn calg_copy_test_sources(ctx: &ActionCtx, reference: &str, source: &str):
     for name in ["alloc-testing", "framework"]:
         for extension in [".c", ".h"]:
@@ -67,10 +90,15 @@ fn calg_options(source: &str, output: &str, testing: bool) -> MigrateOptions:
         exclude_basenames: Vec.new(), check_mode: false, diff_mode: false,
         stats_mode: false, no_c_export: true, c_export_functions: false,
         convert_goto_to_structured: false, block_style: 2, width_slice: 8,
-        shared_defs: "std.c_algorithms.defs", migrate_one: "",
+        shared_defs: (if testing: CALG_TESTS_PACKAGE else: "std.c_algorithms") ++ ".defs", migrate_one: "",
         shared_fragment: "", ir_roundtrip: false,
     }
 
+// A migration runs in the build driver's own compiler (a migrate workspace
+// is driver comptime evaluation), so re-migrating needs a tree compiler as
+// the driver: `WITH=out/release/bin/with out/release/bin/with build
+// :c-algorithms-promote`. The battery never migrates; it compiles the
+// checked-in output with the release binary.
 fn calg_migrate(ctx: &ActionCtx, label: &str, options: MigrateOptions):
     let workspace = ctx.create_workspace(label)
     var compiler_options = workspace.options()
@@ -169,28 +197,62 @@ pub fn run_calg_migrate_action(ctx: ActionCtx) -> i32:
     if fs.rename(generated, output) != 0: return calg_fail(ctx, "cannot publish " ++ output)
     0
 
+// Promotes the ALLOC_TESTING test migration into the tree. Every program's
+// migration carries its own copy of the engine and framework; those copies
+// are byte-identical across programs (the same translation units), so one
+// engine/ is checked in and each programs/<name>/ keeps only what differs:
+// the program's defs.w (its globals) and its test module.
+pub fn run_calg_promote_tests_action(ctx: ActionCtx) -> i32:
+    let fs = ctx.fs()
+    let generated = ctx.inputs()[0] ++ "/tests"
+    let destination = ctx.output()
+    if calg_reset(ctx, destination) != 0: return 1
+    let engine = destination ++ "/engine"
+    if fs.mkdir_all(engine) != 0: return calg_fail(ctx, "cannot create " ++ engine)
+    var engine_from = ""
+    for name in calg_tests():
+        let program = generated ++ "/" ++ name
+        let test_module = calg_test_module(name)
+        let target = destination ++ "/programs/" ++ name
+        if fs.mkdir_all(target) != 0: return calg_fail(ctx, "cannot create " ++ target)
+        for path in fs.list_files(program):
+            if not path.ends_with(".w"): continue
+            let base = calg_basename(path)
+            if base == "defs.w" or base == test_module:
+                if calg_copy(ctx, path, target ++ "/" ++ base) != 0: return 1
+                continue
+            let shared = engine ++ "/" ++ base
+            if engine_from.len() == 0 or not fs.exists(shared):
+                if calg_copy(ctx, path, shared) != 0: return 1
+            else if fs.read_text(shared) != fs.read_text(path):
+                return calg_fail(ctx, "engine module " ++ base ++ " differs between programs " ++ engine_from ++ " and " ++ name ++ "; the shared engine/ layout no longer holds")
+        if engine_from.len() == 0: engine_from = name.clone()
+    if fs.write_text(destination ++ "/UPSTREAM", CALG_REVISION ++ "\nsha256=" ++ CALG_SHA256 ++ "\nconfiguration=ALLOC_TESTING\n") != 0: return 1
+    print(f"promoted {calg_tests().len()} c-algorithms test programs into " ++ calg_abs(ctx, destination))
+    0
+
+// The corpora lane: every checked-in test program is assembled into its own
+// module tree, compiled by the release binary and run. The engine's
+// allocation oracle asserts inside the program; a non-zero exit is the
+// failure.
 pub fn run_calg_test_action(ctx: ActionCtx) -> i32:
     let fs = ctx.fs()
-    let generated = ctx.inputs()[0]
+    let compiler = calg_abs(ctx, ctx.inputs()[0])
     let output = ctx.output()
     if calg_reset(ctx, output) != 0: return 1
     var report = "upstream=" ++ CALG_REVISION ++ "\nconfiguration=ALLOC_TESTING\n"
     for name in calg_tests():
-        let module_dir = output ++ "/" ++ name ++ "/lib/std/c_algorithms"
+        let program_root = output ++ "/" ++ name
+        let module_dir = program_root ++ "/" ++ calg_tests_package_dir()
         if fs.mkdir_all(module_dir) != 0: return 1
-        for path in fs.list_files(generated ++ "/tests/" ++ name):
-            if not path.ends_with(".w"): continue
-            if calg_copy(ctx, path, module_dir ++ "/" ++ calg_basename(path)) != 0: return 1
-        let test_name = "test_" ++ name.replace("-", "_") ++ ".w"
+        if calg_copy_w_files(ctx, CALG_TESTS_DIR ++ "/engine", module_dir) != 0: return 1
+        if calg_copy_w_files(ctx, CALG_TESTS_DIR ++ "/programs/" ++ name, module_dir) != 0: return 1
         let binary = output ++ "/test-" ++ name
-        let workspace = ctx.create_workspace("c-algorithms-test-" ++ name)
-        workspace.add_file(module_dir ++ "/" ++ test_name)
-        var options = workspace.options()
-        options.output_path = binary.clone()
-        options.prelude_mode = PreludeMode.None
-        workspace.set_options(options)
-        let compiled = workspace.compile()
-        if compiled.rc != 0: return calg_fail(ctx, "compile test-" ++ name ++ f" exited {compiled.rc}")
+        // The program's directory is the project root so its lib/ root holds
+        // the package; the release binary's embedded std supplies std.libc.
+        let compile_args: Vec[str] = [compiler.clone(), "build", "--no-prelude", "-O1", calg_tests_package_dir() ++ "/" ++ calg_test_module(name), "-o", calg_abs(ctx, binary)]
+        let compiled = ctx.process_runner().run_capture_cwd(compile_args, calg_abs(ctx, binary ++ ".compile.stdout"), calg_abs(ctx, binary ++ ".compile.stderr"), 600000, calg_abs(ctx, program_root))
+        if compiled.rc != 0: return calg_fail(ctx, "compile test-" ++ name ++ f" exited {compiled.rc}\n" ++ fs.read_text(binary ++ ".compile.stderr"))
         let argv: Vec[str] = [calg_abs(ctx, binary)]
         let result = ctx.process_runner().run_capture(argv, calg_abs(ctx, binary ++ ".stdout"), calg_abs(ctx, binary ++ ".stderr"), 300000)
         if result.rc != 0: return calg_fail(ctx, "test-" ++ name ++ f" exited {result.rc}\n" ++ result.stdout ++ result.stderr)
@@ -235,7 +297,14 @@ pub fn run_calg_bundle_root_check_action(ctx: ActionCtx) -> i32:
     if fs.write_text(ctx.output(), "ok\n") != 0: return calg_fail(ctx, "cannot write " ++ ctx.output())
     0
 
-pub fn calg_pipeline(out: Build) -> Build:
+// Every checked-in test program file is an input: an edit re-runs the lane.
+fn calg_with_test_inputs(target: Target, ctx: &BuildCtx) -> Target:
+    var out = target
+    for path in ctx.fs().list_files(CALG_TESTS_DIR):
+        if path.ends_with(".w"): out = out.input(path.clone())
+    out
+
+pub fn calg_pipeline(out: Build, ctx: &BuildCtx, release_compiler: &str) -> Build:
     let archive = "out/c_algorithms_reference/c-algorithms.tar.gz"
     let extracted = "out/c_algorithms_reference/extracted"
     let reference = extracted ++ "/c-algorithms-" ++ CALG_REVISION
@@ -253,16 +322,21 @@ pub fn calg_pipeline(out: Build) -> Build:
         target = target.write_scope("out/tmp/action-scratch/" ++ name)
         if testing: target = target.arg("testing")
         graph = graph.add_target(target)
-    var tests = target_new(.Action, "c-algorithms-test", "").output("out/corpus/c-algorithms-test")
-    tests.action = run_calg_test_action
-    tests = tests.input("out/c_algorithms_tests_migrated").dep("c-algorithms-migrate-tests")
-    graph = graph.add_target(tests)
     var check = target_new(.Action, "c-algorithms-check-generated", "").output("out/gen/.c-algorithms-check-generated-stamp")
     check.action = run_calg_check_generated_action
     check = check.input("out/c_algorithms_migrated").dep("c-algorithms-migrate")
     graph = graph.add_target(check)
+    var promote_tests = target_new(.Action, "c-algorithms-promote-tests", "").output(CALG_TESTS_DIR)
+    promote_tests.action = run_calg_promote_tests_action
+    promote_tests = promote_tests.input("out/c_algorithms_tests_migrated").dep("c-algorithms-migrate-tests")
+    graph = graph.add_target(promote_tests)
     var promote = target_new(.Action, "c-algorithms-promote", "").output("lib/std/c_algorithms")
     promote.action = run_calg_promote_action
     promote = promote.write_scope("out/tmp/action-scratch/c-algorithms-promote")
-    promote = promote.input("out/c_algorithms_migrated").dep("c-algorithms-check-generated").dep("c-algorithms-test")
-    graph.add_target(promote)
+    promote = promote.input("out/c_algorithms_migrated").dep("c-algorithms-check-generated").dep("c-algorithms-promote-tests")
+    graph = graph.add_target(promote)
+    var tests = target_new(.Action, "c-algorithms-test", "").output("out/corpus/c-algorithms-test")
+    tests.action = run_calg_test_action
+    tests = tests.input(release_compiler.clone()).dep("build")
+    tests = calg_with_test_inputs(move tests, ctx)
+    graph.add_target(tests)

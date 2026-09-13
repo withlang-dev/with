@@ -1,10 +1,11 @@
 // Migrated from C
-use std.c_algorithms.defs
+use std.calg_testing.defs
+use std.calg_testing.alloc_testing
 
 pub fn trie_new() -> *mut _Trie {
     var __local_new_trie: *mut _Trie
 
-    (__local_new_trie = (((unsafe { with_alloc(((sizeof[_Trie]() as c_ulong) as i64)) } as *mut c_void) as *mut _Trie)))
+    (__local_new_trie = ((alloc_test_malloc((sizeof[_Trie]() as c_ulong)) as *mut _Trie)))
 
     if ((if __local_new_trie == null: 1 else: 0) != 0) {
         return ((null as *mut _Trie))
@@ -20,7 +21,7 @@ pub fn trie_new() -> *mut _Trie {
 pub unsafe fn trie_free(__param_trie: *mut _Trie) -> Unit {
     free_node_recursive((unsafe *__param_trie).root_node)
 
-    with_free(((__param_trie as *mut c_void) as *mut u8))
+    alloc_test_free((__param_trie as *mut c_void))
 
 }
 
@@ -62,7 +63,7 @@ pub unsafe fn trie_insert(__param_trie: *mut _Trie, __param_key: *mut i8, __para
         (__local_node = (unsafe *__local_rover))
 
         if ((if __local_node == null: 1 else: 0) != 0) {
-            (__local_node = (((with_alloc_zeroed(((1 as c_ulong) as i64), ((sizeof[_TrieNode]() as c_ulong) as i64)) as *mut c_void) as *mut _TrieNode)))
+            (__local_node = ((alloc_test_calloc((1 as c_ulong), (sizeof[_TrieNode]() as c_ulong)) as *mut _TrieNode)))
 
             if ((if __local_node == null: 1 else: 0) != 0) {
                 trie_insert_rollback(__param_trie, (__param_key as *mut u8))
@@ -137,7 +138,7 @@ pub unsafe fn trie_insert_binary(__param_trie: *mut _Trie, __param_key: *mut u8,
         (__local_node = (unsafe *__local_rover))
 
         if ((if __local_node == null: 1 else: 0) != 0) {
-            (__local_node = (((with_alloc_zeroed(((1 as c_ulong) as i64), ((sizeof[_TrieNode]() as c_ulong) as i64)) as *mut c_void) as *mut _TrieNode)))
+            (__local_node = ((alloc_test_calloc((1 as c_ulong), (sizeof[_TrieNode]() as c_ulong)) as *mut _TrieNode)))
 
             if ((if __local_node == null: 1 else: 0) != 0) {
                 trie_insert_rollback(__param_trie, __param_key)
@@ -243,7 +244,7 @@ pub unsafe fn trie_remove(__param_trie: *mut _Trie, __param_key: *mut i8) -> c_i
         ((unsafe *__local_node).use_count = ((unsafe *__local_node).use_count -% 1))
 
         if ((if (unsafe *__local_node).use_count <= 0: 1 else: 0) != 0) {
-            with_free(((__local_node as *mut c_void) as *mut u8))
+            alloc_test_free((__local_node as *mut c_void))
 
             if ((if __local_last_next_ptr != null: 1 else: 0) != 0) {
                 ((unsafe *__local_last_next_ptr) = ((null as *mut _TrieNode)))
@@ -317,7 +318,7 @@ pub unsafe fn trie_remove_binary(__param_trie: *mut _Trie, __param_key: *mut u8,
         ((unsafe *__local_node).use_count = ((unsafe *__local_node).use_count -% 1))
 
         if ((if (unsafe *__local_node).use_count <= 0: 1 else: 0) != 0) {
-            with_free(((__local_node as *mut c_void) as *mut u8))
+            alloc_test_free((__local_node as *mut c_void))
 
             if ((if __local_last_next_ptr != null: 1 else: 0) != 0) {
                 ((unsafe *__local_last_next_ptr) = ((null as *mut _TrieNode)))
@@ -377,7 +378,7 @@ unsafe fn free_node_recursive(__param_node: *mut _TrieNode) -> Unit {
     }
 
 
-    with_free(((__param_node as *mut c_void) as *mut u8))
+    alloc_test_free((__param_node as *mut c_void))
 
 }
 
@@ -466,7 +467,7 @@ unsafe fn trie_insert_rollback(__param_trie: *mut _Trie, __param_key: *mut u8) -
         ((unsafe *__local_node).use_count = ((unsafe *__local_node).use_count -% 1))
 
         if ((if (unsafe *__local_node).use_count == 0: 1 else: 0) != 0) {
-            with_free(((__local_node as *mut c_void) as *mut u8))
+            alloc_test_free((__local_node as *mut c_void))
 
             if ((if __local_prev_ptr != null: 1 else: 0) != 0) {
                 ((unsafe *__local_prev_ptr) = ((null as *mut _TrieNode)))

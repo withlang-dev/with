@@ -1,5 +1,5 @@
 // Migrated from C
-use std.c_algorithms.defs
+use std.calg_testing.defs
 use std.libc
 
 pub fn alloc_test_malloc(__param_bytes: c_ulong) -> *mut c_void {

@@ -1,5 +1,5 @@
 // Migrated from C
-use std.c_algorithms.defs
+use std.calg_testing.defs
 use std.libc
 
 pub unsafe fn string_equal(__param_string1: *mut c_void, __param_string2: *mut c_void) -> c_int {
