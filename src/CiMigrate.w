@@ -139,14 +139,11 @@ fn ci_migrate_shared_defs_active() -> bool:
 fn ci_migrate_output_is_prelude_free() -> bool:
     g_migrate_prelude_free != 0
 
-// True when the shared-defs migration targets the lib/std/re modeled-C zone
-// (pcre2 uses `--shared-defs std.re.defs`). Only there does the compiler exempt
-// cross-module manual-extern calls from the unsafe requirement
-// (sema_path_is_migrated_regex_implementation), so only there is dropping the
-// migrator's `unsafe` wrap around a modeled-libc call correct. The prelude-free
-// vocabulary is NOT keyed on this: that is ci_migrate_output_is_prelude_free.
-fn ci_migrate_shared_defs_targets_regex_zone() -> bool:
-    ci_starts_with(g_migrate_shared_defs_prefix, "std.re")
+// Sema classifies extern declarations in every lib/std module as compiler
+// implementation bindings (sema_extern_is_compiler_implementation). Match
+// that declaration policy for every corpus, without a library-name exception.
+fn ci_migrate_shared_defs_targets_std_zone() -> bool:
+    ci_starts_with(g_migrate_shared_defs_prefix, "std.")
 
 fn ci_migrate_shared_defs_reset:
     g_migrate_shared_decl_buf = Vec.new()

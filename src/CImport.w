@@ -6426,12 +6426,22 @@ fn ci_cursor_is_function_ref(session: i64, cursor: i32) -> bool:
         return ci_cursor_is_function_ref(session, with_ci_child(session, cursor, 0))
     if kind != CXK_DECL_REF:
         return false
-    let operand_ty = with_ci_type_translated(session, with_ci_cursor_type(session, cursor))
-    if ci_starts_with(operand_ty, "fn(") or ci_starts_with(operand_ty, "extern \"C\" fn("):
-        return true
     let cxtype = with_ci_cursor_type(session, cursor)
-    let canon_kind = with_ci_type_kind(session, cxtype)
+    let canonical = with_ci_type_canonical(session, cxtype)
+    let canon_kind = with_ci_type_kind(session, if canonical >= 0: canonical else: cxtype)
     canon_kind == CXT_FunctionProto or canon_kind == CXT_FunctionNoProto
+
+fn ci_callable_cxtype(session: i64, cursor: i32) -> i32:
+    let original = with_ci_cursor_type(session, cursor)
+    var callable = with_ci_type_canonical(session, original)
+    if callable < 0: callable = original
+    if with_ci_type_kind(session, callable) == CXT_Pointer:
+        let pointee = with_ci_type_pointee(session, callable)
+        callable = with_ci_type_canonical(session, pointee)
+        if callable < 0: callable = pointee
+    let kind = with_ci_type_kind(session, callable)
+    if kind == CXT_FunctionProto or kind == CXT_FunctionNoProto: callable
+    else: -1
 
 fn ci_literal_token_text(session: i64, cursor: i32) -> str:
     let token_text = with_ci_cursor_token_text(session, cursor)
@@ -6609,7 +6619,7 @@ impl CiTypePool:
             if (ret_ty as i32) == 0:
                 return 0 as CiTypeId
             let arg_count = with_ci_type_arg_count(session, cxtype)
-            let params_start = self.state.extra.len() as i32
+            var params: Vec[i32] = Vec.new()
             var i: i32 = 0
             while i < arg_count:
                 let arg_idx = with_ci_type_arg(session, cxtype, i)
@@ -6621,8 +6631,10 @@ impl CiTypePool:
                     else: self.type_from_libclang(session, arg_idx)
                 if (arg_ty as i32) == 0:
                     return 0 as CiTypeId
-                let _ = self.add_extra(arg_ty as i32)
+                params.push(arg_ty as i32)
                 i = i + 1
+            let params_start = self.state.extra.len() as i32
+            for param in params: self.add_extra(param)
             return self.ty_fn_ptr(ret_ty, params_start, arg_count)
 
         // Typedef, elaborated, atomic, and other named wrappers.
@@ -7427,6 +7439,7 @@ impl CiExprPool:
                     ai = ai + elem_field_count
                 else:
                     item_id = self.lower_expr_ir(session, child, types, scope)
+                    item_id = self.coerce_value_expr_for_target(session, elem_ty_id, child, item_id, types)
                     ai = ai + 1
                 if (item_id as i32) == 0:
                     return 0 as CiExprId
@@ -8501,9 +8514,9 @@ impl CiExprPool:
     fn coerce_value_expr_for_target(session: i64, target_ty_id: CiTypeId, value_cursor: i32, value_id: CiExprId, types: CiTypePool) -> CiExprId:
         if (target_ty_id as i32) == 0 or (value_id as i32) == 0:
             return value_id
-        if types.kind(target_ty_id) == CiTypeKind.CT_FN_PTR and ci_expr_is_zero_int_lit(self.val(), value_id):
+        if ci_type_is_fn_ptr(types, target_ty_id) and ci_expr_is_zero_int_lit(self.val(), value_id):
             return self.null_ptr(target_ty_id)
-        if types.kind(target_ty_id) == CiTypeKind.CT_FN_PTR:
+        if ci_type_is_fn_ptr(types, target_ty_id):
             let value_ty = self.get_type(value_id)
             if ci_type_is_fn_ptr(types, value_ty):
                 return value_id
@@ -9174,17 +9187,11 @@ fn ci_migrate_preamble_name_is_modeled_libc(name: &str) -> bool:
     false
 
 fn ci_migrate_preamble_extern_call_requires_unsafe(name: &str) -> bool:
-    // Modeled libc/libm/ctype bindings. In a shared-defs migration that targets the
-    // lib/std/re modeled-C zone (pcre2: `--shared-defs std.re.defs`), these are
-    // declared in the imported `defs` module AND the compiler exempts that zone
-    // (sema_path_is_migrated_regex_implementation) from the manual-extern-call
-    // unsafe requirement — so a call is safe and wrapping it in `unsafe` is vacuous
-    // ("unsafe block contains no unsafe operations"). Mission: modeled C is humane;
-    // the programmer never spells out `unsafe` for a header-modeled libc call there.
-    // A GENERIC shared-defs migration (or a single-file one) is NOT exempt: a bare
-    // manual-extern call requires unsafe, so it must stay wrapped.
+    // Extern declarations in std modules have the compiler-implementation
+    // policy. Match Sema for all std corpora; ordinary user modules still
+    // require the wrapper around their manual pointer-ABI extern calls.
     if ci_migrate_preamble_name_is_modeled_libc(name):
-        return not (ci_migrate_shared_defs_active() and ci_migrate_shared_defs_targets_regex_zone())
+        return not (ci_migrate_shared_defs_active() and ci_migrate_shared_defs_targets_std_zone())
     // with_* compiler-ABI externs stay wrapped even in shared-defs mode: the D30
     // transition (SemaCheck) keeps that `unsafe` honest in both the object and
     // in-unit worlds, so it is never vacuous.
@@ -10414,7 +10421,12 @@ impl CiStmtPool:
                     g_ci_bail_location = with_ci_cursor_location(session, cursor)
                     g_ci_bail_kind = kind
                 return ci_value_ir_invalid()
-            let callee_param_count = if callee_decl_idx >= 0: with_cimport_fn_param_count(session, callee_decl_idx) else: 0
+            // A local function pointer has a callable signature even though it
+            // has no function declaration index. Use Clang's callable type for
+            // every call, including nested callback parameters and typedefs.
+            let callee_cursor = if first_arg > 0: with_ci_child(session, cursor, 0) else: -1
+            let callable_type = if callee_cursor >= 0: ci_callable_cxtype(session, callee_cursor) else: -1
+            let callee_param_count = if callable_type >= 0: with_ci_type_arg_count(session, callable_type) else if callee_decl_idx >= 0: with_cimport_fn_param_count(session, callee_decl_idx) else: 0
             var ai = first_arg
             while ai < nc:
                 let arg_cursor = with_ci_child(session, cursor, ai)
@@ -10435,9 +10447,14 @@ impl CiStmtPool:
                 if ci_expand_string_macro_sequence(session, arg_src).len() > 0 and exprs.kind(arg_id) != CiExprKind.CIE_STRING_LIT:
                     return ci_value_ir_invalid()
                 let param_index = ai - first_arg
-                if callee_decl_idx >= 0 and param_index >= 0 and param_index < callee_param_count:
-                    let raw_param_ty = with_cimport_fn_param_type_translated(session, callee_decl_idx, param_index)
-                    let target_ty = types.type_from_translated_text(ci_pointer_type_explicit_mut(raw_param_ty))
+                if param_index >= 0 and param_index < callee_param_count:
+                    let target_ty = if callable_type >= 0:
+                        let parameter = with_ci_type_arg(session, callable_type, param_index)
+                        if cimport_type_is_va_list_at(session, parameter, true): types.ty_named(types.add_string("c_va_list"))
+                        else: types.type_from_libclang(session, parameter)
+                    else:
+                        let raw_param_ty = with_cimport_fn_param_type_translated(session, callee_decl_idx, param_index)
+                        types.type_from_translated_text(ci_pointer_type_explicit_mut(raw_param_ty))
                     if (target_ty as i32) != 0:
                         arg_id = exprs.coerce_value_expr_for_target(session, target_ty, arg_cursor, arg_id, types)
                         if (arg_id as i32) == 0:
@@ -10457,8 +10474,8 @@ impl CiStmtPool:
             if has_mapped_call:
                 return ci_value_ir_invalid()
             if callee_text.len() > 0 and ci_is_c_ident(callee_text) and not ci_scope_contains(scope, callee_text):
-                let callee_cursor = if nc > 0: with_ci_child(session, cursor, 0) else: cursor
-                if not ci_note_filtered_system_symbol_ref_at(session, callee_cursor, callee_text, CI_LIBC_KIND_FN):
+                let referenced_cursor = if nc > 0: with_ci_child(session, cursor, 0) else: cursor
+                if not ci_note_filtered_system_symbol_ref_at(session, referenced_cursor, callee_text, CI_LIBC_KIND_FN):
                     return ci_value_ir_invalid()
             let args_start = exprs.extra_len()
             var j: i64 = 0
@@ -10466,18 +10483,11 @@ impl CiStmtPool:
                 let _ = exprs.add_extra(arg_ids.get(j))
                 j = j + 1
             var call_id = exprs.add(CiExprKind.CIE_CALL, callee.value_expr as i32, args_start, arg_ids.len() as i32, 0 as CiTypeId)
-            // An indirect call through a function-pointer value (e.g. a struct's
-            // fn-ptr field such as memctl.free) requires an unsafe context (§16.11):
-            // a fn pointer can be null or dangling, so unlike a named modeled extern
-            // it is genuinely unsafe to invoke. ci_migrate_call_requires_unsafe_wrapper
-            // only recognizes named callees, so detect the fn-ptr callee by its type.
-            // `not ci_is_c_ident(callee_text)` excludes direct named calls: a
-            // function reference (strlen, a cross-module _pcre2_* fn) also carries a
-            // fn-ptr type, but invoking it by name is not an indirect call and must
-            // not be wrapped — doing so reintroduces the vacuous modeled-libc wraps.
-            // Only a fn-ptr *value* spelled as a non-identifier expression (a struct
-            // field like memctl.free, a deref) is an indirect call needing unsafe.
-            let indirect_fn_ptr_call = ci_type_is_fn_ptr(types, exprs.get_type(callee.value_expr)) and not ci_is_c_ident(callee_text) and not g_ci_migrate_in_unsafe_function_body
+            // A local identifier can denote a function pointer just as a field
+            // can. Declaration identity distinguishes direct function references
+            // from pointer values; the spelling of the expression cannot.
+            let direct_function = if callee_cursor >= 0: ci_cursor_is_function_ref(session, callee_cursor) else: callee_decl_idx >= 0
+            let indirect_fn_ptr_call = ci_type_is_fn_ptr(types, exprs.get_type(callee.value_expr)) and not direct_function and not g_ci_migrate_in_unsafe_function_body
             if ci_migrate_call_requires_unsafe_wrapper(callee_text) or indirect_fn_ptr_call:
                 call_id = exprs.unsafe_expr(call_id)
             return CiValueExprIR {
