@@ -6443,23 +6443,19 @@ fn ci_cursor_is_function_ref(session: i64, cursor: i32) -> bool:
     let canon_kind = with_ci_type_kind(session, if canonical >= 0: canonical else: cxtype)
     canon_kind == CXT_FunctionProto or canon_kind == CXT_FunctionNoProto
 
+// The callee's canonical function type: parameter KINDS (a `void *` behind
+// a typedef is a pointer) drive the argument coercions.
 fn ci_callable_cxtype(session: i64, cursor: i32) -> i32:
     let original = with_ci_cursor_type(session, cursor)
-    // The sugared type first: canonicalization erases the `va_list` typedef
-    // the parameter model keys on (#1104; Darwin's canonical va_list is
-    // `char *`, and a call argument would be cast to `*mut c_char`). The
-    // canonical type only serves a callee whose sugared type is not itself a
-    // function or a pointer to one (a typedef'd function pointer).
-    let canonical = with_ci_type_canonical(session, original)
-    for candidate in [original, canonical]:
-        if candidate < 0: continue
-        var callable = candidate
-        if with_ci_type_kind(session, callable) == CXT_Pointer:
-            let pointee = with_ci_type_pointee(session, callable)
-            if pointee >= 0: callable = pointee
-        let kind = with_ci_type_kind(session, callable)
-        if kind == CXT_FunctionProto or kind == CXT_FunctionNoProto: return callable
-    -1
+    var callable = with_ci_type_canonical(session, original)
+    if callable < 0: callable = original
+    if with_ci_type_kind(session, callable) == CXT_Pointer:
+        let pointee = with_ci_type_pointee(session, callable)
+        callable = with_ci_type_canonical(session, pointee)
+        if callable < 0: callable = pointee
+    let kind = with_ci_type_kind(session, callable)
+    if kind == CXT_FunctionProto or kind == CXT_FunctionNoProto: callable
+    else: -1
 
 fn ci_literal_token_text(session: i64, cursor: i32) -> str:
     let token_text = with_ci_cursor_token_text(session, cursor)
@@ -10446,8 +10442,14 @@ impl CiStmtPool:
             // has no function declaration index. Use Clang's callable type for
             // every call, including nested callback parameters and typedefs.
             let callee_cursor = if first_arg > 0: with_ci_child(session, cursor, 0) else: -1
+            // A declared callee's parameter types come from its declaration:
+            // that renderer follows typedef identity (a `va_list *` behind
+            // `argument_pointer` stays `*mut c_va_list`, #1104). The callable
+            // type serves a callee without a declaration (a local function
+            // pointer, a nested callback parameter); canonical, it erases
+            // that identity on Darwin.
             let callable_type = if callee_cursor >= 0: ci_callable_cxtype(session, callee_cursor) else: -1
-            let callee_param_count = if callable_type >= 0: with_ci_type_arg_count(session, callable_type) else if callee_decl_idx >= 0: with_cimport_fn_param_count(session, callee_decl_idx) else: 0
+            let callee_param_count = if callee_decl_idx >= 0: with_cimport_fn_param_count(session, callee_decl_idx) else if callable_type >= 0: with_ci_type_arg_count(session, callable_type) else: 0
             var ai = first_arg
             while ai < nc:
                 let arg_cursor = with_ci_child(session, cursor, ai)
@@ -10469,7 +10471,7 @@ impl CiStmtPool:
                     return ci_value_ir_invalid()
                 let param_index = ai - first_arg
                 if param_index >= 0 and param_index < callee_param_count:
-                    let target_ty = if callable_type >= 0:
+                    let target_ty = if callee_decl_idx < 0 and callable_type >= 0:
                         let parameter = with_ci_type_arg(session, callable_type, param_index)
                         if cimport_type_is_va_list_at(session, parameter, true): types.ty_named(types.add_string("c_va_list"))
                         else: types.type_from_libclang(session, parameter)
