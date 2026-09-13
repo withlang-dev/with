@@ -71,10 +71,24 @@ node 889 and observed reference-to-string type 17. The call chain reached
 it from `Codegen.gen_closure + 9456`, which constructs a fresh MirBuilder
 during codegen. `lower_concrete_specialization` restores generic AST type
 sidecars only while lowering the enclosing function; `lower_closure`
-currently retains just an AST marker. This is an unfinished architecture
-fix: retain the closure's MIR while that concrete context is active, then
-read it in codegen. Proof: `generic-closure-crash-lldb.txt` and
+retained just an AST marker. Closure and async MIR bodies are now prepared
+while that concrete context is active and stored in the module's flat body
+table. Codegen reads those bodies and their concrete parameter/capture types.
+The module validator requires each anonymous-expression constant to reference
+a matching retained body. Proof: `generic-closure-crash-lldb.txt` and
 `closure-context-proof.txt` under `out/phase1-drafts/`.
+
+The rebuilt compiler passes the mixed `i32`/`i64`/`str` callback regression,
+ordinary copy/ref capture, and async capture. The pre-change native ownership
+audit passes 119/119 cases. The nested generic async fixture also exposed a
+codegen-state bug: LLVM rejected a `store i32 %7, ptr %1` because `%1` was an
+argument of the enclosing async trampoline, and rejected `ret void` in the
+integer-returning closure. `mir_emit_term`'s `async_block_rbuf != 0` branch
+was still active inside `gen_closure`. Closure emission now saves, clears,
+and restores that field; async emission restores its caller's value too.
+The source check passes; the complete self-host/native regression batch is
+pending. Logs: `anonymous-callback-native.txt`, `anonymous-nested-native.txt`,
+and `anonymous-before-drop-audit.txt` under `out/phase1-drafts/`.
 
 ## Reference types at repeated checks and pointer comparisons
 

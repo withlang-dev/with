@@ -59,6 +59,7 @@ enum ControlTargetKind: i32:
 
 type MirBuilder = ephemeral {
     body: MirBody,
+    anonymous_bodies: Vec[MirBody],
     cur_bb: BlockId,
 
     // Drop scope stack (flat storage + per-scope start offsets).
@@ -178,6 +179,7 @@ fn MirBuilder.init(sema: &Sema, ast: AstPool, pool: InternPool, fn_sym: i32) -> 
     let entry = body.new_block()
     MirBuilder {
         body,
+        anonymous_bodies: Vec.new(),
         cur_bb: entry,
         drop_local_ids: Vec.new(),
         drop_kinds: Vec.new(),
@@ -12565,15 +12567,72 @@ impl MirBuilder:
         let ret_ty = self.expr_type(node)
         self.lower_call_with_arg_nodes(fn_op, callee_sym, arg_nodes, ret_ty, node)
 
-    mut fn lower_closure(_captured_start: i32, _captured_count: i32, _params_start: i32, _params_count: i32, node: i32) -> i32:
-        // Emit ConstKind.CK_CLOSURE so MIR codegen can delegate to gen_closure.
-        // The closure body is compiled as a separate function by AST codegen.
+    mut fn prepare_anonymous_body(node: i32, ty: i32, is_async: bool) -> i32:
+        let body_node = self.ast.get_data0(node)
+        let body_sym = self.pool.intern(f"$anonymous${self.body.fn_sym}${node}")
+        let captures: Vec[i32] = Vec.new()
+        if is_async:
+            for i in 0..self.bind_syms.len():
+                let sym = self.bind_syms[i]
+                let sema_sym = self.sema.pool_lookup_symbol(self.pool.resolve_symbol(sym))
+                if self.sema.expr_uses_symbol(body_node, sema_sym) != 0:
+                    captures.push(sym)
+        else:
+            for i in 0..self.sema.closure_capture_summary_count(node):
+                let sym = self.sema.closure_capture_summary_sym(node, i)
+                captures.push(mir_symbol_for_pool(self.sema, self.pool, sym))
+        let callable_ty = self.sema.resolve_alias(ty)
+        let param_count = if is_async: 0 else: self.ast.get_data2(node)
+        let param_start = self.ast.get_data1(node)
+        let ret_ty = if is_async: self.sema.unwrap_task_type(callable_ty) as i32 else: self.sema.get_type_d2(callable_ty)
+        if ret_ty == 0:
+            sema_phase_bug(f"BUG: anonymous body lacks a concrete return type: node={node}")
+        var child = MirBuilder.init(self.sema, self.ast, self.pool, body_sym)
+        child.contextual_fact_sig_idx = if not is_async and captures.len() > 0: 0 else: self.contextual_fact_sig_idx
+        child.body.anonymous_type = ty
+        child.body.anonymous_capture_count = captures.len()
+        child.body.local_type_ids[0] = ret_ty
+        child.push_scope()
+        for sym in captures:
+            let local = self.lookup_local(sym)
+            let capture_ty = if local >= 0: self.local_type(local) else: self.lookup_alias_type(sym)
+            if capture_ty == 0:
+                sema_phase_bug(f"BUG: anonymous capture lacks a concrete local type: node={node} symbol={sym}")
+            let capture_local = child.body.new_local(capture_ty, 0, sym, 1)
+            child.bind_local(sym, capture_local)
+        for i in 0..param_count:
+            let sym = self.ast.get_extra(param_start + i * 2)
+            let param_ty = self.sema.fn_type_param_type(callable_ty, i)
+            if param_ty == 0:
+                sema_phase_bug(f"BUG: anonymous parameter lacks a concrete type: node={node} parameter={i}")
+            let local = child.body.new_local(param_ty, 1, sym, 1)
+            child.bind_local(sym, local)
+        child.body.n_params = captures.len() + param_count
+        child.expected_type = ret_ty
+        let frame = child.push_stmt_temp_frame()
+        let result = child.lower_expr(body_node)
+        if ret_ty != self.sema.ty_void and ret_ty != self.sema.ty_never:
+            let return_place = child.place_for_local(0)
+            child.assign_operand_to_place(return_place, result, self.ast.get_end(body_node))
+        child.finish_stmt_temp_frame(frame)
+        child.pop_scope_inline()
+        child.terminate(TermKind.TK_RETURN, 0, 0, 0, 0)
+        var finished = LoweredFunction { body: move child.body, anonymous_bodies: move child.anonymous_bodies }
+        self.anonymous_bodies.push(move finished.body)
+        while finished.anonymous_bodies.len() > 0:
+            self.anonymous_bodies.push(finished.anonymous_bodies.pop().unwrap())
+        body_sym
+
+    mut fn lower_closure(_captured_start: i32, _captured_count: i32, _params_start: i32, _params_count: i32, node: i32):
         let ty = self.expr_type(node)
         if ty == 0:
             return self.unit_operand()
+        // Lower now, while the enclosing specialization's AST type sidecars
+        // are active. Codegen only reads the retained concrete MIR.
+        let body_sym = self.prepare_anonymous_body(node, ty, false)
         let tmp = self.new_temp(ty)
         let place = self.place_for_local(tmp)
-        let closure_const = self.body.new_const(ConstKind.CK_CLOSURE, node, 0, 0, ty)
+        let closure_const = self.body.new_const(ConstKind.CK_CLOSURE, node, body_sym, 0, ty)
         let op = self.body.new_operand(OperandKind.OK_CONSTANT, closure_const)
         let rv = self.body.new_rvalue(RvalueKind.RK_USE, op, 0, 0)
         self.body.push_stmt(self.cur_bb, StmtKind.Assign, place, rv, self.ast.get_start(node))
@@ -13773,15 +13832,14 @@ impl MirBuilder:
             return body_result
 
         if kind == NodeKind.NK_ASYNC_BLOCK:
-            // Emit CK_ASYNC_BLOCK constant — codegen handles the fiber spawn.
-            // Same pattern as CK_CLOSURE: MIR just creates a marker, codegen
-            // creates the anonymous function, collects captures, and spawns.
+            // Retain the concrete body; codegen handles the fiber spawn.
             let ab_ty = self.expr_type(node)
             if ab_ty == 0:
                 return self.unit_operand()
+            let body_sym = self.prepare_anonymous_body(node, ab_ty, true)
             let ab_tmp = self.new_temp(ab_ty)
             let ab_place = self.place_for_local(ab_tmp)
-            let ab_const = self.body.new_const(ConstKind.CK_ASYNC_BLOCK, node, 0, 0, ab_ty)
+            let ab_const = self.body.new_const(ConstKind.CK_ASYNC_BLOCK, node, body_sym, 0, ab_ty)
             let ab_op = self.body.new_operand(OperandKind.OK_CONSTANT, ab_const)
             let ab_rv = self.body.new_rvalue(RvalueKind.RK_USE, ab_op, 0, 0)
             self.body.push_stmt(self.cur_bb, StmtKind.Assign, ab_place, ab_rv, self.ast.get_start(node))
@@ -13914,7 +13972,12 @@ fn mir_symbol_for_pool(sema: &Sema, pool: InternPool, sym: i32) -> i32:
         return pool.intern(sema_name)
     sym
 
-fn lower_fn_with_sig(builder: MirBuilder, fn_node: i32, sig_idx: i32) -> MirBody:
+type LoweredFunction {
+    body: MirBody,
+    anonymous_bodies: Vec[MirBody],
+}
+
+fn lower_fn_with_sig(builder: MirBuilder, fn_node: i32, sig_idx: i32) -> LoweredFunction:
     if builder.ast.fn_decl_body_is_interface(fn_node):
         sema_phase_bug("BUG: interface body reached MIR lowering (D39: lower_module skips interface declarations)")
     builder.contextual_fact_sig_idx = sig_idx
@@ -14078,7 +14141,7 @@ fn lower_fn_with_sig(builder: MirBuilder, fn_node: i32, sig_idx: i32) -> MirBody
 
     // D32: field vacates need a mutable path — rebind the owned param.
     var owned_builder = builder
-    return move owned_builder.body
+    LoweredFunction { body: move owned_builder.body, anonymous_bodies: move owned_builder.anonymous_bodies }
 
 fn lower_fn_clause_dispatcher(sema: &Sema, ast_pool: AstPool, pool: InternPool, group: i32) -> MirBody:
     let dispatch_sym = sema.fn_clause_group_name(group)
@@ -14634,13 +14697,28 @@ fn mir_fn_is_generic_template_at(sema: &Sema, ast_pool: AstPool, pool: InternPoo
 
 type ConcreteSpecializationLowerResult {
     sema: Sema,
-    body: MirBody,
+    lowered: LoweredFunction,
 }
 
 impl MirModule:
+    mut fn add_lowered_function(lowered: LoweredFunction):
+        var owned = lowered
+        self.add_body(move owned.body)
+        while owned.anonymous_bodies.len() > 0:
+            self.add_body(owned.anonymous_bodies.pop().unwrap())
+
     fn validate_generic_call_contracts(sema: &Sema):
         for bi in 0..self.bodies.len():
             let body = &self.bodies[bi]
+            for ci in 0..body.const_kinds.len():
+                let kind = body.const_kinds[ci]
+                if kind != ConstKind.CK_CLOSURE and kind != ConstKind.CK_ASYNC_BLOCK: continue
+                let child_idx = self.find_body(body.const_d1[ci])
+                if child_idx < 0:
+                    sema_phase_bug(f"BUG: anonymous expression has no prelowered MIR body: body={body.fn_sym} node={body.const_d0[ci]}")
+                let child = &self.bodies[child_idx]
+                if child.anonymous_type != body.const_types[ci] or child.anonymous_capture_count < 0 or child.anonymous_capture_count > child.n_params:
+                    sema_phase_bug(f"BUG: anonymous expression/body contract mismatch: body={body.fn_sym} node={body.const_d0[ci]}")
             let call_count = body.call_arg_starts.len() as i32
             if body.call_sig_indices.len() != call_count or body.call_mono_syms.len() as i32 != call_count or body.call_contract_required.len() as i32 != call_count or body.call_pipeline_receiver_places.len() as i32 != call_count:
                 sema_phase_bug(f"BUG: MIR call-contract tables are not parallel in body {body.fn_sym}")
@@ -14735,7 +14813,7 @@ fn lower_concrete_specialization(sema: Sema, ast_pool: AstPool, pool: InternPool
     if decl_index >= 0:
         sema.update_decl_source_context(decl_index)
     var builder = MirBuilder.init(&sema, ast_pool, pool, mono_sym)
-    let body = lower_fn_with_sig(move builder, fn_node, sig_idx)
+    let lowered = lower_fn_with_sig(move builder, fn_node, sig_idx)
     sema.local_file_id = saved_file_id
     sema.current_module_path = saved_module_path
     sema.current_module_has_ci = saved_module_has_ci
@@ -14748,7 +14826,7 @@ fn lower_concrete_specialization(sema: Sema, ast_pool: AstPool, pool: InternPool
             sema.named_types.remove(sym)
     sema.generic_subst_param_syms = saved_subst_syms
     sema.generic_subst_type_ids = saved_subst_types
-    ConcreteSpecializationLowerResult { sema, body }
+    ConcreteSpecializationLowerResult { sema, lowered }
 
 fn lower_module(input_sema: Sema, ast_pool: AstPool, pool: InternPool) -> MirLowerResult:
     var sema = input_sema
@@ -14777,11 +14855,13 @@ fn lower_module(input_sema: Sema, ast_pool: AstPool, pool: InternPool) -> MirLow
                 continue
             var source_builder = MirBuilder.init(&sema, ast_pool, pool, mir_fn_sym)
             source_builder.in_generator = 1
-            let source_body = lower_fn_with_sig(move source_builder, decl as i32, sig_idx)
+            var source = lower_fn_with_sig(move source_builder, decl as i32, sig_idx)
             let ctor_body = lower_generator_constructor(sema, ast_pool, pool, decl as i32, sig_idx)
-            let next_body = lower_generator_next_body(sema, source_body, decl as i32)
+            let next_body = lower_generator_next_body(sema, source.body, decl as i32)
             mir_mod.add_body(move ctor_body)
             mir_mod.add_body(move next_body)
+            while source.anonymous_bodies.len() > 0:
+                mir_mod.add_body(source.anonymous_bodies.pop().unwrap())
             continue
         let sig_idx = sema.get_sig(fn_sym)
         var builder = MirBuilder.init(&sema, ast_pool, pool, mir_fn_sym)
@@ -14789,8 +14869,7 @@ fn lower_module(input_sema: Sema, ast_pool: AstPool, pool: InternPool) -> MirLow
         // mir_fn_sym belongs to the output pool; treating its numeric ID as a
         // Sema symbol can select an unrelated but valid signature in large
         // combined modules and corrupt every parameter type during lowering.
-        let body = lower_fn_with_sig(move builder, decl as i32, sig_idx)
-        mir_mod.add_body(move body)
+        mir_mod.add_lowered_function(lower_fn_with_sig(move builder, decl as i32, sig_idx))
 
     for gi in 0..sema.fn_clause_group_count():
         let dispatch_sym = sema.fn_clause_group_name(gi)
@@ -14809,7 +14888,7 @@ fn lower_module(input_sema: Sema, ast_pool: AstPool, pool: InternPool) -> MirLow
             if mir_mod.find_body(mono_sym) < 0:
                 var lowered = lower_concrete_specialization(move sema, ast_pool, pool, specialization)
                 sema = move lowered.sema
-                mir_mod.add_body(move lowered.body)
+                mir_mod.add_lowered_function(move lowered.lowered)
             specialization = specialization + 1
         sema.preregister_mir_types()
         let before_drop_registration = sema.concrete_specialization_nodes.len() as i32
