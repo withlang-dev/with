@@ -1,6 +1,6 @@
 // lib/std/re/bundle.w — the pcre2 .wo bundle root (docs/wo_bundles.md).
-// Written by build/pcre2.w (pcre2-migrate) from the migrated module list:
-// one `use` per corpus module; pcre2test and pcre2posix are the harness.
+// Written by build/corpora.w (pcre2-migrate) from the migrated module list:
+// one `use` per corpus module; the harness (pcre2test, pcre2posix) is excluded.
 use std.re.defs
 use std.re.pcre2_auto_possess
 use std.re.pcre2_chartables

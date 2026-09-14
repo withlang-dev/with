@@ -1,6 +1,6 @@
 // lib/std/zl/bundle.w — the zlib .wo bundle root (docs/wo_bundles.md).
-// Written by build/zlib.w (zlib-migrate) from the migrated module list:
-// one `use` per corpus module; example and minigzip are the harness.
+// Written by build/corpora.w (zlib-migrate) from the migrated module list:
+// one `use` per corpus module; the harness (example, minigzip) is excluded.
 use std.zl.adler32
 use std.zl.compress
 use std.zl.crc32

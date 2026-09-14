@@ -1,6 +1,6 @@
-// lib/std/c_algorithms/bundle.w — the c-algorithms .wo bundle root (docs/wo_bundles.md).
-// Written by build/c_algorithms.w (c-algorithms-migrate) from the migrated module list:
-// one `use` per corpus module; alloc_testing, framework and test_cpp are the harness.
+// lib/std/c_algorithms/bundle.w — the c_algorithms .wo bundle root (docs/wo_bundles.md).
+// Written by build/corpora.w (c-algorithms-migrate) from the migrated module list:
+// one `use` per corpus module; the harness (alloc_testing, framework, test_cpp) is excluded.
 use std.c_algorithms.arraylist
 use std.c_algorithms.avl_tree
 use std.c_algorithms.binary_heap

@@ -1,6 +1,6 @@
-// lib/std/tommyds/bundle.w — the TommyDS .wo bundle root (docs/wo_bundles.md).
-// Written by build/tommyds.w (tommyds-migrate) from the migrated module list:
-// one `use` per corpus module; check_ is the harness.
+// lib/std/tommyds/bundle.w — the tommyds .wo bundle root (docs/wo_bundles.md).
+// Written by build/corpora.w (tommyds-migrate) from the migrated module list:
+// one `use` per corpus module; the harness (check_) is excluded.
 use std.tommyds.defs
 use std.tommyds.tommyalloc
 use std.tommyds.tommyarray
