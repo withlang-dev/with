@@ -118,10 +118,15 @@ the release binary of the fixed tree):
 
 ## 2. What is NOT done
 
-- **The battery.** `with build` and `:fixpoint` pass on the fixed tree; the
-  full `:test` → `:test-green` → `:last-green` → `:drop-audit` → `:move-audit`
-  chain was started after e132688b (logs in the session scratchpad; re-run
-  if in doubt). A stage1 behavior-test sweep and a direct
+- **The battery is GREEN** at 4832bf0a: `with build`, `:fixpoint`, `:test`
+  (1027 behavior, 759 compile-error, corpora lane 17/17, wo-drift x3),
+  `:test-green`, `:last-green`, `:drop-audit` (131 cells, 0 non-PASS; the
+  three empty facade cells read FIXED against the seed baseline, which
+  cannot run them), `:move-audit`. Two more fixes landed on the way:
+  `anon_union_init_not_flattened` (the unnamed-record lookup keyed on a
+  marker b0434ad3 removed from the translated type text) and the ABI hash
+  re-record (message-only TypeLayout change). Not reseeded: the branch is
+  stacked on #1129, which is red on CI. A stage1 behavior-test sweep and a direct
   `with run tools/drop_audit.w <stage1> ~/.local/bin/with` were started; check
   their logs before trusting anything (`p7`-harness fixtures pick the stale
   `out/stage/bin/with-stage2` and fail for that reason alone until a full build

@@ -452,7 +452,8 @@ by the M*LIB-backed `BTreeMap`/`BTreeSet` work in Phase 4.
   (#1137, fixed in this branch: it is now a diagnostic).
 - The branch's pre-facade compiler commits (31a347d4, 88f0ad31, 92c0c01d)
   regressed ~16 existing fixtures; root-caused and fixed (`docs/handoff.md`
-  §1c), plus the va_list call-site model (e7ddf116).
+  §1c), plus the va_list call-site model (e7ddf116). The full battery is
+  green at 4832bf0a.
 - Open for Eric: comparisons of user types. §11.7 dispatches `<` to a
   fixed `lt` method, and `Ord` only carries `cmp(other: Self)`, so a type
   with `Ord` alone has no `<` and a generic `T: Ord` cannot compare two
