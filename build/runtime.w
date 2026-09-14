@@ -144,12 +144,19 @@ fn br_collect_runtime_files(ctx: &ActionCtx) -> Vec[str]:
             files.push(path)
     files
 
+// A bundled corpus is provided by its .wo, never embedded as source; the
+// target's `exclude=<dir>/` args name the corpus directories (build/corpora.w).
+fn br_excluded_source(ctx: &ActionCtx, path: &str) -> bool:
+    for arg in ctx.args():
+        if arg.starts_with("exclude=") and path.starts_with(arg.slice(8, arg.len())): return true
+    false
+
 fn br_collect_stdlib_files(ctx: &ActionCtx) -> Vec[str]:
     let files: Vec[str] = Vec.new()
     let all_files = br_sorted_paths(ctx.fs().list_files("lib/std"))
     for i in 0..all_files.len() as i32:
         let path = br_normalize_path_separators(all_files[i])
-        if path.ends_with(".w") and not path.starts_with("lib/std/re/") and not path.starts_with("lib/std/zl/") and not path.starts_with("lib/std/c_algorithms/") and not path.starts_with("lib/std/tommyds/"):
+        if path.ends_with(".w") and not br_excluded_source(ctx, path):
             files.push(path)
     files
 
@@ -369,8 +376,11 @@ pub fn generate_compat_runtime_action(ctx: ActionCtx) -> i32:
         return br_fail(ctx, "could not write: " ++ embedded_output)
     if fs.write_text(embedded_rt_output, embedded_rt) != 0:
         return br_fail(ctx, "could not write: " ++ embedded_rt_output)
-    // D38: the .wo bundle index; the target's args name the bundles embedded.
-    let bundle_names = ctx.args()
+    // D38: the .wo bundle index; the target's args name the bundles embedded
+    // (the `exclude=` args are the corpus directories, not bundles).
+    var bundle_names: Vec[str] = Vec.new()
+    for arg in ctx.args():
+        if not arg.starts_with("exclude="): bundle_names.push(arg.clone())
     let embedded_bundles_output = outputs.get(3)
     if fs.write_text(embedded_bundles_output, br_generate_embedded_bundles(bundle_names)) != 0:
         return br_fail(ctx, "could not write: " ++ embedded_bundles_output)

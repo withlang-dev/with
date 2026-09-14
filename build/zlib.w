@@ -1,581 +1,133 @@
 module build.zlib
 
 use std.build
-fn zlib_owned_text(s: &str): s ++ ""
+use build.corpus
+
+// zlib 1.3.2 (madler/zlib release tarball), the second .wo bundle
+// (docs/wo_bundles.md "Conforming pcre2 and zlib"). The generic pipeline
+// (build/corpora.w) fetches, migrates, checks, promotes and bundles it;
+// this module holds the facts, the staging hook, the migrate hook (the two
+// test programs are migrated one at a time after the library) and the
+// corpus's own lanes: upstream's example and minigzip round trip.
 
 const ZLIB_RELEASE: str = "zlib-1.3.2"
 const ZLIB_SHA256: str = "bb329a0a2cd0274d05519d61c667c062e06990d72e125ee2dfa8de64f0119d16"
 
-fn zlib_join(left: &str, right: &str) -> str:
-    if left.len() == 0:
-        return zlib_owned_text(right)
-    if right.len() == 0:
-        return zlib_owned_text(left)
-    if left.ends_with("/"):
-        return left ++ right
-    left ++ "/" ++ right
-
-fn zlib_safe_label(text: &str) -> str:
-    var out = ""
-    for i in 0..text.len() as i32:
-        let ch = text[i]
-        let keep = (ch >= 48 and ch <= 57) or (ch >= 65 and ch <= 90) or (ch >= 97 and ch <= 122) or ch == 45 or ch == 46 or ch == 95
-        if keep:
-            out = out ++ text.slice(i as i64, (i + 1) as i64)
-        else:
-            out = out ++ "_"
-    if out.len() == 0:
-        return "unknown"
-    out
-
-fn zlib_scratch_dir(ctx: &ActionCtx) -> str:
-    "out/tmp/action-scratch/" ++ zlib_safe_label(ctx.target_name())
-
-fn zlib_dirname(path: &str) -> str:
-    var last_slash = -1
-    for i in 0..path.len() as i32:
-        if path[i] == 47:
-            last_slash = i
-    if last_slash < 0:
-        return "."
-    if last_slash == 0:
-        return "/"
-    path.slice(0, last_slash as i64)
-
-fn zlib_basename(path: &str) -> str:
-    var last_slash = -1
-    for i in 0..path.len() as i32:
-        if path[i] == 47:
-            last_slash = i
-    path.slice((last_slash + 1) as i64, path.len())
-
-fn zlib_abs(root: &str, path: &str) -> str:
-    if path.len() > 0 and path[0] == 47:
-        return zlib_owned_text(path)
-    zlib_join(root, path)
-
-fn zlib_fail(ctx: &ActionCtx, message: &str) -> i32:
-    ctx.diagnostics().error(ctx.target_name() ++ ": " ++ message)
-    1
-
-fn zlib_remove_tree_if_exists(ctx: &ActionCtx, path: &str) -> i32:
-    let fs = ctx.fs()
-    if not fs.exists(path):
-        return 0
-    if fs.remove_tree(path) != 0:
-        return zlib_fail(ctx, "could not remove directory: " ++ path)
-    0
-
-fn zlib_remove_file_if_exists(ctx: &ActionCtx, path: &str) -> i32:
-    let fs = ctx.fs()
-    if not fs.exists(path):
-        return 0
-    if fs.remove_file(path) != 0:
-        return zlib_fail(ctx, "could not remove file: " ++ path)
-    0
-
-fn zlib_copy_file(ctx: &ActionCtx, src: &str, dst: &str) -> i32:
-    let fs = ctx.fs()
-    if not fs.exists(src):
-        return zlib_fail(ctx, "missing source file: " ++ src)
-    if fs.mkdir_all(zlib_dirname(dst)) != 0:
-        return zlib_fail(ctx, "could not create directory: " ++ zlib_dirname(dst))
-    if fs.copy_file(src, dst) != 0:
-        return zlib_fail(ctx, "could not copy " ++ src ++ " to " ++ dst)
-    0
-
-fn zlib_copy_w_files(ctx: &ActionCtx, source_dir: &str, dest_dir: &str) -> i32:
-    let fs = ctx.fs()
-    let files = fs.list_files(source_dir)
-    var copied = 0
-    if fs.mkdir_all(dest_dir) != 0:
-        return zlib_fail(ctx, "could not create destination directory: " ++ dest_dir)
-    for fi in 0..files.len() as i32:
-        let source_path = files[fi]
-        if source_path.ends_with(".w"):
-            let dest_path = zlib_join(dest_dir, zlib_basename(source_path))
-            if fs.copy_file(source_path, dest_path) != 0:
-                return zlib_fail(ctx, "could not copy " ++ source_path ++ " to " ++ dest_path)
-            copied = copied + 1
-    if copied == 0:
-        return zlib_fail(ctx, "no .w files found in " ++ source_dir)
-    0
-
-fn zlib_source_files() -> Vec[str]:
-    let files: Vec[str] = Vec.new()
-    files.push("adler32.c")
-    files.push("compress.c")
-    files.push("crc32.c")
-    files.push("crc32.h")
-    files.push("deflate.c")
-    files.push("deflate.h")
-    files.push("gzclose.c")
-    files.push("gzguts.h")
-    files.push("gzlib.c")
-    files.push("gzread.c")
-    files.push("gzwrite.c")
-    files.push("infback.c")
-    files.push("inffast.c")
-    files.push("inffast.h")
-    files.push("inffixed.h")
-    files.push("inflate.c")
-    files.push("inflate.h")
-    files.push("inftrees.c")
-    files.push("inftrees.h")
-    files.push("trees.c")
-    files.push("trees.h")
-    files.push("uncompr.c")
-    files.push("zconf.h")
-    files.push("zlib.h")
-    files.push("zutil.c")
-    files.push("zutil.h")
-    files
-
-fn zlib_reference_missing(ctx: &ActionCtx, ref_dir: &str) -> str:
-    let fs = ctx.fs()
-    let files = zlib_source_files()
-    files.push("test/example.c")
-    files.push("test/minigzip.c")
-    for file in files:
-        let path = zlib_join(ref_dir, file)
-        if not fs.exists(path) or fs.is_dir(path) or fs.read_text(path).len() == 0:
-            return zlib_owned_text(file)
-    ""
-
-fn zlib_prepare_migration_source(ctx: &ActionCtx, ref_dir: &str, out_dir: &str) -> i32:
-    let fs = ctx.fs()
-    var rc = zlib_remove_tree_if_exists(ctx, out_dir)
-    if rc != 0: return rc
-    if fs.mkdir_all(out_dir) != 0:
-        return zlib_fail(ctx, "could not create zlib migrate source directory: " ++ out_dir)
-    let files = zlib_source_files()
-    for i in 0..files.len() as i32:
-        let rel = files[i]
-        rc = zlib_copy_file(ctx, zlib_join(ref_dir, rel), zlib_join(out_dir, rel))
-        if rc != 0: return rc
-    0
-
-fn zlib_migrate_options(source_path: &str, output_path: &str, source_dir: &str) -> MigrateOptions:
-    let include_paths: Vec[str] = Vec.new()
-    include_paths.push(zlib_owned_text(source_dir))
-    let forced_includes: Vec[str] = Vec.new()
-    let defines: Vec[str] = Vec.new()
-    MigrateOptions {
-        source_path: zlib_owned_text(source_path),
-        output_path: zlib_owned_text(output_path),
-        include_paths,
-        forced_includes,
-        defines,
-        exclude_basenames: Vec.new(),
-        check_mode: false,
-        diff_mode: false,
-        stats_mode: false,
-        no_c_export: true,
-        c_export_functions: false,
-        convert_goto_to_structured: false,
-        block_style: 2,
-        width_slice: 8,
-        shared_defs: "std.zl.defs",
-        migrate_one: "",
-        shared_fragment: "",
-        ir_roundtrip: false,
+pub fn zlib_corpus() -> Corpus:
+    Corpus {
+        name: "zlib", stem: "zlib", package: "std.zl",
+        corpus_rel: "std/zl", corpus_dir: "lib/std/zl",
+        upstream: upstream_release("zlib", ZLIB_RELEASE, "https://zlib.net/fossils/" ++ ZLIB_RELEASE ++ ".tar.gz", ZLIB_SHA256),
+        license: "",
+        // example and minigzip are the harness, never the bundle; example.w
+        // takes the .gz scratch file as its one argument, spelled inside the
+        // drift dir so the harness never writes at the root
+        harness: ["example", "minigzip"], drift_harness: "example.w", drift_harness_arg: "out/wo-drift/zlib/example.gz",
+        module_floor: 18, defines: Vec.new(), excludes: Vec.new(),
+        promote_after: ["zlib-test"], test_lane: "",
+        prepare_reference: corpus_no_prepare, stage: zlib_stage,
+        migrate: zlib_migrate, finish_generated: corpus_no_finish,
+        verify_generated: corpus_no_verify, lanes: zlib_lanes,
     }
 
-fn zlib_migrate_one_options(source_dir: &str, output_dir: &str, basename: &str, shared_fragment: &str) -> MigrateOptions:
-    var options = zlib_migrate_options(source_dir, output_dir, source_dir)
-    options.migrate_one = zlib_owned_text(basename)
-    options.shared_fragment = zlib_owned_text(shared_fragment)
-    options
+fn zlib_source_files() -> Vec[str]:
+    ["adler32.c", "compress.c", "crc32.c", "crc32.h", "deflate.c", "deflate.h",
+     "gzclose.c", "gzguts.h", "gzlib.c", "gzread.c", "gzwrite.c", "infback.c",
+     "inffast.c", "inffast.h", "inffixed.h", "inflate.c", "inflate.h",
+     "inftrees.c", "inftrees.h", "trees.c", "trees.h", "uncompr.c", "zconf.h",
+     "zlib.h", "zutil.c", "zutil.h"]
 
-// The corpus is a .wo bundle: build/wo.w compiles it --no-prelude, so the
-// migration runs prelude-free too and its defs carry the prelude-only
-// vocabulary (c_void, the unreachable shim) the translation reaches for.
-fn zlib_migrate_prelude_free(workspace: &Workspace):
-    var options = workspace.options()
-    options.prelude_mode = PreludeMode.None
-    workspace.set_options(options)
-
-fn zlib_migrate_file(ctx: &ActionCtx, workspace_name: &str, source_path: &str, output_path: &str, source_dir: &str) -> i32:
-    let workspace = ctx.create_workspace(workspace_name)
-    zlib_migrate_prelude_free(workspace)
-    workspace.set_migrate_options(zlib_migrate_options(source_path, output_path, source_dir))
-    let result = workspace.compile()
-    if result.rc != 0:
-        return zlib_fail(ctx, workspace_name ++ f" failed with exit code {result.rc}")
-    if not ctx.fs().exists(output_path):
-        return zlib_fail(ctx, workspace_name ++ " did not produce " ++ output_path)
+// The library's units and headers, flat. The test programs are not staged:
+// migrated as part of the directory they would become library modules.
+fn zlib_stage(ctx: &ActionCtx, corpus: &Corpus, reference: &str, source: &str) -> i32:
+    for file in zlib_source_files():
+        let path = reference ++ "/" ++ file
+        if not ctx.fs().exists(path) or ctx.fs().read_text(path).len() == 0:
+            return corpus_fail(ctx, "reference tree lacks " ++ path)
+        if corpus_copy(ctx, path, source ++ "/" ++ file) != 0: return 1
     0
 
-fn zlib_migrate_one_file(ctx: &ActionCtx, workspace_name: &str, source_dir: &str, output_dir: &str, basename: &str, output_path: &str) -> i32:
-    let workspace = ctx.create_workspace(workspace_name)
-    zlib_migrate_prelude_free(workspace)
-    let fragment_path = zlib_join(zlib_scratch_dir(ctx), workspace_name ++ ".shared-fragment")
-    workspace.set_migrate_options(zlib_migrate_one_options(source_dir, output_dir, basename, fragment_path))
-    let result = workspace.compile()
-    if result.rc != 0:
-        return zlib_fail(ctx, workspace_name ++ f" failed with exit code {result.rc}")
-    if not ctx.fs().exists(output_path):
-        return zlib_fail(ctx, workspace_name ++ " did not produce " ++ output_path)
+// One test program migrated on its own against the library's shared defs:
+// staged beside the library for the migration and removed after, so the
+// next one sees the same sources.
+fn zlib_migrate_one(ctx: &ActionCtx, corpus: &Corpus, source: &str, generated: &str, basename: &str) -> i32:
+    let staged = source ++ "/" ++ basename
+    if corpus_copy(ctx, corpus.upstream.reference ++ "/test/" ++ basename, staged) != 0: return 1
+    let label = "zlib-migrate-" ++ corpus_module_name(basename)
+    var options = corpus_migrate_options(corpus, source, generated)
+    options.migrate_one = basename.clone()
+    options.shared_fragment = corpus_scratch(ctx) ++ "/" ++ label ++ ".shared-fragment"
+    if corpus_run_migration(ctx, label, options) != 0: return 1
+    if ctx.fs().remove_file(staged) != 0: return corpus_fail(ctx, "cannot remove staged " ++ basename)
     0
 
-fn zlib_count_w_files(ctx: &ActionCtx, dir: &str) -> i32:
-    let files = ctx.fs().list_files(dir)
-    var count = 0
-    for i in 0..files.len() as i32:
-        if files[i].ends_with(".w"):
-            count = count + 1
-    count
-
-fn zlib_reject_c_exports(ctx: &ActionCtx, generated_dir: &str) -> i32:
-    let fs = ctx.fs()
-    let files = fs.list_files(generated_dir)
-    var errors = 0
-    for i in 0..files.len() as i32:
-        let path = files[i]
-        if path.ends_with(".w"):
-            let text = fs.read_text(path)
-            if text.contains("@[c_export("):
-                ctx.diagnostics().error("zlib generated source contains forbidden c_export attribute in " ++ path)
-                errors = errors + 1
-            if text.contains("// Bail:") or text.contains("[MIGRATOR_UNTRANSLATED]"):
-                ctx.diagnostics().error("zlib generated source contains untranslatable migrator output in " ++ path)
-                errors = errors + 1
-    errors
-
-fn zlib_compile_binary(ctx: &ActionCtx, workspace_name: &str, source_path: &str, output_path: &str) -> i32:
-    let workspace = ctx.create_workspace(workspace_name)
-    workspace.add_file(source_path)
-    var options = workspace.options()
-    options.output_path = zlib_owned_text(output_path)
-    workspace.set_options(options)
-    let result = workspace.compile()
-    if result.rc != 0:
-        return zlib_fail(ctx, workspace_name ++ f" failed with exit code {result.rc}")
-    if not ctx.fs().exists(output_path):
-        return zlib_fail(ctx, workspace_name ++ " did not produce " ++ output_path)
-    0
-
-pub fn run_zlib_reference_action(ctx: ActionCtx) -> i32:
-    let args = ctx.args()
-    let ref_dir = ctx.output()
-    if args.len() < 2 or ref_dir.len() == 0:
-        return zlib_fail(ctx, "requires release and URL args plus reference tree output")
-    let release = args.get(0)
-    let url = args.get(1)
-    let fs = ctx.fs()
-    let root = ctx.project_info().project_root()
-    let scratch_dir = zlib_scratch_dir(ctx)
-    let ready_stamp = if ctx.outputs().len() > 1: zlib_owned_text(ctx.outputs().get(1)) else: zlib_join(ref_dir, ".with-reference-ready")
-    // The runner precreates the stamp's parent. Check every migration input,
-    // including the test programs, before trusting an empty or partial tree.
-    let needs_extract = zlib_reference_missing(ctx, ref_dir).len() != 0
-    if needs_extract:
-        let rc = zlib_remove_file_if_exists(ctx, ready_stamp)
-        if rc != 0: return rc
-    let archive_path = zlib_join(scratch_dir, release ++ ".tar.gz")
-    if fs.mkdir_all(zlib_dirname(archive_path)) != 0:
-        return zlib_fail(ctx, "could not create archive directory")
-    if not fs.exists(archive_path):
-        print("fetching " ++ release ++ " from " ++ url)
-        let fetch_bin = zlib_join(scratch_dir, "zlib_http_fetch")
-        var rc = zlib_compile_binary(ctx, "zlib-http-fetch-helper", "build/zlib_http_fetch.w", fetch_bin)
-        if rc != 0:
-            return rc
-        var fetch_args: Vec[str] = Vec.new()
-        fetch_args.push(zlib_abs(root, fetch_bin))
-        fetch_args.push(zlib_owned_text(url))
-        fetch_args.push(zlib_abs(root, archive_path))
-        let fetch_result = ctx.process_runner().run_capture(fetch_args, zlib_abs(root, zlib_join(scratch_dir, release ++ ".fetch.stdout")), zlib_abs(root, zlib_join(scratch_dir, release ++ ".fetch.stderr")), 300000)
-        if fetch_result.rc != 0:
-            return zlib_fail(ctx, f"zlib HTTP fetch helper failed with exit code {fetch_result.rc}: " ++ fetch_result.stdout ++ fetch_result.stderr)
-    let actual_sha = fs.sha256_file(archive_path)
-    if actual_sha != ZLIB_SHA256:
-        return zlib_fail(ctx, "sha256 mismatch for " ++ archive_path ++ ": expected " ++ ZLIB_SHA256 ++ " got " ++ actual_sha)
-    if needs_extract:
-        let tmp_dir = zlib_join(scratch_dir, release ++ ".extract")
-        let extracted_dir = zlib_join(tmp_dir, release)
-        if fs.exists(tmp_dir) and fs.remove_tree(tmp_dir) != 0:
-            return zlib_fail(ctx, "could not remove old extract directory: " ++ tmp_dir)
-        if fs.mkdir_all(tmp_dir) != 0:
-            return zlib_fail(ctx, "could not create extract directory: " ++ tmp_dir)
-        let tar_path = zlib_join(scratch_dir, release ++ ".tar")
-        let gunzip_bin = zlib_join(scratch_dir, "zlib_gunzip")
-        if fs.mkdir_all(zlib_dirname(gunzip_bin)) != 0:
-            return zlib_fail(ctx, "could not create zlib gunzip helper directory")
-        var rc = zlib_compile_binary(ctx, "zlib-gunzip-helper", "build/zlib_gunzip.w", gunzip_bin)
-        if rc != 0:
-            return rc
-        var gunzip_args: Vec[str] = Vec.new()
-        gunzip_args.push(zlib_abs(root, gunzip_bin))
-        gunzip_args.push(zlib_abs(root, archive_path))
-        gunzip_args.push(zlib_abs(root, tar_path))
-        let gunzip_result = ctx.process_runner().run_capture(gunzip_args, zlib_abs(root, zlib_join(scratch_dir, release ++ ".gunzip.stdout")), zlib_abs(root, zlib_join(scratch_dir, release ++ ".gunzip.stderr")), 300000)
-        if gunzip_result.rc != 0:
-            return zlib_fail(ctx, f"zlib gunzip helper failed with exit code {gunzip_result.rc}: " ++ gunzip_result.stdout ++ gunzip_result.stderr)
-        if fs.extract_tar(tar_path, tmp_dir) != 0:
-            return zlib_fail(ctx, "could not extract tar archive: " ++ tar_path)
-        let missing = zlib_reference_missing(ctx, extracted_dir)
-        if missing.len() != 0:
-            return zlib_fail(ctx, "archive did not contain required source: " ++ zlib_join(extracted_dir, missing))
-        if fs.mkdir_all(zlib_dirname(ref_dir)) != 0:
-            return zlib_fail(ctx, "could not create reference parent: " ++ zlib_dirname(ref_dir))
-        if fs.exists(ref_dir) and fs.remove_tree(ref_dir) != 0:
-            return zlib_fail(ctx, "could not remove empty or partial reference tree: " ++ ref_dir)
-        if fs.rename(extracted_dir, ref_dir) != 0:
-            return zlib_fail(ctx, "could not move extracted tree to: " ++ ref_dir)
-        let _remove_extract_root = fs.remove_tree(tmp_dir)
-    if fs.write_text(zlib_join(ref_dir, ".with-reference-url"), url ++ "\n") != 0:
-        return zlib_fail(ctx, "could not write reference URL marker")
-    if fs.write_text(ready_stamp, "ok\n") != 0:
-        return zlib_fail(ctx, "could not write ready stamp: " ++ ready_stamp)
-    0
-
-pub fn run_zlib_migrate_action(ctx: ActionCtx) -> i32:
-    let fs = ctx.fs()
-    let inputs = ctx.inputs()
-    let args = ctx.args()
-    let root = ctx.project_info().project_root()
-    let stamp_path = ctx.output()
-    if inputs.len() == 0 or args.len() == 0 or stamp_path.len() == 0:
-        return zlib_fail(ctx, "requires reference-tree input, generated-dir arg, and stamp output")
-    let ref_dir = inputs.get(0)
-    let generated_dir = args.get(0)
-    if not fs.is_dir(ref_dir):
-        return zlib_fail(ctx, "missing zlib reference directory: " ++ ref_dir)
-    let source_dir = zlib_join(zlib_scratch_dir(ctx), "source")
-    var rc = zlib_prepare_migration_source(ctx, ref_dir, source_dir)
-    if rc != 0: return rc
-    let tmp_dir = zlib_join(zlib_scratch_dir(ctx), "generated")
-    rc = zlib_remove_tree_if_exists(ctx, tmp_dir)
-    if rc != 0: return rc
-    if fs.mkdir_all(zlib_dirname(tmp_dir)) != 0:
-        return zlib_fail(ctx, "could not create generated parent: " ++ zlib_dirname(tmp_dir))
-    let workspace = ctx.create_workspace("zlib-migrate")
-    zlib_migrate_prelude_free(workspace)
-    workspace.set_migrate_options(zlib_migrate_options(source_dir, tmp_dir, source_dir))
-    let migrate_result = workspace.compile()
-    if migrate_result.rc != 0:
-        return zlib_fail(ctx, f"migrate failed with exit code {migrate_result.rc}")
-    rc = zlib_copy_file(ctx, zlib_join(ref_dir, "test/example.c"), zlib_join(source_dir, "example.c"))
-    if rc != 0: return rc
-    rc = zlib_migrate_one_file(ctx, "zlib-migrate-example", source_dir, tmp_dir, "example.c", zlib_join(tmp_dir, "example.w"))
-    if rc != 0: return rc
-    rc = zlib_remove_file_if_exists(ctx, zlib_join(source_dir, "example.c"))
-    if rc != 0: return rc
-    rc = zlib_copy_file(ctx, zlib_join(ref_dir, "test/minigzip.c"), zlib_join(source_dir, "minigzip.c"))
-    if rc != 0: return rc
-    rc = zlib_migrate_one_file(ctx, "zlib-migrate-minigzip", source_dir, tmp_dir, "minigzip.c", zlib_join(tmp_dir, "minigzip.w"))
-    if rc != 0: return rc
-    let generated_count = zlib_count_w_files(ctx, tmp_dir)
-    if generated_count < 18:
-        return zlib_fail(ctx, f"only generated {generated_count} .w files; expected at least 18")
-    if zlib_reject_c_exports(ctx, tmp_dir) != 0:
-        return 1
-    rc = zlib_write_bundle_root(ctx, tmp_dir)
-    if rc != 0: return rc
-    rc = zlib_remove_tree_if_exists(ctx, generated_dir)
-    if rc != 0: return rc
-    if fs.rename(tmp_dir, generated_dir) != 0:
-        return zlib_fail(ctx, "could not publish generated directory: " ++ generated_dir)
-    rc = zlib_remove_tree_if_exists(ctx, "out/zlib_build")
-    if rc != 0: return rc
-    rc = zlib_remove_tree_if_exists(ctx, "out/corpus/zlib-test")
-    if rc != 0: return rc
-    if fs.write_text(stamp_path, "ok\n") != 0:
-        return zlib_fail(ctx, "could not write stamp: " ++ stamp_path)
-    print(f"migrated zlib: {generated_count} .w files in " ++ zlib_abs(root, generated_dir))
-    0
-
-// The .wo bundle root (docs/wo_bundles.md "Root"): one `use` per corpus
-// module, bytewise by name, so the bundle build reaches every module.
-// example and minigzip are the harness, never the bundle. The text is a
-// pure function of the module listing; zlib-bundle-root-check checks the
-// promoted lib/std/zl/bundle.w against it, exactly as pcre2's.
-fn zlib_module_name(path: &str) -> str:
-    var start: i64 = 0
-    for i in 0..path.len():
-        if path[i] == '/': start = i + 1
-    var end = path.len()
-    for j in start..path.len():
-        if path[j] == '.':
-            end = j
-            break
-    zlib_owned_text(path.slice(start, end))
-
-fn zlib_sorted_strings(items: Vec[str]) -> Vec[str]:
-    var sorted: Vec[str] = Vec.new()
-    for item in items:
-        var placed = false
-        var next: Vec[str] = Vec.new()
-        for existing in sorted:
-            if not placed and item < existing:
-                next.push(item ++ "")
-                placed = true
-            next.push(existing ++ "")
-        if not placed: next.push(item ++ "")
-        sorted = next
-    sorted
-
-pub fn zlib_bundle_root_text(module_paths: &Vec[str]) -> str:
-    var names: Vec[str] = Vec.new()
-    for path in module_paths:
-        if not path.ends_with(".w"): continue
-        let mod_name = zlib_module_name(path)
-        if mod_name != "bundle" and mod_name != "example" and mod_name != "minigzip":
-            names.push(mod_name)
-    var text = "// lib/std/zl/bundle.w — the zlib .wo bundle root (docs/wo_bundles.md).\n"
-    text = text ++ "// Written by build/zlib.w (zlib-migrate) from the migrated module list:\n"
-    text = text ++ "// one `use` per corpus module; example and minigzip are the harness.\n"
-    for name in zlib_sorted_strings(move names):
-        text = text ++ "use std.zl." ++ name ++ "\n"
-    text
-
-fn zlib_write_bundle_root(ctx: &ActionCtx, generated_dir: &str) -> i32:
-    let fs = ctx.fs()
-    let path = zlib_join(generated_dir, "bundle.w")
-    let text = zlib_bundle_root_text(fs.list_files(generated_dir))
-    if fs.exists(path) and fs.read_text(path) == text:
-        return 0
-    if fs.write_text(path, text) != 0:
-        return zlib_fail(ctx, "could not write the bundle root " ++ path)
-    0
-
-// The promoted bundle root is exactly what the migrate action writes for
-// the corpus listing — a module added without regenerating it, or a hand
-// edit, fails here. Input: the root; arg: the corpus directory.
-pub fn run_zlib_bundle_root_check_action(ctx: ActionCtx) -> i32:
-    let inputs = ctx.inputs()
-    let args = ctx.args()
-    if inputs.len() == 0 or args.len() == 0 or ctx.output().len() == 0:
-        return zlib_fail(ctx, "requires the bundle root input, the corpus directory arg and a stamp output")
-    let fs = ctx.fs()
-    let root = inputs.get(0)
-    let expected = zlib_bundle_root_text(fs.list_files(args.get(0)))
-    if fs.read_text(root) != expected:
-        return zlib_fail(ctx, root ++ " is not the bundle root the migrate action writes for " ++ args.get(0) ++ " (one `use` per corpus module, sorted; example and minigzip excluded)")
-    if fs.mkdir_all(zlib_dirname(ctx.output())) != 0 or fs.write_text(ctx.output(), "ok\n") != 0:
-        return zlib_fail(ctx, "could not write " ++ ctx.output())
+fn zlib_migrate(ctx: &ActionCtx, corpus: &Corpus, source: &str, generated: &str) -> i32:
+    if corpus_migrate_directory(ctx, corpus, source, generated) != 0: return 1
+    for program in ["example.c", "minigzip.c"]:
+        if zlib_migrate_one(ctx, corpus, source, generated, program) != 0: return 1
     0
 
 pub fn run_zlib_build_action(ctx: ActionCtx) -> i32:
     let fs = ctx.fs()
-    let inputs = ctx.inputs()
-    let root = ctx.project_info().project_root()
-    let output_dir = ctx.output()
-    if inputs.len() == 0 or output_dir.len() == 0:
-        return zlib_fail(ctx, "requires migrated-dir input and output directory")
-    let migrated_dir = inputs.get(0)
-    if not fs.is_dir(migrated_dir):
-        return zlib_fail(ctx, "missing migrated zlib directory: " ++ migrated_dir ++ " - run zlib-migrate deliberately")
-    let tmp_dir = zlib_join(zlib_scratch_dir(ctx), "build")
-    let zlib_dir = zlib_join(zlib_join(zlib_join(tmp_dir, "lib"), "std"), "zl")
-    let bin_dir = zlib_join(tmp_dir, "bin")
-    var rc = zlib_remove_tree_if_exists(ctx, tmp_dir)
-    if rc != 0: return rc
-    if fs.mkdir_all(zlib_dir) != 0 or fs.mkdir_all(bin_dir) != 0:
-        return zlib_fail(ctx, "could not create temp build directories under " ++ tmp_dir)
-    rc = zlib_copy_w_files(ctx, migrated_dir, zlib_dir)
-    if rc != 0: return rc
-    rc = zlib_reject_c_exports(ctx, zlib_dir)
-    if rc != 0: return 1
-    rc = zlib_compile_binary(ctx, "zlib-build-example", zlib_join(zlib_dir, "example.w"), zlib_join(bin_dir, "zlib_example"))
-    if rc != 0: return rc
-    rc = zlib_compile_binary(ctx, "zlib-build-minigzip", zlib_join(zlib_dir, "minigzip.w"), zlib_join(bin_dir, "minigzip"))
-    if rc != 0: return rc
-    rc = zlib_remove_tree_if_exists(ctx, output_dir)
-    if rc != 0: return rc
-    if fs.rename(tmp_dir, output_dir) != 0:
-        return zlib_fail(ctx, "could not move temp tree to " ++ output_dir)
-    print("built migrated zlib tests: " ++ zlib_abs(root, zlib_join(output_dir, "bin/zlib_example")))
+    let migrated = ctx.inputs()[0]
+    let output = ctx.output()
+    if not fs.is_dir(migrated): return corpus_fail(ctx, "missing migrated zlib directory: " ++ migrated ++ " - run zlib-migrate deliberately")
+    let tmp = corpus_scratch(ctx) ++ "/build"
+    let zl = tmp ++ "/lib/std/zl"
+    let bin = tmp ++ "/bin"
+    if corpus_reset_dir(ctx, tmp) != 0: return 1
+    if fs.mkdir_all(zl) != 0 or fs.mkdir_all(bin) != 0: return corpus_fail(ctx, "could not create temp build directories under " ++ tmp)
+    if corpus_copy_w_files(ctx, migrated, zl) != 0: return 1
+    if corpus_compile_binary(ctx, "zlib-build-example", zl ++ "/example.w", bin ++ "/zlib_example") != 0: return 1
+    if corpus_compile_binary(ctx, "zlib-build-minigzip", zl ++ "/minigzip.w", bin ++ "/minigzip") != 0: return 1
+    if fs.exists(output) and fs.remove_tree(output) != 0: return corpus_fail(ctx, "cannot replace " ++ output)
+    if fs.rename(tmp, output) != 0: return corpus_fail(ctx, "could not move temp tree to " ++ output)
+    print("built migrated zlib tests: " ++ corpus_abs(ctx, output ++ "/bin/zlib_example"))
     0
 
 pub fn run_zlib_test_action(ctx: ActionCtx) -> i32:
     let fs = ctx.fs()
     let inputs = ctx.inputs()
-    let root = ctx.project_info().project_root()
-    let output_dir = ctx.output()
-    if inputs.len() < 3 or output_dir.len() == 0:
-        return zlib_fail(ctx, "requires migrated-dir, example binary, minigzip binary, and output directory")
+    let output = ctx.output()
+    if inputs.len() < 3: return corpus_fail(ctx, "requires migrated-dir, example binary and minigzip binary inputs")
     let example_bin = inputs.get(1)
     let minigzip_bin = inputs.get(2)
-    if not fs.exists(example_bin):
-        return zlib_fail(ctx, "missing zlib example binary: " ++ example_bin)
-    if not fs.exists(minigzip_bin):
-        return zlib_fail(ctx, "missing minigzip binary: " ++ minigzip_bin)
-    let run_dir = zlib_join(output_dir, "current")
-    var rc = zlib_remove_tree_if_exists(ctx, run_dir)
-    if rc != 0: return rc
-    if fs.mkdir_all(run_dir) != 0:
-        return zlib_fail(ctx, "could not create zlib-test output directory: " ++ run_dir)
+    if not fs.exists(example_bin): return corpus_fail(ctx, "missing zlib example binary: " ++ example_bin)
+    if not fs.exists(minigzip_bin): return corpus_fail(ctx, "missing minigzip binary: " ++ minigzip_bin)
+    let run_dir = output ++ "/current"
+    if corpus_reset_dir(ctx, run_dir) != 0: return 1
     var example_args: Vec[str] = Vec.new()
-    example_args.push(zlib_abs(root, example_bin))
+    example_args.push(corpus_abs(ctx, example_bin))
     example_args.push("foo.gz")
-    let example_result = ctx.process_runner().run_capture_cwd(example_args, zlib_abs(root, zlib_join(run_dir, "example.stdout")), zlib_abs(root, zlib_join(run_dir, "example.stderr")), 120000, zlib_abs(root, run_dir))
-    if example_result.rc != 0:
-        return zlib_fail(ctx, f"zlib example failed with exit code {example_result.rc}; stdout=" ++ zlib_join(run_dir, "example.stdout") ++ " stderr=" ++ zlib_join(run_dir, "example.stderr"))
-    let input_path = zlib_join(run_dir, "minigzip-input.txt")
-    if fs.write_text(input_path, "hello, hello!\n") != 0:
-        return zlib_fail(ctx, "could not write minigzip input")
+    let example = ctx.process_runner().run_capture_cwd(example_args, corpus_abs(ctx, run_dir ++ "/example.stdout"), corpus_abs(ctx, run_dir ++ "/example.stderr"), 120000, corpus_abs(ctx, run_dir))
+    if example.rc != 0:
+        return corpus_fail(ctx, f"zlib example failed with exit code {example.rc}; stdout=" ++ run_dir ++ "/example.stdout stderr=" ++ run_dir ++ "/example.stderr")
+    let input_path = run_dir ++ "/minigzip-input.txt"
+    if fs.write_text(input_path, "hello, hello!\n") != 0: return corpus_fail(ctx, "could not write minigzip input")
     var gzip_args: Vec[str] = Vec.new()
-    gzip_args.push(zlib_abs(root, minigzip_bin))
+    gzip_args.push(corpus_abs(ctx, minigzip_bin))
     gzip_args.push("minigzip-input.txt")
-    let gzip_result = ctx.process_runner().run_capture_cwd(gzip_args, zlib_abs(root, zlib_join(run_dir, "minigzip-compress.stdout")), zlib_abs(root, zlib_join(run_dir, "minigzip-compress.stderr")), 120000, zlib_abs(root, run_dir))
-    if gzip_result.rc != 0:
-        return zlib_fail(ctx, f"minigzip compress failed with exit code {gzip_result.rc}")
-    if not fs.exists(zlib_join(run_dir, "minigzip-input.txt.gz")):
-        return zlib_fail(ctx, "minigzip did not produce compressed file")
+    let gzip = ctx.process_runner().run_capture_cwd(gzip_args, corpus_abs(ctx, run_dir ++ "/minigzip-compress.stdout"), corpus_abs(ctx, run_dir ++ "/minigzip-compress.stderr"), 120000, corpus_abs(ctx, run_dir))
+    if gzip.rc != 0: return corpus_fail(ctx, f"minigzip compress failed with exit code {gzip.rc}")
+    if not fs.exists(run_dir ++ "/minigzip-input.txt.gz"): return corpus_fail(ctx, "minigzip did not produce compressed file")
     var gunzip_args: Vec[str] = Vec.new()
-    gunzip_args.push(zlib_abs(root, minigzip_bin))
+    gunzip_args.push(corpus_abs(ctx, minigzip_bin))
     gunzip_args.push("-d")
     gunzip_args.push("minigzip-input.txt.gz")
-    let gunzip_result = ctx.process_runner().run_capture_cwd(gunzip_args, zlib_abs(root, zlib_join(run_dir, "minigzip-decompress.stdout")), zlib_abs(root, zlib_join(run_dir, "minigzip-decompress.stderr")), 120000, zlib_abs(root, run_dir))
-    if gunzip_result.rc != 0:
-        return zlib_fail(ctx, f"minigzip decompress failed with exit code {gunzip_result.rc}")
-    if fs.read_text(input_path) != "hello, hello!\n":
-        return zlib_fail(ctx, "minigzip round-trip content mismatch")
+    let gunzip = ctx.process_runner().run_capture_cwd(gunzip_args, corpus_abs(ctx, run_dir ++ "/minigzip-decompress.stdout"), corpus_abs(ctx, run_dir ++ "/minigzip-decompress.stderr"), 120000, corpus_abs(ctx, run_dir))
+    if gunzip.rc != 0: return corpus_fail(ctx, f"minigzip decompress failed with exit code {gunzip.rc}")
+    if fs.read_text(input_path) != "hello, hello!\n": return corpus_fail(ctx, "minigzip round-trip content mismatch")
     print("VERIFIED: migrated zlib example and minigzip tests pass")
     0
 
-pub fn run_zlib_check_generated_action(ctx: ActionCtx) -> i32:
-    let inputs = ctx.inputs()
-    let output = ctx.output()
-    if inputs.len() == 0 or output.len() == 0:
-        return zlib_fail(ctx, "requires generated-dir input and stamp output")
-    let generated_dir = inputs.get(0)
-    if zlib_reject_c_exports(ctx, generated_dir) != 0:
-        return 1
-    let count = zlib_count_w_files(ctx, generated_dir)
-    if count < 18:
-        return zlib_fail(ctx, f"only found {count} generated .w files; expected at least 18")
-    if ctx.fs().write_text(output, "ok\n") != 0:
-        return zlib_fail(ctx, "could not write generated-check stamp: " ++ output)
-    0
-
-pub fn run_zlib_promote_action(ctx: ActionCtx) -> i32:
-    let fs = ctx.fs()
-    let inputs = ctx.inputs()
-    let dest_dir = ctx.output()
-    let root = ctx.project_info().project_root()
-    if inputs.len() == 0 or dest_dir.len() == 0:
-        return zlib_fail(ctx, "requires generated-dir input and destination output")
-    let generated_dir = inputs.get(0)
-    if zlib_reject_c_exports(ctx, generated_dir) != 0:
-        return 1
-    if fs.mkdir_all(dest_dir) != 0:
-        return zlib_fail(ctx, "could not create destination: " ++ dest_dir)
-    let existing = fs.list_files(dest_dir)
-    for ei in 0..existing.len() as i32:
-        let path = existing[ei]
-        if path.ends_with(".w") and fs.remove_file(path) != 0:
-            return zlib_fail(ctx, "could not remove old generated file: " ++ path)
-    let files = fs.list_files(generated_dir)
-    var copied = 0
-    for fi in 0..files.len() as i32:
-        let source_path = files[fi]
-        if source_path.ends_with(".w"):
-            let dest_path = zlib_join(dest_dir, zlib_basename(source_path))
-            if fs.copy_file(source_path, dest_path) != 0:
-                return zlib_fail(ctx, "could not copy " ++ source_path ++ " to " ++ dest_path)
-            copied = copied + 1
-    print(f"promoted {copied} generated zlib modules into " ++ zlib_abs(root, dest_dir))
-    0
+fn zlib_lanes(out: Build, ctx: &BuildCtx, corpus: &Corpus, release_compiler: &str) -> Build:
+    var graph = out
+    var build = target_new(.Action, "zlib-build", "").output("out/zlib_build")
+    build.action = run_zlib_build_action
+    build = build.write_scope("out/tmp/action-scratch/zlib-build")
+    build = build.input("out/zlib_migrated").dep("build").dep("zlib-migrate")
+    graph = graph.add_target(build)
+    var test = target_new(.Action, "zlib-test", "").output("out/corpus/zlib-test")
+    test.action = run_zlib_test_action
+    test = test.input("out/zlib_migrated").input("out/zlib_build/bin/zlib_example").input("out/zlib_build/bin/minigzip").dep("zlib-build")
+    graph.add_target(test)

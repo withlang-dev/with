@@ -1,11 +1,20 @@
 module build.pcre2
 
 use std.build
-use std.string.StringBuilder
-use build.compiler
-fn pcre2_owned_text(s: &str): s ++ ""
+use build.corpus
+use build.wo
 
+// PCRE2 10.47 (the 8-bit library), the first .wo bundle (docs/wo_bundles.md).
+// The generic pipeline (build/corpora.w) fetches, migrates, checks,
+// promotes and bundles it; this module holds the facts and PCRE2's hooks:
+// the reference tree needs a generated config.h and a normalized heap test
+// output, the generated tree needs its cross-module imports completed, and
+// the check compiles the whole library cohesively. Its lanes run upstream's
+// RunTest over the migrated pcre2test.
+
+const PCRE2_RELEASE: str = "pcre2-10.47"
 const PCRE2_SHA256: str = "c08ae2388ef333e8403e670ad70c0a11f1eed021fd88308d7e02f596fcd9dc16"
+fn pcre2_owned_text(s: &str): s ++ ""
 
 fn pcre2_join(left: &str, right: &str) -> str:
     if left.len() == 0:
@@ -162,61 +171,6 @@ fn pcre2_remove_tree_if_exists(ctx: &ActionCtx, path: &str) -> i32:
         return pcre2_fail(ctx, "could not remove directory: " ++ path)
     0
 
-fn pcre2_remove_file_if_exists(ctx: &ActionCtx, path: &str) -> i32:
-    let fs = ctx.fs()
-    if not fs.exists(path):
-        return 0
-    if fs.remove_file(path) != 0:
-        return pcre2_fail(ctx, "could not remove file: " ++ path)
-    0
-
-fn pcre2_migrate_options(source_path: &str, output_path: &str, source_dir: &str, excludes: Vec[str]) -> MigrateOptions:
-    let include_paths: Vec[str] = Vec.new()
-    include_paths.push(pcre2_owned_text(source_dir))
-    let forced_includes: Vec[str] = Vec.new()
-    let defines: Vec[str] = Vec.new()
-    defines.push("PCRE2_CODE_UNIT_WIDTH=8")
-    defines.push("HAVE_CONFIG_H=1")
-    MigrateOptions {
-        source_path: pcre2_owned_text(source_path),
-        output_path: pcre2_owned_text(output_path),
-        include_paths,
-        forced_includes,
-        defines,
-        exclude_basenames: excludes,
-        check_mode: false,
-        diff_mode: false,
-        stats_mode: false,
-        no_c_export: true,
-        c_export_functions: false,
-        convert_goto_to_structured: false,
-        block_style: 2,
-        width_slice: 8,
-        shared_defs: "std.re.defs",
-        migrate_one: "",
-        shared_fragment: "",
-        ir_roundtrip: false,
-    }
-
-fn pcre2_count_w_files(ctx: &ActionCtx, dir: &str) -> i32:
-    let files = ctx.fs().list_files(dir)
-    var count = 0
-    for i in 0..files.len() as i32:
-        if files[i].ends_with(".w"):
-            count = count + 1
-    count
-
-fn pcre2_reject_c_exports(ctx: &ActionCtx, generated_dir: &str) -> i32:
-    let fs = ctx.fs()
-    let files = fs.list_files(generated_dir)
-    var errors = 0
-    for i in 0..files.len() as i32:
-        let path = files[i]
-        if path.ends_with(".w") and fs.read_text(path).contains("@[c_export("):
-            ctx.diagnostics().error("pcre2 generated source contains forbidden c_export attribute in " ++ path)
-            errors = errors + 1
-    errors
-
 fn pcre2_module_name(path: &str) -> str:
     let base = pcre2_basename(path)
     if base.ends_with(".w"):
@@ -258,110 +212,34 @@ fn pcre2_add_imports(ctx: &ActionCtx, path: &str, sentinel: &str, insertion: &st
         return 0
     fs.write_text(path, updated)
 
-fn pcre2_line_starts_with_fn_main(line: &str) -> bool:
-    var j = 0
-    while j < line.len() as i32:
-        let ch = line[j]
-        if ch != 32 and ch != 9:
-            break
-        j = j + 1
-    line.slice(j as i64, line.len()).starts_with("fn main")
+fn pcre2_copy_w_files(ctx: &ActionCtx, source_dir: &str, dest_dir: &str) -> i32:
+    let fs = ctx.fs()
+    let files = fs.list_files(source_dir)
+    var copied = 0
+    if fs.mkdir_all(dest_dir) != 0:
+        return pcre2_fail(ctx, "could not create destination directory: " ++ dest_dir)
+    for fi in 0..files.len() as i32:
+        let source_path = files[fi]
+        if source_path.ends_with(".w"):
+            let dest_path = pcre2_join(dest_dir, pcre2_basename(source_path))
+            if fs.copy_file(source_path, dest_path) != 0:
+                return pcre2_fail(ctx, "could not copy " ++ source_path ++ " to " ++ dest_path)
+            copied = copied + 1
+    if copied == 0:
+        return pcre2_fail(ctx, "no .w files found in " ++ source_dir)
+    0
 
-fn pcre2_module_defines_main(text: &str) -> bool:
-    var line_start = 0
-    for i in 0..text.len() as i32:
-        if text[i] == 10:
-            if pcre2_line_starts_with_fn_main(text.slice(line_start as i64, i as i64)):
-                return true
-            line_start = i + 1
-    if line_start < text.len() as i32:
-        if pcre2_line_starts_with_fn_main(text.slice(line_start as i64, text.len())):
-            return true
-    false
-
-fn pcre2_module_body_for_synthetic_check(text: &str) -> str:
-    // StringBuilder, not `out ++ line`: the pcre2 modules are large (pcre2_match
-    // is ~49k lines), and quadratic `++` here blows the comptime string budget
-    // during this build action (#892).
-    var out = StringBuilder.with_capacity(text.len())
-    var line_start = 0
-    var line_no = 1
-    for i in 0..text.len() as i32:
-        if text[i] == 10:
-            let line = text.slice(line_start as i64, (i + 1) as i64)
-            if line_no > 2 and not line.starts_with("use std.re."):
-                out.push_str(line)
-            line_start = i + 1
-            line_no = line_no + 1
-    if line_start < text.len() as i32:
-        let line = text.slice(line_start as i64, text.len())
-        if line_no > 2 and not line.starts_with("use std.re."):
-            out.push_str(line)
-    out.to_str()
-
-fn pcre2_first_function_name(text: &str) -> str:
-    var line_start = 0
-    for i in 0..text.len() as i32:
-        if text[i] == 10:
-            let line = text.slice(line_start as i64, i as i64)
-            if line.starts_with("fn "):
-                var end = 3
-                while end < line.len() as i32:
-                    let ch = line[end]
-                    if ch == 40 or ch == 58 or ch == 32 or ch == 9:
-                        break
-                    end = end + 1
-                return line.slice(3, end as i64)
-            line_start = i + 1
-    if line_start < text.len() as i32:
-        let line = text.slice(line_start as i64, text.len())
-        if line.starts_with("fn "):
-            var end = 3
-            while end < line.len() as i32:
-                let ch = line[end]
-                if ch == 40 or ch == 58 or ch == 32 or ch == 9:
-                    break
-                end = end + 1
-            return line.slice(3, end as i64)
-    ""
-
-fn pcre2_decls_contain_function(decls: Vec[DeclSummary], name: &str, source_suffix: &str) -> bool:
-    for di in 0..decls.len() as i32:
-        let decl = decls[di]
-        if decl.kind == DeclKind.function and decl.name == name and decl.source.file.ends_with(source_suffix):
-            return true
-    false
-
-fn pcre2_check_synthetic_module(ctx: &ActionCtx, mod_name: &str, source_name: &str, source_text: &str, expected_decl: &str) -> i32:
-    let ws = ctx.create_workspace("pcre2-check-" ++ mod_name)
-    ws.add_string(source_name, source_text)
-    var options = ws.options()
-    options.output_kind = BuildOutputKind.Check
-    ws.set_options(options)
-    ws.begin_intercept()
-    let result = ws.compile()
-    var saw_expected = expected_decl.len() == 0
-    var saw_complete = false
-    var rc = result.rc
-    while not saw_complete:
-        let envelope = ws.wait_for_message()
-        match envelope.message:
-            CompilerMessage.Typechecked(decls) =>
-                if expected_decl.len() > 0 and pcre2_decls_contain_function(decls, expected_decl, source_name):
-                    saw_expected = true
-            CompilerMessage.Complete(done) =>
-                rc = done.rc
-                saw_complete = true
-            CompilerMessage.Error(_, message, _) =>
-                let _ = pcre2_fail(ctx, "generated-check workspace error in " ++ mod_name ++ ": " ++ message)
-                return -1
-            _ => false
-    ws.end_intercept()
-    if rc != 0:
-        return 1
-    if not saw_expected:
-        let _ = pcre2_fail(ctx, "generated-check missing expected declaration '" ++ expected_decl ++ "' in " ++ mod_name)
-        return 1
+fn pcre2_compile_binary(ctx: &ActionCtx, workspace_name: &str, source_path: &str, output_path: &str) -> i32:
+    let workspace = ctx.create_workspace(workspace_name)
+    workspace.add_file(source_path)
+    var options = workspace.options()
+    options.output_path = pcre2_owned_text(output_path)
+    workspace.set_options(options)
+    let result = workspace.compile()
+    if result.rc != 0:
+        return pcre2_fail(ctx, workspace_name ++ f" failed with exit code {result.rc}")
+    if not ctx.fs().exists(output_path):
+        return pcre2_fail(ctx, workspace_name ++ " did not produce " ++ output_path)
     0
 
 fn pcre2_ensure_generated_dependencies(ctx: &ActionCtx, generated_dir: &str) -> i32:
@@ -384,9 +262,6 @@ fn pcre2_ensure_generated_dependencies(ctx: &ActionCtx, generated_dir: &str) -> 
     if pcre2_add_imports(ctx, auto_path, "use std.re.pcre2_xclass", "use std.re.pcre2_xclass\n") != 0:
         return pcre2_fail(ctx, "could not update imports in " ++ auto_path)
 
-    let bundle_rc = pcre2_write_bundle_root(ctx, generated_dir)
-    if bundle_rc != 0: return bundle_rc
-
     let pcre2test_path = pcre2_join(generated_dir, "pcre2test.w")
     let fs = ctx.fs()
     if not fs.exists(pcre2test_path):
@@ -404,59 +279,6 @@ fn pcre2_ensure_generated_dependencies(ctx: &ActionCtx, generated_dir: &str) -> 
     if updated != pcre2test_text:
         if fs.write_text(pcre2test_path, updated) != 0:
             return pcre2_fail(ctx, "could not update imports in " ++ pcre2test_path)
-    0
-
-// The .wo bundle root (docs/wo_bundles.md "Root"): one `use` per corpus
-// module, bytewise by name, so the bundle build reaches every module.
-// pcre2test and pcre2posix are the harness, never the bundle. The text is a
-// pure function of the module listing; wo-drift checks the promoted
-// lib/std/re/bundle.w against it.
-pub fn pcre2_bundle_root_text(module_paths: &Vec[str]) -> str:
-    var names: Vec[str] = Vec.new()
-    for mi in 0..module_paths.len() as i32:
-        let path = module_paths[mi]
-        if not path.ends_with(".w"):
-            continue
-        let mod_name = pcre2_module_name(path)
-        if mod_name != "bundle" and mod_name != "pcre2test" and mod_name != "pcre2posix":
-            names.push(pcre2_owned_text(mod_name))
-    let sorted = comp_sort_strings(move names)
-    var text = "// lib/std/re/bundle.w — the pcre2 .wo bundle root (docs/wo_bundles.md).\n"
-    text = text ++ "// Written by build/pcre2.w (pcre2-migrate) from the migrated module list:\n"
-    text = text ++ "// one `use` per corpus module; pcre2test and pcre2posix are the harness.\n"
-    for ni in 0..sorted.len() as i32:
-        text = text ++ "use std.re." ++ sorted[ni] ++ "\n"
-    text
-
-fn pcre2_write_bundle_root(ctx: &ActionCtx, generated_dir: &str) -> i32:
-    let fs = ctx.fs()
-    let path = pcre2_join(generated_dir, "bundle.w")
-    let text = pcre2_bundle_root_text(fs.list_files(generated_dir))
-    // Idempotent like pcre2_add_imports: pcre2-check-generated and
-    // pcre2-promote run this over their INPUT tree (out/pcre2_build/lib/std/re),
-    // which is outside their write scope; a root already holding this text
-    // is left alone.
-    if fs.exists(path) and fs.read_text(path) == text:
-        return 0
-    if fs.write_text(path, text) != 0:
-        return pcre2_fail(ctx, "could not write the bundle root " ++ path)
-    0
-
-// wo-drift: the promoted bundle root is exactly what the migrate action
-// writes for the corpus listing — a module added without regenerating it,
-// or a hand edit, fails here. Input: the root; arg: the corpus directory.
-pub fn run_pcre2_bundle_root_check_action(ctx: ActionCtx) -> i32:
-    let inputs = ctx.inputs()
-    let args = ctx.args()
-    if inputs.len() == 0 or args.len() == 0 or ctx.output().len() == 0:
-        return pcre2_fail(ctx, "requires the bundle root input, the corpus directory arg and a stamp output")
-    let fs = ctx.fs()
-    let root = inputs.get(0)
-    let expected = pcre2_bundle_root_text(fs.list_files(args.get(0)))
-    if fs.read_text(root) != expected:
-        return pcre2_fail(ctx, root ++ " is not the bundle root the migrate action writes for " ++ args.get(0) ++ " (one `use` per corpus module, bytewise); regenerate it")
-    if fs.mkdir_all(pcre2_dirname(ctx.output())) != 0 or fs.write_text(ctx.output(), "ok\n") != 0:
-        return pcre2_fail(ctx, "could not write " ++ ctx.output())
     0
 
 pub fn pcre2_count_generated_errors(ctx: &ActionCtx, generated_dir: &str, print_summary: bool) -> i32:
@@ -508,39 +330,6 @@ pub fn pcre2_count_generated_errors(ctx: &ActionCtx, generated_dir: &str, print_
         print(f"pcre2 cohesive check rc={rc}")
     if rc == 0: 0 else: 1
 
-fn pcre2_copy_w_files(ctx: &ActionCtx, source_dir: &str, dest_dir: &str) -> i32:
-    let fs = ctx.fs()
-    let files = fs.list_files(source_dir)
-    var copied = 0
-    if fs.mkdir_all(dest_dir) != 0:
-        return pcre2_fail(ctx, "could not create destination directory: " ++ dest_dir)
-    for fi in 0..files.len() as i32:
-        let source_path = files[fi]
-        if source_path.ends_with(".w"):
-            let dest_path = pcre2_join(dest_dir, pcre2_basename(source_path))
-            if fs.copy_file(source_path, dest_path) != 0:
-                return pcre2_fail(ctx, "could not copy " ++ source_path ++ " to " ++ dest_path)
-            copied = copied + 1
-    if copied == 0:
-        return pcre2_fail(ctx, "no .w files found in " ++ source_dir)
-    0
-
-fn pcre2_migrate_tmp_dir(ctx: &ActionCtx) -> str:
-    pcre2_join(pcre2_scratch_dir(ctx), "migrate-" ++ f"{ctx.target_name()}")
-
-fn pcre2_compile_binary(ctx: &ActionCtx, workspace_name: &str, source_path: &str, output_path: &str) -> i32:
-    let workspace = ctx.create_workspace(workspace_name)
-    workspace.add_file(source_path)
-    var options = workspace.options()
-    options.output_path = pcre2_owned_text(output_path)
-    workspace.set_options(options)
-    let result = workspace.compile()
-    if result.rc != 0:
-        return pcre2_fail(ctx, workspace_name ++ f" failed with exit code {result.rc}")
-    if not ctx.fs().exists(output_path):
-        return pcre2_fail(ctx, workspace_name ++ " did not produce " ++ output_path)
-    0
-
 fn pcre2_prepare_reference_tree(ctx: &ActionCtx, ref_dir: &str) -> i32:
     let fs = ctx.fs()
     let src_dir = pcre2_join(ref_dir, "src")
@@ -585,153 +374,6 @@ fn pcre2_prepare_reference_tree(ctx: &ActionCtx, ref_dir: &str) -> i32:
             print("normalized " ++ pcre2_abs(ctx.project_info().project_root(), heap_output))
     0
 
-pub fn run_pcre2_reference_action(ctx: ActionCtx) -> i32:
-    let args = ctx.args()
-    if args.len() < 2:
-        return pcre2_fail(ctx, "requires release and URL args")
-    let release = args.get(0)
-    let url = args.get(1)
-    let ref_dir = ctx.output()
-    if ref_dir.len() == 0:
-        return pcre2_fail(ctx, "requires reference tree output")
-    let fs = ctx.fs()
-    let root = ctx.project_info().project_root()
-    let scratch_dir = pcre2_scratch_dir(ctx)
-    let archive_path = pcre2_join(scratch_dir, release ++ ".tar.gz")
-    if fs.mkdir_all(pcre2_dirname(archive_path)) != 0:
-        return pcre2_fail(ctx, "could not create archive directory")
-    if not fs.exists(archive_path):
-        print("fetching " ++ release ++ " from " ++ url)
-        let fetch_bin = pcre2_join(scratch_dir, "https_fetch")
-        var rc = pcre2_compile_binary(ctx, "pcre2-https-fetch-helper", "build/https_fetch.w", fetch_bin)
-        if rc != 0:
-            return rc
-        var fetch_args: Vec[str] = Vec.new()
-        fetch_args.push(pcre2_abs(root, fetch_bin))
-        fetch_args.push(pcre2_owned_text(url))
-        fetch_args.push(pcre2_abs(root, archive_path))
-        let fetch_result = ctx.process_runner().run_capture(fetch_args, pcre2_abs(root, pcre2_join(scratch_dir, release ++ ".fetch.stdout")), pcre2_abs(root, pcre2_join(scratch_dir, release ++ ".fetch.stderr")), 300000)
-        if fetch_result.rc != 0:
-            return pcre2_fail(ctx, f"HTTPS fetch helper failed with exit code {fetch_result.rc}: " ++ fetch_result.stdout ++ fetch_result.stderr)
-    let actual_sha = fs.sha256_file(archive_path)
-    if actual_sha != PCRE2_SHA256:
-        return pcre2_fail(ctx, "sha256 mismatch for " ++ archive_path ++ ": expected " ++ PCRE2_SHA256 ++ " got " ++ actual_sha)
-    // The tree is present when its `src` is, never when the directory merely
-    // exists: the runner creates the ready stamp's parent — ref_dir itself —
-    // before the action starts, so on a fresh out/ the directory is there
-    // and empty (#948), and a torn extraction leaves it partial.
-    if not fs.is_dir(pcre2_join(ref_dir, "src")):
-        let tmp_dir = pcre2_join(scratch_dir, release ++ ".extract")
-        let extracted_dir = pcre2_join(tmp_dir, release)
-        if fs.exists(tmp_dir) and fs.remove_tree(tmp_dir) != 0:
-            return pcre2_fail(ctx, "could not remove old extract directory: " ++ tmp_dir)
-        if fs.mkdir_all(tmp_dir) != 0:
-            return pcre2_fail(ctx, "could not create extract directory: " ++ tmp_dir)
-        let tar_path = pcre2_join(scratch_dir, release ++ ".tar")
-        let gunzip_bin = pcre2_join(scratch_dir, "zlib_gunzip")
-        var rc = pcre2_compile_binary(ctx, "pcre2-gunzip-helper", "build/zlib_gunzip.w", gunzip_bin)
-        if rc != 0:
-            return rc
-        var gunzip_args: Vec[str] = Vec.new()
-        gunzip_args.push(pcre2_abs(root, gunzip_bin))
-        gunzip_args.push(pcre2_abs(root, archive_path))
-        gunzip_args.push(pcre2_abs(root, tar_path))
-        let gunzip_result = ctx.process_runner().run_capture(gunzip_args, pcre2_abs(root, pcre2_join(scratch_dir, release ++ ".gunzip.stdout")), pcre2_abs(root, pcre2_join(scratch_dir, release ++ ".gunzip.stderr")), 300000)
-        if gunzip_result.rc != 0:
-            return pcre2_fail(ctx, f"gunzip helper failed with exit code {gunzip_result.rc}: " ++ gunzip_result.stdout ++ gunzip_result.stderr)
-        if fs.extract_tar(tar_path, tmp_dir) != 0:
-            return pcre2_fail(ctx, "could not extract tar archive: " ++ tar_path)
-        if not fs.is_dir(pcre2_join(extracted_dir, "src")):
-            return pcre2_fail(ctx, "archive did not contain expected src directory: " ++ extracted_dir)
-        if fs.mkdir_all(pcre2_dirname(ref_dir)) != 0:
-            return pcre2_fail(ctx, "could not create reference parent: " ++ pcre2_dirname(ref_dir))
-        if fs.exists(ref_dir) and fs.remove_tree(ref_dir) != 0:
-            return pcre2_fail(ctx, "could not remove the empty or partial reference tree: " ++ ref_dir)
-        if fs.rename(extracted_dir, ref_dir) != 0:
-            return pcre2_fail(ctx, "could not move extracted tree to: " ++ ref_dir)
-        let _remove_extract_root = fs.remove_tree(tmp_dir)
-    if fs.write_text(pcre2_join(ref_dir, ".with-reference-url"), url ++ "\n") != 0:
-        return pcre2_fail(ctx, "could not write reference URL marker")
-    let prep_rc = pcre2_prepare_reference_tree(ctx, ref_dir)
-    if prep_rc != 0:
-        return prep_rc
-    let ready_stamp = if ctx.outputs().len() > 1: pcre2_owned_text(ctx.outputs().get(1)) else: pcre2_join(ref_dir, ".with-reference-ready")
-    if fs.write_text(ready_stamp, "ok\n") != 0:
-        return pcre2_fail(ctx, "could not write ready stamp: " ++ ready_stamp)
-    0
-
-// The corpus is a .wo bundle: build/wo.w compiles it --no-prelude, so the
-// migration runs prelude-free too and its defs carry the prelude-only
-// vocabulary (c_void, the unreachable shim) the translation reaches for.
-fn pcre2_migrate_prelude_free(workspace: &Workspace):
-    var options = workspace.options()
-    options.prelude_mode = PreludeMode.None
-    workspace.set_options(options)
-
-pub fn run_pcre2_migrate_action(ctx: ActionCtx) -> i32:
-    let fs = ctx.fs()
-    let inputs = ctx.inputs()
-    let args = ctx.args()
-    let root = ctx.project_info().project_root()
-    let stamp_path = ctx.output()
-    if inputs.len() == 0 or args.len() == 0 or stamp_path.len() == 0:
-        return pcre2_fail(ctx, "requires source-dir input, generated-dir arg, and stamp output")
-
-    let source_dir = inputs.get(0)
-    let generated_dir = args.get(0)
-    if not fs.is_dir(source_dir):
-        return pcre2_fail(ctx, "missing PCRE2 source directory: " ++ source_dir)
-    if fs.mkdir_all(pcre2_dirname(stamp_path)) != 0:
-        return pcre2_fail(ctx, "could not create stamp directory: " ++ pcre2_dirname(stamp_path))
-    if fs.mkdir_all(pcre2_dirname(generated_dir)) != 0:
-        return pcre2_fail(ctx, "could not create generated parent: " ++ pcre2_dirname(generated_dir))
-    let scratch_dir = pcre2_scratch_dir(ctx)
-    if fs.mkdir_all(scratch_dir) != 0:
-        return pcre2_fail(ctx, "could not create scratch directory: " ++ scratch_dir)
-
-    let tmp_dir = pcre2_migrate_tmp_dir(ctx)
-    let remove_tmp_rc = pcre2_remove_tree_if_exists(ctx, tmp_dir)
-    if remove_tmp_rc != 0: return remove_tmp_rc
-    if fs.mkdir_all(tmp_dir) != 0:
-        return pcre2_fail(ctx, "could not create temp migration directory: " ++ tmp_dir)
-
-    let excludes: Vec[str] = Vec.new()
-    var exclude_i = 1
-    while exclude_i < args.len() as i32:
-        excludes.push(pcre2_owned_text(args[exclude_i]))
-        exclude_i = exclude_i + 1
-    let workspace = ctx.create_workspace("pcre2-migrate")
-    pcre2_migrate_prelude_free(workspace)
-    workspace.set_migrate_options(pcre2_migrate_options(source_dir, tmp_dir, source_dir, move excludes))
-    let migrate_result = workspace.compile()
-    if migrate_result.rc != 0:
-        return pcre2_fail(ctx, f"migrate failed with exit code {migrate_result.rc}")
-
-    let generated_count = pcre2_count_w_files(ctx, tmp_dir)
-    if generated_count < 30:
-        return pcre2_fail(ctx, f"only generated {generated_count} .w files; expected at least 30")
-    if pcre2_reject_c_exports(ctx, tmp_dir) != 0:
-        return 1
-
-    var rc = pcre2_remove_tree_if_exists(ctx, generated_dir)
-    if rc != 0: return rc
-    if fs.rename(tmp_dir, generated_dir) != 0:
-        return pcre2_fail(ctx, "could not publish generated directory: " ++ generated_dir)
-
-    rc = pcre2_remove_tree_if_exists(ctx, "out/pcre2_migrate_raw")
-    if rc != 0: return rc
-    rc = pcre2_remove_tree_if_exists(ctx, "out/pcre2_generated")
-    if rc != 0: return rc
-    rc = pcre2_remove_file_if_exists(ctx, "out/gen/.regex-build-stamp")
-    if rc != 0: return rc
-    rc = pcre2_remove_tree_if_exists(ctx, "out/pcre2_build")
-    if rc != 0: return rc
-
-    if fs.write_text(stamp_path, "ok\n") != 0:
-        return pcre2_fail(ctx, "could not write stamp: " ++ stamp_path)
-    print(f"migrated PCRE2: {generated_count} .w files in " ++ pcre2_abs(root, generated_dir))
-    0
-
 pub fn run_pcre2_migrate_smoke_action(ctx: ActionCtx) -> i32:
     let fs = ctx.fs()
     let inputs = ctx.inputs()
@@ -750,13 +392,12 @@ pub fn run_pcre2_migrate_smoke_action(ctx: ActionCtx) -> i32:
         return pcre2_fail(ctx, "could not create smoke output directory: " ++ output_dir)
 
     let out_w = pcre2_join(output_dir, "pcre2_compile.w")
-    let excludes: Vec[str] = Vec.new()
-    let workspace = ctx.create_workspace("pcre2-migrate-smoke")
-    pcre2_migrate_prelude_free(workspace)
-    workspace.set_migrate_options(pcre2_migrate_options(compile_c, out_w, source_dir, move excludes))
-    let result = workspace.compile()
-    if result.rc != 0:
-        return pcre2_fail(ctx, f"pcre2_compile.c migration smoke failed with exit code {result.rc}")
+    let corpus = pcre2_corpus()
+    var options = corpus_migrate_options(corpus, compile_c, out_w)
+    options.include_paths = [pcre2_owned_text(source_dir)]
+    options.exclude_basenames = Vec.new()
+    if corpus_run_migration(ctx, "pcre2-migrate-smoke", options) != 0:
+        return pcre2_fail(ctx, "pcre2_compile.c migration smoke failed")
     if not fs.exists(out_w):
         return pcre2_fail(ctx, "pcre2_compile.c migration smoke did not produce " ++ out_w)
     if fs.read_text(out_w).contains("@[c_export("):
@@ -909,55 +550,80 @@ pub fn run_pcre2_test_action(ctx: ActionCtx) -> i32:
     print("VERIFIED: migrated pcre2test passes upstream RunTest for the 8-bit corpus")
     0
 
-pub fn run_pcre2_check_generated_action(ctx: ActionCtx) -> i32:
-    let inputs = ctx.inputs()
-    let output = ctx.output()
-    if inputs.len() == 0 or output.len() == 0:
-        return pcre2_fail(ctx, "requires generated-dir input and stamp output")
-    let generated_dir = inputs.get(0)
-    let c_export_errors = pcre2_reject_c_exports(ctx, generated_dir)
-    if c_export_errors != 0:
-        return 1
-    let errors = pcre2_count_generated_errors(ctx, generated_dir, true)
-    if errors < 0:
-        return 1
-    if errors != 0:
-        return 1
-    if ctx.fs().write_text(output, "ok\n") != 0:
-        return pcre2_fail(ctx, "could not write generated-check stamp: " ++ output)
+
+pub fn pcre2_corpus() -> Corpus:
+    Corpus {
+        name: "pcre2", stem: "pcre2", package: "std.re",
+        corpus_rel: "std/re", corpus_dir: "lib/std/re",
+        upstream: upstream_release("pcre2", PCRE2_RELEASE, "https://github.com/PCRE2Project/pcre2/releases/download/" ++ PCRE2_RELEASE ++ "/" ++ PCRE2_RELEASE ++ ".tar.gz", PCRE2_SHA256),
+        license: "",
+        // pcre2test and pcre2posix are the harness, never the bundle
+        harness: ["pcre2test", "pcre2posix"], drift_harness: "pcre2test.w", drift_harness_arg: "-C",
+        module_floor: 30,
+        defines: ["PCRE2_CODE_UNIT_WIDTH=8", "HAVE_CONFIG_H=1"],
+        excludes: ["pcre2demo.c", "pcre2grep.c", "pcre2posix_test.c", "pcre2_jit_test.c", "pcre2_dftables.c", "pcre2_fuzzsupport.c"],
+        promote_after: ["pcre2-test"], test_lane: "",
+        prepare_reference: pcre2_prepare, stage: pcre2_stage,
+        migrate: corpus_migrate_directory, finish_generated: pcre2_finish,
+        verify_generated: pcre2_verify, lanes: pcre2_lanes,
+    }
+
+fn pcre2_prepare(ctx: &ActionCtx, corpus: &Corpus, reference: &str) -> i32:
+    pcre2_prepare_reference_tree(ctx, reference)
+
+// Every file at the top of upstream's src/ (the units, the headers and the
+// .generic templates config.h includes; the jit subtree stays behind), so
+// the migration sees exactly what it saw in place; its excludes drop the
+// programs and generators that are not the library.
+fn pcre2_stage(ctx: &ActionCtx, corpus: &Corpus, reference: &str, source: &str) -> i32:
+    let src = reference ++ "/src/"
+    for path in ctx.fs().list_files(reference ++ "/src"):
+        if not path.starts_with(src) or path.slice(src.len(), path.len()).contains("/"): continue
+        if corpus_copy(ctx, path, source ++ "/" ++ pcre2_basename(path)) != 0: return 1
     0
 
-pub fn run_pcre2_promote_action(ctx: ActionCtx) -> i32:
-    let fs = ctx.fs()
-    let inputs = ctx.inputs()
-    let dest_dir = ctx.output()
-    let root = ctx.project_info().project_root()
-    if inputs.len() == 0 or dest_dir.len() == 0:
-        return pcre2_fail(ctx, "requires generated-dir input and destination output")
-    let generated_dir = inputs.get(0)
-    let c_export_errors = pcre2_reject_c_exports(ctx, generated_dir)
-    if c_export_errors != 0:
-        return 1
-    let errors = pcre2_count_generated_errors(ctx, generated_dir, true)
-    if errors < 0:
-        return 1
-    if errors != 0:
-        return pcre2_fail(ctx, f"refusing to promote generated PCRE2 with {errors} remaining errors")
-    if fs.mkdir_all(dest_dir) != 0:
-        return pcre2_fail(ctx, "could not create destination: " ++ dest_dir)
-    let existing = fs.list_files(dest_dir)
-    for ei in 0..existing.len() as i32:
-        let path = existing[ei]
-        if path.ends_with(".w") and fs.remove_file(path) != 0:
-            return pcre2_fail(ctx, "could not remove old generated file: " ++ path)
-    let files = fs.list_files(generated_dir)
-    var copied = 0
-    for fi in 0..files.len() as i32:
-        let source_path = files[fi]
-        if source_path.ends_with(".w"):
-            let dest_path = pcre2_join(dest_dir, pcre2_basename(source_path))
-            if fs.copy_file(source_path, dest_path) != 0:
-                return pcre2_fail(ctx, "could not copy " ++ source_path ++ " to " ++ dest_path)
-            copied = copied + 1
-    print(f"promoted {copied} generated modules into " ++ pcre2_abs(root, dest_dir))
+fn pcre2_finish(ctx: &ActionCtx, corpus: &Corpus, generated: &str) -> i32:
+    pcre2_ensure_generated_dependencies(ctx, generated)
+
+fn pcre2_verify(ctx: &ActionCtx, corpus: &Corpus, generated: &str) -> i32:
+    let errors = pcre2_count_generated_errors(ctx, generated, true)
+    if errors < 0: return 1
+    if errors != 0: return pcre2_fail(ctx, f"generated sources have {errors} remaining errors")
     0
+
+fn pcre2_lanes(out: Build, ctx: &BuildCtx, corpus: &Corpus, release_compiler: &str) -> Build:
+    var graph = out
+    let reference = corpus.upstream.reference.clone()
+    var migrate_smoke = target_new(.Action, "pcre2-migrate-smoke", "").output("out/test-graph/pcre2-migrate-smoke")
+    migrate_smoke.action = run_pcre2_migrate_smoke_action
+    migrate_smoke = migrate_smoke.input(reference ++ "/src/pcre2_compile.c").input(reference ++ "/src").dep("pcre2-prepare-reference")
+    graph = graph.add_target(migrate_smoke)
+
+    var test_smoke = target_new(.Action, "pcre2-test-smoke", "").output("out/test-graph/pcre2-test-smoke")
+    test_smoke.action = run_pcre2_test_smoke_action
+    test_smoke = test_smoke.input("lib/std/re/pcre2test.w").input(reference ++ "/RunTest").arg(reference.clone())
+    test_smoke = test_smoke.dep("pcre2-prepare-reference").dep("selfcheck")
+    graph = graph.add_target(test_smoke)
+
+    var build = target_new(.Action, "pcre2-build", "").output("out/pcre2_build")
+    build.action = run_pcre2_build_action
+    build = build.write_scope("out/tmp/action-scratch/pcre2-build")
+    build = build.input("out/pcre2_migrated").dep("build").dep("pcre2-migrate")
+    graph = graph.add_target(build)
+
+    var test = target_new(.Action, "pcre2-test", "").output("out/corpus/pcre2-test")
+    test.action = run_pcre2_test_action
+    test = test.input("out/pcre2_migrated").input("out/pcre2_build/bin/pcre2test").input(reference ++ "/RunTest").arg(reference.clone())
+    test = test.dep("verified-existing-stage").dep("pcre2-build")
+    graph = graph.add_target(test)
+
+    // The upstream suite against the STORED bundle: pcre2test as the drift
+    // lane built it. The root file, never the directory, names the corpus
+    // (lib/std/re is pcre2-promote's output; naming it would pull the whole
+    // migration pipeline in as a producer, D36).
+    let plan = wo_bundle_plan(ctx, corpus.name, corpus.corpus_rel, corpus.corpus_dir ++ "/bundle.w")
+    var wo_test = target_new(.Action, "pcre2-wo-test", "").output("out/corpus/pcre2-wo-test")
+    wo_test.action = run_pcre2_test_action
+    wo_test = wo_test.input(corpus.corpus_dir ++ "/bundle.w").input(wo_drift_harness_bin(&plan, "lib/std/re/pcre2test.w")).input(reference ++ "/RunTest").arg(reference.clone())
+    wo_test = wo_test.dep(wo_drift_target_name(&plan)).dep("pcre2-prepare-reference")
+    graph.add_target(wo_test)
