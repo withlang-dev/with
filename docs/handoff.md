@@ -139,6 +139,45 @@ the release binary of the fixed tree):
 
 ## 3. Rulings and gaps to raise with Eric
 
+0. **RULED (D41):** `Ord.cmp(&self, &other)` backs the four ordered
+   operators, `Eq.eq(&self, &other)` backs `==`/`!=`, fixed-name methods
+   are overrides. Implemented on the branch (Sema `operator_method_derived`,
+   MirLower `lower_derived_comparison`, `traits.w`, every impl in the tree,
+   fixture `behav_ord_cmp_operators.w`). The §11.7 wording below is
+   PROPOSED — only Eric's blessing of the exact words lands it in
+   `docs/with-specification.md`; until then the spec still says six fixed
+   names and the implementation is ahead of it.
+
+   Proposed §11.7 intro (replaces "Arithmetic and comparison operators are
+   the main exception … need to name them."):
+
+   > Arithmetic operators are the main exception: they use fixed method
+   > names on the concrete type (`add`, `sub`, `mul`, `div`, `matmul`,
+   > `neg`). Comparison is one primitive per family: `Eq.eq(self: &Self,
+   > other: &Self) -> bool` backs `==` and `!=`, and `Ord.cmp(self: &Self,
+   > other: &Self) -> i32` backs `<`, `<=`, `>`, and `>=` (negative, zero,
+   > or positive as the receiver orders before, with, or after `other`). A
+   > type may additionally define the fixed-name methods `ne`, `lt`, `le`,
+   > `gt`, `ge` as overrides; when present, the override is selected for
+   > its operator. Both operands are observed, never consumed: `a < b`
+   > compares the values `a` and `b` name, whether they are owned or views,
+   > and a view of a type with neither primitive is a compile error, never
+   > an address comparison — only raw pointers order by address (§16). The
+   > prelude traits `Add`, `Sub`, `Mul`, `Div`, `MatMul`, `Neg`, `Eq`, and
+   > `Ord` remain available for explicit bounds and documentation, but an
+   > unbounded generic does not need to name them.
+
+   Proposed replacement for the "Arithmetic and comparison operator
+   methods" table: arithmetic rows unchanged (`+ add`, `- sub`, `* mul`,
+   `/ div`, `@ matmul`, unary `- neg`); the comparison rows become a
+   derivation table — `==` ← `eq(&other)`; `!=` ← `not eq(&other)`,
+   override `ne`; `<` ← `cmp(&other) < 0`, override `lt`; `<=` ←
+   `cmp(&other) <= 0`, override `le`; `>` ← `cmp(&other) > 0`, override
+   `gt`; `>=` ← `cmp(&other) >= 0`, override `ge` — followed by
+   `trait Eq: fn eq(self: &Self, other: &Self) -> bool` and
+   `trait Ord: fn cmp(self: &Self, other: &Self) -> i32`, then the existing
+   arithmetic trait listing introduced as "for the arithmetic operators".
+
 1. **`<` on user types.** §11.7 dispatches comparison operators to fixed method
    names (`lt`, `gt`, …); `Ord` carries only `cmp(other: Self)`. So a type
    with `Ord` has no `<`, and generic `T: Ord` code cannot compare two views

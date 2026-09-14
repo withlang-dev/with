@@ -454,12 +454,12 @@ by the M*LIB-backed `BTreeMap`/`BTreeSet` work in Phase 4.
   regressed ~16 existing fixtures; root-caused and fixed (`docs/handoff.md`
   §1c), plus the va_list call-site model (e7ddf116). The full battery is
   green at 4832bf0a.
-- Open for Eric: comparisons of user types. §11.7 dispatches `<` to a
-  fixed `lt` method, and `Ord` only carries `cmp(other: Self)`, so a type
-  with `Ord` alone has no `<` and a generic `T: Ord` cannot compare two
-  views without a copy. The facades therefore require the six operator
-  methods on `T`, taking `&T`. The With-y alternative is one `cmp(other:
-  &Self)` backing every comparison; that is a spec ruling.
+- Comparisons of user types: ruled (decisions.md D41, 2026-09-13).
+  `Ord.cmp(self: &Self, other: &Self)` backs `<`/`<=`/`>`/`>=` and
+  `Eq.eq(other: &Self)` backs `==`/`!=`; fixed-name methods are optional
+  overrides. The facades bound `T: Ord` and compare views with `<`/`>`
+  directly. §11.7's wording is proposed in the handoff, pending Eric's
+  blessing of the words.
 
 **Phase 2 — TommyDS, whole.**
 Specialized indexing/storage engines: `hashtable`, `hashdyn`, `hashlin`,
