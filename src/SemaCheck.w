@@ -7994,6 +7994,13 @@ impl Sema:
                         return SemaTryInfo { ok: 1, carrier_ty, continue_ty: continue_ty2, break_ty: break_ty2, branch_result_ty: branch_result_ty2, branch_fn: branch_fn2, from_break_fn: from_break_fn2 }
         sema_try_info_none()
 
+// §11.7: the primitive a comparison derives from when the type defines no
+// fixed-name override — `cmp` for the ordered four, `eq` for `!=`.
+fn sema_operator_primitive_name(op: i32) -> str:
+    if op == BinaryOp.OP_NEQ: return "eq"
+    if op == BinaryOp.OP_LT or op == BinaryOp.OP_GT or op == BinaryOp.OP_LTE or op == BinaryOp.OP_GTE: return "cmp"
+    ""
+
 fn sema_operator_method_name(op: i32) -> str:
     if op == BinaryOp.OP_ADD: return "add"
     if op == BinaryOp.OP_SUB: return "sub"
@@ -8104,9 +8111,18 @@ impl Sema:
         let method_name = sema_operator_method_name(op)
         if method_name.len() == 0:
             return 0
-        let method_sym = self.pool_intern(method_name)
-        let lhs_candidate = self.operator_candidate_for(lhs, rhs, method_sym)
-        let rhs_candidate = self.operator_candidate_for(rhs, lhs, method_sym)
+        var method_sym = self.pool_intern(method_name)
+        var lhs_candidate = self.operator_candidate_for(lhs, rhs, method_sym)
+        var rhs_candidate = self.operator_candidate_for(rhs, lhs, method_sym)
+        var derived = 0
+        let primitive_name = sema_operator_primitive_name(op)
+        if lhs_candidate.sig < 0 and rhs_candidate.sig < 0 and primitive_name.len() > 0 and self.type_has_operator_method(lhs, method_sym) == 0 and self.type_has_operator_method(rhs, method_sym) == 0:
+            // §11.7: no fixed-name override on either operand — derive the
+            // comparison from the family's primitive.
+            method_sym = self.pool_intern(primitive_name)
+            lhs_candidate = self.operator_candidate_for(lhs, rhs, method_sym)
+            rhs_candidate = self.operator_candidate_for(rhs, lhs, method_sym)
+            derived = 1
         let lhs_ok = if lhs_candidate.sig >= 0: 1 else: 0
         let rhs_ok = if rhs_candidate.sig >= 0: 1 else: 0
         if lhs_ok != 0 and rhs_ok != 0 and lhs_candidate.fn_sym != rhs_candidate.fn_sym:
@@ -8140,8 +8156,15 @@ impl Sema:
         if self.call_arg_type_compatible_base(expected_rhs, selected_rhs_ty) == 0 and self.record_contextual_copy_adjustment(selected_rhs_node, expected_rhs, selected_rhs_ty) == 0:
             self.emit_error("selected operator parameter cannot accept the exact operand type", selected_rhs_node)
             return 0
-        let ret = self.sig_return_type(selected.sig)
-        if op == BinaryOp.OP_EQ or op == BinaryOp.OP_NEQ or op == BinaryOp.OP_LT or op == BinaryOp.OP_GT or op == BinaryOp.OP_LTE or op == BinaryOp.OP_GTE:
+        var ret = self.sig_return_type(selected.sig)
+        if derived != 0:
+            let primitive_ret = if method_name == "ne": self.ty_bool as i32 else: self.ty_i32 as i32
+            if self.types_compatible(primitive_ret, ret) == 0:
+                self.emit_error("comparison primitive '" ++ primitive_name ++ "' must return " ++ self.type_name(primitive_ret), node)
+                return 0
+            self.operator_method_derived.insert(node, op)
+            ret = self.ty_bool as i32
+        else if op == BinaryOp.OP_EQ or op == BinaryOp.OP_NEQ or op == BinaryOp.OP_LT or op == BinaryOp.OP_GT or op == BinaryOp.OP_LTE or op == BinaryOp.OP_GTE:
             if self.types_compatible(self.ty_bool as i32, ret) == 0:
                 self.emit_error("comparison operator method must return bool", node)
                 return 0
@@ -8348,6 +8371,13 @@ impl Sema:
     mut fn check_binary(node: i32) -> i32:
         let op = self.ast.get_data0(node)
         let lhs_node = self.ast.get_data1(node)
+        // A generic body is rechecked per instantiation; an operator that
+        // resolved to a method for one T (Tag.cmp) and to the builtin for
+        // another (i32, str) must not keep the earlier method in the
+        // sidecars, or the later specialization calls the wrong function.
+        self.operator_method_calls.remove(node)
+        self.operator_method_reversed.remove(node)
+        self.operator_method_derived.remove(node)
         let rhs_node = self.ast.get_data2(node)
         let lhs_is_num_lit = sema_node_is_numeric_literal(self.ast, lhs_node)
         let rhs_is_num_lit = sema_node_is_numeric_literal(self.ast, rhs_node)
@@ -8476,7 +8506,11 @@ impl Sema:
             let resolved_operator_name = sema_operator_method_name(op)
             if resolved_operator_name.len() > 0:
                 let resolved_operator_sym = self.pool_intern(resolved_operator_name)
-                let has_resolved_operator = self.type_has_operator_method(lhs as i32, resolved_operator_sym) != 0 or self.type_has_operator_method(rhs as i32, resolved_operator_sym) != 0
+                var has_resolved_operator = self.type_has_operator_method(lhs as i32, resolved_operator_sym) != 0 or self.type_has_operator_method(rhs as i32, resolved_operator_sym) != 0
+                let primitive_name = sema_operator_primitive_name(op)
+                if has_resolved_operator == 0 and primitive_name.len() > 0:
+                    let primitive_sym = self.pool_intern(primitive_name)
+                    has_resolved_operator = self.type_has_operator_method(lhs as i32, primitive_sym) != 0 or self.type_has_operator_method(rhs as i32, primitive_sym) != 0
                 if has_resolved_operator != 0:
                     return self.check_binary_operator_method(node, op, lhs as i32, rhs as i32)
             let contextual_pair = self.contextualize_builtin_binary_operands(lhs_node, lhs as i32, rhs_node, rhs as i32)
@@ -8505,7 +8539,7 @@ impl Sema:
                     let declared = target_kind == TypeKind.TY_STRUCT or target_kind == TypeKind.TY_ENUM or target_kind == TypeKind.TY_GENERIC_INST
                     if declared and target_sym != 0 and self.type_decl_nodes.contains(target_sym):
                         let target_name = self.type_name(target as i32)
-                        self.emit_error("operator '" ++ sema_operator_symbol_text(op) ++ "' on views of " ++ target_name ++ " needs a '" ++ sema_operator_method_name(op) ++ "' method on " ++ target_name ++ "; a view compares the value it observes, and only raw pointers compare by address", node)
+                        self.emit_error("operator '" ++ sema_operator_symbol_text(op) ++ "' on views of " ++ target_name ++ " needs an Ord impl (cmp) or a '" ++ sema_operator_method_name(op) ++ "' method on " ++ target_name ++ "; a view compares the value it observes, and only raw pointers compare by address", node)
                         return 0
             let bool_int_cmp = (lhs_cmp_kind == TypeKind.TY_BOOL and rhs_cmp_kind == TypeKind.TY_INT) or (lhs_cmp_kind == TypeKind.TY_INT and rhs_cmp_kind == TypeKind.TY_BOOL)
             let lhs_option_ptr = self.is_option_pointer_type(lhs as i32) != 0

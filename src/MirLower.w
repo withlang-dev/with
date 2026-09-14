@@ -4225,6 +4225,8 @@ impl MirBuilder:
         if self.sema.operator_method_calls.contains(node):
             let method_sym: i32 = self.sema.operator_method_calls.get(node).unwrap()
             let reversed = if self.sema.operator_method_reversed.contains(node): self.sema.operator_method_reversed.get(node).unwrap() else: 0
+            if self.sema.operator_method_derived.contains(node):
+                return self.lower_derived_comparison(op, lhs_expr, rhs_expr, method_sym, reversed, node)
             if reversed != 0:
                 return self.lower_method_bin_op(rhs_expr, lhs_expr, method_sym, node)
             return self.lower_method_bin_op(lhs_expr, rhs_expr, method_sym, node)
@@ -4575,6 +4577,32 @@ impl MirBuilder:
         arg_nodes.push(rhs_expr)
         let ret_ty = self.expr_type(node)
         self.lower_call_with_arg_nodes(fn_op, method_sym, arg_nodes, ret_ty, node)
+
+    // §11.7: `a < b` with no `lt` on the type is `a.cmp(&b) < 0` (a reversed
+    // selection is `b.cmp(&a) > 0`); `a != b` with no `ne` is `not a.eq(&b)`.
+    mut fn lower_derived_comparison(op: i32, lhs_expr: i32, rhs_expr: i32, method_sym: i32, reversed: i32, node: i32) -> i32:
+        let fn_op = self.lower_var(method_sym, 0, 0)
+        let arg_nodes: Vec[i32] = Vec.new()
+        arg_nodes.push(if reversed != 0: rhs_expr else: lhs_expr)
+        arg_nodes.push(if reversed != 0: lhs_expr else: rhs_expr)
+        let bool_ty = self.sema.ty_bool as i32
+        if op == BinaryOp.OP_NEQ:
+            let equal = self.lower_call_with_arg_nodes(fn_op, method_sym, arg_nodes, bool_ty, node)
+            let not_rv = self.body.new_rvalue(RvalueKind.RK_UN_OP, UnaryOp.UOP_NOT, equal, 0)
+            let not_tmp = self.new_temp(bool_ty)
+            let not_place = self.place_for_local(not_tmp)
+            self.body.push_stmt(self.cur_bb, StmtKind.Assign, not_place, not_rv, self.ast.get_start(node))
+            return self.body.new_operand(OperandKind.OK_COPY, not_place)
+        let i32_ty = self.sema.ty_i32 as i32
+        let ordering = self.lower_call_with_arg_nodes(fn_op, method_sym, arg_nodes, i32_ty, node)
+        // With the operands swapped the ordering's sign flips.
+        let effective = if reversed == 0: op else if op == BinaryOp.OP_LT: BinaryOp.OP_GT else if op == BinaryOp.OP_GT: BinaryOp.OP_LT else if op == BinaryOp.OP_LTE: BinaryOp.OP_GTE else: BinaryOp.OP_LTE
+        let zero = self.const_operand(ConstKind.CK_INT, 0, i32_ty)
+        let cmp_rv = self.body.new_rvalue(RvalueKind.RK_BIN_OP, effective, ordering, zero)
+        let cmp_tmp = self.new_temp(bool_ty)
+        let cmp_place = self.place_for_local(cmp_tmp)
+        self.body.push_stmt(self.cur_bb, StmtKind.Assign, cmp_place, cmp_rv, self.ast.get_start(node))
+        self.body.new_operand(OperandKind.OK_COPY, cmp_place)
 
     mut fn lower_method_un_op(expr: i32, method_sym: i32, node: i32) -> i32:
         let fn_op = self.lower_var(method_sym, 0, 0)

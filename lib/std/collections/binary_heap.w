@@ -22,7 +22,8 @@ const HEAP_TYPE_MIN: c_uint = 0
 const HEAP_TYPE_MAX: c_uint = 1
 
 /// A max-heap by default (`pop` yields the greatest value); `new_min()`
-/// builds the min-heap. `peek` observes, `pop` transfers (D27).
+/// builds the min-heap. `T: Ord` orders through `cmp` (D41). `peek`
+/// observes, `pop` transfers (D27).
 pub type BinaryHeap[T] { heap: *mut _BinaryHeap }
 
 fn binary_heap_engine(max: bool) -> *mut _BinaryHeap:

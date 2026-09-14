@@ -8,7 +8,7 @@ type MyInt { val: i32 }
 type MyStr { val: str }
 
 impl Eq for MyInt:    fn eq(self: &Self, other:
-    MyInt) -> bool:
+    &MyInt) -> bool:
         self.val == other.val
 
 impl Debug for MyInt:    fn debug_str(self:

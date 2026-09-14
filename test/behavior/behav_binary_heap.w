@@ -9,11 +9,8 @@ use std.collections.binary_heap.BinaryHeap
 
 type Tag { id: i32, slot: *mut i32 }
 impl Ord for Tag:
-    fn cmp(other: Tag) -> i32:
+    fn cmp(other: &Tag) -> i32:
         if self.id < other.id: -1 else if self.id > other.id: 1 else: 0
-impl Tag:
-    fn lt(other: &Tag) -> bool: self.id < other.id
-    fn gt(other: &Tag) -> bool: self.id > other.id
 impl Drop for Tag:
     fn drop(move self: Self):
         unsafe:

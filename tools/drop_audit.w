@@ -351,12 +351,11 @@ fn sc_slotmap(kind: &str):
 // Phase 1 facade cells (docs/stdlib_sourcing_plan.md "Facade rules"): every
 // value a c-algorithms-backed facade holds drops exactly once — empty,
 // full, after partial transfers, and after a cursor abandoned midway.
-// R orders by id through the §11.7 operator methods the facades compare with.
+// R orders by id through Ord.cmp, which backs the facades' `<` / `>` (§11.7).
 fn sc_facade_prelude(facade: &str):
     "use std.collections." ++ facade ++ "\n" ++
-    "impl R:\n" ++
-    "    fn lt(other: &R) -> bool: self.id < other.id\n" ++
-    "    fn gt(other: &R) -> bool: self.id > other.id\n"
+    "impl Ord for R:\n" ++
+    "    fn cmp(other: &R) -> i32: if self.id < other.id: -1 else if self.id > other.id: 1 else: 0\n"
 
 fn sc_sorted_vec(kind: &str):
     var source = sc_facade_prelude("sorted_vec.SortedVec") ++ "fn go(slot: *mut i32):\n    var sorted = SortedVec[R].new()\n"

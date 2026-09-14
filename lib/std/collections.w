@@ -296,7 +296,7 @@ pub type Handle[T] {
 impl[T] Copy for Handle[T]
 
 impl[T] Eq for Handle[T]:
-    fn eq(other: Handle[T]) -> bool:
+    fn eq(other: &Handle[T]) -> bool:
         self.index == other.index and self.generation == other.generation
 
 impl[T] Hash for Handle[T]:

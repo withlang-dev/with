@@ -17,7 +17,8 @@ extern fn with_alloc(size: i64) -> *mut u8
 extern fn with_free(ptr: *mut u8) -> Unit
 extern fn with_memcpy(dst: *mut u8, src: *const u8, n: i64) -> *mut u8
 
-/// Values kept in ascending `Ord` order. `get(i)` observes the i-th value;
+/// Values kept in ascending `Ord` order (D41: `cmp` backs the `<`/`>` the
+/// comparator applies to views). `get(i)` observes the i-th value;
 /// `remove(i)` transfers it out (D27).
 pub type SortedVec[T] { array: *mut _SortedArray }
 
