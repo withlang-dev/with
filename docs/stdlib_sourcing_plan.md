@@ -1,12 +1,11 @@
 # Stdlib sourcing: three migrated corpora, one facade
 
-Status (2026-09-12): PCRE2 and zlib share the bundle pipeline. Phase 0 is
-implemented and locally verified in PR #1129; Phase 1 (c-algorithms) is
-implemented on branch `c-algorithms-phase1` — see "Phase 1 status" below;
-Phases 2–4 remain planned. Engine selections were ruled on
-2026-09-12; module grouping is provisional.
-Companion: `docs/harden_migrate.md` (the migrator plan
+Status: PLAN (2026-09-01), with engine selections ruled on 2026-09-12.
+The selections below describe the destination, not completed migrations.
+Module grouping is provisional. Companion: `docs/harden_migrate.md` (the migrator plan
 this campaign exercises), `docs/harden_plan.md` item 7.
+Phase 0 (PR #1129) and Phase 1 (PR #1138, c-algorithms) are implemented;
+see "Phase 1 status" below.
 
 ## The ruling
 
@@ -375,30 +374,11 @@ above, with benchmark evidence recorded during implementation.
 ## Phases and gates
 
 **Phase 0 — measure first (small, immediate).**
-Verification completed on Darwin arm64 at `-O1`: full build and test suite,
-byte-identical fixpoint, pinned v0.15.2.0 seed compatibility, compiler analysis
-(2,514,772 facts, zero violations), drop audit (119/119), and move audit
-(15/15). PCRE2 and zlib bundle drift checks passed byte-for-byte.
-
 The complexity-fixture lane and a stdlib inventory (`docs/stdlib_inventory.md`:
 every structure and algorithm we need, its complexity contract, current
 status). Engine validation needs this yardstick. SlotMap's native
 free list (#936) lands here too. Gate: lane green on today's containers
 with the known cliffs recorded as expected failures.
-
-Implementation (2026-09-12): [the inventory](stdlib_inventory.md) records the
-current engines and planned algorithm families. `with build :stdlib-complexity`
-is part of `:test`; [its fixtures](../test/complexity/README.md) check results,
-N/4N runtime growth, and allocation requests with `--trace-alloc`. The known
-#937/#938/#939 cost cliffs are explicit expected failures; incorrect results,
-crashes, and invalid measurement controls fail the lane.
-
-SlotMap now uses a FIFO free list and retires exhausted generations. Native
-fixtures cover reuse order, growth, stale handles, exhaustion, and exact Drop
-counts. Four SlotMap cells extend the drop audit. The runtime header grows from
-48 to 56 bytes, and each slot uses a four-byte next link instead of a one-byte
-occupancy flag; [ABI v4](with-abi.md) records that internal layout change.
-This phase migrates no new C corpus and chooses no new public API names.
 
 **Phase 1 — c-algorithms, whole.**
 The first container corpus through the pipeline; non-macro C, so the
