@@ -1137,7 +1137,12 @@ fn ci_field_cursor_anon_record_decl(session: i64, field_cursor: i32) -> i32:
     if kind == CK_STRUCT or kind == CK_UNION:
         let decl_name = with_ci_cursor_spelling(session, decl_cursor)
         let field_ty_str = with_ci_type_translated(session, field_ty)
-        if decl_name.len() == 0 or ci_str_contains(field_ty_str, "(unnamed at ") or ci_str_contains(field_ty_str, "::("):
+        // An unnamed record's identity is on its CURSOR spelling ("union
+        // (unnamed at file:line)" / "(anonymous union at ...)", by libclang
+        // version); the translated type text is `c_void` since b0434ad3
+        // asked Clang about anonymity instead of matching the spelling, so
+        // it no longer carries the marker (anon_union_init_not_flattened).
+        if decl_name.len() == 0 or ci_str_contains(decl_name, "(unnamed") or ci_str_contains(decl_name, "(anonymous") or ci_str_contains(field_ty_str, "(unnamed at ") or ci_str_contains(field_ty_str, "::("):
             return decl_cursor
     -1
 
