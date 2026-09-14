@@ -5130,21 +5130,31 @@ impl Codegen:
             return wl_int_type_n(self.context, (size * 8) as i32)
         wl_array_type(wl_i64_type(self.context), 2)
 
-    fn ensure_llvm_memcpy_declared() -> i64:
-        let mc_sym = self.intern.intern("llvm.memcpy.p0.p0.i64")
-        let cached = self.fn_values.get(mc_sym)
+    // The memory intrinsics `(ptr, <second>, i64 len, i1 volatile)`. LLVM
+    // itself declares these when a pass forms them (wl_lower_aggregate_copies
+    // builds memmove/memset; MemCpyOpt turns a memmove into memcpy), and a
+    // second declaration under the same name gets a `.N` suffix the verifier
+    // rejects — so an existing declaration is reused, never re-added.
+    fn ensure_llvm_mem_intrinsic(name: &str, second: i64) -> i64:
+        let sym = self.intern.intern(name)
+        let cached = self.fn_values.get(sym)
         if cached.is_some():
             return cached.unwrap() as i64
         let params: Vec[i64] = Vec.new()
         params.push(wl_ptr_type(self.context))
-        params.push(wl_ptr_type(self.context))
+        params.push(second)
         params.push(wl_i64_type(self.context))
         params.push(wl_i1_type(self.context))
         let fn_ty = wl_function_type(wl_void_type(self.context), vec_data_i64(&params), 4, 0)
-        let fn_val = wl_add_function(self.llmod, "llvm.memcpy.p0.p0.i64", fn_ty)
-        self.fn_values.insert(mc_sym, fn_val)
-        self.fn_fn_types.insert(mc_sym, fn_ty)
+        var fn_val = wl_get_named_function(self.llmod, name)
+        if fn_val == 0:
+            fn_val = wl_add_function(self.llmod, name, fn_ty)
+        self.fn_values.insert(sym, fn_val)
+        self.fn_fn_types.insert(sym, fn_ty)
         fn_val
+
+    fn ensure_llvm_memcpy_declared() -> i64: self.ensure_llvm_mem_intrinsic("llvm.memcpy.p0.p0.i64", wl_ptr_type(self.context))
+    fn ensure_llvm_memset_declared() -> i64: self.ensure_llvm_mem_intrinsic("llvm.memset.p0.i64", wl_i8_type(self.context))
 
     fn emit_llvm_memcpy(dst: i64, src: i64, byte_count: i64):
         let fn_val = self.ensure_llvm_memcpy_declared()
