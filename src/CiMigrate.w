@@ -906,6 +906,9 @@ impl CiProject:
     // unit whose stem equals the header's (`dir/tommyhashdyn.h:12:1` ->
     // the module for `.../tommyhashdyn.c`), or -1 when no unit has it.
     fn header_owner_module(location: &str) -> i32:
+        // Only a HEADER's definition is API; a unit's own `static inline`
+        // helpers (tommyhashdyn.c's hashdyn_grow_step) stay private.
+        if not ci_migrate_location_is_header(location): return -1
         let stem = ci_migrate_location_stem(location)
         if stem.len() == 0: return -1
         for i in 0..self.module_paths.len() as i32:
@@ -1264,15 +1267,23 @@ fn ci_migrate_path_stem(basename: &str) -> str:
         end = end - 1
     if end == 0: basename.clone() else: basename.slice(0, (end - 1) as i64)
 
-// The file stem of a cursor location (`path:line:col`), "" when absent.
-fn ci_migrate_location_stem(location: &str) -> str:
+// The file of a cursor location (`path:line:col`), "" when absent.
+fn ci_migrate_location_file(location: &str) -> str:
     var end = location.len() as i32
     var colons = 0
     while end > 0 and colons < 2:
         end = end - 1
         if location[end] == ':': colons = colons + 1
-    if colons < 2: return ""
-    ci_migrate_path_stem(ci_migrate_path_basename(location.slice(0, end as i64)))
+    if colons < 2: "" else: location.slice(0, end as i64)
+
+fn ci_migrate_location_is_header(location: &str) -> bool:
+    ci_migrate_location_file(location).ends_with(".h")
+
+// The file stem of a cursor location (`path:line:col`), "" when absent.
+fn ci_migrate_location_stem(location: &str) -> str:
+    let file = ci_migrate_location_file(location)
+    if file.len() == 0: return ""
+    ci_migrate_path_stem(ci_migrate_path_basename(file))
 
 fn ci_migrate_excludes_contains(excludes: &str, basename: &str) -> bool:
     if excludes.len() == 0 or basename.len() == 0:
@@ -1801,7 +1812,10 @@ fn ci_migrate_collect_unsafe_extern_fns(session: i64, count: i32, primary_path: 
         let local_def = ci_find_fn_cursor(session, name)
         if local_def >= 0 and (owner_path.len() == 0 or owner_path == primary_path) and ci_migrate_fn_has_raw_pointer_param(session, i):
             ci_migrate_note_unsafe_extern_fn(ci_migrate_c_function_name(name))
-        if with_cimport_fn_storage_class(session, i) == CX_SC_STATIC:
+        // A static function stays local unless it is a header's inline
+        // definition another unit publishes (owner_path): then its calls
+        // here need the same unsafe context as any imported raw function.
+        if with_cimport_fn_storage_class(session, i) == CX_SC_STATIC and owner_path.len() == 0:
             i = i + 1
             continue
         if (owner_path.len() > 0 and owner_path != primary_path) and ci_migrate_fn_has_raw_pointer_param(session, i):
