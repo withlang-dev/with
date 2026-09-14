@@ -152,13 +152,73 @@ linked by G+k), so two checks replace it:
 ## Conforming pcre2 and zlib (the first two bundles)
 
 (c-algorithms is the third bundle, 2026-09-13: `lib/std/c_algorithms/`,
-package `std.c_algorithms`, root `bundle.w`, harness `test_cpp.w`; the
-same plan, wiring and lanes as zlib via `calg_wo` in `build.w`. See
+package `std.c_algorithms`, root `bundle.w`, harness `test_cpp.w`. See
 `docs/stdlib_sourcing_plan.md`, "Phase 1 status". TommyDS is the fourth,
 2026-09-14: `lib/std/tommyds/`, package `std.tommyds`, root `bundle.w`,
 harness `check_.w` (upstream's `check.c`; `check` collides with the
-prelude name), `tommy_wo` in `build.w`, corpora lane `tommyds-test`. See
-"Phase 2 status" in the same plan.)
+prelude name), corpora lane `tommyds-test`. See "Phase 2 status" in the
+same plan. Since 2026-09-14 every corpus is one entry in the registry
+below; nothing in `build.w` names a corpus.)
+
+## The corpus registry (build/corpus.w, build/corpora.w)
+
+Four corpora were enough to see the repeated shape, and enough to see the
+failure mode: corpus identity was threaded by hand through 27 sites of
+`build.w` (the compat runtime's bundle args, the stage and release
+embeddings, the bootstrap empty slots, four stage links, two Linux and two
+Windows cross plans, the drift and root-check lanes) plus three exclusion
+lists in `build.w`, `build/runtime.w` and `build/compiler.w`, and each
+`build/<corpus>.w` copied the same fetch/stage/migrate/root/check/promote
+pipeline. Missing one site does not fail cleanly; it embeds a corpus as
+source, or links a stage without its bundle, or leaves a cross target
+without it. At 20 corpora that is a hand-expanded database in code.
+
+The registry replaces that with two records and one loop:
+
+- **`Corpus`** (`build/corpus.w`) is the upstream source, its migration and
+  its test oracle: name, target stem, package, corpus directory, the pinned
+  `Upstream` (URL, sha256, revision, where the tree lives under `out/`),
+  the license file, the harness modules, the drift harness, the module
+  floor, the migration's defines and excludes, what a promote waits for,
+  which lane `:test` runs, and six hooks — `prepare_reference`, `stage`,
+  `migrate`, `finish_generated`, `verify_generated`, `lanes`. A hook is an
+  explicit function; there are no flags. The common path is strong
+  (`corpus_migrate_directory`, the `corpus_no_*` defaults) and an unusual
+  library gets one small hook: PCRE2 generates its `config.h` in
+  `prepare_reference` and completes cross-module imports in
+  `finish_generated`; zlib migrates its two test programs one at a time in
+  `migrate`; STC will stage template instantiations in `stage`.
+- **`WoBundle`** (`build/wo.w`) is the compiled artifact: name, corpus
+  spelling, root, target, ABI stamp, store slot. `corpus_bundle_plan`
+  derives one from a `Corpus`; today every corpus produces one bundle, and
+  the two records stay separate so that can change (one upstream backing
+  several bundles, or several small corpora sharing one) without touching
+  the registry.
+- **The registry** (`build/corpora.w`): `corpus_count()` and
+  `corpus_at(i)`, in bundle order. `build.w` derives `corpus_plans` from
+  it and every site loops; the embedded-stdlib exclusion, the compat
+  runtime's `exclude=` args and the spec inventory's `internal-module=`
+  args come from the same list; `corpus_pipeline` registers the generic
+  targets for each corpus — `<stem>-download`, `<stem>-reference`,
+  `<stem>-prepare-reference`, `<stem>-migrate`, `<stem>-check-generated`,
+  `<stem>-promote`, `<stem>-bundle-root` (regenerates the root),
+  `<stem>-bundle-root-check`, `<name>-wo-drift` — and then the corpus's
+  own lanes. A corpus is present everywhere it must be by construction.
+
+Adding a corpus: one `build/<corpus>.w` with `pub fn <corpus>_corpus() ->
+Corpus` (its facts and hooks; the lanes hook registers its upstream test
+lane), one line in `corpus_at`, and `corpus_count` bumped. The registry
+is indexed rather than a `Vec[Corpus]` because a `Corpus` is ephemeral
+(its hooks take references, which a plain record may not hold) and the
+pinned seed's comptime evaluator iterates a `Vec` of ephemeral records
+incorrectly; every other shape in the registry is what the seed already
+evaluates for `Target`.
+
+The proof of the refactor was byte identity: with the same migrator, the
+old per-corpus pipelines and the registry pipeline produce identical
+migrated trees, and `wo-drift` rebuilds every stored bundle byte for byte.
+The one deliberate text change is the bundle root's header comment, now
+written by the generic generator (`with build :<stem>-bundle-root`).
 
 What each is today, and what changes. Both follow the one pattern; every
 later corpus follows it from day one.

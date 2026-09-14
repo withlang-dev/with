@@ -155,7 +155,9 @@ it. That gives:
 
 ## The pipeline (pcre2's, reused)
 
-Per corpus, exactly what `build/pcre2.w` does today:
+Per corpus (since 2026-09-14 the generic pipeline in `build/corpora.w`
+driven by the registry, `docs/wo_bundles.md` "The corpus registry"; a
+corpus is a `Corpus` declaration in `build/<corpus>.w` plus its hooks):
 
 1. **Pin.** Upstream release tag, tarball URL, sha256 constant. Re-migration
    happens only when the pin changes (the SDLC rule: we re-migrate, never
@@ -397,7 +399,7 @@ by the M*LIB-backed `BTreeMap`/`BTreeSet` work in Phase 4.
   `lib/std/c_algorithms/` as the third `.wo` bundle (`c_algorithms.wo`;
   `bundle.w` root, `c-algorithms-bundle-root-check`, drift lane with
   upstream's `test-cpp` as the harness). The build wires it exactly as
-  zlib's bundle at every site (`calg_wo` in `build.w`).
+  zlib's bundle at every site (since 2026-09-14 through the corpus registry).
 - Upstream tests: all 17 test programs pass under With with
   `ALLOC_TESTING`. Each test is its own whole migration (engine + framework +
   test) because the programs' globals are independent; the migration is
@@ -455,7 +457,7 @@ adapters have complexity and drop evidence. #939 remains a Phase 3 gate.
   promoted to `lib/std/tommyds/` as the fourth `.wo` bundle (`tommyds.wo`;
   `bundle.w` root, `tommyds-bundle-root-check`, drift lane with upstream's
   `check.c` as the harness — module `check_`, since `check` is a prelude
-  name). Wired as c-algorithms is at every site (`tommy_wo` in `build.w`).
+  name). Wired as c-algorithms is at every site (through the corpus registry).
 - Upstream test: `check.c` runs to `OK` under With (37 timed sections,
   every structure's insert/search/remove/sort paths, `tommy_hash` test
   vectors). The corpora lane `tommyds-test` (in `:test`) compiles it from
