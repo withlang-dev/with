@@ -250,10 +250,20 @@ pub fn run_calg_test_action(ctx: ActionCtx) -> i32:
         let binary = output ++ "/test-" ++ name
         // The program's directory is the project root so its lib/ root holds
         // the package; the release binary's embedded std supplies std.libc.
-        let compile_args: Vec[str] = [compiler.clone(), "build", "--no-prelude", "-O1", calg_tests_package_dir() ++ "/" ++ calg_test_module(name), "-o", calg_abs(ctx, binary)]
+        // Build-layer code is compiled by the SEED: a collection literal with
+        // moved element temporaries is #1122 under seeds before 9ccd1e2d.
+        var compile_args: Vec[str] = Vec.new()
+        compile_args.push(compiler.clone())
+        compile_args.push("build")
+        compile_args.push("--no-prelude")
+        compile_args.push("-O1")
+        compile_args.push(calg_tests_package_dir() ++ "/" ++ calg_test_module(name))
+        compile_args.push("-o")
+        compile_args.push(calg_abs(ctx, binary))
         let compiled = ctx.process_runner().run_capture_cwd(compile_args, calg_abs(ctx, binary ++ ".compile.stdout"), calg_abs(ctx, binary ++ ".compile.stderr"), 600000, calg_abs(ctx, program_root))
         if compiled.rc != 0: return calg_fail(ctx, "compile test-" ++ name ++ f" exited {compiled.rc}\n" ++ fs.read_text(binary ++ ".compile.stderr"))
-        let argv: Vec[str] = [calg_abs(ctx, binary)]
+        var argv: Vec[str] = Vec.new()
+        argv.push(calg_abs(ctx, binary))
         let result = ctx.process_runner().run_capture(argv, calg_abs(ctx, binary ++ ".stdout"), calg_abs(ctx, binary ++ ".stderr"), 300000)
         if result.rc != 0: return calg_fail(ctx, "test-" ++ name ++ f" exited {result.rc}\n" ++ result.stdout ++ result.stderr)
         report = report ++ "PASS test-" ++ name ++ "\n"
