@@ -1,7 +1,15 @@
-# Handoff — stdlib sourcing Phases 0/1/2 (2026-09-14, evening)
+# Handoff — stdlib sourcing Phases 0/1/2 and the corpus registry (2026-09-14, night)
 
-Three worktrees under `~/.local/with-staging/`, one PR stack. Read this
-whole file before touching any of them. Nothing here is reseeded.
+Worktrees under `~/.local/with-staging/`. Read this whole file before
+touching any of them. Nothing here is reseeded.
+
+Where things stand on GitHub: #1129 (Phase 0) is MERGED into main as one
+squash commit. #1138 was squash-merged into fnabi-phase0 and #1141 into
+c-algorithms-phase1 (both stacked PRs; neither reached main). #1142
+(`c-algorithms-phase1` → main) carries Phase 1 + Phase 2; origin/main was
+merged into it (96b31754, every conflict resolved to the branch side, which
+is the superset; abi-hash-check green). The registry branch below stacks
+on c-algorithms-phase1 and targets main once #1142 lands.
 
 | Worktree | Branch | PR | State |
 |---|---|---|---|
@@ -90,10 +98,40 @@ with `return` truncates the output file; #1139 (two modules of one package
 cannot both define a private fn of one name — user packages only, the std
 bundle path is fine).
 
-## 4. Open follow-ups
+## 4. The corpus registry (`corpus-registry`, branch off c-algorithms-phase1)
+
+Ruled by Eric 2026-09-14 ("do it now, before STC"): `build/corpus.w`
+(the `Corpus` record: upstream pin, package, directory, harness, floor,
+defines, excludes, promote ordering, test lane, six explicit hooks) and
+`build/corpora.w` (the registry `corpus_count`/`corpus_at`, the generic
+actions, `corpus_pipeline`, the exclusion and internal-module args, the
+wo-drift group, the :test deps). `build.w` derives `corpus_plans` and
+loops at all 27 former sites; `build/runtime.w` takes `exclude=` args,
+`build/compiler.w`'s inventory `internal-module=` args. The four corpus
+modules are declarations + hooks + lanes. Docs: wo_bundles.md "The corpus
+registry" (also why the registry is indexed: ephemeral records and the
+seed's comptime evaluator). Commits ab9ac09c, 33bd693a (roots regenerated,
+comments only), 3534f1fd.
+
+Proof done: fixpoint green; `wo-drift` byte-identical for all four
+bundles; with the same migrator the old pipelines (run in the Phase 2
+tree) and the registry pipeline produce identical migrated trees for
+pcre2, zlib, c-algorithms and TommyDS (pcre2's registry output adds the
+root and UPSTREAM the raw old dir lacked). Battery `:test` → `:test-green`
+→ `:last-green` was running (scratch `cr_bt_*.log`, marker
+`cr_bt_done`); then push, PR (base c-algorithms-phase1, retarget to main
+after #1142), watch lanes. Seed-evaluator traps hit are in memory
+(`corpus-registry`): plain records cannot hold reference-taking fn fields
+(ephemeral can); a Vec of ephemeral records does not iterate under the
+seed; hook values need `&ctx`/`&path` explicitly; `module` is a keyword.
+
+## 5. Open follow-ups
 - #1139 private-name collision across modules of one package.
 - #1140 UCRT `_wassert` + wide string literals in the migrator.
 - Phase 0 codegen follow-ups (§1).
 - `hashlin`/`hashtable` facades: same node protocol, not surfaced until a
   facade needs incremental or fixed-size resize.
-- Phase 3 (STC) per the plan.
+- Phase 3 (STC) per the plan: its template-instantiation staging is a
+  `stage` hook on a `Corpus`; the registry is the test of the abstraction.
+- Retarget: after #1142 merges, open/retarget the registry PR to main and
+  delete the merged phase branches so nothing is stranded.
