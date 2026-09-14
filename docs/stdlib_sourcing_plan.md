@@ -448,6 +448,61 @@ map engine. The facade design item is node ownership (above).
 Gate: `check.c` passes under With; benchmark table recorded; specialized
 adapters have complexity and drop evidence. #939 remains a Phase 3 gate.
 
+**Phase 2 status (2026-09-14, branch `tommyds-phase2`).**
+- Corpus: pinned (`build/tommyds.w`, amadvance/tommyds `1f3727fc`),
+  migrated raw with `with migrate` (the 13 units as modules + `defs.w`;
+  `tommy.c`, upstream's amalgamation of those units, is excluded),
+  promoted to `lib/std/tommyds/` as the fourth `.wo` bundle (`tommyds.wo`;
+  `bundle.w` root, `tommyds-bundle-root-check`, drift lane with upstream's
+  `check.c` as the harness — module `check_`, since `check` is a prelude
+  name). Wired as c-algorithms is at every site (`tommy_wo` in `build.w`).
+- Upstream test: `check.c` runs to `OK` under With (37 timed sections,
+  every structure's insert/search/remove/sort paths, `tommy_hash` test
+  vectors). The corpora lane `tommyds-test` (in `:test`) compiles it from
+  the checked-in corpus with the release binary and runs it. Re-migration:
+  `WITH=out/release/bin/with out/release/bin/with build :tommyds-promote`.
+- Migrator fixes made for it, all general: `__builtin_clz/ctz/popcount/
+  bswap` lower to the integer methods (`(x as u32).clz()`); a pointer to a
+  function typedef is a function pointer; `qsort`/`rand`/`srand` and
+  Darwin's mach clock are std.libc bindings (the clock modeled portably:
+  the runtime's monotonic nanoseconds, timebase 1/1); a header's
+  `static inline` definitions are published once by the unit of the same
+  name and imported by every other unit (TommyDS keeps `tommy_hashdyn_search`,
+  `tommy_hashlin_search`, `tommy_inthash_u32` in headers; before this every
+  includer had a private copy and nothing outside the corpus could call
+  them). A header no unit owns (`tommytypes.h`'s `tommy_ilog2`) keeps a
+  private copy per includer.
+- Node ownership, the facade design item: `std.collections.hash_index.
+  HashIndex[K: Hash + Eq, V]` over `hashdyn`. The engine threads intrusive
+  nodes it never allocates; the facade owns every node — one heap slot per
+  entry holding the node (first, so the engine's node pointer is the slot),
+  the With key comparator (fixed offset, read by the one C trampoline
+  `hash_slot_compare`), the key and the value. `get` observes, `remove`
+  and a replacing `insert` transfer, `clear`/`drop` walk the buckets and
+  release every slot exactly once. Behavior test `behav_hash_index`,
+  complexity row `hash-index` (`test/complexity/stdlib.w`), drop-audit
+  cells `hash_index_*` (`tools/drop_audit.w`). `hashlin` (incremental
+  resize) and `hashtable` (fixed) stay internal engines: same node
+  protocol, so the facade would be the same file with three `init`
+  calls; not a public surface until a facade needs it.
+- Benchmark (`test/benchmark/hash_engines.w`, `with run`; i32 keys,
+  n = 200000, ns per operation, median of three, Eric's laptop, `-O1`):
+
+  | engine | insert | lookup | remove |
+  |---|---|---|---|
+  | `rt_core` HashMap[i32, i32] | 41 | 9 | 58 |
+  | HashIndex[i32, i32] (hashdyn, facade) | 32 | 3 | 26 |
+  | tommy_hashdyn raw (caller-owned nodes) | 18 | 5 | 15 |
+  | tommy_hashlin raw | 24 | 6 | 14 |
+  | tommy_hashtable raw (fixed, n buckets) | 4 | 7 | 10 |
+  | c-algorithms hash_table raw | 47 | 1 | 25 |
+
+  The facade's cost over the raw engine is one heap slot per entry and
+  the key hash + comparator call; its lookup reuses one probe slot.
+
+  STC remains the selected default owning map engine (Phase 3); the
+  numbers above are the comparison the plan asked for, not a selection.
+
 **Phase 3 — STC, whole: the macro-migrator campaign.**
 STC is valuable because its template mechanism is nasty: containers are
 instantiated by defining parameters and including the header, so one
