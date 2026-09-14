@@ -2,11 +2,11 @@
 
 ## Current integration (2026-09-12)
 
-PCRE2 C4 (#1101), SDK-macro hygiene (#1107), and target-correct va_list
-(#1108) have merged. Main is `00a2fc9c`. Their old blockers below are
+PCRE2 C4 (#1101), SDK-macro hygiene (#1107), target-correct va_list
+(#1108), and zlib (#1103) have merged. Main is `17109853`. Their old blockers below are
 historical, not current instructions to reproduce them again.
 
-Zlib #1103 is integrated with that main in the `zlib-1103-ready` worktree.
+Zlib #1103 was integrated in the `zlib-1103-ready` worktree and merged.
 The merge keeps main's populated stage2/stage3 embedding object and adds
 both bundles to it; only stage1 uses empty bundle slots. The renamed
 `std.zl` corpus retains the macro-hygiene and c_va_list re-promotion.
@@ -101,330 +101,377 @@ Debugger launches now work; a disabled DevToolsSecurity status did not
 establish an authorization blocker, and no approval popup was seen.
 Do not repeat the performance gate or
 use the earlier quiet-box requirement below; the local ratio ruling
-supersedes it. C4 is not yet merged or reseeded.
 
-You are picking up a campaign mid-flight. This note is self-contained: it
-tells you where every thread stands, exactly what is next, the gates that
-must hold, and the traps that cost days this week. Read `CLAUDE.md` first —
-the self-host discipline is binding, and the memory notes in
-`~/.claude/projects/-Users-eric-with/memory/` (indexed by `MEMORY.md`) hold
-the rulings and traps in more detail than fits here.
+## Historical snapshot — the zlib `.wo` bundle and the ABI/bundle blocker chain (2026-09-09)
 
-## 0. Where the repo stands (stable — build on it, don't re-fight it)
+The following preserves the September 9 investigation. Its open blockers and
+next-step instructions are historical; the current integration update above
+supersedes them.
 
-- **Main is green on all five CI lanes** (macOS, linux-x86_64, linux-aarch64,
-  windows-x86_64, windows-aarch64) at `79d523f4`. Windows was the last
-  holdout (#1081, a native-Windows `invalid free` in the compiler building
-  the pcre2 bundle); it is closed, and `fix_windows.md` records the route.
-- **Seeds:** `seed.lock` pins Mac/Linux to **v0.15.2.0** and both Windows
-  platforms to **v0.15.2.1**. Every platform bootstraps from a published seed
-  it can use. `with build :seed` reads the lock; `tools/bump_seed_pins.w`
-  rewrites every workflow pin from it.
-- **Never-again guards, all landed:** `seed.lock` + the `:seed-compat` lane
-  (the pinned seed builds stage1 of a tree copy — run it with the FRESH
-  compiler, see §6), D40 seed numbering (`docs/decisions.md`: `Y` is a
-  bootstrap-compatibility group, a breakage bumps `Y` and resets `Z`), and
-  publish-first releases (`with build :publish-release-asset`,
-  `build/release_publish.w`: each platform adds its asset the moment it is
-  verified; nobody waits for the slowest runner).
-- **Open PRs:** only #1078 (Eric's own draft audit evidence; not a review
-  target). Everything mergeable was merged or closed-as-landed on 09-07.
+This is a complete state dump for an agent picking up the `.wo` bundles /
+stdlib-sourcing campaign. It is long on purpose: read it all before touching
+anything. The headline is a **real, unsolved macOS bug** (section 1) that
+gates two PRs, plus a **three-deep dependency chain** of ABI/migrator fixes
+(section 2). Everything is on branches/worktrees; `main` is untouched.
 
-## 1. The campaign and its sequence
+Author/commit rules (do not violate): commits are `Eric Hartford
+<eric@quixi.ai>`, never any other identity, never `lazarus.enterprises`; no
+attribution/co-author trailers. Never `git stash`. No Python/bash/perl/sed/awk
+for scripts or transforms — use With one-liners (`with -p`/`-n`/`-e`). Never
+`-O0`. Only Eric blesses spec wording. The Bash tool's shell is **zsh** (an
+unquoted `$OPTS` holding several flags is ONE argument and gets silently
+dropped — spell flags out).
 
-The goal, per `docs/wo_bundles.md`, `docs/with-abi.md`, `docs/abi_roadmap.md`,
-`docs/fn_abi_descriptor_design.md`, and `docs/stdlib_sourcing_plan.md`:
-compile each migrated C corpus **once** into a `.wo` bundle behind a
-versioned With ABI (Level 0), so that bringing in the container/algorithm
-corpora costs nothing per build. The sequence in `wo_bundles.md` §Sequence:
+---
 
-| step | state |
-|---|---|
-| 1. ABI v1 written + ABI-hash check in the battery | **done** |
-| 2. pcre2 → `pcre2.wo`, `with_regex_*` shim retired | mechanism + bundle landed (C1–C3); **shim retirement = C4, built but NOT merged — see §2** |
-| 3. zlib → `zlib.wo` | **not started** — §3 |
-| 4. new corpora arrive as `.wo` from day one | gated on 2 and 3 — §4 |
+## 0. Branches, worktrees, PRs, issues (verified 2026-09-09 ~18:30Z)
 
-**The order is not negotiable:** C4 lands, then zlib, then Phase 0 of the
-corpora plan, then c-algorithms. zlib and Phase 0 touch the same
-embed/link wiring C4 touches, so starting them before C4 lands only adds to
-C4's rebase. Phase 0's *docs* (§4) are the one thing that can run in
-parallel.
+| Branch  | Worktree                          | Tip       | Meaning |
+|---------|-----------------------------------|-----------|---------|
+| main    | `~/with`                          | a2df2115  | untouched baseline |
+| wo-c4   | `~/.local/with-staging/c4r`       | 7910cf98  | **PR #1101** (C4: retire regex shim). Eric-finished; +my CI diagnostics |
+| zlib-wo | `~/.local/with-staging/zlibwo`    | 61f1e301  | **PR #1103** (zlib `.wo` bundle), stacked on wo-c4 |
+| va-list | `~/.local/with-staging/valist`    | 71b7467c  | **#1104** va_list ABI fix, off wo-c4. WIP, does not build yet |
 
-## 2. C4 — retire the regex shim. THE BLOCKER. Land this first.
+- **PR #1101** (wo-c4): `linux aarch64/x86_64` + `windows aarch64/x86_64` GREEN;
+  **`macOS arm64` FAILURE** (section 1). This is the ONLY thing blocking C4.
+- **PR #1103** (zlib-wo): `linux aarch64` + both `windows` GREEN (the Windows
+  `fcntl` fix worked); **`macOS arm64` FAILURE** (same bug, section 1);
+  **`linux x86_64` FAILURE** (= #1104 va_list crash, section 2).
+- **#1102** OPEN — migrator leaks host SDK macros into shared defs.
+- **#1104** OPEN — va_list modeled as a pointer on every target.
 
-### What it is
-`std.regex` calls pcre2 directly through the bundle interface; the
-`with_regex_*` runtime shim and every hook that carried it are deleted
-(D30); the compiler's regex-literal validation and codegen go through the
-facade. Tracked by #955 (also covers the emit-C lane after the bundle).
+Landing order intended: fix macOS bug → #1102 → #1104 → C4 (#1101) → #1103.
+The macOS bug (section 1) must be solved first; it blocks BOTH #1101 and #1103.
 
-### Where the code is
-Two worktrees under `~/.local/with-staging/`:
+---
 
-- **`c4r` — the landing tree.** Branch `wo-c4` rebased onto main
-  `79d523f4`: **head `973a738a`, 32 commits**, ABI hash re-recorded for the
-  merged tree, `with check src/main.w` passes with the seed. This is what
-  eventually merges to main.
-- **`c4p` — the measuring tree.** Head `980a12e0` (same fixes, on the older
-  base), working tree clean. Lane measurements were taken here because the
-  box must be quiet for a valid number.
+## 1. THE BLOCKER: macOS embedded-bundle bug (unsolved, not reproducible locally)
 
-Both carry the full C4 series, in this order: the facade (C4.1), regex-literal
-validation via `std.regex` (C4.2), codegen through the facade, the shim
-deletion (C4.4), the ambient-tier/prelude changes, the bundle-corpus
-in-unit compile for emit-C, the MIR global-proxy mark, then the three
-performance commits: **lazy interface collection** (`fe5d31dd`-class),
-**indexed symbol/signature/extern-var lookups** (`a463244a`), and the
-**on-demand interface merge** (`e331b848` + the root-tail rotation
-`2fe8ecb9`). Plus `1c775d05`: three "source wins" rules (Sema
-`collect_fn_decl`, `collect_extern_fn`, codegen `declare_function_at_inner`)
-so an interface declaration never displaces a same-named source
-declaration whatever the order.
+### What fails
 
-### The gate (Eric's ruling, 2026-09-07: "we are gonna need to fix the perf")
-**Hard. C4 does not land above it.**
-- hello-world `with check` ≤ **0.05 s** (pre-C4 baseline 0.03 s)
-- behavior-tests lane ≤ **158 s** (pre-C4 baseline 144 s; that is +10%)
-- measured on an **idle box**, first cold run excluded, release compiler.
+Both `wo-c4` and `zlib-wo` fail the `macOS arm64` CI lane on the **same two
+tests**, deterministically (three reruns, identical):
 
-### Where the numbers stand
-| mechanism | hello check | behavior lane | verdict |
-|---|---|---|---|
-| C4 without perf work | 0.23 s | 414 s | the bug Eric ruled on |
-| + lazy interface collection | 0.07 s | 177 s (green) | hello over, lane over |
-| + lookup indexes | 0.07 s | 177 s (no change — expected; it is the fix for large units) | — |
-| + on-demand merge, first run | **0.05 s ✓** (`decls` 4771→1366; interface parses 59 of 3,405 lines) | 306.8 s **RED**, 14/980 failed | invalid |
-| + root-tail rotation, rerun | 0.05 s ✓ | 282.2 s, **GREEN** (980/980) — but **invalid**: the box carried a full core of foreign load (Steam ~99% of a core, WindowServer, VS Code, a VM; load 3.0–3.5) | not a gate measurement |
+1. **`selfcheck`** corpus test = `out/stage/bin/with-stage2 check src/main.w`.
+   Errors:
+   ```
+   let stderr = with_fs_read_file(err_path)   // src/main.w:1307
+   error: wrong argument type in call to 'reduce_discard_kept_test_binary'
+     = label argument 'stderr' has type *mut c_void
+     = note: parameter 'text' expects &str
+   error: shadowing is not allowed for 'stderr'   --> src/main.w:1:1
+   ```
+   The local `stderr` binding is typed `*mut c_void` — the type of the libc /
+   bundle-interface global `stderr` (Darwin's `__stderrp`). The local should be
+   `str` (return of `with_fs_read_file`).
 
-**Neither 177 s nor 282 s is admissible** — both were taken on a loaded box.
-Per-test timings on `behav_derive_clone.w`, same box state, three binaries:
-pre-C4 seed check/build/test 0.03/0.09/0.39–0.54 s; eager C4 0.45/0.54/0.81 s;
-on-demand C4 **0.05/0.12/0.40 s** — parity with the seed on `test`, half of
-eager C4. On that arithmetic the lane on a quiet box lands near **150–160 s**,
-i.e. at the gate. So the "regression" was load, not the merge.
+2. **`behav_cli_test_command_args.w`** (a p7 CLI test). It writes a trivial
+   `tests/one.w` (`fn main: print("one")`) into a scratch dir and runs the
+   compiler there. It fails with:
+   ```
+   error: import module not found: 'std.re.defs' (build-generated modules live
+     under out/gen; run `with build` once in a fresh checkout)
+   error: import module not found: 'std.re.pcre2_compile' ...
+   ... (every std.re.* module)
+   ```
 
-The 14 failures in the first run were a real ordering bug: the merge
-appended interface chunks *after* the root's declarations, but
-`Sema.is_local_decl` takes the **last N** declarations of the merged pool as
-the root's, so the root's own types read as imported (`derive` generation,
-sealed-trait locality and `copy` all failed). `2fe8ecb9` rotates the chunks
-in before the root tail; the rerun above proves it (980/980).
+### Root cause (as far as established)
 
-**The remaining per-compile residue is measured** (phase profile of `check`
-on `behav_derive_clone.w`, on-demand release vs seed, ms): parse 9.7 vs 3.5,
-resolve 9.9 vs 3.8, imports 4.2 vs 0.3, interface 4.2 (new), comptime 9.9
-vs 4.4, sema 4.9 vs 3.9, MIR 3.5 vs 2.8 — **48 vs 21 ms**. About 16 of the
-extra 27 ms is the interface sections' **937 `use` lines**: parsed as `use`
-declarations twice (Resolve, then the import worklist — `decls` 1368 vs
-447, the 920 extra are those use decls), each resolved to a module path
-individually (`resolve_module_path_frontend` × 937 for ~35 distinct
-modules), then carried through the comptime transform's pool clone before
-being stripped. The chunk fixpoint itself is 4.2 ms (two passes); the
-rotation is sub-millisecond. **That fix is done and committed** (`c4p`
-`980a12e0`, ported to `c4r` as `4d775b12`): Resolve turns a section's `use`
-lines into import edges directly from text (`process_interface_module`),
-and the worklist enqueues a section's imports from the same text with a
-per-compile name→path memo (35 distinct modules) — no use declaration of a
-section enters the pool. Same check: **48 → 40 ms** (seed 21), `decls=463`,
-imports 0.5 ms. The same commit fixes a latent pairing bug it exposed: a
-section's path was pushed to the pending list before its imports recursed
-and its text after, so `pcre2_compile_8` was attributed to
-`pcre2_compile_cgroup.w`, its link name hashed the wrong module and the
-bundle went unlinked (caught by the regex tests). With it: check 0.04 s ×3
-(seed 0.03), hello-world **0.04–0.05 s ×4** — the hello gate is met; the 14
-derive/sealed/copy tests, the three regex behavior tests, the regex/abort
-repros, the compiler self-check and both fixtures all pass. The branch's
-`docs/wo_bundles.md` (`973a738a`) documents all five mechanisms with their
-figures.
+Both symptoms are downstream of the **embedded pcre2 bundle interface not being
+used** on the macOS CI build. When the bundle interface is active, `use
+std.regex` resolves to the embedded `.wi`, `std.re.*` resolve to it, and the
+libc/interface `stderr` global is import-gated (a local `stderr` wins). When it
+is NOT active, the frontend falls back to looking for `std.re` **sources** under
+`out/gen` (symptom 2's message), and the flat namespace lets the interface/libc
+`stderr` shadow a program local (symptom 1).
 
-### What you must do next (in order)
-1. **Measure the gate as a RATIO, LOCALLY — this is the only thing left before landing.** Every mechanism is done; per-test arithmetic (`test` 0.40 s vs the seed's 0.39–0.54) puts the lane at or under the seed's own 144 s. Eric's rulings (2026-09-09): activity on the laptop blocks nothing — do **not** wait for an idle box — and the measurement is **local, not CI**. The gate is *relative* (≤ +10% over the pre-C4 baseline), so measure it on this box under identical conditions where load cancels: run the pre-C4 seed's behavior lane and C4's behavior lane **interleaved, A/B/A/B, at least two full pairs**, same box, release compiler. Report each run's wall time and the ratio C4/seed; **ratio ≤ 1.10 is the gate.** A wall-clock number taken alone on the shared laptop (177 s, 282 s) is load noise and proves nothing either way.
-3. Iterate until the lane is **green and ≤ 158 s on the `c4p` base.** If the quiet-box number lands above the gate, profile a representative behavior test (not hello) with `WITH_PROFILE=1` and name the next mechanism with its ms, as above. Every mechanism you add: report its measured delta.
-4. **Port to `c4r`**, re-measure the lane once on the rebased tree (main's changes can shift it), then the full battery **with the move and drop audits** (C4 touches MIR): `with build`, then with the fresh `out/release/bin/with`: `:fixpoint`, `:move-audit`, `:drop-audit`, `:test`, `:seed-compat`, `analyze src/main.w audit:all`, `:test-green`, `:last-green`. Report all numbers. Only then push, reseed (`:update-seed`, `:install-user`), close #955.
-5. Update `docs/wo_bundles.md` §"Shim retired (batch C4)" with the final measured table (the branch's copy has the 0.23 s / 414 s pre-fix numbers and the placeholder).
+### Critical facts — read these before forming a theory
 
-### The prior agent
-Session id `aa40516def8194a3f` did all of the above and knows the code
-intimately; it can be resumed with a message if it is still reachable. It
-went idle twice without reporting a lane number — if you resume it, demand
-the number first. Its regression-found-then-fixed history is in this
-session's memory note `wo-c4-plan.md`.
+- **Not a flake.** Deterministic across reruns. The failing tests are real
+  compile errors, surfaced by the `Failure diagnostics` CI step (added on wo-c4
+  in 7910cf98 / zlib-wo 61f1e301 — `if: failure()` dumps captures + probes the
+  stage2 binary; it is the reason we can see this at all).
+- **Not reproducible locally.** On `~/.local/with-staging/c4r`,
+  `out/stage/bin/with-stage2 check src/main.w` returns **rc 0**, and
+  `out/release/bin/with test test/behavior/behav_cli_test_command_args.w`
+  passes. The C4 release binary embeds the bundle (`strings out/release/bin/with
+  | grep -c std/re/pcre2_compile` = 6) and its abi-sha is
+  `ea839643fc8666b5e605023e5e41f05026918a62405ea69d7fdf91f6f179718b`.
+  **The failure is layout/build-dependent** — the #729 / test-runner-only class
+  (see the `test-runner-only-failures` playbook: hard-link the runner's binary,
+  break on the collision). It manifests on the CI runner's freshly-built
+  stage2/release, not on a locally-built one.
+- **The zlib-wo Sema fix does NOT fix it.** I hypothesized that my zlib-wo
+  commit `ca40e7f5` ("a source definition keeps the flat signature index
+  whatever the collection order; interface globals bind per declaring module")
+  would green macOS. **REFUTED**: zlib-wo (61f1e301) CONTAINS ca40e7f5 and still
+  fails macOS on the identical two tests. Do not re-assert this.
 
-## 3. zlib → `zlib.wo` (DONE on branch `zlib-wo`; PR after #1101)
+### Candidate causes NOT yet checked (start here)
 
-**State (2026-09-09).** Branch `zlib-wo` = `wo-c4` (C4, PR #1101) + the
-zlib batch, in worktree `~/.local/with-staging/zlibwo`. Battery #3
-fully green there (build 195 s, fixpoint 289 s, test 1006 s,
-seed-compat, test-green, last-green; both drift lanes byte-identical,
-both harnesses run). Not reseeded: reseed from main once #1101 and this
-PR have merged. The second bundle was not "mechanical": it exposed five
-consumer-side defects and one build-cache defect, all fixed in the batch
-(commits `af9fd36c` migrator, `59012470` variadic interface,
-`c8835444` corpus, `ca40e7f5` Sema, `f6b82ba0` codegen, `0da6940b`
-build-layer, `ab30b320` store key) — see `docs/wo_bundles.md` and the
-notes below. **Measured** (interleaved A/B, `WITH_PROFILE=1`, release
-compilers of `wo-c4` vs `zlib-wo`, 3 rounds): a program importing
-`std.zlib` (`test/behavior/behav_zlib_std.w`) spends ~800 ms in the
-compiler's phases with the corpus in-unit and ~160 ms with the bundle
-(imports 48→1.3 ms, comptime 75→11 ms, mir.lower 30→4 ms, llvm
-gen/optimize/emit 570→115 ms; link unchanged at 26 ms). `with check
-build.w` is unchanged (57 ms comptime either way) and the compiler's
-own build is unchanged: the compiler binary never reaches zlib, so
-"stop recompiling zlib on every build" is a per-consumer win, not a
-compiler-build win.
+1. **Embedded-bundle abi-sha mismatch on the macOS build.** `Link.w`
+   (`link_stage_select_embedded_bundles`) refuses a bundle whose manifest
+   abi-sha != the compiler's baked abi-sha, and the frontend then has no
+   interface → falls back to out/gen. If the macOS CI build stamps a different
+   abi-sha into the compiler than into the bundle (build ordering, a stale
+   embed, the `.unstamped` vs stamped binary), the bundle is silently refused.
+   Check: on the runner, `with version --abi-sha` vs the embedded bundle
+   manifest's abi-sha; look for a "was built for ABI X but this compiler is Y"
+   eprint (it may be swallowed).
+2. **Empty/stale embed data.** `out/gen/compiler/EmbeddedBundlesData.w` (the
+   embed index) or the embedded `.wi` blob could be empty/wrong on the macOS
+   build. The p7 "run with build once" message is exactly the fresh-checkout
+   fallback — the frontend found neither embedded nor out/gen sources.
+3. **cwd / WITH_OUT_DIR resolution.** The p7 test runs the compiler with cwd =
+   scratch dir. macOS CI sets `WITH_OUT_DIR=<workspace>/out` (ci.yml). If bundle
+   / out/gen resolution uses cwd instead of WITH_OUT_DIR, a scratch-cwd compile
+   fails to find them. But the EMBEDDED bundle should not need out/gen at all —
+   so the real question is why the embedded path isn't taken.
+4. **The stderr collision itself** (symptom 1) may be a second, independent
+   flat-namespace hole not covered by wo-c4's `785730e1` / `b7758cad` /
+   zlib-wo's `ca40e7f5` — a local named exactly like a libc global the
+   (embedded or fallback) bundle interface re-exports. But if the bundle were
+   used correctly, `stderr` would be import-gated; so symptom 1 is likely also
+   downstream of "bundle not used."
 
-What the batch had to fix beyond the pcre2 template (each is a general
-rule now, not a zlib special case):
-- Sema flat namespace (D29-B pending): an interface declaration collected
-  after a same-named source definition kept `fn_decl_nodes` but
-  overwrote `sig_lookup` (std.zlib's `compress` vs the corpus's C
-  `compress`); interface globals were keyed by name alone (pcre2's
-  `UINT_MAX` hid zlib's). Both per-module now.
-- Codegen: unions were never predeclared, so the alphabetical `.wi`
-  (struct before the unions it holds) failed layout; a bundle build now
-  carries the non-corpus With functions its corpus reaches (std.libc's
-  gz I/O wrappers) as internal copies, because a whole-program consumer
-  never defines module-link-named symbols.
-- The bundle interface spells variadic functions (`gzprintf(..., ...)`).
-- The store slot is keyed by the compiler sources too (`compiler-src-sha`):
-  battery #2 linked a stale object under an unchanged ABI.
-- ToolFs accepted only project-relative paths, hiding the real error on
-  the helper-programs failure path; `std.zl` is an internal module for
+### How to reproduce (the hard part)
+
+You need the CI runner's binary or a from-scratch macOS build that reproduces
+the layout. Options: (a) trigger the macOS lane and pull the uploaded artifacts
+(zlib-wo's ci.yml `Failure diagnostics` dumps captures; consider adding an
+`actions/upload-artifact` of `out/stage/bin/with-stage2` + `out/gen` +
+`out/wo/*` on failure, as the Windows workflow already does); (b) a clean
+`git clone` + `with build :seed` + full `with build` on this Mac and run
+`out/stage/bin/with-stage2 check src/main.w` and the p7 test — try to hit the
+layout. The `WITH_ALLOC_NO_REUSE` / debug-allocator / `--dump-place-map` route
+applies once reproduced. This is a real deep-compiler bug; use the deep tools,
+not grep.
+
+**THE PLAN — a local CI VM via Apple Virtualization.** The failure is
+layout/build-dependent and does not reproduce on the dev Mac (option b keeps
+passing), so the strategy is to build a virtual machine that replicates the
+GitHub `macos-latest` runner environment as closely as possible and reproduce
+the failure inside it, where we can then attach the debugger. Use Apple's
+Virtualization framework (`https://developer.apple.com/documentation/virtualization`)
+to stand up a macOS arm64 guest that mirrors the runner: a clean checkout, the
+same seed (`with build :seed`, pinned in `seed.lock`), the same `.deps` LLVM
+SDK, the same env (`WITH_OUT_DIR`, `WITH`, `LLVM_PREFIX` per `.github/workflows/ci.yml`),
+and the same steps (`src/main build` → `build :fixpoint` → `src/main build :test`).
+The goal is a fresh, isolated filesystem/build layout matching the runner so the
+`#729`-class non-determinism actually triggers; once it fails inside the VM, the
+usual deep tools (debug allocator, `WITH_ALLOC_NO_REUSE`, breakpoints on the
+`stderr`/bundle collision, `--dump-place-map`, `--trace-ownership`) reach the
+live compiler branch. Per the self-host rule, any VM orchestration/driver we
+write is With, not shell/Python (the only exception is the framework calls
+themselves, reached via `extern fn`). This is Anka/Tart-style runner
+virtualization but built on the first-party Virtualization API so it stays a
+self-contained, reproducible local environment.
+
+CI run IDs for the dumps (`gh run view <id> --log`): #1101 macOS = 34368362224;
+#1103 macOS = 34372877059; #1103 linux x86_64 = 34372876934.
+
+---
+
+## 2. The dependency chain behind #1103's `linux x86_64` lane
+
+`#1103 (zlib bundle) → #1104 (va_list ABI) → #1102 (migrator macro leak)`.
+
+### #1104 — va_list is modeled as a pointer on every target (IMPLEMENTED, verified)
+
+**Bug**: `va_list` was modeled as the migration HOST's shape. On macOS it is
+`char *`, so a variadic C definition migrated there (zlib's `gzprintf`/
+`gzvprintf`, pcre2test's `cfprintf`) becomes `var __local_va: *mut i8`;
+`llvm.va_start` writes into an 8-byte slot. On SysV x86_64 the `__va_list_tag`
+is 24 bytes and `vsnprintf` wants a POINTER to it → stack corruption, **exit
+139** (this is #1103's `linux x86_64` `zlib-wo-drift` crash). Only variadic
+DEFINITIONS that read varargs are affected; calls and externs already work.
+pcre2 (the bundle) has none; only pcre2test (the harness) and zlib's gz layer.
+
+**Fix (on branch `va-list`, worktree `~/.local/with-staging/valist`, commits
+aec8b11a + 71b7467c):** C's va_list is a compiler-known per-target type
+`c_va_list`:
+- `TypeKind.TY_VA_LIST` (=21) in `src/Sema.w`; `ty_c_va_list` field, created
+  with `add_type(TY_VA_LIST,0,0,0)`, `register_prim("c_va_list", ...)`;
+  `is_copy` returns 1. Sema imports `TargetSpec`.
+- `src/TypeLayout.w`: `type_layout_c_va_list_size()` = 8 (Darwin/Windows) / 24
+  (Linux x86_64) / 32 (Linux aarch64); size_of/align_of handle TY_VA_LIST
+  (align 8). **TypeLayout.w is in `docs/with-abi.sha256` — re-record it.**
+- `src/Codegen.w` `sema_type_to_llvm`: TY_VA_LIST → `ptr` when size 8, else
+  `[i8 x size]`. Codegen imports `TypeLayout`.
+- **Share-place on Linux**: `Sema.sig_param_is_c_va_list_by_place(sig,pi)` (true
+  when the param is c_va_list AND `target_spec_os() == "Linux"`) →
+  `set_sig_param_value_ref_abi`, wired in `src/SemaDecl.w` for BOTH
+  `collect_fn_decl` and `collect_extern_fn`. `Codegen.declare_extern_fn`
+  declares a value_ref_abi param as `ptr`.
+- **Migrator**: `src/compiler/ClangBridge.w` `translate_type_recursive_mode`
+  checks the PRE-canonical spelling (`clang_getTypeSpelling` + `c_strstr
+  "va_list"`) and returns `c_va_list` BEFORE canonicalization decays a macOS
+  `char *` va_list. Also `CImport.w ci_map_builtin_typedef` maps
+  va_list/__builtin_va_list/__gnuc_va_list → c_va_list, the aggregate-va_list
+  path returns `ty_named("c_va_list")`, and `ci_translated_builtin_type_name`
+  knows it. `lib/std/libc.w`'s `vsnprintf`/`vfprintf`/`vprintf` take `c_va_list`.
+  `with_va_start`/`with_va_end` stay `*mut i8` (the migrator passes `&raw mut va`).
+
+**VERIFIED from IR** (`with ir X.w --target=linux_x86_64` vs native): the
+migrated pattern `var va: c_va_list; with_va_start(&raw mut va as *mut i8);
+vsnprintf(..., va)` emits, on linux_x86_64, `alloca [24 x i8]`, `va_start` on it,
+`vsnprintf(..., ptr %2)` (the tag ADDRESS); on darwin, `alloca ptr`, `va_start`
+on it, `vsnprintf(..., ptr %loaded)` (the char* BY VALUE). A macOS re-migration
+of `gzwrite.c` now emits `var __local_va: c_va_list` and `gzvprintf(...,
+__param_va: c_va_list)`.
+
+**Remaining for #1104 to land:**
+1. **Fix #1102 first** (below) — it blocks the pcre2 corpus re-promotion.
+2. Re-promote both corpora so `gzwrite.w` and `pcre2test.w` carry `c_va_list`.
+   The zlib half is done on `va-list` (71b7467c: only gzwrite.w's 2 va lines
+   changed; the +105-line SDK-macro defs.w drift was discarded = #1102). pcre2
+   still needs it (pcre2test.w's `cfprintf` still `__local_args: *mut i8`).
+3. **The branch does NOT build yet** — std.libc's v-formatters take c_va_list,
+   so pcre2test.w won't compile until re-promoted.
+4. Re-record `docs/with-abi.sha256` (TypeLayout.w changed → abi-hash-check trips).
+5. Full battery + move/drop audits (this is an ABI change — isolated batch).
+
+`c_va_list` is a builtin (registered prim), NOT emitted into `defs.w`, so
+`defs.w` does not change for #1104 — only the two files that USE va change.
+
+### #1102 — migrator leaks host SDK macros into shared defs (fix located)
+
+**Bug**: since the 2026-09-03 promote, the migrator captures object-like macros
+from SYSTEM headers and emits them as `pub let` into the shared `defs.w` —
+`MAC_OS_X_VERSION_10_0`, `FD_SETSIZE`, and on pcre2 config macros
+(`HAVE_UNISTD_H`, `USE_CLANG_TYPES`, `USE_CLANG_STDDEF`, `USER_ADDR_NULL`,
+`USE_CLANG_STDARG`) that collide → `error: shadowing is not allowed for
+'HAVE_UNISTD_H'`. This makes corpus output host-dependent AND blocks re-migrating
+pcre2 (the collisions are hard errors). Candidates for the regression: the
+c_import macro commits `1f826ac4` / `82f21d7c`.
+
+**Fix (located, one guard — NOT yet applied):** the bridge already computes
+system-ness. In `src/CiMigrate.w` `ci_capture_macro_values` (~line 776) and
+`src/CImport.w` `ci_collect_object_macro_values` (~line 2698), skip a macro when
+`with_cimport_macro_is_system(session, i) != 0`. That predicate
+(`src/compiler/ClangBridge.w:2613`, populated at 2310 from
+`macro_location_is_system_from_cursor` → `cimport_location_path_is_system`) is
+real and populated. **Still verify the pub-let EMIT path reads the capture
+table** (so skipping at capture actually suppresses emission), then re-promote
+both corpora and confirm the diff is empty except intended changes. #1102 is a
+migrator-hygiene fix; keep it its own commit/batch (do not fold into the ABI
+batch beyond what's forced).
+
+### Corpus re-promotion gotchas (both #1102 and #1104 need it)
+
+- The zlib corpus is package `std.zlib` under `lib/std/zlib/` on wo-c4 (NOT the
+  `std.zl` rename — that is zlib-wo only). It is prelude-ON (committed
+  `lib/std/zlib/defs.w` has NO `type c_void = opaque`). Migrate settings:
+  `--shared-defs std.zlib.defs --no-c-export --prefer-brace --width-slice 8`,
+  NO `--no-prelude`. A faithful full-directory re-migrate matched committed
+  byte-for-byte except gzwrite's va lines and defs.w's SDK-macro drift (#1102).
+- The pcre2 corpus is package `std.re` under `lib/std/re/`, prelude-OFF
+  (committed `lib/std/re/defs.w` HAS `type c_void = opaque` via the name-based
+  `ci_migrate_shared_defs_targets_regex_zone`). Its migrate is a directory
+  migrate with excludes (pcre2demo/pcre2grep/pcre2posix_test/pcre2_jit_test/
+  pcre2_dftables/pcre2_fuzzsupport) and special source handling
+  (`pcre2_chkdint.c` fails a naive CLI directory scan) — use the
+  `:pcre2-migrate` ACTION, not a hand CLI migrate.
+- **Reference trees** the actions expect: `out/zlib_reference/zlib-1.3.2/`
+  (with `.with-reference-ready`) and `out/pcre2_reference/pcre2-10.47/`
+  (NOT `out/pcre2_reference/src`). Copy from `~/with/out/*_reference/` or another
+  worktree; the reference download is network-gated.
+- **`:*-promote` chain via the native runner hits #921**: `error:
+  Workspace.set_migrate_options requires compiler driver comptime evaluation`.
+  Run `:*-migrate` directly (`WITH=<stage1> <stage1> build :zlib-migrate`), which
+  re-runs under comptime, then copy the .w files the way `run_*_promote_action`
+  does. Do the re-migrate with a stage1 that HAS the migrator changes.
+
+---
+
+## 3. The zlib `.wo` bundle (PR #1103) — what it is and what landed
+
+The campaign: compile each migrated C corpus once into a versioned-ABI `.wo`
+bundle (object + `.wi` interface + manifest, keyed by corpus/target/ABI), embed
+it, link on demand, so a consumer of `std.zlib` doesn't recompile zlib every
+build. pcre2 was the first bundle (C1–C4). zlib is the second.
+
+zlib-wo (61f1e301, over wo-c4) is a fully-green worktree battery (build/fixpoint/
+test/seed-compat/test-green/last-green) — the macOS + linux-x86_64 failures are
+CI-only (sections 1, 2). What the second bundle exposed and fixed (all in the
+batch; each is now a general rule, see `docs/wo_bundles.md`):
+- Corpus package `std.zlib` collided with the facade module `lib/std/zlib.w`
+  (the frontend's parent-module import fallback pulled the facade into the
+  `--no-prelude` bundle build). Renamed corpus → `std.zl` under `lib/std/zl/`;
+  `build/wo.w` now refuses a corpus whose package name is also a module file.
+  (This rename is ON zlib-wo only, NOT wo-c4/va-list.)
+- The migrator's prelude-free vocabulary (c_void, `__ci_unreachable`) is keyed
+  on the migrate workspace's `prelude_mode: None` (`with migrate --no-prelude`),
+  no longer on the corpus name `std.re` (`ci_migrate_output_is_prelude_free`).
+- The bundle interface spells variadic functions (`gzprintf(..., ...)`) instead
+  of refusing them (§18.5c: a `.wi` is ordinary declaration syntax).
+- Two Sema flat-namespace holes (`ca40e7f5`): a source fn signature was
+  overwritten by a same-named interface signature (facade `compress` vs corpus C
+  `compress`); interface globals were keyed by name only (pcre2's `UINT_MAX` hid
+  zlib's) → per-declaring-module binding (`interface_global_alt_*`).
+- Two codegen gaps (`f6b82ba0`): unions weren't predeclared (the alphabetical
+  `.wi` puts `ct_data_s` before its unions); a bundle build now carries the
+  non-corpus With functions its corpus reaches (std.libc's gz I/O wrappers) as
+  INTERNAL copies (`decl_path_is_bundle_carried`), because a whole-program
+  consumer never defines module-link-named symbols.
+- The store slot is keyed by the compiler SOURCES too (`compiler-src-sha`,
+  `ab30b320`): battery #2 linked a stale object under an unchanged ABI.
+- Windows: `fcntl` is a per-target runtime seam (`961bbda6`) — zlib's gz layer,
+  migrated on macOS with O_NONBLOCK/O_CLOEXEC resolved, calls fcntl, which
+  std.libc had as a bare extern and UCRT lacks. POSIX forwards via a variadic
+  libc extern; Windows returns -1. A failed undefined-symbol probe now warns
+  instead of silently linking every bundle (`6cb098c8`).
+- ToolFs accepts an absolute path under the project root (`0da6940b`, a
+  failure-path bug in build-helper-programs); `std.zl` is an internal module for
   the spec inventory.
-- #1102 filed: the migrator now leaks the macOS SDK's `MAC_OS_X_VERSION_*`
-  macros into every shared defs (host-dependent corpus output); zlib's
-  re-promoted defs carries them, pcre2 was not re-promoted.
-- Windows (#1103's first CI run): the bundle object carries every corpus
-  module, and zlib's gz layer — migrated on macOS with `O_NONBLOCK` /
-  `O_CLOEXEC` resolved — calls `fcntl`, which `std.libc` declared as a
-  bare extern and UCRT does not have. `fcntl` is now a runtime seam like
-  `open`/`read`/`close` (`with_libc_fcntl` → `rt_fcntl`; POSIX forwards
-  through a variadic extern, Windows reports unsupported). Windows linked
-  zlib's object at all because Link.w's undefined-symbol probe fails
-  there and a failed probe silently linked every bundle; it now warns.
-- **#1104 (blocks #1103's linux x86_64 lane): `va_list` is modeled as an
-  8-byte pointer on every target.** The drift harness runs zlib's
-  `gzprintf` → `vsnprintf(va)`; on SysV x86_64 `va_start` writes a
-  24-byte tag into the 8-byte slot and `vsnprintf` expects a pointer to
-  it — exit 139. Verified from the IR (`with ir --target=linux_x86_64`
-  emits the same `alloca ptr` as Darwin). Only variadic *definitions*
-  are affected (pcre2 has none). Fix = a per-target `VaList` type, one
-  `PassMode` rule in `compute_fn_abi`, the migrator emitting `VaList`,
-  zlib re-migrated, and a behavior test on every lane — an ABI batch,
-  alone, with the audits. Landing order: #1101 → #1104 → #1103.
-- macOS CI fails `behav_cli_test_command_args` and the `selfcheck` corpus
-  test on both this branch and #1101, deterministically, while both pass
-  locally; both use `out/stage/bin/with-stage2`, which the CI Fixpoint
-  step rewrites just before the battery. `wo-c4` (7910cf98, merged here)
-  adds a `Failure diagnostics` workflow step that dumps the surviving
-  captures and probes that binary; the next failing run names the cause.
 
-How it was wired (the template for the next corpus):
-- the corpus moved from `lib/std/zlib/` (package `std.zlib`) to
-  `lib/std/zl/` (package `std.zl`): the corpus package and the facade
-  `std.zlib` (`lib/std/zlib.w`) may not share a dotted path, because the
-  frontend's parent-module import fallback pulled the facade into the
-  `--no-prelude` bundle build (`docs/wo_bundles.md`; `build/wo.w` now
-  refuses such a corpus by name);
-- a `wo_bundle_plan(ctx, "zlib", "std/zl", "lib/std/zl/bundle.w")` in
-  `build.w` beside `pcre2_wo`, wired through `wo_bundle_targets`,
-  `target_with_link_bundle` on every stage, and `target_with_wo_blobs`;
-  `lib/std/zl/` is excluded from the embedded stdlib in BOTH lists
-  (`build.w target_with_embedded_stdlib_inputs` and the generator in
-  `build/runtime.w`; missing the second one is 232 "unknown type c_void"
-  errors at `<embedded-std>/std/zl/…`);
-- a generated bundle root over the 18 modules in `lib/std/zl/` (16 corpus
-  + `example.w`/`minigzip.w` harness), written by
-  `build/zlib.w zlib_bundle_root_text` the way `build/pcre2.w` writes
-  `lib/std/re/bundle.w`, and checked by `zlib-bundle-root-check`;
-- the migrator's prelude-free vocabulary (`type c_void = opaque`, the
-  `__ci_unreachable` shim) is keyed on the migrate workspace's
-  `prelude_mode: None` / `with migrate --no-prelude`
-  (`ci_migrate_output_is_prelude_free`), no longer on the corpus name
-  `std.re`; `build/zlib.w` and `build/pcre2.w` set it on every migrate
-  workspace. The zlib corpus is re-migrated with that compiler
-  (`WITH=<stage1> <stage1> build :zlib-promote`);
-- `std.zlib` and the consumers that recompile in-unit today (`std.build`,
-  `build/zlib_gzip.w`, `build/zlib_gunzip.w`) link the bundle instead
-  (measured above).
+**Measured** (interleaved A/B, `WITH_PROFILE=1`, release compilers wo-c4 vs
+zlib-wo, 3 rounds): a program importing `std.zlib` spends ~800 ms in compiler
+phases with the corpus in-unit vs ~160 ms with the bundle (imports 48→1.3 ms,
+comptime 75→11 ms, mir.lower 30→4 ms, llvm gen/opt/emit 570→115 ms; link
+unchanged). The compiler's own build is unchanged (it never reaches zlib).
 
-Landing order: #1101 (C4) merges first; then open the zlib PR onto
-main (the branch already contains C4, so its diff against main is only
-the zlib commits once C4 is in), merge, sync local main, reseed
-(`:update-seed` + `:install-user`), close #1102 when the migrator fix
-lands. Fast consumer test without a release build:
-`out/bootstrap/bin/with-stage1 build X.w --link-bundle out/wo/zlib
---link-bundle out/wo/pcre2`.
+`docs/wo_bundles.md` on zlib-wo has the full mechanism (naming rule, variadics,
+carried copies, the `compiler-src-sha` key). Design docs: `docs/wo_bundles.md`,
+`docs/abi_roadmap.md` (Level 0), `docs/with-abi.md`, `docs/decisions.md` D38/D39,
+`docs/stdlib_sourcing_plan.md`.
 
-## 4. The corpora plan (`docs/stdlib_sourcing_plan.md`)
+---
 
-Three corpora + one surgical port, each migrated **whole** through pcre2's
-pipeline and arriving as a `.wo`, with native facades choosing engines by
-benchmark (D37): **c-algorithms** (fragglet: RB/AVL, heap, sorted array,
-trie, hash table, list), **TommyDS** (hardened hashing/indexing), **STC**
-(modern breadth: vec/deque/pqueue/hmap/smap/cstr/cbits...), and **M*LIB**
-`m-bptree.h` only. Written natively, not migrated: graph algorithms,
-union-find, SlotMap's free list, and Vec/str.
+## 4. Battery / reseed discipline (do not skip)
 
-- **Phase 0 — measure first** (can start in parallel, docs-only until the
-  lane): `docs/stdlib_inventory.md` (every structure/algorithm needed, its
-  complexity contract, status — **not started**), the complexity-fixture
-  lane (**not started**), and SlotMap's native free list (#936, open;
-  Miguel is building SlotMap — keep it single-owner, no built-in locking;
-  see the D22/D27 notes). Gate: lane green with known cliffs recorded.
-- **Phase 1** c-algorithms whole (non-macro C; the `void*` + callback
-  idiom). **Phase 2** TommyDS. **Phase 3** STC (the macro-migrator
-  campaign). **Phase 4** M*LIB bptree, surgical.
+- Battery (batch tier): `with build` → `:fixpoint` → `:test` (includes
+  `:seed-compat`) → `:test-green` → `:last-green`; add `:move-audit`/`:drop-audit`
+  for ownership/codegen/ABI changes (#1104 needs them). Reseed once after
+  (`:update-seed` + `:install-user`). Commit BEFORE the battery, never during it
+  (even docs) or `install-user`'s gate trips.
+- An ABI change (#1104) must be ALONE in its batch. It changes
+  `docs/with-abi.sha256` inputs (TypeLayout.w) → re-record and expect
+  `abi-hash-check` to trip until you do.
+- The perf gate is a RELATIVE ratio measured LOCALLY by interleaved A/B on
+  Eric's laptop (~10x CI), never on CI, never by waiting for an idle box.
+- Run long work detached with a keep_awake hold (Eric's box is a traveling
+  laptop; runs die ~10 min after turn activity stops). Verify via logs.
+- The macOS in-place-overwrite SIGKILL class (2026-09-03 install incident):
+  `:install-user` renames via a temp sibling, not an in-place copy.
 
-**Open questions still Eric's** (plan §"Open questions"): #2 whether every
-corpus builds in every battery (a `corpora` lane); #3 whether Phase 0's
-inventory rules on names now (`Heap` vs `PriorityQueue`, the `BitSet` API)
-or leaves that to each facade PR. #1 was ruled as D37.
+---
 
-## 5. Related, done, don't redo
-- Publish-first release (`build/release_publish.w`, per-job publish in
-  `nightly-release.yml`), proven on CI (create-first and add-later).
-- D40 accepted and applied (v0.15.1.10 renumbered to v0.15.2.0; the
-  transient v0.15.1.9/.11/.12/.13 tags deleted).
-- Rob's #997/#1016/#1029/#1035 landed by cherry-pick (a c_import regression
-  #997 exposed — glibc's `NAN`/`INFINITY`/`HUGE_VALF` emitted as
-  self-referential globals — was caught by the battery and fixed, `1f826ac4`).
-- `with_str_from_cstr` copies (the #1081 root cause), Windows runtime fixes.
+## 5. Recommended order for the next agent
 
-## 6. Traps that cost days this week — read before your first battery
-- **Never commit during a battery.** `last-green`'s version stamp tracks
-  HEAD; a commit mid-battery leaves a stale test-pass marker and a red
-  `last-green`. Commit first, then battery, then reseed.
-- **Drive post-build steps with the FRESH compiler** (`./out/release/bin/with`),
-  as CI does. Driver-side rules (cache freshness, the RSS tripwire) live in
-  the compiler; the installed seed lacks them until reseed.
-- **`:seed-compat` is a fresh-compiler check, not a seed-driven `:test`
-  dep.** The pinned seed's 1 GiB RSS tripwire is flaky on its ~1 GiB nested
-  build; that is why it left `:test`. Run it as its own fresh-driver step.
-- **Build-layer API is seed-gated.** `build.w`/`build/*.w`/`lib/std/build.w`
-  are comptime-evaluated by the *pinned seed*; a new `std.build` API or
-  `Target` field used there needs a published seed that has it. Driver-side
-  rules keyed by target name take effect in-batch; a real API addition is a
-  seed-release cycle (land unused → publish seed → bump lock → use).
-- **A seed experiment must set `WITH=<seed>`.** The driver binary is not the
-  seed; unset `WITH` silently uses the installed compiler.
-- **Never revert language surface to appease an old seed** (build-layer
-  `s[i]` included). Cut a newer seed (D40 tells you the number).
-- **No Python/bash/perl/sed/awk for text work; With one-liners and With
-  tools.** Edit tool for edits. Never `git stash`.
-- **Verify by running.** A grep, dump or trace print is a hypothesis; the
-  root cause is the exact line, proven in lldb or the debug allocator.
-- **Isolation:** an ownership/drop/codegen/ABI change is alone in its batch
-  with `:move-audit` and `:drop-audit`. C4 qualifies.
+1. **Reproduce and fix the macOS embedded-bundle bug (section 1)** — it blocks
+   BOTH #1101 and #1103, is not fixed by anything on the branches, and is the
+   real gate. Start with the abi-sha-mismatch / empty-embed candidates; get a
+   reproduction (CI artifact upload of the runner's stage2 + out/gen + out/wo,
+   or a clean from-scratch build on this Mac). Use the deep-compiler tools once
+   reproduced. Land the fix so C4's macOS lane goes green; then #1101 can merge.
+2. **#1102** (one-guard migrator fix) — its own small batch.
+3. **#1104** (va_list) rebased on #1102 — re-promote both corpora, re-record
+   abi-hash, full battery + audits. Verify #1103's `linux x86_64`
+   `zlib-wo-drift` no longer exits 139.
+4. **#1103** rebased on the merged main — should then be green on all five.
 
-## 7. Worktrees and files
-- `~/.local/with-staging/c4r` (wo-c4 rebased, landing), `c4p` (measuring),
-  `c4` (older detached), `relpub` (rob-lanes, landed — can be removed),
-  `uncast` (wo-hash, landed — can be removed).
-- `build/pcre2.w`, `build/wo.w`, `lib/std/re/bundle.w` — the pcre2 pipeline
-  to mirror for zlib. `build/release_publish.w`, `build/seed.w`,
-  `tools/bump_seed_pins.w` — the release/seed machinery.
-- Issues: #955 (C4/emit-C), #936 (SlotMap free list, Phase 0), #1076/#1077
-  (filed by the C4 agent: silent in-unit corpus fallback; store install dir
-  `$HOME` literal).
+All the detail above (commits, file:line, IR evidence, reproduction notes) is
+mirrored in the session memory notes `wo-bundles-state`, `va-list-per-target-1104`,
+`bundled-corpus-two-exclusions`, `test-runner-only-failures`, `zsh-no-word-split`.
