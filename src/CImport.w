@@ -1137,7 +1137,12 @@ fn ci_field_cursor_anon_record_decl(session: i64, field_cursor: i32) -> i32:
     if kind == CK_STRUCT or kind == CK_UNION:
         let decl_name = with_ci_cursor_spelling(session, decl_cursor)
         let field_ty_str = with_ci_type_translated(session, field_ty)
-        if decl_name.len() == 0 or ci_str_contains(field_ty_str, "(unnamed at ") or ci_str_contains(field_ty_str, "::("):
+        // An unnamed record's identity is on its CURSOR spelling ("union
+        // (unnamed at file:line)" / "(anonymous union at ...)", by libclang
+        // version); the translated type text is `c_void` since b0434ad3
+        // asked Clang about anonymity instead of matching the spelling, so
+        // it no longer carries the marker (anon_union_init_not_flattened).
+        if decl_name.len() == 0 or ci_str_contains(decl_name, "(unnamed") or ci_str_contains(decl_name, "(anonymous") or ci_str_contains(field_ty_str, "(unnamed at ") or ci_str_contains(field_ty_str, "::("):
             return decl_cursor
     -1
 
@@ -2154,12 +2159,6 @@ fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs: &s
             ci_mark_type_name_emitted(name)
             return ""
 
-    // Skip reserved C internal names (__foo or _Uppercase), keep _lowercase (e.g., _pcre2_*)
-    if name.len() >= 2 and name[0] == 95:
-        let second = name[1]
-        if second == 95 or (second >= 65 and second <= 90):
-            return ""
-
     // Skip already-emitted type names. C struct/union tags live in a separate
     // namespace from variables, and With can represent a type and value with
     // the same spelling, so do not use the value emission table here.
@@ -2179,6 +2178,18 @@ fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs: &s
         let loc = ci_get_decl_location(session, name)
         let loc_comment = if loc.len() > 0: "// " ++ loc ++ ": demoted to opaque\n" else: ""
         let rendered = loc_comment ++ "type " ++ safe_name ++ " = opaque\n"
+        if ci_migrate_shared_decl_add("type", name, rendered):
+            return ""
+        return rendered
+
+    // A forward declaration with no definition in this TU is an incomplete
+    // type, not an empty struct: it has no size. Render it opaque so another
+    // TU's definition upgrades it in the shared defs whatever the file order
+    // (c-algorithms' test-trie.c sorts before trie.c, which defines _Trie).
+    if with_cimport_struct_is_opaque(session, idx) != 0:
+        ci_mark_type_name_emitted(name)
+        let safe_name = ci_escape_reserved(name)
+        let rendered = "type " ++ safe_name ++ " = opaque\n"
         if ci_migrate_shared_decl_add("type", name, rendered):
             return ""
         return rendered
@@ -6258,10 +6269,7 @@ impl CiStmtPool:
             return self.merge_ir( lhs_stmt, rhs_stmt)
 
         if kind == CXK_CALL_EXPR or kind == CXK_COMPOUND_ASSIGN_OP or kind == CXK_COND_OP:
-            let stmt = self.lower_effect_expr_ir(session, cursor, exprs, types, scope)
-            if (stmt as i32) != 0:
-                return stmt
-            return self.empty_stmt_ir()
+            return self.lower_effect_expr_ir(session, cursor, exprs, types, scope)
 
         if kind == CXK_BINARY_OP:
             let op = with_ci_binary_op(session, cursor)
@@ -6313,6 +6321,19 @@ impl CiStmtPool:
             let cfp = self.lower_cfprintf_effect_ir(session, cursor, exprs, types, scope)
             if (cfp as i32) != 0:
                 return cfp
+
+        if kind == CXK_COND_OP and nc >= 3:
+            let cond_cursor = with_ci_child(session, cursor, 0)
+            let cond = self.lower_value_expr_ir(session, cond_cursor, exprs, types, scope)
+            if not ci_value_ir_valid(cond): return 0 as CiStmtId
+            let then_body = self.lower_discard_expr_side_effects_ir(session, with_ci_child(session, cursor, 1), exprs, types, scope)
+            let else_body = self.lower_discard_expr_side_effects_ir(session, with_ci_child(session, cursor, 2), exprs, types, scope)
+            if (then_body as i32) == 0 or (else_body as i32) == 0: return 0 as CiStmtId
+            let truthy = exprs.bool_expr_from_value_ir(session, cond_cursor, cond.value_expr, types)
+            if (truthy as i32) == 0: return 0 as CiStmtId
+            // A discarded conditional selects effects; a void arm has no
+            // value to initialize or assign to a synthetic ternary local.
+            return self.merge_ir(cond.setup_stmt, self.if_stmt(truthy, then_body, else_body))
 
         if kind == CXK_BINARY_OP and nc >= 2 and with_ci_binary_op(session, cursor) == BO_COMMA:
             let lhs_stmt = self.lower_effect_expr_ir(session, with_ci_child(session, cursor, 0), exprs, types, scope)
@@ -6422,12 +6443,24 @@ fn ci_cursor_is_function_ref(session: i64, cursor: i32) -> bool:
         return ci_cursor_is_function_ref(session, with_ci_child(session, cursor, 0))
     if kind != CXK_DECL_REF:
         return false
-    let operand_ty = with_ci_type_translated(session, with_ci_cursor_type(session, cursor))
-    if ci_starts_with(operand_ty, "fn(") or ci_starts_with(operand_ty, "extern \"C\" fn("):
-        return true
     let cxtype = with_ci_cursor_type(session, cursor)
-    let canon_kind = with_ci_type_kind(session, cxtype)
+    let canonical = with_ci_type_canonical(session, cxtype)
+    let canon_kind = with_ci_type_kind(session, if canonical >= 0: canonical else: cxtype)
     canon_kind == CXT_FunctionProto or canon_kind == CXT_FunctionNoProto
+
+// The callee's canonical function type: parameter KINDS (a `void *` behind
+// a typedef is a pointer) drive the argument coercions.
+fn ci_callable_cxtype(session: i64, cursor: i32) -> i32:
+    let original = with_ci_cursor_type(session, cursor)
+    var callable = with_ci_type_canonical(session, original)
+    if callable < 0: callable = original
+    if with_ci_type_kind(session, callable) == CXT_Pointer:
+        let pointee = with_ci_type_pointee(session, callable)
+        callable = with_ci_type_canonical(session, pointee)
+        if callable < 0: callable = pointee
+    let kind = with_ci_type_kind(session, callable)
+    if kind == CXT_FunctionProto or kind == CXT_FunctionNoProto: callable
+    else: -1
 
 fn ci_literal_token_text(session: i64, cursor: i32) -> str:
     let token_text = with_ci_cursor_token_text(session, cursor)
@@ -6605,7 +6638,7 @@ impl CiTypePool:
             if (ret_ty as i32) == 0:
                 return 0 as CiTypeId
             let arg_count = with_ci_type_arg_count(session, cxtype)
-            let params_start = self.state.extra.len() as i32
+            var params: Vec[i32] = Vec.new()
             var i: i32 = 0
             while i < arg_count:
                 let arg_idx = with_ci_type_arg(session, cxtype, i)
@@ -6617,8 +6650,10 @@ impl CiTypePool:
                     else: self.type_from_libclang(session, arg_idx)
                 if (arg_ty as i32) == 0:
                     return 0 as CiTypeId
-                let _ = self.add_extra(arg_ty as i32)
+                params.push(arg_ty as i32)
                 i = i + 1
+            let params_start = self.state.extra.len() as i32
+            for param in params: self.add_extra(param)
             return self.ty_fn_ptr(ret_ty, params_start, arg_count)
 
         // Typedef, elaborated, atomic, and other named wrappers.
@@ -6674,8 +6709,11 @@ fn ci_type_is_fn_ptr(types: CiTypePool, ty: CiTypeId) -> bool:
         return true
     if types.kind(ty) == CiTypeKind.CT_NAMED:
         let text = types.get_string(types.get_d0(ty))
-        return ci_starts_with(text, "fn(") or ci_starts_with(text, "extern \"C\" fn(") or ci_starts_with(text, "unsafe extern \"C\" fn(")
+        return ci_type_text_is_fn_ptr(text)
     false
+
+fn ci_type_text_is_fn_ptr(text: &str) -> bool:
+    ci_starts_with(text, "fn(") or ci_starts_with(text, "unsafe fn(") or ci_starts_with(text, "extern \"C\" fn(") or ci_starts_with(text, "unsafe extern \"C\" fn(")
 
 impl CiExprPool:
     fn char_array_init_from_string_literal(types: CiTypePool, array_ty: CiTypeId, literal: &str) -> CiExprId:
@@ -7423,6 +7461,7 @@ impl CiExprPool:
                     ai = ai + elem_field_count
                 else:
                     item_id = self.lower_expr_ir(session, child, types, scope)
+                    item_id = self.coerce_value_expr_for_target(session, elem_ty_id, child, item_id, types)
                     ai = ai + 1
                 if (item_id as i32) == 0:
                     return 0 as CiExprId
@@ -8497,9 +8536,9 @@ impl CiExprPool:
     fn coerce_value_expr_for_target(session: i64, target_ty_id: CiTypeId, value_cursor: i32, value_id: CiExprId, types: CiTypePool) -> CiExprId:
         if (target_ty_id as i32) == 0 or (value_id as i32) == 0:
             return value_id
-        if types.kind(target_ty_id) == CiTypeKind.CT_FN_PTR and ci_expr_is_zero_int_lit(self.val(), value_id):
+        if ci_type_is_fn_ptr(types, target_ty_id) and ci_expr_is_zero_int_lit(self.val(), value_id):
             return self.null_ptr(target_ty_id)
-        if types.kind(target_ty_id) == CiTypeKind.CT_FN_PTR:
+        if ci_type_is_fn_ptr(types, target_ty_id):
             let value_ty = self.get_type(value_id)
             if ci_type_is_fn_ptr(types, value_ty):
                 return value_id
@@ -8808,6 +8847,14 @@ impl CiExprPool:
                 return self.add(CiExprKind.CIE_STRING_LIT, s, 0, 0, 0 as CiTypeId)
             if ci_is_string_literal(literal_src):
                 let s = self.add_string(literal_src)
+                return self.add(CiExprKind.CIE_STRING_LIT, s, 0, 0, 0 as CiTypeId)
+
+            // Macro extents can cover the invocation instead of its literal,
+            // including the implicit string child of __func__. Clang prints
+            // the actual StringLiteral with escapes and embedded NULs intact.
+            let cursor_literal = with_ci_cursor_spelling(session, cursor)
+            if ci_is_string_literal(cursor_literal):
+                let s = self.add_string(cursor_literal)
                 return self.add(CiExprKind.CIE_STRING_LIT, s, 0, 0, 0 as CiTypeId)
 
             let expansion_src = with_ci_cursor_expansion_text(session, cursor)
@@ -9162,17 +9209,11 @@ fn ci_migrate_preamble_name_is_modeled_libc(name: &str) -> bool:
     false
 
 fn ci_migrate_preamble_extern_call_requires_unsafe(name: &str) -> bool:
-    // Modeled libc/libm/ctype bindings. In a shared-defs migration that targets the
-    // lib/std/re modeled-C zone (pcre2: `--shared-defs std.re.defs`), these are
-    // declared in the imported `defs` module AND the compiler exempts that zone
-    // (sema_path_is_migrated_regex_implementation) from the manual-extern-call
-    // unsafe requirement — so a call is safe and wrapping it in `unsafe` is vacuous
-    // ("unsafe block contains no unsafe operations"). Mission: modeled C is humane;
-    // the programmer never spells out `unsafe` for a header-modeled libc call there.
-    // A GENERIC shared-defs migration (or a single-file one) is NOT exempt: a bare
-    // manual-extern call requires unsafe, so it must stay wrapped.
+    // Extern declarations in std modules have the compiler-implementation
+    // policy. Match Sema for all std corpora; ordinary user modules still
+    // require the wrapper around their manual pointer-ABI extern calls.
     if ci_migrate_preamble_name_is_modeled_libc(name):
-        return not (ci_migrate_shared_defs_active() and ci_migrate_shared_defs_targets_regex_zone())
+        return not (ci_migrate_shared_defs_active() and ci_migrate_shared_defs_targets_std_zone())
     // with_* compiler-ABI externs stay wrapped even in shared-defs mode: the D30
     // transition (SemaCheck) keeps that `unsafe` honest in both the object and
     // in-unit worlds, so it is never vacuous.
@@ -9862,6 +9903,16 @@ impl CiExprPool:
             return self.int_lit(zero_idx, 0 as CiTypeId)
         if callee_text == "__builtin_offsetof":
             return self.lower_offsetof_value_expr(session, cursor)
+        if callee_text == "__builtin_expect" or callee_text == "__builtin_expect_with_probability":
+            let expected_args = if callee_text == "__builtin_expect": 2 else: 3
+            if arg_ids.len() != expected_args:
+                return self.reject_builtin_call(session, cursor, callee_text, "invalid branch prediction hint arity")
+            // Clang has checked the constant hint operands. The intrinsic
+            // returns its first argument, converted to the C long result type.
+            let result_ty = types.type_from_libclang(session, with_ci_cursor_type(session, cursor))
+            if (result_ty as i32) == 0:
+                return self.reject_builtin_call(session, cursor, callee_text, "missing branch prediction hint result type")
+            return self.cast(result_ty, arg_ids.get(0) as CiExprId)
         if callee_text == "__builtin_add_overflow" or callee_text == "__builtin_sub_overflow" or callee_text == "__builtin_mul_overflow":
             return self.build_overflow_builtin_call(session, cursor, callee_text, arg_ids, types)
         if ci_starts_with(callee_text, "__builtin"):
@@ -10392,7 +10443,18 @@ impl CiStmtPool:
                     g_ci_bail_location = with_ci_cursor_location(session, cursor)
                     g_ci_bail_kind = kind
                 return ci_value_ir_invalid()
-            let callee_param_count = if callee_decl_idx >= 0: with_cimport_fn_param_count(session, callee_decl_idx) else: 0
+            // A local function pointer has a callable signature even though it
+            // has no function declaration index. Use Clang's callable type for
+            // every call, including nested callback parameters and typedefs.
+            let callee_cursor = if first_arg > 0: with_ci_child(session, cursor, 0) else: -1
+            // A declared callee's parameter types come from its declaration:
+            // that renderer follows typedef identity (a `va_list *` behind
+            // `argument_pointer` stays `*mut c_va_list`, #1104). The callable
+            // type serves a callee without a declaration (a local function
+            // pointer, a nested callback parameter); canonical, it erases
+            // that identity on Darwin.
+            let callable_type = if callee_cursor >= 0: ci_callable_cxtype(session, callee_cursor) else: -1
+            let callee_param_count = if callee_decl_idx >= 0: with_cimport_fn_param_count(session, callee_decl_idx) else if callable_type >= 0: with_ci_type_arg_count(session, callable_type) else: 0
             var ai = first_arg
             while ai < nc:
                 let arg_cursor = with_ci_child(session, cursor, ai)
@@ -10413,9 +10475,14 @@ impl CiStmtPool:
                 if ci_expand_string_macro_sequence(session, arg_src).len() > 0 and exprs.kind(arg_id) != CiExprKind.CIE_STRING_LIT:
                     return ci_value_ir_invalid()
                 let param_index = ai - first_arg
-                if callee_decl_idx >= 0 and param_index >= 0 and param_index < callee_param_count:
-                    let raw_param_ty = with_cimport_fn_param_type_translated(session, callee_decl_idx, param_index)
-                    let target_ty = types.type_from_translated_text(ci_pointer_type_explicit_mut(raw_param_ty))
+                if param_index >= 0 and param_index < callee_param_count:
+                    let target_ty = if callee_decl_idx < 0 and callable_type >= 0:
+                        let parameter = with_ci_type_arg(session, callable_type, param_index)
+                        if cimport_type_is_va_list_at(session, parameter, true): types.ty_named(types.add_string("c_va_list"))
+                        else: types.type_from_libclang(session, parameter)
+                    else:
+                        let raw_param_ty = with_cimport_fn_param_type_translated(session, callee_decl_idx, param_index)
+                        types.type_from_translated_text(ci_pointer_type_explicit_mut(raw_param_ty))
                     if (target_ty as i32) != 0:
                         arg_id = exprs.coerce_value_expr_for_target(session, target_ty, arg_cursor, arg_id, types)
                         if (arg_id as i32) == 0:
@@ -10435,8 +10502,8 @@ impl CiStmtPool:
             if has_mapped_call:
                 return ci_value_ir_invalid()
             if callee_text.len() > 0 and ci_is_c_ident(callee_text) and not ci_scope_contains(scope, callee_text):
-                let callee_cursor = if nc > 0: with_ci_child(session, cursor, 0) else: cursor
-                if not ci_note_filtered_system_symbol_ref_at(session, callee_cursor, callee_text, CI_LIBC_KIND_FN):
+                let referenced_cursor = if nc > 0: with_ci_child(session, cursor, 0) else: cursor
+                if not ci_note_filtered_system_symbol_ref_at(session, referenced_cursor, callee_text, CI_LIBC_KIND_FN):
                     return ci_value_ir_invalid()
             let args_start = exprs.extra_len()
             var j: i64 = 0
@@ -10444,18 +10511,12 @@ impl CiStmtPool:
                 let _ = exprs.add_extra(arg_ids.get(j))
                 j = j + 1
             var call_id = exprs.add(CiExprKind.CIE_CALL, callee.value_expr as i32, args_start, arg_ids.len() as i32, 0 as CiTypeId)
-            // An indirect call through a function-pointer value (e.g. a struct's
-            // fn-ptr field such as memctl.free) requires an unsafe context (§16.11):
-            // a fn pointer can be null or dangling, so unlike a named modeled extern
-            // it is genuinely unsafe to invoke. ci_migrate_call_requires_unsafe_wrapper
-            // only recognizes named callees, so detect the fn-ptr callee by its type.
-            // `not ci_is_c_ident(callee_text)` excludes direct named calls: a
-            // function reference (strlen, a cross-module _pcre2_* fn) also carries a
-            // fn-ptr type, but invoking it by name is not an indirect call and must
-            // not be wrapped — doing so reintroduces the vacuous modeled-libc wraps.
-            // Only a fn-ptr *value* spelled as a non-identifier expression (a struct
-            // field like memctl.free, a deref) is an indirect call needing unsafe.
-            let indirect_fn_ptr_call = ci_type_is_fn_ptr(types, exprs.get_type(callee.value_expr)) and not ci_is_c_ident(callee_text) and not g_ci_migrate_in_unsafe_function_body
+            // A local identifier can denote a function pointer just as a field
+            // can. Declaration identity distinguishes direct function references
+            // from pointer values; the spelling of the expression cannot.
+            let direct_function = if callee_cursor >= 0: ci_cursor_is_function_ref(session, callee_cursor) else: callee_decl_idx >= 0
+            let callee_type = exprs.get_type(callee.value_expr)
+            let indirect_fn_ptr_call = ci_type_is_fn_ptr(types, callee_type) and ci_starts_with(ci_print_type(types, callee_type), "unsafe ") and not direct_function and not g_ci_migrate_in_unsafe_function_body
             if ci_migrate_call_requires_unsafe_wrapper(callee_text) or indirect_fn_ptr_call:
                 call_id = exprs.unsafe_expr(call_id)
             return CiValueExprIR {
@@ -11122,7 +11183,7 @@ impl CiExprPool:
 // Recursive statement lowering helper: produces a CiStmtId from a
 // cursor. Specific handlers build real CIS_* nodes for kinds we
 // own structurally; everything else: returns 0 so callers can bail
-// transactionally. Returns 0 for the empty case (CXK_NULL_STMT).
+// transactionally. An empty statement has valid block IR; zero means failure.
 impl CiStmtPool:
     fn lower_stmt_ir(session: i64, cursor: i32, exprs: CiExprPool, types: CiTypePool, indent: i32, scope: CiScope) -> CiStmtId:
         let kind = with_ci_cursor_kind(session, cursor)
@@ -11138,7 +11199,7 @@ impl CiStmtPool:
         if kind == CXK_CONTINUE_STMT:
             return self.continue_()
         if kind == CXK_NULL_STMT:
-            return 0 as CiStmtId
+            return self.empty_stmt_ir()
 
         if kind == CXK_RETURN_STMT:
             let nc = with_ci_num_children(session, cursor)
@@ -11473,7 +11534,7 @@ fn ci_try_eval_var_init_for_type(session: i64, idx: i32, target_type: &str) -> s
     if var_cursor >= 0:
         let cursor_type = with_ci_type_translated(session, with_ci_cursor_type(session, var_cursor))
         let init_type = if target_type.len() > 0: with_str_clone_ref(target_type) else: cursor_type
-        let init_cursor = ci_find_var_init_cursor(session, var_cursor)
+        let init_cursor = with_ci_var_initializer(session, var_cursor)
         if init_cursor >= 0:
             let init_peeled = ci_peel_transparent(session, init_cursor)
             let init_kind = with_ci_cursor_kind(session, init_peeled)
@@ -11752,29 +11813,23 @@ fn ci_scope_restore(scope: CiScope, mark: CiScopeMark) -> CiScope:
         if scope.ptr as i64 == 0:
             return scope
         while (*scope.ptr).name_log_keys.len() > mark.name_log_len:
-            let idx = (*scope.ptr).name_log_keys.len() - 1
-            let key = (*scope.ptr).name_log_keys.get(idx)
-            let value = (*scope.ptr).name_log_values.get(idx)
-            let had = (*scope.ptr).name_log_had.get(idx)
-            let _ = (*scope.ptr).name_log_keys.pop()
-            let _ = (*scope.ptr).name_log_values.pop()
-            let _ = (*scope.ptr).name_log_had.pop()
+            // Pop transfers ownership. Views into these logs expire when the
+            // entries are removed, before the previous bindings are restored.
+            let key = (*scope.ptr).name_log_keys.pop().unwrap()
+            let value = (*scope.ptr).name_log_values.pop().unwrap()
+            let had = (*scope.ptr).name_log_had.pop().unwrap()
             if had != 0:
-                (*scope.ptr).names.insert(with_str_clone_ref(key), with_str_clone_ref(value))
+                (*scope.ptr).names.insert(key, value)
             else:
-                let _ = (*scope.ptr).names.remove(with_str_clone_ref(key))
+                (*scope.ptr).names.remove(key)
         while (*scope.ptr).type_log_keys.len() > mark.type_log_len:
-            let idx = (*scope.ptr).type_log_keys.len() - 1
-            let key = (*scope.ptr).type_log_keys.get(idx)
-            let value = (*scope.ptr).type_log_values.get(idx)
-            let had = (*scope.ptr).type_log_had.get(idx)
-            let _ = (*scope.ptr).type_log_keys.pop()
-            let _ = (*scope.ptr).type_log_values.pop()
-            let _ = (*scope.ptr).type_log_had.pop()
+            let key = (*scope.ptr).type_log_keys.pop().unwrap()
+            let value = (*scope.ptr).type_log_values.pop().unwrap()
+            let had = (*scope.ptr).type_log_had.pop().unwrap()
             if had != 0:
-                (*scope.ptr).types.insert(with_str_clone_ref(key), with_str_clone_ref(value))
+                (*scope.ptr).types.insert(key, value)
             else:
-                let _ = (*scope.ptr).types.remove(with_str_clone_ref(key))
+                (*scope.ptr).types.remove(key)
     scope
 
 fn ci_scope_add(scope: CiScope, name: &str) -> CiScope:
@@ -11973,7 +12028,7 @@ impl CiStmtPool:
                     storage_name = mangled
                     new_scope = ci_scope_add_mangled(new_scope, escaped, storage_name)
                     ci_fn_var_names_register(storage_name)
-                let init_cursor = ci_find_var_init_cursor(session, child)
+                let init_cursor = with_ci_var_initializer(session, child)
                 var init_id: CiExprId = 0 as CiExprId
                 var init_setup_id: CiStmtId = 0 as CiStmtId
                 var source_init_expr = ""
@@ -13376,11 +13431,12 @@ fn ci_macro_miss_contains(name: &str) -> bool:
         i = i + 1
     false
 
-// Check if a fn-like macro is a stringify macro (has # in body) or
-// calls another fn-like macro that stringifies (e.g. XSTRING -> STRING -> #a).
+// A stringify macro's entire result must be #param, or a single forwarding
+// call to another stringify macro. A diagnostic macro such as assert uses
+// #param inside a larger expression; replacing that expression with text
+// would discard its condition and effects.
 fn ci_is_stringify_macro(session: i64, name: &str, depth: i32) -> bool:
     if depth > 5: return false
-    let _ = session
     let macro_session = g_migrate_macro_session
     if macro_session == 0:
         return false
@@ -13389,38 +13445,21 @@ fn ci_is_stringify_macro(session: i64, name: &str, depth: i32) -> bool:
     while i < count:
         if with_cimport_macro_is_fn_like(macro_session, i) != 0:
             if with_cimport_macro_name(macro_session, i) == name:
-                let value = with_cimport_macro_value(macro_session, i)
-                // Direct stringify: body contains `#param` (a `#`
-                // not part of a `##` token-paste pair). Walk byte
-                // by byte and skip both `#`s when we see `##` so
-                // we don't misread the second `#` as a stringify.
-                var j = 0
-                while j < value.len() as i32 - 1:
-                    if value[j] == 35:
-                        if value[(j + 1)] == 35:
-                            // `##` token paste — skip both
-                            j = j + 2
-                            continue
-                        // `#` followed by non-`#` — stringify
-                        return true
-                    j = j + 1
-                // Indirect: body calls another fn-like macro, e.g. STRING(s)
-                var k = 0
-                while k < value.len() as i32:
-                    if ci_is_ident_start(value[k]):
-                        var ke = k + 1
-                        while ke < value.len() as i32 and ci_is_ident_char(value[ke]):
-                            ke = ke + 1
-                        if ke < value.len() as i32 and value[ke] == 40:
-                            let callee = value.slice(k as i64, ke as i64)
-                            if ci_is_stringify_macro(macro_session, callee, depth + 1):
-                                return true
-                        k = ke
-                    else:
-                        k = k + 1
-                return false
+                if with_cimport_macro_param_count(macro_session, i) != 1: return false
+                let param = with_cimport_macro_param_name(macro_session, i, 0)
+                let value = ci_strip_parens(ci_trim(ci_strip_c_comments(with_cimport_macro_value(macro_session, i))))
+                if value.starts_with("#"):
+                    return ci_trim(value.slice(1, value.len())) == param
+                let open = ci_find_call_paren(value)
+                if open <= 0: return false
+                let close = ci_find_matching_paren(value, open)
+                if close != value.len() - 1: return false
+                let callee = ci_trim(value.slice(0, open))
+                if not ci_is_c_ident(callee): return false
+                if ci_trim(value.slice(open + 1, close)) != param: return false
+                return ci_is_stringify_macro(session, callee, depth + 1)
         i = i + 1
-	    false
+    false
 
 fn ci_string_text_has_stringify_call(session: i64, s: &str) -> bool:
     var i = 0
@@ -13713,42 +13752,6 @@ fn ci_expand_string_macro_sequence_depth(session: i64, s: &str, depth: i32) -> s
         return ci_concat_strings(segments)
     ""
 
-fn ci_var_decl_has_initializer_text(s: &str) -> bool:
-    let text = ci_strip_c_comments(s)
-    let slen = text.len() as i32
-    var paren_depth = 0
-    var bracket_depth = 0
-    var brace_depth = 0
-    var i = 0
-    while i < slen:
-        let c = text[i]
-        if c == 34 or c == 39:
-            let quote = c
-            i = i + 1
-            while i < slen:
-                let inner = text[i]
-                if inner == 92:
-                    i = i + 2
-                    continue
-                if inner == quote:
-                    break
-                i = i + 1
-            i = i + 1
-            continue
-        if c == 40: paren_depth = paren_depth + 1
-        if c == 41 and paren_depth > 0: paren_depth = paren_depth - 1
-        if c == 91: bracket_depth = bracket_depth + 1
-        if c == 93 and bracket_depth > 0: bracket_depth = bracket_depth - 1
-        if c == 123: brace_depth = brace_depth + 1
-        if c == 125 and brace_depth > 0: brace_depth = brace_depth - 1
-        if c == 61 and paren_depth == 0 and bracket_depth == 0 and brace_depth == 0:
-            let prev = if i > 0: text[(i - 1)] else: 0
-            let next = if i + 1 < slen: text[(i + 1)] else: 0
-            if prev != 61 and prev != 33 and prev != 60 and prev != 62 and next != 61:
-                return true
-        i = i + 1
-    false
-
 fn ci_extract_var_initializer_text(s: &str) -> str:
     let text = ci_strip_c_comments(s)
     let slen = text.len() as i32
@@ -13914,9 +13917,7 @@ fn ci_translate_c_initializer_for_cursor_type(session: i64, init_src: &str, ty: 
     if ci_is_string_literal(trimmed):
         return ci_coerce_init_value_for_type(trimmed, ty)
     if ci_c_initializer_is_null_pointer_cast(ci_strip_parens(trimmed)):
-        if ty.len() > 0 and (ty[0] == 42 or ci_starts_with(ty, "Option[")):
-            return "null"
-        return "0"
+        return ci_coerce_init_value_for_type("0", ty)
     if trimmed[0] != 123:
         let decayed = ci_c_initializer_decay_array_identifier(session, trimmed, ty)
         if decayed.len() > 0:
@@ -14454,7 +14455,7 @@ fn ci_var_init_expr(session: i64, var_cursor: i32, scope: CiScope) -> str:
     ci_var_init_expr_for_type(session, var_cursor, scope, "")
 
 fn ci_var_init_expr_for_type(session: i64, var_cursor: i32, scope: CiScope, target_type: &str) -> str:
-    let init_cursor = ci_find_var_init_cursor(session, var_cursor)
+    let init_cursor = with_ci_var_initializer(session, var_cursor)
     if init_cursor >= 0:
         var types = CiTypePool.new()
         var exprs = CiExprPool.new()
@@ -16103,23 +16104,6 @@ fn ci_find_var_cursor(session: i64, name: &str) -> i32:
 fn ci_cursor_kind_is_expr(kind: i32) -> bool:
     kind >= 100 and kind < 200
 
-fn ci_find_var_init_cursor(session: i64, var_cursor: i32) -> i32:
-    let has_init_text = ci_var_decl_has_initializer_text(with_ci_cursor_source_text(session, var_cursor))
-    if not has_init_text:
-        let var_ty = with_ci_type_translated(session, with_ci_cursor_type(session, var_cursor))
-        if var_ty.len() > 0 and var_ty[0] == 91:
-            return -1
-    let nc = with_ci_num_children(session, var_cursor)
-    var i = nc - 1
-    while i >= 0:
-        let child = with_ci_child(session, var_cursor, i)
-        if ci_cursor_kind_is_expr(with_ci_cursor_kind(session, child)):
-            return child
-        i = i - 1
-    if not has_init_text:
-        return -1
-    -1
-
 fn ci_find_last_expr_child(session: i64, cursor: i32) -> i32:
     let nc = with_ci_num_children(session, cursor)
     var i = nc - 1
@@ -16235,7 +16219,7 @@ fn ci_type_field_type(session: i64, ty_name: &str, field_idx: i32) -> str:
     ""
 
 fn ci_coerce_init_value_for_type(value: &str, ty: &str) -> str:
-    if value == "0" and (ci_starts_with(ty, "*") or ci_starts_with(ty, "Option[")):
+    if value == "0" and (ci_starts_with(ty, "*") or ci_starts_with(ty, "Option[") or ci_type_text_is_fn_ptr(ty)):
         return "null"
     if ty.len() > 0 and ty[0] == 91 and (ci_is_string_literal(value) or ci_is_concatenated_string(value)):
         let rendered = ci_render_string_literal_as_byte_array(value, ty)
@@ -16378,13 +16362,14 @@ fn ci_libc_symbol_kind_mask(name: &str) -> i32:
     if name == "fgets" or name == "fgetc" or name == "fputc" or name == "fputs": return CI_LIBC_KIND_FN
     if name == "putc" or name == "perror" or name == "feof" or name == "ferror" or name == "fread" or name == "fwrite": return CI_LIBC_KIND_FN
     if name == "strcpy" or name == "strncpy" or name == "strstr" or name == "strrchr" or name == "strerror": return CI_LIBC_KIND_FN
-    if name == "strtol" or name == "strtoul" or name == "strtod" or name == "setlocale": return CI_LIBC_KIND_FN
+    if name == "atoi" or name == "strtol" or name == "strtoul" or name == "strtod" or name == "setlocale": return CI_LIBC_KIND_FN
     if name == "isalpha" or name == "isdigit" or name == "isalnum" or name == "isspace": return CI_LIBC_KIND_FN
     if name == "isupper" or name == "islower" or name == "isxdigit" or name == "isprint": return CI_LIBC_KIND_FN
     if name == "isgraph" or name == "ispunct" or name == "iscntrl": return CI_LIBC_KIND_FN
     if name == "tolower" or name == "toupper": return CI_LIBC_KIND_FN
     if ci_is_libm_fn(name): return CI_LIBC_KIND_FN
     if name == "abort" or name == "exit" or name == "clock" or name == "time" or name == "isatty": return CI_LIBC_KIND_FN
+    if name == "__assert_rtn" or name == "__assert_fail": return CI_LIBC_KIND_FN
     if name == "mkstemp" or name == "realpath": return CI_LIBC_KIND_FN
     if name == "open" or name == "read" or name == "write" or name == "close": return CI_LIBC_KIND_FN
     if name == "lseek" or name == "unlink": return CI_LIBC_KIND_FN
@@ -16476,11 +16461,8 @@ fn ci_is_system_decl(name: &str) -> bool:
     // spelling to avoid collisions with user identifiers. They are still
     // source symbols owned by the translation unit, not system declarations.
     if ci_starts_with(name, "__with_"): return false
-    // Skip system internal names (__ prefix or _[A-Z]) but keep _pcre2_* etc.
-    if name.len() >= 2 and name[0] == 95:
-        let second = name[1]
-        if second == 95 or (second >= 65 and second <= 90):
-            return true
+    // A reserved C spelling does not establish system provenance. Callers
+    // filter system-header locations; corpus-owned _Tag and __Tag survive.
     // Known system types
     if ci_starts_with(name, "malloc_type") or ci_starts_with(name, "malloc_zone"): return true
     if name == "malloc_zone_t" or name == "malloc_type_id_t": return true

@@ -2846,7 +2846,7 @@ fn run_build_command(options: BuildCommandOptions, graph_options: &BuildGraphCom
                 return 1
             if graph_options.selected_target == "effects":
                 return build_cache_print_effects(root, graph, "")
-            var selected_target_name = graph_options.selected_target
+            var selected_target_name = graph_options.selected_target.clone()
             if selected_target_name.len() == 0 and graph.default_target.len() > 0:
                 // Clone: a bare field read on an assignment RHS moves the str
                 // out of graph (blank-on-move), and the filter below would

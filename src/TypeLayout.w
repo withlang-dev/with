@@ -430,7 +430,7 @@ impl Sema:
     fn is_copy_frozen(tid: TypeId) -> i32:
         if self.is_copy_cache.contains(tid as i32):
             return self.is_copy_cache.get(tid as i32).unwrap()
-        sema_phase_bug("BUG: is_copy_frozen miss — type not preregistered")
+        sema_phase_bug("BUG: is_copy_frozen miss — type not preregistered: " ++ self.type_name(tid as i32))
 
     // D7 frozen read twin of type_needs_drop (filled in preregister_mir_types). Pure &Self
     // lookup, complete by construction; a miss is a loud phase violation (aborts).

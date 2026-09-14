@@ -5266,12 +5266,21 @@ Certain traits, when implemented, unlock participation in language
 syntax. This is a deliberate design pattern: library types opt into
 language constructs by implementing a known trait. The set of syntax
 traits is **fixed and closed** — users cannot define new syntax hooks.
-Arithmetic and comparison operators are the main exception: they use
-fixed method names on the concrete type (`add`, `sub`, `mul`, `div`,
-`matmul`, `eq`, `lt`, and so on). The prelude traits `Add`, `Sub`,
-`Mul`, `Div`, `MatMul`, `Neg`, `Eq`, and `Ord` remain available for
-explicit bounds and documentation, but an unbounded generic does not
-need to name them.
+Arithmetic operators are the main exception: they use fixed method names
+on the concrete type (`add`, `sub`, `mul`, `div`, `matmul`, `neg`).
+Comparison is one primitive per family: `Eq.eq(self: &Self, other: &Self)
+-> bool` backs `==` and `!=`, and `Ord.cmp(self: &Self, other: &Self) ->
+i32` backs `<`, `<=`, `>`, and `>=` (negative, zero, or positive as the
+receiver orders before, with, or after `other`). A type may additionally
+define the fixed-name methods `ne`, `lt`, `le`, `gt`, `ge` as overrides;
+when present, the override is selected for its operator. Both operands are
+observed, never consumed: `a < b` compares the values `a` and `b` name,
+whether they are owned or views, and a view of a type with neither
+primitive is a compile error, never an address comparison — only raw
+pointers order by address (§16). The prelude traits `Add`, `Sub`, `Mul`,
+`Div`, `MatMul`, `Neg`, `Eq`, and `Ord` remain available for explicit
+bounds and documentation, but an unbounded generic does not need to name
+them.
 
 | Trait | Unlocks | Syntax |
 |-------|---------|--------|
@@ -5387,8 +5396,7 @@ fn parse_pair(input: &str) -> ParseResult[(Expr, Expr)]:
 
 **Arithmetic and comparison operator methods:**
 
-Arithmetic and comparison operators use fixed method names on the
-concrete type:
+Arithmetic operators use fixed method names on the concrete type:
 
 | Operator | Method |
 |----------|--------|
@@ -5398,15 +5406,30 @@ concrete type:
 | `/` | `div` |
 | `@` | `matmul` |
 | unary `-` | `neg` |
-| `==` | `eq` |
-| `!=` | `ne` |
-| `<` | `lt` |
-| `<=` | `le` |
-| `>` | `gt` |
-| `>=` | `ge` |
+
+Comparison operators derive from one primitive per family; a fixed-name
+method, when defined, overrides the derivation for its operator:
+
+| Operator | Derived from | Override |
+|----------|--------------|----------|
+| `==` | `eq(&other)` | — |
+| `!=` | `not eq(&other)` | `ne` |
+| `<` | `cmp(&other) < 0` | `lt` |
+| `<=` | `cmp(&other) <= 0` | `le` |
+| `>` | `cmp(&other) > 0` | `gt` |
+| `>=` | `cmp(&other) >= 0` | `ge` |
+
+```
+trait Eq:
+    fn eq(self: &Self, other: &Self) -> bool
+
+trait Ord:
+    fn cmp(self: &Self, other: &Self) -> i32
+```
 
 The prelude also defines optional traits with matching names and
-signatures for explicit bounds and documentation:
+signatures for the arithmetic operators, for explicit bounds and
+documentation:
 
 ```
 trait Add[Rhs, Output]:

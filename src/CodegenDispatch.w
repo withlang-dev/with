@@ -1671,7 +1671,7 @@ impl Codegen:
                     let sema_ty = body.local_type_ids[li]
                     if sema_ty != 0:
                         self.local_sema_types.insert(name_sym, sema_ty)
-            let closure_result = self.gen_closure(closure_node)
+            let closure_result = self.gen_closure(closure_node, body)
             return closure_result
 
         if ck == ConstKind.CK_ASYNC_BLOCK:
@@ -1693,7 +1693,7 @@ impl Codegen:
                     let ab_sema_ty = body.local_type_ids[ab_li]
                     if ab_sema_ty != 0:
                         self.local_sema_types.insert(ab_name_sym, ab_sema_ty)
-            return self.gen_async_block(ab_node)
+            return self.gen_async_block(ab_node, body)
 
         if ck == ConstKind.CK_FN:
             let fn_sym = cd
@@ -14775,7 +14775,7 @@ impl Codegen:
                                     let spawn_sema_ty = body.local_type_ids[spawn_li]
                                     if spawn_sema_ty != 0:
                                         self.local_sema_types.insert(spawn_name_sym, spawn_sema_ty)
-                            spawn_worker_val = self.gen_closure(spawn_worker_node)
+                            spawn_worker_val = self.gen_closure(spawn_worker_node, body)
                         else:
                             spawn_worker_val = self.mir_eval_operand(body, spawn_worker_op, 0)
                         let spawn_worker_ty = wl_type_of(spawn_worker_val)
@@ -16919,75 +16919,35 @@ impl Codegen:
 
     // ── Struct literal ────────────────────────────────────────────────
 
-    mut fn gen_closure(node: i32) -> i64:
+    fn prepared_anonymous_body(parent: &MirBody, node: i32, kind: i32) -> &MirBody:
+        for i in 0..parent.const_kinds.len():
+            if parent.const_kinds[i] == kind and parent.const_d0[i] == node:
+                let body_idx = self.mir_find_body_idx(parent.const_d1[i])
+                if body_idx < 0:
+                    sema_phase_bug(f"BUG: anonymous expression lacks retained MIR: node={node} parent={parent.fn_sym}")
+                return self.mir_body_at(body_idx)
+        sema_phase_bug(f"BUG: anonymous expression lacks MIR constant: node={node} parent={parent.fn_sym}")
+
+    mut fn gen_closure(node: i32, parent: &MirBody) -> i64:
         // Closure: create an anonymous function and return fat pointer {fn_ptr, ctx_ptr}
         // Calling convention: fn(ctx_ptr, params...) -> ret_ty
         // NodeKind.NK_CLOSURE layout: d0=body, d1=extra_start, d2=param_count
-        let body_node = self.pool.get_data0(node)
+        let closure_body = self.prepared_anonymous_body(parent, node, ConstKind.CK_CLOSURE)
         let extra_start = self.pool.get_data1(node)
         let param_count = self.pool.get_data2(node)
         let ptr_ty = wl_ptr_type(self.context)
         let i32_ty = wl_i32_type(self.context)
-        var closure_fn_tid = 0
-        var closure_fn_param_start = 0
-        var closure_fn_param_count = 0
-        var closure_fn_ret_tid = 0
-        var is_extern_closure = false
-        let closure_node_ty = self.sema_type_of_node(node)
-        if closure_node_ty != 0:
-            let resolved_closure_ty = self.sema.resolve_alias(closure_node_ty)
-            if self.sema.get_type_kind(resolved_closure_ty) == TypeKind.TY_FN:
-                closure_fn_tid = resolved_closure_ty as i32
-                closure_fn_param_start = self.sema.get_type_d0(resolved_closure_ty)
-                closure_fn_param_count = self.sema.get_type_d1(resolved_closure_ty)
-                closure_fn_ret_tid = self.sema.get_type_d2(resolved_closure_ty)
-            else if self.sema.get_type_kind(resolved_closure_ty) == TypeKind.TY_EXTERN_FN:
-                is_extern_closure = true
-                closure_fn_tid = resolved_closure_ty as i32
-                closure_fn_param_start = self.sema.get_type_d0(resolved_closure_ty)
-                closure_fn_param_count = self.sema.get_type_d1(resolved_closure_ty)
-                closure_fn_ret_tid = self.sema.get_type_d2(resolved_closure_ty)
+        let closure_kind = self.sema.get_type_kind(self.sema.resolve_alias(closure_body.anonymous_type))
+        if closure_kind != TypeKind.TY_FN and closure_kind != TypeKind.TY_EXTERN_FN:
+            sema_phase_bug(f"BUG: retained closure has non-callable type: node={node}")
+        let is_extern_closure = closure_kind == TypeKind.TY_EXTERN_FN
+        let closure_fn_ret_tid = closure_body.local_type_ids[0]
 
-        // Collect captured variables from enclosing scope
-        // First, temporarily mark closure params so collect_captures skips them
-        let param_syms: Vec[i32] = Vec.new()
-        for i in 0..param_count:
-            param_syms.push(self.pool.get_extra(extra_start + i * 2))
-        let fresh_captures: Vec[i32] = Vec.new()
-        self.async_block_captures = fresh_captures
-        self.collect_captures(body_node)
-        // Remove closure params from captures (they are not free variables)
+        // Capture identity and types belong to this concrete MIR body.
+        let capture_count = closure_body.anonymous_capture_count
         let captures: Vec[i32] = Vec.new()
-        for ci in 0..self.async_block_captures.len() as i32:
-            let sym = self.async_block_captures[ci]
-            var is_param = 0
-            for pi in 0..param_count:
-                if param_syms[pi] == sym:
-                    is_param = 1
-            if is_param == 0:
-                captures.push(sym)
-        let summary_count = self.sema.closure_capture_summary_count(node)
-        for sci in 0..summary_count:
-            let summary_sym = self.sema.closure_capture_summary_sym(node, sci)
-            if summary_sym == 0:
-                continue
-            var summary_is_param = 0
-            let summary_name = self.sema_symbol_text(summary_sym)
-            for pi2 in 0..param_count:
-                let param_sym = param_syms[pi2]
-                if param_sym == summary_sym or self.intern.resolve(param_sym) == summary_name:
-                    summary_is_param = 1
-            if summary_is_param != 0:
-                continue
-            var already_captured = 0
-            for ci2 in 0..captures.len() as i32:
-                let existing = captures[ci2]
-                if existing == summary_sym or self.intern.resolve(existing) == summary_name or self.sema_symbol_text(existing) == summary_name:
-                    already_captured = 1
-                    break
-            if already_captured == 0:
-                captures.push(summary_sym)
-        let capture_count = captures.len() as i32
+        for ci in 0..capture_count:
+            captures.push(closure_body.local_names[ci + 1])
         if is_extern_closure and capture_count > 0:
             with_eprint("internal error: capturing closure reached extern C function pointer lowering")
             self.had_error = 1
@@ -17001,8 +16961,8 @@ impl Codegen:
             if force_by_place_capture:
                 by_ref = 1
             else if can_capture_by_ref:
-                let sema_ty = self.lookup_capture_sema_type(sym)
-                if sema_ty == 0 or self.sema.is_copy_frozen(sema_ty as TypeId) == 0:
+                let sema_ty = closure_body.local_type_ids[ci + 1]
+                if self.sema.is_copy_frozen(sema_ty as TypeId) == 0:
                     by_ref = 1
             capture_ref_modes.push(by_ref)
 
@@ -17013,20 +16973,16 @@ impl Codegen:
             if capture_ref_modes[ci] != 0:
                 cap_types.push(ptr_ty)
             else:
-                let capture_ty = self.lookup_capture_type(sym)
-                if capture_ty != 0:
-                    cap_types.push(capture_ty)
-                else:
-                    cap_types.push(i32_ty)
+                let capture_ty = self.sema_type_to_llvm(closure_body.local_type_ids[ci + 1])
+                if capture_ty == 0: sema_phase_bug(f"BUG: closure capture lacks LLVM type: node={node} capture={ci}")
+                cap_types.push(capture_ty)
         // Collect original types for ref capture (needed inside closure body)
         let cap_orig_types: Vec[i64] = Vec.new()
         for ci in 0..capture_count:
             let sym = captures[ci]
-            let capture_ty = self.lookup_capture_type(sym)
-            if capture_ty != 0:
-                cap_orig_types.push(capture_ty)
-            else:
-                cap_orig_types.push(i32_ty)
+            let capture_ty = self.sema_type_to_llvm(closure_body.local_type_ids[ci + 1])
+            if capture_ty == 0: sema_phase_bug(f"BUG: closure capture lacks LLVM type: node={node} capture={ci}")
+            cap_orig_types.push(capture_ty)
         var cap_struct_type: i64 = 0
         if capture_count > 0:
             cap_struct_type = wl_struct_type(self.context, vec_data_i64(&cap_types), capture_count, 0)
@@ -17038,32 +16994,16 @@ impl Codegen:
         let param_types: Vec[i64] = Vec.new()
         let closure_places: Vec[i32] = Vec.new()
         for i in 0..param_count:
-            let p_type = self.pool.get_extra(extra_start + i * 2 + 1)
-            var p_sema_ty = self.sema.ty_i32 as i32
-            if p_type != 0:
-                let resolved_p = self.sema.resolve_type_expr_frozen(p_type)
-                if resolved_p != 0:
-                    p_sema_ty = resolved_p as i32
-            else if closure_fn_tid != 0 and i < closure_fn_param_count:
-                let expected_p_sema_ty = self.sema.type_extra[(closure_fn_param_start + i)]
-                if expected_p_sema_ty != 0:
-                    p_sema_ty = expected_p_sema_ty
+            let p_sema_ty = closure_body.local_type_ids[capture_count + i + 1]
             closure_param_sema_types.push(p_sema_ty)
             let p_llvm_ty = self.sema_type_to_llvm(p_sema_ty)
-            var chosen_ty = i32_ty
-            if p_llvm_ty != 0:
-                chosen_ty = p_llvm_ty
-            else if p_type != 0:
-                chosen_ty = self.resolve_type(p_type)
-            param_types.push(chosen_ty)
+            if p_llvm_ty == 0:
+                sema_phase_bug(f"BUG: anonymous parameter lacks LLVM type: node={node} parameter={i}")
+            param_types.push(p_llvm_ty)
             let reference = self.sema.get_type_kind(self.sema.resolve_alias(p_sema_ty as TypeId)) == TypeKind.TY_REF
             closure_places.push(self.sema.type_uses_c_va_list_place(p_sema_ty) | (if reference: 2 else: 0))
-        // Determine return type (infer from context or use i32)
-        var ret_ty = i32_ty
-        if closure_fn_ret_tid != 0:
-            let expected_ret_ty = self.sema_type_to_llvm(closure_fn_ret_tid)
-            if expected_ret_ty != 0:
-                ret_ty = expected_ret_ty
+        let ret_ty = self.sema_type_to_llvm(closure_fn_ret_tid)
+        if ret_ty == 0: sema_phase_bug(f"BUG: closure result lacks LLVM type: node={node}")
         let closure_abi_index = self.compute_fn_abi(ret_ty, param_types, closure_places, if is_extern_closure: FN_ABI_C else: FN_ABI_CLOSURE, 0)
         let closure_abi: FnAbi = self.fn_abis[closure_abi_index]
         let closure_has_sret = closure_abi.ret.pass == PM_INDIRECT
@@ -17080,6 +17020,8 @@ impl Codegen:
         let saved_fn = self.current_function
         let saved_ret = self.current_ret_type
         let saved_fn_name_sym = self.current_function_name_sym
+        let saved_async_rbuf = self.async_block_rbuf
+        self.async_block_rbuf = 0
         let saved_bb = wl_get_insert_block(self.builder)
         let saved_allocas = self.local_allocas
         let saved_types = self.local_types
@@ -17179,69 +17121,6 @@ impl Codegen:
         self.mir_ref_capture_local_types = fresh_cl_mir_ref_capture_local_types
         self.mir_bb_values = fresh_cl_mir_bbs
         self.mir_default_unreachable_bbs = fresh_cl_mir_unreachable
-
-        // Create MirBuilder for the closure body
-        var closure_builder = MirBuilder.init(self.sema, self.pool, self.intern, 0)
-        // Set return type (try sema inference, default to i32)
-        let ret_sema_ty = self.sema_type_of_node(body_node)
-        if closure_fn_ret_tid != 0 and closure_fn_ret_tid != self.sema.ty_void:
-            closure_builder.body.local_type_ids[0] = closure_fn_ret_tid
-        else if ret_sema_ty != 0 and ret_sema_ty != self.sema.ty_void:
-            closure_builder.body.local_type_ids[0] = ret_sema_ty
-        else:
-            closure_builder.body.local_type_ids[0] = self.sema.ty_i32
-
-        closure_builder.push_scope()
-
-        // Register captures as MIR locals (locals 1..capture_count)
-        for cl_ci in 0..capture_count:
-            let cl_cap_sym = captures[cl_ci]
-            var cl_cap_sema_ty = self.sema.ty_i32 as i32
-            let cl_cap_sema = self.lookup_capture_sema_type(cl_cap_sym)
-            if cl_cap_sema != 0:
-                cl_cap_sema_ty = cl_cap_sema
-            let cl_cap_local = closure_builder.body.new_local(cl_cap_sema_ty, 0, cl_cap_sym, 1)
-            closure_builder.bind_local(cl_cap_sym, cl_cap_local)
-
-        // Register params as MIR locals (locals capture_count+1..)
-        for cl_pi in 0..param_count:
-            let cl_p_name = self.pool.get_extra(extra_start + cl_pi * 2)
-            let cl_p_type_node = self.pool.get_extra(extra_start + cl_pi * 2 + 1)
-            var cl_p_sema_ty = self.sema.ty_i32 as i32
-            if cl_pi < closure_param_sema_types.len() as i32:
-                let cached_cl_p_ty = closure_param_sema_types[cl_pi]
-                if cached_cl_p_ty != 0:
-                    cl_p_sema_ty = cached_cl_p_ty
-            else if cl_p_type_node > 0:
-                if self.sema.typed_expr_types.contains(cl_p_type_node):
-                    let cl_tt = self.sema.typed_expr_types.get(cl_p_type_node).unwrap()
-                    if cl_tt > 0:
-                        cl_p_sema_ty = cl_tt
-                if cl_p_sema_ty == self.sema.ty_i32:
-                    let cl_pk = self.pool.kind(cl_p_type_node)
-                    if cl_pk == NodeKind.NK_TYPE_NAMED or cl_pk == NodeKind.NK_IDENT:
-                        let cl_type_sym = self.pool.get_data0(cl_p_type_node)
-                        let cl_prim = self.sema.primitive_type_by_sym(cl_type_sym)
-                        if cl_prim != 0:
-                            cl_p_sema_ty = cl_prim as i32
-                        else if self.sema.named_types.contains(cl_type_sym):
-                            cl_p_sema_ty = self.sema.named_types.get(cl_type_sym).unwrap()
-            else if closure_fn_tid != 0 and cl_pi < closure_fn_param_count:
-                let cl_expected_ty = self.sema.type_extra[(closure_fn_param_start + cl_pi)]
-                if cl_expected_ty != 0:
-                    cl_p_sema_ty = cl_expected_ty
-            let cl_p_local = closure_builder.body.new_local(cl_p_sema_ty, 1, cl_p_name, 1)
-            closure_builder.bind_local(cl_p_name, cl_p_local)
-
-        closure_builder.expected_type = closure_builder.body.local_type_ids.get(0)
-
-        // Lower the closure body expression to MIR
-        let cl_result = closure_builder.lower_expr(body_node)
-        let cl_ret_place = closure_builder.place_for_local(0)
-        closure_builder.assign_operand_to_place(cl_ret_place, cl_result, self.pool.get_end(body_node))
-        closure_builder.pop_scope_inline()
-        closure_builder.terminate(TermKind.TK_RETURN, 0, 0, 0, 0)
-        let closure_body = closure_builder.body
 
         // Set up return alloca (MIR local 0)
         let cl_ret_storage_ty = if ret_ty != wl_void_type(self.context): ret_ty else: i32_ty
@@ -17350,6 +17229,7 @@ impl Codegen:
         self.current_function = saved_fn
         self.current_ret_type = saved_ret
         self.current_function_name_sym = saved_fn_name_sym
+        self.async_block_rbuf = saved_async_rbuf
         wl_position_at_end(self.builder, saved_bb)
         self.local_allocas = saved_allocas
         self.local_types = saved_types
@@ -17786,7 +17666,7 @@ impl Codegen:
             with_str_clone_ref(self.current_decl_source_file)
         else:
             self.source_file
-        var source_text = self.source_text
+        var source_text = self.source_text.clone()
         if source_path.len() > 0 and source_path != self.source_file:
             let file_text = with_fs_read_file(source_path)
             if file_text.len() > 0:
@@ -18412,44 +18292,33 @@ impl Codegen:
 
     // ── Async block codegen ──────────────────────────────────────────
 
-    mut fn gen_async_block(node: i32) -> i64:
-        let body_node = self.pool.get_data0(node)
+    mut fn gen_async_block(node: i32, parent: &MirBody) -> i64:
+        let ab_body = self.prepared_anonymous_body(parent, node, ConstKind.CK_ASYNC_BLOCK)
         let ctx = self.context
         let ptr_ty = wl_ptr_type(ctx)
         let i32_ty = wl_i32_type(ctx)
         let i64_ty = wl_i64_type(ctx)
         let void_ty = wl_void_type(ctx)
 
-        // 1. Collect captures (local_allocas populated by CK_ASYNC_BLOCK preamble)
-        let fresh_captures: Vec[i32] = Vec.new()
-        self.async_block_captures = fresh_captures
-        self.collect_captures(body_node)
-        let captures = self.async_block_captures
-        let capture_count = captures.len() as i32
+        // Capture locals were established in the concrete lowering context.
+        let capture_count = ab_body.anonymous_capture_count
+        let captures: Vec[i32] = Vec.new()
+        for ci in 0..capture_count:
+            captures.push(ab_body.local_names[ci + 1])
 
         // 2. Build capture struct type
         let cap_types: Vec[i64] = Vec.new()
         for ci in 0..capture_count:
-            let sym = captures[ci]
-            let ty_opt = self.local_types.get(sym)
-            if ty_opt.is_some():
-                cap_types.push(ty_opt.unwrap() as i64)
-            else:
-                cap_types.push(i32_ty)
+            let ty = self.sema_type_to_llvm(ab_body.local_type_ids[ci + 1])
+            if ty == 0: sema_phase_bug(f"BUG: async capture lacks LLVM type: node={node} capture={ci}")
+            cap_types.push(ty)
         var cap_struct_type: i64 = 0
         if capture_count > 0:
             cap_struct_type = wl_struct_type(ctx, vec_data_i64(&cap_types), capture_count, 0)
 
-        // Determine result type from sema (unwrap Task[T] → T for result buffer)
-        var ret_sema_ty_id = self.sema.ty_i32 as i32
-        let node_sema_ty = self.sema_type_of_node(node)
-        if node_sema_ty != 0:
-            let unwrapped = self.sema.unwrap_task_type(node_sema_ty) as i32
-            if unwrapped > 0:
-                ret_sema_ty_id = unwrapped
-        var ret_ty = self.sema_type_to_llvm(ret_sema_ty_id)
-        if ret_ty == 0:
-            ret_ty = i32_ty
+        let ret_sema_ty_id = ab_body.local_type_ids[0]
+        let ret_ty = self.sema_type_to_llvm(ret_sema_ty_id)
+        if ret_ty == 0: sema_phase_bug(f"BUG: async result lacks LLVM type: node={node}")
 
         // 3. Create anonymous trampoline: Unit(ptr env, ptr result_buf)
         self.async_block_counter = self.async_block_counter + 1
@@ -18463,6 +18332,7 @@ impl Codegen:
         // 4. Save codegen state
         let saved_fn = self.current_function
         let saved_ret = self.current_ret_type
+        let saved_async_rbuf = self.async_block_rbuf
         let saved_bb = wl_get_insert_block(self.builder)
         let saved_allocas = self.local_allocas
         let saved_types = self.local_types
@@ -18513,30 +18383,6 @@ impl Codegen:
             let free_args: Vec[i64] = Vec.new()
             free_args.push(env_arg)
             wl_build_call(self.builder, free_ft, free_fn, vec_data_i64(&free_args), 1)
-
-        // 6. Lower body via MirBuilder (same pattern as gen_closure)
-        var ab_builder = MirBuilder.init(self.sema, self.pool, self.intern, 0)
-        if ret_sema_ty_id != 0 and ret_sema_ty_id != self.sema.ty_void as i32:
-            ab_builder.body.local_type_ids[0] = ret_sema_ty_id
-        else:
-            ab_builder.body.local_type_ids[0] = self.sema.ty_i32 as i32
-        ab_builder.push_scope()
-        // Register captures as MIR locals
-        for ci in 0..capture_count:
-            let sym = captures[ci]
-            var cap_sema_ty = self.sema.ty_i32 as i32
-            let cap_sema_opt = self.local_sema_types.get(sym)
-            if cap_sema_opt.is_some():
-                cap_sema_ty = cap_sema_opt.unwrap()
-            let cap_local = ab_builder.body.new_local(cap_sema_ty, 0, sym, 1)
-            ab_builder.bind_local(sym, cap_local)
-        // Lower body expression
-        let ab_result = ab_builder.lower_expr(body_node)
-        let ab_ret_place = ab_builder.place_for_local(0)
-        ab_builder.assign_operand_to_place(ab_ret_place, ab_result, self.pool.get_end(body_node))
-        ab_builder.pop_scope_inline()
-        ab_builder.terminate(TermKind.TK_RETURN, 0, 0, 0, 0)
-        let ab_body = ab_builder.body
 
         // Set rbuf flag so TK_RETURN stores result into result_buf
         self.async_block_rbuf = rbuf_arg
@@ -18591,7 +18437,7 @@ impl Codegen:
                     let _ = wl_build_unreachable(self.builder)
 
         // 7. Restore codegen state
-        self.async_block_rbuf = 0
+        self.async_block_rbuf = saved_async_rbuf
         self.mir_local_ptrs = saved_mir_locals
         self.mir_local_values = saved_mir_values
         self.mir_memory_locals = saved_mir_memory_locals

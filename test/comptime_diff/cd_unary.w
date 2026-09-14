@@ -6,6 +6,7 @@
 // not comptime-evaluable yet (#665).
 
 type Acc { total: i32 }
+impl Copy for Acc
 
 comptime fn bump(a: &Acc, n: i32) -> Acc:
     var out = *a

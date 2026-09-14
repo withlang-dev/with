@@ -96,7 +96,7 @@ impl JsonWriter:
         let prefixed = self.prefix_value()
         JsonWriter { text: prefixed.text ++ raw, needs_comma: true, after_key: false }
 
-    pub move fn value_str(value: str) -> JsonWriter:
+    pub move fn value_str(value: &str) -> JsonWriter:
         self.value_raw(json_quote(value))
 
     pub move fn value_i32(value: i32) -> JsonWriter:
@@ -110,7 +110,7 @@ impl JsonWriter:
 
 impl Serialize for str:    fn serialize(self: &str, out:
     JsonWriter) -> JsonWriter:
-        out.value_str(*self)
+        out.value_str(self)
 
 impl Serialize for i32:    fn serialize(self: &i32, out:
     JsonWriter) -> JsonWriter:

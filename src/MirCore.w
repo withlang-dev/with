@@ -393,6 +393,8 @@ type MirLocalInfo {
 type MirBody {
     fn_sym: i32,
     lowering_failed: i32,
+    anonymous_type: i32,
+    anonymous_capture_count: i32,
 
     // Locals
     local_type_ids: Vec[i32],
@@ -611,6 +613,8 @@ fn MirBody.init_for_fn(fn_sym: i32) -> MirBody:
     var body = MirBody {
         fn_sym,
         lowering_failed: 0,
+        anonymous_type: 0,
+        anonymous_capture_count: 0,
         local_type_ids: Vec.new(),
         local_mutables: Vec.new(),
         local_names: Vec.new(),

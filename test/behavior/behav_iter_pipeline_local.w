@@ -1,5 +1,8 @@
 //! expect-stdout: ok
 
+use std.collections.VecIter
+use std.collections.FilterIter
+
 fn make_iter(xs: &Vec[i32]) -> VecIter[i32]:
     xs.iter()
 

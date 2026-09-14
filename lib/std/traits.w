@@ -5,14 +5,17 @@
 // even without explicit import. The source definitions here make them
 // available through the prelude for documentation and tooling.
 
-/// Equality comparison. Implement to enable `==` and `!=` operators.
+/// Equality comparison (§11.7): `eq` backs `==` and `!=`; a type may
+/// override `!=` with `ne`. Both operands are observed.
 pub trait Eq:
-    fn eq(self: &Self, other: Self) -> bool
+    fn eq(self: &Self, other: &Self) -> bool
 
-/// Ordering comparison. Implement to enable `<`, `>`, `<=`, `>=`.
-/// Return negative for less-than, 0 for equal, positive for greater-than.
+/// Ordering comparison (§11.7): `cmp` backs `<`, `<=`, `>`, `>=`; a type may
+/// override any of them with `lt`, `le`, `gt`, `ge`. Both operands are
+/// observed. Return negative for less-than, 0 for equal, positive for
+/// greater-than.
 pub trait Ord:
-    fn cmp(self: &Self, other: Self) -> i32
+    fn cmp(self: &Self, other: &Self) -> i32
 
 /// Addition. Available for explicit generic bounds; `+` dispatches by the
 /// fixed method name `add` on concrete operand types.
@@ -120,13 +123,13 @@ pub trait ScopedMut[T]:    fn with_enter_mut(self:
 // Core trait impls for primitive types
 
 impl Eq for i32:
-    fn eq(other: i32) -> bool: *self == other
+    fn eq(other: &i32) -> bool: *self == *other
 
 impl Eq for bool:
-    fn eq(other: bool) -> bool: *self == other
+    fn eq(other: &bool) -> bool: *self == *other
 
 impl Eq for u8:
-    fn eq(other: u8) -> bool: *self == other
+    fn eq(other: &u8) -> bool: *self == *other
 
 impl Default for i32:
     fn default() -> i32:
@@ -174,30 +177,30 @@ impl Eq for str:
     fn eq(other: &str) -> bool: *self == other
 
 impl Eq for i64:
-    fn eq(other: i64) -> bool: *self == other
+    fn eq(other: &i64) -> bool: *self == *other
 
 impl Ord for i32:
-    fn cmp(other: i32) -> i32:
-        if *self < other: return -1
-        if *self > other: return 1
+    fn cmp(other: &i32) -> i32:
+        if *self < *other: return -1
+        if *self > *other: return 1
         0
 
 impl Ord for i64:
-    fn cmp(other: i64) -> i32:
-        if *self < other: return -1
-        if *self > other: return 1
+    fn cmp(other: &i64) -> i32:
+        if *self < *other: return -1
+        if *self > *other: return 1
         0
 
 impl Ord for u8:
-    fn cmp(other: u8) -> i32:
-        if *self < other: return -1
-        if *self > other: return 1
+    fn cmp(other: &u8) -> i32:
+        if *self < *other: return -1
+        if *self > *other: return 1
         0
 
 impl Ord for bool:
-    fn cmp(other: bool) -> i32:
-        if *self == other: return 0
-        if not *self and other: return -1
+    fn cmp(other: &bool) -> i32:
+        if *self == *other: return 0
+        if not *self and *other: return -1
         1
 
 impl Ord for str:

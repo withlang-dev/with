@@ -108,6 +108,11 @@ impl Sema:
         self.decl_iface_demanded = sema_new_vec_i32()
         self.iface_mentioned = sema_new_map_i32_i32()
         let iface_files = sema_new_map_i32_i32()
+        // Type names the program's own source declares. A mention of such a
+        // name demands the source declaration, never a same-named interface
+        // alias: c-algorithms' `pub type Trie = _Trie` would otherwise shadow
+        // the facade's `Trie[V]` in the flat type namespace (#1116 class).
+        let source_type_names = sema_new_map_i32_i32()
         // A bundle build and a .wi root (the emitter, the fingerprint and
         // the check-wi pass read the full tables) collect everything.
         let eager = self.interface_eager != 0
@@ -126,6 +131,13 @@ impl Sema:
                     last_flag = flag
             self.decl_is_iface.push(flag)
             self.decl_iface_demanded.push(if flag != 0 and not eager: 0 else: 1)
+            if flag == 0:
+                let source_decl = self.ast.get_decl(di)
+                // An alias (std.libc's `c_int = i32`) coexists with the
+                // interface's identical alias; only a real type declaration
+                // (`Trie[V]`) displaces an interface alias of its name.
+                if self.ast.kind(source_decl) == NodeKind.NK_TYPE_DECL and type_decl_sub_kind(self.ast.get_data2(source_decl)) != TypeDeclKind.Alias:
+                    source_type_names.insert(self.ast.get_data0(source_decl), 1)
             if flag != 0:
                 iface_count = iface_count + 1
                 if di < self.decl_source_file_ids.len() as i32:
@@ -155,6 +167,8 @@ impl Sema:
                     continue
                 let decl = self.ast.get_decl(di)
                 if not self.interface_decl_is_named(decl):
+                    continue
+                if self.ast.kind(decl) == NodeKind.NK_TYPE_DECL and source_type_names.contains(self.ast.get_data0(decl)):
                     continue
                 self.decl_iface_demanded[di] = 1
                 changed = true
@@ -2955,6 +2969,9 @@ impl Sema:
         0
 
     mut fn validate_generic_type_decls():
+        let saved_file_id = self.local_file_id
+        let saved_module_path = move self.current_module_path
+        let saved_module_has_ci = self.current_module_has_ci
         for di in 0..self.ast.decl_count():
             if self.decl_is_lazy_skipped(di):
                 continue
@@ -2965,6 +2982,9 @@ impl Sema:
             let tp_count = self.type_decl_tp_count(decl)
             if tp_count <= 0:
                 continue
+            // A private field type is looked up in its declaring module,
+            // including during this generic-template validation pass.
+            self.update_decl_source_context(di)
             let tp_start = self.type_decl_tp_start(decl)
             let extra_start = self.ast.get_data1(decl)
             let sub_kind = type_decl_sub_kind(self.ast.get_data2(decl))
@@ -3007,6 +3027,10 @@ impl Sema:
 
             if sub_kind == TypeDeclKind.Alias or sub_kind == TypeDeclKind.Distinct:
                 self.validate_type_expr_with_type_params(self.ast.get_extra(extra_start), tp_start, tp_count)
+
+        self.local_file_id = saved_file_id
+        self.current_module_path = saved_module_path
+        self.current_module_has_ci = saved_module_has_ci
 
     fn type_expr_mentions_type_param(type_node: i32, tp_sym: i32) -> i32:
         if type_node == 0:

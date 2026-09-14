@@ -59,6 +59,7 @@ enum ControlTargetKind: i32:
 
 type MirBuilder = ephemeral {
     body: MirBody,
+    anonymous_bodies: Vec[MirBody],
     cur_bb: BlockId,
 
     // Drop scope stack (flat storage + per-scope start offsets).
@@ -178,6 +179,7 @@ fn MirBuilder.init(sema: &Sema, ast: AstPool, pool: InternPool, fn_sym: i32) -> 
     let entry = body.new_block()
     MirBuilder {
         body,
+        anonymous_bodies: Vec.new(),
         cur_bb: entry,
         drop_local_ids: Vec.new(),
         drop_kinds: Vec.new(),
@@ -4223,6 +4225,8 @@ impl MirBuilder:
         if self.sema.operator_method_calls.contains(node):
             let method_sym: i32 = self.sema.operator_method_calls.get(node).unwrap()
             let reversed = if self.sema.operator_method_reversed.contains(node): self.sema.operator_method_reversed.get(node).unwrap() else: 0
+            if self.sema.operator_method_derived.contains(node):
+                return self.lower_derived_comparison(op, lhs_expr, rhs_expr, method_sym, reversed, node)
             if reversed != 0:
                 return self.lower_method_bin_op(rhs_expr, lhs_expr, method_sym, node)
             return self.lower_method_bin_op(lhs_expr, rhs_expr, method_sym, node)
@@ -4573,6 +4577,32 @@ impl MirBuilder:
         arg_nodes.push(rhs_expr)
         let ret_ty = self.expr_type(node)
         self.lower_call_with_arg_nodes(fn_op, method_sym, arg_nodes, ret_ty, node)
+
+    // §11.7: `a < b` with no `lt` on the type is `a.cmp(&b) < 0` (a reversed
+    // selection is `b.cmp(&a) > 0`); `a != b` with no `ne` is `not a.eq(&b)`.
+    mut fn lower_derived_comparison(op: i32, lhs_expr: i32, rhs_expr: i32, method_sym: i32, reversed: i32, node: i32) -> i32:
+        let fn_op = self.lower_var(method_sym, 0, 0)
+        let arg_nodes: Vec[i32] = Vec.new()
+        arg_nodes.push(if reversed != 0: rhs_expr else: lhs_expr)
+        arg_nodes.push(if reversed != 0: lhs_expr else: rhs_expr)
+        let bool_ty = self.sema.ty_bool as i32
+        if op == BinaryOp.OP_NEQ:
+            let equal = self.lower_call_with_arg_nodes(fn_op, method_sym, arg_nodes, bool_ty, node)
+            let not_rv = self.body.new_rvalue(RvalueKind.RK_UN_OP, UnaryOp.UOP_NOT, equal, 0)
+            let not_tmp = self.new_temp(bool_ty)
+            let not_place = self.place_for_local(not_tmp)
+            self.body.push_stmt(self.cur_bb, StmtKind.Assign, not_place, not_rv, self.ast.get_start(node))
+            return self.body.new_operand(OperandKind.OK_COPY, not_place)
+        let i32_ty = self.sema.ty_i32 as i32
+        let ordering = self.lower_call_with_arg_nodes(fn_op, method_sym, arg_nodes, i32_ty, node)
+        // With the operands swapped the ordering's sign flips.
+        let effective = if reversed == 0: op else if op == BinaryOp.OP_LT: BinaryOp.OP_GT else if op == BinaryOp.OP_GT: BinaryOp.OP_LT else if op == BinaryOp.OP_LTE: BinaryOp.OP_GTE else: BinaryOp.OP_LTE
+        let zero = self.const_operand(ConstKind.CK_INT, 0, i32_ty)
+        let cmp_rv = self.body.new_rvalue(RvalueKind.RK_BIN_OP, effective, ordering, zero)
+        let cmp_tmp = self.new_temp(bool_ty)
+        let cmp_place = self.place_for_local(cmp_tmp)
+        self.body.push_stmt(self.cur_bb, StmtKind.Assign, cmp_place, cmp_rv, self.ast.get_start(node))
+        self.body.new_operand(OperandKind.OK_COPY, cmp_place)
 
     mut fn lower_method_un_op(expr: i32, method_sym: i32, node: i32) -> i32:
         let fn_op = self.lower_var(method_sym, 0, 0)
@@ -5051,6 +5081,10 @@ impl MirBuilder:
         let kind = self.ast.kind(node)
         if kind == NodeKind.NK_GROUPED:
             return self.lower_binding_alias_place(self.ast.get_data0(node))
+        if kind == NodeKind.NK_UNARY and self.ast.get_data0(node) == UnaryOp.UOP_DEREF and self.sema.view_projection_exprs.contains(node):
+            // Sema recorded a non-owning projection through &T. Copying this
+            // place into an owning local would free the referent at scope exit.
+            return self.lower_expr_place(node)
         if kind == NodeKind.NK_CALL:
             return self.lower_call_place(node)
         if kind == NodeKind.NK_FIELD_ACCESS:
@@ -8875,7 +8909,7 @@ impl MirBuilder:
         self.body.set_call_contract(args_id, sig_idx, mono_sym)
 
     mut fn lower_call(fn_expr: i32, arg_exprs_start: i32, arg_exprs_count: i32, ret_type_id: i32, node: i32) -> i32:
-        let fn_op = self.lower_expr(fn_expr)
+        let fn_op = self.lower_callable_expr(fn_expr)
         var sig_idx = self.call_sig_for_expr(fn_expr)
         let recorded_sig = self.sema.resolved_call_sigs.get(node)
         if recorded_sig.is_some():
@@ -9135,6 +9169,21 @@ impl MirBuilder:
         if expr_tid == 0:
             return 0
         self.sema.callable_any_fn_type(expr_tid as TypeId)
+
+    mut fn lower_callable_expr(node: i32) -> i32:
+        var operand = self.lower_expr(node)
+        var exact_type = self.expr_type(node)
+        if self.sema.callable_any_fn_type(exact_type as TypeId) == 0:
+            return operand
+        // A callable view (including a collection element) addresses the
+        // stored callable. Project through references before invoking it;
+        // passing the reference itself jumps into data instead of code.
+        // FnAbi still owns the complete argument/result convention.
+        while self.sema.get_type_kind(self.sema.resolve_alias(exact_type as TypeId)) == TypeKind.TY_REF:
+            let reference = self.materialize_operand(operand, exact_type, self.ast.get_start(node))
+            operand = self.body.new_operand(OperandKind.OK_COPY, self.new_deref_place(reference))
+            exact_type = self.sema.get_type_d0(self.sema.resolve_alias(exact_type as TypeId))
+        operand
 
     mut fn lower_call_arg(arg_node: i32, sig_idx: i32, callable_fn_tid: i32, arg_i: i32, callee_sym: i32 = 0) -> i32:
         let saved_expected = self.expected_type
@@ -10238,7 +10287,12 @@ impl MirBuilder:
                     if self.ast.kind(gc_ma_node) != NodeKind.NK_CLOSURE:
                         gc_args.push(self.lower_call_arg(gc_ma_node, gc_sig_idx, 0, gc_mai + gc_param_offset))
                     else:
-                        gc_args.push(self.const_operand(ConstKind.CK_INT, 0, self.sema.ty_i32))
+                        // Codegen reads a closure argument back from the AST
+                        // (the spawn worker, a monomorphized method's callback),
+                        // but its body must already be lowered and retained
+                        // here: gen_closure resolves the node through this
+                        // body's CK_CLOSURE constant, never from the AST.
+                        gc_args.push(self.lower_closure(0, 0, self.ast.get_data1(gc_ma_node), self.ast.get_data2(gc_ma_node), gc_ma_node))
                 let gc_args_id = self.body.new_call_args(gc_args)
                 self.body.set_call_intrinsic(gc_args_id, MirIntrinsic.GENERIC_CALL)
                 self.require_generic_call_contract(gc_args_id, callee_sym, method_sym, self_expr, has_recorded_method_sig, "method-gc")
@@ -10252,7 +10306,7 @@ impl MirBuilder:
                 let gc_next = self.new_block()
                 self.terminate(TermKind.TK_CALL, gc_fn_op, gc_args_id, gc_place, gc_next)
                 self.switch_to(gc_next)
-                return self.body.new_operand(OperandKind.OK_COPY, gc_place)
+                return self.call_result_operand(gc_result, gc_place, gc_ret_ty)
 
         let fn_op = self.lower_var(callee_sym, 0, 0)
         let arg_nodes: Vec[i32] = Vec.new()
@@ -12365,6 +12419,10 @@ impl MirBuilder:
         let op_kind = if self.sema.is_copy_frozen(type_id) != 0: OperandKind.OK_COPY else: OperandKind.OK_MOVE
         self.body.new_operand(op_kind, place)
 
+    mut fn call_result_operand(local: i32, place: i32, type_id: i32) -> i32:
+        self.register_stmt_temp(local, type_id)
+        self.operand_for_place(place, type_id)
+
     mut fn lower_call_with_operand_args(fn_op: i32, args: &Vec[i32], ret_type: i32, node: i32) -> i32:
         for ai in 0..args.len():
             self.consume_moved_operand(args[ai])
@@ -12561,15 +12619,78 @@ impl MirBuilder:
         let ret_ty = self.expr_type(node)
         self.lower_call_with_arg_nodes(fn_op, callee_sym, arg_nodes, ret_ty, node)
 
+    mut fn prepare_anonymous_body(node: i32, ty: i32, is_async: bool) -> i32:
+        let body_node = self.ast.get_data0(node)
+        let body_sym = self.pool.intern(f"$anonymous${self.body.fn_sym}${node}")
+        let captures: Vec[i32] = Vec.new()
+        if is_async:
+            for i in 0..self.bind_syms.len():
+                let sym = self.bind_syms[i]
+                let sema_sym = self.sema.pool_lookup_symbol(self.pool.resolve_symbol(sym))
+                if self.sema.expr_uses_symbol(body_node, sema_sym) != 0:
+                    captures.push(sym)
+        else:
+            for i in 0..self.sema.closure_capture_summary_count(node):
+                let sym = self.sema.closure_capture_summary_sym(node, i)
+                captures.push(mir_symbol_for_pool(self.sema, self.pool, sym))
+        let callable_ty = self.sema.resolve_alias(ty)
+        let param_count = if is_async: 0 else: self.ast.get_data2(node)
+        let param_start = self.ast.get_data1(node)
+        let ret_ty = if is_async: self.sema.unwrap_task_type(callable_ty) as i32 else: self.sema.get_type_d2(callable_ty)
+        if ret_ty == 0:
+            sema_phase_bug(f"BUG: anonymous body lacks a concrete return type: node={node}")
+        var child = MirBuilder.init(self.sema, self.ast, self.pool, body_sym)
+        child.contextual_fact_sig_idx = if not is_async and captures.len() > 0: 0 else: self.contextual_fact_sig_idx
+        child.body.anonymous_type = ty
+        child.body.anonymous_capture_count = captures.len()
+        child.body.local_type_ids[0] = ret_ty
+        child.push_scope()
+        for sym in captures:
+            let local = self.lookup_local(sym)
+            let capture_ty = if local >= 0: self.local_type(local) else: self.lookup_alias_type(sym)
+            if capture_ty == 0:
+                sema_phase_bug(f"BUG: anonymous capture lacks a concrete local type: node={node} symbol={sym}")
+            let capture_local = child.body.new_local(capture_ty, 0, sym, 1)
+            child.bind_local(sym, capture_local)
+        for i in 0..param_count:
+            let sym = self.ast.get_extra(param_start + i * 2)
+            let param_ty = self.sema.fn_type_param_type(callable_ty, i)
+            if param_ty == 0:
+                sema_phase_bug(f"BUG: anonymous parameter lacks a concrete type: node={node} parameter={i}")
+            let local = child.body.new_local(param_ty, 1, sym, 1)
+            child.bind_local(sym, local)
+        child.body.n_params = captures.len() + param_count
+        child.expected_type = ret_ty
+        let frame = child.push_stmt_temp_frame()
+        let result = child.lower_expr(body_node)
+        if ret_ty != self.sema.ty_void and ret_ty != self.sema.ty_never:
+            let return_place = child.place_for_local(0)
+            // A body that is a statement (`item => xs.push(item)` for an
+            // `fn(i32) -> i32`) returns the implicit default (spec: implicit
+            // default return), exactly as a bare `return` does; a unit operand
+            // in the typed return slot fails the typed-MIR validator.
+            let body_ty = child.expr_type(body_node)
+            let returned = if body_ty == self.sema.ty_void as i32: child.lower_implicit_default_return(ret_ty, self.ast.get_end(body_node)) else: result
+            child.assign_operand_to_place(return_place, returned, self.ast.get_end(body_node))
+        child.finish_stmt_temp_frame(frame)
+        child.pop_scope_inline()
+        child.terminate(TermKind.TK_RETURN, 0, 0, 0, 0)
+        var finished = LoweredFunction { body: move child.body, anonymous_bodies: move child.anonymous_bodies }
+        self.anonymous_bodies.push(move finished.body)
+        while finished.anonymous_bodies.len() > 0:
+            self.anonymous_bodies.push(finished.anonymous_bodies.pop().unwrap())
+        body_sym
+
     mut fn lower_closure(_captured_start: i32, _captured_count: i32, _params_start: i32, _params_count: i32, node: i32) -> i32:
-        // Emit ConstKind.CK_CLOSURE so MIR codegen can delegate to gen_closure.
-        // The closure body is compiled as a separate function by AST codegen.
         let ty = self.expr_type(node)
         if ty == 0:
             return self.unit_operand()
+        // Lower now, while the enclosing specialization's AST type sidecars
+        // are active. Codegen only reads the retained concrete MIR.
+        let body_sym = self.prepare_anonymous_body(node, ty, false)
         let tmp = self.new_temp(ty)
         let place = self.place_for_local(tmp)
-        let closure_const = self.body.new_const(ConstKind.CK_CLOSURE, node, 0, 0, ty)
+        let closure_const = self.body.new_const(ConstKind.CK_CLOSURE, node, body_sym, 0, ty)
         let op = self.body.new_operand(OperandKind.OK_CONSTANT, closure_const)
         let rv = self.body.new_rvalue(RvalueKind.RK_USE, op, 0, 0)
         self.body.push_stmt(self.cur_bb, StmtKind.Assign, place, rv, self.ast.get_start(node))
@@ -13078,7 +13199,7 @@ impl MirBuilder:
                 let gc_next = self.new_block()
                 self.terminate(TermKind.TK_CALL, gc_fn_op, gc_args_id, gc_place, gc_next)
                 self.switch_to(gc_next)
-                return self.body.new_operand(OperandKind.OK_COPY, gc_place)
+                return self.call_result_operand(gc_result, gc_place, gc_ret_ty)
             // Check for enum variant constructor call: Some(v), Ok(v), Err(e), etc.
             if self.ast.kind(callee) == NodeKind.NK_IDENT:
                 var vc_sym = self.ast.get_data0(callee)
@@ -13206,7 +13327,7 @@ impl MirBuilder:
                     let gc_next = self.new_block()
                     self.terminate(TermKind.TK_CALL, gc_fn_op, gc_args_id, gc_place, gc_next)
                     self.switch_to(gc_next)
-                    return self.body.new_operand(OperandKind.OK_COPY, gc_place)
+                    return self.call_result_operand(gc_result, gc_place, gc_ret_ty)
             // Check for builtin calls (embed_file, src, etc.) — no sig, not a local
             if self.ast.kind(callee) == NodeKind.NK_IDENT:
                 let bu_sym = self.ast.get_data0(callee)
@@ -13227,7 +13348,7 @@ impl MirBuilder:
                     let bu_next = self.new_block()
                     self.terminate(TermKind.TK_CALL, bu_fn_op, bu_args_id, bu_place, bu_next)
                     self.switch_to(bu_next)
-                    return self.body.new_operand(OperandKind.OK_COPY, bu_place)
+                    return self.call_result_operand(bu_result, bu_place, bu_ret_ty)
             // Intrinsic free functions: fence(order)
             if self.ast.kind(callee) == NodeKind.NK_IDENT:
                 let ifn_sym = self.ast.get_data0(callee)
@@ -13769,15 +13890,14 @@ impl MirBuilder:
             return body_result
 
         if kind == NodeKind.NK_ASYNC_BLOCK:
-            // Emit CK_ASYNC_BLOCK constant — codegen handles the fiber spawn.
-            // Same pattern as CK_CLOSURE: MIR just creates a marker, codegen
-            // creates the anonymous function, collects captures, and spawns.
+            // Retain the concrete body; codegen handles the fiber spawn.
             let ab_ty = self.expr_type(node)
             if ab_ty == 0:
                 return self.unit_operand()
+            let body_sym = self.prepare_anonymous_body(node, ab_ty, true)
             let ab_tmp = self.new_temp(ab_ty)
             let ab_place = self.place_for_local(ab_tmp)
-            let ab_const = self.body.new_const(ConstKind.CK_ASYNC_BLOCK, node, 0, 0, ab_ty)
+            let ab_const = self.body.new_const(ConstKind.CK_ASYNC_BLOCK, node, body_sym, 0, ab_ty)
             let ab_op = self.body.new_operand(OperandKind.OK_CONSTANT, ab_const)
             let ab_rv = self.body.new_rvalue(RvalueKind.RK_USE, ab_op, 0, 0)
             self.body.push_stmt(self.cur_bb, StmtKind.Assign, ab_place, ab_rv, self.ast.get_start(node))
@@ -13910,7 +14030,12 @@ fn mir_symbol_for_pool(sema: &Sema, pool: InternPool, sym: i32) -> i32:
         return pool.intern(sema_name)
     sym
 
-fn lower_fn_with_sig(builder: MirBuilder, fn_node: i32, sig_idx: i32) -> MirBody:
+type LoweredFunction {
+    body: MirBody,
+    anonymous_bodies: Vec[MirBody],
+}
+
+fn lower_fn_with_sig(builder: MirBuilder, fn_node: i32, sig_idx: i32) -> LoweredFunction:
     if builder.ast.fn_decl_body_is_interface(fn_node):
         sema_phase_bug("BUG: interface body reached MIR lowering (D39: lower_module skips interface declarations)")
     builder.contextual_fact_sig_idx = sig_idx
@@ -14074,7 +14199,7 @@ fn lower_fn_with_sig(builder: MirBuilder, fn_node: i32, sig_idx: i32) -> MirBody
 
     // D32: field vacates need a mutable path — rebind the owned param.
     var owned_builder = builder
-    return move owned_builder.body
+    LoweredFunction { body: move owned_builder.body, anonymous_bodies: move owned_builder.anonymous_bodies }
 
 fn lower_fn_clause_dispatcher(sema: &Sema, ast_pool: AstPool, pool: InternPool, group: i32) -> MirBody:
     let dispatch_sym = sema.fn_clause_group_name(group)
@@ -14630,13 +14755,28 @@ fn mir_fn_is_generic_template_at(sema: &Sema, ast_pool: AstPool, pool: InternPoo
 
 type ConcreteSpecializationLowerResult {
     sema: Sema,
-    body: MirBody,
+    lowered: LoweredFunction,
 }
 
 impl MirModule:
+    mut fn add_lowered_function(lowered: LoweredFunction):
+        var owned = lowered
+        self.add_body(move owned.body)
+        while owned.anonymous_bodies.len() > 0:
+            self.add_body(owned.anonymous_bodies.pop().unwrap())
+
     fn validate_generic_call_contracts(sema: &Sema):
         for bi in 0..self.bodies.len():
             let body = &self.bodies[bi]
+            for ci in 0..body.const_kinds.len():
+                let kind = body.const_kinds[ci]
+                if kind != ConstKind.CK_CLOSURE and kind != ConstKind.CK_ASYNC_BLOCK: continue
+                let child_idx = self.find_body(body.const_d1[ci])
+                if child_idx < 0:
+                    sema_phase_bug(f"BUG: anonymous expression has no prelowered MIR body: body={body.fn_sym} node={body.const_d0[ci]}")
+                let child = &self.bodies[child_idx]
+                if child.anonymous_type != body.const_types[ci] or child.anonymous_capture_count < 0 or child.anonymous_capture_count > child.n_params:
+                    sema_phase_bug(f"BUG: anonymous expression/body contract mismatch: body={body.fn_sym} node={body.const_d0[ci]}")
             let call_count = body.call_arg_starts.len() as i32
             if body.call_sig_indices.len() != call_count or body.call_mono_syms.len() as i32 != call_count or body.call_contract_required.len() as i32 != call_count or body.call_pipeline_receiver_places.len() as i32 != call_count:
                 sema_phase_bug(f"BUG: MIR call-contract tables are not parallel in body {body.fn_sym}")
@@ -14731,7 +14871,7 @@ fn lower_concrete_specialization(sema: Sema, ast_pool: AstPool, pool: InternPool
     if decl_index >= 0:
         sema.update_decl_source_context(decl_index)
     var builder = MirBuilder.init(&sema, ast_pool, pool, mono_sym)
-    let body = lower_fn_with_sig(move builder, fn_node, sig_idx)
+    let lowered = lower_fn_with_sig(move builder, fn_node, sig_idx)
     sema.local_file_id = saved_file_id
     sema.current_module_path = saved_module_path
     sema.current_module_has_ci = saved_module_has_ci
@@ -14744,7 +14884,7 @@ fn lower_concrete_specialization(sema: Sema, ast_pool: AstPool, pool: InternPool
             sema.named_types.remove(sym)
     sema.generic_subst_param_syms = saved_subst_syms
     sema.generic_subst_type_ids = saved_subst_types
-    ConcreteSpecializationLowerResult { sema, body }
+    ConcreteSpecializationLowerResult { sema, lowered }
 
 fn lower_module(input_sema: Sema, ast_pool: AstPool, pool: InternPool) -> MirLowerResult:
     var sema = input_sema
@@ -14773,11 +14913,13 @@ fn lower_module(input_sema: Sema, ast_pool: AstPool, pool: InternPool) -> MirLow
                 continue
             var source_builder = MirBuilder.init(&sema, ast_pool, pool, mir_fn_sym)
             source_builder.in_generator = 1
-            let source_body = lower_fn_with_sig(move source_builder, decl as i32, sig_idx)
+            var source = lower_fn_with_sig(move source_builder, decl as i32, sig_idx)
             let ctor_body = lower_generator_constructor(sema, ast_pool, pool, decl as i32, sig_idx)
-            let next_body = lower_generator_next_body(sema, source_body, decl as i32)
+            let next_body = lower_generator_next_body(sema, source.body, decl as i32)
             mir_mod.add_body(move ctor_body)
             mir_mod.add_body(move next_body)
+            while source.anonymous_bodies.len() > 0:
+                mir_mod.add_body(source.anonymous_bodies.pop().unwrap())
             continue
         let sig_idx = sema.get_sig(fn_sym)
         var builder = MirBuilder.init(&sema, ast_pool, pool, mir_fn_sym)
@@ -14785,8 +14927,7 @@ fn lower_module(input_sema: Sema, ast_pool: AstPool, pool: InternPool) -> MirLow
         // mir_fn_sym belongs to the output pool; treating its numeric ID as a
         // Sema symbol can select an unrelated but valid signature in large
         // combined modules and corrupt every parameter type during lowering.
-        let body = lower_fn_with_sig(move builder, decl as i32, sig_idx)
-        mir_mod.add_body(move body)
+        mir_mod.add_lowered_function(lower_fn_with_sig(move builder, decl as i32, sig_idx))
 
     for gi in 0..sema.fn_clause_group_count():
         let dispatch_sym = sema.fn_clause_group_name(gi)
@@ -14805,12 +14946,21 @@ fn lower_module(input_sema: Sema, ast_pool: AstPool, pool: InternPool) -> MirLow
             if mir_mod.find_body(mono_sym) < 0:
                 var lowered = lower_concrete_specialization(move sema, ast_pool, pool, specialization)
                 sema = move lowered.sema
-                mir_mod.add_body(move lowered.body)
+                mir_mod.add_lowered_function(move lowered.lowered)
             specialization = specialization + 1
         sema.preregister_mir_types()
         let before_drop_registration = sema.concrete_specialization_nodes.len() as i32
+        let types_before_drop_registration = sema.type_kinds.len() as i32
         sema.register_generic_drop_specializations()
         specializations_stable = sema.concrete_specialization_nodes.len() == before_drop_registration
+        // Checking a Drop body here creates its dependent types (a `*mut
+        // Slot[T]` only the drop mentions) AFTER the preregistration above;
+        // lower_concrete_specialization's own refresh compares against a count
+        // taken after this point and would never see them, so the frozen
+        // reads (is_copy_frozen) missed on a generic type whose only use was
+        // being dropped.
+        if sema.type_kinds.len() as i32 != types_before_drop_registration:
+            sema.preregister_mir_types()
 
     mir_mod.validate_generic_call_contracts(&sema)
 

@@ -93,6 +93,7 @@ extern fn clang_getCursorLocation(cursor: CXCursor) -> CXSourceLocation
 extern fn clang_Location_isFromMainFile(location: CXSourceLocation) -> i32
 extern fn clang_getCursorLinkage(cursor: CXCursor) -> i32
 extern fn clang_Cursor_getStorageClass(cursor: CXCursor) -> i32
+extern fn clang_Cursor_getVarDeclInitializer(cursor: CXCursor) -> CXCursor
 extern fn clang_Cursor_getNumArguments(cursor: CXCursor) -> i32
 extern fn clang_Cursor_getArgument(cursor: CXCursor, idx: u32) -> CXCursor
 extern fn clang_Cursor_isFunctionInlined(cursor: CXCursor) -> i32
@@ -931,7 +932,9 @@ unsafe fn translate_type_recursive_mode(s: *mut CImportSession, ty: CXType, dept
             bare = (bare as i64 + 7) as *const u8
         else if bare as i64 != 0 and c_strncmp(bare, "union \0" as *const u8, 6) == 0:
             bare = (bare as i64 + 6) as *const u8
-        if bare as i64 == 0 or *bare == 0 or *bare == 95 or c_strstr(name_str, "(anonymous\0" as *const u8) as i64 != 0:
+        // A leading underscore is a valid tag, not evidence of anonymity.
+        // Ask Clang about the declaration so typedefs retain record identity.
+        if bare as i64 == 0 or *bare == 0 or clang_Cursor_isAnonymous(clang_getTypeDeclaration(canonical)) != 0:
             clang_disposeString(spelling)
             return session_strdup(s, "c_void\0" as *const u8)
         let result = session_strdup(s, bare)
@@ -1058,7 +1061,10 @@ unsafe fn collect_decl(cursor: CXCursor, parent: CXCursor, data: *mut u8) -> i32
         clang_getFileLocation(loc, &raw mut file, 0 as *mut u32, 0 as *mut u32, 0 as *mut u32)
         if file as i64 != 0 and clang_File_isEqual(file, (*s).header_file) == 0:
             return CXChildVisit_Continue
-    // Grow decl array
+    session_append_decl(s, cursor)
+    CXChildVisit_Continue
+
+unsafe fn session_append_decl(s: *mut CImportSession, cursor: CXCursor):
     if (*s).decl_count >= (*s).decl_cap:
         (*s).decl_cap = if (*s).decl_cap > 0: (*s).decl_cap * 2 else: 256
         let old_decls = (*s).decls
@@ -1070,7 +1076,68 @@ unsafe fn collect_decl(cursor: CXCursor, parent: CXCursor, data: *mut u8) -> i32
     let dst = (((*s).decls as i64) + ((*s).decl_count as i64 * 32)) as *mut CXCursor
     *dst = cursor
     (*s).decl_count = (*s).decl_count + 1
+
+unsafe fn session_decl_contains(s: *mut CImportSession, cursor: CXCursor) -> bool:
+    var i = 0
+    while i < (*s).decl_count:
+        if clang_equalCursors(*(((*s).decls as i64 + i as i64 * 32) as *const CXCursor), cursor) != 0:
+            return true
+        i = i + 1
+    false
+
+// A record that is named only through a type — `struct __locale_data *`
+// inside another record's member, never declared at file scope — has no
+// cursor of its own in the top-level walk, yet the rendered member names
+// it. Every such record without a definition anywhere in the TU joins the
+// declaration list, so it renders `type X = opaque` next to its users
+// (glibc's __locale_struct under `use c_import("time.h")`).
+unsafe fn collect_undefined_record_type(s: *mut CImportSession, ty: CXType, depth: i32):
+    if depth > MAX_TYPE_DEPTH: return
+    if ty.kind == CXType_Typedef:
+        collect_undefined_record_type(s, clang_getTypedefDeclUnderlyingType(clang_getTypeDeclaration(ty)), depth + 1)
+        return
+    if ty.kind == CXType_Elaborated:
+        collect_undefined_record_type(s, clang_Type_getNamedType(ty), depth + 1)
+        return
+    let canonical = clang_getCanonicalType(ty)
+    let kind = canonical.kind
+    if kind == CXType_Pointer:
+        collect_undefined_record_type(s, clang_getPointeeType(canonical), depth + 1)
+    else if kind == CXType_ConstantArray or kind == CXType_IncompleteArray:
+        collect_undefined_record_type(s, clang_getArrayElementType(canonical), depth + 1)
+    else if kind == CXType_FunctionProto or kind == CXType_FunctionNoProto:
+        collect_undefined_record_type(s, clang_getResultType(canonical), depth + 1)
+        let n = clang_getNumArgTypes(canonical)
+        var i = 0
+        while i < n:
+            collect_undefined_record_type(s, clang_getArgType(canonical, i as u32), depth + 1)
+            i = i + 1
+    else if kind == CXType_Record:
+        let decl = clang_getTypeDeclaration(canonical)
+        if clang_Cursor_isNull(decl) == 0 and clang_Cursor_isAnonymous(decl) == 0 and clang_Cursor_isNull(clang_getCursorDefinition(decl)) != 0 and not session_decl_contains(s, decl):
+            session_append_decl(s, decl)
+
+@[callconv("c")]
+unsafe fn collect_member_record_types(cursor: CXCursor, parent: CXCursor, data: *mut u8) -> i32:
+    if clang_getCursorKind(cursor) == CXCursor_FieldDecl:
+        collect_undefined_record_type(data as *mut CImportSession, clang_getCursorType(cursor), 0)
     CXChildVisit_Continue
+
+// Walks every collected declaration's types (record members, function
+// signatures, typedef targets, variables). Declarations appended on the way
+// are walked too; an undefined record has no members, so the walk ends.
+unsafe fn collect_undefined_records(s: *mut CImportSession):
+    var i = 0
+    while i < (*s).decl_count:
+        let cursor = *(((*s).decls as i64 + i as i64 * 32) as *const CXCursor)
+        let kind = clang_getCursorKind(cursor)
+        if kind == CXCursor_StructDecl or kind == CXCursor_UnionDecl:
+            let _ = clang_visitChildren(cursor, collect_member_record_types as *const u8, s as *mut u8)
+        else if kind == CXCursor_FunctionDecl or kind == CXCursor_VarDecl:
+            collect_undefined_record_type(s, clang_getCursorType(cursor), 0)
+        else if kind == CXCursor_TypedefDecl:
+            collect_undefined_record_type(s, clang_getTypedefDeclUnderlyingType(cursor), 0)
+        i = i + 1
 
 @[callconv("c")]
 unsafe fn collect_field(cursor: CXCursor, parent: CXCursor, data: *mut u8) -> i32:
@@ -1353,6 +1420,7 @@ pub fn with_cimport_parse(header_code: &str) -> i64:
         let root = clang_getTranslationUnitCursor((*s).tu)
         (*s).header_file = 0 as *mut u8
         let _ = clang_visitChildren(root, collect_decl as *const u8, s as *mut u8)
+        collect_undefined_records(s)
         s as i64
 
 // ── Dispose ─────────────────────────────────────────────────
@@ -1892,66 +1960,25 @@ pub fn with_cimport_var_storage_class(session: i64, idx: i32) -> i32:
         let cursor = *(((*s).decls as i64 + idx as i64 * 32) as *const CXCursor)
         clang_Cursor_getStorageClass(cursor)
 
-unsafe fn cimport_var_decl_has_initializer_text(s: &str) -> i32:
-    let slen = s.len() as i32
-    var paren_depth = 0
-    var bracket_depth = 0
-    var brace_depth = 0
-    var i = 0
-    while i < slen:
-        let c = s[i]
-        if c == 47 and i + 1 < slen:
-            let next = s[(i + 1)]
-            if next == 47:
-                i = i + 2
-                while i < slen and s[i] != 10:
-                    i = i + 1
-                continue
-            if next == 42:
-                i = i + 2
-                while i + 1 < slen:
-                    if s[i] == 42 and s[(i + 1)] == 47:
-                        i = i + 2
-                        break
-                    i = i + 1
-                continue
-        if c == 34 or c == 39:
-            let quote = c
-            i = i + 1
-            while i < slen:
-                let inner = s[i]
-                if inner == 92:
-                    i = i + 2
-                    continue
-                if inner == quote:
-                    break
-                i = i + 1
-            i = i + 1
-            continue
-        if c == 40: paren_depth = paren_depth + 1
-        if c == 41 and paren_depth > 0: paren_depth = paren_depth - 1
-        if c == 91: bracket_depth = bracket_depth + 1
-        if c == 93 and bracket_depth > 0: bracket_depth = bracket_depth - 1
-        if c == 123: brace_depth = brace_depth + 1
-        if c == 125 and brace_depth > 0: brace_depth = brace_depth - 1
-        if c == 61 and paren_depth == 0 and bracket_depth == 0 and brace_depth == 0:
-            let prev = if i > 0: s[(i - 1)] else: 0
-            let next = if i + 1 < slen: s[(i + 1)] else: 0
-            if prev != 61 and prev != 33 and prev != 60 and prev != 62 and next != 61:
-                return 1
-        i = i + 1
-    0
-
 pub fn with_cimport_var_definition_kind(session: i64, idx: i32) -> i32:
     unsafe:
         let s = session as *mut CImportSession
         if s as i64 == 0 or idx < 0 or idx >= (*s).decl_count: return 0
         let cursor = *(((*s).decls as i64 + idx as i64 * 32) as *const CXCursor)
-        if cimport_var_decl_has_initializer_text(cursor_source_text_from_cursor(s, cursor)) != 0:
+        if clang_Cursor_isNull(clang_Cursor_getVarDeclInitializer(cursor)) == 0:
             return 2
         if clang_Cursor_getStorageClass(cursor) == CB_CX_SC_EXTERN:
             return 0
         1
+
+pub fn with_ci_var_initializer(session: i64, cursor_idx: i32) -> i32:
+    unsafe:
+        let s = session as *mut CImportSession
+        if s as i64 == 0 or cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return -1
+        let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
+        let initializer = clang_Cursor_getVarDeclInitializer(cursor)
+        if clang_Cursor_isNull(initializer) != 0: return -1
+        store_cursor(s, initializer)
 
 pub fn with_cimport_var_type_translated(session: i64, idx: i32) -> str:
     unsafe:

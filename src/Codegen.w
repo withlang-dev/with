@@ -2635,6 +2635,14 @@ impl Codegen:
                 let sema_ty = self.sema_type_to_llvm(sema_tid)
                 if sema_ty != 0:
                     return sema_ty
+            // Type applications parsed in expression position still need the
+            // active monomorphization frame, just like NK_TYPE_GENERIC.
+            let base = self.pool.get_data0(type_node)
+            if self.pool.kind(base) == NodeKind.NK_IDENT:
+                let args: Vec[i32] = Vec.new()
+                args.push(self.pool.get_data1(type_node))
+                if self.pool.get_data2(type_node) != 0: args.push(self.pool.get_data2(type_node))
+                return self.resolve_generic_type_nodes(self.pool.get_data0(base), args, type_node)
             return 0
 
         if kind == NodeKind.NK_TYPE_ARRAY:
@@ -2671,46 +2679,9 @@ impl Codegen:
             let name_sym = self.pool.get_data0(type_node)
             let g_extra = self.pool.get_data1(type_node)
             let g_count = self.pool.get_data2(type_node)
-            // Box[T] is always a pointer (fat pointer for Box[dyn Trait])
-            if self.sema.type_symbol_is_std_box(name_sym) != 0 and g_count == 1:
-                let inner_node = self.pool.get_extra(g_extra)
-                if self.pool.kind(inner_node) == NodeKind.NK_TYPE_TRAIT_OBJ:
-                    return self.get_dyn_fat_ptr_type()
-                return wl_ptr_type(self.context)
-            // ContextError[E] = { message: str, source: E }
-            if name_sym == self.sym_context_error and g_count == 1:
-                let src_node = self.pool.get_extra(g_extra)
-                let src_ty = self.resolve_type(src_node)
-                return self.get_or_create_context_error_type(src_ty)
-            // Codegen-level resolution must run before the Sema fallback when
-            // monomorphizing generic struct fields. Sema does not see Codegen's
-            // active type bindings, so asking it first would turn Vec[(K, V)]
-            // into a fallback type and poison codegen with had_error.
-            if name_sym == self.sym_option and g_count == 1:
-                let opt_arg = self.resolve_type(self.pool.get_extra(g_extra))
-                if opt_arg != 0:
-                    return self.get_or_create_option_type(0, opt_arg)
-            if name_sym == self.sym_vec and g_count == 1:
-                let vec_arg = self.resolve_type(self.pool.get_extra(g_extra))
-                if vec_arg != 0:
-                    return self.get_or_create_vec_type(0, vec_arg)
-            if name_sym == self.sym_result and g_count == 2:
-                let res_ok = self.resolve_type(self.pool.get_extra(g_extra))
-                let res_err = self.resolve_type(self.pool.get_extra(g_extra + 1))
-                if res_ok != 0 and res_err != 0:
-                    return self.get_or_create_result_type(0, res_ok, res_err)
-            // Sema-based path for other builtin containers (HashMap, HashSet)
-            // and fully concrete generic instantiations.
-            let sema_tid = self.sema.resolve_type_expr_frozen(type_node)
-            if sema_tid > 0:
-                let llvm_ty = self.sema_type_to_llvm(sema_tid)
-                if llvm_ty != 0:
-                    return llvm_ty
-            // Monomorphize user-defined generic structs
-            let gs_opt = self.generic_structs.get(name_sym)
-            if gs_opt.is_some():
-                return self.monomorphize_struct(name_sym, g_extra, g_count)
-            return 0
+            let args: Vec[i32] = Vec.new()
+            for i in 0..g_count: args.push(self.pool.get_extra(g_extra + i))
+            return self.resolve_generic_type_nodes(name_sym, args, type_node)
 
         if kind == NodeKind.NK_TYPE_TRAIT_OBJ:
             // dyn Trait → fat pointer {data_ptr, vtable_ptr}
@@ -2754,6 +2725,37 @@ impl Codegen:
         let ctx_owner = if self.current_method_owner_sym != 0: with_str_clone_ref(self.intern.resolve(self.current_method_owner_sym)) else: ""
         with_eprint(f"warning: [type-resolve] unhandled type node kind={kind} node={type_node} span={self.pool.get_start(type_node)}..{self.pool.get_end(type_node)} in={ctx_fn} owner={ctx_owner}")
         self.type_fallback()
+
+    mut fn resolve_generic_type_nodes(name_sym: i32, args: &Vec[i32], type_node: i32) -> i64:
+        let count = args.len()
+        if self.sema.type_symbol_is_std_box(name_sym) != 0 and count == 1:
+            if self.pool.kind(args[0]) == NodeKind.NK_TYPE_TRAIT_OBJ: return self.get_dyn_fat_ptr_type()
+            return wl_ptr_type(self.context)
+        if name_sym == self.sym_context_error and count == 1:
+            let inner = self.resolve_type(args[0])
+            return self.get_or_create_context_error_type(inner)
+        // Resolve arguments against the active frame before asking frozen
+        // Sema, which cannot see codegen's current type-parameter bindings.
+        if name_sym == self.sym_option and count == 1:
+            let inner = self.resolve_type(args[0])
+            if inner != 0: return self.get_or_create_option_type(0, inner)
+        if name_sym == self.sym_vec and count == 1:
+            let inner = self.resolve_type(args[0])
+            if inner != 0: return self.get_or_create_vec_type(0, inner)
+        if name_sym == self.sym_result and count == 2:
+            let ok = self.resolve_type(args[0])
+            let err = self.resolve_type(args[1])
+            if ok != 0 and err != 0: return self.get_or_create_result_type(0, ok, err)
+        let sema_tid = if self.pool.kind(type_node) == NodeKind.NK_INDEX:
+            self.sema.resolve_type_level_arg_expr_frozen(type_node)
+        else:
+            self.sema.resolve_type_expr_frozen(type_node)
+        if sema_tid > 0:
+            let resolved = self.sema_type_to_llvm(sema_tid)
+            if resolved != 0: return resolved
+        if self.generic_structs.contains(name_sym):
+            return self.monomorphize_struct_nodes(name_sym, args)
+        0
 
     fn resolve_primitive_named_type(sym: i32) -> i64:
         if sym == self.sym_bool: return wl_i1_type(self.context)
@@ -3606,21 +3608,25 @@ impl Codegen:
         let st_type: i64 = self.struct_llvm_types[idx]
         let extra_start = self.codegen_get_type_d1(resolved)
         let field_count = self.codegen_generator_state_field_count(resolved)
-        self.struct_field_starts[idx] = self.struct_field_names.len() as i32
+        let field_start = self.struct_field_names.len() as i32
+        self.struct_field_starts[idx] = field_start
         self.struct_field_counts[idx] = field_count
+
+        for fi in 0..field_count:
+            let field_sym = self.codegen_generator_state_field_sym(resolved, fi, extra_start)
+            self.struct_field_names.push(field_sym)
+            self.struct_field_types.push(0)
+            self.struct_field_type_nodes.push(0)
+            self.struct_field_defaults.push(0)
+            self.struct_llvm_field_indices.push(fi)
 
         let field_types: Vec[i64] = Vec.new()
         for fi in 0..field_count:
-            let field_sym = self.codegen_generator_state_field_sym(resolved, fi, extra_start)
             let field_tid = self.codegen_generator_state_field_type(resolved, fi, extra_start)
             var field_ty = self.mir_sema_type_to_llvm(field_tid)
             if field_ty == 0:
                 field_ty = self.type_fallback()
-            self.struct_field_names.push(field_sym)
-            self.struct_field_types.push(field_ty)
-            self.struct_field_type_nodes.push(0)
-            self.struct_field_defaults.push(0)
-            self.struct_llvm_field_indices.push(fi)
+            self.struct_field_types[field_start + fi] = field_ty
             field_types.push(field_ty)
         wl_struct_set_body(st_type, vec_data_i64(&field_types), field_count, 0)
 
@@ -3713,18 +3719,32 @@ impl Codegen:
 
     // ── Declare struct type ───────────────────────────────────────────
 
+    // Type resolution can recursively register another record. Reserve every
+    // parallel column before that recursion so each owner keeps one range.
+    mut fn reserve_struct_fields(idx: i32, extra_start: i32, field_count: i32, is_union: bool):
+        let start = self.struct_field_names.len() as i32
+        self.struct_field_starts[idx] = start
+        self.struct_field_counts[idx] = field_count
+        for fi in 0..field_count:
+            let offset = extra_start + 1 + fi * 3
+            self.struct_field_names.push(self.pool.get_extra(offset))
+            self.struct_field_types.push(0)
+            self.struct_field_type_nodes.push(self.pool.get_extra(offset + 1))
+            self.struct_field_defaults.push(self.pool.get_extra(offset + 2))
+            self.struct_llvm_field_indices.push(if is_union: 0 else: fi)
+        start
+
     mut fn declare_struct_type(name_sym: i32, type_node: i32):
         // type_node is the NodeKind.NK_TYPE_DECL node with TypeDeclSubKind.TDK_STRUCT
         let extra_start = self.pool.get_data1(type_node)
         let field_count = self.pool.get_extra(extra_start)
 
-        let name_str: str = with_str_clone_ref(self.intern.resolve(name_sym))
+        let name_str = with_str_clone_ref(self.intern.resolve(name_sym))
         if not self.struct_type_map.get(name_sym).is_some():
             self.predeclare_struct_type(name_sym)
         let idx: i32 = self.struct_type_map.get(name_sym).unwrap()
         let st_type: i64 = self.struct_llvm_types[idx]
-        self.struct_field_starts[idx] = self.struct_field_names.len() as i32
-        self.struct_field_counts[idx] = field_count
+        let field_start = self.reserve_struct_fields(idx, extra_start, field_count, false)
 
         // Parse fields: [field_name, field_type, field_default]*
         let ft_vec: Vec[i64] = Vec.new()
@@ -3733,7 +3753,6 @@ impl Codegen:
             let offset = extra_start + 1 + fi * 3
             let f_name = self.pool.get_extra(offset)
             let f_type_node = self.pool.get_extra(offset + 1)
-            let f_default = self.pool.get_extra(offset + 2)
             let f_ty = self.resolve_type(f_type_node)
             self.debug_type_layout_field(name_str, fi, f_name, f_type_node, f_ty)
 
@@ -3751,16 +3770,10 @@ impl Codegen:
                 invalid_layout = 1
                 self.had_error = 1
 
-            self.struct_field_names.push(f_name)
-            self.struct_field_types.push(f_ty)
-            self.struct_field_type_nodes.push(f_type_node)
-            self.struct_field_defaults.push(f_default)
+            self.struct_field_types[field_start + fi] = f_ty
             ft_vec.push(f_ty)
 
         if invalid_layout != 0:
-            // Push identity mapping for error case
-            for fi in 0..field_count:
-                self.struct_llvm_field_indices.push(fi)
             return
 
         // Read alignment array from AST extras
@@ -3804,9 +3817,6 @@ impl Codegen:
             // Store the backing integer type separately (struct_llvm_types keeps the named struct)
             self.bitpacked_backing_types.insert(idx, backing_ty)
             self.bitpacked_by_llvm_type.insert(backing_ty, idx)
-            // Identity field index mapping (not used for GEP but needed for bookkeeping)
-            for fi in 0..field_count:
-                self.struct_llvm_field_indices.push(fi)
             return
 
         if has_alignment and not is_packed:
@@ -3840,7 +3850,7 @@ impl Codegen:
                         byte_offset = byte_offset + pad_size
 
                 // Record LLVM field index for this source field
-                self.struct_llvm_field_indices.push(padded_types.len() as i32)
+                self.struct_llvm_field_indices[field_start + fi] = padded_types.len() as i32
 
                 padded_types.push(f_ty)
                 let f_size = if dl != 0: wl_abi_size_of(dl, f_ty) else: wl_size_of(f_ty)
@@ -3857,8 +3867,6 @@ impl Codegen:
             wl_struct_set_body(st_type, vec_data_i64(&padded_types), padded_types.len() as i32, packed_flag)
         else:
             // No alignment annotations — identity mapping, direct field types
-            for fi in 0..field_count:
-                self.struct_llvm_field_indices.push(fi)
             wl_struct_set_body(st_type, vec_data_i64(&ft_vec), field_count, is_packed)
 
     // ── Declare union type ────────────────────────────────────────────
@@ -3868,14 +3876,13 @@ impl Codegen:
         // Field access uses bitcast of pointer to field type.
         let extra_start = self.pool.get_data1(type_node)
         let field_count = self.pool.get_extra(extra_start)
-        let name_str: str = with_str_clone_ref(self.intern.resolve(name_sym))
+        let name_str = with_str_clone_ref(self.intern.resolve(name_sym))
 
         if not self.struct_type_map.get(name_sym).is_some():
             self.predeclare_struct_type(name_sym)
         let idx: i32 = self.struct_type_map.get(name_sym).unwrap()
         let st_type: i64 = self.struct_llvm_types[idx]
-        self.struct_field_starts[idx] = self.struct_field_names.len() as i32
-        self.struct_field_counts[idx] = field_count
+        let field_start = self.reserve_struct_fields(idx, extra_start, field_count, true)
 
         // Find max ABI size/alignment among all fields. LLVMSizeOf returns an
         // LLVM constant value, not a host integer, so use Sema's layout model here.
@@ -3888,17 +3895,12 @@ impl Codegen:
             let offset = extra_start + 1 + fi * 3
             let f_name = self.pool.get_extra(offset)
             let f_type_node = self.pool.get_extra(offset + 1)
-            let f_default = self.pool.get_extra(offset + 2)
             let f_ty = self.resolve_type(f_type_node)
             if f_ty == 0:
                 with_eprint("error: unresolved type for field '" ++ self.intern.resolve(f_name) ++ "' in union '" ++ name_str ++ "'")
                 invalid_layout = 1
                 self.had_error = 1
-            self.struct_field_names.push(f_name)
-            self.struct_field_types.push(f_ty)
-            self.struct_field_type_nodes.push(f_type_node)
-            self.struct_field_defaults.push(f_default)
-            self.struct_llvm_field_indices.push(0)
+            self.struct_field_types[field_start + fi] = f_ty
             let f_tid = self.sema.resolve_type_expr_frozen(f_type_node)
             let f_size = if f_tid > 0: self.sema.type_layout_size_of_frozen(f_tid) else: self.abi_size_of(f_ty)
             let f_align = if f_tid > 0: self.sema.type_layout_align_of_frozen(f_tid) else: 1
@@ -5673,6 +5675,12 @@ impl Codegen:
     // ── Monomorphize struct (stub) ────────────────────────────────────
 
     mut fn monomorphize_struct(name_sym: i32, extra_start: i32, arg_count: i32) -> i64:
+        let args: Vec[i32] = Vec.new()
+        for i in 0..arg_count: args.push(self.pool.get_extra(extra_start + i))
+        self.monomorphize_struct_nodes(name_sym, args)
+
+    mut fn monomorphize_struct_nodes(name_sym: i32, args: &Vec[i32]) -> i64:
+        let arg_count = args.len() as i32
         let gs_opt = self.generic_structs.get(name_sym)
         if not gs_opt.is_some():
             return 0
@@ -5696,7 +5704,7 @@ impl Codegen:
         let arg_sema_types: Vec[i32] = Vec.new()
         if arg_count > 0:
             for ai in 0..arg_count:
-                let arg_node = self.pool.get_extra(extra_start + ai)
+                let arg_node = args[ai]
                 let arg_ty = self.resolve_type(arg_node)
                 let arg_sema = self.type_expr_to_sema_type(arg_node)
                 if arg_ty != 0:
@@ -5762,8 +5770,7 @@ impl Codegen:
 
         let decl_extra_start = self.pool.get_data1(type_node)
         let field_count = self.pool.get_extra(decl_extra_start)
-        self.struct_field_starts[mono_idx] = self.struct_field_names.len() as i32
-        self.struct_field_counts[mono_idx] = field_count
+        let field_start = self.reserve_struct_fields(mono_idx, decl_extra_start, field_count, false)
 
         let ft_vec: Vec[i64] = Vec.new()
         var invalid_layout = 0
@@ -5771,7 +5778,6 @@ impl Codegen:
             let offset = decl_extra_start + 1 + fi * 3
             let f_name = self.pool.get_extra(offset)
             let f_type_node = self.pool.get_extra(offset + 1)
-            let f_default = self.pool.get_extra(offset + 2)
             var f_ty = self.resolve_type(f_type_node)
             self.debug_type_layout_field(mangled, fi, f_name, f_type_node, f_ty)
             if f_ty == 0:
@@ -5779,15 +5785,8 @@ impl Codegen:
                 invalid_layout = 1
                 self.had_error = 1
                 f_ty = self.type_fallback()
-            self.struct_field_names.push(f_name)
-            self.struct_field_types.push(f_ty)
-            self.struct_field_type_nodes.push(f_type_node)
-            self.struct_field_defaults.push(f_default)
+            self.struct_field_types[field_start + fi] = f_ty
             ft_vec.push(f_ty)
-
-        // Push identity field index mapping (generic structs don't have alignment)
-        for fi in 0..field_count:
-            self.struct_llvm_field_indices.push(fi)
 
         if invalid_layout == 0:
             wl_struct_set_body(mono_ty, vec_data_i64(&ft_vec), field_count, 0)

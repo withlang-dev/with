@@ -920,6 +920,11 @@ type Sema {
     // node -> 1 when the right operand is the receiver.
     operator_method_calls: HashMap[i32, i32],
     operator_method_reversed: HashMap[i32, i32],
+    // §11.7: node -> the comparison operator derived from the family's
+    // primitive (`Ord.cmp` for the ordered four, `Eq.eq` for `!=`); the call
+    // in operator_method_calls yields i32 / bool and MirLower applies the
+    // derivation (`cmp(...) < 0`, `not eq(...)`).
+    operator_method_derived: HashMap[i32, i32],
     // User Try resolution sidecars for NK_UNARY(UOP_TRY): node -> type/fn data.
     try_continue_tys: HashMap[i32, i32],
     try_break_tys: HashMap[i32, i32],
@@ -2190,6 +2195,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         pipeline_carrier_kinds: sema_new_map_i32_i32(),
         operator_method_calls: sema_new_map_i32_i32(),
         operator_method_reversed: sema_new_map_i32_i32(),
+        operator_method_derived: sema_new_map_i32_i32(),
         try_continue_tys: sema_new_map_i32_i32(),
         try_break_tys: sema_new_map_i32_i32(),
         try_branch_result_tys: sema_new_map_i32_i32(),
@@ -4019,6 +4025,9 @@ impl Sema:
         if gi_base_tid == 0:
             // D29 scaffolding (#750): a registered-but-gated generic base is an
             // import error, not a silent flat-map fallback.
+            if self.private_symbol_path_from_current(gi_base_sym).len() > 0:
+                self.emit_private_symbol_error(gi_base_sym, node)
+                return 0
             let gi_gate_note = self.std_gated_import_note(gi_base_sym)
             if gi_gate_note.len() > 0:
                 self.emit_error("'" ++ self.pool_resolve_symbol(gi_base_sym) ++ "' requires an explicit import (§18.1)" ++ gi_gate_note, node)
