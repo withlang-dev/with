@@ -70,45 +70,6 @@ fn tommy_haszero_u32(__param_value: c_uint) -> c_int {
 
 }
 
-unsafe fn tommy_array_ref(__param_array: *mut tommy_array_struct, __param_pos: c_ulonglong) -> *mut *mut c_void {
-    var __local_bsr: c_uint
-
-    if ((((if not ((if __param_pos < (unsafe *__param_array).count: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
-        __assert_rtn(c"tommy_array_ref".ptr, c"tommyarray.h".ptr, (92 as c_int), c"pos < array->count".ptr)
-    } else {
-        0
-    }
-
-    (__local_bsr = ((tommy_ilog2_u64((((__param_pos as c_ulonglong) | (1 as c_ulonglong)) as c_ulonglong)) as c_uint)))
-
-    return (((&raw const (unsafe (unsafe *__param_array).bucket[__local_bsr][__param_pos]) as *const *mut c_void) as *mut *mut c_void))
-
-}
-
-unsafe fn tommy_array_set(__param_array: *mut tommy_array_struct, __param_pos: c_ulonglong, __param_element: *mut c_void) -> Unit {
-    ((unsafe *(tommy_array_ref(__param_array, __param_pos))) = __param_element)
-
-}
-
-unsafe fn tommy_array_get(__param_array: *mut tommy_array_struct, __param_pos: c_ulonglong) -> *mut c_void {
-    return (unsafe *(tommy_array_ref(__param_array, __param_pos)))
-
-}
-
-unsafe fn tommy_array_insert(__param_array: *mut tommy_array_struct, __param_element: *mut c_void) -> Unit {
-    var __local_pos: c_ulonglong = (unsafe *__param_array).count
-
-    tommy_array_grow(__param_array, (((__local_pos as c_ulonglong) +% (1 as c_ulonglong)) as c_ulonglong))
-
-    tommy_array_set(__param_array, __local_pos, __param_element)
-
-}
-
-unsafe fn tommy_array_size(__param_array: *mut tommy_array_struct) -> c_ulonglong {
-    return (unsafe *__param_array).count
-
-}
-
 pub unsafe fn tommy_arrayblkof_init(__param_array: *mut tommy_arrayblkof_struct, __param_element_size: c_ulonglong) -> Unit {
     tommy_array_init(((&raw const (unsafe *__param_array).block as *const tommy_array_struct) as *mut tommy_array_struct))
 
@@ -166,7 +127,7 @@ pub unsafe fn tommy_arrayblkof_grow(__param_array: *mut tommy_arrayblkof_struct,
 
 }
 
-unsafe fn tommy_arrayblkof_ref(__param_array: *mut tommy_arrayblkof_struct, __param_pos: c_ulonglong) -> *mut c_void {
+pub unsafe fn tommy_arrayblkof_ref(__param_array: *mut tommy_arrayblkof_struct, __param_pos: c_ulonglong) -> *mut c_void {
     var __local_base: *mut u8
 
     if ((((if not ((if __param_pos < (unsafe *__param_array).count: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
@@ -181,7 +142,7 @@ unsafe fn tommy_arrayblkof_ref(__param_array: *mut tommy_arrayblkof_struct, __pa
 
 }
 
-unsafe fn tommy_arrayblkof_size(__param_array: *mut tommy_arrayblkof_struct) -> c_ulonglong {
+pub unsafe fn tommy_arrayblkof_size(__param_array: *mut tommy_arrayblkof_struct) -> c_ulonglong {
     return (unsafe *__param_array).count
 
 }

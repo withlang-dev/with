@@ -159,7 +159,7 @@ pub unsafe fn tommy_tree_foreach_arg(__param_tree: *mut tommy_tree_struct, __par
 
 }
 
-unsafe fn tommy_tree_count(__param_tree: *mut tommy_tree_struct) -> c_ulonglong {
+pub unsafe fn tommy_tree_count(__param_tree: *mut tommy_tree_struct) -> c_ulonglong {
     return (unsafe *__param_tree).count
 
 }

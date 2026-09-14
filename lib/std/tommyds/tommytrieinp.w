@@ -1038,7 +1038,7 @@ pub unsafe fn tommy_trie_inplace_bucket(__param_trie_inplace: *mut tommy_trie_in
 
 }
 
-unsafe fn tommy_trie_inplace_search(__param_trie_inplace: *mut tommy_trie_inplace_struct, __param_key: c_ulonglong) -> *mut c_void {
+pub unsafe fn tommy_trie_inplace_search(__param_trie_inplace: *mut tommy_trie_inplace_struct, __param_key: c_ulonglong) -> *mut c_void {
     var __local_i: *mut tommy_trie_inplace_node_struct = tommy_trie_inplace_bucket(__param_trie_inplace, __param_key)
 
     if ((if not (__local_i != null): 1 else: 0) != 0) {
@@ -1364,7 +1364,7 @@ pub unsafe fn tommy_trie_inplace_remove_existing(__param_trie_inplace: *mut tomm
 
 }
 
-unsafe fn tommy_trie_inplace_count(__param_trie_inplace: *mut tommy_trie_inplace_struct) -> c_ulonglong {
+pub unsafe fn tommy_trie_inplace_count(__param_trie_inplace: *mut tommy_trie_inplace_struct) -> c_ulonglong {
     return (unsafe *__param_trie_inplace).count
 
 }

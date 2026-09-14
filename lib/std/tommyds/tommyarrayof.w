@@ -136,7 +136,7 @@ pub unsafe fn tommy_arrayof_grow(__param_array: *mut tommy_arrayof_struct, __par
 
 }
 
-unsafe fn tommy_arrayof_ref(__param_array: *mut tommy_arrayof_struct, __param_pos: c_ulonglong) -> *mut c_void {
+pub unsafe fn tommy_arrayof_ref(__param_array: *mut tommy_arrayof_struct, __param_pos: c_ulonglong) -> *mut c_void {
     var __local_ptr: *mut u8
 
     var __local_bsr: c_uint
@@ -155,7 +155,7 @@ unsafe fn tommy_arrayof_ref(__param_array: *mut tommy_arrayof_struct, __param_po
 
 }
 
-unsafe fn tommy_arrayof_size(__param_array: *mut tommy_arrayof_struct) -> c_ulonglong {
+pub unsafe fn tommy_arrayof_size(__param_array: *mut tommy_arrayof_struct) -> c_ulonglong {
     return (unsafe *__param_array).count
 
 }

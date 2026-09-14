@@ -1076,7 +1076,7 @@ pub unsafe fn tommy_trie_bucket(__param_trie: *mut tommy_trie_struct, __param_ke
 
 }
 
-unsafe fn tommy_trie_search(__param_trie: *mut tommy_trie_struct, __param_key: c_ulonglong) -> *mut c_void {
+pub unsafe fn tommy_trie_search(__param_trie: *mut tommy_trie_struct, __param_key: c_ulonglong) -> *mut c_void {
     var __local_i: *mut tommy_node_struct = tommy_trie_bucket(__param_trie, __param_key)
 
     if ((if not (__local_i != null): 1 else: 0) != 0) {
@@ -1402,193 +1402,13 @@ pub unsafe fn tommy_trie_remove_existing(__param_trie: *mut tommy_trie_struct, _
 
 }
 
-unsafe fn tommy_trie_count(__param_trie: *mut tommy_trie_struct) -> c_ulonglong {
+pub unsafe fn tommy_trie_count(__param_trie: *mut tommy_trie_struct) -> c_ulonglong {
     return (unsafe *__param_trie).count
 
 }
 
 pub unsafe fn tommy_trie_memory_usage(__param_trie: *mut tommy_trie_struct) -> c_ulonglong {
     return ((((tommy_trie_count(__param_trie) as c_ulonglong) *% ((sizeof[tommy_node_struct]() as c_ulonglong) as c_ulonglong)) as c_ulonglong) +% ((((unsafe *__param_trie).node_count as c_ulonglong) *% ((((((64 as c_ulong) / (8 as c_ulong)) as c_ulong) *% (8 as c_ulong)) as c_ulonglong) as c_ulonglong)) as c_ulonglong))
-
-}
-
-unsafe fn tommy_list_init(__param_list: *mut *mut tommy_node_struct) -> Unit {
-    ((unsafe *__param_list) = null)
-
-}
-
-unsafe fn tommy_list_head(__param_list: *mut *mut tommy_node_struct) -> *mut tommy_node_struct {
-    return (unsafe *__param_list)
-
-}
-
-unsafe fn tommy_list_tail(__param_list: *mut *mut tommy_node_struct) -> *mut tommy_node_struct {
-    var __local_head: *mut tommy_node_struct = tommy_list_head(__param_list)
-
-    if ((if not (__local_head != null): 1 else: 0) != 0) {
-        return ((0 as *mut tommy_node_struct))
-    }
-
-    return (unsafe *__local_head).prev
-
-}
-
-unsafe fn tommy_list_insert_first(__param_list: *mut *mut tommy_node_struct, __param_node: *mut tommy_node_struct) -> Unit {
-    ((unsafe *__param_node).prev = __param_node)
-
-    ((unsafe *__param_node).next = null)
-
-    ((unsafe *__param_list) = __param_node)
-
-}
-
-unsafe fn tommy_list_insert_head_not_empty(__param_list: *mut *mut tommy_node_struct, __param_node: *mut tommy_node_struct) -> Unit {
-    var __local_head: *mut tommy_node_struct = tommy_list_head(__param_list)
-
-    ((unsafe *__param_node).prev = (unsafe *__local_head).prev)
-
-    ((unsafe *__local_head).prev = __param_node)
-
-    ((unsafe *__param_node).next = __local_head)
-
-    ((unsafe *__param_list) = __param_node)
-
-}
-
-unsafe fn tommy_list_insert_tail_not_empty(__param_head: *mut tommy_node_struct, __param_node: *mut tommy_node_struct) -> Unit {
-    ((unsafe *__param_node).prev = (unsafe *__param_head).prev)
-
-    ((unsafe *__param_head).prev = __param_node)
-
-    ((unsafe *__param_node).next = null)
-
-    ((unsafe *(unsafe *__param_node).prev).next = __param_node)
-
-}
-
-unsafe fn tommy_list_insert_head(__param_list: *mut *mut tommy_node_struct, __param_node: *mut tommy_node_struct, __param_data: *mut c_void) -> Unit {
-    var __local_head: *mut tommy_node_struct = tommy_list_head(__param_list)
-
-    if (__local_head != null) {
-        tommy_list_insert_head_not_empty(__param_list, __param_node)
-    } else {
-        tommy_list_insert_first(__param_list, __param_node)
-    }
-
-    ((unsafe *__param_node).data = __param_data)
-
-}
-
-unsafe fn tommy_list_insert_tail(__param_list: *mut *mut tommy_node_struct, __param_node: *mut tommy_node_struct, __param_data: *mut c_void) -> Unit {
-    var __local_head: *mut tommy_node_struct = tommy_list_head(__param_list)
-
-    if (__local_head != null) {
-        tommy_list_insert_tail_not_empty(__local_head, __param_node)
-    } else {
-        tommy_list_insert_first(__param_list, __param_node)
-    }
-
-    ((unsafe *__param_node).data = __param_data)
-
-}
-
-unsafe fn tommy_list_remove_existing(__param_list: *mut *mut tommy_node_struct, __param_node: *mut tommy_node_struct) -> *mut c_void {
-    var __local_head: *mut tommy_node_struct = tommy_list_head(__param_list)
-
-    if ((unsafe *__param_node).next != null) {
-        ((unsafe *(unsafe *__param_node).next).prev = (unsafe *__param_node).prev)
-    } else {
-        ((unsafe *__local_head).prev = (unsafe *__param_node).prev)
-    }
-
-    if ((if __local_head == __param_node: 1 else: 0) != 0) {
-        ((unsafe *__param_list) = (unsafe *__param_node).next)
-    } else {
-        ((unsafe *(unsafe *__param_node).prev).next = (unsafe *__param_node).next)
-    }
-
-    return (unsafe *__param_node).data
-
-}
-
-unsafe fn tommy_list_concat(__param_first: *mut *mut tommy_node_struct, __param_second: *mut *mut tommy_node_struct) -> Unit {
-    var __local_first_head: *mut tommy_node_struct
-
-    var __local_first_tail: *mut tommy_node_struct
-
-    var __local_second_head: *mut tommy_node_struct
-
-    (__local_second_head = tommy_list_head(__param_second))
-
-    if ((if __local_second_head == 0: 1 else: 0) != 0) {
-        return
-    }
-
-    (__local_first_head = tommy_list_head(__param_first))
-
-    if ((if __local_first_head == 0: 1 else: 0) != 0) {
-        ((unsafe *__param_first) = (unsafe *__param_second))
-
-        return
-
-    }
-
-    (__local_first_tail = (unsafe *__local_first_head).prev)
-
-    ((unsafe *__local_first_head).prev = (unsafe *__local_second_head).prev)
-
-    ((unsafe *__local_second_head).prev = __local_first_tail)
-
-    ((unsafe *__local_first_tail).next = __local_second_head)
-
-}
-
-unsafe fn tommy_list_empty(__param_list: *mut *mut tommy_node_struct) -> c_int {
-    return (if tommy_list_head(__param_list) == 0: 1 else: 0)
-
-}
-
-unsafe fn tommy_list_count(__param_list: *mut *mut tommy_node_struct) -> c_ulonglong {
-    var __local_count: c_ulonglong = ((0 as c_ulonglong))
-
-    var __local_i: *mut tommy_node_struct = tommy_list_head(__param_list)
-
-    while (__local_i != null) {
-        (__local_count = (__local_count +% 1))
-
-        (__local_i = (unsafe *__local_i).next)
-
-    }
-
-    return __local_count
-
-}
-
-unsafe fn tommy_list_foreach(__param_list: *mut *mut tommy_node_struct, __param_func: unsafe extern "C" fn(*mut c_void) -> Unit) -> Unit {
-    var __local_node: *mut tommy_node_struct = tommy_list_head(__param_list)
-
-    while (__local_node != null) {
-        var __local_data: *mut c_void = (unsafe *__local_node).data
-
-        (__local_node = (unsafe *__local_node).next)
-
-        __param_func(__local_data)
-
-    }
-
-}
-
-unsafe fn tommy_list_foreach_arg(__param_list: *mut *mut tommy_node_struct, __param_func: unsafe extern "C" fn(*mut c_void, *mut c_void) -> Unit, __param_arg: *mut c_void) -> Unit {
-    var __local_node: *mut tommy_node_struct = tommy_list_head(__param_list)
-
-    while (__local_node != null) {
-        var __local_data: *mut c_void = (unsafe *__local_node).data
-
-        (__local_node = (unsafe *__local_node).next)
-
-        __param_func(__param_arg, __local_data)
-
-    }
 
 }
 

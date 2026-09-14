@@ -683,7 +683,7 @@ pub unsafe fn tommy_strhash_u32(__param_init_val: c_uint, __param_void_key: *con
 
 }
 
-fn tommy_inthash_u32(__param_key: c_uint) -> c_uint {
+pub fn tommy_inthash_u32(__param_key: c_uint) -> c_uint {
     var __local_key = __param_key
     (__local_key = (__local_key -% ((__local_key as c_uint) << (6 as c_uint))))
 
@@ -703,7 +703,7 @@ fn tommy_inthash_u32(__param_key: c_uint) -> c_uint {
 
 }
 
-fn tommy_inthash_u64(__param_key: c_ulonglong) -> c_ulonglong {
+pub fn tommy_inthash_u64(__param_key: c_ulonglong) -> c_ulonglong {
     var __local_key = __param_key
     (__local_key = (((((~__local_key) as c_ulonglong) +% (((__local_key as c_ulonglong) << (21 as c_uint)) as c_ulonglong)) as c_ulonglong)))
 
