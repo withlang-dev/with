@@ -1,7 +1,14 @@
 // std.libc — narrow libc/POSIX ABI surface used by migrated C code.
 //
 // This module intentionally exposes concrete target ABI symbols. Migrated C
-// output is target-specific and should be regenerated for a different target.
+// output is target-specific and should be regenerated for a different target,
+// except where a host-only symbol is modeled portably below (the assertion
+// reporters, the mach clock) so a bundled corpus migrated on one host runs on
+// every target.
+
+use std.builtins.eprint
+
+extern fn with_str_from_cstr(s: *const u8) -> str
 
 pub type rlimit {
     rlim_cur: u64,
@@ -75,9 +82,18 @@ pub extern fn setlocale(category: i32, locale: *const i8) -> *mut i8
 
 // process / time / POSIX
 pub extern fn abort() -> Never
-// Assertion reporters used by the Darwin and glibc assert.h expansions.
-pub extern fn __assert_rtn(function: *const i8, file: *const i8, line: i32, expression: *const i8) -> Never
-pub extern fn __assert_fail(expression: *const i8, file: *const i8, line: u32, function: *const i8) -> Never
+// Assertion reporters of the Darwin (`__assert_rtn`) and glibc
+// (`__assert_fail`) assert.h expansions, modeled portably: neither symbol
+// exists on the other platforms, and a corpus migrated on one host must
+// assert the same way on every target. Same report, then abort.
+pub fn __assert_rtn(function: *const i8, file: *const i8, line: i32, expression: *const i8) -> Never:
+    libc_assert_failed(expression, function, file, line)
+pub fn __assert_fail(expression: *const i8, file: *const i8, line: u32, function: *const i8) -> Never:
+    libc_assert_failed(expression, function, file, line as i64)
+fn libc_assert_failed(expression: *const i8, function: *const i8, file: *const i8, line: i64) -> Never:
+    let text = unsafe { f"Assertion failed: ({with_str_from_cstr(expression as *const u8)}), function {with_str_from_cstr(function as *const u8)}, file {with_str_from_cstr(file as *const u8)}, line {line}." }
+    eprint(text)
+    abort()
 pub extern fn exit(code: i32) -> Never
 pub extern fn clock() -> u64
 pub extern fn time(tloc: *mut i64) -> i64
