@@ -5,6 +5,7 @@ use build.abi
 use build.pcre2
 use build.zlib
 use build.c_algorithms
+use build.tommyds
 use build.seed
 use build.release_publish
 use build.emit_c
@@ -118,7 +119,7 @@ fn cross_fiber_asm_source(tag: &str) -> str:
 // Register the full cross runtime/bridge/embed/rsp target set for one
 // cross tag under name prefix `p`, grouped as `group_name`; `wo` is the
 // tag's bundle plan, built here and embedded by the tag's compiler.
-fn add_cross_rt_targets(out0: Build, ctx: &BuildCtx, tag: &str, p: &str, group_name: &str, wo: &WoBundle, wo2: &WoBundle, wo3: &WoBundle) -> Build:
+fn add_cross_rt_targets(out0: Build, ctx: &BuildCtx, tag: &str, p: &str, group_name: &str, wo: &WoBundle, wo2: &WoBundle, wo3: &WoBundle, wo4: &WoBundle) -> Build:
     var out = out0
     let dir = cross_dir(tag)
     let triple = cross_triple(tag)
@@ -177,6 +178,8 @@ fn add_cross_rt_targets(out0: Build, ctx: &BuildCtx, tag: &str, p: &str, group_n
     cross_embedded = target_with_wo_blobs(move cross_embedded, wo2)
     out = wo_bundle_targets(move out, ctx, wo3, release_compiler_bin("with"), "build")
     cross_embedded = target_with_wo_blobs(move cross_embedded, wo3)
+    out = wo_bundle_targets(move out, ctx, wo4, release_compiler_bin("with"), "build")
+    cross_embedded = target_with_wo_blobs(move cross_embedded, wo4)
     out = out.add_target(cross_embedded)
 
     var cross_embedded_obj = target_new(.CompileAsmObject, p ++ "embedded-objects-object", dir ++ "/embedded_objects.s").output(dir ++ "/embedded_objects.o")
@@ -456,7 +459,7 @@ fn target_with_embedded_stdlib_inputs(target: Target, ctx: &BuildCtx) -> Target:
         let path = files[i]
         // A bundled corpus (lib/std/re, lib/std/zl, lib/std/c_algorithms) is provided by its
         // .wo, never embedded as source.
-        if path.ends_with(".w") and not path.starts_with("lib/std/re/") and not path.starts_with("lib/std/zl/") and not path.starts_with("lib/std/c_algorithms/"):
+        if path.ends_with(".w") and not path.starts_with("lib/std/re/") and not path.starts_with("lib/std/zl/") and not path.starts_with("lib/std/c_algorithms/") and not path.starts_with("lib/std/tommyds/"):
             out = out.input(build_owned_text(path))
     out
 
@@ -1736,6 +1739,8 @@ pub fn build(ctx: BuildCtx) -> Build:
     // c-algorithms is the third bundle (docs/stdlib_sourcing_plan.md Phase 1):
     // the container corpus its facades in std.collections reach.
     let calg_wo = wo_bundle_plan(ctx, "c_algorithms", "std/c_algorithms", "lib/std/c_algorithms/bundle.w")
+    // TommyDS is the fourth bundle (docs/stdlib_sourcing_plan.md Phase 2).
+    let tommy_wo = wo_bundle_plan(ctx, "tommyds", "std/tommyds", "lib/std/tommyds/bundle.w")
 
     var compat_runtime = target_new(.Action, "compat-runtime-source", "").output("out/gen/compat_runtime.w")
     compat_runtime = compat_runtime.extra_output("out/gen/compiler/EmbeddedStdlibData.w")
@@ -1747,6 +1752,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     compat_runtime = compat_runtime.arg(build_owned_text(pcre2_wo.name))
     compat_runtime = compat_runtime.arg(build_owned_text(zlib_wo.name))
     compat_runtime = compat_runtime.arg(build_owned_text(calg_wo.name))
+    compat_runtime = compat_runtime.arg(build_owned_text(tommy_wo.name))
     compat_runtime = compat_runtime.input(build_owned_text(host_runtime.compat_source))
     compat_runtime = target_with_embedded_stdlib_inputs(move compat_runtime, ctx)
     compat_runtime = target_with_embedded_runtime_inputs(move compat_runtime, ctx)
@@ -1874,6 +1880,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     stage_embedded_objects = target_with_wo_blobs(move stage_embedded_objects, &pcre2_wo)
     stage_embedded_objects = target_with_wo_blobs(move stage_embedded_objects, &zlib_wo)
     stage_embedded_objects = target_with_wo_blobs(move stage_embedded_objects, &calg_wo)
+    stage_embedded_objects = target_with_wo_blobs(move stage_embedded_objects, &tommy_wo)
     out = out.add_target(stage_embedded_objects)
     var stage_embedded_objects_obj = target_new(.CompileAsmObject, "stage-embedded-objects-object", "out/stage/lib/embedded_objects.s").output("out/stage/lib/embedded_objects.o")
     stage_embedded_objects_obj = stage_embedded_objects_obj.dep("stage-embedded-objects-asm")
@@ -1885,8 +1892,10 @@ pub fn build(ctx: BuildCtx) -> Build:
     bootstrap_embedded_objects = target_with_empty_wo_blobs(move bootstrap_embedded_objects, "bootstrap-", "out/bootstrap-lib", pcre2_wo.name)
     out = add_empty_wo_blob_targets(move out, "bootstrap-", "out/bootstrap-lib", zlib_wo.name)
     out = add_empty_wo_blob_targets(move out, "bootstrap-", "out/bootstrap-lib", calg_wo.name)
+    out = add_empty_wo_blob_targets(move out, "bootstrap-", "out/bootstrap-lib", tommy_wo.name)
     bootstrap_embedded_objects = target_with_empty_wo_blobs(move bootstrap_embedded_objects, "bootstrap-", "out/bootstrap-lib", zlib_wo.name)
     bootstrap_embedded_objects = target_with_empty_wo_blobs(move bootstrap_embedded_objects, "bootstrap-", "out/bootstrap-lib", calg_wo.name)
+    bootstrap_embedded_objects = target_with_empty_wo_blobs(move bootstrap_embedded_objects, "bootstrap-", "out/bootstrap-lib", tommy_wo.name)
     out = out.add_target(bootstrap_embedded_objects)
     var bootstrap_embedded_objects_obj = target_new(.CompileAsmObject, "bootstrap-embedded-objects-object", "out/bootstrap-lib/embedded_objects.s").output("out/bootstrap-lib/embedded_objects.o")
     bootstrap_embedded_objects_obj = bootstrap_embedded_objects_obj.dep("bootstrap-embedded-objects-asm")
@@ -1966,6 +1975,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     out = wo_bundle_targets(move out, ctx, &pcre2_wo, bootstrap_compiler_bin("with-stage1"), "stage1")
     out = wo_bundle_targets(move out, ctx, &zlib_wo, bootstrap_compiler_bin("with-stage1"), "stage1")
     out = wo_bundle_targets(move out, ctx, &calg_wo, bootstrap_compiler_bin("with-stage1"), "stage1")
+    out = wo_bundle_targets(move out, ctx, &tommy_wo, bootstrap_compiler_bin("with-stage1"), "stage1")
 
     // Dev tier (D14): the sanctioned iterate loop. One self-compile —
     // seed → stage1 — yields a testable compiler at out/bootstrap/bin/
@@ -1992,6 +2002,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     stage2 = target_with_link_bundle(move stage2, ctx, &pcre2_wo)
     stage2 = target_with_link_bundle(move stage2, ctx, &zlib_wo)
     stage2 = target_with_link_bundle(move stage2, ctx, &calg_wo)
+    stage2 = target_with_link_bundle(move stage2, ctx, &tommy_wo)
     stage2 = stage2.input("out/stage/lib/embedded_objects.o")
     stage2 = stage2.arg("embedded-object=out/stage/lib/embedded_objects.o")
     stage2 = stage2.dep("stage-embedded-objects-object")
@@ -2014,6 +2025,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     stage3 = target_with_link_bundle(move stage3, ctx, &pcre2_wo)
     stage3 = target_with_link_bundle(move stage3, ctx, &zlib_wo)
     stage3 = target_with_link_bundle(move stage3, ctx, &calg_wo)
+    stage3 = target_with_link_bundle(move stage3, ctx, &tommy_wo)
     stage3 = stage3.input("out/stage/lib/embedded_objects.o")
     stage3 = stage3.arg("embedded-object=out/stage/lib/embedded_objects.o")
     stage3 = stage3.dep("stage-embedded-objects-object")
@@ -2036,6 +2048,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     stage2_fixpoint = target_with_link_bundle(move stage2_fixpoint, ctx, &pcre2_wo)
     stage2_fixpoint = target_with_link_bundle(move stage2_fixpoint, ctx, &zlib_wo)
     stage2_fixpoint = target_with_link_bundle(move stage2_fixpoint, ctx, &calg_wo)
+    stage2_fixpoint = target_with_link_bundle(move stage2_fixpoint, ctx, &tommy_wo)
     out = out.add_target(stage2_fixpoint)
 
     var stage3_fixpoint = target_new(.Action, "stage3-fixpoint-object", "").output(stage_compiler_obj("with-stage3-fixpoint.o"))
@@ -2055,6 +2068,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     stage3_fixpoint = target_with_link_bundle(move stage3_fixpoint, ctx, &pcre2_wo)
     stage3_fixpoint = target_with_link_bundle(move stage3_fixpoint, ctx, &zlib_wo)
     stage3_fixpoint = target_with_link_bundle(move stage3_fixpoint, ctx, &calg_wo)
+    stage3_fixpoint = target_with_link_bundle(move stage3_fixpoint, ctx, &tommy_wo)
     out = out.add_target(stage3_fixpoint)
 
     var selfcheck = target_new(.RunCorpusTest, "selfcheck", stage_compiler_bin("with-stage2"))
@@ -2168,6 +2182,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     embedded_objects = target_with_wo_blobs(move embedded_objects, &pcre2_wo)
     embedded_objects = target_with_wo_blobs(move embedded_objects, &zlib_wo)
     embedded_objects = target_with_wo_blobs(move embedded_objects, &calg_wo)
+    embedded_objects = target_with_wo_blobs(move embedded_objects, &tommy_wo)
     // Every consumed object's producer, declared (#680 edge audit).
     embedded_objects = embedded_objects.dep("cimport-stubs-object")
     embedded_objects = embedded_objects.dep("compat-runtime-object")
@@ -2212,10 +2227,12 @@ pub fn build(ctx: BuildCtx) -> Build:
     let pcre2_wo_linux_aarch64 = cross_wo_plan(ctx, &pcre2_wo, "linux_aarch64")
     let zlib_wo_linux_x86_64 = cross_wo_plan(ctx, &zlib_wo, "linux_x86_64")
     let calg_wo_linux_x86_64 = cross_wo_plan(ctx, &calg_wo, "linux_x86_64")
+    let tommy_wo_linux_x86_64 = cross_wo_plan(ctx, &tommy_wo, "linux_x86_64")
     let zlib_wo_linux_aarch64 = cross_wo_plan(ctx, &zlib_wo, "linux_aarch64")
     let calg_wo_linux_aarch64 = cross_wo_plan(ctx, &calg_wo, "linux_aarch64")
-    out = add_cross_rt_targets(move out, ctx, "linux_x86_64", "cross-", "cross-rt", &pcre2_wo_linux_x86_64, &zlib_wo_linux_x86_64, &calg_wo_linux_x86_64)
-    out = add_cross_rt_targets(move out, ctx, "linux_aarch64", "cross-arm-", "cross-rt-arm", &pcre2_wo_linux_aarch64, &zlib_wo_linux_aarch64, &calg_wo_linux_aarch64)
+    let tommy_wo_linux_aarch64 = cross_wo_plan(ctx, &tommy_wo, "linux_aarch64")
+    out = add_cross_rt_targets(move out, ctx, "linux_x86_64", "cross-", "cross-rt", &pcre2_wo_linux_x86_64, &zlib_wo_linux_x86_64, &calg_wo_linux_x86_64, &tommy_wo_linux_x86_64)
+    out = add_cross_rt_targets(move out, ctx, "linux_aarch64", "cross-arm-", "cross-rt-arm", &pcre2_wo_linux_aarch64, &zlib_wo_linux_aarch64, &calg_wo_linux_aarch64, &tommy_wo_linux_aarch64)
 
     // ── Cross-target runtime (windows_x86_64) ───────────────────────
     // `with build :cross-rt-windows` builds the full windows_x86_64
@@ -2277,10 +2294,13 @@ pub fn build(ctx: BuildCtx) -> Build:
     cross_win_embedded = target_with_wo_blobs(move cross_win_embedded, &pcre2_wo_windows_x86_64)
     let zlib_wo_windows_x86_64 = cross_wo_plan(ctx, &zlib_wo, "windows_x86_64")
     let calg_wo_windows_x86_64 = cross_wo_plan(ctx, &calg_wo, "windows_x86_64")
+    let tommy_wo_windows_x86_64 = cross_wo_plan(ctx, &tommy_wo, "windows_x86_64")
     out = wo_bundle_targets(move out, ctx, &zlib_wo_windows_x86_64, release_compiler_bin("with"), "build")
     out = wo_bundle_targets(move out, ctx, &calg_wo_windows_x86_64, release_compiler_bin("with"), "build")
+    out = wo_bundle_targets(move out, ctx, &tommy_wo_windows_x86_64, release_compiler_bin("with"), "build")
     cross_win_embedded = target_with_wo_blobs(move cross_win_embedded, &zlib_wo_windows_x86_64)
     cross_win_embedded = target_with_wo_blobs(move cross_win_embedded, &calg_wo_windows_x86_64)
+    cross_win_embedded = target_with_wo_blobs(move cross_win_embedded, &tommy_wo_windows_x86_64)
     out = out.add_target(cross_win_embedded)
 
     var cross_win_embedded_obj = target_new(.CompileAsmObject, "cross-win-embedded-objects-object", cross_windows_dir() ++ "/embedded_objects.s").output(cross_windows_dir() ++ "/embedded_objects.o")
@@ -2362,10 +2382,13 @@ pub fn build(ctx: BuildCtx) -> Build:
     cross_winarm_embedded = target_with_wo_blobs(move cross_winarm_embedded, &pcre2_wo_windows_aarch64)
     let zlib_wo_windows_aarch64 = cross_wo_plan(ctx, &zlib_wo, "windows_aarch64")
     let calg_wo_windows_aarch64 = cross_wo_plan(ctx, &calg_wo, "windows_aarch64")
+    let tommy_wo_windows_aarch64 = cross_wo_plan(ctx, &tommy_wo, "windows_aarch64")
     out = wo_bundle_targets(move out, ctx, &zlib_wo_windows_aarch64, release_compiler_bin("with"), "build")
     out = wo_bundle_targets(move out, ctx, &calg_wo_windows_aarch64, release_compiler_bin("with"), "build")
+    out = wo_bundle_targets(move out, ctx, &tommy_wo_windows_aarch64, release_compiler_bin("with"), "build")
     cross_winarm_embedded = target_with_wo_blobs(move cross_winarm_embedded, &zlib_wo_windows_aarch64)
     cross_winarm_embedded = target_with_wo_blobs(move cross_winarm_embedded, &calg_wo_windows_aarch64)
+    cross_winarm_embedded = target_with_wo_blobs(move cross_winarm_embedded, &tommy_wo_windows_aarch64)
     out = out.add_target(cross_winarm_embedded)
 
     var cross_winarm_embedded_obj = target_new(.CompileAsmObject, "cross-winarm-embedded-objects-object", cross_windows_aarch64_dir() ++ "/embedded_objects.s").output(cross_windows_aarch64_dir() ++ "/embedded_objects.o")
@@ -2405,6 +2428,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     compiler = target_with_link_bundle(move compiler, ctx, &pcre2_wo)
     compiler = target_with_link_bundle(move compiler, ctx, &zlib_wo)
     compiler = target_with_link_bundle(move compiler, ctx, &calg_wo)
+    compiler = target_with_link_bundle(move compiler, ctx, &tommy_wo)
     out = out.add_target(compiler)
 
     // Post-link version stamp: keeps the name `build` and the output path so every
@@ -2799,6 +2823,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     // The corpora lane (docs/stdlib_sourcing_plan.md): every migrated
     // container corpus runs its upstream test programs under With.
     tests = tests.dep("c-algorithms-test")
+    tests = tests.dep("tommyds-test")
     tests = tests.dep("cli-selfhost-build-w-tests")
     tests = tests.dep("build-helper-programs")
     // seed-compat is NOT a :test dependency: :test is driven by the pinned
@@ -3178,6 +3203,16 @@ pub fn build(ctx: BuildCtx) -> Build:
     calg_root_check = calg_root_check.write_scope("out/wo-drift")
     out = out.add_target(calg_root_check)
     out = out.add_target(wo_drift_target(ctx, &calg_wo, release_compiler_bin("with"), "build", "lib/std/c_algorithms/test_cpp.w", ""))
+    // TommyDS: the same root check and drift lane; check.w is upstream's
+    // check program (exit 0 on success).
+    var tommy_root_check = target_new(.Action, "tommyds-bundle-root-check", "").output("out/wo-drift/tommyds-bundle-root-check.stamp")
+    tommy_root_check.action = run_tommy_bundle_root_check_action
+    tommy_root_check = tommy_root_check.input(build_owned_text(tommy_wo.root))
+    tommy_root_check = target_with_wo_corpus_inputs(move tommy_root_check, ctx, &tommy_wo)
+    tommy_root_check = tommy_root_check.arg(build_owned_text(tommy_wo.corpus_dir))
+    tommy_root_check = tommy_root_check.write_scope("out/wo-drift")
+    out = out.add_target(tommy_root_check)
+    out = out.add_target(wo_drift_target(ctx, &tommy_wo, release_compiler_bin("with"), "build", "lib/std/tommyds/check_.w", ""))
     var wo_drift = target_new(.Group, "wo-drift", "")
     wo_drift = wo_drift.dep("pcre2-bundle-root-check")
     wo_drift = wo_drift.dep(wo_drift_target_name(&pcre2_wo))
@@ -3185,6 +3220,8 @@ pub fn build(ctx: BuildCtx) -> Build:
     wo_drift = wo_drift.dep(wo_drift_target_name(&zlib_wo))
     wo_drift = wo_drift.dep("c-algorithms-bundle-root-check")
     wo_drift = wo_drift.dep(wo_drift_target_name(&calg_wo))
+    wo_drift = wo_drift.dep("tommyds-bundle-root-check")
+    wo_drift = wo_drift.dep(wo_drift_target_name(&tommy_wo))
     out = out.add_target(wo_drift)
 
     var pcre2_wo_test = target_new(.Action, "pcre2-wo-test", "").output("out/corpus/pcre2-wo-test")
@@ -3269,6 +3306,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     out = out.add_target(zlib_promote)
 
     out = calg_pipeline(move out, ctx, release_compiler_bin("with"))
+    out = tommy_pipeline(move out, release_compiler_bin("with"))
 
     var prune = target_new(.Action, "prune", "").output("out/.build-state/prune.always")
     prune.action = run_prune_action

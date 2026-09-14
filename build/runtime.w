@@ -149,7 +149,7 @@ fn br_collect_stdlib_files(ctx: &ActionCtx) -> Vec[str]:
     let all_files = br_sorted_paths(ctx.fs().list_files("lib/std"))
     for i in 0..all_files.len() as i32:
         let path = br_normalize_path_separators(all_files[i])
-        if path.ends_with(".w") and not path.starts_with("lib/std/re/") and not path.starts_with("lib/std/zl/") and not path.starts_with("lib/std/c_algorithms/"):
+        if path.ends_with(".w") and not path.starts_with("lib/std/re/") and not path.starts_with("lib/std/zl/") and not path.starts_with("lib/std/c_algorithms/") and not path.starts_with("lib/std/tommyds/"):
             files.push(path)
     files
 

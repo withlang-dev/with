@@ -154,7 +154,11 @@ linked by G+k), so two checks replace it:
 (c-algorithms is the third bundle, 2026-09-13: `lib/std/c_algorithms/`,
 package `std.c_algorithms`, root `bundle.w`, harness `test_cpp.w`; the
 same plan, wiring and lanes as zlib via `calg_wo` in `build.w`. See
-`docs/stdlib_sourcing_plan.md`, "Phase 1 status".)
+`docs/stdlib_sourcing_plan.md`, "Phase 1 status". TommyDS is the fourth,
+2026-09-14: `lib/std/tommyds/`, package `std.tommyds`, root `bundle.w`,
+harness `check_.w` (upstream's `check.c`; `check` collides with the
+prelude name), `tommy_wo` in `build.w`, corpora lane `tommyds-test`. See
+"Phase 2 status" in the same plan.)
 
 What each is today, and what changes. Both follow the one pattern; every
 later corpus follows it from day one.

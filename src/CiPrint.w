@@ -625,6 +625,10 @@ fn ci_print_expr(exprs: CiExprPool, types: CiTypePool, id: CiExprId, parent_prec
         let base = (exprs.get_d0(id)) as CiExprId
         let field = exprs.get_string(exprs.get_d1(id))
         let base_ty = exprs.get_type(base)
+        if exprs.get_d2(id) == 2:
+            // A method on a value (the migrator's bit builtins): plain
+            // `base.method`, the base printed as a value.
+            return ci_print_expr(exprs, types, base, 0, 0) ++ "." ++ field
         if wants_ptr != 0 and (base_ty as i32) != 0 and types.kind(base_ty) == CiTypeKind.CT_POINTER:
             let base_text = ci_print_expr(exprs, types, base, 0, 0)
             return f"(unsafe *{base_text}).{field}"

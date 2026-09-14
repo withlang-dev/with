@@ -6510,6 +6510,8 @@ let CXT_Float16: i32 = 32
 let CXT_Pointer: i32 = 101
 let CXT_Record: i32 = 105
 let CXT_Enum: i32 = 106
+let CXT_Typedef: i32 = 107
+let CXT_Elaborated: i32 = 119
 let CXT_FunctionNoProto: i32 = 110
 let CXT_FunctionProto: i32 = 111
 
@@ -6583,6 +6585,15 @@ impl CiTypePool:
             let pointee_kind = with_ci_type_kind(session, pointee_idx)
             if pointee_kind == CXT_FunctionProto or pointee_kind == CXT_FunctionNoProto:
                 return self.type_from_libclang(session, pointee_idx)
+            // A pointer to a function TYPEDEF (`typedef int cmp_fn(...);
+            // cmp_fn* cmp`) is the same function pointer: the typedef's
+            // canonical type is the prototype, and a `*mut fn` would not be.
+            if pointee_kind == CXT_Typedef or pointee_kind == CXT_Elaborated:
+                let pointee_canonical = with_ci_type_canonical(session, pointee_idx)
+                if pointee_canonical >= 0:
+                    let canonical_kind = with_ci_type_kind(session, pointee_canonical)
+                    if canonical_kind == CXT_FunctionProto or canonical_kind == CXT_FunctionNoProto:
+                        return self.type_from_libclang(session, pointee_canonical)
             if pointee_kind == CXT_Void:
                 let c_void_idx = self.add_string("c_void")
                 let c_void_ty = self.ty_named(c_void_idx)
@@ -9223,6 +9234,8 @@ fn ci_migrate_preamble_extern_call_requires_unsafe(name: &str) -> bool:
     if name == "with_abs" or name == "with_alloc" or name == "with_alloc_zeroed" or name == "with_realloc" or name == "with_free": return true
     if name == "with_memcpy" or name == "with_memmove" or name == "with_memset" or name == "with_memcmp": return true
     if name == "with_va_start" or name == "with_va_end": return true
+    // std.libc models this one as `unsafe fn` (it writes through its pointer).
+    if name == "mach_timebase_info": return true
     false
 
 impl CiExprPool:
@@ -9915,6 +9928,25 @@ impl CiExprPool:
             return self.cast(result_ty, arg_ids.get(0) as CiExprId)
         if callee_text == "__builtin_add_overflow" or callee_text == "__builtin_sub_overflow" or callee_text == "__builtin_mul_overflow":
             return self.build_overflow_builtin_call(session, cursor, callee_text, arg_ids, types)
+        let bit_method = ci_builtin_bit_method(callee_text)
+        if bit_method.len() > 0:
+            // __builtin_clz(x) is `(x as u32).clz()`, the ll/l forms are the
+            // u64 method; bswapN is `.swap_bytes()` on the N-bit unsigned.
+            // Every one returns exactly what C's builtin returns (an int
+            // count, or the same-width swapped value).
+            if arg_ids.len() != 1:
+                return self.reject_builtin_call(session, cursor, callee_text, "expected one argument")
+            let operand_ty = types.named_type_from_text(ci_builtin_bit_operand_type(callee_text))
+            if (operand_ty as i32) == 0:
+                return self.reject_builtin_call(session, cursor, callee_text, "could not materialize the operand type")
+            let operand = self.cast(operand_ty, arg_ids.get(0) as CiExprId)
+            let method_idx = self.add_string(bit_method)
+            // d2 = 2: a method selected on the VALUE (the printer renders
+            // `base.method` and never borrows the operand as a place).
+            let callee = self.add(CiExprKind.CIE_FIELD, operand as i32, method_idx, 2, 0 as CiTypeId)
+            let args_start = self.extra_len() as i32
+            let result_ty = if bit_method == "swap_bytes": operand_ty else: types.named_type_from_text("i32")
+            return self.add(CiExprKind.CIE_CALL, callee as i32, args_start, 0, result_ty)
         if ci_starts_with(callee_text, "__builtin"):
             return self.reject_builtin_call(session, cursor, callee_text, "no structural lowering")
         0 as CiExprId
@@ -16341,6 +16373,21 @@ fn ci_libc_symbol_platforms(name: &str) -> i32:
     if name == "__error": return CI_LIBC_PLATFORM_DARWIN
     CI_LIBC_PLATFORM_DARWIN
 
+// The With integer method a bit-manipulation builtin lowers to, or "".
+fn ci_builtin_bit_method(name: &str) -> str:
+    if name == "__builtin_clz" or name == "__builtin_clzl" or name == "__builtin_clzll": return "clz"
+    if name == "__builtin_ctz" or name == "__builtin_ctzl" or name == "__builtin_ctzll": return "ctz"
+    if name == "__builtin_popcount" or name == "__builtin_popcountl" or name == "__builtin_popcountll": return "popcount"
+    if name == "__builtin_bswap16" or name == "__builtin_bswap32" or name == "__builtin_bswap64": return "swap_bytes"
+    ""
+
+// The unsigned operand width of a bit builtin (C's `unsigned` is 32 bits
+// on every supported target; `long`/`long long` forms are 64).
+fn ci_builtin_bit_operand_type(name: &str) -> str:
+    if name == "__builtin_bswap16": return "u16"
+    if name.ends_with("l") or name == "__builtin_bswap64": return "u64"
+    "u32"
+
 fn ci_is_libm_fn(name: &str) -> bool:
     if name == "sqrt" or name == "pow": return true
     if name == "floor" or name == "ceil" or name == "round": return true
@@ -16375,6 +16422,12 @@ fn ci_libc_symbol_kind_mask(name: &str) -> i32:
     if name == "lseek" or name == "unlink": return CI_LIBC_KIND_FN
     if name == "fcntl": return CI_LIBC_KIND_FN
     if name == "getrlimit" or name == "setrlimit" or name == "__error": return CI_LIBC_KIND_FN
+    if name == "qsort" or name == "rand" or name == "srand": return CI_LIBC_KIND_FN
+    // Darwin's mach clock, modeled portably (std.libc: nanoseconds, 1/1).
+    if name == "mach_absolute_time": return CI_LIBC_KIND_FN
+    // `mach_timebase_info` is both the function and the struct tag.
+    if name == "mach_timebase_info": return CI_LIBC_KIND_FN | CI_LIBC_KIND_TYPE
+    if name == "mach_timebase_info_data_t" or name == "kern_return_t": return CI_LIBC_KIND_TYPE
     0
 
 fn ci_libc_symbol_allowed_as(name: &str, kind: i32) -> bool:
