@@ -7,7 +7,7 @@ whole file before touching any of them. Nothing here is reseeded.
 |---|---|---|---|
 | `fnabi-phase0` | `fnabi-phase0` | #1129 → main | tip 503b3c3a pushed; local battery green (build, fixpoint, test, test-green, last-green, drop-audit 119/0, move-audit 15/0); ALL FIVE CI LANES GREEN. Ready to merge. |
 | `c-algorithms-phase1` | `c-algorithms-phase1` | #1138 → fnabi-phase0 | tip 71b4bdf7 pushed; local battery green at da594bc0 (build, fixpoint, test, test-green, last-green); CI: the corpora lanes went green with the portable assert reporters, `behav_migrate_assert_macro` is `skip-on: windows #1140`. Watch the lanes at 71b4bdf7. |
-| `tommyds-phase2` | `tommyds-phase2` | none yet (stack on #1138) | Phase 2 implemented, commits through 3b77462e; battery IN PROGRESS (see §3). Push + PR once green. |
+| `tommyds-phase2` | `tommyds-phase2` | none yet (stack on #1138) | PR #1141 → c-algorithms-phase1; tip pushed; local battery GREEN at 376daeee (build, fixpoint, test, test-green, last-green, drop-audit 136/0, move-audit 15/0). Watch the lanes. |
 
 Standing rules: commits authored `Eric Hartford <eric@quixi.ai>`, no AI
 attribution; never `git stash`; no python/bash/perl/sed/awk scripts (With
@@ -40,7 +40,7 @@ walk and renders opaque (fixture `behav_migrate_member_only_record`); the
 native-Windows `assert.h` migration gap (UCRT `_wassert` + wide string
 literals) is filed as #1140 and the fixture skips on Windows.
 
-## 3. Phase 2 (`tommyds-phase2`) — implemented, battery in progress
+## 3. Phase 2 (`tommyds-phase2`, PR #1141) — done pending CI
 
 Commits on top of the Phase 1 tip (03eb3d8e..3b77462e):
 - migrator: bit builtins → integer methods; pointer-to-function-typedef →
@@ -72,7 +72,7 @@ Verified on the branch tip's release binary: all Phase 2 fixtures, the
 corpora lane, the complexity lane, the benchmark; `:tommyds-promote` with
 the release compiler reproduces the checked-in corpus byte for byte.
 
-Battery chain running from the scratchpad
+Battery GREEN at 376daeee (the chain below has finished; PR #1141 carries the evidence comment). Was run from the scratchpad
 (`p2_dropaudit.log`, then `p2_bt_build.log` → `p2_bt_fixpoint.log` →
 `p2_bt_test.log`; marker `p2_battery_done`). Remaining after it: `:test-green`,
 `:last-green`, `:move-audit`; read `out/drop-audit/audit.stdout` (expect the
