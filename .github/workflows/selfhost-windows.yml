@@ -132,7 +132,10 @@ jobs:
           command -v lld-link.exe && lld-link.exe --version || true
 
       - name: Build (seed -> stage1 -> stage2 -> stage3)
-        run: ./src/main.exe build
+        # WITH_PROFILE: every stage's compiler prints each phase to stderr as
+        # it completes, so a stage that hangs (stage2, 1801 s on #1129) leaves
+        # its last finished phase in out/command/<stage>/stderr.txt.
+        run: WITH_PROFILE=1 ./src/main.exe build
 
       - name: Fixpoint (stage2 == stage3)
         run: ./src/main.exe build :fixpoint
@@ -157,12 +160,33 @@ jobs:
           # battery over time.
           ./src/main.exe build :test
 
+      - name: Stage diagnostics on failure
+        if: failure()
+        shell: bash
+        run: |
+          set +e
+          echo "== out/command/stage2 captures"
+          for f in out/command/stage2/stdout.txt out/command/stage2/stderr.txt out/command/stage1/stderr.txt; do
+            [ -f "$f" ] || continue
+            echo "== $f ($(wc -l < "$f") lines)"; tail -60 "$f"
+          done
+          if [ -x out/bootstrap/bin/with-stage1.exe ]; then
+            echo "== probe: stage1 check src/main.w (Sema/MIR only, 900 s)"
+            timeout 900 ./out/bootstrap/bin/with-stage1.exe check src/main.w > out/probe-check.stdout 2> out/probe-check.stderr; echo "check rc=$?"
+            tail -20 out/probe-check.stderr
+            echo "== probe: stage1 build out/gen/main.w with one codegen unit (1500 s)"
+            WITH_CODEGEN_UNITS=1 WITH_PROFILE=1 timeout 1500 ./out/bootstrap/bin/with-stage1.exe build out/gen/main.w -O1 -o out/probe-single.exe > out/probe-single.stdout 2> out/probe-single.stderr; echo "single-unit build rc=$?"
+            tail -40 out/probe-single.stderr
+          fi
+
       - name: Upload test captures on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: windows-test-captures
           path: |
+            out/command/**
+            out/probe-*.std*
             out/test-graph/**
             out/tmp/pre-d-p7-capture/**
             out/tmp/pre-d-p7/**

@@ -304,6 +304,15 @@ extern fn LLVMSetTailCallKind(call: *mut u8, kind: i32)
 
 // Value ops
 extern fn LLVMInstructionEraseFromParent(v: *mut u8)
+extern fn LLVMIsAStoreInst(v: *mut u8) -> *mut u8
+extern fn LLVMIsALoadInst(v: *mut u8) -> *mut u8
+extern fn LLVMGetOperand(v: *mut u8, index: u32) -> *mut u8
+extern fn LLVMGetVolatile(v: *mut u8) -> i32
+extern fn LLVMIsNull(v: *mut u8) -> i32
+extern fn LLVMGetAlignment(v: *mut u8) -> u32
+extern fn LLVMInstructionGetDebugLoc(inst: *mut u8) -> *mut u8
+extern fn LLVMBuildMemMove(b: *mut u8, dst: *mut u8, dst_align: u32, src: *mut u8, src_align: u32, size: *mut u8) -> *mut u8
+extern fn LLVMBuildMemSet(b: *mut u8, ptr: *mut u8, val: *mut u8, len: *mut u8, align: u32) -> *mut u8
 extern fn LLVMGetValueKind(v: *mut u8) -> i32
 extern fn LLVMGetFirstUse(v: *mut u8) -> *mut u8
 extern fn LLVMSetValueName2(v: *mut u8, name: *const u8, len: u64)
@@ -1016,6 +1025,59 @@ pub fn wl_fn_instruction_count(f: i64) -> i32:
                 inst = LLVMGetNextInstruction(inst)
             bb = LLVMGetNextBasicBlock(bb)
     count
+
+// Aggregate copies as memory operations, the way every LLVM front end emits
+// them. Codegen moves a struct as `store (load %T, src), dst`; SROA then
+// scalarizes a first-class aggregate into one load and one store PER LEAF
+// (1660 for `Compilation`, 510-field records elsewhere), so a function
+// moving a few large records carries tens of thousands of scalar stores in
+// one block — and SelectionDAG's store merging goes quadratic on that
+// (`checkMergeStoreCandidatesForDependencies`: 635 s for one unit of the
+// windows_x86_64 stage2 build, the #1129 CI timeout). A `store` of a loaded
+// aggregate of at least `min_bytes` becomes `llvm.memmove` (the source and
+// destination may be the same place), a store of a zero aggregate becomes
+// `llvm.memset`, and a load left without uses is erased. Runs before the
+// per-function cleanup passes; returns the number of stores rewritten.
+pub fn wl_lower_aggregate_copies(f: i64, ctx: i64, dl: i64, min_bytes: i64) -> i32:
+    var rewritten = 0
+    unsafe:
+        let builder = LLVMCreateBuilderInContext(ctx as *mut u8)
+        let i64_ty = LLVMInt64TypeInContext(ctx as *mut u8)
+        let i8_ty = LLVMInt8TypeInContext(ctx as *mut u8)
+        var bb = LLVMGetFirstBasicBlock(f as *mut u8)
+        while bb as i64 != 0:
+            var inst = LLVMGetFirstInstruction(bb)
+            while inst as i64 != 0:
+                let next = LLVMGetNextInstruction(inst)
+                if LLVMIsAStoreInst(inst) as i64 != 0 and LLVMGetVolatile(inst) == 0:
+                    let value = LLVMGetOperand(inst, 0 as u32)
+                    let dst = LLVMGetOperand(inst, 1 as u32)
+                    let ty = LLVMTypeOf(value)
+                    let kind = LLVMGetTypeKind(ty)
+                    if kind == LLVM_StructTypeKind or kind == LLVM_ArrayTypeKind:
+                        let size = LLVMABISizeOfType(dl as *mut u8, ty) as i64
+                        if size >= min_bytes:
+                            let is_load = LLVMIsALoadInst(value) as i64 != 0 and LLVMGetVolatile(value) == 0
+                            let is_zero = LLVMIsNull(value) != 0
+                            if is_load or is_zero:
+                                LLVMPositionBuilderBefore(builder, inst)
+                                LLVMSetCurrentDebugLocation2(builder, LLVMInstructionGetDebugLoc(inst))
+                                let len = LLVMConstInt(i64_ty, size as u64, 0)
+                                let dst_align = LLVMGetAlignment(inst)
+                                if is_load:
+                                    let src = LLVMGetOperand(value, 0 as u32)
+                                    if src as i64 != dst as i64:
+                                        let _ = LLVMBuildMemMove(builder, dst, dst_align, src, LLVMGetAlignment(value), len)
+                                else:
+                                    let _ = LLVMBuildMemSet(builder, dst, LLVMConstInt(i8_ty, 0 as u64, 0), len, dst_align)
+                                LLVMInstructionEraseFromParent(inst)
+                                if is_load and LLVMGetFirstUse(value) as i64 == 0:
+                                    LLVMInstructionEraseFromParent(value)
+                                rewritten = rewritten + 1
+                inst = next
+            bb = LLVMGetNextBasicBlock(bb)
+        LLVMDisposeBuilder(builder)
+    rewritten
 
 // Mirror Function::deleteBody(): drop every reference held by the body
 // before erasing it. Instructions may be used across blocks (SSA dominance)
