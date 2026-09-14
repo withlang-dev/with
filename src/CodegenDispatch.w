@@ -5515,7 +5515,14 @@ impl Codegen:
     mut fn marshal_ref_operand(body: &MirBody, operand_id: i32) -> i64:
         let sema = self.mir_operand_sema_type(body, operand_id)
         let transparent = self.mir_sema_type_is_box(sema) or self.mir_sema_type_refcount_kind(sema) != 0
-        if not transparent:
+        // A reference/raw-pointer operand's VALUE is already the pointer the
+        // ref param wants: evaluate it (one scalar load, never the aggregate
+        // copy this routine exists to avoid) and let marshal_ref_addr pass it
+        // through. The place-address shortcut hands the callee &&T — for a
+        // projected place (`view.source: &str`) mir_try_place_ptr_for_ref
+        // returns the field address with no load, and json_str/print read
+        // through it as the str itself (the #1129 behavior-test red).
+        if not transparent and not self.mir_sema_type_is_raw_pointer_or_ref(sema):
             let place_ptr = self.mir_try_place_ptr_for_ref(body, operand_id)
             if place_ptr != 0:
                 // A pointer-holding local was loaded (an explicit `&T`); any
