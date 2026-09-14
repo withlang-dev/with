@@ -102,6 +102,26 @@ pub fn lseek(fd: i32, offset: i64, whence: i32) -> i64:
     with_libc_lseek(fd, offset, whence)
 pub fn unlink(path: *const i8) -> i32:
     with_libc_unlink(path)
+pub extern fn rand() -> i32
+pub extern fn srand(seed: u32) -> Unit
+pub extern fn qsort(base: *mut c_void, count: u64, size: u64, compare: unsafe extern "C" fn(*const c_void, *const c_void) -> i32) -> Unit
+
+// Darwin's mach clock, modeled portably: the absolute time is the runtime's
+// monotonic clock in nanoseconds on every target and the timebase is 1/1,
+// so `(t / denom) * numer` yields nanoseconds exactly as it does on Darwin.
+pub type kern_return_t = i32
+// C's `struct mach_timebase_info`, typedef'd `mach_timebase_info_data_t`;
+// migrated code spells the tag.
+pub type mach_timebase_info { numer: u32 = 0, denom: u32 = 0 }
+impl Copy for mach_timebase_info
+pub type mach_timebase_info_data_t = mach_timebase_info
+extern fn with_libc_mach_absolute_time() -> u64
+pub fn mach_absolute_time() -> u64: with_libc_mach_absolute_time()
+pub unsafe fn mach_timebase_info(info: *mut mach_timebase_info) -> kern_return_t:
+    (*info).numer = 1 as u32
+    (*info).denom = 1 as u32
+    0
+
 // fcntl is modeled like open/read/close: a runtime seam per target, never
 // the bare C symbol (UCRT has none, and zlib's gz layer — migrated with
 // O_NONBLOCK/O_CLOEXEC resolved — calls it from the bundle on every
