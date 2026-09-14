@@ -3497,6 +3497,9 @@ pub fn with_libc_lseek(fd: i32, offset: i64, whence: i32) -> i64:
     let r = rt_seek(fd, offset, whence)
     if r < 0: -1 else: r
 
+// std.libc's portable mach_absolute_time: the monotonic clock in nanoseconds.
+pub fn with_libc_mach_absolute_time() -> u64: with_clock_nanos() as u64
+
 // std.libc's fcntl: the POSIX platforms forward to libc, Windows has no
 // fcntl and returns -1 (zlib's gz layer ignores the result, as its own
 // Windows build never makes the call).
