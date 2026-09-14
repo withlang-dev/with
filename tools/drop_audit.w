@@ -5,9 +5,11 @@
 // Generates a curated cell matrix over (value shape × ownership op ×
 // receiver mode × control flow), runs every cell under the native debug
 // allocator, and classifies verdicts. With a baseline compiler, a cell is a
-// REGRESSION iff the candidate's verdict differs from the baseline's — so
-// drop-scheduling changes self-identify. Without one, verdicts compare
-// against each cell's EXPECTED column only.
+// REGRESSION iff the candidate's verdict differs from the baseline's and
+// the candidate does not PASS — so drop-scheduling changes self-identify;
+// a cell the baseline could not even run and the candidate passes is FIXED
+// (printed, never red: the baseline is the older seed). Without a
+// baseline, verdicts compare against each cell's EXPECTED column only.
 //
 //   with run tools/drop_audit.w <candidate-with> [baseline-with]
 //   with build :drop-audit          # candidate=out/release/bin/with,
@@ -519,8 +521,8 @@ fn main:
         var row = c.name ++ "\t" ++ cv
         if baseline.len() > 0:
             let bv = run_cell(baseline, baseline_dir, i, c.source, c.expect_sum, c.expect_clean)
-            let klass = if cv == bv: "same" else: "REGRESSION"
-            if cv != bv:
+            let klass = if cv == bv: "same" else if cv == "PASS": "FIXED" else: "REGRESSION"
+            if klass == "REGRESSION":
                 regressions = regressions + 1
             row = row ++ "\t" ++ bv ++ "\t" ++ klass
         if cv != "PASS":
