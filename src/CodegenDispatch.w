@@ -3801,20 +3801,7 @@ impl Codegen:
                     let af_len_val = wl_const_int(wl_i64_type(self.context), af_arr_len, 0)
                     let af_is_volatile = wl_const_int(wl_i1_type(self.context), 0, 0)
                     let ms_sym = self.intern.intern("llvm.memset.p0.i64")
-                    var ms_func = 0 as i64
-                    let ms_cached = self.fn_values.get(ms_sym)
-                    if ms_cached.is_some():
-                        ms_func = ms_cached.unwrap() as i64
-                    else:
-                        let ms_params: Vec[i64] = Vec.new()
-                        ms_params.push(wl_ptr_type(self.context))
-                        ms_params.push(wl_i8_type(self.context))
-                        ms_params.push(wl_i64_type(self.context))
-                        ms_params.push(wl_i1_type(self.context))
-                        let ms_ft = wl_function_type(wl_void_type(self.context), vec_data_i64(&ms_params), 4, 0)
-                        ms_func = wl_add_function(self.llmod, "llvm.memset.p0.i64", ms_ft)
-                        self.fn_values.insert(ms_sym, ms_func)
-                        self.fn_fn_types.insert(ms_sym, ms_ft)
+                    let ms_func = self.ensure_llvm_memset_declared()
                     let ms_ft = self.fn_fn_types.get(ms_sym).unwrap() as i64
                     let ms_args: Vec[i64] = Vec.new()
                     ms_args.push(af_alloca)
@@ -5122,20 +5109,7 @@ impl Codegen:
     // drop's rt_value_is_zero check regardless of struct layout.
     fn emit_memset_zero(ptr: i64, size_bytes: i64) -> Unit:
         let ms_sym = self.intern.intern("llvm.memset.p0.i64")
-        var ms_func = 0 as i64
-        let ms_cached = self.fn_values.get(ms_sym)
-        if ms_cached.is_some():
-            ms_func = ms_cached.unwrap() as i64
-        else:
-            let ms_params: Vec[i64] = Vec.new()
-            ms_params.push(wl_ptr_type(self.context))
-            ms_params.push(wl_i8_type(self.context))
-            ms_params.push(wl_i64_type(self.context))
-            ms_params.push(wl_i1_type(self.context))
-            let ms_ft = wl_function_type(wl_void_type(self.context), vec_data_i64(&ms_params), 4, 0)
-            ms_func = wl_add_function(self.llmod, "llvm.memset.p0.i64", ms_ft)
-            self.fn_values.insert(ms_sym, ms_func)
-            self.fn_fn_types.insert(ms_sym, ms_ft)
+        let ms_func = self.ensure_llvm_memset_declared()
         let ms_ft = self.fn_fn_types.get(ms_sym).unwrap() as i64
         let ms_args: Vec[i64] = Vec.new()
         ms_args.push(ptr)
@@ -5214,20 +5188,7 @@ impl Codegen:
                         let af_len = wl_const_int(wl_i64_type(self.context), af_arr_len, 0)
                         let af_vol = wl_const_int(wl_i1_type(self.context), 0, 0)
                         let ms_sym = self.intern.intern("llvm.memset.p0.i64")
-                        var ms_func = 0 as i64
-                        let ms_cached = self.fn_values.get(ms_sym)
-                        if ms_cached.is_some():
-                            ms_func = ms_cached.unwrap() as i64
-                        else:
-                            let ms_params: Vec[i64] = Vec.new()
-                            ms_params.push(wl_ptr_type(self.context))
-                            ms_params.push(wl_i8_type(self.context))
-                            ms_params.push(wl_i64_type(self.context))
-                            ms_params.push(wl_i1_type(self.context))
-                            let ms_ft = wl_function_type(wl_void_type(self.context), vec_data_i64(&ms_params), 4, 0)
-                            ms_func = wl_add_function(self.llmod, "llvm.memset.p0.i64", ms_ft)
-                            self.fn_values.insert(ms_sym, ms_func)
-                            self.fn_fn_types.insert(ms_sym, ms_ft)
+                        let ms_func = self.ensure_llvm_memset_declared()
                         let ms_ft = self.fn_fn_types.get(ms_sym).unwrap() as i64
                         let ms_args: Vec[i64] = Vec.new()
                         ms_args.push(dst_ptr)
@@ -5261,20 +5222,7 @@ impl Codegen:
                                     dst_ptr = self.mir_get_or_create_local_ptr(dst_local, use_arr_ty)
                                     self.mir_local_types.insert(dst_local, use_arr_ty)
                                 let mc_sym = self.intern.intern("llvm.memcpy.p0.p0.i64")
-                                var mc_func = 0 as i64
-                                let mc_cached = self.fn_values.get(mc_sym)
-                                if mc_cached.is_some():
-                                    mc_func = mc_cached.unwrap() as i64
-                                else:
-                                    let mc_params: Vec[i64] = Vec.new()
-                                    mc_params.push(wl_ptr_type(self.context))
-                                    mc_params.push(wl_ptr_type(self.context))
-                                    mc_params.push(wl_i64_type(self.context))
-                                    mc_params.push(wl_i1_type(self.context))
-                                    let mc_ft = wl_function_type(wl_void_type(self.context), vec_data_i64(&mc_params), 4, 0)
-                                    mc_func = wl_add_function(self.llmod, "llvm.memcpy.p0.p0.i64", mc_ft)
-                                    self.fn_values.insert(mc_sym, mc_func)
-                                    self.fn_fn_types.insert(mc_sym, mc_ft)
+                                let mc_func = self.ensure_llvm_memcpy_declared()
                                 let mc_ft = self.fn_fn_types.get(mc_sym).unwrap() as i64
                                 let mc_len = wl_const_int(wl_i64_type(self.context), wl_get_array_length(use_arr_ty), 0)
                                 let mc_vol = wl_const_int(wl_i1_type(self.context), 0, 0)
@@ -5558,10 +5506,46 @@ impl Codegen:
         self.analysis_last_marshal_strategy = AnalysisMarshalStrategy.TemporaryAddress
         tmp
 
-    // Evaluating wrapper for call paths that have not pre-computed the value.
-    mut fn mir_ref_arg_ptr(body: &MirBody, operand_id: i32) -> i64:
+    // The same policy for a call path that has NOT evaluated the operand: a
+    // place operand yields its address (or the pointer the local holds)
+    // without materializing its value first. Evaluating an aggregate only to
+    // discard it is not free — SROA scalarizes the dead `load %Compilation`
+    // into 1660 field loads per in-place receiver call, and run_cli carried
+    // 26 of them (the #1129 Windows x86_64 stage2 timeout).
+    mut fn marshal_ref_operand(body: &MirBody, operand_id: i32) -> i64:
+        let sema = self.mir_operand_sema_type(body, operand_id)
+        let transparent = self.mir_sema_type_is_box(sema) or self.mir_sema_type_refcount_kind(sema) != 0
+        // A reference/raw-pointer operand's VALUE is already the pointer the
+        // ref param wants: evaluate it (one scalar load, never the aggregate
+        // copy this routine exists to avoid) and let marshal_ref_addr pass it
+        // through. The place-address shortcut hands the callee &&T — for a
+        // projected place (`view.source: &str`) mir_try_place_ptr_for_ref
+        // returns the field address with no load, and json_str/print read
+        // through it as the str itself (the #1129 behavior-test red).
+        if not transparent and not self.mir_sema_type_is_raw_pointer_or_ref(sema):
+            let place_ptr = self.mir_try_place_ptr_for_ref(body, operand_id)
+            if place_ptr != 0:
+                // A pointer-holding local was loaded (an explicit `&T`); any
+                // other place is passed by address.
+                self.analysis_last_marshal_strategy = if self.mir_operand_local_holds_pointer(body, operand_id): AnalysisMarshalStrategy.ExistingPointer else: AnalysisMarshalStrategy.PlaceAddress
+                return place_ptr
         let val = self.mir_eval_operand(body, operand_id, 0)
         self.marshal_ref_addr(body, operand_id, val)
+
+    // Whether a COPY/MOVE operand of an unprojected local names a local whose
+    // LLVM slot holds a pointer (so a ref marshal loads that pointer).
+    fn mir_operand_local_holds_pointer(body: &MirBody, operand_id: i32) -> bool:
+        if operand_id < 0 or operand_id >= body.operand_kinds.len() as i32: return false
+        let ok = body.operand_kinds[operand_id]
+        let od = body.operand_d0[operand_id]
+        if (ok != OperandKind.OK_COPY and ok != OperandKind.OK_MOVE) or od < 0 or od >= body.place_locals.len() as i32: return false
+        if body.place_proj_counts[od] != 0: return false
+        let ptr_ty_opt = self.mir_local_types.get(body.place_locals[od])
+        ptr_ty_opt.is_some() and wl_get_type_kind(ptr_ty_opt.unwrap() as i64) == wl_pointer_type_kind()
+
+    // Evaluating wrapper for call paths that have not pre-computed the value.
+    mut fn mir_ref_arg_ptr(body: &MirBody, operand_id: i32) -> i64:
+        self.marshal_ref_operand(body, operand_id)
 
     mut fn marshal_mir_call_arg(body: &MirBody, args_id: i32, operand: i32, param_index: i32, raw: i64) -> i64:
         let sig_idx = body.call_sig_index(args_id)
@@ -15178,10 +15162,10 @@ impl Codegen:
             // (dyn_trait_sym was resolved above the byval branch.)
             var arg_val: i64 = 0
             if needs_ref:
-                // #D5 cathedral: single ref-param address policy (extracted).
-                let raw_arg_val = self.mir_eval_operand(body, operand_id, 0)
-                arg_val = self.marshal_ref_addr(body, operand_id, raw_arg_val)
-                self.record_codegen_call_argument(body, args_id, operand_id, ai, self.analysis_last_marshal_strategy, raw_arg_val, arg_val)
+                // #D5 cathedral: single ref-param address policy (extracted),
+                // without evaluating a place operand's value first.
+                arg_val = self.marshal_ref_operand(body, operand_id)
+                self.record_codegen_call_argument(body, args_id, operand_id, ai, self.analysis_last_marshal_strategy, arg_val, arg_val)
             else if dyn_trait_sym != 0:
                 // Evaluate without coercion so we get the raw concrete value.
                 arg_val = self.mir_eval_operand(body, operand_id, 0)
@@ -15488,6 +15472,9 @@ impl Codegen:
             with_eprint("===== PRE MIR CLEANUP " ++ name_str ++ " =====\n")
             wl_dump_value(function)
             with_eprint("===== END PRE MIR CLEANUP =====\n")
+        // Large aggregate moves become memmove/memset before SROA can
+        // scalarize them into a store per leaf (see wl_lower_aggregate_copies).
+        let _ = wl_lower_aggregate_copies(function, self.context, wl_get_module_data_layout(self.llmod), 64)
         let rc = wl_run_function_passes(function, self.target_machine, "sroa,mem2reg")
         if rc != 0:
             with_eprint("error: LLVM MIR cleanup failed for function " ++ name_str ++ "\n")
