@@ -1294,7 +1294,16 @@ fn run_stdlib_complexity_action(ctx: ActionCtx):
     let binary = build_project_abs(root, build_project_join(output, host_bin("stdlib-complexity")))
     let stdout_rel = build_project_join(output, "compile.stdout")
     let stderr_rel = build_project_join(output, "compile.stderr")
-    let compile_args: Vec[str] = [compiler.clone(), "build", "test/complexity/stdlib.w", "-O1", "-o", binary.clone()]
+    // Build-layer code is compiled by the SEED (docs/decisions.md D14; the
+    // seed-gated build-layer rule): a collection literal with moved element
+    // temporaries is #1122 under seeds before 9ccd1e2d, so argv is pushed.
+    var compile_args: Vec[str] = Vec.new()
+    compile_args.push(compiler.clone())
+    compile_args.push("build")
+    compile_args.push("test/complexity/stdlib.w")
+    compile_args.push("-O1")
+    compile_args.push("-o")
+    compile_args.push(binary.clone())
     let compiled = ctx.process_runner().run_capture_cwd(
         compile_args,
         build_project_abs(root, stdout_rel), build_project_abs(root, stderr_rel), 300000, root)
@@ -1303,7 +1312,8 @@ fn run_stdlib_complexity_action(ctx: ActionCtx):
         return 1
     let timing_out = build_project_join(output, "timing.stdout")
     let timing_err = build_project_join(output, "timing.stderr")
-    let timing_args: Vec[str] = [binary]
+    var timing_args: Vec[str] = Vec.new()
+    timing_args.push(binary.clone())
     let timed = ctx.process_runner().run_capture_cwd(timing_args,
         build_project_abs(root, timing_out), build_project_abs(root, timing_err), 120000, root)
     if timed.rc != 0:
@@ -1314,7 +1324,13 @@ fn run_stdlib_complexity_action(ctx: ActionCtx):
     let alloc_err = build_project_join(output, "allocation.stderr")
     // The CLI enables the runtime trace only for this child. Compilation and
     // process startup fall outside the marked spans, as in the timing probe.
-    let allocation_args: Vec[str] = [compiler, "run", "-O1", "--trace-alloc", "test/complexity/stdlib.w", "allocations"]
+    var allocation_args: Vec[str] = Vec.new()
+    allocation_args.push(compiler.clone())
+    allocation_args.push("run")
+    allocation_args.push("-O1")
+    allocation_args.push("--trace-alloc")
+    allocation_args.push("test/complexity/stdlib.w")
+    allocation_args.push("allocations")
     let allocated = ctx.process_runner().run_capture_cwd(
         allocation_args,
         build_project_abs(root, alloc_out), build_project_abs(root, alloc_err), 300000, root)
