@@ -438,8 +438,7 @@ by the M*LIB-backed `BTreeMap`/`BTreeSet` work in Phase 4.
   `Ord.cmp(self: &Self, other: &Self)` backs `<`/`<=`/`>`/`>=` and
   `Eq.eq(other: &Self)` backs `==`/`!=`; fixed-name methods are optional
   overrides. The facades bound `T: Ord` and compare views with `<`/`>`
-  directly. §11.7's wording is proposed in the handoff, pending Eric's
-  blessing of the words.
+  directly. §11.7 carries the blessed wording (2026-09-14).
 
 **Phase 2 — TommyDS, whole.**
 Specialized indexing/storage engines: `hashtable`, `hashdyn`, `hashlin`,

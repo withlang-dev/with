@@ -16,10 +16,9 @@ decision supersedes an earlier one, say so in both.
 **Status:** Ruled by Eric (verbatim: "I rule for one Ord.cmp(self: &Self,
 other: &Self) -> i32 backing all four ordered operators (and Eq.eq(other:
 &Self) for equality), keeping the fixed-name methods as optional overrides,
-and amend §11.7"). The §11.7 wording is proposed in the Phase 1 handoff
-and lands as the ruling once Eric blesses the words; the implementation is
-non-compliant until it conforms (it conforms on branch
-`c-algorithms-phase1`).
+and amend §11.7"). The §11.7 wording was blessed verbatim ("lgtm",
+2026-09-14) and landed in `docs/with-specification.md` §11.7; the
+implementation conforms on branch `c-algorithms-phase1`.
 
 **Context.** §11.7 dispatched every comparison to a fixed method name
 (`lt`, `le`, `gt`, `ge`, `eq`, `ne`) while `Ord` carried only

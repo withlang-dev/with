@@ -143,10 +143,9 @@ the release binary of the fixed tree):
    operators, `Eq.eq(&self, &other)` backs `==`/`!=`, fixed-name methods
    are overrides. Implemented on the branch (Sema `operator_method_derived`,
    MirLower `lower_derived_comparison`, `traits.w`, every impl in the tree,
-   fixture `behav_ord_cmp_operators.w`). The §11.7 wording below is
-   PROPOSED — only Eric's blessing of the exact words lands it in
-   `docs/with-specification.md`; until then the spec still says six fixed
-   names and the implementation is ahead of it.
+   fixture `behav_ord_cmp_operators.w`). The §11.7 wording below was
+   blessed verbatim by Eric (2026-09-14) and is landed in
+   `docs/with-specification.md`.
 
    Proposed §11.7 intro (replaces "Arithmetic and comparison operators are
    the main exception … need to name them."):
