@@ -1061,7 +1061,10 @@ unsafe fn collect_decl(cursor: CXCursor, parent: CXCursor, data: *mut u8) -> i32
         clang_getFileLocation(loc, &raw mut file, 0 as *mut u32, 0 as *mut u32, 0 as *mut u32)
         if file as i64 != 0 and clang_File_isEqual(file, (*s).header_file) == 0:
             return CXChildVisit_Continue
-    // Grow decl array
+    session_append_decl(s, cursor)
+    CXChildVisit_Continue
+
+unsafe fn session_append_decl(s: *mut CImportSession, cursor: CXCursor):
     if (*s).decl_count >= (*s).decl_cap:
         (*s).decl_cap = if (*s).decl_cap > 0: (*s).decl_cap * 2 else: 256
         let old_decls = (*s).decls
@@ -1073,7 +1076,68 @@ unsafe fn collect_decl(cursor: CXCursor, parent: CXCursor, data: *mut u8) -> i32
     let dst = (((*s).decls as i64) + ((*s).decl_count as i64 * 32)) as *mut CXCursor
     *dst = cursor
     (*s).decl_count = (*s).decl_count + 1
+
+unsafe fn session_decl_contains(s: *mut CImportSession, cursor: CXCursor) -> bool:
+    var i = 0
+    while i < (*s).decl_count:
+        if clang_equalCursors(*(((*s).decls as i64 + i as i64 * 32) as *const CXCursor), cursor) != 0:
+            return true
+        i = i + 1
+    false
+
+// A record that is named only through a type — `struct __locale_data *`
+// inside another record's member, never declared at file scope — has no
+// cursor of its own in the top-level walk, yet the rendered member names
+// it. Every such record without a definition anywhere in the TU joins the
+// declaration list, so it renders `type X = opaque` next to its users
+// (glibc's __locale_struct under `use c_import("time.h")`).
+unsafe fn collect_undefined_record_type(s: *mut CImportSession, ty: CXType, depth: i32):
+    if depth > MAX_TYPE_DEPTH: return
+    if ty.kind == CXType_Typedef:
+        collect_undefined_record_type(s, clang_getTypedefDeclUnderlyingType(clang_getTypeDeclaration(ty)), depth + 1)
+        return
+    if ty.kind == CXType_Elaborated:
+        collect_undefined_record_type(s, clang_Type_getNamedType(ty), depth + 1)
+        return
+    let canonical = clang_getCanonicalType(ty)
+    let kind = canonical.kind
+    if kind == CXType_Pointer:
+        collect_undefined_record_type(s, clang_getPointeeType(canonical), depth + 1)
+    else if kind == CXType_ConstantArray or kind == CXType_IncompleteArray:
+        collect_undefined_record_type(s, clang_getArrayElementType(canonical), depth + 1)
+    else if kind == CXType_FunctionProto or kind == CXType_FunctionNoProto:
+        collect_undefined_record_type(s, clang_getResultType(canonical), depth + 1)
+        let n = clang_getNumArgTypes(canonical)
+        var i = 0
+        while i < n:
+            collect_undefined_record_type(s, clang_getArgType(canonical, i as u32), depth + 1)
+            i = i + 1
+    else if kind == CXType_Record:
+        let decl = clang_getTypeDeclaration(canonical)
+        if clang_Cursor_isNull(decl) == 0 and clang_Cursor_isAnonymous(decl) == 0 and clang_Cursor_isNull(clang_getCursorDefinition(decl)) != 0 and not session_decl_contains(s, decl):
+            session_append_decl(s, decl)
+
+@[callconv("c")]
+unsafe fn collect_member_record_types(cursor: CXCursor, parent: CXCursor, data: *mut u8) -> i32:
+    if clang_getCursorKind(cursor) == CXCursor_FieldDecl:
+        collect_undefined_record_type(data as *mut CImportSession, clang_getCursorType(cursor), 0)
     CXChildVisit_Continue
+
+// Walks every collected declaration's types (record members, function
+// signatures, typedef targets, variables). Declarations appended on the way
+// are walked too; an undefined record has no members, so the walk ends.
+unsafe fn collect_undefined_records(s: *mut CImportSession):
+    var i = 0
+    while i < (*s).decl_count:
+        let cursor = *(((*s).decls as i64 + i as i64 * 32) as *const CXCursor)
+        let kind = clang_getCursorKind(cursor)
+        if kind == CXCursor_StructDecl or kind == CXCursor_UnionDecl:
+            let _ = clang_visitChildren(cursor, collect_member_record_types as *const u8, s as *mut u8)
+        else if kind == CXCursor_FunctionDecl or kind == CXCursor_VarDecl:
+            collect_undefined_record_type(s, clang_getCursorType(cursor), 0)
+        else if kind == CXCursor_TypedefDecl:
+            collect_undefined_record_type(s, clang_getTypedefDeclUnderlyingType(cursor), 0)
+        i = i + 1
 
 @[callconv("c")]
 unsafe fn collect_field(cursor: CXCursor, parent: CXCursor, data: *mut u8) -> i32:
@@ -1356,6 +1420,7 @@ pub fn with_cimport_parse(header_code: &str) -> i64:
         let root = clang_getTranslationUnitCursor((*s).tu)
         (*s).header_file = 0 as *mut u8
         let _ = clang_visitChildren(root, collect_decl as *const u8, s as *mut u8)
+        collect_undefined_records(s)
         s as i64
 
 // ── Dispose ─────────────────────────────────────────────────
