@@ -389,8 +389,28 @@ fn sc_trie(kind: &str):
         source = source ++ "    var cursor = trie.iter_prefix(\"k\")\n    assert(cursor.next().unwrap().id == 1)\n"
     source
 
+// HashIndex[i32, R] over the TommyDS hashdyn engine (Phase 2): the facade
+// owns every node; a replaced value transfers out, removals transfer, the
+// index drops the rest exactly once.
+fn sc_hash_index(kind: &str):
+    var source = "use std.collections.hash_index.HashIndex\nfn go(slot: *mut i32):\n    var index = HashIndex[i32, R].new()\n"
+    if kind == "empty": return source
+    source = source ++ "    for i in 1..9: assert(index.insert(i, mk(i, slot)).is_none())\n    assert(index.len() == 8 and index.get(&3).unwrap().id == 3)\n"
+    if kind == "partial":
+        source = source ++ "    for i in 1..5:\n        let removed = index.remove(&i).unwrap()\n        assert(removed.id == i)\n    assert(index.len() == 4)\n"
+    if kind == "replace":
+        source = source ++ "    let old = index.insert(3, mk(3, slot)).unwrap()\n    assert(old.id == 3)\n"
+    if kind == "cursor":
+        source = source ++ "    var cursor = index.iter()\n    var seen = 0\n    while let Some(entry) = cursor.next():\n        assert(entry.value().id == *entry.key())\n        seen = seen + 1\n    assert(seen == 8)\n"
+    source
+
 fn build_cells():
     var cells: Vec[Cell] = Vec.new()
+    cells.push(cell("hash_index_empty/facade", sc_hash_index("empty"), 0))
+    cells.push(cell("hash_index_full/facade", sc_hash_index("full"), 36))
+    cells.push(cell("hash_index_partial/facade", sc_hash_index("partial"), 36))
+    cells.push(cell("hash_index_replace/facade", sc_hash_index("replace"), 39))
+    cells.push(cell("hash_index_cursor/facade", sc_hash_index("cursor"), 36))
     cells.push(cell("sorted_vec_empty/facade", sc_sorted_vec("empty"), 0))
     cells.push(cell("sorted_vec_full/facade", sc_sorted_vec("full"), 36))
     cells.push(cell("sorted_vec_partial/facade", sc_sorted_vec("partial"), 36))

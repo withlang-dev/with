@@ -2,6 +2,7 @@ use std.collections
 use std.collections.sorted_vec.SortedVec
 use std.collections.binary_heap.BinaryHeap
 use std.collections.trie.Trie
+use std.collections.hash_index.HashIndex
 use std.time
 use std.process
 use std.builtins
@@ -67,6 +68,18 @@ fn hashmap_work(n: i32):
     for i in 0..n:
         if i % 2 == 0: assert(entries.get(i).is_none())
         else: assert(entries.get(i).unwrap() == i)
+    assert(entries.len() == n / 2)
+    n
+
+fn hash_index_work(n: i32):
+    var entries = HashIndex[i32, i32].new()
+    for i in 0..n: entries.insert(i, i)
+    for i in 0..n: assert(*entries.get(&i).unwrap() == i)
+    for i in 0..n:
+        if i % 2 == 0: assert(entries.remove(&i).unwrap() == i)
+    for i in 0..n:
+        if i % 2 == 0: assert(entries.get(&i).is_none())
+        else: assert(*entries.get(&i).unwrap() == i)
     assert(entries.len() == n / 2)
     n
 
@@ -215,3 +228,4 @@ else:
     measure("sorted-vec", sorted_vec_work, 4000, 0)
     measure("binary-heap", binary_heap_work, 4000, 0)
     measure("trie", trie_work, 2000, 0)
+    measure("hash-index", hash_index_work, 4000, 0)
