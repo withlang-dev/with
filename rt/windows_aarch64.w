@@ -420,14 +420,34 @@ pub fn rt_fill_random(buf: *mut u8, len: u64) -> Unit:
     if SystemFunction036(buf, len as u32) == 0:
         ExitProcess(1)
 
+// The UCRT streams (`#define stdin (__acrt_iob_func(0))`), as std.libc's
+// libc_stdin/stdout/stderr hand them to fprintf and friends on every target.
 pub fn rt_libc_stdin() -> *mut c_void:
-    0 as *mut c_void
+    __acrt_iob_func(0 as u32)
 
 pub fn rt_libc_stdout() -> *mut c_void:
-    0 as *mut c_void
+    __acrt_iob_func(1 as u32)
 
 pub fn rt_libc_stderr() -> *mut c_void:
-    0 as *mut c_void
+    __acrt_iob_func(2 as u32)
+
+// std.libc's POSIX seams (rt_core.w's with_libc_*) over the UCRT: errno is
+// _errno(), fileno/isatty are the CRT's underscore spellings on CRT fds,
+// rlimit has no equivalent (the main stack is fixed at link time: RLIMIT_STACK
+// reads unlimited, a set is a no-op, other resources are refused), mkstemp
+// and realpath are the Win32 temp-file and full-path calls.
+@[link_name("_fileno")]
+extern fn rt_ucrt_fileno(stream: *mut c_void) -> i32
+@[link_name("_isatty")]
+extern fn rt_ucrt_isatty(fd: i32) -> i32
+
+pub fn rt_errno_ptr() -> *mut i32: rt_ucrt_errno()
+pub fn rt_fileno(stream: *mut c_void) -> i32: rt_ucrt_fileno(stream)
+pub fn rt_isatty(fd: i32) -> i32: rt_ucrt_isatty(fd)
+pub fn rt_getrlimit(resource: i32, lim: *mut u8) -> i32: getrlimit(resource, lim)
+pub fn rt_setrlimit(resource: i32, lim: *const u8) -> i32: setrlimit(resource, lim)
+pub fn rt_mkstemp(template_path: *mut u8) -> i32: mkstemp(template_path)
+pub fn rt_realpath(path: *const u8, resolved_path: *mut u8) -> *mut u8: realpath(path, resolved_path)
 
 pub fn rt_fiber_page_size() -> i64:
     4096

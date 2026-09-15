@@ -117,6 +117,24 @@ pub fn rt_libc_stdout() -> *mut c_void:
 pub fn rt_libc_stderr() -> *mut c_void:
     stderr
 
+// std.libc's POSIX seams (rt_core.w's with_libc_*): the glibc calls.
+@[link_name("fileno")]
+extern fn rt_libc_fileno(stream: *mut c_void) -> i32
+@[link_name("isatty")]
+extern fn rt_libc_isatty(fd: i32) -> i32
+@[link_name("mkstemp")]
+extern fn rt_libc_mkstemp(template_path: *mut u8) -> i32
+@[link_name("realpath")]
+extern fn rt_libc_realpath(path: *const u8, resolved_path: *mut u8) -> *mut u8
+
+pub fn rt_errno_ptr() -> *mut i32: rt_libc_errno_location()
+pub fn rt_fileno(stream: *mut c_void) -> i32: rt_libc_fileno(stream)
+pub fn rt_isatty(fd: i32) -> i32: rt_libc_isatty(fd)
+pub fn rt_getrlimit(resource: i32, lim: *mut u8) -> i32: rt_libc_getrlimit(resource, lim)
+pub fn rt_setrlimit(resource: i32, lim: *const u8) -> i32: rt_libc_setrlimit(resource, lim)
+pub fn rt_mkstemp(template_path: *mut u8) -> i32: rt_libc_mkstemp(template_path)
+pub fn rt_realpath(path: *const u8, resolved_path: *mut u8) -> *mut u8: rt_libc_realpath(path, resolved_path)
+
 pub fn rt_fiber_page_size() -> i64:
     let page_size = rt_libc_sysconf(30)
     if page_size > 0:
