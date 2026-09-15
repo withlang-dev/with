@@ -230,7 +230,7 @@ pub unsafe fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_
     '__ci_bb_0 {
         (__local_re__goto_3346_24 = __param_code)
         (__local_original_options__goto_3347_10 = __local_options)
-        (__local_null_str__goto_3349_13 = [205])
+        (__local_null_str__goto_3349_13 = [(205 as u8)])
         (__local_original_subject__goto_3350_12 = __local_subject)
         (__local_has_first_cu__goto_3357_6 = ((0 as c_int)))
         (__local_has_req_cu__goto_3358_6 = ((0 as c_int)))
@@ -1992,7 +1992,7 @@ pub unsafe fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_
     }
 
     '__ci_bb_201 {
-        ((unsafe *__param_match_data).subject = (((unsafe *(&raw const (unsafe *__param_match_data).memctl as *const pcre2_memctl)).malloc(((__local_length as c_ulong) *% (1 as c_ulong)), (unsafe *(&raw const (unsafe *__param_match_data).memctl as *const pcre2_memctl)).memory_data) as *const u8)))
+        ((unsafe *__param_match_data).subject = (((unsafe *(&raw const (unsafe *__param_match_data).memctl as *const pcre2_memctl)).malloc((((__local_length as c_ulong) *% (1 as c_ulong)) as c_ulong), (unsafe *(&raw const (unsafe *__param_match_data).memctl as *const pcre2_memctl)).memory_data) as *const u8)))
         if ((if (unsafe *__param_match_data).subject == null: 1 else: 0) != 0) {
             goto '__ci_bb_204
         } else {
@@ -2140,7 +2140,7 @@ pub unsafe fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_
     '__ci_bb_220 {
         (__local_next__goto_4119_15 = (unsafe *__local_rws__goto_3385_13).next)
         ((unsafe *__local_rws__goto_3385_13).next = (unsafe *__local_next__goto_4119_15).next)
-        (unsafe *(&raw const (unsafe *__local_mb__goto_3377_18).memctl as *const pcre2_memctl)).free(__local_next__goto_4119_15, (unsafe *(&raw const (unsafe *__local_mb__goto_3377_18).memctl as *const pcre2_memctl)).memory_data)
+        (unsafe *(&raw const (unsafe *__local_mb__goto_3377_18).memctl as *const pcre2_memctl)).free((__local_next__goto_4119_15 as *mut c_void), (unsafe *(&raw const (unsafe *__local_mb__goto_3377_18).memctl as *const pcre2_memctl)).memory_data)
         goto '__ci_bb_219
     }
 
@@ -2236,7 +2236,7 @@ unsafe fn more_workspace(__param_rwsptr: *mut *mut RWS_anchor, __param_ovecsize:
             return -63
         }
 
-        (__local_new = (((unsafe *(&raw const (unsafe *__param_mb).memctl as *const pcre2_memctl)).malloc(((__local_newsize as c_ulong) *% (sizeof[c_int]() as c_ulong)), (unsafe *(&raw const (unsafe *__param_mb).memctl as *const pcre2_memctl)).memory_data) as *mut RWS_anchor)))
+        (__local_new = (((unsafe *(&raw const (unsafe *__param_mb).memctl as *const pcre2_memctl)).malloc((((__local_newsize as c_ulong) *% (sizeof[c_int]() as c_ulong)) as c_ulong), (unsafe *(&raw const (unsafe *__param_mb).memctl as *const pcre2_memctl)).memory_data) as *mut RWS_anchor)))
 
         if ((if __local_new == null: 1 else: 0) != 0) {
             return -48
@@ -17385,6 +17385,6 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
 }
 
 let coptable: [173]u8 = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, (1 + 2), (1 + 2), (1 + 2), 1, 1, 1, (1 + 2), 1, 1, 1, 1, 1, 1, (1 + 2), (1 + 2), (1 + 2), 1, 1, 1, (1 + 2), 1, 1, 1, 1, 1, 1, (1 + 2), (1 + 2), (1 + 2), 1, 1, 1, (1 + 2), 1, 1, 1, 1, 1, 1, (1 + 2), (1 + 2), (1 + 2), 1, 1, 1, (1 + 2), 1, 1, 1, 1, 1, 1, (1 + 2), (1 + 2), (1 + 2), 1, 1, 1, (1 + 2), 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-let poptable: [173]u8 = [0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1]
+let poptable: [173]u8 = [(0 as u8), (0 as u8), (0 as u8), (0 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (0 as u8), (1 as u8), (1 as u8)]
 let toptable1: [14]u8 = [0, 0, 0, 0, 0, 0, 0x08, 0x08, 0x01, 0x01, 0x10, 0x10, 0, 0]
 let toptable2: [14]u8 = [0, 0, 0, 0, 0, 0, 0x08, 0, 0x01, 0, 0x10, 0, 1, 1]

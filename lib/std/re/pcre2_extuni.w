@@ -82,6 +82,8 @@ pub unsafe fn _pcre2_extuni_8(__param_c: c_uint, __param_eptr: *const u8, __para
 
             }
 
+
+
         }
 
         (__local_rgb = ((((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[(((_pcre2_ucd_stage1_8[((__local_c as c_int) / 128)] as c_int) * 128) + ((__local_c as c_int) % 128))] as c_uint) as usize)).gbprop as c_int)))
@@ -154,6 +156,8 @@ pub unsafe fn _pcre2_extuni_8(__param_c: c_uint, __param_eptr: *const u8, __para
                         }
 
                     }
+
+
 
                 } else {
                     (__local_c = (((unsafe *__local_bptr) as c_uint)))

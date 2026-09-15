@@ -70,6 +70,7 @@ pub unsafe fn _tr_tally(__param_s: *mut internal_state, __param_dist: c_uint, __
 
         (__local_dist = (__local_dist -% 1))
 
+
         ((unsafe *__param_s).dyn_ltree[(((_length_code[__param_lc] as c_int) + 256) + 1)].fc.freq = ((unsafe *__param_s).dyn_ltree[(((_length_code[__param_lc] as c_int) + 256) + 1)].fc.freq +% 1))
 
         var __ci_expr_ternary_3: c_int = 0
@@ -104,13 +105,16 @@ pub unsafe fn _tr_flush_block(__param_s: *mut internal_state, __param_buf: *mut 
 
         build_tree(__param_s, ((&raw const (unsafe *__param_s).l_desc as *const tree_desc_s) as *mut tree_desc_s))
 
+
         build_tree(__param_s, ((&raw const (unsafe *__param_s).d_desc as *const tree_desc_s) as *mut tree_desc_s))
+
 
         (__local_max_blindex = ((build_bl_tree(__param_s) as c_int)))
 
         (__local_opt_lenb = (((((((((unsafe *__param_s).opt_len as c_ulong) +% (3 as c_ulong)) as c_ulong) +% (7 as c_ulong)) as c_ulong) >> (3 as c_uint)) as c_ulong)))
 
         (__local_static_lenb = (((((((((unsafe *__param_s).static_len as c_ulong) +% (3 as c_ulong)) as c_ulong) +% (7 as c_ulong)) as c_ulong) >> (3 as c_uint)) as c_ulong)))
+
 
         var __ci_expr_logic_0: c_int
 
@@ -126,6 +130,7 @@ pub unsafe fn _tr_flush_block(__param_s: *mut internal_state, __param_buf: *mut 
 
 
     } else {
+
         (__local_static_lenb = ((((__param_stored_len as c_ulong) +% (5 as c_ulong)) as c_ulong)))
 
         (__local_opt_lenb = __local_static_lenb)
@@ -159,11 +164,14 @@ pub unsafe fn _tr_flush_block(__param_s: *mut internal_state, __param_buf: *mut 
 
 
 
+
                 var __ci_expr_old_3: c_ulong = (unsafe *__param_s).pending
 
                 ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
 
                 ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_3]) = (((((unsafe *__param_s).bi_buf as c_int) >> (8 as c_uint)) as u8)))
+
+
 
 
 
@@ -178,6 +186,7 @@ pub unsafe fn _tr_flush_block(__param_s: *mut internal_state, __param_buf: *mut 
                 ((unsafe *__param_s).bi_valid = (unsafe *__param_s).bi_valid + __local_len)
 
             }
+
 
 
             compress_block(__param_s, (&static_ltree[0] as *const ct_data_s), (&static_dtree[0] as *const ct_data_s))
@@ -198,11 +207,14 @@ pub unsafe fn _tr_flush_block(__param_s: *mut internal_state, __param_buf: *mut 
 
 
 
+
                 var __ci_expr_old_5: c_ulong = (unsafe *__param_s).pending
 
                 ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
 
                 ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_5]) = (((((unsafe *__param_s).bi_buf as c_int) >> (8 as c_uint)) as u8)))
+
+
 
 
 
@@ -219,6 +231,7 @@ pub unsafe fn _tr_flush_block(__param_s: *mut internal_state, __param_buf: *mut 
             }
 
 
+
             send_all_trees(__param_s, (((unsafe *(&raw const (unsafe *__param_s).l_desc as *const tree_desc_s)).max_code + 1) as c_int), (((unsafe *(&raw const (unsafe *__param_s).d_desc as *const tree_desc_s)).max_code + 1) as c_int), ((__local_max_blindex + 1) as c_int))
 
             compress_block(__param_s, (&(unsafe *__param_s).dyn_ltree[0] as *const ct_data_s), (&(unsafe *__param_s).dyn_dtree[0] as *const ct_data_s))
@@ -227,12 +240,14 @@ pub unsafe fn _tr_flush_block(__param_s: *mut internal_state, __param_buf: *mut 
     }
 
 
+
     init_block(__param_s)
 
     if (__param_last != 0) {
         bi_windup(__param_s)
 
     }
+
 
 }
 
@@ -257,11 +272,14 @@ pub unsafe fn _tr_align(__param_s: *mut internal_state) -> Unit {
 
 
 
+
         var __ci_expr_old_1: c_ulong = (unsafe *__param_s).pending
 
         ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
 
         ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_1]) = (((((unsafe *__param_s).bi_buf as c_int) >> (8 as c_uint)) as u8)))
+
+
 
 
 
@@ -276,6 +294,7 @@ pub unsafe fn _tr_align(__param_s: *mut internal_state) -> Unit {
         ((unsafe *__param_s).bi_valid = (unsafe *__param_s).bi_valid + __local_len)
 
     }
+
 
 
     var __local_len_1: c_int = ((static_ltree[256].dl.len as c_int))
@@ -293,11 +312,14 @@ pub unsafe fn _tr_align(__param_s: *mut internal_state) -> Unit {
 
 
 
+
         var __ci_expr_old_3: c_ulong = (unsafe *__param_s).pending
 
         ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
 
         ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_3]) = (((((unsafe *__param_s).bi_buf as c_int) >> (8 as c_uint)) as u8)))
+
+
 
 
 
@@ -312,6 +334,7 @@ pub unsafe fn _tr_align(__param_s: *mut internal_state) -> Unit {
         ((unsafe *__param_s).bi_valid = (unsafe *__param_s).bi_valid + __local_len_1)
 
     }
+
 
 
     bi_flush(__param_s)
@@ -334,11 +357,14 @@ pub unsafe fn _tr_stored_block(__param_s: *mut internal_state, __param_buf: *mut
 
 
 
+
         var __ci_expr_old_1: c_ulong = (unsafe *__param_s).pending
 
         ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
 
         ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_1]) = (((((unsafe *__param_s).bi_buf as c_int) >> (8 as c_uint)) as u8)))
+
+
 
 
 
@@ -355,6 +381,7 @@ pub unsafe fn _tr_stored_block(__param_s: *mut internal_state, __param_buf: *mut
     }
 
 
+
     bi_windup(__param_s)
 
     var __ci_expr_old_2: c_ulong = (unsafe *__param_s).pending
@@ -362,6 +389,7 @@ pub unsafe fn _tr_stored_block(__param_s: *mut internal_state, __param_buf: *mut
     ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
 
     ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_2]) = ((((((__param_stored_len as c_ushort) as c_int) as c_int) & (255 as c_int)) as u8)))
+
 
 
 
@@ -374,6 +402,8 @@ pub unsafe fn _tr_stored_block(__param_s: *mut internal_state, __param_buf: *mut
 
 
 
+
+
     var __ci_expr_old_4: c_ulong = (unsafe *__param_s).pending
 
     ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
@@ -382,11 +412,14 @@ pub unsafe fn _tr_stored_block(__param_s: *mut internal_state, __param_buf: *mut
 
 
 
+
     var __ci_expr_old_5: c_ulong = (unsafe *__param_s).pending
 
     ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
 
     ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_5]) = ((((((~__param_stored_len) as c_ushort) as c_int) >> (8 as c_uint)) as u8)))
+
+
 
 
 
@@ -432,11 +465,14 @@ unsafe fn bi_flush(__param_s: *mut internal_state) -> Unit {
 
 
 
+
         var __ci_expr_old_1: c_ulong = (unsafe *__param_s).pending
 
         ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
 
         ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_1]) = (((((unsafe *__param_s).bi_buf as c_int) >> (8 as c_uint)) as u8)))
+
+
 
 
 
@@ -452,6 +488,7 @@ unsafe fn bi_flush(__param_s: *mut internal_state) -> Unit {
             ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
 
             ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_2]) = (((unsafe *__param_s).bi_buf as u8)))
+
 
 
 
@@ -474,11 +511,14 @@ unsafe fn bi_windup(__param_s: *mut internal_state) -> Unit {
 
 
 
+
         var __ci_expr_old_1: c_ulong = (unsafe *__param_s).pending
 
         ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
 
         ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_1]) = (((((unsafe *__param_s).bi_buf as c_int) >> (8 as c_uint)) as u8)))
+
+
 
 
 
@@ -490,6 +530,7 @@ unsafe fn bi_windup(__param_s: *mut internal_state) -> Unit {
             ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
 
             ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_2]) = (((unsafe *__param_s).bi_buf as u8)))
+
 
 
 
@@ -526,6 +567,8 @@ unsafe fn gen_codes(__param_tree: *mut ct_data_s, __param_max_code: c_int, __par
     }
 
 
+
+
     (__local_n = ((0 as c_int)))
 
     while ((if __local_n <= __param_max_code: 1 else: 0) != 0) {
@@ -543,6 +586,7 @@ unsafe fn gen_codes(__param_tree: *mut ct_data_s, __param_max_code: c_int, __par
         (__local_next_code[__local_len] = (__local_next_code[__local_len] +% 1))
 
         ((unsafe __param_tree[__local_n]).fc.code = ((bi_reverse((__ci_expr_old_0 as c_uint), __local_len) as c_ushort)))
+
 
 
 
@@ -760,6 +804,7 @@ unsafe fn gen_bitlen(__param_s: *mut internal_state, __param_desc: *mut tree_des
         return
     }
 
+
     loop {
         (__local_bits = (((__local_max_length - 1) as c_int)))
 
@@ -796,6 +841,7 @@ unsafe fn gen_bitlen(__param_s: *mut internal_state, __param_desc: *mut tree_des
             }
 
             if ((if (((unsafe __local_tree[__local_m]).dl.len as c_uint)) != ((__local_bits as c_uint)): 1 else: 0) != 0) {
+
                 ((unsafe *__param_s).opt_len = ((unsafe *__param_s).opt_len +% (((((__local_bits as c_ulong) as c_ulong) -% (((unsafe __local_tree[__local_m]).dl.len as c_int) as c_ulong)) as c_ulong) *% (((unsafe __local_tree[__local_m]).fc.freq as c_int) as c_ulong))))
 
                 ((unsafe __local_tree[__local_m]).dl.len = ((__local_bits as c_ushort)))
@@ -915,6 +961,7 @@ unsafe fn build_tree(__param_s: *mut internal_state, __param_desc: *mut tree_des
 
 
         pqdownheap(__param_s, __local_tree, (1 as c_int))
+
 
 
         (__local_m = (((unsafe *__param_s).heap[1] as c_int)))
@@ -1136,11 +1183,14 @@ unsafe fn send_tree(__param_s: *mut internal_state, __param_tree: *mut ct_data_s
 
 
 
+
                     var __ci_expr_old_2: c_ulong = (unsafe *__param_s).pending
 
                     ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
 
                     ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_2]) = (((((unsafe *__param_s).bi_buf as c_int) >> (8 as c_uint)) as u8)))
+
+
 
 
 
@@ -1155,6 +1205,7 @@ unsafe fn send_tree(__param_s: *mut internal_state, __param_tree: *mut ct_data_s
                     ((unsafe *__param_s).bi_valid = (unsafe *__param_s).bi_valid + __local_len)
 
                 }
+
 
 
                 (__local_count = __local_count - 1)
@@ -1181,11 +1232,14 @@ unsafe fn send_tree(__param_s: *mut internal_state, __param_tree: *mut ct_data_s
 
 
 
+
                         var __ci_expr_old_4: c_ulong = (unsafe *__param_s).pending
 
                         ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
 
                         ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_4]) = (((((unsafe *__param_s).bi_buf as c_int) >> (8 as c_uint)) as u8)))
+
+
 
 
 
@@ -1202,9 +1256,11 @@ unsafe fn send_tree(__param_s: *mut internal_state, __param_tree: *mut ct_data_s
                     }
 
 
+
                     (__local_count = __local_count - 1)
 
                 }
+
 
                 var __local_len_2: c_int = (((unsafe *__param_s).bl_tree[16].dl.len as c_int))
 
@@ -1221,11 +1277,14 @@ unsafe fn send_tree(__param_s: *mut internal_state, __param_tree: *mut ct_data_s
 
 
 
+
                     var __ci_expr_old_6: c_ulong = (unsafe *__param_s).pending
 
                     ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
 
                     ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_6]) = (((((unsafe *__param_s).bi_buf as c_int) >> (8 as c_uint)) as u8)))
+
+
 
 
 
@@ -1240,6 +1299,7 @@ unsafe fn send_tree(__param_s: *mut internal_state, __param_tree: *mut ct_data_s
                     ((unsafe *__param_s).bi_valid = (unsafe *__param_s).bi_valid + __local_len_2)
 
                 }
+
 
 
                 var __local_len_3: c_int = ((2 as c_int))
@@ -1257,11 +1317,14 @@ unsafe fn send_tree(__param_s: *mut internal_state, __param_tree: *mut ct_data_s
 
 
 
+
                     var __ci_expr_old_8: c_ulong = (unsafe *__param_s).pending
 
                     ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
 
                     ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_8]) = (((((unsafe *__param_s).bi_buf as c_int) >> (8 as c_uint)) as u8)))
+
+
 
 
 
@@ -1276,6 +1339,7 @@ unsafe fn send_tree(__param_s: *mut internal_state, __param_tree: *mut ct_data_s
                     ((unsafe *__param_s).bi_valid = (unsafe *__param_s).bi_valid + __local_len_3)
 
                 }
+
 
 
             } else {
@@ -1295,11 +1359,14 @@ unsafe fn send_tree(__param_s: *mut internal_state, __param_tree: *mut ct_data_s
 
 
 
+
                         var __ci_expr_old_10: c_ulong = (unsafe *__param_s).pending
 
                         ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
 
                         ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_10]) = (((((unsafe *__param_s).bi_buf as c_int) >> (8 as c_uint)) as u8)))
+
+
 
 
 
@@ -1314,6 +1381,7 @@ unsafe fn send_tree(__param_s: *mut internal_state, __param_tree: *mut ct_data_s
                         ((unsafe *__param_s).bi_valid = (unsafe *__param_s).bi_valid + __local_len_4)
 
                     }
+
 
 
                     var __local_len_5: c_int = ((3 as c_int))
@@ -1331,11 +1399,14 @@ unsafe fn send_tree(__param_s: *mut internal_state, __param_tree: *mut ct_data_s
 
 
 
+
                         var __ci_expr_old_12: c_ulong = (unsafe *__param_s).pending
 
                         ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
 
                         ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_12]) = (((((unsafe *__param_s).bi_buf as c_int) >> (8 as c_uint)) as u8)))
+
+
 
 
 
@@ -1350,6 +1421,7 @@ unsafe fn send_tree(__param_s: *mut internal_state, __param_tree: *mut ct_data_s
                         ((unsafe *__param_s).bi_valid = (unsafe *__param_s).bi_valid + __local_len_5)
 
                     }
+
 
 
                 } else {
@@ -1368,11 +1440,14 @@ unsafe fn send_tree(__param_s: *mut internal_state, __param_tree: *mut ct_data_s
 
 
 
+
                         var __ci_expr_old_14: c_ulong = (unsafe *__param_s).pending
 
                         ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
 
                         ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_14]) = (((((unsafe *__param_s).bi_buf as c_int) >> (8 as c_uint)) as u8)))
+
+
 
 
 
@@ -1387,6 +1462,7 @@ unsafe fn send_tree(__param_s: *mut internal_state, __param_tree: *mut ct_data_s
                         ((unsafe *__param_s).bi_valid = (unsafe *__param_s).bi_valid + __local_len_6)
 
                     }
+
 
 
                     var __local_len_7: c_int = ((7 as c_int))
@@ -1404,11 +1480,14 @@ unsafe fn send_tree(__param_s: *mut internal_state, __param_tree: *mut ct_data_s
 
 
 
+
                         var __ci_expr_old_16: c_ulong = (unsafe *__param_s).pending
 
                         ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
 
                         ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_16]) = (((((unsafe *__param_s).bi_buf as c_int) >> (8 as c_uint)) as u8)))
+
+
 
 
 
@@ -1423,6 +1502,7 @@ unsafe fn send_tree(__param_s: *mut internal_state, __param_tree: *mut ct_data_s
                         ((unsafe *__param_s).bi_valid = (unsafe *__param_s).bi_valid + __local_len_7)
 
                     }
+
 
 
                 }
@@ -1488,12 +1568,16 @@ unsafe fn build_bl_tree(__param_s: *mut internal_state) -> c_int {
 
     ((unsafe *__param_s).opt_len = ((unsafe *__param_s).opt_len +% ((((((((3 as c_ulong) *% ((((__local_max_blindex as c_ulong) as c_ulong) +% (1 as c_ulong)) as c_ulong)) as c_ulong) +% (5 as c_ulong)) as c_ulong) +% (5 as c_ulong)) as c_ulong) +% (4 as c_ulong))))
 
+
     return __local_max_blindex
 
 }
 
 unsafe fn send_all_trees(__param_s: *mut internal_state, __param_lcodes: c_int, __param_dcodes: c_int, __param_blcodes: c_int) -> Unit {
     var __local_rank: c_int
+
+
+
 
     var __local_len: c_int = ((5 as c_int))
 
@@ -1510,11 +1594,14 @@ unsafe fn send_all_trees(__param_s: *mut internal_state, __param_lcodes: c_int, 
 
 
 
+
         var __ci_expr_old_1: c_ulong = (unsafe *__param_s).pending
 
         ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
 
         ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_1]) = (((((unsafe *__param_s).bi_buf as c_int) >> (8 as c_uint)) as u8)))
+
+
 
 
 
@@ -1529,6 +1616,7 @@ unsafe fn send_all_trees(__param_s: *mut internal_state, __param_lcodes: c_int, 
         ((unsafe *__param_s).bi_valid = (unsafe *__param_s).bi_valid + __local_len)
 
     }
+
 
 
     var __local_len_1: c_int = ((5 as c_int))
@@ -1546,11 +1634,14 @@ unsafe fn send_all_trees(__param_s: *mut internal_state, __param_lcodes: c_int, 
 
 
 
+
         var __ci_expr_old_3: c_ulong = (unsafe *__param_s).pending
 
         ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
 
         ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_3]) = (((((unsafe *__param_s).bi_buf as c_int) >> (8 as c_uint)) as u8)))
+
+
 
 
 
@@ -1565,6 +1656,7 @@ unsafe fn send_all_trees(__param_s: *mut internal_state, __param_lcodes: c_int, 
         ((unsafe *__param_s).bi_valid = (unsafe *__param_s).bi_valid + __local_len_1)
 
     }
+
 
 
     var __local_len_2: c_int = ((4 as c_int))
@@ -1582,11 +1674,14 @@ unsafe fn send_all_trees(__param_s: *mut internal_state, __param_lcodes: c_int, 
 
 
 
+
         var __ci_expr_old_5: c_ulong = (unsafe *__param_s).pending
 
         ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
 
         ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_5]) = (((((unsafe *__param_s).bi_buf as c_int) >> (8 as c_uint)) as u8)))
+
+
 
 
 
@@ -1603,9 +1698,11 @@ unsafe fn send_all_trees(__param_s: *mut internal_state, __param_lcodes: c_int, 
     }
 
 
+
     (__local_rank = ((0 as c_int)))
 
     while ((if __local_rank < __param_blcodes: 1 else: 0) != 0) {
+
         var __local_len_3: c_int = ((3 as c_int))
 
         if ((if (unsafe *__param_s).bi_valid > (16 - __local_len_3): 1 else: 0) != 0) {
@@ -1621,11 +1718,14 @@ unsafe fn send_all_trees(__param_s: *mut internal_state, __param_lcodes: c_int, 
 
 
 
+
             var __ci_expr_old_7: c_ulong = (unsafe *__param_s).pending
 
             ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
 
             ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_7]) = (((((unsafe *__param_s).bi_buf as c_int) >> (8 as c_uint)) as u8)))
+
+
 
 
 
@@ -1643,14 +1743,18 @@ unsafe fn send_all_trees(__param_s: *mut internal_state, __param_lcodes: c_int, 
 
 
 
+
         (__local_rank = __local_rank + 1)
 
     }
 
 
+
     send_tree(__param_s, (&(unsafe *__param_s).dyn_ltree[0] as *mut ct_data_s), ((__param_lcodes - 1) as c_int))
 
+
     send_tree(__param_s, (&(unsafe *__param_s).dyn_dtree[0] as *mut ct_data_s), ((__param_dcodes - 1) as c_int))
+
 
 }
 
@@ -1704,11 +1808,14 @@ unsafe fn compress_block(__param_s: *mut internal_state, __param_ltree: *const c
 
 
 
+
                     var __ci_expr_old_4: c_ulong = (unsafe *__param_s).pending
 
                     ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
 
                     ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_4]) = (((((unsafe *__param_s).bi_buf as c_int) >> (8 as c_uint)) as u8)))
+
+
 
 
 
@@ -1723,6 +1830,8 @@ unsafe fn compress_block(__param_s: *mut internal_state, __param_ltree: *const c
                     ((unsafe *__param_s).bi_valid = (unsafe *__param_s).bi_valid + __local_len)
 
                 }
+
+
 
 
             } else {
@@ -1743,11 +1852,14 @@ unsafe fn compress_block(__param_s: *mut internal_state, __param_ltree: *const c
 
 
 
+
                     var __ci_expr_old_6: c_ulong = (unsafe *__param_s).pending
 
                     ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
 
                     ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_6]) = (((((unsafe *__param_s).bi_buf as c_int) >> (8 as c_uint)) as u8)))
+
+
 
 
 
@@ -1762,6 +1874,7 @@ unsafe fn compress_block(__param_s: *mut internal_state, __param_ltree: *const c
                     ((unsafe *__param_s).bi_valid = (unsafe *__param_s).bi_valid + __local_len_1)
 
                 }
+
 
 
                 (__local_extra = ((extra_lbits[__local_code] as c_int)))
@@ -1784,11 +1897,14 @@ unsafe fn compress_block(__param_s: *mut internal_state, __param_ltree: *const c
 
 
 
+
                         var __ci_expr_old_8: c_ulong = (unsafe *__param_s).pending
 
                         ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
 
                         ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_8]) = (((((unsafe *__param_s).bi_buf as c_int) >> (8 as c_uint)) as u8)))
+
+
 
 
 
@@ -1803,6 +1919,7 @@ unsafe fn compress_block(__param_s: *mut internal_state, __param_ltree: *const c
                         ((unsafe *__param_s).bi_valid = (unsafe *__param_s).bi_valid + __local_len_2)
 
                     }
+
 
 
                 }
@@ -1820,6 +1937,7 @@ unsafe fn compress_block(__param_s: *mut internal_state, __param_ltree: *const c
                 (__local_code = ((__ci_expr_ternary_9 as c_uint)))
 
 
+
                 var __local_len_3: c_int = (((unsafe __param_dtree[__local_code]).dl.len as c_int))
 
                 if ((if (unsafe *__param_s).bi_valid > (16 - __local_len_3): 1 else: 0) != 0) {
@@ -1835,11 +1953,14 @@ unsafe fn compress_block(__param_s: *mut internal_state, __param_ltree: *const c
 
 
 
+
                     var __ci_expr_old_11: c_ulong = (unsafe *__param_s).pending
 
                     ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
 
                     ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_11]) = (((((unsafe *__param_s).bi_buf as c_int) >> (8 as c_uint)) as u8)))
+
+
 
 
 
@@ -1854,6 +1975,7 @@ unsafe fn compress_block(__param_s: *mut internal_state, __param_ltree: *const c
                     ((unsafe *__param_s).bi_valid = (unsafe *__param_s).bi_valid + __local_len_3)
 
                 }
+
 
 
                 (__local_extra = ((extra_dbits[__local_code] as c_int)))
@@ -1876,11 +1998,14 @@ unsafe fn compress_block(__param_s: *mut internal_state, __param_ltree: *const c
 
 
 
+
                         var __ci_expr_old_13: c_ulong = (unsafe *__param_s).pending
 
                         ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
 
                         ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_13]) = (((((unsafe *__param_s).bi_buf as c_int) >> (8 as c_uint)) as u8)))
+
+
 
 
 
@@ -1897,9 +2022,11 @@ unsafe fn compress_block(__param_s: *mut internal_state, __param_ltree: *const c
                     }
 
 
+
                 }
 
             }
+
 
             if not (((if __local_sx < (unsafe *__param_s).sym_next: 1 else: 0) != 0)) {
                 break
@@ -1922,11 +2049,14 @@ unsafe fn compress_block(__param_s: *mut internal_state, __param_ltree: *const c
 
 
 
+
         var __ci_expr_old_15: c_ulong = (unsafe *__param_s).pending
 
         ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
 
         ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_15]) = (((((unsafe *__param_s).bi_buf as c_int) >> (8 as c_uint)) as u8)))
+
+
 
 
 
@@ -1941,6 +2071,7 @@ unsafe fn compress_block(__param_s: *mut internal_state, __param_ltree: *const c
         ((unsafe *__param_s).bi_valid = (unsafe *__param_s).bi_valid + __local_len_5)
 
     }
+
 
 
 }
@@ -2009,14 +2140,14 @@ unsafe fn detect_data_type(__param_s: *mut internal_state) -> c_int {
 
 }
 
-let extra_lbits: [29]c_int = [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 0]
-let extra_dbits: [30]c_int = [0, 0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13]
-let extra_blbits: [19]c_int = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 3, 7]
-let bl_order: [19]u8 = [16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15]
+let extra_lbits: [29]c_int = [(0 as c_int), (0 as c_int), (0 as c_int), (0 as c_int), (0 as c_int), (0 as c_int), (0 as c_int), (0 as c_int), (1 as c_int), (1 as c_int), (1 as c_int), (1 as c_int), (2 as c_int), (2 as c_int), (2 as c_int), (2 as c_int), (3 as c_int), (3 as c_int), (3 as c_int), (3 as c_int), (4 as c_int), (4 as c_int), (4 as c_int), (4 as c_int), (5 as c_int), (5 as c_int), (5 as c_int), (5 as c_int), (0 as c_int)]
+let extra_dbits: [30]c_int = [(0 as c_int), (0 as c_int), (0 as c_int), (0 as c_int), (1 as c_int), (1 as c_int), (2 as c_int), (2 as c_int), (3 as c_int), (3 as c_int), (4 as c_int), (4 as c_int), (5 as c_int), (5 as c_int), (6 as c_int), (6 as c_int), (7 as c_int), (7 as c_int), (8 as c_int), (8 as c_int), (9 as c_int), (9 as c_int), (10 as c_int), (10 as c_int), (11 as c_int), (11 as c_int), (12 as c_int), (12 as c_int), (13 as c_int), (13 as c_int)]
+let extra_blbits: [19]c_int = [(0 as c_int), (0 as c_int), (0 as c_int), (0 as c_int), (0 as c_int), (0 as c_int), (0 as c_int), (0 as c_int), (0 as c_int), (0 as c_int), (0 as c_int), (0 as c_int), (0 as c_int), (0 as c_int), (0 as c_int), (0 as c_int), (2 as c_int), (3 as c_int), (7 as c_int)]
+let bl_order: [19]u8 = [(16 as u8), (17 as u8), (18 as u8), (0 as u8), (8 as u8), (7 as u8), (9 as u8), (6 as u8), (10 as u8), (5 as u8), (11 as u8), (4 as u8), (12 as u8), (3 as u8), (13 as u8), (2 as u8), (14 as u8), (1 as u8), (15 as u8)]
 let static_ltree: [288]ct_data_s = [ct_data_s { fc: ct_data_s_fc { freq: 12 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 140 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 76 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 204 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 44 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 172 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 108 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 236 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 28 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 156 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 92 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 220 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 60 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 188 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 124 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 252 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 2 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 130 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 66 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 194 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 34 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 162 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 98 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 226 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 18 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 146 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 82 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 210 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 50 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 178 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 114 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 242 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 10 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 138 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 74 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 202 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 42 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 170 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 106 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 234 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 26 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 154 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 90 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 218 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 58 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 186 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 122 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 250 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 6 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 134 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 70 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 198 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 38 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 166 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 102 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 230 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 22 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 150 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 86 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 214 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 54 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 182 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 118 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 246 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 14 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 142 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 78 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 206 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 46 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 174 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 110 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 238 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 30 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 158 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 94 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 222 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 62 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 190 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 126 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 254 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 1 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 129 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 65 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 193 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 33 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 161 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 97 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 225 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 17 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 145 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 81 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 209 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 49 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 177 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 113 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 241 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 9 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 137 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 73 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 201 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 41 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 169 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 105 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 233 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 25 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 153 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 89 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 217 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 57 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 185 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 121 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 249 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 5 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 133 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 69 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 197 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 37 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 165 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 101 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 229 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 21 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 149 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 85 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 213 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 53 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 181 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 117 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 245 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 13 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 141 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 77 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 205 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 45 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 173 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 109 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 237 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 29 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 157 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 93 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 221 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 61 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 189 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 125 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 253 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 19 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 275 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 147 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 403 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 83 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 339 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 211 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 467 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 51 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 307 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 179 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 435 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 115 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 371 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 243 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 499 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 11 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 267 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 139 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 395 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 75 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 331 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 203 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 459 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 43 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 299 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 171 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 427 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 107 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 363 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 235 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 491 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 27 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 283 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 155 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 411 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 91 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 347 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 219 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 475 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 59 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 315 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 187 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 443 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 123 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 379 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 251 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 507 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 7 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 263 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 135 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 391 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 71 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 327 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 199 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 455 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 39 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 295 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 167 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 423 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 103 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 359 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 231 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 487 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 23 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 279 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 151 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 407 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 87 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 343 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 215 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 471 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 55 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 311 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 183 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 439 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 119 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 375 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 247 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 503 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 15 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 271 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 143 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 399 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 79 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 335 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 207 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 463 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 47 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 303 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 175 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 431 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 111 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 367 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 239 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 495 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 31 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 287 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 159 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 415 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 95 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 351 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 223 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 479 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 63 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 319 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 191 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 447 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 127 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 383 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 255 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 511 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 0 }, dl: ct_data_s_dl { dad: 7 } }, ct_data_s { fc: ct_data_s_fc { freq: 64 }, dl: ct_data_s_dl { dad: 7 } }, ct_data_s { fc: ct_data_s_fc { freq: 32 }, dl: ct_data_s_dl { dad: 7 } }, ct_data_s { fc: ct_data_s_fc { freq: 96 }, dl: ct_data_s_dl { dad: 7 } }, ct_data_s { fc: ct_data_s_fc { freq: 16 }, dl: ct_data_s_dl { dad: 7 } }, ct_data_s { fc: ct_data_s_fc { freq: 80 }, dl: ct_data_s_dl { dad: 7 } }, ct_data_s { fc: ct_data_s_fc { freq: 48 }, dl: ct_data_s_dl { dad: 7 } }, ct_data_s { fc: ct_data_s_fc { freq: 112 }, dl: ct_data_s_dl { dad: 7 } }, ct_data_s { fc: ct_data_s_fc { freq: 8 }, dl: ct_data_s_dl { dad: 7 } }, ct_data_s { fc: ct_data_s_fc { freq: 72 }, dl: ct_data_s_dl { dad: 7 } }, ct_data_s { fc: ct_data_s_fc { freq: 40 }, dl: ct_data_s_dl { dad: 7 } }, ct_data_s { fc: ct_data_s_fc { freq: 104 }, dl: ct_data_s_dl { dad: 7 } }, ct_data_s { fc: ct_data_s_fc { freq: 24 }, dl: ct_data_s_dl { dad: 7 } }, ct_data_s { fc: ct_data_s_fc { freq: 88 }, dl: ct_data_s_dl { dad: 7 } }, ct_data_s { fc: ct_data_s_fc { freq: 56 }, dl: ct_data_s_dl { dad: 7 } }, ct_data_s { fc: ct_data_s_fc { freq: 120 }, dl: ct_data_s_dl { dad: 7 } }, ct_data_s { fc: ct_data_s_fc { freq: 4 }, dl: ct_data_s_dl { dad: 7 } }, ct_data_s { fc: ct_data_s_fc { freq: 68 }, dl: ct_data_s_dl { dad: 7 } }, ct_data_s { fc: ct_data_s_fc { freq: 36 }, dl: ct_data_s_dl { dad: 7 } }, ct_data_s { fc: ct_data_s_fc { freq: 100 }, dl: ct_data_s_dl { dad: 7 } }, ct_data_s { fc: ct_data_s_fc { freq: 20 }, dl: ct_data_s_dl { dad: 7 } }, ct_data_s { fc: ct_data_s_fc { freq: 84 }, dl: ct_data_s_dl { dad: 7 } }, ct_data_s { fc: ct_data_s_fc { freq: 52 }, dl: ct_data_s_dl { dad: 7 } }, ct_data_s { fc: ct_data_s_fc { freq: 116 }, dl: ct_data_s_dl { dad: 7 } }, ct_data_s { fc: ct_data_s_fc { freq: 3 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 131 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 67 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 195 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 35 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 163 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 99 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 227 }, dl: ct_data_s_dl { dad: 8 } }]
 let static_dtree: [30]ct_data_s = [ct_data_s { fc: ct_data_s_fc { freq: 0 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 16 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 8 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 24 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 4 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 20 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 12 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 28 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 2 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 18 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 10 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 26 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 6 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 22 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 14 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 30 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 1 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 17 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 9 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 25 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 5 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 21 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 13 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 29 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 3 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 19 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 11 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 27 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 7 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 23 }, dl: ct_data_s_dl { dad: 5 } }]
-let base_length: [29]c_int = [0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 12, 14, 16, 20, 24, 28, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 0]
-let base_dist: [30]c_int = [0, 1, 2, 3, 4, 6, 8, 12, 16, 24, 32, 48, 64, 96, 128, 192, 256, 384, 512, 768, 1024, 1536, 2048, 3072, 4096, 6144, 8192, 12288, 16384, 24576]
+let base_length: [29]c_int = [(0 as c_int), (1 as c_int), (2 as c_int), (3 as c_int), (4 as c_int), (5 as c_int), (6 as c_int), (7 as c_int), (8 as c_int), (10 as c_int), (12 as c_int), (14 as c_int), (16 as c_int), (20 as c_int), (24 as c_int), (28 as c_int), (32 as c_int), (40 as c_int), (48 as c_int), (56 as c_int), (64 as c_int), (80 as c_int), (96 as c_int), (112 as c_int), (128 as c_int), (160 as c_int), (192 as c_int), (224 as c_int), (0 as c_int)]
+let base_dist: [30]c_int = [(0 as c_int), (1 as c_int), (2 as c_int), (3 as c_int), (4 as c_int), (6 as c_int), (8 as c_int), (12 as c_int), (16 as c_int), (24 as c_int), (32 as c_int), (48 as c_int), (64 as c_int), (96 as c_int), (128 as c_int), (192 as c_int), (256 as c_int), (384 as c_int), (512 as c_int), (768 as c_int), (1024 as c_int), (1536 as c_int), (2048 as c_int), (3072 as c_int), (4096 as c_int), (6144 as c_int), (8192 as c_int), (12288 as c_int), (16384 as c_int), (24576 as c_int)]
 let static_l_desc: static_tree_desc_s = static_tree_desc_s { static_tree: (&raw const static_ltree[0] as *const ct_data_s), extra_bits: (&raw const extra_lbits[0] as *const c_int), extra_base: (256 + 1), elems: ((256 + 1) + 29), max_length: 15 }
 let static_d_desc: static_tree_desc_s = static_tree_desc_s { static_tree: (&raw const static_dtree[0] as *const ct_data_s), extra_bits: (&raw const extra_dbits[0] as *const c_int), extra_base: 0, elems: 30, max_length: 15 }
 let static_bl_desc: static_tree_desc_s = static_tree_desc_s { static_tree: null, extra_bits: (&raw const extra_blbits[0] as *const c_int), extra_base: 0, elems: 19, max_length: 7 }

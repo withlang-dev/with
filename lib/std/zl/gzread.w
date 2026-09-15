@@ -68,7 +68,7 @@ pub unsafe fn gzread(__param_file: *mut gzFile_s, __param_buf: *mut c_void, __pa
 
 
         if (__local_state.again != 0) {
-            gz_error(__local_state, (-1 as c_int), (strerror((unsafe *(__error()))) as *const i8))
+            gz_error(__local_state, (-1 as c_int), (strerror((unsafe *(errno_ptr()))) as *const i8))
 
             return -1
 
@@ -565,7 +565,7 @@ unsafe fn gz_load(__param_state: *mut gz_state, __param_buf: *mut u8, __param_le
 
     ((unsafe *__param_state).again = ((0 as c_int)))
 
-    ((unsafe *(__error())) = ((0 as c_int)))
+    ((unsafe *(errno_ptr())) = ((0 as c_int)))
 
     ((unsafe *__param_have) = ((0 as c_uint)))
 
@@ -592,10 +592,10 @@ unsafe fn gz_load(__param_state: *mut gz_state, __param_buf: *mut u8, __param_le
     if ((if __local_ret < 0: 1 else: 0) != 0) {
         var __ci_expr_logic_0: c_int
 
-        if ((if (unsafe *(__error())) == 35: 1 else: 0) != 0) {
+        if ((if (unsafe *(errno_ptr())) == 35: 1 else: 0) != 0) {
             (__ci_expr_logic_0 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_0 = (if (if (unsafe *(__error())) == 35: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_0 = (if (if (unsafe *(errno_ptr())) == 35: 1 else: 0) != 0: 1 else: 0))
         }
 
         if (__ci_expr_logic_0 != 0) {
@@ -608,7 +608,7 @@ unsafe fn gz_load(__param_state: *mut gz_state, __param_buf: *mut u8, __param_le
         }
 
 
-        gz_error(__param_state, (-1 as c_int), (strerror((unsafe *(__error()))) as *const i8))
+        gz_error(__param_state, (-1 as c_int), (strerror((unsafe *(errno_ptr()))) as *const i8))
 
         return -1
 

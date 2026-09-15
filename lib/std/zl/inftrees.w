@@ -57,13 +57,13 @@ pub unsafe fn inflate_table(__param_type_: i32, __param_lens: *mut c_ushort, __p
 
     var __local_offs: [16]c_ushort
 
-    var __local_lbase: [31]c_ushort = [3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 15, 17, 19, 23, 27, 31, 35, 43, 51, 59, 67, 83, 99, 115, 131, 163, 195, 227, 258, 0, 0]
+    var __local_lbase: [31]c_ushort = [(3 as c_ushort), (4 as c_ushort), (5 as c_ushort), (6 as c_ushort), (7 as c_ushort), (8 as c_ushort), (9 as c_ushort), (10 as c_ushort), (11 as c_ushort), (13 as c_ushort), (15 as c_ushort), (17 as c_ushort), (19 as c_ushort), (23 as c_ushort), (27 as c_ushort), (31 as c_ushort), (35 as c_ushort), (43 as c_ushort), (51 as c_ushort), (59 as c_ushort), (67 as c_ushort), (83 as c_ushort), (99 as c_ushort), (115 as c_ushort), (131 as c_ushort), (163 as c_ushort), (195 as c_ushort), (227 as c_ushort), (258 as c_ushort), (0 as c_ushort), (0 as c_ushort)]
 
-    var __local_lext: [31]c_ushort = [16, 16, 16, 16, 16, 16, 16, 16, 17, 17, 17, 17, 18, 18, 18, 18, 19, 19, 19, 19, 20, 20, 20, 20, 21, 21, 21, 21, 16, 199, 75]
+    var __local_lext: [31]c_ushort = [(16 as c_ushort), (16 as c_ushort), (16 as c_ushort), (16 as c_ushort), (16 as c_ushort), (16 as c_ushort), (16 as c_ushort), (16 as c_ushort), (17 as c_ushort), (17 as c_ushort), (17 as c_ushort), (17 as c_ushort), (18 as c_ushort), (18 as c_ushort), (18 as c_ushort), (18 as c_ushort), (19 as c_ushort), (19 as c_ushort), (19 as c_ushort), (19 as c_ushort), (20 as c_ushort), (20 as c_ushort), (20 as c_ushort), (20 as c_ushort), (21 as c_ushort), (21 as c_ushort), (21 as c_ushort), (21 as c_ushort), (16 as c_ushort), (199 as c_ushort), (75 as c_ushort)]
 
-    var __local_dbase: [32]c_ushort = [1, 2, 3, 4, 5, 7, 9, 13, 17, 25, 33, 49, 65, 97, 129, 193, 257, 385, 513, 769, 1025, 1537, 2049, 3073, 4097, 6145, 8193, 12289, 16385, 24577, 0, 0]
+    var __local_dbase: [32]c_ushort = [(1 as c_ushort), (2 as c_ushort), (3 as c_ushort), (4 as c_ushort), (5 as c_ushort), (7 as c_ushort), (9 as c_ushort), (13 as c_ushort), (17 as c_ushort), (25 as c_ushort), (33 as c_ushort), (49 as c_ushort), (65 as c_ushort), (97 as c_ushort), (129 as c_ushort), (193 as c_ushort), (257 as c_ushort), (385 as c_ushort), (513 as c_ushort), (769 as c_ushort), (1025 as c_ushort), (1537 as c_ushort), (2049 as c_ushort), (3073 as c_ushort), (4097 as c_ushort), (6145 as c_ushort), (8193 as c_ushort), (12289 as c_ushort), (16385 as c_ushort), (24577 as c_ushort), (0 as c_ushort), (0 as c_ushort)]
 
-    var __local_dext: [32]c_ushort = [16, 16, 16, 16, 17, 17, 18, 18, 19, 19, 20, 20, 21, 21, 22, 22, 23, 23, 24, 24, 25, 25, 26, 26, 27, 27, 28, 28, 29, 29, 64, 64]
+    var __local_dext: [32]c_ushort = [(16 as c_ushort), (16 as c_ushort), (16 as c_ushort), (16 as c_ushort), (17 as c_ushort), (17 as c_ushort), (18 as c_ushort), (18 as c_ushort), (19 as c_ushort), (19 as c_ushort), (20 as c_ushort), (20 as c_ushort), (21 as c_ushort), (21 as c_ushort), (22 as c_ushort), (22 as c_ushort), (23 as c_ushort), (23 as c_ushort), (24 as c_ushort), (24 as c_ushort), (25 as c_ushort), (25 as c_ushort), (26 as c_ushort), (26 as c_ushort), (27 as c_ushort), (27 as c_ushort), (28 as c_ushort), (28 as c_ushort), (29 as c_ushort), (29 as c_ushort), (64 as c_ushort), (64 as c_ushort)]
 
     (__local_len = ((0 as c_uint)))
 

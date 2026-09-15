@@ -3660,11 +3660,11 @@ fn expand_input_buffers() -> Unit {
     }
 
     if (__ci_expr_logic_0 != 0) {
-        unsafe { colour_begin(31, __stderrp) }
+        unsafe { colour_begin(31, libc_stderr()) }
 
-        fprintf(__stderrp, c"pcre2test: malloc(%zu) failed\n".ptr, __local_new_pbuffer8_size)
+        fprintf(libc_stderr(), c"pcre2test: malloc(%zu) failed\n".ptr, __local_new_pbuffer8_size)
 
-        unsafe { colour_end(__stderrp) }
+        unsafe { colour_end(libc_stderr()) }
 
 
         exit((1 as c_int))
@@ -3709,11 +3709,11 @@ unsafe fn extend_inputline(__param_f: *mut c_void, __param_start: *mut u8, __par
             }
 
             if (isatty((fileno(__param_f) as c_int)) != 0) {
-                colour_begin(34, __stdoutp)
+                colour_begin(34, libc_stdout())
 
-                fprintf(__stdoutp, c"%s".ptr, __param_prompt)
+                fprintf(libc_stdout(), c"%s".ptr, __param_prompt)
 
-                colour_end(__stdoutp)
+                colour_end(libc_stdout())
 
             }
 
@@ -5389,7 +5389,7 @@ unsafe fn open_file(__param_buffptr: *mut u8, __param_mode: *const i8, __param_f
     if ((if (unsafe *__param_fptr) == null: 1 else: 0) != 0) {
         colour_begin(31, outfile)
 
-        fprintf(outfile, c"** Failed to open \"%s\": %s\n".ptr, __local_filename, strerror((unsafe *(__error()))))
+        fprintf(outfile, c"** Failed to open \"%s\": %s\n".ptr, __local_filename, strerror((unsafe *(errno_ptr()))))
 
         colour_end(outfile)
 
@@ -6158,11 +6158,11 @@ unsafe fn config_str_8(__param_what: c_uint, __param_where_: *mut i8) -> Unit {
     }
 
     if (__ci_expr_logic_1 != 0) {
-        colour_begin(31, __stderrp)
+        colour_begin(31, libc_stderr())
 
-        fprintf(__stderrp, c"pcre2test: Error in pcre2_config(%d)\n".ptr, __param_what)
+        fprintf(libc_stderr(), c"pcre2test: Error in pcre2_config(%d)\n".ptr, __param_what)
 
-        colour_end(__stderrp)
+        colour_end(libc_stderr())
 
 
         exit((1 as c_int))
@@ -11989,7 +11989,7 @@ unsafe fn check_match_limit_8(__param_pp: *const u8, __param_ulen: c_ulong, __pa
         if ((if __param_errnumber == -63: 1 else: 0) != 0) {
             pcre2_set_heap_limit_8(dat_context_8, __local_mid)
 
-            (unsafe *(&raw const (unsafe *match_data_8).memctl as *const pcre2_memctl)).free((unsafe *match_data_8).heapframes, (unsafe *(&raw const (unsafe *match_data_8).memctl as *const pcre2_memctl)).memory_data)
+            (unsafe *(&raw const (unsafe *match_data_8).memctl as *const pcre2_memctl)).free(((unsafe *match_data_8).heapframes as *mut c_void), (unsafe *(&raw const (unsafe *match_data_8).memctl as *const pcre2_memctl)).memory_data)
 
             ((unsafe *match_data_8).heapframes = ((null as *mut heapframe)))
 
@@ -13520,6 +13520,7 @@ unsafe fn copy_substitute_string_8(__param_utf: c_int, __param_input: *mut u8, _
                 }
 
 
+
             }
 
             (__local_output = __local_output + ((ord_to_utf8(__local_c, __local_output) as isize) as usize))
@@ -14195,9 +14196,9 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_31 {
-        unsafe { colour_begin(31, __stderrp) }
-        fprintf(__stderrp, c"pcre2test: realloc(%zu) failed\n".ptr, dbuffer_size)
-        unsafe { colour_end(__stderrp) }
+        unsafe { colour_begin(31, libc_stderr()) }
+        fprintf(libc_stderr(), c"pcre2test: realloc(%zu) failed\n".ptr, dbuffer_size)
+        unsafe { colour_end(libc_stderr()) }
         exit((1 as c_int))
     }
 
@@ -14400,9 +14401,9 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_56 {
-        unsafe { colour_begin(31, __stderrp) }
-        fprintf(__stderrp, c"pcre2test: realloc(%zu) failed\n".ptr, dbuffer_size)
-        unsafe { colour_end(__stderrp) }
+        unsafe { colour_begin(31, libc_stderr()) }
+        fprintf(libc_stderr(), c"pcre2test: realloc(%zu) failed\n".ptr, dbuffer_size)
+        unsafe { colour_end(libc_stderr()) }
         exit((1 as c_int))
     }
 
@@ -14930,11 +14931,11 @@ fn process_data_8() -> c_int {
 
     '__ci_bb_129 {
         (__local_p__goto_3840_10 = __local_p__goto_3840_10 + ((3 as isize) as usize))
-        ((unsafe *(__error())) = ((0 as c_int)))
+        ((unsafe *(errno_ptr())) = ((0 as c_int)))
         (__local_uli__goto_4162_21 = ((strtoul(((__local_p__goto_3840_10 as *const c_char) as *const i8), ((&raw mut __local_endptr__goto_4161_13 as *mut *mut c_char) as *mut *mut i8), (16 as c_int)) as c_ulong)))
         (__ci_expr_logic_33 = 0)
         (__ci_expr_logic_32 = 0)
-        if ((if (unsafe *(__error())) == 0: 1 else: 0) != 0) {
+        if ((if (unsafe *(errno_ptr())) == 0: 1 else: 0) != 0) {
             (__ci_expr_logic_32 = (if (if (unsafe *__local_endptr__goto_4161_13) == 125: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_32 != 0) {
@@ -18733,12 +18734,12 @@ fn unittest_8() -> Unit {
         (__local_test_con_context_copy__goto_5636_50 = ((null as *mut pcre2_real_convert_context_8)))
         (__local_test_match_data__goto_5637_19 = ((null as *mut pcre2_real_match_data_8)))
         (__local_test_compiled_code__goto_5638_13 = ((null as *mut pcre2_real_code_8)))
-        (__local_pattern__goto_5639_13 = [65, 66, 67, 0])
-        (__local_callout_int_pattern__goto_5640_13 = [40, 63, 67, 41, 0])
-        (__local_callout_str_pattern__goto_5642_13 = [40, 63, 67, 34, 90, 34, 41, 0])
-        (__local_capture_pattern__goto_5645_13 = [65, 40, 63, 60, 78, 62, 46, 42, 41, 90, 0])
-        (__local_subject_abcz__goto_5649_13 = [65, 66, 67, 90, 0])
-        (__local_name_n__goto_5652_13 = [78, 0])
+        (__local_pattern__goto_5639_13 = [(65 as u8), (66 as u8), (67 as u8), (0 as u8)])
+        (__local_callout_int_pattern__goto_5640_13 = [(40 as u8), (63 as u8), (67 as u8), (41 as u8), (0 as u8)])
+        (__local_callout_str_pattern__goto_5642_13 = [(40 as u8), (63 as u8), (67 as u8), (34 as u8), (90 as u8), (34 as u8), (41 as u8), (0 as u8)])
+        (__local_capture_pattern__goto_5645_13 = [(65 as u8), (40 as u8), (63 as u8), (60 as u8), (78 as u8), (62 as u8), (46 as u8), (42 as u8), (41 as u8), (90 as u8), (0 as u8)])
+        (__local_subject_abcz__goto_5649_13 = [(65 as u8), (66 as u8), (67 as u8), (90 as u8), (0 as u8)])
+        (__local_name_n__goto_5652_13 = [(78 as u8), (0 as u8)])
         (__local_invalid_code__goto_5664_7 = null)
         (__local_test_tables__goto_5665_16 = ((null as *const u8)))
         (__local_subs_other_code__goto_5670_13 = ((null as *mut pcre2_real_code_8)))
@@ -22976,9 +22977,9 @@ fn unittest_8() -> Unit {
     }
 
     '__ci_bb_674 {
-        unsafe { colour_begin(31, __stderrp) }
-        fprintf(__stderrp, c"pcre2test: Unit test error in %s\n".ptr, __local_failure__goto_5632_13)
-        unsafe { colour_end(__stderrp) }
+        unsafe { colour_begin(31, libc_stderr()) }
+        fprintf(libc_stderr(), c"pcre2test: Unit test error in %s\n".ptr, __local_failure__goto_5632_13)
+        unsafe { colour_end(libc_stderr()) }
         exit((1 as c_int))
     }
 
@@ -23235,11 +23236,11 @@ unsafe fn c_option(__param_arg: *const i8) -> c_int {
 
 
         if ((if __local_i >= (((13 * sizeof[coptstruct]()) as c_ulong) / (sizeof[coptstruct]() as c_ulong)): 1 else: 0) != 0) {
-            colour_begin(31, __stderrp)
+            colour_begin(31, libc_stderr())
 
-            fprintf(__stderrp, c"pcre2test: Unknown -C option \"%s\"\n".ptr, __param_arg)
+            fprintf(libc_stderr(), c"pcre2test: Unknown -C option \"%s\"\n".ptr, __param_arg)
 
-            colour_end(__stderrp)
+            colour_end(libc_stderr())
 
 
             return 0
@@ -23318,7 +23319,7 @@ unsafe fn c_option(__param_arg: *const i8) -> c_int {
     }
 
 
-    print_version(__stdoutp, (0 as c_int))
+    print_version(libc_stdout(), (0 as c_int))
 
     printf(c"Compiled with\n".ptr)
 
@@ -23341,7 +23342,7 @@ unsafe fn c_option(__param_arg: *const i8) -> c_int {
     if ((if __local_optval != 0: 1 else: 0) != 0) {
         printf(c"  UTF and UCP support (".ptr)
 
-        print_unicode_version(__stdoutp)
+        print_unicode_version(libc_stdout())
 
         printf(c")\n".ptr)
 
@@ -23356,7 +23357,7 @@ unsafe fn c_option(__param_arg: *const i8) -> c_int {
 
         printf(c"    Architecture: ".ptr)
 
-        print_jit_target(__stdoutp)
+        print_jit_target(libc_stdout())
 
         printf(c"\n".ptr)
 
@@ -23373,18 +23374,18 @@ unsafe fn c_option(__param_arg: *const i8) -> c_int {
                     printf(c"No (so cannot work)\n".ptr)
                 },
                 _ => {
-                    colour_begin(31, __stdoutp)
+                    colour_begin(31, libc_stdout())
 
-                    fprintf(__stdoutp, c"\n** Unexpected return %d from pcre2_jit_compile(NULL, PCRE2_JIT_TEST_ALLOC)\n".ptr, __local_rc)
+                    fprintf(libc_stdout(), c"\n** Unexpected return %d from pcre2_jit_compile(NULL, PCRE2_JIT_TEST_ALLOC)\n".ptr, __local_rc)
 
-                    colour_end(__stdoutp)
+                    colour_end(libc_stdout())
 
 
-                    colour_begin(31, __stdoutp)
+                    colour_begin(31, libc_stdout())
 
-                    fprintf(__stdoutp, c"** Should not occur\n".ptr)
+                    fprintf(libc_stdout(), c"** Should not occur\n".ptr)
 
-                    colour_end(__stdoutp)
+                    colour_end(libc_stdout())
 
 
                     (__local_yield_ = ((1 as c_int)))
@@ -23687,11 +23688,11 @@ fn display_properties(__param_wantscripts: c_int) -> Unit {
 
 
             if ((if __local_m >= 5: 1 else: 0) != 0) {
-                unsafe { colour_begin(31, __stdoutp) }
+                unsafe { colour_begin(31, libc_stdout()) }
 
-                fprintf(__stdoutp, c"** Too many synonyms: %s ignored\n".ptr, ((&utt_names[0] as *const c_char) + (((unsafe *__local_tt).name_offset as c_uint) as usize)))
+                fprintf(libc_stdout(), c"** Too many synonyms: %s ignored\n".ptr, ((&utt_names[0] as *const c_char) + (((unsafe *__local_tt).name_offset as c_uint) as usize)))
 
-                unsafe { colour_end(__stdoutp) }
+                unsafe { colour_end(libc_stdout()) }
 
             } else {
                 var __ci_expr_old_7: c_int = __local_m
@@ -24175,7 +24176,7 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     '__ci_bb_6 {
         (__ci_expr_logic_40 = 0)
         if ((if infile != null: 1 else: 0) != 0) {
-            (__ci_expr_logic_40 = (if (if infile != __stdinp: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_40 = (if (if infile != libc_stdin(): 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_40 != 0) {
             goto '__ci_bb_197
@@ -24256,9 +24257,9 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_18 {
-        colour_begin(31, __stderrp)
-        fprintf(__stderrp, c"pcre2test: This version of PCRE2 was built without 16-bit support\n".ptr)
-        colour_end(__stderrp)
+        colour_begin(31, libc_stderr())
+        fprintf(libc_stderr(), c"pcre2test: This version of PCRE2 was built without 16-bit support\n".ptr)
+        colour_end(libc_stderr())
         exit((1 as c_int))
     }
 
@@ -24275,9 +24276,9 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_21 {
-        colour_begin(31, __stderrp)
-        fprintf(__stderrp, c"pcre2test: This version of PCRE2 was built without 32-bit support\n".ptr)
-        colour_end(__stderrp)
+        colour_begin(31, libc_stderr())
+        fprintf(libc_stderr(), c"pcre2test: This version of PCRE2 was built without 32-bit support\n".ptr)
+        colour_end(libc_stderr())
         exit((1 as c_int))
     }
 
@@ -24360,9 +24361,9 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_33 {
-        colour_begin(31, __stderrp)
-        fprintf(__stderrp, c"pcre2test: Argument for -S is too big\n".ptr)
-        colour_end(__stderrp)
+        colour_begin(31, libc_stderr())
+        fprintf(libc_stderr(), c"pcre2test: Argument for -S is too big\n".ptr)
+        colour_end(libc_stderr())
         exit((1 as c_int))
     }
 
@@ -24383,9 +24384,9 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_35 {
-        colour_begin(31, __stderrp)
-        fprintf(__stderrp, c"pcre2test: requested stack size %luMiB is greater than hard limit ".ptr, (__local_stack_size__goto_3781_14 as c_ulong))
-        colour_end(__stderrp)
+        colour_begin(31, libc_stderr())
+        fprintf(libc_stderr(), c"pcre2test: requested stack size %luMiB is greater than hard limit ".ptr, (__local_stack_size__goto_3781_14 as c_ulong))
+        colour_end(libc_stderr())
         if ((if (((unsafe *(&raw const __local_rlim__goto_3782_19 as *const rlimit)).rlim_max as c_ulonglong) % (1048576 as c_ulonglong)) == 0: 1 else: 0) != 0) {
             goto '__ci_bb_37
         } else {
@@ -24410,9 +24411,9 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_37 {
-        colour_begin(31, __stderrp)
-        fprintf(__stderrp, c"%luMiB\n".ptr, ((((unsafe *(&raw const __local_rlim__goto_3782_19 as *const rlimit)).rlim_max as c_ulonglong) / (1048576 as c_ulonglong)) as c_ulong))
-        colour_end(__stderrp)
+        colour_begin(31, libc_stderr())
+        fprintf(libc_stderr(), c"%luMiB\n".ptr, ((((unsafe *(&raw const __local_rlim__goto_3782_19 as *const rlimit)).rlim_max as c_ulonglong) / (1048576 as c_ulonglong)) as c_ulong))
+        colour_end(libc_stderr())
         goto '__ci_bb_39
     }
 
@@ -24429,16 +24430,16 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_40 {
-        colour_begin(31, __stderrp)
-        fprintf(__stderrp, c"%luKiB\n".ptr, ((((unsafe *(&raw const __local_rlim__goto_3782_19 as *const rlimit)).rlim_max as c_ulonglong) / (1024 as c_ulonglong)) as c_ulong))
-        colour_end(__stderrp)
+        colour_begin(31, libc_stderr())
+        fprintf(libc_stderr(), c"%luKiB\n".ptr, ((((unsafe *(&raw const __local_rlim__goto_3782_19 as *const rlimit)).rlim_max as c_ulonglong) / (1024 as c_ulonglong)) as c_ulong))
+        colour_end(libc_stderr())
         goto '__ci_bb_42
     }
 
     '__ci_bb_41 {
-        colour_begin(31, __stderrp)
-        fprintf(__stderrp, c"%lu bytes\n".ptr, ((unsafe *(&raw const __local_rlim__goto_3782_19 as *const rlimit)).rlim_max as c_ulong))
-        colour_end(__stderrp)
+        colour_begin(31, libc_stderr())
+        fprintf(libc_stderr(), c"%lu bytes\n".ptr, ((unsafe *(&raw const __local_rlim__goto_3782_19 as *const rlimit)).rlim_max as c_ulong))
+        colour_end(libc_stderr())
         goto '__ci_bb_42
     }
 
@@ -24460,9 +24461,9 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_45 {
-        colour_begin(31, __stderrp)
-        fprintf(__stderrp, c"pcre2test: setting stack size %luMiB failed: %s\n".ptr, (__local_stack_size__goto_3781_14 as c_ulong), strerror((unsafe *(__error()))))
-        colour_end(__stderrp)
+        colour_begin(31, libc_stderr())
+        fprintf(libc_stderr(), c"pcre2test: setting stack size %luMiB failed: %s\n".ptr, (__local_stack_size__goto_3781_14 as c_ulong), strerror((unsafe *(errno_ptr()))))
+        colour_end(libc_stderr())
         exit((1 as c_int))
     }
 
@@ -24635,9 +24636,9 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
 
     '__ci_bb_70 {
         (def_patctl.jit = ((((((1 as c_uint) | (2 as c_uint)) as c_uint) | (4 as c_uint)) as c_uint)))
-        colour_begin(31, __stderrp)
-        fprintf(__stderrp, c"pcre2test: Warning: JIT support is not available: -jit[fast|verify] calls functions that do nothing.\n".ptr)
-        colour_end(__stderrp)
+        colour_begin(31, libc_stderr())
+        fprintf(libc_stderr(), c"pcre2test: Warning: JIT support is not available: -jit[fast|verify] calls functions that do nothing.\n".ptr)
+        colour_end(libc_stderr())
         goto '__ci_bb_67
     }
 
@@ -24701,9 +24702,9 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_79 {
-        colour_begin(31, __stderrp)
-        fprintf(__stderrp, c"pcre2test: Argument for %s must not be zero\n".ptr, __local_arg__goto_3683_9)
-        colour_end(__stderrp)
+        colour_begin(31, libc_stderr())
+        fprintf(libc_stderr(), c"pcre2test: Argument for %s must not be zero\n".ptr, __local_arg__goto_3683_9)
+        colour_end(libc_stderr())
         exit((1 as c_int))
     }
 
@@ -24716,9 +24717,9 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_81 {
-        colour_begin(31, __stderrp)
-        fprintf(__stderrp, c"pcre2test: Argument for %s is too big\n".ptr, __local_arg__goto_3683_9)
-        colour_end(__stderrp)
+        colour_begin(31, libc_stderr())
+        fprintf(libc_stderr(), c"pcre2test: Argument for %s is too big\n".ptr, __local_arg__goto_3683_9)
+        colour_end(libc_stderr())
         exit((1 as c_int))
     }
 
@@ -24783,7 +24784,7 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_91 {
-        print_version(__stdoutp, (0 as c_int))
+        print_version(libc_stdout(), (0 as c_int))
         goto '__ci_bb_6
     }
 
@@ -24864,9 +24865,9 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_104 {
-        colour_begin(31, __stderrp)
-        fprintf(__stderrp, c"pcre2test: Missing value for %s\n".ptr, __local_arg__goto_3683_9)
-        colour_end(__stderrp)
+        colour_begin(31, libc_stderr())
+        fprintf(libc_stderr(), c"pcre2test: Missing value for %s\n".ptr, __local_arg__goto_3683_9)
+        colour_end(libc_stderr())
         (__local_yield___goto_3644_10 = ((1 as c_uint)))
         goto '__ci_bb_6
     }
@@ -24909,9 +24910,9 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_110 {
-        colour_begin(31, __stderrp)
-        fprintf(__stderrp, c"pcre2test: Unknown or malformed option \"%s\"\n".ptr, __local_arg__goto_3683_9)
-        colour_end(__stderrp)
+        colour_begin(31, libc_stderr())
+        fprintf(libc_stderr(), c"pcre2test: Unknown or malformed option \"%s\"\n".ptr, __local_arg__goto_3683_9)
+        colour_end(libc_stderr())
         usage()
         (__local_yield___goto_3644_10 = ((1 as c_uint)))
         goto '__ci_bb_6
@@ -24961,9 +24962,9 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_119 {
-        colour_begin(31, __stderrp)
-        fprintf(__stderrp, c"pcre2test: Invalid value for \"%.*s\"\n".ptr, (((((__local_val__goto_3931_11 - ((1 as isize) as usize)) as usize) -% (__local_arg__goto_3683_9 as usize)) / sizeof[c_char]()) as c_int), __local_arg__goto_3683_9)
-        colour_end(__stderrp)
+        colour_begin(31, libc_stderr())
+        fprintf(libc_stderr(), c"pcre2test: Invalid value for \"%.*s\"\n".ptr, (((((__local_val__goto_3931_11 - ((1 as isize) as usize)) as usize) -% (__local_arg__goto_3683_9 as usize)) / sizeof[c_char]()) as c_int), __local_arg__goto_3683_9)
+        colour_end(libc_stderr())
         (__local_yield___goto_3644_10 = ((1 as c_uint)))
         goto '__ci_bb_6
     }
@@ -24979,7 +24980,7 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     '__ci_bb_122 {
         (max_oveccount = ((15 as c_uint)))
         init_globals()
-        (outfile = __stderrp)
+        (outfile = libc_stderr())
         (__ci_expr_logic_20 = 0)
         if ((if __local_arg_pattern__goto_3652_7 != null: 1 else: 0) != 0) {
             (__ci_expr_logic_20 = (if (if not (decode_modifiers((__local_arg_pattern__goto_3652_7 as *mut u8), CTX_DEFPAT, (&raw mut def_patctl as *mut patctl), (null as *mut datctl)) != 0): 1 else: 0) != 0: 1 else: 0))
@@ -25038,9 +25039,9 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_127 {
-        colour_begin(31, __stderrp)
-        fprintf(__stderrp, c"pcre2test: \"%s\" is not a valid error number list\n".ptr, __local_arg_error__goto_3653_7)
-        colour_end(__stderrp)
+        colour_begin(31, libc_stderr())
+        fprintf(libc_stderr(), c"pcre2test: \"%s\" is not a valid error number list\n".ptr, __local_arg_error__goto_3653_7)
+        colour_end(libc_stderr())
         (__local_yield___goto_3644_10 = ((1 as c_uint)))
         goto '__ci_bb_6
     }
@@ -25048,7 +25049,7 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     '__ci_bb_128 {
         (__local_errcode__goto_3962_7 = ((__local_li__goto_3964_8 as c_int)))
         printf(c"Error %d: ".ptr, __local_errcode__goto_3962_7)
-        print_error_message_file(__stdoutp, __local_errcode__goto_3962_7, c"".ptr, c"\n".ptr, (1 as c_int))
+        print_error_message_file(libc_stdout(), __local_errcode__goto_3962_7, c"".ptr, c"\n".ptr, (1 as c_int))
         if ((if (unsafe *__local_endptr__goto_3963_9) == 0: 1 else: 0) != 0) {
             goto '__ci_bb_129
         } else {
@@ -25071,8 +25072,8 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_132 {
-        (infile = __stdinp)
-        (outfile = __stdoutp)
+        (infile = libc_stdin())
+        (outfile = libc_stdout())
         (__ci_expr_logic_23 = 0)
         if ((if __local_argc > 1: 1 else: 0) != 0) {
             (__ci_expr_logic_23 = (if (if strcmp(((unsafe __param_argv[__local_op__goto_3645_10]) as *const i8), c"-".ptr) != 0: 1 else: 0) != 0: 1 else: 0))
@@ -25102,9 +25103,9 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_135 {
-        colour_begin(31, __stderrp)
-        fprintf(__stderrp, c"pcre2test: Failed to open \"%s\": %s\n".ptr, (unsafe __param_argv[__local_op__goto_3645_10]), strerror((unsafe *(__error()))))
-        colour_end(__stderrp)
+        colour_begin(31, libc_stderr())
+        fprintf(libc_stderr(), c"pcre2test: Failed to open \"%s\": %s\n".ptr, (unsafe __param_argv[__local_op__goto_3645_10]), strerror((unsafe *(errno_ptr()))))
+        colour_end(libc_stderr())
         (__local_yield___goto_3644_10 = ((1 as c_uint)))
         goto '__ci_bb_6
     }
@@ -25131,9 +25132,9 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_139 {
-        colour_begin(31, __stderrp)
-        fprintf(__stderrp, c"pcre2test: Failed to open \"%s\": %s\n".ptr, (unsafe __param_argv[((__local_op__goto_3645_10 as c_uint) +% (1 as c_uint))]), strerror((unsafe *(__error()))))
-        colour_end(__stderrp)
+        colour_begin(31, libc_stderr())
+        fprintf(libc_stderr(), c"pcre2test: Failed to open \"%s\": %s\n".ptr, (unsafe __param_argv[((__local_op__goto_3645_10 as c_uint) +% (1 as c_uint))]), strerror((unsafe *(errno_ptr()))))
+        colour_end(libc_stderr())
         (__local_yield___goto_3644_10 = ((1 as c_uint)))
         goto '__ci_bb_6
     }
@@ -25611,7 +25612,7 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     '__ci_bb_198 {
         (__ci_expr_logic_41 = 0)
         if ((if outfile != null: 1 else: 0) != 0) {
-            (__ci_expr_logic_41 = (if (if outfile != __stdoutp: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_41 = (if (if outfile != libc_stdout(): 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_41 != 0) {
             goto '__ci_bb_199
@@ -25653,7 +25654,7 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
 }
 
 var OP_names: [173]*const i8 = [(("End" as *mut c_char) as *const c_char), (("\\A" as *mut c_char) as *const c_char), (("\\G" as *mut c_char) as *const c_char), (("\\K" as *mut c_char) as *const c_char), (("\\B" as *mut c_char) as *const c_char), (("\\b" as *mut c_char) as *const c_char), (("\\D" as *mut c_char) as *const c_char), (("\\d" as *mut c_char) as *const c_char), (("\\S" as *mut c_char) as *const c_char), (("\\s" as *mut c_char) as *const c_char), (("\\W" as *mut c_char) as *const c_char), (("\\w" as *mut c_char) as *const c_char), (("Any" as *mut c_char) as *const c_char), (("AllAny" as *mut c_char) as *const c_char), (("Anybyte" as *mut c_char) as *const c_char), (("notprop" as *mut c_char) as *const c_char), (("prop" as *mut c_char) as *const c_char), (("\\R" as *mut c_char) as *const c_char), (("\\H" as *mut c_char) as *const c_char), (("\\h" as *mut c_char) as *const c_char), (("\\V" as *mut c_char) as *const c_char), (("\\v" as *mut c_char) as *const c_char), (("extuni" as *mut c_char) as *const c_char), (("\\Z" as *mut c_char) as *const c_char), (("\\z" as *mut c_char) as *const c_char), (("$" as *mut c_char) as *const c_char), (("$" as *mut c_char) as *const c_char), (("^" as *mut c_char) as *const c_char), (("^" as *mut c_char) as *const c_char), (("char" as *mut c_char) as *const c_char), (("chari" as *mut c_char) as *const c_char), (("not" as *mut c_char) as *const c_char), (("noti" as *mut c_char) as *const c_char), (("*" as *mut c_char) as *const c_char), (("*?" as *mut c_char) as *const c_char), (("+" as *mut c_char) as *const c_char), (("+?" as *mut c_char) as *const c_char), (("?" as *mut c_char) as *const c_char), (("??" as *mut c_char) as *const c_char), (("{" as *mut c_char) as *const c_char), (("{" as *mut c_char) as *const c_char), (("{" as *mut c_char) as *const c_char), (("*+" as *mut c_char) as *const c_char), (("++" as *mut c_char) as *const c_char), (("?+" as *mut c_char) as *const c_char), (("{" as *mut c_char) as *const c_char), (("*" as *mut c_char) as *const c_char), (("*?" as *mut c_char) as *const c_char), (("+" as *mut c_char) as *const c_char), (("+?" as *mut c_char) as *const c_char), (("?" as *mut c_char) as *const c_char), (("??" as *mut c_char) as *const c_char), (("{" as *mut c_char) as *const c_char), (("{" as *mut c_char) as *const c_char), (("{" as *mut c_char) as *const c_char), (("*+" as *mut c_char) as *const c_char), (("++" as *mut c_char) as *const c_char), (("?+" as *mut c_char) as *const c_char), (("{" as *mut c_char) as *const c_char), (("*" as *mut c_char) as *const c_char), (("*?" as *mut c_char) as *const c_char), (("+" as *mut c_char) as *const c_char), (("+?" as *mut c_char) as *const c_char), (("?" as *mut c_char) as *const c_char), (("??" as *mut c_char) as *const c_char), (("{" as *mut c_char) as *const c_char), (("{" as *mut c_char) as *const c_char), (("{" as *mut c_char) as *const c_char), (("*+" as *mut c_char) as *const c_char), (("++" as *mut c_char) as *const c_char), (("?+" as *mut c_char) as *const c_char), (("{" as *mut c_char) as *const c_char), (("*" as *mut c_char) as *const c_char), (("*?" as *mut c_char) as *const c_char), (("+" as *mut c_char) as *const c_char), (("+?" as *mut c_char) as *const c_char), (("?" as *mut c_char) as *const c_char), (("??" as *mut c_char) as *const c_char), (("{" as *mut c_char) as *const c_char), (("{" as *mut c_char) as *const c_char), (("{" as *mut c_char) as *const c_char), (("*+" as *mut c_char) as *const c_char), (("++" as *mut c_char) as *const c_char), (("?+" as *mut c_char) as *const c_char), (("{" as *mut c_char) as *const c_char), (("*" as *mut c_char) as *const c_char), (("*?" as *mut c_char) as *const c_char), (("+" as *mut c_char) as *const c_char), (("+?" as *mut c_char) as *const c_char), (("?" as *mut c_char) as *const c_char), (("??" as *mut c_char) as *const c_char), (("{" as *mut c_char) as *const c_char), (("{" as *mut c_char) as *const c_char), (("{" as *mut c_char) as *const c_char), (("*+" as *mut c_char) as *const c_char), (("++" as *mut c_char) as *const c_char), (("?+" as *mut c_char) as *const c_char), (("{" as *mut c_char) as *const c_char), (("*" as *mut c_char) as *const c_char), (("*?" as *mut c_char) as *const c_char), (("+" as *mut c_char) as *const c_char), (("+?" as *mut c_char) as *const c_char), (("?" as *mut c_char) as *const c_char), (("??" as *mut c_char) as *const c_char), (("{" as *mut c_char) as *const c_char), (("{" as *mut c_char) as *const c_char), (("*+" as *mut c_char) as *const c_char), (("++" as *mut c_char) as *const c_char), (("?+" as *mut c_char) as *const c_char), (("{" as *mut c_char) as *const c_char), (("class" as *mut c_char) as *const c_char), (("nclass" as *mut c_char) as *const c_char), (("xclass" as *mut c_char) as *const c_char), (("eclass" as *mut c_char) as *const c_char), (("Ref" as *mut c_char) as *const c_char), (("Refi" as *mut c_char) as *const c_char), (("DnRef" as *mut c_char) as *const c_char), (("DnRefi" as *mut c_char) as *const c_char), (("Recurse" as *mut c_char) as *const c_char), (("Callout" as *mut c_char) as *const c_char), (("CalloutStr" as *mut c_char) as *const c_char), (("Alt" as *mut c_char) as *const c_char), (("Ket" as *mut c_char) as *const c_char), (("KetRmax" as *mut c_char) as *const c_char), (("KetRmin" as *mut c_char) as *const c_char), (("KetRpos" as *mut c_char) as *const c_char), (("Reverse" as *mut c_char) as *const c_char), (("VReverse" as *mut c_char) as *const c_char), (("Assert" as *mut c_char) as *const c_char), (("Assert not" as *mut c_char) as *const c_char), (("Assert back" as *mut c_char) as *const c_char), (("Assert back not" as *mut c_char) as *const c_char), (("Non-atomic assert" as *mut c_char) as *const c_char), (("Non-atomic assert back" as *mut c_char) as *const c_char), (("Scan substring" as *mut c_char) as *const c_char), (("Once" as *mut c_char) as *const c_char), (("Script run" as *mut c_char) as *const c_char), (("Bra" as *mut c_char) as *const c_char), (("BraPos" as *mut c_char) as *const c_char), (("CBra" as *mut c_char) as *const c_char), (("CBraPos" as *mut c_char) as *const c_char), (("Cond" as *mut c_char) as *const c_char), (("SBra" as *mut c_char) as *const c_char), (("SBraPos" as *mut c_char) as *const c_char), (("SCBra" as *mut c_char) as *const c_char), (("SCBraPos" as *mut c_char) as *const c_char), (("SCond" as *mut c_char) as *const c_char), (("Capture ref" as *mut c_char) as *const c_char), (("Capture dnref" as *mut c_char) as *const c_char), (("Cond rec" as *mut c_char) as *const c_char), (("Cond dnrec" as *mut c_char) as *const c_char), (("Cond false" as *mut c_char) as *const c_char), (("Cond true" as *mut c_char) as *const c_char), (("Brazero" as *mut c_char) as *const c_char), (("Braminzero" as *mut c_char) as *const c_char), (("Braposzero" as *mut c_char) as *const c_char), (("*MARK" as *mut c_char) as *const c_char), (("*PRUNE" as *mut c_char) as *const c_char), (("*PRUNE" as *mut c_char) as *const c_char), (("*SKIP" as *mut c_char) as *const c_char), (("*SKIP" as *mut c_char) as *const c_char), (("*THEN" as *mut c_char) as *const c_char), (("*THEN" as *mut c_char) as *const c_char), (("*COMMIT" as *mut c_char) as *const c_char), (("*COMMIT" as *mut c_char) as *const c_char), (("*FAIL" as *mut c_char) as *const c_char), (("*ACCEPT" as *mut c_char) as *const c_char), (("*ASSERT_ACCEPT" as *mut c_char) as *const c_char), (("Close" as *mut c_char) as *const c_char), (("Skip zero" as *mut c_char) as *const c_char), (("Define" as *mut c_char) as *const c_char), (("\\B (ucp)" as *mut c_char) as *const c_char), (("\\b (ucp)" as *mut c_char) as *const c_char)]
-let OP_lengths_8: [173]u8 = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 3, 3, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 4, 4, 4, 2, 2, 2, 4, 2, 2, 2, 2, 2, 2, 4, 4, 4, 2, 2, 2, 4, 2, 2, 2, 2, 2, 2, 4, 4, 4, 2, 2, 2, 4, 2, 2, 2, 2, 2, 2, 4, 4, 4, 2, 2, 2, 4, 2, 2, 2, 2, 2, 2, 4, 4, 4, 2, 2, 2, 4, 1, 1, 1, 1, 1, 1, 5, 5, 1, 1, 1, 5, 33, 33, 0, 0, 3, 4, 5, 6, 3, 6, 0, 3, 3, 3, 3, 3, 3, 5, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 5, 5, 3, 3, 3, 5, 5, 3, 3, 5, 3, 5, 1, 1, 1, 1, 1, 3, 1, 3, 1, 3, 1, 3, 1, 3, 1, 1, 1, 3, 1, 1, 1, 1]
+let OP_lengths_8: [173]u8 = [(1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (3 as u8), (3 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (2 as u8), (2 as u8), (2 as u8), (2 as u8), (2 as u8), (2 as u8), (2 as u8), (2 as u8), (2 as u8), (2 as u8), (4 as u8), (4 as u8), (4 as u8), (2 as u8), (2 as u8), (2 as u8), (4 as u8), (2 as u8), (2 as u8), (2 as u8), (2 as u8), (2 as u8), (2 as u8), (4 as u8), (4 as u8), (4 as u8), (2 as u8), (2 as u8), (2 as u8), (4 as u8), (2 as u8), (2 as u8), (2 as u8), (2 as u8), (2 as u8), (2 as u8), (4 as u8), (4 as u8), (4 as u8), (2 as u8), (2 as u8), (2 as u8), (4 as u8), (2 as u8), (2 as u8), (2 as u8), (2 as u8), (2 as u8), (2 as u8), (4 as u8), (4 as u8), (4 as u8), (2 as u8), (2 as u8), (2 as u8), (4 as u8), (2 as u8), (2 as u8), (2 as u8), (2 as u8), (2 as u8), (2 as u8), (4 as u8), (4 as u8), (4 as u8), (2 as u8), (2 as u8), (2 as u8), (4 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (5 as u8), (5 as u8), (1 as u8), (1 as u8), (1 as u8), (5 as u8), (33 as u8), (33 as u8), (0 as u8), (0 as u8), (3 as u8), (4 as u8), (5 as u8), (6 as u8), (3 as u8), (6 as u8), (0 as u8), (3 as u8), (3 as u8), (3 as u8), (3 as u8), (3 as u8), (3 as u8), (5 as u8), (3 as u8), (3 as u8), (3 as u8), (3 as u8), (3 as u8), (3 as u8), (3 as u8), (3 as u8), (3 as u8), (3 as u8), (3 as u8), (5 as u8), (5 as u8), (3 as u8), (3 as u8), (3 as u8), (5 as u8), (5 as u8), (3 as u8), (3 as u8), (5 as u8), (3 as u8), (5 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (3 as u8), (1 as u8), (3 as u8), (1 as u8), (3 as u8), (1 as u8), (3 as u8), (1 as u8), (3 as u8), (1 as u8), (1 as u8), (1 as u8), (3 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8)]
 var cmdlist: [12]cmdstruct = [cmdstruct { name: (("endif" as *mut c_char) as *const c_char), value: CMD_ENDIF }, cmdstruct { name: (("forbid_utf" as *mut c_char) as *const c_char), value: CMD_FORBID_UTF }, cmdstruct { name: (("if" as *mut c_char) as *const c_char), value: CMD_IF }, cmdstruct { name: (("load" as *mut c_char) as *const c_char), value: CMD_LOAD }, cmdstruct { name: (("loadtables" as *mut c_char) as *const c_char), value: CMD_LOADTABLES }, cmdstruct { name: (("newline_default" as *mut c_char) as *const c_char), value: CMD_NEWLINE_DEFAULT }, cmdstruct { name: (("pattern" as *mut c_char) as *const c_char), value: CMD_PATTERN }, cmdstruct { name: (("perltest" as *mut c_char) as *const c_char), value: CMD_PERLTEST }, cmdstruct { name: (("pop" as *mut c_char) as *const c_char), value: CMD_POP }, cmdstruct { name: (("popcopy" as *mut c_char) as *const c_char), value: CMD_POPCOPY }, cmdstruct { name: (("save" as *mut c_char) as *const c_char), value: CMD_SAVE }, cmdstruct { name: (("subject" as *mut c_char) as *const c_char), value: CMD_SUBJECT }]
 var newlines: [7]*const i8 = [(("DEFAULT" as *mut c_char) as *const c_char), (("CR" as *mut c_char) as *const c_char), (("LF" as *mut c_char) as *const c_char), (("CRLF" as *mut c_char) as *const c_char), (("ANY" as *mut c_char) as *const c_char), (("ANYCRLF" as *mut c_char) as *const c_char), (("NUL" as *mut c_char) as *const c_char)]
 var convertlist: [6]convertstruct = [convertstruct { name: (("glob" as *mut c_char) as *const c_char), option: 16 }, convertstruct { name: (("glob_no_starstar" as *mut c_char) as *const c_char), option: 80 }, convertstruct { name: (("glob_no_wild_separator" as *mut c_char) as *const c_char), option: 48 }, convertstruct { name: (("posix_basic" as *mut c_char) as *const c_char), option: 4 }, convertstruct { name: (("posix_extended" as *mut c_char) as *const c_char), option: 8 }, convertstruct { name: (("unset" as *mut c_char) as *const c_char), option: 4294967295 }]
