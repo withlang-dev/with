@@ -139,7 +139,7 @@ std.libc exports C-standard functions plus With functions over
 
 Commits (one PR to main after #1143 merges; the branch rebases onto main
 with `git rebase --onto main corpus-registry`):
-- 7623152e `build: the pinned seed drives the battery` — `src/main` is
+- `build: the pinned seed drives the battery` — `src/main` is
   always the seed.lock asset (`:seed` idempotent on the digest);
   `seed-driver` (build/retention.w) hashes the driver and walks the
   action's process ancestry on POSIX, checks the workflow pins; first in
@@ -147,22 +147,22 @@ with `git rebase --onto main corpus-registry`):
   `:seed-compat` are gone; nightly drives `:test`/`:last-green` with
   `src/main`; CLAUDE.md/AGENTS.md, README and the runbooks describe
   `WITH=$PWD/src/main src/main build ...`.
-- fb2933d5 `rt: with_libc_* seams ...` — rt_core seams over one `rt_*`
+- `rt: with_libc_* seams ...` — rt_core seams over one `rt_*`
   body per backend; Windows' stream accessors return the UCRT streams.
-- 8ef7c0a2 `migrate: the Clang bridge is the one path boundary` — every
+- `migrate: the Clang bridge is the one path boundary` — every
   location/path the bridge hands up is `/`; migrator CLI paths normalized
   at entry; `behav_migrate_backslash_locations`.
-- 2916e660 `migrate: FILE-class system records are c_void again; an
+- `migrate: FILE-class system records are c_void again; an
   anonymous union base reads plain` — two #1142 regressions found by
   re-migrating (nothing re-migrates in the battery: wo-drift compiles the
   checked-in output). Fixtures pin both.
-- b8fda967 `std.libc: C-standard functions and with_libc_* seams only` —
+- `std.libc: C-standard functions and with_libc_* seams only` —
   the module, the migrator mapping (`ci_libc_stream_accessor`,
   `ci_libc_portable_callee`), the Linux/Windows shim removal, FnAbi list,
   `libc-surface-check`, `corpus_reject_foreign_symbols`
   (`Corpus.declared_externs` for rb_tree_subtree_height), `rt-decl-audit`
   lane, #1149 for the aarch64 lane's missing `:test`.
-- 1ed6c14f `corpora: pcre2 and zlib re-promoted by the current migrator`.
+- `corpora: pcre2 and zlib re-promoted by the current migrator`.
 
 Re-migration is driven by a tree compiler: `WITH=out/stage/bin/with-stage2
 out/stage/bin/with-stage2 build :<stem>-promote` (stage2 has the bundles;
