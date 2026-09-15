@@ -855,6 +855,8 @@ pub unsafe fn _pcre2_xclass_8(__param_c: c_uint, __param_data: *const u8, __para
 
                 }
 
+
+
             } else {
                 var __ci_expr_old_45: *const u8 = __local_data
 
@@ -934,6 +936,8 @@ pub unsafe fn _pcre2_xclass_8(__param_c: c_uint, __param_data: *const u8, __para
                     }
 
                 }
+
+
 
             } else {
                 var __ci_expr_old_49: *const u8 = __local_data

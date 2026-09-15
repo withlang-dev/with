@@ -56,6 +56,8 @@ pub unsafe fn _pcre2_is_newline_8(__param_ptr: *const u8, __param_type_: c_uint,
 
         }
 
+
+
     } else {
         (__local_c = (((unsafe *__param_ptr) as c_uint)))
     }
@@ -202,6 +204,8 @@ pub unsafe fn _pcre2_was_newline_8(__param_ptr: *const u8, __param_type_: c_uint
             }
 
         }
+
+
 
     } else {
         (__local_c = (((unsafe *__local_ptr) as c_uint)))

@@ -35,7 +35,7 @@ pub unsafe fn pcre2_pattern_convert_8(__param_pattern: *const u8, __param_plengt
     var __local_ccontext = __param_ccontext
     var __local_rc: c_int
 
-    var __local_null_str: [1]u8 = [205]
+    var __local_null_str: [1]u8 = [(205 as u8)]
 
     var __local_dummy_buffer: [100]u8
 
@@ -247,7 +247,7 @@ pub unsafe fn pcre2_converted_pattern_free_8(__param_converted: *mut u8) -> Unit
     if ((if __param_converted != null: 1 else: 0) != 0) {
         var __local_memctl: *mut pcre2_memctl = ((((__param_converted as *mut c_char) - (sizeof[pcre2_memctl]() as usize)) as *mut pcre2_memctl))
 
-        (unsafe *__local_memctl).free(__local_memctl, (unsafe *__local_memctl).memory_data)
+        (unsafe *__local_memctl).free((__local_memctl as *mut c_void), (unsafe *__local_memctl).memory_data)
 
     }
 
@@ -365,7 +365,7 @@ unsafe fn convert_posix(__param_pattype: c_uint, __param_pattern: *const u8, __p
         __param_utf
         __param_ccontext
         ((unsafe *__param_bufflenptr) = __local_plength)
-        (__local_s__goto_172_1 = c"\x28\x2a\x4e\x55\x4c\x29".ptr)
+        (__local_s__goto_172_1 = c"(*NUL)".ptr)
         goto '__ci_bb_1
     }
 
@@ -662,7 +662,7 @@ unsafe fn convert_posix(__param_pattype: c_uint, __param_pattern: *const u8, __p
     }
 
     '__ci_bb_43 {
-        (__local_s__goto_224_11 = c"\x3a\x5d".ptr)
+        (__local_s__goto_224_11 = c":]".ptr)
         goto '__ci_bb_45
     }
 
@@ -1894,6 +1894,8 @@ unsafe fn convert_glob_parse_range(__param_from: *mut *const u8, __param_pattern
         }
 
 
+
+
         if ((if __local_c == 93: 1 else: 0) != 0) {
             convert_glob_write(__param_out, (__local_c as u8))
 
@@ -2040,6 +2042,8 @@ unsafe fn convert_glob_parse_range(__param_from: *mut *const u8, __param_pattern
                 }
 
 
+
+
                 if ((if __local_pattern >= __param_pattern_end: 1 else: 0) != 0) {
                     break
                 }
@@ -2103,6 +2107,8 @@ unsafe fn convert_glob_parse_range(__param_from: *mut *const u8, __param_pattern
                         }
 
                     }
+
+
 
 
                 } else {
@@ -2204,6 +2210,8 @@ unsafe fn convert_glob_parse_range(__param_from: *mut *const u8, __param_pattern
                         }
 
                     }
+
+
 
 
                     if ((if __local_pattern >= __param_pattern_end: 1 else: 0) != 0) {

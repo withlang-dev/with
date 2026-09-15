@@ -97,6 +97,8 @@ pub unsafe fn _pcre2_script_run_8(__param_ptr: *const u8, __param_endptr: *const
     }
 
 
+
+
     if ((if __local_ptr >= __param_endptr: 1 else: 0) != 0) {
         return 1
     }
@@ -397,6 +399,8 @@ pub unsafe fn _pcre2_script_run_8(__param_ptr: *const u8, __param_endptr: *const
             }
 
         }
+
+
 
 
     }

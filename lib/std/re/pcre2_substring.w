@@ -109,7 +109,7 @@ pub unsafe fn pcre2_substring_free_8(__param_string: *mut u8) -> Unit {
     if ((if __param_string != null: 1 else: 0) != 0) {
         var __local_memctl: *mut pcre2_memctl = ((((__param_string as *mut c_char) - (sizeof[pcre2_memctl]() as usize)) as *mut pcre2_memctl))
 
-        (unsafe *__local_memctl).free(__local_memctl, (unsafe *__local_memctl).memory_data)
+        (unsafe *__local_memctl).free((__local_memctl as *mut c_void), (unsafe *__local_memctl).memory_data)
 
     }
 
@@ -432,7 +432,7 @@ pub unsafe fn pcre2_substring_list_free_8(__param_list: *mut *mut u8) -> Unit {
     if ((if __param_list != null: 1 else: 0) != 0) {
         var __local_memctl: *mut pcre2_memctl = ((((__param_list as *mut c_char) - (sizeof[pcre2_memctl]() as usize)) as *mut pcre2_memctl))
 
-        (unsafe *__local_memctl).free(__local_memctl, (unsafe *__local_memctl).memory_data)
+        (unsafe *__local_memctl).free((__local_memctl as *mut c_void), (unsafe *__local_memctl).memory_data)
 
     }
 

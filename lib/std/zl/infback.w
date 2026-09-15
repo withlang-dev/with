@@ -104,7 +104,7 @@ pub unsafe fn inflateBack(__param_strm: *mut z_stream_s, __param_in_: unsafe ext
     goto '__ci_bb_0
 
     '__ci_bb_0 {
-        (__local_order__goto_205_33 = [16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15])
+        (__local_order__goto_205_33 = [(16 as c_ushort), (17 as c_ushort), (18 as c_ushort), (0 as c_ushort), (8 as c_ushort), (7 as c_ushort), (9 as c_ushort), (6 as c_ushort), (10 as c_ushort), (5 as c_ushort), (11 as c_ushort), (4 as c_ushort), (12 as c_ushort), (3 as c_ushort), (13 as c_ushort), (2 as c_ushort), (14 as c_ushort), (1 as c_ushort), (15 as c_ushort)])
         if ((if __param_strm == 0: 1 else: 0) != 0) {
             (__ci_expr_logic_0 = (if true: 1 else: 0))
         } else {
@@ -2826,7 +2826,7 @@ pub unsafe fn inflateBack(__param_strm: *mut z_stream_s, __param_in_: unsafe ext
 
     '__ci_bb_435 {
         (__ci_expr_logic_28 = 0)
-        if (__param_out(__param_out_desc, (unsafe *__local_state__goto_193_31).window, (((unsafe *__local_state__goto_193_31).wsize as c_uint) -% (__local_left__goto_196_20 as c_uint))) != 0) {
+        if (__param_out(__param_out_desc, (unsafe *__local_state__goto_193_31).window, ((((unsafe *__local_state__goto_193_31).wsize as c_uint) -% (__local_left__goto_196_20 as c_uint)) as c_uint)) != 0) {
             (__ci_expr_logic_28 = (if (if __local_ret__goto_204_9 == 1: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_28 != 0) {
@@ -2880,6 +2880,7 @@ pub unsafe fn inflateBackEnd(__param_strm: *mut z_stream_s) -> c_int {
     (unsafe *__param_strm).zfree((unsafe *__param_strm).opaque_, ((unsafe *__param_strm).state as *mut c_void))
 
     ((unsafe *__param_strm).state = null)
+
 
     return 0
 
@@ -2951,11 +2952,12 @@ pub unsafe fn inflateBackInit_(__param_strm: *mut z_stream_s, __param_windowBits
         ((unsafe *__param_strm).zfree = zcfree)
     }
 
-    (__local_state = (((unsafe *__param_strm).zalloc((unsafe *__param_strm).opaque_, 1, 7160) as *mut inflate_state)))
+    (__local_state = (((unsafe *__param_strm).zalloc((unsafe *__param_strm).opaque_, (1 as c_uint), (7160 as c_uint)) as *mut inflate_state)))
 
     if ((if __local_state == 0: 1 else: 0) != 0) {
         return -4
     }
+
 
     ((unsafe *__param_strm).state = ((__local_state as *mut internal_state)))
 

@@ -34,7 +34,7 @@ pub unsafe fn pcre2_maketables_8(__param_gcontext: *mut pcre2_real_general_conte
     var __local_yield_: *mut u8 = with 0 as __ci_expr_seq_9 {
         var __ci_expr_ternary_0: *mut c_void = null
         if ((if __param_gcontext != null: 1 else: 0) != 0) {
-            (__ci_expr_ternary_0 = (unsafe *(&raw const (unsafe *__param_gcontext).memctl as *const pcre2_memctl)).malloc(1088, (unsafe *(&raw const (unsafe *__param_gcontext).memctl as *const pcre2_memctl)).memory_data))
+            (__ci_expr_ternary_0 = (unsafe *(&raw const (unsafe *__param_gcontext).memctl as *const pcre2_memctl)).malloc((1088 as c_ulong), (unsafe *(&raw const (unsafe *__param_gcontext).memctl as *const pcre2_memctl)).memory_data))
         } else {
             (__ci_expr_ternary_0 = ((with_alloc(((1088 as c_ulong) as i64)) as *mut c_void)))
         }

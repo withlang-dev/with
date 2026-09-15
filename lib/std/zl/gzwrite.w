@@ -722,7 +722,7 @@ unsafe fn gz_comp(__param_state: *mut gz_state, __param_flush: c_int) -> c_int {
 
     if ((unsafe *__param_state).direct != 0) {
         while (__local_strm.avail_in != 0) {
-            ((unsafe *(__error())) = ((0 as c_int)))
+            ((unsafe *(errno_ptr())) = ((0 as c_int)))
 
             ((unsafe *__param_state).again = ((0 as c_int)))
 
@@ -737,15 +737,15 @@ unsafe fn gz_comp(__param_state: *mut gz_state, __param_flush: c_int) -> c_int {
             (__local_put = __ci_expr_ternary_1)
 
 
-            (__local_writ = ((write((unsafe *__param_state).fd, __local_strm.next_in, __local_put) as c_int)))
+            (__local_writ = ((write((unsafe *__param_state).fd, (__local_strm.next_in as *const c_void), (__local_put as c_ulong)) as c_int)))
 
             if ((if __local_writ < 0: 1 else: 0) != 0) {
                 var __ci_expr_logic_2: c_int
 
-                if ((if (unsafe *(__error())) == 35: 1 else: 0) != 0) {
+                if ((if (unsafe *(errno_ptr())) == 35: 1 else: 0) != 0) {
                     (__ci_expr_logic_2 = (if true: 1 else: 0))
                 } else {
-                    (__ci_expr_logic_2 = (if (if (unsafe *(__error())) == 35: 1 else: 0) != 0: 1 else: 0))
+                    (__ci_expr_logic_2 = (if (if (unsafe *(errno_ptr())) == 35: 1 else: 0) != 0: 1 else: 0))
                 }
 
                 if (__ci_expr_logic_2 != 0) {
@@ -753,7 +753,7 @@ unsafe fn gz_comp(__param_state: *mut gz_state, __param_flush: c_int) -> c_int {
                 }
 
 
-                gz_error(__param_state, (-1 as c_int), (strerror((unsafe *(__error()))) as *const i8))
+                gz_error(__param_state, (-1 as c_int), (strerror((unsafe *(errno_ptr()))) as *const i8))
 
                 return -1
 
@@ -816,7 +816,7 @@ unsafe fn gz_comp(__param_state: *mut gz_state, __param_flush: c_int) -> c_int {
 
         if (__ci_expr_logic_6 != 0) {
             while ((if __local_strm.next_out > (unsafe *(&raw const (unsafe *__param_state).x as *const gzFile_s)).next: 1 else: 0) != 0) {
-                ((unsafe *(__error())) = ((0 as c_int)))
+                ((unsafe *(errno_ptr())) = ((0 as c_int)))
 
                 ((unsafe *__param_state).again = ((0 as c_int)))
 
@@ -831,15 +831,15 @@ unsafe fn gz_comp(__param_state: *mut gz_state, __param_flush: c_int) -> c_int {
                 (__local_put = __ci_expr_ternary_7)
 
 
-                (__local_writ = ((write((unsafe *__param_state).fd, (unsafe *(&raw const (unsafe *__param_state).x as *const gzFile_s)).next, __local_put) as c_int)))
+                (__local_writ = ((write((unsafe *__param_state).fd, ((unsafe *(&raw const (unsafe *__param_state).x as *const gzFile_s)).next as *const c_void), (__local_put as c_ulong)) as c_int)))
 
                 if ((if __local_writ < 0: 1 else: 0) != 0) {
                     var __ci_expr_logic_8: c_int
 
-                    if ((if (unsafe *(__error())) == 35: 1 else: 0) != 0) {
+                    if ((if (unsafe *(errno_ptr())) == 35: 1 else: 0) != 0) {
                         (__ci_expr_logic_8 = (if true: 1 else: 0))
                     } else {
-                        (__ci_expr_logic_8 = (if (if (unsafe *(__error())) == 35: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_8 = (if (if (unsafe *(errno_ptr())) == 35: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     if (__ci_expr_logic_8 != 0) {
@@ -847,7 +847,7 @@ unsafe fn gz_comp(__param_state: *mut gz_state, __param_flush: c_int) -> c_int {
                     }
 
 
-                    gz_error(__param_state, (-1 as c_int), (strerror((unsafe *(__error()))) as *const i8))
+                    gz_error(__param_state, (-1 as c_int), (strerror((unsafe *(errno_ptr()))) as *const i8))
 
                     return -1
 
