@@ -1251,12 +1251,17 @@ pub fn migrate_c_file(input_path: &str, output_path: &str) -> i32:
     var project = CiProject.new()
     ci_migrate_file_inner(input_path, output_path, false, &project)
 
+// Either separator: a Clang cursor location on Windows spells the file
+// with backslashes (the header-owner rule compares its stem with the
+// unit list's).
+fn ci_migrate_is_path_separator(c: u8) -> bool: c == '/' or c == '\\'
+
 fn ci_migrate_path_basename(path: &str) -> str:
     var end = path.len() as i32
-    while end > 0 and path[(end - 1)] == 47:
+    while end > 0 and ci_migrate_is_path_separator(path[(end - 1)]):
         end = end - 1
     var start = end - 1
-    while start >= 0 and path[start] != 47:
+    while start >= 0 and not ci_migrate_is_path_separator(path[start]):
         start = start - 1
     path.slice((start + 1) as i64, end as i64)
 
