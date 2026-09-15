@@ -919,6 +919,20 @@ unsafe fn translate_type_recursive_mode(s: *mut CImportSession, ty: CXType, dept
             buf_append_str(&raw mut buf as *mut [64]u8 as *mut u8, &raw mut pos, 64, qual)
             buf_append_str(&raw mut buf as *mut [64]u8 as *mut u8, &raw mut pos, 64, " i8\0" as *const u8)
             return session_strdup(s, &buf as *const [64]u8 as *const u8)
+        // A pointer to a reserved-spelled record from a system header
+        // (`__sFILE`, glibc's `_IO_FILE`, the UCRT's `_iobuf`: what `FILE *`
+        // is) is a `c_void` pointer: the migrator never emits system
+        // records, and std.libc's fopen returns `*mut c_void`. Only the
+        // pointer: such a record embedded by value in another system record
+        // keeps its name (`__darwin_mcontext32`'s `__es`), and a project's
+        // `_Tag` keeps its identity everywhere (c_algorithms' `_RBTreeNode`).
+        if can_pointee.kind == CXType_Record and record_is_reserved_system(can_pointee) != 0:
+            var buf: [64]u8 = [0 as u8; 64]
+            var pos: i64 = 0
+            buf_append_str(&raw mut buf as *mut [64]u8 as *mut u8, &raw mut pos, 64, "*\0" as *const u8)
+            buf_append_str(&raw mut buf as *mut [64]u8 as *mut u8, &raw mut pos, 64, qual)
+            buf_append_str(&raw mut buf as *mut [64]u8 as *mut u8, &raw mut pos, 64, " c_void\0" as *const u8)
+            return session_strdup(s, &buf as *const [64]u8 as *const u8)
         // General pointer
         let inner = translate_type_recursive_mode(s, pointee, depth + 1, 0, preserve_incomplete_arrays)
         if inner as i64 == 0 or c_strncmp(inner as *const u8, "__UNSUPPORTED:\0" as *const u8, 14) == 0:
@@ -1027,6 +1041,24 @@ unsafe fn translate_type_recursive_mode(s: *mut CImportSession, ty: CXType, dept
 
     // Default: unsupported — must produce a loud compile error
     session_strdup(s, "__UNSUPPORTED:unknown_type_kind\0" as *const u8)
+
+/// A canonical record type whose tag is reserved-spelled (`_X`, `__x`) and
+/// whose declaration lives in a system header.
+unsafe fn record_is_reserved_system(canonical: CXType) -> i32:
+    let spelling = clang_getTypeSpelling(canonical)
+    var bare = clang_getCString(spelling)
+    if bare as i64 != 0 and c_strncmp(bare, "const \0" as *const u8, 6) == 0:
+        bare = (bare as i64 + 6) as *const u8
+    if bare as i64 != 0 and c_strncmp(bare, "volatile \0" as *const u8, 9) == 0:
+        bare = (bare as i64 + 9) as *const u8
+    if bare as i64 != 0 and c_strncmp(bare, "struct \0" as *const u8, 7) == 0:
+        bare = (bare as i64 + 7) as *const u8
+    else if bare as i64 != 0 and c_strncmp(bare, "union \0" as *const u8, 6) == 0:
+        bare = (bare as i64 + 6) as *const u8
+    let reserved = bare as i64 != 0 and *bare == '_'
+    clang_disposeString(spelling)
+    if not reserved: return 0
+    macro_location_is_system_from_cursor(clang_getTypeDeclaration(canonical))
 
 unsafe fn translate_type_recursive(s: *mut CImportSession, ty: CXType, depth: i32, is_last_struct_field: i32) -> *mut u8:
     translate_type_recursive_mode(s, ty, depth, is_last_struct_field, 0)
