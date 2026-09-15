@@ -142,7 +142,9 @@ pub fn run_corpus_promote_action(ctx: ActionCtx) -> i32:
 /// root that predates the generator's current text).
 pub fn run_corpus_bundle_root_action(ctx: ActionCtx) -> i32:
     let owned = action_corpus(ctx)
-    corpus_write_bundle_root(ctx, &owned, owned.corpus_dir)
+    if corpus_write_bundle_root(ctx, &owned, owned.corpus_dir) != 0: return 1
+    if ctx.fs().write_text(ctx.output(), "ok\n") != 0: return corpus_fail(ctx, "cannot write " ++ ctx.output())
+    0
 
 /// wo-drift: the promoted root is exactly what the migrate action writes
 /// for the corpus listing; a module added without regenerating it, or a
@@ -204,9 +206,11 @@ pub fn corpus_pipeline(out: Build, ctx: &BuildCtx, corpus: &Corpus, release_comp
     for after in corpus.promote_after: promote = promote.dep(after.clone())
     graph = graph.add_target(promote)
 
-    var root = corpus_target(.Action, corpus, "bundle-root", corpus.corpus_dir ++ "/bundle.w")
+    // A tool, not a producer: its output is a stamp, so the graph never runs
+    // it to satisfy the root as an input of the bundle and check targets.
+    var root = corpus_target(.Action, corpus, "bundle-root", "out/.build-state/" ++ corpus.stem ++ "-bundle-root.stamp")
     root.action = run_corpus_bundle_root_action
-    root = root.write_scope(corpus.corpus_dir.clone())
+    root = root.write_scope(corpus.corpus_dir.clone()).write_scope("out/.build-state")
     root = target_with_corpus_module_inputs(move root, ctx, corpus)
     graph = graph.add_target(root)
 

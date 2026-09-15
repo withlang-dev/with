@@ -146,13 +146,21 @@ pub fn corpus_count_w_files(ctx: &ActionCtx, dir: &str) -> i32:
         if path.ends_with(".w"): count = count + 1
     count
 
+// Bytewise order. Spelled as a byte loop, not `a < b`: the pinned seed's
+// comptime evaluator (the linux-aarch64 asset) does not order strings.
+fn corpus_str_less(a: &str, b: &str) -> bool:
+    let min_len = if a.len() < b.len(): a.len() else: b.len()
+    for i in 0..min_len as i32:
+        if a[i] != b[i]: return (a[i] as i32) < (b[i] as i32)
+    a.len() < b.len()
+
 pub fn corpus_sorted(items: Vec[str]) -> Vec[str]:
     var sorted: Vec[str] = Vec.new()
     for item in items:
         var placed = false
         var next: Vec[str] = Vec.new()
         for existing in sorted:
-            if not placed and item < existing:
+            if not placed and corpus_str_less(item, existing):
                 next.push(item.clone())
                 placed = true
             next.push(existing.clone())
