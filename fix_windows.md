@@ -213,8 +213,9 @@ crash:
   seeds can still bootstrap, it is a `Z` bump within `v0.15.2.x`. It only bumps
   `Y` if it makes the tree unbuildable by the group's seeds (it won't — a
   codegen/drop fix doesn't touch comptime-evaluated `build.w`).
-- **`with build :seed-compat`** (part of the local battery) proves the pinned
-  seed still builds the tree; keep it green.
+- **`with build :seed-driver`** (first in `:test`) refuses a battery driven by
+  anything but the pinned seed; the battery itself proves the seed builds the
+  tree. Keep it green.
 
 ## Files that matter
 

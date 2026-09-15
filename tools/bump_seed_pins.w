@@ -5,9 +5,9 @@
 // each `seed_sha256:` / `WITH_SEED_SHA256:` line takes the lock's digest for
 // the asset named on the nearest `seed_asset:` / `WITH_SEED_ASSET:` line of
 // the same block (the asset line sits between the version and the digest in
-// every block shape we have). `with build :seed-compat` refuses while any
-// pin disagrees with the lock, so bumping a seed is: edit seed.lock, run
-// this, commit both.
+// every block shape we have). `with build :seed-driver` (first in `:test`)
+// refuses while any pin disagrees with the lock, so bumping a seed is: edit
+// seed.lock, run this, `with build :seed`, commit the lock and the pins.
 //
 // Line endings are not content: a file is compared and written as LF (the
 // tree's form; the pins are content-hashed across platforms), and a file

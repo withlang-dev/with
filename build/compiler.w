@@ -269,11 +269,6 @@ fn comp_llvm_prefix() -> str:
 fn comp_llvm_prefix_for_root(root: &str) -> str:
     comp_abs(root, comp_llvm_prefix())
 
-/// The static LLVM SDK this build uses, absolute: LLVM_PREFIX when set,
-/// otherwise the host's `.deps/llvm-<ver>-<host>` under `root`. Exposed for
-/// lanes that run a nested build elsewhere (`:seed-compat`).
-pub fn compiler_llvm_prefix_for_root(root: &str) -> str: comp_llvm_prefix_for_root(root)
-
 // Exposed so the `deps` target can name the per-platform SDK asset and the
 // `.deps/llvm-<ver>-<host>` directory it extracts into.
 pub fn compiler_llvm_version() -> str:
@@ -408,6 +403,17 @@ fn comp_resolve_seed_compiler(ctx: &ActionCtx) -> str:
     if fs.exists(legacy_compiler):
         return legacy_compiler
     "with"
+
+/// The compiler that drives this build, as the graph resolves `"seed"`:
+/// WITH, then `with` on PATH, then src/main. The driver evaluates build.w
+/// and seeds the stage chain through the same chain, so this is the only
+/// driver identity an action has (the evaluator exports nothing about
+/// itself); `seed-driver` (build/retention.w) hashes it against seed.lock.
+pub fn compiler_resolve_seed(ctx: &ActionCtx) -> str: comp_resolve_seed_compiler(ctx)
+
+/// `path` made absolute, with a bare `with` resolved through `which`.
+pub fn compiler_resolve_command_file(ctx: &ActionCtx, capture_dir: &str, path: &str) -> str:
+    comp_resolve_command_file(ctx, capture_dir, path)
 
 fn comp_compiler_path(ctx: &ActionCtx, compiler: &str) -> str:
     if compiler == "seed":

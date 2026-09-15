@@ -561,6 +561,11 @@ pub fn build_cache_freshness_reason(root: &str, target: &BuildGraphTarget, dep_r
         return "stale: target is always run"
     if target.name == "last-green" or target.name == "test-green" or target.name == "require-last-green" or target.name == "check-committed-state" or target.name == "print-version":
         return "stale: target is always run"
+    // The pinned-driver gate answers "which compiler is running this build",
+    // a fact no input names (every action's signature already carries the
+    // driver fingerprint, so the pinned seed re-runs it on a driver change).
+    if target.name == "seed-driver":
+        return "stale: target is always run"
     // Publishing is not a function of declared inputs (env-driven, and the
     // release's add-only rule is what refuses a duplicate): never a cache hit.
     // A name, like the lanes above: a Target flag would be a std.build API

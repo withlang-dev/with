@@ -3,6 +3,8 @@ module build.retention
 use std.build
 use std.string.StringBuilder
 use std.sysinfo
+use build.seed
+use build.compiler
 fn retention_owned_text(s: &str): s ++ ""
 
 const RET_SEED_KEEP: i32 = 5
@@ -35,6 +37,9 @@ fn ret_join(left: &str, right: &str) -> str:
 
 fn ret_abs(root: &str, path: &str) -> str:
     if path.len() > 0 and path[0] == 47:
+        return retention_owned_text(path)
+    // A Windows driver path (`C:/...`, WITH on the Windows lanes).
+    if os() == "Windows" and path.len() >= 3 and path[1] == ':' and (path[2] == '/' or path[2] == '\\'):
         return retention_owned_text(path)
     ret_join(root, path)
 
@@ -582,10 +587,129 @@ fn ret_archive_verified_seed(ctx: &ActionCtx, version: &str, commit: &str, sha25
         return ret_fail(ctx, "could not write out/seed-archive/manifest.tsv")
     0
 
+// ── The pinned driver ───────────────────────────────────────────────────────
+// CI drives `build` and `:test` with the seed pinned in seed.lock, so every
+// action body here is comptime-evaluated by that released compiler. A battery
+// driven by anything newer proves nothing about CI (#1143: an action used
+// `<` on strings; the fresh driver accepted it, the pinned seed did not), so
+// `seed-driver`, `test-green` and `last-green` refuse any other driver — the
+// Rust and Go rule: the pinned stage0 builds `bootstrap`, `GOROOT_BOOTSTRAP`
+// builds `cmd/dist`, and a newer compiler is refused for that job.
+//
+// The driver is whatever the graph resolves `"seed"` to (WITH, then `with`
+// on PATH, then src/main): the evaluator exports nothing about itself, and
+// the driver seeds the stage chain through that same chain. On POSIX the
+// action's process ancestry is checked too, so `WITH=src/main with build`
+// (the pinned seed compiles, the fresh compiler evaluates build.w) is
+// refused as well.
+
+/// The host seed asset the target was registered with (release_asset_for_host).
+fn ret_seed_asset_arg(ctx: &ActionCtx) -> str:
+    let args = ctx.args()
+    if args.len() > 0: args.get(0).clone() else: ""
+
+/// The pinned digest for `asset` when the driving compiler is that seed;
+/// "" after a diagnostic naming the driver, its digest and the fix.
+fn ret_require_pinned_driver(ctx: &ActionCtx, asset: &str) -> str:
+    let fs = ctx.fs()
+    let lock = seed_lock_read(fs)
+    if lock.len() == 0:
+        let _ = ret_fail(ctx, "seed.lock is missing: the tree has no pinned seed")
+        return ""
+    if asset.len() == 0:
+        let _ = ret_fail(ctx, "no host seed asset (release_asset_for_host) for " ++ os() ++ "/" ++ arch())
+        return ""
+    let expected = seed_lock_value(lock, asset)
+    let version = seed_lock_version_for(lock, asset)
+    if version.len() == 0 or expected.len() != 64:
+        let _ = ret_fail(ctx, "seed.lock has no version or no 64-hex digest for " ++ asset)
+        return ""
+    let capture_dir = ret_join("out/command", ctx.target_name())
+    if fs.mkdir_all(capture_dir) != 0:
+        let _ = ret_fail(ctx, "could not create " ++ capture_dir)
+        return ""
+    let driver_arg = compiler_resolve_seed(ctx)
+    let driver = compiler_resolve_command_file(ctx, capture_dir, driver_arg)
+    let actual = ret_sha256_file(ctx, "driver", driver)
+    if actual.len() == 0:
+        let _ = ret_fail(ctx, "could not hash the driving compiler: " ++ driver)
+        return ""
+    if actual != expected:
+        let _ = ret_fail(ctx, ret_pinned_driver_fix("the driving compiler " ++ driver ++ " (sha256 " ++ actual ++ ") is not the pinned seed " ++ version ++ " (" ++ expected ++ ")"))
+        return ""
+    if ret_driver_ancestry_verdict(ctx, expected, version) != 0:
+        return ""
+    expected
+
+fn ret_pinned_driver_fix(problem: &str) -> str:
+    problem ++ "; the battery is driven by the pinned seed, as CI is: `with build :seed` (once per seed.lock bump), then `WITH=$PWD/src/main src/main build :test`"
+
+/// POSIX: the executables of this action's ancestor processes (the runner or
+/// the evaluating driver, then its parents). One of them must be the pinned
+/// seed; when none can be resolved to a file the check reports itself
+/// unverified instead of failing.
+fn ret_driver_ancestry_verdict(ctx: &ActionCtx, expected: &str, version: &str) -> i32:
+    if os() == "Windows":
+        return 0
+    let fs = ctx.fs()
+    let root = ctx.project_info().project_root()
+    let capture_dir = ret_join("out/command", ctx.target_name())
+    let probe: Vec[str] = Vec.new()
+    probe.push("sh")
+    probe.push("-c")
+    probe.push("p=$PPID; n=0; while [ \"$p\" -gt 1 ] && [ $n -lt 8 ]; do e=$(readlink /proc/$p/exe 2>/dev/null || ps -o comm= -p $p 2>/dev/null); echo \"$e\"; p=$(ps -o ppid= -p $p 2>/dev/null | tr -d ' '); [ -n \"$p\" ] || break; n=$((n+1)); done")
+    let ancestors = ret_run_lines(ctx, "driver-ancestry", probe, 30000)
+    var seen: Vec[str] = Vec.new()
+    for i in 0..ancestors.len() as i32:
+        var exe: str = ancestors.get(i).clone()
+        if exe.len() == 0: continue
+        if exe.starts_with("-"): exe = exe.slice(1, exe.len())
+        // A bare name is a PATH lookup (`with build`): resolve it the way the
+        // shell did, so the installed compiler is named, not skipped.
+        if not exe.contains("/"):
+            let which: Vec[str] = Vec.new()
+            which.push("which")
+            which.push(exe.clone())
+            exe = ret_run_first_line(ctx, f"driver-ancestry-which-{i}", which, 30000)
+            if exe.len() == 0: continue
+        let path = ret_abs(root, exe)
+        if not fs.host_exists(path): continue
+        let sha = ret_sha256_file(ctx, f"driver-ancestry-{i}", path)
+        if sha == expected:
+            return 0
+        if sha.len() > 0: seen.push(path)
+    if seen.len() == 0:
+        print("[" ++ ctx.target_name() ++ "] driver identity unverified: no ancestor process resolves to a file (probe: " ++ ret_join(capture_dir, "driver-ancestry.stdout") ++ ")")
+        return 0
+    var message = "no ancestor process of this action is the pinned seed " ++ version ++ "; the build system is being evaluated by another compiler:"
+    for i in 0..seen.len() as i32: message = message ++ "\n  " ++ seen.get(i)
+    ret_fail(ctx, ret_pinned_driver_fix(message))
+
+/// `with build :seed-driver` (arg: host seed asset). Fails fast, first in
+/// `:test`, when the driver is not the pinned seed or a workflow pin
+/// disagrees with seed.lock.
+pub fn run_seed_driver_action(ctx: ActionCtx) -> i32:
+    let asset = ret_seed_asset_arg(ctx)
+    let expected = ret_require_pinned_driver(ctx, asset)
+    if expected.len() == 0:
+        return 1
+    let lock = seed_lock_read(ctx.fs())
+    let drift = seed_lock_workflow_drift(ctx.fs(), lock)
+    if drift.len() > 0:
+        var message = "these workflow seed pins disagree with seed.lock (" ++ seed_lock_version_for(lock, asset) ++ "); `with run tools/bump_seed_pins.w` rewrites them:"
+        for i in 0..drift.len() as i32: message = message ++ "\n  " ++ drift.get(i)
+        return ret_fail(ctx, message)
+    print("[seed-driver] the driver is the pinned seed " ++ seed_lock_version_for(lock, asset) ++ "; workflow pins agree with seed.lock")
+    ret_write_output_stamp(ctx)
+
 pub fn run_test_green_action(ctx: ActionCtx) -> i32:
     let fs = ctx.fs()
     if fs.mkdir_all("out/.build-state") != 0:
         return ret_fail(ctx, "could not create out/.build-state")
+    let asset = ret_seed_asset_arg(ctx)
+    let driver_sha = ret_require_pinned_driver(ctx, asset)
+    if driver_sha.len() == 0:
+        return 1
     let compiler_path = ret_release_compiler_path()
     if not fs.exists(compiler_path):
         return ret_fail(ctx, "missing " ++ compiler_path)
@@ -602,6 +726,8 @@ pub fn run_test_green_action(ctx: ActionCtx) -> i32:
         "  \"git_commit\": \"" ++ ret_json_escape(commit_label) ++ "\",\n" ++
         "  \"host\": \"" ++ ret_json_escape(os() ++ "/" ++ arch()) ++ "\",\n" ++
         "  \"compiler_sha256\": \"" ++ ret_json_escape(compiler_sha) ++ "\",\n" ++
+        "  \"driver_sha256\": \"" ++ ret_json_escape(driver_sha) ++ "\",\n" ++
+        "  \"seed_lock_version\": \"" ++ ret_json_escape(seed_lock_version_for(seed_lock_read(fs), asset)) ++ "\",\n" ++
         "  \"test_inputs_fingerprint\": \"" ++ ret_json_escape(fingerprint) ++ "\"\n" ++
         "}\n"
     if fs.write_text("out/.build-state/test-green.json", manifest) != 0:
@@ -609,7 +735,7 @@ pub fn run_test_green_action(ctx: ActionCtx) -> i32:
     print("[test-green] recorded current test evidence in out/.build-state/test-green.json")
     0
 
-fn ret_require_test_green(ctx: &ActionCtx, compiler_sha: &str) -> i32:
+fn ret_require_test_green(ctx: &ActionCtx, compiler_sha: &str, driver_sha: &str) -> i32:
     let manifest = if ctx.fs().exists("out/.build-state/test-green.json"): ctx.fs().read_text("out/.build-state/test-green.json") else: ""
     if manifest.len() == 0:
         return ret_fail(ctx, "missing test-green manifest; run `with build :test`")
@@ -619,6 +745,9 @@ fn ret_require_test_green(ctx: &ActionCtx, compiler_sha: &str) -> i32:
     let expected_compiler = "\"compiler_sha256\": \"" ++ compiler_sha ++ "\""
     if not manifest.contains(expected_compiler):
         return ret_fail(ctx, "test-green manifest was recorded for a different compiler; run `with build :test`")
+    let expected_driver = "\"driver_sha256\": \"" ++ driver_sha ++ "\""
+    if not manifest.contains(expected_driver):
+        return ret_fail(ctx, "test-green manifest was not recorded under the pinned seed; run `WITH=$PWD/src/main src/main build :test`")
     let expected_fingerprint = "\"test_inputs_fingerprint\": \"" ++ fingerprint ++ "\""
     if not manifest.contains(expected_fingerprint):
         return ret_fail(ctx, "test-green manifest is stale; run `with build :test`")
@@ -672,6 +801,10 @@ pub fn run_last_green_action(ctx: ActionCtx) -> i32:
     let fs = ctx.fs()
     if fs.mkdir_all("out/.build-state") != 0:
         return ret_fail(ctx, "could not create out/.build-state")
+    let asset = ret_seed_asset_arg(ctx)
+    let driver_sha = ret_require_pinned_driver(ctx, asset)
+    if driver_sha.len() == 0:
+        return 1
     let compiler_path = ret_release_compiler_path()
     if not fs.exists(compiler_path):
         return ret_fail(ctx, "missing " ++ compiler_path)
@@ -682,7 +815,7 @@ pub fn run_last_green_action(ctx: ActionCtx) -> i32:
     let compiler_sha = ret_sha256_file(ctx, "verified-compiler", compiler_path)
     if compiler_sha.len() == 0:
         return ret_fail(ctx, "could not hash " ++ compiler_path)
-    if ret_require_test_green(ctx, compiler_sha) != 0:
+    if ret_require_test_green(ctx, compiler_sha, driver_sha) != 0:
         return 1
     // D19: read the fixpoint tier's recorded evidence; never re-hash (or
     // rebuild) the objects here. Stale evidence fails loudly instead.
@@ -700,6 +833,10 @@ pub fn run_last_green_action(ctx: ActionCtx) -> i32:
     if ret_archive_verified_seed(ctx, source_version, commit_label, compiler_sha) != 0:
         return 1
     let seed_input = if fs.exists("out/.build-state/seed-input.json"): fs.read_text("out/.build-state/seed-input.json") else: ""
+    // The stage chain was seeded by the pinned seed too, not merely driven
+    // by it (stage1 records the compiler it was built with).
+    if ret_json_field(seed_input, "sha256") != driver_sha:
+        return ret_fail(ctx, ret_pinned_driver_fix("stage1 was seeded by " ++ ret_json_field(seed_input, "resolved_path") ++ " (sha256 " ++ ret_json_field(seed_input, "sha256") ++ "), not the pinned seed"))
     let seed_json = if seed_input.len() > 0: ret_trim(seed_input) else: "null"
     let manifest =
         "{\n" ++
@@ -708,6 +845,7 @@ pub fn run_last_green_action(ctx: ActionCtx) -> i32:
         "  \"git_commit\": \"" ++ ret_json_escape(commit_label) ++ "\",\n" ++
         "  \"host\": \"" ++ ret_json_escape(os() ++ "/" ++ arch()) ++ "\",\n" ++
         "  \"compiler_sha256\": \"" ++ ret_json_escape(compiler_sha) ++ "\",\n" ++
+        "  \"driver_sha256\": \"" ++ ret_json_escape(driver_sha) ++ "\",\n" ++
         "  \"stage2_fixpoint_sha256\": \"" ++ ret_json_escape(stage2_sha) ++ "\",\n" ++
         "  \"stage3_fixpoint_sha256\": \"" ++ ret_json_escape(stage3_sha) ++ "\",\n" ++
         "  \"seed_retention_count\": " ++ f"{RET_SEED_KEEP}" ++ ",\n" ++

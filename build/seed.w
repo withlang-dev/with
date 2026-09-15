@@ -211,16 +211,25 @@ pub fn run_seed_download_action(ctx: ActionCtx) -> i32:
         return seed_fail(ctx, "requires repo arg, asset arg, and output path")
     let repo = args.get(0)
     let asset_name = args.get(1)
-    if fs.exists(output_path):
-        print("seed binary already exists: " ++ output_path)
-        print("remove it first if you want to re-download")
-        return 0
+    let lock = seed_lock_read(fs)
+    let pinned = seed_lock_value(lock, asset_name)
     var tag = env("SEED_VERSION")
     // The pinned seed (seed.lock) before "the newest release": the newest
     // release is not always able to build this tree, the pinned one is.
-    if tag.len() == 0 and fs.exists("seed.lock"):
-        tag = seed_lock_value(fs.read_text("seed.lock"), "version")
+    if tag.len() == 0 and lock.len() > 0:
+        tag = seed_lock_version_for(lock, asset_name)
         if tag.len() > 0: print("pinned seed release (seed.lock): " ++ tag)
+    // Idempotent on the pin: src/main is the pinned seed, so a bump of
+    // seed.lock refetches and an unchanged lock is a no-op. A binary that is
+    // not the pinned one (a stale seed, a fresh compiler copied by hand) is
+    // replaced, never kept.
+    if fs.exists(output_path):
+        if pinned.len() == 64 and tag.len() > 0 and fs.sha256_file(output_path) == pinned:
+            print(output_path ++ " is the pinned seed " ++ tag)
+            return 0
+        print(output_path ++ " is not the pinned seed; refetching")
+        if fs.remove_file(output_path) != 0:
+            return seed_fail(ctx, "could not remove " ++ output_path)
     if tag.len() == 0:
         tag = seed_release_from_api(ctx, repo, asset_name)
         if tag.len() == 0:
@@ -244,6 +253,12 @@ pub fn run_seed_download_action(ctx: ActionCtx) -> i32:
     let verify_rc = seed_verify_download_sha256(ctx, tmp_dir, "seed-asset", url, tmp_path)
     if verify_rc != 0:
         return verify_rc
+    // The sidecar proves the download; the lock proves it is the pinned seed.
+    if pinned.len() == 64 and env("SEED_VERSION").len() == 0:
+        let actual = fs.sha256_file(tmp_path)
+        if actual != pinned:
+            let _remove_bad = fs.remove_file(tmp_path)
+            return seed_fail(ctx, asset_name ++ " " ++ tag ++ " digest " ++ actual ++ " does not match seed.lock's " ++ pinned)
     if fs.rename(tmp_path, output_path) != 0:
         return seed_fail(ctx, "could not publish seed: " ++ output_path)
     if fs.chmod(output_path, 0o755) != 0:
@@ -325,19 +340,25 @@ pub fn run_deps_download_action(ctx: ActionCtx) -> i32:
     print("static LLVM SDK installed: " ++ target_dir)
     0
 
-// ── seed.lock and `with build :seed-compat` ─────────────────────────────────
-// The tree must stay buildable by the PUBLISHED seed, not by the compiler
-// the last green battery reseeded from it. A local battery ends in
-// :update-seed, so "the seed builds HEAD" was true by construction while
-// CI was red for two days (2026-09-02..04: C3's build/wo.w action needed
-// the unreleased native build runner, then build.w indexed a str at
-// comptime). This lane runs the pinned seed against a copy of the tree:
-// the seed evaluates build.w and compiles src/ into stage1 — exactly what
-// CI's first step does — and refuses when a workflow pin disagrees with
-// seed.lock, so the pin can only move in one place.
+// ── seed.lock and the pinned driver ─────────────────────────────────────────
+// CI drives `build` and `:test` with the seed pinned in seed.lock, so every
+// action body in build.w and build/*.w is comptime-evaluated by that
+// released compiler. The local battery is driven the same way: `with build
+// :seed` keeps src/main at the pinned asset, `WITH=$PWD/src/main src/main
+// build ...` runs the battery, and `seed-driver` (build/retention.w) refuses
+// `:test`, `:test-green` and `:last-green` under any other driver — the Rust
+// and Go rule (the pinned stage0 builds `bootstrap`; `GOROOT_BOOTSTRAP` builds
+// `cmd/dist`). Before this, the battery ended in `:update-seed`, the local
+// seed chased the tree, and features only the fresh compiler had passed
+// locally and broke CI (2026-09-02..04, #1143). The workflow pins must equal
+// the lock, so the pin can only move in one place.
+
+/// The text of seed.lock; "" when the tree has none.
+pub fn seed_lock_read(fs: &ToolFs) -> str:
+    if fs.exists("seed.lock"): fs.read_text("seed.lock") else: ""
 
 /// One `key=value` line of seed.lock; "" when the key is absent.
-fn seed_lock_value(lock: &str, key: &str) -> str:
+pub fn seed_lock_value(lock: &str, key: &str) -> str:
     for line in lock.split("\n"):
         let l = line.trim()
         if l.starts_with("#") or l.len() == 0: continue
@@ -348,7 +369,7 @@ fn seed_lock_value(lock: &str, key: &str) -> str:
 /// The seed version an asset is pinned to: `<asset>.version=` when the lock
 /// carries one (a platform that cannot bootstrap the newest seed yet — say
 /// which issue in the lock's comment), else `version=`.
-fn seed_lock_version_for(lock: &str, asset: &str) -> str:
+pub fn seed_lock_version_for(lock: &str, asset: &str) -> str:
     let own = seed_lock_value(lock, asset ++ ".version")
     if own.len() > 0: own else: seed_lock_value(lock, "version")
 
@@ -370,7 +391,7 @@ fn seed_lock_block_asset(lines: &Vec[str], i: i64) -> str:
 /// that disagree ("file:line: <line>"), empty when all agree. A version line
 /// is checked against its block's asset (see seed_lock_block_asset), a
 /// digest line against the asset named since.
-fn seed_lock_workflow_drift(fs: &ToolFs, lock: &str) -> Vec[str]:
+pub fn seed_lock_workflow_drift(fs: &ToolFs, lock: &str) -> Vec[str]:
     var drift: Vec[str] = Vec.new()
     let dir = ".github/workflows"
     for path in fs.list_files(dir):
@@ -398,135 +419,3 @@ fn seed_lock_workflow_drift(fs: &ToolFs, lock: &str) -> Vec[str]:
                 if at >= 0 and line.slice(at + skey.len(), line.len()).trim() != seed_lock_value(lock, pending_asset):
                     drift.push(f"{path}:{nr}: {line}")
     drift
-
-/// The pinned seed binary for this host, fetched once per version into
-/// out/seed-compat/seeds and verified against the lock's digest.
-fn seed_compat_fetch_seed(ctx: &ActionCtx, repo: &str, asset: &str, version: &str, digest: &str) -> str:
-    let fs = ctx.fs()
-    let dir = seed_join("out/seed-compat/seeds", version)
-    let path = seed_join(dir, asset)
-    if fs.exists(path) and fs.sha256_file(path) == digest:
-        return path
-    if fs.mkdir_all(dir) != 0:
-        ctx.diagnostics().error(ctx.target_name() ++ ": could not create " ++ dir)
-        return ""
-    let url = "https://github.com/" ++ repo ++ "/releases/download/" ++ version ++ "/" ++ asset
-    let tmp = path ++ ".tmp"
-    let _rm = fs.remove_file(tmp)
-    print("seed-compat: fetching pinned seed " ++ version ++ " (" ++ asset ++ ")")
-    if seed_fetch_to_file(ctx, dir, "seed-compat-seed", url, tmp, 300000) != 0:
-        return ""
-    let actual = fs.sha256_file(tmp)
-    if actual != digest:
-        ctx.diagnostics().error(ctx.target_name() ++ ": " ++ asset ++ " " ++ version ++ " digest " ++ actual ++ " does not match seed.lock's " ++ digest)
-        return ""
-    if fs.rename(tmp, path) != 0 or fs.chmod(path, 0o755) != 0:
-        ctx.diagnostics().error(ctx.target_name() ++ ": could not publish " ++ path)
-        return ""
-    path
-
-/// `with build :seed-compat` (args: repo, host asset). See the section note.
-pub fn run_seed_compat_action(ctx: ActionCtx) -> i32:
-    let fs = ctx.fs()
-    let args = ctx.args()
-    if args.len() < 2:
-        return seed_fail(ctx, "requires repo and asset args")
-    let repo = args.get(0)
-    let asset = args.get(1)
-    let root = ctx.project_info().project_root()
-    let output_dir = ctx.output()
-    if output_dir.len() == 0:
-        return seed_fail(ctx, "missing output directory")
-    if fs.exists(output_dir) and fs.remove_tree(output_dir) != 0:
-        return seed_fail(ctx, "could not remove " ++ output_dir)
-    if fs.mkdir_all(output_dir) != 0:
-        return seed_fail(ctx, "could not create " ++ output_dir)
-
-    if not fs.exists("seed.lock"):
-        return seed_fail(ctx, "seed.lock is missing: the tree has no pinned seed")
-    let lock = fs.read_text("seed.lock")
-    let version = seed_lock_value(lock, "version")
-    let digest = seed_lock_value(lock, asset)
-    if version.len() == 0 or digest.len() != 64:
-        return seed_fail(ctx, "seed.lock has no version or no 64-hex digest for " ++ asset)
-
-    let drift = seed_lock_workflow_drift(fs, lock)
-    if drift.len() > 0:
-        var message = "these workflow seed pins disagree with seed.lock (" ++ version ++ "):"
-        for d in drift: message = message ++ "\n  " ++ d
-        return seed_fail(ctx, message)
-
-    let seed = seed_compat_fetch_seed(&ctx, repo, asset, version, digest)
-    if seed.len() == 0:
-        return 1
-    let seed_abs_path = seed_abs(root, seed)
-
-    // A copy of the tree, so the seed's build touches nothing under out/ or
-    // the checkout: the bootstrap inputs only (no .git — the version stamp
-    // then reads the plain src/version, which is what a release tarball
-    // sees too).
-    let tree = "out/seed-compat/tree"
-    if fs.exists(tree) and fs.remove_tree(tree) != 0:
-        return seed_fail(ctx, "could not remove " ++ tree)
-    if fs.mkdir_all(tree) != 0:
-        return seed_fail(ctx, "could not create " ++ tree)
-    for d in ["src", "lib", "rt", "runtime", "build", "tools"]:
-        if fs.exists(d) and fs.copy_tree(d, seed_join(tree, d)) != 0:
-            return seed_fail(ctx, "could not copy " ++ d)
-    for f in ["build.w", "seed.lock", "with.toml"]:
-        if fs.exists(f) and fs.copy_file(f, seed_join(tree, f)) != 0:
-            return seed_fail(ctx, "could not copy " ++ f)
-    if fs.mkdir_all(seed_join(tree, "docs")) != 0 or fs.copy_file("docs/with-abi.sha256", seed_join(tree, "docs/with-abi.sha256")) != 0:
-        return seed_fail(ctx, "could not copy docs/with-abi.sha256")
-    // The static LLVM SDK: the embedded-clang-resource target resolves
-    // `.deps/llvm-<ver>-<host>/lib/clang` relative to the tree root, not
-    // through LLVM_PREFIX, so the copy links the checkout's .deps.
-    if fs.exists(".deps") and fs.symlink(".deps", seed_join(tree, ".deps")) != 0:
-        return seed_fail(ctx, "could not link .deps into " ++ tree)
-
-    // The pinned seed drives AND seeds the build: WITH names it explicitly
-    // (build.w resolves WITH, then `with` on PATH, then src/main — an unset
-    // WITH would silently test the installed compiler instead).
-    var child_env = process_env()
-    child_env = child_env.set("WITH", seed_abs_path ++ "")
-    child_env = child_env.set("WITH_OUT_DIR", seed_abs(root, seed_join(tree, "out")))
-    child_env = child_env.set("LLVM_PREFIX", compiler_llvm_prefix_for_root(root))
-    var argv: Vec[str] = Vec.new()
-    argv.push(seed_abs_path ++ "")
-    argv.push("build")
-    argv.push(":stage1")
-    let stdout_path = seed_abs(root, seed_join(output_dir, "stage1.stdout"))
-    let stderr_path = seed_abs(root, seed_join(output_dir, "stage1.stderr"))
-    print("seed-compat: " ++ version ++ " builds stage1 of the tree copy")
-    let result = ctx.process_runner().run_capture_cwd_with_env(argv, stdout_path, stderr_path, 1800000, seed_abs(root, tree), move child_env)
-    // The success signal is the artifact, not the exit code: the pinned seed
-    // runs its own memory tripwire (#679, a hard 1 GiB) over the nested
-    // build, and a legitimate ~1 GiB compile trips it on a memory-tight
-    // runner AFTER stage1 is already written — that is the old seed's budget,
-    // not this tree's, and it does not mean the seed cannot build the tree.
-    // So a nonzero exit that still produced stage1 is a pass with a note; a
-    // nonzero exit with no stage1 is the real "cannot build" failure.
-    let stage1 = seed_join(tree, "out/bootstrap/bin/with-stage1")
-    let combined = result.stdout ++ "\n" ++ result.stderr
-    if not fs.exists(stage1):
-        var message = f"the pinned seed {version} cannot build this tree (exit code {result.rc}); the first change that needs a newer seed must tag that seed first:"
-        var shown = 0
-        for line in combined.split("\n"):
-            if (line.starts_with("error") or line.contains("failed:")) and shown < 8:
-                message = message ++ "\n  " ++ line
-                shown = shown + 1
-        return seed_fail(ctx, message ++ "\n  full output: " ++ stdout_path ++ " " ++ stderr_path)
-    if result.rc != 0:
-        // stage1 exists but the build exited nonzero: only the seed's own RSS
-        // tripwire may be tolerated here (it fires post-artifact); any other
-        // nonzero cause is a real failure the artifact happens to survive.
-        var only_tripwire = true
-        for line in combined.split("\n"):
-            if (line.starts_with("error") or line.contains("failed:")) and not line.contains("rss tripwire") and not line.contains("seed-compat"):
-                only_tripwire = false
-        if not only_tripwire:
-            return seed_fail(ctx, f"the pinned seed {version} built stage1 but exited {result.rc} for a reason beyond its RSS tripwire; see " ++ stderr_path)
-        print(f"seed-compat: {version} built stage1; its own RSS tripwire fired on the nested build (#679, the old seed's budget) — tolerated")
-    let _ = fs.write_text(seed_join(output_dir, ".stamp"), "ok")
-    print("seed-compat: ok — " ++ version ++ " builds stage1")
-    0

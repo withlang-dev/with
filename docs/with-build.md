@@ -81,7 +81,7 @@ commands that replaced the old Make aliases:
 | `make fixpoint` | `with build :fixpoint` |
 | `make install` | `with build :install` |
 | `make install-user` | `with build :install-user` |
-| `make update-seed` | `with build :update-seed` |
+| `make update-seed` | gone: `src/main` is the seed pinned in `seed.lock`; `with build :seed` writes it |
 | `make clean` | `with build :clean` |
 | `make seed` after a seed already exists | `with build :seed` |
 | `make deps` | `with build :deps` |

@@ -459,7 +459,7 @@ with build :stage2      # stage1 → stage2
 with build :fixpoint    # verify stage2 == stage3 (byte-identical)
 with build :test        # run test suite
 with build :test-green  # verify/record current test evidence
-with build :seed-compat # the seed pinned in seed.lock builds stage1 of this tree (in :test)
+with build :seed-driver # the driver is the seed pinned in seed.lock; workflow pins agree (first in :test)
 with build :clean       # remove build artifacts
 ```
 
@@ -499,13 +499,28 @@ builds are fast.)
 
 Resolution order: `WITH=<path>` → `with` on PATH → `src/main`
 
-`src/main` is not checked into git. It is the local seed path fetched from the
-`with-darwin-aarch64` GitHub release asset. Run `with build :seed` to fetch it.
-After `with build`, `with build :fixpoint`, and `with build :test` pass, run
-`with build :test-green` and `with build :last-green`, then update `src/main`
-with `with build :update-seed` and the installed compiler with
-`with build :install-user`. `:test-green` records evidence from a completed test
-run; it is not a substitute for running `:test`.
+`src/main` is not checked into git. It is always the seed pinned in `seed.lock`,
+fetched from the `with-darwin-aarch64` GitHub release asset by `with build
+:seed` (a no-op while it matches the lock; a bump of the lock refetches). The
+battery is driven by that seed, exactly as CI is — never by the installed
+compiler:
+
+```
+with build :seed                      # once per seed.lock bump
+export WITH=$PWD/src/main
+src/main build
+src/main build :fixpoint
+src/main build :test                  # seed-driver runs first, test-green last
+src/main build :last-green
+src/main build :install-user          # the fresh compiler to ~/.local/bin/with
+```
+
+`seed-driver` refuses `:test`, `:test-green` and `:last-green` when the
+driver's digest is not the lock's (or an ancestor process is another
+compiler), so a green cannot be recorded under the wrong driver. There is no
+`:update-seed`: only `:seed` writes `src/main`. `:test-green` records evidence
+from a completed test run; it is not a substitute for running `:test`. The
+iterate tier (`with check`, `with build :dev`) uses the installed compiler.
 
 If the seed, installed compiler, and release binaries are all broken, the
 compiler cannot be recovered.
@@ -657,14 +672,14 @@ and/or `with build :dev` (seed → stage1, one self-compile), plus the targeted
 tests for what you touched. Never run the full battery per edit.
 
 **Batch tier — the default.** Accumulate related commits; ONE battery blesses
-the whole batch:
+the whole batch, driven by the pinned seed (`WITH=$PWD/src/main`):
 ```
-with build              # must pass
-with build :fixpoint    # must pass
+src/main build              # must pass
+src/main build :fixpoint    # must pass
 ```
 plus `audit:all`, `:test`, `:test-green`, `:last-green` (`audit:all` and `:test`
-may run concurrently — they share no outputs), then reseed once. Batteries are
-expensive; batching them is the discipline, not a shortcut.
+may run concurrently — they share no outputs), then `:install-user` once.
+Batteries are expensive; batching them is the discipline, not a shortcut.
 
 **Isolation rule — blast radius, not ritual.** A change to ownership/drop
 scheduling, codegen determinism, or ABI must be ALONE in its batch (and adds
@@ -896,13 +911,13 @@ There is **no `NK_VAR_DECL`**. Mutable variables use the mut flag on
 
 ## Success Checklist
 
-A change is acceptable only if:
+A change is acceptable only if (driven by the pinned seed, `WITH=$PWD/src/main`):
 
 ```
-with build              # compiles
-with build :fixpoint    # stage2 == stage3
-with build :test        # no regressions
-with build :test-green  # current test evidence recorded
+src/main build              # compiles
+src/main build :fixpoint    # stage2 == stage3
+src/main build :test        # no regressions
+src/main build :test-green  # current test evidence recorded
 ```
 
 If any step fails, continue debugging until it passes.
@@ -923,18 +938,19 @@ exists in the repo before it merges — if a change needs a newer seed, tag a
 release to be that seed first.
 
 The pinned seed is `seed.lock` (version and per-platform digests); every CI
-lane and `with build :seed` read it, and `with build :seed-compat` (part of
-`:test`) fetches that seed and builds stage1 of a copy of the tree with it,
-refusing when any workflow pin disagrees with the lock. The local battery
-cannot check this on its own: it ends in `:update-seed`, so the local seed
-always chases the tree. build.w, `build/*.w` and `lib/std/build.w` are
-comptime-evaluated by the seed that runs `with build`, so a language or
-evaluator feature used there raises the minimum seed — never revert the
-surface to appease an old seed (Eric, 2026-09-04); cut a newer seed, bump
-`seed.lock`, and land the change after. Main was unbuildable by every
-published seed for two days (2026-09-02..04) because nothing ran the
-published seed against the tree and twelve red CI runs on direct pushes
-went unread; `:seed-compat` red is a stop-the-line failure.
+lane and `with build :seed` read it. The local battery is driven by that seed
+(§Seed Compiler), so what runs locally is what runs on CI: build.w,
+`build/*.w` and `lib/std/build.w` are comptime-evaluated by the driver, and
+every action body runs under the pinned seed's evaluator. `seed-driver`
+(first in `:test`, a dep of `:test-green` and `:last-green`) refuses any other
+driver and any workflow pin that disagrees with the lock. A language or
+evaluator feature used in the build layer raises the minimum seed — never
+revert the surface to appease an old seed (Eric, 2026-09-04); cut a newer
+seed, bump `seed.lock` (`with run tools/bump_seed_pins.w`, `with build
+:seed`), and land the change after. Main was unbuildable by every published
+seed for two days (2026-09-02..04) because the local seed chased the tree and
+twelve red CI runs on direct pushes went unread; `seed-driver` red is a
+stop-the-line failure.
 
 ### The seed compiler is frozen
 The installed compiler at ~/.local/bin/with has its own Link.w, embedded runtime

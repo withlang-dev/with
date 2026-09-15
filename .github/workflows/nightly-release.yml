@@ -162,20 +162,27 @@ jobs:
           WITH: ${{ github.workspace }}/src/main
         run: src/main build
 
-      - name: Select rebuilt compiler
-        run: echo "WITH=$GITHUB_WORKSPACE/out/release/bin/with" >> "$GITHUB_ENV"
-
       - name: Verify fixpoint
-        run: ./out/release/bin/with build :fixpoint
+        env:
+          WITH: ${{ github.workspace }}/src/main
+        run: src/main build :fixpoint
 
       - name: Green battery (build :test)
         # The release UAT gate requires last-green, and last-green requires the
         # test-green evidence `:test` records: the asset this job publishes is
         # the one the battery blessed, not merely the one that fixpointed.
-        run: ./out/release/bin/with build :test
+        # Driven by the pinned seed: seed-driver refuses any other driver.
+        env:
+          WITH: ${{ github.workspace }}/src/main
+        run: src/main build :test
 
       - name: Record last-green (the release UAT gate reads it)
-        run: ./out/release/bin/with build :last-green
+        env:
+          WITH: ${{ github.workspace }}/src/main
+        run: src/main build :last-green
+
+      - name: Select rebuilt compiler (the release UAT runs the rebuilt binary as the orchestrator)
+        run: echo "WITH=$GITHUB_WORKSPACE/out/release/bin/with" >> "$GITHUB_ENV"
 
       - name: Provide a display and software OpenGL (Linux)
         if: runner.os == 'Linux'
@@ -369,7 +376,7 @@ jobs:
         run: ./src/main.exe build :test
 
       - name: Record last-green (the release UAT gate reads it)
-        run: ./out/release/bin/with.exe build :last-green
+        run: ./src/main.exe build :last-green
 
       - name: Provide software OpenGL (Mesa llvmpipe)
         # The runner's stock driver stops at OpenGL 1.1; raylib needs 3.3. The
@@ -568,11 +575,16 @@ jobs:
         run: ./src/main build :fixpoint
 
       - name: Green battery (build :test)
-        # last-green requires the test-green evidence `:test` records.
+        # last-green requires the test-green evidence `:test` records; driven
+        # by the pinned seed (seed-driver refuses any other driver).
+        env:
+          WITH: ${{ github.workspace }}/src/main
         run: ./src/main build :test
 
       - name: Record last-green (the release UAT gate reads it)
-        run: ./out/release/bin/with build :last-green
+        env:
+          WITH: ${{ github.workspace }}/src/main
+        run: ./src/main build :last-green
 
       - name: Provide a display and software OpenGL
         run: |
@@ -739,7 +751,7 @@ jobs:
         run: ./src/main.exe build :test
 
       - name: Record last-green (the release UAT gate reads it)
-        run: ./out/release/bin/with.exe build :last-green
+        run: ./src/main.exe build :last-green
 
       - name: Provide software OpenGL (Mesa llvmpipe, arm64)
         # As on windows-x86_64: the spiral UAT places this opengl32.dll beside
