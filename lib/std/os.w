@@ -5,7 +5,9 @@
 // application code should prefer layer-2 modules such as std.fs, std.process,
 // and std.sysinfo.
 
-use c_import("int getpid(void); int isatty(int);")
+// Compiler-owned modules never c_import: the process id and the terminal
+// test come from the runtime and std.libc's isatty seam.
+use std.libc.isatty
 
 extern fn with_sysinfo_os() -> str
 extern fn with_sysinfo_arch() -> str
@@ -65,7 +67,7 @@ pub fn process_id() -> i32:
 
 /// POSIX getpid wrapper. Prefer process_id() in cross-platform code.
 pub fn posix_process_id() -> i32:
-    getpid()
+    with_getpid()
 
 /// POSIX isatty wrapper. Prefer layer-2 terminal APIs once available.
 pub fn posix_fd_is_terminal(fd: i32) -> bool:

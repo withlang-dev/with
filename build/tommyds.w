@@ -29,7 +29,7 @@ pub fn tommyds_corpus() -> Corpus:
         // program, never in the bundle root (`check` collides with the
         // prelude name, so the migrator spells the module check_)
         harness: ["check_"], drift_harness: "check_.w", drift_harness_arg: "",
-        module_floor: 14, defines: Vec.new(), excludes: Vec.new(),
+        module_floor: 14, defines: Vec.new(), excludes: Vec.new(), declared_externs: Vec.new(),
         promote_after: Vec.new(), test_lane: "tommyds-test",
         prepare_reference: corpus_no_prepare, stage: tommy_stage,
         migrate: corpus_migrate_directory, finish_generated: corpus_no_finish,

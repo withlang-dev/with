@@ -14,13 +14,18 @@ extern fn rt_write(fd: i32, buf: *const u8, len: u64) -> i64
 extern fn rt_close(fd: i32) -> i32
 
 // ── libSystem extern fns ────────────────────────────────────────
-extern fn mkstemp(template_path: *mut u8) -> i32
+// mkstemp and realpath are the runtime's with_libc_* seams (one body per
+// backend; Windows has neither name), never the host's symbols.
+extern fn with_libc_mkstemp(template_path: *mut i8) -> i32
+extern fn with_libc_realpath(path: *const i8, resolved_path: *mut i8) -> *mut i8
+unsafe fn mkstemp(template_path: *mut u8) -> i32: with_libc_mkstemp(template_path as *mut i8)
+unsafe fn realpath(path: *const u8, resolved_name: *mut u8) -> *mut u8:
+    with_libc_realpath(path as *const i8, resolved_name as *mut i8) as *mut u8
 extern fn unlink(path: *const u8) -> i32
 extern fn opendir(path: *const u8) -> *mut u8
 extern fn readdir(dirp: *mut u8) -> *mut u8
 extern fn closedir(dirp: *mut u8) -> i32
 extern fn strtod(str: *const u8, endptr: *mut *mut u8) -> f64
-extern fn realpath(path: *const u8, resolved_name: *mut u8) -> *mut u8
 extern fn with_fs_read_file(path: &str) -> str
 extern fn with_fs_remove_file(path: &str) -> i32
 extern fn with_fs_file_exists(path: &str) -> i32

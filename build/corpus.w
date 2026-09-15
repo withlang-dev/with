@@ -53,6 +53,9 @@ pub type Corpus ephemeral {
     // preprocessor defines and excluded basenames for the directory migration
     defines: Vec[str],
     excludes: Vec[str],
+    // functions upstream declares in its own headers but never defines (the
+    // migrated extern has no body anywhere; it links only while unreferenced)
+    declared_externs: Vec[str],
     // lane targets a promote waits for (the corpus's own tests)
     promote_after: Vec[str],
     // the lane `:test` runs ("" = none)
@@ -241,6 +244,85 @@ pub fn corpus_reject_bad_output(ctx: &ActionCtx, corpus: &Corpus, generated: &st
             errors = errors + 1
     if modules < corpus.module_floor:
         return corpus_fail(ctx, f"only {modules} generated .w files under " ++ generated ++ f"; expected at least {corpus.module_floor}")
+    errors
+
+/// The externs a migrated module may declare: the migrator preamble's ctype,
+/// libm and with_* runtime set (ci_migrate_preamble_text, src/CiMigrate.w).
+/// Everything else a corpus reaches comes through std.libc or its own
+/// definitions, so the bundle links on every target (Eric, 2026-09-15).
+fn corpus_permitted_externs() -> str:
+    "|strlen|strcmp|strncmp|strchr|memchr|isalpha|isdigit|isalnum|isspace|isupper|islower|isxdigit|isprint|isgraph|ispunct|iscntrl|tolower|toupper|" ++
+    "sqrt|pow|floor|ceil|round|sin|cos|tan|log|log10|exp|fabs|fmod|asin|acos|atan|atan2|abort|" ++
+    "with_clz|with_ctz|with_popcount|with_bswap16|with_bswap32|with_bswap64|with_clzl|with_clzll|with_ctzl|with_ctzll|with_abs|" ++
+    "with_alloc|with_alloc_zeroed|with_realloc|with_free|with_memcpy|with_memmove|with_memset|with_memcmp|with_va_start|with_va_end|"
+
+/// Host-only symbols std.libc no longer exports; a reference in generated
+/// source means the migrator emitted the host's spelling instead of the model.
+fn corpus_retired_host_symbols() -> Vec[str]:
+    ["__stderrp", "__stdoutp", "__stdinp", "__error(", "__errno_location(", "_errno(", "__acrt_iob_func(", "_fileno(", "_isatty("]
+
+// Not `str.trim`: this runs under the comptime evaluator when the action
+// falls back to it (a verify hook that intercepts the workspace), and the
+// evaluator has no trim yet.
+fn corpus_trim(text: &str) -> str:
+    var start = 0
+    var end = text.len() as i32
+    while start < end and (text[start] == ' ' or text[start] == '\t' or text[start] == '\r'):
+        start = start + 1
+    while end > start and (text[end - 1] == ' ' or text[end - 1] == '\t' or text[end - 1] == '\r'):
+        end = end - 1
+    text.slice(start as i64, end as i64)
+
+fn corpus_ident_prefix(text: &str) -> str:
+    var end = 0
+    while end < text.len() as i32:
+        let ch = text[end]
+        let ident = (ch >= 'a' and ch <= 'z') or (ch >= 'A' and ch <= 'Z') or (ch >= '0' and ch <= '9') or ch == '_'
+        if not ident: break
+        end = end + 1
+    text.slice(0, end as i64)
+
+/// The generated tree references no foreign symbol: every extern it declares
+/// is a preamble name or one of its own definitions, no variable is
+/// declared extern, and no retired host spelling survives. Returns the
+/// error count.
+pub fn corpus_reject_foreign_symbols(ctx: &ActionCtx, corpus: &Corpus, generated: &str) -> i32:
+    let fs = ctx.fs()
+    var permitted = corpus_permitted_externs()
+    for i in 0..corpus.declared_externs.len() as i32: permitted = permitted ++ corpus.declared_externs[i] ++ "|"
+    var defined = "|"
+    var errors = 0
+    let files = fs.list_files(generated)
+    for i in 0..files.len() as i32:
+        let path = files[i]
+        if not path.ends_with(".w"): continue
+        for line in fs.read_text(path).split("\n"):
+            let l = corpus_trim(line)
+            for head in ["pub unsafe fn ", "pub fn ", "unsafe fn ", "fn "]:
+                if l.starts_with(head):
+                    defined = defined ++ corpus_ident_prefix(l.slice(head.len(), l.len())) ++ "|"
+                    break
+    for i in 0..files.len() as i32:
+        let path = files[i]
+        if not path.ends_with(".w"): continue
+        let text = fs.read_text(path)
+        var nr = 0
+        for line in text.split("\n"):
+            nr = nr + 1
+            let l = corpus_trim(line)
+            if l.starts_with("extern var ") or l.starts_with("pub extern var "):
+                ctx.diagnostics().error(corpus.name ++ f" generated source declares a foreign variable at {path}:{nr}: " ++ l)
+                errors = errors + 1
+            else if l.starts_with("extern fn ") or l.starts_with("pub extern fn "):
+                let head_len = if l.starts_with("pub "): 14 else: 10
+                let name = corpus_ident_prefix(l.slice(head_len, l.len()))
+                if not permitted.contains("|" ++ name ++ "|") and not defined.contains("|" ++ name ++ "|"):
+                    ctx.diagnostics().error(corpus.name ++ f" generated source declares the foreign symbol '" ++ name ++ f"' at {path}:{nr}; std.libc models the C surface, extend it instead")
+                    errors = errors + 1
+        for retired in corpus_retired_host_symbols():
+            if text.contains(retired):
+                ctx.diagnostics().error(corpus.name ++ " generated source references the host-only symbol '" ++ retired ++ "' in " ++ path ++ "; the migrator must emit the std.libc model")
+                errors = errors + 1
     errors
 
 /// The .wo bundle root (docs/wo_bundles.md "Root"): one `use` per corpus

@@ -51,6 +51,8 @@ pub fn c_algorithms_corpus() -> Corpus:
         // as the drift harness; they are never part of the bundle root
         harness: ["alloc_testing", "framework", "test_cpp"], drift_harness: "test_cpp.w", drift_harness_arg: "",
         module_floor: 20, defines: Vec.new(), excludes: Vec.new(),
+        // rb-tree.h declares rb_tree_subtree_height; rb-tree.c never defines it.
+        declared_externs: ["rb_tree_subtree_height"],
         promote_after: ["c-algorithms-promote-tests"], test_lane: "c-algorithms-test",
         prepare_reference: corpus_no_prepare, stage: calg_stage,
         migrate: corpus_migrate_directory, finish_generated: corpus_no_finish,

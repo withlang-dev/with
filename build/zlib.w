@@ -23,7 +23,7 @@ pub fn zlib_corpus() -> Corpus:
         // takes the .gz scratch file as its one argument, spelled inside the
         // drift dir so the harness never writes at the root
         harness: ["example", "minigzip"], drift_harness: "example.w", drift_harness_arg: "out/wo-drift/zlib/example.gz",
-        module_floor: 18, defines: Vec.new(), excludes: Vec.new(),
+        module_floor: 18, defines: Vec.new(), excludes: Vec.new(), declared_externs: Vec.new(),
         promote_after: ["zlib-test"], test_lane: "",
         prepare_reference: corpus_no_prepare, stage: zlib_stage,
         migrate: zlib_migrate, finish_generated: corpus_no_finish,

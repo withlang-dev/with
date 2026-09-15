@@ -562,6 +562,7 @@ pub fn pcre2_corpus() -> Corpus:
         module_floor: 30,
         defines: ["PCRE2_CODE_UNIT_WIDTH=8", "HAVE_CONFIG_H=1"],
         excludes: ["pcre2demo.c", "pcre2grep.c", "pcre2posix_test.c", "pcre2_jit_test.c", "pcre2_dftables.c", "pcre2_fuzzsupport.c"],
+        declared_externs: Vec.new(),
         promote_after: ["pcre2-test"], test_lane: "",
         prepare_reference: pcre2_prepare, stage: pcre2_stage,
         migrate: corpus_migrate_directory, finish_generated: pcre2_finish,
