@@ -105,10 +105,10 @@ pub fn migrate_set_shared_fragment_path(path: &str) -> Unit:
     g_migrate_shared_fragment_path = with_str_clone_ref(path)
 
 pub fn migrate_add_include_path(path: &str) -> Unit:
-    g_migrate_include_paths.push(with_str_clone_ref(path))
+    g_migrate_include_paths.push(ci_migrate_fs_path(path))
 
 pub fn migrate_add_forced_include(path: &str) -> Unit:
-    g_migrate_forced_includes.push(with_str_clone_ref(path))
+    g_migrate_forced_includes.push(ci_migrate_fs_path(path))
 
 pub fn migrate_reset_options() -> Unit:
     g_migrate_width_slice = 0
@@ -1247,21 +1247,25 @@ fn ci_migrate_file_body(input_path: &str, output_path: &str, project_active: boo
     g_migrate_fn_translated_total = g_migrate_fn_translated_total + g_migrate_fn_translated
     0
 
-pub fn migrate_c_file(input_path: &str, output_path: &str) -> i32:
+pub fn migrate_c_file(input_path_arg: &str, output_path_arg: &str) -> i32:
+    let input_path = ci_migrate_fs_path(input_path_arg)
+    let output_path = ci_migrate_fs_path(output_path_arg)
     var project = CiProject.new()
     ci_migrate_file_inner(input_path, output_path, false, &project)
 
-// Either separator: a Clang cursor location on Windows spells the file
-// with backslashes (the header-owner rule compares its stem with the
-// unit list's).
-fn ci_migrate_is_path_separator(c: u8) -> bool: c == '/' or c == '\\'
+// Every path the migrator handles is spelled with `/`: the Clang bridge
+// rewrites every location and file name it hands up (its path boundary),
+// the runtime's directory listing joins with `/`, and the CLI paths are
+// rewritten once at entry (ci_migrate_fs_path). No helper here looks for
+// `\`.
+fn ci_migrate_fs_path(path: &str) -> str: path.replace("\\", "/")
 
 fn ci_migrate_path_basename(path: &str) -> str:
     var end = path.len() as i32
-    while end > 0 and ci_migrate_is_path_separator(path[(end - 1)]):
+    while end > 0 and path[(end - 1)] == '/':
         end = end - 1
     var start = end - 1
-    while start >= 0 and not ci_migrate_is_path_separator(path[start]):
+    while start >= 0 and path[start] != '/':
         start = start - 1
     path.slice((start + 1) as i64, end as i64)
 
@@ -1464,7 +1468,9 @@ fn ci_migrate_directory_filewise(input_dir: &str, output_dir: &str, files: &Vec[
     if migrated == 0: 1 else: 0
 
 // Translate a directory of .c files to .w files.
-pub fn migrate_c_directory(input_dir: &str, output_dir: &str, exclude_basenames: &str) -> i32:
+pub fn migrate_c_directory(input_dir_arg: &str, output_dir_arg: &str, exclude_basenames: &str) -> i32:
+    let input_dir = ci_migrate_fs_path(input_dir_arg)
+    let output_dir = ci_migrate_fs_path(output_dir_arg)
     g_migrate_fn_translated_total = 0
     g_migrate_directory_input_dir = with_str_clone_ref(input_dir)
     if ci_migrate_shared_defs_active():
