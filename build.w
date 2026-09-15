@@ -1239,6 +1239,33 @@ fn run_drop_audit_action(ctx: ActionCtx) -> i32:
     let _ = report
     0
 
+// tools/rt_decl_audit.w: every `extern fn with_*` declaration in the tree
+// (lib/std, src, tools, test) matches the runtime's definition signature, so
+// a seam such as std.libc's with_libc_* cannot drift from rt/rt_core.w.
+fn run_rt_decl_audit_action(ctx: ActionCtx) -> i32:
+    let fs = ctx.fs()
+    let out_dir = ctx.output()
+    if fs.mkdir_all(out_dir) != 0:
+        ctx.diagnostics().error("rt-decl-audit: could not create output dir: " ++ out_dir)
+        return 1
+    let root = ctx.project_info().project_root()
+    let compiler = build_project_abs(root, ctx.inputs().get(0))
+    var args: Vec[str] = Vec.new()
+    args.push(build_owned_text(compiler))
+    args.push("run")
+    args.push("tools/rt_decl_audit.w")
+    let aout_rel = build_project_join(out_dir, "audit.stdout")
+    let aout = build_project_abs(root, aout_rel)
+    let aerr_rel = build_project_join(out_dir, "audit.stderr")
+    let aerr = build_project_abs(root, aerr_rel)
+    let ar = ctx.process_runner().run_capture_cwd(args, aout, aerr, 600000, root)
+    if ar.rc != 0:
+        ctx.diagnostics().error(f"rt-decl-audit: runtime declarations diverge (rc={ar.rc})\n" ++ fs.read_text(aout_rel) ++ fs.read_text(aerr_rel))
+        return 1
+    print("rt-decl-audit: " ++ build_trim_trailing_line_endings(fs.read_text(aout_rel)))
+    let _ = fs.write_text(build_project_join(out_dir, ".stamp"), "ok")
+    0
+
 // Move-checker verdict matrix (tools/move_audit.w — the compile-time analog of
 // drop-audit). Candidate = the freshly built release compiler; each cell has a
 // ground-truth expected verdict, so a drifted dataflow transfer function (the
@@ -1788,6 +1815,16 @@ pub fn build(ctx: BuildCtx) -> Build:
     spec_inventory = spec_inventory.input("src/compiler/DriverOptions.w")
     spec_inventory = spec_inventory.input("lib/std")
     out = out.add_target(spec_inventory)
+
+    // std.libc exports C-standard functions and with_libc_* seams only, and
+    // the migrator's libc allowlist agrees with it (build/compiler.w).
+    var libc_surface = target_new(.Action, "libc-surface-check", "").output("out/.build-state/libc-surface-check.txt")
+    libc_surface.action = run_check_libc_surface_action
+    libc_surface = libc_surface.write_scope("out/.build-state")
+    libc_surface = libc_surface.input("lib/std/libc.w")
+    libc_surface = libc_surface.input("src/CImport.w")
+    libc_surface = libc_surface.input("src/CiMigrate.w")
+    out = out.add_target(libc_surface)
 
     out = out.add_target(with_object_target("bootstrap-llvm-bridge-object", "seed", "src/compiler/LlvmBridge.w", "out/bootstrap-lib/llvm_bridge.o", "-O1", ""))
     out = out.add_target(with_object_target("bootstrap-clang-bridge-object", "seed", "src/compiler/ClangBridge.w", "out/bootstrap-lib/clang_bridge.o", "-O1", ""))
@@ -2468,6 +2505,17 @@ pub fn build(ctx: BuildCtx) -> Build:
     drop_audit = drop_audit.dep("build")
     drop_audit = drop_audit.write_scope("out/drop-audit")
     out = out.add_target(drop_audit)
+    var rt_decl_audit = target_new(.Action, "rt-decl-audit", "").output("out/rt-decl-audit")
+    rt_decl_audit.action = run_rt_decl_audit_action
+    rt_decl_audit = rt_decl_audit.allow_parallel()
+    rt_decl_audit = rt_decl_audit.input(release_compiler_bin("with"))
+    rt_decl_audit = rt_decl_audit.input("tools/rt_decl_audit.w")
+    rt_decl_audit = rt_decl_audit.input("rt")
+    rt_decl_audit = rt_decl_audit.input("lib/std")
+    rt_decl_audit = rt_decl_audit.input("src")
+    rt_decl_audit = rt_decl_audit.dep("build")
+    rt_decl_audit = rt_decl_audit.write_scope("out/rt-decl-audit")
+    out = out.add_target(rt_decl_audit)
     // Runtime measurements need a quiet worker pool; leave this action serial.
     var stdlib_complexity = target_new(.Action, "stdlib-complexity", "").output("out/stdlib-complexity")
     stdlib_complexity.action = run_stdlib_complexity_action
@@ -2790,6 +2838,8 @@ pub fn build(ctx: BuildCtx) -> Build:
     tests = tests.dep("emit-c-smoke")
     tests = tests.dep("requirements-informative-check")
     tests = tests.dep("spec-inventory-check")
+    tests = tests.dep("libc-surface-check")
+    tests = tests.dep("rt-decl-audit")
     tests = tests.dep("test-green")
     out = out.add_target(tests)
 

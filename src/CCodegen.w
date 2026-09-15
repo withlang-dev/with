@@ -879,7 +879,7 @@ fn cc_is_public_abi_name(name: &str) -> i32:
         return 1
     if name.starts_with("migrate_") or name.starts_with("ci_"):
         return 1
-    if name == "gethostname" or name == "pthread_self" or name == "mkstemp" or name == "realpath":
+    if name == "gethostname" or name == "pthread_self":
         return 1
     if name == "i32_to_str" or name == "i64_to_string" or name == "str_from_byte":
         return 1
@@ -1209,6 +1209,12 @@ impl CCodegen:
         let out = cc_sanitize_ident(raw)
         if self.check_interrupted() != 0:
             return "with_interrupted"
+        // A With record std.libc models under a libc name (`rlimit`) is a
+        // With type: the included C headers declare their own `struct
+        // rlimit`, so the With one is spelled apart from it, as With
+        // functions with libc names are.
+        if ci_libc_symbol_allowed_as(raw, CI_LIBC_KIND_TYPE):
+            return out ++ "__with"
         out
 
     fn type_is_payload_enum(tid: i32) -> i32:

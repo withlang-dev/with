@@ -147,9 +147,9 @@ jobs:
           export LD_LIBRARY_PATH="$PWD/.link-shim:${LD_LIBRARY_PATH:-}"
           "$WITH" build :fixpoint
 
-      # NOTE: the `build :test` green battery is deliberately NOT run here yet.
-      # On linux-aarch64 it currently fails 8 target groups (behavior-tests 7 of
+      # NOTE: the `build :test` green battery is deliberately NOT run here yet
+      # (#1149). On linux-aarch64 it fails 8 target groups (behavior-tests 7 of
       # 948 files, the three cli-selfhost suites, both c-migrator suites,
       # embedded-runtime-regression, emit-c-smoke) while build and fixpoint are
-      # green. A follow-up change fixes those and adds the `:test` step here, so
-      # this platform matches the other selfhost workflows.
+      # green. #1149 fixes those and adds `src/main build :test` here, so this
+      # platform matches the other selfhost workflows.
