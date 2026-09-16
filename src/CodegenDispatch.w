@@ -8,6 +8,7 @@ use Diagnostic
 use Source
 use Overflow
 use AnalysisTypes
+use MathBuiltins
 use std.builtins.int_to_string
 
 extern fn with_str_clone_ref(s: &str) -> str
@@ -10759,6 +10760,42 @@ impl Codegen:
                 let br_args: Vec[i64] = Vec.new()
                 br_args.push(br_val)
                 result = wl_build_call(self.builder, br_fnt, br_func, vec_data_i64(&br_args), 1)
+
+        else if intrinsic == MirIntrinsic.MATH_FN:
+            // One arm for every MathBuiltins row. The row names an LLVM
+            // intrinsic (`llvm.cos` -> `llvm.cos.f64`) or, when LLVM has none,
+            // the libm base symbol (`tan` -> `tan` / `tanf`). Width comes from
+            // the first operand; every operand shares it (Sema enforced).
+            let mf_id = body.call_math_fn_id(args_id)
+            let mf_arity = math_fn_arity(mf_id)
+            let mf_a = self.mir_intrinsic_arg(body, args_id, 0)
+            let mf_ty = wl_type_of(mf_a)
+            let mf_is_f32 = wl_get_type_kind(mf_ty) == wl_float_type_kind()
+            let mf_llvm = math_fn_llvm(mf_id)
+            var mf_fn_name = math_fn_libm(mf_id)
+            if mf_llvm.len() > 0:
+                mf_fn_name = if mf_is_f32: mf_llvm ++ ".f32" else: mf_llvm ++ ".f64"
+            else if mf_is_f32:
+                mf_fn_name = mf_fn_name ++ "f"
+            let mf_args: Vec[i64] = Vec.new()
+            mf_args.push(mf_a)
+            if mf_arity == 2:
+                mf_args.push(self.mir_intrinsic_arg(body, args_id, 1))
+            let mf_sym = self.intern.intern(mf_fn_name)
+            let mf_fv = self.fn_values.get(mf_sym)
+            let mf_ft = self.fn_fn_types.get(mf_sym)
+            if mf_fv.is_some() and mf_ft.is_some():
+                result = wl_build_call(self.builder, mf_ft.unwrap() as i64, mf_fv.unwrap() as i64, vec_data_i64(&mf_args), mf_arity)
+            else:
+                let mf_pts: Vec[i64] = Vec.new()
+                mf_pts.push(mf_ty)
+                if mf_arity == 2:
+                    mf_pts.push(mf_ty)
+                let mf_fnt = wl_function_type(mf_ty, vec_data_i64(&mf_pts), mf_arity, 0)
+                let mf_func = wl_add_function(self.llmod, mf_fn_name, mf_fnt)
+                self.fn_values.insert(mf_sym, mf_func)
+                self.fn_fn_types.insert(mf_sym, mf_fnt)
+                result = wl_build_call(self.builder, mf_fnt, mf_func, vec_data_i64(&mf_args), mf_arity)
 
         else if intrinsic == MirIntrinsic.MIN or intrinsic == MirIntrinsic.MAX:
             let mm_a = self.mir_intrinsic_arg(body, args_id, 0)

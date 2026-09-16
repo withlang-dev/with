@@ -13,6 +13,7 @@ use compiler.EmbeddedStdlib
 use Overflow
 use std.collections.HashMap
 use std.string.StringBuilder
+use MathBuiltins
 
 extern fn with_str_clone_ref(s: &str) -> str
 extern fn with_fs_read_file(path: &str) -> str
@@ -172,6 +173,7 @@ enum CcBuiltin: i32:
     VECRANGE
     FMT_BUF_WRITE_STR_REF
     STR_CLONE_REF
+    MATH_FN
 
 impl Copy for CcBuiltin
 
@@ -5310,7 +5312,7 @@ impl CCodegen:
             if dst != 0 and self.is_void_tid(dst) == 0:
                 return dst
             return self.sema.ty_i32 as i32
-        if kind == CcBuiltin.MIN or kind == CcBuiltin.MAX or kind == CcBuiltin.ABS:
+        if kind == CcBuiltin.MIN or kind == CcBuiltin.MAX or kind == CcBuiltin.ABS or kind == CcBuiltin.MATH_FN:
             let hinted = self.call_dest_expected_tid(body, dest_place)
             if hinted != 0 and self.is_void_tid(hinted) == 0:
                 return hinted
@@ -5961,6 +5963,7 @@ impl CCodegen:
         out ++ " " ++ cc_rbrace() ++ "\n"
 
 fn cc_builtin_from_mir_intrinsic(intrinsic: MirIntrinsic) -> CcBuiltin:
+    if intrinsic == MirIntrinsic.MATH_FN: return CcBuiltin.MATH_FN
     if intrinsic == MirIntrinsic.VEC_NEW: return CcBuiltin.VEC_NEW
     if intrinsic == MirIntrinsic.VEC_PUSH: return CcBuiltin.VEC_PUSH
     if intrinsic == MirIntrinsic.VEC_GET: return CcBuiltin.VEC_GET
@@ -7216,6 +7219,30 @@ impl CCodegen:
             if has_ret != 0:
                 let dst = self.place_text(body, dest_place)
                 out = out ++ "    " ++ dst ++ " = fma((" ++ fa ++ "), (" ++ fb ++ "), (" ++ fc ++ "));\n"
+            out = out ++ f"    goto bb{next_bb};"
+            return out
+
+        if kind == CcBuiltin.MATH_FN:
+            // math.h is always included; emit the width-correct C call
+            // (`cos` for double, `cosf` for float) from the MathBuiltins row.
+            let mf_id = body.call_math_fn_id(args_id)
+            let mf_arity = math_fn_arity(mf_id)
+            let mf_nm = math_fn_name(mf_id)
+            if argc < mf_arity:
+                self.fail(f"{mf_nm} expects {mf_arity} argument(s)")
+                return "    abort();"
+            var mf_sym = math_fn_libm(mf_id)
+            if self.operand_tid(body, self.call_arg_operand(body, args_id, 0)) == self.sema.ty_f32 as i32:
+                mf_sym = mf_sym ++ "f"
+            var mf_call = mf_sym ++ "((" ++ self.operand_text(body, self.call_arg_operand(body, args_id, 0)) ++ ")"
+            if mf_arity == 2:
+                mf_call = mf_call ++ ", (" ++ self.operand_text(body, self.call_arg_operand(body, args_id, 1)) ++ ")"
+            mf_call = mf_call ++ ")"
+            var out = ""
+            if has_ret != 0:
+                out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = " ++ mf_call ++ ";\n"
+            else:
+                out = out ++ "    (void)" ++ mf_call ++ ";\n"
             out = out ++ f"    goto bb{next_bb};"
             return out
 

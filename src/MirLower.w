@@ -8,6 +8,7 @@ use Mir
 use Sema
 use SemaCheck
 use Overflow
+use MathBuiltins
 extern fn with_str_clone_ref(s: &str) -> str
 extern fn with_eprint(s: &str) -> Unit
 
@@ -1939,6 +1940,8 @@ impl MirBuilder:
                 return self.sema.unsigned_counterpart(recv_type)
         if tk == TypeKind.TY_FLOAT:
             if method_name == "min" or method_name == "max" or method_name == "abs" or method_name == "mul_add":
+                return recv_type
+            if math_fn_lookup(method_name) >= 0:
                 return recv_type
         self.sema.ty_void as i32
 
@@ -8908,6 +8911,36 @@ impl MirBuilder:
             mono_sym = self.sema.sig_names[sig_idx]
         self.body.set_call_contract(args_id, sig_idx, mono_sym)
 
+    // A free math builtin (`cos(x)`, `pow(x, y)`). Sema resolved the call into
+    // math_builtin_calls; lower it as MirIntrinsic.MATH_FN with a unit callee,
+    // the same MIR the method spelling `x.cos()` produces. Called from the
+    // NK_CALL dispatch before any call shape is chosen, so no sig lookup,
+    // generic tagging, or extern resolution can claim the node first.
+    mut fn lower_math_builtin_call(node: i32, math_id: i32) -> i32:
+        let arg_exprs_start = self.ast.get_data1(node)
+        let arg_exprs_count = self.ast.get_data2(node)
+        let ret_type_id = self.expr_type(node)
+        let math_args: Vec[i32] = Vec.new()
+        for i in 0..arg_exprs_count:
+            let math_arg_node = self.ast.get_extra(arg_exprs_start + i)
+            let math_arg = self.lower_expr(math_arg_node)
+            self.consume_moved_operand(math_arg)
+            math_args.push(math_arg)
+        let math_args_id = self.body.new_call_args(math_args)
+        self.body.set_call_ast_node(math_args_id, node)
+        self.body.set_call_intrinsic(math_args_id, MirIntrinsic.MATH_FN)
+        self.body.set_call_math_fn_id(math_args_id, math_id)
+        let math_local = self.new_temp(ret_type_id)
+        let math_place = self.place_for_local(math_local)
+        let math_next = self.new_block()
+        let math_unit = self.unit_operand()
+        self.terminate(TermKind.TK_CALL, math_unit, math_args_id, math_place, math_next)
+        self.switch_to(math_next)
+        self.register_stmt_temp(math_local, ret_type_id)
+        if self.sema.is_copy_frozen(ret_type_id) != 0:
+            return self.body.new_operand(OperandKind.OK_COPY, math_place)
+        self.body.new_operand(OperandKind.OK_MOVE, math_place)
+
     mut fn lower_call(fn_expr: i32, arg_exprs_start: i32, arg_exprs_count: i32, ret_type_id: i32, node: i32) -> i32:
         let fn_op = self.lower_callable_expr(fn_expr)
         var sig_idx = self.call_sig_for_expr(fn_expr)
@@ -9811,6 +9844,7 @@ impl MirBuilder:
             if method_name == "max": return MirIntrinsic.MAX
             if method_name == "abs": return MirIntrinsic.ABS
             if method_name == "mul_add": return MirIntrinsic.FMA
+            if math_fn_lookup(method_name) >= 0: return MirIntrinsic.MATH_FN
         let type_name_sym = self.sema.get_type_name(resolved)
         if type_name_sym == 0:
             return MirIntrinsic.NONE
@@ -10514,6 +10548,10 @@ impl MirBuilder:
         // Tag call with intrinsic kind for codegen dispatch.
         let call_id = self.body.call_arg_starts.len() as i32 - 1
         self.body.set_call_intrinsic(call_id, intrinsic)
+        if intrinsic == MirIntrinsic.MATH_FN:
+            let math_method_name = self.pool.resolve_symbol(method_sym)
+            let math_method_id = math_fn_lookup(math_method_name)
+            self.body.set_call_math_fn_id(call_id, math_method_id)
 
         if self.sema.is_copy_frozen(ret_type) != 0:
             return self.body.new_operand(OperandKind.OK_COPY, result_place)
@@ -12399,6 +12437,10 @@ impl MirBuilder:
         self.terminate(TermKind.TK_CALL, fn_op, args_id, result_place, next_bb)
         self.switch_to(next_bb)
         self.body.set_call_intrinsic(args_id, intrinsic)
+        if intrinsic == MirIntrinsic.MATH_FN:
+            let math_method_name = self.pool.resolve_symbol(method_sym)
+            let math_method_id = math_fn_lookup(math_method_name)
+            self.body.set_call_math_fn_id(args_id, math_method_id)
         if self.sema.is_copy_frozen(ret_type) != 0:
             return self.body.new_operand(OperandKind.OK_COPY, result_place)
         self.body.new_operand(OperandKind.OK_MOVE, result_place)
@@ -13200,6 +13242,13 @@ impl MirBuilder:
                 self.terminate(TermKind.TK_CALL, gc_fn_op, gc_args_id, gc_place, gc_next)
                 self.switch_to(gc_next)
                 return self.call_result_operand(gc_result, gc_place, gc_ret_ty)
+            // A free math builtin: Sema decided (math_builtin_calls); honor it
+            // before variant, src(), drop, generic, or signature dispatch.
+            if self.ast.kind(callee) == NodeKind.NK_IDENT and self.sema.math_builtin_calls.contains(node):
+                // The annotation demands an owned i32 (D22): no view into
+                // self.sema stays live across the mutating lowering call.
+                let math_id: i32 = self.sema.math_builtin_calls.get(node).unwrap()
+                return self.lower_math_builtin_call(node, math_id)
             // Check for enum variant constructor call: Some(v), Ok(v), Err(e), etc.
             if self.ast.kind(callee) == NodeKind.NK_IDENT:
                 var vc_sym = self.ast.get_data0(callee)

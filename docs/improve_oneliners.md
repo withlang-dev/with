@@ -540,7 +540,7 @@ with -e 'fn s(a:str)->BTreeSet[str]:[a.slice(i,i+1) for i in 0..a.len()];let x=s
 with -e 'fn s(a:str)->BTreeSet[str]:[a.slice(i,i+1) for i in 0..a.len()];let x=s("banana");let y=s("anna");let z=x.intersection(&y);print(f"{z.len() as f64/min(x.len(),y.len()) as f64}")'
 
 # Print cosine similarity over sets of 1-grams
-with -e 'fn s(a:str)->BTreeSet[str]:[a.slice(i,i+1) for i in 0..a.len()];let x=s("banana");let y=s("anna");let z=x.intersection(&y);print(f"{z.len() as f64/sqrt_f64((x.len()*y.len()) as f64)}")'
+with -e 'fn s(a:str)->BTreeSet[str]:[a.slice(i,i+1) for i in 0..a.len()];let x=s("banana");let y=s("anna");let z=x.intersection(&y);print(f"{z.len() as f64/sqrt((x.len()*y.len()) as f64)}")'
 
 # Build an index of character positions
 with -e 'let s="banana";var m:BTreeMap[str,str]=BTreeMap.new();for i in 0..s.len(){let c=s.slice(i,i+1);let v=m.get(c).cloned().unwrap_or("");m.insert(c,v++if v=="":f"{i}" else:f" {i}")};for (c,i) in m.items():print(f"{c}: {i}")'

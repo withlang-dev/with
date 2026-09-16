@@ -10273,6 +10273,31 @@ let result = 3.0.mul_add(4.0, 5.0)    // 17.0
 Maps to a single hardware instruction on all modern architectures
 (via LLVM's `llvm.fma` intrinsic).
 
+**Floating-point math** — `sqrt`, `sin`, `cos`, `tan`, `asin`, `acos`,
+`atan`, `atan2`, `sinh`, `cosh`, `tanh`, `exp`, `exp2`, `expm1`, `log`,
+`log2`, `log10`, `log1p`, `pow`, `hypot`, `cbrt`, `fmod`, `copysign`,
+`floor`, `ceil`, `trunc`, `round`, `rint`, `nearbyint`, `fabs`, `erf`,
+`erfc`, `tgamma`, `lgamma`.
+
+Each is a builtin, spelled without a width suffix, and callable as a free
+function or as a method:
+
+```
+cos(x)          x.cos()
+pow(x, y)       x.pow(y)
+```
+
+The argument is `f32` or `f64`; the result has the argument's type, and a
+second operand must have the same type. A width is never written: the
+compiler reads it from the argument. Where a function has an LLVM intrinsic
+the call lowers to it; otherwise it lowers to the width-correct C library
+symbol. The distinction is not observable.
+
+A function of the same name defined in scope takes precedence; the builtin
+is reached only when ordinary resolution finds nothing. An `extern fn`
+declaration of a builtin's name does not shadow it: for `f64` the two name
+the same symbol, and only the builtin is correct for `f32`.
+
 ### 17.7 Constraints
 
 1. **No runtime reflection.** `TypeInfo` is only available in

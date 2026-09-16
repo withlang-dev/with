@@ -11,6 +11,7 @@ use Diagnostic
 use InternPool
 use TypeLayout
 use render
+use MathBuiltins
 use std.builtins.int_to_string
 use std.regex.Regex
 
@@ -15272,8 +15273,15 @@ impl Sema:
         // D29: a lexical CALLABLE binding preempts a module-level signature
         // of the same flat name (same-module shadowing is already rejected,
         // so this only decides the cross-module case in favor of the local).
+        // A math builtin outranks an EXTERN declaration of its own name. D29
+        // makes every extern global, so the migrator's `extern fn cos(f64)`
+        // (and libm decls in any corpus) would otherwise shadow the builtin
+        // and silently widen an f32 argument. For f64 the two are the same
+        // symbol; a real, non-extern definition still wins.
+        let math_extern_yields = sig_idx_raw >= 0 and self.extern_fn_names.contains(self.sig_names[sig_idx_raw]) and math_fn_lookup(self.pool_resolve(fn_sym)) >= 0
         let sig_idx = if callable_value_tid != 0: -1
             else if sig_idx_raw >= 0 and self.is_ci_visible(fn_sym) == 0: -1
+            else if math_extern_yields: -1
             else: sig_idx_raw
         let variant_expected_ty = if self.variant_lookup.contains(fn_sym) and self.is_ci_visible(fn_sym) != 0: self.expected_variant_constructor_type(fn_sym) else: 0
         let imported_variant_owner_for_call = if self.imported_variant_owners.contains(fn_sym): self.imported_variant_owners.get(fn_sym).unwrap() else: 0
@@ -19173,6 +19181,10 @@ impl Sema:
         if tk == TypeKind.TY_FLOAT:
             if method_name == "min" or method_name == "max" or method_name == "abs" or method_name == "mul_add":
                 return recv_type
+            // `x.cos()`: every MathBuiltins row is a width-generic float method
+            // whose result is the receiver's own float type.
+            if math_fn_lookup(method_name) >= 0:
+                return recv_type
 
         0
 
@@ -19190,6 +19202,12 @@ impl Sema:
                 return resolved as i32
             if self.pool_resolve(field) == "mul_add" and (arg_index == 0 or arg_index == 1):
                 return resolved as i32
+            // A two-operand math builtin as a method (`x.pow(y)`): the one
+            // explicit argument shares the receiver's float type.
+            if recv_tk == TypeKind.TY_FLOAT and arg_index == 0:
+                let math_id = math_fn_lookup(self.pool_resolve(field))
+                if math_id >= 0 and math_fn_arity(math_id) == 2:
+                    return resolved as i32
         var owner_sym = 0
         if self.get_type_kind(resolved) == TypeKind.TY_GENERIC_INST:
             owner_sym = self.get_generic_inst_base(resolved as i32)
@@ -21350,6 +21368,10 @@ impl Sema:
             return 1
         if fn_sym == self.syms.embed_file:
             return 1
+        // A free math builtin (`cos(x)`). Reached only after every user and
+        // stdlib resolution has failed, so a user's own `fn cos` shadows it.
+        if math_fn_lookup(self.pool_resolve(fn_sym)) >= 0:
+            return 1
         0
 
     mut fn check_intrinsic_call(fn_sym: i32, node: i32, arg_types: &Vec[i32], arg_count: i32) -> i32:
@@ -21434,6 +21456,35 @@ impl Sema:
             if not read_result.ok:
                 self.emit_error(read_result.error_msg, node)
             return self.ty_str as i32
+        // Free math builtin: `cos(x)`, `pow(x, y)`. Width-generic — the result
+        // is the argument's float type, and a second operand must share it.
+        // The name is resolved inline in each message: pool_resolve hands back
+        // a view into self, which may not be live across emit_error.
+        let math_id = math_fn_lookup(self.pool_resolve(fn_sym))
+        if math_id >= 0:
+            let math_arity = math_fn_arity(math_id)
+            if arg_count != math_arity:
+                if math_arity == 1:
+                    self.emit_error(self.pool_resolve(fn_sym) ++ "() expects one floating-point argument", node)
+                else:
+                    self.emit_error(self.pool_resolve(fn_sym) ++ "() expects two floating-point arguments of the same type", node)
+                return 0
+            let first_ty = arg_types.get(0)
+            if first_ty == 0:
+                return 0
+            let first_resolved = self.resolve_alias(first_ty)
+            if self.get_type_kind(first_resolved) != TypeKind.TY_FLOAT:
+                let first_node = self.ast.get_extra(args_start)
+                self.emit_error(self.pool_resolve(fn_sym) ++ "() takes a floating-point argument (f32 or f64)", first_node)
+                return 0
+            if math_arity == 2:
+                let second_ty = arg_types.get(1)
+                if second_ty != 0 and self.resolve_alias(second_ty) != first_resolved:
+                    let second_node = self.ast.get_extra(args_start + 1)
+                    self.emit_error(self.pool_resolve(fn_sym) ++ "() operands must be the same float type", second_node)
+                    return 0
+            self.math_builtin_calls.insert(node, math_id)
+            return first_resolved as i32
         0
 
     fn static_receiver_base_sym(expr: i32) -> i32:

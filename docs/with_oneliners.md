@@ -513,7 +513,7 @@ Print the overlap coefficient based on sets of 1-grams
 
 Print the cosine similarity based on sets of 1-grams
 
-    with -e 'fn s(a:str)->BTreeSet[str]:[a.slice(i,i+1) for i in 0..a.len()];let x=s("banana");let y=s("anna");let z=x.intersection(&y);print(f"{z.len() as f64/sqrt_f64((x.len()*y.len()) as f64)}")'
+    with -e 'fn s(a:str)->BTreeSet[str]:[a.slice(i,i+1) for i in 0..a.len()];let x=s("banana");let y=s("anna");let z=x.intersection(&y);print(f"{z.len() as f64/sqrt((x.len()*y.len()) as f64)}")'
     POSSIBLE_IMPROVE
 
 Build and print an index of characters within a string

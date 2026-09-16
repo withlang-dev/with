@@ -314,6 +314,9 @@ enum MirIntrinsic: i32:
     SLOTMAP_ULEN32
     FMT_BUF_WRITE_STR_REF
     STR_CLONE_REF
+    // A floating-point math builtin (`cos(x)` / `x.cos()`); the MathBuiltins
+    // row id rides on the call (call_math_fn_ids) and picks the lowering.
+    MATH_FN
 
 // Copy: MirIntrinsic is a lightweight integer tag passed by value, stored in
 // Vec/HashMap, and compared throughout MIR lowering and codegen.
@@ -468,6 +471,8 @@ type MirBody {
 
     // Call intrinsic markers (parallel to call_arg_starts)
     call_intrinsic_kinds: Vec[MirIntrinsic],
+    // MathBuiltins row id for MATH_FN calls (parallel; -1 otherwise)
+    call_math_fn_ids: Vec[i32],
     // AST call node for generic calls (parallel to call_arg_starts, 0 if N/A)
     call_ast_nodes: Vec[i32],
     // Concrete semantic contract captured at lowering time. AST call nodes are
@@ -665,6 +670,7 @@ fn MirBody.init_for_fn(fn_sym: i32) -> MirBody:
         call_arg_counts: Vec.new(),
         call_arg_operands: Vec.new(),
         call_intrinsic_kinds: Vec.new(),
+        call_math_fn_ids: Vec.new(),
         call_ast_nodes: Vec.new(),
         call_sig_indices: Vec.new(),
         call_mono_syms: Vec.new(),
@@ -885,6 +891,7 @@ impl MirBody:
         self.call_arg_starts.push(start)
         self.call_arg_counts.push(count)
         self.call_intrinsic_kinds.push(MirIntrinsic.NONE)
+        self.call_math_fn_ids.push(-1)
         self.call_ast_nodes.push(0)
         self.call_sig_indices.push(-1)
         self.call_mono_syms.push(0)
@@ -903,6 +910,16 @@ impl MirBody:
         if call_id < 0 or call_id >= self.call_intrinsic_kinds.len():
             return MirIntrinsic.NONE
         self.call_intrinsic_kinds[call_id]
+
+    mut fn set_call_math_fn_id(call_id: i32, math_id: i32):
+        if call_id >= 0 and call_id < self.call_math_fn_ids.len():
+            self.call_math_fn_ids[call_id] = math_id
+
+    /// The MathBuiltins row id of a MirIntrinsic.MATH_FN call, else -1.
+    fn call_math_fn_id(call_id: i32) -> i32:
+        if call_id < 0 or call_id >= self.call_math_fn_ids.len():
+            return -1
+        self.call_math_fn_ids[call_id]
 
     mut fn set_call_ast_node(call_id: i32, node: i32):
         if call_id >= 0 and call_id < self.call_ast_nodes.len():

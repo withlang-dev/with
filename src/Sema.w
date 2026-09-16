@@ -883,6 +883,9 @@ type Sema {
     // share-place ABI and the monomorphized MIR identity.
     resolved_call_sigs: HashMap[i32, i32],
     resolved_call_mono_syms: HashMap[i32, i32],
+    // A free math builtin call (`cos(x)`), keyed by the call node, to its
+    // MathBuiltins row id. Sema decides once; MirLower reads, never re-derives.
+    math_builtin_calls: HashMap[i32, i32],
     // #912: the iteration desugar's next() specialization, keyed by the FOR
     // node (loops) or the clause's iterable expression node (comprehensions).
     // A dedicated channel — keying resolved_call_sigs by an expression node
@@ -2172,6 +2175,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         call_resolved_default_arg_keys: sema_new_map_i64_i32(),
         resolved_call_sigs: sema_new_map_i32_i32(),
         resolved_call_mono_syms: sema_new_map_i32_i32(),
+        math_builtin_calls: sema_new_map_i32_i32(),
         iter_next_sigs: sema_new_map_i32_i32(),
         iter_next_mono_syms: sema_new_map_i32_i32(),
         magic_ident_kinds: sema_new_map_i32_i32(),
