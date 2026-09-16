@@ -48,19 +48,13 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: darwin-aarch64
-            runner: macos-latest
-            sdk_host_tag: darwin-arm64
-            seed_repo: withlang-dev/with
-            seed_version: v0.15.2.0
-            seed_asset: with-darwin-aarch64
-            seed_sha256: 79a63ff91d5d9260463adf3e08ff43bdd5446d070eac2ca56ef543ae05484075
-            sdk_version: nightly-sdk-test-20260815-680aa139
-            sdk_asset: with-llvm-sdk-22.1.6-darwin-aarch64.tar.gz
-            sdk_sha256: 4f99fc99a933ee3cf0578336a4fbbbcaaedbbe89112cd49454ea64149c188e6d
-            sdk_sidecar_sha256: 0df49017de4631cdc6367eb66dd39f15657b793757a65d743393898f9d848a75
-            sdk_manifest_sha256: 96e84c9b27a6d0dfbfe33cc221aebabdc2daaaeea04dc0b04721c61109a53623
-            release_asset: with-darwin-aarch64
+          # darwin-aarch64 is a local-first platform: on a `v*` tag push the
+          # maintainer's Mac builds, verifies and publishes it (with
+          # linux-aarch64, via tools/release_local.w) before CI even starts;
+          # CI builds it only for the nightly and test channels, in the
+          # build-darwin-aarch64 job below. On a tag push CI builds and
+          # appends the x86_64 platforms and windows-aarch64 (which no Mac
+          # can build).
           - platform: linux-x86_64
             runner: ubuntu-latest
             sdk_host_tag: linux-x86_64
@@ -252,6 +246,184 @@ jobs:
           # `releases/latest/download/install.sh` resolves instead of 404ing (#1144).
           # Uploaded add-only; one leg avoids a cross-job race on the same asset.
           RELEASE_EXTRA_FILES: out/release/${{ matrix.sdk_asset }},out/release/${{ matrix.sdk_asset }}.sha256,out/release/${{ matrix.sdk_asset }}.manifest${{ matrix.platform == 'darwin-aarch64' && ',scripts/install.sh,scripts/install.ps1,scripts/install.cmd' || '' }}
+          RELEASE_SOURCE_SHA: ${{ github.sha }}
+          RELEASE_BUILDER: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} (${{ matrix.platform }})
+          RELEASE_REPO: ${{ github.repository }}
+        run: ./out/release/bin/with build :publish-release-asset
+
+  build-darwin-aarch64:
+    name: Verify and package darwin-aarch64
+    # Local-first: on a `v*` tag push this platform is built, verified and
+    # published from the maintainer's Mac (tools/release_local.w) minutes
+    # after the tag; CI builds it for the nightly and test channels only.
+    # The body mirrors the unix matrix job above.
+    if: github.event_name != 'push'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: darwin-aarch64
+            runner: macos-latest
+            sdk_host_tag: darwin-arm64
+            seed_repo: withlang-dev/with
+            seed_version: v0.15.2.0
+            seed_asset: with-darwin-aarch64
+            seed_sha256: 79a63ff91d5d9260463adf3e08ff43bdd5446d070eac2ca56ef543ae05484075
+            sdk_version: nightly-sdk-test-20260815-680aa139
+            sdk_asset: with-llvm-sdk-22.1.6-darwin-aarch64.tar.gz
+            sdk_sha256: 4f99fc99a933ee3cf0578336a4fbbbcaaedbbe89112cd49454ea64149c188e6d
+            sdk_sidecar_sha256: 0df49017de4631cdc6367eb66dd39f15657b793757a65d743393898f9d848a75
+            sdk_manifest_sha256: 96e84c9b27a6d0dfbfe33cc221aebabdc2daaaeea04dc0b04721c61109a53623
+            release_asset: with-darwin-aarch64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 360
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    env:
+      WITH_SEED_REPO: ${{ matrix.seed_repo }}
+      WITH_SEED_VERSION: ${{ matrix.seed_version }}
+      WITH_SEED_ASSET: ${{ matrix.seed_asset }}
+      WITH_SEED_SHA256: ${{ matrix.seed_sha256 }}
+      WITH_SDK_REPO: ${{ github.repository }}
+      WITH_SDK_VERSION: ${{ matrix.sdk_version }}
+      WITH_SDK_ASSET: ${{ matrix.sdk_asset }}
+      WITH_SDK_SHA256: ${{ matrix.sdk_sha256 }}
+      WITH_SDK_SIDECAR_SHA256: ${{ matrix.sdk_sidecar_sha256 }}
+      WITH_SDK_MANIFEST_SHA256: ${{ matrix.sdk_manifest_sha256 }}
+      LLVM_PREFIX: ${{ github.workspace }}/.deps/llvm-22.1.6-${{ matrix.sdk_host_tag }}
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Resolve and verify version
+        run: |
+          set -euo pipefail
+          src="$(tr -d '\r\n' < src/version)"
+          test -n "$src"
+          if [ -n "$WITH_VERSION" ]; then
+            test "$src" = "$WITH_VERSION"
+          else
+            echo "WITH_VERSION=$src" >> "$GITHUB_ENV"
+          fi
+
+      - name: Fetch verified bootstrap seed
+        run: |
+          set -euo pipefail
+          curl -fL -o src/main \
+            "https://github.com/$WITH_SEED_REPO/releases/download/$WITH_SEED_VERSION/$WITH_SEED_ASSET"
+          printf '%s  %s\n' "$WITH_SEED_SHA256" src/main | shasum -a 256 -c -
+          chmod +x src/main
+          src/main version
+
+      - name: Fetch verified static LLVM SDK
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/$WITH_SDK_ASSET"
+          curl -fL -o "$archive" \
+            "https://github.com/$WITH_SDK_REPO/releases/download/$WITH_SDK_VERSION/$WITH_SDK_ASSET"
+          curl -fL -o "$archive.sha256" \
+            "https://github.com/$WITH_SDK_REPO/releases/download/$WITH_SDK_VERSION/$WITH_SDK_ASSET.sha256"
+          curl -fL -o "$archive.manifest" \
+            "https://github.com/$WITH_SDK_REPO/releases/download/$WITH_SDK_VERSION/$WITH_SDK_ASSET.manifest"
+          printf '%s  %s\n' "$WITH_SDK_SHA256" "$archive" | shasum -a 256 -c -
+          printf '%s  %s\n' "$WITH_SDK_SIDECAR_SHA256" "$archive.sha256" | shasum -a 256 -c -
+          printf '%s  %s\n' "$WITH_SDK_MANIFEST_SHA256" "$archive.manifest" | shasum -a 256 -c -
+          mkdir -p .deps
+          tar -xzf "$archive" -C .deps
+          test -f "$LLVM_PREFIX/lib/libclang.a"
+          test -f "$LLVM_PREFIX/lib/clang/22/include/stddef.h"
+          test -f "$LLVM_PREFIX/share/cmake-4.2/Modules/CMake.cmake"
+          for tool in clang clang++ cmake ninja lld llvm-ar llvm-config llvm-dwarfdump llvm-nm llvm-objcopy llvm-ranlib llvm-readobj llvm-strip; do
+            test -x "$LLVM_PREFIX/bin/$tool"
+          done
+          dangling="$(find -L "$LLVM_PREFIX/bin" -type l -print -quit)"
+          if [ -n "$dangling" ]; then
+            echo "dangling SDK symlink: $dangling" >&2
+            exit 1
+          fi
+          "$LLVM_PREFIX/bin/clang" --version
+          "$LLVM_PREFIX/bin/cmake" --version
+          export PATH="$LLVM_PREFIX/bin:$PATH"
+          symbol="$("$LLVM_PREFIX/bin/llvm-nm" -g "$LLVM_PREFIX/lib/libclang.a" | ./src/main -n 'if line.ends_with("clang_createIndex"): print(line)')"
+          test -n "$symbol"
+          printf '%s\n' "$LLVM_PREFIX/bin" >> "$GITHUB_PATH"
+
+      - name: Verify dependency graph
+        env:
+          WITH: ${{ github.workspace }}/src/main
+        run: src/main build :deps
+
+      - name: Build seed to release compiler
+        env:
+          WITH: ${{ github.workspace }}/src/main
+        run: src/main build
+
+      - name: Verify fixpoint
+        env:
+          WITH: ${{ github.workspace }}/src/main
+        run: src/main build :fixpoint
+
+      - name: Green battery (build :test)
+        env:
+          WITH: ${{ github.workspace }}/src/main
+        run: src/main build :test
+
+      - name: Record last-green (the release UAT gate reads it)
+        env:
+          WITH: ${{ github.workspace }}/src/main
+        run: src/main build :last-green
+
+      - name: Select rebuilt compiler (the release UAT runs the rebuilt binary as the orchestrator)
+        run: echo "WITH=$GITHUB_WORKSPACE/out/release/bin/with" >> "$GITHUB_ENV"
+
+      - name: Release UAT (macOS)
+        # The runner's session has a WindowServer; the spiral opens a real window.
+        run: ./out/release/bin/with build :release-uat
+
+      - name: Package fixpoint-verified release asset
+        run: |
+          set -euo pipefail
+          test "$(./out/release/bin/with version)" = "with $WITH_VERSION"
+          cp out/release/bin/with "out/release/${{ matrix.release_asset }}"
+          chmod +x "out/release/${{ matrix.release_asset }}"
+          shasum -a 256 "out/release/${{ matrix.release_asset }}" > "out/release/${{ matrix.release_asset }}.sha256"
+          cp "$RUNNER_TEMP/$WITH_SDK_ASSET" "out/release/$WITH_SDK_ASSET"
+          cp "$RUNNER_TEMP/$WITH_SDK_ASSET.sha256" "out/release/$WITH_SDK_ASSET.sha256"
+          cp "$RUNNER_TEMP/$WITH_SDK_ASSET.manifest" "out/release/$WITH_SDK_ASSET.manifest"
+
+      - name: Verify packaged checksums
+        run: |
+          shasum -a 256 -c "out/release/${{ matrix.release_asset }}.sha256"
+          shasum -a 256 -c "out/release/$WITH_SDK_ASSET.sha256"
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@96b4a1ef7235a096b17240c259729fdd70c83d45 # v2
+        with:
+          subject-path: out/release/${{ matrix.release_asset }}
+
+      - name: Resolve release metadata
+        id: release
+        env:
+          REQUESTED_CHANNEL: ${{ github.event_name == 'push' && 'release' || inputs.channel }}
+        run: |
+          set -euo pipefail
+          ./out/release/bin/with run tools/nightly_release_metadata.w \
+            "$GITHUB_EVENT_NAME" "$REQUESTED_CHANNEL" "$(date -u +%Y%m%d)" "$(date -u +%Y-%m-%d)" \
+            "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$GITHUB_SHA" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" \
+            "$WITH_VERSION" "$GITHUB_OUTPUT" out/release/nightly-release-notes.md "${{ matrix.platform }}"
+
+      - name: Publish this platform's assets (add-only)
+        env:
+          GH_TOKEN: ${{ github.event_name == 'schedule' && github.token || secrets.RELEASE_TOKEN }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          RELEASE_TITLE: ${{ steps.release.outputs.title }}
+          RELEASE_CHANNEL: ${{ steps.release.outputs.channel }}
+          RELEASE_ASSETS: out/release/${{ matrix.release_asset }}
+          # The install scripts (README Quick Start, mirrored on withlang.org)
+          # ship from the darwin leg only (#1144); add-only, one leg, no race.
+          RELEASE_EXTRA_FILES: out/release/${{ matrix.sdk_asset }},out/release/${{ matrix.sdk_asset }}.sha256,out/release/${{ matrix.sdk_asset }}.manifest,scripts/install.sh,scripts/install.ps1,scripts/install.cmd
           RELEASE_SOURCE_SHA: ${{ github.sha }}
           RELEASE_BUILDER: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} (${{ matrix.platform }})
           RELEASE_REPO: ${{ github.repository }}
@@ -461,6 +633,11 @@ jobs:
 
   build-linux-aarch64:
     name: Verify and package linux-aarch64
+    # Local-first: on a `v*` tag push this platform is built, verified and
+    # published from the maintainer's Mac (tools/release_local.w, the
+    # linux/arm64 container in tools/docker/linux-aarch64). CI builds it for
+    # the nightly and test channels only.
+    if: github.event_name != 'push'
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 360
     permissions:

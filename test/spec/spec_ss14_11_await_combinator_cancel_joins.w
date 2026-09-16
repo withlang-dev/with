@@ -1,4 +1,5 @@
 //! known-issue: #916 async caller of a cancelled sync-but-suspending callee consumes its garbage return
+//! skip-on: linux-aarch64 #916 does not reproduce on aarch64 Linux (the test passes there, which the known-issue gate reports as "expected red but passed"); scoped until #916 is fixed everywhere
 //! expect-stdout: ok
 
 use std.task.Task

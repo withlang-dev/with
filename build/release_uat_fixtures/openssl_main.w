@@ -1,4 +1,5 @@
 use c_import("openssl/evp.h")
+use std.builtins.write
 
 fn main:
     let input = "abc"

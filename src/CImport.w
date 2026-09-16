@@ -437,6 +437,46 @@ fn ci_object_macro_is_function_alias(type_session: i64, value: &str) -> bool:
         return false
     ci_lookup_c_function_return_type(type_session, t).len() > 0
 
+// `#define zlib_version zlibVersion()`: an object-like macro whose whole
+// value is a call to a known C function. It is not a value but a call site,
+// re-evaluated at every use in C; a With `let` global would evaluate it once
+// at program start, and when the callee is raw (zlibVersion returns a raw
+// pointer) that global initializer is a raw call outside `unsafe`, which
+// Sema rightly rejects. Record it untranslated, like a function alias: the
+// caller can call the function itself.
+fn ci_object_macro_is_function_call(type_session: i64, value: &str) -> bool:
+    let t = ci_strip_parens(ci_trim(value))
+    if t.len() < 3 or t[t.len() - 1] != 41:
+        return false
+    var open = 0
+    while open < t.len() and ci_is_ident_char(t[open]): open += 1
+    if open == 0 or open >= t.len() or t[open] != 40:
+        return false
+    // The call's parentheses must enclose the rest of the value.
+    var depth = 0
+    var i = open
+    while i < t.len():
+        let ch = t[i]
+        if ch == 40: depth += 1
+        else if ch == 41:
+            depth -= 1
+            if depth == 0 and i != t.len() - 1: return false
+        i += 1
+    if depth != 0:
+        return false
+    let callee = t.slice(0, open as i64)
+    if not ci_is_c_ident(callee):
+        return false
+    // A known C function: the global would be a raw call at program start.
+    if ci_lookup_c_function_return_type(type_session, callee).len() > 0:
+        return true
+    // Anything else must be a name this import emitted (a translated
+    // function-like macro such as `#define MAX2 MAX(1, 2)`); a callee that
+    // was not emitted — openssl's `#define OSSL_DEPRECATEDIN_4_0
+    // OSSL_DEPRECATED(4.0)`, an attribute macro with no With form — would
+    // leave a `let` referencing an undefined name.
+    with_cimport_is_name_emitted(callee) == 0
+
 fn ci_record_omitted_symbol(name: &str, reason: &str):
     // Default category: no With representation. Use ci_record_omitted_symbol_cat
     // for ABI-expressible constructs that can be reached via the raw surface.
@@ -2569,7 +2609,12 @@ fn ci_normalize_translated_type_name(name: &str) -> str:
         let alias_builtin = ci_map_builtin_typedef(alias)
         if alias_builtin.len() > 0:
             return alias_builtin
-        return alias
+        // The emitted `type` alias spells a raw C function pointer
+        // `unsafe extern "C" fn(...)` (ci_translate_typedef); expanding the
+        // alias name here must yield the same spelling, or a macro global
+        // annotated with it mismatches its own cast (sqlite3's
+        // SQLITE_STATIC, a `(sqlite3_destructor_type)0`).
+        return ci_unsafe_fn_ptr_type(alias)
     t
 
 fn ci_translate_typedef(session: i64, idx: i32, count: i32) -> str:
@@ -2817,7 +2862,13 @@ fn ci_try_translate_object_macro_probe(macro_source: &str, name: &str) -> str:
     var i = 0
     while i < count:
         if with_cimport_decl_kind(probe_session, i) == CK_VAR and with_cimport_decl_name(probe_session, i) == probe_name:
-            let ty = with_cimport_var_type_translated(probe_session, i)
+            // The bridge's translated type is the one position that did not go
+            // through ci_unsafe_fn_ptr_type: sqlite3's
+            // `#define SQLITE_STATIC ((sqlite3_destructor_type)0)` probed as
+            // `let SQLITE_STATIC: extern "C" fn(...) = (0 as unsafe extern "C"
+            // fn(...))`, a binding type mismatch. Normalize like every other
+            // type position.
+            let ty = ci_unsafe_fn_ptr_type(with_cimport_var_type_translated(probe_session, i))
             if ty.len() > 0 and not ci_starts_with(ty, "__UNSUPPORTED"):
                 let init = ci_try_eval_var_init_for_type(probe_session, i, ty)
                 if ci_var_init_translation_is_valid(ty, init) and not ci_str_contains(init, name):
@@ -3146,7 +3197,7 @@ fn ci_translate_macros(session: i64, type_session: i64, extern_vars: &str, macro
         // Strip outer parentheses for macro values like (-1)
         let stripped = ci_strip_parens(obj_value)
 
-        if ci_object_macro_is_function_alias(type_session, stripped):
+        if ci_object_macro_is_function_alias(type_session, stripped) or ci_object_macro_is_function_call(type_session, stripped):
             ci_record_untranslated_object_macro(name, macro_is_system)
             continue
 
@@ -3221,7 +3272,13 @@ fn ci_translate_macros(session: i64, type_session: i64, extern_vars: &str, macro
             else if offsetof_result.len() > 0:
                 cast_expr_ty = "c_int"
             else if semantic_expr_ty.len() > 0:
-                cast_expr_ty = semantic_expr_ty
+                // clang's semantic type is the one type position that did not
+                // go through ci_unsafe_fn_ptr_type, so a raw C function pointer
+                // (sqlite3.h: `#define SQLITE_STATIC ((sqlite3_destructor_type)0)`)
+                // was annotated `extern "C" fn(...)` while its typedef, and the
+                // cast the initializer renders, spell `unsafe extern "C" fn(...)`
+                // — a binding type mismatch. Normalize like every other position.
+                cast_expr_ty = ci_unsafe_fn_ptr_type(semantic_expr_ty)
             else:
                 cast_expr_ty = ci_infer_cast_return_type(cast_expr_result)
             var macro_expr_result = if compound_literal_result.len() > 0: compound_literal_result else: cast_expr_result
@@ -4160,7 +4217,11 @@ fn ci_infer_cast_return_type(translated: &str) -> str:
             let type_start = (i + 1) as i64
             let type_end = t.len() - 1
             let cast_type = ci_trim(t.slice(type_start, type_end))
-            if ci_starts_with(cast_type, "extern \"C\" fn(") or ci_starts_with(cast_type, "fn("):
+            // A raw C function pointer casts as `unsafe extern "C" fn(...)`
+            // (the c_import safe/raw surfaces); without these prefixes the
+            // `)` check below rejected it and callers fell back to clang's
+            // typedef spelling, which mismatched the initializer.
+            if ci_starts_with(cast_type, "extern \"C\" fn(") or ci_starts_with(cast_type, "fn(") or ci_starts_with(cast_type, "unsafe extern \"C\" fn(") or ci_starts_with(cast_type, "unsafe fn("):
                 return cast_type
             if ci_str_contains(cast_type, ")") or ci_str_contains(cast_type, "{") or ci_str_contains(cast_type, "}"):
                 return ""

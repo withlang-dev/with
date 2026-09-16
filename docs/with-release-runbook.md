@@ -414,6 +414,57 @@ a release with `out/release/bin/with` or `~/.local/bin/with` reporting an
 older version or a different development build. If this check fails, rerun the
 release gates with `WITH_VERSION` still set and stop before publishing.
 
+### Linux aarch64 Release Host (Docker on Apple Silicon)
+
+There is no physical linux-aarch64 host. An Apple Silicon Mac runs a
+`linux/arm64` container natively (`docker run --rm --platform linux/arm64
+ubuntu:24.04 uname -m` prints `aarch64`), so the linux-aarch64 lane
+(`.github/workflows/selfhost-linux-aarch64.yml`) reproduces locally. The
+lane is the source of truth for the pins below; read them from it.
+
+The host image is checked in at `tools/docker/linux-aarch64/Dockerfile`. It
+bakes in the runner's packages because a bare `ubuntu:24.04` lacks `g++`
+(stage1 links `libstdc++`) and `libxml2` (the SDK's `ld.lld` loads it), and
+both failures are silent — the seed reports only `build failed` /
+`run failed`. Build it once; it carries no pins:
+
+```sh
+docker build --platform linux/arm64 -t with-aarch64-host tools/docker/linux-aarch64
+docker volume create with-aarch64        # the clone, SDK, seed and out/ persist here
+docker run -it --platform linux/arm64 -v with-aarch64:/work with-aarch64-host
+```
+
+Inside the container, mirror the lane's steps (asset names and the seed
+digest come from the lane file and `seed.lock`):
+
+```sh
+git clone https://github.com/withlang-dev/with.git /work/with && cd /work/with
+export LLVM_PREFIX=$PWD/.deps/llvm-22.1.6-linux-aarch64
+mkdir -p .deps && curl -fsSL -o /tmp/sdk.tar.gz \
+  https://github.com/withlang-dev/with/releases/download/sdk-linux-aarch64/with-llvm-sdk-22.1.6-linux-aarch64.tar.gz
+tar -xzf /tmp/sdk.tar.gz -C .deps
+mkdir -p .link-shim
+ln -sf "$LLVM_PREFIX/bin/ld.lld" .link-shim/ld.lld
+ln -sf "$LLVM_PREFIX/bin/ld.lld" .link-shim/ld64.lld
+ln -sf "$LLVM_PREFIX/bin/lld"    .link-shim/lld
+ln -sf "$(ls /usr/lib/aarch64-linux-gnu/libxml2.so.2* | head -1)" .link-shim/libxml2.so.16
+export PATH="$PWD/.link-shim:$LLVM_PREFIX/bin:$PATH" LD_LIBRARY_PATH="$PWD/.link-shim"
+curl -fsSL -o src/main https://github.com/withlang-dev/with/releases/download/<seed.lock version>/with-linux-aarch64
+chmod +x src/main
+# The linux-aarch64 seed has no embedded runtime; it links from src/runtime.
+mkdir -p src/runtime && curl -fsSL -o /tmp/rt.tar.gz \
+  https://github.com/withlang-dev/with/releases/download/with-linux-aarch64/with-linux-aarch64-runtime.tar.gz
+tar -xzf /tmp/rt.tar.gz -C src/runtime && echo "$LLVM_PREFIX/bin/ld.lld" > src/runtime/llvm_ld
+export WITH_OUT_DIR=$PWD/out
+WITH=$PWD/src/main src/main build && WITH=$PWD/src/main src/main build :fixpoint
+WITH=$PWD/src/main src/main build :test
+```
+
+Verify the seed and bundle digests with `sha256sum -c` exactly as the lane
+does. `strace -f -e trace=execve` (with `--cap-add=SYS_PTRACE
+--security-opt seccomp=unconfined` on `docker run`) is the quickest way to
+see which runtime objects a link picked up and which exec failed.
+
 ## Publish
 
 Create an annotated tag at the verified commit:
@@ -437,6 +488,35 @@ move every workflow seed pin with it (`with run tools/bump_seed_pins.w`;
 `with build :seed-driver` refuses while any pin disagrees with the lock), then
 `with build :seed` refetches `src/main`. Land the first change that needs the
 new seed after that bump, never in the same PR.
+
+### Local-first: the Mac publishes darwin and linux-aarch64; CI appends the rest
+
+The two platforms an Apple Silicon Mac can build are built, verified and
+published from the release host, minutes after the tag; the tag push makes
+CI build and append only what a Mac cannot — linux-x86_64, windows-x86_64
+and windows-aarch64 (`.github/workflows/nightly-release.yml` gates the
+darwin-aarch64 and linux-aarch64 jobs on `github.event_name != 'push'`, so
+the nightly and test channels still exercise all five). The whole local half
+is one command, run from the release checkout after `src/version` is bumped
+and the tag is pushed:
+
+```sh
+export GH_TOKEN=$(gh auth token)
+export RELEASE_SOURCE_SHA=$(git rev-parse v0.14.3)
+with run tools/release_local.w v0.14.3            # --channel test to rehearse
+```
+
+It runs, in order: the darwin gates (`build`, `:fixpoint`, `:test`,
+`:test-green`, `:last-green`, seed-driven), the rebuilt compiler's
+`:release-uat`, `:package-current-host`, `:package-llvm-sdk` and
+`:publish-release-asset` (compiler, SDK and the installer scripts); then it
+builds the `tools/docker/linux-aarch64` image, checks the tagged commit out
+in the `with-aarch64` volume, bootstraps exactly as the linux-aarch64 lane
+does (seed and runtime bundle from `seed.lock` and the lane's pins, SDK via
+`build :deps`), runs the same gates inside the container and publishes the
+linux-aarch64 compiler and SDK. `--skip-darwin` / `--skip-linux-aarch64`
+rerun one half. Every step prints its command and stops at the first
+failure; a failed platform simply has no asset until it is rerun.
 
 ### Publish-first: the release exists as soon as one platform is done
 
