@@ -742,6 +742,11 @@ jobs:
           echo "WITH_WINDOWS_UCRT_LIBDIR=$(cygpath -m "$kit_root/$kit_ver/ucrt/arm64")" >> "$GITHUB_ENV"
           echo "WITH_WINDOWS_UM_LIBDIR=$(cygpath -m "$kit_root/$kit_ver/um/arm64")" >> "$GITHUB_ENV"
           echo "$PWD/.deps/llvm-22.1.6-windows-aarch64-msvc/bin" >> "$GITHUB_PATH"
+          # The runner's ambient MSYS binutils nm cannot parse an arm64 COFF
+          # image; the object-symbol and bundle-interface tests read nm through
+          # bs_build_w_tool_from_env("NM", ...), so point them at the SDK's
+          # llvm-nm (same as selfhost-windows-aarch64.yml).
+          echo "NM=$(cygpath -m "$PWD/.deps/llvm-22.1.6-windows-aarch64-msvc/bin/llvm-nm.exe")" >> "$GITHUB_ENV"
 
       - name: Build seed to release compiler
         run: ./src/main.exe build

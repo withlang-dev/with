@@ -568,6 +568,14 @@ fn link_stage_make_windows_llvm_link_command(llvm_ld: &str, obj_path: &str, bin_
     let inputs: Vec[str] = Vec.new()
     let outputs: Vec[str] = Vec.new()
     args.push("/nologo")
+    // Reproducible PE output: lld-link derives the header timestamp and the
+    // PDB GUID from a hash of the image instead of the wall clock, so
+    // relinking the same inputs yields the same bytes. Without it every
+    // relink of the release compiler differed, and the seed-driven gates
+    // (which relink per step) declared the test-pass marker stale on
+    // Windows only: fixpoint compares emitted objects, never the linked
+    // image, so the churn was invisible there.
+    args.push("/Brepro")
     args.push("/subsystem:console")
     args.push("/debug")
     args.push("/pdb:" ++ bin_path ++ ".pdb")

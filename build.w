@@ -666,6 +666,11 @@ fn release_asset_for_host() -> str:
         return "with-windows-x86_64.exe"
     if os() == "Windows" and (arch() == "armv8" or arch() == "aarch64"):
         return "with-windows-aarch64.exe"
+    // linux-aarch64 was missing here, so on that host every consumer — the
+    // seed-driver gate above all — fell through to the darwin asset and
+    // compared the driving compiler against the darwin digest.
+    if os() == "Linux" and (arch() == "armv8" or arch() == "aarch64"):
+        return "with-linux-aarch64"
     "with-darwin-aarch64"
 
 // "with-darwin-aarch64" -> "darwin-aarch64"
@@ -687,6 +692,8 @@ fn supported_release_platform_tag() -> str:
         return "windows-x86_64"
     if os() == "Windows" and (arch() == "armv8" or arch() == "aarch64"):
         return "windows-aarch64"
+    if os() == "Linux" and (arch() == "armv8" or arch() == "aarch64"):
+        return "linux-aarch64"
     ""
 
 // ".deps/llvm-<ver>-<host>" -> "llvm-<ver>-<host>"
