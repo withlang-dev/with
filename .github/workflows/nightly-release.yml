@@ -571,7 +571,12 @@ jobs:
           echo "WITH_UAT_OPENGL32_DLL=$(cygpath -m "$RUNNER_TEMP/mesa/opengl32.dll")" >> "$GITHUB_ENV"
 
       - name: Release UAT
-        run: ./out/release/bin/with.exe build :release-uat
+        # Driven by the seed, not the rebuilt binary: the UAT tests the
+        # platform asset (release_platform_asset_bin) whichever driver runs
+        # it, and its `build` dependency relinks out/release/bin/with.exe on
+        # every invocation (#1157) — Windows cannot replace a running
+        # executable ("could not rename out/release/bin/with.exe.tmp").
+        run: ./src/main.exe build :release-uat
 
       - name: Package fixpoint-verified release asset
         run: |
@@ -955,7 +960,12 @@ jobs:
           echo "WITH_UAT_OPENGL32_DLL=$(cygpath -m "$RUNNER_TEMP/mesa/opengl32.dll")" >> "$GITHUB_ENV"
 
       - name: Release UAT
-        run: ./out/release/bin/with.exe build :release-uat
+        # Driven by the seed, not the rebuilt binary: the UAT tests the
+        # platform asset (release_platform_asset_bin) whichever driver runs
+        # it, and its `build` dependency relinks out/release/bin/with.exe on
+        # every invocation (#1157) — Windows cannot replace a running
+        # executable ("could not rename out/release/bin/with.exe.tmp").
+        run: ./src/main.exe build :release-uat
 
       - name: Package fixpoint-verified release asset
         run: |
