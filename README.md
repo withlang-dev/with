@@ -59,31 +59,35 @@ let config = with Config.default() as mut c:
 Install the latest release on macOS arm64 or Linux x86_64:
 
 ```sh
-curl -fsSL https://github.com/withlang-dev/with/releases/latest/download/install.sh | sh
+curl -fsSL https://withlang.org/installer/install.sh | sh
 ```
 
 Install the latest release on Windows x86_64 from PowerShell:
 
 ```powershell
-irm https://github.com/withlang-dev/with/releases/latest/download/install.ps1 | iex
+irm https://withlang.org/installer/install.ps1 | iex
 ```
 
 Or from `cmd.exe`:
 
 ```bat
-curl.exe -L -o install.cmd https://github.com/withlang-dev/with/releases/latest/download/install.cmd
+curl.exe -L -o install.cmd https://withlang.org/installer/install.cmd
 install.cmd
 ```
 
 Inspect the installers before running them:
 
 ```sh
-curl -fsSL https://github.com/withlang-dev/with/releases/latest/download/install.sh | less
+curl -fsSL https://withlang.org/installer/install.sh | less
 ```
 
 ```powershell
-irm https://github.com/withlang-dev/with/releases/latest/download/install.ps1
+irm https://withlang.org/installer/install.ps1
 ```
+
+The same scripts are also published as release assets — swap the URL for
+`https://github.com/withlang-dev/with/releases/latest/download/install.sh`
+(`.ps1`, `.cmd`) if you prefer to pin to a GitHub release.
 
 The Unix installer writes `with` to `~/.local/bin` by default. The Windows
 installer writes `with.exe` to `%USERPROFILE%\.local\bin` by default. Set

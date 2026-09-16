@@ -240,7 +240,11 @@ jobs:
           RELEASE_TITLE: ${{ steps.release.outputs.title }}
           RELEASE_CHANNEL: ${{ steps.release.outputs.channel }}
           RELEASE_ASSETS: out/release/${{ matrix.release_asset }}
-          RELEASE_EXTRA_FILES: out/release/${{ matrix.sdk_asset }},out/release/${{ matrix.sdk_asset }}.sha256,out/release/${{ matrix.sdk_asset }}.manifest
+          # The install scripts (documented in the README Quick Start and mirrored
+          # on withlang.org) ship as release assets from the darwin leg only, so
+          # `releases/latest/download/install.sh` resolves instead of 404ing (#1144).
+          # Uploaded add-only; one leg avoids a cross-job race on the same asset.
+          RELEASE_EXTRA_FILES: out/release/${{ matrix.sdk_asset }},out/release/${{ matrix.sdk_asset }}.sha256,out/release/${{ matrix.sdk_asset }}.manifest${{ matrix.platform == 'darwin-aarch64' && ',scripts/install.sh,scripts/install.ps1,scripts/install.cmd' || '' }}
           RELEASE_SOURCE_SHA: ${{ github.sha }}
           RELEASE_BUILDER: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} (${{ matrix.platform }})
           RELEASE_REPO: ${{ github.repository }}
