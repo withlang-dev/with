@@ -578,6 +578,56 @@ jobs:
         # executable ("could not rename out/release/bin/with.exe.tmp").
         run: ./src/main.exe build :release-uat
 
+      - name: Diagnose bzip2 check (test channel)
+        if: ${{ failure() && inputs.channel == 'test' }}
+        timeout-minutes: 3
+        continue-on-error: true
+        working-directory: out/release-uat/bzip2-project
+        env:
+          WITH_PROFILE: '1'
+        run: ../../release/bin/with.exe check src/main.w
+
+      - name: Diagnose bzip2 build (test channel)
+        if: ${{ failure() && inputs.channel == 'test' }}
+        timeout-minutes: 3
+        continue-on-error: true
+        working-directory: out/release-uat/bzip2-project
+        env:
+          WITH_PROFILE: '1'
+        run: ../../release/bin/with.exe build src/main.w -O1 -o out/probe.exe
+
+      - name: Diagnose bzip2 program (test channel)
+        if: ${{ failure() && inputs.channel == 'test' }}
+        timeout-minutes: 3
+        continue-on-error: true
+        working-directory: out/release-uat/bzip2-project
+        run: ./out/probe.exe
+
+      - name: Diagnose libcurl check (test channel)
+        if: ${{ failure() && inputs.channel == 'test' }}
+        timeout-minutes: 3
+        continue-on-error: true
+        working-directory: out/release-uat/libcurl-project
+        env:
+          WITH_PROFILE: '1'
+        run: ../../release/bin/with.exe check src/main.w
+
+      - name: Diagnose libcurl build (test channel)
+        if: ${{ failure() && inputs.channel == 'test' }}
+        timeout-minutes: 3
+        continue-on-error: true
+        working-directory: out/release-uat/libcurl-project
+        env:
+          WITH_PROFILE: '1'
+        run: ../../release/bin/with.exe build src/main.w -O1 -o out/probe.exe
+
+      - name: Diagnose libcurl program (test channel)
+        if: ${{ failure() && inputs.channel == 'test' }}
+        timeout-minutes: 3
+        continue-on-error: true
+        working-directory: out/release-uat/libcurl-project
+        run: ./out/probe.exe
+
       - name: Package fixpoint-verified release asset
         run: |
           set -euo pipefail
@@ -967,6 +1017,56 @@ jobs:
         # executable ("could not rename out/release/bin/with.exe.tmp").
         run: ./src/main.exe build :release-uat
 
+      - name: Diagnose bzip2 check (test channel)
+        if: ${{ failure() && inputs.channel == 'test' }}
+        timeout-minutes: 3
+        continue-on-error: true
+        working-directory: out/release-uat/bzip2-project
+        env:
+          WITH_PROFILE: '1'
+        run: ../../release/bin/with.exe check src/main.w
+
+      - name: Diagnose bzip2 build (test channel)
+        if: ${{ failure() && inputs.channel == 'test' }}
+        timeout-minutes: 3
+        continue-on-error: true
+        working-directory: out/release-uat/bzip2-project
+        env:
+          WITH_PROFILE: '1'
+        run: ../../release/bin/with.exe build src/main.w -O1 -o out/probe.exe
+
+      - name: Diagnose bzip2 program (test channel)
+        if: ${{ failure() && inputs.channel == 'test' }}
+        timeout-minutes: 3
+        continue-on-error: true
+        working-directory: out/release-uat/bzip2-project
+        run: ./out/probe.exe
+
+      - name: Diagnose libcurl check (test channel)
+        if: ${{ failure() && inputs.channel == 'test' }}
+        timeout-minutes: 3
+        continue-on-error: true
+        working-directory: out/release-uat/libcurl-project
+        env:
+          WITH_PROFILE: '1'
+        run: ../../release/bin/with.exe check src/main.w
+
+      - name: Diagnose libcurl build (test channel)
+        if: ${{ failure() && inputs.channel == 'test' }}
+        timeout-minutes: 3
+        continue-on-error: true
+        working-directory: out/release-uat/libcurl-project
+        env:
+          WITH_PROFILE: '1'
+        run: ../../release/bin/with.exe build src/main.w -O1 -o out/probe.exe
+
+      - name: Diagnose libcurl program (test channel)
+        if: ${{ failure() && inputs.channel == 'test' }}
+        timeout-minutes: 3
+        continue-on-error: true
+        working-directory: out/release-uat/libcurl-project
+        run: ./out/probe.exe
+
       - name: Package fixpoint-verified release asset
         run: |
           set -euo pipefail
@@ -1012,4 +1112,3 @@ jobs:
           RELEASE_BUILDER: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} (windows-aarch64)
           RELEASE_REPO: ${{ github.repository }}
         run: ./out/release/bin/with.exe build :publish-release-asset
-
