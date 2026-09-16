@@ -125,6 +125,53 @@ after #1142), watch lanes. Seed-evaluator traps hit are in memory
 (ephemeral can); a Vec of ephemeral records does not iterate under the
 seed; hook values need `&ctx`/`&path` explicitly; `module` is a keyword.
 
+## 4b. The CI gates (`ci-gates`, branch off corpus-registry, 2026-09-15)
+
+Why: PR #1143 went red twice for defects the local battery cannot see —
+an action used `<` on strings (the pinned seed's evaluator rejects it,
+the fresh compiler accepts it), a fixture split a Windows location on
+`/` only, and std.libc exported Darwin/glibc-only externs that only fail
+to link on another host. Eric's rulings: the battery is driven by the
+pinned seed exactly like CI ("the Rust and Go way", chosen over Zig's
+build-script-on-the-fresh-compiler after the reference comparison), and
+std.libc exports C-standard functions plus With functions over
+`with_libc_*` seams, nothing host-spelled ("seams only").
+
+Commits (one PR to main after #1143 merges; the branch rebases onto main
+with `git rebase --onto main corpus-registry`):
+- `build: the pinned seed drives the battery` — `src/main` is
+  always the seed.lock asset (`:seed` idempotent on the digest);
+  `seed-driver` (build/retention.w) hashes the driver and walks the
+  action's process ancestry on POSIX, checks the workflow pins; first in
+  `:test`, a dep of `test-green`/`last-green`; `:update-seed` and
+  `:seed-compat` are gone; nightly drives `:test`/`:last-green` with
+  `src/main`; CLAUDE.md/AGENTS.md, README and the runbooks describe
+  `WITH=$PWD/src/main src/main build ...`.
+- `rt: with_libc_* seams ...` — rt_core seams over one `rt_*`
+  body per backend; Windows' stream accessors return the UCRT streams.
+- `migrate: the Clang bridge is the one path boundary` — every
+  location/path the bridge hands up is `/`; migrator CLI paths normalized
+  at entry; `behav_migrate_backslash_locations`.
+- `migrate: FILE-class system records are c_void again; an
+  anonymous union base reads plain` — two #1142 regressions found by
+  re-migrating (nothing re-migrates in the battery: wo-drift compiles the
+  checked-in output). Fixtures pin both.
+- `std.libc: C-standard functions and with_libc_* seams only` —
+  the module, the migrator mapping (`ci_libc_stream_accessor`,
+  `ci_libc_portable_callee`), the Linux/Windows shim removal, FnAbi list,
+  `libc-surface-check`, `corpus_reject_foreign_symbols`
+  (`Corpus.declared_externs` for rb_tree_subtree_height), `rt-decl-audit`
+  lane, #1149 for the aarch64 lane's missing `:test`.
+- `corpora: pcre2 and zlib re-promoted by the current migrator`.
+
+Re-migration is driven by a tree compiler: `WITH=out/stage/bin/with-stage2
+out/stage/bin/with-stage2 build :<stem>-promote` (stage2 has the bundles;
+stage1 does not, #1116). Verified: seed-driven `build` green, all four
+bundle objects carry no host symbol (`nm -u`), the three new fixtures
+pass, `seed-driver` refuses the installed driver and the
+`WITH=src/main with build` shape. Battery (`:fixpoint`, `:test`,
+`:last-green`) logs: scratch `cig_*.log`.
+
 ## 5. Open follow-ups
 - #1139 private-name collision across modules of one package.
 - #1140 UCRT `_wassert` + wide string literals in the migrator.

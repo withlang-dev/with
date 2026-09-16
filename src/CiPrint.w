@@ -448,6 +448,12 @@ fn ci_field_base_needs_borrow(types: CiTypePool, ty: CiTypeId) -> bool:
         let name = types.get_string(types.get_d0(ty))
         if ci_starts_with_str(name, "*") or ci_contains_str(name, "::(") or ci_contains_str(name, "(unnamed"):
             return false
+        // An anonymous record (a struct's unnamed union member, zlib's
+        // `ct_data.fc`) translates as `c_void`: its With name is synthesized
+        // by the emitter, so no borrow can spell it. Plain `base.field`
+        // reads it through the place, as it did before the borrow form.
+        if name == "c_void":
+            return false
     kind == CiTypeKind.CT_STRUCT or kind == CiTypeKind.CT_NAMED
 
 fn ci_named_type_is_scalar(name: &str) -> bool:

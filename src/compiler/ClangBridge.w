@@ -518,6 +518,39 @@ unsafe fn make_str(p: *const u8) -> str:
     let sp = &raw as *const str
     *sp
 
+// ── The path boundary ──────────────────────────────────────
+// Every file path or location this bridge hands upward is spelled with `/`,
+// whatever libclang or the host said: on Windows Clang spells locations
+// with `\` (and mixes separators within one path), and GetFullPathNameA
+// answers realpath with `\`. Consumers (the migrator's basename/stem rules,
+// the header-owner pairing, module paths, diagnostics, golden fixtures)
+// therefore see one spelling on every host; a location that must be
+// re-opened as a file works with `/` on every Win32 file API. This is the
+// only place that rewrites separators (#1143 shipped a `\`-aware basename
+// in the migrator instead; that arm is gone).
+
+/// `p` as an owned str with every `\` spelled `/`.
+unsafe fn make_path_str(p: *const u8) -> str:
+    if p as i64 == 0 or *p == 0:
+        return ""
+    let len = c_strlen(p)
+    let owned = with_alloc(len + 1)
+    if owned as i64 == 0: return ""
+    var i: i64 = 0
+    while i < len:
+        let ch = *((p as i64 + i) as *const u8)
+        *((owned as i64 + i) as *mut u8) = if ch == '\\': '/' else: ch
+        i = i + 1
+    *((owned as i64 + len) as *mut u8) = 0
+    var raw: [2]i64 = [owned as i64, len]
+    let sp = &raw as *const str
+    *sp
+
+unsafe fn clang_path_to_with(cxs: CXString) -> str:
+    let r = make_path_str(clang_getCString(cxs))
+    clang_disposeString(cxs)
+    r
+
 // Session-tracked string allocation (freed on dispose)
 unsafe fn session_strdup(s: *mut CImportSession, p: *const u8) -> *mut u8:
     if p as i64 == 0: return 0 as *mut u8
@@ -561,6 +594,18 @@ unsafe fn buf_append_str(buf: *mut u8, pos: *mut i64, cap: i64, s: *const u8):
     var i: i64 = 0
     while i < len and *pos < cap - 1:
         *((buf as i64 + *pos) as *mut u8) = *((s as i64 + i) as *const u8)
+        *pos = *pos + 1
+        i = i + 1
+    *((buf as i64 + *pos) as *mut u8) = 0
+
+/// buf_append_str for a file path: `\` is appended as `/` (the path boundary).
+unsafe fn buf_append_path(buf: *mut u8, pos: *mut i64, cap: i64, s: *const u8):
+    if s as i64 == 0: return
+    let len = c_strlen(s)
+    var i: i64 = 0
+    while i < len and *pos < cap - 1:
+        let ch = *((s as i64 + i) as *const u8)
+        *((buf as i64 + *pos) as *mut u8) = if ch == '\\': '/' else: ch
         *pos = *pos + 1
         i = i + 1
     *((buf as i64 + *pos) as *mut u8) = 0
@@ -874,6 +919,20 @@ unsafe fn translate_type_recursive_mode(s: *mut CImportSession, ty: CXType, dept
             buf_append_str(&raw mut buf as *mut [64]u8 as *mut u8, &raw mut pos, 64, qual)
             buf_append_str(&raw mut buf as *mut [64]u8 as *mut u8, &raw mut pos, 64, " i8\0" as *const u8)
             return session_strdup(s, &buf as *const [64]u8 as *const u8)
+        // A pointer to a reserved-spelled record from a system header
+        // (`__sFILE`, glibc's `_IO_FILE`, the UCRT's `_iobuf`: what `FILE *`
+        // is) is a `c_void` pointer: the migrator never emits system
+        // records, and std.libc's fopen returns `*mut c_void`. Only the
+        // pointer: such a record embedded by value in another system record
+        // keeps its name (`__darwin_mcontext32`'s `__es`), and a project's
+        // `_Tag` keeps its identity everywhere (c_algorithms' `_RBTreeNode`).
+        if can_pointee.kind == CXType_Record and record_is_reserved_system(can_pointee) != 0:
+            var buf: [64]u8 = [0 as u8; 64]
+            var pos: i64 = 0
+            buf_append_str(&raw mut buf as *mut [64]u8 as *mut u8, &raw mut pos, 64, "*\0" as *const u8)
+            buf_append_str(&raw mut buf as *mut [64]u8 as *mut u8, &raw mut pos, 64, qual)
+            buf_append_str(&raw mut buf as *mut [64]u8 as *mut u8, &raw mut pos, 64, " c_void\0" as *const u8)
+            return session_strdup(s, &buf as *const [64]u8 as *const u8)
         // General pointer
         let inner = translate_type_recursive_mode(s, pointee, depth + 1, 0, preserve_incomplete_arrays)
         if inner as i64 == 0 or c_strncmp(inner as *const u8, "__UNSUPPORTED:\0" as *const u8, 14) == 0:
@@ -982,6 +1041,24 @@ unsafe fn translate_type_recursive_mode(s: *mut CImportSession, ty: CXType, dept
 
     // Default: unsupported — must produce a loud compile error
     session_strdup(s, "__UNSUPPORTED:unknown_type_kind\0" as *const u8)
+
+/// A canonical record type whose tag is reserved-spelled (`_X`, `__x`) and
+/// whose declaration lives in a system header.
+unsafe fn record_is_reserved_system(canonical: CXType) -> i32:
+    let spelling = clang_getTypeSpelling(canonical)
+    var bare = clang_getCString(spelling)
+    if bare as i64 != 0 and c_strncmp(bare, "const \0" as *const u8, 6) == 0:
+        bare = (bare as i64 + 6) as *const u8
+    if bare as i64 != 0 and c_strncmp(bare, "volatile \0" as *const u8, 9) == 0:
+        bare = (bare as i64 + 9) as *const u8
+    if bare as i64 != 0 and c_strncmp(bare, "struct \0" as *const u8, 7) == 0:
+        bare = (bare as i64 + 7) as *const u8
+    else if bare as i64 != 0 and c_strncmp(bare, "union \0" as *const u8, 6) == 0:
+        bare = (bare as i64 + 6) as *const u8
+    let reserved = bare as i64 != 0 and *bare == '_'
+    clang_disposeString(spelling)
+    if not reserved: return 0
+    macro_location_is_system_from_cursor(clang_getTypeDeclaration(canonical))
 
 unsafe fn translate_type_recursive(s: *mut CImportSession, ty: CXType, depth: i32, is_last_struct_field: i32) -> *mut u8:
     translate_type_recursive_mode(s, ty, depth, is_last_struct_field, 0)
@@ -1504,8 +1581,8 @@ unsafe fn collect_inclusion(included_file: *mut u8, inclusion_stack: *mut u8, in
     let _ = include_len
     if included_file as i64 == 0:
         return
-    let s = data as *mut CImportSession
-    let path = clang_str_to_with(s, clang_getFileName(included_file))
+    let _ = data
+    let path = clang_path_to_with(clang_getFileName(included_file))
     if path.len() == 0:
         return
     // The synthetic main file is a throwaway temp; it is not a dependency.
@@ -2027,7 +2104,7 @@ pub fn with_ci_cursor_in_file(session: i64, cursor_idx: i32, path: &str) -> i32:
                 if actual_real as i64 != 0 and target_real as i64 != 0:
                     presumed_matches = if c_strcmp(actual_real as *const u8, target_real as *const u8) == 0: 1 else: 0
                 else:
-                    presumed_matches = if c_strcmp(presumed_name, c_path as *const u8) == 0: 1 else: 0
+                    presumed_matches = if make_path_str(presumed_name) == make_path_str(c_path as *const u8): 1 else: 0
             if actual_buf as i64 != 0:
                 with_free(actual_buf)
             if target_buf as i64 != 0:
@@ -2059,7 +2136,7 @@ pub fn with_ci_cursor_in_file(session: i64, cursor_idx: i32, path: &str) -> i32:
             if actual_real as i64 != 0 and target_real as i64 != 0:
                 matches = if c_strcmp(actual_real as *const u8, target_real as *const u8) == 0: 1 else: 0
             else:
-                matches = if c_strcmp(fname_str, c_path as *const u8) == 0: 1 else: 0
+                matches = if make_path_str(fname_str) == make_path_str(c_path as *const u8): 1 else: 0
         clang_disposeString(fname)
         if actual_buf as i64 != 0:
             with_free(actual_buf)
@@ -2117,14 +2194,15 @@ pub fn with_cimport_realpath(path: &str) -> str:
         let r = realpath(cpath, &raw mut buf as *mut [1024]u8 as *mut u8)
         with_free(cpath)
         if r as i64 == 0: return ""
-        make_str(r)
+        make_path_str(r)
 
 // ── Macro extraction ────────────────────────────────────────
 
 unsafe fn cimport_location_path_is_system(path: *const u8) -> i32:
     if path as i64 == 0: return 0
-    // Clang locations can mix separators even within one header path.
-    let normalized = make_str(path).replace("\\", "/")
+    // Bridge locations are already `/`; the resource dir below comes from
+    // the environment or the embedding, and a caller may pass a raw path.
+    let normalized = make_path_str(path)
     // Embedded builtin headers remain system headers after materialization.
     // Use the configured resource root, including an explicit override, and
     // require a path boundary so a neighboring project directory stays public.
@@ -2165,7 +2243,7 @@ unsafe fn macro_location_from_cursor(s: *mut CImportSession, cursor: CXCursor) -
         return ""
     var buf: [1024]u8 = [0 as u8; 1024]
     var pos: i64 = 0
-    buf_append_str(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, fname_str)
+    buf_append_path(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, fname_str)
     buf_append_str(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, ":\0" as *const u8)
     buf_append_i64(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, line_val as i64)
     buf_append_str(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, ":\0" as *const u8)
@@ -2187,7 +2265,7 @@ unsafe fn macro_source_line_from_cursor(s: *mut CImportSession, cursor: CXCursor
     if fname_str as i64 == 0 or *fname_str == 0:
         clang_disposeString(fname)
         return ""
-    let path = session_make_str(s, fname_str)
+    let path = make_path_str(fname_str)
     clang_disposeString(fname)
     let text = with_fs_read_file(path)
     if text.len() == 0:
@@ -3483,7 +3561,7 @@ pub fn with_ci_cursor_location(session: i64, cursor_idx: i32) -> str:
             fallback_active = true
         var buf: [1024]u8 = [0 as u8; 1024]
         var pos: i64 = 0
-        buf_append_str(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, if fname_str as i64 != 0: fname_str else: "?\0" as *const u8)
+        buf_append_path(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, if fname_str as i64 != 0: fname_str else: "?\0" as *const u8)
         buf_append_str(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, ":\0" as *const u8)
         buf_append_i64(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, line_val as i64)
         buf_append_str(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, ":\0" as *const u8)
@@ -3514,7 +3592,7 @@ pub fn with_ci_cursor_referenced_location(session: i64, cursor_idx: i32) -> str:
             return ""
         var buf: [1024]u8 = [0 as u8; 1024]
         var pos: i64 = 0
-        buf_append_str(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, fname_str)
+        buf_append_path(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, fname_str)
         buf_append_str(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, ":\0" as *const u8)
         buf_append_i64(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, line_val as i64)
         buf_append_str(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, ":\0" as *const u8)
@@ -3541,7 +3619,7 @@ pub fn with_ci_cursor_expansion_location(session: i64, cursor_idx: i32) -> str:
             return ""
         var buf: [1024]u8 = [0 as u8; 1024]
         var pos: i64 = 0
-        buf_append_str(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, fname_str)
+        buf_append_path(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, fname_str)
         buf_append_str(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, ":\0" as *const u8)
         buf_append_i64(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, line_val as i64)
         buf_append_str(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, ":\0" as *const u8)
@@ -3572,7 +3650,7 @@ pub fn with_ci_cursor_spelling_location(session: i64, cursor_idx: i32) -> str:
             return ""
         var buf: [1024]u8 = [0 as u8; 1024]
         var pos: i64 = 0
-        buf_append_str(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, fname_str)
+        buf_append_path(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, fname_str)
         buf_append_str(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, ":\0" as *const u8)
         buf_append_i64(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, line_val as i64)
         buf_append_str(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, ":\0" as *const u8)

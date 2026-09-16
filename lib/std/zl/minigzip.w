@@ -50,7 +50,7 @@ unsafe fn string_copy(__param_dst: *mut i8, __param_src: *const i8, __param_len:
 }
 
 unsafe fn error_(__param_msg: *const i8) -> Unit {
-    fprintf(__stderrp, c"%s: %s\n".ptr, prog, __param_msg)
+    fprintf(libc_stderr(), c"%s: %s\n".ptr, prog, __param_msg)
 
     exit((1 as c_int))
 
@@ -137,7 +137,7 @@ unsafe fn file_compress(__param_file: *mut i8, __param_mode: *mut i8) -> Unit {
     var __local_out: *mut gzFile_s
 
     if ((if ((strlen((__param_file as *const i8)) as c_ulong) +% (strlen(c".gz".ptr) as c_ulong)) >= (1025 * sizeof[c_char]()): 1 else: 0) != 0) {
-        fprintf(__stderrp, c"%s: filename too long\n".ptr, prog)
+        fprintf(libc_stderr(), c"%s: filename too long\n".ptr, prog)
 
         exit((1 as c_int))
 
@@ -161,7 +161,7 @@ unsafe fn file_compress(__param_file: *mut i8, __param_mode: *mut i8) -> Unit {
     if ((if __local_out == null: 1 else: 0) != 0) {
         fclose(__local_in_)
 
-        fprintf(__stderrp, c"%s: can't gzopen %s\n".ptr, prog, (&__local_outfile[0] as *mut c_char))
+        fprintf(libc_stderr(), c"%s: can't gzopen %s\n".ptr, prog, (&__local_outfile[0] as *mut c_char))
 
         exit((1 as c_int))
 
@@ -188,7 +188,7 @@ unsafe fn file_uncompress(__param_file: *mut i8) -> Unit {
     var __local_len: c_ulong = ((strlen((__param_file as *const i8)) as c_ulong))
 
     if ((if ((__local_len as c_ulong) +% (strlen(c".gz".ptr) as c_ulong)) >= (1025 * sizeof[c_char]()): 1 else: 0) != 0) {
-        fprintf(__stderrp, c"%s: filename too long\n".ptr, prog)
+        fprintf(libc_stderr(), c"%s: filename too long\n".ptr, prog)
 
         exit((1 as c_int))
 
@@ -222,7 +222,7 @@ unsafe fn file_uncompress(__param_file: *mut i8) -> Unit {
     (__local_in_ = gzopen((__local_infile as *const i8), c"rb".ptr))
 
     if ((if __local_in_ == null: 1 else: 0) != 0) {
-        fprintf(__stderrp, c"%s: can't gzopen %s\n".ptr, prog, __local_infile)
+        fprintf(libc_stderr(), c"%s: can't gzopen %s\n".ptr, prog, __local_infile)
 
         exit((1 as c_int))
 
@@ -345,27 +345,32 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     if ((if __local_argc == 0: 1 else: 0) != 0) {
+
+
         if (__local_uncompr != 0) {
-            (__local_file = gzdopen((fileno(__stdinp) as c_int), c"rb".ptr))
+            (__local_file = gzdopen((fileno(libc_stdin()) as c_int), c"rb".ptr))
 
             if ((if __local_file == null: 1 else: 0) != 0) {
                 error_(c"can't gzdopen stdin".ptr)
             }
 
-            gz_uncompress(__local_file, __stdoutp)
+            gz_uncompress(__local_file, libc_stdout())
 
         } else {
-            (__local_file = gzdopen((fileno(__stdoutp) as c_int), (&__local_outmode[0] as *mut c_char)))
+            (__local_file = gzdopen((fileno(libc_stdout()) as c_int), (&__local_outmode[0] as *mut c_char)))
 
             if ((if __local_file == null: 1 else: 0) != 0) {
                 error_(c"can't gzdopen stdout".ptr)
             }
 
-            gz_compress(__stdinp, __local_file)
+            gz_compress(libc_stdin(), __local_file)
 
         }
 
     } else {
+        if (__local_copyout != 0) {
+
+        }
 
         loop {
             if (__local_uncompr != 0) {
@@ -373,9 +378,9 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
                     (__local_file = gzopen(((unsafe *__local_argv) as *const i8), c"rb".ptr))
 
                     if ((if __local_file == null: 1 else: 0) != 0) {
-                        fprintf(__stderrp, c"%s: can't gzopen %s\n".ptr, prog, (unsafe *__local_argv))
+                        fprintf(libc_stderr(), c"%s: can't gzopen %s\n".ptr, prog, (unsafe *__local_argv))
                     } else {
-                        gz_uncompress(__local_file, __stdoutp)
+                        gz_uncompress(__local_file, libc_stdout())
                     }
 
                 } else {
@@ -391,7 +396,7 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
                         perror(((unsafe *__local_argv) as *const i8))
 
                     } else {
-                        (__local_file = gzdopen((fileno(__stdoutp) as c_int), (&__local_outmode[0] as *mut c_char)))
+                        (__local_file = gzdopen((fileno(libc_stdout()) as c_int), (&__local_outmode[0] as *mut c_char)))
 
                         if ((if __local_file == null: 1 else: 0) != 0) {
                             error_(c"can't gzdopen stdout".ptr)

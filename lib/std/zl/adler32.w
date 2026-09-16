@@ -92,9 +92,12 @@ pub unsafe fn adler32_z(__param_adler: c_ulong, __param_buf: *const u8, __param_
             (__local_sum2 = (__local_sum2 +% __local_adler))
 
 
+
             (__local_adler = (__local_adler +% ((unsafe __local_buf[(0 + 1)]) as c_int)))
 
             (__local_sum2 = (__local_sum2 +% __local_adler))
+
+
 
 
             (__local_adler = (__local_adler +% ((unsafe __local_buf[(0 + 2)]) as c_int)))
@@ -102,9 +105,13 @@ pub unsafe fn adler32_z(__param_adler: c_ulong, __param_buf: *const u8, __param_
             (__local_sum2 = (__local_sum2 +% __local_adler))
 
 
+
             (__local_adler = (__local_adler +% ((unsafe __local_buf[((0 + 2) + 1)]) as c_int)))
 
             (__local_sum2 = (__local_sum2 +% __local_adler))
+
+
+
 
 
             (__local_adler = (__local_adler +% ((unsafe __local_buf[(0 + 4)]) as c_int)))
@@ -112,9 +119,12 @@ pub unsafe fn adler32_z(__param_adler: c_ulong, __param_buf: *const u8, __param_
             (__local_sum2 = (__local_sum2 +% __local_adler))
 
 
+
             (__local_adler = (__local_adler +% ((unsafe __local_buf[((0 + 4) + 1)]) as c_int)))
 
             (__local_sum2 = (__local_sum2 +% __local_adler))
+
+
 
 
             (__local_adler = (__local_adler +% ((unsafe __local_buf[((0 + 4) + 2)]) as c_int)))
@@ -122,9 +132,14 @@ pub unsafe fn adler32_z(__param_adler: c_ulong, __param_buf: *const u8, __param_
             (__local_sum2 = (__local_sum2 +% __local_adler))
 
 
+
             (__local_adler = (__local_adler +% ((unsafe __local_buf[(((0 + 4) + 2) + 1)]) as c_int)))
 
             (__local_sum2 = (__local_sum2 +% __local_adler))
+
+
+
+
 
 
             (__local_adler = (__local_adler +% ((unsafe __local_buf[8]) as c_int)))
@@ -132,9 +147,12 @@ pub unsafe fn adler32_z(__param_adler: c_ulong, __param_buf: *const u8, __param_
             (__local_sum2 = (__local_sum2 +% __local_adler))
 
 
+
             (__local_adler = (__local_adler +% ((unsafe __local_buf[(8 + 1)]) as c_int)))
 
             (__local_sum2 = (__local_sum2 +% __local_adler))
+
+
 
 
             (__local_adler = (__local_adler +% ((unsafe __local_buf[(8 + 2)]) as c_int)))
@@ -142,9 +160,13 @@ pub unsafe fn adler32_z(__param_adler: c_ulong, __param_buf: *const u8, __param_
             (__local_sum2 = (__local_sum2 +% __local_adler))
 
 
+
             (__local_adler = (__local_adler +% ((unsafe __local_buf[((8 + 2) + 1)]) as c_int)))
 
             (__local_sum2 = (__local_sum2 +% __local_adler))
+
+
+
 
 
             (__local_adler = (__local_adler +% ((unsafe __local_buf[(8 + 4)]) as c_int)))
@@ -152,9 +174,12 @@ pub unsafe fn adler32_z(__param_adler: c_ulong, __param_buf: *const u8, __param_
             (__local_sum2 = (__local_sum2 +% __local_adler))
 
 
+
             (__local_adler = (__local_adler +% ((unsafe __local_buf[((8 + 4) + 1)]) as c_int)))
 
             (__local_sum2 = (__local_sum2 +% __local_adler))
+
+
 
 
             (__local_adler = (__local_adler +% ((unsafe __local_buf[((8 + 4) + 2)]) as c_int)))
@@ -162,9 +187,15 @@ pub unsafe fn adler32_z(__param_adler: c_ulong, __param_buf: *const u8, __param_
             (__local_sum2 = (__local_sum2 +% __local_adler))
 
 
+
             (__local_adler = (__local_adler +% ((unsafe __local_buf[(((8 + 4) + 2) + 1)]) as c_int)))
 
             (__local_sum2 = (__local_sum2 +% __local_adler))
+
+
+
+
+
 
 
             (__local_buf = __local_buf + ((16 as isize) as usize))
@@ -190,9 +221,12 @@ pub unsafe fn adler32_z(__param_adler: c_ulong, __param_buf: *const u8, __param_
             (__local_sum2 = (__local_sum2 +% __local_adler))
 
 
+
             (__local_adler = (__local_adler +% ((unsafe __local_buf[(0 + 1)]) as c_int)))
 
             (__local_sum2 = (__local_sum2 +% __local_adler))
+
+
 
 
             (__local_adler = (__local_adler +% ((unsafe __local_buf[(0 + 2)]) as c_int)))
@@ -200,9 +234,13 @@ pub unsafe fn adler32_z(__param_adler: c_ulong, __param_buf: *const u8, __param_
             (__local_sum2 = (__local_sum2 +% __local_adler))
 
 
+
             (__local_adler = (__local_adler +% ((unsafe __local_buf[((0 + 2) + 1)]) as c_int)))
 
             (__local_sum2 = (__local_sum2 +% __local_adler))
+
+
+
 
 
             (__local_adler = (__local_adler +% ((unsafe __local_buf[(0 + 4)]) as c_int)))
@@ -210,9 +248,12 @@ pub unsafe fn adler32_z(__param_adler: c_ulong, __param_buf: *const u8, __param_
             (__local_sum2 = (__local_sum2 +% __local_adler))
 
 
+
             (__local_adler = (__local_adler +% ((unsafe __local_buf[((0 + 4) + 1)]) as c_int)))
 
             (__local_sum2 = (__local_sum2 +% __local_adler))
+
+
 
 
             (__local_adler = (__local_adler +% ((unsafe __local_buf[((0 + 4) + 2)]) as c_int)))
@@ -220,9 +261,14 @@ pub unsafe fn adler32_z(__param_adler: c_ulong, __param_buf: *const u8, __param_
             (__local_sum2 = (__local_sum2 +% __local_adler))
 
 
+
             (__local_adler = (__local_adler +% ((unsafe __local_buf[(((0 + 4) + 2) + 1)]) as c_int)))
 
             (__local_sum2 = (__local_sum2 +% __local_adler))
+
+
+
+
 
 
             (__local_adler = (__local_adler +% ((unsafe __local_buf[8]) as c_int)))
@@ -230,9 +276,12 @@ pub unsafe fn adler32_z(__param_adler: c_ulong, __param_buf: *const u8, __param_
             (__local_sum2 = (__local_sum2 +% __local_adler))
 
 
+
             (__local_adler = (__local_adler +% ((unsafe __local_buf[(8 + 1)]) as c_int)))
 
             (__local_sum2 = (__local_sum2 +% __local_adler))
+
+
 
 
             (__local_adler = (__local_adler +% ((unsafe __local_buf[(8 + 2)]) as c_int)))
@@ -240,9 +289,13 @@ pub unsafe fn adler32_z(__param_adler: c_ulong, __param_buf: *const u8, __param_
             (__local_sum2 = (__local_sum2 +% __local_adler))
 
 
+
             (__local_adler = (__local_adler +% ((unsafe __local_buf[((8 + 2) + 1)]) as c_int)))
 
             (__local_sum2 = (__local_sum2 +% __local_adler))
+
+
+
 
 
             (__local_adler = (__local_adler +% ((unsafe __local_buf[(8 + 4)]) as c_int)))
@@ -250,9 +303,12 @@ pub unsafe fn adler32_z(__param_adler: c_ulong, __param_buf: *const u8, __param_
             (__local_sum2 = (__local_sum2 +% __local_adler))
 
 
+
             (__local_adler = (__local_adler +% ((unsafe __local_buf[((8 + 4) + 1)]) as c_int)))
 
             (__local_sum2 = (__local_sum2 +% __local_adler))
+
+
 
 
             (__local_adler = (__local_adler +% ((unsafe __local_buf[((8 + 4) + 2)]) as c_int)))
@@ -260,9 +316,15 @@ pub unsafe fn adler32_z(__param_adler: c_ulong, __param_buf: *const u8, __param_
             (__local_sum2 = (__local_sum2 +% __local_adler))
 
 
+
             (__local_adler = (__local_adler +% ((unsafe __local_buf[(((8 + 4) + 2) + 1)]) as c_int)))
 
             (__local_sum2 = (__local_sum2 +% __local_adler))
+
+
+
+
+
 
 
             (__local_buf = __local_buf + ((16 as isize) as usize))

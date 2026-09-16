@@ -345,11 +345,11 @@ pub unsafe fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param
         (__local_escaped_literal__goto_749_6 = ((0 as c_int)))
         (__local_overflowed__goto_750_6 = ((0 as c_int)))
         (__local_utf__goto_753_6 = (((if (((unsafe *__param_code).overall_options as c_uint) & (524288 as c_uint)) != 0: 1 else: 0) as c_int)))
-        (__local_null_str__goto_755_13 = [205])
+        (__local_null_str__goto_755_13 = [(205 as u8)])
         (__local_original_subject__goto_756_12 = __local_subject)
         (__local_repend__goto_758_12 = null)
         (__local_extra_needed__goto_759_12 = ((0 as c_ulong)))
-        (__local_ovecsave__goto_762_12 = [0, 0])
+        (__local_ovecsave__goto_762_12 = [(0 as c_ulong), (0 as c_ulong)])
         (__local_substitute_case_callout__goto_765_14 = null)
         (__local_substitute_case_callout_data__goto_767_7 = null)
         (__local_buff_offset__goto_760_12 = ((0 as c_ulong)))
@@ -4953,6 +4953,8 @@ unsafe fn default_substitute_case_callout(__param_input: *const u8, __param_inpu
         }
 
 
+
+
         var __ci_expr_logic_5: c_int = 0
 
         var __ci_expr_logic_4: c_int
@@ -5237,6 +5239,8 @@ unsafe fn do_case_copy(__param_input_output: *mut u8, __param_input_len: c_ulong
         }
 
     }
+
+
 
 
     __local_ch

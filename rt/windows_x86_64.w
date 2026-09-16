@@ -190,36 +190,23 @@ type RtSysInfo:
     memory_total: i64
     page_size: i64
 
-// Darwin-migrated C reads the preprocessed stdio globals __std{in,out,err}p;
-// Windows/UCRT has neither those symbols nor stdin/stdout/stderr globals -- the
-// FILE* streams come from __acrt_iob_func(0/1/2). Define the Darwin-spelled
-// symbols here and bind them to the UCRT stream table at startup (rt_store_args,
-// the pre-main entry hook) so a Darwin-migrated harness (pcre2test.w) links and
-// runs unchanged on Windows. See rt/linux_x86_64.w for the glibc analogue.
-pub var __stdinp: *mut c_void = 0 as *mut c_void
-pub var __stdoutp: *mut c_void = 0 as *mut c_void
-pub var __stderrp: *mut c_void = 0 as *mut c_void
-
-// Darwin-migrated C (pcre2test.w through std.libc) reads errno through
-// __error() and sizes its stack with get/setrlimit. UCRT spells errno as
-// _errno(); there is no rlimit -- the main thread's stack is fixed at link
-// time -- so RLIMIT_STACK (3) reads as unlimited and a set is accepted as a
-// no-op; any other resource is refused. The rlimit layout is std.libc's:
-// rlim_cur then rlim_max, both u64; RLIM_INFINITY is Darwin's (1<<63)-1.
+// std.libc's errno and rlimit seams (rt_errno_ptr, rt_getrlimit below).
+// UCRT spells errno as _errno(); there is no rlimit -- the main thread's
+// stack is fixed at link time -- so RLIMIT_STACK (3) reads as unlimited and
+// a set is accepted as a no-op; any other resource is refused. The rlimit
+// layout is std.libc's: rlim_cur then rlim_max, both u64; RLIM_INFINITY is
+// Darwin's (1<<63)-1.
 @[link_name("_errno")]
 extern fn rt_ucrt_errno() -> *mut i32
 
-pub fn __error() -> *mut i32:
-    rt_ucrt_errno()
-
-pub fn getrlimit(resource: i32, lim: *mut u8) -> i32:
+fn win_getrlimit(resource: i32, lim: *mut u8) -> i32:
     if resource != 3:
         return -1
     unsafe *(lim as *mut i64) = 9223372036854775807
     unsafe *((lim as i64 + 8) as *mut i64) = 9223372036854775807
     0
 
-pub fn setrlimit(resource: i32, lim: *const u8) -> i32:
+fn win_setrlimit(resource: i32, lim: *const u8) -> i32:
     let _ = lim
     if resource != 3: -1 else: 0
 
@@ -314,9 +301,6 @@ fn win_alloc_fd(handle: i64) -> i32:
 pub fn rt_store_args(argc_val: i32, argv_val: *const *const u8) -> Unit:
     rt_argc = argc_val
     rt_argv_raw = argv_val as i64
-    __stdinp = __acrt_iob_func(0 as u32)
-    __stdoutp = __acrt_iob_func(1 as u32)
-    __stderrp = __acrt_iob_func(2 as u32)
     // PWD is the runtime's on Windows. The driver reads it for its working
     // directory (project root, absolutized paths, embed anchoring). No shell
     // maintains it here the way POSIX shells do: a git-bash parent exports the
@@ -518,14 +502,34 @@ pub fn rt_fill_random(buf: *mut u8, len: u64) -> Unit:
     if SystemFunction036(buf, len as u32) == 0:
         ExitProcess(1)
 
+// The UCRT streams (`#define stdin (__acrt_iob_func(0))`), as std.libc's
+// libc_stdin/stdout/stderr hand them to fprintf and friends on every target.
 pub fn rt_libc_stdin() -> *mut c_void:
-    0 as *mut c_void
+    __acrt_iob_func(0 as u32)
 
 pub fn rt_libc_stdout() -> *mut c_void:
-    0 as *mut c_void
+    __acrt_iob_func(1 as u32)
 
 pub fn rt_libc_stderr() -> *mut c_void:
-    0 as *mut c_void
+    __acrt_iob_func(2 as u32)
+
+// std.libc's POSIX seams (rt_core.w's with_libc_*) over the UCRT: errno is
+// _errno(), fileno/isatty are the CRT's underscore spellings on CRT fds,
+// rlimit has no equivalent (the main stack is fixed at link time: RLIMIT_STACK
+// reads unlimited, a set is a no-op, other resources are refused), mkstemp
+// and realpath are the Win32 temp-file and full-path calls.
+@[link_name("_fileno")]
+extern fn rt_ucrt_fileno(stream: *mut c_void) -> i32
+@[link_name("_isatty")]
+extern fn rt_ucrt_isatty(fd: i32) -> i32
+
+pub fn rt_errno_ptr() -> *mut i32: rt_ucrt_errno()
+pub fn rt_fileno(stream: *mut c_void) -> i32: rt_ucrt_fileno(stream)
+pub fn rt_isatty(fd: i32) -> i32: rt_ucrt_isatty(fd)
+pub fn rt_getrlimit(resource: i32, lim: *mut u8) -> i32: win_getrlimit(resource, lim)
+pub fn rt_setrlimit(resource: i32, lim: *const u8) -> i32: win_setrlimit(resource, lim)
+pub fn rt_mkstemp(template_path: *mut u8) -> i32: win_mkstemp(template_path)
+pub fn rt_realpath(path: *const u8, resolved_path: *mut u8) -> *mut u8: win_realpath(path, resolved_path)
 
 pub fn rt_fiber_page_size() -> i64:
     4096
@@ -876,7 +880,7 @@ pub fn gethostname(name: *mut u8, len: u64) -> i32:
 pub fn pthread_self() -> i64:
     GetCurrentThreadId() as i64
 
-pub fn mkstemp(template_path: *mut u8) -> i32:
+fn win_mkstemp(template_path: *mut u8) -> i32:
     if template_path as i64 == 0:
         return -1
     var dir: [1024]u8 = [0 as u8; 1024]
@@ -897,7 +901,7 @@ pub fn mkstemp(template_path: *mut u8) -> i32:
     unsafe *((template_path as i64 + i) as *mut u8) = 0
     rt_open(&name as *const [1024]u8 as *const u8, 2, 384)
 
-pub fn realpath(path: *const u8, resolved_path: *mut u8) -> *mut u8:
+fn win_realpath(path: *const u8, resolved_path: *mut u8) -> *mut u8:
     if path as i64 == 0 or resolved_path as i64 == 0:
         return 0 as *mut u8
     let n = GetFullPathNameA(path, 4096 as u32, resolved_path, 0 as *mut *mut u8)

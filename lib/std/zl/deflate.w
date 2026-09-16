@@ -304,6 +304,7 @@ pub unsafe fn deflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
 
 
 
+
         var __ci_expr_old_22: c_ulong = (unsafe *__local_s).pending
 
         ((unsafe *__local_s).pending = ((unsafe *__local_s).pending +% 1))
@@ -312,11 +313,13 @@ pub unsafe fn deflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
 
 
 
+
         var __ci_expr_old_23: c_ulong = (unsafe *__local_s).pending
 
         ((unsafe *__local_s).pending = ((unsafe *__local_s).pending +% 1))
 
         ((unsafe (unsafe *__local_s).pending_buf[__ci_expr_old_23]) = ((8 as u8)))
+
 
 
 
@@ -329,11 +332,13 @@ pub unsafe fn deflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
 
 
 
+
             var __ci_expr_old_25: c_ulong = (unsafe *__local_s).pending
 
             ((unsafe *__local_s).pending = ((unsafe *__local_s).pending +% 1))
 
             ((unsafe (unsafe *__local_s).pending_buf[__ci_expr_old_25]) = ((0 as u8)))
+
 
 
 
@@ -345,6 +350,7 @@ pub unsafe fn deflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
 
 
 
+
             var __ci_expr_old_27: c_ulong = (unsafe *__local_s).pending
 
             ((unsafe *__local_s).pending = ((unsafe *__local_s).pending +% 1))
@@ -353,11 +359,13 @@ pub unsafe fn deflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
 
 
 
+
             var __ci_expr_old_28: c_ulong = (unsafe *__local_s).pending
 
             ((unsafe *__local_s).pending = ((unsafe *__local_s).pending +% 1))
 
             ((unsafe (unsafe *__local_s).pending_buf[__ci_expr_old_28]) = ((0 as u8)))
+
 
 
 
@@ -394,11 +402,13 @@ pub unsafe fn deflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
 
 
 
+
             var __ci_expr_old_33: c_ulong = (unsafe *__local_s).pending
 
             ((unsafe *__local_s).pending = ((unsafe *__local_s).pending +% 1))
 
             ((unsafe (unsafe *__local_s).pending_buf[__ci_expr_old_33]) = ((19 as u8)))
+
 
 
 
@@ -462,11 +472,13 @@ pub unsafe fn deflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
 
 
 
+
             var __ci_expr_old_40: c_ulong = (unsafe *__local_s).pending
 
             ((unsafe *__local_s).pending = ((unsafe *__local_s).pending +% 1))
 
             ((unsafe (unsafe *__local_s).pending_buf[__ci_expr_old_40]) = (((((unsafe *__local_s).gzhead.time as c_ulong) & (255 as c_ulong)) as u8)))
+
 
 
 
@@ -478,6 +490,7 @@ pub unsafe fn deflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
 
 
 
+
             var __ci_expr_old_42: c_ulong = (unsafe *__local_s).pending
 
             ((unsafe *__local_s).pending = ((unsafe *__local_s).pending +% 1))
@@ -486,11 +499,13 @@ pub unsafe fn deflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
 
 
 
+
             var __ci_expr_old_43: c_ulong = (unsafe *__local_s).pending
 
             ((unsafe *__local_s).pending = ((unsafe *__local_s).pending +% 1))
 
             ((unsafe (unsafe *__local_s).pending_buf[__ci_expr_old_43]) = (((((((unsafe *__local_s).gzhead.time as c_ulong) >> (24 as c_uint)) as c_ulong) & (255 as c_ulong)) as u8)))
+
 
 
 
@@ -527,11 +542,13 @@ pub unsafe fn deflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
 
 
 
+
             var __ci_expr_old_48: c_ulong = (unsafe *__local_s).pending
 
             ((unsafe *__local_s).pending = ((unsafe *__local_s).pending +% 1))
 
             ((unsafe (unsafe *__local_s).pending_buf[__ci_expr_old_48]) = (((((unsafe *__local_s).gzhead.os as c_int) & (255 as c_int)) as u8)))
+
 
 
 
@@ -544,11 +561,13 @@ pub unsafe fn deflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
 
 
 
+
                 var __ci_expr_old_50: c_ulong = (unsafe *__local_s).pending
 
                 ((unsafe *__local_s).pending = ((unsafe *__local_s).pending +% 1))
 
                 ((unsafe (unsafe *__local_s).pending_buf[__ci_expr_old_50]) = (((((((unsafe *__local_s).gzhead.extra_len as c_uint) >> (8 as c_uint)) as c_uint) & (255 as c_uint)) as u8)))
+
 
 
 
@@ -695,6 +714,7 @@ pub unsafe fn deflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
 
 
 
+
                 if not (((if __local_val != 0: 1 else: 0) != 0)) {
                     break
                 }
@@ -778,6 +798,7 @@ pub unsafe fn deflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
 
 
 
+
                 if not (((if __local_val_1 != 0: 1 else: 0) != 0)) {
                     break
                 }
@@ -828,11 +849,13 @@ pub unsafe fn deflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
 
 
 
+
             var __ci_expr_old_62: c_ulong = (unsafe *__local_s).pending
 
             ((unsafe *__local_s).pending = ((unsafe *__local_s).pending +% 1))
 
             ((unsafe (unsafe *__local_s).pending_buf[__ci_expr_old_62]) = (((((((unsafe *__param_strm).adler as c_ulong) >> (8 as c_uint)) as c_ulong) & (255 as c_ulong)) as u8)))
+
 
 
 
@@ -1007,11 +1030,13 @@ pub unsafe fn deflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
 
 
 
+
         var __ci_expr_old_72: c_ulong = (unsafe *__local_s).pending
 
         ((unsafe *__local_s).pending = ((unsafe *__local_s).pending +% 1))
 
         ((unsafe (unsafe *__local_s).pending_buf[__ci_expr_old_72]) = (((((((unsafe *__param_strm).adler as c_ulong) >> (8 as c_uint)) as c_ulong) & (255 as c_ulong)) as u8)))
+
 
 
 
@@ -1023,11 +1048,13 @@ pub unsafe fn deflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
 
 
 
+
         var __ci_expr_old_74: c_ulong = (unsafe *__local_s).pending
 
         ((unsafe *__local_s).pending = ((unsafe *__local_s).pending +% 1))
 
         ((unsafe (unsafe *__local_s).pending_buf[__ci_expr_old_74]) = (((((((unsafe *__param_strm).adler as c_ulong) >> (24 as c_uint)) as c_ulong) & (255 as c_ulong)) as u8)))
+
 
 
 
@@ -1039,11 +1066,13 @@ pub unsafe fn deflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
 
 
 
+
         var __ci_expr_old_76: c_ulong = (unsafe *__local_s).pending
 
         ((unsafe *__local_s).pending = ((unsafe *__local_s).pending +% 1))
 
         ((unsafe (unsafe *__local_s).pending_buf[__ci_expr_old_76]) = (((((((unsafe *__param_strm).total_in as c_ulong) >> (8 as c_uint)) as c_ulong) & (255 as c_ulong)) as u8)))
+
 
 
 
@@ -1055,11 +1084,13 @@ pub unsafe fn deflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
 
 
 
+
         var __ci_expr_old_78: c_ulong = (unsafe *__local_s).pending
 
         ((unsafe *__local_s).pending = ((unsafe *__local_s).pending +% 1))
 
         ((unsafe (unsafe *__local_s).pending_buf[__ci_expr_old_78]) = (((((((unsafe *__param_strm).total_in as c_ulong) >> (24 as c_uint)) as c_ulong) & (255 as c_ulong)) as u8)))
+
 
 
 
@@ -1103,9 +1134,11 @@ pub unsafe fn deflateEnd(__param_strm: *mut z_stream_s) -> c_int {
     }
 
 
+
     if ((unsafe *(unsafe *__param_strm).state).head != null) {
         (unsafe *__param_strm).zfree((unsafe *__param_strm).opaque_, ((unsafe *(unsafe *__param_strm).state).head as *mut c_void))
     }
+
 
 
     if ((unsafe *(unsafe *__param_strm).state).prev != null) {
@@ -1113,9 +1146,11 @@ pub unsafe fn deflateEnd(__param_strm: *mut z_stream_s) -> c_int {
     }
 
 
+
     if ((unsafe *(unsafe *__param_strm).state).window != null) {
         (unsafe *__param_strm).zfree((unsafe *__param_strm).opaque_, ((unsafe *(unsafe *__param_strm).state).window as *mut c_void))
     }
+
 
 
     (unsafe *__param_strm).zfree((unsafe *__param_strm).opaque_, ((unsafe *__param_strm).state as *mut c_void))
@@ -1352,7 +1387,7 @@ pub unsafe fn deflateCopy(__param_dest: *mut z_stream_s, __param_source: *mut z_
 
     with_memcpy(((__param_dest as *mut c_void) as *mut u8), ((__param_source as *const c_void) as *const u8), ((sizeof[z_stream_s]() as c_ulong) as i64))
 
-    (__local_ds = (((unsafe *__param_dest).zalloc((unsafe *__param_dest).opaque_, 1, 5968) as *mut internal_state)))
+    (__local_ds = (((unsafe *__param_dest).zalloc((unsafe *__param_dest).opaque_, (1 as c_uint), (5968 as c_uint)) as *mut internal_state)))
 
     if ((if __local_ds == 0: 1 else: 0) != 0) {
         return -4
@@ -1366,13 +1401,13 @@ pub unsafe fn deflateCopy(__param_dest: *mut z_stream_s, __param_source: *mut z_
 
     ((unsafe *__local_ds).strm = __param_dest)
 
-    ((unsafe *__local_ds).window = (((unsafe *__param_dest).zalloc((unsafe *__param_dest).opaque_, (unsafe *__local_ds).w_size, 2) as *mut u8)))
+    ((unsafe *__local_ds).window = (((unsafe *__param_dest).zalloc((unsafe *__param_dest).opaque_, (unsafe *__local_ds).w_size, (2 as c_uint)) as *mut u8)))
 
-    ((unsafe *__local_ds).prev = (((unsafe *__param_dest).zalloc((unsafe *__param_dest).opaque_, (unsafe *__local_ds).w_size, 2) as *mut c_ushort)))
+    ((unsafe *__local_ds).prev = (((unsafe *__param_dest).zalloc((unsafe *__param_dest).opaque_, (unsafe *__local_ds).w_size, (2 as c_uint)) as *mut c_ushort)))
 
-    ((unsafe *__local_ds).head = (((unsafe *__param_dest).zalloc((unsafe *__param_dest).opaque_, (unsafe *__local_ds).hash_size, 2) as *mut c_ushort)))
+    ((unsafe *__local_ds).head = (((unsafe *__param_dest).zalloc((unsafe *__param_dest).opaque_, (unsafe *__local_ds).hash_size, (2 as c_uint)) as *mut c_ushort)))
 
-    ((unsafe *__local_ds).pending_buf = (((unsafe *__param_dest).zalloc((unsafe *__param_dest).opaque_, (unsafe *__local_ds).lit_bufsize, 4) as *mut u8)))
+    ((unsafe *__local_ds).pending_buf = (((unsafe *__param_dest).zalloc((unsafe *__param_dest).opaque_, (unsafe *__local_ds).lit_bufsize, (4 as c_uint)) as *mut u8)))
 
     var __ci_expr_logic_3: c_int
 
@@ -2103,7 +2138,7 @@ pub unsafe fn deflateInit2_(__param_strm: *mut z_stream_s, __param_level: c_int,
         (__local_windowBits = ((9 as c_int)))
     }
 
-    (__local_s = (((unsafe *__param_strm).zalloc((unsafe *__param_strm).opaque_, 1, 5968) as *mut internal_state)))
+    (__local_s = (((unsafe *__param_strm).zalloc((unsafe *__param_strm).opaque_, (1 as c_uint), (5968 as c_uint)) as *mut internal_state)))
 
     if ((if __local_s == 0: 1 else: 0) != 0) {
         return -4
@@ -2135,17 +2170,17 @@ pub unsafe fn deflateInit2_(__param_strm: *mut z_stream_s, __param_level: c_int,
 
     ((unsafe *__local_s).hash_shift = (((((((((unsafe *__local_s).hash_bits as c_uint) +% (3 as c_uint)) as c_uint) -% (1 as c_uint)) as c_uint) / (3 as c_uint)) as c_uint)))
 
-    ((unsafe *__local_s).window = (((unsafe *__param_strm).zalloc((unsafe *__param_strm).opaque_, (unsafe *__local_s).w_size, 2) as *mut u8)))
+    ((unsafe *__local_s).window = (((unsafe *__param_strm).zalloc((unsafe *__param_strm).opaque_, (unsafe *__local_s).w_size, (2 as c_uint)) as *mut u8)))
 
-    ((unsafe *__local_s).prev = (((unsafe *__param_strm).zalloc((unsafe *__param_strm).opaque_, (unsafe *__local_s).w_size, 2) as *mut c_ushort)))
+    ((unsafe *__local_s).prev = (((unsafe *__param_strm).zalloc((unsafe *__param_strm).opaque_, (unsafe *__local_s).w_size, (2 as c_uint)) as *mut c_ushort)))
 
-    ((unsafe *__local_s).head = (((unsafe *__param_strm).zalloc((unsafe *__param_strm).opaque_, (unsafe *__local_s).hash_size, 2) as *mut c_ushort)))
+    ((unsafe *__local_s).head = (((unsafe *__param_strm).zalloc((unsafe *__param_strm).opaque_, (unsafe *__local_s).hash_size, (2 as c_uint)) as *mut c_ushort)))
 
     ((unsafe *__local_s).high_water = ((0 as c_ulong)))
 
     ((unsafe *__local_s).lit_bufsize = ((((1 as c_int) << ((__param_memLevel + 6) as c_uint)) as c_uint)))
 
-    ((unsafe *__local_s).pending_buf = (((unsafe *__param_strm).zalloc((unsafe *__param_strm).opaque_, (unsafe *__local_s).lit_bufsize, 4) as *mut u8)))
+    ((unsafe *__local_s).pending_buf = (((unsafe *__param_strm).zalloc((unsafe *__param_strm).opaque_, (unsafe *__local_s).lit_bufsize, (4 as c_uint)) as *mut u8)))
 
     ((unsafe *__local_s).pending_buf_size = ((((((unsafe *__local_s).lit_bufsize as c_ulong) as c_ulong) *% (4 as c_ulong)) as c_ulong)))
 
@@ -2728,6 +2763,7 @@ unsafe fn deflate_fast(__param_s: *mut internal_state, __param_flush: c_int) -> 
 
 
         if ((if (unsafe *__param_s).match_length >= 3: 1 else: 0) != 0) {
+
             var __local_len: u8 = (((((unsafe *__param_s).match_length as c_uint) -% (3 as c_uint)) as u8))
 
             var __local_dist: c_ushort = (((((unsafe *__param_s).strstart as c_uint) -% ((unsafe *__param_s).match_start as c_uint)) as c_ushort))
@@ -2769,6 +2805,7 @@ unsafe fn deflate_fast(__param_s: *mut internal_state, __param_flush: c_int) -> 
 
 
             (__local_bflush = (((if (unsafe *__param_s).sym_next == (unsafe *__param_s).sym_end: 1 else: 0) as c_int)))
+
 
 
             ((unsafe *__param_s).lookahead = ((unsafe *__param_s).lookahead -% (unsafe *__param_s).match_length))
@@ -2815,6 +2852,7 @@ unsafe fn deflate_fast(__param_s: *mut internal_state, __param_flush: c_int) -> 
 
 
         } else {
+
             var __local_cc: u8 = (((unsafe (unsafe *__param_s).window[(unsafe *__param_s).strstart]) as u8))
 
             var __ci_expr_old_7: c_uint = (unsafe *__param_s).sym_next
@@ -2843,6 +2881,7 @@ unsafe fn deflate_fast(__param_s: *mut internal_state, __param_flush: c_int) -> 
             (__local_bflush = (((if (unsafe *__param_s).sym_next == (unsafe *__param_s).sym_end: 1 else: 0) as c_int)))
 
 
+
             ((unsafe *__param_s).lookahead = ((unsafe *__param_s).lookahead -% 1))
 
             ((unsafe *__param_s).strstart = ((unsafe *__param_s).strstart +% 1))
@@ -2866,11 +2905,14 @@ unsafe fn deflate_fast(__param_s: *mut internal_state, __param_flush: c_int) -> 
             flush_pending((unsafe *__param_s).strm)
 
 
+
+
             if ((if (unsafe *__param_s).strm.avail_out == 0: 1 else: 0) != 0) {
                 return 0
             }
 
         }
+
 
     }
 
@@ -2902,9 +2944,12 @@ unsafe fn deflate_fast(__param_s: *mut internal_state, __param_flush: c_int) -> 
         flush_pending((unsafe *__param_s).strm)
 
 
+
+
         if ((if (unsafe *__param_s).strm.avail_out == 0: 1 else: 0) != 0) {
             return 2
         }
+
 
 
         return 3
@@ -2928,11 +2973,14 @@ unsafe fn deflate_fast(__param_s: *mut internal_state, __param_flush: c_int) -> 
         flush_pending((unsafe *__param_s).strm)
 
 
+
+
         if ((if (unsafe *__param_s).strm.avail_out == 0: 1 else: 0) != 0) {
             return 0
         }
 
     }
+
 
     return 1
 
@@ -3041,6 +3089,7 @@ unsafe fn deflate_slow(__param_s: *mut internal_state, __param_flush: c_int) -> 
         if (__ci_expr_logic_6 != 0) {
             var __local_max_insert: c_uint = (((((((unsafe *__param_s).strstart as c_uint) +% ((unsafe *__param_s).lookahead as c_uint)) as c_uint) -% (3 as c_uint)) as c_uint))
 
+
             var __local_len: u8 = (((((unsafe *__param_s).prev_length as c_uint) -% (3 as c_uint)) as u8))
 
             var __local_dist: c_ushort = (((((((unsafe *__param_s).strstart as c_uint) -% (1 as c_uint)) as c_uint) -% ((unsafe *__param_s).prev_match as c_uint)) as c_ushort))
@@ -3082,6 +3131,7 @@ unsafe fn deflate_slow(__param_s: *mut internal_state, __param_flush: c_int) -> 
 
 
             (__local_bflush = (((if (unsafe *__param_s).sym_next == (unsafe *__param_s).sym_end: 1 else: 0) as c_int)))
+
 
 
             ((unsafe *__param_s).lookahead = ((unsafe *__param_s).lookahead -% (((unsafe *__param_s).prev_length as c_uint) -% (1 as c_uint))))
@@ -3133,14 +3183,18 @@ unsafe fn deflate_slow(__param_s: *mut internal_state, __param_flush: c_int) -> 
                 flush_pending((unsafe *__param_s).strm)
 
 
+
+
                 if ((if (unsafe *__param_s).strm.avail_out == 0: 1 else: 0) != 0) {
                     return 0
                 }
 
             }
 
+
         } else {
             if ((unsafe *__param_s).match_available != 0) {
+
                 var __local_cc: u8 = (((unsafe (unsafe *__param_s).window[(((unsafe *__param_s).strstart as c_uint) -% (1 as c_uint))]) as u8))
 
                 var __ci_expr_old_12: c_uint = (unsafe *__param_s).sym_next
@@ -3169,6 +3223,7 @@ unsafe fn deflate_slow(__param_s: *mut internal_state, __param_flush: c_int) -> 
                 (__local_bflush = (((if (unsafe *__param_s).sym_next == (unsafe *__param_s).sym_end: 1 else: 0) as c_int)))
 
 
+
                 if (__local_bflush != 0) {
                     var __ci_expr_ternary_15: *mut c_char = null
 
@@ -3184,6 +3239,8 @@ unsafe fn deflate_slow(__param_s: *mut internal_state, __param_flush: c_int) -> 
                     ((unsafe *__param_s).block_start = (((unsafe *__param_s).strstart as c_long)))
 
                     flush_pending((unsafe *__param_s).strm)
+
+
 
 
                 }
@@ -3209,7 +3266,9 @@ unsafe fn deflate_slow(__param_s: *mut internal_state, __param_flush: c_int) -> 
 
     }
 
+
     if ((unsafe *__param_s).match_available != 0) {
+
         var __local_cc_1: u8 = (((unsafe (unsafe *__param_s).window[(((unsafe *__param_s).strstart as c_uint) -% (1 as c_uint))]) as u8))
 
         var __ci_expr_old_16: c_uint = (unsafe *__param_s).sym_next
@@ -3236,6 +3295,7 @@ unsafe fn deflate_slow(__param_s: *mut internal_state, __param_flush: c_int) -> 
         ((unsafe *__param_s).dyn_ltree[__local_cc_1].fc.freq = ((unsafe *__param_s).dyn_ltree[__local_cc_1].fc.freq +% 1))
 
         (__local_bflush = (((if (unsafe *__param_s).sym_next == (unsafe *__param_s).sym_end: 1 else: 0) as c_int)))
+
 
 
         ((unsafe *__param_s).match_available = ((0 as c_int)))
@@ -3270,9 +3330,12 @@ unsafe fn deflate_slow(__param_s: *mut internal_state, __param_flush: c_int) -> 
         flush_pending((unsafe *__param_s).strm)
 
 
+
+
         if ((if (unsafe *__param_s).strm.avail_out == 0: 1 else: 0) != 0) {
             return 2
         }
+
 
 
         return 3
@@ -3296,11 +3359,14 @@ unsafe fn deflate_slow(__param_s: *mut internal_state, __param_flush: c_int) -> 
         flush_pending((unsafe *__param_s).strm)
 
 
+
+
         if ((if (unsafe *__param_s).strm.avail_out == 0: 1 else: 0) != 0) {
             return 0
         }
 
     }
+
 
     return 1
 
@@ -3461,10 +3527,12 @@ unsafe fn deflate_rle(__param_s: *mut internal_state, __param_flush: c_int) -> i
             }
 
 
+
         }
 
 
         if ((if (unsafe *__param_s).match_length >= 3: 1 else: 0) != 0) {
+
             var __local_len: u8 = (((((unsafe *__param_s).match_length as c_uint) -% (3 as c_uint)) as u8))
 
             var __local_dist: c_ushort = ((1 as c_ushort))
@@ -3508,6 +3576,7 @@ unsafe fn deflate_rle(__param_s: *mut internal_state, __param_flush: c_int) -> i
             (__local_bflush = (((if (unsafe *__param_s).sym_next == (unsafe *__param_s).sym_end: 1 else: 0) as c_int)))
 
 
+
             ((unsafe *__param_s).lookahead = ((unsafe *__param_s).lookahead -% (unsafe *__param_s).match_length))
 
             ((unsafe *__param_s).strstart = ((unsafe *__param_s).strstart +% (unsafe *__param_s).match_length))
@@ -3515,6 +3584,7 @@ unsafe fn deflate_rle(__param_s: *mut internal_state, __param_flush: c_int) -> i
             ((unsafe *__param_s).match_length = ((0 as c_uint)))
 
         } else {
+
             var __local_cc: u8 = (((unsafe (unsafe *__param_s).window[(unsafe *__param_s).strstart]) as u8))
 
             var __ci_expr_old_16: c_uint = (unsafe *__param_s).sym_next
@@ -3543,6 +3613,7 @@ unsafe fn deflate_rle(__param_s: *mut internal_state, __param_flush: c_int) -> i
             (__local_bflush = (((if (unsafe *__param_s).sym_next == (unsafe *__param_s).sym_end: 1 else: 0) as c_int)))
 
 
+
             ((unsafe *__param_s).lookahead = ((unsafe *__param_s).lookahead -% 1))
 
             ((unsafe *__param_s).strstart = ((unsafe *__param_s).strstart +% 1))
@@ -3566,11 +3637,14 @@ unsafe fn deflate_rle(__param_s: *mut internal_state, __param_flush: c_int) -> i
             flush_pending((unsafe *__param_s).strm)
 
 
+
+
             if ((if (unsafe *__param_s).strm.avail_out == 0: 1 else: 0) != 0) {
                 return 0
             }
 
         }
+
 
     }
 
@@ -3593,9 +3667,12 @@ unsafe fn deflate_rle(__param_s: *mut internal_state, __param_flush: c_int) -> i
         flush_pending((unsafe *__param_s).strm)
 
 
+
+
         if ((if (unsafe *__param_s).strm.avail_out == 0: 1 else: 0) != 0) {
             return 2
         }
+
 
 
         return 3
@@ -3619,11 +3696,14 @@ unsafe fn deflate_rle(__param_s: *mut internal_state, __param_flush: c_int) -> i
         flush_pending((unsafe *__param_s).strm)
 
 
+
+
         if ((if (unsafe *__param_s).strm.avail_out == 0: 1 else: 0) != 0) {
             return 0
         }
 
     }
+
 
     return 1
 
@@ -3648,6 +3728,7 @@ unsafe fn deflate_huff(__param_s: *mut internal_state, __param_flush: c_int) -> 
         }
 
         ((unsafe *__param_s).match_length = ((0 as c_uint)))
+
 
         var __local_cc: u8 = (((unsafe (unsafe *__param_s).window[(unsafe *__param_s).strstart]) as u8))
 
@@ -3677,6 +3758,7 @@ unsafe fn deflate_huff(__param_s: *mut internal_state, __param_flush: c_int) -> 
         (__local_bflush = (((if (unsafe *__param_s).sym_next == (unsafe *__param_s).sym_end: 1 else: 0) as c_int)))
 
 
+
         ((unsafe *__param_s).lookahead = ((unsafe *__param_s).lookahead -% 1))
 
         ((unsafe *__param_s).strstart = ((unsafe *__param_s).strstart +% 1))
@@ -3698,11 +3780,14 @@ unsafe fn deflate_huff(__param_s: *mut internal_state, __param_flush: c_int) -> 
             flush_pending((unsafe *__param_s).strm)
 
 
+
+
             if ((if (unsafe *__param_s).strm.avail_out == 0: 1 else: 0) != 0) {
                 return 0
             }
 
         }
+
 
     }
 
@@ -3725,9 +3810,12 @@ unsafe fn deflate_huff(__param_s: *mut internal_state, __param_flush: c_int) -> 
         flush_pending((unsafe *__param_s).strm)
 
 
+
+
         if ((if (unsafe *__param_s).strm.avail_out == 0: 1 else: 0) != 0) {
             return 2
         }
+
 
 
         return 3
@@ -3751,11 +3839,14 @@ unsafe fn deflate_huff(__param_s: *mut internal_state, __param_flush: c_int) -> 
         flush_pending((unsafe *__param_s).strm)
 
 
+
+
         if ((if (unsafe *__param_s).strm.avail_out == 0: 1 else: 0) != 0) {
             return 0
         }
 
     }
+
 
     return 1
 
@@ -3869,6 +3960,7 @@ unsafe fn fill_window(__param_s: *mut internal_state) -> Unit {
 
     var __local_wsize: c_uint = (unsafe *__param_s).w_size
 
+
     loop {
         (__local_more = (((((((unsafe *__param_s).window_size as c_ulong) -% (((unsafe *__param_s).lookahead as c_ulong) as c_ulong)) as c_ulong) -% (((unsafe *__param_s).strstart as c_ulong) as c_ulong)) as c_uint)))
 
@@ -3920,6 +4012,7 @@ unsafe fn fill_window(__param_s: *mut internal_state) -> Unit {
         if ((if (unsafe *__param_s).strm.avail_in == 0: 1 else: 0) != 0) {
             break
         }
+
 
         (__local_n = ((read_buf((unsafe *__param_s).strm, (((unsafe *__param_s).window + ((unsafe *__param_s).strstart as usize)) + ((unsafe *__param_s).lookahead as usize)), __local_more) as c_uint)))
 
@@ -3994,6 +4087,7 @@ unsafe fn fill_window(__param_s: *mut internal_state) -> Unit {
         }
 
     }
+
 
 }
 
@@ -4142,11 +4236,13 @@ unsafe fn putShortMSB(__param_s: *mut internal_state, __param_b: c_uint) -> Unit
 
 
 
+
     var __ci_expr_old_1: c_ulong = (unsafe *__param_s).pending
 
     ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
 
     ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_1]) = ((((__param_b as c_uint) & (255 as c_uint)) as u8)))
+
 
 
 
@@ -4227,6 +4323,7 @@ unsafe fn longest_match(__param_s: *mut internal_state, __param_cur_match: c_uin
 
     var __local_scan_end: u8 = (((unsafe __local_scan[__local_best_len]) as u8))
 
+
     if ((if (unsafe *__param_s).prev_length >= (unsafe *__param_s).good_match: 1 else: 0) != 0) {
         (__local_chain_length = __local_chain_length >> (2 as c_uint))
 
@@ -4236,7 +4333,9 @@ unsafe fn longest_match(__param_s: *mut internal_state, __param_cur_match: c_uin
         (__local_nice_match = (((unsafe *__param_s).lookahead as c_int)))
     }
 
+
     loop {
+
         (__local_match_ = (unsafe *__param_s).window + (__local_cur_match as usize))
 
         var __ci_expr_logic_4: c_int
@@ -4289,6 +4388,7 @@ unsafe fn longest_match(__param_s: *mut internal_state, __param_cur_match: c_uin
         (__local_scan = __local_scan + ((2 as isize) as usize))
 
         (__local_match_ = __local_match_ + 1)
+
 
 
         loop {
@@ -4384,6 +4484,7 @@ unsafe fn longest_match(__param_s: *mut internal_state, __param_cur_match: c_uin
                 break
             }
         }
+
 
         (__local_len = (((258 - ((((__local_strend as usize) -% (__local_scan as usize)) / sizeof[u8]()) as c_int)) as c_int)))
 

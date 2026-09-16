@@ -2510,12 +2510,6 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
         var rss_trip_rc = 0
         for tri in 0..timed_rss.len() as i32:
             let trip_name = if tri < timed_names.len() as i32: with_str_clone_ref(timed_names[tri]) else: "?" ++ ""
-            // seed-compat's process tree is the PINNED SEED building the tree
-            // (12.9 GB measured for v0.15.1.9): a released binary this tree
-            // cannot budget, so the lane is exempt. By name, like the always-run
-            // lanes: a Target flag would be std.build API the pinned seed
-            // evaluating build.w does not have.
-            if trip_name == "seed-compat": continue
             if timed_rss[tri] > 1073741824:
                 let peak_mb: i64 = timed_rss[tri] / 1048576
                 with_eprint("error: rss tripwire: target '" ++ trip_name ++ f"' peaked at {peak_mb}M (limit 1024M, #679)")
@@ -2717,10 +2711,12 @@ fn build_report_wall(target_name: &str, t0: i64):
     let label = if target_name.len() > 0: ":" ++ target_name else: "(default)"
     with_eprint("[build] " ++ label ++ " wall " ++ build_graph_time_fmt(with_clock_nanos() - t0))
 
-// #702: the reseed fast path. `:update-seed` / `:install-user` after a green
-// battery reduce to: verify out/release/bin/with is the exact binary
-// last-green blessed, copy it, set 0755. Same guarantee require-last-green
-// enforces, none of the graph machinery.
+// #702: the install fast path. `:install-user` after a green battery reduces
+// to: verify out/release/bin/with is the exact binary last-green blessed,
+// copy it, set 0755. Same guarantee require-last-green enforces, none of the
+// graph machinery. (`:update-seed` is gone: src/main is the seed pinned in
+// seed.lock and only `with build :seed` writes it — the battery is driven by
+// the pinned seed, as CI is.)
 // #745/#757: during the battery the release candidate only ever runs as a
 // spawned pure-compiler child (workers, tests). It first evaluates build.w
 // as the ORCHESTRATOR — comptime evaluator, action graph, worker/runner
@@ -2802,7 +2798,7 @@ fn cli_fast_install_blessed(root: &str, target_name: &str) -> i32:
     let gate_rc = reseed_gate_smoke(root, compiler_path)
     if gate_rc != 0:
         return gate_rc
-    let dest = if target_name == "update-seed": resolve_join(root, "src/main") else: with_getenv_str("HOME") ++ "/.local/bin/with"
+    let dest = with_getenv_str("HOME") ++ "/.local/bin/with"
     if with_fs_write_file(dest, data) != 0:
         with_eprint("error: could not write " ++ dest)
         return 1
@@ -2837,7 +2833,7 @@ fn run_build_command(options: BuildCommandOptions, graph_options: &BuildGraphCom
             // system — the battery already proved everything and last-green
             // already recorded the verified sha. Verify against the manifest
             // and copy; no graph evaluation.
-            if graph_options.selected_target == "update-seed" or graph_options.selected_target == "install-user":
+            if graph_options.selected_target == "install-user":
                 return cli_fast_install_blessed(root, graph_options.selected_target)
             var load_result = load_build_graph_from_build_w(root, &cfg, &actual_options)
             let graph = load_result.graph

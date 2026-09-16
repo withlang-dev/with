@@ -60,8 +60,8 @@ They are not normal post-seed release tools: once the first seed and static SDK
 exist for a platform, repeat SDK production is graph-owned by
 `with build :sdk-ninja`, `with build :sdk-cmake`, `with build :sdk-llvm`, and
 `with build :sdk`. `docs/with-release-runbook.md` reuses the published SDK
-asset and updates the local compiler with `with build :install-user` /
-`with build :update-seed`.
+asset and updates the installed compiler with `with build :install-user`
+(`src/main` stays the seed pinned in `seed.lock`; `with build :seed` writes it).
 
 Use the repo scripts to build this initial SDK:
 

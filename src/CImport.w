@@ -9000,6 +9000,12 @@ impl CiExprPool:
                 else:
                     if not ci_note_filtered_system_symbol_ref_at(session, cursor, name, CI_LIBC_KIND_VAR):
                         return 0 as CiExprId
+            if mangled.len() == 0 and ci_libc_stream_accessor(name).len() > 0:
+                // A stdio global is std.libc's accessor call on every target.
+                let accessor = ci_libc_stream_accessor(name)
+                ci_migrate_note_libc_symbol(accessor)
+                let no_args: Vec[i32] = Vec.new()
+                return self.build_named_call_expr_typed(accessor, &no_args, types.type_from_libclang(session, with_ci_cursor_type(session, cursor)))
             var text = ""
             if mangled.len() > 0:
                 text = mangled
@@ -16366,12 +16372,23 @@ fn ci_is_system_path(loc: &str) -> bool: cimport_path_is_system(loc)
 let CI_LIBC_KIND_FN: i32 = 1
 let CI_LIBC_KIND_VAR: i32 = 2
 let CI_LIBC_KIND_TYPE: i32 = 4
-let CI_LIBC_PLATFORM_DARWIN: i32 = 1
 
-fn ci_libc_symbol_platforms(name: &str) -> i32:
-    if name == "__stdinp" or name == "__stdoutp" or name == "__stderrp": return CI_LIBC_PLATFORM_DARWIN
-    if name == "__error": return CI_LIBC_PLATFORM_DARWIN
-    CI_LIBC_PLATFORM_DARWIN
+// std.libc exports no host-spelled symbol (Eric, 2026-09-15): a modeled
+// stream, errno accessor or CRT-spelled function is rewritten from the
+// host's spelling to the std.libc name, so the same migrated module links
+// on every target. The stdio globals become calls (`stderr` → `libc_stderr()`).
+fn ci_libc_stream_accessor(name: &str) -> str:
+    if name == "__stdinp" or name == "stdin": return "libc_stdin"
+    if name == "__stdoutp" or name == "stdout": return "libc_stdout"
+    if name == "__stderrp" or name == "stderr": return "libc_stderr"
+    ""
+
+fn ci_libc_portable_callee(name: &str) -> str:
+    if name == "__error" or name == "__errno_location" or name == "_errno": return "errno_ptr"
+    if name == "_fileno": return "fileno"
+    if name == "_isatty": return "isatty"
+    if name == "__acrt_iob_func": return "libc_iob"
+    name ++ ""
 
 // The With integer method a bit-manipulation builtin lowers to, or "".
 fn ci_builtin_bit_method(name: &str) -> str:
@@ -16399,10 +16416,15 @@ fn ci_is_libm_fn(name: &str) -> bool:
 
 fn ci_libc_symbol_kind_mask(name: &str) -> i32:
     if name == "rlimit": return CI_LIBC_KIND_TYPE
-    if name == "__stdinp" or name == "__stdoutp" or name == "__stderrp": return CI_LIBC_KIND_VAR
-    // glibc spells the stdio globals stdin/stdout/stderr (Darwin uses the
-    // __std*p forms above). std.libc exposes both target surfaces.
-    if name == "stdin" or name == "stdout" or name == "stderr": return CI_LIBC_KIND_VAR
+    // The stdio globals (Darwin __std*p, glibc stdin/stdout/stderr): allowed
+    // as variables so the reference is not a filtered system symbol, then
+    // lowered as the std.libc accessor call (ci_libc_stream_accessor).
+    if ci_libc_stream_accessor(name).len() > 0: return CI_LIBC_KIND_VAR
+    // The host spellings of modeled functions (ci_libc_portable_callee) and
+    // the std.libc names they lower to: a later pass re-checks the emitted
+    // callee against this allowlist.
+    if name == "__errno_location" or name == "_errno" or name == "_fileno" or name == "_isatty" or name == "__acrt_iob_func": return CI_LIBC_KIND_FN
+    if name == "errno_ptr" or name == "libc_iob" or name == "libc_stdin" or name == "libc_stdout" or name == "libc_stderr": return CI_LIBC_KIND_FN
     if name == "fprintf" or name == "printf" or name == "snprintf" or name == "sprintf": return CI_LIBC_KIND_FN
     if name == "vsnprintf" or name == "vfprintf" or name == "vprintf": return CI_LIBC_KIND_FN
     if name == "fopen" or name == "fclose" or name == "fflush" or name == "fileno": return CI_LIBC_KIND_FN
@@ -16442,7 +16464,7 @@ fn ci_libc_symbol_allowed_as(name: &str, kind: i32) -> bool:
 // spelling for such calls; emitting write_ references a name nothing defines.
 fn ci_migrate_call_callee_name(name: &str) -> str:
     if ci_translate_in_migrate_mode() and ci_libc_symbol_allowed_as(name, CI_LIBC_KIND_FN):
-        return name ++ ""
+        return ci_libc_portable_callee(name)
     ci_migrate_c_function_name(name)
 
 fn ci_libc_kind_name(kind: i32) -> str:

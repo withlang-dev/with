@@ -88,7 +88,7 @@ Installer scripts are not part of the required post-seed release contract. A
 release may temporarily attach shell, PowerShell, or CMD convenience installers
 while the With-native installer path is being built, but normal release
 verification and post-seed updates use `with build :install-user` and
-`with build :update-seed`, not `scripts/install.*`.
+`with build :seed`, not `scripts/install.*`.
 
 ### Static LLVM SDK asset
 
@@ -164,15 +164,18 @@ git add src/version
 git commit -m "release: $WITH_VERSION"
 ```
 
-Run the deterministic release gates with the primary build interface on every
-release platform:
+Run the deterministic release gates on every release platform, driven by the
+seed pinned in `seed.lock` (the same driver CI uses; `seed-driver` refuses any
+other):
 
 ```sh
-with build
-with build :fixpoint
-with build :test
-with build :test-green
-with build :last-green
+with build :seed
+export WITH=$PWD/src/main
+src/main build
+src/main build :fixpoint
+src/main build :test
+src/main build :test-green
+src/main build :last-green
 ```
 
 `:test` runs the full suite and records current test evidence. `:test-green`
@@ -302,17 +305,18 @@ export WITH=$RELEASE_SEED
 WITH_VERSION=$WITH_VERSION "$RELEASE_SEED" build
 ```
 
-After the first build creates `out/release/bin/with`, use that verified
-compiler for the remaining Darwin gates:
+The remaining Darwin gates stay under the pinned seed (`seed-driver` refuses
+`:test` and `:last-green` under any other driver); only the release UAT runs
+under the rebuilt compiler, since it exercises that binary as the orchestrator:
 
 ```sh
-export WITH=$PWD/out/release/bin/with
-
-WITH_VERSION=$WITH_VERSION ./out/release/bin/with build :fixpoint
-WITH_VERSION=$WITH_VERSION ./out/release/bin/with build :test
-WITH_VERSION=$WITH_VERSION ./out/release/bin/with build :test-green
-WITH_VERSION=$WITH_VERSION ./out/release/bin/with build :last-green
+WITH_VERSION=$WITH_VERSION "$RELEASE_SEED" build :fixpoint
+WITH_VERSION=$WITH_VERSION "$RELEASE_SEED" build :test
+WITH_VERSION=$WITH_VERSION "$RELEASE_SEED" build :test-green
+WITH_VERSION=$WITH_VERSION "$RELEASE_SEED" build :last-green
 WITH_VERSION=$WITH_VERSION ./out/release/bin/with version
+
+export WITH=$PWD/out/release/bin/with
 WITH_VERSION=$WITH_VERSION ./out/release/bin/with build :release-uat
 ```
 
@@ -388,30 +392,27 @@ Expected output:
 with v0.14.3
 ```
 
-Finalize the local development seeds after the gates pass. This step is
-required: the release is not done until the compiler that this checkout will
-use for the next self-host build (`out/release/bin/with`), the local bootstrap
-seed (`src/main`), and the installed user compiler all report the released
-version.
+Install the verified compiler after the gates pass. This step is required:
+the release is not done until the rebuilt compiler (`out/release/bin/with`)
+and the installed user compiler both report the released version.
 
 ```sh
-with build :update-seed
 with build :install-user
-src/main version
 out/release/bin/with version
 ~/.local/bin/with version
 ```
 
-Both commands must print:
+Both must print:
 
 ```text
 with v0.14.3
 ```
 
-Do not leave a release with `src/main`, `out/bin/with`, or
-`~/.local/bin/with` reporting an older version or a different development
-build. If this check fails, rerun the release gates with `WITH_VERSION` still
-set and stop before publishing.
+`src/main` is not touched here: it stays the seed pinned in `seed.lock` and
+moves only when the lock is bumped to this release (see Publish). Do not leave
+a release with `out/release/bin/with` or `~/.local/bin/with` reporting an
+older version or a different development build. If this check fails, rerun the
+release gates with `WITH_VERSION` still set and stop before publishing.
 
 ## Publish
 
@@ -432,9 +433,10 @@ second manual `gh release create` for a tag handled by this workflow.
 
 When the release is meant to become the seed, bump `seed.lock` on main to the
 new version with every platform's published digest (the `.sha256` sidecars),
-move every workflow seed pin with it (`with build :seed-compat` refuses while
-any pin disagrees with the lock), and confirm `:seed-compat` is green before
-landing the first change that needs the new seed.
+move every workflow seed pin with it (`with run tools/bump_seed_pins.w`;
+`with build :seed-driver` refuses while any pin disagrees with the lock), then
+`with build :seed` refetches `src/main`. Land the first change that needs the
+new seed after that bump, never in the same PR.
 
 ### Publish-first: the release exists as soon as one platform is done
 

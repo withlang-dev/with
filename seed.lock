@@ -1,9 +1,10 @@
 # The pinned bootstrap seed: the published release this tree is built from.
 # Every CI lane reads it (`with run tools/bump_seed_pins.w` rewrites the
-# workflow pins from it; `with build :seed-compat` refuses while any pin
-# disagrees), `with build :seed` downloads it, and `:seed-compat` proves it
-# still builds this tree. Bump it — version and every digest — in the same
-# commit as the first change that needs a newer seed: tag the seed first.
+# workflow pins from it; `with build :seed-driver` refuses while any pin
+# disagrees), `with build :seed` keeps src/main at it, and the battery is
+# driven by it (`WITH=$PWD/src/main src/main build ...`). Bump it — version
+# and every digest — in the same commit as the first change that needs a
+# newer seed: tag the seed first.
 #
 # `<asset>.version=` pins one platform to another release while it cannot
 # bootstrap the newest seed; say which issue, and remove it when fixed.

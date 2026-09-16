@@ -136,7 +136,7 @@ with build :test        # run test suite
 ```
 
 `seed.lock` names the published release every build starts from; `with build
-:seed-compat` (part of `:test`) proves that seed still builds the tree.
+:seed-driver` (first in `:test`) refuses a battery driven by any other compiler.
 
 Install to your PATH:
 

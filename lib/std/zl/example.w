@@ -22,11 +22,12 @@ unsafe fn test_compress(__param_compr: *mut u8, __param_comprLen: c_ulong, __par
     (__local_err = ((compress(__param_compr, (&raw mut __param_comprLen as *mut c_ulong), (&hello[0] as *const u8), __local_len) as c_int)))
 
     if ((if __local_err != 0: 1 else: 0) != 0) {
-        fprintf(__stderrp, c"%s error: %d\n".ptr, "compress", __local_err)
+        fprintf(libc_stderr(), c"%s error: %d\n".ptr, "compress", __local_err)
 
         exit((1 as c_int))
 
     }
+
 
 
     strcpy(((__param_uncompr as *mut c_char) as *mut i8), c"garbage".ptr)
@@ -34,15 +35,16 @@ unsafe fn test_compress(__param_compr: *mut u8, __param_comprLen: c_ulong, __par
     (__local_err = ((uncompress(__param_uncompr, (&raw mut __param_uncomprLen as *mut c_ulong), (__param_compr as *const u8), __param_comprLen) as c_int)))
 
     if ((if __local_err != 0: 1 else: 0) != 0) {
-        fprintf(__stderrp, c"%s error: %d\n".ptr, "uncompress", __local_err)
+        fprintf(libc_stderr(), c"%s error: %d\n".ptr, "uncompress", __local_err)
 
         exit((1 as c_int))
 
     }
 
 
+
     if (strcmp(((__param_uncompr as *mut c_char) as *const i8), (&hello[0] as *mut c_char)) != 0) {
-        fprintf(__stderrp, c"bad uncompress\n".ptr)
+        fprintf(libc_stderr(), c"bad uncompress\n".ptr)
 
         exit((1 as c_int))
 
@@ -65,7 +67,7 @@ unsafe fn test_gzio(__param_fname: *const i8, __param_uncompr: *mut u8, __param_
     (__local_file = gzopen(__param_fname, c"wb".ptr))
 
     if ((if __local_file == null: 1 else: 0) != 0) {
-        fprintf(__stderrp, c"gzopen error\n".ptr)
+        fprintf(libc_stderr(), c"gzopen error\n".ptr)
 
         exit((1 as c_int))
 
@@ -74,14 +76,14 @@ unsafe fn test_gzio(__param_fname: *const i8, __param_uncompr: *mut u8, __param_
     gzputc(__local_file, (104 as c_int))
 
     if ((if gzputs(__local_file, c"ello".ptr) != 4: 1 else: 0) != 0) {
-        fprintf(__stderrp, c"gzputs err: %s\n".ptr, gzerror(__local_file, (&raw mut __local_err as *mut c_int)))
+        fprintf(libc_stderr(), c"gzputs err: %s\n".ptr, gzerror(__local_file, (&raw mut __local_err as *mut c_int)))
 
         exit((1 as c_int))
 
     }
 
     if ((if gzprintf(__local_file, c", %s!".ptr, "hello") != 8: 1 else: 0) != 0) {
-        fprintf(__stderrp, c"gzprintf err: %s\n".ptr, gzerror(__local_file, (&raw mut __local_err as *mut c_int)))
+        fprintf(libc_stderr(), c"gzprintf err: %s\n".ptr, gzerror(__local_file, (&raw mut __local_err as *mut c_int)))
 
         exit((1 as c_int))
 
@@ -94,7 +96,7 @@ unsafe fn test_gzio(__param_fname: *const i8, __param_uncompr: *mut u8, __param_
     (__local_file = gzopen(__param_fname, c"rb".ptr))
 
     if ((if __local_file == null: 1 else: 0) != 0) {
-        fprintf(__stderrp, c"gzopen error\n".ptr)
+        fprintf(libc_stderr(), c"gzopen error\n".ptr)
 
         exit((1 as c_int))
 
@@ -103,14 +105,14 @@ unsafe fn test_gzio(__param_fname: *const i8, __param_uncompr: *mut u8, __param_
     strcpy(((__param_uncompr as *mut c_char) as *mut i8), c"garbage".ptr)
 
     if ((if gzread(__local_file, (__param_uncompr as *mut c_void), (__param_uncomprLen as c_uint)) != __local_len: 1 else: 0) != 0) {
-        fprintf(__stderrp, c"gzread err: %s\n".ptr, gzerror(__local_file, (&raw mut __local_err as *mut c_int)))
+        fprintf(libc_stderr(), c"gzread err: %s\n".ptr, gzerror(__local_file, (&raw mut __local_err as *mut c_int)))
 
         exit((1 as c_int))
 
     }
 
     if (strcmp(((__param_uncompr as *mut c_char) as *const i8), (&hello[0] as *mut c_char)) != 0) {
-        fprintf(__stderrp, c"bad gzread: %s\n".ptr, (__param_uncompr as *mut c_char))
+        fprintf(libc_stderr(), c"bad gzread: %s\n".ptr, (__param_uncompr as *mut c_char))
 
         exit((1 as c_int))
 
@@ -130,7 +132,7 @@ unsafe fn test_gzio(__param_fname: *const i8, __param_uncompr: *mut u8, __param_
     }
 
     if (__ci_expr_logic_0 != 0) {
-        fprintf(__stderrp, c"gzseek error, pos=%ld, gztell=%ld\n".ptr, (__local_pos as c_long), (gztell(__local_file) as c_long))
+        fprintf(libc_stderr(), c"gzseek error, pos=%ld, gztell=%ld\n".ptr, (__local_pos as c_long), (gztell(__local_file) as c_long))
 
         exit((1 as c_int))
 
@@ -159,7 +161,7 @@ unsafe fn test_gzio(__param_fname: *const i8, __param_uncompr: *mut u8, __param_
     }
 
     if ((if __ci_expr_ternary_4 != 32: 1 else: 0) != 0) {
-        fprintf(__stderrp, c"gzgetc error\n".ptr)
+        fprintf(libc_stderr(), c"gzgetc error\n".ptr)
 
         exit((1 as c_int))
 
@@ -167,7 +169,7 @@ unsafe fn test_gzio(__param_fname: *const i8, __param_uncompr: *mut u8, __param_
 
 
     if ((if gzungetc((32 as c_int), __local_file) != 32: 1 else: 0) != 0) {
-        fprintf(__stderrp, c"gzungetc error\n".ptr)
+        fprintf(libc_stderr(), c"gzungetc error\n".ptr)
 
         exit((1 as c_int))
 
@@ -176,14 +178,14 @@ unsafe fn test_gzio(__param_fname: *const i8, __param_uncompr: *mut u8, __param_
     gzgets(__local_file, ((__param_uncompr as *mut c_char) as *mut i8), (__param_uncomprLen as c_int))
 
     if ((if strlen(((__param_uncompr as *mut c_char) as *const i8)) != 7: 1 else: 0) != 0) {
-        fprintf(__stderrp, c"gzgets err after gzseek: %s\n".ptr, gzerror(__local_file, (&raw mut __local_err as *mut c_int)))
+        fprintf(libc_stderr(), c"gzgets err after gzseek: %s\n".ptr, gzerror(__local_file, (&raw mut __local_err as *mut c_int)))
 
         exit((1 as c_int))
 
     }
 
     if (strcmp(((__param_uncompr as *mut c_char) as *const i8), (((&hello[0] as *mut c_char) + ((6 as isize) as usize)) as *const i8)) != 0) {
-        fprintf(__stderrp, c"bad gzgets after gzseek\n".ptr)
+        fprintf(libc_stderr(), c"bad gzgets after gzseek\n".ptr)
 
         exit((1 as c_int))
 
@@ -212,11 +214,12 @@ unsafe fn test_deflate(__param_compr: *mut u8, __param_comprLen: c_ulong) -> Uni
     (__local_err = ((deflateInit_((&raw mut __local_c_stream as *mut z_stream_s), (-1 as c_int), c"1.3.2".ptr, (sizeof[z_stream_s]() as c_int)) as c_int)))
 
     if ((if __local_err != 0: 1 else: 0) != 0) {
-        fprintf(__stderrp, c"%s error: %d\n".ptr, "deflateInit", __local_err)
+        fprintf(libc_stderr(), c"%s error: %d\n".ptr, "deflateInit", __local_err)
 
         exit((1 as c_int))
 
     }
+
 
 
     (__local_c_stream.next_in = (&hello[0] as *mut u8))
@@ -241,7 +244,7 @@ unsafe fn test_deflate(__param_compr: *mut u8, __param_comprLen: c_ulong) -> Uni
         (__local_err = ((deflate((&raw mut __local_c_stream as *mut z_stream_s), (0 as c_int)) as c_int)))
 
         if ((if __local_err != 0: 1 else: 0) != 0) {
-            fprintf(__stderrp, c"%s error: %d\n".ptr, "deflate", __local_err)
+            fprintf(libc_stderr(), c"%s error: %d\n".ptr, "deflate", __local_err)
 
             exit((1 as c_int))
 
@@ -259,11 +262,12 @@ unsafe fn test_deflate(__param_compr: *mut u8, __param_comprLen: c_ulong) -> Uni
         }
 
         if ((if __local_err != 0: 1 else: 0) != 0) {
-            fprintf(__stderrp, c"%s error: %d\n".ptr, "deflate", __local_err)
+            fprintf(libc_stderr(), c"%s error: %d\n".ptr, "deflate", __local_err)
 
             exit((1 as c_int))
 
         }
+
 
 
     }
@@ -271,11 +275,12 @@ unsafe fn test_deflate(__param_compr: *mut u8, __param_comprLen: c_ulong) -> Uni
     (__local_err = ((deflateEnd((&raw mut __local_c_stream as *mut z_stream_s)) as c_int)))
 
     if ((if __local_err != 0: 1 else: 0) != 0) {
-        fprintf(__stderrp, c"%s error: %d\n".ptr, "deflateEnd", __local_err)
+        fprintf(libc_stderr(), c"%s error: %d\n".ptr, "deflateEnd", __local_err)
 
         exit((1 as c_int))
 
     }
+
 
 
 }
@@ -302,11 +307,12 @@ unsafe fn test_inflate(__param_compr: *mut u8, __param_comprLen: c_ulong, __para
     (__local_err = ((inflateInit_((&raw mut __local_d_stream as *mut z_stream_s), c"1.3.2".ptr, (sizeof[z_stream_s]() as c_int)) as c_int)))
 
     if ((if __local_err != 0: 1 else: 0) != 0) {
-        fprintf(__stderrp, c"%s error: %d\n".ptr, "inflateInit", __local_err)
+        fprintf(libc_stderr(), c"%s error: %d\n".ptr, "inflateInit", __local_err)
 
         exit((1 as c_int))
 
     }
+
 
 
     while true {
@@ -331,7 +337,7 @@ unsafe fn test_inflate(__param_compr: *mut u8, __param_comprLen: c_ulong, __para
         }
 
         if ((if __local_err != 0: 1 else: 0) != 0) {
-            fprintf(__stderrp, c"%s error: %d\n".ptr, "inflate", __local_err)
+            fprintf(libc_stderr(), c"%s error: %d\n".ptr, "inflate", __local_err)
 
             exit((1 as c_int))
 
@@ -342,15 +348,16 @@ unsafe fn test_inflate(__param_compr: *mut u8, __param_comprLen: c_ulong, __para
     (__local_err = ((inflateEnd((&raw mut __local_d_stream as *mut z_stream_s)) as c_int)))
 
     if ((if __local_err != 0: 1 else: 0) != 0) {
-        fprintf(__stderrp, c"%s error: %d\n".ptr, "inflateEnd", __local_err)
+        fprintf(libc_stderr(), c"%s error: %d\n".ptr, "inflateEnd", __local_err)
 
         exit((1 as c_int))
 
     }
 
 
+
     if (strcmp(((__param_uncompr as *mut c_char) as *const i8), (&hello[0] as *mut c_char)) != 0) {
-        fprintf(__stderrp, c"bad inflate\n".ptr)
+        fprintf(libc_stderr(), c"bad inflate\n".ptr)
 
         exit((1 as c_int))
 
@@ -375,11 +382,12 @@ unsafe fn test_large_deflate(__param_compr: *mut u8, __param_comprLen: c_ulong, 
     (__local_err = ((deflateInit_((&raw mut __local_c_stream as *mut z_stream_s), (1 as c_int), c"1.3.2".ptr, (sizeof[z_stream_s]() as c_int)) as c_int)))
 
     if ((if __local_err != 0: 1 else: 0) != 0) {
-        fprintf(__stderrp, c"%s error: %d\n".ptr, "deflateInit", __local_err)
+        fprintf(libc_stderr(), c"%s error: %d\n".ptr, "deflateInit", __local_err)
 
         exit((1 as c_int))
 
     }
+
 
 
     (__local_c_stream.next_out = __param_compr)
@@ -393,15 +401,16 @@ unsafe fn test_large_deflate(__param_compr: *mut u8, __param_comprLen: c_ulong, 
     (__local_err = ((deflate((&raw mut __local_c_stream as *mut z_stream_s), (0 as c_int)) as c_int)))
 
     if ((if __local_err != 0: 1 else: 0) != 0) {
-        fprintf(__stderrp, c"%s error: %d\n".ptr, "deflate", __local_err)
+        fprintf(libc_stderr(), c"%s error: %d\n".ptr, "deflate", __local_err)
 
         exit((1 as c_int))
 
     }
 
 
+
     if ((if (unsafe *(&raw const __local_c_stream as *const z_stream_s)).avail_in != 0: 1 else: 0) != 0) {
-        fprintf(__stderrp, c"deflate not greedy\n".ptr)
+        fprintf(libc_stderr(), c"deflate not greedy\n".ptr)
 
         exit((1 as c_int))
 
@@ -416,11 +425,12 @@ unsafe fn test_large_deflate(__param_compr: *mut u8, __param_comprLen: c_ulong, 
     (__local_err = ((deflate((&raw mut __local_c_stream as *mut z_stream_s), (0 as c_int)) as c_int)))
 
     if ((if __local_err != 0: 1 else: 0) != 0) {
-        fprintf(__stderrp, c"%s error: %d\n".ptr, "deflate", __local_err)
+        fprintf(libc_stderr(), c"%s error: %d\n".ptr, "deflate", __local_err)
 
         exit((1 as c_int))
 
     }
+
 
 
     deflateParams((&raw mut __local_c_stream as *mut z_stream_s), (9 as c_int), (1 as c_int))
@@ -432,17 +442,18 @@ unsafe fn test_large_deflate(__param_compr: *mut u8, __param_comprLen: c_ulong, 
     (__local_err = ((deflate((&raw mut __local_c_stream as *mut z_stream_s), (0 as c_int)) as c_int)))
 
     if ((if __local_err != 0: 1 else: 0) != 0) {
-        fprintf(__stderrp, c"%s error: %d\n".ptr, "deflate", __local_err)
+        fprintf(libc_stderr(), c"%s error: %d\n".ptr, "deflate", __local_err)
 
         exit((1 as c_int))
 
     }
 
 
+
     (__local_err = ((deflate((&raw mut __local_c_stream as *mut z_stream_s), (4 as c_int)) as c_int)))
 
     if ((if __local_err != 1: 1 else: 0) != 0) {
-        fprintf(__stderrp, c"deflate should report Z_STREAM_END\n".ptr)
+        fprintf(libc_stderr(), c"deflate should report Z_STREAM_END\n".ptr)
 
         exit((1 as c_int))
 
@@ -451,11 +462,12 @@ unsafe fn test_large_deflate(__param_compr: *mut u8, __param_comprLen: c_ulong, 
     (__local_err = ((deflateEnd((&raw mut __local_c_stream as *mut z_stream_s)) as c_int)))
 
     if ((if __local_err != 0: 1 else: 0) != 0) {
-        fprintf(__stderrp, c"%s error: %d\n".ptr, "deflateEnd", __local_err)
+        fprintf(libc_stderr(), c"%s error: %d\n".ptr, "deflateEnd", __local_err)
 
         exit((1 as c_int))
 
     }
+
 
 
 }
@@ -480,11 +492,12 @@ unsafe fn test_large_inflate(__param_compr: *mut u8, __param_comprLen: c_ulong, 
     (__local_err = ((inflateInit_((&raw mut __local_d_stream as *mut z_stream_s), c"1.3.2".ptr, (sizeof[z_stream_s]() as c_int)) as c_int)))
 
     if ((if __local_err != 0: 1 else: 0) != 0) {
-        fprintf(__stderrp, c"%s error: %d\n".ptr, "inflateInit", __local_err)
+        fprintf(libc_stderr(), c"%s error: %d\n".ptr, "inflateInit", __local_err)
 
         exit((1 as c_int))
 
     }
+
 
 
     while true {
@@ -499,11 +512,12 @@ unsafe fn test_large_inflate(__param_compr: *mut u8, __param_comprLen: c_ulong, 
         }
 
         if ((if __local_err != 0: 1 else: 0) != 0) {
-            fprintf(__stderrp, c"%s error: %d\n".ptr, "large inflate", __local_err)
+            fprintf(libc_stderr(), c"%s error: %d\n".ptr, "large inflate", __local_err)
 
             exit((1 as c_int))
 
         }
+
 
 
     }
@@ -511,15 +525,16 @@ unsafe fn test_large_inflate(__param_compr: *mut u8, __param_comprLen: c_ulong, 
     (__local_err = ((inflateEnd((&raw mut __local_d_stream as *mut z_stream_s)) as c_int)))
 
     if ((if __local_err != 0: 1 else: 0) != 0) {
-        fprintf(__stderrp, c"%s error: %d\n".ptr, "inflateEnd", __local_err)
+        fprintf(libc_stderr(), c"%s error: %d\n".ptr, "inflateEnd", __local_err)
 
         exit((1 as c_int))
 
     }
 
 
+
     if ((if (unsafe *(&raw const __local_d_stream as *const z_stream_s)).total_out != ((((2 as c_ulong) *% (__param_uncomprLen as c_ulong)) as c_ulong) +% (((__param_uncomprLen as c_ulong) / (2 as c_ulong)) as c_ulong)): 1 else: 0) != 0) {
-        fprintf(__stderrp, c"bad large inflate: %lu\n".ptr, (unsafe *(&raw const __local_d_stream as *const z_stream_s)).total_out)
+        fprintf(libc_stderr(), c"bad large inflate: %lu\n".ptr, (unsafe *(&raw const __local_d_stream as *const z_stream_s)).total_out)
 
         exit((1 as c_int))
 
@@ -546,11 +561,12 @@ unsafe fn test_flush(__param_compr: *mut u8, __param_comprLen: *mut c_ulong) -> 
     (__local_err = ((deflateInit_((&raw mut __local_c_stream as *mut z_stream_s), (-1 as c_int), c"1.3.2".ptr, (sizeof[z_stream_s]() as c_int)) as c_int)))
 
     if ((if __local_err != 0: 1 else: 0) != 0) {
-        fprintf(__stderrp, c"%s error: %d\n".ptr, "deflateInit", __local_err)
+        fprintf(libc_stderr(), c"%s error: %d\n".ptr, "deflateInit", __local_err)
 
         exit((1 as c_int))
 
     }
+
 
 
     (__local_c_stream.next_in = (&hello[0] as *mut u8))
@@ -564,11 +580,12 @@ unsafe fn test_flush(__param_compr: *mut u8, __param_comprLen: *mut c_ulong) -> 
     (__local_err = ((deflate((&raw mut __local_c_stream as *mut z_stream_s), (3 as c_int)) as c_int)))
 
     if ((if __local_err != 0: 1 else: 0) != 0) {
-        fprintf(__stderrp, c"%s error: %d\n".ptr, "deflate", __local_err)
+        fprintf(libc_stderr(), c"%s error: %d\n".ptr, "deflate", __local_err)
 
         exit((1 as c_int))
 
     }
+
 
 
     ((unsafe __param_compr[3]) = ((unsafe __param_compr[3]) +% 1))
@@ -579,11 +596,12 @@ unsafe fn test_flush(__param_compr: *mut u8, __param_comprLen: *mut c_ulong) -> 
 
     if ((if __local_err != 1: 1 else: 0) != 0) {
         if ((if __local_err != 0: 1 else: 0) != 0) {
-            fprintf(__stderrp, c"%s error: %d\n".ptr, "deflate", __local_err)
+            fprintf(libc_stderr(), c"%s error: %d\n".ptr, "deflate", __local_err)
 
             exit((1 as c_int))
 
         }
+
 
 
     }
@@ -591,11 +609,12 @@ unsafe fn test_flush(__param_compr: *mut u8, __param_comprLen: *mut c_ulong) -> 
     (__local_err = ((deflateEnd((&raw mut __local_c_stream as *mut z_stream_s)) as c_int)))
 
     if ((if __local_err != 0: 1 else: 0) != 0) {
-        fprintf(__stderrp, c"%s error: %d\n".ptr, "deflateEnd", __local_err)
+        fprintf(libc_stderr(), c"%s error: %d\n".ptr, "deflateEnd", __local_err)
 
         exit((1 as c_int))
 
     }
+
 
 
     ((unsafe *__param_comprLen) = (unsafe *(&raw const __local_c_stream as *const z_stream_s)).total_out)
@@ -622,11 +641,12 @@ unsafe fn test_sync(__param_compr: *mut u8, __param_comprLen: c_ulong, __param_u
     (__local_err = ((inflateInit_((&raw mut __local_d_stream as *mut z_stream_s), c"1.3.2".ptr, (sizeof[z_stream_s]() as c_int)) as c_int)))
 
     if ((if __local_err != 0: 1 else: 0) != 0) {
-        fprintf(__stderrp, c"%s error: %d\n".ptr, "inflateInit", __local_err)
+        fprintf(libc_stderr(), c"%s error: %d\n".ptr, "inflateInit", __local_err)
 
         exit((1 as c_int))
 
     }
+
 
 
     (__local_d_stream.next_out = __param_uncompr)
@@ -636,11 +656,12 @@ unsafe fn test_sync(__param_compr: *mut u8, __param_comprLen: c_ulong, __param_u
     (__local_err = ((inflate((&raw mut __local_d_stream as *mut z_stream_s), (0 as c_int)) as c_int)))
 
     if ((if __local_err != 0: 1 else: 0) != 0) {
-        fprintf(__stderrp, c"%s error: %d\n".ptr, "inflate", __local_err)
+        fprintf(libc_stderr(), c"%s error: %d\n".ptr, "inflate", __local_err)
 
         exit((1 as c_int))
 
     }
+
 
 
     (__local_d_stream.avail_in = (((((__param_comprLen as c_uint) as c_uint) -% (2 as c_uint)) as c_uint)))
@@ -648,17 +669,18 @@ unsafe fn test_sync(__param_compr: *mut u8, __param_comprLen: c_ulong, __param_u
     (__local_err = ((inflateSync((&raw mut __local_d_stream as *mut z_stream_s)) as c_int)))
 
     if ((if __local_err != 0: 1 else: 0) != 0) {
-        fprintf(__stderrp, c"%s error: %d\n".ptr, "inflateSync", __local_err)
+        fprintf(libc_stderr(), c"%s error: %d\n".ptr, "inflateSync", __local_err)
 
         exit((1 as c_int))
 
     }
 
 
+
     (__local_err = ((inflate((&raw mut __local_d_stream as *mut z_stream_s), (4 as c_int)) as c_int)))
 
     if ((if __local_err != 1: 1 else: 0) != 0) {
-        fprintf(__stderrp, c"inflate should report Z_STREAM_END\n".ptr)
+        fprintf(libc_stderr(), c"inflate should report Z_STREAM_END\n".ptr)
 
         exit((1 as c_int))
 
@@ -667,11 +689,12 @@ unsafe fn test_sync(__param_compr: *mut u8, __param_comprLen: c_ulong, __param_u
     (__local_err = ((inflateEnd((&raw mut __local_d_stream as *mut z_stream_s)) as c_int)))
 
     if ((if __local_err != 0: 1 else: 0) != 0) {
-        fprintf(__stderrp, c"%s error: %d\n".ptr, "inflateEnd", __local_err)
+        fprintf(libc_stderr(), c"%s error: %d\n".ptr, "inflateEnd", __local_err)
 
         exit((1 as c_int))
 
     }
+
 
 
     printf(c"after inflateSync(): hel%s\n".ptr, (__param_uncompr as *mut c_char))
@@ -692,21 +715,23 @@ unsafe fn test_dict_deflate(__param_compr: *mut u8, __param_comprLen: c_ulong) -
     (__local_err = ((deflateInit_((&raw mut __local_c_stream as *mut z_stream_s), (9 as c_int), c"1.3.2".ptr, (sizeof[z_stream_s]() as c_int)) as c_int)))
 
     if ((if __local_err != 0: 1 else: 0) != 0) {
-        fprintf(__stderrp, c"%s error: %d\n".ptr, "deflateInit", __local_err)
+        fprintf(libc_stderr(), c"%s error: %d\n".ptr, "deflateInit", __local_err)
 
         exit((1 as c_int))
 
     }
+
 
 
     (__local_err = ((deflateSetDictionary((&raw mut __local_c_stream as *mut z_stream_s), (&dictionary[0] as *const u8), (6 as c_uint)) as c_int)))
 
     if ((if __local_err != 0: 1 else: 0) != 0) {
-        fprintf(__stderrp, c"%s error: %d\n".ptr, "deflateSetDictionary", __local_err)
+        fprintf(libc_stderr(), c"%s error: %d\n".ptr, "deflateSetDictionary", __local_err)
 
         exit((1 as c_int))
 
     }
+
 
 
     (dictId = (unsafe *(&raw const __local_c_stream as *const z_stream_s)).adler)
@@ -722,7 +747,7 @@ unsafe fn test_dict_deflate(__param_compr: *mut u8, __param_comprLen: c_ulong) -
     (__local_err = ((deflate((&raw mut __local_c_stream as *mut z_stream_s), (4 as c_int)) as c_int)))
 
     if ((if __local_err != 1: 1 else: 0) != 0) {
-        fprintf(__stderrp, c"deflate should report Z_STREAM_END\n".ptr)
+        fprintf(libc_stderr(), c"deflate should report Z_STREAM_END\n".ptr)
 
         exit((1 as c_int))
 
@@ -731,11 +756,12 @@ unsafe fn test_dict_deflate(__param_compr: *mut u8, __param_comprLen: c_ulong) -
     (__local_err = ((deflateEnd((&raw mut __local_c_stream as *mut z_stream_s)) as c_int)))
 
     if ((if __local_err != 0: 1 else: 0) != 0) {
-        fprintf(__stderrp, c"%s error: %d\n".ptr, "deflateEnd", __local_err)
+        fprintf(libc_stderr(), c"%s error: %d\n".ptr, "deflateEnd", __local_err)
 
         exit((1 as c_int))
 
     }
+
 
 
 }
@@ -760,11 +786,12 @@ unsafe fn test_dict_inflate(__param_compr: *mut u8, __param_comprLen: c_ulong, _
     (__local_err = ((inflateInit_((&raw mut __local_d_stream as *mut z_stream_s), c"1.3.2".ptr, (sizeof[z_stream_s]() as c_int)) as c_int)))
 
     if ((if __local_err != 0: 1 else: 0) != 0) {
-        fprintf(__stderrp, c"%s error: %d\n".ptr, "inflateInit", __local_err)
+        fprintf(libc_stderr(), c"%s error: %d\n".ptr, "inflateInit", __local_err)
 
         exit((1 as c_int))
 
     }
+
 
 
     (__local_d_stream.next_out = __param_uncompr)
@@ -780,7 +807,7 @@ unsafe fn test_dict_inflate(__param_compr: *mut u8, __param_comprLen: c_ulong, _
 
         if ((if __local_err == 2: 1 else: 0) != 0) {
             if ((if (unsafe *(&raw const __local_d_stream as *const z_stream_s)).adler != dictId: 1 else: 0) != 0) {
-                fprintf(__stderrp, c"unexpected dictionary".ptr)
+                fprintf(libc_stderr(), c"unexpected dictionary".ptr)
 
                 exit((1 as c_int))
 
@@ -791,11 +818,12 @@ unsafe fn test_dict_inflate(__param_compr: *mut u8, __param_comprLen: c_ulong, _
         }
 
         if ((if __local_err != 0: 1 else: 0) != 0) {
-            fprintf(__stderrp, c"%s error: %d\n".ptr, "inflate with dict", __local_err)
+            fprintf(libc_stderr(), c"%s error: %d\n".ptr, "inflate with dict", __local_err)
 
             exit((1 as c_int))
 
         }
+
 
 
     }
@@ -803,15 +831,16 @@ unsafe fn test_dict_inflate(__param_compr: *mut u8, __param_comprLen: c_ulong, _
     (__local_err = ((inflateEnd((&raw mut __local_d_stream as *mut z_stream_s)) as c_int)))
 
     if ((if __local_err != 0: 1 else: 0) != 0) {
-        fprintf(__stderrp, c"%s error: %d\n".ptr, "inflateEnd", __local_err)
+        fprintf(libc_stderr(), c"%s error: %d\n".ptr, "inflateEnd", __local_err)
 
         exit((1 as c_int))
 
     }
 
 
+
     if (strcmp(((__param_uncompr as *mut c_char) as *const i8), (&hello[0] as *mut c_char)) != 0) {
-        fprintf(__stderrp, c"bad inflate with dict\n".ptr)
+        fprintf(libc_stderr(), c"bad inflate with dict\n".ptr)
 
         exit((1 as c_int))
 
@@ -835,13 +864,13 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     var __local_myVersion: *const c_char = c"1.3.2".ptr
 
     if ((if (unsafe zlibVersion()[0]) != (unsafe __local_myVersion[0]): 1 else: 0) != 0) {
-        fprintf(__stderrp, c"incompatible zlib version\n".ptr)
+        fprintf(libc_stderr(), c"incompatible zlib version\n".ptr)
 
         exit((1 as c_int))
 
     } else {
         if ((if strcmp(zlibVersion(), c"1.3.2".ptr) != 0: 1 else: 0) != 0) {
-            fprintf(__stderrp, c"warning: different zlib version linked: %s\n".ptr, zlibVersion())
+            fprintf(libc_stderr(), c"warning: different zlib version linked: %s\n".ptr, zlibVersion())
 
         }
     }

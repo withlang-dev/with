@@ -1,10 +1,14 @@
-// std.libc — narrow libc/POSIX ABI surface used by migrated C code.
+// std.libc — the C surface migrated C code links against.
 //
-// This module intentionally exposes concrete target ABI symbols. Migrated C
-// output is target-specific and should be regenerated for a different target,
-// except where a host-only symbol is modeled portably below (the assertion
-// reporters, the mach clock) so a bundled corpus migrated on one host runs on
-// every target.
+// The rule (Eric, 2026-09-15): this module exports C-standard functions —
+// present under the same name in libSystem, glibc and the UCRT — and With
+// functions over `with_libc_*` runtime seams (rt/rt_core.w, one body per
+// backend). Nothing POSIX-, Darwin- or glibc-spelled is exported: a corpus
+// migrated on one host must link and behave the same on every target, with
+// no external dependency beyond the OS's C runtime and system calls. The
+// migrator rewrites the host's spelling of a modeled symbol (`__stderrp`,
+// `stderr`, `__error()`, `_errno()`, `_fileno`) to the name here, and the
+// `libc-surface-check` lane refuses any other `pub extern` in this file.
 
 use std.builtins.eprint
 
@@ -15,33 +19,21 @@ pub type rlimit {
     rlim_max: u64,
 }
 
-// Darwin stdio globals. These are the names produced by the Darwin headers
-// after preprocessing stdin/stdout/stderr.
-pub extern var __stdinp: *mut c_void
-pub extern var __stdoutp: *mut c_void
-pub extern var __stderrp: *mut c_void
+// The stdio streams. C reaches them through a per-libc macro (Darwin
+// `__stderrp`, glibc `stderr`, UCRT `__acrt_iob_func(2)`); migrated code
+// calls these instead, on every target.
+extern fn with_libc_stdin() -> *mut c_void
+extern fn with_libc_stdout() -> *mut c_void
+extern fn with_libc_stderr() -> *mut c_void
 
-// glibc stdio globals. These are the names produced by the Linux headers
-// (stdin/stdout/stderr are the real exported symbols; the macros expand to
-// themselves). Migrated output is target-specific, so only the target's set
-// is ever referenced — the other set stays an unreferenced extern and forces
-// no link resolution.
-pub extern var stdin: *mut c_void
-pub extern var stdout: *mut c_void
-pub extern var stderr: *mut c_void
-
-extern fn rt_libc_stdin() -> *mut c_void
-extern fn rt_libc_stdout() -> *mut c_void
-extern fn rt_libc_stderr() -> *mut c_void
-
-pub fn libc_stdin() -> *mut c_void:
-    rt_libc_stdin()
-
-pub fn libc_stdout() -> *mut c_void:
-    rt_libc_stdout()
-
-pub fn libc_stderr() -> *mut c_void:
-    rt_libc_stderr()
+pub fn libc_stdin() -> *mut c_void: with_libc_stdin()
+pub fn libc_stdout() -> *mut c_void: with_libc_stdout()
+pub fn libc_stderr() -> *mut c_void: with_libc_stderr()
+// The UCRT's stream table by index (`__acrt_iob_func`), for code migrated on Windows.
+pub fn libc_iob(index: i32) -> *mut c_void:
+    if index == 0: return libc_stdin()
+    if index == 1: return libc_stdout()
+    libc_stderr()
 
 // stdio
 pub extern fn fprintf(stream: *mut c_void, fmt: *const i8, ...) -> i32
@@ -56,7 +48,6 @@ pub extern fn vprintf(fmt: *const i8, va: c_va_list) -> i32
 pub extern fn fopen(path: *const i8, mode: *const i8) -> *mut c_void
 pub extern fn fclose(stream: *mut c_void) -> i32
 pub extern fn fflush(stream: *mut c_void) -> i32
-pub extern fn fileno(stream: *mut c_void) -> i32
 pub extern fn fgets(s: *mut i8, size: i32, stream: *mut c_void) -> *mut i8
 pub extern fn fgetc(stream: *mut c_void) -> i32
 pub extern fn fputc(c: i32, stream: *mut c_void) -> i32
@@ -67,6 +58,9 @@ pub extern fn feof(stream: *mut c_void) -> i32
 pub extern fn ferror(stream: *mut c_void) -> i32
 pub extern fn fread(ptr: *mut c_void, size: u64, count: u64, stream: *mut c_void) -> u64
 pub extern fn fwrite(ptr: *const c_void, size: u64, count: u64, stream: *mut c_void) -> u64
+// POSIX fileno (UCRT `_fileno`): a seam.
+extern fn with_libc_fileno(stream: *mut c_void) -> i32
+pub fn fileno(stream: *mut c_void) -> i32: with_libc_fileno(stream)
 
 // strings / locale / conversion
 pub extern fn strcpy(dst: *mut i8, src: *const i8) -> *mut i8
@@ -80,7 +74,12 @@ pub extern fn strtoul(nptr: *const i8, endptr: *mut *mut i8, base: i32) -> u64
 pub extern fn strtod(nptr: *const i8, endptr: *mut *mut i8) -> f64
 pub extern fn setlocale(category: i32, locale: *const i8) -> *mut i8
 
-// process / time / POSIX
+// errno: C's lvalue macro reaches a per-libc accessor (Darwin `__error()`,
+// glibc `__errno_location()`, UCRT `_errno()`); migrated code derefs this.
+extern fn with_libc_errno() -> *mut i32
+pub fn errno_ptr() -> *mut i32: with_libc_errno()
+
+// process / time
 pub extern fn abort() -> Never
 // Assertion reporters of the Darwin (`__assert_rtn`) and glibc
 // (`__assert_fail`) assert.h expansions, modeled portably: neither symbol
@@ -97,15 +96,21 @@ fn libc_assert_failed(expression: *const i8, function: *const i8, file: *const i
 pub extern fn exit(code: i32) -> Never
 pub extern fn clock() -> u64
 pub extern fn time(tloc: *mut i64) -> i64
-pub extern fn isatty(fd: i32) -> i32
-pub extern fn mkstemp(template_path: *mut i8) -> i32
-pub extern fn realpath(path: *const i8, resolved_path: *mut i8) -> *mut i8
+
+// POSIX file descriptors, temp files and paths: seams (UCRT spells them
+// `_isatty`, `_open`, ...; Windows has no mkstemp or realpath).
+extern fn with_libc_isatty(fd: i32) -> i32
+extern fn with_libc_mkstemp(template_path: *mut i8) -> i32
+extern fn with_libc_realpath(path: *const i8, resolved_path: *mut i8) -> *mut i8
 extern fn with_libc_open(path: *const i8, flags: i32, mode: i32) -> i32
 extern fn with_libc_read(fd: i32, buf: *mut u8, count: u64) -> i64
 extern fn with_libc_write(fd: i32, buf: *const u8, count: u64) -> i64
 extern fn with_libc_close(fd: i32) -> i32
 extern fn with_libc_lseek(fd: i32, offset: i64, whence: i32) -> i64
 extern fn with_libc_unlink(path: *const i8) -> i32
+pub fn isatty(fd: i32) -> i32: with_libc_isatty(fd)
+pub fn mkstemp(template_path: *mut i8) -> i32: with_libc_mkstemp(template_path)
+pub fn realpath(path: *const i8, resolved_path: *mut i8) -> *mut i8: with_libc_realpath(path, resolved_path)
 pub fn open(path: *const i8, flags: i32, mode: i32) -> i32:
     with_libc_open(path, flags, mode)
 pub fn read(fd: i32, buf: *mut c_void, count: u64) -> i64:
@@ -146,8 +151,9 @@ pub unsafe fn mach_timebase_info(info: *mut mach_timebase_info) -> kern_return_t
 extern fn with_libc_fcntl(fd: i32, cmd: i32, arg: i32) -> i32
 pub fn fcntl(fd: i32, cmd: i32, arg: i32 = 0) -> i32:
     with_libc_fcntl(fd, cmd, arg)
-pub extern fn getrlimit(resource: i32, rlp: *mut rlimit) -> i32
-pub extern fn setrlimit(resource: i32, rlp: *const rlimit) -> i32
-
-// Darwin errno accessor.
-pub extern fn __error() -> *mut i32
+// rlimit: POSIX forwards to libc (the two-u64 layout is Darwin's and
+// glibc's); Windows reads RLIMIT_STACK as unlimited and accepts a set.
+extern fn with_libc_getrlimit(resource: i32, lim: *mut u8) -> i32
+extern fn with_libc_setrlimit(resource: i32, lim: *const u8) -> i32
+pub fn getrlimit(resource: i32, rlp: *mut rlimit) -> i32: with_libc_getrlimit(resource, rlp as *mut u8)
+pub fn setrlimit(resource: i32, rlp: *const rlimit) -> i32: with_libc_setrlimit(resource, rlp as *const u8)

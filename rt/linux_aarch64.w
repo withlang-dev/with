@@ -46,22 +46,10 @@ extern var stdin: *mut c_void
 extern var stdout: *mut c_void
 extern var stderr: *mut c_void
 
-// Darwin-migrated C reads the preprocessed stdio globals __std{in,out,err}p;
-// glibc exports the streams as stdin/stdout/stderr instead. Define the
-// Darwin-spelled symbols here and bind them to the glibc streams at startup
-// (rt_store_args, the pre-main entry hook) so a Darwin-migrated harness links
-// and runs unchanged on Linux. Darwin's libSystem provides these directly, so
-// its backend does not define them.
-pub var __stdinp: *mut c_void = 0 as *mut c_void
-pub var __stdoutp: *mut c_void = 0 as *mut c_void
-pub var __stderrp: *mut c_void = 0 as *mut c_void
 
 fn get_errno() -> i32:
     let p = rt_libc_errno_location()
     unsafe *p
-
-pub fn __error() -> *mut i32:
-    rt_libc_errno_location()
 
 type RtStatBuf:
     size: i64
@@ -75,9 +63,6 @@ var rt_argv_raw: i64 = 0
 pub fn rt_store_args(argc_val: i32, argv_val: *const *const u8) -> Unit:
     rt_argc = argc_val
     rt_argv_raw = argv_val as i64
-    __stdinp = stdin
-    __stdoutp = stdout
-    __stderrp = stderr
 
 fn rt_random_fail():
     let msg = "fatal: could not read OS randomness\n" as *const u8
@@ -116,6 +101,24 @@ pub fn rt_libc_stdout() -> *mut c_void:
 
 pub fn rt_libc_stderr() -> *mut c_void:
     stderr
+
+// std.libc's POSIX seams (rt_core.w's with_libc_*): the glibc calls.
+@[link_name("fileno")]
+extern fn rt_libc_fileno(stream: *mut c_void) -> i32
+@[link_name("isatty")]
+extern fn rt_libc_isatty(fd: i32) -> i32
+@[link_name("mkstemp")]
+extern fn rt_libc_mkstemp(template_path: *mut u8) -> i32
+@[link_name("realpath")]
+extern fn rt_libc_realpath(path: *const u8, resolved_path: *mut u8) -> *mut u8
+
+pub fn rt_errno_ptr() -> *mut i32: rt_libc_errno_location()
+pub fn rt_fileno(stream: *mut c_void) -> i32: rt_libc_fileno(stream)
+pub fn rt_isatty(fd: i32) -> i32: rt_libc_isatty(fd)
+pub fn rt_getrlimit(resource: i32, lim: *mut u8) -> i32: rt_libc_getrlimit(resource, lim)
+pub fn rt_setrlimit(resource: i32, lim: *const u8) -> i32: rt_libc_setrlimit(resource, lim)
+pub fn rt_mkstemp(template_path: *mut u8) -> i32: rt_libc_mkstemp(template_path)
+pub fn rt_realpath(path: *const u8, resolved_path: *mut u8) -> *mut u8: rt_libc_realpath(path, resolved_path)
 
 pub fn rt_fiber_page_size() -> i64:
     let page_size = rt_libc_sysconf(30)

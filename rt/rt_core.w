@@ -8,6 +8,8 @@
 // The rt_* platform functions are provided by rt/darwin_aarch64.o (or similar).
 // Float formatting is implemented inline below.
 
+use std.builtins.c_void
+
 // ── rt_* platform interface (provided by darwin_aarch64.o) ─────────
 
 extern fn rt_write(fd: i32, buf: *const u8, len: u64) -> i64
@@ -16,6 +18,17 @@ extern fn rt_open(path: *const u8, flags: i32, mode: i32) -> i32
 extern fn rt_close(fd: i32) -> i32
 extern fn rt_seek(fd: i32, offset: i64, whence: i32) -> i64
 extern fn rt_fcntl(fd: i32, cmd: i32, arg: i32) -> i32
+// std.libc's remaining libc seams, one body per backend (see with_libc_*).
+extern fn rt_libc_stdin() -> *mut c_void
+extern fn rt_libc_stdout() -> *mut c_void
+extern fn rt_libc_stderr() -> *mut c_void
+extern fn rt_errno_ptr() -> *mut i32
+extern fn rt_fileno(stream: *mut c_void) -> i32
+extern fn rt_isatty(fd: i32) -> i32
+extern fn rt_getrlimit(resource: i32, lim: *mut u8) -> i32
+extern fn rt_setrlimit(resource: i32, lim: *const u8) -> i32
+extern fn rt_mkstemp(template_path: *mut u8) -> i32
+extern fn rt_realpath(path: *const u8, resolved_path: *mut u8) -> *mut u8
 extern fn rt_mmap(size: u64) -> *mut u8
 extern fn rt_munmap(ptr: *mut u8, size: u64)
 @[link_name("malloc")]
@@ -3510,6 +3523,25 @@ pub fn with_libc_fcntl(fd: i32, cmd: i32, arg: i32) -> i32:
 pub fn with_libc_unlink(path: *const i8) -> i32:
     let r = rt_unlink(path)
     if r < 0: -1 else: r
+
+// std.libc exports C-standard functions and With functions over these
+// seams; nothing POSIX-, Darwin- or glibc-spelled (Eric, 2026-09-15). A
+// corpus migrated on one host therefore links on every target: the stdio
+// streams, errno, fileno/isatty, rlimit, mkstemp and realpath each have one
+// body per backend, and the migrator rewrites the host's spelling
+// (`__stderrp`, `stderr`, `__error()`, `_errno()`, `_fileno`) to the
+// std.libc name.
+pub fn with_libc_stdin() -> *mut c_void: rt_libc_stdin()
+pub fn with_libc_stdout() -> *mut c_void: rt_libc_stdout()
+pub fn with_libc_stderr() -> *mut c_void: rt_libc_stderr()
+pub fn with_libc_errno() -> *mut i32: rt_errno_ptr()
+pub fn with_libc_fileno(stream: *mut c_void) -> i32: rt_fileno(stream)
+pub fn with_libc_isatty(fd: i32) -> i32: rt_isatty(fd)
+pub fn with_libc_getrlimit(resource: i32, lim: *mut u8) -> i32: rt_getrlimit(resource, lim)
+pub fn with_libc_setrlimit(resource: i32, lim: *const u8) -> i32: rt_setrlimit(resource, lim)
+pub fn with_libc_mkstemp(template_path: *mut i8) -> i32: rt_mkstemp(template_path as *mut u8)
+pub fn with_libc_realpath(path: *const i8, resolved_path: *mut i8) -> *mut i8:
+    rt_realpath(path as *const u8, resolved_path as *mut u8) as *mut i8
 
 pub fn with_fs_chmod(path: &str, mode: i32) -> i32:
     let cpath = str_to_cstr(path)

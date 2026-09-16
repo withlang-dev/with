@@ -1239,6 +1239,33 @@ fn run_drop_audit_action(ctx: ActionCtx) -> i32:
     let _ = report
     0
 
+// tools/rt_decl_audit.w: every `extern fn with_*` declaration in the tree
+// (lib/std, src, tools, test) matches the runtime's definition signature, so
+// a seam such as std.libc's with_libc_* cannot drift from rt/rt_core.w.
+fn run_rt_decl_audit_action(ctx: ActionCtx) -> i32:
+    let fs = ctx.fs()
+    let out_dir = ctx.output()
+    if fs.mkdir_all(out_dir) != 0:
+        ctx.diagnostics().error("rt-decl-audit: could not create output dir: " ++ out_dir)
+        return 1
+    let root = ctx.project_info().project_root()
+    let compiler = build_project_abs(root, ctx.inputs().get(0))
+    var args: Vec[str] = Vec.new()
+    args.push(build_owned_text(compiler))
+    args.push("run")
+    args.push("tools/rt_decl_audit.w")
+    let aout_rel = build_project_join(out_dir, "audit.stdout")
+    let aout = build_project_abs(root, aout_rel)
+    let aerr_rel = build_project_join(out_dir, "audit.stderr")
+    let aerr = build_project_abs(root, aerr_rel)
+    let ar = ctx.process_runner().run_capture_cwd(args, aout, aerr, 600000, root)
+    if ar.rc != 0:
+        ctx.diagnostics().error(f"rt-decl-audit: runtime declarations diverge (rc={ar.rc})\n" ++ fs.read_text(aout_rel) ++ fs.read_text(aerr_rel))
+        return 1
+    print("rt-decl-audit: " ++ build_trim_trailing_line_endings(fs.read_text(aout_rel)))
+    let _ = fs.write_text(build_project_join(out_dir, ".stamp"), "ok")
+    0
+
 // Move-checker verdict matrix (tools/move_audit.w — the compile-time analog of
 // drop-audit). Candidate = the freshly built release compiler; each cell has a
 // ground-truth expected verdict, so a drifted dataflow transfer function (the
@@ -1788,6 +1815,16 @@ pub fn build(ctx: BuildCtx) -> Build:
     spec_inventory = spec_inventory.input("src/compiler/DriverOptions.w")
     spec_inventory = spec_inventory.input("lib/std")
     out = out.add_target(spec_inventory)
+
+    // std.libc exports C-standard functions and with_libc_* seams only, and
+    // the migrator's libc allowlist agrees with it (build/compiler.w).
+    var libc_surface = target_new(.Action, "libc-surface-check", "").output("out/.build-state/libc-surface-check.txt")
+    libc_surface.action = run_check_libc_surface_action
+    libc_surface = libc_surface.write_scope("out/.build-state")
+    libc_surface = libc_surface.input("lib/std/libc.w")
+    libc_surface = libc_surface.input("src/CImport.w")
+    libc_surface = libc_surface.input("src/CiMigrate.w")
+    out = out.add_target(libc_surface)
 
     out = out.add_target(with_object_target("bootstrap-llvm-bridge-object", "seed", "src/compiler/LlvmBridge.w", "out/bootstrap-lib/llvm_bridge.o", "-O1", ""))
     out = out.add_target(with_object_target("bootstrap-clang-bridge-object", "seed", "src/compiler/ClangBridge.w", "out/bootstrap-lib/clang_bridge.o", "-O1", ""))
@@ -2468,6 +2505,17 @@ pub fn build(ctx: BuildCtx) -> Build:
     drop_audit = drop_audit.dep("build")
     drop_audit = drop_audit.write_scope("out/drop-audit")
     out = out.add_target(drop_audit)
+    var rt_decl_audit = target_new(.Action, "rt-decl-audit", "").output("out/rt-decl-audit")
+    rt_decl_audit.action = run_rt_decl_audit_action
+    rt_decl_audit = rt_decl_audit.allow_parallel()
+    rt_decl_audit = rt_decl_audit.input(release_compiler_bin("with"))
+    rt_decl_audit = rt_decl_audit.input("tools/rt_decl_audit.w")
+    rt_decl_audit = rt_decl_audit.input("rt")
+    rt_decl_audit = rt_decl_audit.input("lib/std")
+    rt_decl_audit = rt_decl_audit.input("src")
+    rt_decl_audit = rt_decl_audit.dep("build")
+    rt_decl_audit = rt_decl_audit.write_scope("out/rt-decl-audit")
+    out = out.add_target(rt_decl_audit)
     // Runtime measurements need a quiet worker pool; leave this action serial.
     var stdlib_complexity = target_new(.Action, "stdlib-complexity", "").output("out/stdlib-complexity")
     stdlib_complexity.action = run_stdlib_complexity_action
@@ -2631,23 +2679,22 @@ pub fn build(ctx: BuildCtx) -> Build:
     build_helper_programs = build_helper_programs.dep("build")
     out = out.add_target(build_helper_programs)
 
-    // The tree stays buildable by the PUBLISHED seed pinned in seed.lock:
-    // that seed builds stage1 of a copy of the tree, and every workflow pin
-    // must equal the lock (build/seed.w). Independent of the fresh compiler.
-    var seed_compat = target_new(.Action, "seed-compat", "").output("out/test-graph/seed-compat")
-    seed_compat = seed_compat.allow_parallel()
-    seed_compat.action = run_seed_compat_action
-    seed_compat = seed_compat.input("seed.lock")
-    seed_compat = seed_compat.input("build.w")
-    seed_compat = seed_compat.input("build/seed.w")
-    seed_compat = seed_compat.write_scope("out/seed-compat")
-    seed_compat = seed_compat.allow_network()
-    seed_compat = seed_compat.arg("withlang-dev/with")
-    seed_compat = seed_compat.arg(release_asset_for_host())
-    // Its nested stage1 compile peaks near 1.3 GiB (the compiler compiling
-    // src/main.w); the driver's RSS tripwire gives this target 2 GiB by name
-    // (src/main.w, #679).
-    out = out.add_target(seed_compat)
+    // The battery is driven by the PUBLISHED seed pinned in seed.lock, as CI
+    // is (build/retention.w): the driver's digest must be the lock's, and
+    // every workflow pin must equal the lock. First in :test, so a wrong
+    // driver fails before an hour of lanes; also a dep of test-green and
+    // last-green, so a green cannot be recorded under any other driver.
+    // Never cached (a name in the driver's always-run list, like test-green).
+    var seed_driver = target_new(.Action, "seed-driver", "").output("out/command/seed-driver/ok")
+    seed_driver.action = run_seed_driver_action
+    seed_driver = seed_driver.input("seed.lock")
+    seed_driver = seed_driver.input(host_bin("out/bin/with-sha256"))
+    for workflow in ctx.fs().list_files(".github/workflows"):
+        if workflow.ends_with(".yml"): seed_driver = seed_driver.input(workflow.clone())
+    seed_driver = seed_driver.write_scope("out/command/seed-driver")
+    seed_driver = seed_driver.dep("with-sha256")
+    seed_driver = seed_driver.arg(release_asset_for_host())
+    out = out.add_target(seed_driver)
 
     var cli_selfhost_project_tests = target_new(.Action, "cli-selfhost-project-tests", "").output("out/test-graph/cli-selfhost-project-tests")
     cli_selfhost_project_tests = cli_selfhost_project_tests.allow_parallel()
@@ -2746,9 +2793,12 @@ pub fn build(ctx: BuildCtx) -> Build:
     test_green = test_green.write_scope("out/.build-state")
     test_green = test_green.write_scope("out/command/test-green")
     test_green = test_green.dep("with-sha256")
+    test_green = test_green.dep("seed-driver")
+    test_green = test_green.arg(release_asset_for_host())
     out = out.add_target(test_green)
 
     var tests = target_new(.Group, "test", "")
+    tests = tests.dep("seed-driver")
     tests = tests.dep("behavior-tests")
     tests = tests.dep("native-compile-error-tests")
     tests = tests.dep("native-codegen-tests")
@@ -2777,13 +2827,6 @@ pub fn build(ctx: BuildCtx) -> Build:
     tests = corpora_test_deps(move tests)
     tests = tests.dep("cli-selfhost-build-w-tests")
     tests = tests.dep("build-helper-programs")
-    // seed-compat is NOT a :test dependency: :test is driven by the pinned
-    // SEED on CI (WITH=with-seed), and seed-compat's nested `<seed> build
-    // :stage1` legitimately peaks right at the seed's 1 GiB RSS tripwire
-    // (#679) — flaky at the boundary (1066M/1114M), and the seed predates the
-    // tripwire's seed-compat exemption, so it trips under the seed. It is run
-    // with the FRESH compiler instead (which carries the exemption): the
-    // local battery runs `./out/release/bin/with build :seed-compat`.
     tests = tests.dep("cli-selfhost-project-tests")
     tests = tests.dep("cli-selfhost-lsp-tests")
     tests = tests.dep("cli-selfhost-edge-tests")
@@ -2795,6 +2838,8 @@ pub fn build(ctx: BuildCtx) -> Build:
     tests = tests.dep("emit-c-smoke")
     tests = tests.dep("requirements-informative-check")
     tests = tests.dep("spec-inventory-check")
+    tests = tests.dep("libc-surface-check")
+    tests = tests.dep("rt-decl-audit")
     tests = tests.dep("test-green")
     out = out.add_target(tests)
 
@@ -2814,6 +2859,8 @@ pub fn build(ctx: BuildCtx) -> Build:
     last_green = last_green.write_scope("out/seed-archive")
     last_green = last_green.write_scope("out/command/last-green")
     last_green = last_green.dep("with-sha256")
+    last_green = last_green.dep("seed-driver")
+    last_green = last_green.arg(release_asset_for_host())
     out = out.add_target(last_green)
 
     var require_last_green = target_new(.Action, "require-last-green", "").output("out/command/require-last-green/ok")
@@ -3037,8 +3084,6 @@ pub fn build(ctx: BuildCtx) -> Build:
     cross = cross.arg(env("CROSS_TARGET"))
     cross = cross.write_scope("out/command/cross")
     out = out.add_target(cross)
-
-    out = out.add_target(install_compiler_target("update-seed", release_compiler_bin("with"), "src/main", "require-last-green"))
 
     var clean = target_new(.Clean, "clean", "")
     clean = clean.arg("out")

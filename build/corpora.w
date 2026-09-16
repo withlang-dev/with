@@ -109,6 +109,7 @@ pub fn run_corpus_migrate_action(ctx: ActionCtx) -> i32:
 
 fn corpus_check_generated(ctx: &ActionCtx, corpus: &Corpus, generated: &str) -> i32:
     if corpus_reject_bad_output(ctx, corpus, generated) != 0: return 1
+    if corpus_reject_foreign_symbols(ctx, corpus, generated) != 0: return 1
     let verify = corpus.verify_generated
     verify(ctx, corpus, generated)
 

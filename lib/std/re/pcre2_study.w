@@ -3466,6 +3466,7 @@ unsafe fn set_table_bit(__param_re: *mut pcre2_real_code_8, __param_p: *const u8
 
         }
 
+
     }
 
     if (__param_caseless != 0) {

@@ -337,6 +337,7 @@ pub unsafe fn _pcre2_compile_parse_scan_substr_args8(__param_pptr: *mut c_uint, 
         ((unsafe *__param_cb).erroroffset = ((((((((unsafe __local_pptr[1]) as c_ulong) as c_ulong) << (32 as c_uint)) as c_ulong) | (((unsafe __local_pptr[2]) as c_ulong) as c_ulong)) as c_ulong)))
 
 
+
         return ((null as *mut c_uint))
 
     }
@@ -482,7 +483,7 @@ pub unsafe fn _pcre2_compile_parse_scan_substr_args8(__param_pptr: *mut c_uint, 
 
     }
 
-    (unsafe *(&raw const (unsafe *(unsafe *__param_cb).cx).memctl as *const pcre2_memctl)).free(__local_captures, (unsafe *(&raw const (unsafe *(unsafe *__param_cb).cx).memctl as *const pcre2_memctl)).memory_data)
+    (unsafe *(&raw const (unsafe *(unsafe *__param_cb).cx).memctl as *const pcre2_memctl)).free((__local_captures as *mut c_void), (unsafe *(&raw const (unsafe *(unsafe *__param_cb).cx).memctl as *const pcre2_memctl)).memory_data)
 
     return (((__local_pptr - ((1 as isize) as usize)) as *mut c_uint))
 
@@ -518,7 +519,7 @@ pub unsafe fn _pcre2_compile_parse_recurse_args8(__param_pptr_start: *mut c_uint
         return 0
     }
 
-    (__local_args = (((unsafe *(&raw const (unsafe *(unsafe *__param_cb).cx).memctl as *const pcre2_memctl)).malloc(((sizeof[recurse_arguments]() as c_ulong) +% (((__local_size as c_ulong) *% (sizeof[u16]() as c_ulong)) as c_ulong)), (unsafe *(&raw const (unsafe *(unsafe *__param_cb).cx).memctl as *const pcre2_memctl)).memory_data) as *mut recurse_arguments)))
+    (__local_args = (((unsafe *(&raw const (unsafe *(unsafe *__param_cb).cx).memctl as *const pcre2_memctl)).malloc((((sizeof[recurse_arguments]() as c_ulong) +% (((__local_size as c_ulong) *% (sizeof[u16]() as c_ulong)) as c_ulong)) as c_ulong), (unsafe *(&raw const (unsafe *(unsafe *__param_cb).cx).memctl as *const pcre2_memctl)).memory_data) as *mut recurse_arguments)))
 
     if ((if __local_args == null: 1 else: 0) != 0) {
         ((unsafe *__param_errorcodeptr) = ERR21)

@@ -269,11 +269,6 @@ fn comp_llvm_prefix() -> str:
 fn comp_llvm_prefix_for_root(root: &str) -> str:
     comp_abs(root, comp_llvm_prefix())
 
-/// The static LLVM SDK this build uses, absolute: LLVM_PREFIX when set,
-/// otherwise the host's `.deps/llvm-<ver>-<host>` under `root`. Exposed for
-/// lanes that run a nested build elsewhere (`:seed-compat`).
-pub fn compiler_llvm_prefix_for_root(root: &str) -> str: comp_llvm_prefix_for_root(root)
-
 // Exposed so the `deps` target can name the per-platform SDK asset and the
 // `.deps/llvm-<ver>-<host>` directory it extracts into.
 pub fn compiler_llvm_version() -> str:
@@ -408,6 +403,17 @@ fn comp_resolve_seed_compiler(ctx: &ActionCtx) -> str:
     if fs.exists(legacy_compiler):
         return legacy_compiler
     "with"
+
+/// The compiler that drives this build, as the graph resolves `"seed"`:
+/// WITH, then `with` on PATH, then src/main. The driver evaluates build.w
+/// and seeds the stage chain through the same chain, so this is the only
+/// driver identity an action has (the evaluator exports nothing about
+/// itself); `seed-driver` (build/retention.w) hashes it against seed.lock.
+pub fn compiler_resolve_seed(ctx: &ActionCtx) -> str: comp_resolve_seed_compiler(ctx)
+
+/// `path` made absolute, with a bare `with` resolved through `which`.
+pub fn compiler_resolve_command_file(ctx: &ActionCtx, capture_dir: &str, path: &str) -> str:
+    comp_resolve_command_file(ctx, capture_dir, path)
 
 fn comp_compiler_path(ctx: &ActionCtx, compiler: &str) -> str:
     if compiler == "seed":
@@ -1198,6 +1204,115 @@ pub fn run_check_requirements_informative_action(ctx: ActionCtx) -> i32:
     let rc = comp_check_requirements_informative_text(ctx, fs.read_text(path))
     if rc != 0:
         return rc
+    comp_write_ok_output(ctx)
+
+// ── std.libc surface (Eric, 2026-09-15) ─────────────────────────────────────
+// std.libc exports C-standard functions (the same name and meaning in
+// libSystem, glibc and the UCRT) and With functions over with_libc_* runtime
+// seams; never a variable, never a POSIX-, Darwin- or glibc-only symbol. A
+// corpus migrated on one host then links on every target. The migrator's
+// allowlist (ci_libc_symbol_kind_mask, src/CImport.w) must agree with the
+// module: every name it admits is exported here, declared by the migrator
+// preamble (ctype/libm, src/CiMigrate.w), or a host spelling it rewrites.
+
+fn comp_libc_standard_externs() -> str:
+    "|fprintf|printf|snprintf|sprintf|vsnprintf|vfprintf|vprintf|fopen|fclose|fflush|" ++
+    "fgets|fgetc|fputc|fputs|putc|perror|feof|ferror|fread|fwrite|" ++
+    "strcpy|strncpy|strrchr|strstr|strerror|atoi|strtol|strtoul|strtod|setlocale|" ++
+    "abort|exit|clock|time|rand|srand|qsort|"
+
+/// The identifier at the start of `text` ("" when none).
+fn comp_ident_prefix(text: &str) -> str:
+    var end = 0
+    while end < text.len() as i32 and comp_is_ident_continue(text[end] as i32):
+        end = end + 1
+    text.slice(0, end as i64)
+
+/// The body of `fn <name>(` in `text`: from its header to the next top-level
+/// declaration ("" when the function is absent).
+fn comp_fn_body_text(text: &str, header: &str) -> str:
+    let start = comp_index_of(text, header)
+    if start < 0:
+        return ""
+    var end = text.len() as i32
+    for stop in ["\nfn ", "\npub fn ", "\nimpl ", "\nlet ", "\ntype "]:
+        let at = comp_find_from(text, stop, start + header.len() as i32)
+        if at >= 0 and at < end: end = at
+    text.slice(start as i64, end as i64)
+
+/// Every "quoted" identifier in `body`, joined as |a|b|.
+fn comp_quoted_names(body: &str) -> str:
+    var names = "|"
+    var i = 0
+    while i < body.len() as i32:
+        if body[i] == '"':
+            let name = comp_ident_prefix(body.slice((i + 1) as i64, body.len()))
+            if name.len() > 0 and i + 1 + name.len() as i32 < body.len() as i32 and body[i + 1 + name.len() as i32] == '"':
+                names = names ++ name ++ "|"
+                i = i + name.len() as i32 + 1
+        i = i + 1
+    names
+
+/// Every `extern fn NAME(` the migrator preamble declares, joined as |a|b|.
+fn comp_preamble_extern_names(preamble_body: &str) -> str:
+    var names = "|"
+    var at = comp_index_of(preamble_body, "\"extern fn ")
+    while at >= 0:
+        let name = comp_ident_prefix(preamble_body.slice((at + 11) as i64, preamble_body.len()))
+        if name.len() > 0: names = names ++ name ++ "|"
+        at = comp_find_from(preamble_body, "\"extern fn ", at + 11)
+    names
+
+pub fn run_check_libc_surface_action(ctx: ActionCtx) -> i32:
+    let fs = ctx.fs()
+    let path = "lib/std/libc.w"
+    if not fs.exists(path):
+        return comp_fail(ctx, "missing " ++ path)
+    let standard = comp_libc_standard_externs()
+    var exported = "|"
+    var errors = 0
+    let lines = comp_split_lines(fs.read_text(path))
+    for i in 0..lines.len() as i32:
+        let line = comp_trim(lines[i])
+        let nr = i + 1
+        if line.starts_with("pub extern var ") or line.starts_with("extern var "):
+            ctx.diagnostics().error(f"{path}:{nr}: std.libc declares a variable; a libc global is a With function over a with_libc_* seam: " ++ line)
+            errors = errors + 1
+        else if line.starts_with("pub extern fn "):
+            let name = comp_ident_prefix(line.slice(14, line.len()))
+            exported = exported ++ name ++ "|"
+            if not standard.contains("|" ++ name ++ "|"):
+                ctx.diagnostics().error(f"{path}:{nr}: std.libc exports '" ++ name ++ "', which is not a C-standard function; model it as a With function over a with_libc_* seam (rt/rt_core.w)")
+                errors = errors + 1
+        else if line.starts_with("extern fn "):
+            let name = comp_ident_prefix(line.slice(10, line.len()))
+            if not name.starts_with("with_"):
+                ctx.diagnostics().error(f"{path}:{nr}: std.libc reaches '" ++ name ++ "' directly; a private extern here is a with_* runtime seam")
+                errors = errors + 1
+        else if line.starts_with("pub fn ") or line.starts_with("pub unsafe fn ") or line.starts_with("pub type "):
+            let after = if line.starts_with("pub fn "): line.slice(7, line.len()) else if line.starts_with("pub unsafe fn "): line.slice(14, line.len()) else: line.slice(9, line.len())
+            exported = exported ++ comp_ident_prefix(after) ++ "|"
+    // The migrator allowlist agrees with the module.
+    let cimport = fs.read_text("src/CImport.w")
+    let cimigrate = fs.read_text("src/CiMigrate.w")
+    let mask_body = comp_fn_body_text(cimport, "fn ci_libc_symbol_kind_mask(")
+    let libm_body = comp_fn_body_text(cimport, "fn ci_is_libm_fn(")
+    if mask_body.len() == 0 or libm_body.len() == 0:
+        return comp_fail(ctx, "src/CImport.w has no ci_libc_symbol_kind_mask/ci_is_libm_fn to audit")
+    let preamble = comp_preamble_extern_names(comp_fn_body_text(cimigrate, "fn ci_migrate_preamble_text("))
+    let host_spellings = comp_quoted_names(comp_fn_body_text(cimport, "fn ci_libc_stream_accessor(")) ++ comp_quoted_names(comp_fn_body_text(cimport, "fn ci_libc_portable_callee("))
+    let admitted = comp_quoted_names(mask_body) ++ comp_quoted_names(libm_body)
+    var seen = "|"
+    for name in admitted.split("|"):
+        if name.len() == 0 or seen.contains("|" ++ name ++ "|"): continue
+        seen = seen ++ name ++ "|"
+        let key = "|" ++ name ++ "|"
+        if exported.contains(key) or preamble.contains(key) or host_spellings.contains(key): continue
+        ctx.diagnostics().error("src/CImport.w admits libc symbol '" ++ name ++ "' that lib/std/libc.w does not export and the migrator preamble does not declare")
+        errors = errors + 1
+    if errors > 0:
+        return comp_fail(ctx, f"{errors} std.libc surface violation(s)")
+    print("libc-surface-check: std.libc exports C-standard functions and with_libc_* seams only; the migrator allowlist agrees")
     comp_write_ok_output(ctx)
 
 pub fn run_check_spec_inventory_action(ctx: ActionCtx) -> i32:
