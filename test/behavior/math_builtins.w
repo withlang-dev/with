@@ -64,6 +64,19 @@ fn main:
     let r32: f32 = cos(0.0f32)
     if not near(r64, 1.0): fails += 1
     if not near32(r32, 1.0f32): fails += 1
+    // integer operands convert, as anywhere in With: no float operand -> f64;
+    // a float operand fixes the width and the integer follows it
+    if not near(sqrt(2), 1.41421356): fails += 1
+    if not near(pow(2, 10), 1024.0): fails += 1
+    if not near(hypot(3, 4), 5.0): fails += 1
+    let n: i32 = 9
+    let m: i64 = 16
+    if not near(sqrt(n), 3.0): fails += 1
+    if not near(sqrt(m), 4.0): fails += 1
+    if not near32(pow(2.0f32, 3), 8.0f32): fails += 1
+    if not near32(atan2(1, 1.0f32), 0.7853982f32): fails += 1
+    let ri: f64 = sqrt(4)
+    if not near(ri, 2.0): fails += 1
     print(f"math builtins: {fails} failures")
     if fails > 0: return 1
     0

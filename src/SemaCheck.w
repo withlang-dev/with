@@ -21465,26 +21465,35 @@ impl Sema:
             let math_arity = math_fn_arity(math_id)
             if arg_count != math_arity:
                 if math_arity == 1:
-                    self.emit_error(self.pool_resolve(fn_sym) ++ "() expects one floating-point argument", node)
+                    self.emit_error(self.pool_resolve(fn_sym) ++ "() expects one argument", node)
                 else:
-                    self.emit_error(self.pool_resolve(fn_sym) ++ "() expects two floating-point arguments of the same type", node)
+                    self.emit_error(self.pool_resolve(fn_sym) ++ "() expects two arguments", node)
                 return 0
-            let first_ty = arg_types.get(0)
-            if first_ty == 0:
-                return 0
-            let first_resolved = self.resolve_alias(first_ty)
-            if self.get_type_kind(first_resolved) != TypeKind.TY_FLOAT:
-                let first_node = self.ast.get_extra(args_start)
-                self.emit_error(self.pool_resolve(fn_sym) ++ "() takes a floating-point argument (f32 or f64)", first_node)
-                return 0
-            if math_arity == 2:
-                let second_ty = arg_types.get(1)
-                if second_ty != 0 and self.resolve_alias(second_ty) != first_resolved:
-                    let second_node = self.ast.get_extra(args_start + 1)
-                    self.emit_error(self.pool_resolve(fn_sym) ++ "() operands must be the same float type", second_node)
+            // The call's float type is the float operand's width; with no
+            // float operand it is f64. An integer operand converts to it, as
+            // an integer converts to a float parameter or binding anywhere
+            // in With (`f(2)`, `let x: f64 = n`). Two floats must agree.
+            var target: TypeId = 0
+            for ai in 0..math_arity:
+                let arg_ty = arg_types.get(ai)
+                if arg_ty == 0:
                     return 0
+                let arg_resolved = self.resolve_alias(arg_ty)
+                let arg_kind = self.get_type_kind(arg_resolved)
+                if arg_kind == TypeKind.TY_FLOAT:
+                    if target != 0 and arg_resolved != target:
+                        let arg_node = self.ast.get_extra(args_start + ai)
+                        self.emit_error(self.pool_resolve(fn_sym) ++ "() operands must be the same float type", arg_node)
+                        return 0
+                    target = arg_resolved
+                else if arg_kind != TypeKind.TY_INT:
+                    let arg_node = self.ast.get_extra(args_start + ai)
+                    self.emit_error(self.pool_resolve(fn_sym) ++ "() takes a floating-point or integer argument", arg_node)
+                    return 0
+            if target == 0:
+                target = self.ty_f64
             self.math_builtin_calls.insert(node, math_id)
-            return first_resolved as i32
+            return target as i32
         0
 
     fn static_receiver_base_sym(expr: i32) -> i32:

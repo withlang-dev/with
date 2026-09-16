@@ -8923,7 +8923,11 @@ impl MirBuilder:
         let math_args: Vec[i32] = Vec.new()
         for i in 0..arg_exprs_count:
             let math_arg_node = self.ast.get_extra(arg_exprs_start + i)
-            let math_arg = self.lower_expr(math_arg_node)
+            // An integer operand converts to the call's float type (Sema
+            // chose it); a float operand already has that type.
+            let math_arg_ty = self.sema.resolve_alias(self.expr_type(math_arg_node))
+            let math_arg_is_int = self.sema.get_type_kind(math_arg_ty) == TypeKind.TY_INT
+            let math_arg = if math_arg_is_int: self.lower_cast(math_arg_node, ret_type_id, node) else: self.lower_expr(math_arg_node)
             self.consume_moved_operand(math_arg)
             math_args.push(math_arg)
         let math_args_id = self.body.new_call_args(math_args)

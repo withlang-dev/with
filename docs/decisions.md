@@ -17,8 +17,10 @@ decision supersedes an earlier one, say so in both.
 **Ruling.** `cos(x)` and `x.cos()` work for `f32` and `f64` with no width in
 the name; the `*_f64` wrappers in `std.math` are deleted. Both spellings; the
 full libm surface (specification §17.6a lists it); the intrinsic-vs-libm
-split is hidden. A function of the same name defined in scope shadows the
-builtin; an `extern fn` declaration of the name does not.
+split is hidden. Integer operands convert to the call's float type (the
+float operand's width, else `f64`), as integers convert to floats anywhere
+in With. A function of the same name defined in scope shadows the builtin;
+an `extern fn` declaration of the name does not.
 
 **Context.** With has no ad-hoc overloading, so `std.math` shipped
 `cos_f64(x)` over an `extern fn cos(f64)`. That makes the user spell a type

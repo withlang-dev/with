@@ -1,4 +1,4 @@
-//! expect-error: cos() expects one floating-point argument
+//! expect-error: cos() expects one argument
 
 // §17.6a / D42: arity is fixed per builtin.
 fn main:

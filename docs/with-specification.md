@@ -10287,9 +10287,12 @@ cos(x)          x.cos()
 pow(x, y)       x.pow(y)
 ```
 
-The argument is `f32` or `f64`; the result has the argument's type, and a
-second operand must have the same type. A width is never written: the
-compiler reads it from the argument. Where a function has an LLVM intrinsic
+The result has the float type of the argument (`f32` or `f64`); two float
+operands must have the same type. An integer operand converts to the
+call's float type — the float operand's width when there is one, `f64`
+otherwise — exactly as an integer converts to a float parameter or
+binding anywhere in With (`sqrt(2)`, `pow(2.0f32, 3)`). A width is never
+written: the compiler reads it from the arguments. Where a function has an LLVM intrinsic
 the call lowers to it; otherwise it lowers to the width-correct C library
 symbol. The distinction is not observable.
 
