@@ -578,6 +578,13 @@ jobs:
         # executable ("could not rename out/release/bin/with.exe.tmp").
         run: ./src/main.exe build :release-uat
 
+      - name: Fetch native hang capture tool (test channel)
+        if: ${{ failure() && inputs.channel == 'test' }}
+        run: |
+          curl -fL -o out/procdump.zip https://download.sysinternals.com/files/Procdump.zip
+          7z x -y -oout/procdump out/procdump.zip
+          mkdir -p out/package-dumps/bzip2 out/package-dumps/libcurl
+
       - name: Diagnose bzip2 check (test channel)
         if: ${{ failure() && inputs.channel == 'test' }}
         timeout-minutes: 3
@@ -585,23 +592,7 @@ jobs:
         working-directory: out/release-uat/bzip2-project
         env:
           WITH_PROFILE: '1'
-        run: ../../release/bin/with.exe check src/main.w
-
-      - name: Diagnose bzip2 build (test channel)
-        if: ${{ failure() && inputs.channel == 'test' }}
-        timeout-minutes: 3
-        continue-on-error: true
-        working-directory: out/release-uat/bzip2-project
-        env:
-          WITH_PROFILE: '1'
-        run: ../../release/bin/with.exe build src/main.w -O1 -o out/probe.exe
-
-      - name: Diagnose bzip2 program (test channel)
-        if: ${{ failure() && inputs.channel == 'test' }}
-        timeout-minutes: 3
-        continue-on-error: true
-        working-directory: out/release-uat/bzip2-project
-        run: ./out/probe.exe
+        run: ../../procdump/procdump64.exe -accepteula -mm -n 3 -s 15 -k -x ../../package-dumps/bzip2 ../../release/bin/with.exe check src/main.w
 
       - name: Diagnose libcurl check (test channel)
         if: ${{ failure() && inputs.channel == 'test' }}
@@ -610,23 +601,27 @@ jobs:
         working-directory: out/release-uat/libcurl-project
         env:
           WITH_PROFILE: '1'
-        run: ../../release/bin/with.exe check src/main.w
+        run: ../../procdump/procdump64.exe -accepteula -mm -n 3 -s 15 -k -x ../../package-dumps/libcurl ../../release/bin/with.exe check src/main.w
 
-      - name: Diagnose libcurl build (test channel)
+      - name: Inspect spiral DLL integrity (test channel)
         if: ${{ failure() && inputs.channel == 'test' }}
-        timeout-minutes: 3
         continue-on-error: true
-        working-directory: out/release-uat/libcurl-project
-        env:
-          WITH_PROFILE: '1'
-        run: ../../release/bin/with.exe build src/main.w -O1 -o out/probe.exe
+        run: |
+          sha256sum "$WITH_UAT_OPENGL32_DLL" out/release-uat/raylib-spiral-project/out/bin/opengl32.dll
+          "$LLVM_PREFIX/bin/llvm-readobj.exe" --file-headers "$WITH_UAT_OPENGL32_DLL" out/release-uat/raylib-spiral-project/out/bin/opengl32.dll
+          ls -l out/release-uat/raylib-spiral-project/out/bin
 
-      - name: Diagnose libcurl program (test channel)
+      - name: Preserve native package failure evidence (test channel)
         if: ${{ failure() && inputs.channel == 'test' }}
-        timeout-minutes: 3
-        continue-on-error: true
-        working-directory: out/release-uat/libcurl-project
-        run: ./out/probe.exe
+        uses: actions/upload-artifact@v4
+        with:
+          name: package-failures-windows-x86_64
+          retention-days: 7
+          path: |
+            out/package-dumps
+            out/release/bin/with.exe
+            out/release/bin/*.pdb
+            out/release-uat/raylib-spiral-project/out/bin/opengl32.dll
 
       - name: Package fixpoint-verified release asset
         run: |
@@ -1017,6 +1012,13 @@ jobs:
         # executable ("could not rename out/release/bin/with.exe.tmp").
         run: ./src/main.exe build :release-uat
 
+      - name: Fetch native hang capture tool (test channel)
+        if: ${{ failure() && inputs.channel == 'test' }}
+        run: |
+          curl -fL -o out/procdump.zip https://download.sysinternals.com/files/Procdump.zip
+          7z x -y -oout/procdump out/procdump.zip
+          mkdir -p out/package-dumps/bzip2 out/package-dumps/libcurl
+
       - name: Diagnose bzip2 check (test channel)
         if: ${{ failure() && inputs.channel == 'test' }}
         timeout-minutes: 3
@@ -1024,23 +1026,7 @@ jobs:
         working-directory: out/release-uat/bzip2-project
         env:
           WITH_PROFILE: '1'
-        run: ../../release/bin/with.exe check src/main.w
-
-      - name: Diagnose bzip2 build (test channel)
-        if: ${{ failure() && inputs.channel == 'test' }}
-        timeout-minutes: 3
-        continue-on-error: true
-        working-directory: out/release-uat/bzip2-project
-        env:
-          WITH_PROFILE: '1'
-        run: ../../release/bin/with.exe build src/main.w -O1 -o out/probe.exe
-
-      - name: Diagnose bzip2 program (test channel)
-        if: ${{ failure() && inputs.channel == 'test' }}
-        timeout-minutes: 3
-        continue-on-error: true
-        working-directory: out/release-uat/bzip2-project
-        run: ./out/probe.exe
+        run: ../../procdump/procdump64a.exe -accepteula -mm -n 3 -s 15 -k -x ../../package-dumps/bzip2 ../../release/bin/with.exe check src/main.w
 
       - name: Diagnose libcurl check (test channel)
         if: ${{ failure() && inputs.channel == 'test' }}
@@ -1049,23 +1035,27 @@ jobs:
         working-directory: out/release-uat/libcurl-project
         env:
           WITH_PROFILE: '1'
-        run: ../../release/bin/with.exe check src/main.w
+        run: ../../procdump/procdump64a.exe -accepteula -mm -n 3 -s 15 -k -x ../../package-dumps/libcurl ../../release/bin/with.exe check src/main.w
 
-      - name: Diagnose libcurl build (test channel)
+      - name: Inspect spiral DLL integrity (test channel)
         if: ${{ failure() && inputs.channel == 'test' }}
-        timeout-minutes: 3
         continue-on-error: true
-        working-directory: out/release-uat/libcurl-project
-        env:
-          WITH_PROFILE: '1'
-        run: ../../release/bin/with.exe build src/main.w -O1 -o out/probe.exe
+        run: |
+          sha256sum "$WITH_UAT_OPENGL32_DLL" out/release-uat/raylib-spiral-project/out/bin/opengl32.dll
+          "$LLVM_PREFIX/bin/llvm-readobj.exe" --file-headers "$WITH_UAT_OPENGL32_DLL" out/release-uat/raylib-spiral-project/out/bin/opengl32.dll
+          ls -l out/release-uat/raylib-spiral-project/out/bin
 
-      - name: Diagnose libcurl program (test channel)
+      - name: Preserve native package failure evidence (test channel)
         if: ${{ failure() && inputs.channel == 'test' }}
-        timeout-minutes: 3
-        continue-on-error: true
-        working-directory: out/release-uat/libcurl-project
-        run: ./out/probe.exe
+        uses: actions/upload-artifact@v4
+        with:
+          name: package-failures-windows-aarch64
+          retention-days: 7
+          path: |
+            out/package-dumps
+            out/release/bin/with.exe
+            out/release/bin/*.pdb
+            out/release-uat/raylib-spiral-project/out/bin/opengl32.dll
 
       - name: Package fixpoint-verified release asset
         run: |
