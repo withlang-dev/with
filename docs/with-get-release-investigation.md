@@ -192,6 +192,12 @@ and detects changed destinations, changed contents and deleted outputs.
 The frozen pinned seed retains its old implementation until a later reseed.
 Tracked in [#1157](https://github.com/withlang-dev/with/issues/1157).
 
+The macro-scaling, install-cache and Conan-transport batch passes the full
+seed-driven build, byte-identical fixpoint, `audit:all` with zero violations,
+the full test battery (929.8 seconds), and `:last-green`. Targeted stage2
+tests include the 33,000-macro fixture and offline transport matrix. Logs:
+`scaling-transport-{full-build,fixpoint,audit-all,test,last-green}.log`.
+
 ## Remaining root-cause work
 
 Isolated Windows stack jobs reuse the exact failed compiler and PDB.
@@ -217,11 +223,38 @@ Both source and output SHA-256 are
 Windows diagnostic run `35202112398` adds the same copy test under each
 architecture's pinned seed, preserving the original and copied DLLs.
 
+Both Windows relative-copy probes passed. Repeating the exact external
+absolute source in run `35202995832` produced a **zero-byte** copied DLL
+on both architectures while the pinned driver reported success. This explains
+the later WGL invalid-Win32-application error. Logs:
+`windows-x64-dll-external.log` and `windows-arm-dll-external.log`.
+
+LLDB on the pinned Darwin driver confirms the legacy resolver joins
+`D:/a/_temp/mesa/opengl32.dll` onto the project root
+(`dll-copy-drive-resolver-lldb.log`). The current compiler correctly rejects
+out-of-project absolute paths, but its copy operation still discards read
+errors: LLDB returns a zero-length str for `missing.dll` to
+`ComptimeEvaluator.eval_toolfs_capability_method`, which then writes it and
+returns success (`dll-copy-missing-read-correct-lldb.log`). The native
+ToolFs copy and binary-read implementations use the same unchecked reader.
+Filed as [#1164](https://github.com/withlang-dev/with/issues/1164).
+
+The UAT now declares a project-relative Mesa input. Native and interpreted
+ToolFs operations check the read status before writing or creating output
+directories. The stage2 regression passes all sixteen cases: both execution
+modes, copy and binary read, with missing, directory, empty, and binary
+sources. Read failures preserve an existing destination; empty and binary
+files retain their exact contents. The pinned seed accepts the revised build
+graph and its workflow pins pass `:seed-driver`. Logs:
+`toolfs-{read-status-dev,stage2,binary-matrix,raylib-graph,seed-driver}.log`.
+The complete Windows raylib UAT still needs to run with these changes.
+The actual 58,609,152-byte Mesa DLL also copies with an identical SHA-256
+under both rebuilt execution modes (`toolfs-large-dll-{native,interpreted}.log`).
+
 - Verify the macro scaling fixes against real Windows package imports; a
   faster synthetic probe is not enough to close the timeout.
-- Determine why the copied Windows Mesa DLL is rejected, including file
-  integrity and architecture. The earlier sandbox failure is not the
-  newest x86_64 failure.
+- Verify Windows raylib rendering with the declared project-relative Mesa
+  input; the empty-DLL root is proven and the copy regression passes.
 - Verify Linux system-library diagnostics/provisioning and rerun Darwin UAT
   locally with the final compiler; retain the rendered spiral assertion.
 - Keep ownership/codegen changes in an isolated batch with full move/drop

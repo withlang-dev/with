@@ -2971,6 +2971,9 @@ pub fn build(ctx: BuildCtx) -> Build:
     release_raylib_spiral_uat.action = run_release_raylib_spiral_uat_action
     release_raylib_spiral_uat = release_raylib_spiral_uat.input(release_platform_asset_bin())
     release_raylib_spiral_uat = release_raylib_spiral_uat.input("build/release_uat_fixtures/raylib_spiral_main.w")
+    let uat_opengl = ctx.env_input("WITH_UAT_OPENGL32_DLL")
+    if uat_opengl.len() > 0:
+        release_raylib_spiral_uat = release_raylib_spiral_uat.input(uat_opengl)
     release_raylib_spiral_uat = release_raylib_spiral_uat.write_scope("out/release-uat")
     release_raylib_spiral_uat = release_raylib_spiral_uat.allow_network()
     release_raylib_spiral_uat = release_raylib_spiral_uat.dep("require-last-green")

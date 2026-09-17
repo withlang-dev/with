@@ -398,7 +398,8 @@ pub fn run_release_raylib_spiral_uat_action(ctx: ActionCtx) -> i32:
         return ruat_fail(ctx, "could not write spiral UAT source")
 
     // A headless Windows host has no OpenGL past 1.1 and raylib needs 3.3.
-    // WITH_UAT_OPENGL32_DLL names a software driver (Mesa llvmpipe); it goes
+    // WITH_UAT_OPENGL32_DLL names a declared project-relative software driver
+    // (Mesa llvmpipe); ToolFs inputs stay inside the build project. It goes
     // beside the program `with run` builds (out/bin under the project), the
     // first place Windows looks for a DLL, so the spiral renders through it.
     // Proven on a GL-less Windows box: the same binary fails with "WGL: the
