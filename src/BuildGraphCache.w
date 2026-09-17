@@ -3,6 +3,7 @@
 use BuildGraphModel
 use BuildGraphRuntime
 use BuildGraphSupport
+use BuildGraphOps
 use compiler.TrackedInputs
 use compiler.Runtime
 use std.crypto.sha256
