@@ -5654,7 +5654,11 @@ impl ComptimeEvaluator:
                 let vec_type = self.node_type_or(node, 0)
                 if vec_type == 0:
                     return self.fail(node, "ToolFs.read_binary result type is unknown")
-                return comptime_control_value(comptime_value_bytes(vec_type, with_fs_read_file(resolved)))
+                var status: i32 = 0
+                let data = with_fs_read_file_status(resolved, &raw mut status as *mut i32)
+                if status != 0:
+                    return self.fail(node, "read_binary: " ++ resolved ++ ": " ++ comptime_os_error_message(0 - status))
+                return comptime_control_value(comptime_value_bytes(vec_type, data))
             if method == "sha256_file":
                 if with_fs_file_exists(resolved) == 0:
                     return comptime_control_value(comptime_value_str(""))
@@ -5737,8 +5741,15 @@ impl ComptimeEvaluator:
                 if self.had_error != 0:
                     return comptime_control_error()
                 let resolved_src = self.capability_resolve_project_path(record, src, method, node)
+                if self.had_error != 0:
+                    return comptime_control_error()
                 if not self.capability_require_write_file_allowed(record, dst, method, node):
                     return comptime_control_error()
+                var status: i32 = 0
+                let contents = with_fs_read_file_status(resolved_src, &raw mut status as *mut i32)
+                if status != 0:
+                    with_eprint("error: copy_file: " ++ resolved_src ++ ": " ++ comptime_os_error_message(0 - status))
+                    return comptime_control_value(comptime_value_int(self.node_type_or(node, self.sema.ty_i32 as i32), status as i64))
                 let dst_dir = comptime_tool_path_dirname(dst)
                 if dst_dir != ".":
                     if not self.capability_require_mkdir_allowed(record, dst_dir, method, node):
@@ -5749,7 +5760,7 @@ impl ComptimeEvaluator:
                 let resolved_dst = self.capability_resolve_project_path(record, dst, method, node)
                 if self.had_error != 0:
                     return comptime_control_error()
-                return comptime_control_value(comptime_value_int(self.node_type_or(node, self.sema.ty_i32 as i32), with_fs_write_file(resolved_dst, with_fs_read_file(resolved_src)) as i64))
+                return comptime_control_value(comptime_value_int(self.node_type_or(node, self.sema.ty_i32 as i32), with_fs_write_file(resolved_dst, contents) as i64))
             if method == "chmod":
                 let path = self.capability_arg_str(args_signal.value, 0, method, node)
                 let mode = self.capability_arg_i32(args_signal.value, 1, method, node)

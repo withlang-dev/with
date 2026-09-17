@@ -955,7 +955,12 @@ pub fn ToolFs.read_text_opt(self: &Self, path: &str) -> Option[str]:
 
 pub fn ToolFs.read_binary(self: &Self, path: &str) -> Vec[u8]:
     let resolved = self.resolve_path(path)
-    let data = with_fs_read_file(resolved)
+    var status: i32 = 0
+    let data = with_fs_read_file_status(resolved, &raw mut status as *mut i32)
+    if status != 0:
+        let site = "read_binary: " ++ resolved ++ ": "
+        let err: IoError = .Os(0 - status, resolved)
+        panic(site ++ err.message())
     let result: Vec[u8] = Vec.new()
     for i in 0..data.len() as i32:
         result.push(data[i] as u8)
@@ -1486,13 +1491,20 @@ pub fn ToolFs.copy_file(self: &Self, src: &str, dst: &str) -> i32:
     if tool_fs_writes_suppressed(): return 0
     tool_path_require_project_relative(src)
     self.require_write_file_allowed(dst)
+    let source_path = self.resolve_path(src)
+    var status: i32 = 0
+    let contents = with_fs_read_file_status(source_path, &raw mut status as *mut i32)
+    if status != 0:
+        let site = "error: copy_file: " ++ source_path ++ ": "
+        let err: IoError = .Os(0 - status, source_path)
+        with_eprint(site ++ err.message())
+        return status
     let dst_dir = tool_path_dirname(dst)
     if dst_dir != ".":
         self.require_mkdir_allowed(dst_dir)
         let mkdir_rc = with_fs_mkdir_p(self.resolve_path(dst_dir))
         if mkdir_rc != 0:
             return mkdir_rc
-    let contents = with_fs_read_file(self.resolve_path(src))
     with_fs_write_file(self.resolve_path(dst), contents)
 
 pub fn ToolFs.chmod(self: &Self, path: &str, mode: i32) -> i32:

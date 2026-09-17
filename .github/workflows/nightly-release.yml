@@ -740,10 +740,10 @@ jobs:
           curl -fL -o "$archive" \
             "https://github.com/mmozeiko/build-mesa/releases/download/26.2.2/mesa-llvmpipe-x64-26.2.2.7z"
           printf '%s  %s\n' "418f1938dc48d401538cf6440d3c718e2f456ef2023e44133105263f483e903f" "$archive" | sha256sum -c -
-          mkdir -p "$RUNNER_TEMP/mesa"
-          7z x -y -o"$RUNNER_TEMP/mesa" "$archive" opengl32.dll > /dev/null
-          test -f "$RUNNER_TEMP/mesa/opengl32.dll"
-          echo "WITH_UAT_OPENGL32_DLL=$(cygpath -m "$RUNNER_TEMP/mesa/opengl32.dll")" >> "$GITHUB_ENV"
+          mkdir -p out/release-uat/mesa
+          7z x -y -oout/release-uat/mesa "$archive" opengl32.dll > /dev/null
+          test -f out/release-uat/mesa/opengl32.dll
+          echo "WITH_UAT_OPENGL32_DLL=out/release-uat/mesa/opengl32.dll" >> "$GITHUB_ENV"
 
       - name: Release UAT
         # Driven by the seed, not the rebuilt binary: the UAT tests the
@@ -1175,10 +1175,10 @@ jobs:
           curl -fL -o "$archive" \
             "https://github.com/mmozeiko/build-mesa/releases/download/26.2.2/mesa-llvmpipe-arm64-26.2.2.7z"
           printf '%s  %s\n' "bd1c00a49504b3efe20037cf29fa437380cfb5cbe73f196272624b94938330f1" "$archive" | sha256sum -c -
-          mkdir -p "$RUNNER_TEMP/mesa"
-          7z x -y -o"$RUNNER_TEMP/mesa" "$archive" opengl32.dll > /dev/null
-          test -f "$RUNNER_TEMP/mesa/opengl32.dll"
-          echo "WITH_UAT_OPENGL32_DLL=$(cygpath -m "$RUNNER_TEMP/mesa/opengl32.dll")" >> "$GITHUB_ENV"
+          mkdir -p out/release-uat/mesa
+          7z x -y -oout/release-uat/mesa "$archive" opengl32.dll > /dev/null
+          test -f out/release-uat/mesa/opengl32.dll
+          echo "WITH_UAT_OPENGL32_DLL=out/release-uat/mesa/opengl32.dll" >> "$GITHUB_ENV"
 
       - name: Release UAT
         # Driven by the seed, not the rebuilt binary: the UAT tests the
