@@ -20,15 +20,48 @@ type ConanLibraryScan {
     libs: Vec[str],
 }
 
-fn conan_http_get(url: &str) -> str:
-    let tmp = f"/tmp/with-conan-http-{runtime_getpid()}.json"
-    let _rm_old = runtime_remove_file(tmp)
+fn conan_temp_root() -> str:
+    if runtime_sysinfo_os() == "Windows":
+        let tmp = runtime_getenv("TMP")
+        if tmp.len() > 0: return tmp
+        return runtime_getenv("TEMP")
+    let tmp = runtime_getenv("TMPDIR")
+    if tmp.len() > 0: tmp else: "/tmp"
+
+fn conan_scratch_dir() -> str:
+    let base = conan_temp_root()
+    if base.len() == 0:
+        runtime_eprint("error: no temporary directory configured for Conan downloads (set TMP or TEMP)")
+        return ""
+    let scratch = base ++ f"/with-conan-http-{runtime_getpid()}.{runtime_clock_nanos()}"
+    if runtime_mkdir_p(scratch) != 0:
+        runtime_eprint("error: could not create Conan download directory: " ++ scratch)
+        return ""
+    scratch
+
+fn conan_run_tool(argv: &str, timeout_ms: i32) -> i32:
+    let scratch = conan_scratch_dir()
+    if scratch.len() == 0: return -1
+    let stdout_path = scratch ++ "/stdout"
+    let stderr_path = scratch ++ "/stderr"
+    let rc = runtime_exec_argv_capture(argv, stdout_path, stderr_path, timeout_ms)
+    let output = runtime_read_file(stdout_path)
+    let errors = runtime_read_file(stderr_path)
+    if output.len() > 0: print(output)
+    if errors.len() > 0: runtime_eprint(errors)
+    runtime_remove_tree(scratch)
+    rc
+
+pub fn conan_http_get(url: &str) -> str:
+    let scratch = conan_scratch_dir()
+    if scratch.len() == 0: return ""
+    let tmp = scratch ++ "/response.json"
     let rc = conan_curl_to_file(url, tmp, 300000)
     if rc != 0:
-        let _rm_fail = runtime_remove_file(tmp)
+        runtime_remove_tree(scratch)
         return ""
     let body = runtime_read_file(tmp)
-    let _rm = runtime_remove_file(tmp)
+    runtime_remove_tree(scratch)
     body
 
 fn conan_http_download(url: &str, path: &str) -> i32:
@@ -57,7 +90,10 @@ fn conan_curl_to_file(url: &str, path: &str, timeout_ms: i32) -> i32:
     argv = conan_argv_append(argv, "-o")
     argv = conan_argv_append(argv, path)
     argv = conan_argv_append(argv, url)
-    runtime_exec_argv_capture(argv, "/dev/null", "/dev/null", timeout_ms)
+    let rc = conan_run_tool(argv, timeout_ms)
+    if rc != 0:
+        runtime_eprint(f"error: Conan download failed (curl exit {rc}): " ++ url ++ " -> " ++ path)
+    rc
 
 fn conan_extract_tgz(archive: &str, dest: &str) -> i32:
     var argv = ""
@@ -66,7 +102,7 @@ fn conan_extract_tgz(archive: &str, dest: &str) -> i32:
     argv = conan_argv_append(argv, archive)
     argv = conan_argv_append(argv, "-C")
     argv = conan_argv_append(argv, dest)
-    runtime_exec_argv_capture(argv, "/dev/null", "/dev/null", 120000)
+    conan_run_tool(argv, 120000)
 
 fn conan_extract_tgz_strip1(archive: &str, dest: &str) -> i32:
     var argv = ""
@@ -76,7 +112,7 @@ fn conan_extract_tgz_strip1(archive: &str, dest: &str) -> i32:
     argv = conan_argv_append(argv, "-C")
     argv = conan_argv_append(argv, dest)
     argv = conan_argv_append(argv, "--strip-components=1")
-    runtime_exec_argv_capture(argv, "/dev/null", "/dev/null", 120000)
+    conan_run_tool(argv, 120000)
 
 fn conan_str_compare(a: &str, b: &str) -> i32:
     let min_len = if a.len() < b.len(): a.len() else: b.len()
@@ -1044,7 +1080,7 @@ fn conan_compile_c_source(source: &str, obj: &str, include_dirs: &Vec[str]) -> i
     argv = conan_argv_append(argv, source)
     argv = conan_argv_append(argv, "-o")
     argv = conan_argv_append(argv, obj)
-    runtime_exec_argv_capture(argv, "/dev/null", "/dev/null", 120000)
+    conan_run_tool(argv, 120000)
 
 fn conan_install_source_fallback(name: &str, version: &str, project_root: &str) -> str:
     let folder = conan_recipe_folder(name, version)
@@ -1134,7 +1170,7 @@ fn conan_install_internal(name: &str, version_hint: &str, project_root: &str, de
         return ""
     let version = conan_resolve_version(name, version_hint)
     if version.len() == 0:
-        runtime_eprint("error: package " ++ name ++ "/" ++ version_hint ++ " not found on Conan Center")
+        runtime_eprint("error: could not resolve package " ++ name ++ "/" ++ version_hint ++ " on Conan Center")
         return ""
     let meta_path = project_root ++ "/.with/deps/c/" ++ name ++ "/" ++ version ++ "/metadata.json"
     if not force_reinstall and runtime_file_exists(meta_path) != 0:
@@ -1145,7 +1181,7 @@ fn conan_install_internal(name: &str, version_hint: &str, project_root: &str, de
     runtime_eprint("resolving " ++ name ++ "/" ++ version ++ "...")
     let recipe_rev = conan_get_latest_recipe_rev(name, version)
     if recipe_rev.len() == 0:
-        runtime_eprint("error: package " ++ name ++ "/" ++ version ++ " not found on Conan Center")
+        runtime_eprint("error: could not resolve recipe for " ++ name ++ "/" ++ version ++ " on Conan Center")
         return ""
     runtime_eprint("  revision: " ++ recipe_rev.slice(0, if recipe_rev.len() > 12: 12 else: recipe_rev.len()))
     let installed_binary = conan_install_binary(name, version, recipe_rev, project_root, depth, force_reinstall)
