@@ -91,6 +91,14 @@ jobs:
       - name: Fetch current package
         working-directory: out/diagnostic-project
         run: ../diagnostic-compiler/release/bin/with.exe get c.${{ matrix.package }}
+      - name: Expose failed package download
+        if: failure()
+        shell: pwsh
+        working-directory: out/diagnostic-project
+        run: |
+          Get-Command curl.exe
+          Get-Item /tmp
+          curl.exe -v -fSL -o /tmp/with-conan-diagnostic.json "https://center2.conan.io/v2/conans/search?q=${{ matrix.package }}"
       - name: Install the actual UAT fixture
         run: cp build/release_uat_fixtures/${{ matrix.package }}_main.w out/diagnostic-project/src/main.w
       - name: Capture native check stacks
