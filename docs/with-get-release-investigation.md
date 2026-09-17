@@ -1,6 +1,6 @@
 # Floating-package release investigation
 
-Work in progress, 2026-09-16. The release remains blocked. No package pins,
+Work in progress, 2026-09-17. The release remains blocked. No package pins,
 platform exclusions, or relaxed UAT verdicts are proposed.
 
 ## Failure matrix
@@ -14,11 +14,11 @@ OpenSSL 4.0.2, libcurl 8.21.0, and raylib 6.0.
 | Package | Darwin local | Darwin CI | Linux x86_64 | Windows x86_64 | Windows arm64 |
 |---|---|---|---|---|---|
 | zlib | check/run pass | pass | pass | pass | pass in initial run |
-| bzip2 | check/run pass | pass | pass | C import check/build time out | run times out; stage probe pending |
+| bzip2 | check/run pass | pass | pass | C import check/build time out | C import check/build time out |
 | sqlite3 | check/run pass | pass | pass | pass | pass in initial run |
 | OpenSSL | generated undefined macro; debug allocator double free | compiler invalid free | compiler invalid free | generated undefined macro | generated undefined macro |
-| libcurl | check/run pass | pass | pass | C import check/build time out | run times out; stage probe pending |
-| raylib | check/run and rendered spiral pass | NSGL pixel format unavailable | missing GL/X11 link libraries | WGL cannot load Mesa DLL (invalid Win32 application) | earlier ToolFs external-path refusal; new result pending |
+| libcurl | check/run pass | pass | pass | C import check/build time out | C import check/build time out |
+| raylib | check/run and rendered spiral pass | NSGL pixel format unavailable | missing GL/X11 link libraries | WGL cannot load Mesa DLL (invalid Win32 application) | WGL cannot load Mesa DLL (invalid Win32 application) |
 
 Linux arm64 stops before UAT in the native test gate. Its `skip-on` is
 honored internally, then the outer `known-issue` wrapper incorrectly treats
@@ -32,6 +32,11 @@ Neither creates a program. The diagnostic steps use `continue-on-error`
 to collect all stages; their displayed successful conclusions do **not**
 mean the commands passed. Raw logs show the three-minute timeouts.
 The seed-driven UAT no longer fails to rename the executing compiler.
+
+Darwin verification follows the existing local-first release path. Eric's
+Mac rendered the spiral successfully on its Apple M5 Max. The hosted NSGL
+failure does not establish a limitation of his Mac; no paid runner or local
+Actions runner registration is needed.
 
 ## Proven roots
 
@@ -104,6 +109,29 @@ grouped, nested-expression and alias forms pass a separate check. The new
 positive fixture fails on the baseline with a generated reference to the
 omitted `ATTRIBUTE` macro.
 
+Clang macro probes also accepted recovery ASTs after parse errors. On the
+reduced `#define END { 0, (void *)0 }`, LLDB found a severity-3 diagnostic
+in the probe TU while `ci_try_eval_var_init_for_type` returned
+`void { 0, null }`. Both ordinary imports and macro probes now use the
+same parse-error check; batched type collection excludes invalid recovered
+declarations. Evidence: `macro-brace-error-lldb.log` and
+`macro-brace-recovery-lldb.log` in the investigation output directory.
+
+The registry fix exposed an ordering regression in CI run `35169665692`:
+the existing `behav_c_import_offsetof.w` failed on all five platforms,
+before the jobs reached UAT. LLDB in `ci_object_macro_is_function_call`
+returned `w0 = 1` for `offsetof(with_offset_point_t, x)`, preventing its
+constant translator from running (`offsetof-guard-lldb.log`). The call
+guard now runs after the validated constant probe and offsetof translator;
+an emitted function macro alone does not prove that its invocation is a
+constant. Stage1 build exit 0; eight targeted fixtures pass, covering
+packed/nested/flexible layout offsets, constant and runtime macro calls,
+invalid probe ASTs, and precise used-omission diagnostics.
+
+Test gates now compare Darwin with the runtime's `Macos` spelling, and
+skip/directive-error verdicts bypass known-issue inversion. Direct skip
+probes pass; the full CLI verdict matrix awaits rebuilt stage2.
+
 OpenSSL verification remains open: the development stage lacks embedded
 generated modules when run outside the compiler tree, and from the compiler
 tree its C import reports opaque-by-value types. A full stage chain is needed
@@ -111,13 +139,22 @@ to distinguish the known stage1 limitation from a remaining translator defect.
 
 ## Remaining root-cause work
 
+Isolated Windows stack jobs reuse the exact failed compiler and PDB.
+Run `35196602998` additionally exposed clean-machine floating-get failures:
+native `/tmp` does not exist, while ConanClient hardcodes that output path
+and suppresses download errors. Filed as
+[#1162](https://github.com/withlang-dev/with/issues/1162). The diagnostic
+workflow preserves the fresh-get failure before reconstructing the old
+binary's scratch environment to investigate the separate header hang.
+This setup is not release evidence.
+
 - Capture the Windows C import hang's native stack; stage timing is only
   localization, not instruction-level proof.
 - Determine why the copied Windows Mesa DLL is rejected, including file
   integrity and architecture. The earlier sandbox failure is not the
   newest x86_64 failure.
-- Verify Linux system-library diagnostics/provisioning and provide an actual
-  GL 3.3 context on hosted Darwin; retain the rendered spiral assertion.
+- Verify Linux system-library diagnostics/provisioning and rerun Darwin UAT
+  locally with the final compiler; retain the rendered spiral assertion.
 - Prove and cover skip/known-issue/directive-error verdict composition.
 - Keep ownership/codegen changes in an isolated batch with full move/drop
   audits, then run floating UAT on all five platforms before publishing.
