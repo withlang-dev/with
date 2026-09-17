@@ -2730,27 +2730,29 @@ fn ci_translate_typedef(session: i64, idx: i32, count: i32) -> str:
 
 // ── Macro translation ───────────────────────────────────────
 
-fn ci_collect_object_macro_type_map(session: i64, macro_source: &str) -> str:
+fn ci_collect_object_macro_type_map(session: i64, macro_source: &str):
     if macro_source.len() == 0:
         return ""
     let count = with_cimport_macro_count(session)
-    var names = ""
+    var names = StringBuilder.new()
     var i = 0
     while i < count:
         if with_cimport_macro_is_fn_like(session, i) == 0:
             let name = with_cimport_macro_name(session, i)
             let value = ci_trim(ci_strip_c_comments(with_cimport_macro_value(session, i)))
             if name.len() > 0 and name[0] != 95 and value.len() > 0:
-                names = names ++ "|" ++ name ++ "|"
+                names.push_str("|")
+                names.push_str(name)
+                names.push_str("|")
         i = i + 1
     if names.len() == 0:
         return ""
     ci_prepare_clang_resource_dir()
-    with_cimport_collect_object_macro_types(macro_source, names)
+    with_cimport_collect_object_macro_types(macro_source, names.to_str())
 
 fn ci_collect_object_macro_values(session: i64) -> str:
     let count = with_cimport_macro_count(session)
-    var values = ""
+    var values = StringBuilder.new()
     for i in 0..count:
         if with_cimport_macro_is_fn_like(session, i) != 0:
             continue
@@ -2760,8 +2762,11 @@ fn ci_collect_object_macro_values(session: i64) -> str:
             continue
         if ci_str_contains(value, "|"):
             continue
-        values = values ++ "|" ++ name ++ "=" ++ value
-    values
+        values.push_str("|")
+        values.push_str(name)
+        values.push_str("=")
+        values.push_str(value)
+    values.to_str()
 
 fn ci_offsetof_record_type_name(raw_type: &str) -> str:
     let t = ci_trim(raw_type)
