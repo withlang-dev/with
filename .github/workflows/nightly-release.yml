@@ -105,6 +105,23 @@ jobs:
           file source.dll out/copied.dll
           sha256sum source.dll out/copied.dll
           cmp source.dll out/copied.dll
+      - name: Reproduce the UAT's external absolute source
+        working-directory: out/dll-copy-probe
+        continue-on-error: true
+        run: |
+          cp out/copied.dll out/relative-copy.dll
+          cp source.dll ../external-source.dll
+          rm out/copied.dll
+          export WITH_UAT_OPENGL32_DLL="$(cygpath -m "$PWD/../external-source.dll")"
+          ../diagnostic-seed.exe build --strict-effects
+      - name: Inspect external-path copy result
+        if: always()
+        working-directory: out/dll-copy-probe
+        run: |
+          ls -l source.dll out/copied.dll
+          file source.dll out/copied.dll
+          sha256sum source.dll out/copied.dll
+          cmp source.dll out/copied.dll
       - name: Preserve DLL evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -114,6 +131,7 @@ jobs:
           path: |
             out/dll-copy-probe/source.dll
             out/dll-copy-probe/out/copied.dll
+            out/dll-copy-probe/out/relative-copy.dll
 
   package-diagnostics:
     name: Diagnose ${{ matrix.package }} on windows-${{ matrix.arch }}
