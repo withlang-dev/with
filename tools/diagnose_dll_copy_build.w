@@ -2,7 +2,9 @@
 use std.build
 
 fn copy_dll(ctx: ActionCtx) -> i32:
-    ctx.fs().copy_file("source.dll", "out/copied.dll")
+    let external = ctx.env_input("WITH_UAT_OPENGL32_DLL")
+    let source = if external.len() > 0: external else: "source.dll"
+    ctx.fs().copy_file(source, "out/copied.dll")
 
 pub fn build(ctx: BuildCtx) -> Build:
     var out = ctx.new_build()
