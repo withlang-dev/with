@@ -129,13 +129,68 @@ packed/nested/flexible layout offsets, constant and runtime macro calls,
 invalid probe ASTs, and precise used-omission diagnostics.
 
 Test gates now compare Darwin with the runtime's `Macos` spelling, and
-skip/directive-error verdicts bypass known-issue inversion. Direct skip
-probes pass; the full CLI verdict matrix awaits rebuilt stage2.
+skip/directive-error verdicts bypass known-issue inversion. The complete
+ten-case CLI verdict matrix passes on rebuilt stage2.
 
-OpenSSL verification remains open: the development stage lacks embedded
-generated modules when run outside the compiler tree, and from the compiler
-tree its C import reports opaque-by-value types. A full stage chain is needed
-to distinguish the known stage1 limitation from a remaining translator defect.
+The macro/verdict batch passes the full seed-driven build, byte-identical
+fixpoint, `audit:all` (zero violations), all 82 `:test` targets, and
+`:last-green`. The test battery took 1001.9 seconds and included 1047 behavior
+files. Logs: `macro-batch-{full-build,fixpoint,audit-all,test,last-green}.log`.
+This is compiler-battery evidence, not floating-package release approval.
+
+OpenSSL still reports an invalid free with the rebuilt stage2. Its check
+passes with `WITH_ALLOC_NO_REUSE=1`, confirming that the ownership bug is
+still live after macro translation succeeds; no-reuse is diagnostic only.
+
+### Windows macro collection scaling
+
+Run `35197408709` captured native Windows minidumps using the exact compiler
+from failed run `35169665692`. Both architectures stop in
+`ci_collect_object_macro_values` via `with_str_concat_n`, `str_concat_n_copy`,
+and `rt_memcpy`. The x86_64 libcurl frame is at macro 15517 of 33367,
+copying an accumulated prefix of 580692 bytes to append the next value.
+The source is `values = values ++ "|" ++ name ++ "=" ++ value`.
+Evidence: `windows-libcurl-stack-lldb.log`,
+`windows-macro-collector-{disassembly,state}.log`, and
+`windows-arm-bzip2-lldb.log`. Tracked in
+[#1163](https://github.com/withlang-dev/with/issues/1163).
+
+An isolated development patch replaces append-only table strings with
+builders. A 33,000-macro inline-header probe also exposed two other costs:
+`c_import_decode_escapes +472` recopies the accumulated header on each escaped
+newline, and `macro_source_line_from_cursor +216` calls `with_fs_read_file`
+for every definition before scanning from line one. The latter native stack
+and disassembly are in `macro-source-read-symbol-lldb.log`.
+Clang already owns a source buffer and supplies the definition's byte offset;
+the patch reads that buffer directly. The standalone bridge and stage1 build
+pass. Cold-cache C-import time for 8,000 macros falls from 3389.432 ms to
+174.928 ms; 33,000 falls from 45990.103 ms to 326.392 ms. These are local
+synthetic measurements; the actual Windows bzip2/libcurl UAT remains required.
+
+The source-line regression also found that a continued identity macro is
+omitted while its single-line form works. LLDB shows the unspliced
+backslash-newline entering `macro_session_add_from_define_line`
+(`macro-continuation-cold-source-lldb.log`). The same source reader now
+splices logical definitions, including CRLF. It must remain buildable as a
+standalone bootstrap object, before the stdlib is available.
+
+The source-line regression passes on the rebuilt development compiler,
+covering first/last lines, no final newline, CRLF, continued bodies, split
+macro names and split directives (`macro-source-lines-fixed.log`).
+
+### Install cache destination mismatch
+
+The pinned driver's `build_cache_collect_output_paths` returns the literal
+`/Users/eric/with/$HOME/.local/...`, observed on return to
+`build_cache_freshness_reason +4520`. Installation expands `$HOME`, so each
+gate incorrectly considers the install stale and rebuilds dependents.
+Evidence: `wo-install-cache-output-lldb.log`.
+
+The cache now uses the install operation's destination resolver. Its direct
+regression passes for project paths, HOME, INSTALL_BINDIR and INSTALL_LIBDIR,
+and detects changed destinations, changed contents and deleted outputs.
+The frozen pinned seed retains its old implementation until a later reseed.
+Tracked in [#1157](https://github.com/withlang-dev/with/issues/1157).
 
 ## Remaining root-cause work
 
@@ -148,13 +203,26 @@ workflow preserves the fresh-get failure before reconstructing the old
 binary's scratch environment to investigate the separate header hang.
 This setup is not release evidence.
 
-- Capture the Windows C import hang's native stack; stage timing is only
-  localization, not instruction-level proof.
+The client patch now uses Windows TMP/TEMP or POSIX TMPDIR and captures tool
+output in per-request temporary directories. It reports actual failures and
+cleans up after success or failure. Source check and the offline transport
+regression pass, including spaces in paths and an unusable temporary directory.
+Native evidence: `conan-http-temp-lldb.log`; test evidence:
+`conan-internals-tests.log`. Windows validation remains outstanding.
+
+The pinned Darwin seed copies the actual 56 MB x64 Mesa DLL byte-for-byte
+through both native and interpreted (`--strict-effects`) ToolFs actions.
+Both source and output SHA-256 are
+`184b6f374d06a195c07ac458638697b42209ebf31d5a6f08cd269a7165f90d45`.
+Windows diagnostic run `35202112398` adds the same copy test under each
+architecture's pinned seed, preserving the original and copied DLLs.
+
+- Verify the macro scaling fixes against real Windows package imports; a
+  faster synthetic probe is not enough to close the timeout.
 - Determine why the copied Windows Mesa DLL is rejected, including file
   integrity and architecture. The earlier sandbox failure is not the
   newest x86_64 failure.
 - Verify Linux system-library diagnostics/provisioning and rerun Darwin UAT
   locally with the final compiler; retain the rendered spiral assertion.
-- Prove and cover skip/known-issue/directive-error verdict composition.
 - Keep ownership/codegen changes in an isolated batch with full move/drop
   audits, then run floating UAT on all five platforms before publishing.
