@@ -89,16 +89,29 @@ jobs:
         working-directory: out/diagnostic-project
         run: ../diagnostic-compiler/release/bin/with.exe init .
       - name: Fetch current package
+        id: fresh-get
+        continue-on-error: true
         working-directory: out/diagnostic-project
         run: ../diagnostic-compiler/release/bin/with.exe get c.${{ matrix.package }}
       - name: Expose failed package download
-        if: failure()
+        if: steps.fresh-get.outcome == 'failure'
+        continue-on-error: true
         shell: pwsh
         working-directory: out/diagnostic-project
         run: |
           Get-Command curl.exe
-          Get-Item /tmp
           curl.exe -v -fSL -o /tmp/with-conan-diagnostic.json "https://center2.conan.io/v2/conans/search?q=${{ matrix.package }}"
+      # Investigation of the old binary only: retain the fresh-get failure
+      # above, then recreate the full battery's scratch directory so we can
+      # reach its separate C import hang. This is never release evidence.
+      - name: Reproduce the older compiler's scratch environment
+        if: steps.fresh-get.outcome == 'failure'
+        shell: pwsh
+        run: New-Item -ItemType Directory -Force /tmp
+      - name: Fetch package for header stack capture
+        if: steps.fresh-get.outcome == 'failure'
+        working-directory: out/diagnostic-project
+        run: ../diagnostic-compiler/release/bin/with.exe get c.${{ matrix.package }}
       - name: Install the actual UAT fixture
         run: cp build/release_uat_fixtures/${{ matrix.package }}_main.w out/diagnostic-project/src/main.w
       - name: Capture native check stacks
