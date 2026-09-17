@@ -77,6 +77,7 @@ extern fn clang_disposeIndex(index: *mut u8)
 extern fn clang_parseTranslationUnit(index: *mut u8, src: *const u8, args: *const *const u8, nargs: i32, unsaved: *mut u8, nunsaved: u32, opts: u32) -> *mut u8
 extern fn clang_disposeTranslationUnit(tu: *mut u8)
 extern fn clang_getTranslationUnitCursor(tu: *mut u8) -> CXCursor
+extern fn clang_isInvalidDeclaration(cursor: CXCursor) -> u32
 extern fn clang_getNumDiagnostics(tu: *mut u8) -> u32
 extern fn clang_getDiagnostic(tu: *mut u8, idx: u32) -> *mut u8
 extern fn clang_getDiagnosticSeverity(diag: *mut u8) -> i32
@@ -1413,6 +1414,23 @@ pub fn with_cimport_set_resource_dir(path: &str) -> Unit:
 
 // ── Parse ───────────────────────────────────────────────────
 
+// A non-null translation unit can contain Clang's error-recovery AST. Only
+// successfully parsed declarations may enter the With translator.
+unsafe fn cimport_record_parse_error(s: *mut CImportSession):
+    let count = clang_getNumDiagnostics((*s).tu)
+    var i: u32 = 0
+    while i < count:
+        let diag = clang_getDiagnostic((*s).tu, i)
+        if clang_getDiagnosticSeverity(diag) >= CXDiagnostic_Error:
+            let msg = clang_getDiagnosticSpelling(diag)
+            (*s).err_msg = c_strdup(clang_getCString(msg))
+            clang_disposeString(msg)
+            clang_disposeDiagnostic(diag)
+            return true
+        clang_disposeDiagnostic(diag)
+        i += 1
+    false
+
 // #744: monotonically increasing parse counter. Caches keyed by session
 // address also record the generation, so a session address recycled by a
 // later parse can never validate a stale cache.
@@ -1484,19 +1502,7 @@ pub fn with_cimport_parse(header_code: &str) -> i64:
             (*s).err_msg = c_strdup("failed to parse translation unit\0" as *const u8)
             return s as i64
 
-        // Check for fatal errors
-        let diag_count = clang_getNumDiagnostics((*s).tu)
-        var di: u32 = 0
-        while di < diag_count:
-            let diag = clang_getDiagnostic((*s).tu, di)
-            if clang_getDiagnosticSeverity(diag) >= CXDiagnostic_Error:
-                let msg = clang_getDiagnosticSpelling(diag)
-                (*s).err_msg = c_strdup(clang_getCString(msg))
-                clang_disposeString(msg)
-                clang_disposeDiagnostic(diag)
-                return s as i64
-            clang_disposeDiagnostic(diag)
-            di = di + 1
+        if cimport_record_parse_error(s): return s as i64
 
         // Collect top-level declarations
         let root = clang_getTranslationUnitCursor((*s).tu)
@@ -2645,7 +2651,9 @@ pub fn with_cimport_collect_object_macro_types(header_code: &str, macro_names: &
         var i: i32 = 0
         while i < (*s).decl_count:
             let cursor = *(((*s).decls as i64 + i as i64 * 32) as *const CXCursor)
-            if clang_getCursorKind(cursor) == CXCursor_VarDecl:
+            // One bad macro must not discard valid siblings in this batch,
+            // but its recovery type is not evidence of a usable C expression.
+            if clang_getCursorKind(cursor) == CXCursor_VarDecl and clang_isInvalidDeclaration(cursor) == 0:
                 let spelling = clang_str_to_with(s, clang_getCursorSpelling(cursor))
                 if spelling.len() > prefix.len() and spelling.slice(0, prefix.len()) == prefix:
                     let macro_name = spelling.slice(prefix.len(), spelling.len())
@@ -2722,6 +2730,10 @@ pub fn with_cimport_parse_macro_probe(header_code: &str, macro_name: &str) -> i6
         (*s).index = clang_createIndex(0, 0)
         (*s).tu = clang_parseTranslationUnit((*s).index, (*s).tmp_path as *const u8, &args as *const [64]*const u8 as *const *const u8, nargs, 0 as *mut u8, 0 as u32, 0 as u32)
         if (*s).tu as i64 == 0:
+            with_cimport_dispose(s as i64)
+            return 0
+
+        if cimport_record_parse_error(s):
             with_cimport_dispose(s as i64)
             return 0
 
