@@ -315,3 +315,37 @@ tracked in https://github.com/withlang-dev/with/issues/1167.
   recipes, and remove the clean-host external linker dependency.
 - Keep ownership/codegen changes in an isolated batch with full move/drop
   audits, then run floating UAT on all five platforms before publishing.
+
+### Implicit Result tails freed their transferred payload (#1169)
+
+The source-metadata parser exposed a separate ownership failure. A function
+returning `Result[str, str]` with an `if` or `match` tail copied its branch
+join temporary into `Ok`, then freed the same temporary on body-frame exit.
+The reduced program retains `scalar("sources").unwrap()`, allocates the
+same-sized `scalar("changed").unwrap()`, and observes the first value change.
+
+The native allocator with reuse disabled and the address trap proves the
+first free occurs in `source_yaml_scalar`; LLDB then stops at
+`lower_fn_with_sig+6224` while lowering the reduced function. The implicit
+`Ok` aggregate assignment at `src/MirLower.w` replaced `result` without
+calling `consume_moved_operand`. Other aggregate transfer paths already
+consume their operands. The fix consumes this payload before leaving its
+temporary frame. Evidence: `result-tail-wrap-live-lldb.log` and the reduced
+`result_branch_reduced.w` under `out/with-get-investigation/`.
+
+The regression retains returned strings, vectors, and structs across a
+second allocation, covering direct, both `if` arms, and both `match` arms.
+The fresh stage2 passes with zero allocator leaks. Full build, byte-identical
+fixpoint, compiler audit (2,528,140 facts, zero violations), move audit
+(15 PASS, zero differences), and drop audit (136 PASS, zero regressions)
+pass. Logs: `result-tail-full-build.log`, `result-tail-fixpoint.log`,
+`result-tail-audit-all.log`, `result-tail-after-move-audit.log`,
+`result-tail-stage2-drop-audit.log`, and `result-tail-stage2-matrix.log`.
+The full seed-driven suite also passes, including all 1,052 behavior files,
+and `last-green` archives verified evidence. Logs:
+`result-tail-full-test.log` and `result-tail-last-green.log`.
+
+The MIR validator accepted this invalid moved-payload cleanup; its missing
+check is filed separately as #1170. The parser also exposed an independent
+early-return leak from an enclosing statement temporary frame (#1172),
+which this change does not claim to fix.

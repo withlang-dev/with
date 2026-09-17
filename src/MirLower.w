@@ -14446,6 +14446,10 @@ fn lower_fn_with_sig(builder: MirBuilder, fn_node: i32, sig_idx: i32) -> Lowered
                     let ok_tmp = builder.new_temp(ret_ty)
                     let ok_place = builder.place_for_local(ok_tmp)
                     builder.body.push_stmt(builder.cur_bb, StmtKind.Assign, ok_place, ok_rv, builder.ast.get_end(fn_node))
+                    // The payload now belongs to Ok. In particular, an if or
+                    // match tail leaves an owned join temporary in the body
+                    // frame; consume it before that frame emits cleanup.
+                    builder.consume_moved_operand(result)
                     result = builder.body.new_operand(OperandKind.OK_COPY, ok_place)
 
     // Implicit return value assignment for non-diverging tail expressions.
