@@ -3051,7 +3051,9 @@ fn ci_translate_macros(session: i64, type_session: i64, extern_vars: &str, macro
                 continue
             if name.len() > 0 and name[0] != 95:
                 if with_cimport_is_name_emitted(name) == 0:
-                    with_cimport_mark_name_emitted(name)
+                    // Dependent macros consult this registry. Register only
+                    // after translation succeeds; an omitted declaration must
+                    // never authorize a dangling reference in another macro.
                     let safe_name = ci_escape_reserved(name)
                     let param_count = with_cimport_macro_param_count(session, fn_index)
                     // Detect variadic macros (... params or __VA_ARGS__ in body)
@@ -3080,6 +3082,7 @@ fn ci_translate_macros(session: i64, type_session: i64, extern_vars: &str, macro
                             empty_params = empty_params ++ epname ++ ": i32"
                             epi = epi + 1
                         let r = ci_render_generated_fn_body("fn " ++ safe_name ++ "(" ++ empty_params ++ ") -> Unit", "    return")
+                        with_cimport_mark_name_emitted(name)
                         if not ci_migrate_shared_decl_add("fn", safe_name, r):
                             output = output ++ r ++ "\n"
                         continue
@@ -3116,6 +3119,7 @@ fn ci_translate_macros(session: i64, type_session: i64, extern_vars: &str, macro
                         let stripped_identity = ci_strip_parens(ci_trim(work_value))
                         if stripped_identity == original_param:
                             let r = ci_render_generated_fn_body("fn " ++ safe_name ++ "[T](" ++ safe_param ++ ": T) -> T", "    " ++ safe_param)
+                            with_cimport_mark_name_emitted(name)
                             if not ci_migrate_shared_decl_add("fn", safe_name, r):
                                 output = output ++ r ++ "\n"
                             continue
@@ -3136,6 +3140,7 @@ fn ci_translate_macros(session: i64, type_session: i64, extern_vars: &str, macro
                             let body_trimmed = ci_trim(work_value)
                             if body_trimmed == "#" ++ p0 or body_trimmed == "(#" ++ p0 ++ ")":
                                 let r = ci_render_generated_fn_body("fn " ++ safe_name ++ "(x: str) -> str", "    x")
+                                with_cimport_mark_name_emitted(name)
                                 if not ci_migrate_shared_decl_add("fn", safe_name, r):
                                     output = output ++ r ++ "\n"
                                 continue
@@ -3163,6 +3168,7 @@ fn ci_translate_macros(session: i64, type_session: i64, extern_vars: &str, macro
                             continue
                         let fn_kw = if ci_translation_calls_raw_function(translated): "unsafe fn " else: "fn "
                         let r = ci_render_generated_fn_body(fn_kw ++ safe_name ++ type_params ++ "(" ++ param_decl ++ ") -> " ++ inferred_ret, "    " ++ translated)
+                        with_cimport_mark_name_emitted(name)
                         if not ci_migrate_shared_decl_add("fn", safe_name, r):
                             output = output ++ r ++ "\n"
                         known_macro_returns = known_macro_returns ++ safe_name ++ "=" ++ inferred_ret ++ "|"
