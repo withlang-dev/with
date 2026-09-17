@@ -1328,31 +1328,27 @@ fn c_import_map_c_type(spec_raw: &str) -> str:
     out
 
 fn c_import_decode_escapes(raw: &str) -> str:
-    var out = ""
+    var out = StringBuilder.with_capacity(raw.len())
     var i = 0
     let len = raw.len() as i32
     while i < len:
         let ch = raw[i]
         if ch != 92 or i + 1 >= len:
-            out = out ++ raw.slice(i as i64, (i + 1) as i64)
+            out.push_char(ch)
             i = i + 1
             continue
 
-        let esc = raw[(i + 1)]
+        let esc = raw[i + 1]
         if esc == 110:
-            out = out ++ "\n"
+            out.push_char(10)
         else if esc == 114:
-            out = out ++ "\r"
+            out.push_char(13)
         else if esc == 116:
-            out = out ++ "\t"
-        else if esc == 92:
-            out = out ++ "\\"
-        else if esc == 34:
-            out = out ++ "\""
+            out.push_char(9)
         else:
-            out = out ++ raw.slice((i + 1) as i64, (i + 2) as i64)
+            out.push_char(esc)
         i = i + 2
-    out
+    out.to_str()
 
 fn c_import_trim_outer_parens(value_raw: &str) -> str:
     var v = c_import_trim(value_raw)

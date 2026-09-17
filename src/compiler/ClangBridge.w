@@ -2265,50 +2265,56 @@ unsafe fn macro_location_from_cursor(s: *mut CImportSession, cursor: CXCursor) -
 unsafe fn macro_source_line_from_cursor(s: *mut CImportSession, cursor: CXCursor) -> str:
     let loc = clang_getCursorLocation(cursor)
     var file: *mut u8 = 0 as *mut u8
-    var line_val: u32 = 0
-    clang_getSpellingLocation(loc, &raw mut file, &raw mut line_val, 0 as *mut u32, 0 as *mut u32)
+    var offset: u32 = 0
+    clang_getSpellingLocation(loc, &raw mut file, 0 as *mut u32, 0 as *mut u32, &raw mut offset)
     if file as i64 == 0:
-        clang_getExpansionLocation(loc, &raw mut file, &raw mut line_val, 0 as *mut u32, 0 as *mut u32)
-    if file as i64 == 0 or line_val == 0:
-        return ""
-    let fname = clang_getFileName(file)
-    let fname_str = clang_getCString(fname)
-    if fname_str as i64 == 0 or *fname_str == 0:
-        clang_disposeString(fname)
-        return ""
-    let path = make_path_str(fname_str)
-    clang_disposeString(fname)
-    let text = with_fs_read_file(path)
-    if text.len() == 0:
-        return ""
-    var current: u32 = 1
-    var start: i32 = 0
-    var i: i32 = 0
-    while i <= text.len() as i32:
-        if i == text.len() as i32 or text[i] == 10:
-            if current == line_val:
-                var end = i
-                if end > start and text[(end - 1)] == 13:
-                    end = end - 1
-                var result = text.slice(start as i64, end as i64)
-                // Preserve simple backslash continuations in multi-line macros.
-                var next_start = i + 1
-                var keep_going = result.len() > 0 and result[result.len() - 1] == 92
-                while keep_going and next_start < text.len() as i32:
-                    var next_end = next_start
-                    while next_end < text.len() as i32 and text[next_end] != 10:
-                        next_end = next_end + 1
-                    var trimmed_next_end = next_end
-                    if trimmed_next_end > next_start and text[(trimmed_next_end - 1)] == 13:
-                        trimmed_next_end = trimmed_next_end - 1
-                    result = result ++ "\n" ++ text.slice(next_start as i64, trimmed_next_end as i64)
-                    keep_going = trimmed_next_end > next_start and text[(trimmed_next_end - 1)] == 92
-                    next_start = next_end + 1
-                return result
-            current = current + 1
-            start = i + 1
-        i = i + 1
-    ""
+        clang_getExpansionLocation(loc, &raw mut file, 0 as *mut u32, 0 as *mut u32, &raw mut offset)
+    if file as i64 == 0: return ""
+    // Clang owns the exact buffer it parsed. Reopening and scanning the
+    // entire header for every definition made collection quadratic (#1163).
+    var size: u64 = 0
+    let contents = clang_getFileContents((*s).tu, file, &raw mut size)
+    if contents as i64 == 0 or offset as u64 >= size: return ""
+    let len = size as i64
+    var start = offset as i64
+    while start > 0 and contents[start - 1] != 10: start -= 1
+    // The macro name itself can start on a continued physical line.
+    while start > 0:
+        var previous_end = start - 1
+        if previous_end > 0 and contents[previous_end - 1] == 13: previous_end -= 1
+        if previous_end == 0 or contents[previous_end - 1] != 92: break
+        start = previous_end - 1
+        while start > 0 and contents[start - 1] != 10: start -= 1
+    var end = start
+    while end < len:
+        if contents[end] == 10:
+            let previous_end = if end > start and contents[end - 1] == 13: end - 1 else: end
+            if previous_end == start or contents[previous_end - 1] != 92: break
+        end += 1
+    if end > start and contents[end - 1] == 13: end -= 1
+    // This bridge is also compiled alone before the stdlib is available.
+    // Bound the scratch allocation to this logical definition, as the
+    // other Clang source-range readers do.
+    let text = with_alloc(end - start + 1)
+    var written: i64 = 0
+    var pos = start
+    while pos < end:
+        // C translation phase 2 removes backslash-newline before tokens
+        // are parsed; retaining it made continued function macros omitted.
+        if contents[pos] == 92 and pos + 1 < len:
+            if contents[pos + 1] == 10:
+                pos += 2
+                continue
+            if contents[pos + 1] == 13 and pos + 2 < len and contents[pos + 2] == 10:
+                pos += 3
+                continue
+        text[written] = contents[pos]
+        written += 1
+        pos += 1
+    text[written] = 0
+    let result = make_str(text as *const u8)
+    with_free(text)
+    result
 
 unsafe fn macro_location_is_system_from_cursor(cursor: CXCursor) -> i32:
     let loc = clang_getCursorLocation(cursor)
