@@ -47,6 +47,74 @@ env:
   WITH_VERSION: ${{ github.event_name == 'push' && github.ref_name || inputs.version || '' }}
 
 jobs:
+  dll-copy-diagnostics:
+    name: Diagnose Mesa copy on windows-${{ matrix.arch }}
+    if: github.event_name == 'workflow_dispatch' && inputs.diagnostic_run != ''
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: windows-latest
+            seed_version: v0.15.2.1
+            seed_asset: with-windows-x86_64.exe
+            seed_sha256: 8f4817f2c4a3a916515ec93fd8a8f228bc9cfcd423689c5977dc564efc02a115
+            mesa_arch: x64
+            mesa_sha256: 418f1938dc48d401538cf6440d3c718e2f456ef2023e44133105263f483e903f
+          - arch: aarch64
+            runner: windows-11-arm
+            seed_version: v0.15.2.1
+            seed_asset: with-windows-aarch64.exe
+            seed_sha256: bb3b17c64ad057ddc852a5ee6a61a4e4a224780447013699d490e6f726893c73
+            mesa_arch: arm64
+            mesa_sha256: bd1c00a49504b3efe20037cf29fa437380cfb5cbe73f196272624b94938330f1
+    steps:
+      - name: Require diagnostic channel
+        run: test "${{ inputs.channel }}" = test
+      - name: Checkout copy fixture
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Fetch the pinned driver and actual Mesa library
+        run: |
+          mkdir -p out/dll-copy-probe
+          curl -fL -o out/diagnostic-seed.exe "https://github.com/withlang-dev/with/releases/download/${{ matrix.seed_version }}/${{ matrix.seed_asset }}"
+          printf '%s  %s\n' '${{ matrix.seed_sha256 }}' out/diagnostic-seed.exe | sha256sum -c -
+          curl -fL -o out/mesa.7z "https://github.com/mmozeiko/build-mesa/releases/download/26.2.2/mesa-llvmpipe-${{ matrix.mesa_arch }}-26.2.2.7z"
+          printf '%s  %s\n' '${{ matrix.mesa_sha256 }}' out/mesa.7z | sha256sum -c -
+          7z x -y -oout/dll-copy-probe out/mesa.7z opengl32.dll
+          mv out/dll-copy-probe/opengl32.dll out/dll-copy-probe/source.dll
+      - name: Initialize isolated copy project
+        working-directory: out/dll-copy-probe
+        run: ../diagnostic-seed.exe init .
+      - name: Install copy action
+        run: cp tools/diagnose_dll_copy_build.w out/dll-copy-probe/build.w
+      - name: Copy through the pinned evaluator
+        working-directory: out/dll-copy-probe
+        run: ../diagnostic-seed.exe build --strict-effects
+      - name: Compare original and copied DLL bytes
+        if: always()
+        working-directory: out/dll-copy-probe
+        run: |
+          ls -l source.dll out/copied.dll
+          file source.dll out/copied.dll
+          sha256sum source.dll out/copied.dll
+          cmp source.dll out/copied.dll
+      - name: Preserve DLL evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dll-copy-windows-${{ matrix.arch }}
+          retention-days: 7
+          path: |
+            out/dll-copy-probe/source.dll
+            out/dll-copy-probe/out/copied.dll
+
   package-diagnostics:
     name: Diagnose ${{ matrix.package }} on windows-${{ matrix.arch }}
     if: github.event_name == 'workflow_dispatch' && inputs.diagnostic_run != ''
