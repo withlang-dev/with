@@ -3437,11 +3437,11 @@ fn test_arch_is_x86_64(arch: &str) -> bool:
 fn test_gate_value_is_os(value: &str) -> bool:
     value == "windows" or value == "linux" or value == "darwin"
 
-fn test_gate_os_matches(value: &str) -> bool:
+fn test_gate_os_matches(value: &str):
     let host = with_sysinfo_os()
     if value == "windows": return host == "Windows"
     if value == "linux": return host == "Linux"
-    if value == "darwin": return host == "Darwin"
+    if value == "darwin": return host == "Macos"
     false
 
 fn test_gate_value_is_arch(value: &str) -> bool:
@@ -3857,6 +3857,11 @@ fn run_test_binary_checked(bin_path: &str, target: &str, test_name: &str, quiet:
 // fails the file until the directive is removed with the issue's fix.
 fn run_test_file_with_build_settings(target: &str, opt_level: i32, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32, debug_info: bool, verbose: bool, quiet: bool, keep_binary: bool, filter: &str, include_paths: &Vec[str], defines: &Vec[str], link_libs: &Vec[str]) -> i32:
     var directives = parse_test_directives_for_target(target)
+    // These are directive verdicts, not outcomes of executing a known bug.
+    // A skip is neither an unexpected pass nor an expected failure; malformed
+    // directives must fail even when the fixture names a known issue.
+    if directives.skip or directives.directive_error.len() > 0:
+        return run_test_directive_command(target, directives, quiet)
     let known_issue = move directives.known_issue
     if known_issue.len() == 0:
         return run_test_file_with_build_settings_inner(target, opt_level, no_std, alloc_mode, runtime_available, prelude_mode, debug_info, verbose, quiet, keep_binary, filter, include_paths, defines, link_libs)
