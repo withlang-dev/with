@@ -437,19 +437,17 @@ fn ci_object_macro_is_function_alias(type_session: i64, value: &str) -> bool:
         return false
     ci_lookup_c_function_return_type(type_session, t).len() > 0
 
-// `#define zlib_version zlibVersion()`: an object-like macro whose whole
-// value is a call to a known C function. It is not a value but a call site,
-// re-evaluated at every use in C; a With `let` global would evaluate it once
-// at program start, and when the callee is raw (zlibVersion returns a raw
-// pointer) that global initializer is a raw call outside `unsafe`, which
-// Sema rightly rejects. Record it untranslated, like a function alias: the
-// caller can call the function itself.
-fn ci_object_macro_is_function_call(type_session: i64, value: &str) -> bool:
+// After semantic constant translation has failed, a whole call expression
+// cannot become a global: C re-evaluates it at each use. This also applies
+// when the callee is a successfully translated function-like macro.
+fn ci_object_macro_has_call_shape(value: &str):
     let t = ci_strip_parens(ci_trim(value))
     if t.len() < 3 or t[t.len() - 1] != 41:
         return false
     var open = 0
     while open < t.len() and ci_is_ident_char(t[open]): open += 1
+    let callee_end = open
+    while open < t.len() and ci_is_space(t[open]): open += 1
     if open == 0 or open >= t.len() or t[open] != 40:
         return false
     // The call's parentheses must enclose the rest of the value.
@@ -464,18 +462,7 @@ fn ci_object_macro_is_function_call(type_session: i64, value: &str) -> bool:
         i += 1
     if depth != 0:
         return false
-    let callee = t.slice(0, open as i64)
-    if not ci_is_c_ident(callee):
-        return false
-    // A known C function: the global would be a raw call at program start.
-    if ci_lookup_c_function_return_type(type_session, callee).len() > 0:
-        return true
-    // Anything else must be a name this import emitted (a translated
-    // function-like macro such as `#define MAX2 MAX(1, 2)`); a callee that
-    // was not emitted — openssl's `#define OSSL_DEPRECATEDIN_4_0
-    // OSSL_DEPRECATED(4.0)`, an attribute macro with no With form — would
-    // leave a `let` referencing an undefined name.
-    with_cimport_is_name_emitted(callee) == 0
+    ci_is_c_ident(t.slice(0, callee_end as i64))
 
 fn ci_record_omitted_symbol(name: &str, reason: &str):
     // Default category: no With representation. Use ci_record_omitted_symbol_cat
@@ -3203,7 +3190,7 @@ fn ci_translate_macros(session: i64, type_session: i64, extern_vars: &str, macro
         // Strip outer parentheses for macro values like (-1)
         let stripped = ci_strip_parens(obj_value)
 
-        if ci_object_macro_is_function_alias(type_session, stripped) or ci_object_macro_is_function_call(type_session, stripped):
+        if ci_object_macro_is_function_alias(type_session, stripped):
             ci_record_untranslated_object_macro(name, macro_is_system)
             continue
 
@@ -3270,6 +3257,11 @@ fn ci_translate_macros(session: i64, type_session: i64, extern_vars: &str, macro
                         output = output ++ probe_result ++ "\n"
                     continue
             let offsetof_result = if compound_literal_result.len() > 0: "" else: ci_try_translate_offsetof_expr(type_session, stripped)
+            // Give constant macro invocations and offsetof their semantic
+            // translation before rejecting calls with no constant value.
+            if compound_literal_result.len() == 0 and offsetof_result.len() == 0 and ci_object_macro_has_call_shape(stripped):
+                ci_record_untranslated_object_macro(name, macro_is_system)
+                continue
             let cast_expr_result = if offsetof_result.len() > 0: offsetof_result else: ci_translate_c_expr(stripped, "", known_values)
             let semantic_expr_ty = ci_lookup_known(name, object_macro_types)
             var cast_expr_ty = ""
