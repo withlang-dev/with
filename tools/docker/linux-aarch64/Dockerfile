@@ -16,6 +16,8 @@ FROM ubuntu:24.04
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update -qq && apt-get install -y -qq --no-install-recommends \
         ca-certificates curl git gcc g++ libc6-dev zlib1g-dev libzstd-dev libxml2-dev xz-utils strace \
+        xvfb xauth libgl1-mesa-dri libgl-dev libx11-dev libxext-dev libxfixes-dev \
+        libxi-dev libxinerama-dev libxrandr-dev libxcursor-dev \
     && rm -rf /var/lib/apt/lists/* \
     # The SDK's lld was linked against libxml2.so.16; Ubuntu ships .so.2.
     && ln -sf "$(ls /usr/lib/aarch64-linux-gnu/libxml2.so.2* | head -1)" /usr/lib/aarch64-linux-gnu/libxml2.so.16

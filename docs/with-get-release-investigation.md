@@ -251,11 +251,67 @@ The complete Windows raylib UAT still needs to run with these changes.
 The actual 58,609,152-byte Mesa DLL also copies with an identical SHA-256
 under both rebuilt execution modes (`toolfs-large-dll-{native,interpreted}.log`).
 
+### Linux system libraries and the arm64 source-build gap
+
+Native GDB on the Linux compiler reaches
+`conan_write_known_system_package+1092` with the metadata writer's status
+zero, then returns success. `libGL.so` is absent on that host. A successful
+metadata write is the only condition behind "using system package";
+evidence is `linux-system-package-success-gdb.log`. The existing x86_64
+release failure supplies the actual missing GL/X11 linker verdict.
+
+The isolated #1165 change reads the linker's diagnostic rather than
+duplicating its library search. It retains failure status and original
+errors, names missing development libraries and known Debian/Ubuntu
+packages, and provisions GL/X11 plus Xvfb in CI and the local Linux host.
+GNU/LLVM diagnostic fixtures, the compiler source check, the local release
+tool source check, and an actual ELF lld missing-library invocation pass.
+Logs: `linux-link-{diagnostics-test,main-check,real-lld}.log` and
+`linux-release-local-check.log`. Darwin bootstrap and the resulting stage1's
+diagnostic fixture pass (`linux-link-dev.log`, `linux-link-stage1-test.log`).
+Native Linux arm64 bootstrap and the resulting stage1's fixture check also
+pass (`linux-link-diagnostics-dev.log`, `linux-link-stage1-native-check.log`).
+End-to-end native program linking remains blocked by #1167 below.
+Issue: https://github.com/withlang-dev/with/issues/1165.
+
+There is a second Linux arm64 blocker. Conan's current raylib 6.0 revision
+`4e39a8be96a10eb27035f97e83620a2d` contains Linux x86_64 binaries but no
+Linux armv8 binary. Native GDB observes `conan_source_unsupported_recipe`
+returning 1 to `conan_install_source_fallback+512`, which enters the
+unsupported-source diagnostic. The recipe needs CMake configuration and
+dependency generation for GLFW/OpenGL. Merely deleting the guard would
+incorrectly compile every discovered C source without those semantics.
+Evidence: `linux-raylib-packages.json`, `linux-raylib-source-rejection-gdb.log`,
+and the captured recipe/config/conandata files. Source-build support for
+this recipe class is required before the floating arm64 UAT can pass;
+tracked in https://github.com/withlang-dev/with/issues/1166.
+
+The fresh Linux compiler at `196f0a00` confirms this gap affects all six
+floating packages: zlib 1.3.2, bzip2 1.0.8, sqlite3 3.53.4, OpenSSL 4.0.2,
+libcurl 8.21.0, and raylib 6.0. Each fresh project initializes, then `get`
+rejects unsupported source fallback. The current package API responses
+contain no Linux armv8 binaries. Evidence: `linux-arm-current-get-*.log`
+and `linux-*-packages.json`. This needs complete source configuration,
+dependencies, patches, and installation semantics for the recipe classes;
+raw compilation of every C file cannot meet that contract.
+
+A clean-host probe with that compiler also fails before running even a
+one-line program: `collect2: fatal error: cannot find 'ld'`. Native GDB
+at `with_exec_argv` observes `cc` plus `-fuse-ld=lld`, from
+`LinkStageCommand.run`. `link_stage_make_link_command` unconditionally
+adds that flag on Linux; collect2 searches PATH for the absent `ld.lld`.
+The build SDK on PATH masks the runtime dependency, violating the
+self-contained release invariant. Evidence:
+`linux-current-no-sdk-path-run.log`, `linux-current-linker-exec-gdb.log`;
+tracked in https://github.com/withlang-dev/with/issues/1167.
+
 - Verify the macro scaling fixes against real Windows package imports; a
   faster synthetic probe is not enough to close the timeout.
 - Verify Windows raylib rendering with the declared project-relative Mesa
   input; the empty-DLL root is proven and the copy regression passes.
 - Verify Linux system-library diagnostics/provisioning and rerun Darwin UAT
   locally with the final compiler; retain the rendered spiral assertion.
+- Implement complete source-build fallback for the six current Linux arm64
+  recipes, and remove the clean-host external linker dependency.
 - Keep ownership/codegen changes in an isolated batch with full move/drop
   audits, then run floating UAT on all five platforms before publishing.

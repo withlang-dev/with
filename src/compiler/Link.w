@@ -1,5 +1,6 @@
 use Archive
 use compiler.Runtime
+use compiler.LinkDiagnostics
 use compiler.EmbeddedBundles
 use compiler.BundleInterfaces
 use compiler.AbiStamp
@@ -305,7 +306,10 @@ impl LinkStageCommand:
         for i in 0..self.args.len() as i32:
             argv = link_stage_argv_append(argv, self.args[i])
         let saved = link_stage_apply_env(&self.env)
-        let rc = if self.cwd.len() > 0:
+        let linux_target = if target_spec_is_native(): runtime_sysinfo_os() == "Linux" else: target_spec_active_kind() == 1 or target_spec_active_kind() == 2
+        let rc = if linux_target:
+            link_run_with_diagnostics(argv, self.cwd)
+        else if self.cwd.len() > 0:
             runtime_exec_argv_cwd(argv, self.cwd)
         else:
             runtime_exec_argv(argv)

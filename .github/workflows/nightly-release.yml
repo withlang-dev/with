@@ -359,7 +359,9 @@ jobs:
           sudo apt-get update -qq
           # xvfb: a virtual X display. libgl1-mesa-dri: Mesa's llvmpipe, the
           # software OpenGL 4.5 the raylib spiral UAT renders through.
-          sudo apt-get install -y --no-install-recommends xvfb libgl1-mesa-dri
+          sudo apt-get install -y --no-install-recommends xvfb xauth libgl1-mesa-dri \
+            libgl-dev libx11-dev libxext-dev libxfixes-dev libxi-dev \
+            libxinerama-dev libxrandr-dev libxcursor-dev
 
       - name: Release UAT (Linux, under Xvfb)
         if: runner.os == 'Linux'
@@ -998,7 +1000,9 @@ jobs:
           sudo apt-get update -qq
           # xvfb: a virtual X display. libgl1-mesa-dri: Mesa's llvmpipe, the
           # software OpenGL 4.5 the raylib spiral UAT renders through.
-          sudo apt-get install -y --no-install-recommends xvfb libgl1-mesa-dri
+          sudo apt-get install -y --no-install-recommends xvfb xauth libgl1-mesa-dri \
+            libgl-dev libx11-dev libxext-dev libxfixes-dev libxi-dev \
+            libxinerama-dev libxrandr-dev libxcursor-dev
 
       - name: Release UAT (under Xvfb)
         env:

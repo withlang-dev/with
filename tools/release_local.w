@@ -133,7 +133,8 @@ fn linux_aarch64_script(version: &str, channel: &str, sha: &str, seed_version: &
     "echo \"$LLVM_PREFIX/bin/ld.lld\" > src/runtime/llvm_ld\n" ++
     "export PATH=/work/with/.link-shim:$LLVM_PREFIX/bin:$PATH LD_LIBRARY_PATH=/work/with/.link-shim WITH_OUT_DIR=/work/with/out WITH_VERSION=" ++ version ++ "\n" ++
     "for t in '' :fixpoint :test :test-green :last-green; do WITH=/work/with/src/main ./src/main build $t; done\n" ++
-    "for t in :release-uat :package-current-host :package-llvm-sdk; do WITH=/work/with/out/release/bin/with ./out/release/bin/with build $t; done\n" ++
+    "LIBGL_ALWAYS_SOFTWARE=1 WITH=/work/with/out/release/bin/with xvfb-run -a -s '-screen 0 1280x800x24' ./out/release/bin/with build :release-uat\n" ++
+    "for t in :package-current-host :package-llvm-sdk; do WITH=/work/with/out/release/bin/with ./out/release/bin/with build $t; done\n" ++
     "SDK=out/release/with-llvm-sdk-22.1.6-linux-aarch64.tar.gz\n" ++
     "RELEASE_TAG=" ++ version ++ " RELEASE_TITLE='With " ++ version ++ "' RELEASE_CHANNEL=" ++ channel ++ " RELEASE_ASSETS=out/release/with-linux-aarch64 " ++
     "RELEASE_EXTRA_FILES=$SDK,$SDK.sha256,$SDK.manifest RELEASE_BUILDER='local linux-aarch64 (docker on the release host)' RELEASE_REPO=withlang-dev/with " ++

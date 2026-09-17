@@ -1,0 +1,25 @@
+//! expect-stdout: ok
+use compiler.LinkDiagnostics
+
+fn main:
+    let missing = link_missing_libraries("ld.lld: error: unable to find library -lGL\nld.lld: error: unable to find library -lX11\nld.lld: error: unable to find library -lGL\n")
+    assert(missing.len() == 2)
+    assert(missing[0] == "GL")
+    assert(missing[1] == "X11")
+    let gnu = link_missing_libraries("/usr/bin/ld: cannot find -lunknown-test: No such file or directory\n/usr/bin/ld: cannot find -l:custom.so.2: No such file or directory\n")
+    assert(gnu.len() == 2)
+    assert(gnu[0] == "unknown-test")
+    assert(gnu[1] == ":custom.so.2")
+    let help = link_missing_library_help("ld.lld: error: unable to find library -lGL\nld: cannot find -lssl: absent\nld: cannot find -lcrypto: absent\n")
+    assert(help.contains("libGL.so or libGL.a"))
+    assert(help.contains("sudo apt-get install libgl-dev libssl-dev\n"))
+    let unknown = link_missing_library_help("ld: cannot find -lunknown-test: absent")
+    assert(unknown.contains("libunknown-test.so or libunknown-test.a"))
+    assert(not unknown.contains("apt-get"))
+    let exact = link_missing_library_help("ld: cannot find -l:custom.so.2: absent")
+    assert(exact.contains("  custom.so.2\n"))
+    assert(not exact.contains("lib:custom"))
+    assert(link_missing_library_help("ld.lld: error: undefined symbol: main").len() == 0)
+    assert(link_missing_library_help("").len() == 0)
+    assert(link_missing_libraries("ld: cannot find -l: \n").len() == 0)
+    print("ok")
