@@ -22,9 +22,14 @@ on:
         required: false
         default: ""
         type: string
+      diagnostic_run:
+        description: Test-only native package diagnosis using compiler artifacts from this run ID; does not verify or publish a release
+        required: false
+        default: ""
+        type: string
 
 concurrency:
-  group: nightly-release-${{ github.repository }}-${{ github.event_name == 'push' && github.ref_name || github.event_name == 'schedule' && 'nightly' || inputs.channel || 'test' }}
+  group: nightly-release-${{ github.repository }}-${{ inputs.diagnostic_run && 'diagnostic' || github.event_name == 'push' && github.ref_name || github.event_name == 'schedule' && 'nightly' || inputs.channel || 'test' }}
   cancel-in-progress: false
 
 permissions: {}
@@ -42,8 +47,70 @@ env:
   WITH_VERSION: ${{ github.event_name == 'push' && github.ref_name || inputs.version || '' }}
 
 jobs:
+  package-diagnostics:
+    name: Diagnose ${{ matrix.package }} on windows-${{ matrix.arch }}
+    if: github.event_name == 'workflow_dispatch' && inputs.diagnostic_run != ''
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    permissions:
+      actions: read
+      contents: read
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      fail-fast: false
+      matrix:
+        package: [bzip2, libcurl]
+        arch: [x86_64, aarch64]
+        include:
+          - arch: x86_64
+            runner: windows-latest
+            procdump: procdump64.exe
+          - arch: aarch64
+            runner: windows-11-arm
+            procdump: procdump64a.exe
+    steps:
+      - name: Require diagnostic channel
+        run: test "${{ inputs.channel }}" = test
+      - name: Checkout diagnostic fixtures
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Fetch the exact failed compiler and symbols
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DIAGNOSTIC_RUN: ${{ inputs.diagnostic_run }}
+        run: gh run download "$DIAGNOSTIC_RUN" --repo "$GITHUB_REPOSITORY" --name package-failures-windows-${{ matrix.arch }} --dir out/diagnostic-compiler
+      - name: Fetch native stack capture tool
+        run: |
+          curl -fL -o out/procdump.zip https://download.sysinternals.com/files/Procdump.zip
+          7z x -y -oout/procdump out/procdump.zip
+          mkdir -p out/diagnostic-project out/package-dumps
+      - name: Initialize isolated package project
+        working-directory: out/diagnostic-project
+        run: ../diagnostic-compiler/release/bin/with.exe init .
+      - name: Fetch current package
+        working-directory: out/diagnostic-project
+        run: ../diagnostic-compiler/release/bin/with.exe get c.${{ matrix.package }}
+      - name: Install the actual UAT fixture
+        run: cp build/release_uat_fixtures/${{ matrix.package }}_main.w out/diagnostic-project/src/main.w
+      - name: Capture native check stacks
+        working-directory: out/diagnostic-project
+        timeout-minutes: 3
+        env:
+          WITH_PROFILE: '1'
+        run: ../procdump/${{ matrix.procdump }} -accepteula -mm -n 3 -s 15 -k -x ../package-dumps ../diagnostic-compiler/release/bin/with.exe check src/main.w
+      - name: Preserve stack evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: package-stacks-${{ matrix.package }}-windows-${{ matrix.arch }}
+          retention-days: 7
+          if-no-files-found: error
+          path: out/package-dumps
+
   build:
     name: Verify and package ${{ matrix.platform }}
+    if: inputs.diagnostic_run == ''
     strategy:
       fail-fast: false
       matrix:
@@ -257,7 +324,7 @@ jobs:
     # published from the maintainer's Mac (tools/release_local.w) minutes
     # after the tag; CI builds it for the nightly and test channels only.
     # The body mirrors the unix matrix job above.
-    if: github.event_name != 'push'
+    if: github.event_name != 'push' && inputs.diagnostic_run == ''
     strategy:
       fail-fast: false
       matrix:
@@ -431,6 +498,7 @@ jobs:
 
   build-windows:
     name: Verify and package windows-x86_64
+    if: inputs.diagnostic_run == ''
     runs-on: windows-latest
     timeout-minutes: 360
     defaults:
@@ -687,7 +755,7 @@ jobs:
     # published from the maintainer's Mac (tools/release_local.w, the
     # linux/arm64 container in tools/docker/linux-aarch64). CI builds it for
     # the nightly and test channels only.
-    if: github.event_name != 'push'
+    if: github.event_name != 'push' && inputs.diagnostic_run == ''
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 360
     permissions:
@@ -879,6 +947,7 @@ jobs:
 
   build-windows-aarch64:
     name: Verify and package windows-aarch64
+    if: inputs.diagnostic_run == ''
     runs-on: windows-11-arm
     timeout-minutes: 360
     defaults:
