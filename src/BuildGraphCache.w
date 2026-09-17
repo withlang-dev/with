@@ -3,6 +3,7 @@
 use BuildGraphModel
 use BuildGraphRuntime
 use BuildGraphSupport
+use BuildGraphOps
 use compiler.TrackedInputs
 use compiler.Runtime
 use std.crypto.sha256
@@ -547,7 +548,12 @@ fn build_cache_collect_input_paths(root: &str, target: &BuildGraphTarget) -> Vec
 fn build_cache_collect_output_paths(root: &str, target: &BuildGraphTarget) -> Vec[str]:
     var paths: Vec[str] = Vec.new()
     if target.output.len() > 0:
-        paths.push(root ++ "/" ++ target.output)
+        // Install execution and freshness must name the same destination,
+        // including HOME and configured installation directories (#1157).
+        if target.kind == 8:
+            paths.push(build_graph_expand_install_path(root, target.output))
+        else:
+            paths.push(root ++ "/" ++ target.output)
     for i in 0..target.extra_outputs.len() as i32:
         let extra = target.extra_outputs[i]
         if extra.len() > 0:
