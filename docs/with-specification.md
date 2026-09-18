@@ -1008,9 +1008,9 @@ An owned-value demand is established independently by:
 4. the join rule below.
 
 Inference alone does not create an owned demand. In particular, `let x =
-view`, an inferred function return, a pattern binding, or a closure capture
-preserves the reference type. Method and overload resolution first preserve
-reference identity and apply ordinary auto-dereferencing; contextual Copy
+view`, an inferred function return (§9.1), a pattern binding, or a closure
+capture preserves the reference type. Method and overload resolution first
+preserve reference identity and apply ordinary auto-dereferencing; contextual Copy
 materialization may satisfy an already-selected by-value receiver but does not
 change receiver dispatch or ABI.
 
@@ -3369,11 +3369,40 @@ fn clamp(x: i32, lo: i32, hi: i32) -> i32:
 **Syntax:**
 
 ```
-fn NAME(PARAMS) -> TYPE: BODY    // parameters + return type
-fn NAME(PARAMS): BODY            // parameters, returns Unit
-fn NAME -> TYPE: BODY            // no parameters, has return type
-fn NAME: BODY                    // no parameters, returns Unit
+fn NAME(PARAMS) -> TYPE: BODY    // parameters + declared return type
+fn NAME(PARAMS): BODY            // parameters, return type inferred
+fn NAME -> TYPE: BODY            // no parameters, declared return type
+fn NAME: BODY                    // no parameters, return type inferred
 ```
+
+When `-> TYPE` is omitted, the return type is inferred from the body's
+tail. A body whose tail is a statement or a `Unit`-typed expression
+returns `Unit`. An assignment in tail position is a statement. `main`,
+`@[entry]` functions and `test_*` functions do not infer: their return
+contract is fixed and their tail is statement position.
+
+**Inferred returns through a branching tail.** When the tail is an `if`,
+`if let` or `match`:
+
+1. If an arm is missing — no final `else`, a partial `match`, or an arm
+   that holds no expression (`else: {}`, `_ => {}`) — the tail is a
+   statement and the function returns `Unit`. (An `if` without `else` and
+   a partial `match` are never values: see "`else` is required in
+   expression position" below and §9.7.)
+2. Otherwise the reaching arms must have one type, which is the return
+   type. `Never`-typed arms join with anything. The join follows §3.8.
+3. If the reaching arms do not have one type, the return type cannot be
+   inferred and the program is rejected: the programmer writes `->`. The
+   compiler never chooses `Unit`, an arm's type, or a default for them.
+
+A single-statement body and a block body ending in the same tail are the
+same case. Every `return e` in the body must agree with the inferred
+type; a value on one path and fall-off on another is a missing return
+(§4.10). A closure with no expected function type infers its result the
+same way.
+
+An assignment `place = value` is an expression whose type is the type of
+`place`; in statement or tail position its value is discarded.
 
 Function bodies support three interchangeable forms (§29.13):
 
@@ -3385,8 +3414,7 @@ fn NAME(PARAMS) -> TYPE { BODY } // braced
 Parentheses are required when a function takes parameters. When a
 function takes no parameters, parentheses may be included or
 omitted — `fn greet:` and `fn greet():` are both legal. The
-idiomatic style omits them. The return type `-> TYPE` is omitted
-when the function returns `Unit` (void). The body is introduced by
+idiomatic style omits them. The body is introduced by
 `:` (colon form) or `{ }` (brace form) — see §29.13 for the full
 rules.
 
