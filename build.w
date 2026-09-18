@@ -441,7 +441,9 @@ fn target_with_wo_blobs(target: Target, plan: &WoBundle) -> Target:
         let kind = kinds[ki]
         out = out.input(wo_prefix(plan) ++ "." ++ kind)
         out = out.arg("wo_" ++ plan.name ++ "_" ++ kind)
-    out.dep(wo_group_target_name(plan))
+    // #1157: the bundle's build, not its group. The group carries the store
+    // installs, and a dependency that re-ran makes this target stale.
+    out.dep(wo_build_target_name(plan))
 
 // `--link-bundle out/wo/<name>` for a stage compile: the interface,
 // declarations-only codegen and the object, exactly what a compiler that
@@ -450,7 +452,7 @@ fn target_with_link_bundle(target: Target, ctx: &BuildCtx, plan: &WoBundle) -> T
     var out = target
     out = out.arg("--link-bundle")
     out = out.arg(build_project_abs(ctx.project_info().project_root(), wo_prefix(plan)))
-    out.dep(wo_group_target_name(plan))
+    out.dep(wo_build_target_name(plan))
 
 
 fn target_with_embedded_stdlib_inputs(target: Target, ctx: &BuildCtx) -> Target:
@@ -2440,6 +2442,10 @@ pub fn build(ctx: BuildCtx) -> Build:
     stamp = stamp.extra_output("out/command/build")
     stamp = stamp.write_scope("out/release/bin")
     stamp = stamp.dep("link-compiler")
+    // #1157: publishing each bundle into the store happens here, behind the
+    // millisecond stamp, instead of upstream of every stage compile.
+    for pi in 0..corpus_plans.len() as i32:
+        stamp = stamp.dep(wo_group_target_name(corpus_plans[pi]))
     out = out.add_target(stamp)
 
     var build_handoff = target_new(.CopyFile, "update-bin", release_compiler_bin("with")).output(host_bin("out/bin/with"))

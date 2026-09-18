@@ -544,14 +544,17 @@ fn build_cache_collect_input_paths(root: &str, target: &BuildGraphTarget) -> Vec
             paths.push(root ++ "/" ++ input)
     paths
 
+fn build_cache_output_path(root: &str, output: &str) -> str:
+    if build_graph_path_is_install_dest(output): build_graph_expand_install_path(root, output) else: root ++ "/" ++ output
+
 fn build_cache_collect_output_paths(root: &str, target: &BuildGraphTarget) -> Vec[str]:
     var paths: Vec[str] = Vec.new()
     if target.output.len() > 0:
-        paths.push(root ++ "/" ++ target.output)
+        paths.push(build_cache_output_path(root, target.output))
     for i in 0..target.extra_outputs.len() as i32:
         let extra = target.extra_outputs[i]
         if extra.len() > 0:
-            paths.push(root ++ "/" ++ extra)
+            paths.push(build_cache_output_path(root, extra))
     paths
 
 pub fn build_cache_freshness_reason(root: &str, target: &BuildGraphTarget, dep_rebuilt: bool) -> str:
