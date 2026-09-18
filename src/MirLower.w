@@ -2253,6 +2253,19 @@ impl MirBuilder:
             let elem_ty = self.indexed_element_type(base_ty)
             if elem_ty != 0:
                 return elem_ty
+            // #1180: a user IndexPlace subscript has the type its `get`
+            // returns. Falling through typed the read, and the temporaries of
+            // `g[i] += x`, as Unit; the typed validator now rejects that.
+            var ip_base_ty = base_ty
+            while ip_base_ty > 0 and self.sema.get_type_kind(self.sema.resolve_alias(ip_base_ty)) == TypeKind.TY_REF:
+                ip_base_ty = self.sema.get_type_d0(self.sema.resolve_alias(ip_base_ty))
+            if self.is_user_index_place(ip_base_ty) != 0:
+                let ip_get_fn = self.sema.lookup_method_fn(self.sema.get_type_name(ip_base_ty), self.sema.pool_lookup_symbol("get"))
+                let ip_get_sig = if ip_get_fn != 0: self.sema.get_sig(ip_get_fn) else: -1
+                if ip_get_sig >= 0:
+                    let ip_value_ty = self.sema.sig_return_type(ip_get_sig)
+                    if ip_value_ty != 0 and ip_value_ty != self.sema.ty_void as i32:
+                        return self.concrete_type(ip_value_ty)
         if kind == NodeKind.NK_BINARY:
             let op = self.ast.get_data0(node)
             // D22: a &T operand is a view; value arithmetic auto-derefs it to T
