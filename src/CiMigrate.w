@@ -792,16 +792,16 @@ fn migrate_host_compat_preamble() -> str:
     "#undef stpcpy\n#undef stpncpy\n"
 
 fn ci_capture_macro_values(session: i64):
-    g_migrate_macro_values = ""
-    g_migrate_macro_miss_names = Vec.new()
+    g_migrate_macro_values = HashMap.new()
+    g_migrate_macro_miss_names = HashMap.new()
     let count = with_cimport_macro_count(session)
     var i = 0
     while i < count:
         if with_cimport_macro_is_fn_like(session, i) == 0:
             let name = with_cimport_macro_name(session, i)
             let value = with_cimport_macro_value(session, i)
-            if name.len() > 0 and value.len() > 0:
-                g_migrate_macro_values = g_migrate_macro_values ++ "|" ++ name ++ "=" ++ value ++ "|"
+            if name.len() > 0 and value.len() > 0 and not g_migrate_macro_values.contains(name):
+                g_migrate_macro_values.insert(ci_ir_owned_text(name), ci_ir_owned_text(value))
         i = i + 1
 
 fn ci_collect_macro_type_names(session: i64) -> str:
@@ -1065,8 +1065,8 @@ fn ci_migrate_file_body(input_path: &str, output_path: &str, project_active: boo
     ci_prepare_clang_resource_dir()
 
     g_migrate_file_error = ""
-    g_migrate_macro_values = ""
-    g_migrate_macro_miss_names = Vec.new()
+    g_migrate_macro_values = HashMap.new()
+    g_migrate_macro_miss_names = HashMap.new()
     g_migrate_macro_session = 0
     ci_migrate_reset_fn_counts()
     ci_migrate_libc_reset()
@@ -1197,8 +1197,8 @@ fn ci_migrate_file_body(input_path: &str, output_path: &str, project_active: boo
         with_cimport_dispose(session)
         if macro_session != 0:
             with_cimport_dispose_macros(macro_session)
-        g_migrate_macro_values = ""
-        g_migrate_macro_miss_names = Vec.new()
+        g_migrate_macro_values = HashMap.new()
+        g_migrate_macro_miss_names = HashMap.new()
         g_migrate_macro_session = 0
         g_migrate_raw_source = ""
         g_migrate_current_input_path = ""
@@ -1214,8 +1214,8 @@ fn ci_migrate_file_body(input_path: &str, output_path: &str, project_active: boo
         output_parts.push(ci_translate_macros(macro_session, session, extern_vars, macro_include))
         with_cimport_dispose_macros(macro_session)
     with_cimport_dispose(session)
-    g_migrate_macro_values = ""
-    g_migrate_macro_miss_names = Vec.new()
+    g_migrate_macro_values = HashMap.new()
+    g_migrate_macro_miss_names = HashMap.new()
     g_migrate_macro_session = 0
     g_migrate_raw_source = ""
     g_migrate_current_input_path = ""
@@ -1233,8 +1233,8 @@ fn ci_migrate_file_body(input_path: &str, output_path: &str, project_active: boo
     let write_result = with_fs_write_file(output_path, output)
     if write_result != 0:
         eprint("migrate: failed to write " ++ output_path)
-        g_migrate_macro_values = ""
-        g_migrate_macro_miss_names = Vec.new()
+        g_migrate_macro_values = HashMap.new()
+        g_migrate_macro_miss_names = HashMap.new()
         g_migrate_macro_session = 0
         g_migrate_raw_source = ""
         g_migrate_current_input_path = ""
