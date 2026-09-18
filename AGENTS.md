@@ -11,9 +11,11 @@ small mistakes corrupt the stage chain, so strict discipline is required.
 
 With is an ergonomics-first systems language: close to the machine, native by
 default, exactly as safe as Rust, built to remove the suffering. Every
-unnecessary character is a compiler failure — if With can infer, import, fetch,
-bind, prove, generate, link, migrate, wrap, or make it safe, the programmer
-shouldn't spell it out. C interop is first-class, not an escape hatch: raw C
+character the program has already determined is a compiler failure if the
+programmer still writes it — when one meaning is forced, With infers, imports,
+fetches, binds, proves, generates, links, migrates, wraps, or makes it safe;
+when two remain, the programmer spells the choice, and that spelling is a
+guardrail. Defaults pick representations, never meanings. C interop is first-class, not an escape hatch: raw C
 stays explicit, modeled C becomes humane, and the programmer never has to become
 the build system.
 

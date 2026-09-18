@@ -1,6 +1,6 @@
 With is an ergonomics-first systems language: close to the machine, native by default, exactly as safe as Rust, and built to remove the suffering.
 
-Every unnecessary character is a compiler failure. If With can infer it, import it, fetch it, bind it, prove it, generate it, link it, migrate it, wrap it, or make it safe, the programmer should not have to spell it out.
+Every character the program has already determined is a compiler failure if the programmer still has to write it. When exactly one meaning is forced — by types, by scope, by a header, by an ABI, by a proof — With infers it, imports it, fetches it, binds it, proves it, generates it, links it, migrates it, wraps it, or makes it safe. When two meanings remain, the programmer spells the choice. That spelling is a guardrail, not ceremony. A documented default may stand in for the choice only when the alternatives are representations of the same meaning (an unsuffixed `1` is `i32` unless context says otherwise); a default never selects between meanings.
 
 C interop is first-class, not an escape hatch. With should understand C headers, ABIs, native libraries, linkers, package managers, and existing C code well enough to import, integrate, and migrate them without making the programmer become the build system.
 
