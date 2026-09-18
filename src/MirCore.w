@@ -1273,7 +1273,7 @@ impl MirDropStateMap:
         for i in start..end:
             self.states[keys.children[i]] = state
 
-    mut fn mark_place(keys: &MirDropStateKeys, body: &MirBody, place_id: i32, state: i32):
+    mut fn mark_place(keys: &MirDropStateKeys, body: &MirBody, place_id: i32, state: i32) -> Unit:
         if place_id < 0 or place_id >= keys.place_key.len():
             return
         let id: i32 = keys.place_key[place_id]

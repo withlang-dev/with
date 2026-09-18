@@ -1095,6 +1095,12 @@ type Sema {
     has_gen_yield_type: i32,
     in_pipeline_rhs: i32,
     match_in_stmt_pos: i32,
+    // D43: the node whose type an unannotated function or closure will
+    // inherit as its return type. Only a block, `if`, or `match` with this
+    // exact id reacts, handing the role to its own tail or arms.
+    infer_tail_node: i32,
+    infer_tail_is_closure: i32,
+    infer_tail_join: i32,
     current_for_comprehension_carrier: i32,
     in_comptime_fn: i32,
     in_concrete_generic_body: i32,
@@ -2310,6 +2316,9 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         has_gen_yield_type: 0,
         in_pipeline_rhs: 0,
         match_in_stmt_pos: 0,
+        infer_tail_node: 0,
+        infer_tail_is_closure: 0,
+        infer_tail_join: 0,
         current_for_comprehension_carrier: 0,
         in_comptime_fn: 0,
         in_concrete_generic_body: 0,

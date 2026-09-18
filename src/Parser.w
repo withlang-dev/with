@@ -5419,8 +5419,9 @@ impl Parser:
                 else_body = self.parse_if_else_body(chain_col, chain_is_stmt)
         else:
             self.pos = save
+        // #1179: a missing else is a missing arm (D43), never a fabricated 0.
         if else_body == 0:
-            else_body = self.pool.add_node(NodeKind.NK_INT_LIT, start, start, 0, 0, 0)
+            else_body = self.pool.add_node(NodeKind.NK_BLOCK, start, start, 0, 0, 0)
 
         // Desugar chained if-let into nested match/if expressions from right to left.
         var acc = then_body

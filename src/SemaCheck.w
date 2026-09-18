@@ -663,9 +663,26 @@ impl Sema:
             if self.get_type_kind(resolved) == TypeKind.TY_REF:
                 reference_candidate = self.merge_contextual_reference_join_types(reference_candidate, arm_ty)
             else:
+                let prior_candidate = owned_candidate
                 owned_candidate = self.merge_contextual_owned_join_types(owned_candidate, arm_ty)
                 if owned_candidate == 0:
-                    self.emit_error(join_name ++ " expressions do not establish one compatible owned result type", report_node)
+                    if self.infer_tail_join != 0:
+                        // D43: two meanings remain; the programmer spells the choice.
+                        let lhs_name = self.type_name(prior_candidate)
+                        let rhs_name = self.type_name(arm_ty)
+                        let prior_is_unit = self.resolve_alias(prior_candidate as TypeId) == self.ty_void
+                        let arm_is_unit = resolved == self.ty_void
+                        let remedy = if self.infer_tail_is_closure != 0:
+                            "give the closure an expected function type"
+                        else if prior_is_unit:
+                            "add `-> " ++ rhs_name ++ "` or `-> Unit`"
+                        else if arm_is_unit:
+                            "add `-> " ++ lhs_name ++ "` or `-> Unit`"
+                        else:
+                            "add `-> " ++ lhs_name ++ "`, `-> " ++ rhs_name ++ "`, or `-> Unit`"
+                        self.emit_error("cannot infer return type: " ++ join_name ++ " arms have types " ++ lhs_name ++ " and " ++ rhs_name ++ "; " ++ remedy, report_node)
+                    else:
+                        self.emit_error(join_name ++ " expressions do not establish one compatible owned result type", report_node)
                     return 0
 
         if reaching_count == 0:
@@ -2220,7 +2237,15 @@ impl Sema:
             self.expected_expr_type = body_expected_ret
             self.has_expected_type = 1
             self.current_value_expr_root = body
+        // D43: with no annotation (and no trait contract) the function
+        // inherits its tail's type. Entry points have a fixed contract.
+        let saved_infer_tail = self.infer_tail_node
+        let saved_infer_closure = self.infer_tail_is_closure
+        self.infer_tail_node = if body_expected_ret == 0 and self.fn_decl_is_entry_point(node) == 0: body else: 0
+        self.infer_tail_is_closure = 0
         let body_ty = self.check_expr(body)
+        self.infer_tail_node = saved_infer_tail
+        self.infer_tail_is_closure = saved_infer_closure
         self.stamp_move_site_liveness(body_site_start)
         self.binding_use_epoch = saved_use_epoch
         self.current_drop_type_sym = saved_drop_type_sym
@@ -3249,6 +3274,29 @@ impl Sema:
                     pname = f"arg{pi}"
                 params = params ++ self.cheader_decl_with_name(self.sig_param_type(sig, pi), pname)
         ret ++ " " ++ self.cheader_export_name(fn_node) ++ "(" ++ params ++ ");\n"
+
+    // D43: `main`, `@[entry]` functions and `test_*` functions have a return
+    // contract fixed by the runtime; their tails are statement position.
+    fn fn_decl_is_entry_point(fn_node: i32) -> i32:
+        let fn_name = self.pool_resolve(self.ast.get_data0(fn_node))
+        if fn_name == "main" or fn_name.starts_with("test_"): return 1
+        (self.ast.get_data2(fn_node) / FnFlags.ENTRY) % 2
+
+    // D43: an arm holding no expression (`else: {}`, `_ => {}`) is the
+    // programmer spelling "nothing here" and counts as a missing arm.
+    fn branch_arm_is_empty(arm: i32) -> i32:
+        if arm == 0: return 1
+        if self.ast.kind(arm) != NodeKind.NK_BLOCK: return 0
+        if self.ast.get_data1(arm) == 0 and self.ast.get_data2(arm) == 0: 1 else: 0
+
+    // D43: an `if` chain with no final `else`, or with an empty arm, is never
+    // a value (§9.1 requires `else` in expression position).
+    fn if_chain_has_missing_arm(node: i32) -> i32:
+        if self.branch_arm_is_empty(self.ast.get_data1(node)) != 0: return 1
+        let else_body = self.ast.get_data2(node)
+        if self.branch_arm_is_empty(else_body) != 0: return 1
+        if self.ast.kind(else_body) == NodeKind.NK_IF_EXPR: return self.if_chain_has_missing_arm(else_body)
+        0
 
     fn fn_decl_is_comptime_error_root(fn_node: i32) -> i32:
         let fn_sym = self.ast.get_data0(fn_node)
@@ -7461,6 +7509,10 @@ impl Sema:
                     let view_resolved = self.resolve_alias(expr_ty)
                     if self.get_type_kind(view_resolved) == TypeKind.TY_REF:
                         expr_ty = self.get_type_d0(view_resolved) as TypeId
+                // #1180: a Unit interpolant has no value; codegen formatted
+                // whatever the register held.
+                if expr_ty != 0 and self.get_type_kind(self.resolve_alias(expr_ty)) == TypeKind.TY_VOID:
+                    self.emit_error("cannot interpolate a Unit value", expr_node)
                 // Validate format spec against expression type
                 if spec_node != 0:
                     self.validate_fstring_spec(spec_node, expr_ty as i32, expr_node)
@@ -9106,7 +9158,13 @@ impl Sema:
             let tail_is_value = self.current_value_expr_root == node or (self.stmt_pos_depth == 0 and self.current_return_type != 0 and self.current_return_type != self.ty_void) or (self.has_expected_type != 0 and self.expected_expr_type != 0 and self.expected_expr_type != self.ty_void)
             if tail_is_value:
                 self.current_value_expr_root = tail
+            // D43: a block in the inferring-tail role hands it to its own tail, so
+            // a block body and a single-statement body get the same answer.
+            let saved_infer_tail = self.infer_tail_node
+            if saved_infer_tail == node:
+                self.infer_tail_node = tail
             let tail_type = if tail_is_value: self.check_expr(tail) else: self.check_expr_statement_context(tail)
+            self.infer_tail_node = saved_infer_tail
             if not tail_is_value:
                 self.check_task_statement_disposition(tail)
             self.current_value_expr_root = saved_tail_value_root
@@ -9515,14 +9573,21 @@ impl Sema:
         // An `if` nested inside a call argument, operator operand, or value arm
         // remains a value even when the enclosing call is itself a statement.
         let is_statement_chain = self.current_statement_expr_root != 0 and self.if_chain_contains_node(self.current_statement_expr_root, node) != 0
-        let in_statement_context = if is_statement_chain:
+        // D43: the tail of an unannotated function is a statement when an arm
+        // is missing and an undemanded value join otherwise, in every body
+        // spelling. Its arms inherit the tail role only in the value case.
+        let is_infer_tail = self.infer_tail_node == node
+        let in_statement_context = if is_infer_tail:
+            self.if_chain_has_missing_arm(node) != 0
+        else if is_statement_chain:
             true
         else if self.current_value_expr_root != 0:
             false
         else:
             self.stmt_pos_depth > 0 or self.current_return_type == self.ty_void or (self.current_return_type == 0 and else_body == 0)
         let in_value_context = in_statement_context == 0
-        let outer_expected: TypeId = if in_value_context and self.has_expected_type != 0: self.expected_expr_type else: 0 as TypeId
+        let outer_expected: TypeId = if is_infer_tail: 0 as TypeId else if in_value_context and self.has_expected_type != 0: self.expected_expr_type else: 0 as TypeId
+        let saved_infer_tail = self.infer_tail_node
         // Save scope states before then branch so early-return branches don't
         // permanently mark outer variables as MOVED when control continues past the if.
         // Branch move-state join (MaybeUninitialized half — docs/branch-merge-soundness.md):
@@ -9549,9 +9614,13 @@ impl Sema:
         let then_type = if outer_expected != 0:
             self.check_expr_with_expected(then_body, outer_expected)
         else if in_value_context:
+            self.infer_tail_node = if is_infer_tail: then_body else: saved_infer_tail
             self.check_expr_value_context(then_body)
+        else if is_infer_tail:
+            self.check_expr_statement_context(then_body)
         else:
             self.check_expr(then_body)
+        self.infer_tail_node = saved_infer_tail
         self.pop_move_control_flow_context()
         self.drop_control_flow_depth = saved_drop_cf_then
         if pushed_regex_capture_scope != 0:
@@ -9573,9 +9642,13 @@ impl Sema:
             let else_type = if outer_expected != 0:
                 self.check_expr_with_expected(else_body, outer_expected)
             else if in_value_context:
+                self.infer_tail_node = if is_infer_tail: else_body else: saved_infer_tail
                 self.check_expr_value_context(else_body)
+            else if is_infer_tail:
+                self.check_expr_statement_context(else_body)
             else:
                 self.check_expr(else_body)
+            self.infer_tail_node = saved_infer_tail
             self.pop_move_control_flow_context()
             self.drop_control_flow_depth = saved_drop_cf_else
             else_is_never = if self.get_type_kind(self.resolve_alias(else_type as TypeId)) == TypeKind.TY_NEVER: 1 else: 0
@@ -9592,7 +9665,10 @@ impl Sema:
                 let join_roles: Vec[i32] = Vec.new()
                 join_roles.push(D22_JOIN_ROLE_EXPR)
                 join_roles.push(D22_JOIN_ROLE_EXPR)
+                let saved_infer_join = self.infer_tail_join
+                self.infer_tail_join = if is_infer_tail: 1 else: 0
                 result_type = self.resolve_contextual_join(outer_expected as i32, &join_nodes, &origin_nodes, &join_types, &join_roles, node, "if") as TypeId
+                self.infer_tail_join = saved_infer_join
         else:
             if in_value_context and self.current_statement_expr_root == 0 and then_is_never == 0:
                 self.emit_error("if expression requires an else branch unless the then branch diverges", node)
@@ -10693,7 +10769,7 @@ impl Sema:
     // the ordinary generic-method-call machinery, keyed so the lowering can
     // dispatch the recorded mono sym: for-loops key by the FOR node,
     // comprehension clauses by their iterable expression node.
-    mut fn demand_generic_iter_next(iter_type: TypeId, iterable: i32, key_node: i32):
+    mut fn demand_generic_iter_next(iter_type: TypeId, iterable: i32, key_node: i32) -> Unit:
         let it_resolved = self.resolve_alias(iter_type)
         if self.get_type_kind(it_resolved) != TypeKind.TY_GENERIC_INST:
             return
@@ -12492,8 +12568,14 @@ impl Sema:
         if comprehension_carrier != 0 and self.current_for_comprehension_carrier != 0 and comprehension_carrier != self.current_for_comprehension_carrier:
             self.emit_error("for-comprehension clauses must use the same carrier family", node)
         var result_type: TypeId = 0 as TypeId
-        let match_is_value = self.match_in_stmt_pos == 0
-        let match_expected: TypeId = if match_is_value and self.has_expected_type != 0: self.expected_expr_type else: 0 as TypeId
+        // D43: the tail of an unannotated function is a statement when an arm
+        // is missing and an undemanded value join otherwise, in every body
+        // spelling. Its arms inherit the tail role only in the value case.
+        let is_infer_tail = self.infer_tail_node == node
+        let saved_infer_tail = self.infer_tail_node
+        let match_is_value = if is_infer_tail: self.match_has_missing_arm(subject_type as i32, extra_start, arm_count) == 0 else: self.match_in_stmt_pos == 0
+        let match_expected: TypeId = if is_infer_tail: 0 as TypeId else if match_is_value and self.has_expected_type != 0: self.expected_expr_type else: 0 as TypeId
+        var stmt_arms_mixed = false
         let join_expr_nodes: Vec[i32] = Vec.new()
         let join_origin_nodes: Vec[i32] = Vec.new()
         let join_expr_types: Vec[i32] = Vec.new()
@@ -12541,7 +12623,9 @@ impl Sema:
             else if match_expected != 0:
                 self.check_expr_with_expected(arm_body, match_expected)
             else:
+                self.infer_tail_node = if is_infer_tail: arm_body else: saved_infer_tail
                 self.check_expr_value_context(arm_body)
+            self.infer_tail_node = saved_infer_tail
             self.drop_control_flow_depth = saved_drop_cf_arm
             if match_is_value and self.type_is_ephemeral_value(arm_type as i32) != 0:
                 // Join resolution runs after the arm scope is gone. Freeze the
@@ -12567,19 +12651,28 @@ impl Sema:
                 result_type = arm_type
             else if arm_type != 0 and self.types_compatible(result_type, arm_type) != 0:
                 result_type = self.preferred_compatible_type(result_type, arm_type)
+            else if arm_type != 0 and arm_type != self.ty_never:
+                // #1180: statement arms that do not join have no value. Keeping
+                // the first arm's type made MirLower store a Unit arm into it.
+                stmt_arms_mixed = true
 
         self.restore_scope_states(&match_merged_states)
         self.current_for_comprehension_carrier = saved_for_comprehension_carrier
 
         if match_is_value:
+            let saved_infer_join = self.infer_tail_join
+            self.infer_tail_join = if is_infer_tail: 1 else: 0
             result_type = self.resolve_contextual_join(match_expected as i32, &join_expr_nodes, &join_origin_nodes, &join_expr_types, &join_roles, node, "match") as TypeId
+            self.infer_tail_join = saved_infer_join
+        else if stmt_arms_mixed:
+            result_type = self.ty_void
 
         // Exhaustiveness checking for enum and bool subjects.
         // Expression-position match always requires exhaustiveness.
         // Statement-position match allows partial match (unmatched variants are no-op),
         // unless the subject type is @[must_use].
         var require_exhaustive = 0
-        if self.match_in_stmt_pos == 0:
+        if match_is_value:
             require_exhaustive = 1
         else:
             // Must-use types require exhaustive match even in statement position
@@ -12637,6 +12730,48 @@ impl Sema:
 
     mut fn emit_partial_statement_match_warning(message: &str, node: i32):
         self.emit_warning_code(message, node, "partial-statement-match")
+
+    // D43: a match with an empty arm, or a partial match on a bool or enum
+    // subject, is never a value (§9.7 requires an expression-position match to
+    // be exhaustive). Other subjects keep their existing value reading.
+    fn match_has_missing_arm(subject_type: i32, extra_start: i32, arm_count: i32) -> i32:
+        var has_catchall = 0
+        for ai in 0..arm_count:
+            let arm_node = self.ast.get_extra(extra_start + ai)
+            if self.branch_arm_is_empty(self.ast.get_data1(arm_node)) != 0: return 1
+            if self.ast.get_data2(arm_node) == 0 and sema_pattern_is_catchall(self.ast, self.ast.get_data0(arm_node)): has_catchall = 1
+        if has_catchall != 0 or subject_type == 0: return 0
+        let resolved = self.resolve_alias(subject_type)
+        var tk = self.get_type_kind(resolved)
+        var enum_resolved = resolved
+        if tk == TypeKind.TY_GENERIC_INST:
+            let base_tid = self.lookup_named_type_visible(self.get_generic_inst_base(resolved as i32))
+            if base_tid != 0 and self.get_type_kind(self.resolve_alias(base_tid as TypeId)) == TypeKind.TY_ENUM:
+                enum_resolved = self.resolve_alias(base_tid as TypeId)
+                tk = TypeKind.TY_ENUM
+        if tk == TypeKind.TY_BOOL:
+            var has_true = 0
+            var has_false = 0
+            for ai in 0..arm_count:
+                let arm_node = self.ast.get_extra(extra_start + ai)
+                let pat = self.ast.get_data0(arm_node)
+                if self.ast.get_data2(arm_node) != 0 or self.ast.kind(pat) != NodeKind.NK_PAT_BOOL: continue
+                if self.ast.get_data0(pat) != 0: has_true = 1
+                else: has_false = 1
+            return if has_true == 0 or has_false == 0: 1 else: 0
+        if tk != TypeKind.TY_ENUM: return 0
+        var pos = self.get_type_d1(enum_resolved)
+        for vi in 0..self.get_type_d2(enum_resolved):
+            let v_name_sym = self.type_extra[pos]
+            var covered = 0
+            for ai in 0..arm_count:
+                let arm_node = self.ast.get_extra(extra_start + ai)
+                if self.ast.get_data2(arm_node) == 0 and sema_pattern_covers_variant(self.ast, self.ast.get_data0(arm_node), v_name_sym):
+                    covered = 1
+                    break
+            if covered == 0: return 1
+            pos = pos + 2 + self.type_extra[(pos + 1)]
+        0
 
     mut fn check_match_exhaustiveness(node: i32, subject_type: i32, extra_start: i32, arm_count: i32, require_exhaustive: i32, warn_partial_statement_match: i32):
         if subject_type == 0:
@@ -13975,7 +14110,14 @@ impl Sema:
             expected_ret_ty = self.get_type_d2(expected_fn_tid)
         // An inferred closure body is a fresh value context. The expected
         // function type constrains its parameters, not its inferred return.
+        // D43: a closure with no expected result inherits its tail's type.
+        let saved_infer_tail = self.infer_tail_node
+        let saved_infer_closure = self.infer_tail_is_closure
+        self.infer_tail_node = if expected_ret_ty == 0: body else: 0
+        self.infer_tail_is_closure = 1
         let body_ty = if expected_ret_ty != 0: self.check_expr_with_expected(body, expected_ret_ty as TypeId) else: self.check_expr_value_context(body)
+        self.infer_tail_node = saved_infer_tail
+        self.infer_tail_is_closure = saved_infer_closure
         if expected_extern_fn != 0:
             self.record_global_concurrency_evidence(node, "extern C callback coercion")
             if closure_capture_syms.len() as i32 > 0:

@@ -41,8 +41,9 @@ expression (`if`, `if let`, `match`):
 - **Explicit `return e`** on any path must unify with the tail under the
   same rule; a value on one path and fall-off on another remains §4.10's
   missing-return error.
-- **Entry points do not infer.** `main` and implicit main have return types
-  fixed by the runtime contract; their tails are statement position.
+- **Entry points do not infer.** `main` (explicit or implicit), `@[entry]`
+  functions and `test_*` functions have return types fixed by the runtime
+  contract; their tails are statement position.
 
 "Cannot infer" arises only when every arm is present and they do not
 unify. Then the compiler does not infer. It does not pick `Unit`; it does
@@ -155,7 +156,12 @@ the garbage return, the invalid MIR, and the silent validator (#1180). Sweep
 unannotated function ending in an else-less `if let` with an assignment
 body infers `i32` today (returning the value or a fabricated `0`) and
 becomes `Unit`, so a caller consuming it stops compiling; a mixed written
-tail becomes "cannot infer" and gets its `->`.
+tail becomes "cannot infer" and gets its `->`. **Measured 2026-09-18:**
+2,861 files under `lib/`, `tools/`, `test/`, `examples/`, `build/` plus the
+compiler source: two functions needed `-> Unit` (`MirCore.mark_place`, a call
+arm against an assignment arm; `SemaCheck.demand_generic_iter_next`, `insert`
+against `remove`), both in `src/`. That is the data point for the reopen
+clause and for the assignment-as-result follow-up (one of the two).
 
 **Follow-ups, not part of the ruling.**
 - The demanded-join diagnostic names the `Unit` arm.
