@@ -2770,8 +2770,11 @@ fn reseed_gate_smoke(root: &str, compiler_path: &str) -> i32:
         with_ewrite(with_fs_read_file(smoke_err))
         with_eprint(f"error: reseed gate: candidate failed as build orchestrator on ':{smoke_target}' (exit {smoke_rc}); a regression confined to build.w evaluation or the action graph would detonate on the first post-reseed build (#757)")
         return 1
-    if smoke_rss > 1073741824:
-        with_eprint(f"error: reseed gate: candidate as orchestrator peaked at {smoke_rss / 1048576}M (limit 1024M, #679 tripwire) — the clone-storm class (#757)")
+    // #1182: re-baselined 1024M -> 2048M (Eric, 2026-09-18). The orchestrator
+    // compiles the native build runner in-process, ~1.25 GB and steady since
+    // at least 2026-09-12; the clone storm this guards against was 64 GiB.
+    if smoke_rss / 1048576 > 2048:
+        with_eprint(f"error: reseed gate: candidate as orchestrator peaked at {smoke_rss / 1048576}M (limit 2048M, #679 tripwire) — the clone-storm class (#757)")
         return 1
     with_write("[reseed-gate] candidate checks build.w and orchestrates ':" ++ smoke_target ++ "' natively (" ++ build_graph_time_fmt(spent) ++ f", peak {smoke_rss / 1048576}M)\n")
     0
