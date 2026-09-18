@@ -88,6 +88,26 @@ and [#1159](https://github.com/withlang-dev/with/issues/1159), respectively.
 The allocator root is also recorded on
 [#1158](https://github.com/withlang-dev/with/issues/1158#issuecomment-5706888853).
 
+### Windows library filenames lost a significant prefix (#1171)
+
+Conan's current OpenSSL Windows package contains `lib/libcrypto.lib` and
+`lib/libssl.lib`. `conan_library_name_from_path` applied the Unix `lib`
+prefix convention before removing any extension, producing `crypto` and
+`ssl`; the Windows linker therefore searched for different filenames.
+
+LLDB stops on the exact `name.slice(3, name.len())` branch with input
+`libcrypto`, start 3, and end 9, then observes the returned `crypto`.
+Evidence: `out/with-get-investigation/windows-openssl-manifest.txt` and
+`conan-library-name-strip-lldb.log`. The manifest is from recipe revision
+`b700c658ab174d6ef1bbd719ca441236`, x86_64 package
+`2962650defb331e6d5396b541575d7735fb220d7`.
+
+The fix handles `.lib` first and preserves its basename, including a `lib`
+prefix. Unix `.a`, `.so`, and `.dylib` retain their existing convention.
+The twelve-case internal fixture passes (`conan-library-names-after.log`),
+covering OpenSSL, import libraries, unprefixed names, versioned Unix shared
+objects, and non-library input. Native Windows UAT is still required.
+
 ### Test verdict composition
 
 The reduced `known-issue` + unconditional `skip` fixture reaches

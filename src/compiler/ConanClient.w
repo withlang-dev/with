@@ -525,13 +525,15 @@ fn conan_write_metadata(dest_dir: &str, name: &str, version: &str, recipe_rev: &
     meta = meta ++ "}" ++ nl
     runtime_write_file(dest_dir ++ "/metadata.json", meta)
 
-fn conan_library_name_from_path(path: &str) -> str:
+pub fn conan_library_name_from_path(path: &str) -> str:
     let base = conan_path_basename(path)
+    // Windows linkers append .lib to the supplied name verbatim. The lib
+    // prefix convention belongs to Unix -l lookup, not COFF filenames.
+    if base.ends_with(".lib"):
+        return base.slice(0, base.len() - 4)
     var name = ""
     if base.ends_with(".a"):
         name = base.slice(0, base.len() - 2)
-    else if base.ends_with(".lib"):
-        name = base.slice(0, base.len() - 4)
     else:
         let dylib = conan_find_text(base, ".dylib")
         let so = conan_find_text(base, ".so")
