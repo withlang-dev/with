@@ -74,6 +74,7 @@ type MirBuilder = ephemeral {
     moved_field_path_kinds: Vec[i32],
     moved_field_path_syms: Vec[i32],
     stmt_temp_locals: Vec[i32],
+    stmt_temp_drop_depths: Vec[i32],
     stmt_temp_starts: Vec[i32],
     pending_reset_locals: Vec[i32],
     // #719: per-statement-frame snapshots of the pending-reset stacks.
@@ -192,6 +193,7 @@ fn MirBuilder.init(sema: &Sema, ast: AstPool, pool: InternPool, fn_sym: i32) -> 
         moved_field_path_kinds: Vec.new(),
         moved_field_path_syms: Vec.new(),
         stmt_temp_locals: Vec.new(),
+        stmt_temp_drop_depths: Vec.new(),
         stmt_temp_starts: Vec.new(),
         pending_reset_locals: Vec.new(),
         stmt_reset_starts: Vec.new(),
@@ -708,6 +710,7 @@ impl MirBuilder:
         if self.stmt_temp_needs_drop(type_id) == 0:
             return
         self.stmt_temp_locals.push(local_id)
+        self.stmt_temp_drop_depths.push(self.drop_local_ids.len() as i32)
 
     mut fn cancel_stmt_temp_for_local(local_id: i32) -> Unit:
         var i = self.stmt_temp_locals.len() as i32 - 1
@@ -842,6 +845,7 @@ impl MirBuilder:
             i = i - 1
         while self.stmt_temp_locals.len() > start:
             self.stmt_temp_locals.pop()
+            self.stmt_temp_drop_depths.pop()
         self.stmt_temp_starts.pop()
         var reset_start = 0
         var reset_field_start = 0
@@ -865,7 +869,17 @@ impl MirBuilder:
     // local's later drops (drop-before-overwrite, scope-exit) free nothing.
     // `start` scopes the flush to a branch/statement so an outer-scope move's reset
     // is not emitted inside (and made conditional by) an inner branch.
-    mut fn flush_pending_resets_since(start: i32, field_start: i32, temp_start: i32) -> Unit:
+    mut fn flush_pending_resets_since(start: i32, field_start: i32, temp_start: i32):
+        self.emit_pending_resets_since(start, field_start, temp_start)
+        while self.pending_move_temp_locals.len() > temp_start:
+            self.pending_move_temp_locals.pop()
+        while self.pending_reset_locals.len() > start:
+            self.pending_reset_locals.pop()
+        while self.pending_reset_field_places.len() > field_start:
+            self.pending_reset_field_places.pop()
+            self.pending_reset_field_types.pop()
+
+    mut fn emit_pending_resets_since(start: i32, field_start: i32, temp_start: i32):
         // D16: drop the move-arg temporaries first (their values die at the end
         // of the statement / on the moving path), then blank the moved-from
         // sources. The drops are dominated by the temp's initialization — both
@@ -876,8 +890,6 @@ impl MirBuilder:
             let tl_place = self.place_for_local(tl)
             self.emit_drop_stmt(tl_place, "move-arg-temp", 0)
             ti = ti + 1
-        while self.pending_move_temp_locals.len() > temp_start:
-            self.pending_move_temp_locals.pop()
         var ri = start
         while ri < self.pending_reset_locals.len():
             let rl: i32 = self.pending_reset_locals[ri]
@@ -885,8 +897,6 @@ impl MirBuilder:
             let rval = self.body.new_rvalue(RvalueKind.RK_USE, zop, 0, 0)
             self.body.push_stmt(self.cur_bb, StmtKind.Assign, self.place_for_local(rl), rval, 0)
             ri = ri + 1
-        while self.pending_reset_locals.len() > start:
-            self.pending_reset_locals.pop()
         // Field-place niche (Slice E): blank each conditionally-moved Drop-bearing
         // field since `field_start` (scoped like the local resets above, so a
         // conditional field move resets only on the moving path). The owner's
@@ -901,9 +911,6 @@ impl MirBuilder:
             let frval = self.body.new_rvalue(RvalueKind.RK_USE, fzop, 0, 0)
             self.body.push_stmt(self.cur_bb, StmtKind.Assign, fplace, frval, 0)
             fri = fri + 1
-        while self.pending_reset_field_places.len() > field_start:
-            self.pending_reset_field_places.pop()
-            self.pending_reset_field_types.pop()
 
     mut fn finish_stmt_temp_frame(frame_depth: i32) -> Unit:
         while self.stmt_temp_starts.len() > frame_depth:
@@ -1130,7 +1137,21 @@ impl MirBuilder:
         self.emit_drops_for_range(target.break_drop_depth, lowest_drop_start)
 
     mut fn emit_drops_for_return():
+        // A return crosses all statement frames. Merge their temporaries into
+        // the reverse local-drop order: a loop body's borrowed local must die
+        // before the temporary iterable that owns it. Defers run before this
+        // cleanup. Keep every record for sibling paths that may continue.
         var i = self.drop_local_ids.len() as i32 - 1
+        var temp = self.stmt_temp_locals.len() as i32 - 1
+        while temp >= 0:
+            let depth: i32 = self.stmt_temp_drop_depths[temp]
+            while i >= depth:
+                self.emit_drop_entry(self.drop_local_ids[i], self.drop_kinds[i])
+                i -= 1
+            let local_id: i32 = self.stmt_temp_locals[temp]
+            if local_id >= 0:
+                self.emit_drop_entry(local_id, DropKind.DK_VALUE)
+            temp -= 1
         while i >= 0:
             self.emit_drop_entry(self.drop_local_ids[i], self.drop_kinds[i])
             i = i - 1
@@ -4675,6 +4696,7 @@ impl MirBuilder:
         from_break_args.push(break_op)
         let ret_op = self.lower_resolved_call_with_operand_args_contract(from_break_fn, from_break_args, ret_ty, node, from_break_sig, from_break_mono_sym)
         self.assign_operand_to_place(ret_place, ret_op, self.ast.get_start(expr))
+        self.emit_pending_resets_since(0, 0, 0)
         self.emit_errdefers_for_return()
         self.emit_defers_for_return()
         self.emit_drops_for_return()
@@ -7944,7 +7966,7 @@ impl MirBuilder:
         let ret_place = self.place_for_local(0)
         self.assign_operand_to_place(ret_place, ret_op, self.ast.get_start(node))
 
-        self.flush_stmt_temp_frame()
+        self.emit_pending_resets_since(0, 0, 0)
         self.emit_defers_for_return()
         self.emit_drops_for_return()
         self.terminate(TermKind.TK_RETURN, 0, 0, 0, 0)
@@ -8057,7 +8079,7 @@ impl MirBuilder:
         self.switch_to(after_scr)
         // D17: same early-exit flush as the `?` error path — moves already
         // executed must blank before the cancellation return.
-        self.flush_pending_resets()
+        self.emit_pending_resets_since(0, 0, 0)
         self.emit_defers_for_return()
         self.emit_drops_for_return()
         self.terminate(TermKind.TK_RETURN, 0, 0, 0, 0)
@@ -8803,6 +8825,16 @@ impl MirBuilder:
         // match entry; an arm that moves the value clears its flag, and the value's
         // scope-exit cleanup drops it only when the flag is still set. Each arm is
         // analyzed from the entry move-state, restored after each arm below.
+        // The arms own the subject's payloads. Retire the enclosing cleanup
+        // before lowering them: an arm can return before reaching the join.
+        // Both match and parser-desugared if-let take this path.
+        let match_scrut_local = mir_place_plain_local(&self.body, scrutinee_place)
+        if match_scrut_local >= 0:
+            self.cancel_stmt_temp_for_local(match_scrut_local)
+            self.cancel_scheduled_value_drop_for_local(match_scrut_local)
+            self.mark_local_value_moved(match_scrut_local)
+        self.cancel_scheduled_value_drop_for_receiver_expr(scrutinee_expr)
+
         let match_entry_bb = self.cur_bb as i32
         let branch_drop_depth = self.drop_local_ids.len() as i32
         let branch_move_state = self.save_move_state()
@@ -8890,18 +8922,6 @@ impl MirBuilder:
             self.restore_move_state(&branch_move_state)
 
             dispatch_bb = fail_bb
-
-        // #605/#606: the match takes ownership of its subject; arms move payloads out
-        // of the materialized scrutinee. Consume the scrutinee copy and a named source
-        // so the enum's variant-aware payload drop does not double-free the moved-out
-        // bindings. Wildcard / unbound / ref-bound payloads then leak rather than
-        // double-free — sound; precise per-variant tracking is a follow-up.
-        let match_scrut_local = mir_place_plain_local(&self.body, scrutinee_place)
-        if match_scrut_local >= 0:
-            self.cancel_stmt_temp_for_local(match_scrut_local)
-            self.cancel_scheduled_value_drop_for_local(match_scrut_local)
-            self.mark_local_value_moved(match_scrut_local)
-        self.cancel_scheduled_value_drop_for_receiver_expr(scrutinee_expr)
 
         self.switch_to(join_bb)
         self.forget_string_flow_facts()
@@ -10858,7 +10878,7 @@ impl MirBuilder:
         // D17: moves already executed in this statement (field blanks, move-arg
         // temps) must land before the early error return — the enclosing
         // statement's flush is never reached on this path.
-        self.flush_pending_resets()
+        self.emit_pending_resets_since(0, 0, 0)
         self.emit_errdefers_for_return()
         self.emit_defers_for_return()
         self.emit_drops_for_return()
@@ -10992,6 +11012,12 @@ impl MirBuilder:
         let dq_scrut_local = mir_place_plain_local(&self.body, value_place)
         if dq_scrut_local >= 0:
             self.emit_drop_stmt(value_place, "coalesce-default", self.ast.get_start(expr))
+            // Both arms have decomposed the carrier: the success arm moved
+            // its payload, and this arm dropped it. Retire its cleanup before
+            // lowering a default that may itself return from the function.
+            self.cancel_stmt_temp_for_local(dq_scrut_local)
+            self.cancel_scheduled_value_drop_for_local(dq_scrut_local)
+            self.mark_local_value_moved(dq_scrut_local)
         // #772: a stmt-temp frame + divergence guard, exactly like lower_if's
         // branches. A diverging default (`?? return e`) leaves a Unit operand
         // in its unreachable continuation; assigning it into the typed join
@@ -11004,10 +11030,6 @@ impl MirBuilder:
         self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
 
         self.switch_to(join_bb)
-        if dq_scrut_local >= 0:
-            self.cancel_stmt_temp_for_local(dq_scrut_local)
-            self.cancel_scheduled_value_drop_for_local(dq_scrut_local)
-            self.mark_local_value_moved(dq_scrut_local)
         self.forget_string_flow_facts()
         if self.sema.is_copy_frozen(result_ty) != 0:
             return self.body.new_operand(OperandKind.OK_COPY, result_place)
