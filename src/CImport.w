@@ -755,7 +755,7 @@ fn process_c_import_with_defines(header_spec: &str, defines: &Vec[str]) -> str:
     let macro_session = with_cimport_parse_macros(include_text)
     if macro_session != 0:
         g_migrate_macro_values = ci_collect_object_macro_values(macro_session)
-        g_migrate_macro_miss_names = Vec.new()
+        g_migrate_macro_miss_names = HashMap.new()
 
     // Pre-scan: collect all opaque-demoted types (bitfield, forward decl, unsupported)
     // then cascade through field references until fixpoint
@@ -818,8 +818,8 @@ fn process_c_import_with_defines(header_spec: &str, defines: &Vec[str]) -> str:
     ci_fn_decl_index_reset()
     g_macro_type_names = ""
     g_macro_type_aliases = ""
-    g_migrate_macro_values = ""
-    g_migrate_macro_miss_names = Vec.new()
+    g_migrate_macro_values = HashMap.new()
+    g_migrate_macro_miss_names = HashMap.new()
 
     let rendered = output.to_str()
     ci_omitted_manifest_comments() ++ rendered
@@ -2750,9 +2750,9 @@ fn ci_collect_object_macro_type_map(session: i64, macro_source: &str):
     ci_prepare_clang_resource_dir()
     with_cimport_collect_object_macro_types(macro_source, names.to_str())
 
-fn ci_collect_object_macro_values(session: i64) -> str:
+fn ci_collect_object_macro_values(session: i64) -> HashMap[str, str]:
     let count = with_cimport_macro_count(session)
-    var values = StringBuilder.new()
+    let values: HashMap[str, str] = HashMap.new()
     for i in 0..count:
         if with_cimport_macro_is_fn_like(session, i) != 0:
             continue
@@ -2760,13 +2760,11 @@ fn ci_collect_object_macro_values(session: i64) -> str:
         let value = ci_trim(ci_strip_c_comments(with_cimport_macro_value(session, i)))
         if name.len() == 0 or value.len() == 0 or value == name:
             continue
-        if ci_str_contains(value, "|"):
-            continue
-        values.push_str("|")
-        values.push_str(name)
-        values.push_str("=")
-        values.push_str(value)
-    values.to_str()
+        // Header order determines the first definition, as in the old
+        // registry. Values are independent strings, so C's bitwise-or and
+        // quoted pipes cannot be mistaken for record delimiters.
+        if not values.contains(name): values.insert(name.clone(), value.clone())
+    values
 
 fn ci_offsetof_record_type_name(raw_type: &str) -> str:
     let t = ci_trim(raw_type)
@@ -2924,7 +2922,7 @@ fn ci_macro_substitute_arguments(session: i64, index: i32, body: &str, args: &Ve
 // Expand private dependencies BEFORE parsing the expression: expanding only
 // a parsed call would change precedence for an unparenthesized C macro body.
 // Public project macros retain their ordinary translated declarations.
-fn ci_expand_private_macro_body(session: i64, body: &str, params: &str, disabled: &str, depth: i32) -> str:
+fn ci_expand_private_macro_body(session: i64, indices: &HashMap[str, i32], body: &str, params: &str, disabled: &str, depth: i32) -> str:
     if depth > 16: return ""
     var output = ""
     var pos = 0
@@ -2933,12 +2931,11 @@ fn ci_expand_private_macro_body(session: i64, body: &str, params: &str, disabled
         let token = body.slice(pos, end)
         var index = -1
         if ci_is_ident_start(body[pos]) and not params.contains("|" ++ token ++ "|") and not disabled.contains("|" ++ token ++ "|"):
-            var mi = with_cimport_macro_count(session) - 1
-            while mi >= 0:
-                if with_cimport_macro_name(session, mi) == token:
-                    if ci_macro_is_migration_private(session, mi): index = mi
-                    break
-                mi -= 1
+            let found = indices.get(token)
+            if found.is_some():
+                let mi = found.unwrap()
+                if token[0] == 95 or (ci_translate_in_migrate_mode() and ci_macro_is_migration_private(session, mi)):
+                    index = mi
         if index < 0:
             output = output ++ token
             pos = end
@@ -2967,25 +2964,25 @@ fn ci_expand_private_macro_body(session: i64, body: &str, params: &str, disabled
             else:
                 replacement = ci_macro_substitute_arguments(session, index, replacement, args)
             end = close + 1
-        let expanded = ci_expand_private_macro_body(session, replacement, params, disabled ++ "|" ++ token ++ "|", depth + 1)
+        let expanded = ci_expand_private_macro_body(session, indices, replacement, params, disabled ++ "|" ++ token ++ "|", depth + 1)
         if expanded.len() == 0 and replacement.len() > 0: return ""
         output = output ++ expanded
         pos = end
     // Rescan across replacement boundaries, e.g. an object alias followed by
     // arguments that invoke the function-like macro it names.
-    if output != body: return ci_expand_private_macro_body(session, output, params, disabled, depth + 1)
+    if output != body: return ci_expand_private_macro_body(session, indices, output, params, disabled, depth + 1)
     output
 
 // An object alias of a function-like macro is still callable after C
 // preprocessing. Emit its function body under the alias, never a global
 // initialized with an unspecialized generic function.
-fn ci_function_macro_alias_target(session: i64, value: &str):
+fn ci_function_macro_alias_target(session: i64, indices: &HashMap[str, i32], value: &str):
     var name = ci_trim(value)
     for depth in 0..16:
         if not ci_is_c_ident(name): return -1
-        var index = with_cimport_macro_count(session) - 1
-        while index >= 0 and with_cimport_macro_name(session, index) != name: index -= 1
-        if index < 0: return -1
+        let found = indices.get(name)
+        if found.is_none(): return -1
+        let index: i32 = found.unwrap()
         if with_cimport_macro_is_fn_like(session, index) != 0: return index
         let next = ci_trim(ci_strip_c_comments(with_cimport_macro_value(session, index)))
         if next == name: return -1
@@ -2994,6 +2991,11 @@ fn ci_function_macro_alias_target(session: i64, value: &str):
 
 fn ci_translate_macros(session: i64, type_session: i64, extern_vars: &str, macro_source: &str) -> str:
     let count = with_cimport_macro_count(session)
+    // Match the previous backward lookup: the last definition wins. Build
+    // once so private expansion and aliases never scan a whole SDK header.
+    var indices: HashMap[str, i32] = HashMap.new()
+    for i in 0..count:
+        indices.insert(with_cimport_macro_name(session, i).clone(), i)
     var output = ""
     var known_values = ""
     var known_macro_returns = ""
@@ -3028,7 +3030,7 @@ fn ci_translate_macros(session: i64, type_session: i64, extern_vars: &str, macro
 
         var fn_index = i
         if fn_like == 0:
-            let alias_target = ci_function_macro_alias_target(session, value)
+            let alias_target = ci_function_macro_alias_target(session, indices, value)
             if alias_target >= 0:
                 fn_index = alias_target
                 fn_like = 1
@@ -3142,8 +3144,7 @@ fn ci_translate_macros(session: i64, type_session: i64, extern_vars: &str, macro
                     if translated.len() == 0 and ci_str_contains(work_value, "##"):
                         translated = ci_try_translate_token_paste(work_value, param_names)
                     if translated.len() == 0:
-                        if ci_translate_in_migrate_mode():
-                            work_value = ci_expand_private_macro_body(session, work_value, param_names, "", 0)
+                        work_value = ci_expand_private_macro_body(session, indices, work_value, param_names, "", 0)
                         translated = ci_translate_c_expr(work_value, param_names, known_values)
                     if translated.len() > 0:
                         // Infer return type from cast expression: (x as c_int) → return c_int
@@ -5200,15 +5201,10 @@ fn ci_lookup_known(name: &str, known: &str) -> str:
 fn ci_lookup_simple_literal_macro_value(name: &str) -> str:
     if name.len() == 0:
         return ""
-    let needle = "|" ++ name ++ "="
-    let pos = ci_find_str(g_migrate_macro_values, needle)
-    if pos < 0:
+    let found = g_migrate_macro_values.get(name)
+    if found.is_none():
         return ""
-    let start = pos + needle.len() as i32
-    var end = start
-    while end < g_migrate_macro_values.len() as i32 and g_migrate_macro_values[end] != 124:
-        end = end + 1
-    let value = ci_strip_parens(ci_trim(g_migrate_macro_values.slice(start as i64, end as i64)))
+    let value = ci_strip_parens(ci_trim(found.unwrap()))
     if ci_is_int_literal(value):
         return ci_strip_int_suffix(value)
     if ci_is_float_literal(value):
@@ -13416,14 +13412,9 @@ fn ci_resolve_pp_conditionals(src: &str) -> str:
 fn ci_lookup_macro_value(session: i64, name: &str) -> str:
     if name.len() == 0:
         return ""
-    let needle = "|" ++ name ++ "="
-    let pos = ci_find_str(g_migrate_macro_values, needle)
-    if pos >= 0:
-        let start = pos + needle.len() as i32
-        var end = start
-        while end < g_migrate_macro_values.len() as i32 and g_migrate_macro_values[end] != 124:
-            end = end + 1
-        return g_migrate_macro_values.slice(start as i64, end as i64)
+    let found = g_migrate_macro_values.get(name)
+    if found.is_some():
+        return ci_ir_owned_text(found.unwrap())
     if ci_macro_miss_contains(name):
         return ""
     let macro_session = g_migrate_macro_session
@@ -13435,11 +13426,11 @@ fn ci_lookup_macro_value(session: i64, name: &str) -> str:
         if with_cimport_macro_is_fn_like(macro_session, i) == 0:
             if with_cimport_macro_name(macro_session, i) == name:
                 let value = ci_trim(ci_strip_c_comments(with_cimport_macro_value(macro_session, i)))
-                if value.len() > 0 and value != name and not ci_str_contains(value, "|"):
-                    g_migrate_macro_values = g_migrate_macro_values ++ needle ++ value
+                if value.len() > 0 and value != name:
+                    g_migrate_macro_values.insert(ci_ir_owned_text(name), ci_ir_owned_text(value))
                 return value
         i = i + 1
-    g_migrate_macro_miss_names.push(ci_ir_owned_text(name))
+    g_migrate_macro_miss_names.insert(ci_ir_owned_text(name), true)
     ""
 
 // #348: is `name` a function-like macro in the session? (by-name variant of
@@ -13526,12 +13517,7 @@ fn ci_expand_macros_in_text_depth(session: i64, text: &str, depth: i32) -> str:
     result
 
 fn ci_macro_miss_contains(name: &str) -> bool:
-    var i: i64 = 0
-    while i < g_migrate_macro_miss_names.len():
-        if g_migrate_macro_miss_names.get(i) == name:
-            return true
-        i = i + 1
-    false
+    g_migrate_macro_miss_names.contains(name)
 
 // A stringify macro's entire result must be #param, or a single forwarding
 // call to another stringify macro. A diagnostic macro such as assert uses
@@ -14618,8 +14604,8 @@ fn ci_var_init_expr_for_type(session: i64, var_cursor: i32, scope: CiScope, targ
 //  during D3 cleanup. Only globals used by shared CImport code remain
 //  here, along with the macro type globals that aren't migrate-specific.)
 
-var g_migrate_macro_values: str = ""
-var g_migrate_macro_miss_names: Vec[str] = Vec.new()
+var g_migrate_macro_values: HashMap[str, str] = HashMap.new()
+var g_migrate_macro_miss_names: HashMap[str, bool] = HashMap.new()
 var g_migrate_macro_session: i64 = 0
 // #348: raw source of the file being migrated; macro expansion happens
 // on demand via ci_expand_macros_in_text (no cc -E dump).

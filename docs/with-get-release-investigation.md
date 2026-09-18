@@ -178,6 +178,44 @@ The source-line regression passes on the rebuilt development compiler,
 covering first/last lines, no final newline, CRLF, continued bodies, split
 macro names and split directives (`macro-source-lines-fixed.log`).
 
+Run `35205173022` proves that collection was only the first scaling cost.
+The Windows bzip2/libcurl dumps at 1, 17, and 33 seconds progress into
+`ci_lookup_simple_literal_macro_value -> ci_find_str -> ci_str_matches_at`.
+The table header contains length `0x1117f0` (1,120,240 bytes); every constant
+initializer lookup scans that table. Native evidence is retained in
+`ci-35205173022-bzip2-lldb.log`,
+`ci-35205173022-macro-lookup-disassembly.log`, and
+`ci-35205173022-lookup-memory.log` under `out/with-get-investigation/`.
+
+Macro values and misses now use keyed maps, retaining the old first-value
+selection. A separate per-session name/index map replaces backward scans
+for aliases and private dependency expansion, retaining their last-definition
+selection. Raw values can contain `|` without colliding with a table delimiter.
+
+The expanded regression also exposed a private-expression omission:
+`#define _WITH_PIPE (1 | 2)` used by `PIPE(x)` was found in the table but
+rejected by the literal-only lookup. LLDB observes the lookup return length
+zero at `ci_lookup_simple_literal_macro_value+248`; the caller had skipped
+private expansion outside migration mode. Evidence:
+`macro-private-expression-return-lldb.log`. Import now expands private
+dependencies before expression parsing through the same indexed expander.
+
+The full build and 33,000-definition/256-initializer regression pass, including
+bitwise private values, nested function macros, aliases, parameter shadowing,
+and unparenthesized C precedence. Six related macro fixtures also pass.
+Logs: `macro-private-expansion-full-build.log`,
+`macro-private-expansion-matrix.log`, and `macro-index-behav*.log`.
+The byte-identical fixpoint, compiler analysis (2,528,011 facts, zero
+violations), and full seed-driven suite (1,051 behavior files plus all
+other gates) pass. Logs: `macro-index-fixpoint.log`,
+`macro-index-audit-all.log`, and `macro-index-full-test.log`.
+The pinned seed's final evidence check also passes
+(`macro-index-last-green.log`).
+Cold-cache checks and actual Darwin bzip2/libcurl UAT programs also pass
+(`macro-index-darwin-{bzip2,libcurl}-{check,run}.log`). Actual Windows
+package UAT remains required; Darwin OpenSSL still reaches the independently
+tracked map ownership failure (#1158).
+
 ### Install cache destination mismatch
 
 The pinned driver's `build_cache_collect_output_paths` returns the literal
