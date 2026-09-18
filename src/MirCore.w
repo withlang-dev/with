@@ -2979,6 +2979,29 @@ fn mir_validate_operand_type(mir_mod: &MirModule, body: &MirBody, operand_id: i3
         return mir_validate_place_type(mir_mod, body, d0)
     0
 
+// #1180: nothing coerces to or from Unit, so a Unit operand is a valid call
+// argument only when the callee's own parameter is Unit. A named callee with
+// a body in the module states its parameter types; one without a body is a
+// runtime or extern function, which never takes Unit (an f-string once handed
+// `fmt_to_str` a Unit call result and printed the register). Intrinsics and
+// indirect callees are not judged. Returns the offending argument index or -1.
+fn mir_validate_call_unit_argument(mir_mod: &MirModule, body: &MirBody, callee_operand: i32, call_id: i32) -> i32:
+    if call_id < 0 or call_id >= body.call_arg_starts.len() or body.call_intrinsic(call_id) != MirIntrinsic.NONE: return -1
+    if callee_operand < 0 or callee_operand >= body.operand_kinds.len() or body.operand_kinds[callee_operand] != OperandKind.OK_CONSTANT: return -1
+    let callee_const = body.operand_d0[callee_operand]
+    if callee_const < 0 or callee_const >= body.const_kinds.len() or body.const_kinds[callee_const] != ConstKind.CK_FN: return -1
+    let callee_idx = mir_mod.find_body(body.const_d0[callee_const])
+    let arg_start = body.call_arg_starts[call_id]
+    for ai in 0..body.call_arg_counts[call_id]:
+        let arg_ty = mir_validate_operand_type(mir_mod, body, body.call_arg_operands[arg_start + ai])
+        if arg_ty <= 0 or mir_mod.mir_get_type_kind(mir_mod.mir_resolve_alias(arg_ty)) != TypeKind.TY_VOID: continue
+        if callee_idx < 0: return ai
+        let callee = &mir_mod.bodies[callee_idx]
+        if ai >= callee.n_params: continue
+        let param_ty = callee.local_type_ids[ai + 1]
+        if param_ty > 0 and mir_mod.mir_get_type_kind(mir_mod.mir_resolve_alias(param_ty)) != TypeKind.TY_VOID: return ai
+    -1
+
 fn mir_validate_is_compare_op(op: i32) -> bool:
     op == BinaryOp.OP_EQ or op == BinaryOp.OP_NEQ or op == BinaryOp.OP_LT or op == BinaryOp.OP_GT or op == BinaryOp.OP_LTE or op == BinaryOp.OP_GTE
 
@@ -3122,6 +3145,9 @@ fn validate_typed_mir_body(mir_mod: &MirModule, body: &MirBody) -> MirValidation
             let dest_is_unit = dest_ty > 0 and mir_mod.mir_get_type_kind(resolved_dest) == TypeKind.TY_VOID
             if body.call_intrinsic(d1) == MirIntrinsic.VEC_PUSH and not dest_is_unit:
                 return mir_validation_fail(body.fn_sym, span, "Vec.push call destination must be Unit")
+            let unit_arg = mir_validate_call_unit_argument(mir_mod, body, d0, d1)
+            if unit_arg >= 0:
+                return mir_validation_fail(body.fn_sym, span, f"call argument {unit_arg} is Unit but the callee parameter is not")
 
             let carrier_place = body.call_pipeline_receiver_place(d1)
             if carrier_place >= 0:

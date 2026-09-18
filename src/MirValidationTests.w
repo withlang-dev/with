@@ -92,3 +92,46 @@ pub fn mir_test_uninitialized_drop() -> Unit:
     let multiple = multiple_body_verdict()
     assert(multiple.contains("fn sym1"))
     assert(multiple.contains("fn sym2"))
+
+// #1180: a call handing a Unit operand to a callee whose parameter is not Unit.
+// callee_kind: 0 = named callee with no body (runtime/extern), 1 = body with
+// an i32 parameter, 2 = body with a Unit parameter.
+fn unit_argument_verdict(callee_kind: i32, arg_is_unit: bool) -> str:
+    var mir_mod = MirModule.init()
+    for kind in [0, TypeKind.TY_VOID, TypeKind.TY_INT]:
+        mir_mod.sema_type_kinds.push(kind)
+        mir_mod.sema_type_d0.push(0)
+        mir_mod.sema_type_d1.push(0)
+        mir_mod.sema_type_d2.push(0)
+    let unit_ty = 1
+    let int_ty = 2
+    if callee_kind != 0:
+        var callee = MirBody.init_for_fn(2)
+        callee.new_local(if callee_kind == 2: unit_ty else: int_ty, 0, 0, 0)
+        callee.n_params = 1
+        let callee_entry = callee.new_block()
+        callee.set_terminator(callee_entry, TermKind.TK_RETURN, 0, 0, 0, 0, 0)
+        mir_mod.add_body(callee)
+    var body = MirBody.init_for_fn(1)
+    let arg_local = body.new_temp(if arg_is_unit: unit_ty else: int_ty)
+    let arg_place = body.new_place(arg_local)
+    let result_local = body.new_temp(unit_ty)
+    let result_place = body.new_place(result_local)
+    let entry = body.new_block()
+    let done = body.new_block()
+    let callee_const = body.new_const(ConstKind.CK_FN, 2, 0, 0, unit_ty)
+    let callee_operand = body.new_operand(OperandKind.OK_CONSTANT, callee_const)
+    let args: Vec[i32] = Vec.new()
+    args.push(body.new_operand(OperandKind.OK_COPY, arg_place))
+    let call_id = body.new_call_args(&args)
+    body.set_terminator(entry, TermKind.TK_CALL, callee_operand, call_id, result_place, done, 0)
+    body.set_terminator(done, TermKind.TK_RETURN, 0, 0, 0, 0, 0)
+    let err = validate_typed_mir_body(mir_mod, body)
+    with_str_clone_ref(err.message)
+
+pub fn mir_test_unit_call_argument() -> Unit:
+    assert(unit_argument_verdict(0, true).contains("call argument 0 is Unit"))
+    assert(unit_argument_verdict(1, true).contains("call argument 0 is Unit"))
+    assert(unit_argument_verdict(2, true) == "")
+    assert(unit_argument_verdict(0, false) == "")
+    assert(unit_argument_verdict(1, false) == "")
