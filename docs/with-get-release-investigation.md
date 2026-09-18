@@ -343,6 +343,22 @@ self-contained release invariant. Evidence:
 `linux-current-no-sdk-path-run.log`, `linux-current-linker-exec-gdb.log`;
 tracked in https://github.com/withlang-dev/with/issues/1167.
 
+The native-cc fix removes `-fuse-ld=lld` and the lld-only `--icf=all`
+from ordinary Linux user-program links. Compiler and cross links retain
+their explicit LLVM linker plan. A seed-driven native Linux full build
+passes (880.9 s), its release compiler runs with no SDK on PATH, and
+`behav_linux_platform_linker.w` restricts the child PATH to system cc,
+as, ld, and nm: the baseline fails with missing ld; the fixed stage2
+prints `ok`. Evidence: `linux-platform-linker-before.log`,
+`linux-platform-linker-after.log`, `linux-platform-linker-full-build.log`.
+
+The same release compiler's real build of a project linking GL and X11
+first fails with GNU ld's missing-library errors plus the exact
+`libgl-dev libx11-dev` installation suggestion. After installing those
+development packages, the unchanged project links successfully.
+Evidence: `linux-native-missing-libraries.log` (rc=1) and
+`linux-native-provisioned-libraries.log` (rc=0).
+
 - Verify the macro scaling fixes against real Windows package imports; a
   faster synthetic probe is not enough to close the timeout.
 - Verify Windows raylib rendering with the declared project-relative Mesa

@@ -330,10 +330,12 @@ fn link_stage_make_link_command(linker: &str, obj_path: &str, bin_path: &str, ex
     if runtime_sysinfo_os() == "Macos":
         args.push("-Wl,-dead_strip")
     else if runtime_sysinfo_os() == "Linux":
-        args.push("-fuse-ld=lld")
+        // Native user programs use the platform C driver. Requiring lld here
+        // makes the release compiler depend on an external LLVM installation.
+        // Compiler/cross links use the explicit LLVM plan below, which owns
+        // its lld-specific flags (including identical-code folding).
         args.push("-no-pie")
         args.push("-Wl,--gc-sections")
-        args.push("-Wl,--icf=all")
     args.push("-o")
     args.push(with_str_clone_ref(bin_path))
     outputs.push(with_str_clone_ref(bin_path))
