@@ -1,0 +1,133 @@
+// BuildGraphRuntime -- repository runtime-generation support for build.w.
+
+extern fn with_exec_argv_capture(args: &str, stdout_path: &str, stderr_path: &str, timeout_ms: i32) -> i32
+extern fn with_exec_argv_capture_cwd(args: &str, stdout_path: &str, stderr_path: &str, timeout_ms: i32, cwd: &str) -> i32
+extern fn with_exec_argv_capture_spawn(args: &str, stdout_path: &str, stderr_path: &str) -> i32
+extern fn with_exec_wait(pid: i32, timeout_ms: i32) -> i32
+extern fn with_exec_binary(path: &str) -> i32
+extern fn with_exec_argv(args: &str) -> i32
+extern fn with_arg_at(idx: i32) -> str
+extern fn with_getenv_str(name: &str) -> str
+extern fn with_setenv_str(name: &str, value: &str) -> i32
+extern fn with_fs_chmod(path: &str, mode: i32) -> i32
+extern fn with_fs_file_exists(path: &str) -> i32
+extern fn with_fs_file_mode(path: &str) -> i32
+extern fn with_fs_is_dir(path: &str) -> i32
+extern fn with_fs_mkdir_p(path: &str) -> i32
+extern fn with_fs_read_file(path: &str) -> str
+extern fn with_fs_readlink(path: &str) -> str
+extern fn with_fs_remove_dir(path: &str) -> i32
+extern fn with_fs_remove_file(path: &str) -> i32
+extern fn with_fs_remove_tree(path: &str) -> i32
+extern fn with_fs_list_files(path: &str) -> str
+extern fn with_fs_rename_file(old_path: &str, new_path: &str) -> i32
+extern fn with_fs_write_file(path: &str, data: &str) -> i32
+extern fn with_getpid() -> i32
+extern fn with_clock_nanos() -> i64
+extern fn with_write(s: &str) -> Unit
+extern fn with_eprint(s: &str) -> Unit
+// #747: the LlvmBridge definitions take &str; a `str` decl here was an ABI
+// mismatch (by-value {ptr,len} pair against a header pointer).
+extern fn wl_assemble_to_object(source_path: &str, output_path: &str) -> i32
+extern fn wl_assemble_to_object_for_triple(source_path: &str, output_path: &str, triple: &str) -> i32
+extern fn wl_compile_ir_to_object(source_path: &str, output_path: &str) -> i32
+
+pub fn build_graph_rt_exec_argv(args: &str) -> i32:
+    with_exec_argv(args)
+
+pub fn build_graph_rt_arg_at(idx: i32) -> str:
+    with_arg_at(idx)
+
+pub fn build_graph_rt_exec_binary(path: &str) -> i32:
+    with_exec_binary(path)
+
+pub fn build_graph_rt_exec_argv_capture(args: &str, stdout_path: &str, stderr_path: &str, timeout_ms: i32) -> i32:
+    with_exec_argv_capture(args, stdout_path, stderr_path, timeout_ms)
+
+pub fn build_graph_rt_exec_argv_capture_cwd(args: &str, stdout_path: &str, stderr_path: &str, timeout_ms: i32, cwd: &str) -> i32:
+    with_exec_argv_capture_cwd(args, stdout_path, stderr_path, timeout_ms, cwd)
+
+pub fn build_graph_rt_exec_argv_capture_spawn(args: &str, stdout_path: &str, stderr_path: &str) -> i32:
+    with_exec_argv_capture_spawn(args, stdout_path, stderr_path)
+
+pub fn build_graph_rt_exec_wait(pid: i32, timeout_ms: i32) -> i32:
+    with_exec_wait(pid, timeout_ms)
+
+pub fn build_graph_rt_getenv(name: &str) -> str:
+    with_getenv_str(name)
+
+pub fn build_graph_rt_setenv(name: &str, value: &str) -> i32:
+    with_setenv_str(name, value)
+
+pub fn build_graph_rt_file_exists(path: &str) -> i32:
+    with_fs_file_exists(path)
+
+pub fn build_graph_rt_file_mode(path: &str) -> i32:
+    with_fs_file_mode(path)
+
+pub fn build_graph_rt_is_dir(path: &str) -> i32:
+    with_fs_is_dir(path)
+
+pub fn build_graph_rt_mkdir_p(path: &str) -> i32:
+    with_fs_mkdir_p(path)
+
+pub fn build_graph_rt_read_file(path: &str) -> str:
+    with_fs_read_file(path)
+
+pub fn build_graph_rt_readlink(path: &str) -> str:
+    with_fs_readlink(path)
+
+pub fn build_graph_rt_remove_file(path: &str) -> i32:
+    with_fs_remove_file(path)
+
+pub fn build_graph_rt_remove_dir(path: &str) -> i32:
+    with_fs_remove_dir(path)
+
+pub fn build_graph_rt_remove_tree(path: &str) -> i32:
+    with_fs_remove_tree(path)
+
+pub fn build_graph_rt_list_files(path: &str) -> str:
+    with_fs_list_files(path)
+
+pub fn build_graph_rt_rename_file(old_path: &str, new_path: &str) -> i32:
+    with_fs_rename_file(old_path, new_path)
+
+pub fn build_graph_rt_write_file(path: &str, data: &str) -> i32:
+    with_fs_write_file(path, data)
+
+pub fn build_graph_rt_assemble_to_object(source_path: &str, output_path: &str) -> i32:
+    wl_assemble_to_object(source_path, output_path)
+
+pub fn build_graph_rt_assemble_to_object_for_triple(source_path: &str, output_path: &str, triple: &str) -> i32:
+    wl_assemble_to_object_for_triple(source_path, output_path, triple)
+
+pub fn build_graph_rt_compile_ir_to_object(source_path: &str, output_path: &str) -> i32:
+    wl_compile_ir_to_object(source_path, output_path)
+
+pub fn build_graph_rt_chmod(path: &str, mode: i32) -> i32:
+    with_fs_chmod(path, mode)
+
+pub fn build_graph_rt_getpid() -> i32:
+    with_getpid()
+
+// Same out-param layout with_sysinfo fills for codegen units.
+type BuildGraphSysInfo {
+    cpu_cores: i32,
+    memory_total: i64,
+    page_size: i64,
+}
+extern fn with_sysinfo(out: *mut u8) -> i32
+
+pub fn build_graph_rt_cpu_cores() -> i32:
+    var info = BuildGraphSysInfo { cpu_cores: 0, memory_total: 0, page_size: 0 }
+    let _ = with_sysinfo(&info as *mut u8)
+    info.cpu_cores
+
+pub fn build_graph_rt_clock_nanos() -> i64:
+    with_clock_nanos()
+
+pub fn build_graph_rt_write(s: &str) -> Unit:
+    with_write(s)
+
+pub fn build_graph_rt_eprint(s: &str) -> Unit:
+    with_eprint(s)

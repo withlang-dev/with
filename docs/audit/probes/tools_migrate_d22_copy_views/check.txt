@@ -1,0 +1,298 @@
+error: wrong argument type in call to 'edit_key'
+ --> tools/migrate_d22_copy_views.w:76:21
+76 |         if edit_key(edits.paths.get(i as i64), edits.lines.get(i as i64), edits.names.get(i as i64)) == wanted: return true
+  |                     ^^^^^^^^^^^^^^^^^^^^^^^^^
+  = label @76:21 argument expression 'edits.paths.get(i as i64)' has type &str
+  = note: parameter 'path' expects str
+  = note: actual type: &str
+
+error: wrong argument type in call to 'edit_key'
+ --> tools/migrate_d22_copy_views.w:76:75
+76 |         if edit_key(edits.paths.get(i as i64), edits.lines.get(i as i64), edits.names.get(i as i64)) == wanted: return true
+  |                                                                           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  = label @76:75 argument expression 'edits.names.get(i as i64)' has type &str
+  = note: parameter 'name' expects str
+  = note: actual type: &str
+
+error: use of moved value
+ --> tools/migrate_d22_copy_views.w:86:30
+86 |         let next = find_from(text, "\nerror:", start + 1)
+  |                              ^^^^
+  = help: a moved value cannot be used again; if it is moved on only some control-flow paths, reinitialize it on every path before this use, or clone it before the move
+
+error: use of moved value
+ --> tools/migrate_d22_copy_views.w:87:50
+87 |         let block_end = if next >= 0: next else: text.len()
+  |                                                  ^^^^
+  = help: a moved value cannot be used again; if it is moved on only some control-flow paths, reinitialize it on every path before this use, or clone it before the move
+
+error: use of moved value
+ --> tools/migrate_d22_copy_views.w:88:21
+88 |         let block = text.slice(start, block_end)
+  |                     ^^^^
+  = help: a moved value cannot be used again; if it is moved on only some control-flow paths, reinitialize it on every path before this use, or clone it before the move
+
+error: use of moved value
+ --> tools/migrate_d22_copy_views.w:91:51
+91 |         let live_at = if while_at >= 0: find_from(block, "` is a live view", while_at + 8) else: -1
+  |                                                   ^^^^^
+  = help: a moved value cannot be used again; if it is moved on only some control-flow paths, reinitialize it on every path before this use, or clone it before the move
+
+error: use of moved value: `text` is moved inside a loop and not reinitialized before the loop repeats
+ --> tools/migrate_d22_copy_views.w:94:13
+94 |             continue
+  |             ^^^^^^^^
+  = help: reinitialize `text` on every path before the loop repeats, or move it only on a path that exits the loop
+
+error: use of moved value: `error_prefix` is moved inside a loop and not reinitialized before the loop repeats
+ --> tools/migrate_d22_copy_views.w:94:13
+94 |             continue
+  |             ^^^^^^^^
+  = help: reinitialize `error_prefix` on every path before the loop repeats, or move it only on a path that exits the loop
+
+error: use of moved value
+ --> tools/migrate_d22_copy_views.w:95:20
+95 |         let name = block.slice(while_at + 8, live_at)
+  |                    ^^^^^
+  = help: a moved value cannot be used again; if it is moved on only some control-flow paths, reinitialize it on every path before this use, or clone it before the move
+
+error: use of moved value
+ --> tools/migrate_d22_copy_views.w:97:33
+97 |         let path_at = find_from(block, "\n --> ", 0)
+  |                                 ^^^^^
+  = help: a moved value cannot be used again; if it is moved on only some control-flow paths, reinitialize it on every path before this use, or clone it before the move
+
+error: use of moved value: `text` is moved inside a loop and not reinitialized before the loop repeats
+ --> tools/migrate_d22_copy_views.w:100:13
+100 |             continue
+  |             ^^^^^^^^
+  = help: reinitialize `text` on every path before the loop repeats, or move it only on a path that exits the loop
+
+error: use of moved value: `error_prefix` is moved inside a loop and not reinitialized before the loop repeats
+ --> tools/migrate_d22_copy_views.w:100:13
+100 |             continue
+  |             ^^^^^^^^
+  = help: reinitialize `error_prefix` on every path before the loop repeats, or move it only on a path that exits the loop
+
+error: use of moved value
+ --> tools/migrate_d22_copy_views.w:101:34
+101 |         let location = line_text(block, path_at + 6)
+  |                                  ^^^^^
+  = help: a moved value cannot be used again; if it is moved on only some control-flow paths, reinitialize it on every path before this use, or clone it before the move
+
+error: use of moved value: `text` is moved inside a loop and not reinitialized before the loop repeats
+ --> tools/migrate_d22_copy_views.w:105:13
+105 |             continue
+  |             ^^^^^^^^
+  = help: reinitialize `text` on every path before the loop repeats, or move it only on a path that exits the loop
+
+error: use of moved value: `error_prefix` is moved inside a loop and not reinitialized before the loop repeats
+ --> tools/migrate_d22_copy_views.w:105:13
+105 |             continue
+  |             ^^^^^^^^
+  = help: reinitialize `error_prefix` on every path before the loop repeats, or move it only on a path that exits the loop
+
+error: use of moved value
+ --> tools/migrate_d22_copy_views.w:106:43
+106 |         let path = diagnostic_source_path(location.slice(0, first_colon))
+  |                                           ^^^^^^^^
+  = help: a moved value cannot be used again; if it is moved on only some control-flow paths, reinitialize it on every path before this use, or clone it before the move
+
+error: use of moved value
+ --> tools/migrate_d22_copy_views.w:109:34
+109 |         var label_at = find_from(block, label_prefix, 0)
+  |                                  ^^^^^
+  = help: a moved value cannot be used again; if it is moved on only some control-flow paths, reinitialize it on every path before this use, or clone it before the move
+
+error: use of moved value
+ --> tools/migrate_d22_copy_views.w:112:35
+112 |             let label = line_text(block, label_at)
+  |                                   ^^^^^
+  = help: a moved value cannot be used again; if it is moved on only some control-flow paths, reinitialize it on every path before this use, or clone it before the move
+
+error: use of moved value
+ --> tools/migrate_d22_copy_views.w:114:47
+114 |                 let digits_start = label_at + label_prefix.len()
+  |                                               ^^^^^^^^^^^^
+  = help: a moved value cannot be used again; if it is moved on only some control-flow paths, reinitialize it on every path before this use, or clone it before the move
+
+error: use of moved value
+ --> tools/migrate_d22_copy_views.w:115:39
+115 |                 let colon = find_from(block, ":", digits_start)
+  |                                       ^^^^^
+  = help: a moved value cannot be used again; if it is moved on only some control-flow paths, reinitialize it on every path before this use, or clone it before the move
+
+error: use of moved value
+ --> tools/migrate_d22_copy_views.w:116:62
+116 |                 if colon >= 0: binding_line = parse_i32_text(block.slice(digits_start, colon))
+  |                                                              ^^^^^
+  = help: a moved value cannot be used again; if it is moved on only some control-flow paths, reinitialize it on every path before this use, or clone it before the move
+
+error: use of moved value
+ --> tools/migrate_d22_copy_views.w:118:34
+118 |             label_at = find_from(block, label_prefix, label_at + label_prefix.len())
+  |                                  ^^^^^
+  = help: a moved value cannot be used again; if it is moved on only some control-flow paths, reinitialize it on every path before this use, or clone it before the move
+
+error: use of moved value
+ --> tools/migrate_d22_copy_views.w:118:41
+118 |             label_at = find_from(block, label_prefix, label_at + label_prefix.len())
+  |                                         ^^^^^^^^^^^^
+  = help: a moved value cannot be used again; if it is moved on only some control-flow paths, reinitialize it on every path before this use, or clone it before the move
+
+error: use of moved value
+ --> tools/migrate_d22_copy_views.w:118:66
+118 |             label_at = find_from(block, label_prefix, label_at + label_prefix.len())
+  |                                                                  ^^^^^^^^^^^^
+  = help: a moved value cannot be used again; if it is moved on only some control-flow paths, reinitialize it on every path before this use, or clone it before the move
+
+error: use of moved value: `text` is moved inside a loop and not reinitialized before the loop repeats
+ --> tools/migrate_d22_copy_views.w:121:13
+121 |             continue
+  |             ^^^^^^^^
+  = help: reinitialize `text` on every path before the loop repeats, or move it only on a path that exits the loop
+
+error: use of moved value: `error_prefix` is moved inside a loop and not reinitialized before the loop repeats
+ --> tools/migrate_d22_copy_views.w:121:13
+121 |             continue
+  |             ^^^^^^^^
+  = help: reinitialize `error_prefix` on every path before the loop repeats, or move it only on a path that exits the loop
+
+error: use of moved value
+ --> tools/migrate_d22_copy_views.w:124:33
+124 |         let type_at = find_from(block, type_prefix, 0)
+  |                                 ^^^^^
+  = help: a moved value cannot be used again; if it is moved on only some control-flow paths, reinitialize it on every path before this use, or clone it before the move
+
+error: use of moved value
+ --> tools/migrate_d22_copy_views.w:125:51
+125 |         let type_end = if type_at >= 0: find_from(block, " = ...`", type_at + type_prefix.len()) else: -1
+  |                                                   ^^^^^
+  = help: a moved value cannot be used again; if it is moved on only some control-flow paths, reinitialize it on every path before this use, or clone it before the move
+
+error: use of moved value
+ --> tools/migrate_d22_copy_views.w:125:79
+125 |         let type_end = if type_at >= 0: find_from(block, " = ...`", type_at + type_prefix.len()) else: -1
+  |                                                                               ^^^^^^^^^^^
+  = help: a moved value cannot be used again; if it is moved on only some control-flow paths, reinitialize it on every path before this use, or clone it before the move
+
+error: use of moved value: `text` is moved inside a loop and not reinitialized before the loop repeats
+ --> tools/migrate_d22_copy_views.w:128:13
+128 |             continue
+  |             ^^^^^^^^
+  = help: reinitialize `text` on every path before the loop repeats, or move it only on a path that exits the loop
+
+error: use of moved value: `error_prefix` is moved inside a loop and not reinitialized before the loop repeats
+ --> tools/migrate_d22_copy_views.w:128:13
+128 |             continue
+  |             ^^^^^^^^
+  = help: reinitialize `error_prefix` on every path before the loop repeats, or move it only on a path that exits the loop
+
+error: use of moved value
+ --> tools/migrate_d22_copy_views.w:129:18
+129 |         let ty = block.slice(type_at + type_prefix.len(), type_end)
+  |                  ^^^^^
+  = help: a moved value cannot be used again; if it is moved on only some control-flow paths, reinitialize it on every path before this use, or clone it before the move
+
+error: use of moved value
+ --> tools/migrate_d22_copy_views.w:129:40
+129 |         let ty = block.slice(type_at + type_prefix.len(), type_end)
+  |                                        ^^^^^^^^^^^
+  = help: a moved value cannot be used again; if it is moved on only some control-flow paths, reinitialize it on every path before this use, or clone it before the move
+
+error: use of moved value
+ --> tools/migrate_d22_copy_views.w:131:30
+131 |             edits.paths.push(path)
+  |                              ^^^^
+  = help: a moved value cannot be used again; if it is moved on only some control-flow paths, reinitialize it on every path before this use, or clone it before the move
+
+error: use of moved value
+ --> tools/migrate_d22_copy_views.w:133:30
+133 |             edits.names.push(name)
+  |                              ^^^^
+  = help: a moved value cannot be used again; if it is moved on only some control-flow paths, reinitialize it on every path before this use, or clone it before the move
+
+error: use of moved value: `text` is moved inside a loop and not reinitialized before the loop repeats
+ --> tools/migrate_d22_copy_views.w:83:5
+83 |     while true:
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  = help: reinitialize `text` on every path before the loop repeats, or move it only on a path that exits the loop
+
+error: use of moved value: `error_prefix` is moved inside a loop and not reinitialized before the loop repeats
+ --> tools/migrate_d22_copy_views.w:83:5
+83 |     while true:
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  = help: reinitialize `error_prefix` on every path before the loop repeats, or move it only on a path that exits the loop
+
+error: use of moved value
+ --> tools/migrate_d22_copy_views.w:141:31
+141 |     let end = source_line_end(text, start)
+  |                               ^^^^
+  = help: a moved value cannot be used again; if it is moved on only some control-flow paths, reinitialize it on every path before this use, or clone it before the move
+
+error: use of moved value
+ --> tools/migrate_d22_copy_views.w:142:28
+142 |     var lexer = Lexer.init(text, 0)
+  |                            ^^^^
+  = help: a moved value cannot be used again; if it is moved on only some control-flow paths, reinitialize it on every path before this use, or clone it before the move
+
+error: use of moved value
+ --> tools/migrate_d22_copy_views.w:150:21
+150 |         let found = text.slice(tokens.get_start(i + 1) as i64, tokens.get_end(i + 1) as i64)
+  |                     ^^^^
+  = help: a moved value cannot be used again; if it is moved on only some control-flow paths, reinitialize it on every path before this use, or clone it before the move
+
+error: use of moved value
+ --> tools/migrate_d22_copy_views.w:160:67
+160 |         print(f"error: ambiguous D22 binding site {path}:{line} `{name}`")
+  |                                                                   ^^^^
+  = help: a moved value cannot be used again; if it is moved on only some control-flow paths, reinitialize it on every path before this use, or clone it before the move
+
+error: use of moved value
+ --> tools/migrate_d22_copy_views.w:162:77
+162 |     print(f"{if apply: "migrate" else: "would migrate"}: {path}:{line} let {name}: {ty}")
+  |                                                                             ^^^^
+  = help: a moved value cannot be used again; if it is moved on only some control-flow paths, reinitialize it on every path before this use, or clone it before the move
+
+error: use of moved value
+ --> tools/migrate_d22_copy_views.w:164:23
+164 |         let updated = text.slice(0, insert as i64) ++ ": " ++ ty ++ text.slice(insert as i64, text.len())
+  |                       ^^^^
+  = help: a moved value cannot be used again; if it is moved on only some control-flow paths, reinitialize it on every path before this use, or clone it before the move
+
+error: use of moved value
+ --> tools/migrate_d22_copy_views.w:164:69
+164 |         let updated = text.slice(0, insert as i64) ++ ": " ++ ty ++ text.slice(insert as i64, text.len())
+  |                                                                     ^^^^
+  = help: a moved value cannot be used again; if it is moved on only some control-flow paths, reinitialize it on every path before this use, or clone it before the move
+
+error: use of moved value
+ --> tools/migrate_d22_copy_views.w:164:95
+164 |         let updated = text.slice(0, insert as i64) ++ ": " ++ ty ++ text.slice(insert as i64, text.len())
+  |                                                                                               ^^^^
+  = help: a moved value cannot be used again; if it is moved on only some control-flow paths, reinitialize it on every path before this use, or clone it before the move
+
+error: wrong argument type in call to 'apply_one'
+ --> tools/migrate_d22_copy_views.w:202:22
+202 |         if apply_one(edits.paths.get(i as i64), edits.lines.get(i as i64), edits.names.get(i as i64), edits.types.get(i as i64), apply) < 0:
+  |                      ^^^^^^^^^^^^^^^^^^^^^^^^^
+  = label @202:22 argument expression 'edits.paths.get(i as i64)' has type &str
+  = note: parameter 'path' expects str
+  = note: actual type: &str
+
+error: wrong argument type in call to 'apply_one'
+ --> tools/migrate_d22_copy_views.w:202:76
+202 |         if apply_one(edits.paths.get(i as i64), edits.lines.get(i as i64), edits.names.get(i as i64), edits.types.get(i as i64), apply) < 0:
+  |                                                                            ^^^^^^^^^^^^^^^^^^^^^^^^^
+  = label @202:76 argument expression 'edits.names.get(i as i64)' has type &str
+  = note: parameter 'name' expects str
+  = note: actual type: &str
+
+error: wrong argument type in call to 'apply_one'
+ --> tools/migrate_d22_copy_views.w:202:103
+202 |         if apply_one(edits.paths.get(i as i64), edits.lines.get(i as i64), edits.names.get(i as i64), edits.types.get(i as i64), apply) < 0:
+  |                                                                                                       ^^^^^^^^^^^^^^^^^^^^^^^^^
+  = label @202:103 argument expression 'edits.types.get(i as i64)' has type &str
+  = note: parameter 'ty' expects str
+  = note: actual type: &str
+error: check failed during compilation

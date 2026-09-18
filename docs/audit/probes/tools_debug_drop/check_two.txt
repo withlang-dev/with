@@ -1,0 +1,3 @@
+PASS test/debug_alloc/da_pod_vec.w
+PASS test/debug_alloc/da_manual_double_free.w
+debug-alloc lane: ok

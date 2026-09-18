@@ -1,0 +1,1 @@
+usage: debug_drop <run|check> <with-bin> <target.w> [more fixtures...]

@@ -1,0 +1,14 @@
+PASS u32_from_be
+PASS u32_from_le
+PASS u16_from_be
+PASS u16_from_le
+PASS u64_from_be
+PASS u64_from_le
+PASS u32 be roundtrip
+PASS u32 le roundtrip
+PASS u64 be roundtrip
+PASS u64 le roundtrip
+PASS u16 be roundtrip off6
+PASS u16 le roundtrip off6
+PASS u32_from_be off1
+PASS u16_from_le off2

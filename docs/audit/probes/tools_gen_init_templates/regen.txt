@@ -1,0 +1,10 @@
+error: manual extern function call requires unsafe context
+ --> .audit/probes/tools_gen_init_templates/gen_probe.w:28:11
+28 | let doc = with_fs_read_file("docs/with_for_ai.md")
+  |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: manual extern function call requires unsafe context
+ --> .audit/probes/tools_gen_init_templates/gen_probe.w:52:4
+52 | if with_fs_write_file(".audit/probes/tools_gen_init_templates/regen.w", out) != 0:
+  |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+error: run failed

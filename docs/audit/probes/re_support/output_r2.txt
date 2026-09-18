@@ -1,0 +1,17 @@
+ascii rc=0 off=9999
+e-acute rc=0 off=9999
+euro rc=0 off=9999
+grin rc=0 off=9999
+lone-trail rc=-22 off=1
+trunc-e2 rc=-4 off=0
+trunc-e282 rc=-3 off=0
+trunc-f09f rc=-4 off=0
+overlong2 rc=-17 off=0
+overlong3 rc=-18 off=0
+overlong4 rc=-19 off=0
+bad-cont rc=-8 off=0
+surrogate rc=-16 off=0
+beyond-10ffff rc=-15 off=0
+fe rc=-23 off=0
+five-byte rc=-13 off=0
+six-byte rc=-14 off=0

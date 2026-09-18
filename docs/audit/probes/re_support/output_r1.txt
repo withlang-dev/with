@@ -1,0 +1,35 @@
+nomatch=-1 utf=524288 infocap=4 cfgver=11 subglob=256 convglob=16
+tableslen=1088 ucpLu=9 ucpNd=13 maxtables=1114111
+op_end=0 op_xclass=112 op_tablelen=173
+ckd1 rc=0 r=6000000000
+ckd2 rc=0 r=4611686014132420609
+ckd3 rc=0 r=0
+ckd4 rc=0 r=18446744073709551581
+strlen=2 strcmp_hi_hj=-1 strcmp_hi_hi=0 strncmp1=0 strncmp0=0
+strcpy=3 s2=0
+ord41 n=1 b=65
+ord7ff n=2 b=223 191
+ord20ac n=3 b=226 130 172
+ord1f600 n=4 b=240 159 152 128
+err 101 rc=19 msg=\ at end of pattern
+err -1 rc=8 msg=no match
+err -48 rc=14 msg=no more memory
+err -45 rc=14 msg=bad JIT option
+err -68 rc=44 msg=feature is not supported by the JIT compiler
+err -34 rc=16 msg=bad option value
+trunc rc=-48 msg=no 
+zerosize rc=-48
+cfg 0 rc=0 val=1
+cfg 1 rc=0 val=0
+cfg 3 rc=0 val=2
+cfg 4 rc=0 val=10000000
+cfg 5 rc=0 val=2
+cfg 6 rc=0 val=250
+cfg 9 rc=0 val=1
+cfg 12 rc=0 val=20000000
+cfg16 tableslen rc=0 val=1088
+cfgbad rc=-34
+cfgver rc=17 str=10.47 2025-10-21
+cfguni rc=7 str=16.0.0
+jittarget=JIT is not supported jitsize=0 stacknull=1
+maketables_bad=0 lccA=97 fcct=84

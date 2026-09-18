@@ -1,0 +1,4 @@
+table_count=72 (want 72: 8 IV + 64 K)
+IV_match=True K_match=True ALL_match=True
+mismatches=none
+precision_stable=True

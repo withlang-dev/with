@@ -1,0 +1,6 @@
+u32_from_be struct=0x12345678 identity=0x12345678 MATCH
+u32_from_le struct=0x78563412 identity=0x78563412 MATCH
+u16_from_be struct=0x1234 identity=0x1234 MATCH
+u16_from_le struct=0x3412 identity=0x3412 MATCH
+u64_from_be struct=0x102030405060708 identity=0x102030405060708 MATCH
+u64_from_le struct=0x807060504030201 identity=0x807060504030201 MATCH

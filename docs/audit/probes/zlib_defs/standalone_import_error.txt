@@ -1,0 +1,21 @@
+warning: large Copy type 'internal_state' is 3200 bytes; implicit copies may be expensive (copy_warn_threshold=128)
+ --> <embedded-std>/std/zlib/defs.w:305:1
+305 | impl Copy for internal_state
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: large Copy type 'gz_state' is 248 bytes; implicit copies may be expensive (copy_warn_threshold=128)
+ --> <embedded-std>/std/zlib/defs.w:861:1
+861 | impl Copy for gz_state
+  | ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: large Copy type 'inflate_state' is 7160 bytes; implicit copies may be expensive (copy_warn_threshold=128)
+ --> <embedded-std>/std/zlib/defs.w:1192:1
+1192 | impl Copy for inflate_state
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: undefined variable
+ --> <embedded-std>/std/zlib/defs.w:487:35
+487 | pub let zlib_version: *const i8 = zlibVersion()
+  |                                   ^^^^^^^^^^^
+  = help: did you mean 'zlib_version'?
+error: check failed during compilation

@@ -1,0 +1,1 @@
+error: source commit must contain at least 12 characters

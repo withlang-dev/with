@@ -1,0 +1,1 @@
+usage: with run tools/move_audit.w <candidate-with> [baseline-with]

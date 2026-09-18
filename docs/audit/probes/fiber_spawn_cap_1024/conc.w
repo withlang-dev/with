@@ -1,0 +1,18 @@
+use std.builtins.print_i32
+use std.task.Task
+use std.task.await_all
+use std.task.with_concurrency
+async fn mark(idx: i32) -> i32: idx + 1
+fn build_tasks(n: i32) -> Vec[Task[i32]]:
+    var tasks: Vec[Task[i32]] = Vec.new()
+    var i = 0
+    while i < n:
+        tasks.push(mark(i))
+        i = i + 1
+    tasks
+async fn main:
+    let results = await_all(with_concurrency(build_tasks(1100), 1))
+    print_i32(results.len() as i32)
+    print_i32(results.get(1023))
+    print_i32(results.get(1024))
+    print_i32(results.get(1099))

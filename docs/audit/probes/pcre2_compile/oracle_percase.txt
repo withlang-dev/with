@@ -1,0 +1,29 @@
+nested || /((a)(b(c)))/ |     abc |  0: abc |  1: abc |  2: a |  3: bc |  4: c
+backref-hit || /(a|b)\1/ |     aa |  0: aa |  1: a
+backref-miss || /(a|b)\1/ |     ab | No match
+lookahead || /(?=abc)abc/ |     abc |  0: abc
+neglookahead || /(?!foo)bar/ |     bar |  0: bar
+lookbehind || /(?<=ab)c/ |     abc |  0: c
+count || /a{64}/ |     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa |  0: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+countrange || /x{1,200}/ |     xxxx |  0: xxxx
+class || /[a-z]+/ |     hello |  0: hello
+negclass || /[^abc]+/ |     xyz |  0: xyz
+posixclass || /[[:alpha:]]+/ |     hello |  0: hello
+alt || /(a|b)*abb/ |     aababb |  0: aababb |  1: b
+nongreedy || /a+?b/ |     aaab |  0: aaab
+named || /(?<word>ab)c/ |     abc |  0: abc |  1: ab
+namedref || /(?<w>a|b)k(?P=w)/ |     aka |  0: aka |  1: a
+possessive || /a++b/ |     aaab |  0: aaab
+atomic || /(?>a+)b/ |     aaab |  0: aaab
+cond-hit || /(a)?(?(1)b|c)/ |     ab |  0: ab |  1: a
+cond-else || /(a)?(?(1)b|c)/ |     c |  0: c
+anchors || /^\d{3}-\d{4}$/ |     123-4567 |  0: 123-4567
+deep10 || /((((((((((a))))))))))/ |     a |  0: a |  1: a |  2: a |  3: a |  4: a |  5: a |  6: a |  7: a |  8: a |  9: a | 10: a
+bad-unclosed || /(abc/ | Failed: error 114 at offset 4: missing closing parenthesis |         here: (abc |<--| |     abc
+bad-class || /[abc/ | Failed: error 106 at offset 4: missing terminating ] for character class |         here: [abc |<--| |     abc
+bad-quant || /*abc/ | Failed: error 109 at offset 1: quantifier does not follow a repeatable item |         here: * |<--| abc |     abc
+bad-backref || /(a)\2/ | Failed: error 115 at offset 5: reference to non-existent subpattern |         here: (a)\2 |<-->| |     aa
+bad-range || /a{3,2}/ | Failed: error 104 at offset 5: numbers out of order in {} quantifier |         here: a{3,2 |<--| } |     aaa
+bad-trailbs || /abc\/ |     abc | ** Unexpected EOF | ** pcre2test run abandoned
+bad-lookbehind || /(?<=a*)b/ | Failed: error 125 at offset 0: length of lookbehind assertion is not limited |         here: |-->| (?<=a*)b |     ab
+bad-dupname || /(?P<n>a)(?P<n>b)/ | Failed: error 143 at offset 14: two named subpatterns have the same name (PCRE2_DUPNAMES not set) |         here: ...n>a)(?P<n> |<--| b) |     ab

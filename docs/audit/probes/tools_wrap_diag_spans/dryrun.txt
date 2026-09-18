@@ -1,0 +1,4 @@
+sites collected: 1
+wrap .audit/probes/tools_wrap_diag_spans/fixture.w:2:5 kind=return span='name'
+planned/applied 1 edits
+dry run: re-run with --apply to write

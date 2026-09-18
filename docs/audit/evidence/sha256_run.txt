@@ -1,0 +1,15 @@
+error: undefined variable
+ --> .audit/probes/sha256/main.w:67:16
+67 |         w[i] = u32_from_be(&ctx.buf[0] as *const u8, i * 4)
+  |                ^^^^^^^^^^^
+
+error: undefined variable
+ --> .audit/probes/sha256/main.w:132:5
+132 |     u64_to_be(&raw mut len_buf[0] as *mut u8, 0, total_bits)
+  |     ^^^^^^^^^
+
+error: undefined variable
+ --> .audit/probes/sha256/main.w:137:9
+137 |         u32_to_be(out, i * 4, ctx.state[i])
+  |         ^^^^^^^^^
+error: run failed

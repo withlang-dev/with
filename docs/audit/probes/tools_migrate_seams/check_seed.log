@@ -1,0 +1,37 @@
+error: wrong argument type in call to 'argv_append'
+ --> tools/migrate_seams.w:78:31
+78 |     var cmd = argv_append("", compiler)
+  |                               ^^^^^^^^
+  = label @78:31 argument expression 'compiler' has type &str
+  = note: parameter 'arg' expects str
+  = note: actual type: &str
+
+error: wrong argument type in call to 'argv_append'
+ --> tools/migrate_seams.w:80:28
+80 |     cmd = argv_append(cmd, root)
+  |                            ^^^^
+  = label @80:28 argument expression 'root' has type &str
+  = note: parameter 'arg' expects str
+  = note: actual type: &str
+
+error: manual extern function call requires unsafe context
+ --> tools/migrate_seams.w:86:18
+86 |     let report = with_fs_read_file(out_path)
+  |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: wrong argument type in call to 'split_tabs'
+ --> tools/migrate_seams.w:94:31
+94 |         let cols = split_tabs(line)
+  |                               ^^^^
+  = label @94:31 argument expression 'line' has type &str
+  = note: parameter 'line' expects str
+  = note: actual type: &str
+
+error: wrong argument type in call to 'parse_int'
+ --> tools/migrate_seams.w:106:32
+106 |         let offset = parse_int(cols.get(1))
+  |                                ^^^^^^^^^^^
+  = label @106:32 argument expression 'cols.get(1)' has type &str
+  = note: parameter 'text' expects str
+  = note: actual type: &str
+error: check failed during compilation

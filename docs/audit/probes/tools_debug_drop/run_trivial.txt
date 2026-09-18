@@ -1,0 +1,2 @@
+=== debug-alloc: .audit/probes/tools_debug_drop/repro.w (exit 1) ===
+verdict: clean (no double-free, no leak)

@@ -1,0 +1,13 @@
+glob-star rc=0 len=19 conv=(?s)\A[^/]*?\.txt\z
+glob-star match-txt rc=1 match-dat rc=-1
+glob-q rc=0 len=25 conv=(?s)\Afoo\.[^/][^/][^/]\z
+glob-q match-txt rc=1 match-dat rc=1
+glob-class rc=0 len=33 conv=(?s)\A[a-c](*COMMIT)[^/]*?\.txt\z
+glob-class match-txt rc=-1 match-dat rc=-1
+posix rc=0 len=14 conv=(*NUL)a\(b*\)c
+posix match rc=-1
+conv-badopt rc=-34 conv-null rc=-51
+enc rc=1 size=1283 ncodes=1
+dec rc=1
+rt-match rc=3
+dec-badmagic rc=-31 enc-null rc=-51
