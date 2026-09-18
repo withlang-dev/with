@@ -444,8 +444,15 @@ fn comp_run_compiler_capture(ctx: &ActionCtx, label: &str, argv: Vec[str], stdou
     if ctx.target_name() == "stage1":
         if env("WITH_CODEGEN_UNITS").len() == 0:
             process_env = process_env.set("WITH_CODEGEN_UNITS", "16")
+        // Emit width trades memory for time (16 units, darwin arm64: width 1
+        // 218 s / 3.1 GB, 4 114 s / 4.4 GB, 16 78 s / 7.2 GB). A CI runner
+        // keeps the single-thread layout this block exists for; elsewhere 4
+        // is safe on any development machine. The build layer cannot ask the
+        // host for its memory under the pinned seed, so set
+        // WITH_CODEGEN_EMIT_WIDTH (16 on a large machine) to choose.
         if env("WITH_CODEGEN_EMIT_WIDTH").len() == 0:
-            process_env = process_env.set("WITH_CODEGEN_EMIT_WIDTH", "1")
+            let on_ci = env("CI").len() > 0 or env("GITHUB_ACTIONS").len() > 0
+            process_env = process_env.set("WITH_CODEGEN_EMIT_WIDTH", if on_ci: "1" else: "4")
     let embedded_object = comp_arg_value(ctx.args(), "embedded-object=")
     if embedded_object.len() > 0:
         process_env = process_env.set("WITH_COMPILER_EMBEDDED_OBJECT", comp_abs(root, embedded_object))
