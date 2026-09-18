@@ -423,3 +423,83 @@ The MIR validator accepted this invalid moved-payload cleanup; its missing
 check is filed separately as #1170. The parser also exposed an independent
 early-return leak from an enclosing statement temporary frame (#1172),
 which this change does not claim to fix.
+
+
+### Function exits skipped outer statement temporaries (#1172)
+
+The source-manifest parser still leaked 38 allocations after the independent
+implicit-Result payload repair. Reduction leaves a loop over `text.split(",")`
+whose body returns an error: its two strings and vector leak. The allocator
+address trap identifies `str_split_vec_ref` as the allocation site. Native
+LLDB stops at `MirBuilder.lower_return+336`, the call to
+`flush_stmt_temp_frame`, with pending locals `[2, 4]` and frame starts
+`[0, 0, 2, 2]`. Flushing only the last frame drops neither outer temporary.
+Evidence: `for-temporary-return-frame-state.log`,
+`for-temporary-return-flush-lldb.log`, and
+`conan-source-parser-leak-origin.log` under `out/with-get-investigation/`.
+
+Function-exit cleanup now includes every active statement temporary and
+pending move reset without removing records needed by continuing paths.
+Explicit returns, builtin `?`, user-defined `Try`, and await cancellation
+use the shared cleanup. Normal statement cleanup removes completed records.
+
+The initial 14-case regression checks owned error payloads, nested loop returns,
+returns while evaluating arguments, both conditional paths, normal loop
+completion, break/continue, both Try forms, and cancellation. All cases pass
+with zero leaks both with allocator reuse and with `WITH_ALLOC_NO_REUSE=1`.
+The baseline leaked 3 allocations for each single-loop function exit, 6 for
+nested returns, and 1 for an argument-evaluation return. The fresh stage2
+passes the regression and the reduced repro's integrated MIR audit; the
+full build and move/drop audits also passed on that intermediate change.
+
+The compiler-wide audit then caught five invalid drops in `?? return`
+fallbacks. The reduced MIR proves that `coalesce-default` had already dropped
+the carrier before return cleanup dropped it again; its cleanup records were
+retired only after lowering the default. They now retire before lowering the
+default. Evidence: `return-temps-coalesce-{audit,mir}.log`.
+
+An additional defer probe caught a second ordering problem in the intermediate
+change: emitting every temporary before defers destroyed the iterable before
+the deferred read. Native LLDB observes element 0x100068030 containing payload
+4295393296 and length 3 at the free (0x100000694), then zero/zero at the deferred
+read (0x100000744). The allocator trap confirms that first free. Compiler LLDB
+for `stop` (sym 330) proves `lower_return+268` called temporary cleanup before
+`+276` called defer emission. A local ephemeral destructor borrowing the same
+element also fails, so moving cleanup past defers alone would be incomplete.
+Evidence: `return-temps-defer-{free-read,trap,lowering}-lldb.log` and
+`return-temps-destructor-before.log`.
+
+Each temporary now records its position in the ordinary drop stack. Return
+cleanup merges both stacks in reverse order after defers, keeping temporary
+owners alive through later locals' destructors. The regression now has 22
+cases, adding Option/Result coalescing, defer/destructor reads, both Try
+errdefers and a deferred read during cancellation.
+
+With exits now dropping temporaries, a match arm (and the if-let it
+desugars from) that returned before the join dropped both the bound payload
+and its carrier: compiler LLDB for local 330 shows two `emit_drop_entry`
+calls, because `lower_match` retired the subject's cleanup only after
+lowering the arms. It now retires it before. Eight more cases (match,
+if-let and named subjects, returning, completing and empty) bring the
+regression to 30. Evidence: `return-temps-{match,iflet}-double-drop-lldb.log`.
+
+The fix landed on its own branch off `main` as #1183 (`f71737c1` on main),
+alone in its batch: build, fixpoint, `:test` (1,041 behaviour files),
+`:move-audit`, `:drop-audit`, `:test-green`, `:last-green` all green under
+the pinned seed, `audit:all` 12,571 facts and 0 violations. The same modes
+on `main` before the fix leak 3 (return), 6 (nested), 1 (argument) and 3
+(defer) allocations. The fixture's tail-position if-let exposed an unrelated
+typing defect class, ruled as D43 and merged as #1181 (#1178, #1179, #1180).
+
+Two tool findings remain explicit. Unbundled stage1 analysis expands the
+regex `match_` body (39,712 locals, 41,818 blocks), whose dense drop-state
+matrix exceeds 7 GB; #1173 tracks this scaling problem. Those oversized
+audit runs were stopped, not marked passing. Separately, even the verified
+baseline's two-line `use std.sync` program triggers eight integrated
+receiver/ABI audit violations (#1174). The cancellation fixture uses
+`Atomic[i32]`; its runtime assertions and allocator checks pass, while that
+independent whole-module audit finding remains open.
+The defer probe also exposes an ownership-audit blind spot (#1175): it reports
+11,547 facts and zero violations while the deferred read uses the destroyed
+owner. `analyze` rejecting the valid implicit-main spelling is tracked in
+#1176; the explicit-main form was used for that audit. No checks were waived.

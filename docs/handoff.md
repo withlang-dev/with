@@ -1,231 +1,353 @@
-# Handoff — cutting v0.15.2.2 (2026-09-16)
+# Handoff — v0.15.2.2 is blocked on `with get` just working (2026-09-16)
 
-Read this whole file before touching anything. The active work is the
-release worktree `~/.local/with-staging/release` on branch
-`release-v0.15.2.2` (tip `4ecfddb0`), PR **#1155** → main. Nothing here is
-reseeded; `seed.lock` still pins `v0.15.2.0`.
+Read this whole file before touching anything. Nothing is tagged or
+published. `src/version` still says `v0.15.2.1`; `seed.lock` still pins
+`v0.15.2.0`.
 
-**Two decisions are blocking the release. They are listed in §4 and Eric
-has not answered them yet.** Do not merge, tag, or publish before he does.
+## Current state (2026-09-18, evening) — read this first
+
+Sections 1–5 below are from 2026-09-16 and partly stale; §0 (Eric's ruling),
+§8 (environment traps) and §9 (standing rules) still hold. The running record
+of the campaign is `docs/with-get-release-investigation.md` (newest findings
+at the end); evidence logs are in `~/with/out/with-get-investigation/`.
+
+**`main` = `a91d0bf7`.** Landed today, all off-campaign defects the campaign
+exposed:
+
+- #1181 — D43 (`docs/decisions.md`): an unannotated function inherits its
+  tail's type; a missing arm forces `Unit`; written arms that do not unify
+  are "cannot infer return type". Mission ¶2 and spec §9.1 changed with it.
+  Closed #1178, #1179 (`parse_if_let` fabricated `else: 0`), #1180 (f-string
+  formatted a `Unit` as garbage; invalid MIR; validator rule for `Unit` call
+  arguments, which then found user-`IndexPlace` subscripts typed `Unit`).
+- #1183 — #1172: every active statement temporary's cleanup runs on a
+  function exit. Ownership change, battery with `:move-audit`/`:drop-audit`.
+- #1184 — #1182: the reseed gate's memory tripwire is 2048M (Eric). The
+  runner compile's ~1.25 GB is unexplained (first suspect #1173) but no
+  longer blocks anything.
+
+**Reseeding now needs the candidate as driver for the last step.** The gate
+is compiled into whichever binary drives `:install-user`, and the pinned seed
+(v0.15.2.0) still has the 1024M limit. After the seed-driven battery:
+`WITH=$PWD/out/release/bin/with out/release/bin/with build :install-user`.
+It still verifies its hash against last-green. This ends when a seed newer
+than `a91d0bf7` is published and pinned.
+
+**The campaign: branch `fix-with-get-release-uat`, tip `5a9577f5`, 22 commits
+not on `main`, not rebased onto it yet.** No PR is open. Last validation:
+Release run `35291941683` (test channel, at `5a9577f5`). Every leg's battery
+is green and every leg fails only in the Release UAT step:
+
+| leg | failing UAT targets |
+|---|---|
+| darwin-aarch64 | openssl, raylib-spiral |
+| linux-x86_64 | openssl, libcurl, raylib-spiral |
+| linux-aarch64 | zlib, bzip2, sqlite3, openssl, libcurl, raylib-spiral |
+| windows-x86_64 | bzip2, libcurl (each ~185 s, the timeout), openssl |
+| windows-aarch64 | bzip2, libcurl (each ~185–190 s) |
+
+Passing on every leg: install-layout, fresh-project, one-liner, migrate,
+artifact-smoke. That run predates #1181/#1183: the openssl path hit the
+regex double free that #1172's hunt found, so re-validate after rebasing
+before reading the openssl cells. The linux-aarch64 column is the "arm64
+source-build gap" section of the investigation doc; the Windows ~185 s cells
+are the header-hang/macro-scaling work (`e944748f`, `a32a6fa6`), which has
+not had a Windows run since.
+
+**Next steps, in order:**
+1. Rebase `fix-with-get-release-uat` onto `main` (`a91d0bf7`). Expect
+   conflicts in `src/MirLower.w` with `3d5de2c9` (implicit Result tail
+   payload, #1169) and possibly `src/SemaCheck.w`.
+2. Seed-driven battery on the rebased branch; `3d5de2c9` is an ownership
+   change, so include `:move-audit` and `:drop-audit`.
+3. `gh workflow run Release --ref fix-with-get-release-uat -f channel=test`
+   and rebuild the matrix above from the new run.
+4. Work the remaining cells by root cause (§4 classes A–E), fixtures in
+   `:test` for each, then the release steps in §5.
+
+Tool gaps filed during #1172 and still open: #1173 (drop-state matrix
+>7 GB on the unbundled regex body), #1174 (`use std.sync` trips eight audit
+violations on the baseline), #1175 and #1177 (ownership audit passes a use
+of a destroyed owner / a duplicate cleanup of a moved enum payload), #1176
+(`analyze` rejects implicit main), #1170 (validator accepts a drop of a moved
+aggregate payload).
+
+Traps met today: run a bootstrap stage1 from the repo root (elsewhere it
+fails with `import module not found: 'std.re.defs'`); stage1 has no regex
+bundle, so every check prints ~78k lines of pcre2 warnings — send output to
+a file and grep `^error`. `xargs -I{}` silently stopped a 2,861-file sweep
+after 29 files; the With sweep tool (shards + a processed count) did not.
+A printed value is not proof of a type: `print(f"{f()}")` on a `Unit`
+function printed plausible numbers until #1180; bind `let x: T = f()`.
+
+## 0. Eric's ruling — the task
+
+The release UAT runs `with init` + `with get c.<package>` + `with run`
+against whatever Conan Center serves today. When it went red (OpenSSL moved
+to 4.0.2, zlib to 1.3.2), the previous handoff proposed pinning the openssl
+UAT to 3.x. Eric rejected that (2026-09-16, verbatim):
+
+> Yes, this is valid. `with get` should /just work/ and this correctly
+> shows us that it isn't. Fix it - and not with a bandaid - with a true,
+> deep, real fix after doing a deep dive and root cause analysis, fix the
+> whole class of problem not just the tip of the iceberg.
+
+So:
+
+- **The UAT keeps floating to the newest package.** Do not pin package
+  versions in the UAT, do not waive a UAT, do not skip a platform. The UAT
+  is the user's experience; it is correct to be red.
+- **Old decision 1 (#1158: chase / pin 3.x / waive) is answered: fix it**,
+  as part of the whole class below.
+- **Deep dive first.** Build the full failure matrix and find root causes
+  before the first edit (CLAUDE.md: "Root cause, always", "Exhaust small
+  answer-spaces in one pass", "Every bug has a route"). One-site patches for
+  whichever header broke today are exactly what Eric ruled out.
+- **Do not tag or publish v0.15.2.2 until `:release-uat` is green on every
+  leg with floating packages.** The release exists to ship the Windows LLVM
+  SDK (#1145); it still needs to happen, after this.
+
+**Decision 2, windows-aarch64 placement — answered.** Eric (2026-09-16):
+"anything the mac can't build, needs to be in the CI". So windows-aarch64
+stays on CI with linux-x86_64 and windows-x86_64 on a `v*` tag push, as
+#1155 already set up (`build-windows-aarch64` has no `if:` gate in
+`.github/workflows/nightly-release.yml`). Nothing to change.
 
 ## 1. Where things stand
 
 | Thing | State |
 |---|---|
-| main | `0a0ff13d`. Carries D42 (math builtins, #1154) and the #1144 installer fix (#1152), both merged today. CI green on all five lanes. |
-| `~/.local/with-staging/release` | branch `release-v0.15.2.2`, tip `4ecfddb0`, pushed. PR #1155 open. Local battery GREEN through `last-green`; `:release-uat` fails on **openssl only** (#1158). |
-| `~/.local/with-staging/math-builtins` | branch `math-builtins`, tip `20800683`. D42's source. Already merged as #1154 — the worktree is only kept because it holds a built release compiler and the fetched UAT projects under `out/release-uat/`. Disposable. |
-| `~/.local/with-staging/aarch64` | detached at `0a0ff13d`. Was a scratch checkout for the container work; nothing in it is needed. Disposable. |
-| Docker | image `with-aarch64-host` (715 MB), volume `with-aarch64` holding a clone + SDK + seed + `out/`. Both reusable; the image is rebuilt from `tools/docker/linux-aarch64/Dockerfile`. |
-| Scratch | `/private/tmp/claude-501/-Users-eric-with/c74a0c2d-…/scratchpad/` — battery logs, the fetched `zlib-project`, `uat-openssl`, `uat-bzip2`, `uat-libcurl` projects for check-level repros. |
+| main | `69bf4e70` = #1155 squash (release prep). Before it: #1154 (D42 math builtins), #1152 (#1144 installers), #1151 (CI gates: seed-driven battery, std.libc seams only, Clang bridge path boundary), #1143 (corpus registry). Main CI for `69bf4e70` was in progress at handoff; `0a0ff13d` was green on all five lanes. |
+| `~/with` | at `69bf4e70`. Its main had held a local pre-squash copy of #1144 (`6fd711a6`, patch-id identical to the #1152 squash); kept as branch `backup/main-6fd711a6`, then the branch was moved to origin/main. Eric's uncommitted `plans/*.md` deletions are untouched. **`src/main` is the pinned seed** (digest `79a63ff9…`, matches seed.lock; it self-reports `v0.15.1.10`, which is known). This file is uncommitted there. |
+| `~/.local/with-staging/release` | branch `release-v0.15.2.2`, tip `4ecfddb0`, merged as #1155. Holds a built release compiler and fetched UAT projects under `out/release-uat/`. |
+| `~/.local/with-staging/ci-gates` | branch `ci-gates`, merged as #1151. Disposable. |
+| `~/.local/with-staging/math-builtins`, `aarch64` | disposable (see git history of this file). |
+| Docker | image `with-aarch64-host`, volume `with-aarch64` (clone + SDK + seed + `out/`), rebuilt from `tools/docker/linux-aarch64/Dockerfile`. |
 
-The many other `~/.local/with-staging/*` worktrees are from earlier
-campaigns and are not part of this work.
+## 2. What `with get` + the UAT actually do
 
-## 2. The goal, and Eric's ruling on how releases are cut
+- `with get c.openssl` → `src/compiler/ConanClient.w`. With no version
+  hint, `conan_resolve_version` picks the **highest** version on
+  `center2.conan.io` and `conan_get_latest_recipe_rev` the latest recipe
+  revision. It downloads the prebuilt package (headers + libraries).
+- The program then `use c_import("openssl/evp.h")`: the compiler translates
+  the package's **whole** header closure through the Clang bridge and the
+  c_import generator (`src/CImport.w`) at compile time, then links.
+- The UAT body is `ruat_run_c_package_uat` in `build/release_uat.w`:
+  `with init .`, `with get <package>`, write the fixture from
+  `build/release_uat_fixtures/`, `with run`, compare stdout. Packages:
+  zlib, bzip2, sqlite3, openssl, libcurl, and the raylib spiral (needs an
+  OpenGL 3.3 context). The runbook (`docs/with-release-runbook.md`,
+  "Verification") makes `:release-uat` mandatory on every platform.
+- **This path has no coverage outside the release UAT** (nightly and
+  release channels only). `:test` never runs `with get`. That is why a
+  whole class of breakage accumulated unseen until release day.
 
-Cut **v0.15.2.2** with a compiler *and* an LLVM SDK for every platform. The
-motivating defect: the Release workflow had failed on every leg since
-2026-09-12, and v0.15.2.1 shipped SDKs for only three of five platforms
-because its Windows legs never finished.
+## 3. The evidence — validation Release run `35143254857`
 
-**Eric, 2026-09-16 (verbatim intent):** on every release the Mac builds and
-uploads the darwin and linux-aarch64 binaries; only the x86_64 platforms
-(linux, windows) are built by GitHub CI and appended afterwards. The
-process must be documented and automated. Separately: a linux-aarch64 build
-on a MacBook must be in the runbooks with a checked-in Dockerfile — "it's
-dumb that we had to figure it out from scratch multiple times."
+Test channel, dispatched on `4ecfddb0` (= main minus the later Windows
+UAT-driver workflow change and this doc). All five legs failed. Job logs:
+`gh api repos/withlang-dev/with/actions/jobs/<id>/logs` (`gh run view
+--log-failed` returns nothing while any job of a run is still in progress).
 
-Implemented in #1155:
+| leg (job id) | failing step | what failed |
+|---|---|---|
+| darwin-aarch64 | Release UAT (macOS) | openssl: compiler `invalid free` (#1158). raylib spiral: "window not created (no OpenGL 3.3 context)" on the macOS runner (passes on the Mac locally). |
+| linux-x86_64 (`104971208165`) | Release UAT (Linux, under Xvfb) | openssl: compiler `invalid free` (#1158). raylib spiral: link fails, `ld.lld: unable to find library -lGL -lX11 -lXext -lXfixes -lXi -lXinerama -lXrandr` (the job installs only `xvfb libgl1-mesa-dri`). |
+| windows-x86_64 (`104971208218`) | Release UAT | `build`: "could not rename out/release/bin/with.exe.tmp to with.exe" (see §4 F). bzip2: exit 124 after ~184 s, **no stdout/stderr**. openssl: `error: undefined variable` at `<c_import openssl/evp.h>:3503` `let OSSL_DEPRECATEDIN_4_0: c_int = OSSL_DEPRECATED(4.0)`. libcurl: exit 124 after ~186 s, no output. raylib spiral: "ToolFs path escapes project root: D:/a/_temp/mesa/opengl32.dll". |
+| windows-aarch64 (`104971208197`) | Release UAT | identical to windows-x86_64 (bzip2 124 at ~184 s, libcurl 124 at ~195 s, same openssl line 3502, same opengl32.dll refusal). |
+| linux-aarch64 (`104971208087`) | Green battery (`build :test`) | `test/spec/spec_ss14_11_await_combinator_cancel_joins.w` fails although the file carries `//! skip-on: linux-aarch64` (added by #1155). The skip is not honored in that lane. |
 
-- `tools/docker/linux-aarch64/Dockerfile` — the native `linux/arm64`
-  release host. An Apple Silicon Mac runs it natively
-  (`docker run --rm --platform linux/arm64 ubuntu:24.04 uname -m` →
-  `aarch64`).
-- `tools/release_local.w` — `with run tools/release_local.w vX.Y.Z
-  [--channel test] [--skip-darwin] [--skip-linux-aarch64]`, with `GH_TOKEN`
-  and `RELEASE_SOURCE_SHA` set. Runs the darwin gates, `:release-uat`,
-  packaging and publish-first, then the same inside the container for
-  linux-aarch64. It type-checks; **it has never been run end to end.**
-- `.github/workflows/nightly-release.yml` — `darwin-aarch64` moved out of
-  the unix matrix into its own `build-darwin-aarch64` job; it and
-  `build-linux-aarch64` are gated `if: github.event_name != 'push'`, so a
-  `v*` tag push builds only linux-x86_64, windows-x86_64 and
-  windows-aarch64, while the nightly and test channels still exercise all
-  five.
-- `docs/with-release-runbook.md` — two new sections: "Linux aarch64 Release
-  Host (Docker on Apple Silicon)" and "Local-first: the Mac publishes
-  darwin and linux-aarch64; CI appends the rest".
+Passing everywhere: zlib and sqlite3 (after #1155's generator fixes),
+install-layout, one-liner. On darwin/linux: bzip2 and libcurl pass.
 
-## 3. What #1155 fixes, per leg, with evidence
+Two facts worth noticing before theorizing:
 
-Diagnosed from failed run `35102512299` and the test-channel run
-`35134417320` dispatched on the branch.
+- **openssl fails differently by OS.** On darwin/linux the #1155 generator
+  fix (an object macro whose value is a call is recorded untranslated)
+  suppresses the dangling `OSSL_DEPRECATEDIN_4_0` and the compiler then
+  crashes (#1158). On Windows the same macro is still emitted as a
+  dangling `let`, so the fix does not cover the Windows expansion of the
+  same header. Not root-caused.
+- **Windows bzip2 and libcurl die at the same ~180 s with no output at all,**
+  while zlib and sqlite3 pass there in 7–11 s. Not characterized: which of
+  `get`, translate, compile, link or run is hanging is unknown.
 
-| leg | failure | root cause | status |
-|---|---|---|---|
-| linux-aarch64 | `seed-driver: … is not the pinned seed v0.15.2.0 (79a63ff…)` | `release_asset_for_host()` / `supported_release_platform_tag()` in `build.w` had no linux-aarch64 case and fell through to the darwin asset. That also fed test-green, last-green, seed and the SDK asset name. | **fixed**; the gate prints "the driver is the pinned seed v0.15.2.0" in the test-channel run |
-| linux-aarch64 | `ld.lld: undefined symbol: with_vec_append_bytes` in one spec test | That test is the single `known-issue #916` file. #916 **does not reproduce on aarch64**: a native container build ran 210 spec files and it failed the known-issue gate with "expected red but passed". | **scoped** `skip-on: linux-aarch64`; the CI-side link residue is #1156 |
-| windows-aarch64 | `nm failed for emit_obj_globals` / bundle object | The Release job never exported `NM`; the runner's MSYS `nm` cannot parse an arm64 COFF image. `selfhost-windows-aarch64.yml` already sets it. | **fixed**: `NM=<sdk>/bin/llvm-nm.exe` |
-| windows-x86_64 | `last-green: stale test pass marker` | The gates relink the release compiler on every step on every platform (#1157); only on Windows did the bytes change, because lld-link stamps the PE header and PDB GUID from the wall clock. Fixpoint compares emitted objects, never the linked image, so it never saw the churn. | **fixed**: `/Brepro` on the COFF link in `src/compiler/Link.w`; that leg now passes build, fixpoint, test and last-green |
-| windows (both) | `could not rename out/release/bin/with.exe.tmp to with.exe` in the Release UAT step | The UAT step ran `./out/release/bin/with.exe build :release-uat`, and that target's `build` dependency relinks the very binary that is executing. Windows cannot replace a running executable. | **fixed**: the Windows UAT steps now run `./src/main.exe build :release-uat` (the seed drives; the UAT tests the *platform asset* either way) — **not yet validated by CI** |
-| all | release UAT: zlib `raw c_import function call requires unsafe context`, sqlite3 `type mismatch in binding`, openssl `undefined variable` | **Not a compiler regression.** `with get` now fetches **zlib 1.3.2** and **OpenSSL 4.0.2**, whose headers reach three latent c_import generator gaps. The 09-06 release compiler v0.15.2.1 fails on them identically (verified directly). | **fixed** in `src/CImport.w`; zlib and sqlite3 UATs pass end to end locally |
-| darwin, linux-x86_64 | openssl UAT: compiler **double free** | See §4, decision 1. | **open, #1158** |
-| windows-x86_64 | bzip2 UAT exit 124 (timeout) | Windows-only; runs to "UAT passed" well inside the limit on darwin. | uncharacterized; watch the next run |
+## 4. The class of problem — leads for the deep dive
 
-The three c_import generator fixes, all in `src/CImport.w`:
+These are hypotheses and pointers, not conclusions. Settle facts by
+running (CLAUDE.md "Verify by Running").
 
-1. An object-like macro whose value is a **call** is recorded untranslated,
-   like a function alias. A known C function would be a raw call at program
-   start (`#define zlib_version zlibVersion()`), and a callee this import
-   never emitted leaves a dangling name (`#define OSSL_DEPRECATEDIN_4_0
-   OSSL_DEPRECATED(4.0)`). Referencing such a macro is now the loud,
-   allow-gated omission error.
-2. Every type position now spells a raw C function pointer
-   `unsafe extern "C" fn(...)`. The **constant-probe emitter**
-   (`ci_try_translate_object_macro_probe`), the typedef alias resolver and
-   `ci_infer_cast_return_type` had kept the safe spelling, so sqlite3's
-   `#define SQLITE_STATIC ((sqlite3_destructor_type)0)` became
-   `let SQLITE_STATIC: extern "C" fn(...) = (0 as unsafe extern "C" fn(...))`.
-   *Finding the right emitter took three rebuild cycles; I did it by
-   appending `// emit:<site>` markers to each candidate emitter's output
-   line, rebuilding once, and reading which marker appeared. Use that trick
-   again rather than guessing.*
-3. `build/release_uat_fixtures/openssl_main.w` needed `use
-   std.builtins.write` (import-gated by #750).
+**A. c_import translation breaks on real-world headers, one gap at a
+time.** #1155 fixed three generator gaps that newer zlib/sqlite3/openssl
+headers exposed; Windows openssl shows a fourth. Questions:
+- Why does a construct have several emitters that each spell it
+  differently? #1155 fix 2 had to fix the constant-probe emitter
+  (`ci_try_translate_object_macro_probe`), the typedef alias resolver and
+  `ci_infer_cast_return_type` separately. Find every duplicate emission
+  path for macros, typedefs and casts; one source of truth per construct
+  (the `FnAbi` lesson in CLAUDE.md).
+- Why can a macro the program never references make the whole import
+  fail? The fixture uses EVP digests; `OSSL_DEPRECATEDIN_4_0` is unused.
+  An untranslatable, unreferenced declaration should never be an error
+  at import; a referenced one must be a loud, precise error (No Silent
+  Fallbacks).
+- What do the MSVC/UCRT header branches expand to that the darwin/glibc
+  branches do not (OpenSSL's `OSSL_DEPRECATED` under `_MSC_VER`,
+  `__declspec`)? Related: #799 (c_import on MSVC headers), #1140 (UCRT
+  `_wassert`).
+- Related open issues: #582 (real-header macro omission diagnostics),
+  #1047 (c_import translation cache keyed on header + hand-bumped format
+  version, not the compiler: a translator fix can ship stale
+  translations), #977 (`c_long` platform-invariant), #357 (c_import
+  auto-defer heuristic).
 
-### Verified evidence on `4ecfddb0`
+**B. The c_import error path is not memory-safe in the compiler (#1158).**
+`Zcu.compile_source_frontend_mode` double-frees a HashMap on the error
+path; regression since `d9091ce0` (v0.15.2.1 takes the same path cleanly).
+Layout-dependent (#729 class): it disappears under `tools/debug_drop.w`.
+Route per CLAUDE.md: `WITH_DEBUG_ALLOC=1`, `WITH_ALLOC_NO_REUSE`,
+`WITH_DEBUG_ALLOC_TRAP_FREE=<addr>` with `tools/debug_drop_sites.lldb` on
+the compiler binary, then `--dump-drop-plan`/`--trace-ownership` on the
+map local. The issue body has the lldb backtrace and the suspected window
+(error-return edges added to the frontend between 09-06 and 09-16). Once
+A stops reaching this error path for openssl, the bug is still there for
+any c_import that errors: it needs its own fixture.
 
-- Local seed-driven battery: `build`, `:fixpoint`, `:test`, `:test-green`,
-  `:last-green` all rc=0.
-- `:release-uat` rc=1, failing **only** `release-openssl-uat`. zlib,
-  bzip2, sqlite3, libcurl, install-layout, raylib-spiral and one-liner all
-  pass.
-- zlib and sqlite3 UAT programs run to "UAT passed" with the rebuilt
-  compiler; the untranslated-macro guard produces the correct loud error.
-- linux-aarch64 built end to end in the container (build rc=0), and
-  `out/lib/rt_core.o` exports `with_vec_append_bytes` while the seed's
-  bundled `src/runtime/rt_core.o` does not — that asymmetry is #1156.
+**C. Packages hang on Windows (bzip2, libcurl).** Unknown stage. Leads:
+#623 (`with get` shells out to host curl/wget), a CRT/DLL-runtime mismatch
+with Conan prebuilt libraries (the runbook records one found before), a
+child waiting on console/stdin, or #1075 (the Windows seed cannot link the
+native build runner, so actions fall back to the comptime evaluator).
+Reproduce on a test-channel run with per-stage timing before guessing.
 
-## 4. THE TWO BLOCKING DECISIONS
+**D. Prebuilt packages have system requirements `with get` neither
+provisions nor reports.** raylib on Linux needs GL/X11 development
+libraries; the error surfaces as a raw `ld.lld` failure. "Just works"
+means `with get` (or `with run`) detects the missing system libraries and
+says exactly what to install, or supplies them. Also #1148: on Windows
+`with get c.raylib` installs but no documented `c_import` form resolves
+it. The CI runner additionally needs the libraries installed for the UAT;
+the macOS runner has no OpenGL 3.3 context.
 
-**Decision 1 — #1158, the openssl double free.** Modeling OpenSSL 4.0.2's
-`evp.h`, the current compiler double-frees a HashMap in
-`Zcu.compile_source_frontend_mode` on the c_import **error path**. lldb
-backtrace is on the issue (`with_hashmap_free` ← `compile_source_frontend_mode`).
-The 09-06 compiler v0.15.2.1 takes the same error path cleanly, so this is a
-main regression since `d9091ce0`, and it is layout-dependent (#729 class):
-it **disappears under `tools/debug_drop.w`**, which reports "clean". The
-openssl UAT is a release gate. Options put to Eric:
+**E. The build capability sandbox refuses the UAT's GL DLL.**
+`WITH_UAT_OPENGL32_DLL` points outside the project root and ToolFs rejects
+it ("path escapes project root"). Decide whether the harness copies the
+file in through a declared input or the action declares the path.
 
-- (a) chase it now — route is the drop-plan / `--trace-ownership` /
-  `WITH_DEBUG_ALLOC_TRAP_FREE` sequence; hours, uncertain;
-- (b) **pin the openssl UAT to the 3.x package for v0.15.2.2** and ship,
-  with #1158 first post-release — *my recommendation*;
-- (c) waive the openssl UAT for this release.
+**F. Release plumbing (not `with get`, but blocks the same release).**
+- Windows UAT relinked the running `with.exe` ("could not rename"). Main
+  now runs `./src/main.exe build :release-uat` on Windows (after
+  `4ecfddb0`); **not yet validated by a CI run.**
+- linux-aarch64: `skip-on` not honored in `native-spec-tests`. The parser
+  is in `src/main.w` (#795 gates); find why this lane's runner does not
+  apply it, rather than editing the test. #1156 is the underlying
+  runtime-object residue.
+- #1157: the seed-driven gates relink stage2 and the release compiler on
+  every gate step (~10 min per leg); signature changes between steps.
+- `tools/release_local.w` has never run end to end.
 
-Note the generator fix in #1155 stops the *dangling-macro* error, so with
-option (b) the openssl UAT should pass on 3.x. Confirm that before relying
-on it.
+**Coverage gap to close as part of the fix:** `with get` for the UAT
+package set must run somewhere before release day (a nightly lane at
+minimum, filing an issue when newest-package breaks), so the next header
+change is found the day it lands, not at the next release.
 
-**Decision 2 — windows-aarch64 placement.** No Mac can build it, so I left
-it on CI with the x86_64 legs. Eric has not confirmed. If he wants it
-elsewhere, the gate to change is `build-windows-aarch64`'s `if:` in
-`nightly-release.yml`.
+## 5. Suggested order
 
-## 5. Exact next steps once the decisions land
+1. Reproduce every darwin-reproducible failure locally with the
+   release compiler first: build it seed-driven, then
+   `WITH=$PWD/out/release/bin/with out/release/bin/with build
+   :release-openssl-uat` (targets: `release-{zlib,bzip2,sqlite3,openssl,
+   libcurl,raylib-spiral}-uat`; group `:release-uat`). The fetched
+   projects land in `out/release-uat/<label>-project/`, where
+   `with check src/main.w` gives a check-level repro.
+2. For Windows-only failures, dispatch a test-channel run from your branch:
+   `gh workflow run Release --ref <branch> -f channel=test` (inputs:
+   `channel` test|nightly|release, `version` empty = from src/version).
+   Runs share a concurrency group per channel and queue.
+3. Write the matrix (package × platform × stage: get / translate / check /
+   link / run) with the exact failure per cell before fixing.
+4. Fix the classes (A–E), with fixtures in `:test` for each root cause,
+   not only a green UAT. Battery seed-driven; a change to drop scheduling
+   (B) is alone in its batch with `:drop-audit`/`:move-audit`.
+5. Then the release (unchanged from #1155's plan): a green test-channel run
+   on main → `echo v0.15.2.2 > src/version`, commit, land on main → tag
+   `v0.15.2.2` at that commit and push the tag (**before** release_local;
+   publish-first refuses an unknown commit) → `export GH_TOKEN=$(gh auth
+   token); export RELEASE_SOURCE_SHA=$(git rev-parse v0.15.2.2); with run
+   tools/release_local.w v0.15.2.2` → CI appends linux-x86_64 and both
+   Windows legs → runbook "Post-Publish Checks" → consider bumping
+   `seed.lock` as a separate step.
+6. **After the release ships:** flip the deferred D42 surface to `cos(x)`
+   in `build/release_uat_fixtures/raylib_spiral_main.w` and the
+   withlang.org homepage example (`~/withlang-dev.github.io/index.html`).
+   Eric: "flip only after a release ships the new compiler."
 
-1. Apply the openssl decision (likely: pin the UAT's package version, then
-   rerun `:release-uat` locally to confirm it is green).
-2. Watch the test-channel run already dispatched on `4ecfddb0`:
-   **`gh run view 35143254857 --repo withlang-dev/with`**. It was `pending`
-   (queued behind run `35134417320`, same concurrency group) at handoff.
-   It is the first validation of the NM fix, the Windows UAT-driver fix and
-   the generator fixes on CI. The earlier run `35134417320` is pre-fix and
-   is diagnostic only — its failures are all explained above.
-3. When that run is green on linux-x86_64, windows-x86_64 and
-   windows-aarch64: bump `src/version` to `v0.15.2.2`, commit, merge #1155
-   to main.
-4. Tag at the merge commit and push the tag. **The tag push must come
-   before `release_local.w`** — publish-first refuses a commit the
-   repository does not have.
-5. `export GH_TOKEN=$(gh auth token); export RELEASE_SOURCE_SHA=$(git
-   rev-parse v0.15.2.2); with run tools/release_local.w v0.15.2.2`. This
-   has never been run; expect to debug it. `--skip-linux-aarch64` /
-   `--skip-darwin` rerun one half.
-6. CI appends linux-x86_64, windows-x86_64 and windows-aarch64 from the tag
-   push.
-7. Post-publish: verify the asset list per the runbook's "Post-Publish
-   Checks", then consider bumping `seed.lock` to v0.15.2.2 (a separate,
-   deliberate step — see the runbook's Publish section).
-8. **After the release ships**, flip the deferred D42 surface to `cos(x)`:
-   `build/release_uat_fixtures/raylib_spiral_main.w`, the spiral release
-   UAT, and the withlang.org homepage example in
-   `~/withlang-dev.github.io/index.html` (they still declare `extern fn
-   sin/cos`). Eric ruled: "flip only after a release ships the new
-   compiler," because the site promises its examples compile on the current
-   release.
+## 6. What #1155 already fixed (keep; do not redo)
 
-## 6. Issues filed today
+- linux-aarch64 host map: `release_asset_for_host()` /
+  `supported_release_platform_tag()` in `build.w` fell through to darwin.
+- windows-aarch64 `NM=<sdk>/bin/llvm-nm.exe` in the Release job.
+- Reproducible Windows links: `/Brepro` in `src/compiler/Link.w`
+  (last-green "stale test pass marker").
+- c_import generator: call-valued object macros recorded untranslated;
+  raw function pointer types spelled `unsafe extern "C" fn` in every type
+  position; `openssl_main.w` imports `std.builtins.write`. Debug trick that
+  worked: append `// emit:<site>` markers to candidate emitters, rebuild
+  once, read which marker appears.
+- Local-first release process (`tools/release_local.w`, Docker host,
+  workflow split, two runbook sections).
 
-- **#1153** — migrate: stop emitting `pub extern fn` for libm names that
-  are now compiler builtins (D42 fallout; not blocking, user code is
-  already correct via builtin-over-extern precedence).
-- **#1156** — linux-aarch64 `:test` link failure residue (the CI harness
-  resolves a stale runtime object for one spec file; the container does
-  not).
-- **#1157** — the seed-driven gates relink stage2 + the release compiler on
-  every step (~2.5–3.5 min each). I confirmed the mechanism: after a
-  completed `build`, `--explain stage2` says **fresh**, but the first
-  invocation of the *next* gate reports `stale: action signature changed`.
-  The signature (`build_cache_compute_signature`) mixes in the driver's
-  content fingerprint and, for stage targets, a hash of `src/` and the
-  `compiler=` path — so something a gate step writes changes it. Not yet
-  root-caused; this is the cheapest large win available (~10 min per
-  release leg and per local battery).
-- **#1158** — the openssl double free (decision 1).
+## 7. Issues
 
-Also commented: **#916** (does not reproduce on linux-aarch64) and **#1144**
-(closed by #1152).
+Filed 2026-09-14..16: #1144 (closed by #1152), #1145 (Windows SDK not in
+tagged releases — the reason for this release), #1146 (`install-user`
+outside a project), #1147 (Windows lld-link long section name warnings),
+#1148 (raylib on Windows), #1149 (linux-aarch64 lane runs no `:test`),
+#1150 (examples/ rotted, in no lane), #1153 (migrate emits `pub extern fn`
+for builtin libm names), #1156, #1157, #1158.
 
-## 7. Environment traps — expensive to rediscover
+Most relevant to the `with get` class: #1158, #1148, #1047, #799, #582,
+#623, #1140, #977, #1075, #1079 (`:seed`/`:deps` API response parsed
+line-by-line; `ConanClient.w` also hand-parses JSON — check it for the
+same fragility).
 
-- **A fresh worktree cannot build.** It has no `src/main` seed and no
-  `.deps` SDK. Fix: `cp ~/with/src/main src/main` (or `with build :seed`)
-  and `mkdir -p .deps && ln -sfn ~/with/.deps/llvm-22.1.6-darwin-arm64
-  .deps/` plus the `-release` sibling.
-- **Read `rc=` from your own log.** `with build`'s exit code reaches the
-  Bash tool as 0 even when the build fails. Every background build here
-  appends `echo "… rc=$?"` to its log for that reason.
+## 8. Environment traps — expensive to rediscover
+
+- **A fresh worktree cannot build.** No `src/main`, no `.deps`. Fix:
+  `with build :seed` (idempotent on seed.lock's digest) and
+  `ln -sfn ~/with/.deps .deps`.
+- **The battery is seed-driven.** `export WITH=$PWD/src/main; src/main build
+  …`. `seed-driver` refuses any other driver (and `WITH=src/main with
+  build`). Re-migrating a corpus needs a tree compiler with bundles:
+  `WITH=out/stage/bin/with-stage2 out/stage/bin/with-stage2 build
+  :<stem>-promote`.
+- **Never commit during a battery** (even docs): the version stamp tracks
+  `.git`.
+- **Read `rc=` from your own log.** Append `echo "rc=$?"` to every
+  background build log.
 - **`:dev` writes `out/bootstrap/bin/with-stage1`**, not `out/stage/bin/`.
-- **Three failures are pre-existing on a bootstrap stage1** and are not
-  your regression (verified against a clean base-commit build):
-  `test/spec/spec_ss16_ffi_and_c_import.w` (stdio.h opaque-struct errors),
-  `with-stage1 -e '…'` ("conflicting global declaration for 'stdin'"), and
-  `test/benchmark/hash_engines.w` (does not parse, not in any corpus).
-- **Bisecting old commits on this Mac needs `SDKROOT`.** Xcode 26's
-  `libm.tbd` lists `arm64e.x1-macos`, which ld64.lld 22 rejects; export
-  `SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX15.4.sdk`. And
-  when you kill `git bisect run`, kill its in-flight `build :dev` too
-  (match by cwd via `lsof`), or every later step dies instantly with
-  "another build is already running" and is recorded as a skip.
-- **The arm64 container needs `g++` and `libxml2`** or it fails *silently*
-  — the seed prints only "build failed". That is exactly why the Dockerfile
-  is checked in. Add `--cap-add=SYS_PTRACE --security-opt seccomp=unconfined`
-  when you need `strace` (which is how I found the missing `libstdc++`).
-- **Use the zvec-grep tools for workspace search** (`zvec_grep_rg`,
-  `zvec_grep_search`), not `git grep` in Bash. Eric flagged this. The MCP
-  server may show as disconnected at session start and reconnect later;
-  load the tools via ToolSearch when it does. The `release` worktree has no
-  index — run searches against `/Users/eric/with`.
+- **Pre-existing on a bootstrap stage1:** `test/spec/spec_ss16_ffi_and_c_import.w`
+  (stdio.h opaque-struct errors), `with-stage1 -e '…'` ("conflicting global
+  declaration for 'stdin'"), `test/benchmark/hash_engines.w`.
+- **Bisecting old commits needs `SDKROOT`**:
+  `export SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX15.4.sdk`
+  (Xcode 26's `libm.tbd` lists `arm64e.x1-macos`, which ld64.lld 22
+  rejects). Kill an interrupted bisect's in-flight `build :dev` too.
+- **The arm64 container needs `g++` and `libxml2`** or it fails silently.
+  `--cap-add=SYS_PTRACE --security-opt seccomp=unconfined` for `strace`.
+- **Workspace search:** use the zvec-grep MCP tools when connected
+  (`zvec_grep_rg`, `zvec_grep_search`); it failed to connect in the last
+  session. The `release` worktree has no index — search `/Users/eric/with`.
+- **zsh:** `echo ====` is a glob error; an unquoted `$OPTS` is one
+  argument.
 
-## 8. Standing rules
+## 9. Standing rules
 
-Commits authored `Eric Hartford <eric@quixi.ai>`, never any AI attribution.
-Never `git stash`. No python/bash/perl/sed/awk for scripting — With
+Commits authored `Eric Hartford <eric@quixi.ai>`, never any AI
+attribution. Never `git stash`. No python/bash/perl/sed/awk scripts — With
 one-liners or `with run tool.w`. Never `-O0`. Take a `keep_awake` hold for
-long runs (this laptop sleeps and kills detached work). The Bash tool is
-zsh, so an unquoted `$OPTS` is one argument. Never cite a commit hash you
-have not printed. The battery runs under the pinned seed
-(`WITH=$PWD/src/main src/main build …`); `seed-driver` refuses any other
-driver.
+long runs (this laptop sleeps and kills detached work). Never cite a commit
+hash you have not printed. Changes reach main by PR targeting `main`
+directly (no stacked PRs). A migrator or c_import fix is done only when the
+regenerated output compiles and the library's own program runs.
