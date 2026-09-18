@@ -2511,6 +2511,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     debug_alloc_tests = debug_alloc_tests.input("tools/debug_drop.w")
     debug_alloc_tests = debug_alloc_tests.input("test/debug_alloc")
     var drop_audit = target_new(.Action, "drop-audit", "").output("out/drop-audit")
+    drop_audit = drop_audit.allow_parallel()
     drop_audit.action = run_drop_audit_action
     drop_audit = drop_audit.input(release_compiler_bin("with"))
     drop_audit = drop_audit.input("tools/drop_audit.w")
@@ -2855,6 +2856,16 @@ pub fn build(ctx: BuildCtx) -> Build:
     tests = tests.dep("rt-decl-audit")
     tests = tests.dep("test-green")
     out = out.add_target(tests)
+    // The ownership battery in one invocation. The audits are listed before
+    // the tests so they fall in the same consecutive pooled run as the
+    // behaviour tests and overlap with them; as separate invocations they
+    // queue behind the repo lock.
+    var ownership_gates = target_new(.Group, "test-with-audits", "")
+    ownership_gates = ownership_gates.dep("seed-driver")
+    ownership_gates = ownership_gates.dep("drop-audit")
+    ownership_gates = ownership_gates.dep("move-audit")
+    ownership_gates = ownership_gates.dep("test")
+    out = out.add_target(ownership_gates)
 
     var last_green = target_new(.Action, "last-green", "").output("out/.build-state/last-green.json")
     last_green.action = run_last_green_action
