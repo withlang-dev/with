@@ -4261,6 +4261,19 @@ impl Sema:
     // lookup_generic_method_fn + concrete_owner_method_sig is the canonical
     // resolution/specialization path. Record that Sema decision for MIR rather
     // than re-resolving a frozen trait call during lowering.
+    // D44 / §2.3: keys(), values() and items() return independent elements. A
+    // Copy element is copied; any other is cloned through its Clone impl,
+    // resolved here and recorded on `anchor` for MIR. The byte copy these
+    // methods once made gave the Vec and the map the same buffers (#1158).
+    // The view MIR reads the slot through must exist before types freeze.
+    mut fn record_map_snapshot_clone(elem_ty: i32, anchor: i32, report: i32, method: &str):
+        if elem_ty == 0 or self.is_copy(elem_ty as TypeId) != 0: return
+        if self.type_implements_trait(elem_ty, self.syms.clone_trait) == 0:
+            self.emit_error("HashMap." ++ method ++ "() returns independent elements, so the element type must implement Clone; iterate the map to observe it instead", report)
+            return
+        let _view = self.ensure_exact_type(TypeKind.TY_REF, elem_ty, 0, 0)
+        let _contract = self.record_clone_contract(elem_ty, anchor)
+
     mut fn record_clone_contract(payload_ty: i32, anchor_node: i32) -> i32:
         let owner_ty = self.resolve_alias(payload_ty as TypeId) as i32
         let owner_sym = self.method_owner_symbol_for_type(owner_ty)
@@ -21286,11 +21299,17 @@ impl Sema:
                     return generic_len_ret
                 if field == self.syms.keys:
                     let key_ty = self.get_generic_inst_arg(recv_type, 0)
+                    self.record_map_snapshot_clone(key_ty, node, node, "keys")
                     return self.ensure_vec_type_for(key_ty)
                 if field == self.syms.values:
                     let value_ty = self.get_generic_inst_arg(recv_type, 1)
+                    self.record_map_snapshot_clone(value_ty, node, node, "values")
                     return self.ensure_vec_type_for(value_ty)
                 if field == self.syms.items:
+                    // The key's clone contract is anchored on the call, the
+                    // value's on its callee: one contract per node.
+                    self.record_map_snapshot_clone(self.get_generic_inst_arg(recv_type, 0), node, node, "items")
+                    self.record_map_snapshot_clone(self.get_generic_inst_arg(recv_type, 1), self.ast.get_data0(node), node, "items")
                     let item_elems: Vec[i32] = Vec.new()
                     item_elems.push(self.get_generic_inst_arg(recv_type, 0))
                     item_elems.push(self.get_generic_inst_arg(recv_type, 1))
@@ -23526,6 +23545,20 @@ impl Sema:
 
     // ── Helper functions ─────────────────────────────────────────────
 
+    // D44 / §13.5: map traversal observes. One element rule with Vec above:
+    // a Copy-class key or value binds by value, a Drop-class one binds as a
+    // view into the map's slot (copying it would make a second owner, §2.3).
+    mut fn traversal_binding_type(elem: i32) -> i32:
+        if self.type_needs_drop(elem) != 0 and self.is_copy(elem as TypeId) == 0:
+            return self.ensure_exact_type(TypeKind.TY_REF, elem, 0, 0) as i32
+        elem
+
+    mut fn map_traversal_element_type(map_inst: i32) -> i32:
+        let elems: Vec[i32] = Vec.new()
+        elems.push(self.traversal_binding_type(self.get_generic_inst_arg(map_inst, 0)))
+        elems.push(self.traversal_binding_type(self.get_generic_inst_arg(map_inst, 1)))
+        self.ensure_tuple_type(elems, 2) as i32
+
     mut fn infer_for_element_type(iter_type: i32) -> i32:
         if iter_type == 0:
             return 0
@@ -23547,6 +23580,10 @@ impl Sema:
                 if ref_base == "Vec" and self.get_generic_inst_arg_count(ref_pointee_resolved as i32) > 0:
                     let ref_elem = self.get_generic_inst_arg(ref_pointee_resolved as i32, 0)
                     return self.ensure_exact_type(TypeKind.TY_REF, ref_elem, 0, 0) as i32
+                // #1187: `for (k, v) in &m` and a `&HashMap` parameter iterate
+                // like the map itself; returning 0 left k and v unbound.
+                if ref_base == "HashMap" and self.get_generic_inst_arg_count(ref_pointee_resolved as i32) >= 2:
+                    return self.map_traversal_element_type(ref_pointee_resolved as i32)
             return 0
         if tk == TypeKind.TY_GENERIC_INST:
             let base_name = self.pool_resolve(self.get_type_d0(resolved))
@@ -23559,10 +23596,7 @@ impl Sema:
                     return self.ensure_exact_type(TypeKind.TY_REF, vec_elem, 0, 0) as i32
                 return vec_elem
             if base_name == "HashMap" and self.get_generic_inst_arg_count(resolved as i32) >= 2:
-                let elems: Vec[i32] = Vec.new()
-                elems.push(self.get_generic_inst_arg(resolved as i32, 0))
-                elems.push(self.get_generic_inst_arg(resolved as i32, 1))
-                return self.ensure_tuple_type(elems, 2) as i32
+                return self.map_traversal_element_type(resolved as i32)
             if base_name == "Receiver" and self.get_generic_inst_arg_count(resolved as i32) > 0:
                 // D10: `for msg in rx:` receives until the channel is closed
                 // and drained. The loop desugars through recv() -> Option[T];
@@ -24204,6 +24238,12 @@ impl Sema:
                     let bare_elem = self.get_generic_inst_arg(bare_resolved as i32, 0)
                     if self.type_needs_drop(bare_elem) != 0 and self.is_copy(bare_elem as TypeId) == 0:
                         return 1
+                // D44: a map's Drop-class keys and values bind as views too.
+                if self.pool_resolve(self.get_type_d0(bare_resolved)) == "HashMap" and self.get_generic_inst_arg_count(bare_resolved as i32) >= 2:
+                    for ai in 0..2:
+                        let map_elem = self.get_generic_inst_arg(bare_resolved as i32, ai)
+                        if self.type_needs_drop(map_elem) != 0 and self.is_copy(map_elem as TypeId) == 0:
+                            return 1
         if self.ast.kind(iterable) != NodeKind.NK_CALL:
             return 0
         let callee = self.ast.get_data0(iterable)

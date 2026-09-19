@@ -8295,6 +8295,34 @@ impl Codegen:
             args.push(map_ptr)
             result = wl_build_call(self.builder, fn_ty, fn_val, vec_data_i64(&args), 1)
 
+        else if intrinsic == MirIntrinsic.MAP_CAPACITY:
+            let map_ptr = self.mir_intrinsic_map_handle(body, args_id)
+            let fn_val = self.ensure_hm_fn("with_hashmap_capacity", i64_ty)
+            let fn_ty = wl_function_type(i64_ty, vec_data_i64(&self.make_ptr_vec()), 1, 0)
+            let args: Vec[i64] = Vec.new()
+            args.push(map_ptr)
+            result = wl_build_call(self.builder, fn_ty, fn_val, vec_data_i64(&args), 1)
+
+        else if intrinsic == MirIntrinsic.MAP_SLOT_OCCUPIED or intrinsic == MirIntrinsic.MAP_KEY_AT or intrinsic == MirIntrinsic.MAP_VALUE_AT:
+            // D44: the slot is read where it lives. A view destination gets
+            // the slot's address; a value destination (Copy-class) is loaded
+            // through it. Nothing non-Copy is duplicated (§2.3).
+            let map_ptr = self.mir_intrinsic_map_handle(body, args_id)
+            let slot = self.coerce_int(self.mir_intrinsic_arg(body, args_id, 1), i64_ty)
+            let slot_args: Vec[i64] = Vec.new()
+            slot_args.push(map_ptr)
+            slot_args.push(slot)
+            if intrinsic == MirIntrinsic.MAP_SLOT_OCCUPIED:
+                let occupied_fn = self.ensure_hashmap_slot_runtime_fn("with_hashmap_slot_occupied", i32_ty)
+                result = wl_build_call(self.builder, self.hashmap_slot_runtime_fn_type(i32_ty), occupied_fn, vec_data_i64(&slot_args), 2)
+            else:
+                let at_name = if intrinsic == MirIntrinsic.MAP_KEY_AT: "with_hashmap_key_ptr_at" else: "with_hashmap_value_ptr_at"
+                let at_fn = self.ensure_hashmap_slot_runtime_fn(at_name, ptr_ty)
+                let slot_ptr = wl_build_call(self.builder, self.hashmap_slot_runtime_fn_type(ptr_ty), at_fn, vec_data_i64(&slot_args), 2)
+                let dest_sema = self.mir_intrinsic_dest_sema_type(body, dest_place)
+                let dest_is_view = dest_sema > 0 and self.mir_type_kind_at(self.mir_resolve_alias_at(dest_sema)) == TypeKind.TY_REF
+                result = if dest_is_view: slot_ptr else: wl_build_load(self.builder, self.mir_dest_llvm_type(body, dest_place), slot_ptr)
+
         else if intrinsic == MirIntrinsic.MAP_LEN32 or intrinsic == MirIntrinsic.MAP_LEN64 or intrinsic == MirIntrinsic.MAP_ULEN32:
             let map_ptr = self.mir_intrinsic_map_handle(body, args_id)
             let fn_val = self.ensure_hm_fn("with_hashmap_len", i64_ty)

@@ -107,6 +107,7 @@ enum CcBuiltin: i32:
     MAP_KEYS
     MAP_VALUES
     MAP_ITEMS
+    MAP_SLOT_WALK
     VEC_MAP
     VEC_FILTER
     VEC_FOLD
@@ -6036,6 +6037,7 @@ fn cc_builtin_from_mir_intrinsic(intrinsic: MirIntrinsic) -> CcBuiltin:
     if intrinsic == MirIntrinsic.MAP_KEYS: return CcBuiltin.MAP_KEYS
     if intrinsic == MirIntrinsic.MAP_VALUES: return CcBuiltin.MAP_VALUES
     if intrinsic == MirIntrinsic.MAP_ITEMS: return CcBuiltin.MAP_ITEMS
+    if intrinsic == MirIntrinsic.MAP_CAPACITY or intrinsic == MirIntrinsic.MAP_SLOT_OCCUPIED or intrinsic == MirIntrinsic.MAP_KEY_AT or intrinsic == MirIntrinsic.MAP_VALUE_AT: return CcBuiltin.MAP_SLOT_WALK
     if intrinsic == MirIntrinsic.VEC_MAP: return CcBuiltin.VEC_MAP
     if intrinsic == MirIntrinsic.VEC_FILTER: return CcBuiltin.VEC_FILTER
     if intrinsic == MirIntrinsic.VEC_FOLD: return CcBuiltin.VEC_FOLD
@@ -6940,6 +6942,9 @@ impl CCodegen:
             out = out ++ f"    goto bb{next_bb};"
             return out
 
+        if kind == CcBuiltin.MAP_SLOT_WALK:
+            self.fail("emit-c: HashMap traversal (`for (k, v) in map`) lowering is not implemented; use the LLVM backend")
+            return "    abort();"
         if kind == CcBuiltin.MAP_VALUES or kind == CcBuiltin.MAP_ITEMS:
             self.fail("emit-c: HashMap.values()/items() lowering is not implemented; use keys() or the LLVM backend")
             return "    abort();"

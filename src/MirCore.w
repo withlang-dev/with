@@ -317,6 +317,13 @@ enum MirIntrinsic: i32:
     // A floating-point math builtin (`cos(x)` / `x.cos()`); the MathBuiltins
     // row id rides on the call (call_math_fn_ids) and picks the lowering.
     MATH_FN
+    // D44: walk a map's table in place. (map) -> slot count; (map, slot) ->
+    // occupied?; (map, slot) -> the slot's key / value, as a view when the
+    // destination is `&T` and read through it when the destination is `T`.
+    MAP_CAPACITY
+    MAP_SLOT_OCCUPIED
+    MAP_KEY_AT
+    MAP_VALUE_AT
 
 // Copy: MirIntrinsic is a lightweight integer tag passed by value, stored in
 // Vec/HashMap, and compared throughout MIR lowering and codegen.

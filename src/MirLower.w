@@ -6475,6 +6475,9 @@ impl MirBuilder:
                     let rin_sym = self.sema.get_type_name(ref_inner_resolved)
                     if rin_sym != 0 and self.pool.resolve(rin_sym) == "Vec":
                         return self.lower_for_iter_ref(for_node, pat_or_sym, ref_inner, body_expr)
+                    // #1187: `for (k, v) in &m` walks m's table in place.
+                    if rin_sym != 0 and self.pool.resolve(rin_sym) == "HashMap":
+                        return self.lower_for_hashmap(for_node, pat_or_sym, ref_inner, body_expr)
 
         // Range variable: iter_expr is an ident/expr whose type is TY_RANGE
         let iter_ty = self.expr_type(iter_expr)
@@ -6490,6 +6493,10 @@ impl MirBuilder:
                     let rp_sym = self.sema.get_type_name(ref_pointee)
                     if rp_sym != 0 and self.pool.resolve(rp_sym) == "Vec":
                         return self.lower_for_iter_ref(for_node, pat_or_sym, iter_expr, body_expr)
+                    // #1187: a `&HashMap` binding (a borrowed parameter)
+                    // traverses like the map it views.
+                    if rp_sym != 0 and self.pool.resolve(rp_sym) == "HashMap":
+                        return self.lower_for_hashmap(for_node, pat_or_sym, iter_expr, body_expr)
 
         // Check for slice/vec-based for
         if iter_ty != 0:
@@ -7579,31 +7586,187 @@ impl MirBuilder:
         self.forget_string_flow_facts()
         self.unit_operand()
 
+    fn map_snapshot_clones(node: i32) -> bool:
+        self.sema.clone_contract_fns.contains(node) or self.sema.clone_contract_fns.contains(self.ast.get_data0(node))
+
+    // One snapshot element read from a slot: a Copy element is loaded, any
+    // other is cloned through the contract Sema recorded on `anchor`.
+    mut fn lower_map_snapshot_element(at: MirIntrinsic, map_place: i32, slot_place: i32, elem_ty: i32, anchor: i32) -> i32:
+        if self.sema.is_copy_frozen(elem_ty) != 0:
+            return self.lower_map_slot_binding(at, map_place, slot_place, elem_ty)
+        let view_ty = self.sema.find_exact_type(TypeKind.TY_REF, elem_ty, 0, 0) as i32
+        if view_ty == 0:
+            self.mark_unsupported()
+            return self.unit_operand()
+        let view_local = self.new_temp(view_ty)
+        let view_place = self.place_for_local(view_local)
+        self.emit_map_slot_call(at, map_place, slot_place, view_place)
+        let slot_value = self.body.new_deref_place(view_place, elem_ty)
+        self.clone_or_copy_place(slot_value, elem_ty, anchor)
+
+    // keys() / values() / items() over a non-Copy element: walk the table
+    // and push a clone of each element. The map keeps sole ownership of its
+    // own keys and values.
+    mut fn lower_map_snapshot(intrinsic: MirIntrinsic, self_expr: i32, node: i32) -> i32:
+        let span = self.ast.get_start(node)
+        let result_ty = self.expr_type(node)
+        let elem_ty = self.sema.get_generic_inst_arg(self.sema.resolve_alias(result_ty) as i32, 0)
+        var map_ty = self.expr_type(self_expr)
+        while map_ty > 0 and self.sema.get_type_kind(self.sema.resolve_alias(map_ty)) == TypeKind.TY_REF:
+            map_ty = self.sema.get_type_d0(self.sema.resolve_alias(map_ty))
+        let map_inst = self.sema.resolve_alias(map_ty) as i32
+        let key_ty = self.sema.get_generic_inst_arg(map_inst, 0)
+        let value_ty = self.sema.get_generic_inst_arg(map_inst, 1)
+
+        let rk = self.ast.kind(self_expr)
+        var map_place = 0
+        if rk == NodeKind.NK_IDENT or rk == NodeKind.NK_FIELD_ACCESS or rk == NodeKind.NK_INDEX:
+            map_place = self.lower_expr_place(self_expr)
+        else:
+            let map_op = self.lower_expr(self_expr)
+            let recv_ty = self.expr_type(self_expr)
+            map_place = self.materialize_operand(map_op, recv_ty, span)
+
+        let out_local = self.new_temp(result_ty)
+        let out_place = self.place_for_local(out_local)
+        self.emit_vec_new_into(out_place, span)
+
+        let cap_local = self.new_temp(self.sema.ty_i64)
+        let cap_place = self.place_for_local(cap_local)
+        let cap_args: Vec[i32] = Vec.new()
+        cap_args.push(self.body.new_operand(OperandKind.OK_COPY, map_place))
+        let cap_args_id = self.body.new_call_args(cap_args)
+        self.body.set_call_intrinsic(cap_args_id, MirIntrinsic.MAP_CAPACITY)
+        let cap_after_bb = self.new_block()
+        let cap_callee = self.unit_operand()
+        self.terminate(TermKind.TK_CALL, cap_callee, cap_args_id, cap_place, cap_after_bb)
+        self.switch_to(cap_after_bb)
+
+        let slot_local = self.new_temp(self.sema.ty_i64)
+        let slot_place = self.place_for_local(slot_local)
+        let zero_op = self.int_const_operand(0, self.sema.ty_i64)
+        let zero_rv = self.body.new_rvalue(RvalueKind.RK_USE, zero_op, 0, 0)
+        self.body.push_stmt(self.cur_bb, StmtKind.Assign, slot_place, zero_rv, span)
+
+        let header_bb = self.new_block()
+        let body_bb = self.new_block()
+        let live_bb = self.new_block()
+        let inc_bb = self.new_block()
+        let exit_bb = self.new_block()
+        self.terminate(TermKind.TK_GOTO, header_bb, 0, 0, 0)
+
+        self.switch_to(header_bb)
+        let slot_read = self.body.new_operand(OperandKind.OK_COPY, slot_place)
+        let cap_read = self.body.new_operand(OperandKind.OK_COPY, cap_place)
+        let more_rv = self.body.new_rvalue(RvalueKind.RK_BIN_OP, BinaryOp.OP_LT, slot_read, cap_read)
+        let more_local = self.new_temp(self.sema.ty_bool)
+        let more_place = self.place_for_local(more_local)
+        self.body.push_stmt(self.cur_bb, StmtKind.Assign, more_place, more_rv, span)
+        let more_vals: Vec[i32] = Vec.new()
+        more_vals.push(1)
+        let more_targets: Vec[i32] = Vec.new()
+        more_targets.push(body_bb as i32)
+        let more_table = self.body.new_switch_table(more_vals, more_targets)
+        let more_read = self.body.new_operand(OperandKind.OK_COPY, more_place)
+        self.terminate(TermKind.TK_SWITCH_INT, more_read, more_table, exit_bb, 0)
+
+        self.switch_to(body_bb)
+        let occupied_local = self.new_temp(self.sema.ty_i32)
+        let occupied_place = self.place_for_local(occupied_local)
+        self.emit_map_slot_call(MirIntrinsic.MAP_SLOT_OCCUPIED, map_place, slot_place, occupied_place)
+        let empty_vals: Vec[i32] = Vec.new()
+        empty_vals.push(0)
+        let empty_targets: Vec[i32] = Vec.new()
+        empty_targets.push(inc_bb as i32)
+        let empty_table = self.body.new_switch_table(empty_vals, empty_targets)
+        let occupied_read = self.body.new_operand(OperandKind.OK_COPY, occupied_place)
+        self.terminate(TermKind.TK_SWITCH_INT, occupied_read, empty_table, live_bb, 0)
+
+        self.switch_to(live_bb)
+        let element_frame = self.push_stmt_temp_frame()
+        var elem_op = 0
+        if intrinsic == MirIntrinsic.MAP_KEYS:
+            elem_op = self.lower_map_snapshot_element(MirIntrinsic.MAP_KEY_AT, map_place, slot_place, key_ty, node)
+        else if intrinsic == MirIntrinsic.MAP_VALUES:
+            elem_op = self.lower_map_snapshot_element(MirIntrinsic.MAP_VALUE_AT, map_place, slot_place, value_ty, node)
+        else:
+            let pair_fields: Vec[i32] = Vec.new()
+            let pair_names: Vec[i32] = Vec.new()
+            let key_op = self.lower_map_snapshot_element(MirIntrinsic.MAP_KEY_AT, map_place, slot_place, key_ty, node)
+            self.consume_moved_operand(key_op)
+            pair_fields.push(key_op)
+            pair_names.push(0)
+            let value_op = self.lower_map_snapshot_element(MirIntrinsic.MAP_VALUE_AT, map_place, slot_place, value_ty, self.ast.get_data0(node))
+            self.consume_moved_operand(value_op)
+            pair_fields.push(value_op)
+            pair_names.push(0)
+            let pair_fid = self.body.new_agg_fields(pair_fields, pair_names)
+            let pair_rv = self.body.new_rvalue(RvalueKind.RK_AGGREGATE, 0, pair_fid, 0)
+            let pair_local = self.new_temp(elem_ty)
+            let pair_place = self.place_for_local(pair_local)
+            self.body.push_stmt(self.cur_bb, StmtKind.Assign, pair_place, pair_rv, span)
+            elem_op = self.body.new_operand(OperandKind.OK_MOVE, pair_place)
+        self.consume_moved_operand(elem_op)
+        self.emit_vec_push(out_place, elem_op, span)
+        self.finish_stmt_temp_frame(element_frame)
+        self.terminate(TermKind.TK_GOTO, inc_bb, 0, 0, 0)
+
+        self.switch_to(inc_bb)
+        let slot_cur = self.body.new_operand(OperandKind.OK_COPY, slot_place)
+        let one_op = self.int_const_operand(1, self.sema.ty_i64)
+        let next_rv = self.body.new_rvalue(RvalueKind.RK_BIN_OP, BinaryOp.OP_ADD, slot_cur, one_op)
+        self.body.push_stmt(self.cur_bb, StmtKind.Assign, slot_place, next_rv, span)
+        self.terminate(TermKind.TK_GOTO, header_bb, 0, 0, 0)
+
+        self.switch_to(exit_bb)
+        self.body.new_operand(OperandKind.OK_MOVE, out_place)
+
+    // D44: one call of a map table-walk intrinsic on (map, slot).
+    mut fn emit_map_slot_call(intrinsic: MirIntrinsic, map_place: i32, slot_place: i32, dest_place: i32):
+        let args: Vec[i32] = Vec.new()
+        args.push(self.body.new_operand(OperandKind.OK_COPY, map_place))
+        args.push(self.body.new_operand(OperandKind.OK_COPY, slot_place))
+        let args_id = self.body.new_call_args(args)
+        self.body.set_call_intrinsic(args_id, intrinsic)
+        let after_bb = self.new_block()
+        let callee = self.unit_operand()
+        self.terminate(TermKind.TK_CALL, callee, args_id, dest_place, after_bb)
+        self.switch_to(after_bb)
+
+    // The operand a traversal binds for a slot's key or value. Sema typed
+    // the binding (Sema.traversal_binding_type): `&T` for a Drop-class
+    // element, `T` for a Copy-class one. The intrinsic yields the slot's
+    // address for the first and reads through it for the second, as
+    // VEC_GET_REF and VEC_GET do.
+    mut fn lower_map_slot_binding(intrinsic: MirIntrinsic, map_place: i32, slot_place: i32, binding_ty: i32) -> i32:
+        let binding_local = self.new_temp(binding_ty)
+        let binding_place = self.place_for_local(binding_local)
+        self.emit_map_slot_call(intrinsic, map_place, slot_place, binding_place)
+        self.body.new_operand(OperandKind.OK_COPY, binding_place)
+
     mut fn lower_for_hashmap(for_node: i32, pat_or_sym: i32, iter_expr: i32, body_expr: i32) -> i32:
         // for (k, v) in map → materialize map.items() then use the normal Vec loop.
-        let map_op = self.lower_expr(iter_expr)
+        // §13.5 / D44 (#1187): the implicit form borrows. A place receiver is
+        // read through its own place, as lower_for_vec does; moving it into a
+        // temp dropped the map after the loop and left the binding blank
+        // (`m.len()` was 0, `m.get` crashed). Only an rvalue receiver
+        // materializes an owning temp.
         let map_ty = self.expr_type(iter_expr)
         let elem_ty = self.sema.infer_for_element_type_frozen(map_ty)
-        let items_vec_ty = self.sema.find_vec_type_for(elem_ty)
 
-        let map_place = self.materialize_operand(map_op, map_ty, self.ast.get_start(iter_expr))
-        let items_local = self.new_temp(items_vec_ty)
-        let items_place = self.place_for_local(items_local)
-        let items_args: Vec[i32] = Vec.new()
-        items_args.push(self.body.new_operand(OperandKind.OK_COPY, map_place))
-        let items_args_id = self.body.new_call_args(items_args)
-        self.body.set_call_intrinsic(items_args_id, MirIntrinsic.MAP_ITEMS)
-        let items_after_bb = self.new_block()
-        let items_unit = self.unit_operand()
-        self.terminate(TermKind.TK_CALL, items_unit, items_args_id, items_place, items_after_bb)
-        self.switch_to(items_after_bb)
-
+        let mvk = self.ast.kind(iter_expr)
+        var map_place = 0
+        if mvk == NodeKind.NK_IDENT or mvk == NodeKind.NK_FIELD_ACCESS or mvk == NodeKind.NK_INDEX:
+            map_place = self.lower_expr_place(iter_expr)
+        else:
+            let map_op = self.lower_expr(iter_expr)
+            map_place = self.materialize_operand(map_op, map_ty, self.ast.get_start(iter_expr))
         let len_local = self.new_temp(self.sema.ty_i64)
         let len_place = self.place_for_local(len_local)
         let len_args: Vec[i32] = Vec.new()
-        len_args.push(self.body.new_operand(OperandKind.OK_COPY, items_place))
+        len_args.push(self.body.new_operand(OperandKind.OK_COPY, map_place))
         let len_args_id = self.body.new_call_args(len_args)
-        self.body.set_call_intrinsic(len_args_id, MirIntrinsic.VEC_LEN)
+        self.body.set_call_intrinsic(len_args_id, MirIntrinsic.MAP_CAPACITY)
         let len_after_bb = self.new_block()
         let len_unit = self.unit_operand()
         self.terminate(TermKind.TK_CALL, len_unit, len_args_id, len_place, len_after_bb)
@@ -7638,18 +7801,34 @@ impl MirBuilder:
         let table = self.body.new_switch_table(vals, targets)
         self.terminate(TermKind.TK_SWITCH_INT, cmp_read, table, exit_bb, 0)
 
+        // An empty slot is skipped; an occupied one yields views of its key
+        // and value. Nothing is copied out of the map unless it is Copy.
         self.switch_to(body_bb)
+        let span = self.ast.get_start(iter_expr)
+        let occupied_local = self.new_temp(self.sema.ty_i32)
+        let occupied_place = self.place_for_local(occupied_local)
+        self.emit_map_slot_call(MirIntrinsic.MAP_SLOT_OCCUPIED, map_place, counter_place, occupied_place)
+        let live_bb = self.new_block()
+        let occupied_vals: Vec[i32] = Vec.new()
+        occupied_vals.push(0)
+        let occupied_targets: Vec[i32] = Vec.new()
+        occupied_targets.push(inc_bb as i32)
+        let occupied_table = self.body.new_switch_table(occupied_vals, occupied_targets)
+        let occupied_read = self.body.new_operand(OperandKind.OK_COPY, occupied_place)
+        self.terminate(TermKind.TK_SWITCH_INT, occupied_read, occupied_table, live_bb, 0)
+
+        self.switch_to(live_bb)
+        let tuple_fields: Vec[i32] = Vec.new()
+        let tuple_names: Vec[i32] = Vec.new()
+        tuple_fields.push(self.lower_map_slot_binding(MirIntrinsic.MAP_KEY_AT, map_place, counter_place, self.tuple_elem_type(elem_ty, 0)))
+        tuple_names.push(0)
+        tuple_fields.push(self.lower_map_slot_binding(MirIntrinsic.MAP_VALUE_AT, map_place, counter_place, self.tuple_elem_type(elem_ty, 1)))
+        tuple_names.push(0)
+        let tuple_fid = self.body.new_agg_fields(tuple_fields, tuple_names)
+        let tuple_rv = self.body.new_rvalue(RvalueKind.RK_AGGREGATE, 0, tuple_fid, 0)
         let elem_local = self.new_temp(elem_ty)
         let elem_place = self.place_for_local(elem_local)
-        let get_args: Vec[i32] = Vec.new()
-        get_args.push(self.body.new_operand(OperandKind.OK_COPY, items_place))
-        get_args.push(self.body.new_operand(OperandKind.OK_COPY, counter_place))
-        let get_args_id = self.body.new_call_args(get_args)
-        self.body.set_call_intrinsic(get_args_id, MirIntrinsic.VEC_GET)
-        let get_after_bb = self.new_block()
-        let get_unit = self.unit_operand()
-        self.terminate(TermKind.TK_CALL, get_unit, get_args_id, elem_place, get_after_bb)
-        self.switch_to(get_after_bb)
+        self.body.push_stmt(self.cur_bb, StmtKind.Assign, elem_place, tuple_rv, span)
 
         self.bind_for_element_or_skip(for_node, pat_or_sym, elem_place, elem_ty, body_expr, inc_bb)
 
@@ -10480,6 +10659,10 @@ impl MirBuilder:
         0
 
     mut fn lower_intrinsic_call(intrinsic: MirIntrinsic, self_expr: i32, method_sym: i32, arg_start: i32, arg_count: i32, node: i32) -> i32:
+        // D44 / §2.3: a snapshot whose element is not Copy is built from
+        // clones; the byte-copy intrinsic is only for Copy elements.
+        if (intrinsic == MirIntrinsic.MAP_KEYS or intrinsic == MirIntrinsic.MAP_VALUES or intrinsic == MirIntrinsic.MAP_ITEMS) and self.map_snapshot_clones(node):
+            return self.lower_map_snapshot(intrinsic, self_expr, node)
         // Emit a call terminator with a ConstKind.CK_FN operand and intrinsic tag.
         // The ConstKind.CK_FN sym is meaningless — codegen dispatches by intrinsic kind.
         let fn_op = self.const_operand(ConstKind.CK_FN, method_sym, self.sema.ty_void)
