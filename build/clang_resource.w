@@ -129,18 +129,34 @@ fn cr_should_embed(name: &str) -> bool:
         return true
     false
 
-// The name a `#include` / `#include_next` line asks for, or "".
+// The name a `#include` / `#include_next` line asks for, or "". Written with
+// indexing and slice only: on the linux-aarch64 leg the pinned seed evaluates
+// this action at comptime, where str.trim is not available.
 fn cr_included_name(line: &str) -> str:
-    let t = line.trim()
-    if not t.starts_with("#"): return ""
-    let rest = t.slice(1, t.len()).trim()
-    if not rest.starts_with("include"): return ""
-    for open in ["<", "\""]:
-        let parts = rest.split(open)
-        if parts.len() >= 2:
-            let close = if open == "<": ">" else: "\""
-            return parts.get(1).split(close).get(0).to_owned()
-    ""
+    let n = line.len() as i32
+    var i = 0
+    while i < n and (line[i] == 32 or line[i] == 9):
+        i = i + 1
+    if i >= n or line[i] != 35:
+        return ""
+    i = i + 1
+    while i < n and (line[i] == 32 or line[i] == 9):
+        i = i + 1
+    if not line.slice(i as i64, n as i64).starts_with("include"):
+        return ""
+    // The opening `<` or `"`, then up to its closing partner.
+    while i < n and line[i] != 60 and line[i] != 34:
+        i = i + 1
+    if i >= n:
+        return ""
+    let close = if line[i] == 60: 62 else: 34
+    let start = i + 1
+    var end = start
+    while end < n and line[end] != close:
+        end = end + 1
+    if end >= n:
+        return ""
+    line.slice(start as i64, end as i64)
 
 // An embedded header that includes a builtin sibling we left out fails at the
 // user's first c_import of it (float.h after clang 22 split it). The subset
