@@ -218,6 +218,17 @@ pub fn link_stage_lib_args(lib: &str, is_darwin: i32) -> Vec[str]:
     out.push("-l" ++ lib)
     out
 
+// #1193: GNU ld and lld resolve static archives left to right, once. A
+// package's archives arrive in scan order (libcrypto before libssl), so one
+// that depends on a later one leaves undefined references. On an ELF target
+// the user's libraries are linked as one group; ld64 and lld-link are
+// order-insensitive and take no marker. `via_driver` selects the `-Wl,`
+// spelling for a C compiler driver.
+pub fn link_stage_archive_group_marker(is_elf: i32, via_driver: i32, open: i32) -> str:
+    if is_elf == 0: return ""
+    let flag = if open != 0: "--start-group" else: "--end-group"
+    if via_driver != 0: "-Wl," ++ flag else: flag
+
 fn link_stage_collect_cleanup_files(extras: &Vec[str]) -> Vec[str]:
     let cleanup: Vec[str] = Vec.new()
     for i in 0..extras.len() as i32:
@@ -340,10 +351,13 @@ fn link_stage_make_link_command(linker: &str, obj_path: &str, bin_path: &str, ex
     args.push(with_str_clone_ref(bin_path))
     outputs.push(with_str_clone_ref(bin_path))
     let cc_is_darwin = if runtime_sysinfo_os() == "Macos": 1 else: 0
+    let cc_is_elf = if runtime_sysinfo_os() == "Linux" and link_libs.len() > 0: 1 else: 0
+    if cc_is_elf != 0: args.push(link_stage_archive_group_marker(1, 1, 1))
     for i in 0..link_libs.len() as i32:
         let cc_la = link_stage_lib_args(link_libs[i], cc_is_darwin)
         for j in 0..cc_la.len() as i32:
             args.push(with_str_clone_ref(cc_la[j]))
+    if cc_is_elf != 0: args.push(link_stage_archive_group_marker(1, 1, 0))
     for i in 0..link_args.len() as i32:
         args.push(with_str_clone_ref(link_args[i]))
     if runtime_sysinfo_os() == "Linux":
@@ -529,6 +543,7 @@ fn link_stage_make_linux_llvm_link_command(llvm_ld: &str, obj_path: &str, bin_pa
     args.push("-L" ++ sysroot ++ "/lib/" ++ link_stage_linux_multiarch())
     args.push("-L" ++ sysroot ++ "/usr/lib")
     args.push("-L" ++ sysroot ++ "/lib")
+    if link_libs.len() > 0: args.push(link_stage_archive_group_marker(1, 0, 1))
     for i in 0..link_libs.len() as i32:
         let lib = link_libs[i]
         if link_stage_framework_name(lib).len() > 0:
@@ -540,6 +555,7 @@ fn link_stage_make_linux_llvm_link_command(llvm_ld: &str, obj_path: &str, bin_pa
                 inputs.push(fallback_lib)
             else:
                 args.push("-l" ++ lib)
+    if link_libs.len() > 0: args.push(link_stage_archive_group_marker(1, 0, 0))
     for i in 0..link_args.len() as i32:
         args.push(with_str_clone_ref(link_args[i]))
     args.push("-lc")

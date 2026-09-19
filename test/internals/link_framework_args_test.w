@@ -31,4 +31,13 @@ fn main:
     let bad = link_stage_lib_args("framework:CoreFoundation", 0)
     assert(bad.len() == 0)
 
+    // #1193: ELF linkers resolve static archives left to right, once, so the
+    // user's libraries are linked as one group; ld64 and lld-link take none.
+    assert(link_stage_archive_group_marker(1, 1, 1) == "-Wl,--start-group")
+    assert(link_stage_archive_group_marker(1, 1, 0) == "-Wl,--end-group")
+    assert(link_stage_archive_group_marker(1, 0, 1) == "--start-group")
+    assert(link_stage_archive_group_marker(1, 0, 0) == "--end-group")
+    assert(link_stage_archive_group_marker(0, 1, 1) == "")
+    assert(link_stage_archive_group_marker(0, 0, 0) == "")
+
     print("ok")
