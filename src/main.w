@@ -30,6 +30,7 @@ use BuildGraphTests
 use InitTemplates
 use BuildGraphRuntime
 use BuildGraphCache
+use compiler.ClangDriver
 use compiler.DriverOptions
 use compiler.AbiStamp
 use compiler.Runtime
@@ -742,6 +743,8 @@ fn run_one_liner_command(argc: i32, one: &CliOneLiner, no_std: bool, alloc_mode:
     rc
 
 fn run_cli(argc: i32) -> i32:
+    // `with cc ...` is clang; none of With's own flags apply to it.
+    if cli_command(argc) == "cc": return with_cc_main()
     let opt_level = cli_opt_level(argc)
     let no_std = cli_has_flag(argc, "--no-std") or cli_has_flag(argc, "--freestanding")
     let alloc_mode = cli_has_flag(argc, "--alloc")
