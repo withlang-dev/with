@@ -739,7 +739,9 @@ pub fn run_sdk_cmake_action(ctx: ActionCtx) -> i32:
 fn sdk_llvm_targets_arg(ctx: &ActionCtx, requested: &str) -> str:
     if requested.len() > 0:
         return sdk_owned_text(requested)
-    "AArch64;X86"
+    // WebAssembly is in the default set: the wasm32 target (docs/wasm-target.md)
+    // needs the backend and wasm-ld in every SDK the compiler links against.
+    "AArch64;X86;WebAssembly"
 
 pub fn run_sdk_llvm_action(ctx: ActionCtx) -> i32:
     let args = ctx.args()

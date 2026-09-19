@@ -3,7 +3,7 @@ $ErrorActionPreference = "Stop"
 $LLVM_VERSION = if ($env:LLVM_VERSION) { $env:LLVM_VERSION } else { "22.1.6" }
 $LLVM_TAG = "llvmorg-$LLVM_VERSION"
 $LLVM_SOURCE_SHA256 = if ($env:LLVM_SOURCE_SHA256) { $env:LLVM_SOURCE_SHA256 } else { "6e0b376a1f6d9873e7dfb09ae6e04b9c7024400f01733fa4c29be69d5c138bc2" }
-$TARGETS = if ($env:LLVM_TARGETS_TO_BUILD) { $env:LLVM_TARGETS_TO_BUILD } else { "AArch64;X86" }
+$TARGETS = if ($env:LLVM_TARGETS_TO_BUILD) { $env:LLVM_TARGETS_TO_BUILD } else { "AArch64;X86;WebAssembly" }
 
 $ROOT = if ($env:ROOT) { $env:ROOT } else { Join-Path (Get-Location) ".deps" }
 $HOST_TAG = if ($env:HOST_TAG) { $env:HOST_TAG } else { "windows-x86_64-msvc" }
