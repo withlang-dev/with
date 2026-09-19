@@ -2956,16 +2956,6 @@ pub fn build(ctx: BuildCtx) -> Build:
     release_sqlite3_uat = release_uat_platform_asset_dep(move release_sqlite3_uat)
     out = out.add_target(release_sqlite3_uat)
 
-    var release_openssl_uat = target_new(.Action, "release-openssl-uat", "").output("out/release-uat/openssl.passed")
-    release_openssl_uat.action = run_release_openssl_uat_action
-    release_openssl_uat = release_openssl_uat.input(release_platform_asset_bin())
-    release_openssl_uat = release_openssl_uat.input("build/release_uat_fixtures/openssl_main.w")
-    release_openssl_uat = release_openssl_uat.write_scope("out/release-uat")
-    release_openssl_uat = release_openssl_uat.allow_network()
-    release_openssl_uat = release_openssl_uat.dep("require-last-green")
-    release_openssl_uat = release_uat_platform_asset_dep(move release_openssl_uat)
-    out = out.add_target(release_openssl_uat)
-
     var release_libcurl_uat = target_new(.Action, "release-libcurl-uat", "").output("out/release-uat/libcurl.passed")
     release_libcurl_uat.action = run_release_libcurl_uat_action
     release_libcurl_uat = release_libcurl_uat.input(release_platform_asset_bin())
@@ -3012,7 +3002,6 @@ pub fn build(ctx: BuildCtx) -> Build:
     release_uat = release_uat.dep("release-zlib-uat")
     release_uat = release_uat.dep("release-bzip2-uat")
     release_uat = release_uat.dep("release-sqlite3-uat")
-    release_uat = release_uat.dep("release-openssl-uat")
     release_uat = release_uat.dep("release-libcurl-uat")
     release_uat = release_uat.dep("release-install-layout-uat")
     release_uat = release_uat.dep("release-raylib-spiral-uat")

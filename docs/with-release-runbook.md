@@ -253,9 +253,6 @@ runtime) that macOS could never show. It includes:
 - `:release-sqlite3-uat`, which validates `with get c.sqlite3`,
   `use c_import("sqlite3.h")`, and an in-memory `:memory:` database
   `CREATE TABLE`/`INSERT`/`SELECT` round trip.
-- `:release-openssl-uat`, which validates `with get c.openssl`,
-  `use c_import("openssl/evp.h")`, and SHA-256 of `"abc"` through the EVP API
-  against the standard digest bytes.
 - `:release-libcurl-uat`, which validates `with get c.libcurl`,
   `use c_import("curl/curl.h")`, `curl_global_init`, `curl_easy_init`,
   `curl_easy_setopt`, `curl_version_info`, and cleanup without network access.
