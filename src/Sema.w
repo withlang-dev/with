@@ -1101,6 +1101,10 @@ type Sema {
     infer_tail_node: i32,
     infer_tail_is_closure: i32,
     infer_tail_join: i32,
+    // #1196: signatures whose return type has been taken from their body. Until
+    // then an unannotated signature reads as Unit, which a caller cannot tell
+    // from a function that returns nothing.
+    body_typed_sigs: HashMap[i32, i32],
     current_for_comprehension_carrier: i32,
     in_comptime_fn: i32,
     in_concrete_generic_body: i32,
@@ -2319,6 +2323,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         infer_tail_node: 0,
         infer_tail_is_closure: 0,
         infer_tail_join: 0,
+        body_typed_sigs: sema_new_map_i32_i32(),
         current_for_comprehension_carrier: 0,
         in_comptime_fn: 0,
         in_concrete_generic_body: 0,
