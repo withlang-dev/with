@@ -222,6 +222,14 @@ fn cr_generate(ctx: &ActionCtx, include_dir: &str, files: &Vec[str], version: &s
     out = out ++ "let CLANG_RES_VERSION: str = " ++ cr_raw_string_literal(version) ++ "\n\n"
     out = out ++ "pub fn embedded_clang_resource_list() -> str:\n    return CLANG_RES_LIST\n\n"
     out = out ++ "pub fn embedded_clang_resource_version() -> str:\n    return CLANG_RES_VERSION\n\n"
+    // Whether this compiler links clang's driver (`with cc`): the SDK has the
+    // archive, or it predates it and with_clang_main is aliased to a stand-in
+    // (build/compiler.w). An address comparison cannot tell: LLVM folds two
+    // distinct function symbols to "not equal".
+    // The same SDK, by the same path, that the compiler link tests.
+    let lib_dir = comp_llvm_prefix_for_root(ctx.project_info().project_root()) ++ "/lib"
+    let driver_linked = ctx.fs().host_exists(lib_dir ++ "/libclangMain.a") or ctx.fs().host_exists(lib_dir ++ "/clangMain.lib")
+    out = out ++ "pub fn embedded_clang_driver_linked() -> bool:\n    return " ++ (if driver_linked: "true" else: "false") ++ "\n\n"
     out = out ++ "pub fn embedded_clang_resource_data(name: &str) -> str:\n"
     for i in 0..files.len() as i32:
         let rel = cr_relpath(files[i], include_dir)

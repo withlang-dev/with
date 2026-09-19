@@ -10,6 +10,7 @@
 // the child is `with cc -cc1 ...` and lands back here.
 
 use compiler.EmbeddedClangResource
+use compiler.EmbeddedClangResourceData
 use compiler.ClangBridge
 
 extern fn with_alloc(size: i64) -> *mut u8
@@ -24,6 +25,11 @@ type ClangToolContext { path: *const u8, prepend_arg: *const u8, needs_prepend_a
 // aliases this name to the platform's C++ spelling (build/compiler.w).
 extern fn with_clang_main(argc: i32, argv: *mut *mut u8, ctx: *const ClangToolContext) -> i32
 
+// False when this compiler was linked against an SDK published before `with
+// cc`: the link then aliases with_clang_main to a stand-in (build/compiler.w),
+// which must never be called.
+pub fn with_cc_available() -> bool: embedded_clang_driver_linked()
+
 // A NUL-terminated copy that lives for the rest of the process, as argv does.
 unsafe fn cc_c_string(s: &str) -> *mut u8:
     let out = with_alloc(s.len() + 1)
@@ -34,6 +40,9 @@ unsafe fn cc_c_string(s: &str) -> *mut u8:
 
 // argv[0] is `with`, argv[1] is `cc`; everything after it is clang's.
 pub fn with_cc_main() -> i32:
+    if not with_cc_available():
+        with_eprint("error: this build of `with` has no C compiler: the LLVM SDK it was linked against predates `with cc`")
+        return 127
     let args: Vec[str] = Vec.new()
     args.push("clang")
     let first = if with_arg_count() > 2: with_arg_at(2) else: ""

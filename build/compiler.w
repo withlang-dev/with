@@ -1821,7 +1821,13 @@ pub fn run_generate_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
     // whose spelling depends on the platform's mangling. The source names one
     // plain symbol, with_clang_main; each linker aliases it here, and pulls the
     // archive member in, since an alias alone does not.
-    let clang_main_itanium = "_Z10clang_mainiPPcRKN4llvm11ToolContextE"
+    // An SDK published before `with cc` has no driver archive. The compiler
+    // still links: with_clang_main is aliased to a runtime symbol it already
+    // has, and ClangDriver.w tells the two apart by address and says that
+    // this build has no C compiler. Each platform gains `with cc` when its SDK
+    // is republished with the archive.
+    let has_clang_main = fs.host_exists(llvm_lib_dir ++ "/libclangMain.a") or fs.host_exists(llvm_lib_dir ++ "/clangMain.lib")
+    let clang_main_itanium = if has_clang_main: "_Z10clang_mainiPPcRKN4llvm11ToolContextE" else: "with_alloc"
     if os() == "Macos":
         rsp = rsp ++ "-Wl,-u,_" ++ clang_main_itanium ++ "\n-Wl,-alias,_" ++ clang_main_itanium ++ ",_with_clang_main\n"
         ld_rsp = ld_rsp ++ "-u\n_" ++ clang_main_itanium ++ "\n-alias\n_" ++ clang_main_itanium ++ "\n_with_clang_main\n"
@@ -1829,7 +1835,7 @@ pub fn run_generate_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
         rsp = rsp ++ "-Wl,-u," ++ clang_main_itanium ++ "\n-Wl,--defsym=with_clang_main=" ++ clang_main_itanium ++ "\n"
         ld_rsp = ld_rsp ++ "-u\n" ++ clang_main_itanium ++ "\n--defsym=with_clang_main=" ++ clang_main_itanium ++ "\n"
     else if os() == "Windows":
-        let clang_main_msvc = "?clang_main@@YAHHPEAPEADAEBUToolContext@llvm@@@Z"
+        let clang_main_msvc = if has_clang_main: "?clang_main@@YAHHPEAPEADAEBUToolContext@llvm@@@Z" else: "with_alloc"
         rsp = rsp ++ "-Wl,/include:" ++ clang_main_msvc ++ "\n-Wl,/alternatename:with_clang_main=" ++ clang_main_msvc ++ "\n"
         ld_rsp = ld_rsp ++ "/include:" ++ clang_main_msvc ++ "\n/alternatename:with_clang_main=" ++ clang_main_msvc ++ "\n"
     if os() == "Macos":

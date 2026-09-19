@@ -894,7 +894,12 @@ fn sdk_clang_main_source_sha256(name: &str) -> str:
 pub fn run_sdk_clang_main_action(ctx: ActionCtx) -> i32:
     let rc = sdk_ensure_clang_main(ctx)
     if rc != 0: return rc
-    if ctx.fs().mkdir_all(sdk_dirname(ctx.output())) != 0 or ctx.fs().write_text(ctx.output(), sdk_clang_main_archive(compiler_default_llvm_prefix()) ++ "\n") != 0:
+    // The marker says which it is; the generated clang resource module reads
+    // the same fact and takes this file as an input, so it is regenerated
+    // when an SDK gains the archive.
+    let root = ctx.project_info().project_root()
+    let linked = ctx.fs().host_exists(sdk_abs(root, sdk_clang_main_archive(comp_llvm_prefix_for_root(root))))
+    if ctx.fs().mkdir_all(sdk_dirname(ctx.output())) != 0 or ctx.fs().write_text(ctx.output(), (if linked: "linked" else: "absent") ++ "\n") != 0:
         return sdk_fail(ctx, "could not write " ++ ctx.output())
     0
 
@@ -908,9 +913,10 @@ fn sdk_ensure_clang_main(ctx: &ActionCtx) -> i32:
     // Compiling the driver needs LLVM's and clang's headers. A packaged SDK
     // ships libraries and tools only; it has to be published with the archive.
     if not fs.host_exists(sdk_abs(root, sdk_join(prefix, "include/clang/Driver/Driver.h"))):
-        return sdk_fail(ctx, "the LLVM SDK at " ++ prefix ++ " has neither lib/" ++ (if os() == "Windows": "clangMain.lib" else: "libclangMain.a") ++ " nor the headers to build it; it predates `with cc` and must be republished (build/sdk.w archives the driver when the SDK is built)")
+        print("note: the LLVM SDK at " ++ prefix ++ " predates `with cc` (no clang driver archive, and no headers to build one): this compiler will have no C compiler until that SDK is republished")
+        return 0
     if not fs.host_exists(sdk_abs(root, sdk_tool(prefix, "clang++"))):
-        return sdk_fail(ctx, "no static LLVM SDK at " ++ prefix ++ "; run `with build :deps`")
+        return sdk_fail(ctx, "no clang++ in the LLVM SDK at " ++ prefix)
     let scratch = "out/tmp/sdk-clang-main"
     if fs.mkdir_all(scratch) != 0:
         return sdk_fail(ctx, "could not create " ++ scratch)

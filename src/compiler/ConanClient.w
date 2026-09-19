@@ -6,6 +6,7 @@ use Archive
 use compiler.Runtime
 use compiler.ConanRecipe
 use compiler.ConanPatch
+use compiler.ClangDriver
 use std.crypto.sha256
 extern fn with_str_clone_ref(s: &str) -> str
 
@@ -1167,6 +1168,8 @@ fn conan_install_from_source(name: &str, version: &str, project_root: &str, dept
     let recipe_cmake = if exports_cmake: conan_http_get(conan_recipe_file_url(name, folder, "CMakeLists.txt")) else: ""
 
     // Prerequisites first: say what is missing before downloading anything.
+    if not with_cc_available():
+        return conan_source_fail("", "building " ++ name ++ " from source needs `with cc`, and this build of `with` has none: the LLVM SDK it was linked against predates it")
     let cmake = conan_build_tool("cmake", "WITH_CMAKE")
     let ninja = conan_build_tool("ninja", "WITH_NINJA")
     if cmake.len() == 0 or ninja.len() == 0:
