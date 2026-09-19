@@ -8342,24 +8342,36 @@ impl Codegen:
             wl_build_store(self.builder, key, key_alloca)
             let is_str_val = wl_const_int(i64_ty, if self.is_str_type(wl_type_of(key)): 1 else: 0, 0)
             let recv_base_sym = self.mir_map_recv_base_sym(body, recv_op)
-            let fn_val = self.ensure_hm_fn("with_hashmap_remove", i64_ty)
+            // #1189: a stored key that owns memory is transported out by the
+            // runtime and dropped here with its real type; the value goes to
+            // the caller. A miss leaves the zeroed slot, whose drop frees
+            // nothing.
+            let rm_key_sema = self.mir_hash_collection_arg_sema_type(self.mir_operand_sema_type(body, recv_op), 0)
+            let rm_key_llvm = if rm_key_sema > 0 and self.sema.type_needs_drop_frozen(rm_key_sema) != 0: self.mir_sema_type_to_llvm(rm_key_sema) else: 0
+            var stored_key_alloca: i64 = 0
+            if rm_key_llvm != 0:
+                stored_key_alloca = self.create_entry_alloca(rm_key_llvm)
+                wl_build_store(self.builder, self.build_default_value(rm_key_llvm), stored_key_alloca)
+            let fn_val = self.ensure_hm_fn(if rm_key_llvm != 0: "with_hashmap_remove_entry" else: "with_hashmap_remove", i64_ty)
             let params: Vec[i64] = Vec.new()
             params.push(ptr_ty)
             params.push(ptr_ty)
             params.push(ptr_ty)
-            params.push(i64_ty)
+            params.push(if rm_key_llvm != 0: ptr_ty else: i64_ty)
             let fn_ty = wl_function_type(i64_ty, vec_data_i64(&params), 4, 0)
             let args: Vec[i64] = Vec.new()
             args.push(map_ptr)
             args.push(key_alloca)
+            if rm_key_llvm != 0: args.push(stored_key_alloca)
             if recv_base_sym == self.sym_hashmap:
                 var val_ty = self.mir_hashmap_value_type(body, recv_op)
                 if val_ty == 0:
                     val_ty = i64_ty
                 let out_alloca = self.create_entry_alloca(val_ty)
                 args.push(out_alloca)
-                args.push(is_str_val)
+                if rm_key_llvm == 0: args.push(is_str_val)
                 let found = wl_build_call(self.builder, fn_ty, fn_val, vec_data_i64(&args), 4)
+                if rm_key_llvm != 0: self.mir_emit_drop_ptr_for_sema_type(stored_key_alloca, rm_key_llvm, rm_key_sema)
                 let val = wl_build_load(self.builder, val_ty, out_alloca)
                 var dest_llvm = self.get_or_create_option_type(0, val_ty)
                 if dest_llvm != 0:
@@ -8371,8 +8383,9 @@ impl Codegen:
                     result = val
             else:
                 args.push(wl_const_null(ptr_ty))
-                args.push(is_str_val)
+                if rm_key_llvm == 0: args.push(is_str_val)
                 let raw = wl_build_call(self.builder, fn_ty, fn_val, vec_data_i64(&args), 4)
+                if rm_key_llvm != 0: self.mir_emit_drop_ptr_for_sema_type(stored_key_alloca, rm_key_llvm, rm_key_sema)
                 result = wl_build_icmp(self.builder, wl_int_ne(), raw, wl_const_int(i64_ty, 0, 0))
 
         else if intrinsic == MirIntrinsic.MAP_CLEAR:

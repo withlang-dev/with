@@ -29,6 +29,7 @@ fn main:
     assert(set_env("WITH_DEBUG_ALLOC_SCRIBBLE", "1") == 0)
     run_cases("d44_map_traversal", "d44maptraversal", "test/behavior/lib/map_traversal_cases.w")
     run_cases("d44_map_snapshots", "d44mapsnapshots", "test/behavior/lib/map_snapshot_cases.w")
+    run_cases("d44_map_remove", "d44mapremove", "test/behavior/lib/map_remove_cases.w")
     assert(set_env("WITH_ALLOC_NO_REUSE", previous_reuse) == 0)
     assert(set_env("WITH_DEBUG_ALLOC_SCRIBBLE", previous_scribble) == 0)
     print("ok")

@@ -103,10 +103,10 @@ fn main:
     let empty: HashMap[str, str] = HashMap.new()
     for (k, v) in empty: assert(false)
 
-    // The map is still mutable and correct after being traversed. (`remove`
-    // belongs here too once #1189 lands: today it leaks the stored key, and
-    // this test asserts zero leaks.)
+    // The map is still mutable and correct after being traversed.
     m.insert("delta".to_owned(), "four".to_owned())
     assert(m.len() == 4)
+    assert(m.remove("beta").unwrap() == "two")
+    assert(m.len() == 3)
     assert(m.get("delta").unwrap() == "four")
     print("ok")

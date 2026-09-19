@@ -3226,6 +3226,29 @@ pub fn with_hashmap_remove(map: *mut u8, key: *const u8, val_out: *mut u8, is_st
         probes = probes + 1
     0
 
+// #1189: removal transfers the stored key out as well as the value. The
+// table is type-erased, so only the caller can drop a key that owns memory;
+// `remove` alone cleared the slot and the key's buffer leaked. The stored
+// key's bytes are transported into `key_out` before the slot is vacated
+// (`remove` still compares stored keys while it rehashes the entries that
+// follow), leaving `key_out` the key's sole owner.
+pub fn with_hashmap_remove_entry(map: *mut u8, key: *const u8, key_out: *mut u8, val_out: *mut u8) -> i32:
+    let m = map as i64
+    if hm_len(m) == 0: return 0
+    let cap = hm_cap(m)
+    let ksz = hm_key_size(m)
+    var h = (hm_hash_key(m, key) % (cap as u64)) as i64
+    var probes: i64 = 0
+    while probes < cap:
+        if (unsafe hm_occ(m)[h]) == 0: return 0
+        let stored = (hm_keys(m) as i64 + h * ksz) as *const u8
+        if hm_keys_eq(m, stored, key) != 0:
+            if key_out as i64 != 0: rt_memcpy(key_out, stored, ksz)
+            return with_hashmap_remove(map, key, val_out, 0)
+        h = ((h + 1) as u64 % (cap as u64)) as i64
+        probes = probes + 1
+    0
+
 pub fn with_hashmap_len(map: *mut u8) -> i64:
     if map as i64 == 0:
         return 0
