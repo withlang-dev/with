@@ -5,8 +5,11 @@
 // llvm-config, or system clang is consulted (#312).
 //
 // libclang reads headers from real files, so the embedded bytes must be written
-// to disk; we cache them under <cache>/with/clang-resource/<v>/include and skip
-// the work once a completion stamp exists. Compiler code calls
+// to disk; we cache them under <cache>/with/clang-resource/<v>-<identity>/include
+// and skip the work once a completion stamp exists. The identity covers the
+// listing and every header's bytes: a directory keyed by clang's version alone
+// kept serving an older compiler's header set (#1198 added __float_*.h, and
+// existing caches never received them). Compiler code calls
 // ensure_clang_resource_dir() directly and passes the resulting path to the
 // libclang bridge.
 
@@ -27,16 +30,21 @@ fn ecr_dirname(path: &str) -> str:
         return ""
     path.slice(0, last as i64)
 
+// One line per embedded header: its path and the hash of its bytes.
+fn ecr_identity_text() -> str:
+    let listing = embedded_clang_resource_list()
+    var content = "version:" ++ embedded_clang_resource_version() ++ "\n"
+    content = content ++ "listing:" ++ f"{with_str_hash(listing) as i64}" ++ "\n"
+    for rel in listing.split("\n"):
+        if rel.len() > 0: content = content ++ rel ++ ":" ++ f"{with_str_hash(embedded_clang_resource_data(rel)) as i64}" ++ "\n"
+    content
+
 fn ecr_cache_root() -> str:
-    let version = embedded_clang_resource_version()
     var base = with_getenv_str("XDG_CACHE_HOME")
     if base.len() == 0:
         let home = with_getenv_str("HOME")
-        if home.len() == 0:
-            base = "/tmp/with-cache"
-        else:
-            base = home ++ "/.cache"
-    base ++ "/with/clang-resource/" ++ version
+        base = if home.len() == 0: "/tmp/with-cache" else: home ++ "/.cache"
+    base ++ "/with/clang-resource/" ++ embedded_clang_resource_version() ++ "-" ++ f"{with_str_hash(ecr_identity_text())}"
 
 pub fn ensure_clang_resource_dir() -> str:
     let root = ecr_cache_root()
@@ -70,18 +78,5 @@ pub fn ensure_clang_resource_identity_file() -> str:
     if root.len() == 0:
         return ""
     let path = root ++ "/.with-resource-identity"
-    let listing = embedded_clang_resource_list()
-    var content = "version:" ++ embedded_clang_resource_version() ++ "\n"
-    content = content ++ "listing:" ++ f"{with_str_hash(listing) as i64}" ++ "\n"
-    var start = 0
-    var i = 0
-    while i <= listing.len() as i32:
-        let at_end = i == listing.len() as i32
-        if at_end or listing[i] == 10:
-            if i > start:
-                let rel = listing.slice(start as i64, i as i64)
-                content = content ++ rel ++ ":" ++ f"{with_str_hash(embedded_clang_resource_data(rel)) as i64}" ++ "\n"
-            start = i + 1
-        i = i + 1
-    let _write = with_fs_write_file(path, content)
+    let _write = with_fs_write_file(path, ecr_identity_text())
     path
