@@ -104,8 +104,8 @@ fn cr_raw_string_literal(text: &str) -> str:
     "r" ++ hashes ++ "\"" ++ text ++ "\"" ++ hashes
 
 // We embed the C/POSIX builtin headers a c_import realistically needs, NOT the
-// full ~15 MB tree. The bulk of the full tree is SIMD/GPU intrinsics (arm_neon
-// 3 MB, arm_sve, arm_mve, opencl-c, altivec, …) that FFI never includes, and a
+// full ~15 MB tree. The bulk of the full tree is SIMD/GPU intrinsics for every
+// architecture (arm_neon 3 MB, arm_sve, arm_mve, opencl-c, altivec, …), and a
 // 15 MB generated module is ~46x the working embedded-stdlib data — the seed's
 // comptime evaluator is SIGKILL'd building a string that large. The subset is
 // ~156 KB. WITH_CLANG_RESOURCE_DIR overrides for the rare header outside it.
@@ -127,6 +127,19 @@ fn cr_should_embed(name: &str) -> bool:
         return true
     if name == "tgmath.h" or name == "inttypes.h" or name == "stdcountof.h" or name == "mm_malloc.h":
         return true
+    cr_is_host_intrinsics(name)
+
+// `with cc` compiles real C, and real C reaches for SIMD: raylib's
+// stb_image_resize2.h includes <arm_neon.h>. A port builds for the host, so the
+// host architecture's intrinsic headers are embedded (arm64 5.7 MB, x86_64
+// 4.2 MB); the other architectures', and Arm's M-profile ones (MVE, CDE), are
+// not.
+fn cr_is_host_intrinsics(name: &str) -> bool:
+    if not name.ends_with(".h"): return false
+    if arch() == "aarch64" or arch() == "arm64":
+        return (name.starts_with("arm_") and name != "arm_mve.h" and name != "arm_cde.h") or name == "arm64intr.h"
+    if arch() == "x86_64":
+        return name.ends_with("intrin.h") or name == "cpuid.h" or name == "mm3dnow.h" or name == "immintrin.h"
     false
 
 // The name a `#include` / `#include_next` line asks for, or "". Written with
