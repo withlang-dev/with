@@ -4,6 +4,9 @@
 
 use Archive
 use compiler.Runtime
+use compiler.ConanRecipe
+use compiler.ConanPatch
+use compiler.ClangDriver
 use std.crypto.sha256
 extern fn with_str_clone_ref(s: &str) -> str
 
@@ -1038,143 +1041,252 @@ fn conan_recipe_folder(name: &str, version: &str) -> str:
             break
     ""
 
-fn conan_source_url_from_data(data: &str, version: &str) -> str:
-    let lines = conan_split_nonempty_lines(data)
-    var in_version = false
-    let version_line_a = "\"" ++ version ++ "\":"
-    let version_line_b = version ++ ":"
-    for i in 0..lines.len() as i32:
-        let line = lines[i]
-        if line == version_line_a or line == version_line_b:
-            in_version = true
-        else if in_version and line.starts_with("url:"):
-            return conan_strip_quotes(line.slice(4, line.len()))
-        else if in_version and line.ends_with(":") and not line.starts_with("url:"):
-            break
+// ── Building from source ─────────────────────────────────────────────
+// `with get --from-source`: skip Conan Center's binaries.
+var g_conan_from_source: bool = false
+
+pub fn conan_set_from_source(enabled: bool) -> Unit:
+    g_conan_from_source = enabled
+
+// No linkable binary on Conan Center: build the package from source.
+//
+// Nothing here knows any package. The recipe Conan Center publishes is read as
+// data (src/compiler/ConanRecipe.w): conandata.yml gives the tarball, its
+// digest and the patches; conanfile.py gives the requirements and the CMake
+// variables. The package's own CMake build does the rest, driven by `cmake`
+// and `ninja` with `with cc` as the C compiler and `with ar` as the archiver.
+// It installs into the dependency directory, which is then scanned exactly as
+// an extracted Conan binary is. What the machine lacks is named, not guessed
+// around: the user installs it.
+
+fn conan_source_fail(dep_dir: &str, message: &str) -> str:
+    runtime_eprint("error: " ++ message)
+    if dep_dir.len() > 0:
+        let _remove = runtime_remove_tree(dep_dir)
     ""
 
-fn conan_version_has_patches(data: &str, version: &str) -> bool:
-    let patch_pos = conan_find_text(data, "patches:")
-    if patch_pos < 0:
-        return false
-    let after = data.slice(patch_pos as i64, data.len())
-    after.contains("\"" ++ version ++ "\":") or after.contains(version ++ ":")
+// This executable, for the `cc` / `ar` / `ranlib` launchers.
+fn conan_self_exe() -> str:
+    let argv0 = with_arg_at(0)
+    if argv0.contains("/") or argv0.contains("\\"): return conan_absolute(argv0)
+    conan_find_program(argv0)
 
-fn conan_source_unsupported_recipe(recipe: &str) -> bool:
-    recipe.contains("self.requires(") or recipe.contains("apply_conandata_patches") or recipe.contains("configure(")
+// CMake wants absolute paths; a relative one is relative to where we were run.
+fn conan_absolute(path: &str) -> str:
+    let cwd = runtime_getenv("PWD")
+    if runtime_path_is_absolute(path) or cwd.len() == 0: path.to_owned() else: cwd ++ "/" ++ path
 
-fn conan_collect_c_sources_and_headers(source_dir: &str) -> ConanLibraryScan:
-    let listing = runtime_list_files(source_dir)
-    let files = conan_split_nonempty_lines(listing)
-    var c_files: Vec[str] = Vec.new()
-    var header_dirs: Vec[str] = Vec.new()
-    for i in 0..files.len() as i32:
-        let path = files[i]
-        if path.ends_with(".c"):
-            c_files = conan_sorted_insert_unique(move c_files, path)
-        else if path.ends_with(".h"):
-            header_dirs = conan_sorted_insert_unique(move header_dirs, conan_path_dirname(path))
-    ConanLibraryScan { lib_paths: header_dirs, libs: c_files }
+// `name` on PATH, or "".
+fn conan_find_program(name: &str) -> str:
+    let windows = runtime_sysinfo_os() == "Windows"
+    for dir in runtime_getenv("PATH").split(if windows: ";" else: ":"):
+        if dir.len() == 0: continue
+        let candidate = dir ++ "/" ++ name ++ (if windows and not name.ends_with(".exe"): ".exe" else: "")
+        if runtime_file_exists(candidate) != 0: return candidate
+    ""
 
-fn conan_c_compiler -> str:
-    let cc = runtime_getenv("CC")
-    if cc.len() > 0:
-        return cc
-    "cc"
+// A build tool: WITH_<NAME> names it outright, otherwise PATH.
+fn conan_build_tool(name: &str, env_name: &str) -> str:
+    let named = runtime_getenv(env_name)
+    if named.len() > 0: named else: conan_find_program(name)
 
-fn conan_compile_c_source(source: &str, obj: &str, include_dirs: &Vec[str]) -> i32:
+// `<dir>/<tool>`: a launcher that runs `<self> <tool> ...`. CMake wants one
+// program path for a compiler; `with cc` is two words.
+fn conan_write_launcher(dir: &str, tool: &str, self_exe: &str) -> str:
+    if runtime_sysinfo_os() == "Windows":
+        let path = dir ++ "/" ++ tool ++ ".cmd"
+        let _w = runtime_write_file(path, "@\"" ++ self_exe ++ "\" " ++ tool ++ " %*\r\n")
+        return path
+    let path = dir ++ "/" ++ tool
+    let _w = runtime_write_file(path, "#!/bin/sh\nexec \"" ++ self_exe ++ "\" " ++ tool ++ " \"$@\"\n")
+    var chmod = ""
+    chmod = conan_argv_append(chmod, "chmod")
+    chmod = conan_argv_append(chmod, "+x")
+    chmod = conan_argv_append(chmod, path)
+    let _x = conan_run_tool(chmod, 10000)
+    path
+
+// tar reads gzip, xz and bzip2 tarballs, and (bsdtar: macOS, Windows) zip; GNU
+// tar does not read zip, so `unzip` is the second try.
+fn conan_extract_any(archive: &str, dest: &str) -> i32:
     var argv = ""
-    argv = conan_argv_append(argv, conan_c_compiler())
-    argv = conan_argv_append(argv, "-O2")
-    for i in 0..include_dirs.len() as i32:
-        argv = conan_argv_append(argv, "-I" ++ include_dirs[i])
-    argv = conan_argv_append(argv, "-c")
-    argv = conan_argv_append(argv, source)
-    argv = conan_argv_append(argv, "-o")
-    argv = conan_argv_append(argv, obj)
-    conan_run_tool(argv, 120000)
+    argv = conan_argv_append(argv, "tar")
+    argv = conan_argv_append(argv, "xf")
+    argv = conan_argv_append(argv, archive)
+    argv = conan_argv_append(argv, "-C")
+    argv = conan_argv_append(argv, dest)
+    if conan_run_tool(argv, 300000) == 0: return 0
+    if not archive.ends_with(".zip"): return 1
+    var unzip = ""
+    unzip = conan_argv_append(unzip, "unzip")
+    unzip = conan_argv_append(unzip, "-q")
+    unzip = conan_argv_append(unzip, "-o")
+    unzip = conan_argv_append(unzip, archive)
+    unzip = conan_argv_append(unzip, "-d")
+    unzip = conan_argv_append(unzip, dest)
+    conan_run_tool(unzip, 300000)
 
-fn conan_install_source_fallback(name: &str, version: &str, project_root: &str) -> str:
+// An archive usually holds one top-level directory; the source is inside it.
+fn conan_source_root(raw_dir: &str) -> str:
+    var top = ""
+    for path in conan_split_nonempty_lines(runtime_list_files(raw_dir)):
+        let rel = conan_relative_path(raw_dir, path)
+        let slash = rel.find("/")
+        if slash <= 0: return raw_dir.to_owned()
+        let first = rel.slice(0, slash)
+        if top.len() == 0: top = first.to_owned()
+        else if top != first: return raw_dir.to_owned()
+    if top.len() == 0: raw_dir.to_owned() else: raw_dir ++ "/" ++ top
+
+fn conan_patch_read(path: &str) -> str: runtime_read_file(path)
+
+fn conan_patch_write(path: &str, text: &str) -> i32: runtime_write_file(path, text)
+
+// What the recipe says about a build we cannot drive, for the error.
+fn conan_recipe_build_system(recipe: &str) -> str:
+    if recipe.contains("Configure") and recipe.contains("perl"): return "its own Configure script, which needs Perl"
+    if recipe.contains("Autotools(") or recipe.contains("AutotoolsToolchain"): return "autotools (sh and make)"
+    if recipe.contains("Meson("): return "Meson"
+    if recipe.contains("MSBuild("): return "MSBuild"
+    "a build system other than CMake"
+
+fn conan_install_from_source(name: &str, version: &str, project_root: &str, depth: i32) -> str:
+    let platform = conan_detect_os() ++ "/" ++ conan_detect_arch()
+    let why = if g_conan_from_source: "--from-source" else: "Conan Center has no binary for " ++ platform ++ " that this toolchain can link"
+    runtime_eprint("  " ++ why ++ "; building " ++ name ++ "/" ++ version ++ " from source")
     let folder = conan_recipe_folder(name, version)
-    if folder.len() == 0:
-        runtime_eprint("error: no prebuilt binary for your platform, source build not supported for " ++ name ++ "/" ++ version)
-        return ""
-    let conandata = conan_http_get(conan_recipe_file_url(name, folder, "conandata.yml"))
-    if conandata.len() == 0:
-        runtime_eprint("error: no prebuilt binary for your platform, source build not supported for " ++ name ++ "/" ++ version)
-        return ""
-    if conan_version_has_patches(conandata, version):
-        runtime_eprint("error: no prebuilt binary for your platform, source build not supported for " ++ name ++ "/" ++ version)
-        return ""
-    let recipe = conan_http_get(conan_recipe_file_url(name, folder, "conanfile.py"))
-    if recipe.len() == 0 or conan_source_unsupported_recipe(recipe):
-        runtime_eprint("error: no prebuilt binary for your platform, source build not supported for " ++ name ++ "/" ++ version)
-        return ""
-    let source_url = conan_source_url_from_data(conandata, version)
-    if source_url.len() == 0:
-        runtime_eprint("error: no prebuilt binary for your platform, source build not supported for " ++ name ++ "/" ++ version)
-        return ""
-    let dep_dir = project_root ++ "/.with/deps/c/" ++ name ++ "/" ++ version
+    let data = if folder.len() > 0: conan_http_get(conan_recipe_file_url(name, folder, "conandata.yml")) else: ""
+    let recipe = if folder.len() > 0: conan_http_get(conan_recipe_file_url(name, folder, "conanfile.py")) else: ""
+    if data.len() == 0 or recipe.len() == 0:
+        return conan_source_fail("", "could not read the Conan Center recipe of " ++ name ++ "/" ++ version)
+    let source = conan_data_source(data, version)
+    if source.url.len() == 0 or source.sha256.len() == 0:
+        return conan_source_fail("", "the recipe of " ++ name ++ " lists no source archive for " ++ version)
+    // A recipe that ships its own CMakeLists.txt exports it; asking for one
+    // that is not there is a 404 printed at the user.
+    let exports_cmake = recipe.contains("\"CMakeLists.txt\", self.recipe_folder") or recipe.contains("\"CMakeLists.txt\", src=self.recipe_folder") or recipe.contains("exports_sources = \"CMakeLists.txt\"") or recipe.contains("exports_sources = [\"CMakeLists.txt\"")
+    let recipe_cmake = if exports_cmake: conan_http_get(conan_recipe_file_url(name, folder, "CMakeLists.txt")) else: ""
+
+    // Prerequisites first: say what is missing before downloading anything.
+    if not with_cc_available():
+        return conan_source_fail("", "building " ++ name ++ " from source needs `with cc`, and this build of `with` has none: the LLVM SDK it was linked against predates it")
+    let cmake = conan_build_tool("cmake", "WITH_CMAKE")
+    let ninja = conan_build_tool("ninja", "WITH_NINJA")
+    if cmake.len() == 0 or ninja.len() == 0:
+        let missing = if cmake.len() == 0 and ninja.len() == 0: "cmake and ninja" else: if cmake.len() == 0: "cmake" else: "ninja"
+        return conan_source_fail("", "building " ++ name ++ " from source needs " ++ missing ++ ", which " ++ (if missing.contains(" and "): "are" else: "is") ++ " not on PATH; install " ++ (if missing.contains(" and "): "them" else: "it") ++ " (or set WITH_CMAKE / WITH_NINJA) and run `with get` again")
+    let self_exe = conan_self_exe()
+    if self_exe.len() == 0: return conan_source_fail("", "could not locate this `with` executable to use as the C compiler")
+
+    let env = CrEnv { recipe: recipe.clone(), version: version.to_owned(), source_dir: "", os: conan_detect_os(), arch: conan_detect_arch() }
+    let requires = conan_recipe_requires(&env)
+    for undecided in requires.undecided:
+        runtime_eprint("  note: not requiring " ++ undecided ++ ": that condition needs the recipe to run")
+    let resolved: Vec[str] = Vec.new()
+    for reference in requires.refs:
+        let required = conan_ref_name(reference)
+        let written = conan_ref_version(reference)
+        // A version range asks for the newest release Conan Center has.
+        let hint = if written.starts_with("["): "" else: written.clone()
+        let installed = conan_install_internal(required, hint, project_root, depth + 1, false)
+        if installed.len() == 0:
+            return conan_source_fail("", name ++ "/" ++ version ++ " requires " ++ reference ++ ", which could not be installed (above)")
+        resolved.push(required ++ "/" ++ installed)
+
+    let dep_dir = conan_absolute(project_root ++ "/.with/deps/c/" ++ name ++ "/" ++ version)
     let _clean = runtime_remove_tree(dep_dir)
-    let source_dir = dep_dir ++ "/source"
-    let obj_dir = dep_dir ++ "/obj"
-    let lib_dir = dep_dir ++ "/lib"
-    if runtime_mkdir_p(source_dir) != 0 or runtime_mkdir_p(obj_dir) != 0 or runtime_mkdir_p(lib_dir) != 0:
-        runtime_eprint("error: failed to create dependency directory for " ++ name ++ "/" ++ version)
-        let _remove = runtime_remove_tree(dep_dir)
-        return ""
-    let archive_path = dep_dir ++ "/source.tgz"
-    runtime_eprint("  downloading source for " ++ name ++ "/" ++ version ++ "...")
-    if conan_http_download(source_url, archive_path) != 0:
-        runtime_eprint("error: failed to download source for " ++ name ++ "/" ++ version)
-        let _remove = runtime_remove_tree(dep_dir)
-        return ""
-    if conan_extract_tgz_strip1(archive_path, source_dir) != 0:
-        runtime_eprint("error: failed to extract source for " ++ name ++ "/" ++ version)
-        let _remove = runtime_remove_tree(dep_dir)
-        return ""
-    let collected = conan_collect_c_sources_and_headers(source_dir)
-    let header_dirs_abs = collected.lib_paths
-    let c_files = collected.libs
-    if c_files.len() == 0 or header_dirs_abs.len() == 0:
-        runtime_eprint("error: no prebuilt binary for your platform, source build not supported for " ++ name ++ "/" ++ version)
-        let _remove = runtime_remove_tree(dep_dir)
-        return ""
-    var include_paths: Vec[str] = Vec.new()
-    include_paths.push("source")
-    let include_dirs_abs: Vec[str] = Vec.new()
-    include_dirs_abs.push(source_dir)
-    for i in 0..header_dirs_abs.len() as i32:
-        let abs = header_dirs_abs[i]
-        include_dirs_abs.push(with_str_clone_ref(abs))
-        include_paths = conan_sorted_insert_unique(move include_paths, conan_relative_path(dep_dir, abs))
-    let objects: Vec[str] = Vec.new()
-    for i in 0..c_files.len() as i32:
-        let obj = obj_dir ++ "/" ++ f"{i}.o"
-        if conan_compile_c_source(c_files[i], obj, include_dirs_abs) != 0:
-            runtime_eprint("error: source build failed for " ++ name ++ "/" ++ version ++ "; source build not supported for this package")
-            let _remove = runtime_remove_tree(dep_dir)
-            return ""
-        objects.push(obj)
-    let lib_path = lib_dir ++ "/lib" ++ name ++ ".a"
-    if create_static_archive(lib_path, objects) != 0:
-        runtime_eprint("error: failed to archive source build for " ++ name ++ "/" ++ version)
-        let _remove = runtime_remove_tree(dep_dir)
-        return ""
-    let lib_paths: Vec[str] = Vec.new()
-    lib_paths.push("lib")
-    var libs: Vec[str] = Vec.new()
-    libs.push(with_str_clone_ref(name))
-    let defines: Vec[str] = Vec.new()
-    let link_args: Vec[str] = Vec.new()
-    let known = conan_link_metadata_with_recipe(name, version, move libs, move link_args, recipe)
-    let requires: Vec[str] = Vec.new()
-    if conan_write_metadata(dep_dir, name, version, "source", "source", "source", include_paths, lib_paths, known.libs, defines, known.lib_paths, requires) != 0:
-        runtime_eprint("error: failed to write metadata for " ++ name ++ "/" ++ version)
-        let _remove = runtime_remove_tree(dep_dir)
-        return ""
-    runtime_eprint("  built source package at .with/deps/c/" ++ name ++ "/" ++ version ++ "/")
-    with_str_clone_ref(version)
+    let work = dep_dir ++ "/.build"
+    let raw_dir = work ++ "/src"
+    let tools_dir = work ++ "/tools"
+    if runtime_mkdir_p(raw_dir) != 0 or runtime_mkdir_p(tools_dir) != 0 or runtime_mkdir_p(work ++ "/recipe") != 0:
+        return conan_source_fail(dep_dir, "could not create " ++ work)
+    let archive = work ++ "/" ++ conan_path_basename(source.url)
+    runtime_eprint("  downloading " ++ source.url)
+    if conan_http_download(source.url, archive) != 0: return conan_source_fail(dep_dir, "could not download " ++ source.url)
+    let digest = conan_sha256_file(archive)
+    if digest != source.sha256:
+        return conan_source_fail(dep_dir, source.url ++ " has sha256 " ++ digest ++ "; the recipe expects " ++ source.sha256)
+    if conan_extract_any(archive, raw_dir) != 0:
+        return conan_source_fail(dep_dir, "could not extract " ++ conan_path_basename(source.url) ++ " (it needs `tar`" ++ (if archive.ends_with(".zip"): " with zip support, or `unzip`" else: if archive.ends_with(".xz"): " and `xz`" else: "") ++ ")")
+    let source_dir = conan_source_root(raw_dir)
+    for patch_file in conan_data_patches(data, version):
+        let patch = conan_http_get(conan_recipe_file_url(name, folder, patch_file))
+        if patch.len() == 0: return conan_source_fail(dep_dir, "could not fetch the recipe's " ++ patch_file)
+        let problem = conan_apply_patch(patch, source_dir, conan_patch_read, conan_patch_write)
+        if problem.len() > 0: return conan_source_fail(dep_dir, patch_file ++ ": " ++ problem)
+
+    // The project's own CMakeLists, or the one the recipe ships for it.
+    var cmake_dir = source_dir.clone()
+    if recipe_cmake.len() > 0:
+        cmake_dir = work ++ "/recipe"
+        if runtime_write_file(cmake_dir ++ "/CMakeLists.txt", recipe_cmake) != 0: return conan_source_fail(dep_dir, "could not write the recipe's CMakeLists.txt")
+    else if runtime_file_exists(source_dir ++ "/CMakeLists.txt") == 0:
+        return conan_source_fail(dep_dir, name ++ "/" ++ version ++ " builds with " ++ conan_recipe_build_system(recipe) ++ "; `with get` builds CMake projects from source, so this package needs a platform Conan Center has a binary for")
+
+    let built_env = CrEnv { recipe: recipe.clone(), version: version.to_owned(), source_dir: source_dir.clone(), os: conan_detect_os(), arch: conan_detect_arch() }
+    let variables = conan_recipe_cmake_variables(&built_env)
+    var prefix_path = ""
+    for reference in resolved:
+        if prefix_path.len() > 0: prefix_path = prefix_path ++ ";"
+        prefix_path = prefix_path ++ conan_absolute(project_root ++ "/.with/deps/c/" ++ reference)
+    var configure = ""
+    configure = conan_argv_append(configure, cmake)
+    configure = conan_argv_append(configure, "-S")
+    configure = conan_argv_append(configure, cmake_dir)
+    configure = conan_argv_append(configure, "-B")
+    configure = conan_argv_append(configure, work ++ "/b")
+    configure = conan_argv_append(configure, "-G")
+    configure = conan_argv_append(configure, "Ninja")
+    configure = conan_argv_append(configure, "-DCMAKE_MAKE_PROGRAM=" ++ ninja)
+    configure = conan_argv_append(configure, "-DCMAKE_C_COMPILER=" ++ conan_write_launcher(tools_dir, "cc", self_exe))
+    configure = conan_argv_append(configure, "-DCMAKE_AR=" ++ conan_write_launcher(tools_dir, "ar", self_exe))
+    configure = conan_argv_append(configure, "-DCMAKE_RANLIB=" ++ conan_write_launcher(tools_dir, "ranlib", self_exe))
+    configure = conan_argv_append(configure, "-DCMAKE_BUILD_TYPE=Release")
+    configure = conan_argv_append(configure, "-DBUILD_SHARED_LIBS=OFF")
+    configure = conan_argv_append(configure, "-DCMAKE_POSITION_INDEPENDENT_CODE=ON")
+    configure = conan_argv_append(configure, "-DCMAKE_INSTALL_PREFIX=" ++ dep_dir)
+    configure = conan_argv_append(configure, "-DCMAKE_INSTALL_LIBDIR=lib")
+    if prefix_path.len() > 0: configure = conan_argv_append(configure, "-DCMAKE_PREFIX_PATH=" ++ prefix_path)
+    for define in variables.defines: configure = conan_argv_append(configure, define)
+    runtime_eprint("  configuring...")
+    if conan_run_tool(configure, 900000) != 0:
+        for unknown in variables.unknown: runtime_eprint("  note: the recipe also sets " ++ unknown ++ ", which could not be evaluated")
+        return conan_source_fail(dep_dir, "CMake could not configure " ++ name ++ "/" ++ version ++ " (its output is above)")
+    // Keep going past a test or example program that does not link: the
+    // library is what gets installed, and the install step says if it is missing.
+    var build = ""
+    build = conan_argv_append(build, cmake)
+    build = conan_argv_append(build, "--build")
+    build = conan_argv_append(build, work ++ "/b")
+    build = conan_argv_append(build, "--")
+    build = conan_argv_append(build, "-k")
+    build = conan_argv_append(build, "0")
+    runtime_eprint("  building...")
+    let build_rc = conan_run_tool(build, 3600000)
+    var install = ""
+    install = conan_argv_append(install, cmake)
+    install = conan_argv_append(install, "--install")
+    install = conan_argv_append(install, work ++ "/b")
+    if conan_run_tool(install, 300000) != 0:
+        return conan_source_fail(dep_dir, name ++ "/" ++ version ++ " did not build (the compiler's output is above" ++ (if build_rc != 0: "; the build step failed" else: "") ++ ")")
+    let _work = runtime_remove_tree(work)
+    if conan_write_binary_metadata(name, version, "built", "built", source.sha256, dep_dir, resolved) != 0:
+        return conan_source_fail(dep_dir, "could not write metadata for " ++ name ++ "/" ++ version)
+    runtime_eprint("  built " ++ name ++ "/" ++ version ++ " into .with/deps/c/" ++ name ++ "/" ++ version ++ "/")
+    version.to_owned()
+
+// A lock entry that was built from source: reuse the build, or build the same
+// version again; the recipe's digest for it must still be the locked one.
+pub fn conan_restore_locked_source(name: &str, version: &str, sha256: &str, project_root: &str) -> bool:
+    if runtime_file_exists(project_root ++ "/.with/deps/c/" ++ name ++ "/" ++ version ++ "/metadata.json") != 0: return true
+    let folder = conan_recipe_folder(name, version)
+    let data = if folder.len() > 0: conan_http_get(conan_recipe_file_url(name, folder, "conandata.yml")) else: ""
+    let pinned = conan_data_source(data, version)
+    let now = pinned.sha256.clone()
+    if now != sha256:
+        runtime_eprint("error: the lock pins c." ++ name ++ "@" ++ version ++ " to source sha256 " ++ sha256 ++ "; the recipe now says " ++ (if now.len() == 0: "nothing for that version" else: now))
+        return false
+    conan_install_from_source(name, version, project_root, 0).len() > 0
 
 fn conan_install_internal(name: &str, version_hint: &str, project_root: &str, depth: i32, force_reinstall: bool) -> str:
     if depth > 8:
@@ -1196,10 +1308,11 @@ fn conan_install_internal(name: &str, version_hint: &str, project_root: &str, de
         runtime_eprint("error: could not resolve recipe for " ++ name ++ "/" ++ version ++ " on Conan Center")
         return ""
     runtime_eprint("  revision: " ++ recipe_rev.slice(0, if recipe_rev.len() > 12: 12 else: recipe_rev.len()))
+    if g_conan_from_source: return conan_install_from_source(name, version, project_root, depth)
     let installed_binary = conan_install_binary(name, version, recipe_rev, project_root, depth, force_reinstall)
     if installed_binary.len() > 0:
         return installed_binary
-    conan_install_source_fallback(name, version, project_root)
+    conan_install_from_source(name, version, project_root, depth)
 
 // Public API. Returns the concrete installed version, or "" on failure.
 fn conan_install(name: &str, version_hint: &str, project_root: &str, force_reinstall: bool) -> str:

@@ -30,6 +30,7 @@ use BuildGraphTests
 use InitTemplates
 use BuildGraphRuntime
 use BuildGraphCache
+use compiler.ClangDriver
 use compiler.DriverOptions
 use compiler.AbiStamp
 use compiler.Runtime
@@ -742,6 +743,19 @@ fn run_one_liner_command(argc: i32, one: &CliOneLiner, no_std: bool, alloc_mode:
     rc
 
 fn run_cli(argc: i32) -> i32:
+    // `with cc ...` is clang; none of With's own flags apply to it.
+    if cli_command(argc) == "cc": return with_cc_main()
+    // `with ar qc lib.a a.o b.o` / `with ranlib lib.a`: what CMake asks of an
+    // archiver, so a source build needs no binutils. The archive is written
+    // with its symbol index; ranlib has nothing left to do.
+    if cli_command(argc) == "ranlib": return 0
+    if cli_command(argc) == "ar":
+        if argc < 5:
+            with_eprint("usage: with ar <qc|rc|rcs> <archive> <object>...")
+            return 2
+        let members: Vec[str] = Vec.new()
+        for i in 4..argc: members.push(with_arg_at(i))
+        return create_static_archive(with_arg_at(3), members)
     let opt_level = cli_opt_level(argc)
     let no_std = cli_has_flag(argc, "--no-std") or cli_has_flag(argc, "--freestanding")
     let alloc_mode = cli_has_flag(argc, "--alloc")
@@ -5466,7 +5480,7 @@ type GetCommandOptions {
 }
 
 fn get_command_usage():
-    with_eprint("usage: with get [--force-reinstall] [c.<package>[@version] | <package>[@version]]")
+    with_eprint("usage: with get [--force-reinstall] [--from-source] [c.<package>[@version] | <package>[@version]]")
     with_eprint("  c.<package>     C dependency via Conan Center")
     with_eprint("  <package>       With package (registry not yet available)")
     with_eprint("  (no arguments)  restore dependencies from lock file")
@@ -5510,6 +5524,8 @@ fn parse_get_command_options(argc: i32) -> GetCommandOptions:
         let arg = with_arg_at(i)
         if arg == "--force-reinstall" or arg == "--force":
             force_reinstall = true
+        else if arg == "--from-source":
+            conan_set_from_source(true)
         else if arg.starts_with("-"):
             with_eprint("error: unknown with get option '" ++ arg ++ "'")
             return GetCommandOptions { spec: "", force_reinstall }

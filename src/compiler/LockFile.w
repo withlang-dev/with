@@ -290,7 +290,8 @@ pub fn lock_write(project_root: &str, lock: &LockFile) -> i32:
         let entry = lock.entries[i]
         text = text ++ "    " ++ q ++ lock_json_escape(entry.name) ++ q ++ ": {\n"
         text = text ++ lock_json_string("source", entry.source, true)
-        text = text ++ lock_json_string("version", entry.version, entry.source == "conan")
+        text = text ++ lock_json_string("version", entry.version, entry.source == "conan" or entry.source == "built")
+        if entry.source == "built": text = text ++ lock_json_string("sha256", entry.sha256, false)
         if entry.source == "conan":
             text = text ++ lock_json_string("recipe_rev", entry.recipe_rev, true)
             text = text ++ lock_json_string("package_id", entry.package_id, true)
@@ -342,6 +343,9 @@ fn lock_entry_from_installed_c_dep(project_root: &str, name: &str, version: &str
     let dep_name = "c." ++ name
     if recipe_rev == "system" and package_id == "system" and package_rev == "system":
         return LockEntry { name: dep_name, source: "system", version: with_str_clone_ref(version), recipe_rev: "", package_id: "", package_rev: "", sha256: "" }
+    // Built from source: what pins it is the source archive's digest.
+    if recipe_rev == "built":
+        return LockEntry { name: dep_name, source: "built", version: with_str_clone_ref(version), recipe_rev: "", package_id: "", package_rev: "", sha256: package_rev }
     let tgz_path = dep_dir ++ "/conan_package.tgz"
     let digest = lock_sha256_file(tgz_path)
     if digest.len() == 0:
@@ -415,6 +419,11 @@ fn lock_restore_entry(project_root: &str, entry: &LockEntry) -> i32:
             runtime_eprint("restored " ++ entry.name ++ "@" ++ entry.version ++ " (system)")
             return 0
         runtime_eprint("error: unsupported system package in lock file: " ++ entry.name ++ "@" ++ entry.version)
+        return 1
+    if entry.source == "built":
+        if conan_restore_locked_source(c_name, entry.version, entry.sha256, project_root):
+            runtime_eprint("restored " ++ entry.name ++ "@" ++ entry.version ++ " (built from source)")
+            return 0
         return 1
     if entry.source != "conan":
         runtime_eprint("error: unsupported lock source '" ++ entry.source ++ "' for " ++ entry.name)

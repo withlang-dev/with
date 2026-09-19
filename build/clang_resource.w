@@ -104,8 +104,8 @@ fn cr_raw_string_literal(text: &str) -> str:
     "r" ++ hashes ++ "\"" ++ text ++ "\"" ++ hashes
 
 // We embed the C/POSIX builtin headers a c_import realistically needs, NOT the
-// full ~15 MB tree. The bulk of the full tree is SIMD/GPU intrinsics (arm_neon
-// 3 MB, arm_sve, arm_mve, opencl-c, altivec, …) that FFI never includes, and a
+// full ~15 MB tree. The bulk of the full tree is SIMD/GPU intrinsics for every
+// architecture (arm_neon 3 MB, arm_sve, arm_mve, opencl-c, altivec, …), and a
 // 15 MB generated module is ~46x the working embedded-stdlib data — the seed's
 // comptime evaluator is SIGKILL'd building a string that large. The subset is
 // ~156 KB. WITH_CLANG_RESOURCE_DIR overrides for the rare header outside it.
@@ -127,6 +127,19 @@ fn cr_should_embed(name: &str) -> bool:
         return true
     if name == "tgmath.h" or name == "inttypes.h" or name == "stdcountof.h" or name == "mm_malloc.h":
         return true
+    cr_is_host_intrinsics(name)
+
+// `with cc` compiles real C, and real C reaches for SIMD: raylib's
+// stb_image_resize2.h includes <arm_neon.h>. A port builds for the host, so the
+// host architecture's intrinsic headers are embedded (arm64 5.7 MB, x86_64
+// 4.2 MB); the other architectures', and Arm's M-profile ones (MVE, CDE), are
+// not.
+fn cr_is_host_intrinsics(name: &str) -> bool:
+    if not name.ends_with(".h"): return false
+    if arch() == "aarch64" or arch() == "arm64":
+        return (name.starts_with("arm_") and name != "arm_mve.h" and name != "arm_cde.h") or name == "arm64intr.h"
+    if arch() == "x86_64":
+        return name.ends_with("intrin.h") or name == "cpuid.h" or name == "mm3dnow.h" or name == "immintrin.h"
     false
 
 // The name a `#include` / `#include_next` line asks for, or "". Written with
@@ -157,21 +170,6 @@ fn cr_included_name(line: &str) -> str:
     if end >= n:
         return ""
     line.slice(start as i64, end as i64)
-
-// An embedded header that includes a builtin sibling we left out fails at the
-// user's first c_import of it (float.h after clang 22 split it). The subset
-// must be closed under inclusion; name the gap at build time.
-fn cr_unembedded_include(ctx: &ActionCtx, include_dir: &str, files: &Vec[str], all: &Vec[str]) -> str:
-    let fs = ctx.fs()
-    for i in 0..files.len() as i32:
-        let text = fs.read_text(files[i])
-        for line in text.split("\n"):
-            let name = cr_included_name(line)
-            if name.len() == 0 or cr_should_embed(cr_basename(name)): continue
-            for k in 0..all.len() as i32:
-                if cr_normalize_path_separators(all[k]) == include_dir ++ "/" ++ name:
-                    return cr_relpath(files[i], include_dir) ++ " includes " ++ name
-    ""
 
 // Path relative to the include dir, preserving subdirectories.
 fn cr_relpath(path: &str, base: &str) -> str:
@@ -224,6 +222,14 @@ fn cr_generate(ctx: &ActionCtx, include_dir: &str, files: &Vec[str], version: &s
     out = out ++ "let CLANG_RES_VERSION: str = " ++ cr_raw_string_literal(version) ++ "\n\n"
     out = out ++ "pub fn embedded_clang_resource_list() -> str:\n    return CLANG_RES_LIST\n\n"
     out = out ++ "pub fn embedded_clang_resource_version() -> str:\n    return CLANG_RES_VERSION\n\n"
+    // Whether this compiler links clang's driver (`with cc`): the SDK has the
+    // archive, or it predates it and with_clang_main is aliased to a stand-in
+    // (build/compiler.w). An address comparison cannot tell: LLVM folds two
+    // distinct function symbols to "not equal".
+    // The same SDK, by the same path, that the compiler link tests.
+    let lib_dir = comp_llvm_prefix_for_root(ctx.project_info().project_root()) ++ "/lib"
+    let driver_linked = ctx.fs().host_exists(lib_dir ++ "/libclangMain.a") or ctx.fs().host_exists(lib_dir ++ "/clangMain.lib")
+    out = out ++ "pub fn embedded_clang_driver_linked() -> bool:\n    return " ++ (if driver_linked: "true" else: "false") ++ "\n\n"
     out = out ++ "pub fn embedded_clang_resource_data(name: &str) -> str:\n"
     for i in 0..files.len() as i32:
         let rel = cr_relpath(files[i], include_dir)
@@ -251,9 +257,28 @@ pub fn generate_embedded_clang_resource_action(ctx: ActionCtx) -> i32:
             files.push(path)
     if files.len() == 0:
         return cr_fail(ctx, "found no C/POSIX builtin headers under " ++ include_dir)
-    let gap = cr_unembedded_include(ctx, include_dir, files, all)
-    if gap.len() > 0:
-        return cr_fail(ctx, "embedded clang header set is not closed: " ++ gap ++ ", which cr_should_embed leaves out")
+    // Close the set under inclusion: an intrinsics umbrella pulls in siblings no
+    // name rule lists (x86 intrin.h includes intrin0.h, immintrin.h dozens).
+    // A header is added when an embedded one includes it and the SDK has it.
+    var scanned = 0
+    while scanned < files.len() as i32:
+        let text = fs.read_text(files[scanned])
+        for line in text.split("\n"):
+            let name = cr_included_name(line)
+            if name.len() == 0:
+                continue
+            let wanted = include_dir ++ "/" ++ name
+            var have = false
+            for k in 0..files.len() as i32:
+                if files[k] == wanted:
+                    have = true
+            if have:
+                continue
+            for k in 0..all.len() as i32:
+                if cr_normalize_path_separators(all[k]) == wanted:
+                    files.push(wanted)
+                    break
+        scanned = scanned + 1
     let generated = cr_generate(ctx, include_dir, files, version)
     if generated.len() == 0:
         return 1
