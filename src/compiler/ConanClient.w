@@ -1150,7 +1150,7 @@ fn conan_install_port(name: &str, wanted_version: &str, project_root: &str) -> s
     libs.push(port.lib.clone())
     for lib in port.system_libs: libs.push(lib.to_owned())
     let none: Vec[str] = Vec.new()
-    if conan_write_metadata(dep_dir, name, port.version, "port", "port", port.sha256, include_paths, lib_paths, libs, none, none, none) != 0:
+    if conan_write_metadata(dep_dir, name, port.version, "port", "port", port.sha256, include_paths, lib_paths, libs, none, port.link_args, none) != 0:
         return conan_port_fail(dep_dir, "could not write metadata for " ++ name ++ "/" ++ port.version)
     let _objs = runtime_remove_tree(obj_dir)
     runtime_eprint(f"  built {sources.len()} files into .with/deps/c/" ++ name ++ "/" ++ port.version ++ "/lib/lib" ++ port.lib ++ ".a")
