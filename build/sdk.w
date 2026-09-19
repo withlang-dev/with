@@ -901,9 +901,14 @@ pub fn run_sdk_clang_main_action(ctx: ActionCtx) -> i32:
 fn sdk_ensure_clang_main(ctx: &ActionCtx) -> i32:
     let fs = ctx.fs()
     let root = ctx.project_info().project_root()
-    let prefix = compiler_default_llvm_prefix()
+    // The same SDK the link will read, which on CI is LLVM_PREFIX, not .deps.
+    let prefix = comp_llvm_prefix_for_root(root)
     if fs.host_exists(sdk_abs(root, sdk_clang_main_archive(prefix))):
         return 0
+    // Compiling the driver needs LLVM's and clang's headers. A packaged SDK
+    // ships libraries and tools only; it has to be published with the archive.
+    if not fs.host_exists(sdk_abs(root, sdk_join(prefix, "include/clang/Driver/Driver.h"))):
+        return sdk_fail(ctx, "the LLVM SDK at " ++ prefix ++ " has neither lib/" ++ (if os() == "Windows": "clangMain.lib" else: "libclangMain.a") ++ " nor the headers to build it; it predates `with cc` and must be republished (build/sdk.w archives the driver when the SDK is built)")
     if not fs.host_exists(sdk_abs(root, sdk_tool(prefix, "clang++"))):
         return sdk_fail(ctx, "no static LLVM SDK at " ++ prefix ++ "; run `with build :deps`")
     let scratch = "out/tmp/sdk-clang-main"

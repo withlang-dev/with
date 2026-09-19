@@ -171,21 +171,6 @@ fn cr_included_name(line: &str) -> str:
         return ""
     line.slice(start as i64, end as i64)
 
-// An embedded header that includes a builtin sibling we left out fails at the
-// user's first c_import of it (float.h after clang 22 split it). The subset
-// must be closed under inclusion; name the gap at build time.
-fn cr_unembedded_include(ctx: &ActionCtx, include_dir: &str, files: &Vec[str], all: &Vec[str]) -> str:
-    let fs = ctx.fs()
-    for i in 0..files.len() as i32:
-        let text = fs.read_text(files[i])
-        for line in text.split("\n"):
-            let name = cr_included_name(line)
-            if name.len() == 0 or cr_should_embed(cr_basename(name)): continue
-            for k in 0..all.len() as i32:
-                if cr_normalize_path_separators(all[k]) == include_dir ++ "/" ++ name:
-                    return cr_relpath(files[i], include_dir) ++ " includes " ++ name
-    ""
-
 // Path relative to the include dir, preserving subdirectories.
 fn cr_relpath(path: &str, base: &str) -> str:
     let prefix = base ++ "/"
@@ -264,9 +249,28 @@ pub fn generate_embedded_clang_resource_action(ctx: ActionCtx) -> i32:
             files.push(path)
     if files.len() == 0:
         return cr_fail(ctx, "found no C/POSIX builtin headers under " ++ include_dir)
-    let gap = cr_unembedded_include(ctx, include_dir, files, all)
-    if gap.len() > 0:
-        return cr_fail(ctx, "embedded clang header set is not closed: " ++ gap ++ ", which cr_should_embed leaves out")
+    // Close the set under inclusion: an intrinsics umbrella pulls in siblings no
+    // name rule lists (x86 intrin.h includes intrin0.h, immintrin.h dozens).
+    // A header is added when an embedded one includes it and the SDK has it.
+    var scanned = 0
+    while scanned < files.len() as i32:
+        let text = fs.read_text(files[scanned])
+        for line in text.split("\n"):
+            let name = cr_included_name(line)
+            if name.len() == 0:
+                continue
+            let wanted = include_dir ++ "/" ++ name
+            var have = false
+            for k in 0..files.len() as i32:
+                if files[k] == wanted:
+                    have = true
+            if have:
+                continue
+            for k in 0..all.len() as i32:
+                if cr_normalize_path_separators(all[k]) == wanted:
+                    files.push(wanted)
+                    break
+        scanned = scanned + 1
     let generated = cr_generate(ctx, include_dir, files, version)
     if generated.len() == 0:
         return 1

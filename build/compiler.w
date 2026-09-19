@@ -266,7 +266,8 @@ fn comp_llvm_prefix() -> str:
         return prefix
     comp_default_llvm_prefix()
 
-fn comp_llvm_prefix_for_root(root: &str) -> str:
+// The SDK the compiler link uses: LLVM_PREFIX when set (CI), else the default.
+pub fn comp_llvm_prefix_for_root(root: &str) -> str:
     comp_abs(root, comp_llvm_prefix())
 
 // Exposed so the `deps` target can name the per-platform SDK asset and the
