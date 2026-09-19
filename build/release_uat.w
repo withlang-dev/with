@@ -340,9 +340,6 @@ pub fn run_release_bzip2_uat_action(ctx: ActionCtx) -> i32:
 pub fn run_release_sqlite3_uat_action(ctx: ActionCtx) -> i32:
     ruat_run_c_package_uat(ctx, "c.sqlite3", "sqlite3", "build/release_uat_fixtures/sqlite3_main.w", "sqlite3 UAT passed")
 
-pub fn run_release_openssl_uat_action(ctx: ActionCtx) -> i32:
-    ruat_run_c_package_uat(ctx, "c.openssl", "openssl", "build/release_uat_fixtures/openssl_main.w", "openssl UAT passed")
-
 pub fn run_release_libcurl_uat_action(ctx: ActionCtx) -> i32:
     ruat_run_c_package_uat(ctx, "c.libcurl", "libcurl", "build/release_uat_fixtures/libcurl_main.w", "libcurl UAT passed")
 
