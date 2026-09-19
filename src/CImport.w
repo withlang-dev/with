@@ -936,49 +936,62 @@ fn ci_build_include_text(header_spec: &str) -> str:
 // This prevents the common C collision: typedef struct Foo { ... } Foo;
 
 // Returns pipe-delimited string of struct/union names shadowed by typedefs.
+// The name-existence queries below each scanned every declaration, allocating
+// its spelling, once per pointer field, return type and record: decls x uses,
+// which is what c_import of a windows.h-sized header spent its minutes on.
+// One pass records, per name, which kinds of declaration carry it.
+let CI_NAME_TYPE = 2             // struct/union/enum/typedef, raw or escaped
+let CI_NAME_TYPEDEF = 4          // a typedef, raw spelling
+let CI_NAME_STRUCT_DEF = 8       // a struct with a body, raw spelling
+let CI_NAME_UNION_DEF = 16       // a union with a body, raw spelling
+
+var g_ci_decl_name_flags: HashMap[str, i32] = HashMap.new()
+var g_ci_decl_name_index_session: i64 = 0
+var g_ci_decl_name_index_generation: i64 = 0
+
+fn ci_decl_name_index_ensure(session: i64):
+    if g_ci_decl_name_index_session == session and g_ci_decl_name_index_generation == with_cimport_parse_generation():
+        return
+    var flags: HashMap[str, i32] = HashMap.new()
+    for i in 0..with_cimport_decl_count(session):
+        let name = with_cimport_decl_name(session, i)
+        if name.len() == 0: continue
+        let kind = with_cimport_decl_kind(session, i)
+        var bits = 0
+        if kind == CK_STRUCT or kind == CK_UNION or kind == CK_ENUM or kind == CK_TYPEDEF: bits = bits | CI_NAME_TYPE
+        let escaped = ci_escape_reserved(name)
+        let escaped_have: i32 = flags.get(escaped) ?? 0
+        flags.insert(ci_ir_owned_text(escaped), escaped_have | bits)
+        if kind == CK_TYPEDEF: bits = bits | CI_NAME_TYPEDEF
+        if (kind == CK_STRUCT or kind == CK_UNION) and with_cimport_struct_is_opaque(session, i) == 0:
+            bits = bits | (if kind == CK_UNION: CI_NAME_UNION_DEF else: CI_NAME_STRUCT_DEF)
+        let raw_have: i32 = flags.get(name) ?? 0
+        flags.insert(ci_ir_owned_text(name), raw_have | bits)
+    g_ci_decl_name_flags = flags
+    g_ci_decl_name_index_session = session
+    g_ci_decl_name_index_generation = with_cimport_parse_generation()
+
+fn ci_decl_name_has(session: i64, name: &str, bits: i32) -> bool:
+    if name.len() == 0: return false
+    ci_decl_name_index_ensure(session)
+    let have: i32 = g_ci_decl_name_flags.get(name) ?? 0
+    (have & bits) != 0
+
 fn ci_prepopulate_names(session: i64, count: i32) -> str:
     // For the common C pattern: typedef struct Foo { ... } Foo;
     // The struct "Foo" should be skipped so the typedef "Foo" wins.
     var shadowed = ""
-    var i = 0
-    while i < count:
+    for i in 0..count:
         let name = with_cimport_decl_name(session, i)
-        if name.len() > 0 and name[0] != 95:
-            let kind = with_cimport_decl_kind(session, i)
-            if kind == CK_STRUCT or kind == CK_UNION:
-                var j = 0
-                while j < count:
-                    if j != i:
-                        let jname = with_cimport_decl_name(session, j)
-                        if jname == name and with_cimport_decl_kind(session, j) == CK_TYPEDEF:
-                            shadowed = shadowed ++ "|" ++ name ++ "|"
-                            break
-                    j = j + 1
-        i = i + 1
+        if name.len() == 0 or name[0] == '_': continue
+        let kind = with_cimport_decl_kind(session, i)
+        if (kind == CK_STRUCT or kind == CK_UNION) and ci_decl_name_has(session, name, CI_NAME_TYPEDEF):
+            shadowed = shadowed ++ "|" ++ name ++ "|"
     shadowed
 
-fn ci_record_definition_exists(session: i64, name: &str, is_union: bool, count: i32) -> bool:
-    if name.len() == 0:
-        return false
-    let target_kind = if is_union: CK_UNION else: CK_STRUCT
-    var i = 0
-    while i < count:
-        if with_cimport_decl_kind(session, i) == target_kind:
-            if with_cimport_decl_name(session, i) == name and with_cimport_struct_is_opaque(session, i) == 0:
-                return true
-        i = i + 1
-    false
+fn ci_record_definition_exists(session: i64, name: &str, is_union: bool) -> bool:
+    ci_decl_name_has(session, name, if is_union: CI_NAME_UNION_DEF else: CI_NAME_STRUCT_DEF)
 
-fn ci_decl_name_exists(session: i64, name: &str, count: i32) -> bool:
-    if name.len() == 0:
-        return false
-    var i = 0
-    while i < count:
-        let decl_name = with_cimport_decl_name(session, i)
-        if decl_name == name or ci_escape_reserved(decl_name) == name:
-            return true
-        i = i + 1
-    false
 
 fn ci_type_emitted_key(name: &str) -> str:
     "__cimport_type:" ++ name
@@ -989,18 +1002,7 @@ fn ci_type_name_is_emitted(name: &str) -> bool:
 fn ci_mark_type_name_emitted(name: &str):
     with_cimport_mark_name_emitted(ci_type_emitted_key(name))
 
-fn ci_type_decl_name_exists(session: i64, name: &str, count: i32) -> bool:
-    if name.len() == 0:
-        return false
-    var i = 0
-    while i < count:
-        let kind = with_cimport_decl_kind(session, i)
-        if kind == CK_STRUCT or kind == CK_UNION or kind == CK_ENUM or kind == CK_TYPEDEF:
-            let decl_name = with_cimport_decl_name(session, i)
-            if decl_name == name or ci_escape_reserved(decl_name) == name:
-                return true
-        i = i + 1
-    false
+fn ci_type_decl_name_exists(session: i64, name: &str) -> bool: ci_decl_name_has(session, name, CI_NAME_TYPE)
 
 fn ci_translated_builtin_type_name(name: &str) -> bool:
     if name == "c_void": return true
@@ -1051,7 +1053,7 @@ fn ci_missing_pointer_opaque_add(session: i64, count: i32, names: &str, translat
     let name = ci_pointer_pointee_name(translated_type)
     if name.len() == 0:
         return with_str_clone_ref(names)
-    if ci_type_decl_name_exists(session, name, count):
+    if ci_type_decl_name_exists(session, name):
         return with_str_clone_ref(names)
     if ci_str_contains(names, "|" ++ name ++ "|"):
         return with_str_clone_ref(names)
@@ -1306,7 +1308,7 @@ fn ci_is_directly_demoted(session: i64, idx: i32, count: i32) -> bool:
     if with_cimport_struct_is_opaque(session, idx) != 0:
         let name = with_cimport_decl_name(session, idx)
         let is_union = with_cimport_decl_kind(session, idx) == CK_UNION
-        if ci_record_definition_exists(session, name, is_union, count):
+        if ci_record_definition_exists(session, name, is_union):
             return false
         return true
     let decl_cursor = ci_find_decl_cursor_for_idx(session, idx)
@@ -2194,7 +2196,7 @@ fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs: &s
 
     // Skip forward declarations that have a definition elsewhere in the TU —
     // the definition cursor will be processed later with the actual fields.
-    if with_cimport_struct_is_opaque(session, idx) != 0 and ci_record_definition_exists(session, name, is_union, count):
+    if with_cimport_struct_is_opaque(session, idx) != 0 and ci_record_definition_exists(session, name, is_union):
         return ""
 
     // Check if pre-scan marked this type as demoted (bitfield, forward decl,
@@ -2700,7 +2702,7 @@ fn ci_translate_typedef(session: i64, idx: i32, count: i32) -> str:
         let is_forward_struct = ci_starts_with(underlying, "struct ")
         let is_forward_union = ci_starts_with(underlying, "union ")
         if is_forward_struct or is_forward_union:
-            if not ci_record_definition_exists(session, name, is_forward_union, count):
+            if not ci_record_definition_exists(session, name, is_forward_union):
                 let safe_name = ci_escape_reserved(name)
                 with_cimport_mark_name_emitted(name)
                 ci_mark_type_name_emitted(name)
@@ -2840,34 +2842,100 @@ fn ci_object_macro_value_is_type_like(raw: &str) -> bool:
         return true
     false
 
-fn ci_try_translate_object_macro_probe(macro_source: &str, name: &str) -> str:
+// The probe declaration's translation, or "" when its type or value has none.
+fn ci_macro_probe_decl_result(probe_session: i64, decl: i32, name: &str) -> str:
+    // The bridge's translated type is the one position that did not go
+    // through ci_unsafe_fn_ptr_type: sqlite3's
+    // `#define SQLITE_STATIC ((sqlite3_destructor_type)0)` probed as
+    // `let SQLITE_STATIC: extern "C" fn(...) = (0 as unsafe extern "C"
+    // fn(...))`, a binding type mismatch. Normalize like every other
+    // type position.
+    let ty = ci_unsafe_fn_ptr_type(with_cimport_var_type_translated(probe_session, decl))
+    if ty.len() == 0 or ci_starts_with(ty, "__UNSUPPORTED"): return ""
+    let init = ci_try_eval_var_init_for_type(probe_session, decl, ty)
+    if not ci_var_init_translation_is_valid(ty, init) or ci_str_contains(init, name): return ""
+    // #775: clang's evaluated init can be i64.min's bare spelling; render it
+    // as arithmetic.
+    "let " ++ ci_escape_reserved(name) ++ ": " ++ ty ++ " = " ++ ci_render_int_value(init)
+
+// A probe is one line ending in `;`, which is where clang recovers — unless
+// the macro leaves a delimiter open and swallows the probes after it.
+fn ci_macro_value_delims_balanced(value: &str) -> bool:
+    var depth = 0
+    for i in 0..value.len() as i32:
+        let c = value[i]
+        if c == '(' or c == '{' or c == '[': depth = depth + 1
+        if c == ')' or c == '}' or c == ']': depth = depth - 1
+        if depth < 0: return false
+    depth == 0
+
+// Every object macro of one import that may need clang to type and evaluate
+// it, probed by ONE parse on first use. A parse per macro is macros x header.
+type CiMacroProbes { opened: bool, session: i64, errors: str, order: HashMap[str, i32], decls: HashMap[str, i32] }
+
+fn CiMacroProbes.new(): CiMacroProbes { opened: false, session: 0, errors: "", order: HashMap.new(), decls: HashMap.new() }
+
+impl CiMacroProbes:
+
+    mut fn open(session: i64, macro_source: &str):
+        self.opened = true
+        var names = StringBuilder.new()
+        for i in 0..with_cimport_macro_count(session):
+            if with_cimport_macro_is_fn_like(session, i) != 0 or with_cimport_macro_is_system(session, i) != 0: continue
+            let name = with_cimport_macro_name(session, i)
+            let value = ci_trim(ci_strip_c_comments(with_cimport_macro_value(session, i)))
+            if name.len() == 0 or value.len() == 0 or self.order.contains(name): continue
+            if not ci_macro_value_delims_balanced(value): continue
+            self.order.insert(name.clone(), self.order.len() as i32)
+            names.push_str("|")
+            names.push_str(name)
+            names.push_str("|")
+        if names.len() == 0: return
+        ci_prepare_clang_resource_dir()
+        self.session = with_cimport_parse_macro_probe(macro_source, names.to_str())
+        if self.session == 0:
+            self.errors = "*"
+            return
+        self.errors = with_cimport_macro_probe_errors(self.session, with_cimport_macro_probe_first_line(macro_source))
+        let prefix = "__with_macro_probe_"
+        for i in 0..with_cimport_decl_count(self.session):
+            if with_cimport_decl_kind(self.session, i) != CK_VAR: continue
+            let decl_name = with_cimport_decl_name(self.session, i)
+            if decl_name.starts_with(prefix):
+                self.decls.insert(decl_name.slice(prefix.len(), decl_name.len()).to_owned(), i)
+
+    mut fn result(session: i64, macro_source: &str, name: &str) -> str:
+        if not self.opened: self.open(session, macro_source)
+        let slot = self.order.get(name)
+        if slot.is_none(): return ci_probe_one_object_macro(macro_source, name)
+        let k: i32 = slot.unwrap()
+        if self.errors == "*" or self.errors.contains(f"|{k}|"): return ""
+        let found = self.decls.get(name)
+        if found.is_none(): return ""
+        let decl: i32 = found.unwrap()
+        ci_record_field_caches_clear()
+        let out = ci_macro_probe_decl_result(self.session, decl, name)
+        ci_record_field_caches_clear()
+        out
+
+    mut fn close():
+        if self.session != 0: with_cimport_dispose(self.session)
+        self.session = 0
+
+// A macro left out of the batch (it opens a delimiter it does not close)
+// gets a parse of its own, so it cannot swallow its siblings' probes.
+fn ci_probe_one_object_macro(macro_source: &str, name: &str) -> str:
     ci_record_field_caches_clear()
     ci_prepare_clang_resource_dir()
-    let probe_session = with_cimport_parse_macro_probe(macro_source, name)
-    if probe_session == 0:
-        return ""
-    let probe_name = "__with_macro_probe_" ++ name
-    let count = with_cimport_decl_count(probe_session)
+    let probe_session = with_cimport_parse_macro_probe(macro_source, "|" ++ name ++ "|")
+    if probe_session == 0: return ""
     var result = ""
-    var i = 0
-    while i < count:
-        if with_cimport_decl_kind(probe_session, i) == CK_VAR and with_cimport_decl_name(probe_session, i) == probe_name:
-            // The bridge's translated type is the one position that did not go
-            // through ci_unsafe_fn_ptr_type: sqlite3's
-            // `#define SQLITE_STATIC ((sqlite3_destructor_type)0)` probed as
-            // `let SQLITE_STATIC: extern "C" fn(...) = (0 as unsafe extern "C"
-            // fn(...))`, a binding type mismatch. Normalize like every other
-            // type position.
-            let ty = ci_unsafe_fn_ptr_type(with_cimport_var_type_translated(probe_session, i))
-            if ty.len() > 0 and not ci_starts_with(ty, "__UNSUPPORTED"):
-                let init = ci_try_eval_var_init_for_type(probe_session, i, ty)
-                if ci_var_init_translation_is_valid(ty, init) and not ci_str_contains(init, name):
-                    // #775: clang's evaluated init can be i64.min's bare
-                    // spelling; render it as arithmetic.
-                    result = "let " ++ ci_escape_reserved(name) ++ ": " ++ ty ++ " = " ++ ci_render_int_value(init)
-            i = count
-        else:
-            i = i + 1
+    if with_cimport_macro_probe_errors(probe_session, with_cimport_macro_probe_first_line(macro_source)).len() == 0:
+        let probe_name = "__with_macro_probe_" ++ name
+        for i in 0..with_cimport_decl_count(probe_session):
+            if with_cimport_decl_kind(probe_session, i) == CK_VAR and with_cimport_decl_name(probe_session, i) == probe_name:
+                result = ci_macro_probe_decl_result(probe_session, i, name)
+                break
     with_cimport_dispose(probe_session)
     ci_record_field_caches_clear()
     result
@@ -3002,6 +3070,7 @@ fn ci_translate_macros(session: i64, type_session: i64, extern_vars: &str, macro
     var blank_macros = ""
     let object_macro_types = ci_collect_object_macro_type_map(session, macro_source)
     g_migrate_macro_session = session
+    var probes = CiMacroProbes.new()
     for i in 0..count:
         let name = with_cimport_macro_name(session, i)
         let raw_value = with_cimport_macro_value(session, i)
@@ -3256,7 +3325,7 @@ fn ci_translate_macros(session: i64, type_session: i64, extern_vars: &str, macro
                 ci_record_untranslated_object_macro(name, macro_is_system)
                 continue
             if compound_literal_result.len() == 0:
-                let probe_result = if macro_is_system == 0: ci_try_translate_object_macro_probe(macro_source, name) else: ""
+                let probe_result = if macro_is_system == 0: probes.result(session, macro_source, name) else: ""
                 if probe_result.len() > 0:
                     with_cimport_mark_name_emitted(name)
                     if not ci_migrate_shared_decl_add("let", ci_escape_reserved(name), probe_result):
@@ -3362,6 +3431,7 @@ fn ci_translate_macros(session: i64, type_session: i64, extern_vars: &str, macro
                                 output = output ++ let_line ++ "\n"
                     else:
                         ci_record_untranslated_object_macro(name, macro_is_system)
+    probes.close()
     g_migrate_macro_session = 0
     g_macro_type_names = ""
     g_macro_type_aliases = ""
@@ -8717,6 +8787,9 @@ fn ci_fn_decl_index_ensure(session: i64):
     g_ci_fn_decl_index_generation = with_cimport_parse_generation()
 
 fn ci_fn_decl_index_reset:
+    g_ci_decl_name_flags = HashMap.new()
+    g_ci_decl_name_index_session = 0
+    g_ci_decl_name_index_generation = 0
     g_ci_fn_decl_by_escaped = HashMap.new()
     g_ci_fn_decl_by_raw = HashMap.new()
     g_ci_fn_decl_index_session = 0
