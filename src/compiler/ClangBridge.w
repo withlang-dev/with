@@ -728,6 +728,11 @@ unsafe fn get_sdk_path() -> *const u8:
         return &sdk_path_buf as *const [1024]u8 as *const u8
     0 as *const u8
 
+// The macOS SDK c_import parses against, for `with cc` to compile against.
+pub fn with_cimport_sdk_path() -> str:
+    if with_sysinfo_os() != "Macos": return ""
+    unsafe { resolve_target_sdk_path() }
+
 unsafe fn resolve_target_sdk_path() -> str:
     let with_sdkroot = with_getenv_str("WITH_SDKROOT")
     if with_sdkroot.len() > 0:

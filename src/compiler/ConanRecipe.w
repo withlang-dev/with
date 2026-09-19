@@ -302,53 +302,23 @@ pub fn conan_recipe_cmake_value(value: &CrValue) -> str:
     if value.kind == CRV_TEXT: return value.text.clone()
     ""
 
-pub type ConanCMakeVariables {
-    // `-DNAME=value` for every assignment whose value is known.
-    defines: Vec[str],
-    // `NAME = <expression>` for the rest, to report if the build then fails.
-    unknown: Vec[str],
-}
 
-// `tc.variables["NAME"] = <expr>` and `tc.cache_variables["NAME"] = <expr>`.
-pub fn conan_recipe_cmake_variables(env: &CrEnv) -> ConanCMakeVariables:
-    let defines: Vec[str] = Vec.new()
-    let unknown: Vec[str] = Vec.new()
-    for raw in env.recipe.split("\n"):
-        let line = raw.trim()
-        let at = line.find("variables[")
-        if at < 0 or line.starts_with("#"): continue
-        let rest = line.slice(at + 10, line.len())
-        let close = rest.find("]")
-        let eq = rest.find("=")
-        if close < 0 or eq < close or rest.slice(eq, rest.len()).starts_with("=="): continue
-        let name = cr_unquote(rest.slice(0, close))
-        let expr = rest.slice(eq + 1, rest.len()).trim()
-        let value = conan_recipe_eval(expr, env)
-        if value.kind == CRV_BOOL or value.kind == CRV_TEXT: defines.push("-D" ++ name ++ "=" ++ conan_recipe_cmake_value(&value))
-        else if value.kind != CRV_NONE: unknown.push(name ++ " = " ++ expr)
-    ConanCMakeVariables { defines, unknown }
-
-pub type ConanRequires {
-    // "zlib/[>=1.2.11 <2]": requirements whose enclosing conditions all hold.
-    refs: Vec[str],
-    // A requirement under a condition that could not be evaluated, with it.
-    undecided: Vec[str],
-}
+// A recipe line with the verdict of the `if` / `elif` / `else` around it: 1 when
+// every enclosing condition holds for the default options on this platform, 0
+// when one does not, -1 when one cannot be evaluated (`why` names it).
+type CrGuardedLine { text: str, verdict: i32, why: str }
 
 fn cr_indent(raw: &str) -> i32:
     var n = 0
     while n < raw.len() as i32 and (raw[n] == ' ' or raw[n] == '\t'): n = n + 1
     n
 
-// `self.requires("x/1.0")` lines, each kept only if every `if` around it is
-// true for the default options on this platform.
-pub fn conan_recipe_requires(env: &CrEnv) -> ConanRequires:
-    let refs: Vec[str] = Vec.new()
-    let undecided: Vec[str] = Vec.new()
+fn cr_guarded_lines(env: &CrEnv) -> Vec[CrGuardedLine]:
+    let out: Vec[CrGuardedLine] = Vec.new()
     var indents: Vec[i32] = Vec.new()
-    var kinds: Vec[i32] = Vec.new()          // 1 true, 0 false, -1 unknown
+    var kinds: Vec[i32] = Vec.new()
     var texts: Vec[str] = Vec.new()
-    // The if/elif chain last closed at each indent: 1 once a branch was taken,
+    // The if/elif chain last closed at an indent: 1 once a branch was taken,
     // -1 once one could not be decided, 0 while every branch was false.
     var chain_indent = -1
     var chain_state = 0
@@ -365,7 +335,6 @@ pub fn conan_recipe_requires(env: &CrEnv) -> ConanRequires:
                 chain_state = if prior == 1 or closed_kind == 1: 1 else: if prior == -1 or closed_kind == -1: -1 else: 0
                 chain_indent = indent
         if line.starts_with("if ") and line.ends_with(":"):
-            // A new `if` starts a new chain at this indent.
             if chain_indent == indent: chain_indent = -1
             let cond = line.slice(3, line.len() - 1)
             let value = conan_recipe_eval(cond, env)
@@ -382,21 +351,78 @@ pub fn conan_recipe_requires(env: &CrEnv) -> ConanRequires:
             indents.push(indent)
             kinds.push(if prior == 1: 0 else: if prior == -1 and kind != 0: -1 else: kind)
             texts.push(line.to_owned())
-        let at = line.find("self.requires(")
-        if at < 0: continue
-        var arg = line.slice(at + 14, line.len()).trim()
+        var verdict = 1
+        var why = ""
+        for i in 0..kinds.len() as i32:
+            if kinds[i] == 0: verdict = 0
+            if kinds[i] < 0 and why.len() == 0: why = texts[i].clone()
+        if verdict == 1 and why.len() > 0: verdict = -1
+        out.push(CrGuardedLine { text: line.to_owned(), verdict, why })
+    out
+
+pub type ConanCMakeVariables {
+    // `-DNAME=value` for every assignment that applies and whose value is known.
+    defines: Vec[str],
+    // `NAME = <expression>` for the rest, to report if the build then fails.
+    unknown: Vec[str],
+}
+
+// `tc.variables["NAME"] = <expr>` and `tc.cache_variables["NAME"] = <expr>`,
+// under the conditions that hold. A later assignment to a name replaces an
+// earlier one, as it would when the recipe runs.
+pub fn conan_recipe_cmake_variables(env: &CrEnv) -> ConanCMakeVariables:
+    let names: Vec[str] = Vec.new()
+    let values: Vec[str] = Vec.new()
+    let unknown: Vec[str] = Vec.new()
+    for guarded in cr_guarded_lines(env):
+        let line = guarded.text.clone()
+        let at = line.find("variables[")
+        if at < 0 or guarded.verdict == 0: continue
+        let rest = line.slice(at + 10, line.len())
+        let close = rest.find("]")
+        let eq = rest.find("=")
+        if close < 0 or eq < close or rest.slice(eq, rest.len()).starts_with("=="): continue
+        let name = cr_unquote(rest.slice(0, close))
+        let expr = rest.slice(eq + 1, rest.len()).trim().to_owned()
+        if guarded.verdict < 0:
+            unknown.push(name ++ " = " ++ expr ++ "  (if " ++ guarded.why ++ ")")
+            continue
+        let value = conan_recipe_eval(expr, env)
+        if value.kind == CRV_NONE: continue
+        if value.kind != CRV_BOOL and value.kind != CRV_TEXT:
+            unknown.push(name ++ " = " ++ expr)
+            continue
+        var slot = -1
+        for i in 0..names.len() as i32:
+            if names[i] == name: slot = i
+        if slot >= 0: values[slot] = conan_recipe_cmake_value(&value)
+        else:
+            names.push(name)
+            values.push(conan_recipe_cmake_value(&value))
+    let defines: Vec[str] = Vec.new()
+    for i in 0..names.len() as i32: defines.push("-D" ++ names[i] ++ "=" ++ values[i])
+    ConanCMakeVariables { defines, unknown }
+
+pub type ConanRequires {
+    // "zlib/[>=1.2.11 <2]": requirements whose enclosing conditions all hold.
+    refs: Vec[str],
+    // A requirement under a condition that could not be evaluated, with it.
+    undecided: Vec[str],
+}
+
+pub fn conan_recipe_requires(env: &CrEnv) -> ConanRequires:
+    let refs: Vec[str] = Vec.new()
+    let undecided: Vec[str] = Vec.new()
+    for guarded in cr_guarded_lines(env):
+        let at = guarded.text.find("self.requires(")
+        if at < 0 or guarded.verdict == 0: continue
+        var arg = guarded.text.slice(at + 14, guarded.text.len()).trim().to_owned()
         // `f"openssl/[>=3 <4]"`: an f-string with nothing to format.
-        if arg.starts_with("f\"") or arg.starts_with("f'"): arg = arg.slice(1, arg.len())
+        if arg.starts_with("f\"") or arg.starts_with("f'"): arg = arg.slice(1, arg.len()).to_owned()
         if arg.len() < 2 or (arg[0] != '"' and arg[0] != '\'') or arg.contains("{"): continue
         let close = arg.slice(1, arg.len()).find(arg.slice(0, 1))
         if close <= 0: continue
         let reference = arg.slice(1, close + 1).to_owned()
-        var holds = true
-        var why = ""
-        for i in 0..kinds.len() as i32:
-            if kinds[i] == 0: holds = false
-            if kinds[i] < 0 and why.len() == 0: why = texts[i].clone()
-        if not holds: continue
-        if why.len() > 0: undecided.push(reference ++ "  (if " ++ why ++ ")")
+        if guarded.verdict < 0: undecided.push(reference ++ "  (if " ++ guarded.why ++ ")")
         else: refs.push(reference)
     ConanRequires { refs, undecided }

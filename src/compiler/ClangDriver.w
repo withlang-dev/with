@@ -10,6 +10,7 @@
 // the child is `with cc -cc1 ...` and lands back here.
 
 use compiler.EmbeddedClangResource
+use compiler.ClangBridge
 
 extern fn with_alloc(size: i64) -> *mut u8
 extern fn with_memcpy(dst: *mut u8, src: *const u8, len: i64) -> *mut u8
@@ -42,6 +43,15 @@ pub fn with_cc_main() -> i32:
         if resource_dir.len() > 0:
             args.push("-resource-dir")
             args.push(resource_dir)
+        // macOS has no /usr/include: the driver needs the SDK c_import uses,
+        // unless the caller names one.
+        var names_sysroot = false
+        for i in 2..with_arg_count():
+            if with_arg_at(i) == "-isysroot": names_sysroot = true
+        let sdk = with_cimport_sdk_path()
+        if sdk.len() > 0 and not names_sysroot:
+            args.push("-isysroot")
+            args.push(sdk.trim().to_owned())
     for i in 2..with_arg_count(): args.push(with_arg_at(i))
     unsafe:
         let argv = with_alloc((args.len() + 1) * 8) as *mut *mut u8
