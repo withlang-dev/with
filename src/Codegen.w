@@ -2439,7 +2439,7 @@ impl Codegen:
         if kind == wl_float_type_kind() or kind == wl_double_type_kind():
             if op == BinaryOp.OP_EQ:
                 return wl_build_fcmp(self.builder, wl_real_oeq(), lhs, rhs)
-            return wl_build_fcmp(self.builder, wl_real_one(), lhs, rhs)
+            return wl_build_fcmp(self.builder, wl_real_une(), lhs, rhs)
         if op == BinaryOp.OP_EQ:
             return wl_build_icmp(self.builder, wl_int_eq(), lhs, rhs)
         wl_build_icmp(self.builder, wl_int_ne(), lhs, rhs)

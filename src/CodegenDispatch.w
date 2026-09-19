@@ -2340,7 +2340,7 @@ impl Codegen:
             if op == BinaryOp.OP_DIV: return wl_build_fdiv(self.builder, lhs_float, rhs_float)
             if op == BinaryOp.OP_MOD: return wl_build_frem(self.builder, lhs_float, rhs_float)
             if op == BinaryOp.OP_EQ: return wl_build_fcmp(self.builder, wl_real_oeq(), lhs_float, rhs_float)
-            if op == BinaryOp.OP_NEQ: return wl_build_fcmp(self.builder, wl_real_one(), lhs_float, rhs_float)
+            if op == BinaryOp.OP_NEQ: return wl_build_fcmp(self.builder, wl_real_une(), lhs_float, rhs_float)
             if op == BinaryOp.OP_LT: return wl_build_fcmp(self.builder, wl_real_olt(), lhs_float, rhs_float)
             if op == BinaryOp.OP_GT: return wl_build_fcmp(self.builder, wl_real_ogt(), lhs_float, rhs_float)
             if op == BinaryOp.OP_LTE: return wl_build_fcmp(self.builder, wl_real_ole(), lhs_float, rhs_float)

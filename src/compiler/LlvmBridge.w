@@ -51,8 +51,8 @@ let LLVM_RealOGT: i32 = 2
 let LLVM_RealOGE: i32 = 3
 let LLVM_RealOLT: i32 = 4
 let LLVM_RealOLE: i32 = 5
-let LLVM_RealONE: i32 = 6
 let LLVM_RealUNO: i32 = 8
+let LLVM_RealUNE: i32 = 14
 let LLVM_ExternalLinkage: i32 = 0
 let LLVM_WeakAnyLinkage: i32 = 5
 let LLVM_InternalLinkage: i32 = 8
@@ -732,7 +732,7 @@ pub fn wl_int_ugt() -> i32: LLVM_IntUGT
 // ── FCmp predicates ─────────────────────────────────────────────
 
 pub fn wl_real_oeq() -> i32: LLVM_RealOEQ
-pub fn wl_real_one() -> i32: LLVM_RealONE
+pub fn wl_real_une() -> i32: LLVM_RealUNE
 pub fn wl_real_olt() -> i32: LLVM_RealOLT
 pub fn wl_real_ogt() -> i32: LLVM_RealOGT
 pub fn wl_real_ole() -> i32: LLVM_RealOLE
