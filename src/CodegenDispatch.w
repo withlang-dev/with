@@ -2880,16 +2880,71 @@ impl Codegen:
             if pi > 0:
                 result = self.mir_str_concat(result, self.gen_string_literal_raw(", "))
             let payload_val = self.gen_enum_payload_field_value(val, enum_sema_ty, variant_idx, pi)
+            if payload_val == 0:
+                sema_phase_bug(f"BUG: no payload value for enum type {enum_sema_ty} variant {variant_idx} field {pi} while formatting")
             let payload_sema_ty = self.mir_enum_payload_sema_type(enum_sema_ty, variant_idx, pi)
             let payload_str = self.coerce_typed_val_to_str(payload_val, payload_sema_ty, str_ty)
             result = self.mir_str_concat(result, payload_str)
         result = self.mir_str_concat(result, self.gen_string_literal_raw(")"))
         result
 
+    // Option[&T] is a nullable pointer, not a tag + payload struct (D22: the
+    // same niche representation as a map or slot lookup): null is None, and
+    // any other value is the address of the T the option observes. The
+    // tag/payload walk in gen_display_enum would read a struct that is not
+    // there, so this formats the two shapes directly. Formatting observes:
+    // the pointee is loaded and formatted as its own type (a str pointee
+    // reaches the concat as the borrowed value, which concat only reads).
+    mut fn gen_display_nullable_option(val: i64, enum_sema_ty: i32, str_ty: i64) -> i64:
+        let variant_count = self.mir_enum_variant_count(enum_sema_ty)
+        var some_idx = -1
+        var none_idx = -1
+        for vi in 0..variant_count:
+            if self.mir_enum_variant_payload_count(enum_sema_ty, vi) > 0:
+                some_idx = vi
+            else:
+                none_idx = vi
+        if some_idx < 0 or none_idx < 0:
+            sema_phase_bug(f"BUG: pointer-shaped enum type {enum_sema_ty} is not an Option while formatting")
+        let ref_sema = self.mir_enum_payload_sema_type(enum_sema_ty, some_idx, 0)
+        let ref_resolved = self.mir_display_resolved_type(ref_sema)
+        var pointee = 0
+        if ref_resolved > 0 and self.mir_display_type_kind(ref_resolved) == TypeKind.TY_REF:
+            pointee = self.mir_display_resolved_type(self.sema.get_type_d0(ref_resolved) as i32)
+        let ptr_ty = wl_ptr_type(self.context)
+        let result_ptr = self.create_entry_alloca(str_ty)
+        let none_bb = wl_append_bb(self.context, self.current_function, "fmt.option.none")
+        let some_bb = wl_append_bb(self.context, self.current_function, "fmt.option.some")
+        let merge_bb = wl_append_bb(self.context, self.current_function, "fmt.option.merge")
+        let is_none = wl_build_icmp(self.builder, wl_int_eq(), val, wl_const_null(ptr_ty))
+        wl_build_cond_br(self.builder, is_none, none_bb, some_bb)
+        wl_position_at_end(self.builder, none_bb)
+        wl_build_store(self.builder, self.gen_string_literal_raw(self.mir_enum_variant_name(enum_sema_ty, none_idx)), result_ptr)
+        wl_build_br(self.builder, merge_bb)
+        wl_position_at_end(self.builder, some_bb)
+        var payload_str: i64 = 0
+        if pointee > 0:
+            let pointee_llvm = self.mir_sema_type_to_llvm(pointee)
+            if pointee_llvm == 0:
+                sema_phase_bug(f"BUG: no LLVM type for the pointee {pointee} of a formatted Option[&T]")
+            payload_str = self.coerce_typed_val_to_str(wl_build_load(self.builder, pointee_llvm, val), pointee, str_ty)
+        else:
+            payload_str = self.coerce_val_to_str(val, str_ty)
+        var some_str = self.gen_string_literal_raw(self.mir_enum_variant_name(enum_sema_ty, some_idx))
+        some_str = self.mir_str_concat(some_str, self.gen_string_literal_raw("("))
+        some_str = self.mir_str_concat(some_str, payload_str)
+        some_str = self.mir_str_concat(some_str, self.gen_string_literal_raw(")"))
+        wl_build_store(self.builder, some_str, result_ptr)
+        wl_build_br(self.builder, merge_bb)
+        wl_position_at_end(self.builder, merge_bb)
+        wl_build_load(self.builder, str_ty, result_ptr)
+
     mut fn gen_display_enum(val: i64, enum_sema_ty: i32, str_ty: i64) -> i64:
         let variant_count = self.mir_enum_variant_count(enum_sema_ty)
         if variant_count <= 0:
             return self.coerce_val_to_str(val, str_ty)
+        if wl_get_type_kind(wl_type_of(val)) == wl_pointer_type_kind():
+            return self.gen_display_nullable_option(val, enum_sema_ty, str_ty)
         let tag_val = self.mir_enum_tag_value(val)
         let tag_ty = wl_type_of(tag_val)
         let result_ptr = self.create_entry_alloca(str_ty)
