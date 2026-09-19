@@ -4558,7 +4558,7 @@ impl Codegen:
                 let packed = self.c_abi_direct_struct_return_type(ret_ty)
                 if packed != 0:
                     ret.llvm_ty = packed
-                else if not (codegen_c_abi_darwin_arm64() and self.c_abi_hfa_info(ret_ty) != 0) and self.c_abi_needs_sret(ret_ty):
+                else if not (codegen_c_abi_aarch64() and self.c_abi_hfa_info(ret_ty) != 0) and self.c_abi_needs_sret(ret_ty):
                     indirect_return = true
         else:
             indirect_return = self.internal_abi_needs_sret(ret_ty)
@@ -4569,6 +4569,11 @@ impl Codegen:
         if convention == FN_ABI_CLOSURE: params.push(ptr_ty)
         if ret.pass == PM_INDIRECT: params.push(ptr_ty)
         let classified: Vec[ArgAbi] = Vec.new()
+        // System V x86_64: a struct goes in registers only if all of it fits in
+        // the ones still free; otherwise all of it goes to the stack (§3.2.3).
+        let sysv = convention == FN_ABI_C and codegen_c_abi_sysv_x86_64()
+        var int_regs = if ret.pass == PM_INDIRECT: 5 else: 6
+        var sse_regs = 8
         for pi in 0..source_types.len():
             let source_ty = source_types[pi]
             let kind = wl_get_type_kind(source_ty)
@@ -4578,7 +4583,10 @@ impl Codegen:
             if convention == FN_ABI_C:
                 if wl_get_type_kind(source_ty) == wl_struct_type_kind():
                     let packed = self.c_abi_direct_struct_param_type(source_ty)
-                    if packed != 0:
+                    let cost = if sysv and packed != 0: self.c_abi_sysv_register_cost(packed) else: 0
+                    if cost / 16 > int_regs or cost % 16 > sse_regs:
+                        indirect = true
+                    else if packed != 0:
                         arg.llvm_ty = packed
                     else if self.c_abi_needs_indirect_param(source_ty):
                         indirect = true
@@ -4587,6 +4595,10 @@ impl Codegen:
             arg.pass = fn_abi_argument_pass(places[pi] & 1, convention, indirect or owned_place)
             if arg.pass == PM_INDIRECT or arg.pass == PM_INDIRECT_PLACE:
                 arg.llvm_ty = ptr_ty
+            if sysv and not (indirect and not owned_place):
+                let cost = self.c_abi_sysv_register_cost(arg.llvm_ty)
+                int_regs = if cost / 16 > int_regs: 0 else: int_regs - cost / 16
+                sse_regs = if cost % 16 > sse_regs: 0 else: sse_regs - cost % 16
             params.push(arg.llvm_ty)
             classified.push(arg)
         let start = self.fn_abi_args.len() as i32
@@ -4953,10 +4965,12 @@ fn codegen_c_abi_needs_byval_attr() -> bool:
     let arch = target_spec_arch()
     arch == "x86_64" and (os == "Linux" or os == "Macos")
 
-fn codegen_c_abi_darwin_arm64() -> bool:
-    let os = target_spec_os()
-    let arch = target_spec_arch()
-    os == "Macos" and arch == "aarch64"
+// AAPCS64 and Apple's arm64 variant agree on how a struct of at most 16 bytes
+// (or a homogeneous float aggregate) crosses a non-variadic C call.
+fn codegen_c_abi_aarch64() -> bool: target_spec_arch() == "aarch64"
+
+// System V x86_64 (Linux, macOS): §3.2.3 eightbyte classification.
+fn codegen_c_abi_sysv_x86_64() -> bool: target_spec_arch() == "x86_64" and target_spec_os() != "Windows"
 
 fn codegen_windows_x86_64() -> bool:
     let os = target_spec_os()
@@ -5016,24 +5030,6 @@ impl Codegen:
             return self.c_abi_direct_struct_param_type(param_ty) == 0
         self.abi_size_of(param_ty) > 16
 
-    fn c_abi_integer_aggregate_ok(ty: i64) -> bool:
-        if ty == 0:
-            return false
-        let kind = wl_get_type_kind(ty)
-        if kind == wl_integer_type_kind() or kind == wl_pointer_type_kind():
-            return true
-        if kind == wl_array_type_kind():
-            return self.c_abi_integer_aggregate_ok(wl_get_element_type(ty))
-        if kind == wl_struct_type_kind():
-            let field_count = wl_count_struct_elem_types(ty)
-            if field_count <= 0:
-                return false
-            for fi in 0..field_count:
-                if not self.c_abi_integer_aggregate_ok(wl_struct_get_type_at(ty, fi)):
-                    return false
-            return true
-        false
-
     fn c_abi_hfa_accumulate(ty: i64, state: i32) -> i32:
         if ty == 0 or state < 0:
             return -1
@@ -5085,6 +5081,67 @@ impl Codegen:
         let elem_ty = if kind == 1: wl_f32_type(self.context) else: wl_f64_type(self.context)
         wl_array_type(elem_ty, count as i64)
 
+    // System V x86_64 §3.2.3. A struct of at most 16 bytes is one or two
+    // eightbytes; each is INTEGER if any integer or pointer leaf lies in it,
+    // otherwise SSE. `classes` carries two bits per eightbyte (1 = INTEGER,
+    // 2 = SSE); -1 means a leaf this classifier does not model.
+    mut fn c_abi_sysv_classify(ty: i64, offset: i64, classes: i32) -> i32:
+        if ty == 0 or classes < 0: return -1
+        let kind = wl_get_type_kind(ty)
+        if kind == wl_struct_type_kind():
+            if wl_is_packed_struct(ty): return -1
+            let dl = wl_get_module_data_layout(self.llmod)
+            var at = offset
+            var out = classes
+            for fi in 0..wl_count_struct_elem_types(ty):
+                let field = wl_struct_get_type_at(ty, fi)
+                let align = wl_abi_align_of(dl, field) as i64
+                at = (at + align - 1) / align * align
+                out = self.c_abi_sysv_classify(field, at, out)
+                at = at + self.abi_size_of(field)
+            return out
+        if kind == wl_array_type_kind():
+            let elem = wl_get_element_type(ty)
+            let stride = self.abi_size_of(elem)
+            var out = classes
+            for i in 0..wl_get_array_length(ty):
+                out = self.c_abi_sysv_classify(elem, offset + i * stride, out)
+            return out
+        let is_sse = kind == wl_float_type_kind() or kind == wl_double_type_kind()
+        if not is_sse and kind != wl_integer_type_kind() and kind != wl_pointer_type_kind(): return -1
+        if self.abi_size_of(ty) > 8 or offset >= 16: return -1
+        let bit = if is_sse: 2 else: 1
+        classes | (if offset >= 8: bit * 4 else: bit)
+
+    // The scalar one eightbyte travels as. Two floats sharing an SSE
+    // eightbyte go as one double: the same 64 bits in the same register.
+    fn c_abi_sysv_eightbyte_type(class: i32, bytes: i64) -> i64:
+        if (class & 1) != 0: return wl_int_type_n(self.context, (bytes * 8) as i32)
+        if bytes <= 4: wl_f32_type(self.context) else: wl_f64_type(self.context)
+
+    mut fn c_abi_sysv_direct_struct_type(ty: i64) -> i64:
+        let size = self.abi_size_of(ty)
+        if size <= 0 or size > 16: return 0
+        let classes = self.c_abi_sysv_classify(ty, 0, 0)
+        if classes <= 0: return 0
+        if size <= 8: return self.c_abi_sysv_eightbyte_type(classes & 3, size)
+        let parts: Vec[i64] = Vec.new()
+        parts.push(self.c_abi_sysv_eightbyte_type(classes & 3, 8))
+        parts.push(self.c_abi_sysv_eightbyte_type((classes / 4) & 3, size - 8))
+        wl_struct_type(self.context, vec_data_i64(&parts), 2, 0)
+
+    // Register cost of a classified value: INTEGER registers * 16 + SSE.
+    fn c_abi_sysv_register_cost(abi_ty: i64) -> i32:
+        let kind = wl_get_type_kind(abi_ty)
+        if kind == wl_struct_type_kind():
+            var cost = 0
+            for fi in 0..wl_count_struct_elem_types(abi_ty):
+                cost = cost + self.c_abi_sysv_register_cost(wl_struct_get_type_at(abi_ty, fi))
+            return cost
+        if kind == wl_float_type_kind() or kind == wl_double_type_kind(): return 1
+        if kind == wl_integer_type_kind() or kind == wl_pointer_type_kind(): return 16
+        0
+
     mut fn c_abi_direct_struct_param_type(ty: i64) -> i64:
         if ty == 0 or wl_get_type_kind(ty) != wl_struct_type_kind():
             return 0
@@ -5092,18 +5149,18 @@ impl Codegen:
             return 0
         if codegen_windows_x86_64():
             let size = self.abi_size_of(ty)
-            if (size == 1 or size == 2 or size == 4 or size == 8) and self.c_abi_integer_aggregate_ok(ty):
+            if size == 1 or size == 2 or size == 4 or size == 8:
                 return wl_int_type_n(self.context, (size * 8) as i32)
             return 0
-        if not codegen_c_abi_darwin_arm64():
-            return 0
+        if codegen_c_abi_sysv_x86_64(): return self.c_abi_sysv_direct_struct_type(ty)
+        if not codegen_c_abi_aarch64(): return 0
         let hfa = self.c_abi_hfa_info(ty)
         if hfa != 0:
             return self.c_abi_hfa_type(hfa)
+        // Any other composite of at most 16 bytes goes in general registers,
+        // float members included (AAPCS64 §6.8.2 C.12).
         let size = self.abi_size_of(ty)
         if size <= 0 or size > 16:
-            return 0
-        if not self.c_abi_integer_aggregate_ok(ty):
             return 0
         if size <= 8:
             return wl_i64_type(self.context)
@@ -5116,17 +5173,15 @@ impl Codegen:
             return 0
         if codegen_windows_x86_64():
             let size = self.abi_size_of(ty)
-            if (size == 1 or size == 2 or size == 4 or size == 8) and self.c_abi_integer_aggregate_ok(ty):
+            if size == 1 or size == 2 or size == 4 or size == 8:
                 return wl_int_type_n(self.context, (size * 8) as i32)
             return 0
-        if not codegen_c_abi_darwin_arm64():
-            return 0
+        if codegen_c_abi_sysv_x86_64(): return self.c_abi_sysv_direct_struct_type(ty)
+        if not codegen_c_abi_aarch64(): return 0
         if self.c_abi_hfa_info(ty) != 0:
             return 0
         let size = self.abi_size_of(ty)
         if size <= 0 or size > 16:
-            return 0
-        if not self.c_abi_integer_aggregate_ok(ty):
             return 0
         if size <= 8:
             return wl_int_type_n(self.context, (size * 8) as i32)

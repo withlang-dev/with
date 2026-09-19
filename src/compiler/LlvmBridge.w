@@ -150,6 +150,7 @@ extern fn LLVMStructCreateNamed(c: *mut u8, name: *const u8) -> *mut u8
 extern fn LLVMStructSetBody(ty: *mut u8, elems: *const *mut u8, count: u32, packed: i32)
 extern fn LLVMStructGetTypeAtIndex(ty: *mut u8, idx: u32) -> *mut u8
 extern fn LLVMCountStructElementTypes(ty: *mut u8) -> u32
+extern fn LLVMIsPackedStruct(ty: *mut u8) -> i32
 extern fn LLVMGetElementType(ty: *mut u8) -> *mut u8
 extern fn LLVMGetArrayLength2(ty: *mut u8) -> u64
 
@@ -640,6 +641,7 @@ pub fn wl_struct_set_body_2(ty: i64, t0: i64, t1: i64, packed: i32) -> Unit:
 
 pub fn wl_struct_get_type_at(ty: i64, idx: i32) -> i64: unsafe { LLVMStructGetTypeAtIndex(ty as *mut u8, idx as u32) as i64 }
 pub fn wl_count_struct_elem_types(ty: i64) -> i32: unsafe { LLVMCountStructElementTypes(ty as *mut u8) as i32 }
+pub fn wl_is_packed_struct(ty: i64) -> bool: unsafe { LLVMIsPackedStruct(ty as *mut u8) != 0 }
 pub fn wl_get_element_type(ty: i64) -> i64: unsafe { LLVMGetElementType(ty as *mut u8) as i64 }
 pub fn wl_get_array_length(ty: i64) -> i64: unsafe { LLVMGetArrayLength2(ty as *mut u8) as i64 }
 
