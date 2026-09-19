@@ -81,6 +81,7 @@ extern fn clang_isInvalidDeclaration(cursor: CXCursor) -> u32
 extern fn clang_getNumDiagnostics(tu: *mut u8) -> u32
 extern fn clang_getDiagnostic(tu: *mut u8, idx: u32) -> *mut u8
 extern fn clang_getDiagnosticSeverity(diag: *mut u8) -> i32
+extern fn clang_getDiagnosticLocation(diag: *mut u8) -> CXSourceLocation
 extern fn clang_getDiagnosticSpelling(diag: *mut u8) -> CXString
 extern fn clang_disposeDiagnostic(diag: *mut u8)
 extern fn clang_getTranslationUnitTargetInfo(tu: *mut u8) -> *mut u8
@@ -2673,10 +2674,18 @@ pub fn with_cimport_collect_object_macro_types(header_code: &str, macro_names: &
         with_cimport_dispose(s as i64)
         result
 
-pub fn with_cimport_parse_macro_probe(header_code: &str, macro_name: &str) -> i64:
+// One parse probes every macro in `macro_names` (`|A||B|`): probe k is the
+// declaration `__with_macro_probe_<name>` on line
+// with_cimport_macro_probe_first_line(header_code) + k. A parse per macro made
+// c_import cost macros x header: bzip2 and libcurl timed out on Windows,
+// where every parse re-reads windows.h. The parse keeps going past errors;
+// with_cimport_macro_probe_errors says which probes they belong to.
+pub fn with_cimport_parse_macro_probe(header_code: &str, macro_names: &str) -> i64:
     unsafe:
-        if macro_name.len() == 0:
+        if macro_names.len() == 0:
             return 0
+        // A probe session can reuse a freed session address (#744).
+        g_cimport_parse_counter = g_cimport_parse_counter + 1
 
         let size = sizeof[CImportSession]()
         let s = with_alloc(size) as *mut CImportSession
@@ -2696,9 +2705,11 @@ pub fn with_cimport_parse_macro_probe(header_code: &str, macro_name: &str) -> i6
         let src_ptr = **(&header_code as *const *const *const u8)
         let _ = rt_write(fd, src_ptr, header_code.len() as u64)
         let _ = rt_write(fd, "\n\0" as *const u8, 1 as u64)
-        let probe_line = "__typeof__(" ++ macro_name ++ ") __with_macro_probe_" ++ macro_name ++ " = " ++ macro_name ++ ";\n"
-        let probe_ptr = *(&probe_line as *const *const u8)
-        let _ = rt_write(fd, probe_ptr, probe_line.len() as u64)
+        for name in macro_names.split("|"):
+            if name.len() == 0: continue
+            let probe_line = "__typeof__(" ++ name ++ ") __with_macro_probe_" ++ name ++ " = " ++ name ++ ";\n"
+            let probe_ptr = *(&probe_line as *const *const u8)
+            let _ = rt_write(fd, probe_ptr, probe_line.len() as u64)
         let _ = rt_close(fd)
         (*s).tmp_path = c_strdup(&template_path as *const [4096]u8 as *const u8)
 
@@ -2739,14 +2750,43 @@ pub fn with_cimport_parse_macro_probe(header_code: &str, macro_name: &str) -> i6
             with_cimport_dispose(s as i64)
             return 0
 
-        if cimport_record_parse_error(s):
-            with_cimport_dispose(s as i64)
-            return 0
-
         (*s).header_file = clang_getFile((*s).tu, (*s).tmp_path as *const u8)
         let root = clang_getTranslationUnitCursor((*s).tu)
         let _ = clang_visitChildren(root, collect_decl as *const u8, s as *mut u8)
         s as i64
+
+// The probe file is the header, a newline, then one probe per line.
+pub fn with_cimport_macro_probe_first_line(header_code: &str) -> i32:
+    var lines = 2
+    for i in 0..header_code.len() as i32:
+        if header_code[i] == '\n': lines = lines + 1
+    lines
+
+// `|k|` for each probe k whose line carries an error; `*` when the header
+// itself (or a file it includes) has one, which no probe result survives.
+pub fn with_cimport_macro_probe_errors(session: i64, first_line: i32) -> str:
+    unsafe:
+        let s = session as *mut CImportSession
+        if s as i64 == 0: return "*"
+        var out = ""
+        let count = clang_getNumDiagnostics((*s).tu)
+        var i: u32 = 0
+        while i < count:
+            let diag = clang_getDiagnostic((*s).tu, i)
+            if clang_getDiagnosticSeverity(diag) >= CXDiagnostic_Error:
+                var file: *mut u8 = 0 as *mut u8
+                var line: u32 = 0
+                var col: u32 = 0
+                var offset: u32 = 0
+                clang_getExpansionLocation(clang_getDiagnosticLocation(diag), &raw mut file, &raw mut line, &raw mut col, &raw mut offset)
+                let in_probes = file as i64 != 0 and clang_File_isEqual(file, (*s).header_file) != 0 and line as i32 >= first_line
+                out = if in_probes: out ++ f"|{line as i32 - first_line}|" else: "*"
+                if not in_probes:
+                    clang_disposeDiagnostic(diag)
+                    return out
+            clang_disposeDiagnostic(diag)
+            i += 1
+        out
 
 pub fn with_cimport_macro_count(session: i64) -> i32:
     unsafe:
