@@ -420,11 +420,6 @@ fn lock_restore_entry(project_root: &str, entry: &LockEntry) -> i32:
             return 0
         runtime_eprint("error: unsupported system package in lock file: " ++ entry.name ++ "@" ++ entry.version)
         return 1
-    if entry.source == "port":
-        if conan_restore_locked_port(c_name, entry.version, entry.sha256, project_root):
-            runtime_eprint("restored " ++ entry.name ++ "@" ++ entry.version ++ " (port)")
-            return 0
-        return 1
     if entry.source != "conan":
         runtime_eprint("error: unsupported lock source '" ++ entry.source ++ "' for " ++ entry.name)
         return 1
