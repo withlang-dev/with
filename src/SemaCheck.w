@@ -23566,10 +23566,16 @@ impl Sema:
         let tk = self.get_type_kind(resolved)
         if tk == TypeKind.TY_RANGE:
             return self.get_type_d0(resolved)
-        if tk == TypeKind.TY_ARRAY:
-            return self.get_type_d0(resolved)
-        if tk == TypeKind.TY_SLICE:
-            return self.get_type_d0(resolved)
+        if tk == TypeKind.TY_ARRAY or tk == TypeKind.TY_SLICE:
+            // §2.3, §13: traversal observes. A Copy element binds by value; a
+            // Drop-class element binds as a `&T` view of its place. Copying
+            // one out made a second owner, and the copy's drop freed the
+            // array's strings under the caller (the second traversal read
+            // freed memory).
+            let seq_elem = self.get_type_d0(resolved)
+            if self.type_needs_drop(seq_elem) != 0 and self.is_copy(seq_elem as TypeId) == 0:
+                return self.ensure_exact_type(TypeKind.TY_REF, seq_elem, 0, 0) as i32
+            return seq_elem
         if tk == TypeKind.TY_REF:
             // #607: `for w in &vec` / `for w in &h.field` borrow-iterates — the loop var
             // is `&T` (each element borrowed, no copy/move). Mirrors VecIterRef[T] below.
@@ -23584,6 +23590,10 @@ impl Sema:
                 // like the map itself; returning 0 left k and v unbound.
                 if ref_base == "HashMap" and self.get_generic_inst_arg_count(ref_pointee_resolved as i32) >= 2:
                     return self.map_traversal_element_type(ref_pointee_resolved as i32)
+            // #1197: a `&[T]` / `&[N]T` binding iterates the sequence it views.
+            let pointee_kind = self.get_type_kind(ref_pointee_resolved)
+            if pointee_kind == TypeKind.TY_ARRAY or pointee_kind == TypeKind.TY_SLICE:
+                return self.infer_for_element_type(ref_pointee_resolved as i32)
             return 0
         if tk == TypeKind.TY_GENERIC_INST:
             let base_name = self.pool_resolve(self.get_type_d0(resolved))
@@ -24232,7 +24242,14 @@ impl Sema:
         // infer_for_element_type), so the binding is view-bound for §15.17.
         if self.typed_expr_types.contains(iterable):
             let bare_ty = self.typed_expr_types.get(iterable).unwrap()
-            let bare_resolved = self.resolve_alias(bare_ty as TypeId)
+            var bare_resolved = self.resolve_alias(bare_ty as TypeId)
+            // A slice or array of Drop-class elements, directly or through a
+            // reference, binds views as well.
+            var seq_resolved = bare_resolved
+            if self.get_type_kind(seq_resolved) == TypeKind.TY_REF: seq_resolved = self.resolve_alias(self.get_type_d0(seq_resolved) as TypeId)
+            if self.get_type_kind(seq_resolved) == TypeKind.TY_ARRAY or self.get_type_kind(seq_resolved) == TypeKind.TY_SLICE:
+                let seq_elem = self.get_type_d0(seq_resolved)
+                return if self.type_needs_drop(seq_elem) != 0 and self.is_copy(seq_elem as TypeId) == 0: 1 else: 0
             if self.get_type_kind(bare_resolved) == TypeKind.TY_GENERIC_INST and self.get_generic_inst_arg_count(bare_resolved as i32) > 0:
                 if self.pool_resolve(self.get_type_d0(bare_resolved)) == "Vec":
                     let bare_elem = self.get_generic_inst_arg(bare_resolved as i32, 0)

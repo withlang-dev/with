@@ -6497,6 +6497,12 @@ impl MirBuilder:
                     // traverses like the map it views.
                     if rp_sym != 0 and self.pool.resolve(rp_sym) == "HashMap":
                         return self.lower_for_hashmap(for_node, pat_or_sym, iter_expr, body_expr)
+                // #1197: a `&[T]` or `&[N]T` binding (a borrowed parameter)
+                // iterates the slice it views. No branch took it, and the
+                // function failed to lower with no source diagnostic.
+                let pointee_kind = self.sema.get_type_kind(ref_pointee)
+                if pointee_kind == TypeKind.TY_SLICE or pointee_kind == TypeKind.TY_ARRAY:
+                    return self.lower_for_slice(for_node, pat_or_sym, iter_expr, body_expr)
 
         // Check for slice/vec-based for
         if iter_ty != 0:
@@ -7412,17 +7418,46 @@ impl MirBuilder:
 
     mut fn lower_for_slice(for_node: i32, pat_or_sym: i32, iter_expr: i32, body_expr: i32) -> i32:
         // for x in slice → index from 0 to len
-        let iter_op = self.lower_expr(iter_expr)
-        let iter_ty = self.expr_type(iter_expr)
+        let written_ty = self.expr_type(iter_expr)
+        let written_resolved = self.sema.resolve_alias(written_ty)
+        let through_ref = self.sema.get_type_kind(written_resolved) == TypeKind.TY_REF
+        let iter_ty = if through_ref: self.sema.get_type_d0(written_resolved) else: written_ty
         let elem_ty = self.sema.infer_for_element_type_frozen(iter_ty)
 
-        // Materialize slice into a local
-        let slice_place = self.materialize_operand(iter_op, iter_ty, self.ast.get_start(iter_expr))
+        // §13: the implicit form borrows. A place iterable is read through its
+        // own place — lowering it as a value MOVED an array of Drop-class
+        // elements into a temp, and the binding was empty after the loop. Only
+        // an rvalue materializes a temp, which the statement frame drops.
+        let ivk = self.ast.kind(iter_expr)
+        var held_place = 0
+        if ivk == NodeKind.NK_IDENT or ivk == NodeKind.NK_FIELD_ACCESS or ivk == NodeKind.NK_INDEX:
+            held_place = self.lower_expr_place(iter_expr)
+        else:
+            let iter_op = self.lower_expr(iter_expr)
+            held_place = self.materialize_operand(iter_op, written_ty, self.ast.get_start(iter_expr))
+        // A slice is a Copy view (pointer and length): read it out of the
+        // reference once and iterate that. RK_LEN does not see through a deref
+        // projection — it read a length of 0 and the loop never ran.
+        // An array is not a view: copying it out would make a second owner of
+        // its elements (the copy's drop freed the caller's strings). It is read
+        // in place, and its length is its type's.
+        let array_in_place = through_ref and self.sema.get_type_kind(self.sema.resolve_alias(iter_ty)) == TypeKind.TY_ARRAY
+        var slice_place = held_place
+        if array_in_place:
+            slice_place = self.new_deref_place(held_place)
+        else if through_ref:
+            let viewed_local = self.new_temp(iter_ty)
+            slice_place = self.place_for_local(viewed_local)
+            let viewed_op = self.body.new_operand(OperandKind.OK_COPY, self.new_deref_place(held_place))
+            self.assign_operand_to_place(slice_place, viewed_op, self.ast.get_start(iter_expr))
 
         // Get length: len_local = RvalueKind.RK_LEN(slice_place)
         let len_local = self.new_temp(self.sema.ty_i64)
         let len_place = self.place_for_local(len_local)
-        let len_rv = self.body.new_rvalue(RvalueKind.RK_LEN, slice_place, 0, 0)
+        // An array's length is its type's. RK_LEN reads 0 through a field or
+        // deref projection, and the loop over `holder.names` never ran.
+        let is_array = self.sema.get_type_kind(self.sema.resolve_alias(iter_ty)) == TypeKind.TY_ARRAY
+        let len_rv = if is_array: self.body.new_rvalue(RvalueKind.RK_USE, self.int_const_operand(self.sema.get_type_d1(self.sema.resolve_alias(iter_ty)) as i64, self.sema.ty_i64), 0, 0) else: self.body.new_rvalue(RvalueKind.RK_LEN, slice_place, 0, 0)
         self.body.push_stmt(self.cur_bb, StmtKind.Assign, len_place, len_rv, self.ast.get_start(iter_expr))
 
         // Counter: i64 starting at 0
@@ -7459,12 +7494,20 @@ impl MirBuilder:
         // Body: bind element = slice[counter]
         self.switch_to(body_bb)
         let idx_place = self.body.new_index_place(slice_place, counter_local, 0)
-        let elem_op = self.body.new_operand(OperandKind.OK_COPY, idx_place)
 
         // Materialize element into a temp so pattern destructuring has a place to read from
         let elem_local = self.new_temp(elem_ty)
         let elem_place = self.place_for_local(elem_local)
-        self.assign_operand_to_place(elem_place, elem_op, self.ast.get_start(body_expr))
+        // A Drop-class element binds as `&T` (infer_for_element_type): borrow
+        // its place. Copying it out made a second owner whose drop freed the
+        // sequence's element.
+        let seq_elem_ty = self.sema.get_type_d0(self.sema.resolve_alias(iter_ty))
+        if elem_ty != seq_elem_ty and self.sema.get_type_kind(self.sema.resolve_alias(elem_ty)) == TypeKind.TY_REF:
+            let ref_rv = self.body.new_rvalue(RvalueKind.RK_REF, BorrowKind.SHARED, idx_place, 0)
+            self.body.push_stmt(self.cur_bb, StmtKind.Assign, elem_place, ref_rv, self.ast.get_start(body_expr))
+        else:
+            let elem_op = self.body.new_operand(OperandKind.OK_COPY, idx_place)
+            self.assign_operand_to_place(elem_place, elem_op, self.ast.get_start(body_expr))
         self.bind_for_element_or_skip(for_node, pat_or_sym, elem_place, elem_ty, body_expr, inc_bb)
 
         // #771 (the #729 loop shape): stmt temps created INSIDE the body must
