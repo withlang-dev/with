@@ -12,6 +12,16 @@ impl Counter:
 
 fn go(x: i32) -> bool: x > 0 and later_pred()
 
+// Neither function is annotated and the callee comes second, but the call is
+// a statement: its value is discarded, so there is nothing to have got wrong
+// (std/crypto/bigint.w calls i31_reduce_once this way).
+fn bump_twice(n: i32):
+    var calls = 0
+    later(n)
+    calls = calls + 1
+    later(n)
+    calls = calls + 1
+
 fn main:
     let c = Counter { n: 1 }
     let n: i32 = later(2)

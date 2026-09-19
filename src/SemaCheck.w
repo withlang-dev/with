@@ -9172,7 +9172,10 @@ impl Sema:
             self.current_value_expr_root = 0
             self.expected_expr_type = 0 as TypeId
             self.has_expected_type = 0
+            let saved_discarded_stmt = self.discarded_stmt_node
+            self.discarded_stmt_node = stmt
             let stmt_ty = self.check_expr(stmt)
+            self.discarded_stmt_node = saved_discarded_stmt
             self.current_statement_expr_root = saved_statement_root
             self.current_value_expr_root = saved_value_root
             self.expected_expr_type = saved_expected
@@ -15813,7 +15816,7 @@ impl Sema:
             // #1196: a callee that takes its type from a body not checked yet
             // reads as Unit. Often that is right (a procedure); check_bodies
             // reports the calls where it was not.
-            if not self.body_typed_sigs.contains(sig_idx) and fn_sym != self.current_fn_symbol and self.fn_decl_nodes.contains(fn_sym):
+            if node != self.discarded_stmt_node and not self.body_typed_sigs.contains(sig_idx) and fn_sym != self.current_fn_symbol and self.fn_decl_nodes.contains(fn_sym):
                 let callee_decl: i32 = self.fn_decl_nodes.get(fn_sym).unwrap()
                 let callee_meta = self.ast.find_fn_meta(callee_decl)
                 if callee_meta >= 0 and self.ast.fn_meta_ret(callee_meta) == 0 and self.ast.fn_meta_tp_count(callee_meta) == 0 and self.fn_decl_is_entry_point(callee_decl) == 0:

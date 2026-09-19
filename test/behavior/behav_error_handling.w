@@ -8,7 +8,7 @@ error ParseError =
     | EmptyInput
     | Overflow
 
-fn parse_positive(s: str) -> Result[i32, ParseError]:
+fn parse_positive(s: &str) -> Result[i32, ParseError]:
     if s == "":
         return Err(.EmptyInput)
     if s == "42":
