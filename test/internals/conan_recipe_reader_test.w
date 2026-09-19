@@ -3,12 +3,31 @@ use compiler.ConanRecipe
 
 // A recipe is read as data: nothing here runs Python, and nothing is about any
 // one package. The shapes are the ones Conan Center's recipes use.
+// A dead first mirror, a second that serves the wrong bytes, a third that is right.
+fn fake_download(url: &str, path: &str) -> i32: if url.contains("dead"): 1 else: 0
+
+fn fake_digest(path: &str) -> str: if path.contains("good"): "ab5a" else: "ffff"
+
 fn main:
     let data = "sources:\n  \"1.0.8\":\n    url:\n    - \"https://a.invalid/x-1.0.8.tar.gz\"\n    - \"https://mirror.invalid/x-1.0.8.tar.gz\"\n    sha256: \"ab5a\"\n  \"1.0.6\":\n    url: \"https://a.invalid/x-1.0.6.tar.gz\"\n    sha256: \"a284\"\npatches:\n  \"1.0.6\":\n    - patch_file: \"patches/0001-fix.patch\"\n      patch_type: \"portability\"\n    - patch_file: \"patches/0002-more.patch\"\n"
     let newest = conan_data_source(data, "1.0.8")
-    assert(newest.url == "https://a.invalid/x-1.0.8.tar.gz" and newest.sha256 == "ab5a")
-    assert(conan_data_source(data, "1.0.6").url == "https://a.invalid/x-1.0.6.tar.gz")
-    assert(conan_data_source(data, "9.9").url == "")
+    // Every mirror, in the recipe's order: the second is tried when the first is down.
+    assert(newest.urls.len() == 2 and newest.sha256 == "ab5a")
+    assert(newest.urls[0] == "https://a.invalid/x-1.0.8.tar.gz" and newest.urls[1] == "https://mirror.invalid/x-1.0.8.tar.gz")
+    let older = conan_data_source(data, "1.0.6")
+    assert(older.urls.len() == 1 and older.urls[0] == "https://a.invalid/x-1.0.6.tar.gz")
+    assert(conan_data_source(data, "9.9").urls.len() == 0)
+    let mirrors = ConanSource { urls: ["https://dead.invalid/x-dead.tgz", "https://stale.invalid/x-stale.tgz", "https://ok.invalid/x-good.tgz"], sha256: "ab5a" }
+    let picked = conan_pick_archive(&mirrors, "/w", fake_download, fake_digest)
+    assert(picked.path == "/w/x-good.tgz")
+    assert(picked.tried.contains("dead.invalid/x-dead.tgz: did not download") and picked.tried.contains("x-stale.tgz: sha256 ffff, the recipe expects ab5a"))
+    let none = ConanSource { urls: ["https://dead.invalid/x-dead.tgz"], sha256: "ab5a" }
+    assert(conan_pick_archive(&none, "/w", fake_download, fake_digest).path == "")
+    // A patch that names where it applies is refused, not applied somewhere else.
+    assert(conan_data_patch_problem(data, "1.0.6") == "")
+    let placed = data.replace("      patch_type: \"portability\"\n", "      base_path: \"source_subfolder\"\n")
+    assert(conan_data_patch_problem(placed, "1.0.6") == "its patches use `base_path: \"source_subfolder\"`, which this build does not apply yet")
+    assert(conan_data_patch_problem(placed, "1.0.8") == "")
     assert(conan_data_patches(data, "1.0.8").len() == 0)
     let patches = conan_data_patches(data, "1.0.6")
     assert(patches.len() == 2 and patches[1] == "patches/0002-more.patch")
