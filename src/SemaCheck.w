@@ -20751,6 +20751,13 @@ impl Sema:
             let method_fn_sym = self.lookup_method_fn(type_name_sym, field)
             let sig_idx = self.lookup_method_sig(type_name_sym, field)
             if sig_idx >= 0:
+                // #1201: `Type.method()` on a method that takes `self`, with too few
+                // arguments for the receiver to be among them. It reached codegen
+                // and failed LLVM verification ("Incorrect number of arguments").
+                if is_static_receiver != 0 and self.sig_receiver_mode(sig_idx) != ReceiverMode.None and mc_resolved_arg_count < self.sig_get_param_count(sig_idx):
+                    let qualified = self.pool_resolve(type_name_sym) ++ "." ++ self.pool_resolve(field)
+                    self.emit_error("'" ++ qualified ++ "' takes `self`, and this call has no receiver; call it on a value, or declare it outside the impl as `fn " ++ qualified ++ "(...)` to make it a function of the type", node)
+                    return 0
                 if call_param_offset == 1 and self.sig_get_param_count(sig_idx) > 0:
                     let exact_receiver_ty = self.recorded_expr_type_or_zero(expr)
                     if exact_receiver_ty != 0:
