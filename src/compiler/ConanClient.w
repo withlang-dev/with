@@ -1054,7 +1054,7 @@ pub fn conan_set_from_source(enabled: bool) -> Unit:
 // data (src/compiler/ConanRecipe.w): conandata.yml gives the tarball, its
 // digest and the patches; conanfile.py gives the requirements and the CMake
 // variables. The package's own CMake build does the rest, driven by `cmake`
-// and `ninja` with `with cc` as the C compiler and `with ar` as the archiver.
+// and `ninja` with `with cc` as the C compiler and `with __ar` as the archiver.
 // It installs into the dependency directory, which is then scanned exactly as
 // an extracted Conan binary is. What the machine lacks is named, not guessed
 // around: the user installs it.
@@ -1239,8 +1239,8 @@ fn conan_install_from_source(name: &str, version: &str, project_root: &str, dept
     configure = conan_argv_append(configure, "Ninja")
     configure = conan_argv_append(configure, "-DCMAKE_MAKE_PROGRAM=" ++ ninja)
     configure = conan_argv_append(configure, "-DCMAKE_C_COMPILER=" ++ conan_write_launcher(tools_dir, "cc", self_exe))
-    configure = conan_argv_append(configure, "-DCMAKE_AR=" ++ conan_write_launcher(tools_dir, "ar", self_exe))
-    configure = conan_argv_append(configure, "-DCMAKE_RANLIB=" ++ conan_write_launcher(tools_dir, "ranlib", self_exe))
+    configure = conan_argv_append(configure, "-DCMAKE_AR=" ++ conan_write_launcher(tools_dir, "__ar", self_exe))
+    configure = conan_argv_append(configure, "-DCMAKE_RANLIB=" ++ conan_write_launcher(tools_dir, "__ranlib", self_exe))
     configure = conan_argv_append(configure, "-DCMAKE_BUILD_TYPE=Release")
     configure = conan_argv_append(configure, "-DBUILD_SHARED_LIBS=OFF")
     configure = conan_argv_append(configure, "-DCMAKE_POSITION_INDEPENDENT_CODE=ON")

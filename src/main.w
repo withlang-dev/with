@@ -745,13 +745,14 @@ fn run_one_liner_command(argc: i32, one: &CliOneLiner, no_std: bool, alloc_mode:
 fn run_cli(argc: i32) -> i32:
     // `with cc ...` is clang; none of With's own flags apply to it.
     if cli_command(argc) == "cc": return with_cc_main()
-    // `with ar qc lib.a a.o b.o` / `with ranlib lib.a`: what CMake asks of an
-    // archiver, so a source build needs no binutils. The archive is written
-    // with its symbol index; ranlib has nothing left to do.
-    if cli_command(argc) == "ranlib": return 0
-    if cli_command(argc) == "ar":
+    // `with __ar qc lib.a a.o b.o` / `with __ranlib lib.a`: what CMake asks of
+    // an archiver, so a source build needs no binutils. They are the compiler
+    // invoking itself (the `__` prefix), not commands a user types. The
+    // archive is written with its symbol index; ranlib has nothing left to do.
+    if cli_command(argc) == "__ranlib": return 0
+    if cli_command(argc) == "__ar":
         if argc < 5:
-            with_eprint("usage: with ar <qc|rc|rcs> <archive> <object>...")
+            with_eprint("usage: with __ar <qc|rc|rcs> <archive> <object>...")
             return 2
         let members: Vec[str] = Vec.new()
         for i in 4..argc: members.push(with_arg_at(i))
