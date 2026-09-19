@@ -6761,13 +6761,17 @@ let coords = [(x, y) for x in 0..3 for y in 0..3 if x != y]
 // Vec[(i32, i32)]: [(0,1), (0,2), (1,0), (1,2), (2,0), (2,1)]
 
 // Expected type selects the target collection:
-let words: HashSet[str] = [w for w in tokens]
+let words: HashSet[str] = [w.clone() for w in tokens]
 let ordered: BTreeSet[i32] = [x for x in xs if x > 0]
 
 // Map form: key-colon-value builds a map (HashMap by default)
-let index = [w: i for (i, w) in vocab.enumerate()]
-let sorted_index: BTreeMap[str, i32] = [w: i for (i, w) in vocab.enumerate()]
+let index = [w.clone(): i for (i, w) in vocab.enumerate()]
+let sorted_index: BTreeMap[str, i32] = [w.clone(): i for (i, w) in vocab.enumerate()]
 ```
+
+An element, key or value expression is an owned-value demand (§3.8,
+D22): a view of a Copy type materializes; a view of any other type is
+cloned explicitly (D45).
 
 **Desugaring:**
 
@@ -10548,6 +10552,7 @@ with repl                                    # interactive session
 with init                                    # create a new project
 with migrate <c-sources>                     # translate C to With (§13.5b, §16)
 with emit-c-header <file>                    # emit C declarations for @[c_export] (§16.5)
+with cc <clang arguments>                    # the C compiler inside this binary (§18.8)
 with version [--abi-sha] | with help         # --abi-sha: the ABI identity .wo bundles key on
 with -e <code> | -n <code> | -p <code>      # one-liners (§18.5b)
 ```
@@ -11119,6 +11124,18 @@ headers, prebuilt libraries, and transitive deps into
 package includes a `metadata.json` with include paths, library
 paths, library names, and transitive dependencies.
 
+When Conan Center has no binary this toolchain can link for the
+platform, `with get c.X` builds the package from source. The recipe
+Conan Center publishes is read as data and never executed: it names
+the source archive, its digest and patches, the requirements, and the
+CMake variables. The package's own CMake build runs with `with cc` as
+the C compiler, and the result installs into
+`.with/deps/c/<name>/<version>/` exactly as a binary package does. The
+lock records the source archive's digest. A build that needs a tool
+the machine lacks (`cmake`, `ninja`, or for a package that does not
+build with CMake, whatever its build system needs) names it and stops;
+installing it is the programmer's step.
+
 **Build integration.** When `with build` encounters
 `use c_import("<glib.h>")`, the compiler reads `with.toml`, finds
 all `c.*` deps, reads their `metadata.json`, and constructs include
@@ -11149,6 +11166,7 @@ link = ["custom"]
 | `with get c.X` | Add C dependency via Conan |
 | `with get c.X@2.78` | Pin specific version |
 | `with get --force-reinstall c.X@2.78` | Delete and recreate the local installed C package |
+| `with get --from-source c.X` | Build the C package from source even when a binary exists |
 | `with remove c.X` | Remove dependency |
 | `with update` | Update all deps to latest compatible |
 | `with get` (no args) | Restore deps from lock file |
