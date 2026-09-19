@@ -117,6 +117,11 @@ extern fn LLVMInitializeWebAssemblyTarget()
 extern fn LLVMInitializeWebAssemblyTargetMC()
 extern fn LLVMInitializeWebAssemblyAsmPrinter()
 extern fn LLVMInitializeWebAssemblyAsmParser()
+// When the SDK has no WebAssembly backend the link aliases these five to
+// rt/cimport_stubs.w's with_llvm_wasm_backend_missing (build/compiler.w
+// comp_wasm_backend_alias_lines): registering the target is then a no-op,
+// and the driver refuses a wasm build from the baked
+// embedded_llvm_wasm_backend_linked() fact before codegen starts.
 extern fn LLVMGetDefaultTargetTriple() -> *mut u8
 extern fn LLVMGetTargetFromTriple(triple: *const u8, target: *mut *mut u8, err: *mut *mut u8) -> i32
 extern fn LLVMCreateTargetMachine(target: *mut u8, triple: *const u8, cpu: *const u8, features: *const u8, level: i32, reloc: i32, model: i32) -> *mut u8

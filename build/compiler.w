@@ -1757,6 +1757,40 @@ pub fn run_patch_version_action(ctx: ActionCtx) -> i32:
         return comp_fail(ctx, "could not create capture directory: " ++ capture_dir)
     comp_patch_version_binary(ctx, unstamped, output_path, version)
 
+// Whether an LLVM SDK's lib dir carries the WebAssembly backend the wasm32
+// target needs (docs/wasm-target.md). tools/build-static-llvm.sh builds it
+// by default now; SDKs published before that were AArch64+X86 only.
+pub fn comp_sdk_has_wasm_backend(fs: &ToolFs, llvm_lib_dir: &str) -> bool:
+    fs.host_exists(llvm_lib_dir ++ "/libLLVMWebAssemblyCodeGen.a") or fs.host_exists(llvm_lib_dir ++ "/LLVMWebAssemblyCodeGen.lib")
+
+// Linker lines aliasing each LLVMInitializeWebAssembly* entry point to the
+// runtime's no-op stand-in (rt/cimport_stubs.w, always in the compiler
+// link, bare name) when the SDK has no WebAssembly backend, so the compiler
+// links against such an SDK; the driver refuses a wasm build from the baked
+// embedded_llvm_wasm_backend_linked() fact. `driver_form` spells them for
+// the cc driver (-Wl,...), otherwise for lld directly. Empty when the
+// backend exists.
+pub fn comp_wasm_backend_alias_lines(has_wasm_backend: bool, target_os: &str, driver_form: bool) -> str:
+    if has_wasm_backend:
+        return ""
+    let stand_in = "with_llvm_wasm_backend_missing"
+    let names: Vec[str] = Vec.new()
+    names.push("LLVMInitializeWebAssemblyTargetInfo")
+    names.push("LLVMInitializeWebAssemblyTarget")
+    names.push("LLVMInitializeWebAssemblyTargetMC")
+    names.push("LLVMInitializeWebAssemblyAsmPrinter")
+    names.push("LLVMInitializeWebAssemblyAsmParser")
+    var out = ""
+    for i in 0..names.len() as i32:
+        let name = names[i]
+        if target_os == "Macos":
+            out = out ++ (if driver_form: "-Wl,-alias,_" ++ stand_in ++ ",_" ++ name ++ "\n" else: "-alias\n_" ++ stand_in ++ "\n_" ++ name ++ "\n")
+        else if target_os == "Windows":
+            out = out ++ (if driver_form: "-Wl,/alternatename:" else: "/alternatename:") ++ name ++ "=" ++ stand_in ++ "\n"
+        else:
+            out = out ++ (if driver_form: "-Wl,--defsym=" else: "--defsym=") ++ name ++ "=" ++ stand_in ++ "\n"
+    out
+
 pub fn run_generate_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
     let fs = ctx.fs()
     let root = ctx.project_info().project_root()
@@ -1838,6 +1872,12 @@ pub fn run_generate_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
         let clang_main_msvc = if has_clang_main: "?clang_main@@YAHHPEAPEADAEBUToolContext@llvm@@@Z" else: "with_alloc"
         rsp = rsp ++ "-Wl,/include:" ++ clang_main_msvc ++ "\n-Wl,/alternatename:with_clang_main=" ++ clang_main_msvc ++ "\n"
         ld_rsp = ld_rsp ++ "/include:" ++ clang_main_msvc ++ "\n/alternatename:with_clang_main=" ++ clang_main_msvc ++ "\n"
+    // An SDK built without the WebAssembly backend (every SDK published before
+    // the wasm32 target) has no LLVMInitializeWebAssembly* entry points. The
+    // compiler still links: each is aliased to a bridge no-op, and
+    // LlvmBridge.w tells the two apart by address and refuses a wasm build.
+    rsp = rsp ++ comp_wasm_backend_alias_lines(comp_sdk_has_wasm_backend(fs, llvm_lib_dir), os(), true)
+    ld_rsp = ld_rsp ++ comp_wasm_backend_alias_lines(comp_sdk_has_wasm_backend(fs, llvm_lib_dir), os(), false)
     if os() == "Macos":
         let sdk_path = comp_host_sdk_path(ctx)
         if sdk_path.len() > 0:

@@ -230,6 +230,13 @@ fn cr_generate(ctx: &ActionCtx, include_dir: &str, files: &Vec[str], version: &s
     let lib_dir = comp_llvm_prefix_for_root(ctx.project_info().project_root()) ++ "/lib"
     let driver_linked = ctx.fs().host_exists(lib_dir ++ "/libclangMain.a") or ctx.fs().host_exists(lib_dir ++ "/clangMain.lib")
     out = out ++ "pub fn embedded_clang_driver_linked() -> bool:\n    return " ++ (if driver_linked: "true" else: "false") ++ "\n\n"
+    // Whether this compiler links LLVM's WebAssembly backend (the wasm32
+    // target): the SDK has the archive, or it predates it and the five
+    // LLVMInitializeWebAssembly* entry points are aliased to a stand-in
+    // (build/compiler.w comp_wasm_backend_alias_lines). The driver refuses a
+    // wasm build from this fact before codegen starts.
+    let wasm_backend_linked = comp_sdk_has_wasm_backend(ctx.fs(), lib_dir)
+    out = out ++ "pub fn embedded_llvm_wasm_backend_linked() -> bool:\n    return " ++ (if wasm_backend_linked: "true" else: "false") ++ "\n\n"
     out = out ++ "pub fn embedded_clang_resource_data(name: &str) -> str:\n"
     for i in 0..files.len() as i32:
         let rel = cr_relpath(files[i], include_dir)

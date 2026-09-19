@@ -263,6 +263,7 @@ fn run_cross_linux_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
     for i in 0..sorted_llvm.len() as i32:
         ld_rsp = ld_rsp ++ comp_rsp_path(sorted_llvm[i]) ++ "\n"
     ld_rsp = ld_rsp ++ "-Bstatic\n-lstdc++\n-lgcc\n-lgcc_eh\n-Bdynamic\n-lpthread\n-ldl\n-lm\n-lz\n-lzstd\n-lxml2\n"
+    ld_rsp = ld_rsp ++ comp_wasm_backend_alias_lines(comp_sdk_has_wasm_backend(fs, lib_dir), "Linux", false)
     if fs.write_text(output_path, ld_rsp) != 0:
         ctx.diagnostics().error("cross-llvm-link-metadata: could not write: " ++ output_path)
         return 1
@@ -325,6 +326,7 @@ fn run_cross_windows_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
     let sorted_llvm = comp_sort_strings(llvm_archives)
     for i in 0..sorted_llvm.len() as i32:
         ld_rsp = ld_rsp ++ comp_rsp_path(sorted_llvm[i]) ++ "\n"
+    ld_rsp = ld_rsp ++ comp_wasm_backend_alias_lines(comp_sdk_has_wasm_backend(fs, lib_dir), "Windows", false)
     if fs.write_text(output_path, ld_rsp) != 0:
         ctx.diagnostics().error("cross-windows-llvm-link-metadata: could not write: " ++ output_path)
         return 1
@@ -384,6 +386,7 @@ fn run_cross_windows_aarch64_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
     let sorted_llvm = comp_sort_strings(llvm_archives)
     for i in 0..sorted_llvm.len() as i32:
         ld_rsp = ld_rsp ++ comp_rsp_path(sorted_llvm[i]) ++ "\n"
+    ld_rsp = ld_rsp ++ comp_wasm_backend_alias_lines(comp_sdk_has_wasm_backend(fs, lib_dir), "Windows", false)
     if fs.write_text(output_path, ld_rsp) != 0:
         ctx.diagnostics().error("cross-windows-aarch64-llvm-link-metadata: could not write: " ++ output_path)
         return 1

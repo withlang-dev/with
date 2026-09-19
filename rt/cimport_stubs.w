@@ -12,6 +12,16 @@ fn str_c() -> str: "c"
 
 @[weak] pub fn with_cimport_available() -> i32: 0
 
+// The stand-in the compiler link aliases LLVM's five
+// LLVMInitializeWebAssembly* entry points to when the SDK was built without
+// the WebAssembly backend (build/compiler.w comp_wasm_backend_alias_lines):
+// registering the wasm target is then a no-op, and the driver refuses
+// --target=wasm32 from the baked embedded_llvm_wasm_backend_linked() fact.
+// Lives here because this object is always in the compiler link and rt/
+// sources keep bare with_* link names.
+pub fn with_llvm_wasm_backend_missing() -> Unit:
+    let _ = 0
+
 @[weak] pub fn with_cimport_parse(h: str) -> i64:
     let _ = h
     0
