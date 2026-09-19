@@ -1815,6 +1815,22 @@ pub fn run_generate_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
         let path = sorted_llvm_archives[i]
         rsp = rsp ++ comp_rsp_path(path) ++ "\n"
         ld_rsp = ld_rsp ++ comp_rsp_path(path) ++ "\n"
+    // `with cc` (src/compiler/ClangDriver.w) calls clang's driver entry point,
+    // `int clang_main(int, char **, const llvm::ToolContext &)`, a C++ symbol
+    // whose spelling depends on the platform's mangling. The source names one
+    // plain symbol, with_clang_main; each linker aliases it here, and pulls the
+    // archive member in, since an alias alone does not.
+    let clang_main_itanium = "_Z10clang_mainiPPcRKN4llvm11ToolContextE"
+    if os() == "Macos":
+        rsp = rsp ++ "-Wl,-u,_" ++ clang_main_itanium ++ "\n-Wl,-alias,_" ++ clang_main_itanium ++ ",_with_clang_main\n"
+        ld_rsp = ld_rsp ++ "-u\n_" ++ clang_main_itanium ++ "\n-alias\n_" ++ clang_main_itanium ++ "\n_with_clang_main\n"
+    else if os() == "Linux":
+        rsp = rsp ++ "-Wl,-u," ++ clang_main_itanium ++ "\n-Wl,--defsym=with_clang_main=" ++ clang_main_itanium ++ "\n"
+        ld_rsp = ld_rsp ++ "-u\n" ++ clang_main_itanium ++ "\n--defsym=with_clang_main=" ++ clang_main_itanium ++ "\n"
+    else if os() == "Windows":
+        let clang_main_msvc = "?clang_main@@YAHHPEAPEADAEBUToolContext@llvm@@@Z"
+        rsp = rsp ++ "-Wl,/include:" ++ clang_main_msvc ++ "\n-Wl,/alternatename:with_clang_main=" ++ clang_main_msvc ++ "\n"
+        ld_rsp = ld_rsp ++ "/include:" ++ clang_main_msvc ++ "\n/alternatename:with_clang_main=" ++ clang_main_msvc ++ "\n"
     if os() == "Macos":
         let sdk_path = comp_host_sdk_path(ctx)
         if sdk_path.len() > 0:

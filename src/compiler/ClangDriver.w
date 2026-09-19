@@ -19,9 +19,9 @@ extern fn with_arg_at(idx: i32) -> str
 // llvm::ToolContext (llvm/Support/LLVMDriver.h).
 type ClangToolContext { path: *const u8, prepend_arg: *const u8, needs_prepend_arg: bool }
 
-// int clang_main(int, char **, const llvm::ToolContext &)
-@[link_name("_Z10clang_mainiPPcRKN4llvm11ToolContextE")]
-extern fn clang_main(argc: i32, argv: *mut *mut u8, ctx: *const ClangToolContext) -> i32
+// int clang_main(int, char **, const llvm::ToolContext &). The compiler link
+// aliases this name to the platform's C++ spelling (build/compiler.w).
+extern fn with_clang_main(argc: i32, argv: *mut *mut u8, ctx: *const ClangToolContext) -> i32
 
 // A NUL-terminated copy that lives for the rest of the process, as argv does.
 unsafe fn cc_c_string(s: &str) -> *mut u8:
@@ -49,4 +49,4 @@ pub fn with_cc_main() -> i32:
             *((argv as i64 + i as i64 * 8) as *mut *mut u8) = cc_c_string(args[i])
         *((argv as i64 + args.len() * 8) as *mut *mut u8) = 0 as *mut u8
         let ctx = ClangToolContext { path: cc_c_string(with_arg_at(0)), prepend_arg: cc_c_string("cc"), needs_prepend_arg: true }
-        clang_main(args.len() as i32, argv, &raw const ctx)
+        with_clang_main(args.len() as i32, argv, &raw const ctx)

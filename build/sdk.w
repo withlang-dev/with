@@ -333,6 +333,8 @@ fn sdk_validate_package_prefix(ctx: &ActionCtx, platform: &str, prefix: &str, bu
         for i in 0..tools.len() as i32:
             rc = sdk_check_file(ctx, sdk_required_tool(prefix, tools[i]), tools[i])
             if rc != 0: return rc
+    rc = sdk_check_file(ctx, sdk_clang_main_archive(prefix), "clang driver archive (with cc)")
+    if rc != 0: return rc
     let fs = ctx.fs()
     if not fs.is_dir(sdk_join(prefix, "lib/clang")):
         return sdk_fail(ctx, "missing clang builtin header tree: " ++ sdk_join(prefix, "lib/clang"))
@@ -839,4 +841,41 @@ pub fn run_sdk_llvm_action(ctx: ActionCtx) -> i32:
         return sdk_fail(ctx, "clang driver was not installed: " ++ sdk_tool(output_prefix, "clang"))
     if not fs.exists(sdk_tool(output_prefix, "llvm-nm")):
         return sdk_fail(ctx, "llvm-nm was not installed: " ++ sdk_tool(output_prefix, "llvm-nm"))
+    sdk_archive_clang_main(ctx, root, build_dir, output_prefix)
+
+// `with cc` is clang's driver linked into the compiler (src/compiler/
+// ClangDriver.w). LLVM installs that driver only as the bin/clang executable;
+// its objects — driver, cc1, cc1as, cc1gen_reproducer, where clang_main lives —
+// stay in the build tree. Archive them next to the other clang libraries, where
+// the compiler link already picks up every libclang*.a / clang*.lib.
+fn sdk_clang_main_archive(prefix: &str) -> str:
+    sdk_join(prefix, if os() == "Windows": "lib/clangMain.lib" else: "lib/libclangMain.a")
+
+fn sdk_archive_clang_main(ctx: &ActionCtx, root: &str, build_dir: &str, output_prefix: &str) -> i32:
+    let objects_dir = sdk_abs(root, build_dir) ++ "/tools/clang/tools/driver/CMakeFiles/clang.dir"
+    let ext = if os() == "Windows": ".cpp.obj" else: ".cpp.o"
+    let archive = sdk_abs(root, sdk_clang_main_archive(output_prefix))
+    var argv: Vec[str] = Vec.new()
+    if os() == "Windows":
+        argv.push(sdk_abs(root, sdk_tool(output_prefix, "llvm-lib")))
+        argv.push("/OUT:" ++ archive)
+    else:
+        argv.push(sdk_abs(root, sdk_tool(output_prefix, "llvm-ar")))
+        argv.push("rcs")
+        argv.push(archive)
+    // Pushed one by one: the build layer runs on the pinned seed (#1122).
+    let names: Vec[str] = Vec.new()
+    names.push("driver")
+    names.push("cc1_main")
+    names.push("cc1as_main")
+    names.push("cc1gen_reproducer_main")
+    for i in 0..names.len() as i32:
+        let object = objects_dir ++ "/" ++ names[i] ++ ext
+        if not ctx.fs().host_exists(object):
+            return sdk_fail(ctx, "clang driver object was not built: " ++ object)
+        argv.push(object)
+    let rc = sdk_run_capture(ctx, "clang-main-archive", argv, 120000)
+    if rc != 0: return rc
+    if not ctx.fs().exists(sdk_clang_main_archive(output_prefix)):
+        return sdk_fail(ctx, "clang driver archive was not written: " ++ sdk_clang_main_archive(output_prefix))
     0
