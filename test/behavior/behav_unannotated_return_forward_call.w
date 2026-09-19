@@ -1,4 +1,4 @@
-//! expect-stdout: ok 42 ok
+//! expect-stdout: ok 42 ok 84
 
 // #1196: a function with no return annotation takes its type from its body
 // (§9.1). A caller declared above it used to see no type at all. Every caller
@@ -27,7 +27,11 @@ fn main:
     let n: i32 = later(2)
     let a = if c.positive(): "ok" else: "no"
     let b = if go(1): "ok" else: "no"
-    print(f"{a} {n} {b}")
+    let t: i32 = twice(2)
+    print(f"{a} {n} {b} {t}")
+
+// Unannotated calling unannotated, declared after it: `later` is typed first.
+fn twice(x: i32): later(x) + later(x)
 
 fn later_pred(): 1 + 1 == 2
 

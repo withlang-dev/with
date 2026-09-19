@@ -1596,12 +1596,17 @@ impl Sema:
     // #1196: a function with no return annotation gets its type from its body
     // (§9.1, D43), so a caller checked before that body saw no type at all
     // ("right operand of logical operator must be bool" for a bool function
-    // declared further down). Bodies that define a signature are checked first,
-    // in source order; the rest follow. Declaration order no longer matters to
-    // a caller whose own return type is written.
+    // declared further down). Bodies are checked in declaration order, except
+    // that such a function is checked before the first declaration that calls
+    // it. Nothing else moves: a callee's inferred parameter effects are also
+    // read by its callers, and checking every unannotated function first put
+    // `bad` ahead of std.thread.spawn_os and lost "escaping closure cannot
+    // capture ephemeral references".
     mut fn check_bodies():
-        self.check_bodies_where(false)
-        self.check_bodies_where(true)
+        let count = self.ast.decl_count()
+        self.prepare_body_order(count)
+        for di in 0..count:
+            self.check_decl_body_in_order(di)
         // A call typed before its callee's body was: wrong only if that body
         // turned out to produce a value.
         let saved_file_id = self.local_file_id
@@ -1618,17 +1623,64 @@ impl Sema:
         self.local_file_id = saved_file_id
         self.validate_global_data_race_accesses()
 
-    mut fn check_bodies_where(annotated: bool):
-        for di in 0..self.ast.decl_count():
+    // Nodes are appended children first, so a declaration's subtree is the ids
+    // between the nearest declaration node below it and its own.
+    mut fn prepare_body_order(count: i32):
+        var decl_nodes: HashMap[i32, i32] = sema_new_map_i32_i32()
+        for di in 0..count: decl_nodes.insert(self.ast.get_decl(di), di)
+        self.body_order_state = Vec.new()
+        self.body_order_lower = Vec.new()
+        self.body_typed_next = Vec.new()
+        self.body_typed_decls = sema_new_map_i32_i32()
+        for di in 0..count:
+            let decl = self.ast.get_decl(di)
+            // Walk down to the nearest declaration node below: the ranges are
+            // disjoint, so all of them together are one pass over the pool.
+            var below = decl - 1
+            while below > 0 and not decl_nodes.contains(below): below = below - 1
+            self.body_order_state.push(0)
+            self.body_order_lower.push(below)
+            self.body_typed_next.push(-1)
+        for di in 0..count:
+            let decl = self.ast.get_decl(di)
+            if self.ast.kind(decl) != NodeKind.NK_FN_DECL: continue
+            let meta = self.ast.find_fn_meta(decl)
+            if meta < 0 or self.ast.fn_meta_ret(meta) != 0 or self.ast.fn_meta_tp_count(meta) != 0 or self.fn_decl_is_entry_point(decl) != 0: continue
+            // A call names it by its bare name: `later(x)`, `self.later()`.
+            let parsed = self.ast.get_data0(decl)
+            let text: str = with_str_clone_ref(self.pool_resolve(parsed))
+            var bare = parsed
+            for ci in 0..text.len() as i32:
+                if text[ci] == '.': bare = self.pool_intern(text.slice(ci + 1, text.len()))
+            let earlier: i32 = self.body_typed_decls.get(bare) ?? -1
+            self.body_typed_next[di] = earlier
+            self.body_typed_decls.insert(bare, di)
+
+    mut fn check_decl_body_in_order(di: i32):
+        if self.body_order_state[di] != 0: return
+        self.body_order_state[di] = 1
+        let decl = self.ast.get_decl(di)
+        if self.ast.kind(decl) == NodeKind.NK_FN_DECL and not self.decl_is_lazy_skipped(di):
+            var n: i32 = self.body_order_lower[di] + 1
+            while n < decl:
+                if self.ast.kind(n) == NodeKind.NK_CALL:
+                    let callee = self.ast.get_data0(n)
+                    let callee_kind = self.ast.kind(callee)
+                    let named = if callee_kind == NodeKind.NK_IDENT: self.ast.get_data0(callee) else: if callee_kind == NodeKind.NK_FIELD_ACCESS: self.ast.get_data1(callee) else: 0
+                    var target: i32 = if named != 0: (self.body_typed_decls.get(named) ?? -1) else: -1
+                    while target >= 0:
+                        // In progress means a cycle: that call is reported, not chased.
+                        if target != di: self.check_decl_body_in_order(target)
+                        target = self.body_typed_next[target]
+                n = n + 1
+        self.check_one_decl_body(di)
+        self.body_order_state[di] = 2
+
+    mut fn check_one_decl_body(only: i32):
+        // One iteration: the body below leaves through `continue`.
+        for di in only..only + 1:
             if self.decl_is_lazy_skipped(di):
                 continue
-            let candidate = self.ast.get_decl(di)
-            if self.ast.kind(candidate) == NodeKind.NK_FN_DECL:
-                let candidate_meta = self.ast.find_fn_meta(candidate)
-                // An entry point or test has a fixed contract: nothing reads its type.
-                let has_contract = (candidate_meta >= 0 and self.ast.fn_meta_ret(candidate_meta) != 0) or self.fn_decl_is_entry_point(candidate) != 0
-                if has_contract != annotated: continue
-            else if not annotated: continue
             self.update_decl_source_context(di)
             let decl = self.ast.get_decl(di)
             if self.ast.kind(decl) == NodeKind.NK_FN_DECL:
@@ -7054,8 +7106,26 @@ impl Sema:
                         self.emit_error("comprehension filter must be bool", filter2)
             let key_ty = if key_expected != 0: self.check_expr_with_owned_demand(key_expr, key_expected as TypeId) else: self.check_expr(key_expr)
             let val_ty = if val_expected != 0: self.check_expr_with_owned_demand(val_expr, val_expected as TypeId) else: self.check_expr(val_expr)
-            let stored_key_ty = if key_expected != 0: key_expected else: key_ty as i32
-            let stored_val_ty = if val_expected != 0: val_expected else: val_ty as i32
+            // A map owns what it stores, so storing is an owned-value demand
+            // (D22): a `&T` view with T: Copy materializes a T. A view of a
+            // Drop-class value cannot be stored; the message says to clone it
+            // rather than that `&str` has no Hash.
+            var stored_key_ty = if key_expected != 0: key_expected else: key_ty as i32
+            var stored_val_ty = if val_expected != 0: val_expected else: val_ty as i32
+            if key_expected == 0 and self.get_type_kind(self.resolve_alias(key_ty)) == TypeKind.TY_REF:
+                let key_pointee = self.get_type_d0(self.resolve_alias(key_ty))
+                if self.is_copy(key_pointee as TypeId) == 0:
+                    self.emit_error("a map comprehension owns its keys, and this key is a view (`" ++ self.type_name(key_ty as i32) ++ "`) of the collection being traversed; clone it (`.clone()`)", key_expr)
+                    return 0
+                let _ = self.record_contextual_copy_adjustment(key_expr, key_pointee, key_ty as i32)
+                stored_key_ty = key_pointee
+            if val_expected == 0 and self.get_type_kind(self.resolve_alias(val_ty)) == TypeKind.TY_REF:
+                let val_pointee = self.get_type_d0(self.resolve_alias(val_ty))
+                if self.is_copy(val_pointee as TypeId) == 0:
+                    self.emit_error("a map comprehension owns its values, and this value is a view (`" ++ self.type_name(val_ty as i32) ++ "`) of the collection being traversed; clone it (`.clone()`)", val_expr)
+                    return 0
+                let _ = self.record_contextual_copy_adjustment(val_expr, val_pointee, val_ty as i32)
+                stored_val_ty = val_pointee
             for _ in 0..pushed_scopes2:
                 self.pop_scope()
             if map_target_ty == 0:

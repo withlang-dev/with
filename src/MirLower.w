@@ -6936,15 +6936,15 @@ impl MirBuilder:
         self.forget_string_flow_facts()
 
     mut fn lower_comprehension_slice(comp_node: i32, clause_index: i32, out_place: i32, out_elem_ty: i32, pat_or_sym: i32, iter_expr: i32):
-        let iter_op = self.lower_expr(iter_expr)
-        let iter_ty = self.expr_type(iter_expr)
+        // The same receiver, length and element binding as `for` (below): a
+        // comprehension observes the sequence it traverses too.
+        let iter_ty = self.sequence_iter_type(iter_expr)
         let elem_ty = self.sema.infer_for_element_type_frozen(iter_ty)
-        let slice_place = self.materialize_operand(iter_op, iter_ty, self.ast.get_start(iter_expr))
+        let slice_place = self.lower_sequence_place(iter_expr)
 
         let len_local = self.new_temp(self.sema.ty_i64)
         let len_place = self.place_for_local(len_local)
-        let len_rv = self.body.new_rvalue(RvalueKind.RK_LEN, slice_place, 0, 0)
-        self.body.push_stmt(self.cur_bb, StmtKind.Assign, len_place, len_rv, self.ast.get_start(iter_expr))
+        self.body.push_stmt(self.cur_bb, StmtKind.Assign, len_place, self.sequence_len_rvalue(slice_place, iter_ty), self.ast.get_start(iter_expr))
 
         let counter_local = self.new_temp(self.sema.ty_i64)
         let counter_place = self.place_for_local(counter_local)
@@ -6974,11 +6974,7 @@ impl MirBuilder:
         self.terminate(TermKind.TK_SWITCH_INT, cmp_read, table, exit_bb, 0)
 
         self.switch_to(body_bb)
-        let idx_place = self.body.new_index_place(slice_place, counter_local, 0)
-        let elem_op = self.body.new_operand(OperandKind.OK_COPY, idx_place)
-        let elem_local = self.new_temp(elem_ty)
-        let elem_place = self.place_for_local(elem_local)
-        self.assign_operand_to_place(elem_place, elem_op, self.ast.get_start(iter_expr))
+        let elem_place = self.lower_sequence_element(slice_place, counter_local, iter_ty, elem_ty, self.ast.get_start(iter_expr))
         self.bind_comprehension_element(comp_node, pat_or_sym, elem_place, elem_ty, iter_expr)
         self.lower_comprehension_body(comp_node, clause_index, out_place, out_elem_ty, inc_bb)
 
@@ -7416,14 +7412,17 @@ impl MirBuilder:
         self.forget_string_flow_facts()
         self.unit_operand()
 
-    mut fn lower_for_slice(for_node: i32, pat_or_sym: i32, iter_expr: i32, body_expr: i32) -> i32:
-        // for x in slice → index from 0 to len
+    // ── Traversing a slice or array (`for`, comprehensions) ─────────────
+    // The sequence's type, seeing through a `&[T]` / `&[N]T` binding.
+    mut fn sequence_iter_type(iter_expr: i32) -> i32:
         let written_ty = self.expr_type(iter_expr)
         let written_resolved = self.sema.resolve_alias(written_ty)
-        let through_ref = self.sema.get_type_kind(written_resolved) == TypeKind.TY_REF
-        let iter_ty = if through_ref: self.sema.get_type_d0(written_resolved) else: written_ty
-        let elem_ty = self.sema.infer_for_element_type_frozen(iter_ty)
+        if self.sema.get_type_kind(written_resolved) == TypeKind.TY_REF: self.sema.get_type_d0(written_resolved) else: written_ty
 
+    mut fn lower_sequence_place(iter_expr: i32) -> i32:
+        let written_ty = self.expr_type(iter_expr)
+        let through_ref = self.sema.get_type_kind(self.sema.resolve_alias(written_ty)) == TypeKind.TY_REF
+        let iter_ty = self.sequence_iter_type(iter_expr)
         // §13: the implicit form borrows. A place iterable is read through its
         // own place — lowering it as a value MOVED an array of Drop-class
         // elements into a temp, and the binding was empty after the loop. Only
@@ -7451,14 +7450,41 @@ impl MirBuilder:
             let viewed_op = self.body.new_operand(OperandKind.OK_COPY, self.new_deref_place(held_place))
             self.assign_operand_to_place(slice_place, viewed_op, self.ast.get_start(iter_expr))
 
-        // Get length: len_local = RvalueKind.RK_LEN(slice_place)
+        slice_place
+
+    // An array's length is its type's. RK_LEN reads 0 through a field or deref
+    // projection, and the loop over `holder.names` never ran.
+    mut fn sequence_len_rvalue(slice_place: i32, iter_ty: i32) -> i32:
+        let resolved = self.sema.resolve_alias(iter_ty)
+        if self.sema.get_type_kind(resolved) == TypeKind.TY_ARRAY:
+            return self.body.new_rvalue(RvalueKind.RK_USE, self.int_const_operand(self.sema.get_type_d1(resolved) as i64, self.sema.ty_i64), 0, 0)
+        self.body.new_rvalue(RvalueKind.RK_LEN, slice_place, 0, 0)
+
+    // The element at `counter_local`, in a temp the pattern can read. A
+    // Drop-class element binds as `&T` (infer_for_element_type): its place is
+    // borrowed. Copying it out made a second owner whose drop freed the
+    // sequence's element.
+    mut fn lower_sequence_element(slice_place: i32, counter_local: i32, iter_ty: i32, elem_ty: i32, pos: i32) -> i32:
+        let idx_place = self.body.new_index_place(slice_place, counter_local, 0)
+        let elem_local = self.new_temp(elem_ty)
+        let elem_place = self.place_for_local(elem_local)
+        let seq_elem_ty = self.sema.get_type_d0(self.sema.resolve_alias(iter_ty))
+        if elem_ty != seq_elem_ty and self.sema.get_type_kind(self.sema.resolve_alias(elem_ty)) == TypeKind.TY_REF:
+            let ref_rv = self.body.new_rvalue(RvalueKind.RK_REF, BorrowKind.SHARED, idx_place, 0)
+            self.body.push_stmt(self.cur_bb, StmtKind.Assign, elem_place, ref_rv, pos)
+        else:
+            let elem_op = self.body.new_operand(OperandKind.OK_COPY, idx_place)
+            self.assign_operand_to_place(elem_place, elem_op, pos)
+        elem_place
+
+    mut fn lower_for_slice(for_node: i32, pat_or_sym: i32, iter_expr: i32, body_expr: i32) -> i32:
+        // for x in slice → index from 0 to len
+        let iter_ty = self.sequence_iter_type(iter_expr)
+        let elem_ty = self.sema.infer_for_element_type_frozen(iter_ty)
+        let slice_place = self.lower_sequence_place(iter_expr)
         let len_local = self.new_temp(self.sema.ty_i64)
         let len_place = self.place_for_local(len_local)
-        // An array's length is its type's. RK_LEN reads 0 through a field or
-        // deref projection, and the loop over `holder.names` never ran.
-        let is_array = self.sema.get_type_kind(self.sema.resolve_alias(iter_ty)) == TypeKind.TY_ARRAY
-        let len_rv = if is_array: self.body.new_rvalue(RvalueKind.RK_USE, self.int_const_operand(self.sema.get_type_d1(self.sema.resolve_alias(iter_ty)) as i64, self.sema.ty_i64), 0, 0) else: self.body.new_rvalue(RvalueKind.RK_LEN, slice_place, 0, 0)
-        self.body.push_stmt(self.cur_bb, StmtKind.Assign, len_place, len_rv, self.ast.get_start(iter_expr))
+        self.body.push_stmt(self.cur_bb, StmtKind.Assign, len_place, self.sequence_len_rvalue(slice_place, iter_ty), self.ast.get_start(iter_expr))
 
         // Counter: i64 starting at 0
         let counter_local = self.new_temp(self.sema.ty_i64)
@@ -7493,21 +7519,7 @@ impl MirBuilder:
 
         // Body: bind element = slice[counter]
         self.switch_to(body_bb)
-        let idx_place = self.body.new_index_place(slice_place, counter_local, 0)
-
-        // Materialize element into a temp so pattern destructuring has a place to read from
-        let elem_local = self.new_temp(elem_ty)
-        let elem_place = self.place_for_local(elem_local)
-        // A Drop-class element binds as `&T` (infer_for_element_type): borrow
-        // its place. Copying it out made a second owner whose drop freed the
-        // sequence's element.
-        let seq_elem_ty = self.sema.get_type_d0(self.sema.resolve_alias(iter_ty))
-        if elem_ty != seq_elem_ty and self.sema.get_type_kind(self.sema.resolve_alias(elem_ty)) == TypeKind.TY_REF:
-            let ref_rv = self.body.new_rvalue(RvalueKind.RK_REF, BorrowKind.SHARED, idx_place, 0)
-            self.body.push_stmt(self.cur_bb, StmtKind.Assign, elem_place, ref_rv, self.ast.get_start(body_expr))
-        else:
-            let elem_op = self.body.new_operand(OperandKind.OK_COPY, idx_place)
-            self.assign_operand_to_place(elem_place, elem_op, self.ast.get_start(body_expr))
+        let elem_place = self.lower_sequence_element(slice_place, counter_local, iter_ty, elem_ty, self.ast.get_start(body_expr))
         self.bind_for_element_or_skip(for_node, pat_or_sym, elem_place, elem_ty, body_expr, inc_bb)
 
         // #771 (the #729 loop shape): stmt temps created INSIDE the body must

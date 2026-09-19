@@ -1111,6 +1111,14 @@ type Sema {
     // The statement a block is checking: its value is discarded, so a callee
     // that is not typed yet costs a call in that position nothing.
     discarded_stmt_node: i32,
+    // check_bodies order (#1196): per declaration 0 unchecked / 1 in progress /
+    // 2 done; the node id its subtree starts after; and, for the functions that
+    // take their type from their body, declaration index by name symbol, with
+    // same-name declarations chained through body_typed_next.
+    body_order_state: Vec[i32],
+    body_order_lower: Vec[i32],
+    body_typed_decls: HashMap[i32, i32],
+    body_typed_next: Vec[i32],
     current_for_comprehension_carrier: i32,
     in_comptime_fn: i32,
     in_concrete_generic_body: i32,
@@ -2332,6 +2340,10 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         body_typed_sigs: sema_new_map_i32_i32(),
         untyped_callee_calls: Vec.new(),
         discarded_stmt_node: 0,
+        body_order_state: Vec.new(),
+        body_order_lower: Vec.new(),
+        body_typed_decls: sema_new_map_i32_i32(),
+        body_typed_next: Vec.new(),
         current_for_comprehension_carrier: 0,
         in_comptime_fn: 0,
         in_concrete_generic_body: 0,
