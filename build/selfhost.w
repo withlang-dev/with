@@ -357,10 +357,18 @@ fn bs_expect_cli_input_success_exact(ctx: &ActionCtx, compiler_path: &str, label
         return bs_fail(ctx, "one-liner '" ++ label ++ f"' failed with exit code {result.rc}")
     bs_assert_stdout_exact(ctx, result, expected, label)
 
+// A failed expectation shows what was there instead: linux-x86_64 validation
+// 35423258758 said only "missing expected output ... bad cwd prelink missing",
+// which did not reproduce on linux-aarch64 and left nothing to read.
+fn bs_actual_excerpt(text: &str) -> str:
+    if text.len() == 0: return "\n  actual: (empty)"
+    let start = if text.len() > 2000: text.len() - 2000 else: 0
+    "\n  actual (last 2000 bytes):\n" ++ text.slice(start, text.len())
+
 fn bs_assert_contains(ctx: &ActionCtx, text: &str, needle: &str, label: &str) -> i32:
     if text.contains(needle):
         return 0
-    bs_fail(ctx, "missing expected output for " ++ label ++ ": " ++ needle)
+    bs_fail(ctx, "missing expected output for " ++ label ++ ": " ++ needle ++ bs_actual_excerpt(text))
 
 fn bs_assert_not_contains(ctx: &ActionCtx, text: &str, needle: &str, label: &str) -> i32:
     if not text.contains(needle):
