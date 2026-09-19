@@ -10,6 +10,8 @@
 //     [source]
 //     url = "https://zlib.net/fossils/zlib-1.3.2.tar.gz"
 //     sha256 = "..."
+//     overlay = ["zconf.h"]                      # files/<path> beside port.toml,
+//                                                # written over the extracted source
 //
 //     [build]
 //     sources = ["adler32.c", "contrib/*.c"]     # relative to the source root
@@ -27,14 +29,14 @@
 //     system_libs = ["m"]
 //
 // Array keys under [build.<os>] / [link.<os>] (linux, macos, windows) append to
-// the unconditional ones. Files under `files/` beside port.toml are copied over
-// the extracted source first: that is where a generated config.h lives.
+// the unconditional ones. An overlay file is where a generated config.h lives.
 
 pub type CPort {
     name: str,
     version: str,
     source_url: str,
     sha256: str,
+    overlay: Vec[str],
     sources: Vec[str],
     exclude: Vec[str],
     include_dirs: Vec[str],
@@ -85,6 +87,7 @@ impl CPort:
             else if key == "defines": self.defines.push(v.to_owned())
             else if key == "cflags": self.cflags.push(v.to_owned())
             else if key == "system_libs": self.system_libs.push(v.to_owned())
+            else if key == "overlay": self.overlay.push(v.to_owned())
 
     mut fn apply(section: &str, key: &str, value: &str, os_section: &str):
         let build = section == "build" or section == "build." ++ os_section
@@ -93,6 +96,7 @@ impl CPort:
         else if section == "port" and key == "version": self.version = cport_unquote(value)
         else if section == "source" and key == "url": self.source_url = cport_unquote(value)
         else if section == "source" and key == "sha256": self.sha256 = cport_unquote(value)
+        else if section == "source" and key == "overlay": self.append(key, &cport_string_array(value))
         else if build and key == "lib": self.lib = cport_unquote(value)
         else if build and (key == "sources" or key == "exclude" or key == "include" or key == "public_include" or key == "defines" or key == "cflags"): self.append(key, &cport_string_array(value))
         else if link and key == "system_libs": self.append(key, &cport_string_array(value))
@@ -103,7 +107,7 @@ impl CPort:
         else if self.problem.len() == 0: self.problem = "unknown key `" ++ key ++ "` in [" ++ section ++ "]"
 
 fn CPort.empty(): CPort {
-    name: "", version: "", source_url: "", sha256: "",
+    name: "", version: "", source_url: "", sha256: "", overlay: Vec.new(),
     sources: Vec.new(), exclude: Vec.new(), include_dirs: Vec.new(), public_include_dirs: Vec.new(),
     defines: Vec.new(), cflags: Vec.new(), lib: "", system_libs: Vec.new(), problem: "",
 }

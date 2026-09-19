@@ -4,6 +4,7 @@
 
 use Archive
 use compiler.Runtime
+use compiler.CPort
 use std.crypto.sha256
 extern fn with_str_clone_ref(s: &str) -> str
 
@@ -1038,143 +1039,122 @@ fn conan_recipe_folder(name: &str, version: &str) -> str:
             break
     ""
 
-fn conan_source_url_from_data(data: &str, version: &str) -> str:
-    let lines = conan_split_nonempty_lines(data)
-    var in_version = false
-    let version_line_a = "\"" ++ version ++ "\":"
-    let version_line_b = version ++ ":"
-    for i in 0..lines.len() as i32:
-        let line = lines[i]
-        if line == version_line_a or line == version_line_b:
-            in_version = true
-        else if in_version and line.starts_with("url:"):
-            return conan_strip_quotes(line.slice(4, line.len()))
-        else if in_version and line.ends_with(":") and not line.starts_with("url:"):
-            break
-    ""
+// ── Building from a port ─────────────────────────────────────────────
+// No linkable binary on ConanCenter: build the library from its port
+// (src/compiler/CPort.w) with `with cc`, the clang inside this binary. No
+// system compiler, no foreign build tool.
 
-fn conan_version_has_patches(data: &str, version: &str) -> bool:
-    let patch_pos = conan_find_text(data, "patches:")
-    if patch_pos < 0:
-        return false
-    let after = data.slice(patch_pos as i64, data.len())
-    after.contains("\"" ++ version ++ "\":") or after.contains(version ++ ":")
+// `with get --from-source`: skip Conan Center's binaries and build the port.
+var g_conan_from_source: bool = false
 
-fn conan_source_unsupported_recipe(recipe: &str) -> bool:
-    recipe.contains("self.requires(") or recipe.contains("apply_conandata_patches") or recipe.contains("configure(")
+pub fn conan_set_from_source(enabled: bool) -> Unit:
+    g_conan_from_source = enabled
 
-fn conan_collect_c_sources_and_headers(source_dir: &str) -> ConanLibraryScan:
-    let listing = runtime_list_files(source_dir)
-    let files = conan_split_nonempty_lines(listing)
-    var c_files: Vec[str] = Vec.new()
-    var header_dirs: Vec[str] = Vec.new()
-    for i in 0..files.len() as i32:
-        let path = files[i]
-        if path.ends_with(".c"):
-            c_files = conan_sorted_insert_unique(move c_files, path)
-        else if path.ends_with(".h"):
-            header_dirs = conan_sorted_insert_unique(move header_dirs, conan_path_dirname(path))
-    ConanLibraryScan { lib_paths: header_dirs, libs: c_files }
+fn CONAN_PORTS_RAW -> str: "https://raw.githubusercontent.com/withlang-dev/with/main/ports"
 
-fn conan_c_compiler -> str:
-    let cc = runtime_getenv("CC")
-    if cc.len() > 0:
-        return cc
-    "cc"
+// A file of the port `name`: WITH_PORTS_DIR names a local registry (a checkout,
+// or a port being written); otherwise the published one.
+fn conan_port_file(name: &str, rel: &str) -> str:
+    let local = runtime_getenv("WITH_PORTS_DIR")
+    if local.len() > 0: return runtime_read_file(local ++ "/" ++ name ++ "/" ++ rel)
+    conan_http_get(CONAN_PORTS_RAW() ++ "/" ++ name ++ "/" ++ rel)
 
-fn conan_compile_c_source(source: &str, obj: &str, include_dirs: &Vec[str]) -> i32:
+// This executable, for `<self> cc`.
+fn conan_self_exe() -> str:
+    let argv0 = with_arg_at(0)
+    if argv0.contains("/") or argv0.contains("\\"): return argv0
+    let sep = if runtime_sysinfo_os() == "Windows": ";" else: ":"
+    for dir in runtime_getenv("PATH").split(sep):
+        let candidate = dir ++ "/" ++ argv0
+        if runtime_file_exists(candidate) != 0: return candidate
+    argv0
+
+fn conan_port_compile(port: &CPort, source_dir: &str, rel: &str, obj: &str) -> i32:
     var argv = ""
-    argv = conan_argv_append(argv, conan_c_compiler())
+    argv = conan_argv_append(argv, conan_self_exe())
+    argv = conan_argv_append(argv, "cc")
     argv = conan_argv_append(argv, "-O2")
-    for i in 0..include_dirs.len() as i32:
-        argv = conan_argv_append(argv, "-I" ++ include_dirs[i])
+    if runtime_sysinfo_os() != "Windows": argv = conan_argv_append(argv, "-fPIC")
+    for dir in port.include_dirs: argv = conan_argv_append(argv, "-I" ++ source_dir ++ "/" ++ dir)
+    for define in port.defines: argv = conan_argv_append(argv, "-D" ++ define)
+    for flag in port.cflags: argv = conan_argv_append(argv, flag)
     argv = conan_argv_append(argv, "-c")
-    argv = conan_argv_append(argv, source)
+    argv = conan_argv_append(argv, source_dir ++ "/" ++ rel)
     argv = conan_argv_append(argv, "-o")
     argv = conan_argv_append(argv, obj)
-    conan_run_tool(argv, 120000)
+    conan_run_tool(argv, 600000)
 
-fn conan_install_source_fallback(name: &str, version: &str, project_root: &str) -> str:
-    let folder = conan_recipe_folder(name, version)
-    if folder.len() == 0:
-        runtime_eprint("error: no prebuilt binary for your platform, source build not supported for " ++ name ++ "/" ++ version)
-        return ""
-    let conandata = conan_http_get(conan_recipe_file_url(name, folder, "conandata.yml"))
-    if conandata.len() == 0:
-        runtime_eprint("error: no prebuilt binary for your platform, source build not supported for " ++ name ++ "/" ++ version)
-        return ""
-    if conan_version_has_patches(conandata, version):
-        runtime_eprint("error: no prebuilt binary for your platform, source build not supported for " ++ name ++ "/" ++ version)
-        return ""
-    let recipe = conan_http_get(conan_recipe_file_url(name, folder, "conanfile.py"))
-    if recipe.len() == 0 or conan_source_unsupported_recipe(recipe):
-        runtime_eprint("error: no prebuilt binary for your platform, source build not supported for " ++ name ++ "/" ++ version)
-        return ""
-    let source_url = conan_source_url_from_data(conandata, version)
-    if source_url.len() == 0:
-        runtime_eprint("error: no prebuilt binary for your platform, source build not supported for " ++ name ++ "/" ++ version)
-        return ""
-    let dep_dir = project_root ++ "/.with/deps/c/" ++ name ++ "/" ++ version
+fn conan_port_fail(dep_dir: &str, message: &str) -> str:
+    runtime_eprint("error: " ++ message)
+    if dep_dir.len() > 0:
+        let _remove = runtime_remove_tree(dep_dir)
+    ""
+
+// A lock entry built from a port: reuse the build if it is there, else build the
+// same version from the same tarball, or say which of the two moved.
+pub fn conan_restore_locked_port(name: &str, version: &str, sha256: &str, project_root: &str) -> bool:
+    if runtime_file_exists(project_root ++ "/.with/deps/c/" ++ name ++ "/" ++ version ++ "/metadata.json") != 0: return true
+    let port = cport_parse(conan_port_file(name, "port.toml"), runtime_sysinfo_os())
+    if port.problem.len() > 0 or port.version != version or port.sha256 != sha256:
+        runtime_eprint("error: the lock pins c." ++ name ++ "@" ++ version ++ " (source sha256 " ++ sha256 ++ "); the port of " ++ name ++ " is now " ++ (if port.problem.len() > 0: "unreadable: " ++ port.problem else: port.version ++ " (" ++ port.sha256 ++ ")"))
+        return false
+    conan_install_port(name, version, project_root).len() > 0
+
+fn conan_install_port(name: &str, wanted_version: &str, project_root: &str) -> str:
+    let platform = conan_detect_os() ++ "/" ++ conan_detect_arch()
+    let text = conan_port_file(name, "port.toml")
+    if text.len() == 0:
+        return conan_port_fail("", "Conan Center has no binary of " ++ name ++ "/" ++ wanted_version ++ " for " ++ platform ++ " that this toolchain can link, and there is no port of " ++ name ++ " to build it from")
+    let port = cport_parse(text, runtime_sysinfo_os())
+    if port.problem.len() > 0: return conan_port_fail("", "port of " ++ name ++ ": " ++ port.problem)
+    if port.name != name: return conan_port_fail("", "port of " ++ name ++ " describes `" ++ port.name ++ "`")
+    runtime_eprint("  " ++ (if g_conan_from_source: "--from-source" else: "no binary for " ++ platform) ++ "; building " ++ name ++ "/" ++ port.version ++ " from its port")
+    if port.version != wanted_version:
+        runtime_eprint("  note: Conan Center's newest is " ++ wanted_version ++ "; the port is " ++ port.version)
+    let dep_dir = project_root ++ "/.with/deps/c/" ++ name ++ "/" ++ port.version
     let _clean = runtime_remove_tree(dep_dir)
     let source_dir = dep_dir ++ "/source"
     let obj_dir = dep_dir ++ "/obj"
-    let lib_dir = dep_dir ++ "/lib"
-    if runtime_mkdir_p(source_dir) != 0 or runtime_mkdir_p(obj_dir) != 0 or runtime_mkdir_p(lib_dir) != 0:
-        runtime_eprint("error: failed to create dependency directory for " ++ name ++ "/" ++ version)
-        let _remove = runtime_remove_tree(dep_dir)
-        return ""
+    if runtime_mkdir_p(source_dir) != 0 or runtime_mkdir_p(obj_dir) != 0 or runtime_mkdir_p(dep_dir ++ "/lib") != 0:
+        return conan_port_fail(dep_dir, "could not create " ++ dep_dir)
     let archive_path = dep_dir ++ "/source.tgz"
-    runtime_eprint("  downloading source for " ++ name ++ "/" ++ version ++ "...")
-    if conan_http_download(source_url, archive_path) != 0:
-        runtime_eprint("error: failed to download source for " ++ name ++ "/" ++ version)
-        let _remove = runtime_remove_tree(dep_dir)
-        return ""
+    if conan_http_download(port.source_url, archive_path) != 0:
+        return conan_port_fail(dep_dir, "could not download " ++ port.source_url)
+    let digest = conan_sha256_file(archive_path)
+    if digest != port.sha256:
+        return conan_port_fail(dep_dir, port.source_url ++ " has sha256 " ++ digest ++ "; the port of " ++ name ++ " expects " ++ port.sha256)
     if conan_extract_tgz_strip1(archive_path, source_dir) != 0:
-        runtime_eprint("error: failed to extract source for " ++ name ++ "/" ++ version)
-        let _remove = runtime_remove_tree(dep_dir)
-        return ""
-    let collected = conan_collect_c_sources_and_headers(source_dir)
-    let header_dirs_abs = collected.lib_paths
-    let c_files = collected.libs
-    if c_files.len() == 0 or header_dirs_abs.len() == 0:
-        runtime_eprint("error: no prebuilt binary for your platform, source build not supported for " ++ name ++ "/" ++ version)
-        let _remove = runtime_remove_tree(dep_dir)
-        return ""
-    var include_paths: Vec[str] = Vec.new()
-    include_paths.push("source")
-    let include_dirs_abs: Vec[str] = Vec.new()
-    include_dirs_abs.push(source_dir)
-    for i in 0..header_dirs_abs.len() as i32:
-        let abs = header_dirs_abs[i]
-        include_dirs_abs.push(with_str_clone_ref(abs))
-        include_paths = conan_sorted_insert_unique(move include_paths, conan_relative_path(dep_dir, abs))
+        return conan_port_fail(dep_dir, "could not extract the source of " ++ name ++ "/" ++ port.version)
+    for rel in port.overlay:
+        let body = conan_port_file(name, "files/" ++ rel)
+        if body.len() == 0: return conan_port_fail(dep_dir, "port of " ++ name ++ ": overlay file files/" ++ rel ++ " is missing or empty")
+        let _mk = runtime_mkdir_p(conan_path_dirname(source_dir ++ "/" ++ rel))
+        if runtime_write_file(source_dir ++ "/" ++ rel, body) != 0: return conan_port_fail(dep_dir, "could not write " ++ rel)
+    let files: Vec[str] = Vec.new()
+    for path in conan_split_nonempty_lines(runtime_list_files(source_dir)): files.push(conan_relative_path(source_dir, path))
+    let sources = cport_select_sources(&port, &files)
+    if sources.len() == 0: return conan_port_fail(dep_dir, "port of " ++ name ++ ": `sources` matches no file of " ++ port.source_url)
     let objects: Vec[str] = Vec.new()
-    for i in 0..c_files.len() as i32:
+    for i in 0..sources.len() as i32:
         let obj = obj_dir ++ "/" ++ f"{i}.o"
-        if conan_compile_c_source(c_files[i], obj, include_dirs_abs) != 0:
-            runtime_eprint("error: source build failed for " ++ name ++ "/" ++ version ++ "; source build not supported for this package")
-            let _remove = runtime_remove_tree(dep_dir)
-            return ""
+        if conan_port_compile(&port, source_dir, sources[i], obj) != 0:
+            return conan_port_fail(dep_dir, "port of " ++ name ++ ": " ++ sources[i] ++ " did not compile")
         objects.push(obj)
-    let lib_path = lib_dir ++ "/lib" ++ name ++ ".a"
-    if create_static_archive(lib_path, objects) != 0:
-        runtime_eprint("error: failed to archive source build for " ++ name ++ "/" ++ version)
-        let _remove = runtime_remove_tree(dep_dir)
-        return ""
+    if create_static_archive(dep_dir ++ "/lib/lib" ++ port.lib ++ ".a", objects) != 0:
+        return conan_port_fail(dep_dir, "could not archive " ++ name ++ "/" ++ port.version)
+    let include_paths: Vec[str] = Vec.new()
+    for dir in port.public_include_dirs: include_paths.push(if dir == ".": "source" else: "source/" ++ dir)
     let lib_paths: Vec[str] = Vec.new()
     lib_paths.push("lib")
-    var libs: Vec[str] = Vec.new()
-    libs.push(with_str_clone_ref(name))
-    let defines: Vec[str] = Vec.new()
-    let link_args: Vec[str] = Vec.new()
-    let known = conan_link_metadata_with_recipe(name, version, move libs, move link_args, recipe)
-    let requires: Vec[str] = Vec.new()
-    if conan_write_metadata(dep_dir, name, version, "source", "source", "source", include_paths, lib_paths, known.libs, defines, known.lib_paths, requires) != 0:
-        runtime_eprint("error: failed to write metadata for " ++ name ++ "/" ++ version)
-        let _remove = runtime_remove_tree(dep_dir)
-        return ""
-    runtime_eprint("  built source package at .with/deps/c/" ++ name ++ "/" ++ version ++ "/")
-    with_str_clone_ref(version)
+    let libs: Vec[str] = Vec.new()
+    libs.push(port.lib.clone())
+    for lib in port.system_libs: libs.push(lib.to_owned())
+    let none: Vec[str] = Vec.new()
+    if conan_write_metadata(dep_dir, name, port.version, "port", "port", port.sha256, include_paths, lib_paths, libs, none, none, none) != 0:
+        return conan_port_fail(dep_dir, "could not write metadata for " ++ name ++ "/" ++ port.version)
+    let _objs = runtime_remove_tree(obj_dir)
+    runtime_eprint(f"  built {sources.len()} files into .with/deps/c/" ++ name ++ "/" ++ port.version ++ "/lib/lib" ++ port.lib ++ ".a")
+    port.version.clone()
 
 fn conan_install_internal(name: &str, version_hint: &str, project_root: &str, depth: i32, force_reinstall: bool) -> str:
     if depth > 8:
@@ -1196,10 +1176,11 @@ fn conan_install_internal(name: &str, version_hint: &str, project_root: &str, de
         runtime_eprint("error: could not resolve recipe for " ++ name ++ "/" ++ version ++ " on Conan Center")
         return ""
     runtime_eprint("  revision: " ++ recipe_rev.slice(0, if recipe_rev.len() > 12: 12 else: recipe_rev.len()))
+    if g_conan_from_source: return conan_install_port(name, version, project_root)
     let installed_binary = conan_install_binary(name, version, recipe_rev, project_root, depth, force_reinstall)
     if installed_binary.len() > 0:
         return installed_binary
-    conan_install_source_fallback(name, version, project_root)
+    conan_install_port(name, version, project_root)
 
 // Public API. Returns the concrete installed version, or "" on failure.
 fn conan_install(name: &str, version_hint: &str, project_root: &str, force_reinstall: bool) -> str:

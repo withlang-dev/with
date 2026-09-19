@@ -5469,7 +5469,7 @@ type GetCommandOptions {
 }
 
 fn get_command_usage():
-    with_eprint("usage: with get [--force-reinstall] [c.<package>[@version] | <package>[@version]]")
+    with_eprint("usage: with get [--force-reinstall] [--from-source] [c.<package>[@version] | <package>[@version]]")
     with_eprint("  c.<package>     C dependency via Conan Center")
     with_eprint("  <package>       With package (registry not yet available)")
     with_eprint("  (no arguments)  restore dependencies from lock file")
@@ -5513,6 +5513,8 @@ fn parse_get_command_options(argc: i32) -> GetCommandOptions:
         let arg = with_arg_at(i)
         if arg == "--force-reinstall" or arg == "--force":
             force_reinstall = true
+        else if arg == "--from-source":
+            conan_set_from_source(true)
         else if arg.starts_with("-"):
             with_eprint("error: unknown with get option '" ++ arg ++ "'")
             return GetCommandOptions { spec: "", force_reinstall }
