@@ -116,6 +116,9 @@ fn cr_should_embed(name: &str) -> bool:
         return true
     if name.starts_with("__stdarg_") and name.ends_with(".h"):
         return true
+    // clang 22 split float.h into these parts.
+    if name.starts_with("__float_") and name.ends_with(".h"):
+        return true
     if name == "stddef.h" or name == "stdarg.h" or name == "stdint.h" or name == "stdbool.h":
         return true
     if name == "stdalign.h" or name == "stdnoreturn.h" or name == "stdatomic.h" or name == "stdckdint.h":
@@ -125,6 +128,34 @@ fn cr_should_embed(name: &str) -> bool:
     if name == "tgmath.h" or name == "inttypes.h" or name == "stdcountof.h" or name == "mm_malloc.h":
         return true
     false
+
+// The name a `#include` / `#include_next` line asks for, or "".
+fn cr_included_name(line: &str) -> str:
+    let t = line.trim()
+    if not t.starts_with("#"): return ""
+    let rest = t.slice(1, t.len()).trim()
+    if not rest.starts_with("include"): return ""
+    for open in ["<", "\""]:
+        let parts = rest.split(open)
+        if parts.len() >= 2:
+            let close = if open == "<": ">" else: "\""
+            return parts.get(1).split(close).get(0).to_owned()
+    ""
+
+// An embedded header that includes a builtin sibling we left out fails at the
+// user's first c_import of it (float.h after clang 22 split it). The subset
+// must be closed under inclusion; name the gap at build time.
+fn cr_unembedded_include(ctx: &ActionCtx, include_dir: &str, files: &Vec[str], all: &Vec[str]) -> str:
+    let fs = ctx.fs()
+    for i in 0..files.len() as i32:
+        let text = fs.read_text(files[i])
+        for line in text.split("\n"):
+            let name = cr_included_name(line)
+            if name.len() == 0 or cr_should_embed(cr_basename(name)): continue
+            for k in 0..all.len() as i32:
+                if cr_normalize_path_separators(all[k]) == include_dir ++ "/" ++ name:
+                    return cr_relpath(files[i], include_dir) ++ " includes " ++ name
+    ""
 
 // Path relative to the include dir, preserving subdirectories.
 fn cr_relpath(path: &str, base: &str) -> str:
@@ -204,6 +235,9 @@ pub fn generate_embedded_clang_resource_action(ctx: ActionCtx) -> i32:
             files.push(path)
     if files.len() == 0:
         return cr_fail(ctx, "found no C/POSIX builtin headers under " ++ include_dir)
+    let gap = cr_unembedded_include(ctx, include_dir, files, all)
+    if gap.len() > 0:
+        return cr_fail(ctx, "embedded clang header set is not closed: " ++ gap ++ ", which cr_should_embed leaves out")
     let generated = cr_generate(ctx, include_dir, files, version)
     if generated.len() == 0:
         return 1
