@@ -841,7 +841,7 @@ pub fn run_sdk_llvm_action(ctx: ActionCtx) -> i32:
         return sdk_fail(ctx, "clang driver was not installed: " ++ sdk_tool(output_prefix, "clang"))
     if not fs.exists(sdk_tool(output_prefix, "llvm-nm")):
         return sdk_fail(ctx, "llvm-nm was not installed: " ++ sdk_tool(output_prefix, "llvm-nm"))
-    sdk_archive_clang_main(ctx, root, build_dir, output_prefix)
+    sdk_archive_clang_main(ctx, root, sdk_abs(root, build_dir) ++ "/tools/clang/tools/driver/CMakeFiles/clang.dir", output_prefix)
 
 // `with cc` is clang's driver linked into the compiler (src/compiler/
 // ClangDriver.w). LLVM installs that driver only as the bin/clang executable;
@@ -851,8 +851,7 @@ pub fn run_sdk_llvm_action(ctx: ActionCtx) -> i32:
 fn sdk_clang_main_archive(prefix: &str) -> str:
     sdk_join(prefix, if os() == "Windows": "lib/clangMain.lib" else: "lib/libclangMain.a")
 
-fn sdk_archive_clang_main(ctx: &ActionCtx, root: &str, build_dir: &str, output_prefix: &str) -> i32:
-    let objects_dir = sdk_abs(root, build_dir) ++ "/tools/clang/tools/driver/CMakeFiles/clang.dir"
+fn sdk_archive_clang_main(ctx: &ActionCtx, root: &str, objects_dir: &str, output_prefix: &str) -> i32:
     let ext = if os() == "Windows": ".cpp.obj" else: ".cpp.o"
     let archive = sdk_abs(root, sdk_clang_main_archive(output_prefix))
     var argv: Vec[str] = Vec.new()
@@ -879,3 +878,75 @@ fn sdk_archive_clang_main(ctx: &ActionCtx, root: &str, build_dir: &str, output_p
     if not ctx.fs().exists(sdk_clang_main_archive(output_prefix)):
         return sdk_fail(ctx, "clang driver archive was not written: " ++ sdk_clang_main_archive(output_prefix))
     0
+
+// A packaged SDK (`with build :deps`) predating `with cc` has no clang driver
+// archive, and rebuilding LLVM for it is hours per platform. The driver is
+// four small files that need only the SDK's installed headers: fetch them from
+// the LLVM release tag, check them against pinned digests, and compile them
+// with the SDK's own clang++.
+fn sdk_clang_main_source_sha256(name: &str) -> str:
+    if name == "driver": return "3363bf2ecfd09487855a53551d87589daad81b43a749cb18859610f72f47cedf"
+    if name == "cc1_main": return "7705c2a5e60d067e9858bb9f72ede2b6012ede6c020b13cc7871a894246ec50f"
+    if name == "cc1as_main": return "41ab8f70668e50cd58977c4072eb3cd73fdace21603207fc26c2ea8d33cb997c"
+    if name == "cc1gen_reproducer_main": return "c196cd251ca3ddc3323c2bc2bedd2389f7672ddaa3c1c90b8f2a414bc515d4fe"
+    ""
+
+pub fn run_sdk_clang_main_action(ctx: ActionCtx) -> i32:
+    let rc = sdk_ensure_clang_main(ctx)
+    if rc != 0: return rc
+    if ctx.fs().mkdir_all(sdk_dirname(ctx.output())) != 0 or ctx.fs().write_text(ctx.output(), sdk_clang_main_archive(compiler_default_llvm_prefix()) ++ "\n") != 0:
+        return sdk_fail(ctx, "could not write " ++ ctx.output())
+    0
+
+fn sdk_ensure_clang_main(ctx: &ActionCtx) -> i32:
+    let fs = ctx.fs()
+    let root = ctx.project_info().project_root()
+    let prefix = compiler_default_llvm_prefix()
+    if fs.host_exists(sdk_abs(root, sdk_clang_main_archive(prefix))):
+        return 0
+    if not fs.host_exists(sdk_abs(root, sdk_tool(prefix, "clang++"))):
+        return sdk_fail(ctx, "no static LLVM SDK at " ++ prefix ++ "; run `with build :deps`")
+    let scratch = "out/tmp/sdk-clang-main"
+    if fs.mkdir_all(scratch) != 0:
+        return sdk_fail(ctx, "could not create " ++ scratch)
+    let ext = if os() == "Windows": ".cpp.obj" else: ".cpp.o"
+    let names: Vec[str] = Vec.new()
+    names.push("driver")
+    names.push("cc1_main")
+    names.push("cc1as_main")
+    names.push("cc1gen_reproducer_main")
+    for i in 0..names.len() as i32:
+        let source = sdk_join(scratch, names[i] ++ ".cpp")
+        let url = "https://raw.githubusercontent.com/llvm/llvm-project/llvmorg-" ++ COMPILER_LLVM_VERSION ++ "/clang/tools/driver/" ++ names[i] ++ ".cpp"
+        var rc = sdk_fetch(ctx, scratch, names[i], url, source, 120000)
+        if rc != 0: return rc
+        let digest = fs.sha256_file(source)
+        if digest != sdk_clang_main_source_sha256(names[i]):
+            return sdk_fail(ctx, url ++ " has sha256 " ++ digest ++ ", expected " ++ sdk_clang_main_source_sha256(names[i]))
+        var argv: Vec[str] = Vec.new()
+        argv.push(sdk_abs(root, sdk_tool(prefix, "clang++")))
+        argv.push("-c")
+        argv.push(sdk_abs(root, source))
+        argv.push("-o")
+        argv.push(sdk_abs(root, sdk_join(scratch, names[i] ++ ext)))
+        argv.push("-O2")
+        argv.push("-std=c++17")
+        argv.push("-fno-rtti")
+        argv.push("-fno-exceptions")
+        argv.push("-I" ++ sdk_abs(root, sdk_join(prefix, "include")))
+        argv.push("-D__STDC_CONSTANT_MACROS")
+        argv.push("-D__STDC_FORMAT_MACROS")
+        argv.push("-D__STDC_LIMIT_MACROS")
+        if os() == "Windows":
+            argv.push("-D_CRT_SECURE_NO_WARNINGS")
+        else:
+            argv.push("-fPIC")
+            argv.push("-D_GNU_SOURCE")
+        if os() == "Macos":
+            let sdkroot = comp_host_sdk_path(ctx)
+            if sdkroot.len() > 0:
+                argv.push("-isysroot")
+                argv.push(sdkroot)
+        rc = sdk_run_capture(ctx, "clang-main-" ++ names[i], argv, 600000)
+        if rc != 0: return rc
+    sdk_archive_clang_main(ctx, root, sdk_abs(root, scratch), prefix)

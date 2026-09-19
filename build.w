@@ -1985,6 +1985,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     var stage1 = target_new(.Action, "stage1", "").output(bootstrap_compiler_bin("with-stage1"))
     stage1.action = run_with_compiler_build_action
     stage1 = stage1.compiler("seed")
+    stage1 = stage1.dep("sdk-clang-main")
     stage1 = stage1.input("out/gen/main.w")
     stage1 = target_with_compiler_source_inputs(move stage1, ctx)
     stage1 = stage1.arg("-O1")
@@ -3094,6 +3095,17 @@ pub fn build(ctx: BuildCtx) -> Build:
     deps = deps.arg(llvm_sdk_asset_for_host())
     deps = deps.arg(llvm_sdk_dir_basename())
     out = out.add_target(deps)
+
+    // `with cc` links clang's driver; an SDK fetched before that existed gets
+    // the archive added in place (build/sdk.w).
+    var clang_main = target_new(.Action, "sdk-clang-main", "").output("out/command/sdk-clang-main/done")
+    clang_main.action = run_sdk_clang_main_action
+    clang_main = clang_main.input("build/https_fetch.w")
+    clang_main = clang_main.write_scope("out/tmp")
+    clang_main = clang_main.write_scope("out/command/sdk-clang-main")
+    clang_main = clang_main.write_scope(".deps")
+    clang_main = clang_main.allow_network()
+    out = out.add_target(clang_main)
 
     var cross = target_new(.Action, "cross", "").output("out/command/cross/unsupported")
     cross.action = run_cross_unsupported_action

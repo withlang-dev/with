@@ -324,7 +324,7 @@ pub fn compiler_default_libclang_archive_path() -> str:
         return prefix ++ "/lib/libclang.lib"
     prefix ++ "/lib/libclang.a"
 
-fn comp_host_sdk_path(ctx: &ActionCtx) -> str:
+pub fn comp_host_sdk_path(ctx: &ActionCtx) -> str:
     let sdkroot = env("SDKROOT")
     if sdkroot.len() > 0:
         return sdkroot
