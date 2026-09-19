@@ -468,6 +468,15 @@ function `drop(x)` remains available as a no-op-body consume.
 These rules guarantee that `Copy` is always safe in safe code — it
 cannot cause double-free, use-after-free, or resource leaks.
 
+**Transport is not duplication.** The compiler may move a value's bytes
+wherever ownership moves: into a parameter, out of a return, between a
+container's slots when it grows. It never produces a second live value from
+one unless the type is `Copy`. This binds compiler-provided operations —
+intrinsics, runtime helpers, derived and generated code — exactly as it
+binds user code. An operation that needs an independent value of a
+non-`Copy` type clones it, under a `Clone` bound, where the program asks for
+that; an operation that only needs to look yields a view.
+
 **Size warning:** The compiler emits a **warning** (not an error)
 when `Copy` is implemented for types exceeding a size threshold. The
 default threshold is 128 bytes. It is configurable via `with.toml`
@@ -2328,7 +2337,7 @@ let s = pair.1                       // "hello"
 fn swap[A, B](pair: (A, B)) -> (B, A):
     (pair.1, pair.0)
 
-// HashMap iteration yields (K, V) tuples
+// HashMap iteration yields (&K, &V) views
 for (key, value) in map:
     print(f"{key}: {value}")
 
@@ -6007,6 +6016,44 @@ signatures is a separate ruling, provisionally identified as a D23 candidate.
 `SlotMap.get` already has the uniform `Option[&T]` contract specified by §6.2
 and therefore participates in D22 without an API change.
 
+**Traversal observes; consuming iteration transfers (D44).**
+
+Every owning keyed map in the standard library, including `HashMap[K, V]`
+and `BTreeMap[K, V]`, has one uniform traversal contract:
+
+| Method | Signature | Yields | Ownership |
+|--------|-----------|--------|-----------|
+| `iter` | `(self: &Self) -> MapIter[K, V]` | `(&K, &V)` | Borrows map-owned storage |
+| `keys` | `(self: &Self) -> MapKeys[K, V]` | `&K` | Borrows map-owned storage |
+| `values` | `(self: &Self) -> MapValues[K, V]` | `&V` | Borrows map-owned storage |
+| `into_iter` | `(move self: Self) -> MapIntoIter[K, V]` | `(K, V)` | Consumes the map |
+| `into_keys` | `(move self: Self) -> MapIntoKeys[K, V]` | `K` | Consumes the map; values are dropped |
+| `into_values` | `(move self: Self) -> MapIntoValues[K, V]` | `V` | Consumes the map; keys are dropped |
+| `drain` | `(mut self: Self) -> MapDrain[K, V]` | `(K, V)` | Transfers every entry out; the map remains, empty |
+
+The observing iterators are concrete ephemeral structs (§13.1): usable in the
+scope that made them, not stored, and they do not outlive the map. Their
+views originate in the map receiver and remain valid only while that storage
+remains unmutated, exactly as for `get`. Their signatures do not vary by
+generic instantiation: `keys` yields `&K` for every `K`, including `Copy`
+keys, which materialize under an owned demand by §3.8 (`let n: i32 = v`).
+
+No traversal produces a second owner of a key or a value (§2.3). An element
+leaves the map's ownership only through `remove`, `drain`, or a consuming
+iterator.
+
+An independent collection is spelled where it is wanted, because it
+allocates and requires `Clone`:
+
+```
+let names = ages.keys() |> map(it.clone()) |> collect[Vec]()   // Vec[str], owned
+let sorted = ages.keys() |> collect[Vec]() |> sorted()          // ephemeral Vec of views (§22.1 rule 7)
+```
+
+A typed binding does not collect: `let ks: Vec[K] = m.keys()` is a type
+error, not a request to clone. §3.8 materializes `Copy` because a copy is
+free; it never turns an annotation into an allocation.
+
 **HashMap convenience methods:**
 
 Beyond the standard iterator operations, `HashMap` provides
@@ -6180,6 +6227,10 @@ for item in my_vec.into_iter():   // consuming (moves elements)
 The implicit `.iter()` insertion means `for x in collection:`
 borrows the collection immutably — the collection remains valid
 after the loop.
+
+For a keyed map, `for (k, v) in map:` is `for (k, v) in map.iter():`, so
+`k: &K` and `v: &V`. `for (k, v) in map.into_iter():` consumes the map and
+binds `k: K`, `v: V`.
 
 Pattern matching uses the same pattern language as `let` and `match`.
 Irrefutable patterns bind every element. Refutable patterns are
@@ -11611,9 +11662,9 @@ precision debt, not user ceremony.
 | 9 | Escaping closure captures ephemeral value | Reject |
 | 10 | Guarded `with` block (Form 1) result is ephemeral | Reject |
 
-Rule 7: A `Vec[T]` where `T` is ephemeral becomes an ephemeral
-`Vec`. It can be used as a local variable but cannot be stored in
-structs, returned from functions, or sent to other threads. This
+Rule 7: A `Vec[T]` where `T` is ephemeral becomes an ephemeral `Vec`. It
+cannot be stored in a struct or sent to another thread; returned from a
+function, it makes the caller's binding ephemeral (rule 8). This
 enables common patterns like collecting tokens from a parser:
 
 ```
@@ -11622,7 +11673,7 @@ let tokens = with Vec.new() as mut toks:
     while let Some(tok) = parser.next_token():
         toks.push(tok)
 // tokens: Vec[Token] is itself ephemeral — valid only in this scope
-// Cannot store tokens in a struct or return it from the function
+// Cannot store tokens in a struct; returning it makes the caller's binding ephemeral
 ```
 
 This is consistent with Rule 3 (generic container inherits

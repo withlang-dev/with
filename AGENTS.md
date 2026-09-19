@@ -179,6 +179,20 @@ over-broad #730 unannotated-let field gate are retired. Serialize/Deserialize
 signatures are correct as declared (`JsonView` is a Copy view token); don't "fix"
 the threaded sink into a borrow.
 
+**D44 (decisions.md) extends the doctrine to map traversal: traversal
+observes; consuming iteration transfers; nothing makes a second owner.**
+`for (k, v) in map` is `map.iter()` and binds `&K`/`&V`; `keys()`, `values()`
+and `iter()` return concrete ephemeral view iterators; `remove`, `drain` and
+`into_iter`/`into_keys`/`into_values` transfer; an owned collection is spelled
+`m.keys() |> map(it.clone()) |> collect[Vec]()` and a typed binding never
+collects. Specification §2.3 says transport is not duplication: the compiler
+may move a value's bytes, and never produces a second live value from one
+unless the type is `Copy` — intrinsics, runtime helpers and generated code
+included. The current compiler is deliberately NON-COMPLIANT (#1158, #1187):
+don't add callers of `keys()`/`values()`/`items()` as `Vec`s, don't byte-copy
+a non-`Copy` element out of a container, and follow the D44 entry's
+non-compliance list rather than isolated fixes.
+
 **`FnAbi` is the single ABI source of truth — never re-derive call ABI
 per-path.** Every function signature has ONE ABI descriptor (`FnAbi` with a
 per-parameter `PassMode`: `Direct`/`Indirect`/`IndirectPlace`/`Fat`/`Ignore`),
