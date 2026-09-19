@@ -10,7 +10,7 @@ extern fn with_str_clone_ref(s: &str) -> str
 fn CONAN_CENTER_URL -> str: "https://center2.conan.io"
 fn CONAN_INDEX_RAW -> str: "https://raw.githubusercontent.com/conan-io/conan-center-index/master/recipes"
 
-type ConanPackagePick {
+pub type ConanPackagePick {
     package_id: str,
     shared: bool,
 }
@@ -408,8 +408,20 @@ fn conan_find_matching_package(name: &str, version: &str, rev: &str) -> ConanPac
     let response = conan_http_get(url)
     if response.len() == 0:
         return ConanPackagePick { package_id: "", shared: false }
-    let target_os = conan_detect_os()
-    let target_arch = conan_detect_arch()
+    conan_pick_package(response, conan_detect_os(), conan_detect_arch())
+
+// A binary we can link: built for this os and arch, a Release build when the
+// package has build types (a Debug msvc build wants the debug CRT), and on
+// Windows an msvc build — `with` links for windows-msvc, and the clang/gcc
+// packages there are msys2/MinGW archives (libcrypto.a, not libcrypto.lib).
+fn conan_block_is_linkable(block: &str, target_os: &str, target_arch: &str) -> bool:
+    if not conan_block_matches_setting(block, "os", target_os) or not conan_block_matches_setting(block, "arch", target_arch): return false
+    if block.contains("\"build_type\"") and not conan_block_matches_setting(block, "build_type", "Release"): return false
+    target_os != "Windows" or conan_block_matches_setting(block, "compiler", "msvc")
+
+// The first linkable static package of a ConanCenter search listing, else the
+// first linkable shared one.
+pub fn conan_pick_package(response: &str, target_os: &str, target_arch: &str) -> ConanPackagePick:
     var best_id = ""
     var best_shared = false
     let json_len = response.len() as i32
@@ -439,9 +451,7 @@ fn conan_find_matching_package(name: &str, version: &str, rev: &str) -> ConanPac
                 depth = depth - 1
             pos = pos + 1
         let block = response.slice(block_start as i64, pos as i64)
-        let has_os = conan_block_matches_setting(block, "os", target_os)
-        let has_arch = conan_block_matches_setting(block, "arch", target_arch)
-        if has_os and has_arch:
+        if conan_block_is_linkable(block, target_os, target_arch):
             let shared = conan_block_shared(block)
             if not shared:
                 return ConanPackagePick { package_id: pkg_id, shared }
