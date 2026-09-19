@@ -1602,6 +1602,20 @@ impl Sema:
     mut fn check_bodies():
         self.check_bodies_where(false)
         self.check_bodies_where(true)
+        // A call typed before its callee's body was: wrong only if that body
+        // turned out to produce a value.
+        let saved_file_id = self.local_file_id
+        var ci = 0
+        while ci + 3 < self.untyped_callee_calls.len() as i32:
+            let call_node: i32 = self.untyped_callee_calls[ci]
+            let call_sig: i32 = self.untyped_callee_calls[ci + 1]
+            let call_file: i32 = self.untyped_callee_calls[ci + 3]
+            if self.sig_return_type(call_sig) != self.ty_void as i32:
+                let callee: str = with_str_clone_ref(self.pool_resolve(self.untyped_callee_calls[ci + 2]))
+                self.local_file_id = call_file
+                self.emit_error("the return type of '" ++ callee ++ "' was not known here: it comes from a body declared after this function's, and this function has no return type either; write either function's return type, or declare '" ++ callee ++ "' first", call_node)
+            ci = ci + 4
+        self.local_file_id = saved_file_id
         self.validate_global_data_race_accesses()
 
     mut fn check_bodies_where(annotated: bool):
@@ -15796,14 +15810,17 @@ impl Sema:
                 self.note_allocation_site(node, AllocConstructKind.EXPLICIT_API, 0, 0)
             self.note_allocating_callee(node, fn_sym)
             let ret = self.sig_return_type(sig_idx) as i32
-            // #1196: between two functions that both take their type from their
-            // body, the one declared later is not typed yet. Say that, rather
-            // than whatever the missing type breaks downstream.
+            // #1196: a callee that takes its type from a body not checked yet
+            // reads as Unit. Often that is right (a procedure); check_bodies
+            // reports the calls where it was not.
             if not self.body_typed_sigs.contains(sig_idx) and fn_sym != self.current_fn_symbol and self.fn_decl_nodes.contains(fn_sym):
                 let callee_decl: i32 = self.fn_decl_nodes.get(fn_sym).unwrap()
                 let callee_meta = self.ast.find_fn_meta(callee_decl)
                 if callee_meta >= 0 and self.ast.fn_meta_ret(callee_meta) == 0 and self.ast.fn_meta_tp_count(callee_meta) == 0 and self.fn_decl_is_entry_point(callee_decl) == 0:
-                    self.emit_error("the return type of '" ++ self.pool_resolve(fn_sym) ++ "' is not known yet: it comes from a body declared after this one, and this function has no return type either; write either function's return type, or declare '" ++ self.pool_resolve(fn_sym) ++ "' first", node)
+                    self.untyped_callee_calls.push(node)
+                    self.untyped_callee_calls.push(sig_idx)
+                    self.untyped_callee_calls.push(fn_sym)
+                    self.untyped_callee_calls.push(self.local_file_id)
             // Check arg count (supports default parameters via required-count
             // metadata packed into fn_meta flags by the parser).
             let expected = self.sig_get_param_count(sig_idx)

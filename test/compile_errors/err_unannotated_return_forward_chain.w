@@ -1,4 +1,4 @@
-//! expect-check-fail: the return type of 'later' is not known yet
+//! expect-check-fail: the return type of 'later' was not known here
 
 // #1196: neither function writes its return type and the callee is declared
 // second, so the callee is not typed when the caller's body is checked.
