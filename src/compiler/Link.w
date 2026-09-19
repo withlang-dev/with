@@ -4,6 +4,7 @@ use compiler.LinkDiagnostics
 use compiler.EmbeddedBundles
 use compiler.BundleInterfaces
 use compiler.AbiStamp
+use compiler.WasmHost
 use std.collections.Atomic
 use TargetSpec
 
@@ -678,6 +679,69 @@ fn link_stage_make_windows_llvm_link_command(llvm_ld: &str, obj_path: &str, bin_
     let cleanup_files = link_stage_collect_cleanup_files(extras)
     LinkStageCommand { linker: with_str_clone_ref(llvm_ld), args, cwd: "", env, inputs, outputs, cleanup_files }
 
+// The lld flavor for a WebAssembly link: wasm-ld ships beside the host
+// flavor recorded in the llvm_ld metadata.
+fn link_stage_wasm_lld_for(llvm_ld: &str) -> str:
+    if link_stage_basename(llvm_ld) == "wasm-ld":
+        return llvm_ld ++ ""
+    let sibling = link_stage_dirname(llvm_ld) ++ "/wasm-ld"
+    if link_stage_file_exists(sibling):
+        return sibling
+    ""
+
+// The shadow stack a wasm program gets. wasm-ld's 64 KiB default is far
+// below what With code with page-sized stack buffers needs; 8 MiB matches
+// the native targets' main-thread stack. WITH_WASM_STACK_SIZE overrides.
+fn link_stage_wasm_stack_size() -> str:
+    let env = with_getenv_str("WITH_WASM_STACK_SIZE")
+    if env.len() > 0:
+        return env
+    "8388608"
+
+fn link_stage_make_wasm_llvm_link_command(wasm_ld: &str, obj_path: &str, bin_path: &str, extras: &Vec[str], link_libs: &Vec[str], link_args: &Vec[str]) -> LinkStageCommand:
+    let args: Vec[str] = Vec.new()
+    let env: Vec[LinkStageEnvVar] = Vec.new()
+    let inputs: Vec[str] = Vec.new()
+    let outputs: Vec[str] = Vec.new()
+    if target_spec_active_kind() == 8:
+        args.push("-mwasm64")
+    // rt/wasm.w's with_wasm_startup/with_wasm_exit bracket codegen's
+    // `_start`; the stack goes first so an overflow traps on the guard
+    // below it instead of silently overwriting data.
+    args.push("--entry=_start")
+    args.push("--stack-first")
+    // A wasm-ld warning is a real defect: a function-signature mismatch
+    // between objects would otherwise link into a stub that traps at the
+    // first call. Fail the link instead.
+    args.push("--fatal-warnings")
+    args.push("-z")
+    args.push("stack-size=" ++ link_stage_wasm_stack_size())
+    args.push("-o")
+    args.push(with_str_clone_ref(bin_path))
+    outputs.push(with_str_clone_ref(bin_path))
+    args.push(with_str_clone_ref(obj_path))
+    inputs.push(with_str_clone_ref(obj_path))
+    for i in 0..extras.len() as i32:
+        let extra = extras[i]
+        if extra.starts_with("-L") or extra.starts_with("@"):
+            args.push(with_str_clone_ref(extra))
+        else:
+            args.push(with_str_clone_ref(extra))
+            inputs.push(with_str_clone_ref(extra))
+    for i in 0..link_libs.len() as i32:
+        // There is no libc or libm on this target; a request for one is a
+        // no-op, anything else must resolve as a wasm archive or fail loudly.
+        let lib = link_libs[i]
+        if lib != "m" and lib != "c":
+            args.push("-l" ++ lib)
+    for i in 0..link_args.len() as i32:
+        args.push(with_str_clone_ref(link_args[i]))
+    if wasm_host_emit(bin_path) != 0:
+        return LinkStageCommand { linker: "", args: Vec.new(), cwd: "", env: Vec.new(), inputs: Vec.new(), outputs: Vec.new(), cleanup_files: Vec.new() }
+    outputs.push(wasm_host_js_path(bin_path))
+    let cleanup_files = link_stage_collect_cleanup_files(extras)
+    LinkStageCommand { linker: with_str_clone_ref(wasm_ld), args, cwd: "", env, inputs, outputs, cleanup_files }
+
 // The lld flavor for a Linux ELF link. The build's llvm_ld metadata
 // records the host flavor (ld64.lld on macOS); the ELF driver ships
 // beside it in the same SDK bin directory.
@@ -718,6 +782,12 @@ fn link_stage_make_llvm_link_command(llvm_ld: &str, obj_path: &str, bin_path: &s
                 with_eprint("error: cross link needs the COFF lld driver (lld-link) next to " ++ llvm_ld)
                 return LinkStageCommand { linker: "", args: Vec.new(), cwd: "", env: Vec.new(), inputs: Vec.new(), outputs: Vec.new(), cleanup_files: Vec.new() }
             return link_stage_make_windows_llvm_link_command(coff_ld, obj_path, bin_path, extras, link_libs, link_args)
+        if target_spec_is_wasm():
+            let wasm_ld = link_stage_wasm_lld_for(llvm_ld)
+            if wasm_ld.len() == 0:
+                with_eprint("error: cross link needs the WebAssembly lld driver (wasm-ld) next to " ++ llvm_ld)
+                return LinkStageCommand { linker: "", args: Vec.new(), cwd: "", env: Vec.new(), inputs: Vec.new(), outputs: Vec.new(), cleanup_files: Vec.new() }
+            return link_stage_make_wasm_llvm_link_command(wasm_ld, obj_path, bin_path, extras, link_libs, link_args)
         with_eprint("error: unsupported cross link target: " ++ target_spec_name())
         return LinkStageCommand { linker: "", args: Vec.new(), cwd: "", env: Vec.new(), inputs: Vec.new(), outputs: Vec.new(), cleanup_files: Vec.new() }
     let os = runtime_sysinfo_os()
@@ -1229,6 +1299,8 @@ fn link_stage_platform_runtime_object() -> str:
             return "rt_windows_x86_64.o"
         if target_spec_active_kind() == 6:
             return "rt_windows_aarch64.o"
+        if target_spec_is_wasm():
+            return "rt_wasm.o"
         with_eprint("error: unsupported cross runtime platform: " ++ target_spec_name())
         return ""
     link_stage_host_platform_runtime_object()
@@ -1252,7 +1324,9 @@ fn link_stage_host_platform_runtime_object() -> str:
     ""
 
 fn link_stage_make_archive(obj_path: &str) -> str:
-    if runtime_sysinfo_os() == "Windows" or target_spec_active_kind() == 5 or target_spec_active_kind() == 6:
+    // wasm-ld resolves plain objects; the runtime objects carry no
+    // overlapping definitions, so nothing needs archive semantics there.
+    if runtime_sysinfo_os() == "Windows" or target_spec_active_kind() == 5 or target_spec_active_kind() == 6 or target_spec_is_wasm():
         return with_str_clone_ref(obj_path)
     // Wrap a .o file in a .a archive so the linker treats it as a library
     // (only pulling in symbols that aren't already defined).
@@ -1358,6 +1432,8 @@ fn link_stage_output_dir_for_source(source_path: &str) -> str:
 
 fn link_stage_output_path_for_source(source_path: &str) -> str:
     let base = link_stage_output_dir_for_source(source_path) ++ "/" ++ link_stage_source_stem(source_path)
+    if target_spec_is_wasm():
+        return base ++ ".wasm"
     if runtime_sysinfo_os() == "Windows":
         return base ++ ".exe"
     base
@@ -1394,8 +1470,19 @@ fn link_stage_link_object_to_binary_plan_with_units(obj_path: &str, extra_object
             undef = "<probe-failed>"
         else:
             undef = undef ++ unit_undef
-    let needs_fiber_runtime = if needs_async_runtime: 1 else: link_stage_undefined_symbols_need_fiber_runtime(undef)
+    var needs_fiber_runtime = if needs_async_runtime: 1 else: link_stage_undefined_symbols_need_fiber_runtime(undef)
     let needs_compat_runtime = link_stage_undefined_symbols_need_compat_runtime(undef)
+    // WebAssembly has no stack switching, so the fiber core (context-switch
+    // assembly plus guard-page signal handling) cannot exist there yet. A
+    // wasm program links fiber_stubs.o: it answers every lifecycle
+    // reference a non-spawning program makes, and a program that really
+    // spawns fails at wasm-ld with the undefined with_fiber_spawn /
+    // with_channel_* symbols the core alone defines. Neither the symbol
+    // probe nor the front end's requires_async_runtime can decide it
+    // earlier: both fire for any unit that merely contains async bodies
+    // (the prelude always does).
+    if target_spec_is_wasm():
+        needs_fiber_runtime = 0
     // D38: embedded .wo bundles join on demand — an undefined symbol carrying
     // one of a bundle's module prefixes selects it; its abi-sha must equal this
     // compiler's (never a silent mixed-ABI link, #761). The program's own

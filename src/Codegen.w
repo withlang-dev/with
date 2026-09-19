@@ -2558,6 +2558,17 @@ impl Codegen:
 
     // ── Resolve type expression → LLVM type ───────────────────────────
 
+    // The LLVM type of a RETURN position. An explicit `-> Unit` and an absent
+    // return type are the same Sema type (ty_void) and must lower to the same
+    // signature: void. resolve_named_type carries `Unit` as i32 so it can be a
+    // value (local, parameter, generic argument); as a result type that i32
+    // made `fn f() -> Unit` and `extern fn f()` disagree — invisible on native
+    // ABIs, a signature-mismatch trap on wasm.
+    mut fn resolve_return_type(ret_type_node: i32) -> i64:
+        if ret_type_node != 0 and self.pool.kind(ret_type_node) == NodeKind.NK_TYPE_NAMED and self.pool.get_data0(ret_type_node) == self.sym_unit:
+            return wl_void_type(self.context)
+        self.resolve_type(ret_type_node)
+
     mut fn resolve_type(type_node: i32) -> i64:
         if type_node == 0: return wl_void_type(self.context)
         if type_node < 0 or type_node >= self.pool.node_count():
@@ -4357,7 +4368,7 @@ impl Codegen:
 
         var ret_ty_raw: i64 = 0
         if ret_type_node != 0:
-            ret_ty_raw = self.resolve_type(ret_type_node)
+            ret_ty_raw = self.resolve_return_type(ret_type_node)
         else if sema_sig_idx >= 0:
             ret_ty_raw = self.sema_type_to_llvm(self.sema.sig_return_type(sema_sig_idx))
         let ret_ty = if ret_ty_raw != 0: ret_ty_raw else: self.type_fallback()
@@ -5331,7 +5342,7 @@ impl Codegen:
         // different arity. FnAbi must read this raw declaration's signature.
         let sema_sig_idx = self.sema.extern_decl_sigs.get(ext_node) ?? -1
 
-        let ret_ty = self.resolve_type(ret_type_node)
+        let ret_ty = self.resolve_return_type(ret_type_node)
         let name_str = self.intern.resolve(name_sym)
         let cc_name = self.fn_callconv_name(meta)
         let uses_internal_abi = codegen_extern_uses_internal_abi(name_str, cc_name)
@@ -5382,6 +5393,13 @@ impl Codegen:
         if existing == 0:
             function = wl_add_function(self.llmod, link_name, fn_type)
 
+        // @[import_module("ns")]: a WebAssembly import lives in namespace
+        // `ns` under its own symbol name. Both string attributes must be on
+        // the declaration or wasm-ld defaults the namespace to `env`.
+        if cc_name.len() > 14 and cc_name.slice(0, 14) == "import_module:":
+            wl_add_fn_string_attr(self.context, function, "wasm-import-module", cc_name.slice(14, cc_name.len() as i64))
+            wl_add_fn_string_attr(self.context, function, "wasm-import-name", link_name)
+
         if has_sret != 0:
             wl_add_sret_attr(self.context, function, 0, sret_ty)
         self.apply_c_abi_byval_attrs(function, byval_types, param_count, if has_sret != 0: 1 else: 0)
@@ -5394,6 +5412,9 @@ impl Codegen:
         if cc_name.len() > 0:
             if cc_name.len() > 10 and cc_name.slice(0, 10) == "link_name:":
                 // @[link_name(...)] — symbol already applied above; keep C ABI.
+                0
+            else if cc_name.len() > 14 and cc_name.slice(0, 14) == "import_module:":
+                // @[import_module(...)] — import attributes applied above; keep C ABI.
                 0
             else if cc_name.len() > 9 and cc_name.slice(0, 9) == "c_export:":
                 // @[c_export("name")] — set external linkage for C visibility
@@ -6078,7 +6099,7 @@ impl Codegen:
         for i in 0..param_count:
             let p_node = self.pool.get_extra(extra_start + i)
             param_types.push(self.resolve_type(p_node))
-        let ret_ty = self.resolve_type(ret_node)
+        let ret_ty = self.resolve_return_type(ret_node)
         wl_function_type(ret_ty, vec_data_i64(&param_types), param_count + 1, 0)
 
     // ── gen_module: multi-pass entry point ────────────────────────────
@@ -6362,16 +6383,44 @@ impl Codegen:
 
         let i32_ty = wl_i32_type(self.context)
         let ptr_ty = wl_ptr_type(self.context)
-        let wrapper_params: Vec[i64] = Vec.new()
-        wrapper_params.push(i32_ty)
-        wrapper_params.push(ptr_ty)
-        let wrapper_ft = wl_function_type(i32_ty, vec_data_i64(&wrapper_params), 2, 0)
-        let wrapper = wl_add_function(self.llmod, "main", wrapper_ft)
-        let bb = wl_append_bb(self.context, wrapper, "entry")
-        wl_position_at_end(self.builder, bb)
-
-        let argc_val = wl_get_param(wrapper, 0)
-        let argv_val = wl_get_param(wrapper, 1)
+        let is_wasm = target_spec_is_wasm()
+        var wrapper: i64 = 0
+        var argc_val: i64 = 0
+        var argv_val: i64 = 0
+        if is_wasm:
+            // WebAssembly: wasm-ld's entry `_start` takes no arguments. The
+            // platform runtime (rt/wasm.w) fills argc/argv from WASI and
+            // owns the exit: a plain return from _start reports success, so
+            // the tail below leaves through with_wasm_exit instead of ret.
+            let wrapper_ft = wl_function_type(wl_void_type(self.context), 0, 0, 0)
+            wrapper = wl_add_function(self.llmod, "_start", wrapper_ft)
+            let bb = wl_append_bb(self.context, wrapper, "entry")
+            wl_position_at_end(self.builder, bb)
+            let argc_slot = wl_build_alloca(self.builder, i32_ty)
+            let argv_slot = wl_build_alloca(self.builder, ptr_ty)
+            let startup_params: Vec[i64] = Vec.new()
+            startup_params.push(ptr_ty)
+            startup_params.push(ptr_ty)
+            let startup_ft = wl_function_type(wl_void_type(self.context), vec_data_i64(&startup_params), 2, 0)
+            var startup_fn = wl_get_named_function(self.llmod, "with_wasm_startup")
+            if startup_fn == 0:
+                startup_fn = wl_add_function(self.llmod, "with_wasm_startup", startup_ft)
+            let startup_args: Vec[i64] = Vec.new()
+            startup_args.push(argc_slot)
+            startup_args.push(argv_slot)
+            wl_build_call(self.builder, wl_global_get_value_type(startup_fn), startup_fn, vec_data_i64(&startup_args), 2)
+            argc_val = wl_build_load(self.builder, i32_ty, argc_slot)
+            argv_val = wl_build_load(self.builder, ptr_ty, argv_slot)
+        else:
+            let wrapper_params: Vec[i64] = Vec.new()
+            wrapper_params.push(i32_ty)
+            wrapper_params.push(ptr_ty)
+            let wrapper_ft = wl_function_type(i32_ty, vec_data_i64(&wrapper_params), 2, 0)
+            wrapper = wl_add_function(self.llmod, "main", wrapper_ft)
+            let bb = wl_append_bb(self.context, wrapper, "entry")
+            wl_position_at_end(self.builder, bb)
+            argc_val = wl_get_param(wrapper, 0)
+            argv_val = wl_get_param(wrapper, 1)
 
         var set_argv_fn = wl_get_named_function(self.llmod, "with_runtime_set_argv")
         if set_argv_fn == 0:
@@ -6454,13 +6503,23 @@ impl Codegen:
         // Async main's spawn wrapper returns fiber_id (i32), not a meaningful exit code.
         let main_sym = self.intern.intern("main")
         let main_is_async = self.sema.task_fns.contains(main_sym)
-        if ret_ty == wl_void_type(self.context) or wl_get_type_kind(ret_ty) == wl_struct_type_kind() or main_is_async:
-            let _ = wl_build_ret(self.builder, wl_const_int(i32_ty, 0, 0))
-            return
-
         let exit_val =
-            if ret_ty == i32_ty:
+            if ret_ty == wl_void_type(self.context) or wl_get_type_kind(ret_ty) == wl_struct_type_kind() or main_is_async:
+                wl_const_int(i32_ty, 0, 0)
+            else if ret_ty == i32_ty:
                 main_call
             else:
                 self.coerce_int(main_call, i32_ty)
+        if is_wasm:
+            let exit_params: Vec[i64] = Vec.new()
+            exit_params.push(i32_ty)
+            let exit_ft = wl_function_type(wl_void_type(self.context), vec_data_i64(&exit_params), 1, 0)
+            var exit_fn = wl_get_named_function(self.llmod, "with_wasm_exit")
+            if exit_fn == 0:
+                exit_fn = wl_add_function(self.llmod, "with_wasm_exit", exit_ft)
+            let exit_args: Vec[i64] = Vec.new()
+            exit_args.push(exit_val)
+            wl_build_call(self.builder, wl_global_get_value_type(exit_fn), exit_fn, vec_data_i64(&exit_args), 1)
+            let _ = wl_build_ret_void(self.builder)
+            return
         let _ = wl_build_ret(self.builder, exit_val)

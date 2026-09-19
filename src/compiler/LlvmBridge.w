@@ -112,6 +112,11 @@ extern fn LLVMInitializeX86Target()
 extern fn LLVMInitializeX86TargetMC()
 extern fn LLVMInitializeX86AsmPrinter()
 extern fn LLVMInitializeX86AsmParser()
+extern fn LLVMInitializeWebAssemblyTargetInfo()
+extern fn LLVMInitializeWebAssemblyTarget()
+extern fn LLVMInitializeWebAssemblyTargetMC()
+extern fn LLVMInitializeWebAssemblyAsmPrinter()
+extern fn LLVMInitializeWebAssemblyAsmParser()
 extern fn LLVMGetDefaultTargetTriple() -> *mut u8
 extern fn LLVMGetTargetFromTriple(triple: *const u8, target: *mut *mut u8, err: *mut *mut u8) -> i32
 extern fn LLVMCreateTargetMachine(target: *mut u8, triple: *const u8, cpu: *const u8, features: *const u8, level: i32, reloc: i32, model: i32) -> *mut u8
@@ -202,6 +207,7 @@ extern fn LLVMGetLinkage(v: *mut u8) -> i32
 extern fn LLVMDeleteGlobal(g: *mut u8)
 extern fn LLVMGetEnumAttributeKindForName(name: *const u8, len: u64) -> u32
 extern fn LLVMCreateEnumAttribute(c: *mut u8, kind: u32, val: u64) -> *mut u8
+extern fn LLVMCreateStringAttribute(c: *mut u8, key: *const u8, key_len: u32, value: *const u8, value_len: u32) -> *mut u8
 extern fn LLVMCreateTypeAttribute(c: *mut u8, kind: u32, ty: *mut u8) -> *mut u8
 extern fn LLVMAddAttributeAtIndex(v: *mut u8, idx: u32, attr: *mut u8)
 extern fn LLVMAddCallSiteAttribute(call: *mut u8, idx: u32, attr: *mut u8)
@@ -512,6 +518,9 @@ pub fn wl_init_native_target() -> i32:
             LLVMInitializeX86TargetInfo()
             LLVMInitializeX86Target()
             LLVMInitializeX86TargetMC()
+            LLVMInitializeWebAssemblyTargetInfo()
+            LLVMInitializeWebAssemblyTarget()
+            LLVMInitializeWebAssemblyTargetMC()
             llvm_native_target_done = 1
         llvm_init_unlock()
         0
@@ -522,6 +531,7 @@ pub fn wl_init_native_asm_printer() -> i32:
         if llvm_native_asm_printer_done == 0:
             LLVMInitializeAArch64AsmPrinter()
             LLVMInitializeX86AsmPrinter()
+            LLVMInitializeWebAssemblyAsmPrinter()
             llvm_native_asm_printer_done = 1
         llvm_init_unlock()
         0
@@ -532,6 +542,7 @@ pub fn wl_init_native_asm_parser() -> i32:
         if llvm_native_asm_parser_done == 0:
             LLVMInitializeAArch64AsmParser()
             LLVMInitializeX86AsmParser()
+            LLVMInitializeWebAssemblyAsmParser()
             llvm_native_asm_parser_done = 1
         llvm_init_unlock()
         0
@@ -774,6 +785,14 @@ pub fn wl_add_param_attr(ctx: i64, fn_val: i64, param_idx: i32, attr_name: &str)
         if kind != 0:
             let attr = LLVMCreateEnumAttribute(ctx as *mut u8, kind, 0)
             LLVMAddAttributeAtIndex(fn_val as *mut u8, (param_idx + 1) as u32, attr)
+
+// A string ("target-dependent") function attribute, e.g. the
+// wasm-import-module / wasm-import-name pair that tells the WebAssembly
+// object writer which import namespace an extern declaration lives in.
+pub fn wl_add_fn_string_attr(ctx: i64, fn_val: i64, key: &str, value: &str) -> Unit:
+    unsafe:
+        let attr = LLVMCreateStringAttribute(ctx as *mut u8, to_cstr(key) as *const u8, key.len() as u32, to_cstr(value) as *const u8, value.len() as u32)
+        LLVMAddAttributeAtIndex(fn_val as *mut u8, 4294967295 as u32, attr)
 
 pub fn wl_add_param_byval_attr(ctx: i64, fn_val: i64, param_idx: i32, ty: i64) -> Unit:
     unsafe:

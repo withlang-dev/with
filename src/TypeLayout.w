@@ -7,6 +7,8 @@ use TargetSpec
 // AAPCS64 Linux (struct __va_list). The one layout query codegen and Sema
 // share; llvm.va_start writes exactly this many bytes.
 pub fn type_layout_c_va_list_size() -> i64:
+    if target_spec_os() == "Wasi":
+        return target_spec_ptr_bytes()
     if target_spec_os() != "Linux":
         return 8
     if target_spec_arch() == "x86_64": 24 else: 32
@@ -313,10 +315,12 @@ impl Sema:
             return 1
         if tk == TypeKind.TY_VOID or tk == TypeKind.TY_NEVER or tk == TypeKind.TY_ERR:
             return 1
-        if tk == TypeKind.TY_STR or tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF or tk == TypeKind.TY_FN or tk == TypeKind.TY_EXTERN_FN or tk == TypeKind.TY_GENERIC_FN or tk == TypeKind.TY_TRAIT_OBJ:
+        if tk == TypeKind.TY_STR:
             return 8
+        if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF or tk == TypeKind.TY_FN or tk == TypeKind.TY_EXTERN_FN or tk == TypeKind.TY_GENERIC_FN or tk == TypeKind.TY_TRAIT_OBJ:
+            return target_spec_ptr_bytes()
         if tk == TypeKind.TY_VA_LIST:
-            return 8
+            return if target_spec_os() == "Wasi": target_spec_ptr_bytes() else: 8
         if tk == TypeKind.TY_ARRAY:
             return self.type_layout_align_of(self.get_type_d0(resolved))
         if tk == TypeKind.TY_SLICE:
@@ -367,9 +371,9 @@ impl Sema:
         if tk == TypeKind.TY_STR or tk == TypeKind.TY_SLICE:
             return 16
         if tk == TypeKind.TY_FN:
-            return 16
+            return 2 * target_spec_ptr_bytes()
         if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF or tk == TypeKind.TY_EXTERN_FN or tk == TypeKind.TY_GENERIC_FN or tk == TypeKind.TY_TRAIT_OBJ:
-            return 8
+            return target_spec_ptr_bytes()
         if tk == TypeKind.TY_VA_LIST:
             return type_layout_c_va_list_size()
         if tk == TypeKind.TY_ARRAY:

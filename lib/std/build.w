@@ -66,6 +66,9 @@ pub enum BuildTarget: i32:
     darwin_x86_64 = 3
     darwin_aarch64 = 4
     windows_x86_64 = 5
+    windows_aarch64 = 6
+    wasm32 = 7
+    wasm64 = 8
 
 pub enum OptimizeMode: i32:
     debug = 0

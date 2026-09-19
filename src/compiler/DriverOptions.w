@@ -325,6 +325,12 @@ pub fn driver_target_triple_kind(triple: &str) -> i32:
         return 5
     if triple == "aarch64-pc-windows-msvc" or triple == "arm64-pc-windows-msvc" or triple == "windows_aarch64":
         return 6
+    // WebAssembly. The import ABI is WASI preview1 whatever the OS field
+    // says, so the wasi/wasip1 spellings map to the same freestanding kind.
+    if triple == "wasm32" or triple == "wasm32-unknown-unknown" or triple == "wasm32-wasi" or triple == "wasm32-wasip1" or triple == "wasm32-unknown-wasi":
+        return 7
+    if triple == "wasm64" or triple == "wasm64-unknown-unknown" or triple == "wasm64-wasi" or triple == "wasm64-wasip1" or triple == "wasm64-unknown-wasi":
+        return 8
     -1
 
 pub type DriverTargetParseResult {

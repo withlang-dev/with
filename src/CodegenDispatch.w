@@ -8274,18 +8274,18 @@ impl Codegen:
             let key_alloca = self.create_entry_alloca(wl_type_of(key))
             wl_build_store(self.builder, key, key_alloca)
             let is_str_val = wl_const_int(i64_ty, if self.is_str_type(wl_type_of(key)): 1 else: 0, 0)
-            let fn_val = self.ensure_hm_fn("with_hashmap_contains", i64_ty)
+            let fn_val = self.ensure_hm_fn("with_hashmap_contains", wl_i32_type(self.context))
             let params: Vec[i64] = Vec.new()
             params.push(ptr_ty)
             params.push(ptr_ty)
             params.push(i64_ty)
-            let fn_ty = wl_function_type(i64_ty, vec_data_i64(&params), 3, 0)
+            let fn_ty = wl_function_type(wl_i32_type(self.context), vec_data_i64(&params), 3, 0)
             let args: Vec[i64] = Vec.new()
             args.push(map_ptr)
             args.push(key_alloca)
             args.push(is_str_val)
             let raw = wl_build_call(self.builder, fn_ty, fn_val, vec_data_i64(&args), 3)
-            result = wl_build_icmp(self.builder, wl_int_ne(), raw, wl_const_int(i64_ty, 0, 0))
+            result = wl_build_icmp(self.builder, wl_int_ne(), raw, wl_const_int(wl_i32_type(self.context), 0, 0))
 
         else if intrinsic == MirIntrinsic.MAP_LEN:
             let map_ptr = self.mir_intrinsic_map_handle(body, args_id)
@@ -8352,13 +8352,13 @@ impl Codegen:
             if rm_key_llvm != 0:
                 stored_key_alloca = self.create_entry_alloca(rm_key_llvm)
                 wl_build_store(self.builder, self.build_default_value(rm_key_llvm), stored_key_alloca)
-            let fn_val = self.ensure_hm_fn(if rm_key_llvm != 0: "with_hashmap_remove_entry" else: "with_hashmap_remove", i64_ty)
+            let fn_val = self.ensure_hm_fn(if rm_key_llvm != 0: "with_hashmap_remove_entry" else: "with_hashmap_remove", wl_i32_type(self.context))
             let params: Vec[i64] = Vec.new()
             params.push(ptr_ty)
             params.push(ptr_ty)
             params.push(ptr_ty)
             params.push(if rm_key_llvm != 0: ptr_ty else: i64_ty)
-            let fn_ty = wl_function_type(i64_ty, vec_data_i64(&params), 4, 0)
+            let fn_ty = wl_function_type(wl_i32_type(self.context), vec_data_i64(&params), 4, 0)
             let args: Vec[i64] = Vec.new()
             args.push(map_ptr)
             args.push(key_alloca)
@@ -8375,7 +8375,7 @@ impl Codegen:
                 let val = wl_build_load(self.builder, val_ty, out_alloca)
                 var dest_llvm = self.get_or_create_option_type(0, val_ty)
                 if dest_llvm != 0:
-                    let is_found = wl_build_icmp(self.builder, wl_int_ne(), found, wl_const_int(i64_ty, 0, 0))
+                    let is_found = wl_build_icmp(self.builder, wl_int_ne(), found, wl_const_int(wl_i32_type(self.context), 0, 0))
                     let some_val = self.build_option_some(val, dest_llvm)
                     let none_val = self.build_option_none(dest_llvm)
                     result = wl_build_select(self.builder, is_found, some_val, none_val)
@@ -8386,7 +8386,7 @@ impl Codegen:
                 if rm_key_llvm == 0: args.push(is_str_val)
                 let raw = wl_build_call(self.builder, fn_ty, fn_val, vec_data_i64(&args), 4)
                 if rm_key_llvm != 0: self.mir_emit_drop_ptr_for_sema_type(stored_key_alloca, rm_key_llvm, rm_key_sema)
-                result = wl_build_icmp(self.builder, wl_int_ne(), raw, wl_const_int(i64_ty, 0, 0))
+                result = wl_build_icmp(self.builder, wl_int_ne(), raw, wl_const_int(wl_i32_type(self.context), 0, 0))
 
         else if intrinsic == MirIntrinsic.MAP_CLEAR:
             // The runtime table is type-erased and clear only resets occupancy.
@@ -8921,18 +8921,18 @@ impl Codegen:
             let oi_key_alloca = self.create_entry_alloca(oi_key_ty)
             wl_build_store(self.builder, oi_key, oi_key_alloca)
             // contains?
-            let oi_contains_fn = self.ensure_hm_fn("with_hashmap_contains", i64_ty)
+            let oi_contains_fn = self.ensure_hm_fn("with_hashmap_contains", wl_i32_type(self.context))
             let oi_c_params: Vec[i64] = Vec.new()
             oi_c_params.push(ptr_ty)
             oi_c_params.push(ptr_ty)
             oi_c_params.push(i64_ty)
-            let oi_c_fn_ty = wl_function_type(i64_ty, vec_data_i64(&oi_c_params), 3, 0)
+            let oi_c_fn_ty = wl_function_type(wl_i32_type(self.context), vec_data_i64(&oi_c_params), 3, 0)
             let oi_c_args: Vec[i64] = Vec.new()
             oi_c_args.push(oi_map_ptr)
             oi_c_args.push(oi_key_alloca)
             oi_c_args.push(oi_is_str)
             let oi_found = wl_build_call(self.builder, oi_c_fn_ty, oi_contains_fn, vec_data_i64(&oi_c_args), 3)
-            let oi_cond = wl_build_icmp(self.builder, wl_int_eq(), oi_found, wl_const_int(i64_ty, 0, 0))
+            let oi_cond = wl_build_icmp(self.builder, wl_int_eq(), oi_found, wl_const_int(wl_i32_type(self.context), 0, 0))
             let oi_insert_bb = wl_append_bb(self.context, self.current_function, "entry.insert")
             let oi_get_bb = wl_append_bb(self.context, self.current_function, "entry.get")
             wl_build_cond_br(self.builder, oi_cond, oi_insert_bb, oi_get_bb)
@@ -8957,13 +8957,13 @@ impl Codegen:
             // get value
             wl_position_at_end(self.builder, oi_get_bb)
             let oi_out_alloca = self.create_entry_alloca(oi_val_ty)
-            let oi_get_fn = self.ensure_hm_fn("with_hashmap_get", i64_ty)
+            let oi_get_fn = self.ensure_hm_fn("with_hashmap_get", wl_i32_type(self.context))
             let oi_g_params: Vec[i64] = Vec.new()
             oi_g_params.push(ptr_ty)
             oi_g_params.push(ptr_ty)
             oi_g_params.push(ptr_ty)
             oi_g_params.push(i64_ty)
-            let oi_g_fn_ty = wl_function_type(i64_ty, vec_data_i64(&oi_g_params), 4, 0)
+            let oi_g_fn_ty = wl_function_type(wl_i32_type(self.context), vec_data_i64(&oi_g_params), 4, 0)
             let oi_g_args: Vec[i64] = Vec.new()
             oi_g_args.push(oi_map_ptr)
             oi_g_args.push(oi_key_alloca)
@@ -9010,13 +9010,13 @@ impl Codegen:
             let eg_key_alloca = self.create_entry_alloca(eg_key_ty)
             wl_build_store(self.builder, eg_key, eg_key_alloca)
             let eg_out_alloca = self.create_entry_alloca(eg_val_ty)
-            let eg_get_fn = self.ensure_hm_fn("with_hashmap_get", i64_ty)
+            let eg_get_fn = self.ensure_hm_fn("with_hashmap_get", wl_i32_type(self.context))
             let eg_g_params: Vec[i64] = Vec.new()
             eg_g_params.push(ptr_ty)
             eg_g_params.push(ptr_ty)
             eg_g_params.push(ptr_ty)
             eg_g_params.push(i64_ty)
-            let eg_g_fn_ty = wl_function_type(i64_ty, vec_data_i64(&eg_g_params), 4, 0)
+            let eg_g_fn_ty = wl_function_type(wl_i32_type(self.context), vec_data_i64(&eg_g_params), 4, 0)
             let eg_g_args: Vec[i64] = Vec.new()
             eg_g_args.push(eg_map_ptr)
             eg_g_args.push(eg_key_alloca)
@@ -10565,20 +10565,20 @@ impl Codegen:
             let upd_default = if wl_type_of(upd_default_raw) != upd_val_ty: self.coerce_value_to_type(upd_default_raw, upd_val_ty) else: upd_default_raw
             let upd_val_alloca = self.create_entry_alloca(upd_val_ty)
             let upd_is_str = wl_const_int(i64_ty, if self.is_str_type(upd_key_ty): 1 else: 0, 0)
-            let upd_get_fn = self.ensure_hm_fn("with_hashmap_get", i64_ty)
+            let upd_get_fn = self.ensure_hm_fn("with_hashmap_get", wl_i32_type(self.context))
             let upd_hm_params: Vec[i64] = Vec.new()
             upd_hm_params.push(wl_ptr_type(self.context))
             upd_hm_params.push(wl_ptr_type(self.context))
             upd_hm_params.push(wl_ptr_type(self.context))
             upd_hm_params.push(i64_ty)
-            let upd_get_ty = wl_function_type(i64_ty, vec_data_i64(&upd_hm_params), 4, 0)
+            let upd_get_ty = wl_function_type(wl_i32_type(self.context), vec_data_i64(&upd_hm_params), 4, 0)
             let upd_get_args: Vec[i64] = Vec.new()
             upd_get_args.push(upd_map_ptr)
             upd_get_args.push(upd_key_alloca)
             upd_get_args.push(upd_val_alloca)
             upd_get_args.push(upd_is_str)
             let upd_found = wl_build_call(self.builder, upd_get_ty, upd_get_fn, vec_data_i64(&upd_get_args), 4)
-            let upd_missing = wl_build_icmp(self.builder, wl_int_eq(), upd_found, wl_const_int(i64_ty, 0, 0))
+            let upd_missing = wl_build_icmp(self.builder, wl_int_eq(), upd_found, wl_const_int(wl_i32_type(self.context), 0, 0))
             let upd_default_bb = wl_append_bb(self.context, self.current_function, "map.update.default")
             let upd_call_bb = wl_append_bb(self.context, self.current_function, "map.update.call")
             wl_build_cond_br(self.builder, upd_missing, upd_default_bb, upd_call_bb)
@@ -17863,15 +17863,45 @@ impl Codegen:
         wl_add_function(self.llmod, name, fn_ty)
 
     fn get_runtime_fn_type(name: &str, ret_ty: i64, param_count: i32) -> i64:
-        // Every live ensure_c_fn caller passes slotmap names or
-        // with_vec_str_join, all i64/ptr-parameter shapes; the old by-value
-        // str name table here was dead (D30 R1a).
-        let _ = name
+        // The runtime's real prototype (rt/rt_core.w) for every helper
+        // ensure_c_fn declares — the slotmap family. The parameter types are
+        // load-bearing: with an all-i64 placeholder the call sites' own
+        // (ptr, i32, i32) function types disagreed with the declaration, and
+        // the WebAssembly backend turns that into a thunk that traps
+        // (`.L<name>_bitcast_invalid`); native code never noticed.
         let i64_ty = wl_i64_type(self.context)
+        let i32_ty = wl_i32_type(self.context)
+        let ptr_ty = wl_ptr_type(self.context)
         let params: Vec[i64] = Vec.new()
-        for i in 0..param_count:
+        if name == "with_slotmap_new":
             params.push(i64_ty)
-        wl_function_type(ret_ty, vec_data_i64(&params), param_count, 0)
+        else if name == "with_slotmap_insert_out":
+            params.push(ptr_ty)
+            params.push(ptr_ty)
+            params.push(ptr_ty)
+        else if name == "with_slotmap_get_ptr" or name == "with_slotmap_contains":
+            params.push(ptr_ty)
+            params.push(i32_ty)
+            params.push(i32_ty)
+        else if name == "with_slotmap_remove" or name == "with_slotmap_set":
+            params.push(ptr_ty)
+            params.push(i32_ty)
+            params.push(i32_ty)
+            params.push(ptr_ty)
+        else if name == "with_slotmap_replace":
+            params.push(ptr_ty)
+            params.push(i32_ty)
+            params.push(i32_ty)
+            params.push(ptr_ty)
+            params.push(ptr_ty)
+        else if name == "with_slotmap_len":
+            params.push(ptr_ty)
+        else:
+            for i in 0..param_count:
+                params.push(i64_ty)
+        if params.len() as i32 != param_count:
+            sema_phase_bug(f"BUG: runtime helper '{name}' declared with {param_count} parameters; its prototype has {params.len()}")
+        wl_function_type(ret_ty, vec_data_i64(&params), params.len() as i32, 0)
 
     fn emit_runtime_panic(msg: &str) -> Unit:
         self.emit_runtime_panic_value(self.gen_string_literal_raw(msg), self.gen_string_literal_raw(""))
@@ -17960,13 +17990,44 @@ impl Codegen:
 
     // ── HashMap method dispatch ───────────────────────────────────────
 
+    // A map runtime helper's declaration, with the runtime's real prototype
+    // (rt/rt_core.w). The prototype is load-bearing: a wasm object records
+    // it as the import's signature, and wasm-ld rejects a call whose
+    // arguments disagree with it. Native objects carry no signatures, which
+    // is how a one-pointer placeholder here went unnoticed.
     fn ensure_hm_fn(name: &str, ret_ty: i64) -> i64:
         let existing = wl_get_named_function(self.llmod, name)
         if existing != 0: return existing
         let ptr_ty = wl_ptr_type(self.context)
+        let i32_ty = wl_i32_type(self.context)
+        let i64_ty = wl_i64_type(self.context)
         let params: Vec[i64] = Vec.new()
         params.push(ptr_ty)
-        let fn_ty = wl_function_type(ret_ty, vec_data_i64(&params), 1, 0)
+        var real_ret = ret_ty
+        if name == "with_hashmap_insert":
+            params.push(ptr_ty)
+            params.push(ptr_ty)
+            params.push(i64_ty)
+        else if name == "with_hashmap_get" or name == "with_hashmap_remove":
+            params.push(ptr_ty)
+            params.push(ptr_ty)
+            params.push(i64_ty)
+            real_ret = i32_ty
+        else if name == "with_hashmap_remove_entry":
+            params.push(ptr_ty)
+            params.push(ptr_ty)
+            params.push(ptr_ty)
+            real_ret = i32_ty
+        else if name == "with_hashmap_get_ptr":
+            params.push(ptr_ty)
+            params.push(i64_ty)
+        else if name == "with_hashmap_contains":
+            params.push(ptr_ty)
+            params.push(i64_ty)
+            real_ret = i32_ty
+        if real_ret != ret_ty:
+            sema_phase_bug(f"BUG: runtime helper '{name}' declared with a return type other than its prototype's")
+        let fn_ty = wl_function_type(real_ret, vec_data_i64(&params), params.len() as i32, 0)
         wl_add_function(self.llmod, name, fn_ty)
 
     fn make_ptr_vec() -> Vec[i64]:

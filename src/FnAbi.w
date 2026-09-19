@@ -20,7 +20,7 @@ extern fn with_getenv_str(name: &str) -> str
 
 // A label for docs/with-abi.md's version history, not the bundle key; it
 // becomes a frozen, normative major version at Level 1 of the roadmap.
-pub const WITH_ABI_VERSION: i32 = 4
+pub const WITH_ABI_VERSION: i32 = 5
 
 // #D6: PassMode — the per-parameter ABI classification, the SINGLE source of
 // truth. fn_abi_pass_mode computes it; both the callee prologue
@@ -159,8 +159,20 @@ pub fn codegen_is_runtime_abi_symbol(base_name: &str) -> bool:
         base_name == "i32_to_str" or base_name == "i64_to_string" or
         base_name == "str_from_byte"
 
+// rt/wasm.w stands in for libc and compiler-rt on the freestanding wasm
+// target: these definitions must keep the bare names LLVM and rt_core's
+// externs call them by. Link-name preservation only — an extern of the same
+// name elsewhere (a c_import of memset) keeps the C ABI, so this is kept out
+// of codegen_is_runtime_abi_symbol.
+pub fn codegen_is_wasm_libc_provider_symbol(base_name: &str) -> bool:
+    base_name == "_exit" or base_name == "abort" or
+        base_name == "malloc" or base_name == "free" or
+        base_name == "memcpy" or base_name == "memmove" or base_name == "memset" or
+        base_name == "memcmp" or base_name == "bcmp" or
+        base_name == "__multi3"
+
 pub fn codegen_preserve_runtime_link_name(source_path: &str, base_name: &str) -> bool:
-    codegen_is_runtime_source_file(source_path) and codegen_is_runtime_abi_symbol(base_name)
+    codegen_is_runtime_source_file(source_path) and (codegen_is_runtime_abi_symbol(base_name) or codegen_is_wasm_libc_provider_symbol(base_name))
 
 // The prefix every module-qualified symbol of `source_path` carries:
 // `__with_mod_<hash(canonical module path)>__`. A .wo bundle's manifest lists

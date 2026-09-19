@@ -34,6 +34,7 @@ use compiler.ClangDriver
 use compiler.DriverOptions
 use compiler.AbiStamp
 use compiler.Runtime
+use compiler.WasmHost
 use Analysis
 use ReceiverMigration
 use TargetSpec
@@ -832,6 +833,8 @@ fn run_cli(argc: i32) -> i32:
         if emit_c_mode:
             with_eprint("error: '--emit-c' is only supported with 'build'")
             return 1
+        if cli_apply_platform_target(argc) != 0:
+            return 1
         return run_run_command(source, find_target_selector_arg(argc), opt_level, no_std, alloc_mode, runtime_available, prelude_mode, debug_info, run_program_args(argc, source))
     if cli_command(argc) == "emit-c-header":
         // §16.5: print the generated C header for this module's @[c_export]
@@ -988,6 +991,8 @@ fn run_cli(argc: i32) -> i32:
         if cli_has_flag(argc, "--help") or cli_has_flag(argc, "-h"):
             print_test_usage()
             return 0
+        if cli_apply_platform_target(argc) != 0:
+            return 1
         return run_test_command(argc, opt_level, no_std, alloc_mode, runtime_available, prelude_mode, debug_info)
     if cli_command(argc) == "bench":
         return run_bench_command(argc, opt_level, no_std, alloc_mode, runtime_available, prelude_mode, debug_info)
@@ -1133,6 +1138,8 @@ fn cleanup_binary_artifacts(bin_path: &str):
         return
     let _bin = build_graph_rt_remove_file(bin_path)
     let _dsym = build_graph_rt_remove_tree(bin_path ++ ".dSYM")
+    if target_spec_is_wasm():
+        let _js = build_graph_rt_remove_file(wasm_host_js_path(bin_path))
 
 // #1013: the runner's artifact (the synthesized test main, linked) is the
 // only reproducer of a failure that lives in that layout — a `with build`
@@ -3007,18 +3014,44 @@ fn run_run_command(source_file: &str, selected_target_hint: &str, opt_level: i32
     comp.configure(opt_level, no_std, alloc_mode, runtime_available)
     comp.set_prelude_mode(prelude_mode)
     comp.set_debug_info(debug_info)
+    comp.set_target_kind(cli_platform_target_kind)
     let bin_path = comp.build_binary(source_file)
     if bin_path == "":
         with_eprint("error: run failed")
         return 1
     comp.print_warnings()
     // Forward `with run prog.w a b` args to the program (space-joined argv).
-    let run_rc = if prog_args == "":
+    let run_rc = if target_spec_is_wasm():
+        build_graph_rt_exec_argv(wasm_program_exec_argv(bin_path) ++ prog_args)
+    else if prog_args == "":
         build_graph_rt_exec_binary(bin_path)
     else:
         build_graph_rt_exec_argv(bin_path ++ "\0" ++ prog_args)
     cleanup_binary_artifacts(bin_path)
     run_rc
+
+// A wasm program runs through its emitted JS host under node (WITH_NODE
+// names the interpreter; default `node` from PATH): the NUL-terminated
+// argv prefix `node <prog>.js` that stands in for the native binary path.
+fn wasm_program_exec_argv(bin_path: &str) -> str:
+    let node_env = build_graph_rt_getenv("WITH_NODE")
+    let node: str = if node_env.len() > 0: node_env ++ "" else: "node"
+    build_graph_argv_append(build_graph_argv_append("", node), wasm_host_js_path(bin_path))
+
+// `--target` for `run` and `test` (§18.5): the parser `build` uses, applied
+// to every Compilation those commands create. Kind 0 is the host.
+var cli_platform_target_kind: i32 = 0
+
+fn cli_apply_platform_target(argc: i32) -> i32:
+    let parsed = driver_parse_build_target(argc)
+    if not parsed.ok:
+        with_eprint(parsed.error_msg)
+        return 1
+    if not build_graph_target_is_host(parsed.kind) and not target_spec_cross_supported(parsed.kind):
+        with_eprint("error: cross-target build for '" ++ build_graph_target_name(parsed.kind) ++ "' is not implemented yet; host is " ++ build_graph_target_name(build_graph_host_target_kind()))
+        return 1
+    cli_platform_target_kind = parsed.kind
+    0
 
 fn dump_ast(source_file: &str, no_std: bool, alloc_mode: bool, include_header: bool) -> i32:
     let text = with_fs_read_file(source_file)
@@ -3820,7 +3853,10 @@ fn run_test_process(bin_path: &str, test_name: &str, quiet: bool) -> TestRunResu
     if quiet:
         let _set_short = build_graph_rt_setenv("WITH_TEST_SHORT", "1")
     var argv = ""
-    argv = build_graph_argv_append(argv, bin_path)
+    if target_spec_is_wasm():
+        argv = wasm_program_exec_argv(bin_path)
+    else:
+        argv = build_graph_argv_append(argv, bin_path)
     let rc = with_exec_argv_capture(argv, out_path, err_path, 120000)
     if test_name.len() > 0:
         let _restore_filter = build_graph_rt_setenv("WITH_TEST_FILTER", old_filter)
@@ -3930,6 +3966,7 @@ fn run_test_file_env_applied(target: &str, opt_level: i32, no_std: bool, alloc_m
     comp.configure(effective_opt_level, effective_no_std, effective_alloc_mode, effective_runtime_available)
     comp.set_prelude_mode(effective_prelude_mode)
     comp.set_debug_info(debug_info)
+    comp.set_target_kind(cli_platform_target_kind)
     let synthetic_source = maybe_synthesize_test_source(target)
     let test_bin_path = test_unique_binary_path(target)
     var bin_path = ""

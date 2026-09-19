@@ -69,6 +69,8 @@ fn cross_triple(tag: &str) -> str:
         return "x86_64-pc-windows-msvc"
     if tag == "windows_aarch64":
         return "aarch64-pc-windows-msvc"
+    if tag == "wasm32":
+        return "wasm32-unknown-unknown"
     "x86_64-unknown-linux-gnu"
 
 // The pcre2-style bundle plan for a cross tag: the same corpus, compiled by
@@ -98,6 +100,28 @@ fn cross_platform_symbol(tag: &str) -> str:
     if tag == "linux_aarch64":
         return "rt_linux_aarch64_o"
     "rt_linux_x86_64_o"
+
+// The wasm32 program runtime: the objects src/compiler/Link.w links into a
+// pure-With wasm program (rt_core + platform + panic + fiber stubs + compat).
+// No fiber core (no stack switching in WebAssembly), no cimport stubs (no
+// libc), no compiler link inputs (the compiler itself is not a wasm
+// target). `with build :cross-rt-wasm` populates out/lib/cross/wasm32/.
+fn add_cross_wasm_rt_targets(out0: Build, tag: &str, p: &str, group_name: &str) -> Build:
+    var out = out0
+    out = out.add_target(cross_object_target(tag, p ++ "rt-core-object", "rt/rt_core.w", "-O2"))
+    out = out.add_target(cross_object_target_named(tag, p ++ "rt-platform-object", "rt/wasm.w", "rt_wasm.o", "-O2"))
+    var cross_compat = cross_object_target_named(tag, p ++ "compat-runtime-object", "out/gen/compat_runtime.w", "compat_runtime.o", "-O1")
+    cross_compat = cross_compat.dep("compat-runtime-source")
+    out = out.add_target(cross_compat)
+    out = out.add_target(cross_object_target(tag, p ++ "panic-runtime-object", "rt/panic_runtime.w", "-O1"))
+    out = out.add_target(cross_object_target(tag, p ++ "fiber-stubs-object", "rt/fiber_stubs.w", "-O1"))
+    var cross_rt = target_new(.Group, build_owned_text(group_name), "")
+    cross_rt = cross_rt.dep(p ++ "rt-core-object")
+    cross_rt = cross_rt.dep(p ++ "rt-platform-object")
+    cross_rt = cross_rt.dep(p ++ "compat-runtime-object")
+    cross_rt = cross_rt.dep(p ++ "panic-runtime-object")
+    cross_rt = cross_rt.dep(p ++ "fiber-stubs-object")
+    out.add_target(cross_rt)
 
 fn cross_llvm_prefix(tag: &str) -> str:
     let arch_tag = if tag == "linux_aarch64": "linux-aarch64" else: "linux-x86_64"
@@ -2262,6 +2286,11 @@ pub fn build(ctx: BuildCtx) -> Build:
     out = add_cross_rt_targets(move out, ctx, "linux_x86_64", "cross-", "cross-rt", &corpus_plans_linux_x86_64)
     out = add_cross_rt_targets(move out, ctx, "linux_aarch64", "cross-arm-", "cross-rt-arm", &corpus_plans_linux_aarch64)
 
+    // ── Cross-target runtime (wasm32) ───────────────────────────────
+    // `with build :cross-rt-wasm` builds the wasm32 program runtime into
+    // out/lib/cross/wasm32/ for `with build --target=wasm32 prog.w`.
+    out = add_cross_wasm_rt_targets(move out, "wasm32", "cross-wasm-", "cross-rt-wasm")
+
     // ── Cross-target runtime (windows_x86_64) ───────────────────────
     // `with build :cross-rt-windows` builds the full windows_x86_64
     // runtime + compiler link inputs into out/lib/cross/windows_x86_64/
@@ -2609,6 +2638,18 @@ pub fn build(ctx: BuildCtx) -> Build:
     comptime_diff_tests = comptime_diff_tests.dep("build")
     comptime_diff_tests = comptime_diff_tests.dep("selfcheck")
     out = out.add_target(comptime_diff_tests)
+
+    // The wasm32 lane (docs/wasm-target.md): each fixture is compiled for
+    // wasm32 against out/lib/cross/wasm32/ and run through its emitted JS
+    // host under node. `with build :wasm-tests`; not in the standing
+    // battery because it needs node on PATH.
+    var wasm_tests = target_new(.Test, "wasm-tests", "test/wasm/*.w")
+    wasm_tests = wasm_tests.allow_parallel()
+    wasm_tests = wasm_tests.arg("compiler=" ++ release_compiler_bin("with"))
+    wasm_tests = wasm_tests.arg("--target=wasm32")
+    wasm_tests = wasm_tests.dep("build")
+    wasm_tests = wasm_tests.dep("cross-rt-wasm")
+    out = out.add_target(wasm_tests)
 
     var native_phase_tests = target_new(.Test, "native-phase-tests", "test/phase/*.w")
     native_phase_tests = native_phase_tests.allow_parallel()

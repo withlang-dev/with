@@ -16,9 +16,13 @@ a With value type, not as a contract With makes with another language.
 ## 1. Scalars and pointers
 
 - `i8/i16/i32/i64`, `u8..u64`, `f32/f64`, `bool` (1 byte), `Unit` (zero
-  size) lower to the LLVM integer/float types of that width.
+  size) lower to the LLVM integer/float types of that width. A `Unit`
+  *result* is LLVM `void` in every signature, whether spelled `-> Unit` or
+  left off; as a value (local, parameter, generic argument) `Unit` is
+  carried as `i32`.
 - Raw pointers (`*const T`, `*mut T`), references (`&T`), and
-  `extern fn` values are one pointer word.
+  `extern fn` values are one pointer word — 8 bytes on every native target,
+  4 on `wasm32` (`target_spec_ptr_bytes`).
 - Ordinary With function values use `{ function pointer, environment pointer }`.
   Named functions acquire an adapter thunk when converted to this representation.
 - A reference is a **value of pointer type**: it is passed as that pointer,
@@ -163,6 +167,13 @@ layout change there is caught by the `wo-drift` lane, not by this check.
 
 ## Version history
 
+- **v5** (2026-09-19): a `Unit` result lowers to LLVM `void` in every
+  signature. An explicit `-> Unit` had lowered to an `i32` result while an
+  absent return type lowered to `void`, so a definition and a declaration of
+  the same symbol could disagree — harmless on the native ABIs (an unused
+  return register), a signature-mismatch trap on WebAssembly. Pointer-sized
+  types (pointers, references, `extern fn`, trait objects, the two words of
+  a function value) take their width from the target: 4 bytes on `wasm32`.
 - **v4** (2026-09-12): SlotMap replaces its occupied-byte array with a `u32`
   free-list link array and adds FIFO head/tail indices to its runtime header.
   Insertion reuses free slots without scanning capacity. Slots whose generation

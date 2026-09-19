@@ -8,7 +8,7 @@ const BUILD_GRAPH_STANDARD_KIND_MAX: i32 = 23
 const BUILD_GRAPH_PROJECT_KIND_MIN: i32 = 1000
 const BUILD_GRAPH_PROJECT_KIND_MAX: i32 = 1027
 const BUILD_GRAPH_TARGET_MIN: i32 = 0
-const BUILD_GRAPH_TARGET_MAX: i32 = 6
+const BUILD_GRAPH_TARGET_MAX: i32 = 8
 
 fn build_graph_kind_is_standard(kind: i32) -> bool:
     if kind >= BUILD_GRAPH_STANDARD_KIND_MIN and kind <= 4:
@@ -105,6 +105,10 @@ pub fn build_graph_target_name(kind: i32) -> str:
         return "windows_x86_64"
     if kind == 6:
         return "windows_aarch64"
+    if kind == 7:
+        return "wasm32"
+    if kind == 8:
+        return "wasm64"
     f"unknown({kind})"
 
 pub fn build_graph_host_target_kind() -> i32:

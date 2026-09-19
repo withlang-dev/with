@@ -20,7 +20,10 @@ extern fn str_from_byte(b: i32) -> str
 // resolve to the host arch as before.
 fn parser_active_arch() -> str:
     let a = target_spec_arch()
-    if a == "x86_64" or a == "amd64": "x86_64" else: "aarch64"
+    if a == "amd64": "x86_64" else: a
+
+fn parser_target_guard_arch_known(arch: &str) -> bool:
+    arch == "aarch64" or arch == "x86_64" or arch == "wasm32" or arch == "wasm64"
 pub type Parser {
     tokens: TokenList,
     pos: i32,
@@ -698,6 +701,21 @@ impl Parser:
                         self.advance()
                     if self.peek() == TokenKind.TK_R_PAREN:
                         self.advance()
+            else if self.is_ident_named("import_module"):
+                // @[import_module("namespace")] — the WebAssembly import
+                // namespace an extern fn is imported from (clang's
+                // import_module attribute); the symbol keeps its With name
+                // as the import name. Stored as callconv with an
+                // "import_module:" prefix for codegen to apply.
+                self.advance()
+                if self.peek() == TokenKind.TK_L_PAREN:
+                    self.advance()
+                    if self.peek() == TokenKind.TK_STRING_LIT:
+                        let im = self.source.slice((self.current_start() + 1) as i64, (self.current_end() - 1) as i64)
+                        self.pending_callconv = self.intern.intern("import_module:" ++ im)
+                        self.advance()
+                    if self.peek() == TokenKind.TK_R_PAREN:
+                        self.advance()
             else if self.is_ident_named("link_name"):
                 // @[link_name("symbol")] — the C symbol an extern fn links against,
                 // when its With name differs (e.g. a generated wrapper takes the
@@ -755,8 +773,8 @@ impl Parser:
                         self.emit_error("@[target(...)] requires a string literal architecture name, e.g. @[target(\"aarch64\")]")
                     else:
                         let arch = self.source.slice((self.current_start() + 1) as i64, (self.current_end() - 1) as i64)
-                        if arch != "aarch64" and arch != "x86_64":
-                            self.emit_error("unknown target architecture '" ++ arch ++ "'; expected \"aarch64\" or \"x86_64\"")
+                        if not parser_target_guard_arch_known(arch):
+                            self.emit_error("unknown target architecture '" ++ arch ++ "'; expected \"aarch64\", \"x86_64\", \"wasm32\", or \"wasm64\"")
                         else:
                             self.pending_target = self.intern.intern(arch)
                         self.advance()
