@@ -83,12 +83,14 @@ Both are fixed for every target:
   `--fatal-warnings` so any remaining mismatch fails the link instead of
   trapping at the first call.
 
-## Known pre-existing bug found on the way
+## Pre-existing bug found on the way
 
 Formatting an `Option[&T]` in an f-string (`print(f"{m.get("k")}")` with a
-`HashMap`, or `let o: Option[&i32] = ...; print(f"{o}")`) segfaults the
-v0.15.2.1 compiler (`LLVMTypeOf` on a null value) on every target. Not
-wasm-specific and not fixed here; `test/wasm/wasm_alloc.w` avoids it.
+`HashMap`, or `let o: Option[&i32] = ...; print(f"{o}")`) segfaulted the
+compiler (`LLVMTypeOf` on a null value) on every target: the enum
+formatter walked the nullable-pointer niche representation as a
+tag + payload struct. Not wasm-specific; fixed on its own in #1216.
+`test/wasm/wasm_alloc.w` predates that fix and unwraps instead.
 
 ## Spec items awaiting a ruling
 
