@@ -4,81 +4,97 @@ Read this whole file before touching anything. Nothing is tagged or
 published. `src/version` still says `v0.15.2.1`; `seed.lock` still pins
 `v0.15.2.0`.
 
-## Current state (2026-09-18, evening) — read this first
+## Current state (2026-09-18, night) — read this first
 
 Sections 1–5 below are from 2026-09-16 and partly stale; §0 (Eric's ruling),
 §8 (environment traps) and §9 (standing rules) still hold. The running record
 of the campaign is `docs/with-get-release-investigation.md` (newest findings
 at the end); evidence logs are in `~/with/out/with-get-investigation/`.
 
-**`main` = `a91d0bf7`.** Landed today, all off-campaign defects the campaign
-exposed:
+**Merged to `main` today:** #1181 (D43 tail inference, mission ¶2, spec
+§9.1), #1183 (#1172 return cleanup), #1184 (reseed gate 2048M), #1185 (gate
+steps no longer rebuild stage2; `:test-with-audits`), #1186 (stage1 emit
+width 4 off CI), #1188 (D44 spec + ruling). **Open:** #1190 — D44 step 1, the
+map ownership fix (#1187, and the defect behind #1158). The installed `with`
+was reseeded from `a91d0bf7`: it has D43 and #1172, not D44.
 
-- #1181 — D43 (`docs/decisions.md`): an unannotated function inherits its
-  tail's type; a missing arm forces `Unit`; written arms that do not unify
-  are "cannot infer return type". Mission ¶2 and spec §9.1 changed with it.
-  Closed #1178, #1179 (`parse_if_let` fabricated `else: 0`), #1180 (f-string
-  formatted a `Unit` as garbage; invalid MIR; validator rule for `Unit` call
-  arguments, which then found user-`IndexPlace` subscripts typed `Unit`).
-- #1183 — #1172: every active statement temporary's cleanup runs on a
-  function exit. Ownership change, battery with `:move-audit`/`:drop-audit`.
-- #1184 — #1182: the reseed gate's memory tripwire is 2048M (Eric). The
-  runner compile's ~1.25 GB is unexplained (first suspect #1173) but no
-  longer blocks anything.
+**The campaign branch is `with-get-release-uat-rebased`** (worktree
+`~/.local/with-staging/with-get`): the 23 campaign commits rebased onto
+`main` (`667f82d6`) plus a cherry-pick of #1190's commit. The old
+`fix-with-get-release-uat` in `~/with` is superseded; nothing is unique to
+it. One rebase conflict: `ed39964b` ("Resolve install cache outputs through
+the execution path") fixed the same `$HOME` install-path freshness defect as
+#1185; `main`'s version was kept, the campaign's regression test
+(`behav_build_cache_install_paths.w`) stays.
 
-**Reseeding now needs the candidate as driver for the last step.** The gate
-is compiled into whichever binary drives `:install-user`, and the pinned seed
-(v0.15.2.0) still has the 1024M limit. After the seed-driven battery:
-`WITH=$PWD/out/release/bin/with out/release/bin/with build :install-user`.
-It still verifies its hash against last-green. This ends when a seed newer
-than `a91d0bf7` is published and pinned.
+**The whole darwin `:release-uat` group is green on that branch** (rc=0,
+61 s, floating packages: zlib, bzip2, sqlite3, openssl, libcurl,
+raylib-spiral) — the first fully green darwin UAT of the campaign. OpenSSL
+died with `invalid free` on every earlier validation run. Root cause (D44, spec §2.3):
+`HashMap.keys()/values()/items()` byte-copied their elements, so the
+compiler's own `sema_clone_str_str_hashmap` double-freed through `.keys()`.
+The release UAT targets refuse a compiler that has no last-green record
+(`require-last-green`): run the full battery on a tree before its
+`:release-uat`.
 
-**The campaign: branch `fix-with-get-release-uat`, tip `5a9577f5`, 22 commits
-not on `main`, not rebased onto it yet.** No PR is open. Last validation:
-Release run `35291941683` (test channel, at `5a9577f5`). Every leg's battery
-is green and every leg fails only in the Release UAT step:
+**Last full validation** is Release run `35388740596` (before the D44 fix):
+every leg's battery green, every leg red only in the release UAT.
 
-| leg | failing UAT targets |
+| leg | failing UAT targets at that run |
 |---|---|
-| darwin-aarch64 | openssl, raylib-spiral |
-| linux-x86_64 | openssl, libcurl, raylib-spiral |
-| linux-aarch64 | zlib, bzip2, sqlite3, openssl, libcurl, raylib-spiral |
-| windows-x86_64 | bzip2, libcurl (each ~185 s, the timeout), openssl |
-| windows-aarch64 | bzip2, libcurl (each ~185–190 s) |
+| darwin-aarch64 | openssl (fixed since), raylib-spiral (runner has no OpenGL 3.3 context; passes locally) |
+| linux-x86_64 | openssl (same invalid free — expect fixed), libcurl, raylib-spiral |
+| linux-aarch64 | zlib, bzip2, sqlite3, openssl, libcurl, raylib-spiral (the arm64 source-build gap) |
+| windows-x86_64 | bzip2 and libcurl exit 124 at ~185 s; openssl `lld-link: could not open 'crypto.lib' / 'ssl.lib'` |
+| windows-aarch64 | bzip2 and libcurl exit 124 at ~186–190 s |
 
-Passing on every leg: install-layout, fresh-project, one-liner, migrate,
-artifact-smoke. That run predates #1181/#1183: the openssl path hit the
-regex double free that #1172's hunt found, so re-validate after rebasing
-before reading the openssl cells. The linux-aarch64 column is the "arm64
-source-build gap" section of the investigation doc; the Windows ~185 s cells
-are the header-hang/macro-scaling work (`e944748f`, `a32a6fa6`), which has
-not had a Windows run since.
+Windows OpenSSL lead, unproven: `conan_library_name_from_path` is correct in
+the tree (`c93e4bde`: COFF names keep their basename) and the aarch64 leg
+links, so on x86_64 the name `crypto` was produced by something else — most
+likely an older binary ran `with get` there. The log does not show which
+binary ran it or what it wrote to the package's `metadata.json`; capture both
+on the next Windows run before theorizing.
 
 **Next steps, in order:**
-1. Rebase `fix-with-get-release-uat` onto `main` (`a91d0bf7`). Expect
-   conflicts in `src/MirLower.w` with `3d5de2c9` (implicit Result tail
-   payload, #1169) and possibly `src/SemaCheck.w`.
-2. Seed-driven battery on the rebased branch; `3d5de2c9` is an ownership
-   change, so include `:move-audit` and `:drop-audit`.
-3. `gh workflow run Release --ref fix-with-get-release-uat -f channel=test`
-   and rebuild the matrix above from the new run.
-4. Work the remaining cells by root cause (§4 classes A–E), fixtures in
+1. After #1190 merges, rebase the campaign branch onto `main` (drop the
+   cherry-pick), battery with `:test-with-audits`, then
+   `gh workflow run Release --ref with-get-release-uat-rebased -f channel=test`
+   and rebuild the matrix.
+2. Work the remaining cells by root cause (§4 classes A–E), fixtures in
    `:test` for each, then the release steps in §5.
+3. D44's remaining non-compliance (`docs/decisions.md` D44): view iterators
+   for `keys()`/`values()`/`iter()`, `into_*`/`drain`, retire `items()`, the
+   stdlib Vec-backed map in the same commit; `Vec[&T]` rejected while
+   `Vec[Wrapper{&T}]` is accepted; #1189 (`HashMap.remove` leaks its key).
 
-Tool gaps filed during #1172 and still open: #1173 (drop-state matrix
->7 GB on the unbundled regex body), #1174 (`use std.sync` trips eight audit
-violations on the baseline), #1175 and #1177 (ownership audit passes a use
-of a destroyed owner / a duplicate cleanup of a moved enum payload), #1176
-(`analyze` rejects implicit main), #1170 (validator accepts a drop of a moved
-aggregate payload).
+**The battery is ~21 minutes now, not ~38.** `export
+WITH_CODEGEN_EMIT_WIDTH=16` on a large machine (stage1 289 s → 89 s; `:dev`
+228 s → 84 s); use `:test-with-audits` for an ownership batch; gate steps no
+longer relink. Reseeding still needs the candidate as the driver for the
+last step only, because the pinned seed has the old 1024M gate compiled in:
+`WITH=$PWD/out/release/bin/with out/release/bin/with build :install-user`.
 
-Traps met today: run a bootstrap stage1 from the repo root (elsewhere it
-fails with `import module not found: 'std.re.defs'`); stage1 has no regex
-bundle, so every check prints ~78k lines of pcre2 warnings — send output to
-a file and grep `^error`. `xargs -I{}` silently stopped a 2,861-file sweep
-after 29 files; the With sweep tool (shards + a processed count) did not.
-A printed value is not proof of a type: `print(f"{f()}")` on a `Unit`
-function printed plausible numbers until #1180; bind `let x: T = f()`.
+Tool gaps filed and still open: #1159 (ownership audit passed the shallow
+map owners), #1170, #1173 (drop-state matrix >7 GB), #1174, #1175, #1176,
+#1177.
+
+Traps met today:
+- `WITH_DEBUG_ALLOC=1 <compiler> run prog.w` puts the COMPILER under the
+  debug allocator too; on a bundle-less stage1 that ran 10 minutes. Use
+  `run --debug-alloc`, or build first and set the variable on the binary.
+- A plain run is not evidence for ownership: the map defects passed plainly
+  and failed only under `WITH_DEBUG_ALLOC_SCRIBBLE=1`. A printed value is not
+  evidence of a type: `print(f"{f()}")` on a `Unit` function printed numbers
+  until #1180; bind `let x: T = f()`.
+- `WITH_BUILD_ACTION_FORCE=1` forces every Action in the chain and rebuilds
+  the stages per invocation; do not use it to make one target stale.
+- The test cache is keyed on the compiler, so a `build.w`-only commit serves
+  tests from cache (`1041 cached, 0 ran`); clear
+  `out/.build-state/*.test-pass` and `*.test-verdicts` to really run them.
+- A bootstrap stage1 must run from the repo root and prints ~78k lines of
+  pcre2 warnings per check; send output to a file and grep `^error`.
+- `xargs -I{}` silently stopped a 2,861-file sweep after 29 files; shard a
+  With tool and print a processed count.
 
 ## 0. Eric's ruling — the task
 
