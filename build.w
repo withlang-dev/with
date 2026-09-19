@@ -3111,7 +3111,6 @@ pub fn build(ctx: BuildCtx) -> Build:
     // the archive added in place (build/sdk.w).
     var clang_main = target_new(.Action, "sdk-clang-main", "").output("out/command/sdk-clang-main/done")
     clang_main.action = run_sdk_clang_main_action
-    clang_main = clang_main.input("build/https_fetch.w")
     clang_main = clang_main.write_scope("out/tmp")
     clang_main = clang_main.write_scope("out/command/sdk-clang-main")
     clang_main = clang_main.write_scope(".deps")

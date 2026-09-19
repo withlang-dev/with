@@ -875,7 +875,7 @@ fn sdk_archive_clang_main(ctx: &ActionCtx, root: &str, objects_dir: &str, output
         argv.push(object)
     let rc = sdk_run_capture(ctx, "clang-main-archive", argv, 120000)
     if rc != 0: return rc
-    if not ctx.fs().exists(sdk_clang_main_archive(output_prefix)):
+    if not ctx.fs().host_exists(sdk_abs(root, sdk_clang_main_archive(output_prefix))):
         return sdk_fail(ctx, "clang driver archive was not written: " ++ sdk_clang_main_archive(output_prefix))
     0
 
@@ -929,7 +929,18 @@ fn sdk_ensure_clang_main(ctx: &ActionCtx) -> i32:
     for i in 0..names.len() as i32:
         let source = sdk_join(scratch, names[i] ++ ".cpp")
         let url = "https://raw.githubusercontent.com/llvm/llvm-project/llvmorg-" ++ COMPILER_LLVM_VERSION ++ "/clang/tools/driver/" ++ names[i] ++ ".cpp"
-        var rc = sdk_fetch(ctx, scratch, names[i], url, source, 120000)
+        // curl, as `with get` downloads: the HTTPS helper is a With program the
+        // pinned linux-aarch64 seed cannot link (with_vec_append_bytes). The
+        // digest below is what makes the download trustworthy.
+        var fetch: Vec[str] = Vec.new()
+        fetch.push("curl")
+        fetch.push("-fsSL")
+        fetch.push("--retry")
+        fetch.push("3")
+        fetch.push("-o")
+        fetch.push(sdk_abs(root, source))
+        fetch.push(sdk_owned_text(url))
+        var rc = sdk_run_capture(ctx, "clang-main-fetch-" ++ names[i], fetch, 120000)
         if rc != 0: return rc
         let digest = fs.sha256_file(source)
         if digest != sdk_clang_main_source_sha256(names[i]):
