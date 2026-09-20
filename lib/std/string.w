@@ -104,8 +104,9 @@ impl CStr:
     /// Raw pointer to the NUL-terminated bytes this `CStr` borrows.
     pub fn ptr() -> *const i8: self.ptr
 
-    /// An owned copy of the text: the `str` outlives the C storage.
-    pub fn to_str() -> str: with_str_from_bytes(self.ptr as *const u8, self.len)
+    /// An owned copy of the text (D51 §41: allocation is explicit): the `str`
+    /// outlives the C storage.
+    pub fn to_owned() -> str: with_str_from_bytes(self.ptr as *const u8, self.len)
 
 /// View the NUL-terminated string C handed back (§16.1). The caller vouches
 /// that `ptr` is non-null, NUL-terminated, and stays valid while the view is
