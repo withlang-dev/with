@@ -556,6 +556,14 @@ compiler), so a green cannot be recorded under the wrong driver. There is no
 from a completed test run; it is not a substitute for running `:test`. The
 iterate tier (`with check`, `with build :dev`) uses the installed compiler.
 
+**A green belongs to the sources, not to the commit or the worktree (D49).**
+`:last-green` publishes the green keyed on the git tree, the pinned seed and
+the host (`~/.local/with-green/green.tsv`). After a squash-merge of a branch
+whose battery passed, the reseed on main is `git pull`, `src/main build`,
+`out/release/bin/with build :install-user`: no second `:fixpoint` or `:test`.
+The gate refuses a dirty worktree and any tree that differs by a byte; never
+re-run a battery over sources that already passed one.
+
 If the seed, installed compiler, and release binaries are all broken, the
 compiler cannot be recovered.
 

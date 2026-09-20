@@ -2366,7 +2366,7 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
             completed_targets.push(with_str_clone_ref(target.name))
             continue
         if target.kind == 23:
-            if survey and survey_failed.len() > 0 and (target.name == "test-green" or target.name == "last-green"):
+            if survey and survey_failed.len() > 0 and (target.name == "test-green" or target.name == "last-green" or target.name == "last-green-record"):
                 with_eprint("survey: skipping evidence target '" ++ target.name ++ "' (earlier failures)")
                 continue
             if not build_action_worker_env_enabled():
@@ -2810,15 +2810,62 @@ fn reseed_gate_smoke(root: &str, compiler_path: &str) -> i32:
     with_write("[reseed-gate] candidate checks build.w and orchestrates ':" ++ smoke_target ++ "' natively (" ++ build_graph_time_fmt(spent) ++ f", peak {smoke_rss / 1048576}M)\n")
     0
 
+// The first line git prints for `args` run in `root`, or "".
+fn cli_git_first_line(root: &str, args: &Vec[str], label: &str) -> str:
+    let dir = resolve_join(root, "out/command/install-gate")
+    let _mk = with_fs_mkdir_p(dir)
+    let stdout_path = resolve_join(dir, label ++ ".stdout")
+    var argv = build_graph_argv_append("", "git")
+    for i in 0..args.len() as i32: argv = build_graph_argv_append(argv, args[i])
+    if with_exec_argv_capture_cwd(argv, stdout_path, resolve_join(dir, label ++ ".stderr"), 60000, root) != 0: return ""
+    let text = with_fs_read_file(stdout_path)
+    for i in 0..text.len() as i32:
+        if text[i] == '\n': return text.slice(0, i as i64)
+    text
+
+// Whether these sources already passed a battery (build/retention.w, "green
+// evidence is keyed on what was tested"): the worktree is clean, the chain here
+// was seeded by a compiler seed.lock pins, and the store has a green for this
+// git tree, that seed and this host. The commit it was recorded at, or "".
+fn cli_green_by_source_identity(root: &str) -> str:
+    let seed_input = with_fs_read_file(resolve_join(root, "out/.build-state/seed-input.json"))
+    let marker = "\"sha256\": \""
+    let at = seed_input.find(marker)
+    if at < 0 or at + marker.len() + 64 > seed_input.len(): return ""
+    let seeded_by = seed_input.slice(at + marker.len(), at + marker.len() + 64)
+    if not with_fs_read_file(resolve_join(root, "seed.lock")).contains(seeded_by): return ""
+    let status_args: Vec[str] = Vec.new()
+    status_args.push("status")
+    status_args.push("--porcelain")
+    let dir = resolve_join(root, "out/command/install-gate")
+    let _first = cli_git_first_line(root, &status_args, "status")
+    let status = with_fs_read_file(resolve_join(dir, "status.stdout"))
+    let status_lines = status.split("\n")
+    for i in 0..status_lines.len() as i32:
+        let line = status_lines.get(i)
+        if line.len() > 0 and not line.starts_with("?? examples/"): return ""
+    let tree_args: Vec[str] = Vec.new()
+    tree_args.push("rev-parse")
+    tree_args.push("HEAD^{tree}")
+    let tree = cli_git_first_line(root, &tree_args, "tree")
+    if tree.len() < 40: return ""
+    let identity = tree ++ "-" ++ seeded_by ++ "-" ++ with_sysinfo_os() ++ "_" ++ with_sysinfo_arch()
+    let explicit = with_getenv_str("WITH_GREEN_DIR")
+    let store_dir = if explicit.len() > 0: explicit else: with_getenv_str("HOME") ++ "/.local/with-green"
+    let store_lines = with_fs_read_file(store_dir ++ "/green.tsv").split("\n")
+    for i in 0..store_lines.len() as i32:
+        let line = store_lines.get(i)
+        if line.starts_with(identity ++ "\t"):
+            let fields = line.split("\t")
+            return if fields.len() > 1: fields.get(1).clone() else: "recorded"
+    ""
+
 fn cli_fast_install_blessed(root: &str, target_name: &str) -> i32:
     let compiler_path = resolve_join(root, "out/release/bin/with")
     if with_fs_file_exists(compiler_path) == 0:
         with_eprint("error: missing " ++ compiler_path ++ "; run `with build` first")
         return 1
     let manifest = with_fs_read_file(resolve_join(root, "out/.build-state/last-green.json"))
-    if manifest.len() == 0:
-        with_eprint("error: missing last-green manifest; run `with build :last-green` after build/fixpoint/test")
-        return 1
     let data = with_fs_read_file(compiler_path)
     if data.len() == 0:
         with_eprint("error: could not read " ++ compiler_path)
@@ -2826,8 +2873,15 @@ fn cli_fast_install_blessed(root: &str, target_name: &str) -> i32:
     var digest: [32]u8 = [0 as u8; 32]
     sha256_hash_str(data, &raw mut digest[0] as *mut u8)
     let sha = sha256_hex(&digest[0] as *const u8)
+    var verified_by = "verified against last-green"
     if not manifest.contains("\"compiler_sha256\": \"" ++ sha ++ "\""):
-        with_eprint("error: " ++ compiler_path ++ " is not the compiler recorded by last-green; run `with build`, `with build :fixpoint`, `with build :test`, then `with build :last-green`")
+        let green_commit = cli_green_by_source_identity(root)
+        if green_commit.len() > 0: verified_by = "these sources are green: recorded at commit " ++ green_commit
+    if verified_by == "verified against last-green" and manifest.len() == 0:
+        with_eprint("error: missing last-green manifest, and no published green for these sources; run `with build :last-green` after build/fixpoint/test")
+        return 1
+    if verified_by == "verified against last-green" and not manifest.contains("\"compiler_sha256\": \"" ++ sha ++ "\""):
+        with_eprint("error: " ++ compiler_path ++ " is not the compiler recorded by last-green, and these sources have no published green (a dirty or changed tree never borrows one); run `with build`, `with build :fixpoint`, `with build :test`, then `with build :last-green`")
         return 1
     let gate_rc = reseed_gate_smoke(root, compiler_path)
     if gate_rc != 0:
@@ -2839,7 +2893,7 @@ fn cli_fast_install_blessed(root: &str, target_name: &str) -> i32:
     if with_fs_chmod(dest, 0o755) != 0:
         with_eprint("error: could not chmod " ++ dest)
         return 1
-    with_write("[" ++ target_name ++ "] " ++ dest ++ " <- out/release/bin/with (verified against last-green)\n")
+    with_write("[" ++ target_name ++ "] " ++ dest ++ " <- out/release/bin/with (" ++ verified_by ++ ")\n")
     0
 
 fn run_build_command(options: BuildCommandOptions, graph_options: &BuildGraphCommandOptions) -> i32:

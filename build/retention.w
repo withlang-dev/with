@@ -519,6 +519,58 @@ fn ret_git_commit(ctx: &ActionCtx) -> str:
     args.push("HEAD")
     ret_run_first_line(ctx, "git-head", args, 30000)
 
+// ── green evidence is keyed on what was tested (Eric, 2026-09-20) ───────────
+// The compiler binary names a commit (its version ends in -g<hash>) and its
+// debug info names the worktree, so a squash-merge of a tested tree, or a
+// battery run in a staging worktree, produced a "different" compiler and the
+// whole battery ran again over byte-identical sources. What was tested is the
+// inputs: the git tree, the pinned seed that drove and seeded the chain, and
+// the host. A green for that identity is published to a store shared by every
+// worktree ($WITH_GREEN_DIR, else ~/.local/with-green), one line per identity:
+//   identity <TAB> git commit <TAB> compiler version <TAB> driver sha256
+// A dirty worktree has no identity: uncommitted edits never borrow a green.
+
+pub fn ret_green_store_path() -> str:
+    let explicit = env("WITH_GREEN_DIR")
+    let dir = if explicit.len() > 0: explicit else: env("HOME") ++ "/.local/with-green"
+    dir ++ "/green.tsv"
+
+/// The tracked tree is as committed, and nothing untracked could be a build
+/// input (an untracked path under examples/ is a user's own program).
+fn ret_worktree_is_clean(ctx: &ActionCtx) -> bool:
+    let args: Vec[str] = Vec.new()
+    args.push("git")
+    args.push("status")
+    args.push("--porcelain")
+    let lines = ret_run_lines(ctx, "git-status", args, 60000)
+    for i in 0..lines.len() as i32:
+        let line = lines.get(i)
+        if line.len() == 0: continue
+        if line.starts_with("?? examples/"): continue
+        return false
+    true
+
+/// `<tree>-<driver sha256>-<os>_<arch>`, or "" for a dirty worktree or a
+/// tree git cannot name.
+pub fn ret_source_identity(ctx: &ActionCtx, driver_sha: &str) -> str:
+    if driver_sha.len() != 64 or not ret_worktree_is_clean(ctx): return ""
+    let args: Vec[str] = Vec.new()
+    args.push("git")
+    args.push("rev-parse")
+    args.push("HEAD^{tree}")
+    let tree = ret_run_first_line(ctx, "git-tree", args, 30000)
+    if tree.len() < 40: return ""
+    tree ++ "-" ++ driver_sha ++ "-" ++ os() ++ "_" ++ arch()
+
+/// The store line for `identity`, or "".
+fn ret_green_store_line(store: &str, identity: &str) -> str:
+    if identity.len() == 0: return ""
+    let lines = store.split("\n")
+    for i in 0..lines.len() as i32:
+        let line = lines.get(i)
+        if line.starts_with(identity ++ "\t"): return line.clone()
+    ""
+
 fn ret_compiler_version(ctx: &ActionCtx, compiler_path: &str) -> str:
     let root = ctx.project_info().project_root()
     let args: Vec[str] = Vec.new()
@@ -838,9 +890,21 @@ pub fn run_last_green_action(ctx: ActionCtx) -> i32:
     if ret_json_field(seed_input, "sha256") != driver_sha:
         return ret_fail(ctx, ret_pinned_driver_fix("stage1 was seeded by " ++ ret_json_field(seed_input, "resolved_path") ++ " (sha256 " ++ ret_json_field(seed_input, "sha256") ++ "), not the pinned seed"))
     let seed_json = if seed_input.len() > 0: ret_trim(seed_input) else: "null"
+    let identity = ret_source_identity(ctx, driver_sha)
+    // The store as it will be published (last-green-publish installs this
+    // file): what is there now, plus this green when the tree has an identity.
+    var store = fs.host_read_text(ret_green_store_path())
+    if identity.len() > 0 and ret_green_store_line(store, identity).len() == 0:
+        if store.len() > 0 and not store.ends_with("\n"): store = store ++ "\n"
+        store = store ++ identity ++ "\t" ++ commit_label ++ "\t" ++ compiler_version ++ "\t" ++ driver_sha ++ "\n"
+    if fs.write_text("out/.build-state/green-store.tsv", store) != 0:
+        return ret_fail(ctx, "could not write out/.build-state/green-store.tsv")
+    if identity.len() == 0:
+        print("[last-green] the worktree is not clean: this green is local to it and is not published")
     let manifest =
         "{\n" ++
         "  \"source_version\": \"" ++ ret_json_escape(source_version) ++ "\",\n" ++
+        "  \"source_identity\": \"" ++ ret_json_escape(identity) ++ "\",\n" ++
         "  \"compiler_version\": \"" ++ ret_json_escape(compiler_version) ++ "\",\n" ++
         "  \"git_commit\": \"" ++ ret_json_escape(commit_label) ++ "\",\n" ++
         "  \"host\": \"" ++ ret_json_escape(os() ++ "/" ++ arch()) ++ "\",\n" ++
@@ -856,18 +920,38 @@ pub fn run_last_green_action(ctx: ActionCtx) -> i32:
     print("[last-green] archived verified seed and wrote out/.build-state/last-green.json")
     0
 
+/// Whether this clean tree, built by the pinned seed, has a published green:
+/// the release compiler here was built from sources a battery already passed.
+fn ret_green_by_identity(ctx: &ActionCtx) -> bool:
+    let fs = ctx.fs()
+    let seed_input = if fs.exists("out/.build-state/seed-input.json"): fs.read_text("out/.build-state/seed-input.json") else: ""
+    let seeded_by = ret_json_field(seed_input, "sha256")
+    // the chain here was seeded by a compiler seed.lock pins
+    if seeded_by.len() != 64 or not seed_lock_read(fs).contains(seeded_by): return false
+    let identity = ret_source_identity(ctx, seeded_by)
+    let line = ret_green_store_line(fs.host_read_text(ret_green_store_path()), identity)
+    if line.len() == 0: return false
+    let fields = line.split("\t")
+    let commit = if fields.len() > 1: fields.get(1).clone() else: ""
+    print("[" ++ ctx.target_name() ++ "] these sources are green: recorded at commit " ++ commit ++ " (" ++ ret_green_store_path() ++ ")")
+    true
+
 pub fn run_require_last_green_action(ctx: ActionCtx) -> i32:
     let fs = ctx.fs()
     let compiler_path = ret_release_compiler_path()
     if not fs.exists(compiler_path):
         return ret_fail(ctx, "missing " ++ compiler_path ++ "; run `with build` first")
     let manifest = if fs.exists("out/.build-state/last-green.json"): fs.read_text("out/.build-state/last-green.json") else: ""
+    if manifest.len() == 0 and ret_green_by_identity(ctx):
+        return ret_write_output_stamp(ctx)
     if manifest.len() == 0:
         return ret_fail(ctx, "missing last-green manifest; run `with build :last-green` after build/fixpoint/test")
     let compiler_sha = ret_sha256_file(ctx, "verified-compiler-check", compiler_path)
     if compiler_sha.len() == 0:
         return ret_fail(ctx, "could not hash " ++ compiler_path)
     let expected = "\"compiler_sha256\": \"" ++ compiler_sha ++ "\""
+    if not manifest.contains(expected) and ret_green_by_identity(ctx):
+        return ret_write_output_stamp(ctx)
     if not manifest.contains(expected):
         return ret_fail(ctx, compiler_path ++ " is not the compiler recorded by last-green; run `with build`, `with build :fixpoint`, `with build :test`, then `with build :last-green`")
     let output = ctx.output()

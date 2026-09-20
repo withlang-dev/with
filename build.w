@@ -933,6 +933,17 @@ fn install_file_target(name: &str, source: &str, dest: &str, mode: &str, dep: &s
 // installed file cannot start (2026-09-03: an install landed a binary macOS
 // killed with "Code Signature Invalid" while the identical release binary
 // ran; nothing noticed until the next `with` invocation).
+// The green store as an .Install destination: $WITH_GREEN_DIR, else
+// ~/.local/with-green (build/retention.w ret_green_store_path reads the same
+// two). The kind writes outside the project only under `$HOME/`.
+fn green_store_install_path(ctx: &BuildCtx) -> str:
+    let explicit = ctx.env_input("WITH_GREEN_DIR")
+    let home = ctx.env_input("HOME")
+    let dir = if explicit.len() > 0: explicit else: home ++ "/.local/with-green"
+    if home.len() > 0 and dir.starts_with(home ++ "/"):
+        return "$HOME/" ++ dir.slice(home.len() + 1, dir.len()) ++ "/green.tsv"
+    dir ++ "/green.tsv"
+
 fn install_compiler_target(name: &str, source: &str, dest: &str, dep: &str) -> Target:
     install_file_target(name, source, dest, "0755", dep).arg("verify=version")
 
@@ -2871,7 +2882,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     ownership_gates = ownership_gates.dep("test")
     out = out.add_target(ownership_gates)
 
-    var last_green = target_new(.Action, "last-green", "").output("out/.build-state/last-green.json")
+    var last_green = target_new(.Action, "last-green-record", "").output("out/.build-state/last-green.json")
     last_green.action = run_last_green_action
     // D19: last-green is pure evidence assembly — it reads what test-green
     // and fixpoint-evidence recorded and fails loudly when stale. It must
@@ -2889,7 +2900,15 @@ pub fn build(ctx: BuildCtx) -> Build:
     last_green = last_green.dep("with-sha256")
     last_green = last_green.dep("seed-driver")
     last_green = last_green.arg(release_asset_for_host())
+    last_green = last_green.extra_output("out/.build-state/green-store.tsv")
     out = out.add_target(last_green)
+
+    // `:last-green` records the green here and publishes it, keyed on what was
+    // tested (git tree, pinned seed, host), to the store every worktree reads:
+    // a squash-merge of these sources, or a checkout of them elsewhere, is
+    // already green (build/retention.w).
+    out = out.add_target(install_file_target("last-green-publish", "out/.build-state/green-store.tsv", green_store_install_path(ctx), "0644", "last-green-record"))
+    out = out.add_target(target_new(.Group, "last-green", "").dep("last-green-publish"))
 
     var require_last_green = target_new(.Action, "require-last-green", "").output("out/command/require-last-green/ok")
     require_last_green.action = run_require_last_green_action
