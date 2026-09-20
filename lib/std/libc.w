@@ -47,6 +47,7 @@ pub extern fn vfprintf(stream: *mut c_void, fmt: *const i8, va: c_va_list) -> i3
 pub extern fn vprintf(fmt: *const i8, va: c_va_list) -> i32
 pub extern fn fopen(path: *const i8, mode: *const i8) -> *mut c_void
 pub extern fn fclose(stream: *mut c_void) -> i32
+pub extern fn remove(path: *const i8) -> i32
 pub extern fn fflush(stream: *mut c_void) -> i32
 pub extern fn fgets(s: *mut i8, size: i32, stream: *mut c_void) -> *mut i8
 pub extern fn fgetc(stream: *mut c_void) -> i32
@@ -61,6 +62,13 @@ pub extern fn fwrite(ptr: *const c_void, size: u64, count: u64, stream: *mut c_v
 // POSIX fileno (UCRT `_fileno`): a seam.
 extern fn with_libc_fileno(stream: *mut c_void) -> i32
 pub fn fileno(stream: *mut c_void) -> i32: with_libc_fileno(stream)
+// Stream positions are 64-bit on every target: C's `long` is 32 bits on
+// Windows, so fseek/ftell and the host's wide spellings (fseeko, ftello,
+// _fseeki64, _ftelli64) are one seam.
+extern fn with_libc_fseek(stream: *mut c_void, offset: i64, whence: i32) -> i32
+extern fn with_libc_ftell(stream: *mut c_void) -> i64
+pub fn fseek(stream: *mut c_void, offset: i64, whence: i32) -> i32: with_libc_fseek(stream, offset, whence)
+pub fn ftell(stream: *mut c_void) -> i64: with_libc_ftell(stream)
 
 // strings / locale / conversion
 pub extern fn strcpy(dst: *mut i8, src: *const i8) -> *mut i8

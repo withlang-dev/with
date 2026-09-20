@@ -6724,7 +6724,9 @@ impl CiTypePool:
                     let canonical_kind = with_ci_type_kind(session, pointee_canonical)
                     if canonical_kind == CXT_FunctionProto or canonical_kind == CXT_FunctionNoProto:
                         return self.type_from_libclang(session, pointee_canonical)
-            if pointee_kind == CXT_Void:
+            // A `FILE *` local or cast is `*mut c_void` like its parameters,
+            // fields and returns: the bridge's one rule decides.
+            if pointee_kind == CXT_Void or with_ci_type_is_reserved_system_record(session, pointee_idx):
                 let c_void_idx = self.add_string("c_void")
                 let c_void_ty = self.ty_named(c_void_idx)
                 return self.ty_pointer(c_void_ty, is_const)
@@ -9378,6 +9380,18 @@ fn ci_migrate_preamble_extern_call_requires_unsafe(name: &str) -> bool:
     false
 
 impl CiExprPool:
+    // `*arr` is `arr[0]`: C decays an array operand of unary `*` to a pointer
+    // to its first element (mztools' `READ_8(header)` over `char header[30]`).
+    fn decay_deref_operand(session: i64, operand_cursor: i32, value_id: CiExprId, types: CiTypePool) -> CiExprId:
+        let value_ty = self.get_type(value_id)
+        let array_valued = (value_ty as i32) != 0 and types.kind(value_ty) == CiTypeKind.CT_ARRAY
+        let peeled = ci_peel_transparent(session, operand_cursor)
+        // An array-spelled parameter is already a pointer.
+        if with_ci_cursor_references_parameter(session, peeled): return value_id
+        if not array_valued and not ci_cursor_is_array_type(session, peeled): return value_id
+        let decayed = self.decay_array_value_expr(session, operand_cursor, value_id, 0 as CiTypeId, types)
+        if (decayed as i32) == 0: value_id else: decayed
+
     fn decay_array_value_expr(session: i64, original_cursor: i32, value_id: CiExprId, target_ty: CiTypeId, types: CiTypePool) -> CiExprId:
         let peeled = ci_peel_transparent(session, original_cursor)
         if with_ci_cursor_kind(session, peeled) == CXK_STRING_LITERAL:
@@ -9672,6 +9686,9 @@ impl CiExprPool:
                         deref_child = self.cast(resolved_ty, child_id)
                         if (deref_ty as i32) == 0:
                             deref_ty = (types.get_d0(resolved_ty)) as CiTypeId
+            deref_child = self.decay_deref_operand(session, child_cursor, deref_child, types)
+            if (deref_ty as i32) == 0 and self.kind(deref_child) == CiExprKind.CIE_ARRAY_DECAY:
+                deref_ty = (self.get_d1(deref_child)) as CiTypeId
             return self.add(CiExprKind.CIE_DEREF, deref_child as i32, 0, 0, deref_ty)
 
         if op == UO_MINUS:
@@ -10163,6 +10180,9 @@ impl CiStmtPool:
                             deref_operand = exprs.cast(resolved_ty, operand.value_expr)
                             if (deref_ty as i32) == 0:
                                 deref_ty = (types.get_d0(resolved_ty)) as CiTypeId
+                deref_operand = exprs.decay_deref_operand(session, operand_cursor, deref_operand, types)
+                if (deref_ty as i32) == 0 and exprs.kind(deref_operand) == CiExprKind.CIE_ARRAY_DECAY:
+                    deref_ty = (exprs.get_d1(deref_operand)) as CiTypeId
                 let deref_id = exprs.add(CiExprKind.CIE_DEREF, deref_operand as i32, 0, 0, deref_ty)
                 return CiValueExprIR {
                     setup_stmt: operand.setup_stmt,
@@ -16510,6 +16530,9 @@ fn ci_libc_portable_callee(name: &str) -> str:
     if name == "__error" or name == "__errno_location" or name == "_errno": return "errno_ptr"
     if name == "_fileno": return "fileno"
     if name == "_isatty": return "isatty"
+    if name == "fopen64": return "fopen"
+    if name == "fseeko" or name == "fseeko64" or name == "_fseeki64": return "fseek"
+    if name == "ftello" or name == "ftello64" or name == "_ftelli64": return "ftell"
     if name == "__acrt_iob_func": return "libc_iob"
     name ++ ""
 
@@ -16550,7 +16573,9 @@ fn ci_libc_symbol_kind_mask(name: &str) -> i32:
     if name == "errno_ptr" or name == "libc_iob" or name == "libc_stdin" or name == "libc_stdout" or name == "libc_stderr": return CI_LIBC_KIND_FN
     if name == "fprintf" or name == "printf" or name == "snprintf" or name == "sprintf": return CI_LIBC_KIND_FN
     if name == "vsnprintf" or name == "vfprintf" or name == "vprintf": return CI_LIBC_KIND_FN
-    if name == "fopen" or name == "fclose" or name == "fflush" or name == "fileno": return CI_LIBC_KIND_FN
+    if name == "fopen" or name == "fclose" or name == "fflush" or name == "fileno" or name == "remove": return CI_LIBC_KIND_FN
+    if name == "fseek" or name == "ftell" or name == "fseeko" or name == "ftello": return CI_LIBC_KIND_FN
+    if name == "fopen64" or name == "fseeko64" or name == "ftello64" or name == "_fseeki64" or name == "_ftelli64": return CI_LIBC_KIND_FN
     if name == "fgets" or name == "fgetc" or name == "fputc" or name == "fputs": return CI_LIBC_KIND_FN
     if name == "putc" or name == "perror" or name == "feof" or name == "ferror" or name == "fread" or name == "fwrite": return CI_LIBC_KIND_FN
     if name == "strcpy" or name == "strncpy" or name == "strstr" or name == "strrchr" or name == "strerror": return CI_LIBC_KIND_FN

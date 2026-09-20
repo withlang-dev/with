@@ -236,6 +236,7 @@ let CXCursor_FieldDecl: i32 = 6
 let CXCursor_EnumConstantDecl: i32 = 7
 let CXCursor_FunctionDecl: i32 = 8
 let CXCursor_VarDecl: i32 = 9
+let CXCursor_ParmDecl: i32 = 10
 let CXCursor_TypedefDecl: i32 = 20
 let CXCursor_TranslationUnit: i32 = 350
 let CXCursor_MacroDefinition: i32 = 501
@@ -858,6 +859,19 @@ unsafe fn cimport_type_is_va_list_parameter(ty: CXType):
 unsafe fn translate_parameter_type(s: *mut CImportSession, ty: CXType, depth: i32):
     if cimport_type_is_va_list_parameter(ty):
         return session_strdup(s, "c_va_list\0" as *const u8)
+    // C adjusts a parameter of array type to a pointer to its element
+    // (`int v[4]` is `int *v`); libclang reports the written array type.
+    // An incomplete array (`char *argv[]`) already translates as a pointer.
+    let canonical = clang_getCanonicalType(ty)
+    if canonical.kind == CXType_ConstantArray or canonical.kind == CXType_VariableArray:
+        let elem = clang_getArrayElementType(canonical)
+        let elem_str = translate_type_recursive(s, elem, depth + 1, 0)
+        if elem_str as i64 == 0 or c_strncmp(elem_str as *const u8, "__UNSUPPORTED:\0" as *const u8, 14) == 0: return elem_str
+        var buf: [2048]u8 = [0 as u8; 2048]
+        var pos: i64 = 0
+        buf_append_str(&raw mut buf as *mut [2048]u8 as *mut u8, &raw mut pos, 2048, if clang_isConstQualifiedType(elem) != 0: "*const \0" as *const u8 else: "*mut \0" as *const u8)
+        buf_append_str(&raw mut buf as *mut [2048]u8 as *mut u8, &raw mut pos, 2048, elem_str as *const u8)
+        return session_strdup(s, &buf as *const [2048]u8 as *const u8)
     translate_type_recursive(s, ty, depth, 0)
 
 unsafe fn translate_type_recursive_mode(s: *mut CImportSession, ty: CXType, depth: i32, is_last_struct_field: i32, preserve_incomplete_arrays: i32) -> *mut u8:
@@ -3242,6 +3256,16 @@ pub fn with_ci_type_is_const(session: i64, type_idx: i32) -> i32:
         let ty = *(((*s).types as i64 + type_idx as i64 * 24) as *const CXType)
         clang_isConstQualifiedType(ty)
 
+// Whether the type is a reserved-spelled record from a system header: the
+// pointee of `FILE *`, which every type path spells `c_void`
+// (record_is_reserved_system is the one rule).
+pub fn with_ci_type_is_reserved_system_record(session: i64, type_idx: i32) -> bool:
+    unsafe:
+        let s = session as *mut CImportSession
+        if s as i64 == 0 or type_idx < 0 or type_idx >= (*s).type_count: return false
+        let canonical = clang_getCanonicalType(*(((*s).types as i64 + type_idx as i64 * 24) as *const CXType))
+        canonical.kind == CXType_Record and record_is_reserved_system(canonical) != 0
+
 pub fn with_ci_type_is_volatile(session: i64, type_idx: i32) -> i32:
     unsafe:
         let s = session as *mut CImportSession
@@ -3639,6 +3663,16 @@ pub fn with_ci_cursor_location(session: i64, cursor_idx: i32) -> str:
             clang_disposeString(fallback_file)
         clang_disposeString(presumed_file)
         session_make_str(s, &buf as *const [1024]u8 as *const u8)
+
+// Whether the cursor names a function parameter. C adjusts an array-spelled
+// parameter (`char *argv[]`, `int v[4]`) to a pointer, while libclang still
+// reports the written array type for a reference to it.
+pub fn with_ci_cursor_references_parameter(session: i64, cursor_idx: i32) -> bool:
+    unsafe:
+        let s = session as *mut CImportSession
+        if s as i64 == 0 or cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return false
+        let referenced = clang_getCursorReferenced(*(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor))
+        clang_Cursor_isNull(referenced) == 0 and clang_getCursorKind(referenced) == CXCursor_ParmDecl
 
 pub fn with_ci_cursor_referenced_location(session: i64, cursor_idx: i32) -> str:
     unsafe:

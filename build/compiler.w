@@ -1225,7 +1225,7 @@ pub fn run_check_requirements_informative_action(ctx: ActionCtx) -> i32:
 
 fn comp_libc_standard_externs() -> str:
     "|fprintf|printf|snprintf|sprintf|vsnprintf|vfprintf|vprintf|fopen|fclose|fflush|" ++
-    "fgets|fgetc|fputc|fputs|putc|perror|feof|ferror|fread|fwrite|" ++
+    "fgets|fgetc|fputc|fputs|putc|perror|feof|ferror|fread|fwrite|remove|" ++
     "strcpy|strncpy|strrchr|strstr|strerror|atoi|strtol|strtoul|strtod|setlocale|" ++
     "abort|exit|clock|time|rand|srand|qsort|"
 
