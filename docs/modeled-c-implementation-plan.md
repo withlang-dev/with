@@ -269,12 +269,54 @@ and an audit lane in the shape of `libc-surface-check` (`build/compiler.w:
 1243`) that fails when a runtime extern touching a declared domain is added
 without a contract row.
 
-**Tooling (ruling §2.3, §63), alongside stages 10-12.** Facade generation
-emits a draft facade from names, signatures, `const`, out-parameters,
-`_v2` families and prefix grouping; every capability-granting line is
-commented out with its provenance; the draft is ordinary With source in the
-project (`facades/` by convention) and is never adopted silently. The CLI
-spelling is proposed, not ruled.
+**Tooling (ruling §2.3, §63), alongside stages 10-12.** The design rule,
+adopted verbatim from the architect's review: *tooling may be aggressive in
+proposing; the compiler must remain conservative in believing.* Authoring
+burden, not semantics, is what decides whether this architecture is adopted,
+so the tooling is not secondary ergonomics; it is part of the campaign.
+
+The intended workflow is tool-assisted designation, reviewed as confirming a
+contract rather than learning a mini-language:
+1. the tool reads the header and recognizes likely constructors and
+   destructors (`foo_create` returning `Foo *`, `foo_destroy(Foo *)`), and
+   proposes `resource Foo` with producer and destroyer;
+2. it lists the functions that take `Foo *` and proposes their effects, with
+   `lend` shown as an assertion about foreign behavior, never as a safe
+   default;
+3. for every producer that receives a resource, it asks whether the produced
+   handle is dependent or independent, and explains the consequence of each;
+4. it flags `register_*` / callback-taking shapes and asks about retention
+   and destroy-callback transfer;
+5. it proposes thread capabilities from header annotations, documentation
+   patterns or an adopted profile, never from representation;
+6. it shows the effective contract graph — resources, dependencies, domains,
+   views — and the user confirms or overrides;
+7. the compiler verifies every structurally checkable clause (§61).
+
+Every suggestion answers *why it was suggested* (naming heuristic, header
+annotation, convention profile, documentation pattern, prior facade,
+compiler proof); every capability-granting line is emitted commented out
+with that provenance; the draft is ordinary With source in the project
+(`facades/` by convention) and is never adopted silently.
+
+Three diagnostics and views get first-class attention because they will be
+used most:
+- **`independent`.** Conservative dependency will over-restrict often (an
+  API that merely uses an allocator or context temporarily). The Rule 6/7
+  and return-escape diagnostics on a facaded child must name the producer,
+  the candidate parent, and the exact `independent` clause to write (§8,
+  §57), and the generator asks the question up front.
+- **Profiles.** A profile is trusted evidence that infers from names, so a
+  bad profile can make hundreds of bindings unsound systematically. The
+  contract view must be able to list every fact a profile decided, by rule,
+  per binding, and profiles get the most aggressive versioning and
+  provenance display of any evidence class.
+- **Domains.** Process/thread/resource/static domains with preservation and
+  invalidation are the hardest part to author correctly; the contract view
+  renders the relationships between origins, domains and dependent views,
+  not a flat list.
+
+The CLI spellings are proposed, not ruled, and are settled with stage 10.
 
 ## Batching (blast radius)
 
