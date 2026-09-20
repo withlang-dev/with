@@ -682,36 +682,6 @@ impl Sema:
             return 1
         0
 
-// Curated libc contract overlay (#379). Evidence, not exemptions: a
-// `const char*` parameter is modeled as a NUL-terminated, borrowed string
-// input (`cstr_in`) only when this overlay vouches for the specific function.
-// There is NO blanket `const char*` assumption — that would be the "strlen
-// guessing" / context reinterpretation §16.3c forbids. Functions absent here
-// import with raw surfaces (callable only under `unsafe`).
-//
-// Returns the number of leading parameters that are `cstr_in` (all remaining
-// parameters and the return are plain value types for these entries), or -1
-// when the function is not curated. Every curated entry here has its char*
-// parameters in leading position, so a count is sufficient.
-fn ci_overlay_cstr_in_param_count(name: &str) -> i32:
-    if name == "atof": return 1
-    if name == "atoi": return 1
-    if name == "atol": return 1
-    if name == "atoll": return 1
-    if name == "getenv": return 1
-    if name == "strcasecmp": return 2
-    if name == "strchr": return 1
-    if name == "strcmp": return 2
-    if name == "strcspn": return 2
-    if name == "strlen": return 1
-    if name == "strncasecmp": return 2
-    if name == "strncmp": return 2
-    if name == "strpbrk": return 2
-    if name == "strrchr": return 1
-    if name == "strspn": return 2
-    if name == "strstr": return 2
-    -1
-
 // #379: curated functions whose pointer RETURN is a borrowed, nullable handle.
 // Raw C pointers (`*T`) are natively nullable in With — `== None` and
 // `.unwrap()` work directly (e.g. malloc returns a plain `*mut c_void`), so the
@@ -726,6 +696,31 @@ fn ci_overlay_return_is_borrowed_ptr(name: &str) -> i32:
     if name == "strrchr": return 1
     if name == "strstr": return 1
     0
+
+// Whether a string literal's interned source text denotes a NUL byte: a raw
+// literal (`\x01raw\x01` prefix) holds its bytes as written; any other spells
+// one as `\0`, `\x00` or `\u{0}`.
+pub fn sema_string_literal_has_nul(raw: &str) -> bool:
+    let n = raw.len() as i32
+    let is_raw = n >= 5 and raw[0] == 1 and raw[1] == 'r' and raw[2] == 'a' and raw[3] == 'w' and raw[4] == 1
+    var i = if is_raw: 5 else: 0
+    while i < n:
+        let c = raw[i]
+        if c == 0: return true
+        if not is_raw and c == '\\' and i + 1 < n:
+            let e = raw[i + 1]
+            if e == '0': return true
+            if e == 'x' and i + 3 < n and raw[i + 2] == '0' and raw[i + 3] == '0': return true
+            if e == 'u' and i + 2 < n and raw[i + 2] == '{':
+                var k = i + 3
+                var all_zero = k < n and raw[k] != '}'
+                while k < n and raw[k] != '}':
+                    if raw[k] != '0': all_zero = false
+                    k = k + 1
+                if all_zero: return true
+            i = i + 1
+        i = i + 1
+    false
 
 impl Sema:
     fn ci_function_requires_raw_abi(fn_sym: i32) -> i32:
@@ -755,16 +750,16 @@ impl Sema:
         if self.ci_type_requires_raw_contract(self.sig_return_type(sig_idx)) != 0:
             if ci_overlay_return_is_borrowed_ptr(name) == 0:
                 return 1
-        let cstr_n = ci_overlay_cstr_in_param_count(name)
         for pi in 0..param_count:
             let pty = self.sig_param_type(sig_idx, pi)
             if self.ci_type_requires_raw_contract(pty) != 0:
-                // A pointer parameter is modeled as a C-string input (`cstr_in`)
-                // only when the curated overlay vouches for it, OR (#602) when a
-                // `retains:` annotation vouches for it: a retained `const char*`
-                // param is a modeled C-string input whose retention is enforced at
-                // the call site. No evidence -> raw.
-                if (pi < cstr_n or self.param_is_retained(fn_sym, pi) != 0) and self.ci_type_is_const_c_string_input(pty) != 0:
+                // §16.3c, D47: evidence governs what With receives from C. A
+                // `const char *` parameter is lent a NUL-terminated `str` for
+                // the call (a literal directly, any other `str` through storage
+                // that stays readable), so it never makes the function raw. A
+                // `retains:` parameter (#602) is the same input, with a `str`
+                // argument refused at the call site.
+                if self.ci_type_is_const_c_string_input(pty) != 0:
                     continue
                 return 1
         0

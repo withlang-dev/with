@@ -499,6 +499,12 @@ type CallArgValue {
     cleanup_ptr: i64,
 }
 
+// A call operand that is a string literal, with its decoded text.
+type StrLiteralOperand {
+    found: bool,
+    text: str,
+}
+
 type LoopState {
     break_bbs: Vec[i64],
     continue_bbs: Vec[i64],

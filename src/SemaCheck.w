@@ -15941,6 +15941,10 @@ impl Sema:
                             if sc_kind == 2:
                                 sc_mut_args.push(err_arg_node)
                             if sc_kind == 0:
+                                // §16.3c: a proven interior NUL is a compile error; C would
+                                // read the literal only up to it.
+                                if self.ci_syms.contains(fn_sym) and self.ci_type_is_const_c_string_input(expected_ty) != 0 and err_arg_node > 0 and self.ast.kind(err_arg_node) == NodeKind.NK_STRING_LIT and sema_string_literal_has_nul(self.pool_resolve(self.ast.get_data0(err_arg_node))):
+                                    self.emit_error("a string literal passed to a C string parameter has an interior NUL byte; C would read it only up to there", err_arg_node)
                                 if not (self.ci_syms.contains(fn_sym) and self.try_ci_coercion(fn_sym, arg_ty, expected_ty) != 0):
                                     self.emit_argument_type_mismatch(self.safe_symbol_text(fn_sym), fn_sym, ai, param_i, expected_ty, arg_ty, if err_arg_node > 0: err_arg_node else: node)
                         else:

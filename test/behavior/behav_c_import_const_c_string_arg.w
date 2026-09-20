@@ -1,9 +1,7 @@
 //! expect-stdout: ok
 
-// #379: strlen is in the curated libc overlay, so its `const char*` parameter
-// is modeled as a `cstr_in` NUL-terminated string input and a With `str`
-// coerces without unsafe. This works through the overlay evidence, not the
-// removed blanket `const char*`-as-cstring assumption.
+// §16.3c, D47: a `str` is lent to a c_imported `const char *` parameter as
+// NUL-terminated input text, a literal and a runtime string alike.
 
 use c_import("unsigned long strlen(const char *s);\n")
 

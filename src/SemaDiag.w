@@ -79,10 +79,9 @@ impl Sema:
         let par_k = self.get_type_kind(self.resolve_alias(param_ty))
         if arg_k == TypeKind.TY_BOOL and par_k == TypeKind.TY_INT:
             return 1
-        // str → C string is evidence-driven (#379): only a modeled function (one
-        // the curated overlay vouches for) coerces a With `str` to its `cstr_in`
-        // const char* parameter. Raw functions get no string magic — the caller
-        // must pass an explicit C string under `unsafe`.
+        // str → C string (§16.3c, D47): a `str` is lent to a c_imported
+        // `const char *` parameter for the call. A function that is raw for
+        // another reason (what it returns, a mutable buffer) gets no coercion.
         if self.ci_raw_syms.contains(fn_sym) == 0 and self.ci_type_is_const_c_string_input(param_ty) != 0:
             if arg_k == TypeKind.TY_STR:
                 return 1

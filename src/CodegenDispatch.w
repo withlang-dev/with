@@ -1594,13 +1594,7 @@ impl Codegen:
             return wl_const_int(wl_i1_type(self.context), cd as i64, 0)
 
         if ck == ConstKind.CK_STR:
-            var text = ""
-            if cd != 0:
-                let raw = self.intern.resolve(cd)
-                if raw.len() >= 5 and raw[0] == 1 and raw[1] == 114 and raw[2] == 97 and raw[3] == 119 and raw[4] == 1:
-                    text = raw.slice(5, raw.len())
-                else:
-                    text = self.decode_string_escapes(raw)
+            let text = self.str_const_text(cd)
             let const_sema_ty = if const_id >= 0 and const_id < body.const_types.len() as i32: body.const_types[const_id] else: 0
             if self.mir_sema_type_is_ref_to_str(const_sema_ty) != 0:
                 return self.gen_string_literal_ref(text)
@@ -5644,17 +5638,40 @@ impl Codegen:
                 return 1
         0
 
+    // The text of a CK_STR constant: a raw literal's bytes as written, any
+    // other literal's with its escapes decoded.
+    fn str_const_text(interned: i32) -> str:
+        if interned == 0: return ""
+        let raw = self.intern.resolve(interned)
+        if raw.len() >= 5 and raw[0] == 1 and raw[1] == 114 and raw[2] == 97 and raw[3] == 119 and raw[4] == 1:
+            return raw.slice(5, raw.len())
+        self.decode_string_escapes(raw)
+
+    // Whether a call operand is a string literal. One with an interior NUL is
+    // not reported as one: it takes the lending path, which refuses it loudly.
+    fn mir_operand_str_literal(body: &MirBody, operand_id: i32) -> StrLiteralOperand:
+        if operand_id < 0 or operand_id >= body.operand_kinds.len() as i32 or body.operand_kinds[operand_id] != OperandKind.OK_CONSTANT:
+            return StrLiteralOperand { found: false, text: "" }
+        let const_id = body.operand_d0[operand_id]
+        if const_id < 0 or const_id >= body.const_kinds.len() as i32 or body.const_kinds[const_id] != ConstKind.CK_STR:
+            return StrLiteralOperand { found: false, text: "" }
+        let text = self.str_const_text(body.const_d0[const_id])
+        for i in 0..text.len():
+            if text[i] == 0: return StrLiteralOperand { found: false, text: "" }
+        StrLiteralOperand { found: true, text: text }
+
     mut fn copy_str_to_cstr_temp(str_val: i64) -> i64:
         let str_ty = wl_type_of(str_val)
         if str_ty == 0:
             return str_val
-        // #761: observing form — pass the header address.
-        var fn_val = wl_get_named_function(self.llmod, "with_str_to_cstr_ref")
+        // #761: observing form — pass the header address. The copy is lent
+        // from storage that stays readable after the call (§16.3c, D47).
+        var fn_val = wl_get_named_function(self.llmod, "with_cstr_lend")
         if fn_val == 0:
             let params: Vec[i64] = Vec.new()
             params.push(wl_ptr_type(self.context))
             let fn_ty = wl_function_type(wl_ptr_type(self.context), vec_data_i64(&params), 1, 0)
-            fn_val = wl_add_function(self.llmod, "with_str_to_cstr_ref", fn_ty)
+            fn_val = wl_add_function(self.llmod, "with_cstr_lend", fn_ty)
         if fn_val == 0:
             return self.extract_str_ptr(str_val)
         let fn_ty = wl_global_get_value_type(fn_val)
@@ -5665,12 +5682,12 @@ impl Codegen:
     fn free_call_temp_ptrs(ptrs: &Vec[i64]):
         if ptrs.len() == 0:
             return
-        var free_fn = wl_get_named_function(self.llmod, "with_free")
+        var free_fn = wl_get_named_function(self.llmod, "with_cstr_release")
         if free_fn == 0:
             let fp: Vec[i64] = Vec.new()
             fp.push(wl_ptr_type(self.context))
             let fft = wl_function_type(wl_void_type(self.context), vec_data_i64(&fp), 1, 0)
-            free_fn = wl_add_function(self.llmod, "with_free", fft)
+            free_fn = wl_add_function(self.llmod, "with_cstr_release", fft)
         if free_fn == 0:
             return
         let free_ty = wl_global_get_value_type(free_fn)
@@ -5688,6 +5705,10 @@ impl Codegen:
         if out != 0 and expected_ty != 0:
             let expected_kind = wl_get_type_kind(expected_ty)
             let actual_kind = wl_get_type_kind(wl_type_of(out))
+            let literal_text = self.mir_operand_str_literal(body, operand_id)
+            if is_c_abi_arg != 0 and literal_text.found and expected_kind == wl_pointer_type_kind() and self.sema_type_is_c_char_pointer(expected_sema_ty) != 0:
+                let direct = wl_build_global_string_ptr(self.builder, literal_text.text)
+                return CallArgValue { value: self.enforce_coerced_type(direct, expected_ty, "wrong argument type"), cleanup_ptr: 0 }
             if is_c_abi_arg != 0 and expected_kind == wl_pointer_type_kind() and self.sema_type_is_c_char_pointer(expected_sema_ty) != 0 and self.sema_type_is_str_value_or_view(self.mir_operand_sema_type(body, operand_id)) != 0:
                 var str_out = out
                 if actual_kind == wl_pointer_type_kind():
