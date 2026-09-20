@@ -1271,6 +1271,52 @@ fn comp_preamble_extern_names(preamble_body: &str) -> str:
         at = comp_find_from(preamble_body, "\"extern fn ", at + 11)
     names
 
+// ── user programs never say `unsafe` (Eric, 2026-09-19) ─────────────────────
+// A release UAT fixture and an example are what an application developer
+// writes: a game, a site, a tool over a C library. If one needs `unsafe`, the
+// compiler forced that user somewhere they should never be, and the defect is
+// the compiler's. The spiral fixture was once rewritten to `unsafe` so a new
+// c_import rule would pass; this lane makes that a red build instead.
+
+/// Whether `line` uses the `unsafe` keyword outside a string literal or a
+/// `//` comment.
+fn comp_line_says_unsafe(line: &str) -> bool:
+    var in_string = false
+    var i = 0
+    let n = line.len() as i32
+    while i < n:
+        let c = line[i]
+        if in_string:
+            if c == '\\': i = i + 1
+            else if c == '"': in_string = false
+        else if c == '"': in_string = true
+        else if c == '/' and i + 1 < n and line[i + 1] == '/': return false
+        else if c == 'u' and line.slice(i as i64, line.len()).starts_with("unsafe"):
+            let before_ok = i == 0 or not comp_is_ident_continue(line[i - 1] as i32)
+            let after_ok = i + 6 >= n or not comp_is_ident_continue(line[i + 6] as i32)
+            if before_ok and after_ok: return true
+        i = i + 1
+    false
+
+pub fn run_check_user_programs_safe_action(ctx: ActionCtx) -> i32:
+    let fs = ctx.fs()
+    var errors = 0
+    var files = 0
+    for root in ["build/release_uat_fixtures", "examples"]:
+        if not fs.is_dir(root): continue
+        for path in fs.list_files(root):
+            if not path.ends_with(".w"): continue
+            files = files + 1
+            let lines = comp_split_lines(fs.read_text(path))
+            for i in 0..lines.len() as i32:
+                if comp_line_says_unsafe(lines[i]):
+                    print(path ++ f":{i + 1}: " ++ comp_trim(lines[i]))
+                    errors = errors + 1
+    if errors > 0:
+        return comp_fail(ctx, f"{errors} uses of `unsafe` in release UAT fixtures and examples; a user program never needs one - fix the compiler, never the program")
+    if fs.write_text(ctx.output(), f"ok: {files} user programs, no unsafe\n") != 0: return comp_fail(ctx, "cannot write " ++ ctx.output())
+    0
+
 pub fn run_check_libc_surface_action(ctx: ActionCtx) -> i32:
     let fs = ctx.fs()
     let path = "lib/std/libc.w"

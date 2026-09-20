@@ -300,6 +300,24 @@ into under pressure to complete.
 with a human that the check is wrong. Never downgrade it to a warning, add an
 exemption, or route around it.
 
+**Editing a user program to make it pass.** Release UAT fixtures
+(`build/release_uat_fixtures/`), `examples/`, and any code published on the
+blog or the homepage are contracts with Eric and with everyone who has read
+them: they are what an application developer writes. When a compiler, spec,
+or stdlib change breaks one, the change is what broke. Stop and take it to
+Eric; never edit the program so the new rule passes. That is deleting a
+failing test. (2026-06-17 a c_import rule change broke the raylib spiral UAT;
+it sat broken until 2026-09-07, when the fixture was rewritten to `unsafe` to
+go green, without Eric's knowledge, while his blog still showed the original.)
+
+**`unsafe` in a user program.** An application developer — someone writing a
+game, a site, a tool over a C library — never writes `unsafe`. If a UAT
+fixture or an example needs it, the compiler forced a user somewhere they
+should never be, and the defect is the compiler's: model the C surface, prove
+the call, or make it safe. `with build :user-programs-safe` (a gate of
+`:release-uat`) fails on any `unsafe` in those programs. `unsafe` belongs to
+library maintainers and the compiler's own runtime.
+
 **"Pre-existing" without evidence.** A failure is pre-existing only if you've
 verified it on the previous commit. Otherwise it's your failure, renamed. Never
 use `git stash` to answer this; use `git worktree` or a separate clone.

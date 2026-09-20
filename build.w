@@ -1831,6 +1831,12 @@ pub fn build(ctx: BuildCtx) -> Build:
 
     // std.libc exports C-standard functions and with_libc_* seams only, and
     // the migrator's libc allowlist agrees with it (build/compiler.w).
+    var user_programs_safe = target_new(.Action, "user-programs-safe", "").output("out/.build-state/user-programs-safe.txt")
+    user_programs_safe.action = run_check_user_programs_safe_action
+    user_programs_safe = user_programs_safe.write_scope("out/.build-state")
+    user_programs_safe = user_programs_safe.input("build/release_uat_fixtures").input("examples")
+    out = out.add_target(user_programs_safe)
+
     var libc_surface = target_new(.Action, "libc-surface-check", "").output("out/.build-state/libc-surface-check.txt")
     libc_surface.action = run_check_libc_surface_action
     libc_surface = libc_surface.write_scope("out/.build-state")
@@ -3008,6 +3014,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     out = out.add_target(release_one_liner_uat)
 
     var release_uat = target_new(.Group, "release-uat", "")
+    release_uat = release_uat.dep("user-programs-safe")
     release_uat = release_uat.dep("release-artifact-smoke-uat")
     release_uat = release_uat.dep("release-fresh-project-uat")
     release_uat = release_uat.dep("release-migrate-uat")
