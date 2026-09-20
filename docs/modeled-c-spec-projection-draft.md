@@ -51,21 +51,28 @@ library) may be toolchain-owned where separately justified.
 
 ### 16.2b.2 Evidence, precedence and provenance [§1–§4, §8, §60]
 
-Every modeled-C fact has a value and a provenance. Facts come from, in this
-order of authority:
+Every modeled-C fact has a value and a provenance. ABI/header impossibilities
+and compiler-proven contradictions constrain all modeling. Subject to those
+constraints, explicit facade clauses override profile facts, which override
+conservative defaults:
 
-1. ABI and header facts: types, pointer structure, layout, calling
-   convention, imported constants, link identity, and machine-readable
-   nullability, ownership or lifetime annotations. These constrain everything
-   below and cannot be overridden.
-2. Compiler proofs, where the compiler genuinely establishes a contract.
-3. Explicit facade clauses.
-4. Facts contributed by a convention profile the facade explicitly adopts.
-5. Conservative defaults.
+```
+ABI/header facts and proven contradictions   (constrain everything)
+explicit facade clause
+        ↓
+adopted convention profile
+        ↓
+conservative default
+```
 
-An explicit facade clause refines, overrides or suppresses a profile-derived
-fact. A facade cannot override an ABI impossibility. A compiler proof
-overrides a facade only when it proves the asserted contract impossible.
+ABI and header facts are types, pointer structure, layout, calling
+convention, imported constants, link identity, and machine-readable
+nullability, ownership or lifetime annotations. An explicit facade clause
+refines, overrides or suppresses a profile-derived fact. A facade cannot
+override an ABI impossibility. A compiler analysis overrides a facade only
+when it genuinely proves the asserted contract impossible, never merely
+because it reached a conclusion of its own; where the compiler genuinely
+proves a contract, the proof may grant capability.
 
 **The asymmetry rule.** Without a facade clause or an adopted profile, the
 compiler may infer only conclusions whose failure removes capability or
@@ -121,9 +128,13 @@ live after a successful `init`, dead after destruction. Its storage begins as
 `Drop` is armed only when initialization establishes production; storage
 existence alone never arms foreign destruction.
 
-**Never half-model.** A resource with a producer and no valid destruction
-path is a compile error. A destroying operation cannot remain callable as a
-borrow. A safe constructor with no destruction contract is not permitted.
+**Never half-model unsafely.** A partial model is acceptable when the missing
+fact only removes capability: ownership known but status uninterpreted, a
+child dependent until independence is known, a C string left as a borrowed
+byte view. A partial model that could create unsafety is a compile error: a
+resource with a producer and no valid destruction path; a destroying
+operation callable as a borrow; a safe constructor with no destruction
+contract; a returned pointer guessed to be owned.
 
 More than one resource may wrap the same representation (`InflateStream` and
 `DeflateStream` over `z_stream`). When exactly one resource wraps a
@@ -146,9 +157,9 @@ init inflateInit(self)               // in-place
 **Production is not success.** For an out-parameter producer the compiler
 initializes the slot to `NULL`, calls the function, and inspects the slot:
 non-null means a resource was produced and ownership begins at once; null
-means none was. This holds whether or not the status convention is known, so
-the low-level result of a producer is always meaningful as
-`(status, Option[Resource])`.
+means none was. This holds whether or not the status convention is known: for
+a status-returning out-parameter producer, the low-level modeled result
+remains `(status, Option[Resource])` when the status convention is unknown.
 
 A producer may state its success condition with an imported compile-time
 constant:
@@ -181,7 +192,10 @@ retains param 1 by param 0
 ```
 
 **Lend.** Once a resource is modeled, its facade-exposed operations borrow it
-unless stronger evidence says otherwise. With proves the resource is live,
+unless stronger evidence says otherwise. This default is not a compiler proof
+or a conservative safety inference; it is the facade's assertion that the
+foreign operation does not retain, consume, or destroy the argument. With
+proves the resource is live,
 unmoved and undestroyed, and that With discharges ownership per the contract;
 it does not prove that foreign code honors borrowing. Lending is trusted
 facade semantics. A facade that exposes a consuming or destroying operation as
@@ -315,8 +329,9 @@ explicit copying conversion. The same applies to any foreign-owned buffer.
 
 **Nullability.** `NULL` is information. Machine-readable nullability is used
 directly. Otherwise `nullable -> Option`, `nonnull -> direct value`, and
-unknown nullability is represented as nullable; it never silently becomes
-non-null. Out-resource production keeps its own NULL-inspect rule.
+unknown nullability is represented as nullable or otherwise restricted; it
+never silently becomes non-null. Out-resource production keeps its own
+NULL-inspect rule.
 
 ### 16.2b.9 Callbacks [§44–§47]
 
@@ -328,7 +343,10 @@ static lifetime).
 A callback used only during one foreign call needs no retained lifetime. A
 callback C keeps is modeled with `retains`, and its userdata likewise. A
 callback receives ownership only through explicit evidence (`callback
-consumes param N`); this is never inferred.
+consumes param N`); this is never inferred. A callback named by
+`destroyed_by` (§16.2b.5) is the modeled eventual destruction path of
+ownership already transferred into C: the value is live in C until that
+callback runs, and With destroys it through no other path.
 
 **Reentrancy.** A foreign operation that may invoke a callback is treated as
 affecting the origins the callback captures, according to the captures'
@@ -342,8 +360,10 @@ is capability-granting evidence, and absent it the call is reentrant.
 A modeled resource is `thread creator` by default: operations and destruction
 occur on the creating thread and ownership does not cross threads. The
 capabilities are `send`, `share` and `drop_any_thread`; none is inferred from
-representation. In v1, `send` requires `drop_any_thread`; a facade granting
-`send` without it is a compile error. `share` is independent of `send`.
+representation. With v1 does not marshal destruction back to the creator
+thread; therefore `send` requires `drop_any_thread`, a creator-thread-bound
+resource is not sendable, and a facade granting `send` without
+`drop_any_thread` is a compile error. `share` is independent of `send`.
 
 A retained callback executes on the registering thread unless the facade
 states `callback_thread any`, in which case captured With state must satisfy
@@ -451,8 +471,11 @@ standard deliverable ..."
 > precedence §16.2b.2 gives; anything else is a conservative default. A
 > facade may be written locally or come as a package. The toolchain's own
 > knowledge is bounded to the C standard library (the curated libc facade),
-> which is a standard deliverable; libraries without a facade import with raw
-> surfaces until one is supplied.
+> which is a standard deliverable. A library without a facade still receives
+> whatever modeling ABI and header facts alone establish (machine-readable
+> nullability, header ownership or lifetime annotations, conservative
+> defaults); everything beyond that imports as the raw surface until a facade
+> is supplied.
 
 ### B.3 §16.3c — `retains:`
 
@@ -463,10 +486,11 @@ past the call ..."
 **Proposed:** keep the paragraph's semantics and add, as its first sentence:
 
 > Retention is stated in the facade with `retains param … by param …`
-> (§16.2b.5); the `retains:` import attribute is the same fact for the
-> C-string-input case and is accepted during migration.
-
-(Whether the attribute is then removed, and when, is Eric's call.)
+> (§16.2b.5), which is the canonical form: retention participates in
+> callbacks, ownership and origins, not only in C-string inputs. The
+> `retains:` import attribute is a compatibility spelling of the C-string
+> case, accepted during migration and deprecated in favour of the facade
+> vocabulary.
 
 ### B.4 §16.3c — nullable string returns
 
@@ -497,38 +521,48 @@ modeled as `Option[str]`, `Option[*T]`, or an equivalent generated wrapper."
 **Proposed:** add one sentence to scope rule 3:
 
 > For c_imported declarations the facade vocabulary (§16.2b.5) states these
-> effects; `@[effect]` remains the form for hand-written `extern`
-> declarations, which are the raw surface.
+> effects. `@[effect]` remains valid for hand-written `extern` declarations,
+> which have no imported facade namespace to attach to: it is the raw,
+> manual analogue of facade evidence, and a one-off extern needs no facade
+> block.
 
 ### B.7 §18.5 Toolchain
 
 **Proposed:** add:
 
-> `with analyze <file> contract` prints the effective modeled foreign contract
-> (§16.2b) — resources, producers, destroyers, effects, retention, borrowed
-> results, dependencies, status conventions, nullability, domains,
-> preservation, static lifetime, callback and thread facts, presentation — with
-> the provenance of every fact, and flags suspicious configurations: a producer
-> with no destroy path, a destroyer presented as a lend, a retained callback
-> with no owner, an illegal thread combination, an ambiguous profile match, a
-> profile fact shadowed by an override, and a function whose name and shape
-> resemble a destroyer but which is exposed as a lend. The last is advisory:
-> it changes no contract, and an explicit `lend` records that the author
-> reviewed it.
+> `with analyze` provides a foreign-contract view: the effective modeled
+> foreign contract (§16.2b) — resources, producers, destroyers, effects,
+> retention, borrowed results, dependencies, status conventions, nullability,
+> domains, preservation, static lifetime, callback and thread facts,
+> presentation — with the provenance of every fact. It flags suspicious
+> configurations: a producer with no destroy path, a destroyer presented as a
+> lend, a retained callback with no owner, an illegal thread combination, an
+> ambiguous profile match, a profile fact shadowed by an override, and a
+> function whose name and shape resemble a destroyer but which is exposed as a
+> lend. The last is advisory: it changes no contract, and an explicit `lend`
+> records that the author reviewed it.
 
-> `with facade <header>` writes a draft facade from the heuristics §16.2b.2
-> permits tooling to use. Every capability-granting line it proposes is
-> commented out with its provenance; the author uncomments what they trust,
+> Facade-generation tooling may emit a draft facade from the heuristics
+> §16.2b.2 permits tooling to use. Every capability-granting line it proposes
+> is commented out with its provenance; the author uncomments what they trust,
 > and the compiler verifies each clause (§16.2b.13). A generated facade is
-> never adopted silently.
+> ordinary With source in the project's source or package space (a `facades/`
+> directory is a convention, not a compiler location) and is never adopted
+> silently.
+
+(The exact CLI spellings — `with analyze <file> contract`, `with facade
+<header>` — are proposed, not ruled, and are settled with the tooling.)
 
 ### B.8 §18.8 Package Management
 
 **Proposed:** add:
 
-> A facade or a convention profile is a versioned package. `with get` may
-> fetch the facade published for a C package alongside the package; the
-> toolchain publishes none beyond the C standard library's.
+> A facade or a convention profile is a versioned package. When a C package
+> publishes a facade that declares compatibility with the resolved package
+> version, `with get` installs and applies it automatically; package-owned
+> metadata needs no opt-in ceremony. A locally generated draft facade is
+> never trusted automatically. The toolchain publishes no facade beyond the C
+> standard library's.
 
 ---
 
@@ -545,14 +579,16 @@ Until the facade language is implemented the compiler is non-compliant:
   `to_owned()`, with `to_str()` becoming the validating conversion.
 - No `c facade` syntax exists; `with analyze` has no contract view.
 
-## D. Open questions for Eric (not answered by the ruling's text)
+## D. Decisions Eric made on review (2026-09-20), now folded into A and B
 
-1. Section number and placement: a new §16.2b, or a new top-level §16.4 with
-   the rest renumbered?
-2. Does the `retains:` import attribute stay as a permanent spelling of the
-   C-string-input case, or is it deprecated and removed after migration?
-3. `@[effect]` on hand-written externs: keep as the raw-surface form (B.6), or
-   fold into facades too?
-4. The generated-facade output location and filename convention (`facades/`?
-   beside `build.w`?), and whether `with get` installs a published facade by
-   default or on request.
+1. **Placement:** §16.2b, as the semantic continuation of C import and
+   modeling, not a separate interop subsystem.
+2. **`retains:`** is a compatibility spelling accepted during migration and
+   deprecated; the facade vocabulary is canonical (B.3).
+3. **`@[effect]`** remains valid for hand-written `extern` declarations, the
+   raw/manual analogue of facade evidence (B.6).
+4. **Generated and published facades:** a facade is ordinary With source in
+   source or package space (`facades/` as a convention). A package-published
+   facade that declares compatibility with the resolved C package version is
+   installed and applied automatically; a locally generated draft is never
+   trusted automatically (B.7, B.8).
