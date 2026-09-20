@@ -2447,6 +2447,11 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
             let test_compiler = build_graph_test_compiler(root, target)
             var survey_target_failed = false
             if test_compiler.len() > 0:
+                // The tests are children of this worker, not workers: a
+                // `with build` a test runs must not inherit "run every
+                // target even when fresh".
+                build_action_clear_worker_env_for_children()
+                build_test_clear_worker_env_for_children()
                 let test_rc = build_graph_run_external_test_files(root, target, test_compiler, test_files)
                 if test_rc != 0:
                     with_eprint("error: build.w test target failed: " ++ target.name)
@@ -3919,6 +3924,11 @@ fn run_test_binary_checked(bin_path: &str, target: &str, test_name: &str, quiet:
     let result = run_test_process(bin_path, test_name, quiet)
     if validate_test_run(result, directives, target, test_name):
         return 0
+    // Quiet spares the log a passing test's output. A failing test's output
+    // is the diagnosis (its panic line names the assertion).
+    if quiet:
+        if result.stdout.len() > 0: with_write(result.stdout)
+        if result.stderr.len() > 0: with_ewrite(result.stderr)
     1
 
 // `//! known-issue: #NNN` (BDFL ruling 2026-07-26, Rust compiletest
