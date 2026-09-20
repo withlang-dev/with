@@ -29,6 +29,7 @@ impl MirModule:
         for i in 0..distinct_type_syms.len():
             let sym = distinct_type_syms[i]
             self.sema_distinct_type_names.insert(sym, sema.distinct_type_names.get(sym).unwrap())
+        self.sema_result_sym = sema.syms.result
         if sema.type_symbol_is_std_box(sema.syms.box) != 0:
             self.sema_box_sym = sema.syms.box
             self.sema_option_sym = sema.syms.option

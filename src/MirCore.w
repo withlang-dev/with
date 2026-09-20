@@ -523,6 +523,9 @@ type MirModule {
     // coercion arm exactly instead of approximating it.
     sema_box_sym: i32,
     sema_option_sym: i32,
+    // Result's symbol: the one two-argument enum whose variants carry its
+    // arguments in declaration order (Ok(T), Err(E)).
+    sema_result_sym: i32,
 }
 
 // ── MirModule helpers ────────────────────────────────────────────
@@ -542,6 +545,7 @@ fn MirModule.init -> MirModule:
         sema_distinct_type_names: HashMap.new(),
         sema_box_sym: 0,
         sema_option_sym: 0,
+        sema_result_sym: 0,
     }
 
 impl MirModule:
@@ -2728,8 +2732,11 @@ fn mir_validate_enum_payload_type(mir_mod: &MirModule, enum_tid: i32, variant_id
                 pos = pos + 2 + payload_count
             if payload_variant == variant_idx:
                 return mir_validate_get_generic_inst_arg(mir_mod, resolved, 0)
-        // Result[T, E]: two generic args, both variants carry one payload in declaration order.
-        if arg_count == 2 and variant_count == 2 and field_idx == 0:
+        // Result[T, E]: two generic args, both variants carry one payload in
+        // declaration order. Only Result: ControlFlow[B, C] declares
+        // Continue(C) before Break(B), and the positional guess named the
+        // wrong argument for it.
+        if arg_count == 2 and variant_count == 2 and field_idx == 0 and base_sym == mir_mod.sema_result_sym:
             return mir_validate_get_generic_inst_arg(mir_mod, resolved, variant_idx)
 
         // Fallback to the erased base payload type for non-substituted generic enums.
@@ -2911,6 +2918,16 @@ fn mir_validate_payload_read_mismatch(mir_mod: &MirModule, body: &MirBody, opera
     if proj_count < 2: return 0
     let last = body.place_proj_starts[place_id] + proj_count - 1
     if body.proj_kinds[last] != ProjKind.PK_FIELD or body.proj_kinds[last - 1] != ProjKind.PK_DOWNCAST: return 0
+    // Only where the variant's payload type is exact: a plain enum, or an
+    // Option or Result instance. Another generic enum's payload is a type
+    // parameter this module cannot substitute.
+    let enum_ty = mir_mod.mir_resolve_alias(mir_validate_place_prefix_type(mir_mod, body, place_id, 2))
+    let enum_kind = mir_mod.mir_get_type_kind(enum_ty)
+    if enum_kind == TypeKind.TY_GENERIC_INST:
+        let base_sym = mir_mod.mir_get_type_d0(enum_ty)
+        if base_sym == 0 or (base_sym != mir_mod.sema_result_sym and base_sym != mir_mod.sema_option_sym): return 0
+    else if enum_kind != TypeKind.TY_ENUM:
+        return 0
     let derived = mir_validate_place_derived_type(mir_mod, body, place_id)
     if derived <= 0 or mir_validate_use_assign_compatible(mir_mod, declared_ty, derived) or mir_validate_use_assign_compatible(mir_mod, derived, declared_ty): return 0
     derived
@@ -2927,6 +2944,10 @@ pub fn mir_validate_place_type(mir_mod: &MirModule, body: &MirBody, place_id: i3
 // The type a place's projections yield from its local's type, ignoring the
 // type the lowering declared for it; 0 when the walk cannot resolve one.
 pub fn mir_validate_place_derived_type(mir_mod: &MirModule, body: &MirBody, place_id: i32) -> i32:
+    mir_validate_place_prefix_type(mir_mod, body, place_id, 0)
+
+// The same walk stopped `trailing` projections short of the place's end.
+fn mir_validate_place_prefix_type(mir_mod: &MirModule, body: &MirBody, place_id: i32, trailing: i32) -> i32:
     if place_id < 0 or place_id >= body.place_locals.len():
         return 0
     let local_id = body.place_locals[place_id]
@@ -2934,7 +2955,7 @@ pub fn mir_validate_place_derived_type(mir_mod: &MirModule, body: &MirBody, plac
         return 0
     var current_ty: i32 = body.local_type_ids[local_id]
     let proj_start = body.place_proj_starts[place_id]
-    let proj_count = body.place_proj_counts[place_id]
+    let proj_count = body.place_proj_counts[place_id] - trailing
     if proj_count <= 0:
         return current_ty
     var active_variant_idx = -1
