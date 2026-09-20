@@ -12,7 +12,11 @@ decision supersedes an earlier one, say so in both.
 
 ## D51 — Modeled C: ownership, effects, conventions and foreign lifetimes live in a checked facade; one canonical ruling
 
-**Date:** 2026-09-20. **Status:** ruled. The complete, controlling text is
+**Date:** 2026-09-20. **Status:** ruled; specification projections blessed
+the same day ("Canonized into law") and landed as §16.2b plus the
+replacements in §16.2a, §16.3c, §15.3, §16.3d, §18.5 and §18.8
+(`docs/modeled-c-spec-projection-draft.md` records the projection and its
+traceability). The complete, controlling text is
 `docs/Ruling-modeled-C-ownership-effects-conventions-and-foreign-lifetimes.md`
 (Eric's ruling, 69 sections). As with D22, that file is canonical: this entry
 is a pointer, the specification carries conforming projections, and

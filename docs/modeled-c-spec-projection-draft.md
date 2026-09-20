@@ -1,11 +1,19 @@
 # Draft: specification projections of D51 (modeled C)
 
-**Status: DRAFT FOR BLESSING. Not spec text.** Nothing here is normative
-until Eric blesses the words. Every section below is a proposed conforming
-projection of `docs/Ruling-modeled-C-ownership-effects-conventions-and-foreign-lifetimes.md`
-(the ruling); where the two differ, the ruling is right and this draft is
-wrong. Ruling section numbers are given in brackets so each sentence can be
-traced.
+**Status: BLESSED 2026-09-20 (Eric: "I bless the document with these
+tweaks. Canonized into law") and LANDED** in `with-specification.md`
+(§16.2b; the replacements in §16.2a, §16.3c, §15.3, §16.3d, §18.5, §18.8),
+with three tweaks from the architect's review: B.7 states that tooling
+reporting a lend calls it an assertion, and that the contract view shows the
+relationships between origins, domains and views; B.8 states that a
+package-shipped facade is trusted as the package's own code is, pinned by the
+same lock, with provenance `facade:<package>@<version>`. This file is kept as
+the record of the projection and its traceability to the ruling; the
+specification is now the normative text and the ruling remains canonical.
+Every section below is a conforming projection of
+`docs/Ruling-modeled-C-ownership-effects-conventions-and-foreign-lifetimes.md`
+(the ruling); where the two differ, the ruling is right. Ruling section
+numbers are given in brackets so each sentence can be traced.
 
 Two kinds of change: **A.** a new chapter §16.2b, and **B.** replacements of
 existing sentences elsewhere. Each replacement quotes the current text first.
