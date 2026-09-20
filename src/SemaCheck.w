@@ -7216,12 +7216,17 @@ impl Sema:
 
         // Check local/param scope (always visible — local bindings are never c_import)
         let tid = self.scope_lookup(sym)
+        // A parameter or local shadows every global of its name. The checks below
+        // look the name up again, and found another module's private global:
+        // a top-level `let ptr` broke every imported function with a `ptr`
+        // parameter.
+        let is_local = self.scope_binding_is_local(sym)
         if tid >= 0:
             let binding_decl = self.binding_decl_node(sym)
-            if binding_decl != 0 and self.decl_node_visible_from_current(binding_decl) == 0 and self.has_extern_var_decl(sym) == 0:
+            if not is_local and binding_decl != 0 and self.decl_node_visible_from_current(binding_decl) == 0 and self.has_extern_var_decl(sym) == 0:
                 self.emit_private_symbol_error(sym, node)
                 return 0
-            if binding_decl == 0 and self.global_value_decl_kind(sym) != 0 and self.has_extern_var_decl(sym) == 0 and self.symbol_visible_from_current(sym) == 0:
+            if not is_local and binding_decl == 0 and self.global_value_decl_kind(sym) != 0 and self.has_extern_var_decl(sym) == 0 and self.symbol_visible_from_current(sym) == 0:
                 self.emit_private_symbol_error(sym, node)
                 return 0
             if sym != self.assign_target_revive_sym:
