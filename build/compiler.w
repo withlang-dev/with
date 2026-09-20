@@ -1055,59 +1055,6 @@ fn comp_collect_string_literal_flags(items: Vec[str], text: &str) -> Vec[str]:
 fn comp_impl_flags(fs: &ToolFs) -> Vec[str]:
     comp_collect_string_literal_flags(Vec.new(), fs.read_text("src/main.w") ++ "\n" ++ fs.read_text("src/compiler/DriverOptions.w"))
 
-fn comp_spec_modules(spec: &str) -> Vec[str]:
-    let sec = comp_spec_subsection(spec, "#### Module Map")
-    var modules: Vec[str] = Vec.new()
-    var tick = 0
-    while tick < sec.len() as i32:
-        let open = comp_find_from(sec, "`", tick)
-        if open < 0:
-            break
-        let close = comp_find_from(sec, "`", open + 1)
-        if close < 0:
-            break
-        let item = sec.slice((open + 1) as i64, close as i64)
-        if item.starts_with("std."):
-            if not comp_vec_contains(modules, item):
-                modules.push(item)
-        tick = close + 1
-    modules
-
-fn comp_strip_suffix(text: &str, suffix: &str) -> str:
-    if text.ends_with(suffix):
-        return text.slice(0, text.len() - suffix.len())
-    compiler_owned_text(text)
-
-fn comp_std_module_from_path(path: &str) -> str:
-    let prefix = "lib/std/"
-    if not path.starts_with(prefix):
-        return ""
-    let rest = path.slice(prefix.len(), path.len())
-    if rest.len() == 0 or rest.starts_with("."):
-        return ""
-    var first = compiler_owned_text(rest)
-    for i in 0..rest.len() as i32:
-        if rest[i] == 47:
-            first = rest.slice(0, i as i64)
-            break
-    if first.len() == 0 or first.starts_with("."):
-        return ""
-    if first.ends_with(".w"):
-        first = comp_strip_suffix(first, ".w")
-    "std." ++ first
-
-fn comp_impl_modules(fs: &ToolFs) -> Vec[str]:
-    let files = fs.list_files("lib/std")
-    var modules: Vec[str] = Vec.new()
-    for i in 0..files.len() as i32:
-        let item = comp_std_module_from_path(files[i])
-        if item.len() > 0 and not comp_vec_contains(modules, item):
-            modules.push(item)
-    if fs.exists("lib/std/internal/str_abi.w"):
-        if not comp_vec_contains(modules, "std.str_abi"):
-            modules.push("std.str_abi")
-    modules
-
 fn comp_known_missing_flag(item: &str) -> str:
     if item == "--target": return "#425"
     if item == "--open": return "#537"
@@ -1392,15 +1339,8 @@ pub fn run_check_spec_inventory_action(ctx: ActionCtx) -> i32:
 
     errors = comp_inventory_add_errors(move errors, "cli commands", comp_spec_cli_commands(spec), comp_impl_commands(fs), "", "command")
     errors = comp_inventory_add_errors(move errors, "cli flags", comp_spec_cli_flags(), comp_impl_flags(fs), "flag", "flag")
-    // A corpus package (build/corpora.w, `internal-module=` args) is
-    // internal; it never needs a spec entry.
-    var impl_modules: Vec[str] = Vec.new()
-    for item in comp_impl_modules(fs):
-        var internal = false
-        for arg in ctx.args():
-            if arg == "internal-module=" ++ item: internal = true
-        if not internal: impl_modules.push(item.clone())
-    errors = comp_inventory_add_errors(move errors, "stdlib modules", comp_spec_modules(spec), impl_modules, "module", "module")
+    // The spec does not catalogue lib/std (Eric, 2026-09-20): a library is
+    // documented by its source, and adding one is not a language change.
 
     if errors.len() > 0:
         ctx.diagnostics().error(comp_inventory_error_text(errors))

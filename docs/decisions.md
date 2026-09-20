@@ -10,6 +10,82 @@ decision supersedes an earlier one, say so in both.
 
 ---
 
+## D48 — The specification does not catalogue `lib/std`
+
+**Date:** 2026-09-20. **Status:** ruled (Eric: "I do not want the language
+spec to care what we do in lib/std"). §18.6's Module Map table and the
+`std.internal` paragraph removed; the `spec-inventory-check` stdlib arm
+retired.
+
+**Context.** Adding `std.zip` failed `spec-inventory-check`, which required
+every top-level module under `lib/std` to have a row in the spec's Module Map.
+That put Eric's exact-wording sign-off on every library addition.
+
+**What the others do.** Go's spec names two packages, `main` and `unsafe`,
+both compiler-known. Zig's langref uses `std` in examples and catalogues
+none of it. Swift keeps the standard library in its own documents. Rust's
+Reference disclaims the standard library (from memory; its tree is not
+checked out in `.reference/`).
+
+**Reasoning.** A specification says what programs mean; a module list says
+what ships. The table was a second source of truth, so it drifted and needed
+a gate. What stays normative is the library surface the language itself
+depends on, each in its own section: the prelude, `Option`/`Result` and
+`?`/`??`, the traits behind syntax (`Iter`, `Try`, `Drop`, `IndexGet`,
+`IndexPlace`, `Contains`), what literals and comprehensions build, the regex
+literal engine, and the collection ownership doctrine (D22, D27, D44). The
+test: would a program's meaning change if this changed?
+
+**Reopen if** a library module becomes something syntax depends on; it then
+gets its own normative section, not a table row.
+
+---
+
+## D47 — Lending is not receiving: a `c_import`ed `const char *` parameter accepts a `str`; an application developer never writes `unsafe`
+
+**Date:** 2026-09-20. **Status:** ruled (Eric: "there is no way this should
+have to be declared unsafe. This flies in the face of the mission"; "no UAT
+code should have `unsafe` in it … if 'normal' users are using unsafe - WE
+forced them into a situation they shouldn't be in"). §16.3c sentence blessed
+2026-09-20. Narrows #379 (a88df01a).
+
+**Context.** 1e53f8aa (2026-06-11) modeled every `const char *` parameter of
+a c_imported function as a string input; the raylib spiral on Eric's blog
+dates from then. a88df01a (2026-06-17, #379) replaced that with a curated
+libc overlay: outside the list, a string parameter made the function the raw
+surface. That broke the spiral release UAT, which sat broken until
+bd9683f0 (2026-09-07) rewrote the fixture to
+`unsafe { InitWindow(900, 600, c"...".ptr) }` to go green, without Eric's
+knowledge. By 2026-09-19 every release UAT fixture said `unsafe` (30 uses).
+
+**Reasoning.** #379's rule is sound for the direction it was written for:
+With never reads or frees C memory on a guess (`strlen` on an arbitrary
+`char *`, ownership of a return). It was applied to the other direction,
+where nothing is guessed: With hands C a valid NUL-terminated buffer it owns.
+The header forces one meaning for a `str` argument to a `const char *`
+parameter (mission: "forced … by a header"); c_import is the modeling step,
+not raw C. The one hazard in lending is a callee that keeps the pointer,
+which no spelling by the programmer resolves, so it is the compiler's: a
+literal is static and cannot dangle; any other `str` goes through call-scoped
+storage that stays readable, so a retaining callee reads stale text, never
+freed memory. `retains:` remains the way to hand a keeping callee an owned
+copy. A hand-written `extern fn` with raw pointers is still raw C.
+
+**Alternatives weighed.** Assume non-retention (Swift's rule): a wrong guess
+is a silent use-after-free. Per-library contract data: the per-package upkeep
+Eric rejected for `with get` (D46). Inference from parameter names: unsound.
+Proof from C source when `with get` built it: a later refinement.
+
+**Process rules this produced** (CLAUDE.md): a UAT fixture, an example or
+published code is a contract — a change that breaks one stops and goes to
+Eric, and the program is never edited to pass; `with build
+:user-programs-safe` fails on `unsafe` in those programs.
+
+**Reopen if** a lent-string hazard appears that readable storage does not
+cover.
+
+---
+
 ## D46 — `with get` builds a C package from source from the recipe read as data; no per-package files; `with cc` is clang inside the binary
 
 **Date:** 2026-09-19. **Status:** ruled (Eric: "with get must build c when

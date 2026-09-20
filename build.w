@@ -1822,7 +1822,6 @@ pub fn build(ctx: BuildCtx) -> Build:
     spec_inventory = spec_inventory.input("docs/with-specification.md")
     spec_inventory = spec_inventory.input("src/Token.w")
     // The corpus packages are internal modules (build/corpora.w names them).
-    spec_inventory = corpora_internal_module_args(move spec_inventory)
     spec_inventory = spec_inventory.input("src/Parser.w")
     spec_inventory = spec_inventory.input("src/main.w")
     spec_inventory = spec_inventory.input("src/compiler/DriverOptions.w")

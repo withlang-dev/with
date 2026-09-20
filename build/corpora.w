@@ -44,13 +44,6 @@ pub fn corpora_exclude_args(target: Target) -> Target:
     for i in 0..corpus_count(): out = out.arg("exclude=" ++ corpus_at(i).corpus_dir ++ "/")
     out
 
-/// The corpus packages are internal modules of the compiler (the spec
-/// inventory takes them as `internal-module=` args).
-pub fn corpora_internal_module_args(target: Target) -> Target:
-    var out = target
-    for i in 0..corpus_count(): out = out.arg("internal-module=" ++ corpus_at(i).package)
-    out
-
 pub fn corpus_bundle_plan(ctx: &BuildCtx, corpus: &Corpus) -> WoBundle:
     wo_bundle_plan(ctx, corpus.name, corpus.corpus_rel, corpus.corpus_dir ++ "/bundle.w")
 

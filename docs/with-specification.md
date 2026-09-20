@@ -9189,6 +9189,12 @@ write(fd, data)          // compiler supplies data.ptr and data.len together
 raw_register_callback(name_ptr as *const c_char)
 ```
 
+Binding evidence governs what With receives from C. An argument With lends
+to C for the duration of a call needs none: a `c_import`ed `const char *`
+parameter accepts a `str`, passed as NUL-terminated input text. A string
+literal is passed directly; any other `str` is passed through call-scoped
+storage that stays readable if the callee retains it.
+
 **`str` → input C string (`*const c_char`).** A `str` may be passed
 automatically to a `*const c_char` parameter only when the binding
 establishes all of these facts:
@@ -10894,44 +10900,6 @@ intended for direct use by application developers.
 
 **Layer 2: `std.*`** — idiomatic, safe, cross-platform APIs. This is
 what users import.
-
-#### Module Map
-
-| Module | Purpose | Replaces |
-|--------|---------|----------|
-| `std.os` | Layer-1 thin safe platform wrappers | libc, POSIX, Win32 |
-| `std.io` | I/O primitives, Reader/Writer traits, buffered streams | `stdio.h` |
-| `std.fs` | File system operations | `unistd.h`, `dirent.h`, `sys/stat.h` |
-| `std.time` | Clocks, durations, sleep | `time.h`, `sys/time.h` |
-| `std.math` | f32/f64 methods, constants | `math.h` |
-| `std.box` | `Box[T]` single-owner heap allocation | — |
-| `std.rc` | `Rc[T]`, `Arc[T]`, explicit shared ownership | — |
-| `std.collections` | Vec, HashMap, HashSet, BTreeMap, SlotMap, Handle | — |
-| `std.string` | String/StrView types and methods | `string.h`, `ctype.h` |
-| `std.encoding` | Native RFC 4648 Base16, Base32, Base32hex, Base64, and Base64URL data encodings | — |
-| `std.net` | TCP, UDP, DNS | `sys/socket.h`, `netdb.h` |
-| `std.thread` | OS-level threading | `pthread.h` |
-| `std.sync` | Mutex, RwLock, Atomic, Condvar, Barrier, Once | `pthread.h`, `stdatomic.h` |
-| `std.process` | Process control, args, env, Command | `stdlib.h`, `unistd.h` |
-| `std.mem` | Low-level memory, Allocator trait, mmap | `stdlib.h`, `sys/mman.h` |
-| `std.alloc` | Arena, TempArena, Pool | — |
-| `std.fixed_string` | `FixedString[N]` stack-owned string storage for `core`/`no_std` code | — |
-| `std.build` | Typed project build graph construction | Make/CMake project files |
-| `std.context` | Standard implicit execution context | ad hoc context parameters |
-| `std.signal` | Signal handling | `signal.h` |
-| `std.random` | Rng, seeded PRNG | `stdlib.h` |
-| `std.hash` | Hasher trait, DefaultHasher | — |
-| `std.fmt` | Debug trait, f-string internals | `stdio.h` (sprintf) |
-| `std.testing` | assert, require, check, assert_eq, assert_matches, panic, todo, unreachable | — |
-| `std.ffi` | C callback context boxing and raw FFI helper types | `void*` context plumbing |
-| `std.regex` | `Regex`, `Match`, `Captures`; engine behind §15.8 literals and `=~` | PCRE2 (migrated) |
-| `std.zlib` | DEFLATE, zlib, and gzip compression support | zlib (migrated) |
-| `std.json` | JSON parse/serialize | — |
-| `std.http` | HTTP client | libcurl |
-| `std.crypto` | sha256, aes, chacha20, ecdsa, rsa, x509, endian, ... | OpenSSL (subset) |
-Modules under `std.internal` (and compiler-support modules such as
-`std.str_abi`) are compiler/runtime implementation surface, not user
-API; they may change without notice.
 
 All collection types provide `.len()` returning `Int` (i64) — signed, so
 `v.len() - 1` and countdown/index arithmetic just work; a held container
