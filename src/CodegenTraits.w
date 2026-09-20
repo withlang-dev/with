@@ -2344,6 +2344,15 @@ impl Codegen:
                     if global_ty != 0 and val == 0:
                         let _ = self.record_module_binding_global(name_sym, global_ty, wl_const_null(global_ty), is_mut)
                         return
+            // A binding whose type lowers to a pointer holds a pointer: C's
+            // `#define SQLITE_TRANSIENT ((void (*)(void *))-1)` is all ones at
+            // pointer width, never an i32 read back as eight bytes.
+            if resolved_binding_ty != 0 and val != 0:
+                let pointer_ty = self.sema_type_to_llvm(resolved_binding_ty)
+                if pointer_ty != 0 and wl_get_type_kind(pointer_ty) == wl_pointer_type_kind():
+                    let address = wl_const_int(wl_i64_type(self.context), val, 1)
+                    let _ = self.record_module_binding_global(name_sym, pointer_ty, wl_const_int_to_ptr(address, pointer_ty), is_mut)
+                    return
             if resolved_binding_ty != 0 and self.sema.get_type_kind(resolved_binding_ty) == TypeKind.TY_FLOAT:
                 let global_ty = self.sema_type_to_llvm(resolved_binding_ty)
                 let _ = self.record_module_binding_global(name_sym, global_ty, wl_const_real(global_ty, val as f64), is_mut)

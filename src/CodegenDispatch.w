@@ -3696,8 +3696,13 @@ impl Codegen:
                 if vk == wl_pointer_type_kind() and ck == wl_integer_type_kind():
                     return wl_build_ptr_to_int(self.builder, val, cast_ty)
                 // Int → Ptr
+                // `inttoptr` zero-extends a narrower integer, so a signed source
+                // widens first: C's `(void (*)(void *))-1` (SQLITE_TRANSIENT) is
+                // all ones, not 0x00000000FFFFFFFF.
                 if vk == wl_integer_type_kind() and ck == wl_pointer_type_kind():
-                    return wl_build_int_to_ptr(self.builder, val, cast_ty)
+                    let i64_ty = wl_i64_type(self.context)
+                    let wide = if src_unsigned or wl_get_int_type_width(wl_type_of(val)) >= 64: val else: wl_build_sext(self.builder, val, i64_ty)
+                    return wl_build_int_to_ptr(self.builder, wide, cast_ty)
                 // Int → Int: use zext for unsigned source OR unsigned target
                 if vk == wl_integer_type_kind() and ck == wl_integer_type_kind():
                     let dst_unsigned = if d1 > 0: self.mir_sema_type_is_unsigned(d1) else: false

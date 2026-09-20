@@ -178,6 +178,7 @@ extern fn LLVMConstStructInContext(c: *mut u8, vals: *const *mut u8, count: u32,
 extern fn LLVMConstNamedStruct(ty: *mut u8, vals: *const *mut u8, count: u32) -> *mut u8
 extern fn LLVMConstArray2(elem_ty: *mut u8, vals: *const *mut u8, count: u64) -> *mut u8
 extern fn LLVMConstBitCast(v: *mut u8, ty: *mut u8) -> *mut u8
+extern fn LLVMConstIntToPtr(v: *mut u8, ty: *mut u8) -> *mut u8
 extern fn LLVMConstIntGetSExtValue(v: *mut u8) -> i64
 extern fn LLVMIsConstant(v: *mut u8) -> i32
 extern fn LLVMSizeOf(ty: *mut u8) -> *mut u8
@@ -714,6 +715,7 @@ pub fn wl_const_array(elem_ty: i64, vals_ptr: i64, count: i32) -> i64:
         LLVMConstArray2(elem_ty as *mut u8, vals_ptr as *const *mut u8, count as u64) as i64
 
 pub fn wl_const_bitcast(val: i64, ty: i64) -> i64: unsafe { LLVMConstBitCast(val as *mut u8, ty as *mut u8) as i64 }
+pub fn wl_const_int_to_ptr(val: i64, ty: i64) -> i64: unsafe { LLVMConstIntToPtr(val as *mut u8, ty as *mut u8) as i64 }
 pub fn wl_const_int_sext_val(v: i64) -> i64: unsafe { LLVMConstIntGetSExtValue(v as *mut u8) }
 pub fn wl_is_constant(v: i64) -> i32: unsafe { LLVMIsConstant(v as *mut u8) }
 pub fn wl_size_of(ty: i64) -> i64: unsafe { LLVMSizeOf(ty as *mut u8) as i64 }
