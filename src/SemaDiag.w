@@ -80,9 +80,9 @@ impl Sema:
         if arg_k == TypeKind.TY_BOOL and par_k == TypeKind.TY_INT:
             return 1
         // str → C string (§16.3c, D47): a `str` is lent to a c_imported
-        // `const char *` parameter for the call. A function that is raw for
-        // another reason (what it returns, a mutable buffer) gets no coercion.
-        if self.ci_raw_syms.contains(fn_sym) == 0 and self.ci_type_is_const_c_string_input(param_ty) != 0:
+        // `const char *` parameter for the call, whatever the function's other
+        // parameters or its return need: a raw call still reads its text input.
+        if self.ci_type_is_const_c_string_input(param_ty) != 0:
             if arg_k == TypeKind.TY_STR:
                 return 1
             if arg_k == TypeKind.TY_REF:
