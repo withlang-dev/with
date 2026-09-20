@@ -615,6 +615,23 @@ fn build_cache_collect_output_paths(root: &str, target: &BuildGraphTarget) -> Ve
             paths.push(build_cache_output_path(root, extra))
     paths
 
+/// The digest of a target's declared outputs as they are on disk now, or ""
+/// when early cutoff cannot apply: no declared output, or one that is missing.
+/// A capture directory under out/command/ is left out: its logs differ on
+/// every run and no target consumes them.
+pub fn build_cache_cutoff_digest(root: &str, target: &BuildGraphTarget) -> str:
+    // The memo may hold hashes taken before the target ran.
+    build_cache_forget_fingerprints()
+    var text = ""
+    let paths = build_cache_collect_output_paths(root, target)
+    for i in 0..paths.len() as i32:
+        let path = paths[i]
+        if build_cache_project_relative(root, path).starts_with("out/command/"): continue
+        if build_graph_rt_file_exists(path) == 0: return ""
+        text = text ++ build_cache_project_relative(root, path) ++ ":" ++ build_cache_fingerprint_file(path) ++ "\n"
+    if text.len() == 0: return ""
+    build_cache_sha256_text("cutoff\n" ++ text)
+
 pub fn build_cache_freshness_reason(root: &str, target: &BuildGraphTarget, dep_rebuilt: bool) -> str:
     if not build_cache_is_cacheable(target.kind):
         return "not cacheable"

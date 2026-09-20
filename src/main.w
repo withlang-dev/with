@@ -2130,6 +2130,22 @@ fn build_options_for_graph_target(root: &str, base: &BuildCommandOptions, target
         options.output_kind = BuildOutputKind.Binary
     options
 
+// Whether dependency `dep_name`, which ran in this invocation, left its
+// declared outputs byte-identical to what they were when it was dispatched.
+// WITH_BUILD_NO_EARLY_CUTOFF=1 answers no, restoring "a dependency ran, so
+// rebuild".
+fn build_graph_dep_outputs_unchanged(root: &str, graph: &BuildGraph, dep_name: &str, names: &Vec[str], digests: &Vec[str]) -> bool:
+    if with_getenv_str("WITH_BUILD_NO_EARLY_CUTOFF").len() > 0: return false
+    var before = ""
+    for i in 0..names.len() as i32:
+        if names[i] == dep_name: before = digests[i].clone()
+    if before.len() == 0: return false
+    let index = build_graph_find_target_index_by_name(graph, dep_name)
+    if index < 0: return false
+    if build_cache_cutoff_digest(root, graph.targets[index]) != before: return false
+    with_eprint("[cutoff] '" ++ dep_name ++ "' re-ran to identical outputs; its dependents stay fresh")
+    true
+
 // The first dependency of `target` that failed or was skipped, or "".
 fn build_graph_first_broken_dep(target: &BuildGraphTarget, failed: &Vec[str]) -> str:
     for dep in target.deps:
@@ -2154,6 +2170,11 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
         return generated_rc
     let completed_targets: Vec[str] = Vec.new()
     let skipped_targets: Vec[str] = Vec.new()
+    // Early cutoff: a target's output digest taken when it was dispatched, by
+    // name. A dependency that re-ran and produced the same bytes has not
+    // changed anything its dependents can see (Go's content ID).
+    var cutoff_names: Vec[str] = Vec.new()
+    var cutoff_digests: Vec[str] = Vec.new()
     // Per-target wall time: only the top-level driver records/reports; worker
     // re-entries (forced action / test workers) stay silent.
     let times_top_level = not force_action_worker_target and not build_test_worker_env_enabled()
@@ -2248,6 +2269,16 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
                         pool_failed_rc = final_rc
             if pool_failed_rc != 0:
                 return pool_failed_rc
+        // With its dependencies finished, a non-Group target asks again: one
+        // that re-ran to byte-identical outputs did not rebuild anything.
+        if target.kind != 9 and dep_rebuilt:
+            dep_rebuilt = false
+            for di in 0..target.deps.len() as i32:
+                let dep_name = target.deps[di]
+                if skipped_targets.contains(dep_name) or not completed_targets.contains(dep_name): continue
+                if build_graph_dep_outputs_unchanged(root, graph, dep_name, &cutoff_names, &cutoff_digests): continue
+                dep_rebuilt = true
+                break
         // Survey keeps going past a failure, never through one: a target whose
         // dependency failed or was itself skipped does not run (zlib-promote
         // once overwrote lib/std/zl after zlib-test failed), and counts as a
@@ -2269,6 +2300,9 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
                     skipped_targets.push(with_str_clone_ref(target.name))
                     completed_targets.push(with_str_clone_ref(target.name))
                     continue
+        // About to run: remember what its outputs are now.
+        cutoff_names.push(with_str_clone_ref(target.name))
+        cutoff_digests.push(build_cache_cutoff_digest(root, target))
         let bootstrap_ready = with_fs_file_exists(runtime_probe_path) != 0 and with_fs_file_exists(link_metadata_path) != 0
         let runner_retry = runner_waits_for_bootstrap and bootstrap_ready
         if target.kind == 23 and (not runner_checked or runner_retry) and not build_action_worker_env_enabled() and not options.strict_effects:
