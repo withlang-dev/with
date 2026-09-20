@@ -2899,6 +2899,22 @@ fn mir_validate_single_field_inner(mir_mod: &MirModule, tid: i32) -> i32:
     let extra_start = mir_mod.mir_get_type_d1(resolved)
     mir_mod.mir_get_type_extra(extra_start + 1)
 
+// The variant payload type when operand `operand_id` reads an enum payload
+// (a field under a downcast) whose declared type disagrees with it; else 0.
+fn mir_validate_payload_read_mismatch(mir_mod: &MirModule, body: &MirBody, operand_id: i32, declared_ty: i32) -> i32:
+    if operand_id < 0 or operand_id >= body.operand_kinds.len(): return 0
+    let op_kind = body.operand_kinds[operand_id]
+    if op_kind != OperandKind.OK_COPY and op_kind != OperandKind.OK_MOVE: return 0
+    let place_id = body.operand_d0[operand_id]
+    if place_id < 0 or place_id >= body.place_locals.len(): return 0
+    let proj_count = body.place_proj_counts[place_id]
+    if proj_count < 2: return 0
+    let last = body.place_proj_starts[place_id] + proj_count - 1
+    if body.proj_kinds[last] != ProjKind.PK_FIELD or body.proj_kinds[last - 1] != ProjKind.PK_DOWNCAST: return 0
+    let derived = mir_validate_place_derived_type(mir_mod, body, place_id)
+    if derived <= 0 or mir_validate_use_assign_compatible(mir_mod, declared_ty, derived) or mir_validate_use_assign_compatible(mir_mod, derived, declared_ty): return 0
+    derived
+
 pub fn mir_validate_place_type(mir_mod: &MirModule, body: &MirBody, place_id: i32) -> i32:
     if place_id < 0 or place_id >= body.place_locals.len():
         return 0
@@ -2906,6 +2922,13 @@ pub fn mir_validate_place_type(mir_mod: &MirModule, body: &MirBody, place_id: i3
         let stored = body.place_sema_types[place_id]
         if stored > 0:
             return stored
+    mir_validate_place_derived_type(mir_mod, body, place_id)
+
+// The type a place's projections yield from its local's type, ignoring the
+// type the lowering declared for it; 0 when the walk cannot resolve one.
+pub fn mir_validate_place_derived_type(mir_mod: &MirModule, body: &MirBody, place_id: i32) -> i32:
+    if place_id < 0 or place_id >= body.place_locals.len():
+        return 0
     let local_id = body.place_locals[place_id]
     if local_id < 0 or local_id >= body.local_type_ids.len():
         return 0
@@ -3090,6 +3113,13 @@ fn validate_typed_mir_body(mir_mod: &MirModule, body: &MirBody) -> MirValidation
                         let pk0 = if spc > 0: body.proj_kinds[body.place_proj_starts[sp]] else: -1
                         src_detail = f"place local={sl} local_ty={slt} projs={spc} proj0_kind={pk0}"
                     return mir_validation_fail(body.fn_sym, span, f"use rvalue does not resolve to a concrete MIR type ({src_detail})")
+                // A declared place type is a claim, not a proof: an enum payload
+                // read must agree with the variant's payload type. `?` over
+                // `Result[Unit, E]` declared the Unit payload as the whole Result
+                // and this verifier passed it to codegen, which trapped in LLVM.
+                let payload_mismatch = mir_validate_payload_read_mismatch(mir_mod, body, rv_d0, src_ty)
+                if payload_mismatch != 0:
+                    return mir_validation_fail(body.fn_sym, span, f"enum payload read declares ty={src_ty} but the variant's payload is ty={payload_mismatch}")
                 if not mir_validate_use_assign_compatible(mir_mod, dest_ty, src_ty):
                     let dk = mir_mod.mir_get_type_kind(mir_mod.mir_resolve_alias(dest_ty)) as i32
                     let sk = mir_mod.mir_get_type_kind(mir_mod.mir_resolve_alias(src_ty)) as i32

@@ -11126,7 +11126,17 @@ impl MirBuilder:
         var result_ty = result_ty_hint
         if result_ty == 0 or result_ty == self.sema.ty_void:
             result_ty = self.sema.try_unwrapped_type_frozen(value_ty)
-        if result_ty == 0 or result_ty == self.sema.ty_void:
+        // `Result[Unit, E]?`: the payload is Unit, so the pass path extracts
+        // nothing and the expression is unit. Unit is an answer here, not a
+        // missing one: typing the payload as the whole Result made codegen
+        // load an unsized field (an LLVM trap, on every `step()?` statement).
+        if result_ty == self.sema.ty_void:
+            self.switch_to(pass_bb)
+            self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
+            self.switch_to(join_bb)
+            self.forget_string_flow_facts()
+            return self.unit_operand()
+        if result_ty == 0:
             result_ty = value_ty
         self.switch_to(pass_bb)
         let result_local = self.new_temp(result_ty)
