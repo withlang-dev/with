@@ -104,6 +104,12 @@ fn compilation_run_dsymutil_best_effort(bin_path: &str):
         return
     var argv = ""
     argv = compilation_argv_append(argv, "dsymutil")
+    // The linker dropped this root from the debug map's object paths
+    // (-oso_prefix, Link.w); dsymutil puts it back to find the objects.
+    let oso_root = link_stage_file_prefix_map_root()
+    if oso_root.len() > 0:
+        argv = compilation_argv_append(argv, "-oso-prepend-path")
+        argv = compilation_argv_append(argv, oso_root)
     argv = compilation_argv_append(argv, bin_path)
     let _ = runtime_exec_argv_capture(argv, "/dev/null", "/dev/null", 0)
 

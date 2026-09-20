@@ -453,6 +453,12 @@ fn link_stage_linux_system_lib_path(sysroot: &str, name: &str) -> str:
             return libdir ++ "/libxml2.so.16"
     ""
 
+/// The `<from>` of WITH_FILE_PREFIX_MAP=<from>=<to> (src/FnAbi.w), or "".
+pub fn link_stage_file_prefix_map_root() -> str:
+    let mapping = runtime_getenv("WITH_FILE_PREFIX_MAP")
+    let eq = mapping.find("=")
+    if eq <= 0: "" else: mapping.slice(0, eq)
+
 fn link_stage_make_darwin_llvm_link_command(llvm_ld: &str, obj_path: &str, bin_path: &str, extras: &Vec[str], link_libs: &Vec[str], link_args: &Vec[str]) -> LinkStageCommand:
     let args: Vec[str] = Vec.new()
     let env: Vec[LinkStageEnvVar] = Vec.new()
@@ -466,6 +472,14 @@ fn link_stage_make_darwin_llvm_link_command(llvm_ld: &str, obj_path: &str, bin_p
     args.push(with_str_clone_ref(platform_version))
     args.push(platform_version)
     args.push("-dead_strip")
+    // The debug map (N_OSO) names every linked object by absolute path, 23
+    // checkout paths in the compiler's string table. Under WITH_FILE_PREFIX_MAP
+    // the linker drops the mapped root, and dsymutil is told where to look
+    // (compilation_run_dsymutil_best_effort).
+    let oso_root = link_stage_file_prefix_map_root()
+    if oso_root.len() > 0:
+        args.push("-oso_prefix")
+        args.push(oso_root ++ "/")
     args.push("-o")
     args.push(with_str_clone_ref(bin_path))
     outputs.push(with_str_clone_ref(bin_path))

@@ -439,6 +439,11 @@ fn comp_run_compiler_capture(ctx: &ActionCtx, label: &str, argv: Vec[str], stdou
     let root = ctx.project_info().project_root()
     var process_env = process_env()
     process_env = process_env.set("WITH_OUT_DIR", comp_abs(root, "out"))
+    // The compiler's own objects name their sources under /with-src, not under
+    // this checkout, so one tree compiles to the same bytes in every worktree
+    // (src/FnAbi.w fn_abi_file_prefix_mapped). A debugger maps it back:
+    // `lldb -o "settings set target.source-map /with-src $PWD" -- <binary>`.
+    process_env = process_env.set("WITH_FILE_PREFIX_MAP", root ++ "=/with-src")
     // The frozen seed predates bounded compiler partitions. Give its one
     // compiler-sized bootstrap invocation the same portable low-memory
     // layout; ordinary small programs keep the compiler's size gate.

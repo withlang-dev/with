@@ -853,8 +853,10 @@ is red only when the verdicts DIFFER; known-shipped findings like #693's enum
 cells and the #608 POD-leak pins read as `same`).
 
 ### LLDB (preferred)
+The compiler's objects name their sources under `/with-src`, not under the
+checkout (D50: one tree, one binary, in any worktree), so give lldb the map:
 ```
-lldb -- ./out/stage/bin/with-stage2 check src/main.w
+lldb -o "settings set target.source-map /with-src $PWD" -- ./out/stage/bin/with-stage2 check src/main.w
 (lldb) run
 (lldb) bt all
 ```

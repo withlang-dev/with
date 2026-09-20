@@ -1158,7 +1158,8 @@ impl Codegen:
         let canonical = codegen_canonical_module_path(self.source_file)
         // #747: an owned copy — plain field assignment would move source_file
         // out of self and poison the slice reads below.
-        let di_path = if canonical.starts_with("<embedded-std>/"): canonical else: with_str_clone_ref(self.source_file)
+        // Any other root is named through WITH_FILE_PREFIX_MAP (FnAbi.w).
+        let di_path = if canonical.starts_with("<embedded-std>/"): canonical else: fn_abi_file_prefix_mapped(self.source_file)
 
         // Split the path into directory and filename
         var last_slash = -1
