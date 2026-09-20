@@ -2129,6 +2129,12 @@ fn build_options_for_graph_target(root: &str, base: &BuildCommandOptions, target
         options.output_kind = BuildOutputKind.Binary
     options
 
+// The first dependency of `target` that failed or was skipped, or "".
+fn build_graph_first_broken_dep(target: &BuildGraphTarget, failed: &Vec[str]) -> str:
+    for dep in target.deps:
+        if failed.contains(dep): return dep.clone()
+    ""
+
 unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, action_sema: *mut Sema, options: &BuildCommandOptions, survey: bool) -> i32:
     let no_strings: Vec[str] = Vec.new()
     if graph.targets.len() == 0:
@@ -2241,6 +2247,16 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
                         pool_failed_rc = final_rc
             if pool_failed_rc != 0:
                 return pool_failed_rc
+        // Survey keeps going past a failure, never through one: a target whose
+        // dependency failed or was itself skipped does not run (zlib-promote
+        // once overwrote lib/std/zl after zlib-test failed), and counts as a
+        // failure of the run.
+        if survey:
+            let broken_dep = build_graph_first_broken_dep(target, &survey_failed)
+            if broken_dep.len() > 0:
+                with_eprint("survey: skipping '" ++ target.name ++ "' (dependency '" ++ broken_dep ++ "' did not succeed)")
+                survey_failed.push(with_str_clone_ref(target.name))
+                continue
         if target.kind == 9:
             if not dep_rebuilt:
                 skipped_targets.push(with_str_clone_ref(target.name))
