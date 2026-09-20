@@ -454,6 +454,11 @@ fn comp_run_compiler_capture(ctx: &ActionCtx, label: &str, argv: Vec[str], stdou
         if env("WITH_CODEGEN_EMIT_WIDTH").len() == 0:
             let on_ci = env("CI").len() > 0 or env("GITHUB_ACTIONS").len() > 0
             process_env = process_env.set("WITH_CODEGEN_EMIT_WIDTH", if on_ci: "1" else: "4")
+    // unit-digests=<file>: the compile records the sha256 of every unit object
+    // it links (src/compiler/Compilation.w); `:fixpoint` compares two of them.
+    let unit_digests = comp_arg_value(ctx.args(), "unit-digests=")
+    if unit_digests.len() > 0:
+        process_env = process_env.set("WITH_UNIT_DIGESTS", comp_abs(root, unit_digests))
     let embedded_object = comp_arg_value(ctx.args(), "embedded-object=")
     if embedded_object.len() > 0:
         process_env = process_env.set("WITH_COMPILER_EMBEDDED_OBJECT", comp_abs(root, embedded_object))

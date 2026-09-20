@@ -920,6 +920,10 @@ fn sdk_package_target(ctx: &BuildCtx) -> Target:
     var target = package_llvm_sdk_platform_target("sdk-package", platform, sdk_output_prefix_arg(ctx, platform), sdk_output_llvm_cache_for_platform(platform))
     target.dep("sdk")
 
+// The unit digests of the two compiles `:fixpoint` compares.
+const FIXPOINT_STAGE2_UNITS: str = "out/stage/bin/with-stage2.units"
+const FIXPOINT_STAGE3_UNITS: str = "out/release/bin/with.units"
+
 fn install_file_target(name: &str, source: &str, dest: &str, mode: &str, dep: &str) -> Target:
     var target = target_new(.Install, build_owned_text(name), build_owned_text(source)).output(build_owned_text(dest))
     target = target.input(build_owned_text(source))
@@ -2052,6 +2056,8 @@ pub fn build(ctx: BuildCtx) -> Build:
     stage2 = stage2.input("out/stage/lib/embedded_objects.o")
     stage2 = stage2.arg("embedded-object=out/stage/lib/embedded_objects.o")
     stage2 = stage2.dep("stage-embedded-objects-object")
+    // stage1's compile of the compiler, unit by unit (see fixpoint-compare).
+    stage2 = stage2.arg("unit-digests=" ++ FIXPOINT_STAGE2_UNITS).extra_output(FIXPOINT_STAGE2_UNITS)
     out = out.add_target(stage2)
 
     var stage3 = target_new(.Action, "stage3", "").output(stage_compiler_bin("with-stage3"))
@@ -2118,10 +2124,20 @@ pub fn build(ctx: BuildCtx) -> Build:
     selfcheck = selfcheck.dep("stage2")
     out = out.add_target(selfcheck)
 
-    var fixpoint_compare = target_new(.FixpointCompare, "fixpoint-compare", stage_compiler_obj("with-stage2-fixpoint.o"))
-    fixpoint_compare = fixpoint_compare.arg(stage_compiler_obj("with-stage3-fixpoint.o"))
-    fixpoint_compare = fixpoint_compare.dep("stage2-fixpoint-object")
-    fixpoint_compare = fixpoint_compare.dep("stage3-fixpoint-object")
+    // stage2 == stage3, over the whole compiler and at no compile's cost. The
+    // `stage2` build is stage1 compiling the compiler; `link-compiler` is
+    // stage2 compiling the same source with the same flags, which is what a
+    // stage3 is. Each records the sha256 of every unit object it links, and
+    // the fixpoint is those two lists agreeing. (It used to recompile both with
+    // `--emit-obj` and compare the results: 100 s, and `--emit-obj` is
+    // module-object mode, so the two objects held main.w's own functions and
+    // no other module's. stage2-fixpoint-object and stage3-fixpoint-object
+    // remain for `fixpoint-diff`, which explains a differing object.)
+    var fixpoint_compare = target_new(.Action, "fixpoint-compare", "").output("out/.build-state/fixpoint-compare.txt")
+    fixpoint_compare.action = run_fixpoint_compare_units_action
+    fixpoint_compare = fixpoint_compare.input(FIXPOINT_STAGE2_UNITS).input(FIXPOINT_STAGE3_UNITS)
+    fixpoint_compare = fixpoint_compare.write_scope("out/.build-state")
+    fixpoint_compare = fixpoint_compare.dep("stage2").dep("link-compiler")
     out = out.add_target(fixpoint_compare)
 
     var bless_manifest = target_new(.Action, "bless-manifest", "").output("out/.build-state/blessed-manifest")
@@ -2135,14 +2151,12 @@ pub fn build(ctx: BuildCtx) -> Build:
     var fixpoint_evidence = target_new(.Action, "fixpoint-evidence", "").output("out/.build-state/fixpoint-evidence.json")
     fixpoint_evidence.action = run_fixpoint_evidence_action
     fixpoint_evidence = fixpoint_evidence.input(host_bin("out/bin/with-sha256"))
-    fixpoint_evidence = fixpoint_evidence.input(stage_compiler_obj("with-stage2-fixpoint.o"))
-    fixpoint_evidence = fixpoint_evidence.input(stage_compiler_obj("with-stage3-fixpoint.o"))
+    fixpoint_evidence = fixpoint_evidence.input(FIXPOINT_STAGE2_UNITS)
+    fixpoint_evidence = fixpoint_evidence.input(FIXPOINT_STAGE3_UNITS)
     fixpoint_evidence = fixpoint_evidence.input(release_compiler_bin("with"))
     fixpoint_evidence = fixpoint_evidence.write_scope("out/.build-state")
     fixpoint_evidence = fixpoint_evidence.write_scope("out/command/fixpoint-evidence")
     fixpoint_evidence = fixpoint_evidence.dep("fixpoint-compare")
-    fixpoint_evidence = fixpoint_evidence.dep("stage2-fixpoint-object")
-    fixpoint_evidence = fixpoint_evidence.dep("stage3-fixpoint-object")
     fixpoint_evidence = fixpoint_evidence.dep("with-sha256")
     fixpoint_evidence = fixpoint_evidence.dep("build")
     out = out.add_target(fixpoint_evidence)
@@ -2435,6 +2449,8 @@ pub fn build(ctx: BuildCtx) -> Build:
     compiler = compiler.input("out/gen/main.w")
     compiler = target_with_compiler_source_inputs(move compiler, ctx)
     compiler = compiler.arg("-O1")
+    // stage2's compile of the compiler, unit by unit (see fixpoint-compare).
+    compiler = compiler.arg("unit-digests=" ++ FIXPOINT_STAGE3_UNITS).extra_output(FIXPOINT_STAGE3_UNITS)
     compiler = compiler.extra_output("out/command/link-compiler")
     compiler = compiler.timeout(1800000)
     compiler = compiler.write_scope("out/release/bin")

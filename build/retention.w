@@ -805,6 +805,33 @@ fn ret_require_test_green(ctx: &ActionCtx, compiler_sha: &str, driver_sha: &str)
         return ret_fail(ctx, "test-green manifest is stale; run `with build :test`")
     0
 
+/// `fixpoint-compare`: the unit digests of stage1's compile of the compiler
+/// (inputs[0]) equal those of stage2's (inputs[1]). A difference names every
+/// unit that differs: nondeterminism, or a miscompile by one generation.
+pub fn run_fixpoint_compare_units_action(ctx: ActionCtx) -> i32:
+    let fs = ctx.fs()
+    let inputs = ctx.inputs()
+    if inputs.len() < 2: return ret_fail(ctx, "requires the two unit-digest files")
+    let left = fs.read_text(inputs.get(0))
+    let right = fs.read_text(inputs.get(1))
+    if left.len() == 0: return ret_fail(ctx, "no unit digests in " ++ inputs.get(0) ++ "; the stage2 build records them")
+    if right.len() == 0: return ret_fail(ctx, "no unit digests in " ++ inputs.get(1) ++ "; the release build records them")
+    let left_lines = left.split("\n")
+    let right_lines = right.split("\n")
+    var units = 0
+    var differing = ""
+    let count = if left_lines.len() > right_lines.len(): left_lines.len() else: right_lines.len()
+    for i in 0..count as i32:
+        let a = if i < left_lines.len() as i32: left_lines.get(i).clone() else: ""
+        let b = if i < right_lines.len() as i32: right_lines.get(i).clone() else: ""
+        if a.len() == 0 and b.len() == 0: continue
+        units = units + 1
+        if a != b: differing = differing ++ "\n  stage2: " ++ (if a.len() > 0: a else: "(no such unit)") ++ "\n  stage3: " ++ (if b.len() > 0: b else: "(no such unit)")
+    if differing.len() > 0:
+        return ret_fail(ctx, "FIXPOINT FAILED: stage2 and stage3 disagree on these units of the compiler" ++ differing ++ "\nrun `with build :fixpoint-diff` for the root module, or rebuild with WITH_KEEP_UNIT_OBJECTS=1 to keep the unit objects")
+    print(f"[fixpoint] stage2 == stage3 over all {units} units of the compiler")
+    ret_write_output_stamp(ctx)
+
 // D19: evidence is written once by the step that produces it and only read
 // thereafter. The fixpoint tier records what it verified — the fixpoint
 // object shas, bound to the exact release binary present at verification —
@@ -820,8 +847,8 @@ pub fn run_fixpoint_evidence_action(ctx: ActionCtx) -> i32:
     let compiler_sha = ret_sha256_file(ctx, "fixpoint-evidence-compiler", compiler_path)
     if compiler_sha.len() == 0:
         return ret_fail(ctx, "could not hash " ++ compiler_path)
-    let stage2_sha = ret_sha256_file(ctx, "fixpoint-evidence-stage2", ret_stage_fixpoint_path("with-stage2-fixpoint.o"))
-    let stage3_sha = ret_sha256_file(ctx, "fixpoint-evidence-stage3", ret_stage_fixpoint_path("with-stage3-fixpoint.o"))
+    let stage2_sha = ret_sha256_file(ctx, "fixpoint-evidence-stage2", "out/stage/bin/with-stage2.units")
+    let stage3_sha = ret_sha256_file(ctx, "fixpoint-evidence-stage3", "out/release/bin/with.units")
     if stage2_sha.len() == 0 or stage3_sha.len() == 0:
         return ret_fail(ctx, "could not hash fixpoint objects")
     let evidence =
