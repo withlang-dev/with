@@ -9775,6 +9775,26 @@ impl MirBuilder:
         self.body.push_stmt(self.cur_bb, StmtKind.Assign, place, rv, span)
         self.body.new_operand(OperandKind.OK_COPY, place)
 
+    // Whether derefs (reference, pointer, user Deref) from `from_ty` reach a
+    // type `expected_ty` accepts, directly or by auto-ref: the type-only twin
+    // of lower_auto_deref_call_arg's walk, which it must agree with.
+    fn auto_deref_reaches(expected_ty: i32, from_ty: i32) -> bool:
+        var current_ty = from_ty
+        var depth = 0
+        while current_ty > 0 and depth < 32:
+            if self.sema.types_compatible_frozen(expected_ty, current_ty) != 0: return true
+            if self.sema.can_auto_ref_arg_frozen(expected_ty, current_ty) != 0: return true
+            let current_resolved = self.sema.resolve_alias(current_ty as TypeId)
+            let current_kind = self.sema.get_type_kind(current_resolved)
+            if current_kind == TypeKind.TY_REF or current_kind == TypeKind.TY_PTR:
+                current_ty = self.sema.get_type_d0(current_resolved)
+            else:
+                let deref_info = self.sema.resolve_user_deref_info_frozen(current_resolved as i32)
+                if deref_info.ok == 0: return false
+                current_ty = deref_info.result_ref_ty
+            depth = depth + 1
+        false
+
     mut fn lower_auto_deref_call_arg(arg_node: i32, expected_ty: i32) -> i32:
         if arg_node == 0 or expected_ty == 0:
             return -1
@@ -9798,6 +9818,12 @@ impl MirBuilder:
         if current_ty == 0:
             return -1
         if self.sema.types_compatible_frozen(expected_ty, current_ty) != 0:
+            return -1
+        // Lowering the argument emits it (its calls run), and a -1 from here
+        // sends the caller to lower it again: `strlen(name(1))` called `name`
+        // twice, a `str` reaching no `*const c_char` by any deref. Decide from
+        // the types first; lower only an argument the walk can finish.
+        if not self.auto_deref_reaches(expected_ty, current_ty):
             return -1
         var place = self.lower_expr_place(arg_node)
         let place_ty = self.place_local_type(place)
