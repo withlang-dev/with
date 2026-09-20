@@ -3880,6 +3880,11 @@ fn run_test_process(bin_path: &str, test_name: &str, quiet: bool) -> TestRunResu
         let _set_filter = build_graph_rt_setenv("WITH_TEST_FILTER", test_name)
     if quiet:
         let _set_short = build_graph_rt_setenv("WITH_TEST_SHORT", "1")
+    // A test binary is never a build worker, whoever launched `with test`: a
+    // lane driven by an older compiler (the pinned seed) still hands its
+    // worker switches down, and a `with build` the test runs would obey them.
+    build_action_clear_worker_env_for_children()
+    build_test_clear_worker_env_for_children()
     var argv = ""
     argv = build_graph_argv_append(argv, bin_path)
     let rc = with_exec_argv_capture(argv, out_path, err_path, 120000)
