@@ -18,6 +18,7 @@ extern fn with_fs_copy_tree(src: &str, dst: &str) -> i32
 extern fn with_fs_symlink(target: &str, link_path: &str) -> i32
 extern fn with_fs_list_files(path: &str) -> str
 extern fn with_fs_mkdir_p(path: &str) -> i32
+extern fn with_fs_chmod(path: &str, mode: i32) -> i32
 
 /// Check if a file exists at the given path.
 pub fn file_exists(path: &str) -> bool:
@@ -77,6 +78,11 @@ pub fn read_file(path: &str) -> Result[str, IoError]:
     if status != 0:
         return Err(.Os(0 - status, path.clone()))
     text
+
+/// Set a file's permission bits (a no-op where the platform has none).
+/// Returns 0 on success.
+pub fn chmod(path: &str, mode: i32) -> i32:
+    with_fs_chmod(path, mode)
 
 /// Create directories recursively (like mkdir -p). Returns 0 on success.
 pub fn mkdir_p(path: &str) -> i32:

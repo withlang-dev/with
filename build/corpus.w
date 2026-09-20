@@ -225,6 +225,32 @@ pub fn corpus_compile_binary(ctx: &ActionCtx, label: &str, source: &str, output:
     if not ctx.fs().exists(output): return corpus_fail(ctx, label ++ " did not produce " ++ output)
     0
 
+/// Type-checks the generated bundle root, which imports every module: a
+/// module no harness program reaches (minizip's mztools) is otherwise first
+/// compiled by the bundle build, after promotion replaced the corpus.
+/// `compiler` checks them as the bundle build compiles them: the prelude
+/// off, and the corpus read from these sources (`--bundle-corpus`), never from
+/// the bundle interface that compiler embeds, which predates the migration.
+pub fn corpus_check_every_module(ctx: &ActionCtx, corpus: &Corpus, generated: &str, compiler: &str) -> i32:
+    let tree = corpus_scratch(ctx) ++ "/check"
+    let modules = tree ++ "/lib/" ++ corpus.corpus_rel
+    if corpus_reset_dir(ctx, tree) != 0: return 1
+    if corpus_copy_w_files(ctx, generated, modules) != 0: return 1
+    // Pushed, not a literal: the pinned seed frees a literal's moved
+    // temporaries (#1122).
+    var argv: Vec[str] = Vec.new()
+    argv.push(corpus_abs(ctx, compiler))
+    argv.push("check")
+    argv.push(corpus_abs(ctx, modules ++ "/bundle.w"))
+    argv.push("--no-prelude")
+    argv.push("--bundle-corpus")
+    argv.push(corpus.corpus_rel.clone())
+    let stdout = corpus_abs(ctx, tree ++ "/check.stdout")
+    let stderr = corpus_abs(ctx, tree ++ "/check.stderr")
+    let checked = ctx.process_runner().run_capture_cwd(argv, stdout, stderr.clone(), 600000, corpus_abs(ctx, "."))
+    if checked.rc != 0: return corpus_fail(ctx, corpus.name ++ f" generated modules do not type-check (exit {checked.rc}); see " ++ stderr)
+    0
+
 /// The generated tree carries no foreign ABI surface and no untranslated
 /// residue (No Silent Fallbacks); a migration that lost modules fails the
 /// floor rather than promoting a partial corpus. Returns the error count.

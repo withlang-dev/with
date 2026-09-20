@@ -23,7 +23,7 @@ pub fn zlib_corpus() -> Corpus:
         // takes the .gz scratch file as its one argument, spelled inside the
         // drift dir so the harness never writes at the root
         harness: ["example", "minigzip"], drift_harness: "example.w", drift_harness_arg: "out/wo-drift/zlib/example.gz",
-        module_floor: 18, defines: Vec.new(), excludes: Vec.new(), declared_externs: Vec.new(),
+        module_floor: 21, defines: Vec.new(), excludes: Vec.new(), declared_externs: Vec.new(),
         promote_after: ["zlib-test"], test_lane: "",
         prepare_reference: corpus_no_prepare, stage: zlib_stage,
         migrate: zlib_migrate, finish_generated: corpus_no_finish,
@@ -37,6 +37,16 @@ fn zlib_source_files() -> Vec[str]:
      "inftrees.c", "inftrees.h", "trees.c", "trees.h", "uncompr.c", "zconf.h",
      "zlib.h", "zutil.c", "zutil.h"]
 
+// contrib/minizip, from the same release: the ZIP container over the
+// library's raw inflate — reader (unzip), repair (mztools) and their stream
+// callbacks (ioapi). The writer (zip.c with skipset.h) waits on
+// setjmp/longjmp, which zipAlreadyThere uses as its out-of-memory landing
+// pad and the migrator refuses. The two command-line programs and the Win32
+// stream layer (iowin32) stay out.
+fn zlib_minizip_files() -> Vec[str]:
+    ["crypt.h", "ints.h", "ioapi.c", "ioapi.h", "mztools.c", "mztools.h",
+     "unzip.c", "unzip.h"]
+
 // The library's units and headers, flat. The test programs are not staged:
 // migrated as part of the directory they would become library modules.
 fn zlib_stage(ctx: &ActionCtx, corpus: &Corpus, reference: &str, source: &str) -> i32:
@@ -44,6 +54,10 @@ fn zlib_stage(ctx: &ActionCtx, corpus: &Corpus, reference: &str, source: &str) -
         let path = reference ++ "/" ++ file
         if not ctx.fs().exists(path) or ctx.fs().read_text(path).len() == 0:
             return corpus_fail(ctx, "reference tree lacks " ++ path)
+        if corpus_copy(ctx, path, source ++ "/" ++ file) != 0: return 1
+    for file in zlib_minizip_files():
+        let path = reference ++ "/contrib/minizip/" ++ file
+        if not ctx.fs().exists(path): return corpus_fail(ctx, "reference tree lacks " ++ path)
         if corpus_copy(ctx, path, source ++ "/" ++ file) != 0: return 1
     0
 
