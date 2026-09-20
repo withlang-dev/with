@@ -195,6 +195,30 @@ fn build_cache_target_uses_current_compiler(target: &BuildGraphTarget) -> bool:
     if target.kind == 23: return true
     false
 
+// What produces a target's output, for its cache key. The binary that
+// orchestrates the build is the producer only when it compiles the target
+// itself: the compile kinds, and an action with no `compiler=` (a workspace
+// compile runs in the driver's own compiler). An action that names its
+// compiler is produced by that compiler: a tree compiler is hashed by the
+// stage-target block below, and `compiler=seed` is the seed `WITH` names. So
+// such an action keys on the seed, and `with build`, `src/main build` and
+// `out/release/bin/with build` over one seed agree that stage1, stage2 and the
+// release compile are fresh. (Keyed on the orchestrator, each switch between
+// them rebuilt the compiler: four minutes, several times a day. Go, Zig and
+// Rust all key on the producing tool.) With `WITH` unset the seed is whatever
+// the driver resolves, so the driver stands in, as before.
+fn build_cache_producer_fingerprint(target: &BuildGraphTarget) -> str:
+    if target.kind == 23 and build_cache_target_names_compiler(target):
+        let seed = build_cache_resolve_executable_path(build_graph_rt_getenv("WITH"))
+        if seed.len() > 0 and build_graph_rt_file_exists(seed) != 0:
+            return build_cache_fingerprint_file(seed)
+    build_cache_current_compiler_fingerprint()
+
+fn build_cache_target_names_compiler(target: &BuildGraphTarget) -> bool:
+    for i in 0..target.args.len() as i32:
+        if target.args[i].starts_with("compiler="): return true
+    false
+
 fn build_cache_target_has_arg(target: &BuildGraphTarget, needle: &str) -> bool:
     for i in 0..target.args.len() as i32:
         if target.args[i] == needle:
@@ -503,19 +527,26 @@ pub fn build_cache_write_test_verdicts(root: &str, target_name: &str, keys: &Vec
 pub fn build_cache_project_relative_path(root: &str, path: &str) -> str:
     build_cache_project_relative(root, path)
 
-fn build_cache_compute_signature(target: &BuildGraphTarget, root: &str) -> str:
-    var sig = f"{target.kind}:{target.name}:{target.entry}:{target.output}"
-    sig = sig ++ f":{target.optimize_mode}:{target.target_kind}"
+// One named component of a target's signature. The signature is the sha256
+// of the texts joined in order; the state also records each component's own
+// hash, so a stale verdict can say WHICH component changed.
+type BuildCacheSigPart { name: str, text: str }
+
+fn build_cache_signature_parts(target: &BuildGraphTarget, root: &str) -> Vec[BuildCacheSigPart]:
+    var parts: Vec[BuildCacheSigPart] = Vec.new()
+    var shape = f"{target.kind}:{target.name}:{target.entry}:{target.output}"
+    shape = shape ++ f":{target.optimize_mode}:{target.target_kind}"
     for i in 0..target.args.len() as i32:
-        sig = sig ++ ":" ++ target.args[i]
+        shape = shape ++ ":" ++ target.args[i]
     for i in 0..target.defines.len() as i32:
-        sig = sig ++ ":D:" ++ target.defines[i]
+        shape = shape ++ ":D:" ++ target.defines[i]
     for i in 0..target.include_paths.len() as i32:
-        sig = sig ++ ":I:" ++ target.include_paths[i]
+        shape = shape ++ ":I:" ++ target.include_paths[i]
     for i in 0..target.system_libs.len() as i32:
-        sig = sig ++ ":L:" ++ target.system_libs[i]
+        shape = shape ++ ":L:" ++ target.system_libs[i]
+    parts.push(BuildCacheSigPart { name: "target", text: shape })
     if build_cache_target_uses_current_compiler(target):
-        sig = sig ++ ":WITH:" ++ build_cache_current_compiler_fingerprint()
+        parts.push(BuildCacheSigPart { name: "producer", text: ":WITH:" ++ build_cache_producer_fingerprint(target) })
     if target.kind == 23:
         // #686: hash only the modules the action's code can reach (defining
         // file + use closure, computed at materialize). A build.w-only edit
@@ -523,17 +554,43 @@ fn build_cache_compute_signature(target: &BuildGraphTarget, root: &str) -> str:
         // Empty closure (mapping unavailable) falls back to hashing all
         // build-graph sources — the always-safe superset.
         if target.action_source_paths.len() > 0:
-            sig = sig ++ ":ACTION_CODE:" ++ build_cache_hash_action_sources(root, &target.action_source_paths)
+            parts.push(BuildCacheSigPart { name: "action-code", text: ":ACTION_CODE:" ++ build_cache_hash_action_sources(root, &target.action_source_paths) })
         else:
-            sig = sig ++ ":BUILD_GRAPH:" ++ build_cache_hash_build_graph_sources(root)
+            parts.push(BuildCacheSigPart { name: "build-graph", text: ":BUILD_GRAPH:" ++ build_cache_hash_build_graph_sources(root) })
     if build_cache_is_stage_target(target):
-        let src_hash = build_cache_hash_directory_w_files(root, "src")
-        sig = sig ++ ":SRC:" ++ src_hash
+        parts.push(BuildCacheSigPart { name: "compiler-source", text: ":SRC:" ++ build_cache_hash_directory_w_files(root, "src") })
         let compiler_path = build_cache_target_compiler_path(root, target)
         if compiler_path.len() > 0:
-            let compiler_hash = build_cache_fingerprint_file(compiler_path)
-            sig = sig ++ ":COMPILER:" ++ compiler_hash
+            parts.push(BuildCacheSigPart { name: "compiler", text: ":COMPILER:" ++ build_cache_fingerprint_file(compiler_path) })
+    parts
+
+fn build_cache_compute_signature(target: &BuildGraphTarget, root: &str) -> str:
+    var sig = ""
+    // WITH_BUILD_CACHE_TRACE=<target>: print that target's signature
+    // components, for telling two drivers' views of one target apart.
+    let traced = build_graph_rt_getenv("WITH_BUILD_CACHE_TRACE") == target.name
+    for part in build_cache_signature_parts(target, root):
+        if traced: build_graph_rt_eprint("[cache-trace] " ++ target.name ++ " " ++ part.name ++ " " ++ build_cache_sha256_text(part.text))
+        sig = sig ++ part.text
     build_cache_sha256_text(sig)
+
+// `sigpart:<name>:<sha256 of the component>` lines, for the state file.
+fn build_cache_signature_part_lines(target: &BuildGraphTarget, root: &str) -> str:
+    var lines = ""
+    for part in build_cache_signature_parts(target, root):
+        lines = lines ++ "sigpart:" ++ part.name ++ ":" ++ build_cache_sha256_text(part.text) ++ "\n"
+    lines
+
+// The components whose recorded hash differs from the current one, e.g.
+// " (producer, action-code)"; "" when the state predates component hashes.
+fn build_cache_changed_signature_parts(target: &BuildGraphTarget, root: &str, state_text: &str) -> str:
+    if not state_text.contains("\nsigpart:"): return ""
+    var changed = ""
+    for part in build_cache_signature_parts(target, root):
+        let line = "\nsigpart:" ++ part.name ++ ":" ++ build_cache_sha256_text(part.text) ++ "\n"
+        if not state_text.contains(line):
+            changed = if changed.len() == 0: part.name.clone() else: changed ++ ", " ++ part.name
+    if changed.len() == 0: "" else: " (" ++ changed ++ ")"
 
 fn build_cache_collect_input_paths(root: &str, target: &BuildGraphTarget) -> Vec[str]:
     var paths: Vec[str] = Vec.new()
@@ -633,7 +690,7 @@ pub fn build_cache_freshness_reason(root: &str, target: &BuildGraphTarget, dep_r
     if not saw_v2:
         return "stale: cache state version changed"
     if state_sig != expected_sig:
-        return "stale: action signature changed"
+        return "stale: action signature changed" ++ build_cache_changed_signature_parts(target, root, state_text)
     let input_paths = build_cache_collect_input_paths(root, target)
     if input_paths.len() != input_hashes.len():
         return "stale: input set changed"
@@ -694,7 +751,7 @@ pub fn build_cache_record(root: &str, target: &BuildGraphTarget, discovered_deps
     let _ = build_graph_rt_mkdir_p(state_dir)
     let state_path = build_cache_state_path(root, target.name)
     let sig = build_cache_compute_signature(target, root)
-    var content = "v2\nsig:" ++ sig ++ "\n"
+    var content = "v2\nsig:" ++ sig ++ "\n" ++ build_cache_signature_part_lines(target, root)
     if build_cache_target_uses_current_compiler(target):
         content = content ++ "compiler:" ++ build_cache_current_compiler_fingerprint() ++ "\n"
     let input_paths = build_cache_collect_input_paths(root, target)
