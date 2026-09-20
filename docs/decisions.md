@@ -108,6 +108,14 @@ profile is found to need compiler-owned knowledge to work.
 
 ## D49 — Green evidence is keyed on what was tested: git tree, pinned seed, host
 
+*Amended 2026-09-20 (D50 applied):* the identity keys on the battery's
+inputs, not the whole tree — `git ls-tree HEAD` without the `docs` entry and
+without top-level `*.md`, plus the docs files lanes read, as the object name
+`git hash-object` gives that listing. A docs-only commit produced a tree with
+no green and `:install-user` refused a compiler whose sources had passed;
+Eric: "best fix this immediately". `GreenEvidence.w` and `build/retention.w`
+apply one rule; `behav_green_identity_keys_on_inputs.w` pins it.
+
 **Date:** 2026-09-20. **Status:** ruled (Eric: "it is moronic that we are testing what we already tested"; "proceed").
 
 **Context.** #1222's battery passed in a staging worktree. It was squash-merged; main's tree was byte-identical to the tested head (`git diff` empty). `:install-user` still required a second full battery on main, 25 minutes, because `last-green` and the driver's install gate accept only the exact compiler binary that was tested (`compiler_sha256`), and the binary names its commit (`v0.15.2.1-g<hash>`, a post-link stamp) and, through debug info, its worktree. A squash-merge or another checkout of the same sources is a "different" compiler.

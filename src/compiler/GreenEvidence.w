@@ -28,6 +28,48 @@ fn green_first_line(text: &str) -> str:
         if text[i] == '\n': return text.slice(0, i as i64)
     text.clone()
 
+// The paths under docs/ that a battery lane reads: the specification
+// (spec-inventory-check), the ABI record (abi-hash-check, the stage inputs)
+// and the primer `with init` writes (selfhost).
+pub const GREEN_DOCS_INPUTS: str = "docs/with-specification.md docs/with-abi.sha256 docs/with_for_ai.md"
+
+/// The battery's inputs, as the text `git hash-object` identifies (D50: key
+/// on what the output is made from). `top_level` is `git ls-tree HEAD`;
+/// `docs_inputs` is `git ls-tree HEAD <GREEN_DOCS_INPUTS>`. A top-level entry
+/// named `docs`, or a top-level `*.md` (CLAUDE.md, README.md, …), is prose no
+/// lane compiles or tests, so it is left out: a docs-only commit keeps the
+/// identity of the tree whose battery passed. build/retention.w applies the
+/// same rule; the two must agree byte for byte.
+pub fn green_identity_inputs(top_level: &str, docs_inputs: &str) -> str:
+    var kept = ""
+    for line in top_level.split("\n"):
+        if line.len() == 0: continue
+        let tab = line.find("\t")
+        let path = if tab >= 0: line.slice(tab + 1, line.len()) else: line.clone()
+        if path == "docs" or path.ends_with(".md"): continue
+        kept = kept ++ line ++ "\n"
+    kept ++ docs_inputs
+
+// The identity of the inputs as committed: the git object name of the
+// filtered listing, or "" when git fails.
+fn green_inputs_identity(root: &str) -> str:
+    let top_args: Vec[str] = Vec.new()
+    top_args.push("ls-tree")
+    top_args.push("HEAD")
+    let top_level = green_git_output(root, &top_args, "ls-tree")
+    if top_level.len() == 0: return ""
+    var docs_args: Vec[str] = Vec.new()
+    docs_args.push("ls-tree")
+    docs_args.push("HEAD")
+    for name in GREEN_DOCS_INPUTS.split(" "): docs_args.push(name.clone())
+    let docs_inputs = green_git_output(root, &docs_args, "ls-tree-docs")
+    let listing = green_join(green_join(root, "out/command/install-gate"), "green-inputs.txt")
+    if runtime_write_file(listing, green_identity_inputs(top_level, docs_inputs)) != 0: return ""
+    let hash_args: Vec[str] = Vec.new()
+    hash_args.push("hash-object")
+    hash_args.push(listing)
+    green_first_line(green_git_output(root, &hash_args, "hash-object"))
+
 // The tracked tree is as committed and nothing untracked could be a build
 // input; an untracked path under examples/ is a user's own program.
 fn green_worktree_is_clean(root: &str) -> bool:
@@ -51,10 +93,7 @@ pub fn green_by_source_identity(root: &str) -> str:
     let seeded_by = seed_input.slice(at + marker.len(), at + marker.len() + 64)
     if not runtime_read_file(green_join(root, "seed.lock")).contains(seeded_by): return ""
     if not green_worktree_is_clean(root): return ""
-    let tree_args: Vec[str] = Vec.new()
-    tree_args.push("rev-parse")
-    tree_args.push("HEAD^{tree}")
-    let tree = green_first_line(green_git_output(root, &tree_args, "tree"))
+    let tree = green_inputs_identity(root)
     if tree.len() < 40: return ""
     let identity = tree ++ "-" ++ seeded_by ++ "-" ++ with_sysinfo_os() ++ "_" ++ with_sysinfo_arch()
     let explicit = runtime_getenv("WITH_GREEN_DIR")

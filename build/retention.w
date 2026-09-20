@@ -552,13 +552,55 @@ fn ret_worktree_is_clean(ctx: &ActionCtx) -> bool:
 
 /// `<tree>-<driver sha256>-<os>_<arch>`, or "" for a dirty worktree or a
 /// tree git cannot name.
+// The paths under docs/ that a battery lane reads. Mirrors
+// src/compiler/GreenEvidence.w GREEN_DOCS_INPUTS; the two must agree.
+const RET_GREEN_DOCS_INPUTS: str = "docs/with-specification.md docs/with-abi.sha256 docs/with_for_ai.md"
+
+// The battery's inputs as the text `git hash-object` identifies (D50): the
+// top-level `git ls-tree HEAD` without the `docs` entry and without top-level
+// `*.md` files (prose no lane compiles or tests), plus the docs files lanes
+// do read. A docs-only commit keeps the identity of the tree whose battery
+// passed. Mirrors GreenEvidence.green_identity_inputs byte for byte.
+fn ret_green_identity_inputs(top_level: &str, docs_inputs: &str) -> str:
+    var kept = ""
+    for line in top_level.split("\n"):
+        if line.len() == 0: continue
+        let tab = line.find("\t")
+        let path = if tab >= 0: line.slice(tab + 1, line.len()) else: line.clone()
+        if path == "docs" or path.ends_with(".md"): continue
+        kept = kept ++ line ++ "\n"
+    kept ++ docs_inputs
+
+fn ret_run_all(ctx: &ActionCtx, label: &str, args: &Vec[str], timeout_ms: i32) -> str:
+    let fs = ctx.fs()
+    let root = ctx.project_info().project_root()
+    let dir = ret_join("out/command", ctx.target_name())
+    if fs.mkdir_all(dir) != 0: return ""
+    let result = ctx.process_runner().run_capture(args, ret_abs(root, ret_join(dir, label ++ ".stdout")), ret_abs(root, ret_join(dir, label ++ ".stderr")), timeout_ms)
+    if result.rc != 0: return ""
+    result.stdout.clone()
+
 pub fn ret_source_identity(ctx: &ActionCtx, driver_sha: &str) -> str:
     if driver_sha.len() != 64 or not ret_worktree_is_clean(ctx): return ""
-    let args: Vec[str] = Vec.new()
-    args.push("git")
-    args.push("rev-parse")
-    args.push("HEAD^{tree}")
-    let tree = ret_run_first_line(ctx, "git-tree", args, 30000)
+    let top_args: Vec[str] = Vec.new()
+    top_args.push("git")
+    top_args.push("ls-tree")
+    top_args.push("HEAD")
+    let top_level = ret_run_all(ctx, "git-ls-tree", top_args, 30000)
+    if top_level.len() == 0: return ""
+    var docs_args: Vec[str] = Vec.new()
+    docs_args.push("git")
+    docs_args.push("ls-tree")
+    docs_args.push("HEAD")
+    for name in RET_GREEN_DOCS_INPUTS.split(" "): docs_args.push(name.clone())
+    let docs_inputs = ret_run_all(ctx, "git-ls-tree-docs", docs_args, 30000)
+    let listing = ret_join(ret_join("out/command", ctx.target_name()), "green-inputs.txt")
+    if ctx.fs().write_text(listing, ret_green_identity_inputs(top_level, docs_inputs)) != 0: return ""
+    let hash_args: Vec[str] = Vec.new()
+    hash_args.push("git")
+    hash_args.push("hash-object")
+    hash_args.push(listing)
+    let tree = ret_run_first_line(ctx, "git-hash-object", hash_args, 30000)
     if tree.len() < 40: return ""
     tree ++ "-" ++ driver_sha ++ "-" ++ os() ++ "_" ++ arch()
 
