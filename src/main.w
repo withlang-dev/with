@@ -1885,7 +1885,7 @@ impl PoolState:
         let err_text = with_fs_read_file(self.errs.get(idx))
         if err_text.len() > 0:
             with_ewrite(err_text)
-        with_eprint("[time] " ++ name ++ " " ++ build_graph_time_fmt(spent))
+        build_graph_time_eprint("[time] " ++ name ++ " " ++ build_graph_time_fmt(spent))
         let ran_via_runner = self.via_runner.get(idx)
         let effects_path = with_str_clone_ref(self.effects_paths.get(idx))
         if rc == 124:
@@ -2152,6 +2152,15 @@ fn build_graph_first_broken_dep(target: &BuildGraphTarget, failed: &Vec[str]) ->
         if failed.contains(dep): return dep.clone()
     ""
 
+// `with run` builds a target only to run it: the person asked for their
+// program's output, so the build's timing report stays out of it (a failed
+// build still prints its errors). `with build` and the compiler's own lanes
+// report times as before.
+var build_graph_quiet_times: bool = false
+
+fn build_graph_time_eprint(line: &str):
+    if not build_graph_quiet_times: with_eprint(line)
+
 unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, action_sema: *mut Sema, options: &BuildCommandOptions, survey: bool) -> i32:
     let no_strings: Vec[str] = Vec.new()
     if graph.targets.len() == 0:
@@ -2213,7 +2222,7 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
             timed_names.push(with_str_clone_ref(timing_name))
             timed_ns.push(spent)
             timed_rss.push(build_graph_rt_self_maxrss() - timing_rss0)
-            with_eprint("[time] " ++ timing_name ++ " " ++ build_graph_time_fmt(spent))
+            build_graph_time_eprint("[time] " ++ timing_name ++ " " ++ build_graph_time_fmt(spent))
             timing_name = ""
         if build_graph_kind_removed(target.kind):
             with_eprint("error: build.w target kind " ++ build_graph_kind_name(target.kind) ++ f" ({target.kind}) was removed; regenerate your build graph")
@@ -2571,9 +2580,9 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
         timed_names.push(with_str_clone_ref(timing_name))
         timed_ns.push(spent)
         timed_rss.push(build_graph_rt_self_maxrss() - timing_rss0)
-        with_eprint("[time] " ++ timing_name ++ " " ++ build_graph_time_fmt(spent))
+        build_graph_time_eprint("[time] " ++ timing_name ++ " " ++ build_graph_time_fmt(spent))
     if times_top_level:
-        build_graph_times_report(root, &timed_names, &timed_ns, &timed_rss, with_clock_nanos() - run_t0)
+        if not build_graph_quiet_times: build_graph_times_report(root, &timed_names, &timed_ns, &timed_rss, with_clock_nanos() - run_t0)
         // #679 RSS tripwire (Eric, 2026-09-02): measured peak is ~0.5 GB;
         // any target crossing 1 GB is a memory regression and fails the
         // build loudly. Raising the limit is a deliberate, visible edit
@@ -3047,7 +3056,9 @@ fn run_run_project_command(selected_target_hint: &str, opt_level: i32, no_std: b
         return 1
     if not repo_lock_acquire(selected_target_name):
         return 1
+    build_graph_quiet_times = true
     let build_rc = unsafe { run_build_graph(root, cfg, selected_graph, &raw mut load_result.sema as *mut Sema, options, false) }
+    build_graph_quiet_times = false
     repo_lock_release()
     if build_rc != 0:
         return build_rc

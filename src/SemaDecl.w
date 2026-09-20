@@ -2383,6 +2383,14 @@ impl Sema:
         // prelude's std.regex) is not theirs to change.
         if sema_path_is_user_lint_source(self.decl_source_path_for_node(node)) == 0:
             return
+        // Nor is a c_imported declaration: raylib's `Model` is Copy because a C
+        // struct copies, and "large Copy type 'Model'" greeted every first
+        // raylib program with two warnings nobody could act on. Such a
+        // declaration is spliced into the importing module, so its source path
+        // is the user's file; decl_is_c_import is what says where it came from.
+        let decl_index = self.find_decl_index(node)
+        if decl_index >= 0 and decl_index < self.decl_is_c_import.len() as i32 and self.decl_is_c_import[decl_index] != 0:
+            return
         let threshold = self.copy_warn_threshold
         if threshold <= 0 or type_tid <= 0:
             return
