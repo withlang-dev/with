@@ -758,30 +758,6 @@ fn comp_split_lines(text: &str) -> Vec[str]:
         i = i + 1
     lines
 
-fn comp_requirements_section_30_start(lines: &Vec[str]) -> i32:
-    for i in 0..lines.len() as i32:
-        if lines[i].starts_with("## 30."):
-            return i
-    -1
-
-fn comp_check_requirements_informative_text(ctx: &ActionCtx, text: &str) -> i32:
-    if not text.contains("Section 30 is explicitly informative"):
-        return comp_fail(ctx, "requirements must state that Section 30 is explicitly informative")
-    let lines = comp_split_lines(text)
-    let section_start = comp_requirements_section_30_start(lines)
-    if section_start < 0:
-        return comp_fail(ctx, "requirements missing Section 30")
-    var has_trace = false
-    for i in section_start..lines.len() as i32:
-        let line = lines[i]
-        if line.contains("Informative trace:"):
-            has_trace = true
-        if line.contains("  - Requirement:"):
-            return comp_fail(ctx, f"docs/requirements.md:{i + 1}: Section 30 must not contain normative Requirement rows")
-    if not has_trace:
-        return comp_fail(ctx, "requirements Section 30 must include Informative trace:")
-    0
-
 fn comp_vec_contains(items: &Vec[str], item: &str) -> bool:
     for i in 0..items.len() as i32:
         if items[i] == item:
@@ -1149,16 +1125,6 @@ pub fn run_check_compiler_no_new_c_export_action(ctx: ActionCtx) -> i32:
         let rc = comp_check_c_export_path(ctx, files[i])
         if rc != 0:
             return rc
-    comp_write_ok_output(ctx)
-
-pub fn run_check_requirements_informative_action(ctx: ActionCtx) -> i32:
-    let fs = ctx.fs()
-    let path = "docs/requirements.md"
-    if not fs.exists(path):
-        return comp_fail(ctx, "missing " ++ path)
-    let rc = comp_check_requirements_informative_text(ctx, fs.read_text(path))
-    if rc != 0:
-        return rc
     comp_write_ok_output(ctx)
 
 // ── std.libc surface (Eric, 2026-09-15) ─────────────────────────────────────

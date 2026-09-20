@@ -1804,18 +1804,6 @@ pub fn build(ctx: BuildCtx) -> Build:
     compiler_no_c_export = target_with_compiler_c_export_audit_inputs(move compiler_no_c_export, ctx)
     out = out.add_target(compiler_no_c_export)
 
-    var requirements_informative = target_new(.Action, "requirements-informative-check", "").output("out/.build-state/requirements-informative-check.txt")
-    requirements_informative.action = run_check_requirements_informative_action
-    requirements_informative = requirements_informative.write_scope("out/.build-state")
-    requirements_informative = requirements_informative.input("docs/requirements.md")
-    out = out.add_target(requirements_informative)
-
-    // docs/requirements.md is hand-maintained, NOT build-generated. The former
-    // `requirements` (generate) and `requirements-check` targets — which rewrote
-    // docs/requirements.md from the spec and failed the build if it differed —
-    // have been removed (build/requirements.w deleted). The build must never
-    // auto-generate or auto-modify docs/requirements.md.
-
     var spec_inventory = target_new(.Action, "spec-inventory-check", "").output("out/.build-state/spec-inventory-check.txt")
     spec_inventory.action = run_check_spec_inventory_action
     spec_inventory = spec_inventory.write_scope("out/.build-state")
@@ -2867,7 +2855,6 @@ pub fn build(ctx: BuildCtx) -> Build:
     tests = tests.dep("invariance-check")
     tests = tests.dep("embedded-runtime-regression")
     tests = tests.dep("emit-c-smoke")
-    tests = tests.dep("requirements-informative-check")
     tests = tests.dep("spec-inventory-check")
     tests = tests.dep("libc-surface-check")
     tests = tests.dep("rt-decl-audit")

@@ -38,7 +38,6 @@ install targets.
 These unblock later work by settling grammar/API questions and keeping the
 spec, requirements, and implementation inventories synchronized.
 
-- `#386` Maintain docs/requirements.md against current spec v7.2
 - `#410` Add the spec inventory gate (keywords/attributes/CLI/modules vs spec tables)
 - `#385` Stdlib uses an '=' body introducer not in §29.13 — spec it or migrate
 - `#381` Decide the spawn keyword: spec it or remove it
