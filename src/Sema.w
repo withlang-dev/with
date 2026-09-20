@@ -4803,6 +4803,12 @@ impl Sema:
             if self.implicit_binding_syms[ii] == sym:
                 self.implicit_binding_types[ii] = tid
 
+    // Whether `sym` currently names a parameter or a local: a binding made
+    // inside any scope below the module-level one.
+    fn scope_binding_is_local(sym: i32) -> bool:
+        let opt = self.scope_name_map.get(sym)
+        opt.is_some() and self.scope_starts.len() > 1 and opt.unwrap() >= self.scope_starts[1]
+
     fn scope_lookup_mut(sym: i32) -> i32:
         let opt = self.scope_name_map.get(sym)
         if opt.is_some():

@@ -4436,8 +4436,15 @@ impl Codegen:
         // C symbol — stealing it re-pointed rt-internal libc calls at a
         // renamed undefined decl; the With fn takes the auto-uniquified
         // name instead (whole-program resolution is value-keyed).
-        var ast_existing = wl_get_named_function(self.llmod, effective_name)
-        if ast_existing != 0 and not codegen_is_runtime_abi_symbol(effective_name):
+        // `@[c_export("name")]` defines the C symbol `name`. A c_imported header
+        // may already declare it (the library calls back into With), and call
+        // sites hold that declaration: the body goes into it. Adding a second
+        // `name` let LLVM rename the body `name.1` and left the prototype the
+        // C code calls undefined at link.
+        let c_export_symbol = if cc_name.len() > 9 and cc_name.slice(0, 9) == "c_export:": cc_name.slice(9, cc_name.len()) else: ""
+        let defined_symbol = if c_export_symbol.len() > 0: c_export_symbol.clone() else: effective_name.clone()
+        var ast_existing = wl_get_named_function(self.llmod, defined_symbol)
+        if ast_existing != 0 and c_export_symbol.len() == 0 and not codegen_is_runtime_abi_symbol(effective_name):
             ast_existing = 0
         if ast_existing != 0 and wl_fn_is_declaration(ast_existing) != 0 and wl_global_get_value_type(ast_existing) != fn_type:
             wl_set_value_name(ast_existing, effective_name ++ "__stale_decl")
