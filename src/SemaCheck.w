@@ -2382,7 +2382,9 @@ impl Sema:
             self.body_typed_sigs.insert(sig_idx, 1)
         else if body_expected_ret != 0 and body_expected_ret != self.ty_void and body_ty == self.ty_void:
             let explicit_void_results_ok = self.check_body_explicit_value_results(body, 1, body_expected_ret as i32, "return type mismatch")
-            if explicit_void_results_ok != 0 and self.body_has_explicit_value_result(body, 1) != 0 and self.body_can_fall_through(body) != 0:
+            // §4.9: falling off the end of a `Result[Unit, E]` body is `Ok(())`,
+            // also after an early `return Err(...)`.
+            if explicit_void_results_ok != 0 and self.body_has_explicit_value_result(body, 1) != 0 and self.body_can_fall_through(body) != 0 and self.type_is_result_of_unit(body_expected_ret as i32) == 0:
                 self.emit_error("missing return", body)
             else if self.type_has_default_value(body_expected_ret as i32) == 0:
                 self.emit_error("return type does not implement Default", body)
@@ -17687,6 +17689,13 @@ impl Sema:
         if self.type_is_send(tid) != 0:
             return 1
         self.type_satisfies_thread_trait(tid, self.syms.scoped_send_trait)
+
+    fn type_is_result_of_unit(tid: i32) -> i32:
+        let resolved = self.resolve_alias(tid as TypeId)
+        if self.get_type_kind(resolved) != TypeKind.TY_GENERIC_INST: return 0
+        if self.get_generic_inst_base(resolved as i32) != self.syms.result or self.get_generic_inst_arg_count(resolved as i32) != 2: return 0
+        let ok = self.resolve_alias(self.get_generic_inst_arg(resolved as i32, 0) as TypeId)
+        if self.get_type_kind(ok) == TypeKind.TY_VOID: 1 else: 0
 
     mut fn type_has_default_value(tid: i32) -> i32:
         if tid == 0:
