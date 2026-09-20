@@ -193,6 +193,29 @@ don't add callers of `keys()`/`values()`/`items()` as `Vec`s, don't byte-copy
 a non-`Copy` element out of a container, and follow the D44 entry's
 non-compliance list rather than isolated fixes.
 
+**D51 has one canonical, complete source:
+`docs/Ruling-modeled-C-ownership-effects-conventions-and-foreign-lifetimes.md`**
+— Eric's ruling on modeled C, not a draft or summary. Any document, comment,
+test, TODO, plan or behavior that conflicts with it is false and
+non-conforming. Don't edit, reinterpret, narrow or broaden it; the
+specification and decision log must conform to it, and
+`docs/modeled-c-implementation-plan.md` is a derivative execution plan that
+can't amend it. Its test for every C-interop inference is *what happens if
+this inference is wrong?*: infer silently only what can at worst remove
+capability or reject a valid program (dependency, invalidation, nullable,
+thread-bound, coarse domain, presentation sugar); never infer what can create
+unsafety (ownership, destruction, consumption, retention, independence,
+static lifetime, success, thread crossing) — those come from an explicit
+`c facade` clause, an explicitly adopted convention profile, or a proof, and
+never from a name. Never half-model: a safe constructor with no destruction
+contract is a leak and is non-compliant (§65). **Ordering (§66): the SQLite
+facade is written first and must compile against the real header before any
+example, release UAT, blog sample or documentation example is rewritten
+against the new surface** — validation artifacts test the rule, they do not
+define it. Until the facade language lands, the compiler is NON-COMPLIANT:
+don't add safe c_import constructors, wrappers or method sugar that grant
+ownership, and don't teach new code that a name proves a destructor.
+
 **`FnAbi` is the single ABI source of truth — never re-derive call ABI
 per-path.** Every function signature has ONE ABI descriptor (`FnAbi` with a
 per-parameter `PassMode`: `Direct`/`Indirect`/`IndirectPlace`/`Fat`/`Ignore`),
