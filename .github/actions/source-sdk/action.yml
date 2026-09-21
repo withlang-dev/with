@@ -46,16 +46,51 @@ runs:
           fi
           return 0
         }
+        # The runner's copy of a tool, never the asset's own (the asset's bin is
+        # on PATH and is exactly what cannot bootstrap); on Windows `command -v`
+        # drops the .exe, so the candidates are re-spelled with it.
+        prefix_real="$(readlink -f "$SDK_BOOTSTRAP_PREFIX")"
+        host_tool() {
+          local tool="$1" cand
+          while IFS= read -r cand; do
+            [[ -n "$cand" ]] || continue
+            [[ -f "$cand" ]] || cand="$cand$exe"
+            [[ -f "$cand" ]] || continue
+            case "$(readlink -f "$cand")" in "$prefix_real"/*) continue;; esac
+            printf '%s\n' "$cand"
+            return 0
+          done < <(type -aP "$tool$exe" "$tool" 2>/dev/null)
+          return 1
+        }
+        # A tool finds its own trees relative to its executable: cmake its
+        # `share/cmake-X.Y` modules (CMAKE_ROOT), clang its `lib/clang`
+        # resource headers. A copied binary loses them, so on unix the seed is
+        # a symlink to the real path; on Windows, where cmake does not resolve
+        # links, the companion trees are copied alongside.
         for tool in clang clang++ cmake ninja; do
           if usable "$tool"; then continue; fi
-          host="$(command -v "$tool" || true)"
+          host="$(host_tool "$tool" || true)"
           if [[ -z "$host" ]]; then
             echo "source-sdk: the SDK asset cannot bootstrap ($tool missing or dangling) and the runner has no $tool to seed from" >&2
             exit 1
           fi
+          real="$(readlink -f "$host")"
           rm -f "$SDK_BOOTSTRAP_PREFIX/bin/$tool$exe"
-          cp -f "$host" "$SDK_BOOTSTRAP_PREFIX/bin/$tool$exe"
-          echo "source-sdk: bootstrap $tool seeded from the runner ($host): the SDK asset cannot bootstrap; the package this run produces will"
+          if [[ "$RUNNER_OS" == Windows ]]; then
+            cp -f "$real" "$SDK_BOOTSTRAP_PREFIX/bin/$tool$exe"
+            hostprefix="$(dirname "$(dirname "$real")")"
+            if [[ "$tool" == cmake ]]; then
+              rm -rf "$SDK_BOOTSTRAP_PREFIX"/share/cmake-*
+              mkdir -p "$SDK_BOOTSTRAP_PREFIX/share"
+              cp -R "$hostprefix"/share/cmake-* "$SDK_BOOTSTRAP_PREFIX/share/"
+            elif [[ "$tool" == clang && -d "$hostprefix/lib/clang" && ! -d "$SDK_BOOTSTRAP_PREFIX/lib/clang" ]]; then
+              mkdir -p "$SDK_BOOTSTRAP_PREFIX/lib"
+              cp -R "$hostprefix/lib/clang" "$SDK_BOOTSTRAP_PREFIX/lib/"
+            fi
+          else
+            ln -s "$real" "$SDK_BOOTSTRAP_PREFIX/bin/$tool$exe"
+          fi
+          echo "source-sdk: bootstrap $tool seeded from the runner ($real): the SDK asset cannot bootstrap; the package this run produces will"
         done
 
     - name: Build and package SDK from source
