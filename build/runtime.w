@@ -231,7 +231,7 @@ fn br_generate_embedded_stdlib(ctx: &ActionCtx, files: &Vec[str]) -> str:
             ctx.diagnostics().error("compat-runtime-source: stdlib source too large: " ++ path)
             return ""
         let sym = f"EMBEDDED_STD_{i}"
-        out.push_str("let ")
+        out.push_str("const ")
         out.push_str(sym)
         out.push_str(": str = ")
         out.push_str(br_raw_string_literal(source))
@@ -239,7 +239,7 @@ fn br_generate_embedded_stdlib(ctx: &ActionCtx, files: &Vec[str]) -> str:
         if listing.len() > 0:
             listing.push_str("\n")
         listing.push_str(rel)
-    out.push_str("let EMBEDDED_STD_MODULE_LIST: str = ")
+    out.push_str("const EMBEDDED_STD_MODULE_LIST: str = ")
     out.push_str(br_raw_string_literal(listing.to_str()))
     out.push_str("\n\n")
     out.push_str("pub fn embedded_std_source_data(path: &str) -> str:\n")
@@ -315,7 +315,7 @@ fn br_generate_embedded_runtime(ctx: &ActionCtx, files: &Vec[str]) -> str:
             ctx.diagnostics().error("compat-runtime-source: runtime source too large: " ++ path)
             return ""
         let sym = f"EMBEDDED_RT_{i}"
-        out.push_str("let ")
+        out.push_str("const ")
         out.push_str(sym)
         out.push_str(": str = ")
         out.push_str(br_raw_string_literal(source))
@@ -323,7 +323,7 @@ fn br_generate_embedded_runtime(ctx: &ActionCtx, files: &Vec[str]) -> str:
         if listing.len() > 0:
             listing.push_str("\n")
         listing.push_str(path)
-    out.push_str("let EMBEDDED_RT_MODULE_LIST: str = ")
+    out.push_str("const EMBEDDED_RT_MODULE_LIST: str = ")
     out.push_str(br_raw_string_literal(listing.to_str()))
     out.push_str("\n\n")
     out.push_str("pub fn embedded_rt_source_data(path: &str) -> str:\n")

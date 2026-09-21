@@ -741,9 +741,8 @@ unsafe fn resolve_target_sdk_path() -> str:
     let sdkroot = with_getenv_str("SDKROOT")
     if sdkroot.len() > 0:
         return sdkroot
-    let configured = g_cimport_sdk_path
-    if configured.len() > 0:
-        return configured
+    if g_cimport_sdk_path.len() > 0:
+        return with_str_clone_ref(g_cimport_sdk_path)
     let clt = "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk"
     if with_fs_file_exists(clt) != 0:
         return clt
@@ -1633,7 +1632,7 @@ pub fn with_cimport_included_files(session: i64) -> str:
             return ""
         g_bridge_inclusion_files = ""
         clang_getInclusions((*s).tu, collect_inclusion as *const u8, s as *mut u8)
-        let out = g_bridge_inclusion_files
+        let out = with_str_clone_ref(g_bridge_inclusion_files)
         g_bridge_inclusion_files = ""
         out
 

@@ -1617,7 +1617,7 @@ pub fn comp_patch_version_binary(ctx: &ActionCtx, input_path: &str, output_path:
     var data = if fs.exists(input_path): fs.read_text(input_path) else: ""
     if data.len() == 0:
         return comp_fail(ctx, "empty unstamped binary: " ++ input_path)
-    let sentinel = COMPILER_VERSION_SENTINEL
+    let sentinel = COMPILER_VERSION_SENTINEL.clone()
     let vslot: i64 = COMPILER_VERSION_SLOT_WIDTH as i64
     let nul = "\0"
     var patched = 0

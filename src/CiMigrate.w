@@ -309,7 +309,7 @@ fn ci_migrate_insert_libc_use(output: &str) -> str:
 fn ci_migrate_shared_module_prefix() -> str:
     if g_migrate_shared_defs_prefix.ends_with(".defs"):
         return g_migrate_shared_defs_prefix.slice(0, g_migrate_shared_defs_prefix.len() - 5)
-    g_migrate_shared_defs_prefix
+    g_migrate_shared_defs_prefix.clone()
 
 // Physical output paths and imports must use the same identifier spelling.
 // A C filename may contain punctuation that is not valid in a With module.

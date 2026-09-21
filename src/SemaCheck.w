@@ -7229,6 +7229,10 @@ impl Sema:
             if not is_local and binding_decl == 0 and self.global_value_decl_kind(sym) != 0 and self.has_extern_var_decl(sym) == 0 and self.symbol_visible_from_current(sym) == 0:
                 self.emit_private_symbol_error(sym, node)
                 return 0
+            // A `const` is a comptime value, not a place: every use
+            // materializes it, so it is never moved out of (#1242).
+            if not is_local and self.global_value_decl_kind(sym) != 0 and not self.const_global_syms.contains(sym):
+                self.global_value_ident_nodes.insert(node, sym)
             if sym != self.assign_target_revive_sym:
                 self.record_global_data_race_access(sym, node, GLOBAL_RACE_ACCESS_READ)
             if self.in_comptime_fn != 0 and self.is_mutable_global(sym) != 0:
@@ -23959,6 +23963,8 @@ impl Sema:
                     if self.type_needs_drop(tid) != 0 and self.outer_binding_has_unsupported_move_context(sym) != 0:
                         self.emit_error("conditional move of Drop value requires drop-state tracking", node)
                         return
+                    if self.reject_move_out_of_global(node, tid):
+                        return
                     if sema_debug_move_enabled() != 0:
                         let resolved = self.resolve_alias(tid as TypeId)
                         let name = self.pool_resolve(sym)
@@ -23985,6 +23991,21 @@ impl Sema:
     // View returns (&T / *T) escape, not move; explicit `move` spellings
     // are NK_MOVE_ARG leaves gated at check_expr's arm; NK_RETURN values
     // route here from check_return itself, so the walker skips them.
+    // #1242: a global always holds a value and has no drop flag, so a move
+    // out of it leaves the old bytes in place — the next assignment (or the
+    // module's exit drop) frees them, and so does whoever received the value.
+    // Move state on a global is not per function either: the mark leaked
+    // into every later body as "use of moved value".
+    mut fn reject_move_out_of_global(node: i32, tid: i32) -> bool:
+        let global_opt = self.global_value_ident_nodes.get(node)
+        if global_opt.is_none():
+            return false
+        let sym: i32 = global_opt.unwrap()
+        if self.type_needs_drop(tid) == 0:
+            return false
+        self.emit_error("cannot move out of global `" ++ self.pool_resolve(sym) ++ "`: a global always holds a value; clone it (`.clone()`) instead", node)
+        true
+
     mut fn check_returned_field_move(expr: i32, ret_tid: i32):
         if expr == 0 or ret_tid == 0:
             return
@@ -24010,6 +24031,11 @@ impl Sema:
             return
         if k == NodeKind.NK_MATCH_ARM:
             self.check_returned_field_move(self.ast.get_data1(expr), ret_tid)
+            return
+        if k == NodeKind.NK_IDENT:
+            // A returned global is not routed through mark_moved_if_consumed
+            // either; the ident record survives the body scope's pop.
+            let _ = self.reject_move_out_of_global(expr, ret_tid)
             return
         if k != NodeKind.NK_FIELD_ACCESS:
             return

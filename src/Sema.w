@@ -519,6 +519,11 @@ type Sema {
     binding_use_epoch: i32,
     binding_epoch_counter: i32,
     binding_last_use: HashMap[i32, i64],
+    // #1242: ident nodes that resolved to a module global (not a local or
+    // parameter), keyed by node — the move checks consult it after scopes pop.
+    global_value_ident_nodes: HashMap[i32, i32],
+    // `const` globals: comptime values, exempt from the move-out check.
+    const_global_syms: HashMap[i32, i32],
     // move-sites: last use per (root, first-field) path — the liveness key for
     // FIELD-shaped transfer args, so `eat(move self.r)` followed by `self.tag`
     // reads verdicts on the `.r` path, not the whole receiver. Key packs
@@ -1971,6 +1976,8 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         binding_use_epoch: 0,
         binding_epoch_counter: 0,
         binding_last_use: HashMap.new(),
+        global_value_ident_nodes: HashMap.new(),
+        const_global_syms: HashMap.new(),
         field_last_use: HashMap.new(),
         effect_prov: HashMap.new(),
         effect_note_origin_node: 0,

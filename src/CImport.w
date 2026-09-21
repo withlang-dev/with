@@ -14221,17 +14221,16 @@ fn ci_preprocessed_var_initializer_by_name(var_name: &str) -> str:
     // already expanded).
     if g_migrate_raw_source.len() == 0 or var_name.len() == 0:
         return ""
-    let s = g_migrate_raw_source
-    let slen = s.len() as i32
+    let slen = g_migrate_raw_source.len() as i32
     let nlen = var_name.len() as i32
     var i = 0
     while i + nlen <= slen:
-        let c = s[i]
+        let c = g_migrate_raw_source[i]
         if c == 34 or c == 39:
             let quote = c
             i = i + 1
             while i < slen:
-                let inner = s[i]
+                let inner = g_migrate_raw_source[i]
                 if inner == 92:
                     i = i + 2
                     continue
@@ -14240,9 +14239,9 @@ fn ci_preprocessed_var_initializer_by_name(var_name: &str) -> str:
                 i = i + 1
             i = i + 1
             continue
-        if s.slice(i as i64, (i + nlen) as i64) == var_name:
-            let before = if i > 0: s[(i - 1)] else: 0
-            let after = if i + nlen < slen: s[(i + nlen)] else: 0
+        if g_migrate_raw_source.slice(i as i64, (i + nlen) as i64) == var_name:
+            let before = if i > 0: g_migrate_raw_source[(i - 1)] else: 0
+            let after = if i + nlen < slen: g_migrate_raw_source[(i + nlen)] else: 0
             if not ci_is_ident_char(before) and not ci_is_ident_char(after):
                 var pos = i + nlen
                 var paren_depth = 0
@@ -14250,12 +14249,12 @@ fn ci_preprocessed_var_initializer_by_name(var_name: &str) -> str:
                 var brace_depth = 0
                 var eq_pos = -1
                 while pos < slen:
-                    let ch = s[pos]
+                    let ch = g_migrate_raw_source[pos]
                     if ch == 34 or ch == 39:
                         let quote = ch
                         pos = pos + 1
                         while pos < slen:
-                            let inner = s[pos]
+                            let inner = g_migrate_raw_source[pos]
                             if inner == 92:
                                 pos = pos + 2
                                 continue
@@ -14282,12 +14281,12 @@ fn ci_preprocessed_var_initializer_by_name(var_name: &str) -> str:
                     bracket_depth = 0
                     brace_depth = 0
                     while end < slen:
-                        let ch = s[end]
+                        let ch = g_migrate_raw_source[end]
                         if ch == 34 or ch == 39:
                             let quote = ch
                             end = end + 1
                             while end < slen:
-                                let inner = s[end]
+                                let inner = g_migrate_raw_source[end]
                                 if inner == 92:
                                     end = end + 2
                                     continue
@@ -14297,7 +14296,7 @@ fn ci_preprocessed_var_initializer_by_name(var_name: &str) -> str:
                             end = end + 1
                             continue
                         if ch == 59 and paren_depth == 0 and bracket_depth == 0 and brace_depth == 0:
-                            return ci_trim(ci_expand_macros_in_text(g_migrate_macro_session, ci_trim(s.slice((eq_pos + 1) as i64, end as i64))))
+                            return ci_trim(ci_expand_macros_in_text(g_migrate_macro_session, ci_trim(g_migrate_raw_source.slice((eq_pos + 1) as i64, end as i64))))
                         if ch == 40: paren_depth = paren_depth + 1
                         if ch == 41 and paren_depth > 0: paren_depth = paren_depth - 1
                         if ch == 91: bracket_depth = bracket_depth + 1
@@ -14734,13 +14733,13 @@ var g_ci_bail_kind: i32 = 0
 var g_ci_bail_message: str = ""
 
 pub fn ci_get_bail_location() -> str:
-    g_ci_bail_location
+    g_ci_bail_location.clone()
 
 pub fn ci_get_bail_kind() -> i32:
     g_ci_bail_kind
 
 pub fn ci_get_bail_message() -> str:
-    g_ci_bail_message
+    g_ci_bail_message.clone()
 
 pub fn ci_clear_bail_location() -> Unit:
     g_ci_bail_location = ""

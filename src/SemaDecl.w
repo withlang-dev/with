@@ -2212,6 +2212,8 @@ impl Sema:
                 self.emit_error("ephemeral references cannot be stored in generic containers", node)
         let decl_kind = if self.ast.let_decl_is_interface_provided(node): GLOBAL_VALUE_DECL_INTERFACE else: GLOBAL_VALUE_DECL_DEF
         self.register_top_level_global_decl(name, bind_ty as i32, is_mut, node, decl_kind)
+        if self.ast.is_const_decl_node(node) != 0:
+            self.const_global_syms.insert(name, 1)
         self.typed_binding_types.insert(node, bind_ty as i32)
         self.typed_binding_names.insert(node, name)
         self.typed_binding_muts.insert(node, is_mut)
