@@ -68,17 +68,19 @@ runs:
         prefix_real="$(readlink -f "$asset")"
         host_tool() {
           local tool="$1" cand
+          # Chocolatey's bin/ holds shims that run only beside their sidecar;
+          # the real executables live under lib/<pkg>/tools, and Visual Studio
+          # ships its own Ninja. Try those before PATH on Windows.
+          if [[ "$RUNNER_OS" == Windows ]]; then
+            for cand in /c/ProgramData/chocolatey/lib/$tool/tools/$tool.exe "/c/Program Files/Microsoft Visual Studio/"*/*/Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja/$tool.exe; do
+              if [[ -f "$cand" ]]; then printf '%s\n' "$cand"; return 0; fi
+            done
+          fi
           while IFS= read -r cand; do
             [[ -n "$cand" ]] || continue
             [[ -f "$cand" ]] || cand="$cand$exe"
             [[ -f "$cand" ]] || continue
-            # A Chocolatey shim only runs beside its .shim sidecar; seed the
-            # real executable it names.
-            if [[ -f "${cand%.exe}.shim" ]]; then
-              target="$(rg -o '^path *= *.*' "${cand%.exe}.shim" | head -1 | cut -d= -f2- | tr -d ' \r')"
-              [[ -n "$target" ]] && cand="$(cygpath -u "$target")"
-              [[ -f "$cand" ]] || continue
-            fi
+            case "$cand" in */[Cc]hocolatey/bin/*) continue;; esac
             case "$(readlink -f "$cand")" in "$prefix_real"/*) continue;; esac
             printf '%s\n' "$cand"
             return 0
