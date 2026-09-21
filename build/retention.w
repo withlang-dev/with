@@ -552,16 +552,13 @@ fn ret_worktree_is_clean(ctx: &ActionCtx) -> bool:
 
 /// `<tree>-<driver sha256>-<os>_<arch>`, or "" for a dirty worktree or a
 /// tree git cannot name.
-// The paths under docs/ that a battery lane reads. Mirrors
-// src/compiler/GreenEvidence.w GREEN_DOCS_INPUTS; the two must agree.
-const RET_GREEN_DOCS_INPUTS: str = "docs/with-specification.md docs/with-abi.sha256 docs/with_for_ai.md"
-
 // The battery's inputs as the text `git hash-object` identifies (D50): the
 // top-level `git ls-tree HEAD` without the `docs` entry and without top-level
-// `*.md` files (prose no lane compiles or tests), plus the docs files lanes
-// do read. A docs-only commit keeps the identity of the tree whose battery
-// passed. Mirrors GreenEvidence.green_identity_inputs byte for byte.
-fn ret_green_identity_inputs(top_level: &str, docs_inputs: &str) -> str:
+// `*.md` files. The build measures software, not documents (Eric,
+// 2026-09-21), so the specification is not an input either; a docs-only
+// commit keeps the identity of the tree whose battery passed. Mirrors
+// GreenEvidence.green_identity_inputs byte for byte.
+fn ret_green_identity_inputs(top_level: &str) -> str:
     var kept = ""
     for line in top_level.split("\n"):
         if line.len() == 0: continue
@@ -569,7 +566,7 @@ fn ret_green_identity_inputs(top_level: &str, docs_inputs: &str) -> str:
         let path = if tab >= 0: line.slice(tab + 1, line.len()) else: line.clone()
         if path == "docs" or path.ends_with(".md"): continue
         kept = kept ++ line ++ "\n"
-    kept ++ docs_inputs
+    kept
 
 fn ret_run_all(ctx: &ActionCtx, label: &str, args: &Vec[str], timeout_ms: i32) -> str:
     let fs = ctx.fs()
@@ -588,14 +585,8 @@ pub fn ret_source_identity(ctx: &ActionCtx, driver_sha: &str) -> str:
     top_args.push("HEAD")
     let top_level = ret_run_all(ctx, "git-ls-tree", top_args, 30000)
     if top_level.len() == 0: return ""
-    var docs_args: Vec[str] = Vec.new()
-    docs_args.push("git")
-    docs_args.push("ls-tree")
-    docs_args.push("HEAD")
-    for name in RET_GREEN_DOCS_INPUTS.split(" "): docs_args.push(name.clone())
-    let docs_inputs = ret_run_all(ctx, "git-ls-tree-docs", docs_args, 30000)
     let listing = ret_join(ret_join("out/command", ctx.target_name()), "green-inputs.txt")
-    if ctx.fs().write_text(listing, ret_green_identity_inputs(top_level, docs_inputs)) != 0: return ""
+    if ctx.fs().write_text(listing, ret_green_identity_inputs(top_level)) != 0: return ""
     let hash_args: Vec[str] = Vec.new()
     hash_args.push("git")
     hash_args.push("hash-object")

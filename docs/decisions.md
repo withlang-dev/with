@@ -114,11 +114,18 @@ profile is found to need compiler-owned knowledge to work.
 
 *Amended 2026-09-20 (D50 applied):* the identity keys on the battery's
 inputs, not the whole tree — `git ls-tree HEAD` without the `docs` entry and
-without top-level `*.md`, plus the docs files lanes read, as the object name
-`git hash-object` gives that listing. A docs-only commit produced a tree with
-no green and `:install-user` refused a compiler whose sources had passed;
-Eric: "best fix this immediately". `GreenEvidence.w` and `build/retention.w`
-apply one rule; `behav_green_identity_keys_on_inputs.w` pins it.
+without top-level `*.md`, as the object name `git hash-object` gives that
+listing. A docs-only commit produced a tree with no green and `:install-user`
+refused a compiler whose sources had passed; Eric: "best fix this
+immediately". `GreenEvidence.w` and `build/retention.w` apply one rule;
+`behav_green_identity_keys_on_inputs.w` pins it.
+
+*Amended 2026-09-21:* the first amendment kept three docs files in the
+identity because lanes read them (the specification, `with-abi.sha256`,
+`with_for_ai.md`); a spec-only merge (#1245) then left main with no green
+and forced a full battery. Eric: "build measures software not documents."
+No file under `docs/` is an input; the lanes that read one still run on a
+docs-only change (spec-inventory-check) and record nothing.
 
 **Date:** 2026-09-20. **Status:** ruled (Eric: "it is moronic that we are testing what we already tested"; "proceed").
 
