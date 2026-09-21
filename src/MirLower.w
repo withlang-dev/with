@@ -5810,7 +5810,13 @@ impl MirBuilder:
             let place = self.place_for_local(local_id)
             let saved_expected = self.expected_type
             self.expected_type = bind_ty
-            let rhs_op = self.lower_expr(rhs_expr)
+            // #1244: `let s: &T = place` is a borrow (Sema recorded the
+            // auto-ref); take the place's address like a call argument.
+            var rhs_op = -1
+            if self.sema.auto_ref_binding_values.contains(rhs_expr):
+                rhs_op = self.lower_auto_ref_call_arg(rhs_expr, bind_ty)
+            if rhs_op < 0:
+                rhs_op = self.lower_expr(rhs_expr)
             self.expected_type = saved_expected
             // The lowered operand owns the transfer decision. A borrowed
             // field may have materialized an independent value, so revisiting

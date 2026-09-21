@@ -995,6 +995,11 @@ type Sema {
     // by MOVE (never the alias path); the field glue skips them via
     // drop_consumed_field.
     drop_consumed_binding_values: HashMap[i32, i32],
+    // #1244: initializer nodes of `let s: &T = place` — the annotation demands
+    // a reference and the value is an owned T, so the binding BORROWS (§3.8
+    // auto-referencing, the same rule as a call argument); MirLower emits the
+    // shared ref instead of moving the bytes.
+    auto_ref_binding_values: HashMap[i32, i32],
     typed_binding_names: HashMap[i32, i32],
     typed_binding_muts: HashMap[i32, i32],
     ephemeral_task_binding_nodes: HashMap[i32, i32],
@@ -1900,6 +1905,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
     let typed_binding_types = sema_new_map_i32_i32()
     let view_projection_exprs = sema_new_map_i32_i32()
     let drop_consumed_binding_values = sema_new_map_i32_i32()
+    let auto_ref_binding_values = sema_new_map_i32_i32()
     let typed_binding_names = sema_new_map_i32_i32()
     let typed_binding_muts = sema_new_map_i32_i32()
     let ephemeral_task_binding_nodes = sema_new_map_i32_i32()
@@ -2263,6 +2269,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         typed_binding_types,
         view_projection_exprs,
         drop_consumed_binding_values,
+        auto_ref_binding_values,
         typed_binding_names,
         typed_binding_muts,
         ephemeral_task_binding_nodes,

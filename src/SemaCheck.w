@@ -9603,6 +9603,11 @@ impl Sema:
                 // alias-binds it) — marking would blank the field and reject
                 // legal later base uses (`let saved = a.buf; a.buf = ...`).
                 let _ = value
+            else if ann_type != 0 and val_type != 0 and self.can_auto_ref_arg(ann_type as i32, val_type as i32) != 0 and self.place_root_sym(value) != 0:
+                // #1244 / §3.8: `let s: &T = place` auto-references — the
+                // binding observes the place, it does not consume it. The
+                // borrow is registered with the view deps below.
+                self.auto_ref_binding_values.insert(value, 1)
             else:
                 self.mark_moved_if_consumed(value)
 
@@ -10177,7 +10182,9 @@ impl Sema:
             var peeled_place = expr_node
             while peeled_place != 0 and self.ast.kind(peeled_place) == NodeKind.NK_GROUPED:
                 peeled_place = self.ast.get_data0(peeled_place)
-            if peeled_place != 0 and self.ast.kind(peeled_place) == NodeKind.NK_INDEX:
+            // #1244: an auto-referenced initializer (`let s: &T = x`) borrows
+            // its root exactly as `&x` does.
+            if peeled_place != 0 and (self.ast.kind(peeled_place) == NodeKind.NK_INDEX or self.auto_ref_binding_values.contains(expr_node)):
                 let root = self.place_root_sym(peeled_place)
                 if root != 0 and root != sym:
                     deps = self.push_unique_i32(move deps, root)
