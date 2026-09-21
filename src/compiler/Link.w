@@ -682,9 +682,10 @@ fn link_stage_make_windows_llvm_link_command(llvm_ld: &str, obj_path: &str, bin_
 // The lld flavor for a WebAssembly link: wasm-ld ships beside the host
 // flavor recorded in the llvm_ld metadata.
 fn link_stage_wasm_lld_for(llvm_ld: &str) -> str:
-    if link_stage_basename(llvm_ld) == "wasm-ld":
+    let name = if runtime_sysinfo_os() == "Windows": "wasm-ld.exe" else: "wasm-ld"
+    if link_stage_basename(llvm_ld) == name:
         return llvm_ld ++ ""
-    let sibling = link_stage_dirname(llvm_ld) ++ "/wasm-ld"
+    let sibling = link_stage_dirname(llvm_ld) ++ "/" ++ name
     if link_stage_file_exists(sibling):
         return sibling
     ""

@@ -21,7 +21,7 @@ jobs:
     name: linux aarch64
     runs-on: ubuntu-24.04-arm
     # Self-host + fixpoint only; give it headroom on the shared ARM runner.
-    timeout-minutes: 180
+    timeout-minutes: 360
     env:
       WITH_OUT_DIR: ${{ github.workspace }}/out
       LLVM_PREFIX: ${{ github.workspace }}/.deps/llvm-22.1.6-linux-aarch64
@@ -127,6 +127,10 @@ jobs:
             LD_LIBRARY_PATH="$PWD/.link-shim:${LD_LIBRARY_PATH:-}" \
             ./with-seed run /tmp/seedcheck.w
 
+      - uses: ./.github/actions/source-sdk
+        with:
+          host-tag: linux-aarch64
+
       - name: Build (seed -> stage1 -> stage2 -> final)
         env:
           WITH: ${{ github.workspace }}/with-seed
@@ -135,6 +139,11 @@ jobs:
           export PATH="$PWD/.link-shim:$LLVM_PREFIX/bin:$PATH"
           export LD_LIBRARY_PATH="$PWD/.link-shim:${LD_LIBRARY_PATH:-}"
           "$WITH" build
+
+      - name: WebAssembly fixtures with source-built SDK
+        env:
+          WITH: ${{ github.workspace }}/with-seed
+        run: LD_LIBRARY_PATH="$PWD/.link-shim:${LD_LIBRARY_PATH:-}" ./with-seed build :wasm-tests
 
       - name: Fixpoint (stage2.emit == stage3.emit)
         env:

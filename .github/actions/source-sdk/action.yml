@@ -1,0 +1,119 @@
+name: Source-built WebAssembly SDK
+description: Rebuild and package the native SDK, then use it for the compiler build
+inputs:
+  host-tag:
+    required: true
+    description: SDK host directory tag
+runs:
+  using: composite
+  steps:
+    - name: Restore source-built SDK artifact
+      id: sdk-cache
+      uses: actions/cache/restore@v4
+      with:
+        path: |
+          out/release/with-llvm-sdk-*.tar.gz*
+          out/test-graph/sdk-contract-tests
+        key: source-sdk-${{ inputs.host-tag }}-22.1.6-${{ hashFiles('build.w', 'build/*.w', 'lib/std/build.w', 'lib/std/zl/*.w', 'lib/std/crypto/bigint.w', 'seed.lock', '.github/actions/source-sdk/action.yml') }}
+
+    - name: Build and package SDK from source
+      if: steps.sdk-cache.outputs.cache-hit != 'true'
+      shell: bash
+      env:
+        SDK_BOOTSTRAP_PREFIX: .deps/llvm-22.1.6-${{ inputs.host-tag }}
+        PARALLEL_JOBS: '4'
+        LLVM_TARGETS_TO_BUILD: AArch64;X86;WebAssembly
+      run: |
+        set -euo pipefail
+        export PATH="$LLVM_PREFIX/bin:$PATH"
+        if [[ "$RUNNER_OS" == macOS ]]; then
+          export SDKROOT="$(xcrun --sdk macosx --show-sdk-path)"
+        fi
+        if [[ "$RUNNER_OS" == Windows ]]; then
+          export INCLUDE="$WITH_WINDOWS_MSVC_INCDIR;$WITH_WINDOWS_UCRT_INCDIR;$WITH_WINDOWS_SHARED_INCDIR;$WITH_WINDOWS_UM_INCDIR"
+          export LIB="$WITH_WINDOWS_MSVC_LIBDIR;$WITH_WINDOWS_UCRT_LIBDIR;$WITH_WINDOWS_UM_LIBDIR"
+          kit="${WITH_WINDOWS_UCRT_INCDIR%/Include/*}"
+          version="${WITH_WINDOWS_UCRT_INCDIR%/ucrt}"
+          version="${version##*/}"
+          export SDK_WINDOWS_MT="$kit/bin/$version/x64/mt.exe"
+          if [[ "$RUNNER_ARCH" == ARM64 ]]; then
+            export SDK_WINDOWS_MT="$kit/bin/$version/arm64/mt.exe"
+          fi
+          export PATH="$(cygpath -u "${SDK_WINDOWS_MT%/*}"):$PATH"
+          # The pinned seed embeds the older, whole-archive ToolFs writer.
+          # Build today's native driver first so SDK packaging uses the
+          # bounded-memory writer from this source tree on every host.
+          ./src/main.exe build :dev
+          export WITH="$(cygpath -m "$PWD/out/bootstrap/bin/with-stage1.exe")"
+          "$WITH" build :sdk-package
+        else
+          export LD_LIBRARY_PATH="$PWD/.link-shim:${LD_LIBRARY_PATH:-}"
+          if [[ "$RUNNER_OS" == Linux ]]; then
+            export WITH="$PWD/with-seed"
+          else
+            export WITH="$PWD/src/main"
+          fi
+          "$WITH" build :dev
+          export WITH="$PWD/out/bootstrap/bin/with-stage1"
+          "$WITH" build :sdk-package
+        fi
+
+    - name: Check streamed archive round trip
+      shell: bash
+      run: |
+        set -euo pipefail
+        cd out/test-graph/sdk-contract-tests
+        tar -xzf stream.tar.gz
+        cmp payload.bin sample/payload.bin
+        cmp empty sample/empty
+        if [[ "$RUNNER_OS" != Windows ]]; then
+          test -x sample/payload.bin
+          test -L sample/alias
+          cmp payload.bin sample/alias
+        fi
+
+    - name: Upload native SDK archive, digest and manifest
+      uses: actions/upload-artifact@v4
+      with:
+        name: source-sdk-${{ inputs.host-tag }}
+        path: out/release/with-llvm-sdk-*.tar.gz*
+        if-no-files-found: error
+        compression-level: 0
+
+    - name: Unpack and select SDK artifact for compiler verification
+      shell: bash
+      env:
+        SDK_HOST_TAG: ${{ inputs.host-tag }}
+      run: |
+        set -euo pipefail
+        mkdir -p .deps/wasm-sdk
+        for archive in out/release/with-llvm-sdk-*.tar.gz; do
+          if [[ "$RUNNER_OS" == macOS ]]; then
+            shasum -a 256 -c "$archive.sha256"
+          else
+            sha256sum -c "$archive.sha256"
+          fi
+          tar -xzf "$archive" -C .deps/wasm-sdk
+        done
+        prefix="$PWD/.deps/wasm-sdk/llvm-22.1.6-$SDK_HOST_TAG"
+        output="$PWD/out"
+        if [[ "$RUNNER_OS" == Windows ]]; then
+          prefix="$(cygpath -m "$prefix")"
+          output="$(cygpath -m "$output")"
+        fi
+        echo "LLVM_PREFIX=$prefix" >> "$GITHUB_ENV"
+        echo "WITH_OUT_DIR=$output" >> "$GITHUB_ENV"
+        echo "$prefix/bin" >> "$GITHUB_PATH"
+
+    - name: Save verified source-built SDK artifact
+      if: steps.sdk-cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: |
+          out/release/with-llvm-sdk-*.tar.gz*
+          out/test-graph/sdk-contract-tests
+        key: ${{ steps.sdk-cache.outputs.cache-primary-key }}
+
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '22'

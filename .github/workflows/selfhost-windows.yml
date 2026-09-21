@@ -20,7 +20,7 @@ jobs:
   selfhost-windows:
     name: windows x86_64
     runs-on: windows-latest
-    timeout-minutes: 120
+    timeout-minutes: 360
     defaults:
       run:
         shell: bash
@@ -131,11 +131,18 @@ jobs:
           echo "UM_INCDIR=$WITH_WINDOWS_UM_INCDIR"
           command -v lld-link.exe && lld-link.exe --version || true
 
+      - uses: ./.github/actions/source-sdk
+        with:
+          host-tag: windows-x86_64-msvc
+
       - name: Build (seed -> stage1 -> stage2 -> stage3)
         # WITH_PROFILE: every stage's compiler prints each phase to stderr as
         # it completes, so a stage that hangs (stage2, 1801 s on #1129) leaves
         # its last finished phase in out/command/<stage>/stderr.txt.
         run: WITH_PROFILE=1 ./src/main.exe build
+
+      - name: WebAssembly fixtures with source-built SDK
+        run: ./src/main.exe build :wasm-tests
 
       - name: Fixpoint (stage2 == stage3)
         run: ./src/main.exe build :fixpoint

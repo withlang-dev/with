@@ -118,7 +118,12 @@ pub fn sdk_host_tag_for_platform(platform: &str) -> str:
         return "linux-aarch64"
     if platform == "windows-x86_64":
         return "windows-x86_64-msvc"
+    if platform == "windows-aarch64":
+        return "windows-aarch64-msvc"
     "unsupported"
+
+fn sdk_platform_is_windows(platform: &str) -> bool:
+    platform == "windows-x86_64" or platform == "windows-aarch64"
 
 pub fn sdk_default_prefix_for_platform(platform: &str) -> str:
     ".deps/llvm-" ++ compiler_llvm_version() ++ "-" ++ sdk_host_tag_for_platform(platform)
@@ -190,8 +195,8 @@ fn sdk_str_compare(a: &str, b: &str) -> i32:
     let n = if a.len() < b.len(): a.len() else: b.len()
     var i = 0
     while i < n as i32:
-        let ac = a[i]
-        let bc = b[i]
+        let ac = a[i] as i32
+        let bc = b[i] as i32
         if ac != bc:
             return ac - bc
         i = i + 1
@@ -272,9 +277,13 @@ fn sdk_validate_cache(ctx: &ActionCtx, platform: &str, cache_path: &str) -> i32:
     if not fs.exists(cache_path):
         return sdk_fail(ctx, "missing SDK build cache: " ++ cache_path)
     let cache = fs.read_text(cache_path)
+    let targets = sdk_cache_line(cache, "LLVM_TARGETS_TO_BUILD:")
+    let equal = targets.find("=")
+    if equal < 0 or not sdk_targets_include_wasm(targets.slice(equal + 1, targets.len())):
+        return sdk_fail(ctx, "refusing to package SDK without the WebAssembly backend; " ++ targets)
     let cc = sdk_cache_line(cache, "CMAKE_C_COMPILER:")
     let cxx = sdk_cache_line(cache, "CMAKE_CXX_COMPILER:")
-    if platform == "windows-x86_64" or platform == "windows-aarch64":
+    if sdk_platform_is_windows(platform):
         if not cc.contains("clang-cl") or not cxx.contains("clang-cl"):
             return sdk_fail(ctx, "refusing to package SDK not built with clang-cl; CMAKE_C_COMPILER=" ++ cc ++ " CMAKE_CXX_COMPILER=" ++ cxx)
         if platform == "windows-x86_64":
@@ -299,7 +308,7 @@ fn sdk_validate_package_prefix(ctx: &ActionCtx, platform: &str, prefix: &str, bu
     var rc = sdk_validate_cache(ctx, platform, build_cache)
     if rc != 0:
         return rc
-    if platform == "windows-x86_64":
+    if sdk_platform_is_windows(platform):
         rc = sdk_check_file(ctx, sdk_join(prefix, "lib/libclang.lib"), "static libclang archive")
         if rc != 0: return rc
         let tools: Vec[str] = Vec.new()
@@ -335,11 +344,35 @@ fn sdk_validate_package_prefix(ctx: &ActionCtx, platform: &str, prefix: &str, bu
             if rc != 0: return rc
     rc = sdk_check_file(ctx, sdk_clang_main_archive(prefix), "clang driver archive (with cc)")
     if rc != 0: return rc
+    rc = sdk_validate_wasm_install(ctx, prefix)
+    if rc != 0: return rc
+    rc = sdk_check_file(ctx, sdk_join(prefix, sdk_cmake_data_prefix() ++ "Modules/CMake.cmake"), "CMake runtime modules")
+    if rc != 0: return rc
     let fs = ctx.fs()
     if not fs.is_dir(sdk_join(prefix, "lib/clang")):
         return sdk_fail(ctx, "missing clang builtin header tree: " ++ sdk_join(prefix, "lib/clang"))
     if not sdk_package_has_builtin_stddef(fs, prefix):
         return sdk_fail(ctx, "clang builtin header tree is missing include/stddef.h")
+    0
+
+fn sdk_validate_wasm_install(ctx: &ActionCtx, prefix: &str) -> i32:
+    var rc = sdk_check_file(ctx, sdk_tool(prefix, "wasm-ld"), "WebAssembly linker")
+    if rc != 0: return rc
+    let linker_archive = if os() == "Windows": "lib/lldWasm.lib" else: "lib/liblldWasm.a"
+    rc = sdk_check_file(ctx, sdk_join(prefix, linker_archive), "static WebAssembly linker archive")
+    if rc != 0: return rc
+    let components: Vec[str] = Vec.new()
+    components.push("AsmParser")
+    components.push("CodeGen")
+    components.push("Desc")
+    components.push("Disassembler")
+    components.push("Info")
+    components.push("Utils")
+    for i in 0..components.len() as i32:
+        let name = "LLVMWebAssembly" ++ components[i]
+        let archive = if os() == "Windows": name ++ ".lib" else: "lib" ++ name ++ ".a"
+        rc = sdk_check_file(ctx, sdk_join(prefix, "lib/" ++ archive), "static WebAssembly backend archive")
+        if rc != 0: return rc
     0
 
 fn sdk_package_has_builtin_stddef(fs: &ToolFs, prefix: &str) -> bool:
@@ -356,22 +389,36 @@ fn sdk_optional_tool_exists(fs: &ToolFs, prefix: &str, name: &str) -> bool:
 fn sdk_is_unix_lld_alias(rel: &str) -> bool:
     rel == "bin/ld.lld" or rel == "bin/ld64.lld" or rel == "bin/lld-link" or rel == "bin/wasm-ld"
 
+fn sdk_cmake_data_prefix() -> str:
+    let version = SDK_CMAKE_VERSION.split(".")
+    "share/cmake-" ++ version[0] ++ "." ++ version[1] ++ "/"
+
 fn sdk_select_package_files(fs: &ToolFs, prefix: &str, platform: &str) -> Vec[str]:
     let selected: Vec[str] = Vec.new()
-    let all = sdk_sort_strings(fs.list_files(prefix))
+    // Enumerate the shipped subtrees directly. A symlinked prefix is
+    // an ancestor here, not the final lstat leaf, so it is followed normally.
+    // LLVM's development headers outside lib/clang are not package inputs.
+    var candidates = fs.list_files(sdk_join(prefix, "bin"))
+    let libraries = fs.list_files(sdk_join(prefix, "lib"))
+    for i in 0..libraries.len() as i32:
+        candidates.push(sdk_owned_text(libraries[i]))
+    let cmake_data = fs.list_files(sdk_join(prefix, "share"))
+    for i in 0..cmake_data.len() as i32:
+        candidates.push(sdk_owned_text(cmake_data[i]))
+    let all = sdk_sort_strings(candidates)
     for i in 0..all.len() as i32:
         let path = all[i]
         let rel = sdk_rel_path(prefix, path)
         if rel.len() == 0:
             continue
-        if platform != "windows-x86_64" and sdk_is_unix_lld_alias(rel):
+        if not sdk_platform_is_windows(platform) and sdk_is_unix_lld_alias(rel):
             continue
-        if rel.starts_with("lib/clang/"):
+        if rel.starts_with("lib/clang/") or rel.starts_with(sdk_cmake_data_prefix()):
             selected.push(sdk_owned_text(path))
         else if rel.starts_with("lib/"):
             let lib_rel = rel.slice(4, rel.len())
             if not sdk_has_slash(lib_rel):
-                if platform == "windows-x86_64":
+                if sdk_platform_is_windows(platform):
                     if rel.ends_with(".lib"):
                         selected.push(sdk_owned_text(path))
                 else if rel.ends_with(".a"):
@@ -383,13 +430,14 @@ fn sdk_select_package_files(fs: &ToolFs, prefix: &str, platform: &str) -> Vec[st
 
 fn sdk_package_tool_selected(rel: &str, platform: &str) -> bool:
     let tools: Vec[str] = Vec.new()
-    if platform == "windows-x86_64":
+    if sdk_platform_is_windows(platform):
         tools.push("bin/clang.exe")
         tools.push("bin/clang++.exe")
         tools.push("bin/clang-cl.exe")
         tools.push("bin/cmake.exe")
         tools.push("bin/ninja.exe")
         tools.push("bin/lld-link.exe")
+        tools.push("bin/wasm-ld.exe")
         tools.push("bin/llvm-lib.exe")
         tools.push("bin/llvm-ml.exe")
         tools.push("bin/llvm-ml64.exe")
@@ -426,7 +474,7 @@ fn sdk_package_entries(ctx: &ActionCtx, prefix: &str, sdk_base: &str, platform: 
     for i in 0..files.len() as i32:
         let rel = sdk_rel_path(prefix, files[i])
         dirs = sdk_add_parent_dirs(move dirs, sdk_base, rel)
-    if platform != "windows-x86_64":
+    if not sdk_platform_is_windows(platform):
         let aliases: Vec[str] = Vec.new()
         aliases.push("ld.lld")
         aliases.push("ld64.lld")
@@ -444,7 +492,7 @@ fn sdk_package_entries(ctx: &ActionCtx, prefix: &str, sdk_base: &str, platform: 
         let path = files[i]
         let rel = sdk_rel_path(prefix, path)
         entries.push(archive_file_entry(sdk_owned_text(path), sdk_base ++ "/" ++ rel, sdk_file_mode(rel)))
-    if platform != "windows-x86_64":
+    if not sdk_platform_is_windows(platform):
         let aliases: Vec[str] = Vec.new()
         aliases.push("ld.lld")
         aliases.push("ld64.lld")
@@ -488,6 +536,22 @@ pub fn run_package_llvm_sdk_action(ctx: ActionCtx) -> i32:
     let entries = sdk_package_entries(ctx, prefix, sdk_base, platform)
     if entries.len() == 0:
         return sdk_fail(ctx, "SDK package would be empty")
+    // Validate what will actually be written, not just the source prefix.
+    // In particular, linker aliases alone do not make a usable SDK.
+    let selected = sdk_archive_manifest(entries)
+    let clang = if sdk_platform_is_windows(platform): "lib/libclang.lib" else: "lib/libclang.a"
+    let lld = if sdk_platform_is_windows(platform): "bin/lld-link.exe" else: "bin/lld"
+    let wasm = if sdk_platform_is_windows(platform): "bin/wasm-ld.exe" else: "bin/wasm-ld"
+    if not selected.contains(sdk_base ++ "/" ++ clang ++ "\n") or not selected.contains(sdk_base ++ "/" ++ lld ++ "\n") or not selected.contains(sdk_base ++ "/" ++ wasm ++ "\n"):
+        return sdk_fail(ctx, "SDK archive selection omitted required libraries or linkers")
+    if not selected.contains(sdk_base ++ "/" ++ sdk_cmake_data_prefix() ++ "Modules/CMake.cmake\n"):
+        return sdk_fail(ctx, "SDK archive selection omitted CMake runtime modules")
+    let source_libs = ctx.fs().list_files(sdk_join(prefix, "lib/"))
+    for i in 0..source_libs.len() as i32:
+        let rel = sdk_rel_path(prefix, source_libs[i])
+        if rel.starts_with("lib/LLVMWebAssembly") or rel.starts_with("lib/libLLVMWebAssembly"):
+            if not selected.contains(sdk_base ++ "/" ++ rel ++ "\n"):
+                return sdk_fail(ctx, "SDK archive selection omitted " ++ rel)
     if ctx.fs().mkdir_all("out/release") != 0:
         return sdk_fail(ctx, "could not create out/release")
     if ctx.fs().write_tar_gz(output_path, entries) != 0:
@@ -743,6 +807,78 @@ fn sdk_llvm_targets_arg(ctx: &ActionCtx, requested: &str) -> str:
     // needs the backend and wasm-ld in every SDK the compiler links against.
     "AArch64;X86;WebAssembly"
 
+fn sdk_targets_include_wasm(targets: &str) -> bool:
+    let parts = targets.split(";")
+    for i in 0..parts.len() as i32:
+        let target = parts[i].trim()
+        if target == "WebAssembly" or target == "all":
+            return true
+    false
+
+// Run on every host: packaging decisions for another platform must not
+// accidentally depend on the OS executing this test.
+pub fn run_sdk_contract_tests_action(ctx: ActionCtx) -> i32:
+    assert(sdk_str_compare("a", "z") < 0)
+    assert(sdk_str_compare("z", "a") > 0)
+    assert(sdk_str_compare("same", "same") == 0)
+    assert(sdk_cmake_data_prefix() == "share/cmake-4.2/")
+    assert(sdk_targets_include_wasm("AArch64;X86;WebAssembly"))
+    assert(sdk_targets_include_wasm("all"))
+    assert(sdk_targets_include_wasm("AArch64;X86;WebAssembly\r"))
+    assert(not sdk_targets_include_wasm("AArch64;X86"))
+    assert(not sdk_targets_include_wasm("NotWebAssembly"))
+    let platforms: Vec[str] = Vec.new()
+    platforms.push("darwin-aarch64")
+    platforms.push("linux-x86_64")
+    platforms.push("linux-aarch64")
+    platforms.push("windows-x86_64")
+    platforms.push("windows-aarch64")
+    for i in 0..platforms.len() as i32:
+        let platform = platforms[i]
+        assert(sdk_host_tag_for_platform(platform) != "unsupported")
+        if sdk_platform_is_windows(platform):
+            assert(sdk_package_tool_selected("bin/wasm-ld.exe", platform))
+            assert(sdk_package_tool_selected("bin/lld-link.exe", platform))
+            assert(not sdk_package_tool_selected("bin/lld", platform))
+        else:
+            assert(sdk_package_tool_selected("bin/lld", platform))
+            assert(sdk_is_unix_lld_alias("bin/wasm-ld"))
+            assert(not sdk_package_tool_selected("bin/wasm-ld.exe", platform))
+    assert(sdk_host_tag_for_platform("windows-aarch64") == "windows-aarch64-msvc")
+    // Cross the input-buffer boundary and include every byte value, an
+    // empty file, executable mode, USTAR prefix paths for CMake modules,
+    // and (on Unix) a relative linker alias.
+    let fs = ctx.fs()
+    let dir = "out/test-graph/sdk-contract-tests"
+    assert(fs.mkdir_all(dir) == 0)
+    let bytes: Vec[u8] = Vec.new()
+    for i in 0..131073: bytes.push((i % 256) as u8)
+    assert(fs.write_binary(dir ++ "/payload.bin", bytes) == 0)
+    assert(fs.write_text(dir ++ "/empty", "") == 0)
+    let entries: Vec[ArchiveEntry] = Vec.new()
+    entries.push(archive_dir_entry("sample", 0o755))
+    entries.push(archive_file_entry(dir ++ "/payload.bin", "sample/payload.bin", 0o755))
+    entries.push(archive_file_entry(dir ++ "/empty", "sample/empty", 0o644))
+    var long_dir = "sample/"
+    for i in 0..96: long_dir = long_dir ++ "x"
+    entries.push(archive_dir_entry(sdk_owned_text(long_dir), 0o755))
+    entries.push(archive_file_entry(dir ++ "/payload.bin", long_dir ++ "/payload.bin", 0o644))
+    if os() != "Windows":
+        entries.push(archive_symlink_entry("payload.bin", "sample/alias", 0o777))
+    assert(fs.write_tar_gz(dir ++ "/stream.tar.gz", entries) == 0)
+    assert(fs.write_tar_gz(dir ++ "/repeat.tar.gz", entries) == 0)
+    assert(fs.sha256_file(dir ++ "/stream.tar.gz") == fs.sha256_file(dir ++ "/repeat.tar.gz"))
+    assert(fs.write_tar(dir ++ "/sample.tar", entries) == 0)
+    let unpacked = dir ++ "/unpacked"
+    if fs.exists(unpacked): assert(fs.remove_tree(unpacked) == 0)
+    assert(fs.extract_tar(dir ++ "/sample.tar", unpacked) == 0)
+    assert(fs.sha256_file(dir ++ "/payload.bin") == fs.sha256_file(unpacked ++ "/sample/payload.bin"))
+    assert(fs.read_text(unpacked ++ "/sample/empty") == "")
+    assert(fs.sha256_file(dir ++ "/payload.bin") == fs.sha256_file(unpacked ++ "/" ++ long_dir ++ "/payload.bin"))
+    if os() != "Windows":
+        assert(fs.sha256_file(dir ++ "/payload.bin") == fs.sha256_file(unpacked ++ "/sample/alias"))
+    sdk_write_text(ctx, ctx.output(), "SDK packaging rules: all five platforms passed\n")
+
 pub fn run_sdk_llvm_action(ctx: ActionCtx) -> i32:
     let args = ctx.args()
     if args.len() < 9:
@@ -753,6 +889,8 @@ pub fn run_sdk_llvm_action(ctx: ActionCtx) -> i32:
     let build_dir = args.get(3)
     let jobs = args.get(4)
     let targets = sdk_llvm_targets_arg(ctx, args.get(5))
+    if not sdk_targets_include_wasm(targets):
+        return sdk_fail(ctx, "LLVM_TARGETS_TO_BUILD must include WebAssembly for the With SDK")
     let sdkroot = args.get(6)
     let deployment_target = if args.get(7).len() > 0: sdk_owned_text(args.get(7)) else: "11.0"
     let windows_mt = args.get(8)
@@ -797,7 +935,8 @@ pub fn run_sdk_llvm_action(ctx: ActionCtx) -> i32:
         configure.push("-DCMAKE_C_COMPILER=" ++ sdk_abs(root, sdk_tool(bootstrap_prefix, "clang-cl")))
         configure.push("-DCMAKE_CXX_COMPILER=" ++ sdk_abs(root, sdk_tool(bootstrap_prefix, "clang-cl")))
         configure.push("-DCMAKE_LINKER=" ++ sdk_abs(root, sdk_tool(bootstrap_prefix, "lld-link")))
-        configure.push("-DCMAKE_ASM_MASM_COMPILER=" ++ sdk_abs(root, sdk_tool(bootstrap_prefix, "llvm-ml64")))
+        if arch() == "x86_64":
+            configure.push("-DCMAKE_ASM_MASM_COMPILER=" ++ sdk_abs(root, sdk_tool(bootstrap_prefix, "llvm-ml64")))
         configure.push("-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded")
         configure.push("-DLLVM_ENABLE_PIC=OFF")
         configure.push("-DLLVM_ENABLE_DIA_SDK=OFF")
@@ -843,6 +982,8 @@ pub fn run_sdk_llvm_action(ctx: ActionCtx) -> i32:
         return sdk_fail(ctx, "clang driver was not installed: " ++ sdk_tool(output_prefix, "clang"))
     if not fs.exists(sdk_tool(output_prefix, "llvm-nm")):
         return sdk_fail(ctx, "llvm-nm was not installed: " ++ sdk_tool(output_prefix, "llvm-nm"))
+    rc = sdk_validate_wasm_install(ctx, output_prefix)
+    if rc != 0: return rc
     sdk_archive_clang_main(ctx, root, sdk_abs(root, build_dir) ++ "/tools/clang/tools/driver/CMakeFiles/clang.dir", output_prefix)
 
 // `with cc` is clang's driver linked into the compiler (src/compiler/

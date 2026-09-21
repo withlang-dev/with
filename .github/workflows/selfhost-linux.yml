@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     # The full battery (seed bootstrap + build + fixpoint + :test) is longer than
     # the bare self-host check; give it headroom on the shared runner.
-    timeout-minutes: 180
+    timeout-minutes: 360
     env:
       WITH_OUT_DIR: ${{ github.workspace }}/out
       LLVM_PREFIX: ${{ github.workspace }}/.deps/llvm-22.1.6-linux-x86_64
@@ -87,6 +87,10 @@ jobs:
           chmod +x with-seed
           LD_LIBRARY_PATH="$PWD/.link-shim:${LD_LIBRARY_PATH:-}" ./with-seed version
 
+      - uses: ./.github/actions/source-sdk
+        with:
+          host-tag: linux-x86_64
+
       - name: Build (seed -> stage1 -> stage2 -> final)
         env:
           WITH: ${{ github.workspace }}/with-seed
@@ -95,6 +99,11 @@ jobs:
           export PATH="$PWD/.link-shim:$LLVM_PREFIX/bin:$PATH"
           export LD_LIBRARY_PATH="$PWD/.link-shim:${LD_LIBRARY_PATH:-}"
           "$WITH" build
+
+      - name: WebAssembly fixtures with source-built SDK
+        env:
+          WITH: ${{ github.workspace }}/with-seed
+        run: LD_LIBRARY_PATH="$PWD/.link-shim:${LD_LIBRARY_PATH:-}" ./with-seed build :wasm-tests
 
       - name: Fixpoint (stage2.emit == stage3.emit)
         env:

@@ -114,6 +114,40 @@ be weakened.
 
 ## Verifying
 
+### Source-built SDK on every host
+
+`with build :sdk-package` rebuilds Ninja, CMake, LLVM/Clang and lld from
+pinned sources using the existing With SDK as the bootstrap toolchain. The
+LLVM target set includes `AArch64;X86;WebAssembly`; an override omitting
+WebAssembly is rejected. No separate WASI SDK or emscripten is needed.
+
+SDK installation and packaging require all six `LLVMWebAssembly*` static
+archives, the `lldWasm` static archive, and `wasm-ld` (`wasm-ld.exe` on Windows). Unix archives preserve
+the `wasm-ld -> lld` symlink. Windows x86_64 and ARM64 packages include the
+native executable and `.lib` archives.
+The package also carries CMake's `share/cmake-<major.minor>` modules, so
+the installed SDK can configure the next source build without host CMake.
+
+The five native CI lanes build and upload the SDK archive, digest and
+manifest, unpack that archive, build the compiler against it, and run
+`:wasm-tests` under Node. `:sdk-contract-tests` also checks the packaging
+rules for all five platforms on each host. An input-keyed cache reuses
+source-built SDK artifacts when SDK build inputs are unchanged; extraction,
+digest verification, compiler builds and wasm fixtures still run.
+Publishing these artifacts and
+updating the pinned bootstrap SDK digests is a separate release step;
+existing downloaded SDKs are not silently upgraded.
+
+CI first builds `:dev` with the pinned seed and uses that current driver for
+`:sdk-package`: old seeds embed the old whole-archive writer. The current
+driver streams tar extraction and gzip creation using With's own zlib code,
+so the LLVM source tree and SDK archive do not exceed the build memory gate.
+Archive paths use USTAR's prefix field for long CMake module names. File
+sizes are counted with bounded-memory stdio reads; archive I/O never mixes
+UCRT descriptors with the Windows runtime's separate handle table.
+
+### Compiler and runtime
+
 ```
 with build :dev                      # stage1 with the target
 with build :cross-rt-wasm            # out/lib/cross/wasm32/*.o

@@ -23,7 +23,7 @@ jobs:
     # this repo the job stays queued rather than failing — the seed and nightly
     # jobs do not depend on it.
     runs-on: windows-11-arm
-    timeout-minutes: 120
+    timeout-minutes: 360
     defaults:
       run:
         shell: bash
@@ -139,8 +139,15 @@ jobs:
           echo "UM_INCDIR=$WITH_WINDOWS_UM_INCDIR"
           command -v lld-link.exe && lld-link.exe --version || true
 
+      - uses: ./.github/actions/source-sdk
+        with:
+          host-tag: windows-aarch64-msvc
+
       - name: Build (seed -> stage1 -> stage2 -> stage3)
         run: ./src/main.exe build
+
+      - name: WebAssembly fixtures with source-built SDK
+        run: ./src/main.exe build :wasm-tests
 
       - name: Fixpoint (stage2 == stage3)
         run: ./src/main.exe build :fixpoint

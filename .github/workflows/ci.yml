@@ -20,7 +20,7 @@ jobs:
   selfhost-macos:
     name: macOS arm64
     runs-on: macos-latest
-    timeout-minutes: 180
+    timeout-minutes: 360
     env:
       WITH_OUT_DIR: ${{ github.workspace }}/out
       WITH: ${{ github.workspace }}/src/main
@@ -102,10 +102,17 @@ jobs:
       - name: Fetch SDK
         run: src/main build :deps
 
+      - uses: ./.github/actions/source-sdk
+        with:
+          host-tag: darwin-arm64
+
       - name: Build
         env:
           WITH_PROFILE: "1"
         run: src/main build
+
+      - name: WebAssembly fixtures with source-built SDK
+        run: src/main build :wasm-tests
 
       - name: Fixpoint
         env:

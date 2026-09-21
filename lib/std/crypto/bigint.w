@@ -87,7 +87,7 @@ unsafe fn i31_decode_reduce(x: *mut u32, src: *const u8, len: i32, m: *const u32
         i31_reduce_once(x, m, mlen)
         si = si + 1
 
-unsafe fn i31_reduce_once(x: *mut u32, m: *const u32, mlen: i32):
+unsafe fn i31_reduce_once(x: *mut u32, m: *const u32, mlen: i32) -> u32:
     var borrow: u32 = 0u32
     var i = 1
     while i <= mlen:

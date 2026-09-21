@@ -5,9 +5,16 @@
 
 use std.crypto.sha256
 use std.fs.IoError
+use std.libc.fopen
+use std.libc.fclose
+use std.libc.fread
+use std.libc.fwrite
+use std.zl.defs
+use std.zl.deflate
 
 extern fn with_eprint(s: &str) -> Unit
 extern fn exit(code: i32) -> Never
+extern fn ferror(stream: *mut c_void) -> i32
 extern fn with_getenv_str(name: &str) -> str
 extern fn with_setenv_str(name: &str, value: &str) -> i32
 extern fn with_str_clone_ref(value: &str) -> str
@@ -1102,8 +1109,6 @@ fn tool_tar_entry_name(path: &str, directory: bool) -> str:
         return ""
     tool_path_require_project_relative(normalized)
     let result = if directory: normalized ++ "/" else: normalized
-    if result.len() > 100:
-        return ""
     result
 
 fn tool_tar_link_name(target: &str) -> str:
@@ -1138,10 +1143,20 @@ fn tool_tar_extract_fail(message: &str) -> i32:
     1
 
 fn tool_tar_build_header(name: &str, mode: i32, size: i64, kind: ArchiveEntryKind, link_name: &str) -> Vec[u8]:
-    if name.len() == 0 or name.len() > 100 or mode < 0 or size < 0 or link_name.len() > 100:
+    if name.len() == 0 or mode < 0 or size < 0 or link_name.len() > 100:
         return Vec.new()
+    var split = -1
+    if name.len() > 100:
+        for i in 0..name.len() as i32:
+            if name[i] == 47 and i > 0 and i <= 155 and i + 1 < name.len() and name.len() - i - 1 <= 100:
+                split = i
+        if split < 0:
+            with_eprint("error: archive path cannot be represented in USTAR: " ++ name ++ "\n")
+            return Vec.new()
+    let leaf = if split < 0: with_str_clone_ref(name) else: name.slice(split + 1, name.len())
+    let path_prefix = if split < 0: "" else: name.slice(0, split)
     var prefix: Vec[u8] = Vec.new()
-    prefix = tool_tar_append_str_padded(move prefix, name, 100)
+    prefix = tool_tar_append_str_padded(move prefix, leaf, 100)
     prefix = tool_tar_append_octal_nul(move prefix, mode as i64, 8)
     prefix = tool_tar_append_octal_nul(move prefix, 0, 8)
     prefix = tool_tar_append_octal_nul(move prefix, 0, 8)
@@ -1159,7 +1174,9 @@ fn tool_tar_build_header(name: &str, mode: i32, size: i64, kind: ArchiveEntryKin
     suffix = tool_tar_append_str_padded(move suffix, link_name, 100)
     suffix = tool_tar_append_str_padded(move suffix, "ustar", 6)
     suffix = tool_tar_append_str_padded(move suffix, "00", 2)
-    suffix = tool_tar_append_zeroes(move suffix, 247)
+    suffix = tool_tar_append_zeroes(move suffix, 80)
+    suffix = tool_tar_append_str_padded(move suffix, path_prefix, 155)
+    suffix = tool_tar_append_zeroes(move suffix, 12)
     if suffix.len() == 0:
         return Vec.new()
     let checksum = tool_tar_sum(&prefix) + 256 + tool_tar_sum(&suffix)
@@ -1271,10 +1288,149 @@ pub fn ToolFs.write_tar(self: &Self, output_path: &str, entries: &Vec[ArchiveEnt
 pub fn ToolFs.write_tar_gz(self: &Self, output_path: &str, entries: &Vec[ArchiveEntry]) -> i32:
     if tool_fs_writes_suppressed(): return 0
     self.require_write_file_allowed(output_path)
-    let tar = self.tar_bytes(entries)
-    if tar.len() == 0:
-        return 1
-    self.write_binary(output_path, tool_gzip_stored(&tar))
+    var file = tool_archive_open(self.resolve_path(output_path), c"wb".ptr)
+    if file.handle == null: return 1
+    // A single compressed gzip member. Do not hold
+    // the tar, gzip and write_binary copies of a multi-GB SDK in memory.
+    // This is With's translated zlib, not a host compression program or dylib.
+    var state: z_stream_s
+    let init_rc = unsafe { deflateInit2_(&raw mut state, Z_DEFAULT_COMPRESSION, Z_DEFLATED, MAX_WBITS + 16, 8, Z_DEFAULT_STRATEGY, c"1.3.2".ptr, sizeof[z_stream_s]() as c_int) }
+    if init_rc != Z_OK: return 1
+    defer: unsafe { deflateEnd(&raw mut state) }
+    var compressed = Vec[u8].with_capacity(65536)
+    for _ in 0..65536: compressed.push(0)
+    // state never moves while zlib retains its address.
+    var writer = ToolGzipStream { file: move file, state: &raw mut state, buffer: move compressed }
+    var buffer = Vec[u8].with_capacity(65535)
+    for _ in 0..65535: buffer.push(0)
+    for i in 0..entries.len() as i32:
+        let entry = entries[i]
+        if entry.kind == ArchiveEntryKind.Directory or entry.kind == ArchiveEntryKind.Symlink:
+            let name = tool_tar_entry_name(entry.archive_path, entry.kind == ArchiveEntryKind.Directory)
+            let link_name = if entry.kind == ArchiveEntryKind.Symlink: tool_tar_link_name(entry.source_path) else: ""
+            let kind = if entry.kind == ArchiveEntryKind.Directory: ArchiveEntryKind.Directory else: ArchiveEntryKind.Symlink
+            let block = tool_tar_build_header(name, entry.mode, 0, kind, link_name)
+            if block.len() == 0 or not writer.append(block, block.len()): return 1
+        else:
+            if entry.source_path.len() == 0: return 1
+            tool_path_require_project_relative(entry.source_path)
+            let input_path = self.resolve_path(entry.source_path)
+            let size = tool_archive_size(input_path)
+            if size < 0: return 1
+            var input = tool_archive_open(input_path, c"rb".ptr)
+            if input.handle == null: return 1
+            let name = tool_tar_entry_name(entry.archive_path, false)
+            let block = tool_tar_build_header(name, entry.mode, size, ArchiveEntryKind.File, "")
+            if block.len() == 0 or not writer.append(block, block.len()): return 1
+            var remaining = size
+            while remaining > 0:
+                let count = if remaining > buffer.len(): buffer.len() else: remaining
+                let got = fread(&raw mut buffer[0] as *mut c_void, 1, count as u64, input.handle)
+                if got == 0: return 1
+                if not writer.append(buffer, got as i64): return 1
+                remaining = remaining - got as i64
+            if input.close() != 0: return 1
+            let padding = tool_tar_append_zeroes(Vec.new(), (512 - (size % 512)) % 512)
+            if not writer.append(padding, padding.len()): return 1
+    let end = tool_tar_append_zeroes(Vec.new(), 1024)
+    if not writer.append(end, end.len()): return 1
+    if not writer.finish(): return 1
+    writer.file.close()
+
+type ToolArchiveFile { handle: *mut c_void }
+
+impl ToolArchiveFile:
+    mut fn close() -> i32:
+        if self.handle == null: return 0
+        let handle = self.handle
+        self.handle = null
+        fclose(handle)
+
+impl Drop for ToolArchiveFile:
+    move fn drop():
+        if self.handle != null: fclose(self.handle)
+
+fn tool_archive_open(path: &str, mode: *const i8) -> ToolArchiveFile:
+    let cpath = match path.to_cstring():
+        Ok(c) => c
+        Err(_) => return ToolArchiveFile { handle: null }
+    ToolArchiveFile { handle: fopen(cpath.as_cstr().ptr(), mode) }
+
+fn tool_archive_write(file: &ToolArchiveFile, bytes: &Vec[u8], offset: i64, count: i64) -> bool:
+    var written: i64 = 0
+    while written < count:
+        let n = fwrite(&raw const bytes[offset + written] as *const c_void, 1, (count - written) as u64, file.handle)
+        if n == 0: return false
+        written = written + n as i64
+    true
+
+fn tool_archive_size(path: &str) -> i64:
+    // Tar headers precede their payloads. Count with bounded storage before
+    // opening the payload stream, using only stdio on every platform.
+    // In particular, UCRT descriptors cannot be passed to the runtime's
+    // separate Windows handle table, and C long is only 32 bits there.
+    var input = tool_archive_open(path, c"rb".ptr)
+    if input.handle == null: return -1
+    var buffer: [65536]u8 = [0 as u8; 65536]
+    var size: i64 = 0
+    while true:
+        let got = fread(&raw mut buffer[0] as *mut c_void, 1, 65536, input.handle)
+        if got == 0:
+            if ferror(input.handle) != 0: return -1
+            if input.close() != 0: return -1
+            return size
+        size = size + got as i64
+    -1
+
+fn tool_archive_read(file: &ToolArchiveFile, buffer: *mut u8, count: i64) -> bool:
+    var loaded: i64 = 0
+    while loaded < count:
+        let n = fread((buffer + loaded as u64) as *mut c_void, 1, (count - loaded) as u64, file.handle)
+        if n == 0: return false
+        loaded = loaded + n as i64
+    true
+
+fn tool_archive_skip(file: &ToolArchiveFile, count: i64) -> bool:
+    var buffer: [65536]u8 = [0 as u8; 65536]
+    var remaining = count
+    while remaining > 0:
+        let chunk = if remaining > 65536: 65536 else: remaining
+        if not tool_archive_read(file, &raw mut buffer[0], chunk): return false
+        remaining = remaining - chunk
+    true
+
+type ToolGzipStream { file: ToolArchiveFile, state: *mut z_stream_s, buffer: Vec[u8] }
+
+impl ToolGzipStream:
+    mut fn append(bytes: &Vec[u8], count: i64) -> bool:
+        assert(count >= 0 and count <= bytes.len())
+        if count == 0: return true
+        assert(count <= 65536)
+        unsafe:
+            self.state.next_in = &raw const bytes[0] as *mut u8
+            self.state.avail_in = count as c_uint
+            while self.state.avail_in > 0:
+                self.state.next_out = &raw mut self.buffer[0]
+                self.state.avail_out = self.buffer.len() as c_uint
+                let rc = deflate(self.state, Z_NO_FLUSH)
+                if rc != Z_OK: return false
+                let written = self.buffer.len() - self.state.avail_out as i64
+                if not tool_archive_write(self.file, self.buffer, 0, written): return false
+        true
+
+    mut fn finish() -> bool:
+        unsafe:
+            self.state.avail_in = 0
+            self.state.next_in = null
+            while true:
+                self.state.next_out = &raw mut self.buffer[0]
+                self.state.avail_out = self.buffer.len() as c_uint
+                let rc = deflate(self.state, Z_FINISH)
+                if rc != Z_OK and rc != Z_STREAM_END: return false
+                let written = self.buffer.len() - self.state.avail_out as i64
+                if not tool_archive_write(self.file, self.buffer, 0, written): return false
+                if rc == Z_STREAM_END: return true
+        false
 
 fn tool_tar_block_is_zero(bytes: &Vec[u8], offset: i64) -> bool:
     if offset + 512 > bytes.len():
@@ -1411,29 +1567,46 @@ pub fn ToolFs.extract_tar(self: &Self, archive_path: &str, output_dir: &str) -> 
     tool_path_require_project_relative(archive_path)
     if self.mkdir_all(output_dir) != 0:
         return tool_tar_extract_fail("could not create output directory: " ++ output_dir)
-    let archive = self.read_binary(archive_path)
+    let input_path = self.resolve_path(archive_path)
+    let archive_len = tool_archive_size(input_path)
+    if archive_len < 0: return tool_tar_extract_fail("could not read archive size: " ++ archive_path)
+    var input = tool_archive_open(input_path, c"rb".ptr)
+    if input.handle == null: return tool_tar_extract_fail("could not open " ++ archive_path)
+    var archive = Vec[u8].with_capacity(512)
+    for _ in 0..512: archive.push(0)
+    var buffer = Vec[u8].with_capacity(65536)
+    for _ in 0..65536: buffer.push(0)
     var offset: i64 = 0
     var pending_path = ""
     var pending_link = ""
-    while offset + 512 <= archive.len():
-        if tool_tar_block_is_zero(&archive, offset):
+    while offset + 512 <= archive_len:
+        if not tool_archive_read(input, &raw mut archive[0], 512):
+            return tool_tar_extract_fail(f"truncated header at offset {offset}")
+        if tool_tar_block_is_zero(&archive, 0):
             return 0
-        if not tool_tar_magic_ok(&archive, offset):
+        if not tool_tar_magic_ok(&archive, 0):
             return tool_tar_extract_fail(f"invalid tar magic at offset {offset}")
-        let stored_checksum = tool_tar_parse_octal(&archive, offset + 148, 8)
-        if stored_checksum < 0 or stored_checksum != tool_tar_header_checksum(&archive, offset):
+        let stored_checksum = tool_tar_parse_octal(&archive, 148, 8)
+        if stored_checksum < 0 or stored_checksum != tool_tar_header_checksum(&archive, 0):
             return tool_tar_extract_fail(f"invalid header checksum at offset {offset}")
-        let mode = tool_tar_parse_octal(&archive, offset + 100, 8)
-        let size = tool_tar_parse_octal(&archive, offset + 124, 12)
+        let mode = tool_tar_parse_octal(&archive, 100, 8)
+        let size = tool_tar_parse_octal(&archive, 124, 12)
         if mode < 0 or size < 0:
             return tool_tar_extract_fail(f"invalid numeric field at offset {offset}")
-        let typeflag = archive.get(offset + 156)
+        let typeflag = archive.get(156)
         let content_start = offset + 512
-        if content_start + size > archive.len():
+        if size > archive_len - content_start:
             return tool_tar_extract_fail(f"entry payload extends past archive at offset {offset}")
         let padded = ((size + 511) / 512) * 512
+        var metadata: Vec[u8] = Vec.new()
+        if typeflag == 120 as u8 or typeflag == 76 as u8:
+            for _ in 0..size: metadata.push(0)
+            if size > 0 and not tool_archive_read(input, &raw mut metadata[0], size):
+                return tool_tar_extract_fail(f"truncated metadata at offset {offset}")
+            if not tool_archive_skip(input, padded - size):
+                return tool_tar_extract_fail(f"truncated padding at offset {offset}")
         if typeflag == 120 as u8:
-            let pax = tool_tar_payload_text(&archive, content_start, size)
+            let pax = tool_tar_payload_text(&metadata, 0, size)
             let pax_path = tool_pax_value(pax, "path")
             let pax_link = tool_pax_value(pax, "linkpath")
             if pax_path.len() > 0:
@@ -1443,13 +1616,15 @@ pub fn ToolFs.extract_tar(self: &Self, archive_path: &str, output_dir: &str) -> 
             offset = offset + 512 + padded
             continue
         if typeflag == 103 as u8:
+            if not tool_archive_skip(input, padded):
+                return tool_tar_extract_fail(f"truncated global metadata at offset {offset}")
             offset = offset + 512 + padded
             continue
         if typeflag == 76 as u8:
-            pending_path = tool_tar_trim_payload_name(tool_tar_payload_text(&archive, content_start, size))
+            pending_path = tool_tar_trim_payload_name(tool_tar_payload_text(&metadata, 0, size))
             offset = offset + 512 + padded
             continue
-        let raw_name = if pending_path.len() > 0: pending_path else: tool_tar_header_name(&archive, offset)
+        let raw_name = if pending_path.len() > 0: pending_path else: tool_tar_header_name(&archive, 0)
         pending_path = ""
         if not tool_tar_archive_name_safe(raw_name):
             return tool_tar_extract_fail("unsafe archive path: " ++ raw_name)
@@ -1461,7 +1636,7 @@ pub fn ToolFs.extract_tar(self: &Self, archive_path: &str, output_dir: &str) -> 
             if mode > 0:
                 let _ = self.chmod(output_path, mode as i32)
         else if typeflag == 50 as u8:
-            let link_name = if pending_link.len() > 0: pending_link else: tool_tar_field_str(&archive, offset + 157, 100)
+            let link_name = if pending_link.len() > 0: pending_link else: tool_tar_field_str(&archive, 157, 100)
             pending_link = ""
             if not tool_tar_link_target_safe(output_dir, output_path, link_name):
                 return tool_tar_extract_fail("unsafe symlink target for " ++ output_path ++ ": " ++ link_name)
@@ -1476,17 +1651,27 @@ pub fn ToolFs.extract_tar(self: &Self, archive_path: &str, output_dir: &str) -> 
             let output_parent = tool_path_dirname(output_path)
             if output_parent != "." and self.mkdir_all(output_parent) != 0:
                 return tool_tar_extract_fail("could not create parent directory for file: " ++ output_parent)
-            var payload: Vec[u8] = Vec[u8].with_capacity(size)
-            var pi: i64 = 0
-            while pi < size:
-                payload.push(archive.get(content_start + pi))
-                pi = pi + 1
-            if self.write_binary(output_path, payload) != 0:
+            self.require_write_file_allowed(output_path)
+            var output = tool_archive_open(self.resolve_path(output_path), c"wb".ptr)
+            if output.handle == null:
+                return tool_tar_extract_fail("could not open file entry: " ++ output_path)
+            var remaining = size
+            while remaining > 0:
+                let chunk = if remaining > buffer.len(): buffer.len() else: remaining
+                if not tool_archive_read(input, &raw mut buffer[0], chunk):
+                    return tool_tar_extract_fail("truncated file entry: " ++ output_path)
+                if not tool_archive_write(output, buffer, 0, chunk):
+                    return tool_tar_extract_fail("could not write file entry: " ++ output_path)
+                remaining = remaining - chunk
+            if output.close() != 0:
                 return tool_tar_extract_fail("could not write file entry: " ++ output_path)
             if mode > 0:
                 let _ = self.chmod(output_path, mode as i32)
         else:
             return tool_tar_extract_fail(f"unsupported tar entry type {typeflag as i32} for " ++ raw_name)
+        let consumed = if typeflag == 48 as u8 or typeflag == 0 as u8: size else: 0
+        if not tool_archive_skip(input, padded - consumed):
+            return tool_tar_extract_fail(f"truncated padding at offset {offset}")
         offset = offset + 512 + padded
     tool_tar_extract_fail("archive ended without two zero blocks")
 

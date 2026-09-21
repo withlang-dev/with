@@ -794,6 +794,7 @@ fn package_llvm_sdk_platform_target(name: &str, platform: &str, prefix: &str, bu
     let asset = sdk_asset_for_platform(platform)
     let sdk_base = "llvm-" ++ compiler_llvm_version() ++ "-" ++ sdk_host_tag_for_platform(platform)
     var target = target_new(.Action, build_owned_text(name), "").output("out/release/" ++ name ++ ".passed")
+    target = target.dep("sdk-contract-tests")
     target.action = run_package_llvm_sdk_action
     target = target.arg(build_owned_text(platform))
     target = target.arg(build_owned_text(prefix))
@@ -1774,6 +1775,15 @@ pub fn build(ctx: BuildCtx) -> Build:
     out = out.add_target(package_platform_target("package-windows-x86_64", "windows-x86_64", ctx))
     out = out.add_target(package_platform_target("package-windows-aarch64", "windows-aarch64", ctx))
     out = out.add_target(package_current_host_target())
+    var sdk_contract = target_new(.Action, "sdk-contract-tests", "").output("out/test-graph/sdk-contract-tests/passed")
+    sdk_contract.action = run_sdk_contract_tests_action
+    sdk_contract = sdk_contract.input("build/sdk.w")
+    sdk_contract = sdk_contract.extra_output("out/test-graph/sdk-contract-tests/payload.bin")
+    sdk_contract = sdk_contract.extra_output("out/test-graph/sdk-contract-tests/empty")
+    sdk_contract = sdk_contract.extra_output("out/test-graph/sdk-contract-tests/stream.tar.gz")
+    sdk_contract = sdk_contract.extra_output("out/test-graph/sdk-contract-tests/repeat.tar.gz")
+    sdk_contract = sdk_contract.write_scope("out/test-graph/sdk-contract-tests")
+    out = out.add_target(sdk_contract)
     out = out.add_target(package_llvm_sdk_platform_target("package-llvm-sdk-darwin-aarch64", "darwin-aarch64", sdk_default_prefix_for_platform("darwin-aarch64"), sdk_default_build_cache_for_platform("darwin-aarch64")))
     out = out.add_target(package_llvm_sdk_platform_target("package-llvm-sdk-linux-x86_64", "linux-x86_64", sdk_default_prefix_for_platform("linux-x86_64"), sdk_default_build_cache_for_platform("linux-x86_64")))
     out = out.add_target(package_llvm_sdk_platform_target("package-llvm-sdk-linux-aarch64", "linux-aarch64", sdk_default_prefix_for_platform("linux-aarch64"), sdk_default_build_cache_for_platform("linux-aarch64")))
