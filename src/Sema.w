@@ -1075,6 +1075,10 @@ type Sema {
     binding_view_dep_data: Vec[i32],
     // Expression-level view metadata for call expressions and view-producing nodes.
     expr_view_param_origins: HashMap[i32, i32],
+    // #962: a view produced from a statement temporary (`split(..).get(1)`,
+    // `split(..)[1]`): node → the temporary's type. Fine inside the statement,
+    // a use-after-free once bound or returned.
+    expr_view_into_temporary: HashMap[i32, i32],
     expr_view_dep_starts: HashMap[i32, i32],
     expr_view_dep_counts: HashMap[i32, i32],
     expr_view_dep_data: Vec[i32],
@@ -2316,6 +2320,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         binding_closure_nodes: sema_new_map_i32_i32(),
         binding_view_dep_data: Vec.new(),
         expr_view_param_origins: sema_new_map_i32_i32(),
+        expr_view_into_temporary: sema_new_map_i32_i32(),
         expr_view_dep_starts: sema_new_map_i32_i32(),
         expr_view_dep_counts: sema_new_map_i32_i32(),
         expr_view_dep_data: Vec.new(),

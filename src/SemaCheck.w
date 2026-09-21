@@ -10127,13 +10127,34 @@ impl Sema:
             return self.expr_view_origin_mask(node)
         0
 
-    fn record_transparent_view_origins(result_node: i32, source_node: i32):
+    mut fn record_transparent_view_origins(result_node: i32, source_node: i32):
         if result_node == 0 or source_node == 0 or self.has_contextual_copy_adjustment(result_node) != 0:
             return
         let param_mask = self.compute_expr_view_origin_mask(source_node)
         var deps: Vec[i32] = Vec.new()
         deps = self.collect_expr_view_deps(source_node, move deps)
         self.set_expr_view_deps(result_node, param_mask, deps)
+        // #962: a carrier of a view into a temporary is a view into it too.
+        let temp_ty = self.view_into_temporary_type(source_node)
+        if temp_ty != 0:
+            self.expr_view_into_temporary.insert(result_node, temp_ty)
+
+    // #962: the type of the statement temporary `node` is a view into, after
+    // peeling grouping, or 0.
+    fn view_into_temporary_type(node: i32) -> i32:
+        var peeled = node
+        while peeled != 0 and self.ast.kind(peeled) == NodeKind.NK_GROUPED:
+            peeled = self.ast.get_data0(peeled)
+        if peeled != 0 and self.expr_view_into_temporary.contains(peeled):
+            return self.expr_view_into_temporary.get(peeled).unwrap()
+        0
+
+    mut fn reject_view_into_temporary(node: i32, what: &str) -> i32:
+        let temp_ty = self.view_into_temporary_type(node)
+        if temp_ty == 0: return 0
+        let temp_name = self.type_name(temp_ty)
+        self.emit_error(what ++ " a view into a temporary `" ++ temp_name ++ "` that is freed when this statement ends (§21.1); bind the `" ++ temp_name ++ "` first, or take an owned value (`.clone()`)", node)
+        1
 
     fn record_transparent_view_origins_from_nodes(result_node: i32, source_nodes: &Vec[i32]):
         if result_node == 0 or self.has_contextual_copy_adjustment(result_node) != 0:
@@ -10147,7 +10168,7 @@ impl Sema:
                 deps = self.collect_expr_view_deps(source_node, move deps)
         self.set_expr_view_deps(result_node, param_mask, deps)
 
-    fn record_view_producer_origins(result_node: i32, receiver_node: i32):
+    mut fn record_view_producer_origins(result_node: i32, receiver_node: i32):
         if result_node == 0 or receiver_node == 0:
             return
         let param_mask = self.compute_expr_view_origin_mask(receiver_node)
@@ -10156,9 +10177,19 @@ impl Sema:
         if deps.len() == 0:
             deps = self.push_unique_i32(move deps, self.place_root_sym(receiver_node))
         self.set_expr_view_deps(result_node, param_mask, deps)
+        // #962: the receiver is a temporary (a call result, not a place) that
+        // owns storage: it is freed when this statement ends, so the view has
+        // no origin that outlives the statement. Remember it; a binding or a
+        // return of this view is rejected, a use inside the statement is fine.
+        if self.typed_expr_types.contains(receiver_node):
+            let recv_ty: i32 = self.typed_expr_types.get(receiver_node).unwrap()
+            if recv_ty != 0 and unpack_place_kind(self.classify_place(receiver_node)) == PlaceKind.PK_NotPlace and self.type_needs_drop(recv_ty) != 0:
+                self.expr_view_into_temporary.insert(result_node, recv_ty)
 
     mut fn record_view_binding_from_expr(sym: i32, expr_node: i32):
         if sym == 0 or expr_node == 0:
+            return
+        if self.reject_view_into_temporary(expr_node, "`" ++ self.pool_resolve(sym) ++ "` binds") != 0:
             return
         let param_mask = self.compute_expr_view_origin_mask(expr_node)
         var deps: Vec[i32] = Vec.new()
@@ -10330,6 +10361,8 @@ impl Sema:
     mut fn check_returned_view_origins(expr_node: i32, report_node: i32):
         if expr_node == 0:
             return
+        if self.reject_view_into_temporary(expr_node, "returns") != 0:
+            return
         if self.ast.kind(expr_node) == NodeKind.NK_UNARY and self.ast.get_data0(expr_node) == UnaryOp.UOP_REF:
             let origin_sym = self.place_root_sym(self.ast.get_data1(expr_node))
             if self.view_origin_is_stack_local(origin_sym) != 0:
@@ -10412,6 +10445,8 @@ impl Sema:
     mut fn check_returned_ephemeral_value_origins(expr_node: i32, report_node: i32):
         if expr_node == 0:
             return
+        if self.reject_view_into_temporary(expr_node, "returns") != 0:
+            return
         var deps: Vec[i32] = Vec.new()
         deps = self.collect_expr_view_deps(expr_node, move deps)
         for i in 0..deps.len() as i32:
@@ -10459,7 +10494,7 @@ impl Sema:
             self.effect_note_origin_node = 0
             self.note_param_view_origin(param_sym, origin_mask, expr_node)
 
-    fn record_builtin_receiver_view_origins(call_node: i32, recv_node: i32):
+    mut fn record_builtin_receiver_view_origins(call_node: i32, recv_node: i32):
         self.record_view_producer_origins(call_node, recv_node)
 
     fn record_call_view_origins(call_node: i32, sig_idx: i32, param_offset: i32, recv_node: i32, extra_start: i32, arg_count: i32, has_resolved: i32):
