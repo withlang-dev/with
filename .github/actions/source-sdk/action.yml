@@ -28,7 +28,7 @@ runs:
       if: steps.sdk-cache.outputs.cache-hit != 'true'
       shell: bash
       env:
-        SDK_BOOTSTRAP_PREFIX: .deps/llvm-22.1.6-${{ inputs.host-tag }}
+        SDK_ASSET_PREFIX: .deps/llvm-22.1.6-${{ inputs.host-tag }}
       run: |
         set -euo pipefail
         exe=""
@@ -37,19 +37,35 @@ runs:
           export PATH="/c/Program Files/LLVM/bin:$PATH"
           command -v ninja >/dev/null 2>&1 || choco install ninja -y --no-progress >/dev/null
         fi
-        mkdir -p "$SDK_BOOTSTRAP_PREFIX/bin"
+        # The fetched SDK is read-only here: nothing is ever written into it.
+        asset="$SDK_ASSET_PREFIX"
         usable() {
-          local tool="$1" path="$SDK_BOOTSTRAP_PREFIX/bin/$tool$exe"
+          local tool="$1" path="$asset/bin/$tool$exe"
           [[ -x "$(readlink -f "$path" 2>/dev/null || echo /nonexistent)" ]] || return 1
           if [[ "$tool" == cmake ]]; then
-            ls -d "$SDK_BOOTSTRAP_PREFIX"/share/cmake-*/Modules >/dev/null 2>&1 || return 1
+            ls -d "$asset"/share/cmake-*/Modules >/dev/null 2>&1 || return 1
           fi
           return 0
         }
+        need=0
+        for tool in clang clang++ cmake ninja; do
+          usable "$tool" || need=1
+        done
+        if [[ $need == 0 ]]; then
+          echo "SDK_BOOTSTRAP_PREFIX=$asset" >> "$GITHUB_ENV"
+          echo "source-sdk: the fetched SDK bootstraps itself ($asset)"
+          exit 0
+        fi
+        # Generation zero: a separate seed prefix holding only links to the
+        # runner's tools; the fetched SDK stays untouched.
+        seed=".deps/bootstrap-${{ inputs.host-tag }}"
+        rm -rf "$seed"
+        mkdir -p "$seed/bin"
+        echo "SDK_BOOTSTRAP_PREFIX=$seed" >> "$GITHUB_ENV"
         # The runner's copy of a tool, never the asset's own (the asset's bin is
         # on PATH and is exactly what cannot bootstrap); on Windows `command -v`
         # drops the .exe, so the candidates are re-spelled with it.
-        prefix_real="$(readlink -f "$SDK_BOOTSTRAP_PREFIX")"
+        prefix_real="$(readlink -f "$asset")"
         host_tool() {
           local tool="$1" cand
           while IFS= read -r cand; do
@@ -68,41 +84,40 @@ runs:
         # a symlink to the real path; on Windows, where cmake does not resolve
         # links, the companion trees are copied alongside.
         for tool in clang clang++ cmake ninja; do
-          if usable "$tool"; then continue; fi
           host="$(host_tool "$tool" || true)"
           if [[ -z "$host" ]]; then
             echo "source-sdk: the SDK asset cannot bootstrap ($tool missing or dangling) and the runner has no $tool to seed from" >&2
             exit 1
           fi
           real="$(readlink -f "$host")"
-          rm -f "$SDK_BOOTSTRAP_PREFIX/bin/$tool$exe"
           if [[ "$RUNNER_OS" == Windows ]]; then
-            cp -f "$real" "$SDK_BOOTSTRAP_PREFIX/bin/$tool$exe"
+            cp -f "$real" "$seed/bin/$tool$exe"
             hostprefix="$(dirname "$(dirname "$real")")"
             if [[ "$tool" == cmake ]]; then
-              rm -rf "$SDK_BOOTSTRAP_PREFIX"/share/cmake-*
-              mkdir -p "$SDK_BOOTSTRAP_PREFIX/share"
-              cp -R "$hostprefix"/share/cmake-* "$SDK_BOOTSTRAP_PREFIX/share/"
-            elif [[ "$tool" == clang && -d "$hostprefix/lib/clang" && ! -d "$SDK_BOOTSTRAP_PREFIX/lib/clang" ]]; then
-              mkdir -p "$SDK_BOOTSTRAP_PREFIX/lib"
-              cp -R "$hostprefix/lib/clang" "$SDK_BOOTSTRAP_PREFIX/lib/"
+              mkdir -p "$seed/share"
+              cp -R "$hostprefix"/share/cmake-* "$seed/share/"
+            elif [[ "$tool" == clang && -d "$hostprefix/lib/clang" ]]; then
+              mkdir -p "$seed/lib"
+              cp -R "$hostprefix/lib/clang" "$seed/lib/"
             fi
           else
-            ln -s "$real" "$SDK_BOOTSTRAP_PREFIX/bin/$tool$exe"
+            ln -s "$real" "$seed/bin/$tool$exe"
           fi
-          echo "source-sdk: bootstrap $tool seeded from the runner ($real): the SDK asset cannot bootstrap; the package this run produces will"
-          echo "SDK_SEEDED=1" >> "$GITHUB_ENV"
+          echo "source-sdk: bootstrap $tool seeded from the runner ($real) into $seed: the fetched SDK cannot bootstrap"
         done
 
     - name: Build and package SDK from source
       if: steps.sdk-cache.outputs.cache-hit != 'true'
       shell: bash
       env:
-        SDK_BOOTSTRAP_PREFIX: .deps/llvm-22.1.6-${{ inputs.host-tag }}
+        SDK_ASSET_PREFIX: .deps/llvm-22.1.6-${{ inputs.host-tag }}
         PARALLEL_JOBS: '4'
         LLVM_TARGETS_TO_BUILD: AArch64;X86;WebAssembly
       run: |
         set -euo pipefail
+        # SDK_BOOTSTRAP_PREFIX comes from the seed step: the fetched SDK when it
+        # can bootstrap, otherwise the separate seed prefix.
+        test -n "${SDK_BOOTSTRAP_PREFIX:-}" || { echo "source-sdk: no bootstrap prefix chosen"; exit 1; }
         export PATH="$LLVM_PREFIX/bin:$PATH"
         if [[ "$RUNNER_OS" == macOS ]]; then
           export SDKROOT="$(xcrun --sdk macosx --show-sdk-path)"
@@ -138,7 +153,7 @@ runs:
         # built. A seeded (generation-zero) run compiled stage 1 with the
         # runner's compiler, so it is a bootstrap, never a product: build
         # again with stage 1's own clang/cmake/ninja and package that.
-        if [[ "${SDK_SEEDED:-0}" == 1 ]]; then
+        if [[ "$SDK_BOOTSTRAP_PREFIX" != "$SDK_ASSET_PREFIX" ]]; then
           host="${{ inputs.host-tag }}"
           stage1=".deps/llvm-22.1.6-$host-stage1"
           rm -rf "$stage1"
