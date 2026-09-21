@@ -91,6 +91,7 @@ runs:
             ln -s "$real" "$SDK_BOOTSTRAP_PREFIX/bin/$tool$exe"
           fi
           echo "source-sdk: bootstrap $tool seeded from the runner ($real): the SDK asset cannot bootstrap; the package this run produces will"
+          echo "SDK_SEEDED=1" >> "$GITHUB_ENV"
         done
 
     - name: Build and package SDK from source
@@ -122,7 +123,6 @@ runs:
           # bounded-memory writer from this source tree on every host.
           ./src/main.exe build :dev
           export WITH="$(cygpath -m "$PWD/out/bootstrap/bin/with-stage1.exe")"
-          "$WITH" build :sdk-package
         else
           export LD_LIBRARY_PATH="$PWD/.link-shim:${LD_LIBRARY_PATH:-}"
           if [[ "$RUNNER_OS" == Linux ]]; then
@@ -132,6 +132,20 @@ runs:
           fi
           "$WITH" build :dev
           export WITH="$PWD/out/bootstrap/bin/with-stage1"
+        fi
+        "$WITH" build :sdk-package
+        # The SDK contains only binaries we built, built by a toolchain we
+        # built. A seeded (generation-zero) run compiled stage 1 with the
+        # runner's compiler, so it is a bootstrap, never a product: build
+        # again with stage 1's own clang/cmake/ninja and package that.
+        if [[ "${SDK_SEEDED:-0}" == 1 ]]; then
+          host="${{ inputs.host-tag }}"
+          stage1=".deps/llvm-22.1.6-$host-stage1"
+          rm -rf "$stage1"
+          mv "out/sdk/$host/install/llvm-22.1.6-$host" "$stage1"
+          rm -rf "out/sdk/$host" out/release/with-llvm-sdk-*
+          export SDK_BOOTSTRAP_PREFIX="$stage1"
+          echo "source-sdk: stage 1 was built by the runner's toolchain; rebuilding the SDK with stage 1's own tools ($stage1) and packaging only that"
           "$WITH" build :sdk-package
         fi
 
