@@ -50,7 +50,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p .deps
-          curl -fL -o /tmp/sdk.tar.zst \
+          curl -fL --retry 5 --retry-delay 5 --retry-all-errors -o /tmp/sdk.tar.zst \
             "https://github.com/$WITH_SDK_REPO/releases/download/$WITH_SDK_VERSION/$WITH_SDK_ASSET"
           # asset is .tar.zst; `with build :deps` expects .tar.gz, so extract by hand.
           zstd -d -c /tmp/sdk.tar.zst | tar -x -C .deps
@@ -81,7 +81,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          curl -fL -o with-seed \
+          curl -fL --retry 5 --retry-delay 5 --retry-all-errors -o with-seed \
             "https://github.com/$WITH_SEED_REPO/releases/download/$WITH_SEED_VERSION/$WITH_SEED_ASSET"
           printf '%s  %s\n' "$WITH_SEED_SHA256" with-seed | sha256sum -c -
           chmod +x with-seed

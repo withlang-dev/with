@@ -63,7 +63,7 @@ jobs:
           # git-bash GNU tar treats a "D:\..." path as a remote host (the drive
           # colon looks like host:path), so keep the archive on a msys path.
           sdk="$(cygpath -u "$RUNNER_TEMP")/sdk.tar.zst"
-          curl -fL -o "$sdk" \
+          curl -fL --retry 5 --retry-delay 5 --retry-all-errors -o "$sdk" \
             "https://github.com/$WITH_SDK_REPO/releases/download/$WITH_SDK_VERSION/$WITH_SDK_ASSET"
           tar --zstd -xf "$sdk" -C .deps
           prefix=".deps/llvm-22.1.6-windows-x86_64-msvc"
@@ -73,7 +73,7 @@ jobs:
       - name: Fetch Windows seed
         run: |
           set -euo pipefail
-          curl -fL -o src/main.exe \
+          curl -fL --retry 5 --retry-delay 5 --retry-all-errors -o src/main.exe \
             "https://github.com/$WITH_SEED_REPO/releases/download/$WITH_SEED_VERSION/$WITH_SEED_ASSET"
           printf '%s  %s\n' "$WITH_SEED_SHA256" src/main.exe | sha256sum -c -
           ./src/main.exe version

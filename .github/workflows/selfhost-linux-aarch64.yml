@@ -74,7 +74,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p .deps
-          curl -fL -o /tmp/sdk.tar.gz \
+          curl -fL --retry 5 --retry-delay 5 --retry-all-errors -o /tmp/sdk.tar.gz \
             "https://github.com/$WITH_SDK_REPO/releases/download/$WITH_SDK_VERSION/$WITH_SDK_ASSET"
           printf '%s  %s\n' "$WITH_SDK_SHA256" /tmp/sdk.tar.gz | sha256sum -c -
           tar -xzf /tmp/sdk.tar.gz -C .deps
@@ -104,14 +104,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          curl -fL -o with-seed \
+          curl -fL --retry 5 --retry-delay 5 --retry-all-errors -o with-seed \
             "https://github.com/$WITH_SEED_REPO/releases/download/$WITH_SEED_VERSION/$WITH_SEED_ASSET"
           printf '%s  %s\n' "$WITH_SEED_SHA256" with-seed | sha256sum -c -
           chmod +x with-seed
           # Runtime objects the seed links into everything it builds. They live
           # in <bindir>/runtime/, i.e. beside with-seed at the workspace root.
           mkdir -p runtime
-          curl -fL -o /tmp/rt.tar.gz \
+          curl -fL --retry 5 --retry-delay 5 --retry-all-errors -o /tmp/rt.tar.gz \
             "https://github.com/$WITH_SEED_REPO/releases/download/$WITH_RUNTIME_VERSION/$WITH_RUNTIME_ASSET"
           printf '%s  %s\n' "$WITH_RUNTIME_SHA256" /tmp/rt.tar.gz | sha256sum -c -
           tar -xzf /tmp/rt.tar.gz -C runtime

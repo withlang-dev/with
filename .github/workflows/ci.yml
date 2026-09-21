@@ -37,7 +37,7 @@ jobs:
           WITH_SEED_SHA256: 79a63ff91d5d9260463adf3e08ff43bdd5446d070eac2ca56ef543ae05484075
         run: |
           set -euo pipefail
-          curl -fL -o src/main \
+          curl -fL --retry 5 --retry-delay 5 --retry-all-errors -o src/main \
             "https://github.com/$WITH_SEED_REPO/releases/download/$WITH_SEED_VERSION/$WITH_SEED_ASSET"
           printf '%s  %s\n' "$WITH_SEED_SHA256" src/main | shasum -a 256 -c -
           chmod +x src/main
@@ -85,7 +85,7 @@ jobs:
           fi
           echo "provisioning SDK from $tag: $asset"
           mkdir -p .deps
-          curl -fL -o "$RUNNER_TEMP/$asset" \
+          curl -fL --retry 5 --retry-delay 5 --retry-all-errors -o "$RUNNER_TEMP/$asset" \
             "https://github.com/$WITH_SDK_REPO/releases/download/$tag/$asset"
           case "$asset" in
             *.tar.gz)  tar -xzf "$RUNNER_TEMP/$asset" -C .deps ;;
