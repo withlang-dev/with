@@ -83,9 +83,9 @@ jobs:
       - name: Fetch the pinned driver and actual Mesa library
         run: |
           mkdir -p out/dll-copy-probe
-          curl -fL -o out/diagnostic-seed.exe "https://github.com/withlang-dev/with/releases/download/${{ matrix.seed_version }}/${{ matrix.seed_asset }}"
+          curl -fL --retry 5 --retry-delay 5 --retry-all-errors -o out/diagnostic-seed.exe "https://github.com/withlang-dev/with/releases/download/${{ matrix.seed_version }}/${{ matrix.seed_asset }}"
           printf '%s  %s\n' '${{ matrix.seed_sha256 }}' out/diagnostic-seed.exe | sha256sum -c -
-          curl -fL -o out/mesa.7z "https://github.com/mmozeiko/build-mesa/releases/download/26.2.2/mesa-llvmpipe-${{ matrix.mesa_arch }}-26.2.2.7z"
+          curl -fL --retry 5 --retry-delay 5 --retry-all-errors -o out/mesa.7z "https://github.com/mmozeiko/build-mesa/releases/download/26.2.2/mesa-llvmpipe-${{ matrix.mesa_arch }}-26.2.2.7z"
           printf '%s  %s\n' '${{ matrix.mesa_sha256 }}' out/mesa.7z | sha256sum -c -
           7z x -y -oout/dll-copy-probe out/mesa.7z opengl32.dll
           mv out/dll-copy-probe/opengl32.dll out/dll-copy-probe/source.dll
@@ -168,7 +168,7 @@ jobs:
         run: gh run download "$DIAGNOSTIC_RUN" --repo "$GITHUB_REPOSITORY" --name package-failures-windows-${{ matrix.arch }} --dir out/diagnostic-compiler
       - name: Fetch native stack capture tool
         run: |
-          curl -fL -o out/procdump.zip https://download.sysinternals.com/files/Procdump.zip
+          curl -fL --retry 5 --retry-delay 5 --retry-all-errors -o out/procdump.zip https://download.sysinternals.com/files/Procdump.zip
           7z x -y -oout/procdump out/procdump.zip
           mkdir -p out/diagnostic-project out/package-dumps
       - name: Initialize isolated package project
@@ -281,7 +281,7 @@ jobs:
       - name: Fetch verified bootstrap seed
         run: |
           set -euo pipefail
-          curl -fL -o src/main \
+          curl -fL --retry 5 --retry-delay 5 --retry-all-errors -o src/main \
             "https://github.com/$WITH_SEED_REPO/releases/download/$WITH_SEED_VERSION/$WITH_SEED_ASSET"
           printf '%s  %s\n' "$WITH_SEED_SHA256" src/main | shasum -a 256 -c -
           chmod +x src/main
@@ -291,11 +291,11 @@ jobs:
         run: |
           set -euo pipefail
           archive="$RUNNER_TEMP/$WITH_SDK_ASSET"
-          curl -fL -o "$archive" \
+          curl -fL --retry 5 --retry-delay 5 --retry-all-errors -o "$archive" \
             "https://github.com/$WITH_SDK_REPO/releases/download/$WITH_SDK_VERSION/$WITH_SDK_ASSET"
-          curl -fL -o "$archive.sha256" \
+          curl -fL --retry 5 --retry-delay 5 --retry-all-errors -o "$archive.sha256" \
             "https://github.com/$WITH_SDK_REPO/releases/download/$WITH_SDK_VERSION/$WITH_SDK_ASSET.sha256"
-          curl -fL -o "$archive.manifest" \
+          curl -fL --retry 5 --retry-delay 5 --retry-all-errors -o "$archive.manifest" \
             "https://github.com/$WITH_SDK_REPO/releases/download/$WITH_SDK_VERSION/$WITH_SDK_ASSET.manifest"
           printf '%s  %s\n' "$WITH_SDK_SHA256" "$archive" | shasum -a 256 -c -
           printf '%s  %s\n' "$WITH_SDK_SIDECAR_SHA256" "$archive.sha256" | shasum -a 256 -c -
@@ -487,7 +487,7 @@ jobs:
       - name: Fetch verified bootstrap seed
         run: |
           set -euo pipefail
-          curl -fL -o src/main \
+          curl -fL --retry 5 --retry-delay 5 --retry-all-errors -o src/main \
             "https://github.com/$WITH_SEED_REPO/releases/download/$WITH_SEED_VERSION/$WITH_SEED_ASSET"
           printf '%s  %s\n' "$WITH_SEED_SHA256" src/main | shasum -a 256 -c -
           chmod +x src/main
@@ -497,11 +497,11 @@ jobs:
         run: |
           set -euo pipefail
           archive="$RUNNER_TEMP/$WITH_SDK_ASSET"
-          curl -fL -o "$archive" \
+          curl -fL --retry 5 --retry-delay 5 --retry-all-errors -o "$archive" \
             "https://github.com/$WITH_SDK_REPO/releases/download/$WITH_SDK_VERSION/$WITH_SDK_ASSET"
-          curl -fL -o "$archive.sha256" \
+          curl -fL --retry 5 --retry-delay 5 --retry-all-errors -o "$archive.sha256" \
             "https://github.com/$WITH_SDK_REPO/releases/download/$WITH_SDK_VERSION/$WITH_SDK_ASSET.sha256"
-          curl -fL -o "$archive.manifest" \
+          curl -fL --retry 5 --retry-delay 5 --retry-all-errors -o "$archive.manifest" \
             "https://github.com/$WITH_SDK_REPO/releases/download/$WITH_SDK_VERSION/$WITH_SDK_ASSET.manifest"
           printf '%s  %s\n' "$WITH_SDK_SHA256" "$archive" | shasum -a 256 -c -
           printf '%s  %s\n' "$WITH_SDK_SIDECAR_SHA256" "$archive.sha256" | shasum -a 256 -c -
@@ -674,7 +674,7 @@ jobs:
           # git-bash GNU tar treats "D:\..." as host:path (the drive colon looks
           # like host:path), so keep the archive on an msys path.
           sdk="$(cygpath -u "$RUNNER_TEMP")/sdk.tar.zst"
-          curl -fL -o "$sdk" \
+          curl -fL --retry 5 --retry-delay 5 --retry-all-errors -o "$sdk" \
             "https://github.com/$WITH_SDK_REPO/releases/download/$WITH_SDK_VERSION/$WITH_SDK_ASSET"
           printf '%s  %s\n' "$WITH_SDK_SHA256" "$sdk" | sha256sum -c -
           tar --zstd -xf "$sdk" -C .deps
@@ -685,7 +685,7 @@ jobs:
       - name: Fetch verified Windows seed
         run: |
           set -euo pipefail
-          curl -fL -o src/main.exe \
+          curl -fL --retry 5 --retry-delay 5 --retry-all-errors -o src/main.exe \
             "https://github.com/$WITH_SEED_REPO/releases/download/$WITH_SEED_VERSION/$WITH_SEED_ASSET"
           printf '%s  %s\n' "$WITH_SEED_SHA256" src/main.exe | sha256sum -c -
           ./src/main.exe version
@@ -739,7 +739,7 @@ jobs:
         run: |
           set -euo pipefail
           archive="$RUNNER_TEMP/mesa-llvmpipe-x64-26.2.2.7z"
-          curl -fL -o "$archive" \
+          curl -fL --retry 5 --retry-delay 5 --retry-all-errors -o "$archive" \
             "https://github.com/mmozeiko/build-mesa/releases/download/26.2.2/mesa-llvmpipe-x64-26.2.2.7z"
           printf '%s  %s\n' "418f1938dc48d401538cf6440d3c718e2f456ef2023e44133105263f483e903f" "$archive" | sha256sum -c -
           mkdir -p out/release-uat/mesa
@@ -758,7 +758,7 @@ jobs:
       - name: Fetch native hang capture tool (test channel)
         if: ${{ failure() && inputs.channel == 'test' }}
         run: |
-          curl -fL -o out/procdump.zip https://download.sysinternals.com/files/Procdump.zip
+          curl -fL --retry 5 --retry-delay 5 --retry-all-errors -o out/procdump.zip https://download.sysinternals.com/files/Procdump.zip
           7z x -y -oout/procdump out/procdump.zip
           mkdir -p out/package-dumps/bzip2 out/package-dumps/libcurl
 
@@ -928,7 +928,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p .deps
-          curl -fL -o "$RUNNER_TEMP/sdk.tar.gz" \
+          curl -fL --retry 5 --retry-delay 5 --retry-all-errors -o "$RUNNER_TEMP/sdk.tar.gz" \
             "https://github.com/$WITH_SDK_REPO/releases/download/$WITH_SDK_VERSION/$WITH_SDK_ASSET"
           printf '%s  %s\n' "$WITH_SDK_SHA256" "$RUNNER_TEMP/sdk.tar.gz" | sha256sum -c -
           tar -xzf "$RUNNER_TEMP/sdk.tar.gz" -C .deps
@@ -959,12 +959,12 @@ jobs:
       - name: Fetch verified seed
         run: |
           set -euo pipefail
-          curl -fL -o src/main \
+          curl -fL --retry 5 --retry-delay 5 --retry-all-errors -o src/main \
             "https://github.com/$WITH_SEED_REPO/releases/download/$WITH_SEED_VERSION/$WITH_SEED_ASSET"
           printf '%s  %s\n' "$WITH_SEED_SHA256" src/main | sha256sum -c -
           chmod +x src/main
           mkdir -p src/runtime
-          curl -fL -o "$RUNNER_TEMP/rt.tar.gz" \
+          curl -fL --retry 5 --retry-delay 5 --retry-all-errors -o "$RUNNER_TEMP/rt.tar.gz" \
             "https://github.com/$WITH_SEED_REPO/releases/download/$WITH_RUNTIME_VERSION/$WITH_RUNTIME_ASSET"
           printf '%s  %s\n' "$WITH_RUNTIME_SHA256" "$RUNNER_TEMP/rt.tar.gz" | sha256sum -c -
           tar -xzf "$RUNNER_TEMP/rt.tar.gz" -C src/runtime
@@ -1114,7 +1114,7 @@ jobs:
           # git-bash GNU tar treats "D:\..." as host:path (the drive colon looks
           # like host:path), so keep the archive on an msys path.
           sdk="$(cygpath -u "$RUNNER_TEMP")/sdk.tar.gz"
-          curl -fL -o "$sdk" \
+          curl -fL --retry 5 --retry-delay 5 --retry-all-errors -o "$sdk" \
             "https://github.com/$WITH_SDK_REPO/releases/download/$WITH_SDK_VERSION/$WITH_SDK_ASSET"
           printf '%s  %s\n' "$WITH_SDK_SHA256" "$sdk" | sha256sum -c -
           tar -xzf "$sdk" -C .deps
@@ -1125,7 +1125,7 @@ jobs:
       - name: Fetch verified windows-aarch64 seed
         run: |
           set -euo pipefail
-          curl -fL -o src/main.exe \
+          curl -fL --retry 5 --retry-delay 5 --retry-all-errors -o src/main.exe \
             "https://github.com/$WITH_SEED_REPO/releases/download/$WITH_SEED_VERSION/$WITH_SEED_ASSET"
           printf '%s  %s\n' "$WITH_SEED_SHA256" src/main.exe | sha256sum -c -
           ./src/main.exe version
@@ -1176,7 +1176,7 @@ jobs:
         run: |
           set -euo pipefail
           archive="$RUNNER_TEMP/mesa-llvmpipe-arm64-26.2.2.7z"
-          curl -fL -o "$archive" \
+          curl -fL --retry 5 --retry-delay 5 --retry-all-errors -o "$archive" \
             "https://github.com/mmozeiko/build-mesa/releases/download/26.2.2/mesa-llvmpipe-arm64-26.2.2.7z"
           printf '%s  %s\n' "bd1c00a49504b3efe20037cf29fa437380cfb5cbe73f196272624b94938330f1" "$archive" | sha256sum -c -
           mkdir -p out/release-uat/mesa
@@ -1195,7 +1195,7 @@ jobs:
       - name: Fetch native hang capture tool (test channel)
         if: ${{ failure() && inputs.channel == 'test' }}
         run: |
-          curl -fL -o out/procdump.zip https://download.sysinternals.com/files/Procdump.zip
+          curl -fL --retry 5 --retry-delay 5 --retry-all-errors -o out/procdump.zip https://download.sysinternals.com/files/Procdump.zip
           7z x -y -oout/procdump out/procdump.zip
           mkdir -p out/package-dumps/bzip2 out/package-dumps/libcurl
 

@@ -241,7 +241,7 @@ unsafe fn verify_heap(__param_heap: *mut _BinomialHeap) -> Unit {
 
         (__local_val = ((binomial_heap_pop(__param_heap) as *mut c_int)))
 
-        if ((((if not ((if (unsafe *__local_val) == __local_i: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+        if ((((if not ((if (*__local_val) == __local_i: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
             __assert_rtn(c"verify_heap".ptr, c"test-binomial-heap.c".ptr, (168 as c_int), c"*val == i".ptr)
         } else {
             0

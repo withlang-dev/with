@@ -8271,7 +8271,7 @@ impl CCodegen:
         self.fail(f"unsupported terminator kind {tk}")
         "    abort();"
 
-// docs/mut.md Rev 8 §5.1 — accumulator state for struct-type collection.
+// docs/completed/mut.md Rev 8 §5.1 — accumulator state for struct-type collection.
 // Bundling out + seen_names into a single CollectStructTypes value lets the
 // recursive walk be a method with `mut self: Self` instead of taking two
 // separate `&mut` accumulators.

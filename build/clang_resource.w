@@ -220,8 +220,8 @@ fn cr_generate(ctx: &ActionCtx, include_dir: &str, files: &Vec[str], version: &s
         listing = listing ++ rel
     out = out ++ "let CLANG_RES_LIST: str = " ++ cr_raw_string_literal(listing) ++ "\n"
     out = out ++ "let CLANG_RES_VERSION: str = " ++ cr_raw_string_literal(version) ++ "\n\n"
-    out = out ++ "pub fn embedded_clang_resource_list() -> str:\n    return CLANG_RES_LIST\n\n"
-    out = out ++ "pub fn embedded_clang_resource_version() -> str:\n    return CLANG_RES_VERSION\n\n"
+    out = out ++ "pub fn embedded_clang_resource_list() -> str:\n    return CLANG_RES_LIST.clone()\n\n"
+    out = out ++ "pub fn embedded_clang_resource_version() -> str:\n    return CLANG_RES_VERSION.clone()\n\n"
     // Whether this compiler links clang's driver (`with cc`): the SDK has the
     // archive, or it predates it and with_clang_main is aliased to a stand-in
     // (build/compiler.w). An address comparison cannot tell: LLVM folds two
@@ -242,7 +242,7 @@ fn cr_generate(ctx: &ActionCtx, include_dir: &str, files: &Vec[str], version: &s
         let rel = cr_relpath(files[i], include_dir)
         let sym = f"CLANG_RES_{i}"
         out = out ++ "    if name == " ++ cr_raw_string_literal(rel) ++ ":\n"
-        out = out ++ "        return " ++ sym ++ "\n"
+        out = out ++ "        return " ++ sym ++ ".clone()\n"
     out ++ "    return \"\"\n"
 
 pub fn generate_embedded_clang_resource_action(ctx: ActionCtx) -> i32:

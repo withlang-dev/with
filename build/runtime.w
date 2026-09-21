@@ -251,11 +251,11 @@ fn br_generate_embedded_stdlib(ctx: &ActionCtx, files: &Vec[str]) -> str:
         out.push_str(br_raw_string_literal(rel))
         out.push_str(":\n")
         out.push_str("        return ")
-        out.push_str(sym)
+        out.push_str(sym ++ ".clone()")
         out.push_str("\n")
     out.push_str("    return \"\"\n\n")
     out.push_str("pub fn embedded_std_list_modules_data() -> str:\n")
-    out.push_str("    return EMBEDDED_STD_MODULE_LIST\n")
+    out.push_str("    return EMBEDDED_STD_MODULE_LIST.clone()\n")
     out.to_str()
 
 // D38: the embedded .wo bundle index, consumed by src/compiler/EmbeddedBundles.w.
@@ -334,11 +334,11 @@ fn br_generate_embedded_runtime(ctx: &ActionCtx, files: &Vec[str]) -> str:
         out.push_str(br_raw_string_literal(path))
         out.push_str(":\n")
         out.push_str("        return ")
-        out.push_str(sym)
+        out.push_str(sym ++ ".clone()")
         out.push_str("\n")
     out.push_str("    return \"\"\n\n")
     out.push_str("pub fn embedded_rt_list_modules_data() -> str:\n")
-    out.push_str("    return EMBEDDED_RT_MODULE_LIST\n")
+    out.push_str("    return EMBEDDED_RT_MODULE_LIST.clone()\n")
     out.to_str()
 
 pub fn generate_compat_runtime_action(ctx: ActionCtx) -> i32:

@@ -523,6 +523,9 @@ type MirModule {
     // coercion arm exactly instead of approximating it.
     sema_box_sym: i32,
     sema_option_sym: i32,
+    // Result's symbol: the one two-argument enum whose variants carry its
+    // arguments in declaration order (Ok(T), Err(E)).
+    sema_result_sym: i32,
 }
 
 // ── MirModule helpers ────────────────────────────────────────────
@@ -542,6 +545,7 @@ fn MirModule.init -> MirModule:
         sema_distinct_type_names: HashMap.new(),
         sema_box_sym: 0,
         sema_option_sym: 0,
+        sema_result_sym: 0,
     }
 
 impl MirModule:
@@ -2728,8 +2732,11 @@ fn mir_validate_enum_payload_type(mir_mod: &MirModule, enum_tid: i32, variant_id
                 pos = pos + 2 + payload_count
             if payload_variant == variant_idx:
                 return mir_validate_get_generic_inst_arg(mir_mod, resolved, 0)
-        // Result[T, E]: two generic args, both variants carry one payload in declaration order.
-        if arg_count == 2 and variant_count == 2 and field_idx == 0:
+        // Result[T, E]: two generic args, both variants carry one payload in
+        // declaration order. Only Result: ControlFlow[B, C] declares
+        // Continue(C) before Break(B), and the positional guess named the
+        // wrong argument for it.
+        if arg_count == 2 and variant_count == 2 and field_idx == 0 and base_sym == mir_mod.sema_result_sym:
             return mir_validate_get_generic_inst_arg(mir_mod, resolved, variant_idx)
 
         // Fallback to the erased base payload type for non-substituted generic enums.
@@ -2899,6 +2906,32 @@ fn mir_validate_single_field_inner(mir_mod: &MirModule, tid: i32) -> i32:
     let extra_start = mir_mod.mir_get_type_d1(resolved)
     mir_mod.mir_get_type_extra(extra_start + 1)
 
+// The variant payload type when operand `operand_id` reads an enum payload
+// (a field under a downcast) whose declared type disagrees with it; else 0.
+fn mir_validate_payload_read_mismatch(mir_mod: &MirModule, body: &MirBody, operand_id: i32, declared_ty: i32) -> i32:
+    if operand_id < 0 or operand_id >= body.operand_kinds.len(): return 0
+    let op_kind = body.operand_kinds[operand_id]
+    if op_kind != OperandKind.OK_COPY and op_kind != OperandKind.OK_MOVE: return 0
+    let place_id = body.operand_d0[operand_id]
+    if place_id < 0 or place_id >= body.place_locals.len(): return 0
+    let proj_count = body.place_proj_counts[place_id]
+    if proj_count < 2: return 0
+    let last = body.place_proj_starts[place_id] + proj_count - 1
+    if body.proj_kinds[last] != ProjKind.PK_FIELD or body.proj_kinds[last - 1] != ProjKind.PK_DOWNCAST: return 0
+    // Only where the variant's payload type is exact: a plain enum, or an
+    // Option or Result instance. Another generic enum's payload is a type
+    // parameter this module cannot substitute.
+    let enum_ty = mir_mod.mir_resolve_alias(mir_validate_place_prefix_type(mir_mod, body, place_id, 2))
+    let enum_kind = mir_mod.mir_get_type_kind(enum_ty)
+    if enum_kind == TypeKind.TY_GENERIC_INST:
+        let base_sym = mir_mod.mir_get_type_d0(enum_ty)
+        if base_sym == 0 or (base_sym != mir_mod.sema_result_sym and base_sym != mir_mod.sema_option_sym): return 0
+    else if enum_kind != TypeKind.TY_ENUM:
+        return 0
+    let derived = mir_validate_place_derived_type(mir_mod, body, place_id)
+    if derived <= 0 or mir_validate_use_assign_compatible(mir_mod, declared_ty, derived) or mir_validate_use_assign_compatible(mir_mod, derived, declared_ty): return 0
+    derived
+
 pub fn mir_validate_place_type(mir_mod: &MirModule, body: &MirBody, place_id: i32) -> i32:
     if place_id < 0 or place_id >= body.place_locals.len():
         return 0
@@ -2906,12 +2939,23 @@ pub fn mir_validate_place_type(mir_mod: &MirModule, body: &MirBody, place_id: i3
         let stored = body.place_sema_types[place_id]
         if stored > 0:
             return stored
+    mir_validate_place_derived_type(mir_mod, body, place_id)
+
+// The type a place's projections yield from its local's type, ignoring the
+// type the lowering declared for it; 0 when the walk cannot resolve one.
+pub fn mir_validate_place_derived_type(mir_mod: &MirModule, body: &MirBody, place_id: i32) -> i32:
+    mir_validate_place_prefix_type(mir_mod, body, place_id, 0)
+
+// The same walk stopped `trailing` projections short of the place's end.
+fn mir_validate_place_prefix_type(mir_mod: &MirModule, body: &MirBody, place_id: i32, trailing: i32) -> i32:
+    if place_id < 0 or place_id >= body.place_locals.len():
+        return 0
     let local_id = body.place_locals[place_id]
     if local_id < 0 or local_id >= body.local_type_ids.len():
         return 0
     var current_ty: i32 = body.local_type_ids[local_id]
     let proj_start = body.place_proj_starts[place_id]
-    let proj_count = body.place_proj_counts[place_id]
+    let proj_count = body.place_proj_counts[place_id] - trailing
     if proj_count <= 0:
         return current_ty
     var active_variant_idx = -1
@@ -3090,6 +3134,13 @@ fn validate_typed_mir_body(mir_mod: &MirModule, body: &MirBody) -> MirValidation
                         let pk0 = if spc > 0: body.proj_kinds[body.place_proj_starts[sp]] else: -1
                         src_detail = f"place local={sl} local_ty={slt} projs={spc} proj0_kind={pk0}"
                     return mir_validation_fail(body.fn_sym, span, f"use rvalue does not resolve to a concrete MIR type ({src_detail})")
+                // A declared place type is a claim, not a proof: an enum payload
+                // read must agree with the variant's payload type. `?` over
+                // `Result[Unit, E]` declared the Unit payload as the whole Result
+                // and this verifier passed it to codegen, which trapped in LLVM.
+                let payload_mismatch = mir_validate_payload_read_mismatch(mir_mod, body, rv_d0, src_ty)
+                if payload_mismatch != 0:
+                    return mir_validation_fail(body.fn_sym, span, f"enum payload read declares ty={src_ty} but the variant's payload is ty={payload_mismatch}")
                 if not mir_validate_use_assign_compatible(mir_mod, dest_ty, src_ty):
                     let dk = mir_mod.mir_get_type_kind(mir_mod.mir_resolve_alias(dest_ty)) as i32
                     let sk = mir_mod.mir_get_type_kind(mir_mod.mir_resolve_alias(src_ty)) as i32

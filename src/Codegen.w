@@ -499,6 +499,12 @@ type CallArgValue {
     cleanup_ptr: i64,
 }
 
+// A call operand that is a string literal, with its decoded text.
+type StrLiteralOperand {
+    found: bool,
+    text: str,
+}
+
 type LoopState {
     break_bbs: Vec[i64],
     continue_bbs: Vec[i64],
@@ -1152,7 +1158,8 @@ impl Codegen:
         let canonical = codegen_canonical_module_path(self.source_file)
         // #747: an owned copy — plain field assignment would move source_file
         // out of self and poison the slice reads below.
-        let di_path = if canonical.starts_with("<embedded-std>/"): canonical else: with_str_clone_ref(self.source_file)
+        // Any other root is named through WITH_FILE_PREFIX_MAP (FnAbi.w).
+        let di_path = if canonical.starts_with("<embedded-std>/"): canonical else: fn_abi_file_prefix_mapped(self.source_file)
 
         // Split the path into directory and filename
         var last_slash = -1
@@ -2439,7 +2446,7 @@ impl Codegen:
         if kind == wl_float_type_kind() or kind == wl_double_type_kind():
             if op == BinaryOp.OP_EQ:
                 return wl_build_fcmp(self.builder, wl_real_oeq(), lhs, rhs)
-            return wl_build_fcmp(self.builder, wl_real_one(), lhs, rhs)
+            return wl_build_fcmp(self.builder, wl_real_une(), lhs, rhs)
         if op == BinaryOp.OP_EQ:
             return wl_build_icmp(self.builder, wl_int_eq(), lhs, rhs)
         wl_build_icmp(self.builder, wl_int_ne(), lhs, rhs)
@@ -4440,8 +4447,15 @@ impl Codegen:
         // C symbol — stealing it re-pointed rt-internal libc calls at a
         // renamed undefined decl; the With fn takes the auto-uniquified
         // name instead (whole-program resolution is value-keyed).
-        var ast_existing = wl_get_named_function(self.llmod, effective_name)
-        if ast_existing != 0 and not codegen_is_runtime_abi_symbol(effective_name):
+        // `@[c_export("name")]` defines the C symbol `name`. A c_imported header
+        // may already declare it (the library calls back into With), and call
+        // sites hold that declaration: the body goes into it. Adding a second
+        // `name` let LLVM rename the body `name.1` and left the prototype the
+        // C code calls undefined at link.
+        let c_export_symbol = if cc_name.len() > 9 and cc_name.slice(0, 9) == "c_export:": cc_name.slice(9, cc_name.len()) else: ""
+        let defined_symbol = if c_export_symbol.len() > 0: c_export_symbol.clone() else: effective_name.clone()
+        var ast_existing = wl_get_named_function(self.llmod, defined_symbol)
+        if ast_existing != 0 and c_export_symbol.len() == 0 and not codegen_is_runtime_abi_symbol(effective_name):
             ast_existing = 0
         if ast_existing != 0 and wl_fn_is_declaration(ast_existing) != 0 and wl_global_get_value_type(ast_existing) != fn_type:
             wl_set_value_name(ast_existing, effective_name ++ "__stale_decl")

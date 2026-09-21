@@ -124,6 +124,24 @@ fn fn_abi_std_tree_relative(path: &str) -> str:
         i = i + 1
     ""
 
+// WITH_FILE_PREFIX_MAP=<from>=<to> (clang's -ffile-prefix-map, Rust's
+// remap-debuginfo): a source under <from> is named under <to> wherever its
+// path enters an artifact — the DWARF compile unit and the module link-name
+// hash — so one tree compiles to the same bytes from every checkout. The
+// compiler's own build maps its project root to /with-src; a debugger maps it
+// back (`settings set target.source-map /with-src <checkout>`). The mapping
+// applies at a path boundary only: /a/with never rewrites /a/with-staging.
+pub fn fn_abi_file_prefix_mapped(path: &str) -> str:
+    let mapping = with_getenv_str("WITH_FILE_PREFIX_MAP")
+    let eq = mapping.find("=")
+    if eq <= 0: return with_str_clone_ref(path)
+    let from = mapping.slice(0, eq)
+    let to = mapping.slice(eq + 1, mapping.len())
+    if path == from: return to.clone()
+    if path.starts_with(from) and path.len() > from.len() and path[from.len()] == '/':
+        return to ++ path.slice(from.len(), path.len())
+    with_str_clone_ref(path)
+
 pub fn codegen_canonical_module_path(path: &str) -> str:
     if path.len() == 0 or path == "<unknown>":
         return with_str_clone_ref(path)
@@ -137,11 +155,11 @@ pub fn codegen_canonical_module_path(path: &str) -> str:
     if std_rel.len() > 0:
         return "<embedded-std>/" ++ std_rel
     if path[0] == '/':
-        return resolve_normalize_path(path)
+        return fn_abi_file_prefix_mapped(resolve_normalize_path(path))
     let cwd = with_getenv_str("PWD")
     if cwd.len() == 0:
         return resolve_normalize_path(path)
-    resolve_join(cwd, path)
+    fn_abi_file_prefix_mapped(resolve_join(cwd, path))
 
 pub fn codegen_is_runtime_source_file(source_path: &str) -> bool:
     source_path.starts_with("rt/") or source_path.contains("/rt/") or

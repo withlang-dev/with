@@ -1054,7 +1054,7 @@ pub fn conan_set_from_source(enabled: bool) -> Unit:
 // data (src/compiler/ConanRecipe.w): conandata.yml gives the tarball, its
 // digest and the patches; conanfile.py gives the requirements and the CMake
 // variables. The package's own CMake build does the rest, driven by `cmake`
-// and `ninja` with `with cc` as the C compiler and `with ar` as the archiver.
+// and `ninja` with `with cc` as the C compiler and `with __ar` as the archiver.
 // It installs into the dependency directory, which is then scanned exactly as
 // an extracted Conan binary is. What the machine lacks is named, not guessed
 // around: the user installs it.
@@ -1138,6 +1138,10 @@ fn conan_source_root(raw_dir: &str) -> str:
         else if top != first: return raw_dir.to_owned()
     if top.len() == 0: raw_dir.to_owned() else: raw_dir ++ "/" ++ top
 
+fn conan_archive_download(url: &str, path: &str) -> i32: conan_http_download(url, path)
+
+fn conan_archive_digest(path: &str) -> str: conan_sha256_file(path)
+
 fn conan_patch_read(path: &str) -> str: runtime_read_file(path)
 
 fn conan_patch_write(path: &str, text: &str) -> i32: runtime_write_file(path, text)
@@ -1160,11 +1164,13 @@ fn conan_install_from_source(name: &str, version: &str, project_root: &str, dept
     if data.len() == 0 or recipe.len() == 0:
         return conan_source_fail("", "could not read the Conan Center recipe of " ++ name ++ "/" ++ version)
     let source = conan_data_source(data, version)
-    if source.url.len() == 0 or source.sha256.len() == 0:
+    if source.urls.len() == 0 or source.sha256.len() == 0:
         return conan_source_fail("", "the recipe of " ++ name ++ " lists no source archive for " ++ version)
     // A recipe that ships its own CMakeLists.txt exports it; asking for one
     // that is not there is a 404 printed at the user.
     let exports_cmake = recipe.contains("\"CMakeLists.txt\", self.recipe_folder") or recipe.contains("\"CMakeLists.txt\", src=self.recipe_folder") or recipe.contains("exports_sources = \"CMakeLists.txt\"") or recipe.contains("exports_sources = [\"CMakeLists.txt\"")
+    let patch_problem = conan_data_patch_problem(data, version)
+    if patch_problem.len() > 0: return conan_source_fail("", name ++ "/" ++ version ++ " cannot be built from source: " ++ patch_problem)
     let recipe_cmake = if exports_cmake: conan_http_get(conan_recipe_file_url(name, folder, "CMakeLists.txt")) else: ""
 
     // Prerequisites first: say what is missing before downloading anything.
@@ -1200,14 +1206,13 @@ fn conan_install_from_source(name: &str, version: &str, project_root: &str, dept
     let tools_dir = work ++ "/tools"
     if runtime_mkdir_p(raw_dir) != 0 or runtime_mkdir_p(tools_dir) != 0 or runtime_mkdir_p(work ++ "/recipe") != 0:
         return conan_source_fail(dep_dir, "could not create " ++ work)
-    let archive = work ++ "/" ++ conan_path_basename(source.url)
-    runtime_eprint("  downloading " ++ source.url)
-    if conan_http_download(source.url, archive) != 0: return conan_source_fail(dep_dir, "could not download " ++ source.url)
-    let digest = conan_sha256_file(archive)
-    if digest != source.sha256:
-        return conan_source_fail(dep_dir, source.url ++ " has sha256 " ++ digest ++ "; the recipe expects " ++ source.sha256)
+    runtime_eprint("  downloading " ++ source.urls[0])
+    let picked = conan_pick_archive(&source, work, conan_archive_download, conan_archive_digest)
+    let archive = picked.path.clone()
+    let tried = picked.tried.clone()
+    if archive.len() == 0: return conan_source_fail(dep_dir, "no source archive of " ++ name ++ "/" ++ version ++ " could be used:" ++ tried)
     if conan_extract_any(archive, raw_dir) != 0:
-        return conan_source_fail(dep_dir, "could not extract " ++ conan_path_basename(source.url) ++ " (it needs `tar`" ++ (if archive.ends_with(".zip"): " with zip support, or `unzip`" else: if archive.ends_with(".xz"): " and `xz`" else: "") ++ ")")
+        return conan_source_fail(dep_dir, "could not extract " ++ conan_path_basename(archive) ++ " (it needs `tar`" ++ (if archive.ends_with(".zip"): " with zip support, or `unzip`" else: if archive.ends_with(".xz"): " and `xz`" else: "") ++ ")")
     let source_dir = conan_source_root(raw_dir)
     for patch_file in conan_data_patches(data, version):
         let patch = conan_http_get(conan_recipe_file_url(name, folder, patch_file))
@@ -1239,8 +1244,8 @@ fn conan_install_from_source(name: &str, version: &str, project_root: &str, dept
     configure = conan_argv_append(configure, "Ninja")
     configure = conan_argv_append(configure, "-DCMAKE_MAKE_PROGRAM=" ++ ninja)
     configure = conan_argv_append(configure, "-DCMAKE_C_COMPILER=" ++ conan_write_launcher(tools_dir, "cc", self_exe))
-    configure = conan_argv_append(configure, "-DCMAKE_AR=" ++ conan_write_launcher(tools_dir, "ar", self_exe))
-    configure = conan_argv_append(configure, "-DCMAKE_RANLIB=" ++ conan_write_launcher(tools_dir, "ranlib", self_exe))
+    configure = conan_argv_append(configure, "-DCMAKE_AR=" ++ conan_write_launcher(tools_dir, "__ar", self_exe))
+    configure = conan_argv_append(configure, "-DCMAKE_RANLIB=" ++ conan_write_launcher(tools_dir, "__ranlib", self_exe))
     configure = conan_argv_append(configure, "-DCMAKE_BUILD_TYPE=Release")
     configure = conan_argv_append(configure, "-DBUILD_SHARED_LIBS=OFF")
     configure = conan_argv_append(configure, "-DCMAKE_POSITION_INDEPENDENT_CODE=ON")

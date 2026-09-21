@@ -3590,6 +3590,10 @@ value may still mutate through `mut self` methods, field assignment,
 or `IndexPlace` writes if the type supports them. A `global var` may
 additionally be reassigned to a new value of the same type.
 
+A global always holds a value: it is observed, mutated in place, or
+reassigned, never moved out of; an owned copy is spelled `.clone()`. A
+`const` is a value, not a place — each use materializes it.
+
 **Initialization.** Global initializers are ordinary expressions.
 They run before `main`, on the initial thread, in declaration order
 within a module. Because concurrency in With can only be created by
@@ -6761,13 +6765,17 @@ let coords = [(x, y) for x in 0..3 for y in 0..3 if x != y]
 // Vec[(i32, i32)]: [(0,1), (0,2), (1,0), (1,2), (2,0), (2,1)]
 
 // Expected type selects the target collection:
-let words: HashSet[str] = [w for w in tokens]
+let words: HashSet[str] = [w.clone() for w in tokens]
 let ordered: BTreeSet[i32] = [x for x in xs if x > 0]
 
 // Map form: key-colon-value builds a map (HashMap by default)
-let index = [w: i for (i, w) in vocab.enumerate()]
-let sorted_index: BTreeMap[str, i32] = [w: i for (i, w) in vocab.enumerate()]
+let index = [w.clone(): i for (i, w) in vocab.enumerate()]
+let sorted_index: BTreeMap[str, i32] = [w.clone(): i for (i, w) in vocab.enumerate()]
 ```
+
+An element, key or value expression is an owned-value demand (§3.8,
+D22): a view of a Copy type materializes; a view of any other type is
+cloned explicitly (D45).
 
 **Desugaring:**
 
@@ -8415,6 +8423,11 @@ puts(name.as_cstr().ptr)
 `c"..."` does not support string interpolation. For dynamic C
 strings, construct a `CString` from an owned `str`.
 
+`CStr` makes no UTF-8 claim. Its conversions to With text are explicit:
+`to_str()` validates and returns an error on invalid UTF-8, `to_str_lossy()`
+repairs, and `to_owned()` allocates an owned copy. No `CStr` becomes a `str`
+silently.
+
 ### 15.4 Formatted String Interpolation (F-Strings)
 
 F-strings are the sole formatting mechanism in With. There is no
@@ -9024,11 +9037,6 @@ method syntax so C APIs feel like native With APIs. This is sugar —
 let table = g_hash_table_new(g_str_hash, g_str_equal)
 g_hash_table_insert(table, "name", "Eric")
 g_hash_table_destroy(table)
-
-// With modeled owning wrapper, when ownership evidence exists:
-let table = GHashTable()
-table.insert("name", "Eric")
-// Drop calls g_hash_table_destroy when table's value lifetime ends.
 ```
 
 **Detection rules.** For each struct `S` from `c_import`, the
@@ -9051,41 +9059,13 @@ g_hash_table_destroy   → .destroy()                // method candidate
 name itself becomes callable: `GHashTable(args)` is sugar for
 `GHashTable.new(args)`.
 
-**Proven ownership cleanup.** Method-name detection and ownership are
-separate facts. Name heuristics such as `prefix_destroy`,
-`prefix_free`, `prefix_close`, `prefix_unref`, and `prefix_release`
-may produce candidates, import-manifest notes, or diagnostics
-suggesting a likely constructor/destructor pairing. They may not, by
-themselves, insert cleanup, call a destructor, generate an owning
-wrapper, or mark a raw C value as owned.
-
-`c_import` may treat a C resource as owned only when ownership is known
-from evidence that proves or asserts the contract:
-
-- an explicit annotation;
-- author-supplied or imported metadata;
-- conservative source/header analysis strong enough to prove the
-  ownership contract;
-- a curated, library-specific convention that asserts facts about a
-  known library; or
-- a hand-written owning wrapper.
-
-Generic naming conventions and speculative source analysis are not
-ownership evidence.
-
-When ownership is established, cleanup is expressed only as a generated
-owning wrapper type whose `Drop` calls the correct C destructor. The
-compiler does not insert scope-local `defer` for C resources. A
-`Drop`-owning wrapper handles locals, returned values, and values
-stored inside other owning structures because cleanup follows the
-value's lifetime rather than a lexical scope.
-
-Raw pointers and raw handles stay raw unless wrapped by a proven
-ownership model. Reference-counted resources are modeled according to
-their actual contract: a `Drop` wrapper that calls `unref` is generated
-only for values built from an owning constructor or retain/copy/create
-operation that returns a +1 reference. Borrowing accessors produce
-non-owning handles with no `Drop`.
+Auto-method generation is presentation (§16.2b.11). It groups imported
+functions as methods and shortens prefixes; it establishes no ownership,
+lending, destruction, dependency or lifetime fact, and it never inserts
+cleanup or generates an owning wrapper. Owned C resources are modeled by a
+facade (§16.2b). Name heuristics such as `prefix_free` or `prefix_unref` may
+drive tooling suggestions and advisory diagnostics; they may not, by
+themselves, mark a raw C value as owned.
 
 **Opt-out.** Per-type: `use c_import("lib.h", no_methods: "Type")`.
 Global: `use c_import("lib.h", no_methods: true)`. Flat C functions
@@ -9095,6 +9075,427 @@ are always available regardless.
 the longest prefix wins. If equal length, neither claims it.
 User-written `impl` methods always take priority over auto-generated
 ones.
+
+### 16.2b Facades: Modeled C Ownership, Effects and Lifetimes
+
+#### 16.2b.1 What a facade is
+
+The raw C surface supplies ABI truth; a **facade** supplies semantic meaning.
+Ownership, lifetime, mutation, retention, destruction, status, callback,
+concurrency, presentation and foreign-state facts about imported C
+declarations live in a facade: ordinary checked With source, scoped to the
+declarations it describes.
+
+```
+use c_import("sqlite3.h", link: "sqlite3")
+
+c facade sqlite:
+    resource Database wraps *mut sqlite3
+        from sqlite3_open(out param 1)
+        drop sqlite3_close
+        destroys sqlite3_close_v2
+        ok SQLITE_OK
+```
+
+Everything after `c_import` is With syntax. Imported types are named by the
+exact With spelling `c_import` gives them (`*mut sqlite3`, never `sqlite3*`),
+and imported constants resolve through the ordinary imported namespace.
+
+The `c facade` block is the scope in which imported identifiers resolve, the
+provenance identity of every fact it states, the scope of convention-profile
+adoption and of overrides, and the namespace of the resources and domains it
+declares. Facade clauses do not occur outside a facade block.
+
+A facade may be written in the importing project, shipped by a package,
+fetched through `with get`, generated by tooling and then reviewed, and
+supplemented by machine-readable header annotations and by convention
+profiles. The toolchain does not accumulate knowledge of third-party
+libraries; bounded knowledge of universal runtime facilities (the C standard
+library) may be toolchain-owned where separately justified.
+
+#### 16.2b.2 Evidence, precedence and provenance
+
+Every modeled-C fact has a value and a provenance. ABI/header impossibilities
+and compiler-proven contradictions constrain all modeling. Subject to those
+constraints, explicit facade clauses override profile facts, which override
+conservative defaults:
+
+```
+ABI/header facts and proven contradictions   (constrain everything)
+explicit facade clause
+        ↓
+adopted convention profile
+        ↓
+conservative default
+```
+
+ABI and header facts are types, pointer structure, layout, calling
+convention, imported constants, link identity, and machine-readable
+nullability, ownership or lifetime annotations. An explicit facade clause
+refines, overrides or suppresses a profile-derived fact. A facade cannot
+override an ABI impossibility. A compiler analysis overrides a facade only
+when it genuinely proves the asserted contract impossible, never merely
+because it reached a conclusion of its own; where the compiler genuinely
+proves a contract, the proof may grant capability.
+
+**The asymmetry rule.** Without a facade clause or an adopted profile, the
+compiler may infer only conclusions whose failure removes capability or
+rejects a valid program:
+
+```
+unknown independence   -> dependent
+unknown preservation   -> invalidating
+unknown nullability    -> nullable
+unknown encoding       -> bytes, not str
+unknown thread ability -> creator-thread-bound
+unknown domain detail  -> coarse library domain
+recognizable naming    -> presentation sugar only
+```
+
+It never infers, from a name or a shape, a fact whose failure can make safe
+code unsafe: construction, destruction, consumption, ownership, retention,
+independence, static lifetime, a status convention, or send/share
+capability. Heuristics may suggest such facts (§18.5, tooling); they do not
+decide them.
+
+**Provenance is mandatory.** Every effective fact records its source (ABI,
+proof, facade clause, named profile rule, or conservative default) and its
+facade identity. Diagnostics and `with analyze` report it:
+
+```
+error: Statement may outlive Database
+  = dependency: conservative default from resource parameter 0
+  = help: declare this producer `independent` if the C API guarantees independence
+```
+
+#### 16.2b.3 Resources
+
+The fundamental ownership abstraction is the **resource**: a With ownership
+type whose physical representation is foreign. Its ownership semantics are
+distinct from the representation's C copying and layout semantics. A resource
+is non-Copy unless the facade states semantic duplication separately.
+
+A resource wraps one of three physical forms:
+
+```
+resource Database wraps *mut sqlite3          // opaque pointer
+resource Texture  wraps Texture2D             // by-value token
+resource InflateStream wraps z_stream         // in-place struct
+```
+
+A by-value C struct that is trivially copyable in C does not make the
+resource Copy: moving `Texture` moves ownership of one GPU object.
+
+An in-place resource has explicit states — storage allocated but not live,
+live after a successful `init`, dead after destruction. Its storage begins as
+`Representation.zeroed()` unless the facade names a `preinit` operation.
+`Drop` is armed only when initialization establishes production; storage
+existence alone never arms foreign destruction.
+
+**Never half-model unsafely.** A partial model is acceptable when the missing
+fact only removes capability: ownership known but status uninterpreted, a
+child dependent until independence is known, a C string left as a borrowed
+byte view. A partial model that could create unsafety is a compile error: a
+resource with a producer and no valid destruction path; a destroying
+operation callable as a borrow; a safe constructor with no destruction
+contract; a returned pointer guessed to be owned.
+
+More than one resource may wrap the same representation (`InflateStream` and
+`DeflateStream` over `z_stream`). When exactly one resource wraps a
+representation, operations taking that representation may be associated with
+it. When several do, an operation is callable through a resource only after
+the facade assigns it (`of InflateStream`); an unassigned operation is
+rejected on every candidate, naming them. Raw access remains available.
+
+#### 16.2b.4 Production and status
+
+A resource is produced by direct return, by pointer out-parameter, or by
+in-place initialization. The facade states the shape:
+
+```
+from curl_easy_init                  // direct return
+from sqlite3_open(out param 1)       // out-parameter
+init inflateInit(self)               // in-place
+```
+
+**Production is not success.** For an out-parameter producer the compiler
+initializes the slot to `NULL`, calls the function, and inspects the slot:
+non-null means a resource was produced and ownership begins at once; null
+means none was. This holds whether or not the status convention is known: for
+a status-returning out-parameter producer, the low-level modeled result
+remains `(status, Option[Resource])` when the status convention is unknown.
+
+A producer may state its success condition with an imported compile-time
+constant:
+
+```
+ok SQLITE_OK
+```
+
+There is no rule that `0` means success, for C in general or for any library.
+Without `ok`, the status is uninterpreted. A failed status does not imply that
+nothing was produced: the compiler keeps the status, whether a resource was
+produced, and ownership of any produced resource. A `Result`-shaped API is a
+projection over this model, and a facade-specific error type may own the
+failure-state resource where the C contract requires it.
+
+When trusted evidence establishes that a pointer-returning producer signals
+failure with `NULL`, its modeled result is `Option[Resource]` and no `ok`
+clause is needed. This is not inferred from the return type alone.
+
+#### 16.2b.5 Parameter effects
+
+Foreign resource parameters use one ownership vocabulary:
+
+```
+lend                                  // the default; may be stated to record review
+consumes param 0
+destroys                              // an operation that consumes and terminates
+consumes param 4 destroyed_by param 8
+retains param 1 by param 0
+```
+
+**Lend.** Once a resource is modeled, its facade-exposed operations borrow it
+unless stronger evidence says otherwise. This default is not a compiler proof
+or a conservative safety inference; it is the facade's assertion that the
+foreign operation does not retain, consume, or destroy the argument. With
+proves the resource is live,
+unmoved and undestroyed, and that With discharges ownership per the contract;
+it does not prove that foreign code honors borrowing. Lending is trusted
+facade semantics. A facade that exposes a consuming or destroying operation as
+a lend is unsound.
+
+**Consume.** The argument moves into C; it cannot be used afterward and With
+does not destroy it. Consumption is never inferred from a name.
+
+**Destroy.** A destroying operation consumes and terminates ownership. A
+resource names one destroyer as its automatic `drop`; other destroyers are
+exposed as consuming methods. Every destroyer is consuming; none may be
+callable as a lend, so "destroy through C, then `Drop` destroys again" is not
+expressible in safe code.
+
+**Consume with destroy callback.** Some APIs take caller-owned data and a
+callback C later invokes to destroy it. `consumes param 4 destroyed_by
+param 8` moves ownership into C, names the callback as its destruction path,
+and requires the callback to be compatible with destroying that value. If
+registration can fail without taking ownership, the contract must say when
+transfer occurs; absent that, the caller keeps ownership.
+
+**Retain.** Retention extends a borrow past the call while ownership stays
+outside C: `retains param 1 by param 0` means the value in parameter 1 must
+outlive the resource in parameter 0. A modeled unregister operation may
+release the retention; otherwise it lasts until the retaining resource is
+destroyed. This is the one retention system; §16.3c's `retains:` is a
+projection of it.
+
+**Parameter references.** A clause names a parameter by `param name`,
+`param N` (zero-based), or `param type T`; a name must be unambiguous and a
+type reference legal only when exactly one parameter matches. Because C
+documentation numbers from one, every positional diagnostic prints the
+resolved C parameter (`consumes param 4: void *pApp`).
+
+#### 16.2b.6 Borrowed returns, dependency and independence
+
+An operation may return a borrowed resource:
+
+```
+fn sqlite3_db_handle
+    returns borrow Database from param 0
+```
+
+The result has no `Drop`, cannot outlive the named origin, and cannot be
+consumed or destroyed. A nullable borrowed return is `Option` of the borrowed
+value.
+
+**Unknown independence means dependency.** When a producer receives modeled
+resources and produces another, the result is dependent on each candidate
+parent unless the facade states `independent`. A facade may make the
+relationship precise:
+
+```
+resource Statement wraps *mut sqlite3_stmt
+    from sqlite3_prepare_v2(out param 3)
+    drop sqlite3_finalize
+    borrows param 0
+```
+
+A resource may depend on several parents and is valid only while all remain
+valid. Dependencies use With's ordinary origin and ephemeral-value analysis:
+a dependent resource cannot outlive a required parent, prevents the parent's
+invalid move or destruction, is destroyed before it, cannot be stored where
+the relationship cannot be preserved, and cannot escape through a return. No
+reference counting or generation check is introduced for C interop.
+
+A layout such as `type App { db: Database, stmt: Statement }` is invalid when
+`stmt` borrows from `db`; the compatible patterns are a statement cache owned
+by the connection, or stable handles into owner-managed storage.
+
+#### 16.2b.7 Origins, foreign-state domains and preservation
+
+Borrowed foreign memory always has a real origin: a modeled resource, a
+foreign-state domain, static lifetime, or the callback scope. With does not
+invent a lifetime, and does not allocate a copy to hide an unknown one.
+
+**Resource-backed memory** borrows from the resource, and later operations
+that invalidate the resource invalidate the view through ordinary
+view-liveness rules.
+
+**Foreign-state domains** give ownerless C storage an origin: the process
+environment, locale, `errno`, diagnostic buffers, library caches.
+
+```
+c facade libc:
+    domain errno thread
+    domain environ process
+```
+
+A domain is `process`, `thread`, `resource` or `static`. The default coarse
+domain of a library is its link identity; a facade may split it or merge
+domains from separate imports that name the same state. A view borrowed from
+a thread domain inherits the thread restriction. Static data does not
+participate in invalidation.
+
+**Preservation.** For every origin an operation touches, its view effect is
+`invalidate` or `preserve`; **unknown effect means invalidate**. A facade may
+state `preserves param 0` or `preserves domain environ`. C `const` is
+evidence for diagnostics, profile rules and suggestions; it does not by itself
+establish preservation, and non-const does not establish invalidation.
+
+**Static lifetime** grants capability and is never inferred from the absence
+of a visible owner. `returns static CStr` states it.
+
+#### 16.2b.8 Foreign strings, buffers and nullability
+
+The modeled NUL-terminated foreign string type is `CStr`; it makes no UTF-8
+claim. A nullable borrowed foreign string is `Option[&CStr]`, borrowing from
+the resource, domain or static origin the facade establishes. Conversion to
+With text is explicit:
+
+```
+cstr.to_str()          // validates UTF-8; does not repair
+cstr.to_str_lossy()    // repairs, explicitly
+cstr.to_owned()        // allocates an owned copy, explicitly
+```
+
+No `char *` becomes `str` silently.
+
+Caller-owned returned memory is a resource:
+
+```
+resource SqliteString wraps *mut c_char
+    from sqlite3_mprintf
+    drop sqlite3_free
+```
+
+It exposes a borrowed `CStr` view; the foreign allocator/deallocator pairing
+stays intact, and With never substitutes its allocator except through an
+explicit copying conversion. The same applies to any foreign-owned buffer.
+
+**Nullability.** `NULL` is information. Machine-readable nullability is used
+directly. Otherwise `nullable -> Option`, `nonnull -> direct value`, and
+unknown nullability is represented as nullable or otherwise restricted; it
+never silently becomes non-null. Out-resource production keeps its own
+NULL-inspect rule.
+
+#### 16.2b.9 Callbacks
+
+A value C passes into a With callback is borrowed for the callback's scope;
+it does not become owned because C passed a pointer, and it cannot escape the
+callback without stronger evidence (transfer, a longer-lived origin, or
+static lifetime).
+
+A callback used only during one foreign call needs no retained lifetime. A
+callback C keeps is modeled with `retains`, and its userdata likewise. A
+callback receives ownership only through explicit evidence (`callback
+consumes param N`); this is never inferred. A callback named by
+`destroyed_by` (§16.2b.5) is the modeled eventual destruction path of
+ownership already transferred into C: the value is live in C until that
+callback runs, and With destroys it through no other path.
+
+**Reentrancy.** A foreign operation that may invoke a callback is treated as
+affecting the origins the callback captures, according to the captures'
+allowed operations: immutable captures contribute reads, mutable captures
+contribute invalidation, owned captures follow ownership and retention. A
+facade may assert that an operation cannot invoke applicable callbacks; that
+is capability-granting evidence, and absent it the call is reentrant.
+
+#### 16.2b.10 Thread capabilities
+
+A modeled resource is `thread creator` by default: operations and destruction
+occur on the creating thread and ownership does not cross threads. The
+capabilities are `send`, `share` and `drop_any_thread`; none is inferred from
+representation. With v1 does not marshal destruction back to the creator
+thread; therefore `send` requires `drop_any_thread`, a creator-thread-bound
+resource is not sendable, and a facade granting `send` without
+`drop_any_thread` is a compile error. `share` is independent of `send`.
+
+A retained callback executes on the registering thread unless the facade
+states `callback_thread any`, in which case captured With state must satisfy
+the corresponding send/share constraints.
+
+#### 16.2b.11 Presentation
+
+Method grouping, prefix shortening and namespace presentation are not safety
+semantics, and With may apply recognizable naming conventions to them
+silently: `sqlite3_prepare_v2(db, …)` may be presented as `db.prepare(…)`.
+Presentation never establishes ownership, lending, consumption, destruction,
+dependency, independence, retention, preservation, thread safety or static
+lifetime; the underlying semantics must already be valid.
+
+A facade may rename, regroup or suppress presented methods:
+
+```
+fn sqlite3_prepare_v2
+    of Database
+    rename prepare
+```
+
+Explicit presentation overrides the automatic convention. Where automatic
+grouping is ambiguous the sugar is omitted and the operation remains
+available under its imported name.
+
+#### 16.2b.12 Convention profiles
+
+A convention profile is a versioned package of facade rules that another
+facade adopts explicitly:
+
+```
+c facade gtk:
+    use convention gobject.v1
+```
+
+Adopting a profile makes it trusted foreign-contract evidence for the API it
+applies to; a profile may therefore infer from names (`*_unref -> destroying`)
+what core With never does. Every capability-granting profile match is
+**unique-or-nothing**: zero candidates contribute nothing, exactly one
+contributes evidence, several contribute nothing, and the compiler never
+chooses among matches. Explicit facade clauses override profile facts.
+Profiles are packages, never compiler knowledge, and are versioned.
+
+#### 16.2b.13 Verification and versioning
+
+The compiler verifies every mechanically checkable facade statement: the
+referenced declaration exists; the representation resolves; parameter
+references resolve uniquely; a destroyer accepts the representation; a
+producer's return or out-parameter matches; a status constant is a
+materialized compile-time value; a callback parameter is callable;
+`consumes` refers to a compatible value; a domain exists; a profile rule
+resolves uniquely; the thread-capability combination is legal. A referenced
+constant that is missing, ambiguous or not compile-time is a compile error.
+Verification does not prove semantic facts that require trusting the foreign
+API; a structurally valid but false facade is a trusted-boundary bug.
+
+A facade describes an API version or compatible range and is validated
+against the imported declarations on every build. ABI compatibility does not
+imply semantic compatibility.
+
+#### 16.2b.14 The runtime is not exempt
+
+Runtime foreign calls are described by an internal facade or equivalent
+audited contract data. Hidden runtime behavior must not invalidate a foreign
+view that safe user code is permitted to hold; a runtime change that begins
+mutating a domain supporting live safe views is caught by audit.
+
 
 ### 16.3 Manual Declarations
 
@@ -9164,15 +9565,18 @@ conversion: sentinel, length or capacity, lifetime and retention,
 nullability, mutability, ownership, allocation, cleanup, and copy-back.
 If those facts are missing, the operation stays on the raw surface.
 
-**Contract metadata sources.** The facts that make a binding modeled
-come from, in priority order: explicit annotations in the importing
-project, curated contract overlays shipped with the toolchain, and
-package-supplied binding metadata (`with get c.*`). The toolchain
-maintains a **curated libc overlay** as a standard deliverable, so
-common calls such as `fopen`, `strlen`, and `write` present modeled
-surfaces out of the box; libraries without overlays import with raw
-surfaces until contracts are supplied. An overlay supplies evidence,
-never exemptions — it cannot weaken the rules below.
+**Contract metadata sources.** The facts that make a binding modeled are
+facade evidence (§16.2b): an explicit clause in a `c facade`, a fact from a
+convention profile the facade adopts, machine-readable header annotations, or
+a compiler proof, in the precedence §16.2b.2 gives; anything else is a
+conservative default. A facade may be written locally or come as a package.
+The toolchain's own knowledge is bounded to the C standard library (the
+curated libc facade), which is a standard deliverable. A library without a
+facade still receives whatever modeling ABI and header facts alone establish
+(machine-readable nullability, header ownership or lifetime annotations,
+conservative defaults); everything beyond that imports as the raw surface
+until a facade is supplied. An overlay supplies evidence, never exemptions —
+it cannot weaken the rules below.
 
 ```
 // Modeled input C string contract:
@@ -9184,6 +9588,12 @@ write(fd, data)          // compiler supplies data.ptr and data.len together
 // Raw surface when the contract is unknown:
 raw_register_callback(name_ptr as *const c_char)
 ```
+
+Binding evidence governs what With receives from C. An argument With lends
+to C for the duration of a call needs none: a `c_import`ed `const char *`
+parameter accepts a `str`, passed as NUL-terminated input text. A string
+literal is passed directly; any other `str` is passed through call-scoped
+storage that stays readable if the callee retains it.
 
 **`str` → input C string (`*const c_char`).** A `str` may be passed
 automatically to a `*const c_char` parameter only when the binding
@@ -9198,7 +9608,12 @@ prove already lives in valid NUL-terminated storage, the compiler may
 pass it directly. Otherwise it generates a call-scoped
 NUL-terminated temporary and frees it when the call returns.
 
-**Retention (`retains:`).** Parameters are borrowed by default. A
+**Retention (`retains:`).** Retention is stated in the facade with
+`retains param … by param …` (§16.2b.5), which is the canonical form:
+retention participates in callbacks, ownership and origins, not only in
+C-string inputs. The `retains:` import attribute is a compatibility spelling
+of the C-string case, accepted during migration and deprecated in favour of
+the facade vocabulary. Parameters are borrowed by default. A
 `c_import` contract may annotate a parameter as retaining the pointer:
 `use c_import("…", retains: ["fn(idx)"])` declares that `fn`'s parameter
 `idx` keeps the C-string pointer past the call (violating condition 3
@@ -9247,10 +9662,10 @@ is an unsafe memory read based on a guess. It is allowed only when the
 binding proves the pointer is a valid NUL-terminated string with known
 lifetime and nullability.
 
-**Nullability.** Null is information. A nullable C string or pointer
-return is modeled as `Option[str]`, `Option[*T]`, or an equivalent
-generated wrapper. `None` and `Some("")` are distinct unless the C
-contract explicitly states that null means empty.
+**Nullability.** Null is information. A nullable C string return is modeled
+as `Option[&CStr]` borrowing from its origin (§16.2b.8); a nullable pointer
+return as `Option` of the borrowed or owned modeled value. `None` and
+`Some("")` are distinct unless the C contract states that null means empty.
 
 **Always raw unless modeled:** arbitrary `void*`, retained or
 unknown-lifetime string pointers, mutable C buffers without a modeled
@@ -9294,7 +9709,12 @@ Recognized effect names: `read`, `write`, `consume`, `escape_value`,
    compile error — the pin is a checked contract, not an override.
 3. `@[effect]` is library-author surface (stdlib, FFI bindings,
    contract overlays §16.3c). Ordinary application code never needs
-   it; requiring it there would be annotation ceremony (§1.7).
+   it; requiring it there would be annotation ceremony (§1.7). For
+   c_imported declarations the facade vocabulary (§16.2b.5) states these
+   effects. `@[effect]` remains valid for hand-written `extern`
+   declarations, which have no imported facade namespace to attach to: it
+   is the raw, manual analogue of facade evidence, and a one-off extern
+   needs no facade block.
 
 ### 16.3e ABI Boundary Signatures Are C-Representable
 
@@ -10548,6 +10968,7 @@ with repl                                    # interactive session
 with init                                    # create a new project
 with migrate <c-sources>                     # translate C to With (§13.5b, §16)
 with emit-c-header <file>                    # emit C declarations for @[c_export] (§16.5)
+with cc <clang arguments>                    # the C compiler inside this binary (§18.8)
 with version [--abi-sha] | with help         # --abi-sha: the ABI identity .wo bundles key on
 with -e <code> | -n <code> | -p <code>      # one-liners (§18.5b)
 ```
@@ -10564,6 +10985,29 @@ compiler-diagnostic surface: available, but implementation-internal
 and not covered by stability guarantees.
 
 Cross-compilation is a normal mode, not special.
+
+`with analyze` provides a foreign-contract view: the effective modeled
+foreign contract (§16.2b) — resources, producers, destroyers, effects,
+retention, borrowed results, dependencies, status conventions, nullability,
+domains, preservation, static lifetime, callback and thread facts,
+presentation — with the provenance of every fact, and the relationships
+between origins, domains and the views that depend on them. It flags
+suspicious configurations: a producer with no destroy path, a destroyer
+presented as a lend, a retained callback with no owner, an illegal thread
+combination, an ambiguous profile match, a profile fact shadowed by an
+override, and a function whose name and shape resemble a destroyer but which
+is exposed as a lend. The last is advisory: it changes no contract, and an
+explicit `lend` records that the author reviewed it. Tooling that proposes
+or reports a lend states that it is an assertion about foreign behavior,
+never a conservative inference.
+
+Facade-generation tooling may emit a draft facade from the heuristics
+§16.2b.2 permits tooling to use. Every capability-granting line it proposes
+is commented out with its provenance; the author uncomments what they trust,
+and the compiler verifies each clause (§16.2b.13). A generated facade is
+ordinary With source in the project's source or package space (a `facades/`
+directory is a convention, not a compiler location) and is never adopted
+silently.
 
 ### 18.5a Project Builds
 
@@ -10890,44 +11334,6 @@ intended for direct use by application developers.
 **Layer 2: `std.*`** — idiomatic, safe, cross-platform APIs. This is
 what users import.
 
-#### Module Map
-
-| Module | Purpose | Replaces |
-|--------|---------|----------|
-| `std.os` | Layer-1 thin safe platform wrappers | libc, POSIX, Win32 |
-| `std.io` | I/O primitives, Reader/Writer traits, buffered streams | `stdio.h` |
-| `std.fs` | File system operations | `unistd.h`, `dirent.h`, `sys/stat.h` |
-| `std.time` | Clocks, durations, sleep | `time.h`, `sys/time.h` |
-| `std.math` | f32/f64 methods, constants | `math.h` |
-| `std.box` | `Box[T]` single-owner heap allocation | — |
-| `std.rc` | `Rc[T]`, `Arc[T]`, explicit shared ownership | — |
-| `std.collections` | Vec, HashMap, HashSet, BTreeMap, SlotMap, Handle | — |
-| `std.string` | String/StrView types and methods | `string.h`, `ctype.h` |
-| `std.encoding` | Native RFC 4648 Base16, Base32, Base32hex, Base64, and Base64URL data encodings | — |
-| `std.net` | TCP, UDP, DNS | `sys/socket.h`, `netdb.h` |
-| `std.thread` | OS-level threading | `pthread.h` |
-| `std.sync` | Mutex, RwLock, Atomic, Condvar, Barrier, Once | `pthread.h`, `stdatomic.h` |
-| `std.process` | Process control, args, env, Command | `stdlib.h`, `unistd.h` |
-| `std.mem` | Low-level memory, Allocator trait, mmap | `stdlib.h`, `sys/mman.h` |
-| `std.alloc` | Arena, TempArena, Pool | — |
-| `std.fixed_string` | `FixedString[N]` stack-owned string storage for `core`/`no_std` code | — |
-| `std.build` | Typed project build graph construction | Make/CMake project files |
-| `std.context` | Standard implicit execution context | ad hoc context parameters |
-| `std.signal` | Signal handling | `signal.h` |
-| `std.random` | Rng, seeded PRNG | `stdlib.h` |
-| `std.hash` | Hasher trait, DefaultHasher | — |
-| `std.fmt` | Debug trait, f-string internals | `stdio.h` (sprintf) |
-| `std.testing` | assert, require, check, assert_eq, assert_matches, panic, todo, unreachable | — |
-| `std.ffi` | C callback context boxing and raw FFI helper types | `void*` context plumbing |
-| `std.regex` | `Regex`, `Match`, `Captures`; engine behind §15.8 literals and `=~` | PCRE2 (migrated) |
-| `std.zlib` | DEFLATE, zlib, and gzip compression support | zlib (migrated) |
-| `std.json` | JSON parse/serialize | — |
-| `std.http` | HTTP client | libcurl |
-| `std.crypto` | sha256, aes, chacha20, ecdsa, rsa, x509, endian, ... | OpenSSL (subset) |
-Modules under `std.internal` (and compiler-support modules such as
-`std.str_abi`) are compiler/runtime implementation surface, not user
-API; they may change without notice.
-
 All collection types provide `.len()` returning `Int` (i64) — signed, so
 `v.len() - 1` and countdown/index arithmetic just work; a held container
 always has a length, so length is never wrapped in `Option` (decisions.md
@@ -11119,6 +11525,18 @@ headers, prebuilt libraries, and transitive deps into
 package includes a `metadata.json` with include paths, library
 paths, library names, and transitive dependencies.
 
+When Conan Center has no binary this toolchain can link for the
+platform, `with get c.X` builds the package from source. The recipe
+Conan Center publishes is read as data and never executed: it names
+the source archive, its digest and patches, the requirements, and the
+CMake variables. The package's own CMake build runs with `with cc` as
+the C compiler, and the result installs into
+`.with/deps/c/<name>/<version>/` exactly as a binary package does. The
+lock records the source archive's digest. A build that needs a tool
+the machine lacks (`cmake`, `ninja`, or for a package that does not
+build with CMake, whatever its build system needs) names it and stops;
+installing it is the programmer's step.
+
 **Build integration.** When `with build` encounters
 `use c_import("<glib.h>")`, the compiler reads `with.toml`, finds
 all `c.*` deps, reads their `metadata.json`, and constructs include
@@ -11149,6 +11567,7 @@ link = ["custom"]
 | `with get c.X` | Add C dependency via Conan |
 | `with get c.X@2.78` | Pin specific version |
 | `with get --force-reinstall c.X@2.78` | Delete and recreate the local installed C package |
+| `with get --from-source c.X` | Build the C package from source even when a binary exists |
 | `with remove c.X` | Remove dependency |
 | `with update` | Update all deps to latest compatible |
 | `with get` (no args) | Restore deps from lock file |
@@ -11163,6 +11582,16 @@ link = ["custom"]
 ```
 
 `.with/` is gitignored. `with.toml` and `lock.json` are committed.
+
+A facade or a convention profile is a versioned package. When a C package
+publishes a facade that declares compatibility with the resolved package
+version, `with get` installs and applies it automatically; package-owned
+metadata needs no opt-in ceremony. A facade a package ships is trusted
+exactly as the package's own code is: it is pinned by the same lock and
+digest, and every fact it contributes carries the provenance
+`facade:<package>@<version>`, which the contract view reports. A locally
+generated draft facade is never trusted automatically. The toolchain
+publishes no facade beyond the C standard library's.
 
 ---
 

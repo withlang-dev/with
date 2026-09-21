@@ -54,7 +54,7 @@ pub unsafe fn crc32_z(__param_crc: c_ulong, __param_buf: *const u8, __param_len:
 
             (__local_buf = __local_buf + 1)
 
-            (__local_crc = ((((((__local_crc as c_ulong) >> (8 as c_uint)) as c_ulong) ^ (crc_table[((((__local_crc as c_ulong) ^ (((unsafe *__ci_expr_old_1) as c_int) as c_ulong)) as c_ulong) & (255 as c_ulong))] as c_ulong)) as c_ulong)))
+            (__local_crc = ((((((__local_crc as c_ulong) >> (8 as c_uint)) as c_ulong) ^ (crc_table[((((__local_crc as c_ulong) ^ (((*__ci_expr_old_1) as c_int) as c_ulong)) as c_ulong) & (255 as c_ulong))] as c_ulong)) as c_ulong)))
 
         }
 
@@ -66,7 +66,7 @@ pub unsafe fn crc32_z(__param_crc: c_ulong, __param_buf: *const u8, __param_len:
 
         (__local_endian = ((1 as c_uint)))
 
-        if ((unsafe *((&raw mut __local_endian as *mut c_uint) as *mut u8)) != 0) {
+        if ((*((&raw mut __local_endian as *mut c_uint) as *mut u8)) != 0) {
             var __local_crc0: c_uint
 
             var __local_word0: c_ulong
@@ -104,15 +104,15 @@ pub unsafe fn crc32_z(__param_crc: c_ulong, __param_buf: *const u8, __param_len:
                     break
                 }
 
-                (__local_word0 = ((((__local_crc0 as c_ulong) ^ ((unsafe __local_words[0]) as c_ulong)) as c_ulong)))
+                (__local_word0 = ((((__local_crc0 as c_ulong) ^ ((__local_words[0]) as c_ulong)) as c_ulong)))
 
-                (__local_word1 = ((((__local_crc1 as c_ulong) ^ ((unsafe __local_words[1]) as c_ulong)) as c_ulong)))
+                (__local_word1 = ((((__local_crc1 as c_ulong) ^ ((__local_words[1]) as c_ulong)) as c_ulong)))
 
-                (__local_word2 = ((((__local_crc2 as c_ulong) ^ ((unsafe __local_words[2]) as c_ulong)) as c_ulong)))
+                (__local_word2 = ((((__local_crc2 as c_ulong) ^ ((__local_words[2]) as c_ulong)) as c_ulong)))
 
-                (__local_word3 = ((((__local_crc3 as c_ulong) ^ ((unsafe __local_words[3]) as c_ulong)) as c_ulong)))
+                (__local_word3 = ((((__local_crc3 as c_ulong) ^ ((__local_words[3]) as c_ulong)) as c_ulong)))
 
-                (__local_word4 = ((((__local_crc4 as c_ulong) ^ ((unsafe __local_words[4]) as c_ulong)) as c_ulong)))
+                (__local_word4 = ((((__local_crc4 as c_ulong) ^ ((__local_words[4]) as c_ulong)) as c_ulong)))
 
                 (__local_words = __local_words + ((5 as isize) as usize))
 
@@ -146,15 +146,15 @@ pub unsafe fn crc32_z(__param_crc: c_ulong, __param_buf: *const u8, __param_len:
 
             }
 
-            (__local_crc = ((crc_word((((__local_crc0 as c_ulong) ^ ((unsafe __local_words[0]) as c_ulong)) as c_ulong)) as c_ulong)))
+            (__local_crc = ((crc_word((((__local_crc0 as c_ulong) ^ ((__local_words[0]) as c_ulong)) as c_ulong)) as c_ulong)))
 
-            (__local_crc = ((crc_word((((((__local_crc1 as c_ulong) ^ ((unsafe __local_words[1]) as c_ulong)) as c_ulong) ^ (__local_crc as c_ulong)) as c_ulong)) as c_ulong)))
+            (__local_crc = ((crc_word((((((__local_crc1 as c_ulong) ^ ((__local_words[1]) as c_ulong)) as c_ulong) ^ (__local_crc as c_ulong)) as c_ulong)) as c_ulong)))
 
-            (__local_crc = ((crc_word((((((__local_crc2 as c_ulong) ^ ((unsafe __local_words[2]) as c_ulong)) as c_ulong) ^ (__local_crc as c_ulong)) as c_ulong)) as c_ulong)))
+            (__local_crc = ((crc_word((((((__local_crc2 as c_ulong) ^ ((__local_words[2]) as c_ulong)) as c_ulong) ^ (__local_crc as c_ulong)) as c_ulong)) as c_ulong)))
 
-            (__local_crc = ((crc_word((((((__local_crc3 as c_ulong) ^ ((unsafe __local_words[3]) as c_ulong)) as c_ulong) ^ (__local_crc as c_ulong)) as c_ulong)) as c_ulong)))
+            (__local_crc = ((crc_word((((((__local_crc3 as c_ulong) ^ ((__local_words[3]) as c_ulong)) as c_ulong) ^ (__local_crc as c_ulong)) as c_ulong)) as c_ulong)))
 
-            (__local_crc = ((crc_word((((((__local_crc4 as c_ulong) ^ ((unsafe __local_words[4]) as c_ulong)) as c_ulong) ^ (__local_crc as c_ulong)) as c_ulong)) as c_ulong)))
+            (__local_crc = ((crc_word((((((__local_crc4 as c_ulong) ^ ((__local_words[4]) as c_ulong)) as c_ulong) ^ (__local_crc as c_ulong)) as c_ulong)) as c_ulong)))
 
             (__local_words = __local_words + ((5 as isize) as usize))
 
@@ -203,15 +203,15 @@ pub unsafe fn crc32_z(__param_crc: c_ulong, __param_buf: *const u8, __param_len:
                     break
                 }
 
-                (__local_word0_1 = ((((__local_crc0_1 as c_ulong) ^ ((unsafe __local_words[0]) as c_ulong)) as c_ulong)))
+                (__local_word0_1 = ((((__local_crc0_1 as c_ulong) ^ ((__local_words[0]) as c_ulong)) as c_ulong)))
 
-                (__local_word1_1 = ((((__local_crc1_1 as c_ulong) ^ ((unsafe __local_words[1]) as c_ulong)) as c_ulong)))
+                (__local_word1_1 = ((((__local_crc1_1 as c_ulong) ^ ((__local_words[1]) as c_ulong)) as c_ulong)))
 
-                (__local_word2_1 = ((((__local_crc2_1 as c_ulong) ^ ((unsafe __local_words[2]) as c_ulong)) as c_ulong)))
+                (__local_word2_1 = ((((__local_crc2_1 as c_ulong) ^ ((__local_words[2]) as c_ulong)) as c_ulong)))
 
-                (__local_word3_1 = ((((__local_crc3_1 as c_ulong) ^ ((unsafe __local_words[3]) as c_ulong)) as c_ulong)))
+                (__local_word3_1 = ((((__local_crc3_1 as c_ulong) ^ ((__local_words[3]) as c_ulong)) as c_ulong)))
 
-                (__local_word4_1 = ((((__local_crc4_1 as c_ulong) ^ ((unsafe __local_words[4]) as c_ulong)) as c_ulong)))
+                (__local_word4_1 = ((((__local_crc4_1 as c_ulong) ^ ((__local_words[4]) as c_ulong)) as c_ulong)))
 
                 (__local_words = __local_words + ((5 as isize) as usize))
 
@@ -245,15 +245,15 @@ pub unsafe fn crc32_z(__param_crc: c_ulong, __param_buf: *const u8, __param_len:
 
             }
 
-            (__local_comb = ((crc_word_big((((__local_crc0_1 as c_ulong) ^ ((unsafe __local_words[0]) as c_ulong)) as c_ulong)) as c_ulong)))
+            (__local_comb = ((crc_word_big((((__local_crc0_1 as c_ulong) ^ ((__local_words[0]) as c_ulong)) as c_ulong)) as c_ulong)))
 
-            (__local_comb = ((crc_word_big((((((__local_crc1_1 as c_ulong) ^ ((unsafe __local_words[1]) as c_ulong)) as c_ulong) ^ (__local_comb as c_ulong)) as c_ulong)) as c_ulong)))
+            (__local_comb = ((crc_word_big((((((__local_crc1_1 as c_ulong) ^ ((__local_words[1]) as c_ulong)) as c_ulong) ^ (__local_comb as c_ulong)) as c_ulong)) as c_ulong)))
 
-            (__local_comb = ((crc_word_big((((((__local_crc2_1 as c_ulong) ^ ((unsafe __local_words[2]) as c_ulong)) as c_ulong) ^ (__local_comb as c_ulong)) as c_ulong)) as c_ulong)))
+            (__local_comb = ((crc_word_big((((((__local_crc2_1 as c_ulong) ^ ((__local_words[2]) as c_ulong)) as c_ulong) ^ (__local_comb as c_ulong)) as c_ulong)) as c_ulong)))
 
-            (__local_comb = ((crc_word_big((((((__local_crc3_1 as c_ulong) ^ ((unsafe __local_words[3]) as c_ulong)) as c_ulong) ^ (__local_comb as c_ulong)) as c_ulong)) as c_ulong)))
+            (__local_comb = ((crc_word_big((((((__local_crc3_1 as c_ulong) ^ ((__local_words[3]) as c_ulong)) as c_ulong) ^ (__local_comb as c_ulong)) as c_ulong)) as c_ulong)))
 
-            (__local_comb = ((crc_word_big((((((__local_crc4_1 as c_ulong) ^ ((unsafe __local_words[4]) as c_ulong)) as c_ulong) ^ (__local_comb as c_ulong)) as c_ulong)) as c_ulong)))
+            (__local_comb = ((crc_word_big((((((__local_crc4_1 as c_ulong) ^ ((__local_words[4]) as c_ulong)) as c_ulong) ^ (__local_comb as c_ulong)) as c_ulong)) as c_ulong)))
 
             (__local_words = __local_words + ((5 as isize) as usize))
 
@@ -272,56 +272,56 @@ pub unsafe fn crc32_z(__param_crc: c_ulong, __param_buf: *const u8, __param_len:
 
         (__local_buf = __local_buf + 1)
 
-        (__local_crc = ((((((__local_crc as c_ulong) >> (8 as c_uint)) as c_ulong) ^ (crc_table[((((__local_crc as c_ulong) ^ (((unsafe *__ci_expr_old_2) as c_int) as c_ulong)) as c_ulong) & (255 as c_ulong))] as c_ulong)) as c_ulong)))
+        (__local_crc = ((((((__local_crc as c_ulong) >> (8 as c_uint)) as c_ulong) ^ (crc_table[((((__local_crc as c_ulong) ^ (((*__ci_expr_old_2) as c_int) as c_ulong)) as c_ulong) & (255 as c_ulong))] as c_ulong)) as c_ulong)))
 
 
         var __ci_expr_old_3: *const u8 = __local_buf
 
         (__local_buf = __local_buf + 1)
 
-        (__local_crc = ((((((__local_crc as c_ulong) >> (8 as c_uint)) as c_ulong) ^ (crc_table[((((__local_crc as c_ulong) ^ (((unsafe *__ci_expr_old_3) as c_int) as c_ulong)) as c_ulong) & (255 as c_ulong))] as c_ulong)) as c_ulong)))
+        (__local_crc = ((((((__local_crc as c_ulong) >> (8 as c_uint)) as c_ulong) ^ (crc_table[((((__local_crc as c_ulong) ^ (((*__ci_expr_old_3) as c_int) as c_ulong)) as c_ulong) & (255 as c_ulong))] as c_ulong)) as c_ulong)))
 
 
         var __ci_expr_old_4: *const u8 = __local_buf
 
         (__local_buf = __local_buf + 1)
 
-        (__local_crc = ((((((__local_crc as c_ulong) >> (8 as c_uint)) as c_ulong) ^ (crc_table[((((__local_crc as c_ulong) ^ (((unsafe *__ci_expr_old_4) as c_int) as c_ulong)) as c_ulong) & (255 as c_ulong))] as c_ulong)) as c_ulong)))
+        (__local_crc = ((((((__local_crc as c_ulong) >> (8 as c_uint)) as c_ulong) ^ (crc_table[((((__local_crc as c_ulong) ^ (((*__ci_expr_old_4) as c_int) as c_ulong)) as c_ulong) & (255 as c_ulong))] as c_ulong)) as c_ulong)))
 
 
         var __ci_expr_old_5: *const u8 = __local_buf
 
         (__local_buf = __local_buf + 1)
 
-        (__local_crc = ((((((__local_crc as c_ulong) >> (8 as c_uint)) as c_ulong) ^ (crc_table[((((__local_crc as c_ulong) ^ (((unsafe *__ci_expr_old_5) as c_int) as c_ulong)) as c_ulong) & (255 as c_ulong))] as c_ulong)) as c_ulong)))
+        (__local_crc = ((((((__local_crc as c_ulong) >> (8 as c_uint)) as c_ulong) ^ (crc_table[((((__local_crc as c_ulong) ^ (((*__ci_expr_old_5) as c_int) as c_ulong)) as c_ulong) & (255 as c_ulong))] as c_ulong)) as c_ulong)))
 
 
         var __ci_expr_old_6: *const u8 = __local_buf
 
         (__local_buf = __local_buf + 1)
 
-        (__local_crc = ((((((__local_crc as c_ulong) >> (8 as c_uint)) as c_ulong) ^ (crc_table[((((__local_crc as c_ulong) ^ (((unsafe *__ci_expr_old_6) as c_int) as c_ulong)) as c_ulong) & (255 as c_ulong))] as c_ulong)) as c_ulong)))
+        (__local_crc = ((((((__local_crc as c_ulong) >> (8 as c_uint)) as c_ulong) ^ (crc_table[((((__local_crc as c_ulong) ^ (((*__ci_expr_old_6) as c_int) as c_ulong)) as c_ulong) & (255 as c_ulong))] as c_ulong)) as c_ulong)))
 
 
         var __ci_expr_old_7: *const u8 = __local_buf
 
         (__local_buf = __local_buf + 1)
 
-        (__local_crc = ((((((__local_crc as c_ulong) >> (8 as c_uint)) as c_ulong) ^ (crc_table[((((__local_crc as c_ulong) ^ (((unsafe *__ci_expr_old_7) as c_int) as c_ulong)) as c_ulong) & (255 as c_ulong))] as c_ulong)) as c_ulong)))
+        (__local_crc = ((((((__local_crc as c_ulong) >> (8 as c_uint)) as c_ulong) ^ (crc_table[((((__local_crc as c_ulong) ^ (((*__ci_expr_old_7) as c_int) as c_ulong)) as c_ulong) & (255 as c_ulong))] as c_ulong)) as c_ulong)))
 
 
         var __ci_expr_old_8: *const u8 = __local_buf
 
         (__local_buf = __local_buf + 1)
 
-        (__local_crc = ((((((__local_crc as c_ulong) >> (8 as c_uint)) as c_ulong) ^ (crc_table[((((__local_crc as c_ulong) ^ (((unsafe *__ci_expr_old_8) as c_int) as c_ulong)) as c_ulong) & (255 as c_ulong))] as c_ulong)) as c_ulong)))
+        (__local_crc = ((((((__local_crc as c_ulong) >> (8 as c_uint)) as c_ulong) ^ (crc_table[((((__local_crc as c_ulong) ^ (((*__ci_expr_old_8) as c_int) as c_ulong)) as c_ulong) & (255 as c_ulong))] as c_ulong)) as c_ulong)))
 
 
         var __ci_expr_old_9: *const u8 = __local_buf
 
         (__local_buf = __local_buf + 1)
 
-        (__local_crc = ((((((__local_crc as c_ulong) >> (8 as c_uint)) as c_ulong) ^ (crc_table[((((__local_crc as c_ulong) ^ (((unsafe *__ci_expr_old_9) as c_int) as c_ulong)) as c_ulong) & (255 as c_ulong))] as c_ulong)) as c_ulong)))
+        (__local_crc = ((((((__local_crc as c_ulong) >> (8 as c_uint)) as c_ulong) ^ (crc_table[((((__local_crc as c_ulong) ^ (((*__ci_expr_old_9) as c_int) as c_ulong)) as c_ulong) & (255 as c_ulong))] as c_ulong)) as c_ulong)))
 
 
     }
@@ -333,7 +333,7 @@ pub unsafe fn crc32_z(__param_crc: c_ulong, __param_buf: *const u8, __param_len:
 
         (__local_buf = __local_buf + 1)
 
-        (__local_crc = ((((((__local_crc as c_ulong) >> (8 as c_uint)) as c_ulong) ^ (crc_table[((((__local_crc as c_ulong) ^ (((unsafe *__ci_expr_old_10) as c_int) as c_ulong)) as c_ulong) & (255 as c_ulong))] as c_ulong)) as c_ulong)))
+        (__local_crc = ((((((__local_crc as c_ulong) >> (8 as c_uint)) as c_ulong) ^ (crc_table[((((__local_crc as c_ulong) ^ (((*__ci_expr_old_10) as c_int) as c_ulong)) as c_ulong) & (255 as c_ulong))] as c_ulong)) as c_ulong)))
 
 
     }

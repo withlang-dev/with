@@ -68,7 +68,8 @@ fn test_hashset_target:
 
 fn test_hashmap_default:
     let pairs = [("a", 1), ("b", 2), ("a", 3)]
-    let index = [k: v for (k, v) in pairs]
+    // D44: the pairs are observed; an owning map of their keys clones them.
+    let index = [k.clone(): v for (k, v) in pairs]
     assert(index.get("a").unwrap() == 3)
     assert(index.get("b").unwrap() == 2)
     assert(index.get("missing").is_none())

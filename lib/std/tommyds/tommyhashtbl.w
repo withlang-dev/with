@@ -78,57 +78,57 @@ pub unsafe fn tommy_hashtable_init(__param_hashtable: *mut tommy_hashtable_struc
         (__local_bucket_max = ((tommy_roundup_pow2_u64(__local_bucket_max) as c_ulonglong)))
     }
 
-    ((unsafe *__param_hashtable).bucket_max = __local_bucket_max)
+    ((*__param_hashtable).bucket_max = __local_bucket_max)
 
-    ((unsafe *__param_hashtable).bucket_mask = (((((unsafe *__param_hashtable).bucket_max as c_ulonglong) -% (1 as c_ulonglong)) as c_ulonglong)))
+    ((*__param_hashtable).bucket_mask = (((((*__param_hashtable).bucket_max as c_ulonglong) -% (1 as c_ulonglong)) as c_ulonglong)))
 
-    ((unsafe *__param_hashtable).bucket = (((with_alloc((((((unsafe *__param_hashtable).bucket_max as c_ulonglong) *% (8 as c_ulonglong)) as c_ulong) as i64)) as *mut c_void) as *mut *mut tommy_node_struct)))
+    ((*__param_hashtable).bucket = (((with_alloc((((((*__param_hashtable).bucket_max as c_ulonglong) *% (8 as c_ulonglong)) as c_ulong) as i64)) as *mut c_void) as *mut *mut tommy_node_struct)))
 
-    with_memset((((unsafe *__param_hashtable).bucket as *mut c_void) as *mut u8), (0 as c_int), (((((unsafe *__param_hashtable).bucket_max as c_ulonglong) *% (8 as c_ulonglong)) as c_ulong) as i64))
+    with_memset((((*__param_hashtable).bucket as *mut c_void) as *mut u8), (0 as c_int), (((((*__param_hashtable).bucket_max as c_ulonglong) *% (8 as c_ulonglong)) as c_ulong) as i64))
 
-    ((unsafe *__param_hashtable).count = ((0 as c_ulonglong)))
+    ((*__param_hashtable).count = ((0 as c_ulonglong)))
 
 }
 
 pub unsafe fn tommy_hashtable_done(__param_hashtable: *mut tommy_hashtable_struct) -> Unit {
-    with_free((((unsafe *__param_hashtable).bucket as *mut c_void) as *mut u8))
+    with_free((((*__param_hashtable).bucket as *mut c_void) as *mut u8))
 
 }
 
 pub unsafe fn tommy_hashtable_insert(__param_hashtable: *mut tommy_hashtable_struct, __param_node: *mut tommy_node_struct, __param_data: *mut c_void, __param_hash: c_ulonglong) -> Unit {
-    var __local_pos: c_ulonglong = ((((__param_hash as c_ulonglong) & ((unsafe *__param_hashtable).bucket_mask as c_ulonglong)) as c_ulonglong))
+    var __local_pos: c_ulonglong = ((((__param_hash as c_ulonglong) & ((*__param_hashtable).bucket_mask as c_ulonglong)) as c_ulonglong))
 
-    tommy_list_insert_tail(((&raw const (unsafe (unsafe *__param_hashtable).bucket[__local_pos]) as *const *mut tommy_node_struct) as *mut *mut tommy_node_struct), __param_node, __param_data)
+    tommy_list_insert_tail(((&raw const ((*__param_hashtable).bucket[__local_pos]) as *const *mut tommy_node_struct) as *mut *mut tommy_node_struct), __param_node, __param_data)
 
-    ((unsafe *__param_node).index = __param_hash)
+    ((*__param_node).index = __param_hash)
 
-    ((unsafe *__param_hashtable).count = ((unsafe *__param_hashtable).count +% 1))
+    ((*__param_hashtable).count = ((*__param_hashtable).count +% 1))
 
 }
 
 pub unsafe fn tommy_hashtable_remove(__param_hashtable: *mut tommy_hashtable_struct, __param_cmp: unsafe extern "C" fn(*const c_void, *const c_void) -> c_int, __param_cmp_arg: *const c_void, __param_hash: c_ulonglong) -> *mut c_void {
-    var __local_pos: c_ulonglong = ((((__param_hash as c_ulonglong) & ((unsafe *__param_hashtable).bucket_mask as c_ulonglong)) as c_ulonglong))
+    var __local_pos: c_ulonglong = ((((__param_hash as c_ulonglong) & ((*__param_hashtable).bucket_mask as c_ulonglong)) as c_ulonglong))
 
-    var __local_node: *mut tommy_node_struct = (unsafe (unsafe *__param_hashtable).bucket[__local_pos])
+    var __local_node: *mut tommy_node_struct = ((*__param_hashtable).bucket[__local_pos])
 
     while (__local_node != null) {
         var __ci_expr_logic_0: c_int = 0
 
-        if ((if (unsafe *__local_node).index == __param_hash: 1 else: 0) != 0) {
-            (__ci_expr_logic_0 = (if (if __param_cmp(__param_cmp_arg, ((unsafe *__local_node).data as *const c_void)) == 0: 1 else: 0) != 0: 1 else: 0))
+        if ((if (*__local_node).index == __param_hash: 1 else: 0) != 0) {
+            (__ci_expr_logic_0 = (if (if __param_cmp(__param_cmp_arg, ((*__local_node).data as *const c_void)) == 0: 1 else: 0) != 0: 1 else: 0))
         }
 
         if (__ci_expr_logic_0 != 0) {
-            tommy_list_remove_existing(((&raw const (unsafe (unsafe *__param_hashtable).bucket[__local_pos]) as *const *mut tommy_node_struct) as *mut *mut tommy_node_struct), __local_node)
+            tommy_list_remove_existing(((&raw const ((*__param_hashtable).bucket[__local_pos]) as *const *mut tommy_node_struct) as *mut *mut tommy_node_struct), __local_node)
 
-            ((unsafe *__param_hashtable).count = ((unsafe *__param_hashtable).count -% 1))
+            ((*__param_hashtable).count = ((*__param_hashtable).count -% 1))
 
-            return (unsafe *__local_node).data
+            return (*__local_node).data
 
         }
 
 
-        (__local_node = (unsafe *__local_node).next)
+        (__local_node = (*__local_node).next)
 
     }
 
@@ -137,7 +137,7 @@ pub unsafe fn tommy_hashtable_remove(__param_hashtable: *mut tommy_hashtable_str
 }
 
 pub unsafe fn tommy_hashtable_bucket(__param_hashtable: *mut tommy_hashtable_struct, __param_hash: c_ulonglong) -> *mut tommy_node_struct {
-    return (((unsafe (unsafe *__param_hashtable).bucket[((__param_hash as c_ulonglong) & ((unsafe *__param_hashtable).bucket_mask as c_ulonglong))]) as *mut tommy_node_struct))
+    return ((((*__param_hashtable).bucket[((__param_hash as c_ulonglong) & ((*__param_hashtable).bucket_mask as c_ulonglong))]) as *mut tommy_node_struct))
 
 }
 
@@ -147,16 +147,16 @@ pub unsafe fn tommy_hashtable_search(__param_hashtable: *mut tommy_hashtable_str
     while (__local_i != null) {
         var __ci_expr_logic_0: c_int = 0
 
-        if ((if (unsafe *__local_i).index == __param_hash: 1 else: 0) != 0) {
-            (__ci_expr_logic_0 = (if (if __param_cmp(__param_cmp_arg, ((unsafe *__local_i).data as *const c_void)) == 0: 1 else: 0) != 0: 1 else: 0))
+        if ((if (*__local_i).index == __param_hash: 1 else: 0) != 0) {
+            (__ci_expr_logic_0 = (if (if __param_cmp(__param_cmp_arg, ((*__local_i).data as *const c_void)) == 0: 1 else: 0) != 0: 1 else: 0))
         }
 
         if (__ci_expr_logic_0 != 0) {
-            return (unsafe *__local_i).data
+            return (*__local_i).data
         }
 
 
-        (__local_i = (unsafe *__local_i).next)
+        (__local_i = (*__local_i).next)
 
     }
 
@@ -165,32 +165,32 @@ pub unsafe fn tommy_hashtable_search(__param_hashtable: *mut tommy_hashtable_str
 }
 
 pub unsafe fn tommy_hashtable_remove_existing(__param_hashtable: *mut tommy_hashtable_struct, __param_node: *mut tommy_node_struct) -> *mut c_void {
-    var __local_pos: c_ulonglong = (((((unsafe *__param_node).index as c_ulonglong) & ((unsafe *__param_hashtable).bucket_mask as c_ulonglong)) as c_ulonglong))
+    var __local_pos: c_ulonglong = (((((*__param_node).index as c_ulonglong) & ((*__param_hashtable).bucket_mask as c_ulonglong)) as c_ulonglong))
 
-    tommy_list_remove_existing(((&raw const (unsafe (unsafe *__param_hashtable).bucket[__local_pos]) as *const *mut tommy_node_struct) as *mut *mut tommy_node_struct), __param_node)
+    tommy_list_remove_existing(((&raw const ((*__param_hashtable).bucket[__local_pos]) as *const *mut tommy_node_struct) as *mut *mut tommy_node_struct), __param_node)
 
-    ((unsafe *__param_hashtable).count = ((unsafe *__param_hashtable).count -% 1))
+    ((*__param_hashtable).count = ((*__param_hashtable).count -% 1))
 
-    return (unsafe *__param_node).data
+    return (*__param_node).data
 
 }
 
 pub unsafe fn tommy_hashtable_foreach(__param_hashtable: *mut tommy_hashtable_struct, __param_func: unsafe extern "C" fn(*mut c_void) -> Unit) -> Unit {
-    var __local_bucket_max: c_ulonglong = (unsafe *__param_hashtable).bucket_max
+    var __local_bucket_max: c_ulonglong = (*__param_hashtable).bucket_max
 
-    var __local_bucket: *mut *mut tommy_node_struct = (unsafe *__param_hashtable).bucket
+    var __local_bucket: *mut *mut tommy_node_struct = (*__param_hashtable).bucket
 
     var __local_pos: c_ulonglong
 
     (__local_pos = ((0 as c_ulonglong)))
 
     while ((if __local_pos < __local_bucket_max: 1 else: 0) != 0) {
-        var __local_node: *mut tommy_node_struct = (unsafe __local_bucket[__local_pos])
+        var __local_node: *mut tommy_node_struct = (__local_bucket[__local_pos])
 
         while (__local_node != null) {
-            var __local_data: *mut c_void = (unsafe *__local_node).data
+            var __local_data: *mut c_void = (*__local_node).data
 
-            (__local_node = (unsafe *__local_node).next)
+            (__local_node = (*__local_node).next)
 
             __param_func(__local_data)
 
@@ -205,21 +205,21 @@ pub unsafe fn tommy_hashtable_foreach(__param_hashtable: *mut tommy_hashtable_st
 }
 
 pub unsafe fn tommy_hashtable_foreach_arg(__param_hashtable: *mut tommy_hashtable_struct, __param_func: unsafe extern "C" fn(*mut c_void, *mut c_void) -> Unit, __param_arg: *mut c_void) -> Unit {
-    var __local_bucket_max: c_ulonglong = (unsafe *__param_hashtable).bucket_max
+    var __local_bucket_max: c_ulonglong = (*__param_hashtable).bucket_max
 
-    var __local_bucket: *mut *mut tommy_node_struct = (unsafe *__param_hashtable).bucket
+    var __local_bucket: *mut *mut tommy_node_struct = (*__param_hashtable).bucket
 
     var __local_pos: c_ulonglong
 
     (__local_pos = ((0 as c_ulonglong)))
 
     while ((if __local_pos < __local_bucket_max: 1 else: 0) != 0) {
-        var __local_node: *mut tommy_node_struct = (unsafe __local_bucket[__local_pos])
+        var __local_node: *mut tommy_node_struct = (__local_bucket[__local_pos])
 
         while (__local_node != null) {
-            var __local_data: *mut c_void = (unsafe *__local_node).data
+            var __local_data: *mut c_void = (*__local_node).data
 
-            (__local_node = (unsafe *__local_node).next)
+            (__local_node = (*__local_node).next)
 
             __param_func(__param_arg, __local_data)
 
@@ -234,11 +234,11 @@ pub unsafe fn tommy_hashtable_foreach_arg(__param_hashtable: *mut tommy_hashtabl
 }
 
 pub unsafe fn tommy_hashtable_count(__param_hashtable: *mut tommy_hashtable_struct) -> c_ulonglong {
-    return (unsafe *__param_hashtable).count
+    return (*__param_hashtable).count
 
 }
 
 pub unsafe fn tommy_hashtable_memory_usage(__param_hashtable: *mut tommy_hashtable_struct) -> c_ulonglong {
-    return (((((unsafe *__param_hashtable).bucket_max as c_ulonglong) *% ((sizeof[usize]() as c_ulonglong) as c_ulonglong)) as c_ulonglong) +% (((tommy_hashtable_count(__param_hashtable) as c_ulonglong) *% ((sizeof[tommy_node_struct]() as c_ulonglong) as c_ulonglong)) as c_ulonglong))
+    return (((((*__param_hashtable).bucket_max as c_ulonglong) *% ((sizeof[usize]() as c_ulonglong) as c_ulonglong)) as c_ulonglong) +% (((tommy_hashtable_count(__param_hashtable) as c_ulonglong) *% ((sizeof[tommy_node_struct]() as c_ulonglong) as c_ulonglong)) as c_ulonglong))
 
 }

@@ -8,8 +8,8 @@ pub unsafe fn run_tests(__param_tests: *mut extern "C" fn() -> Unit) -> Unit {
 
     (__local_i = ((0 as c_int)))
 
-    while ((if (unsafe __param_tests[__local_i]) != null: 1 else: 0) != 0) {
-        run_test((unsafe __param_tests[__local_i]))
+    while ((if (__param_tests[__local_i]) != null: 1 else: 0) != 0) {
+        run_test((__param_tests[__local_i]))
 
 
         (__local_i = __local_i + 1)

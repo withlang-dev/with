@@ -12,9 +12,9 @@
 // type params are not all bound by its receiver (e.g. `Vec.map[T, U]` on `Vec[T]`)
 // is SKIPPED and reported, never silently mis-moved.
 //
-//   with run tools/relocate_methods.w --report src/main.w     # whole-project proof
-//   with run tools/relocate_methods.w --list src/main.w       # include every target
-//   with run tools/relocate_methods.w --apply src/main.w      # rewrite selected files
+//   with migrate-receivers --report src/main.w     # whole-project proof
+//   with migrate-receivers --list src/main.w       # include every target
+//   with migrate-receivers --apply src/main.w      # rewrite selected files
 
 use std.process
 use AnalysisTypes
@@ -458,7 +458,7 @@ impl RelocationFacts:
 pub fn run_receiver_migration -> i32:
     let argv = args()
     if argv.len() < 2:
-        print("usage: relocate_methods [--report|--list|--apply] [--exclude path ...] <entry.w>")
+        print("usage: with migrate-receivers [--report|--list|--apply] [--exclude path ...] <entry.w>")
         exit_code(1)
     var apply = false
     var list_methods = false

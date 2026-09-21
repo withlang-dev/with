@@ -154,7 +154,7 @@ unsafe fn test_gzio(__param_fname: *const i8, __param_uncompr: *mut u8, __param_
 
         (__local_file.next = __local_file.next + 1)
 
-        (__ci_expr_ternary_4 = (((unsafe *__ci_expr_old_3) as c_int)))
+        (__ci_expr_ternary_4 = (((*__ci_expr_old_3) as c_int)))
 
     } else {
         (__ci_expr_ternary_4 = ((gzgetc(__local_file) as c_int)))
@@ -229,8 +229,8 @@ unsafe fn test_deflate(__param_compr: *mut u8, __param_comprLen: c_ulong) -> Uni
     while true {
         var __ci_expr_logic_0: c_int = 0
 
-        if ((if (unsafe *(&raw const __local_c_stream as *const z_stream_s)).total_in != __local_len: 1 else: 0) != 0) {
-            (__ci_expr_logic_0 = (if (if (unsafe *(&raw const __local_c_stream as *const z_stream_s)).total_out < __param_comprLen: 1 else: 0) != 0: 1 else: 0))
+        if ((if (*(&raw const __local_c_stream as *const z_stream_s)).total_in != __local_len: 1 else: 0) != 0) {
+            (__ci_expr_logic_0 = (if (if (*(&raw const __local_c_stream as *const z_stream_s)).total_out < __param_comprLen: 1 else: 0) != 0: 1 else: 0))
         }
 
         if (not (__ci_expr_logic_0 != 0)) {
@@ -239,7 +239,7 @@ unsafe fn test_deflate(__param_compr: *mut u8, __param_comprLen: c_ulong) -> Uni
 
         (__local_c_stream.avail_out = ((1 as c_uint)))
 
-        (__local_c_stream.avail_in = (unsafe *(&raw const __local_c_stream as *const z_stream_s)).avail_out)
+        (__local_c_stream.avail_in = (*(&raw const __local_c_stream as *const z_stream_s)).avail_out)
 
         (__local_err = ((deflate((&raw mut __local_c_stream as *mut z_stream_s), (0 as c_int)) as c_int)))
 
@@ -318,8 +318,8 @@ unsafe fn test_inflate(__param_compr: *mut u8, __param_comprLen: c_ulong, __para
     while true {
         var __ci_expr_logic_0: c_int = 0
 
-        if ((if (unsafe *(&raw const __local_d_stream as *const z_stream_s)).total_out < __param_uncomprLen: 1 else: 0) != 0) {
-            (__ci_expr_logic_0 = (if (if (unsafe *(&raw const __local_d_stream as *const z_stream_s)).total_in < __param_comprLen: 1 else: 0) != 0: 1 else: 0))
+        if ((if (*(&raw const __local_d_stream as *const z_stream_s)).total_out < __param_uncomprLen: 1 else: 0) != 0) {
+            (__ci_expr_logic_0 = (if (if (*(&raw const __local_d_stream as *const z_stream_s)).total_in < __param_comprLen: 1 else: 0) != 0: 1 else: 0))
         }
 
         if (not (__ci_expr_logic_0 != 0)) {
@@ -328,7 +328,7 @@ unsafe fn test_inflate(__param_compr: *mut u8, __param_comprLen: c_ulong, __para
 
         (__local_d_stream.avail_out = ((1 as c_uint)))
 
-        (__local_d_stream.avail_in = (unsafe *(&raw const __local_d_stream as *const z_stream_s)).avail_out)
+        (__local_d_stream.avail_in = (*(&raw const __local_d_stream as *const z_stream_s)).avail_out)
 
         (__local_err = ((inflate((&raw mut __local_d_stream as *mut z_stream_s), (0 as c_int)) as c_int)))
 
@@ -409,7 +409,7 @@ unsafe fn test_large_deflate(__param_compr: *mut u8, __param_comprLen: c_ulong, 
 
 
 
-    if ((if (unsafe *(&raw const __local_c_stream as *const z_stream_s)).avail_in != 0: 1 else: 0) != 0) {
+    if ((if (*(&raw const __local_c_stream as *const z_stream_s)).avail_in != 0: 1 else: 0) != 0) {
         fprintf(libc_stderr(), c"deflate not greedy\n".ptr)
 
         exit((1 as c_int))
@@ -533,8 +533,8 @@ unsafe fn test_large_inflate(__param_compr: *mut u8, __param_comprLen: c_ulong, 
 
 
 
-    if ((if (unsafe *(&raw const __local_d_stream as *const z_stream_s)).total_out != ((((2 as c_ulong) *% (__param_uncomprLen as c_ulong)) as c_ulong) +% (((__param_uncomprLen as c_ulong) / (2 as c_ulong)) as c_ulong)): 1 else: 0) != 0) {
-        fprintf(libc_stderr(), c"bad large inflate: %lu\n".ptr, (unsafe *(&raw const __local_d_stream as *const z_stream_s)).total_out)
+    if ((if (*(&raw const __local_d_stream as *const z_stream_s)).total_out != ((((2 as c_ulong) *% (__param_uncomprLen as c_ulong)) as c_ulong) +% (((__param_uncomprLen as c_ulong) / (2 as c_ulong)) as c_ulong)): 1 else: 0) != 0) {
+        fprintf(libc_stderr(), c"bad large inflate: %lu\n".ptr, (*(&raw const __local_d_stream as *const z_stream_s)).total_out)
 
         exit((1 as c_int))
 
@@ -575,7 +575,7 @@ unsafe fn test_flush(__param_compr: *mut u8, __param_comprLen: *mut c_ulong) -> 
 
     (__local_c_stream.avail_in = ((3 as c_uint)))
 
-    (__local_c_stream.avail_out = (((unsafe *__param_comprLen) as c_uint)))
+    (__local_c_stream.avail_out = (((*__param_comprLen) as c_uint)))
 
     (__local_err = ((deflate((&raw mut __local_c_stream as *mut z_stream_s), (3 as c_int)) as c_int)))
 
@@ -588,7 +588,7 @@ unsafe fn test_flush(__param_compr: *mut u8, __param_comprLen: *mut c_ulong) -> 
 
 
 
-    ((unsafe __param_compr[3]) = ((unsafe __param_compr[3]) +% 1))
+    ((__param_compr[3]) = ((__param_compr[3]) +% 1))
 
     (__local_c_stream.avail_in = ((((__local_len as c_uint) -% (3 as c_uint)) as c_uint)))
 
@@ -617,7 +617,7 @@ unsafe fn test_flush(__param_compr: *mut u8, __param_comprLen: *mut c_ulong) -> 
 
 
 
-    ((unsafe *__param_comprLen) = (unsafe *(&raw const __local_c_stream as *const z_stream_s)).total_out)
+    ((*__param_comprLen) = (*(&raw const __local_c_stream as *const z_stream_s)).total_out)
 
 }
 
@@ -734,7 +734,7 @@ unsafe fn test_dict_deflate(__param_compr: *mut u8, __param_comprLen: c_ulong) -
 
 
 
-    (dictId = (unsafe *(&raw const __local_c_stream as *const z_stream_s)).adler)
+    (dictId = (*(&raw const __local_c_stream as *const z_stream_s)).adler)
 
     (__local_c_stream.next_out = __param_compr)
 
@@ -806,7 +806,7 @@ unsafe fn test_dict_inflate(__param_compr: *mut u8, __param_comprLen: c_ulong, _
         }
 
         if ((if __local_err == 2: 1 else: 0) != 0) {
-            if ((if (unsafe *(&raw const __local_d_stream as *const z_stream_s)).adler != dictId: 1 else: 0) != 0) {
+            if ((if (*(&raw const __local_d_stream as *const z_stream_s)).adler != dictId: 1 else: 0) != 0) {
                 fprintf(libc_stderr(), c"unexpected dictionary".ptr)
 
                 exit((1 as c_int))
@@ -863,7 +863,7 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
 
     var __local_myVersion: *const c_char = c"1.3.2".ptr
 
-    if ((if (unsafe zlibVersion()[0]) != (unsafe __local_myVersion[0]): 1 else: 0) != 0) {
+    if ((if (zlibVersion()[0]) != (__local_myVersion[0]): 1 else: 0) != 0) {
         fprintf(libc_stderr(), c"incompatible zlib version\n".ptr)
 
         exit((1 as c_int))
@@ -902,7 +902,7 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     var __ci_expr_ternary_1: *mut c_char = null
 
     if ((if __param_argc > 1: 1 else: 0) != 0) {
-        (__ci_expr_ternary_1 = (((unsafe __param_argv[1]) as *mut c_char)))
+        (__ci_expr_ternary_1 = (((__param_argv[1]) as *mut c_char)))
     } else {
         (__ci_expr_ternary_1 = (("foo.gz" as *mut c_char)))
     }

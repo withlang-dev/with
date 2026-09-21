@@ -5,7 +5,7 @@
 // future advanced analyses (e.g., loop-iteration-aware borrow tracking,
 // branch-divergent uses).
 //
-// NOTE on NLL last-use semantics (docs/mut.md Rev 8 §8.4 / §15.6):
+// NOTE on NLL last-use semantics (docs/completed/mut.md Rev 8 §8.4 / §15.6):
 //
 // Non-lexical-lifetime borrow expiry is NOT implemented via this CFG.
 // Instead, Sema.expire_dead_borrows_in_block (in SemaCheck.w) provides

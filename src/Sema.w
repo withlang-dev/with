@@ -300,7 +300,7 @@ const GLOBAL_VALUE_DECL_EXTERN: i32 = 2
 // D39: storage a bundle interface declares; the bundle's object defines it.
 const GLOBAL_VALUE_DECL_INTERFACE: i32 = 3
 
-// docs/mutability.md §5 — per-parameter effect bits.
+// docs/completed/mutability.md §5 — per-parameter effect bits.
 const EFF_READ: i32         = 1   // parameter is read
 const EFF_WRITE: i32        = 2   // parameter place is mutated (implies read)
 const EFF_CONSUME: i32      = 4   // parameter is moved/consumed in the body
@@ -446,7 +446,7 @@ type Sema {
     sig_lookup: HashMap[i32, i32],
     // An extern keeps its own signature when a curated wrapper takes its name.
     extern_decl_sigs: HashMap[i32, i32],
-    // docs/mutability.md Phase 4 — per-parameter effect bitsets.
+    // docs/completed/mutability.md Phase 4 — per-parameter effect bitsets.
     // sig_param_effects[sig_param_eff_starts[si] + pi] = effect bits for param pi of sig si.
     // Effects: EFF_READ=1, EFF_WRITE=2, EFF_CONSUME=4,
     // EFF_ESCAPE_VALUE=8, EFF_ESCAPE_VIEW=16, EFF_RAW_PTR_VALIDITY=32.
@@ -519,6 +519,11 @@ type Sema {
     binding_use_epoch: i32,
     binding_epoch_counter: i32,
     binding_last_use: HashMap[i32, i64],
+    // #1242: ident nodes that resolved to a module global (not a local or
+    // parameter), keyed by node — the move checks consult it after scopes pop.
+    global_value_ident_nodes: HashMap[i32, i32],
+    // `const` globals: comptime values, exempt from the move-out check.
+    const_global_syms: HashMap[i32, i32],
     // move-sites: last use per (root, first-field) path — the liveness key for
     // FIELD-shaped transfer args, so `eat(move self.r)` followed by `self.tag`
     // reads verdicts on the `.r` path, not the whole receiver. Key packs
@@ -711,7 +716,7 @@ type Sema {
     generator_state_field_names: HashMap[i64, i32],
     generator_state_field_types: HashMap[i64, i32],
     mutable_global_syms: HashMap[i32, i32],
-    // docs/mut.md Rev 8 §12 / §15.12 — symbols declared via `global X = ...`
+    // docs/completed/mut.md Rev 8 §12 / §15.12 — symbols declared via `global X = ...`
     // (stable) recorded here. Used by check_assign to emit a specific
     // diagnostic on rebind attempts. `global var X = ...` does NOT register
     // here — it's rebindable.
@@ -819,7 +824,7 @@ type Sema {
     label_kinds: Vec[i32],
     label_nodes: Vec[i32],
     label_break_value_types: Vec[i32],
-    // Loop move-state tracking (docs/branch-merge-soundness.md §6.7 / #613):
+    // Loop move-state tracking (docs/completed/branch-merge-soundness.md §6.7 / #613):
     // per label frame: entry bind-count (outer/inner boundary), the offset of this
     // loop's break-flag region in loop_break_flat (-1 = none), and whether any
     // break to this frame was captured. loop_break_flat is a flat stack of
@@ -995,6 +1000,11 @@ type Sema {
     // by MOVE (never the alias path); the field glue skips them via
     // drop_consumed_field.
     drop_consumed_binding_values: HashMap[i32, i32],
+    // #1244: initializer nodes of `let s: &T = place` — the annotation demands
+    // a reference and the value is an owned T, so the binding BORROWS (§3.8
+    // auto-referencing, the same rule as a call argument); MirLower emits the
+    // shared ref instead of moving the bytes.
+    auto_ref_binding_values: HashMap[i32, i32],
     typed_binding_names: HashMap[i32, i32],
     typed_binding_muts: HashMap[i32, i32],
     ephemeral_task_binding_nodes: HashMap[i32, i32],
@@ -1056,7 +1066,7 @@ type Sema {
     symbols_frozen: i32,
     types_frozen: i32,
 
-    // docs/mutability.md Phase 4 — per-function effect tracking during body analysis.
+    // docs/completed/mutability.md Phase 4 — per-function effect tracking during body analysis.
     // Cleared and set by check_fn_body_with_sig; used to accumulate effects as the body is checked.
     current_fn_param_syms: Vec[i32],   // param name symbols for the function being checked
     current_fn_param_effs: Vec[i32],   // accumulated effect bits per param
@@ -1075,6 +1085,10 @@ type Sema {
     binding_view_dep_data: Vec[i32],
     // Expression-level view metadata for call expressions and view-producing nodes.
     expr_view_param_origins: HashMap[i32, i32],
+    // #962: a view produced from a statement temporary (`split(..).get(1)`,
+    // `split(..)[1]`): node → the temporary's type. Fine inside the statement,
+    // a use-after-free once bound or returned.
+    expr_view_into_temporary: HashMap[i32, i32],
     expr_view_dep_starts: HashMap[i32, i32],
     expr_view_dep_counts: HashMap[i32, i32],
     expr_view_dep_data: Vec[i32],
@@ -1108,6 +1122,17 @@ type Sema {
     // Calls checked against such a placeholder: (node, sig, callee symbol, file)
     // in fours. Whether the placeholder was wrong is known once every body is typed.
     untyped_callee_calls: Vec[i32],
+    // The statement a block is checking: its value is discarded, so a callee
+    // that is not typed yet costs a call in that position nothing.
+    discarded_stmt_node: i32,
+    // check_bodies order (#1196): per declaration 0 unchecked / 1 in progress /
+    // 2 done; the node id its subtree starts after; and, for the functions that
+    // take their type from their body, declaration index by name symbol, with
+    // same-name declarations chained through body_typed_next.
+    body_order_state: Vec[i32],
+    body_order_lower: Vec[i32],
+    body_typed_decls: HashMap[i32, i32],
+    body_typed_next: Vec[i32],
     current_for_comprehension_carrier: i32,
     in_comptime_fn: i32,
     in_concrete_generic_body: i32,
@@ -1889,6 +1914,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
     let typed_binding_types = sema_new_map_i32_i32()
     let view_projection_exprs = sema_new_map_i32_i32()
     let drop_consumed_binding_values = sema_new_map_i32_i32()
+    let auto_ref_binding_values = sema_new_map_i32_i32()
     let typed_binding_names = sema_new_map_i32_i32()
     let typed_binding_muts = sema_new_map_i32_i32()
     let ephemeral_task_binding_nodes = sema_new_map_i32_i32()
@@ -1960,6 +1986,8 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         binding_use_epoch: 0,
         binding_epoch_counter: 0,
         binding_last_use: HashMap.new(),
+        global_value_ident_nodes: HashMap.new(),
+        const_global_syms: HashMap.new(),
         field_last_use: HashMap.new(),
         effect_prov: HashMap.new(),
         effect_note_origin_node: 0,
@@ -2252,6 +2280,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         typed_binding_types,
         view_projection_exprs,
         drop_consumed_binding_values,
+        auto_ref_binding_values,
         typed_binding_names,
         typed_binding_muts,
         ephemeral_task_binding_nodes,
@@ -2305,6 +2334,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         binding_closure_nodes: sema_new_map_i32_i32(),
         binding_view_dep_data: Vec.new(),
         expr_view_param_origins: sema_new_map_i32_i32(),
+        expr_view_into_temporary: sema_new_map_i32_i32(),
         expr_view_dep_starts: sema_new_map_i32_i32(),
         expr_view_dep_counts: sema_new_map_i32_i32(),
         expr_view_dep_data: Vec.new(),
@@ -2328,6 +2358,11 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         infer_tail_join: 0,
         body_typed_sigs: sema_new_map_i32_i32(),
         untyped_callee_calls: Vec.new(),
+        discarded_stmt_node: 0,
+        body_order_state: Vec.new(),
+        body_order_lower: Vec.new(),
+        body_typed_decls: sema_new_map_i32_i32(),
+        body_typed_next: Vec.new(),
         current_for_comprehension_carrier: 0,
         in_comptime_fn: 0,
         in_concrete_generic_body: 0,
@@ -4787,6 +4822,12 @@ impl Sema:
             if self.implicit_binding_syms[ii] == sym:
                 self.implicit_binding_types[ii] = tid
 
+    // Whether `sym` currently names a parameter or a local: a binding made
+    // inside any scope below the module-level one.
+    fn scope_binding_is_local(sym: i32) -> bool:
+        let opt = self.scope_name_map.get(sym)
+        opt.is_some() and self.scope_starts.len() > 1 and opt.unwrap() >= self.scope_starts[1]
+
     fn scope_lookup_mut(sym: i32) -> i32:
         let opt = self.scope_name_map.get(sym)
         if opt.is_some():
@@ -5169,7 +5210,7 @@ impl Sema:
         self.moved_field_path_syms = move syms
 
     // Conservative union of move-state across two control-flow branches, for the
-    // MaybeUninitialized use-checking half (see docs/branch-merge-soundness.md). A
+    // MaybeUninitialized use-checking half (see docs/completed/branch-merge-soundness.md). A
     // binding is MOVED after the construct iff it is MOVED on ANY non-diverging
     // branch (so a value moved on one path cannot be used after — use-after-move
     // soundness); divergent branches (TY_NEVER) contribute nothing. If both branches
@@ -5193,7 +5234,7 @@ impl Sema:
     // Pointwise union for accumulating a join over N branches/arms (e.g. match): a
     // binding is MOVED in the result iff MOVED in either input. Seed the accumulator
     // with the entry state (the implicit no-match/fallthrough path) and fold each
-    // non-diverging arm exit into it; see docs/branch-merge-soundness.md.
+    // non-diverging arm exit into it; see docs/completed/branch-merge-soundness.md.
     fn union_move_states(base: &Vec[i32], other: &Vec[i32]) -> Vec[i32]:
         var out: Vec[i32] = Vec.new()
         let n = base.len() as i32
@@ -5203,7 +5244,7 @@ impl Sema:
             out.push(if bv == VarState.MOVED or ov == VarState.MOVED: VarState.MOVED else: VarState.LIVE)
         out
 
-    // ── Loop move-state (#613, docs/branch-merge-soundness.md §6.7) ──────────────
+    // ── Loop move-state (#613, docs/completed/branch-merge-soundness.md §6.7) ──────────────
 
     mut fn emit_loop_carried_move_error(bind_idx: i32, loop_node: i32):
         let sym = self.bind_names[bind_idx]
@@ -5467,7 +5508,18 @@ impl Sema:
                 continue
             if self.bind_states[bi] != VarState.LIVE:
                 continue
-            if self.binding_depends_on_origin(view_sym, origin_sym) != 0 or self.binding_value_depends_on_origin(view_sym, origin_sym) != 0:
+            if self.binding_depends_on_origin(view_sym, origin_sym) != 0:
+                self.mark_binding_poisoned_by_origin(view_sym, origin_sym, origin_node)
+                continue
+            // A value expression that mentions `&raw const origin` poisons the
+            // binding only if the binding can hold a view: a reference, an
+            // ephemeral value, or a Drop value that may retain one. A Copy value
+            // read through the dereference (`g = (*(&raw const a as *const S)).n`)
+            // is independent of `a`; poisoning it made a later read of `g`
+            // "may originate from `a`" (§21.1 Rule 6) in another function.
+            let view_ty = self.bind_types[bi]
+            let can_hold_view = view_ty != 0 and (self.get_type_kind(self.resolve_alias(view_ty as TypeId)) == TypeKind.TY_REF or self.type_has_drop_impl(view_ty) != 0 or self.type_is_ephemeral_value(view_ty) != 0)
+            if can_hold_view and self.binding_value_depends_on_origin(view_sym, origin_sym) != 0:
                 self.mark_binding_poisoned_by_origin(view_sym, origin_sym, origin_node)
 
     fn expr_view_depends_on_origin(node: i32, origin_sym: i32) -> i32:
@@ -5851,7 +5903,7 @@ impl Sema:
         if self.mutable_global_syms.contains(sym): return 1
         0
 
-    // docs/mut.md Rev 8 §15.12 — declared via `global X = ...`, no `var`.
+    // docs/completed/mut.md Rev 8 §15.12 — declared via `global X = ...`, no `var`.
     // Rebinding such a symbol is the §15.12 diagnostic.
     fn is_stable_global(sym: i32) -> i32:
         if self.stable_global_syms.contains(sym): return 1
@@ -5888,7 +5940,7 @@ impl Sema:
         self.sig_param_starts.push(param_start)
         self.sig_param_counts.push(param_count)
         self.sig_variadic.push(variadic)
-        // docs/mutability.md Phase 4 — per-parameter effect storage.
+        // docs/completed/mutability.md Phase 4 — per-parameter effect storage.
         self.sig_param_eff_starts.push(self.sig_param_effects.len() as i32)
         for pi in 0..param_count:
             self.sig_param_effects.push(0)

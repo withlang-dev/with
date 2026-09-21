@@ -29,6 +29,7 @@ impl MirModule:
         for i in 0..distinct_type_syms.len():
             let sym = distinct_type_syms[i]
             self.sema_distinct_type_names.insert(sym, sema.distinct_type_names.get(sym).unwrap())
+        self.sema_result_sym = sema.syms.result
         if sema.type_symbol_is_std_box(sema.syms.box) != 0:
             self.sema_box_sym = sema.syms.box
             self.sema_option_sym = sema.syms.option
@@ -560,7 +561,7 @@ fn dump_drop_plan_module(mir_mod: &MirModule, pool: &InternPool, sema: &Sema) ->
         out = out ++ dump_drop_plan_body(body, pool, sema)
     out
 
-// Drop elaboration — the "Dead" arm (#614, docs/drop-elaboration-soundness.md).
+// Drop elaboration — the "Dead" arm (#614, docs/completed/drop-elaboration-soundness.md).
 // A `StmtKind.Drop` whose place is statically `Moved` at that point is provably
 // dead: the value was moved out, so emitting the drop double-drops it. Rewrite it
 // to `StmtKind.Nop` (codegen already treats Nop as a no-op). This is the analogue

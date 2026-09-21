@@ -543,13 +543,13 @@ pub fn test_set_to_array() -> Unit {
     (__local_i = ((0 as c_int)))
 
     while ((if __local_i < 100: 1 else: 0) != 0) {
-        if ((((if not ((if (unsafe *((unsafe __local_array[__local_i]) as *mut c_int)) == 1: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+        if ((((if not ((if (unsafe *((__local_array[__local_i]) as *mut c_int)) == 1: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
             __assert_rtn(c"test_set_to_array".ptr, c"test-set.c".ptr, (319 as c_int), c"*array[i] == 1".ptr)
         } else {
             0
         }
 
-        ((unsafe *((unsafe __local_array[__local_i]) as *mut c_int)) = ((0 as c_int)))
+        ((unsafe *((__local_array[__local_i]) as *mut c_int)) = ((0 as c_int)))
 
 
         (__local_i = __local_i + 1)

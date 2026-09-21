@@ -1,8 +1,5 @@
 use c_import("raylib.h")
 
-extern fn sin(x: f64) -> f64
-extern fn cos(x: f64) -> f64
-
 fn draw_spiral(cx: f64, cy: f64, t: f64):
     for i in 0..180:
         let p = (i as f64) / 180.0
@@ -21,7 +18,7 @@ fn is_spiral_sample(c: Color) -> bool:
     (r > 70 or g > 70 or b > 70) and (r + g + b > 170)
 
 fn main:
-    unsafe { InitWindow(900, 600, c"with raylib spiral uat".ptr) }
+    InitWindow(900, 600, "with raylib spiral uat")
     // No window means no GL context: every later call would run on nothing
     // (LoadImageFromScreen crashed with exit 139 on a host whose driver stops
     // at OpenGL 1.1). Say so and fail; a headless host needs a software GL.
@@ -40,7 +37,7 @@ fn main:
         BeginDrawing()
         ClearBackground(bg)
         draw_spiral(cx, cy, t)
-        unsafe { DrawText(c"with raylib spiral uat".ptr, 20, 20, 20, LIGHTGRAY) }
+        DrawText("with raylib spiral uat", 20, 20, 20, LIGHTGRAY)
         EndDrawing()
         frame = frame + 1
 

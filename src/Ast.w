@@ -116,7 +116,7 @@ pub enum NodeKind: i32:
     // NK_WITH_TUPLE: d0=source_expr, d1=body_expr, d2=extra_start
     // Extra: [name_count, is_mut, sym0, sym1, ...]
     NK_WITH_TUPLE = 117
-    // docs/mutability.md — call-site passing mode wrappers.
+    // docs/completed/mutability.md — call-site passing mode wrappers.
     // NK_COPY_ARG: d0=inner(node), d1=0, d2=0  (explicit copy at call site)
     // NK_MOVE_ARG: d0=inner(node), d1=0, d2=0  (explicit move at call site)
     NK_COPY_ARG = 118
@@ -280,16 +280,16 @@ const TRAIT_METHOD_SOURCE_START: i32 = 6
 const TRAIT_METHOD_SOURCE_END: i32 = 7
 const FN_PARAM_FLAG_NOALIAS: i32 = 1
 const FN_PARAM_FLAG_IMPLICIT: i32 = 2
-// docs/mut.md Rev 8 §5.1 — receiver-place mode `mut self: Self`.
+// docs/completed/mut.md Rev 8 §5.1 — receiver-place mode `mut self: Self`.
 // Set by the parser when the param name is `self` and was preceded by `mut`.
 // Stored as a flag bit so callers can detect a mutating receiver without
 // reparsing. No semantic effect during the bridge phase (P1..P11);
 // at P11 sema reads this bit to require a mutable place at the call site.
 const FN_PARAM_FLAG_MUT_SELF: i32 = 4
-// docs/mutability.md — receiver-mode `self: &Self` (read-only view).
+// docs/completed/mutability.md — receiver-mode `self: &Self` (read-only view).
 // Set when param name is `self` and the declared type is a reference (&Self).
 const FN_PARAM_FLAG_REF_SELF: i32 = 8
-// docs/mutability.md — receiver-mode `move self: Self` (consuming).
+// docs/completed/mutability.md — receiver-mode `move self: Self` (consuming).
 // Set when param name is `self` and was preceded by `move`.
 const FN_PARAM_FLAG_MOVE_SELF: i32 = 16
 // D7: the parser synthesized this receiver from `fn` / `mut fn` / `move fn`.
@@ -334,7 +334,7 @@ fn fn_param_is_move_self(flags: i32) -> i32:
 fn fn_param_is_synth_receiver(flags: i32) -> i32:
     (flags / FN_PARAM_FLAG_SYNTH_RECEIVER) % 2
 
-// docs/mut.md Rev 8 §12 — module-level place declarations.
+// docs/completed/mut.md Rev 8 §12 — module-level place declarations.
 // NK_LET_DECL flags layout:
 //   bit 0 (mask 1):  is_mut (var vs let)
 //   bit 1 (mask 2):  is_pub
@@ -421,7 +421,7 @@ enum UnaryOp: i32:
     UOP_DEREF = 4
     UOP_TRY = 5
     UOP_BIT_NOT = 6
-    // docs/mut.md Rev 8 §13.2 — explicit raw-address-of forms.
+    // docs/completed/mut.md Rev 8 §13.2 — explicit raw-address-of forms.
     UOP_RAW_REF_CONST = 7
     UOP_RAW_REF_MUT = 8
 

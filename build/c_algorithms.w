@@ -45,7 +45,7 @@ pub fn c_algorithms_corpus() -> Corpus:
         name: "c_algorithms", stem: "c-algorithms", package: "std.c_algorithms",
         corpus_rel: "std/c_algorithms", corpus_dir: "lib/std/c_algorithms",
         upstream: upstream_github("c_algorithms", "fragglet/c-algorithms", CALG_REVISION, CALG_SHA256),
-        license: "COPYING",
+        license: "COPYING.md",
         // upstream's test framework and its smoke program (test-cpp
         // exercises every module once) ride along in the production corpus
         // as the drift harness; they are never part of the bundle root

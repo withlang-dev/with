@@ -68,13 +68,13 @@ pub unsafe fn pcre2_get_error_message_8(__param_enumber: c_int, __param_buffer: 
 
             (__local_message = __local_message + 1)
 
-            if (not ((if (unsafe *__ci_expr_old_0) != 0: 1 else: 0) != 0)) {
+            if (not ((if (*__ci_expr_old_0) != 0: 1 else: 0) != 0)) {
                 break
             }
 
         }
 
-        if ((if (unsafe *__local_message) == 0: 1 else: 0) != 0) {
+        if ((if (*__local_message) == 0: 1 else: 0) != 0) {
             return -29
         }
 
@@ -85,7 +85,7 @@ pub unsafe fn pcre2_get_error_message_8(__param_enumber: c_int, __param_buffer: 
 
     (__local_i = ((0 as c_ulong)))
 
-    while ((if (unsafe *__local_message) != 0: 1 else: 0) != 0) {
+    while ((if (*__local_message) != 0: 1 else: 0) != 0) {
         if ((if __local_i >= ((__param_size as c_ulong) -% (1 as c_ulong)): 1 else: 0) != 0) {
             (__local_rc = ((-48 as c_int)))
 
@@ -97,7 +97,7 @@ pub unsafe fn pcre2_get_error_message_8(__param_enumber: c_int, __param_buffer: 
 
         (__local_message = __local_message + 1)
 
-        ((unsafe __param_buffer[__local_i]) = (unsafe *__ci_expr_old_1))
+        ((__param_buffer[__local_i]) = (*__ci_expr_old_1))
 
 
 
@@ -106,7 +106,7 @@ pub unsafe fn pcre2_get_error_message_8(__param_enumber: c_int, __param_buffer: 
     }
 
 
-    ((unsafe __param_buffer[__local_i]) = ((0 as u8)))
+    ((__param_buffer[__local_i]) = ((0 as u8)))
 
     var __ci_expr_ternary_2: c_int = 0
 

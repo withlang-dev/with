@@ -504,7 +504,7 @@ pub fn test_rb_tree_to_array() -> Unit {
     (__local_i = ((0 as c_int)))
 
     while ((if __local_i < __local_num_entries: 1 else: 0) != 0) {
-        if ((((if not ((if (unsafe *((unsafe __local_array[__local_i]) as *mut c_int)) == __local_sorted[__local_i]: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+        if ((((if not ((if (unsafe *((__local_array[__local_i]) as *mut c_int)) == __local_sorted[__local_i]: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
             __assert_rtn(c"test_rb_tree_to_array".ptr, c"test-rb-tree.c".ptr, (323 as c_int), c"*array[i] == sorted[i]".ptr)
         } else {
             0

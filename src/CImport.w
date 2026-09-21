@@ -1719,28 +1719,36 @@ fn ci_translate_function(session: i64, idx: i32, known_structs: &str) -> str:
     let needs_body_translation = (storage == CX_SC_STATIC and is_inline != 0) or (is_inline != 0 and storage != CX_SC_STATIC)
     let safe_name = ci_escape_reserved(name)
     if needs_body_translation:
-        // Static inline or always-inline — try to translate the body
+        // Static inline or always-inline — try to translate the body. The
+        // signature decides `unsafe fn` first: the body printer omits its
+        // `unsafe` prefixes exactly when the function is already that context.
+        let si_param_count = with_cimport_fn_param_count(session, idx)
+        var si_params = ""
+        var si_raw = false
+        for spi in 0..si_param_count:
+            if spi > 0:
+                si_params = si_params ++ ", "
+            let spname = with_cimport_fn_param_name(session, idx, spi)
+            let sptype = with_cimport_fn_param_type_translated(session, idx, spi)
+            if ci_cimport_param_type_requires_raw_abi(sptype):
+                si_raw = true
+            let actual_pname = ci_param_signature_name(ci_escape_reserved(spname), spi)
+            si_params = si_params ++ actual_pname ++ ": " ++ sptype
+        let si_ret = with_cimport_fn_return_type_translated(session, idx)
+        if ci_cimport_type_is_raw_abi(si_ret):
+            si_raw = true
+        ci_migrate_set_unsafe_function_body_context(si_raw)
         let body = ci_try_translate_fn_body(session, idx)
+        ci_migrate_set_unsafe_function_body_context(false)
+        let unrendered = ci_print_take_unknowns()
+        if unrendered.len() > 0:
+            ci_record_omitted_symbol_cat(name, ci_get_decl_location(session, name), "raw-modelable", "inline body has no rendering for " ++ unrendered[0])
+            return ""
         if body.len() > 0:
             with_cimport_mark_name_emitted(name)
-            let si_param_count = with_cimport_fn_param_count(session, idx)
-            var si_params = ""
-            var si_raw = false
-            for spi in 0..si_param_count:
-                if spi > 0:
-                    si_params = si_params ++ ", "
-                let spname = with_cimport_fn_param_name(session, idx, spi)
-                let sptype = with_cimport_fn_param_type_translated(session, idx, spi)
-                if ci_cimport_param_type_requires_raw_abi(sptype):
-                    si_raw = true
-                let actual_pname = ci_param_signature_name(ci_escape_reserved(spname), spi)
-                si_params = si_params ++ actual_pname ++ ": " ++ sptype
-            let si_ret = with_cimport_fn_return_type_translated(session, idx)
             if ci_starts_with(si_ret, "extern \"C\" fn(") or ci_starts_with(si_ret, "fn("):
                 ci_record_omitted_symbol_cat(name, ci_get_decl_location(session, name), "raw-modelable", "inline function returning function pointer not modeled")
                 return ""
-            if ci_cimport_type_is_raw_abi(si_ret):
-                si_raw = true
             let fn_kw = if si_raw: "unsafe fn " else: "fn "
             if si_raw:
                 ci_record_raw_function_name(name)
@@ -3212,9 +3220,18 @@ fn ci_translate_macros(session: i64, type_session: i64, extern_vars: &str, macro
                     // Token paste (##) translation
                     if translated.len() == 0 and ci_str_contains(work_value, "##"):
                         translated = ci_try_translate_token_paste(work_value, param_names)
+                    var from_c_expr = false
                     if translated.len() == 0:
                         work_value = ci_expand_private_macro_body(session, indices, work_value, param_names, "", 0)
                         translated = ci_translate_c_expr(work_value, param_names, known_values)
+                        from_c_expr = true
+                    // The text decides `unsafe fn` (it calls a raw function), so an
+                    // expression that does is printed again as an unsafe body: no
+                    // `unsafe` prefix inside a function that already is the context.
+                    if from_c_expr and ci_translation_calls_raw_function(translated):
+                        ci_migrate_set_unsafe_function_body_context(true)
+                        translated = ci_translate_c_expr(work_value, param_names, known_values)
+                        ci_migrate_set_unsafe_function_body_context(false)
                     if translated.len() > 0:
                         // Infer return type from cast expression: (x as c_int) → return c_int
                         var inferred_ret = with_str_clone_ref(ret_type)
@@ -3710,7 +3727,7 @@ fn ci_parse_unary_expr(s: &str, params: &str, known: &str) -> str:
     if c0 == 42:
         let inner = ci_parse_cast_expr(t.slice(1, t.len()), params, known)
         if inner.len() > 0:
-            return "(unsafe *" ++ inner ++ ")"
+            return ci_wrap_unsafe("*" ++ inner)
         return ""
     // sizeof(T)
     if ci_starts_with(t, "sizeof"):
@@ -5815,7 +5832,7 @@ fn ci_value_ir_plain(value_expr: CiExprId) -> CiValueExprIR:
 fn ci_value_ir_valid(lowered: CiValueExprIR) -> bool:
     (lowered.value_expr as i32) != 0
 
-// docs/mut.md Rev 8 §5.1 — accumulator helper. Owned-by-value `out` Vec
+// docs/completed/mut.md Rev 8 §5.1 — accumulator helper. Owned-by-value `out` Vec
 // is threaded through the recursion; the underlying buffer is shared by
 // reference but the {len, cap} triple is reassigned on push so we return
 // the updated Vec to avoid losing growth on the caller side.
@@ -6724,7 +6741,9 @@ impl CiTypePool:
                     let canonical_kind = with_ci_type_kind(session, pointee_canonical)
                     if canonical_kind == CXT_FunctionProto or canonical_kind == CXT_FunctionNoProto:
                         return self.type_from_libclang(session, pointee_canonical)
-            if pointee_kind == CXT_Void:
+            // A `FILE *` local or cast is `*mut c_void` like its parameters,
+            // fields and returns: the bridge's one rule decides.
+            if pointee_kind == CXT_Void or with_ci_type_is_reserved_system_record(session, pointee_idx):
                 let c_void_idx = self.add_string("c_void")
                 let c_void_ty = self.ty_named(c_void_idx)
                 return self.ty_pointer(c_void_ty, is_const)
@@ -9378,6 +9397,18 @@ fn ci_migrate_preamble_extern_call_requires_unsafe(name: &str) -> bool:
     false
 
 impl CiExprPool:
+    // `*arr` is `arr[0]`: C decays an array operand of unary `*` to a pointer
+    // to its first element (mztools' `READ_8(header)` over `char header[30]`).
+    fn decay_deref_operand(session: i64, operand_cursor: i32, value_id: CiExprId, types: CiTypePool) -> CiExprId:
+        let value_ty = self.get_type(value_id)
+        let array_valued = (value_ty as i32) != 0 and types.kind(value_ty) == CiTypeKind.CT_ARRAY
+        let peeled = ci_peel_transparent(session, operand_cursor)
+        // An array-spelled parameter is already a pointer.
+        if with_ci_cursor_references_parameter(session, peeled): return value_id
+        if not array_valued and not ci_cursor_is_array_type(session, peeled): return value_id
+        let decayed = self.decay_array_value_expr(session, operand_cursor, value_id, 0 as CiTypeId, types)
+        if (decayed as i32) == 0: value_id else: decayed
+
     fn decay_array_value_expr(session: i64, original_cursor: i32, value_id: CiExprId, target_ty: CiTypeId, types: CiTypePool) -> CiExprId:
         let peeled = ci_peel_transparent(session, original_cursor)
         if with_ci_cursor_kind(session, peeled) == CXK_STRING_LITERAL:
@@ -9672,6 +9703,9 @@ impl CiExprPool:
                         deref_child = self.cast(resolved_ty, child_id)
                         if (deref_ty as i32) == 0:
                             deref_ty = (types.get_d0(resolved_ty)) as CiTypeId
+            deref_child = self.decay_deref_operand(session, child_cursor, deref_child, types)
+            if (deref_ty as i32) == 0 and self.kind(deref_child) == CiExprKind.CIE_ARRAY_DECAY:
+                deref_ty = (self.get_d1(deref_child)) as CiTypeId
             return self.add(CiExprKind.CIE_DEREF, deref_child as i32, 0, 0, deref_ty)
 
         if op == UO_MINUS:
@@ -10163,6 +10197,9 @@ impl CiStmtPool:
                             deref_operand = exprs.cast(resolved_ty, operand.value_expr)
                             if (deref_ty as i32) == 0:
                                 deref_ty = (types.get_d0(resolved_ty)) as CiTypeId
+                deref_operand = exprs.decay_deref_operand(session, operand_cursor, deref_operand, types)
+                if (deref_ty as i32) == 0 and exprs.kind(deref_operand) == CiExprKind.CIE_ARRAY_DECAY:
+                    deref_ty = (exprs.get_d1(deref_operand)) as CiTypeId
                 let deref_id = exprs.add(CiExprKind.CIE_DEREF, deref_operand as i32, 0, 0, deref_ty)
                 return CiValueExprIR {
                     setup_stmt: operand.setup_stmt,
@@ -12332,6 +12369,9 @@ fn ci_indent_str(level: i32) -> str:
 // Returns "" on failure; callers must omit the generated surface or fail loudly.
 
 fn ci_try_translate_fn_body(session: i64, decl_idx: i32) -> str:
+    // A record left by a body that bailed elsewhere must not be charged to
+    // this one: every caller takes the records right after this returns.
+    let _stale = ci_print_take_unknowns()
     ci_clear_bail_location()
     // B9: fresh per-function temp counter. This path is called
     // from ci_translate_function's static-inline branch — which
@@ -14201,17 +14241,16 @@ fn ci_preprocessed_var_initializer_by_name(var_name: &str) -> str:
     // already expanded).
     if g_migrate_raw_source.len() == 0 or var_name.len() == 0:
         return ""
-    let s = g_migrate_raw_source
-    let slen = s.len() as i32
+    let slen = g_migrate_raw_source.len() as i32
     let nlen = var_name.len() as i32
     var i = 0
     while i + nlen <= slen:
-        let c = s[i]
+        let c = g_migrate_raw_source[i]
         if c == 34 or c == 39:
             let quote = c
             i = i + 1
             while i < slen:
-                let inner = s[i]
+                let inner = g_migrate_raw_source[i]
                 if inner == 92:
                     i = i + 2
                     continue
@@ -14220,9 +14259,9 @@ fn ci_preprocessed_var_initializer_by_name(var_name: &str) -> str:
                 i = i + 1
             i = i + 1
             continue
-        if s.slice(i as i64, (i + nlen) as i64) == var_name:
-            let before = if i > 0: s[(i - 1)] else: 0
-            let after = if i + nlen < slen: s[(i + nlen)] else: 0
+        if g_migrate_raw_source.slice(i as i64, (i + nlen) as i64) == var_name:
+            let before = if i > 0: g_migrate_raw_source[(i - 1)] else: 0
+            let after = if i + nlen < slen: g_migrate_raw_source[(i + nlen)] else: 0
             if not ci_is_ident_char(before) and not ci_is_ident_char(after):
                 var pos = i + nlen
                 var paren_depth = 0
@@ -14230,12 +14269,12 @@ fn ci_preprocessed_var_initializer_by_name(var_name: &str) -> str:
                 var brace_depth = 0
                 var eq_pos = -1
                 while pos < slen:
-                    let ch = s[pos]
+                    let ch = g_migrate_raw_source[pos]
                     if ch == 34 or ch == 39:
                         let quote = ch
                         pos = pos + 1
                         while pos < slen:
-                            let inner = s[pos]
+                            let inner = g_migrate_raw_source[pos]
                             if inner == 92:
                                 pos = pos + 2
                                 continue
@@ -14262,12 +14301,12 @@ fn ci_preprocessed_var_initializer_by_name(var_name: &str) -> str:
                     bracket_depth = 0
                     brace_depth = 0
                     while end < slen:
-                        let ch = s[end]
+                        let ch = g_migrate_raw_source[end]
                         if ch == 34 or ch == 39:
                             let quote = ch
                             end = end + 1
                             while end < slen:
-                                let inner = s[end]
+                                let inner = g_migrate_raw_source[end]
                                 if inner == 92:
                                     end = end + 2
                                     continue
@@ -14277,7 +14316,7 @@ fn ci_preprocessed_var_initializer_by_name(var_name: &str) -> str:
                             end = end + 1
                             continue
                         if ch == 59 and paren_depth == 0 and bracket_depth == 0 and brace_depth == 0:
-                            return ci_trim(ci_expand_macros_in_text(g_migrate_macro_session, ci_trim(s.slice((eq_pos + 1) as i64, end as i64))))
+                            return ci_trim(ci_expand_macros_in_text(g_migrate_macro_session, ci_trim(g_migrate_raw_source.slice((eq_pos + 1) as i64, end as i64))))
                         if ch == 40: paren_depth = paren_depth + 1
                         if ch == 41 and paren_depth > 0: paren_depth = paren_depth - 1
                         if ch == 91: bracket_depth = bracket_depth + 1
@@ -14714,13 +14753,13 @@ var g_ci_bail_kind: i32 = 0
 var g_ci_bail_message: str = ""
 
 pub fn ci_get_bail_location() -> str:
-    g_ci_bail_location
+    g_ci_bail_location.clone()
 
 pub fn ci_get_bail_kind() -> i32:
     g_ci_bail_kind
 
 pub fn ci_get_bail_message() -> str:
-    g_ci_bail_message
+    g_ci_bail_message.clone()
 
 pub fn ci_clear_bail_location() -> Unit:
     g_ci_bail_location = ""
@@ -16510,6 +16549,9 @@ fn ci_libc_portable_callee(name: &str) -> str:
     if name == "__error" or name == "__errno_location" or name == "_errno": return "errno_ptr"
     if name == "_fileno": return "fileno"
     if name == "_isatty": return "isatty"
+    if name == "fopen64": return "fopen"
+    if name == "fseeko" or name == "fseeko64" or name == "_fseeki64": return "fseek"
+    if name == "ftello" or name == "ftello64" or name == "_ftelli64": return "ftell"
     if name == "__acrt_iob_func": return "libc_iob"
     name ++ ""
 
@@ -16550,7 +16592,9 @@ fn ci_libc_symbol_kind_mask(name: &str) -> i32:
     if name == "errno_ptr" or name == "libc_iob" or name == "libc_stdin" or name == "libc_stdout" or name == "libc_stderr": return CI_LIBC_KIND_FN
     if name == "fprintf" or name == "printf" or name == "snprintf" or name == "sprintf": return CI_LIBC_KIND_FN
     if name == "vsnprintf" or name == "vfprintf" or name == "vprintf": return CI_LIBC_KIND_FN
-    if name == "fopen" or name == "fclose" or name == "fflush" or name == "fileno": return CI_LIBC_KIND_FN
+    if name == "fopen" or name == "fclose" or name == "fflush" or name == "fileno" or name == "remove": return CI_LIBC_KIND_FN
+    if name == "fseek" or name == "ftell" or name == "fseeko" or name == "ftello": return CI_LIBC_KIND_FN
+    if name == "fopen64" or name == "fseeko64" or name == "ftello64" or name == "_fseeki64" or name == "_ftelli64": return CI_LIBC_KIND_FN
     if name == "fgets" or name == "fgetc" or name == "fputc" or name == "fputs": return CI_LIBC_KIND_FN
     if name == "putc" or name == "perror" or name == "feof" or name == "ferror" or name == "fread" or name == "fwrite": return CI_LIBC_KIND_FN
     if name == "strcpy" or name == "strncpy" or name == "strstr" or name == "strrchr" or name == "strerror": return CI_LIBC_KIND_FN

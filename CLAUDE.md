@@ -193,6 +193,29 @@ don't add callers of `keys()`/`values()`/`items()` as `Vec`s, don't byte-copy
 a non-`Copy` element out of a container, and follow the D44 entry's
 non-compliance list rather than isolated fixes.
 
+**D51 has one canonical, complete source:
+`docs/Ruling-modeled-C-ownership-effects-conventions-and-foreign-lifetimes.md`**
+— Eric's ruling on modeled C, not a draft or summary. Any document, comment,
+test, TODO, plan or behavior that conflicts with it is false and
+non-conforming. Don't edit, reinterpret, narrow or broaden it; the
+specification and decision log must conform to it, and
+`docs/modeled-c-implementation-plan.md` is a derivative execution plan that
+can't amend it. Its test for every C-interop inference is *what happens if
+this inference is wrong?*: infer silently only what can at worst remove
+capability or reject a valid program (dependency, invalidation, nullable,
+thread-bound, coarse domain, presentation sugar); never infer what can create
+unsafety (ownership, destruction, consumption, retention, independence,
+static lifetime, success, thread crossing) — those come from an explicit
+`c facade` clause, an explicitly adopted convention profile, or a proof, and
+never from a name. Never half-model: a safe constructor with no destruction
+contract is a leak and is non-compliant (§65). **Ordering (§66): the SQLite
+facade is written first and must compile against the real header before any
+example, release UAT, blog sample or documentation example is rewritten
+against the new surface** — validation artifacts test the rule, they do not
+define it. Until the facade language lands, the compiler is NON-COMPLIANT:
+don't add safe c_import constructors, wrappers or method sugar that grant
+ownership, and don't teach new code that a name proves a destructor.
+
 **`FnAbi` is the single ABI source of truth — never re-derive call ABI
 per-path.** Every function signature has ONE ABI descriptor (`FnAbi` with a
 per-parameter `PassMode`: `Direct`/`Indirect`/`IndirectPlace`/`Fat`/`Ignore`),
@@ -300,6 +323,24 @@ into under pressure to complete.
 with a human that the check is wrong. Never downgrade it to a warning, add an
 exemption, or route around it.
 
+**Editing a user program to make it pass.** Release UAT fixtures
+(`build/release_uat_fixtures/`), `examples/`, and any code published on the
+blog or the homepage are contracts with Eric and with everyone who has read
+them: they are what an application developer writes. When a compiler, spec,
+or stdlib change breaks one, the change is what broke. Stop and take it to
+Eric; never edit the program so the new rule passes. That is deleting a
+failing test. (2026-06-17 a c_import rule change broke the raylib spiral UAT;
+it sat broken until 2026-09-07, when the fixture was rewritten to `unsafe` to
+go green, without Eric's knowledge, while his blog still showed the original.)
+
+**`unsafe` in a user program.** An application developer — someone writing a
+game, a site, a tool over a C library — never writes `unsafe`. If a UAT
+fixture or an example needs it, the compiler forced a user somewhere they
+should never be, and the defect is the compiler's: model the C surface, prove
+the call, or make it safe. `with build :user-programs-safe` (a gate of
+`:release-uat`) fails on any `unsafe` in those programs. `unsafe` belongs to
+library maintainers and the compiler's own runtime.
+
 **"Pre-existing" without evidence.** A failure is pre-existing only if you've
 verified it on the previous commit. Otherwise it's your failure, renamed. Never
 use `git stash` to answer this; use `git worktree` or a separate clone.
@@ -370,13 +411,14 @@ Two surfaces, never conflated:
   That is the entire user-facing surface.
 - **`with_*` symbols and everything in `rt/*.w` are the compiler's own internal
   runtime/ABI.** User *source* never names a `with_*` symbol — the compiler emits
-  those calls. `rt/regex_runtime.w` (`with_regex_*`) is the **compiler's** regex,
-  compiled as part of the compiler, not a foreign object to embed and hand out.
+  those calls. (The `with_regex_*` shim, `rt/regex_runtime.w`, is gone:
+  `std.regex` is a facade over the pcre2 `.wo` bundle, `std.re`, D38/D39.)
 
 Never reason as if a user program must *link* or *resolve* the internal runtime.
-If you catch yourself asking "how does a user program get the `with_regex_*`
-symbols?", **stop** — the question is malformed. Users reach regex through
-`std.regex`. `rt/*.w` is part of the compiler; treat it that way.
+If you catch yourself asking "how does a user program get the `with_*`
+symbols?", **stop** — the question is malformed. Users reach the runtime
+through the language and `std.*`. `rt/*.w` is part of the compiler; treat it
+that way.
 
 ---
 
@@ -412,8 +454,8 @@ same violation as C in the compiler. With IS a scripting language; there is no
   - `sed '/pat/d'`      →  `... | with -n 'if not line.contains("pat"): print(line)'`
   - `grep pat`          →  `... | with -n 'if line.contains("pat"): print(line)'`
     (also `.starts_with`/`.ends_with`; `grep -i` is `line =~ /pat/i`)
-  - `cut -f2`           →  `... | with -n 'print(line.split("\t").get(1))'`
-  - `awk '{print $2}'`  →  `... | with -n 'print(line.split(" ").get(1))'` — exact
+  - `cut -f2`           →  `... | with -n 'print(line.split("\t")[1])'`
+  - `awk '{print $2}'`  →  `... | with -n 'print(line.split(" ")[1])'` — exact
     separator only until `str.fields()` lands (#959)
   - `wc -l`, `tail`, sums → `with -e` with a loop over `stdin.lines()` (the
     whole input, so END-style work is a print after the loop); `-n` gains
@@ -537,6 +579,19 @@ compiler), so a green cannot be recorded under the wrong driver. There is no
 `:update-seed`: only `:seed` writes `src/main`. `:test-green` records evidence
 from a completed test run; it is not a substitute for running `:test`. The
 iterate tier (`with check`, `with build :dev`) uses the installed compiler.
+
+**A green belongs to the sources, not to the commit or the worktree (D49).**
+`:last-green` publishes the green keyed on the battery's inputs, the pinned
+seed and the host (`~/.local/with-green/green.tsv`). The inputs are the
+committed tree without `docs/` and without top-level `*.md` — the build
+measures software, not documents (Eric, 2026-09-21), so the specification is
+not an input and a docs-only commit keeps its green (D50: key on what the
+output is made from). `GreenEvidence.w` and `build/retention.w` apply the
+same rule and must agree byte for byte. After a squash-merge of a branch
+whose battery passed, the reseed on main is `git pull`, `src/main build`,
+`out/release/bin/with build :install-user`: no second `:fixpoint` or `:test`.
+The gate refuses a dirty worktree and any tree that differs by a byte; never
+re-run a battery over sources that already passed one.
 
 If the seed, installed compiler, and release binaries are all broken, the
 compiler cannot be recovered.
@@ -803,7 +858,8 @@ must come from `compiler_analyze_file` facts:
 
 - `tools/annotate_receivers.w`: finalized Sema receiver requirements.
 - `tools/migrate_receivers.w`: Sema declaration scope/mode plus lexical splices.
-- `tools/relocate_methods.w`: Sema top-level method/owner/mode plus reindentation.
+- `with migrate-receivers` (built in, `src/ReceiverMigration.w`): Sema top-level
+  method/owner/mode plus reindentation; `--report`, `--list`, `--apply`.
 - `tools/migrate_method_arg_moves.w`: structured compiler diagnostics and spans.
 
 The removed receiver/frozen/closure/diagnostic-map tools must not be recreated;
@@ -827,8 +883,10 @@ is red only when the verdicts DIFFER; known-shipped findings like #693's enum
 cells and the #608 POD-leak pins read as `same`).
 
 ### LLDB (preferred)
+The compiler's objects name their sources under `/with-src`, not under the
+checkout (D50: one tree, one binary, in any worktree), so give lldb the map:
 ```
-lldb -- ./out/stage/bin/with-stage2 check src/main.w
+lldb -o "settings set target.source-map /with-src $PWD" -- ./out/stage/bin/with-stage2 check src/main.w
 (lldb) run
 (lldb) bt all
 ```

@@ -14,6 +14,9 @@ use std.zl.infback
 use std.zl.inffast
 use std.zl.inflate
 use std.zl.inftrees
+use std.zl.ioapi
+use std.zl.mztools
 use std.zl.trees
 use std.zl.uncompr
+use std.zl.unzip
 use std.zl.zutil

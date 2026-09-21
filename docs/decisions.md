@@ -10,7 +10,7 @@ decision supersedes an earlier one, say so in both.
 
 ---
 
-## D45 — wasm32 is a freestanding target whose "libc" is the With runtime over WASI preview1, with an emitted JS host
+## D53 — wasm32 is a freestanding target whose "libc" is the With runtime over WASI preview1, with an emitted JS host
 
 **Date:** 2026-09-19. **Status:** implemented on the `wasm-target` branch
 (fork); not yet a BDFL ruling. Design note: `docs/wasm-target.md`.
@@ -62,6 +62,355 @@ rejected: the link fails loudly instead.
 about (async on wasm); the runtime retirement (D30) moves the platform
 layer in-unit (then `rt/wasm.w` compiles like the embedded stdlib and the
 cross-object directory goes away).
+
+---
+
+## D52 — A global is never moved out of; a `const` is a value, not a place
+
+**Date:** 2026-09-21. **Status:** ruled — the §9.1c sentence below was
+blessed verbatim the same day ("blessed") and landed (#1245); the compiler
+enforces it (#1242).
+
+**Decision.** Consuming a module global — binding it by value
+(`let out = g`), passing it to a plain-`T` parameter, returning it (tail or
+`return`), or calling a `move self` method on it — is a compile error when
+its type needs drop: "cannot move out of global `g`: a global always holds a
+value; clone it (`.clone()`) instead". Reading, viewing (`g.get(0)`,
+`let v = g.field` as a D27 alias), mutating in place and reassigning stay
+legal. A `const` is exempt: it desugars to a comptime value and every use
+materializes it, so `return SOME_CONST` transfers nothing.
+
+**Context.** `let out = g; g = Vec.new(); out` double-freed
+(`debug-alloc: DOUBLE FREE ... origin=Vec`). MIR showed why: inside a
+function the global read lowered as `_1 = copy _2` — a byte copy of a
+non-Copy value with no blanking — so the reassignment's `drop(_2)` and the
+returned value freed one buffer (§2.3: transport never produces a second
+live value). In `main` the same spelling lowered as `move` plus
+`_1 = const zst`, a blanked global that every other function still sees as
+holding a value. And the checker's MOVED mark on a global is not
+per-function: after `fn f(): let s = g`, every later body reported
+"use of moved value" for `g`.
+
+**Alternatives.** (a) Per-global drop flags: runtime state for a property
+that cannot be decided statically across functions, and it would legalize
+a global that is empty from some other function's point of view. (b) Blank
+on move: the same empty-global hole, silently. (c) Treat `let x = g` as a
+D27 alias of the global place: consistent with `let v = g.field`, but a
+spec change (the ident form moves everywhere else) and it does nothing for
+the argument, return and `move self` spellings. (d) Reject: the only
+option under which "a global always holds a value" is true in every
+function, and the fix-it is the one the programmer means (`.clone()`).
+
+**§9.1c (blessed).** "A global always holds
+a value: it is observed, mutated in place, or reassigned, never moved out
+of; an owned copy is spelled `.clone()`. A `const` is a value, not a
+place — each use materializes it."
+
+**Reopens if** globals gain a statically tracked vacancy (a `global var`
+of `Option[T]` already expresses "sometimes empty" without one).
+
+---
+
+## D51 — Modeled C: ownership, effects, conventions and foreign lifetimes live in a checked facade; one canonical ruling
+
+**Date:** 2026-09-20. **Status:** ruled; specification projections blessed
+the same day ("Canonized into law") and landed as §16.2b plus the
+replacements in §16.2a, §16.3c, §15.3, §16.3d, §18.5 and §18.8
+(`docs/modeled-c-spec-projection-draft.md` records the projection and its
+traceability). The complete, controlling text is
+`docs/Ruling-modeled-C-ownership-effects-conventions-and-foreign-lifetimes.md`
+(Eric's ruling, 69 sections). As with D22, that file is canonical: this entry
+is a pointer, the specification carries conforming projections, and
+`docs/modeled-c-implementation-plan.md` is a derivative execution plan that
+cannot amend it. Any document, comment, test, TODO or behavior that conflicts
+with it is non-conforming.
+
+**Context.** `examples/c-interop` had been cut down to hand-written externs
+(e0ce209b) and then rewritten as a Rust-style wrapper module with `unsafe` in
+it; `:user-programs-safe` flagged it and Eric ruled that this is exactly what
+the gate exists to prevent. The compiler marks a c_imported function raw on
+type spelling alone (`SemaDecl.w` ~735-765), §16.2a's auto-methods construct
+handles safely with no `Drop` (a leak), and the #357 owning wrapper emits its
+constructor as `unsafe fn`. The brief that preceded the ruling, with the
+reference-language evidence (all seven `.reference/` trees, cited) and a
+survey of real headers, is `docs/completed/modeled-c-decision-brief.md`.
+
+**The ruling, in its own governing sentences.**
+> With uses the strongest reliable evidence available, including conventions
+> where doing so is safe and useful.
+
+> A convention may be inferred silently when being wrong can only remove
+> capability or reject a valid program. A convention that can create memory
+> unsafety must be explicit, strongly established, or deliberately trusted.
+
+> Heuristics may suggest; they do not decide safety-critical semantics.
+
+> With proves what it can, trusts what the facade asserts, exploits safe
+> conventions where appropriate, refuses what none of those justify, and
+> never pretends one category is another.
+
+> A restrictive interpretation is the absence of a proof, not a choice between
+> program meanings.
+
+**Shape.** Semantic facts about C (ownership, destruction, consumption,
+retention, dependency, independence, status, preservation, nullability,
+callbacks, threads, presentation) live in a `c facade name:` block of ordinary
+With syntax after `use c_import(...)`. The core abstraction is the *resource*
+(opaque pointer, in-place struct, by-value token), never Copy, owning a
+foreign representation with a designated `drop` and any alternate
+`destroys`. Evidence precedence: explicit facade clause → explicitly adopted,
+versioned convention profile → conservative default; ABI/header facts
+constrain all; every fact carries provenance that `with analyze` and
+diagnostics expose. Unknown independence is dependency; unknown preservation
+invalidates; unknown status stays uninterpreted; no `0 == success` rule;
+out-parameter production is NULL-initialize-then-inspect; a failed status may
+still produce ownership. Strings are `Option[&CStr]` with explicit
+`to_str()` / `to_str_lossy()` / `to_owned()`; no `char *` becomes `str`
+silently. Foreign-state domains (`errno`) give ownerless C storage an origin.
+Resources are creator-thread-bound; `send` requires `drop_any_thread` in v1.
+Facades and profiles are versioned packages, never compiler tables.
+
+**Supersedes / narrows.** D4's `retains:` attribute is subsumed by the
+facade's `retains … by …` clause (one retention system). §16.2a's "proven
+ownership cleanup" paragraph is replaced: name heuristics may shape
+presentation only. §16.3c's evidence-source list is replaced by the ruling's
+precedence; "package-supplied binding metadata" is a facade package, which
+does not revive the per-package compiler tables D46 rejected.
+
+**Non-compliance.** Every existing safe C auto-constructor without a
+complete destruction contract (§65) reverts to raw or becomes fully modeled.
+The compiler is non-compliant until the facade language is implemented.
+
+**Ordering (§66).** The SQLite facade is written first, against the real
+header, and must compile before any example, release UAT, blog sample or
+documentation example is rewritten against the new surface: validation
+artifacts test the rule, they do not define it.
+
+**Reopen if** a facade-asserted contract class turns out to be unverifiable
+in a way that makes safe application code unsound in practice, or a convention
+profile is found to need compiler-owned knowledge to work.
+
+---
+
+## D50 — The build keys work on what it is made from: content of inputs and the producing tool, never a commit, a checkout or the build driver
+
+**Date:** 2026-09-20. **Status:** ruled (Eric: "our entire build process is absolutely addicted to re-doing things it's already done"; after the survey and the reference comparison, "correct. please implement it").
+
+**Context.** A survey of one battery (build 274 s, fixpoint 107 s, test 836 s) and the cache code found the redo had one shape: identity standing in for content. `:fixpoint` recompiled what `build` had just compiled; every action's key carried the orchestrating binary; the compiler named its checkout in DWARF, in module link-name hashes and in the linker's debug map, so nothing built in one worktree was usable in another; green evidence named a commit (D49).
+
+**What the others do** (verified in `.reference/`). Go: action ID = content of inputs + the ID of the tool that produces the output; dependents hash a dependency's *content* ID, so a byte-identical rebuild stops there; `-trimpath` always; one per-user cache; test results cached on the binary plus what the test read. Zig: content digests + compiler version; byte-for-byte stage3/stage4 in CI release scripts only; manifests store prefix-relative paths. Rust: "uplifts" a later stage from artifacts an earlier one built (`compile.rs:1089`); `omit-git-hash` on by default for dev ("can cause a lot of rebuilds"); `remap-debuginfo`; `download-rustc = if-unchanged`. Scala 3: two compiles, API-hash early cutoff, `-sourceroot`. Bazel (Mojo's tree): content digests, hermetic, shared disk and remote caches. Vale: `sbt clean` and `rm -rf` every build — the counter-example.
+
+**Decisions.**
+1. `:fixpoint` compares the unit digests of the two compiles the build already does (`stage2`; `link-compiler`, which is a stage3). No extra compile, and the whole compiler: the old objects were `--emit-obj` module objects holding main.w alone. (#1224)
+2. An action that names its compiler keys on the seed `WITH` names, not on the orchestrator; a workspace compile keeps the driver, which is its producer. The state records each signature component so a stale reason names what changed. (#1225)
+3. `WITH_FILE_PREFIX_MAP=<from>=<to>` (clang's `-ffile-prefix-map`): the mapped root is what enters the DWARF compile unit, the module link-name hash and, with `-oso_prefix`, the debug map. The compiler's own build maps its root to `/with-src`. One commit built in two worktrees gives a byte-identical release compiler. Debuggers map back: `settings set target.source-map /with-src <checkout>`.
+
+**Still to do, in order:** a per-user content-addressed artifact store (a known tree's compiler is fetched, not built: Rust's `if-unchanged`); early cutoff on a dependency's output content (Go's content ID); no commit stamp in dev builds (stamp at install/package); cacheable test lanes (Zig: a run step is cached unless it declares side effects). Withdrawn: a finer-than-whole-compiler test fingerprint — Rust's compiletest and Go both invalidate every test when the compiler changes.
+
+**Reopen if** two builds of one identity are found to behave differently; fix the nondeterminism, do not re-key on identity.
+
+---
+
+## D49 — Green evidence is keyed on what was tested: git tree, pinned seed, host
+
+*Amended 2026-09-20 (D50 applied):* the identity keys on the battery's
+inputs, not the whole tree — `git ls-tree HEAD` without the `docs` entry and
+without top-level `*.md`, as the object name `git hash-object` gives that
+listing. A docs-only commit produced a tree with no green and `:install-user`
+refused a compiler whose sources had passed; Eric: "best fix this
+immediately". `GreenEvidence.w` and `build/retention.w` apply one rule;
+`behav_green_identity_keys_on_inputs.w` pins it.
+
+*Amended 2026-09-21:* the first amendment kept three docs files in the
+identity because lanes read them (the specification, `with-abi.sha256`,
+`with_for_ai.md`); a spec-only merge (#1245) then left main with no green
+and forced a full battery. Eric: "build measures software not documents."
+No file under `docs/` is an input; the lanes that read one still run on a
+docs-only change (spec-inventory-check) and record nothing.
+
+**Date:** 2026-09-20. **Status:** ruled (Eric: "it is moronic that we are testing what we already tested"; "proceed").
+
+**Context.** #1222's battery passed in a staging worktree. It was squash-merged; main's tree was byte-identical to the tested head (`git diff` empty). `:install-user` still required a second full battery on main, 25 minutes, because `last-green` and the driver's install gate accept only the exact compiler binary that was tested (`compiler_sha256`), and the binary names its commit (`v0.15.2.1-g<hash>`, a post-link stamp) and, through debug info, its worktree. A squash-merge or another checkout of the same sources is a "different" compiler.
+
+**Decision.** What a battery tests is its inputs. `:last-green` records the source identity — `git rev-parse HEAD^{tree}`, the digest of the pinned seed that drove and seeded the chain, and the host — and publishes it to a store every worktree reads (`$WITH_GREEN_DIR`, else `~/.local/with-green/green.tsv`). `require-last-green` and the driver's `:install-user` gate accept a compiler when either the local manifest names that binary (unchanged) or the worktree is clean, its stage chain was seeded by a compiler `seed.lock` pins, and its source identity has a published green. After a squash-merge of a tested branch the reseed is `git pull`, `build`, `:install-user`.
+
+**What it trusts.** Same tree, same seed, same host: same compiler behavior. `:fixpoint` and the seed-driven battery already enforce that determinism. A dirty worktree has no identity (untracked paths under `examples/` excepted: a user's own programs are not build inputs), so uncommitted edits never borrow a green; any tree change, one byte, is a new identity.
+
+**Alternatives weighed.** Stamping the binary with the tree hash, or keying on the unstamped binary: both still differ across worktrees (debug paths). Keeping the branch worktree until install: relies on a person not cleaning up, and did not survive its first day.
+
+**Not done here.** The test cache is still keyed on the stamped compiler (`0 cached, N ran` after a merge); it needs no re-run for the reseed any more, but a developer who wants `:test` on main after a merge still pays for it.
+
+**Reopen if** a nondeterminism is found that makes two builds of one identity behave differently; fix that, do not re-key on the binary.
+
+---
+
+## D48 — The specification does not catalogue `lib/std`
+
+**Date:** 2026-09-20. **Status:** ruled (Eric: "I do not want the language
+spec to care what we do in lib/std"). §18.6's Module Map table and the
+`std.internal` paragraph removed; the `spec-inventory-check` stdlib arm
+retired.
+
+**Context.** Adding `std.zip` failed `spec-inventory-check`, which required
+every top-level module under `lib/std` to have a row in the spec's Module Map.
+That put Eric's exact-wording sign-off on every library addition.
+
+**What the others do.** Go's spec names two packages, `main` and `unsafe`,
+both compiler-known. Zig's langref uses `std` in examples and catalogues
+none of it. Swift keeps the standard library in its own documents. Rust's
+Reference disclaims the standard library (from memory; its tree is not
+checked out in `.reference/`).
+
+**Reasoning.** A specification says what programs mean; a module list says
+what ships. The table was a second source of truth, so it drifted and needed
+a gate. What stays normative is the library surface the language itself
+depends on, each in its own section: the prelude, `Option`/`Result` and
+`?`/`??`, the traits behind syntax (`Iter`, `Try`, `Drop`, `IndexGet`,
+`IndexPlace`, `Contains`), what literals and comprehensions build, the regex
+literal engine, and the collection ownership doctrine (D22, D27, D44). The
+test: would a program's meaning change if this changed?
+
+**Reopen if** a library module becomes something syntax depends on; it then
+gets its own normative section, not a table row.
+
+---
+
+## D47 — Lending is not receiving: a `c_import`ed `const char *` parameter accepts a `str`; an application developer never writes `unsafe`
+
+**Date:** 2026-09-20. **Status:** ruled (Eric: "there is no way this should
+have to be declared unsafe. This flies in the face of the mission"; "no UAT
+code should have `unsafe` in it … if 'normal' users are using unsafe - WE
+forced them into a situation they shouldn't be in"). §16.3c sentence blessed
+2026-09-20. Narrows #379 (a88df01a).
+
+**Context.** 1e53f8aa (2026-06-11) modeled every `const char *` parameter of
+a c_imported function as a string input; the raylib spiral on Eric's blog
+dates from then. a88df01a (2026-06-17, #379) replaced that with a curated
+libc overlay: outside the list, a string parameter made the function the raw
+surface. That broke the spiral release UAT, which sat broken until
+bd9683f0 (2026-09-07) rewrote the fixture to
+`unsafe { InitWindow(900, 600, c"...".ptr) }` to go green, without Eric's
+knowledge. By 2026-09-19 every release UAT fixture said `unsafe` (30 uses).
+
+**Reasoning.** #379's rule is sound for the direction it was written for:
+With never reads or frees C memory on a guess (`strlen` on an arbitrary
+`char *`, ownership of a return). It was applied to the other direction,
+where nothing is guessed: With hands C a valid NUL-terminated buffer it owns.
+The header forces one meaning for a `str` argument to a `const char *`
+parameter (mission: "forced … by a header"); c_import is the modeling step,
+not raw C. The one hazard in lending is a callee that keeps the pointer,
+which no spelling by the programmer resolves, so it is the compiler's: a
+literal is static and cannot dangle; any other `str` goes through call-scoped
+storage that stays readable, so a retaining callee reads stale text, never
+freed memory. `retains:` remains the way to hand a keeping callee an owned
+copy. A hand-written `extern fn` with raw pointers is still raw C.
+
+**Alternatives weighed.** Assume non-retention (Swift's rule): a wrong guess
+is a silent use-after-free. Per-library contract data: the per-package upkeep
+Eric rejected for `with get` (D46). Inference from parameter names: unsound.
+Proof from C source when `with get` built it: a later refinement.
+
+**Process rules this produced** (CLAUDE.md): a UAT fixture, an example or
+published code is a contract — a change that breaks one stops and goes to
+Eric, and the program is never edited to pass; `with build
+:user-programs-safe` fails on `unsafe` in those programs.
+
+**Reopen if** a lent-string hazard appears that readable storage does not
+cover.
+
+---
+
+## D46 — `with get` builds a C package from source from the recipe read as data; no per-package files; `with cc` is clang inside the binary
+
+**Date:** 2026-09-19. **Status:** ruled (Eric: "with get must build c when
+there's no binary for the package"; "we cant be writing special case code
+for every conan package"; prerequisites "we need to expose them to the
+user … user will need to take care of it"; "OpenSSL can't be a UAT").
+Specification §18.5 and §18.8 blessed 2026-09-19. Implemented in #1208.
+
+**Context.** Conan Center publishes no Linux armv8 binaries at all (zlib,
+bzip2, sqlite3, openssl, libcurl, raylib checked 2026-09-18), so every
+`with get c.X` on linux-aarch64 failed. The old fallback compiled every `.c`
+in the tarball with the system `cc` and gave up on any recipe with patches or
+a configure step — zlib already — and could not be locked.
+
+**Decision.**
+- *Compiler:* clang's driver is linked into `with` (`with cc`), as Zig does;
+  the toolchain never trusts a system compiler. `clang_main` lives in the
+  clang tool's own objects, archived into the SDK as `libclangMain`; one plain
+  extern is aliased to the mangled name per linker. An SDK published before
+  this links a stand-in and the compiler says it has no C compiler; a platform
+  gains `with cc` when its SDK is republished.
+- *Build knowledge:* the package's own CMake build, driven by `cmake` and
+  `ninja` with `with cc`. What is package-specific comes from the recipe Conan
+  Center already publishes, **read as data and never executed**: archive,
+  digest, patches, requirements, and `tc.variables`, evaluated against the
+  option defaults and the host under the `if`s that hold.
+- *Prerequisites* (`cmake`, `ninja`, Perl for OpenSSL, …) are named and the
+  build stops; installing them is the programmer's step. A release UAT may not
+  require one, so OpenSSL is not a UAT.
+
+**Rejected.** Per-package port files (written, then deleted the same night:
+"special case code for every conan package"). Executing `conanfile.py`
+(needs Python and Conan). pkg-config / system packages (apt ceremony, no
+Windows story). Hosting our own binaries as the primary answer (moves the
+gap). Detecting the stand-in by comparing function addresses (LLVM folds two
+distinct function symbols to "not equal"; the stand-in was called).
+
+**What would reopen it.** A class of popular packages whose recipes cannot
+be read as data (logic the evaluator cannot follow), or Conan Center
+publishing binaries for every platform With targets.
+
+---
+
+## D45 — A copy is never implicit unless it is O(1); an allocating copy is spelled
+
+**Date:** 2026-09-19. **Status:** ruled (Eric: "unless copy is O(1) we
+should[n't] even consider doing it by default"; "yes for now option A … that
+lands regardless of what happens to str later"). Specification §13.6's
+examples do not yet conform (they build owning collections of `str` from
+views without a clone); the wording is Eric's to bless. Measurement that
+could reopen this: #1211.
+
+**Question.** `let words: HashSet[str] = [w for w in tokens]` — `tokens` is
+observed (D44), so `w` is a `&str`. Does the comprehension clone it? Mission
+¶2 argues yes (the target type forces exactly one meaning). The same question
+covers `let s: str = w` and passing a view to a consuming parameter.
+
+**Ruling.** An owned-value demand on a view `&T` materializes a `T` only when
+`T: Copy` (D22). For a type whose copy allocates, the programmer writes
+`.clone()`. A comprehension's element, key and value positions are
+owned-value demands like any other; they get no exception. A view of a Copy
+type stored by a comprehension materializes (it stored `&i32` before); a view
+of a Drop-class value is an error that says to clone it.
+
+**Why.** Meaning is one gate; cost visibility is the other ("close to the
+machine"). Verified in `.reference/`: of go, mojo, rust, scala3, swift, Vale
+and zig, none copies a string implicitly while paying an allocation for it.
+Every implicit-copy language made the copy O(1) first — Mojo (refcount, COW,
+small strings inline), Swift (ARC retain, skipped for small and immortal
+strings), Vale (`str` is always a shared type), Go and Scala (shared immutable
+bytes). Rust, whose `String::clone` allocates, spells it. Mojo 0.25.6 drew
+this exact line: `Copyable` became explicit (`.copy()`), `ImplicitlyCopyable`
+opt-in; `List`, `Dict` and `Set` lost implicit copy because theirs allocates,
+`String` kept it because its copy is a refcount bump. With's `str` is an owned
+`(ptr, len)` buffer and §15.2 already marks `&str → str` as "(allocates)".
+Cloning silently would have made With the only one of the eight that hides a
+per-element allocation.
+
+**Rejected.** Implicit clone in a typed comprehension only (a second rule for
+one position, and the same hidden cost). A separate cheap string type in the
+library (the default type, the one in every example, still needs the clone).
+
+**What would reopen it.** `str` becoming O(1) to copy — immutable shared bytes,
+a refcount in the allocation header, immortal literals (#1211 measures whether
+that pays, including deleting the per-free `rt_payload_start_is_owned`
+lookup). Then D22 extends by one line, and the string clones this ruling
+requires become redundant and are removed. If the numbers are bad, this is the
+permanent answer and §13.6's examples iterate `move tokens`.
+
+**Supersedes nothing.** Extends D22 (owned-value demand) and D44 (traversal
+observes) to the positions a comprehension stores from.
 
 ---
 

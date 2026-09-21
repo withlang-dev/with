@@ -104,6 +104,12 @@ fn compilation_run_dsymutil_best_effort(bin_path: &str):
         return
     var argv = ""
     argv = compilation_argv_append(argv, "dsymutil")
+    // The linker dropped this root from the debug map's object paths
+    // (-oso_prefix, Link.w); dsymutil puts it back to find the objects.
+    let oso_root = link_stage_file_prefix_map_root()
+    if oso_root.len() > 0:
+        argv = compilation_argv_append(argv, "-oso-prepend-path")
+        argv = compilation_argv_append(argv, oso_root)
     argv = compilation_argv_append(argv, bin_path)
     let _ = runtime_exec_argv_capture(argv, "/dev/null", "/dev/null", 0)
 
@@ -1213,6 +1219,32 @@ impl Compilation:
             return ""
         bin_path
 
+// WITH_UNIT_DIGESTS=<file>: before a binary build deletes the objects it
+// linked, record the sha256 of each — the canonical object (unit 0) and every
+// <obj>.u<k>.o — one `u<k> <sha256>` line per unit, in unit order. Two
+// compiles of one program by two compiler generations agree on this file
+// exactly when every unit agrees, which is the fixpoint `:fixpoint` checks:
+// the stage2 build and the release build already are those two compiles, so
+// the check costs no compile. (`--emit-obj` is module-object mode and holds
+// the root module alone; comparing two of those covered main.w only.)
+fn compilation_write_unit_digests(obj_path: &str) -> bool:
+    let digests_path = runtime_getenv("WITH_UNIT_DIGESTS")
+    if digests_path.len() == 0: return true
+    var text = ""
+    var k = 0
+    while k < 64:
+        let unit_path = if k == 0: with_str_clone_ref(obj_path) else: f"{obj_path}.u{k}.o"
+        if runtime_file_exists(unit_path) == 0: break
+        text = text ++ f"u{k} " ++ bundle_fingerprint_sha(runtime_read_file(unit_path)) ++ "\n"
+        k = k + 1
+    if k == 0:
+        runtime_eprint("error: WITH_UNIT_DIGESTS: no object at " ++ obj_path)
+        return false
+    if runtime_write_file(digests_path, text) != 0:
+        runtime_eprint("error: WITH_UNIT_DIGESTS: could not write " ++ digests_path)
+        return false
+    true
+
 fn compilation_execute_binary_link_plan(debug_info: bool, plan: CompilationBinaryLinkPlan) -> LinkStageResult:
     if not plan.ok:
         return link_stage_result_fail()
@@ -1230,6 +1262,11 @@ fn compilation_execute_binary_link_plan(debug_info: bool, plan: CompilationBinar
         compilation_run_dsymutil_best_effort(owned.bin_path)
         if profile_enabled():
             profile_emit("dsymutil", t_dsym, "")
+    if not compilation_write_unit_digests(owned.obj_path):
+        return link_stage_result_fail()
+    // WITH_KEEP_UNIT_OBJECTS=1 leaves the linked objects beside the binary, for
+    // diffing the unit a failed fixpoint names.
+    if runtime_getenv("WITH_KEEP_UNIT_OBJECTS").len() > 0: return link_result
     compilation_remove_file_best_effort(owned.obj_path)
     compilation_remove_unit_objects_best_effort(owned.obj_path)
     link_result

@@ -26,6 +26,7 @@ extern fn with_str_len(s: &str) -> i64
 extern fn with_vec_append_bytes(v: *mut u8, s: &str) -> Unit
 extern fn with_str_eq_ref(a: &str, b: &str) -> i32
 extern fn with_str_from_vec_u8(bytes: *const u8) -> str
+extern fn with_str_from_bytes(s: *const u8, len: i64) -> str
 extern fn with_alloc(size: i64) -> *mut u8
 extern fn with_free(ptr: *mut u8) -> Unit
 
@@ -101,8 +102,19 @@ impl CStr:
         self.len
 
     /// Raw pointer to the NUL-terminated bytes this `CStr` borrows.
-    pub fn ptr() -> *const i8:
-        self.ptr
+    pub fn ptr() -> *const i8: self.ptr
+
+    /// An owned copy of the text (D51 §41: allocation is explicit): the `str`
+    /// outlives the C storage.
+    pub fn to_owned() -> str: with_str_from_bytes(self.ptr as *const u8, self.len)
+
+/// View the NUL-terminated string C handed back (§16.1). The caller vouches
+/// that `ptr` is non-null, NUL-terminated, and stays valid while the view is
+/// used: that is the one fact With cannot check.
+pub unsafe fn CStr.from_ptr(ptr: *const i8) -> CStr:
+    var len: i64 = 0
+    while ptr[len] != 0: len += 1
+    CStr { ptr, len }
 
 // ── String conversion surface (§15.1–§15.3) ───────────────────────────
 

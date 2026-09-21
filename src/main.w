@@ -31,6 +31,7 @@ use InitTemplates
 use BuildGraphRuntime
 use BuildGraphCache
 use compiler.ClangDriver
+use compiler.GreenEvidence
 use compiler.DriverOptions
 use compiler.AbiStamp
 use compiler.Runtime
@@ -746,13 +747,14 @@ fn run_one_liner_command(argc: i32, one: &CliOneLiner, no_std: bool, alloc_mode:
 fn run_cli(argc: i32) -> i32:
     // `with cc ...` is clang; none of With's own flags apply to it.
     if cli_command(argc) == "cc": return with_cc_main()
-    // `with ar qc lib.a a.o b.o` / `with ranlib lib.a`: what CMake asks of an
-    // archiver, so a source build needs no binutils. The archive is written
-    // with its symbol index; ranlib has nothing left to do.
-    if cli_command(argc) == "ranlib": return 0
-    if cli_command(argc) == "ar":
+    // `with __ar qc lib.a a.o b.o` / `with __ranlib lib.a`: what CMake asks of
+    // an archiver, so a source build needs no binutils. They are the compiler
+    // invoking itself (the `__` prefix), not commands a user types. The
+    // archive is written with its symbol index; ranlib has nothing left to do.
+    if cli_command(argc) == "__ranlib": return 0
+    if cli_command(argc) == "__ar":
         if argc < 5:
-            with_eprint("usage: with ar <qc|rc|rcs> <archive> <object>...")
+            with_eprint("usage: with __ar <qc|rc|rcs> <archive> <object>...")
             return 2
         let members: Vec[str] = Vec.new()
         for i in 4..argc: members.push(with_arg_at(i))
@@ -1890,7 +1892,7 @@ impl PoolState:
         let err_text = with_fs_read_file(self.errs.get(idx))
         if err_text.len() > 0:
             with_ewrite(err_text)
-        with_eprint("[time] " ++ name ++ " " ++ build_graph_time_fmt(spent))
+        build_graph_time_eprint("[time] " ++ name ++ " " ++ build_graph_time_fmt(spent))
         let ran_via_runner = self.via_runner.get(idx)
         let effects_path = with_str_clone_ref(self.effects_paths.get(idx))
         if rc == 124:
@@ -2135,6 +2137,37 @@ fn build_options_for_graph_target(root: &str, base: &BuildCommandOptions, target
         options.output_kind = BuildOutputKind.Binary
     options
 
+// Whether dependency `dep_name`, which ran in this invocation, left its
+// declared outputs byte-identical to what they were when it was dispatched.
+// WITH_BUILD_NO_EARLY_CUTOFF=1 answers no, restoring "a dependency ran, so
+// rebuild".
+fn build_graph_dep_outputs_unchanged(root: &str, graph: &BuildGraph, dep_name: &str, names: &Vec[str], digests: &Vec[str]) -> bool:
+    if with_getenv_str("WITH_BUILD_NO_EARLY_CUTOFF").len() > 0: return false
+    var before = ""
+    for i in 0..names.len() as i32:
+        if names[i] == dep_name: before = digests[i].clone()
+    if before.len() == 0: return false
+    let index = build_graph_find_target_index_by_name(graph, dep_name)
+    if index < 0: return false
+    if build_cache_cutoff_digest(root, graph.targets[index]) != before: return false
+    with_eprint("[cutoff] '" ++ dep_name ++ "' re-ran to identical outputs; its dependents stay fresh")
+    true
+
+// The first dependency of `target` that failed or was skipped, or "".
+fn build_graph_first_broken_dep(target: &BuildGraphTarget, failed: &Vec[str]) -> str:
+    for dep in target.deps:
+        if failed.contains(dep): return dep.clone()
+    ""
+
+// `with run` builds a target only to run it: the person asked for their
+// program's output, so the build's timing report stays out of it (a failed
+// build still prints its errors). `with build` and the compiler's own lanes
+// report times as before.
+var build_graph_quiet_times: bool = false
+
+fn build_graph_time_eprint(line: &str):
+    if not build_graph_quiet_times: with_eprint(line)
+
 unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, action_sema: *mut Sema, options: &BuildCommandOptions, survey: bool) -> i32:
     let no_strings: Vec[str] = Vec.new()
     if graph.targets.len() == 0:
@@ -2153,6 +2186,11 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
         return generated_rc
     let completed_targets: Vec[str] = Vec.new()
     let skipped_targets: Vec[str] = Vec.new()
+    // Early cutoff: a target's output digest taken when it was dispatched, by
+    // name. A dependency that re-ran and produced the same bytes has not
+    // changed anything its dependents can see (Go's content ID).
+    var cutoff_names: Vec[str] = Vec.new()
+    var cutoff_digests: Vec[str] = Vec.new()
     // Per-target wall time: only the top-level driver records/reports; worker
     // re-entries (forced action / test workers) stay silent.
     let times_top_level = not force_action_worker_target and not build_test_worker_env_enabled()
@@ -2191,7 +2229,7 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
             timed_names.push(with_str_clone_ref(timing_name))
             timed_ns.push(spent)
             timed_rss.push(build_graph_rt_self_maxrss() - timing_rss0)
-            with_eprint("[time] " ++ timing_name ++ " " ++ build_graph_time_fmt(spent))
+            build_graph_time_eprint("[time] " ++ timing_name ++ " " ++ build_graph_time_fmt(spent))
             timing_name = ""
         if build_graph_kind_removed(target.kind):
             with_eprint("error: build.w target kind " ++ build_graph_kind_name(target.kind) ++ f" ({target.kind}) was removed; regenerate your build graph")
@@ -2247,6 +2285,26 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
                         pool_failed_rc = final_rc
             if pool_failed_rc != 0:
                 return pool_failed_rc
+        // With its dependencies finished, a non-Group target asks again: one
+        // that re-ran to byte-identical outputs did not rebuild anything.
+        if target.kind != 9 and dep_rebuilt:
+            dep_rebuilt = false
+            for di in 0..target.deps.len() as i32:
+                let dep_name = target.deps[di]
+                if skipped_targets.contains(dep_name) or not completed_targets.contains(dep_name): continue
+                if build_graph_dep_outputs_unchanged(root, graph, dep_name, &cutoff_names, &cutoff_digests): continue
+                dep_rebuilt = true
+                break
+        // Survey keeps going past a failure, never through one: a target whose
+        // dependency failed or was itself skipped does not run (zlib-promote
+        // once overwrote lib/std/zl after zlib-test failed), and counts as a
+        // failure of the run.
+        if survey:
+            let broken_dep = build_graph_first_broken_dep(target, &survey_failed)
+            if broken_dep.len() > 0:
+                with_eprint("survey: skipping '" ++ target.name ++ "' (dependency '" ++ broken_dep ++ "' did not succeed)")
+                survey_failed.push(with_str_clone_ref(target.name))
+                continue
         if target.kind == 9:
             if not dep_rebuilt:
                 skipped_targets.push(with_str_clone_ref(target.name))
@@ -2258,6 +2316,9 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
                     skipped_targets.push(with_str_clone_ref(target.name))
                     completed_targets.push(with_str_clone_ref(target.name))
                     continue
+        // About to run: remember what its outputs are now.
+        cutoff_names.push(with_str_clone_ref(target.name))
+        cutoff_digests.push(build_cache_cutoff_digest(root, target))
         let bootstrap_ready = with_fs_file_exists(runtime_probe_path) != 0 and with_fs_file_exists(link_metadata_path) != 0
         let runner_retry = runner_waits_for_bootstrap and bootstrap_ready
         if target.kind == 23 and (not runner_checked or runner_retry) and not build_action_worker_env_enabled() and not options.strict_effects:
@@ -2356,7 +2417,7 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
             completed_targets.push(with_str_clone_ref(target.name))
             continue
         if target.kind == 23:
-            if survey and survey_failed.len() > 0 and (target.name == "test-green" or target.name == "last-green"):
+            if survey and survey_failed.len() > 0 and (target.name == "test-green" or target.name == "last-green" or target.name == "last-green-record"):
                 with_eprint("survey: skipping evidence target '" ++ target.name ++ "' (earlier failures)")
                 continue
             if not build_action_worker_env_enabled():
@@ -2402,6 +2463,11 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
             let test_compiler = build_graph_test_compiler(root, target)
             var survey_target_failed = false
             if test_compiler.len() > 0:
+                // The tests are children of this worker, not workers: a
+                // `with build` a test runs must not inherit "run every
+                // target even when fresh".
+                build_action_clear_worker_env_for_children()
+                build_test_clear_worker_env_for_children()
                 let test_rc = build_graph_run_external_test_files(root, target, test_compiler, test_files)
                 if test_rc != 0:
                     with_eprint("error: build.w test target failed: " ++ target.name)
@@ -2521,9 +2587,9 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
         timed_names.push(with_str_clone_ref(timing_name))
         timed_ns.push(spent)
         timed_rss.push(build_graph_rt_self_maxrss() - timing_rss0)
-        with_eprint("[time] " ++ timing_name ++ " " ++ build_graph_time_fmt(spent))
+        build_graph_time_eprint("[time] " ++ timing_name ++ " " ++ build_graph_time_fmt(spent))
     if times_top_level:
-        build_graph_times_report(root, &timed_names, &timed_ns, &timed_rss, with_clock_nanos() - run_t0)
+        if not build_graph_quiet_times: build_graph_times_report(root, &timed_names, &timed_ns, &timed_rss, with_clock_nanos() - run_t0)
         // #679 RSS tripwire (Eric, 2026-09-02): measured peak is ~0.5 GB;
         // any target crossing 1 GB is a memory regression and fails the
         // build loudly. Raising the limit is a deliberate, visible edit
@@ -2806,9 +2872,6 @@ fn cli_fast_install_blessed(root: &str, target_name: &str) -> i32:
         with_eprint("error: missing " ++ compiler_path ++ "; run `with build` first")
         return 1
     let manifest = with_fs_read_file(resolve_join(root, "out/.build-state/last-green.json"))
-    if manifest.len() == 0:
-        with_eprint("error: missing last-green manifest; run `with build :last-green` after build/fixpoint/test")
-        return 1
     let data = with_fs_read_file(compiler_path)
     if data.len() == 0:
         with_eprint("error: could not read " ++ compiler_path)
@@ -2816,8 +2879,15 @@ fn cli_fast_install_blessed(root: &str, target_name: &str) -> i32:
     var digest: [32]u8 = [0 as u8; 32]
     sha256_hash_str(data, &raw mut digest[0] as *mut u8)
     let sha = sha256_hex(&digest[0] as *const u8)
+    var verified_by = "verified against last-green"
     if not manifest.contains("\"compiler_sha256\": \"" ++ sha ++ "\""):
-        with_eprint("error: " ++ compiler_path ++ " is not the compiler recorded by last-green; run `with build`, `with build :fixpoint`, `with build :test`, then `with build :last-green`")
+        let green_commit = green_by_source_identity(root)
+        if green_commit.len() > 0: verified_by = "these sources are green: recorded at commit " ++ green_commit
+    if verified_by == "verified against last-green" and manifest.len() == 0:
+        with_eprint("error: missing last-green manifest, and no published green for these sources; run `with build :last-green` after build/fixpoint/test")
+        return 1
+    if verified_by == "verified against last-green" and not manifest.contains("\"compiler_sha256\": \"" ++ sha ++ "\""):
+        with_eprint("error: " ++ compiler_path ++ " is not the compiler recorded by last-green, and these sources have no published green (a dirty or changed tree never borrows one); run `with build`, `with build :fixpoint`, `with build :test`, then `with build :last-green`")
         return 1
     let gate_rc = reseed_gate_smoke(root, compiler_path)
     if gate_rc != 0:
@@ -2829,7 +2899,7 @@ fn cli_fast_install_blessed(root: &str, target_name: &str) -> i32:
     if with_fs_chmod(dest, 0o755) != 0:
         with_eprint("error: could not chmod " ++ dest)
         return 1
-    with_write("[" ++ target_name ++ "] " ++ dest ++ " <- out/release/bin/with (verified against last-green)\n")
+    with_write("[" ++ target_name ++ "] " ++ dest ++ " <- out/release/bin/with (" ++ verified_by ++ ")\n")
     0
 
 fn run_build_command(options: BuildCommandOptions, graph_options: &BuildGraphCommandOptions) -> i32:
@@ -2993,7 +3063,9 @@ fn run_run_project_command(selected_target_hint: &str, opt_level: i32, no_std: b
         return 1
     if not repo_lock_acquire(selected_target_name):
         return 1
+    build_graph_quiet_times = true
     let build_rc = unsafe { run_build_graph(root, cfg, selected_graph, &raw mut load_result.sema as *mut Sema, options, false) }
+    build_graph_quiet_times = false
     repo_lock_release()
     if build_rc != 0:
         return build_rc
@@ -3852,6 +3924,11 @@ fn run_test_process(bin_path: &str, test_name: &str, quiet: bool) -> TestRunResu
         let _set_filter = build_graph_rt_setenv("WITH_TEST_FILTER", test_name)
     if quiet:
         let _set_short = build_graph_rt_setenv("WITH_TEST_SHORT", "1")
+    // A test binary is never a build worker, whoever launched `with test`: a
+    // lane driven by an older compiler (the pinned seed) still hands its
+    // worker switches down, and a `with build` the test runs would obey them.
+    build_action_clear_worker_env_for_children()
+    build_test_clear_worker_env_for_children()
     var argv = ""
     if target_spec_is_wasm():
         argv = wasm_program_exec_argv(bin_path)
@@ -3899,6 +3976,11 @@ fn run_test_binary_checked(bin_path: &str, target: &str, test_name: &str, quiet:
     let result = run_test_process(bin_path, test_name, quiet)
     if validate_test_run(result, directives, target, test_name):
         return 0
+    // Quiet spares the log a passing test's output. A failing test's output
+    // is the diagnosis (its panic line names the assertion).
+    if quiet:
+        if result.stdout.len() > 0: with_write(result.stdout)
+        if result.stderr.len() > 0: with_ewrite(result.stderr)
     1
 
 // `//! known-issue: #NNN` (BDFL ruling 2026-07-26, Rust compiletest

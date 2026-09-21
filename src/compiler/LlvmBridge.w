@@ -51,8 +51,8 @@ let LLVM_RealOGT: i32 = 2
 let LLVM_RealOGE: i32 = 3
 let LLVM_RealOLT: i32 = 4
 let LLVM_RealOLE: i32 = 5
-let LLVM_RealONE: i32 = 6
 let LLVM_RealUNO: i32 = 8
+let LLVM_RealUNE: i32 = 14
 let LLVM_ExternalLinkage: i32 = 0
 let LLVM_WeakAnyLinkage: i32 = 5
 let LLVM_InternalLinkage: i32 = 8
@@ -188,6 +188,7 @@ extern fn LLVMConstStructInContext(c: *mut u8, vals: *const *mut u8, count: u32,
 extern fn LLVMConstNamedStruct(ty: *mut u8, vals: *const *mut u8, count: u32) -> *mut u8
 extern fn LLVMConstArray2(elem_ty: *mut u8, vals: *const *mut u8, count: u64) -> *mut u8
 extern fn LLVMConstBitCast(v: *mut u8, ty: *mut u8) -> *mut u8
+extern fn LLVMConstIntToPtr(v: *mut u8, ty: *mut u8) -> *mut u8
 extern fn LLVMConstIntGetSExtValue(v: *mut u8) -> i64
 extern fn LLVMIsConstant(v: *mut u8) -> i32
 extern fn LLVMSizeOf(ty: *mut u8) -> *mut u8
@@ -730,6 +731,7 @@ pub fn wl_const_array(elem_ty: i64, vals_ptr: i64, count: i32) -> i64:
         LLVMConstArray2(elem_ty as *mut u8, vals_ptr as *const *mut u8, count as u64) as i64
 
 pub fn wl_const_bitcast(val: i64, ty: i64) -> i64: unsafe { LLVMConstBitCast(val as *mut u8, ty as *mut u8) as i64 }
+pub fn wl_const_int_to_ptr(val: i64, ty: i64) -> i64: unsafe { LLVMConstIntToPtr(val as *mut u8, ty as *mut u8) as i64 }
 pub fn wl_const_int_sext_val(v: i64) -> i64: unsafe { LLVMConstIntGetSExtValue(v as *mut u8) }
 pub fn wl_is_constant(v: i64) -> i32: unsafe { LLVMIsConstant(v as *mut u8) }
 pub fn wl_size_of(ty: i64) -> i64: unsafe { LLVMSizeOf(ty as *mut u8) as i64 }
@@ -750,7 +752,7 @@ pub fn wl_int_ugt() -> i32: LLVM_IntUGT
 // ── FCmp predicates ─────────────────────────────────────────────
 
 pub fn wl_real_oeq() -> i32: LLVM_RealOEQ
-pub fn wl_real_one() -> i32: LLVM_RealONE
+pub fn wl_real_une() -> i32: LLVM_RealUNE
 pub fn wl_real_olt() -> i32: LLVM_RealOLT
 pub fn wl_real_ogt() -> i32: LLVM_RealOGT
 pub fn wl_real_ole() -> i32: LLVM_RealOLE

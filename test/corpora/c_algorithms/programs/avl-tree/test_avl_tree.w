@@ -82,13 +82,13 @@ pub unsafe fn validate_subtree(__param_node: *mut _AVLTreeNode) -> c_int {
 
     (__local_key = ((avl_tree_node_key(__param_node) as *mut c_int)))
 
-    if ((((if not ((if (unsafe *__local_key) > counter: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if ((((if not ((if (*__local_key) > counter: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
         __assert_rtn(c"validate_subtree".ptr, c"test-avl-tree.c".ptr, (112 as c_int), c"*key > counter".ptr)
     } else {
         0
     }
 
-    (counter = (unsafe *__local_key))
+    (counter = (*__local_key))
 
     (__local_right_height = ((validate_subtree(__local_right_node) as c_int)))
 
@@ -603,7 +603,7 @@ pub fn test_avl_tree_to_array() -> Unit {
     (__local_i = ((0 as c_uint)))
 
     while ((if __local_i < __local_num_entries: 1 else: 0) != 0) {
-        if ((((if not ((if (unsafe *((unsafe __local_array[__local_i]) as *mut c_int)) == __local_sorted[__local_i]: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+        if ((((if not ((if (unsafe *((__local_array[__local_i]) as *mut c_int)) == __local_sorted[__local_i]: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
             __assert_rtn(c"test_avl_tree_to_array".ptr, c"test-avl-tree.c".ptr, (386 as c_int), c"*array[i] == sorted[i]".ptr)
         } else {
             0

@@ -44,13 +44,6 @@ pub fn corpora_exclude_args(target: Target) -> Target:
     for i in 0..corpus_count(): out = out.arg("exclude=" ++ corpus_at(i).corpus_dir ++ "/")
     out
 
-/// The corpus packages are internal modules of the compiler (the spec
-/// inventory takes them as `internal-module=` args).
-pub fn corpora_internal_module_args(target: Target) -> Target:
-    var out = target
-    for i in 0..corpus_count(): out = out.arg("internal-module=" ++ corpus_at(i).package)
-    out
-
 pub fn corpus_bundle_plan(ctx: &BuildCtx, corpus: &Corpus) -> WoBundle:
     wo_bundle_plan(ctx, corpus.name, corpus.corpus_rel, corpus.corpus_dir ++ "/bundle.w")
 
@@ -116,6 +109,7 @@ fn corpus_check_generated(ctx: &ActionCtx, corpus: &Corpus, generated: &str) -> 
 pub fn run_corpus_check_generated_action(ctx: ActionCtx) -> i32:
     let owned = action_corpus(ctx)
     if corpus_check_generated(ctx, &owned, ctx.inputs()[0]) != 0: return 1
+    if corpus_check_every_module(ctx, &owned, ctx.inputs()[0], ctx.inputs()[1]) != 0: return 1
     if ctx.fs().write_text(ctx.output(), "ok\n") != 0: return corpus_fail(ctx, "cannot write " ++ ctx.output())
     0
 
@@ -198,7 +192,7 @@ pub fn corpus_pipeline(out: Build, ctx: &BuildCtx, corpus: &Corpus, release_comp
 
     var check = corpus_target(.Action, corpus, "check-generated", "out/gen/." ++ corpus.stem ++ "-check-generated-stamp")
     check.action = run_corpus_check_generated_action
-    check = check.input(corpus_migrated_dir(corpus)).dep(corpus.stem ++ "-migrate")
+    check = check.input(corpus_migrated_dir(corpus)).input(release_compiler.clone()).dep(corpus.stem ++ "-migrate").dep("build")
     graph = graph.add_target(check)
 
     var promote = corpus_target(.Action, corpus, "promote", corpus.corpus_dir.clone())

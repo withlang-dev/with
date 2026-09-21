@@ -77,18 +77,18 @@ pub unsafe fn tommy_trie_init(__param_trie: *mut tommy_trie_struct, __param_allo
     (__local_i = ((0 as c_uint)))
 
     while ((if __local_i < 32: 1 else: 0) != 0) {
-        ((unsafe *__param_trie).bucket[__local_i] = null)
+        ((*__param_trie).bucket[__local_i] = null)
 
         (__local_i = (__local_i +% 1))
 
     }
 
 
-    ((unsafe *__param_trie).count = ((0 as c_ulonglong)))
+    ((*__param_trie).count = ((0 as c_ulonglong)))
 
-    ((unsafe *__param_trie).node_count = ((0 as c_ulonglong)))
+    ((*__param_trie).node_count = ((0 as c_ulonglong)))
 
-    ((unsafe *__param_trie).alloc = __param_alloc)
+    ((*__param_trie).alloc = __param_alloc)
 
 }
 
@@ -244,9 +244,9 @@ pub unsafe fn tommy_trie_insert(__param_trie: *mut tommy_trie_struct, __param_no
     }
 
 
-    ((unsafe *__param_node).data = __param_data)
+    ((*__param_node).data = __param_data)
 
-    ((unsafe *__param_node).index = __param_key)
+    ((*__param_node).index = __param_key)
 
     var __ci_expr_ternary_23: c_int = 0
 
@@ -390,12 +390,12 @@ pub unsafe fn tommy_trie_insert(__param_trie: *mut tommy_trie_struct, __param_no
 
     }
 
-    (__local_let_ptr = (((&raw const (unsafe *__param_trie).bucket[((__param_key as c_ulonglong) >> ((32 - ((32 % __ci_expr_ternary_23) + __ci_expr_ternary_31)) as c_uint))] as *const *mut tommy_node_struct) as *mut *mut tommy_node_struct)))
+    (__local_let_ptr = (((&raw const (*__param_trie).bucket[((__param_key as c_ulonglong) >> ((32 - ((32 % __ci_expr_ternary_23) + __ci_expr_ternary_31)) as c_uint))] as *const *mut tommy_node_struct) as *mut *mut tommy_node_struct)))
 
 
     trie_bucket_insert(__param_trie, (27 as c_uint), __local_let_ptr, __param_node, __param_key)
 
-    ((unsafe *__param_trie).count = ((unsafe *__param_trie).count +% 1))
+    ((*__param_trie).count = ((*__param_trie).count +% 1))
 
 }
 
@@ -695,7 +695,7 @@ pub unsafe fn tommy_trie_remove(__param_trie: *mut tommy_trie_struct, __param_ke
 
     }
 
-    (__local_let_ptr = (((&raw const (unsafe *__param_trie).bucket[((__param_key as c_ulonglong) >> ((32 - ((32 % __ci_expr_ternary_23) + __ci_expr_ternary_31)) as c_uint))] as *const *mut tommy_node_struct) as *mut *mut tommy_node_struct)))
+    (__local_let_ptr = (((&raw const (*__param_trie).bucket[((__param_key as c_ulonglong) >> ((32 - ((32 % __ci_expr_ternary_23) + __ci_expr_ternary_31)) as c_uint))] as *const *mut tommy_node_struct) as *mut *mut tommy_node_struct)))
 
 
     (__local_ret = trie_bucket_remove_existing(__param_trie, (27 as c_uint), __local_let_ptr, null, __param_key))
@@ -704,9 +704,9 @@ pub unsafe fn tommy_trie_remove(__param_trie: *mut tommy_trie_struct, __param_ke
         return ((0 as *mut c_void))
     }
 
-    ((unsafe *__param_trie).count = ((unsafe *__param_trie).count -% 1))
+    ((*__param_trie).count = ((*__param_trie).count -% 1))
 
-    return (unsafe *__local_ret).data
+    return (*__local_ret).data
 
 }
 
@@ -1011,7 +1011,7 @@ pub unsafe fn tommy_trie_bucket(__param_trie: *mut tommy_trie_struct, __param_ke
             (__ci_expr_ternary_31 = __ci_expr_ternary_30)
 
         }
-        (__local_ptr__goto_299_8 = (((unsafe *__param_trie).bucket[((__param_key as c_ulonglong) >> ((32 - ((32 % __ci_expr_ternary_23) + __ci_expr_ternary_31)) as c_uint))] as *mut c_void)))
+        (__local_ptr__goto_299_8 = (((*__param_trie).bucket[((__param_key as c_ulonglong) >> ((32 - ((32 % __ci_expr_ternary_23) + __ci_expr_ternary_31)) as c_uint))] as *mut c_void)))
         (__local_shift__goto_301_15 = ((27 as c_uint)))
         goto '__ci_bb_1
     }
@@ -1043,7 +1043,7 @@ pub unsafe fn tommy_trie_bucket(__param_trie: *mut tommy_trie_struct, __param_ke
 
     '__ci_bb_6 {
         (__local_node__goto_298_19 = ((__local_ptr__goto_299_8 as *mut tommy_node_struct)))
-        if ((if (unsafe *__local_node__goto_298_19).index != __param_key: 1 else: 0) != 0) {
+        if ((if (*__local_node__goto_298_19).index != __param_key: 1 else: 0) != 0) {
             goto '__ci_bb_7
         } else {
             goto '__ci_bb_8
@@ -1059,7 +1059,7 @@ pub unsafe fn tommy_trie_bucket(__param_trie: *mut tommy_trie_struct, __param_ke
     }
 
     '__ci_bb_9 {
-        (__local_ptr__goto_299_8 = (((unsafe *((((__local_ptr__goto_299_8 as c_ulong) as c_ulong) -% (1 as c_ulong)) as *mut tommy_trie_tree_struct)).map[((((__param_key as c_ulonglong) >> (__local_shift__goto_301_15 as c_uint)) as c_ulonglong) & (7 as c_ulonglong))] as *mut c_void)))
+        (__local_ptr__goto_299_8 = (((*((((__local_ptr__goto_299_8 as c_ulong) as c_ulong) -% (1 as c_ulong)) as *mut tommy_trie_tree_struct)).map[((((__param_key as c_ulonglong) >> (__local_shift__goto_301_15 as c_uint)) as c_ulonglong) & (7 as c_ulonglong))] as *mut c_void)))
         (__local_shift__goto_301_15 = (__local_shift__goto_301_15 -% 3))
         goto '__ci_bb_1
     }
@@ -1083,14 +1083,14 @@ pub unsafe fn tommy_trie_search(__param_trie: *mut tommy_trie_struct, __param_ke
         return ((0 as *mut c_void))
     }
 
-    return (unsafe *__local_i).data
+    return (*__local_i).data
 
 }
 
 pub unsafe fn tommy_trie_remove_existing(__param_trie: *mut tommy_trie_struct, __param_node: *mut tommy_node_struct) -> *mut c_void {
     var __local_ret: *mut tommy_node_struct
 
-    var __local_key: c_ulonglong = (unsafe *__param_node).index
+    var __local_key: c_ulonglong = (*__param_node).index
 
     var __local_let_ptr: *mut *mut tommy_node_struct
 
@@ -1385,7 +1385,7 @@ pub unsafe fn tommy_trie_remove_existing(__param_trie: *mut tommy_trie_struct, _
 
     }
 
-    (__local_let_ptr = (((&raw const (unsafe *__param_trie).bucket[((__local_key as c_ulonglong) >> ((32 - ((32 % __ci_expr_ternary_23) + __ci_expr_ternary_31)) as c_uint))] as *const *mut tommy_node_struct) as *mut *mut tommy_node_struct)))
+    (__local_let_ptr = (((&raw const (*__param_trie).bucket[((__local_key as c_ulonglong) >> ((32 - ((32 % __ci_expr_ternary_23) + __ci_expr_ternary_31)) as c_uint))] as *const *mut tommy_node_struct) as *mut *mut tommy_node_struct)))
 
 
     (__local_ret = trie_bucket_remove_existing(__param_trie, (27 as c_uint), __local_let_ptr, __param_node, __local_key))
@@ -1396,19 +1396,19 @@ pub unsafe fn tommy_trie_remove_existing(__param_trie: *mut tommy_trie_struct, _
         0
     }
 
-    ((unsafe *__param_trie).count = ((unsafe *__param_trie).count -% 1))
+    ((*__param_trie).count = ((*__param_trie).count -% 1))
 
-    return (unsafe *__local_ret).data
+    return (*__local_ret).data
 
 }
 
 pub unsafe fn tommy_trie_count(__param_trie: *mut tommy_trie_struct) -> c_ulonglong {
-    return (unsafe *__param_trie).count
+    return (*__param_trie).count
 
 }
 
 pub unsafe fn tommy_trie_memory_usage(__param_trie: *mut tommy_trie_struct) -> c_ulonglong {
-    return ((((tommy_trie_count(__param_trie) as c_ulonglong) *% ((sizeof[tommy_node_struct]() as c_ulonglong) as c_ulonglong)) as c_ulonglong) +% ((((unsafe *__param_trie).node_count as c_ulonglong) *% ((((((64 as c_ulong) / (8 as c_ulong)) as c_ulong) *% (8 as c_ulong)) as c_ulonglong) as c_ulonglong)) as c_ulonglong))
+    return ((((tommy_trie_count(__param_trie) as c_ulonglong) *% ((sizeof[tommy_node_struct]() as c_ulonglong) as c_ulonglong)) as c_ulonglong) +% ((((*__param_trie).node_count as c_ulonglong) *% ((((((64 as c_ulong) / (8 as c_ulong)) as c_ulong) *% (8 as c_ulong)) as c_ulonglong) as c_ulonglong)) as c_ulonglong))
 
 }
 
@@ -1432,7 +1432,7 @@ unsafe fn trie_bucket_insert(__param_trie: *mut tommy_trie_struct, __param_shift
     }
 
     '__ci_bb_1 {
-        (__local_ptr__goto_94_8 = (((unsafe *__local_let_ptr) as *mut c_void)))
+        (__local_ptr__goto_94_8 = (((*__local_let_ptr) as *mut c_void)))
         if ((if not (__local_ptr__goto_94_8 != null): 1 else: 0) != 0) {
             goto '__ci_bb_2
         } else {
@@ -1454,14 +1454,14 @@ unsafe fn trie_bucket_insert(__param_trie: *mut tommy_trie_struct, __param_shift
     }
 
     '__ci_bb_4 {
-        (__local_let_ptr = (((&raw const (unsafe *((((__local_ptr__goto_94_8 as c_ulong) as c_ulong) -% (1 as c_ulong)) as *mut tommy_trie_tree_struct)).map[((((__param_key as c_ulonglong) >> (__local_shift as c_uint)) as c_ulonglong) & (7 as c_ulonglong))] as *const *mut tommy_node_struct) as *mut *mut tommy_node_struct)))
+        (__local_let_ptr = (((&raw const (*((((__local_ptr__goto_94_8 as c_ulong) as c_ulong) -% (1 as c_ulong)) as *mut tommy_trie_tree_struct)).map[((((__param_key as c_ulonglong) >> (__local_shift as c_uint)) as c_ulonglong) & (7 as c_ulonglong))] as *const *mut tommy_node_struct) as *mut *mut tommy_node_struct)))
         (__local_shift = (__local_shift -% 3))
         goto '__ci_bb_1
     }
 
     '__ci_bb_5 {
         (__local_node__goto_93_19 = ((__local_ptr__goto_94_8 as *mut tommy_node_struct)))
-        if ((if (unsafe *__local_node__goto_93_19).index == __param_key: 1 else: 0) != 0) {
+        if ((if (*__local_node__goto_93_19).index == __param_key: 1 else: 0) != 0) {
             goto '__ci_bb_6
         } else {
             goto '__ci_bb_7
@@ -1478,9 +1478,9 @@ unsafe fn trie_bucket_insert(__param_trie: *mut tommy_trie_struct, __param_shift
     }
 
     '__ci_bb_8 {
-        (__local_tree__goto_92_19 = ((tommy_allocator_alloc((unsafe *__param_trie).alloc) as *mut tommy_trie_tree_struct)))
-        ((unsafe *__param_trie).node_count = ((unsafe *__param_trie).node_count +% 1))
-        ((unsafe *__local_let_ptr) = ((((((__local_tree__goto_92_19 as c_ulong) as c_ulong) +% (1 as c_ulong)) as *mut c_void) as *mut tommy_node_struct)))
+        (__local_tree__goto_92_19 = ((tommy_allocator_alloc((*__param_trie).alloc) as *mut tommy_trie_tree_struct)))
+        ((*__param_trie).node_count = ((*__param_trie).node_count +% 1))
+        ((*__local_let_ptr) = ((((((__local_tree__goto_92_19 as c_ulong) as c_ulong) +% (1 as c_ulong)) as *mut c_void) as *mut tommy_node_struct)))
         (__local_i__goto_95_15 = ((0 as c_uint)))
         goto '__ci_bb_9
     }
@@ -1494,7 +1494,7 @@ unsafe fn trie_bucket_insert(__param_trie: *mut tommy_trie_struct, __param_shift
     }
 
     '__ci_bb_10 {
-        ((unsafe *__local_tree__goto_92_19).map[__local_i__goto_95_15] = null)
+        ((*__local_tree__goto_92_19).map[__local_i__goto_95_15] = null)
         goto '__ci_bb_11
     }
 
@@ -1504,7 +1504,7 @@ unsafe fn trie_bucket_insert(__param_trie: *mut tommy_trie_struct, __param_shift
     }
 
     '__ci_bb_12 {
-        (__local_i__goto_95_15 = (((((((unsafe *__local_node__goto_93_19).index as c_ulonglong) >> (__local_shift as c_uint)) as c_ulonglong) & (7 as c_ulonglong)) as c_uint)))
+        (__local_i__goto_95_15 = (((((((*__local_node__goto_93_19).index as c_ulonglong) >> (__local_shift as c_uint)) as c_ulonglong) & (7 as c_ulonglong)) as c_uint)))
         (__local_j__goto_96_15 = ((((((__param_key as c_ulonglong) >> (__local_shift as c_uint)) as c_ulonglong) & (7 as c_ulonglong)) as c_uint)))
         if ((if __local_i__goto_95_15 != __local_j__goto_96_15: 1 else: 0) != 0) {
             goto '__ci_bb_13
@@ -1514,13 +1514,13 @@ unsafe fn trie_bucket_insert(__param_trie: *mut tommy_trie_struct, __param_shift
     }
 
     '__ci_bb_13 {
-        ((unsafe *__local_tree__goto_92_19).map[__local_i__goto_95_15] = __local_node__goto_93_19)
-        tommy_list_insert_first(((&raw const (unsafe *__local_tree__goto_92_19).map[__local_j__goto_96_15] as *const *mut tommy_node_struct) as *mut *mut tommy_node_struct), __param_insert)
+        ((*__local_tree__goto_92_19).map[__local_i__goto_95_15] = __local_node__goto_93_19)
+        tommy_list_insert_first(((&raw const (*__local_tree__goto_92_19).map[__local_j__goto_96_15] as *const *mut tommy_node_struct) as *mut *mut tommy_node_struct), __param_insert)
         return
     }
 
     '__ci_bb_14 {
-        (__local_let_ptr = (((&raw const (unsafe *__local_tree__goto_92_19).map[__local_i__goto_95_15] as *const *mut tommy_node_struct) as *mut *mut tommy_node_struct)))
+        (__local_let_ptr = (((&raw const (*__local_tree__goto_92_19).map[__local_i__goto_95_15] as *const *mut tommy_node_struct) as *mut *mut tommy_node_struct)))
         (__local_shift = (__local_shift -% 3))
         goto '__ci_bb_8
     }
@@ -1561,7 +1561,7 @@ unsafe fn trie_bucket_remove_existing(__param_trie: *mut tommy_trie_struct, __pa
     }
 
     '__ci_bb_1 {
-        (__local_ptr__goto_174_8 = (((unsafe *__local_let_ptr) as *mut c_void)))
+        (__local_ptr__goto_174_8 = (((*__local_let_ptr) as *mut c_void)))
         if ((if not (__local_ptr__goto_174_8 != null): 1 else: 0) != 0) {
             goto '__ci_bb_2
         } else {
@@ -1586,7 +1586,7 @@ unsafe fn trie_bucket_remove_existing(__param_trie: *mut tommy_trie_struct, __pa
         (__ci_expr_old_0 = __local_level__goto_176_15)
         (__local_level__goto_176_15 = (__local_level__goto_176_15 +% 1))
         (__local_let_back__goto_175_20[__ci_expr_old_0] = __local_let_ptr)
-        (__local_let_ptr = (((&raw const (unsafe *__local_tree__goto_173_19).map[((((__param_key as c_ulonglong) >> (__local_shift as c_uint)) as c_ulonglong) & (7 as c_ulonglong))] as *const *mut tommy_node_struct) as *mut *mut tommy_node_struct)))
+        (__local_let_ptr = (((&raw const (*__local_tree__goto_173_19).map[((((__param_key as c_ulonglong) >> (__local_shift as c_uint)) as c_ulonglong) & (7 as c_ulonglong))] as *const *mut tommy_node_struct) as *mut *mut tommy_node_struct)))
         (__local_shift = (__local_shift -% 3))
         goto '__ci_bb_1
     }
@@ -1602,7 +1602,7 @@ unsafe fn trie_bucket_remove_existing(__param_trie: *mut tommy_trie_struct, __pa
 
     '__ci_bb_6 {
         (__local_remove = __local_node__goto_172_19)
-        if ((if (unsafe *__local_remove).index != __param_key: 1 else: 0) != 0) {
+        if ((if (*__local_remove).index != __param_key: 1 else: 0) != 0) {
             goto '__ci_bb_8
         } else {
             goto '__ci_bb_9
@@ -1611,7 +1611,7 @@ unsafe fn trie_bucket_remove_existing(__param_trie: *mut tommy_trie_struct, __pa
 
     '__ci_bb_7 {
         tommy_list_remove_existing(__local_let_ptr, __local_remove)
-        if ((unsafe *__local_let_ptr) != null) {
+        if ((*__local_let_ptr) != null) {
             (__ci_expr_logic_1 = (if true: 1 else: 0))
         } else {
             (__ci_expr_logic_1 = (if (if not (__local_level__goto_176_15 != 0): 1 else: 0) != 0: 1 else: 0))
@@ -1642,7 +1642,7 @@ unsafe fn trie_bucket_remove_existing(__param_trie: *mut tommy_trie_struct, __pa
     '__ci_bb_12 {
         (__local_level__goto_176_15 = (__local_level__goto_176_15 -% 1))
         (__local_let_ptr = __local_let_back__goto_175_20[__local_level__goto_176_15])
-        (__local_tree__goto_173_19 = ((((((unsafe *__local_let_ptr) as c_ulong) as c_ulong) -% (1 as c_ulong)) as *mut tommy_trie_tree_struct)))
+        (__local_tree__goto_173_19 = ((((((*__local_let_ptr) as c_ulong) as c_ulong) -% (1 as c_ulong)) as *mut tommy_trie_tree_struct)))
         (__local_count__goto_178_15 = ((0 as c_uint)))
         (__local_last__goto_179_15 = ((0 as c_uint)))
         (__local_i__goto_177_15 = ((0 as c_uint)))
@@ -1658,7 +1658,7 @@ unsafe fn trie_bucket_remove_existing(__param_trie: *mut tommy_trie_struct, __pa
     }
 
     '__ci_bb_14 {
-        if ((unsafe *__local_tree__goto_173_19).map[__local_i__goto_177_15] != null) {
+        if ((*__local_tree__goto_173_19).map[__local_i__goto_177_15] != null) {
             goto '__ci_bb_17
         } else {
             goto '__ci_bb_18
@@ -1676,9 +1676,9 @@ unsafe fn trie_bucket_remove_existing(__param_trie: *mut tommy_trie_struct, __pa
         } else {
             0
         }
-        ((unsafe *__local_let_ptr) = (unsafe *__local_tree__goto_173_19).map[__local_last__goto_179_15])
-        tommy_allocator_free((unsafe *__param_trie).alloc, (__local_tree__goto_173_19 as *mut c_void))
-        ((unsafe *__param_trie).node_count = ((unsafe *__param_trie).node_count -% 1))
+        ((*__local_let_ptr) = (*__local_tree__goto_173_19).map[__local_last__goto_179_15])
+        tommy_allocator_free((*__param_trie).alloc, (__local_tree__goto_173_19 as *mut c_void))
+        ((*__param_trie).node_count = ((*__param_trie).node_count -% 1))
         if (__local_level__goto_176_15 != 0) {
             goto '__ci_bb_23
         } else {
@@ -1687,7 +1687,7 @@ unsafe fn trie_bucket_remove_existing(__param_trie: *mut tommy_trie_struct, __pa
     }
 
     '__ci_bb_17 {
-        if ((if ((((unsafe *__local_tree__goto_173_19).map[__local_i__goto_177_15] as c_ulong) as c_ulong) & (1 as c_ulong)) != 0: 1 else: 0) != 0) {
+        if ((if ((((*__local_tree__goto_173_19).map[__local_i__goto_177_15] as c_ulong) as c_ulong) & (1 as c_ulong)) != 0: 1 else: 0) != 0) {
             goto '__ci_bb_19
         } else {
             goto '__ci_bb_20

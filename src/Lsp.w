@@ -673,115 +673,116 @@ fn lsp_line_col_to_offset(text: &str, line: i32, col: i32) -> i32:
 
 // ── Diagnostics ──────────────────────────────────────────────
 
-fn LspState.publish_diagnostics(mut self: LspState, uri: &str, text: &str):
-    let idx = self.find_doc(uri)
-    if idx >= 0:
-        self.ensure_doc_analyzed(idx)
+impl LspState:
+    mut fn publish_diagnostics(uri: &str, text: &str):
+        let idx = self.find_doc(uri)
+        if idx >= 0:
+            self.ensure_doc_analyzed(idx)
 
-    // Read diagnostics through a view. Copying cached_diags (or comp.zcu's
-    // list) into an owned local bit-copied the Vec header, and the local's
-    // drop freed the document's buffers while the document kept its pointer
-    // (the lsp-use-std shutdown crash). comp stays at function scope so the
-    // fresh branch's view outlives its use.
-    var comp = Compilation.init()
-    let use_cache = idx >= 0 and (&self.documents[idx]).cache_valid
-    if not use_cache:
-        comp.set_prelude_mode(2)
-        let pool = comp.compile_source_text(uri_to_path(uri), text)
-    let dl = if use_cache: &self.documents[idx].cached_diags else: &comp.zcu.diagnostics
+        // Read diagnostics through a view. Copying cached_diags (or comp.zcu's
+        // list) into an owned local bit-copied the Vec header, and the local's
+        // drop freed the document's buffers while the document kept its pointer
+        // (the lsp-use-std shutdown crash). comp stays at function scope so the
+        // fresh branch's view outlives its use.
+        var comp = Compilation.init()
+        let use_cache = idx >= 0 and (&self.documents[idx]).cache_valid
+        if not use_cache:
+            comp.set_prelude_mode(2)
+            let pool = comp.compile_source_text(uri_to_path(uri), text)
+        let dl = if use_cache: &self.documents[idx].cached_diags else: &comp.zcu.diagnostics
 
-    var diags = jarr_start()
-    var first = true
-    for i in 0..dl.count():
-        let d = &dl.items[i]
-        let severity = d.severity
-        let sl = lsp_offset_to_line(text, d.primary.start)
-        let sc = lsp_offset_to_col(text, d.primary.start)
-        var el = sl
-        var ec = sc + 1
-        if d.primary.end > d.primary.start and d.primary.end <= text.len() as i32:
-            el = lsp_offset_to_line(text, d.primary.end)
-            ec = lsp_offset_to_col(text, d.primary.end)
-        if not first:
-            diags = diags ++ ","
-        first = false
-        let range = jrange(sl, sc, el, ec)
-        diags = diags ++ jobj_start() ++ jkv_raw("range", range) ++ "," ++ jkv_int("severity", severity) ++ "," ++ jkv_str("source", "with") ++ "," ++ jkv_str("message", d.message) ++ jobj_end()
-    diags = diags ++ jarr_end()
+        var diags = jarr_start()
+        var first = true
+        for i in 0..dl.count():
+            let d = &dl.items[i]
+            let severity = d.severity
+            let sl = lsp_offset_to_line(text, d.primary.start)
+            let sc = lsp_offset_to_col(text, d.primary.start)
+            var el = sl
+            var ec = sc + 1
+            if d.primary.end > d.primary.start and d.primary.end <= text.len() as i32:
+                el = lsp_offset_to_line(text, d.primary.end)
+                ec = lsp_offset_to_col(text, d.primary.end)
+            if not first:
+                diags = diags ++ ","
+            first = false
+            let range = jrange(sl, sc, el, ec)
+            diags = diags ++ jobj_start() ++ jkv_raw("range", range) ++ "," ++ jkv_int("severity", severity) ++ "," ++ jkv_str("source", "with") ++ "," ++ jkv_str("message", d.message) ++ jobj_end()
+        diags = diags ++ jarr_end()
 
-    let params = jobj_start() ++ jkv_str("uri", uri) ++ "," ++ jkv_raw("diagnostics", diags) ++ jobj_end()
-    lsp_write_response(jrpc_notification("textDocument/publishDiagnostics", params))
+        let params = jobj_start() ++ jkv_str("uri", uri) ++ "," ++ jkv_raw("diagnostics", diags) ++ jobj_end()
+        lsp_write_response(jrpc_notification("textDocument/publishDiagnostics", params))
 
-// ── Go to definition ─────────────────────────────────────────
+    // ── Go to definition ─────────────────────────────────────────
 
-fn LspState.definition(mut self: LspState, id: i32, uri: &str, text: &str, line: i32, col: i32):
-    let offset = lsp_line_col_to_offset(text, line, col)
+    mut fn definition(id: i32, uri: &str, text: &str, line: i32, col: i32):
+        let offset = lsp_line_col_to_offset(text, line, col)
 
-    var lexer = Lexer.init(text, 0)
-    let tokens = lexer.tokenize()
-    var token_text = ""
-    for i in 0..tokens.len():
-        if offset >= tokens.get_start(i) and offset < tokens.get_end(i):
-            if tokens.get_tag(i) == TokenKind.TK_IDENT:
-                token_text = text.slice(tokens.get_start(i) as i64, tokens.get_end(i) as i64)
-            break
+        var lexer = Lexer.init(text, 0)
+        let tokens = lexer.tokenize()
+        var token_text = ""
+        for i in 0..tokens.len():
+            if offset >= tokens.get_start(i) and offset < tokens.get_end(i):
+                if tokens.get_tag(i) == TokenKind.TK_IDENT:
+                    token_text = text.slice(tokens.get_start(i) as i64, tokens.get_end(i) as i64)
+                break
 
-    if token_text.len() == 0:
-        lsp_write_response(jrpc_result_null(id))
-        return
+        if token_text.len() == 0:
+            lsp_write_response(jrpc_result_null(id))
+            return
 
-    // Try slow tier first (cross-file via decl_source_paths)
-    let idx = self.find_doc(uri)
-    if idx >= 0:
-        self.ensure_doc_analyzed(idx)
-    let empty_pool = AstPool.new()
-    let empty_intern = InternPool.init()
-    let empty_paths: Vec[str] = Vec.new()
-    let slow_valid = idx >= 0 and (&self.documents[idx]).cache_valid
-    let slow_pool = if slow_valid: &self.documents[idx].cached_pool else: &empty_pool
-    let slow_intern = if slow_valid: &self.documents[idx].cached_intern else: &empty_intern
-    let slow_paths = if slow_valid: &self.documents[idx].cached_decl_paths else: &empty_paths
-    if slow_valid:
-        for di in 0..slow_pool.decl_count():
-            let decl = slow_pool.get_decl(di)
-            let kind = slow_pool.kind(decl)
-            if kind == NodeKind.NK_FN_DECL or kind == NodeKind.NK_TYPE_DECL or kind == NodeKind.NK_TRAIT_DECL or kind == NodeKind.NK_LET_DECL or kind == NodeKind.NK_EXTERN_FN:
-                let name = slow_intern.resolve(slow_pool.get_data0(decl))
+        // Try slow tier first (cross-file via decl_source_paths)
+        let idx = self.find_doc(uri)
+        if idx >= 0:
+            self.ensure_doc_analyzed(idx)
+        let empty_pool = AstPool.new()
+        let empty_intern = InternPool.init()
+        let empty_paths: Vec[str] = Vec.new()
+        let slow_valid = idx >= 0 and (&self.documents[idx]).cache_valid
+        let slow_pool = if slow_valid: &self.documents[idx].cached_pool else: &empty_pool
+        let slow_intern = if slow_valid: &self.documents[idx].cached_intern else: &empty_intern
+        let slow_paths = if slow_valid: &self.documents[idx].cached_decl_paths else: &empty_paths
+        if slow_valid:
+            for di in 0..slow_pool.decl_count():
+                let decl = slow_pool.get_decl(di)
+                let kind = slow_pool.kind(decl)
+                if kind == NodeKind.NK_FN_DECL or kind == NodeKind.NK_TYPE_DECL or kind == NodeKind.NK_TRAIT_DECL or kind == NodeKind.NK_LET_DECL or kind == NodeKind.NK_EXTERN_FN:
+                    let name = slow_intern.resolve(slow_pool.get_data0(decl))
+                    if name == token_text:
+                        let ds = slow_pool.get_start(decl)
+                        var def_uri = with_str_clone_ref(uri)
+                        var def_text = with_str_clone_ref(text)
+                        if di < slow_paths.len() as i32:
+                            let decl_path = slow_paths[di]
+                            if decl_path.len() > 0 and decl_path != uri_to_path(uri):
+                                def_uri = "file://" ++ decl_path
+                                let file_text = with_fs_read_file(decl_path)
+                                if file_text.len() > 0:
+                                    def_text = file_text
+                                else:
+                                    continue
+                        let dl = lsp_offset_to_line(def_text, ds)
+                        let dc = lsp_offset_to_col(def_text, ds)
+                        let loc = jobj_start() ++ jkv_str("uri", def_uri) ++ "," ++ jkv_raw("range", jrange(dl, dc, dl, dc + name.len() as i32)) ++ jobj_end()
+                        lsp_write_response(jrpc_result(id, loc))
+                        return
+
+        // Fall back to fast-tier same-file lookup (parse-only, cached)
+        let parsed = self.get_parsed(uri, text)
+        for di in 0..parsed.pool.decl_count():
+            let decl = parsed.pool.get_decl(di)
+            let kind = parsed.pool.kind(decl)
+            if kind == NodeKind.NK_FN_DECL or kind == NodeKind.NK_TYPE_DECL or kind == NodeKind.NK_TRAIT_DECL or kind == NodeKind.NK_LET_DECL:
+                let name = parsed.intern.resolve(parsed.pool.get_data0(decl))
                 if name == token_text:
-                    let ds = slow_pool.get_start(decl)
-                    var def_uri = with_str_clone_ref(uri)
-                    var def_text = with_str_clone_ref(text)
-                    if di < slow_paths.len() as i32:
-                        let decl_path = slow_paths[di]
-                        if decl_path.len() > 0 and decl_path != uri_to_path(uri):
-                            def_uri = "file://" ++ decl_path
-                            let file_text = with_fs_read_file(decl_path)
-                            if file_text.len() > 0:
-                                def_text = file_text
-                            else:
-                                continue
-                    let dl = lsp_offset_to_line(def_text, ds)
-                    let dc = lsp_offset_to_col(def_text, ds)
-                    let loc = jobj_start() ++ jkv_str("uri", def_uri) ++ "," ++ jkv_raw("range", jrange(dl, dc, dl, dc + name.len() as i32)) ++ jobj_end()
+                    let ds = parsed.pool.get_start(decl)
+                    let dl = lsp_offset_to_line(text, ds)
+                    let dc = lsp_offset_to_col(text, ds)
+                    let loc = jobj_start() ++ jkv_str("uri", uri) ++ "," ++ jkv_raw("range", jrange(dl, dc, dl, dc + name.len() as i32)) ++ jobj_end()
                     lsp_write_response(jrpc_result(id, loc))
                     return
 
-    // Fall back to fast-tier same-file lookup (parse-only, cached)
-    let parsed = self.get_parsed(uri, text)
-    for di in 0..parsed.pool.decl_count():
-        let decl = parsed.pool.get_decl(di)
-        let kind = parsed.pool.kind(decl)
-        if kind == NodeKind.NK_FN_DECL or kind == NodeKind.NK_TYPE_DECL or kind == NodeKind.NK_TRAIT_DECL or kind == NodeKind.NK_LET_DECL:
-            let name = parsed.intern.resolve(parsed.pool.get_data0(decl))
-            if name == token_text:
-                let ds = parsed.pool.get_start(decl)
-                let dl = lsp_offset_to_line(text, ds)
-                let dc = lsp_offset_to_col(text, ds)
-                let loc = jobj_start() ++ jkv_str("uri", uri) ++ "," ++ jkv_raw("range", jrange(dl, dc, dl, dc + name.len() as i32)) ++ jobj_end()
-                lsp_write_response(jrpc_result(id, loc))
-                return
-
-    lsp_write_response(jrpc_result_null(id))
+        lsp_write_response(jrpc_result_null(id))
 
 // ── Hover ────────────────────────────────────────────────────
 
@@ -819,214 +820,215 @@ fn lsp_extract_doc_comment(text: &str, decl_start: i32) -> str:
         i = i - 1
     result
 
-fn LspState.hover(mut self: LspState, id: i32, uri: &str, text: &str, line: i32, col: i32):
-    let offset = lsp_line_col_to_offset(text, line, col)
+impl LspState:
+    mut fn hover(id: i32, uri: &str, text: &str, line: i32, col: i32):
+        let offset = lsp_line_col_to_offset(text, line, col)
 
-    var lexer = Lexer.init(text, 0)
-    let tokens = lexer.tokenize()
-    var token_text = ""
-    for i in 0..tokens.len():
-        if offset >= tokens.get_start(i) and offset < tokens.get_end(i):
-            if tokens.get_tag(i) == TokenKind.TK_IDENT:
-                token_text = text.slice(tokens.get_start(i) as i64, tokens.get_end(i) as i64)
-            break
-
-    if token_text.len() == 0:
-        lsp_write_response(jrpc_result_null(id))
-        return
-
-    let idx = self.find_doc(uri)
-    if idx >= 0:
-        self.ensure_doc_analyzed(idx)
-    var comp = Compilation.init()
-    var fresh_pool = AstPool.new()
-    let use_cache = idx >= 0 and (&self.documents[idx]).cache_valid
-    if not use_cache:
-        comp.set_prelude_mode(2)
-        fresh_pool = comp.compile_source_text(uri_to_path(uri), text)
-    let pool = if use_cache: &self.documents[idx].cached_pool else: &fresh_pool
-    let intern = if use_cache: &self.documents[idx].cached_intern else: &comp.zcu.pool
-
-    var hover = ""
-    var decl_start = 0
-    for di in 0..pool.decl_count():
-        let decl = pool.get_decl(di)
-        let kind = pool.kind(decl)
-        if kind == NodeKind.NK_FN_DECL:
-            if intern.resolve(pool.get_data0(decl)) == token_text:
-                hover = "fn " ++ token_text
-                decl_start = pool.get_start(decl)
-                break
-        if kind == NodeKind.NK_TYPE_DECL:
-            if intern.resolve(pool.get_data0(decl)) == token_text:
-                hover = "type " ++ token_text
-                decl_start = pool.get_start(decl)
-                break
-        if kind == NodeKind.NK_TRAIT_DECL:
-            if intern.resolve(pool.get_data0(decl)) == token_text:
-                hover = "trait " ++ token_text
-                decl_start = pool.get_start(decl)
-                break
-        if kind == NodeKind.NK_LET_DECL:
-            if intern.resolve(pool.get_data0(decl)) == token_text:
-                hover = "let " ++ token_text
-                decl_start = pool.get_start(decl)
+        var lexer = Lexer.init(text, 0)
+        let tokens = lexer.tokenize()
+        var token_text = ""
+        for i in 0..tokens.len():
+            if offset >= tokens.get_start(i) and offset < tokens.get_end(i):
+                if tokens.get_tag(i) == TokenKind.TK_IDENT:
+                    token_text = text.slice(tokens.get_start(i) as i64, tokens.get_end(i) as i64)
                 break
 
-    if hover.len() == 0:
-        lsp_write_response(jrpc_result_null(id))
-        return
+        if token_text.len() == 0:
+            lsp_write_response(jrpc_result_null(id))
+            return
 
-    // Extract doc comment above the declaration
-    let doc = lsp_extract_doc_comment(text, decl_start)
-    var value = "`" ++ hover ++ "`"
-    if doc.len() > 0:
-        value = value ++ "\n\n---\n\n" ++ doc
+        let idx = self.find_doc(uri)
+        if idx >= 0:
+            self.ensure_doc_analyzed(idx)
+        var comp = Compilation.init()
+        var fresh_pool = AstPool.new()
+        let use_cache = idx >= 0 and (&self.documents[idx]).cache_valid
+        if not use_cache:
+            comp.set_prelude_mode(2)
+            fresh_pool = comp.compile_source_text(uri_to_path(uri), text)
+        let pool = if use_cache: &self.documents[idx].cached_pool else: &fresh_pool
+        let intern = if use_cache: &self.documents[idx].cached_intern else: &comp.zcu.pool
 
-    let content = jobj_start() ++ jkv_str("kind", "markdown") ++ "," ++ jkv_str("value", value) ++ jobj_end()
-    lsp_write_response(jrpc_result(id, jobj_start() ++ jkv_raw("contents", content) ++ jobj_end()))
+        var hover = ""
+        var decl_start = 0
+        for di in 0..pool.decl_count():
+            let decl = pool.get_decl(di)
+            let kind = pool.kind(decl)
+            if kind == NodeKind.NK_FN_DECL:
+                if intern.resolve(pool.get_data0(decl)) == token_text:
+                    hover = "fn " ++ token_text
+                    decl_start = pool.get_start(decl)
+                    break
+            if kind == NodeKind.NK_TYPE_DECL:
+                if intern.resolve(pool.get_data0(decl)) == token_text:
+                    hover = "type " ++ token_text
+                    decl_start = pool.get_start(decl)
+                    break
+            if kind == NodeKind.NK_TRAIT_DECL:
+                if intern.resolve(pool.get_data0(decl)) == token_text:
+                    hover = "trait " ++ token_text
+                    decl_start = pool.get_start(decl)
+                    break
+            if kind == NodeKind.NK_LET_DECL:
+                if intern.resolve(pool.get_data0(decl)) == token_text:
+                    hover = "let " ++ token_text
+                    decl_start = pool.get_start(decl)
+                    break
 
-// ── Dot completion ───────────────────────────────────────────
+        if hover.len() == 0:
+            lsp_write_response(jrpc_result_null(id))
+            return
 
-fn LspState.dot_completion(mut self: LspState, id: i32, uri: &str, text: &str, offset: i32, dot_pos: i32):
-    // Find the receiver identifier before the dot
-    var recv_end = dot_pos
-    var recv_start = recv_end - 1
-    while recv_start >= 0 and lsp_is_ident_char(text[recv_start]):
-        recv_start = recv_start - 1
-    recv_start = recv_start + 1
-    if recv_start >= recv_end:
-        lsp_write_response(jrpc_result(id, jobj_start() ++ jkv_raw("items", "[]") ++ jobj_end()))
-        return
-    let receiver = text.slice(recv_start as i64, recv_end as i64)
+        // Extract doc comment above the declaration
+        let doc = lsp_extract_doc_comment(text, decl_start)
+        var value = "`" ++ hover ++ "`"
+        if doc.len() > 0:
+            value = value ++ "\n\n---\n\n" ++ doc
 
-    // Parse file to find receiver's type (cached)
-    let parsed = self.get_parsed(uri, text)
-    var type_name = lsp_resolve_receiver_type(parsed.pool, parsed.intern, receiver, offset)
+        let content = jobj_start() ++ jkv_str("kind", "markdown") ++ "," ++ jkv_str("value", value) ++ jobj_end()
+        lsp_write_response(jrpc_result(id, jobj_start() ++ jkv_raw("contents", content) ++ jobj_end()))
 
-    // Slow-tier fallback: use typed_expr_types for type inference
-    if type_name.len() == 0:
-        let cidx = self.find_doc(uri)
-        if cidx >= 0 and (&self.documents[cidx]).cache_valid:
-            type_name = (&self.documents[cidx]).type_at_offset(recv_start)
+    // ── Dot completion ───────────────────────────────────────────
 
-    // Build items JSON inline (Vec is pass-by-value, can't use helpers)
-    var items = jarr_start()
-    var first = true
+    mut fn dot_completion(id: i32, uri: &str, text: &str, offset: i32, dot_pos: i32):
+        // Find the receiver identifier before the dot
+        var recv_end = dot_pos
+        var recv_start = recv_end - 1
+        while recv_start >= 0 and lsp_is_ident_char(text[recv_start]):
+            recv_start = recv_start - 1
+        recv_start = recv_start + 1
+        if recv_start >= recv_end:
+            lsp_write_response(jrpc_result(id, jobj_start() ++ jkv_raw("items", "[]") ++ jobj_end()))
+            return
+        let receiver = text.slice(recv_start as i64, recv_end as i64)
 
-    if type_name == "str":
-        // str methods
-        let str_methods = "len,slice,starts_with,ends_with,contains,find,replace,to_upper,to_lower,upper,lower,trim,split,byte_at,repeat"
-        var sm_start = 0
-        for smi in 0..str_methods.len() as i32:
-            if str_methods[smi] == 44 or smi == str_methods.len() as i32 - 1:
-                let sm_end = if str_methods[smi] == 44: smi else: smi + 1
-                let m = str_methods.slice(sm_start as i64, sm_end as i64)
-                if not first: items = items ++ ","
-                first = false
-                items = items ++ jobj_start() ++ jkv_str("label", m) ++ "," ++ jkv_int("kind", 2) ++ jobj_end()
-                sm_start = smi + 1
+        // Parse file to find receiver's type (cached)
+        let parsed = self.get_parsed(uri, text)
+        var type_name = lsp_resolve_receiver_type(parsed.pool, parsed.intern, receiver, offset)
 
-    else if type_name == "Vec":
-        let vec_methods = "push,pop,get,len,is_empty,contains,clear"
-        var vm_start = 0
-        for vmi in 0..vec_methods.len() as i32:
-            if vec_methods[vmi] == 44 or vmi == vec_methods.len() as i32 - 1:
-                let vm_end = if vec_methods[vmi] == 44: vmi else: vmi + 1
-                let m = vec_methods.slice(vm_start as i64, vm_end as i64)
-                if not first: items = items ++ ","
-                first = false
-                items = items ++ jobj_start() ++ jkv_str("label", m) ++ "," ++ jkv_int("kind", 2) ++ jobj_end()
-                vm_start = vmi + 1
+        // Slow-tier fallback: use typed_expr_types for type inference
+        if type_name.len() == 0:
+            let cidx = self.find_doc(uri)
+            if cidx >= 0 and (&self.documents[cidx]).cache_valid:
+                type_name = (&self.documents[cidx]).type_at_offset(recv_start)
 
-    else if type_name == "HashMap":
-        let hm_methods = "get,insert,contains,remove,len,is_empty,clear"
-        var hm_start = 0
-        for hmi in 0..hm_methods.len() as i32:
-            if hm_methods[hmi] == 44 or hmi == hm_methods.len() as i32 - 1:
-                let hm_end = if hm_methods[hmi] == 44: hmi else: hmi + 1
-                let m = hm_methods.slice(hm_start as i64, hm_end as i64)
-                if not first: items = items ++ ","
-                first = false
-                items = items ++ jobj_start() ++ jkv_str("label", m) ++ "," ++ jkv_int("kind", 2) ++ jobj_end()
-                hm_start = hmi + 1
+        // Build items JSON inline (Vec is pass-by-value, can't use helpers)
+        var items = jarr_start()
+        var first = true
 
-    else if type_name.len() > 0:
-        // User struct: find fields from type declaration
-        for di in 0..parsed.pool.decl_count():
-            let decl = parsed.pool.get_decl(di)
-            if parsed.pool.kind(decl) != NodeKind.NK_TYPE_DECL:
-                continue
-            let dname = parsed.intern.resolve(parsed.pool.get_data0(decl))
-            if dname != type_name:
-                continue
-            let sub = type_decl_sub_kind(parsed.pool.get_data2(decl))
-            if sub != TypeDeclKind.Struct:
-                continue
-            // Walk struct fields from extra data
-            let es = parsed.pool.get_data1(decl)
-            let fc = parsed.pool.get_extra(es)
-            for fi in 0..fc:
-                let field_name_node = parsed.pool.get_extra(es + 1 + fi * 3)
-                if field_name_node != 0:
-                    let fname = parsed.intern.resolve(field_name_node)
-                    if fname.len() > 0:
-                        if not first: items = items ++ ","
-                        first = false
-                        items = items ++ jobj_start() ++ jkv_str("label", fname) ++ "," ++ jkv_int("kind", 5) ++ jobj_end()
-            break
-        // Find methods from extend/impl blocks.
-        // Methods are NK_FN_DECL with mangled names like "TypeName.method".
-        let prefix = type_name ++ "."
-        for di in 0..parsed.pool.decl_count():
-            let decl = parsed.pool.get_decl(di)
-            if parsed.pool.kind(decl) != NodeKind.NK_FN_DECL:
-                continue
-            let dname = parsed.intern.resolve(parsed.pool.get_data0(decl))
-            if dname.starts_with(prefix) and dname.len() > prefix.len():
-                let method_name = dname.slice(prefix.len(), dname.len())
-                if not first: items = items ++ ","
-                first = false
-                items = items ++ jobj_start() ++ jkv_str("label", method_name) ++ "," ++ jkv_int("kind", 2) ++ jobj_end()
-        // Trait methods: find impls for this type, then look up trait methods
-        for di in 0..parsed.pool.decl_count():
-            let decl = parsed.pool.get_decl(di)
-            if parsed.pool.kind(decl) != NodeKind.NK_IMPL_DECL:
-                continue
-            let impl_type = parsed.intern.resolve(parsed.pool.get_data0(decl))
-            if impl_type != type_name:
-                continue
-            let trait_sym = parsed.pool.get_data2(decl)
-            if trait_sym == 0:
-                continue
-            // Find the trait declaration and extract its method names
-            let trait_name = parsed.intern.resolve(trait_sym)
-            for ti in 0..parsed.pool.decl_count():
-                let tdecl = parsed.pool.get_decl(ti)
-                if parsed.pool.kind(tdecl) != NodeKind.NK_TRAIT_DECL:
+        if type_name == "str":
+            // str methods
+            let str_methods = "len,slice,starts_with,ends_with,contains,find,replace,to_upper,to_lower,upper,lower,trim,split,byte_at,repeat"
+            var sm_start = 0
+            for smi in 0..str_methods.len() as i32:
+                if str_methods[smi] == 44 or smi == str_methods.len() as i32 - 1:
+                    let sm_end = if str_methods[smi] == 44: smi else: smi + 1
+                    let m = str_methods.slice(sm_start as i64, sm_end as i64)
+                    if not first: items = items ++ ","
+                    first = false
+                    items = items ++ jobj_start() ++ jkv_str("label", m) ++ "," ++ jkv_int("kind", 2) ++ jobj_end()
+                    sm_start = smi + 1
+
+        else if type_name == "Vec":
+            let vec_methods = "push,pop,get,len,is_empty,contains,clear"
+            var vm_start = 0
+            for vmi in 0..vec_methods.len() as i32:
+                if vec_methods[vmi] == 44 or vmi == vec_methods.len() as i32 - 1:
+                    let vm_end = if vec_methods[vmi] == 44: vmi else: vmi + 1
+                    let m = vec_methods.slice(vm_start as i64, vm_end as i64)
+                    if not first: items = items ++ ","
+                    first = false
+                    items = items ++ jobj_start() ++ jkv_str("label", m) ++ "," ++ jkv_int("kind", 2) ++ jobj_end()
+                    vm_start = vmi + 1
+
+        else if type_name == "HashMap":
+            let hm_methods = "get,insert,contains,remove,len,is_empty,clear"
+            var hm_start = 0
+            for hmi in 0..hm_methods.len() as i32:
+                if hm_methods[hmi] == 44 or hmi == hm_methods.len() as i32 - 1:
+                    let hm_end = if hm_methods[hmi] == 44: hmi else: hmi + 1
+                    let m = hm_methods.slice(hm_start as i64, hm_end as i64)
+                    if not first: items = items ++ ","
+                    first = false
+                    items = items ++ jobj_start() ++ jkv_str("label", m) ++ "," ++ jkv_int("kind", 2) ++ jobj_end()
+                    hm_start = hmi + 1
+
+        else if type_name.len() > 0:
+            // User struct: find fields from type declaration
+            for di in 0..parsed.pool.decl_count():
+                let decl = parsed.pool.get_decl(di)
+                if parsed.pool.kind(decl) != NodeKind.NK_TYPE_DECL:
                     continue
-                if parsed.intern.resolve(parsed.pool.get_data0(tdecl)) != trait_name:
+                let dname = parsed.intern.resolve(parsed.pool.get_data0(decl))
+                if dname != type_name:
                     continue
-                let method_count = parsed.pool.trait_method_count(tdecl)
-                for mi in 0..method_count:
-                    let mname = parsed.intern.resolve(parsed.pool.trait_method_field(tdecl, mi, TRAIT_METHOD_NAME))
-                    if mname.len() > 0:
-                        if not first: items = items ++ ","
-                        first = false
-                        items = items ++ jobj_start() ++ jkv_str("label", mname) ++ "," ++ jkv_int("kind", 2) ++ jobj_end()
+                let sub = type_decl_sub_kind(parsed.pool.get_data2(decl))
+                if sub != TypeDeclKind.Struct:
+                    continue
+                // Walk struct fields from extra data
+                let es = parsed.pool.get_data1(decl)
+                let fc = parsed.pool.get_extra(es)
+                for fi in 0..fc:
+                    let field_name_node = parsed.pool.get_extra(es + 1 + fi * 3)
+                    if field_name_node != 0:
+                        let fname = parsed.intern.resolve(field_name_node)
+                        if fname.len() > 0:
+                            if not first: items = items ++ ","
+                            first = false
+                            items = items ++ jobj_start() ++ jkv_str("label", fname) ++ "," ++ jkv_int("kind", 5) ++ jobj_end()
                 break
-        // Sema-based trait methods from slow tier (includes imported traits)
-        let cidx = self.find_doc(uri)
-        if cidx >= 0 and (&self.documents[cidx]).cache_valid:
-            let trait_methods = (&self.documents[cidx]).trait_methods_for_type(type_name)
-            for tmi in 0..trait_methods.len() as i32:
-                let tmname = trait_methods[tmi]
-                if not first: items = items ++ ","
-                first = false
-                items = items ++ jobj_start() ++ jkv_str("label", tmname) ++ "," ++ jkv_int("kind", 2) ++ jobj_end()
+            // Find methods from extend/impl blocks.
+            // Methods are NK_FN_DECL with mangled names like "TypeName.method".
+            let prefix = type_name ++ "."
+            for di in 0..parsed.pool.decl_count():
+                let decl = parsed.pool.get_decl(di)
+                if parsed.pool.kind(decl) != NodeKind.NK_FN_DECL:
+                    continue
+                let dname = parsed.intern.resolve(parsed.pool.get_data0(decl))
+                if dname.starts_with(prefix) and dname.len() > prefix.len():
+                    let method_name = dname.slice(prefix.len(), dname.len())
+                    if not first: items = items ++ ","
+                    first = false
+                    items = items ++ jobj_start() ++ jkv_str("label", method_name) ++ "," ++ jkv_int("kind", 2) ++ jobj_end()
+            // Trait methods: find impls for this type, then look up trait methods
+            for di in 0..parsed.pool.decl_count():
+                let decl = parsed.pool.get_decl(di)
+                if parsed.pool.kind(decl) != NodeKind.NK_IMPL_DECL:
+                    continue
+                let impl_type = parsed.intern.resolve(parsed.pool.get_data0(decl))
+                if impl_type != type_name:
+                    continue
+                let trait_sym = parsed.pool.get_data2(decl)
+                if trait_sym == 0:
+                    continue
+                // Find the trait declaration and extract its method names
+                let trait_name = parsed.intern.resolve(trait_sym)
+                for ti in 0..parsed.pool.decl_count():
+                    let tdecl = parsed.pool.get_decl(ti)
+                    if parsed.pool.kind(tdecl) != NodeKind.NK_TRAIT_DECL:
+                        continue
+                    if parsed.intern.resolve(parsed.pool.get_data0(tdecl)) != trait_name:
+                        continue
+                    let method_count = parsed.pool.trait_method_count(tdecl)
+                    for mi in 0..method_count:
+                        let mname = parsed.intern.resolve(parsed.pool.trait_method_field(tdecl, mi, TRAIT_METHOD_NAME))
+                        if mname.len() > 0:
+                            if not first: items = items ++ ","
+                            first = false
+                            items = items ++ jobj_start() ++ jkv_str("label", mname) ++ "," ++ jkv_int("kind", 2) ++ jobj_end()
+                    break
+            // Sema-based trait methods from slow tier (includes imported traits)
+            let cidx = self.find_doc(uri)
+            if cidx >= 0 and (&self.documents[cidx]).cache_valid:
+                let trait_methods = (&self.documents[cidx]).trait_methods_for_type(type_name)
+                for tmi in 0..trait_methods.len() as i32:
+                    let tmname = trait_methods[tmi]
+                    if not first: items = items ++ ","
+                    first = false
+                    items = items ++ jobj_start() ++ jkv_str("label", tmname) ++ "," ++ jkv_int("kind", 2) ++ jobj_end()
 
-    items = items ++ jarr_end()
-    lsp_write_response(jrpc_result(id, jobj_start() ++ jkv_raw("items", items) ++ jobj_end()))
+        items = items ++ jarr_end()
+        lsp_write_response(jrpc_result(id, jobj_start() ++ jkv_raw("items", items) ++ jobj_end()))
 
 fn lsp_is_ident_char(ch: i32) -> bool:
     (ch >= 97 and ch <= 122) or (ch >= 65 and ch <= 90) or (ch >= 48 and ch <= 57) or ch == 95
@@ -1128,134 +1130,135 @@ fn lsp_type_node_to_name(pool: AstPool, intern: InternPool, type_node: i32) -> s
 
 // ── Completion ───────────────────────────────────────────────
 
-fn LspState.completion(mut self: LspState, id: i32, uri: &str, text: &str, line: i32, col: i32):
-    let offset = lsp_line_col_to_offset(text, line, col)
+impl LspState:
+    mut fn completion(id: i32, uri: &str, text: &str, line: i32, col: i32):
+        let offset = lsp_line_col_to_offset(text, line, col)
 
-    // Find the line text up to cursor to detect context
-    var line_start = offset
-    while line_start > 0 and text[(line_start - 1)] != 10:
-        line_start = line_start - 1
-    let line_text = text.slice(line_start as i64, offset as i64)
+        // Find the line text up to cursor to detect context
+        var line_start = offset
+        while line_start > 0 and text[(line_start - 1)] != 10:
+            line_start = line_start - 1
+        let line_text = text.slice(line_start as i64, offset as i64)
 
-    var items = jarr_start()
-    var first = true
+        var items = jarr_start()
+        var first = true
 
-    // Context: "use std." / "use test." → module completion (check before dot)
-    if lsp_find_substr(line_text, "use std.") >= 0:
-        let modules = lsp_list_embedded_modules("std/")
-        for i in 0..modules.len() as i32:
-            let m = modules[i]
+        // Context: "use std." / "use test." → module completion (check before dot)
+        if lsp_find_substr(line_text, "use std.") >= 0:
+            let modules = lsp_list_embedded_modules("std/")
+            for i in 0..modules.len() as i32:
+                let m = modules[i]
+                if not first:
+                    items = items ++ ","
+                first = false
+                items = items ++ jobj_start() ++ jkv_str("label", m) ++ "," ++ jkv_int("kind", 9) ++ jobj_end()
+            items = items ++ jarr_end()
+            lsp_write_response(jrpc_result(id, jobj_start() ++ jkv_raw("items", items) ++ jobj_end()))
+            return
+
+        // Context: "use test." → suggest embedded test modules
+        if lsp_find_substr(line_text, "use test.") >= 0:
+            let test_mods = lsp_list_embedded_modules("test/")
+            for i in 0..test_mods.len() as i32:
+                let m = test_mods[i]
+                if not first:
+                    items = items ++ ","
+                first = false
+                items = items ++ jobj_start() ++ jkv_str("label", m) ++ "," ++ jkv_int("kind", 9) ++ jobj_end()
+            items = items ++ jarr_end()
+            lsp_write_response(jrpc_result(id, jobj_start() ++ jkv_raw("items", items) ++ jobj_end()))
+            return
+
+        // Detect dot context: character before cursor is '.'
+        var dot_pos = offset - 1
+        while dot_pos >= 0 and text[dot_pos] == 32:
+            dot_pos = dot_pos - 1
+        if dot_pos >= 0 and text[dot_pos] == 46:
+            self.dot_completion(id, uri, text, offset, dot_pos)
+            return
+
+        // Get cached analysis
+        let cidx = self.find_doc(uri)
+        if cidx >= 0:
+            self.ensure_doc_analyzed(cidx)
+        var comp = Compilation.init()
+        var fresh_pool = AstPool.new()
+        let use_cache = cidx >= 0 and (&self.documents[cidx]).cache_valid
+        if not use_cache:
+            comp.set_prelude_mode(2)
+            fresh_pool = comp.compile_source_text(uri_to_path(uri), text)
+        let pool = if use_cache: &self.documents[cidx].cached_pool else: &fresh_pool
+        let intern = if use_cache: &self.documents[cidx].cached_intern else: &comp.zcu.pool
+
+        // Phase 2: scope-aware completion via AST walking.
+        // Find the enclosing function, collect its parameters and local bindings
+        // that are visible at the cursor position.
+        // Fast-tier scope-aware completion (cached).
+        let parsed = self.get_parsed(uri, text)
+        let parse_pool = parsed.pool
+        let parse_intern = parsed.intern
+        let enclosing_fn = lsp_find_enclosing_fn(parse_pool, offset)
+        var scope_names: Vec[str] = Vec.new()
+        if enclosing_fn as i32 != 0:
+            let params = lsp_collect_fn_params(parse_pool, parse_intern, enclosing_fn)
+            for pi in 0..params.len() as i32:
+                scope_names.push(with_str_clone_ref(params[pi]))
+            // Walk body recursively to collect bindings visible at cursor.
+            let body = parse_pool.get_data1(enclosing_fn)
+            if body != 0:
+                let bindings = lsp_collect_bindings_rec(parse_pool, parse_intern, body, offset)
+                for bi in 0..bindings.len() as i32:
+                    scope_names.push(with_str_clone_ref(bindings[bi]))
+        for si in 0..scope_names.len() as i32:
+            let sname = scope_names[si]
             if not first:
                 items = items ++ ","
             first = false
-            items = items ++ jobj_start() ++ jkv_str("label", m) ++ "," ++ jkv_int("kind", 9) ++ jobj_end()
+            items = items ++ jobj_start() ++ jkv_str("label", sname) ++ "," ++ jkv_int("kind", 6) ++ jobj_end()
+
+        // Keywords
+        let keywords = lsp_keywords()
+        for i in 0..keywords.len() as i32:
+            let kw = keywords[i]
+            if not first:
+                items = items ++ ","
+            first = false
+            items = items ++ jobj_start() ++ jkv_str("label", kw) ++ "," ++ jkv_int("kind", 14) ++ jobj_end()
+
+        // Top-level declarations
+        for di in 0..pool.decl_count():
+            let decl = pool.get_decl(di)
+            let kind = pool.kind(decl)
+            var label = ""
+            var ck = 0
+            if kind == NodeKind.NK_FN_DECL:
+                label = with_str_clone_ref(intern.resolve(pool.get_data0(decl)))
+                ck = 3
+            else if kind == NodeKind.NK_TYPE_DECL:
+                label = with_str_clone_ref(intern.resolve(pool.get_data0(decl)))
+                ck = 22
+            else if kind == NodeKind.NK_TRAIT_DECL:
+                label = with_str_clone_ref(intern.resolve(pool.get_data0(decl)))
+                ck = 8
+            else if kind == NodeKind.NK_LET_DECL:
+                label = with_str_clone_ref(intern.resolve(pool.get_data0(decl)))
+                ck = 6
+            if label.len() > 0:
+                if not first:
+                    items = items ++ ","
+                first = false
+                items = items ++ jobj_start() ++ jkv_str("label", label) ++ "," ++ jkv_int("kind", ck) ++ jobj_end()
+
+        // Prelude builtins (always available without explicit import)
+        let prelude_fns = "print,eprint,write,ewrite,print_i32,print_i64,print_bool,assert,require,check,int_to_string"
+        let prelude_types = "Vec,HashMap,HashSet,Option,Result,Some,None,Ok,Err"
+        items = lsp_append_csv_items(items, prelude_fns, 3, first)
+        if prelude_fns.len() > 0:
+            first = false
+        items = lsp_append_csv_items(items, prelude_types, 22, first)
+
         items = items ++ jarr_end()
         lsp_write_response(jrpc_result(id, jobj_start() ++ jkv_raw("items", items) ++ jobj_end()))
-        return
-
-    // Context: "use test." → suggest embedded test modules
-    if lsp_find_substr(line_text, "use test.") >= 0:
-        let test_mods = lsp_list_embedded_modules("test/")
-        for i in 0..test_mods.len() as i32:
-            let m = test_mods[i]
-            if not first:
-                items = items ++ ","
-            first = false
-            items = items ++ jobj_start() ++ jkv_str("label", m) ++ "," ++ jkv_int("kind", 9) ++ jobj_end()
-        items = items ++ jarr_end()
-        lsp_write_response(jrpc_result(id, jobj_start() ++ jkv_raw("items", items) ++ jobj_end()))
-        return
-
-    // Detect dot context: character before cursor is '.'
-    var dot_pos = offset - 1
-    while dot_pos >= 0 and text[dot_pos] == 32:
-        dot_pos = dot_pos - 1
-    if dot_pos >= 0 and text[dot_pos] == 46:
-        self.dot_completion(id, uri, text, offset, dot_pos)
-        return
-
-    // Get cached analysis
-    let cidx = self.find_doc(uri)
-    if cidx >= 0:
-        self.ensure_doc_analyzed(cidx)
-    var comp = Compilation.init()
-    var fresh_pool = AstPool.new()
-    let use_cache = cidx >= 0 and (&self.documents[cidx]).cache_valid
-    if not use_cache:
-        comp.set_prelude_mode(2)
-        fresh_pool = comp.compile_source_text(uri_to_path(uri), text)
-    let pool = if use_cache: &self.documents[cidx].cached_pool else: &fresh_pool
-    let intern = if use_cache: &self.documents[cidx].cached_intern else: &comp.zcu.pool
-
-    // Phase 2: scope-aware completion via AST walking.
-    // Find the enclosing function, collect its parameters and local bindings
-    // that are visible at the cursor position.
-    // Fast-tier scope-aware completion (cached).
-    let parsed = self.get_parsed(uri, text)
-    let parse_pool = parsed.pool
-    let parse_intern = parsed.intern
-    let enclosing_fn = lsp_find_enclosing_fn(parse_pool, offset)
-    var scope_names: Vec[str] = Vec.new()
-    if enclosing_fn as i32 != 0:
-        let params = lsp_collect_fn_params(parse_pool, parse_intern, enclosing_fn)
-        for pi in 0..params.len() as i32:
-            scope_names.push(with_str_clone_ref(params[pi]))
-        // Walk body recursively to collect bindings visible at cursor.
-        let body = parse_pool.get_data1(enclosing_fn)
-        if body != 0:
-            let bindings = lsp_collect_bindings_rec(parse_pool, parse_intern, body, offset)
-            for bi in 0..bindings.len() as i32:
-                scope_names.push(with_str_clone_ref(bindings[bi]))
-    for si in 0..scope_names.len() as i32:
-        let sname = scope_names[si]
-        if not first:
-            items = items ++ ","
-        first = false
-        items = items ++ jobj_start() ++ jkv_str("label", sname) ++ "," ++ jkv_int("kind", 6) ++ jobj_end()
-
-    // Keywords
-    let keywords = lsp_keywords()
-    for i in 0..keywords.len() as i32:
-        let kw = keywords[i]
-        if not first:
-            items = items ++ ","
-        first = false
-        items = items ++ jobj_start() ++ jkv_str("label", kw) ++ "," ++ jkv_int("kind", 14) ++ jobj_end()
-
-    // Top-level declarations
-    for di in 0..pool.decl_count():
-        let decl = pool.get_decl(di)
-        let kind = pool.kind(decl)
-        var label = ""
-        var ck = 0
-        if kind == NodeKind.NK_FN_DECL:
-            label = with_str_clone_ref(intern.resolve(pool.get_data0(decl)))
-            ck = 3
-        else if kind == NodeKind.NK_TYPE_DECL:
-            label = with_str_clone_ref(intern.resolve(pool.get_data0(decl)))
-            ck = 22
-        else if kind == NodeKind.NK_TRAIT_DECL:
-            label = with_str_clone_ref(intern.resolve(pool.get_data0(decl)))
-            ck = 8
-        else if kind == NodeKind.NK_LET_DECL:
-            label = with_str_clone_ref(intern.resolve(pool.get_data0(decl)))
-            ck = 6
-        if label.len() > 0:
-            if not first:
-                items = items ++ ","
-            first = false
-            items = items ++ jobj_start() ++ jkv_str("label", label) ++ "," ++ jkv_int("kind", ck) ++ jobj_end()
-
-    // Prelude builtins (always available without explicit import)
-    let prelude_fns = "print,eprint,write,ewrite,print_i32,print_i64,print_bool,assert,require,check,int_to_string"
-    let prelude_types = "Vec,HashMap,HashSet,Option,Result,Some,None,Ok,Err"
-    items = lsp_append_csv_items(items, prelude_fns, 3, first)
-    if prelude_fns.len() > 0:
-        first = false
-    items = lsp_append_csv_items(items, prelude_types, 22, first)
-
-    items = items ++ jarr_end()
-    lsp_write_response(jrpc_result(id, jobj_start() ++ jkv_raw("items", items) ++ jobj_end()))
 
 fn lsp_append_csv_items(items: &str, csv: &str, kind: i32, first: bool) -> str:
     var result = with_str_clone_ref(items)
@@ -1493,270 +1496,271 @@ fn lsp_keywords() -> Vec[str]:
 
 // ── Signature help ───────────────────────────────────────────
 
-fn LspState.signature_help(mut self: LspState, id: i32, uri: &str, text: &str, line: i32, col: i32):
-    let offset = lsp_line_col_to_offset(text, line, col)
+impl LspState:
+    mut fn signature_help(id: i32, uri: &str, text: &str, line: i32, col: i32):
+        let offset = lsp_line_col_to_offset(text, line, col)
 
-    // Walk tokens backward from cursor to find the opening ( and function name.
-    var lexer = Lexer.init(text, 0)
-    let tokens = lexer.tokenize()
+        // Walk tokens backward from cursor to find the opening ( and function name.
+        var lexer = Lexer.init(text, 0)
+        let tokens = lexer.tokenize()
 
-    // Find the token at or just before cursor
-    var cursor_tok = -1
-    for i in 0..tokens.len():
-        if tokens.get_start(i) >= offset:
-            cursor_tok = i - 1
-            break
-    if cursor_tok < 0:
-        cursor_tok = tokens.len() - 1
-
-    // Walk backward to find the opening ( and count commas for active param
-    var paren_depth = 0
-    var comma_count = 0
-    var fn_name_tok = -1
-    var ti = cursor_tok
-    while ti >= 0:
-        let tag = tokens.get_tag(ti)
-        if tag == TokenKind.TK_R_PAREN:
-            paren_depth = paren_depth + 1
-        else if tag == TokenKind.TK_L_PAREN:
-            if paren_depth > 0:
-                paren_depth = paren_depth - 1
-            else:
-                // Found the opening paren. The token before it is the function name.
-                if ti > 0 and tokens.get_tag(ti - 1) == TokenKind.TK_IDENT:
-                    fn_name_tok = ti - 1
+        // Find the token at or just before cursor
+        var cursor_tok = -1
+        for i in 0..tokens.len():
+            if tokens.get_start(i) >= offset:
+                cursor_tok = i - 1
                 break
-        else if tag == TokenKind.TK_COMMA and paren_depth == 0:
-            comma_count = comma_count + 1
-        ti = ti - 1
+        if cursor_tok < 0:
+            cursor_tok = tokens.len() - 1
 
-    if fn_name_tok < 0:
-        lsp_write_response(jrpc_result_null(id))
-        return
-
-    let fn_name = text.slice(tokens.get_start(fn_name_tok) as i64, tokens.get_end(fn_name_tok) as i64)
-
-    // Look up the function declaration in the parsed AST (cached)
-    let parsed = self.get_parsed(uri, text)
-    var sig_label = ""
-    let param_labels: Vec[str] = Vec.new()
-
-    for di in 0..parsed.pool.decl_count():
-        let decl = parsed.pool.get_decl(di)
-        if parsed.pool.kind(decl) != NodeKind.NK_FN_DECL:
-            continue
-        let name = parsed.intern.resolve(parsed.pool.get_data0(decl))
-        if name != fn_name:
-            continue
-        // Found the function. Build signature label from parameters.
-        let meta = parsed.pool.find_fn_meta(decl)
-        if meta < 0:
-            continue
-        let param_start = parsed.pool.fn_meta_param_start(meta)
-        let param_count = parsed.pool.fn_meta_param_count(meta)
-        var label = "fn " ++ fn_name ++ "("
-        for pi in 0..param_count:
-            let pname = parsed.intern.resolve(parsed.pool.fn_param_name(param_start, pi))
-            let ptype_node = parsed.pool.fn_param_type(param_start, pi)
-            var ptype_str = ""
-            if ptype_node > 0:
-                let ptk = parsed.pool.kind(ptype_node as NodeId)
-                if ptk == NodeKind.NK_TYPE_NAMED:
-                    ptype_str = with_str_clone_ref(parsed.intern.resolve(parsed.pool.get_data0(ptype_node as NodeId)))
-                else if ptk == NodeKind.NK_TYPE_REF:
-                    let inner = parsed.pool.get_data0(ptype_node as NodeId)
-                    if inner > 0 and parsed.pool.kind(inner as NodeId) == NodeKind.NK_TYPE_NAMED:
-                        ptype_str = "&" ++ parsed.intern.resolve(parsed.pool.get_data0(inner as NodeId))
-            let param_text = if ptype_str.len() > 0: pname ++ ": " ++ ptype_str else: with_str_clone_ref(pname)
-            if pi > 0:
-                label = label ++ ", "
-            label = label ++ param_text
-            param_labels.push(param_text)
-        label = label ++ ")"
-        sig_label = label
-        break
-
-    if sig_label.len() == 0:
-        lsp_write_response(jrpc_result_null(id))
-        return
-
-    // Build SignatureHelp response
-    var params_json = jarr_start()
-    for pi in 0..param_labels.len() as i32:
-        if pi > 0:
-            params_json = params_json ++ ","
-        params_json = params_json ++ jobj_start() ++ jkv_str("label", param_labels[pi]) ++ jobj_end()
-    params_json = params_json ++ jarr_end()
-
-    let sig = jobj_start() ++ jkv_str("label", sig_label) ++ "," ++ jkv_raw("parameters", params_json) ++ jobj_end()
-    let result = jobj_start() ++ jkv_raw("signatures", jarr_start() ++ sig ++ jarr_end()) ++ "," ++ jkv_int("activeSignature", 0) ++ "," ++ jkv_int("activeParameter", comma_count) ++ jobj_end()
-    lsp_write_response(jrpc_result(id, result))
-
-// ── Find references ──────────────────────────────────────────
-
-fn LspState.find_references(mut self: LspState, id: i32, uri: &str, text: &str, line: i32, col: i32):
-    let offset = lsp_line_col_to_offset(text, line, col)
-
-    // Find the identifier at cursor
-    var lex0 = Lexer.init(text, 0)
-    let tok0 = lex0.tokenize()
-    var target = ""
-    for i in 0..tok0.len():
-        if offset >= tok0.get_start(i) and offset < tok0.get_end(i):
-            if tok0.get_tag(i) == TokenKind.TK_IDENT:
-                target = text.slice(tok0.get_start(i) as i64, tok0.get_end(i) as i64)
-            break
-
-    if target.len() == 0:
-        lsp_write_response(jrpc_result(id, "[]"))
-        return
-
-    // Determine if target is a top-level declaration or a local variable.
-    // For locals, restrict references to the enclosing function scope.
-    let parsed = self.get_parsed(uri, text)
-    var is_top_level = false
-    var scope_start = 0
-    var scope_end = text.len() as i32
-    for di in 0..parsed.pool.decl_count():
-        let decl = parsed.pool.get_decl(di)
-        let kind = parsed.pool.kind(decl)
-        if kind == NodeKind.NK_FN_DECL or kind == NodeKind.NK_TYPE_DECL or kind == NodeKind.NK_TRAIT_DECL or kind == NodeKind.NK_EXTERN_FN:
-            if parsed.intern.resolve(parsed.pool.get_data0(decl)) == target:
-                is_top_level = true
-                break
-    if not is_top_level:
-        // Local variable: restrict to enclosing function
-        let fn_node = lsp_find_enclosing_fn(parsed.pool, offset)
-        if fn_node as i32 != 0:
-            scope_start = parsed.pool.get_start(fn_node as NodeId)
-            // Use next declaration start as end bound
-            var found_current = false
-            for di in 0..parsed.pool.decl_count():
-                let decl = parsed.pool.get_decl(di)
-                if found_current:
-                    scope_end = parsed.pool.get_start(decl)
+        // Walk backward to find the opening ( and count commas for active param
+        var paren_depth = 0
+        var comma_count = 0
+        var fn_name_tok = -1
+        var ti = cursor_tok
+        while ti >= 0:
+            let tag = tokens.get_tag(ti)
+            if tag == TokenKind.TK_R_PAREN:
+                paren_depth = paren_depth + 1
+            else if tag == TokenKind.TK_L_PAREN:
+                if paren_depth > 0:
+                    paren_depth = paren_depth - 1
+                else:
+                    // Found the opening paren. The token before it is the function name.
+                    if ti > 0 and tokens.get_tag(ti - 1) == TokenKind.TK_IDENT:
+                        fn_name_tok = ti - 1
                     break
-                if parsed.pool.get_start(decl) == scope_start:
-                    found_current = true
+            else if tag == TokenKind.TK_COMMA and paren_depth == 0:
+                comma_count = comma_count + 1
+            ti = ti - 1
 
-    // Scan current file for matching identifiers within scope
-    var locs = jarr_start()
-    var first = true
-    var lex1 = Lexer.init(text, 0)
-    let toks1 = lex1.tokenize()
-    for ti in 0..toks1.len():
-        if toks1.get_tag(ti) != TokenKind.TK_IDENT:
-            continue
-        let tstart = toks1.get_start(ti)
-        if not is_top_level and (tstart < scope_start or tstart >= scope_end):
-            continue
-        let tt = text.slice(tstart as i64, toks1.get_end(ti) as i64)
-        if tt != target:
-            continue
-        let rl = lsp_offset_to_line(text, tstart)
-        let rc = lsp_offset_to_col(text, tstart)
-        let re = lsp_offset_to_col(text, toks1.get_end(ti))
-        if not first:
-            locs = locs ++ ","
-        first = false
-        locs = locs ++ jobj_start() ++ jkv_str("uri", uri) ++ "," ++ jkv_raw("range", jrange(rl, rc, rl, re)) ++ jobj_end()
+        if fn_name_tok < 0:
+            lsp_write_response(jrpc_result_null(id))
+            return
 
-    // Cross-file: only scan for top-level declarations (locals can't be cross-file)
-    if not is_top_level:
+        let fn_name = text.slice(tokens.get_start(fn_name_tok) as i64, tokens.get_end(fn_name_tok) as i64)
+
+        // Look up the function declaration in the parsed AST (cached)
+        let parsed = self.get_parsed(uri, text)
+        var sig_label = ""
+        let param_labels: Vec[str] = Vec.new()
+
+        for di in 0..parsed.pool.decl_count():
+            let decl = parsed.pool.get_decl(di)
+            if parsed.pool.kind(decl) != NodeKind.NK_FN_DECL:
+                continue
+            let name = parsed.intern.resolve(parsed.pool.get_data0(decl))
+            if name != fn_name:
+                continue
+            // Found the function. Build signature label from parameters.
+            let meta = parsed.pool.find_fn_meta(decl)
+            if meta < 0:
+                continue
+            let param_start = parsed.pool.fn_meta_param_start(meta)
+            let param_count = parsed.pool.fn_meta_param_count(meta)
+            var label = "fn " ++ fn_name ++ "("
+            for pi in 0..param_count:
+                let pname = parsed.intern.resolve(parsed.pool.fn_param_name(param_start, pi))
+                let ptype_node = parsed.pool.fn_param_type(param_start, pi)
+                var ptype_str = ""
+                if ptype_node > 0:
+                    let ptk = parsed.pool.kind(ptype_node as NodeId)
+                    if ptk == NodeKind.NK_TYPE_NAMED:
+                        ptype_str = with_str_clone_ref(parsed.intern.resolve(parsed.pool.get_data0(ptype_node as NodeId)))
+                    else if ptk == NodeKind.NK_TYPE_REF:
+                        let inner = parsed.pool.get_data0(ptype_node as NodeId)
+                        if inner > 0 and parsed.pool.kind(inner as NodeId) == NodeKind.NK_TYPE_NAMED:
+                            ptype_str = "&" ++ parsed.intern.resolve(parsed.pool.get_data0(inner as NodeId))
+                let param_text = if ptype_str.len() > 0: pname ++ ": " ++ ptype_str else: with_str_clone_ref(pname)
+                if pi > 0:
+                    label = label ++ ", "
+                label = label ++ param_text
+                param_labels.push(param_text)
+            label = label ++ ")"
+            sig_label = label
+            break
+
+        if sig_label.len() == 0:
+            lsp_write_response(jrpc_result_null(id))
+            return
+
+        // Build SignatureHelp response
+        var params_json = jarr_start()
+        for pi in 0..param_labels.len() as i32:
+            if pi > 0:
+                params_json = params_json ++ ","
+            params_json = params_json ++ jobj_start() ++ jkv_str("label", param_labels[pi]) ++ jobj_end()
+        params_json = params_json ++ jarr_end()
+
+        let sig = jobj_start() ++ jkv_str("label", sig_label) ++ "," ++ jkv_raw("parameters", params_json) ++ jobj_end()
+        let result = jobj_start() ++ jkv_raw("signatures", jarr_start() ++ sig ++ jarr_end()) ++ "," ++ jkv_int("activeSignature", 0) ++ "," ++ jkv_int("activeParameter", comma_count) ++ jobj_end()
+        lsp_write_response(jrpc_result(id, result))
+
+    // ── Find references ──────────────────────────────────────────
+
+    mut fn find_references(id: i32, uri: &str, text: &str, line: i32, col: i32):
+        let offset = lsp_line_col_to_offset(text, line, col)
+
+        // Find the identifier at cursor
+        var lex0 = Lexer.init(text, 0)
+        let tok0 = lex0.tokenize()
+        var target = ""
+        for i in 0..tok0.len():
+            if offset >= tok0.get_start(i) and offset < tok0.get_end(i):
+                if tok0.get_tag(i) == TokenKind.TK_IDENT:
+                    target = text.slice(tok0.get_start(i) as i64, tok0.get_end(i) as i64)
+                break
+
+        if target.len() == 0:
+            lsp_write_response(jrpc_result(id, "[]"))
+            return
+
+        // Determine if target is a top-level declaration or a local variable.
+        // For locals, restrict references to the enclosing function scope.
+        let parsed = self.get_parsed(uri, text)
+        var is_top_level = false
+        var scope_start = 0
+        var scope_end = text.len() as i32
+        for di in 0..parsed.pool.decl_count():
+            let decl = parsed.pool.get_decl(di)
+            let kind = parsed.pool.kind(decl)
+            if kind == NodeKind.NK_FN_DECL or kind == NodeKind.NK_TYPE_DECL or kind == NodeKind.NK_TRAIT_DECL or kind == NodeKind.NK_EXTERN_FN:
+                if parsed.intern.resolve(parsed.pool.get_data0(decl)) == target:
+                    is_top_level = true
+                    break
+        if not is_top_level:
+            // Local variable: restrict to enclosing function
+            let fn_node = lsp_find_enclosing_fn(parsed.pool, offset)
+            if fn_node as i32 != 0:
+                scope_start = parsed.pool.get_start(fn_node as NodeId)
+                // Use next declaration start as end bound
+                var found_current = false
+                for di in 0..parsed.pool.decl_count():
+                    let decl = parsed.pool.get_decl(di)
+                    if found_current:
+                        scope_end = parsed.pool.get_start(decl)
+                        break
+                    if parsed.pool.get_start(decl) == scope_start:
+                        found_current = true
+
+        // Scan current file for matching identifiers within scope
+        var locs = jarr_start()
+        var first = true
+        var lex1 = Lexer.init(text, 0)
+        let toks1 = lex1.tokenize()
+        for ti in 0..toks1.len():
+            if toks1.get_tag(ti) != TokenKind.TK_IDENT:
+                continue
+            let tstart = toks1.get_start(ti)
+            if not is_top_level and (tstart < scope_start or tstart >= scope_end):
+                continue
+            let tt = text.slice(tstart as i64, toks1.get_end(ti) as i64)
+            if tt != target:
+                continue
+            let rl = lsp_offset_to_line(text, tstart)
+            let rc = lsp_offset_to_col(text, tstart)
+            let re = lsp_offset_to_col(text, toks1.get_end(ti))
+            if not first:
+                locs = locs ++ ","
+            first = false
+            locs = locs ++ jobj_start() ++ jkv_str("uri", uri) ++ "," ++ jkv_raw("range", jrange(rl, rc, rl, re)) ++ jobj_end()
+
+        // Cross-file: only scan for top-level declarations (locals can't be cross-file)
+        if not is_top_level:
+            locs = locs ++ jarr_end()
+            lsp_write_response(jrpc_result(id, locs))
+            return
+        let idx = self.find_doc(uri)
+        if idx >= 0:
+            self.ensure_doc_analyzed(idx)
+        let empty_paths: Vec[str] = Vec.new()
+        let use_cache = idx >= 0 and (&self.documents[idx]).cache_valid
+        let cached_paths = if use_cache: &self.documents[idx].cached_decl_paths else: &empty_paths
+        if cached_paths.len() > 0:
+            var scanned_paths = uri_to_path(uri) ++ "\n"
+            for di in 0..cached_paths.len() as i32:
+                let dpath = cached_paths[di]
+                if dpath.len() == 0:
+                    continue
+                if dpath.starts_with("<embedded"):
+                    continue
+                if lsp_find_substr(scanned_paths, dpath) >= 0:
+                    continue
+                scanned_paths = scanned_paths ++ dpath ++ "\n"
+                let ft = with_fs_read_file(dpath)
+                if ft.len() == 0:
+                    continue
+                let file_uri = "file://" ++ dpath
+                var lex2 = Lexer.init(ft, 0)
+                let toks2 = lex2.tokenize()
+                for ti2 in 0..toks2.len():
+                    if toks2.get_tag(ti2) != TokenKind.TK_IDENT:
+                        continue
+                    let tt2 = ft.slice(toks2.get_start(ti2) as i64, toks2.get_end(ti2) as i64)
+                    if tt2 != target:
+                        continue
+                    let rl2 = lsp_offset_to_line(ft, toks2.get_start(ti2))
+                    let rc2 = lsp_offset_to_col(ft, toks2.get_start(ti2))
+                    let re2 = lsp_offset_to_col(ft, toks2.get_end(ti2))
+                    if not first:
+                        locs = locs ++ ","
+                    first = false
+                    locs = locs ++ jobj_start() ++ jkv_str("uri", file_uri) ++ "," ++ jkv_raw("range", jrange(rl2, rc2, rl2, re2)) ++ jobj_end()
+
         locs = locs ++ jarr_end()
         lsp_write_response(jrpc_result(id, locs))
-        return
-    let idx = self.find_doc(uri)
-    if idx >= 0:
-        self.ensure_doc_analyzed(idx)
-    let empty_paths: Vec[str] = Vec.new()
-    let use_cache = idx >= 0 and (&self.documents[idx]).cache_valid
-    let cached_paths = if use_cache: &self.documents[idx].cached_decl_paths else: &empty_paths
-    if cached_paths.len() > 0:
-        var scanned_paths = uri_to_path(uri) ++ "\n"
-        for di in 0..cached_paths.len() as i32:
-            let dpath = cached_paths[di]
-            if dpath.len() == 0:
-                continue
-            if dpath.starts_with("<embedded"):
-                continue
-            if lsp_find_substr(scanned_paths, dpath) >= 0:
-                continue
-            scanned_paths = scanned_paths ++ dpath ++ "\n"
-            let ft = with_fs_read_file(dpath)
-            if ft.len() == 0:
-                continue
-            let file_uri = "file://" ++ dpath
-            var lex2 = Lexer.init(ft, 0)
-            let toks2 = lex2.tokenize()
-            for ti2 in 0..toks2.len():
-                if toks2.get_tag(ti2) != TokenKind.TK_IDENT:
-                    continue
-                let tt2 = ft.slice(toks2.get_start(ti2) as i64, toks2.get_end(ti2) as i64)
-                if tt2 != target:
-                    continue
-                let rl2 = lsp_offset_to_line(ft, toks2.get_start(ti2))
-                let rc2 = lsp_offset_to_col(ft, toks2.get_start(ti2))
-                let re2 = lsp_offset_to_col(ft, toks2.get_end(ti2))
+
+    // ── Document symbols ─────────────────────────────────────────
+
+    mut fn document_symbols(id: i32, uri: &str, text: &str):
+        let idx = self.find_doc(uri)
+        if idx >= 0:
+            self.ensure_doc_analyzed(idx)
+        var comp = Compilation.init()
+        var fresh_pool = AstPool.new()
+        let use_cache = idx >= 0 and (&self.documents[idx]).cache_valid
+        if not use_cache:
+            comp.set_prelude_mode(2)
+            fresh_pool = comp.compile_source_text(uri_to_path(uri), text)
+        let pool = if use_cache: &self.documents[idx].cached_pool else: &fresh_pool
+        let intern = if use_cache: &self.documents[idx].cached_intern else: &comp.zcu.pool
+
+        var items = jarr_start()
+        var first = true
+        for di in 0..pool.decl_count():
+            let decl = pool.get_decl(di)
+            let kind = pool.kind(decl)
+            var label = ""
+            var sk = 0
+            if kind == NodeKind.NK_FN_DECL:
+                label = with_str_clone_ref(intern.resolve(pool.get_data0(decl)))
+                sk = 12
+            else if kind == NodeKind.NK_TYPE_DECL:
+                label = with_str_clone_ref(intern.resolve(pool.get_data0(decl)))
+                sk = 23
+            else if kind == NodeKind.NK_TRAIT_DECL:
+                label = with_str_clone_ref(intern.resolve(pool.get_data0(decl)))
+                sk = 11
+            else if kind == NodeKind.NK_LET_DECL:
+                label = with_str_clone_ref(intern.resolve(pool.get_data0(decl)))
+                sk = 13
+            else if kind == NodeKind.NK_EXTERN_FN:
+                label = with_str_clone_ref(intern.resolve(pool.get_data0(decl)))
+                sk = 12
+            if label.len() > 0:
+                let ds = pool.get_start(decl)
+                let de = pool.get_end(decl)
+                let sl = lsp_offset_to_line(text, ds)
+                let sc = lsp_offset_to_col(text, ds)
+                let el = lsp_offset_to_line(text, de)
+                let ec = lsp_offset_to_col(text, de)
+                let range = jrange(sl, sc, el, ec)
                 if not first:
-                    locs = locs ++ ","
+                    items = items ++ ","
                 first = false
-                locs = locs ++ jobj_start() ++ jkv_str("uri", file_uri) ++ "," ++ jkv_raw("range", jrange(rl2, rc2, rl2, re2)) ++ jobj_end()
-
-    locs = locs ++ jarr_end()
-    lsp_write_response(jrpc_result(id, locs))
-
-// ── Document symbols ─────────────────────────────────────────
-
-fn LspState.document_symbols(mut self: LspState, id: i32, uri: &str, text: &str):
-    let idx = self.find_doc(uri)
-    if idx >= 0:
-        self.ensure_doc_analyzed(idx)
-    var comp = Compilation.init()
-    var fresh_pool = AstPool.new()
-    let use_cache = idx >= 0 and (&self.documents[idx]).cache_valid
-    if not use_cache:
-        comp.set_prelude_mode(2)
-        fresh_pool = comp.compile_source_text(uri_to_path(uri), text)
-    let pool = if use_cache: &self.documents[idx].cached_pool else: &fresh_pool
-    let intern = if use_cache: &self.documents[idx].cached_intern else: &comp.zcu.pool
-
-    var items = jarr_start()
-    var first = true
-    for di in 0..pool.decl_count():
-        let decl = pool.get_decl(di)
-        let kind = pool.kind(decl)
-        var label = ""
-        var sk = 0
-        if kind == NodeKind.NK_FN_DECL:
-            label = with_str_clone_ref(intern.resolve(pool.get_data0(decl)))
-            sk = 12
-        else if kind == NodeKind.NK_TYPE_DECL:
-            label = with_str_clone_ref(intern.resolve(pool.get_data0(decl)))
-            sk = 23
-        else if kind == NodeKind.NK_TRAIT_DECL:
-            label = with_str_clone_ref(intern.resolve(pool.get_data0(decl)))
-            sk = 11
-        else if kind == NodeKind.NK_LET_DECL:
-            label = with_str_clone_ref(intern.resolve(pool.get_data0(decl)))
-            sk = 13
-        else if kind == NodeKind.NK_EXTERN_FN:
-            label = with_str_clone_ref(intern.resolve(pool.get_data0(decl)))
-            sk = 12
-        if label.len() > 0:
-            let ds = pool.get_start(decl)
-            let de = pool.get_end(decl)
-            let sl = lsp_offset_to_line(text, ds)
-            let sc = lsp_offset_to_col(text, ds)
-            let el = lsp_offset_to_line(text, de)
-            let ec = lsp_offset_to_col(text, de)
-            let range = jrange(sl, sc, el, ec)
-            if not first:
-                items = items ++ ","
-            first = false
-            items = items ++ jobj_start() ++ jkv_str("name", label) ++ "," ++ jkv_int("kind", sk) ++ "," ++ jkv_raw("range", range) ++ "," ++ jkv_raw("selectionRange", range) ++ jobj_end()
-    items = items ++ jarr_end()
-    lsp_write_response(jrpc_result(id, items))
+                items = items ++ jobj_start() ++ jkv_str("name", label) ++ "," ++ jkv_int("kind", sk) ++ "," ++ jkv_raw("range", range) ++ "," ++ jkv_raw("selectionRange", range) ++ jobj_end()
+        items = items ++ jarr_end()
+        lsp_write_response(jrpc_result(id, items))
 
 // ── Rename symbol ───────────────────────────────────────────
 
@@ -1772,103 +1776,104 @@ fn lsp_is_valid_ident(name: &str) -> bool:
             return false
     true
 
-fn LspState.rename(mut self: LspState, id: i32, uri: &str, text: &str, line: i32, col: i32, new_name: &str):
-    let offset = lsp_line_col_to_offset(text, line, col)
+impl LspState:
+    mut fn rename(id: i32, uri: &str, text: &str, line: i32, col: i32, new_name: &str):
+        let offset = lsp_line_col_to_offset(text, line, col)
 
-    // Find the identifier at cursor
-    var lex0 = Lexer.init(text, 0)
-    let tok0 = lex0.tokenize()
-    var target = ""
-    for i in 0..tok0.len():
-        if offset >= tok0.get_start(i) and offset < tok0.get_end(i):
-            if tok0.get_tag(i) == TokenKind.TK_IDENT:
-                target = text.slice(tok0.get_start(i) as i64, tok0.get_end(i) as i64)
-            break
+        // Find the identifier at cursor
+        var lex0 = Lexer.init(text, 0)
+        let tok0 = lex0.tokenize()
+        var target = ""
+        for i in 0..tok0.len():
+            if offset >= tok0.get_start(i) and offset < tok0.get_end(i):
+                if tok0.get_tag(i) == TokenKind.TK_IDENT:
+                    target = text.slice(tok0.get_start(i) as i64, tok0.get_end(i) as i64)
+                break
 
-    if target.len() == 0 or new_name.len() == 0:
-        lsp_write_response(jrpc_result_null(id))
-        return
+        if target.len() == 0 or new_name.len() == 0:
+            lsp_write_response(jrpc_result_null(id))
+            return
 
-    // Validate new name is a legal identifier
-    if not lsp_is_valid_ident(new_name):
-        lsp_write_response(jrpc_error(id, -32602, "Invalid identifier: " ++ new_name))
-        return
+        // Validate new name is a legal identifier
+        if not lsp_is_valid_ident(new_name):
+            lsp_write_response(jrpc_error(id, -32602, "Invalid identifier: " ++ new_name))
+            return
 
-    // Build WorkspaceEdit with changes per file
-    var changes = jobj_start()
-    var first_file = true
+        // Build WorkspaceEdit with changes per file
+        var changes = jobj_start()
+        var first_file = true
 
-    // Current file edits
-    var edits = jarr_start()
-    var first = true
-    var lex1 = Lexer.init(text, 0)
-    let toks1 = lex1.tokenize()
-    for ti in 0..toks1.len():
-        if toks1.get_tag(ti) != TokenKind.TK_IDENT:
-            continue
-        let tt = text.slice(toks1.get_start(ti) as i64, toks1.get_end(ti) as i64)
-        if tt != target:
-            continue
-        let rl = lsp_offset_to_line(text, toks1.get_start(ti))
-        let rc = lsp_offset_to_col(text, toks1.get_start(ti))
-        let re = lsp_offset_to_col(text, toks1.get_end(ti))
-        if not first:
-            edits = edits ++ ","
-        first = false
-        edits = edits ++ jobj_start() ++ jkv_raw("range", jrange(rl, rc, rl, re)) ++ "," ++ jkv_str("newText", new_name) ++ jobj_end()
-    edits = edits ++ jarr_end()
-    changes = changes ++ jkv_raw(json_escape(uri), edits)
-    first_file = false
-
-    // Cross-file edits via cached decl_source_paths
-    let cidx = self.find_doc(uri)
-    if cidx >= 0:
-        self.ensure_doc_analyzed(cidx)
-    let empty_paths: Vec[str] = Vec.new()
-    let use_cache = cidx >= 0 and (&self.documents[cidx]).cache_valid
-    let cached_paths = if use_cache: &self.documents[cidx].cached_decl_paths else: &empty_paths
-    if cached_paths.len() > 0:
-        var scanned_paths = uri_to_path(uri) ++ "\n"
-        for di in 0..cached_paths.len() as i32:
-            let dpath = cached_paths[di]
-            if dpath.len() == 0 or dpath.starts_with("<embedded"):
+        // Current file edits
+        var edits = jarr_start()
+        var first = true
+        var lex1 = Lexer.init(text, 0)
+        let toks1 = lex1.tokenize()
+        for ti in 0..toks1.len():
+            if toks1.get_tag(ti) != TokenKind.TK_IDENT:
                 continue
-            if lsp_find_substr(scanned_paths, dpath) >= 0:
+            let tt = text.slice(toks1.get_start(ti) as i64, toks1.get_end(ti) as i64)
+            if tt != target:
                 continue
-            scanned_paths = scanned_paths ++ dpath ++ "\n"
-            let ft = with_fs_read_file(dpath)
-            if ft.len() == 0:
-                continue
-            var file_edits = jarr_start()
-            var fe_first = true
-            var lex2 = Lexer.init(ft, 0)
-            let toks2 = lex2.tokenize()
-            var has_edits = false
-            for ti2 in 0..toks2.len():
-                if toks2.get_tag(ti2) != TokenKind.TK_IDENT:
+            let rl = lsp_offset_to_line(text, toks1.get_start(ti))
+            let rc = lsp_offset_to_col(text, toks1.get_start(ti))
+            let re = lsp_offset_to_col(text, toks1.get_end(ti))
+            if not first:
+                edits = edits ++ ","
+            first = false
+            edits = edits ++ jobj_start() ++ jkv_raw("range", jrange(rl, rc, rl, re)) ++ "," ++ jkv_str("newText", new_name) ++ jobj_end()
+        edits = edits ++ jarr_end()
+        changes = changes ++ jkv_raw(json_escape(uri), edits)
+        first_file = false
+
+        // Cross-file edits via cached decl_source_paths
+        let cidx = self.find_doc(uri)
+        if cidx >= 0:
+            self.ensure_doc_analyzed(cidx)
+        let empty_paths: Vec[str] = Vec.new()
+        let use_cache = cidx >= 0 and (&self.documents[cidx]).cache_valid
+        let cached_paths = if use_cache: &self.documents[cidx].cached_decl_paths else: &empty_paths
+        if cached_paths.len() > 0:
+            var scanned_paths = uri_to_path(uri) ++ "\n"
+            for di in 0..cached_paths.len() as i32:
+                let dpath = cached_paths[di]
+                if dpath.len() == 0 or dpath.starts_with("<embedded"):
                     continue
-                let tt2 = ft.slice(toks2.get_start(ti2) as i64, toks2.get_end(ti2) as i64)
-                if tt2 != target:
+                if lsp_find_substr(scanned_paths, dpath) >= 0:
                     continue
-                let rl2 = lsp_offset_to_line(ft, toks2.get_start(ti2))
-                let rc2 = lsp_offset_to_col(ft, toks2.get_start(ti2))
-                let re2 = lsp_offset_to_col(ft, toks2.get_end(ti2))
-                if not fe_first:
-                    file_edits = file_edits ++ ","
-                fe_first = false
-                has_edits = true
-                file_edits = file_edits ++ jobj_start() ++ jkv_raw("range", jrange(rl2, rc2, rl2, re2)) ++ "," ++ jkv_str("newText", new_name) ++ jobj_end()
-            file_edits = file_edits ++ jarr_end()
-            if has_edits:
-                let file_uri = "file://" ++ dpath
-                if not first_file:
-                    changes = changes ++ ","
-                first_file = false
-                changes = changes ++ jkv_raw(json_escape(file_uri), file_edits)
+                scanned_paths = scanned_paths ++ dpath ++ "\n"
+                let ft = with_fs_read_file(dpath)
+                if ft.len() == 0:
+                    continue
+                var file_edits = jarr_start()
+                var fe_first = true
+                var lex2 = Lexer.init(ft, 0)
+                let toks2 = lex2.tokenize()
+                var has_edits = false
+                for ti2 in 0..toks2.len():
+                    if toks2.get_tag(ti2) != TokenKind.TK_IDENT:
+                        continue
+                    let tt2 = ft.slice(toks2.get_start(ti2) as i64, toks2.get_end(ti2) as i64)
+                    if tt2 != target:
+                        continue
+                    let rl2 = lsp_offset_to_line(ft, toks2.get_start(ti2))
+                    let rc2 = lsp_offset_to_col(ft, toks2.get_start(ti2))
+                    let re2 = lsp_offset_to_col(ft, toks2.get_end(ti2))
+                    if not fe_first:
+                        file_edits = file_edits ++ ","
+                    fe_first = false
+                    has_edits = true
+                    file_edits = file_edits ++ jobj_start() ++ jkv_raw("range", jrange(rl2, rc2, rl2, re2)) ++ "," ++ jkv_str("newText", new_name) ++ jobj_end()
+                file_edits = file_edits ++ jarr_end()
+                if has_edits:
+                    let file_uri = "file://" ++ dpath
+                    if not first_file:
+                        changes = changes ++ ","
+                    first_file = false
+                    changes = changes ++ jkv_raw(json_escape(file_uri), file_edits)
 
-    changes = changes ++ jobj_end()
-    let result = jobj_start() ++ jkv_raw("changes", changes) ++ jobj_end()
-    lsp_write_response(jrpc_result(id, result))
+        changes = changes ++ jobj_end()
+        let result = jobj_start() ++ jkv_raw("changes", changes) ++ jobj_end()
+        lsp_write_response(jrpc_result(id, result))
 
 // ── Main loop ────────────────────────────────────────────────
 

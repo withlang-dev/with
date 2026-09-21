@@ -36,7 +36,7 @@ pub fn bloom_filter_new(__param_table_size: c_uint, __param_hash_func: unsafe ex
 }
 
 pub unsafe fn bloom_filter_free(__param_bloomfilter: *mut _BloomFilter) -> Unit {
-    with_free((((unsafe *__param_bloomfilter).table as *mut c_void) as *mut u8))
+    with_free((((*__param_bloomfilter).table as *mut c_void) as *mut u8))
 
     with_free(((__param_bloomfilter as *mut c_void) as *mut u8))
 
@@ -53,18 +53,18 @@ pub unsafe fn bloom_filter_insert(__param_bloomfilter: *mut _BloomFilter, __para
 
     var __local_b: u8
 
-    (__local_hash = (((unsafe *__param_bloomfilter).hash_func(__param_value) as c_uint)))
+    (__local_hash = (((*__param_bloomfilter).hash_func(__param_value) as c_uint)))
 
     (__local_i = ((0 as c_uint)))
 
-    while ((if __local_i < (unsafe *__param_bloomfilter).num_functions: 1 else: 0) != 0) {
+    while ((if __local_i < (*__param_bloomfilter).num_functions: 1 else: 0) != 0) {
         (__local_subhash = ((((__local_hash as c_uint) ^ (salts[__local_i] as c_uint)) as c_uint)))
 
-        (__local_index = ((((__local_subhash as c_uint) % ((unsafe *__param_bloomfilter).table_size as c_uint)) as c_uint)))
+        (__local_index = ((((__local_subhash as c_uint) % ((*__param_bloomfilter).table_size as c_uint)) as c_uint)))
 
         (__local_b = ((((1 as c_int) << (((__local_index as c_uint) % (8 as c_uint)) as c_uint)) as u8)))
 
-        ((unsafe (unsafe *__param_bloomfilter).table[((__local_index as c_uint) / (8 as c_uint))]) = ((unsafe (unsafe *__param_bloomfilter).table[((__local_index as c_uint) / (8 as c_uint))]) as u8) | (__local_b as u8))
+        (((*__param_bloomfilter).table[((__local_index as c_uint) / (8 as c_uint))]) = (((*__param_bloomfilter).table[((__local_index as c_uint) / (8 as c_uint))]) as u8) | (__local_b as u8))
 
 
         (__local_i = (__local_i +% 1))
@@ -87,16 +87,16 @@ pub unsafe fn bloom_filter_query(__param_bloomfilter: *mut _BloomFilter, __param
 
     var __local_bit: c_int
 
-    (__local_hash = (((unsafe *__param_bloomfilter).hash_func(__param_value) as c_uint)))
+    (__local_hash = (((*__param_bloomfilter).hash_func(__param_value) as c_uint)))
 
     (__local_i = ((0 as c_uint)))
 
-    while ((if __local_i < (unsafe *__param_bloomfilter).num_functions: 1 else: 0) != 0) {
+    while ((if __local_i < (*__param_bloomfilter).num_functions: 1 else: 0) != 0) {
         (__local_subhash = ((((__local_hash as c_uint) ^ (salts[__local_i] as c_uint)) as c_uint)))
 
-        (__local_index = ((((__local_subhash as c_uint) % ((unsafe *__param_bloomfilter).table_size as c_uint)) as c_uint)))
+        (__local_index = ((((__local_subhash as c_uint) % ((*__param_bloomfilter).table_size as c_uint)) as c_uint)))
 
-        (__local_b = (((unsafe (unsafe *__param_bloomfilter).table[((__local_index as c_uint) / (8 as c_uint))]) as u8)))
+        (__local_b = ((((*__param_bloomfilter).table[((__local_index as c_uint) / (8 as c_uint))]) as u8)))
 
         (__local_bit = ((((1 as c_int) << (((__local_index as c_uint) % (8 as c_uint)) as c_uint)) as c_int)))
 
@@ -118,18 +118,18 @@ pub unsafe fn bloom_filter_query(__param_bloomfilter: *mut _BloomFilter, __param
 pub unsafe fn bloom_filter_read(__param_bloomfilter: *mut _BloomFilter, __param_array: *mut u8) -> Unit {
     var __local_array_size: c_uint
 
-    (__local_array_size = (((((((unsafe *__param_bloomfilter).table_size as c_uint) +% (7 as c_uint)) as c_uint) / (8 as c_uint)) as c_uint)))
+    (__local_array_size = (((((((*__param_bloomfilter).table_size as c_uint) +% (7 as c_uint)) as c_uint) / (8 as c_uint)) as c_uint)))
 
-    with_memcpy(((__param_array as *mut c_void) as *mut u8), (((unsafe *__param_bloomfilter).table as *const c_void) as *const u8), ((__local_array_size as c_ulong) as i64))
+    with_memcpy(((__param_array as *mut c_void) as *mut u8), (((*__param_bloomfilter).table as *const c_void) as *const u8), ((__local_array_size as c_ulong) as i64))
 
 }
 
 pub unsafe fn bloom_filter_load(__param_bloomfilter: *mut _BloomFilter, __param_array: *mut u8) -> Unit {
     var __local_array_size: c_uint
 
-    (__local_array_size = (((((((unsafe *__param_bloomfilter).table_size as c_uint) +% (7 as c_uint)) as c_uint) / (8 as c_uint)) as c_uint)))
+    (__local_array_size = (((((((*__param_bloomfilter).table_size as c_uint) +% (7 as c_uint)) as c_uint) / (8 as c_uint)) as c_uint)))
 
-    with_memcpy((((unsafe *__param_bloomfilter).table as *mut c_void) as *mut u8), ((__param_array as *const c_void) as *const u8), ((__local_array_size as c_ulong) as i64))
+    with_memcpy((((*__param_bloomfilter).table as *mut c_void) as *mut u8), ((__param_array as *const c_void) as *const u8), ((__local_array_size as c_ulong) as i64))
 
 }
 
@@ -144,16 +144,16 @@ pub unsafe fn bloom_filter_union(__param_filter1: *mut _BloomFilter, __param_fil
 
     var __ci_expr_logic_0: c_int
 
-    if ((if (unsafe *__param_filter1).table_size != (unsafe *__param_filter2).table_size: 1 else: 0) != 0) {
+    if ((if (*__param_filter1).table_size != (*__param_filter2).table_size: 1 else: 0) != 0) {
         (__ci_expr_logic_0 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_0 = (if (if (unsafe *__param_filter1).num_functions != (unsafe *__param_filter2).num_functions: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_0 = (if (if (*__param_filter1).num_functions != (*__param_filter2).num_functions: 1 else: 0) != 0: 1 else: 0))
     }
 
     if (__ci_expr_logic_0 != 0) {
         (__ci_expr_logic_1 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_1 = (if (if (unsafe *__param_filter1).hash_func != (unsafe *__param_filter2).hash_func: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_1 = (if (if (*__param_filter1).hash_func != (*__param_filter2).hash_func: 1 else: 0) != 0: 1 else: 0))
     }
 
     if (__ci_expr_logic_1 != 0) {
@@ -162,19 +162,19 @@ pub unsafe fn bloom_filter_union(__param_filter1: *mut _BloomFilter, __param_fil
     }
 
 
-    (__local_result = bloom_filter_new((unsafe *__param_filter1).table_size, (unsafe *__param_filter1).hash_func, (unsafe *__param_filter1).num_functions))
+    (__local_result = bloom_filter_new((*__param_filter1).table_size, (*__param_filter1).hash_func, (*__param_filter1).num_functions))
 
     if ((if __local_result == null: 1 else: 0) != 0) {
         return ((null as *mut _BloomFilter))
 
     }
 
-    (__local_array_size = (((((((unsafe *__param_filter1).table_size as c_uint) +% (7 as c_uint)) as c_uint) / (8 as c_uint)) as c_uint)))
+    (__local_array_size = (((((((*__param_filter1).table_size as c_uint) +% (7 as c_uint)) as c_uint) / (8 as c_uint)) as c_uint)))
 
     (__local_i = ((0 as c_uint)))
 
     while ((if __local_i < __local_array_size: 1 else: 0) != 0) {
-        ((unsafe (unsafe *__local_result).table[__local_i]) = ((((((unsafe (unsafe *__param_filter1).table[__local_i]) as c_int) as c_int) | (((unsafe (unsafe *__param_filter2).table[__local_i]) as c_int) as c_int)) as u8)))
+        (((*__local_result).table[__local_i]) = (((((((*__param_filter1).table[__local_i]) as c_int) as c_int) | ((((*__param_filter2).table[__local_i]) as c_int) as c_int)) as u8)))
 
 
         (__local_i = (__local_i +% 1))
@@ -197,16 +197,16 @@ pub unsafe fn bloom_filter_intersection(__param_filter1: *mut _BloomFilter, __pa
 
     var __ci_expr_logic_0: c_int
 
-    if ((if (unsafe *__param_filter1).table_size != (unsafe *__param_filter2).table_size: 1 else: 0) != 0) {
+    if ((if (*__param_filter1).table_size != (*__param_filter2).table_size: 1 else: 0) != 0) {
         (__ci_expr_logic_0 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_0 = (if (if (unsafe *__param_filter1).num_functions != (unsafe *__param_filter2).num_functions: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_0 = (if (if (*__param_filter1).num_functions != (*__param_filter2).num_functions: 1 else: 0) != 0: 1 else: 0))
     }
 
     if (__ci_expr_logic_0 != 0) {
         (__ci_expr_logic_1 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_1 = (if (if (unsafe *__param_filter1).hash_func != (unsafe *__param_filter2).hash_func: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_1 = (if (if (*__param_filter1).hash_func != (*__param_filter2).hash_func: 1 else: 0) != 0: 1 else: 0))
     }
 
     if (__ci_expr_logic_1 != 0) {
@@ -215,19 +215,19 @@ pub unsafe fn bloom_filter_intersection(__param_filter1: *mut _BloomFilter, __pa
     }
 
 
-    (__local_result = bloom_filter_new((unsafe *__param_filter1).table_size, (unsafe *__param_filter1).hash_func, (unsafe *__param_filter1).num_functions))
+    (__local_result = bloom_filter_new((*__param_filter1).table_size, (*__param_filter1).hash_func, (*__param_filter1).num_functions))
 
     if ((if __local_result == null: 1 else: 0) != 0) {
         return ((null as *mut _BloomFilter))
 
     }
 
-    (__local_array_size = (((((((unsafe *__param_filter1).table_size as c_uint) +% (7 as c_uint)) as c_uint) / (8 as c_uint)) as c_uint)))
+    (__local_array_size = (((((((*__param_filter1).table_size as c_uint) +% (7 as c_uint)) as c_uint) / (8 as c_uint)) as c_uint)))
 
     (__local_i = ((0 as c_uint)))
 
     while ((if __local_i < __local_array_size: 1 else: 0) != 0) {
-        ((unsafe (unsafe *__local_result).table[__local_i]) = ((((((unsafe (unsafe *__param_filter1).table[__local_i]) as c_int) as c_int) & (((unsafe (unsafe *__param_filter2).table[__local_i]) as c_int) as c_int)) as u8)))
+        (((*__local_result).table[__local_i]) = (((((((*__param_filter1).table[__local_i]) as c_int) as c_int) & ((((*__param_filter2).table[__local_i]) as c_int) as c_int)) as u8)))
 
 
         (__local_i = (__local_i +% 1))

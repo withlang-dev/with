@@ -25,11 +25,11 @@ pub unsafe fn compress_z(__param_dest: *mut u8, __param_destLen: *mut c_ulong, _
 pub unsafe fn compress2(__param_dest: *mut u8, __param_destLen: *mut c_ulong, __param_source: *const u8, __param_sourceLen: c_ulong, __param_level: c_int) -> c_int {
     var __local_ret: c_int
 
-    var __local_got: c_ulong = (unsafe *__param_destLen)
+    var __local_got: c_ulong = (*__param_destLen)
 
     (__local_ret = ((compress2_z(__param_dest, (&raw mut __local_got as *mut c_ulong), __param_source, __param_sourceLen, __param_level) as c_int)))
 
-    ((unsafe *__param_destLen) = __local_got)
+    ((*__param_destLen) = __local_got)
 
     return __local_ret
 
@@ -66,7 +66,7 @@ pub unsafe fn compress2_z(__param_dest: *mut u8, __param_destLen: *mut c_ulong, 
     } else {
         var __ci_expr_logic_2: c_int = 0
 
-        if ((if (unsafe *__param_destLen) > 0: 1 else: 0) != 0) {
+        if ((if (*__param_destLen) > 0: 1 else: 0) != 0) {
             (__ci_expr_logic_2 = (if (if __param_dest == null: 1 else: 0) != 0: 1 else: 0))
         }
 
@@ -79,9 +79,9 @@ pub unsafe fn compress2_z(__param_dest: *mut u8, __param_destLen: *mut c_ulong, 
     }
 
 
-    (__local_left = (unsafe *__param_destLen))
+    (__local_left = (*__param_destLen))
 
-    ((unsafe *__param_destLen) = ((0 as c_ulong)))
+    ((*__param_destLen) = ((0 as c_ulong)))
 
     (__local_stream.zalloc = ((0 as unsafe extern "C" fn(*mut c_void, c_uint, c_uint) -> *mut c_void)))
 
@@ -104,7 +104,7 @@ pub unsafe fn compress2_z(__param_dest: *mut u8, __param_destLen: *mut c_ulong, 
     (__local_stream.avail_in = ((0 as c_uint)))
 
     loop {
-        if ((if (unsafe *(&raw const __local_stream as *const z_stream_s)).avail_out == 0: 1 else: 0) != 0) {
+        if ((if (*(&raw const __local_stream as *const z_stream_s)).avail_out == 0: 1 else: 0) != 0) {
             var __ci_expr_ternary_4: c_uint = 0
 
             if ((if __local_left > ((4294967295 as c_ulong)): 1 else: 0) != 0) {
@@ -116,11 +116,11 @@ pub unsafe fn compress2_z(__param_dest: *mut u8, __param_destLen: *mut c_ulong, 
             (__local_stream.avail_out = __ci_expr_ternary_4)
 
 
-            (__local_left = (__local_left -% (unsafe *(&raw const __local_stream as *const z_stream_s)).avail_out))
+            (__local_left = (__local_left -% (*(&raw const __local_stream as *const z_stream_s)).avail_out))
 
         }
 
-        if ((if (unsafe *(&raw const __local_stream as *const z_stream_s)).avail_in == 0: 1 else: 0) != 0) {
+        if ((if (*(&raw const __local_stream as *const z_stream_s)).avail_in == 0: 1 else: 0) != 0) {
             var __ci_expr_ternary_5: c_uint = 0
 
             if ((if __local_sourceLen > ((4294967295 as c_ulong)): 1 else: 0) != 0) {
@@ -132,7 +132,7 @@ pub unsafe fn compress2_z(__param_dest: *mut u8, __param_destLen: *mut c_ulong, 
             (__local_stream.avail_in = __ci_expr_ternary_5)
 
 
-            (__local_sourceLen = (__local_sourceLen -% (unsafe *(&raw const __local_stream as *const z_stream_s)).avail_in))
+            (__local_sourceLen = (__local_sourceLen -% (*(&raw const __local_stream as *const z_stream_s)).avail_in))
 
         }
 
@@ -152,7 +152,7 @@ pub unsafe fn compress2_z(__param_dest: *mut u8, __param_destLen: *mut c_ulong, 
         }
     }
 
-    ((unsafe *__param_destLen) = ((((((unsafe *(&raw const __local_stream as *const z_stream_s)).next_out as usize) -% (__param_dest as usize)) / sizeof[u8]()) as c_ulong)))
+    ((*__param_destLen) = ((((((*(&raw const __local_stream as *const z_stream_s)).next_out as usize) -% (__param_dest as usize)) / sizeof[u8]()) as c_ulong)))
 
     deflateEnd((&raw mut __local_stream as *mut z_stream_s))
 

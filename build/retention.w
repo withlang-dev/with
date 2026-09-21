@@ -519,6 +519,91 @@ fn ret_git_commit(ctx: &ActionCtx) -> str:
     args.push("HEAD")
     ret_run_first_line(ctx, "git-head", args, 30000)
 
+// ── green evidence is keyed on what was tested (Eric, 2026-09-20) ───────────
+// The compiler binary names a commit (its version ends in -g<hash>) and its
+// debug info names the worktree, so a squash-merge of a tested tree, or a
+// battery run in a staging worktree, produced a "different" compiler and the
+// whole battery ran again over byte-identical sources. What was tested is the
+// inputs: the git tree, the pinned seed that drove and seeded the chain, and
+// the host. A green for that identity is published to a store shared by every
+// worktree ($WITH_GREEN_DIR, else ~/.local/with-green), one line per identity:
+//   identity <TAB> git commit <TAB> compiler version <TAB> driver sha256
+// A dirty worktree has no identity: uncommitted edits never borrow a green.
+
+pub fn ret_green_store_path() -> str:
+    let explicit = env("WITH_GREEN_DIR")
+    let dir = if explicit.len() > 0: explicit else: env("HOME") ++ "/.local/with-green"
+    dir ++ "/green.tsv"
+
+/// The tracked tree is as committed, and nothing untracked could be a build
+/// input (an untracked path under examples/ is a user's own program).
+fn ret_worktree_is_clean(ctx: &ActionCtx) -> bool:
+    let args: Vec[str] = Vec.new()
+    args.push("git")
+    args.push("status")
+    args.push("--porcelain")
+    let lines = ret_run_lines(ctx, "git-status", args, 60000)
+    for i in 0..lines.len() as i32:
+        let line = lines.get(i)
+        if line.len() == 0: continue
+        if line.starts_with("?? examples/"): continue
+        return false
+    true
+
+/// `<tree>-<driver sha256>-<os>_<arch>`, or "" for a dirty worktree or a
+/// tree git cannot name.
+// The battery's inputs as the text `git hash-object` identifies (D50): the
+// top-level `git ls-tree HEAD` without the `docs` entry and without top-level
+// `*.md` files. The build measures software, not documents (Eric,
+// 2026-09-21), so the specification is not an input either; a docs-only
+// commit keeps the identity of the tree whose battery passed. Mirrors
+// GreenEvidence.green_identity_inputs byte for byte.
+fn ret_green_identity_inputs(top_level: &str) -> str:
+    var kept = ""
+    for line in top_level.split("\n"):
+        if line.len() == 0: continue
+        let tab = line.find("\t")
+        let path = if tab >= 0: line.slice(tab + 1, line.len()) else: line.clone()
+        if path == "docs" or path.ends_with(".md"): continue
+        kept = kept ++ line ++ "\n"
+    kept
+
+fn ret_run_all(ctx: &ActionCtx, label: &str, args: &Vec[str], timeout_ms: i32) -> str:
+    let fs = ctx.fs()
+    let root = ctx.project_info().project_root()
+    let dir = ret_join("out/command", ctx.target_name())
+    if fs.mkdir_all(dir) != 0: return ""
+    let result = ctx.process_runner().run_capture(args, ret_abs(root, ret_join(dir, label ++ ".stdout")), ret_abs(root, ret_join(dir, label ++ ".stderr")), timeout_ms)
+    if result.rc != 0: return ""
+    result.stdout.clone()
+
+pub fn ret_source_identity(ctx: &ActionCtx, driver_sha: &str) -> str:
+    if driver_sha.len() != 64 or not ret_worktree_is_clean(ctx): return ""
+    let top_args: Vec[str] = Vec.new()
+    top_args.push("git")
+    top_args.push("ls-tree")
+    top_args.push("HEAD")
+    let top_level = ret_run_all(ctx, "git-ls-tree", top_args, 30000)
+    if top_level.len() == 0: return ""
+    let listing = ret_join(ret_join("out/command", ctx.target_name()), "green-inputs.txt")
+    if ctx.fs().write_text(listing, ret_green_identity_inputs(top_level)) != 0: return ""
+    let hash_args: Vec[str] = Vec.new()
+    hash_args.push("git")
+    hash_args.push("hash-object")
+    hash_args.push(listing)
+    let tree = ret_run_first_line(ctx, "git-hash-object", hash_args, 30000)
+    if tree.len() < 40: return ""
+    tree ++ "-" ++ driver_sha ++ "-" ++ os() ++ "_" ++ arch()
+
+/// The store line for `identity`, or "".
+fn ret_green_store_line(store: &str, identity: &str) -> str:
+    if identity.len() == 0: return ""
+    let lines = store.split("\n")
+    for i in 0..lines.len() as i32:
+        let line = lines.get(i)
+        if line.starts_with(identity ++ "\t"): return line.clone()
+    ""
+
 fn ret_compiler_version(ctx: &ActionCtx, compiler_path: &str) -> str:
     let root = ctx.project_info().project_root()
     let args: Vec[str] = Vec.new()
@@ -753,6 +838,33 @@ fn ret_require_test_green(ctx: &ActionCtx, compiler_sha: &str, driver_sha: &str)
         return ret_fail(ctx, "test-green manifest is stale; run `with build :test`")
     0
 
+/// `fixpoint-compare`: the unit digests of stage1's compile of the compiler
+/// (inputs[0]) equal those of stage2's (inputs[1]). A difference names every
+/// unit that differs: nondeterminism, or a miscompile by one generation.
+pub fn run_fixpoint_compare_units_action(ctx: ActionCtx) -> i32:
+    let fs = ctx.fs()
+    let inputs = ctx.inputs()
+    if inputs.len() < 2: return ret_fail(ctx, "requires the two unit-digest files")
+    let left = fs.read_text(inputs.get(0))
+    let right = fs.read_text(inputs.get(1))
+    if left.len() == 0: return ret_fail(ctx, "no unit digests in " ++ inputs.get(0) ++ "; the stage2 build records them")
+    if right.len() == 0: return ret_fail(ctx, "no unit digests in " ++ inputs.get(1) ++ "; the release build records them")
+    let left_lines = left.split("\n")
+    let right_lines = right.split("\n")
+    var units = 0
+    var differing = ""
+    let count = if left_lines.len() > right_lines.len(): left_lines.len() else: right_lines.len()
+    for i in 0..count as i32:
+        let a = if i < left_lines.len() as i32: left_lines.get(i).clone() else: ""
+        let b = if i < right_lines.len() as i32: right_lines.get(i).clone() else: ""
+        if a.len() == 0 and b.len() == 0: continue
+        units = units + 1
+        if a != b: differing = differing ++ "\n  stage2: " ++ (if a.len() > 0: a else: "(no such unit)") ++ "\n  stage3: " ++ (if b.len() > 0: b else: "(no such unit)")
+    if differing.len() > 0:
+        return ret_fail(ctx, "FIXPOINT FAILED: stage2 and stage3 disagree on these units of the compiler" ++ differing ++ "\nrun `with build :fixpoint-diff` for the root module, or rebuild with WITH_KEEP_UNIT_OBJECTS=1 to keep the unit objects")
+    print(f"[fixpoint] stage2 == stage3 over all {units} units of the compiler")
+    ret_write_output_stamp(ctx)
+
 // D19: evidence is written once by the step that produces it and only read
 // thereafter. The fixpoint tier records what it verified — the fixpoint
 // object shas, bound to the exact release binary present at verification —
@@ -768,8 +880,8 @@ pub fn run_fixpoint_evidence_action(ctx: ActionCtx) -> i32:
     let compiler_sha = ret_sha256_file(ctx, "fixpoint-evidence-compiler", compiler_path)
     if compiler_sha.len() == 0:
         return ret_fail(ctx, "could not hash " ++ compiler_path)
-    let stage2_sha = ret_sha256_file(ctx, "fixpoint-evidence-stage2", ret_stage_fixpoint_path("with-stage2-fixpoint.o"))
-    let stage3_sha = ret_sha256_file(ctx, "fixpoint-evidence-stage3", ret_stage_fixpoint_path("with-stage3-fixpoint.o"))
+    let stage2_sha = ret_sha256_file(ctx, "fixpoint-evidence-stage2", "out/stage/bin/with-stage2.units")
+    let stage3_sha = ret_sha256_file(ctx, "fixpoint-evidence-stage3", "out/release/bin/with.units")
     if stage2_sha.len() == 0 or stage3_sha.len() == 0:
         return ret_fail(ctx, "could not hash fixpoint objects")
     let evidence =
@@ -838,9 +950,21 @@ pub fn run_last_green_action(ctx: ActionCtx) -> i32:
     if ret_json_field(seed_input, "sha256") != driver_sha:
         return ret_fail(ctx, ret_pinned_driver_fix("stage1 was seeded by " ++ ret_json_field(seed_input, "resolved_path") ++ " (sha256 " ++ ret_json_field(seed_input, "sha256") ++ "), not the pinned seed"))
     let seed_json = if seed_input.len() > 0: ret_trim(seed_input) else: "null"
+    let identity = ret_source_identity(ctx, driver_sha)
+    // The store as it will be published (last-green-publish installs this
+    // file): what is there now, plus this green when the tree has an identity.
+    var store = fs.host_read_text(ret_green_store_path())
+    if identity.len() > 0 and ret_green_store_line(store, identity).len() == 0:
+        if store.len() > 0 and not store.ends_with("\n"): store = store ++ "\n"
+        store = store ++ identity ++ "\t" ++ commit_label ++ "\t" ++ compiler_version ++ "\t" ++ driver_sha ++ "\n"
+    if fs.write_text("out/.build-state/green-store.tsv", store) != 0:
+        return ret_fail(ctx, "could not write out/.build-state/green-store.tsv")
+    if identity.len() == 0:
+        print("[last-green] the worktree is not clean: this green is local to it and is not published")
     let manifest =
         "{\n" ++
         "  \"source_version\": \"" ++ ret_json_escape(source_version) ++ "\",\n" ++
+        "  \"source_identity\": \"" ++ ret_json_escape(identity) ++ "\",\n" ++
         "  \"compiler_version\": \"" ++ ret_json_escape(compiler_version) ++ "\",\n" ++
         "  \"git_commit\": \"" ++ ret_json_escape(commit_label) ++ "\",\n" ++
         "  \"host\": \"" ++ ret_json_escape(os() ++ "/" ++ arch()) ++ "\",\n" ++
@@ -856,18 +980,38 @@ pub fn run_last_green_action(ctx: ActionCtx) -> i32:
     print("[last-green] archived verified seed and wrote out/.build-state/last-green.json")
     0
 
+/// Whether this clean tree, built by the pinned seed, has a published green:
+/// the release compiler here was built from sources a battery already passed.
+fn ret_green_by_identity(ctx: &ActionCtx) -> bool:
+    let fs = ctx.fs()
+    let seed_input = if fs.exists("out/.build-state/seed-input.json"): fs.read_text("out/.build-state/seed-input.json") else: ""
+    let seeded_by = ret_json_field(seed_input, "sha256")
+    // the chain here was seeded by a compiler seed.lock pins
+    if seeded_by.len() != 64 or not seed_lock_read(fs).contains(seeded_by): return false
+    let identity = ret_source_identity(ctx, seeded_by)
+    let line = ret_green_store_line(fs.host_read_text(ret_green_store_path()), identity)
+    if line.len() == 0: return false
+    let fields = line.split("\t")
+    let commit = if fields.len() > 1: fields.get(1).clone() else: ""
+    print("[" ++ ctx.target_name() ++ "] these sources are green: recorded at commit " ++ commit ++ " (" ++ ret_green_store_path() ++ ")")
+    true
+
 pub fn run_require_last_green_action(ctx: ActionCtx) -> i32:
     let fs = ctx.fs()
     let compiler_path = ret_release_compiler_path()
     if not fs.exists(compiler_path):
         return ret_fail(ctx, "missing " ++ compiler_path ++ "; run `with build` first")
     let manifest = if fs.exists("out/.build-state/last-green.json"): fs.read_text("out/.build-state/last-green.json") else: ""
+    if manifest.len() == 0 and ret_green_by_identity(ctx):
+        return ret_write_output_stamp(ctx)
     if manifest.len() == 0:
         return ret_fail(ctx, "missing last-green manifest; run `with build :last-green` after build/fixpoint/test")
     let compiler_sha = ret_sha256_file(ctx, "verified-compiler-check", compiler_path)
     if compiler_sha.len() == 0:
         return ret_fail(ctx, "could not hash " ++ compiler_path)
     let expected = "\"compiler_sha256\": \"" ++ compiler_sha ++ "\""
+    if not manifest.contains(expected) and ret_green_by_identity(ctx):
+        return ret_write_output_stamp(ctx)
     if not manifest.contains(expected):
         return ret_fail(ctx, compiler_path ++ " is not the compiler recorded by last-green; run `with build`, `with build :fixpoint`, `with build :test`, then `with build :last-green`")
     let output = ctx.output()

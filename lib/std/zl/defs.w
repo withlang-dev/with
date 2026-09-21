@@ -381,7 +381,6 @@ pub let Z_ASCII: c_int = 1
 pub let Z_UNKNOWN: c_int = 2
 pub let Z_DEFLATED: c_int = 8
 pub let Z_NULL: c_int = 0
-pub let zlib_version: *const i8 = zlibVersion()
 pub let DEF_WBITS: c_int = 15
 pub let DEF_MEM_LEVEL: c_int = 8
 pub let STORED_BLOCK: c_int = 0
@@ -408,6 +407,9 @@ pub fn Tracec(c: i32, x: i32) -> Unit {
 }
 pub fn Tracecv(c: i32, x: i32) -> Unit {
     return
+}
+pub fn ZSWAP32[T](q: T) -> T {
+    (((((q >> 24) & 0xff) + ((q >> 8) & 0xff00)) + ((q & 0xff00) << 8)) + ((q & 0xff) << 24))
 }
 pub let BASE: c_uint = 65521
 pub let NMAX: c_int = 5552
@@ -458,12 +460,18 @@ pub type config = config_s
 
 pub let deflate_copyright: [68]c_char = [32, 100, 101, 102, 108, 97, 116, 101, 32, 49, 46, 51, 46, 50, 32, 67, 111, 112, 121, 114, 105, 103, 104, 116, 32, 49, 57, 57, 53, 45, 50, 48, 50, 54, 32, 74, 101, 97, 110, 45, 108, 111, 117, 112, 32, 71, 97, 105, 108, 108, 121, 32, 97, 110, 100, 32, 77, 97, 114, 107, 32, 65, 100, 108, 101, 114, 32, 0]
 
+pub fn deflateInit[T](strm: T, level: T) -> T {
+    unsafe { deflateInit_(strm, level, ZLIB_VERSION, (sizeof[z_stream_s]() as c_int)) }
+}
+pub fn deflateInit2[T](strm: T, level: T, method: T, windowBits: T, memLevel: T, strategy: T) -> T {
+    unsafe { deflateInit2_(strm, level, method, windowBits, memLevel, strategy, ZLIB_VERSION, (sizeof[z_stream_s]() as c_int)) }
+}
 pub let LENGTH_CODES: c_int = 29
 pub let LITERALS: c_int = 256
-pub let L_CODES: c_int = 286
+pub let L_CODES: c_int = ((256 + 1) + 29)
 pub let D_CODES: c_int = 30
 pub let BL_CODES: c_int = 19
-pub let HEAP_SIZE: c_int = 573
+pub let HEAP_SIZE: c_int = ((2 * L_CODES) + 1)
 pub let MAX_BITS: c_int = 15
 pub let Buf_size: c_int = 16
 pub let INIT_STATE: c_int = 42
@@ -475,8 +483,11 @@ pub let HCRC_STATE: c_int = 103
 pub let BUSY_STATE: c_int = 113
 pub let FINISH_STATE: c_int = 666
 pub let LIT_BUFS: c_int = 4
-pub let MIN_LOOKAHEAD: c_int = 262
+pub let MIN_LOOKAHEAD: c_int = ((258 + 3) + 1)
 pub let WIN_INIT: c_int = 258
+pub fn d_code[T](dist: T) -> T {
+    (if (dist < 256): _dist_code[dist] else: _dist_code[(256 + (dist >> 7))])
+}
 pub let NIL: c_int = 0
 pub let TOO_FAR: c_int = 4096
 pub fn RANK[T](f: T) -> T {
@@ -549,12 +560,145 @@ pub let SYNC: c_uint = 16211
 pub type inflate_state { strm: *mut z_stream_s = null, mode: i32 = 0, last: c_int = 0, wrap: c_int = 0, havedict: c_int = 0, flags: c_int = 0, dmax: c_uint = 0, check_: c_ulong = 0, total: c_ulong = 0, head: *mut gz_header_s = null, wbits: c_uint = 0, wsize: c_uint = 0, whave: c_uint = 0, wnext: c_uint = 0, window: *mut u8 = null, hold: c_ulong = 0, bits: c_uint = 0, length: c_uint = 0, offset: c_uint = 0, extra: c_uint = 0, lencode: *const code = null, distcode: *const code = null, lenbits: c_uint = 0, distbits: c_uint = 0, ncode: c_uint = 0, nlen: c_uint = 0, ndist: c_uint = 0, have: c_uint = 0, next: *mut code = null, lens: [320]c_ushort = [0 as c_ushort; 320], work: [288]c_ushort = [0 as c_ushort; 288], codes: [1444]code, sane: c_int = 0, back: c_int = 0, was: c_uint = 0 }
 impl Copy for inflate_state
 
+pub fn inflateBackInit[T](strm: T, windowBits: T, window: T) -> T {
+    unsafe { inflateBackInit_(strm, windowBits, window, ZLIB_VERSION, (sizeof[z_stream_s]() as c_int)) }
+}
 pub let ENOUGH_LENS: c_int = 852
 pub let ENOUGH_DISTS: c_int = 592
 pub let ENOUGH: c_int = 1444
+pub fn inflateInit[T](strm: T) -> T {
+    unsafe { inflateInit_(strm, ZLIB_VERSION, (sizeof[z_stream_s]() as c_int)) }
+}
+pub fn inflateInit2[T](strm: T, windowBits: T) -> T {
+    unsafe { inflateInit2_(strm, windowBits, ZLIB_VERSION, (sizeof[z_stream_s]() as c_int)) }
+}
 pub let inflate_copyright: [47]c_char = [32, 105, 110, 102, 108, 97, 116, 101, 32, 49, 46, 51, 46, 50, 32, 67, 111, 112, 121, 114, 105, 103, 104, 116, 32, 49, 57, 57, 53, 45, 50, 48, 50, 54, 32, 77, 97, 114, 107, 32, 65, 100, 108, 101, 114, 32, 0]
 
 pub let MAXBITS: c_int = 15
+pub type i8_t = c_char
+
+pub type ui8_t = u8
+
+pub type i16_t = c_short
+
+pub type ui16_t = c_ushort
+
+pub type i32_t = c_int
+
+pub type ui32_t = c_uint
+
+pub type i64_t = c_long
+
+pub type ui64_t = c_ulong
+
+pub type ZPOS64_T = c_ulong
+
+pub type open_file_func = unsafe extern "C" fn(*mut c_void, *const i8, c_int) -> *mut c_void
+
+pub type read_file_func = unsafe extern "C" fn(*mut c_void, *mut c_void, *mut c_void, c_ulong) -> c_ulong
+
+pub type write_file_func = unsafe extern "C" fn(*mut c_void, *mut c_void, *const c_void, c_ulong) -> c_ulong
+
+pub type close_file_func = unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int
+
+pub type testerror_file_func = unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int
+
+pub type tell_file_func = unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_long
+
+pub type seek_file_func = unsafe extern "C" fn(*mut c_void, *mut c_void, c_ulong, c_int) -> c_long
+
+pub type zlib_filefunc_def_s { zopen_file: unsafe extern "C" fn(*mut c_void, *const i8, c_int) -> *mut c_void, zread_file: unsafe extern "C" fn(*mut c_void, *mut c_void, *mut c_void, c_ulong) -> c_ulong, zwrite_file: unsafe extern "C" fn(*mut c_void, *mut c_void, *const c_void, c_ulong) -> c_ulong, ztell_file: unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_long, zseek_file: unsafe extern "C" fn(*mut c_void, *mut c_void, c_ulong, c_int) -> c_long, zclose_file: unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int, zerror_file: unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int, opaque_: *mut c_void = null }
+impl Copy for zlib_filefunc_def_s
+
+pub type zlib_filefunc_def = zlib_filefunc_def_s
+
+pub type tell64_file_func = unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_ulong
+
+pub type seek64_file_func = unsafe extern "C" fn(*mut c_void, *mut c_void, c_ulong, c_int) -> c_long
+
+pub type open64_file_func = unsafe extern "C" fn(*mut c_void, *const c_void, c_int) -> *mut c_void
+
+pub type zlib_filefunc64_def_s { zopen64_file: unsafe extern "C" fn(*mut c_void, *const c_void, c_int) -> *mut c_void, zread_file: unsafe extern "C" fn(*mut c_void, *mut c_void, *mut c_void, c_ulong) -> c_ulong, zwrite_file: unsafe extern "C" fn(*mut c_void, *mut c_void, *const c_void, c_ulong) -> c_ulong, ztell64_file: unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_ulong, zseek64_file: unsafe extern "C" fn(*mut c_void, *mut c_void, c_ulong, c_int) -> c_long, zclose_file: unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int, zerror_file: unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int, opaque_: *mut c_void = null }
+impl Copy for zlib_filefunc64_def_s
+
+pub type zlib_filefunc64_def = zlib_filefunc64_def_s
+
+pub type zlib_filefunc64_32_def_s { zfile_func64: zlib_filefunc64_def_s, zopen32_file: unsafe extern "C" fn(*mut c_void, *const i8, c_int) -> *mut c_void, ztell32_file: unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_long, zseek32_file: unsafe extern "C" fn(*mut c_void, *mut c_void, c_ulong, c_int) -> c_long }
+impl Copy for zlib_filefunc64_32_def_s
+
+pub type zlib_filefunc64_32_def = zlib_filefunc64_32_def_s
+
+pub let PI32 = "d"
+pub let PUI32 = "u"
+pub let PI64 = "ld"
+pub let PUI64 = "lu"
+pub let MAXU32: c_uint = 0xffffffff
+pub let ZLIB_FILEFUNC_SEEK_CUR: c_int = 1
+pub let ZLIB_FILEFUNC_SEEK_END: c_int = 2
+pub let ZLIB_FILEFUNC_SEEK_SET: c_int = 0
+pub let ZLIB_FILEFUNC_MODE_READ: c_int = 1
+pub let ZLIB_FILEFUNC_MODE_WRITE: c_int = 2
+pub let ZLIB_FILEFUNC_MODE_READWRITEFILTER: c_int = 3
+pub let ZLIB_FILEFUNC_MODE_EXISTING: c_int = 4
+pub let ZLIB_FILEFUNC_MODE_CREATE: c_int = 8
+pub fn ZOPEN64[T](filefunc: T, filename: T, mode: T) -> T {
+    unsafe { call_zopen64(&filefunc, filename, mode) }
+}
+pub fn ZTELL64[T](filefunc: T, filestream: T) -> T {
+    unsafe { call_ztell64(&filefunc, filestream) }
+}
+pub fn ZSEEK64[T](filefunc: T, filestream: T, pos: T, mode: T) -> T {
+    unsafe { call_zseek64(&filefunc, filestream, pos, mode) }
+}
+pub type unzFile = *mut c_void
+
+pub type tm_unz_s { tm_sec: c_int = 0, tm_min: c_int = 0, tm_hour: c_int = 0, tm_mday: c_int = 0, tm_mon: c_int = 0, tm_year: c_int = 0 }
+impl Copy for tm_unz_s
+
+pub type tm_unz = tm_unz_s
+
+pub type unz_global_info64_s { number_entry: c_ulong = 0, size_comment: c_ulong = 0 }
+impl Copy for unz_global_info64_s
+
+pub type unz_global_info64 = unz_global_info64_s
+
+pub type unz_global_info_s { number_entry: c_ulong = 0, size_comment: c_ulong = 0 }
+impl Copy for unz_global_info_s
+
+pub type unz_global_info = unz_global_info_s
+
+pub type unz_file_info64_s { version: c_ulong = 0, version_needed: c_ulong = 0, flag: c_ulong = 0, compression_method: c_ulong = 0, dosDate: c_ulong = 0, crc: c_ulong = 0, compressed_size: c_ulong = 0, uncompressed_size: c_ulong = 0, size_filename: c_ulong = 0, size_file_extra: c_ulong = 0, size_file_comment: c_ulong = 0, disk_num_start: c_ulong = 0, internal_fa: c_ulong = 0, external_fa: c_ulong = 0, tmu_date: tm_unz_s }
+impl Copy for unz_file_info64_s
+
+pub type unz_file_info64 = unz_file_info64_s
+
+pub type unz_file_info_s { version: c_ulong = 0, version_needed: c_ulong = 0, flag: c_ulong = 0, compression_method: c_ulong = 0, dosDate: c_ulong = 0, crc: c_ulong = 0, compressed_size: c_ulong = 0, uncompressed_size: c_ulong = 0, size_filename: c_ulong = 0, size_file_extra: c_ulong = 0, size_file_comment: c_ulong = 0, disk_num_start: c_ulong = 0, internal_fa: c_ulong = 0, external_fa: c_ulong = 0, tmu_date: tm_unz_s }
+impl Copy for unz_file_info_s
+
+pub type unz_file_info = unz_file_info_s
+
+pub type unz_file_pos_s { pos_in_zip_directory: c_ulong = 0, num_of_file: c_ulong = 0 }
+impl Copy for unz_file_pos_s
+
+pub type unz_file_pos = unz_file_pos_s
+
+pub type unz64_file_pos_s { pos_in_zip_directory: c_ulong = 0, num_of_file: c_ulong = 0 }
+impl Copy for unz64_file_pos_s
+
+pub type unz64_file_pos = unz64_file_pos_s
+
+pub let Z_BZIP2ED: c_int = 12
+pub let UNZ_OK: c_int = 0
+pub let UNZ_END_OF_LIST_OF_FILE: c_int = -100
+pub let UNZ_ERRNO: c_int = -1
+pub let UNZ_EOF: c_int = 0
+pub let UNZ_PARAMERROR: c_int = -102
+pub let UNZ_BADZIPFILE: c_int = -103
+pub let UNZ_INTERNALERROR: c_int = -104
+pub let UNZ_CRCERROR: c_int = -105
+pub fn READ_8[T](adr: T) -> u8 {
+    ((unsafe *adr) as u8)
+}
 pub let _dist_code: [512]u8 = [(0 as u8), (1 as u8), (2 as u8), (3 as u8), (4 as u8), (4 as u8), (5 as u8), (5 as u8), (6 as u8), (6 as u8), (6 as u8), (6 as u8), (7 as u8), (7 as u8), (7 as u8), (7 as u8), (8 as u8), (8 as u8), (8 as u8), (8 as u8), (8 as u8), (8 as u8), (8 as u8), (8 as u8), (9 as u8), (9 as u8), (9 as u8), (9 as u8), (9 as u8), (9 as u8), (9 as u8), (9 as u8), (10 as u8), (10 as u8), (10 as u8), (10 as u8), (10 as u8), (10 as u8), (10 as u8), (10 as u8), (10 as u8), (10 as u8), (10 as u8), (10 as u8), (10 as u8), (10 as u8), (10 as u8), (10 as u8), (11 as u8), (11 as u8), (11 as u8), (11 as u8), (11 as u8), (11 as u8), (11 as u8), (11 as u8), (11 as u8), (11 as u8), (11 as u8), (11 as u8), (11 as u8), (11 as u8), (11 as u8), (11 as u8), (12 as u8), (12 as u8), (12 as u8), (12 as u8), (12 as u8), (12 as u8), (12 as u8), (12 as u8), (12 as u8), (12 as u8), (12 as u8), (12 as u8), (12 as u8), (12 as u8), (12 as u8), (12 as u8), (12 as u8), (12 as u8), (12 as u8), (12 as u8), (12 as u8), (12 as u8), (12 as u8), (12 as u8), (12 as u8), (12 as u8), (12 as u8), (12 as u8), (12 as u8), (12 as u8), (12 as u8), (12 as u8), (13 as u8), (13 as u8), (13 as u8), (13 as u8), (13 as u8), (13 as u8), (13 as u8), (13 as u8), (13 as u8), (13 as u8), (13 as u8), (13 as u8), (13 as u8), (13 as u8), (13 as u8), (13 as u8), (13 as u8), (13 as u8), (13 as u8), (13 as u8), (13 as u8), (13 as u8), (13 as u8), (13 as u8), (13 as u8), (13 as u8), (13 as u8), (13 as u8), (13 as u8), (13 as u8), (13 as u8), (13 as u8), (14 as u8), (14 as u8), (14 as u8), (14 as u8), (14 as u8), (14 as u8), (14 as u8), (14 as u8), (14 as u8), (14 as u8), (14 as u8), (14 as u8), (14 as u8), (14 as u8), (14 as u8), (14 as u8), (14 as u8), (14 as u8), (14 as u8), (14 as u8), (14 as u8), (14 as u8), (14 as u8), (14 as u8), (14 as u8), (14 as u8), (14 as u8), (14 as u8), (14 as u8), (14 as u8), (14 as u8), (14 as u8), (14 as u8), (14 as u8), (14 as u8), (14 as u8), (14 as u8), (14 as u8), (14 as u8), (14 as u8), (14 as u8), (14 as u8), (14 as u8), (14 as u8), (14 as u8), (14 as u8), (14 as u8), (14 as u8), (14 as u8), (14 as u8), (14 as u8), (14 as u8), (14 as u8), (14 as u8), (14 as u8), (14 as u8), (14 as u8), (14 as u8), (14 as u8), (14 as u8), (14 as u8), (14 as u8), (14 as u8), (14 as u8), (15 as u8), (15 as u8), (15 as u8), (15 as u8), (15 as u8), (15 as u8), (15 as u8), (15 as u8), (15 as u8), (15 as u8), (15 as u8), (15 as u8), (15 as u8), (15 as u8), (15 as u8), (15 as u8), (15 as u8), (15 as u8), (15 as u8), (15 as u8), (15 as u8), (15 as u8), (15 as u8), (15 as u8), (15 as u8), (15 as u8), (15 as u8), (15 as u8), (15 as u8), (15 as u8), (15 as u8), (15 as u8), (15 as u8), (15 as u8), (15 as u8), (15 as u8), (15 as u8), (15 as u8), (15 as u8), (15 as u8), (15 as u8), (15 as u8), (15 as u8), (15 as u8), (15 as u8), (15 as u8), (15 as u8), (15 as u8), (15 as u8), (15 as u8), (15 as u8), (15 as u8), (15 as u8), (15 as u8), (15 as u8), (15 as u8), (15 as u8), (15 as u8), (15 as u8), (15 as u8), (15 as u8), (15 as u8), (15 as u8), (15 as u8), (0 as u8), (0 as u8), (16 as u8), (17 as u8), (18 as u8), (18 as u8), (19 as u8), (19 as u8), (20 as u8), (20 as u8), (20 as u8), (20 as u8), (21 as u8), (21 as u8), (21 as u8), (21 as u8), (22 as u8), (22 as u8), (22 as u8), (22 as u8), (22 as u8), (22 as u8), (22 as u8), (22 as u8), (23 as u8), (23 as u8), (23 as u8), (23 as u8), (23 as u8), (23 as u8), (23 as u8), (23 as u8), (24 as u8), (24 as u8), (24 as u8), (24 as u8), (24 as u8), (24 as u8), (24 as u8), (24 as u8), (24 as u8), (24 as u8), (24 as u8), (24 as u8), (24 as u8), (24 as u8), (24 as u8), (24 as u8), (25 as u8), (25 as u8), (25 as u8), (25 as u8), (25 as u8), (25 as u8), (25 as u8), (25 as u8), (25 as u8), (25 as u8), (25 as u8), (25 as u8), (25 as u8), (25 as u8), (25 as u8), (25 as u8), (26 as u8), (26 as u8), (26 as u8), (26 as u8), (26 as u8), (26 as u8), (26 as u8), (26 as u8), (26 as u8), (26 as u8), (26 as u8), (26 as u8), (26 as u8), (26 as u8), (26 as u8), (26 as u8), (26 as u8), (26 as u8), (26 as u8), (26 as u8), (26 as u8), (26 as u8), (26 as u8), (26 as u8), (26 as u8), (26 as u8), (26 as u8), (26 as u8), (26 as u8), (26 as u8), (26 as u8), (26 as u8), (27 as u8), (27 as u8), (27 as u8), (27 as u8), (27 as u8), (27 as u8), (27 as u8), (27 as u8), (27 as u8), (27 as u8), (27 as u8), (27 as u8), (27 as u8), (27 as u8), (27 as u8), (27 as u8), (27 as u8), (27 as u8), (27 as u8), (27 as u8), (27 as u8), (27 as u8), (27 as u8), (27 as u8), (27 as u8), (27 as u8), (27 as u8), (27 as u8), (27 as u8), (27 as u8), (27 as u8), (27 as u8), (28 as u8), (28 as u8), (28 as u8), (28 as u8), (28 as u8), (28 as u8), (28 as u8), (28 as u8), (28 as u8), (28 as u8), (28 as u8), (28 as u8), (28 as u8), (28 as u8), (28 as u8), (28 as u8), (28 as u8), (28 as u8), (28 as u8), (28 as u8), (28 as u8), (28 as u8), (28 as u8), (28 as u8), (28 as u8), (28 as u8), (28 as u8), (28 as u8), (28 as u8), (28 as u8), (28 as u8), (28 as u8), (28 as u8), (28 as u8), (28 as u8), (28 as u8), (28 as u8), (28 as u8), (28 as u8), (28 as u8), (28 as u8), (28 as u8), (28 as u8), (28 as u8), (28 as u8), (28 as u8), (28 as u8), (28 as u8), (28 as u8), (28 as u8), (28 as u8), (28 as u8), (28 as u8), (28 as u8), (28 as u8), (28 as u8), (28 as u8), (28 as u8), (28 as u8), (28 as u8), (28 as u8), (28 as u8), (28 as u8), (28 as u8), (29 as u8), (29 as u8), (29 as u8), (29 as u8), (29 as u8), (29 as u8), (29 as u8), (29 as u8), (29 as u8), (29 as u8), (29 as u8), (29 as u8), (29 as u8), (29 as u8), (29 as u8), (29 as u8), (29 as u8), (29 as u8), (29 as u8), (29 as u8), (29 as u8), (29 as u8), (29 as u8), (29 as u8), (29 as u8), (29 as u8), (29 as u8), (29 as u8), (29 as u8), (29 as u8), (29 as u8), (29 as u8), (29 as u8), (29 as u8), (29 as u8), (29 as u8), (29 as u8), (29 as u8), (29 as u8), (29 as u8), (29 as u8), (29 as u8), (29 as u8), (29 as u8), (29 as u8), (29 as u8), (29 as u8), (29 as u8), (29 as u8), (29 as u8), (29 as u8), (29 as u8), (29 as u8), (29 as u8), (29 as u8), (29 as u8), (29 as u8), (29 as u8), (29 as u8), (29 as u8), (29 as u8), (29 as u8), (29 as u8), (29 as u8)]
 
 pub let _length_code: [256]u8 = [(0 as u8), (1 as u8), (2 as u8), (3 as u8), (4 as u8), (5 as u8), (6 as u8), (7 as u8), (8 as u8), (8 as u8), (9 as u8), (9 as u8), (10 as u8), (10 as u8), (11 as u8), (11 as u8), (12 as u8), (12 as u8), (12 as u8), (12 as u8), (13 as u8), (13 as u8), (13 as u8), (13 as u8), (14 as u8), (14 as u8), (14 as u8), (14 as u8), (15 as u8), (15 as u8), (15 as u8), (15 as u8), (16 as u8), (16 as u8), (16 as u8), (16 as u8), (16 as u8), (16 as u8), (16 as u8), (16 as u8), (17 as u8), (17 as u8), (17 as u8), (17 as u8), (17 as u8), (17 as u8), (17 as u8), (17 as u8), (18 as u8), (18 as u8), (18 as u8), (18 as u8), (18 as u8), (18 as u8), (18 as u8), (18 as u8), (19 as u8), (19 as u8), (19 as u8), (19 as u8), (19 as u8), (19 as u8), (19 as u8), (19 as u8), (20 as u8), (20 as u8), (20 as u8), (20 as u8), (20 as u8), (20 as u8), (20 as u8), (20 as u8), (20 as u8), (20 as u8), (20 as u8), (20 as u8), (20 as u8), (20 as u8), (20 as u8), (20 as u8), (21 as u8), (21 as u8), (21 as u8), (21 as u8), (21 as u8), (21 as u8), (21 as u8), (21 as u8), (21 as u8), (21 as u8), (21 as u8), (21 as u8), (21 as u8), (21 as u8), (21 as u8), (21 as u8), (22 as u8), (22 as u8), (22 as u8), (22 as u8), (22 as u8), (22 as u8), (22 as u8), (22 as u8), (22 as u8), (22 as u8), (22 as u8), (22 as u8), (22 as u8), (22 as u8), (22 as u8), (22 as u8), (23 as u8), (23 as u8), (23 as u8), (23 as u8), (23 as u8), (23 as u8), (23 as u8), (23 as u8), (23 as u8), (23 as u8), (23 as u8), (23 as u8), (23 as u8), (23 as u8), (23 as u8), (23 as u8), (24 as u8), (24 as u8), (24 as u8), (24 as u8), (24 as u8), (24 as u8), (24 as u8), (24 as u8), (24 as u8), (24 as u8), (24 as u8), (24 as u8), (24 as u8), (24 as u8), (24 as u8), (24 as u8), (24 as u8), (24 as u8), (24 as u8), (24 as u8), (24 as u8), (24 as u8), (24 as u8), (24 as u8), (24 as u8), (24 as u8), (24 as u8), (24 as u8), (24 as u8), (24 as u8), (24 as u8), (24 as u8), (25 as u8), (25 as u8), (25 as u8), (25 as u8), (25 as u8), (25 as u8), (25 as u8), (25 as u8), (25 as u8), (25 as u8), (25 as u8), (25 as u8), (25 as u8), (25 as u8), (25 as u8), (25 as u8), (25 as u8), (25 as u8), (25 as u8), (25 as u8), (25 as u8), (25 as u8), (25 as u8), (25 as u8), (25 as u8), (25 as u8), (25 as u8), (25 as u8), (25 as u8), (25 as u8), (25 as u8), (25 as u8), (26 as u8), (26 as u8), (26 as u8), (26 as u8), (26 as u8), (26 as u8), (26 as u8), (26 as u8), (26 as u8), (26 as u8), (26 as u8), (26 as u8), (26 as u8), (26 as u8), (26 as u8), (26 as u8), (26 as u8), (26 as u8), (26 as u8), (26 as u8), (26 as u8), (26 as u8), (26 as u8), (26 as u8), (26 as u8), (26 as u8), (26 as u8), (26 as u8), (26 as u8), (26 as u8), (26 as u8), (26 as u8), (27 as u8), (27 as u8), (27 as u8), (27 as u8), (27 as u8), (27 as u8), (27 as u8), (27 as u8), (27 as u8), (27 as u8), (27 as u8), (27 as u8), (27 as u8), (27 as u8), (27 as u8), (27 as u8), (27 as u8), (27 as u8), (27 as u8), (27 as u8), (27 as u8), (27 as u8), (27 as u8), (27 as u8), (27 as u8), (27 as u8), (27 as u8), (27 as u8), (27 as u8), (27 as u8), (27 as u8), (28 as u8)]
@@ -566,4 +710,30 @@ pub let REPZ_3_10: c_int = 17
 pub let REPZ_11_138: c_int = 18
 pub let DIST_CODE_LEN: c_int = 512
 pub let SMALLEST: c_int = 1
+pub fn smaller[T](tree: T, n: T, m: T, depth: T) -> T {
+    ((tree[n].Freq < tree[m].Freq) or ((tree[n].Freq == tree[m].Freq) and (depth[n] <= depth[m])))
+}
+pub type unz_file_info64_internal_s { offset_curfile: c_ulong = 0 }
+impl Copy for unz_file_info64_internal_s
+
+pub type unz_file_info64_internal = unz_file_info64_internal_s
+
+pub type file_in_zip64_read_info_s { read_buffer: *mut i8 = null, stream: z_stream_s, pos_in_zipfile: c_ulong = 0, stream_initialised: c_ulong = 0, offset_local_extrafield: c_ulong = 0, size_local_extrafield: c_uint = 0, pos_local_extrafield: c_ulong = 0, total_out_64: c_ulong = 0, crc32: c_ulong = 0, crc32_wait: c_ulong = 0, rest_read_compressed: c_ulong = 0, rest_read_uncompressed: c_ulong = 0, z_filefunc: zlib_filefunc64_32_def_s, filestream: *mut c_void = null, compression_method: c_ulong = 0, byte_before_the_zipfile: c_ulong = 0, raw: c_int = 0 }
+impl Copy for file_in_zip64_read_info_s
+
+pub type unz64_s { z_filefunc: zlib_filefunc64_32_def_s, is64bitOpenFunction: c_int = 0, filestream: *mut c_void = null, gi: unz_global_info64_s, byte_before_the_zipfile: c_ulong = 0, num_file: c_ulong = 0, pos_in_central_dir: c_ulong = 0, current_file_ok: c_ulong = 0, central_pos: c_ulong = 0, size_central_dir: c_ulong = 0, offset_central_dir: c_ulong = 0, cur_file_info: unz_file_info64_s, cur_file_info_internal: unz_file_info64_internal_s, pfile_in_zip_read: *mut file_in_zip64_read_info_s = null, encrypted: c_int = 0, isZip64: c_int = 0, keys: [3]c_ulong = [0 as c_ulong; 3], pcrc_32_tab: *const c_uint = null }
+impl Copy for unz64_s
+
+pub let unz_copyright: [95]c_char = [32, 117, 110, 122, 105, 112, 32, 49, 46, 48, 49, 32, 67, 111, 112, 121, 114, 105, 103, 104, 116, 32, 49, 57, 57, 56, 45, 50, 48, 48, 52, 32, 71, 105, 108, 108, 101, 115, 32, 86, 111, 108, 108, 97, 110, 116, 32, 45, 32, 104, 116, 116, 112, 115, 58, 47, 47, 119, 119, 119, 46, 119, 105, 110, 105, 109, 97, 103, 101, 46, 99, 111, 109, 47, 122, 76, 105, 98, 68, 108, 108, 47, 109, 105, 110, 105, 122, 105, 112, 46, 104, 116, 109, 108, 0]
+
+pub let UNZ_BUFSIZE: c_int = 16384
+pub let UNZ_MAXFILENAMEINZIP: c_int = 256
+pub fn ALLOC[T](size: T) -> *mut c_void {
+    (unsafe { with_alloc((size) as i64) } as *mut c_void)
+}
+pub let SIZECENTRALDIRITEM: c_int = 0x2e
+pub let SIZEZIPLOCALHEADER: c_int = 0x1e
+pub let CASESENSITIVITYDEFAULTVALUE: c_int = 2
+pub let BUFREADCOMMENT: c_int = 0x400
+pub let CENTRALDIRINVALID: c_ulong = ((0 as c_ulong) -% 1)
 pub let z_errmsg: [10]*mut i8 = [("need dictionary" as *mut c_char), ("stream end" as *mut c_char), ("" as *mut c_char), ("file error" as *mut c_char), ("stream error" as *mut c_char), ("data error" as *mut c_char), ("insufficient memory" as *mut c_char), ("buffer error" as *mut c_char), ("incompatible version" as *mut c_char), ("" as *mut c_char)]

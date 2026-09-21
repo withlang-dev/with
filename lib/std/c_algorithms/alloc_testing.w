@@ -50,7 +50,7 @@ pub unsafe fn alloc_test_free(__param_ptr: *mut c_void) -> Unit {
 
     (__local_header = alloc_test_get_header(__param_ptr))
 
-    (__local_block_size = (unsafe *__local_header).bytes)
+    (__local_block_size = (*__local_header).bytes)
 
     if ((((if not ((if allocated_bytes >= __local_block_size: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
         __assert_rtn(c"alloc_test_free".ptr, c"alloc-testing.c".ptr, (145 as c_int), c"allocated_bytes >= block_size".ptr)
@@ -58,9 +58,9 @@ pub unsafe fn alloc_test_free(__param_ptr: *mut c_void) -> Unit {
         0
     }
 
-    alloc_test_overwrite(__param_ptr, (unsafe *__local_header).bytes, (3735928559 as c_uint))
+    alloc_test_overwrite(__param_ptr, (*__local_header).bytes, (3735928559 as c_uint))
 
-    ((unsafe *__local_header).magic_number = ((0 as c_uint)))
+    ((*__local_header).magic_number = ((0 as c_uint)))
 
     with_free(((__local_header as *mut c_void) as *mut u8))
 
@@ -85,7 +85,7 @@ pub unsafe fn alloc_test_realloc(__param_ptr: *mut c_void, __param_bytes: c_ulon
     if ((if __param_ptr != null: 1 else: 0) != 0) {
         (__local_header = alloc_test_get_header(__param_ptr))
 
-        (__local_bytes_to_copy = (unsafe *__local_header).bytes)
+        (__local_bytes_to_copy = (*__local_header).bytes)
 
         if ((if __local_bytes_to_copy > __param_bytes: 1 else: 0) != 0) {
             (__local_bytes_to_copy = __param_bytes)
@@ -151,7 +151,7 @@ unsafe fn alloc_test_get_header(__param_ptr: *mut c_void) -> *mut _BlockHeader {
 
     (__local_result = (__param_ptr as *mut _BlockHeader) - ((1 as isize) as usize))
 
-    if ((((if not ((if (unsafe *__local_result).magic_number == 1928102610: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if ((((if not ((if (*__local_result).magic_number == 1928102610: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
         __assert_rtn(c"alloc_test_get_header".ptr, c"alloc-testing.c".ptr, (70 as c_int), c"result->magic_number == ALLOC_TEST_MAGIC".ptr)
     } else {
         0
@@ -179,7 +179,7 @@ unsafe fn alloc_test_overwrite(__param_ptr: *mut c_void, __param_length: c_ulong
 
         (__local_b = ((((((__param_pattern as c_uint) >> ((8 * __local_pattern_seq) as c_uint)) as c_uint) & (255 as c_uint)) as u8)))
 
-        ((unsafe __local_byte_ptr[__local_i]) = __local_b)
+        ((__local_byte_ptr[__local_i]) = __local_b)
 
 
         (__local_i = (__local_i +% 1))

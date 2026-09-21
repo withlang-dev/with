@@ -948,6 +948,10 @@ fn sdk_package_target(ctx: &BuildCtx) -> Target:
     var target = package_llvm_sdk_platform_target("sdk-package", platform, sdk_output_prefix_arg(ctx, platform), sdk_output_llvm_cache_for_platform(platform))
     target.dep("sdk")
 
+// The unit digests of the two compiles `:fixpoint` compares.
+const FIXPOINT_STAGE2_UNITS: str = "out/stage/bin/with-stage2.units"
+const FIXPOINT_STAGE3_UNITS: str = "out/release/bin/with.units"
+
 fn install_file_target(name: &str, source: &str, dest: &str, mode: &str, dep: &str) -> Target:
     var target = target_new(.Install, build_owned_text(name), build_owned_text(source)).output(build_owned_text(dest))
     target = target.input(build_owned_text(source))
@@ -961,6 +965,17 @@ fn install_file_target(name: &str, source: &str, dest: &str, mode: &str, dep: &s
 // installed file cannot start (2026-09-03: an install landed a binary macOS
 // killed with "Code Signature Invalid" while the identical release binary
 // ran; nothing noticed until the next `with` invocation).
+// The green store as an .Install destination: $WITH_GREEN_DIR, else
+// ~/.local/with-green (build/retention.w ret_green_store_path reads the same
+// two). The kind writes outside the project only under `$HOME/`.
+fn green_store_install_path(ctx: &BuildCtx) -> str:
+    let explicit = ctx.env_input("WITH_GREEN_DIR")
+    let home = ctx.env_input("HOME")
+    let dir = if explicit.len() > 0: explicit else: home ++ "/.local/with-green"
+    if home.len() > 0 and dir.starts_with(home ++ "/"):
+        return "$HOME/" ++ dir.slice(home.len() + 1, dir.len()) ++ "/green.tsv"
+    dir ++ "/green.tsv"
+
 fn install_compiler_target(name: &str, source: &str, dest: &str, dep: &str) -> Target:
     install_file_target(name, source, dest, "0755", dep).arg("verify=version")
 
@@ -1841,25 +1856,12 @@ pub fn build(ctx: BuildCtx) -> Build:
     compiler_no_c_export = target_with_compiler_c_export_audit_inputs(move compiler_no_c_export, ctx)
     out = out.add_target(compiler_no_c_export)
 
-    var requirements_informative = target_new(.Action, "requirements-informative-check", "").output("out/.build-state/requirements-informative-check.txt")
-    requirements_informative.action = run_check_requirements_informative_action
-    requirements_informative = requirements_informative.write_scope("out/.build-state")
-    requirements_informative = requirements_informative.input("docs/requirements.md")
-    out = out.add_target(requirements_informative)
-
-    // docs/requirements.md is hand-maintained, NOT build-generated. The former
-    // `requirements` (generate) and `requirements-check` targets — which rewrote
-    // docs/requirements.md from the spec and failed the build if it differed —
-    // have been removed (build/requirements.w deleted). The build must never
-    // auto-generate or auto-modify docs/requirements.md.
-
     var spec_inventory = target_new(.Action, "spec-inventory-check", "").output("out/.build-state/spec-inventory-check.txt")
     spec_inventory.action = run_check_spec_inventory_action
     spec_inventory = spec_inventory.write_scope("out/.build-state")
     spec_inventory = spec_inventory.input("docs/with-specification.md")
     spec_inventory = spec_inventory.input("src/Token.w")
     // The corpus packages are internal modules (build/corpora.w names them).
-    spec_inventory = corpora_internal_module_args(move spec_inventory)
     spec_inventory = spec_inventory.input("src/Parser.w")
     spec_inventory = spec_inventory.input("src/main.w")
     spec_inventory = spec_inventory.input("src/compiler/DriverOptions.w")
@@ -1868,6 +1870,12 @@ pub fn build(ctx: BuildCtx) -> Build:
 
     // std.libc exports C-standard functions and with_libc_* seams only, and
     // the migrator's libc allowlist agrees with it (build/compiler.w).
+    var user_programs_safe = target_new(.Action, "user-programs-safe", "").output("out/.build-state/user-programs-safe.txt")
+    user_programs_safe.action = run_check_user_programs_safe_action
+    user_programs_safe = user_programs_safe.write_scope("out/.build-state")
+    user_programs_safe = user_programs_safe.input("build/release_uat_fixtures").input("examples")
+    out = out.add_target(user_programs_safe)
+
     var libc_surface = target_new(.Action, "libc-surface-check", "").output("out/.build-state/libc-surface-check.txt")
     libc_surface.action = run_check_libc_surface_action
     libc_surface = libc_surface.write_scope("out/.build-state")
@@ -2085,6 +2093,8 @@ pub fn build(ctx: BuildCtx) -> Build:
     stage2 = stage2.input("out/stage/lib/embedded_objects.o")
     stage2 = stage2.arg("embedded-object=out/stage/lib/embedded_objects.o")
     stage2 = stage2.dep("stage-embedded-objects-object")
+    // stage1's compile of the compiler, unit by unit (see fixpoint-compare).
+    stage2 = stage2.arg("unit-digests=" ++ FIXPOINT_STAGE2_UNITS).extra_output(FIXPOINT_STAGE2_UNITS)
     out = out.add_target(stage2)
 
     var stage3 = target_new(.Action, "stage3", "").output(stage_compiler_bin("with-stage3"))
@@ -2151,10 +2161,20 @@ pub fn build(ctx: BuildCtx) -> Build:
     selfcheck = selfcheck.dep("stage2")
     out = out.add_target(selfcheck)
 
-    var fixpoint_compare = target_new(.FixpointCompare, "fixpoint-compare", stage_compiler_obj("with-stage2-fixpoint.o"))
-    fixpoint_compare = fixpoint_compare.arg(stage_compiler_obj("with-stage3-fixpoint.o"))
-    fixpoint_compare = fixpoint_compare.dep("stage2-fixpoint-object")
-    fixpoint_compare = fixpoint_compare.dep("stage3-fixpoint-object")
+    // stage2 == stage3, over the whole compiler and at no compile's cost. The
+    // `stage2` build is stage1 compiling the compiler; `link-compiler` is
+    // stage2 compiling the same source with the same flags, which is what a
+    // stage3 is. Each records the sha256 of every unit object it links, and
+    // the fixpoint is those two lists agreeing. (It used to recompile both with
+    // `--emit-obj` and compare the results: 100 s, and `--emit-obj` is
+    // module-object mode, so the two objects held main.w's own functions and
+    // no other module's. stage2-fixpoint-object and stage3-fixpoint-object
+    // remain for `fixpoint-diff`, which explains a differing object.)
+    var fixpoint_compare = target_new(.Action, "fixpoint-compare", "").output("out/.build-state/fixpoint-compare.txt")
+    fixpoint_compare.action = run_fixpoint_compare_units_action
+    fixpoint_compare = fixpoint_compare.input(FIXPOINT_STAGE2_UNITS).input(FIXPOINT_STAGE3_UNITS)
+    fixpoint_compare = fixpoint_compare.write_scope("out/.build-state")
+    fixpoint_compare = fixpoint_compare.dep("stage2").dep("link-compiler")
     out = out.add_target(fixpoint_compare)
 
     var bless_manifest = target_new(.Action, "bless-manifest", "").output("out/.build-state/blessed-manifest")
@@ -2168,14 +2188,12 @@ pub fn build(ctx: BuildCtx) -> Build:
     var fixpoint_evidence = target_new(.Action, "fixpoint-evidence", "").output("out/.build-state/fixpoint-evidence.json")
     fixpoint_evidence.action = run_fixpoint_evidence_action
     fixpoint_evidence = fixpoint_evidence.input(host_bin("out/bin/with-sha256"))
-    fixpoint_evidence = fixpoint_evidence.input(stage_compiler_obj("with-stage2-fixpoint.o"))
-    fixpoint_evidence = fixpoint_evidence.input(stage_compiler_obj("with-stage3-fixpoint.o"))
+    fixpoint_evidence = fixpoint_evidence.input(FIXPOINT_STAGE2_UNITS)
+    fixpoint_evidence = fixpoint_evidence.input(FIXPOINT_STAGE3_UNITS)
     fixpoint_evidence = fixpoint_evidence.input(release_compiler_bin("with"))
     fixpoint_evidence = fixpoint_evidence.write_scope("out/.build-state")
     fixpoint_evidence = fixpoint_evidence.write_scope("out/command/fixpoint-evidence")
     fixpoint_evidence = fixpoint_evidence.dep("fixpoint-compare")
-    fixpoint_evidence = fixpoint_evidence.dep("stage2-fixpoint-object")
-    fixpoint_evidence = fixpoint_evidence.dep("stage3-fixpoint-object")
     fixpoint_evidence = fixpoint_evidence.dep("with-sha256")
     fixpoint_evidence = fixpoint_evidence.dep("build")
     out = out.add_target(fixpoint_evidence)
@@ -2473,6 +2491,8 @@ pub fn build(ctx: BuildCtx) -> Build:
     compiler = compiler.input("out/gen/main.w")
     compiler = target_with_compiler_source_inputs(move compiler, ctx)
     compiler = compiler.arg("-O1")
+    // stage2's compile of the compiler, unit by unit (see fixpoint-compare).
+    compiler = compiler.arg("unit-digests=" ++ FIXPOINT_STAGE3_UNITS).extra_output(FIXPOINT_STAGE3_UNITS)
     compiler = compiler.extra_output("out/command/link-compiler")
     compiler = compiler.timeout(1800000)
     compiler = compiler.write_scope("out/release/bin")
@@ -2916,7 +2936,6 @@ pub fn build(ctx: BuildCtx) -> Build:
     tests = tests.dep("invariance-check")
     tests = tests.dep("embedded-runtime-regression")
     tests = tests.dep("emit-c-smoke")
-    tests = tests.dep("requirements-informative-check")
     tests = tests.dep("spec-inventory-check")
     tests = tests.dep("libc-surface-check")
     tests = tests.dep("rt-decl-audit")
@@ -2933,7 +2952,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     ownership_gates = ownership_gates.dep("test")
     out = out.add_target(ownership_gates)
 
-    var last_green = target_new(.Action, "last-green", "").output("out/.build-state/last-green.json")
+    var last_green = target_new(.Action, "last-green-record", "").output("out/.build-state/last-green.json")
     last_green.action = run_last_green_action
     // D19: last-green is pure evidence assembly — it reads what test-green
     // and fixpoint-evidence recorded and fails loudly when stale. It must
@@ -2944,14 +2963,22 @@ pub fn build(ctx: BuildCtx) -> Build:
     last_green = last_green.input("out/.build-state/seed-input.json")
     last_green = last_green.input("src/version")
     last_green = last_green.extra_output("out/seed-archive")
-    last_green = last_green.extra_output("out/command/last-green")
+    last_green = last_green.extra_output("out/command/last-green-record")
     last_green = last_green.write_scope("out/.build-state")
     last_green = last_green.write_scope("out/seed-archive")
-    last_green = last_green.write_scope("out/command/last-green")
+    last_green = last_green.write_scope("out/command/last-green-record")
     last_green = last_green.dep("with-sha256")
     last_green = last_green.dep("seed-driver")
     last_green = last_green.arg(release_asset_for_host())
+    last_green = last_green.extra_output("out/.build-state/green-store.tsv")
     out = out.add_target(last_green)
+
+    // `:last-green` records the green here and publishes it, keyed on what was
+    // tested (git tree, pinned seed, host), to the store every worktree reads:
+    // a squash-merge of these sources, or a checkout of them elsewhere, is
+    // already green (build/retention.w).
+    out = out.add_target(install_file_target("last-green-publish", "out/.build-state/green-store.tsv", green_store_install_path(ctx), "0644", "last-green-record"))
+    out = out.add_target(target_new(.Group, "last-green", "").dep("last-green-publish"))
 
     var require_last_green = target_new(.Action, "require-last-green", "").output("out/command/require-last-green/ok")
     require_last_green.action = run_require_last_green_action
@@ -3062,6 +3089,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     out = out.add_target(release_one_liner_uat)
 
     var release_uat = target_new(.Group, "release-uat", "")
+    release_uat = release_uat.dep("user-programs-safe")
     release_uat = release_uat.dep("release-artifact-smoke-uat")
     release_uat = release_uat.dep("release-fresh-project-uat")
     release_uat = release_uat.dep("release-migrate-uat")

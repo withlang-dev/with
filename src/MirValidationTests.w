@@ -135,3 +135,47 @@ pub fn mir_test_unit_call_argument() -> Unit:
     assert(unit_argument_verdict(2, true) == "")
     assert(unit_argument_verdict(0, false) == "")
     assert(unit_argument_verdict(1, false) == "")
+
+// A payload read out of an enum variant whose declared type is not the
+// variant's payload type. `?` over `Result[Unit, E]` once declared the Unit
+// payload as the whole Result; the verifier trusted the declaration and
+// codegen loaded an unsized field. The enum has one variant with one payload.
+fn payload_read_verdict(payload_is_unit: bool, declared_is_enum: bool) -> str:
+    var mir_mod = MirModule.init()
+    for kind in [0, TypeKind.TY_VOID, TypeKind.TY_INT, TypeKind.TY_ENUM]:
+        mir_mod.sema_type_kinds.push(kind)
+        mir_mod.sema_type_d0.push(0)
+        mir_mod.sema_type_d1.push(0)
+        mir_mod.sema_type_d2.push(0)
+    let unit_ty = 1
+    let int_ty = 2
+    let enum_ty = 3
+    let payload_ty = if payload_is_unit: unit_ty else: int_ty
+    // The variant record: its name, its payload count, its payload types.
+    mir_mod.sema_type_d0[enum_ty] = 7
+    mir_mod.sema_type_d1[enum_ty] = mir_mod.sema_type_extra.len() as i32
+    mir_mod.sema_type_d2[enum_ty] = 1
+    mir_mod.sema_type_extra.push(0)
+    mir_mod.sema_type_extra.push(1)
+    mir_mod.sema_type_extra.push(payload_ty)
+    let declared_ty = if declared_is_enum: enum_ty else: payload_ty
+    var body = MirBody.init_for_fn(1)
+    let scrutinee_local = body.new_temp(enum_ty)
+    let scrutinee = body.new_place(scrutinee_local)
+    let destination_local = body.new_temp(declared_ty)
+    let destination = body.new_place(destination_local)
+    let variant = body.new_downcast_place(scrutinee, 0, enum_ty)
+    let payload = body.new_field_place(variant, 0, declared_ty)
+    let entry = body.new_block()
+    let payload_operand = body.new_operand(OperandKind.OK_MOVE, payload)
+    let read = body.new_rvalue(RvalueKind.RK_USE, payload_operand, 0, 0)
+    body.push_stmt(entry, StmtKind.Assign, destination, read, 0)
+    body.set_terminator(entry, TermKind.TK_RETURN, 0, 0, 0, 0, 0)
+    let err = validate_typed_mir_body(mir_mod, body)
+    with_str_clone_ref(err.message)
+
+pub fn mir_test_enum_payload_read() -> Unit:
+    assert(payload_read_verdict(true, true).contains("enum payload read declares"))
+    assert(payload_read_verdict(false, true).contains("enum payload read declares"))
+    assert(payload_read_verdict(true, false) == "")
+    assert(payload_read_verdict(false, false) == "")

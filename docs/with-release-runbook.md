@@ -265,9 +265,13 @@ runtime) that macOS could never show. It includes:
   `with run`. The generated raylib app renders a deterministic spiral, reads
   back the rendered framebuffer, counts bright non-background samples in the
   spiral annulus, and exits non-zero if the visual check fails, or loudly if
-  no window could be created. raylib has no contract overlay, so its
-  `const char*` parameters are the raw surface (§16.3c, #379): the fixture
-  calls `InitWindow` and `DrawText` under `unsafe` with `c"..."` literals.
+  no window could be created. The fixture is the program a user writes:
+  `InitWindow(900, 600, "...")` and `DrawText("...", ...)` with plain string
+  literals, `sin`/`cos` from the language, and no `unsafe`.
+- `:user-programs-safe`, a gate of `:release-uat`: no release UAT fixture and
+  no program under `examples/` says `unsafe`. A red here is a compiler defect
+  (a C surface the compiler has not modeled), never a reason to edit the
+  program.
 - `:release-one-liner-uat`, which validates real shell one-liner workflows:
   `seq 100 | with -n 'if line =~ /^[0-9]$/: print(line)'`,
   `cat names.txt | with -p 'line = line.upper()'`, regex captures, numbered

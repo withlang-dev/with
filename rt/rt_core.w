@@ -25,6 +25,8 @@ extern fn rt_libc_stderr() -> *mut c_void
 extern fn rt_errno_ptr() -> *mut i32
 extern fn rt_fileno(stream: *mut c_void) -> i32
 extern fn rt_isatty(fd: i32) -> i32
+extern fn rt_fseek(stream: *mut c_void, offset: i64, whence: i32) -> i32
+extern fn rt_ftell(stream: *mut c_void) -> i64
 extern fn rt_getrlimit(resource: i32, lim: *mut u8) -> i32
 extern fn rt_setrlimit(resource: i32, lim: *const u8) -> i32
 extern fn rt_mkstemp(template_path: *mut u8) -> i32
@@ -1504,6 +1506,86 @@ fn str_to_cstr(s: &str) -> *const u8:
 
 pub fn with_str_to_cstr_ref(s: &str) -> *mut u8:
     str_to_cstr(s) as *mut u8
+
+// ── C strings lent to a call (spec §16.3c, D47) ────────────────────────────
+// A `str` argument to a c_imported `const char *` parameter is lent for the
+// call in storage that stays readable: a callee that keeps the pointer later
+// reads stale text, never freed memory. Blocks come from rt_mmap, not the
+// allocator (so they are never handed to other types, and the debug
+// allocator's ledger never sees them), are reused only for other lent
+// strings, and always end in a zero byte that no lend overwrites. The memory
+// held is the peak of strings lent at once, by size class; it is never
+// unmapped, which is the point.
+//
+// Block: [class: i64][next: i64][payload: size - 16 bytes, last byte 0].
+// Class k holds blocks of 64 << k bytes; release keeps the payload intact and
+// links the block through its header.
+const CSTR_LEND_HEADER: i64 = 16
+const CSTR_LEND_CLASSES: i32 = 40
+const CSTR_LEND_SLAB: i64 = 65536
+var cstr_lend_free: [40]i64
+var cstr_lend_slab_at: i64
+var cstr_lend_slab_left: i64
+
+fn cstr_lend_class_size(class: i32) -> i64:
+    var size: i64 = 64
+    for _ in 0..class: size = size * 2
+    size
+
+fn cstr_lend_class_for(need: i64) -> i32:
+    var class = 0
+    var size: i64 = 64
+    while size < need and class < CSTR_LEND_CLASSES - 1:
+        size = size * 2
+        class = class + 1
+    class
+
+// A fresh block of `size` bytes: carved from the current slab when it fits,
+// else mapped by itself. rt_mmap memory is zero, so the guard byte is set.
+fn cstr_lend_map(size: i64) -> *mut u8:
+    if size > CSTR_LEND_SLAB / 4: return rt_mmap(size as u64)
+    if cstr_lend_slab_left < size:
+        cstr_lend_slab_at = rt_mmap(CSTR_LEND_SLAB as u64) as i64
+        cstr_lend_slab_left = if cstr_lend_slab_at == 0: 0 else: CSTR_LEND_SLAB
+    if cstr_lend_slab_left < size: return 0 as *mut u8
+    let block = cstr_lend_slab_at as *mut u8
+    cstr_lend_slab_at = cstr_lend_slab_at + size
+    cstr_lend_slab_left = cstr_lend_slab_left - size
+    block
+
+pub fn with_cstr_lend(s: &str) -> *mut u8:
+    if str_has_interior_nul(s):
+        let empty = make_str("" as *const u8, 0)
+        with_panic_core("str to C string conversion: interior NUL byte", empty, 0)
+    let slen = str_length(s)
+    // payload = text + its terminator + the guard byte at the block's end
+    let class = cstr_lend_class_for(CSTR_LEND_HEADER + slen + 2)
+    let size = cstr_lend_class_size(class)
+    rt_allocator_lock()
+    var block = cstr_lend_free[class] as *mut u8
+    if block as i64 != 0:
+        cstr_lend_free[class] = unsafe *((block as i64 + 8) as *const i64)
+    else:
+        block = cstr_lend_map(size)
+    rt_allocator_unlock()
+    if block as i64 == 0:
+        let empty = make_str("" as *const u8, 0)
+        with_panic_core("out of memory lending a str to C", empty, 0)
+    unsafe *(block as *mut i64) = class as i64
+    let payload = (block as i64 + CSTR_LEND_HEADER) as *mut u8
+    rt_memcpy(payload, str_data(s), slen)
+    unsafe *((payload as i64 + slen) as *mut u8) = 0
+    payload
+
+pub fn with_cstr_release(payload: *mut u8) -> Unit:
+    if payload as i64 == 0: return
+    let block = payload as i64 - CSTR_LEND_HEADER
+    let class = unsafe *(block as *const i64)
+    if class < 0 or class >= CSTR_LEND_CLASSES as i64: return
+    rt_allocator_lock()
+    unsafe *((block + 8) as *mut i64) = cstr_lend_free[class as i32]
+    cstr_lend_free[class as i32] = block
+    rt_allocator_unlock()
 
 // ── Exported allocator/memory API for std/mem.w ───────────────────
 
@@ -3560,6 +3642,8 @@ pub fn with_libc_stderr() -> *mut c_void: rt_libc_stderr()
 pub fn with_libc_errno() -> *mut i32: rt_errno_ptr()
 pub fn with_libc_fileno(stream: *mut c_void) -> i32: rt_fileno(stream)
 pub fn with_libc_isatty(fd: i32) -> i32: rt_isatty(fd)
+pub fn with_libc_fseek(stream: *mut c_void, offset: i64, whence: i32) -> i32: rt_fseek(stream, offset, whence)
+pub fn with_libc_ftell(stream: *mut c_void) -> i64: rt_ftell(stream)
 pub fn with_libc_getrlimit(resource: i32, lim: *mut u8) -> i32: rt_getrlimit(resource, lim)
 pub fn with_libc_setrlimit(resource: i32, lim: *const u8) -> i32: rt_setrlimit(resource, lim)
 pub fn with_libc_mkstemp(template_path: *mut i8) -> i32: rt_mkstemp(template_path as *mut u8)

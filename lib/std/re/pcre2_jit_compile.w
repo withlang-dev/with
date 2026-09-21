@@ -50,8 +50,8 @@ pub unsafe fn pcre2_jit_compile_8(__param_code: *mut pcre2_real_code_8, __param_
     }
 
     if ((if ((__param_options as c_uint) & (256 as c_uint)) != 0: 1 else: 0) != 0) {
-        if ((if (((unsafe *__local_re).overall_options as c_uint) & (67108864 as c_uint)) == 0: 1 else: 0) != 0) {
-            ((unsafe *__local_re).overall_options = ((unsafe *__local_re).overall_options as c_uint) | (67108864 as c_uint))
+        if ((if (((*__local_re).overall_options as c_uint) & (67108864 as c_uint)) == 0: 1 else: 0) != 0) {
+            ((*__local_re).overall_options = ((*__local_re).overall_options as c_uint) | (67108864 as c_uint))
 
         }
 
@@ -74,9 +74,9 @@ pub unsafe fn pcre2_jit_match_8(__param_code: *const pcre2_real_code_8, __param_
 
     __param_mcontext
 
-    ((unsafe *__param_match_data).rc = ((-45 as c_int)))
+    ((*__param_match_data).rc = ((-45 as c_int)))
 
-    return (unsafe *__param_match_data).rc
+    return (*__param_match_data).rc
 
 
 }

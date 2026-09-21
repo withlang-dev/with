@@ -1044,6 +1044,16 @@ fn bs_check_test_keep_binary(ctx: &ActionCtx, compiler_path: &str, test_dir: &st
     if rerun_green.rc != 0:
         return bs_fail(ctx, f"kept binary failed test_green under WITH_TEST_FILTER=test_green (exit code {rerun_green.rc})")
 
+    // --quiet (how a build.w test lane runs each file) spares the log a
+    // passing test's output; a failing test's output is the diagnosis.
+    var quiet_args = bs_test_args(red_src)
+    quiet_args.push("--quiet")
+    let quiet_red = bs_run_cli_capture_with_env(ctx, compiler_path, "test-quiet-red", quiet_args, 120000, env)
+    if quiet_red.rc == 0:
+        return bs_fail(ctx, "quiet red fixture unexpectedly passed")
+    rc = bs_assert_contains(ctx, quiet_red.stderr, "assertion failed", "test_quiet_red_shows_output")
+    if rc != 0: return rc
+
     let green_src = bs_join(test_dir, "keep_binary_green.w")
     if fs.write_text(green_src, "fn test_green: assert(true)\n") != 0:
         return bs_fail(ctx, "could not write " ++ green_src)
@@ -5155,9 +5165,15 @@ fn bs_check_migrate_raw_pointer_index(ctx: &ActionCtx, compiler_path: &str, case
     let out_text = ctx.fs().read_text(out_w)
     rc = bs_assert_contains(ctx, out_text, "__param_p +", "raw_pointer_index_unsafe")
     if rc != 0: return rc
-    rc = bs_assert_contains(ctx, out_text, "(unsafe __local_r[0])", "raw_pointer_index_unsafe")
+    // The body is emitted as `unsafe fn`, so its raw indexes carry no prefix:
+    // a prefix inside an unsafe context is the redundancy Sema warns about.
+    rc = bs_assert_contains(ctx, out_text, "unsafe fn issue146_ptr_ops", "raw_pointer_index_unsafe")
     if rc != 0: return rc
-    rc = bs_assert_contains(ctx, out_text, "(unsafe __param_p[1])", "raw_pointer_index_unsafe")
+    rc = bs_assert_not_contains(ctx, out_text, "(unsafe __local_r[0])", "raw_pointer_index_unsafe")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, out_text, "(__local_r[0])", "raw_pointer_index_unsafe")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, out_text, "(__param_p[1])", "raw_pointer_index_unsafe")
     if rc != 0: return rc
     var check_args: Vec[str] = Vec.new()
     check_args |> push("check")

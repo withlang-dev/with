@@ -439,6 +439,11 @@ fn comp_run_compiler_capture(ctx: &ActionCtx, label: &str, argv: Vec[str], stdou
     let root = ctx.project_info().project_root()
     var process_env = process_env()
     process_env = process_env.set("WITH_OUT_DIR", comp_abs(root, "out"))
+    // The compiler's own objects name their sources under /with-src, not under
+    // this checkout, so one tree compiles to the same bytes in every worktree
+    // (src/FnAbi.w fn_abi_file_prefix_mapped). A debugger maps it back:
+    // `lldb -o "settings set target.source-map /with-src $PWD" -- <binary>`.
+    process_env = process_env.set("WITH_FILE_PREFIX_MAP", root ++ "=/with-src")
     // The frozen seed predates bounded compiler partitions. Give its one
     // compiler-sized bootstrap invocation the same portable low-memory
     // layout; ordinary small programs keep the compiler's size gate.
@@ -454,6 +459,11 @@ fn comp_run_compiler_capture(ctx: &ActionCtx, label: &str, argv: Vec[str], stdou
         if env("WITH_CODEGEN_EMIT_WIDTH").len() == 0:
             let on_ci = env("CI").len() > 0 or env("GITHUB_ACTIONS").len() > 0
             process_env = process_env.set("WITH_CODEGEN_EMIT_WIDTH", if on_ci: "1" else: "4")
+    // unit-digests=<file>: the compile records the sha256 of every unit object
+    // it links (src/compiler/Compilation.w); `:fixpoint` compares two of them.
+    let unit_digests = comp_arg_value(ctx.args(), "unit-digests=")
+    if unit_digests.len() > 0:
+        process_env = process_env.set("WITH_UNIT_DIGESTS", comp_abs(root, unit_digests))
     let embedded_object = comp_arg_value(ctx.args(), "embedded-object=")
     if embedded_object.len() > 0:
         process_env = process_env.set("WITH_COMPILER_EMBEDDED_OBJECT", comp_abs(root, embedded_object))
@@ -758,30 +768,6 @@ fn comp_split_lines(text: &str) -> Vec[str]:
         i = i + 1
     lines
 
-fn comp_requirements_section_30_start(lines: &Vec[str]) -> i32:
-    for i in 0..lines.len() as i32:
-        if lines[i].starts_with("## 30."):
-            return i
-    -1
-
-fn comp_check_requirements_informative_text(ctx: &ActionCtx, text: &str) -> i32:
-    if not text.contains("Section 30 is explicitly informative"):
-        return comp_fail(ctx, "requirements must state that Section 30 is explicitly informative")
-    let lines = comp_split_lines(text)
-    let section_start = comp_requirements_section_30_start(lines)
-    if section_start < 0:
-        return comp_fail(ctx, "requirements missing Section 30")
-    var has_trace = false
-    for i in section_start..lines.len() as i32:
-        let line = lines[i]
-        if line.contains("Informative trace:"):
-            has_trace = true
-        if line.contains("  - Requirement:"):
-            return comp_fail(ctx, f"docs/requirements.md:{i + 1}: Section 30 must not contain normative Requirement rows")
-    if not has_trace:
-        return comp_fail(ctx, "requirements Section 30 must include Informative trace:")
-    0
-
 fn comp_vec_contains(items: &Vec[str], item: &str) -> bool:
     for i in 0..items.len() as i32:
         if items[i] == item:
@@ -1055,59 +1041,6 @@ fn comp_collect_string_literal_flags(items: Vec[str], text: &str) -> Vec[str]:
 fn comp_impl_flags(fs: &ToolFs) -> Vec[str]:
     comp_collect_string_literal_flags(Vec.new(), fs.read_text("src/main.w") ++ "\n" ++ fs.read_text("src/compiler/DriverOptions.w"))
 
-fn comp_spec_modules(spec: &str) -> Vec[str]:
-    let sec = comp_spec_subsection(spec, "#### Module Map")
-    var modules: Vec[str] = Vec.new()
-    var tick = 0
-    while tick < sec.len() as i32:
-        let open = comp_find_from(sec, "`", tick)
-        if open < 0:
-            break
-        let close = comp_find_from(sec, "`", open + 1)
-        if close < 0:
-            break
-        let item = sec.slice((open + 1) as i64, close as i64)
-        if item.starts_with("std."):
-            if not comp_vec_contains(modules, item):
-                modules.push(item)
-        tick = close + 1
-    modules
-
-fn comp_strip_suffix(text: &str, suffix: &str) -> str:
-    if text.ends_with(suffix):
-        return text.slice(0, text.len() - suffix.len())
-    compiler_owned_text(text)
-
-fn comp_std_module_from_path(path: &str) -> str:
-    let prefix = "lib/std/"
-    if not path.starts_with(prefix):
-        return ""
-    let rest = path.slice(prefix.len(), path.len())
-    if rest.len() == 0 or rest.starts_with("."):
-        return ""
-    var first = compiler_owned_text(rest)
-    for i in 0..rest.len() as i32:
-        if rest[i] == 47:
-            first = rest.slice(0, i as i64)
-            break
-    if first.len() == 0 or first.starts_with("."):
-        return ""
-    if first.ends_with(".w"):
-        first = comp_strip_suffix(first, ".w")
-    "std." ++ first
-
-fn comp_impl_modules(fs: &ToolFs) -> Vec[str]:
-    let files = fs.list_files("lib/std")
-    var modules: Vec[str] = Vec.new()
-    for i in 0..files.len() as i32:
-        let item = comp_std_module_from_path(files[i])
-        if item.len() > 0 and not comp_vec_contains(modules, item):
-            modules.push(item)
-    if fs.exists("lib/std/internal/str_abi.w"):
-        if not comp_vec_contains(modules, "std.str_abi"):
-            modules.push("std.str_abi")
-    modules
-
 fn comp_known_missing_flag(item: &str) -> str:
     if item == "--target": return "#425"
     if item == "--open": return "#537"
@@ -1131,7 +1064,7 @@ fn comp_internal_flag(item: &str) -> bool:
     // --link-object / --link-bundle / --emit-bundle-manifest are .wo bundle
     // plumbing driven by build.w (docs/wo_bundles.md), never hand-written:
     // internal like --no-prelude.
-    item == "--keep-binary" or item == "--test" or item == "--alloc" or item == "--check" or item == "--c-export-functions" or item == "--contains" or item == "--convert-goto-to-structured" or item == "--debug-alloc-filter" or item == "--deterministic" or item == "--diff" or item == "--dry-run" or item == "--dump-abi" or item == "--emit-bundle-manifest" or item == "--emit-bundle-interface" or item == "--bundle-fingerprint" or item == "--bundle-corpus" or item == "--link-object" or item == "--link-bundle" or item == "--dump-ast" or item == "--dump-async-mir" or item == "--dump-drop-flags" or item == "--dump-drop-plan" or item == "--dump-drop-state" or item == "--dump-mir" or item == "--dump-place-map" or item == "--dump-project-info" or item == "--dump-resolved" or item == "--dump-tokens" or item == "--dump-typed" or item == "--exclude" or item == "--exit-code" or item == "--explain" or item == "--explain-mir-origin" or item == "--filter" or item == "--force" or item == "--force-reinstall" or item == "--freestanding" or item == "--graph" or item == "--help" or item == "--ir-roundtrip" or item == "--lib" or item == "--migrate-one" or item == "--name" or item == "--no-c-export" or item == "--no-deps" or item == "--no-prelude" or item == "--no-runtime" or item == "--out" or item == "--output" or item == "--prefer-brace" or item == "--prefer-colon" or item == "--prefer-curly" or item == "--prelude" or item == "--quiet" or item == "--shared-defs" or item == "--shared-fragment" or item == "--stats" or item == "--survey" or item == "--trace-cleanup-edge" or item == "--trace-ownership" or item == "--trace-place" or item == "--validate-all" or item == "--validate-ownership" or item == "--verbose" or item == "--width-slice" or item == "--version" or item == "-f" or item == "-D" or item == "-g0" or item == "-h" or item == "-I" or item == "-include" or item == "-l" or item == "-o" or item == "-q" or item == "-v" or item == "-w"
+    item == "--keep-binary" or item == "--test" or item == "--alloc" or item == "--check" or item == "--c-export-functions" or item == "--contains" or item == "--convert-goto-to-structured" or item == "--debug-alloc-filter" or item == "--deterministic" or item == "--diff" or item == "--dry-run" or item == "--dump-abi" or item == "--emit-bundle-manifest" or item == "--emit-bundle-interface" or item == "--bundle-fingerprint" or item == "--bundle-corpus" or item == "--link-object" or item == "--link-bundle" or item == "--dump-ast" or item == "--dump-async-mir" or item == "--dump-drop-flags" or item == "--dump-drop-plan" or item == "--dump-drop-state" or item == "--dump-mir" or item == "--dump-place-map" or item == "--dump-project-info" or item == "--dump-resolved" or item == "--dump-tokens" or item == "--dump-typed" or item == "--exclude" or item == "--exit-code" or item == "--explain" or item == "--explain-mir-origin" or item == "--filter" or item == "--force" or item == "--force-reinstall" or item == "--from-source" or item == "--freestanding" or item == "--graph" or item == "--help" or item == "--ir-roundtrip" or item == "--lib" or item == "--migrate-one" or item == "--name" or item == "--no-c-export" or item == "--no-deps" or item == "--no-prelude" or item == "--no-runtime" or item == "--out" or item == "--output" or item == "--prefer-brace" or item == "--prefer-colon" or item == "--prefer-curly" or item == "--prelude" or item == "--quiet" or item == "--shared-defs" or item == "--shared-fragment" or item == "--stats" or item == "--survey" or item == "--trace-cleanup-edge" or item == "--trace-ownership" or item == "--trace-place" or item == "--validate-all" or item == "--validate-ownership" or item == "--verbose" or item == "--width-slice" or item == "--version" or item == "-f" or item == "-D" or item == "-g0" or item == "-h" or item == "-I" or item == "-include" or item == "-l" or item == "-o" or item == "-q" or item == "-v" or item == "-w"
 
 fn comp_internal_module(item: &str) -> bool:
     item == "std.builtins" or item == "std.channel" or item == "std.cfg" or item == "std.async" or item == "std.compiler" or item == "std.component" or item == "std.iter" or item == "std.libc" or item == "std.option" or item == "std.prelude" or item == "std.prelude_alloc" or item == "std.prelude_core" or item == "std.result" or item == "std.str" or item == "std.str_abi" or item == "std.sys" or item == "std.sysinfo" or item == "std.task" or item == "std.tls" or item == "std.traits"
@@ -1204,16 +1137,6 @@ pub fn run_check_compiler_no_new_c_export_action(ctx: ActionCtx) -> i32:
             return rc
     comp_write_ok_output(ctx)
 
-pub fn run_check_requirements_informative_action(ctx: ActionCtx) -> i32:
-    let fs = ctx.fs()
-    let path = "docs/requirements.md"
-    if not fs.exists(path):
-        return comp_fail(ctx, "missing " ++ path)
-    let rc = comp_check_requirements_informative_text(ctx, fs.read_text(path))
-    if rc != 0:
-        return rc
-    comp_write_ok_output(ctx)
-
 // ── std.libc surface (Eric, 2026-09-15) ─────────────────────────────────────
 // std.libc exports C-standard functions (the same name and meaning in
 // libSystem, glibc and the UCRT) and With functions over with_libc_* runtime
@@ -1225,7 +1148,7 @@ pub fn run_check_requirements_informative_action(ctx: ActionCtx) -> i32:
 
 fn comp_libc_standard_externs() -> str:
     "|fprintf|printf|snprintf|sprintf|vsnprintf|vfprintf|vprintf|fopen|fclose|fflush|" ++
-    "fgets|fgetc|fputc|fputs|putc|perror|feof|ferror|fread|fwrite|" ++
+    "fgets|fgetc|fputc|fputs|putc|perror|feof|ferror|fread|fwrite|remove|" ++
     "strcpy|strncpy|strrchr|strstr|strerror|atoi|strtol|strtoul|strtod|setlocale|" ++
     "abort|exit|clock|time|rand|srand|qsort|"
 
@@ -1270,6 +1193,52 @@ fn comp_preamble_extern_names(preamble_body: &str) -> str:
         if name.len() > 0: names = names ++ name ++ "|"
         at = comp_find_from(preamble_body, "\"extern fn ", at + 11)
     names
+
+// ── user programs never say `unsafe` (Eric, 2026-09-19) ─────────────────────
+// A release UAT fixture and an example are what an application developer
+// writes: a game, a site, a tool over a C library. If one needs `unsafe`, the
+// compiler forced that user somewhere they should never be, and the defect is
+// the compiler's. The spiral fixture was once rewritten to `unsafe` so a new
+// c_import rule would pass; this lane makes that a red build instead.
+
+/// Whether `line` uses the `unsafe` keyword outside a string literal or a
+/// `//` comment.
+fn comp_line_says_unsafe(line: &str) -> bool:
+    var in_string = false
+    var i = 0
+    let n = line.len() as i32
+    while i < n:
+        let c = line[i]
+        if in_string:
+            if c == '\\': i = i + 1
+            else if c == '"': in_string = false
+        else if c == '"': in_string = true
+        else if c == '/' and i + 1 < n and line[i + 1] == '/': return false
+        else if c == 'u' and line.slice(i as i64, line.len()).starts_with("unsafe"):
+            let before_ok = i == 0 or not comp_is_ident_continue(line[i - 1] as i32)
+            let after_ok = i + 6 >= n or not comp_is_ident_continue(line[i + 6] as i32)
+            if before_ok and after_ok: return true
+        i = i + 1
+    false
+
+pub fn run_check_user_programs_safe_action(ctx: ActionCtx) -> i32:
+    let fs = ctx.fs()
+    var errors = 0
+    var files = 0
+    for root in ["build/release_uat_fixtures", "examples"]:
+        if not fs.is_dir(root): continue
+        for path in fs.list_files(root):
+            if not path.ends_with(".w"): continue
+            files = files + 1
+            let lines = comp_split_lines(fs.read_text(path))
+            for i in 0..lines.len() as i32:
+                if comp_line_says_unsafe(lines[i]):
+                    print(path ++ f":{i + 1}: " ++ comp_trim(lines[i]))
+                    errors = errors + 1
+    if errors > 0:
+        return comp_fail(ctx, f"{errors} uses of `unsafe` in release UAT fixtures and examples; a user program never needs one - fix the compiler, never the program")
+    if fs.write_text(ctx.output(), f"ok: {files} user programs, no unsafe\n") != 0: return comp_fail(ctx, "cannot write " ++ ctx.output())
+    0
 
 pub fn run_check_libc_surface_action(ctx: ActionCtx) -> i32:
     let fs = ctx.fs()
@@ -1346,15 +1315,8 @@ pub fn run_check_spec_inventory_action(ctx: ActionCtx) -> i32:
 
     errors = comp_inventory_add_errors(move errors, "cli commands", comp_spec_cli_commands(spec), comp_impl_commands(fs), "", "command")
     errors = comp_inventory_add_errors(move errors, "cli flags", comp_spec_cli_flags(), comp_impl_flags(fs), "flag", "flag")
-    // A corpus package (build/corpora.w, `internal-module=` args) is
-    // internal; it never needs a spec entry.
-    var impl_modules: Vec[str] = Vec.new()
-    for item in comp_impl_modules(fs):
-        var internal = false
-        for arg in ctx.args():
-            if arg == "internal-module=" ++ item: internal = true
-        if not internal: impl_modules.push(item.clone())
-    errors = comp_inventory_add_errors(move errors, "stdlib modules", comp_spec_modules(spec), impl_modules, "module", "module")
+    // The spec does not catalogue lib/std (Eric, 2026-09-20): a library is
+    // documented by its source, and adding one is not a language change.
 
     if errors.len() > 0:
         ctx.diagnostics().error(comp_inventory_error_text(errors))
@@ -1655,7 +1617,7 @@ pub fn comp_patch_version_binary(ctx: &ActionCtx, input_path: &str, output_path:
     var data = if fs.exists(input_path): fs.read_text(input_path) else: ""
     if data.len() == 0:
         return comp_fail(ctx, "empty unstamped binary: " ++ input_path)
-    let sentinel = COMPILER_VERSION_SENTINEL
+    let sentinel = COMPILER_VERSION_SENTINEL.clone()
     let vslot: i64 = COMPILER_VERSION_SLOT_WIDTH as i64
     let nul = "\0"
     var patched = 0
