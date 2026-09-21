@@ -9523,6 +9523,11 @@ symbol name used for linking while keeping the With declaration name
 available for local overload avoidance, curation wrappers, or naming
 conventions. It does not change the function type or safety contract.
 
+`@[import_module("ns")]` on an `extern fn` names the WebAssembly import
+namespace the symbol is imported from; without it the namespace is `env`.
+It applies only to the wasm32 target and does not change the function type
+or safety contract.
+
 ### 16.3b External Variables
 
 Global variables defined in C libraries can be declared with
@@ -12686,6 +12691,7 @@ not marked internal is invalid.
 | `@[ffi_stack]` | §14.19 | Reserved: OS-stack execution (roadmap) |
 | `@[panic_handler]` / `@[entry]` / `@[no_main]` / `@[global_allocator]` | §18.7 | Freestanding-mode hooks |
 | `@[target("arch")]` | §16.13 | Architecture-guarded items |
+| `@[import_module("ns")]` | §16.3 | WebAssembly import namespace of an extern function (wasm32 only) |
 
 **Implementation-internal (unstable):** `@[bench]`, `@[test]`,
 `@[before]`, `@[after]`, `@[stack_size]`, `@[callconv]`,
