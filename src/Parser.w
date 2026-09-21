@@ -4032,7 +4032,7 @@ impl Parser:
             let digits = self.intern_current()
             self.advance()
             return self.pool.add_node(NodeKind.NK_FACADE_PARAM_REF, start, self.prev_end(), FACADE_PARAM_REF_INDEX, digits, 0) as i32
-        if self.current_ident_is("type"):
+        if self.peek() == TokenKind.TK_KW_TYPE:
             self.advance()
             let ty = self.parse_type_expr()
             if ty == 0: return 0

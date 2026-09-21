@@ -283,6 +283,8 @@ impl Sema:
             if kind == NodeKind.NK_LET_DECL:
                 self.collect_let_decl(decl, is_local)
 
+        // D51 stage 2: facade facts, once every signature they reference exists.
+        self.collect_c_facades()
         self.check_trait_default_method_bodies()
 
     mut fn collect_enum_constructor_imports():

@@ -399,6 +399,47 @@ type ContextualJoinDecision {
 
 impl Copy for ContextualJoinDecision
 
+// D51 §16.2b stage 2: a facade's facts, each with the node that stated it.
+// Parameter positions are zero-based indices into the fn's signature; -1 is
+// "none". Consumed by stage 3 (raw classification) and later stages.
+type FacadeResource {
+    name: i32,
+    facade: i32,
+    node: i32,
+    repr_tid: i32,
+    producer: i32,
+    out_param: i32,
+    init: i32,
+    preinit: i32,
+    drop: i32,
+    destroyers: Vec[i32],
+    ok_const: i32,
+    borrows: Vec[i32],
+    independent: i32,
+    thread_caps: i32,     // bit0 creator, bit1 send, bit2 share, bit3 drop_any_thread
+}
+
+type ForeignContract {
+    fn_sym: i32,
+    facade: i32,
+    node: i32,
+    lend: i32,
+    destroys: i32,
+    consumes: Vec[i32],
+    consumes_destroyed_by: Vec[i32],   // parallel to consumes; -1 = none
+    retains: Vec[i32],
+    retains_by: Vec[i32],
+    returns_borrow_resource: i32,
+    returns_borrow_from: i32,
+    returns_static_tid: i32,
+    preserves_params: Vec[i32],
+    preserves_domains: Vec[i32],
+    of_resource: i32,
+    rename: i32,
+    callback_thread_any: i32,
+    callback_consumes: Vec[i32],
+}
+
 type Sema {
     pool: InternPool,
     diags: DiagnosticList,
@@ -993,6 +1034,13 @@ type Sema {
     // Typed dump sidecar maps (keyed by span start byte offset)
     typed_expr_types: HashMap[i32, i32],
     typed_binding_types: HashMap[i32, i32],
+    // D51 stage 2: facade facts (SemaFacade.w).
+    facade_resource_index: HashMap[i32, i32],   // resource sym -> facade_resources index
+    facade_resources: Vec[FacadeResource],
+    foreign_contract_index: HashMap[i32, i32],  // fn sym -> foreign_contracts index
+    foreign_contracts: Vec[ForeignContract],
+    facade_domains: HashMap[i32, i32],          // domain sym -> kind sym
+    facade_convention_nodes: Vec[i32],
     // D22 §13.6: field-access exprs whose base is a shared view and whose
     // field type is non-Copy — an owned demand on one is an error.
     view_projection_exprs: HashMap[i32, i32],
@@ -2264,6 +2312,12 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         contextual_join_decisions: Vec.new(),
         contextual_join_arm_nodes: Vec.new(),
         contextual_join_arm_origin_nodes: Vec.new(),
+        facade_resource_index: sema_new_map_i32_i32(),
+        facade_resources: Vec.new(),
+        foreign_contract_index: sema_new_map_i32_i32(),
+        foreign_contracts: Vec.new(),
+        facade_domains: sema_new_map_i32_i32(),
+        facade_convention_nodes: Vec.new(),
         contextual_join_arm_types: Vec.new(),
         contextual_join_arm_kinds: Vec.new(),
         contextual_join_arm_roles: Vec.new(),

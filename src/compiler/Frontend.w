@@ -6,6 +6,7 @@ use Sema
 use SemaDecl
 use SemaCheck
 use SemaDiag
+use SemaFacade
 use ComptimeTransform
 use Resolve
 use Span
