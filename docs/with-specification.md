@@ -3590,6 +3590,10 @@ value may still mutate through `mut self` methods, field assignment,
 or `IndexPlace` writes if the type supports them. A `global var` may
 additionally be reassigned to a new value of the same type.
 
+A global always holds a value: it is observed, mutated in place, or
+reassigned, never moved out of; an owned copy is spelled `.clone()`. A
+`const` is a value, not a place — each use materializes it.
+
 **Initialization.** Global initializers are ordinary expressions.
 They run before `main`, on the initial thread, in declaration order
 within a module. Because concurrency in With can only be created by
