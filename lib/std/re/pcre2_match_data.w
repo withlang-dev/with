@@ -47,13 +47,13 @@ pub unsafe fn pcre2_match_data_create_8(__param_oveccount: c_uint, __param_gcont
         return ((null as *mut pcre2_real_match_data_8))
     }
 
-    ((unsafe *__local_yield_).oveccount = ((__local_oveccount as c_ushort)))
+    ((*__local_yield_).oveccount = ((__local_oveccount as c_ushort)))
 
-    ((unsafe *__local_yield_).flags = ((0 as u8)))
+    ((*__local_yield_).flags = ((0 as u8)))
 
-    ((unsafe *__local_yield_).heapframes = ((null as *mut heapframe)))
+    ((*__local_yield_).heapframes = ((null as *mut heapframe)))
 
-    ((unsafe *__local_yield_).heapframes_size = ((0 as c_ulong)))
+    ((*__local_yield_).heapframes_size = ((0 as c_ulong)))
 
     return __local_yield_
 
@@ -69,52 +69,52 @@ pub unsafe fn pcre2_match_data_create_from_pattern_8(__param_code: *const pcre2_
         (__local_gcontext = ((__param_code as *mut pcre2_real_general_context_8)))
     }
 
-    return ((pcre2_match_data_create_8(((((unsafe *__param_code).top_bracket as c_int) + 1) as c_uint), __local_gcontext) as *mut pcre2_real_match_data_8))
+    return ((pcre2_match_data_create_8(((((*__param_code).top_bracket as c_int) + 1) as c_uint), __local_gcontext) as *mut pcre2_real_match_data_8))
 
 }
 
 pub unsafe fn pcre2_match_data_free_8(__param_match_data: *mut pcre2_real_match_data_8) -> Unit {
     if ((if __param_match_data != null: 1 else: 0) != 0) {
-        if ((if (unsafe *__param_match_data).heapframes != null: 1 else: 0) != 0) {
-            (unsafe *(&raw const (unsafe *__param_match_data).memctl as *const pcre2_memctl)).free(((unsafe *__param_match_data).heapframes as *mut c_void), (unsafe *(&raw const (unsafe *__param_match_data).memctl as *const pcre2_memctl)).memory_data)
+        if ((if (*__param_match_data).heapframes != null: 1 else: 0) != 0) {
+            (*(&raw const (*__param_match_data).memctl as *const pcre2_memctl)).free(((*__param_match_data).heapframes as *mut c_void), (*(&raw const (*__param_match_data).memctl as *const pcre2_memctl)).memory_data)
         }
 
-        if ((if ((((unsafe *__param_match_data).flags as c_int) as c_uint) & (1 as c_uint)) != 0: 1 else: 0) != 0) {
-            (unsafe *(&raw const (unsafe *__param_match_data).memctl as *const pcre2_memctl)).free(((unsafe *__param_match_data).subject as *mut c_void), (unsafe *(&raw const (unsafe *__param_match_data).memctl as *const pcre2_memctl)).memory_data)
+        if ((if ((((*__param_match_data).flags as c_int) as c_uint) & (1 as c_uint)) != 0: 1 else: 0) != 0) {
+            (*(&raw const (*__param_match_data).memctl as *const pcre2_memctl)).free(((*__param_match_data).subject as *mut c_void), (*(&raw const (*__param_match_data).memctl as *const pcre2_memctl)).memory_data)
         }
 
-        (unsafe *(&raw const (unsafe *__param_match_data).memctl as *const pcre2_memctl)).free((__param_match_data as *mut c_void), (unsafe *(&raw const (unsafe *__param_match_data).memctl as *const pcre2_memctl)).memory_data)
+        (*(&raw const (*__param_match_data).memctl as *const pcre2_memctl)).free((__param_match_data as *mut c_void), (*(&raw const (*__param_match_data).memctl as *const pcre2_memctl)).memory_data)
 
     }
 
 }
 
 pub unsafe fn pcre2_get_mark_8(__param_match_data: *mut pcre2_real_match_data_8) -> *const u8 {
-    return (unsafe *__param_match_data).mark
+    return (*__param_match_data).mark
 
 }
 
 pub unsafe fn pcre2_get_match_data_size_8(__param_match_data: *mut pcre2_real_match_data_8) -> c_ulong {
-    return ((120 as c_ulong) +% ((((2 * ((unsafe *__param_match_data).oveccount as c_int)) as c_ulong) *% (sizeof[usize]() as c_ulong)) as c_ulong))
+    return ((120 as c_ulong) +% ((((2 * ((*__param_match_data).oveccount as c_int)) as c_ulong) *% (sizeof[usize]() as c_ulong)) as c_ulong))
 
 }
 
 pub unsafe fn pcre2_get_match_data_heapframes_size_8(__param_match_data: *mut pcre2_real_match_data_8) -> c_ulong {
-    return (unsafe *__param_match_data).heapframes_size
+    return (*__param_match_data).heapframes_size
 
 }
 
 pub unsafe fn pcre2_get_ovector_count_8(__param_match_data: *mut pcre2_real_match_data_8) -> c_uint {
-    return (((unsafe *__param_match_data).oveccount as c_uint))
+    return (((*__param_match_data).oveccount as c_uint))
 
 }
 
 pub unsafe fn pcre2_get_ovector_pointer_8(__param_match_data: *mut pcre2_real_match_data_8) -> *mut c_ulong {
-    return (&(unsafe *__param_match_data).ovector[0] as *mut c_ulong)
+    return (&(*__param_match_data).ovector[0] as *mut c_ulong)
 
 }
 
 pub unsafe fn pcre2_get_startchar_8(__param_match_data: *mut pcre2_real_match_data_8) -> c_ulong {
-    return (unsafe *__param_match_data).startchar
+    return (*__param_match_data).startchar
 
 }

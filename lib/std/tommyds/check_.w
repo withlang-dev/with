@@ -89,11 +89,11 @@ pub unsafe fn compare(__param_void_a: *const c_void, __param_void_b: *const c_vo
 
     (compare_counter = (compare_counter +% 1))
 
-    if ((if (unsafe *__local_a).value < (unsafe *__local_b).value: 1 else: 0) != 0) {
+    if ((if (*__local_a).value < (*__local_b).value: 1 else: 0) != 0) {
         return -1
     }
 
-    if ((if (unsafe *__local_a).value > (unsafe *__local_b).value: 1 else: 0) != 0) {
+    if ((if (*__local_a).value > (*__local_b).value: 1 else: 0) != 0) {
         return 1
     }
 
@@ -108,11 +108,11 @@ pub unsafe fn compare_vector(__param_void_a: *const c_void, __param_void_b: *con
 
     (compare_counter = (compare_counter +% 1))
 
-    if ((if (unsafe *__local_a).value < (unsafe *__local_b).value: 1 else: 0) != 0) {
+    if ((if (*__local_a).value < (*__local_b).value: 1 else: 0) != 0) {
         return -1
     }
 
-    if ((if (unsafe *__local_a).value > (unsafe *__local_b).value: 1 else: 0) != 0) {
+    if ((if (*__local_a).value > (*__local_b).value: 1 else: 0) != 0) {
         return 1
     }
 
@@ -264,7 +264,7 @@ unsafe fn count_arg_callback(__param_arg: *mut c_void, __param_data: *mut c_void
 
     __param_data
 
-    ((unsafe *__local_count) = ((unsafe *__local_count) +% 1))
+    ((*__local_count) = ((*__local_count) +% 1))
 
 }
 
@@ -509,18 +509,18 @@ pub unsafe fn test_list_order(__param_list: *mut tommy_node_struct) -> Unit {
     (__local_node = __param_list)
 
     while (__local_node != null) {
-        if ((unsafe *__local_node).next != null) {
-            var __local_a: *const object = (((unsafe *__local_node).data as *const object))
+        if ((*__local_node).next != null) {
+            var __local_a: *const object = (((*__local_node).data as *const object))
 
-            var __local_b: *const object = (((unsafe *(unsafe *__local_node).next).data as *const object))
+            var __local_b: *const object = (((*(*__local_node).next).data as *const object))
 
-            if ((if (unsafe *__local_a).value > (unsafe *__local_b).value: 1 else: 0) != 0) {
+            if ((if (*__local_a).value > (*__local_b).value: 1 else: 0) != 0) {
                 abort()
             }
 
             var __ci_expr_logic_0: c_int = 0
 
-            if ((if (unsafe *__local_a).value == (unsafe *__local_b).value: 1 else: 0) != 0) {
+            if ((if (*__local_a).value == (*__local_b).value: 1 else: 0) != 0) {
                 (__ci_expr_logic_0 = (if (if __local_a > __local_b: 1 else: 0) != 0: 1 else: 0))
             }
 
@@ -531,7 +531,7 @@ pub unsafe fn test_list_order(__param_list: *mut tommy_node_struct) -> Unit {
 
         }
 
-        (__local_node = (unsafe *__local_node).next)
+        (__local_node = (*__local_node).next)
 
     }
 

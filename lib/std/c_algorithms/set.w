@@ -41,11 +41,11 @@ pub unsafe fn set_free(__param_set: *mut _Set) -> Unit {
 
     (__local_i = ((0 as c_uint)))
 
-    while ((if __local_i < (unsafe *__param_set).table_size: 1 else: 0) != 0) {
-        (__local_rover = (unsafe (unsafe *__param_set).table[__local_i]))
+    while ((if __local_i < (*__param_set).table_size: 1 else: 0) != 0) {
+        (__local_rover = ((*__param_set).table[__local_i]))
 
         while ((if __local_rover != null: 1 else: 0) != 0) {
-            (__local_next = (unsafe *__local_rover).next)
+            (__local_next = (*__local_rover).next)
 
             set_free_entry(__param_set, __local_rover)
 
@@ -59,14 +59,14 @@ pub unsafe fn set_free(__param_set: *mut _Set) -> Unit {
     }
 
 
-    with_free((((unsafe *__param_set).table as *mut c_void) as *mut u8))
+    with_free((((*__param_set).table as *mut c_void) as *mut u8))
 
     with_free(((__param_set as *mut c_void) as *mut u8))
 
 }
 
 pub unsafe fn set_register_free_function(__param_set: *mut _Set, __param_free_func: unsafe extern "C" fn(*mut c_void) -> Unit) -> Unit {
-    ((unsafe *__param_set).free_func = __param_free_func)
+    ((*__param_set).free_func = __param_free_func)
 
 }
 
@@ -77,7 +77,7 @@ pub unsafe fn set_insert(__param_set: *mut _Set, __param_data: *mut c_void) -> c
 
     var __local_index: c_uint
 
-    if ((if (((((unsafe *__param_set).entries as c_uint) *% (3 as c_uint)) as c_uint) / ((unsafe *__param_set).table_size as c_uint)) > 0: 1 else: 0) != 0) {
+    if ((if (((((*__param_set).entries as c_uint) *% (3 as c_uint)) as c_uint) / ((*__param_set).table_size as c_uint)) > 0: 1 else: 0) != 0) {
         if ((if not (set_enlarge(__param_set) != 0): 1 else: 0) != 0) {
             return 0
 
@@ -85,17 +85,17 @@ pub unsafe fn set_insert(__param_set: *mut _Set, __param_data: *mut c_void) -> c
 
     }
 
-    (__local_index = (((((unsafe *__param_set).hash_func(__param_data) as c_uint) % ((unsafe *__param_set).table_size as c_uint)) as c_uint)))
+    (__local_index = (((((*__param_set).hash_func(__param_data) as c_uint) % ((*__param_set).table_size as c_uint)) as c_uint)))
 
-    (__local_rover = (unsafe (unsafe *__param_set).table[__local_index]))
+    (__local_rover = ((*__param_set).table[__local_index]))
 
     while ((if __local_rover != null: 1 else: 0) != 0) {
-        if ((if (unsafe *__param_set).equal_func(__param_data, (unsafe *__local_rover).data) != 0: 1 else: 0) != 0) {
+        if ((if (*__param_set).equal_func(__param_data, (*__local_rover).data) != 0: 1 else: 0) != 0) {
             return 0
 
         }
 
-        (__local_rover = (unsafe *__local_rover).next)
+        (__local_rover = (*__local_rover).next)
 
     }
 
@@ -106,13 +106,13 @@ pub unsafe fn set_insert(__param_set: *mut _Set, __param_data: *mut c_void) -> c
 
     }
 
-    ((unsafe *__local_newentry).data = __param_data)
+    ((*__local_newentry).data = __param_data)
 
-    ((unsafe *__local_newentry).next = (unsafe (unsafe *__param_set).table[__local_index]))
+    ((*__local_newentry).next = ((*__param_set).table[__local_index]))
 
-    ((unsafe (unsafe *__param_set).table[__local_index]) = __local_newentry)
+    (((*__param_set).table[__local_index]) = __local_newentry)
 
-    ((unsafe *__param_set).entries = ((unsafe *__param_set).entries +% 1))
+    ((*__param_set).entries = ((*__param_set).entries +% 1))
 
     return 1
 
@@ -125,17 +125,17 @@ pub unsafe fn set_remove(__param_set: *mut _Set, __param_data: *mut c_void) -> c
 
     var __local_index: c_uint
 
-    (__local_index = (((((unsafe *__param_set).hash_func(__param_data) as c_uint) % ((unsafe *__param_set).table_size as c_uint)) as c_uint)))
+    (__local_index = (((((*__param_set).hash_func(__param_data) as c_uint) % ((*__param_set).table_size as c_uint)) as c_uint)))
 
-    (__local_rover = (((&raw const (unsafe (unsafe *__param_set).table[__local_index]) as *const *mut _SetEntry) as *mut *mut _SetEntry)))
+    (__local_rover = (((&raw const ((*__param_set).table[__local_index]) as *const *mut _SetEntry) as *mut *mut _SetEntry)))
 
-    while ((if (unsafe *__local_rover) != null: 1 else: 0) != 0) {
-        if ((if (unsafe *__param_set).equal_func(__param_data, (unsafe *(unsafe *__local_rover)).data) != 0: 1 else: 0) != 0) {
-            (__local_entry = (unsafe *__local_rover))
+    while ((if (*__local_rover) != null: 1 else: 0) != 0) {
+        if ((if (*__param_set).equal_func(__param_data, (*(*__local_rover)).data) != 0: 1 else: 0) != 0) {
+            (__local_entry = (*__local_rover))
 
-            ((unsafe *__local_rover) = (unsafe *__local_entry).next)
+            ((*__local_rover) = (*__local_entry).next)
 
-            ((unsafe *__param_set).entries = ((unsafe *__param_set).entries -% 1))
+            ((*__param_set).entries = ((*__param_set).entries -% 1))
 
             set_free_entry(__param_set, __local_entry)
 
@@ -143,7 +143,7 @@ pub unsafe fn set_remove(__param_set: *mut _Set, __param_data: *mut c_void) -> c
 
         }
 
-        (__local_rover = (((&raw const (unsafe *(unsafe *__local_rover)).next as *const *mut _SetEntry) as *mut *mut _SetEntry)))
+        (__local_rover = (((&raw const (*(*__local_rover)).next as *const *mut _SetEntry) as *mut *mut _SetEntry)))
 
     }
 
@@ -156,17 +156,17 @@ pub unsafe fn set_query(__param_set: *mut _Set, __param_data: *mut c_void) -> c_
 
     var __local_index: c_uint
 
-    (__local_index = (((((unsafe *__param_set).hash_func(__param_data) as c_uint) % ((unsafe *__param_set).table_size as c_uint)) as c_uint)))
+    (__local_index = (((((*__param_set).hash_func(__param_data) as c_uint) % ((*__param_set).table_size as c_uint)) as c_uint)))
 
-    (__local_rover = (unsafe (unsafe *__param_set).table[__local_index]))
+    (__local_rover = ((*__param_set).table[__local_index]))
 
     while ((if __local_rover != null: 1 else: 0) != 0) {
-        if ((if (unsafe *__param_set).equal_func(__param_data, (unsafe *__local_rover).data) != 0: 1 else: 0) != 0) {
+        if ((if (*__param_set).equal_func(__param_data, (*__local_rover).data) != 0: 1 else: 0) != 0) {
             return 1
 
         }
 
-        (__local_rover = (unsafe *__local_rover).next)
+        (__local_rover = (*__local_rover).next)
 
     }
 
@@ -175,7 +175,7 @@ pub unsafe fn set_query(__param_set: *mut _Set, __param_data: *mut c_void) -> c_
 }
 
 pub unsafe fn set_num_entries(__param_set: *mut _Set) -> c_uint {
-    return (unsafe *__param_set).entries
+    return (*__param_set).entries
 
 }
 
@@ -188,7 +188,7 @@ pub unsafe fn set_to_array(__param_set: *mut _Set) -> *mut *mut c_void {
 
     var __local_rover: *mut _SetEntry
 
-    (__local_array = (((with_alloc(((((sizeof[usize]() as c_ulong) *% ((unsafe *__param_set).entries as c_ulong)) as c_ulong) as i64)) as *mut c_void) as *mut *mut c_void)))
+    (__local_array = (((with_alloc(((((sizeof[usize]() as c_ulong) *% ((*__param_set).entries as c_ulong)) as c_ulong) as i64)) as *mut c_void) as *mut *mut c_void)))
 
     if ((if __local_array == null: 1 else: 0) != 0) {
         return ((null as *mut *mut c_void))
@@ -199,15 +199,15 @@ pub unsafe fn set_to_array(__param_set: *mut _Set) -> *mut *mut c_void {
 
     (__local_i = ((0 as c_uint)))
 
-    while ((if __local_i < (unsafe *__param_set).table_size: 1 else: 0) != 0) {
-        (__local_rover = (unsafe (unsafe *__param_set).table[__local_i]))
+    while ((if __local_i < (*__param_set).table_size: 1 else: 0) != 0) {
+        (__local_rover = ((*__param_set).table[__local_i]))
 
         while ((if __local_rover != null: 1 else: 0) != 0) {
-            ((unsafe __local_array[__local_array_counter]) = (unsafe *__local_rover).data)
+            ((__local_array[__local_array_counter]) = (*__local_rover).data)
 
             (__local_array_counter = __local_array_counter + 1)
 
-            (__local_rover = (unsafe *__local_rover).next)
+            (__local_rover = (*__local_rover).next)
 
         }
 
@@ -228,7 +228,7 @@ pub unsafe fn set_union(__param_set1: *mut _Set, __param_set2: *mut _Set) -> *mu
 
     var __local_value: *mut c_void
 
-    (__local_new_set = set_new((unsafe *__param_set1).hash_func, (unsafe *__param_set1).equal_func))
+    (__local_new_set = set_new((*__param_set1).hash_func, (*__param_set1).equal_func))
 
     if ((if __local_new_set == null: 1 else: 0) != 0) {
         return ((null as *mut _Set))
@@ -277,7 +277,7 @@ pub unsafe fn set_intersection(__param_set1: *mut _Set, __param_set2: *mut _Set)
 
     var __local_value: *mut c_void
 
-    (__local_new_set = set_new((unsafe *__param_set1).hash_func, (unsafe *__param_set2).equal_func))
+    (__local_new_set = set_new((*__param_set1).hash_func, (*__param_set2).equal_func))
 
     if ((if __local_new_set == null: 1 else: 0) != 0) {
         return ((null as *mut _Set))
@@ -308,15 +308,15 @@ pub unsafe fn set_intersection(__param_set1: *mut _Set, __param_set2: *mut _Set)
 pub unsafe fn set_iterate(__param_set: *mut _Set, __param_iter: *mut _SetIterator) -> Unit {
     var __local_chain: c_uint
 
-    ((unsafe *__param_iter).set = __param_set)
+    ((*__param_iter).set = __param_set)
 
-    ((unsafe *__param_iter).next_entry = ((null as *mut _SetEntry)))
+    ((*__param_iter).next_entry = ((null as *mut _SetEntry)))
 
     (__local_chain = ((0 as c_uint)))
 
-    while ((if __local_chain < (unsafe *__param_set).table_size: 1 else: 0) != 0) {
-        if ((if (unsafe (unsafe *__param_set).table[__local_chain]) != null: 1 else: 0) != 0) {
-            ((unsafe *__param_iter).next_entry = (unsafe (unsafe *__param_set).table[__local_chain]))
+    while ((if __local_chain < (*__param_set).table_size: 1 else: 0) != 0) {
+        if ((if ((*__param_set).table[__local_chain]) != null: 1 else: 0) != 0) {
+            ((*__param_iter).next_entry = ((*__param_set).table[__local_chain]))
 
             break
 
@@ -328,12 +328,12 @@ pub unsafe fn set_iterate(__param_set: *mut _Set, __param_iter: *mut _SetIterato
     }
 
 
-    ((unsafe *__param_iter).next_chain = __local_chain)
+    ((*__param_iter).next_chain = __local_chain)
 
 }
 
 pub unsafe fn set_iter_has_more(__param_iterator: *mut _SetIterator) -> c_int {
-    return (if (unsafe *__param_iterator).next_entry != null: 1 else: 0)
+    return (if (*__param_iterator).next_entry != null: 1 else: 0)
 
 }
 
@@ -346,28 +346,28 @@ pub unsafe fn set_iter_next(__param_iterator: *mut _SetIterator) -> *mut c_void 
 
     var __local_chain: c_uint
 
-    (__local_set = (unsafe *__param_iterator).set)
+    (__local_set = (*__param_iterator).set)
 
-    if ((if (unsafe *__param_iterator).next_entry == null: 1 else: 0) != 0) {
+    if ((if (*__param_iterator).next_entry == null: 1 else: 0) != 0) {
         return set_null_value
 
     }
 
-    (__local_current_entry = (unsafe *__param_iterator).next_entry)
+    (__local_current_entry = (*__param_iterator).next_entry)
 
-    (__local_result = (unsafe *__local_current_entry).data)
+    (__local_result = (*__local_current_entry).data)
 
-    if ((if (unsafe *__local_current_entry).next != null: 1 else: 0) != 0) {
-        ((unsafe *__param_iterator).next_entry = (unsafe *__local_current_entry).next)
+    if ((if (*__local_current_entry).next != null: 1 else: 0) != 0) {
+        ((*__param_iterator).next_entry = (*__local_current_entry).next)
 
     } else {
-        ((unsafe *__param_iterator).next_entry = ((null as *mut _SetEntry)))
+        ((*__param_iterator).next_entry = ((null as *mut _SetEntry)))
 
-        (__local_chain = (((((unsafe *__param_iterator).next_chain as c_uint) +% (1 as c_uint)) as c_uint)))
+        (__local_chain = (((((*__param_iterator).next_chain as c_uint) +% (1 as c_uint)) as c_uint)))
 
-        while ((if __local_chain < (unsafe *__local_set).table_size: 1 else: 0) != 0) {
-            if ((if (unsafe (unsafe *__local_set).table[__local_chain]) != null: 1 else: 0) != 0) {
-                ((unsafe *__param_iterator).next_entry = (unsafe (unsafe *__local_set).table[__local_chain]))
+        while ((if __local_chain < (*__local_set).table_size: 1 else: 0) != 0) {
+            if ((if ((*__local_set).table[__local_chain]) != null: 1 else: 0) != 0) {
+                ((*__param_iterator).next_entry = ((*__local_set).table[__local_chain]))
 
                 break
 
@@ -377,7 +377,7 @@ pub unsafe fn set_iter_next(__param_iterator: *mut _SetIterator) -> *mut c_void 
 
         }
 
-        ((unsafe *__param_iterator).next_chain = __local_chain)
+        ((*__param_iterator).next_chain = __local_chain)
 
     }
 
@@ -386,23 +386,23 @@ pub unsafe fn set_iter_next(__param_iterator: *mut _SetIterator) -> *mut c_void 
 }
 
 unsafe fn set_allocate_table(__param_set: *mut _Set) -> c_int {
-    if ((if (unsafe *__param_set).prime_index < 24: 1 else: 0) != 0) {
-        ((unsafe *__param_set).table_size = ((set_primes[(unsafe *__param_set).prime_index] as c_uint)))
+    if ((if (*__param_set).prime_index < 24: 1 else: 0) != 0) {
+        ((*__param_set).table_size = ((set_primes[(*__param_set).prime_index] as c_uint)))
 
     } else {
-        ((unsafe *__param_set).table_size = (((((unsafe *__param_set).entries as c_uint) *% (10 as c_uint)) as c_uint)))
+        ((*__param_set).table_size = (((((*__param_set).entries as c_uint) *% (10 as c_uint)) as c_uint)))
 
     }
 
-    ((unsafe *__param_set).table = (((with_alloc_zeroed((((unsafe *__param_set).table_size as c_ulong) as i64), ((sizeof[usize]() as c_ulong) as i64)) as *mut c_void) as *mut *mut _SetEntry)))
+    ((*__param_set).table = (((with_alloc_zeroed((((*__param_set).table_size as c_ulong) as i64), ((sizeof[usize]() as c_ulong) as i64)) as *mut c_void) as *mut *mut _SetEntry)))
 
-    return (if (unsafe *__param_set).table != null: 1 else: 0)
+    return (if (*__param_set).table != null: 1 else: 0)
 
 }
 
 unsafe fn set_free_entry(__param_set: *mut _Set, __param_entry: *mut _SetEntry) -> Unit {
-    if ((if (unsafe *__param_set).free_func != null: 1 else: 0) != 0) {
-        (unsafe *__param_set).free_func((unsafe *__param_entry).data)
+    if ((if (*__param_set).free_func != null: 1 else: 0) != 0) {
+        (*__param_set).free_func((*__param_entry).data)
 
     }
 
@@ -425,20 +425,20 @@ unsafe fn set_enlarge(__param_set: *mut _Set) -> c_int {
 
     var __local_i: c_uint
 
-    (__local_old_table = (unsafe *__param_set).table)
+    (__local_old_table = (*__param_set).table)
 
-    (__local_old_table_size = (unsafe *__param_set).table_size)
+    (__local_old_table_size = (*__param_set).table_size)
 
-    (__local_old_prime_index = (unsafe *__param_set).prime_index)
+    (__local_old_prime_index = (*__param_set).prime_index)
 
-    ((unsafe *__param_set).prime_index = ((unsafe *__param_set).prime_index +% 1))
+    ((*__param_set).prime_index = ((*__param_set).prime_index +% 1))
 
     if ((if not (set_allocate_table(__param_set) != 0): 1 else: 0) != 0) {
-        ((unsafe *__param_set).table = __local_old_table)
+        ((*__param_set).table = __local_old_table)
 
-        ((unsafe *__param_set).table_size = __local_old_table_size)
+        ((*__param_set).table_size = __local_old_table_size)
 
-        ((unsafe *__param_set).prime_index = __local_old_prime_index)
+        ((*__param_set).prime_index = __local_old_prime_index)
 
         return 0
 
@@ -447,16 +447,16 @@ unsafe fn set_enlarge(__param_set: *mut _Set) -> c_int {
     (__local_i = ((0 as c_uint)))
 
     while ((if __local_i < __local_old_table_size: 1 else: 0) != 0) {
-        (__local_rover = (unsafe __local_old_table[__local_i]))
+        (__local_rover = (__local_old_table[__local_i]))
 
         while ((if __local_rover != null: 1 else: 0) != 0) {
-            (__local_next = (unsafe *__local_rover).next)
+            (__local_next = (*__local_rover).next)
 
-            (__local_index = (((((unsafe *__param_set).hash_func((unsafe *__local_rover).data) as c_uint) % ((unsafe *__param_set).table_size as c_uint)) as c_uint)))
+            (__local_index = (((((*__param_set).hash_func((*__local_rover).data) as c_uint) % ((*__param_set).table_size as c_uint)) as c_uint)))
 
-            ((unsafe *__local_rover).next = (unsafe (unsafe *__param_set).table[__local_index]))
+            ((*__local_rover).next = ((*__param_set).table[__local_index]))
 
-            ((unsafe (unsafe *__param_set).table[__local_index]) = __local_rover)
+            (((*__param_set).table[__local_index]) = __local_rover)
 
             (__local_rover = __local_next)
 

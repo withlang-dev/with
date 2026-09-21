@@ -43,11 +43,11 @@ pub unsafe fn hash_table_free(__param_hash_table: *mut _HashTable) -> Unit {
 
     (__local_i = ((0 as c_uint)))
 
-    while ((if __local_i < (unsafe *__param_hash_table).table_size: 1 else: 0) != 0) {
-        (__local_rover = (unsafe (unsafe *__param_hash_table).table[__local_i]))
+    while ((if __local_i < (*__param_hash_table).table_size: 1 else: 0) != 0) {
+        (__local_rover = ((*__param_hash_table).table[__local_i]))
 
         while ((if __local_rover != null: 1 else: 0) != 0) {
-            (__local_next = (unsafe *__local_rover).next)
+            (__local_next = (*__local_rover).next)
 
             hash_table_free_entry(__param_hash_table, __local_rover)
 
@@ -61,16 +61,16 @@ pub unsafe fn hash_table_free(__param_hash_table: *mut _HashTable) -> Unit {
     }
 
 
-    with_free((((unsafe *__param_hash_table).table as *mut c_void) as *mut u8))
+    with_free((((*__param_hash_table).table as *mut c_void) as *mut u8))
 
     with_free(((__param_hash_table as *mut c_void) as *mut u8))
 
 }
 
 pub unsafe fn hash_table_register_free_functions(__param_hash_table: *mut _HashTable, __param_key_free_func: unsafe extern "C" fn(*mut c_void) -> Unit, __param_value_free_func: unsafe extern "C" fn(*mut c_void) -> Unit) -> Unit {
-    ((unsafe *__param_hash_table).key_free_func = __param_key_free_func)
+    ((*__param_hash_table).key_free_func = __param_key_free_func)
 
-    ((unsafe *__param_hash_table).value_free_func = __param_value_free_func)
+    ((*__param_hash_table).value_free_func = __param_value_free_func)
 
 }
 
@@ -83,7 +83,7 @@ pub unsafe fn hash_table_insert(__param_hash_table: *mut _HashTable, __param_key
 
     var __local_index: c_uint
 
-    if ((if (((((unsafe *__param_hash_table).entries as c_uint) *% (3 as c_uint)) as c_uint) / ((unsafe *__param_hash_table).table_size as c_uint)) > 0: 1 else: 0) != 0) {
+    if ((if (((((*__param_hash_table).entries as c_uint) *% (3 as c_uint)) as c_uint) / ((*__param_hash_table).table_size as c_uint)) > 0: 1 else: 0) != 0) {
         if ((if not (hash_table_enlarge(__param_hash_table) != 0): 1 else: 0) != 0) {
             return 0
 
@@ -91,33 +91,33 @@ pub unsafe fn hash_table_insert(__param_hash_table: *mut _HashTable, __param_key
 
     }
 
-    (__local_index = (((((unsafe *__param_hash_table).hash_func(__param_key) as c_uint) % ((unsafe *__param_hash_table).table_size as c_uint)) as c_uint)))
+    (__local_index = (((((*__param_hash_table).hash_func(__param_key) as c_uint) % ((*__param_hash_table).table_size as c_uint)) as c_uint)))
 
-    (__local_rover = (unsafe (unsafe *__param_hash_table).table[__local_index]))
+    (__local_rover = ((*__param_hash_table).table[__local_index]))
 
     while ((if __local_rover != null: 1 else: 0) != 0) {
-        (__local_pair = (((&raw const (unsafe *__local_rover).pair as *const _HashTablePair) as *mut _HashTablePair)))
+        (__local_pair = (((&raw const (*__local_rover).pair as *const _HashTablePair) as *mut _HashTablePair)))
 
-        if ((if (unsafe *__param_hash_table).equal_func((unsafe *__local_pair).key, __param_key) != 0: 1 else: 0) != 0) {
-            if ((if (unsafe *__param_hash_table).value_free_func != null: 1 else: 0) != 0) {
-                (unsafe *__param_hash_table).value_free_func((unsafe *__local_pair).value)
-
-            }
-
-            if ((if (unsafe *__param_hash_table).key_free_func != null: 1 else: 0) != 0) {
-                (unsafe *__param_hash_table).key_free_func((unsafe *__local_pair).key)
+        if ((if (*__param_hash_table).equal_func((*__local_pair).key, __param_key) != 0: 1 else: 0) != 0) {
+            if ((if (*__param_hash_table).value_free_func != null: 1 else: 0) != 0) {
+                (*__param_hash_table).value_free_func((*__local_pair).value)
 
             }
 
-            ((unsafe *__local_pair).key = __param_key)
+            if ((if (*__param_hash_table).key_free_func != null: 1 else: 0) != 0) {
+                (*__param_hash_table).key_free_func((*__local_pair).key)
 
-            ((unsafe *__local_pair).value = __param_value)
+            }
+
+            ((*__local_pair).key = __param_key)
+
+            ((*__local_pair).value = __param_value)
 
             return 1
 
         }
 
-        (__local_rover = (unsafe *__local_rover).next)
+        (__local_rover = (*__local_rover).next)
 
     }
 
@@ -128,15 +128,15 @@ pub unsafe fn hash_table_insert(__param_hash_table: *mut _HashTable, __param_key
 
     }
 
-    ((unsafe *__local_newentry).pair.key = __param_key)
+    ((*__local_newentry).pair.key = __param_key)
 
-    ((unsafe *__local_newentry).pair.value = __param_value)
+    ((*__local_newentry).pair.value = __param_value)
 
-    ((unsafe *__local_newentry).next = (unsafe (unsafe *__param_hash_table).table[__local_index]))
+    ((*__local_newentry).next = ((*__param_hash_table).table[__local_index]))
 
-    ((unsafe (unsafe *__param_hash_table).table[__local_index]) = __local_newentry)
+    (((*__param_hash_table).table[__local_index]) = __local_newentry)
 
-    ((unsafe *__param_hash_table).entries = ((unsafe *__param_hash_table).entries +% 1))
+    ((*__param_hash_table).entries = ((*__param_hash_table).entries +% 1))
 
     return 1
 
@@ -149,19 +149,19 @@ pub unsafe fn hash_table_lookup(__param_hash_table: *mut _HashTable, __param_key
 
     var __local_index: c_uint
 
-    (__local_index = (((((unsafe *__param_hash_table).hash_func(__param_key) as c_uint) % ((unsafe *__param_hash_table).table_size as c_uint)) as c_uint)))
+    (__local_index = (((((*__param_hash_table).hash_func(__param_key) as c_uint) % ((*__param_hash_table).table_size as c_uint)) as c_uint)))
 
-    (__local_rover = (unsafe (unsafe *__param_hash_table).table[__local_index]))
+    (__local_rover = ((*__param_hash_table).table[__local_index]))
 
     while ((if __local_rover != null: 1 else: 0) != 0) {
-        (__local_pair = (((&raw const (unsafe *__local_rover).pair as *const _HashTablePair) as *mut _HashTablePair)))
+        (__local_pair = (((&raw const (*__local_rover).pair as *const _HashTablePair) as *mut _HashTablePair)))
 
-        if ((if (unsafe *__param_hash_table).equal_func(__param_key, (unsafe *__local_pair).key) != 0: 1 else: 0) != 0) {
-            return (unsafe *__local_pair).value
+        if ((if (*__param_hash_table).equal_func(__param_key, (*__local_pair).key) != 0: 1 else: 0) != 0) {
+            return (*__local_pair).value
 
         }
 
-        (__local_rover = (unsafe *__local_rover).next)
+        (__local_rover = (*__local_rover).next)
 
     }
 
@@ -180,23 +180,23 @@ pub unsafe fn hash_table_remove(__param_hash_table: *mut _HashTable, __param_key
 
     var __local_result: c_int
 
-    (__local_index = (((((unsafe *__param_hash_table).hash_func(__param_key) as c_uint) % ((unsafe *__param_hash_table).table_size as c_uint)) as c_uint)))
+    (__local_index = (((((*__param_hash_table).hash_func(__param_key) as c_uint) % ((*__param_hash_table).table_size as c_uint)) as c_uint)))
 
     (__local_result = ((0 as c_int)))
 
-    (__local_rover = (((&raw const (unsafe (unsafe *__param_hash_table).table[__local_index]) as *const *mut _HashTableEntry) as *mut *mut _HashTableEntry)))
+    (__local_rover = (((&raw const ((*__param_hash_table).table[__local_index]) as *const *mut _HashTableEntry) as *mut *mut _HashTableEntry)))
 
-    while ((if (unsafe *__local_rover) != null: 1 else: 0) != 0) {
-        (__local_pair = (((&raw const (unsafe *(unsafe *__local_rover)).pair as *const _HashTablePair) as *mut _HashTablePair)))
+    while ((if (*__local_rover) != null: 1 else: 0) != 0) {
+        (__local_pair = (((&raw const (*(*__local_rover)).pair as *const _HashTablePair) as *mut _HashTablePair)))
 
-        if ((if (unsafe *__param_hash_table).equal_func(__param_key, (unsafe *__local_pair).key) != 0: 1 else: 0) != 0) {
-            (__local_entry = (unsafe *__local_rover))
+        if ((if (*__param_hash_table).equal_func(__param_key, (*__local_pair).key) != 0: 1 else: 0) != 0) {
+            (__local_entry = (*__local_rover))
 
-            ((unsafe *__local_rover) = (unsafe *__local_entry).next)
+            ((*__local_rover) = (*__local_entry).next)
 
             hash_table_free_entry(__param_hash_table, __local_entry)
 
-            ((unsafe *__param_hash_table).entries = ((unsafe *__param_hash_table).entries -% 1))
+            ((*__param_hash_table).entries = ((*__param_hash_table).entries -% 1))
 
             (__local_result = ((1 as c_int)))
 
@@ -204,7 +204,7 @@ pub unsafe fn hash_table_remove(__param_hash_table: *mut _HashTable, __param_key
 
         }
 
-        (__local_rover = (((&raw const (unsafe *(unsafe *__local_rover)).next as *const *mut _HashTableEntry) as *mut *mut _HashTableEntry)))
+        (__local_rover = (((&raw const (*(*__local_rover)).next as *const *mut _HashTableEntry) as *mut *mut _HashTableEntry)))
 
     }
 
@@ -213,24 +213,24 @@ pub unsafe fn hash_table_remove(__param_hash_table: *mut _HashTable, __param_key
 }
 
 pub unsafe fn hash_table_num_entries(__param_hash_table: *mut _HashTable) -> c_uint {
-    return (unsafe *__param_hash_table).entries
+    return (*__param_hash_table).entries
 
 }
 
 pub unsafe fn hash_table_iterate(__param_hash_table: *mut _HashTable, __param_iterator: *mut _HashTableIterator) -> Unit {
     var __local_chain: c_uint
 
-    ((unsafe *__param_iterator).hash_table = __param_hash_table)
+    ((*__param_iterator).hash_table = __param_hash_table)
 
-    ((unsafe *__param_iterator).next_entry = ((null as *mut _HashTableEntry)))
+    ((*__param_iterator).next_entry = ((null as *mut _HashTableEntry)))
 
     (__local_chain = ((0 as c_uint)))
 
-    while ((if __local_chain < (unsafe *__param_hash_table).table_size: 1 else: 0) != 0) {
-        if ((if (unsafe (unsafe *__param_hash_table).table[__local_chain]) != null: 1 else: 0) != 0) {
-            ((unsafe *__param_iterator).next_entry = (unsafe (unsafe *__param_hash_table).table[__local_chain]))
+    while ((if __local_chain < (*__param_hash_table).table_size: 1 else: 0) != 0) {
+        if ((if ((*__param_hash_table).table[__local_chain]) != null: 1 else: 0) != 0) {
+            ((*__param_iterator).next_entry = ((*__param_hash_table).table[__local_chain]))
 
-            ((unsafe *__param_iterator).next_chain = __local_chain)
+            ((*__param_iterator).next_chain = __local_chain)
 
             break
 
@@ -245,7 +245,7 @@ pub unsafe fn hash_table_iterate(__param_hash_table: *mut _HashTable, __param_it
 }
 
 pub unsafe fn hash_table_iter_has_more(__param_iterator: *mut _HashTableIterator) -> c_int {
-    return (if (unsafe *__param_iterator).next_entry != null: 1 else: 0)
+    return (if (*__param_iterator).next_entry != null: 1 else: 0)
 
 }
 
@@ -258,28 +258,28 @@ pub unsafe fn hash_table_iter_next(__param_iterator: *mut _HashTableIterator) ->
 
     var __local_chain: c_uint
 
-    (__local_hash_table = (unsafe *__param_iterator).hash_table)
+    (__local_hash_table = (*__param_iterator).hash_table)
 
-    if ((if (unsafe *__param_iterator).next_entry == null: 1 else: 0) != 0) {
+    if ((if (*__param_iterator).next_entry == null: 1 else: 0) != 0) {
         return __local_pair
 
     }
 
-    (__local_current_entry = (unsafe *__param_iterator).next_entry)
+    (__local_current_entry = (*__param_iterator).next_entry)
 
-    with_memcpy((&raw mut __local_pair as *mut u8), (&raw const (unsafe *__local_current_entry).pair as *const u8), sizeof[_HashTablePair]())
+    with_memcpy((&raw mut __local_pair as *mut u8), (&raw const (*__local_current_entry).pair as *const u8), sizeof[_HashTablePair]())
 
-    if ((if (unsafe *__local_current_entry).next != null: 1 else: 0) != 0) {
-        ((unsafe *__param_iterator).next_entry = (unsafe *__local_current_entry).next)
+    if ((if (*__local_current_entry).next != null: 1 else: 0) != 0) {
+        ((*__param_iterator).next_entry = (*__local_current_entry).next)
 
     } else {
-        (__local_chain = (((((unsafe *__param_iterator).next_chain as c_uint) +% (1 as c_uint)) as c_uint)))
+        (__local_chain = (((((*__param_iterator).next_chain as c_uint) +% (1 as c_uint)) as c_uint)))
 
-        ((unsafe *__param_iterator).next_entry = ((null as *mut _HashTableEntry)))
+        ((*__param_iterator).next_entry = ((null as *mut _HashTableEntry)))
 
-        while ((if __local_chain < (unsafe *__local_hash_table).table_size: 1 else: 0) != 0) {
-            if ((if (unsafe (unsafe *__local_hash_table).table[__local_chain]) != null: 1 else: 0) != 0) {
-                ((unsafe *__param_iterator).next_entry = (unsafe (unsafe *__local_hash_table).table[__local_chain]))
+        while ((if __local_chain < (*__local_hash_table).table_size: 1 else: 0) != 0) {
+            if ((if ((*__local_hash_table).table[__local_chain]) != null: 1 else: 0) != 0) {
+                ((*__param_iterator).next_entry = ((*__local_hash_table).table[__local_chain]))
 
                 break
 
@@ -289,7 +289,7 @@ pub unsafe fn hash_table_iter_next(__param_iterator: *mut _HashTableIterator) ->
 
         }
 
-        ((unsafe *__param_iterator).next_chain = __local_chain)
+        ((*__param_iterator).next_chain = __local_chain)
 
     }
 
@@ -300,34 +300,34 @@ pub unsafe fn hash_table_iter_next(__param_iterator: *mut _HashTableIterator) ->
 unsafe fn hash_table_allocate_table(__param_hash_table: *mut _HashTable) -> c_int {
     var __local_new_table_size: c_uint
 
-    if ((if (unsafe *__param_hash_table).prime_index < 24: 1 else: 0) != 0) {
-        (__local_new_table_size = ((hash_table_primes[(unsafe *__param_hash_table).prime_index] as c_uint)))
+    if ((if (*__param_hash_table).prime_index < 24: 1 else: 0) != 0) {
+        (__local_new_table_size = ((hash_table_primes[(*__param_hash_table).prime_index] as c_uint)))
 
     } else {
-        (__local_new_table_size = (((((unsafe *__param_hash_table).entries as c_uint) *% (10 as c_uint)) as c_uint)))
+        (__local_new_table_size = (((((*__param_hash_table).entries as c_uint) *% (10 as c_uint)) as c_uint)))
 
     }
 
-    ((unsafe *__param_hash_table).table_size = __local_new_table_size)
+    ((*__param_hash_table).table_size = __local_new_table_size)
 
-    ((unsafe *__param_hash_table).table = (((with_alloc_zeroed((((unsafe *__param_hash_table).table_size as c_ulong) as i64), ((sizeof[usize]() as c_ulong) as i64)) as *mut c_void) as *mut *mut _HashTableEntry)))
+    ((*__param_hash_table).table = (((with_alloc_zeroed((((*__param_hash_table).table_size as c_ulong) as i64), ((sizeof[usize]() as c_ulong) as i64)) as *mut c_void) as *mut *mut _HashTableEntry)))
 
-    return (if (unsafe *__param_hash_table).table != null: 1 else: 0)
+    return (if (*__param_hash_table).table != null: 1 else: 0)
 
 }
 
 unsafe fn hash_table_free_entry(__param_hash_table: *mut _HashTable, __param_entry: *mut _HashTableEntry) -> Unit {
     var __local_pair: *mut _HashTablePair
 
-    (__local_pair = (((&raw const (unsafe *__param_entry).pair as *const _HashTablePair) as *mut _HashTablePair)))
+    (__local_pair = (((&raw const (*__param_entry).pair as *const _HashTablePair) as *mut _HashTablePair)))
 
-    if ((if (unsafe *__param_hash_table).key_free_func != null: 1 else: 0) != 0) {
-        (unsafe *__param_hash_table).key_free_func((unsafe *__local_pair).key)
+    if ((if (*__param_hash_table).key_free_func != null: 1 else: 0) != 0) {
+        (*__param_hash_table).key_free_func((*__local_pair).key)
 
     }
 
-    if ((if (unsafe *__param_hash_table).value_free_func != null: 1 else: 0) != 0) {
-        (unsafe *__param_hash_table).value_free_func((unsafe *__local_pair).value)
+    if ((if (*__param_hash_table).value_free_func != null: 1 else: 0) != 0) {
+        (*__param_hash_table).value_free_func((*__local_pair).value)
 
     }
 
@@ -352,20 +352,20 @@ unsafe fn hash_table_enlarge(__param_hash_table: *mut _HashTable) -> c_int {
 
     var __local_i: c_uint
 
-    (__local_old_table = (unsafe *__param_hash_table).table)
+    (__local_old_table = (*__param_hash_table).table)
 
-    (__local_old_table_size = (unsafe *__param_hash_table).table_size)
+    (__local_old_table_size = (*__param_hash_table).table_size)
 
-    (__local_old_prime_index = (unsafe *__param_hash_table).prime_index)
+    (__local_old_prime_index = (*__param_hash_table).prime_index)
 
-    ((unsafe *__param_hash_table).prime_index = ((unsafe *__param_hash_table).prime_index +% 1))
+    ((*__param_hash_table).prime_index = ((*__param_hash_table).prime_index +% 1))
 
     if ((if not (hash_table_allocate_table(__param_hash_table) != 0): 1 else: 0) != 0) {
-        ((unsafe *__param_hash_table).table = __local_old_table)
+        ((*__param_hash_table).table = __local_old_table)
 
-        ((unsafe *__param_hash_table).table_size = __local_old_table_size)
+        ((*__param_hash_table).table_size = __local_old_table_size)
 
-        ((unsafe *__param_hash_table).prime_index = __local_old_prime_index)
+        ((*__param_hash_table).prime_index = __local_old_prime_index)
 
         return 0
 
@@ -374,18 +374,18 @@ unsafe fn hash_table_enlarge(__param_hash_table: *mut _HashTable) -> c_int {
     (__local_i = ((0 as c_uint)))
 
     while ((if __local_i < __local_old_table_size: 1 else: 0) != 0) {
-        (__local_rover = (unsafe __local_old_table[__local_i]))
+        (__local_rover = (__local_old_table[__local_i]))
 
         while ((if __local_rover != null: 1 else: 0) != 0) {
-            (__local_next = (unsafe *__local_rover).next)
+            (__local_next = (*__local_rover).next)
 
-            (__local_pair = (((&raw const (unsafe *__local_rover).pair as *const _HashTablePair) as *mut _HashTablePair)))
+            (__local_pair = (((&raw const (*__local_rover).pair as *const _HashTablePair) as *mut _HashTablePair)))
 
-            (__local_index = (((((unsafe *__param_hash_table).hash_func((unsafe *__local_pair).key) as c_uint) % ((unsafe *__param_hash_table).table_size as c_uint)) as c_uint)))
+            (__local_index = (((((*__param_hash_table).hash_func((*__local_pair).key) as c_uint) % ((*__param_hash_table).table_size as c_uint)) as c_uint)))
 
-            ((unsafe *__local_rover).next = (unsafe (unsafe *__param_hash_table).table[__local_index]))
+            ((*__local_rover).next = ((*__param_hash_table).table[__local_index]))
 
-            ((unsafe (unsafe *__param_hash_table).table[__local_index]) = __local_rover)
+            (((*__param_hash_table).table[__local_index]) = __local_rover)
 
             (__local_rover = __local_next)
 

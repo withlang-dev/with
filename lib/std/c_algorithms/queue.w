@@ -39,21 +39,21 @@ pub unsafe fn queue_push_head(__param_queue: *mut _Queue, __param_data: *mut c_v
 
     }
 
-    ((unsafe *__local_new_entry).data = __param_data)
+    ((*__local_new_entry).data = __param_data)
 
-    ((unsafe *__local_new_entry).prev = ((null as *mut _QueueEntry)))
+    ((*__local_new_entry).prev = ((null as *mut _QueueEntry)))
 
-    ((unsafe *__local_new_entry).next = (unsafe *__param_queue).head)
+    ((*__local_new_entry).next = (*__param_queue).head)
 
-    if ((if (unsafe *__param_queue).head == null: 1 else: 0) != 0) {
-        ((unsafe *__param_queue).head = __local_new_entry)
+    if ((if (*__param_queue).head == null: 1 else: 0) != 0) {
+        ((*__param_queue).head = __local_new_entry)
 
-        ((unsafe *__param_queue).tail = __local_new_entry)
+        ((*__param_queue).tail = __local_new_entry)
 
     } else {
-        ((unsafe *(unsafe *__param_queue).head).prev = __local_new_entry)
+        ((*(*__param_queue).head).prev = __local_new_entry)
 
-        ((unsafe *__param_queue).head = __local_new_entry)
+        ((*__param_queue).head = __local_new_entry)
 
     }
 
@@ -71,17 +71,17 @@ pub unsafe fn queue_pop_head(__param_queue: *mut _Queue) -> *mut c_void {
 
     }
 
-    (__local_entry = (unsafe *__param_queue).head)
+    (__local_entry = (*__param_queue).head)
 
-    ((unsafe *__param_queue).head = (unsafe *__local_entry).next)
+    ((*__param_queue).head = (*__local_entry).next)
 
-    (__local_result = (unsafe *__local_entry).data)
+    (__local_result = (*__local_entry).data)
 
-    if ((if (unsafe *__param_queue).head == null: 1 else: 0) != 0) {
-        ((unsafe *__param_queue).tail = ((null as *mut _QueueEntry)))
+    if ((if (*__param_queue).head == null: 1 else: 0) != 0) {
+        ((*__param_queue).tail = ((null as *mut _QueueEntry)))
 
     } else {
-        ((unsafe *(unsafe *__param_queue).head).prev = ((null as *mut _QueueEntry)))
+        ((*(*__param_queue).head).prev = ((null as *mut _QueueEntry)))
 
     }
 
@@ -96,7 +96,7 @@ pub unsafe fn queue_peek_head(__param_queue: *mut _Queue) -> *mut c_void {
         return queue_null_value
 
     }
-    return (unsafe *(unsafe *__param_queue).head).data
+    return (*(*__param_queue).head).data
 
 
 }
@@ -111,21 +111,21 @@ pub unsafe fn queue_push_tail(__param_queue: *mut _Queue, __param_data: *mut c_v
 
     }
 
-    ((unsafe *__local_new_entry).data = __param_data)
+    ((*__local_new_entry).data = __param_data)
 
-    ((unsafe *__local_new_entry).prev = (unsafe *__param_queue).tail)
+    ((*__local_new_entry).prev = (*__param_queue).tail)
 
-    ((unsafe *__local_new_entry).next = ((null as *mut _QueueEntry)))
+    ((*__local_new_entry).next = ((null as *mut _QueueEntry)))
 
-    if ((if (unsafe *__param_queue).tail == null: 1 else: 0) != 0) {
-        ((unsafe *__param_queue).head = __local_new_entry)
+    if ((if (*__param_queue).tail == null: 1 else: 0) != 0) {
+        ((*__param_queue).head = __local_new_entry)
 
-        ((unsafe *__param_queue).tail = __local_new_entry)
+        ((*__param_queue).tail = __local_new_entry)
 
     } else {
-        ((unsafe *(unsafe *__param_queue).tail).next = __local_new_entry)
+        ((*(*__param_queue).tail).next = __local_new_entry)
 
-        ((unsafe *__param_queue).tail = __local_new_entry)
+        ((*__param_queue).tail = __local_new_entry)
 
     }
 
@@ -143,17 +143,17 @@ pub unsafe fn queue_pop_tail(__param_queue: *mut _Queue) -> *mut c_void {
 
     }
 
-    (__local_entry = (unsafe *__param_queue).tail)
+    (__local_entry = (*__param_queue).tail)
 
-    ((unsafe *__param_queue).tail = (unsafe *__local_entry).prev)
+    ((*__param_queue).tail = (*__local_entry).prev)
 
-    (__local_result = (unsafe *__local_entry).data)
+    (__local_result = (*__local_entry).data)
 
-    if ((if (unsafe *__param_queue).tail == null: 1 else: 0) != 0) {
-        ((unsafe *__param_queue).head = ((null as *mut _QueueEntry)))
+    if ((if (*__param_queue).tail == null: 1 else: 0) != 0) {
+        ((*__param_queue).head = ((null as *mut _QueueEntry)))
 
     } else {
-        ((unsafe *(unsafe *__param_queue).tail).next = ((null as *mut _QueueEntry)))
+        ((*(*__param_queue).tail).next = ((null as *mut _QueueEntry)))
 
     }
 
@@ -168,13 +168,13 @@ pub unsafe fn queue_peek_tail(__param_queue: *mut _Queue) -> *mut c_void {
         return queue_null_value
 
     }
-    return (unsafe *(unsafe *__param_queue).tail).data
+    return (*(*__param_queue).tail).data
 
 
 }
 
 pub unsafe fn queue_is_empty(__param_queue: *mut _Queue) -> c_int {
-    return (if (unsafe *__param_queue).head == null: 1 else: 0)
+    return (if (*__param_queue).head == null: 1 else: 0)
 
 }
 

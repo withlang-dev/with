@@ -29,16 +29,16 @@ pub unsafe fn uncompress_z(__param_dest: *mut u8, __param_destLen: *mut c_ulong,
 pub unsafe fn uncompress2(__param_dest: *mut u8, __param_destLen: *mut c_ulong, __param_source: *const u8, __param_sourceLen: *mut c_ulong) -> c_int {
     var __local_ret: c_int
 
-    var __local_got: c_ulong = (unsafe *__param_destLen)
+    var __local_got: c_ulong = (*__param_destLen)
 
-    var __local_used: c_ulong = (unsafe *__param_sourceLen)
+    var __local_used: c_ulong = (*__param_sourceLen)
 
 
     (__local_ret = ((uncompress2_z(__param_dest, (&raw mut __local_got as *mut c_ulong), __param_source, (&raw mut __local_used as *mut c_ulong)) as c_int)))
 
-    ((unsafe *__param_sourceLen) = __local_used)
+    ((*__param_sourceLen) = __local_used)
 
-    ((unsafe *__param_destLen) = __local_got)
+    ((*__param_destLen) = __local_got)
 
     return __local_ret
 
@@ -68,7 +68,7 @@ pub unsafe fn uncompress2_z(__param_dest: *mut u8, __param_destLen: *mut c_ulong
     } else {
         var __ci_expr_logic_0: c_int = 0
 
-        if ((if (unsafe *__param_sourceLen) > 0: 1 else: 0) != 0) {
+        if ((if (*__param_sourceLen) > 0: 1 else: 0) != 0) {
             (__ci_expr_logic_0 = (if (if __param_source == null: 1 else: 0) != 0: 1 else: 0))
         }
 
@@ -87,7 +87,7 @@ pub unsafe fn uncompress2_z(__param_dest: *mut u8, __param_destLen: *mut c_ulong
     } else {
         var __ci_expr_logic_3: c_int = 0
 
-        if ((if (unsafe *__param_destLen) > 0: 1 else: 0) != 0) {
+        if ((if (*__param_destLen) > 0: 1 else: 0) != 0) {
             (__ci_expr_logic_3 = (if (if __local_dest == null: 1 else: 0) != 0: 1 else: 0))
         }
 
@@ -100,9 +100,9 @@ pub unsafe fn uncompress2_z(__param_dest: *mut u8, __param_destLen: *mut c_ulong
     }
 
 
-    (__local_len = (unsafe *__param_sourceLen))
+    (__local_len = (*__param_sourceLen))
 
-    (__local_left = (unsafe *__param_destLen))
+    (__local_left = (*__param_destLen))
 
     var __ci_expr_logic_5: c_int = 0
 
@@ -111,7 +111,7 @@ pub unsafe fn uncompress2_z(__param_dest: *mut u8, __param_destLen: *mut c_ulong
     }
 
     if (__ci_expr_logic_5 != 0) {
-        (__local_dest = ((((&raw const (unsafe *(&raw const __local_stream as *const z_stream_s)).reserved as *const c_ulong) as *mut c_ulong) as *mut u8)))
+        (__local_dest = ((((&raw const (*(&raw const __local_stream as *const z_stream_s)).reserved as *const c_ulong) as *mut c_ulong) as *mut u8)))
     }
 
 
@@ -136,7 +136,7 @@ pub unsafe fn uncompress2_z(__param_dest: *mut u8, __param_destLen: *mut c_ulong
     (__local_stream.avail_out = ((0 as c_uint)))
 
     loop {
-        if ((if (unsafe *(&raw const __local_stream as *const z_stream_s)).avail_out == 0: 1 else: 0) != 0) {
+        if ((if (*(&raw const __local_stream as *const z_stream_s)).avail_out == 0: 1 else: 0) != 0) {
             var __ci_expr_ternary_6: c_uint = 0
 
             if ((if __local_left > ((4294967295 as c_ulong)): 1 else: 0) != 0) {
@@ -148,11 +148,11 @@ pub unsafe fn uncompress2_z(__param_dest: *mut u8, __param_destLen: *mut c_ulong
             (__local_stream.avail_out = __ci_expr_ternary_6)
 
 
-            (__local_left = (__local_left -% (unsafe *(&raw const __local_stream as *const z_stream_s)).avail_out))
+            (__local_left = (__local_left -% (*(&raw const __local_stream as *const z_stream_s)).avail_out))
 
         }
 
-        if ((if (unsafe *(&raw const __local_stream as *const z_stream_s)).avail_in == 0: 1 else: 0) != 0) {
+        if ((if (*(&raw const __local_stream as *const z_stream_s)).avail_in == 0: 1 else: 0) != 0) {
             var __ci_expr_ternary_7: c_uint = 0
 
             if ((if __local_len > ((4294967295 as c_ulong)): 1 else: 0) != 0) {
@@ -164,7 +164,7 @@ pub unsafe fn uncompress2_z(__param_dest: *mut u8, __param_destLen: *mut c_ulong
             (__local_stream.avail_in = __ci_expr_ternary_7)
 
 
-            (__local_len = (__local_len -% (unsafe *(&raw const __local_stream as *const z_stream_s)).avail_in))
+            (__local_len = (__local_len -% (*(&raw const __local_stream as *const z_stream_s)).avail_in))
 
         }
 
@@ -175,13 +175,13 @@ pub unsafe fn uncompress2_z(__param_dest: *mut u8, __param_destLen: *mut c_ulong
         }
     }
 
-    (__local_len = (__local_len +% (unsafe *(&raw const __local_stream as *const z_stream_s)).avail_in))
+    (__local_len = (__local_len +% (*(&raw const __local_stream as *const z_stream_s)).avail_in))
 
-    (__local_left = (__local_left +% (unsafe *(&raw const __local_stream as *const z_stream_s)).avail_out))
+    (__local_left = (__local_left +% (*(&raw const __local_stream as *const z_stream_s)).avail_out))
 
-    ((unsafe *__param_sourceLen) = ((unsafe *__param_sourceLen) -% __local_len))
+    ((*__param_sourceLen) = ((*__param_sourceLen) -% __local_len))
 
-    ((unsafe *__param_destLen) = ((unsafe *__param_destLen) -% __local_left))
+    ((*__param_destLen) = ((*__param_destLen) -% __local_left))
 
     inflateEnd((&raw mut __local_stream as *mut z_stream_s))
 

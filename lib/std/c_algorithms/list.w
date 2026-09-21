@@ -9,7 +9,7 @@ pub unsafe fn list_free(__param_list: *mut _ListEntry) -> Unit {
     while ((if __local_entry != null: 1 else: 0) != 0) {
         var __local_next: *mut _ListEntry
 
-        (__local_next = (unsafe *__local_entry).next)
+        (__local_next = (*__local_entry).next)
 
         with_free(((__local_entry as *mut c_void) as *mut u8))
 
@@ -34,18 +34,18 @@ pub unsafe fn list_prepend(__param_list: *mut *mut _ListEntry, __param_data: *mu
 
     }
 
-    ((unsafe *__local_newentry).data = __param_data)
+    ((*__local_newentry).data = __param_data)
 
-    if ((if (unsafe *__param_list) != null: 1 else: 0) != 0) {
-        ((unsafe *(unsafe *__param_list)).prev = __local_newentry)
+    if ((if (*__param_list) != null: 1 else: 0) != 0) {
+        ((*(*__param_list)).prev = __local_newentry)
 
     }
 
-    ((unsafe *__local_newentry).prev = ((null as *mut _ListEntry)))
+    ((*__local_newentry).prev = ((null as *mut _ListEntry)))
 
-    ((unsafe *__local_newentry).next = (unsafe *__param_list))
+    ((*__local_newentry).next = (*__param_list))
 
-    ((unsafe *__param_list) = __local_newentry)
+    ((*__param_list) = __local_newentry)
 
     return __local_newentry
 
@@ -68,28 +68,28 @@ pub unsafe fn list_append(__param_list: *mut *mut _ListEntry, __param_data: *mut
 
     }
 
-    ((unsafe *__local_newentry).data = __param_data)
+    ((*__local_newentry).data = __param_data)
 
-    ((unsafe *__local_newentry).next = ((null as *mut _ListEntry)))
+    ((*__local_newentry).next = ((null as *mut _ListEntry)))
 
-    if ((if (unsafe *__param_list) == null: 1 else: 0) != 0) {
-        ((unsafe *__param_list) = __local_newentry)
+    if ((if (*__param_list) == null: 1 else: 0) != 0) {
+        ((*__param_list) = __local_newentry)
 
-        ((unsafe *__local_newentry).prev = ((null as *mut _ListEntry)))
+        ((*__local_newentry).prev = ((null as *mut _ListEntry)))
 
     } else {
-        (__local_rover = (unsafe *__param_list))
+        (__local_rover = (*__param_list))
 
-        while ((if (unsafe *__local_rover).next != null: 1 else: 0) != 0) {
+        while ((if (*__local_rover).next != null: 1 else: 0) != 0) {
 
-            (__local_rover = (unsafe *__local_rover).next)
+            (__local_rover = (*__local_rover).next)
 
         }
 
 
-        ((unsafe *__local_newentry).prev = __local_rover)
+        ((*__local_newentry).prev = __local_rover)
 
-        ((unsafe *__local_rover).next = __local_newentry)
+        ((*__local_rover).next = __local_newentry)
 
     }
 
@@ -103,7 +103,7 @@ pub unsafe fn list_prev(__param_listentry: *mut _ListEntry) -> *mut _ListEntry {
 
     }
 
-    return (unsafe *__param_listentry).prev
+    return (*__param_listentry).prev
 
 }
 
@@ -113,7 +113,7 @@ pub unsafe fn list_next(__param_listentry: *mut _ListEntry) -> *mut _ListEntry {
 
     }
 
-    return (unsafe *__param_listentry).next
+    return (*__param_listentry).next
 
 }
 
@@ -123,13 +123,13 @@ pub unsafe fn list_data(__param_listentry: *mut _ListEntry) -> *mut c_void {
 
     }
 
-    return (unsafe *__param_listentry).data
+    return (*__param_listentry).data
 
 }
 
 pub unsafe fn list_set_data(__param_listentry: *mut _ListEntry, __param_value: *mut c_void) -> Unit {
     if ((if __param_listentry != null: 1 else: 0) != 0) {
-        ((unsafe *__param_listentry).data = __param_value)
+        ((*__param_listentry).data = __param_value)
 
     }
 
@@ -150,7 +150,7 @@ pub unsafe fn list_nth_entry(__param_list: *mut _ListEntry, __param_n: c_uint) -
 
         }
 
-        (__local_entry = (unsafe *__local_entry).next)
+        (__local_entry = (*__local_entry).next)
 
 
         (__local_i = (__local_i +% 1))
@@ -171,7 +171,7 @@ pub unsafe fn list_nth_data(__param_list: *mut _ListEntry, __param_n: c_uint) ->
         return list_null_value
 
     }
-    return (unsafe *__local_entry).data
+    return (*__local_entry).data
 
 
 }
@@ -188,7 +188,7 @@ pub unsafe fn list_length(__param_list: *mut _ListEntry) -> c_uint {
     while ((if __local_entry != null: 1 else: 0) != 0) {
         (__local_length = (__local_length +% 1))
 
-        (__local_entry = (unsafe *__local_entry).next)
+        (__local_entry = (*__local_entry).next)
 
     }
 
@@ -219,9 +219,9 @@ pub unsafe fn list_to_array(__param_list: *mut _ListEntry) -> *mut *mut c_void {
     (__local_i = ((0 as c_uint)))
 
     while ((if __local_i < __local_length: 1 else: 0) != 0) {
-        ((unsafe __local_array[__local_i]) = (unsafe *__local_rover).data)
+        ((__local_array[__local_i]) = (*__local_rover).data)
 
-        (__local_rover = (unsafe *__local_rover).next)
+        (__local_rover = (*__local_rover).next)
 
 
         (__local_i = (__local_i +% 1))
@@ -241,7 +241,7 @@ pub unsafe fn list_remove_entry(__param_list: *mut *mut _ListEntry, __param_entr
     if ((if __param_list == null: 1 else: 0) != 0) {
         (__ci_expr_logic_0 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_0 = (if (if (unsafe *__param_list) == null: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_0 = (if (if (*__param_list) == null: 1 else: 0) != 0: 1 else: 0))
     }
 
     if (__ci_expr_logic_0 != 0) {
@@ -256,19 +256,19 @@ pub unsafe fn list_remove_entry(__param_list: *mut *mut _ListEntry, __param_entr
     }
 
 
-    if ((if (unsafe *__param_entry).prev == null: 1 else: 0) != 0) {
-        ((unsafe *__param_list) = (unsafe *__param_entry).next)
+    if ((if (*__param_entry).prev == null: 1 else: 0) != 0) {
+        ((*__param_list) = (*__param_entry).next)
 
-        if ((if (unsafe *__param_entry).next != null: 1 else: 0) != 0) {
-            ((unsafe *(unsafe *__param_entry).next).prev = ((null as *mut _ListEntry)))
+        if ((if (*__param_entry).next != null: 1 else: 0) != 0) {
+            ((*(*__param_entry).next).prev = ((null as *mut _ListEntry)))
 
         }
 
     } else {
-        ((unsafe *(unsafe *__param_entry).prev).next = (unsafe *__param_entry).next)
+        ((*(*__param_entry).prev).next = (*__param_entry).next)
 
-        if ((if (unsafe *__param_entry).next != null: 1 else: 0) != 0) {
-            ((unsafe *(unsafe *__param_entry).next).prev = (unsafe *__param_entry).prev)
+        if ((if (*__param_entry).next != null: 1 else: 0) != 0) {
+            ((*(*__param_entry).next).prev = (*__param_entry).prev)
 
         }
 
@@ -303,22 +303,22 @@ pub unsafe fn list_remove_data(__param_list: *mut *mut _ListEntry, __param_callb
 
     (__local_entries_removed = ((0 as c_uint)))
 
-    (__local_rover = (unsafe *__param_list))
+    (__local_rover = (*__param_list))
 
     while ((if __local_rover != null: 1 else: 0) != 0) {
-        (__local_next = (unsafe *__local_rover).next)
+        (__local_next = (*__local_rover).next)
 
-        if (__param_callback((unsafe *__local_rover).data, __param_data) != 0) {
-            if ((if (unsafe *__local_rover).prev == null: 1 else: 0) != 0) {
-                ((unsafe *__param_list) = (unsafe *__local_rover).next)
+        if (__param_callback((*__local_rover).data, __param_data) != 0) {
+            if ((if (*__local_rover).prev == null: 1 else: 0) != 0) {
+                ((*__param_list) = (*__local_rover).next)
 
             } else {
-                ((unsafe *(unsafe *__local_rover).prev).next = (unsafe *__local_rover).next)
+                ((*(*__local_rover).prev).next = (*__local_rover).next)
 
             }
 
-            if ((if (unsafe *__local_rover).next != null: 1 else: 0) != 0) {
-                ((unsafe *(unsafe *__local_rover).next).prev = (unsafe *__local_rover).prev)
+            if ((if (*__local_rover).next != null: 1 else: 0) != 0) {
+                ((*(*__local_rover).next).prev = (*__local_rover).prev)
 
             }
 
@@ -347,13 +347,13 @@ pub unsafe fn list_find_data(__param_list: *mut _ListEntry, __param_callback: un
     (__local_rover = __param_list)
 
     while ((if __local_rover != null: 1 else: 0) != 0) {
-        if ((if __param_callback((unsafe *__local_rover).data, __param_data) != 0: 1 else: 0) != 0) {
+        if ((if __param_callback((*__local_rover).data, __param_data) != 0: 1 else: 0) != 0) {
             return __local_rover
 
         }
 
 
-        (__local_rover = (unsafe *__local_rover).next)
+        (__local_rover = (*__local_rover).next)
 
     }
 
@@ -363,26 +363,26 @@ pub unsafe fn list_find_data(__param_list: *mut _ListEntry, __param_callback: un
 }
 
 pub unsafe fn list_iterate(__param_list: *mut *mut _ListEntry, __param_iter: *mut _ListIterator) -> Unit {
-    ((unsafe *__param_iter).prev_next = __param_list)
+    ((*__param_iter).prev_next = __param_list)
 
-    ((unsafe *__param_iter).current = ((null as *mut _ListEntry)))
+    ((*__param_iter).current = ((null as *mut _ListEntry)))
 
 }
 
 pub unsafe fn list_iter_has_more(__param_iter: *mut _ListIterator) -> c_int {
     var __ci_expr_logic_0: c_int
 
-    if ((if (unsafe *__param_iter).current == null: 1 else: 0) != 0) {
+    if ((if (*__param_iter).current == null: 1 else: 0) != 0) {
         (__ci_expr_logic_0 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_0 = (if (if (unsafe *__param_iter).current != (unsafe *((unsafe *__param_iter).prev_next)): 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_0 = (if (if (*__param_iter).current != (*((*__param_iter).prev_next)): 1 else: 0) != 0: 1 else: 0))
     }
 
     if (__ci_expr_logic_0 != 0) {
-        return (if (unsafe *((unsafe *__param_iter).prev_next)) != null: 1 else: 0)
+        return (if (*((*__param_iter).prev_next)) != null: 1 else: 0)
 
     }
-    return (if (unsafe *(unsafe *__param_iter).current).next != null: 1 else: 0)
+    return (if (*(*__param_iter).current).next != null: 1 else: 0)
 
 
 
@@ -391,28 +391,28 @@ pub unsafe fn list_iter_has_more(__param_iter: *mut _ListIterator) -> c_int {
 pub unsafe fn list_iter_next(__param_iter: *mut _ListIterator) -> *mut c_void {
     var __ci_expr_logic_0: c_int
 
-    if ((if (unsafe *__param_iter).current == null: 1 else: 0) != 0) {
+    if ((if (*__param_iter).current == null: 1 else: 0) != 0) {
         (__ci_expr_logic_0 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_0 = (if (if (unsafe *__param_iter).current != (unsafe *((unsafe *__param_iter).prev_next)): 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_0 = (if (if (*__param_iter).current != (*((*__param_iter).prev_next)): 1 else: 0) != 0: 1 else: 0))
     }
 
     if (__ci_expr_logic_0 != 0) {
-        ((unsafe *__param_iter).current = (unsafe *((unsafe *__param_iter).prev_next)))
+        ((*__param_iter).current = (*((*__param_iter).prev_next)))
 
     } else {
-        ((unsafe *__param_iter).prev_next = (((&raw const (unsafe *(unsafe *__param_iter).current).next as *const *mut _ListEntry) as *mut *mut _ListEntry)))
+        ((*__param_iter).prev_next = (((&raw const (*(*__param_iter).current).next as *const *mut _ListEntry) as *mut *mut _ListEntry)))
 
-        ((unsafe *__param_iter).current = (unsafe *(unsafe *__param_iter).current).next)
+        ((*__param_iter).current = (*(*__param_iter).current).next)
 
     }
 
 
-    if ((if (unsafe *__param_iter).current == null: 1 else: 0) != 0) {
+    if ((if (*__param_iter).current == null: 1 else: 0) != 0) {
         return list_null_value
 
     }
-    return (unsafe *(unsafe *__param_iter).current).data
+    return (*(*__param_iter).current).data
 
 
 }
@@ -420,23 +420,23 @@ pub unsafe fn list_iter_next(__param_iter: *mut _ListIterator) -> *mut c_void {
 pub unsafe fn list_iter_remove(__param_iter: *mut _ListIterator) -> Unit {
     var __ci_expr_logic_0: c_int
 
-    if ((if (unsafe *__param_iter).current == null: 1 else: 0) != 0) {
+    if ((if (*__param_iter).current == null: 1 else: 0) != 0) {
         (__ci_expr_logic_0 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_0 = (if (if (unsafe *__param_iter).current != (unsafe *((unsafe *__param_iter).prev_next)): 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_0 = (if (if (*__param_iter).current != (*((*__param_iter).prev_next)): 1 else: 0) != 0: 1 else: 0))
     }
 
     if (not (__ci_expr_logic_0 != 0)) {
-        ((unsafe *((unsafe *__param_iter).prev_next)) = (unsafe *(unsafe *__param_iter).current).next)
+        ((*((*__param_iter).prev_next)) = (*(*__param_iter).current).next)
 
-        if ((if (unsafe *(unsafe *__param_iter).current).next != null: 1 else: 0) != 0) {
-            ((unsafe *(unsafe *(unsafe *__param_iter).current).next).prev = (unsafe *(unsafe *__param_iter).current).prev)
+        if ((if (*(*__param_iter).current).next != null: 1 else: 0) != 0) {
+            ((*(*(*__param_iter).current).next).prev = (*(*__param_iter).current).prev)
 
         }
 
-        with_free((((unsafe *__param_iter).current as *mut c_void) as *mut u8))
+        with_free((((*__param_iter).current as *mut c_void) as *mut u8))
 
-        ((unsafe *__param_iter).current = ((null as *mut _ListEntry)))
+        ((*__param_iter).current = ((null as *mut _ListEntry)))
 
     }
 
@@ -474,48 +474,48 @@ unsafe fn list_sort_internal(__param_list: *mut *mut _ListEntry, __param_compare
 
     var __ci_expr_logic_1: c_int
 
-    if ((if (unsafe *__param_list) == null: 1 else: 0) != 0) {
+    if ((if (*__param_list) == null: 1 else: 0) != 0) {
         (__ci_expr_logic_1 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_1 = (if (if (unsafe *(unsafe *__param_list)).next == null: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_1 = (if (if (*(*__param_list)).next == null: 1 else: 0) != 0: 1 else: 0))
     }
 
     if (__ci_expr_logic_1 != 0) {
-        return (unsafe *__param_list)
+        return (*__param_list)
 
     }
 
 
-    (__local_pivot = (unsafe *__param_list))
+    (__local_pivot = (*__param_list))
 
     (__local_less_list = ((null as *mut _ListEntry)))
 
     (__local_more_list = ((null as *mut _ListEntry)))
 
-    (__local_rover = (unsafe *(unsafe *__param_list)).next)
+    (__local_rover = (*(*__param_list)).next)
 
     while ((if __local_rover != null: 1 else: 0) != 0) {
-        var __local_next: *mut _ListEntry = (unsafe *__local_rover).next
+        var __local_next: *mut _ListEntry = (*__local_rover).next
 
-        if ((if __param_compare_func((unsafe *__local_rover).data, (unsafe *__local_pivot).data) < 0: 1 else: 0) != 0) {
-            ((unsafe *__local_rover).prev = ((null as *mut _ListEntry)))
+        if ((if __param_compare_func((*__local_rover).data, (*__local_pivot).data) < 0: 1 else: 0) != 0) {
+            ((*__local_rover).prev = ((null as *mut _ListEntry)))
 
-            ((unsafe *__local_rover).next = __local_less_list)
+            ((*__local_rover).next = __local_less_list)
 
             if ((if __local_less_list != null: 1 else: 0) != 0) {
-                ((unsafe *__local_less_list).prev = __local_rover)
+                ((*__local_less_list).prev = __local_rover)
 
             }
 
             (__local_less_list = __local_rover)
 
         } else {
-            ((unsafe *__local_rover).prev = ((null as *mut _ListEntry)))
+            ((*__local_rover).prev = ((null as *mut _ListEntry)))
 
-            ((unsafe *__local_rover).next = __local_more_list)
+            ((*__local_rover).next = __local_more_list)
 
             if ((if __local_more_list != null: 1 else: 0) != 0) {
-                ((unsafe *__local_more_list).prev = __local_rover)
+                ((*__local_more_list).prev = __local_rover)
 
             }
 
@@ -531,24 +531,24 @@ unsafe fn list_sort_internal(__param_list: *mut *mut _ListEntry, __param_compare
 
     (__local_more_list_end = list_sort_internal((&raw mut __local_more_list as *mut *mut _ListEntry), __param_compare_func))
 
-    ((unsafe *__param_list) = __local_less_list)
+    ((*__param_list) = __local_less_list)
 
     if ((if __local_less_list == null: 1 else: 0) != 0) {
-        ((unsafe *__local_pivot).prev = ((null as *mut _ListEntry)))
+        ((*__local_pivot).prev = ((null as *mut _ListEntry)))
 
-        ((unsafe *__param_list) = __local_pivot)
+        ((*__param_list) = __local_pivot)
 
     } else {
-        ((unsafe *__local_pivot).prev = __local_less_list_end)
+        ((*__local_pivot).prev = __local_less_list_end)
 
-        ((unsafe *__local_less_list_end).next = __local_pivot)
+        ((*__local_less_list_end).next = __local_pivot)
 
     }
 
-    ((unsafe *__local_pivot).next = __local_more_list)
+    ((*__local_pivot).next = __local_more_list)
 
     if ((if __local_more_list != null: 1 else: 0) != 0) {
-        ((unsafe *__local_more_list).prev = __local_pivot)
+        ((*__local_more_list).prev = __local_pivot)
 
     }
 

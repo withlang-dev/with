@@ -45,9 +45,9 @@ pub unsafe fn string_nocase_compare(__param_string1: *mut c_void, __param_string
     (__local_p2 = ((__param_string2 as *mut c_char)))
 
     while true {
-        (__local_c1 = ((tolower(((unsafe *__local_p1) as c_int)) as c_int)))
+        (__local_c1 = ((tolower(((*__local_p1) as c_int)) as c_int)))
 
-        (__local_c2 = ((tolower(((unsafe *__local_p2) as c_int)) as c_int)))
+        (__local_c2 = ((tolower(((*__local_p2) as c_int)) as c_int)))
 
         if ((if __local_c1 != __local_c2: 1 else: 0) != 0) {
             if ((if __local_c1 < __local_c2: 1 else: 0) != 0) {

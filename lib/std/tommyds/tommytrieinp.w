@@ -75,14 +75,14 @@ pub unsafe fn tommy_trie_inplace_init(__param_trie_inplace: *mut tommy_trie_inpl
     (__local_i = ((0 as c_uint)))
 
     while ((if __local_i < 64: 1 else: 0) != 0) {
-        ((unsafe *__param_trie_inplace).bucket[__local_i] = null)
+        ((*__param_trie_inplace).bucket[__local_i] = null)
 
         (__local_i = (__local_i +% 1))
 
     }
 
 
-    ((unsafe *__param_trie_inplace).count = ((0 as c_ulonglong)))
+    ((*__param_trie_inplace).count = ((0 as c_ulonglong)))
 
 }
 
@@ -240,14 +240,14 @@ pub unsafe fn tommy_trie_inplace_insert(__param_trie_inplace: *mut tommy_trie_in
     }
 
 
-    ((unsafe *__param_node).data = __param_data)
+    ((*__param_node).data = __param_data)
 
-    ((unsafe *__param_node).key = __param_key)
+    ((*__param_node).key = __param_key)
 
     (__local_i = ((0 as c_uint)))
 
     while ((if __local_i < 4: 1 else: 0) != 0) {
-        ((unsafe *__param_node).map[__local_i] = null)
+        ((*__param_node).map[__local_i] = null)
 
         (__local_i = (__local_i +% 1))
 
@@ -396,12 +396,12 @@ pub unsafe fn tommy_trie_inplace_insert(__param_trie_inplace: *mut tommy_trie_in
 
     }
 
-    (__local_let_ptr = (((&raw const (unsafe *__param_trie_inplace).bucket[((__param_key as c_ulonglong) >> ((32 - ((32 % __ci_expr_ternary_23) + (3 * __ci_expr_ternary_31))) as c_uint))] as *const *mut tommy_trie_inplace_node_struct) as *mut *mut tommy_trie_inplace_node_struct)))
+    (__local_let_ptr = (((&raw const (*__param_trie_inplace).bucket[((__param_key as c_ulonglong) >> ((32 - ((32 % __ci_expr_ternary_23) + (3 * __ci_expr_ternary_31))) as c_uint))] as *const *mut tommy_trie_inplace_node_struct) as *mut *mut tommy_trie_inplace_node_struct)))
 
 
     trie_inplace_bucket_insert((26 as c_uint), __local_let_ptr, __param_node, __param_key)
 
-    ((unsafe *__param_trie_inplace).count = ((unsafe *__param_trie_inplace).count +% 1))
+    ((*__param_trie_inplace).count = ((*__param_trie_inplace).count +% 1))
 
 }
 
@@ -701,7 +701,7 @@ pub unsafe fn tommy_trie_inplace_remove(__param_trie_inplace: *mut tommy_trie_in
 
     }
 
-    (__local_let_ptr = (((&raw const (unsafe *__param_trie_inplace).bucket[((__param_key as c_ulonglong) >> ((32 - ((32 % __ci_expr_ternary_23) + (3 * __ci_expr_ternary_31))) as c_uint))] as *const *mut tommy_trie_inplace_node_struct) as *mut *mut tommy_trie_inplace_node_struct)))
+    (__local_let_ptr = (((&raw const (*__param_trie_inplace).bucket[((__param_key as c_ulonglong) >> ((32 - ((32 % __ci_expr_ternary_23) + (3 * __ci_expr_ternary_31))) as c_uint))] as *const *mut tommy_trie_inplace_node_struct) as *mut *mut tommy_trie_inplace_node_struct)))
 
 
     (__local_ret = trie_inplace_bucket_remove((26 as c_uint), __local_let_ptr, null, __param_key))
@@ -710,9 +710,9 @@ pub unsafe fn tommy_trie_inplace_remove(__param_trie_inplace: *mut tommy_trie_in
         return ((0 as *mut c_void))
     }
 
-    ((unsafe *__param_trie_inplace).count = ((unsafe *__param_trie_inplace).count -% 1))
+    ((*__param_trie_inplace).count = ((*__param_trie_inplace).count -% 1))
 
-    return (unsafe *__local_ret).data
+    return (*__local_ret).data
 
 }
 
@@ -1012,7 +1012,7 @@ pub unsafe fn tommy_trie_inplace_bucket(__param_trie_inplace: *mut tommy_trie_in
 
     }
 
-    (__local_node = (unsafe *__param_trie_inplace).bucket[((__param_key as c_ulonglong) >> ((32 - ((32 % __ci_expr_ternary_23) + (3 * __ci_expr_ternary_31))) as c_uint))])
+    (__local_node = (*__param_trie_inplace).bucket[((__param_key as c_ulonglong) >> ((32 - ((32 % __ci_expr_ternary_23) + (3 * __ci_expr_ternary_31))) as c_uint))])
 
 
     (__local_shift = ((26 as c_uint)))
@@ -1021,14 +1021,14 @@ pub unsafe fn tommy_trie_inplace_bucket(__param_trie_inplace: *mut tommy_trie_in
         var __ci_expr_logic_32: c_int = 0
 
         if (__local_node != null) {
-            (__ci_expr_logic_32 = (if (if (unsafe *__local_node).key != __param_key: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_32 = (if (if (*__local_node).key != __param_key: 1 else: 0) != 0: 1 else: 0))
         }
 
         if (not (__ci_expr_logic_32 != 0)) {
             break
         }
 
-        (__local_node = (unsafe *__local_node).map[((((__param_key as c_ulonglong) >> (__local_shift as c_uint)) as c_ulonglong) & (3 as c_ulonglong))])
+        (__local_node = (*__local_node).map[((((__param_key as c_ulonglong) >> (__local_shift as c_uint)) as c_ulonglong) & (3 as c_ulonglong))])
 
         (__local_shift = (__local_shift -% 2))
 
@@ -1045,14 +1045,14 @@ pub unsafe fn tommy_trie_inplace_search(__param_trie_inplace: *mut tommy_trie_in
         return ((0 as *mut c_void))
     }
 
-    return (unsafe *__local_i).data
+    return (*__local_i).data
 
 }
 
 pub unsafe fn tommy_trie_inplace_remove_existing(__param_trie_inplace: *mut tommy_trie_inplace_struct, __param_node: *mut tommy_trie_inplace_node_struct) -> *mut c_void {
     var __local_ret: *mut tommy_trie_inplace_node_struct
 
-    var __local_key: c_ulonglong = (unsafe *__param_node).key
+    var __local_key: c_ulonglong = (*__param_node).key
 
     var __local_let_ptr: *mut *mut tommy_trie_inplace_node_struct
 
@@ -1347,7 +1347,7 @@ pub unsafe fn tommy_trie_inplace_remove_existing(__param_trie_inplace: *mut tomm
 
     }
 
-    (__local_let_ptr = (((&raw const (unsafe *__param_trie_inplace).bucket[((__local_key as c_ulonglong) >> ((32 - ((32 % __ci_expr_ternary_23) + (3 * __ci_expr_ternary_31))) as c_uint))] as *const *mut tommy_trie_inplace_node_struct) as *mut *mut tommy_trie_inplace_node_struct)))
+    (__local_let_ptr = (((&raw const (*__param_trie_inplace).bucket[((__local_key as c_ulonglong) >> ((32 - ((32 % __ci_expr_ternary_23) + (3 * __ci_expr_ternary_31))) as c_uint))] as *const *mut tommy_trie_inplace_node_struct) as *mut *mut tommy_trie_inplace_node_struct)))
 
 
     (__local_ret = trie_inplace_bucket_remove((26 as c_uint), __local_let_ptr, __param_node, __local_key))
@@ -1358,14 +1358,14 @@ pub unsafe fn tommy_trie_inplace_remove_existing(__param_trie_inplace: *mut tomm
         0
     }
 
-    ((unsafe *__param_trie_inplace).count = ((unsafe *__param_trie_inplace).count -% 1))
+    ((*__param_trie_inplace).count = ((*__param_trie_inplace).count -% 1))
 
-    return (unsafe *__local_ret).data
+    return (*__local_ret).data
 
 }
 
 pub unsafe fn tommy_trie_inplace_count(__param_trie_inplace: *mut tommy_trie_inplace_struct) -> c_ulonglong {
-    return (unsafe *__param_trie_inplace).count
+    return (*__param_trie_inplace).count
 
 }
 
@@ -1375,38 +1375,38 @@ pub unsafe fn tommy_trie_inplace_memory_usage(__param_trie_inplace: *mut tommy_t
 }
 
 unsafe fn tommy_trie_inplace_list_insert_first(__param_node: *mut tommy_trie_inplace_node_struct) -> *mut tommy_trie_inplace_node_struct {
-    ((unsafe *__param_node).prev = __param_node)
+    ((*__param_node).prev = __param_node)
 
-    ((unsafe *__param_node).next = null)
+    ((*__param_node).next = null)
 
     return __param_node
 
 }
 
 unsafe fn tommy_trie_inplace_list_insert_tail_not_empty(__param_head: *mut tommy_trie_inplace_node_struct, __param_node: *mut tommy_trie_inplace_node_struct) -> Unit {
-    ((unsafe *__param_node).prev = (unsafe *__param_head).prev)
+    ((*__param_node).prev = (*__param_head).prev)
 
-    ((unsafe *__param_head).prev = __param_node)
+    ((*__param_head).prev = __param_node)
 
-    ((unsafe *__param_node).next = null)
+    ((*__param_node).next = null)
 
-    ((unsafe *(unsafe *__param_node).prev).next = __param_node)
+    ((*(*__param_node).prev).next = __param_node)
 
 }
 
 unsafe fn tommy_trie_inplace_list_remove(__param_let_ptr: *mut *mut tommy_trie_inplace_node_struct, __param_node: *mut tommy_trie_inplace_node_struct) -> Unit {
-    var __local_head: *mut tommy_trie_inplace_node_struct = (unsafe *__param_let_ptr)
+    var __local_head: *mut tommy_trie_inplace_node_struct = (*__param_let_ptr)
 
-    if ((unsafe *__param_node).next != null) {
-        ((unsafe *(unsafe *__param_node).next).prev = (unsafe *__param_node).prev)
+    if ((*__param_node).next != null) {
+        ((*(*__param_node).next).prev = (*__param_node).prev)
     } else {
-        ((unsafe *__local_head).prev = (unsafe *__param_node).prev)
+        ((*__local_head).prev = (*__param_node).prev)
     }
 
     if ((if __local_head == __param_node: 1 else: 0) != 0) {
-        ((unsafe *__param_let_ptr) = (unsafe *__param_node).next)
+        ((*__param_let_ptr) = (*__param_node).next)
     } else {
-        ((unsafe *(unsafe *__param_node).prev).next = (unsafe *__param_node).next)
+        ((*(*__param_node).prev).next = (*__param_node).next)
     }
 
 }
@@ -1416,29 +1416,29 @@ unsafe fn trie_inplace_bucket_insert(__param_shift: c_uint, __param_let_ptr: *mu
     var __local_let_ptr = __param_let_ptr
     var __local_node: *mut tommy_trie_inplace_node_struct
 
-    (__local_node = (unsafe *__local_let_ptr))
+    (__local_node = (*__local_let_ptr))
 
     while true {
         var __ci_expr_logic_0: c_int = 0
 
         if (__local_node != null) {
-            (__ci_expr_logic_0 = (if (if (unsafe *__local_node).key != __param_key: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_0 = (if (if (*__local_node).key != __param_key: 1 else: 0) != 0: 1 else: 0))
         }
 
         if (not (__ci_expr_logic_0 != 0)) {
             break
         }
 
-        (__local_let_ptr = (((&raw const (unsafe *__local_node).map[((((__param_key as c_ulonglong) >> (__local_shift as c_uint)) as c_ulonglong) & (3 as c_ulonglong))] as *const *mut tommy_trie_inplace_node_struct) as *mut *mut tommy_trie_inplace_node_struct)))
+        (__local_let_ptr = (((&raw const (*__local_node).map[((((__param_key as c_ulonglong) >> (__local_shift as c_uint)) as c_ulonglong) & (3 as c_ulonglong))] as *const *mut tommy_trie_inplace_node_struct) as *mut *mut tommy_trie_inplace_node_struct)))
 
-        (__local_node = (unsafe *__local_let_ptr))
+        (__local_node = (*__local_let_ptr))
 
         (__local_shift = (__local_shift -% 2))
 
     }
 
     if ((if not (__local_node != null): 1 else: 0) != 0) {
-        ((unsafe *__local_let_ptr) = tommy_trie_inplace_list_insert_first(__param_insert))
+        ((*__local_let_ptr) = tommy_trie_inplace_list_insert_first(__param_insert))
 
     } else {
         tommy_trie_inplace_list_insert_tail_not_empty(__local_node, __param_insert)
@@ -1459,22 +1459,22 @@ unsafe fn trie_inplace_bucket_remove(__param_shift: c_uint, __param_let_ptr: *mu
 
     var __local_leaf: *mut tommy_trie_inplace_node_struct
 
-    (__local_node = (unsafe *__local_let_ptr))
+    (__local_node = (*__local_let_ptr))
 
     while true {
         var __ci_expr_logic_0: c_int = 0
 
         if (__local_node != null) {
-            (__ci_expr_logic_0 = (if (if (unsafe *__local_node).key != __param_key: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_0 = (if (if (*__local_node).key != __param_key: 1 else: 0) != 0: 1 else: 0))
         }
 
         if (not (__ci_expr_logic_0 != 0)) {
             break
         }
 
-        (__local_let_ptr = (((&raw const (unsafe *__local_node).map[((((__param_key as c_ulonglong) >> (__local_shift as c_uint)) as c_ulonglong) & (3 as c_ulonglong))] as *const *mut tommy_trie_inplace_node_struct) as *mut *mut tommy_trie_inplace_node_struct)))
+        (__local_let_ptr = (((&raw const (*__local_node).map[((((__param_key as c_ulonglong) >> (__local_shift as c_uint)) as c_ulonglong) & (3 as c_ulonglong))] as *const *mut tommy_trie_inplace_node_struct) as *mut *mut tommy_trie_inplace_node_struct)))
 
-        (__local_node = (unsafe *__local_let_ptr))
+        (__local_node = (*__local_let_ptr))
 
         (__local_shift = (__local_shift -% 2))
 
@@ -1490,17 +1490,17 @@ unsafe fn trie_inplace_bucket_remove(__param_shift: c_uint, __param_let_ptr: *mu
 
     tommy_trie_inplace_list_remove(__local_let_ptr, __local_remove)
 
-    if ((if (unsafe *__local_let_ptr) == __local_node: 1 else: 0) != 0) {
+    if ((if (*__local_let_ptr) == __local_node: 1 else: 0) != 0) {
         return __local_remove
     }
 
-    if ((if (unsafe *__local_let_ptr) != 0: 1 else: 0) != 0) {
-        (__local_node = (unsafe *__local_let_ptr))
+    if ((if (*__local_let_ptr) != 0: 1 else: 0) != 0) {
+        (__local_node = (*__local_let_ptr))
 
         (__local_i = ((0 as c_int)))
 
         while ((if __local_i < 4: 1 else: 0) != 0) {
-            ((unsafe *__local_node).map[__local_i] = (unsafe *__local_remove).map[__local_i])
+            ((*__local_node).map[__local_i] = (*__local_remove).map[__local_i])
 
             (__local_i = __local_i + 1)
 
@@ -1518,10 +1518,10 @@ unsafe fn trie_inplace_bucket_remove(__param_shift: c_uint, __param_let_ptr: *mu
     (__local_i = (((4 - 1) as c_int)))
 
     while ((if __local_i >= 0: 1 else: 0) != 0) {
-        if ((unsafe *__local_leaf).map[__local_i] != null) {
-            (__local_leaf_let_ptr = (((&raw const (unsafe *__local_leaf).map[__local_i] as *const *mut tommy_trie_inplace_node_struct) as *mut *mut tommy_trie_inplace_node_struct)))
+        if ((*__local_leaf).map[__local_i] != null) {
+            (__local_leaf_let_ptr = (((&raw const (*__local_leaf).map[__local_i] as *const *mut tommy_trie_inplace_node_struct) as *mut *mut tommy_trie_inplace_node_struct)))
 
-            (__local_leaf = (unsafe *__local_leaf_let_ptr))
+            (__local_leaf = (*__local_leaf_let_ptr))
 
             (__local_i = (((4 - 1) as c_int)))
 
@@ -1537,19 +1537,19 @@ unsafe fn trie_inplace_bucket_remove(__param_shift: c_uint, __param_let_ptr: *mu
         return __local_remove
     }
 
-    ((unsafe *__local_leaf_let_ptr) = null)
+    ((*__local_leaf_let_ptr) = null)
 
     (__local_i = ((0 as c_int)))
 
     while ((if __local_i < 4: 1 else: 0) != 0) {
-        ((unsafe *__local_leaf).map[__local_i] = (unsafe *__local_remove).map[__local_i])
+        ((*__local_leaf).map[__local_i] = (*__local_remove).map[__local_i])
 
         (__local_i = __local_i + 1)
 
     }
 
 
-    ((unsafe *__local_let_ptr) = __local_leaf)
+    ((*__local_let_ptr) = __local_leaf)
 
     return __local_remove
 

@@ -10,7 +10,7 @@ pub unsafe fn int_equal(__param_vlocation1: *mut c_void, __param_vlocation2: *mu
 
     (__local_location2 = ((__param_vlocation2 as *mut c_int)))
 
-    return (if (unsafe *__local_location1) == (unsafe *__local_location2): 1 else: 0)
+    return (if (*__local_location1) == (*__local_location2): 1 else: 0)
 
 }
 
@@ -23,11 +23,11 @@ pub unsafe fn int_compare(__param_vlocation1: *mut c_void, __param_vlocation2: *
 
     (__local_location2 = ((__param_vlocation2 as *mut c_int)))
 
-    if ((if (unsafe *__local_location1) < (unsafe *__local_location2): 1 else: 0) != 0) {
+    if ((if (*__local_location1) < (*__local_location2): 1 else: 0) != 0) {
         return -1
 
     }
-    if ((if (unsafe *__local_location1) > (unsafe *__local_location2): 1 else: 0) != 0) {
+    if ((if (*__local_location1) > (*__local_location2): 1 else: 0) != 0) {
         return 1
 
     }

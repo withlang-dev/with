@@ -469,6 +469,9 @@ pub let TOMMY_ALLOCATOR_BLOCK_SIZE: c_int = 4032
 pub fn tommy_swap32[T](x: T) -> T {
     with_bswap32(x)
 }
+pub fn tommy_rot[T](x: T, k: T) -> T {
+    ((x << (k as u32)) | (x >> ((32 - k) as u32)))
+}
 pub let TOMMY_HASHLIN_STATE_STABLE: c_int = 0
 pub let TOMMY_HASHLIN_STATE_GROW: c_int = 1
 pub let TOMMY_HASHLIN_STATE_SHRINK: c_int = 2

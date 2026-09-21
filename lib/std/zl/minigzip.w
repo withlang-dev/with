@@ -33,9 +33,9 @@ unsafe fn string_copy(__param_dst: *mut i8, __param_src: *const i8, __param_len:
 
         (__local_src = __local_src + 1)
 
-        ((unsafe *__local_dst) = (((unsafe *__ci_expr_old_0) as c_char)))
+        ((*__local_dst) = (((*__ci_expr_old_0) as c_char)))
 
-        if ((if (unsafe *__local_dst) == 0: 1 else: 0) != 0) {
+        if ((if (*__local_dst) == 0: 1 else: 0) != 0) {
             return __local_dst
         }
 
@@ -43,7 +43,7 @@ unsafe fn string_copy(__param_dst: *mut i8, __param_src: *const i8, __param_len:
 
     }
 
-    ((unsafe *__local_dst) = ((0 as c_char)))
+    ((*__local_dst) = ((0 as c_char)))
 
     return __local_dst
 
@@ -207,7 +207,7 @@ unsafe fn file_uncompress(__param_file: *mut i8) -> Unit {
 
         (__local_outfile = (&__local_buf[0] as *mut c_char))
 
-        ((unsafe __local_outfile[((__local_len as c_ulong) -% (3 as c_ulong))]) = ((0 as c_char)))
+        ((__local_outfile[((__local_len as c_ulong) -% (3 as c_ulong))]) = ((0 as c_char)))
 
     } else {
         (__local_outfile = ((__param_file as *mut c_char)))
@@ -261,14 +261,14 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
 
     string_copy((&__local_outmode[0] as *mut c_char), c"wb6 ".ptr, ((5 * sizeof[c_char]()) as c_ulong))
 
-    (prog = (((unsafe __local_argv[0]) as *mut c_char)))
+    (prog = (((__local_argv[0]) as *mut c_char)))
 
-    (__local_bname = ((strrchr(((unsafe __local_argv[0]) as *const i8), (47 as c_int)) as *mut c_char)))
+    (__local_bname = ((strrchr(((__local_argv[0]) as *const i8), (47 as c_int)) as *mut c_char)))
 
     if (__local_bname != null) {
         (__local_bname = __local_bname + 1)
     } else {
-        (__local_bname = (((unsafe __local_argv[0]) as *mut c_char)))
+        (__local_bname = (((__local_argv[0]) as *mut c_char)))
     }
 
     (__local_argc = __local_argc - 1)
@@ -288,19 +288,19 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     while ((if __local_argc > 0: 1 else: 0) != 0) {
-        if ((if strcmp(((unsafe *__local_argv) as *const i8), c"-c".ptr) == 0: 1 else: 0) != 0) {
+        if ((if strcmp(((*__local_argv) as *const i8), c"-c".ptr) == 0: 1 else: 0) != 0) {
             (__local_copyout = ((1 as c_int)))
         } else {
-            if ((if strcmp(((unsafe *__local_argv) as *const i8), c"-d".ptr) == 0: 1 else: 0) != 0) {
+            if ((if strcmp(((*__local_argv) as *const i8), c"-d".ptr) == 0: 1 else: 0) != 0) {
                 (__local_uncompr = ((1 as c_int)))
             } else {
-                if ((if strcmp(((unsafe *__local_argv) as *const i8), c"-f".ptr) == 0: 1 else: 0) != 0) {
+                if ((if strcmp(((*__local_argv) as *const i8), c"-f".ptr) == 0: 1 else: 0) != 0) {
                     (__local_outmode[3] = ((102 as c_char)))
                 } else {
-                    if ((if strcmp(((unsafe *__local_argv) as *const i8), c"-h".ptr) == 0: 1 else: 0) != 0) {
+                    if ((if strcmp(((*__local_argv) as *const i8), c"-h".ptr) == 0: 1 else: 0) != 0) {
                         (__local_outmode[3] = ((104 as c_char)))
                     } else {
-                        if ((if strcmp(((unsafe *__local_argv) as *const i8), c"-r".ptr) == 0: 1 else: 0) != 0) {
+                        if ((if strcmp(((*__local_argv) as *const i8), c"-r".ptr) == 0: 1 else: 0) != 0) {
                             (__local_outmode[3] = ((82 as c_char)))
                         } else {
                             var __ci_expr_logic_2: c_int = 0
@@ -309,20 +309,20 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
 
                             var __ci_expr_logic_0: c_int = 0
 
-                            if ((if (unsafe (unsafe *__local_argv)[0]) == 45: 1 else: 0) != 0) {
-                                (__ci_expr_logic_0 = (if (if (unsafe (unsafe *__local_argv)[1]) >= 49: 1 else: 0) != 0: 1 else: 0))
+                            if ((if ((*__local_argv)[0]) == 45: 1 else: 0) != 0) {
+                                (__ci_expr_logic_0 = (if (if ((*__local_argv)[1]) >= 49: 1 else: 0) != 0: 1 else: 0))
                             }
 
                             if (__ci_expr_logic_0 != 0) {
-                                (__ci_expr_logic_1 = (if (if (unsafe (unsafe *__local_argv)[1]) <= 57: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_1 = (if (if ((*__local_argv)[1]) <= 57: 1 else: 0) != 0: 1 else: 0))
                             }
 
                             if (__ci_expr_logic_1 != 0) {
-                                (__ci_expr_logic_2 = (if (if (unsafe (unsafe *__local_argv)[2]) == 0: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_2 = (if (if ((*__local_argv)[2]) == 0: 1 else: 0) != 0: 1 else: 0))
                             }
 
                             if (__ci_expr_logic_2 != 0) {
-                                (__local_outmode[2] = (((unsafe (unsafe *__local_argv)[1]) as c_char)))
+                                (__local_outmode[2] = ((((*__local_argv)[1]) as c_char)))
                             } else {
                                 break
                             }
@@ -375,25 +375,25 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
         loop {
             if (__local_uncompr != 0) {
                 if (__local_copyout != 0) {
-                    (__local_file = gzopen(((unsafe *__local_argv) as *const i8), c"rb".ptr))
+                    (__local_file = gzopen(((*__local_argv) as *const i8), c"rb".ptr))
 
                     if ((if __local_file == null: 1 else: 0) != 0) {
-                        fprintf(libc_stderr(), c"%s: can't gzopen %s\n".ptr, prog, (unsafe *__local_argv))
+                        fprintf(libc_stderr(), c"%s: can't gzopen %s\n".ptr, prog, (*__local_argv))
                     } else {
                         gz_uncompress(__local_file, libc_stdout())
                     }
 
                 } else {
-                    file_uncompress((unsafe *__local_argv))
+                    file_uncompress((*__local_argv))
 
                 }
 
             } else {
                 if (__local_copyout != 0) {
-                    var __local_in_: *mut c_void = fopen(((unsafe *__local_argv) as *const i8), c"rb".ptr)
+                    var __local_in_: *mut c_void = fopen(((*__local_argv) as *const i8), c"rb".ptr)
 
                     if ((if __local_in_ == null: 1 else: 0) != 0) {
-                        perror(((unsafe *__local_argv) as *const i8))
+                        perror(((*__local_argv) as *const i8))
 
                     } else {
                         (__local_file = gzdopen((fileno(libc_stdout()) as c_int), (&__local_outmode[0] as *mut c_char)))
@@ -407,7 +407,7 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
                     }
 
                 } else {
-                    file_compress((unsafe *__local_argv), (&__local_outmode[0] as *mut c_char))
+                    file_compress((*__local_argv), (&__local_outmode[0] as *mut c_char))
 
                 }
 

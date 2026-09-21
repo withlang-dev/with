@@ -55,7 +55,7 @@ pub unsafe fn _pcre2_ord2utf_8(__param_cvalue: c_uint, __param_buffer: *mut u8) 
 
         (__local_buffer = __local_buffer - 1)
 
-        ((unsafe *__ci_expr_old_0) = ((((128 as c_uint) | (((__local_cvalue as c_uint) & (63 as c_uint)) as c_uint)) as u8)))
+        ((*__ci_expr_old_0) = ((((128 as c_uint) | (((__local_cvalue as c_uint) & (63 as c_uint)) as c_uint)) as u8)))
 
 
         (__local_cvalue = __local_cvalue >> (6 as c_uint))
@@ -66,7 +66,7 @@ pub unsafe fn _pcre2_ord2utf_8(__param_cvalue: c_uint, __param_buffer: *mut u8) 
     }
 
 
-    ((unsafe *__local_buffer) = ((((_pcre2_utf8_table2[__local_i] as c_int) | ((__local_cvalue as c_int) as c_int)) as u8)))
+    ((*__local_buffer) = ((((_pcre2_utf8_table2[__local_i] as c_int) | ((__local_cvalue as c_int) as c_int)) as u8)))
 
     return ((__local_i as c_uint) +% (1 as c_uint))
 

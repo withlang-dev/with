@@ -142,25 +142,25 @@ pub fn test_arraylist_append() -> Unit {
         0
     }
 
-    if ((((if not ((if (unsafe (unsafe *__local_arraylist).data[0]) == ((&raw mut variable1 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if ((((if not ((if (unsafe (*__local_arraylist).data[0]) == ((&raw mut variable1 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
         __assert_rtn(c"test_arraylist_append".ptr, c"test-arraylist.c".ptr, (101 as c_int), c"arraylist->data[0] == &variable1".ptr)
     } else {
         0
     }
 
-    if ((((if not ((if (unsafe (unsafe *__local_arraylist).data[1]) == ((&raw mut variable2 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if ((((if not ((if (unsafe (*__local_arraylist).data[1]) == ((&raw mut variable2 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
         __assert_rtn(c"test_arraylist_append".ptr, c"test-arraylist.c".ptr, (102 as c_int), c"arraylist->data[1] == &variable2".ptr)
     } else {
         0
     }
 
-    if ((((if not ((if (unsafe (unsafe *__local_arraylist).data[2]) == ((&raw mut variable3 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if ((((if not ((if (unsafe (*__local_arraylist).data[2]) == ((&raw mut variable3 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
         __assert_rtn(c"test_arraylist_append".ptr, c"test-arraylist.c".ptr, (103 as c_int), c"arraylist->data[2] == &variable3".ptr)
     } else {
         0
     }
 
-    if ((((if not ((if (unsafe (unsafe *__local_arraylist).data[3]) == ((&raw mut variable4 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if ((((if not ((if (unsafe (*__local_arraylist).data[3]) == ((&raw mut variable4 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
         __assert_rtn(c"test_arraylist_append".ptr, c"test-arraylist.c".ptr, (104 as c_int), c"arraylist->data[3] == &variable4".ptr)
     } else {
         0
@@ -285,25 +285,25 @@ pub fn test_arraylist_prepend() -> Unit {
         0
     }
 
-    if ((((if not ((if (unsafe (unsafe *__local_arraylist).data[0]) == ((&raw mut variable4 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if ((((if not ((if (unsafe (*__local_arraylist).data[0]) == ((&raw mut variable4 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
         __assert_rtn(c"test_arraylist_prepend".ptr, c"test-arraylist.c".ptr, (151 as c_int), c"arraylist->data[0] == &variable4".ptr)
     } else {
         0
     }
 
-    if ((((if not ((if (unsafe (unsafe *__local_arraylist).data[1]) == ((&raw mut variable3 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if ((((if not ((if (unsafe (*__local_arraylist).data[1]) == ((&raw mut variable3 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
         __assert_rtn(c"test_arraylist_prepend".ptr, c"test-arraylist.c".ptr, (152 as c_int), c"arraylist->data[1] == &variable3".ptr)
     } else {
         0
     }
 
-    if ((((if not ((if (unsafe (unsafe *__local_arraylist).data[2]) == ((&raw mut variable2 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if ((((if not ((if (unsafe (*__local_arraylist).data[2]) == ((&raw mut variable2 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
         __assert_rtn(c"test_arraylist_prepend".ptr, c"test-arraylist.c".ptr, (153 as c_int), c"arraylist->data[2] == &variable2".ptr)
     } else {
         0
     }
 
-    if ((((if not ((if (unsafe (unsafe *__local_arraylist).data[3]) == ((&raw mut variable1 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if ((((if not ((if (unsafe (*__local_arraylist).data[3]) == ((&raw mut variable1 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
         __assert_rtn(c"test_arraylist_prepend".ptr, c"test-arraylist.c".ptr, (154 as c_int), c"arraylist->data[3] == &variable1".ptr)
     } else {
         0
@@ -398,19 +398,19 @@ pub fn test_arraylist_insert() -> Unit {
         0
     }
 
-    if ((((if not ((if (unsafe (unsafe *__local_arraylist).data[4]) == ((&raw mut variable1 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if ((((if not ((if (unsafe (*__local_arraylist).data[4]) == ((&raw mut variable1 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
         __assert_rtn(c"test_arraylist_insert".ptr, c"test-arraylist.c".ptr, (193 as c_int), c"arraylist->data[4] == &variable1".ptr)
     } else {
         0
     }
 
-    if ((((if not ((if (unsafe (unsafe *__local_arraylist).data[5]) == ((&raw mut variable2 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if ((((if not ((if (unsafe (*__local_arraylist).data[5]) == ((&raw mut variable2 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
         __assert_rtn(c"test_arraylist_insert".ptr, c"test-arraylist.c".ptr, (194 as c_int), c"arraylist->data[5] == &variable2".ptr)
     } else {
         0
     }
 
-    if ((((if not ((if (unsafe (unsafe *__local_arraylist).data[6]) == ((&raw mut variable3 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if ((((if not ((if (unsafe (*__local_arraylist).data[6]) == ((&raw mut variable3 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
         __assert_rtn(c"test_arraylist_insert".ptr, c"test-arraylist.c".ptr, (195 as c_int), c"arraylist->data[6] == &variable3".ptr)
     } else {
         0
@@ -428,43 +428,43 @@ pub fn test_arraylist_insert() -> Unit {
         0
     }
 
-    if ((((if not ((if (unsafe (unsafe *__local_arraylist).data[4]) == ((&raw mut variable1 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if ((((if not ((if (unsafe (*__local_arraylist).data[4]) == ((&raw mut variable1 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
         __assert_rtn(c"test_arraylist_insert".ptr, c"test-arraylist.c".ptr, (200 as c_int), c"arraylist->data[4] == &variable1".ptr)
     } else {
         0
     }
 
-    if ((((if not ((if (unsafe (unsafe *__local_arraylist).data[5]) == ((&raw mut variable4 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if ((((if not ((if (unsafe (*__local_arraylist).data[5]) == ((&raw mut variable4 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
         __assert_rtn(c"test_arraylist_insert".ptr, c"test-arraylist.c".ptr, (201 as c_int), c"arraylist->data[5] == &variable4".ptr)
     } else {
         0
     }
 
-    if ((((if not ((if (unsafe (unsafe *__local_arraylist).data[6]) == ((&raw mut variable2 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if ((((if not ((if (unsafe (*__local_arraylist).data[6]) == ((&raw mut variable2 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
         __assert_rtn(c"test_arraylist_insert".ptr, c"test-arraylist.c".ptr, (202 as c_int), c"arraylist->data[6] == &variable2".ptr)
     } else {
         0
     }
 
-    if ((((if not ((if (unsafe (unsafe *__local_arraylist).data[7]) == ((&raw mut variable3 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if ((((if not ((if (unsafe (*__local_arraylist).data[7]) == ((&raw mut variable3 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
         __assert_rtn(c"test_arraylist_insert".ptr, c"test-arraylist.c".ptr, (203 as c_int), c"arraylist->data[7] == &variable3".ptr)
     } else {
         0
     }
 
-    if ((((if not ((if (unsafe (unsafe *__local_arraylist).data[0]) == ((&raw mut variable1 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if ((((if not ((if (unsafe (*__local_arraylist).data[0]) == ((&raw mut variable1 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
         __assert_rtn(c"test_arraylist_insert".ptr, c"test-arraylist.c".ptr, (206 as c_int), c"arraylist->data[0] == &variable1".ptr)
     } else {
         0
     }
 
-    if ((((if not ((if (unsafe (unsafe *__local_arraylist).data[1]) == ((&raw mut variable2 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if ((((if not ((if (unsafe (*__local_arraylist).data[1]) == ((&raw mut variable2 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
         __assert_rtn(c"test_arraylist_insert".ptr, c"test-arraylist.c".ptr, (207 as c_int), c"arraylist->data[1] == &variable2".ptr)
     } else {
         0
     }
 
-    if ((((if not ((if (unsafe (unsafe *__local_arraylist).data[2]) == ((&raw mut variable3 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if ((((if not ((if (unsafe (*__local_arraylist).data[2]) == ((&raw mut variable3 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
         __assert_rtn(c"test_arraylist_insert".ptr, c"test-arraylist.c".ptr, (208 as c_int), c"arraylist->data[2] == &variable3".ptr)
     } else {
         0
@@ -482,43 +482,43 @@ pub fn test_arraylist_insert() -> Unit {
         0
     }
 
-    if ((((if not ((if (unsafe (unsafe *__local_arraylist).data[0]) == ((&raw mut variable4 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if ((((if not ((if (unsafe (*__local_arraylist).data[0]) == ((&raw mut variable4 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
         __assert_rtn(c"test_arraylist_insert".ptr, c"test-arraylist.c".ptr, (213 as c_int), c"arraylist->data[0] == &variable4".ptr)
     } else {
         0
     }
 
-    if ((((if not ((if (unsafe (unsafe *__local_arraylist).data[1]) == ((&raw mut variable1 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if ((((if not ((if (unsafe (*__local_arraylist).data[1]) == ((&raw mut variable1 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
         __assert_rtn(c"test_arraylist_insert".ptr, c"test-arraylist.c".ptr, (214 as c_int), c"arraylist->data[1] == &variable1".ptr)
     } else {
         0
     }
 
-    if ((((if not ((if (unsafe (unsafe *__local_arraylist).data[2]) == ((&raw mut variable2 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if ((((if not ((if (unsafe (*__local_arraylist).data[2]) == ((&raw mut variable2 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
         __assert_rtn(c"test_arraylist_insert".ptr, c"test-arraylist.c".ptr, (215 as c_int), c"arraylist->data[2] == &variable2".ptr)
     } else {
         0
     }
 
-    if ((((if not ((if (unsafe (unsafe *__local_arraylist).data[3]) == ((&raw mut variable3 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if ((((if not ((if (unsafe (*__local_arraylist).data[3]) == ((&raw mut variable3 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
         __assert_rtn(c"test_arraylist_insert".ptr, c"test-arraylist.c".ptr, (216 as c_int), c"arraylist->data[3] == &variable3".ptr)
     } else {
         0
     }
 
-    if ((((if not ((if (unsafe (unsafe *__local_arraylist).data[15]) == ((&raw mut variable2 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if ((((if not ((if (unsafe (*__local_arraylist).data[15]) == ((&raw mut variable2 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
         __assert_rtn(c"test_arraylist_insert".ptr, c"test-arraylist.c".ptr, (219 as c_int), c"arraylist->data[15] == &variable2".ptr)
     } else {
         0
     }
 
-    if ((((if not ((if (unsafe (unsafe *__local_arraylist).data[16]) == ((&raw mut variable3 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if ((((if not ((if (unsafe (*__local_arraylist).data[16]) == ((&raw mut variable3 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
         __assert_rtn(c"test_arraylist_insert".ptr, c"test-arraylist.c".ptr, (220 as c_int), c"arraylist->data[16] == &variable3".ptr)
     } else {
         0
     }
 
-    if ((((if not ((if (unsafe (unsafe *__local_arraylist).data[17]) == ((&raw mut variable4 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if ((((if not ((if (unsafe (*__local_arraylist).data[17]) == ((&raw mut variable4 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
         __assert_rtn(c"test_arraylist_insert".ptr, c"test-arraylist.c".ptr, (221 as c_int), c"arraylist->data[17] == &variable4".ptr)
     } else {
         0
@@ -536,25 +536,25 @@ pub fn test_arraylist_insert() -> Unit {
         0
     }
 
-    if ((((if not ((if (unsafe (unsafe *__local_arraylist).data[15]) == ((&raw mut variable2 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if ((((if not ((if (unsafe (*__local_arraylist).data[15]) == ((&raw mut variable2 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
         __assert_rtn(c"test_arraylist_insert".ptr, c"test-arraylist.c".ptr, (226 as c_int), c"arraylist->data[15] == &variable2".ptr)
     } else {
         0
     }
 
-    if ((((if not ((if (unsafe (unsafe *__local_arraylist).data[16]) == ((&raw mut variable3 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if ((((if not ((if (unsafe (*__local_arraylist).data[16]) == ((&raw mut variable3 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
         __assert_rtn(c"test_arraylist_insert".ptr, c"test-arraylist.c".ptr, (227 as c_int), c"arraylist->data[16] == &variable3".ptr)
     } else {
         0
     }
 
-    if ((((if not ((if (unsafe (unsafe *__local_arraylist).data[17]) == ((&raw mut variable4 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if ((((if not ((if (unsafe (*__local_arraylist).data[17]) == ((&raw mut variable4 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
         __assert_rtn(c"test_arraylist_insert".ptr, c"test-arraylist.c".ptr, (228 as c_int), c"arraylist->data[17] == &variable4".ptr)
     } else {
         0
     }
 
-    if ((((if not ((if (unsafe (unsafe *__local_arraylist).data[18]) == ((&raw mut variable1 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if ((((if not ((if (unsafe (*__local_arraylist).data[18]) == ((&raw mut variable1 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
         __assert_rtn(c"test_arraylist_insert".ptr, c"test-arraylist.c".ptr, (229 as c_int), c"arraylist->data[18] == &variable1".ptr)
     } else {
         0
@@ -586,25 +586,25 @@ pub fn test_arraylist_remove_range() -> Unit {
         0
     }
 
-    if ((((if not ((if (unsafe (unsafe *__local_arraylist).data[3]) == ((&raw mut variable4 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if ((((if not ((if (unsafe (*__local_arraylist).data[3]) == ((&raw mut variable4 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
         __assert_rtn(c"test_arraylist_remove_range".ptr, c"test-arraylist.c".ptr, (246 as c_int), c"arraylist->data[3] == &variable4".ptr)
     } else {
         0
     }
 
-    if ((((if not ((if (unsafe (unsafe *__local_arraylist).data[4]) == ((&raw mut variable1 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if ((((if not ((if (unsafe (*__local_arraylist).data[4]) == ((&raw mut variable1 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
         __assert_rtn(c"test_arraylist_remove_range".ptr, c"test-arraylist.c".ptr, (247 as c_int), c"arraylist->data[4] == &variable1".ptr)
     } else {
         0
     }
 
-    if ((((if not ((if (unsafe (unsafe *__local_arraylist).data[5]) == ((&raw mut variable2 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if ((((if not ((if (unsafe (*__local_arraylist).data[5]) == ((&raw mut variable2 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
         __assert_rtn(c"test_arraylist_remove_range".ptr, c"test-arraylist.c".ptr, (248 as c_int), c"arraylist->data[5] == &variable2".ptr)
     } else {
         0
     }
 
-    if ((((if not ((if (unsafe (unsafe *__local_arraylist).data[6]) == ((&raw mut variable3 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if ((((if not ((if (unsafe (*__local_arraylist).data[6]) == ((&raw mut variable3 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
         __assert_rtn(c"test_arraylist_remove_range".ptr, c"test-arraylist.c".ptr, (249 as c_int), c"arraylist->data[6] == &variable3".ptr)
     } else {
         0
@@ -618,25 +618,25 @@ pub fn test_arraylist_remove_range() -> Unit {
         0
     }
 
-    if ((((if not ((if (unsafe (unsafe *__local_arraylist).data[3]) == ((&raw mut variable4 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if ((((if not ((if (unsafe (*__local_arraylist).data[3]) == ((&raw mut variable4 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
         __assert_rtn(c"test_arraylist_remove_range".ptr, c"test-arraylist.c".ptr, (254 as c_int), c"arraylist->data[3] == &variable4".ptr)
     } else {
         0
     }
 
-    if ((((if not ((if (unsafe (unsafe *__local_arraylist).data[4]) == ((&raw mut variable4 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if ((((if not ((if (unsafe (*__local_arraylist).data[4]) == ((&raw mut variable4 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
         __assert_rtn(c"test_arraylist_remove_range".ptr, c"test-arraylist.c".ptr, (255 as c_int), c"arraylist->data[4] == &variable4".ptr)
     } else {
         0
     }
 
-    if ((((if not ((if (unsafe (unsafe *__local_arraylist).data[5]) == ((&raw mut variable1 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if ((((if not ((if (unsafe (*__local_arraylist).data[5]) == ((&raw mut variable1 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
         __assert_rtn(c"test_arraylist_remove_range".ptr, c"test-arraylist.c".ptr, (256 as c_int), c"arraylist->data[5] == &variable1".ptr)
     } else {
         0
     }
 
-    if ((((if not ((if (unsafe (unsafe *__local_arraylist).data[6]) == ((&raw mut variable2 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if ((((if not ((if (unsafe (*__local_arraylist).data[6]) == ((&raw mut variable2 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
         __assert_rtn(c"test_arraylist_remove_range".ptr, c"test-arraylist.c".ptr, (257 as c_int), c"arraylist->data[6] == &variable2".ptr)
     } else {
         0
@@ -667,25 +667,25 @@ pub fn test_arraylist_remove() -> Unit {
         0
     }
 
-    if ((((if not ((if (unsafe (unsafe *__local_arraylist).data[3]) == ((&raw mut variable4 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if ((((if not ((if (unsafe (*__local_arraylist).data[3]) == ((&raw mut variable4 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
         __assert_rtn(c"test_arraylist_remove".ptr, c"test-arraylist.c".ptr, (275 as c_int), c"arraylist->data[3] == &variable4".ptr)
     } else {
         0
     }
 
-    if ((((if not ((if (unsafe (unsafe *__local_arraylist).data[4]) == ((&raw mut variable1 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if ((((if not ((if (unsafe (*__local_arraylist).data[4]) == ((&raw mut variable1 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
         __assert_rtn(c"test_arraylist_remove".ptr, c"test-arraylist.c".ptr, (276 as c_int), c"arraylist->data[4] == &variable1".ptr)
     } else {
         0
     }
 
-    if ((((if not ((if (unsafe (unsafe *__local_arraylist).data[5]) == ((&raw mut variable2 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if ((((if not ((if (unsafe (*__local_arraylist).data[5]) == ((&raw mut variable2 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
         __assert_rtn(c"test_arraylist_remove".ptr, c"test-arraylist.c".ptr, (277 as c_int), c"arraylist->data[5] == &variable2".ptr)
     } else {
         0
     }
 
-    if ((((if not ((if (unsafe (unsafe *__local_arraylist).data[6]) == ((&raw mut variable3 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if ((((if not ((if (unsafe (*__local_arraylist).data[6]) == ((&raw mut variable3 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
         __assert_rtn(c"test_arraylist_remove".ptr, c"test-arraylist.c".ptr, (278 as c_int), c"arraylist->data[6] == &variable3".ptr)
     } else {
         0
@@ -699,25 +699,25 @@ pub fn test_arraylist_remove() -> Unit {
         0
     }
 
-    if ((((if not ((if (unsafe (unsafe *__local_arraylist).data[3]) == ((&raw mut variable4 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if ((((if not ((if (unsafe (*__local_arraylist).data[3]) == ((&raw mut variable4 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
         __assert_rtn(c"test_arraylist_remove".ptr, c"test-arraylist.c".ptr, (283 as c_int), c"arraylist->data[3] == &variable4".ptr)
     } else {
         0
     }
 
-    if ((((if not ((if (unsafe (unsafe *__local_arraylist).data[4]) == ((&raw mut variable2 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if ((((if not ((if (unsafe (*__local_arraylist).data[4]) == ((&raw mut variable2 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
         __assert_rtn(c"test_arraylist_remove".ptr, c"test-arraylist.c".ptr, (284 as c_int), c"arraylist->data[4] == &variable2".ptr)
     } else {
         0
     }
 
-    if ((((if not ((if (unsafe (unsafe *__local_arraylist).data[5]) == ((&raw mut variable3 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if ((((if not ((if (unsafe (*__local_arraylist).data[5]) == ((&raw mut variable3 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
         __assert_rtn(c"test_arraylist_remove".ptr, c"test-arraylist.c".ptr, (285 as c_int), c"arraylist->data[5] == &variable3".ptr)
     } else {
         0
     }
 
-    if ((((if not ((if (unsafe (unsafe *__local_arraylist).data[6]) == ((&raw mut variable4 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if ((((if not ((if (unsafe (*__local_arraylist).data[6]) == ((&raw mut variable4 as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
         __assert_rtn(c"test_arraylist_remove".ptr, c"test-arraylist.c".ptr, (286 as c_int), c"arraylist->data[6] == &variable4".ptr)
     } else {
         0
@@ -872,7 +872,7 @@ pub fn test_arraylist_sort() -> Unit {
     while ((if __local_i < __local_num_entries: 1 else: 0) != 0) {
         var __local_value: *mut c_int
 
-        (__local_value = (((unsafe (unsafe *__local_arraylist).data[__local_i]) as *mut c_int)))
+        (__local_value = (((unsafe (*__local_arraylist).data[__local_i]) as *mut c_int)))
 
         if ((((if not ((if (unsafe *__local_value) == __local_sorted[__local_i]: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
             __assert_rtn(c"test_arraylist_sort".ptr, c"test-arraylist.c".ptr, (379 as c_int), c"*value == sorted[i]".ptr)
@@ -912,7 +912,7 @@ pub fn test_arraylist_sort() -> Unit {
         0
     }
 
-    if ((((if not ((if (unsafe (unsafe *__local_arraylist).data[0]) == (((&raw const __local_entries[0] as *const c_int) as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if ((((if not ((if (unsafe (*__local_arraylist).data[0]) == (((&raw const __local_entries[0] as *const c_int) as *mut c_int)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
         __assert_rtn(c"test_arraylist_sort".ptr, c"test-arraylist.c".ptr, (400 as c_int), c"arraylist->data[0] == &entries[0]".ptr)
     } else {
         0

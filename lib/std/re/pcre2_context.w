@@ -30,7 +30,7 @@ use std.re.pcre2_valid_utf
 use std.re.pcre2_xclass
 
 pub unsafe fn pcre2_general_context_copy_8(__param_gcontext: *mut pcre2_real_general_context_8) -> *mut pcre2_real_general_context_8 {
-    var __local_newcontext: *mut pcre2_real_general_context_8 = (((unsafe *(&raw const (unsafe *__param_gcontext).memctl as *const pcre2_memctl)).malloc((sizeof[pcre2_real_general_context_8]() as c_ulong), (unsafe *(&raw const (unsafe *__param_gcontext).memctl as *const pcre2_memctl)).memory_data) as *mut pcre2_real_general_context_8))
+    var __local_newcontext: *mut pcre2_real_general_context_8 = (((*(&raw const (*__param_gcontext).memctl as *const pcre2_memctl)).malloc((sizeof[pcre2_real_general_context_8]() as c_ulong), (*(&raw const (*__param_gcontext).memctl as *const pcre2_memctl)).memory_data) as *mut pcre2_real_general_context_8))
 
     if ((if __local_newcontext == null: 1 else: 0) != 0) {
         return ((null as *mut pcre2_real_general_context_8))
@@ -61,11 +61,11 @@ pub unsafe fn pcre2_general_context_create_8(__param_private_malloc: unsafe exte
         return ((null as *mut pcre2_real_general_context_8))
     }
 
-    ((unsafe *__local_gcontext).memctl.malloc = __local_private_malloc)
+    ((*__local_gcontext).memctl.malloc = __local_private_malloc)
 
-    ((unsafe *__local_gcontext).memctl.free = __local_private_free)
+    ((*__local_gcontext).memctl.free = __local_private_free)
 
-    ((unsafe *__local_gcontext).memctl.memory_data = __param_memory_data)
+    ((*__local_gcontext).memctl.memory_data = __param_memory_data)
 
     return __local_gcontext
 
@@ -73,13 +73,13 @@ pub unsafe fn pcre2_general_context_create_8(__param_private_malloc: unsafe exte
 
 pub unsafe fn pcre2_general_context_free_8(__param_gcontext: *mut pcre2_real_general_context_8) -> Unit {
     if ((if __param_gcontext != null: 1 else: 0) != 0) {
-        (unsafe *(&raw const (unsafe *__param_gcontext).memctl as *const pcre2_memctl)).free((__param_gcontext as *mut c_void), (unsafe *(&raw const (unsafe *__param_gcontext).memctl as *const pcre2_memctl)).memory_data)
+        (*(&raw const (*__param_gcontext).memctl as *const pcre2_memctl)).free((__param_gcontext as *mut c_void), (*(&raw const (*__param_gcontext).memctl as *const pcre2_memctl)).memory_data)
     }
 
 }
 
 pub unsafe fn pcre2_compile_context_copy_8(__param_ccontext: *mut pcre2_real_compile_context_8) -> *mut pcre2_real_compile_context_8 {
-    var __local_newcontext: *mut pcre2_real_compile_context_8 = (((unsafe *(&raw const (unsafe *__param_ccontext).memctl as *const pcre2_memctl)).malloc((sizeof[pcre2_real_compile_context_8]() as c_ulong), (unsafe *(&raw const (unsafe *__param_ccontext).memctl as *const pcre2_memctl)).memory_data) as *mut pcre2_real_compile_context_8))
+    var __local_newcontext: *mut pcre2_real_compile_context_8 = (((*(&raw const (*__param_ccontext).memctl as *const pcre2_memctl)).malloc((sizeof[pcre2_real_compile_context_8]() as c_ulong), (*(&raw const (*__param_ccontext).memctl as *const pcre2_memctl)).memory_data) as *mut pcre2_real_compile_context_8))
 
     if ((if __local_newcontext == null: 1 else: 0) != 0) {
         return ((null as *mut pcre2_real_compile_context_8))
@@ -98,10 +98,10 @@ pub unsafe fn pcre2_compile_context_create_8(__param_gcontext: *mut pcre2_real_g
         return ((null as *mut pcre2_real_compile_context_8))
     }
 
-    with_memcpy((&raw mut (unsafe *__local_ccontext) as *mut u8), (&raw const _pcre2_default_compile_context_8 as *const u8), sizeof[pcre2_real_compile_context_8]())
+    with_memcpy((&raw mut (*__local_ccontext) as *mut u8), (&raw const _pcre2_default_compile_context_8 as *const u8), sizeof[pcre2_real_compile_context_8]())
 
     if ((if __param_gcontext != null: 1 else: 0) != 0) {
-        with_memcpy((&raw mut (unsafe *(__local_ccontext as *mut pcre2_memctl)) as *mut u8), (&raw const (unsafe *(__param_gcontext as *mut pcre2_memctl)) as *const u8), sizeof[pcre2_memctl]())
+        with_memcpy((&raw mut (*(__local_ccontext as *mut pcre2_memctl)) as *mut u8), (&raw const (*(__param_gcontext as *mut pcre2_memctl)) as *const u8), sizeof[pcre2_memctl]())
     }
 
     return __local_ccontext
@@ -110,7 +110,7 @@ pub unsafe fn pcre2_compile_context_create_8(__param_gcontext: *mut pcre2_real_g
 
 pub unsafe fn pcre2_compile_context_free_8(__param_ccontext: *mut pcre2_real_compile_context_8) -> Unit {
     if ((if __param_ccontext != null: 1 else: 0) != 0) {
-        (unsafe *(&raw const (unsafe *__param_ccontext).memctl as *const pcre2_memctl)).free((__param_ccontext as *mut c_void), (unsafe *(&raw const (unsafe *__param_ccontext).memctl as *const pcre2_memctl)).memory_data)
+        (*(&raw const (*__param_ccontext).memctl as *const pcre2_memctl)).free((__param_ccontext as *mut c_void), (*(&raw const (*__param_ccontext).memctl as *const pcre2_memctl)).memory_data)
     }
 
 }
@@ -118,13 +118,13 @@ pub unsafe fn pcre2_compile_context_free_8(__param_ccontext: *mut pcre2_real_com
 pub unsafe fn pcre2_set_bsr_8(__param_ccontext: *mut pcre2_real_compile_context_8, __param_value: c_uint) -> c_int {
     match __param_value {
         2 => {
-            ((unsafe *__param_ccontext).bsr_convention = ((__param_value as c_ushort)))
+            ((*__param_ccontext).bsr_convention = ((__param_value as c_ushort)))
 
             return 0
 
         },
         1 => {
-            ((unsafe *__param_ccontext).bsr_convention = ((__param_value as c_ushort)))
+            ((*__param_ccontext).bsr_convention = ((__param_value as c_ushort)))
 
             return 0
 
@@ -137,35 +137,35 @@ pub unsafe fn pcre2_set_bsr_8(__param_ccontext: *mut pcre2_real_compile_context_
 }
 
 pub unsafe fn pcre2_set_character_tables_8(__param_ccontext: *mut pcre2_real_compile_context_8, __param_tables: *const u8) -> c_int {
-    ((unsafe *__param_ccontext).tables = __param_tables)
+    ((*__param_ccontext).tables = __param_tables)
 
     return 0
 
 }
 
 pub unsafe fn pcre2_set_compile_extra_options_8(__param_ccontext: *mut pcre2_real_compile_context_8, __param_options: c_uint) -> c_int {
-    ((unsafe *__param_ccontext).extra_options = __param_options)
+    ((*__param_ccontext).extra_options = __param_options)
 
     return 0
 
 }
 
 pub unsafe fn pcre2_set_max_pattern_length_8(__param_ccontext: *mut pcre2_real_compile_context_8, __param_length: c_ulong) -> c_int {
-    ((unsafe *__param_ccontext).max_pattern_length = __param_length)
+    ((*__param_ccontext).max_pattern_length = __param_length)
 
     return 0
 
 }
 
 pub unsafe fn pcre2_set_max_pattern_compiled_length_8(__param_ccontext: *mut pcre2_real_compile_context_8, __param_length: c_ulong) -> c_int {
-    ((unsafe *__param_ccontext).max_pattern_compiled_length = __param_length)
+    ((*__param_ccontext).max_pattern_compiled_length = __param_length)
 
     return 0
 
 }
 
 pub unsafe fn pcre2_set_max_varlookbehind_8(__param_ccontext: *mut pcre2_real_compile_context_8, __param_limit: c_uint) -> c_int {
-    ((unsafe *__param_ccontext).max_varlookbehind = __param_limit)
+    ((*__param_ccontext).max_varlookbehind = __param_limit)
 
     return 0
 
@@ -174,37 +174,37 @@ pub unsafe fn pcre2_set_max_varlookbehind_8(__param_ccontext: *mut pcre2_real_co
 pub unsafe fn pcre2_set_newline_8(__param_ccontext: *mut pcre2_real_compile_context_8, __param_newline: c_uint) -> c_int {
     match __param_newline {
         1 => {
-            ((unsafe *__param_ccontext).newline_convention = ((__param_newline as c_ushort)))
+            ((*__param_ccontext).newline_convention = ((__param_newline as c_ushort)))
 
             return 0
 
         },
         2 => {
-            ((unsafe *__param_ccontext).newline_convention = ((__param_newline as c_ushort)))
+            ((*__param_ccontext).newline_convention = ((__param_newline as c_ushort)))
 
             return 0
 
         },
         3 => {
-            ((unsafe *__param_ccontext).newline_convention = ((__param_newline as c_ushort)))
+            ((*__param_ccontext).newline_convention = ((__param_newline as c_ushort)))
 
             return 0
 
         },
         4 => {
-            ((unsafe *__param_ccontext).newline_convention = ((__param_newline as c_ushort)))
+            ((*__param_ccontext).newline_convention = ((__param_newline as c_ushort)))
 
             return 0
 
         },
         5 => {
-            ((unsafe *__param_ccontext).newline_convention = ((__param_newline as c_ushort)))
+            ((*__param_ccontext).newline_convention = ((__param_newline as c_ushort)))
 
             return 0
 
         },
         6 => {
-            ((unsafe *__param_ccontext).newline_convention = ((__param_newline as c_ushort)))
+            ((*__param_ccontext).newline_convention = ((__param_newline as c_ushort)))
 
             return 0
 
@@ -217,16 +217,16 @@ pub unsafe fn pcre2_set_newline_8(__param_ccontext: *mut pcre2_real_compile_cont
 }
 
 pub unsafe fn pcre2_set_parens_nest_limit_8(__param_ccontext: *mut pcre2_real_compile_context_8, __param_limit: c_uint) -> c_int {
-    ((unsafe *__param_ccontext).parens_nest_limit = __param_limit)
+    ((*__param_ccontext).parens_nest_limit = __param_limit)
 
     return 0
 
 }
 
 pub unsafe fn pcre2_set_compile_recursion_guard_8(__param_ccontext: *mut pcre2_real_compile_context_8, __param_guard: unsafe extern "C" fn(c_uint, *mut c_void) -> c_int, __param_user_data: *mut c_void) -> c_int {
-    ((unsafe *__param_ccontext).stack_guard = __param_guard)
+    ((*__param_ccontext).stack_guard = __param_guard)
 
-    ((unsafe *__param_ccontext).stack_guard_data = __param_user_data)
+    ((*__param_ccontext).stack_guard_data = __param_user_data)
 
     return 0
 
@@ -240,10 +240,10 @@ pub unsafe fn pcre2_set_optimize_8(__param_ccontext: *mut pcre2_real_compile_con
     while true {
         match __param_directive {
             0 => {
-                ((unsafe *__param_ccontext).optimization_flags = ((0 as c_uint)))
+                ((*__param_ccontext).optimization_flags = ((0 as c_uint)))
             },
             1 => {
-                ((unsafe *__param_ccontext).optimization_flags = ((7 as c_uint)))
+                ((*__param_ccontext).optimization_flags = ((7 as c_uint)))
             },
             _ => {
                 var __ci_expr_logic_0: c_int = 0
@@ -254,9 +254,9 @@ pub unsafe fn pcre2_set_optimize_8(__param_ccontext: *mut pcre2_real_compile_con
 
                 if (__ci_expr_logic_0 != 0) {
                     if ((if ((__param_directive as c_uint) & (1 as c_uint)) != 0: 1 else: 0) != 0) {
-                        ((unsafe *__param_ccontext).optimization_flags = ((unsafe *__param_ccontext).optimization_flags as c_uint) & ((~((1 as c_uint) << (((((__param_directive as c_uint) >> (1 as c_uint)) as c_uint) -% (32 as c_uint)) as c_uint))) as c_uint))
+                        ((*__param_ccontext).optimization_flags = ((*__param_ccontext).optimization_flags as c_uint) & ((~((1 as c_uint) << (((((__param_directive as c_uint) >> (1 as c_uint)) as c_uint) -% (32 as c_uint)) as c_uint))) as c_uint))
                     } else {
-                        ((unsafe *__param_ccontext).optimization_flags = ((unsafe *__param_ccontext).optimization_flags as c_uint) | (((1 as c_uint) << (((((__param_directive as c_uint) >> (1 as c_uint)) as c_uint) -% (32 as c_uint)) as c_uint)) as c_uint))
+                        ((*__param_ccontext).optimization_flags = ((*__param_ccontext).optimization_flags as c_uint) | (((1 as c_uint) << (((((__param_directive as c_uint) >> (1 as c_uint)) as c_uint) -% (32 as c_uint)) as c_uint)) as c_uint))
                     }
 
                     return 0
@@ -278,7 +278,7 @@ pub unsafe fn pcre2_set_optimize_8(__param_ccontext: *mut pcre2_real_compile_con
 }
 
 pub unsafe fn pcre2_convert_context_copy_8(__param_ccontext: *mut pcre2_real_convert_context_8) -> *mut pcre2_real_convert_context_8 {
-    var __local_newcontext: *mut pcre2_real_convert_context_8 = (((unsafe *(&raw const (unsafe *__param_ccontext).memctl as *const pcre2_memctl)).malloc((sizeof[pcre2_real_convert_context_8]() as c_ulong), (unsafe *(&raw const (unsafe *__param_ccontext).memctl as *const pcre2_memctl)).memory_data) as *mut pcre2_real_convert_context_8))
+    var __local_newcontext: *mut pcre2_real_convert_context_8 = (((*(&raw const (*__param_ccontext).memctl as *const pcre2_memctl)).malloc((sizeof[pcre2_real_convert_context_8]() as c_ulong), (*(&raw const (*__param_ccontext).memctl as *const pcre2_memctl)).memory_data) as *mut pcre2_real_convert_context_8))
 
     if ((if __local_newcontext == null: 1 else: 0) != 0) {
         return ((null as *mut pcre2_real_convert_context_8))
@@ -297,10 +297,10 @@ pub unsafe fn pcre2_convert_context_create_8(__param_gcontext: *mut pcre2_real_g
         return ((null as *mut pcre2_real_convert_context_8))
     }
 
-    with_memcpy((&raw mut (unsafe *__local_ccontext) as *mut u8), (&raw const _pcre2_default_convert_context_8 as *const u8), sizeof[pcre2_real_convert_context_8]())
+    with_memcpy((&raw mut (*__local_ccontext) as *mut u8), (&raw const _pcre2_default_convert_context_8 as *const u8), sizeof[pcre2_real_convert_context_8]())
 
     if ((if __param_gcontext != null: 1 else: 0) != 0) {
-        with_memcpy((&raw mut (unsafe *(__local_ccontext as *mut pcre2_memctl)) as *mut u8), (&raw const (unsafe *(__param_gcontext as *mut pcre2_memctl)) as *const u8), sizeof[pcre2_memctl]())
+        with_memcpy((&raw mut (*(__local_ccontext as *mut pcre2_memctl)) as *mut u8), (&raw const (*(__param_gcontext as *mut pcre2_memctl)) as *const u8), sizeof[pcre2_memctl]())
     }
 
     return __local_ccontext
@@ -309,7 +309,7 @@ pub unsafe fn pcre2_convert_context_create_8(__param_gcontext: *mut pcre2_real_g
 
 pub unsafe fn pcre2_convert_context_free_8(__param_ccontext: *mut pcre2_real_convert_context_8) -> Unit {
     if ((if __param_ccontext != null: 1 else: 0) != 0) {
-        (unsafe *(&raw const (unsafe *__param_ccontext).memctl as *const pcre2_memctl)).free((__param_ccontext as *mut c_void), (unsafe *(&raw const (unsafe *__param_ccontext).memctl as *const pcre2_memctl)).memory_data)
+        (*(&raw const (*__param_ccontext).memctl as *const pcre2_memctl)).free((__param_ccontext as *mut c_void), (*(&raw const (*__param_ccontext).memctl as *const pcre2_memctl)).memory_data)
     }
 
 }
@@ -335,7 +335,7 @@ pub unsafe fn pcre2_set_glob_escape_8(__param_ccontext: *mut pcre2_real_convert_
     }
 
 
-    ((unsafe *__param_ccontext).glob_escape = __param_escape)
+    ((*__param_ccontext).glob_escape = __param_escape)
 
     return 0
 
@@ -359,14 +359,14 @@ pub unsafe fn pcre2_set_glob_separator_8(__param_ccontext: *mut pcre2_real_conve
     }
 
 
-    ((unsafe *__param_ccontext).glob_separator = __param_separator)
+    ((*__param_ccontext).glob_separator = __param_separator)
 
     return 0
 
 }
 
 pub unsafe fn pcre2_match_context_copy_8(__param_mcontext: *mut pcre2_real_match_context_8) -> *mut pcre2_real_match_context_8 {
-    var __local_newcontext: *mut pcre2_real_match_context_8 = (((unsafe *(&raw const (unsafe *__param_mcontext).memctl as *const pcre2_memctl)).malloc((sizeof[pcre2_real_match_context_8]() as c_ulong), (unsafe *(&raw const (unsafe *__param_mcontext).memctl as *const pcre2_memctl)).memory_data) as *mut pcre2_real_match_context_8))
+    var __local_newcontext: *mut pcre2_real_match_context_8 = (((*(&raw const (*__param_mcontext).memctl as *const pcre2_memctl)).malloc((sizeof[pcre2_real_match_context_8]() as c_ulong), (*(&raw const (*__param_mcontext).memctl as *const pcre2_memctl)).memory_data) as *mut pcre2_real_match_context_8))
 
     if ((if __local_newcontext == null: 1 else: 0) != 0) {
         return ((null as *mut pcre2_real_match_context_8))
@@ -385,10 +385,10 @@ pub unsafe fn pcre2_match_context_create_8(__param_gcontext: *mut pcre2_real_gen
         return ((null as *mut pcre2_real_match_context_8))
     }
 
-    with_memcpy((&raw mut (unsafe *__local_mcontext) as *mut u8), (&raw const _pcre2_default_match_context_8 as *const u8), sizeof[pcre2_real_match_context_8]())
+    with_memcpy((&raw mut (*__local_mcontext) as *mut u8), (&raw const _pcre2_default_match_context_8 as *const u8), sizeof[pcre2_real_match_context_8]())
 
     if ((if __param_gcontext != null: 1 else: 0) != 0) {
-        with_memcpy((&raw mut (unsafe *(__local_mcontext as *mut pcre2_memctl)) as *mut u8), (&raw const (unsafe *(__param_gcontext as *mut pcre2_memctl)) as *const u8), sizeof[pcre2_memctl]())
+        with_memcpy((&raw mut (*(__local_mcontext as *mut pcre2_memctl)) as *mut u8), (&raw const (*(__param_gcontext as *mut pcre2_memctl)) as *const u8), sizeof[pcre2_memctl]())
     }
 
     return __local_mcontext
@@ -397,61 +397,61 @@ pub unsafe fn pcre2_match_context_create_8(__param_gcontext: *mut pcre2_real_gen
 
 pub unsafe fn pcre2_match_context_free_8(__param_mcontext: *mut pcre2_real_match_context_8) -> Unit {
     if ((if __param_mcontext != null: 1 else: 0) != 0) {
-        (unsafe *(&raw const (unsafe *__param_mcontext).memctl as *const pcre2_memctl)).free((__param_mcontext as *mut c_void), (unsafe *(&raw const (unsafe *__param_mcontext).memctl as *const pcre2_memctl)).memory_data)
+        (*(&raw const (*__param_mcontext).memctl as *const pcre2_memctl)).free((__param_mcontext as *mut c_void), (*(&raw const (*__param_mcontext).memctl as *const pcre2_memctl)).memory_data)
     }
 
 }
 
 pub unsafe fn pcre2_set_callout_8(__param_mcontext: *mut pcre2_real_match_context_8, __param_callout: unsafe extern "C" fn(*mut pcre2_callout_block_8, *mut c_void) -> c_int, __param_callout_data: *mut c_void) -> c_int {
-    ((unsafe *__param_mcontext).callout = __param_callout)
+    ((*__param_mcontext).callout = __param_callout)
 
-    ((unsafe *__param_mcontext).callout_data = __param_callout_data)
+    ((*__param_mcontext).callout_data = __param_callout_data)
 
     return 0
 
 }
 
 pub unsafe fn pcre2_set_substitute_callout_8(__param_mcontext: *mut pcre2_real_match_context_8, __param_substitute_callout: unsafe extern "C" fn(*mut pcre2_substitute_callout_block_8, *mut c_void) -> c_int, __param_substitute_callout_data: *mut c_void) -> c_int {
-    ((unsafe *__param_mcontext).substitute_callout = __param_substitute_callout)
+    ((*__param_mcontext).substitute_callout = __param_substitute_callout)
 
-    ((unsafe *__param_mcontext).substitute_callout_data = __param_substitute_callout_data)
+    ((*__param_mcontext).substitute_callout_data = __param_substitute_callout_data)
 
     return 0
 
 }
 
 pub unsafe fn pcre2_set_substitute_case_callout_8(__param_mcontext: *mut pcre2_real_match_context_8, __param_substitute_case_callout: unsafe extern "C" fn(*const u8, c_ulong, *mut u8, c_ulong, c_int, *mut c_void) -> c_ulong, __param_substitute_case_callout_data: *mut c_void) -> c_int {
-    ((unsafe *__param_mcontext).substitute_case_callout = __param_substitute_case_callout)
+    ((*__param_mcontext).substitute_case_callout = __param_substitute_case_callout)
 
-    ((unsafe *__param_mcontext).substitute_case_callout_data = __param_substitute_case_callout_data)
+    ((*__param_mcontext).substitute_case_callout_data = __param_substitute_case_callout_data)
 
     return 0
 
 }
 
 pub unsafe fn pcre2_set_depth_limit_8(__param_mcontext: *mut pcre2_real_match_context_8, __param_limit: c_uint) -> c_int {
-    ((unsafe *__param_mcontext).depth_limit = __param_limit)
+    ((*__param_mcontext).depth_limit = __param_limit)
 
     return 0
 
 }
 
 pub unsafe fn pcre2_set_heap_limit_8(__param_mcontext: *mut pcre2_real_match_context_8, __param_limit: c_uint) -> c_int {
-    ((unsafe *__param_mcontext).heap_limit = __param_limit)
+    ((*__param_mcontext).heap_limit = __param_limit)
 
     return 0
 
 }
 
 pub unsafe fn pcre2_set_match_limit_8(__param_mcontext: *mut pcre2_real_match_context_8, __param_limit: c_uint) -> c_int {
-    ((unsafe *__param_mcontext).match_limit = __param_limit)
+    ((*__param_mcontext).match_limit = __param_limit)
 
     return 0
 
 }
 
 pub unsafe fn pcre2_set_offset_limit_8(__param_mcontext: *mut pcre2_real_match_context_8, __param_limit: c_ulong) -> c_int {
-    ((unsafe *__param_mcontext).offset_limit = __param_limit)
+    ((*__param_mcontext).offset_limit = __param_limit)
 
     return 0
 
@@ -483,7 +483,7 @@ pub unsafe fn _pcre2_memctl_malloc_8(__param_size: c_ulong, __param_memctl: *mut
         if ((if __param_memctl == null: 1 else: 0) != 0) {
             (__ci_expr_ternary_0 = ((with_alloc((__param_size as i64)) as *mut c_void)))
         } else {
-            (__ci_expr_ternary_0 = (unsafe *__param_memctl).malloc(__param_size, (unsafe *__param_memctl).memory_data))
+            (__ci_expr_ternary_0 = (*__param_memctl).malloc(__param_size, (*__param_memctl).memory_data))
         }
         __ci_expr_ternary_0
     }
@@ -495,14 +495,14 @@ pub unsafe fn _pcre2_memctl_malloc_8(__param_size: c_ulong, __param_memctl: *mut
     (__local_newmemctl = ((__local_yield_ as *mut pcre2_memctl)))
 
     if ((if __param_memctl == null: 1 else: 0) != 0) {
-        ((unsafe *__local_newmemctl).malloc = default_malloc)
+        ((*__local_newmemctl).malloc = default_malloc)
 
-        ((unsafe *__local_newmemctl).free = default_free)
+        ((*__local_newmemctl).free = default_free)
 
-        ((unsafe *__local_newmemctl).memory_data = null)
+        ((*__local_newmemctl).memory_data = null)
 
     } else {
-        with_memcpy((&raw mut (unsafe *__local_newmemctl) as *mut u8), (&raw const (unsafe *__param_memctl) as *const u8), sizeof[pcre2_memctl]())
+        with_memcpy((&raw mut (*__local_newmemctl) as *mut u8), (&raw const (*__param_memctl) as *const u8), sizeof[pcre2_memctl]())
     }
 
     return __local_yield_

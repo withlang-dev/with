@@ -17,23 +17,23 @@ use std.zl.inftrees
 pub unsafe fn _tr_init(__param_s: *mut internal_state) -> Unit {
     tr_static_init()
 
-    ((unsafe *__param_s).l_desc.dyn_tree = (&(unsafe *__param_s).dyn_ltree[0] as *mut ct_data_s))
+    ((*__param_s).l_desc.dyn_tree = (&(*__param_s).dyn_ltree[0] as *mut ct_data_s))
 
-    ((unsafe *__param_s).l_desc.stat_desc = ((&raw const static_l_desc as *const static_tree_desc_s)))
+    ((*__param_s).l_desc.stat_desc = ((&raw const static_l_desc as *const static_tree_desc_s)))
 
-    ((unsafe *__param_s).d_desc.dyn_tree = (&(unsafe *__param_s).dyn_dtree[0] as *mut ct_data_s))
+    ((*__param_s).d_desc.dyn_tree = (&(*__param_s).dyn_dtree[0] as *mut ct_data_s))
 
-    ((unsafe *__param_s).d_desc.stat_desc = ((&raw const static_d_desc as *const static_tree_desc_s)))
+    ((*__param_s).d_desc.stat_desc = ((&raw const static_d_desc as *const static_tree_desc_s)))
 
-    ((unsafe *__param_s).bl_desc.dyn_tree = (&(unsafe *__param_s).bl_tree[0] as *mut ct_data_s))
+    ((*__param_s).bl_desc.dyn_tree = (&(*__param_s).bl_tree[0] as *mut ct_data_s))
 
-    ((unsafe *__param_s).bl_desc.stat_desc = ((&raw const static_bl_desc as *const static_tree_desc_s)))
+    ((*__param_s).bl_desc.stat_desc = ((&raw const static_bl_desc as *const static_tree_desc_s)))
 
-    ((unsafe *__param_s).bi_buf = ((0 as c_ushort)))
+    ((*__param_s).bi_buf = ((0 as c_ushort)))
 
-    ((unsafe *__param_s).bi_valid = ((0 as c_int)))
+    ((*__param_s).bi_valid = ((0 as c_int)))
 
-    ((unsafe *__param_s).bi_used = ((0 as c_int)))
+    ((*__param_s).bi_used = ((0 as c_int)))
 
     init_block(__param_s)
 
@@ -41,37 +41,37 @@ pub unsafe fn _tr_init(__param_s: *mut internal_state) -> Unit {
 
 pub unsafe fn _tr_tally(__param_s: *mut internal_state, __param_dist: c_uint, __param_lc: c_uint) -> c_int {
     var __local_dist = __param_dist
-    var __ci_expr_old_0: c_uint = (unsafe *__param_s).sym_next
+    var __ci_expr_old_0: c_uint = (*__param_s).sym_next
 
-    ((unsafe *__param_s).sym_next = ((unsafe *__param_s).sym_next +% 1))
+    ((*__param_s).sym_next = ((*__param_s).sym_next +% 1))
 
-    ((unsafe (unsafe *__param_s).sym_buf[__ci_expr_old_0]) = ((__local_dist as u8)))
-
-
-    var __ci_expr_old_1: c_uint = (unsafe *__param_s).sym_next
-
-    ((unsafe *__param_s).sym_next = ((unsafe *__param_s).sym_next +% 1))
-
-    ((unsafe (unsafe *__param_s).sym_buf[__ci_expr_old_1]) = ((((__local_dist as c_uint) >> (8 as c_uint)) as u8)))
+    (((*__param_s).sym_buf[__ci_expr_old_0]) = ((__local_dist as u8)))
 
 
-    var __ci_expr_old_2: c_uint = (unsafe *__param_s).sym_next
+    var __ci_expr_old_1: c_uint = (*__param_s).sym_next
 
-    ((unsafe *__param_s).sym_next = ((unsafe *__param_s).sym_next +% 1))
+    ((*__param_s).sym_next = ((*__param_s).sym_next +% 1))
 
-    ((unsafe (unsafe *__param_s).sym_buf[__ci_expr_old_2]) = ((__param_lc as u8)))
+    (((*__param_s).sym_buf[__ci_expr_old_1]) = ((((__local_dist as c_uint) >> (8 as c_uint)) as u8)))
+
+
+    var __ci_expr_old_2: c_uint = (*__param_s).sym_next
+
+    ((*__param_s).sym_next = ((*__param_s).sym_next +% 1))
+
+    (((*__param_s).sym_buf[__ci_expr_old_2]) = ((__param_lc as u8)))
 
 
     if ((if __local_dist == 0: 1 else: 0) != 0) {
-        ((unsafe *__param_s).dyn_ltree[__param_lc].fc.freq = ((unsafe *__param_s).dyn_ltree[__param_lc].fc.freq +% 1))
+        ((*__param_s).dyn_ltree[__param_lc].fc.freq = ((*__param_s).dyn_ltree[__param_lc].fc.freq +% 1))
 
     } else {
-        ((unsafe *__param_s).matches = ((unsafe *__param_s).matches +% 1))
+        ((*__param_s).matches = ((*__param_s).matches +% 1))
 
         (__local_dist = (__local_dist -% 1))
 
 
-        ((unsafe *__param_s).dyn_ltree[(((_length_code[__param_lc] as c_int) + 256) + 1)].fc.freq = ((unsafe *__param_s).dyn_ltree[(((_length_code[__param_lc] as c_int) + 256) + 1)].fc.freq +% 1))
+        ((*__param_s).dyn_ltree[(((_length_code[__param_lc] as c_int) + 256) + 1)].fc.freq = ((*__param_s).dyn_ltree[(((_length_code[__param_lc] as c_int) + 256) + 1)].fc.freq +% 1))
 
         var __ci_expr_ternary_3: c_int = 0
 
@@ -81,12 +81,12 @@ pub unsafe fn _tr_tally(__param_s: *mut internal_state, __param_dist: c_uint, __
             (__ci_expr_ternary_3 = ((_dist_code[((256 as c_uint) +% (((__local_dist as c_uint) >> (7 as c_uint)) as c_uint))] as c_int)))
         }
 
-        ((unsafe *__param_s).dyn_dtree[__ci_expr_ternary_3].fc.freq = ((unsafe *__param_s).dyn_dtree[__ci_expr_ternary_3].fc.freq +% 1))
+        ((*__param_s).dyn_dtree[__ci_expr_ternary_3].fc.freq = ((*__param_s).dyn_dtree[__ci_expr_ternary_3].fc.freq +% 1))
 
 
     }
 
-    return (if (unsafe *__param_s).sym_next == (unsafe *__param_s).sym_end: 1 else: 0)
+    return (if (*__param_s).sym_next == (*__param_s).sym_end: 1 else: 0)
 
 }
 
@@ -98,22 +98,22 @@ pub unsafe fn _tr_flush_block(__param_s: *mut internal_state, __param_buf: *mut 
 
     var __local_max_blindex: c_int = ((0 as c_int))
 
-    if ((if (unsafe *__param_s).level > 0: 1 else: 0) != 0) {
-        if ((if (unsafe *__param_s).strm.data_type == 2: 1 else: 0) != 0) {
-            ((unsafe *__param_s).strm.data_type = ((detect_data_type(__param_s) as c_int)))
+    if ((if (*__param_s).level > 0: 1 else: 0) != 0) {
+        if ((if (*__param_s).strm.data_type == 2: 1 else: 0) != 0) {
+            ((*__param_s).strm.data_type = ((detect_data_type(__param_s) as c_int)))
         }
 
-        build_tree(__param_s, ((&raw const (unsafe *__param_s).l_desc as *const tree_desc_s) as *mut tree_desc_s))
+        build_tree(__param_s, ((&raw const (*__param_s).l_desc as *const tree_desc_s) as *mut tree_desc_s))
 
 
-        build_tree(__param_s, ((&raw const (unsafe *__param_s).d_desc as *const tree_desc_s) as *mut tree_desc_s))
+        build_tree(__param_s, ((&raw const (*__param_s).d_desc as *const tree_desc_s) as *mut tree_desc_s))
 
 
         (__local_max_blindex = ((build_bl_tree(__param_s) as c_int)))
 
-        (__local_opt_lenb = (((((((((unsafe *__param_s).opt_len as c_ulong) +% (3 as c_ulong)) as c_ulong) +% (7 as c_ulong)) as c_ulong) >> (3 as c_uint)) as c_ulong)))
+        (__local_opt_lenb = (((((((((*__param_s).opt_len as c_ulong) +% (3 as c_ulong)) as c_ulong) +% (7 as c_ulong)) as c_ulong) >> (3 as c_uint)) as c_ulong)))
 
-        (__local_static_lenb = (((((((((unsafe *__param_s).static_len as c_ulong) +% (3 as c_ulong)) as c_ulong) +% (7 as c_ulong)) as c_ulong) >> (3 as c_uint)) as c_ulong)))
+        (__local_static_lenb = (((((((((*__param_s).static_len as c_ulong) +% (3 as c_ulong)) as c_ulong) +% (7 as c_ulong)) as c_ulong) >> (3 as c_uint)) as c_ulong)))
 
 
         var __ci_expr_logic_0: c_int
@@ -121,7 +121,7 @@ pub unsafe fn _tr_flush_block(__param_s: *mut internal_state, __param_buf: *mut 
         if ((if __local_static_lenb <= __local_opt_lenb: 1 else: 0) != 0) {
             (__ci_expr_logic_0 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_0 = (if (if (unsafe *__param_s).strategy == 4: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_0 = (if (if (*__param_s).strategy == 4: 1 else: 0) != 0: 1 else: 0))
         }
 
         if (__ci_expr_logic_0 != 0) {
@@ -151,39 +151,39 @@ pub unsafe fn _tr_flush_block(__param_s: *mut internal_state, __param_buf: *mut 
         if ((if __local_static_lenb == __local_opt_lenb: 1 else: 0) != 0) {
             var __local_len: c_int = ((3 as c_int))
 
-            if ((if (unsafe *__param_s).bi_valid > (16 - __local_len): 1 else: 0) != 0) {
+            if ((if (*__param_s).bi_valid > (16 - __local_len): 1 else: 0) != 0) {
                 var __local_val: c_int = (((((1 as c_int) << (1 as c_uint)) + __param_last) as c_int))
 
-                ((unsafe *__param_s).bi_buf = ((unsafe *__param_s).bi_buf as c_ushort) | ((((__local_val as c_ushort) as c_int) << ((unsafe *__param_s).bi_valid as c_uint)) as c_ushort))
+                ((*__param_s).bi_buf = ((*__param_s).bi_buf as c_ushort) | ((((__local_val as c_ushort) as c_int) << ((*__param_s).bi_valid as c_uint)) as c_ushort))
 
-                var __ci_expr_old_2: c_ulong = (unsafe *__param_s).pending
+                var __ci_expr_old_2: c_ulong = (*__param_s).pending
 
-                ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
+                ((*__param_s).pending = ((*__param_s).pending +% 1))
 
-                ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_2]) = ((((((unsafe *__param_s).bi_buf as c_int) as c_int) & (255 as c_int)) as u8)))
-
-
-
-
-                var __ci_expr_old_3: c_ulong = (unsafe *__param_s).pending
-
-                ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
-
-                ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_3]) = (((((unsafe *__param_s).bi_buf as c_int) >> (8 as c_uint)) as u8)))
+                (((*__param_s).pending_buf[__ci_expr_old_2]) = ((((((*__param_s).bi_buf as c_int) as c_int) & (255 as c_int)) as u8)))
 
 
 
 
+                var __ci_expr_old_3: c_ulong = (*__param_s).pending
+
+                ((*__param_s).pending = ((*__param_s).pending +% 1))
+
+                (((*__param_s).pending_buf[__ci_expr_old_3]) = (((((*__param_s).bi_buf as c_int) >> (8 as c_uint)) as u8)))
 
 
-                ((unsafe *__param_s).bi_buf = (((((__local_val as c_ushort) as c_int) >> ((16 - (unsafe *__param_s).bi_valid) as c_uint)) as c_ushort)))
 
-                ((unsafe *__param_s).bi_valid = (unsafe *__param_s).bi_valid + (__local_len - 16))
+
+
+
+                ((*__param_s).bi_buf = (((((__local_val as c_ushort) as c_int) >> ((16 - (*__param_s).bi_valid) as c_uint)) as c_ushort)))
+
+                ((*__param_s).bi_valid = (*__param_s).bi_valid + (__local_len - 16))
 
             } else {
-                ((unsafe *__param_s).bi_buf = ((unsafe *__param_s).bi_buf as c_ushort) | (((((((1 as c_int) << (1 as c_uint)) + __param_last) as c_ushort) as c_int) << ((unsafe *__param_s).bi_valid as c_uint)) as c_ushort))
+                ((*__param_s).bi_buf = ((*__param_s).bi_buf as c_ushort) | (((((((1 as c_int) << (1 as c_uint)) + __param_last) as c_ushort) as c_int) << ((*__param_s).bi_valid as c_uint)) as c_ushort))
 
-                ((unsafe *__param_s).bi_valid = (unsafe *__param_s).bi_valid + __local_len)
+                ((*__param_s).bi_valid = (*__param_s).bi_valid + __local_len)
 
             }
 
@@ -194,47 +194,47 @@ pub unsafe fn _tr_flush_block(__param_s: *mut internal_state, __param_buf: *mut 
         } else {
             var __local_len_1: c_int = ((3 as c_int))
 
-            if ((if (unsafe *__param_s).bi_valid > (16 - __local_len_1): 1 else: 0) != 0) {
+            if ((if (*__param_s).bi_valid > (16 - __local_len_1): 1 else: 0) != 0) {
                 var __local_val_1: c_int = (((((2 as c_int) << (1 as c_uint)) + __param_last) as c_int))
 
-                ((unsafe *__param_s).bi_buf = ((unsafe *__param_s).bi_buf as c_ushort) | ((((__local_val_1 as c_ushort) as c_int) << ((unsafe *__param_s).bi_valid as c_uint)) as c_ushort))
+                ((*__param_s).bi_buf = ((*__param_s).bi_buf as c_ushort) | ((((__local_val_1 as c_ushort) as c_int) << ((*__param_s).bi_valid as c_uint)) as c_ushort))
 
-                var __ci_expr_old_4: c_ulong = (unsafe *__param_s).pending
+                var __ci_expr_old_4: c_ulong = (*__param_s).pending
 
-                ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
+                ((*__param_s).pending = ((*__param_s).pending +% 1))
 
-                ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_4]) = ((((((unsafe *__param_s).bi_buf as c_int) as c_int) & (255 as c_int)) as u8)))
-
-
-
-
-                var __ci_expr_old_5: c_ulong = (unsafe *__param_s).pending
-
-                ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
-
-                ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_5]) = (((((unsafe *__param_s).bi_buf as c_int) >> (8 as c_uint)) as u8)))
+                (((*__param_s).pending_buf[__ci_expr_old_4]) = ((((((*__param_s).bi_buf as c_int) as c_int) & (255 as c_int)) as u8)))
 
 
 
 
+                var __ci_expr_old_5: c_ulong = (*__param_s).pending
+
+                ((*__param_s).pending = ((*__param_s).pending +% 1))
+
+                (((*__param_s).pending_buf[__ci_expr_old_5]) = (((((*__param_s).bi_buf as c_int) >> (8 as c_uint)) as u8)))
 
 
-                ((unsafe *__param_s).bi_buf = (((((__local_val_1 as c_ushort) as c_int) >> ((16 - (unsafe *__param_s).bi_valid) as c_uint)) as c_ushort)))
 
-                ((unsafe *__param_s).bi_valid = (unsafe *__param_s).bi_valid + (__local_len_1 - 16))
+
+
+
+                ((*__param_s).bi_buf = (((((__local_val_1 as c_ushort) as c_int) >> ((16 - (*__param_s).bi_valid) as c_uint)) as c_ushort)))
+
+                ((*__param_s).bi_valid = (*__param_s).bi_valid + (__local_len_1 - 16))
 
             } else {
-                ((unsafe *__param_s).bi_buf = ((unsafe *__param_s).bi_buf as c_ushort) | (((((((2 as c_int) << (1 as c_uint)) + __param_last) as c_ushort) as c_int) << ((unsafe *__param_s).bi_valid as c_uint)) as c_ushort))
+                ((*__param_s).bi_buf = ((*__param_s).bi_buf as c_ushort) | (((((((2 as c_int) << (1 as c_uint)) + __param_last) as c_ushort) as c_int) << ((*__param_s).bi_valid as c_uint)) as c_ushort))
 
-                ((unsafe *__param_s).bi_valid = (unsafe *__param_s).bi_valid + __local_len_1)
+                ((*__param_s).bi_valid = (*__param_s).bi_valid + __local_len_1)
 
             }
 
 
 
-            send_all_trees(__param_s, (((unsafe *(&raw const (unsafe *__param_s).l_desc as *const tree_desc_s)).max_code + 1) as c_int), (((unsafe *(&raw const (unsafe *__param_s).d_desc as *const tree_desc_s)).max_code + 1) as c_int), ((__local_max_blindex + 1) as c_int))
+            send_all_trees(__param_s, (((*(&raw const (*__param_s).l_desc as *const tree_desc_s)).max_code + 1) as c_int), (((*(&raw const (*__param_s).d_desc as *const tree_desc_s)).max_code + 1) as c_int), ((__local_max_blindex + 1) as c_int))
 
-            compress_block(__param_s, (&(unsafe *__param_s).dyn_ltree[0] as *const ct_data_s), (&(unsafe *__param_s).dyn_dtree[0] as *const ct_data_s))
+            compress_block(__param_s, (&(*__param_s).dyn_ltree[0] as *const ct_data_s), (&(*__param_s).dyn_dtree[0] as *const ct_data_s))
 
         }
     }
@@ -259,39 +259,39 @@ pub unsafe fn _tr_flush_bits(__param_s: *mut internal_state) -> Unit {
 pub unsafe fn _tr_align(__param_s: *mut internal_state) -> Unit {
     var __local_len: c_int = ((3 as c_int))
 
-    if ((if (unsafe *__param_s).bi_valid > (16 - __local_len): 1 else: 0) != 0) {
+    if ((if (*__param_s).bi_valid > (16 - __local_len): 1 else: 0) != 0) {
         var __local_val: c_int = ((((1 as c_int) << (1 as c_uint)) as c_int))
 
-        ((unsafe *__param_s).bi_buf = ((unsafe *__param_s).bi_buf as c_ushort) | ((((__local_val as c_ushort) as c_int) << ((unsafe *__param_s).bi_valid as c_uint)) as c_ushort))
+        ((*__param_s).bi_buf = ((*__param_s).bi_buf as c_ushort) | ((((__local_val as c_ushort) as c_int) << ((*__param_s).bi_valid as c_uint)) as c_ushort))
 
-        var __ci_expr_old_0: c_ulong = (unsafe *__param_s).pending
+        var __ci_expr_old_0: c_ulong = (*__param_s).pending
 
-        ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
+        ((*__param_s).pending = ((*__param_s).pending +% 1))
 
-        ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_0]) = ((((((unsafe *__param_s).bi_buf as c_int) as c_int) & (255 as c_int)) as u8)))
-
-
-
-
-        var __ci_expr_old_1: c_ulong = (unsafe *__param_s).pending
-
-        ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
-
-        ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_1]) = (((((unsafe *__param_s).bi_buf as c_int) >> (8 as c_uint)) as u8)))
+        (((*__param_s).pending_buf[__ci_expr_old_0]) = ((((((*__param_s).bi_buf as c_int) as c_int) & (255 as c_int)) as u8)))
 
 
 
 
+        var __ci_expr_old_1: c_ulong = (*__param_s).pending
+
+        ((*__param_s).pending = ((*__param_s).pending +% 1))
+
+        (((*__param_s).pending_buf[__ci_expr_old_1]) = (((((*__param_s).bi_buf as c_int) >> (8 as c_uint)) as u8)))
 
 
-        ((unsafe *__param_s).bi_buf = (((((__local_val as c_ushort) as c_int) >> ((16 - (unsafe *__param_s).bi_valid) as c_uint)) as c_ushort)))
 
-        ((unsafe *__param_s).bi_valid = (unsafe *__param_s).bi_valid + (__local_len - 16))
+
+
+
+        ((*__param_s).bi_buf = (((((__local_val as c_ushort) as c_int) >> ((16 - (*__param_s).bi_valid) as c_uint)) as c_ushort)))
+
+        ((*__param_s).bi_valid = (*__param_s).bi_valid + (__local_len - 16))
 
     } else {
-        ((unsafe *__param_s).bi_buf = ((unsafe *__param_s).bi_buf as c_ushort) | (((2 as c_int) << ((unsafe *__param_s).bi_valid as c_uint)) as c_ushort))
+        ((*__param_s).bi_buf = ((*__param_s).bi_buf as c_ushort) | (((2 as c_int) << ((*__param_s).bi_valid as c_uint)) as c_ushort))
 
-        ((unsafe *__param_s).bi_valid = (unsafe *__param_s).bi_valid + __local_len)
+        ((*__param_s).bi_valid = (*__param_s).bi_valid + __local_len)
 
     }
 
@@ -299,39 +299,39 @@ pub unsafe fn _tr_align(__param_s: *mut internal_state) -> Unit {
 
     var __local_len_1: c_int = ((static_ltree[256].dl.len as c_int))
 
-    if ((if (unsafe *__param_s).bi_valid > (16 - __local_len_1): 1 else: 0) != 0) {
+    if ((if (*__param_s).bi_valid > (16 - __local_len_1): 1 else: 0) != 0) {
         var __local_val_1: c_int = ((static_ltree[256].fc.code as c_int))
 
-        ((unsafe *__param_s).bi_buf = ((unsafe *__param_s).bi_buf as c_ushort) | ((((__local_val_1 as c_ushort) as c_int) << ((unsafe *__param_s).bi_valid as c_uint)) as c_ushort))
+        ((*__param_s).bi_buf = ((*__param_s).bi_buf as c_ushort) | ((((__local_val_1 as c_ushort) as c_int) << ((*__param_s).bi_valid as c_uint)) as c_ushort))
 
-        var __ci_expr_old_2: c_ulong = (unsafe *__param_s).pending
+        var __ci_expr_old_2: c_ulong = (*__param_s).pending
 
-        ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
+        ((*__param_s).pending = ((*__param_s).pending +% 1))
 
-        ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_2]) = ((((((unsafe *__param_s).bi_buf as c_int) as c_int) & (255 as c_int)) as u8)))
-
-
-
-
-        var __ci_expr_old_3: c_ulong = (unsafe *__param_s).pending
-
-        ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
-
-        ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_3]) = (((((unsafe *__param_s).bi_buf as c_int) >> (8 as c_uint)) as u8)))
+        (((*__param_s).pending_buf[__ci_expr_old_2]) = ((((((*__param_s).bi_buf as c_int) as c_int) & (255 as c_int)) as u8)))
 
 
 
 
+        var __ci_expr_old_3: c_ulong = (*__param_s).pending
+
+        ((*__param_s).pending = ((*__param_s).pending +% 1))
+
+        (((*__param_s).pending_buf[__ci_expr_old_3]) = (((((*__param_s).bi_buf as c_int) >> (8 as c_uint)) as u8)))
 
 
-        ((unsafe *__param_s).bi_buf = (((((__local_val_1 as c_ushort) as c_int) >> ((16 - (unsafe *__param_s).bi_valid) as c_uint)) as c_ushort)))
 
-        ((unsafe *__param_s).bi_valid = (unsafe *__param_s).bi_valid + (__local_len_1 - 16))
+
+
+
+        ((*__param_s).bi_buf = (((((__local_val_1 as c_ushort) as c_int) >> ((16 - (*__param_s).bi_valid) as c_uint)) as c_ushort)))
+
+        ((*__param_s).bi_valid = (*__param_s).bi_valid + (__local_len_1 - 16))
 
     } else {
-        ((unsafe *__param_s).bi_buf = ((unsafe *__param_s).bi_buf as c_ushort) | (((static_ltree[256].fc.code as c_int) << ((unsafe *__param_s).bi_valid as c_uint)) as c_ushort))
+        ((*__param_s).bi_buf = ((*__param_s).bi_buf as c_ushort) | (((static_ltree[256].fc.code as c_int) << ((*__param_s).bi_valid as c_uint)) as c_ushort))
 
-        ((unsafe *__param_s).bi_valid = (unsafe *__param_s).bi_valid + __local_len_1)
+        ((*__param_s).bi_valid = (*__param_s).bi_valid + __local_len_1)
 
     }
 
@@ -344,39 +344,39 @@ pub unsafe fn _tr_align(__param_s: *mut internal_state) -> Unit {
 pub unsafe fn _tr_stored_block(__param_s: *mut internal_state, __param_buf: *mut i8, __param_stored_len: c_ulong, __param_last: c_int) -> Unit {
     var __local_len: c_int = ((3 as c_int))
 
-    if ((if (unsafe *__param_s).bi_valid > (16 - __local_len): 1 else: 0) != 0) {
+    if ((if (*__param_s).bi_valid > (16 - __local_len): 1 else: 0) != 0) {
         var __local_val: c_int = (((((0 as c_int) << (1 as c_uint)) + __param_last) as c_int))
 
-        ((unsafe *__param_s).bi_buf = ((unsafe *__param_s).bi_buf as c_ushort) | ((((__local_val as c_ushort) as c_int) << ((unsafe *__param_s).bi_valid as c_uint)) as c_ushort))
+        ((*__param_s).bi_buf = ((*__param_s).bi_buf as c_ushort) | ((((__local_val as c_ushort) as c_int) << ((*__param_s).bi_valid as c_uint)) as c_ushort))
 
-        var __ci_expr_old_0: c_ulong = (unsafe *__param_s).pending
+        var __ci_expr_old_0: c_ulong = (*__param_s).pending
 
-        ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
+        ((*__param_s).pending = ((*__param_s).pending +% 1))
 
-        ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_0]) = ((((((unsafe *__param_s).bi_buf as c_int) as c_int) & (255 as c_int)) as u8)))
-
-
-
-
-        var __ci_expr_old_1: c_ulong = (unsafe *__param_s).pending
-
-        ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
-
-        ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_1]) = (((((unsafe *__param_s).bi_buf as c_int) >> (8 as c_uint)) as u8)))
+        (((*__param_s).pending_buf[__ci_expr_old_0]) = ((((((*__param_s).bi_buf as c_int) as c_int) & (255 as c_int)) as u8)))
 
 
 
 
+        var __ci_expr_old_1: c_ulong = (*__param_s).pending
+
+        ((*__param_s).pending = ((*__param_s).pending +% 1))
+
+        (((*__param_s).pending_buf[__ci_expr_old_1]) = (((((*__param_s).bi_buf as c_int) >> (8 as c_uint)) as u8)))
 
 
-        ((unsafe *__param_s).bi_buf = (((((__local_val as c_ushort) as c_int) >> ((16 - (unsafe *__param_s).bi_valid) as c_uint)) as c_ushort)))
 
-        ((unsafe *__param_s).bi_valid = (unsafe *__param_s).bi_valid + (__local_len - 16))
+
+
+
+        ((*__param_s).bi_buf = (((((__local_val as c_ushort) as c_int) >> ((16 - (*__param_s).bi_valid) as c_uint)) as c_ushort)))
+
+        ((*__param_s).bi_valid = (*__param_s).bi_valid + (__local_len - 16))
 
     } else {
-        ((unsafe *__param_s).bi_buf = ((unsafe *__param_s).bi_buf as c_ushort) | (((((((0 as c_int) << (1 as c_uint)) + __param_last) as c_ushort) as c_int) << ((unsafe *__param_s).bi_valid as c_uint)) as c_ushort))
+        ((*__param_s).bi_buf = ((*__param_s).bi_buf as c_ushort) | (((((((0 as c_int) << (1 as c_uint)) + __param_last) as c_ushort) as c_int) << ((*__param_s).bi_valid as c_uint)) as c_ushort))
 
-        ((unsafe *__param_s).bi_valid = (unsafe *__param_s).bi_valid + __local_len)
+        ((*__param_s).bi_valid = (*__param_s).bi_valid + __local_len)
 
     }
 
@@ -384,40 +384,40 @@ pub unsafe fn _tr_stored_block(__param_s: *mut internal_state, __param_buf: *mut
 
     bi_windup(__param_s)
 
-    var __ci_expr_old_2: c_ulong = (unsafe *__param_s).pending
+    var __ci_expr_old_2: c_ulong = (*__param_s).pending
 
-    ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
+    ((*__param_s).pending = ((*__param_s).pending +% 1))
 
-    ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_2]) = ((((((__param_stored_len as c_ushort) as c_int) as c_int) & (255 as c_int)) as u8)))
-
-
-
-
-    var __ci_expr_old_3: c_ulong = (unsafe *__param_s).pending
-
-    ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
-
-    ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_3]) = (((((__param_stored_len as c_ushort) as c_int) >> (8 as c_uint)) as u8)))
+    (((*__param_s).pending_buf[__ci_expr_old_2]) = ((((((__param_stored_len as c_ushort) as c_int) as c_int) & (255 as c_int)) as u8)))
 
 
 
 
+    var __ci_expr_old_3: c_ulong = (*__param_s).pending
 
+    ((*__param_s).pending = ((*__param_s).pending +% 1))
 
-    var __ci_expr_old_4: c_ulong = (unsafe *__param_s).pending
-
-    ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
-
-    ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_4]) = (((((((~__param_stored_len) as c_ushort) as c_int) as c_int) & (255 as c_int)) as u8)))
-
+    (((*__param_s).pending_buf[__ci_expr_old_3]) = (((((__param_stored_len as c_ushort) as c_int) >> (8 as c_uint)) as u8)))
 
 
 
-    var __ci_expr_old_5: c_ulong = (unsafe *__param_s).pending
 
-    ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
 
-    ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_5]) = ((((((~__param_stored_len) as c_ushort) as c_int) >> (8 as c_uint)) as u8)))
+
+    var __ci_expr_old_4: c_ulong = (*__param_s).pending
+
+    ((*__param_s).pending = ((*__param_s).pending +% 1))
+
+    (((*__param_s).pending_buf[__ci_expr_old_4]) = (((((((~__param_stored_len) as c_ushort) as c_int) as c_int) & (255 as c_int)) as u8)))
+
+
+
+
+    var __ci_expr_old_5: c_ulong = (*__param_s).pending
+
+    ((*__param_s).pending = ((*__param_s).pending +% 1))
+
+    (((*__param_s).pending_buf[__ci_expr_old_5]) = ((((((~__param_stored_len) as c_ushort) as c_int) >> (8 as c_uint)) as u8)))
 
 
 
@@ -425,10 +425,10 @@ pub unsafe fn _tr_stored_block(__param_s: *mut internal_state, __param_buf: *mut
 
 
     if (__param_stored_len != 0) {
-        with_memcpy(((((unsafe *__param_s).pending_buf + ((unsafe *__param_s).pending as usize)) as *mut c_void) as *mut u8), (((__param_buf as *mut u8) as *const c_void) as *const u8), (__param_stored_len as i64))
+        with_memcpy(((((*__param_s).pending_buf + ((*__param_s).pending as usize)) as *mut c_void) as *mut u8), (((__param_buf as *mut u8) as *const c_void) as *const u8), (__param_stored_len as i64))
     }
 
-    ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% __param_stored_len))
+    ((*__param_s).pending = ((*__param_s).pending +% __param_stored_len))
 
 }
 
@@ -456,45 +456,45 @@ fn bi_reverse(__param_code: c_uint, __param_len: c_int) -> c_uint {
 }
 
 unsafe fn bi_flush(__param_s: *mut internal_state) -> Unit {
-    if ((if (unsafe *__param_s).bi_valid == 16: 1 else: 0) != 0) {
-        var __ci_expr_old_0: c_ulong = (unsafe *__param_s).pending
+    if ((if (*__param_s).bi_valid == 16: 1 else: 0) != 0) {
+        var __ci_expr_old_0: c_ulong = (*__param_s).pending
 
-        ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
+        ((*__param_s).pending = ((*__param_s).pending +% 1))
 
-        ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_0]) = ((((((unsafe *__param_s).bi_buf as c_int) as c_int) & (255 as c_int)) as u8)))
-
-
-
-
-        var __ci_expr_old_1: c_ulong = (unsafe *__param_s).pending
-
-        ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
-
-        ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_1]) = (((((unsafe *__param_s).bi_buf as c_int) >> (8 as c_uint)) as u8)))
+        (((*__param_s).pending_buf[__ci_expr_old_0]) = ((((((*__param_s).bi_buf as c_int) as c_int) & (255 as c_int)) as u8)))
 
 
 
 
+        var __ci_expr_old_1: c_ulong = (*__param_s).pending
+
+        ((*__param_s).pending = ((*__param_s).pending +% 1))
+
+        (((*__param_s).pending_buf[__ci_expr_old_1]) = (((((*__param_s).bi_buf as c_int) >> (8 as c_uint)) as u8)))
 
 
-        ((unsafe *__param_s).bi_buf = ((0 as c_ushort)))
 
-        ((unsafe *__param_s).bi_valid = ((0 as c_int)))
+
+
+
+        ((*__param_s).bi_buf = ((0 as c_ushort)))
+
+        ((*__param_s).bi_valid = ((0 as c_int)))
 
     } else {
-        if ((if (unsafe *__param_s).bi_valid >= 8: 1 else: 0) != 0) {
-            var __ci_expr_old_2: c_ulong = (unsafe *__param_s).pending
+        if ((if (*__param_s).bi_valid >= 8: 1 else: 0) != 0) {
+            var __ci_expr_old_2: c_ulong = (*__param_s).pending
 
-            ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
+            ((*__param_s).pending = ((*__param_s).pending +% 1))
 
-            ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_2]) = (((unsafe *__param_s).bi_buf as u8)))
-
-
+            (((*__param_s).pending_buf[__ci_expr_old_2]) = (((*__param_s).bi_buf as u8)))
 
 
-            ((unsafe *__param_s).bi_buf = ((unsafe *__param_s).bi_buf as c_uint) >> (8 as c_uint))
 
-            ((unsafe *__param_s).bi_valid = (unsafe *__param_s).bi_valid - 8)
+
+            ((*__param_s).bi_buf = ((*__param_s).bi_buf as c_uint) >> (8 as c_uint))
+
+            ((*__param_s).bi_valid = (*__param_s).bi_valid - 8)
 
         }
     }
@@ -502,21 +502,21 @@ unsafe fn bi_flush(__param_s: *mut internal_state) -> Unit {
 }
 
 unsafe fn bi_windup(__param_s: *mut internal_state) -> Unit {
-    if ((if (unsafe *__param_s).bi_valid > 8: 1 else: 0) != 0) {
-        var __ci_expr_old_0: c_ulong = (unsafe *__param_s).pending
+    if ((if (*__param_s).bi_valid > 8: 1 else: 0) != 0) {
+        var __ci_expr_old_0: c_ulong = (*__param_s).pending
 
-        ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
+        ((*__param_s).pending = ((*__param_s).pending +% 1))
 
-        ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_0]) = ((((((unsafe *__param_s).bi_buf as c_int) as c_int) & (255 as c_int)) as u8)))
-
-
+        (((*__param_s).pending_buf[__ci_expr_old_0]) = ((((((*__param_s).bi_buf as c_int) as c_int) & (255 as c_int)) as u8)))
 
 
-        var __ci_expr_old_1: c_ulong = (unsafe *__param_s).pending
 
-        ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
 
-        ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_1]) = (((((unsafe *__param_s).bi_buf as c_int) >> (8 as c_uint)) as u8)))
+        var __ci_expr_old_1: c_ulong = (*__param_s).pending
+
+        ((*__param_s).pending = ((*__param_s).pending +% 1))
+
+        (((*__param_s).pending_buf[__ci_expr_old_1]) = (((((*__param_s).bi_buf as c_int) >> (8 as c_uint)) as u8)))
 
 
 
@@ -524,12 +524,12 @@ unsafe fn bi_windup(__param_s: *mut internal_state) -> Unit {
 
 
     } else {
-        if ((if (unsafe *__param_s).bi_valid > 0: 1 else: 0) != 0) {
-            var __ci_expr_old_2: c_ulong = (unsafe *__param_s).pending
+        if ((if (*__param_s).bi_valid > 0: 1 else: 0) != 0) {
+            var __ci_expr_old_2: c_ulong = (*__param_s).pending
 
-            ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
+            ((*__param_s).pending = ((*__param_s).pending +% 1))
 
-            ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_2]) = (((unsafe *__param_s).bi_buf as u8)))
+            (((*__param_s).pending_buf[__ci_expr_old_2]) = (((*__param_s).bi_buf as u8)))
 
 
 
@@ -537,11 +537,11 @@ unsafe fn bi_windup(__param_s: *mut internal_state) -> Unit {
         }
     }
 
-    ((unsafe *__param_s).bi_used = (((((((unsafe *__param_s).bi_valid - 1) as c_int) & (7 as c_int)) + 1) as c_int)))
+    ((*__param_s).bi_used = (((((((*__param_s).bi_valid - 1) as c_int) & (7 as c_int)) + 1) as c_int)))
 
-    ((unsafe *__param_s).bi_buf = ((0 as c_ushort)))
+    ((*__param_s).bi_buf = ((0 as c_ushort)))
 
-    ((unsafe *__param_s).bi_valid = ((0 as c_int)))
+    ((*__param_s).bi_valid = ((0 as c_int)))
 
 }
 
@@ -557,7 +557,7 @@ unsafe fn gen_codes(__param_tree: *mut ct_data_s, __param_max_code: c_int, __par
     (__local_bits = ((1 as c_int)))
 
     while ((if __local_bits <= 15: 1 else: 0) != 0) {
-        (__local_code = ((((((__local_code as c_uint) +% (((unsafe __param_bl_count[(__local_bits - 1)]) as c_int) as c_uint)) as c_uint) << (1 as c_uint)) as c_uint)))
+        (__local_code = ((((((__local_code as c_uint) +% (((__param_bl_count[(__local_bits - 1)]) as c_int) as c_uint)) as c_uint) << (1 as c_uint)) as c_uint)))
 
         (__local_next_code[__local_bits] = ((__local_code as c_ushort)))
 
@@ -572,7 +572,7 @@ unsafe fn gen_codes(__param_tree: *mut ct_data_s, __param_max_code: c_int, __par
     (__local_n = ((0 as c_int)))
 
     while ((if __local_n <= __param_max_code: 1 else: 0) != 0) {
-        var __local_len: c_int = (((unsafe __param_tree[__local_n]).dl.len as c_int))
+        var __local_len: c_int = (((__param_tree[__local_n]).dl.len as c_int))
 
         if ((if __local_len == 0: 1 else: 0) != 0) {
             (__local_n = __local_n + 1)
@@ -585,7 +585,7 @@ unsafe fn gen_codes(__param_tree: *mut ct_data_s, __param_max_code: c_int, __par
 
         (__local_next_code[__local_len] = (__local_next_code[__local_len] +% 1))
 
-        ((unsafe __param_tree[__local_n]).fc.code = ((bi_reverse((__ci_expr_old_0 as c_uint), __local_len) as c_ushort)))
+        ((__param_tree[__local_n]).fc.code = ((bi_reverse((__ci_expr_old_0 as c_uint), __local_len) as c_ushort)))
 
 
 
@@ -607,7 +607,7 @@ unsafe fn init_block(__param_s: *mut internal_state) -> Unit {
     (__local_n = ((0 as c_int)))
 
     while ((if __local_n < ((256 + 1) + 29): 1 else: 0) != 0) {
-        ((unsafe *__param_s).dyn_ltree[__local_n].fc.freq = ((0 as c_ushort)))
+        ((*__param_s).dyn_ltree[__local_n].fc.freq = ((0 as c_ushort)))
 
         (__local_n = __local_n + 1)
 
@@ -617,7 +617,7 @@ unsafe fn init_block(__param_s: *mut internal_state) -> Unit {
     (__local_n = ((0 as c_int)))
 
     while ((if __local_n < 30: 1 else: 0) != 0) {
-        ((unsafe *__param_s).dyn_dtree[__local_n].fc.freq = ((0 as c_ushort)))
+        ((*__param_s).dyn_dtree[__local_n].fc.freq = ((0 as c_ushort)))
 
         (__local_n = __local_n + 1)
 
@@ -627,46 +627,46 @@ unsafe fn init_block(__param_s: *mut internal_state) -> Unit {
     (__local_n = ((0 as c_int)))
 
     while ((if __local_n < 19: 1 else: 0) != 0) {
-        ((unsafe *__param_s).bl_tree[__local_n].fc.freq = ((0 as c_ushort)))
+        ((*__param_s).bl_tree[__local_n].fc.freq = ((0 as c_ushort)))
 
         (__local_n = __local_n + 1)
 
     }
 
 
-    ((unsafe *__param_s).dyn_ltree[256].fc.freq = ((1 as c_ushort)))
+    ((*__param_s).dyn_ltree[256].fc.freq = ((1 as c_ushort)))
 
-    ((unsafe *__param_s).static_len = ((0 as c_ulong)))
+    ((*__param_s).static_len = ((0 as c_ulong)))
 
-    ((unsafe *__param_s).opt_len = (unsafe *__param_s).static_len)
+    ((*__param_s).opt_len = (*__param_s).static_len)
 
 
-    ((unsafe *__param_s).matches = ((0 as c_uint)))
+    ((*__param_s).matches = ((0 as c_uint)))
 
-    ((unsafe *__param_s).sym_next = (unsafe *__param_s).matches)
+    ((*__param_s).sym_next = (*__param_s).matches)
 
 
 }
 
 unsafe fn pqdownheap(__param_s: *mut internal_state, __param_tree: *mut ct_data_s, __param_k: c_int) -> Unit {
     var __local_k = __param_k
-    var __local_v: c_int = (((unsafe *__param_s).heap[__local_k] as c_int))
+    var __local_v: c_int = (((*__param_s).heap[__local_k] as c_int))
 
     var __local_j: c_int = ((((__local_k as c_int) << (1 as c_uint)) as c_int))
 
-    while ((if __local_j <= (unsafe *__param_s).heap_len: 1 else: 0) != 0) {
+    while ((if __local_j <= (*__param_s).heap_len: 1 else: 0) != 0) {
         var __ci_expr_logic_2: c_int = 0
 
-        if ((if __local_j < (unsafe *__param_s).heap_len: 1 else: 0) != 0) {
+        if ((if __local_j < (*__param_s).heap_len: 1 else: 0) != 0) {
             var __ci_expr_logic_1: c_int
 
-            if ((if (unsafe __param_tree[(unsafe *__param_s).heap[(__local_j + 1)]]).fc.freq < (unsafe __param_tree[(unsafe *__param_s).heap[__local_j]]).fc.freq: 1 else: 0) != 0) {
+            if ((if (__param_tree[(*__param_s).heap[(__local_j + 1)]]).fc.freq < (__param_tree[(*__param_s).heap[__local_j]]).fc.freq: 1 else: 0) != 0) {
                 (__ci_expr_logic_1 = (if true: 1 else: 0))
             } else {
                 var __ci_expr_logic_0: c_int = 0
 
-                if ((if (unsafe __param_tree[(unsafe *__param_s).heap[(__local_j + 1)]]).fc.freq == (unsafe __param_tree[(unsafe *__param_s).heap[__local_j]]).fc.freq: 1 else: 0) != 0) {
-                    (__ci_expr_logic_0 = (if (if (unsafe *__param_s).depth[(unsafe *__param_s).heap[(__local_j + 1)]] <= (unsafe *__param_s).depth[(unsafe *__param_s).heap[__local_j]]: 1 else: 0) != 0: 1 else: 0))
+                if ((if (__param_tree[(*__param_s).heap[(__local_j + 1)]]).fc.freq == (__param_tree[(*__param_s).heap[__local_j]]).fc.freq: 1 else: 0) != 0) {
+                    (__ci_expr_logic_0 = (if (if (*__param_s).depth[(*__param_s).heap[(__local_j + 1)]] <= (*__param_s).depth[(*__param_s).heap[__local_j]]: 1 else: 0) != 0: 1 else: 0))
                 }
 
                 (__ci_expr_logic_1 = (if __ci_expr_logic_0 != 0: 1 else: 0))
@@ -685,13 +685,13 @@ unsafe fn pqdownheap(__param_s: *mut internal_state, __param_tree: *mut ct_data_
 
         var __ci_expr_logic_4: c_int
 
-        if ((if (unsafe __param_tree[__local_v]).fc.freq < (unsafe __param_tree[(unsafe *__param_s).heap[__local_j]]).fc.freq: 1 else: 0) != 0) {
+        if ((if (__param_tree[__local_v]).fc.freq < (__param_tree[(*__param_s).heap[__local_j]]).fc.freq: 1 else: 0) != 0) {
             (__ci_expr_logic_4 = (if true: 1 else: 0))
         } else {
             var __ci_expr_logic_3: c_int = 0
 
-            if ((if (unsafe __param_tree[__local_v]).fc.freq == (unsafe __param_tree[(unsafe *__param_s).heap[__local_j]]).fc.freq: 1 else: 0) != 0) {
-                (__ci_expr_logic_3 = (if (if (unsafe *__param_s).depth[__local_v] <= (unsafe *__param_s).depth[(unsafe *__param_s).heap[__local_j]]: 1 else: 0) != 0: 1 else: 0))
+            if ((if (__param_tree[__local_v]).fc.freq == (__param_tree[(*__param_s).heap[__local_j]]).fc.freq: 1 else: 0) != 0) {
+                (__ci_expr_logic_3 = (if (if (*__param_s).depth[__local_v] <= (*__param_s).depth[(*__param_s).heap[__local_j]]: 1 else: 0) != 0: 1 else: 0))
             }
 
             (__ci_expr_logic_4 = (if __ci_expr_logic_3 != 0: 1 else: 0))
@@ -703,7 +703,7 @@ unsafe fn pqdownheap(__param_s: *mut internal_state, __param_tree: *mut ct_data_
         }
 
 
-        ((unsafe *__param_s).heap[__local_k] = (((unsafe *__param_s).heap[__local_j] as c_int)))
+        ((*__param_s).heap[__local_k] = (((*__param_s).heap[__local_j] as c_int)))
 
         (__local_k = __local_j)
 
@@ -711,22 +711,22 @@ unsafe fn pqdownheap(__param_s: *mut internal_state, __param_tree: *mut ct_data_
 
     }
 
-    ((unsafe *__param_s).heap[__local_k] = __local_v)
+    ((*__param_s).heap[__local_k] = __local_v)
 
 }
 
 unsafe fn gen_bitlen(__param_s: *mut internal_state, __param_desc: *mut tree_desc_s) -> Unit {
-    var __local_tree: *mut ct_data_s = (unsafe *__param_desc).dyn_tree
+    var __local_tree: *mut ct_data_s = (*__param_desc).dyn_tree
 
-    var __local_max_code: c_int = (unsafe *__param_desc).max_code
+    var __local_max_code: c_int = (*__param_desc).max_code
 
-    var __local_stree: *const ct_data_s = (unsafe *(unsafe *__param_desc).stat_desc).static_tree
+    var __local_stree: *const ct_data_s = (*(*__param_desc).stat_desc).static_tree
 
-    var __local_extra: *const c_int = (unsafe *(unsafe *__param_desc).stat_desc).extra_bits
+    var __local_extra: *const c_int = (*(*__param_desc).stat_desc).extra_bits
 
-    var __local_base: c_int = (unsafe *(unsafe *__param_desc).stat_desc).extra_base
+    var __local_base: c_int = (*(*__param_desc).stat_desc).extra_base
 
-    var __local_max_length: c_int = (unsafe *(unsafe *__param_desc).stat_desc).max_length
+    var __local_max_length: c_int = (*(*__param_desc).stat_desc).max_length
 
     var __local_h: c_int
 
@@ -746,21 +746,21 @@ unsafe fn gen_bitlen(__param_s: *mut internal_state, __param_desc: *mut tree_des
     (__local_bits = ((0 as c_int)))
 
     while ((if __local_bits <= 15: 1 else: 0) != 0) {
-        ((unsafe *__param_s).bl_count[__local_bits] = ((0 as c_ushort)))
+        ((*__param_s).bl_count[__local_bits] = ((0 as c_ushort)))
 
         (__local_bits = __local_bits + 1)
 
     }
 
 
-    ((unsafe __local_tree[(unsafe *__param_s).heap[(unsafe *__param_s).heap_max]]).dl.len = ((0 as c_ushort)))
+    ((__local_tree[(*__param_s).heap[(*__param_s).heap_max]]).dl.len = ((0 as c_ushort)))
 
-    (__local_h = ((((unsafe *__param_s).heap_max + 1) as c_int)))
+    (__local_h = ((((*__param_s).heap_max + 1) as c_int)))
 
     while ((if __local_h < ((2 * ((256 + 1) + 29)) + 1): 1 else: 0) != 0) {
-        (__local_n = (((unsafe *__param_s).heap[__local_h] as c_int)))
+        (__local_n = (((*__param_s).heap[__local_h] as c_int)))
 
-        (__local_bits = (((((unsafe __local_tree[(unsafe __local_tree[__local_n]).dl.dad]).dl.len as c_int) + 1) as c_int)))
+        (__local_bits = (((((__local_tree[(__local_tree[__local_n]).dl.dad]).dl.len as c_int) + 1) as c_int)))
 
         if ((if __local_bits > __local_max_length: 1 else: 0) != 0) {
             (__local_bits = __local_max_length)
@@ -769,7 +769,7 @@ unsafe fn gen_bitlen(__param_s: *mut internal_state, __param_desc: *mut tree_des
 
         }
 
-        ((unsafe __local_tree[__local_n]).dl.len = ((__local_bits as c_ushort)))
+        ((__local_tree[__local_n]).dl.len = ((__local_bits as c_ushort)))
 
         if ((if __local_n > __local_max_code: 1 else: 0) != 0) {
             (__local_h = __local_h + 1)
@@ -778,20 +778,20 @@ unsafe fn gen_bitlen(__param_s: *mut internal_state, __param_desc: *mut tree_des
 
         }
 
-        ((unsafe *__param_s).bl_count[__local_bits] = ((unsafe *__param_s).bl_count[__local_bits] +% 1))
+        ((*__param_s).bl_count[__local_bits] = ((*__param_s).bl_count[__local_bits] +% 1))
 
         (__local_xbits = ((0 as c_int)))
 
         if ((if __local_n >= __local_base: 1 else: 0) != 0) {
-            (__local_xbits = (((unsafe __local_extra[(__local_n - __local_base)]) as c_int)))
+            (__local_xbits = (((__local_extra[(__local_n - __local_base)]) as c_int)))
         }
 
-        (__local_f = (unsafe __local_tree[__local_n]).fc.freq)
+        (__local_f = (__local_tree[__local_n]).fc.freq)
 
-        ((unsafe *__param_s).opt_len = ((unsafe *__param_s).opt_len +% (((__local_f as c_ulong) as c_ulong) *% (((__local_bits + __local_xbits) as c_uint) as c_ulong))))
+        ((*__param_s).opt_len = ((*__param_s).opt_len +% (((__local_f as c_ulong) as c_ulong) *% (((__local_bits + __local_xbits) as c_uint) as c_ulong))))
 
         if (__local_stree != null) {
-            ((unsafe *__param_s).static_len = ((unsafe *__param_s).static_len +% (((__local_f as c_ulong) as c_ulong) *% (((((unsafe __local_stree[__local_n]).dl.len as c_int) + __local_xbits) as c_uint) as c_ulong))))
+            ((*__param_s).static_len = ((*__param_s).static_len +% (((__local_f as c_ulong) as c_ulong) *% (((((__local_stree[__local_n]).dl.len as c_int) + __local_xbits) as c_uint) as c_ulong))))
         }
 
 
@@ -808,15 +808,15 @@ unsafe fn gen_bitlen(__param_s: *mut internal_state, __param_desc: *mut tree_des
     loop {
         (__local_bits = (((__local_max_length - 1) as c_int)))
 
-        while ((if (unsafe *__param_s).bl_count[__local_bits] == 0: 1 else: 0) != 0) {
+        while ((if (*__param_s).bl_count[__local_bits] == 0: 1 else: 0) != 0) {
             (__local_bits = __local_bits - 1)
         }
 
-        ((unsafe *__param_s).bl_count[__local_bits] = ((unsafe *__param_s).bl_count[__local_bits] -% 1))
+        ((*__param_s).bl_count[__local_bits] = ((*__param_s).bl_count[__local_bits] -% 1))
 
-        ((unsafe *__param_s).bl_count[(__local_bits + 1)] = (((unsafe *__param_s).bl_count[(__local_bits + 1)] as c_int) +% (2 as c_ushort)))
+        ((*__param_s).bl_count[(__local_bits + 1)] = (((*__param_s).bl_count[(__local_bits + 1)] as c_int) +% (2 as c_ushort)))
 
-        ((unsafe *__param_s).bl_count[__local_max_length] = ((unsafe *__param_s).bl_count[__local_max_length] -% 1))
+        ((*__param_s).bl_count[__local_max_length] = ((*__param_s).bl_count[__local_max_length] -% 1))
 
         (__local_overflow = __local_overflow - 2)
 
@@ -828,23 +828,23 @@ unsafe fn gen_bitlen(__param_s: *mut internal_state, __param_desc: *mut tree_des
     (__local_bits = __local_max_length)
 
     while ((if __local_bits != 0: 1 else: 0) != 0) {
-        (__local_n = (((unsafe *__param_s).bl_count[__local_bits] as c_int)))
+        (__local_n = (((*__param_s).bl_count[__local_bits] as c_int)))
 
         while ((if __local_n != 0: 1 else: 0) != 0) {
             (__local_h = __local_h - 1)
 
-            (__local_m = (((unsafe *__param_s).heap[__local_h] as c_int)))
+            (__local_m = (((*__param_s).heap[__local_h] as c_int)))
 
 
             if ((if __local_m > __local_max_code: 1 else: 0) != 0) {
                 continue
             }
 
-            if ((if (((unsafe __local_tree[__local_m]).dl.len as c_uint)) != ((__local_bits as c_uint)): 1 else: 0) != 0) {
+            if ((if (((__local_tree[__local_m]).dl.len as c_uint)) != ((__local_bits as c_uint)): 1 else: 0) != 0) {
 
-                ((unsafe *__param_s).opt_len = ((unsafe *__param_s).opt_len +% (((((__local_bits as c_ulong) as c_ulong) -% (((unsafe __local_tree[__local_m]).dl.len as c_int) as c_ulong)) as c_ulong) *% (((unsafe __local_tree[__local_m]).fc.freq as c_int) as c_ulong))))
+                ((*__param_s).opt_len = ((*__param_s).opt_len +% (((((__local_bits as c_ulong) as c_ulong) -% (((__local_tree[__local_m]).dl.len as c_int) as c_ulong)) as c_ulong) *% (((__local_tree[__local_m]).fc.freq as c_int) as c_ulong))))
 
-                ((unsafe __local_tree[__local_m]).dl.len = ((__local_bits as c_ushort)))
+                ((__local_tree[__local_m]).dl.len = ((__local_bits as c_ushort)))
 
             }
 
@@ -861,11 +861,11 @@ unsafe fn gen_bitlen(__param_s: *mut internal_state, __param_desc: *mut tree_des
 }
 
 unsafe fn build_tree(__param_s: *mut internal_state, __param_desc: *mut tree_desc_s) -> Unit {
-    var __local_tree: *mut ct_data_s = (unsafe *__param_desc).dyn_tree
+    var __local_tree: *mut ct_data_s = (*__param_desc).dyn_tree
 
-    var __local_stree: *const ct_data_s = (unsafe *(unsafe *__param_desc).stat_desc).static_tree
+    var __local_stree: *const ct_data_s = (*(*__param_desc).stat_desc).static_tree
 
-    var __local_elems: c_int = (unsafe *(unsafe *__param_desc).stat_desc).elems
+    var __local_elems: c_int = (*(*__param_desc).stat_desc).elems
 
     var __local_n: c_int
 
@@ -876,26 +876,26 @@ unsafe fn build_tree(__param_s: *mut internal_state, __param_desc: *mut tree_des
 
     var __local_node: c_int
 
-    ((unsafe *__param_s).heap_len = ((0 as c_int)))
+    ((*__param_s).heap_len = ((0 as c_int)))
 
-    ((unsafe *__param_s).heap_max = ((((2 * ((256 + 1) + 29)) + 1) as c_int)))
+    ((*__param_s).heap_max = ((((2 * ((256 + 1) + 29)) + 1) as c_int)))
 
 
     (__local_n = ((0 as c_int)))
 
     while ((if __local_n < __local_elems: 1 else: 0) != 0) {
-        if ((if (unsafe __local_tree[__local_n]).fc.freq != 0: 1 else: 0) != 0) {
-            ((unsafe *__param_s).heap_len = (unsafe *__param_s).heap_len + 1)
+        if ((if (__local_tree[__local_n]).fc.freq != 0: 1 else: 0) != 0) {
+            ((*__param_s).heap_len = (*__param_s).heap_len + 1)
 
             (__local_max_code = __local_n)
 
-            ((unsafe *__param_s).heap[(unsafe *__param_s).heap_len] = __local_max_code)
+            ((*__param_s).heap[(*__param_s).heap_len] = __local_max_code)
 
 
-            ((unsafe *__param_s).depth[__local_n] = ((0 as u8)))
+            ((*__param_s).depth[__local_n] = ((0 as u8)))
 
         } else {
-            ((unsafe __local_tree[__local_n]).dl.len = ((0 as c_ushort)))
+            ((__local_tree[__local_n]).dl.len = ((0 as c_ushort)))
 
         }
 
@@ -905,8 +905,8 @@ unsafe fn build_tree(__param_s: *mut internal_state, __param_desc: *mut tree_des
     }
 
 
-    while ((if (unsafe *__param_s).heap_len < 2: 1 else: 0) != 0) {
-        ((unsafe *__param_s).heap_len = (unsafe *__param_s).heap_len + 1)
+    while ((if (*__param_s).heap_len < 2: 1 else: 0) != 0) {
+        ((*__param_s).heap_len = (*__param_s).heap_len + 1)
 
         var __ci_expr_ternary_0: c_int = 0
 
@@ -919,26 +919,26 @@ unsafe fn build_tree(__param_s: *mut internal_state, __param_desc: *mut tree_des
             (__ci_expr_ternary_0 = ((0 as c_int)))
         }
 
-        ((unsafe *__param_s).heap[(unsafe *__param_s).heap_len] = __ci_expr_ternary_0)
+        ((*__param_s).heap[(*__param_s).heap_len] = __ci_expr_ternary_0)
 
-        (__local_node = (((unsafe *__param_s).heap[(unsafe *__param_s).heap_len] as c_int)))
+        (__local_node = (((*__param_s).heap[(*__param_s).heap_len] as c_int)))
 
 
-        ((unsafe __local_tree[__local_node]).fc.freq = ((1 as c_ushort)))
+        ((__local_tree[__local_node]).fc.freq = ((1 as c_ushort)))
 
-        ((unsafe *__param_s).depth[__local_node] = ((0 as u8)))
+        ((*__param_s).depth[__local_node] = ((0 as u8)))
 
-        ((unsafe *__param_s).opt_len = ((unsafe *__param_s).opt_len -% 1))
+        ((*__param_s).opt_len = ((*__param_s).opt_len -% 1))
 
         if (__local_stree != null) {
-            ((unsafe *__param_s).static_len = ((unsafe *__param_s).static_len -% ((unsafe __local_stree[__local_node]).dl.len as c_int)))
+            ((*__param_s).static_len = ((*__param_s).static_len -% ((__local_stree[__local_node]).dl.len as c_int)))
         }
 
     }
 
-    ((unsafe *__param_desc).max_code = __local_max_code)
+    ((*__param_desc).max_code = __local_max_code)
 
-    (__local_n = ((((unsafe *__param_s).heap_len / 2) as c_int)))
+    (__local_n = ((((*__param_s).heap_len / 2) as c_int)))
 
     while ((if __local_n >= 1: 1 else: 0) != 0) {
         pqdownheap(__param_s, __local_tree, __local_n)
@@ -951,71 +951,71 @@ unsafe fn build_tree(__param_s: *mut internal_state, __param_desc: *mut tree_des
     (__local_node = __local_elems)
 
     loop {
-        (__local_n = (((unsafe *__param_s).heap[1] as c_int)))
+        (__local_n = (((*__param_s).heap[1] as c_int)))
 
-        var __ci_expr_old_1: c_int = (unsafe *__param_s).heap_len
+        var __ci_expr_old_1: c_int = (*__param_s).heap_len
 
-        ((unsafe *__param_s).heap_len = (unsafe *__param_s).heap_len - 1)
+        ((*__param_s).heap_len = (*__param_s).heap_len - 1)
 
-        ((unsafe *__param_s).heap[1] = (((unsafe *__param_s).heap[__ci_expr_old_1] as c_int)))
+        ((*__param_s).heap[1] = (((*__param_s).heap[__ci_expr_old_1] as c_int)))
 
 
         pqdownheap(__param_s, __local_tree, (1 as c_int))
 
 
 
-        (__local_m = (((unsafe *__param_s).heap[1] as c_int)))
+        (__local_m = (((*__param_s).heap[1] as c_int)))
 
-        ((unsafe *__param_s).heap_max = (unsafe *__param_s).heap_max - 1)
+        ((*__param_s).heap_max = (*__param_s).heap_max - 1)
 
-        ((unsafe *__param_s).heap[(unsafe *__param_s).heap_max] = __local_n)
-
-
-        ((unsafe *__param_s).heap_max = (unsafe *__param_s).heap_max - 1)
-
-        ((unsafe *__param_s).heap[(unsafe *__param_s).heap_max] = __local_m)
+        ((*__param_s).heap[(*__param_s).heap_max] = __local_n)
 
 
-        ((unsafe __local_tree[__local_node]).fc.freq = (((((unsafe __local_tree[__local_n]).fc.freq as c_int) + ((unsafe __local_tree[__local_m]).fc.freq as c_int)) as c_ushort)))
+        ((*__param_s).heap_max = (*__param_s).heap_max - 1)
+
+        ((*__param_s).heap[(*__param_s).heap_max] = __local_m)
+
+
+        ((__local_tree[__local_node]).fc.freq = (((((__local_tree[__local_n]).fc.freq as c_int) + ((__local_tree[__local_m]).fc.freq as c_int)) as c_ushort)))
 
         var __ci_expr_ternary_2: c_int = 0
 
-        if ((if (unsafe *__param_s).depth[__local_n] >= (unsafe *__param_s).depth[__local_m]: 1 else: 0) != 0) {
-            (__ci_expr_ternary_2 = (((unsafe *__param_s).depth[__local_n] as c_int)))
+        if ((if (*__param_s).depth[__local_n] >= (*__param_s).depth[__local_m]: 1 else: 0) != 0) {
+            (__ci_expr_ternary_2 = (((*__param_s).depth[__local_n] as c_int)))
         } else {
-            (__ci_expr_ternary_2 = (((unsafe *__param_s).depth[__local_m] as c_int)))
+            (__ci_expr_ternary_2 = (((*__param_s).depth[__local_m] as c_int)))
         }
 
-        ((unsafe *__param_s).depth[__local_node] = (((__ci_expr_ternary_2 + 1) as u8)))
+        ((*__param_s).depth[__local_node] = (((__ci_expr_ternary_2 + 1) as u8)))
 
 
-        ((unsafe __local_tree[__local_m]).dl.dad = ((__local_node as c_ushort)))
+        ((__local_tree[__local_m]).dl.dad = ((__local_node as c_ushort)))
 
-        ((unsafe __local_tree[__local_n]).dl.dad = (unsafe __local_tree[__local_m]).dl.dad)
+        ((__local_tree[__local_n]).dl.dad = (__local_tree[__local_m]).dl.dad)
 
 
         var __ci_expr_old_3: c_int = __local_node
 
         (__local_node = __local_node + 1)
 
-        ((unsafe *__param_s).heap[1] = __ci_expr_old_3)
+        ((*__param_s).heap[1] = __ci_expr_old_3)
 
 
         pqdownheap(__param_s, __local_tree, (1 as c_int))
 
-        if not (((if (unsafe *__param_s).heap_len >= 2: 1 else: 0) != 0)) {
+        if not (((if (*__param_s).heap_len >= 2: 1 else: 0) != 0)) {
             break
         }
     }
 
-    ((unsafe *__param_s).heap_max = (unsafe *__param_s).heap_max - 1)
+    ((*__param_s).heap_max = (*__param_s).heap_max - 1)
 
-    ((unsafe *__param_s).heap[(unsafe *__param_s).heap_max] = (((unsafe *__param_s).heap[1] as c_int)))
+    ((*__param_s).heap[(*__param_s).heap_max] = (((*__param_s).heap[1] as c_int)))
 
 
     gen_bitlen(__param_s, __param_desc)
 
-    gen_codes(__local_tree, __local_max_code, (&(unsafe *__param_s).bl_count[0] as *mut c_ushort))
+    gen_codes(__local_tree, __local_max_code, (&(*__param_s).bl_count[0] as *mut c_ushort))
 
 }
 
@@ -1026,7 +1026,7 @@ unsafe fn scan_tree(__param_s: *mut internal_state, __param_tree: *mut ct_data_s
 
     var __local_curlen: c_int
 
-    var __local_nextlen: c_int = (((unsafe __param_tree[0]).dl.len as c_int))
+    var __local_nextlen: c_int = (((__param_tree[0]).dl.len as c_int))
 
     var __local_count: c_int = ((0 as c_int))
 
@@ -1041,14 +1041,14 @@ unsafe fn scan_tree(__param_s: *mut internal_state, __param_tree: *mut ct_data_s
 
     }
 
-    ((unsafe __param_tree[(__param_max_code + 1)]).dl.len = ((65535 as c_ushort)))
+    ((__param_tree[(__param_max_code + 1)]).dl.len = ((65535 as c_ushort)))
 
     (__local_n = ((0 as c_int)))
 
     while ((if __local_n <= __param_max_code: 1 else: 0) != 0) {
         (__local_curlen = __local_nextlen)
 
-        (__local_nextlen = (((unsafe __param_tree[(__local_n + 1)]).dl.len as c_int)))
+        (__local_nextlen = (((__param_tree[(__local_n + 1)]).dl.len as c_int)))
 
         var __ci_expr_logic_0: c_int = 0
 
@@ -1066,22 +1066,22 @@ unsafe fn scan_tree(__param_s: *mut internal_state, __param_tree: *mut ct_data_s
 
         }
         if ((if __local_count < __local_min_count: 1 else: 0) != 0) {
-            ((unsafe *__param_s).bl_tree[__local_curlen].fc.freq = (((unsafe *__param_s).bl_tree[__local_curlen].fc.freq as c_int) +% (((__local_count as c_ushort) as c_int) as c_ushort)))
+            ((*__param_s).bl_tree[__local_curlen].fc.freq = (((*__param_s).bl_tree[__local_curlen].fc.freq as c_int) +% (((__local_count as c_ushort) as c_int) as c_ushort)))
 
         } else {
             if ((if __local_curlen != 0: 1 else: 0) != 0) {
                 if ((if __local_curlen != __local_prevlen: 1 else: 0) != 0) {
-                    ((unsafe *__param_s).bl_tree[__local_curlen].fc.freq = ((unsafe *__param_s).bl_tree[__local_curlen].fc.freq +% 1))
+                    ((*__param_s).bl_tree[__local_curlen].fc.freq = ((*__param_s).bl_tree[__local_curlen].fc.freq +% 1))
                 }
 
-                ((unsafe *__param_s).bl_tree[16].fc.freq = ((unsafe *__param_s).bl_tree[16].fc.freq +% 1))
+                ((*__param_s).bl_tree[16].fc.freq = ((*__param_s).bl_tree[16].fc.freq +% 1))
 
             } else {
                 if ((if __local_count <= 10: 1 else: 0) != 0) {
-                    ((unsafe *__param_s).bl_tree[17].fc.freq = ((unsafe *__param_s).bl_tree[17].fc.freq +% 1))
+                    ((*__param_s).bl_tree[17].fc.freq = ((*__param_s).bl_tree[17].fc.freq +% 1))
 
                 } else {
-                    ((unsafe *__param_s).bl_tree[18].fc.freq = ((unsafe *__param_s).bl_tree[18].fc.freq +% 1))
+                    ((*__param_s).bl_tree[18].fc.freq = ((*__param_s).bl_tree[18].fc.freq +% 1))
 
                 }
             }
@@ -1129,7 +1129,7 @@ unsafe fn send_tree(__param_s: *mut internal_state, __param_tree: *mut ct_data_s
 
     var __local_curlen: c_int
 
-    var __local_nextlen: c_int = (((unsafe __param_tree[0]).dl.len as c_int))
+    var __local_nextlen: c_int = (((__param_tree[0]).dl.len as c_int))
 
     var __local_count: c_int = ((0 as c_int))
 
@@ -1149,7 +1149,7 @@ unsafe fn send_tree(__param_s: *mut internal_state, __param_tree: *mut ct_data_s
     while ((if __local_n <= __param_max_code: 1 else: 0) != 0) {
         (__local_curlen = __local_nextlen)
 
-        (__local_nextlen = (((unsafe __param_tree[(__local_n + 1)]).dl.len as c_int)))
+        (__local_nextlen = (((__param_tree[(__local_n + 1)]).dl.len as c_int)))
 
         var __ci_expr_logic_0: c_int = 0
 
@@ -1168,41 +1168,41 @@ unsafe fn send_tree(__param_s: *mut internal_state, __param_tree: *mut ct_data_s
         }
         if ((if __local_count < __local_min_count: 1 else: 0) != 0) {
             loop {
-                var __local_len: c_int = (((unsafe *__param_s).bl_tree[__local_curlen].dl.len as c_int))
+                var __local_len: c_int = (((*__param_s).bl_tree[__local_curlen].dl.len as c_int))
 
-                if ((if (unsafe *__param_s).bi_valid > (16 - __local_len): 1 else: 0) != 0) {
-                    var __local_val: c_int = (((unsafe *__param_s).bl_tree[__local_curlen].fc.code as c_int))
+                if ((if (*__param_s).bi_valid > (16 - __local_len): 1 else: 0) != 0) {
+                    var __local_val: c_int = (((*__param_s).bl_tree[__local_curlen].fc.code as c_int))
 
-                    ((unsafe *__param_s).bi_buf = ((unsafe *__param_s).bi_buf as c_ushort) | ((((__local_val as c_ushort) as c_int) << ((unsafe *__param_s).bi_valid as c_uint)) as c_ushort))
+                    ((*__param_s).bi_buf = ((*__param_s).bi_buf as c_ushort) | ((((__local_val as c_ushort) as c_int) << ((*__param_s).bi_valid as c_uint)) as c_ushort))
 
-                    var __ci_expr_old_1: c_ulong = (unsafe *__param_s).pending
+                    var __ci_expr_old_1: c_ulong = (*__param_s).pending
 
-                    ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
+                    ((*__param_s).pending = ((*__param_s).pending +% 1))
 
-                    ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_1]) = ((((((unsafe *__param_s).bi_buf as c_int) as c_int) & (255 as c_int)) as u8)))
-
-
-
-
-                    var __ci_expr_old_2: c_ulong = (unsafe *__param_s).pending
-
-                    ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
-
-                    ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_2]) = (((((unsafe *__param_s).bi_buf as c_int) >> (8 as c_uint)) as u8)))
+                    (((*__param_s).pending_buf[__ci_expr_old_1]) = ((((((*__param_s).bi_buf as c_int) as c_int) & (255 as c_int)) as u8)))
 
 
 
 
+                    var __ci_expr_old_2: c_ulong = (*__param_s).pending
+
+                    ((*__param_s).pending = ((*__param_s).pending +% 1))
+
+                    (((*__param_s).pending_buf[__ci_expr_old_2]) = (((((*__param_s).bi_buf as c_int) >> (8 as c_uint)) as u8)))
 
 
-                    ((unsafe *__param_s).bi_buf = (((((__local_val as c_ushort) as c_int) >> ((16 - (unsafe *__param_s).bi_valid) as c_uint)) as c_ushort)))
 
-                    ((unsafe *__param_s).bi_valid = (unsafe *__param_s).bi_valid + (__local_len - 16))
+
+
+
+                    ((*__param_s).bi_buf = (((((__local_val as c_ushort) as c_int) >> ((16 - (*__param_s).bi_valid) as c_uint)) as c_ushort)))
+
+                    ((*__param_s).bi_valid = (*__param_s).bi_valid + (__local_len - 16))
 
                 } else {
-                    ((unsafe *__param_s).bi_buf = ((unsafe *__param_s).bi_buf as c_ushort) | ((((unsafe *__param_s).bl_tree[__local_curlen].fc.code as c_int) << ((unsafe *__param_s).bi_valid as c_uint)) as c_ushort))
+                    ((*__param_s).bi_buf = ((*__param_s).bi_buf as c_ushort) | ((((*__param_s).bl_tree[__local_curlen].fc.code as c_int) << ((*__param_s).bi_valid as c_uint)) as c_ushort))
 
-                    ((unsafe *__param_s).bi_valid = (unsafe *__param_s).bi_valid + __local_len)
+                    ((*__param_s).bi_valid = (*__param_s).bi_valid + __local_len)
 
                 }
 
@@ -1217,41 +1217,41 @@ unsafe fn send_tree(__param_s: *mut internal_state, __param_tree: *mut ct_data_s
         } else {
             if ((if __local_curlen != 0: 1 else: 0) != 0) {
                 if ((if __local_curlen != __local_prevlen: 1 else: 0) != 0) {
-                    var __local_len_1: c_int = (((unsafe *__param_s).bl_tree[__local_curlen].dl.len as c_int))
+                    var __local_len_1: c_int = (((*__param_s).bl_tree[__local_curlen].dl.len as c_int))
 
-                    if ((if (unsafe *__param_s).bi_valid > (16 - __local_len_1): 1 else: 0) != 0) {
-                        var __local_val_1: c_int = (((unsafe *__param_s).bl_tree[__local_curlen].fc.code as c_int))
+                    if ((if (*__param_s).bi_valid > (16 - __local_len_1): 1 else: 0) != 0) {
+                        var __local_val_1: c_int = (((*__param_s).bl_tree[__local_curlen].fc.code as c_int))
 
-                        ((unsafe *__param_s).bi_buf = ((unsafe *__param_s).bi_buf as c_ushort) | ((((__local_val_1 as c_ushort) as c_int) << ((unsafe *__param_s).bi_valid as c_uint)) as c_ushort))
+                        ((*__param_s).bi_buf = ((*__param_s).bi_buf as c_ushort) | ((((__local_val_1 as c_ushort) as c_int) << ((*__param_s).bi_valid as c_uint)) as c_ushort))
 
-                        var __ci_expr_old_3: c_ulong = (unsafe *__param_s).pending
+                        var __ci_expr_old_3: c_ulong = (*__param_s).pending
 
-                        ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
+                        ((*__param_s).pending = ((*__param_s).pending +% 1))
 
-                        ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_3]) = ((((((unsafe *__param_s).bi_buf as c_int) as c_int) & (255 as c_int)) as u8)))
-
-
-
-
-                        var __ci_expr_old_4: c_ulong = (unsafe *__param_s).pending
-
-                        ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
-
-                        ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_4]) = (((((unsafe *__param_s).bi_buf as c_int) >> (8 as c_uint)) as u8)))
+                        (((*__param_s).pending_buf[__ci_expr_old_3]) = ((((((*__param_s).bi_buf as c_int) as c_int) & (255 as c_int)) as u8)))
 
 
 
 
+                        var __ci_expr_old_4: c_ulong = (*__param_s).pending
+
+                        ((*__param_s).pending = ((*__param_s).pending +% 1))
+
+                        (((*__param_s).pending_buf[__ci_expr_old_4]) = (((((*__param_s).bi_buf as c_int) >> (8 as c_uint)) as u8)))
 
 
-                        ((unsafe *__param_s).bi_buf = (((((__local_val_1 as c_ushort) as c_int) >> ((16 - (unsafe *__param_s).bi_valid) as c_uint)) as c_ushort)))
 
-                        ((unsafe *__param_s).bi_valid = (unsafe *__param_s).bi_valid + (__local_len_1 - 16))
+
+
+
+                        ((*__param_s).bi_buf = (((((__local_val_1 as c_ushort) as c_int) >> ((16 - (*__param_s).bi_valid) as c_uint)) as c_ushort)))
+
+                        ((*__param_s).bi_valid = (*__param_s).bi_valid + (__local_len_1 - 16))
 
                     } else {
-                        ((unsafe *__param_s).bi_buf = ((unsafe *__param_s).bi_buf as c_ushort) | ((((unsafe *__param_s).bl_tree[__local_curlen].fc.code as c_int) << ((unsafe *__param_s).bi_valid as c_uint)) as c_ushort))
+                        ((*__param_s).bi_buf = ((*__param_s).bi_buf as c_ushort) | ((((*__param_s).bl_tree[__local_curlen].fc.code as c_int) << ((*__param_s).bi_valid as c_uint)) as c_ushort))
 
-                        ((unsafe *__param_s).bi_valid = (unsafe *__param_s).bi_valid + __local_len_1)
+                        ((*__param_s).bi_valid = (*__param_s).bi_valid + __local_len_1)
 
                     }
 
@@ -1262,41 +1262,41 @@ unsafe fn send_tree(__param_s: *mut internal_state, __param_tree: *mut ct_data_s
                 }
 
 
-                var __local_len_2: c_int = (((unsafe *__param_s).bl_tree[16].dl.len as c_int))
+                var __local_len_2: c_int = (((*__param_s).bl_tree[16].dl.len as c_int))
 
-                if ((if (unsafe *__param_s).bi_valid > (16 - __local_len_2): 1 else: 0) != 0) {
-                    var __local_val_2: c_int = (((unsafe *__param_s).bl_tree[16].fc.code as c_int))
+                if ((if (*__param_s).bi_valid > (16 - __local_len_2): 1 else: 0) != 0) {
+                    var __local_val_2: c_int = (((*__param_s).bl_tree[16].fc.code as c_int))
 
-                    ((unsafe *__param_s).bi_buf = ((unsafe *__param_s).bi_buf as c_ushort) | ((((__local_val_2 as c_ushort) as c_int) << ((unsafe *__param_s).bi_valid as c_uint)) as c_ushort))
+                    ((*__param_s).bi_buf = ((*__param_s).bi_buf as c_ushort) | ((((__local_val_2 as c_ushort) as c_int) << ((*__param_s).bi_valid as c_uint)) as c_ushort))
 
-                    var __ci_expr_old_5: c_ulong = (unsafe *__param_s).pending
+                    var __ci_expr_old_5: c_ulong = (*__param_s).pending
 
-                    ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
+                    ((*__param_s).pending = ((*__param_s).pending +% 1))
 
-                    ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_5]) = ((((((unsafe *__param_s).bi_buf as c_int) as c_int) & (255 as c_int)) as u8)))
-
-
-
-
-                    var __ci_expr_old_6: c_ulong = (unsafe *__param_s).pending
-
-                    ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
-
-                    ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_6]) = (((((unsafe *__param_s).bi_buf as c_int) >> (8 as c_uint)) as u8)))
+                    (((*__param_s).pending_buf[__ci_expr_old_5]) = ((((((*__param_s).bi_buf as c_int) as c_int) & (255 as c_int)) as u8)))
 
 
 
 
+                    var __ci_expr_old_6: c_ulong = (*__param_s).pending
+
+                    ((*__param_s).pending = ((*__param_s).pending +% 1))
+
+                    (((*__param_s).pending_buf[__ci_expr_old_6]) = (((((*__param_s).bi_buf as c_int) >> (8 as c_uint)) as u8)))
 
 
-                    ((unsafe *__param_s).bi_buf = (((((__local_val_2 as c_ushort) as c_int) >> ((16 - (unsafe *__param_s).bi_valid) as c_uint)) as c_ushort)))
 
-                    ((unsafe *__param_s).bi_valid = (unsafe *__param_s).bi_valid + (__local_len_2 - 16))
+
+
+
+                    ((*__param_s).bi_buf = (((((__local_val_2 as c_ushort) as c_int) >> ((16 - (*__param_s).bi_valid) as c_uint)) as c_ushort)))
+
+                    ((*__param_s).bi_valid = (*__param_s).bi_valid + (__local_len_2 - 16))
 
                 } else {
-                    ((unsafe *__param_s).bi_buf = ((unsafe *__param_s).bi_buf as c_ushort) | ((((unsafe *__param_s).bl_tree[16].fc.code as c_int) << ((unsafe *__param_s).bi_valid as c_uint)) as c_ushort))
+                    ((*__param_s).bi_buf = ((*__param_s).bi_buf as c_ushort) | ((((*__param_s).bl_tree[16].fc.code as c_int) << ((*__param_s).bi_valid as c_uint)) as c_ushort))
 
-                    ((unsafe *__param_s).bi_valid = (unsafe *__param_s).bi_valid + __local_len_2)
+                    ((*__param_s).bi_valid = (*__param_s).bi_valid + __local_len_2)
 
                 }
 
@@ -1304,39 +1304,39 @@ unsafe fn send_tree(__param_s: *mut internal_state, __param_tree: *mut ct_data_s
 
                 var __local_len_3: c_int = ((2 as c_int))
 
-                if ((if (unsafe *__param_s).bi_valid > (16 - __local_len_3): 1 else: 0) != 0) {
+                if ((if (*__param_s).bi_valid > (16 - __local_len_3): 1 else: 0) != 0) {
                     var __local_val_3: c_int = (((__local_count - 3) as c_int))
 
-                    ((unsafe *__param_s).bi_buf = ((unsafe *__param_s).bi_buf as c_ushort) | ((((__local_val_3 as c_ushort) as c_int) << ((unsafe *__param_s).bi_valid as c_uint)) as c_ushort))
+                    ((*__param_s).bi_buf = ((*__param_s).bi_buf as c_ushort) | ((((__local_val_3 as c_ushort) as c_int) << ((*__param_s).bi_valid as c_uint)) as c_ushort))
 
-                    var __ci_expr_old_7: c_ulong = (unsafe *__param_s).pending
+                    var __ci_expr_old_7: c_ulong = (*__param_s).pending
 
-                    ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
+                    ((*__param_s).pending = ((*__param_s).pending +% 1))
 
-                    ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_7]) = ((((((unsafe *__param_s).bi_buf as c_int) as c_int) & (255 as c_int)) as u8)))
-
-
-
-
-                    var __ci_expr_old_8: c_ulong = (unsafe *__param_s).pending
-
-                    ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
-
-                    ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_8]) = (((((unsafe *__param_s).bi_buf as c_int) >> (8 as c_uint)) as u8)))
+                    (((*__param_s).pending_buf[__ci_expr_old_7]) = ((((((*__param_s).bi_buf as c_int) as c_int) & (255 as c_int)) as u8)))
 
 
 
 
+                    var __ci_expr_old_8: c_ulong = (*__param_s).pending
+
+                    ((*__param_s).pending = ((*__param_s).pending +% 1))
+
+                    (((*__param_s).pending_buf[__ci_expr_old_8]) = (((((*__param_s).bi_buf as c_int) >> (8 as c_uint)) as u8)))
 
 
-                    ((unsafe *__param_s).bi_buf = (((((__local_val_3 as c_ushort) as c_int) >> ((16 - (unsafe *__param_s).bi_valid) as c_uint)) as c_ushort)))
 
-                    ((unsafe *__param_s).bi_valid = (unsafe *__param_s).bi_valid + (__local_len_3 - 16))
+
+
+
+                    ((*__param_s).bi_buf = (((((__local_val_3 as c_ushort) as c_int) >> ((16 - (*__param_s).bi_valid) as c_uint)) as c_ushort)))
+
+                    ((*__param_s).bi_valid = (*__param_s).bi_valid + (__local_len_3 - 16))
 
                 } else {
-                    ((unsafe *__param_s).bi_buf = ((unsafe *__param_s).bi_buf as c_ushort) | (((((__local_count - 3) as c_ushort) as c_int) << ((unsafe *__param_s).bi_valid as c_uint)) as c_ushort))
+                    ((*__param_s).bi_buf = ((*__param_s).bi_buf as c_ushort) | (((((__local_count - 3) as c_ushort) as c_int) << ((*__param_s).bi_valid as c_uint)) as c_ushort))
 
-                    ((unsafe *__param_s).bi_valid = (unsafe *__param_s).bi_valid + __local_len_3)
+                    ((*__param_s).bi_valid = (*__param_s).bi_valid + __local_len_3)
 
                 }
 
@@ -1344,41 +1344,41 @@ unsafe fn send_tree(__param_s: *mut internal_state, __param_tree: *mut ct_data_s
 
             } else {
                 if ((if __local_count <= 10: 1 else: 0) != 0) {
-                    var __local_len_4: c_int = (((unsafe *__param_s).bl_tree[17].dl.len as c_int))
+                    var __local_len_4: c_int = (((*__param_s).bl_tree[17].dl.len as c_int))
 
-                    if ((if (unsafe *__param_s).bi_valid > (16 - __local_len_4): 1 else: 0) != 0) {
-                        var __local_val_4: c_int = (((unsafe *__param_s).bl_tree[17].fc.code as c_int))
+                    if ((if (*__param_s).bi_valid > (16 - __local_len_4): 1 else: 0) != 0) {
+                        var __local_val_4: c_int = (((*__param_s).bl_tree[17].fc.code as c_int))
 
-                        ((unsafe *__param_s).bi_buf = ((unsafe *__param_s).bi_buf as c_ushort) | ((((__local_val_4 as c_ushort) as c_int) << ((unsafe *__param_s).bi_valid as c_uint)) as c_ushort))
+                        ((*__param_s).bi_buf = ((*__param_s).bi_buf as c_ushort) | ((((__local_val_4 as c_ushort) as c_int) << ((*__param_s).bi_valid as c_uint)) as c_ushort))
 
-                        var __ci_expr_old_9: c_ulong = (unsafe *__param_s).pending
+                        var __ci_expr_old_9: c_ulong = (*__param_s).pending
 
-                        ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
+                        ((*__param_s).pending = ((*__param_s).pending +% 1))
 
-                        ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_9]) = ((((((unsafe *__param_s).bi_buf as c_int) as c_int) & (255 as c_int)) as u8)))
-
-
-
-
-                        var __ci_expr_old_10: c_ulong = (unsafe *__param_s).pending
-
-                        ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
-
-                        ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_10]) = (((((unsafe *__param_s).bi_buf as c_int) >> (8 as c_uint)) as u8)))
+                        (((*__param_s).pending_buf[__ci_expr_old_9]) = ((((((*__param_s).bi_buf as c_int) as c_int) & (255 as c_int)) as u8)))
 
 
 
 
+                        var __ci_expr_old_10: c_ulong = (*__param_s).pending
+
+                        ((*__param_s).pending = ((*__param_s).pending +% 1))
+
+                        (((*__param_s).pending_buf[__ci_expr_old_10]) = (((((*__param_s).bi_buf as c_int) >> (8 as c_uint)) as u8)))
 
 
-                        ((unsafe *__param_s).bi_buf = (((((__local_val_4 as c_ushort) as c_int) >> ((16 - (unsafe *__param_s).bi_valid) as c_uint)) as c_ushort)))
 
-                        ((unsafe *__param_s).bi_valid = (unsafe *__param_s).bi_valid + (__local_len_4 - 16))
+
+
+
+                        ((*__param_s).bi_buf = (((((__local_val_4 as c_ushort) as c_int) >> ((16 - (*__param_s).bi_valid) as c_uint)) as c_ushort)))
+
+                        ((*__param_s).bi_valid = (*__param_s).bi_valid + (__local_len_4 - 16))
 
                     } else {
-                        ((unsafe *__param_s).bi_buf = ((unsafe *__param_s).bi_buf as c_ushort) | ((((unsafe *__param_s).bl_tree[17].fc.code as c_int) << ((unsafe *__param_s).bi_valid as c_uint)) as c_ushort))
+                        ((*__param_s).bi_buf = ((*__param_s).bi_buf as c_ushort) | ((((*__param_s).bl_tree[17].fc.code as c_int) << ((*__param_s).bi_valid as c_uint)) as c_ushort))
 
-                        ((unsafe *__param_s).bi_valid = (unsafe *__param_s).bi_valid + __local_len_4)
+                        ((*__param_s).bi_valid = (*__param_s).bi_valid + __local_len_4)
 
                     }
 
@@ -1386,80 +1386,80 @@ unsafe fn send_tree(__param_s: *mut internal_state, __param_tree: *mut ct_data_s
 
                     var __local_len_5: c_int = ((3 as c_int))
 
-                    if ((if (unsafe *__param_s).bi_valid > (16 - __local_len_5): 1 else: 0) != 0) {
+                    if ((if (*__param_s).bi_valid > (16 - __local_len_5): 1 else: 0) != 0) {
                         var __local_val_5: c_int = (((__local_count - 3) as c_int))
 
-                        ((unsafe *__param_s).bi_buf = ((unsafe *__param_s).bi_buf as c_ushort) | ((((__local_val_5 as c_ushort) as c_int) << ((unsafe *__param_s).bi_valid as c_uint)) as c_ushort))
+                        ((*__param_s).bi_buf = ((*__param_s).bi_buf as c_ushort) | ((((__local_val_5 as c_ushort) as c_int) << ((*__param_s).bi_valid as c_uint)) as c_ushort))
 
-                        var __ci_expr_old_11: c_ulong = (unsafe *__param_s).pending
+                        var __ci_expr_old_11: c_ulong = (*__param_s).pending
 
-                        ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
+                        ((*__param_s).pending = ((*__param_s).pending +% 1))
 
-                        ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_11]) = ((((((unsafe *__param_s).bi_buf as c_int) as c_int) & (255 as c_int)) as u8)))
-
-
-
-
-                        var __ci_expr_old_12: c_ulong = (unsafe *__param_s).pending
-
-                        ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
-
-                        ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_12]) = (((((unsafe *__param_s).bi_buf as c_int) >> (8 as c_uint)) as u8)))
+                        (((*__param_s).pending_buf[__ci_expr_old_11]) = ((((((*__param_s).bi_buf as c_int) as c_int) & (255 as c_int)) as u8)))
 
 
 
 
+                        var __ci_expr_old_12: c_ulong = (*__param_s).pending
+
+                        ((*__param_s).pending = ((*__param_s).pending +% 1))
+
+                        (((*__param_s).pending_buf[__ci_expr_old_12]) = (((((*__param_s).bi_buf as c_int) >> (8 as c_uint)) as u8)))
 
 
-                        ((unsafe *__param_s).bi_buf = (((((__local_val_5 as c_ushort) as c_int) >> ((16 - (unsafe *__param_s).bi_valid) as c_uint)) as c_ushort)))
 
-                        ((unsafe *__param_s).bi_valid = (unsafe *__param_s).bi_valid + (__local_len_5 - 16))
+
+
+
+                        ((*__param_s).bi_buf = (((((__local_val_5 as c_ushort) as c_int) >> ((16 - (*__param_s).bi_valid) as c_uint)) as c_ushort)))
+
+                        ((*__param_s).bi_valid = (*__param_s).bi_valid + (__local_len_5 - 16))
 
                     } else {
-                        ((unsafe *__param_s).bi_buf = ((unsafe *__param_s).bi_buf as c_ushort) | (((((__local_count - 3) as c_ushort) as c_int) << ((unsafe *__param_s).bi_valid as c_uint)) as c_ushort))
+                        ((*__param_s).bi_buf = ((*__param_s).bi_buf as c_ushort) | (((((__local_count - 3) as c_ushort) as c_int) << ((*__param_s).bi_valid as c_uint)) as c_ushort))
 
-                        ((unsafe *__param_s).bi_valid = (unsafe *__param_s).bi_valid + __local_len_5)
+                        ((*__param_s).bi_valid = (*__param_s).bi_valid + __local_len_5)
 
                     }
 
 
 
                 } else {
-                    var __local_len_6: c_int = (((unsafe *__param_s).bl_tree[18].dl.len as c_int))
+                    var __local_len_6: c_int = (((*__param_s).bl_tree[18].dl.len as c_int))
 
-                    if ((if (unsafe *__param_s).bi_valid > (16 - __local_len_6): 1 else: 0) != 0) {
-                        var __local_val_6: c_int = (((unsafe *__param_s).bl_tree[18].fc.code as c_int))
+                    if ((if (*__param_s).bi_valid > (16 - __local_len_6): 1 else: 0) != 0) {
+                        var __local_val_6: c_int = (((*__param_s).bl_tree[18].fc.code as c_int))
 
-                        ((unsafe *__param_s).bi_buf = ((unsafe *__param_s).bi_buf as c_ushort) | ((((__local_val_6 as c_ushort) as c_int) << ((unsafe *__param_s).bi_valid as c_uint)) as c_ushort))
+                        ((*__param_s).bi_buf = ((*__param_s).bi_buf as c_ushort) | ((((__local_val_6 as c_ushort) as c_int) << ((*__param_s).bi_valid as c_uint)) as c_ushort))
 
-                        var __ci_expr_old_13: c_ulong = (unsafe *__param_s).pending
+                        var __ci_expr_old_13: c_ulong = (*__param_s).pending
 
-                        ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
+                        ((*__param_s).pending = ((*__param_s).pending +% 1))
 
-                        ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_13]) = ((((((unsafe *__param_s).bi_buf as c_int) as c_int) & (255 as c_int)) as u8)))
-
-
-
-
-                        var __ci_expr_old_14: c_ulong = (unsafe *__param_s).pending
-
-                        ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
-
-                        ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_14]) = (((((unsafe *__param_s).bi_buf as c_int) >> (8 as c_uint)) as u8)))
+                        (((*__param_s).pending_buf[__ci_expr_old_13]) = ((((((*__param_s).bi_buf as c_int) as c_int) & (255 as c_int)) as u8)))
 
 
 
 
+                        var __ci_expr_old_14: c_ulong = (*__param_s).pending
+
+                        ((*__param_s).pending = ((*__param_s).pending +% 1))
+
+                        (((*__param_s).pending_buf[__ci_expr_old_14]) = (((((*__param_s).bi_buf as c_int) >> (8 as c_uint)) as u8)))
 
 
-                        ((unsafe *__param_s).bi_buf = (((((__local_val_6 as c_ushort) as c_int) >> ((16 - (unsafe *__param_s).bi_valid) as c_uint)) as c_ushort)))
 
-                        ((unsafe *__param_s).bi_valid = (unsafe *__param_s).bi_valid + (__local_len_6 - 16))
+
+
+
+                        ((*__param_s).bi_buf = (((((__local_val_6 as c_ushort) as c_int) >> ((16 - (*__param_s).bi_valid) as c_uint)) as c_ushort)))
+
+                        ((*__param_s).bi_valid = (*__param_s).bi_valid + (__local_len_6 - 16))
 
                     } else {
-                        ((unsafe *__param_s).bi_buf = ((unsafe *__param_s).bi_buf as c_ushort) | ((((unsafe *__param_s).bl_tree[18].fc.code as c_int) << ((unsafe *__param_s).bi_valid as c_uint)) as c_ushort))
+                        ((*__param_s).bi_buf = ((*__param_s).bi_buf as c_ushort) | ((((*__param_s).bl_tree[18].fc.code as c_int) << ((*__param_s).bi_valid as c_uint)) as c_ushort))
 
-                        ((unsafe *__param_s).bi_valid = (unsafe *__param_s).bi_valid + __local_len_6)
+                        ((*__param_s).bi_valid = (*__param_s).bi_valid + __local_len_6)
 
                     }
 
@@ -1467,39 +1467,39 @@ unsafe fn send_tree(__param_s: *mut internal_state, __param_tree: *mut ct_data_s
 
                     var __local_len_7: c_int = ((7 as c_int))
 
-                    if ((if (unsafe *__param_s).bi_valid > (16 - __local_len_7): 1 else: 0) != 0) {
+                    if ((if (*__param_s).bi_valid > (16 - __local_len_7): 1 else: 0) != 0) {
                         var __local_val_7: c_int = (((__local_count - 11) as c_int))
 
-                        ((unsafe *__param_s).bi_buf = ((unsafe *__param_s).bi_buf as c_ushort) | ((((__local_val_7 as c_ushort) as c_int) << ((unsafe *__param_s).bi_valid as c_uint)) as c_ushort))
+                        ((*__param_s).bi_buf = ((*__param_s).bi_buf as c_ushort) | ((((__local_val_7 as c_ushort) as c_int) << ((*__param_s).bi_valid as c_uint)) as c_ushort))
 
-                        var __ci_expr_old_15: c_ulong = (unsafe *__param_s).pending
+                        var __ci_expr_old_15: c_ulong = (*__param_s).pending
 
-                        ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
+                        ((*__param_s).pending = ((*__param_s).pending +% 1))
 
-                        ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_15]) = ((((((unsafe *__param_s).bi_buf as c_int) as c_int) & (255 as c_int)) as u8)))
-
-
-
-
-                        var __ci_expr_old_16: c_ulong = (unsafe *__param_s).pending
-
-                        ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
-
-                        ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_16]) = (((((unsafe *__param_s).bi_buf as c_int) >> (8 as c_uint)) as u8)))
+                        (((*__param_s).pending_buf[__ci_expr_old_15]) = ((((((*__param_s).bi_buf as c_int) as c_int) & (255 as c_int)) as u8)))
 
 
 
 
+                        var __ci_expr_old_16: c_ulong = (*__param_s).pending
+
+                        ((*__param_s).pending = ((*__param_s).pending +% 1))
+
+                        (((*__param_s).pending_buf[__ci_expr_old_16]) = (((((*__param_s).bi_buf as c_int) >> (8 as c_uint)) as u8)))
 
 
-                        ((unsafe *__param_s).bi_buf = (((((__local_val_7 as c_ushort) as c_int) >> ((16 - (unsafe *__param_s).bi_valid) as c_uint)) as c_ushort)))
 
-                        ((unsafe *__param_s).bi_valid = (unsafe *__param_s).bi_valid + (__local_len_7 - 16))
+
+
+
+                        ((*__param_s).bi_buf = (((((__local_val_7 as c_ushort) as c_int) >> ((16 - (*__param_s).bi_valid) as c_uint)) as c_ushort)))
+
+                        ((*__param_s).bi_valid = (*__param_s).bi_valid + (__local_len_7 - 16))
 
                     } else {
-                        ((unsafe *__param_s).bi_buf = ((unsafe *__param_s).bi_buf as c_ushort) | (((((__local_count - 11) as c_ushort) as c_int) << ((unsafe *__param_s).bi_valid as c_uint)) as c_ushort))
+                        ((*__param_s).bi_buf = ((*__param_s).bi_buf as c_ushort) | (((((__local_count - 11) as c_ushort) as c_int) << ((*__param_s).bi_valid as c_uint)) as c_ushort))
 
-                        ((unsafe *__param_s).bi_valid = (unsafe *__param_s).bi_valid + __local_len_7)
+                        ((*__param_s).bi_valid = (*__param_s).bi_valid + __local_len_7)
 
                     }
 
@@ -1547,16 +1547,16 @@ unsafe fn send_tree(__param_s: *mut internal_state, __param_tree: *mut ct_data_s
 unsafe fn build_bl_tree(__param_s: *mut internal_state) -> c_int {
     var __local_max_blindex: c_int
 
-    scan_tree(__param_s, (&(unsafe *__param_s).dyn_ltree[0] as *mut ct_data_s), (unsafe *(&raw const (unsafe *__param_s).l_desc as *const tree_desc_s)).max_code)
+    scan_tree(__param_s, (&(*__param_s).dyn_ltree[0] as *mut ct_data_s), (*(&raw const (*__param_s).l_desc as *const tree_desc_s)).max_code)
 
-    scan_tree(__param_s, (&(unsafe *__param_s).dyn_dtree[0] as *mut ct_data_s), (unsafe *(&raw const (unsafe *__param_s).d_desc as *const tree_desc_s)).max_code)
+    scan_tree(__param_s, (&(*__param_s).dyn_dtree[0] as *mut ct_data_s), (*(&raw const (*__param_s).d_desc as *const tree_desc_s)).max_code)
 
-    build_tree(__param_s, ((&raw const (unsafe *__param_s).bl_desc as *const tree_desc_s) as *mut tree_desc_s))
+    build_tree(__param_s, ((&raw const (*__param_s).bl_desc as *const tree_desc_s) as *mut tree_desc_s))
 
     (__local_max_blindex = (((19 - 1) as c_int)))
 
     while ((if __local_max_blindex >= 3: 1 else: 0) != 0) {
-        if ((if (unsafe *__param_s).bl_tree[bl_order[__local_max_blindex]].dl.len != 0: 1 else: 0) != 0) {
+        if ((if (*__param_s).bl_tree[bl_order[__local_max_blindex]].dl.len != 0: 1 else: 0) != 0) {
             break
         }
 
@@ -1566,7 +1566,7 @@ unsafe fn build_bl_tree(__param_s: *mut internal_state) -> c_int {
     }
 
 
-    ((unsafe *__param_s).opt_len = ((unsafe *__param_s).opt_len +% ((((((((3 as c_ulong) *% ((((__local_max_blindex as c_ulong) as c_ulong) +% (1 as c_ulong)) as c_ulong)) as c_ulong) +% (5 as c_ulong)) as c_ulong) +% (5 as c_ulong)) as c_ulong) +% (4 as c_ulong))))
+    ((*__param_s).opt_len = ((*__param_s).opt_len +% ((((((((3 as c_ulong) *% ((((__local_max_blindex as c_ulong) as c_ulong) +% (1 as c_ulong)) as c_ulong)) as c_ulong) +% (5 as c_ulong)) as c_ulong) +% (5 as c_ulong)) as c_ulong) +% (4 as c_ulong))))
 
 
     return __local_max_blindex
@@ -1581,39 +1581,39 @@ unsafe fn send_all_trees(__param_s: *mut internal_state, __param_lcodes: c_int, 
 
     var __local_len: c_int = ((5 as c_int))
 
-    if ((if (unsafe *__param_s).bi_valid > (16 - __local_len): 1 else: 0) != 0) {
+    if ((if (*__param_s).bi_valid > (16 - __local_len): 1 else: 0) != 0) {
         var __local_val: c_int = (((__param_lcodes - 257) as c_int))
 
-        ((unsafe *__param_s).bi_buf = ((unsafe *__param_s).bi_buf as c_ushort) | ((((__local_val as c_ushort) as c_int) << ((unsafe *__param_s).bi_valid as c_uint)) as c_ushort))
+        ((*__param_s).bi_buf = ((*__param_s).bi_buf as c_ushort) | ((((__local_val as c_ushort) as c_int) << ((*__param_s).bi_valid as c_uint)) as c_ushort))
 
-        var __ci_expr_old_0: c_ulong = (unsafe *__param_s).pending
+        var __ci_expr_old_0: c_ulong = (*__param_s).pending
 
-        ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
+        ((*__param_s).pending = ((*__param_s).pending +% 1))
 
-        ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_0]) = ((((((unsafe *__param_s).bi_buf as c_int) as c_int) & (255 as c_int)) as u8)))
-
-
-
-
-        var __ci_expr_old_1: c_ulong = (unsafe *__param_s).pending
-
-        ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
-
-        ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_1]) = (((((unsafe *__param_s).bi_buf as c_int) >> (8 as c_uint)) as u8)))
+        (((*__param_s).pending_buf[__ci_expr_old_0]) = ((((((*__param_s).bi_buf as c_int) as c_int) & (255 as c_int)) as u8)))
 
 
 
 
+        var __ci_expr_old_1: c_ulong = (*__param_s).pending
+
+        ((*__param_s).pending = ((*__param_s).pending +% 1))
+
+        (((*__param_s).pending_buf[__ci_expr_old_1]) = (((((*__param_s).bi_buf as c_int) >> (8 as c_uint)) as u8)))
 
 
-        ((unsafe *__param_s).bi_buf = (((((__local_val as c_ushort) as c_int) >> ((16 - (unsafe *__param_s).bi_valid) as c_uint)) as c_ushort)))
 
-        ((unsafe *__param_s).bi_valid = (unsafe *__param_s).bi_valid + (__local_len - 16))
+
+
+
+        ((*__param_s).bi_buf = (((((__local_val as c_ushort) as c_int) >> ((16 - (*__param_s).bi_valid) as c_uint)) as c_ushort)))
+
+        ((*__param_s).bi_valid = (*__param_s).bi_valid + (__local_len - 16))
 
     } else {
-        ((unsafe *__param_s).bi_buf = ((unsafe *__param_s).bi_buf as c_ushort) | (((((__param_lcodes - 257) as c_ushort) as c_int) << ((unsafe *__param_s).bi_valid as c_uint)) as c_ushort))
+        ((*__param_s).bi_buf = ((*__param_s).bi_buf as c_ushort) | (((((__param_lcodes - 257) as c_ushort) as c_int) << ((*__param_s).bi_valid as c_uint)) as c_ushort))
 
-        ((unsafe *__param_s).bi_valid = (unsafe *__param_s).bi_valid + __local_len)
+        ((*__param_s).bi_valid = (*__param_s).bi_valid + __local_len)
 
     }
 
@@ -1621,39 +1621,39 @@ unsafe fn send_all_trees(__param_s: *mut internal_state, __param_lcodes: c_int, 
 
     var __local_len_1: c_int = ((5 as c_int))
 
-    if ((if (unsafe *__param_s).bi_valid > (16 - __local_len_1): 1 else: 0) != 0) {
+    if ((if (*__param_s).bi_valid > (16 - __local_len_1): 1 else: 0) != 0) {
         var __local_val_1: c_int = (((__param_dcodes - 1) as c_int))
 
-        ((unsafe *__param_s).bi_buf = ((unsafe *__param_s).bi_buf as c_ushort) | ((((__local_val_1 as c_ushort) as c_int) << ((unsafe *__param_s).bi_valid as c_uint)) as c_ushort))
+        ((*__param_s).bi_buf = ((*__param_s).bi_buf as c_ushort) | ((((__local_val_1 as c_ushort) as c_int) << ((*__param_s).bi_valid as c_uint)) as c_ushort))
 
-        var __ci_expr_old_2: c_ulong = (unsafe *__param_s).pending
+        var __ci_expr_old_2: c_ulong = (*__param_s).pending
 
-        ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
+        ((*__param_s).pending = ((*__param_s).pending +% 1))
 
-        ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_2]) = ((((((unsafe *__param_s).bi_buf as c_int) as c_int) & (255 as c_int)) as u8)))
-
-
-
-
-        var __ci_expr_old_3: c_ulong = (unsafe *__param_s).pending
-
-        ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
-
-        ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_3]) = (((((unsafe *__param_s).bi_buf as c_int) >> (8 as c_uint)) as u8)))
+        (((*__param_s).pending_buf[__ci_expr_old_2]) = ((((((*__param_s).bi_buf as c_int) as c_int) & (255 as c_int)) as u8)))
 
 
 
 
+        var __ci_expr_old_3: c_ulong = (*__param_s).pending
+
+        ((*__param_s).pending = ((*__param_s).pending +% 1))
+
+        (((*__param_s).pending_buf[__ci_expr_old_3]) = (((((*__param_s).bi_buf as c_int) >> (8 as c_uint)) as u8)))
 
 
-        ((unsafe *__param_s).bi_buf = (((((__local_val_1 as c_ushort) as c_int) >> ((16 - (unsafe *__param_s).bi_valid) as c_uint)) as c_ushort)))
 
-        ((unsafe *__param_s).bi_valid = (unsafe *__param_s).bi_valid + (__local_len_1 - 16))
+
+
+
+        ((*__param_s).bi_buf = (((((__local_val_1 as c_ushort) as c_int) >> ((16 - (*__param_s).bi_valid) as c_uint)) as c_ushort)))
+
+        ((*__param_s).bi_valid = (*__param_s).bi_valid + (__local_len_1 - 16))
 
     } else {
-        ((unsafe *__param_s).bi_buf = ((unsafe *__param_s).bi_buf as c_ushort) | (((((__param_dcodes - 1) as c_ushort) as c_int) << ((unsafe *__param_s).bi_valid as c_uint)) as c_ushort))
+        ((*__param_s).bi_buf = ((*__param_s).bi_buf as c_ushort) | (((((__param_dcodes - 1) as c_ushort) as c_int) << ((*__param_s).bi_valid as c_uint)) as c_ushort))
 
-        ((unsafe *__param_s).bi_valid = (unsafe *__param_s).bi_valid + __local_len_1)
+        ((*__param_s).bi_valid = (*__param_s).bi_valid + __local_len_1)
 
     }
 
@@ -1661,39 +1661,39 @@ unsafe fn send_all_trees(__param_s: *mut internal_state, __param_lcodes: c_int, 
 
     var __local_len_2: c_int = ((4 as c_int))
 
-    if ((if (unsafe *__param_s).bi_valid > (16 - __local_len_2): 1 else: 0) != 0) {
+    if ((if (*__param_s).bi_valid > (16 - __local_len_2): 1 else: 0) != 0) {
         var __local_val_2: c_int = (((__param_blcodes - 4) as c_int))
 
-        ((unsafe *__param_s).bi_buf = ((unsafe *__param_s).bi_buf as c_ushort) | ((((__local_val_2 as c_ushort) as c_int) << ((unsafe *__param_s).bi_valid as c_uint)) as c_ushort))
+        ((*__param_s).bi_buf = ((*__param_s).bi_buf as c_ushort) | ((((__local_val_2 as c_ushort) as c_int) << ((*__param_s).bi_valid as c_uint)) as c_ushort))
 
-        var __ci_expr_old_4: c_ulong = (unsafe *__param_s).pending
+        var __ci_expr_old_4: c_ulong = (*__param_s).pending
 
-        ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
+        ((*__param_s).pending = ((*__param_s).pending +% 1))
 
-        ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_4]) = ((((((unsafe *__param_s).bi_buf as c_int) as c_int) & (255 as c_int)) as u8)))
-
-
-
-
-        var __ci_expr_old_5: c_ulong = (unsafe *__param_s).pending
-
-        ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
-
-        ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_5]) = (((((unsafe *__param_s).bi_buf as c_int) >> (8 as c_uint)) as u8)))
+        (((*__param_s).pending_buf[__ci_expr_old_4]) = ((((((*__param_s).bi_buf as c_int) as c_int) & (255 as c_int)) as u8)))
 
 
 
 
+        var __ci_expr_old_5: c_ulong = (*__param_s).pending
+
+        ((*__param_s).pending = ((*__param_s).pending +% 1))
+
+        (((*__param_s).pending_buf[__ci_expr_old_5]) = (((((*__param_s).bi_buf as c_int) >> (8 as c_uint)) as u8)))
 
 
-        ((unsafe *__param_s).bi_buf = (((((__local_val_2 as c_ushort) as c_int) >> ((16 - (unsafe *__param_s).bi_valid) as c_uint)) as c_ushort)))
 
-        ((unsafe *__param_s).bi_valid = (unsafe *__param_s).bi_valid + (__local_len_2 - 16))
+
+
+
+        ((*__param_s).bi_buf = (((((__local_val_2 as c_ushort) as c_int) >> ((16 - (*__param_s).bi_valid) as c_uint)) as c_ushort)))
+
+        ((*__param_s).bi_valid = (*__param_s).bi_valid + (__local_len_2 - 16))
 
     } else {
-        ((unsafe *__param_s).bi_buf = ((unsafe *__param_s).bi_buf as c_ushort) | (((((__param_blcodes - 4) as c_ushort) as c_int) << ((unsafe *__param_s).bi_valid as c_uint)) as c_ushort))
+        ((*__param_s).bi_buf = ((*__param_s).bi_buf as c_ushort) | (((((__param_blcodes - 4) as c_ushort) as c_int) << ((*__param_s).bi_valid as c_uint)) as c_ushort))
 
-        ((unsafe *__param_s).bi_valid = (unsafe *__param_s).bi_valid + __local_len_2)
+        ((*__param_s).bi_valid = (*__param_s).bi_valid + __local_len_2)
 
     }
 
@@ -1705,39 +1705,39 @@ unsafe fn send_all_trees(__param_s: *mut internal_state, __param_lcodes: c_int, 
 
         var __local_len_3: c_int = ((3 as c_int))
 
-        if ((if (unsafe *__param_s).bi_valid > (16 - __local_len_3): 1 else: 0) != 0) {
-            var __local_val_3: c_int = (((unsafe *__param_s).bl_tree[bl_order[__local_rank]].dl.len as c_int))
+        if ((if (*__param_s).bi_valid > (16 - __local_len_3): 1 else: 0) != 0) {
+            var __local_val_3: c_int = (((*__param_s).bl_tree[bl_order[__local_rank]].dl.len as c_int))
 
-            ((unsafe *__param_s).bi_buf = ((unsafe *__param_s).bi_buf as c_ushort) | ((((__local_val_3 as c_ushort) as c_int) << ((unsafe *__param_s).bi_valid as c_uint)) as c_ushort))
+            ((*__param_s).bi_buf = ((*__param_s).bi_buf as c_ushort) | ((((__local_val_3 as c_ushort) as c_int) << ((*__param_s).bi_valid as c_uint)) as c_ushort))
 
-            var __ci_expr_old_6: c_ulong = (unsafe *__param_s).pending
+            var __ci_expr_old_6: c_ulong = (*__param_s).pending
 
-            ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
+            ((*__param_s).pending = ((*__param_s).pending +% 1))
 
-            ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_6]) = ((((((unsafe *__param_s).bi_buf as c_int) as c_int) & (255 as c_int)) as u8)))
-
-
-
-
-            var __ci_expr_old_7: c_ulong = (unsafe *__param_s).pending
-
-            ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
-
-            ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_7]) = (((((unsafe *__param_s).bi_buf as c_int) >> (8 as c_uint)) as u8)))
+            (((*__param_s).pending_buf[__ci_expr_old_6]) = ((((((*__param_s).bi_buf as c_int) as c_int) & (255 as c_int)) as u8)))
 
 
 
 
+            var __ci_expr_old_7: c_ulong = (*__param_s).pending
+
+            ((*__param_s).pending = ((*__param_s).pending +% 1))
+
+            (((*__param_s).pending_buf[__ci_expr_old_7]) = (((((*__param_s).bi_buf as c_int) >> (8 as c_uint)) as u8)))
 
 
-            ((unsafe *__param_s).bi_buf = (((((__local_val_3 as c_ushort) as c_int) >> ((16 - (unsafe *__param_s).bi_valid) as c_uint)) as c_ushort)))
 
-            ((unsafe *__param_s).bi_valid = (unsafe *__param_s).bi_valid + (__local_len_3 - 16))
+
+
+
+            ((*__param_s).bi_buf = (((((__local_val_3 as c_ushort) as c_int) >> ((16 - (*__param_s).bi_valid) as c_uint)) as c_ushort)))
+
+            ((*__param_s).bi_valid = (*__param_s).bi_valid + (__local_len_3 - 16))
 
         } else {
-            ((unsafe *__param_s).bi_buf = ((unsafe *__param_s).bi_buf as c_ushort) | ((((unsafe *__param_s).bl_tree[bl_order[__local_rank]].dl.len as c_int) << ((unsafe *__param_s).bi_valid as c_uint)) as c_ushort))
+            ((*__param_s).bi_buf = ((*__param_s).bi_buf as c_ushort) | ((((*__param_s).bl_tree[bl_order[__local_rank]].dl.len as c_int) << ((*__param_s).bi_valid as c_uint)) as c_ushort))
 
-            ((unsafe *__param_s).bi_valid = (unsafe *__param_s).bi_valid + __local_len_3)
+            ((*__param_s).bi_valid = (*__param_s).bi_valid + __local_len_3)
 
         }
 
@@ -1750,10 +1750,10 @@ unsafe fn send_all_trees(__param_s: *mut internal_state, __param_lcodes: c_int, 
 
 
 
-    send_tree(__param_s, (&(unsafe *__param_s).dyn_ltree[0] as *mut ct_data_s), ((__param_lcodes - 1) as c_int))
+    send_tree(__param_s, (&(*__param_s).dyn_ltree[0] as *mut ct_data_s), ((__param_lcodes - 1) as c_int))
 
 
-    send_tree(__param_s, (&(unsafe *__param_s).dyn_dtree[0] as *mut ct_data_s), ((__param_dcodes - 1) as c_int))
+    send_tree(__param_s, (&(*__param_s).dyn_dtree[0] as *mut ct_data_s), ((__param_dcodes - 1) as c_int))
 
 
 }
@@ -1769,65 +1769,65 @@ unsafe fn compress_block(__param_s: *mut internal_state, __param_ltree: *const c
 
     var __local_extra: c_int
 
-    if ((if (unsafe *__param_s).sym_next != 0: 1 else: 0) != 0) {
+    if ((if (*__param_s).sym_next != 0: 1 else: 0) != 0) {
         loop {
             var __ci_expr_old_0: c_uint = __local_sx
 
             (__local_sx = (__local_sx +% 1))
 
-            (__local_dist = ((((((unsafe (unsafe *__param_s).sym_buf[__ci_expr_old_0]) as c_int) as c_int) & (255 as c_int)) as c_uint)))
+            (__local_dist = (((((((*__param_s).sym_buf[__ci_expr_old_0]) as c_int) as c_int) & (255 as c_int)) as c_uint)))
 
 
             var __ci_expr_old_1: c_uint = __local_sx
 
             (__local_sx = (__local_sx +% 1))
 
-            (__local_dist = (__local_dist +% (((((((unsafe (unsafe *__param_s).sym_buf[__ci_expr_old_1]) as c_int) as c_int) & (255 as c_int)) as c_uint) as c_uint) << (8 as c_uint))))
+            (__local_dist = (__local_dist +% ((((((((*__param_s).sym_buf[__ci_expr_old_1]) as c_int) as c_int) & (255 as c_int)) as c_uint) as c_uint) << (8 as c_uint))))
 
 
             var __ci_expr_old_2: c_uint = __local_sx
 
             (__local_sx = (__local_sx +% 1))
 
-            (__local_lc = (((unsafe (unsafe *__param_s).sym_buf[__ci_expr_old_2]) as c_int)))
+            (__local_lc = ((((*__param_s).sym_buf[__ci_expr_old_2]) as c_int)))
 
 
             if ((if __local_dist == 0: 1 else: 0) != 0) {
-                var __local_len: c_int = (((unsafe __param_ltree[__local_lc]).dl.len as c_int))
+                var __local_len: c_int = (((__param_ltree[__local_lc]).dl.len as c_int))
 
-                if ((if (unsafe *__param_s).bi_valid > (16 - __local_len): 1 else: 0) != 0) {
-                    var __local_val: c_int = (((unsafe __param_ltree[__local_lc]).fc.code as c_int))
+                if ((if (*__param_s).bi_valid > (16 - __local_len): 1 else: 0) != 0) {
+                    var __local_val: c_int = (((__param_ltree[__local_lc]).fc.code as c_int))
 
-                    ((unsafe *__param_s).bi_buf = ((unsafe *__param_s).bi_buf as c_ushort) | ((((__local_val as c_ushort) as c_int) << ((unsafe *__param_s).bi_valid as c_uint)) as c_ushort))
+                    ((*__param_s).bi_buf = ((*__param_s).bi_buf as c_ushort) | ((((__local_val as c_ushort) as c_int) << ((*__param_s).bi_valid as c_uint)) as c_ushort))
 
-                    var __ci_expr_old_3: c_ulong = (unsafe *__param_s).pending
+                    var __ci_expr_old_3: c_ulong = (*__param_s).pending
 
-                    ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
+                    ((*__param_s).pending = ((*__param_s).pending +% 1))
 
-                    ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_3]) = ((((((unsafe *__param_s).bi_buf as c_int) as c_int) & (255 as c_int)) as u8)))
-
-
-
-
-                    var __ci_expr_old_4: c_ulong = (unsafe *__param_s).pending
-
-                    ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
-
-                    ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_4]) = (((((unsafe *__param_s).bi_buf as c_int) >> (8 as c_uint)) as u8)))
+                    (((*__param_s).pending_buf[__ci_expr_old_3]) = ((((((*__param_s).bi_buf as c_int) as c_int) & (255 as c_int)) as u8)))
 
 
 
 
+                    var __ci_expr_old_4: c_ulong = (*__param_s).pending
+
+                    ((*__param_s).pending = ((*__param_s).pending +% 1))
+
+                    (((*__param_s).pending_buf[__ci_expr_old_4]) = (((((*__param_s).bi_buf as c_int) >> (8 as c_uint)) as u8)))
 
 
-                    ((unsafe *__param_s).bi_buf = (((((__local_val as c_ushort) as c_int) >> ((16 - (unsafe *__param_s).bi_valid) as c_uint)) as c_ushort)))
 
-                    ((unsafe *__param_s).bi_valid = (unsafe *__param_s).bi_valid + (__local_len - 16))
+
+
+
+                    ((*__param_s).bi_buf = (((((__local_val as c_ushort) as c_int) >> ((16 - (*__param_s).bi_valid) as c_uint)) as c_ushort)))
+
+                    ((*__param_s).bi_valid = (*__param_s).bi_valid + (__local_len - 16))
 
                 } else {
-                    ((unsafe *__param_s).bi_buf = ((unsafe *__param_s).bi_buf as c_ushort) | ((((unsafe __param_ltree[__local_lc]).fc.code as c_int) << ((unsafe *__param_s).bi_valid as c_uint)) as c_ushort))
+                    ((*__param_s).bi_buf = ((*__param_s).bi_buf as c_ushort) | ((((__param_ltree[__local_lc]).fc.code as c_int) << ((*__param_s).bi_valid as c_uint)) as c_ushort))
 
-                    ((unsafe *__param_s).bi_valid = (unsafe *__param_s).bi_valid + __local_len)
+                    ((*__param_s).bi_valid = (*__param_s).bi_valid + __local_len)
 
                 }
 
@@ -1837,41 +1837,41 @@ unsafe fn compress_block(__param_s: *mut internal_state, __param_ltree: *const c
             } else {
                 (__local_code = ((_length_code[__local_lc] as c_uint)))
 
-                var __local_len_1: c_int = (((unsafe __param_ltree[((((__local_code as c_uint) +% (256 as c_uint)) as c_uint) +% (1 as c_uint))]).dl.len as c_int))
+                var __local_len_1: c_int = (((__param_ltree[((((__local_code as c_uint) +% (256 as c_uint)) as c_uint) +% (1 as c_uint))]).dl.len as c_int))
 
-                if ((if (unsafe *__param_s).bi_valid > (16 - __local_len_1): 1 else: 0) != 0) {
-                    var __local_val_1: c_int = (((unsafe __param_ltree[((((__local_code as c_uint) +% (256 as c_uint)) as c_uint) +% (1 as c_uint))]).fc.code as c_int))
+                if ((if (*__param_s).bi_valid > (16 - __local_len_1): 1 else: 0) != 0) {
+                    var __local_val_1: c_int = (((__param_ltree[((((__local_code as c_uint) +% (256 as c_uint)) as c_uint) +% (1 as c_uint))]).fc.code as c_int))
 
-                    ((unsafe *__param_s).bi_buf = ((unsafe *__param_s).bi_buf as c_ushort) | ((((__local_val_1 as c_ushort) as c_int) << ((unsafe *__param_s).bi_valid as c_uint)) as c_ushort))
+                    ((*__param_s).bi_buf = ((*__param_s).bi_buf as c_ushort) | ((((__local_val_1 as c_ushort) as c_int) << ((*__param_s).bi_valid as c_uint)) as c_ushort))
 
-                    var __ci_expr_old_5: c_ulong = (unsafe *__param_s).pending
+                    var __ci_expr_old_5: c_ulong = (*__param_s).pending
 
-                    ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
+                    ((*__param_s).pending = ((*__param_s).pending +% 1))
 
-                    ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_5]) = ((((((unsafe *__param_s).bi_buf as c_int) as c_int) & (255 as c_int)) as u8)))
-
-
-
-
-                    var __ci_expr_old_6: c_ulong = (unsafe *__param_s).pending
-
-                    ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
-
-                    ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_6]) = (((((unsafe *__param_s).bi_buf as c_int) >> (8 as c_uint)) as u8)))
+                    (((*__param_s).pending_buf[__ci_expr_old_5]) = ((((((*__param_s).bi_buf as c_int) as c_int) & (255 as c_int)) as u8)))
 
 
 
 
+                    var __ci_expr_old_6: c_ulong = (*__param_s).pending
+
+                    ((*__param_s).pending = ((*__param_s).pending +% 1))
+
+                    (((*__param_s).pending_buf[__ci_expr_old_6]) = (((((*__param_s).bi_buf as c_int) >> (8 as c_uint)) as u8)))
 
 
-                    ((unsafe *__param_s).bi_buf = (((((__local_val_1 as c_ushort) as c_int) >> ((16 - (unsafe *__param_s).bi_valid) as c_uint)) as c_ushort)))
 
-                    ((unsafe *__param_s).bi_valid = (unsafe *__param_s).bi_valid + (__local_len_1 - 16))
+
+
+
+                    ((*__param_s).bi_buf = (((((__local_val_1 as c_ushort) as c_int) >> ((16 - (*__param_s).bi_valid) as c_uint)) as c_ushort)))
+
+                    ((*__param_s).bi_valid = (*__param_s).bi_valid + (__local_len_1 - 16))
 
                 } else {
-                    ((unsafe *__param_s).bi_buf = ((unsafe *__param_s).bi_buf as c_ushort) | ((((unsafe __param_ltree[((((__local_code as c_uint) +% (256 as c_uint)) as c_uint) +% (1 as c_uint))]).fc.code as c_int) << ((unsafe *__param_s).bi_valid as c_uint)) as c_ushort))
+                    ((*__param_s).bi_buf = ((*__param_s).bi_buf as c_ushort) | ((((__param_ltree[((((__local_code as c_uint) +% (256 as c_uint)) as c_uint) +% (1 as c_uint))]).fc.code as c_int) << ((*__param_s).bi_valid as c_uint)) as c_ushort))
 
-                    ((unsafe *__param_s).bi_valid = (unsafe *__param_s).bi_valid + __local_len_1)
+                    ((*__param_s).bi_valid = (*__param_s).bi_valid + __local_len_1)
 
                 }
 
@@ -1884,39 +1884,39 @@ unsafe fn compress_block(__param_s: *mut internal_state, __param_ltree: *const c
 
                     var __local_len_2: c_int = __local_extra
 
-                    if ((if (unsafe *__param_s).bi_valid > (16 - __local_len_2): 1 else: 0) != 0) {
+                    if ((if (*__param_s).bi_valid > (16 - __local_len_2): 1 else: 0) != 0) {
                         var __local_val_2: c_int = __local_lc
 
-                        ((unsafe *__param_s).bi_buf = ((unsafe *__param_s).bi_buf as c_ushort) | ((((__local_val_2 as c_ushort) as c_int) << ((unsafe *__param_s).bi_valid as c_uint)) as c_ushort))
+                        ((*__param_s).bi_buf = ((*__param_s).bi_buf as c_ushort) | ((((__local_val_2 as c_ushort) as c_int) << ((*__param_s).bi_valid as c_uint)) as c_ushort))
 
-                        var __ci_expr_old_7: c_ulong = (unsafe *__param_s).pending
+                        var __ci_expr_old_7: c_ulong = (*__param_s).pending
 
-                        ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
+                        ((*__param_s).pending = ((*__param_s).pending +% 1))
 
-                        ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_7]) = ((((((unsafe *__param_s).bi_buf as c_int) as c_int) & (255 as c_int)) as u8)))
-
-
-
-
-                        var __ci_expr_old_8: c_ulong = (unsafe *__param_s).pending
-
-                        ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
-
-                        ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_8]) = (((((unsafe *__param_s).bi_buf as c_int) >> (8 as c_uint)) as u8)))
+                        (((*__param_s).pending_buf[__ci_expr_old_7]) = ((((((*__param_s).bi_buf as c_int) as c_int) & (255 as c_int)) as u8)))
 
 
 
 
+                        var __ci_expr_old_8: c_ulong = (*__param_s).pending
+
+                        ((*__param_s).pending = ((*__param_s).pending +% 1))
+
+                        (((*__param_s).pending_buf[__ci_expr_old_8]) = (((((*__param_s).bi_buf as c_int) >> (8 as c_uint)) as u8)))
 
 
-                        ((unsafe *__param_s).bi_buf = (((((__local_val_2 as c_ushort) as c_int) >> ((16 - (unsafe *__param_s).bi_valid) as c_uint)) as c_ushort)))
 
-                        ((unsafe *__param_s).bi_valid = (unsafe *__param_s).bi_valid + (__local_len_2 - 16))
+
+
+
+                        ((*__param_s).bi_buf = (((((__local_val_2 as c_ushort) as c_int) >> ((16 - (*__param_s).bi_valid) as c_uint)) as c_ushort)))
+
+                        ((*__param_s).bi_valid = (*__param_s).bi_valid + (__local_len_2 - 16))
 
                     } else {
-                        ((unsafe *__param_s).bi_buf = ((unsafe *__param_s).bi_buf as c_ushort) | ((((__local_lc as c_ushort) as c_int) << ((unsafe *__param_s).bi_valid as c_uint)) as c_ushort))
+                        ((*__param_s).bi_buf = ((*__param_s).bi_buf as c_ushort) | ((((__local_lc as c_ushort) as c_int) << ((*__param_s).bi_valid as c_uint)) as c_ushort))
 
-                        ((unsafe *__param_s).bi_valid = (unsafe *__param_s).bi_valid + __local_len_2)
+                        ((*__param_s).bi_valid = (*__param_s).bi_valid + __local_len_2)
 
                     }
 
@@ -1938,41 +1938,41 @@ unsafe fn compress_block(__param_s: *mut internal_state, __param_ltree: *const c
 
 
 
-                var __local_len_3: c_int = (((unsafe __param_dtree[__local_code]).dl.len as c_int))
+                var __local_len_3: c_int = (((__param_dtree[__local_code]).dl.len as c_int))
 
-                if ((if (unsafe *__param_s).bi_valid > (16 - __local_len_3): 1 else: 0) != 0) {
-                    var __local_val_3: c_int = (((unsafe __param_dtree[__local_code]).fc.code as c_int))
+                if ((if (*__param_s).bi_valid > (16 - __local_len_3): 1 else: 0) != 0) {
+                    var __local_val_3: c_int = (((__param_dtree[__local_code]).fc.code as c_int))
 
-                    ((unsafe *__param_s).bi_buf = ((unsafe *__param_s).bi_buf as c_ushort) | ((((__local_val_3 as c_ushort) as c_int) << ((unsafe *__param_s).bi_valid as c_uint)) as c_ushort))
+                    ((*__param_s).bi_buf = ((*__param_s).bi_buf as c_ushort) | ((((__local_val_3 as c_ushort) as c_int) << ((*__param_s).bi_valid as c_uint)) as c_ushort))
 
-                    var __ci_expr_old_10: c_ulong = (unsafe *__param_s).pending
+                    var __ci_expr_old_10: c_ulong = (*__param_s).pending
 
-                    ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
+                    ((*__param_s).pending = ((*__param_s).pending +% 1))
 
-                    ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_10]) = ((((((unsafe *__param_s).bi_buf as c_int) as c_int) & (255 as c_int)) as u8)))
-
-
-
-
-                    var __ci_expr_old_11: c_ulong = (unsafe *__param_s).pending
-
-                    ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
-
-                    ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_11]) = (((((unsafe *__param_s).bi_buf as c_int) >> (8 as c_uint)) as u8)))
+                    (((*__param_s).pending_buf[__ci_expr_old_10]) = ((((((*__param_s).bi_buf as c_int) as c_int) & (255 as c_int)) as u8)))
 
 
 
 
+                    var __ci_expr_old_11: c_ulong = (*__param_s).pending
+
+                    ((*__param_s).pending = ((*__param_s).pending +% 1))
+
+                    (((*__param_s).pending_buf[__ci_expr_old_11]) = (((((*__param_s).bi_buf as c_int) >> (8 as c_uint)) as u8)))
 
 
-                    ((unsafe *__param_s).bi_buf = (((((__local_val_3 as c_ushort) as c_int) >> ((16 - (unsafe *__param_s).bi_valid) as c_uint)) as c_ushort)))
 
-                    ((unsafe *__param_s).bi_valid = (unsafe *__param_s).bi_valid + (__local_len_3 - 16))
+
+
+
+                    ((*__param_s).bi_buf = (((((__local_val_3 as c_ushort) as c_int) >> ((16 - (*__param_s).bi_valid) as c_uint)) as c_ushort)))
+
+                    ((*__param_s).bi_valid = (*__param_s).bi_valid + (__local_len_3 - 16))
 
                 } else {
-                    ((unsafe *__param_s).bi_buf = ((unsafe *__param_s).bi_buf as c_ushort) | ((((unsafe __param_dtree[__local_code]).fc.code as c_int) << ((unsafe *__param_s).bi_valid as c_uint)) as c_ushort))
+                    ((*__param_s).bi_buf = ((*__param_s).bi_buf as c_ushort) | ((((__param_dtree[__local_code]).fc.code as c_int) << ((*__param_s).bi_valid as c_uint)) as c_ushort))
 
-                    ((unsafe *__param_s).bi_valid = (unsafe *__param_s).bi_valid + __local_len_3)
+                    ((*__param_s).bi_valid = (*__param_s).bi_valid + __local_len_3)
 
                 }
 
@@ -1985,39 +1985,39 @@ unsafe fn compress_block(__param_s: *mut internal_state, __param_ltree: *const c
 
                     var __local_len_4: c_int = __local_extra
 
-                    if ((if (unsafe *__param_s).bi_valid > (16 - __local_len_4): 1 else: 0) != 0) {
+                    if ((if (*__param_s).bi_valid > (16 - __local_len_4): 1 else: 0) != 0) {
                         var __local_val_4: c_int = ((__local_dist as c_int))
 
-                        ((unsafe *__param_s).bi_buf = ((unsafe *__param_s).bi_buf as c_ushort) | ((((__local_val_4 as c_ushort) as c_int) << ((unsafe *__param_s).bi_valid as c_uint)) as c_ushort))
+                        ((*__param_s).bi_buf = ((*__param_s).bi_buf as c_ushort) | ((((__local_val_4 as c_ushort) as c_int) << ((*__param_s).bi_valid as c_uint)) as c_ushort))
 
-                        var __ci_expr_old_12: c_ulong = (unsafe *__param_s).pending
+                        var __ci_expr_old_12: c_ulong = (*__param_s).pending
 
-                        ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
+                        ((*__param_s).pending = ((*__param_s).pending +% 1))
 
-                        ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_12]) = ((((((unsafe *__param_s).bi_buf as c_int) as c_int) & (255 as c_int)) as u8)))
-
-
-
-
-                        var __ci_expr_old_13: c_ulong = (unsafe *__param_s).pending
-
-                        ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
-
-                        ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_13]) = (((((unsafe *__param_s).bi_buf as c_int) >> (8 as c_uint)) as u8)))
+                        (((*__param_s).pending_buf[__ci_expr_old_12]) = ((((((*__param_s).bi_buf as c_int) as c_int) & (255 as c_int)) as u8)))
 
 
 
 
+                        var __ci_expr_old_13: c_ulong = (*__param_s).pending
+
+                        ((*__param_s).pending = ((*__param_s).pending +% 1))
+
+                        (((*__param_s).pending_buf[__ci_expr_old_13]) = (((((*__param_s).bi_buf as c_int) >> (8 as c_uint)) as u8)))
 
 
-                        ((unsafe *__param_s).bi_buf = (((((__local_val_4 as c_ushort) as c_int) >> ((16 - (unsafe *__param_s).bi_valid) as c_uint)) as c_ushort)))
 
-                        ((unsafe *__param_s).bi_valid = (unsafe *__param_s).bi_valid + (__local_len_4 - 16))
+
+
+
+                        ((*__param_s).bi_buf = (((((__local_val_4 as c_ushort) as c_int) >> ((16 - (*__param_s).bi_valid) as c_uint)) as c_ushort)))
+
+                        ((*__param_s).bi_valid = (*__param_s).bi_valid + (__local_len_4 - 16))
 
                     } else {
-                        ((unsafe *__param_s).bi_buf = ((unsafe *__param_s).bi_buf as c_ushort) | (((((__local_dist as c_int) as c_ushort) as c_int) << ((unsafe *__param_s).bi_valid as c_uint)) as c_ushort))
+                        ((*__param_s).bi_buf = ((*__param_s).bi_buf as c_ushort) | (((((__local_dist as c_int) as c_ushort) as c_int) << ((*__param_s).bi_valid as c_uint)) as c_ushort))
 
-                        ((unsafe *__param_s).bi_valid = (unsafe *__param_s).bi_valid + __local_len_4)
+                        ((*__param_s).bi_valid = (*__param_s).bi_valid + __local_len_4)
 
                     }
 
@@ -2028,47 +2028,47 @@ unsafe fn compress_block(__param_s: *mut internal_state, __param_ltree: *const c
             }
 
 
-            if not (((if __local_sx < (unsafe *__param_s).sym_next: 1 else: 0) != 0)) {
+            if not (((if __local_sx < (*__param_s).sym_next: 1 else: 0) != 0)) {
                 break
             }
         }
     }
 
-    var __local_len_5: c_int = (((unsafe __param_ltree[256]).dl.len as c_int))
+    var __local_len_5: c_int = (((__param_ltree[256]).dl.len as c_int))
 
-    if ((if (unsafe *__param_s).bi_valid > (16 - __local_len_5): 1 else: 0) != 0) {
-        var __local_val_5: c_int = (((unsafe __param_ltree[256]).fc.code as c_int))
+    if ((if (*__param_s).bi_valid > (16 - __local_len_5): 1 else: 0) != 0) {
+        var __local_val_5: c_int = (((__param_ltree[256]).fc.code as c_int))
 
-        ((unsafe *__param_s).bi_buf = ((unsafe *__param_s).bi_buf as c_ushort) | ((((__local_val_5 as c_ushort) as c_int) << ((unsafe *__param_s).bi_valid as c_uint)) as c_ushort))
+        ((*__param_s).bi_buf = ((*__param_s).bi_buf as c_ushort) | ((((__local_val_5 as c_ushort) as c_int) << ((*__param_s).bi_valid as c_uint)) as c_ushort))
 
-        var __ci_expr_old_14: c_ulong = (unsafe *__param_s).pending
+        var __ci_expr_old_14: c_ulong = (*__param_s).pending
 
-        ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
+        ((*__param_s).pending = ((*__param_s).pending +% 1))
 
-        ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_14]) = ((((((unsafe *__param_s).bi_buf as c_int) as c_int) & (255 as c_int)) as u8)))
-
-
-
-
-        var __ci_expr_old_15: c_ulong = (unsafe *__param_s).pending
-
-        ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
-
-        ((unsafe (unsafe *__param_s).pending_buf[__ci_expr_old_15]) = (((((unsafe *__param_s).bi_buf as c_int) >> (8 as c_uint)) as u8)))
+        (((*__param_s).pending_buf[__ci_expr_old_14]) = ((((((*__param_s).bi_buf as c_int) as c_int) & (255 as c_int)) as u8)))
 
 
 
 
+        var __ci_expr_old_15: c_ulong = (*__param_s).pending
+
+        ((*__param_s).pending = ((*__param_s).pending +% 1))
+
+        (((*__param_s).pending_buf[__ci_expr_old_15]) = (((((*__param_s).bi_buf as c_int) >> (8 as c_uint)) as u8)))
 
 
-        ((unsafe *__param_s).bi_buf = (((((__local_val_5 as c_ushort) as c_int) >> ((16 - (unsafe *__param_s).bi_valid) as c_uint)) as c_ushort)))
 
-        ((unsafe *__param_s).bi_valid = (unsafe *__param_s).bi_valid + (__local_len_5 - 16))
+
+
+
+        ((*__param_s).bi_buf = (((((__local_val_5 as c_ushort) as c_int) >> ((16 - (*__param_s).bi_valid) as c_uint)) as c_ushort)))
+
+        ((*__param_s).bi_valid = (*__param_s).bi_valid + (__local_len_5 - 16))
 
     } else {
-        ((unsafe *__param_s).bi_buf = ((unsafe *__param_s).bi_buf as c_ushort) | ((((unsafe __param_ltree[256]).fc.code as c_int) << ((unsafe *__param_s).bi_valid as c_uint)) as c_ushort))
+        ((*__param_s).bi_buf = ((*__param_s).bi_buf as c_ushort) | ((((__param_ltree[256]).fc.code as c_int) << ((*__param_s).bi_valid as c_uint)) as c_ushort))
 
-        ((unsafe *__param_s).bi_valid = (unsafe *__param_s).bi_valid + __local_len_5)
+        ((*__param_s).bi_valid = (*__param_s).bi_valid + __local_len_5)
 
     }
 
@@ -2087,7 +2087,7 @@ unsafe fn detect_data_type(__param_s: *mut internal_state) -> c_int {
         var __ci_expr_logic_0: c_int = 0
 
         if (((__local_block_mask as c_ulong) & (1 as c_ulong)) != 0) {
-            (__ci_expr_logic_0 = (if (if (unsafe *__param_s).dyn_ltree[__local_n].fc.freq != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_0 = (if (if (*__param_s).dyn_ltree[__local_n].fc.freq != 0: 1 else: 0) != 0: 1 else: 0))
         }
 
         if (__ci_expr_logic_0 != 0) {
@@ -2107,16 +2107,16 @@ unsafe fn detect_data_type(__param_s: *mut internal_state) -> c_int {
 
     var __ci_expr_logic_1: c_int
 
-    if ((if (unsafe *__param_s).dyn_ltree[9].fc.freq != 0: 1 else: 0) != 0) {
+    if ((if (*__param_s).dyn_ltree[9].fc.freq != 0: 1 else: 0) != 0) {
         (__ci_expr_logic_1 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_1 = (if (if (unsafe *__param_s).dyn_ltree[10].fc.freq != 0: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_1 = (if (if (*__param_s).dyn_ltree[10].fc.freq != 0: 1 else: 0) != 0: 1 else: 0))
     }
 
     if (__ci_expr_logic_1 != 0) {
         (__ci_expr_logic_2 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_2 = (if (if (unsafe *__param_s).dyn_ltree[13].fc.freq != 0: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_2 = (if (if (*__param_s).dyn_ltree[13].fc.freq != 0: 1 else: 0) != 0: 1 else: 0))
     }
 
     if (__ci_expr_logic_2 != 0) {
@@ -2127,7 +2127,7 @@ unsafe fn detect_data_type(__param_s: *mut internal_state) -> c_int {
     (__local_n = ((32 as c_int)))
 
     while ((if __local_n < 256: 1 else: 0) != 0) {
-        if ((if (unsafe *__param_s).dyn_ltree[__local_n].fc.freq != 0: 1 else: 0) != 0) {
+        if ((if (*__param_s).dyn_ltree[__local_n].fc.freq != 0: 1 else: 0) != 0) {
             return 1
         }
 
