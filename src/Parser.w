@@ -248,6 +248,10 @@ impl Parser:
         let t = self.peek()
         if t == TokenKind.TK_KW_FN or t == TokenKind.TK_KW_TYPE or t == TokenKind.TK_KW_ENUM or t == TokenKind.TK_KW_USE or t == TokenKind.TK_KW_EXTERN or t == TokenKind.TK_KW_ERROR or t == TokenKind.TK_KW_CONST or t == TokenKind.TK_KW_PUB or t == TokenKind.TK_KW_GLOBAL:
             return 1
+        // D51 §16.2b: `c facade name:` is a declaration; without this an
+        // implicit-main file read the block as executable statements.
+        if t == TokenKind.TK_IDENT and self.token_text_is(self.pos, "c") and self.token_text_is(self.pos + 1, "facade"):
+            return 1
         if t == TokenKind.TK_KW_UNSAFE or t == TokenKind.TK_KW_ASYNC or t == TokenKind.TK_KW_GEN:
             if self.pos + 1 < self.tokens.len() and self.tokens.get_tag(self.pos + 1) == TokenKind.TK_KW_FN:
                 return 1
@@ -1013,6 +1017,10 @@ impl Parser:
             return self.parse_error_decl(is_pub, start)
         if t == TokenKind.TK_KW_CONST:
             return self.parse_const_decl(is_pub, start)
+        // D51 §16.2b: `c facade name:` — two contextual identifiers, so neither
+        // `c` nor `facade` is taken from user programs.
+        if t == TokenKind.TK_IDENT and self.token_text_is(self.pos, "c") and self.token_text_is(self.pos + 1, "facade"):
+            return self.parse_c_facade(start)
 
         self.emit_error("expected declaration (fn, type, enum, let, use, extern)")
         0 as NodeId
@@ -3883,6 +3891,304 @@ impl Parser:
         if self.peek() == TokenKind.TK_R_PAREN:
             self.advance()
         self.pool.add_node(NodeKind.NK_COMPTIME_ERROR, ce_s, self.prev_end(), ce_msg, 0, 0)
+
+    // ── c facade (D51 §16.2b, stage 1: parse and AST only) ──────────────
+    //
+    // `c facade name:` holds resource, fn, domain and `use convention` items;
+    // each resource or fn item carries an indented clause list. Clause words
+    // (from, drop, ok, lend, …) are ordinary identifiers matched by text, so
+    // the facade grammar reserves nothing. Every malformed clause is an error
+    // here; the facts are collected and verified in stage 2.
+
+    fn token_text_is(i: i32, text: &str) -> bool:
+        if i >= self.tokens.len(): return false
+        if self.tokens.get_tag(i) != TokenKind.TK_IDENT: return false
+        self.source.slice(self.tokens.get_start(i) as i64, self.tokens.get_end(i) as i64) == text
+
+    fn current_ident_is(text: &str) -> bool: self.token_text_is(self.pos, text)
+
+    fn current_text() -> str: self.source.slice(self.current_start() as i64, self.current_end() as i64)
+
+    mut fn parse_c_facade(start: i32) -> NodeId:
+        self.advance()
+        self.advance()
+        let name = self.expect_ident()
+        if name == 0: return self.poisoned_expr()
+        if self.expect(TokenKind.TK_COLON) == 0: return self.poisoned_expr()
+        self.skip_newlines()
+        let items: Vec[i32] = Vec.new()
+        while self.peek() != TokenKind.TK_EOF:
+            let col = column_of(self.source, self.current_start())
+            if col == 0: break
+            let item = self.parse_facade_item(col)
+            if item == 0: return self.poisoned_expr()
+            items.push(item)
+            self.skip_newlines()
+        if items.len() == 0:
+            self.emit_error("c facade block is empty; expected resource, fn, domain or use convention (§16.2b)")
+            return self.poisoned_expr()
+        let extra_start = self.pool.extra_len()
+        for i in 0..items.len() as i32: self.pool.add_extra(items[i])
+        self.pool.add_node(NodeKind.NK_C_FACADE, start, self.prev_end(), name, extra_start, items.len() as i32)
+
+    mut fn parse_facade_item(col: i32) -> i32:
+        let start = self.current_start()
+        if self.peek() == TokenKind.TK_KW_USE:
+            self.advance()
+            if not self.current_ident_is("convention"):
+                self.emit_error("expected 'use convention <profile>' in c facade (§16.2b.12)")
+                return 0
+            self.advance()
+            let first = self.expect_ident()
+            if first == 0: return 0
+            let path: Vec[i32] = Vec.new()
+            path.push(first)
+            while self.peek() == TokenKind.TK_DOT:
+                self.advance()
+                let seg = self.expect_ident()
+                if seg == 0: return 0
+                path.push(seg)
+            let extra_start = self.pool.extra_len()
+            for i in 0..path.len() as i32: self.pool.add_extra(path[i])
+            return self.pool.add_node(NodeKind.NK_FACADE_CONVENTION, start, self.prev_end(), extra_start, path.len() as i32, 0) as i32
+        if self.peek() == TokenKind.TK_KW_FN:
+            self.advance()
+            let name = self.expect_ident()
+            if name == 0: return 0
+            let (clauses, ok) = self.parse_facade_clauses(col, false)
+            if not ok: return 0
+            let extra_start = self.pool.extra_len()
+            for i in 0..clauses.len() as i32: self.pool.add_extra(clauses[i])
+            return self.pool.add_node(NodeKind.NK_FACADE_FN, start, self.prev_end(), name, extra_start, clauses.len() as i32) as i32
+        if self.current_ident_is("resource"):
+            self.advance()
+            let name = self.expect_ident()
+            if name == 0: return 0
+            if not self.current_ident_is("wraps"):
+                self.emit_error("expected 'wraps <representation>' after the resource name (§16.2b.3)")
+                return 0
+            self.advance()
+            let repr = self.parse_type_expr()
+            if repr == 0: return 0
+            let (clauses, ok) = self.parse_facade_clauses(col, true)
+            if not ok: return 0
+            let extra_start = self.pool.extra_len()
+            self.pool.add_extra(repr as i32)
+            for i in 0..clauses.len() as i32: self.pool.add_extra(clauses[i])
+            return self.pool.add_node(NodeKind.NK_FACADE_RESOURCE, start, self.prev_end(), name, extra_start, clauses.len() as i32) as i32
+        if self.current_ident_is("domain"):
+            self.advance()
+            let name = self.expect_ident()
+            if name == 0: return 0
+            let is_kind = self.current_ident_is("process") or self.current_ident_is("thread") or self.current_ident_is("resource") or self.current_ident_is("static")
+            if not is_kind:
+                self.emit_error("a domain is 'process', 'thread', 'resource' or 'static' (§16.2b.7)")
+                return 0
+            let kind = self.expect_ident()
+            return self.pool.add_node(NodeKind.NK_FACADE_DOMAIN, start, self.prev_end(), name, kind, 0) as i32
+        self.emit_error("expected 'resource', 'fn', 'domain' or 'use convention' in c facade (§16.2b)")
+        0
+
+    // The clauses indented deeper than their item. Collected first and written
+    // to extra by the caller: a clause operand may be a type expression, whose
+    // own extras must not interleave with the clause list.
+    mut fn parse_facade_clauses(item_col: i32, in_resource: bool) -> (Vec[i32], bool):
+        self.skip_newlines()
+        let clauses: Vec[i32] = Vec.new()
+        while self.peek() != TokenKind.TK_EOF:
+            let col = column_of(self.source, self.current_start())
+            if col <= item_col: break
+            let clause = self.parse_facade_clause(in_resource)
+            if clause == 0: return (clauses, false)
+            clauses.push(clause)
+            self.skip_newlines()
+        (clauses, true)
+
+    mut fn parse_facade_param_ref() -> i32:
+        let start = self.current_start()
+        if not self.current_ident_is("param"):
+            self.emit_error("expected 'param <name>', 'param <N>' or 'param type <T>' (§16.2b.5)")
+            return 0
+        self.advance()
+        if self.peek() == TokenKind.TK_INT_LIT:
+            let digits = self.intern_current()
+            self.advance()
+            return self.pool.add_node(NodeKind.NK_FACADE_PARAM_REF, start, self.prev_end(), FACADE_PARAM_REF_INDEX, digits, 0) as i32
+        if self.current_ident_is("type"):
+            self.advance()
+            let ty = self.parse_type_expr()
+            if ty == 0: return 0
+            return self.pool.add_node(NodeKind.NK_FACADE_PARAM_REF, start, self.prev_end(), FACADE_PARAM_REF_TYPE, ty as i32, 0) as i32
+        let name = self.expect_ident()
+        if name == 0: return 0
+        self.pool.add_node(NodeKind.NK_FACADE_PARAM_REF, start, self.prev_end(), FACADE_PARAM_REF_NAME, name, 0) as i32
+
+    mut fn parse_facade_clause(in_resource: bool) -> i32:
+        let start = self.current_start()
+        if self.peek() != TokenKind.TK_IDENT:
+            self.emit_error("expected a facade clause (§16.2b)")
+            return 0
+        let word = self.current_text()
+        self.advance()
+        let ops: Vec[i32] = Vec.new()
+        var kind = 0
+        if word == "from":
+            kind = FACADE_CLAUSE_FROM
+            let producer = self.expect_ident()
+            if producer == 0: return 0
+            ops.push(producer)
+            var out_ref = 0
+            if self.peek() == TokenKind.TK_L_PAREN:
+                self.advance()
+                if not self.current_ident_is("out"):
+                    self.emit_error("expected 'out param <ref>' in from <producer>(...) (§16.2b.4)")
+                    return 0
+                self.advance()
+                out_ref = self.parse_facade_param_ref()
+                if out_ref == 0: return 0
+                if self.expect(TokenKind.TK_R_PAREN) == 0: return 0
+            ops.push(out_ref)
+        else if word == "init" or word == "preinit":
+            kind = if word == "init": FACADE_CLAUSE_INIT else: FACADE_CLAUSE_PREINIT
+            let f = self.expect_ident()
+            if f == 0: return 0
+            ops.push(f)
+            if self.peek() == TokenKind.TK_L_PAREN:
+                self.advance()
+                if not self.current_ident_is("self"):
+                    self.emit_error("an in-place initializer is written '" ++ word ++ " <fn>(self)' (§16.2b.4)")
+                    return 0
+                self.advance()
+                if self.expect(TokenKind.TK_R_PAREN) == 0: return 0
+        else if word == "drop":
+            kind = FACADE_CLAUSE_DROP
+            let f = self.expect_ident()
+            if f == 0: return 0
+            ops.push(f)
+        else if word == "destroys":
+            kind = FACADE_CLAUSE_DESTROYS
+            if in_resource:
+                let f = self.expect_ident()
+                if f == 0: return 0
+                ops.push(f)
+            else:
+                if self.peek() == TokenKind.TK_IDENT:
+                    self.emit_error("'destroys' on an fn item takes no name: the fn is the destroyer (§16.2b.5)")
+                    return 0
+                ops.push(0)
+        else if word == "ok":
+            kind = FACADE_CLAUSE_OK
+            let c = self.expect_ident()
+            if c == 0: return 0
+            ops.push(c)
+        else if word == "borrows":
+            kind = FACADE_CLAUSE_BORROWS
+            let r = self.parse_facade_param_ref()
+            if r == 0: return 0
+            ops.push(r)
+        else if word == "independent":
+            kind = FACADE_CLAUSE_INDEPENDENT
+        else if word == "lend":
+            kind = FACADE_CLAUSE_LEND
+        else if word == "consumes":
+            kind = FACADE_CLAUSE_CONSUMES
+            let r = self.parse_facade_param_ref()
+            if r == 0: return 0
+            ops.push(r)
+            var by = 0
+            if self.current_ident_is("destroyed_by"):
+                self.advance()
+                by = self.parse_facade_param_ref()
+                if by == 0: return 0
+            ops.push(by)
+        else if word == "retains":
+            kind = FACADE_CLAUSE_RETAINS
+            let r = self.parse_facade_param_ref()
+            if r == 0: return 0
+            if not self.current_ident_is("by"):
+                self.emit_error("retention is written 'retains param <ref> by param <ref>' (§16.2b.5)")
+                return 0
+            self.advance()
+            let by = self.parse_facade_param_ref()
+            if by == 0: return 0
+            ops.push(r)
+            ops.push(by)
+        else if word == "returns":
+            if self.current_ident_is("borrow"):
+                self.advance()
+                kind = FACADE_CLAUSE_RETURNS_BORROW
+                let res = self.expect_ident()
+                if res == 0: return 0
+                if not self.current_ident_is("from"):
+                    self.emit_error("a borrowed return is written 'returns borrow <Resource> from param <ref>' (§16.2b.6)")
+                    return 0
+                self.advance()
+                let r = self.parse_facade_param_ref()
+                if r == 0: return 0
+                ops.push(res)
+                ops.push(r)
+            else if self.current_ident_is("static"):
+                self.advance()
+                kind = FACADE_CLAUSE_RETURNS_STATIC
+                let ty = self.parse_type_expr()
+                if ty == 0: return 0
+                ops.push(ty as i32)
+            else:
+                self.emit_error("expected 'returns borrow <Resource> from param <ref>' or 'returns static <type>' (§16.2b.6, §16.2b.7)")
+                return 0
+        else if word == "preserves":
+            kind = FACADE_CLAUSE_PRESERVES
+            if self.current_ident_is("domain"):
+                self.advance()
+                let d = self.expect_ident()
+                if d == 0: return 0
+                ops.push(0)
+                ops.push(d)
+            else:
+                let r = self.parse_facade_param_ref()
+                if r == 0: return 0
+                ops.push(r)
+                ops.push(0)
+        else if word == "of":
+            kind = FACADE_CLAUSE_OF
+            let res = self.expect_ident()
+            if res == 0: return 0
+            ops.push(res)
+        else if word == "rename":
+            kind = FACADE_CLAUSE_RENAME
+            let n = self.expect_ident()
+            if n == 0: return 0
+            ops.push(n)
+        else if word == "thread":
+            kind = FACADE_CLAUSE_THREAD
+            while self.current_ident_is("creator") or self.current_ident_is("send") or self.current_ident_is("share") or self.current_ident_is("drop_any_thread"):
+                ops.push(self.intern_current())
+                self.advance()
+            if ops.len() == 0:
+                self.emit_error("thread capabilities are 'creator', 'send', 'share' and 'drop_any_thread' (§16.2b.10)")
+                return 0
+        else if word == "callback_thread":
+            kind = FACADE_CLAUSE_CALLBACK_THREAD
+            if not self.current_ident_is("any"):
+                self.emit_error("expected 'callback_thread any' (§16.2b.10)")
+                return 0
+            ops.push(self.intern_current())
+            self.advance()
+        else if word == "callback":
+            kind = FACADE_CLAUSE_CALLBACK_CONSUMES
+            if not self.current_ident_is("consumes"):
+                self.emit_error("expected 'callback consumes param <ref>' (§16.2b.9)")
+                return 0
+            self.advance()
+            let r = self.parse_facade_param_ref()
+            if r == 0: return 0
+            ops.push(r)
+        else:
+            self.emit_error("unknown facade clause '" ++ word ++ "' (§16.2b)")
+            return 0
+        let extra_start = self.pool.extra_len()
+        for i in 0..ops.len() as i32: self.pool.add_extra(ops[i])
+        self.pool.add_node(NodeKind.NK_FACADE_CLAUSE, start, self.prev_end(), kind, extra_start, ops.len() as i32) as i32
 
     mut fn parse_string_literal() -> NodeId:
         let start = self.current_start()

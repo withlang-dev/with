@@ -145,6 +145,21 @@ pub enum NodeKind: i32:
     // NK_INTERFACE_PROVIDED: d0=0, d1=0, d2=0  (NK_LET_DECL.d1)
     NK_INTERFACE_BODY = 130
     NK_INTERFACE_PROVIDED = 131
+    // D51 modeled C, stage 1 (§16.2b): a `c facade name:` block and its items.
+    // NK_C_FACADE:          d0=name(sym), d1=extra_start, d2=item_count; extra=[item(node)...]
+    // NK_FACADE_RESOURCE:   d0=name(sym), d1=extra_start, d2=clause_count; extra=[wraps_type(node), clause(node)...]
+    // NK_FACADE_FN:         d0=name(sym), d1=extra_start, d2=clause_count; extra=[clause(node)...]
+    // NK_FACADE_DOMAIN:     d0=name(sym), d1=kind(sym: process|thread|resource|static), d2=0
+    // NK_FACADE_CONVENTION: d0=extra_start, d1=path_count, d2=0; extra=[path_sym...]
+    // NK_FACADE_CLAUSE:     d0=FACADE_CLAUSE_*, d1=extra_start, d2=operand_count; extra=[operand...]
+    // NK_FACADE_PARAM_REF:  d0=FACADE_PARAM_REF_*, d1=name(sym)|digits(sym)|type(node), d2=0
+    NK_C_FACADE = 132
+    NK_FACADE_RESOURCE = 133
+    NK_FACADE_FN = 134
+    NK_FACADE_DOMAIN = 135
+    NK_FACADE_CONVENTION = 136
+    NK_FACADE_CLAUSE = 137
+    NK_FACADE_PARAM_REF = 138
     // Type expressions
     NK_TYPE_NAMED = 80
     NK_TYPE_GENERIC = 81
@@ -214,6 +229,31 @@ const TDK_FLAG_PACKED: i32 = 16
 const TDK_FLAG_BITPACKED: i32 = 32
 const TDK_FLAG_SPECIFIED: i32 = 64
 const TDK_FLAG_ERROR: i32 = 128
+
+// D51 §16.2b stage 1: NK_FACADE_CLAUSE.d0 and the operands each kind writes
+// to extra (a 0 operand is "absent"; refs are NK_FACADE_PARAM_REF nodes).
+const FACADE_CLAUSE_FROM: i32 = 1              // [producer_sym, out_param_ref|0]
+const FACADE_CLAUSE_INIT: i32 = 2              // [fn_sym]
+const FACADE_CLAUSE_PREINIT: i32 = 3           // [fn_sym]
+const FACADE_CLAUSE_DROP: i32 = 4              // [fn_sym]
+const FACADE_CLAUSE_DESTROYS: i32 = 5          // [fn_sym|0]   (a resource names one; an fn item is one)
+const FACADE_CLAUSE_OK: i32 = 6                // [const_sym]
+const FACADE_CLAUSE_BORROWS: i32 = 7           // [param_ref]
+const FACADE_CLAUSE_INDEPENDENT: i32 = 8       // []
+const FACADE_CLAUSE_LEND: i32 = 9              // []
+const FACADE_CLAUSE_CONSUMES: i32 = 10         // [param_ref, destroyed_by_ref|0]
+const FACADE_CLAUSE_RETAINS: i32 = 11          // [param_ref, by_ref]
+const FACADE_CLAUSE_RETURNS_BORROW: i32 = 12   // [resource_sym, from_ref]
+const FACADE_CLAUSE_RETURNS_STATIC: i32 = 13   // [type(node)]
+const FACADE_CLAUSE_PRESERVES: i32 = 14        // [param_ref|0, domain_sym|0]
+const FACADE_CLAUSE_OF: i32 = 15               // [resource_sym]
+const FACADE_CLAUSE_RENAME: i32 = 16           // [new_sym]
+const FACADE_CLAUSE_THREAD: i32 = 17           // [capability_sym...]
+const FACADE_CLAUSE_CALLBACK_THREAD: i32 = 18  // [sym]  (`any`)
+const FACADE_CLAUSE_CALLBACK_CONSUMES: i32 = 19 // [param_ref]
+const FACADE_PARAM_REF_NAME: i32 = 0
+const FACADE_PARAM_REF_INDEX: i32 = 1
+const FACADE_PARAM_REF_TYPE: i32 = 2
 const TDK_FLAG_REPR_C: i32 = 256
 
 fn pack_type_decl_kind(sub_kind: i32, is_ephemeral: i32) -> i32:
@@ -1807,6 +1847,16 @@ impl AstPool:
 //
 // NodeKind.NK_INTERFACE_BODY:     d0=0, d1=0, d2=0  (fn body of an interface declaration)
 // NodeKind.NK_INTERFACE_PROVIDED: d0=0, d1=0, d2=0  (initializer of an interface global)
+//
+// NodeKind.NK_C_FACADE (D51 §16.2b, stage 1: parsed, facts not yet collected):
+//                   d0=name(sym), d1=extra_start, d2=item_count; extra=[item(node)...]
+//                   items: NK_FACADE_RESOURCE (extra=[wraps_type, clause...]),
+//                   NK_FACADE_FN (extra=[clause...]), NK_FACADE_DOMAIN (d1=kind sym),
+//                   NK_FACADE_CONVENTION (extra=[path_sym...]). A clause is
+//                   NK_FACADE_CLAUSE d0=FACADE_CLAUSE_* with its operands in extra
+//                   (see the FACADE_CLAUSE_* table); a parameter reference is
+//                   NK_FACADE_PARAM_REF d0=FACADE_PARAM_REF_* (name sym, digits
+//                   sym, or a type node), resolved in stage 2.
 //
 // NodeKind.NK_TYPE_DECL:     d0=name(sym), d1=extra_start, d2=packed_kind (TypeDeclKind.* + TDK_FLAG_*)
 //                   For struct: extra=[field_count, [field_name, field_type, field_default]*, vis, tp_start, tp_count]
