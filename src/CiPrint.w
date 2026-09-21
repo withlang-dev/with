@@ -219,6 +219,16 @@ fn ci_wrap_unsafe(inner: &str) -> str:
     if g_ci_print_in_unsafe_fn: return "(" ++ inner ++ ")"
     "(unsafe " ++ inner ++ ")"
 
+// The operand of a wrapped expression: whatever `unsafe` it needs, the wrapper
+// supplies, so its own raw operations print without a prefix. A prefix inside
+// a prefix was the last "redundant unsafe prefix inside unsafe context".
+fn ci_print_wrapped_operand(exprs: CiExprPool, types: CiTypePool, id: CiExprId, depth: i32, wants_ptr: i32) -> str:
+    let saved = g_ci_print_in_unsafe_fn
+    g_ci_print_in_unsafe_fn = true
+    let text = ci_print_expr(exprs, types, id, depth, wants_ptr)
+    g_ci_print_in_unsafe_fn = saved
+    text
+
 fn ci_print_compact_stmt_local(stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, id: CiStmtId, depth: i32) -> str:
     if (id as i32) == 0:
         return ""
@@ -639,22 +649,21 @@ fn ci_print_expr(exprs: CiExprPool, types: CiTypePool, id: CiExprId, parent_prec
             // `base.method`, the base printed as a value.
             return ci_print_expr(exprs, types, base, 0, 0) ++ "." ++ field
         if (base_ty as i32) != 0 and types.kind(base_ty) == CiTypeKind.CT_POINTER:
-            let base_text = ci_print_expr(exprs, types, base, 0, 0)
+            let base_text = ci_print_wrapped_operand(exprs, types, base, 0, 0)
             return ci_wrap_unsafe("*" ++ base_text) ++ "." ++ field
         if wants_ptr == 0 and ci_field_base_needs_borrow(types, base_ty):
-            let base_text = ci_print_expr(exprs, types, base, 0, 1)
+            let base_text = ci_print_wrapped_operand(exprs, types, base, 0, 1)
             return ci_wrap_unsafe(f"*(&raw const {base_text} as *const {ci_print_type(types, base_ty)})") ++ "." ++ field
         let base_text = ci_print_expr(exprs, types, base, 0, wants_ptr)
         return f"{base_text}.{field}"
     if kind == CiExprKind.CIE_INDEX:
         let base = (exprs.get_d0(id)) as CiExprId
         let idx = (exprs.get_d1(id)) as CiExprId
-        let rendered = ci_print_expr(exprs, types, base, 0, wants_ptr) ++ "[" ++ ci_print_expr(exprs, types, idx, 0, 0) ++ "]"
         let base_ty = exprs.get_type(base)
         let base_is_ptr = (base_ty as i32) != 0 and types.kind(base_ty) == CiTypeKind.CT_POINTER
         if exprs.get_d2(id) != 0 or base_is_ptr:
-            return ci_wrap_unsafe(rendered)
-        return rendered
+            return ci_wrap_unsafe(ci_print_wrapped_operand(exprs, types, base, 0, wants_ptr) ++ "[" ++ ci_print_wrapped_operand(exprs, types, idx, 0, 0) ++ "]")
+        return ci_print_expr(exprs, types, base, 0, wants_ptr) ++ "[" ++ ci_print_expr(exprs, types, idx, 0, 0) ++ "]"
     if kind == CiExprKind.CIE_CAST:
         let target = (exprs.get_d0(id)) as CiTypeId
         let operand = (exprs.get_d1(id)) as CiExprId
@@ -664,7 +673,7 @@ fn ci_print_expr(exprs: CiExprPool, types: CiTypePool, id: CiExprId, parent_prec
         let operand_ty = exprs.get_type(operand)
         if ci_type_is_fn_ptr(types, operand_ty):
             return ci_print_expr(exprs, types, operand, 0, 1)
-        let operand_text = ci_print_expr(exprs, types, operand, 0, 0)
+        let operand_text = ci_print_wrapped_operand(exprs, types, operand, 0, 0)
         if exprs.kind(operand) == CiExprKind.CIE_INDEX and exprs.get_d2(operand) == 0:
             let base = (exprs.get_d0(operand)) as CiExprId
             let base_ty = exprs.get_type(base)
@@ -689,14 +698,14 @@ fn ci_print_expr(exprs: CiExprPool, types: CiTypePool, id: CiExprId, parent_prec
             let base_ty = exprs.get_type(base)
             if ci_field_base_needs_borrow(types, base_ty):
                 let ptr_kw = if is_mut != 0: "*mut " else: "*const "
-                let base_text = ci_print_expr(exprs, types, base, 0, 0)
+                let base_text = ci_print_wrapped_operand(exprs, types, base, 0, 0)
                 return kw ++ ci_wrap_unsafe(f"*({kw}{base_text} as {ptr_kw}{ci_print_type(types, base_ty)})") ++ "." ++ field
         return kw ++ ci_print_expr(exprs, types, operand, 0, 1)
     if kind == CiExprKind.CIE_ARRAY_DECAY:
         let operand = (exprs.get_d0(id)) as CiExprId
-        let operand_text = ci_print_expr(exprs, types, operand, 0, 0)
         let operand_ty = exprs.get_type(operand)
         let operand_is_ptr = (operand_ty as i32) != 0 and types.kind(operand_ty) == CiTypeKind.CT_POINTER
+        let operand_text = if operand_is_ptr: ci_print_wrapped_operand(exprs, types, operand, 0, 0) else: ci_print_expr(exprs, types, operand, 0, 0)
         let indexed = if operand_is_ptr: ci_wrap_unsafe(operand_text ++ "[0]") else: operand_text ++ "[0]"
         let target_ty = exprs.get_type(id)
         if (target_ty as i32) != 0 and types.kind(target_ty) == CiTypeKind.CT_POINTER:
