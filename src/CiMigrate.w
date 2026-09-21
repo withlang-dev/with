@@ -1719,6 +1719,11 @@ fn ci_migrate_translate_function(session: i64, idx: i32, known_structs: &str, pr
     // not a translation failure. Detect it via the body compound having no
     // statements and emit an empty `return` body (handled by body_for_emit).
     let empty_c_body = ret == "Unit" and fn_body_cursor >= 0 and with_ci_num_children(session, fn_body_cursor) == 0
+    let unrendered = ci_print_take_unknowns()
+    if unrendered.len() > 0:
+        let where_loc = if fn_cursor >= 0: with_ci_cursor_location(session, fn_cursor) else: ""
+        let where_suffix = if where_loc.len() > 0: " at " ++ where_loc else: ""
+        return ci_migrate_fail_function(f"migrate: untranslatable function '{name}': no rendering for {unrendered[0]}{where_suffix}")
     if body.len() > 0 or empty_c_body:
         with_cimport_mark_name_emitted(name)
         g_migrate_fn_translated = g_migrate_fn_translated + 1

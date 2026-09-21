@@ -790,7 +790,26 @@ fn ci_print_expr(exprs: CiExprPool, types: CiTypePool, id: CiExprId, parent_prec
         let inner = (exprs.get_d0(id)) as CiExprId
         return "unsafe { " ++ ci_print_expr(exprs, types, inner, 0, wants_ptr) ++ " }"
 
+    ci_print_note_unknown(f"expression kind {kind as i32}")
     "<ci:expr:unknown>"
+
+// The printer never fails quietly: a kind it has no rendering for is recorded
+// here, and whoever asked for the text (the migrator, the static-inline
+// translator) takes the record and refuses the declaration loudly. The
+// placeholder text is what a reader sees only if that refusal is missing;
+// it once reached a generated corpus with exit status 0.
+var g_ci_print_unknowns: Vec[str] = Vec.new()
+
+fn ci_print_note_unknown(detail: &str):
+    g_ci_print_unknowns.push(detail.clone())
+
+/// The printer's unrenderable-node records since the last take; taking clears.
+pub fn ci_print_take_unknowns() -> Vec[str]:
+    var taken: Vec[str] = Vec.new()
+    for i in 0..g_ci_print_unknowns.len() as i32:
+        taken.push(g_ci_print_unknowns[i].clone())
+    g_ci_print_unknowns.clear()
+    taken
 
 // ── CiStmt printing ──────────────────────────────────────────
 
@@ -1043,6 +1062,7 @@ fn ci_print_stmt(stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, id: Ci
         let sym = stmts.get_d0(id)
         return indent ++ "'" ++ stmts.get_string(sym) ++ "\n"
 
+    ci_print_note_unknown(f"statement kind {kind as i32}")
     indent ++ "<ci:stmt:unknown>\n"
 
 // ── CiDecl printing ──────────────────────────────────────────
@@ -1176,6 +1196,15 @@ fn ci_roundtrip_exprs -> i32:
     fails = fails + ci_expect_eq("expr_float_lit", ci_print_expr(exprs, types, float_lit, 0, 0), "3.14")
     fails = fails + ci_expect_eq("expr_char_lit", ci_print_expr(exprs, types, char_lit, 0, 0), "65")
     fails = fails + ci_expect_eq("expr_string_lit", ci_print_expr(exprs, types, str_lit, 0, 0), "\"hello\"")
+    // A kind the printer cannot render is recorded for the caller to refuse
+    // loudly; the placeholder alone once reached a generated corpus.
+    let _fresh = ci_print_take_unknowns()
+    let bogus = exprs.add(9999 as CiExprKind, 0, 0, 0, i32_ty)
+    fails = fails + ci_expect_eq("expr_unknown_placeholder", ci_print_expr(exprs, types, bogus, 0, 0), "<ci:expr:unknown>")
+    let recorded = ci_print_take_unknowns()
+    let recorded_text = if recorded.len() == 1: recorded[0].clone() else: f"{recorded.len()} records"
+    fails = fails + ci_expect_eq("expr_unknown_recorded", recorded_text, "expression kind 9999")
+    fails = fails + ci_expect_eq("expr_unknown_taken", f"{ci_print_take_unknowns().len()}", "0")
     fails = fails + ci_expect_eq("expr_array_pointer_deref", ci_print_expr(exprs, types, slot_deref, 0, 0), "(unsafe *(slots[0] as *const i32))")
     fails
 

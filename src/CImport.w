@@ -1721,6 +1721,10 @@ fn ci_translate_function(session: i64, idx: i32, known_structs: &str) -> str:
     if needs_body_translation:
         // Static inline or always-inline — try to translate the body
         let body = ci_try_translate_fn_body(session, idx)
+        let unrendered = ci_print_take_unknowns()
+        if unrendered.len() > 0:
+            ci_record_omitted_symbol_cat(name, ci_get_decl_location(session, name), "raw-modelable", "inline body has no rendering for " ++ unrendered[0])
+            return ""
         if body.len() > 0:
             with_cimport_mark_name_emitted(name)
             let si_param_count = with_cimport_fn_param_count(session, idx)
@@ -12352,6 +12356,9 @@ fn ci_indent_str(level: i32) -> str:
 // Returns "" on failure; callers must omit the generated surface or fail loudly.
 
 fn ci_try_translate_fn_body(session: i64, decl_idx: i32) -> str:
+    // A record left by a body that bailed elsewhere must not be charged to
+    // this one: every caller takes the records right after this returns.
+    let _stale = ci_print_take_unknowns()
     ci_clear_bail_location()
     // B9: fresh per-function temp counter. This path is called
     // from ci_translate_function's static-inline branch — which
