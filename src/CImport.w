@@ -1719,32 +1719,36 @@ fn ci_translate_function(session: i64, idx: i32, known_structs: &str) -> str:
     let needs_body_translation = (storage == CX_SC_STATIC and is_inline != 0) or (is_inline != 0 and storage != CX_SC_STATIC)
     let safe_name = ci_escape_reserved(name)
     if needs_body_translation:
-        // Static inline or always-inline — try to translate the body
+        // Static inline or always-inline — try to translate the body. The
+        // signature decides `unsafe fn` first: the body printer omits its
+        // `unsafe` prefixes exactly when the function is already that context.
+        let si_param_count = with_cimport_fn_param_count(session, idx)
+        var si_params = ""
+        var si_raw = false
+        for spi in 0..si_param_count:
+            if spi > 0:
+                si_params = si_params ++ ", "
+            let spname = with_cimport_fn_param_name(session, idx, spi)
+            let sptype = with_cimport_fn_param_type_translated(session, idx, spi)
+            if ci_cimport_param_type_requires_raw_abi(sptype):
+                si_raw = true
+            let actual_pname = ci_param_signature_name(ci_escape_reserved(spname), spi)
+            si_params = si_params ++ actual_pname ++ ": " ++ sptype
+        let si_ret = with_cimport_fn_return_type_translated(session, idx)
+        if ci_cimport_type_is_raw_abi(si_ret):
+            si_raw = true
+        ci_migrate_set_unsafe_function_body_context(si_raw)
         let body = ci_try_translate_fn_body(session, idx)
+        ci_migrate_set_unsafe_function_body_context(false)
         let unrendered = ci_print_take_unknowns()
         if unrendered.len() > 0:
             ci_record_omitted_symbol_cat(name, ci_get_decl_location(session, name), "raw-modelable", "inline body has no rendering for " ++ unrendered[0])
             return ""
         if body.len() > 0:
             with_cimport_mark_name_emitted(name)
-            let si_param_count = with_cimport_fn_param_count(session, idx)
-            var si_params = ""
-            var si_raw = false
-            for spi in 0..si_param_count:
-                if spi > 0:
-                    si_params = si_params ++ ", "
-                let spname = with_cimport_fn_param_name(session, idx, spi)
-                let sptype = with_cimport_fn_param_type_translated(session, idx, spi)
-                if ci_cimport_param_type_requires_raw_abi(sptype):
-                    si_raw = true
-                let actual_pname = ci_param_signature_name(ci_escape_reserved(spname), spi)
-                si_params = si_params ++ actual_pname ++ ": " ++ sptype
-            let si_ret = with_cimport_fn_return_type_translated(session, idx)
             if ci_starts_with(si_ret, "extern \"C\" fn(") or ci_starts_with(si_ret, "fn("):
                 ci_record_omitted_symbol_cat(name, ci_get_decl_location(session, name), "raw-modelable", "inline function returning function pointer not modeled")
                 return ""
-            if ci_cimport_type_is_raw_abi(si_ret):
-                si_raw = true
             let fn_kw = if si_raw: "unsafe fn " else: "fn "
             if si_raw:
                 ci_record_raw_function_name(name)
@@ -3216,9 +3220,18 @@ fn ci_translate_macros(session: i64, type_session: i64, extern_vars: &str, macro
                     // Token paste (##) translation
                     if translated.len() == 0 and ci_str_contains(work_value, "##"):
                         translated = ci_try_translate_token_paste(work_value, param_names)
+                    var from_c_expr = false
                     if translated.len() == 0:
                         work_value = ci_expand_private_macro_body(session, indices, work_value, param_names, "", 0)
                         translated = ci_translate_c_expr(work_value, param_names, known_values)
+                        from_c_expr = true
+                    // The text decides `unsafe fn` (it calls a raw function), so an
+                    // expression that does is printed again as an unsafe body: no
+                    // `unsafe` prefix inside a function that already is the context.
+                    if from_c_expr and ci_translation_calls_raw_function(translated):
+                        ci_migrate_set_unsafe_function_body_context(true)
+                        translated = ci_translate_c_expr(work_value, param_names, known_values)
+                        ci_migrate_set_unsafe_function_body_context(false)
                     if translated.len() > 0:
                         // Infer return type from cast expression: (x as c_int) → return c_int
                         var inferred_ret = with_str_clone_ref(ret_type)
@@ -3714,7 +3727,7 @@ fn ci_parse_unary_expr(s: &str, params: &str, known: &str) -> str:
     if c0 == 42:
         let inner = ci_parse_cast_expr(t.slice(1, t.len()), params, known)
         if inner.len() > 0:
-            return "(unsafe *" ++ inner ++ ")"
+            return ci_wrap_unsafe("*" ++ inner)
         return ""
     // sizeof(T)
     if ci_starts_with(t, "sizeof"):

@@ -213,7 +213,10 @@ fn ci_float_type_name(bits: i32) -> str:
 // Wrap an expression source snippet in `(unsafe ...)` for rendering
 // raw pointer access. Keeping the `unsafe` wrapping in one place makes
 // it cheap to change the convention later.
+// Inside an `unsafe fn` body the context is already unsafe, so the prefix is
+// omitted (SemaCheck warns on it); the parentheses stay so precedence does.
 fn ci_wrap_unsafe(inner: &str) -> str:
+    if g_ci_print_in_unsafe_fn: return "(" ++ inner ++ ")"
     "(unsafe " ++ inner ++ ")"
 
 fn ci_print_compact_stmt_local(stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, id: CiStmtId, depth: i32) -> str:
@@ -635,15 +638,12 @@ fn ci_print_expr(exprs: CiExprPool, types: CiTypePool, id: CiExprId, parent_prec
             // A method on a value (the migrator's bit builtins): plain
             // `base.method`, the base printed as a value.
             return ci_print_expr(exprs, types, base, 0, 0) ++ "." ++ field
-        if wants_ptr != 0 and (base_ty as i32) != 0 and types.kind(base_ty) == CiTypeKind.CT_POINTER:
+        if (base_ty as i32) != 0 and types.kind(base_ty) == CiTypeKind.CT_POINTER:
             let base_text = ci_print_expr(exprs, types, base, 0, 0)
-            return f"(unsafe *{base_text}).{field}"
-        if wants_ptr == 0 and (base_ty as i32) != 0 and types.kind(base_ty) == CiTypeKind.CT_POINTER:
-            let base_text = ci_print_expr(exprs, types, base, 0, 0)
-            return f"(unsafe *{base_text}).{field}"
+            return ci_wrap_unsafe("*" ++ base_text) ++ "." ++ field
         if wants_ptr == 0 and ci_field_base_needs_borrow(types, base_ty):
             let base_text = ci_print_expr(exprs, types, base, 0, 1)
-            return f"(unsafe *(&raw const {base_text} as *const {ci_print_type(types, base_ty)})).{field}"
+            return ci_wrap_unsafe(f"*(&raw const {base_text} as *const {ci_print_type(types, base_ty)})") ++ "." ++ field
         let base_text = ci_print_expr(exprs, types, base, 0, wants_ptr)
         return f"{base_text}.{field}"
     if kind == CiExprKind.CIE_INDEX:
@@ -688,10 +688,9 @@ fn ci_print_expr(exprs: CiExprPool, types: CiTypePool, id: CiExprId, parent_prec
             let field = exprs.get_string(exprs.get_d1(operand))
             let base_ty = exprs.get_type(base)
             if ci_field_base_needs_borrow(types, base_ty):
-                let base_kw = if is_mut != 0: "&raw mut " else: "&raw const "
                 let ptr_kw = if is_mut != 0: "*mut " else: "*const "
                 let base_text = ci_print_expr(exprs, types, base, 0, 0)
-                return f"{kw}(unsafe *({base_kw}{base_text} as {ptr_kw}{ci_print_type(types, base_ty)})).{field}"
+                return kw ++ ci_wrap_unsafe(f"*({kw}{base_text} as {ptr_kw}{ci_print_type(types, base_ty)})") ++ "." ++ field
         return kw ++ ci_print_expr(exprs, types, operand, 0, 1)
     if kind == CiExprKind.CIE_ARRAY_DECAY:
         let operand = (exprs.get_d0(id)) as CiExprId
