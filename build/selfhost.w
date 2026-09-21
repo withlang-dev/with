@@ -5165,9 +5165,15 @@ fn bs_check_migrate_raw_pointer_index(ctx: &ActionCtx, compiler_path: &str, case
     let out_text = ctx.fs().read_text(out_w)
     rc = bs_assert_contains(ctx, out_text, "__param_p +", "raw_pointer_index_unsafe")
     if rc != 0: return rc
-    rc = bs_assert_contains(ctx, out_text, "(unsafe __local_r[0])", "raw_pointer_index_unsafe")
+    // The body is emitted as `unsafe fn`, so its raw indexes carry no prefix:
+    // a prefix inside an unsafe context is the redundancy Sema warns about.
+    rc = bs_assert_contains(ctx, out_text, "unsafe fn issue146_ptr_ops", "raw_pointer_index_unsafe")
     if rc != 0: return rc
-    rc = bs_assert_contains(ctx, out_text, "(unsafe __param_p[1])", "raw_pointer_index_unsafe")
+    rc = bs_assert_not_contains(ctx, out_text, "(unsafe __local_r[0])", "raw_pointer_index_unsafe")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, out_text, "(__local_r[0])", "raw_pointer_index_unsafe")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, out_text, "(__param_p[1])", "raw_pointer_index_unsafe")
     if rc != 0: return rc
     var check_args: Vec[str] = Vec.new()
     check_args |> push("check")
