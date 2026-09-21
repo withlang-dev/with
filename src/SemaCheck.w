@@ -12019,6 +12019,25 @@ impl Sema:
                         let ci_tid = self.ensure_generic_inst_type(ci_base_sym, ci_args, ci_arg_count)
                         self.typed_expr_types.insert(node, ci_tid as i32)
                         return ci_tid as i32
+        if self.index_expr_is_type_level(expr):
+            return 0
+        // #1253: a runtime subscript on anything else. A user IndexPlace type
+        // reads as its `get` returns (MirLower reconstructed this from the
+        // signature, #1180; Sema now records it). Everything else is an error
+        // — returning 0 silently let `captures[1]` on a struct with no index
+        // method reach MIR and render as "" inside an f-string.
+        self.check_runtime_index_operand(index)
+        if self.type_is_index_place(container_tid as i32) != 0:
+            let ip_get_fn = self.lookup_method_fn(self.get_type_name(container_tid), self.pool_lookup_symbol("get"))
+            let ip_get_sig = if ip_get_fn != 0: self.get_sig(ip_get_fn) else: -1
+            if ip_get_sig >= 0:
+                let ip_value_ty = self.sig_return_type(ip_get_sig)
+                if ip_value_ty != 0 and ip_value_ty != self.ty_void as i32:
+                    self.typed_expr_types.insert(node, ip_value_ty)
+                    return ip_value_ty
+            return 0
+        let indexed_name: str = self.type_name(container_tid as i32)
+        self.emit_error(f"type '{indexed_name}' cannot be indexed: it is not a positional collection and implements no IndexPlace", node)
         0
 
     fn is_runtime_multi_index_node(node: i32) -> i32:
