@@ -2695,7 +2695,7 @@ impl Parser:
     // ── let decl ─────────────────────────────────────────────────────
 
     mut fn parse_top_level_let(is_pub: i32, start: i32) -> NodeId:
-        // docs/mut.md Rev 8 §12 — `global` (stable) and `global var` (rebindable)
+        // docs/completed/mut.md Rev 8 §12 — `global` (stable) and `global var` (rebindable)
         // are module-level place declarations. The GLOBAL / GLOBAL_VAR markers
         // are stored in NK_LET_DECL.d2 bits 2 and 3 (see Ast.w LET_FLAG_GLOBAL /
         // LET_FLAG_GLOBAL_VAR). Plain top-level `let`/`var` (without `global`)
@@ -5267,7 +5267,7 @@ impl Parser:
         let start = self.current_start()
         self.advance()
         var op = UnaryOp.UOP_REF
-        // docs/mut.md Rev 8 §13.2 — `&raw const P` / `&raw mut P`.
+        // docs/completed/mut.md Rev 8 §13.2 — `&raw const P` / `&raw mut P`.
         // `raw` is contextual: only treated as the raw-address-of marker when it
         // immediately follows `&` AND the next token after it is `const` or `mut`.
         // The two-token lookahead avoids stealing `&raw` where `raw` is an
@@ -7934,10 +7934,10 @@ impl Parser:
 
             var type_node: NodeId = 0 as NodeId
             var extra_flags = 0
-            // docs/mut.md Rev 8 §5.1 / docs/mutability.md — receiver-place modes.
+            // docs/completed/mut.md Rev 8 §5.1 / docs/completed/mutability.md — receiver-place modes.
             // Tag the param so later sema phases can enforce receiver constraints.
             let is_self_param = name != 0 and self.intern.resolve(name) == "self"
-            // #645 / docs/mutability.md: parameters are implicitly rebindable; there
+            // #645 / docs/completed/mutability.md: parameters are implicitly rebindable; there
             // is NO `mut x: T` parameter modifier (`mut self` is the only place `mut`
             // is meaningful). Reject `mut` on a non-self parameter loudly instead of
             // silently discarding it.

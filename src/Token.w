@@ -152,9 +152,9 @@ pub enum TokenKind: i32:
     TK_STAR_SAT_EQ = 131
     TK_KW_ASM = 132
     TK_KW_GOTO = 133
-    // docs/mut.md Rev 8 §12 — module-level place declarations.
+    // docs/completed/mut.md Rev 8 §12 — module-level place declarations.
     TK_KW_GLOBAL = 134
-    // docs/mutability.md — call-site passing mode keywords.
+    // docs/completed/mutability.md — call-site passing mode keywords.
     TK_KW_COPY = 135
     // Regex integration.
     TK_REGEX_LIT = 136

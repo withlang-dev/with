@@ -300,7 +300,7 @@ const GLOBAL_VALUE_DECL_EXTERN: i32 = 2
 // D39: storage a bundle interface declares; the bundle's object defines it.
 const GLOBAL_VALUE_DECL_INTERFACE: i32 = 3
 
-// docs/mutability.md §5 — per-parameter effect bits.
+// docs/completed/mutability.md §5 — per-parameter effect bits.
 const EFF_READ: i32         = 1   // parameter is read
 const EFF_WRITE: i32        = 2   // parameter place is mutated (implies read)
 const EFF_CONSUME: i32      = 4   // parameter is moved/consumed in the body
@@ -446,7 +446,7 @@ type Sema {
     sig_lookup: HashMap[i32, i32],
     // An extern keeps its own signature when a curated wrapper takes its name.
     extern_decl_sigs: HashMap[i32, i32],
-    // docs/mutability.md Phase 4 — per-parameter effect bitsets.
+    // docs/completed/mutability.md Phase 4 — per-parameter effect bitsets.
     // sig_param_effects[sig_param_eff_starts[si] + pi] = effect bits for param pi of sig si.
     // Effects: EFF_READ=1, EFF_WRITE=2, EFF_CONSUME=4,
     // EFF_ESCAPE_VALUE=8, EFF_ESCAPE_VIEW=16, EFF_RAW_PTR_VALIDITY=32.
@@ -711,7 +711,7 @@ type Sema {
     generator_state_field_names: HashMap[i64, i32],
     generator_state_field_types: HashMap[i64, i32],
     mutable_global_syms: HashMap[i32, i32],
-    // docs/mut.md Rev 8 §12 / §15.12 — symbols declared via `global X = ...`
+    // docs/completed/mut.md Rev 8 §12 / §15.12 — symbols declared via `global X = ...`
     // (stable) recorded here. Used by check_assign to emit a specific
     // diagnostic on rebind attempts. `global var X = ...` does NOT register
     // here — it's rebindable.
@@ -819,7 +819,7 @@ type Sema {
     label_kinds: Vec[i32],
     label_nodes: Vec[i32],
     label_break_value_types: Vec[i32],
-    // Loop move-state tracking (docs/branch-merge-soundness.md §6.7 / #613):
+    // Loop move-state tracking (docs/completed/branch-merge-soundness.md §6.7 / #613):
     // per label frame: entry bind-count (outer/inner boundary), the offset of this
     // loop's break-flag region in loop_break_flat (-1 = none), and whether any
     // break to this frame was captured. loop_break_flat is a flat stack of
@@ -1056,7 +1056,7 @@ type Sema {
     symbols_frozen: i32,
     types_frozen: i32,
 
-    // docs/mutability.md Phase 4 — per-function effect tracking during body analysis.
+    // docs/completed/mutability.md Phase 4 — per-function effect tracking during body analysis.
     // Cleared and set by check_fn_body_with_sig; used to accumulate effects as the body is checked.
     current_fn_param_syms: Vec[i32],   // param name symbols for the function being checked
     current_fn_param_effs: Vec[i32],   // accumulated effect bits per param
@@ -5191,7 +5191,7 @@ impl Sema:
         self.moved_field_path_syms = move syms
 
     // Conservative union of move-state across two control-flow branches, for the
-    // MaybeUninitialized use-checking half (see docs/branch-merge-soundness.md). A
+    // MaybeUninitialized use-checking half (see docs/completed/branch-merge-soundness.md). A
     // binding is MOVED after the construct iff it is MOVED on ANY non-diverging
     // branch (so a value moved on one path cannot be used after — use-after-move
     // soundness); divergent branches (TY_NEVER) contribute nothing. If both branches
@@ -5215,7 +5215,7 @@ impl Sema:
     // Pointwise union for accumulating a join over N branches/arms (e.g. match): a
     // binding is MOVED in the result iff MOVED in either input. Seed the accumulator
     // with the entry state (the implicit no-match/fallthrough path) and fold each
-    // non-diverging arm exit into it; see docs/branch-merge-soundness.md.
+    // non-diverging arm exit into it; see docs/completed/branch-merge-soundness.md.
     fn union_move_states(base: &Vec[i32], other: &Vec[i32]) -> Vec[i32]:
         var out: Vec[i32] = Vec.new()
         let n = base.len() as i32
@@ -5225,7 +5225,7 @@ impl Sema:
             out.push(if bv == VarState.MOVED or ov == VarState.MOVED: VarState.MOVED else: VarState.LIVE)
         out
 
-    // ── Loop move-state (#613, docs/branch-merge-soundness.md §6.7) ──────────────
+    // ── Loop move-state (#613, docs/completed/branch-merge-soundness.md §6.7) ──────────────
 
     mut fn emit_loop_carried_move_error(bind_idx: i32, loop_node: i32):
         let sym = self.bind_names[bind_idx]
@@ -5873,7 +5873,7 @@ impl Sema:
         if self.mutable_global_syms.contains(sym): return 1
         0
 
-    // docs/mut.md Rev 8 §15.12 — declared via `global X = ...`, no `var`.
+    // docs/completed/mut.md Rev 8 §15.12 — declared via `global X = ...`, no `var`.
     // Rebinding such a symbol is the §15.12 diagnostic.
     fn is_stable_global(sym: i32) -> i32:
         if self.stable_global_syms.contains(sym): return 1
@@ -5910,7 +5910,7 @@ impl Sema:
         self.sig_param_starts.push(param_start)
         self.sig_param_counts.push(param_count)
         self.sig_variadic.push(variadic)
-        // docs/mutability.md Phase 4 — per-parameter effect storage.
+        // docs/completed/mutability.md Phase 4 — per-parameter effect storage.
         self.sig_param_eff_starts.push(self.sig_param_effects.len() as i32)
         for pi in 0..param_count:
             self.sig_param_effects.push(0)

@@ -349,8 +349,9 @@ and apply byte splices inside compiler-proven spans:
 - `tools/annotate_receivers.w` applies finalized Sema receiver requirements.
 - `tools/migrate_receivers.w` removes explicit receivers only from declarations
   Sema identifies as valid impl methods with matching modes.
-- `tools/relocate_methods.w` relocates only Sema-identified top-level instance
-  methods and verifies one semantic fact per structural rewrite.
+- `with migrate-receivers` (built into the compiler, `src/ReceiverMigration.w`;
+  `--report|--list|--apply <entry.w>`) relocates only Sema-identified top-level
+  instance methods and verifies one semantic fact per structural rewrite.
 - `tools/migrate_method_arg_moves.w` consumes structured diagnostic facts and
   exact spans; it never parses rendered stderr.
 

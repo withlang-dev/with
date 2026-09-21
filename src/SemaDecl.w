@@ -2194,7 +2194,7 @@ impl Sema:
         let is_mut = flags % 2
         if is_mut != 0:
             self.mutable_global_syms.insert(name, 1)
-        // docs/mut.md Rev 8 §12 / §15.12 — register stable globals so
+        // docs/completed/mut.md Rev 8 §12 / §15.12 — register stable globals so
         // check_assign can emit the §15.12 diagnostic on rebind attempts
         // with a more helpful message than the generic immutable-binding error.
         if let_decl_is_global(flags) != 0 and let_decl_is_global_var(flags) == 0:
@@ -2276,7 +2276,7 @@ impl Sema:
             let mt_default_body = self.ast.get_extra(pos + TRAIT_METHOD_DEFAULT_BODY)
             if (mt_flags / FnFlags.ASYNC) % 2 == 1:
                 self.require_async_runtime(node, "async trait method")
-            // docs/mutability.md — trait method must declare explicit receiver mode.
+            // docs/completed/mutability.md — trait method must declare explicit receiver mode.
             if mt_param_count > 0:
                 let p0_name = self.ast.get_extra(mt_param_start)
                 if self.pool_resolve(p0_name) == "self":

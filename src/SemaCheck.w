@@ -21,7 +21,7 @@ extern fn with_eprint(s: &str) -> Unit
 extern fn with_getenv_str(name: &str) -> str
 extern fn str_from_byte(b: i32) -> str
 
-// docs/mut.md Rev 8 — P12 lockdown active. `&mut T` is rejected.
+// docs/completed/mut.md Rev 8 — P12 lockdown active. `&mut T` is rejected.
 const STRICT_NO_MUT_REF: i32 = 1
 
 const GLOBAL_RACE_ACCESS_READ: i32 = 1
@@ -1113,7 +1113,7 @@ impl Sema:
         if kind == NodeKind.NK_TYPE_REF:
             let pointee = self.resolve_type_expr(self.ast.get_data0(node))
             let is_mut = self.ast.get_data1(node)
-            // docs/mut.md Rev 8 §15.1 — at P12 lockdown, reject `&mut T` in
+            // docs/completed/mut.md Rev 8 §15.1 — at P12 lockdown, reject `&mut T` in
             // type position. Use `mut self: Self`, `*mut T` (FFI), or
             // owned-by-value parameters per the migration guide §16.
             if STRICT_NO_MUT_REF != 0 and is_mut != 0:
@@ -6852,7 +6852,7 @@ impl Sema:
             self.in_comptime_fn = saved_comptime
             return result
 
-        // docs/mutability.md — call-site passing mode annotations.
+        // docs/completed/mutability.md — call-site passing mode annotations.
         if kind == NodeKind.NK_COPY_ARG:
             let inner = self.ast.get_data0(node)
             let ty = self.check_expr(inner)
@@ -8949,7 +8949,7 @@ impl Sema:
                 if self.packed_types.contains(ref_recv_ty as i32):
                     self.emit_error("cannot create reference to packed field", node)
                     return 0
-            // docs/mut.md Rev 8 §13 — raw forms produce TY_PTR (*const T / *mut T)
+            // docs/completed/mut.md Rev 8 §13 — raw forms produce TY_PTR (*const T / *mut T)
             // and do not participate in borrow tracking. Forming a raw pointer is
             // safe; dereferencing or writing through it requires unsafe (§13.3).
             // §15.13/15.14 — `&raw mut` requires a mutable place; `&raw const`
@@ -9036,7 +9036,7 @@ impl Sema:
                 self.note_raw_pointer_validity_precondition(operand_node)
                 self.require_unsafe_operation("raw pointer dereference requires unsafe context", node)
                 return self.get_type_d0(resolved)
-            // docs/mut.md Rev 8 §15.16 — deref-precedence diagnostic.
+            // docs/completed/mut.md Rev 8 §15.16 — deref-precedence diagnostic.
             // `*x.field` parses as `*(x.field)`; if the field type is not a
             // pointer/reference, the user almost certainly meant `(*x).field`.
             // Emit a precedence-aware message in that case.
@@ -9715,7 +9715,7 @@ impl Sema:
         let saved_infer_tail = self.infer_tail_node
         // Save scope states before then branch so early-return branches don't
         // permanently mark outer variables as MOVED when control continues past the if.
-        // Branch move-state join (MaybeUninitialized half — docs/branch-merge-soundness.md):
+        // Branch move-state join (MaybeUninitialized half — docs/completed/branch-merge-soundness.md):
         // check each branch from the SAME entry state, then union the two exits so a
         // value moved on one path is treated as moved after the if (use-after-move
         // soundness). The old linear flow let an else-branch reinit silently overwrite a
@@ -10776,7 +10776,7 @@ impl Sema:
             let target_sym = self.ast.get_data0(target)
             if self.scope_has(target_sym) != 0:
                 if self.scope_lookup_mut(target_sym) == 0:
-                    // docs/mut.md Rev 8 §15.12 — when the immutable binding is
+                    // docs/completed/mut.md Rev 8 §15.12 — when the immutable binding is
                     // a stable global (`global X = ...`), emit the more
                     // specific diagnostic suggesting `global var` for
                     // rebindability.
@@ -10786,7 +10786,7 @@ impl Sema:
                     else:
                         self.emit_error("cannot assign to immutable variable", node)
         else:
-            // docs/mut.md Rev 8 §6 — assignment LHS must be a mutable place.
+            // docs/completed/mut.md Rev 8 §6 — assignment LHS must be a mutable place.
             // Already covered above for plain identifiers via binding-mut. For
             // projection LHS (field, index, deref), consult classify_place.
             // Warnings during P7..P11; promoted to errors at P12 lockdown.
@@ -10794,7 +10794,7 @@ impl Sema:
             let lhs_kind = unpack_place_kind(lhs_packed)
             let lhs_mut_state = unpack_place_mut(lhs_packed)
             if lhs_kind == PlaceKind.PK_NotPlace:
-                // docs/mut.md Rev 8 §15.11 — distinguish "type does not support
+                // docs/completed/mut.md Rev 8 §15.11 — distinguish "type does not support
                 // index assignment" (no IndexPlace impl) from generic non-place
                 // when the LHS is an index expression on an ordinary place.
                 if self.ast.kind(target) == NodeKind.NK_INDEX:
@@ -10808,7 +10808,7 @@ impl Sema:
                     self.emit_warning("cannot assign to a non-place expression", node)
             else if lhs_mut_state == PlaceMut.PM_ReadOnly:
                 self.emit_error("cannot assign through a read-only place (e.g., dereferenced &T or *const T) (§15.10)", node)
-            // docs/mut.md Rev 8 §15.17 — mutation through a view-bound
+            // docs/completed/mut.md Rev 8 §15.17 — mutation through a view-bound
             // for-loop variable (e.g., `for u in xs.iter(): u.age += 1`).
             let assign_root = self.place_root_sym(target)
             if assign_root != 0 and self.scope_is_view_bound(assign_root) != 0:
@@ -10968,7 +10968,7 @@ impl Sema:
         // class elements bind as &T views via infer_for_element_type; copying
         // one would double-drop it, so there is no by-value spelling to gate.
 
-        // docs/mut.md Rev 8 §11.4 / §15.17 — when the iterable is a .iter()
+        // docs/completed/mut.md Rev 8 §11.4 / §15.17 — when the iterable is a .iter()
         // call (or any iter_of_self method), the iterator yields &T views.
         // Mark the binding as a view-bound variable so check_assign can emit
         // §15.17 when mutation through it is attempted.
@@ -11723,7 +11723,7 @@ impl Sema:
                 let static_named = self.lookup_named_type_visible(static_type_sym)
                 if static_named != 0:
                     obj_type = static_named as TypeId
-            // docs/mut.md Rev 8 §5.3 / §15.4 — `Vec.push` (etc.) parsed as a
+            // docs/completed/mut.md Rev 8 §5.3 / §15.4 — `Vec.push` (etc.) parsed as a
             // first-class value expression. Method calls dispatch through
             // check_method_call, which never invokes check_field_access on the
             // callee node. Reaching this point with a static-type base means
@@ -12709,7 +12709,7 @@ impl Sema:
         if comprehension_carrier != 0 and saved_for_comprehension_carrier == 0:
             self.current_for_comprehension_carrier = comprehension_carrier
 
-        // Branch move-state join over the arms (docs/branch-merge-soundness.md): seed
+        // Branch move-state join over the arms (docs/completed/branch-merge-soundness.md): seed
         // with the entry state (the implicit no-match/fallthrough path) and union each
         // non-diverging arm's exit. Each arm is analyzed from the entry state, so arms
         // don't inherit each other's moves and a returning/diverging arm's move does not
@@ -14409,7 +14409,7 @@ impl Sema:
                 if emitted_capability_escape == 0 and self.is_tool_capability_type(cap_ty2):
                     self.emit_error("capability-bearing closure cannot escape into runtime code", node)
                     emitted_capability_escape = 1
-            // docs/mut.md Rev 8 §9.4 / §15.9 — a mutating closure may not
+            // docs/completed/mut.md Rev 8 §9.4 / §15.9 — a mutating closure may not
             // escape the scope containing the captured place. If the closure
             // is in escape position (e.g., returned, stored in a long-lived
             // binding) AND mutates any capture, warn.
@@ -15731,7 +15731,7 @@ impl Sema:
         let has_resolved = self.has_resolved_call_args(node)
         let arg_types: Vec[i32] = Vec.new()
         let checked_arg_nodes: Vec[i32] = Vec.new()
-        // docs/mut.md Rev 8 §15.8 — borrow indices to remove after this call's
+        // docs/completed/mut.md Rev 8 §15.8 — borrow indices to remove after this call's
         // arg-loop completes. Iterator-of-self borrows live for the duration of
         // the enclosing call so sibling closures conflict with them.
         let iter_borrow_idxs: Vec[i32] = Vec.new()
@@ -15818,7 +15818,7 @@ impl Sema:
             self.remove_borrow_at(iter_borrow_idxs[ibi])
             ibi = ibi - 1
 
-        // docs/mut.md Rev 8 §9.2 — closure capture conflict detection.
+        // docs/completed/mut.md Rev 8 §9.2 — closure capture conflict detection.
         // When a mutating closure captures a place, sibling arguments may not
         // retain access to the same place (owned move, view, or iterator).
         self.check_closure_capture_conflicts(resolved_extra_start, resolved_arg_count, has_resolved, node)
@@ -20196,7 +20196,7 @@ impl Sema:
         self.generic_subst_type_ids = saved_subst_tys
         out
 
-    // docs/mut.md Rev 8 §15.8 — builtins for which `lookup_method_fn` returns
+    // docs/completed/mut.md Rev 8 §15.8 — builtins for which `lookup_method_fn` returns
     // nothing but whose return value retains access to the receiver. Counterpart
     // to the @[iter_of_self] attribute used for user-declared methods. The set
     // is small and corresponds to types whose methods are intercepted by the
@@ -20413,7 +20413,7 @@ impl Sema:
         let mc_method_fn_for_resolution = if mc_owner_sym_for_effect != 0: self.lookup_method_fn(mc_owner_sym_for_effect, field) else: 0
         self.trace_method_resolution(node, obj_type as i32, mc_owner_sym_for_effect, field, mc_sig_idx_for_effect, mc_method_fn_for_resolution)
         let arg_types: Vec[i32] = Vec.new()
-        // docs/mut.md Rev 8 §15.8 — see check_call.
+        // docs/completed/mut.md Rev 8 §15.8 — see check_call.
         let mc_iter_borrow_idxs: Vec[i32] = Vec.new()
         let mc_param_offset_for_resolution = if self.static_receiver_type_is_known(expr) != 0: 0 else: 1
         var mc_resolved_arg_count = self.resolve_method_implicit_default_args(node, mc_sig_idx_for_effect, mc_method_fn_for_resolution, mc_param_offset_for_resolution, extra_start, arg_count)
@@ -20552,7 +20552,7 @@ impl Sema:
             self.remove_borrow_at(mc_iter_borrow_idxs[mc_ibi])
             mc_ibi = mc_ibi - 1
 
-        // docs/mut.md Rev 8 §9.2 — closure capture conflict detection.
+        // docs/completed/mut.md Rev 8 §9.2 — closure capture conflict detection.
         self.check_closure_capture_conflicts(extra_start, mc_resolved_arg_count, mc_has_resolved_args, node)
 
         let inferred_pending_receiver = self.infer_pending_generic_method_receiver(expr, field, arg_types, mc_resolved_arg_count, node)
@@ -20703,13 +20703,13 @@ impl Sema:
                     if (deref_tk == TypeKind.TY_PTR or deref_tk == TypeKind.TY_REF) and self.get_type_d1(deref_ty) == 0:
                         self.emit_builtin_mutable_receiver_error(type_name_sym, field, node)
                         return 0
-                // docs/mut.md Rev 8 §15.17 — mutating method on a view-bound
+                // docs/completed/mut.md Rev 8 §15.17 — mutating method on a view-bound
                 // for-loop variable (e.g., `for u in xs.iter(): u.push(1)`).
                 let mc_root = self.place_root_sym(expr)
                 if mc_root != 0 and self.scope_is_view_bound(mc_root) != 0:
                     self.emit_error("cannot mutate through read-only view yielded by iterator (§15.17)", node)
                 self.check_mutation_against_views(expr, node)
-            // docs/mut.md Rev 8 §5.1 — user-defined methods declared with
+            // docs/completed/mut.md Rev 8 §5.1 — user-defined methods declared with
             // `mut self: Self` require a mutable place receiver. Warnings during
             // P7..P11; promoted to errors at P12 lockdown. Builtins are already
             // handled above via the hardcoded list.
@@ -20744,7 +20744,7 @@ impl Sema:
                 if ms_root != 0 and self.scope_is_view_bound(ms_root) != 0:
                     self.emit_error("cannot mutate through read-only view yielded by iterator (§15.17)", node)
             else if self.method_has_move_self_flag(type_name_sym, field) != 0 or (self.builtin_method_requires_move_receiver(type_name_sym, field) != 0 and borrowed_payload_eliminator == 0):
-                // docs/mutability.md — move self receiver: the call consumes the
+                // docs/completed/mutability.md — move self receiver: the call consumes the
                 // receiver binding. Copy receivers satisfy the same contract by
                 // copying, so the caller remains live (mutability.md §7).
                 if self.is_copy(obj_type) == 0:
@@ -23004,7 +23004,7 @@ impl Sema:
                 return 1
             return self.expr_mutates_place(self.ast.get_data2(node), sym)
         if kind == NodeKind.NK_CALL:
-            // docs/mut.md Rev 8 §5.1 — a method call `sym.method(...)` whose
+            // docs/completed/mut.md Rev 8 §5.1 — a method call `sym.method(...)` whose
             // method takes a mutating receiver is a mutation of `sym`. Detect
             // both builtin mutating methods (push, pop, …) and user-defined
             // `mut self: Self` methods.
@@ -23066,7 +23066,7 @@ impl Sema:
             return self.expr_mutates_place(self.ast.get_data2(node), sym)
         0
 
-    // docs/mut.md Rev 8 §8.2 / §15.5 — returns the symbol of the indexed base
+    // docs/completed/mut.md Rev 8 §8.2 / §15.5 — returns the symbol of the indexed base
     // when the expression includes any NK_INDEX projection, e.g.:
     //
     //   xs[0]            → returns sym(xs)
@@ -23174,7 +23174,7 @@ impl Sema:
                 return self.place_root_sym(self.ast.get_data1(node))
         0
 
-// ── docs/mut.md Rev 8 §2 — Place classification ──────────────────
+// ── docs/completed/mut.md Rev 8 §2 — Place classification ──────────────────
 //
 // The mutation model is built on the concept of a *place* — a storage
 // location that can be named or reached from a named storage root.
@@ -23445,7 +23445,7 @@ impl Sema:
             // &mut sym.field or &sym.field — check the operand
             return self.capture_is_field_only(operand, sym)
         if kind == NodeKind.NK_CALL:
-            // docs/mut.md Rev 8 §9 — a method call `sym.method(...)` parses as
+            // docs/completed/mut.md Rev 8 §9 — a method call `sym.method(...)` parses as
             // NK_CALL whose callee is NK_FIELD_ACCESS on `sym`. From a capture
             // standpoint that's a *method call on the captured variable*, not
             // a field-only access — fall through to whole-variable capture so
@@ -24301,12 +24301,12 @@ impl Sema:
             count = count + 1
         self.emit_error("ambiguous extension method '" ++ method_name ++ "'; candidates: " ++ candidates ++ "; use pkg.method(value)", node)
 
-    // docs/mut.md Rev 8 §5.1 — returns 1 when the resolved (concrete) method
+    // docs/completed/mut.md Rev 8 §5.1 — returns 1 when the resolved (concrete) method
     // for `type_sym.method_sym` was declared with `mut self: Self` (the parser
     // records this via FN_PARAM_FLAG_MUT_SELF on the first param). Used by
     // check_method_call to warn when a mutating receiver is invoked on a
     // non-place or read-only-place receiver.
-    // docs/mut.md Rev 8 §15.8 — if `arg_node` is a method call to a fn marked
+    // docs/completed/mut.md Rev 8 §15.8 — if `arg_node` is a method call to a fn marked
     // `@[iter_of_self]`, register a SHARED borrow on the receiver's place root
     // and return its index in the borrow vectors. Returns -1 otherwise. Caller
     // is responsible for calling remove_borrow_at on the returned index after
@@ -24351,7 +24351,7 @@ impl Sema:
             return pre_count
         -1
 
-    // docs/mut.md Rev 8 §11.4 / §15.17 — returns 1 when the for-loop iterable
+    // docs/completed/mut.md Rev 8 §11.4 / §15.17 — returns 1 when the for-loop iterable
     // is a .iter() call (or any iter_of_self method), meaning the iterator
     // yields &T views rather than owned T values.
     // #925: `for x in vec.iter()` IS §13's implicit form. MirLower lowers it
@@ -24420,7 +24420,7 @@ impl Sema:
             return 0
         self.method_is_iter_of_self_fn(owner_sym, method_sym)
 
-    // docs/mut.md Rev 8 §9.2 / §15.7 — when a call passes a mutating closure,
+    // docs/completed/mut.md Rev 8 §9.2 / §15.7 — when a call passes a mutating closure,
     // check that no sibling argument retains access to the mutably captured place.
     // §9.2 helper: when arg is `&sym.field` or `sym.field`, return the field sym.
     // Returns 0 for whole-variable access (`&sym`, `sym`, `sym.iter()`).
@@ -24550,7 +24550,7 @@ impl Sema:
             return self.arg_retains_access_to(self.ast.get_data0(arg_node), sym)
         0
 
-    // docs/mut.md Rev 8 §15.8 — returns 1 when the method's fn-decl is marked
+    // docs/completed/mut.md Rev 8 §15.8 — returns 1 when the method's fn-decl is marked
     // `@[iter_of_self]`, indicating the produced value retains access to its
     // receiver place (e.g., Vec.iter, HashMap.entries). Used by check_call's
     // arg-loop to register a SHARED borrow on the receiver place root for the

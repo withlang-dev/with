@@ -411,13 +411,14 @@ Two surfaces, never conflated:
   That is the entire user-facing surface.
 - **`with_*` symbols and everything in `rt/*.w` are the compiler's own internal
   runtime/ABI.** User *source* never names a `with_*` symbol — the compiler emits
-  those calls. `rt/regex_runtime.w` (`with_regex_*`) is the **compiler's** regex,
-  compiled as part of the compiler, not a foreign object to embed and hand out.
+  those calls. (The `with_regex_*` shim, `rt/regex_runtime.w`, is gone:
+  `std.regex` is a facade over the pcre2 `.wo` bundle, `std.re`, D38/D39.)
 
 Never reason as if a user program must *link* or *resolve* the internal runtime.
-If you catch yourself asking "how does a user program get the `with_regex_*`
-symbols?", **stop** — the question is malformed. Users reach regex through
-`std.regex`. `rt/*.w` is part of the compiler; treat it that way.
+If you catch yourself asking "how does a user program get the `with_*`
+symbols?", **stop** — the question is malformed. Users reach the runtime
+through the language and `std.*`. `rt/*.w` is part of the compiler; treat it
+that way.
 
 ---
 
@@ -857,7 +858,8 @@ must come from `compiler_analyze_file` facts:
 
 - `tools/annotate_receivers.w`: finalized Sema receiver requirements.
 - `tools/migrate_receivers.w`: Sema declaration scope/mode plus lexical splices.
-- `tools/relocate_methods.w`: Sema top-level method/owner/mode plus reindentation.
+- `with migrate-receivers` (built in, `src/ReceiverMigration.w`): Sema top-level
+  method/owner/mode plus reindentation; `--report`, `--list`, `--apply`.
 - `tools/migrate_method_arg_moves.w`: structured compiler diagnostics and spans.
 
 The removed receiver/frozen/closure/diagnostic-map tools must not be recreated;
