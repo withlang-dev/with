@@ -12,9 +12,9 @@ decision supersedes an earlier one, say so in both.
 
 ## D52 — A global is never moved out of; a `const` is a value, not a place
 
-**Date:** 2026-09-21. **Status:** implemented (#1242); the §9.1c sentence
-below is proposed, not blessed — the compiler's rejection is the conservative
-reading of §2.3 until Eric rules.
+**Date:** 2026-09-21. **Status:** ruled — the §9.1c sentence below was
+blessed verbatim the same day ("blessed") and landed (#1245); the compiler
+enforces it (#1242).
 
 **Decision.** Consuming a module global — binding it by value
 (`let out = g`), passing it to a plain-`T` parameter, returning it (tail or
@@ -46,7 +46,7 @@ the argument, return and `move self` spellings. (d) Reject: the only
 option under which "a global always holds a value" is true in every
 function, and the fix-it is the one the programmer means (`.clone()`).
 
-**Proposed §9.1c sentence (for Eric's blessing).** "A global always holds
+**§9.1c (blessed).** "A global always holds
 a value: it is observed, mutated in place, or reassigned, never moved out
 of; an owned copy is spelled `.clone()`. A `const` is a value, not a
 place — each use materializes it."
