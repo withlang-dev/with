@@ -6338,7 +6338,7 @@ impl Sema:
             seen.insert(node, 1)
             let required = self.receiver_required_effect_for_decl(node)
             let required_mode = receiver_required_mode_text(required)
-            let name = self.pool_resolve(self.sig_names[si])
+            let name: str = self.pool_resolve(self.sig_names[si])
             if declared == ReceiverMode.Missing:
                 let keyword = if required_mode == "read": "fn" else: required_mode ++ " fn"
                 self.emit_error(f"method receiver mode is missing; compiler effects require `{keyword}` for '{name}'", node)

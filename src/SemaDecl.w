@@ -1523,7 +1523,7 @@ impl Sema:
                         self.prepare_fn_clause(dispatch_fn_name, existing_node, existing_di)
                         fn_name = self.prepare_fn_clause(dispatch_fn_name, node, current_di)
                     else:
-                        let fn_name_str = self.pool_resolve(fn_name)
+                        let fn_name_str: str = self.pool_resolve(fn_name)
                         self.emit_error(f"function '{fn_name_str}' is already defined", node)
                         return
         if self.ast.is_no_alloc_fn_node(node as NodeId) != 0:
@@ -1794,7 +1794,7 @@ impl Sema:
                 for edi in 0..self.ast.decl_count():
                     if self.ast.get_decl(edi) == existing_node:
                         if self.is_local_or_prelude_decl(edi) != 0:
-                            let fn_name_str = self.pool_resolve(name)
+                            let fn_name_str: str = self.pool_resolve(name)
                             self.emit_error(f"'{fn_name_str}' is already defined as a function; extern fn would shadow it", node)
                             return
                         break
@@ -2288,7 +2288,7 @@ impl Sema:
                     if has_mode == 0 and p0_type != 0 and self.ast.kind(p0_type as NodeId) == NodeKind.NK_TYPE_NAMED:
                         let p0_ty_sym = self.ast.get_data0(p0_type as NodeId)
                         if self.pool_resolve(p0_ty_sym) == "Self":
-                            let mt_name_str = self.pool_resolve(mt_name)
+                            let mt_name_str: str = self.pool_resolve(mt_name)
                             self.emit_error(f"trait method '{mt_name_str}' requires an explicit receiver mode: use 'self: &Self', 'mut self: Self', or 'move self: Self'", node)
             self.trait_method_names.push(mt_name)
             self.trait_method_flags.push(mt_flags)
@@ -2404,7 +2404,7 @@ impl Sema:
             return
         let size = self.type_layout_size_of(type_tid)
         if size > threshold:
-            let name = self.pool_resolve(type_name)
+            let name: str = self.pool_resolve(type_name)
             self.emit_warning(f"large Copy type '{name}' is {size} bytes; implicit copies may be expensive (copy_warn_threshold={threshold})", node)
 
     mut fn collect_impl_decl(node: i32, is_local_impl: i32) -> Unit:
@@ -3091,14 +3091,14 @@ impl Sema:
                     // default survives only as cascade suppression when the
                     // arguments already errored.
                     if self.diags.count_by_severity(DiagSeverity.Error) == 0:
-                        let mb_name = self.pool_resolve(tp_name)
+                        let mb_name: str = self.pool_resolve(tp_name)
                         self.emit_error(f"cannot infer type parameter '{mb_name}' for this call; the argument's shape does not match the parameter type that mentions '{mb_name}'", call_node)
                         return
                     self.put_generic_subst(tp_name, self.ty_i32, call_node)
                 else:
                     // #598 (ruled: no turbofish): teach the restructure instead of
                     // a bare "unknown type" cascade.
-                    let ug_name = self.pool_resolve(tp_name)
+                    let ug_name: str = self.pool_resolve(tp_name)
                     self.emit_error(f"cannot infer type parameter '{ug_name}' for this call; annotate the result binding or pass an argument that mentions '{ug_name}'", call_node)
                     return
             pos = pos + 2 + bound_count

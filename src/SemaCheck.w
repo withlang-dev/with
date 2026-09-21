@@ -987,7 +987,7 @@ impl Sema:
             let m_root = self.place_root_sym(m_node)
             if m_root == 0:
                 continue
-            let m_name = self.pool_resolve(m_root)
+            let m_name: str = self.pool_resolve(m_root)
             let m_start = self.borrow_path_data.len() as i32
             let m_count = self.borrow_collect_path(m_node)
             var m_pos = -1
@@ -2120,8 +2120,8 @@ impl Sema:
                     expected_ret = task_ty as i32
             let actual_ret = self.sig_return_type(sig_idx)
             if actual_ret != 0 and self.return_value_type_compatible(expected_ret, actual_ret) == 0:
-                let trait_name3 = self.pool_resolve(contract.trait_sym)
-                let method_name3 = self.pool_resolve(contract.method_sym)
+                let trait_name3: str = self.pool_resolve(contract.trait_sym)
+                let method_name3: str = self.pool_resolve(contract.method_sym)
                 self.emit_error(f"impl method '{method_name3}' return type does not match trait '{trait_name3}'", node)
 
     mut fn check_fn_body_with_sig_at(node: i32, sig_idx: i32, decl_index: i32):
@@ -2451,7 +2451,7 @@ impl Sema:
                     raw_validity_param_sym = self.current_fn_param_syms[pi]
 
         if raw_validity_param_sym != 0 and self.fn_symbol_is_unsafe(fn_name) == 0:
-            let param_name = self.pool_resolve(raw_validity_param_sym)
+            let param_name: str = self.pool_resolve(raw_validity_param_sym)
             self.emit_error(f"safe function relies on caller-guaranteed raw pointer validity for parameter '{param_name}'; declare it unsafe fn or model a safe pointer contract", node)
         if self.current_fn_may_alloc != 0:
             self.fn_may_alloc.insert(fn_name, 1)
@@ -4673,7 +4673,7 @@ impl Sema:
         self.fn_symbol_is_std_builtins_named(fn_sym, "drop")
 
     mut fn check_std_builtins_diverging_call_surface(fn_sym: i32, node: i32, arg_count: i32) -> i32:
-        let name = self.pool_resolve(fn_sym)
+        let name: str = self.pool_resolve(fn_sym)
         if name != "panic" and name != "todo" and name != "unreachable":
             return 0
         if self.fn_symbol_is_std_builtins_named(fn_sym, name) == 0:
@@ -7318,7 +7318,7 @@ impl Sema:
 
         // Omitted c_import symbols should explain the import gap instead of
         // pretending the user misspelled an ordinary local name.
-        let target_name = self.pool_resolve(sym)
+        let target_name: str = self.pool_resolve(sym)
         if self.ci_omitted_symbols.contains(target_name):
             // Value is "location|category|reason" (§16.2 structured manifest).
             let record: str = with_str_clone_ref(self.ci_omitted_symbols.get(target_name).unwrap())
@@ -9921,7 +9921,7 @@ impl Sema:
             if self.fn_symbol_is_builtin_vec_comptime_allowed(fn_sym) != 0:
                 return 0
             if self.fn_symbol_is_comptime(fn_sym) == 0:
-                let cc_name = self.pool_resolve(fn_sym)
+                let cc_name: str = self.pool_resolve(fn_sym)
                 self.emit_error(f"comptime can only call comptime functions ('{cc_name}')", node)
                 return 1
         0
@@ -9938,7 +9938,7 @@ impl Sema:
         if self.fn_symbol_is_builtin_vec_comptime_allowed(method_sym) != 0:
             return 0
         if self.fn_symbol_is_comptime(method_sym) == 0:
-            let cm_name = self.pool_resolve(method_sym)
+            let cm_name: str = self.pool_resolve(method_sym)
             self.emit_error(f"comptime can only call comptime functions ('{cm_name}')", node)
             return 1
         0
@@ -14023,7 +14023,7 @@ impl Sema:
                     self.emit_error("variant '..' rest pattern must be last", self.ast.get_extra(v_extra + rest_pos))
                     return
                 if bind_count - 1 > payload_count:
-                    let v_text = self.pool_resolve(v_name)
+                    let v_text: str = self.pool_resolve(v_name)
                     self.emit_error(f"variant pattern '{v_text}' expects {payload_count} payload pattern(s), found {bind_count - 1}", node)
                     return
                 for bi in 0..rest_pos:
@@ -14043,7 +14043,7 @@ impl Sema:
                 if self.type_is_unit(only_payload_ty) != 0:
                     unit_elided_payload_pattern = 1
             if unit_elided_payload_pattern == 0 and bind_count != payload_count:
-                let v_text = self.pool_resolve(v_name)
+                let v_text: str = self.pool_resolve(v_name)
                 self.emit_error(f"variant pattern '{v_text}' expects {payload_count} payload pattern(s), found {bind_count}", node)
                 return
             for bi in 0..bind_count:
@@ -15645,11 +15645,11 @@ impl Sema:
                             matched = pi
                             break
                     if matched < 0:
-                        let aname = self.pool_resolve(name_sym)
+                        let aname: str = self.pool_resolve(name_sym)
                         self.emit_error(f"no parameter named '{aname}'", node)
                         continue
                     if resolved_map.contains(matched):
-                        let aname = self.pool_resolve(name_sym)
+                        let aname: str = self.pool_resolve(name_sym)
                         self.emit_error(f"parameter '{aname}' specified more than once", node)
                         continue
                     resolved_map.insert(matched, self.ast.get_extra(extra_start + ai))
@@ -15970,7 +15970,7 @@ impl Sema:
                         if has_unfilled_implicit != 0:
                             self.emit_error("implicit parameter not provided; add a 'with' binding of the matching type", node)
                         else:
-                            let fn_name = self.pool_resolve(fn_sym)
+                            let fn_name: str = self.pool_resolve(fn_sym)
                             if min_expected == expected:
                                 self.emit_error(f"function '{fn_name}' expects {expected} argument(s), found {actual}", node)
                             else:
@@ -16110,7 +16110,7 @@ impl Sema:
             let final_payload_tys = self.enum_variant_payload_types(final_variant_ty as i32, fn_sym)
             let expected_payload_count = final_payload_tys.len() as i32
             if resolved_arg_count != expected_payload_count:
-                let variant_name = self.pool_resolve(fn_sym)
+                let variant_name: str = self.pool_resolve(fn_sym)
                 self.emit_error(f"enum variant constructor '{variant_name}' expects {expected_payload_count} argument(s), found {resolved_arg_count}", node)
             for ai in 0..resolved_arg_count:
                 if ai >= expected_payload_count:
@@ -16788,7 +16788,7 @@ impl Sema:
                 best_count = 1
             else if score == best_score:
                 best_count = best_count + 1
-        let name = self.pool_resolve(fn_sym)
+        let name: str = self.pool_resolve(fn_sym)
         if best_node == 0:
             self.emit_error(f"no matching generic overload for '{name}'", call_node)
             return 0
@@ -20854,7 +20854,7 @@ impl Sema:
             let static_payload_nodes: Vec[i32] = Vec.new()
             if mc_resolved_arg_count != expected:
                 let owner_name = self.type_name(obj_type)
-                let variant_name = self.pool_resolve(field)
+                let variant_name: str = self.pool_resolve(field)
                 self.emit_error(f"enum variant constructor '{owner_name}.{variant_name}' expects {expected} argument(s), found {mc_resolved_arg_count}", node)
             for ai in 0..mc_resolved_arg_count:
                 if ai >= expected:
@@ -22734,6 +22734,20 @@ impl Sema:
             for ei in 0..elem_count:
                 if self.expr_uses_symbol(self.ast.get_extra(extra_start + ei), sym) != 0:
                     return 1
+            return 0
+        if kind == NodeKind.NK_FSTRING:
+            // #1249: an interpolation is a use. Without this arm a view read
+            // only inside `f"{s.len()}"` looked dead at the preceding mutation
+            // and check_mutation_against_views dropped its borrow.
+            let seg_count = self.ast.get_data0(node)
+            var pos = self.ast.get_data1(node)
+            for _ in 0..seg_count:
+                if self.ast.get_extra(pos) == FStringSegmentKind.EXPR:
+                    if self.expr_uses_symbol(self.ast.get_extra(pos + 1), sym) != 0:
+                        return 1
+                    pos = pos + 3
+                else:
+                    pos = pos + 2
             return 0
         if kind == NodeKind.NK_RANGE:
             if self.expr_uses_symbol(self.ast.get_data0(node), sym) != 0:

@@ -2347,7 +2347,7 @@ impl Zcu:
                 if ik == NodeKind.NK_FN_DECL:
                     let shadowed_name = merged_pool.get_data0(id)
                     if frontend_name_shadowed_by_extern(root_ordered, merged_pool, shadowed_name):
-                        let sname = self.pool.resolve(shadowed_name)
+                        let sname: str = self.pool.resolve(shadowed_name)
                         self.diagnostics.emit(Diagnostic.err(f"extern fn '{sname}' shadows prelude function '{sname}'", Span { file: 0, start: merged_pool.get_start(id), end: merged_pool.get_end(id) }))
                 continue
             if ik == NodeKind.NK_EXTERN_VAR:
