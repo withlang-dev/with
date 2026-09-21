@@ -5489,7 +5489,18 @@ impl Sema:
                 continue
             if self.bind_states[bi] != VarState.LIVE:
                 continue
-            if self.binding_depends_on_origin(view_sym, origin_sym) != 0 or self.binding_value_depends_on_origin(view_sym, origin_sym) != 0:
+            if self.binding_depends_on_origin(view_sym, origin_sym) != 0:
+                self.mark_binding_poisoned_by_origin(view_sym, origin_sym, origin_node)
+                continue
+            // A value expression that mentions `&raw const origin` poisons the
+            // binding only if the binding can hold a view: a reference, an
+            // ephemeral value, or a Drop value that may retain one. A Copy value
+            // read through the dereference (`g = (*(&raw const a as *const S)).n`)
+            // is independent of `a`; poisoning it made a later read of `g`
+            // "may originate from `a`" (§21.1 Rule 6) in another function.
+            let view_ty = self.bind_types[bi]
+            let can_hold_view = view_ty != 0 and (self.get_type_kind(self.resolve_alias(view_ty as TypeId)) == TypeKind.TY_REF or self.type_has_drop_impl(view_ty) != 0 or self.type_is_ephemeral_value(view_ty) != 0)
+            if can_hold_view and self.binding_value_depends_on_origin(view_sym, origin_sym) != 0:
                 self.mark_binding_poisoned_by_origin(view_sym, origin_sym, origin_node)
 
     fn expr_view_depends_on_origin(node: i32, origin_sym: i32) -> i32:

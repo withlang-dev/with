@@ -7233,7 +7233,7 @@ impl Sema:
                 self.record_global_data_race_access(sym, node, GLOBAL_RACE_ACCESS_READ)
             if self.in_comptime_fn != 0 and self.is_mutable_global(sym) != 0:
                 self.emit_error("mutable global access is not allowed in comptime", node)
-            if self.binding_poisoned_origin_sym(sym) != 0 and sema_path_is_migrated_regex_implementation(self.current_module_path) == 0:
+            if self.binding_poisoned_origin_sym(sym) != 0:
                 self.emit_returned_view_origin_use_error(sym, node)
                 return 0
             if self.scope_lookup_is_task(sym) != 0 and node != self.current_statement_expr_root:
