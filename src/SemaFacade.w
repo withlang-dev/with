@@ -431,3 +431,57 @@ fn facade_clause_name(kind: i32) -> str:
     if kind == FACADE_CLAUSE_THREAD: return "thread"
     if kind == FACADE_CLAUSE_CALLBACK_THREAD: return "callback_thread"
     "callback consumes"
+
+// ── stage 3: raw classification consults the facts ──────────────────────
+//
+// A facade covers a declaration's surface: a described fn lends every
+// parameter by default (§16.2b.5 — the facade's assertion, recorded as
+// review), and `consumes`/`destroys`/`retains` are stronger statements of
+// the same coverage; a resource's producer covers its return (direct) or
+// its out parameter, and a resource's drop/destroys/init/preinit covers the
+// parameter that takes the representation. A covered surface is not raw
+// (ci_function_requires_raw_abi), so the call needs no `unsafe`. Nothing is
+// inferred from a name: an undescribed pointer return stays raw. Symbols
+// are matched by text — the facade's symbols live in the user's pool, the
+// c_import declaration's in its own.
+
+impl Sema:
+    fn facade_contract_for(fn_sym: i32) -> i32:
+        if self.foreign_contract_index.contains(fn_sym):
+            return self.foreign_contract_index.get(fn_sym).unwrap()
+        if self.foreign_contracts.len() == 0:
+            return -1
+        let want: str = self.safe_symbol_text(fn_sym)
+        for i in 0..self.foreign_contracts.len() as i32:
+            if self.safe_symbol_text(self.foreign_contracts[i].fn_sym) == want:
+                return i
+        -1
+
+    fn facade_same_fn(a: i32, b: i32) -> bool:
+        if a == 0 or b == 0:
+            return false
+        a == b or self.safe_symbol_text(a) == self.safe_symbol_text(b)
+
+    fn facade_covers_return(fn_sym: i32) -> bool:
+        let ci = self.facade_contract_for(fn_sym)
+        if ci >= 0:
+            if self.foreign_contracts[ci].returns_borrow_resource != 0 or self.foreign_contracts[ci].returns_static_tid != 0:
+                return true
+        for i in 0..self.facade_resources.len() as i32:
+            if self.facade_resources[i].out_param < 0 and self.facade_same_fn(self.facade_resources[i].producer, fn_sym):
+                return true
+        false
+
+    fn facade_covers_param(fn_sym: i32, pi: i32) -> bool:
+        if self.facade_contract_for(fn_sym) >= 0:
+            return true
+        for i in 0..self.facade_resources.len() as i32:
+            if self.facade_resources[i].out_param == pi and self.facade_same_fn(self.facade_resources[i].producer, fn_sym):
+                return true
+            if pi == 0:
+                if self.facade_same_fn(self.facade_resources[i].drop, fn_sym) or self.facade_same_fn(self.facade_resources[i].init, fn_sym) or self.facade_same_fn(self.facade_resources[i].preinit, fn_sym):
+                    return true
+                for di in 0..self.facade_resources[i].destroyers.len() as i32:
+                    if self.facade_same_fn(self.facade_resources[i].destroyers[di], fn_sym):
+                        return true
+        false

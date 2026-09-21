@@ -749,8 +749,9 @@ impl Sema:
         // A pointer/fn return is raw unless the overlay vouches a borrowed nullable
         // pointer return. Such a return stays a raw (natively nullable) pointer;
         // calling is safe and the deref stays unsafe.
+        // D51 stage 3: a surface a facade covers is not raw (SemaFacade.w).
         if self.ci_type_requires_raw_contract(self.sig_return_type(sig_idx)) != 0:
-            if ci_overlay_return_is_borrowed_ptr(name) == 0:
+            if ci_overlay_return_is_borrowed_ptr(name) == 0 and not self.facade_covers_return(fn_sym):
                 return 1
         for pi in 0..param_count:
             let pty = self.sig_param_type(sig_idx, pi)
@@ -762,6 +763,8 @@ impl Sema:
                 // `retains:` parameter (#602) is the same input, with a `str`
                 // argument refused at the call site.
                 if self.ci_type_is_const_c_string_input(pty) != 0:
+                    continue
+                if self.facade_covers_param(fn_sym, pi):
                     continue
                 return 1
         0
