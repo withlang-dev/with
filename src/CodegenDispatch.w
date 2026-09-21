@@ -2781,6 +2781,23 @@ impl Codegen:
         var effective_sema_ty = sema_ty
         var resolved = self.mir_display_resolved_type(effective_sema_ty)
         var tk = self.mir_display_type_kind(resolved)
+        if tk == TypeKind.TY_VOID:
+            return self.gen_string_literal_raw("()")
+        if tk == TypeKind.TY_REF:
+            // Formatting observes references recursively; a remaining &T is
+            // never a C string merely because LLVM represents it as a pointer.
+            let inner = if resolved < self.mir_type_d0_len() as i32: self.mir_type_d0_at(resolved) else: self.sema.get_type_d0(resolved) as i32
+            let pointee = self.mir_display_resolved_type(inner)
+            if pointee <= 0:
+                sema_phase_bug(f"BUG: no pointee type for formatted reference {resolved}")
+            // Unit has no storage to load (its LLVM type is void).
+            if self.mir_display_type_kind(pointee) == TypeKind.TY_VOID:
+                return self.gen_string_literal_raw("()")
+            let pointee_llvm = self.mir_sema_type_to_llvm(pointee)
+            if pointee_llvm == 0 or wl_get_type_kind(pointee_llvm) == wl_void_type_kind():
+                sema_phase_bug(f"BUG: no loadable LLVM type for formatted reference pointee {pointee}")
+            let observed = wl_build_load(self.builder, pointee_llvm, val)
+            return self.coerce_typed_val_to_str(observed, pointee, str_ty)
         let val_ty = wl_type_of(val)
         if wl_get_type_kind(val_ty) == wl_struct_type_kind():
             let enum_sym = self.enum_by_llvm.get(val_ty)
@@ -2907,10 +2924,6 @@ impl Codegen:
         if some_idx < 0 or none_idx < 0:
             sema_phase_bug(f"BUG: pointer-shaped enum type {enum_sema_ty} is not an Option while formatting")
         let ref_sema = self.mir_enum_payload_sema_type(enum_sema_ty, some_idx, 0)
-        let ref_resolved = self.mir_display_resolved_type(ref_sema)
-        var pointee = 0
-        if ref_resolved > 0 and self.mir_display_type_kind(ref_resolved) == TypeKind.TY_REF:
-            pointee = self.mir_display_resolved_type(self.sema.get_type_d0(ref_resolved) as i32)
         let ptr_ty = wl_ptr_type(self.context)
         let result_ptr = self.create_entry_alloca(str_ty)
         let none_bb = wl_append_bb(self.context, self.current_function, "fmt.option.none")
@@ -2922,14 +2935,7 @@ impl Codegen:
         wl_build_store(self.builder, self.gen_string_literal_raw(self.mir_enum_variant_name(enum_sema_ty, none_idx)), result_ptr)
         wl_build_br(self.builder, merge_bb)
         wl_position_at_end(self.builder, some_bb)
-        var payload_str: i64 = 0
-        if pointee > 0:
-            let pointee_llvm = self.mir_sema_type_to_llvm(pointee)
-            if pointee_llvm == 0:
-                sema_phase_bug(f"BUG: no LLVM type for the pointee {pointee} of a formatted Option[&T]")
-            payload_str = self.coerce_typed_val_to_str(wl_build_load(self.builder, pointee_llvm, val), pointee, str_ty)
-        else:
-            payload_str = self.coerce_val_to_str(val, str_ty)
+        let payload_str = self.coerce_typed_val_to_str(val, ref_sema, str_ty)
         var some_str = self.gen_string_literal_raw(self.mir_enum_variant_name(enum_sema_ty, some_idx))
         some_str = self.mir_str_concat(some_str, self.gen_string_literal_raw("("))
         some_str = self.mir_str_concat(some_str, payload_str)
