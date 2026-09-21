@@ -16,6 +16,48 @@ runs:
           out/test-graph/sdk-contract-tests
         key: source-sdk-${{ inputs.host-tag }}-22.1.6-${{ hashFiles('build.w', 'build/*.w', 'lib/std/build.w', 'lib/std/zl/*.w', 'lib/std/crypto/bigint.w', 'seed.lock', '.github/actions/source-sdk/action.yml') }}
 
+    # Generation zero. The SDK build bootstraps from the fetched SDK's own
+    # clang, clang++, cmake (with its module tree) and ninja, and its package
+    # carries them for the next build. Published assets that predate the
+    # packager keep `bin/clang` as a link without its target, or ship cmake
+    # without `share/cmake-*`, or have no cmake/ninja at all — none of them
+    # can bootstrap. Until an asset produced by this action is published on
+    # every platform, seed each missing or dangling tool from the runner's
+    # toolchain, and say so; the package this run produces bootstraps itself.
+    - name: Seed bootstrap tools from the host when the SDK asset cannot bootstrap
+      if: steps.sdk-cache.outputs.cache-hit != 'true'
+      shell: bash
+      env:
+        SDK_BOOTSTRAP_PREFIX: .deps/llvm-22.1.6-${{ inputs.host-tag }}
+      run: |
+        set -euo pipefail
+        exe=""
+        if [[ "$RUNNER_OS" == Windows ]]; then
+          exe=".exe"
+          export PATH="/c/Program Files/LLVM/bin:$PATH"
+          command -v ninja >/dev/null 2>&1 || choco install ninja -y --no-progress >/dev/null
+        fi
+        mkdir -p "$SDK_BOOTSTRAP_PREFIX/bin"
+        usable() {
+          local tool="$1" path="$SDK_BOOTSTRAP_PREFIX/bin/$tool$exe"
+          [[ -x "$(readlink -f "$path" 2>/dev/null || echo /nonexistent)" ]] || return 1
+          if [[ "$tool" == cmake ]]; then
+            ls -d "$SDK_BOOTSTRAP_PREFIX"/share/cmake-*/Modules >/dev/null 2>&1 || return 1
+          fi
+          return 0
+        }
+        for tool in clang clang++ cmake ninja; do
+          if usable "$tool"; then continue; fi
+          host="$(command -v "$tool" || true)"
+          if [[ -z "$host" ]]; then
+            echo "source-sdk: the SDK asset cannot bootstrap ($tool missing or dangling) and the runner has no $tool to seed from" >&2
+            exit 1
+          fi
+          rm -f "$SDK_BOOTSTRAP_PREFIX/bin/$tool$exe"
+          cp -f "$host" "$SDK_BOOTSTRAP_PREFIX/bin/$tool$exe"
+          echo "source-sdk: bootstrap $tool seeded from the runner ($host): the SDK asset cannot bootstrap; the package this run produces will"
+        done
+
     - name: Build and package SDK from source
       if: steps.sdk-cache.outputs.cache-hit != 'true'
       shell: bash

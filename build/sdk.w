@@ -447,8 +447,13 @@ fn sdk_package_tool_selected(rel: &str, platform: &str) -> bool:
         tools.push("bin/ctest.exe")
         tools.push("bin/cpack.exe")
     else:
+        // LLVM installs the driver as `clang-<major>` and links `clang` and
+        // `clang++` to it. A package that keeps the links without their
+        // target cannot bootstrap the next SDK (the v0.15.1 linux x86_64
+        // asset: `bin/clang -> clang-22`, no clang-22) — select all three.
         tools.push("bin/clang")
         tools.push("bin/clang++")
+        tools.push(sdk_clang_driver_rel())
         tools.push("bin/cmake")
         tools.push("bin/ninja")
         tools.push("bin/ctest")
@@ -461,6 +466,28 @@ fn sdk_package_tool_selected(rel: &str, platform: &str) -> bool:
         if rel == tools[i]:
             return true
     false
+
+// The versioned clang driver binary the `clang`/`clang++` links resolve to.
+fn sdk_clang_driver_rel() -> str: "bin/clang-" ++ COMPILER_LLVM_VERSION.split(".")[0]
+
+// Everything the next SDK build needs from this package as its bootstrap
+// (sdk_validate_staged_paths asks for exactly these): the compiler driver,
+// its links, CMake with its module tree, and Ninja.
+fn sdk_bootstrap_set(platform: &str) -> Vec[str]:
+    let set: Vec[str] = Vec.new()
+    if sdk_platform_is_windows(platform):
+        set.push("bin/clang.exe")
+        set.push("bin/clang++.exe")
+        set.push("bin/cmake.exe")
+        set.push("bin/ninja.exe")
+    else:
+        set.push("bin/clang")
+        set.push("bin/clang++")
+        set.push(sdk_clang_driver_rel())
+        set.push("bin/cmake")
+        set.push("bin/ninja")
+    set.push(sdk_cmake_data_prefix() ++ "Modules/CMakeDetermineSystem.cmake")
+    set
 
 fn sdk_file_mode(rel: &str) -> i32:
     if rel.starts_with("bin/"):
@@ -546,6 +573,12 @@ pub fn run_package_llvm_sdk_action(ctx: ActionCtx) -> i32:
         return sdk_fail(ctx, "SDK archive selection omitted required libraries or linkers")
     if not selected.contains(sdk_base ++ "/" ++ sdk_cmake_data_prefix() ++ "Modules/CMake.cmake\n"):
         return sdk_fail(ctx, "SDK archive selection omitted CMake runtime modules")
+    // The archive is the next build's bootstrap; a package that cannot
+    // bootstrap is not an SDK, whatever else it contains.
+    let bootstrap = sdk_bootstrap_set(platform)
+    for i in 0..bootstrap.len() as i32:
+        if not selected.contains(sdk_base ++ "/" ++ bootstrap[i] ++ "\n"):
+            return sdk_fail(ctx, "SDK archive cannot bootstrap the next SDK build: missing " ++ bootstrap[i] ++ " (the staged prefix lacks it, or the selection skipped it)")
     let source_libs = ctx.fs().list_files(sdk_join(prefix, "lib/"))
     for i in 0..source_libs.len() as i32:
         let rel = sdk_rel_path(prefix, source_libs[i])
@@ -844,6 +877,17 @@ pub fn run_sdk_contract_tests_action(ctx: ActionCtx) -> i32:
             assert(sdk_package_tool_selected("bin/lld", platform))
             assert(sdk_is_unix_lld_alias("bin/wasm-ld"))
             assert(not sdk_package_tool_selected("bin/wasm-ld.exe", platform))
+            // The driver the `clang` links point to ships with them.
+            assert(sdk_clang_driver_rel() == "bin/clang-22")
+            assert(sdk_package_tool_selected("bin/clang-22", platform))
+            assert(not sdk_package_tool_selected("bin/clang-21", platform))
+        let bootstrap = sdk_bootstrap_set(platform)
+        for bi in 0..bootstrap.len() as i32:
+            let item = bootstrap[bi]
+            if item.starts_with("bin/"):
+                assert(sdk_package_tool_selected(item, platform))
+            else:
+                assert(item.starts_with(sdk_cmake_data_prefix()))
     assert(sdk_host_tag_for_platform("windows-aarch64") == "windows-aarch64-msvc")
     // Cross the input-buffer boundary and include every byte value, an
     // empty file, executable mode, USTAR prefix paths for CMake modules,
