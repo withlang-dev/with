@@ -228,6 +228,13 @@ impl AstPool:
     fn ct_empty_block(node: i32) -> i32:
         self.add_node(NodeKind.NK_BLOCK, self.get_start(node), self.get_end(node), self.extra_len(), 0, 0) as i32
 
+// A string literal the transform emits holds ALREADY-DECODED bytes; the
+// parser's raw marker (Parser.parse_string_literal) tells every decoder to
+// take them as written (#1246: a `const r#"a\"b"#` was decoded twice).
+fn ct_raw_literal_text(decoded: &str) -> str:
+    if decoded.starts_with("\x01raw\x01"): return decoded.clone()
+    "\x01raw\x01" ++ decoded
+
 fn ct_fresh_sym(intern: InternPool, prefix: &str, seed: i32) -> i32:
     intern.intern(prefix ++ f"{seed}" ++ "_" ++ f"{intern.symbol_count() + 1}")
 
@@ -437,7 +444,9 @@ impl Sema:
                 0
             ) as i32
         if value.kind == ComptimeValueKind.CV_STR:
-            let sym = intern.intern(value.text)
+            // #1246: the value's bytes are already decoded; the literal must
+            // carry the raw marker or codegen decodes `\"` a second time.
+            let sym = intern.intern(ct_raw_literal_text(value.text))
             return pool.add_node(NodeKind.NK_STRING_LIT, pool.get_start(node), pool.get_end(node), sym, 0, 0) as i32
         if value.kind == ComptimeValueKind.CV_VOID:
             return pool.ct_empty_block(node)
@@ -1455,7 +1464,7 @@ impl AstPool:
         self.add_node(NodeKind.NK_BOOL_LIT, self.get_start(node), self.get_end(node), if value: 1 else: 0, 0, 0) as i32
 
     fn ct_build_string_lit(intern: InternPool, node: i32, value: &str) -> i32:
-        self.add_node(NodeKind.NK_STRING_LIT, self.get_start(node), self.get_end(node), intern.intern(value), 0, 0) as i32
+        self.add_node(NodeKind.NK_STRING_LIT, self.get_start(node), self.get_end(node), intern.intern(ct_raw_literal_text(value)), 0, 0) as i32
 
     fn ct_build_binary(node: i32, op: i32, lhs: i32, rhs: i32) -> i32:
         self.add_node(NodeKind.NK_BINARY, self.get_start(node), self.get_end(node), op, lhs, rhs) as i32
