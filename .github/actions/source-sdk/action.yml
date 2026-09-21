@@ -72,6 +72,13 @@ runs:
             [[ -n "$cand" ]] || continue
             [[ -f "$cand" ]] || cand="$cand$exe"
             [[ -f "$cand" ]] || continue
+            # A Chocolatey shim only runs beside its .shim sidecar; seed the
+            # real executable it names.
+            if [[ -f "${cand%.exe}.shim" ]]; then
+              target="$(rg -o '^path *= *.*' "${cand%.exe}.shim" | head -1 | cut -d= -f2- | tr -d ' \r')"
+              [[ -n "$target" ]] && cand="$(cygpath -u "$target")"
+              [[ -f "$cand" ]] || continue
+            fi
             case "$(readlink -f "$cand")" in "$prefix_real"/*) continue;; esac
             printf '%s\n' "$cand"
             return 0
@@ -104,6 +111,14 @@ runs:
             ln -s "$real" "$seed/bin/$tool$exe"
           fi
           echo "source-sdk: bootstrap $tool seeded from the runner ($real) into $seed: the fetched SDK cannot bootstrap"
+        done
+        # A seed that cannot run is a failure here, with its name, not an
+        # opaque configure error later.
+        for tool in clang cmake ninja; do
+          if ! "$seed/bin/$tool$exe" --version >/dev/null 2>&1; then
+            echo "source-sdk: seeded $tool does not run ($seed/bin/$tool$exe --version failed)" >&2
+            exit 1
+          fi
         done
 
     - name: Build and package SDK from source
