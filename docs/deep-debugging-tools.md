@@ -125,6 +125,27 @@ parallel start/count storage, canonical argument-node validity, and non-collidin
 64-bit keys across the former 16-bit AST-node boundary. The command exits nonzero
 on any violation.
 
+`audit:pool-views` (also in `audit:all`, #1323) finds a reference into a
+growable pool that is still read after the pool may have grown — the
+`let name = intern.resolve(sym)` … `intern.intern(…)` … `name ++ …` shape that
+segfaulted the release compiler. `InternPool` lives behind a Copy `*mut`
+handle, so the ordinary view-invalidation check cannot see the aliasing; the
+audit derives every role from the live MIR instead of names: a *pool field* is
+the `F` in `<place>.F[i]` whose element some body returns a `ref` to (through
+`copy` chains to `_0`); a *producer* is that body or any body whose result is
+a producer's result (`InternPool.resolve_symbol`, `resolve`,
+`Sema.pool_resolve`, …); a *grower* is a body that passes a place ending in a
+pool field as the receiver of a `mut fn` or mutating container intrinsic
+(`symbol_texts.push`) or assigns the field, plus everything that reaches one
+over the MIR call graph; a *hit* is a local holding a producer's result that is
+read, passed, or written through after a call to a grower with no reassignment
+in between, on any CFG path. Each violation names the function, the binding,
+the producer, the source line, the call that poisons the view and the direct
+grower it reaches. Fix by owning the text at the binding
+(`intern.resolve(sym).clone()`) or finishing with the view before the call. Not
+covered: a view stored into an aggregate, a view from a builtin (`Vec.get`),
+and a view into a container the function itself owns (`&Vec[str]` parameter).
+
 Cost: instant on a repro; on the compiler itself (`analyze src/main.w
 audit:all`, the batch-tier step) about 170 s and 20 GB resident at 12033103.
 It is a batch-tier gate, not a per-edit one.

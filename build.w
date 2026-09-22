@@ -1508,6 +1508,32 @@ fn deep_debug_analyze_expect(ctx: &ActionCtx, root: &str, compiler: &str, source
         return 1
     0
 
+// An audit fixture with a planted defect: the audit must exit nonzero, name
+// the defect (`needle`) and stay silent about the clean cases (`absent`). A
+// green verdict over the planted defect is the failure this guards.
+fn deep_debug_analyze_expect_violation(ctx: &ActionCtx, root: &str, compiler: &str, source_path: &str, out_dir: &str, name: &str, request: &str, needle: &str, absent: &str) -> i32:
+    let args: Vec[str] = Vec.new()
+    args.push(build_owned_text(compiler))
+    args.push("analyze")
+    args.push(build_owned_text(source_path))
+    args.push(build_owned_text(request))
+    let stdout_rel = build_project_join(out_dir, name ++ ".stdout")
+    let stderr_rel = build_project_join(out_dir, name ++ ".stderr")
+    let stdout_path = build_project_abs(root, stdout_rel)
+    let stderr_path = build_project_abs(root, stderr_rel)
+    let result = ctx.process_runner().run_capture_cwd(args, stdout_path, stderr_path, 120000, root)
+    if result.rc == 0:
+        ctx.diagnostics().error(f"deep-debug-tool-tests: {name} passed over a planted defect; stdout={stdout_path}")
+        return 1
+    let text = ctx.fs().read_text(stdout_rel)
+    if not text.contains(needle):
+        ctx.diagnostics().error("deep-debug-tool-tests: " ++ name ++ " report missing '" ++ needle ++ "'; stdout=" ++ stdout_path)
+        return 1
+    if text.contains(absent):
+        ctx.diagnostics().error("deep-debug-tool-tests: " ++ name ++ " flagged the clean case '" ++ absent ++ "'; stdout=" ++ stdout_path)
+        return 1
+    0
+
 fn run_deep_debug_tool_tests_action(ctx: ActionCtx) -> i32:
     let inputs = ctx.inputs()
     if inputs.len() == 0:
@@ -1677,6 +1703,42 @@ fn run_deep_debug_tool_tests_action(ctx: ActionCtx) -> i32:
         ctx.diagnostics().error("deep-debug-tool-tests: could not write rebind fixture")
         return 1
     if deep_debug_analyze_expect(ctx, root, compiler, build_project_abs(root, rebind_input), out_dir, "analyze-audit-rebind", "audit:all", "violations=0 ok") != 0:
+        return 1
+    // #1323: `InternPool.resolve` hands out a view into `symbol_texts`; a
+    // binding read after anything that interns is a use-after-free (the
+    // release compiler segfaulted in ct_generate_debug_derive). The pool sits
+    // behind a Copy `*mut` handle, so the view-invalidation check cannot see
+    // the aliasing; audit:pool-views finds it on the live MIR call graph.
+    // `dangling` is the defect; `safe` finishes with the view before
+    // interning and `reads_only` crosses only non-growing calls.
+    let pool_view_input = build_project_join(out_dir, "pool-view-input.w")
+    let pool_view_source =
+        "use InternPool\n\n" ++
+        "fn dangling(pool: InternPool, sym: i32) -> str:\n" ++
+        "    let name = pool.resolve(sym)\n" ++
+        "    pool.intern(\"fresh\")\n" ++
+        "    name ++ \"!\"\n\n" ++
+        "fn safe(pool: InternPool, sym: i32) -> str:\n" ++
+        "    let name = pool.resolve(sym)\n" ++
+        "    let owned = name ++ \"!\"\n" ++
+        "    pool.intern(\"fresh\")\n" ++
+        "    owned\n\n" ++
+        "fn reads_only(pool: InternPool, sym: i32) -> i32:\n" ++
+        "    let name = pool.resolve(sym)\n" ++
+        "    let n = pool.symbol_count()\n" ++
+        "    name.len() as i32 + n\n\n" ++
+        "fn main:\n" ++
+        "    let pool = InternPool.new()\n" ++
+        "    let s = pool.intern(\"a\")\n" ++
+        "    print(safe(pool, s))\n" ++
+        "    print(f\"{reads_only(pool, s)}\")\n" ++
+        "    print(dangling(pool, s))\n"
+    if fs.write_text(pool_view_input, pool_view_source) != 0:
+        ctx.diagnostics().error("deep-debug-tool-tests: could not write pool-view fixture")
+        return 1
+    if deep_debug_analyze_expect_violation(ctx, root, compiler, build_project_abs(root, pool_view_input), out_dir, "analyze-pool-views", "audit:pool-views", "pool-view: dangling: `name`", "pool-view: safe") != 0:
+        return 1
+    if deep_debug_analyze_expect_violation(ctx, root, compiler, build_project_abs(root, pool_view_input), out_dir, "analyze-pool-views-in-all", "audit:all", "pool-view: dangling: `name`", "pool-view: reads_only") != 0:
         return 1
     // D5 superseded: a read-only free parameter is owned, not share-place —
     // callee-place-alias marshalling survives only on receivers (D12), so the

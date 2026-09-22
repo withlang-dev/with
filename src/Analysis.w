@@ -10,6 +10,7 @@ use Mir
 use Sema
 
 extern fn with_str_clone_ref(s: &str) -> str
+extern fn with_getenv_str(name: &str) -> str
 
 pub type CompilerAnalysisResult {
     text: str,
@@ -1296,6 +1297,393 @@ fn analysis_audit_phase(report: &AnalysisReport, sema: &Sema, mir_mod: &MirModul
             report.fail(f"specialization {si}: no prelowered MIR body for mono={mono}")
     analysis_audit_frozen_calls(report, sema, mir_mod)
 
+// audit:pool-views (#1323). A pool view is a reference a function hands out
+// into an element of a growable container it does not own:
+// `InternPool.resolve_symbol` returns `&self.state.symbol_texts[sym]`, and the
+// container's next growth frees the buffer the view points into. Every
+// binding of such a view that is still read after anything that can grow the
+// container is a use-after-free inside the compiler (the release binary
+// segfaulted in `ct_generate_debug_derive` this way). The audit derives every
+// role from the live MIR and the live call graph, never from a name:
+//   pool field  F: the field in `<place>.F[i]` whose element some body
+//                  returns a `ref` to (through `copy` chains to `_0`);
+//   producer:      such a body, or one whose `_0` is the result of a call to
+//                  a producer (`InternPool.resolve`, `Sema.pool_resolve`, …);
+//   grower:        a body that passes a place ending in F as the receiver of a
+//                  `mut fn` / mutating container intrinsic (`symbol_texts.push`)
+//                  or assigns the whole field, plus every body that can reach
+//                  one over the MIR call graph;
+//   hit:           a local holding a producer's result (through `copy`
+//                  chains) that is read — or written through — after a call to
+//                  a grower with no reassignment in between, on any CFG path.
+// Out of scope, by design: a view stored into an aggregate or returned by a
+// builtin (`Vec.get`), and a view into a container the function owns (the
+// caller's `&Vec[str]` parameter) — those are not pool views.
+
+fn analysis_place_local(body: &MirBody, place: i32) -> i32:
+    if place < 0 or place >= body.place_locals.len() as i32: return -1
+    body.place_locals[place]
+
+fn analysis_operand_local(body: &MirBody, operand: i32) -> i32:
+    if operand < 0 or operand >= body.operand_kinds.len() as i32: return -1
+    if body.operand_kinds[operand] == OperandKind.OK_CONSTANT: return -1
+    analysis_place_local(body, body.operand_d0[operand])
+
+// `_a = copy _b` with no projection on either side: the bare source local.
+fn analysis_rvalue_bare_copy_local(body: &MirBody, rv: i32) -> i32:
+    if rv < 0 or rv >= body.rval_kinds.len() as i32 or body.rval_kinds[rv] != RvalueKind.RK_USE: return -1
+    let operand = body.rval_d0[rv]
+    if operand < 0 or operand >= body.operand_kinds.len() as i32 or body.operand_kinds[operand] == OperandKind.OK_CONSTANT: return -1
+    let place = body.operand_d0[operand]
+    if place < 0 or place >= body.place_locals.len() as i32 or body.place_proj_counts[place] != 0: return -1
+    body.place_locals[place]
+
+// The field token F of the innermost `<base>.F[i]` in a place, else -1.
+fn analysis_place_indexed_field(body: &MirBody, place: i32) -> i32:
+    if place < 0 or place >= body.place_locals.len() as i32: return -1
+    let start = body.place_proj_starts[place]
+    var j = body.place_proj_counts[place] - 1
+    while j > 0:
+        if body.proj_kinds[start + j] == ProjKind.PK_INDEX:
+            return if body.proj_kinds[start + j - 1] == ProjKind.PK_FIELD: body.proj_d0[start + j - 1] else: -1
+        j = j - 1
+    -1
+
+// The field token when a place ends in `.F`, else -1.
+fn analysis_place_last_field(body: &MirBody, place: i32) -> i32:
+    if place < 0 or place >= body.place_locals.len() as i32: return -1
+    let count = body.place_proj_counts[place]
+    if count <= 0: return -1
+    let last = body.place_proj_starts[place] + count - 1
+    if body.proj_kinds[last] != ProjKind.PK_FIELD: return -1
+    body.proj_d0[last]
+
+// Callee of a call terminator: the `const fn` operand, else the recorded
+// contract (specialization mono, then signature symbol). 0 for indirect calls.
+fn analysis_call_callee_sym(body: &MirBody, sema: &Sema, bb: i32) -> i32:
+    let fn_operand = body.term_data0(bb)
+    if fn_operand >= 0 and fn_operand < body.operand_kinds.len() as i32 and body.operand_kinds[fn_operand] == OperandKind.OK_CONSTANT:
+        let c = body.operand_d0[fn_operand]
+        if c >= 0 and c < body.const_kinds.len() as i32 and body.const_kinds[c] == ConstKind.CK_FN and body.const_d0[c] != 0:
+            return body.const_d0[c]
+    let args_id = body.term_data1(bb)
+    let mono = body.call_mono_sym(args_id)
+    if mono != 0: return mono
+    let sig = body.call_sig_index(args_id)
+    if sig >= 0 and sig < sema.sig_names.len() as i32: return sema.sig_names[sig]
+    0
+
+fn analysis_operand_list_locals(body: &MirBody, start: i32, count: i32, operands: &Vec[i32]) -> Vec[i32]:
+    let out: Vec[i32] = Vec.new()
+    for i in 0..count:
+        let opi = start + i
+        if opi >= 0 and opi < operands.len() as i32:
+            out.push(analysis_operand_local(body, operands[opi]))
+    out
+
+// Every local an rvalue reads (as a bare operand or as the base of a place).
+fn analysis_rvalue_read_locals(body: &MirBody, rv: i32) -> Vec[i32]:
+    let out: Vec[i32] = Vec.new()
+    if rv < 0 or rv >= body.rval_kinds.len() as i32: return out
+    let k = body.rval_kinds[rv]
+    let d0 = body.rval_d0[rv]
+    let d1 = body.rval_d1[rv]
+    let d2 = body.rval_d2[rv]
+    if k == RvalueKind.RK_USE or k == RvalueKind.RK_CAST or k == RvalueKind.RK_ARRAY_FILL:
+        out.push(analysis_operand_local(body, d0))
+    else if k == RvalueKind.RK_BIN_OP:
+        out.push(analysis_operand_local(body, d1))
+        out.push(analysis_operand_local(body, d2))
+    else if k == RvalueKind.RK_UN_OP:
+        out.push(analysis_operand_local(body, d1))
+    else if k == RvalueKind.RK_REF:
+        out.push(analysis_place_local(body, d1))
+    else if k == RvalueKind.RK_ADDR_OF or k == RvalueKind.RK_DISCRIMINANT or k == RvalueKind.RK_LEN:
+        out.push(analysis_place_local(body, d0))
+    else if k == RvalueKind.RK_SLICE:
+        out.push(analysis_place_local(body, d0))
+        out.push(analysis_operand_local(body, d1))
+        out.push(analysis_operand_local(body, d2))
+    else if k == RvalueKind.RK_AGGREGATE:
+        if d1 >= 0 and d1 < body.agg_field_starts.len() as i32:
+            return analysis_operand_list_locals(body, body.agg_field_starts[d1], body.agg_field_counts[d1], body.agg_field_operands)
+    else if k == RvalueKind.RK_STR_CONCAT_N:
+        if d0 >= 0 and d0 < body.call_arg_starts.len() as i32:
+            return analysis_operand_list_locals(body, body.call_arg_starts[d0], body.call_arg_counts[d0], body.call_arg_operands)
+    out
+
+// Every local a terminator reads: the switch subject, the call arguments.
+fn analysis_term_read_locals(body: &MirBody, bb: i32) -> Vec[i32]:
+    let out: Vec[i32] = Vec.new()
+    let kind = body.term_kind(bb)
+    if kind == TermKind.TK_SWITCH_INT:
+        out.push(analysis_operand_local(body, body.term_data0(bb)))
+    else if kind == TermKind.TK_CALL:
+        let args_id = body.term_data1(bb)
+        if args_id >= 0 and args_id < body.call_arg_starts.len() as i32:
+            return analysis_operand_list_locals(body, body.call_arg_starts[args_id], body.call_arg_counts[args_id], body.call_arg_operands)
+    out
+
+fn analysis_term_successors(body: &MirBody, bb: i32) -> Vec[i32]:
+    let out: Vec[i32] = Vec.new()
+    let kind = body.term_kind(bb)
+    if kind == TermKind.TK_GOTO:
+        out.push(body.term_data0(bb))
+    else if kind == TermKind.TK_CALL:
+        out.push(body.term_data3(bb))
+    else if kind == TermKind.TK_DROP_AND_GOTO:
+        out.push(body.term_data1(bb))
+    else if kind == TermKind.TK_SWITCH_INT:
+        let table = body.term_data1(bb)
+        if table >= 0 and table < body.switch_table_starts.len() as i32:
+            let start = body.switch_table_starts[table]
+            for i in 0..body.switch_table_counts[table]:
+                if start + i < body.switch_table_targets.len() as i32: out.push(body.switch_table_targets[start + i])
+        out.push(body.term_data2(bb))
+    out
+
+// Per local: `origin` 0 = not a view; -1 = a direct `ref` into a pool field
+// element; >0 = the producer whose call result it holds. `field` is the pool
+// field token the view points into (a producer's is its own field). Bare
+// `copy` chains inherit both. With `any_field`, every indexed field counts
+// (producer discovery); otherwise only the known pool fields.
+type PoolViewOrigins { origin: Vec[i32], field: Vec[i32] }
+
+fn analysis_pool_view_locals(body: &MirBody, sema: &Sema, producers: &HashMap[i32, i32], fields: &HashMap[i32, i32], any_field: bool) -> PoolViewOrigins:
+    var origin: Vec[i32] = Vec.new()
+    var field: Vec[i32] = Vec.new()
+    for li in 0..body.local_count():
+        origin.push(0)
+        field.push(-1)
+    for bb in 0..body.block_count():
+        if body.term_kind(bb) != TermKind.TK_CALL: continue
+        let callee = analysis_call_callee_sym(body, sema, bb)
+        if callee == 0 or not producers.contains(callee): continue
+        let dest = body.term_data2(bb)
+        if dest >= 0 and dest < body.place_locals.len() as i32 and body.place_proj_counts[dest] == 0:
+            origin[body.place_locals[dest]] = callee
+            field[body.place_locals[dest]] = producers.get(callee).unwrap()
+    for si in 0..body.stmt_count():
+        if body.stmt_kind(si) != StmtKind.Assign: continue
+        let dest = body.stmt_data0(si)
+        if dest < 0 or dest >= body.place_locals.len() as i32 or body.place_proj_counts[dest] != 0: continue
+        let rv = body.stmt_data1(si)
+        if rv < 0 or rv >= body.rval_kinds.len() as i32 or body.rval_kinds[rv] != RvalueKind.RK_REF: continue
+        let token = analysis_place_indexed_field(body, body.rval_d1[rv])
+        if token < 0 or not (any_field or fields.contains(token)): continue
+        origin[body.place_locals[dest]] = -1
+        field[body.place_locals[dest]] = token
+    var changed = true
+    while changed:
+        changed = false
+        for si in 0..body.stmt_count():
+            if body.stmt_kind(si) != StmtKind.Assign: continue
+            let dest = body.stmt_data0(si)
+            if dest < 0 or dest >= body.place_locals.len() as i32 or body.place_proj_counts[dest] != 0: continue
+            let src = analysis_rvalue_bare_copy_local(body, body.stmt_data1(si))
+            if src < 0 or origin[src] == 0: continue
+            let dl = body.place_locals[dest]
+            if origin[dl] == 0:
+                origin[dl] = origin[src]
+                field[dl] = field[src]
+                changed = true
+    PoolViewOrigins { origin, field }
+
+// The pool fields a body grows directly: it mutates a place ending in the
+// field in place (receiver of a `mut fn`/`move fn`, or a mutating container
+// intrinsic) or assigns the whole field.
+fn analysis_body_grown_fields(body: &MirBody, sema: &Sema, fields: &HashMap[i32, i32]) -> Vec[i32]:
+    let grown: Vec[i32] = Vec.new()
+    for bb in 0..body.block_count():
+        if body.term_kind(bb) != TermKind.TK_CALL: continue
+        let args_id = body.term_data1(bb)
+        if args_id < 0 or args_id >= body.call_arg_starts.len() as i32 or body.call_arg_counts[args_id] == 0: continue
+        let receiver = body.call_arg_operands[body.call_arg_starts[args_id]]
+        if receiver < 0 or receiver >= body.operand_kinds.len() as i32 or body.operand_kinds[receiver] == OperandKind.OK_CONSTANT: continue
+        let field = analysis_place_last_field(body, body.operand_d0[receiver])
+        if field < 0 or not fields.contains(field) or grown.contains(field): continue
+        let intrinsic = body.call_intrinsic(args_id)
+        if intrinsic == MirIntrinsic.VEC_PUSH or intrinsic == MirIntrinsic.VEC_SET or intrinsic == MirIntrinsic.VEC_REMOVE or
+                intrinsic == MirIntrinsic.VEC_CLEAR or intrinsic == MirIntrinsic.VEC_POP or intrinsic == MirIntrinsic.MAP_INSERT or
+                intrinsic == MirIntrinsic.MAP_REMOVE or intrinsic == MirIntrinsic.MAP_CLEAR:
+            grown.push(field)
+            continue
+        let sig = body.call_sig_index(args_id)
+        if sig >= 0:
+            let mode = sema.sig_receiver_mode(sig)
+            if mode == ReceiverMode.Mut or mode == ReceiverMode.Move: grown.push(field)
+    for si in 0..body.stmt_count():
+        if body.stmt_kind(si) != StmtKind.Assign: continue
+        let field = analysis_place_last_field(body, body.stmt_data0(si))
+        if field >= 0 and fields.contains(field) and not grown.contains(field): grown.push(field)
+    grown
+
+fn analysis_local_label(body: &MirBody, sema: &Sema, li: i32) -> str:
+    let sym = if li >= 0 and li < body.local_names.len() as i32: body.local_names[li] else: 0
+    if sym != 0: return "`" ++ sema.pool_resolve(sym) ++ f"` (_{li})"
+    f"_{li}"
+
+fn analysis_audit_pool_views(report: &AnalysisReport, sema: &Sema, mir_mod: &MirModule, source_path: &str, source_text: &str):
+    let bodies = mir_mod.bodies.len() as i32
+    // 1. Producers and pool fields, to a fixpoint over wrapper chains.
+    let fields: HashMap[i32, i32] = HashMap.new()
+    var field_list: Vec[i32] = Vec.new()
+    let producers: HashMap[i32, i32] = HashMap.new()
+    var changed = true
+    while changed:
+        changed = false
+        for bi in 0..bodies:
+            let body = &mir_mod.bodies[bi]
+            if body.lowering_failed != 0 or producers.contains(body.fn_sym) or body.local_count() == 0: continue
+            let ret_ty = body.local_type_ids[0]
+            if ret_ty <= 0 or sema.get_type_kind(sema.resolve_alias(ret_ty as TypeId)) != TypeKind.TY_REF: continue
+            let views = analysis_pool_view_locals(body, sema, producers, fields, true)
+            if views.origin[0] != 0 and views.field[0] >= 0:
+                producers.insert(body.fn_sym, views.field[0])
+                if not fields.contains(views.field[0]):
+                    fields.insert(views.field[0], 1)
+                    field_list.push(views.field[0])
+                report.note("pool-views: producer " ++ sema.pool_resolve(body.fn_sym) ++ f" (field token {views.field[0]})" ++ (if views.origin[0] > 0: " via " ++ sema.pool_resolve(views.origin[0]) else: ""))
+                changed = true
+    // 2. Growers: direct mutators of a pool field, then everything that can
+    //    reach one over the live call graph, per field (forward fixpoint keyed
+    //    on (body, field); each entry remembers the direct grower it reaches,
+    //    for the report). Growing one pool never invalidates a view into
+    //    another.
+    let reaches: HashMap[i64, i32] = HashMap.new()
+    var direct = 0
+    for bi in 0..bodies:
+        let body = &mir_mod.bodies[bi]
+        if body.lowering_failed != 0: continue
+        let grown = analysis_body_grown_fields(body, sema, fields)
+        for gi in 0..grown.len() as i32:
+            reaches.insert(sema_pair_key(body.fn_sym, grown[gi]), body.fn_sym)
+            report.note("pool-views: grower " ++ sema.pool_resolve(body.fn_sym) ++ f" (field token {grown[gi]})")
+            direct = direct + 1
+    changed = true
+    while changed:
+        changed = false
+        for bi in 0..bodies:
+            let body = &mir_mod.bodies[bi]
+            if body.lowering_failed != 0: continue
+            for bb in 0..body.block_count():
+                if body.term_kind(bb) != TermKind.TK_CALL: continue
+                let callee = analysis_call_callee_sym(body, sema, bb)
+                if callee == 0: continue
+                for fi in 0..field_list.len() as i32:
+                    let key = sema_pair_key(callee, field_list[fi])
+                    if reaches.contains(key) and not reaches.contains(sema_pair_key(body.fn_sym, field_list[fi])):
+                        reaches.insert(sema_pair_key(body.fn_sym, field_list[fi]), reaches.get(key).unwrap())
+                        changed = true
+    // 3. Hits: forward dataflow per body. State per (block, local) is the
+    //    callee that poisoned the view (0 = clean); a call that reaches a
+    //    grower of the view's field poisons the local, a bare assignment to
+    //    it clears it, a read while poisoned is a violation. Union at joins;
+    //    smallest callee wins so the report is deterministic.
+    var view_locals = 0
+    var hits = 0
+    let trace = with_getenv_str("WITH_ANALYZE_TRACE") == "pool-views"
+    for bi in 0..bodies:
+        let body = &mir_mod.bodies[bi]
+        if body.lowering_failed != 0: continue
+        let views = analysis_pool_view_locals(body, sema, producers, fields, false)
+        let origin = views.origin
+        let field = views.field
+        let locals = body.local_count()
+        var any = false
+        for li in 0..locals:
+            if origin[li] != 0:
+                any = true
+                view_locals = view_locals + 1
+        if not any: continue
+        let blocks = body.block_count()
+        var state: Vec[i32] = Vec.new()
+        for i in 0..blocks * locals: state.push(0)
+        let seen: HashMap[i32, i32] = HashMap.new()
+        let fn_name = with_str_clone_ref(sema.pool_resolve(body.fn_sym))
+        let fn_path = analysis_sig_path(sema, body.fn_sym, source_path)
+        let fn_source = analysis_source_for_path(sema, fn_path, source_text)
+        var worklist: Vec[i32] = Vec.new()
+        var queued: Vec[i32] = Vec.new()
+        var visited: Vec[i32] = Vec.new()
+        for bb in 0..blocks:
+            queued.push(0)
+            visited.push(0)
+        worklist.push(0)
+        queued[0] = 1
+        var wi = 0
+        while wi < worklist.len() as i32:
+            let bb = worklist[wi]
+            wi = wi + 1
+            queued[bb] = 0
+            visited[bb] = 1
+            var cur: Vec[i32] = Vec.new()
+            for li in 0..locals: cur.push(state[bb * locals + li])
+            if trace:
+                var in_text = ""
+                for li in 0..locals:
+                    if origin[li] != 0: in_text = in_text ++ f" _{li}:origin={origin[li]},poison={cur[li]}"
+                report.note(f"pool-views-trace: {fn_name} bb{bb} term={body.term_kind(bb)} callee={analysis_call_callee_sym(body, sema, bb)} in=[{in_text} ]")
+            let stmt_start = body.bb_stmt_starts[bb]
+            for k in 0..body.bb_stmt_counts[bb]:
+                let si = stmt_start + k
+                if body.stmt_kind(si) != StmtKind.Assign: continue
+                var reads = analysis_rvalue_read_locals(body, body.stmt_data1(si))
+                let dest = body.stmt_data0(si)
+                let dest_local = analysis_place_local(body, dest)
+                if dest_local >= 0 and body.place_proj_counts[dest] != 0: reads.push(dest_local)
+                if trace:
+                    var reads_text = ""
+                    for ri in 0..reads.len() as i32: reads_text = reads_text ++ f" {reads[ri]}"
+                    report.note(f"pool-views-trace:   stmt {si} dest=_{dest_local} rvalue-kind={body.rval_kinds[body.stmt_data1(si)]} reads=[{reads_text} ]")
+                for ri in 0..reads.len() as i32:
+                    let li = reads[ri]
+                    if li >= 0 and origin[li] != 0 and cur[li] != 0 and not seen.contains(li):
+                        seen.insert(li, 1)
+                        hits = hits + 1
+                        report.fail(analysis_pool_view_hit(sema, body, fn_name, fn_path, fn_source, li, origin[li], "read", body.stmt_spans[si], cur[li], reaches.get(sema_pair_key(cur[li], field[li])).unwrap()))
+                if dest_local >= 0 and body.place_proj_counts[dest] == 0: cur[dest_local] = 0
+            let term_reads = analysis_term_read_locals(body, bb)
+            for ri in 0..term_reads.len() as i32:
+                let li = term_reads[ri]
+                if li >= 0 and origin[li] != 0 and cur[li] != 0 and not seen.contains(li):
+                    seen.insert(li, 1)
+                    hits = hits + 1
+                    report.fail(analysis_pool_view_hit(sema, body, fn_name, fn_path, fn_source, li, origin[li], "passed", body.bb_term_spans[bb], cur[li], reaches.get(sema_pair_key(cur[li], field[li])).unwrap()))
+            if body.term_kind(bb) == TermKind.TK_CALL:
+                let callee = analysis_call_callee_sym(body, sema, bb)
+                if callee != 0:
+                    for li in 0..locals:
+                        if origin[li] != 0 and (cur[li] == 0 or callee < cur[li]) and reaches.contains(sema_pair_key(callee, field[li])): cur[li] = callee
+                let dest = body.term_data2(bb)
+                let dest_local = analysis_place_local(body, dest)
+                if dest_local >= 0 and body.place_proj_counts[dest] == 0: cur[dest_local] = 0
+            let succs = analysis_term_successors(body, bb)
+            for sx in 0..succs.len() as i32:
+                let nb = succs[sx]
+                if nb < 0 or nb >= blocks: continue
+                var grew = false
+                for li in 0..locals:
+                    let have = state[nb * locals + li]
+                    if cur[li] != 0 and (have == 0 or cur[li] < have):
+                        state[nb * locals + li] = cur[li]
+                        grew = true
+                // An unvisited block is processed once even with a clean
+                // in-state (the first run of this pass queued only on growth
+                // and audited bb0 alone — silent over the planted defect).
+                if (grew or visited[nb] == 0) and queued[nb] == 0:
+                    queued[nb] = 1
+                    worklist.push(nb)
+    report.note(f"pool-views: fields={fields.len() as i32} producers={producers.len() as i32} growers={direct} growth-reaching={reaches.len() as i32} view-locals={view_locals} hits={hits}")
+    if producers.len() == 0:
+        report.note("pool-views: no body returns a reference into a field-held container; nothing to audit")
+
+fn analysis_pool_view_hit(sema: &Sema, body: &MirBody, fn_name: &str, fn_path: &str, fn_source: &str, li: i32, origin: i32, use_kind: &str, span: i32, poisoner: i32, grower: i32) -> str:
+    let from = if origin > 0: " from " ++ sema.pool_resolve(origin) else: " (direct element ref)"
+    "pool-view: " ++ fn_name ++ ": " ++ analysis_local_label(body, sema, li) ++ from ++ " is " ++ use_kind ++ " at " ++ fn_path ++
+        f":{analysis_line_for_offset(fn_source, span)} after a call to " ++ sema.pool_resolve(poisoner) ++ ", which reaches " ++
+        sema.pool_resolve(grower) ++ " — own the text (`.clone()`) or finish with the view before the call"
+
 // move-sites (docs/deep-debugging-tools.md): classify every recorded
 // plain-arg-to-owned-param site from the live Sema state. Semantic-snapshot
 // request — its primary use is partitioning an ERROR worklist.
@@ -1921,7 +2309,7 @@ fn analysis_help() -> str:
         "  matrix:<query>                          compact cross-stage fact matrix\n" ++
         "  explain:call|value|effect|specialization|diagnostic|type|field|expression|method:<text>\n" ++
         "  explain:node:<id>                       bounded AST + Sema type/resolution tree\n" ++
-        "  audit:calls|effects|storage|methods|mir|returns|receivers|receiver-surface|phase|codegen|trait-tables|all\n" ++
+        "  audit:calls|effects|storage|methods|mir|returns|receivers|receiver-surface|phase|pool-views|codegen|trait-tables|all\n" ++
         "  move-sites | seam-sites                 ownership worklists (owned-param call sites; aliasing/blanking seams)\n" ++
         "  path:call:<from>:<to>                   shortest live MIR call path\n" ++
         "  closure:call:<root>                     live MIR call closure\n" ++
@@ -1949,6 +2337,7 @@ fn compiler_analysis_render(report: &AnalysisReport, request: &str) -> str:
     if request == "audit:returns": return report.render_verdict("return-consistency-audit")
     if request == "audit:receivers": return report.render_verdict("receiver-audit")
     if request == "audit:receiver-surface": return report.render_verdict("receiver-surface-audit")
+    if request == "audit:pool-views": return report.render_verdict("pool-view-audit")
     if request == "audit:codegen": return report.render_verdict("codegen-contract-audit")
     if request == "audit:trait-tables": return report.render_verdict("trait-table-audit")
     if request == "audit:all": return report.render_verdict("compiler-analysis-audit")
@@ -2006,6 +2395,8 @@ fn compiler_analysis_run(sema: &Sema, mir_mod: &MirModule, pool: &InternPool, so
         analysis_audit_receivers(&report, sema)
     else if request == "audit:receiver-surface":
         analysis_audit_receiver_surface(&report, sema)
+    else if request == "audit:pool-views":
+        analysis_audit_pool_views(&report, sema, mir_mod, source_path, source_text)
     else if request == "audit:codegen":
         needs_codegen = true
         codegen_query = "audit"
@@ -2022,6 +2413,7 @@ fn compiler_analysis_run(sema: &Sema, mir_mod: &MirModule, pool: &InternPool, so
         analysis_audit_return_consistency(&report, sema, mir_mod)
         analysis_audit_receivers(&report, sema)
         analysis_audit_phase(&report, sema, mir_mod)
+        analysis_audit_pool_views(&report, sema, mir_mod, source_path, source_text)
         needs_codegen = true
         codegen_query = "audit"
     else if request.starts_with("lldb:"):

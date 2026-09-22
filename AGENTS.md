@@ -834,7 +834,7 @@ Requests:
 - `select:<query>`, `summary[:<query>]`, `matrix:<query>`: query the same fact
   database. Queries are comma-separated `field=value`, `field!=value`, or
   `field~substring` predicates; run `with analyze file.w help` for fields.
-- `audit:calls|effects|storage|methods|mir|returns|receivers|receiver-surface|phase|codegen|trait-tables|all`:
+- `audit:calls|effects|storage|methods|mir|returns|receivers|receiver-surface|phase|pool-views|codegen|trait-tables|all`:
   hard invariants. `all` covers typed/ownership MIR validators, receiver
   declarations/contracts, fixed-point effects, freeze/eager-cache/specialization,
   frozen-phase mutable-Sema re-entry, LLVM declaration ABI, caller marshalling,
