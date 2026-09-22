@@ -5064,6 +5064,10 @@ Generates wrapper variants (`AppError.Io(IoError)`, etc.) and `From`
 implementations. `?` uses `From` for automatic conversion. Chained
 conversion works via transitivity.
 
+An `error` declaration may list both: `error E from A, B =` followed by
+variants. A written variant whose name equals a generated wrapper's name
+is a compile-time error.
+
 ---
 
 ## 11. Traits
