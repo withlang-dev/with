@@ -17136,11 +17136,14 @@ impl Sema:
             generic_def_pi = generic_def_pi - 1
         let generic_min_args = param_count - generic_trailing_defaults
         if arg_count < generic_min_args or arg_count > param_count:
+            // Names the function and the counts like the non-generic check
+            // (`print("x", "y")` now reaches here), and keeps the generic
+            // check's own "wrong argument count" lead.
             let fn_name: str = self.pool_resolve(fn_sym)
             if generic_min_args == param_count:
-                self.emit_error(f"function '{fn_name}' expects {param_count} argument(s), found {arg_count}", call_node)
+                self.emit_error(f"wrong argument count: function '{fn_name}' expects {param_count} argument(s), found {arg_count}", call_node)
             else:
-                self.emit_error(f"function '{fn_name}' expects {generic_min_args}-{param_count} argument(s), found {arg_count}", call_node)
+                self.emit_error(f"wrong argument count: function '{fn_name}' expects {generic_min_args}-{param_count} argument(s), found {arg_count}", call_node)
 
         let saved_generic_call_subst_syms = sema_clone_i32_vec(&self.generic_subst_param_syms)
         let saved_generic_call_subst_tys = sema_clone_i32_vec(&self.generic_subst_type_ids)
