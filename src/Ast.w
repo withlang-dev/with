@@ -1683,8 +1683,8 @@ impl AstPool:
             return opt.unwrap()
         -1
 
-    fn impl_type_params_start(meta: i32): self.state.impl_type_params[(meta + 1)]
-    fn impl_type_params_count(meta: i32): self.state.impl_type_params[(meta + 2)]
+    fn impl_type_params_start(meta: i32) -> i32: self.state.impl_type_params[(meta + 1)]
+    fn impl_type_params_count(meta: i32) -> i32: self.state.impl_type_params[(meta + 2)]
 
     fn add_impl_target_type_node(impl_node: NodeId, type_node: NodeId):
         self.state.impl_target_type_nodes.push(impl_node as i32)
@@ -1715,8 +1715,8 @@ impl AstPool:
             return opt.unwrap()
         -1
 
-    fn impl_trait_type_args_start(meta: i32): self.state.impl_trait_type_args[(meta + 1)]
-    fn impl_trait_type_args_count(meta: i32): self.state.impl_trait_type_args[(meta + 2)]
+    fn impl_trait_type_args_start(meta: i32) -> i32: self.state.impl_trait_type_args[(meta + 1)]
+    fn impl_trait_type_args_count(meta: i32) -> i32: self.state.impl_trait_type_args[(meta + 2)]
 
     fn fn_param_patterns_len() -> i32:
         self.state.fn_param_patterns.len() as i32
