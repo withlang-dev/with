@@ -26,74 +26,137 @@ impl Sema:
                 self.collect_c_facade(decl)
         self.verify_facade_resources()
 
-    // Stage 4a: the facade-level checks that need every facade's facts (an fn
-    // item may describe a destroyer from a block declared after the resource).
-    // Each is "never half-model unsafely" (ruling §9, §16.2b.3) or an honest
-    // "not rendered yet" — a resource the renderer (compiler/FacadeRender.w)
-    // cannot express is reported here, never emitted as a placeholder.
+    // Stage 4a/4b: the facade-level checks that need every facade's facts (an
+    // fn item may describe a destroyer from a block declared after the
+    // resource). Each is "never half-model unsafely" (ruling §9, §16.2b.3) or
+    // a shape the renderer (compiler/FacadeRender.w) cannot express, reported
+    // here and never emitted as a placeholder. The last check is the net
+    // under the renderer itself: a resource that passed every check must
+    // have become a With type, or the renderer stayed silent over a shape
+    // the checks did not name.
     mut fn verify_facade_resources():
         for ri in 0..self.facade_resources.len() as i32:
-            let rname: str = self.pool_resolve(self.facade_resources[ri].name)
-            let node = self.facade_resources[ri].node
-            let producer = self.facade_resources[ri].producer
-            let drop_fn = self.facade_resources[ri].drop
-            let destroyer_count = self.facade_resources[ri].destroyers.len() as i32
-            if self.facade_resources[ri].init != 0 or self.facade_resources[ri].preinit != 0:
-                self.emit_error(f"resource '{rname}' is an in-place resource (init/preinit); the compiler does not render in-place resources yet, so no With type is generated for it (§16.2b.3)", node)
-                continue
-            if producer != 0 and drop_fn == 0 and destroyer_count == 0:
-                let pn: str = self.pool_resolve(producer)
-                self.emit_error(f"resource '{rname}': producer '{pn}' with no 'drop' and no 'destroys' — never half-model unsafely: a safe constructor needs a destruction contract (§16.2b.3)", node)
-                continue
-            if drop_fn == 0 and destroyer_count > 0:
-                // Ruling (Eric, 2026-09-22): a value dropped while live would
-                // leak silently. Must-consume linear resources are a future
-                // ruling, not modeled here.
-                var unary = ""
-                var unary_count = 0
-                for di in 0..destroyer_count:
-                    let d = self.facade_resources[ri].destroyers[di]
-                    let dsig = self.get_sig(d)
-                    if dsig >= 0 and self.sig_get_param_count(dsig) == 1:
-                        let dn: str = self.pool_resolve(d)
-                        unary = unary ++ (if unary_count > 0: ", " else: "") ++ f"'drop {dn}'"
-                        unary_count = unary_count + 1
-                if unary_count == 0:
-                    self.emit_error(f"resource '{rname}' has 'destroys' operations but no 'drop'; every destroyer takes further arguments, so name a 'drop' operation or model the representation differently — never half-model unsafely: a value dropped while live would leak silently (§16.2b.3)", node)
-                else if unary_count == 1:
-                    self.emit_error_with_help(f"resource '{rname}' has 'destroys' operations but no 'drop' — never half-model unsafely: a value dropped while live would leak silently (§16.2b.3)", node, f"name the unary destroyer as the drop operation: {unary}")
-                else:
-                    self.emit_error_with_help(f"resource '{rname}' has 'destroys' operations but no 'drop' — never half-model unsafely: a value dropped while live would leak silently (§16.2b.3)", node, f"name one unary destroyer as the drop operation: {unary}")
-                continue
-            if drop_fn != 0:
-                // Drop has nothing but the representation to pass.
-                let dsig = self.get_sig(drop_fn)
-                if dsig >= 0 and self.sig_get_param_count(dsig) != 1:
-                    let dn: str = self.pool_resolve(drop_fn)
-                    let n = self.sig_get_param_count(dsig)
-                    self.emit_error(f"resource '{rname}': 'drop {dn}' takes {n} parameters; the drop operation takes only the representation — an operation with further arguments is a 'destroys' (§16.2b.3)", node)
-                    continue
-                self.verify_facade_destroyer(ri, drop_fn)
-            for di in 0..destroyer_count:
-                self.verify_facade_destroyer(ri, self.facade_resources[ri].destroyers[di])
-            if producer != 0 and self.facade_resources[ri].out_param < 0 and self.ci_function_requires_raw_abi(producer) != 0:
-                let pn: str = self.pool_resolve(producer)
-                self.emit_error(f"resource '{rname}': producer '{pn}' is still a raw call after the facade covers its return (a variadic, a raw return, or a raw pointer parameter the facade does not describe); describe it with an fn item (§16.2b.5)", node)
+            let destroyable = self.facade_resources[ri].drop != 0 or self.facade_resources[ri].destroyers.len() > 0
+            if self.verify_facade_resource(ri) and destroyable and not self.diags.has_errors() and not self.facade_resource_rendered(ri):
+                let rname: str = self.pool_resolve(self.facade_resources[ri].name)
+                self.emit_error(f"resource '{rname}' passed every facade check but no With type was rendered for it; the renderer cannot express this shape and did not say so — a compiler defect (§16.2b.3)", self.facade_resources[ri].node)
 
-    mut fn verify_facade_destroyer(ri: i32, f: i32):
+    mut fn verify_facade_resource(ri: i32) -> bool:
+        let rname: str = self.pool_resolve(self.facade_resources[ri].name)
+        let node = self.facade_resources[ri].node
+        let producer = self.facade_resources[ri].producer
+        let init_fn = self.facade_resources[ri].init
+        let preinit_fn = self.facade_resources[ri].preinit
+        let drop_fn = self.facade_resources[ri].drop
+        let destroyer_count = self.facade_resources[ri].destroyers.len() as i32
+        if producer != 0 and init_fn != 0:
+            self.emit_error(f"resource '{rname}' names both 'from' and 'init'; a resource is produced by direct return, by out parameter, or by in-place initialization — one shape (§16.2b.4)", node)
+            return false
+        if preinit_fn != 0 and init_fn == 0:
+            self.emit_error(f"resource '{rname}': 'preinit' constructs storage for an 'init' operation; state 'init <fn>(self)' (§16.2b.4)", node)
+            return false
+        if (producer != 0 or init_fn != 0) and drop_fn == 0 and destroyer_count == 0:
+            let pn: str = self.pool_resolve(if producer != 0: producer else: init_fn)
+            self.emit_error(f"resource '{rname}': producer '{pn}' with no 'drop' and no 'destroys' — never half-model unsafely: a safe constructor needs a destruction contract (§16.2b.3)", node)
+            return false
+        if drop_fn == 0 and destroyer_count > 0:
+            // Ruling (Eric, 2026-09-22): a value dropped while live would
+            // leak silently. Must-consume linear resources are a future
+            // ruling, not modeled here.
+            var unary = ""
+            var unary_count = 0
+            for di in 0..destroyer_count:
+                let d = self.facade_resources[ri].destroyers[di]
+                let dsig = self.get_sig(d)
+                if dsig >= 0 and self.sig_get_param_count(dsig) == 1:
+                    let dn: str = self.pool_resolve(d)
+                    unary = unary ++ (if unary_count > 0: ", " else: "") ++ f"'drop {dn}'"
+                    unary_count = unary_count + 1
+            if unary_count == 0:
+                self.emit_error(f"resource '{rname}' has 'destroys' operations but no 'drop'; every destroyer takes further arguments, so name a 'drop' operation or model the representation differently — never half-model unsafely: a value dropped while live would leak silently (§16.2b.3)", node)
+            else if unary_count == 1:
+                self.emit_error_with_help(f"resource '{rname}' has 'destroys' operations but no 'drop' — never half-model unsafely: a value dropped while live would leak silently (§16.2b.3)", node, f"name the unary destroyer as the drop operation: {unary}")
+            else:
+                self.emit_error_with_help(f"resource '{rname}' has 'destroys' operations but no 'drop' — never half-model unsafely: a value dropped while live would leak silently (§16.2b.3)", node, f"name one unary destroyer as the drop operation: {unary}")
+            return false
+        if drop_fn != 0:
+            // Drop has nothing but the representation to pass.
+            let dsig = self.get_sig(drop_fn)
+            if dsig >= 0 and self.sig_get_param_count(dsig) != 1:
+                let dn: str = self.pool_resolve(drop_fn)
+                let n = self.sig_get_param_count(dsig)
+                self.emit_error(f"resource '{rname}': 'drop {dn}' takes {n} parameters; the drop operation takes only the representation — an operation with further arguments is a 'destroys' (§16.2b.3)", node)
+                return false
+            if not self.verify_facade_destroyer(ri, drop_fn):
+                return false
+        for di in 0..destroyer_count:
+            if not self.verify_facade_destroyer(ri, self.facade_resources[ri].destroyers[di]):
+                return false
+        if producer != 0 and self.facade_resources[ri].out_param < 0 and self.ci_function_requires_raw_abi(producer) != 0:
+            let pn: str = self.pool_resolve(producer)
+            self.emit_error(f"resource '{rname}': producer '{pn}' is still a raw call after the facade covers its return (a variadic, a raw return, or a raw pointer parameter the facade does not describe); describe it with an fn item (§16.2b.5)", node)
+            return false
+        if init_fn != 0 and not self.verify_facade_init(ri):
+            return false
+        // An out-parameter producer's constructor is stage 5: Drop and the
+        // destroyers are rendered, the constructor is not — not a silence.
+        true
+
+    // In-place initialization (ruling §13, §16.2b.4): `init` takes a pointer
+    // to the storage — a by-value first parameter would initialize a copy —
+    // and `preinit` returns the storage it constructs (it stands where
+    // `Representation.zeroed()` would). `ok` reads the init's status, so a
+    // void init has none to read. Either call must be safe once covered.
+    mut fn verify_facade_init(ri: i32) -> bool:
+        let rname: str = self.pool_resolve(self.facade_resources[ri].name)
+        let node = self.facade_resources[ri].node
+        let init_fn = self.facade_resources[ri].init
+        let iname: str = self.pool_resolve(init_fn)
+        let isig = self.get_sig(init_fn)
+        if isig < 0:
+            return false
+        let repr = self.resolve_alias(self.facade_resources[ri].repr_tid as TypeId)
+        if self.resolve_alias(self.sig_param_type(isig, 0) as TypeId) == repr:
+            self.emit_error(f"resource '{rname}': 'init {iname}' takes the representation by value, so it would initialize a copy; an in-place initializer takes a pointer to the storage (§16.2b.4)", node)
+            return false
+        if self.facade_resources[ri].ok_const != 0 and self.get_type_kind(self.resolve_alias(self.sig_return_type(isig) as TypeId)) == TypeKind.TY_VOID:
+            let cn: str = self.pool_resolve(self.facade_resources[ri].ok_const)
+            self.emit_error(f"resource '{rname}': 'ok {cn}' names a status but 'init {iname}' returns nothing to compare it with (§16.2b.4)", node)
+            return false
+        if self.ci_function_requires_raw_abi(init_fn) != 0:
+            self.emit_error(f"resource '{rname}': 'init {iname}' is still a raw call after the facade covers the storage (a variadic, a raw return, or a raw pointer parameter the facade does not describe); describe it with an fn item (§16.2b.5)", node)
+            return false
+        let preinit_fn = self.facade_resources[ri].preinit
+        if preinit_fn != 0 and self.ci_function_requires_raw_abi(preinit_fn) != 0:
+            let pn: str = self.pool_resolve(preinit_fn)
+            self.emit_error(f"resource '{rname}': 'preinit {pn}' is still a raw call after the facade covers its return (a variadic or a raw pointer parameter the facade does not describe); describe it with an fn item (§16.2b.5)", node)
+            return false
+        // The constructor takes preinit's parameters and then init's: a C
+        // name both spell would be one With parameter with two meanings.
+        if preinit_fn != 0:
+            let psig = self.get_sig(preinit_fn)
+            for pi in 0..self.sig_get_param_count(psig):
+                let pname = self.facade_param_c_name(preinit_fn, pi)
+                for ii in 1..self.sig_get_param_count(isig):
+                    if self.facade_param_c_name(init_fn, ii) == pname:
+                        let pn: str = self.pool_resolve(preinit_fn)
+                        self.emit_error(f"resource '{rname}': 'preinit {pn}' and 'init {iname}' both take a parameter named '{pname}'; the constructor takes both operations' parameters and cannot tell them apart (§16.2b.4)", node)
+                        return false
+        true
+
+    // The rendered type: a struct declared under the resource's own name.
+    fn facade_resource_rendered(ri: i32) -> bool:
+        let name = self.facade_resources[ri].name
+        for di in 0..self.ast.decl_count():
+            let decl = self.ast.get_decl(di)
+            if self.ast.kind(decl) == NodeKind.NK_TYPE_DECL and self.ast.get_data0(decl) == name and self.ast.get_data2(decl) % 8 == TypeDeclKind.Struct as i32:
+                return true
+        false
+
+    mut fn verify_facade_destroyer(ri: i32, f: i32) -> bool:
         let rname: str = self.pool_resolve(self.facade_resources[ri].name)
         let node = self.facade_resources[ri].node
         let fname: str = self.pool_resolve(f)
-        // A destroyer taking a pointer to the representation is the in-place
-        // shape (`inflateEnd(z_stream *)`); the by-value and pointer renderings
-        // pass the representation itself.
-        let sig = self.get_sig(f)
-        if sig >= 0 and self.sig_get_param_count(sig) > 0:
-            let p0 = self.resolve_alias(self.sig_param_type(sig, 0) as TypeId)
-            let repr = self.resolve_alias(self.facade_resources[ri].repr_tid as TypeId)
-            if p0 != repr and self.get_type_kind(p0) == TypeKind.TY_PTR and not self.facade_void_ptr_accepts(p0, repr):
-                self.emit_error(f"resource '{rname}': '{fname}' takes a pointer to the representation, the in-place shape; the compiler does not render in-place resources yet, so no With type is generated for it (§16.2b.3)", node)
-                return
         // A destroying operation callable as a lend (§16.2b.3): an fn item
         // describing the same function lends its parameters unless it says
         // `destroys` or consumes the representation.
@@ -105,9 +168,11 @@ impl Sema:
                     consumes_repr = true
             if not consumes_repr:
                 self.emit_error(f"resource '{rname}': '{fname}' destroys the resource but the fn item describing it lends its parameters; a destroying operation must not be callable as a lend — state 'destroys' on the fn item (§16.2b.3)", node)
-                return
+                return false
         if self.ci_function_requires_raw_abi(f) != 0:
             self.emit_error(f"resource '{rname}': '{fname}' is still a raw call after the facade covers the representation (a variadic, a raw return, or a raw pointer parameter the facade does not describe); describe it with an fn item (§16.2b.5)", node)
+            return false
+        true
 
     mut fn collect_c_facade(node: i32):
         let facade = self.ast.get_data0(node)
@@ -186,7 +251,21 @@ impl Sema:
                     let pn: str = self.pool_resolve(producer)
                     self.emit_error(f"resource '{rname}': producer '{pn}' returns {rt}, not the representation (§16.2b.13)", clause)
             return r
-        if kind == FACADE_CLAUSE_INIT or kind == FACADE_CLAUSE_PREINIT or kind == FACADE_CLAUSE_DROP or kind == FACADE_CLAUSE_DESTROYS:
+        if kind == FACADE_CLAUSE_PREINIT:
+            // `preinit` constructs the storage (ruling §13.1): it returns the
+            // representation, standing where `Representation.zeroed()` would.
+            let f = self.ast.get_extra(ops)
+            let sig = self.facade_fn_sig(f, clause)
+            if sig < 0:
+                return r
+            if self.resolve_alias(self.sig_return_type(sig) as TypeId) != self.resolve_alias(r.repr_tid as TypeId):
+                let fnm: str = self.pool_resolve(f)
+                let rt: str = self.type_name(self.sig_return_type(sig))
+                self.emit_error(f"resource '{rname}': 'preinit {fnm}' returns {rt}, not the representation; preinit constructs the storage that init fills (§16.2b.4)", clause)
+                return r
+            r.preinit = f
+            return r
+        if kind == FACADE_CLAUSE_INIT or kind == FACADE_CLAUSE_DROP or kind == FACADE_CLAUSE_DESTROYS:
             let f = self.ast.get_extra(ops)
             let sig = self.facade_fn_sig(f, clause)
             if sig < 0:
@@ -196,7 +275,6 @@ impl Sema:
                 self.emit_error(f"resource '{rname}': '{fnm}' does not take the representation as its first parameter (§16.2b.13)", clause)
                 return r
             if kind == FACADE_CLAUSE_INIT: r.init = f
-            else if kind == FACADE_CLAUSE_PREINIT: r.preinit = f
             else if kind == FACADE_CLAUSE_DROP: r.drop = f
             else: r.destroyers.push(f)
             return r
@@ -581,6 +659,8 @@ impl Sema:
         for i in 0..self.facade_resources.len() as i32:
             if self.facade_resources[i].out_param < 0 and self.facade_same_fn(self.facade_resources[i].producer, fn_sym):
                 return true
+            if self.facade_same_fn(self.facade_resources[i].preinit, fn_sym):
+                return true
         false
 
     fn facade_covers_param(fn_sym: i32, pi: i32) -> bool:
@@ -590,7 +670,7 @@ impl Sema:
             if self.facade_resources[i].out_param == pi and self.facade_same_fn(self.facade_resources[i].producer, fn_sym):
                 return true
             if pi == 0:
-                if self.facade_same_fn(self.facade_resources[i].drop, fn_sym) or self.facade_same_fn(self.facade_resources[i].init, fn_sym) or self.facade_same_fn(self.facade_resources[i].preinit, fn_sym):
+                if self.facade_same_fn(self.facade_resources[i].drop, fn_sym) or self.facade_same_fn(self.facade_resources[i].init, fn_sym):
                     return true
                 for di in 0..self.facade_resources[i].destroyers.len() as i32:
                     if self.facade_same_fn(self.facade_resources[i].destroyers[di], fn_sym):
