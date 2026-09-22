@@ -5,9 +5,11 @@
 //   - Channels: chan[T](cap) with buffered send/recv
 //   - Async functions and await
 //   - Structured concurrency with async scope
-//   - Select for multiplexing
+//   - Fan-in through cloned senders
 //   - Channel ownership transfer semantics
 // ===================================================================
+
+use std.channel
 
 // --- Domain Types ---
 
@@ -85,30 +87,35 @@ async fn demo_fan_out:
             let result = result_rx.recv().unwrap()
             print(f"  result: {result}")
 
-// --- Demo 3: Select with Multiple Sources ---
+// --- Demo 3: Fan-in from Multiple Sources ---
+//
+// Two producers share one channel: each holds its own clone of the
+// sender (§14.15), and the channel closes when the last one drops, so
+// the consumer simply drains it.
 
-async fn demo_select:
-    print("\n=== Demo 3: Select with Multiple Sources ===\n")
+async fn demo_fan_in:
+    print("\n=== Demo 3: Fan-in from Multiple Sources ===\n")
 
-    let (fast_tx, fast_rx) = chan[i32](4)
-    let (slow_tx, slow_rx) = chan[i32](4)
+    let (merged_tx, merged_rx) = chan[i32](8)
 
     async scope s =>
         // fast producer
+        let fast_tx = merged_tx.clone()
         s.track(async:
             for i in 0..3:
                 fast_tx.send(i)
         )
 
         // slow producer
+        let slow_tx = merged_tx.clone()
         s.track(async:
             for i in 0..2:
                 slow_tx.send(i + 100)
         )
 
-        // multiplexed consumer
+        // multiplexed consumer: five values, whichever source they came from
         for round in 0..5:
-            let val = fast_rx.recv().unwrap()
+            let val = merged_rx.recv().unwrap()
             print(f"  received: {val}")
 
 // --- Main ---
@@ -118,6 +125,6 @@ async fn main:
 
     demo_simple_pipeline().await
     demo_fan_out().await
-    demo_select().await
+    demo_fan_in().await
 
     print("\n=== Demo complete ===")
