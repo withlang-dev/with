@@ -65,14 +65,14 @@ use render
 // A pinned resource's cell is a `Box` (D54): Resolve makes the facade block
 // that declares one this module's import of std.box (the D29 gate), since
 // the rendering is spliced after resolution.
-pub fn facade_render_block(pool: AstPool, intern: InternPool, facade: i32) -> str:
+pub fn facade_render_block(pool: AstPool, intern: InternPool, facade: i32, ci: &Vec[i32]) -> str:
     var out = ""
     let extra_start = pool.get_data1(facade as NodeId)
     let count = pool.get_data2(facade as NodeId)
     for i in 0..count:
         let item = pool.get_extra(extra_start + i)
         if pool.kind(item as NodeId) == NodeKind.NK_FACADE_RESOURCE:
-            out = out ++ facade_render_resource(pool, intern, item, facade_render_lend_methods(pool, intern, facade, item))
+            out = out ++ facade_render_resource(pool, intern, ci, item, facade_render_lend_methods(pool, intern, ci, item))
     out
 
 // A lend operation on a pointer resource, rendered as a `&self` method of the
@@ -80,7 +80,7 @@ pub fn facade_render_block(pool: AstPool, intern: InternPool, facade: i32) -> st
 // operations borrow it"; With proves the receiver live, unmoved and
 // undestroyed, which it cannot prove of a raw pointer — so the C name stays
 // raw, SemaFacade.w facade_covers_param). An fn item whose first parameter
-// takes the representation of exactly one pointer resource of this block —
+// takes the representation of exactly one pointer resource of any block —
 // or the one its `of` names (§16.2b.3) — and that states nothing stronger
 // than a lend (`lend`, `of`, `rename`, `preserves`) becomes
 //
@@ -91,24 +91,21 @@ pub fn facade_render_block(pool: AstPool, intern: InternPool, facade: i32) -> st
 // under its C name, or its `rename`. Anything else stays as stated: a
 // consuming, destroying or retaining item is not a lend, and an in-place or
 // by-value representation is not reached through a pointer here.
-fn facade_render_lend_methods(pool: AstPool, intern: InternPool, facade: i32, resource: i32) -> str:
+fn facade_render_lend_methods(pool: AstPool, intern: InternPool, ci: &Vec[i32], resource: i32) -> str:
     let rname: str = intern.resolve(pool.get_data0(resource as NodeId))
     let repr = facade_render_unalias(pool, intern, render_type_expr(pool, intern, pool.get_extra(pool.get_data1(resource as NodeId)) as NodeId))
     if not repr.starts_with("*"):
         return ""
-    let extra_start = pool.get_data1(facade as NodeId)
-    let count = pool.get_data2(facade as NodeId)
     var out = ""
-    for i in 0..count:
-        let item = pool.get_extra(extra_start + i)
-        if pool.kind(item as NodeId) != NodeKind.NK_FACADE_FN:
-            continue
+    let items = facade_render_all_items(pool, NodeKind.NK_FACADE_FN)
+    for i in 0..items.len() as i32:
+        let item = items[i]
         var of_sym = 0
         var rename = 0
         var lends = true
         let cstart = pool.get_data1(item as NodeId)
-        for ci in 0..pool.get_data2(item as NodeId):
-            let clause = pool.get_extra(cstart + ci)
+        for k in 0..pool.get_data2(item as NodeId):
+            let clause = pool.get_extra(cstart + k)
             let kind = pool.get_data0(clause as NodeId)
             let ops = pool.get_data1(clause as NodeId)
             if kind == FACADE_CLAUSE_OF: of_sym = pool.get_extra(ops)
@@ -116,7 +113,7 @@ fn facade_render_lend_methods(pool: AstPool, intern: InternPool, facade: i32, re
             else if kind != FACADE_CLAUSE_LEND and kind != FACADE_CLAUSE_PRESERVES: lends = false
         if not lends:
             continue
-        let decl = facade_render_find_fn(pool, intern, pool.get_data0(item as NodeId))
+        let decl = facade_render_find_fn(pool, intern, ci, pool.get_data0(item as NodeId))
         if decl == 0 or facade_render_param_count(pool, decl) == 0:
             continue
         let meta = pool.find_fn_meta(decl as NodeId)
@@ -127,7 +124,7 @@ fn facade_render_lend_methods(pool: AstPool, intern: InternPool, facade: i32, re
             let of_name: str = intern.resolve(of_sym)
             if of_name != rname:
                 continue
-        else if facade_render_resources_wrapping(pool, intern, facade, repr) != 1:
+        else if facade_render_resources_wrapping(pool, intern, repr) != 1:
             continue
         let fname: str = intern.resolve(pool.get_data0(decl as NodeId))
         var mname: str = fname.clone()
@@ -138,17 +135,31 @@ fn facade_render_lend_methods(pool: AstPool, intern: InternPool, facade: i32, re
         out = out ++ "    fn " ++ mname ++ "(" ++ params ++ ")" ++ facade_render_return(pool, intern, decl) ++ ":\n        " ++ facade_render_call(pool, intern, decl, call_args) ++ "\n"
     out
 
-fn facade_render_resources_wrapping(pool: AstPool, intern: InternPool, facade: i32, repr: &str) -> i32:
-    let extra_start = pool.get_data1(facade as NodeId)
+fn facade_render_resources_wrapping(pool: AstPool, intern: InternPool, repr: &str) -> i32:
+    let items = facade_render_all_items(pool, NodeKind.NK_FACADE_RESOURCE)
     var n = 0
-    for i in 0..pool.get_data2(facade as NodeId):
-        let item = pool.get_extra(extra_start + i)
-        if pool.kind(item as NodeId) == NodeKind.NK_FACADE_RESOURCE:
-            let r = facade_render_unalias(pool, intern, render_type_expr(pool, intern, pool.get_extra(pool.get_data1(item as NodeId)) as NodeId))
-            if r == repr: n = n + 1
+    for i in 0..items.len() as i32:
+        let r = facade_render_unalias(pool, intern, render_type_expr(pool, intern, pool.get_extra(pool.get_data1(items[i] as NodeId)) as NodeId))
+        if r == repr: n = n + 1
     n
 
-fn facade_render_resource(pool: AstPool, intern: InternPool, item: i32, methods: &str) -> str:
+// Every item of `kind` in every facade block of the compilation: a program's
+// facade may describe an operation of a resource another block declares
+// (its own `fn telldir` lending the toolchain libc facade's `CDir`).
+fn facade_render_all_items(pool: AstPool, kind: NodeKind) -> Vec[i32]:
+    let out: Vec[i32] = Vec.new()
+    for di in 0..pool.decl_count():
+        let decl = pool.get_decl(di)
+        if pool.kind(decl) != NodeKind.NK_C_FACADE:
+            continue
+        let extra_start = pool.get_data1(decl)
+        for i in 0..pool.get_data2(decl):
+            let item = pool.get_extra(extra_start + i)
+            if pool.kind(item as NodeId) == kind:
+                out.push(item)
+    out
+
+fn facade_render_resource(pool: AstPool, intern: InternPool, ci: &Vec[i32], item: i32, methods: &str) -> str:
     let name: str = intern.resolve(pool.get_data0(item as NodeId))
     let extra_start = pool.get_data1(item as NodeId)
     let clause_count = pool.get_data2(item as NodeId)
@@ -160,26 +171,26 @@ fn facade_render_resource(pool: AstPool, intern: InternPool, item: i32, methods:
     var ok_sym = 0
     var movable = false
     let destroyers: Vec[i32] = Vec.new()
-    for ci in 0..clause_count:
-        let clause = pool.get_extra(extra_start + 1 + ci)
+    for k in 0..clause_count:
+        let clause = pool.get_extra(extra_start + 1 + k)
         let kind = pool.get_data0(clause as NodeId)
         let ops = pool.get_data1(clause as NodeId)
         if kind == FACADE_CLAUSE_FROM:
             // An out-parameter producer's constructor is stage 5.
             if pool.get_extra(ops + 1) == 0:
-                producers.push(facade_render_find_fn(pool, intern, pool.get_extra(ops)))
+                producers.push(facade_render_find_fn(pool, intern, ci, pool.get_extra(ops)))
         else if kind == FACADE_CLAUSE_INIT:
-            init_fn = facade_render_find_fn(pool, intern, pool.get_extra(ops))
+            init_fn = facade_render_find_fn(pool, intern, ci, pool.get_extra(ops))
         else if kind == FACADE_CLAUSE_PREINIT:
-            preinit_fn = facade_render_find_fn(pool, intern, pool.get_extra(ops))
+            preinit_fn = facade_render_find_fn(pool, intern, ci, pool.get_extra(ops))
         else if kind == FACADE_CLAUSE_OK:
             ok_sym = pool.get_extra(ops)
         else if kind == FACADE_CLAUSE_MOVABLE:
             movable = true
         else if kind == FACADE_CLAUSE_DROP:
-            drop_fn = facade_render_find_fn(pool, intern, pool.get_extra(ops))
+            drop_fn = facade_render_find_fn(pool, intern, ci, pool.get_extra(ops))
         else if kind == FACADE_CLAUSE_DESTROYS:
-            destroyers.push(facade_render_find_fn(pool, intern, pool.get_extra(ops)))
+            destroyers.push(facade_render_find_fn(pool, intern, ci, pool.get_extra(ops)))
     // An in-place resource is pinned unless the facade says `movable` (D54):
     // its representation lives in a Box cell the value owns, so the value
     // moves and the address does not.
@@ -282,8 +293,13 @@ fn facade_render_init(pool: AstPool, intern: InternPool, name: &str, repr_text: 
 
 // The declaring node of a function the facade names, by text: a c_import
 // translation and the facade may hold the same name under different symbols.
-fn facade_render_find_fn(pool: AstPool, intern: InternPool, sym: i32) -> i32:
+// A facade describes imported declarations (§16.2b.13), so a c_import one
+// (`ci[di]`) wins over a same-named With declaration elsewhere in the
+// compilation — std.libc's hand-written `fclose(*mut c_void)` is not the
+// `fclose(FILE *)` the program imported.
+fn facade_render_find_fn(pool: AstPool, intern: InternPool, ci: &Vec[i32], sym: i32) -> i32:
     let want: str = intern.resolve(sym)
+    var fallback = 0
     for di in 0..pool.decl_count():
         let decl = pool.get_decl(di)
         let kind = pool.kind(decl)
@@ -291,8 +307,11 @@ fn facade_render_find_fn(pool: AstPool, intern: InternPool, sym: i32) -> i32:
             continue
         let have: str = intern.resolve(pool.get_data0(decl))
         if have == want:
-            return decl as i32
-    0
+            if di < ci.len() as i32 and ci[di] != 0:
+                return decl as i32
+            if fallback == 0:
+                fallback = decl as i32
+    fallback
 
 fn facade_render_param_count(pool: AstPool, decl: i32) -> i32:
     let meta = pool.find_fn_meta(decl as NodeId)
@@ -323,7 +342,14 @@ fn facade_render_repr_arg(pool: AstPool, intern: InternPool, decl: i32, repr_tex
 // (zlib's `z_streamp` is `*mut z_stream`): the same text comparison Sema's
 // resolve_alias makes on TypeIds, so the renderer and the verifier agree on
 // which operation takes the representation.
-fn facade_render_unalias(pool: AstPool, intern: InternPool, text: &str) -> str:
+pub fn facade_render_unalias(pool: AstPool, intern: InternPool, text: &str) -> str:
+    // A pointer's pointee is chased too (a header's `DIR *` translates to
+    // `*mut __dirstream` where the facade names `*mut DIR`), as Sema's
+    // facade_same_type compares them.
+    if text.starts_with("*mut "):
+        return "*mut " ++ facade_render_unalias(pool, intern, text.slice(5, text.len()))
+    if text.starts_with("*const "):
+        return "*const " ++ facade_render_unalias(pool, intern, text.slice(7, text.len()))
     var t: str = text.clone()
     for _ in 0..16:
         var target = ""
@@ -335,8 +361,12 @@ fn facade_render_unalias(pool: AstPool, intern: InternPool, text: &str) -> str:
             if have == t:
                 target = render_type_expr(pool, intern, pool.get_extra(pool.get_data1(decl)) as NodeId)
                 break
-        if target.len() == 0:
+        // `type _IO_FILE = opaque` declares a distinct opaque type, not an
+        // alias of `void` (its target renders as c_void): stop at its name.
+        if target.len() == 0 or target == "c_void" or target == "opaque":
             return t
+        if target.starts_with("*"):
+            return facade_render_unalias(pool, intern, target)
         t = target
     t
 
@@ -409,3 +439,29 @@ fn facade_render_is_raw(pool: AstPool, intern: InternPool, decl: i32) -> bool:
     false
 
 fn facade_render_type_is_raw(text: &str) -> bool: text.starts_with("*") or text.starts_with("&") or text.starts_with("[") or text.starts_with("fn(") or text.starts_with("extern")
+
+// The shape of the declaration a c_import translation made under `name`:
+// whether there is one, and its return and first parameter types with
+// aliases chased ("" when absent). The toolchain libc facade
+// (compiler/LibcFacade.w) describes only declarations of libc's own shape.
+pub fn facade_render_import_shape(pool: AstPool, intern: InternPool, ci: &Vec[i32], name: &str) -> (bool, str, str):
+    for di in 0..pool.decl_count():
+        if di >= ci.len() as i32 or ci[di] == 0:
+            continue
+        let decl = pool.get_decl(di)
+        let kind = pool.kind(decl)
+        if kind != NodeKind.NK_EXTERN_FN and kind != NodeKind.NK_FN_DECL:
+            continue
+        let have: str = intern.resolve(pool.get_data0(decl))
+        if have != name:
+            continue
+        let meta = pool.find_fn_meta(decl)
+        if meta < 0:
+            return (true, "", "")
+        let ret = pool.fn_meta_ret(meta)
+        let ret_text = if ret == 0: "Unit" else: facade_render_unalias(pool, intern, render_type_expr(pool, intern, ret as NodeId))
+        var p0 = ""
+        if pool.fn_meta_param_count(meta) > 0:
+            p0 = facade_render_unalias(pool, intern, render_type_expr(pool, intern, pool.fn_param_type(pool.fn_meta_param_start(meta), 0) as NodeId))
+        return (true, ret_text, p0)
+    (false, "", "")

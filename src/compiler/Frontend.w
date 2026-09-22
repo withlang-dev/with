@@ -553,7 +553,7 @@ impl Zcu:
             let decl = out.get_decl(i)
             if out.kind(decl) != NodeKind.NK_C_FACADE:
                 continue
-            let text = facade_render_block(out, self.pool, decl as i32)
+            let text = facade_render_block(out, self.pool, decl as i32, &self.decl_is_c_import)
             if text.len() == 0:
                 continue
             let facade_name: str = with_str_clone_ref(self.pool.resolve(out.get_data0(decl)))

@@ -121,7 +121,7 @@ impl Sema:
         if isig < 0:
             return false
         let repr = self.resolve_alias(self.facade_resources[ri].repr_tid as TypeId)
-        if self.resolve_alias(self.sig_param_type(isig, 0) as TypeId) == repr:
+        if self.facade_same_type(self.sig_param_type(isig, 0), repr as i32):
             self.emit_error(f"resource '{rname}': 'init {iname}' takes the representation by value, so it would initialize a copy; an in-place initializer takes a pointer to the storage (§16.2b.4)", node)
             return false
         if self.facade_resources[ri].ok_const != 0 and self.get_type_kind(self.resolve_alias(self.sig_return_type(isig) as TypeId)) == TypeKind.TY_VOID:
@@ -161,7 +161,7 @@ impl Sema:
 
     mut fn verify_facade_pinned_op(ri: i32, f: i32) -> bool:
         let sig = self.get_sig(f)
-        if sig < 0 or self.resolve_alias(self.sig_param_type(sig, 0) as TypeId) != self.resolve_alias(self.facade_resources[ri].repr_tid as TypeId):
+        if sig < 0 or not self.facade_same_type(self.sig_param_type(sig, 0), self.facade_resources[ri].repr_tid):
             return true
         let rname: str = self.pool_resolve(self.facade_resources[ri].name)
         let fname: str = self.pool_resolve(f)
@@ -267,15 +267,14 @@ impl Sema:
                 if pi < 0:
                     return r
                 let pty = self.resolve_alias(self.sig_param_type(sig, pi) as TypeId)
-                if self.get_type_kind(pty) != TypeKind.TY_PTR or self.resolve_alias(self.get_type_d0(pty) as TypeId) != self.resolve_alias(r.repr_tid as TypeId):
+                if self.get_type_kind(pty) != TypeKind.TY_PTR or not self.facade_same_type(self.get_type_d0(pty), r.repr_tid):
                     let shown = self.facade_param_display(producer, sig, pi)
                     self.emit_error(f"resource '{rname}': the out parameter {shown} is not a pointer to the representation (§16.2b.13)", clause)
                     return r
                 let last = r.out_params.len() as i32 - 1
                 r.out_params[last] = pi
             else:
-                let ret = self.resolve_alias(self.sig_return_type(sig) as TypeId)
-                if ret != self.resolve_alias(r.repr_tid as TypeId):
+                if not self.facade_same_type(self.sig_return_type(sig), r.repr_tid):
                     let rt: str = self.type_name(self.sig_return_type(sig))
                     let pn: str = self.pool_resolve(producer)
                     self.emit_error(f"resource '{rname}': producer '{pn}' returns {rt}, not the representation (§16.2b.13)", clause)
@@ -287,7 +286,7 @@ impl Sema:
             let sig = self.facade_fn_sig(f, clause)
             if sig < 0:
                 return r
-            if self.resolve_alias(self.sig_return_type(sig) as TypeId) != self.resolve_alias(r.repr_tid as TypeId):
+            if not self.facade_same_type(self.sig_return_type(sig), r.repr_tid):
                 let fnm: str = self.pool_resolve(f)
                 let rt: str = self.type_name(self.sig_return_type(sig))
                 self.emit_error(f"resource '{rname}': 'preinit {fnm}' returns {rt}, not the representation; preinit constructs the storage that init fills (§16.2b.4)", clause)
@@ -430,7 +429,7 @@ impl Sema:
                 return c
             let ri: i32 = self.facade_resource_index.get(res).unwrap()
             let repr = self.facade_resources[ri].repr_tid
-            if self.resolve_alias(self.sig_return_type(sig) as TypeId) != self.resolve_alias(repr as TypeId):
+            if not self.facade_same_type(self.sig_return_type(sig), repr):
                 let rn: str = self.pool_resolve(res)
                 let rt: str = self.type_name(self.sig_return_type(sig))
                 self.emit_error(f"fn '{fname}' returns {rt}, not the representation of '{rn}' (§16.2b.13)", clause)
@@ -587,9 +586,9 @@ impl Sema:
             return false
         let p0 = self.resolve_alias(self.sig_param_type(sig, 0) as TypeId)
         let repr = self.resolve_alias(repr_tid as TypeId)
-        if p0 == repr or self.facade_void_ptr_accepts(p0, repr):
+        if self.facade_same_type(p0 as i32, repr as i32) or self.facade_void_ptr_accepts(p0, repr):
             return true
-        self.get_type_kind(p0) == TypeKind.TY_PTR and self.resolve_alias(self.get_type_d0(p0) as TypeId) == repr
+        self.get_type_kind(p0) == TypeKind.TY_PTR and self.facade_same_type(self.get_type_d0(p0), repr as i32)
 
     // Ruling §61 "the destroyer accepts the representation" is C's own
     // conversion rule (Eric, 2026-09-22): a `void *` parameter (`*mut c_void`
@@ -597,6 +596,17 @@ impl Sema:
     // representation, typedefs chased through their aliases — never a
     // function pointer (C does not convert one to `void *`) and never a
     // by-value representation. Otherwise the type is exact.
+    // Two types the same through `type` aliases, pointees included: a
+    // header's `DIR *` is `*mut __dirstream` where the facade says `*mut DIR`.
+    fn facade_same_type(a: i32, b: i32) -> bool:
+        let ra = self.resolve_alias(a as TypeId)
+        let rb = self.resolve_alias(b as TypeId)
+        if ra == rb:
+            return true
+        if self.get_type_kind(ra) != TypeKind.TY_PTR or self.get_type_kind(rb) != TypeKind.TY_PTR or self.get_type_d1(ra) != self.get_type_d1(rb):
+            return false
+        self.facade_same_type(self.get_type_d0(ra), self.get_type_d0(rb))
+
     fn facade_void_ptr_accepts(p0: i32, repr: i32) -> bool:
         if self.get_type_kind(p0) != TypeKind.TY_PTR or self.is_c_void_like_type(self.get_type_d0(p0)) == 0:
             return false
@@ -714,11 +724,11 @@ impl Sema:
         if sig < 0 or pi >= self.sig_get_param_count(sig):
             return false
         let p = self.resolve_alias(self.sig_param_type(sig, pi) as TypeId)
-        let pointee = if self.get_type_kind(p) == TypeKind.TY_PTR: self.resolve_alias(self.get_type_d0(p) as TypeId) else: 0 as TypeId
+        let pointee = if self.get_type_kind(p) == TypeKind.TY_PTR: self.get_type_d0(p) else: 0
         for i in 0..self.facade_resources.len() as i32:
             let repr = self.resolve_alias(self.facade_resources[i].repr_tid as TypeId)
             if self.get_type_kind(repr) == TypeKind.TY_PTR or self.facade_resources[i].init != 0:
-                if p == repr or pointee == repr:
+                if self.facade_same_type(p as i32, repr as i32) or (pointee != 0 and self.facade_same_type(pointee, repr as i32)):
                     return true
         false
 
