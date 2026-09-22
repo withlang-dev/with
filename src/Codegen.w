@@ -1301,6 +1301,10 @@ impl Codegen:
             return
         if self.di_current_scope == 0:
             return
+        // Seed-gated (#1349): the natural spelling is
+        // `let (line, col) = if byte_offset > 0: self.debug_line_col(byte_offset) else: (1, 0)`;
+        // the pinned seed rejects a tuple pattern over an `if` subject, and
+        // it builds stage1. Restore it once seed.lock names a release with the fix.
         var line = 1
         var col = 0
         if byte_offset > 0:

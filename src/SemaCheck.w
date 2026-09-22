@@ -11131,7 +11131,8 @@ impl Sema:
         let body = self.ast.get_data2(node)
 
         self.union_clear_last_written()
-        let iter_type = self.check_expr(iterable)
+        // #1349: the iterable is a value (`for p in if c: xs else: ys`).
+        let iter_type = self.check_expr_value_context(iterable)
         let elem_type = self.for_loop_element_type(iterable, iter_type as i32)
 
         // #912: the for-desugar over a generic iterator IS a next() call, but
@@ -15240,7 +15241,7 @@ impl Sema:
         let encoded_name = self.ast.get_data2(node)
         let name = decode_with_binding_sym(encoded_name)
         let is_mut = decode_with_binding_is_mut(encoded_name)
-        var source_ty = self.check_expr(source)
+        var source_ty = self.check_expr_value_context(source)   // #1349: the source is a value
         let form = self.classify_guarded_with(node, source_ty as i32, is_mut)
         if form == WithFormKind.Guarded or form == WithFormKind.GuardedMut:
             let payload_ty: i32 = self.with_payload_types.get(node).unwrap()
@@ -15289,7 +15290,7 @@ impl Sema:
         let extra_start = self.ast.get_data2(node)
         let name_count = self.ast.get_extra(extra_start)
         let is_mut = self.ast.get_extra(extra_start + 1)
-        let source_ty = self.check_expr(source)
+        let source_ty = self.check_expr_value_context(source)   // #1349
         let resolved = self.resolve_alias(source_ty as TypeId)
         let tk = self.get_type_kind(resolved)
         if tk != TypeKind.TY_TUPLE:
@@ -15318,7 +15319,7 @@ impl Sema:
         let source = self.ast.get_data0(node)
         let body = self.ast.get_data1(node)
         let binding_name = self.ast.get_data2(node)
-        var source_ty = self.check_expr(source)
+        var source_ty = self.check_expr_value_context(source)   // #1349
         // Push implicit binding onto stack
         self.implicit_binding_types.push(source_ty as i32)
         self.implicit_binding_syms.push(binding_name)
@@ -15371,7 +15372,12 @@ impl Sema:
         let pattern = self.ast.get_data0(node)
         let value = self.ast.get_data1(node)
         let else_body = self.ast.get_data2(node)
-        let val_type = self.check_expr(value)
+        // #1349: the subject is a value, never a statement — checked in the
+        // enclosing statement's context, an `if` subject in a void function
+        // took check_if_expr's statement arm and typed as void, so a tuple
+        // pattern saw no tuple. A plain `let` (check_let_binding) already
+        // checks its value this way.
+        let val_type = self.check_expr_value_context(value)
         if val_type != 0 and val_type != self.ty_void:
             self.typed_expr_types.insert(value, val_type as i32)
         if else_body == 0 and self.pattern_is_refutable(pattern) != 0:
@@ -15423,7 +15429,7 @@ impl Sema:
         let extra_start = self.ast.get_data0(node)
         let name_count = self.ast.get_data1(node)
         let value = self.ast.get_data2(node)
-        let val_type = self.check_expr(value)
+        let val_type = self.check_expr_value_context(value)   // #1349
         // Ensure the value expression's type is cached for MIR lowering
         if val_type != 0 and val_type != self.ty_void:
             self.typed_expr_types.insert(value, val_type as i32)
