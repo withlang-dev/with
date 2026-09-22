@@ -36,8 +36,7 @@ impl Sema:
     // the checks did not name.
     mut fn verify_facade_resources():
         for ri in 0..self.facade_resources.len() as i32:
-            let destroyable = self.facade_resources[ri].drop != 0 or self.facade_resources[ri].destroyers.len() > 0
-            if self.verify_facade_resource(ri) and destroyable and not self.diags.has_errors() and not self.facade_resource_rendered(ri):
+            if self.verify_facade_resource(ri) and self.facade_resources[ri].drop != 0 and not self.diags.has_errors() and not self.facade_resource_rendered(ri):
                 let rname: str = self.pool_resolve(self.facade_resources[ri].name)
                 self.emit_error(f"resource '{rname}' passed every facade check but no With type was rendered for it; the renderer cannot express this shape and did not say so — a compiler defect (§16.2b.3)", self.facade_resources[ri].node)
 
@@ -54,6 +53,9 @@ impl Sema:
             return false
         if preinit_fn != 0 and init_fn == 0:
             self.emit_error(f"resource '{rname}': 'preinit' constructs storage for an 'init' operation; state 'init <fn>(self)' (§16.2b.4)", node)
+            return false
+        if self.facade_resources[ri].movable != 0 and init_fn == 0:
+            self.emit_error(f"resource '{rname}': 'movable' releases the pinning of an in-place resource, and this resource has no 'init'; a pointer or by-value resource is already movable (§16.2b.3)", node)
             return false
         if (producer != 0 or init_fn != 0) and drop_fn == 0 and destroyer_count == 0:
             let pn: str = self.pool_resolve(if producer != 0: producer else: init_fn)
@@ -126,6 +128,16 @@ impl Sema:
         if self.ci_function_requires_raw_abi(init_fn) != 0:
             self.emit_error(f"resource '{rname}': 'init {iname}' is still a raw call after the facade covers the storage (a variadic, a raw return, or a raw pointer parameter the facade does not describe); describe it with an fn item (§16.2b.5)", node)
             return false
+        // A pinned resource's representation lives in its cell (D54): every
+        // operation reaches it by address. One taking it by value would act
+        // on a copy of a representation whose address the library may keep.
+        if self.facade_resources[ri].movable == 0:
+            let drop_fn = self.facade_resources[ri].drop
+            if drop_fn != 0 and not self.verify_facade_pinned_op(ri, drop_fn):
+                return false
+            for di in 0..self.facade_resources[ri].destroyers.len() as i32:
+                if not self.verify_facade_pinned_op(ri, self.facade_resources[ri].destroyers[di]):
+                    return false
         let preinit_fn = self.facade_resources[ri].preinit
         if preinit_fn != 0 and self.ci_function_requires_raw_abi(preinit_fn) != 0:
             let pn: str = self.pool_resolve(preinit_fn)
@@ -143,6 +155,15 @@ impl Sema:
                         self.emit_error(f"resource '{rname}': 'preinit {pn}' and 'init {iname}' both take a parameter named '{pname}'; the constructor takes both operations' parameters and cannot tell them apart (§16.2b.4)", node)
                         return false
         true
+
+    mut fn verify_facade_pinned_op(ri: i32, f: i32) -> bool:
+        let sig = self.get_sig(f)
+        if sig < 0 or self.resolve_alias(self.sig_param_type(sig, 0) as TypeId) != self.resolve_alias(self.facade_resources[ri].repr_tid as TypeId):
+            return true
+        let rname: str = self.pool_resolve(self.facade_resources[ri].name)
+        let fname: str = self.pool_resolve(f)
+        self.emit_error(f"resource '{rname}': '{fname}' takes the representation by value, but an in-place resource is pinned — its operations take the address of the representation; state 'movable' if no operation keeps that address (§16.2b.3)", self.facade_resources[ri].node)
+        false
 
     // The rendered type: a struct declared under the resource's own name.
     fn facade_resource_rendered(ri: i32) -> bool:
@@ -216,7 +237,7 @@ impl Sema:
         let repr_tid = self.resolve_type_expr(repr_node) as i32
         if repr_tid == 0:
             return
-        var r = FacadeResource { name, facade, node: item, repr_tid, producer: 0, out_param: -1, init: 0, preinit: 0, drop: 0, destroyers: Vec.new(), ok_const: 0, borrows: Vec.new(), independent: 0, thread_caps: 0 }
+        var r = FacadeResource { name, facade, node: item, repr_tid, producer: 0, out_param: -1, init: 0, preinit: 0, drop: 0, destroyers: Vec.new(), ok_const: 0, borrows: Vec.new(), independent: 0, movable: 0, thread_caps: 0 }
         for ci in 0..clause_count:
             let clause = self.ast.get_extra(extra_start + 1 + ci)
             r = self.collect_resource_clause(rname, move r, clause)
@@ -297,6 +318,9 @@ impl Sema:
             return r
         if kind == FACADE_CLAUSE_INDEPENDENT:
             r.independent = 1
+            return r
+        if kind == FACADE_CLAUSE_MOVABLE:
+            r.movable = 1
             return r
         if kind == FACADE_CLAUSE_THREAD:
             let cap_count = self.ast.get_data2(clause)
@@ -609,6 +633,7 @@ fn facade_clause_name(kind: i32) -> str:
     if kind == FACADE_CLAUSE_OK: return "ok"
     if kind == FACADE_CLAUSE_BORROWS: return "borrows"
     if kind == FACADE_CLAUSE_INDEPENDENT: return "independent"
+    if kind == FACADE_CLAUSE_MOVABLE: return "movable"
     if kind == FACADE_CLAUSE_LEND: return "lend"
     if kind == FACADE_CLAUSE_CONSUMES: return "consumes"
     if kind == FACADE_CLAUSE_RETAINS: return "retains"

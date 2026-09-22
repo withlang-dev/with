@@ -66,16 +66,25 @@ In-place resource (repr is a by-value struct with `init`): stage 4b, landed
 zeroed construction of an imported struct, whose every field c_import gives
 its zero default (`CImport.w ci_default_for_type`; `T.zeroed()` of the
 storage-types campaign is not implemented and is not needed) — or the
-`preinit` operation's result (it returns the representation); `init` takes
-`&raw mut repr` and arms `live` by `status == OK` under `ok CONST`, else
-unconditionally with the status handed back unread; a status-returning
-init yields `(status, R)`, a void one `R`. Any operation whose first
-parameter is a pointer to the representation (drop, destroyers, aliased
-`z_streamp`) is handed `&raw mut self.repr`. Open: an in-place resource
-moves after init (returned from the constructor, pushed into a Vec), so a
-C library that keeps the storage address (zlib's `state->strm`) breaks —
-address stability is a design question for the maintainer, not a 4b
-rendering choice.
+`preinit` operation's result (it returns the representation); `init` arms
+`live` by `status == OK` under `ok CONST`, else unconditionally with the
+status handed back unread; a status-returning init yields `(status, R)`,
+a void one `R`. **Pinned by default (spec §16.2b.3, D54):** `repr` is a
+`Box[Repr]` cell — `var repr = Box.new(Repr {})` (or of the preinit
+result), `init(repr.as_mut_ptr(), …)`, every drop/destroyer pointer is
+`self.repr.as_mut_ptr()` / `.as_ptr()`, and R's own Drop runs the
+destroyer before the Box field's Drop frees the cell. Resolve makes a
+facade block with a pinned resource its module's import of std.box
+(`Resolve.w facade_declares_pinned_resource`), because the rendering is
+spliced after resolution and the D29 gate would otherwise refuse `Box`.
+A `movable` resource (the facade's claim, never inferred; an error on a
+non-in-place resource) renders over a by-value field with `&raw mut
+self.repr`; a pinned resource's drop/destroyer taking the representation
+by value is an error. Pinning covers the representation's own storage
+only. Tests: `behav_c_facade_resource_in_place_pinned.w` (address kept
+by init, checked after rebinding, Vec, fn argument; raw pointer across a
+move), `da_c_facade_pinned_cell_destroy_then_free.w` (destroy-then-free
+under the debug allocator).
 
 Facade-level errors (§9 / spec "never half-model unsafely"), reported at the
 resource's span with the ruling's wording:

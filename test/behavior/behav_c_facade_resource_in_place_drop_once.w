@@ -6,9 +6,10 @@
 //! expect-stdout: ok
 
 // D51 §16.2b.3/§16.2b.4 stage 4b: an in-place resource (a by-value C struct
-// with `init`) is rendered as ordinary With — storage `z_stream {}`, the C
-// initializer over a pointer to it, Drop passing the address to the facade's
-// `drop` — and the destructor runs exactly once on every path: scope exit,
+// with `init`) is rendered as ordinary With — a pinned cell holding
+// `z_stream {}` (D54), the C initializer over its address, Drop passing that
+// address to the facade's `drop` — and the destructor runs exactly once on
+// every path: scope exit,
 // early return, moved into a function, moved out and returned, held in a
 // Vec. Each stream remembers a counter the initializer is handed and `z_end`
 // bumps it; the counter is never freed, so it stays readable. The resource
@@ -29,7 +30,7 @@ c facade zl:
     fn z_init
         lend
 
-fn state(s: &Stream) -> c_int: unsafe { z_state(&raw const s.repr) }
+fn state(s: &Stream) -> c_int: unsafe { z_state(s.repr.as_ptr()) }
 
 fn scope(ends: *mut c_int) -> c_int:
     let s = Stream.z_init(ends)

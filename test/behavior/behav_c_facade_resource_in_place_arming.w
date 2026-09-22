@@ -13,6 +13,8 @@
 // destroyer runs exactly once. Without `ok` the status is uninterpreted:
 // it is handed back unread and the resource is live (§16.2b.4). `ends`
 // counts every destroyer call through a counter the initializer is handed.
+// `Stream` is `movable` (no operation keeps its address — the facade's
+// claim, D54) and so renders over a by-value field; `Blind` is pinned.
 
 use c_import("void *calloc(unsigned long count, unsigned long size);
 #define Z_OK 0
@@ -26,6 +28,7 @@ static inline int z_tag(const z_stream* s) { return s->tag; }
 
 c facade zl:
     resource Stream wraps z_stream
+        movable
         preinit z_storage
         init z_init(self)
         ok Z_OK

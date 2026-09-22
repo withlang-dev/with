@@ -416,6 +416,7 @@ type FacadeResource {
     ok_const: i32,
     borrows: Vec[i32],
     independent: i32,
+    movable: i32,         // in-place resource declared `movable` (D54); pinned otherwise
     thread_caps: i32,     // bit0 creator, bit1 send, bit2 share, bit3 drop_any_thread
 }
 

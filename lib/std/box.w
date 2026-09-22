@@ -25,6 +25,11 @@ impl[T] Box[T]:
     pub fn as_ptr() -> *const T:
         unsafe { *(self as *const *const T) }
 
+    /// The cell's address for a foreign call that writes through it; the
+    /// cell owns the `T` and outlives the pointer's use.
+    pub fn as_mut_ptr() -> *mut T:
+        unsafe { *(self as *const *mut T) }
+
     pub move fn into_inner() -> T:
         let ptr = self as *mut T
         let value = unsafe { *ptr }

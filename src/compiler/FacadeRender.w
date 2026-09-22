@@ -38,10 +38,13 @@
 // the c_import extern lends a `str` to a `const char *` (§16.3c, D47), and
 // the resource's constructor passes the `str` straight through.
 //
-// An operation that takes a pointer to the representation (the in-place
-// shape, `inflateEnd(z_stream *)`, or a by-value token whose destroyer takes
-// its address) is handed `&raw mut self.repr`; an in-place resource's `init`
-// constructor is facade_render_init below (stage 4b).
+// An in-place resource (`init`) is pinned unless the facade says `movable`
+// (spec §16.2b.3, D54): `repr` is a `Box[Repr]` cell the value owns, every
+// pointer handed to C is `self.repr.as_mut_ptr()` (`.as_ptr()` for a const
+// parameter), and R's own Drop runs the destroyer before the field's Drop
+// frees the cell. A `movable` in-place resource, or a by-value token whose
+// destroyer takes its address, is handed `&raw mut self.repr` over a
+// by-value field. The `init` constructor is facade_render_init below.
 //
 // Not rendered here: an out-parameter producer's constructor (stage 5; its
 // Drop and destroyers are rendered). Nothing is ever rendered as a
@@ -53,6 +56,9 @@ use Ast
 use InternPool
 use render
 
+// A pinned resource's cell is a `Box` (D54): Resolve makes the facade block
+// that declares one this module's import of std.box (the D29 gate), since
+// the rendering is spliced after resolution.
 pub fn facade_render_block(pool: AstPool, intern: InternPool, facade: i32) -> str:
     var out = ""
     let extra_start = pool.get_data1(facade as NodeId)
@@ -74,6 +80,7 @@ fn facade_render_resource(pool: AstPool, intern: InternPool, item: i32) -> str:
     var init_fn = 0
     var preinit_fn = 0
     var ok_sym = 0
+    var movable = false
     let destroyers: Vec[i32] = Vec.new()
     for ci in 0..clause_count:
         let clause = pool.get_extra(extra_start + 1 + ci)
@@ -88,10 +95,16 @@ fn facade_render_resource(pool: AstPool, intern: InternPool, item: i32) -> str:
             preinit_fn = facade_render_find_fn(pool, intern, pool.get_extra(ops))
         else if kind == FACADE_CLAUSE_OK:
             ok_sym = pool.get_extra(ops)
+        else if kind == FACADE_CLAUSE_MOVABLE:
+            movable = true
         else if kind == FACADE_CLAUSE_DROP:
             drop_fn = facade_render_find_fn(pool, intern, pool.get_extra(ops))
         else if kind == FACADE_CLAUSE_DESTROYS:
             destroyers.push(facade_render_find_fn(pool, intern, pool.get_extra(ops)))
+    // An in-place resource is pinned unless the facade says `movable` (D54):
+    // its representation lives in a Box cell the value owns, so the value
+    // moves and the address does not.
+    let pinned = init_fn != 0 and not movable
     // A name that is not a declaration, a resource with no `drop` (a
     // producer with nothing to destroy it; `destroys` operations alone would
     // leak a value dropped while live), a destroyer that takes neither the
@@ -100,20 +113,21 @@ fn facade_render_resource(pool: AstPool, intern: InternPool, item: i32) -> str:
     if drop_fn == 0:
         return ""
     for di in 0..destroyers.len() as i32:
-        if destroyers[di] == 0 or facade_render_repr_arg(pool, intern, destroyers[di], repr_text, "self.repr").len() == 0:
+        if destroyers[di] == 0 or facade_render_repr_arg(pool, intern, destroyers[di], repr_text, "self.repr", pinned).len() == 0:
             return ""
-    if drop_fn != 0 and (facade_render_param_count(pool, drop_fn) != 1 or facade_render_repr_arg(pool, intern, drop_fn, repr_text, "self.repr").len() == 0):
+    if drop_fn != 0 and (facade_render_param_count(pool, drop_fn) != 1 or facade_render_repr_arg(pool, intern, drop_fn, repr_text, "self.repr", pinned).len() == 0):
         return ""
-    var out = "type " ++ name ++ " { repr: " ++ repr_text ++ ", live: bool }\n"
+    let field = if pinned: "Box[" ++ repr_text ++ "]" else: repr_text.clone()
+    var out = "type " ++ name ++ " { repr: " ++ field ++ ", live: bool }\n"
     if drop_fn != 0:
-        out = out ++ "impl Drop for " ++ name ++ ":\n    move fn drop():\n        if self.live: " ++ facade_render_call(pool, intern, drop_fn, facade_render_repr_arg(pool, intern, drop_fn, repr_text, "self.repr")) ++ "\n"
+        out = out ++ "impl Drop for " ++ name ++ ":\n    move fn drop():\n        if self.live: " ++ facade_render_call(pool, intern, drop_fn, facade_render_repr_arg(pool, intern, drop_fn, repr_text, "self.repr", pinned)) ++ "\n"
     if destroyers.len() > 0:
         out = out ++ "impl " ++ name ++ ":\n"
         for di in 0..destroyers.len() as i32:
             let d = destroyers[di]
             let dname: str = intern.resolve(pool.get_data0(d as NodeId))
             let (params, args) = facade_render_params(pool, intern, d, 1)
-            let repr_arg = facade_render_repr_arg(pool, intern, d, repr_text, "self.repr")
+            let repr_arg = facade_render_repr_arg(pool, intern, d, repr_text, "self.repr", pinned)
             let call_args = if args.len() > 0: repr_arg ++ ", " ++ args else: repr_arg
             out = out ++ "    move fn " ++ dname ++ "(" ++ params ++ ")" ++ facade_render_return(pool, intern, d) ++ ":\n        self.live = false\n        " ++ facade_render_call(pool, intern, d, call_args) ++ "\n"
     if producer != 0 and out_param == 0:
@@ -121,7 +135,7 @@ fn facade_render_resource(pool: AstPool, intern: InternPool, item: i32) -> str:
         let (params, args) = facade_render_params(pool, intern, producer, 0)
         out = out ++ "fn " ++ name ++ "." ++ pname ++ "(" ++ params ++ ") -> " ++ name ++ ":\n    " ++ name ++ " { repr: " ++ facade_render_call(pool, intern, producer, args) ++ ", live: true }\n"
     if init_fn != 0:
-        let ctor = facade_render_init(pool, intern, name, repr_text, init_fn, preinit_fn, ok_sym)
+        let ctor = facade_render_init(pool, intern, name, repr_text, init_fn, preinit_fn, ok_sym, pinned)
         if ctor.len() == 0:
             return ""
         out = out ++ ctor
@@ -139,14 +153,23 @@ fn facade_render_resource(pool: AstPool, intern: InternPool, item: i32) -> str:
 // yields `(status, R)`, the low-level model every projection sits over; a
 // void init yields `R`.
 //
+// Pinned (the default, D54): the storage is a Box cell the value owns, so
+// the cell exists — with its one address — from the construction of R,
+// before `live`; every pointer handed to C points into it; and on drop the
+// destruction operation runs in R's own Drop before the field's Drop frees
+// the cell (the cell outlives the C state, never the reverse).
+//
 //     fn R.init(<preinit args>, <init args after self>) -> (c_int, R):
-//         var repr = Repr {}                      // or preinit(<preinit args>)
-//         let status = init(&raw mut repr, <args>)
-//         (status, R { repr, live: status == OK })  // `live: true` without ok
-fn facade_render_init(pool: AstPool, intern: InternPool, name: &str, repr_text: &str, init_fn: i32, preinit_fn: i32, ok_sym: i32) -> str:
+//         var repr = Box.new(Repr {})                     // or Box.new(preinit(<preinit args>))
+//         let status = init(repr.as_mut_ptr(), <args>)
+//         (status, R { repr, live: status == OK })         // `live: true` without ok
+//
+// `movable`: the same over a by-value field — `var repr = Repr {}` and
+// `init(&raw mut repr, <args>)`.
+fn facade_render_init(pool: AstPool, intern: InternPool, name: &str, repr_text: &str, init_fn: i32, preinit_fn: i32, ok_sym: i32, pinned: bool) -> str:
     let iname: str = intern.resolve(pool.get_data0(init_fn as NodeId))
-    let storage_arg = facade_render_repr_arg(pool, intern, init_fn, repr_text, "repr")
-    if not storage_arg.starts_with("&raw"):
+    let storage_arg = facade_render_repr_arg(pool, intern, init_fn, repr_text, "repr", pinned)
+    if storage_arg.len() == 0 or storage_arg == "repr":
         return ""
     let (iparams, iargs) = facade_render_params(pool, intern, init_fn, 1)
     var params = iparams
@@ -156,6 +179,7 @@ fn facade_render_init(pool: AstPool, intern: InternPool, name: &str, repr_text: 
         if pparams.len() > 0:
             params = if params.len() > 0: pparams ++ ", " ++ params else: pparams
         storage = facade_render_call(pool, intern, preinit_fn, pargs)
+    if pinned: storage = "Box.new(" ++ storage ++ ")"
     let ret = facade_render_return(pool, intern, init_fn)
     let call_args = if iargs.len() > 0: storage_arg ++ ", " ++ iargs else: storage_arg
     let call = facade_render_call(pool, intern, init_fn, call_args)
@@ -191,18 +215,19 @@ fn facade_render_param_count(pool: AstPool, decl: i32) -> i32:
 // every object pointer representation (ruling §61 under C's conversion rule;
 // Sema verifies it in facade_void_ptr_accepts; With converts a `*const T` to
 // `*mut c_void` only explicitly), or its address for the in-place shape
-// (`inflateEnd(z_stream *)` over `z_stream`). Empty when the parameter is
-// none of these — Sema names it.
-fn facade_render_repr_arg(pool: AstPool, intern: InternPool, decl: i32, repr_text: &str, place: &str) -> str:
+// (`inflateEnd(z_stream *)` over `z_stream`) — the cell's address when the
+// resource is pinned, where a by-value parameter has nothing to receive.
+// Empty when the parameter is none of these — Sema names it.
+fn facade_render_repr_arg(pool: AstPool, intern: InternPool, decl: i32, repr_text: &str, place: &str, pinned: bool) -> str:
     let meta = pool.find_fn_meta(decl as NodeId)
     if meta < 0 or pool.fn_meta_param_count(meta) == 0:
         return ""
     let p0 = facade_render_unalias(pool, intern, render_type_expr(pool, intern, pool.fn_param_type(pool.fn_meta_param_start(meta), 0) as NodeId))
     let repr = facade_render_unalias(pool, intern, repr_text)
-    if p0 == repr: return place.clone()
+    if p0 == repr: return if pinned: "" else: place.clone()
     if (p0 == "*mut c_void" or p0 == "*const c_void") and repr.starts_with("*"): return place ++ " as " ++ p0
-    if p0 == "*mut " ++ repr: return "&raw mut " ++ place
-    if p0 == "*const " ++ repr: return "&raw const " ++ place
+    if p0 == "*mut " ++ repr: return if pinned: place ++ ".as_mut_ptr()" else: "&raw mut " ++ place
+    if p0 == "*const " ++ repr: return if pinned: place ++ ".as_ptr()" else: "&raw const " ++ place
     ""
 
 // A type spelled through `type` aliases, chased to the spelling beneath

@@ -5,9 +5,11 @@
 // `preinit` operation's result, `R.<init>` calling the C initializer over a
 // pointer to the storage and arming Drop by the `ok` status, Drop and each
 // `destroys` operation passing the address of the representation — over
-// prototype-only C, so this test only checks (phase lane). Two resources
+// prototype-only C, so this test only checks (phase lane). Three resources
 // wrap one representation (§14); `z_streamp` is the pointer typedef zlib
-// spells, resolved through the alias. Nothing here is `unsafe`.
+// spells, resolved through the alias. `InflateStream` and `DeflateStream`
+// are pinned (a Box cell, D54); `Ctx` is `movable` and renders by value.
+// Nothing here is `unsafe`.
 
 use c_import("typedef struct { int state; } z_stream;
 typedef z_stream *z_streamp;
@@ -33,6 +35,7 @@ c facade zlib:
         init deflateInit(self)
         drop deflateEnd
     resource Ctx wraps z_stream
+        movable
         init ctx_init(self)
         drop ctx_end
     fn inflateReset

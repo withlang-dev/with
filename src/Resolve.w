@@ -388,6 +388,30 @@ impl ResolveState:
                 import_index = import_index + 1
                 continue
 
+            // A `c facade` with a pinned in-place resource (spec §16.2b.3,
+            // D54) renders that resource over a `Box` cell; the rendering is
+            // spliced after resolution, so the facade itself is this module's
+            // import of std.box — the way the prelude's own `use std.box` is
+            // text. Without the edge the D29 gate would refuse the cell's
+            // type in the rendered file.
+            if kind == NodeKind.NK_C_FACADE and self.facade_declares_pinned_resource(pool, decl):
+                let resolved_path = self.resolve_use_file_dotted(module_id, "std.box")
+                var target_module = -1
+                if resolved_path.len() > 0:
+                    target_module = self.reserve_module(resolved_path, resolve_dirname(resolved_path), -1)
+                else:
+                    self.emit_import_decl_error(module_id, start, end, import_not_found_message("std.box"))
+                self.result.imports.push(ResolvedImport {
+                    module_id,
+                    index_in_module: import_index,
+                    kind: ImportKind.IK_USE,
+                    path_text: resolve_owned_text("std.box"),
+                    target_module,
+                    span_start: start,
+                    span_end: end,
+                })
+                import_index = import_index + 1
+
             if kind == NodeKind.NK_C_IMPORT:
                 let header_sym = pool.get_data0(decl)
                 let header: str = with_str_clone_ref(self.pool.resolve(header_sym))
@@ -1082,6 +1106,24 @@ impl ResolveState:
 
     // resolve_use_file for a dotted name: the embedded std tree first, then
     // the module's directory, the root's, and the parent module of the path.
+    // An in-place resource (`init`) not declared `movable` is pinned (D54).
+    fn facade_declares_pinned_resource(pool: AstPool, facade: NodeId) -> bool:
+        let extra_start = pool.get_data1(facade)
+        for i in 0..pool.get_data2(facade):
+            let item = pool.get_extra(extra_start + i)
+            if pool.kind(item as NodeId) != NodeKind.NK_FACADE_RESOURCE:
+                continue
+            let clause_start = pool.get_data1(item as NodeId)
+            var has_init = false
+            var movable = false
+            for ci in 0..pool.get_data2(item as NodeId):
+                let kind = pool.get_data0(pool.get_extra(clause_start + 1 + ci) as NodeId)
+                if kind == FACADE_CLAUSE_INIT: has_init = true
+                if kind == FACADE_CLAUSE_MOVABLE: movable = true
+            if has_init and not movable:
+                return true
+        false
+
     fn resolve_use_file_dotted(module_id: i32, dotted: &str) -> str:
         if dotted.len() == 0:
             return ""

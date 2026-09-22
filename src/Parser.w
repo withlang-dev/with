@@ -4106,6 +4106,8 @@ impl Parser:
             ops.push(r)
         else if word == "independent":
             kind = FACADE_CLAUSE_INDEPENDENT
+        else if word == "movable":
+            kind = FACADE_CLAUSE_MOVABLE
         else if word == "lend":
             kind = FACADE_CLAUSE_LEND
         else if word == "consumes":
