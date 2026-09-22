@@ -2342,7 +2342,10 @@ impl Sema:
         let saved_infer_closure = self.infer_tail_is_closure
         self.infer_tail_node = if body_expected_ret == 0 and self.fn_decl_is_entry_point(node) == 0: body else: 0
         self.infer_tail_is_closure = 0
-        let body_ty = self.check_expr(body)
+        let checked_body_ty = self.check_expr(body)
+        // §9.1: a single-statement assignment body is discarded, exactly as
+        // check_block discards a block's assignment tail.
+        let body_ty = if self.expr_is_assignment(body) != 0: self.ty_void else: checked_body_ty
         self.infer_tail_node = saved_infer_tail
         self.infer_tail_is_closure = saved_infer_closure
         self.stamp_move_site_liveness(body_site_start)
@@ -5791,16 +5794,19 @@ impl Sema:
             return self.body_return_type_info(self.ast.get_data0(node))
         info
 
-    fn tail_expr_is_assignment(node: i32) -> i32:
+    // §9.1: an assignment is an expression typed as its place, but in tail
+    // position its value is discarded — the block or body is Unit and §4.9 /
+    // §4.10 supply the implicit result (#1296). Every tail site (block tail,
+    // single-statement fn body, closure body) asks this one predicate, and
+    // MirLower's tail lowering agrees with it.
+    fn expr_is_assignment(node: i32) -> i32:
         if node == 0:
             return 0
         let kind = self.ast.kind(node)
         if kind == NodeKind.NK_ASSIGN:
             return 1
         if kind == NodeKind.NK_GROUPED:
-            return self.tail_expr_is_assignment(self.ast.get_data0(node))
-        if kind == NodeKind.NK_BLOCK:
-            return self.tail_expr_is_assignment(self.ast.get_data2(node))
+            return self.expr_is_assignment(self.ast.get_data0(node))
         0
 
     mut fn infer_unannotated_function_return_type(body: i32, body_ty: TypeId) -> i32:
@@ -5815,8 +5821,6 @@ impl Sema:
             if self.body_can_fall_through(body) != 0 and self.type_has_default_value(info.value_type) == 0:
                 self.emit_error("return type does not implement Default", body)
             return info.value_type
-        if self.tail_expr_is_assignment(body) != 0:
-            return self.ty_void as i32
         if body_ty != 0:
             return body_ty as i32
         self.ty_void as i32
@@ -9300,7 +9304,9 @@ impl Sema:
             let ret_is_void = self.current_return_type == self.ty_void or self.current_return_type == 0
             if ret_is_void and self.ast.kind(tail) == NodeKind.NK_MATCH:
                 self.match_in_stmt_pos = 1
-            let tail_is_value = self.current_value_expr_root == node or (self.stmt_pos_depth == 0 and self.current_return_type != 0 and self.current_return_type != self.ty_void) or (self.has_expected_type != 0 and self.expected_expr_type != 0 and self.expected_expr_type != self.ty_void)
+            // §9.1: an assignment tail is discarded, so the block is Unit.
+            let tail_discarded = self.expr_is_assignment(tail) != 0
+            let tail_is_value = not tail_discarded and (self.current_value_expr_root == node or (self.stmt_pos_depth == 0 and self.current_return_type != 0 and self.current_return_type != self.ty_void) or (self.has_expected_type != 0 and self.expected_expr_type != 0 and self.expected_expr_type != self.ty_void))
             if tail_is_value:
                 self.current_value_expr_root = tail
             // D43: a block in the inferring-tail role hands it to its own tail, so
@@ -9308,7 +9314,8 @@ impl Sema:
             let saved_infer_tail = self.infer_tail_node
             if saved_infer_tail == node:
                 self.infer_tail_node = tail
-            let tail_type = if tail_is_value: self.check_expr(tail) else: self.check_expr_statement_context(tail)
+            let checked_tail_type = if tail_is_value: self.check_expr(tail) else: self.check_expr_statement_context(tail)
+            let tail_type = if tail_discarded: self.ty_void else: checked_tail_type
             self.infer_tail_node = saved_infer_tail
             if not tail_is_value:
                 self.check_task_statement_disposition(tail)
@@ -14436,7 +14443,13 @@ impl Sema:
         let saved_infer_closure = self.infer_tail_is_closure
         self.infer_tail_node = if expected_ret_ty == 0: body else: 0
         self.infer_tail_is_closure = 1
-        let body_ty = if expected_ret_ty != 0: self.check_expr_with_expected(body, expected_ret_ty as TypeId) else: self.check_expr_value_context(body)
+        let checked_body_ty = if expected_ret_ty != 0: self.check_expr_with_expected(body, expected_ret_ty as TypeId) else: self.check_expr_value_context(body)
+        // §9.1: an assignment closure body is discarded, as in check_block; the
+        // recorded type is the verdict MirLower reads for the implicit default.
+        let body_discarded = self.expr_is_assignment(body) != 0
+        let body_ty = if body_discarded: self.ty_void else: checked_body_ty
+        if body_discarded:
+            self.typed_expr_types.insert(body, self.ty_void as i32)
         self.infer_tail_node = saved_infer_tail
         self.infer_tail_is_closure = saved_infer_closure
         if expected_extern_fn != 0:

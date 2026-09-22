@@ -5949,6 +5949,13 @@ impl MirBuilder:
 
         self.switch_to(cont_bb)
 
+    // A function or closure body in the value role. §9.1: an assignment in
+    // tail position is discarded, so the body yields Unit and the caller
+    // supplies the implicit result (§4.9 / §4.10) — the same verdict Sema
+    // reached through expr_is_assignment (#1296).
+    mut fn lower_tail_expr(node: i32) -> i32:
+        if self.sema.expr_is_assignment(node) != 0: self.lower_expr_discard(node) else: self.lower_expr(node)
+
     mut fn lower_expr_discard(node: i32) -> i32:
         if node == 0:
             return self.unit_operand()
@@ -6123,7 +6130,8 @@ impl MirBuilder:
 
         var result = self.unit_operand()
         if tail_expr != 0:
-            if want_result != 0:
+            // §9.1: an assignment tail is discarded (Sema typed the block Unit).
+            if want_result != 0 and self.sema.expr_is_assignment(tail_expr) == 0:
                 self.cancel_scheduled_value_drop_for_receiver_expr(tail_expr)
                 result = self.lower_expr(tail_expr)
                 result = self.materialize_tail_field_move(result, tail_expr)
@@ -13051,7 +13059,7 @@ impl MirBuilder:
         child.body.n_params = captures.len() + param_count
         child.expected_type = ret_ty
         let frame = child.push_stmt_temp_frame()
-        let result = child.lower_expr(body_node)
+        let result = child.lower_tail_expr(body_node)
         if ret_ty != self.sema.ty_void and ret_ty != self.sema.ty_never:
             let return_place = child.place_for_local(0)
             // A body that is a statement (`item => xs.push(item)` for an
@@ -14543,7 +14551,7 @@ fn lower_fn_with_sig(builder: MirBuilder, fn_node: i32, sig_idx: i32) -> Lowered
     var result = if ret_is_void:
         builder.lower_expr_discard(body_expr)
     else:
-        let tail_raw = builder.lower_expr(body_expr)
+        let tail_raw = builder.lower_tail_expr(body_expr)
         let tail_adj = builder.adjust_ret_operand_auto_ref(tail_raw, body_expr, ret_ty, builder.ast.get_end(fn_node))
         let body_result = if tail_adj >= 0: tail_adj else: tail_raw
         if body_falls_through != 0 and builder.operand_type(body_result) == builder.sema.ty_void:
