@@ -6,6 +6,10 @@ on:
   # covered by pull_request; main pushes (merges) by push.
   push:
     branches: [main]
+    # Docs are not build inputs (D49): a docs-only merge starts no lane.
+    paths-ignore:
+      - 'docs/**'
+      - '*.md'
   pull_request:
 
 # Cancel a superseded in-progress run when the same PR branch is re-pushed.
@@ -14,7 +18,10 @@ on:
 # other.
 concurrency:
   group: selfhost-tests-macos-${{ github.head_ref || github.ref }}
-  cancel-in-progress: true
+  # A superseded PR-branch run is cancelled; a main run is never cancelled —
+  # it is the run that builds and caches the source-built SDK (hours), and
+  # every merge would otherwise restart it from zero.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   selfhost-macos:
