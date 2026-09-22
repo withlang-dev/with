@@ -45,6 +45,26 @@ impl Sema:
                 let pn: str = self.pool_resolve(producer)
                 self.emit_error(f"resource '{rname}': producer '{pn}' with no 'drop' and no 'destroys' — never half-model unsafely: a safe constructor needs a destruction contract (§16.2b.3)", node)
                 continue
+            if drop_fn == 0 and destroyer_count > 0:
+                // Ruling (Eric, 2026-09-22): a value dropped while live would
+                // leak silently. Must-consume linear resources are a future
+                // ruling, not modeled here.
+                var unary = ""
+                var unary_count = 0
+                for di in 0..destroyer_count:
+                    let d = self.facade_resources[ri].destroyers[di]
+                    let dsig = self.get_sig(d)
+                    if dsig >= 0 and self.sig_get_param_count(dsig) == 1:
+                        let dn: str = self.pool_resolve(d)
+                        unary = unary ++ (if unary_count > 0: ", " else: "") ++ f"'drop {dn}'"
+                        unary_count = unary_count + 1
+                if unary_count == 0:
+                    self.emit_error(f"resource '{rname}' has 'destroys' operations but no 'drop'; every destroyer takes further arguments, so name a 'drop' operation or model the representation differently — never half-model unsafely: a value dropped while live would leak silently (§16.2b.3)", node)
+                else if unary_count == 1:
+                    self.emit_error_with_help(f"resource '{rname}' has 'destroys' operations but no 'drop' — never half-model unsafely: a value dropped while live would leak silently (§16.2b.3)", node, f"name the unary destroyer as the drop operation: {unary}")
+                else:
+                    self.emit_error_with_help(f"resource '{rname}' has 'destroys' operations but no 'drop' — never half-model unsafely: a value dropped while live would leak silently (§16.2b.3)", node, f"name one unary destroyer as the drop operation: {unary}")
+                continue
             if drop_fn != 0:
                 // Drop has nothing but the representation to pass.
                 let dsig = self.get_sig(drop_fn)

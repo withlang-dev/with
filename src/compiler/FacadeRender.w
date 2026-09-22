@@ -82,9 +82,11 @@ fn facade_render_resource(pool: AstPool, intern: InternPool, item: i32) -> str:
             drop_fn = facade_render_find_fn(pool, intern, pool.get_extra(ops))
         else if kind == FACADE_CLAUSE_DESTROYS:
             destroyers.push(facade_render_find_fn(pool, intern, pool.get_extra(ops)))
-    // A name that is not a declaration, or a producer with nothing to destroy
-    // it: Sema's facade diagnostics name the resource; nothing is rendered.
-    if drop_fn == 0 and destroyers.len() == 0:
+    // A name that is not a declaration, or a resource with no `drop` (a
+    // producer with nothing to destroy it; `destroys` operations alone would
+    // leak a value dropped while live): Sema's facade diagnostics name the
+    // resource; nothing is rendered.
+    if drop_fn == 0:
         return ""
     for di in 0..destroyers.len() as i32:
         if destroyers[di] == 0:
