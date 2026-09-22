@@ -7,7 +7,7 @@ module nebula.main
 //   - Channels for cross-fiber communication
 //   - select await for racing futures
 //   - async scope for structured concurrency
-//   - Error composition with `error` types
+//   - Error composition with `error ... from`
 //   - Postfix await on task handles
 //   - String interpolation
 //   - defer for cleanup
@@ -16,6 +16,7 @@ module nebula.main
 // ===================================================================
 
 use std.channel
+use std.time
 use session.Session
 use session.SessionError
 use session.SessionStats
@@ -29,24 +30,21 @@ use schema.build_test_batch
 
 // --- Error Composition ---
 //
-// Wrapper variants allow ? to automatically convert sub-errors
-// into AppError. Each sub-error type gets its own variant.
+// `from` generates a wrapper variant and a From impl per sub-error
+// (§10.9), so `?` converts a DbError or SessionError into AppError.
 
-error AppError =
-    | Db(DbError)
-    | Session(SessionError)
-    | Config(str)
+error AppError from DbError, SessionError
 
 // --- Entry Point ---
 
-async fn main:
+async fn main -> Result[Unit, AppError]:
     let config = load_config(None)
 
-    // Open the database (Result auto-unwrapped with .expect)
-    let db = Database.open(config.db_path).expect("failed to open database")
+    // Open the database; `?` propagates a DbError as AppError.Db
+    let db = Database.open(config.db_path)?
 
     // Initialize the database schema
-    db.init_schema().expect("failed to initialize schema")
+    db.init_schema()?
 
     print("=== Nebula Telemetry Daemon ===")
     print(f"Config: {config.host}:{config.port}, max_clients={config.max_clients}")
@@ -76,12 +74,14 @@ async fn main:
     session_tx2.send("")  // signals end-of-session
 
     // Structured concurrency: async scope guarantees all tracked
-    // fibers complete or are cancelled before the scope exits.
-    async scope s =>
-        s.track(handle_session(1, session_rx1))
-        s.track(handle_session(2, session_rx2))
+    // fibers complete or are cancelled before the scope exits, and
+    // every tracked result is observed (§14.7).
+    let packets = async scope s =>
+        let first = s.track(handle_session(1, session_rx1))
+        let second = s.track(handle_session(2, session_rx2))
+        first.await? + second.await?
 
-    print("\nAll sessions completed.")
+    print(f"\nAll sessions completed: {packets} packets.")
 
     // --- Test Batch Processing ---
     //
@@ -89,17 +89,20 @@ async fn main:
 
     let batch = build_test_batch(5)
     print(f"\nBatch of {batch.len()} telemetry records built.")
+    db.insert_bulk(&batch)?
 
     // --- Select Await Demo ---
     //
     // Race a "data ready" signal against a "shutdown" signal.
-    // Whichever completes first wins.
+    // Whichever completes first wins; the loser is cancelled at its next
+    // suspension point (§14.10). The analyzer side sleeps before reading,
+    // so the shutdown signal wins the race.
 
-    // Send shutdown signal after a brief moment
     shutdown_tx.send(1)
 
     let data_task = async:
-        data_rx.recv().unwrap()
+        sleep(Duration.millis(300)).await
+        data_rx.recv() ?? ""
     let shutdown_task = async:
         shutdown_rx.recv().unwrap()
 
@@ -111,10 +114,10 @@ async fn main:
 
     // --- Compute Final Stats ---
 
-    with Vec.new() as mut sessions:
+    let sessions = with Vec.new() as mut sessions:
         sessions.push(Session { id: 1, addr: "127.0.0.1", packets_received: 5 })
         sessions.push(Session { id: 2, addr: "127.0.0.2", packets_received: 3 })
-        let stats = compute_stats(&sessions)
-        print(f"\nFinal stats: {stats.active_count} active, {stats.total_packets} packets")
+    let stats = compute_stats(&sessions)
+    print(f"\nFinal stats: {stats.active_count} active, {stats.total_packets} packets")
 
     print("\n=== Clean shutdown complete ===")

@@ -8,10 +8,10 @@ module nebula.db
 //   - Error types with named fields
 //   - extend for method blocks
 //   - Implicit Ok(...) wrapping on the happy path
-//   - defer for cleanup on error paths
+//   - Implicit Ok(()) for Result[Unit, E] functions
 //   - String interpolation for error messages
 //   - Result[T, E] propagation with ?
-//   - Trait imports from sibling modules
+//   - Trait bounds on generic functions
 // ===================================================================
 
 use schema.SqlRecord
@@ -34,59 +34,56 @@ pub type Database {
     record_count: i64 = 0,
 }
 
-// Deterministic destruction. Because `drop` consumes `self` by value,
-// we don't need to null out fields to prevent double-frees.
+// Deterministic destruction. `drop` consumes `self` (§2.4), so there is
+// no need to null out fields to prevent double-frees.
 impl Drop for Database:
-    fn drop(self: Self):
+    move fn drop():
         if self.open:
             print(f"[db] closing database: {self.path}")
 
+// A constructor has no receiver, so it is a function of the type (§3.1).
+// Implicit Ok(...) wrapping: the happy path returns Database, the
+// compiler wraps it in Ok(Database) automatically.
+pub fn Database.open(path: str) -> Result[Database, DbError]:
+    if path.len() == 0:
+        return Err(.Init("empty path"))
+
+    // Happy path — auto-wrapped in Ok(...)
+    Database {
+        path,
+        open: true,
+    }
+
 extend Database:
-    // Implicit Ok(...) wrapping: the happy path returns Database,
-    // the compiler wraps it in Ok(Database) automatically.
-    pub fn open(path: str) -> Result[Database, DbError]:
-        if path.len() == 0:
-            return Err(.Init("empty path"))
-
-        // Happy path — auto-wrapped in Ok(...)
-        Database {
-            path,
-            open: true,
-        }
-
-    // Initialize the schema. Returns Result[(), DbError],
-    // so the function body implicitly returns Ok(()) at the end.
-    pub fn init_schema(self: &Database) -> Result[bool, DbError]:
+    // Initialize the schema. Returns Result[Unit, DbError], so the
+    // function body implicitly returns Ok(()) at the end.
+    pub fn init_schema() -> Result[Unit, DbError]:
         if not self.open:
             return Err(.Init("database not open"))
         print(f"[db] schema initialized for {self.path}")
-        true
-        // implicit Ok(true)
+        // implicit Ok(())
 
     // Execute raw SQL.
-    pub fn execute(self: &Database, sql: str) -> Result[bool, DbError]:
+    pub fn execute(sql: str) -> Result[Unit, DbError]:
         if not self.open:
             return Err(.Query("database not open"))
         print(f"[db] execute: {sql}")
-        true
-        // implicit Ok(true)
+        // implicit Ok(())
 
-    // Bulk insert using trait objects. Any type implementing
+    // Bulk insert through the SqlRecord trait. Any type implementing
     // SqlRecord can be inserted — the caller doesn't need to
     // know the concrete type.
-    pub fn insert_bulk(self: &Database, records: &[dyn SqlRecord]) -> Result[bool, DbError]:
+    pub fn insert_bulk[R: SqlRecord](records: &Vec[R]) -> Result[Unit, DbError]:
         if not self.open:
             return Err(.Query("database not open"))
 
         for rec in records:
             let query = rec.to_insert_query()
             print(f"[db] {query}")
-
-        true
-        // implicit Ok(true)
+        // implicit Ok(())
 
     // Query the record count.
-    pub fn count_records(self: &Database) -> Result[i64, DbError]:
+    pub fn count_records() -> Result[i64, DbError]:
         if not self.open:
             return Err(.Query("database not open"))
         self.record_count

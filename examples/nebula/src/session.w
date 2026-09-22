@@ -10,7 +10,7 @@ module nebula.session
 //   - select await for racing futures
 //   - async scope for structured concurrency
 //   - defer for guaranteed cleanup
-//   - if let for optional pattern matching
+//   - `??` for flat early exits
 //   - with blocks for scoped mutable access
 //   - Field shorthand in struct literals
 //   - Error types and Result propagation
@@ -61,14 +61,14 @@ gen fn step_range(start: i32, end: i32, step: i32) -> i32:
 
 // --- Telemetry Parser ---
 //
-// Uses `if let` for optional pattern matching and match expressions.
+// Observes its input (`&str`, §3.8) and clones the bytes it keeps.
 
-fn parse_telemetry(raw: str) -> Option[Telemetry]:
+fn parse_telemetry(raw: &str) -> Option[Telemetry]:
     if raw.len() == 0:
         return None
 
     Some(Telemetry {
-        device_id: raw,
+        device_id: raw.clone(),
         temp: 0.0,
         status: .Active,
     })
@@ -78,19 +78,18 @@ fn parse_telemetry(raw: str) -> Option[Telemetry]:
 // Parses a list of raw strings into telemetry records.
 // Uses a with-block for scoped mutable access to the result Vec.
 
-fn parse_batch(lines: Vec[str]) -> Result[Vec[Telemetry], SessionError]:
+fn parse_batch(lines: &Vec[str]) -> Result[Vec[Telemetry], SessionError]:
     with Vec.new() as mut results:
         for line in lines:
-            match parse_telemetry(line):
-                Some(t) => results.push(t)
-                None    => return Err(.ParseFailed("invalid input"))
+            let t = parse_telemetry(line) ?? return Err(.ParseFailed("invalid input"))
+            results.push(t)
 
 // --- Async Session Handler ---
 //
 // Demonstrates:
 //   - Async functions and channel recv
 //   - defer for guaranteed cleanup
-//   - Match on Option for message handling
+//   - `??` on the Option a receive returns
 //   - Result propagation
 
 async fn handle_session(id: i32, rx: Receiver[str]) -> Result[i32, SessionError]:
@@ -98,10 +97,10 @@ async fn handle_session(id: i32, rx: Receiver[str]) -> Result[i32, SessionError]
     defer: print(f"[session {id}] cleanup")
 
     loop:
-        let msg = rx.recv().unwrap()
+        let msg = rx.recv() ?? break
         if msg.len() == 0:
             break
-        session.packets_received = session.packets_received + 1
+        session.packets_received += 1
         match parse_telemetry(msg):
             Some(t) => print(f"[session {id}] got: {t.device_id} temp={t.temp}")
             None    => print(f"[session {id}] parse failed")
@@ -130,7 +129,6 @@ async fn handle_priority(
 // --- Session Stats ---
 //
 // Query sessions to compute aggregate statistics.
-// Uses with-block for building the result.
 
 pub type SessionStats {
     active_count: i32,
@@ -140,9 +138,9 @@ pub type SessionStats {
 pub fn compute_stats(sessions: &Vec[Session]) -> SessionStats:
     var total: i32 = 0
     for s in sessions:
-        total = total + s.packets_received
+        total += s.packets_received
     SessionStats {
-        active_count: sessions.len32(),
+        active_count: sessions.len(),
         total_packets: total,
     }
 
@@ -151,7 +149,7 @@ pub fn compute_stats(sessions: &Vec[Session]) -> SessionStats:
 // Uses async scope to run multiple session handlers concurrently.
 // The scope guarantees all tracked tasks complete before exiting.
 
-async fn run_sessions(db: &Database):
+async fn run_sessions(db: &Database) -> Result[i32, SessionError]:
     let (tx1, rx1) = chan[str](8)
     let (tx2, rx2) = chan[str](8)
 
@@ -163,10 +161,12 @@ async fn run_sessions(db: &Database):
     tx2.send("sensor-gamma")
     tx2.send("")  // signals end
 
-    // Structured concurrency: all tracked tasks complete
-    // before the scope exits
-    async scope s =>
-        s.track(handle_session(1, rx1))
-        s.track(handle_session(2, rx2))
+    // Structured concurrency: all tracked tasks complete before the
+    // scope exits, and their results are observed (§14.7).
+    let packets = async scope s =>
+        let a = s.track(handle_session(1, rx1))
+        let b = s.track(handle_session(2, rx2))
+        a.await? + b.await?
 
-    print("all sessions completed")
+    print(f"all sessions completed: {packets} packets")
+    packets

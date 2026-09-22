@@ -5,8 +5,7 @@ module nebula.schema
 //
 // Demonstrates:
 //   - Algebraic data types with named variant fields
-//   - Enum variant shorthand (.Ok)
-//   - @[derive] for automatic trait generation
+//   - Enum variant shorthand (.Active)
 //   - Trait definitions and implementations
 //   - Record update syntax ({ base with field })
 //   - Default field values
@@ -17,13 +16,15 @@ module nebula.schema
 
 // --- Domain Types ---
 
+// `@[derive(Debug, Clone)]` belongs on both of these (§11.8); it returns
+// once #1289 (derive on enums generates nothing) and #1288 (Debug derive
+// fails on an f64 field) are fixed.
 pub enum Status {
     Active
     | Warning(str)
     | Fatal(code: i32)
 }
 
-@[derive(Debug, Clone)]
 pub type Telemetry {
     device_id: str,
     temp: f64 = 0.0,
@@ -44,20 +45,20 @@ pub trait SqlRecord:
 // this automatically by inspecting T's fields at compile time.
 
 impl SqlRecord for Telemetry:
-    fn table_name(self: &Telemetry) -> str:
+    fn table_name() -> str:
         "telemetry"
 
-    fn to_insert_query(self: &Telemetry) -> str:
+    fn to_insert_query() -> str:
         f"INSERT INTO telemetry (device_id, temp) VALUES ('{self.device_id}', {self.temp})"
 
 // --- Status Helpers ---
 
-pub fn is_fatal(s: Status) -> bool:
+pub fn is_fatal(s: &Status) -> bool:
     match s:
         .Fatal(_) => true
         _         => false
 
-pub fn status_label(s: Status) -> str:
+pub fn status_label(s: &Status) -> str:
     match s:
         .Active     => "ok"
         .Warning(w) => f"warn: {w}"
@@ -99,13 +100,14 @@ pub fn should_alert(sev: Severity) -> bool:
 
 // --- Batch Builder ---
 //
-// Uses `with ... as mut` for scoped mutation to build a telemetry batch.
+// Uses `with ... as mut` for scoped mutation to build a telemetry batch
+// (§7.2: the block returns the builder).
 
 pub fn build_test_batch(count: usize) -> Vec[Telemetry]:
     with Vec.new() as mut batch:
         for i in 0..count:
-            let status = if i % 5 == 0: .Warning("periodic check")
-                         else if i % 10 == 0: .Fatal(code: 99)
+            let status = if i % 10 == 0: .Fatal(code: 99)
+                         else if i % 5 == 0: .Warning("periodic check")
                          else: .Active
             batch.push(Telemetry {
                 device_id: f"dev-{i}",
