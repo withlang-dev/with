@@ -40,6 +40,12 @@ fn main:
         // One INTEGER register is left for a two-eightbyte struct: all of it
         // goes to the stack, none of it is split.
         "declare i32 @spill(i64, i64, i64, i64, i64, ptr byval(%L2))",
+        // Packed structs classify at their packed offsets; an unaligned field
+        // makes the struct MEMORY. c_import's raylib Color is packed, and as
+        // an aggregate its return became a hidden pointer again.
+        "declare i32 @r_pcolor(i32)",
+        "declare i40 @r_pt(i40)",
+        "declare void @r_pu(ptr sret(%PU), ptr byval(%PU))",
     ]
     let aapcs = [
         "declare i32 @r_color(i64)",

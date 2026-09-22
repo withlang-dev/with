@@ -8,6 +8,17 @@ pub type DI { d: f64, i: i32 }
 pub type L2 { a: i64, b: i64 }
 pub type I3 { a: i32, b: i32, c: i32 }
 pub type L3 { a: i64, b: i64, c: i64 }
+// c_import packs a struct whose C alignment is 1 (raylib Color); PT is packed
+// with aligned fields, PU has an unaligned i32.
+@[packed]
+pub type PColor { r: u8, g: u8, b: u8, a: u8 }
+@[packed]
+pub type PT { a: i32, b: u8 }
+@[packed]
+pub type PU { a: u8, b: i32 }
+impl Copy for PColor
+impl Copy for PT
+impl Copy for PU
 impl Copy for Color
 impl Copy for V2
 impl Copy for V3
@@ -28,6 +39,9 @@ extern fn r_di(v: DI) -> DI
 extern fn r_l2(v: L2) -> L2
 extern fn r_i3(v: I3) -> I3
 extern fn r_l3(v: L3) -> L3
+extern fn r_pcolor(v: PColor) -> PColor
+extern fn r_pt(v: PT) -> PT
+extern fn r_pu(v: PU) -> PU
 extern fn spill(a: i64, b: i64, c: i64, d: i64, e: i64, s: L2) -> i32
 pub fn use_all(c: Color, a: V2, b: V3, d: V4, e: D2, f: IF, g: DI, h: L2, i: I3, j: L3) -> i32:
     let _ = r_color(c)
@@ -41,3 +55,8 @@ pub fn use_all(c: Color, a: V2, b: V3, d: V4, e: D2, f: IF, g: DI, h: L2, i: I3,
     let _ = r_i3(i)
     let _ = r_l3(j)
     spill(1, 2, 3, 4, 5, h)
+pub fn use_packed(c: PColor, t: PT, u: PU) -> i32:
+    let _ = r_pcolor(c)
+    let _ = r_pt(t)
+    let _ = r_pu(u)
+    0

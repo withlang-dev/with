@@ -5067,6 +5067,9 @@ fn codegen_c_abi_aarch64() -> bool: target_spec_arch() == "aarch64"
 // System V x86_64 (Linux, macOS): §3.2.3 eightbyte classification.
 fn codegen_c_abi_sysv_x86_64() -> bool: target_spec_arch() == "x86_64" and target_spec_os() != "Windows"
 
+// c_abi_sysv_classify's verdict for a struct with an unaligned field.
+const CODEGEN_SYSV_MEMORY: i32 = -2
+
 fn codegen_windows_x86_64() -> bool:
     let os = target_spec_os()
     let arch = target_spec_arch()
@@ -5114,7 +5117,13 @@ impl Codegen:
             return false
         if codegen_windows_x86_64():
             return self.c_abi_direct_struct_return_type(ret_ty) == 0
-        self.abi_size_of(ret_ty) > 16
+        self.abi_size_of(ret_ty) > 16 or self.c_abi_sysv_is_memory(ret_ty)
+
+    // SysV x86_64: a struct of at most 16 bytes with an unaligned field is
+    // MEMORY — sret when returned, byval when passed (§3.2.3), as clang does
+    // for `struct __attribute__((packed)) { char a; int b; }`.
+    mut fn c_abi_sysv_is_memory(ty: i64) -> bool:
+        codegen_c_abi_sysv_x86_64() and self.c_abi_sysv_classify(ty, 0, 0) == CODEGEN_SYSV_MEMORY
 
     mut fn c_abi_needs_indirect_param(param_ty: i64) -> bool:
         if param_ty == 0:
@@ -5123,7 +5132,7 @@ impl Codegen:
             return false
         if codegen_windows_x86_64():
             return self.c_abi_direct_struct_param_type(param_ty) == 0
-        self.abi_size_of(param_ty) > 16
+        self.abi_size_of(param_ty) > 16 or self.c_abi_sysv_is_memory(param_ty)
 
     fn c_abi_hfa_accumulate(ty: i64, state: i32) -> i32:
         if ty == 0 or state < 0:
@@ -5179,19 +5188,26 @@ impl Codegen:
     // System V x86_64 §3.2.3. A struct of at most 16 bytes is one or two
     // eightbytes; each is INTEGER if any integer or pointer leaf lies in it,
     // otherwise SSE. `classes` carries two bits per eightbyte (1 = INTEGER,
-    // 2 = SSE); -1 means a leaf this classifier does not model.
+    // 2 = SSE); -1 means a leaf this classifier does not model, and
+    // CODEGEN_SYSV_MEMORY a field at an offset its alignment does not divide,
+    // which makes the whole object MEMORY. A packed struct is classified at
+    // its packed offsets: c_import packs every struct whose C alignment is 1,
+    // so raylib's `Color { u8 x4 }` is `<{ i8, i8, i8, i8 }>` and must still
+    // travel as clang's `i32`.
     mut fn c_abi_sysv_classify(ty: i64, offset: i64, classes: i32) -> i32:
-        if ty == 0 or classes < 0: return -1
+        if classes < 0: return classes
+        if ty == 0: return -1
         let kind = wl_get_type_kind(ty)
         if kind == wl_struct_type_kind():
-            if wl_is_packed_struct(ty): return -1
+            let packed = wl_is_packed_struct(ty)
             let dl = wl_get_module_data_layout(self.llmod)
             var at = offset
             var out = classes
             for fi in 0..wl_count_struct_elem_types(ty):
                 let field = wl_struct_get_type_at(ty, fi)
                 let align = wl_abi_align_of(dl, field) as i64
-                at = (at + align - 1) / align * align
+                if not packed: at = (at + align - 1) / align * align
+                else if at % align != 0: return CODEGEN_SYSV_MEMORY
                 out = self.c_abi_sysv_classify(field, at, out)
                 at = at + self.abi_size_of(field)
             return out
