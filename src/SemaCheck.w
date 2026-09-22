@@ -1802,7 +1802,15 @@ impl Sema:
         if self.global_race_concurrency_node != 0:
             let conc = self.global_race_concurrency_node
             diag.add_label(Span { file: self.global_race_concurrency_file, start: self.ast.get_start(conc), end: self.ast.get_end(conc) }, "program may run concurrently here (" ++ self.global_race_concurrency_reason ++ ")")
-        diag.add_help("use Atomic[T], wrap the state in a synchronization type, or assert the access with `unsafe`")
+        // §9.1c's worked example names the remedies for this global's own
+        // type: `use Atomic[i32], wrap in Mutex, or assert with `unsafe``.
+        var atomic = "Atomic[T]"
+        if self.global_value_decl_bindings.contains(sym):
+            let bind: i32 = self.global_value_decl_bindings.get(sym).unwrap()
+            let tid: i32 = self.bind_types[bind]
+            if tid != 0:
+                atomic = "Atomic[" ++ self.type_name(tid) ++ "]"
+        diag.add_help("use " ++ atomic ++ ", wrap in Mutex, or assert with `unsafe`")
         self.diags.emit(move diag)
 
     mut fn validate_global_data_race_accesses():
