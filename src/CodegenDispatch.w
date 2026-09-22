@@ -1114,6 +1114,27 @@ impl Codegen:
         let payload = self.sema.resolve_alias(self.sema.get_generic_inst_arg(src, 0) as TypeId)
         self.sema.resolve_alias(self.sema.get_type_d0(tgt) as TypeId) == payload
 
+    // audit:codegen — every projected place must lower to the LLVM type of
+    // its MIR sema type. #1280 (`Box[Cell].ptr` read as Cell.a, i32 for ptr)
+    // passed `--validate-all` because the MIR was right and only codegen's
+    // projection walk was wrong; this joins the two so the divergence is a
+    // violation, not a run-time trap.
+    mut fn audit_codegen_place_types(body: &MirBody):
+        if self.analysis_enabled == 0 or self.analysis_query != "audit":
+            return
+        for place_id in 0..body.place_locals.len() as i32:
+            if body.place_proj_counts[place_id] == 0:
+                continue
+            let sema_ty = body.place_sema_types[place_id]
+            if sema_ty <= 0:
+                continue
+            let want = self.mir_sema_type_to_llvm(sema_ty)
+            let got = self.mir_place_projected_type(body, place_id)
+            if want == 0 or got == 0 or want == got:
+                continue
+            let name = with_str_clone_ref(self.sema.pool_resolve(body.fn_sym))
+            self.analysis_fail(f"place {place_id} in {name}: projection lowers to LLVM type kind {wl_get_type_kind(got)} but its MIR type {sema_ty} ({self.sema.type_name(sema_ty)}) is kind {wl_get_type_kind(want)}")
+
     mut fn mir_place_projected_type(body: &MirBody, place_id: i32) -> i64:
         if place_id < 0 or place_id >= body.place_locals.len() as i32:
             return 0
@@ -15994,6 +16015,7 @@ impl Codegen:
                 if trait_sym != 0:
                     self.record_trait_local(p_name, trait_sym)
 
+        self.audit_codegen_place_types(body)
         for bb in 0..body.block_count():
             let bb_name = f"mir.bb{bb}"
             let llbb = wl_append_bb(self.context, function, bb_name)
@@ -16444,6 +16466,7 @@ impl Codegen:
                 if trait_sym != 0:
                     self.record_trait_local(p_name, trait_sym)
 
+        self.audit_codegen_place_types(body)
         for bb in 0..body.block_count():
             let bb_name = f"mir.bb{bb}"
             let llbb = wl_append_bb(self.context, function, bb_name)
