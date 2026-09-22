@@ -332,6 +332,12 @@ Eric; never edit the program so the new rule passes. That is deleting a
 failing test. (2026-06-17 a c_import rule change broke the raylib spiral UAT;
 it sat broken until 2026-09-07, when the fixture was rewritten to `unsafe` to
 go green, without Eric's knowledge, while his blog still showed the original.)
+Ruling (Eric, 2026-09-22): examples track the current spec. A **spec
+change** that breaks an example updates the example in the same change,
+under the spec ruling, and says so; a **compiler or stdlib** change that
+breaks an example is a defect in the change. The distinction is which one
+moved: the spelling the spec now requires, or the compiler's conformance to
+it. Silently rewriting a program to go green is never either.
 
 **`unsafe` in a user program.** An application developer — someone writing a
 game, a site, a tool over a C library — never writes `unsafe`. If a UAT

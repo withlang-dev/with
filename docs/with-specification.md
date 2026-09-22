@@ -650,6 +650,11 @@ already covered by §2.2's drop-on-reassignment.) Leaking memory therefore
 requires a deliberate, visible act — owning the memory from a named scope —
 never inaction: a program that does nothing special does not leak.
 
+**The only way to skip a destructor is a spelling that is visible at the
+type's own boundary.** Outside a type's own `move fn` methods, no pattern,
+binding or call runs a `Drop` value's fields past its destructor (§9.7);
+inside them, a total destructure of `self` is the visible disarm.
+
 Together these make **double-free impossible by construction**: the live bits
 exist in exactly one binding at a time, every move hands them off and blanks
 the source, and dropping a blanked source frees nothing. This makes §2.2's
@@ -4066,6 +4071,16 @@ matching. `match` has two forms:
   commas.
 
 Semicolons are not valid match arm separators.
+
+**Patterns and `Drop`.** A struct or enum pattern applied to a value whose
+type implements `Drop` is a compile-time error — in `let`, in a `match` arm
+and in `if let` alike — with fix-its to keep the value whole (`let t = r`)
+or read a field (`r.field`); a binding, `_` or a wildcard arm keeps the
+value whole and its destructor runs as usual. Inside that type's own
+`move fn` methods (`drop` included) such a pattern is the visible disarm
+(§2.5.1) and must be total: every field is bound by name or explicitly
+`_`; a partial pattern (`R { fd, .. }`) is an error naming the fields left
+unstated.
 
 **Block form:**
 ```
@@ -7810,6 +7825,12 @@ reference to its own local and then drop that local before Fiber 2
 reads the message. `ScopedSend` guarantees the *scope* outlives the
 fibers, but not that Fiber 1's locals outlive Fiber 2's reads.
 
+`Sender[T]` is `Clone` and never `Copy`: a shared producer is spelled
+`tx.clone()`, and every clone holds the channel open. The channel closes
+when the last sender drops, not the first. `Sender[T]` is `Send` only when
+`T` is `Send`, so a cloned sender cannot carry a non-`Send` payload across
+fibers.
+
 ```
 // ERROR: ephemeral values cannot be sent over channels
 async scope s =>
@@ -9196,9 +9217,13 @@ existence alone never arms foreign destruction.
 fact only removes capability: ownership known but status uninterpreted, a
 child dependent until independence is known, a C string left as a borrowed
 byte view. A partial model that could create unsafety is a compile error: a
-resource with a producer and no valid destruction path; a destroying
-operation callable as a borrow; a safe constructor with no destruction
-contract; a returned pointer guessed to be owned.
+resource with a producer and no valid destruction path; a resource with
+`destroys` operations and no `drop` (a value dropped while live would leak;
+the facade names the unary destroyer as `drop`); a destroying operation
+callable as a borrow; a safe constructor with no destruction contract; a
+returned pointer guessed to be owned. A destroyer parameter of type
+`void *` accepts every object-pointer representation, as C itself converts
+them; it accepts no function-pointer or by-value representation.
 
 More than one resource may wrap the same representation (`InflateStream` and
 `DeflateStream` over `z_stream`). When exactly one resource wraps a
@@ -10885,7 +10910,10 @@ use math.vector.{Vec3, dot, cross}
 - `Unit`
 - `Vec[T]`, `String` / `str`
 - Traits: `Eq`, `Ord`, `Hash`, `Debug`, `Display`, `Default`, `Drop`
-- `print`, `eprint`
+- `print`, `eprint` — `print[T: Display](v: T)`: any `Display` value
+  prints; `&str` is one instance. A `match` whose arms do not share a
+  `Display` type yields nothing joinable, and the diagnostic's fix-it is the
+  f-string (`print(f"{x}")`), never an implicit boxing join.
 - `assert`, `assert_eq`, `assert_ne`, `require`, `check`, `panic`, `unreachable`, `todo`
 - `drop[T](val: T)` — explicitly drop a value to trigger cleanup
 
