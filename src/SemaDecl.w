@@ -1508,6 +1508,8 @@ impl Sema:
         let fn_flags = self.ast.get_data2(node)
         let decl_is_pub = if (fn_flags / FnFlags.PUB) % 2 == 1: 1 else: 0
         self.record_decl_visibility(fn_name, node, decl_is_pub)
+        if method_owner_sym == 0:
+            self.record_displaced_fn(fn_name, decl_is_pub)
         // D39: a source definition owns the flat name whatever the
         // declaration order; an interface declaration of the same name
         // (pcre2's is_alpha beside std.string's) keeps its signature for

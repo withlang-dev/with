@@ -1303,6 +1303,14 @@ pub type Sema {
     decl_visibility_index: HashMap[i32, i32],  // symbol → its newest record; older records chain through decl_visibility_prev
     decl_visibility_prev: Vec[i32],
     decl_visibility_node_index: HashMap[i32, i32], // declaration node → its record
+    // #1350: fns the flat merge displaced to a module-qualified identity
+    // (`name$in$<module>`), chained per short name like decl_visibility.
+    displaced_fn_index: HashMap[i32, i32],     // short symbol → its newest record
+    displaced_fn_record_of: HashMap[i32, i32], // displaced symbol → its record
+    displaced_fn_syms: Vec[i32],               // displaced (module-qualified) symbol
+    displaced_fn_paths: Vec[str],              // parallel declaring module path
+    displaced_fn_pub: Vec[i32],                // parallel public flag
+    displaced_fn_prev: Vec[i32],               // older record for the same short name
     // c_import scoping: tracks which symbols are c_import-origin
     ci_syms: HashMap[i32, i32],      // sym → 1 for c_import-origin symbols
     ci_raw_syms: HashMap[i32, i32],  // sym → 1 for c_import raw ABI calls
@@ -2521,6 +2529,12 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         decl_visibility_index: sema_new_map_i32_i32(),
         decl_visibility_prev: Vec.new(),
         decl_visibility_node_index: sema_new_map_i32_i32(),
+        displaced_fn_index: sema_new_map_i32_i32(),
+        displaced_fn_record_of: sema_new_map_i32_i32(),
+        displaced_fn_syms: Vec.new(),
+        displaced_fn_paths: sema_new_vec_str(),
+        displaced_fn_pub: Vec.new(),
+        displaced_fn_prev: Vec.new(),
         ci_syms: sema_new_map_i32_i32(),
         ci_raw_syms: sema_new_map_i32_i32(),
         ci_omitted_symbols: HashMap.new(),
@@ -2768,6 +2782,64 @@ impl Sema:
         self.decl_visibility_index.insert(sym, record)
         if node != 0:
             self.decl_visibility_node_index.insert(node, record)
+
+    // #1350: the frontend displaced this fn to `short$in$<module>`
+    // (frontend_displace_fn_decl) because another module's declaration took
+    // the short name. Chain it under the short name for
+    // resolve_displaced_fn_ident; diagnostics keep the short spelling.
+    mut fn record_displaced_fn(sym: i32, is_pub: i32):
+        let name: str = with_str_clone_ref(self.pool_resolve(sym))
+        let infix = name.index_of("$in$")
+        if infix <= 0:
+            return
+        let short_name = name.slice(0, infix)
+        self.set_pretty_symbol(sym, short_name)
+        let path = if self.current_module_path.len() > 0: self.current_module_path else: ""
+        if self.displaced_fn_record_of.contains(sym):
+            let existing: i32 = self.displaced_fn_record_of.get(sym).unwrap()
+            self.displaced_fn_paths[existing] = sema_owned_text(path)
+            self.displaced_fn_pub[existing] = is_pub
+            return
+        let short_sym = self.pool_intern(short_name)
+        let record = self.displaced_fn_syms.len() as i32
+        self.displaced_fn_syms.push(sym)
+        self.displaced_fn_paths.push(sema_owned_text(path))
+        self.displaced_fn_pub.push(is_pub)
+        self.displaced_fn_prev.push(if self.displaced_fn_index.contains(short_sym): self.displaced_fn_index.get(short_sym).unwrap() else: -1)
+        self.displaced_fn_index.insert(short_sym, record)
+        self.displaced_fn_record_of.insert(sym, record)
+
+    // #1350: a bare name some module's displaced fn declares binds, in order:
+    // a lexical binding (untouched); the current module's own declaration;
+    // the flat winner when it is visible here; else a displaced declaration
+    // this module can see. The ident node is rewritten to the chosen
+    // identity, so MIR, comptime and codegen read the declaration Sema
+    // checked — never a short-name re-resolution.
+    mut fn resolve_displaced_fn_ident(sym: i32, node: i32) -> i32:
+        if sym == 0 or not self.displaced_fn_index.contains(sym):
+            return sym
+        if self.scope_lookup(sym) >= 0:
+            return sym
+        let head: i32 = self.displaced_fn_index.get(sym).unwrap()
+        var chosen = 0
+        var i = head
+        while i >= 0 and chosen == 0:
+            if self.displaced_fn_paths[i] == self.current_module_path:
+                chosen = self.displaced_fn_syms[i]
+            i = self.displaced_fn_prev[i]
+        if chosen == 0:
+            if self.decl_visibility_index.contains(sym) and self.symbol_visible_from_current(sym) != 0:
+                return sym
+            i = head
+            while i >= 0 and chosen == 0:
+                if self.decl_visible_from_current_gated(self.displaced_fn_paths[i], self.displaced_fn_pub[i], sym) != 0:
+                    chosen = self.displaced_fn_syms[i]
+                i = self.displaced_fn_prev[i]
+        if chosen == 0:
+            return sym
+        if node != 0 and self.ast.kind(node) == NodeKind.NK_IDENT and self.ast.get_data0(node) == sym:
+            self.ast.set_data0(node as NodeId, chosen)
+        chosen
 
     fn decl_visible_from_current(target_path: &str, is_pub: i32) -> i32:
         if target_path.len() == 0:

@@ -19,6 +19,7 @@ use compiler.EmbeddedClangResource
 use compiler.ModuleSource
 use compiler.FacadeRender
 use TargetSpec
+use FnAbi
 
 extern fn with_str_clone_ref(s: &str) -> str
 use compiler.ProjectConfig
@@ -2367,8 +2368,10 @@ impl Zcu:
         // outside the shadow mask (generic identity waits on #751), and the
         // std-Box/Rc special-casing keys type paths by flat symbol — both
         // generic Boxes coexisting mislays std Box's pointer representation
-        // (invalid frees). Leaf-module drops remain sound. FN decls shadow
-        // by decl-drop: the flat signature table holds one entry per symbol.
+        // (invalid frees). Leaf-module drops remain sound. The flat signature
+        // table holds one entry per symbol: a shadowed FN decl of another
+        // module is displaced to its module-qualified identity (#1350), a
+        // same-module duplicate is dropped (frontend_fn_tier_verdict).
         for oi in 0..prelude_ordered.len() as i32:
             let id = prelude_ordered[oi]
             let ik = merged_pool.kind(id)
@@ -2382,7 +2385,8 @@ impl Zcu:
             // and still yield to higher-tier BODIED fns.
             let rt_def = ik == NodeKind.NK_FN_DECL and prelude_path.starts_with("<embedded-rt>/")
             let shadow_names = if rt_def: &higher_bodied_fn_names else: &higher_fn_names
-            if (ik == NodeKind.NK_FN_DECL or ik == NodeKind.NK_EXTERN_FN) and frontend_fn_shadowed_in_tier(prelude_ordered, prelude_paths, merged_pool, self.pool, oi, shadow_names):
+            let prelude_verdict = if ik == NodeKind.NK_FN_DECL or ik == NodeKind.NK_EXTERN_FN: frontend_fn_tier_verdict(prelude_ordered, prelude_paths, merged_pool, self.pool, oi, shadow_names) else: FRONTEND_FN_KEEP
+            if prelude_verdict != FRONTEND_FN_KEEP:
                 // Error when a prelude fn (with a body) is shadowed by an extern fn
                 // (no body). The extern silently replaces the real function with an
                 // unresolved C symbol, causing a cryptic linker error later.
@@ -2391,7 +2395,12 @@ impl Zcu:
                     if frontend_name_shadowed_by_extern(root_ordered, merged_pool, shadowed_name):
                         let sname: str = self.pool.resolve(shadowed_name)
                         self.diagnostics.emit(Diagnostic.err(f"extern fn '{sname}' shadows prelude function '{sname}'", Span { file: 0, start: merged_pool.get_start(id), end: merged_pool.get_end(id) }))
-                continue
+                        continue
+                // A runtime definition is a flat ABI symbol the compiler emits
+                // calls to; it keeps the pre-#1350 decl-drop.
+                if prelude_verdict == FRONTEND_FN_DROP or rt_def:
+                    continue
+                frontend_displace_fn_decl(merged_pool, self.pool, id, prelude_path)
             if ik == NodeKind.NK_EXTERN_VAR:
                 if frontend_extern_var_shadowed_in_tier(prelude_ordered, merged_pool, self.pool, oi) or frontend_extern_var_shadowed_by_tier(user_import_ordered, merged_pool, self.pool, id) or frontend_extern_var_shadowed_by_tier(root_ordered, merged_pool, self.pool, id):
                     continue
@@ -2404,8 +2413,11 @@ impl Zcu:
             let ik = merged_pool.kind(id)
             if ik == NodeKind.NK_EXTERN_FN and frontend_vec_contains_i32(embedded_rt_fn_names, merged_pool.get_data0(id)):
                 continue
-            if (ik == NodeKind.NK_FN_DECL or ik == NodeKind.NK_EXTERN_FN) and frontend_fn_shadowed_in_tier(user_import_ordered, user_import_paths, merged_pool, self.pool, oi, root_fn_names):
+            let user_verdict = if ik == NodeKind.NK_FN_DECL or ik == NodeKind.NK_EXTERN_FN: frontend_fn_tier_verdict(user_import_ordered, user_import_paths, merged_pool, self.pool, oi, root_fn_names) else: FRONTEND_FN_KEEP
+            if user_verdict == FRONTEND_FN_DROP:
                 continue
+            if user_verdict == FRONTEND_FN_DISPLACE:
+                frontend_displace_fn_decl(merged_pool, self.pool, id, user_import_paths[oi])
             if ik == NodeKind.NK_EXTERN_VAR:
                 if frontend_extern_var_shadowed_in_tier(user_import_ordered, merged_pool, self.pool, oi) or frontend_extern_var_shadowed_by_tier(root_ordered, merged_pool, self.pool, id):
                     continue
@@ -2468,15 +2480,30 @@ fn frontend_fn_decl_is_generic(pool: AstPool, decl: i32) -> bool:
     let meta = pool.find_fn_meta(decl as NodeId)
     meta >= 0 and pool.fn_meta_tp_count(meta) > 0
 
-fn frontend_fn_shadowed_in_tier(tier: &Vec[i32], paths: &Vec[str], pool: AstPool, intern: InternPool, idx: i32, higher_names: &Vec[i32]) -> bool:
-    // Check if this fn is shadowed by a higher-priority tier.
+let FRONTEND_FN_KEEP = 0
+let FRONTEND_FN_DROP = 1
+let FRONTEND_FN_DISPLACE = 2
+
+// The flat merge's verdict for one fn decl of a lower-precedence tier. A
+// same-name decl of higher precedence takes the short name. When that decl
+// belongs to ANOTHER module, this one is DISPLACED, not dropped (#1350): it
+// keeps its own module-qualified identity (frontend_displace_fn_decl), and
+// Sema binds its module's own references (and its importers') to it. Dropping
+// it bound them to the other module's function — a user `fn is_digit(u8)`
+// silently became std.string's is_alnum's callee, and std.re's own
+// `is_digit` call became "not visible". A same-module duplicate, an extern
+// (one global C symbol in every tier), an interface decl (D39's flat
+// coexistence; displacing it would half-close the gate leak of #1362) and a
+// c_export fn (one exported C name) keep the drop.
+fn frontend_fn_tier_verdict(tier: &Vec[i32], paths: &Vec[str], pool: AstPool, intern: InternPool, idx: i32, higher_names: &Vec[i32]) -> i32:
     let current = tier[idx]
     let current_kind = pool.kind(current)
     if frontend_fn_decl_is_method(pool, intern, current):
-        return false
+        return FRONTEND_FN_KEEP
     let iname = pool.get_data0(current)
+    let displaceable = frontend_fn_decl_is_displaceable(pool, intern, current)
     if frontend_vec_contains_i32(higher_names, iname):
-        return true
+        return if displaceable: FRONTEND_FN_DISPLACE else: FRONTEND_FN_DROP
 
     // Within-tier precedence:
     // - a real fn beats any extern fn of the same name, regardless of order
@@ -2487,8 +2514,8 @@ fn frontend_fn_shadowed_in_tier(tier: &Vec[i32], paths: &Vec[str], pool: AstPool
                 continue
             let jd = tier[j]
             if pool.kind(jd) == NodeKind.NK_FN_DECL and pool.get_data0(jd) == iname:
-                return true
-        return false
+                return FRONTEND_FN_DROP
+        return FRONTEND_FN_KEEP
 
     let current_rank = frontend_fn_decl_rank(current_kind)
     var j = idx + 1
@@ -2498,16 +2525,42 @@ fn frontend_fn_shadowed_in_tier(tier: &Vec[i32], paths: &Vec[str], pool: AstPool
         if (jk == NodeKind.NK_FN_DECL or jk == NodeKind.NK_EXTERN_FN) and pool.get_data0(jd) == iname:
             // Same-module generic declarations are structural overload
             // candidates, not shadowing declarations. Keep each template for
-            // sema to select after argument types are known. A same-name fn
-            // from another module still follows normal later-wins import rules.
+            // sema to select after argument types are known.
             if frontend_fn_decl_is_generic(pool, current) and frontend_fn_decl_is_generic(pool, jd) and paths[idx] == paths[j]:
                 j = j + 1
                 continue
             let other_rank = frontend_fn_decl_rank(jk)
             if other_rank >= current_rank:
-                return true
+                return if displaceable and paths[idx] != paths[j]: FRONTEND_FN_DISPLACE else: FRONTEND_FN_DROP
         j = j + 1
-    false
+    FRONTEND_FN_KEEP
+
+fn frontend_fn_decl_is_displaceable(pool: AstPool, intern: InternPool, decl: i32) -> bool:
+    if pool.kind(decl) != NodeKind.NK_FN_DECL or pool.fn_decl_body_is_interface(decl as NodeId):
+        return false
+    let meta = pool.find_fn_meta(decl as NodeId)
+    if meta >= 0 and pool.fn_meta_tp_count(meta) == 0 and pool.fn_meta_tp_start(meta) != 0:
+        // The tp_start slot of a non-generic fn carries its callconv.
+        if intern.resolve(pool.fn_meta_tp_start(meta)).starts_with("c_export:"):
+            return false
+    true
+
+// A displaced fn's identity: its name qualified by its module's canonical
+// path (checkout-independent, D38), spelled with `$` so no source name can
+// collide with it. Sema recognizes the `$in$` infix, keeps the short name for
+// diagnostics, and resolves each module's references
+// (Sema.record_displaced_fn, Sema.resolve_displaced_fn_ident).
+fn frontend_displace_fn_decl(pool: AstPool, intern: InternPool, decl: i32, path: &str):
+    let name: str = with_str_clone_ref(intern.resolve(pool.get_data0(decl)))
+    let canonical = codegen_canonical_module_path(path)
+    var tag = StringBuilder.with_capacity(canonical.len())
+    for i in 0..canonical.len():
+        let c = canonical[i]
+        if (c >= 'a' and c <= 'z') or (c >= 'A' and c <= 'Z') or (c >= '0' and c <= '9'):
+            tag.push_byte(c)
+        else:
+            tag.push_byte('_')
+    pool.set_data0(decl as NodeId, intern.intern(name ++ "$in$" ++ tag.to_str()))
 
 fn frontend_global_decl_mut(pool: AstPool, decl: i32) -> i32:
     let kind = pool.kind(decl)

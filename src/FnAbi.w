@@ -212,4 +212,10 @@ pub fn fn_abi_module_link_name(module_object_mode: i32, source_path: &str, base_
     let canonical_path = codegen_canonical_module_path(source_path)
     if canonical_path.len() == 0 or canonical_path == "<unknown>":
         return with_str_clone_ref(base_name)
-    "__with_mod_" ++ codegen_hash_name_component(with_str_hash(canonical_path) as i64) ++ "__" ++ base_name
+    // A fn the flat merge displaced (#1350) is `<name>$in$<module>`; the
+    // module prefix already qualifies it, so its link name is the one its
+    // module declares everywhere else — a bundle's interface names it
+    // `<name>` whichever unit displaced it.
+    let displaced = base_name.index_of("$in$")
+    let link_base = if displaced > 0: base_name.slice(0, displaced) else: with_str_clone_ref(base_name)
+    "__with_mod_" ++ codegen_hash_name_component(with_str_hash(canonical_path) as i64) ++ "__" ++ link_base
