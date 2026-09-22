@@ -2192,10 +2192,35 @@ impl Sema:
 
         let ret_type = self.sig_return_type(sig_idx)
 
-        // Active borrows are per-function state. Remove complete rows,
-        // including scope depth and creation site, before checking a new body.
-        while self.borrow_kinds.len() > 0:
-            self.remove_borrow_at(self.borrow_refs.len() as i32 - 1)
+        // Active borrows are per-function state. This body can be checked in
+        // the middle of another one — check_fn_body_concrete instantiates a
+        // generic callee (`print(e.key)`) while the caller's borrows are live
+        // — so the caller's rows are set aside here and restored at exit, not
+        // discarded; the body's own rows die with it. Wiping them let the
+        // first call of a generic function erase every live view of the
+        // caller (#1317: the `for` binding's borrow of `xs`). The loop view
+        // bindings are the caller's too. borrow_path_data is append-only, so
+        // the saved rows' path indices stay valid.
+        let saved_borrow_kinds = move self.borrow_kinds
+        let saved_borrow_places = move self.borrow_places
+        let saved_borrow_fields = move self.borrow_fields
+        let saved_borrow_refs = move self.borrow_refs
+        let saved_borrow_path_starts = move self.borrow_path_starts
+        let saved_borrow_path_counts = move self.borrow_path_counts
+        let saved_borrow_scope_depths = move self.borrow_scope_depths
+        let saved_borrow_creation_nodes = move self.borrow_creation_nodes
+        let saved_for_view_binding_syms = move self.for_view_binding_syms
+        let saved_for_view_binding_depths = move self.for_view_binding_depths
+        self.borrow_kinds = Vec.new()
+        self.borrow_places = Vec.new()
+        self.borrow_fields = Vec.new()
+        self.borrow_refs = Vec.new()
+        self.borrow_path_starts = Vec.new()
+        self.borrow_path_counts = Vec.new()
+        self.borrow_scope_depths = Vec.new()
+        self.borrow_creation_nodes = Vec.new()
+        self.for_view_binding_syms = Vec.new()
+        self.for_view_binding_depths = Vec.new()
 
         // Push function scope
         self.push_scope()
@@ -2537,6 +2562,16 @@ impl Sema:
             self.implicit_binding_types.pop()
             self.implicit_binding_syms.pop()
         self.pop_scope()
+        self.borrow_kinds = saved_borrow_kinds
+        self.borrow_places = saved_borrow_places
+        self.borrow_fields = saved_borrow_fields
+        self.borrow_refs = saved_borrow_refs
+        self.borrow_path_starts = saved_borrow_path_starts
+        self.borrow_path_counts = saved_borrow_path_counts
+        self.borrow_scope_depths = saved_borrow_scope_depths
+        self.borrow_creation_nodes = saved_borrow_creation_nodes
+        self.for_view_binding_syms = saved_for_view_binding_syms
+        self.for_view_binding_depths = saved_for_view_binding_depths
         self.local_file_id = saved_body_file_id
         self.current_module_path = saved_body_module_path
         self.current_module_has_ci = saved_body_module_has_ci
