@@ -4,5 +4,5 @@ fn main:
             (0, 0) => "FizzBuzz"
             (0, _) => "Fizz"
             (_, 0) => "Buzz"
-            _      => i
+            _      => f"{i}"
         )
