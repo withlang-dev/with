@@ -8589,6 +8589,7 @@ fn ci_fn_decl_index_reset:
     g_ci_fn_decl_index_session = 0
     g_ci_fn_decl_index_generation = 0
     ci_record_index_reset()
+    ci_decl_location_index_reset()
 
 // #744/#749: record/typedef name lookups were the remaining full-scan class —
 // each probe paid O(decls) libclang spelling queries, every one a session
@@ -11563,18 +11564,39 @@ fn ci_str_compare(a: &str, b: &str) -> i32:
         return 1
     0
 
-// Get source location for a declaration by matching name in AST
-fn ci_get_decl_location(session: i64, name: &str) -> str:
+// The FIRST top-level cursor spelled each name. ci_get_decl_location scanned
+// every top-level cursor per query, and a struct translation queries once per
+// struct, so c_import was quadratic in a header's declarations (3000 cost 8x
+// what 750 did; windows.h timed the bzip2 and libcurl UATs out). Rebuilt on
+// session or parse-generation change like the #744 indexes below, and cleared
+// with them at migration teardown.
+var g_ci_decl_location_cursor: HashMap[str, i32] = HashMap.new()
+var g_ci_decl_location_session: i64 = 0
+var g_ci_decl_location_generation: i64 = 0
+
+fn ci_decl_location_index_ensure(session: i64):
+    if g_ci_decl_location_session == session and g_ci_decl_location_generation == with_cimport_parse_generation():
+        return
+    var by_name: HashMap[str, i32] = HashMap.new()
     let root = with_ci_root_cursor(session)
     let n = with_ci_num_children(session, root)
-    var i = 0
-    while i < n:
+    for i in 0..n:
         let child = with_ci_child(session, root, i)
         let cname = with_ci_cursor_spelling(session, child)
-        if cname == name:
-            return with_ci_cursor_location(session, child)
-        i = i + 1
-    ""
+        if not by_name.contains(cname):
+            by_name.insert(ci_ir_owned_text(cname), child)
+    g_ci_decl_location_cursor = by_name
+    g_ci_decl_location_session = session
+    g_ci_decl_location_generation = with_cimport_parse_generation()
+
+fn ci_decl_location_index_reset:
+    g_ci_decl_location_cursor = HashMap.new()
+    g_ci_decl_location_session = 0
+    g_ci_decl_location_generation = 0
+
+fn ci_get_decl_location(session: i64, name: &str) -> str:
+    ci_decl_location_index_ensure(session)
+    if g_ci_decl_location_cursor.contains(name): with_ci_cursor_location(session, g_ci_decl_location_cursor.get(name).unwrap()) else: ""
 
 fn ci_is_null_like_stmt(session: i64, cursor: i32) -> bool:
     let kind = with_ci_cursor_kind(session, cursor)

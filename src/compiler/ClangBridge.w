@@ -659,6 +659,12 @@ unsafe fn grow_ptr_array(arr: *mut *mut u8, count: i32, cap: *mut i32, elem_size
 
 // ── Global state ────────────────────────────────────────────────
 
+// Every name this c_import has emitted: an open-addressing hash set of owned
+// C strings (an empty slot is null; the capacity is a power of two, kept at
+// least twice the count). It was a list scanned linearly on every lookup,
+// which made c_import quadratic in a header's declarations: 3000 of them cost
+// 8x what 750 did, and windows.h timed the bzip2 and libcurl UATs out.
+// (This object is compiled without the prelude, so no std HashMap.)
 var g_emitted_names: *mut *mut u8 = 0 as *mut *mut u8
 var g_emitted_count: i32 = 0
 var g_emitted_cap: i32 = 0
@@ -789,25 +795,50 @@ unsafe fn get_clang_resource_dir() -> *const u8:
 
 // ── Name deduplication ──────────────────────────────────────────
 
-unsafe fn is_name_emitted(name: *const u8) -> i32:
-    var i: i32 = 0
-    while i < g_emitted_count:
-        let entry = *((g_emitted_names as i64 + i as i64 * 8) as *const *const u8)
-        if c_strcmp(entry, name) == 0: return 1
+// A polynomial string hash kept below 2^30, so no step can overflow.
+unsafe fn emitted_name_hash(name: *const u8) -> i64:
+    var h: i64 = 0
+    var i: i64 = 0
+    while true:
+        let c = *((name as i64 + i) as *const u8)
+        if c == 0: return h
+        h = (h * 31 + c as i64) % 1073741789
         i = i + 1
+    h
+
+// The slot holding `name`, or the empty slot where it belongs.
+unsafe fn emitted_name_slot(table: *mut *mut u8, cap: i32, name: *const u8) -> i64:
+    var i = emitted_name_hash(name) % cap as i64
+    while true:
+        let slot = table as i64 + i * 8
+        let entry = *(slot as *const *const u8)
+        if entry as i64 == 0 or c_strcmp(entry, name) == 0: return slot
+        i = (i + 1) % cap as i64
     0
 
+unsafe fn is_name_emitted(name: *const u8) -> i32:
+    if g_emitted_count == 0: return 0
+    let slot = emitted_name_slot(g_emitted_names, g_emitted_cap, name)
+    if *(slot as *const *const u8) as i64 != 0: 1 else: 0
+
 unsafe fn mark_name_emitted(name: *const u8):
-    if is_name_emitted(name) != 0: return
-    if g_emitted_count >= g_emitted_cap:
-        g_emitted_cap = if g_emitted_cap > 0: g_emitted_cap * 2 else: 256
+    if (g_emitted_count + 1) * 2 > g_emitted_cap:
         let old_names = g_emitted_names
+        let old_cap = g_emitted_cap
+        g_emitted_cap = if old_cap > 0: old_cap * 2 else: 256
         g_emitted_names = with_alloc(g_emitted_cap as i64 * 8) as *mut *mut u8
-        if old_names as i64 != 0 and g_emitted_count > 0:
-            with_memcpy(g_emitted_names as *mut u8, old_names as *const u8, g_emitted_count as i64 * 8)
+        let _cleared = with_memset(g_emitted_names as *mut u8, 0, g_emitted_cap as i64 * 8)
+        var i: i32 = 0
+        while i < old_cap:
+            let entry = *((old_names as i64 + i as i64 * 8) as *const *mut u8)
+            if entry as i64 != 0:
+                *(emitted_name_slot(g_emitted_names, g_emitted_cap, entry as *const u8) as *mut *mut u8) = entry
+            i = i + 1
         if old_names as i64 != 0:
             with_free(old_names as *mut u8)
-    *((g_emitted_names as i64 + g_emitted_count as i64 * 8) as *mut *mut u8) = c_strdup(name)
+    let slot = emitted_name_slot(g_emitted_names, g_emitted_cap, name)
+    if *(slot as *const *const u8) as i64 != 0: return
+    *(slot as *mut *mut u8) = c_strdup(name)
     g_emitted_count = g_emitted_count + 1
 
 // ── Type translation helpers ────────────────────────────────────
@@ -1377,9 +1408,10 @@ pub fn with_cimport_mark_name_emitted(name: &str) -> i32:
 pub fn with_cimport_reset_names() -> i32:
     unsafe:
         var i: i32 = 0
-        while i < g_emitted_count:
+        while i < g_emitted_cap:
             let entry = *((g_emitted_names as i64 + i as i64 * 8) as *const *mut u8)
-            with_free(entry)
+            if entry as i64 != 0:
+                with_free(entry)
             i = i + 1
         if g_emitted_names as i64 != 0:
             with_free(g_emitted_names as *mut u8)
