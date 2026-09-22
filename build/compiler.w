@@ -1398,6 +1398,127 @@ pub fn run_stack_budget_check_action(ctx: ActionCtx) -> i32:
         return comp_fail(ctx, f"max frame {max_frame} exceeds budget {max_frame_budget}; report=" ++ report_path)
     0
 
+// stage2-debug-lines: the compiler's own DWARF names each function's own
+// source file and line. Every function of every module once read as
+// `main.w:<garbage>` — Codegen named the root's DIFile and measured every
+// span against the root's text — while lldb, dsymutil and every build step
+// stayed silent. Each anchor is `symbol|source path|declaration text`: the
+// subprogram's DW_AT_decl_file must be exactly /with-src/<source> (the D50
+// prefix map), its DW_AT_decl_line the line the declaration text sits on, and the
+// line table at its low_pc must name the same file.
+pub fn run_debug_lines_check_action(ctx: ActionCtx) -> i32:
+    let inputs = ctx.inputs()
+    if inputs.len() == 0:
+        return comp_fail(ctx, "requires a binary input")
+    let binary_path = inputs.get(0)
+    let fs = ctx.fs()
+    if not fs.exists(binary_path):
+        return comp_fail(ctx, "missing binary: " ++ binary_path)
+    let output_path = ctx.output()
+    if os() == "Windows":
+        // A COFF compiler carries CodeView in a PDB, not DWARF (#1147); this
+        // check reads DWARF only. Say so rather than pass.
+        let note = "skipped: CodeView target (DWARF line check applies to Mach-O and ELF)\n"
+        print("[" ++ ctx.target_name() ++ "] " ++ note)
+        fs.write_text(output_path, note)
+        return 0
+    // Mach-O keeps DWARF in the dSYM, whose DWARF file must carry the
+    // binary's own name; ELF keeps it in the binary.
+    var dwarf_path = compiler_owned_text(binary_path)
+    if os() == "Macos":
+        dwarf_path = binary_path ++ ".dSYM/Contents/Resources/DWARF/" ++ comp_path_basename(binary_path)
+        if not fs.exists(dwarf_path):
+            return comp_fail(ctx, "no dSYM DWARF file named after the binary: " ++ dwarf_path)
+    let root = ctx.project_info().project_root()
+    let tool_path = comp_stack_tool_process_path(root, comp_llvm_dwarfdump_tool(comp_llvm_prefix_for_root(root)))
+    if not fs.host_exists(tool_path):
+        return comp_fail(ctx, "missing llvm-dwarfdump: " ++ tool_path)
+    let capture_dir = comp_join("out/command", ctx.target_name())
+    if fs.mkdir_all(capture_dir) != 0:
+        return comp_fail(ctx, "could not create capture directory: " ++ capture_dir)
+    var report = ""
+    var anchors = 0
+    let args = ctx.args()
+    for i in 0..args.len() as i32:
+        let spec = comp_arg_after(args[i], "anchor=")
+        if spec.len() == 0:
+            continue
+        let parts = spec.split("|")
+        if parts.len() != 3:
+            return comp_fail(ctx, "anchor must be symbol|source|declaration text: " ++ spec)
+        let line = comp_debug_lines_check_anchor(ctx, tool_path, comp_abs(root, dwarf_path), capture_dir, parts[0], parts[1], parts[2])
+        if line.len() == 0:
+            return 1
+        report = report ++ line ++ "\n"
+        anchors = anchors + 1
+    if anchors == 0:
+        return comp_fail(ctx, "requires at least one anchor= argument")
+    print(report)
+    fs.write_text(output_path, report)
+    0
+
+fn comp_arg_after(arg: &str, prefix: &str) -> str:
+    if arg.starts_with(prefix): arg.slice(prefix.len(), arg.len()) else: ""
+
+// The text inside the parentheses of `<attr>\t(<value>)` in a dwarfdump DIE.
+fn comp_dwarf_attr(dump: &str, attr: &str) -> str:
+    let at = dump.find(attr)
+    if at < 0:
+        return ""
+    let rest = dump.slice(at + attr.len(), dump.len())
+    let open = rest.find("(")
+    let close = rest.find(")")
+    if open < 0 or close <= open:
+        return ""
+    let value = rest.slice(open + 1, close)
+    if value.starts_with("\"") and value.ends_with("\"") and value.len() >= 2:
+        return value.slice(1, value.len() - 1)
+    value
+
+// One anchor's verdict line, or "" after reporting the failure.
+fn comp_debug_lines_check_anchor(ctx: &ActionCtx, tool_path: &str, dwarf_path: &str, capture_dir: &str, symbol: &str, source: &str, decl_text: &str) -> str:
+    let fs = ctx.fs()
+    let root = ctx.project_info().project_root()
+    let text = if fs.exists(source): fs.read_text(source) else: ""
+    let decl_at = text.find(decl_text)
+    if decl_at < 0:
+        comp_fail(ctx, f"anchor {symbol}: `{decl_text}` not found in {source}")
+        return ""
+    let expected_line = text.slice(0, decl_at).split("\n").len()
+    // The stage builds name the checkout /with-src (WITH_FILE_PREFIX_MAP, D50).
+    let expected_file = "/with-src/" ++ source
+    let label = comp_replace_all(symbol, ".", "_")
+    let name_argv: Vec[str] = Vec.new()
+    name_argv.push(compiler_owned_text(tool_path))
+    name_argv.push("--name=" ++ symbol)
+    name_argv.push(compiler_owned_text(dwarf_path))
+    let named = ctx.process_runner().run_capture(name_argv, comp_abs(root, comp_join(capture_dir, label ++ ".name.stdout")), comp_abs(root, comp_join(capture_dir, label ++ ".name.stderr")), 300000)
+    if named.rc != 0:
+        comp_fail(ctx, f"anchor {symbol}: llvm-dwarfdump --name exited {named.rc}")
+        return ""
+    let decl_file = comp_dwarf_attr(named.stdout, "DW_AT_decl_file")
+    let decl_line = comp_dwarf_attr(named.stdout, "DW_AT_decl_line")
+    let low_pc = comp_dwarf_attr(named.stdout, "DW_AT_low_pc")
+    if decl_file.len() == 0 or low_pc.len() == 0:
+        comp_fail(ctx, f"anchor {symbol}: no concrete DW_TAG_subprogram (decl_file `{decl_file}`, low_pc `{low_pc}`); the debug info lost it, or the anchor was inlined away — pick a function that keeps a body")
+        return ""
+    if decl_file != expected_file:
+        comp_fail(ctx, f"anchor {symbol}: DW_AT_decl_file is `{decl_file}`, expected `{expected_file}`")
+        return ""
+    if decl_line != f"{expected_line}":
+        comp_fail(ctx, f"anchor {symbol}: DW_AT_decl_line is {decl_line}, expected {expected_line} (`{decl_text}` in {source})")
+        return ""
+    let lookup_argv: Vec[str] = Vec.new()
+    lookup_argv.push(compiler_owned_text(tool_path))
+    lookup_argv.push("--lookup=" ++ low_pc)
+    lookup_argv.push(compiler_owned_text(dwarf_path))
+    let looked = ctx.process_runner().run_capture(lookup_argv, comp_abs(root, comp_join(capture_dir, label ++ ".lookup.stdout")), comp_abs(root, comp_join(capture_dir, label ++ ".lookup.stderr")), 300000)
+    let expected_row = "Line info: file '" ++ comp_path_basename(source) ++ "'"
+    if looked.rc != 0 or not looked.stdout.contains(expected_row):
+        comp_fail(ctx, f"anchor {symbol}: the line table at {low_pc} does not name {comp_path_basename(source)} (rc {looked.rc}); see " ++ comp_join(capture_dir, label ++ ".lookup.stdout"))
+        return ""
+    f"ok {symbol}: {decl_file}:{decl_line}, line table at {low_pc} in {comp_path_basename(source)}"
+
 fn comp_json_escape(text: &str) -> str:
     var out = ""
     for i in 0..text.len() as i32:
@@ -1996,6 +2117,13 @@ pub fn run_with_compiler_build_action(ctx: ActionCtx) -> i32:
     if fs.exists(tmp_output ++ ".dSYM"):
         if fs.rename(tmp_output ++ ".dSYM", output_path ++ ".dSYM") != 0:
             let _cleanup_tmp_dsym_move = comp_remove_tree_if_exists(fs, tmp_output ++ ".dSYM")
+        else:
+            // dsymutil named the DWARF file after the binary it read, the
+            // .tmp link output; the bundle carries the final binary's name.
+            let dwarf_dir = output_path ++ ".dSYM/Contents/Resources/DWARF/"
+            let tmp_dwarf = dwarf_dir ++ comp_path_basename(tmp_output)
+            if fs.exists(tmp_dwarf) and fs.rename(tmp_dwarf, dwarf_dir ++ comp_path_basename(output_path)) != 0:
+                return comp_fail(ctx, "could not rename dSYM DWARF file: " ++ tmp_dwarf)
     if not output_path.contains(".o"):
         print("[" ++ ctx.target_name() ++ "] wrote " ++ output_path)
     let _remove_stdout = fs.remove_file(stdout_path)

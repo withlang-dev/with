@@ -2273,8 +2273,24 @@ pub fn build(ctx: BuildCtx) -> Build:
     fixpoint_evidence = fixpoint_evidence.dep("build")
     out = out.add_target(fixpoint_evidence)
 
+    // The compiler's own debug info names each function's own source file
+    // and line (build/compiler.w run_debug_lines_check_action): lldb on the
+    // stage binaries is the debugging route, and it read every module as
+    // `main.w:<garbage>` with nothing failing. Two anchors, neither the root.
+    var stage2_debug_lines = target_new(.Action, "stage2-debug-lines", "").output("out/command/stage2-debug-lines/report.txt")
+    stage2_debug_lines.action = run_debug_lines_check_action
+    stage2_debug_lines = stage2_debug_lines.input(stage_compiler_bin("with-stage2"))
+    stage2_debug_lines = stage2_debug_lines.input("src/SemaCheck.w")
+    stage2_debug_lines = stage2_debug_lines.input("src/Lexer.w")
+    stage2_debug_lines = stage2_debug_lines.arg("anchor=Sema.check_mutation_against_views|src/SemaCheck.w|fn check_mutation_against_views(")
+    stage2_debug_lines = stage2_debug_lines.arg("anchor=Lexer.skip_whitespace|src/Lexer.w|fn skip_whitespace(")
+    stage2_debug_lines = stage2_debug_lines.write_scope("out/command/stage2-debug-lines")
+    stage2_debug_lines = stage2_debug_lines.dep("stage2")
+    out = out.add_target(stage2_debug_lines)
+
     var fixpoint = target_new(.Group, "fixpoint", "")
     fixpoint = fixpoint.dep("fixpoint-compare")
+    fixpoint = fixpoint.dep("stage2-debug-lines")
     fixpoint = fixpoint.dep("bless-manifest")
     fixpoint = fixpoint.dep("fixpoint-evidence")
     out = out.add_target(fixpoint)
