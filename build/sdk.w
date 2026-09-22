@@ -435,6 +435,10 @@ fn sdk_package_tool_selected(rel: &str, platform: &str) -> bool:
         tools.push("bin/clang++.exe")
         tools.push("bin/clang-cl.exe")
         tools.push("bin/cmake.exe")
+        // The Ninja generator's RC dependency scanner; cmake looks for it
+        // beside cmake.exe and, when it is absent, silently emits the RC
+        // rule without it, so rc.exe gets the scanner's arguments (RC1107).
+        tools.push("bin/cmcldeps.exe")
         tools.push("bin/ninja.exe")
         tools.push("bin/lld-link.exe")
         tools.push("bin/wasm-ld.exe")
@@ -472,13 +476,17 @@ fn sdk_clang_driver_rel() -> str: "bin/clang-" ++ COMPILER_LLVM_VERSION.split(".
 
 // Everything the next SDK build needs from this package as its bootstrap
 // (sdk_validate_staged_paths asks for exactly these): the compiler driver,
-// its links, CMake with its module tree, and Ninja.
+// its links, CMake with its module tree and RC scanner, and Ninja; on
+// Windows also the MSVC-style driver and linker cmake's own build uses.
 fn sdk_bootstrap_set(platform: &str) -> Vec[str]:
     let set: Vec[str] = Vec.new()
     if sdk_platform_is_windows(platform):
         set.push("bin/clang.exe")
         set.push("bin/clang++.exe")
+        set.push("bin/clang-cl.exe")
+        set.push("bin/lld-link.exe")
         set.push("bin/cmake.exe")
+        set.push("bin/cmcldeps.exe")
         set.push("bin/ninja.exe")
     else:
         set.push("bin/clang")

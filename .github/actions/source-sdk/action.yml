@@ -44,11 +44,15 @@ runs:
           [[ -x "$(readlink -f "$path" 2>/dev/null || echo /nonexistent)" ]] || return 1
           if [[ "$tool" == cmake ]]; then
             ls -d "$asset"/share/cmake-*/Modules >/dev/null 2>&1 || return 1
+            # Ninja's RC dependency scanner (see the seed copy below).
+            [[ "$RUNNER_OS" != Windows || -f "$asset/bin/cmcldeps$exe" ]] || return 1
           fi
           return 0
         }
         need=0
-        for tool in clang clang++ cmake ninja; do
+        bootstrap_tools="clang clang++ cmake ninja"
+        [[ "$RUNNER_OS" == Windows ]] && bootstrap_tools="$bootstrap_tools clang-cl lld-link"
+        for tool in $bootstrap_tools; do
           usable "$tool" || need=1
         done
         if [[ $need == 0 ]]; then
@@ -109,6 +113,11 @@ runs:
             if [[ "$tool" == cmake ]]; then
               mkdir -p "$seed/share"
               cp -R "$hostprefix"/share/cmake-* "$seed/share/"
+              # The Ninja generator's RC dependency scanner lives beside
+              # cmake.exe. When it is missing, cmake silently emits the RC
+              # rule without it and rc.exe receives the scanner's own
+              # arguments: `fatal error RC1107: invalid usage`.
+              cp -f "$(dirname "$real")/cmcldeps$exe" "$seed/bin/cmcldeps$exe"
             elif [[ "$tool" == clang && -d "$hostprefix/lib/clang" ]]; then
               mkdir -p "$seed/lib"
               cp -R "$hostprefix/lib/clang" "$seed/lib/"
@@ -126,6 +135,10 @@ runs:
             exit 1
           fi
         done
+        if [[ "$RUNNER_OS" == Windows && ! -f "$seed/bin/cmcldeps$exe" ]]; then
+          echo "source-sdk: seeded cmake has no cmcldeps$exe beside it; its Ninja RC rules would run rc.exe with the scanner's arguments" >&2
+          exit 1
+        fi
 
     - name: Build and package SDK from source
       if: steps.sdk-cache.outputs.cache-hit != 'true'
