@@ -1176,7 +1176,19 @@ impl Codegen:
         self.di_file = wl_di_create_file(self.di_builder, file, dir)
 
         wl_add_module_flag_int(self.llmod, "Debug Info Version", wl_debug_metadata_version())
-        wl_add_module_flag_int(self.llmod, "Dwarf Version", 5)
+        // The debug format follows the target's object format. A COFF/MSVC
+        // target carries its debug info as CodeView: lld-link's `/debug`
+        // builds the PDB from it, and the runtime's backtraces (dbghelp
+        // SymFromAddr) read that PDB. AsmPrinter emits DWARF whenever the
+        // "CodeView" flag is absent or "Dwarf Version" is set, so a Windows
+        // module used to carry nine DWARF `.debug_*` sections that the PDB
+        // never read and that lld-link warned about on every link ("section
+        // name .debug_info is longer than 8 characters", #1147). Every other
+        // target keeps DWARF 5.
+        if target_spec_os() == "Windows":
+            wl_add_module_flag_int(self.llmod, "CodeView", 1)
+        else:
+            wl_add_module_flag_int(self.llmod, "Dwarf Version", 5)
 
         let is_opt = 0
         self.di_compile_unit = wl_di_create_compile_unit(
