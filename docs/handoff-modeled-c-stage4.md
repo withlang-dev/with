@@ -60,10 +60,22 @@ existing With spelling makes the field's Drop not run (check how
 that reads `self.repr` and then lets `self` drop would double-destroy — write
 the test for it first).
 
-In-place resource (repr is a by-value struct with `init`): stage 4b —
-`type R { repr: Repr, live: bool }`; storage `Repr.zeroed()` (or the `preinit`
-operation); `init` sets `live` on success; `drop` runs the destroyer only
-when `live`. Not part of 4a.
+In-place resource (repr is a by-value struct with `init`): stage 4b, landed
+(`FacadeRender.w facade_render_init`, `SemaFacade.w verify_facade_init`) —
+`type R { repr: Repr, live: bool }`; storage is `Repr {}` — the ordinary
+zeroed construction of an imported struct, whose every field c_import gives
+its zero default (`CImport.w ci_default_for_type`; `T.zeroed()` of the
+storage-types campaign is not implemented and is not needed) — or the
+`preinit` operation's result (it returns the representation); `init` takes
+`&raw mut repr` and arms `live` by `status == OK` under `ok CONST`, else
+unconditionally with the status handed back unread; a status-returning
+init yields `(status, R)`, a void one `R`. Any operation whose first
+parameter is a pointer to the representation (drop, destroyers, aliased
+`z_streamp`) is handed `&raw mut self.repr`. Open: an in-place resource
+moves after init (returned from the constructor, pushed into a Vec), so a
+C library that keeps the storage address (zlib's `state->strm`) breaks —
+address stability is a design question for the maintainer, not a 4b
+rendering choice.
 
 Facade-level errors (§9 / spec "never half-model unsafely"), reported at the
 resource's span with the ruling's wording:
