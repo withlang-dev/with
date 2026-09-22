@@ -942,6 +942,7 @@ impl CiProject:
         if session == 0:
             eprint("migrate: failed to parse " ++ input_path)
             return 1
+        with_cimport_session_set_migration(session)
 
         let err_msg = with_cimport_error(session)
         if err_msg.len() > 0:
@@ -1100,6 +1101,8 @@ fn ci_migrate_file_body(input_path: &str, output_path: &str, project_active: boo
 
     // Pass to libclang via cimport_parse
     let session = with_cimport_parse(source)
+    if session != 0:
+        with_cimport_session_set_migration(session)
     if session == 0:
         g_migrate_raw_source = ""
         g_migrate_current_input_path = ""

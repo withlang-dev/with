@@ -417,6 +417,13 @@ type CImportSession:
     // CPU on the emitted compiler C. Entries and array freed at dispose.
     cursor_spellings: *mut *mut u8
     cursor_spellings_cap: i32
+    // A migration session (with_cimport_session_set_migration): a pointer to
+    // a reserved-spelled system record (`FILE *`) is spelled `*mut c_void`,
+    // because migrated code calls std.libc, whose stdio takes `*mut c_void`,
+    // and the migrator never emits system records. A c_import session keeps
+    // the record's identity — the toolchain libc facade's `CFile wraps *mut
+    // FILE` is a pointer to FILE, not to void (D51 ruling §5).
+    migration: i32
 
 type ChildCollector:
     session: *mut CImportSession
@@ -944,14 +951,16 @@ unsafe fn translate_type_recursive_mode(s: *mut CImportSession, ty: CXType, dept
             buf_append_str(&raw mut buf as *mut [64]u8 as *mut u8, &raw mut pos, 64, qual)
             buf_append_str(&raw mut buf as *mut [64]u8 as *mut u8, &raw mut pos, 64, " i8\0" as *const u8)
             return session_strdup(s, &buf as *const [64]u8 as *const u8)
-        // A pointer to a reserved-spelled record from a system header
-        // (`__sFILE`, glibc's `_IO_FILE`, the UCRT's `_iobuf`: what `FILE *`
-        // is) is a `c_void` pointer: the migrator never emits system
-        // records, and std.libc's fopen returns `*mut c_void`. Only the
-        // pointer: such a record embedded by value in another system record
-        // keeps its name (`__darwin_mcontext32`'s `__es`), and a project's
-        // `_Tag` keeps its identity everywhere (c_algorithms' `_RBTreeNode`).
-        if can_pointee.kind == CXType_Record and record_is_reserved_system(can_pointee) != 0:
+        // In a migration session, a pointer to a reserved-spelled record from
+        // a system header (`__sFILE`, glibc's `_IO_FILE`, the UCRT's
+        // `_iobuf`: what `FILE *` is) is a `c_void` pointer: the migrator
+        // never emits system records, and std.libc's fopen returns
+        // `*mut c_void`. Only the pointer: such a record embedded by value in
+        // another system record keeps its name (`__darwin_mcontext32`'s
+        // `__es`), and a project's `_Tag` keeps its identity everywhere
+        // (c_algorithms' `_RBTreeNode`). A c_import keeps the pointee's
+        // identity (`*mut FILE`), which the toolchain libc facade names.
+        if (*s).migration != 0 and can_pointee.kind == CXType_Record and record_is_reserved_system(can_pointee) != 0:
             var buf: [64]u8 = [0 as u8; 64]
             var pos: i64 = 0
             buf_append_str(&raw mut buf as *mut [64]u8 as *mut u8, &raw mut pos, 64, "*\0" as *const u8)
@@ -1454,6 +1463,12 @@ unsafe fn cimport_record_parse_error(s: *mut CImportSession):
 // address also record the generation, so a session address recycled by a
 // later parse can never validate a stale cache.
 var g_cimport_parse_counter: i64 = 0
+
+// Marks a session as a migration's (CImportSession.migration).
+pub fn with_cimport_session_set_migration(session: i64) -> Unit:
+    unsafe:
+        let s = session as *mut CImportSession
+        if s as i64 != 0: (*s).migration = 1
 
 pub fn with_cimport_parse_generation() -> i64:
     g_cimport_parse_counter
@@ -3255,13 +3270,14 @@ pub fn with_ci_type_is_const(session: i64, type_idx: i32) -> i32:
         let ty = *(((*s).types as i64 + type_idx as i64 * 24) as *const CXType)
         clang_isConstQualifiedType(ty)
 
-// Whether the type is a reserved-spelled record from a system header: the
-// pointee of `FILE *`, which every type path spells `c_void`
-// (record_is_reserved_system is the one rule).
+// Whether the type is a reserved-spelled record from a system header that a
+// migration session spells `c_void` behind a pointer: the pointee of
+// `FILE *` (record_is_reserved_system is the one rule). Never in a c_import
+// session, which keeps the record's identity.
 pub fn with_ci_type_is_reserved_system_record(session: i64, type_idx: i32) -> bool:
     unsafe:
         let s = session as *mut CImportSession
-        if s as i64 == 0 or type_idx < 0 or type_idx >= (*s).type_count: return false
+        if s as i64 == 0 or (*s).migration == 0 or type_idx < 0 or type_idx >= (*s).type_count: return false
         let canonical = clang_getCanonicalType(*(((*s).types as i64 + type_idx as i64 * 24) as *const CXType))
         canonical.kind == CXType_Record and record_is_reserved_system(canonical) != 0
 

@@ -67,10 +67,9 @@ fn libc_facade_operand(line: &str) -> str:
 // own facades state) leaves to the toolchain; "" when nothing applies. A
 // declaration is described only when it has libc's shape: a producer returns
 // the representation, the drop takes it (or `void *`, §61), a lend takes it
-// first. A header whose translation gives libc's type another shape — Darwin's
-// <stdio.h> hands FILE * through as `*mut c_void` — is not described: its
-// functions stay the raw surface, which removes capability and never
-// asserts a contract the declarations do not carry.
+// first. A declaration of another shape — a program's own `fopen` over
+// `void *` — is not described: it stays the raw surface, which removes
+// capability and never asserts a contract the declarations do not carry.
 pub fn libc_facade_select(pool: AstPool, intern: InternPool, ci: &Vec[i32], claimed: &Vec[str]) -> str:
     let lines = libc_facade_source().split("\n")
     var kept_names: Vec[str] = Vec.new()
