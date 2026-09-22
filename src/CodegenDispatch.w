@@ -1122,18 +1122,51 @@ impl Codegen:
     mut fn audit_codegen_place_types(body: &MirBody):
         if self.analysis_enabled == 0 or self.analysis_query != "audit":
             return
+        // Stated exclusion (#1305): the async lowering projects
+        // `Task.fiber_id` (`.f0`) off a call-result local that MIR types as
+        // the awaited T, not Task[T]; codegen's FIBER_* intrinsics agree with
+        // it by convention. Those places are the argument of a fiber
+        // intrinsic call and nothing else; skip exactly them until #1305
+        // types the local as Task[T].
+        let intrinsic_places: HashMap[i32, i32] = HashMap.new()
+        for bb in 0..body.block_count():
+            if body.term_kind(bb) != TermKind.TK_CALL:
+                continue
+            let args_id = body.term_data1(bb)
+            if args_id < 0 or args_id >= body.call_arg_counts.len() as i32 or body.call_intrinsic(args_id) == MirIntrinsic.NONE:
+                continue
+            let arg_start = body.call_arg_starts[args_id]
+            for ai in 0..body.call_arg_counts[args_id]:
+                let op_id = body.call_arg_operands[(arg_start + ai)]
+                if op_id >= 0 and op_id < body.operand_d0.len() as i32:
+                    intrinsic_places.insert(body.operand_d0[op_id], 1)
         for place_id in 0..body.place_locals.len() as i32:
-            if body.place_proj_counts[place_id] == 0:
+            if body.place_proj_counts[place_id] == 0 or intrinsic_places.contains(place_id):
                 continue
             let sema_ty = body.place_sema_types[place_id]
             if sema_ty <= 0:
                 continue
             let want = self.mir_sema_type_to_llvm(sema_ty)
             let got = self.mir_place_projected_type(body, place_id)
-            if want == 0 or got == 0 or want == got:
+            if want == 0 or want == got:
                 continue
             let name = with_str_clone_ref(self.sema.pool_resolve(body.fn_sym))
-            self.analysis_fail(f"place {place_id} in {name}: projection lowers to LLVM type kind {wl_get_type_kind(got)} but its MIR type {sema_ty} ({self.sema.type_name(sema_ty)}) is kind {wl_get_type_kind(want)}")
+            let base_local = body.place_locals[place_id]
+            let base_sema = if base_local >= 0 and base_local < body.local_type_ids.len() as i32: body.local_type_ids[base_local] else: 0
+            var projs = ""
+            let p_start = body.place_proj_starts[place_id]
+            for pi in 0..body.place_proj_counts[place_id]:
+                projs = projs ++ f" proj[{pi}]=kind{body.proj_kinds[(p_start + pi)]}:{body.proj_d0[(p_start + pi)]}"
+            let got_width = if got != 0 and wl_get_type_kind(got) == wl_integer_type_kind(): wl_get_int_type_width(got) else: -1
+            let want_width = if wl_get_type_kind(want) == wl_integer_type_kind(): wl_get_int_type_width(want) else: -1
+            let detail = f"base _{base_local}: {self.sema.type_name(base_sema)} (ty {base_sema}){projs} got-int-width={got_width} want-int-width={want_width}"
+            if got == 0:
+                // The walk gave up (a field GEP on a base with no LLVM
+                // struct): an untyped projection is the #1280 shape, not a
+                // blind spot.
+                self.analysis_fail(f"place {place_id} in {name}: projection could not be typed by codegen but its MIR type {sema_ty} ({self.sema.type_name(sema_ty)}) is kind {wl_get_type_kind(want)}; {detail}")
+                continue
+            self.analysis_fail(f"place {place_id} in {name}: projection lowers to LLVM type kind {wl_get_type_kind(got)} but its MIR type {sema_ty} ({self.sema.type_name(sema_ty)}) is kind {wl_get_type_kind(want)}; {detail}")
 
     mut fn mir_place_projected_type(body: &MirBody, place_id: i32) -> i64:
         if place_id < 0 or place_id >= body.place_locals.len() as i32:
