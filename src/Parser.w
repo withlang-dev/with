@@ -7054,6 +7054,20 @@ impl Parser:
 
     // ── Let binding expression ───────────────────────────────────────
 
+    // `= value [else: body]` after a destructuring let pattern.
+    mut fn parse_let_pattern_rest(start: i32, pat: NodeId) -> NodeId:
+        if self.expect(TokenKind.TK_EQ) == 0:
+            return self.poisoned_expr()
+        self.skip_newlines()
+        let value = self.parse_expr()
+        var else_body: NodeId = 0 as NodeId
+        if self.peek() == TokenKind.TK_KW_ELSE:
+            self.advance()
+            if self.peek() == TokenKind.TK_COLON: self.advance()
+            self.skip_newlines()
+            else_body = self.parse_block_or_expr()
+        self.pool.add_node(NodeKind.NK_LET_ELSE, start, self.prev_end(), pat, value, else_body)
+
     mut fn parse_let_binding() -> NodeId:
         let start = self.current_start()
         let is_var = self.peek() == TokenKind.TK_KW_VAR
@@ -7068,17 +7082,7 @@ impl Parser:
         // bindings share the same Sema/MIR path as patterns elsewhere (§9.7).
         if self.peek() == TokenKind.TK_L_PAREN or self.peek() == TokenKind.TK_L_BRACE or self.peek() == TokenKind.TK_L_BRACKET:
             let pat = self.parse_pattern()
-            if self.expect(TokenKind.TK_EQ) == 0:
-                return self.poisoned_expr()
-            self.skip_newlines()
-            let value = self.parse_expr()
-            var else_body: NodeId = 0 as NodeId
-            if self.peek() == TokenKind.TK_KW_ELSE:
-                self.advance()
-                if self.peek() == TokenKind.TK_COLON: self.advance()
-                self.skip_newlines()
-                else_body = self.parse_block_or_expr()
-            return self.pool.add_node(NodeKind.NK_LET_ELSE, start, self.prev_end(), pat, value, else_body)
+            return self.parse_let_pattern_rest(start, pat)
 
         // Let-else: with variant shorthand: let .Some(v) = expr else: body
         if self.peek() == TokenKind.TK_DOT_IDENT:
@@ -7129,7 +7133,14 @@ impl Parser:
         if name_sym == 0:
             return self.poisoned_expr()
         let name_str = self.intern.resolve(name_sym)
-        let is_upper = name_str.len() > 0 and name_str[0] >= 65 and name_str[0] <= 90
+        let is_upper = name_str.len() > 0 and name_str[0] >= 'A' and name_str[0] <= 'Z'
+
+        // Named struct pattern: let Req { name, email } = req (§9.7, #1299) —
+        // the same node a match arm builds, so Sema's Drop gate (#1291)
+        // and MirLower see one pattern form.
+        if is_upper and self.peek() == TokenKind.TK_L_BRACE:
+            let pat = self.parse_struct_pattern(name_sym, start)
+            return self.parse_let_pattern_rest(start, pat)
 
         // Let-else: variant: let Some(x) = expr else: body
         if is_upper and self.peek() == TokenKind.TK_L_PAREN:
