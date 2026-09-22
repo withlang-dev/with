@@ -8,7 +8,6 @@ use Mir
 use Ast
 use InternPool
 use Sema
-use Source
 use compiler.EmbeddedStdlib
 use Overflow
 use std.collections.HashMap
@@ -295,7 +294,11 @@ type CCodegen {
     err_msg: str,
     source_path: str,
     source_text: str,
-    di_source: Source,
+    // The file the current body's declaration was parsed from (AstPool.file):
+    // its statement spans are byte offsets into that file, not the root.
+    // -1 when the body has no declaration node — no #line is emitted then.
+    line_file_id: i32,
+    line_file_path: str,
     last_line_directive: i32,
     body_fn_map: HashMap[i32, i32],
     body_fn_name_map: HashMap[str, i32],
@@ -358,7 +361,8 @@ fn c_emit_module(mir_mod: MirModule, ast: AstPool, intern: InternPool, sema: Sem
         err_msg: "",
         source_path: with_str_clone_ref(source_path),
         source_text: with_str_clone_ref(source_text),
-        di_source: Source.from_string(source_path, source_text, 0),
+        line_file_id: -1,
+        line_file_path: "",
         last_line_directive: 0,
         body_fn_map: HashMap.new(),
         body_fn_name_map: HashMap.new(),
@@ -8040,19 +8044,33 @@ impl CCodegen:
         "0"
 
     mut fn line_directive(body: &MirBody, stmt_id: i32) -> str:
-        if self.source_path.len() == 0:
+        if self.line_file_id < 0 or self.line_file_path.len() == 0:
             return ""
         if stmt_id < 0 or stmt_id >= body.stmt_spans.len() as i32:
             return ""
         let span = body.stmt_spans[stmt_id]
         if span <= 0:
             return ""
-        let loc = self.di_source.offset_to_location(span)
-        let line = loc.line + 1
+        let line = self.sema.source_location_for_file_id(self.line_file_id, span).line + 1
         if line == self.last_line_directive:
             return ""
         self.last_line_directive = line
-        f"#line {line} \"{cc_line_directive_path(self.source_path)}\"\n"
+        f"#line {line} \"{cc_line_directive_path(self.line_file_path)}\"\n"
+
+    // Point the #line directives at the file this body's declaration came
+    // from: the root for file 0, else the name Sema recorded for that file.
+    mut fn enter_line_file(fn_sym: i32):
+        self.last_line_directive = 0
+        let fn_node = self.sema.fn_symbol_decl_node(fn_sym)
+        if fn_node == 0:
+            self.line_file_id = -1
+            self.line_file_path = ""
+            return
+        self.line_file_id = self.sema.ast.file(fn_node) as i32
+        self.line_file_path = self.source_path.clone()
+        for si in 0..self.sema.source_text_file_ids.len() as i32:
+            if self.sema.source_text_file_ids[si] == self.line_file_id:
+                self.line_file_path = self.sema.source_text_names[si].clone()
 
     mut fn emit_stmt_line(body: &MirBody, stmt_id: i32) -> str:
         if stmt_id < 0 or stmt_id >= body.stmt_kinds.len() as i32:
@@ -9307,6 +9325,7 @@ impl CCodegen:
         let sig_idx = self.body_sig_index(fn_sym)
         if sig_idx < 0:
             return ""
+        self.enter_line_file(fn_sym)
         let fn_sig = self.emit_fn_decl(body)
         let param_count = if sig_idx >= 0: self.sema.sig_get_param_count(sig_idx) else: 0
         let out = COut.new()

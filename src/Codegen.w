@@ -13,7 +13,6 @@ use Mir
 use MirLower
 use Sema
 use Diagnostic
-use Source
 use Resolve
 use compiler.LlvmBridge.*
 use Overflow
@@ -462,8 +461,14 @@ type Codegen {
     debug_info: i32,
     di_builder: i64,
     di_compile_unit: i64,
+    // The root's DIFile (the compile unit's file). A function's own file is
+    // di_fn_file: spans are byte offsets into the file a node was parsed
+    // from (AstPool.file), so both the DIFile and the line of every location
+    // come from that file, never the root's.
     di_file: i64,
-    di_source: Source,
+    di_files: HashMap[i32, i64],
+    di_fn_file: i64,
+    di_fn_file_id: i32,
     di_fn_subprograms: HashMap[i32, i64],
     di_type_cache: HashMap[i32, i64],
     di_current_scope: i64,
@@ -1090,7 +1095,9 @@ fn Codegen.init_with_opt(module_name: &str, opt_level: i32) -> Codegen:
         di_builder: 0,
         di_compile_unit: 0,
         di_file: 0,
-        di_source: Source.from_string("<unknown>", "", 0),
+        di_files: HashMap.new(),
+        di_fn_file: 0,
+        di_fn_file_id: 0,
         di_fn_subprograms: HashMap.new(),
         di_type_cache: HashMap.new(),
         di_current_scope: 0,
@@ -1146,34 +1153,9 @@ impl Codegen:
     mut fn debug_init_module():
         if self.debug_info == 0:
             return
-        self.di_source = Source.from_string(self.source_file, self.source_text, 0)
         self.di_builder = wl_di_create_builder(self.llmod)
-
-        // The DWARF compile unit names the root by its canonical module path
-        // when it is a stdlib-tree module (`<embedded-std>/std/re/bundle.w`),
-        // so a .wo bundle object is byte-identical from every checkout — the
-        // identity its symbols already carry (D38 C0; #949: the checkout's
-        // absolute directory made one key hash to a different object per
-        // tree). Any other root keeps its real path for the debugger.
-        let canonical = codegen_canonical_module_path(self.source_file)
-        // #747: an owned copy — plain field assignment would move source_file
-        // out of self and poison the slice reads below.
-        // Any other root is named through WITH_FILE_PREFIX_MAP (FnAbi.w).
-        let di_path = if canonical.starts_with("<embedded-std>/"): canonical else: fn_abi_file_prefix_mapped(self.source_file)
-
-        // Split the path into directory and filename
-        var last_slash = -1
-        for i in 0..di_path.len() as i32:
-            if di_path[i] == 47:
-                last_slash = i
-
-        var dir = "."
-        var file = with_str_clone_ref(di_path)
-        if last_slash >= 0:
-            dir = di_path.slice(0, last_slash as i64)
-            file = di_path.slice((last_slash + 1) as i64, di_path.len())
-
-        self.di_file = wl_di_create_file(self.di_builder, file, dir)
+        self.di_file = self.debug_create_file(self.source_file)
+        self.di_files.insert(0, self.di_file)
 
         wl_add_module_flag_int(self.llmod, "Debug Info Version", wl_debug_metadata_version())
         // The debug format follows the target's object format. A COFF/MSVC
@@ -1194,6 +1176,48 @@ impl Codegen:
         self.di_compile_unit = wl_di_create_compile_unit(
             self.di_builder, self.di_file, "with", is_opt, 5, wl_dwarf_lang_with())
 
+    // A source file's DIFile, named by its canonical module path. A
+    // stdlib-tree module reads `<embedded-std>/std/re/bundle.w`, so a .wo
+    // bundle object is byte-identical from every checkout — the identity its
+    // symbols already carry (D38 C0; #949: the checkout's absolute directory
+    // made one key hash to a different object per tree). Any other file keeps
+    // its real path for the debugger: absolute (a module's recorded name is
+    // relative to the working directory, not to the root's directory, which
+    // DWARF would resolve it against) and named through WITH_FILE_PREFIX_MAP
+    // (FnAbi.w, D50).
+    fn debug_create_file(path: &str) -> i64:
+        let di_path = codegen_canonical_module_path(path)
+        var slash = -1 as i64
+        for i in 0..di_path.len():
+            if di_path[i] == '/':
+                slash = i
+        if slash < 0:
+            return wl_di_create_file(self.di_builder, di_path, ".")
+        wl_di_create_file(self.di_builder, di_path.slice(slash + 1, di_path.len()), di_path.slice(0, slash))
+
+    // The path a node's file id was parsed from: the root for file 0, else
+    // the name Sema recorded for that source text (the table diagnostics use).
+    fn debug_source_path(file_id: i32) -> str:
+        if file_id != 0:
+            for si in 0..self.sema.source_text_file_ids.len() as i32:
+                if self.sema.source_text_file_ids[si] == file_id:
+                    return with_str_clone_ref(self.sema.source_text_names[si])
+        with_str_clone_ref(self.source_file)
+
+    mut fn debug_file_for_id(file_id: i32) -> i64:
+        let cached = self.di_files.get(file_id)
+        if cached.is_some():
+            return cached.unwrap()
+        let di_file = self.debug_create_file(self.debug_source_path(file_id))
+        self.di_files.insert(file_id, di_file)
+        di_file
+
+    // Line (1-based) and column (1-based) of a byte offset in the current
+    // function's own file.
+    fn debug_line_col(byte_offset: i32) -> (i32, i32):
+        let loc = self.sema.source_location_for_file_id(self.di_fn_file_id, byte_offset)
+        (loc.line + 1, loc.col + 1)
+
     fn debug_finalize_module():
         if self.di_builder != 0:
             wl_di_finalize(self.di_builder)
@@ -1201,23 +1225,40 @@ impl Codegen:
     mut fn debug_enter_function(fn_node: i32, fn_sym: i32, function: i64):
         if self.di_builder == 0:
             return
-        let fn_name = self.intern.resolve(fn_sym)
+        let fn_name = self.intern.resolve(fn_sym).clone()
         if fn_name.len() == 0:
             return
-
-        var fn_line = 1
+        // Every location in the function is a byte offset into the file its
+        // declaration was parsed from; the subprogram, its lexical blocks and
+        // its line numbers all name that file (they named the root, so every
+        // function of every imported module read as `main.w:<garbage>`).
+        self.di_fn_file_id = self.pool.file(fn_node) as i32
+        self.di_fn_file = self.debug_file_for_id(self.di_fn_file_id)
         let span = self.pool.get_start(fn_node)
-        if span > 0:
-            let loc = self.di_source.offset_to_location(span)
-            fn_line = loc.line + 1
-
-        let sub_type = wl_di_create_subroutine_type(self.di_builder, self.di_file, 0, 0)
+        let fn_line = if span > 0: self.debug_line_col(span).0 else: 1
+        let sub_type = wl_di_create_subroutine_type(self.di_builder, self.di_fn_file, 0, 0)
         let subprogram = wl_di_create_function(
-            self.di_builder, self.di_file, fn_name, fn_name,
-            self.di_file, fn_line, sub_type, 1, fn_line, 0)
+            self.di_builder, self.di_fn_file, fn_name, fn_name,
+            self.di_fn_file, fn_line, sub_type, 1, fn_line, 0)
         wl_di_set_subprogram(function, subprogram)
         self.di_fn_subprograms.insert(fn_sym, subprogram)
         self.di_current_scope = subprogram
+
+    // The OS entry wrapper (wrap_main_for_exit) calls, and at -O1 inlines,
+    // the user's main. Without a subprogram of its own the inlined body
+    // loses every line: `main` read as `app`main + 28`. Its own code is
+    // compiler-generated, so it is line 0 in the root file.
+    mut fn debug_enter_entry_wrapper(wrapper: i64, name: &str):
+        if self.di_builder == 0:
+            return
+        self.di_fn_file_id = 0
+        self.di_fn_file = self.di_file
+        let sub_type = wl_di_create_subroutine_type(self.di_builder, self.di_file, 0, 0)
+        let subprogram = wl_di_create_function(
+            self.di_builder, self.di_file, name, name, self.di_file, 0, sub_type, 1, 0, 0)
+        wl_di_set_subprogram(wrapper, subprogram)
+        self.di_current_scope = subprogram
+        wl_di_set_current_location(self.builder, wl_di_create_debug_location(self.context, 0, 0, subprogram))
 
     fn debug_set_location(byte_offset: i32):
         if self.di_builder == 0:
@@ -1240,9 +1281,7 @@ impl Codegen:
                 return
             wl_di_clear_current_location(self.builder)
             return
-        let loc = self.di_source.offset_to_location(byte_offset)
-        let line = loc.line + 1
-        let col = loc.col + 1
+        let (line, col) = self.debug_line_col(byte_offset)
         var scope = self.di_current_scope
         if scope == 0:
             let sp = self.di_fn_subprograms.get(self.current_function_name_sym)
@@ -1265,10 +1304,10 @@ impl Codegen:
         var line = 1
         var col = 0
         if byte_offset > 0:
-            let loc = self.di_source.offset_to_location(byte_offset)
-            line = loc.line + 1
-            col = loc.col + 1
-        let block = wl_di_create_lexical_block(self.di_builder, self.di_current_scope, self.di_file, line, col)
+            let lc = self.debug_line_col(byte_offset)
+            line = lc.0
+            col = lc.1
+        let block = wl_di_create_lexical_block(self.di_builder, self.di_current_scope, self.di_fn_file, line, col)
         self.di_current_scope = block
 
     fn debug_get_di_type(sema_tid: i32) -> i64:
@@ -6446,6 +6485,7 @@ impl Codegen:
             wrapper = wl_add_function(self.llmod, "_start", wrapper_ft)
             let bb = wl_append_bb(self.context, wrapper, "entry")
             wl_position_at_end(self.builder, bb)
+            self.debug_enter_entry_wrapper(wrapper, "_start")
             let argc_slot = wl_build_alloca(self.builder, i32_ty)
             let argv_slot = wl_build_alloca(self.builder, ptr_ty)
             let startup_params: Vec[i64] = Vec.new()
@@ -6469,6 +6509,7 @@ impl Codegen:
             wrapper = wl_add_function(self.llmod, "main", wrapper_ft)
             let bb = wl_append_bb(self.context, wrapper, "entry")
             wl_position_at_end(self.builder, bb)
+            self.debug_enter_entry_wrapper(wrapper, "main")
             argc_val = wl_get_param(wrapper, 0)
             argv_val = wl_get_param(wrapper, 1)
 
@@ -6571,5 +6612,7 @@ impl Codegen:
             exit_args.push(exit_val)
             wl_build_call(self.builder, wl_global_get_value_type(exit_fn), exit_fn, vec_data_i64(&exit_args), 1)
             let _ = wl_build_ret_void(self.builder)
+            self.debug_clear_location()
             return
         let _ = wl_build_ret(self.builder, exit_val)
+        self.debug_clear_location()
