@@ -16,7 +16,7 @@ extern fn with_runtime_run_one_step() -> Unit
 
 let CHAN_INITIAL_CAPACITY: i32 = 16
 let DBG_ALLOC_ORIGIN_CHANNEL: i64 = 3
-type ChannelDropFn = *const fn(*mut u8) -> Unit
+pub type ChannelDropFn = *const fn(*mut u8) -> Unit
 
 // Packed channel layout:
 //   0  *mut u8 buffer
