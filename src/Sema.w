@@ -168,6 +168,8 @@ type SemaBuiltinSymbols {
     deref_trait: i32,
     deref_method: i32,
     drop: i32,
+    display_trait: i32,
+    debug_trait: i32,
     self_type: i32,
     vec: i32,
     fixed_string: i32,
@@ -1169,6 +1171,10 @@ pub type Sema {
     infer_tail_node: i32,
     infer_tail_is_closure: i32,
     infer_tail_join: i32,
+    // D55 (§18.2): the `if`/`match` node that is the argument of a generic
+    // parameter bounded by Display (`print(match ..)`). Its arms join under
+    // the ordinary rule; when nothing joins, the fix-it is the f-string.
+    display_join_node: i32,
     // #1196: signatures whose return type has been taken from their body. Until
     // then an unannotated signature reads as Unit, which a caller cannot tell
     // from a function that returns nothing.
@@ -1753,6 +1759,8 @@ fn sema_builtin_symbols_zero -> SemaBuiltinSymbols:
         deref_trait: 0,
         deref_method: 0,
         drop: 0,
+        display_trait: 0,
+        debug_trait: 0,
         self_type: 0,
         vec: 0,
         fixed_string: 0,
@@ -2418,6 +2426,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         infer_tail_node: 0,
         infer_tail_is_closure: 0,
         infer_tail_join: 0,
+        display_join_node: 0,
         body_typed_sigs: sema_new_map_i32_i32(),
         untyped_callee_calls: Vec.new(),
         discarded_stmt_node: 0,
@@ -3153,6 +3162,8 @@ impl Sema:
         self.syms.deref_method = self.pool_intern("deref")
         self.syms.regex = self.pool_intern("Regex")
         self.syms.drop = self.pool_intern("Drop")
+        self.syms.display_trait = self.pool_intern("Display")
+        self.syms.debug_trait = self.pool_intern("Debug")
         self.syms.self_type = self.pool_intern("Self")
         self.syms.vec = self.pool_intern("Vec")
         self.syms.fixed_string = self.pool_intern("FixedString")

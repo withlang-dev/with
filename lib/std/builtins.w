@@ -4,6 +4,11 @@
 // them with intrinsic semantics later, but name resolution should happen
 // through imports, not through hardcoded undefined-name allowlists.
 
+// `print[T: Display]` needs the trait and the primitives' impls wherever
+// it is callable: a `--no-prelude` bundle reaches this module through
+// std.libc and nothing else, so the traits travel with it.
+use std.traits
+
 // Opaque C void type for pointer interop (void * → *mut c_void).
 // Provided here so c_import users don't depend on symbol scoping.
 pub type c_void = opaque
@@ -24,13 +29,22 @@ extern fn with_fmt_u32(n: u32) -> str
 extern fn with_fmt_u64(n: u64) -> str
 extern fn with_bool_to_str(b: bool) -> str
 
-/// Print a string to stdout followed by a newline.
-pub fn print(s: &str) -> Unit:
-    with_println_str(s)
+/// Print any Display value to stdout followed by a newline (§18.2, D55).
+/// A plain generic that observes (§3.8): the `str` instance hands the bytes
+/// straight to the runtime, every other instance formats through
+/// `Display.to_str`.
+pub fn print[T: Display](v: &T) -> Unit:
+    comptime if T.name() == "str":
+        with_println_str(v)
+    else:
+        with_println_str(v.to_str())
 
-/// Print a string to stderr followed by a newline.
-pub fn eprint(s: &str) -> Unit:
-    with_eprint(s)
+/// Print any Display value to stderr followed by a newline.
+pub fn eprint[T: Display](v: &T) -> Unit:
+    comptime if T.name() == "str":
+        with_eprint(v)
+    else:
+        with_eprint(v.to_str())
 
 /// Write a string to stdout without a trailing newline.
 pub fn write(s: &str) -> Unit:

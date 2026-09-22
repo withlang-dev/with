@@ -255,6 +255,23 @@ impl Debug for u64:  fn debug_str() -> str: f"{*self}"
 impl Debug for f32:  fn debug_str() -> str: f"{*self}"
 impl Debug for f64:  fn debug_str() -> str: f"{*self}"
 
+// Display for the primitives (§18.2, D55): `print[T: Display]` and any
+// other Display bound reach them here; std.builtins imports this module so
+// every tier that can call `print` sees them. Each renders exactly as the
+// f-string does, so `print(v)` and `print(f"{v}")` agree byte for byte.
+impl Display for i8:   fn to_str(): f"{*self}"
+impl Display for i16:  fn to_str(): f"{*self}"
+impl Display for i32:  fn to_str(): f"{*self}"
+impl Display for i64:  fn to_str(): f"{*self}"
+impl Display for u8:   fn to_str(): f"{*self}"
+impl Display for u16:  fn to_str(): f"{*self}"
+impl Display for u32:  fn to_str(): f"{*self}"
+impl Display for u64:  fn to_str(): f"{*self}"
+impl Display for f32:  fn to_str(): f"{*self}"
+impl Display for f64:  fn to_str(): f"{*self}"
+impl Display for bool: fn to_str(): f"{*self}"
+impl Display for str:  fn to_str(): self ++ ""
+
 impl Hash for i32:
     fn hash_value() -> i64: (1469598103934665603 *% 1099511628211) ^ (*self as i64)
 

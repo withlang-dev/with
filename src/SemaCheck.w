@@ -681,6 +681,8 @@ impl Sema:
                         else:
                             "add `-> " ++ lhs_name ++ "`, `-> " ++ rhs_name ++ "`, or `-> Unit`"
                         self.emit_error("cannot infer return type: " ++ join_name ++ " arms have types " ++ lhs_name ++ " and " ++ rhs_name ++ "; " ++ remedy, report_node)
+                    else if report_node == self.display_join_node:
+                        self.emit_display_join_mismatch(join_name, prior_candidate, arm_ty, arm_nodes[ai], report_node)
                     else:
                         self.emit_error(join_name ++ " expressions do not establish one compatible owned result type", report_node)
                     return 0
@@ -698,6 +700,16 @@ impl Sema:
                 // truncated to 32 bits (the analyze-audit segfault class).
                 let ref_payload = self.get_type_d0(self.resolve_alias(reference_candidate as TypeId))
                 let mixed = self.merge_contextual_owned_join_types(owned_candidate, ref_payload)
+                if mixed == 0 and report_node == self.display_join_node:
+                    // D55: a view arm and an owned arm of different types share
+                    // no Display type; name the owned arm in the fix-it.
+                    var owned_arm = 0
+                    for ai in 0..arm_count:
+                        if resolved_arm_types[ai] != 0 and self.resolve_alias(resolved_arm_types[ai] as TypeId) as i32 == self.resolve_alias(owned_candidate as TypeId) as i32:
+                            owned_arm = arm_nodes[ai]
+                            break
+                    self.emit_display_join_mismatch(join_name, reference_candidate, owned_candidate, owned_arm, report_node)
+                    return 0
                 final_type = if mixed != 0: mixed else: owned_candidate
             else:
                 final_type = if owned_candidate != 0: owned_candidate else: reference_candidate
@@ -16061,7 +16073,11 @@ impl Sema:
             if is_closure_arg:
                 self.closure_direct_arg_depth = self.closure_direct_arg_depth + 1
                 self.closure_direct_arg_escape_flags.push(closure_arg_escapes)
+            let saved_display_join_node = self.display_join_node
+            if expected_ty == 0 and sig_idx < 0 and self.generic_param_bounded_by_display(fn_sym, ai + param_offset) != 0:
+                self.display_join_node = arg_node
             let arg_ty = if expected_ty != 0: self.check_expr_with_expected(arg_node, expected_ty as TypeId) else: self.check_expr_value_context(arg_node)
+            self.display_join_node = saved_display_join_node
             if is_closure_arg:
                 self.closure_direct_arg_escape_flags.pop()
                 self.closure_direct_arg_depth = self.closure_direct_arg_depth - 1
@@ -17100,7 +17116,11 @@ impl Sema:
             generic_def_pi = generic_def_pi - 1
         let generic_min_args = param_count - generic_trailing_defaults
         if arg_count < generic_min_args or arg_count > param_count:
-            self.emit_error("wrong argument count", call_node)
+            let fn_name: str = self.pool_resolve(fn_sym)
+            if generic_min_args == param_count:
+                self.emit_error(f"function '{fn_name}' expects {param_count} argument(s), found {arg_count}", call_node)
+            else:
+                self.emit_error(f"function '{fn_name}' expects {generic_min_args}-{param_count} argument(s), found {arg_count}", call_node)
 
         let saved_generic_call_subst_syms = sema_clone_i32_vec(&self.generic_subst_param_syms)
         let saved_generic_call_subst_tys = sema_clone_i32_vec(&self.generic_subst_type_ids)
@@ -17251,6 +17271,44 @@ impl Sema:
 
         self.generic_subst_param_syms.push(param_sym)
         self.generic_subst_type_ids.push(tid)
+
+    // Whether parameter `pi` of the generic `fn_sym` is a bare type parameter
+    // whose bounds name Display (`print[T: Display](v: T)`, §18.2).
+    fn generic_param_bounded_by_display(fn_sym: i32, pi: i32) -> i32:
+        let fn_node = self.generic_fn_node_for_symbol(fn_sym)
+        if fn_node == 0:
+            return 0
+        let meta = self.ast.find_fn_meta(fn_node)
+        if meta < 0 or pi >= self.ast.fn_meta_param_count(meta):
+            return 0
+        var p_type_node = self.ast.fn_param_type(self.ast.fn_meta_param_start(meta), pi)
+        if p_type_node != 0 and self.ast.kind(p_type_node) == NodeKind.NK_TYPE_REF:
+            p_type_node = self.ast.get_data0(p_type_node)
+        if p_type_node == 0 or self.ast.kind(p_type_node) != NodeKind.NK_TYPE_NAMED:
+            return 0
+        let sym = self.ast.get_data0(p_type_node)
+        var pos = self.ast.fn_meta_tp_start(meta)
+        for ti in 0..self.ast.fn_meta_tp_count(meta):
+            let tp_name = self.ast.get_extra(pos)
+            let bound_count = self.ast.get_extra(pos + 1)
+            if tp_name == sym:
+                for bi in 0..bound_count:
+                    if self.ast.get_extra(pos + 2 + bi) == self.syms.display_trait:
+                        return 1
+                return 0
+            pos = pos + 2 + bound_count
+        0
+
+    // D55: the arms of a Display-bounded argument share no Display type. The
+    // fix-it is the f-string on the arm that broke the join, never a boxing
+    // join the programmer did not spell.
+    mut fn emit_display_join_mismatch(join_name: &str, prior: i32, arm_ty: i32, arm_node: i32, report_node: i32):
+        let text = self.source_text_for_decl_node(arm_node)
+        let start = self.ast.get_start(arm_node)
+        let end = self.ast.get_end(arm_node)
+        let arm_src = if arm_node > 0 and start >= 0 and end > start and end <= text.len() as i32: text.slice(start, end) else: "x"
+        let msg = join_name ++ " arms have types " ++ self.type_name(prior) ++ " and " ++ self.type_name(arm_ty) ++ "; no Display type joins them"
+        self.emit_error_with_help(msg, if arm_node > 0: arm_node else: report_node, "format the arm as an f-string, print(f\"{x}\") style: f\"{" ++ arm_src ++ "}\"")
 
     fn type_param_exists(tp_start: i32, tp_count: i32, sym: i32) -> i32:
         let canonical_sym = self.canonical_symbol_by_text(sym)
@@ -17762,6 +17820,13 @@ impl Sema:
             return 1
         self.select_blanket_impl_for_generic_inst(tid, trait_sym)
 
+    fn formatting_trait_through_reference(resolved: TypeId, trait_sym: i32) -> i32:
+        if trait_sym != self.syms.display_trait and trait_sym != self.syms.debug_trait:
+            return 0
+        if self.get_type_kind(resolved) != TypeKind.TY_REF or self.get_type_d0(resolved) == 0:
+            return 0
+        1
+
     mut fn type_implements_trait(tid: i32, trait_sym: i32) -> i32:
         if tid == 0 or trait_sym == 0:
             return 0
@@ -17787,6 +17852,10 @@ impl Sema:
             return self.type_is_sync(resolved as i32)
         if trait_sym == self.syms.scoped_send_trait:
             return self.type_is_scoped_send(resolved as i32)
+        // Formatting observes (§18.2, D55): a `&T` is Display/Debug exactly
+        // when `T` is, the way an f-string formats a view's pointee.
+        if self.formatting_trait_through_reference(resolved, trait_sym) != 0:
+            return self.type_implements_trait(self.get_type_d0(resolved), trait_sym)
         if self.get_type_kind(resolved) == TypeKind.TY_GENERIC_INST:
             return self.select_trait_impl_for_generic_inst(resolved as i32, trait_sym)
         var type_sym = self.get_type_name(resolved)
@@ -17815,6 +17884,8 @@ impl Sema:
             if drop_name != 0:
                 return self.select_trait_impl(drop_name, trait_sym)
             return 0
+        if self.formatting_trait_through_reference(resolved, trait_sym) != 0:
+            return self.type_implements_trait_frozen(self.get_type_d0(resolved), trait_sym)
         if self.get_type_kind(resolved) == TypeKind.TY_GENERIC_INST:
             let gi_key2 = sema_pair_key(resolved as i32, trait_sym)
             if self.impl_generic_inst.contains(gi_key2):
