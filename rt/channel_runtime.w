@@ -16,7 +16,7 @@ extern fn with_runtime_run_one_step() -> Unit
 
 let CHAN_INITIAL_CAPACITY: i32 = 16
 let DBG_ALLOC_ORIGIN_CHANNEL: i64 = 3
-pub type ChannelDropFn = *const fn(*mut u8) -> Unit
+type ChannelDropFn = *const fn(*mut u8) -> Unit
 
 // Packed channel layout:
 //   0  *mut u8 buffer
@@ -140,7 +140,7 @@ fn channel_block_until_progress():
     if with_runtime_has_fibers() != 0:
         with_runtime_run_one_step()
 
-pub fn with_channel_create(capacity: i32, elem_size: i32, drop_fn: ChannelDropFn) -> i64:
+pub fn with_channel_create(capacity: i32, elem_size: i32, drop_fn: *const fn(*mut u8) -> Unit) -> i64:
     let ch = with_alloc_origin(CHAN_SIZE, DBG_ALLOC_ORIGIN_CHANNEL)
     if ch as i64 == 0:
         return 0

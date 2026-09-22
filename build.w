@@ -1663,7 +1663,7 @@ fn run_deep_debug_tool_tests_action(ctx: ActionCtx) -> i32:
     let rebind_input = build_project_join(out_dir, "rebind-input.w")
     let rebind_source =
         "type Pair { a: i32, b: i32 }\n\n" ++
-        "type P { vars: Vec[i32] }\n\n" ++
+        "pub type P { vars: Vec[i32] }\n\n" ++
         "pub fn P.set(move self: Self, v: i32) -> P:\n" ++
         "    var owned = self\n" ++
         "    let pair = Pair { a: v, b: v }\n" ++
