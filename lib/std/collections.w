@@ -17,8 +17,7 @@ pub type Vec[T]  {
 }
 
 /// Clone for Vec[T]: produces a deep copy by cloning each element.
-impl[T:
-    Clone] Clone for Vec[T]:
+impl[T: Clone] Clone for Vec[T]:
     fn clone() -> Self:
         var out: Vec[T] = Vec.new()
         var index: i64 = 0
@@ -444,7 +443,8 @@ pub type FlatMapIter[I, C, J, T, U] ephemeral {
     has_current: bool,
 }
 
-impl[T] Iter[T] for VecIter[T]:    mut fn next() -> Option[T]:
+impl[T] Iter[T] for VecIter[T]:
+    mut fn next() -> Option[T]:
         self.next()
 
 /// Index specification for multi-dimensional indexing.

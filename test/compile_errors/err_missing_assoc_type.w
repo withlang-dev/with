@@ -4,5 +4,5 @@ trait Converter:
     fn convert(self: &Self, x: i32) -> Self.Output
 
 type MyConv {}
-impl Converter for MyConv:    fn convert(self: &Self, x: i32) -> i32:
-    x * 2
+impl Converter for MyConv:
+    fn convert(self: &Self, x: i32) -> i32: x * 2

@@ -88,8 +88,8 @@ pub trait Default:
     fn default() -> Self
 
 /// Cloning. Creates an independent copy of a value.
-pub trait Clone:    fn clone(self:
-    &Self) -> Self
+pub trait Clone:
+    fn clone(self: &Self) -> Self
 
 /// Destructor. Called automatically when a value goes out of scope.
 /// The receiver is consuming — `move fn` is the only destructor mode (§2.4).
@@ -103,21 +103,22 @@ pub trait Drop:
 /// across calls. During the bridge phase (P1..P11), `mut self: Self` and
 /// consuming `self` produce the same MIR; existing impls written either
 /// way continue to satisfy this trait.
-pub trait Iter[T]:    mut fn next() -> Option[T]
+pub trait Iter[T]:
+    mut fn next() -> Option[T]
 
 /// Membership test. Implement to enable `x in collection` and
 /// `x not in collection`.
-pub trait Contains[T]:    fn contains(self: &Self, value:
-    &T) -> bool
+pub trait Contains[T]:
+    fn contains(self: &Self, value: &T) -> bool
 
 /// Scoped read access protocol used by guarded `with` blocks.
-pub trait Scoped[T]:    fn with_enter(self:
-    &Self) -> T
+pub trait Scoped[T]:
+    fn with_enter(self: &Self) -> T
     fn with_exit(self: &Self) -> Unit
 
 /// Scoped mutable access protocol used by guarded `with ... as mut`.
-pub trait ScopedMut[T]:    fn with_enter_mut(self:
-    &Self) -> T
+pub trait ScopedMut[T]:
+    fn with_enter_mut(self: &Self) -> T
     mut fn with_exit_mut(value: T) -> Unit
 
 // Core trait impls for primitive types
@@ -312,8 +313,8 @@ pub trait MultiIndexMut[V]:
 /// `P[i]` on an `IndexGet`-only type returns a value, not a place — the
 /// expression cannot appear on the LHS of an assignment, take a `&raw mut`,
 /// or be a mutating-receiver target.
-pub trait IndexGet[I, V]:    fn get(self: &Self, index:
-    I) -> V
+pub trait IndexGet[I, V]:
+    fn get(self: &Self, index: I) -> V
 
 /// Place-projection indexing (docs/mut.md Rev 8 §2.4).
 /// `IndexPlace` is a compiler-recognized syntax trait: implementations
@@ -323,8 +324,8 @@ pub trait IndexGet[I, V]:    fn get(self: &Self, index:
 /// (`xs[i].field = v`, `xs[i].method()`) does not copy the indexed element
 /// out and back. The exact contract is implementation-defined and may
 /// evolve; the minimal operational shape is value-read + value-write.
-pub trait IndexPlace[I, V]:    fn get(self: &Self, index:
-    I) -> V
+pub trait IndexPlace[I, V]:
+    fn get(self: &Self, index: I) -> V
     mut fn set(index: I, value: V)
 
 // Vec, Array, and Slice have IndexPlace semantics via the compiler's

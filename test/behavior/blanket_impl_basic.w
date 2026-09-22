@@ -12,8 +12,7 @@ impl Showable for i32:
 trait Displayable:
     fn display(self: &Self) -> str
 
-impl[T:
-    Showable] Displayable for T:
+impl[T: Showable] Displayable for T:
     fn display(self: &Self) -> str:
         self.show()
 

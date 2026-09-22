@@ -8,8 +8,8 @@ type BorrowBag { count: i32 }
 
 type BorrowIter { value: i32, done: bool }
 
-impl Iter[i32] for BorrowIter:    fn next(mut self:
-    Self) -> Option[i32]:
+impl Iter[i32] for BorrowIter:
+    fn next(mut self: Self) -> Option[i32]:
         if self.done:
             return .None
         self.done = true

@@ -7,6 +7,6 @@ trait Container:
 type Empty { x: i32 }
 
 // Missing 'type Item = ...' — should error
-impl Container for Empty:    fn size(self:
-    &Self) -> i32:
+impl Container for Empty:
+    fn size(self: &Self) -> i32:
         0

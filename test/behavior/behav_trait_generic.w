@@ -2,18 +2,18 @@
 
 // Behavior test: generic traits — trait-bounded generics
 
-trait Showable:    fn show(self:
-    &Self) -> str
+trait Showable:
+    fn show(self: &Self) -> str
 
 type Wrapper { value: i32 }
 type Tag { label: str }
 
-impl Showable for Wrapper:    fn show(self:
-    &Self) -> str:
+impl Showable for Wrapper:
+    fn show(self: &Self) -> str:
         "wrapper"
 
-impl Showable for Tag:    fn show(self:
-    &Self) -> str:
+impl Showable for Tag:
+    fn show(self: &Self) -> str:
         self.label.clone()
 
 fn display[T](x: T) -> str where T: Showable:

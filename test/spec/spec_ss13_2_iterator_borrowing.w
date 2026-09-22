@@ -8,8 +8,8 @@ type Token { text: str }
 
 type TokenStream { index: i32 }
 
-impl Iter[Token] for TokenStream:    fn next(mut self:
-    Self) -> Option[Token]:
+impl Iter[Token] for TokenStream:
+    fn next(mut self: Self) -> Option[Token]:
         if self.index == 0:
             self.index = 1
             return .Some(Token { text: "let" })
@@ -25,8 +25,8 @@ type OwnedIterBag { count: i32 }
 
 type OwnedIter { value: i32, done: bool }
 
-impl Iter[i32] for OwnedIter:    fn next(mut self:
-    Self) -> Option[i32]:
+impl Iter[i32] for OwnedIter:
+    fn next(mut self: Self) -> Option[i32]:
         if self.done:
             return .None
         self.done = true
