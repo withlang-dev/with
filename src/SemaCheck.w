@@ -10623,6 +10623,10 @@ impl Sema:
                                 let root = self.place_root_sym(arg_node)
                                 if root != 0 and self.scope_has(root) != 0:
                                     self.record_consume_call_site(arg_node, sig_idx, param_i)
+                                else if root == 0 and self.d32_is_field_access(arg_node) != 0:
+                                    // #1281: `s.m(make().1)` — the element of a
+                                    // temporary is an implicit field move (§2.2).
+                                    self.mark_moved_if_consumed(arg_node)
 
     mut fn check_return(node: i32) -> i32:
         if self.in_defer != 0:
@@ -12267,6 +12271,11 @@ impl Sema:
             // consumed (use-after-move + drop-once). Only for array targets — Vec and
             // other collection literals manage element ownership separately.
             if target_base == 0 and self.ast.kind(elem) == NodeKind.NK_IDENT and self.type_needs_drop(et as i32) != 0:
+                self.mark_moved_if_consumed(elem)
+            // #1281: a field element (`[s.r]`, `[make().1]`) is an implicit
+            // field move into ANY sequence target (§2.2, D32) — the base kept
+            // its bytes and the element dropped once per copy.
+            else if self.d32_is_field_access(elem) != 0 and self.type_needs_drop(et as i32) != 0:
                 self.mark_moved_if_consumed(elem)
 
         let elem_type = self.resolve_contextual_join(expected_elem, &elem_nodes, &elem_origins, &elem_types, &elem_roles, node, "sequence literal")
@@ -14829,7 +14838,9 @@ impl Sema:
             // consumed (use-after-move + drop-once), mirroring struct-literal fields.
             // Restricted to a plain identifier; projections are partial moves handled
             // elsewhere.
-            if self.ast.kind(elem) == NodeKind.NK_IDENT and self.type_needs_drop(et as i32) != 0:
+            if (self.ast.kind(elem) == NodeKind.NK_IDENT or self.d32_is_field_access(elem) != 0) and self.type_needs_drop(et as i32) != 0:
+                // #1281: `(s.r, 1)` / `(make().1, 1)` — a field element is an
+                // implicit field move (§2.2, D32), the same as a struct field.
                 self.mark_moved_if_consumed(elem)
         let result = if expected_tuple != 0:
             self.expected_expr_type
@@ -16075,6 +16086,11 @@ impl Sema:
                                         self.record_consume_call_site(eff_arg_nd, sig_idx, param_i)
                                         // #714: the plain call consumes (§3.8); mark
                                         // moved so later uses diagnose.
+                                        self.mark_moved_if_consumed(eff_arg_nd)
+                                    else if consume_root == 0 and self.d32_is_field_access(eff_arg_nd) != 0:
+                                        // #1281: a rootless field access (`make().1`,
+                                        // `(*p).f`) is still an implicit field move —
+                                        // §2.2 holds "anywhere, in any context".
                                         self.mark_moved_if_consumed(eff_arg_nd)
                 // escape_view: move/copy is forbidden because they invalidate the view's origin
                 if (param_eff & EFF_ESCAPE_VIEW) != 0:
@@ -23956,6 +23972,54 @@ impl Sema:
             return 0
         self.scope_lookup_mut(root)
 
+    // D32 (§2.2) is uniform over every base, a statement temporary included
+    // (§2.4: an expression temporary is an ordinary value dropped at
+    // statement end). `make().1` has no root binding and its base is not a
+    // place, so neither fix-it of the place rule (`move`, a `var` base, a
+    // `mut fn` receiver) can be followed: the whole value must be bound or
+    // destructured first (#1281).
+    fn d32_is_field_access(node: i32) -> i32:
+        var n = node
+        while n != 0 and self.ast.kind(n) == NodeKind.NK_GROUPED:
+            n = self.ast.get_data0(n)
+        if n != 0 and self.ast.kind(n) == NodeKind.NK_FIELD_ACCESS: 1 else: 0
+
+    mut fn d32_base_is_temporary(fa_node: i32) -> i32:
+        if self.place_root_sym(fa_node) != 0:
+            return 0
+        self.suppress_errors = self.suppress_errors + 1
+        let packed = self.classify_place(fa_node)
+        self.suppress_errors = self.suppress_errors - 1
+        if unpack_place_kind(packed) == PlaceKind.PK_NotPlace: 1 else: 0
+
+    mut fn d32_temporary_base_help(fa_node: i32, place: str, named: i32) -> str:
+        var base = self.ast.get_data0(fa_node)
+        while base != 0 and self.ast.kind(base) == NodeKind.NK_GROUPED:
+            base = self.ast.get_data0(base)
+        let base_text = render_expr(self.ast, self.pool, base as NodeId, 0)
+        let base_ty_opt = self.typed_expr_types.get(base)
+        let base_ty = if base_ty_opt.is_some(): base_ty_opt.unwrap() else: 0
+        let base_resolved = self.resolve_alias(base_ty as TypeId)
+        if base_ty != 0 and self.get_type_kind(base_resolved) == TypeKind.TY_TUPLE:
+            let field_name = self.pool_resolve(self.ast.get_data1(fa_node))
+            var idx = 0
+            for ci in 0..field_name.len() as i32:
+                let ch = field_name[ci]
+                if ch >= '0' and ch <= '9':
+                    idx = idx * 10 + ch - '0'
+            var pattern = "("
+            for ei in 0..self.get_type_d1(base_resolved):
+                if ei > 0:
+                    pattern = pattern ++ ", "
+                pattern = pattern ++ (if ei == idx: "x" else: "_")
+            pattern = pattern ++ ")"
+            if named != 0:
+                return "the base is a temporary, so nothing can vacate it: destructure the whole value (`let " ++ pattern ++ " = " ++ base_text ++ "`), or clone the element (`" ++ place ++ ".clone()`)"
+            return "the base is a temporary, so nothing can vacate it: destructure the whole value (`let " ++ pattern ++ " = <expr>`), or clone the element"
+        if named != 0:
+            return "the base is a temporary, so nothing can vacate it: bind the whole value first (`var t = " ++ base_text ++ "`) and vacate it (`move t." ++ self.pool_resolve(self.ast.get_data1(fa_node)) ++ "`), or clone the field (`" ++ place ++ ".clone()`)"
+        "the base is a temporary, so nothing can vacate it: bind the whole value to a `var` first and vacate it with `move`, or clone the field"
+
     // D32 (§2.2): a field never moves out implicitly — anywhere, in any
     // context. One error shape at the move site; the help offers both
     // intents when the path could take an explicit `move`, and
@@ -23967,7 +24031,9 @@ impl Sema:
         let place = render_expr(self.ast, self.pool, node as NodeId, 0)
         let named = if place.len() > 0 and place.len() < 60 and sema_str_contains_char(place, 10) == 0: 1 else: 0
         var help = ""
-        if self.d32_field_move_path_is_mutable(node) != 0:
+        if self.d32_base_is_temporary(node) != 0:
+            help = self.d32_temporary_base_help(node, place, named)
+        else if self.d32_field_move_path_is_mutable(node) != 0:
             help = if named != 0: "write `move " ++ place ++ "` to vacate the field (reset-on-move leaves an empty value, §2.5.1), or `" ++ place ++ ".clone()` to keep the owner whole" else: "write `move <place>.<field>` to vacate the field (§2.5.1), or clone it to keep the owner whole" ++ ""
         else:
             help = if named != 0: "clone it (`" ++ place ++ ".clone()`), or restructure so the owner transfers it — a vacate needs a `var` base or a `mut fn` receiver" else: "clone the field, or restructure so the owner transfers it — a vacate needs a `var` base or a `mut fn` receiver" ++ ""
