@@ -1,4 +1,4 @@
-//! skip-on: windows #799: POSIX strdup and <dirent.h> are absent from MSVCRT; the libc facade's rendering is covered on Windows by behav_c_import_owning_wrapper_strdup
+//! only-on: darwin
 //! expect-stdout: string ok
 //! expect-stdout: dir ok
 //! expect-stdout: ok
@@ -8,7 +8,9 @@
 // headers declare in libc's shape — `CHeapStr` from <string.h> + <stdlib.h>,
 // `CDir` with its readdir/rewinddir lends from <dirent.h> — with no facade
 // of its own and no `unsafe`. (Darwin's <stdio.h> translation hands `FILE *`
-// through as `*mut c_void`, not libc's shape, so `CFile` is not described
+// through as `*mut c_void` — the bridge types a pointer to a reserved system
+// record (`struct __sFILE`; glibc's `struct __dirstream` DIR likewise, hence
+// Darwin only) as `void *` — not libc's shape, so `CFile` is not described
 // there and fopen stays the raw surface; behav_c_import_owning_wrapper_fopen
 // covers CFile over a `FILE *` declaration.)
 
