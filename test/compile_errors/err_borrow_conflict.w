@@ -1,4 +1,4 @@
-//! expect-check-fail: `&mut` is not part of safe With
+//! expect-check-fail: `&mut` is not part of safe With (§3.1)
 
 // Test: &mut is rejected at P12 lockdown.
 
