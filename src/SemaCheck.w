@@ -14437,6 +14437,8 @@ impl Sema:
         let closure_capture_syms: Vec[i32] = Vec.new()
         for ci in 0..outer_count:
             let cap_sym: i32 = self.bind_names[ci]
+            if self.binding_index_is_global(ci, cap_sym):
+                continue
             if self.expr_uses_symbol(body, cap_sym) != 0:
                 closure_capture_syms.push(cap_sym)
                 self.current_fn_param_syms.push(cap_sym)
@@ -14532,7 +14534,7 @@ impl Sema:
 
         for ici in 0..outer_count:
             let implicit_cap_sym: i32 = self.bind_names[ici]
-            if self.expr_uses_symbol(body, implicit_cap_sym) == 0:
+            if self.binding_index_is_global(ici, implicit_cap_sym) or self.expr_uses_symbol(body, implicit_cap_sym) == 0:
                 continue
             var already_captured = 0
             for cci in 0..closure_capture_syms.len() as i32:
@@ -14635,7 +14637,7 @@ impl Sema:
             var ci = 0
             while ci < outer_count:
                 let cap_sym: i32 = self.bind_names[ci]
-                if self.expr_uses_symbol(body, cap_sym) != 0:
+                if not self.binding_index_is_global(ci, cap_sym) and self.expr_uses_symbol(body, cap_sym) != 0:
                     let cap_ty: i32 = self.bind_types[ci]
                     if self.ast.is_by_place_closure(node) == 0 and self.is_copy(cap_ty as TypeId) != 0:
                         ci = ci + 1
@@ -14669,7 +14671,7 @@ impl Sema:
             var ebi = 0
             while ebi < outer_count:
                 let cap_sym = self.bind_names[ebi]
-                if self.expr_uses_symbol(body, cap_sym) != 0:
+                if not self.binding_index_is_global(ebi, cap_sym) and self.expr_uses_symbol(body, cap_sym) != 0:
                     let cap_ty = self.bind_types[ebi]
                     if self.type_is_ephemeral_value(cap_ty) != 0:
                         self.emit_error("escaping closure cannot capture ephemeral references", node)
@@ -14690,7 +14692,7 @@ impl Sema:
             var ci = 0
             while ci < outer_count:
                 let cap_sym: i32 = self.bind_names[ci]
-                if self.expr_uses_symbol(body, cap_sym) != 0:
+                if not self.binding_index_is_global(ci, cap_sym) and self.expr_uses_symbol(body, cap_sym) != 0:
                     let cap_ty: i32 = self.bind_types[ci]
                     if self.is_copy(cap_ty as TypeId) == 0:
                         self.scope_set_state(cap_sym, VarState.MOVED)

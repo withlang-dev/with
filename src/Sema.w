@@ -4722,6 +4722,21 @@ impl Sema:
         let path = self.global_value_decl_paths.get(sym).unwrap()
         self.current_module_path.len() == 0 or (path != self.current_module_path and self.module_visible_no_prelude(path) == 0)
 
+    // A flat-scope global (§9.1c, D52) — a module's `let`/`var`, or a
+    // bundle interface's storage — is referenced in place by every body,
+    // a closure's included: it is never a capture (#1313). A local that
+    // shadows an unseen global holds the same symbol at another index.
+    fn binding_index_is_global(idx: i32, sym: i32) -> bool:
+        if self.global_value_decl_bindings.contains(sym):
+            let bind: i32 = self.global_value_decl_bindings.get(sym).unwrap()
+            if bind == idx: return true
+        if self.interface_global_index.contains(sym):
+            let bind: i32 = self.interface_global_index.get(sym).unwrap()
+            if bind == idx: return true
+        for ai in 0..self.interface_global_alt_binds.len() as i32:
+            if self.interface_global_alt_binds[ai] == idx: return true
+        false
+
     // The local takes the name; pop_scope gives the global its slot back.
     mut fn shadow_unseen_global(sym: i32, global_idx: i32, tid: i32, is_mut: i32):
         self.shadowed_global_syms.push(sym)
