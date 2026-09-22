@@ -1834,6 +1834,26 @@ impl Sema:
             if sub_kind == TypeDeclKind.Enum or sub_kind == TypeDeclKind.DiscEnum:
                 return 1
             return 0
+        // #1289: `derive(all)` on an enum takes Debug (always) and Clone
+        // when every payload can supply it; the other traits stay struct-only.
+        if sub_kind == TypeDeclKind.Enum or sub_kind == TypeDeclKind.DiscEnum:
+            if trait_sym != intern.intern("Debug") and trait_sym != self.syms.clone_trait:
+                return 0
+            let enum_tid = self.lookup_named_type_visible(out.get_data0(decl))
+            if enum_tid == 0:
+                return 0
+            let enum_resolved = self.resolve_alias(enum_tid)
+            if self.get_type_kind(enum_resolved) != TypeKind.TY_ENUM:
+                return 0
+            var pos = self.get_type_d1(enum_resolved)
+            for _ in 0..self.get_type_d2(enum_resolved):
+                let payload_count: i32 = self.type_extra[(pos + 1)]
+                for pi in 0..payload_count:
+                    let payload_tid: i32 = self.type_extra[(pos + 2 + pi)]
+                    if self.ct_type_can_supply_derive_trait(out, intern, payload_tid, trait_sym, all_sym) == 0:
+                        return 0
+                pos = pos + 2 + payload_count
+            return 1
         if sub_kind != TypeDeclKind.Struct:
             return 0
         let type_name_sym = out.get_data0(decl)
@@ -2022,6 +2042,72 @@ impl Sema:
                 self.ct_emit_error_help(out, field_type_node, "cannot derive " ++ trait_name ++ " for type '" ++ intern.resolve(type_name_sym) ++ "': field '" ++ intern.resolve(field_sym) ++ "' of type '" ++ field_type_name ++ "' does not implement " ++ trait_name, "add `@[derive(" ++ trait_name ++ ")]` to the declaration of '" ++ field_type_name ++ "', or implement " ++ trait_name ++ " for it")
                 return 0
         1
+
+    // #1289: the enum twin of the struct validator — every variant payload
+    // must supply the trait, or the explicit derive is an error, never an
+    // inert attribute. Payload type nodes follow SemaDecl's enum layout:
+    // extra[0] = variant count, then per variant [name, payload_count,
+    // payload type nodes...] (a disc enum leads with its repr node).
+    mut fn ct_validate_explicit_enum_derive_payloads(out: AstPool, intern: InternPool, decl: i32, trait_sym: i32, all_sym: i32) -> i32:
+        if self.type_decl_has_derive(decl, trait_sym) == 0:
+            return 1
+        let trait_name = intern.resolve(trait_sym)
+        let type_name_sym = out.get_data0(decl)
+        let tid = self.lookup_named_type_visible(type_name_sym)
+        if tid == 0:
+            return 0
+        let resolved = self.resolve_alias(tid)
+        if self.get_type_kind(resolved) != TypeKind.TY_ENUM:
+            return 0
+        let tp_start = ct_type_decl_tp_start(out, decl)
+        let tp_count = ct_type_decl_tp_count(out, decl)
+        let is_disc = type_decl_sub_kind(out.get_data2(decl)) == TypeDeclKind.DiscEnum
+        var ast_pos = out.get_data1(decl) + (if is_disc: 2 else: 1)
+        var pos = self.get_type_d1(resolved)
+        for _ in 0..self.get_type_d2(resolved):
+            let variant_sym: i32 = self.type_extra[pos]
+            let payload_count: i32 = self.type_extra[(pos + 1)]
+            ast_pos = ast_pos + (if is_disc: 3 else: 2)
+            for pi in 0..payload_count:
+                let payload_tid: i32 = self.type_extra[(pos + 2 + pi)]
+                let payload_type_node = out.get_extra(ast_pos + pi)
+                if ct_type_node_mentions_type_param(out, payload_type_node, tp_start, tp_count) != 0:
+                    continue
+                if self.ct_type_can_supply_derive_trait(out, intern, payload_tid, trait_sym, all_sym) == 0:
+                    let payload_type_name = self.type_name(payload_tid)
+                    self.ct_emit_error_help(out, payload_type_node, "cannot derive " ++ trait_name ++ " for type '" ++ intern.resolve(type_name_sym) ++ "': variant '" ++ intern.resolve(variant_sym) ++ "' payload of type '" ++ payload_type_name ++ "' does not implement " ++ trait_name, "add `@[derive(" ++ trait_name ++ ")]` to the declaration of '" ++ payload_type_name ++ "', or implement " ++ trait_name ++ " for it")
+                    return 0
+            ast_pos = ast_pos + payload_count
+            pos = pos + 2 + payload_count
+        1
+
+fn ct_type_decl_is_enum(out: AstPool, decl: i32) -> bool:
+    let sub_kind = type_decl_sub_kind(out.get_data2(decl))
+    sub_kind == TypeDeclKind.Enum or sub_kind == TypeDeclKind.DiscEnum
+
+// Positional payload binding names for a generated enum match arm; the
+// parser keeps no payload names (Parser.w `Variant(name: Type)` skips them).
+fn ct_payload_bind_sym(intern: InternPool, pi: i32) -> i32: intern.intern(f"p{pi}")
+
+// `Variant(p0, p1, ...)` pattern binding every payload positionally.
+fn ct_build_variant_bind_pattern(out: AstPool, intern: InternPool, decl: i32, variant_sym: i32, payload_count: i32) -> i32:
+    let start = out.get_start(decl)
+    let end = out.get_end(decl)
+    if payload_count == 0:
+        return out.add_node(NodeKind.NK_PAT_VARIANT, start, end, variant_sym, 0, 0) as i32
+    let pats: Vec[i32] = Vec.new()
+    for pi in 0..payload_count:
+        pats.push(out.add_node(NodeKind.NK_PAT_IDENT, start, end, ct_payload_bind_sym(intern, pi), 0, 0) as i32)
+    let pat_extra = out.extra_len()
+    for pi in 0..payload_count:
+        out.add_extra(pats[pi])
+    out.add_node(NodeKind.NK_PAT_VARIANT, start, end, variant_sym, pat_extra, payload_count) as i32
+
+fn ct_build_match(out: AstPool, decl: i32, subject: i32, arms: &Vec[i32]) -> i32:
+    let arm_start = out.extra_len()
+    for ai in 0..arms.len() as i32:
+        out.add_extra(arms[ai])
+    out.add_node(NodeKind.NK_MATCH, out.get_start(decl), out.get_end(decl), subject, arm_start, arms.len() as i32) as i32
 
 fn ct_build_self_field(out: AstPool, decl: i32, self_sym: i32, field_sym: i32) -> i32:
     let self_ident = out.ct_build_ident(decl, self_sym)
@@ -2436,9 +2522,36 @@ impl Sema:
 
         generated
 
+    // #1289: an enum's Debug arm is `Type.Variant` or `Type.Variant(p0, p1)`
+    // with each payload's own debug_str — positional, as the parser keeps
+    // no payload names.
+    fn ct_enum_debug_body(out: AstPool, intern: InternPool, decl: i32, resolved: TypeId, type_name: &str, self_sym: i32, debug_method_sym: i32) -> i32:
+        let start = out.get_start(decl)
+        let end = out.get_end(decl)
+        let arms: Vec[i32] = Vec.new()
+        var pos = self.get_type_d1(resolved)
+        for _ in 0..self.get_type_d2(resolved):
+            let variant_sym = self.type_extra[pos]
+            let payload_count = self.type_extra[(pos + 1)]
+            let pat = ct_build_variant_bind_pattern(out, intern, decl, variant_sym, payload_count)
+            var body = out.ct_build_string_lit(intern, decl, type_name ++ "." ++ intern.resolve(variant_sym))
+            if payload_count > 0:
+                body = ct_build_concat(out, decl, body, out.ct_build_string_lit(intern, decl, "("))
+                for pi in 0..payload_count:
+                    if pi > 0:
+                        body = ct_build_concat(out, decl, body, out.ct_build_string_lit(intern, decl, ", "))
+                    let no_args: Vec[i32] = Vec.new()
+                    let payload_debug = ct_build_method_call(out, decl, out.ct_build_ident(decl, ct_payload_bind_sym(intern, pi)), debug_method_sym, no_args)
+                    body = ct_build_concat(out, decl, body, payload_debug)
+                body = ct_build_concat(out, decl, body, out.ct_build_string_lit(intern, decl, ")"))
+            arms.push(out.add_node(NodeKind.NK_MATCH_ARM, start, end, pat, body, 0) as i32)
+            pos = pos + 2 + payload_count
+        ct_build_match(out, decl, out.ct_build_ident(decl, self_sym), arms)
+
     fn ct_generate_debug_derive(out: AstPool, intern: InternPool, decl: i32) -> Vec[i32]:
         let generated: Vec[i32] = Vec.new()
-        if type_decl_sub_kind(out.get_data2(decl)) != TypeDeclKind.Struct:
+        let is_enum = ct_type_decl_is_enum(out, decl)
+        if type_decl_sub_kind(out.get_data2(decl)) != TypeDeclKind.Struct and not is_enum:
             return generated
 
         let debug_trait_sym = intern.intern("Debug")
@@ -2453,7 +2566,7 @@ impl Sema:
         if tid == 0:
             return generated
         let resolved = self.resolve_alias(tid)
-        if self.get_type_kind(resolved) != TypeKind.TY_STRUCT:
+        if self.get_type_kind(resolved) != (if is_enum: TypeKind.TY_ENUM else: TypeKind.TY_STRUCT):
             return generated
 
         let type_name = intern.resolve(type_name_sym)
@@ -2463,24 +2576,32 @@ impl Sema:
         let str_sym = intern.intern("str")
         let tp_count = ct_type_decl_tp_count(out, decl)
         let tp_start = ct_type_decl_tp_start(out, decl)
-        let self_type = out.add_node(NodeKind.NK_TYPE_NAMED, start, end, intern.intern("Self"), 0, 0)
+        // The trait declares `fn debug_str(self: &Self)`: the derive observes.
+        // A consuming receiver moved a non-Copy field out of `self.field.debug_str()`
+        // (D32) and moved the caller's binding (#1289's Wrap { tag: S }).
+        let self_pointee_type = out.add_node(NodeKind.NK_TYPE_NAMED, start, end, intern.intern("Self"), 0, 0)
+        let self_type = out.add_node(NodeKind.NK_TYPE_REF, start, end, self_pointee_type as i32, 0, 0)
         let ret_type = out.add_node(NodeKind.NK_TYPE_NAMED, start, end, str_sym, 0, 0)
 
-        let te_start = self.get_type_d1(resolved)
-        let field_count = self.get_type_d2(resolved)
-        var body = out.ct_build_string_lit(intern, decl, type_name ++ " {")
-        for fi in 0..field_count:
-            let field_sym = self.type_extra[(te_start + fi * 3)]
-            let prefix = if fi == 0: " " else: ", "
-            body = ct_build_concat(out, decl, body, out.ct_build_string_lit(intern, decl, prefix ++ intern.resolve(field_sym) ++ ": "))
-            let field_expr = ct_build_self_field(out, decl, self_sym, field_sym)
-            let no_args: Vec[i32] = Vec.new()
-            let field_debug = ct_build_method_call(out, decl, field_expr, debug_method_sym, no_args)
-            body = ct_build_concat(out, decl, body, field_debug)
-        body = ct_build_concat(out, decl, body, out.ct_build_string_lit(intern, decl, " }"))
+        var body = 0
+        if is_enum:
+            body = self.ct_enum_debug_body(out, intern, decl, resolved, type_name, self_sym, debug_method_sym)
+        else:
+            let te_start = self.get_type_d1(resolved)
+            let field_count = self.get_type_d2(resolved)
+            body = out.ct_build_string_lit(intern, decl, type_name ++ " {")
+            for fi in 0..field_count:
+                let field_sym = self.type_extra[(te_start + fi * 3)]
+                let prefix = if fi == 0: " " else: ", "
+                body = ct_build_concat(out, decl, body, out.ct_build_string_lit(intern, decl, prefix ++ intern.resolve(field_sym) ++ ": "))
+                let field_expr = ct_build_self_field(out, decl, self_sym, field_sym)
+                let no_args: Vec[i32] = Vec.new()
+                let field_debug = ct_build_method_call(out, decl, field_expr, debug_method_sym, no_args)
+                body = ct_build_concat(out, decl, body, field_debug)
+            body = ct_build_concat(out, decl, body, out.ct_build_string_lit(intern, decl, " }"))
 
         let param_start = out.extra_len()
-        out.ct_add_fn_param(self_sym, self_type as i32, FN_PARAM_FLAG_MOVE_SELF)
+        out.ct_add_fn_param(self_sym, self_type as i32, FN_PARAM_FLAG_REF_SELF)
         let fn_sym = intern.intern(type_name ++ ".debug_str")
         let fn_node = out.add_node(NodeKind.NK_FN_DECL, start, end, fn_sym, body as i32, 0)
         out.add_fn_meta(fn_node, FN_META_REQUIRED_UNIT, ret_type as i32, param_start, 1, 0, 0)
@@ -2569,14 +2690,43 @@ impl Sema:
         generated.push(impl_node as i32)
         generated
 
+    // #1289: an enum's Clone arm rebuilds the variant from its payloads —
+    // a Copy payload is read, any other payload is cloned (§11.8).
+    mut fn ct_enum_clone_body(out: AstPool, intern: InternPool, decl: i32, resolved: TypeId, self_sym: i32, clone_method_sym: i32) -> i32:
+        let start = out.get_start(decl)
+        let end = out.get_end(decl)
+        let arms: Vec[i32] = Vec.new()
+        var pos = self.get_type_d1(resolved)
+        for _ in 0..self.get_type_d2(resolved):
+            let variant_sym: i32 = self.type_extra[pos]
+            let payload_count: i32 = self.type_extra[(pos + 1)]
+            let pat = ct_build_variant_bind_pattern(out, intern, decl, variant_sym, payload_count)
+            let args: Vec[i32] = Vec.new()
+            for pi in 0..payload_count:
+                let payload_tid: i32 = self.type_extra[(pos + 2 + pi)]
+                let payload = out.ct_build_ident(decl, ct_payload_bind_sym(intern, pi))
+                if self.is_copy(payload_tid as TypeId) != 0:
+                    args.push(payload)
+                else:
+                    let no_args: Vec[i32] = Vec.new()
+                    args.push(ct_build_method_call(out, decl, payload, clone_method_sym, no_args))
+            let body = ct_build_variant_shorthand(out, intern, decl, intern.resolve(variant_sym), args)
+            arms.push(out.add_node(NodeKind.NK_MATCH_ARM, start, end, pat, body, 0) as i32)
+            pos = pos + 2 + payload_count
+        ct_build_match(out, decl, out.ct_build_ident(decl, self_sym), arms)
+
     mut fn ct_generate_clone_derive(out: AstPool, intern: InternPool, decl: i32) -> Vec[i32]:
         let generated: Vec[i32] = Vec.new()
-        if type_decl_sub_kind(out.get_data2(decl)) != TypeDeclKind.Struct:
+        let is_enum = ct_type_decl_is_enum(out, decl)
+        if type_decl_sub_kind(out.get_data2(decl)) != TypeDeclKind.Struct and not is_enum:
             return generated
 
         let clone_trait_sym = intern.intern("Clone")
         let all_sym = intern.intern("all")
-        if self.ct_validate_explicit_struct_derive_fields(out, intern, decl, clone_trait_sym, all_sym) == 0:
+        let payloads_ok =
+            if is_enum: self.ct_validate_explicit_enum_derive_payloads(out, intern, decl, clone_trait_sym, all_sym)
+            else: self.ct_validate_explicit_struct_derive_fields(out, intern, decl, clone_trait_sym, all_sym)
+        if payloads_ok == 0:
             return generated
         let clone_method_sym = intern.intern("clone")
         let type_name_sym = out.get_data0(decl)
@@ -2589,7 +2739,7 @@ impl Sema:
         if tid == 0:
             return generated
         let resolved = self.resolve_alias(tid)
-        if self.get_type_kind(resolved) != TypeKind.TY_STRUCT:
+        if self.get_type_kind(resolved) != (if is_enum: TypeKind.TY_ENUM else: TypeKind.TY_STRUCT):
             return generated
 
         let type_name = intern.resolve(type_name_sym)
@@ -2602,28 +2752,32 @@ impl Sema:
         let ret_type = out.add_node(NodeKind.NK_TYPE_NAMED, start, end, self_type_sym, 0, 0)
         let struct_lit_type = if tp_count > 0: self_type_sym else: type_name_sym
 
-        let te_start = self.get_type_d1(resolved)
-        let field_count = self.get_type_d2(resolved)
-        let field_syms: Vec[i32] = Vec.new()
-        let field_values: Vec[i32] = Vec.new()
-        for fi in 0..field_count:
-            let field_sym: i32 = self.type_extra[(te_start + fi * 3)]
-            let field_tid: i32 = self.type_extra[(te_start + fi * 3 + 1)]
-            let field_expr = ct_build_self_field(out, decl, self_sym, field_sym)
-            let field_value =
-                if self.is_copy(field_tid as TypeId) != 0:
-                    field_expr
-                else:
-                    let no_args: Vec[i32] = Vec.new()
-                    ct_build_method_call(out, decl, field_expr, clone_method_sym, no_args)
-            field_syms.push(field_sym)
-            field_values.push(field_value)
+        var body = 0
+        if is_enum:
+            body = self.ct_enum_clone_body(out, intern, decl, resolved, self_sym, clone_method_sym)
+        else:
+            let te_start = self.get_type_d1(resolved)
+            let field_count = self.get_type_d2(resolved)
+            let field_syms: Vec[i32] = Vec.new()
+            let field_values: Vec[i32] = Vec.new()
+            for fi in 0..field_count:
+                let field_sym: i32 = self.type_extra[(te_start + fi * 3)]
+                let field_tid: i32 = self.type_extra[(te_start + fi * 3 + 1)]
+                let field_expr = ct_build_self_field(out, decl, self_sym, field_sym)
+                let field_value =
+                    if self.is_copy(field_tid as TypeId) != 0:
+                        field_expr
+                    else:
+                        let no_args: Vec[i32] = Vec.new()
+                        ct_build_method_call(out, decl, field_expr, clone_method_sym, no_args)
+                field_syms.push(field_sym)
+                field_values.push(field_value)
 
-        let field_extra = out.extra_len()
-        for fi2 in 0..field_values.len() as i32:
-            out.add_extra(field_syms[fi2])
-            out.add_extra(field_values[fi2])
-        let body = out.add_node(NodeKind.NK_STRUCT_LIT, start, end, struct_lit_type, field_extra, field_count)
+            let field_extra = out.extra_len()
+            for fi2 in 0..field_values.len() as i32:
+                out.add_extra(field_syms[fi2])
+                out.add_extra(field_values[fi2])
+            body = out.add_node(NodeKind.NK_STRUCT_LIT, start, end, struct_lit_type, field_extra, field_count) as i32
         let self_pointee_type = out.add_node(NodeKind.NK_TYPE_NAMED, start, end, self_type_sym, 0, 0)
         let self_param_type = out.add_node(NodeKind.NK_TYPE_REF, start, end, self_pointee_type as i32, 0, 0)
         let param_start = out.extra_len()
