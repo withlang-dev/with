@@ -3145,6 +3145,13 @@ fn validate_typed_mir_body(mir_mod: &MirModule, body: &MirBody) -> MirValidation
                     let dk = mir_mod.mir_get_type_kind(mir_mod.mir_resolve_alias(dest_ty)) as i32
                     let sk = mir_mod.mir_get_type_kind(mir_mod.mir_resolve_alias(src_ty)) as i32
                     return mir_validation_fail(body.fn_sym, span, f"use rvalue type is incompatible with assign destination (dest ty={dest_ty} kind={dk}, src ty={src_ty} kind={sk})")
+            else if rk == RvalueKind.RK_AGGREGATE:
+                // #1229: a slice is a view of storage that already exists; no
+                // lowering builds one from fields. An aggregate into a
+                // slice-typed place is element data misread as {ptr, len}
+                // (`first([5, 6])` reached codegen this way and segfaulted).
+                if mir_mod.mir_get_type_kind(mir_mod.mir_resolve_alias(dest_ty)) == TypeKind.TY_SLICE:
+                    return mir_validation_fail(body.fn_sym, span, f"aggregate assigned to a slice-typed place (ty={dest_ty}); a slice is produced by `slice`, never built from fields")
             else if rk == RvalueKind.RK_REF:
                 if mir_validate_place_type(mir_mod, body, rv_d1) == 0:
                     return mir_validation_fail(body.fn_sym, span, "ref rvalue does not resolve to a concrete place type")

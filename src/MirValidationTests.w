@@ -179,3 +179,39 @@ pub fn mir_test_enum_payload_read() -> Unit:
     assert(payload_read_verdict(false, true).contains("enum payload read declares"))
     assert(payload_read_verdict(true, false) == "")
     assert(payload_read_verdict(false, false) == "")
+
+// #1229: an `aggregate` assigned to a slice-typed place. An array literal
+// passed to a `[]T` parameter was typed as the slice and lowered this way;
+// codegen passed the elements as {ptr, len} and the callee segfaulted while
+// this verifier said ok. A slice is produced by `slice`, never built from
+// fields; the same aggregate into an array-typed place is the literal itself.
+fn slice_aggregate_verdict(dest_is_slice: bool) -> str:
+    var mir_mod = MirModule.init()
+    for kind in [0, TypeKind.TY_INT, TypeKind.TY_ARRAY, TypeKind.TY_SLICE]:
+        mir_mod.sema_type_kinds.push(kind)
+        mir_mod.sema_type_d0.push(if kind == TypeKind.TY_INT: 0 else: 1)
+        mir_mod.sema_type_d1.push(if kind == TypeKind.TY_ARRAY: 2 else: 0)
+        mir_mod.sema_type_d2.push(0)
+    let int_ty = 1
+    let array_ty = 2
+    let slice_ty = 3
+    var body = MirBody.init_for_fn(1)
+    let dest_local = body.new_temp(if dest_is_slice: slice_ty else: array_ty)
+    let dest = body.new_place(dest_local)
+    let entry = body.new_block()
+    let fields: Vec[i32] = Vec.new()
+    let names: Vec[i32] = Vec.new()
+    for value in [5, 6]:
+        let element = body.new_const(ConstKind.CK_INT, value, 0, 0, int_ty)
+        fields.push(body.new_operand(OperandKind.OK_CONSTANT, element))
+        names.push(0)
+    let field_table = body.new_agg_fields(&fields, &names)
+    let aggregate = body.new_rvalue(RvalueKind.RK_AGGREGATE, 0, field_table, 0)
+    body.push_stmt(entry, StmtKind.Assign, dest, aggregate, 0)
+    body.set_terminator(entry, TermKind.TK_RETURN, 0, 0, 0, 0, 0)
+    let err = validate_typed_mir_body(mir_mod, body)
+    with_str_clone_ref(err.message)
+
+pub fn mir_test_slice_aggregate() -> Unit:
+    assert(slice_aggregate_verdict(true).contains("aggregate assigned to a slice-typed place"))
+    assert(slice_aggregate_verdict(false) == "")
