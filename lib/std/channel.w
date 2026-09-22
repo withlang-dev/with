@@ -14,6 +14,7 @@ extern fn with_channel_send(ch: i64, value_ptr: *const u8) -> Unit
 extern fn with_channel_recv(ch: i64, out_ptr: *mut u8) -> i32
 extern fn with_channel_close(ch: i64) -> Unit
 extern fn with_channel_destroy(ch: i64) -> Unit
+extern fn with_channel_retain_sender(ch: i64) -> Unit
 extern fn with_channel_release_sender(ch: i64) -> Unit
 extern fn with_channel_release_receiver(ch: i64) -> Unit
 
@@ -22,6 +23,14 @@ extern fn with_channel_release_receiver(ch: i64) -> Unit
 
 pub type Sender[T] { handle: i64 }
 pub type Receiver[T] { handle: i64 }
+
+// §14.15: Sender[T] is Clone and never Copy. A shared producer is spelled
+// `tx.clone()`; every clone holds the channel open, and the channel closes
+// when the last sender drops. Sender[T]: Send only when T: Send.
+impl[T] Clone for Sender[T]:
+    fn clone() -> Self:
+        with_channel_retain_sender(self.handle)
+        Sender { handle: self.handle }
 
 impl[T] Drop for Sender[T]:
     move fn drop():
