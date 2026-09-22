@@ -38,13 +38,15 @@ async fn process_item(id: i32) -> i32:
     id * 10
 
 async fn test_async_scope:
-    var result = 0
+    // Tracked tasks are observed, never discarded: the scope waits for
+    // all three, and their results are awaited (§14.7).
+    let total = async scope s =>
+        let a = s.track(process_item(1))
+        let b = s.track(process_item(2))
+        let c = s.track(process_item(3))
+        a.await + b.await + c.await
 
-    async scope s =>
-        s.track(process_item(1))
-        s.track(process_item(2))
-        s.track(process_item(3))
-
+    assert(total == 60)
     print("all async tasks completed")
 
 // --- Defer for cleanup ---
@@ -68,9 +70,9 @@ fn test_vec_mutation:
     buffer.push(42)
     assert(buffer.len() == 4)
 
-fn main:
+async fn main:
     test_with_blocks()
     test_defer()
     test_vec_mutation()
-    let _ = test_async_scope()
+    test_async_scope().await
     print("=== all tests passed ===")

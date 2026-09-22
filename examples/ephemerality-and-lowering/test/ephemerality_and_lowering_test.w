@@ -1,13 +1,17 @@
 // Tests for ephemerality + with-lowering interactions
 
+use std.sync
+
 error AppError = DbError(str) | ProcessError | Cancelled
 
 type DbConnection { id: i32 }
 type ConnectionPool { url: str }
 
-var defer_order_len: i64 = 0
-var defer_order_third: i32 = 0
-var defer_order_fourth: i32 = 0
+// The async test below makes the program concurrent, so the globals the
+// defer probes write are Atomic (§9.1c): synchronized globals are always safe.
+var defer_order_len: Atomic[i32] = Atomic.new(0)
+var defer_order_third: Atomic[i32] = Atomic.new(0)
+var defer_order_fourth: Atomic[i32] = Atomic.new(0)
 
 fn with_connection(pool: ConnectionPool) -> DbConnection:
     print(f"Acquiring connection to {pool.url}...")
@@ -27,22 +31,28 @@ fn test_with_blocks:
 fn run_defer_order:
     var order = Vec.new()
     order.push(1)
-    defer: defer_order_len = order.len()
-    defer: defer_order_third = order.get(2)
-    defer: defer_order_fourth = order.get(3)
+    // Typed bindings until #1287 (Atomic intrinsics pass an element view's
+    // address as the value): `store(order[2], ...)` is the spelling.
+    defer: defer_order_len.store(order.len(), .SeqCst)
+    defer:
+        let third: i32 = order[2]
+        defer_order_third.store(third, .SeqCst)
+    defer:
+        let fourth: i32 = order[3]
+        defer_order_fourth.store(fourth, .SeqCst)
     defer: order.push(4)
     defer: order.push(3)
     order.push(2)
 
 @[test]
 fn test_defer_order:
-    defer_order_len = 0
-    defer_order_third = 0
-    defer_order_fourth = 0
+    defer_order_len.store(0, .SeqCst)
+    defer_order_third.store(0, .SeqCst)
+    defer_order_fourth.store(0, .SeqCst)
     run_defer_order()
-    assert(defer_order_len == 4)
-    assert(defer_order_third == 3)
-    assert(defer_order_fourth == 4)
+    assert(defer_order_len.load(.SeqCst) == 4)
+    assert(defer_order_third.load(.SeqCst) == 3)
+    assert(defer_order_fourth.load(.SeqCst) == 4)
 
 @[test]
 fn test_vec_mutation:
@@ -58,10 +68,13 @@ fn test_vec_mutation:
 async fn process_item(id: i32) -> i32:
     id * 10
 
+// A task is observed, never discarded (§14.7): the test is itself async and
+// awaits the tracked tasks through the scope.
 @[test]
-fn test_async_scope:
-    let _ = async:
-        async scope s =>
-            s.track(process_item(1))
-            s.track(process_item(2))
-            s.track(process_item(3))
+async fn test_async_scope:
+    let total = async scope s =>
+        let a = s.track(process_item(1))
+        let b = s.track(process_item(2))
+        let c = s.track(process_item(3))
+        a.await + b.await + c.await
+    assert(total == 60)

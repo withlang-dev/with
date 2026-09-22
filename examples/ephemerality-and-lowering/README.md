@@ -12,15 +12,11 @@ Spec-focused example for testing:
 - `ephemerality_and_lowering.w` — primary example module (includes `@[test]` cases)
 - `test/ephemerality_and_lowering_test.w` — package-style test implementation
 
-## Compile checks
+## Run
 
-From repo root:
+From this directory:
 
 ```bash
-./bootstrap/zig-out/bin/with check examples/ephemerality-and-lowering/ephemerality_and_lowering.w
-./bootstrap/zig-out/bin/with check examples/ephemerality-and-lowering/test/ephemerality_and_lowering_test.w
+with run ephemerality_and_lowering.w
+with test test/ephemerality_and_lowering_test.w
 ```
-
-Current first blocker in bootstrap compiler:
-
-- lexer/parser rejects `vec![...]` macro-call syntax (`unexpected character` on `!`)
