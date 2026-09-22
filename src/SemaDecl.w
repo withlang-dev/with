@@ -1577,7 +1577,7 @@ impl Sema:
         // Bind Self to method owner type for dot-name methods
         let self_sym = self.syms.self_type
         var self_type_id = 0
-        let fn_name_str = self.pool_resolve(method_base_sym)
+        let fn_name_str = self.pool_resolve(method_base_sym).clone()
         if method_owner_sym != 0:
             self_type_id = self.lookup_named_type_visible(method_owner_sym)
             if self_type_id != 0:
@@ -2422,7 +2422,7 @@ impl Sema:
         if trait_sym == 0:
             return
 
-        let trait_name = self.pool_resolve(trait_sym)
+        let trait_name = self.pool_resolve(trait_sym).clone()
         let is_lang_trait = self.lang_trait_syms.contains(trait_sym)
         if not is_lang_trait and not self.trait_lookup.contains(trait_sym):
             self.emit_error("unknown trait", node)
