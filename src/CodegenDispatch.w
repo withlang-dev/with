@@ -1191,6 +1191,11 @@ impl Codegen:
                         cur_ty = payload_ty
                         active_variant_idx = -1
                         continue
+                // A named base with no LLVM struct (a transparent std Box)
+                // leaves cur_ty 0: unknown, not a type to index
+                // (LLVMGetTypeKind(null) segfaulted the #1280 audit).
+                if cur_ty == 0:
+                    return 0
                 let fi = self.mir_resolve_field_index(cur_ty, pd, variant_owner_sema_ty)
                 if fi < 0:
                     return 0
