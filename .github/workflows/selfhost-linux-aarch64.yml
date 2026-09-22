@@ -1,18 +1,22 @@
 name: linux aarch64
 
 on:
-  # Restrict push to main so a PR-branch push does not trigger BOTH a push run
-  # and a pull_request run (the double-run that doubles runner usage). PRs are
-  # covered by pull_request; main pushes (merges) by push.
+  # Lanes run on a push to main (a merge) and on request; never on a PR.
+  # See D56: a PR is gated by the seed-driven battery on the maintainer
+  # machine, posted on the PR, not by these lanes.
   push:
     branches: [main]
     # Docs are not build inputs (D49): a docs-only merge starts no lane.
     paths-ignore:
       - 'docs/**'
       - '*.md'
-  pull_request:
+  # A lane takes hours on a 4-core runner (SDK build, compiler build,
+  # fixpoint, battery); it is not a merge signal (D56). The seed-driven
+  # battery on the maintainer machine gates a PR; lanes run after a merge
+  # (they build and cache the SDK packages) and on request.
+  workflow_dispatch:
 
-# Cancel a superseded in-progress run when the same PR branch is re-pushed.
+# Never cancel a main run: it builds and caches the source-built SDK.
 # Hardcode the platform token (not ${{ github.workflow }}) so a workflow
 # rename can never merge two platforms into one group and cancel each
 # other.
@@ -21,7 +25,7 @@ concurrency:
   # A superseded PR-branch run is cancelled; a main run is never cancelled —
   # it is the run that builds and caches the source-built SDK (hours), and
   # every merge would otherwise restart it from zero.
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: false
 
 jobs:
   selfhost-linux-aarch64:

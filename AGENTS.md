@@ -1010,7 +1010,10 @@ If any step fails, continue debugging until it passes.
 All changes reach `main` through a reviewed PR — no direct pushes. Branch
 protection enforces this (one approving review; admins exempt for release and
 seed operations). Batch related commits into one PR the way the battery
-discipline batches them.
+discipline batches them. The GitHub lanes are not a merge signal (D56: a
+lane takes hours); a PR is a draft until its seed-driven battery is green
+and posted on it, then marked ready. Lanes run only on a push to main and
+on dispatch — post-hoc evidence and the SDK package producer.
 
 ### Every PR must be bootstrappable
 Each PR must be green and buildable from a tagged seed release that already
