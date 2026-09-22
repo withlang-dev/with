@@ -854,3 +854,13 @@ fn column_of(source: &str, pos: i32) -> i32:
         if source[p] == CharCode.Newline:
             return pos - p - 1
     pos
+
+// The indentation (leading spaces and tabs) of the line holding byte offset
+// `pos`: the level a construct introduced on that line must exceed for an
+// indented body (§29.13 Form 2).
+fn line_indent_of(source: &str, pos: i32) -> i32:
+    let line_start = pos - column_of(source, pos)
+    var indent = 0
+    while line_start + indent < source.len() and (source[line_start + indent] == CharCode.Space or source[line_start + indent] == CharCode.Tab):
+        indent = indent + 1
+    indent
