@@ -92,7 +92,11 @@ runs:
         # resource headers. A copied binary loses them, so on unix the seed is
         # a symlink to the real path; on Windows, where cmake does not resolve
         # links, the companion trees are copied alongside.
-        for tool in clang clang++ cmake ninja; do
+        seed_tools="clang clang++ cmake ninja"
+        # cmake's own build on Windows is an MSVC-style build: clang-cl,
+        # lld-link and mt.exe (tools/build-cmake.ps1 is the known-good recipe).
+        [[ "$RUNNER_OS" == Windows ]] && seed_tools="$seed_tools clang-cl lld-link"
+        for tool in $seed_tools; do
           host="$(host_tool "$tool" || true)"
           if [[ -z "$host" ]]; then
             echo "source-sdk: the SDK asset cannot bootstrap ($tool missing or dangling) and the runner has no $tool to seed from" >&2

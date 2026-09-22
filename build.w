@@ -898,6 +898,8 @@ fn sdk_cmake_target(ctx: &BuildCtx) -> Target:
     target = target.arg(sdk_cmake_source_dir())
     target = target.arg(build_root ++ "/cmake-" ++ sdk_host_tag_for_platform(platform))
     target = target.arg(sdk_jobs_arg(ctx))
+    // Windows: cmake's own build is MSVC-style (clang-cl, lld-link, mt.exe).
+    target = target.arg(ctx.env_input("SDK_WINDOWS_MT"))
     target = target.input(sdk_cmake_source_marker())
     target = target.input(output_prefix ++ "/bin/ninja" ++ host_exe_suffix())
     target = target.input(bootstrap_prefix)

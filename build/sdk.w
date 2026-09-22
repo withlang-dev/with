@@ -787,16 +787,31 @@ pub fn run_sdk_cmake_action(ctx: ActionCtx) -> i32:
     let source_dir = args.get(2)
     let build_dir = args.get(3)
     let jobs = args.get(4)
+    let windows_mt = if args.len() > 5: sdk_owned_text(args.get(5)) else: ""
     var rc = sdk_validate_staged_paths(ctx, bootstrap_prefix, output_prefix)
     if rc != 0:
         return rc
     let fs = ctx.fs()
     if not fs.exists(sdk_tool(output_prefix, "ninja")):
         return sdk_fail(ctx, "missing staged Ninja: " ++ sdk_tool(output_prefix, "ninja"))
+    // Windows: cmake's own build is an MSVC-style build — clang-cl, lld-link
+    // and mt.exe, as tools/build-cmake.ps1 (the recipe behind the shipped
+    // cmake.exe) does. The GNU-style clang driver made CMake generate its
+    // own manifest .res beside cmake's manifest .rc: `duplicate resource:
+    // type MANIFEST` at cmcldeps.exe on both Windows lanes.
+    if os() == "Windows":
+        if not fs.exists(sdk_tool(bootstrap_prefix, "clang-cl")):
+            return sdk_fail(ctx, "missing bootstrap SDK clang-cl: " ++ sdk_tool(bootstrap_prefix, "clang-cl"))
+        if not fs.exists(sdk_tool(bootstrap_prefix, "lld-link")):
+            return sdk_fail(ctx, "missing bootstrap SDK lld-link: " ++ sdk_tool(bootstrap_prefix, "lld-link"))
+        if windows_mt.len() == 0:
+            return sdk_fail(ctx, "SDK_WINDOWS_MT must name the Windows SDK mt.exe path for the Windows cmake build")
     if fs.mkdir_all(build_dir) != 0:
         return sdk_fail(ctx, "could not create CMake build directory: " ++ build_dir)
     let root = ctx.project_info().project_root()
     let cmake = sdk_abs(root, sdk_tool(bootstrap_prefix, "cmake"))
+    let cc = if os() == "Windows": "clang-cl" else: "clang"
+    let cxx = if os() == "Windows": "clang-cl" else: "clang++"
     let configure: Vec[str] = Vec.new()
     configure.push(sdk_owned_text(cmake))
     configure.push("-G")
@@ -807,14 +822,15 @@ pub fn run_sdk_cmake_action(ctx: ActionCtx) -> i32:
     configure.push(sdk_abs(root, build_dir))
     configure.push("-DCMAKE_BUILD_TYPE=Release")
     configure.push("-DCMAKE_INSTALL_PREFIX=" ++ sdk_abs(root, output_prefix))
-    configure.push("-DCMAKE_C_COMPILER=" ++ sdk_abs(root, sdk_tool(bootstrap_prefix, "clang")))
-    configure.push("-DCMAKE_CXX_COMPILER=" ++ sdk_abs(root, sdk_tool(bootstrap_prefix, "clang++")))
+    configure.push("-DCMAKE_C_COMPILER=" ++ sdk_abs(root, sdk_tool(bootstrap_prefix, cc)))
+    configure.push("-DCMAKE_CXX_COMPILER=" ++ sdk_abs(root, sdk_tool(bootstrap_prefix, cxx)))
     configure.push("-DCMAKE_MAKE_PROGRAM=" ++ sdk_abs(root, sdk_tool(output_prefix, "ninja")))
     configure.push("-DBUILD_TESTING=OFF")
     configure.push("-DCMAKE_USE_OPENSSL=OFF")
     if os() == "Windows":
         configure.push("-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded")
         configure.push("-DCMAKE_LINKER=" ++ sdk_abs(root, sdk_tool(bootstrap_prefix, "lld-link")))
+        configure.push("-DCMAKE_MT=" ++ windows_mt)
     rc = sdk_run_capture(ctx, "cmake-configure", configure, 600000)
     if rc != 0: return rc
     var build: Vec[str] = Vec.new()
