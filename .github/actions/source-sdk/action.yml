@@ -52,6 +52,9 @@ runs:
         need=0
         bootstrap_tools="clang clang++ cmake ninja"
         [[ "$RUNNER_OS" == Windows ]] && bootstrap_tools="$bootstrap_tools clang-cl lld-link"
+        # LLVM's BLAKE3 on x86_64 Windows is MASM; sdk.w assembles it with the
+        # bootstrap's llvm-ml64 (its packaging contract refuses anything else).
+        [[ "$RUNNER_OS" == Windows && "$RUNNER_ARCH" == X64 ]] && bootstrap_tools="$bootstrap_tools llvm-ml64"
         for tool in $bootstrap_tools; do
           usable "$tool" || need=1
         done
@@ -96,12 +99,14 @@ runs:
         # resource headers. A copied binary loses them, so on unix the seed is
         # a symlink to the real path; on Windows, where cmake does not resolve
         # links, the companion trees are copied alongside.
-        seed_tools="clang clang++ cmake ninja"
-        # cmake's own build on Windows is an MSVC-style build: clang-cl,
-        # lld-link and mt.exe (tools/build-cmake.ps1 is the known-good recipe).
-        [[ "$RUNNER_OS" == Windows ]] && seed_tools="$seed_tools clang-cl lld-link"
+        seed_tools="$bootstrap_tools"
         for tool in $seed_tools; do
           host="$(host_tool "$tool" || true)"
+          # llvm-ml64 is LLVM's own alias of llvm-ml (add_llvm_tool_symlink);
+          # a runner LLVM that installs only llvm-ml seeds it under that name.
+          if [[ -z "$host" && "$tool" == llvm-ml64 ]]; then
+            host="$(host_tool llvm-ml || true)"
+          fi
           if [[ -z "$host" ]]; then
             echo "source-sdk: the SDK asset cannot bootstrap ($tool missing or dangling) and the runner has no $tool to seed from" >&2
             exit 1

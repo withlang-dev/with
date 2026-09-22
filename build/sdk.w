@@ -488,6 +488,9 @@ fn sdk_bootstrap_set(platform: &str) -> Vec[str]:
         set.push("bin/cmake.exe")
         set.push("bin/cmcldeps.exe")
         set.push("bin/ninja.exe")
+        // LLVM's BLAKE3 on x86_64 is MASM, assembled with llvm-ml64.
+        if platform == "windows-x86_64":
+            set.push("bin/llvm-ml64.exe")
     else:
         set.push("bin/clang")
         set.push("bin/clang++")
