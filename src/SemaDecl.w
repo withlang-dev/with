@@ -1563,12 +1563,14 @@ impl Sema:
                 let p0_flags = self.ast.fn_param_flags(param_start, 0)
                 // §2.4/#642: a destructor always consumes — Drop.drop must take
                 // `move self: Self`. Catch other forms here at check time (they
-                // previously died in codegen with no source location).
+                // previously died in codegen with no source location), with the
+                // fix-it the spec promises. A bare `fn drop()` inherits the
+                // trait's move receiver and never reaches this branch.
                 let decl_name_for_drop = self.pool_resolve(fn_name)
                 if fn_param_is_move_self(p0_flags) == 0 and (decl_name_for_drop == "drop" or decl_name_for_drop.ends_with(".drop")):
                     let encl_impl = self.impl_node_for_method_decl(node)
                     if encl_impl != 0 and self.pool_resolve(self.ast.get_data2(encl_impl)) == "Drop":
-                        self.emit_error("Drop.drop receiver must be 'move self: Self' — a destructor always consumes (§2.4)", node)
+                        self.emit_error_with_help("Drop.drop receiver must be 'move self: Self' — a destructor always consumes (§2.4)", node, "write `move fn drop()`")
 
         // Bind Self to method owner type for dot-name methods
         let self_sym = self.syms.self_type
