@@ -531,6 +531,12 @@ fn sdk_package_entries(ctx: &ActionCtx, prefix: &str, sdk_base: &str, platform: 
                 entries.push(archive_symlink_entry("lld", sdk_base ++ "/bin/" ++ alias, 0o777))
     entries
 
+// The resource compiler of the same Windows Kit as mt.exe (they share
+// bin/<version>/<arch>/). Left to PATH, CMake found a 2015 rc.exe that
+// rejects its flags: `fatal error RC1107: invalid usage` compiling
+// CMakeVersion.rc on both Windows lanes.
+fn sdk_windows_rc_from_mt(windows_mt: &str) -> str: sdk_dirname(windows_mt) ++ "/rc.exe"
+
 fn sdk_write_text(ctx: &ActionCtx, path: &str, text: &str) -> i32:
     let fs = ctx.fs()
     let dir = sdk_dirname(path)
@@ -831,6 +837,7 @@ pub fn run_sdk_cmake_action(ctx: ActionCtx) -> i32:
         configure.push("-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded")
         configure.push("-DCMAKE_LINKER=" ++ sdk_abs(root, sdk_tool(bootstrap_prefix, "lld-link")))
         configure.push("-DCMAKE_MT=" ++ windows_mt)
+        configure.push("-DCMAKE_RC_COMPILER=" ++ sdk_windows_rc_from_mt(windows_mt))
     rc = sdk_run_capture(ctx, "cmake-configure", configure, 600000)
     if rc != 0: return rc
     var build: Vec[str] = Vec.new()
@@ -1003,6 +1010,7 @@ pub fn run_sdk_llvm_action(ctx: ActionCtx) -> i32:
         if windows_mt.len() == 0:
             return sdk_fail(ctx, "SDK_WINDOWS_MT must name the Windows SDK mt.exe path for Windows SDK rebuilds")
         configure.push("-DCMAKE_MT=" ++ windows_mt)
+        configure.push("-DCMAKE_RC_COMPILER=" ++ sdk_windows_rc_from_mt(windows_mt))
     else:
         configure.push("-DCMAKE_C_COMPILER=" ++ sdk_abs(root, sdk_tool(bootstrap_prefix, "clang")))
         configure.push("-DCMAKE_CXX_COMPILER=" ++ sdk_abs(root, sdk_tool(bootstrap_prefix, "clang++")))
