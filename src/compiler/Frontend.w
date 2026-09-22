@@ -17,6 +17,7 @@ use compiler.EmbeddedStdlib
 use compiler.EmbeddedRuntime
 use compiler.EmbeddedClangResource
 use compiler.ModuleSource
+use compiler.FacadeRender
 use TargetSpec
 
 extern fn with_str_clone_ref(s: &str) -> str
@@ -536,6 +537,37 @@ impl Zcu:
         self.decl_source_file_ids = ordered_file_ids
         self.decl_is_c_import = ordered_ci
         frontend_cimport_unlock()
+        out
+
+    // D51 §16.2b stage 4a: each `c facade` block's resources, rendered as
+    // ordinary With (compiler/FacadeRender.w) once every source file and every
+    // `<c_import …>` translation is in the pool, spliced in as the synthetic
+    // file `<facade NAME>` with the facade's own module as owner. The decls
+    // are ordinary user declarations, not c_import ones: a c_import-origin
+    // symbol is hidden from modules without a c_import of their own, and a
+    // resource type must be usable wherever its module is imported.
+    mut fn render_c_facades_frontend(pool: AstPool) -> AstPool:
+        var out = pool
+        let base_count = out.decl_count()
+        for i in 0..base_count:
+            let decl = out.get_decl(i)
+            if out.kind(decl) != NodeKind.NK_C_FACADE:
+                continue
+            let text = facade_render_block(out, self.pool, decl as i32)
+            if text.len() == 0:
+                continue
+            let facade_name: str = with_str_clone_ref(self.pool.resolve(out.get_data0(decl)))
+            let file_id = self.next_file_id
+            self.next_file_id = self.next_file_id + 1
+            self.add_source_text_mapping(file_id, "<facade " ++ facade_name ++ ">", text)
+            let before = out.decl_count()
+            var lexer = Lexer.init(text, file_id)
+            let tokens = lexer.tokenize()
+            var parser = Parser.init_with_pool(move tokens, text, file_id, self.pool, move self.diagnostics, out)
+            out = parser.parse_module()
+            self.pool = parser.intern
+            self.diagnostics = move parser.diags
+            self.append_decl_source_paths(out.decl_count() - before, self.decl_source_path_frontend(i), file_id)
         out
 
     fn c_import_cache_key_frontend(pool: AstPool, decl: i32, header_spec: &str) -> str:
@@ -1708,6 +1740,7 @@ impl Zcu:
         let t_cimport = runtime_clock_nanos()
         self.trace_c_import_cache = self.read_trace_c_import_cache_frontend()
         pool = self.expand_c_imports_frontend(pool)
+        pool = self.render_c_facades_frontend(pool)
         if do_profile:
             let cimport_ns = runtime_clock_nanos() - t_cimport
             runtime_eprint(f"[profile] frontend.c_import  {cimport_ns / 1000000}.{(cimport_ns % 1000000) / 1000} ms")
