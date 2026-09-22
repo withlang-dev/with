@@ -660,6 +660,14 @@ all four parts in one brief, then wait for the ruling:
    derived from his decision record — not a menu of options with no stake. It's
    falsifiable; being wrong and told why improves the record.
 
+**Never present an option that plainly fails `docs/mission.md`.** If an
+option obviously and unambiguously violates the mission (it makes the
+programmer write what the compiler already knows, adds ceremony with no
+guardrail, leaks by default, weakens safety), leave it out of the brief —
+listing it wastes Eric's time. Keep only options a reasonable reading of
+the mission could choose; if you drop one that someone might expect to
+see, one clause saying why is enough.
+
 Then Eric rules. For spec changes, the blessed wording lands immediately as the
 ruling itself, and the implementation is non-compliant until it conforms.
 
