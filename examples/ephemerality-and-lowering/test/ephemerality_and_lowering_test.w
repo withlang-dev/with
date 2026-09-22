@@ -31,15 +31,9 @@ fn test_with_blocks:
 fn run_defer_order:
     var order = Vec.new()
     order.push(1)
-    // Typed bindings until #1287 (Atomic intrinsics pass an element view's
-    // address as the value): `store(order[2], ...)` is the spelling.
     defer: defer_order_len.store(order.len(), .SeqCst)
-    defer:
-        let third: i32 = order[2]
-        defer_order_third.store(third, .SeqCst)
-    defer:
-        let fourth: i32 = order[3]
-        defer_order_fourth.store(fourth, .SeqCst)
+    defer: defer_order_third.store(order[2], .SeqCst)
+    defer: defer_order_fourth.store(order[3], .SeqCst)
     defer: order.push(4)
     defer: order.push(3)
     order.push(2)
