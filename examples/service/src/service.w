@@ -5,7 +5,7 @@ use errors.*
 
 // --- Service Configuration ---
 
-type ServiceConfig {
+pub type ServiceConfig {
     cache_ttl_secs: i64 = 300,
     max_batch_size: i32 = 100,
     notify_on_create: bool = true,
@@ -14,7 +14,7 @@ type ServiceConfig {
 
 // --- Service Metrics ---
 
-type ServiceMetrics {
+pub type ServiceMetrics {
     requests: i64 = 0,
     cache_hits: i64 = 0,
     cache_misses: i64 = 0,
@@ -26,28 +26,31 @@ type ServiceMetrics {
 // Demonstrates service-layer architecture with configuration,
 // metrics tracking, builder pattern, and domain logic.
 
-type UserService {
+pub type UserService {
     config: ServiceConfig,
     metrics: ServiceMetrics,
 }
 
 // --- Builder Pattern ---
+//
+// The setters consume the builder (`move fn`, §3.1) and return the next
+// one, so the chain reads `UserService.builder().with_config(cfg).build()`
+// without naming the intermediate builder.
 
-type UserServiceBuilder {
+pub type UserServiceBuilder {
     config: ServiceConfig,
 }
 
-extend UserService:
-    fn builder -> UserServiceBuilder:
-        UserServiceBuilder {
-            config: ServiceConfig {},
-        }
+pub fn UserService.builder() -> UserServiceBuilder:
+    UserServiceBuilder {
+        config: ServiceConfig {},
+    }
 
 extend UserServiceBuilder:
-    fn with_config(move self: UserServiceBuilder, cfg: ServiceConfig) -> UserServiceBuilder:
+    pub move fn with_config(cfg: ServiceConfig) -> UserServiceBuilder:
         { self with config: cfg }
 
-    fn build(self: &Self) -> UserService:
+    pub move fn build() -> UserService:
         UserService {
             config: self.config,
             metrics: ServiceMetrics {},
@@ -58,8 +61,10 @@ extend UserServiceBuilder:
 extend UserService:
 
     // --- Validate a create request ---
+    //
+    // Observes the request (`&T`, §3.8): the caller keeps it for create_user.
 
-    fn validate_create(self: &UserService, req: CreateUserRequest) -> Option[str]:
+    pub fn validate_create(req: &CreateUserRequest) -> Option[str]:
         if req.name == "":
             return Some("name cannot be empty")
         if not req.email.contains("@"):
@@ -68,28 +73,27 @@ extend UserService:
 
     // --- Create User ---
     //
-    // Validates and builds a user from a request.
+    // Validates and builds a user from a request. The request is
+    // consumed and its fields move into the user (§2.2).
     // In a real service, this would insert into a database
     // and send notifications.
 
-    fn create_user(
-        self: &mut UserService,
-        req: CreateUserRequest,
-        actor: UserId,
-    ) -> User:
-        self.metrics.requests = self.metrics.requests + 1
+    pub mut fn create_user(req: CreateUserRequest, actor: UserId) -> User:
+        self.metrics.requests += 1
 
-        // Build the user -- active defaults to true via default field value
+        // Build the user -- active defaults to true via default field value.
+        // A field vacates only from a `var` base (§2.2, D32).
+        var request = req
         User {
             id: UserId { value: 0 },
-            name: req.name,
-            email: req.email,
-            role: req.role,
+            name: move request.name,
+            email: move request.email,
+            role: request.role,
         }
 
     // --- Build a profile from a user ---
 
-    fn make_profile(self: &UserService, user: User, posts: i32, followers: i32) -> UserProfile:
+    pub fn make_profile(user: User, posts: i32, followers: i32) -> UserProfile:
         UserProfile {
             user,
             post_count: posts,
@@ -98,7 +102,7 @@ extend UserService:
 
     // --- Clamp pagination ---
 
-    fn clamp_page_size(self: &UserService, per_page: i32) -> i32:
+    pub fn clamp_page_size(per_page: i32) -> i32:
         if per_page > self.config.max_batch_size:
             self.config.max_batch_size
         else if per_page < 1:
@@ -108,7 +112,7 @@ extend UserService:
 
     // --- Generate welcome message based on role ---
 
-    fn welcome_body(self: &UserService, role: Role) -> str:
+    pub fn welcome_body(role: Role) -> str:
         match role:
             .Admin     => "Welcome, administrator. Full access granted."
             .Moderator => "Welcome, moderator. You can manage content."
@@ -117,9 +121,9 @@ extend UserService:
 
     // --- Build a notification ---
 
-    fn make_welcome_notification(self: &UserService, user: User) -> Notification:
+    pub fn make_welcome_notification(user: &User) -> Notification:
         Notification {
-            recipient: user.email,
+            recipient: user.email.clone(),
             subject: "Welcome to the platform",
             body: self.welcome_body(user.role),
             priority: .Normal,
@@ -127,26 +131,29 @@ extend UserService:
 
     // --- Bump metrics ---
 
-    fn bump_requests(self: &mut UserService):
-        self.metrics.requests = self.metrics.requests + 1
+    pub mut fn bump_requests():
+        self.metrics.requests += 1
 
-    fn bump_cache_hit(self: &mut UserService):
-        self.metrics.cache_hits = self.metrics.cache_hits + 1
+    pub mut fn bump_cache_hit():
+        self.metrics.cache_hits += 1
 
-    fn bump_cache_miss(self: &mut UserService):
-        self.metrics.cache_misses = self.metrics.cache_misses + 1
+    pub mut fn bump_cache_miss():
+        self.metrics.cache_misses += 1
 
 // --- Helper: describe changes between two users ---
+//
+// (`with Vec.new() as mut changes:` is the builder spelling, §7.2; the
+// `var` desugaring is used until #1298 accepts a trailing `if`.)
 
-fn describe_changes(old: User, new_user: User) -> str:
-    with Vec.new() as mut changes:
-        if old.name != new_user.name:
-            changes.push("name changed")
-        if old.email != new_user.email:
-            changes.push("email changed")
-        if old.active != new_user.active:
-            if new_user.active:
-                changes.push("activated")
-            else:
-                changes.push("deactivated")
-        changes.join(", ")
+pub fn describe_changes(old: &User, new_user: &User) -> str:
+    var changes = Vec.new()
+    if old.name != new_user.name:
+        changes.push("name changed")
+    if old.email != new_user.email:
+        changes.push("email changed")
+    if old.active != new_user.active:
+        if new_user.active:
+            changes.push("activated")
+        else:
+            changes.push("deactivated")
+    changes.join(", ")

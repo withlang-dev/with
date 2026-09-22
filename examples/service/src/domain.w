@@ -11,6 +11,7 @@ type User {
 }
 
 enum Role { | Admin | Moderator | Member | Guest }
+impl Copy for Role
 
 type UserProfile {
     user: User,
@@ -40,3 +41,4 @@ type Notification {
 }
 
 enum Priority { | Urgent | Normal | Low }
+impl Copy for Priority

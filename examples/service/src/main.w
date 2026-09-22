@@ -21,10 +21,8 @@ fn main:
         max_batch_size: 50,
     }
 
-    // Build the service
-    let builder = UserService.builder()
-    let builder2 = builder.with_config(config)
-    var service = builder2.build()
+    // Build the service: the setters consume and return the builder
+    let service = UserService.builder().with_config(config).build()
 
     var state = AppState { service }
 
@@ -37,7 +35,7 @@ fn main:
         body: "Alice",
     }
 
-    let resp = handle_request(&mut state, create_req)
+    let resp = state.handle_request(create_req)
     print(f"POST /users -> {resp.status}: {resp.body}")
 
     let list_req = HttpRequest {
@@ -46,7 +44,7 @@ fn main:
         body: "",
     }
 
-    let resp2 = handle_request(&mut state, list_req)
+    let resp2 = state.handle_request(list_req)
     print(f"GET /users  -> {resp2.status}: {resp2.body}")
 
     // Try a 404
@@ -56,7 +54,7 @@ fn main:
         body: "",
     }
 
-    let resp3 = handle_request(&mut state, bad_req)
+    let resp3 = state.handle_request(bad_req)
     print(f"DELETE /unknown -> {resp3.status}: {resp3.body}")
 
     print("=== Done ===")
