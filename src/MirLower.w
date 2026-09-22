@@ -4927,6 +4927,21 @@ impl MirBuilder:
             self.mark_unsupported()
             return self.place_for_local(0)
         let base = self.lower_field_base_place_for_field(base_expr, field_idx)
+        // Transparent std Box (#1280): the box VALUE is the payload pointer,
+        // so Box's own `ptr` field is that value, not a projection into it.
+        // Codegen has no field-on-Box path: a `.ptr` field GEP on the box
+        // place lands on the payload's first field (Box[Cell].ptr read as
+        // Cell.a, an i32, then trapped or failed codegen). Read the box value
+        // and retype it — the same no-op cast as `self as *mut T` — without
+        // consuming the box (a field read moves nothing; the pointer is Copy).
+        let base_ty = self.place_local_type(base)
+        if self.sema.type_is_std_box_inst(base_ty) != 0:
+            let op = self.body.new_operand(OperandKind.OK_COPY, base)
+            let rv = self.body.new_rvalue(RvalueKind.RK_CAST, op, field_ty, base_ty)
+            let temp = self.new_temp(field_ty)
+            let place = self.place_for_local(temp)
+            self.body.push_stmt(self.cur_bb, StmtKind.Assign, place, rv, self.ast.get_start(node))
+            return place
         self.new_projected_field_place(base, field_idx, field_ty)
 
     mut fn lower_user_deref_result_place(place: i32, current_ty: i32, deref_info: &SemaDerefInfo, node: i32) -> i32:

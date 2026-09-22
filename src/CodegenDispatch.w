@@ -1102,6 +1102,18 @@ impl Codegen:
 
         -1
 
+    // `src as tgt` where src is a transparent std Box and tgt is a raw
+    // pointer to its payload type: the box value itself (#1280).
+    fn mir_cast_is_box_payload_pointer(src_sema_ty: i32, tgt_sema_ty: i32) -> bool:
+        if src_sema_ty <= 0 or tgt_sema_ty <= 0 or self.sema.type_is_std_box_inst(src_sema_ty) == 0:
+            return false
+        let tgt = self.sema.resolve_alias(tgt_sema_ty as TypeId)
+        if self.sema.get_type_kind(tgt) != TypeKind.TY_PTR:
+            return false
+        let src = self.sema.resolve_alias(src_sema_ty as TypeId) as i32
+        let payload = self.sema.resolve_alias(self.sema.get_generic_inst_arg(src, 0) as TypeId)
+        self.sema.resolve_alias(self.sema.get_type_d0(tgt) as TypeId) == payload
+
     mut fn mir_place_projected_type(body: &MirBody, place_id: i32) -> i64:
         if place_id < 0 or place_id >= body.place_locals.len() as i32:
             return 0
@@ -3721,7 +3733,14 @@ impl Codegen:
                 // Only aggregate/array place-to-pointer casts should use the
                 // address of the operand place. Integer-to-pointer and
                 // pointer-to-pointer casts must use the operand value.
-                if src_tk != TypeKind.TY_INT and src_tk != TypeKind.TY_PTR and src_tk != TypeKind.TY_REF:
+                // A transparent std Box IS its payload pointer, so a cast to
+                // `*T` (T the payload: `self as *mut T`, the `.ptr` field
+                // read, #1280) is the box VALUE; a Box place in memory (an
+                // in-place receiver's field) otherwise cast to its own
+                // address, handing `(*p).a` the pointer's bits. A cast to
+                // any other pointer type (`self as *const *const T` in
+                // as_ptr/as_ref) keeps the box slot's address.
+                if src_tk != TypeKind.TY_INT and src_tk != TypeKind.TY_PTR and src_tk != TypeKind.TY_REF and not self.mir_cast_is_box_payload_pointer(d2, d1):
                     let cast_ptr = self.mir_try_place_ptr_for_ref(body, d0)
                     if cast_ptr != 0:
                         if wl_type_of(cast_ptr) != cast_ty:
