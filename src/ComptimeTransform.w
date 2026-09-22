@@ -1590,7 +1590,7 @@ impl Sema:
             return generated
 
         let type_name_sym = out.get_data0(decl)
-        let type_name = intern.resolve(type_name_sym)
+        let type_name = intern.resolve(type_name_sym).clone()
         let soa_name = type_name ++ "SoA"
         let soa_sym = intern.intern(soa_name)
         if self.lookup_named_type_visible(soa_sym) != 0:
@@ -1879,7 +1879,7 @@ impl Sema:
         0
 
 fn ct_supported_derive_target(intern: InternPool, derive_sym: i32) -> i32:
-    let name = intern.resolve(derive_sym)
+    let name = intern.resolve(derive_sym).clone()
     if name == "all": return 1
     if name == "Copy": return 1
     if name == "Clone": return 1
@@ -1916,7 +1916,7 @@ fn ct_build_type_decl_type_arg(out: AstPool, decl: i32, type_name_sym: i32) -> i
 
 impl Sema:
     mut fn ct_eval_user_derive_source(out: AstPool, intern: InternPool, decl: i32, derive_sym: i32) -> str:
-        let target_name = intern.resolve(derive_sym)
+        let target_name = intern.resolve(derive_sym).clone()
         let derive_fn_name = ct_derive_target_fn_name(target_name)
         let derive_fn_sym = intern.intern(derive_fn_name)
         if not self.generic_fn_nodes.contains(derive_fn_sym):
@@ -2015,7 +2015,7 @@ impl Sema:
     mut fn ct_validate_explicit_struct_derive_fields(out: AstPool, intern: InternPool, decl: i32, trait_sym: i32, all_sym: i32) -> i32:
         if self.type_decl_has_derive(decl, trait_sym) == 0:
             return 1
-        let trait_name = intern.resolve(trait_sym)
+        let trait_name = intern.resolve(trait_sym).clone()
         if type_decl_sub_kind(out.get_data2(decl)) != TypeDeclKind.Struct:
             self.ct_emit_error(out, decl, "cannot derive " ++ trait_name ++ " for a non-struct type")
             return 0
@@ -2051,7 +2051,7 @@ impl Sema:
     mut fn ct_validate_explicit_enum_derive_payloads(out: AstPool, intern: InternPool, decl: i32, trait_sym: i32, all_sym: i32) -> i32:
         if self.type_decl_has_derive(decl, trait_sym) == 0:
             return 1
-        let trait_name = intern.resolve(trait_sym)
+        let trait_name = intern.resolve(trait_sym).clone()
         let type_name_sym = out.get_data0(decl)
         let tid = self.lookup_named_type_visible(type_name_sym)
         if tid == 0:
@@ -2196,7 +2196,7 @@ impl Sema:
 
         let start = out.get_start(decl)
         let end = out.get_end(decl)
-        let type_name = intern.resolve(type_name_sym)
+        let type_name = intern.resolve(type_name_sym).clone()
         let fn_sym = intern.intern(type_name ++ ".default")
         let tp_count = ct_type_decl_tp_count(out, decl)
         let tp_start = ct_type_decl_tp_start(out, decl)
@@ -2263,7 +2263,7 @@ impl Sema:
         if self.get_type_kind(resolved) != TypeKind.TY_STRUCT:
             return generated
 
-        let type_name = intern.resolve(type_name_sym)
+        let type_name = intern.resolve(type_name_sym).clone()
         let start = out.get_start(decl)
         let end = out.get_end(decl)
         let self_sym = intern.intern("self")
@@ -2333,7 +2333,7 @@ impl Sema:
         if self.get_type_kind(resolved) != TypeKind.TY_STRUCT:
             return generated
 
-        let type_name = intern.resolve(type_name_sym)
+        let type_name = intern.resolve(type_name_sym).clone()
         let start = out.get_start(decl)
         let end = out.get_end(decl)
         let self_sym = intern.intern("self")
@@ -2393,7 +2393,7 @@ impl Sema:
         if self.get_type_kind(resolved) != TypeKind.TY_STRUCT:
             return generated
 
-        let type_name = intern.resolve(type_name_sym)
+        let type_name = intern.resolve(type_name_sym).clone()
         let start = out.get_start(decl)
         let end = out.get_end(decl)
         let self_sym = intern.intern("self")
@@ -2471,7 +2471,7 @@ impl Sema:
         if self.select_trait_impl(type_name_sym, trait_sym) != 0:
             return generated
 
-        let type_name = intern.resolve(type_name_sym)
+        let type_name = intern.resolve(type_name_sym).clone()
         let start = out.get_start(decl)
         let end = out.get_end(decl)
         let self_sym = intern.intern("self")
@@ -2569,7 +2569,7 @@ impl Sema:
         if self.get_type_kind(resolved) != (if is_enum: TypeKind.TY_ENUM else: TypeKind.TY_STRUCT):
             return generated
 
-        let type_name = intern.resolve(type_name_sym)
+        let type_name = intern.resolve(type_name_sym).clone()
         let start = out.get_start(decl)
         let end = out.get_end(decl)
         let self_sym = intern.intern("self")
@@ -2639,7 +2639,7 @@ impl Sema:
         if self.get_type_kind(resolved) != TypeKind.TY_ENUM:
             return generated
 
-        let type_name = intern.resolve(type_name_sym)
+        let type_name = intern.resolve(type_name_sym).clone()
         let start = out.get_start(decl)
         let end = out.get_end(decl)
         let self_sym = intern.intern("self")
@@ -2742,7 +2742,7 @@ impl Sema:
         if self.get_type_kind(resolved) != (if is_enum: TypeKind.TY_ENUM else: TypeKind.TY_STRUCT):
             return generated
 
-        let type_name = intern.resolve(type_name_sym)
+        let type_name = intern.resolve(type_name_sym).clone()
         let start = out.get_start(decl)
         let end = out.get_end(decl)
         let self_sym = intern.intern("self")
@@ -2807,7 +2807,7 @@ impl Sema:
             return generated
 
         let type_name_sym = out.get_data0(decl)
-        let type_name = intern.resolve(type_name_sym)
+        let type_name = intern.resolve(type_name_sym).clone()
         let builder_name = type_name ++ "Builder"
         let builder_sym = intern.intern(builder_name)
         if self.lookup_named_type_visible(builder_sym) != 0:
@@ -2976,7 +2976,7 @@ impl Sema:
         if self.select_trait_impl(type_name_sym, serialize_trait_sym) != 0:
             return generated
 
-        let type_name = intern.resolve(type_name_sym)
+        let type_name = intern.resolve(type_name_sym).clone()
         let start = out.get_start(decl)
         let end = out.get_end(decl)
         let self_sym = intern.intern("self")
@@ -3058,7 +3058,7 @@ impl Sema:
         if self.get_type_kind(resolved) != TypeKind.TY_STRUCT:
             return generated
 
-        let type_name = intern.resolve(type_name_sym)
+        let type_name = intern.resolve(type_name_sym).clone()
         let start = out.get_start(decl)
         let end = out.get_end(decl)
         let input_sym = intern.intern("input")
@@ -3135,7 +3135,7 @@ impl Sema:
         if self.select_trait_impl(type_name_sym, component_trait_sym) != 0:
             return generated
 
-        let type_name = intern.resolve(type_name_sym)
+        let type_name = intern.resolve(type_name_sym).clone()
         let start = out.get_start(decl)
         let end = out.get_end(decl)
         let i64_sym = intern.intern("i64")
