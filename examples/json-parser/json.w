@@ -66,8 +66,6 @@ fn is_digit(ch: u8) -> bool: ch in b'0'..=b'9'
 
 fn Tokenizer.new(input: str): Tokenizer { input }
 
-// The byte arms are guards until a byte literal is accepted as a
-// pattern (#1295).
 extend Tokenizer:
     fn peek() -> Option[u8]:
         if self.pos < self.input.len():
@@ -89,23 +87,23 @@ extend Tokenizer:
     mut fn next_token() -> Result[Option[Token], JsonError]:
         self.skip_whitespace()
         match self.advance():
-            None                       => None
-            Some(ch) if ch == b'{'     => Some(.LBrace)
-            Some(ch) if ch == b'}'     => Some(.RBrace)
-            Some(ch) if ch == b'['     => Some(.LBracket)
-            Some(ch) if ch == b']'     => Some(.RBracket)
-            Some(ch) if ch == b':'     => Some(.Colon)
-            Some(ch) if ch == b','     => Some(.Comma)
-            Some(ch) if ch == b'"'     =>
+            None       => None
+            Some(b'{') => Some(.LBrace)
+            Some(b'}') => Some(.RBrace)
+            Some(b'[') => Some(.LBracket)
+            Some(b']') => Some(.RBracket)
+            Some(b':') => Some(.Colon)
+            Some(b',') => Some(.Comma)
+            Some(b'"') =>
                 let s = self.read_string()?
                 Some(.TString(s))
-            Some(ch) if ch == b't'     =>
+            Some(b't') =>
                 self.expect_literal("rue")?
                 Some(.TBool(true))
-            Some(ch) if ch == b'f'     =>
+            Some(b'f') =>
                 self.expect_literal("alse")?
                 Some(.TBool(false))
-            Some(ch) if ch == b'n'     =>
+            Some(b'n') =>
                 self.expect_literal("ull")?
                 Some(.TNull)
             Some(ch) if ch == b'-' or is_digit(ch) =>
@@ -119,15 +117,15 @@ extend Tokenizer:
         loop:
             match self.advance():
                 None => return Err(.UnexpectedEof(self.pos, "unterminated string"))
-                Some(ch) if ch == b'"' => break
-                Some(ch) if ch == b'\\' =>
+                Some(b'"') => break
+                Some(b'\\') =>
                     match self.advance():
-                        Some(esc) if esc == b'"'  => result = result ++ "\""
-                        Some(esc) if esc == b'\\' => result = result ++ "\\"
-                        Some(esc) if esc == b'/'  => result = result ++ "/"
-                        Some(esc) if esc == b'n'  => result = result ++ "\n"
-                        Some(esc) if esc == b't'  => result = result ++ "\t"
-                        Some(esc) if esc == b'r'  => result = result ++ "\r"
+                        Some(b'"')  => result = result ++ "\""
+                        Some(b'\\') => result = result ++ "\\"
+                        Some(b'/')  => result = result ++ "/"
+                        Some(b'n')  => result = result ++ "\n"
+                        Some(b't')  => result = result ++ "\t"
+                        Some(b'r')  => result = result ++ "\r"
                         Some(esc) => return Err(.InvalidEscape(self.pos - 1, esc))
                         None => return Err(.UnexpectedEof(self.pos, "escape sequence"))
                 Some(_) =>
@@ -339,16 +337,11 @@ fn json_to_string(val: &JsonValue) -> str:
             let inner = parts.join(", ")
             "{" ++ inner ++ "}"
 
-// A field view of an entry. (`&entry.value` inline is rejected until
-// #1297 pins the projection to the parameter's origin.)
-fn kv_value(kv: &JsonKV) -> &JsonValue: &kv.value
-
 fn json_get_field(val: &JsonValue, key: str) -> Option[&JsonValue]:
     match val:
         .Object(entries) =>
-            for i in 0..entries.len():
-                if entries[i].key == key:
-                    return Some(kv_value(entries.get(i)))
+            for entry in entries:
+                if entry.key == key: return Some(&entry.value)
             None
         _ => None
 
