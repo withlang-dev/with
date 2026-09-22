@@ -1,30 +1,22 @@
 name: linux x86_64
 
 on:
-  # Lanes run on a push to main (a merge) and on request; never on a PR.
-  # See D56: a PR is gated by the seed-driven battery on the maintainer
-  # machine, posted on the PR, not by these lanes.
-  push:
-    branches: [main]
-    # Docs are not build inputs (D49): a docs-only merge starts no lane.
-    paths-ignore:
-      - 'docs/**'
-      - '*.md'
-  # A lane takes hours on a 4-core runner (SDK build, compiler build,
-  # fixpoint, battery); it is not a merge signal (D56). The seed-driven
-  # battery on the maintainer machine gates a PR; lanes run after a merge
-  # (they build and cache the SDK packages) and on request.
+  # Lanes run nightly and on request; never on a push or a PR (D56, Eric
+  # 2026-09-22: CI was overzealous in what it did on every push). A lane
+  # takes hours on a 4-core runner (compiler build, fixpoint, battery), so
+  # it is not a merge signal: the seed-driven battery on the maintainer
+  # machine gates a PR and is posted on it. The SDK is built only on
+  # release (sdk-release.yml), never here.
+  schedule:
+    - cron: "5 9 * * *"
   workflow_dispatch:
 
-# Never cancel a main run: it builds and caches the source-built SDK.
+# Never cancel a run: it is the evidence for that night's main.
 # Hardcode the platform token (not ${{ github.workflow }}) so a workflow
 # rename can never merge two platforms into one group and cancel each
 # other.
 concurrency:
   group: selfhost-tests-linux-${{ github.head_ref || github.ref }}
-  # A superseded PR-branch run is cancelled; a main run is never cancelled —
-  # it is the run that builds and caches the source-built SDK (hours), and
-  # every merge would otherwise restart it from zero.
   cancel-in-progress: false
 
 jobs:
@@ -98,10 +90,6 @@ jobs:
           chmod +x with-seed
           LD_LIBRARY_PATH="$PWD/.link-shim:${LD_LIBRARY_PATH:-}" ./with-seed version
 
-      - uses: ./.github/actions/source-sdk
-        with:
-          host-tag: linux-x86_64
-
       - name: Build (seed -> stage1 -> stage2 -> final)
         env:
           WITH: ${{ github.workspace }}/with-seed
@@ -111,7 +99,7 @@ jobs:
           export LD_LIBRARY_PATH="$PWD/.link-shim:${LD_LIBRARY_PATH:-}"
           "$WITH" build
 
-      - name: WebAssembly fixtures with source-built SDK
+      - name: WebAssembly fixtures
         env:
           WITH: ${{ github.workspace }}/with-seed
         run: LD_LIBRARY_PATH="$PWD/.link-shim:${LD_LIBRARY_PATH:-}" ./with-seed build :wasm-tests
