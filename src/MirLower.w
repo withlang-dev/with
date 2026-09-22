@@ -15402,10 +15402,13 @@ fn lower_concrete_specialization(sema: Sema, ast_pool: AstPool, pool: InternPool
     // Rechecking here restores specialization-specific AST sidecars immediately
     // before MIR lowering. This is still the mutable semantic phase; codegen
     // never re-enters Sema. If rechecking discovers a dependent type, refresh
-    // the eager query tables before the read-only MirBuilder sees it.
-    let type_count_before = sema.type_kinds.len() as i32
+    // the eager query tables before the read-only MirBuilder sees it. A
+    // comptime evaluation during the recheck (`comptime if T.name() == ..`)
+    // writes back a Sema whose eager caches prepare_comptime_eval_copy
+    // emptied, so the cache extent is the predicate, not the type count:
+    // the copy-ness table covers every type or the frozen twins phase-bug.
     let sig_idx = sema.check_fn_body_concrete(fn_node, subst_syms, subst_types, mono_sym, concrete_params)
-    if sema.type_kinds.len() != type_count_before:
+    if sema.is_copy_cache.len() != sema.type_kinds.len():
         sema.preregister_mir_types()
 
     let saved_subst_syms = sema_clone_i32_vec(&sema.generic_subst_param_syms)
