@@ -4924,6 +4924,29 @@ impl MirBuilder:
         self.body.push_stmt(self.cur_bb, StmtKind.Assign, place, rv, self.ast.get_start(node))
         self.body.new_operand(OperandKind.OK_COPY, place)
 
+    // `Type.Variant` spelled as a field access on the enum's name — the
+    // same recognition lower_expr uses to lower it as a variant value.
+    fn is_enum_variant_path(node: i32) -> bool:
+        let base = self.ast.get_data0(node)
+        if self.ast.kind(base) != NodeKind.NK_IDENT:
+            return false
+        let base_sym = self.sema.pool_lookup_symbol(self.pool.resolve(self.ast.get_data0(base)))
+        if not self.sema.named_types.contains(base_sym):
+            return false
+        let base_ty: i32 = self.sema.named_types.get(base_sym).unwrap()
+        let resolved = self.sema.resolve_alias(base_ty)
+        if self.sema.get_type_kind(resolved) != TypeKind.TY_ENUM:
+            return false
+        let field_name = self.pool.resolve(self.ast.get_data1(node))
+        let qual_sym = self.sema.pool_lookup_symbol(self.sema.pool_resolve(base_sym) ++ "." ++ field_name)
+        if self.sema.variant_lookup.contains(qual_sym):
+            return true
+        let field_sym = self.sema.pool_lookup_symbol(field_name)
+        if not self.sema.variant_lookup.contains(field_sym):
+            return false
+        let var_tid: i32 = self.sema.variant_type_ids.get(field_sym).unwrap()
+        var_tid == resolved
+
     mut fn lower_field_access(node: i32) -> i32:
         let base_expr = self.ast.get_data0(node)
         let field_idx = self.ast.get_data1(node)
@@ -5719,7 +5742,10 @@ impl MirBuilder:
             self.mark_unsupported()
             return self.place_for_local(0)
 
-        if kind == NodeKind.NK_FIELD_ACCESS:
+        // `S.A` is a variant value, not the field `A` of a place named `S`
+        // (#1310: `S.A.tag()` projected off a type name and failed to
+        // lower); the value falls through to the temporary below.
+        if kind == NodeKind.NK_FIELD_ACCESS and not self.is_enum_variant_path(node):
             return self.lower_field_access(node)
 
         if kind == NodeKind.NK_INDEX:
