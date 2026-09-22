@@ -239,6 +239,13 @@ pub fn with_channel_destroy(ch_handle: i64) -> Unit:
         return
     channel_free(ch_handle)
 
+// Sender.clone(): one more sender holds the channel open (spec §14.15).
+pub fn with_channel_retain_sender(ch_handle: i64) -> Unit:
+    if ch_handle == 0:
+        return
+    chan_set_i32(ch_handle, CHAN_OFF_SENDERS, chan_field_i32(ch_handle, CHAN_OFF_SENDERS) + 1)
+
+// The channel closes when the LAST sender drops, not the first.
 pub fn with_channel_release_sender(ch_handle: i64) -> Unit:
     if ch_handle == 0:
         return
