@@ -930,8 +930,17 @@ impl Sema:
         let sc_exp = self.resolve_alias(expected as TypeId)
         let sc_is_mut = self.get_type_d1(sc_exp) != 0
         let sc_packed = self.classify_place(arg_node)
-        if unpack_place_kind(sc_packed) == PlaceKind.PK_NotPlace:
+        // #1229: an array literal is the obvious spelling of `let xs = [...];
+        // f(xs)`. It is a statement temporary that outlives the call, so a
+        // read-only view of it is sound; MIR materializes it and slices it
+        // exactly like the named form. Writes through a `[]mut` view would
+        // die with the temporary — only a binding keeps them.
+        let sc_is_literal = self.ast.kind(arg_node) == NodeKind.NK_ARRAY_LIT
+        if unpack_place_kind(sc_packed) == PlaceKind.PK_NotPlace and not sc_is_literal:
             self.emit_error("pass a named variable here: a temporary collection would be freed while the callee still uses it", err_node)
+            return 1
+        if sc_is_mut and sc_is_literal:
+            self.emit_error("this argument is written in place ([]mut) but an array literal is a temporary; bind it with `var xs = [...]` and pass xs", err_node)
             return 1
         if sc_is_mut:
             if unpack_place_mut(sc_packed) == PlaceMut.PM_ReadOnly or self.place_base_is_read_only_ref(arg_node) != 0:
@@ -12226,9 +12235,17 @@ impl Sema:
         if self.has_expected_type != 0 and self.expected_expr_type != 0:
             let expected = self.resolve_alias(self.expected_expr_type)
             let expected_kind = self.get_type_kind(expected)
-            if expected_kind == TypeKind.TY_ARRAY or expected_kind == TypeKind.TY_SLICE:
+            if expected_kind == TypeKind.TY_ARRAY:
                 expected_elem = self.get_type_d0(expected)
                 target_ty = self.expected_expr_type as i32
+            else if expected_kind == TypeKind.TY_SLICE:
+                // #1229: a slice expectation types the ELEMENTS, never the
+                // literal. A literal typed as `[]T` reached MIR as an
+                // `aggregate` into a slice-typed temp and the callee received
+                // `{ptr = 5, len = 6}`. The literal is its `[T; N]` array; a
+                // call site slices it (note_slice_coerce_call_arg) and every
+                // other slice context reports the mismatch.
+                expected_elem = self.get_type_d0(expected)
             else if expected_kind == TypeKind.TY_GENERIC_INST:
                 target_base = self.get_generic_inst_base(expected as i32)
                 let target_name = self.pool_resolve(target_base)
@@ -12239,6 +12256,8 @@ impl Sema:
                     self.emit_error("sequence literal cannot target a map; use [key: value] form", node)
                     return 0
         if elem_count == 0:
+            if target_ty == 0 and expected_elem != 0:
+                target_ty = self.ensure_exact_type(TypeKind.TY_ARRAY, expected_elem as TypeId, 0, 0) as i32
             if target_ty != 0:
                 self.typed_expr_types.insert(node, target_ty)
                 return target_ty
