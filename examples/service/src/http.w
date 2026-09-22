@@ -53,7 +53,9 @@ pub type AppState {
 
 extend AppState:
     pub mut fn handle_request(req: HttpRequest) -> HttpResponse:
-        match (req.method, req.path):
+        // The router observes the request (§3.8); the handler that keeps
+        // it receives it whole.
+        match (&req.method, &req.path):
             ("GET",    "/users")  => self.handle_list()
             ("POST",   "/users")  => self.handle_create(req)
             _                     => HttpResponse.not_found()
