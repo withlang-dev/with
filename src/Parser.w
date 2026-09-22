@@ -24,6 +24,14 @@ fn parser_active_arch() -> str:
 
 fn parser_target_guard_arch_known(arch: &str) -> bool:
     arch == "aarch64" or arch == "x86_64" or arch == "wasm32" or arch == "wasm64"
+
+// The §29.13 body form of a trait, impl or extend declaration.
+enum DeclBody:
+    Bodyless    // `impl Copy for X`: a marker impl, complete at its newline (§2.3)
+    Inline      // `impl Clone for i8: fn clone(): *self`: one member, on the header line
+    Indented    // `:` ends the line; the members are the indented block below it
+    Braced      // `{ ... }`: members separated by newlines or semicolons
+    Missing     // no introducer where one is required; already reported
 pub type Parser {
     tokens: TokenList,
     pos: i32,
@@ -2928,6 +2936,68 @@ impl Parser:
 
     // ── trait decl ───────────────────────────────────────────────────
 
+    // Consumes the body introducer of the trait/impl/extend header that began
+    // at `start` and names the body form (§29.13); the cursor is left on the
+    // first member. Only `impl`/`extend` may be bodyless (§2.3). A missing
+    // introducer is reported and returns `Missing`.
+    mut fn parse_decl_body_introducer(construct: &str, start: i32, bodyless_ok: bool) -> DeclBody:
+        let t = self.peek()
+        if t == TokenKind.TK_L_BRACE:
+            self.advance()
+            self.skip_separators()
+            return DeclBody.Braced
+        let hdr_indent = line_indent_of(self.source, start)
+        if t == TokenKind.TK_COLON:
+            let colon = Span { file: self.file_id, start: self.current_start(), end: self.current_end() }
+            self.advance()
+            if self.peek() != TokenKind.TK_NEWLINE and self.peek() != TokenKind.TK_EOF:
+                return DeclBody.Inline
+            self.skip_newlines()
+            if self.peek() == TokenKind.TK_EOF or column_of(self.source, self.current_start()) <= hdr_indent:
+                var diag = Diagnostic.err("expected an indented " ++ construct ++ " body after ':'", colon)
+                if bodyless_ok:
+                    diag.add_help("a ':' that ends the line introduces an indented body (§29.13): indent the members under the header, write `{}` for an empty body, or drop the ':' for a bodyless " ++ construct)
+                else:
+                    diag.add_help("a ':' that ends the line introduces an indented body (§29.13): indent the members under the header, or write `{}` for an empty body")
+                self.diags.emit(move diag)
+            return DeclBody.Indented
+        if bodyless_ok and (t == TokenKind.TK_NEWLINE or t == TokenKind.TK_EOF):
+            let header = Span { file: self.file_id, start, end: self.prev_end() }
+            let header_text = self.source.slice(start as i64, self.prev_end() as i64)
+            self.skip_newlines()
+            if self.peek() != TokenKind.TK_EOF and column_of(self.source, self.current_start()) > hdr_indent:
+                let span = Span { file: self.file_id, start: self.current_start(), end: self.current_end() }
+                var diag = Diagnostic.err("`" ++ header_text ++ "` has no ':' or '{', so it is a bodyless " ++ construct ++ " that ends at its newline; the indented lines below it are not its members (§29.13)", span)
+                diag.add_label(header, "bodyless header")
+                diag.add_help("add ':' to the end of the header to make them its body: `" ++ header_text ++ ":`")
+                self.diags.emit(move diag)
+            return DeclBody.Bodyless
+        self.emit_error("expected ':' or '{' after the " ++ construct ++ " header")
+        DeclBody.Missing
+
+    // Whether the member at the cursor belongs to the `form` body of the
+    // header that began at `start` and whose introducer ended at
+    // `introducer_end`. A colon body holds only what is indented deeper than
+    // the header line; an inline body is exactly one member (§29.13 Form 1),
+    // so a second is reported once, then parsed as a member so the error
+    // does not cascade.
+    mut fn decl_member_continues(construct: &str, form: DeclBody, start: i32, introducer_end: i32, members: i32) -> bool:
+        if form == DeclBody.Braced:
+            return true
+        if column_of(self.source, self.current_start()) <= line_indent_of(self.source, start):
+            return false
+        if form == DeclBody.Inline and members == 1:
+            let header_text = self.source.slice(start as i64, introducer_end as i64)
+            let span = Span { file: self.file_id, start: self.current_start(), end: self.current_end() }
+            var diag = Diagnostic.err("an inline " ++ construct ++ " body is a single member: it ended at the end of the header line, so this member is outside it (§29.13)", span)
+            diag.add_label(Span { file: self.file_id, start: introducer_end - 1, end: introducer_end }, "inline body starts after this ':'")
+            diag.add_help("end the line after `" ++ header_text ++ "` and indent the first member like the rest, one member per line")
+            self.diags.emit(move diag)
+        true
+
+    mut fn skip_member_separators(form: DeclBody):
+        if form == DeclBody.Braced: self.skip_separators() else: self.skip_newlines()
+
     mut fn parse_trait_decl(vis: i32):
         let start = self.current_start()
         if self.peek() == TokenKind.TK_KW_PUB:
@@ -2940,16 +3010,11 @@ impl Parser:
         // Parse optional type parameters: trait Iter[T]: ...
         let trait_tp_start = self.pool.extra_len()
         let trait_tp_count = self.parse_type_params()
-        var trait_braced = false
-        if self.peek() == TokenKind.TK_L_BRACE:
-            trait_braced = true
-            self.advance()
-        else if self.peek() == TokenKind.TK_COLON:
-            self.advance()
-        else:
-            self.emit_error("expected ':' or '{'")
+        let introducer_end = self.current_end()
+        let form = self.parse_decl_body_introducer("trait", start, false)
+        if form == DeclBody.Missing:
             return
-        self.skip_newlines()
+        let trait_braced = form == DeclBody.Braced
 
         var method_names: Vec[i32] = Vec.new()
         var method_flags: Vec[i32] = Vec.new()
@@ -2969,10 +3034,8 @@ impl Parser:
         while self.peek() == TokenKind.TK_KW_FN or self.peek() == TokenKind.TK_KW_PUB or self.peek() == TokenKind.TK_KW_TYPE or self.peek() == TokenKind.TK_KW_ASYNC or self.peek() == TokenKind.TK_KW_MUT or self.peek() == TokenKind.TK_KW_MOVE or (trait_braced and self.peek() == TokenKind.TK_R_BRACE):
             if trait_braced and self.peek() == TokenKind.TK_R_BRACE:
                 break
-            if not trait_braced:
-                let fn_col = column_of(self.source, self.current_start())
-                if fn_col == 0:
-                    break
+            if not self.decl_member_continues("trait", form, start, introducer_end, (method_names.len() + assoc_names.len()) as i32):
+                break
 
             if self.peek() == TokenKind.TK_KW_TYPE:
                 self.advance()
@@ -2999,7 +3062,7 @@ impl Parser:
                 assoc_bound_starts.push(bound_start)
                 assoc_bound_counts.push(bound_count)
                 assoc_default_types.push(default_ty as i32)
-                self.skip_newlines()
+                self.skip_member_separators(form)
                 continue
 
             let method_start = self.current_start()
@@ -3071,7 +3134,7 @@ impl Parser:
             if m_tp_count > 0:
                 mflags = mflags + FnFlags.GEN
             method_flags.push(mflags)
-            self.skip_newlines()
+            self.skip_member_separators(form)
 
         if trait_braced:
             self.expect(TokenKind.TK_R_BRACE)
@@ -3217,16 +3280,12 @@ impl Parser:
 
         self.parse_optional_where_clause()
 
-        var impl_braced = false
-        if self.peek() == TokenKind.TK_L_BRACE:
-            impl_braced = true
-            self.advance()
-        else if self.peek() == TokenKind.TK_COLON:
-            self.advance()
-        else if self.peek() == TokenKind.TK_EQ:
-            self.emit_error("expected ':' or '{'")
+        let construct = if is_extend != 0: "extend" else: "impl"
+        let introducer_end = self.current_end()
+        let form = self.parse_decl_body_introducer(construct, start, true)
+        if form == DeclBody.Missing:
             return
-        self.skip_newlines()
+        let impl_braced = form == DeclBody.Braced
 
         var impl_assoc_names: Vec[i32] = Vec.new()
         var impl_assoc_types: Vec[i32] = Vec.new()
@@ -3236,10 +3295,8 @@ impl Parser:
         while self.peek() == TokenKind.TK_AT or self.peek() == TokenKind.TK_KW_FN or self.peek() == TokenKind.TK_KW_PUB or self.peek() == TokenKind.TK_KW_UNSAFE or self.peek() == TokenKind.TK_KW_ASYNC or self.peek() == TokenKind.TK_KW_MUT or self.peek() == TokenKind.TK_KW_MOVE or self.peek() == TokenKind.TK_KW_TYPE or (impl_braced and self.peek() == TokenKind.TK_R_BRACE):
             if impl_braced and self.peek() == TokenKind.TK_R_BRACE:
                 break
-            if not impl_braced:
-                let fn_col = column_of(self.source, self.current_start())
-                if fn_col == 0:
-                    break
+            if not self.decl_member_continues(construct, form, start, introducer_end, method_count + impl_assoc_names.len() as i32):
+                break
 
             self.skip_attributes()
             self.skip_newlines()
@@ -3255,7 +3312,7 @@ impl Parser:
                 let at_type = self.parse_type_expr()
                 impl_assoc_names.push(at_name)
                 impl_assoc_types.push(at_type as i32)
-                self.skip_newlines()
+                self.skip_member_separators(form)
                 continue
 
             var method_vis = vis
@@ -3366,7 +3423,7 @@ impl Parser:
                 self.pending_iter_of_self = 0
             self.pool.add_decl(fn_node)
             method_count = method_count + 1
-            self.skip_newlines()
+            self.skip_member_separators(form)
 
         if impl_braced:
             self.expect(TokenKind.TK_R_BRACE)
