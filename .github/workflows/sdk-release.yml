@@ -1,0 +1,629 @@
+name: SDK release
+
+# The SDK is built only on release, never on a push (Eric, 2026-09-22; D56).
+# Each job repeats its lane's preamble (seed, pinned SDK asset, native
+# toolchain env — copied from ci.yml / selfhost-*.yml), builds and packages
+# the SDK from source with .github/actions/source-sdk, and attaches the
+# package, its digest sidecar and its manifest to the release named by
+# `tag`, replacing any asset of the same name. The tree built is the ref the
+# workflow is dispatched on (normally main): the package's inputs are the
+# LLVM sources and build/sdk.w, not the compiler at the tag. The asset names
+# are build/sdk.w's sdk_asset_for_platform
+# (with-llvm-sdk-<llvm>-<platform>.tar.gz), the names nightly-release.yml
+# pins and republishes beside each compiler asset; after a republish here,
+# bump the sdk_version/sdk_sha256 pins there and the WITH_SDK_* pins in the
+# lanes.
+#
+# The nightly-release workflow does not call this one: it fetches the pinned,
+# digest-verified SDK the compiler was built against and republishes exactly
+# that. A package built in the same run would not be the one the compiler
+# was verified with, and its digest cannot be pinned before it exists.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag the SDK assets are attached to
+        required: true
+        type: string
+
+concurrency:
+  group: sdk-release-${{ inputs.tag }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  sdk-darwin-aarch64:
+    name: SDK darwin-aarch64
+    runs-on: macos-latest
+    timeout-minutes: 360
+    env:
+      WITH_OUT_DIR: ${{ github.workspace }}/out
+      WITH: ${{ github.workspace }}/src/main
+      LLVM_PREFIX: ${{ github.workspace }}/.deps/llvm-22.1.6-darwin-arm64
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Bootstrap seed
+        env:
+          WITH_SEED_REPO: withlang-dev/with
+          WITH_SEED_VERSION: v0.15.2.0
+          WITH_SEED_ASSET: with-darwin-aarch64
+          WITH_SEED_SHA256: 79a63ff91d5d9260463adf3e08ff43bdd5446d070eac2ca56ef543ae05484075
+        run: |
+          set -euo pipefail
+          curl -fL --retry 5 --retry-delay 5 --retry-all-errors -o src/main \
+            "https://github.com/$WITH_SEED_REPO/releases/download/$WITH_SEED_VERSION/$WITH_SEED_ASSET"
+          printf '%s  %s\n' "$WITH_SEED_SHA256" src/main | shasum -a 256 -c -
+          chmod +x src/main
+          src/main version
+
+      # The static LLVM SDK that `build :deps` fetches is published as a per-
+      # platform release asset. The build tree currently expects a `.tar.gz`
+      # asset (self-hosted zlib_gunzip in `run_deps_download_action`), but every
+      # release published so far ships the SDK only as `.tar.zst`. Until a
+      # release is cut with `.tar.gz` assets, `build :deps` cannot find its
+      # asset and the build fails. Provision `.deps/` directly here, preferring
+      # the correct `.tar.gz` and falling back to the `.tar.zst` that shipped in
+      # the last release, so `build :deps` finds its marker already present and
+      # succeeds without changing the self-hosted fetch path.
+      - name: Provision LLVM SDK (bridge .tar.gz/.tar.zst release skew)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          WITH_SDK_REPO: withlang-dev/with
+        run: |
+          set -euo pipefail
+          prefix="$LLVM_PREFIX"
+          if [ -f "$prefix/lib/libclang.a" ]; then
+            echo "SDK already provisioned at $prefix"
+            exit 0
+          fi
+          # Derive "<ver>" and the darwin-aarch64 asset base from the prefix dir
+          # name (.deps/llvm-<ver>-darwin-arm64).
+          dir="$(basename "$prefix")"        # llvm-<ver>-darwin-arm64
+          ver="${dir#llvm-}"; ver="${ver%-darwin-arm64}"
+          base="with-llvm-sdk-${ver}-darwin-aarch64"
+          asset=""; tag=""
+          # Newest release first; within a release prefer .tar.gz over .tar.zst.
+          while IFS= read -r candidate; do
+            names="$(gh release view "$candidate" --repo "$WITH_SDK_REPO" --json assets --jq '.assets[].name')"
+            if printf '%s\n' "$names" | grep -qx "${base}.tar.gz"; then
+              asset="${base}.tar.gz"; tag="$candidate"; break
+            fi
+            if printf '%s\n' "$names" | grep -qx "${base}.tar.zst"; then
+              asset="${base}.tar.zst"; tag="$candidate"; break
+            fi
+          done < <(gh release list --repo "$WITH_SDK_REPO" --limit 50 --json tagName --jq '.[].tagName')
+          if [ -z "$asset" ]; then
+            echo "error: no release publishes ${base}.tar.gz or ${base}.tar.zst" >&2
+            exit 1
+          fi
+          echo "provisioning SDK from $tag: $asset"
+          mkdir -p .deps
+          curl -fL --retry 5 --retry-delay 5 --retry-all-errors -o "$RUNNER_TEMP/$asset" \
+            "https://github.com/$WITH_SDK_REPO/releases/download/$tag/$asset"
+          case "$asset" in
+            *.tar.gz)  tar -xzf "$RUNNER_TEMP/$asset" -C .deps ;;
+            *.tar.zst)
+              if tar --help 2>&1 | grep -q -- --zstd; then
+                tar --zstd -xf "$RUNNER_TEMP/$asset" -C .deps
+              else
+                zstd -d -c "$RUNNER_TEMP/$asset" | tar -xf - -C .deps
+              fi ;;
+          esac
+          test -f "$prefix/lib/libclang.a"
+          echo "SDK provisioned at $prefix"
+
+      - name: Fetch SDK
+        run: src/main build :deps
+
+      - uses: ./.github/actions/source-sdk
+        with:
+          host-tag: darwin-arm64
+
+      # The action already uploaded the same files as the workflow artifact
+      # source-sdk-darwin-arm64.
+      - name: Attach SDK assets to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName
+          ls -l out/release/with-llvm-sdk-*.tar.gz out/release/with-llvm-sdk-*.tar.gz.sha256 out/release/with-llvm-sdk-*.tar.gz.manifest
+          gh release upload "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --clobber \
+            out/release/with-llvm-sdk-*.tar.gz \
+            out/release/with-llvm-sdk-*.tar.gz.sha256 \
+            out/release/with-llvm-sdk-*.tar.gz.manifest
+
+  sdk-linux-x86_64:
+    name: SDK linux-x86_64
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    env:
+      WITH_OUT_DIR: ${{ github.workspace }}/out
+      LLVM_PREFIX: ${{ github.workspace }}/.deps/llvm-22.1.6-linux-x86_64
+      # Fixpoint-verified stable release seed for this platform.
+      WITH_SEED_REPO: withlang-dev/with
+      WITH_SEED_ASSET: with-linux-x86_64
+      WITH_SEED_VERSION: v0.15.2.0
+      WITH_SEED_SHA256: eaa955602fd96e960ea3cfcb2f41be4013380dce646e45a93422d67ce9003869
+      WITH_SDK_REPO: withlang-dev/with
+      WITH_SDK_VERSION: v0.15.1
+      WITH_SDK_ASSET: with-llvm-sdk-22.1.6-linux-x86_64.tar.zst
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install host packages
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          # zstd: extract the SDK tarball. dev libs: the compiler link line uses
+          # -lz -lzstd -lxml2 (build/compiler.w), which need the .so dev symlinks.
+          sudo apt-get install -y --no-install-recommends zstd zlib1g-dev libzstd-dev libxml2-dev
+
+      - name: Fetch LLVM SDK
+        run: |
+          set -euo pipefail
+          mkdir -p .deps
+          curl -fL --retry 5 --retry-delay 5 --retry-all-errors -o /tmp/sdk.tar.zst \
+            "https://github.com/$WITH_SDK_REPO/releases/download/$WITH_SDK_VERSION/$WITH_SDK_ASSET"
+          # asset is .tar.zst; `with build :deps` expects .tar.gz, so extract by hand.
+          zstd -d -c /tmp/sdk.tar.zst | tar -x -C .deps
+          test -d "$LLVM_PREFIX/bin" || { echo "unexpected SDK layout"; ls -la .deps; exit 1; }
+          test -x "$LLVM_PREFIX/bin/lld" || { echo "SDK lld missing"; exit 1; }
+
+      - name: Set up linker shim (SDK lld + libxml2.so.16)
+        run: |
+          set -euo pipefail
+          mkdir -p .link-shim
+          # The seed emits -fuse-ld=lld; expose the SDK's lld under the names the
+          # driver looks for. SDK lld has DT_NEEDED libxml2.so.16 while Ubuntu
+          # ships libxml2.so.2 — ABI-safe for linking (ELF link never calls into
+          # libxml2), so alias it.
+          ln -sf "$LLVM_PREFIX/bin/ld.lld" .link-shim/ld.lld
+          ln -sf "$LLVM_PREFIX/bin/ld.lld" .link-shim/ld64.lld
+          ln -sf "$LLVM_PREFIX/bin/lld"    .link-shim/lld
+          xml2="$(ldconfig -p | awk '/libxml2\.so\.2 /{print $NF; exit}')"
+          [ -n "$xml2" ] || xml2="$(ls /lib/x86_64-linux-gnu/libxml2.so.2* 2>/dev/null | head -1)"
+          [ -n "$xml2" ] || { echo "no system libxml2.so.2"; exit 1; }
+          ln -sf "$xml2" .link-shim/libxml2.so.16
+          # Verify lld runs — it needs the aliased libxml2.so.16 on the search
+          # path, so point LD_LIBRARY_PATH at the shim (as the build steps do).
+          LD_LIBRARY_PATH="$PWD/.link-shim:${LD_LIBRARY_PATH:-}" "$LLVM_PREFIX/bin/ld.lld" --version
+
+      - name: Bootstrap seed
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          curl -fL --retry 5 --retry-delay 5 --retry-all-errors -o with-seed \
+            "https://github.com/$WITH_SEED_REPO/releases/download/$WITH_SEED_VERSION/$WITH_SEED_ASSET"
+          printf '%s  %s\n' "$WITH_SEED_SHA256" with-seed | sha256sum -c -
+          chmod +x with-seed
+          LD_LIBRARY_PATH="$PWD/.link-shim:${LD_LIBRARY_PATH:-}" ./with-seed version
+
+      - uses: ./.github/actions/source-sdk
+        with:
+          host-tag: linux-x86_64
+
+      # The action already uploaded the same files as the workflow artifact
+      # source-sdk-linux-x86_64.
+      - name: Attach SDK assets to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName
+          ls -l out/release/with-llvm-sdk-*.tar.gz out/release/with-llvm-sdk-*.tar.gz.sha256 out/release/with-llvm-sdk-*.tar.gz.manifest
+          gh release upload "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --clobber \
+            out/release/with-llvm-sdk-*.tar.gz \
+            out/release/with-llvm-sdk-*.tar.gz.sha256 \
+            out/release/with-llvm-sdk-*.tar.gz.manifest
+
+  sdk-linux-aarch64:
+    name: SDK linux-aarch64
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 360
+    env:
+      WITH_OUT_DIR: ${{ github.workspace }}/out
+      LLVM_PREFIX: ${{ github.workspace }}/.deps/llvm-22.1.6-linux-aarch64
+      # Fixpoint-verified bootstrap seed for this platform (built from main
+      # ae4c6a75, the commit carrying the #851 posix_str_to_c_buf fix without
+      # which no fork/exec — and therefore no link — works on linux-aarch64).
+      WITH_SEED_REPO: withlang-dev/with
+      WITH_SEED_ASSET: with-linux-aarch64
+      # Pinned to the v0.15.1.5 stable release asset, matching how the other
+      # three platforms pin (a versioned release, not a rolling tag). That
+      # asset is itself CI-produced and fixpoint-verified by the Release
+      # workflow's build-linux-aarch64 job.
+      WITH_SEED_VERSION: v0.15.2.0
+      WITH_SEED_SHA256: 3e54f7839dbf9549233a19753c897fb08f493fa8cfafeeec25b62fa87a43aac3
+      WITH_SDK_REPO: withlang-dev/with
+      WITH_SDK_VERSION: sdk-linux-aarch64
+      # NOTE: this platform's SDK ships as .tar.gz (the linux-x86_64 asset is
+      # .tar.zst), so it is extracted with tar -xzf rather than zstd.
+      WITH_SDK_ASSET: with-llvm-sdk-22.1.6-linux-aarch64.tar.gz
+      WITH_SDK_SHA256: b1597fe5281c760f594235a0d5b01fe3360b8303f7615b9f87c3ff87a2740926
+      # The linux-aarch64 compiler does not yet embed its platform runtime
+      # object: the build emits with_embedded_rt_linux_aarch64_o_* into
+      # embedded_objects.s, but src/compiler/Link.w declares no extern for it --
+      # HostRuntimeSpec has only three embed slots for four platforms, so a
+      # darwin host cannot emit that blob at all and adding the extern alone
+      # would break darwin's link. Until that is fixed properly, the seed
+      # resolves rt_linux_aarch64.o and friends from <bindir>/runtime/ on disk,
+      # so the fixpoint-verified runtime objects are published beside the seed
+      # and fetched here.
+      WITH_RUNTIME_ASSET: with-linux-aarch64-runtime.tar.gz
+      # The runtime objects live on the rolling with-linux-aarch64 seed release,
+      # NOT on the versioned release, so they need their own tag. They are
+      # interchangeable across these two builds -- verified by running a full
+      # self-host + fixpoint on main with exactly this seed/runtime pair.
+      WITH_RUNTIME_VERSION: with-linux-aarch64
+      WITH_RUNTIME_SHA256: bdfd139b898a0c0d2ad0d989c2c4f2c9c8a63487fb54c08649cd56f34a3844db
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install host packages
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          # dev libs: the compiler link line uses -lz -lzstd -lxml2
+          # (build/compiler.w), which need the .so dev symlinks.
+          sudo apt-get install -y --no-install-recommends zlib1g-dev libzstd-dev libxml2-dev
+
+      - name: Fetch LLVM SDK
+        run: |
+          set -euo pipefail
+          mkdir -p .deps
+          curl -fL --retry 5 --retry-delay 5 --retry-all-errors -o /tmp/sdk.tar.gz \
+            "https://github.com/$WITH_SDK_REPO/releases/download/$WITH_SDK_VERSION/$WITH_SDK_ASSET"
+          printf '%s  %s\n' "$WITH_SDK_SHA256" /tmp/sdk.tar.gz | sha256sum -c -
+          tar -xzf /tmp/sdk.tar.gz -C .deps
+          test -d "$LLVM_PREFIX/bin" || { echo "unexpected SDK layout"; ls -la .deps; exit 1; }
+          test -x "$LLVM_PREFIX/bin/lld" || { echo "SDK lld missing"; exit 1; }
+
+      - name: Set up linker shim (SDK lld + libxml2 alias)
+        run: |
+          set -euo pipefail
+          mkdir -p .link-shim
+          # The seed emits -fuse-ld=lld; expose the SDK's lld under the names the
+          # driver looks for. If the SDK lld carries DT_NEEDED libxml2.so.16
+          # while Ubuntu ships libxml2.so.2, alias it — ABI-safe for linking
+          # (an ELF link never calls into libxml2). Harmless when unneeded.
+          ln -sf "$LLVM_PREFIX/bin/ld.lld" .link-shim/ld.lld
+          ln -sf "$LLVM_PREFIX/bin/ld.lld" .link-shim/ld64.lld
+          ln -sf "$LLVM_PREFIX/bin/lld"    .link-shim/lld
+          xml2="$(ldconfig -p | awk '/libxml2\.so\.2 /{print $NF; exit}')"
+          [ -n "$xml2" ] || xml2="$(ls /lib/aarch64-linux-gnu/libxml2.so.2* 2>/dev/null | head -1)"
+          [ -n "$xml2" ] || { echo "no system libxml2.so.2"; exit 1; }
+          ln -sf "$xml2" .link-shim/libxml2.so.16
+          # Verify lld actually runs under the shim path the build steps use.
+          LD_LIBRARY_PATH="$PWD/.link-shim:${LD_LIBRARY_PATH:-}" "$LLVM_PREFIX/bin/ld.lld" --version
+
+      - name: Bootstrap seed
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          curl -fL --retry 5 --retry-delay 5 --retry-all-errors -o with-seed \
+            "https://github.com/$WITH_SEED_REPO/releases/download/$WITH_SEED_VERSION/$WITH_SEED_ASSET"
+          printf '%s  %s\n' "$WITH_SEED_SHA256" with-seed | sha256sum -c -
+          chmod +x with-seed
+          # Runtime objects the seed links into everything it builds. They live
+          # in <bindir>/runtime/, i.e. beside with-seed at the workspace root.
+          mkdir -p runtime
+          curl -fL --retry 5 --retry-delay 5 --retry-all-errors -o /tmp/rt.tar.gz \
+            "https://github.com/$WITH_SEED_REPO/releases/download/$WITH_RUNTIME_VERSION/$WITH_RUNTIME_ASSET"
+          printf '%s  %s\n' "$WITH_RUNTIME_SHA256" /tmp/rt.tar.gz | sha256sum -c -
+          tar -xzf /tmp/rt.tar.gz -C runtime
+          test -f runtime/rt_linux_aarch64.o || { echo "runtime bundle missing rt_linux_aarch64.o"; exit 1; }
+          # llvm_ld holds an absolute linker path, so it is written here rather
+          # than shipped in the bundle. llvm_ld.rsp's .deps/... entries are
+          # relative and resolve from the workspace root, where the build runs.
+          echo "$LLVM_PREFIX/bin/ld.lld" > runtime/llvm_ld
+          LD_LIBRARY_PATH="$PWD/.link-shim:${LD_LIBRARY_PATH:-}" ./with-seed version
+          # Prove the seed can actually link before spending a full build on it.
+          printf 'fn main:\n    print("seed links")\n' > /tmp/seedcheck.w
+          PATH="$PWD/.link-shim:$LLVM_PREFIX/bin:$PATH" \
+            LD_LIBRARY_PATH="$PWD/.link-shim:${LD_LIBRARY_PATH:-}" \
+            ./with-seed run /tmp/seedcheck.w
+
+      - uses: ./.github/actions/source-sdk
+        with:
+          host-tag: linux-aarch64
+
+      # The action already uploaded the same files as the workflow artifact
+      # source-sdk-linux-aarch64.
+      - name: Attach SDK assets to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName
+          ls -l out/release/with-llvm-sdk-*.tar.gz out/release/with-llvm-sdk-*.tar.gz.sha256 out/release/with-llvm-sdk-*.tar.gz.manifest
+          gh release upload "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --clobber \
+            out/release/with-llvm-sdk-*.tar.gz \
+            out/release/with-llvm-sdk-*.tar.gz.sha256 \
+            out/release/with-llvm-sdk-*.tar.gz.manifest
+
+  sdk-windows-x86_64:
+    name: SDK windows-x86_64
+    runs-on: windows-latest
+    timeout-minutes: 360
+    defaults:
+      run:
+        shell: bash
+    env:
+      # Native Windows self-host: the published Windows seed compiler builds
+      # stage1 -> stage2 -> stage3 and we assert stage2 == stage3 (fixpoint).
+      WITH_SEED_REPO: withlang-dev/with
+      # Seed from a released, versioned asset -- never a hand-cut
+      # seed-windows-x86_64-<sha> release (those are unapproved manual uploads).
+      # v0.15.1.4's with-windows-x86_64.exe is CI-produced by the nightly-release
+      # workflow from post-#806 main, so it carries the win64 aggregate-return ABI
+      # fix. The old v0.15.1.3 seed predated that fix; a compiler bootstrapped from
+      # it self-perpetuates the miscompile and crashes (0xC0000005) compiling any
+      # regex literal at comptime. build/:fixpoint never compile a regex, so that
+      # poison shipped green -- but it reds this job's battery the moment #798/#825
+      # un-skip the regex tests. The regex smoke-test step below is the backstop.
+      WITH_SEED_VERSION: v0.15.2.1
+      WITH_SEED_ASSET: with-windows-x86_64.exe
+      WITH_SEED_SHA256: 8f4817f2c4a3a916515ec93fd8a8f228bc9cfcd423689c5977dc564efc02a115
+      WITH_SDK_REPO: withlang-dev/with
+      WITH_SDK_VERSION: v0.15.1
+      WITH_SDK_ASSET: with-llvm-sdk-22.1.6-windows-x86_64.tar.zst
+      # windows-latest is a 4-vCPU runner. The build worker pool sizes itself
+      # from the CPU count; pin it to the real core count so the pool does not
+      # oversubscribe. The seed's rt_sysinfo reads the wrong SYSTEM_INFO offset
+      # (dwProcessorType ~8664 instead of dwNumberOfProcessors), which would size
+      # the pool 16-wide on a 4-vCPU runner -> 4x oversubscription/thrash (not the
+      # startup hang above, which was the rt_getenv deadlock). build_pool_width
+      # honours this env before the core probe, so it takes effect on the frozen
+      # seed with no reseed.
+      WITH_BUILD_JOBS: "4"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Fetch Windows LLVM SDK
+        run: |
+          set -euo pipefail
+          mkdir -p .deps
+          # git-bash GNU tar treats a "D:\..." path as a remote host (the drive
+          # colon looks like host:path), so keep the archive on a msys path.
+          sdk="$(cygpath -u "$RUNNER_TEMP")/sdk.tar.zst"
+          curl -fL --retry 5 --retry-delay 5 --retry-all-errors -o "$sdk" \
+            "https://github.com/$WITH_SDK_REPO/releases/download/$WITH_SDK_VERSION/$WITH_SDK_ASSET"
+          tar --zstd -xf "$sdk" -C .deps
+          prefix=".deps/llvm-22.1.6-windows-x86_64-msvc"
+          test -f "$prefix/lib/libclang.lib" || { echo "SDK libclang.lib missing"; ls -la "$prefix/lib" | head; exit 1; }
+          test -f "$prefix/bin/lld-link.exe" || { echo "SDK lld-link.exe missing"; ls -la "$prefix/bin" | head; exit 1; }
+
+      - name: Fetch Windows seed
+        run: |
+          set -euo pipefail
+          curl -fL --retry 5 --retry-delay 5 --retry-all-errors -o src/main.exe \
+            "https://github.com/$WITH_SEED_REPO/releases/download/$WITH_SEED_VERSION/$WITH_SEED_ASSET"
+          printf '%s  %s\n' "$WITH_SEED_SHA256" src/main.exe | sha256sum -c -
+          ./src/main.exe version
+
+      - name: Configure native toolchain env
+        run: |
+          set -euo pipefail
+          # The compiler and every child link process are native Windows exes, so
+          # they need Windows-form paths (cygpath -m keeps forward slashes, which
+          # both the file APIs and lld-link accept). Bash file ops keep msys paths.
+
+          # Seed resolution (build/compiler.w comp_resolve_seed_compiler) reads WITH
+          # and spawns it with CreateProcessW.
+          echo "WITH=$(cygpath -m "$PWD/src/main.exe")" >> "$GITHUB_ENV"
+          echo "LLVM_PREFIX=$(cygpath -m "$PWD/.deps/llvm-22.1.6-windows-x86_64-msvc")" >> "$GITHUB_ENV"
+
+          # MSVC CRT + Windows SDK import libs, read by Link.w via
+          # WITH_WINDOWS_{MSVC,UCRT,UM}_LIBDIR. Locate VS with vswhere (edition-
+          # agnostic) and glob the highest MSVC + Windows SDK version dirs.
+          vswhere="/c/Program Files (x86)/Microsoft Visual Studio/Installer/vswhere.exe"
+          vs_root="$(cygpath -u "$("$vswhere" -latest -products '*' -property installationPath)")"
+          msvc_ver="$(ls "$vs_root/VC/Tools/MSVC" | sort -V | tail -1)"
+          echo "WITH_WINDOWS_MSVC_LIBDIR=$(cygpath -m "$vs_root/VC/Tools/MSVC/$msvc_ver/lib/x64")" >> "$GITHUB_ENV"
+          kit_root="/c/Program Files (x86)/Windows Kits/10/Lib"
+          kit_ver="$(ls "$kit_root" | sort -V | tail -1)"
+          echo "WITH_WINDOWS_UCRT_LIBDIR=$(cygpath -m "$kit_root/$kit_ver/ucrt/x64")" >> "$GITHUB_ENV"
+          echo "WITH_WINDOWS_UM_LIBDIR=$(cygpath -m "$kit_root/$kit_ver/um/x64")" >> "$GITHUB_ENV"
+
+          # MSVC CRT + Windows SDK include dirs, read by ClangBridge.w via
+          # WITH_WINDOWS_{MSVC,UCRT,SHARED,UM}_INCDIR so a system-header c_import
+          # (e.g. <stdio.h>) resolves on native Windows — the include-side analog
+          # of the *_LIBDIR block above. Kit headers live under Include, not Lib,
+          # and are versioned independently, so glob that root separately.
+          echo "WITH_WINDOWS_MSVC_INCDIR=$(cygpath -m "$vs_root/VC/Tools/MSVC/$msvc_ver/include")" >> "$GITHUB_ENV"
+          kit_incroot="/c/Program Files (x86)/Windows Kits/10/Include"
+          kit_incver="$(ls "$kit_incroot" | sort -V | tail -1)"
+          echo "WITH_WINDOWS_UCRT_INCDIR=$(cygpath -m "$kit_incroot/$kit_incver/ucrt")" >> "$GITHUB_ENV"
+          echo "WITH_WINDOWS_SHARED_INCDIR=$(cygpath -m "$kit_incroot/$kit_incver/shared")" >> "$GITHUB_ENV"
+          echo "WITH_WINDOWS_UM_INCDIR=$(cygpath -m "$kit_incroot/$kit_incver/um")" >> "$GITHUB_ENV"
+
+          # lld-link.exe on PATH for the native COFF link step.
+          echo "$PWD/.deps/llvm-22.1.6-windows-x86_64-msvc/bin" >> "$GITHUB_PATH"
+
+      - name: Report toolchain
+        run: |
+          set -euo pipefail
+          echo "WITH=$WITH"
+          echo "LLVM_PREFIX=$LLVM_PREFIX"
+          echo "MSVC_LIBDIR=$WITH_WINDOWS_MSVC_LIBDIR"
+          echo "UCRT_LIBDIR=$WITH_WINDOWS_UCRT_LIBDIR"
+          echo "UM_LIBDIR=$WITH_WINDOWS_UM_LIBDIR"
+          echo "MSVC_INCDIR=$WITH_WINDOWS_MSVC_INCDIR"
+          echo "UCRT_INCDIR=$WITH_WINDOWS_UCRT_INCDIR"
+          echo "SHARED_INCDIR=$WITH_WINDOWS_SHARED_INCDIR"
+          echo "UM_INCDIR=$WITH_WINDOWS_UM_INCDIR"
+          command -v lld-link.exe && lld-link.exe --version || true
+
+      - uses: ./.github/actions/source-sdk
+        with:
+          host-tag: windows-x86_64-msvc
+
+      # The action already uploaded the same files as the workflow artifact
+      # source-sdk-windows-x86_64-msvc.
+      - name: Attach SDK assets to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName
+          ls -l out/release/with-llvm-sdk-*.tar.gz out/release/with-llvm-sdk-*.tar.gz.sha256 out/release/with-llvm-sdk-*.tar.gz.manifest
+          gh release upload "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --clobber \
+            out/release/with-llvm-sdk-*.tar.gz \
+            out/release/with-llvm-sdk-*.tar.gz.sha256 \
+            out/release/with-llvm-sdk-*.tar.gz.manifest
+
+  sdk-windows-aarch64:
+    name: SDK windows-aarch64
+    # GitHub's ARM64 Windows runner (public preview / GA). If unavailable to
+    # this repo the job stays queued rather than failing — the seed and nightly
+    # jobs do not depend on it.
+    runs-on: windows-11-arm
+    timeout-minutes: 360
+    defaults:
+      run:
+        shell: bash
+    env:
+      # Native Windows-on-ARM64 self-host: the published windows-aarch64 seed
+      # compiler builds stage1 -> stage2 -> stage3 and we assert stage2 == stage3
+      # (fixpoint). This is the true correctness gate for the cross-built seed —
+      # a cross-emitted binary that self-reproduces byte-for-byte on real arm64
+      # Windows is the definition of a good seed.
+      WITH_SEED_REPO: withlang-dev/with
+      # CI-produced by seed-windows-aarch64.yml (cross-built on Linux, published
+      # to the seed-windows-aarch64 prerelease) — NOT a hand-uploaded asset. The
+      # sha is pinned to the exact published seed.
+      WITH_SEED_VERSION: v0.15.2.1
+      WITH_SEED_ASSET: with-windows-aarch64.exe
+      WITH_SEED_SHA256: bb3b17c64ad057ddc852a5ee6a61a4e4a224780447013699d490e6f726893c73
+      WITH_SDK_REPO: withlang-dev/with
+      WITH_SDK_VERSION: sdk-windows-aarch64
+      WITH_SDK_ASSET: with-llvm-sdk-22.1.6-windows-aarch64.tar.gz
+      WITH_SDK_SHA256: ad13e07af474d683c699f041c52cd98697df9781b581dda913d39d92be186743
+      # Pin the build worker pool to the arm64 runner's real core count. The
+      # seed's rt_sysinfo reads the wrong SYSTEM_INFO offset (dwProcessorType
+      # rather than dwNumberOfProcessors), which would otherwise oversubscribe
+      # the pool. build_pool_width honours this env before the core probe.
+      WITH_BUILD_JOBS: "4"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Fetch windows-aarch64 LLVM SDK
+        run: |
+          set -euo pipefail
+          mkdir -p .deps
+          # git-bash GNU tar treats a "D:\..." path as a remote host (the drive
+          # colon looks like host:path), so keep the archive on a msys path.
+          sdk="$(cygpath -u "$RUNNER_TEMP")/sdk.tar.gz"
+          curl -fL --retry 5 --retry-delay 5 --retry-all-errors -o "$sdk" \
+            "https://github.com/$WITH_SDK_REPO/releases/download/$WITH_SDK_VERSION/$WITH_SDK_ASSET"
+          printf '%s  %s\n' "$WITH_SDK_SHA256" "$sdk" | sha256sum -c -
+          tar -xzf "$sdk" -C .deps
+          prefix=".deps/llvm-22.1.6-windows-aarch64-msvc"
+          test -f "$prefix/lib/libclang.lib" || { echo "SDK libclang.lib missing"; ls -la "$prefix/lib" | head; exit 1; }
+          test -f "$prefix/bin/lld-link.exe" || { echo "SDK lld-link.exe missing"; ls -la "$prefix/bin" | head; exit 1; }
+
+      - name: Fetch windows-aarch64 seed
+        run: |
+          set -euo pipefail
+          curl -fL --retry 5 --retry-delay 5 --retry-all-errors -o src/main.exe \
+            "https://github.com/$WITH_SEED_REPO/releases/download/$WITH_SEED_VERSION/$WITH_SEED_ASSET"
+          printf '%s  %s\n' "$WITH_SEED_SHA256" src/main.exe | sha256sum -c -
+          ./src/main.exe version
+
+      - name: Configure native toolchain env
+        run: |
+          set -euo pipefail
+          # The compiler and every child link process are native Windows exes, so
+          # they need Windows-form paths (cygpath -m keeps forward slashes, which
+          # both the file APIs and lld-link accept). Bash file ops keep msys paths.
+          echo "WITH=$(cygpath -m "$PWD/src/main.exe")" >> "$GITHUB_ENV"
+          echo "LLVM_PREFIX=$(cygpath -m "$PWD/.deps/llvm-22.1.6-windows-aarch64-msvc")" >> "$GITHUB_ENV"
+
+          # MSVC CRT + Windows SDK import libs, read by Link.w via
+          # WITH_WINDOWS_{MSVC,UCRT,UM}_LIBDIR. Locate VS with vswhere (edition-
+          # agnostic) and glob the highest MSVC + Windows SDK version dirs. This
+          # is the arm64 runner, so the ARM64 lib subdirs (…/lib/arm64,
+          # ucrt/arm64, um/arm64) are the native target.
+          vswhere="/c/Program Files (x86)/Microsoft Visual Studio/Installer/vswhere.exe"
+          vs_root="$(cygpath -u "$("$vswhere" -latest -products '*' -property installationPath)")"
+          msvc_ver="$(ls "$vs_root/VC/Tools/MSVC" | sort -V | tail -1)"
+          echo "WITH_WINDOWS_MSVC_LIBDIR=$(cygpath -m "$vs_root/VC/Tools/MSVC/$msvc_ver/lib/arm64")" >> "$GITHUB_ENV"
+          kit_root="/c/Program Files (x86)/Windows Kits/10/Lib"
+          kit_ver="$(ls "$kit_root" | grep -E '^10\.' | sort -V | tail -1)"
+          echo "WITH_WINDOWS_UCRT_LIBDIR=$(cygpath -m "$kit_root/$kit_ver/ucrt/arm64")" >> "$GITHUB_ENV"
+          echo "WITH_WINDOWS_UM_LIBDIR=$(cygpath -m "$kit_root/$kit_ver/um/arm64")" >> "$GITHUB_ENV"
+
+          # MSVC CRT + Windows SDK include dirs, read by ClangBridge.w via
+          # WITH_WINDOWS_{MSVC,UCRT,SHARED,UM}_INCDIR so a system-header c_import
+          # resolves on native Windows. Headers are arch-independent, so the same
+          # Include dirs as the x64 job.
+          echo "WITH_WINDOWS_MSVC_INCDIR=$(cygpath -m "$vs_root/VC/Tools/MSVC/$msvc_ver/include")" >> "$GITHUB_ENV"
+          kit_incroot="/c/Program Files (x86)/Windows Kits/10/Include"
+          kit_incver="$(ls "$kit_incroot" | grep -E '^10\.' | sort -V | tail -1)"
+          echo "WITH_WINDOWS_UCRT_INCDIR=$(cygpath -m "$kit_incroot/$kit_incver/ucrt")" >> "$GITHUB_ENV"
+          echo "WITH_WINDOWS_SHARED_INCDIR=$(cygpath -m "$kit_incroot/$kit_incver/shared")" >> "$GITHUB_ENV"
+          echo "WITH_WINDOWS_UM_INCDIR=$(cygpath -m "$kit_incroot/$kit_incver/um")" >> "$GITHUB_ENV"
+
+          # lld-link.exe on PATH for the native COFF link step. Windows-form
+          # (cygpath -m) so a native process can actually search this dir — an
+          # MSYS-form "/c/..." entry is invisible to CreateProcess PATH search.
+          echo "$(cygpath -m "$PWD/.deps/llvm-22.1.6-windows-aarch64-msvc/bin")" >> "$GITHUB_PATH"
+
+          # The arm64 runner's ambient `nm` (MSYS/Git-for-Windows binutils)
+          # lacks the aarch64-COFF BFD backend, so `nm <arm64 obj>` fails with
+          # "file format not recognized" (the object is a valid COFF-ARM64
+          # image; only this nm can't parse it). The SDK's llvm-nm reads
+          # COFF-ARM64 and emits the same BSD-format symbol lines. Point the
+          # cli-selfhost-object-symbol test at it via $NM (an absolute path, so
+          # it does not depend on PATH-search order) — the build action resolves
+          # nm through bs_build_w_tool_from_env("NM", ...).
+          echo "NM=$(cygpath -m "$PWD/.deps/llvm-22.1.6-windows-aarch64-msvc/bin/llvm-nm.exe")" >> "$GITHUB_ENV"
+
+      - name: Report toolchain
+        run: |
+          set -euo pipefail
+          echo "WITH=$WITH"
+          echo "LLVM_PREFIX=$LLVM_PREFIX"
+          echo "MSVC_LIBDIR=$WITH_WINDOWS_MSVC_LIBDIR"
+          echo "UCRT_LIBDIR=$WITH_WINDOWS_UCRT_LIBDIR"
+          echo "UM_LIBDIR=$WITH_WINDOWS_UM_LIBDIR"
+          echo "MSVC_INCDIR=$WITH_WINDOWS_MSVC_INCDIR"
+          echo "UCRT_INCDIR=$WITH_WINDOWS_UCRT_INCDIR"
+          echo "SHARED_INCDIR=$WITH_WINDOWS_SHARED_INCDIR"
+          echo "UM_INCDIR=$WITH_WINDOWS_UM_INCDIR"
+          command -v lld-link.exe && lld-link.exe --version || true
+
+      - uses: ./.github/actions/source-sdk
+        with:
+          host-tag: windows-aarch64-msvc
+
+      # The action already uploaded the same files as the workflow artifact
+      # source-sdk-windows-aarch64-msvc.
+      - name: Attach SDK assets to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName
+          ls -l out/release/with-llvm-sdk-*.tar.gz out/release/with-llvm-sdk-*.tar.gz.sha256 out/release/with-llvm-sdk-*.tar.gz.manifest
+          gh release upload "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --clobber \
+            out/release/with-llvm-sdk-*.tar.gz \
+            out/release/with-llvm-sdk-*.tar.gz.sha256 \
+            out/release/with-llvm-sdk-*.tar.gz.manifest
