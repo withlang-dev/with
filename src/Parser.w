@@ -95,6 +95,15 @@ pub type Parser {
     interface_mode: i32,
 }
 
+// Pipe-form enum variants before they are written to the extras pool:
+// flat `name, payload_count, payload_type...` records plus each name's span.
+type EnumVariantList {
+    count: i32,
+    records: Vec[i32],
+    name_starts: Vec[i32],
+    name_ends: Vec[i32],
+}
+
 type InterpolatedExprParseAttempt {
     node: NodeId,
     consumed_all: i32,
@@ -1937,7 +1946,24 @@ impl Parser:
         false
 
     mut fn parse_enum_variants() -> i32:
+        let list = self.parse_enum_variant_list()
+        self.add_enum_variant_extras(list.count, &list.records)
+
+    // Writes the enum-variant extras block: the count, then each variant's
+    // `name, payload_count, payload_type...` record.
+    mut fn add_enum_variant_extras(count: i32, records: &Vec[i32]) -> i32:
+        let extra_start = self.pool.extra_len()
+        self.pool.add_extra(count)
+        for vi in 0..records.len() as i32:
+            self.pool.add_extra(records[vi])
+        extra_start
+
+    // Parses `| A | B(payload, ...)` variants without writing extras, so an
+    // `error E from X =` declaration can put its generated wrappers first (D57).
+    mut fn parse_enum_variant_list() -> EnumVariantList:
         var variants: Vec[i32] = Vec.new()
+        var name_starts: Vec[i32] = Vec.new()
+        var name_ends: Vec[i32] = Vec.new()
         var variant_count = 0
 
         if self.peek() == TokenKind.TK_PIPE:
@@ -1945,6 +1971,8 @@ impl Parser:
             self.skip_newlines()
 
         while self.peek() == TokenKind.TK_IDENT:
+            name_starts.push(self.current_start())
+            name_ends.push(self.current_end())
             let vname = self.expect_ident()
             var payloads: Vec[i32] = Vec.new()
 
@@ -1986,11 +2014,7 @@ impl Parser:
                 continue
             break
 
-        let extra_start = self.pool.extra_len()
-        self.pool.add_extra(variant_count)
-        for vi in 0..variants.len() as i32:
-            self.pool.add_extra(variants[vi])
-        extra_start
+        EnumVariantList { count: variant_count, records: variants, name_starts, name_ends }
 
     mut fn parse_enum_variants_braced() -> i32:
         self.advance()
@@ -2848,40 +2872,55 @@ impl Parser:
         if err_name == 0:
             return self.poisoned_expr()
 
-        // error Name from OtherError, ...
+        // error Name from OtherError, ...   (§10.9: one wrapper variant each)
+        var records: Vec[i32] = Vec.new()
+        var wrapper_count = 0
+        var wrapper_names: Vec[i32] = Vec.new()
+        var wrapped_types: Vec[i32] = Vec.new()
         if self.is_ident_named("from"):
             self.advance()
-            let extra_start = self.pool.extra_len()
-            var variant_count = 0
-            let count_idx = self.pool.add_extra(0)
             while true:
                 let src_start = self.current_start()
                 let src_sym = self.expect_ident()
                 if src_sym == 0:
                     break
-                let src_name = self.intern.resolve(src_sym)
-                let variant_sym = self.intern.intern(parser_error_from_variant_name(src_name))
+                let variant_sym = self.intern.intern(parser_error_from_variant_name(self.intern.resolve(src_sym)))
                 let payload_ty = self.pool.add_node(NodeKind.NK_TYPE_NAMED, src_start, self.prev_end(), src_sym, 0, 0)
-                self.pool.add_extra(variant_sym)
-                self.pool.add_extra(1)
-                self.pool.add_extra(payload_ty as i32)
-                variant_count = variant_count + 1
+                records.push(variant_sym)
+                records.push(1)
+                records.push(payload_ty as i32)
+                wrapper_names.push(variant_sym)
+                wrapped_types.push(src_sym)
+                wrapper_count += 1
                 if self.peek() != TokenKind.TK_COMMA:
                     break
                 self.advance()
                 self.skip_newlines()
-            self.pool.state.extra[count_idx] = variant_count
-            self.pool.add_extra(is_pub)
-            self.pool.add_extra(0)
-            self.pool.add_extra(0)
-            return self.pool.add_node(NodeKind.NK_TYPE_DECL, start, self.prev_end(), err_name, extra_start, pack_type_decl_kind(TypeDeclKind.Enum, 0) + TDK_FLAG_ERROR)
+            if self.peek() != TokenKind.TK_EQ:
+                return self.add_error_decl(start, err_name, is_pub, wrapper_count, &records)
 
-        // error Name = Variant1, Variant2(payload), ...
+        // error Name = | Variant1 | Variant2(payload), ...
+        // error Name from A, B = | Variant ...   (D57: wrappers, then written)
         if self.expect(TokenKind.TK_EQ) == 0:
             return self.poisoned_expr()
         self.skip_newlines()
 
-        let extra_start = self.parse_enum_variants()
+        let written = self.parse_enum_variant_list()
+        var pos = 0
+        for wi in 0..written.count:
+            let vname = written.records[pos]
+            for gi in 0..wrapper_count:
+                if wrapper_names[gi] == vname:
+                    let wrapped = self.intern.resolve(wrapped_types[gi])
+                    let msg = f"variant '{self.intern.resolve(vname)}' of error '{self.intern.resolve(err_name)}' has the name of the wrapper variant generated for '{wrapped}' (`from {wrapped}`); give the written variant another name"
+                    self.emit_error_span(msg, written.name_starts[wi], written.name_ends[wi])
+            pos += 2 + written.records[pos + 1]
+        for ri in 0..written.records.len() as i32:
+            records.push(written.records[ri])
+        self.add_error_decl(start, err_name, is_pub, wrapper_count + written.count, &records)
+
+    mut fn add_error_decl(start: i32, err_name: i32, is_pub: i32, variant_count: i32, records: &Vec[i32]) -> NodeId:
+        let extra_start = self.add_enum_variant_extras(variant_count, records)
         self.pool.add_extra(is_pub)
         self.pool.add_extra(0)
         self.pool.add_extra(0)
