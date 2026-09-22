@@ -420,14 +420,20 @@ fn ci_migrate_normalize_output(text: &str) -> str:
         end = end - 1
     ci_str_replace(text.slice(0, end), "-> void", "-> Unit") ++ "\n"
 
-fn ci_migrate_publicize_shared_line(line: &str) -> str:
+// A migrated module's types are its public API: C has no type visibility,
+// and every `pub fn` the migrator emits names them (§18.1 rejects a private
+// type behind a pub signature — the preamble's `c_int`, a header's struct).
+// The shared defs module publishes everything else it holds too.
+fn ci_migrate_publicize_line(line: &str, types_only: bool) -> str:
     if line.starts_with("pub "):
         return with_str_clone_ref(line)
-    if line.starts_with("type ") or line.starts_with("let ") or line.starts_with("var ") or line.starts_with("fn ") or line.starts_with("unsafe fn ") or line.starts_with("extern fn ") or line.starts_with("extern let ") or line.starts_with("extern var "):
+    if line.starts_with("type "):
+        return "pub " ++ line
+    if not types_only and (line.starts_with("let ") or line.starts_with("var ") or line.starts_with("fn ") or line.starts_with("unsafe fn ") or line.starts_with("extern fn ") or line.starts_with("extern let ") or line.starts_with("extern var ")):
         return "pub " ++ line
     with_str_clone_ref(line)
 
-fn ci_migrate_publicize_shared_defs(text: &str) -> str:
+fn ci_migrate_publicize_lines(text: &str, types_only: bool) -> str:
     var out = ""
     var start: i64 = 0
     let n = text.len()
@@ -435,12 +441,16 @@ fn ci_migrate_publicize_shared_defs(text: &str) -> str:
         var end = start
         while end < n and text[end] != 10:
             end = end + 1
-        out = out ++ ci_migrate_publicize_shared_line(text.slice(start, end))
+        out = out ++ ci_migrate_publicize_line(text.slice(start, end), types_only)
         if end < n:
             out = out ++ "\n"
             end = end + 1
         start = end
     out
+
+fn ci_migrate_publicize_shared_defs(text: &str) -> str: ci_migrate_publicize_lines(text, false)
+
+fn ci_migrate_publicize_types(text: &str) -> str: ci_migrate_publicize_lines(text, true)
 
 fn ci_migrate_render_preamble_fn(signature: &str, colon_expr: &str, brace_expr: &str) -> str:
     if migrate_prefer_brace():
@@ -1227,7 +1237,7 @@ fn ci_migrate_file_body(input_path: &str, output_path: &str, project_active: boo
     output = ci_migrate_insert_libc_use(output)
 
     ci_migrate_shared_note_output_uses(output)
-    output = ci_migrate_normalize_output(output)
+    output = ci_migrate_publicize_types(ci_migrate_normalize_output(output))
 
     // Write output
     let write_result = with_fs_write_file(output_path, output)
