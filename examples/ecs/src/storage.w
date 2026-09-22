@@ -27,8 +27,9 @@ pub fn DenseStorage.new[T]() -> DenseStorage[T]:
     }
 
 extend[T] DenseStorage[T]:
-    // `-> Unit` is explicit until #1296: the assignment arm is otherwise
-    // read as a value of type T.
+    // `-> Unit` is the answer D43 asks for: the tail `if`'s arms are an
+    // assignment (a value of type T) and a push (Unit), so an unannotated
+    // return type would have two meanings.
     pub mut fn insert(entity: Entity, component: T) -> Unit:
         if entity.id in self.sparse:
             // An independent index, not a view into the map we are about
