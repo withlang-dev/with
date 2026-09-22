@@ -19801,6 +19801,17 @@ impl Sema:
                 return self.ty_str_view as i32
         if owner_name == "Sender" and method_name == "send" and arg_index == 0:
             return self.get_generic_inst_arg(resolved as i32, 0)
+        // #1287: Atomic[T]'s value operands (§14.17.1) are owned `T` demands:
+        // store/swap/fetch_*'s operand and compare_exchange's expected/new.
+        // Only the ordering operands were published before, so an element
+        // view (`xs[i]`, `&T` per §3.8/D27) recorded no contextual-copy
+        // adjustment and the intrinsic stored the element's address.
+        if owner_name == "Atomic" and self.get_type_kind(resolved) == TypeKind.TY_GENERIC_INST:
+            let atomic_value_arg =
+                if method_name == "compare_exchange" or method_name == "compare_exchange_weak": arg_index == 0 or arg_index == 1
+                else: arg_index == 0 and method_name != "load" and field != self.syms.new
+            if atomic_value_arg:
+                return self.get_generic_inst_arg(resolved as i32, 0)
         if owner_sym == self.syms.option:
             if field == self.syms.expect and arg_index == 0:
                 return self.ty_str as i32
