@@ -3,7 +3,7 @@
 
 use Overflow
 
-type CompilationConfig {
+pub type CompilationConfig {
     opt_level: i32,
     no_std: bool,
     alloc_mode: bool,

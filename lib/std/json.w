@@ -155,7 +155,7 @@ pub type JsonToken {
 }
 
 /// Parser state. Create with `JsonParser.new()`, pass to `json_parse()`.
-type JsonParser {
+pub type JsonParser {
     pos: i32,
     toknext: i32,
     toksuper: i32,

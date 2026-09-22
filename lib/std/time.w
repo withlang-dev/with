@@ -9,7 +9,7 @@ extern fn with_nanosleep(ns: i64) -> i32
 extern fn with_usleep(usecs: i32) -> i32
 
 /// A duration in milliseconds.
-type Duration = i32
+pub type Duration = i32
 
 // Duration constructors are associated functions (no receiver), so under the D7
 // location rule they live at top level (`fn Duration.name`), not in a block.

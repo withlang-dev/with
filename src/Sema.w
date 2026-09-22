@@ -440,7 +440,7 @@ type ForeignContract {
     callback_consumes: Vec[i32],
 }
 
-type Sema {
+pub type Sema {
     pool: InternPool,
     diags: DiagnosticList,
     ast: AstPool,

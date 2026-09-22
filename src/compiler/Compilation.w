@@ -327,7 +327,7 @@ fn compilation_type_decl_kind_name(sub_kind: i32) -> str:
 // Transitional orchestration root:
 // owns compiler-facing config/Zcu state while reusing Driver execution per call.
 // This removes long-lived Driver field ownership from Compilation.
-type Compilation {
+pub type Compilation {
     zcu: Zcu,
     config: CompilationConfig,
     cli_diag_gen_starts: Vec[i32],

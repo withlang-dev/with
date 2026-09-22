@@ -25,7 +25,7 @@ enum ComptimeValueKind: i32:
     CV_STRING_BUILDER = 15
     CV_STRING_CHUNK = 16
 
-type ComptimeValue {
+pub type ComptimeValue {
     kind: i32,
     type_id: i32,
     data0: i64,

@@ -4,7 +4,7 @@ use Overflow
 
 extern fn with_str_clone_ref(s: &str) -> str
 
-type ProjectConfig {
+pub type ProjectConfig {
     root_dir: str,
     manifest_path: str,
     manifest_error: str,

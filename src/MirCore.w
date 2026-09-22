@@ -400,7 +400,7 @@ type MirLocalInfo {
     is_user_var: i32,
 }
 
-type MirBody {
+pub type MirBody {
     fn_sym: i32,
     lowering_failed: i32,
     anonymous_type: i32,
@@ -502,7 +502,7 @@ type MirBody {
     ever_moved_locals: Vec[i32],
 }
 
-type MirModule {
+pub type MirModule {
     bodies: Vec[MirBody],
     body_fn_syms: Vec[i32],
     body_index_by_fn_sym: HashMap[i32, i32],

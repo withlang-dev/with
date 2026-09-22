@@ -18,7 +18,7 @@ pub type ConanPackagePick {
     shared: bool,
 }
 
-type ConanLibraryScan {
+pub type ConanLibraryScan {
     lib_paths: Vec[str],
     libs: Vec[str],
 }

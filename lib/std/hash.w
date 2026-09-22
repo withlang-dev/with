@@ -2,11 +2,11 @@
 //
 // Provides deterministic 64-bit hash utilities for common scalar inputs.
 
-type Hasher  {
+pub type Hasher {
     state: i64,
 }
 
-type DefaultHasher = Hasher
+pub type DefaultHasher = Hasher
 
 pub fn combine(seed: i64, value: i64) -> i64:
     (seed *% 1099511628211) ^ value

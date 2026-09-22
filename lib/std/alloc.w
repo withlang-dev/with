@@ -35,7 +35,7 @@ pub type FrameArena {
     high_water_bytes: i64,
 }
 
-type TempArena {
+pub type TempArena {
     allocations: Vec[i64],
 }
 

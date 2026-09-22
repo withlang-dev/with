@@ -10,7 +10,7 @@ type RawFn0I32 {
 }
 
 /// Handle to a spawned thread's result.
-type JoinHandle  {
+pub type JoinHandle {
     handle: i64
 }
 

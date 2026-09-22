@@ -8,7 +8,7 @@ use compiler.ConanClient
 use std.crypto.sha256
 extern fn with_str_clone_ref(s: &str) -> str
 
-type LockEntry {
+pub type LockEntry {
     name: str,
     source: str,
     version: str,
@@ -19,7 +19,7 @@ type LockEntry {
 }
 // #747: str field — owned, non-Copy now; moves/clones spell intent.
 
-type LockFile {
+pub type LockFile {
     entries: Vec[LockEntry],
 }
 

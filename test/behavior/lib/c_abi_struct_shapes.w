@@ -1,13 +1,13 @@
-type Color { r: u8, g: u8, b: u8, a: u8 }
-type V2 { x: f32, y: f32 }
-type V3 { x: f32, y: f32, z: f32 }
-type V4 { x: f32, y: f32, z: f32, w: f32 }
-type D2 { a: f64, b: f64 }
-type IF { i: i32, f: f32 }
-type DI { d: f64, i: i32 }
-type L2 { a: i64, b: i64 }
-type I3 { a: i32, b: i32, c: i32 }
-type L3 { a: i64, b: i64, c: i64 }
+pub type Color { r: u8, g: u8, b: u8, a: u8 }
+pub type V2 { x: f32, y: f32 }
+pub type V3 { x: f32, y: f32, z: f32 }
+pub type V4 { x: f32, y: f32, z: f32, w: f32 }
+pub type D2 { a: f64, b: f64 }
+pub type IF { i: i32, f: f32 }
+pub type DI { d: f64, i: i32 }
+pub type L2 { a: i64, b: i64 }
+pub type I3 { a: i32, b: i32, c: i32 }
+pub type L3 { a: i64, b: i64, c: i64 }
 impl Copy for Color
 impl Copy for V2
 impl Copy for V3

@@ -8,7 +8,7 @@
 
 extern fn with_memcpy(dst: *mut u8, src: *const u8, n: i64) -> *mut u8
 
-type Slot[T] {
+pub type Slot[T] {
     ptr: *mut T,
 }
 

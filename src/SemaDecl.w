@@ -1552,6 +1552,8 @@ impl Sema:
         let tp_count = self.ast.fn_meta_tp_count(meta)
         if (flags / FnFlags.ASYNC) % 2 == 1:
             self.require_async_runtime(node, "async fn")
+        if decl_is_pub != 0:
+            self.check_pub_signature_names_public_types(node, fn_name, method_owner_sym, meta)
         self.record_fn_behavior_metadata(fn_name, node, flags)
 
         // Record receiver flags here. D7 enforcement runs after body checking and
@@ -2758,6 +2760,62 @@ impl Sema:
                 return 0
 
         1
+
+    // §18.1: a public declaration is reachable by name, so every type its
+    // signature names must be public too. A private type behind a `pub fn`
+    // was silent (std.time's Duration, std.json's JsonParser; #1150).
+    fn module_private_type(sym: i32) -> i32:
+        var ci = self.named_type_candidate_head(sym)
+        while ci >= 0:
+            if self.named_type_candidate_paths[ci] == self.current_module_path:
+                return if self.named_type_candidate_pub[ci] == 0: 1 else: 0
+            ci = self.named_type_candidate_next[ci]
+        0
+
+    mut fn emit_pub_signature_private_type(node: i32, fn_name: i32, sym: i32):
+        let type_text: str = with_str_clone_ref(self.pool_resolve(sym))
+        self.emit_error_with_help("pub fn '" ++ self.pool_resolve(fn_name) ++ "' names private type '" ++ type_text ++ "' in its signature; a public signature names only public types (§18.1)", node, "add `pub` to the declaration of '" ++ type_text ++ "'")
+
+    mut fn check_pub_signature_names_public_types(node: i32, fn_name: i32, owner_sym: i32, meta: i32):
+        let tp_start = self.ast.fn_meta_tp_start(meta)
+        let tp_count = self.ast.fn_meta_tp_count(meta)
+        let impl_node = if owner_sym != 0: self.impl_node_for_method_decl(node) else: 0
+        if owner_sym != 0 and owner_sym != self.syms.self_type and self.module_private_type(owner_sym) != 0:
+            self.emit_pub_signature_private_type(node, fn_name, owner_sym)
+        let param_start = self.ast.fn_meta_param_start(meta)
+        for pi in 0..self.ast.fn_meta_param_count(meta):
+            self.check_pub_signature_type(self.ast.fn_param_type(param_start, pi), fn_name, tp_start, tp_count, impl_node)
+        self.check_pub_signature_type(self.ast.fn_meta_ret(meta), fn_name, tp_start, tp_count, impl_node)
+
+    mut fn check_pub_signature_type(node: i32, fn_name: i32, tp_start: i32, tp_count: i32, impl_node: i32):
+        if node == 0:
+            return
+        let kind = self.ast.kind(node)
+        if kind == NodeKind.NK_TYPE_NAMED or kind == NodeKind.NK_TYPE_GENERIC:
+            let sym = self.ast.get_data0(node)
+            // Primitives register pathless and public, so module_private_type
+            // is silent on them; primitive_type_by_sym would also be silent on
+            // a private alias of one (`type Duration = i32`), which is a hit.
+            if sym != self.syms.self_type and self.type_param_exists_in_impl_context(tp_start, tp_count, impl_node, sym) == 0 and self.module_private_type(sym) != 0:
+                self.emit_pub_signature_private_type(node, fn_name, sym)
+            if kind == NodeKind.NK_TYPE_GENERIC:
+                let extra_start = self.ast.get_data1(node)
+                for ai in 0..self.ast.get_data2(node):
+                    self.check_pub_signature_type(self.ast.get_extra(extra_start + ai), fn_name, tp_start, tp_count, impl_node)
+            return
+        if kind == NodeKind.NK_TYPE_PTR or kind == NodeKind.NK_TYPE_REF or kind == NodeKind.NK_TYPE_OPTIONAL or kind == NodeKind.NK_TYPE_SLICE or kind == NodeKind.NK_TYPE_ARRAY:
+            self.check_pub_signature_type(self.ast.get_data0(node), fn_name, tp_start, tp_count, impl_node)
+            return
+        if kind == NodeKind.NK_TYPE_FN or kind == NodeKind.NK_TYPE_EXTERN_FN:
+            let extra_start = self.ast.get_data0(node)
+            for pi in 0..self.ast.get_data1(node):
+                self.check_pub_signature_type(self.ast.get_extra(extra_start + pi), fn_name, tp_start, tp_count, impl_node)
+            self.check_pub_signature_type(self.ast.get_data2(node), fn_name, tp_start, tp_count, impl_node)
+            return
+        if kind == NodeKind.NK_TYPE_TUPLE:
+            let extra_start = self.ast.get_data0(node)
+            for ei in 0..self.ast.get_data1(node):
+                self.check_pub_signature_type(self.ast.get_extra(extra_start + ei), fn_name, tp_start, tp_count, impl_node)
 
     mut fn validate_type_expr_with_type_params(node: i32, tp_start: i32, tp_count: i32):
         self.validate_type_expr_with_impl_type_params(node, tp_start, tp_count, 0)

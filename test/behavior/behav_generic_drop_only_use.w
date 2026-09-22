@@ -7,8 +7,8 @@
 // on it (the c-algorithms facades' empty drop-audit cells).
 
 
-type Slot[T] { value: T }
-type Holder[T] { p: i64 }
+pub type Slot[T] { value: T }
+pub type Holder[T] { p: i64 }
 
 pub fn Holder.new[T]() -> Holder[T]: Holder { p: 0 }
 

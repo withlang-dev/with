@@ -4,7 +4,7 @@
 // specialization — the loop variable gets the substituted element type,
 // not a placeholder or the old i32 fallback.
 
-type Backwards[T] { items: Vec[T] }
+pub type Backwards[T] { items: Vec[T] }
 
 impl[T] Backwards[T]:
     pub mut fn next() -> Option[T]: self.items.pop()
