@@ -5809,6 +5809,13 @@ impl Sema:
             return self.expr_is_assignment(self.ast.get_data0(node))
         0
 
+    // A bare assignment as a value-position `if`/`match` arm is that arm's
+    // tail, so it is discarded exactly as the block spelling `{ place = value }`
+    // is by check_block: `if ok: n = n + 1 else: { m = m + 1 }` joins Unit
+    // and Unit, never i32 and Unit (#1319).
+    fn arm_type_discarding_assignment(arm: i32, ty: TypeId):
+        if self.expr_is_assignment(arm) != 0: self.ty_void else: ty
+
     mut fn infer_unannotated_function_return_type(body: i32, body_ty: TypeId) -> i32:
         let info = self.body_return_type_info(body)
         if info.mismatch != 0:
@@ -9768,7 +9775,7 @@ impl Sema:
         // Each arm sees only an independently established enclosing expectation.
         // The first arm never becomes the second arm's expected type: Stage 3's
         // shared resolver decides the join after both exact types are known.
-        let then_type = if outer_expected != 0:
+        let checked_then_type = if outer_expected != 0:
             self.check_expr_with_expected(then_body, outer_expected)
         else if in_value_context:
             self.infer_tail_node = if is_infer_tail: then_body else: saved_infer_tail
@@ -9777,6 +9784,7 @@ impl Sema:
             self.check_expr_statement_context(then_body)
         else:
             self.check_expr(then_body)
+        let then_type = self.arm_type_discarding_assignment(then_body, checked_then_type)
         self.infer_tail_node = saved_infer_tail
         self.pop_move_control_flow_context()
         self.drop_control_flow_depth = saved_drop_cf_then
@@ -9796,7 +9804,7 @@ impl Sema:
             if self.current_drop_type_sym != 0:
                 self.drop_control_flow_depth = self.drop_control_flow_depth + 1
             self.push_move_control_flow_context(1)
-            let else_type = if outer_expected != 0:
+            let checked_else_type = if outer_expected != 0:
                 self.check_expr_with_expected(else_body, outer_expected)
             else if in_value_context:
                 self.infer_tail_node = if is_infer_tail: else_body else: saved_infer_tail
@@ -9805,6 +9813,7 @@ impl Sema:
                 self.check_expr_statement_context(else_body)
             else:
                 self.check_expr(else_body)
+            let else_type = self.arm_type_discarding_assignment(else_body, checked_else_type)
             self.infer_tail_node = saved_infer_tail
             self.pop_move_control_flow_context()
             self.drop_control_flow_depth = saved_drop_cf_else
@@ -12929,13 +12938,14 @@ impl Sema:
             let saved_drop_cf_arm = self.drop_control_flow_depth
             if self.current_drop_type_sym != 0:
                 self.drop_control_flow_depth = self.drop_control_flow_depth + 1
-            let arm_type = if not match_is_value:
+            let checked_arm_type = if not match_is_value:
                 self.check_expr_statement_context(arm_body)
             else if match_expected != 0:
                 self.check_expr_with_expected(arm_body, match_expected)
             else:
                 self.infer_tail_node = if is_infer_tail: arm_body else: saved_infer_tail
                 self.check_expr_value_context(arm_body)
+            let arm_type = self.arm_type_discarding_assignment(arm_body, checked_arm_type)
             self.infer_tail_node = saved_infer_tail
             self.drop_control_flow_depth = saved_drop_cf_arm
             if match_is_value and self.type_is_ephemeral_value(arm_type as i32) != 0:

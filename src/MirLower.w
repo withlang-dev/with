@@ -6264,7 +6264,7 @@ impl MirBuilder:
         // condition above; a temp moved into the branch result is cancelled by
         // assign_operand_to_place before the frame closes.
         let then_temp_frame = self.push_stmt_temp_frame()
-        let then_op = if want_result != 0: self.lower_expr(then_expr) else: self.lower_expr_discard(then_expr)
+        let then_op = if want_result != 0: self.lower_tail_expr(then_expr) else: self.lower_expr_discard(then_expr)
         // A diverging branch has no value to contribute to the join. lower_return
         // leaves a Unit operand in its unreachable continuation; assigning that
         // operand to the if result place corrupts typed MIR.
@@ -6285,7 +6285,7 @@ impl MirBuilder:
         self.field_move_in_branch = self.field_move_in_branch + 1
         let else_temp_frame = self.push_stmt_temp_frame()
         let else_op = if else_expr_opt != 0:
-            if want_result != 0: self.lower_expr(else_expr_opt) else: self.lower_expr_discard(else_expr_opt)
+            if want_result != 0: self.lower_tail_expr(else_expr_opt) else: self.lower_expr_discard(else_expr_opt)
         else:
             self.unit_operand()
         if want_result != 0 and (else_expr_opt == 0 or self.sema.body_can_fall_through(else_expr_opt) != 0):
@@ -9241,7 +9241,7 @@ impl MirBuilder:
                 let saved_arm_expected = self.expected_type
                 if result_ty != 0:
                     self.expected_type = result_ty
-                let arm_value = self.lower_expr(body_node)
+                let arm_value = self.lower_tail_expr(body_node)
                 self.expected_type = saved_arm_expected
                 // A diverging arm has no value to contribute to the join. Like
                 // lower_if, lower_return leaves Unit in its unreachable
