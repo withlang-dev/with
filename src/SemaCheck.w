@@ -15032,12 +15032,13 @@ impl Sema:
         self.binding_value_nodes.insert(name, source)
         if had_binding == 0:
             self.register_pending_generic_binding(name, 0, source, source_ty as i32)
-        let body_ty = self.check_expr(body)
+        // §7.2 Form 2: `with <expr> as mut x:` always returns x, so the body's
+        // last statement is a statement (a trailing `if` needs no `else`, #1298).
+        let body_ty = if is_mut != 0: self.check_expr_statement_context(body) else: self.check_expr(body)
         let final_source_ty = self.scope_lookup(name)
         if final_source_ty >= 0:
             source_ty = final_source_ty as TypeId
         self.pop_scope()
-        // Form 2 builder rule: `with <expr> as mut x:` always returns x.
         if is_mut != 0:
             return source_ty as i32
         body_ty as i32
@@ -15066,7 +15067,8 @@ impl Sema:
                 let elem_ty: i32 = self.type_extra[(te_start + i)]
                 self.scope_put(sym, elem_ty, is_mut)
                 self.binding_decl_nodes.insert(sym, node)
-        let body_ty = self.check_expr(body)
+        // §7.2 Form 2: a `mut` builder body is statements; the block returns the tuple.
+        let body_ty = if is_mut != 0: self.check_expr_statement_context(body) else: self.check_expr(body)
         self.pop_scope()
         if is_mut != 0:
             return source_ty as i32
