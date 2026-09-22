@@ -99,6 +99,8 @@ type MirBuilder = ephemeral {
     // (an observed place, see observed_pattern_subject_place): `_` and `..`
     // must not move payloads into drop locals — nothing is being consumed.
     pattern_subject_observed: i32,
+    // 1 while lowering a `var PATTERN` let: its binding locals are mutable (#1354).
+    pattern_bind_mut: i32,
     with_cleanup_guard_locals: Vec[i32],
     with_cleanup_payload_locals: Vec[i32],
     with_cleanup_method_syms: Vec[i32],
@@ -208,6 +210,7 @@ fn MirBuilder.init(sema: &Sema, ast: AstPool, pool: InternPool, fn_sym: i32) -> 
         pending_move_temp_locals: Vec.new(),
         field_move_in_branch: 0,
         pattern_subject_observed: 0,
+        pattern_bind_mut: 0,
         with_cleanup_guard_locals: Vec.new(),
         with_cleanup_payload_locals: Vec.new(),
         with_cleanup_method_syms: Vec.new(),
@@ -5930,8 +5933,15 @@ impl MirBuilder:
             self.cancel_scheduled_value_drop_for_local(src_local)
             self.mark_local_value_moved(src_local)
 
+    // A pattern let's bindings, mutable under `var` (§9.7, #1354).
+    mut fn lower_let_pattern_bindings(node: i32, pat: i32, subject_place: i32):
+        let saved_bind_mut = self.pattern_bind_mut
+        self.pattern_bind_mut = self.ast.let_pattern_is_mut(node)
+        let _ = self.lower_pattern(pat, subject_place)
+        self.pattern_bind_mut = saved_bind_mut
+
     mut fn lower_let_else(node: i32):
-        let pat = self.ast.get_data0(node)
+        let pat = self.ast.let_pattern(node)
         let rhs = self.ast.get_data1(node)
         let else_body = self.ast.get_data2(node)
         let rhs_ty = self.expr_type(rhs)
@@ -5941,7 +5951,7 @@ impl MirBuilder:
             let saved_observed = self.pattern_subject_observed
             if else_body == 0:
                 self.pattern_subject_observed = 1
-                let _ = self.lower_pattern(pat, observed_place)
+                self.lower_let_pattern_bindings(node, pat, observed_place)
                 self.pattern_subject_observed = saved_observed
             else:
                 let obs_success_bb = self.new_block()
@@ -5950,7 +5960,7 @@ impl MirBuilder:
                 self.pattern_subject_observed = 1
                 self.lower_pattern_match(observed_place, pat, obs_success_bb, obs_fail_bb)
                 self.switch_to(obs_success_bb)
-                let _ = self.lower_pattern(pat, observed_place)
+                self.lower_let_pattern_bindings(node, pat, observed_place)
                 self.pattern_subject_observed = saved_observed
                 self.terminate(TermKind.TK_GOTO, obs_cont_bb, 0, 0, 0)
                 self.switch_to(obs_fail_bb)
@@ -5962,11 +5972,17 @@ impl MirBuilder:
         let rhs_reset_start = self.pending_reset_locals.len() as i32
         let rhs_reset_field_start = self.pending_reset_field_places.len() as i32
         let rhs_move_temp_start = self.pending_move_temp_locals.len() as i32
+        // §30.4: an annotated pattern let lowers its subject against the
+        // annotation, as a typed named let does (Sema recorded it as rhs_ty).
+        let saved_expected = self.expected_type
+        if self.ast.let_pattern_type_ann(node) != 0:
+            self.expected_type = rhs_ty
         let rhs_op = self.lower_expr(rhs)
+        self.expected_type = saved_expected
         let rhs_place = self.materialize_operand(rhs_op, rhs_ty, self.ast.get_start(rhs))
 
         if else_body == 0:
-            let _ = self.lower_pattern(pat, rhs_place)
+            self.lower_let_pattern_bindings(node, pat, rhs_place)
             // #605/#606: an irrefutable destructure (e.g. `let (a, b) = t`) moves the
             // source's contents into the pattern bindings, which now own and drop them.
             // Two owners must be silenced so the new aggregate element-drop does not
@@ -6020,7 +6036,8 @@ impl MirBuilder:
         self.restore_move_state(&branch_move_state)
 
         self.switch_to(success_bb)
-        let _ = self.lower_pattern(pat, rhs_place)
+        // §9.7: `var PATTERN = ... else` binds every name it introduces mutably (#1354).
+        self.lower_let_pattern_bindings(node, pat, rhs_place)
         self.terminate(TermKind.TK_GOTO, cont_bb, 0, 0, 0)
 
         self.switch_to(cont_bb)
@@ -8889,7 +8906,7 @@ impl MirBuilder:
         if pk == NodeKind.NK_PAT_IDENT:
             let sym = self.ast.get_data0(pat_node)
             let bind_ty = self.place_local_type(scrutinee_place)
-            let local_id = self.body.new_local(bind_ty, 0, sym, 1)
+            let local_id = self.body.new_local(bind_ty, self.pattern_bind_mut, sym, 1)
             self.bind_local(sym, local_id)
             self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, local_id, 0, self.ast.get_start(pat_node))
             if self.type_needs_value_drop(bind_ty) != 0:
@@ -8904,7 +8921,7 @@ impl MirBuilder:
         if pk == NodeKind.NK_PAT_AT_BINDING:
             let outer_sym = self.ast.get_data0(pat_node)
             let outer_ty = self.place_local_type(scrutinee_place)
-            let outer_local = self.body.new_local(outer_ty, 0, outer_sym, 1)
+            let outer_local = self.body.new_local(outer_ty, self.pattern_bind_mut, outer_sym, 1)
             self.bind_local(outer_sym, outer_local)
             self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, outer_local, 0, self.ast.get_start(pat_node))
             if self.type_needs_value_drop(outer_ty) != 0:
@@ -8978,7 +8995,7 @@ impl MirBuilder:
                         out.push(inner[i])
                     continue
                 let bind_ty = self.place_local_type(child_place)
-                let local_id = self.body.new_local(bind_ty, 0, raw, 1)
+                let local_id = self.body.new_local(bind_ty, self.pattern_bind_mut, raw, 1)
                 self.bind_local(raw, local_id)
                 self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, local_id, 0, self.ast.get_start(pat_node))
                 if self.sema.is_copy_frozen(bind_ty) == 0:
@@ -9035,7 +9052,7 @@ impl MirBuilder:
                         out.push(inner[i])
                 else:
                     let bind_ty = self.place_local_type(child_place)
-                    let local_id = self.body.new_local(bind_ty, 0, field_name, 1)
+                    let local_id = self.body.new_local(bind_ty, self.pattern_bind_mut, field_name, 1)
                     self.bind_local(field_name, local_id)
                     self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, local_id, 0, self.ast.get_start(pat_node))
                     if self.sema.is_copy_frozen(bind_ty) == 0:
@@ -9102,7 +9119,7 @@ impl MirBuilder:
             dc_args.push(dc_type_const)
             let dc_args_id = self.body.new_call_args(dc_args)
             self.body.set_call_intrinsic(dc_args_id, MirIntrinsic.DYN_DOWNCAST)
-            let local_id = self.body.new_local(tb_concrete_ty, 0, tb_bind_sym, 1)
+            let local_id = self.body.new_local(tb_concrete_ty, self.pattern_bind_mut, tb_bind_sym, 1)
             self.bind_local(tb_bind_sym, local_id)
             let dc_result_place = self.place_for_local(local_id)
             let dc_next_bb = self.new_block()
@@ -9131,7 +9148,7 @@ impl MirBuilder:
                 if sym == 0:
                     continue
                 let field_place = self.body.new_field_place(scrutinee_place, si, 0)
-                let local_id = self.body.new_local(sp_elem_ty, 0, sym, 1)
+                let local_id = self.body.new_local(sp_elem_ty, self.pattern_bind_mut, sym, 1)
                 self.bind_local(sym, local_id)
                 self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, local_id, 0, self.ast.get_start(pat_node))
                 let src_op = self.body.new_operand(if self.sema.is_copy_frozen(sp_elem_ty) != 0: OperandKind.OK_COPY else: OperandKind.OK_MOVE, field_place)
@@ -9144,7 +9161,7 @@ impl MirBuilder:
             let rest_sym = self.ast.get_data2(pat_node)
             if sp_has_rest != 0 and rest_sym != 0 and sp_arr_tk == TypeKind.TY_ARRAY:
                 let rest_count = sp_arr_len - sp_head_count - sp_tail_count
-                let local_id = self.body.new_local(self.sema.ty_i64 as i32, 0, rest_sym, 1)
+                let local_id = self.body.new_local(self.sema.ty_i64 as i32, self.pattern_bind_mut, rest_sym, 1)
                 self.bind_local(rest_sym, local_id)
                 self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, local_id, 0, self.ast.get_start(pat_node))
                 let count_op = self.int_const_operand(rest_count, self.sema.ty_i64)
@@ -9158,7 +9175,7 @@ impl MirBuilder:
                     continue
                 let field_idx = sp_arr_len - sp_tail_count + ti
                 let field_place = self.body.new_field_place(scrutinee_place, field_idx, 0)
-                let local_id = self.body.new_local(sp_elem_ty, 0, sym, 1)
+                let local_id = self.body.new_local(sp_elem_ty, self.pattern_bind_mut, sym, 1)
                 self.bind_local(sym, local_id)
                 self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, local_id, 0, self.ast.get_start(pat_node))
                 let src_op = self.body.new_operand(if self.sema.is_copy_frozen(sp_elem_ty) != 0: OperandKind.OK_COPY else: OperandKind.OK_MOVE, field_place)

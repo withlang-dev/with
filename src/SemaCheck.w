@@ -4610,7 +4610,7 @@ impl Sema:
         if kind == NodeKind.NK_LET_BINDING or kind == NodeKind.NK_LET_DECL:
             return self.expr_may_suspend(self.ast.get_data1(node))
         if kind == NodeKind.NK_LET_ELSE:
-            if self.expr_may_suspend(self.ast.get_data0(node)) != 0:
+            if self.expr_may_suspend(self.ast.get_data1(node)) != 0:
                 return 1
             return self.expr_may_suspend(self.ast.get_data2(node))
         if kind == NodeKind.NK_TUPLE_DESTRUCTURE:
@@ -5015,7 +5015,7 @@ impl Sema:
         if kind == NodeKind.NK_LET_BINDING or kind == NodeKind.NK_LET_DECL:
             return self.expr_creates_ephemeral_task(self.ast.get_data1(node))
         if kind == NodeKind.NK_LET_ELSE:
-            if self.expr_creates_ephemeral_task(self.ast.get_data0(node)) != 0:
+            if self.expr_creates_ephemeral_task(self.ast.get_data1(node)) != 0:
                 return 1
             return self.expr_creates_ephemeral_task(self.ast.get_data2(node))
         if kind == NodeKind.NK_TUPLE_DESTRUCTURE:
@@ -9603,6 +9603,63 @@ impl Sema:
                 return 1
         0
 
+    // An annotated binding — `let x: T = v` and `let PATTERN: T = v` alike —
+    // demands what the annotation says (D27). A scalar may widen into it; an
+    // aggregate cannot: no conversion reshapes a `(i32, i32)` into a
+    // `(i64, i64)`, so a value whose element representation differs is a
+    // mismatch here rather than an invalid-MIR failure (#1354).
+    mut fn check_binding_annotation(node: i32, value: i32, ann_type: TypeId, val_type: TypeId):
+        if val_type == 0:
+            return
+        if self.int_narrowing_requires_cast(ann_type, val_type) != 0:
+            self.emit_error("implicit integer narrowing or sign change; use an explicit `as` cast", node)
+        else if self.types_compatible(ann_type as i32, val_type as i32) == 0 and self.has_contextual_copy_adjustment(value) == 0:
+            if self.arithmetic_result_type(ann_type, val_type) == 0:
+                self.emit_error("type mismatch in binding", node)
+        else if self.aggregate_repr_differs(ann_type, val_type, 0) != 0:
+            self.emit_error("type mismatch in binding: the annotation is `" ++ self.type_name(ann_type as i32) ++ "` but the value is `" ++ self.type_name(val_type as i32) ++ "`; an aggregate's elements do not convert", node)
+
+    // 1 when `expected` and `actual` are aggregates whose elements differ in
+    // representation (integer width or sign, float width, integer vs float).
+    // `depth` 0 is the top level, where scalar widening stays legal.
+    fn aggregate_repr_differs(expected: TypeId, actual: TypeId, depth: i32) -> i32:
+        let er = self.resolve_alias(expected)
+        let ar = self.resolve_alias(actual)
+        if er == ar or er == 0 or ar == 0:
+            return 0
+        let ek = self.get_type_kind(er)
+        let ak = self.get_type_kind(ar)
+        if ak == TypeKind.TY_NEVER:
+            return 0
+        if depth > 0:
+            let e_num = ek == TypeKind.TY_INT or ek == TypeKind.TY_FLOAT
+            let a_num = ak == TypeKind.TY_INT or ak == TypeKind.TY_FLOAT
+            if e_num and a_num:
+                if ek != ak: return 1
+                if self.get_type_d0(er) != self.get_type_d0(ar): return 1
+                if ek == TypeKind.TY_INT and self.get_type_d1(er) != self.get_type_d1(ar): return 1
+                return 0
+            if e_num or a_num:
+                return 0
+        if ek == TypeKind.TY_TUPLE and ak == TypeKind.TY_TUPLE:
+            let count = self.get_type_d1(er)
+            if count != self.get_type_d1(ar):
+                return 0
+            for i in 0..count:
+                if self.aggregate_repr_differs(self.type_extra[self.get_type_d0(er) + i], self.type_extra[self.get_type_d0(ar) + i], depth + 1) != 0:
+                    return 1
+            return 0
+        if ek == TypeKind.TY_ARRAY and ak == TypeKind.TY_ARRAY:
+            return self.aggregate_repr_differs(self.get_type_d0(er), self.get_type_d0(ar), depth + 1)
+        if ek == TypeKind.TY_GENERIC_INST and ak == TypeKind.TY_GENERIC_INST and self.get_type_d0(er) == self.get_type_d0(ar):
+            let argc = self.get_type_d2(er)
+            if argc != self.get_type_d2(ar):
+                return 0
+            for i in 0..argc:
+                if self.aggregate_repr_differs(self.get_generic_inst_arg(er, i), self.get_generic_inst_arg(ar, i), depth + 1) != 0:
+                    return 1
+        0
+
     mut fn check_let_binding(node: i32) -> i32:
         let name = self.ast.get_data0(node)
         var bind_name = self.extract_decl_name_after(node, "let")
@@ -9668,12 +9725,7 @@ impl Sema:
             self.emit_error_with_help("ephemeral value borrows a temporary that dies at the end of this statement", value, "bind the collection to a named variable first, then iterate the name")
         if ann_type != 0:
             bind_type = ann_type
-            if val_type != 0:
-                if self.int_narrowing_requires_cast(ann_type, val_type) != 0:
-                    self.emit_error("implicit integer narrowing or sign change; use an explicit `as` cast", node)
-                else if self.types_compatible(ann_type as i32, val_type as i32) == 0 and self.has_contextual_copy_adjustment(value) == 0:
-                    if self.arithmetic_result_type(ann_type, val_type) == 0:
-                        self.emit_error("type mismatch in binding", node)
+            self.check_binding_annotation(node, value, ann_type, val_type)
 
         // Move semantics. #D5/P1: a wildcard `let _ = x` does NOT bind or move `x`
         // (as in Rust) — `x` is untouched, so it must not be marked consumed. This
@@ -14237,7 +14289,7 @@ impl Sema:
 
         if kind == NodeKind.NK_PAT_IDENT:
             let sym = self.ast.get_data0(node)
-            self.scope_put(sym, subject_type, 0)
+            self.scope_put(sym, subject_type, self.pattern_bind_mut)
             return
 
         if kind == NodeKind.NK_PAT_INT or kind == NodeKind.NK_PAT_BOOL or kind == NodeKind.NK_PAT_STRING:
@@ -14271,9 +14323,9 @@ impl Sema:
             var concrete_type = 0
             concrete_type = self.lookup_named_type_visible(type_sym)
             if concrete_type != 0:
-                self.scope_put(bind_sym, concrete_type, 0)
+                self.scope_put(bind_sym, concrete_type, self.pattern_bind_mut)
             else:
-                self.scope_put(bind_sym, subject_type, 0)
+                self.scope_put(bind_sym, subject_type, self.pattern_bind_mut)
             return
 
         if kind == NodeKind.NK_PAT_VARIANT or kind == NodeKind.NK_PAT_ENUM_SHORTHAND:
@@ -14426,7 +14478,7 @@ impl Sema:
         if kind == NodeKind.NK_PAT_AT_BINDING:
             let at_name = self.ast.get_data0(node)
             let inner = self.ast.get_data1(node)
-            self.scope_put(at_name, subject_type, 0)
+            self.scope_put(at_name, subject_type, self.pattern_bind_mut)
             self.check_pattern(inner, subject_type)
             return
 
@@ -14475,14 +14527,14 @@ impl Sema:
             for hi in 0..head_count:
                 let h_sym = self.ast.get_extra(s_extra + 1 + hi)
                 if h_sym != 0:
-                    self.scope_put(h_sym, elem_type, 0)
+                    self.scope_put(h_sym, elem_type, self.pattern_bind_mut)
             if has_rest != 0 and rest_sym != 0:
-                self.scope_put(rest_sym, self.ty_i64, 0)
+                self.scope_put(rest_sym, self.ty_i64, self.pattern_bind_mut)
             let tail_count = self.ast.get_extra(s_extra + 1 + head_count)
             for ti in 0..tail_count:
                 let t_sym = self.ast.get_extra(s_extra + 2 + head_count + ti)
                 if t_sym != 0:
-                    self.scope_put(t_sym, elem_type, 0)
+                    self.scope_put(t_sym, elem_type, self.pattern_bind_mut)
             return
 
         if kind == NodeKind.NK_PAT_STRUCT:
@@ -14534,7 +14586,7 @@ impl Sema:
                 if f_pat != 0:
                     self.check_pattern(f_pat, binding_ty)
                 else:
-                    self.scope_put(f_name, binding_ty, 0)
+                    self.scope_put(f_name, binding_ty, self.pattern_bind_mut)
             return
 
     mut fn check_enum_variant(node: i32) -> i32:
@@ -15370,21 +15422,33 @@ impl Sema:
         source_ty as i32
 
     mut fn check_let_else(node: i32) -> i32:
-        let pattern = self.ast.get_data0(node)
+        let pattern = self.ast.let_pattern(node)
         let value = self.ast.get_data1(node)
         let else_body = self.ast.get_data2(node)
+        // §30.4 `let PATTERN: TYPE = EXPR`: the annotation demands the whole
+        // subject's type and drives its inference, exactly as on a named let.
         // #1349: the subject is a value, never a statement — checked in the
         // enclosing statement's context, an `if` subject in a void function
         // took check_if_expr's statement arm and typed as void, so a tuple
         // pattern saw no tuple. A plain `let` (check_let_binding) already
         // checks its value this way.
-        let val_type = self.check_expr_value_context(value)
+        let ann_node = self.ast.let_pattern_type_ann(node)
+        let ann_type = if ann_node != 0: self.resolve_type_expr(ann_node) else: 0 as TypeId
+        var val_type = if ann_type != 0: self.check_expr_with_owned_demand(value, ann_type) else: self.check_expr_value_context(value)
+        if ann_type != 0:
+            self.reject_owned_demand_from_view_projection(value, ann_type as i32, "typed let binding")
+            self.check_binding_annotation(node, value, ann_type, val_type)
+            val_type = ann_type
         if val_type != 0 and val_type != self.ty_void:
             self.typed_expr_types.insert(value, val_type as i32)
         if else_body == 0 and self.pattern_is_refutable(pattern) != 0:
             self.emit_error("let ... else requires an else branch for refutable patterns", node)
         self.pattern_subject_node = value
+        // §9.7: `var PATTERN = ...` binds every name it introduces mutably (#1354).
+        let saved_bind_mut = self.pattern_bind_mut
+        self.pattern_bind_mut = self.ast.let_pattern_is_mut(node)
         self.check_pattern(pattern, val_type as i32)
+        self.pattern_bind_mut = saved_bind_mut
         self.pattern_subject_node = 0
         self.record_pattern_view_bindings(pattern, value)
         // #782 arm 2: a pattern let over an owned subject EXTRACTS by value —

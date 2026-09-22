@@ -524,10 +524,16 @@ fn render_expr(pool: AstPool, intern: InternPool, node: NodeId, indent: i32) -> 
         return out.to_str()
 
     if kind == NodeKind.NK_LET_ELSE:
-        let pattern = pool.get_data0(node)
         let value = pool.get_data1(node)
         let else_body = pool.get_data2(node)
-        return prefix ++ "let " ++ render_pattern(pool, intern, (pattern) as NodeId) ++ " = " ++ render_expr(pool, intern, (value) as NodeId, 0) ++ " else: " ++ render_expr(pool, intern, (else_body) as NodeId, 0)
+        var out = prefix ++ (if pool.let_pattern_is_mut(node) != 0: "var " else: "let ") ++ render_pattern(pool, intern, pool.let_pattern(node))
+        let type_ann = pool.let_pattern_type_ann(node)
+        if type_ann != 0:
+            out = out ++ ": " ++ render_type_expr(pool, intern, type_ann)
+        out = out ++ " = " ++ render_expr(pool, intern, value, 0)
+        if else_body != 0:
+            out = out ++ " else: " ++ render_expr(pool, intern, else_body, 0)
+        return out
 
     if kind == NodeKind.NK_TUPLE_DESTRUCTURE:
         let extra_start = pool.get_data0(node)

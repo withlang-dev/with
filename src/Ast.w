@@ -160,6 +160,9 @@ pub enum NodeKind: i32:
     NK_FACADE_CONVENTION = 136
     NK_FACADE_CLAUSE = 137
     NK_FACADE_PARAM_REF = 138
+    // The head of a pattern let (§9.7, §30.4): the pattern, whether the
+    // statement is `var`, and the optional `: TYPE` of the whole subject.
+    NK_LET_PATTERN = 139
     // Type expressions
     NK_TYPE_NAMED = 80
     NK_TYPE_GENERIC = 81
@@ -1801,6 +1804,11 @@ fn ast_is_pattern_kind(kind: i32) -> bool:
     kind == NodeKind.NK_PAT_REGEX
 
 impl AstPool:
+    // NK_LET_ELSE's head (#1354): every pattern let carries one.
+    fn let_pattern(let_node: i32): self.get_data0(self.get_data0(let_node))
+    fn let_pattern_is_mut(let_node: i32): self.get_data1(self.get_data0(let_node)) % 2
+    fn let_pattern_type_ann(let_node: i32): self.get_data2(self.get_data0(let_node))
+
     fn is_pattern_node(node: i32) -> bool:
         if node <= 0 or node >= self.node_count():
             return false
@@ -1900,7 +1908,9 @@ impl AstPool:
 // NodeKind.NK_RETURN:        d0=value(node,0=none), d1=0, d2=0
 // NodeKind.NK_LET_BINDING:   d0=name(sym), d1=value(node), d2=flags (bit0=mut)
 //                   If has type: extra=[type_node]
-// NodeKind.NK_LET_ELSE:      d0=pattern(node), d1=value(node), d2=else_body(node)
+// NodeKind.NK_LET_ELSE:      d0=head(NK_LET_PATTERN node), d1=value(node), d2=else_body(node,0=none)
+//                   Read the head through let_pattern/let_pattern_is_mut/let_pattern_type_ann.
+// NodeKind.NK_LET_PATTERN:   d0=pattern(node), d1=flags (bit0=mut: `var`), d2=type_ann(node,0=none)
 // NodeKind.NK_TUPLE_DESTRUCTURE: d0=extra_start, d1=name_count, d2=value(node)
 // NodeKind.NK_ASSIGN:        d0=target(node), d1=value(node), d2=0
 // NodeKind.NK_WHILE:         d0=cond(node), d1=body(node), d2=label(sym,0=none)

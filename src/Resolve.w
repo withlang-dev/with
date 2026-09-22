@@ -706,7 +706,8 @@ impl ResolveState:
         if kind == NodeKind.NK_LET_ELSE:
             // let-else: walk value, bind pattern into current scope (visible after).
             self.walk_expr(pool, module_id, parent_def, current_scope, pool.get_data1(node))
-            self.bind_pattern(pool, module_id, parent_def, current_scope, pool.get_data0(node))
+            self.bind_pattern(pool, module_id, parent_def, current_scope, pool.let_pattern(node))
+            self.walk_type_expr(pool, module_id, current_scope, pool.let_pattern_type_ann(node))
             self.walk_expr(pool, module_id, parent_def, current_scope, pool.get_data2(node))
             return
 

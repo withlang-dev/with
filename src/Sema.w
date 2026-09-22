@@ -824,6 +824,7 @@ pub type Sema {
     needs_drop_visit: HashSet[i32],
     current_drop_type_sym: i32,
     pattern_subject_node: i32,         // subject expr of the pattern being checked (#1272 fix-its); 0 when none
+    pattern_bind_mut: i32,             // 1 while checking a `var PATTERN` head: its bindings are mutable (#1354)
     drop_control_flow_depth: i32,
     move_control_flow_depth: i32,
     move_control_flow_binding_starts: Vec[i32],
@@ -2223,6 +2224,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         needs_drop_visit: HashSet.new(),
         current_drop_type_sym: 0,
         pattern_subject_node: 0,
+        pattern_bind_mut: 0,
         drop_control_flow_depth: 0,
         move_control_flow_depth: 0,
         move_control_flow_binding_starts: Vec.new(),

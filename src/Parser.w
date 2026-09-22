@@ -7158,19 +7158,32 @@ impl Parser:
 
     // ── Let binding expression ───────────────────────────────────────
 
-    // `= value [else: body]` after a destructuring let pattern.
-    mut fn parse_let_pattern_rest(start: i32, pat: NodeId) -> NodeId:
+    // `[: TYPE]` after a let pattern (§30.4 LET_STMT): the whole subject's type.
+    mut fn parse_let_pattern_type_ann() -> NodeId:
+        if self.peek() != TokenKind.TK_COLON: return 0
+        self.advance()
+        self.parse_type_expr()
+
+    // A pattern let keeps `var` and the annotation on its head (#1354): the
+    // bindings a `var` pattern introduces are mutable (§9.7).
+    mut fn let_pattern_node(start: i32, pat: NodeId, value: NodeId, else_body: NodeId, is_mut: bool, type_ann: NodeId) -> NodeId:
+        let head = self.pool.add_node(NodeKind.NK_LET_PATTERN, start, self.prev_end(), pat, if is_mut: 1 else: 0, type_ann)
+        self.pool.add_node(NodeKind.NK_LET_ELSE, start, self.prev_end(), head, value, else_body)
+
+    // `[: TYPE] = value [else: body]` after a destructuring let pattern.
+    mut fn parse_let_pattern_rest(start: i32, pat: NodeId, is_mut: bool) -> NodeId:
+        let type_ann = self.parse_let_pattern_type_ann()
         if self.expect(TokenKind.TK_EQ) == 0:
             return self.poisoned_expr()
         self.skip_newlines()
         let value = self.parse_expr()
-        var else_body: NodeId = 0 as NodeId
+        var else_body: NodeId = 0
         if self.peek() == TokenKind.TK_KW_ELSE:
             self.advance()
             if self.peek() == TokenKind.TK_COLON: self.advance()
             self.skip_newlines()
             else_body = self.parse_block_or_expr()
-        self.pool.add_node(NodeKind.NK_LET_ELSE, start, self.prev_end(), pat, value, else_body)
+        self.let_pattern_node(start, pat, value, else_body, is_mut, type_ann)
 
     mut fn parse_let_binding() -> NodeId:
         let start = self.current_start()
@@ -7186,7 +7199,7 @@ impl Parser:
         // bindings share the same Sema/MIR path as patterns elsewhere (§9.7).
         if self.peek() == TokenKind.TK_L_PAREN or self.peek() == TokenKind.TK_L_BRACE or self.peek() == TokenKind.TK_L_BRACKET:
             let pat = self.parse_pattern()
-            return self.parse_let_pattern_rest(start, pat)
+            return self.parse_let_pattern_rest(start, pat, is_mut)
 
         // Let-else: with variant shorthand: let .Some(v) = expr else: body
         if self.peek() == TokenKind.TK_DOT_IDENT:
@@ -7207,6 +7220,7 @@ impl Parser:
                         self.skip_newlines()
                 self.skip_newlines()
                 self.expect(TokenKind.TK_R_PAREN)
+                let type_ann = self.parse_let_pattern_type_ann()
                 if self.expect(TokenKind.TK_EQ) == 0:
                     return self.poisoned_expr()
                 self.skip_newlines()
@@ -7220,7 +7234,7 @@ impl Parser:
                 for pi in 0..binding_count:
                     self.pool.add_extra(payload_patterns[pi])
                 let pat = self.pool.add_node(NodeKind.NK_PAT_ENUM_SHORTHAND, dot_start, self.prev_end(), dot_sym, extra_start, binding_count)
-                return self.pool.add_node(NodeKind.NK_LET_ELSE, start, self.prev_end(), pat, value, else_body)
+                return self.let_pattern_node(start, pat, value, else_body, is_mut, type_ann)
             if self.peek() == TokenKind.TK_EQ:
                 self.advance()
                 self.skip_newlines()
@@ -7231,7 +7245,7 @@ impl Parser:
                     self.skip_newlines()
                     let else_body = self.parse_block_or_expr()
                     let pat = self.pool.add_node(NodeKind.NK_PAT_ENUM_SHORTHAND, dot_start, self.prev_end(), dot_sym, 0, 0)
-                    return self.pool.add_node(NodeKind.NK_LET_ELSE, start, self.prev_end(), pat, value, else_body)
+                    return self.let_pattern_node(start, pat, value, else_body, is_mut, 0)
 
         let name_sym = self.expect_ident()
         if name_sym == 0:
@@ -7244,7 +7258,7 @@ impl Parser:
         // and MirLower see one pattern form.
         if is_upper and self.peek() == TokenKind.TK_L_BRACE:
             let pat = self.parse_struct_pattern(name_sym, start)
-            return self.parse_let_pattern_rest(start, pat)
+            return self.parse_let_pattern_rest(start, pat, is_mut)
 
         // Let-else: variant: let Some(x) = expr else: body
         if is_upper and self.peek() == TokenKind.TK_L_PAREN:
@@ -7259,6 +7273,7 @@ impl Parser:
                     self.skip_newlines()
             self.skip_newlines()
             self.expect(TokenKind.TK_R_PAREN)
+            let type_ann = self.parse_let_pattern_type_ann()
             if self.expect(TokenKind.TK_EQ) == 0:
                 return self.poisoned_expr()
             self.skip_newlines()
@@ -7272,7 +7287,7 @@ impl Parser:
             for pi in 0..binding_count:
                 self.pool.add_extra(payload_patterns[pi])
             let pat = self.pool.add_node(NodeKind.NK_PAT_VARIANT, start, self.prev_end(), name_sym, extra_start, binding_count)
-            return self.pool.add_node(NodeKind.NK_LET_ELSE, start, self.prev_end(), pat, value, else_body)
+            return self.let_pattern_node(start, pat, value, else_body, is_mut, type_ann)
 
         if is_upper and self.peek() == TokenKind.TK_EQ:
             self.advance()
@@ -7284,7 +7299,7 @@ impl Parser:
                 self.skip_newlines()
                 let else_body = self.parse_block_or_expr()
                 let pat = self.pool.add_node(NodeKind.NK_PAT_VARIANT, start, self.prev_end(), name_sym, 0, 0)
-                return self.pool.add_node(NodeKind.NK_LET_ELSE, start, self.prev_end(), pat, value, else_body)
+                return self.let_pattern_node(start, pat, value, else_body, is_mut, 0)
             // Normal let binding
             var flags = 0
             if is_mut:
