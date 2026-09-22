@@ -13,6 +13,7 @@ use build.release_uat
 use build.package
 use build.sdk
 use build.wo
+use build.examples
 use std.sysinfo
 fn build_owned_text(s: &str): s ++ ""
 
@@ -2791,6 +2792,18 @@ pub fn build(ctx: BuildCtx) -> Build:
     build_helper_programs = build_helper_programs.dep("build")
     out = out.add_target(build_helper_programs)
 
+    // The examples lane (#1150, D55 ruling 4): every example is built with
+    // the release compiler and run, and every package test runs, so a
+    // rotted example turns the battery red. The example list lives in
+    // build/examples.w; untracked user work under examples/ is not on it.
+    var examples_tests = target_new(.Action, "examples-tests", "").output("out/test-graph/examples-tests")
+    examples_tests = examples_tests.allow_parallel()
+    examples_tests.action = run_examples_tests_action
+    examples_tests = examples_tests.input(release_compiler_bin("with"))
+    examples_tests = examples_tests.input("examples")
+    examples_tests = examples_tests.dep("build")
+    out = out.add_target(examples_tests)
+
     // The battery is driven by the PUBLISHED seed pinned in seed.lock, as CI
     // is (build/retention.w): the driver's digest must be the lock's, and
     // every workflow pin must equal the lock. First in :test, so a wrong
@@ -2939,6 +2952,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     tests = corpora_test_deps(move tests)
     tests = tests.dep("cli-selfhost-build-w-tests")
     tests = tests.dep("build-helper-programs")
+    tests = tests.dep("examples-tests")
     tests = tests.dep("cli-selfhost-project-tests")
     tests = tests.dep("cli-selfhost-lsp-tests")
     tests = tests.dep("cli-selfhost-edge-tests")
