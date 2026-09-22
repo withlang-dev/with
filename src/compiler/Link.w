@@ -597,7 +597,26 @@ fn link_stage_windows_libpath(var_name: &str, fallback: &str) -> str:
 // dropped on the Windows link, not turned into a nonexistent `m.lib`.
 fn link_stage_windows_lib_is_crt_implicit(name: &str): name == "m" or name == "c"
 
-fn link_stage_windows_crt_static(): with_getenv_str("WITH_WINDOWS_CRT_STATIC") == "1"
+// The one CRT decision for a Windows link, read by every path that links a
+// program on the target (build.w's stage links and `with build file.w`
+// alike; #1267). The LLVM/Clang SDK archives are built MultiThreaded
+// (static UCRT): a link that carries the LLVM static bridge response file
+// (`@…/llvm_ld.rsp`, the compiler being built as a program) is a static-CRT
+// link, or lld-link resolves `_invalid_parameter_noinfo`/`_wctype` from both
+// libucrt.lib and ucrt.lib. An ordinary program keeps the DLL runtime that
+// every prebuilt Windows library expects (below). WITH_WINDOWS_CRT_STATIC=1
+// still forces the static runtime for a self-contained binary that links
+// no such library.
+fn link_stage_windows_crt_static(extras: &Vec[str]) -> bool:
+    if with_getenv_str("WITH_WINDOWS_CRT_STATIC") == "1":
+        return true
+    for i in 0..extras.len() as i32:
+        if link_stage_is_llvm_bridge_rsp(extras[i]):
+            return true
+    false
+
+fn link_stage_is_llvm_bridge_rsp(extra: &str) -> bool:
+    extra.starts_with("@") and extra.ends_with("/llvm_ld.rsp")
 
 fn link_stage_make_windows_llvm_link_command(llvm_ld: &str, obj_path: &str, bin_path: &str, extras: &Vec[str], link_libs: &Vec[str], link_args: &Vec[str]) -> LinkStageCommand:
     let args: Vec[str] = Vec.new()
@@ -661,10 +680,9 @@ fn link_stage_make_windows_llvm_link_command(llvm_ld: &str, obj_path: &str, bin_
     // `__imp_fopen` references cannot resolve against the static libcmt
     // (release-raylib-spiral-uat, and every `with get c.*` package, on
     // Windows). The static runtime remains for a self-contained binary that
-    // links no such library, the cross-built compiler above all:
-    // WITH_WINDOWS_CRT_STATIC=1 selects libcmt, as build/compiler.w does for
-    // the native compiler's own link.
-    if link_stage_windows_crt_static():
+    // links no such library, the compiler above all: see
+    // link_stage_windows_crt_static, the one place that decides.
+    if link_stage_windows_crt_static(extras):
         args.push("libcpmt.lib")
         args.push("libcmt.lib")
     else:
