@@ -690,7 +690,7 @@ impl Sema:
 // return is left as a raw pointer and NOT wrapped in `Option`. This fact only
 // says the *call* is safe; the returned pointer is borrowed (non-owning) and
 // dereferencing it stays `unsafe`. Owning constructors (fopen, strdup) are NOT
-// here — they belong to #357's owning-wrapper mechanism.
+// here — they are resources of the toolchain libc facade (compiler/LibcFacade.w).
 fn ci_overlay_return_is_borrowed_ptr(name: &str) -> i32:
     if name == "getenv": return 1
     if name == "strchr": return 1

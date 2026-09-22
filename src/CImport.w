@@ -47,78 +47,6 @@ fn ci_clear_no_methods():
     g_cimport_no_methods_all = 0
     g_cimport_no_methods_types = Vec.new()
 
-// #357 increment 4: per-import ownership annotations — the explicit-annotation
-// evidence source beside the curated tables (§16.3c). Set before translation,
-// cleared after, like no_methods.
-//   owns entry:    "ctor -> dtor"        (fn's returned pointer is owned;
-//                                         dtor releases it exactly once)
-//   borrows entry: "fn(pi) -> ctor"      (param pi borrows ctor's owned handle)
-var g_cimport_owns_ann: Vec[str] = Vec.new()
-var g_cimport_borrows_ann: Vec[str] = Vec.new()
-
-fn ci_set_owned_annotations(owns: Vec[str], borrows: Vec[str]):
-    g_cimport_owns_ann = owns
-    g_cimport_borrows_ann = borrows
-
-fn ci_clear_owned_annotations():
-    g_cimport_owns_ann = Vec.new()
-    g_cimport_borrows_ann = Vec.new()
-
-fn ci_ann_trim(s: &str) -> str:
-    var b = 0 as i64
-    var e = s.len()
-    while b < e and (s[b] == 32 or s[b] == 9):
-        b = b + 1
-    while e > b and (s[e - 1] == 32 or s[e - 1] == 9):
-        e = e - 1
-    s.slice(b, e)
-
-// "lhs -> rhs" → lhs into out[0], rhs into out[1]; empty vec if malformed.
-fn ci_ann_split_arrow(entry: &str) -> Vec[str]:
-    let out: Vec[str] = Vec.new()
-    var i = 0 as i64
-    while i + 1 < entry.len():
-        if entry[i] == 45 and entry[i + 1] == 62:
-            out.push(ci_ann_trim(entry.slice(0, i)))
-            out.push(ci_ann_trim(entry.slice(i + 2, entry.len())))
-            return out
-        i = i + 1
-    out
-
-// Annotated destructor for an owning constructor, or "".
-fn ci_ann_owned_return_destructor(name: &str) -> str:
-    for i in 0..g_cimport_owns_ann.len() as i32:
-        let parts = ci_ann_split_arrow(g_cimport_owns_ann[i])
-        if parts.len() == 2 and parts.get(0) == name:
-            return with_str_clone_ref(parts.get(1))
-    ""
-
-// Annotated borrow-param constructor for (name, pi), or "".
-fn ci_ann_borrow_param_ctor(name: &str, pi: i32) -> str:
-    for i in 0..g_cimport_borrows_ann.len() as i32:
-        let parts = ci_ann_split_arrow(g_cimport_borrows_ann[i])
-        if parts.len() != 2:
-            continue
-        let lhs = parts.get(0)
-        // lhs is "fn(pi)": find '(' and compare name + index.
-        var pp = 0 as i64
-        while pp < lhs.len() and lhs[pp] != 40:
-            pp = pp + 1
-        if pp >= lhs.len():
-            continue
-        if ci_ann_trim(lhs.slice(0, pp)) != name:
-            continue
-        var qq = pp + 1
-        var idx = 0
-        var saw_digit = 0
-        while qq < lhs.len() and lhs[qq] >= 48 and lhs[qq] <= 57:
-            idx = idx * 10 + ((lhs[qq] - 48) as i32)
-            saw_digit = 1
-            qq = qq + 1
-        if saw_digit != 0 and idx == pi:
-            return with_str_clone_ref(parts.get(1))
-    ""
-
 // True when auto-method/constructor generation is suppressed for `name`.
 fn ci_no_methods_for_type(name: &str) -> bool:
     if g_cimport_no_methods_all != 0:
@@ -1424,48 +1352,6 @@ fn ci_local_storage_name(escaped: &str, cursor: i32) -> str:
 // Config is keyed by (function, buffer index). Keep ordered for deterministic
 // codegen. Two buffers may share one length parameter (e.g. memcmp); the
 // wrapper then requires equal lengths and panics on mismatch.
-// #357: curated ownership evidence. An owning constructor returns a heap pointer
-// the caller must release with the paired destructor; it is generated as an
-// owning-wrapper type whose Drop calls that destructor exactly once
-// (ci_emit_owning_wrapper). Returns the destructor's C symbol, or "" when not
-// curated. Deterministic curated convention (shared schema with the #379 cstr/
-// buf overlays); name heuristics never insert cleanup on their own.
-fn ci_owned_return_destructor(name: &str) -> str:
-    // Explicit annotation (owns:) outranks the curated convention (§16.3c).
-    let ann = ci_ann_owned_return_destructor(name)
-    if ann.len() > 0:
-        return ann
-    if name == "strdup": return "free"
-    if name == "strndup": return "free"
-    // #357: stdio/dirent owning constructors — each returns an owned opaque handle
-    // (FILE*/DIR*) released by a paired destructor that takes exactly that pointer.
-    if name == "fopen": return "fclose"
-    if name == "fdopen": return "fclose"
-    if name == "tmpfile": return "fclose"
-    if name == "opendir": return "closedir"
-    ""
-
-// #357 increment 2: curated borrow-params — this C function BORROWS the owned
-// resource created by the named constructor at parameter `pi` (it reads or
-// advances the resource but does not release or retain it). The generated
-// wrapper accepts `&COwned_<ctor>` and forwards `.handle()`, so user code
-// never touches the raw handle. "" = not a borrow-param.
-fn ci_owned_borrow_param_ctor(name: &str, pi: i32) -> str:
-    // Explicit annotation (borrows:) outranks the curated convention (§16.3c).
-    let ann = ci_ann_borrow_param_ctor(name, pi)
-    if ann.len() > 0:
-        return ann
-    if name == "readdir" and pi == 0: return "opendir"
-    if name == "rewinddir" and pi == 0: return "opendir"
-    ""
-
-fn ci_has_owned_borrow_param(session: i64, idx: i32, name: &str) -> i32:
-    let n = with_cimport_fn_param_count(session, idx)
-    for pi in 0..n:
-        if ci_owned_borrow_param_ctor(name, pi).len() > 0:
-            return 1
-    0
-
 fn ci_buf_count(name: &str) -> i32:
     if name == "memchr": return 1
     if name == "memcmp": return 2
@@ -1599,101 +1485,6 @@ fn ci_emit_buf_wrapper(session: i64, idx: i32, name: &str) -> str:
     let body = checks ++ ptr_lets ++ "    " ++ ret_prefix ++ "unsafe { " ++ raw_name ++ "(" ++ call_args ++ ") }\n"
     raw_decl ++ "fn " ++ safe_name ++ "(" ++ wrapper_params ++ ") -> " ++ ret_render ++ ":\n" ++ body
 
-// #357: emit a proven-ownership owning wrapper for a curated owning constructor.
-// The returned heap pointer is wrapped in a type whose Drop calls the evidenced
-// C destructor exactly once; the safe constructor (+1) returns the wrapper and a
-// borrowing `.handle()` accessor exposes the raw pointer for further C calls.
-// Self-contained: both the constructor and destructor are bound here via
-// @[link_name] so nothing else need be imported.
-fn ci_emit_owning_wrapper(session: i64, idx: i32, name: &str) -> str:
-    let dtor = ci_owned_return_destructor(name)
-    if dtor.len() == 0:
-        return ""
-    if with_cimport_fn_is_variadic(session, idx) != 0:
-        return ""
-    let safe_name = ci_escape_reserved(name)
-    let param_count = with_cimport_fn_param_count(session, idx)
-    let ret = ci_pointer_type_explicit_mut(with_cimport_fn_return_type_translated(session, idx))
-    // The owned handle must be a raw pointer; anything else is not an owning return.
-    if ci_starts_with(ret, "__UNSUPPORTED:") or not ci_cimport_type_is_raw_abi(ret):
-        return ""
-    var raw_params = ""
-    var ctor_params = ""
-    var call_args = ""
-    for pi in 0..param_count:
-        let pname = with_cimport_fn_param_name(session, idx, pi)
-        let ptype = ci_pointer_type_explicit_mut(with_cimport_fn_param_type_translated(session, idx, pi))
-        if ci_starts_with(ptype, "__UNSUPPORTED:"):
-            return ""
-        let actual = ci_param_signature_name(ci_escape_reserved(pname), pi)
-        if pi > 0:
-            raw_params = raw_params ++ ", "
-            ctor_params = ctor_params ++ ", "
-            call_args = call_args ++ ", "
-        raw_params = raw_params ++ actual ++ ": " ++ ptype
-        ctor_params = ctor_params ++ actual ++ ": " ++ ptype
-        call_args = call_args ++ actual
-    let wrapper_ty = "COwned_" ++ safe_name
-    let raw_name = "__wc_owned_" ++ safe_name
-    let dtor_raw = "__wc_dtor_" ++ safe_name
-    var out = "@[link_name(\"" ++ name ++ "\")]\nextern fn " ++ raw_name ++ "(" ++ raw_params ++ ") -> " ++ ret ++ "\n"
-    out = out ++ "@[link_name(\"" ++ dtor ++ "\")]\nextern fn " ++ dtor_raw ++ "(p: " ++ ret ++ ")\n"
-    out = out ++ "type " ++ wrapper_ty ++ " { handle: " ++ ret ++ " }\n"
-    out = out ++ "impl Drop for " ++ wrapper_ty ++ ":\n    fn drop(move self: Self):\n        unsafe:\n            " ++ dtor_raw ++ "(self.handle)\n"
-    out = out ++ "unsafe fn " ++ safe_name ++ "(" ++ ctor_params ++ ") -> " ++ wrapper_ty ++ ":\n    " ++ wrapper_ty ++ " { handle: " ++ raw_name ++ "(" ++ call_args ++ ") }\n"
-    out = out ++ "impl " ++ wrapper_ty ++ ":\n    fn handle(self: &Self) -> " ++ ret ++ ":\n        self.handle\n"
-    out
-
-// #357 increment 2: a function with curated borrow-params is emitted as a safe
-// wrapper taking `&COwned_<ctor>` where the C signature takes the raw owned
-// handle. Requires the constructor's owning wrapper to have been emitted in
-// this import (else fall back to the raw surface — honest, same as before).
-// Non-borrow params pass through with their translated types; the wrapper is
-// safe iff none of them require the raw ABI (holding/returning a raw pointer
-// is safe — deref stays unsafe, matching the `.handle()` accessor convention).
-fn ci_emit_borrowing_wrapper(session: i64, idx: i32, name: &str) -> str:
-    if with_cimport_fn_is_variadic(session, idx) != 0:
-        return ""
-    let safe_name = ci_escape_reserved(name)
-    let param_count = with_cimport_fn_param_count(session, idx)
-    let ret = ci_pointer_type_explicit_mut(with_cimport_fn_return_type_translated(session, idx))
-    if ci_starts_with(ret, "__UNSUPPORTED:"):
-        return ""
-    var raw_params = ""
-    var wrap_params = ""
-    var call_args = ""
-    for pi in 0..param_count:
-        let pname = with_cimport_fn_param_name(session, idx, pi)
-        let ptype = ci_pointer_type_explicit_mut(with_cimport_fn_param_type_translated(session, idx, pi))
-        if ci_starts_with(ptype, "__UNSUPPORTED:"):
-            return ""
-        let actual = ci_param_signature_name(ci_escape_reserved(pname), pi)
-        if pi > 0:
-            raw_params = raw_params ++ ", "
-            wrap_params = wrap_params ++ ", "
-            call_args = call_args ++ ", "
-        raw_params = raw_params ++ actual ++ ": " ++ ptype
-        let bctor = ci_owned_borrow_param_ctor(name, pi)
-        if bctor.len() > 0:
-            // The ctor's COwned type must exist in this import.
-            if with_cimport_is_name_emitted(bctor) == 0:
-                return ""
-            wrap_params = wrap_params ++ actual ++ ": &COwned_" ++ ci_escape_reserved(bctor)
-            call_args = call_args ++ actual ++ ".handle()"
-        else:
-            wrap_params = wrap_params ++ actual ++ ": " ++ ptype
-            call_args = call_args ++ actual
-    let raw_name = "__wc_brw_" ++ safe_name
-    var out = "@[link_name(\"" ++ name ++ "\")]\nextern fn " ++ raw_name ++ "(" ++ raw_params ++ ")"
-    if ret != "Unit":
-        out = out ++ " -> " ++ ret
-    out = out ++ "\n"
-    out = out ++ "fn " ++ safe_name ++ "(" ++ wrap_params ++ ")"
-    if ret != "Unit":
-        out = out ++ " -> " ++ ret
-    out = out ++ ":\n    unsafe { " ++ raw_name ++ "(" ++ call_args ++ ") }\n"
-    out
-
 fn ci_translate_function(session: i64, idx: i32, known_structs: &str) -> str:
     // B9: fresh per-function temp counter.
     ci_temp_reset()
@@ -1766,22 +1557,6 @@ fn ci_translate_function(session: i64, idx: i32, known_structs: &str) -> str:
         if bw.len() > 0:
             with_cimport_mark_name_emitted(name)
             return bw
-
-    // #357 increment 2: a curated borrow-param function is emitted as a safe
-    // wrapper over the raw extern, taking &COwned_<ctor> for the owned handle.
-    if ci_has_owned_borrow_param(session, idx, name) != 0:
-        let brw = ci_emit_borrowing_wrapper(session, idx, name)
-        if brw.len() > 0:
-            with_cimport_mark_name_emitted(name)
-            return brw
-
-    // #357: a curated owning constructor becomes an owning-wrapper type whose
-    // Drop releases the C resource exactly once.
-    if ci_owned_return_destructor(name).len() > 0:
-        let ow = ci_emit_owning_wrapper(session, idx, name)
-        if ow.len() > 0:
-            with_cimport_mark_name_emitted(name)
-            return ow
 
     let param_count = with_cimport_fn_param_count(session, idx)
     let is_variadic = with_cimport_fn_is_variadic(session, idx)

@@ -18,6 +18,7 @@ use compiler.EmbeddedRuntime
 use compiler.EmbeddedClangResource
 use compiler.ModuleSource
 use compiler.FacadeRender
+use compiler.LibcFacade
 use TargetSpec
 
 extern fn with_str_clone_ref(s: &str) -> str
@@ -439,17 +440,7 @@ impl Zcu:
                     for nmi in 0..c_import_no_methods_count(nm_packed):
                         nm_types.push(frontend_owned_text(self.pool.resolve(out.get_extra(nm_base + nmi))))
                     ci_set_no_methods(c_import_no_methods_all(nm_packed), move nm_types)
-                    // #357: register this import's ownership annotations for the
-                    // duration of translation (annotation evidence, §16.3c).
-                    let ann_owns = frontend_new_vec_str()
-                    for aoi in 0..self.c_import_owns_count_frontend(out, decl):
-                        ann_owns.push(frontend_owned_text(self.c_import_owns_entry_frontend(out, decl, aoi)))
-                    let ann_borrows = frontend_new_vec_str()
-                    for abi in 0..self.c_import_borrows_count_frontend(out, decl):
-                        ann_borrows.push(frontend_owned_text(self.c_import_borrows_entry_frontend(out, decl, abi)))
-                    ci_set_owned_annotations(move ann_owns, move ann_borrows)
                     let libclang_result = process_c_import_with_defines(libclang_header_spec, self.project_config.c_import_defines)
-                    ci_clear_owned_annotations()
                     ci_clear_no_methods()
                     if self.trace_c_import_cache != 0 and libclang_result.len() > 0:
                         runtime_eprint("c_import generated:")
@@ -539,6 +530,129 @@ impl Zcu:
         frontend_cimport_unlock()
         out
 
+    // The toolchain libc facade (compiler/LibcFacade.w; ruling §5, spec
+    // §16.3c): once every `<c_import …>` translation is in the pool, the part
+    // of it the imported declarations support is parsed as the synthetic
+    // file `<toolchain facade libc>` — its provenance — and owned by the
+    // module whose c_import declared the first function it describes, so it
+    // renders beside that module's own facades. Names the program's own
+    // facades state are left to them.
+    mut fn inject_toolchain_facades_frontend(pool: AstPool) -> AstPool:
+        var out = self.project_owned_annotations_frontend(pool)
+        var claimed = frontend_new_vec_str()
+        var owner = -1
+        for i in 0..out.decl_count():
+            let decl = out.get_decl(i)
+            let kind = out.kind(decl)
+            if kind == NodeKind.NK_C_FACADE:
+                claimed = self.collect_facade_claims_frontend(out, decl as i32, move claimed)
+                continue
+            if i >= self.decl_is_c_import.len() as i32 or self.decl_is_c_import[i] == 0:
+                continue
+            if (kind == NodeKind.NK_EXTERN_FN or kind == NodeKind.NK_FN_DECL) and owner < 0:
+                owner = i
+        if owner < 0:
+            return out
+        let text = libc_facade_select(out, self.pool, &self.decl_is_c_import, &claimed)
+        if text.len() == 0:
+            return out
+        self.splice_facade_text_frontend(out, &text, "<toolchain facade libc>", owner)
+
+    // A facade's text parsed as its own synthetic file, owned by the module
+    // of decl `owner`, like a `<c_import …>` translation.
+    mut fn splice_facade_text_frontend(pool: AstPool, text: &str, file_name: &str, owner: i32) -> AstPool:
+        var out = pool
+        let file_id = self.next_file_id
+        self.next_file_id = self.next_file_id + 1
+        self.add_source_text_mapping(file_id, file_name, text)
+        let before = out.decl_count()
+        var lexer = Lexer.init(text, file_id)
+        let tokens = lexer.tokenize()
+        var parser = Parser.init_with_pool(move tokens, text, file_id, self.pool, move self.diagnostics, out)
+        out = parser.parse_module()
+        self.pool = parser.intern
+        self.diagnostics = move parser.diags
+        self.append_decl_source_paths(out.decl_count() - before, self.decl_source_path_frontend(owner), file_id)
+        out
+
+    // `owns:`/`borrows:` are deprecated spellings of facade clauses (plan
+    // stage 4, docs/modeled-c-implementation-plan.md; the compatibility
+    // precedent is `retains:`, spec §16.3c). Each import's entries are
+    // projected into the facade they spell — `owns: ["ctor -> dtor"]` is
+    // `resource <Ctor> wraps <ctor's return>` / `from ctor` / `drop dtor`,
+    // `borrows: ["fn(i) -> ctor"]` is `fn fn` / `lend` — spliced as the
+    // synthetic file `<c_import annotations>` and rendered and verified like
+    // any facade, with a warning naming the clauses to write instead. A
+    // malformed entry, or one naming a declaration the import did not
+    // produce, is an error: it never silently does nothing.
+    mut fn project_owned_annotations_frontend(pool: AstPool) -> AstPool:
+        var out = pool
+        for i in 0..out.decl_count():
+            let decl = out.get_decl(i) as i32
+            if out.kind(decl as NodeId) != NodeKind.NK_C_IMPORT:
+                continue
+            let owns = self.c_import_owns_count_frontend(out, decl)
+            let borrows = self.c_import_borrows_count_frontend(out, decl)
+            if owns == 0 and borrows == 0:
+                continue
+            let span = Span { file: 0, start: out.get_start(decl as NodeId), end: out.get_end(decl as NodeId) }
+            var text = ""
+            for oi in 0..owns:
+                let entry = self.c_import_owns_entry_frontend(out, decl, oi)
+                let parts = entry.split("->")
+                let ctor = if parts.len() == 2: parts[0].trim().clone() else: ""
+                let dtor = if parts.len() == 2: parts[1].trim().clone() else: ""
+                let (found, ret, _) = facade_render_import_shape(out, self.pool, &self.decl_is_c_import, &ctor)
+                if ctor.len() == 0 or dtor.len() == 0:
+                    self.diagnostics.emit(Diagnostic.err(f"c_import: owns: \"{entry}\" is not 'ctor -> dtor'; owns: is a deprecated spelling of a facade resource (§16.2b.3)", span))
+                    continue
+                if not found:
+                    self.diagnostics.emit(Diagnostic.err(f"c_import: owns: \"{entry}\" names '{ctor}', which this c_import does not declare (§16.2b.13)", span))
+                    continue
+                let rname = facade_owns_resource_name(&ctor)
+                text = text ++ f"    resource {rname} wraps {ret}\n        from {ctor}\n        drop {dtor}\n"
+                var w = Diagnostic.warn(f"c_import: owns: \"{entry}\" is a deprecated spelling of a facade resource; `{ctor}` produces a `{rname}` whose Drop calls `{dtor}` (§16.2b.3)", span)
+                w.add_help(f"write it in a facade: `c facade NAME:` / `resource {rname} wraps {ret}` / `from {ctor}` / `drop {dtor}`")
+                self.diagnostics.emit(w)
+            for bi in 0..borrows:
+                let entry = self.c_import_borrows_entry_frontend(out, decl, bi)
+                let parts = entry.split("->")
+                let lhs = if parts.len() == 2: parts[0].trim().clone() else: ""
+                let open = lhs.split("(")
+                let fname = if open.len() == 2 and lhs.ends_with(")"): open[0].trim().clone() else: ""
+                if fname.len() == 0:
+                    self.diagnostics.emit(Diagnostic.err(f"c_import: borrows: \"{entry}\" is not 'fn(index) -> ctor'; borrows: is a deprecated spelling of a facade lend (§16.2b.5)", span))
+                    continue
+                let (found, _, _) = facade_render_import_shape(out, self.pool, &self.decl_is_c_import, &fname)
+                if not found:
+                    self.diagnostics.emit(Diagnostic.err(f"c_import: borrows: \"{entry}\" names '{fname}', which this c_import does not declare (§16.2b.13)", span))
+                    continue
+                text = text ++ f"    fn {fname}\n        lend\n"
+                var w = Diagnostic.warn(f"c_import: borrows: \"{entry}\" is a deprecated spelling of a facade lend; `{fname}` lends the resource, as the method `{fname}` of it (§16.2b.5)", span)
+                w.add_help(f"write it in a facade: `c facade NAME:` / `fn {fname}` / `lend`")
+                self.diagnostics.emit(w)
+            if text.len() > 0:
+                out = self.splice_facade_text_frontend(out, &("c facade c_import_annotations:\n" ++ text), "<c_import annotations>", i)
+        out
+
+    // The names a program's facade block states: its resources, its
+    // producers, and its fn items.
+    fn collect_facade_claims_frontend(pool: AstPool, facade: i32, claimed: Vec[str]) -> Vec[str]:
+        let extra_start = pool.get_data1(facade as NodeId)
+        for i in 0..pool.get_data2(facade as NodeId):
+            let item = pool.get_extra(extra_start + i)
+            let kind = pool.kind(item as NodeId)
+            if kind != NodeKind.NK_FACADE_RESOURCE and kind != NodeKind.NK_FACADE_FN:
+                continue
+            claimed.push(frontend_owned_text(self.pool.resolve(pool.get_data0(item as NodeId))))
+            if kind == NodeKind.NK_FACADE_RESOURCE:
+                let cstart = pool.get_data1(item as NodeId)
+                for ci in 0..pool.get_data2(item as NodeId):
+                    let clause = pool.get_extra(cstart + 1 + ci)
+                    if pool.get_data0(clause as NodeId) == FACADE_CLAUSE_FROM:
+                        claimed.push(frontend_owned_text(self.pool.resolve(pool.get_extra(pool.get_data1(clause as NodeId)))))
+        claimed
+
     // D51 §16.2b stage 4a: each `c facade` block's resources, rendered as
     // ordinary With (compiler/FacadeRender.w) once every source file and every
     // `<c_import …>` translation is in the pool, spliced in as the synthetic
@@ -571,11 +685,14 @@ impl Zcu:
         out
 
     fn c_import_cache_key_frontend(pool: AstPool, decl: i32, header_spec: &str) -> str:
-        // v17: uppercase-initial wrapper parameters get a `p_` prefix and a
+        // v18: the #357 COwned owning/borrowing wrappers are retired — libc's
+        // owned resources are the toolchain libc facade, rendered after
+        // translation, and `owns:`/`borrows:` no longer shape the text; v17:
+        // uppercase-initial wrapper parameters get a `p_` prefix and a
         // bare integer-suffix macro (`L`) is no longer an empty literal; v16
         // evaluated macro constants annotate by value range (#775); v15
         // suffixed >i64::MAX literals.
-        var key = header_spec ++ "\n#format:cimport-v17\n#links:"
+        var key = header_spec ++ "\n#format:cimport-v18\n#links:"
         let link_start = pool.get_data1(decl)
         let packed_counts = pool.get_data2(decl)
         let link_count = c_import_link_count(packed_counts)
@@ -599,14 +716,6 @@ impl Zcu:
         let only_count = self.c_import_only_count_frontend(pool, decl)
         for oi in 0..only_count:
             key = key ++ "|" ++ self.c_import_only_name_frontend(pool, decl, oi)
-        // #357: ownership annotations shape the generated wrappers — a cached
-        // translation must not survive an annotation edit.
-        key = key ++ "\n#owns:"
-        for koi in 0..self.c_import_owns_count_frontend(pool, decl):
-            key = key ++ "|" ++ self.c_import_owns_entry_frontend(pool, decl, koi)
-        key = key ++ "\n#borrows:"
-        for kbi in 0..self.c_import_borrows_count_frontend(pool, decl):
-            key = key ++ "|" ++ self.c_import_borrows_entry_frontend(pool, decl, kbi)
         key = key ++ "\n#defines:"
         for di in 0..self.project_config.c_import_defines.len() as i32:
             key = key ++ "|" ++ self.project_config.c_import_defines[di]
@@ -1740,6 +1849,7 @@ impl Zcu:
         let t_cimport = runtime_clock_nanos()
         self.trace_c_import_cache = self.read_trace_c_import_cache_frontend()
         pool = self.expand_c_imports_frontend(pool)
+        pool = self.inject_toolchain_facades_frontend(pool)
         pool = self.render_c_facades_frontend(pool)
         if do_profile:
             let cimport_ns = runtime_clock_nanos() - t_cimport

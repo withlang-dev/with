@@ -1,25 +1,51 @@
-//! skip-on: windows #799: opendir/readdir/closedir are POSIX <dirent.h>, absent from MSVCRT (link-undefined on Windows); the borrowed-owned-handle wrapper mechanism is already covered on Windows by behav_c_import_owning_wrapper_strdup
+//! skip-on: windows #799: opendir/readdir/rewinddir/closedir are POSIX <dirent.h>, absent from MSVCRT (link-undefined on Windows); the libc facade's destroy-once rendering is covered on Windows by behav_c_import_owning_wrapper_strdup
+//! expect-stdout: entries ok
+//! expect-stdout: rewound ok
+//! expect-stdout: closed 1
+//! expect-stdout: missing none
 //! expect-stdout: ok
 
-// [Phase8] #357 increment 2: readdir BORROWS the owned DIR — its curated
-// wrapper takes &COwned_opendir and forwards .handle() internally, so user
-// code iterates a directory without touching the raw handle. The DIR is
-// closed exactly once by COwned_opendir's Drop. The dirent pointer return is
-// borrowed and never dereferenced here (no layout dependency).
+// D51 §16.2b / ruling §5: libc's DIR is modeled by the toolchain libc facade
+// (compiler/LibcFacade.w): opendir produces a `CDir` whose Drop calls
+// closedir exactly once, and readdir/rewinddir lend it — rendered as the
+// methods `d.readdir()` / `d.rewinddir()`, so user code iterates a directory
+// without touching the raw handle and without `unsafe`. The dirent pointer
+// return is a raw pointer, never dereferenced here. The witness for
+// closedir is the directory's descriptor (`dirfd`), closed after the CDir
+// drops. A failed opendir is `None`: no Drop over NULL.
 
-use c_import("typedef struct __dirstream DIR;\nstruct dirent;\nDIR *opendir(const char *name);\nstruct dirent *readdir(DIR *dirp);\nint closedir(DIR *dirp);\nstatic inline const char *dot357(void){return \".\";}\n")
-use std.builtins.print_i32
+use c_import("typedef struct __dirstream DIR;
+struct dirent;
+DIR *opendir(const char *name);
+struct dirent *readdir(DIR *dirp);
+void rewinddir(DIR *dirp);
+int closedir(DIR *dirp);
+int dirfd(DIR *dirp);
+int dup(int fd);
+int close(int fd);
+")
+
+c facade dir_probe:
+    fn dirfd
+        lend
+
+fn count(d: &CDir) -> i32:
+    var n = 0
+    while d.readdir() != null:
+        n = n + 1
+    n
 
 fn main:
-    unsafe:
-        let d = opendir(dot357())
-        if d.handle() == null:
-            print("bad-open")
-            return
-        var n = 0
-        while readdir(&d) != null:
-            n = n + 1
-        if n >= 2:
-            print("ok")
-        else:
-            print_i32(n)
+    let d = CDir.opendir(".").unwrap()
+    let n = count(&d)
+    print(f"entries {if n >= 2: \"ok\" else: \"bad\"}")
+    d.rewinddir()
+    print(f"rewound {if count(&d) == n: \"ok\" else: \"bad\"}")
+    let fd = d.dirfd()
+    drop(d)
+    let probe = dup(fd)
+    print(f"closed {if probe < 0: 1 else: 0}")
+    match CDir.opendir("/nonexistent-with-357"):
+        Some(_) => print("missing bad")
+        None => print("missing none")
+    print("ok")

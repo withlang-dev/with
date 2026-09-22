@@ -752,3 +752,23 @@ impl Sema:
             if self.ci_type_requires_raw_contract(pty) != 0 and self.ci_type_is_const_c_string_input(pty) == 0 and not self.facade_covers_param(fn_sym, pi):
                 return true
         false
+
+// The resource a deprecated `owns: ["ctor -> dtor"]` c_import entry spells
+// (compiler/Frontend.w project_owned_annotations_frontend): the producer's
+// name in UpperCamelCase — `getcwd` → `Getcwd`, `my_buf_new` → `MyBufNew`.
+pub fn facade_owns_resource_name(ctor: &str) -> str:
+    var out = ""
+    var upper = true
+    for i in 0..ctor.len() as i32:
+        let c = ctor.slice(i, i + 1)
+        if c == "_":
+            upper = true
+            continue
+        let b = ctor[i]
+        if upper and b >= 'a' and b <= 'z':
+            let k = (b - 'a') as i32
+            out = out ++ "ABCDEFGHIJKLMNOPQRSTUVWXYZ".slice(k, k + 1)
+        else:
+            out = out ++ c
+        upper = false
+    out
