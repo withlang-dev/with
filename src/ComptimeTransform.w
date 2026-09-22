@@ -22,6 +22,11 @@ impl Sema:
         let end = ast.get_end(node)
         self.diags.emit(Diagnostic.err(msg, Span { file: self.local_file_id, start, end }))
 
+    mut fn ct_emit_error_help(ast: AstPool, node: i32, msg: &str, help: &str):
+        var diag = Diagnostic.err(msg, Span { file: self.local_file_id, start: ast.get_start(node), end: ast.get_end(node) })
+        diag.add_help(help)
+        self.diags.emit(move diag)
+
 fn astpool_clone_deep(src: AstPool) -> AstPool:
     var out = AstPool.new()
 
@@ -2013,7 +2018,8 @@ impl Sema:
             if ct_type_node_mentions_type_param(out, field_type_node, tp_start, tp_count) != 0:
                 continue
             if self.ct_type_can_supply_derive_trait(out, intern, field_tid, trait_sym, all_sym) == 0:
-                self.ct_emit_error(out, decl, "cannot derive " ++ trait_name ++ " for type '" ++ intern.resolve(type_name_sym) ++ "': field '" ++ intern.resolve(field_sym) ++ "' of type '" ++ self.type_name(field_tid) ++ "' does not implement " ++ trait_name)
+                let field_type_name = self.type_name(field_tid)
+                self.ct_emit_error_help(out, field_type_node, "cannot derive " ++ trait_name ++ " for type '" ++ intern.resolve(type_name_sym) ++ "': field '" ++ intern.resolve(field_sym) ++ "' of type '" ++ field_type_name ++ "' does not implement " ++ trait_name, "add `@[derive(" ++ trait_name ++ ")]` to the declaration of '" ++ field_type_name ++ "', or implement " ++ trait_name ++ " for it")
                 return 0
         1
 
@@ -3065,12 +3071,17 @@ impl Sema:
         let ordered_ci: Vec[i32] = Vec.new()
         let base_decl_count = out.decl_count()
         var generated_local_count = 0
+        // A derive diagnostic is rendered against the declaring file, not
+        // whichever file the pre-sema last checked (it pointed a module's
+        // derive error at a `use` line of the importer).
+        let saved_file_id = self.local_file_id
 
         for di in 0..base_decl_count:
             let decl = out.get_decl(di)
             let decl_path = self.ct_decl_source_path(di)
             let decl_file_id = self.ct_decl_source_file_id(di)
             let decl_ci = self.ct_decl_is_c_import(di)
+            self.local_file_id = decl_file_id
 
             ordered.push(decl as i32)
             ordered_paths.push(sema_owned_text(decl_path))
@@ -3213,6 +3224,7 @@ impl Sema:
                 ordered_ci.push(decl_ci)
             if ct_source_decl_is_local(source_ast, di) != 0:
                 generated_local_count = generated_local_count + generated_user_derives.len() as i32
+        self.local_file_id = saved_file_id
         while out.decl_count() > 0:
             out.state.decls.pop()
         for oi in 0..ordered.len() as i32:
