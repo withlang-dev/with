@@ -1033,8 +1033,8 @@ impl Codegen:
         let method_start = self.trait_method_starts[trait_idx]
         let method_count = self.trait_method_counts[trait_idx]
         let vtable_ty = self.trait_vtable_types[trait_idx]
-        let type_name = self.intern.resolve(impl_type_sym)
-        let trait_name = self.intern.resolve(trait_sym)
+        let type_name = self.intern.resolve(impl_type_sym).clone()
+        let trait_name = self.intern.resolve(trait_sym).clone()
 
         let entries: Vec[i64] = Vec.new()
         for mi in 0..method_count:
@@ -1046,7 +1046,7 @@ impl Codegen:
             let consumes_self =
                 if param_count > 0 and fn_param_is_move_self(self.pool.fn_param_flags(param_start, 0)) != 0: 1
                 else: 0
-            let method_name = self.intern.resolve(method_sym)
+            let method_name = self.intern.resolve(method_sym).clone()
             let concrete_sym = self.intern.intern(type_name ++ "." ++ method_name)
             let fv = self.fn_values.get(concrete_sym)
             let ft = self.fn_fn_types.get(concrete_sym)
@@ -1083,7 +1083,7 @@ impl Codegen:
         if not trait_idx_opt.is_some():
             return
         let trait_idx = trait_idx_opt.unwrap()
-        let trait_text = self.intern.resolve(trait_sym)
+        let trait_text = self.intern.resolve(trait_sym).clone()
         let method_start = self.trait_method_starts[trait_idx]
         let method_count = self.trait_method_counts[trait_idx]
         let vtable_ty = self.trait_vtable_types[trait_idx]
