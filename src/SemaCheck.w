@@ -10355,48 +10355,11 @@ impl Sema:
         self.mark_moved_if_consumed(subject)
 
     mut fn record_pattern_view_bindings(node: i32, subject_node: i32):
-        if node == 0 or subject_node == 0:
+        if subject_node == 0:
             return
-        let kind = self.ast.kind(node)
-        if kind == NodeKind.NK_PAT_IDENT:
-            let sym = self.ast.get_data0(node)
+        for sym in self.pattern_binding_syms(node):
             if self.type_is_ephemeral_value(self.scope_lookup(sym)) != 0:
                 self.record_view_binding_from_expr(sym, subject_node)
-            return
-        if kind == NodeKind.NK_PAT_TYPED_BIND:
-            let sym = self.ast.get_data0(node)
-            if self.type_is_ephemeral_value(self.scope_lookup(sym)) != 0:
-                self.record_view_binding_from_expr(sym, subject_node)
-            return
-        if kind == NodeKind.NK_PAT_AT_BINDING:
-            let sym = self.ast.get_data0(node)
-            if self.type_is_ephemeral_value(self.scope_lookup(sym)) != 0:
-                self.record_view_binding_from_expr(sym, subject_node)
-            self.record_pattern_view_bindings(self.ast.get_data1(node), subject_node)
-            return
-        if kind == NodeKind.NK_PAT_VARIANT or kind == NodeKind.NK_PAT_ENUM_SHORTHAND:
-            let start = self.ast.get_data1(node)
-            let count = self.ast.get_data2(node)
-            for pi in 0..count:
-                self.record_pattern_view_bindings(self.ast.get_extra(start + pi), subject_node)
-            return
-        if kind == NodeKind.NK_PAT_OR or kind == NodeKind.NK_PAT_TUPLE:
-            let start = self.ast.get_data0(node)
-            let count = self.ast.get_data1(node)
-            for pi in 0..count:
-                self.record_pattern_view_bindings(self.ast.get_extra(start + pi), subject_node)
-            return
-        if kind == NodeKind.NK_PAT_STRUCT:
-            let start = self.ast.get_data1(node)
-            let count = self.ast.get_data2(node)
-            for pi in 0..count:
-                let field_sym = self.ast.get_extra(start + 1 + pi * 2)
-                let field_pattern = self.ast.get_extra(start + 1 + pi * 2 + 1)
-                if field_pattern != 0:
-                    self.record_pattern_view_bindings(field_pattern, subject_node)
-                else if self.type_is_ephemeral_value(self.scope_lookup(field_sym)) != 0:
-                    self.record_view_binding_from_expr(field_sym, subject_node)
-            return
 
     fn view_origin_is_stack_local(sym: i32) -> i32:
         if sym == 0:
@@ -11157,16 +11120,21 @@ impl Sema:
         // back-edge check covers only outer bindings — moving the fresh per-iteration
         // loop variable is sound (#613).
         let for_entry_states = self.save_scope_states()
+        let for_view_count = self.for_view_binding_syms.len()
         self.push_scope()
         if self.ast.for_binding_is_pattern(node):
             self.check_pattern(binding, elem_type)
             self.record_pattern_view_bindings(binding, iterable)
+            for sym in self.pattern_binding_syms(binding):
+                if self.type_is_ephemeral_value(self.scope_lookup(sym)) != 0:
+                    self.register_for_binding_borrow(sym, iterable)
         else:
             self.scope_put(binding, elem_type, 0)
         if yields_views != 0 and binding != 0:
             self.scope_set_is_view_bound(binding)
         if binding != 0 and not self.ast.for_binding_is_pattern(node) and self.type_is_ephemeral_value(elem_type) != 0:
             self.record_for_binding_view_origins(binding, iterable)
+            self.register_for_binding_borrow(binding, iterable)
         let for_meta = self.ast.find_for_meta(node)
         var label = 0
         if for_meta >= 0:
@@ -11189,6 +11157,8 @@ impl Sema:
         self.pop_label_frame()
         self.loop_depth = self.loop_depth - 1
         self.pop_scope()
+        while self.for_view_binding_syms.len() > for_view_count:
+            self.for_view_binding_syms.pop()
         self.pop_move_control_flow_context()
         self.ty_void as i32
 
@@ -11196,10 +11166,7 @@ impl Sema:
     // produced from the iterated place and carries its origins the way
     // record_view_producer_origins records them for the spelled call: the
     // parameter mask, the collected deps, else the iterated place's root (a
-    // local collection, so `&x.field` cannot escape). It registers no borrow
-    // of that root — a whole-root borrow of `self` would reject
-    // `for e in self.items: self.count += 1`; #1317 tracks the missing
-    // live-view check on the iterated collection.
+    // local collection, so `&x.field` cannot escape).
     fn record_for_binding_view_origins(sym: i32, iterable: i32):
         let param_mask = self.compute_expr_view_origin_mask(iterable)
         var deps: Vec[i32] = Vec.new()
@@ -11207,6 +11174,76 @@ impl Sema:
         if deps.len() == 0 and param_mask == 0:
             deps = self.push_unique_i32(move deps, self.place_root_sym(iterable))
         self.set_binding_view_deps(sym, param_mask, deps)
+
+    // #1317 / §21.1 rule 1, §15.8, D44: the loop binding is a live view into
+    // the iterated place for the whole loop (the compiler-inserted iterator
+    // reads that place on every iteration), so a mutation of it inside the
+    // body is the same invalidation as `let e = xs.get(0); xs.push(..); use e`.
+    // The borrow is keyed on the field path of the iterated place — `self.items`,
+    // not `self` — so `for e in self.items: self.count += 1` stays accepted;
+    // check_mutation_against_views never expires it at a lexical last use.
+    mut fn register_for_binding_borrow(sym: i32, iterable: i32):
+        let place_node = self.for_iterated_place(iterable)
+        let root = self.borrow_root_place(place_node)
+        if sym == 0 or root == 0 or root == sym:
+            return
+        let before = self.borrow_refs.len() as i32
+        let path_start = self.borrow_path_data.len() as i32
+        let path_count = self.borrow_collect_path(place_node)
+        self.check_borrow_create_direct(root, BorrowKind.SHARED, self.borrow_field(place_node), path_start, path_count, iterable)
+        if self.borrow_refs.len() as i32 > before:
+            self.borrow_refs[before] = sym
+            self.for_view_binding_syms.push(sym)
+
+    fn is_for_view_binding(sym: i32) -> i32:
+        for s in self.for_view_binding_syms:
+            if s == sym: return 1
+        0
+
+    // The place a `for` reads on every iteration: the iterable itself when it
+    // is a place, the receiver when it is a spelled view-iterator call
+    // (`xs.iter()`, `m.keys()`); 0 for a temporary or a range.
+    fn for_iterated_place(iterable: i32) -> i32:
+        var node = iterable
+        while node != 0 and self.ast.kind(node) == NodeKind.NK_GROUPED:
+            node = self.ast.get_data0(node)
+        if node != 0 and self.ast.kind(node) == NodeKind.NK_CALL:
+            let recv = self.iter_of_self_call_receiver(node)
+            return if recv != 0: self.for_iterated_place(recv) else: 0
+        node
+
+    // Every binding a pattern introduces, in pattern order.
+    fn pattern_binding_syms(node: i32) -> Vec[i32]:
+        let out: Vec[i32] = Vec.new()
+        self.collect_pattern_binding_syms(node, out)
+
+    fn collect_pattern_binding_syms(node: i32, out: Vec[i32]) -> Vec[i32]:
+        if node == 0:
+            return out
+        var acc = move out
+        let kind = self.ast.kind(node)
+        if kind == NodeKind.NK_PAT_IDENT or kind == NodeKind.NK_PAT_TYPED_BIND:
+            acc.push(self.ast.get_data0(node))
+        else if kind == NodeKind.NK_PAT_AT_BINDING:
+            acc.push(self.ast.get_data0(node))
+            acc = self.collect_pattern_binding_syms(self.ast.get_data1(node), move acc)
+        else if kind == NodeKind.NK_PAT_VARIANT or kind == NodeKind.NK_PAT_ENUM_SHORTHAND:
+            let start = self.ast.get_data1(node)
+            for pi in 0..self.ast.get_data2(node):
+                acc = self.collect_pattern_binding_syms(self.ast.get_extra(start + pi), move acc)
+        else if kind == NodeKind.NK_PAT_OR or kind == NodeKind.NK_PAT_TUPLE:
+            let start = self.ast.get_data0(node)
+            for pi in 0..self.ast.get_data1(node):
+                acc = self.collect_pattern_binding_syms(self.ast.get_extra(start + pi), move acc)
+        else if kind == NodeKind.NK_PAT_STRUCT:
+            let start = self.ast.get_data1(node)
+            for pi in 0..self.ast.get_data2(node):
+                let field_pattern = self.ast.get_extra(start + 1 + pi * 2 + 1)
+                if field_pattern != 0:
+                    acc = self.collect_pattern_binding_syms(field_pattern, move acc)
+                else:
+                    acc.push(self.ast.get_extra(start + 1 + pi * 2))
+        acc
 
     fn struct_field_info_by_index(struct_type: i32, index: i32) -> i64:
         if struct_type == 0:
@@ -22923,8 +22960,11 @@ impl Sema:
             // after the enclosing branch is not reachable from that mutation.
             // A use inside the mutating call itself remains a conflict because
             // ordinary call checking does not permit the receiver mutation and
-            // an overlapping argument view to coexist.
-            if last_use == 0 and self.expr_uses_symbol(err_node, ref_sym) == 0:
+            // an overlapping argument view to coexist. A `for` binding is read
+            // from the iterated place again on the next iteration, so its
+            // borrow lives until the loop ends (#1317).
+            let is_loop_view = self.is_for_view_binding(ref_sym)
+            if last_use == 0 and self.expr_uses_symbol(err_node, ref_sym) == 0 and is_loop_view == 0:
                 self.remove_borrow_at(i)
                 continue
             let mutation_start = self.ast.get_start(err_node)
@@ -22940,6 +22980,8 @@ impl Sema:
                 let lu_start = self.ast.get_start(last_use)
                 let lu_end = self.ast.get_end(last_use)
                 diag.add_label(Span { file: self.local_file_id, start: lu_start, end: lu_end }, "view is used here after the mutation")
+            if is_loop_view != 0:
+                diag.add_note("the loop reads `" ++ place_name ++ "` again on its next iteration; collect the changes and apply them after the loop")
             let ref_ty = self.resolve_alias(self.scope_lookup(ref_sym) as TypeId)
             if self.get_type_kind(ref_ty) == TypeKind.TY_REF:
                 let pointee = self.get_type_d0(ref_ty)
@@ -24937,23 +24979,23 @@ impl Sema:
                         let map_elem = self.get_generic_inst_arg(seq_resolved as i32, ai)
                         if self.type_needs_drop(map_elem) != 0 and self.is_copy(map_elem as TypeId) == 0:
                             return 1
-        if self.ast.kind(iterable) != NodeKind.NK_CALL:
+        if self.iter_of_self_call_receiver(iterable) != 0: 1 else: 0
+
+    // The receiver of a call to an `@[iter_of_self]` method (`xs.iter()`,
+    // `m.keys()`), whose result retains access to that receiver; 0 otherwise.
+    fn iter_of_self_call_receiver(call: i32) -> i32:
+        if call == 0 or self.ast.kind(call) != NodeKind.NK_CALL:
             return 0
-        let callee = self.ast.get_data0(iterable)
+        let callee = self.ast.get_data0(call)
         if self.ast.kind(callee) != NodeKind.NK_FIELD_ACCESS:
             return 0
         let recv_node = self.ast.get_data0(callee)
-        let method_sym = self.ast.get_data1(callee)
-        var recv_type = 0
-        if self.typed_expr_types.contains(recv_node):
-            recv_type = self.typed_expr_types.get(recv_node).unwrap()
-        if recv_type == 0:
+        if not self.typed_expr_types.contains(recv_node):
             return 0
-        let resolved = self.resolve_alias(recv_type as TypeId)
-        let owner_sym = self.method_owner_symbol_for_type(resolved as i32)
-        if owner_sym == 0:
+        let owner_sym = self.method_owner_symbol_for_type(self.resolve_alias(self.typed_expr_types.get(recv_node).unwrap() as TypeId) as i32)
+        if owner_sym == 0 or self.method_is_iter_of_self_fn(owner_sym, self.ast.get_data1(callee)) == 0:
             return 0
-        self.method_is_iter_of_self_fn(owner_sym, method_sym)
+        recv_node
 
     // docs/completed/mut.md Rev 8 §9.2 / §15.7 — when a call passes a mutating closure,
     // check that no sibling argument retains access to the mutably captured place.
