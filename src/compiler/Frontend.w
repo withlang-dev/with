@@ -1777,6 +1777,14 @@ impl Zcu:
             pre_sema.ci_omitted_symbols = sema_clone_str_str_hashmap(&self.c_import_omitted_symbols)
             pre_sema.tool_mode_entry_path = frontend_owned_text(self.tool_mode_entry_path)
             pre_sema.runtime_available = if self.project_config.runtime_available: 1 else: 0
+            // The pre-sema collects every declaration the comptime transform
+            // demands and diagnoses them with the same tier flags as the
+            // checker below; without `no_std` here a `--no-std` program's
+            // `async fn` was judged against the std tier.
+            if self.project_config.no_std:
+                pre_sema.no_std = 1
+            if self.project_config.alloc_mode:
+                pre_sema.alloc = 1
             pre_sema.runtime_fiber_stack_size = self.project_config.runtime_fiber_stack_size
             pre_sema.runtime_fiber_pool_size = self.project_config.runtime_fiber_pool_size
             pre_sema.runtime_fiber_worker_count = self.project_config.runtime_fiber_worker_count

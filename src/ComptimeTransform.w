@@ -3407,6 +3407,14 @@ impl Sema:
         transform_sema.source_text_names = sema_clone_str_vec(&self.source_text_names)
         transform_sema.source_texts = sema_clone_str_vec(&self.source_texts)
         transform_sema.overflow_mode = self.overflow_mode
+        // The transform Sema checks what a `comptime if` condition in a
+        // generic body (the prelude's `print[T]`) reaches; its diagnostics
+        // must read the same tier flags as the module's own checker or a
+        // `--no-std` program is judged as std.
+        transform_sema.no_std = self.no_std
+        transform_sema.alloc = self.alloc
+        transform_sema.runtime_available = self.runtime_available
+        transform_sema.lint_partial_statement_match = self.lint_partial_statement_match
         transform_sema.bundle_corpus = with_str_clone_ref(self.bundle_corpus)
         transform_sema.interface_eager = self.interface_eager
         transform_sema.copy_module_graph_parts(&saved_module_paths, &saved_module_import_starts, &saved_module_import_counts, &saved_module_import_targets, &saved_module_import_paths, &saved_global_module_paths)
