@@ -1,4 +1,7 @@
 name: Source-built WebAssembly SDK
+# Runs only from .github/workflows/sdk-release.yml: the SDK is built only on
+# release, never on a push (Eric, 2026-09-22; D56). The lanes (ci.yml,
+# selfhost-*.yml) build the compiler against the pinned SDK asset they fetch.
 description: Rebuild and package the native SDK, then use it for the compiler build
 inputs:
   host-tag:

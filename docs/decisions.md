@@ -21,10 +21,11 @@ below is the agent's, from the measurements.
 `:last-green`, plus `:move-audit`/`:drop-audit` for ownership changes) run on
 the maintainer machine and posted on the PR; a PR is a draft until that
 battery is green and is marked ready when it is. The GitHub lanes are not
-run on pull requests at all; they run on a push to main (queued, never
-cancelled) and on manual dispatch, as the post-hoc evidence and the
-producer of the source-built SDK packages. No lane is a required status
-check.
+run on pull requests or pushes at all; they run nightly and on manual
+dispatch, as post-hoc evidence (Eric, 2026-09-22: CI was overzealous in
+what it did on every push). The SDK is built only on release
+(`sdk-release.yml`, dispatched against an existing release tag), never on
+a push (Eric, 2026-09-22). No lane is a required status check.
 
 **Why.** A lane cannot be a real-time signal: on the last green macOS run
 the source-SDK build took 105 min, the compiler build 29 min, fixpoint 34
