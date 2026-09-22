@@ -80,7 +80,7 @@ battery in ≤20 minutes.
 5. **`Sender[T]` is `Clone`, never `Copy`** (semantic copies are spelled),
    retaining the runtime refcount; the channel closes when the last sender
    drops; `Sender[T]: Send` requires `T: Send`.
-6. **`print[T: Display](v: T)`** as a plain generic (the `&str` case a
+6. **`print[T: Display](v: &T)`** as a plain generic (the `&str` case a
    monomorphized instance); the `match` arms join under the `Display` bound
    where the checker already joins arms, not as a new demanded-argument
    feature; a mixed-arm match yields nothing joinable and the fix-it is

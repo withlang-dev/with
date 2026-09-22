@@ -10920,7 +10920,7 @@ use math.vector.{Vec3, dot, cross}
 - `Unit`
 - `Vec[T]`, `String` / `str`
 - Traits: `Eq`, `Ord`, `Hash`, `Debug`, `Display`, `Default`, `Drop`
-- `print`, `eprint` — `print[T: Display](v: T)`: any `Display` value
+- `print`, `eprint` — `print[T: Display](v: &T)`: any `Display` value
   prints; `&str` is one instance. A `match` whose arms do not share a
   `Display` type yields nothing joinable, and the diagnostic's fix-it is the
   f-string (`print(f"{x}")`), never an implicit boxing join.
