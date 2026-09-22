@@ -56,14 +56,7 @@ fn default_config -> ServerConfig:
         db_path: "telemetry.db",
     }
 
-fn config_with_port(base: ServerConfig, port: i32) -> ServerConfig:
-    ServerConfig {
-        host: base.host,
-        port,
-        max_clients: base.max_clients,
-        idle_timeout_secs: base.idle_timeout_secs,
-        db_path: base.db_path,
-    }
+fn config_with_port(base: ServerConfig, port: i32) -> ServerConfig: { base with port }
 
 // --- Packet extraction helpers ---
 

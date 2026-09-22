@@ -6,11 +6,11 @@ type Vec2 {
     y: f64,
 }
 
+fn Vec2.new(x: f64, y: f64) -> Vec2: Vec2 { x, y }
+
+fn Vec2.zero -> Vec2: Vec2 { x: 0.0, y: 0.0 }
+
 extend Vec2:
-    fn new(x: f64, y: f64) -> Vec2: Vec2 { x, y }
-
-    fn zero -> Vec2: Vec2 { x: 0.0, y: 0.0 }
-
     fn add(self: &Self, other: Vec2) -> Vec2:
         Vec2 { x: self.x + other.x, y: self.y + other.y }
 
@@ -49,7 +49,7 @@ fn make_transform(x: f64, y: f64) -> Transform:
 
 fn make_velocity(vx: f64, vy: f64) -> Velocity: Velocity { vx, vy, angular: 0.0 }
 
-fn apply_velocity(t: Transform, v: Velocity, dt: f64) -> Transform:
+fn apply_velocity(t: &Transform, v: &Velocity, dt: f64) -> Transform:
     Transform {
         x: t.x + v.vx * dt,
         y: t.y + v.vy * dt,
@@ -57,7 +57,7 @@ fn apply_velocity(t: Transform, v: Velocity, dt: f64) -> Transform:
         scale_val: t.scale_val,
     }
 
-fn check_collision(t1: Transform, c1: Collider, t2: Transform, c2: Collider) -> bool:
+fn check_collision(t1: &Transform, c1: &Collider, t2: &Transform, c2: &Collider) -> bool:
     let dx = t1.x - t2.x
     let dy = t1.y - t2.y
     let dist_sq = dx * dx + dy * dy

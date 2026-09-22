@@ -25,14 +25,14 @@ fn result_code(r: ServiceResult) -> i32:
 
 fn make_user(id: i32, name: str, email: str, score: i32) -> User: User { id, name, email, score }
 
-fn find_user(users: [5]User, id: i32) -> ServiceResult:
+fn find_user(users: &[5]User, id: i32) -> ServiceResult:
     var found = false
     for i in 0..5:
         if users[i].id == id:
             found = true
     if found: Ok else: NotFound
 
-fn get_user_score(users: [5]User, id: i32) -> i32:
+fn get_user_score(users: &[5]User, id: i32) -> i32:
     var score = 0
     for i in 0..5:
         if users[i].id == id:
@@ -44,20 +44,21 @@ type Service {
     request_count: i32,
 }
 
+fn Service.new(config: ServiceConfig) -> Service: Service { config, request_count: 0 }
+
 extend Service:
-    fn new(config: ServiceConfig) -> Service: Service { config, request_count: 0 }
 
     fn get_timeout(self: &Self) -> i32: self.config.timeout_ms
 
 fn validate_id(id: i32) -> ServiceResult: if id in 1..=1000: Ok else: InvalidInput
 
-fn validate_and_find(users: [5]User, id: i32) -> ServiceResult:
+fn validate_and_find(users: &[5]User, id: i32) -> ServiceResult:
     let validation = validate_id(id)
     match validation:
         Ok => find_user(users, id)
         _ => validation
 
-fn handle_request(users: [5]User, endpoint: i32, user_id: i32) -> ServiceResult:
+fn handle_request(users: &[5]User, endpoint: i32, user_id: i32) -> ServiceResult:
     match endpoint:
         1 => validate_and_find(users, user_id)
         2 => Ok
