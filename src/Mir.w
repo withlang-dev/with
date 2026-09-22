@@ -473,9 +473,9 @@ fn trace_ownership_body(body: &MirBody, pool: &InternPool, sema: &Sema, spec: &s
     var out = ""
     out = out ++ "fn " ++ mir_debug_body_label(body, pool) ++ "\n"
     var hits = 0
-    let blocks = mir_drop_state_compute_blocks(body)
+    var blocks = mir_drop_state_compute_blocks(body)
     for bb in 0..body.block_count():
-        var state = blocks.input(body, bb)
+        var state = blocks.input(bb)
         let stmt_start = body.bb_stmt_starts[bb]
         let stmt_count = body.bb_stmt_counts[bb]
         for si in 0..stmt_count:
@@ -525,9 +525,9 @@ fn mir_drop_plan_place_line(body: &MirBody, pool: &InternPool, sema: &Sema, plac
 fn dump_drop_plan_body(body: &MirBody, pool: &InternPool, sema: &Sema) -> str:
     var out = "fn " ++ mir_debug_body_label(body, pool) ++ "\n"
     var hits = 0
-    let blocks = mir_drop_state_compute_blocks(body)
+    var blocks = mir_drop_state_compute_blocks(body)
     for bb in 0..body.block_count():
-        var state = blocks.input(body, bb)
+        var state = blocks.input(bb)
         let stmt_start = body.bb_stmt_starts[bb]
         let stmt_count = body.bb_stmt_counts[bb]
         for si in 0..stmt_count:
@@ -603,9 +603,9 @@ fn trace_cleanup_edge_module(mir_mod: &MirModule, pool: &InternPool, sema: &Sema
             continue
         if not mir_drop_state_block_has_successor(body, from_bb, to_bb):
             continue
-        let blocks = mir_drop_state_compute_blocks(body)
+        var blocks = mir_drop_state_compute_blocks(body)
         let from_out = blocks.load_block(from_bb)
-        let to_in = blocks.input(body, to_bb)
+        let to_in = blocks.input(to_bb)
         out = out ++ "fn " ++ mir_debug_body_label(body, pool) ++ f" edge=bb{from_bb}->bb{to_bb}\n"
         out = out ++ "  from_out: " ++ from_out.format(blocks.keys) ++ "\n"
         out = out ++ "  to_in: " ++ to_in.format(blocks.keys) ++ "\n"

@@ -1131,12 +1131,24 @@ enum MirDropState: i32:
 // Drop-state dataflow over one body. Every place the transfer functions can
 // mention is interned once per body into a dense key table (locals first, so
 // a local's key id is its local id; then each distinct projected place text),
-// and a state is one `Vec[i32]` indexed by key id. Joins, equality, copies,
-// and marks are then integer loops with no string work: the string-keyed map
-// this replaces cloned every key on every lookup, and the validator on the
-// compiler went from 13s to 464s the moment its states were kept exact across
-// blocks (#729 fixpoint). Absence — a path that never touched a place — is an
-// explicit state (`Absent`) rather than a missing key, with the same join rule.
+// and a state is indexed by key id. Joins, equality, copies, and marks are
+// then integer loops with no string work: the string-keyed map this replaces
+// cloned every key on every lookup, and the validator on the compiler went
+// from 13s to 464s the moment its states were kept exact across blocks (#729
+// fixpoint). Absence — a path that never touched a place — is an explicit
+// state (`Absent`) rather than a missing key, with the same join rule.
+//
+// A state is stored in chunks of at most MIR_DROP_STATE_CHUNK keys (a body
+// with fewer keys has one chunk of exactly its width), and the stored
+// chunks are hash-consed in the key table's chunk store (#1343). A dense
+// state per block made every body cost blocks × keys cells and blocks × keys
+// work per sweep: pcre2's `match_` (41,818 blocks, 43,194 keys) needed 1.8 G
+// cells, 7 GB, and never finished — and every stage1 compile reaches it,
+// because a stage1 has no embedded bundles and lowers std.re from source. A
+// block touches a handful of keys, so its row shares every other chunk with
+// its input by id, and a join or equality test on two equal chunks is one
+// id comparison.
+const MIR_DROP_STATE_CHUNK = 128
 
 type MirDropStateKeys {
     names: Vec[str],
@@ -1149,10 +1161,23 @@ type MirDropStateKeys {
     // Key id of every MIR place id, so a transfer never renders place text.
     place_key: Vec[i32],
     index: HashMap[str, i32],
+    // Keys per chunk, and the chunk store: chunk `id` is
+    // `chunk_data[id * chunk ..]`, padded with Absent past the last key.
+    // Content-hashed (`chunk_heads` maps a hash to its first id,
+    // `chunk_next` chains the rest), so two stored chunks with equal content
+    // always have one id.
+    chunk: i32,
+    chunk_data: Vec[i32],
+    chunk_heads: HashMap[i64, i32],
+    chunk_next: Vec[i32],
+    // join_chunks memo: (a << 32 | b) → the stored join of chunks a and b.
+    chunk_joins: HashMap[i64, i32],
 }
 
 impl MirDropStateKeys:
     fn len(): self.names.len() as i32
+
+    fn chunk_count(): (self.len() + self.chunk - 1) / self.chunk
 
     fn find(name: &str) -> i32:
         match self.index.get(name):
@@ -1160,19 +1185,72 @@ impl MirDropStateKeys:
             None => -1
 
     fn initial(body: &MirBody) -> MirDropStateMap:
-        var states: Vec[i32] = Vec.new()
-        for id in 0..self.len():
-            if id >= body.local_count():
-                states.push(MirDropState.Absent)
+        var own: Vec[i32] = Vec.new()
+        var refs: Vec[i32] = Vec.new()
+        for c in 0..self.chunk_count():
+            refs.push(-(c + 1))
+        for id in 0..self.chunk_count() * self.chunk:
+            if id >= self.len() or id >= body.local_count():
+                own.push(MirDropState.Absent)
             else if id > 0 and id <= body.n_params:
-                states.push(MirDropState.Init)
+                own.push(MirDropState.Init)
             else if body.local_is_global[id] != 0:
                 // A proxy addresses initialized module storage, not a fresh
                 // stack slot. Replacing it must drop the existing value.
-                states.push(MirDropState.Init)
+                own.push(MirDropState.Init)
             else:
-                states.push(MirDropState.Uninit)
-        MirDropStateMap { states }
+                own.push(MirDropState.Uninit)
+        MirDropStateMap { refs, own }
+
+    // The id of the stored chunk equal to `src[start .. start + CHUNK]`,
+    // storing it first if no stored chunk has that content.
+    mut fn intern_chunk(src: &Vec[i32], start: i32) -> i32:
+        var hash: i64 = 0
+        for r in 0..self.chunk:
+            hash = hash *% 31 +% src[start + r]
+        let head = match self.chunk_heads.get(hash):
+            Some(first) => *first
+            None => -1
+        var id = head
+        while id >= 0:
+            let base = id * self.chunk
+            var same = true
+            for r in 0..self.chunk:
+                if self.chunk_data[base + r] != src[start + r]:
+                    same = false
+                    break
+            if same:
+                return id
+            id = self.chunk_next[id]
+        let fresh = self.chunk_next.len() as i32
+        for r in 0..self.chunk:
+            self.chunk_data.push(src[start + r])
+        self.chunk_next.push(head)
+        self.chunk_heads.insert(hash, fresh)
+        fresh
+
+    // The stored chunk that is the key-by-key join of stored chunks `a` and
+    // `b` (in that order: the join is not associative, and input() folds the
+    // predecessors in CSR order exactly as the dense join did). Memoized on
+    // the id pair — ids are content, so the memo is exact.
+    mut fn join_chunks(a: i32, b: i32) -> i32:
+        if a == b:
+            return a
+        var pair: i64 = a
+        pair = pair * 4294967296 + b
+        let memo = match self.chunk_joins.get(pair):
+            Some(joined) => *joined
+            None => -1
+        if memo >= 0:
+            return memo
+        var out: Vec[i32] = Vec.new()
+        let a_base = a * self.chunk
+        let b_base = b * self.chunk
+        for k in 0..self.chunk:
+            out.push(mir_drop_state_join(self.chunk_data[a_base + k], self.chunk_data[b_base + k]))
+        let joined = self.intern_chunk(out, 0)
+        self.chunk_joins.insert(pair, joined)
+        joined
 
 fn mir_drop_state_keys_new(body: &MirBody) -> MirDropStateKeys:
     var names: Vec[str] = Vec.new()
@@ -1222,10 +1300,17 @@ fn mir_drop_state_keys_new(body: &MirBody) -> MirDropStateKeys:
         let slot: i32 = fill[base]
         children[slot] = id
         fill[base] = slot + 1
-    MirDropStateKeys { names, base_local, child_starts, children, place_key, index }
+    let key_count = names.len() as i32
+    let chunk = if key_count >= MIR_DROP_STATE_CHUNK: MIR_DROP_STATE_CHUNK else if key_count > 0: key_count else: 1
+    MirDropStateKeys { names, base_local, child_starts, children, place_key, index, chunk, chunk_data: Vec.new(), chunk_heads: HashMap.new(), chunk_next: Vec.new(), chunk_joins: HashMap.new() }
 
+// One chunk ref per chunk of keys: `id >= 0` is a stored chunk of the key
+// table, `-(slot + 1)` a chunk private to this map in `own`. The first write
+// that changes a stored chunk copies it into `own`; storing the map interns
+// its private chunks back.
 type MirDropStateMap {
-    states: Vec[i32],
+    refs: Vec[i32],
+    own: Vec[i32],
 }
 
 fn mir_drop_state_join(a: i32, b: i32) -> i32:
@@ -1243,58 +1328,65 @@ fn mir_drop_state_join(a: i32, b: i32) -> i32:
     MirDropState.Maybe
 
 impl MirDropStateMap:
-    fn clone() -> MirDropStateMap:
-        var states: Vec[i32] = Vec.new()
-        for i in 0..self.states.len():
-            states.push(self.states[i])
-        MirDropStateMap { states }
+    // The state of key `id`.
+    fn get(keys: &MirDropStateKeys, id: i32) -> i32:
+        let r: i32 = self.refs[id / keys.chunk]
+        let offset = id % keys.chunk
+        if r >= 0: keys.chunk_data[r * keys.chunk + offset] else: self.own[(-r - 1) * keys.chunk + offset]
 
-    fn equal(other: &MirDropStateMap) -> bool:
-        if self.states.len() != other.states.len():
-            return false
-        for i in 0..self.states.len():
-            if self.states[i] != other.states[i]:
-                return false
-        true
+    // Chunk `c` as a private chunk (copied out of the store on first use);
+    // returns the offset of its first key in `own`.
+    mut fn own_chunk(keys: &MirDropStateKeys, c: i32) -> i32:
+        let r: i32 = self.refs[c]
+        if r < 0:
+            return (-r - 1) * keys.chunk
+        let slot = self.own.len() as i32 / keys.chunk
+        let base = r * keys.chunk
+        for k in 0..keys.chunk:
+            self.own.push(keys.chunk_data[base + k])
+        self.refs[c] = -(slot + 1)
+        slot * keys.chunk
 
-    mut fn join_into(other: &MirDropStateMap):
-        for i in 0..self.states.len():
-            self.states[i] = mir_drop_state_join(self.states[i], other.states[i])
+    mut fn set(keys: &MirDropStateKeys, id: i32, state: i32):
+        if self.get(keys, id) == state:
+            return
+        let start = self.own_chunk(keys, id / keys.chunk)
+        self.own[start + id % keys.chunk] = state
 
     // The state of a MIR place; a never-touched projection reads as Uninit,
     // as a missing key did before.
     fn place(keys: &MirDropStateKeys, place_id: i32) -> i32:
         if place_id < 0 or place_id >= keys.place_key.len():
             return MirDropState.Uninit
-        let state: i32 = self.states[keys.place_key[place_id]]
+        let state = self.get(keys, keys.place_key[place_id])
         if state == MirDropState.Absent: MirDropState.Uninit else: state
 
     fn key(keys: &MirDropStateKeys, name: &str) -> i32:
         let id = keys.find(name)
         if id < 0:
             return MirDropState.Uninit
-        let state: i32 = self.states[id]
+        let state = self.get(keys, id)
         if state == MirDropState.Absent: MirDropState.Uninit else: state
 
     mut fn mark_local(keys: &MirDropStateKeys, local_id: i32, state: i32):
         if local_id < 0 or local_id >= keys.child_starts.len() - 1:
             return
-        self.states[local_id] = state
+        self.set(keys, local_id, state)
         let start: i32 = keys.child_starts[local_id]
         let end: i32 = keys.child_starts[local_id + 1]
         for i in start..end:
-            self.states[keys.children[i]] = state
+            self.set(keys, keys.children[i], state)
 
     mut fn mark_place(keys: &MirDropStateKeys, body: &MirBody, place_id: i32, state: i32) -> Unit:
         if place_id < 0 or place_id >= keys.place_key.len():
             return
         let id: i32 = keys.place_key[place_id]
-        self.states[id] = state
+        self.set(keys, id, state)
         let base: i32 = keys.base_local[id]
         if body.place_proj_counts[place_id] == 0:
             self.mark_local(keys, base, state)
         else:
-            self.states[base] = mir_drop_state_join(self.states[base], state)
+            self.set(keys, base, mir_drop_state_join(self.get(keys, base), state))
 
     mut fn note_operand(keys: &MirDropStateKeys, body: &MirBody, operand_id: i32):
         if operand_id < 0 or operand_id >= body.operand_kinds.len():
@@ -1377,13 +1469,13 @@ impl MirDropStateMap:
     // Every present key as `name=State`, capped like the old dump.
     fn format(keys: &MirDropStateKeys) -> str:
         var present = 0
-        for i in 0..self.states.len():
-            if self.states[i] != MirDropState.Absent:
+        for i in 0..keys.len():
+            if self.get(keys, i) != MirDropState.Absent:
                 present = present + 1
         var out = ""
         var emitted = 0
-        for i in 0..self.states.len():
-            let state: i32 = self.states[i]
+        for i in 0..keys.len():
+            let state = self.get(keys, i)
             if state == MirDropState.Absent:
                 continue
             if emitted > 0:
@@ -1402,8 +1494,8 @@ impl MirDropStateMap:
             return self.format(keys)
         var out = ""
         var emitted = 0
-        for i in 0..self.states.len():
-            let state: i32 = self.states[i]
+        for i in 0..keys.len():
+            let state = self.get(keys, i)
             if state == MirDropState.Absent:
                 continue
             if not mir_ownership_key_matches(keys.names[i], target):
@@ -1510,12 +1602,20 @@ fn mir_drop_state_block_successors(body: &MirBody, bb: i32) -> Vec[i32]:
         out.push(d1)
     out
 
-// Per-body dataflow storage: the key table, one out-state row per block
-// (`rows` is blocks × keys, rewritten in place on every store), and the CFG in
-// CSR form so a block's predecessors are a slice, not a terminator scan.
+// Per-body dataflow storage: the key table (with its chunk store), one
+// out-state row per block (`rows` is blocks × chunks of stored chunk ids,
+// rewritten in place on every store), and the CFG in CSR form so a block's
+// predecessors are a slice, not a terminator scan.
 type MirDropStateBlocks {
     keys: MirDropStateKeys,
     rows: Vec[i32],
+    // The entry state's stored chunk ids (keys.initial, interned once: an
+    // unreachable block reads it too, and rebuilding it per read cost a
+    // full key-width pass each time).
+    entry: Vec[i32],
+    // The state being computed: load_input fills it in place, so a visit
+    // allocates only the chunks its statements change.
+    scratch: MirDropStateMap,
     // 1 once a block's out-state has been stored at least once. A predecessor
     // that has never been computed contributes nothing to a join (it is not
     // "all Uninit" — that was the single-pass driver's blind spot: a join block
@@ -1529,21 +1629,15 @@ type MirDropStateBlocks {
 }
 
 impl MirDropStateBlocks:
-    fn width(): self.keys.len()
+    fn width(): self.keys.chunk_count()
 
-    mut fn store_block(bb: i32, map: &MirDropStateMap):
-        self.computed[bb] = 1
-        let base = bb * self.width()
-        for k in 0..self.width():
-            self.rows[base + k] = map.states[k]
-
-    // A copy of the stored out-state of `bb`.
+    // The stored out-state of `bb`, sharing the stored chunks.
     fn load_block(bb: i32) -> MirDropStateMap:
-        var states: Vec[i32] = Vec.new()
+        var refs: Vec[i32] = Vec.new()
         let base = bb * self.width()
-        for k in 0..self.width():
-            states.push(self.rows[base + k])
-        MirDropStateMap { states }
+        for c in 0..self.width():
+            refs.push(self.rows[base + c])
+        MirDropStateMap { refs, own: Vec.new() }
 
     // Whether `bb` has an input this sweep: the entry block always does; any
     // other block needs at least one computed predecessor. Feeding an
@@ -1560,38 +1654,93 @@ impl MirDropStateBlocks:
                 return true
         false
 
-    // The join of every computed predecessor's out-state — not just the
-    // lower-numbered ones: a join block is often numbered before the arms that
-    // feed it (lower_match, the loop back-edge). A predecessor not computed
-    // yet contributes nothing; the fixpoint driver revisits once it is.
-    fn input(body: &MirBody, bb: i32) -> MirDropStateMap:
-        if bb == 0:
-            return self.keys.initial(body)
-        var seen = 0
-        var out = MirDropStateMap { states: Vec.new() }
-        let start: i32 = self.pred_starts[bb]
-        let end: i32 = self.pred_starts[bb + 1]
-        for i in start..end:
-            let pred: i32 = self.preds[i]
-            if self.computed[pred] == 0:
+    // Load `scratch` with the input of `bb`: the join of every computed
+    // predecessor's out-state — not just the lower-numbered ones: a join
+    // block is often numbered before the arms that feed it (lower_match, the
+    // loop back-edge). A predecessor not computed yet contributes nothing;
+    // the fixpoint driver revisits once it is. The entry block, and a block
+    // with no computed predecessor, takes the entry state.
+    mut fn load_input(bb: i32):
+        self.scratch.own.clear()
+        let width = self.width()
+        var seen = false
+        if bb != 0:
+            let start: i32 = self.pred_starts[bb]
+            let end: i32 = self.pred_starts[bb + 1]
+            for i in start..end:
+                let pred: i32 = self.preds[i]
+                if self.computed[pred] == 0:
+                    continue
+                let base = pred * width
+                if not seen:
+                    for c in 0..width:
+                        self.scratch.refs[c] = self.rows[base + c]
+                    seen = true
+                else:
+                    for c in 0..width:
+                        self.scratch.refs[c] = self.keys.join_chunks(self.scratch.refs[c], self.rows[base + c])
+        if not seen:
+            for c in 0..width:
+                self.scratch.refs[c] = self.entry[c]
+
+    // The input state of `bb` (see load_input), sharing the stored chunks.
+    mut fn input(bb: i32) -> MirDropStateMap:
+        self.load_input(bb)
+        var refs: Vec[i32] = Vec.new()
+        for c in 0..self.width():
+            refs.push(self.scratch.refs[c])
+        MirDropStateMap { refs, own: Vec.new() }
+
+    // Recompute the out-state of `bb` in `scratch`; store it and return true
+    // when it differs from the stored one (or none was stored yet).
+    mut fn visit(body: &MirBody, bb: i32) -> bool:
+        self.load_input(bb)
+        let stmt_start: i32 = body.bb_stmt_starts[bb]
+        let stmt_count: i32 = body.bb_stmt_counts[bb]
+        for si in 0..stmt_count:
+            self.scratch.transfer_stmt(self.keys, body, stmt_start + si)
+        self.scratch.transfer_term(self.keys, body, bb)
+        if self.computed[bb] != 0 and self.scratch_is_stored(bb):
+            return false
+        self.computed[bb] = 1
+        let base = bb * self.width()
+        for c in 0..self.width():
+            let r: i32 = self.scratch.refs[c]
+            self.rows[base + c] = if r >= 0: r else: self.keys.intern_chunk(self.scratch.own, (-r - 1) * self.keys.chunk)
+        true
+
+    // Whether the stored out-state of `bb` equals `scratch`.
+    fn scratch_is_stored(bb: i32) -> bool:
+        let base = bb * self.width()
+        for c in 0..self.width():
+            let r: i32 = self.scratch.refs[c]
+            let stored: i32 = self.rows[base + c]
+            if r == stored:
                 continue
-            if seen == 0:
-                out = self.load_block(pred)
-                seen = 1
-            else:
-                let base = pred * self.width()
-                for k in 0..self.width():
-                    out.states[k] = mir_drop_state_join(out.states[k], self.rows[base + k])
-        if seen == 0:
-            return self.keys.initial(body)
-        out
+            // Stored chunks are hash-consed: two different stored ids differ.
+            if r >= 0:
+                return false
+            let own = (-r - 1) * self.keys.chunk
+            let data = stored * self.keys.chunk
+            for k in 0..self.keys.chunk:
+                if self.scratch.own[own + k] != self.keys.chunk_data[data + k]:
+                    return false
+        true
 
 fn mir_drop_state_blocks_new(body: &MirBody) -> MirDropStateBlocks:
     let bb_count = body.block_count()
-    let keys = mir_drop_state_keys_new(body)
+    var keys = mir_drop_state_keys_new(body)
+    var absent: Vec[i32] = Vec.new()
+    for _ in 0..keys.chunk:
+        absent.push(MirDropState.Absent)
+    let absent_id = keys.intern_chunk(absent, 0)
     var rows: Vec[i32] = Vec.new()
-    for _ in 0..bb_count * keys.len():
-        rows.push(MirDropState.Absent)
+    for _ in 0..bb_count * keys.chunk_count():
+        rows.push(absent_id)
+    let initial = keys.initial(body)
+    var entry: Vec[i32] = Vec.new()
+    for c in 0..keys.chunk_count():
+        entry.push(keys.intern_chunk(initial.own, c * keys.chunk))
     var computed: Vec[i32] = Vec.new()
     var pred_counts: Vec[i32] = Vec.new()
     for _ in 0..bb_count:
@@ -1629,7 +1778,11 @@ fn mir_drop_state_blocks_new(body: &MirBody) -> MirDropStateBlocks:
             let slot: i32 = fill[s]
             preds[slot] = bb
             fill[s] = slot + 1
-    MirDropStateBlocks { keys, rows, computed, pred_starts, preds, succ_starts, succs }
+    var scratch_refs: Vec[i32] = Vec.new()
+    for c in 0..keys.chunk_count():
+        scratch_refs.push(entry[c])
+    let scratch = MirDropStateMap { refs: scratch_refs, own: Vec.new() }
+    MirDropStateBlocks { keys, rows, entry, scratch, computed, pred_starts, preds, succ_starts, succs }
 
 // Every block's out-state at the dataflow fixpoint. One sweep in block order is
 // not enough: a block's input joins ALL its predecessors, some of which are
@@ -1668,15 +1821,8 @@ fn mir_drop_state_compute_blocks(body: &MirBody) -> MirDropStateBlocks:
             // block dirty again through its successor list.
             if not blocks.has_input(bb):
                 continue
-            var state = blocks.input(body, bb)
-            let stmt_start: i32 = body.bb_stmt_starts[bb]
-            let stmt_count: i32 = body.bb_stmt_counts[bb]
-            for si in 0..stmt_count:
-                state.transfer_stmt(blocks.keys, body, stmt_start + si)
-            state.transfer_term(blocks.keys, body, bb)
-            if blocks.computed[bb] != 0 and state.equal(blocks.load_block(bb)):
+            if not blocks.visit(body, bb):
                 continue
-            blocks.store_block(bb, state)
             changed = true
             let s_start: i32 = blocks.succ_starts[bb]
             let s_end: i32 = blocks.succ_starts[bb + 1]
@@ -1691,9 +1837,9 @@ fn dump_drop_state_body(body: &MirBody, pool: &InternPool) -> str:
     else:
         "<anon>"
     out = out ++ "fn " ++ fn_name ++ " " ++ lbrace() ++ "\n"
-    let blocks = mir_drop_state_compute_blocks(body)
+    var blocks = mir_drop_state_compute_blocks(body)
     for bb in 0..body.block_count():
-        var state = blocks.input(body, bb)
+        var state = blocks.input(bb)
         out = out ++ f"  bb{bb} in: " ++ state.format(blocks.keys) ++ "\n"
         let stmt_start: i32 = body.bb_stmt_starts[bb]
         let stmt_count: i32 = body.bb_stmt_counts[bb]
@@ -1820,9 +1966,9 @@ pub fn mir_elaborate_dead_drops(body: MirBody) -> MirBody:
     if not has_drop:
         return body
     var to_nop: Vec[i32] = Vec.new()
-    let blocks = mir_drop_state_compute_blocks(body)
+    var blocks = mir_drop_state_compute_blocks(body)
     for bb in 0..body.block_count():
-        var state = blocks.input(&body, bb)
+        var state = blocks.input(bb)
         let stmt_start = body.bb_stmt_starts[bb]
         let stmt_count = body.bb_stmt_counts[bb]
         for si in 0..stmt_count:
@@ -1932,9 +2078,9 @@ pub fn mir_cleanup_edge_spec_ok(spec: &str) -> i32:
     1
 
 fn validate_ownership_body(mir_mod: &MirModule, body: &MirBody) -> str:
-    let blocks = mir_drop_state_compute_blocks(body)
+    var blocks = mir_drop_state_compute_blocks(body)
     for bb in 0..body.block_count():
-        var state = blocks.input(body, bb)
+        var state = blocks.input(bb)
         let stmt_start = body.bb_stmt_starts[bb]
         let stmt_count = body.bb_stmt_counts[bb]
         for si in 0..stmt_count:
