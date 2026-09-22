@@ -9258,7 +9258,7 @@ impl MirBuilder:
                 args.push(self.lower_call_arg(arg_node, sig_idx, callable_fn_tid, i, bc_callee_sym))
 
             // Fill in default parameter values for missing arguments
-            if fn_expr != 0 and self.ast.kind(fn_expr) == NodeKind.NK_IDENT:
+            if fn_expr != 0 and self.ast.kind(fn_expr) == NodeKind.NK_IDENT and not self.ident_names_local_callable(fn_expr):
                 let callee_sym = self.ast.get_data0(fn_expr)
                 if self.sema.fn_decl_nodes.contains(callee_sym):
                     let fn_node = self.sema.fn_decl_nodes.get(callee_sym).unwrap()
@@ -9465,10 +9465,23 @@ impl MirBuilder:
         let ps = self.ast.fn_meta_param_start(meta)
         fn_param_is_mut_self(self.ast.fn_param_flags(ps, 0)) != 0
 
+    // D29 precedence: a lexical binding wins before any module-level
+    // interpretation. Sema resolves the callee of `check(1)` to the local
+    // `check` (its scope lookup runs before the global gate); the name-keyed
+    // signature and declaration tables must not be consulted for it, or a
+    // parameter named like `std.builtins.check` inherits that fn's signature
+    // and its `loc = src()` default (#1230: one extra `str` argument on the
+    // indirect call, rejected by the LLVM verifier).
+    fn ident_names_local_callable(fn_expr: i32) -> bool:
+        if fn_expr == 0 or self.ast.kind(fn_expr) != NodeKind.NK_IDENT:
+            return false
+        let sym = self.ast.get_data0(fn_expr)
+        self.lookup_local(sym) >= 0 or self.lookup_alias_place(sym) >= 0
+
     fn call_sig_for_expr(fn_expr: i32) -> i32:
         if fn_expr == 0:
             return -1
-        if self.ast.kind(fn_expr) != NodeKind.NK_IDENT:
+        if self.ast.kind(fn_expr) != NodeKind.NK_IDENT or self.ident_names_local_callable(fn_expr):
             return -1
         self.call_sig_for_sym(self.ast.get_data0(fn_expr))
 
