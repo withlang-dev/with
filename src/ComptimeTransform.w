@@ -3241,6 +3241,11 @@ impl Sema:
             let decl_file_id = self.ct_decl_source_file_id(di)
             let decl_ci = self.ct_decl_is_c_import(di)
             self.local_file_id = decl_file_id
+            // A derived impl's nodes carry the declaring type's spans, so
+            // they carry its file too (AstPool.file) — not whichever file the
+            // clone above stamped last. Codegen names a function's DWARF file
+            // and lines from it.
+            out.set_current_file_id(out.file(decl))
 
             ordered.push(decl as i32)
             ordered_paths.push(sema_owned_text(decl_path))
@@ -3430,6 +3435,8 @@ impl Sema:
                 continue
             transform_sema.update_decl_source_context(di)
             let decl = out.get_decl(di)
+            // Nodes a comptime expansion adds belong to the declaring file.
+            out.set_current_file_id(out.file(decl))
             let live_ast = out
             transform_sema.ct_transform_decl(live_ast, out, intern, decl as i32)
         self.diags = move transform_sema.diags

@@ -4722,11 +4722,17 @@ impl Parser:
     mut fn parse_interpolated_expr_attempt(expr_text: &str, use_shared_diags: i32, base_start: i32) -> InterpolatedExprParseAttempt:
         // Re-lex and parse the expression text.
         let source_text = self.interp_normalize_expr_text(expr_text)
-        var lexer = Lexer.init(source_text, 0)
+        // The interpolated expression belongs to this parser's file: its
+        // spans are offset into it below, and init_with_pool stamps the
+        // shared pool's current file id, which stays in force for the rest of
+        // this file's parse. File 0 here re-attributed every node after the
+        // first `{expr}` in an imported module to the root (AstPool.file),
+        // and every such function's DWARF to the root's main.w.
+        var lexer = Lexer.init(source_text, self.file_id)
         let tokens = lexer.tokenize()
         let parse_diags = if use_shared_diags != 0: move self.diags else: DiagnosticList.init()
         let first_node = self.pool.node_count()
-        var sub_parser = Parser.init_with_pool(move tokens, source_text, 0, self.intern, move parse_diags, self.pool)
+        var sub_parser = Parser.init_with_pool(move tokens, source_text, self.file_id, self.intern, move parse_diags, self.pool)
         let result = sub_parser.parse_expr()
         sub_parser.skip_newlines()
         offset_interpolated_expr_spans(sub_parser.pool, first_node, base_start)
