@@ -4,42 +4,50 @@
 //   async fn, .await, async blocks, Task[T], select await,
 //   select await biased, async scope, tuple await, channels,
 //   defer, errdefer, cancellation + unwind, @[stack_size],
-//   await_all, await_first, await_any, await_settled,
-//   task.cancel(), task.is_done(), nested async, sleep/timeout
+//   await_all, await_first, task.cancel(), nested async, sleep/timeout
 
 use std.channel
 use std.task
 use std.time
+use std.sync
 
 // ---------------------------------------------------------------------------
-// Global auction state (mutable globals for verification)
+// Global auction state (for verification)
+//
+// The program is concurrent, so shared counters are Atomic (§9.1c):
+// synchronized globals are always safe.
 // ---------------------------------------------------------------------------
 
-var cleanup_count: i32 = 0
-var bids_submitted: i32 = 0
-var rounds_completed: i32 = 0
-var defer_trace: i32 = 0
+var cleanup_count: Atomic[i32] = Atomic.new(0)
+var bids_submitted: Atomic[i32] = Atomic.new(0)
+var rounds_completed: Atomic[i32] = Atomic.new(0)
+var defer_trace: Atomic[i32] = Atomic.new(0)
+
+fn cleanups() -> i32: cleanup_count.load(.SeqCst)
 
 // ---------------------------------------------------------------------------
 // Domain types
 // ---------------------------------------------------------------------------
 
 type Bid { bidder_id: i32, amount: i32 }
+impl Copy for Bid
 
 type AuctionResult { winner_id: i32, winning_bid: i32, total_bids: i32 }
 
 // ---------------------------------------------------------------------------
 // Bidder: submits bids over a channel, defer tracks cleanup
+//
+// Every bidder owns its own Sender: a shared producer is spelled
+// `tx.clone()` at the call site, and the channel closes when the last
+// sender drops (§14.15).
 // ---------------------------------------------------------------------------
 
 async fn bidder(id: i32, base_price: i32, tx: Sender[Bid]) -> i32:
-    defer: cleanup_count = cleanup_count + 1
-    var round: i32 = 0
-    while round < 3:
+    defer: cleanup_count.fetch_add(1, .SeqCst)
+    for round in 0..3:
         let amount = base_price + round * id * 7
-        tx.send(Bid { bidder_id: id, amount: amount })
-        bids_submitted = bids_submitted + 1
-        round = round + 1
+        tx.send(Bid { bidder_id: id, amount })
+        bids_submitted.fetch_add(1, .SeqCst)
     id
 
 // ---------------------------------------------------------------------------
@@ -47,7 +55,7 @@ async fn bidder(id: i32, base_price: i32, tx: Sender[Bid]) -> i32:
 // ---------------------------------------------------------------------------
 
 async fn slow_bidder(id: i32, tx: Sender[Bid]) -> i32:
-    defer: cleanup_count = cleanup_count + 1
+    defer: cleanup_count.fetch_add(1, .SeqCst)
     // Simulate slow thinking with sleep
     sleep(Duration.millis(500)).await
     tx.send(Bid { bidder_id: id, amount: 9999 })
@@ -59,12 +67,10 @@ async fn slow_bidder(id: i32, tx: Sender[Bid]) -> i32:
 
 async fn collect_bids(rx: Receiver[Bid], expected: i32) -> Bid:
     var best = Bid { bidder_id: -1, amount: 0 }
-    var count: i32 = 0
-    while count < expected:
-        let bid = rx.recv().unwrap()
+    for _ in 0..expected:
+        let bid = rx.recv() ?? break
         if bid.amount > best.amount:
             best = bid
-        count = count + 1
     best
 
 // ---------------------------------------------------------------------------
@@ -80,8 +86,7 @@ async fn adjusted_valuation(amount: i32, factor: i32) -> i32:
     base + factor
 
 async fn full_valuation(bid: Bid) -> i32:
-    let adj = adjusted_valuation(bid.amount, bid.bidder_id * 3).await
-    adj
+    adjusted_valuation(bid.amount, bid.bidder_id * 3).await
 
 // ---------------------------------------------------------------------------
 // Async fn returning Result for errdefer + ? demonstration
@@ -89,21 +94,13 @@ async fn full_valuation(bid: Bid) -> i32:
 
 async fn validate_bid(amount: i32) -> Result[i32, str]:
     if amount <= 0:
-        Err("bid must be positive")
-    else:
-        Ok(amount)
-
-// BUG DISCOVERED: `?` on `.await` of async Result gives "aggregate enum
-// payload missing destination payload type". Spec says `.await?` should
-// chain naturally. Workaround: manual if/else: on awaited result.
-// BUG DISCOVERED: `.is_ok()` on Result returned from async fn `.await`
-// returns false for Ok values. Possibly async Result ABI issue.
-async fn process_winning_bid(amount: i32) -> Result[i32, str]:
-    errdefer: cleanup_count = cleanup_count + 100
-    if amount <= 0:
         return Err("bid must be positive")
-    let valuation = full_valuation(Bid { bidder_id: 0, amount: amount }).await
-    Ok(valuation)
+    amount
+
+async fn process_winning_bid(amount: i32) -> Result[i32, str]:
+    errdefer: cleanup_count.fetch_add(100, .SeqCst)
+    let valid = validate_bid(amount).await?
+    full_valuation(Bid { bidder_id: 0, amount: valid }).await
 
 // ---------------------------------------------------------------------------
 // Task escaping a sync function
@@ -116,10 +113,13 @@ fn spawn_valuation(bid: Bid) -> Task[i32]:
 // Defer LIFO helper (top-level because nested fn not in expression context)
 // ---------------------------------------------------------------------------
 
+fn trace(digit: i32):
+    defer_trace.store(defer_trace.load(.SeqCst) * 10 + digit, .SeqCst)
+
 fn check_defer_lifo:
-    defer: defer_trace = defer_trace * 10 + 3
-    defer: defer_trace = defer_trace * 10 + 2
-    defer: defer_trace = defer_trace * 10 + 1
+    defer: trace(3)
+    defer: trace(2)
+    defer: trace(1)
 
 // ---------------------------------------------------------------------------
 // Main auction orchestration
@@ -130,17 +130,18 @@ async fn run_auction() -> AuctionResult:
     print("phase 1: channels + scope")
     let (tx, rx) = chan[Bid](32)
 
-    // Structured concurrency: all bidders tracked in scope
-    async scope s =>:
-        s.track(bidder(1, 100, tx))
-        s.track(bidder(2, 90, tx))
-        s.track(bidder(3, 110, tx))
-    // All bidders done, close channel
+    // Structured concurrency: all bidders tracked in scope, each with
+    // its own clone of the sender
+    async scope s =>
+        s.track(bidder(1, 100, tx.clone()))
+        s.track(bidder(2, 90, tx.clone()))
+        s.track(bidder(3, 110, tx.clone()))
+    // All bidders done and their senders dropped; close ours
     tx.close()
 
     // Collect all 9 bids (3 bidders x 3 rounds)
     let best = collect_bids(rx, 9).await
-    rounds_completed = rounds_completed + 1
+    rounds_completed.fetch_add(1, .SeqCst)
     print("phase 1 done")
 
     // --- Phase 2: Tuple concurrent await for parallel valuation ---
@@ -154,23 +155,21 @@ async fn run_auction() -> AuctionResult:
     // --- Phase 3: Select await — race fast vs slow path ---
     print("phase 3: select await")
     let (tx2, rx2) = chan[Bid](8)
-    let fast_task = bidder(10, 200, tx2)
+    let fast_task = bidder(10, 200, tx2.clone())
     let slow_task = slow_bidder(99, tx2)
-    let cancel_before = cleanup_count
+    let cancel_before = cleanups()
     select await:
         r = fast_task => assert(r == 10)
         r = slow_task => assert(r == 99)
     // The loser was cancelled; its defer still ran
-    assert(cleanup_count > cancel_before)
+    assert(cleanups() > cancel_before)
     print("phase 3 done")
 
     // --- Phase 4: Select await biased — priority ordering ---
-    // BUG DISCOVERED: `select await biased` not recognized by parser.
-    // Spec §14.10 says this should work for deterministic priority.
-    print("phase 4: select (biased workaround)")
+    print("phase 4: select await biased")
     let priority_task = base_valuation(50)
     let normal_task = base_valuation(30)
-    select await:
+    select await biased:
         r = priority_task => assert(r == 5000)
         r = normal_task => assert(r == 3000)
     print("phase 4 done")
@@ -191,82 +190,63 @@ async fn run_auction() -> AuctionResult:
     assert(warmup_result == 100)
     print("phase 6 done")
 
-    // --- Phase 7: Task from sync function + is_done / cancel ---
+    // --- Phase 7: Task from sync function + cancel ---
     print("phase 7: task escape")
     let escaped = spawn_valuation(Bid { bidder_id: 5, amount: 10 })
     let result = escaped.await
     assert(result == 10 * 100 + 5 * 3)  // base + factor
+
+    let to_cancel = base_valuation(777)
+    to_cancel.cancel()
     print("phase 7 done")
 
-    // BUG DISCOVERED: `task.cancel()` gives "unhandled MirIntrinsic
-    // MIR_INTRINSIC_GENERIC_CALL sym=cancel". Spec §14.7 says Task[T]
-    // has a `cancel(task)` method.
-    // let to_cancel = base_valuation(777)
-    // to_cancel.cancel()
-    // let _cancelled = to_cancel.await
-
-    // --- Phase 8–12: Collection combinators ---
-    // BUG DISCOVERED: `await_all`, `await_first`, `await_any`, `await_settled`
-    // from `use std.task` are not resolved by name lookup. Spec §14.11 says
-    // these should be available as free functions. Workaround: manual loops.
-
-    // Phase 8: await all tasks (manual)
-    print("phase 8: await all (manual)")
-    let t_a = base_valuation(1)
-    let t_b = base_valuation(2)
-    let t_c = base_valuation(3)
-    let ra = t_a.await
-    let rb = t_b.await
-    let rc = t_c.await
-    assert(ra + rb + rc == 600)  // 100 + 200 + 300
+    // --- Phase 8: await all tasks ---
+    print("phase 8: await all")
+    var valuations = Vec.new()
+    valuations.push(base_valuation(1))
+    valuations.push(base_valuation(2))
+    valuations.push(base_valuation(3))
+    let results = await_all(valuations)
+    var sum = 0
+    for r in results:
+        sum += r
+    assert(sum == 600)  // 100 + 200 + 300
     print("phase 8 done")
 
-    // Phase 9: await first via select (manual await_first workaround)
-    print("phase 9: await first (manual)")
-    let race_a = base_valuation(10)
-    let race_b = base_valuation(20)
-    select await:
-        r = race_a => assert(r == 1000)
-        r = race_b => assert(r == 2000)
+    // --- Phase 9: await first ---
+    print("phase 9: await first")
+    var racers = Vec.new()
+    racers.push(base_valuation(10))
+    racers.push(base_valuation(20))
+    let first = await_first(racers)
+    assert(first == 1000 or first == 2000)
     print("phase 9 done")
 
     // --- Phase 13: errdefer — only runs on error path ---
     print("phase 13: errdefer")
-    let err_before = cleanup_count
-    print("  calling good path...")
+    let err_before = cleanups()
     let good = process_winning_bid(best.amount).await
-    if good.is_ok():
-        print("  good is ok")
-    else:
-        print("  good is NOT ok")
     assert(good.is_ok())
-    print("  good is ok")
-    assert(cleanup_count == err_before)  // errdefer did NOT run
+    assert(cleanups() == err_before)  // errdefer did NOT run
     print("  errdefer did not run on success (correct)")
 
-    // BUG DISCOVERED: `.is_err()` on Result gives "unhandled MirIntrinsic
-    // MIR_INTRINSIC_GENERIC_CALL sym=is_err". Spec says Result has .is_err().
-    // Workaround: `not .is_ok()`.
-    print("  calling bad path...")
     let bad = process_winning_bid(-1).await
-    print("  bad returned")
-    assert(not bad.is_ok())
-    print("  bad is not ok (correct)")
+    assert(bad.is_err())
     // errdefer DID run on error, adding 100
-    assert(cleanup_count == err_before + 100)
+    assert(cleanups() == err_before + 100)
     print("phase 13 done")
 
     // --- Phase 14: defer LIFO ordering (tested via global) ---
     print("phase 14: defer LIFO")
-    defer_trace = 0
+    defer_trace.store(0, .SeqCst)
     check_defer_lifo()
-    assert(defer_trace == 123)  // 0 -> 1 -> 12 -> 123
+    assert(defer_trace.load(.SeqCst) == 123)  // 0 -> 1 -> 12 -> 123
     print("phase 14 done")
 
     AuctionResult {
         winner_id: best.bidder_id,
         winning_bid: best.amount,
-        total_bids: bids_submitted,
+        total_bids: bids_submitted.load(.SeqCst),
     }
 
 async fn main:
@@ -274,7 +254,7 @@ async fn main:
 
     assert(result.total_bids >= 9)
     assert(result.winning_bid > 0)
-    assert(rounds_completed == 1)
-    assert(cleanup_count > 0)
+    assert(rounds_completed.load(.SeqCst) == 1)
+    assert(cleanups() > 0)
 
     print("ok")
