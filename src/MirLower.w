@@ -5959,6 +5959,9 @@ impl MirBuilder:
                     self.terminate(TermKind.TK_UNREACHABLE, 0, 0, 0, 0)
                 self.switch_to(obs_cont_bb)
             return
+        let rhs_reset_start = self.pending_reset_locals.len() as i32
+        let rhs_reset_field_start = self.pending_reset_field_places.len() as i32
+        let rhs_move_temp_start = self.pending_move_temp_locals.len() as i32
         let rhs_op = self.lower_expr(rhs)
         let rhs_place = self.materialize_operand(rhs_op, rhs_ty, self.ast.get_start(rhs))
 
@@ -5984,23 +5987,41 @@ impl MirBuilder:
 
         self.lower_pattern_match(rhs_place, pat, success_bb, fail_bb)
 
-        self.switch_to(success_bb)
-        let _ = self.lower_pattern(pat, rhs_place)
-        // #605/#606: consume the let-else subject on the success path so the enum
-        // payload-drop does not double-free the moved-out bindings (the fail path
-        // diverges, so the subject is owned only here).
+        // #1365 (§9.7, §2.4): the let-else consumes its subject on BOTH paths.
+        // The success path moves the bound parts into the bindings (and `_`/`..`
+        // drop the rest); the failing path owns the whole subject, whichever
+        // variant it holds, and drops it before the else body diverges. Retire
+        // the subject's cleanup for both paths here, before either is lowered:
+        // cancelling it after the success path left the failing path with no
+        // owner (a `str` Err payload leaked).
         let le_scrut_local = mir_place_plain_local(&self.body, rhs_place)
         if le_scrut_local >= 0:
             self.cancel_stmt_temp_for_local(le_scrut_local)
             self.cancel_scheduled_value_drop_for_local(le_scrut_local)
             self.mark_local_value_moved(le_scrut_local)
         self.cancel_scheduled_value_drop_for_receiver_expr(rhs)
-        self.terminate(TermKind.TK_GOTO, cont_bb, 0, 0, 0)
+        let branch_move_state = self.save_move_state()
 
+        // The failing path is lowered before the success path binds: a binding's
+        // scope-exit drop scheduled by lower_pattern is live only on the success
+        // path. Lowered after it, the else body's `return` dropped the unbound
+        // binding (`Ok(v)` with a Vec payload freed uninitialized stack, #1365).
         self.switch_to(fail_bb)
+        // The subject's source was moved into the materialized subject; blank it
+        // on this path too (reset-on-move, §2.5.1) — the statement-end flush
+        // runs only on the continuing path.
+        self.emit_pending_resets_since(rhs_reset_start, rhs_reset_field_start, rhs_move_temp_start)
+        if self.sema.type_needs_drop_frozen(rhs_ty) != 0:
+            self.emit_drop_stmt(rhs_place, "let-else-fail", self.ast.get_start(node))
         let _ = self.lower_expr(else_body)
         if self.body.term_kind(self.cur_bb) == TermKind.TK_UNREACHABLE:
             self.terminate(TermKind.TK_UNREACHABLE, 0, 0, 0, 0)
+        // The else body diverges; its moves never reach the continuation.
+        self.restore_move_state(&branch_move_state)
+
+        self.switch_to(success_bb)
+        let _ = self.lower_pattern(pat, rhs_place)
+        self.terminate(TermKind.TK_GOTO, cont_bb, 0, 0, 0)
 
         self.switch_to(cont_bb)
 

@@ -326,6 +326,57 @@ fn sc_vec_elem() -> str:
     "    v.push(mk(2, slot))\n" ++
     "    let _k = 0\n"
 
+// #1365 (§9.7, §2.4): `let PAT = subject else: <diverge>` consumes its
+// subject on both paths. The failing path drops the whole subject — whichever
+// variant it holds — exactly once before it diverges; the matching path moves
+// the bound part into the binding and `..` drops the rest. The matching value
+// carries id 1 (plus id 4 in the struct's unbound field), the failing one id 2.
+fn le_ty(shape: &str) -> str:
+    if shape == "result": return "Result[R, R]"
+    if shape == "option": return "Option[R]"
+    if shape == "enum": return "E2"
+    if shape == "nested": return "Option[E2]"
+    "Result[P, R]"
+
+fn le_hit(shape: &str) -> str:
+    if shape == "result": return "Ok(mk(1, slot))"
+    if shape == "option": return "Some(mk(1, slot))"
+    if shape == "enum": return "E2.A(mk(1, slot))"
+    if shape == "nested": return "Some(E2.A(mk(1, slot)))"
+    "Ok(P { a: mk(1, slot), b: mk(4, slot) })"
+
+fn le_miss(shape: &str) -> str:
+    if shape == "option": return "None"
+    if shape == "enum": return "E2.B(mk(2, slot))"
+    if shape == "nested": return "Some(E2.B(mk(2, slot)))"
+    "Err(mk(2, slot))"
+
+fn le_pat(shape: &str) -> str:
+    if shape == "result": return "Ok(v)"
+    if shape == "option": return "Some(v)"
+    if shape == "enum": return ".A(v)"
+    if shape == "nested": return "Some(.A(v))"
+    "Ok(P { a: v, .. })"
+
+// `exit` is return | break | continue; `local` binds the subject to a named
+// local first, otherwise the subject is the call's temporary.
+fn sc_let_else(shape: &str, hit: bool, exit: &str, local: bool) -> str:
+    let flag = if hit: "true" else: "false"
+    let ind = if exit == "return": "    " else: "        "
+    let subject = if local: "s" else: "make_subject(" ++ flag ++ ", slot)"
+    let bind = if local: ind ++ "let s = make_subject(" ++ flag ++ ", slot)\n" else: ""
+    let stmt = ind ++ "let " ++ le_pat(shape) ++ " = " ++ subject ++ " else: " ++ exit ++ "\n" ++ ind ++ "let _k = v.id\n"
+    let body = (if exit == "return": "" else: "    for _i in 0..1:\n") ++ bind ++ stmt
+    "type P { a: R, b: R }\n" ++
+    "enum E2:\n    A(R)\n    B(R)\n" ++
+    "fn make_subject(k: bool, slot: *mut i32) -> " ++ le_ty(shape) ++ ":\n" ++
+    "    if k: " ++ le_hit(shape) ++ " else: " ++ le_miss(shape) ++ "\n" ++
+    "fn go(slot: *mut i32):\n" ++ body
+
+fn le_sum(shape: &str, hit: bool) -> i32:
+    if not hit: return if shape == "option": 0 else: 2
+    if shape == "struct": 5 else: 1
+
 // POD-container cells: #691/D18 — every Vec frees its buffer at scope exit
 // and on reassignment, so the allocator verdict must be CLEAN.
 fn pod_cell(name: str, body: str) -> Cell:
@@ -460,6 +511,12 @@ fn build_cells():
     cells.push(cell("recv_move_consume/bare", sc_recv_move(), 1))
     cells.push(cell("recv_bare_self_replace/bare", sc_recv_replace(), 3))
     cells.push(cell("vec_elem_drop/vec", sc_vec_elem(), 3))
+    for sh in ["result", "option", "enum", "nested", "struct"]:
+        for subj in ["temp", "local"]:
+            let local = subj == "local"
+            cells.push(cell("let_else_hit_" ++ subj ++ "/" ++ sh, sc_let_else(sh, true, "return", local), le_sum(sh, true)))
+            for exit in ["return", "break", "continue"]:
+                cells.push(cell("let_else_miss_" ++ exit ++ "_" ++ subj ++ "/" ++ sh, sc_let_else(sh, false, exit, local), le_sum(sh, false)))
     cells.push(pod_cell("pod_vec_scope_exit/EXPECT-CLEAN", "    var v: Vec[i32] = Vec.new()\n    v.push(1)\n"))
     cells.push(pod_cell("pod_vec_reassign/EXPECT-CLEAN", "    var v: Vec[i32] = Vec.new()\n    v.push(1)\n    var w: Vec[i32] = Vec.new()\n    w.push(2)\n    v = w\n"))
     cells
