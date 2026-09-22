@@ -75,7 +75,7 @@ Generic methods (`get[T: Deserialize]`) can't go in trait objects because each `
 
 ### Error hierarchy and `error...from`
 
-`errors.w` declares `error ServiceError from DbError, CacheError, NotifyError` — the `from` shorthand auto-generates wrapper variants (`Db`, `Cache`, `Notify`) and `From` impls, so `?` propagation works seamlessly across subsystem boundaries. No `Cancelled` variant is needed because cancellation is handled by unwinding (§14.7).
+`errors.w` declares `error ServiceError from DbError, CacheError, NotifyError =` followed by the service's own variants (`Validation`, `TimedOut`, `Cancelled`) — the `from` list generates wrapper variants (`Db`, `Cache`, `Notify`) and `From` conversions, so `?` propagation works across subsystem boundaries, while the written variants are errors the service raises itself (§10.9, D57).
 
 ### `.context()` error wrapping
 

@@ -45,8 +45,9 @@ intermediate builder type.
 fetches the user and fires off three parallel enrichment queries (`count_posts`, `count_followers`,
 `last_login`) inside an `async scope`.
 
-**Error hierarchy with From conversions** — `ServiceError` wraps `DbError`, `CacheError`, and
-`NotifyError` via `impl From`, enabling `?` propagation across subsystem boundaries.
+**Error hierarchy with From conversions** — `error ServiceError from DbError, CacheError,
+NotifyError =` generates the wrappers and conversions that let `?` propagate across subsystem
+boundaries, and declares the service's own variants beside them.
 
 **Testability** — `MockUserRepo`, `MockCache`, `MockNotifier` implement the same traits.
 `NotificationLog = Arc[Mutex[Vec[Notification]]]` gives tests a handle to assert on side effects.

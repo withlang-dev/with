@@ -22,17 +22,10 @@ error NotifyError =
     | RateLimited(retry_seconds: i64)
     | InvalidRecipient(addr: str)
 
-// Unified service error — all subsystem errors convert into this.
-// Use explicit conversion functions instead of From trait.
-error ServiceError =
-    | Db(DbError)
-    | Cache(CacheError)
-    | Notify(NotifyError)
+// Unified service error — `from` generates the Db, Cache and Notify
+// wrappers, so `?` converts each subsystem error; the written variants
+// are the service's own (§10.9).
+error ServiceError from DbError, CacheError, NotifyError =
     | Validation(msg: str)
     | TimedOut(operation: str, limit_secs: i64)
     | Cancelled
-
-// Explicit conversion functions (From trait not yet available)
-fn service_error_from_db(e: DbError) -> ServiceError: .Db(e)
-fn service_error_from_cache(e: CacheError) -> ServiceError: .Cache(e)
-fn service_error_from_notify(e: NotifyError) -> ServiceError: .Notify(e)
