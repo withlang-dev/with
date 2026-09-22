@@ -48,7 +48,6 @@ extern fn with_fs_mkdir_p(path: &str) -> i32
 extern fn with_fs_read_file(path: &str) -> str
 extern fn with_fs_file_exists(path: &str) -> i32
 extern fn with_fs_is_dir(path: &str) -> i32
-extern fn with_fs_chmod(path: &str, mode: i32) -> i32
 extern fn with_read_bytes_stdin(count: i32) -> str
 extern fn with_str_from_cstr(s: *const u8) -> str
 extern fn with_str_len(s: &str) -> i64
@@ -2800,7 +2799,8 @@ fn build_report_wall(target_name: &str, t0: i64):
 
 // #702: the install fast path. `:install-user` after a green battery reduces
 // to: verify out/release/bin/with is the exact binary last-green blessed,
-// copy it, set 0755. Same guarantee require-last-green enforces, none of the
+// install it through the .Install kind's placement (temp + rename + run
+// `<dest> version`). Same guarantee require-last-green enforces, none of the
 // graph machinery. (`:update-seed` is gone: src/main is the seed pinned in
 // seed.lock and only `with build :seed` writes it — the battery is driven by
 // the pinned seed, as CI is.)
@@ -2892,12 +2892,13 @@ fn cli_fast_install_blessed(root: &str, target_name: &str) -> i32:
     let gate_rc = reseed_gate_smoke(root, compiler_path)
     if gate_rc != 0:
         return gate_rc
+    // The .Install kind's own placement, never a write into the existing
+    // file: truncating the installed, previously-executed binary in place
+    // kept its inode, and macOS SIGKILLed the next launch (2026-09-22, after
+    // this path had printed success). Temp sibling + rename + `<dest> version`
+    // proving the installed file starts and is this compiler.
     let dest = with_getenv_str("HOME") ++ "/.local/bin/with"
-    if with_fs_write_file(dest, data) != 0:
-        with_eprint("error: could not write " ++ dest)
-        return 1
-    if with_fs_chmod(dest, 0o755) != 0:
-        with_eprint("error: could not chmod " ++ dest)
+    if build_graph_install_path(f"[{target_name}]", compiler_path, data, dest, 0o755, "version") != 0:
         return 1
     with_write("[" ++ target_name ++ "] " ++ dest ++ " <- out/release/bin/with (" ++ verified_by ++ ")\n")
     0

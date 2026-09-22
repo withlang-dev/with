@@ -600,25 +600,42 @@ pub fn build_graph_install_file(root: &str, target: &BuildGraphTarget) -> i32:
     if dest_path.len() == 0 or dest_path == target.output and dest_path.starts_with("$HOME/"):
         build_graph_rt_eprint("error: install target '" ++ target.name ++ "' could not resolve destination: " ++ target.output)
         return 1
-    let dest_dir = build_graph_dirname(dest_path)
-    if build_graph_rt_mkdir_p(dest_dir) != 0:
-        build_graph_rt_eprint("error: install target '" ++ target.name ++ "' could not create destination directory: " ++ dest_dir)
-        return 1
-    // Install via temp-sibling + rename, never an in-place overwrite: on
-    // arm64 macOS, truncating a previously-executed signed binary's inode
-    // leaves the kernel's per-vnode code-signature cache stale, and the next
-    // exec dies with SIGKILL even though codesign reads the file as valid.
-    // Rename gives the destination path a fresh inode atomically. The temp
-    // name carries this process id so no earlier temp's inode is reused.
     let mode = if target.args.len() == 0: 0o644 else: build_graph_parse_octal_mode(target.args.get(0))
     if mode < 0:
         build_graph_rt_eprint("error: install target '" ++ target.name ++ "' has invalid octal mode: " ++ target.args.get(0))
         return 1
-    let contents = build_graph_read_input("install target '" ++ target.name ++ "'", source_path) ?? return 1
+    let what = "install target '" ++ target.name ++ "'"
+    let contents = build_graph_read_input(what, source_path) ?? return 1
+    build_graph_install_path(what, source_path, contents, dest_path, mode, verify_subcommand)
+
+// The one way a file is installed — the .Install kind and the driver's
+// `:install-user` fast path both come here, so neither can write in place.
+// Temp sibling + rename, never an in-place overwrite: on arm64 macOS,
+// truncating a previously-executed signed binary's inode leaves the kernel's
+// per-vnode code-signature cache stale, and the next exec dies with SIGKILL
+// (137) even though codesign reads the file as valid. Rename gives the
+// destination path a fresh inode atomically. The temp name carries this
+// process id so no earlier temp's inode is reused.
+// A non-empty `verify_subcommand` proves the installed executable starts AND
+// is the source: `<source> <subcommand>` runs first (a source that cannot
+// run is not installed), and `<dest> <subcommand>` after the rename must
+// exit 0 with the identical stdout.
+pub fn build_graph_install_path(what: &str, source_path: &str, contents: &str, dest_path: &str, mode: i32, verify_subcommand: &str) -> i32:
+    let dest_dir = build_graph_dirname(dest_path)
+    if build_graph_rt_mkdir_p(dest_dir) != 0:
+        build_graph_rt_eprint("error: " ++ what ++ " could not create destination directory: " ++ dest_dir)
+        return 1
+    var expected = ""
+    if verify_subcommand.len() > 0:
+        var source_probe = build_graph_install_probe(source_path, verify_subcommand, dest_path ++ f".install-src.{build_graph_rt_pid()}")
+        if source_probe.rc != 0:
+            build_graph_rt_eprint("error: " ++ what ++ f": the source executable does not start (`{source_path} {verify_subcommand}` exited {source_probe.rc}); nothing was installed")
+            return 1
+        expected = move source_probe.stdout
     var attempt = 0
     while attempt < 2:
         attempt = attempt + 1
-        let rc = build_graph_install_place(target, contents, dest_path ++ f".install-tmp.{build_graph_rt_pid()}.{attempt}", dest_path, mode)
+        let rc = build_graph_install_place(what, contents, dest_path ++ f".install-tmp.{build_graph_rt_pid()}.{attempt}", dest_path, mode)
         if rc != 0:
             return rc
         if verify_subcommand.len() == 0:
@@ -627,36 +644,52 @@ pub fn build_graph_install_file(root: &str, target: &BuildGraphTarget) -> i32:
         // produced a file macOS killed with "Code Signature Invalid" while
         // the byte-identical source ran; a second copy through a fresh inode
         // was valid. One retry, loudly; a second failure is the error.
-        if build_graph_install_verify(target, dest_path, verify_subcommand) == 0:
+        let why = build_graph_install_verify_failure(dest_path, verify_subcommand, expected)
+        if why.len() == 0:
             return 0
         if attempt == 1:
-            build_graph_rt_eprint("warning: install target '" ++ target.name ++ "': the installed executable did not start (`" ++ dest_path ++ " " ++ verify_subcommand ++ "` failed); reinstalling through a fresh inode")
-    build_graph_rt_eprint("error: install target '" ++ target.name ++ "': the installed executable does not start: " ++ dest_path ++ " " ++ verify_subcommand)
+            build_graph_rt_eprint("warning: " ++ what ++ ": the installed executable failed verification (`" ++ dest_path ++ " " ++ verify_subcommand ++ "` " ++ why ++ "); reinstalling through a fresh inode")
+        else:
+            build_graph_rt_eprint("error: " ++ what ++ ": the installed executable failed verification: `" ++ dest_path ++ " " ++ verify_subcommand ++ "` " ++ why)
     1
 
 // Write `contents` to a temp sibling, chmod, rename into place.
-fn build_graph_install_place(target: &BuildGraphTarget, contents: &str, temp_path: &str, dest_path: &str, mode: i32) -> i32:
-    let _remove_stale_temp = build_graph_rt_remove_file(temp_path)
+fn build_graph_install_place(what: &str, contents: &str, temp_path: &str, dest_path: &str, mode: i32) -> i32:
+    build_graph_rt_remove_file(temp_path)
     if build_graph_rt_write_file(temp_path, contents) != 0:
-        build_graph_rt_eprint("error: install target '" ++ target.name ++ "' could not write destination: " ++ temp_path)
+        build_graph_rt_eprint("error: " ++ what ++ " could not write destination: " ++ temp_path)
         return 1
     if build_graph_rt_chmod(temp_path, mode) != 0:
-        let _remove_temp = build_graph_rt_remove_file(temp_path)
-        build_graph_rt_eprint("error: install target '" ++ target.name ++ "' could not chmod destination: " ++ temp_path)
+        build_graph_rt_remove_file(temp_path)
+        build_graph_rt_eprint("error: " ++ what ++ " could not chmod destination: " ++ temp_path)
         return 1
     if build_graph_rt_rename_file(temp_path, dest_path) != 0:
-        let _remove_temp = build_graph_rt_remove_file(temp_path)
-        build_graph_rt_eprint("error: install target '" ++ target.name ++ "' could not move into place: " ++ dest_path)
+        build_graph_rt_remove_file(temp_path)
+        build_graph_rt_eprint("error: " ++ what ++ " could not move into place: " ++ dest_path)
         return 1
     0
 
-// `<dest> <subcommand>` must exit 0 (a code-signature kill is 137).
-fn build_graph_install_verify(target: &BuildGraphTarget, dest_path: &str, subcommand: &str) -> i32:
-    var argv = build_graph_argv_append("", dest_path)
+// Why `<dest> <subcommand>` fails verification — it must exit 0 and print
+// exactly `expected` — or "" when it passes.
+pub fn build_graph_install_verify_failure(dest_path: &str, subcommand: &str, expected: &str) -> str:
+    let probe = build_graph_install_probe(dest_path, subcommand, dest_path ++ f".install-verify.{build_graph_rt_pid()}")
+    if probe.rc != 0:
+        return f"exited {probe.rc}"
+    if probe.stdout != expected:
+        return "printed `" ++ probe.stdout ++ "`, the source printed `" ++ expected ++ "`"
+    ""
+
+type InstallProbe { rc: i32, stdout: str }
+
+// `<exe> <subcommand>`: its exit status (a code-signature kill is 137) and
+// stdout. The captures live beside `capture_base` and are removed.
+fn build_graph_install_probe(exe: &str, subcommand: &str, capture_base: &str) -> InstallProbe:
+    var argv = build_graph_argv_append("", exe)
     argv = build_graph_argv_append(argv, subcommand)
-    let stdout_path = dest_path ++ ".verify.stdout"
-    let stderr_path = dest_path ++ ".verify.stderr"
+    let stdout_path = capture_base ++ ".stdout"
+    let stderr_path = capture_base ++ ".stderr"
     let rc = build_graph_rt_exec_argv_capture(argv, stdout_path, stderr_path, 60000)
-    let _out = build_graph_rt_remove_file(stdout_path)
-    let _err = build_graph_rt_remove_file(stderr_path)
-    rc
+    let stdout = build_graph_rt_read_file(stdout_path)
+    build_graph_rt_remove_file(stdout_path)
+    build_graph_rt_remove_file(stderr_path)
+    InstallProbe { rc: rc, stdout: stdout }
