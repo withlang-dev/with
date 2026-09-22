@@ -193,6 +193,13 @@ impl Sema:
         if self.iface_mentioned.contains(name):
             return true
         if kind == NodeKind.NK_FN_DECL:
+            // A displaced interface fn (`is_digit$in$<module>`, #1362) answers
+            // to its short name: that is the name a source mentions.
+            let text = self.pool_resolve(name)
+            let infix = text.index_of("$in$")
+            if infix > 0:
+                let short_name = self.pool_lookup_symbol(text.slice(0, infix))
+                return short_name != 0 and self.iface_mentioned.contains(short_name)
             let bare = self.method_decl_name_symbol(name)
             return bare != 0 and bare != name and self.iface_mentioned.contains(bare)
         false
@@ -1511,11 +1518,13 @@ impl Sema:
         if method_owner_sym == 0:
             self.record_displaced_fn(fn_name, decl_is_pub)
         // D39: a source definition owns the flat name whatever the
-        // declaration order; an interface declaration of the same name
-        // (pcre2's is_alpha beside std.string's) keeps its signature for
-        // the visibility-gated lookups and never displaces it — a
-        // displaced source body would be skipped as shadowed and its
-        // function left declared without a body.
+        // declaration order. The on-demand interface merge already gives a
+        // colliding interface fn its module-qualified identity
+        // (Zcu.displace_colliding_interface_fns, #1362); an interface
+        // declaration that still meets a same-named source one here keeps
+        // its signature for the visibility-gated lookups and never
+        // displaces it — a displaced source body would be skipped as
+        // shadowed and its function left declared without a body.
         let interface_yields = self.ast.fn_decl_body_is_interface(node) and self.fn_decl_nodes.contains(fn_name) and not self.ast.fn_decl_body_is_interface(self.fn_decl_nodes.get(fn_name).unwrap())
         if self.fn_decl_nodes.contains(fn_name) and not interface_yields:
             let existing_node: i32 = self.fn_decl_nodes.get(fn_name).unwrap()

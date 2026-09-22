@@ -2864,10 +2864,14 @@ impl Sema:
     //   1. std blindness — a std implementation module never resolves a
     //      user-tier declaration. The flat merge let newer user decls hijack
     //      std-internal references (user `type Regex` rebound regex.w).
-    //   2. prelude gate — a prelude-closure declaration is ambient only for
-    //      the §18.2 enumerated names; any other std name resolves from user
-    //      code only through an explicit import path (never the synthetic
-    //      prelude edge). Replaced by the D fallback tier when #751 lands.
+    //   2. prelude gate — a std declaration is ambient only for the §18.2
+    //      enumerated names; any other std name resolves from user code only
+    //      through an explicit import path (never the synthetic prelude
+    //      edge). Every std module is gated, not only the prelude closure:
+    //      the modules those import for themselves (the bundle corpora the
+    //      prelude's std.regex reaches, std.re.defs' u128_mul_would_overflow
+    //      and is_alnum) were reachable over the prelude edge and ungated
+    //      (#1362). Replaced by the D fallback tier when #751 lands.
     fn decl_visible_from_current_gated(target_path: &str, is_pub: i32, sym: i32) -> i32:
         if target_path.len() == 0:
             return 1
@@ -2881,7 +2885,7 @@ impl Sema:
         let target_is_std = sema_tier_path_is_std_implementation(target_path)
         if current_is_std != 0 and target_is_std == 0:
             return 0
-        if current_is_std == 0 and target_is_std != 0 and self.module_in_prelude_closure(target_path) != 0:
+        if current_is_std == 0 and target_is_std != 0:
             if sema_prelude_gate_allows_name(self.pool_resolve(sym)) == 0:
                 if self.module_visible_no_prelude(target_path) == 0:
                     return 0
@@ -2992,32 +2996,42 @@ impl Sema:
     // D29 scaffolding (#750): when a name failed resolution only because the
     // prelude gate requires an import, name the exact use line. The message
     // suffix "; add: use <module>.<name>" is a stable contract consumed by
-    // tools/insert_std_uses.w and the migrator's self-fix pass.
+    // tools/insert_std_uses.w and the migrator's self-fix pass. The prelude
+    // closure's modules are offered first; a name only a deeper std module
+    // declares (a bundle corpus's u128_mul_would_overflow, #1362) offers
+    // those, displaced declarations (#1350) included.
     fn std_gated_import_note(sym: i32) -> str:
         if sym == 0:
             return ""
         let name = self.pool_resolve(sym)
         if name.len() == 0 or sema_prelude_gate_allows_name(name) != 0:
             return ""
-        var modules = sema_new_vec_str()
+        let paths = sema_new_vec_str()
         var i = 0
         while i < self.named_type_candidate_syms.len() as i32:
             if self.named_type_candidate_syms[i] == sym and self.named_type_candidate_pub[i] != 0:
-                let path = self.named_type_candidate_paths[i]
-                if sema_tier_path_is_std_implementation(path) != 0 and self.module_in_prelude_closure(path) != 0:
-                    let dotted = sema_std_module_dotted(path)
-                    if dotted.len() > 0 and sema_vec_str_contains(&modules, dotted) == 0:
-                        modules.push(sema_owned_text(dotted))
+                paths.push(sema_owned_text(self.named_type_candidate_paths[i]))
             i = i + 1
         i = 0
         while i < self.decl_visibility_syms.len() as i32:
             if self.decl_visibility_syms[i] == sym and self.decl_visibility_pub[i] != 0:
-                let path = self.decl_visibility_paths[i]
-                if sema_tier_path_is_std_implementation(path) != 0 and self.module_in_prelude_closure(path) != 0:
+                paths.push(sema_owned_text(self.decl_visibility_paths[i]))
+            i = i + 1
+        i = if self.displaced_fn_index.contains(sym): self.displaced_fn_index.get(sym).unwrap() else: -1
+        while i >= 0:
+            if self.displaced_fn_pub[i] != 0:
+                paths.push(sema_owned_text(self.displaced_fn_paths[i]))
+            i = self.displaced_fn_prev[i]
+        var modules = sema_new_vec_str()
+        for round in 0..2:
+            let closure_only = 1 - round
+            if modules.len() as i32 > 0:
+                break
+            for path in paths:
+                if sema_tier_path_is_std_implementation(path) != 0 and (closure_only == 0 or self.module_in_prelude_closure(path) != 0):
                     let dotted = sema_std_module_dotted(path)
                     if dotted.len() > 0 and sema_vec_str_contains(&modules, dotted) == 0:
                         modules.push(sema_owned_text(dotted))
-            i = i + 1
         if modules.len() as i32 == 0:
             return ""
         if modules.len() as i32 == 1:

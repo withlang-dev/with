@@ -2131,6 +2131,7 @@ impl Zcu:
                 chunk = chunk ++ line_texts[li]
                 line_done[li] = 1
                 chunk_lines = chunk_lines + line_counts[li]
+        self.displace_colliding_interface_fns(out, base)
         // The root's declarations stay the pool's tail: after the import
         // merge the order is prelude → imports → root, and is_local_decl
         // takes the last root_tail entries. The chunks go before them.
@@ -2167,6 +2168,39 @@ impl Zcu:
             let ns = runtime_clock_nanos() - t_start
             runtime_eprint(f"[profile] frontend.interface  {ns / 1000000}.{(ns % 1000000) / 1000} ms  sections={paths.len() as i32} lines={parsed_lines} of {decl_lines}")
         out
+
+    // #1362: an interface fn is its module's, like a source fn (#1350). When
+    // a declaration of another module already takes its short name — a user
+    // `fn is_digit(ch: u8)`, std.string's `is_alnum`, another corpus's
+    // `u128_mul_would_overflow` — it is displaced to `name$in$<module>`
+    // (frontend_displace_fn_decl) instead of sharing the flat name: under one
+    // flat symbol the interface signature was checked against the other
+    // module's function (analyze audit:all: "finalized source type or LLVM
+    // parameter disagrees with FnAbi"). Sema binds it for the references its
+    // visibility admits (resolve_displaced_fn_ident, §18.1 precedence, the
+    // §18.2 gate); its link name keeps the bundle's module-qualified name
+    // (fn_abi_module_link_name). The earlier declaration keeps the short name,
+    // so a source definition always does (D39: the interface yields).
+    fn displace_colliding_interface_fns(pool: AstPool, base: i32):
+        let taken: HashMap[i32, str] = HashMap.new()
+        for di in 0..pool.decl_count():
+            let decl = pool.get_decl(di) as i32
+            let kind = pool.kind(decl)
+            if kind != NodeKind.NK_FN_DECL and kind != NodeKind.NK_EXTERN_FN:
+                continue
+            if frontend_fn_decl_is_method(pool, self.pool, decl):
+                continue
+            let name = pool.get_data0(decl)
+            let path = self.decl_source_path_frontend(di)
+            if di < base or not pool.fn_decl_body_is_interface(decl as NodeId):
+                if not taken.contains(name):
+                    taken.insert(name, frontend_owned_text(path))
+                continue
+            if not taken.contains(name):
+                taken.insert(name, frontend_owned_text(path))
+                continue
+            if taken.get(name).unwrap() != path and not frontend_fn_decl_is_c_export(pool, self.pool, decl):
+                frontend_displace_fn_decl(pool, self.pool, decl, path)
 
     mut fn parse_interface_chunk(pool: AstPool, path: &str, chunk: &str) -> AstPool:
         var out = pool
@@ -2602,9 +2636,9 @@ let FRONTEND_FN_DISPLACE = 2
 // it bound them to the other module's function — a user `fn is_digit(u8)`
 // silently became std.string's is_alnum's callee, and std.re's own
 // `is_digit` call became "not visible". A same-module duplicate, an extern
-// (one global C symbol in every tier), an interface decl (D39's flat
-// coexistence; displacing it would half-close the gate leak of #1362) and a
-// c_export fn (one exported C name) keep the drop.
+// (one global C symbol in every tier), an interface decl (displaced by the
+// on-demand interface merge instead: displace_colliding_interface_fns,
+// #1362) and a c_export fn (one exported C name) keep the drop.
 fn frontend_fn_tier_verdict(tier: &Vec[i32], paths: &Vec[str], pool: AstPool, intern: InternPool, idx: i32, higher_names: &Vec[i32]) -> i32:
     let current = tier[idx]
     let current_kind = pool.kind(current)
@@ -2646,14 +2680,12 @@ fn frontend_fn_tier_verdict(tier: &Vec[i32], paths: &Vec[str], pool: AstPool, in
     FRONTEND_FN_KEEP
 
 fn frontend_fn_decl_is_displaceable(pool: AstPool, intern: InternPool, decl: i32) -> bool:
-    if pool.kind(decl) != NodeKind.NK_FN_DECL or pool.fn_decl_body_is_interface(decl as NodeId):
-        return false
+    pool.kind(decl) == NodeKind.NK_FN_DECL and not pool.fn_decl_body_is_interface(decl as NodeId) and not frontend_fn_decl_is_c_export(pool, intern, decl)
+
+fn frontend_fn_decl_is_c_export(pool: AstPool, intern: InternPool, decl: i32) -> bool:
     let meta = pool.find_fn_meta(decl as NodeId)
-    if meta >= 0 and pool.fn_meta_tp_count(meta) == 0 and pool.fn_meta_tp_start(meta) != 0:
-        // The tp_start slot of a non-generic fn carries its callconv.
-        if intern.resolve(pool.fn_meta_tp_start(meta)).starts_with("c_export:"):
-            return false
-    true
+    // The tp_start slot of a non-generic fn carries its callconv.
+    meta >= 0 and pool.fn_meta_tp_count(meta) == 0 and pool.fn_meta_tp_start(meta) != 0 and intern.resolve(pool.fn_meta_tp_start(meta)).starts_with("c_export:")
 
 // A displaced fn's identity: its name qualified by its module's canonical
 // path (checkout-independent, D38), spelled with `$` so no source name can
