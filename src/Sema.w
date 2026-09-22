@@ -820,6 +820,7 @@ pub type Sema {
     // type_needs_drop cycle guard — HashSet (heap handle) for `&Self` interior mut.
     needs_drop_visit: HashSet[i32],
     current_drop_type_sym: i32,
+    pattern_subject_node: i32,         // subject expr of the pattern being checked (#1272 fix-its); 0 when none
     drop_control_flow_depth: i32,
     move_control_flow_depth: i32,
     move_control_flow_binding_starts: Vec[i32],
@@ -2188,6 +2189,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         copy_visit_stack: HashSet.new(),
         needs_drop_visit: HashSet.new(),
         current_drop_type_sym: 0,
+        pattern_subject_node: 0,
         drop_control_flow_depth: 0,
         move_control_flow_depth: 0,
         move_control_flow_binding_starts: Vec.new(),

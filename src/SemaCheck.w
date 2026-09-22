@@ -12821,7 +12821,9 @@ impl Sema:
             // Conditional *field* moves remain rejected via drop_control_flow_depth.
             self.push_move_control_flow_context(1)
             self.push_scope()
+            self.pattern_subject_node = subject
             self.check_pattern(pat, subject_type as i32)
+            self.pattern_subject_node = 0
             self.record_pattern_view_bindings(pat, subject)
             if self.ast.kind(pat) == NodeKind.NK_PAT_REGEX:
                 self.regex_bind_capture_scope(pat)
@@ -13917,6 +13919,69 @@ impl Sema:
             let field_ty = self.type_reflection_field_type(struct_ty, bi)
             self.check_pattern(inner_pat, self.pattern_child_subject_type(subject_type, field_ty))
 
+    // #1272 (Eric, 2026-09-22): a struct/enum pattern applied to a by-value
+    // subject whose type implements Drop consumes the whole and skips its
+    // destructor (MirLower cancels the scratch drop so the arms own the
+    // payloads). The only way to skip a destructor is a spelling visible at
+    // the type's own boundary, so the pattern is an error everywhere except
+    // inside that type's own `move fn` methods (`drop` included), where it is
+    // the visible disarm and must be total. A borrowed subject (`match &r`)
+    // binds views and never moves; `let t = r`, `let _ = r` and a `_` arm keep
+    // the value whole and still run Drop — none of those are touched.
+    // Returns the owner symbol when the pattern sits inside that type's own
+    // `move fn` (the caller enforces totality), -1 when the pattern was
+    // rejected, 0 when the subject is not a by-value Drop type.
+    mut fn drop_pattern_gate(node: i32, subject_type: i32, field_sym: i32) -> i32:
+        let owner = self.drop_pattern_owner_sym(subject_type)
+        if owner == 0:
+            return 0
+        if owner == self.enclosing_move_fn_owner():
+            return owner
+        let type_text: str = self.pool_resolve(owner)
+        let subject_text = self.drop_pattern_subject_text()
+        var read_sym = field_sym
+        if read_sym == 0:
+            read_sym = self.type_reflection_field_name(subject_type, 0)
+        var read_text: str = ""
+        if read_sym != 0:
+            read_text = self.pool_resolve(read_sym)
+        let read_hint = if read_sym != 0: "read a field (`" ++ subject_text ++ "." ++ read_text ++ "`)"
+            else: "match through a borrow (`match &" ++ subject_text ++ "`)"
+        self.emit_error_with_help("cannot destructure `" ++ type_text ++ "` by pattern: `" ++ type_text ++ "` implements Drop, and taking it apart would skip its destructor", node, "keep it whole (`let t = " ++ subject_text ++ "`) or " ++ read_hint ++ "; only a `move fn` of `" ++ type_text ++ "` may take it apart")
+        -1
+
+    fn drop_pattern_owner_sym(subject_type: i32) -> i32:
+        if subject_type == 0:
+            return 0
+        let resolved = self.resolve_alias(subject_type as TypeId)
+        let kind = self.get_type_kind(resolved)
+        if kind == TypeKind.TY_REF or self.type_has_drop_impl(resolved as i32) == 0:
+            return 0
+        if kind == TypeKind.TY_GENERIC_INST: self.get_generic_inst_base(resolved as i32) else: self.get_type_name(resolved)
+
+    // The owner type of the enclosing method when it is a `move fn`; 0 otherwise.
+    fn enclosing_move_fn_owner() -> i32:
+        if self.current_fn_symbol == 0:
+            return 0
+        let si = self.get_sig(self.current_fn_symbol)
+        if si < 0 or self.sig_receiver_mode(si) != ReceiverMode.Move:
+            return 0
+        let text = self.pool_resolve(self.current_fn_symbol)
+        let dot = sema_str_find_char(text, '.')
+        if dot <= 0:
+            return 0
+        self.pool_lookup_symbol(text.slice(0, dot))
+
+    fn drop_pattern_subject_text() -> str:
+        if self.pattern_subject_node == 0:
+            return "v"
+        let text = render_expr(self.ast, self.pool, self.pattern_subject_node as NodeId, 0)
+        if text.len() == 0 or text.len() > 40 or sema_str_contains_char(text, '\n') != 0: "v" else: text
+
+    mut fn emit_partial_drop_pattern(node: i32, owner: i32, unbound: &str, add: &str):
+        let type_text: str = self.pool_resolve(owner)
+        self.emit_error_with_help("partial pattern on `" ++ type_text ++ "` inside its own `move fn` leaves " ++ unbound ++ " unbound", node, "a pattern that disarms `" ++ type_text ++ "`'s Drop must account for every field; add `" ++ add ++ "`")
+
     mut fn check_pattern(node: i32, subject_type: i32):
         if node == 0:
             return
@@ -13976,6 +14041,8 @@ impl Sema:
             let bind_count = self.ast.get_data2(node)
             let subject_shape_type = self.pattern_subject_shape_type(subject_type)
             let subject_enum_ty = self.enum_pattern_type(subject_shape_type)
+            // A rejected pattern still binds its names, so the error stands alone.
+            let drop_owner = self.drop_pattern_gate(node, subject_type, 0)
             if kind == NodeKind.NK_PAT_VARIANT and subject_enum_ty == 0 and bind_count != 0 and self.ast.pattern_qualifier(node) == 0:
                 let struct_ty = self.positional_struct_pattern_type(node, subject_shape_type, v_name)
                 if struct_ty > 0:
@@ -14071,6 +14138,14 @@ impl Sema:
                     let v_text: str = self.pool_resolve(v_name)
                     self.emit_error(f"variant pattern '{v_text}' expects {payload_count} payload pattern(s), found {bind_count - 1}", node)
                     return
+                if drop_owner > 0 and rest_pos < payload_count:
+                    var unbound = ""
+                    var add = ""
+                    for pi in rest_pos..payload_count:
+                        unbound = if unbound.len() == 0: f"payload {pi + 1}" else: f"{unbound}, {pi + 1}"
+                        add = if add.len() == 0: "_" else: add ++ ", _"
+                    let v_text: str = self.pool_resolve(v_name)
+                    self.emit_partial_drop_pattern(node, drop_owner, f"{unbound} of `{v_text}`", add)
                 for bi in 0..rest_pos:
                     let inner_pat = self.ast.get_extra(v_extra + bi)
                     var inner_ty = if bi < payload_count: self.type_extra[(payload_start + bi)] else: 0
@@ -14181,6 +14256,27 @@ impl Sema:
             if self.get_type_kind(resolved) == TypeKind.TY_STRUCT:
                 field_start = self.get_type_d1(resolved)
                 field_count = self.get_type_d2(resolved)
+            let first_named = if sp_count > 0: self.ast.get_extra(sp_extra + 1) else: 0
+            // A rejected pattern still binds its names, so the error stands alone.
+            let drop_owner = self.drop_pattern_gate(node, subject_type, first_named)
+            if drop_owner > 0:
+                // Inside the type's own `move fn` the destructure is the visible
+                // disarm: every field is named or explicitly `_`.
+                var unbound = ""
+                var add = ""
+                for fi in 0..self.type_reflection_field_count(subject_shape_type):
+                    let name_sym = self.type_reflection_field_name(subject_shape_type, fi)
+                    var named = 0
+                    for spi in 0..sp_count:
+                        if self.ast.get_extra(sp_extra + 1 + spi * 2) == name_sym:
+                            named = 1
+                            break
+                    if named == 0:
+                        let name_text = self.pool_resolve(name_sym)
+                        unbound = if unbound.len() == 0: "`" ++ name_text ++ "`" else: unbound ++ ", `" ++ name_text ++ "`"
+                        add = if add.len() == 0: name_text ++ ": _" else: add ++ ", " ++ name_text ++ ": _"
+                if unbound.len() > 0:
+                    self.emit_partial_drop_pattern(node, drop_owner, unbound, add)
             for spi in 0..sp_count:
                 let f_name = self.ast.get_extra(sp_extra + 1 + spi * 2)
                 let f_pat = self.ast.get_extra(sp_extra + 1 + spi * 2 + 1)
@@ -15027,7 +15123,9 @@ impl Sema:
             self.typed_expr_types.insert(value, val_type as i32)
         if else_body == 0 and self.pattern_is_refutable(pattern) != 0:
             self.emit_error("let ... else requires an else branch for refutable patterns", node)
+        self.pattern_subject_node = value
         self.check_pattern(pattern, val_type as i32)
+        self.pattern_subject_node = 0
         self.record_pattern_view_bindings(pattern, value)
         // #782 arm 2: a pattern let over an owned subject EXTRACTS by value —
         // MIR moves the bound elements out, so a later use of the subject
