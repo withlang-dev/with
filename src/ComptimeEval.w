@@ -3383,7 +3383,7 @@ fn comptime_str_find(haystack: &str, needle: &str) -> i32:
 
 impl ComptimeEvaluator:
     mut fn eval_str_method_call(recv_value: &ComptimeValue, field: i32, extra_start: i32, arg_count: i32, node: i32) -> ComptimeControl:
-        let method = self.pool.resolve(field)
+        let method = self.pool.resolve(field).clone()
         let text = recv_value.text
         if method == "len":
             if arg_count != 0:
@@ -4197,7 +4197,7 @@ impl ComptimeEvaluator:
         let file_id = comp.zcu.decl_source_file_id_frontend(decl_index)
         let source = comp.zcu.source_for_file_id_frontend(file_id)
         let module_name = comptime_module_name_for_path(comp.zcu.project_config.root_dir, path)
-        let name = comp.zcu.pool.resolve(pool.get_data0(decl))
+        let name = comp.zcu.pool.resolve(pool.get_data0(decl)).clone()
         let flags = pool.get_data2(decl)
         let is_pub = (flags / FnFlags.PUB) % 2 == 1
         let meta = pool.find_fn_meta(decl)
@@ -4242,7 +4242,7 @@ impl ComptimeEvaluator:
         let file_id = comp.zcu.decl_source_file_id_frontend(decl_index)
         let source = comp.zcu.source_for_file_id_frontend(file_id)
         let module_name = comptime_module_name_for_path(comp.zcu.project_config.root_dir, path)
-        let name = comp.zcu.pool.resolve(pool.get_data0(decl))
+        let name = comp.zcu.pool.resolve(pool.get_data0(decl)).clone()
         let packed = pool.get_data2(decl)
         let sub_kind = type_decl_sub_kind(packed)
         let is_pub = type_decl_is_pub(pool, pool.get_data1(decl), sub_kind)
