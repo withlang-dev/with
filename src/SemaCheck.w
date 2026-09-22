@@ -12066,7 +12066,7 @@ impl Sema:
             self.record_view_producer_origins(node, expr)
             return elem_view
         if container_tk == TypeKind.TY_GENERIC_INST:
-            let base_name = self.pool_resolve(self.get_type_d0(container_tid))
+            let base_name = self.pool_resolve(self.get_type_d0(container_tid)).clone()
             let is_type_level_index = self.index_expr_is_type_level(expr)
             if is_type_level_index and base_name == "Vec" and self.get_generic_inst_arg_count(container_tid) > 0:
                 let elem_ty = self.get_generic_inst_arg(container_tid, 0)
@@ -21309,7 +21309,7 @@ impl Sema:
         // check argument types and return types for builtin generic methods
         if self.get_type_kind(recv_type) == TypeKind.TY_GENERIC_INST:
             let mc_call_name = self.pool_resolve(type_name_sym) ++ "." ++ self.pool_resolve(field)
-            let mc_method_name_raw = self.pool_resolve(field)
+            let mc_method_name_raw = self.pool_resolve(field).clone()
             if type_name_sym == self.syms.fixed_string and field == self.syms.new:
                 if arg_count != 0:
                     self.emit_error("FixedString.new() expects no arguments", node)
@@ -22465,7 +22465,7 @@ impl Sema:
         let field = self.typeinfo_module_field(callee)
         if field == 0:
             return 0
-        let method_name = self.pool_resolve(field)
+        let method_name = self.pool_resolve(field).clone()
         if self.in_comptime_fn == 0:
             self.emit_error("TypeInfo is only available in comptime context", node)
             return 0
