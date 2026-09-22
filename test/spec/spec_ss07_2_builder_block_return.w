@@ -1,5 +1,5 @@
-//! known-issue: #723 builder block return unimplemented (pre-existing; red on the seed too)
-// Spec test: Section 7.2 - Builder Block Return
+// Spec §7.2: `with expr as mut x:` always returns x (the builder) — moved out,
+// never dropped first (#1290).
 
 use std.collections.HashMap
 type Config {

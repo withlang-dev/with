@@ -12526,11 +12526,18 @@ impl MirBuilder:
         let local_place = self.place_for_local(local)
         self.assign_operand_to_place(local_place, rhs, self.ast.get_start(rhs_expr))
         // Form 2 builder rule: `with <expr> as mut x:` always returns x.
+        // The builder moves out (§7.2's desugaring: `{ var c = ...; ...; c }`)
+        // into a statement temp BEFORE the block's scope-exit drops: the
+        // recorded move elides x's own drop (§2.5.2), so the block no longer
+        // frees the buffer it returns (#1290), and the temp is what the
+        // consumer takes — or, in statement position, what the statement
+        // boundary drops (da_temp_arena_drop_resets).
         if is_mut != 0:
             let _ = self.lower_expr_discard(body_expr)
-            let local_return_place = self.place_for_local(local)
+            let moved = self.body.new_operand(OperandKind.OK_MOVE, self.place_for_local(local))
+            let result_place = self.materialize_operand(moved, ty, span)
             self.pop_scope_inline()
-            return self.body.new_operand(OperandKind.OK_COPY, local_return_place)
+            return self.body.new_operand(OperandKind.OK_MOVE, result_place)
         let result = self.lower_expr(body_expr)
         self.pop_scope_inline()
         result

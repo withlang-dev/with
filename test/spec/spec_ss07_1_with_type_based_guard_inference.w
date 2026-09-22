@@ -1,5 +1,5 @@
-//! known-issue: #723 with-type guard inference unimplemented (pre-existing; red on the seed too)
-// Spec test: Section 7.1 - With Type-Based Guard Inference
+// Spec §7.1 guard inference and §7.2 builder return: `with expr as mut x:`
+// returns x, moved out (#1290).
 
 use std.sync
 
