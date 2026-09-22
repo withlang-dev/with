@@ -141,19 +141,16 @@ extend UserService:
         self.metrics.cache_misses += 1
 
 // --- Helper: describe changes between two users ---
-//
-// (`with Vec.new() as mut changes:` is the builder spelling, §7.2; the
-// `var` desugaring is used until #1298 accepts a trailing `if`.)
 
 pub fn describe_changes(old: &User, new_user: &User) -> str:
-    var changes = Vec.new()
-    if old.name != new_user.name:
-        changes.push("name changed")
-    if old.email != new_user.email:
-        changes.push("email changed")
-    if old.active != new_user.active:
-        if new_user.active:
-            changes.push("activated")
-        else:
-            changes.push("deactivated")
+    let changes = with Vec.new() as mut changes:
+        if old.name != new_user.name:
+            changes.push("name changed")
+        if old.email != new_user.email:
+            changes.push("email changed")
+        if old.active != new_user.active:
+            if new_user.active:
+                changes.push("activated")
+            else:
+                changes.push("deactivated")
     changes.join(", ")

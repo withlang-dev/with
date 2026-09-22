@@ -39,16 +39,14 @@ impl UserRepository for PgUserRepo:    async fn find_by_id(self: &PgUserRepo, id
         UserId { value: 1 }
 
     async fn update(self: &PgUserRepo, id: UserId, fields: UserUpdate) -> bool:
-        // Build SET clause dynamically (`with Vec.new() as mut parts:` is
-        // the builder spelling, §7.2; the `var` desugaring until #1298
-        // accepts a trailing `if`)
-        var sets = Vec.new()
-        if fields.name.is_some():
-            sets.push("name = $2")
-        if fields.email.is_some():
-            sets.push("email = $3")
-        if fields.active.is_some():
-            sets.push("active = $5")
+        // Build SET clause dynamically
+        let sets = with Vec.new() as mut parts:
+            if fields.name.is_some():
+                parts.push("name = $2")
+            if fields.email.is_some():
+                parts.push("email = $3")
+            if fields.active.is_some():
+                parts.push("active = $5")
 
         if sets.is_empty():
             return false
