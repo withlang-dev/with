@@ -10144,7 +10144,7 @@ impl Codegen:
                 // template is interned raw at parse time. {name}->$N substitution
                 // already happened in the parser.
                 let asm_tmpl = self.decode_string_escapes(self.intern.resolve(asm_tmpl_sym))
-                let asm_constr = self.intern.resolve(asm_constr_sym)
+                let asm_constr = self.intern.resolve(asm_constr_sym).clone()
                 let asm_is_volatile = (asm_flags & 1) != 0
                 let asm_has_output = (asm_flags & 2) != 0
                 // Determine return type and collect input values.
