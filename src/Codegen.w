@@ -5369,7 +5369,7 @@ impl Codegen:
         let sema_sig_idx = self.sema.extern_decl_sigs.get(ext_node) ?? -1
 
         let ret_ty = self.resolve_return_type(ret_type_node)
-        let name_str = self.intern.resolve(name_sym)
+        let name_str = self.intern.resolve(name_sym).clone()
         let cc_name = self.fn_callconv_name(meta)
         let uses_internal_abi = codegen_extern_uses_internal_abi(name_str, cc_name)
 
