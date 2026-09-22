@@ -1171,6 +1171,12 @@ pub type Sema {
     infer_tail_node: i32,
     infer_tail_is_closure: i32,
     infer_tail_join: i32,
+    // §9.1 / D43: the block that is a function's or closure's own body. Only
+    // its tail, never an arm block's, is discarded when it is an assignment.
+    body_tail_block: i32,
+    // The assignment tails Sema discarded (body tails only); MirLower lowers
+    // exactly these in discard mode.
+    discarded_tails: HashMap[i32, i32],
     // D55 (§18.2): the `if`/`match` node that is the argument of a generic
     // parameter bounded by Display (`print(match ..)`). Its arms join under
     // the ordinary rule; when nothing joins, the fix-it is the f-string.
@@ -2426,6 +2432,8 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         infer_tail_node: 0,
         infer_tail_is_closure: 0,
         infer_tail_join: 0,
+        body_tail_block: 0,
+        discarded_tails: sema_new_map_i32_i32(),
         display_join_node: 0,
         body_typed_sigs: sema_new_map_i32_i32(),
         untyped_callee_calls: Vec.new(),

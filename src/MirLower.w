@@ -6006,10 +6006,11 @@ impl MirBuilder:
 
     // A function or closure body in the value role. §9.1: an assignment in
     // tail position is discarded, so the body yields Unit and the caller
-    // supplies the implicit result (§4.9 / §4.10) — the same verdict Sema
-    // reached through expr_is_assignment (#1296).
+    // supplies the implicit result (§4.9 / §4.10) — the verdict Sema recorded
+    // in discard_body_tail (#1296). Only the body's own tail is discarded; an
+    // arm's assignment keeps its value (D43, Eric 2026-09-22).
     mut fn lower_tail_expr(node: i32) -> i32:
-        if self.sema.expr_is_assignment(node) != 0: self.lower_expr_discard(node) else: self.lower_expr(node)
+        if self.sema.tail_is_discarded(node): self.lower_expr_discard(node) else: self.lower_expr(node)
 
     mut fn lower_expr_discard(node: i32) -> i32:
         if node == 0:
@@ -6185,8 +6186,9 @@ impl MirBuilder:
 
         var result = self.unit_operand()
         if tail_expr != 0:
-            // §9.1: an assignment tail is discarded (Sema typed the block Unit).
-            if want_result != 0 and self.sema.expr_is_assignment(tail_expr) == 0:
+            // §9.1: a body block's assignment tail is discarded (Sema typed the
+            // body Unit); an arm block's tail is not.
+            if want_result != 0 and not self.sema.tail_is_discarded(tail_expr):
                 self.cancel_scheduled_value_drop_for_receiver_expr(tail_expr)
                 result = self.lower_expr(tail_expr)
                 result = self.materialize_tail_field_move(result, tail_expr)

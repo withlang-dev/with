@@ -2354,10 +2354,13 @@ impl Sema:
         let saved_infer_closure = self.infer_tail_is_closure
         self.infer_tail_node = if body_expected_ret == 0 and self.fn_decl_is_entry_point(node) == 0: body else: 0
         self.infer_tail_is_closure = 0
+        let saved_body_tail_block = self.body_tail_block
+        self.body_tail_block = body
         let checked_body_ty = self.check_expr(body)
+        self.body_tail_block = saved_body_tail_block
         // §9.1: a single-statement assignment body is discarded, exactly as
-        // check_block discards a block's assignment tail.
-        let body_ty = if self.expr_is_assignment(body) != 0: self.ty_void else: checked_body_ty
+        // check_block discards the body block's assignment tail.
+        let body_ty = if self.discard_body_tail(body) != 0: self.ty_void else: checked_body_ty
         self.infer_tail_node = saved_infer_tail
         self.infer_tail_is_closure = saved_infer_closure
         self.stamp_move_site_liveness(body_site_start)
@@ -5806,11 +5809,17 @@ impl Sema:
             return self.body_return_type_info(self.ast.get_data0(node))
         info
 
-    // §9.1: an assignment is an expression typed as its place, but in tail
-    // position its value is discarded — the block or body is Unit and §4.9 /
-    // §4.10 supply the implicit result (#1296). Every tail site (block tail,
-    // single-statement fn body, closure body) asks this one predicate, and
-    // MirLower's tail lowering agrees with it.
+    // §9.1: an assignment is an expression typed as its place, but in
+    // statement or tail position its value is discarded (#1296) — the body is
+    // Unit and §4.9 / §4.10 supply the implicit result. "Tail position" is a
+    // function's or closure's OWN body tail: the single-statement body or the
+    // last statement of the body block (Eric, 2026-09-22, reading §9.1 with
+    // D43's pinned test). A written arm of a tail `if`/`match`, bare or as an
+    // arm block's tail, keeps the place's type and joins under D43
+    // (err_d43_cannot_infer_match.w). discard_body_tail is the one verdict:
+    // the fn body, the closure body and check_block (for body_tail_block
+    // only) ask it, and MirLower lowers exactly the recorded tails in discard
+    // mode (tail_is_discarded).
     fn expr_is_assignment(node: i32) -> i32:
         if node == 0:
             return 0
@@ -5820,6 +5829,14 @@ impl Sema:
         if kind == NodeKind.NK_GROUPED:
             return self.expr_is_assignment(self.ast.get_data0(node))
         0
+
+    mut fn discard_body_tail(tail: i32) -> i32:
+        if self.expr_is_assignment(tail) == 0:
+            return 0
+        self.discarded_tails.insert(tail, 1)
+        1
+
+    fn tail_is_discarded(node: i32): node != 0 and self.discarded_tails.contains(node)
 
     mut fn infer_unannotated_function_return_type(body: i32, body_ty: TypeId) -> i32:
         let info = self.body_return_type_info(body)
@@ -9316,8 +9333,9 @@ impl Sema:
             let ret_is_void = self.current_return_type == self.ty_void or self.current_return_type == 0
             if ret_is_void and self.ast.kind(tail) == NodeKind.NK_MATCH:
                 self.match_in_stmt_pos = 1
-            // §9.1: an assignment tail is discarded, so the block is Unit.
-            let tail_discarded = self.expr_is_assignment(tail) != 0
+            // §9.1: the body block's assignment tail is discarded, so the body
+            // is Unit. An arm block's tail keeps the place's type (D43).
+            let tail_discarded = node == self.body_tail_block and self.discard_body_tail(tail) != 0
             let tail_is_value = not tail_discarded and (self.current_value_expr_root == node or (self.stmt_pos_depth == 0 and self.current_return_type != 0 and self.current_return_type != self.ty_void) or (self.has_expected_type != 0 and self.expected_expr_type != 0 and self.expected_expr_type != self.ty_void))
             if tail_is_value:
                 self.current_value_expr_root = tail
@@ -14554,10 +14572,13 @@ impl Sema:
         let saved_infer_closure = self.infer_tail_is_closure
         self.infer_tail_node = if expected_ret_ty == 0: body else: 0
         self.infer_tail_is_closure = 1
+        let saved_body_tail_block = self.body_tail_block
+        self.body_tail_block = body
         let checked_body_ty = if expected_ret_ty != 0: self.check_expr_with_expected(body, expected_ret_ty as TypeId) else: self.check_expr_value_context(body)
+        self.body_tail_block = saved_body_tail_block
         // §9.1: an assignment closure body is discarded, as in check_block; the
         // recorded type is the verdict MirLower reads for the implicit default.
-        let body_discarded = self.expr_is_assignment(body) != 0
+        let body_discarded = self.discard_body_tail(body) != 0
         let body_ty = if body_discarded: self.ty_void else: checked_body_ty
         if body_discarded:
             self.typed_expr_types.insert(body, self.ty_void as i32)
