@@ -1228,7 +1228,9 @@ pub type Sema {
     // #1317: view bindings of the enclosing `for` loops. Their borrow of the
     // iterated place lasts the whole loop (the compiler-inserted iterator
     // reads it on every iteration), so it never expires at a lexical last use.
+    // for_view_binding_depths[i] is the loop_depth of that loop's body.
     for_view_binding_syms: Vec[i32],
+    for_view_binding_depths: Vec[i32],
     stmt_pos_depth: i32,
     current_statement_expr_root: i32,
     current_value_expr_root: i32,
@@ -2469,6 +2471,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         has_break_value_type: 0,
         loop_depth: 0,
         for_view_binding_syms: Vec.new(),
+        for_view_binding_depths: Vec.new(),
         stmt_pos_depth: 0,
         current_statement_expr_root: 0,
         current_value_expr_root: 0,

@@ -11159,6 +11159,7 @@ impl Sema:
         self.pop_scope()
         while self.for_view_binding_syms.len() > for_view_count:
             self.for_view_binding_syms.pop()
+            self.for_view_binding_depths.pop()
         self.pop_move_control_flow_context()
         self.ty_void as i32
 
@@ -11181,7 +11182,9 @@ impl Sema:
     // body is the same invalidation as `let e = xs.get(0); xs.push(..); use e`.
     // The borrow is keyed on the field path of the iterated place — `self.items`,
     // not `self` — so `for e in self.items: self.count += 1` stays accepted;
-    // check_mutation_against_views never expires it at a lexical last use.
+    // check_mutation_against_views never expires it at a lexical last use;
+    // it lets a mutation pass only when the loop ends right after it.
+    // Runs before check_for enters the body, so the body's depth is one more.
     mut fn register_for_binding_borrow(sym: i32, iterable: i32):
         let place_node = self.for_iterated_place(iterable)
         let root = self.borrow_root_place(place_node)
@@ -11194,11 +11197,31 @@ impl Sema:
         if self.borrow_refs.len() as i32 > before:
             self.borrow_refs[before] = sym
             self.for_view_binding_syms.push(sym)
+            self.for_view_binding_depths.push(self.loop_depth + 1)
 
-    fn is_for_view_binding(sym: i32) -> i32:
-        for s in self.for_view_binding_syms:
-            if s == sym: return 1
+    // The loop_depth of the body of the `for` that binds `sym` as a view; 0
+    // when `sym` is not a loop view binding. The innermost binding wins.
+    fn for_view_binding_depth(sym: i32) -> i32:
+        var i = self.for_view_binding_syms.len() as i32 - 1
+        while i >= 0:
+            if self.for_view_binding_syms[i] == sym:
+                return self.for_view_binding_depths[i]
+            i -= 1
         0
+
+    // A mutation inside a `for` body over a view `sym` is harmless when the
+    // loop ends right after it: the next statement of the mutation's block
+    // (or its tail) is `return`, or an unlabeled `break` of that very loop.
+    // No iteration follows, so the loop never reads the place again.
+    fn loop_ends_after_current_stmt(body_depth: i32) -> i32:
+        let next_index = self.current_block_stmt_index + 1
+        let next = if next_index < self.current_block_stmt_count: self.ast.get_extra(self.current_block_extra_start + next_index) else: self.current_block_tail
+        if next == 0:
+            return 0
+        let kind = self.ast.kind(next)
+        if kind == NodeKind.NK_RETURN:
+            return 1
+        if kind == NodeKind.NK_BREAK and self.ast.get_data1(next) == 0 and self.loop_depth == body_depth: 1 else: 0
 
     // The place a `for` reads on every iteration: the iterable itself when it
     // is a place, the receiver when it is a spelled view-iterator call
@@ -22962,11 +22985,17 @@ impl Sema:
             // ordinary call checking does not permit the receiver mutation and
             // an overlapping argument view to coexist. A `for` binding is read
             // from the iterated place again on the next iteration, so its
-            // borrow lives until the loop ends (#1317).
-            let is_loop_view = self.is_for_view_binding(ref_sym)
-            if last_use == 0 and self.expr_uses_symbol(err_node, ref_sym) == 0 and is_loop_view == 0:
-                self.remove_borrow_at(i)
-                continue
+            // borrow lives until the loop ends (#1317) — it is not removed even
+            // when this mutation ends the loop, since other paths may not.
+            let loop_body_depth = self.for_view_binding_depth(ref_sym)
+            let is_loop_view = if loop_body_depth != 0: 1 else: 0
+            if last_use == 0 and self.expr_uses_symbol(err_node, ref_sym) == 0:
+                if is_loop_view == 0:
+                    self.remove_borrow_at(i)
+                    continue
+                if self.loop_ends_after_current_stmt(loop_body_depth) != 0:
+                    i = i + 1
+                    continue
             let mutation_start = self.ast.get_start(err_node)
             let mutation_end = self.ast.get_end(err_node)
             let diag = Diagnostic.err("cannot mutate `" ++ place_name ++ "` while `" ++ ref_name ++ "` is a live view into it", Span { file: self.local_file_id, start: mutation_start, end: mutation_end })
