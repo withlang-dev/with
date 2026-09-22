@@ -245,6 +245,16 @@ impl Debug for str:
         let value = *self
         "\"" ++ value ++ "\""
 
+// #1288: §11.8 derives Debug unconditionally, so every primitive a field can
+// hold formats. The f-string is the one formatter for every width.
+impl Debug for i8:   fn debug_str() -> str: f"{*self}"
+impl Debug for i16:  fn debug_str() -> str: f"{*self}"
+impl Debug for u16:  fn debug_str() -> str: f"{*self}"
+impl Debug for u32:  fn debug_str() -> str: f"{*self}"
+impl Debug for u64:  fn debug_str() -> str: f"{*self}"
+impl Debug for f32:  fn debug_str() -> str: f"{*self}"
+impl Debug for f64:  fn debug_str() -> str: f"{*self}"
+
 impl Hash for i32:
     fn hash_value() -> i64: (1469598103934665603 *% 1099511628211) ^ (*self as i64)
 
