@@ -38,19 +38,19 @@ c facade dbl:
         destroys
 
 fn main:
-    let a = Database.db_new(1)
+    let a = Database.db_new(1).unwrap()
     let pa = a.repr
     drop(a)
     unsafe { print(f"mut {db_closed(pa)}") }
-    let v = View.db_new_const(2)
+    let v = View.db_new_const(2).unwrap()
     let pv = v.repr
     drop(v)
     unsafe { print(f"const {db_closed(pv)}") }
-    let l = Alias.db_new_alias(3)
+    let l = Alias.db_new_alias(3).unwrap()
     let pl = l.repr
     drop(l)
     unsafe { print(f"alias {db_closed(pl)}") }
-    let d = Database.db_new(4)
+    let d = Database.db_new(4).unwrap()
     let pd = d.repr
     let how = d.release_how(7)
     unsafe { print(f"destroys {how} {db_closed(pd)}") }

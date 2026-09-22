@@ -14,13 +14,19 @@
 //     type R { repr: Repr, live: bool }
 //     impl Drop for R:
 //         move fn drop():
-//             if self.live: d(self.repr)
+//             if self.live: unsafe { d(self.repr) }
 //     impl R:
+//         fn l(<args after the representation>) -> <ret>:      // a lend
+//             unsafe { l(self.repr, <args>) }
 //         move fn k(<args after the representation>) -> <ret>:
 //             self.live = false
-//             k(self.repr, <args>)
-//     fn R.p(<args>) -> R:
-//         R { repr: p(<args>), live: true }
+//             unsafe { k(self.repr, <args>) }
+//     fn R.p(<args>) -> Option[R]:                           // one per `from`
+//         let repr = unsafe { p(<args>) }
+//         if repr == null: None else: Some(R { repr, live: true })
+//
+// (a by-value representation's producer yields `R` directly; `unsafe` only
+// where the callee is raw).
 //
 // `live` is the Drop arming bit (ruling §13.2): a `move fn` destroyer consumes
 // `self`, and With has no spelling that forgets a consumed value's Drop — a
@@ -209,7 +215,14 @@ fn facade_render_resource(pool: AstPool, intern: InternPool, item: i32, methods:
             continue
         let pname: str = intern.resolve(pool.get_data0(producer as NodeId))
         let (params, args) = facade_render_params(pool, intern, producer, 0)
-        out = out ++ "fn " ++ name ++ "." ++ pname ++ "(" ++ params ++ ") -> " ++ name ++ ":\n    " ++ name ++ " { repr: " ++ facade_render_call(pool, intern, producer, args) ++ ", live: true }\n"
+        let call = facade_render_call(pool, intern, producer, args)
+        if facade_render_unalias(pool, intern, repr_text).starts_with("*"):
+            // Unknown nullability is nullable, never silently non-null
+            // (§16.2b.8): a pointer producer yields `Option[R]`, and a NULL
+            // produced nothing — no Drop is armed over it (§16.2b.4).
+            out = out ++ "fn " ++ name ++ "." ++ pname ++ "(" ++ params ++ ") -> Option[" ++ name ++ "]:\n    let repr = " ++ call ++ "\n    if repr == null: None else: Some(" ++ name ++ " { repr, live: true })\n"
+        else:
+            out = out ++ "fn " ++ name ++ "." ++ pname ++ "(" ++ params ++ ") -> " ++ name ++ ":\n    " ++ name ++ " { repr: " ++ call ++ ", live: true }\n"
     if init_fn != 0:
         let ctor = facade_render_init(pool, intern, name, repr_text, init_fn, preinit_fn, ok_sym, pinned)
         if ctor.len() == 0:

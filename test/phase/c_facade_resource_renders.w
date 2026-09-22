@@ -31,7 +31,7 @@ c facade dbl:
         destroys
 
 fn main:
-    let d = Database.db_new(3)
+    let d = Database.db_new(3).unwrap()
     let n = d.db_count()
     let status = d.db_close_v2(n)
     let t = Texture.tok_load("a.png")

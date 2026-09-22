@@ -38,11 +38,11 @@ c facade dbl:
         drop tok_unload
 
 fn scope() -> *mut db:
-    let d = Database.db_new(1)
+    let d = Database.db_new(1).unwrap()
     d.repr
 
 fn early(flag: bool) -> *mut db:
-    let d = Database.db_new(2)
+    let d = Database.db_new(2).unwrap()
     if flag: return d.repr
     print("late")
     d.repr
@@ -50,20 +50,20 @@ fn early(flag: bool) -> *mut db:
 fn take(d: Database) -> *mut db: d.repr
 
 fn give() -> Database:
-    let d = Database.db_new(3)
+    let d = Database.db_new(3).unwrap()
     d
 
 fn main:
     let s = scope()
     let e1 = early(true)
     let e2 = early(false)
-    let m = take(Database.db_new(4))
+    let m = take(Database.db_new(4).unwrap())
     let g = give()
     let gp = g.repr
     drop(g)
     var v: Vec[Database] = Vec.new()
-    v.push(Database.db_new(5))
-    v.push(Database.db_new(6))
+    v.push(Database.db_new(5).unwrap())
+    v.push(Database.db_new(6).unwrap())
     let p5 = v[0].repr
     let p6 = v[1].repr
     drop(v)

@@ -23,10 +23,10 @@ c facade dbl:
         drop db_close
 
 fn main:
-    let a = Database.db_new(1)
+    let a = Database.db_new(1).unwrap()
     let pa = a.repr
     drop(a)
-    let b = Database.db_new_named("x")
+    let b = Database.db_new_named("x").unwrap()
     let pb = b.repr
     drop(b)
     unsafe:
