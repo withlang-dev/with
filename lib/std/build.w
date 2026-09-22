@@ -2424,19 +2424,27 @@ fn build_timeout_or(timeout: i32, fallback: i32) -> i32:
         return timeout
     fallback
 
+// The twin of build/https_fetch.w: a fetch retries with a growing pause, so
+// one dropped connection does not fail a lane. Keep the two identical.
 fn build_https_fetch_source() -> str:
     "use std.http\n" ++
-    "use std.process\n\n" ++
+    "use std.process\n" ++
+    "use std.time\n\n" ++
+    "let ATTEMPTS = 5\n\n" ++
     "fn main -> i32:\n" ++
     "    let argv = args()\n" ++
     "    if argv.len() < 3:\n" ++
     "        print(\"usage: https_fetch <url> <output>\")\n" ++
     "        return 2\n" ++
-    "    let rc = https_download(argv.get(1) ++ \"\", argv.get(2) ++ \"\")\n" ++
-    "    if rc != 0:\n" ++
-    "        print(\"HTTPS download failed: \" ++ argv.get(1))\n" ++
-    "        return 1\n" ++
-    "    0\n"
+    "    let url = argv.get(1) ++ \"\"\n" ++
+    "    let output = argv.get(2) ++ \"\"\n" ++
+    "    for attempt in 1..ATTEMPTS + 1:\n" ++
+    "        if https_download(url.clone(), output.clone()) == 0: return 0\n" ++
+    "        if attempt < ATTEMPTS:\n" ++
+    "            print(f\"HTTPS download failed (attempt {attempt} of {ATTEMPTS}), retrying: \" ++ url)\n" ++
+    "            sleep_secs(2 * attempt)\n" ++
+    "    print(f\"HTTPS download failed after {ATTEMPTS} attempts: \" ++ url)\n" ++
+    "    1\n"
 
 fn build_zlib_gunzip_source() -> str:
     "use std.fs\n" ++
