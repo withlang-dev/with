@@ -1,6 +1,21 @@
 # Stdlib sourcing: three migrated corpora, one facade
 
 Status: PLAN (2026-09-01), with engine selections ruled on 2026-09-12.
+
+**Implementation status (2026-09-22, main `f9c11b6d`).** Phase 0 landed
+(#1129: complexity lane, SlotMap free list). Phase 1 c-algorithms landed
+2026-09-14 (`5809ac10`, #1142: third `.wo` bundle, 17 upstream tests,
+`Trie[V]`, `SortedVec[T]`, `BinaryHeap[T]`, `engine_slot`). Phase 2 TommyDS
+landed in the same merge (fourth bundle, `check.c` green, `HashIndex[K, V]`
+over `hashdyn`, the hash-engine benchmark below). **Phase 3 STC — not
+started**: no `build/stc.w`, no `lib/std/stc/`, no `std.algorithms`; the
+`Vec` engine, `Deque`/`Stack`/`Queue`/`PriorityQueue`/`List`, the default
+`HashMap`/`HashSet`, `OrderedMap`/`OrderedSet`, `BitSet`, spans, `sort` and
+the searches all wait on it, and #937/#938/#939/#940 stay open. **Phase 4
+M\*LIB — not started.** By this document's own "done" bar the plan is
+roughly half implemented; the half users feel (sort, the default map) is the
+open half. `docs/feature_plans/libstd-spec.md` (refreshed the same day)
+maps its tiers onto these phases.
 The selections below describe the destination, not completed migrations.
 Module grouping is provisional. Companion: `docs/harden_migrate.md` (the migrator plan
 this campaign exercises), `docs/harden_plan.md` item 7.

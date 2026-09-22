@@ -1,11 +1,21 @@
-# lib/std — Standard Library Specification
+# lib/std — Standard Library Plan
 
-> **Conformance note (D27, 2026-07-30):** this document predates the
-> removal of `&mut T` from safe With (specification §15.1). Its `&mut`
+> **Refreshed 2026-09-22** against main `f9c11b6d`: every module below carries
+> a **Status** line taken from the tree, and the four sections the corpus
+> sourcing plan resolved (Vec sorting, encoding, compress, regex) are
+> collapsed to pointers. This is a *plan*, not a specification: since D48
+> (`db6f935e`) the language specification no longer catalogues `lib/std`,
+> and each landed module's own document (`docs/regex-spec.md`,
+> `docs/std-encoding-rfc4648.md`, `docs/stdlib_sourcing_plan.md`) is
+> authoritative for it.
+>
+> **Conformance note (D27, 2026-07-30):** the API sketches below predate the
+> removal of `&mut T` from safe With (specification §3.1). Their `&mut`
 > signatures are non-conforming and must be respelled (mut receivers,
 > `[]mut T` slices, or threaded owned values) before implementation.
-> Tracked in #739.
-
+> Tracked in #739. Since 2026-09-22 (D55) `print` is `print[T: Display](v: &T)`
+> and `Sender[T]` is `Clone`; sketches that assume the old shapes are read
+> accordingly.
 
 **The standard library for With.**
 
@@ -17,11 +27,19 @@ existing modules.
 
 1. **Methods on types, not free functions.** Users discover APIs from
    the data type. `vec.sort(cmp)` not `sort(vec, cmp)`.
-2. **Pure With over C wrappers.** When feasible, implement in With.
-   No hidden malloc, no libc dependency for user programs. Enables
-   bare metal.
-3. **Borrow inputs, own outputs.** Auto-ref makes `&` invisible in
-   user code.
+2. **Hardened code over fresh code — the sourcing rule (Eric, 2026-09-02;
+   D37).** A *library* whose C implementation has stood the test of time
+   (pcre2, zlib, the container corpora) is migrated **whole** with
+   `with migrate`, kept as a coherent upstream-derived corpus (`.wo`
+   bundle, upstream test suite as the drift lane), and **facaded**: the
+   migrator is raw, the With-ness lives in the facade. *Runtime and
+   low-level primitives* that are small and entangled with assembly or the
+   allocator (fiber switch, crypto primitives, the allocator, entropy) are
+   hand-ported and owned, held to upstream's known-answer vectors. "Pure
+   With, no C dependency" is no longer a principle; "no hidden malloc in a
+   user program" still is. `std.libc` is the one sanctioned libc seam.
+3. **Borrow inputs, own outputs.** Auto-ref makes `&` invisible in user
+   code; observing functions take `&T` (§3.8).
 4. **No ecosystem encroachment.** No image codecs, database drivers,
    template engines, GUI, RPC, or frameworks. Those are ecosystem
    libraries.
@@ -30,55 +48,86 @@ existing modules.
 
 ## Existing Modules
 
-These modules exist and are working. Listed for completeness — this
-spec does not redefine them.
+What `lib/std` contains on main today. Listed for orientation — this
+document does not redefine them; each module's header comment does.
 
 | Module | Contents |
 |---|---|
-| `builtins` | print, eprint, assert, require, check, ToString |
-| `prelude`, `prelude_core` | Ambient imports |
+| `builtins` | `print[T: Display](v: &T)`, `eprint`, `assert`, `require`, `check`, `ToString` |
+| `prelude`, `prelude_core`, `prelude_alloc` | Ambient imports |
 | `option` | `Option[T]` — Some, None, unwrap, map |
 | `result` | `Result[T, E]` — Ok, Err, ContextError, `?` operator |
-| `traits` | Eq, Ord, Hash, Debug, Display, Default, Clone, Drop, Scoped, ScopedMut, Iter, IntoIter, MultiIndex |
-| `collections` | Vec, HashMap, HashSet, Atomic, VecIter, Order, fence |
-| `string` | String methods — len, contains, find, split, replace, trim, slice |
+| `traits` | Eq, Ord, Hash, Debug, Display, Default, Clone, Drop, Scoped, ScopedMut, Iter, IntoIter, MultiIndex, MultiIndexMut, Add/Sub/Mul/Div/MatMul/Neg, Try, ControlFlow, Deref, **Error** (`display`, `source`), Contains, IndexGet, IndexPlace |
+| `collections` | Vec, HashMap, HashSet, BTreeMap, BTreeSet, SlotMap/Handle, Atomic, Order, fence, Iterable/IntoIter and the adapter family (Map, Filter, FilterMap, Take, Drop, TakeWhile, DropWhile, Zip, ZipWith, Enumerate, Chain, StepBy, FlatMap), IndexSpec |
+| `collections/sorted_vec`, `collections/binary_heap`, `collections/trie`, `collections/hash_index`, `collections/engine_slot` | Facades over migrated engines (c-algorithms, TommyDS) — see *Sourced from corpora* |
+| `box`, `rc` | `Box[T]` single-owner heap cell; `Rc[T]` explicit reference counting |
+| `string`, `str`, `fixed_string`, `internal/str_abi` | String methods (ASCII classifiers); `str` shim; `FixedString[N]` for core/no_std; raw-pointer bridge |
 | `fmt` | fmt_int, fmt_float, fmt_bool |
-| `io` | read_line, read_bytes, print_str, write_raw, flush |
-| `fs` | file_exists, read_file, write_file, create_dir, mkdir_p, remove_file |
+| `io` | read_line, read_bytes, read_all, print_str, print_line, print_int, write_raw, flush, `Stdin.lines` |
+| `fs` | file_exists, read_file, write_file, create_dir, mkdir_p, remove_file, rename_file, remove_dir, remove_tree, copy_tree, symlink, list_files_text, chmod, `IoError` |
 | `mem` | alloc, free_mem, mem_copy, mem_move, mem_set, mem_cmp |
 | `alloc` | Arena, Pool |
 | `hash` | Hasher, DefaultHasher, hash_str, hash_i64, combine |
-| `math` | Scalar: sqrt, sin, cos, pow, abs, min, max, clamp, PI, E, TAU |
+| `math` | Seven helpers; transcendentals are width-generic compiler builtins (D42, `src/MathBuiltins.w`) |
 | `process` | args, env, set_env, exit_code, pid, run, Command |
-| `sys` | cpu_count, total_memory, page_size, memory_bandwidth |
-| `sysinfo` | os, arch, hostname |
-| `os` | Layer-1 platform wrapper boundary: os, arch, hostname, process_id, env, set_env, path_exists |
+| `sys`, `sysinfo`, `os` | cpu_count, total_memory, page_size; os, arch, hostname; Layer-1 wrapper (os_kind, arch_kind, env, set_env, has_env, path_exists, posix_*) |
 | `signal` | sigint, sigterm, sigkill, raise_signal |
-| `random` | xorshift64 PRNG — seed, next_i32, range_i32, chance |
+| `random` | xorshift64 PRNG — seed, seed_now, next_i32, range_i32, chance |
 | `time` | Duration, now, now_ns, sleep_secs, async sleep |
 | `thread` | JoinHandle, spawn_os, join |
 | `sync` | Mutex, RwLock, AtomicI64 |
-| `task` | Task[T], await_all, await_first, await_any, await_settled, with_concurrency |
-| `channel` | Sender[T], Receiver[T], chan[T](capacity) |
-| `net` | tcp_listen, tcp_accept, tcp_connect, udp_bind, send, recv |
-| `http` | https_get, https_download |
-| `tls` | TlsConn, tls_connect, tls_send, tls_recv (TLS 1.2) |
+| `task` | Task[T], await_all, await_first, await_any, await_settled, with_concurrency (`lib/std/async/*.md`) |
+| `channel` | Sender[T] (`Clone`, close on last sender, `Send` iff `T: Send`), Receiver[T], chan[T](capacity) |
+| `context` | Ambient execution record: TraceId, CancellationToken, `trait Logger`, NoopLogger, `Context` (ephemeral), default_context — *not* the cancellation tree of §2.5 |
+| `net` | tcp_listen, tcp_accept, tcp_connect, udp_bind, udp_connect, send, recv, socket_close, sock_port |
+| `http`, `tls` | https_get, https_download (private URL parsing); TlsConn, tls_connect/send/recv (TLS 1.2) |
 | `json` | JsonParser, json_parse, json_find, json_str, json_int, json_skip |
-| `crypto/*` | SHA-256, HMAC-SHA256, AES-128, AES-GCM, EC P-256, ECDSA, X.509, ChaCha20, Poly1305, endian |
-| `iter` | sum, map, filter, count, contains |
+| `encoding`, `encoding/*` | `DecodeError`; base64, base64url, base16, base32, base32hex (RFC 4648) |
+| `crypto/*` | SHA-256, HMAC-SHA256, AES-128, AES-GCM, EC P-256, ECDSA, RSA PKCS#1 v1.5 verify, X.509, ChaCha20, Poly1305, ChaCha20-Poly1305, endian (private) |
+| `regex`, `re/` | `Regex`/`Match`/`Captures` facade over migrated PCRE2 (`docs/regex-spec.md`) |
+| `zlib`, `zip`, `zl/` | compress/decompress/gzip facade and ZIP reader over migrated zlib + minizip |
+| `iter` | sum, iter_sum, map, filter, count, contains |
+| `testing` | assert, require, check, assert_eq, assert_ne, assert_matches_failed |
+| `ffi`, `component`, `compiler`, `build`, `libc`, `cfg/stackify` | Closure-context boxing for C callbacks (§16.7); ECS component ids; compiler-hook introspection; the typed build-graph API; the libc seam; Beyond-Relooper stackification (wasm32) |
 
 ### Planned separately
 
 `std.math` (Array type, linalg, random, stats, fft, signal,
 interpolate, optimize, integrate, special, io) is specified in
-`docs/std-math-spec.md`. Not repeated here.
+`docs/std-math-spec.md` — **not started** (no `lib/std/math/`; #1161
+tracks first steps).
+
+---
+
+## Sourced from corpora
+
+`docs/stdlib_sourcing_plan.md` (ruled 2026-09-12) settles which
+containers and algorithms are *facades over migrated corpora* rather
+than native modules, and the corpus registry (`build/corpus.w`,
+`build/corpora.w`) wires each corpus as a `.wo` bundle with its upstream
+test suite as the drift lane. What that resolves in this plan:
+
+| Corpus | Phase / status | Facades landed | Resolves here |
+|---|---|---|---|
+| **pcre2** | landed (first bundle) | `std.regex` | §3.4 |
+| **zlib + minizip** | landed (second bundle; minizip writer waits on setjmp #1217) | `std.zlib`, `std.zip` | §3.1, part of §3.2 |
+| **c-algorithms** | Phase 1 landed 2026-09-13 (`5809ac10`) | `SortedVec[T]`, `BinaryHeap[T]`, `Trie[V]` (+ `engine_slot`) | part of §1.2 |
+| **TommyDS** | Phase 2 landed 2026-09-14 (`#1139`) | `HashIndex[K, V]` over `hashdyn`; hash-engine benchmark recorded | comparison yardstick for the default map |
+| **STC** | Phase 3 — **pending** (the macro-migrator campaign) | `Vec` engine, `Deque`, `Stack`, `Queue`, `PriorityQueue`, `List`, `HashMap`/`HashSet` (default engine), `OrderedMap`/`OrderedSet`, `BitSet`, spans, `std.algorithms` (`sort`, `binary_search`, bounds, `reverse`, `shuffle`) | §1.2 (#940), #938, #939 |
+| **M\*LIB `m-bptree`** | Phase 4 — pending | `BTreeMap`/`BTreeSet` (retires the sorted-Vec implementation, #937) | — |
+
+Sections below that the sourcing plan covers say so in their first line
+and carry no native API to implement. Candidates named in other status
+lines (`tomlc99`, `utf8proc`, `expat`) are *proposals under the sourcing
+rule*, not selections; a corpus is added by a ruling and a registry entry.
 
 ---
 
 ## New Modules
 
 Organized by implementation priority. Each tier must be substantially
-complete before the next begins.
+complete before the next begins. Every section opens with its status on
+main as of 2026-09-22.
 
 ---
 
@@ -87,6 +136,8 @@ complete before the next begins.
 These modules are prerequisites for serious programs. Implement first.
 
 #### 1.1 `std.path` — Cross-platform path manipulation
+
+**Status (2026-09-22): not started.** No `lib/std/path.w`; path logic is duplicated privately in `lib/std/build.w` (`tool_path_dirname`, `build_path_dirname`). Native With; first in the refreshed sequencing.
 
 ```
 type Path = {
@@ -122,24 +173,11 @@ that touch the filesystem.
 
 #### 1.2 Vec sorting and search — methods on `collections.Vec`
 
-```
-fn Vec.sort(self: &mut Self, cmp: fn(&T, &T) -> i32)
-fn Vec.sort_stable(self: &mut Self, cmp: fn(&T, &T) -> i32)
-fn Vec.is_sorted(self: &Self, cmp: fn(&T, &T) -> i32) -> bool
-fn Vec.binary_search(self: &Self, key: &T, cmp: fn(&T, &T) -> i32) -> Option[usize]
-fn Vec.reverse(self: &mut Self)
-fn Vec.dedup(self: &mut Self, eq: fn(&T, &T) -> bool)
-```
-
-`sort` uses pattern-defeating quicksort (pdqsort). `sort_stable`
-uses merge sort. Both in pure With. No allocator dependency for
-`sort`; `sort_stable` allocates a temporary buffer via the
-standard allocator.
-
-`binary_search` returns the index of a matching element, or None.
-Requires the Vec to be sorted by the same comparator.
+**Resolved by the corpus sourcing plan (Phase 3, STC — pending).** `Vec.sort`, `sort_stable`, `is_sorted`, `binary_search`, `reverse`, `dedup` are the `std.algorithms` facade over STC's migrated algorithm layer (`docs/stdlib_sourcing_plan.md`, facade map rows `sort`/`binary_search`/`lower_bound`/`reverse`/`shuffle`; #940). `stable_sort` is exposed only if upstream's stability contract holds. Already landed from Phase 1: `std.collections.sorted_vec.SortedVec[T]` and `std.collections.binary_heap.BinaryHeap[T]` (c-algorithms). Nothing native is written for this section.
 
 #### 1.3 `std.toml` — TOML parser
+
+**Status (2026-09-22): not started.** No TOML parser anywhere in `lib/std` or `src/`. Sourcing candidate under the hardenedness rule: `tomlc99` (MIT, one `.c`/`.h`) migrated whole and facaded; else native.
 
 With uses `with.toml` for project configuration. The language must
 parse its own config format.
@@ -187,30 +225,11 @@ No serialization in v1. Parse-only.
 
 #### 1.4 `std.encoding` — Base64 and Hex
 
-> **Superseded:** The proposal below is retained for historical context. The
-> implemented RFC 4648 API and strict decoding contract are documented in
-> [docs/std-encoding-rfc4648.md](../std-encoding-rfc4648.md).
-
-```
-// std.encoding.base64
-
-fn encode(data: &[u8]) -> str
-fn decode(s: &str) -> Result[Vec[u8], DecodeError]
-fn encode_url_safe(data: &[u8]) -> str
-fn decode_url_safe(s: &str) -> Result[Vec[u8], DecodeError]
-fn encoded_len(n: usize) -> usize
-fn decoded_len(n: usize) -> usize
-
-// std.encoding.hex
-
-fn encode(data: &[u8]) -> str
-fn decode(s: &str) -> Result[Vec[u8], DecodeError]
-fn encode_upper(data: &[u8]) -> str
-```
-
-Pure With. No dependencies. RFC 4648 compliant for base64.
+**Resolved — landed 2026-08-31 (`aacace23`, `f89a4cec`), specified in `docs/std-encoding-rfc4648.md`.** `lib/std/encoding.w` (shared `DecodeError`: `InvalidLength`, `InvalidByte`, `InvalidPadding`, `NonCanonicalBits`) plus `encoding/base64.w` (`base64_encode`/`base64_decode`), `encoding/base64url.w`, `encoding/base16.w` (`base16_encode`/`base16_decode`), `encoding/base32.w`, `encoding/base32hex.w`. Module-prefixed names, `[]u8`/`&str` in, `Result[Vec[u8], DecodeError]` out. Not exposed: `encoded_len`/`decoded_len`, an upper-case hex encoder.
 
 #### 1.5 `std.testing` — Test framework utilities
+
+**Status (2026-09-22): partial (2 of 14).** `lib/std/testing.w` has `assert`, `require`, `check`, `assert_eq`, `assert_ne`, `assert_matches_failed` (the `expect_eq`/`expect_ne` of this section under the `assert_` name). The rest of the `expect_*` vocabulary, `fail`, `skip`, diff output: not started.
 
 ```
 fn expect(cond: bool, msg: str)
@@ -243,6 +262,8 @@ compiler's responsibility (`with test`). This module provides
 the assertion vocabulary.
 
 #### 1.6 `std.bytes` — Byte buffer for binary protocols
+
+**Status (2026-09-22): not started.** No `Buf`; the endian helpers still live privately in `lib/std/crypto/endian.w` (see 3.7).
 
 ```
 type Buf = {
@@ -338,6 +359,8 @@ These modules make With viable for production CLI tools and servers.
 
 #### 2.1 `std.log` — Structured logging
 
+**Status (2026-09-22): not started.** `lib/std/context.w` carries a `trait Logger`/`NoopLogger` (see 2.5) that this module should absorb or build on.
+
 ```
 enum Level =
     | Trace
@@ -374,6 +397,8 @@ Thread-safe. The writer function is called under a lock.
 
 #### 2.2 `std.errors` — Enhanced error handling
 
+**Status (2026-09-22): partial (trait landed, module not).** `trait Error { display, source }` is in `lib/std/traits.w:82` (`display` is this section's `message`); `ContextError` in `result.w`. `wrap`, `chain`, `ErrorChain`, `is`, `downcast`: not started.
+
 ```
 trait Error:
     fn message(self: &Self) -> str
@@ -400,6 +425,8 @@ types. `wrap` adds context messages. `chain` iterates the
 This module adds the trait and traversal utilities.
 
 #### 2.3 `std.unicode` — Unicode and UTF-8
+
+**Status (2026-09-22): not started.** `string.w` has ASCII-only `is_alpha`/`is_digit`/`to_lower`/… on `i32` chars — same names, not codepoint semantics. Sourcing candidate: `utf8proc` (MIT, hardened, tables included) migrated whole and facaded — the shape of module the sourcing rule exists for.
 
 ```
 fn is_valid_utf8(data: &[u8]) -> bool
@@ -449,6 +476,8 @@ the common cases, not the full Thai/Hangul complexity in v1).
 
 #### 2.4 `std.flag` — Command-line argument parsing
 
+**Status (2026-09-22): not started.** No `FlagSet`; argument parsing is ad hoc in `build.w` and the tools. Native With.
+
 ```
 type FlagSet = {
     name: str,
@@ -483,6 +512,8 @@ No derive macros, no proc macros, no code generation. Explicit
 registration. This keeps it simple and debuggable.
 
 #### 2.5 `std.context` — Cancellation, deadlines, and scoped values
+
+**Status (2026-09-22): diverged — the name is taken by a different design.** `lib/std/context.w` (2026-05-09) is an ambient execution record: `TraceId`, `CancellationToken`, `trait Logger`, `NoopLogger`, `type Context ephemeral`, `default_context()`. The Go-style cancellation tree below (`with_cancel`/`with_timeout`/`with_deadline`/`with_value`, `done`/`err`/`deadline`, `with`-block integration) is not started and must reconcile with the existing record rather than replace it silently — a design item to rule before implementation.
 
 ```
 type Context = opaque
@@ -552,53 +583,11 @@ These round out the standard library for production use.
 
 #### 3.1 `std.compress` — Compression
 
-```
-// std.compress.deflate
-
-fn compress(data: &[u8]) -> Vec[u8]
-fn compress_level(data: &[u8], level: i32) -> Vec[u8]
-fn decompress(data: &[u8]) -> Result[Vec[u8], DeflateError]
-
-// Streaming
-type Deflater = { ... }
-type Inflater = { ... }
-
-fn Deflater.new(level: i32) -> Deflater
-fn Deflater.write(self: &mut Self, data: &[u8]) -> Vec[u8]
-fn Deflater.finish(self: &mut Self) -> Vec[u8]
-
-fn Inflater.new() -> Inflater
-fn Inflater.write(self: &mut Self, data: &[u8]) -> Result[Vec[u8], DeflateError]
-fn Inflater.finish(self: &mut Self) -> Result[Vec[u8], DeflateError]
-
-// std.compress.gzip — wraps deflate with gzip framing (RFC 1952)
-
-fn compress(data: &[u8]) -> Vec[u8]
-fn decompress(data: &[u8]) -> Result[Vec[u8], GzipError]
-
-// std.compress.zlib — wraps deflate with zlib framing (RFC 1950)
-
-fn compress(data: &[u8]) -> Vec[u8]
-fn decompress(data: &[u8]) -> Result[Vec[u8], ZlibError]
-```
-
-**Pure With implementation.** No zlib dependency, no libc malloc.
-Uses With's allocator throughout.
-
-Inflate: ~500-800 lines. Deflate: ~1500 lines. Substantial but
-straightforward — the algorithm is well-documented (RFC 1951).
-
-Compression levels:
-- 0: store (no compression)
-- 1: fast (greedy matching)
-- 6: default (lazy matching, reasonable hash chain)
-- 9: best (maximum hash chain search)
-
-This enables: HTTP content-encoding, tar.gz archives, PNG
-(which uses deflate), and general data compression — all without
-a C dependency.
+**Resolved by the corpus sourcing plan — landed (`1ca0beac`, `b509e340`).** `lib/std/zlib.w` is the facade over migrated zlib (`lib/std/zl/`, the second `.wo` bundle): `compress`, `compress_level`, `decompress`, `decompress_with_limit`, `compress_gzip`, `compress_gzip_level`, `decompress_gzip`, `decompress_gzip_with_limit`, `ZlibError`; `&Vec[u8]` in, `Result[Vec[u8], ZlibError]` out. The pure-With deflate this section demanded is superseded by the hardenedness rule. Not yet facaded: streaming `Inflater`/`Deflater` (the in-place `z_stream` resource — modeled-C stage 4b/D54 pinned resources are the mechanism) and raw-deflate entry points.
 
 #### 3.2 `std.archive` — Tar
+
+**Status (2026-09-22): tar not started; ZIP landed instead.** `lib/std/zip.w` (`ZipArchive.open`, `ZipEntry`, `extract`, `ZipError`) reads ZIP archives over minizip in the zlib corpus (`lib/std/zl/`); the minizip writer waits on `setjmp` (#1217). Tar: the format is small enough for native With; the sourcing rule does not demand a corpus for it.
 
 ```
 // std.archive.tar
@@ -636,6 +625,8 @@ and large files. UStar format for writing.
 
 #### 3.3 `std.net` enhancements — DNS, addresses, socket options
 
+**Status (2026-09-22): not started (0 of 12).** `net.w` is the original surface plus `socket_close`, `udp_connect`, `sock_port`. `IpAddr`/`SocketAddr`, `resolve`, socket options: none.
+
 ```
 // Address types
 type IpAddr =
@@ -671,16 +662,11 @@ DNS resolution requires system configuration awareness
 
 #### 3.4 `std.regex` — Regular expressions
 
-Specified separately in `docs/regex-spec.md`.
-
-Language-level regex literals (`/pattern/flags`), `=~`/`!~`
-match operators with capture bindings, regex in `match` arms.
-PCRE2 engine auto-migrated from C via `with migrate` (72K lines).
-Full Perl-compatible syntax: backreferences, lookahead,
-lookbehind, atomic groups, recursive patterns, Unicode
-properties. ~300 lines of With wrapper API over migrated PCRE2.
+**Resolved — landed (`b0291d9f`), specified in `docs/regex-spec.md`.** `lib/std/regex.w` is the facade over migrated PCRE2 (`lib/std/re/`, the first `.wo` bundle): `Regex.compile`/`compile_flags`, `is_match`, `find`/`find_at`/`find_all`, `captures`/`captures_at`/`captures_all`, `replace`/`replace_all`/`replace_fn`, `split`/`splitn`, `Captures.get/by_name/text`, regex literals `/…/` with `=~`. Complete per its spec.
 
 #### 3.5 `std.encoding.csv` — CSV reader/writer
+
+**Status (2026-09-22): not started.** Native With (the format is small).
 
 ```
 type CsvReader = { ... }
@@ -704,6 +690,8 @@ RFC 4180 compliant. Handles quoted fields, embedded newlines,
 and embedded delimiters.
 
 #### 3.6 `std.encoding.xml` — XML tokenizer
+
+**Status (2026-09-22): not started.** Sourcing candidate: `expat` (MIT, hardened) migrated whole and facaded, if a full parser is wanted; the tokenizer below is small enough for native With.
 
 ```
 type XmlToken =
@@ -733,6 +721,8 @@ Does not handle: DTD processing, external entities, namespaces
 
 #### 3.7 `std.encoding.binary` — Endian primitives
 
+**Status (2026-09-22): not started (0 exported).** All twelve functions exist by these exact names in `lib/std/crypto/endian.w` but are private and pointer+offset based; promotion is a slice-typed `pub` surface over them.
+
 Promote the existing `crypto/endian.w` to a proper module.
 
 ```
@@ -757,6 +747,8 @@ a Buf.
 
 #### 3.8 `std.crypto.rand` — Cryptographic randomness
 
+**Status (2026-09-22): not started.** No `random_bytes`/`random_fill` anywhere in `lib/std` outside the migrated corpora; the runtime entropy seam (`getrandom`/`SecRandomCopyBytes`/`BCryptGenRandom`) is the port to own natively under the sourcing rule (runtime primitive, not a library).
+
 ```
 fn random_bytes(n: usize) -> Vec[u8]
 fn random_u32() -> u32
@@ -772,6 +764,8 @@ by `std.crypto` (TLS client random, ECDHE ephemeral keys, etc.).
 Currently internal to the crypto modules — expose it.
 
 #### 3.9 `std.debug` — Debug utilities
+
+**Status (2026-09-22): not started.** Nothing of `stack_trace`/`on_panic`/`MemoryStats`; the native debug allocator (`docs/debug-allocator.md`) is the existing adjacent tooling.
 
 ```
 fn stack_trace() -> Vec[StackFrame]
@@ -808,6 +802,8 @@ reaches 1.0.
 
 #### 4.1 `std.url` — URL parsing
 
+**Status (2026-09-22): private partial.** `http_parse_url`/`HttpUrl`/`http_resolve_redirect` are private inside `lib/std/http.w`; this module is their promotion.
+
 ```
 type Url = {
     scheme: str,
@@ -830,6 +826,8 @@ fn query_parse(s: &str) -> Vec[(str, str)]
 RFC 3986 compliant parsing.
 
 #### 4.2 `std.io.buffered` — Buffered I/O
+
+**Status (2026-09-22): not started.** `io.w` has `Stdin.lines()` returning a whole `Vec[str]`; no `BufReader`/`BufWriter`.
 
 ```
 type BufReader = { ... }
@@ -855,6 +853,8 @@ line-at-a-time I/O.
 
 #### 4.3 `std.env` — Environment utilities
 
+**Status (2026-09-22): partial (2 of 9), diverged.** `env`/`set_env` exist in *both* `process.w` and `os.w` (+ `has_env`, `args`) — a second surface instead of the consolidation asked for. `vars`, `remove`, `home_dir`, `temp_dir`, `current_dir`, `set_current_dir`, `current_exe`: none.
+
 Consolidate and extend `process.env`/`process.set_env`:
 
 ```
@@ -870,6 +870,8 @@ fn current_exe() -> Result[Path, Error]
 ```
 
 #### 4.4 `std.semver` — Semantic versioning
+
+**Status (2026-09-22): not started.** Native With.
 
 ```
 type Version = {
@@ -913,66 +915,74 @@ SemVer 2.0.0 compliant. `satisfies` supports: `^1.2.3`,
 
 ## Implementation Sequencing
 
-Priority order. Each item should be substantially complete (passing
-tests, documented) before moving to the next.
+Scored 2026-09-22. The original 24-item order assumed pure-With delivery
+for everything; the sourcing plan now carries the containers and
+algorithms, so the native list is shorter and its "unblocks everything"
+prefix (path, toml, bytes) is still entirely absent.
+
+| Original # | Module | Outcome |
+|---|---|---|
+| 4 | `std.encoding` base64 + hex | **landed** to spec (`aacace23`, `f89a4cec`) — plus base32/base32hex |
+| 15 | `std.regex` | **landed** via migrated PCRE2 |
+| 12 | `std.compress` | **landed** via migrated zlib (facade `std.zlib`); streaming types open |
+| 5 | `std.testing` | partial (`assert_*` only) |
+| 8 | `std.errors` | partial (`Error` trait in `traits`) |
+| 23 | `std.env` | partial and unconsolidated (duplicated in `process`/`os`) |
+| 2 | Vec sort / search | → sourcing plan Phase 3 (STC), not started; #940 open |
+| 1, 3, 6, 7, 9, 10, 11, 13, 14, 16–22, 24 | everything else | not started (`context` name taken by a different design) |
+
+Refreshed order for the native remainder, by what it unblocks:
 
 | # | Module | Rationale |
 |---|---|---|
-| 1 | `std.path` | Unblocks fs, archive, process, env |
-| 2 | Vec.sort / binary_search | Fundamental collection operation |
-| 3 | `std.toml` | With must parse its own config format |
-| 4 | `std.encoding.base64` + `hex` | Tiny, high value, unblocks crypto/network |
-| 5 | `std.testing` | Better tests for everything after |
-| 6 | `std.bytes` | Foundation for binary protocols |
-| 7 | `std.log` | Needed for debugging real programs |
-| 8 | `std.errors` | Better error chains |
-| 9 | `std.unicode` | Correctness foundation for string ops |
-| 10 | `std.flag` | CLI tools are first users |
-| 11 | `std.context` | Connects `with` blocks to async cancellation |
-| 12 | `std.compress` | Unblocks archive, HTTP content-encoding |
-| 13 | `std.archive.tar` | Package distribution |
-| 14 | `std.net` enhancements | DNS, addresses, socket options |
-| 15 | `std.regex` | Text processing workhorse |
-| 16 | `std.encoding.csv` | Data interchange |
-| 17 | `std.encoding.xml` | Data interchange |
-| 18 | `std.encoding.binary` | Promote crypto/endian |
-| 19 | `std.crypto.rand` | Expose existing entropy source |
-| 20 | `std.debug` | Stack traces, panic hooks |
-| 21 | `std.url` | URL parsing for HTTP client |
-| 22 | `std.io.buffered` | Reduces syscall overhead |
-| 23 | `std.env` | Consolidate environment access |
-| 24 | `std.semver` | Package management support |
+| 1 | `std.path` | Still unblocks fs, archive, process, env; duplicated privately in `build.w` today |
+| 2 | `std.env` consolidation | One surface; `home_dir`/`temp_dir`/`current_dir` are prerequisites for path and tools |
+| 3 | `std.bytes` + `std.encoding.binary` | Promote `crypto/endian.w`; foundation for binary protocols and tar |
+| 4 | `std.testing` `expect_*` | Better tests for everything after |
+| 5 | `std.log` | Absorb `context.w`'s `Logger`; needed for real programs |
+| 6 | `std.flag` | CLI tools are the first users (the compiler's own tools included) |
+| 7 | `std.toml` | With must parse its own config; sourcing candidate `tomlc99` to rule |
+| 8 | `std.errors` chains | `wrap`/`chain` over the landed trait |
+| 9 | `std.crypto.rand` | Runtime entropy seam (hand-ported primitive) |
+| 10 | `std.unicode` | Sourcing candidate `utf8proc` to rule; else native tables |
+| 11 | `std.archive.tar` | Native; ZIP reading already landed |
+| 12 | `std.net` enhancements | DNS, addresses, socket options |
+| 13 | `std.url` | Promote `http.w`'s private parser |
+| 14 | `std.io.buffered` | Reduces syscall overhead |
+| 15 | `std.context` cancellation | Reconcile with the existing `context.w` record (ruling) |
+| 16 | `std.encoding.csv`, `.xml` | Data interchange; xml sourcing candidate `expat` to rule |
+| 17 | `std.debug` | Stack traces, panic hooks |
+| 18 | `std.semver` | Package management support |
+
+Sourced items follow `docs/stdlib_sourcing_plan.md`'s own phase order
+(STC, then M\*LIB) and are not re-sequenced here.
 
 ---
 
 ## Module Size Estimates
 
-| Module | Estimated lines (pure With) |
+Native remainder only (pure With). Items delivered by a corpus facade
+are sized by their facade, not the engine, and are not listed.
+
+| Module | Estimated lines |
 |---|---|
 | `path` | 300–400 |
-| Vec sort/search | 400–600 |
-| `toml` | 800–1200 |
-| `encoding.base64` | 100–150 |
-| `encoding.hex` | 50–80 |
-| `testing` | 200–300 |
-| `bytes` | 400–500 |
+| `env` consolidation | 100–150 |
+| `bytes` + `encoding.binary` | 400–500 |
+| `testing` (`expect_*`) | 200–300 |
 | `log` | 200–300 |
-| `errors` | 150–200 |
-| `unicode` | 500–800 + tables |
 | `flag` | 300–500 |
-| `context` | 300–400 |
-| `compress.deflate` | 1500–2300 |
-| `compress.gzip` | 100–150 (framing over deflate) |
+| `toml` | 800–1200 native, or a facade over a migrated parser |
+| `errors` chains | 150–200 |
+| `crypto.rand` | 50–80 |
+| `unicode` | 500–800 + tables native, or a facade over `utf8proc` |
 | `archive.tar` | 400–600 |
 | `net` enhancements | 300–400 |
-| `regex` | 2000–3000 |
-| `encoding.csv` | 200–300 |
-| `encoding.xml` | 400–600 |
-| `encoding.binary` | 100 (promote existing) |
-| `crypto.rand` | 50–80 |
-| `debug` | 200–400 |
 | `url` | 200–300 |
 | `io.buffered` | 200–300 |
-| `env` | 100–150 |
+| `context` cancellation | 300–400 |
+| `encoding.csv` | 200–300 |
+| `encoding.xml` | 400–600 native, or a facade over `expat` |
+| `debug` | 200–400 |
 | `semver` | 150–200 |
-| **Total** | **~9,000–13,000** |
+| **Total** | **~5,500–8,500** |
