@@ -16,6 +16,7 @@ extern fn with_runtime_request_cancel(fiber_id: i32) -> i32
 extern fn with_runtime_current_cancel_requested() -> i32
 extern fn with_runtime_current_set_cancel_requested() -> Unit
 extern fn with_runtime_current_set_cancelled_return() -> Unit
+extern fn with_runtime_current_cancelled_return() -> i32
 extern fn with_runtime_completed_cancelled_return(fiber_id: i32) -> i32
 extern fn with_free(ptr: *mut u8) -> Unit
 extern fn with_ewrite(s: &str) -> Unit
@@ -310,6 +311,13 @@ pub fn with_fiber_is_cancelled() -> i32:
 
 pub fn with_fiber_set_cancelled_return() -> Unit:
     with_runtime_current_set_cancelled_return()
+
+// §14.7: a runtime wait (channel send/recv) that cancellation cut short
+// marks the current fiber's return as cancelled before returning to it; the
+// lowering reads this right after the wait and unwinds (#1293). A wait that
+// completed without parking leaves it clear.
+pub fn with_fiber_wait_cancelled() -> i32:
+    with_runtime_current_cancelled_return()
 
 pub fn with_fiber_was_cancelled_return(fiber_id: i32) -> i32:
     if last_await_fiber_id == fiber_id:

@@ -252,6 +252,7 @@ int32_t with_runtime_request_cancel(int32_t fiber_id);
 int32_t with_runtime_current_cancel_requested(void);
 void with_runtime_current_set_cancel_requested(void);
 void with_runtime_current_set_cancelled_return(void);
+int32_t with_runtime_current_cancelled_return(void);
 int32_t with_runtime_completed_cancelled_return(int32_t fiber_id);
 
 // ── Fiber / Task runtime ───────────────────────────────────────────
@@ -269,6 +270,7 @@ int32_t with_fiber_is_cancelled(void);
 void with_fiber_select_mode(int32_t *fiber_ids, int32_t count, int32_t biased, int32_t *result_index);
 void with_fiber_select(int32_t *fiber_ids, int32_t count, int32_t *result_index);
 void with_fiber_set_cancelled_return(void);
+int32_t with_fiber_wait_cancelled(void);
 int32_t with_fiber_was_cancelled_return(int32_t fiber_id);
 void with_fiber_request_cancel_self(void);
 

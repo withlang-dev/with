@@ -13,6 +13,8 @@ extern fn with_fiber_in_fiber() -> i32
 extern fn with_fiber_yield() -> Unit
 extern fn with_runtime_has_fibers() -> i32
 extern fn with_runtime_run_one_step() -> Unit
+extern fn with_runtime_current_cancel_requested() -> i32
+extern fn with_runtime_current_set_cancelled_return() -> Unit
 
 let CHAN_INITIAL_CAPACITY: i32 = 16
 let DBG_ALLOC_ORIGIN_CHANNEL: i64 = 3
@@ -140,6 +142,18 @@ fn channel_block_until_progress():
     if with_runtime_has_fibers() != 0:
         with_runtime_run_one_step()
 
+// §14.7: send/recv are current-fiber suspension points. A fiber whose
+// cancellation was requested does not park here: the wait is cut short, the
+// fiber's return is marked cancelled, and the caller's lowering unwinds right
+// after the call (#1293: a select loser parked in recv() never returned to
+// the scheduler's cleanup join). The channel itself is untouched, so a later
+// send/recv still works. A send/recv that needs no wait is not affected.
+fn channel_wait_cut_short() -> bool:
+    if with_fiber_in_fiber() == 0 or with_runtime_current_cancel_requested() == 0:
+        return false
+    with_runtime_current_set_cancelled_return()
+    true
+
 pub fn with_channel_create(capacity: i32, elem_size: i32, drop_fn: *const fn(*mut u8) -> Unit) -> i64:
     let ch = with_alloc_origin(CHAN_SIZE, DBG_ALLOC_ORIGIN_CHANNEL)
     if ch as i64 == 0:
@@ -172,6 +186,13 @@ pub fn with_channel_send(ch_handle: i64, value_ptr: *const u8) -> Unit:
     while chan_field_i32(ch_handle, CHAN_OFF_COUNT) >= chan_field_i32(ch_handle, CHAN_OFF_CAPACITY):
         if chan_field_i32(ch_handle, CHAN_OFF_CLOSED) != 0:
             return
+        if channel_wait_cut_short():
+            // The value was moved into this call and never entered the
+            // channel: destroy it here, the way the queue drops its payloads.
+            let drop_fn = chan_drop_fn(ch_handle)
+            if drop_fn as i64 != 0:
+                drop_fn(value_ptr as *mut u8)
+            return
         if chan_field_i32(ch_handle, CHAN_OFF_BOUNDED_CAPACITY) == 0:
             if channel_grow(ch_handle) != 0:
                 break
@@ -198,6 +219,8 @@ pub fn with_channel_recv(ch_handle: i64, out_ptr: *mut u8) -> i32:
 
     while chan_field_i32(ch_handle, CHAN_OFF_COUNT) == 0:
         if chan_field_i32(ch_handle, CHAN_OFF_CLOSED) != 0:
+            return -1
+        if channel_wait_cut_short():
             return -1
         channel_block_until_progress()
         if with_fiber_in_fiber() == 0 and with_runtime_has_fibers() == 0 and chan_field_i32(ch_handle, CHAN_OFF_COUNT) == 0:

@@ -72,6 +72,9 @@ pub fn with_runtime_current_set_cancel_requested() -> Unit:
 pub fn with_runtime_current_set_cancelled_return() -> Unit:
     let _ = 0
 
+pub fn with_runtime_current_cancelled_return() -> i32:
+    0
+
 pub fn with_runtime_completed_cancelled_return(fiber_id: i32) -> i32:
     let _ = fiber_id
     0

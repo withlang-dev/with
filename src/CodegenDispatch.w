@@ -11594,6 +11594,14 @@ impl Codegen:
             let icft2 = wl_global_get_value_type(ic_fn)
             result = wl_build_call(self.builder, icft2, ic_fn, 0, 0)
 
+        else if intrinsic == MirIntrinsic.FIBER_WAIT_CANCELLED:
+            var wc_fn = wl_get_named_function(self.llmod, "with_fiber_wait_cancelled")
+            if wc_fn == 0:
+                let wcft = wl_function_type(wl_i32_type(self.context), 0, 0, 0)
+                wc_fn = wl_add_function(self.llmod, "with_fiber_wait_cancelled", wcft)
+            let wcft2 = wl_global_get_value_type(wc_fn)
+            result = wl_build_call(self.builder, wcft2, wc_fn, 0, 0)
+
         else if intrinsic == MirIntrinsic.FIBER_IS_DONE:
             let done_fid = self.mir_intrinsic_arg(body, args_id, 0)
             var done_fn = wl_get_named_function(self.llmod, "with_runtime_fiber_is_completed")

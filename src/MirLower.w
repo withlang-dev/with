@@ -8066,6 +8066,7 @@ impl MirBuilder:
         let recv_unit = self.unit_operand()
         self.terminate(TermKind.TK_CALL, recv_unit, recv_args_id, opt_place, recv_after_bb)
         self.switch_to(recv_after_bb)
+        self.emit_wait_cancel_check()
         let disc = self.lower_enum_discriminant(opt_place)
         let some_disc = self.enum_variant_discriminant_for_type(opt_ty, self.sema.syms.some)
         let vals: Vec[i32] = Vec.new()
@@ -8360,10 +8361,20 @@ impl MirBuilder:
 
         // 5. Unwind BB: set cancelled_return, emit defers+drops, return
         self.switch_to(unwind_bb)
+        self.emit_cancelled_return()
+
+        // 6. Normal BB: continue with result
+        self.switch_to(normal_bb)
+        self.body.new_operand(OperandKind.OK_COPY, result_place)
+
+    // The cancellation unwind (§14.7 step 3): mark the fiber's return as
+    // cancelled, then leave the function the way a return does — defers and
+    // drops run, the value is never produced.
+    mut fn emit_cancelled_return():
         let scr_args: Vec[i32] = Vec.new()
         let scr_args_id = self.body.new_call_args(scr_args)
         self.body.set_call_intrinsic(scr_args_id, MirIntrinsic.FIBER_SET_CANCELLED_RETURN)
-        let scr_result = self.new_temp(self.sema.ty_i32 as i32)
+        let scr_result = self.new_temp(self.sema.ty_i32)
         let scr_place = self.place_for_local(scr_result)
         let after_scr = self.new_block()
         let scr_unit = self.unit_operand()
@@ -8376,9 +8387,33 @@ impl MirBuilder:
         self.emit_drops_for_return()
         self.terminate(TermKind.TK_RETURN, 0, 0, 0, 0)
 
-        // 6. Normal BB: continue with result
-        self.switch_to(normal_bb)
-        self.body.new_operand(OperandKind.OK_COPY, result_place)
+    // §14.7: a cancelled fiber unwinds at a runtime wait instead of parking.
+    // Emitted right after a current-fiber wait intrinsic that returns to the
+    // fiber without a child task to join (recv, send): WAIT_CANCELLED == 0 →
+    // the wait completed, continue; else the runtime cut it short → cancelled
+    // return. (#1293: a select loser parked in recv() never unwound.)
+    mut fn emit_wait_cancel_check():
+        let ic_args: Vec[i32] = Vec.new()
+        let ic_args_id = self.body.new_call_args(ic_args)
+        self.body.set_call_intrinsic(ic_args_id, MirIntrinsic.FIBER_WAIT_CANCELLED)
+        let ic_result = self.new_temp(self.sema.ty_i32)
+        let ic_place = self.place_for_local(ic_result)
+        let check_bb = self.new_block()
+        let ic_unit = self.unit_operand()
+        self.terminate(TermKind.TK_CALL, ic_unit, ic_args_id, ic_place, check_bb)
+        self.switch_to(check_bb)
+        let continue_bb = self.new_block()
+        let unwind_bb = self.new_block()
+        let sw_vals: Vec[i32] = Vec.new()
+        sw_vals.push(0)
+        let sw_tgts: Vec[i32] = Vec.new()
+        sw_tgts.push(continue_bb)
+        let sw = self.body.new_switch_table(sw_vals, sw_tgts)
+        let ic_op = self.body.new_operand(OperandKind.OK_COPY, ic_place)
+        self.terminate(TermKind.TK_SWITCH_INT, ic_op, sw, unwind_bb, 0)
+        self.switch_to(unwind_bb)
+        self.emit_cancelled_return()
+        self.switch_to(continue_bb)
 
     // Join a Task purely for cleanup: await completion and free its result buffer,
     // but do not propagate child-cancel status into the current fiber.
@@ -10979,6 +11014,8 @@ impl MirBuilder:
             let math_method_name = self.pool.resolve_symbol(method_sym)
             let math_method_id = math_fn_lookup(math_method_name)
             self.body.set_call_math_fn_id(call_id, math_method_id)
+        if intrinsic == MirIntrinsic.CHAN_SEND or intrinsic == MirIntrinsic.CHAN_RECV:
+            self.emit_wait_cancel_check()
 
         if self.sema.is_copy_frozen(ret_type) != 0:
             return self.body.new_operand(OperandKind.OK_COPY, result_place)

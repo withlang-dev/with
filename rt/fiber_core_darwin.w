@@ -916,6 +916,12 @@ pub fn with_runtime_current_set_cancelled_return() -> Unit:
     if current != 0:
         fiber_set_cancelled_return_flag(current, 1)
 
+pub fn with_runtime_current_cancelled_return() -> i32:
+    let current = current_worker_fiber()
+    if current == 0:
+        return 0
+    fiber_cancelled_return(current)
+
 pub fn with_runtime_completed_cancelled_return(fiber_id: i32) -> i32:
     scheduler_lock()
     let f = fiber_lookup(fiber_id)

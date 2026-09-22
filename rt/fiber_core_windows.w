@@ -702,6 +702,11 @@ pub fn with_runtime_current_set_cancelled_return() -> Unit:
     if current_fiber != 0:
         fiber_set_cancelled_return_flag(current_fiber, 1)
 
+pub fn with_runtime_current_cancelled_return() -> i32:
+    if current_fiber == 0:
+        return 0
+    fiber_cancelled_return(current_fiber)
+
 pub fn with_runtime_completed_cancelled_return(fiber_id: i32) -> i32:
     let f = fiber_lookup(fiber_id)
     if f == 0 or fiber_state(f) != FIBER_STATE_DONE:
