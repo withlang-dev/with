@@ -10242,6 +10242,79 @@ impl Sema:
         self.set_binding_view_deps(sym, param_mask, deps)
         self.register_view_binding_borrows(sym, expr_node)
 
+    // #1302 (§2.2, §9.7, D22/D27/D32): a pattern is structural projection, so a
+    // match observes its subject unless an arm takes an owned value out of it —
+    // a binding of a non-Copy type by value (`Some(.S(s))` with `s: str`), or the
+    // #1272 disarm of a Drop type. Non-binding patterns, `_`, and Copy bindings
+    // observe: the subject stays where it is and MirLower reads it in place.
+    // Walks the pattern after check_pattern, while the arm scope holds the
+    // bindings' types (same shape as record_pattern_view_bindings).
+    mut fn pattern_binds_owned_value(node: i32) -> i32:
+        if node == 0:
+            return 0
+        let kind = self.ast.kind(node)
+        if kind == NodeKind.NK_PAT_IDENT or kind == NodeKind.NK_PAT_TYPED_BIND:
+            return if self.is_copy(self.scope_lookup(self.ast.get_data0(node)) as TypeId) == 0: 1 else: 0
+        if kind == NodeKind.NK_PAT_AT_BINDING:
+            if self.is_copy(self.scope_lookup(self.ast.get_data0(node)) as TypeId) == 0:
+                return 1
+            return self.pattern_binds_owned_value(self.ast.get_data1(node))
+        if kind == NodeKind.NK_PAT_VARIANT or kind == NodeKind.NK_PAT_ENUM_SHORTHAND:
+            let start = self.ast.get_data1(node)
+            let count = self.ast.get_data2(node)
+            for pi in 0..count:
+                if self.pattern_binds_owned_value(self.ast.get_extra(start + pi)) != 0:
+                    return 1
+            return 0
+        if kind == NodeKind.NK_PAT_OR or kind == NodeKind.NK_PAT_TUPLE:
+            let start = self.ast.get_data0(node)
+            let count = self.ast.get_data1(node)
+            for pi in 0..count:
+                if self.pattern_binds_owned_value(self.ast.get_extra(start + pi)) != 0:
+                    return 1
+            return 0
+        if kind == NodeKind.NK_PAT_STRUCT:
+            let start = self.ast.get_data1(node)
+            let count = self.ast.get_data2(node)
+            for pi in 0..count:
+                let field_sym = self.ast.get_extra(start + 1 + pi * 2)
+                let field_pattern = self.ast.get_extra(start + 1 + pi * 2 + 1)
+                if field_pattern != 0:
+                    if self.pattern_binds_owned_value(field_pattern) != 0:
+                        return 1
+                else if self.is_copy(self.scope_lookup(field_sym) as TypeId) == 0:
+                    return 1
+            return 0
+        0
+
+    // A struct/enum pattern on a by-value Drop subject is the #1272 disarm (or
+    // an error already reported): it takes the value apart, so it consumes.
+    fn pattern_disarms_drop_subject(node: i32, subject_type: i32) -> i32:
+        if node == 0 or self.drop_pattern_owner_sym(subject_type) == 0:
+            return 0
+        let kind = self.ast.kind(node)
+        if kind == NodeKind.NK_PAT_VARIANT or kind == NodeKind.NK_PAT_ENUM_SHORTHAND or kind == NodeKind.NK_PAT_STRUCT:
+            return 1
+        if kind == NodeKind.NK_PAT_AT_BINDING:
+            return self.pattern_disarms_drop_subject(self.ast.get_data1(node), subject_type)
+        if kind == NodeKind.NK_PAT_OR:
+            let start = self.ast.get_data0(node)
+            let count = self.ast.get_data1(node)
+            for pi in 0..count:
+                if self.pattern_disarms_drop_subject(self.ast.get_extra(start + pi), subject_type) != 0:
+                    return 1
+        0
+
+    // The subject of a consuming pattern is transferred at entry, before any
+    // arm runs: a local becomes moved (§2.2 flow rules apply to later uses), a
+    // field is the D32 implicit-field-move error with its `move`/`.clone()`
+    // fix-its, and a temporary or explicit `move` subject needs nothing.
+    mut fn mark_pattern_subject_consumed(node: i32, pat: i32, subject: i32, subject_type: i32):
+        if self.pattern_binds_owned_value(pat) == 0 and self.pattern_disarms_drop_subject(pat, subject_type) == 0:
+            return
+        self.consuming_pattern_subjects.insert(node, 1)
+        self.mark_moved_if_consumed(subject)
+
     mut fn record_pattern_view_bindings(node: i32, subject_node: i32):
         if node == 0 or subject_node == 0:
             return
@@ -12834,6 +12907,10 @@ impl Sema:
             self.check_pattern(pat, subject_type as i32)
             self.pattern_subject_node = 0
             self.record_pattern_view_bindings(pat, subject)
+            // #1302: marked per arm, before its body, from the shared entry
+            // state — an arm that consumes the subject and reassigns it
+            // (`Some(n) => cur = n.next`) leaves it live at its exit.
+            self.mark_pattern_subject_consumed(node, pat, subject, subject_type as i32)
             if self.ast.kind(pat) == NodeKind.NK_PAT_REGEX:
                 self.regex_bind_capture_scope(pat)
             if guard != 0:
@@ -15142,7 +15219,9 @@ impl Sema:
         // MIR moves the bound elements out, so a later use of the subject
         // (`t.1` after `let (a, b) = t`) reads blanked storage.
         // mark_moved_if_consumed's gates keep Copy and view subjects live.
-        self.mark_moved_if_consumed(value)
+        // #1302: only when a binding takes an owned value; a pattern that
+        // binds nothing non-Copy observes the subject in place.
+        self.mark_pattern_subject_consumed(node, pattern, value, val_type as i32)
         if else_body != 0:
             let else_ty = self.check_expr(else_body)
             let else_kind = self.get_type_kind(self.resolve_alias(else_ty as TypeId))

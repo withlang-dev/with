@@ -95,6 +95,10 @@ type MirBuilder = ephemeral {
     // branch needs the niche reset: an unconditional field move stays statically
     // moved and the owner's partial drop skips it without a reset.
     field_move_in_branch: i32,
+    // #1302: > 0 while lowering patterns against a subject matched IN PLACE
+    // (an observed place, see observed_pattern_subject_place): `_` and `..`
+    // must not move payloads into drop locals — nothing is being consumed.
+    pattern_subject_observed: i32,
     with_cleanup_guard_locals: Vec[i32],
     with_cleanup_payload_locals: Vec[i32],
     with_cleanup_method_syms: Vec[i32],
@@ -203,6 +207,7 @@ fn MirBuilder.init(sema: &Sema, ast: AstPool, pool: InternPool, fn_sym: i32) -> 
         pending_reset_field_types: Vec.new(),
         pending_move_temp_locals: Vec.new(),
         field_move_in_branch: 0,
+        pattern_subject_observed: 0,
         with_cleanup_guard_locals: Vec.new(),
         with_cleanup_payload_locals: Vec.new(),
         with_cleanup_method_syms: Vec.new(),
@@ -5903,8 +5908,32 @@ impl MirBuilder:
         let pat = self.ast.get_data0(node)
         let rhs = self.ast.get_data1(node)
         let else_body = self.ast.get_data2(node)
-        let rhs_op = self.lower_expr(rhs)
         let rhs_ty = self.expr_type(rhs)
+        // #1302: a pattern that binds nothing non-Copy observes a place subject.
+        let observed_place = self.observed_pattern_subject_place(node, rhs)
+        if observed_place >= 0:
+            let saved_observed = self.pattern_subject_observed
+            if else_body == 0:
+                self.pattern_subject_observed = 1
+                let _ = self.lower_pattern(pat, observed_place)
+                self.pattern_subject_observed = saved_observed
+            else:
+                let obs_success_bb = self.new_block()
+                let obs_fail_bb = self.new_block()
+                let obs_cont_bb = self.new_block()
+                self.pattern_subject_observed = 1
+                self.lower_pattern_match(observed_place, pat, obs_success_bb, obs_fail_bb)
+                self.switch_to(obs_success_bb)
+                let _ = self.lower_pattern(pat, observed_place)
+                self.pattern_subject_observed = saved_observed
+                self.terminate(TermKind.TK_GOTO, obs_cont_bb, 0, 0, 0)
+                self.switch_to(obs_fail_bb)
+                let _ = self.lower_expr(else_body)
+                if self.body.term_kind(self.cur_bb) == TermKind.TK_UNREACHABLE:
+                    self.terminate(TermKind.TK_UNREACHABLE, 0, 0, 0, 0)
+                self.switch_to(obs_cont_bb)
+            return
+        let rhs_op = self.lower_expr(rhs)
         let rhs_place = self.materialize_operand(rhs_op, rhs_ty, self.ast.get_start(rhs))
 
         if else_body == 0:
@@ -8756,7 +8785,7 @@ impl MirBuilder:
             // exit, mirroring the NK_PAT_IDENT binding path. Borrowed subjects
             // surface here as ref-typed places (no value drop) and are untouched.
             let wc_ty = self.place_local_type(scrutinee_place)
-            if self.type_needs_value_drop(wc_ty) != 0:
+            if self.type_needs_value_drop(wc_ty) != 0 and self.pattern_subject_observed == 0:
                 let wc_local = self.body.new_local(wc_ty, 0, 0, 1)
                 self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, wc_local, 0, self.ast.get_start(pat_node))
                 self.schedule_drop(wc_local, DropKind.DK_VALUE)
@@ -8833,7 +8862,7 @@ impl MirBuilder:
                     // consumed variant; move each Drop one into an anonymous
                     // drop-scheduled local (same obligation as `_`). By-value
                     // subjects only — a borrowed subject keeps ownership.
-                    if self.pattern_subject_ref_mutability(scrutinee_place) < 0:
+                    if self.pattern_subject_ref_mutability(scrutinee_place) < 0 and self.pattern_subject_observed == 0:
                         let rest_enum_ty = self.place_local_type(variant_subject_place)
                         let rest_payloads = self.sema.enum_variant_payload_types_frozen(rest_enum_ty, variant_sym)
                         var rpi = bi
@@ -9053,19 +9082,56 @@ impl MirBuilder:
     // owned-value demand. Preserve an Option[&V] payload as &V in every
     // instantiation, and materialize Copy only at a later recorded demand.
     // Join lowering must consume the one Sema-resolved D22 join decision.
+    // #1302 (§9.7, D22/D27): a pattern is structural projection, not an owned
+    // demand. A match whose subject is a by-value non-Copy PLACE (a local, a
+    // field chain, an element) and whose arms take nothing out of it (Sema's
+    // consuming_pattern_subjects verdict: no non-Copy by-value binding, no
+    // Drop disarm) reads the place where it is. Lowering it through
+    // lower_expr + materialize_operand moved the place into a scratch temp —
+    // reset-on-move blanked the field, the arms dropped the value, and a
+    // second `match self.cur` decoded the all-zero sentinel as variant 0
+    // (`Some(.LBrace)`). Returns the subject place, or -1 when the subject is
+    // consumed, Copy, a reference, or a temporary (those keep the scratch
+    // temp: the arms own its payloads and `_`/`..` drop them).
+    mut fn observed_pattern_subject_place(node: i32, subject_expr: i32) -> i32:
+        if self.sema.consuming_pattern_subjects.contains(node):
+            return -1
+        var expr = subject_expr
+        while expr != 0 and (self.ast.kind(expr) == NodeKind.NK_GROUPED or self.ast.kind(expr) == NodeKind.NK_NO_SUSPEND):
+            expr = self.ast.get_data0(expr)
+        if expr == 0:
+            return -1
+        let kind = self.ast.kind(expr)
+        if kind == NodeKind.NK_IDENT:
+            let sym = self.ast.get_data0(expr)
+            if self.lookup_local(sym) < 0 and self.lookup_alias_place(sym) < 0:
+                return -1
+        else if kind != NodeKind.NK_FIELD_ACCESS and kind != NodeKind.NK_INDEX:
+            return -1
+        let ty = self.expr_type(expr)
+        if ty == 0 or self.sema.is_copy_frozen(ty) != 0:
+            return -1
+        let tk = self.sema.get_type_kind(self.sema.resolve_alias(ty as TypeId))
+        if tk == TypeKind.TY_REF or tk == TypeKind.TY_PTR:
+            return -1
+        self.lower_expr_place(expr)
+
     mut fn lower_match(scrutinee_expr: i32, arms_start: i32, arms_count: i32, node: i32, want_result: i32) -> i32:
         if arms_count == 0:
             return self.unit_operand()
 
         let scrutinee_ty = self.expr_type(scrutinee_expr)
-        let saved_scrutinee_expected = self.expected_type
-        if scrutinee_ty != 0 and scrutinee_ty != self.sema.ty_void as i32:
-            self.expected_type = scrutinee_ty
-        else:
-            self.expected_type = 0
-        let scrutinee_op = self.lower_expr(scrutinee_expr)
-        self.expected_type = saved_scrutinee_expected
-        let scrutinee_place = self.materialize_operand(scrutinee_op, scrutinee_ty, self.ast.get_start(scrutinee_expr))
+        let observed_place = self.observed_pattern_subject_place(node, scrutinee_expr)
+        var scrutinee_place = observed_place
+        if observed_place < 0:
+            let saved_scrutinee_expected = self.expected_type
+            if scrutinee_ty != 0 and scrutinee_ty != self.sema.ty_void as i32:
+                self.expected_type = scrutinee_ty
+            else:
+                self.expected_type = 0
+            let scrutinee_op = self.lower_expr(scrutinee_expr)
+            self.expected_type = saved_scrutinee_expected
+            scrutinee_place = self.materialize_operand(scrutinee_op, scrutinee_ty, self.ast.get_start(scrutinee_expr))
 
         let result_ty = self.expr_type(node)
         let result_is_void = if want_result == 0 or result_ty == 0 or result_ty == self.sema.ty_void as i32: 1 else: 0
@@ -9083,12 +9149,14 @@ impl MirBuilder:
         // The arms own the subject's payloads. Retire the enclosing cleanup
         // before lowering them: an arm can return before reaching the join.
         // Both match and parser-desugared if-let take this path.
-        let match_scrut_local = mir_place_plain_local(&self.body, scrutinee_place)
-        if match_scrut_local >= 0:
-            self.cancel_stmt_temp_for_local(match_scrut_local)
-            self.cancel_scheduled_value_drop_for_local(match_scrut_local)
-            self.mark_local_value_moved(match_scrut_local)
-        self.cancel_scheduled_value_drop_for_receiver_expr(scrutinee_expr)
+        // An observed place is never consumed: its owner keeps every drop.
+        if observed_place < 0:
+            let match_scrut_local = mir_place_plain_local(&self.body, scrutinee_place)
+            if match_scrut_local >= 0:
+                self.cancel_stmt_temp_for_local(match_scrut_local)
+                self.cancel_scheduled_value_drop_for_local(match_scrut_local)
+                self.mark_local_value_moved(match_scrut_local)
+            self.cancel_scheduled_value_drop_for_receiver_expr(scrutinee_expr)
 
         let match_entry_bb = self.cur_bb as i32
         let branch_drop_depth = self.drop_local_ids.len() as i32
@@ -9108,6 +9176,10 @@ impl MirBuilder:
             let fail_bb = if ai + 1 < arms_count: self.new_block() else: join_bb
 
             self.switch_to(dispatch_bb)
+            // The observed flag covers only THIS match's pattern lowering: a
+            // match nested in the arm body decides for its own subject.
+            let saved_observed = self.pattern_subject_observed
+            self.pattern_subject_observed = if observed_place >= 0: 1 else: 0
             self.lower_pattern_match(scrutinee_place, pat_node, arm_bb, fail_bb)
 
             self.switch_to(arm_bb)
@@ -9118,6 +9190,7 @@ impl MirBuilder:
             // different arm was taken (memory corruption for Drop-typed payloads).
             self.push_scope()
             let _ = self.lower_pattern(pat_node, scrutinee_place)
+            self.pattern_subject_observed = saved_observed
             self.field_move_in_branch = self.field_move_in_branch + 1
 
             if guard_node != 0:

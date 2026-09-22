@@ -1026,6 +1026,10 @@ pub type Sema {
     autoderef_step_tys: Vec[i32],
     // Match value-pattern sidecar: pattern node → symbol compared by value.
     pattern_value_syms: HashMap[i32, i32],
+    // #1302: match / let-else nodes whose pattern CONSUMES the subject (an arm
+    // binds a non-Copy value by value, or a Drop type is taken apart). Every
+    // other by-value place subject is observed in place by MirLower.
+    consuming_pattern_subjects: HashMap[i32, i32],
     // Regex literal metadata sidecars, keyed by NK_REGEX_LIT/NK_PAT_REGEX node.
     regex_capture_counts: HashMap[i32, i32],
     regex_capture_name_starts: HashMap[i32, i32],
@@ -2328,6 +2332,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         autoderef_step_fns: Vec.new(),
         autoderef_step_tys: Vec.new(),
         pattern_value_syms: sema_new_map_i32_i32(),
+        consuming_pattern_subjects: sema_new_map_i32_i32(),
         regex_capture_counts: sema_new_map_i32_i32(),
         regex_capture_name_starts: sema_new_map_i32_i32(),
         regex_capture_name_counts: sema_new_map_i32_i32(),
