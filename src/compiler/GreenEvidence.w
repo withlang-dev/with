@@ -60,8 +60,16 @@ fn green_inputs_identity(root: &str) -> str:
     hash_args.push(listing)
     green_first_line(green_git_output(root, &hash_args, "hash-object"))
 
+/// An untracked path that is not a build input: a user's own program under
+/// examples/, or a document — `docs/` and top-level `*.md` are outside the
+/// identity (green_identity_inputs), so an untracked one cannot dirty it.
+pub fn green_untracked_is_not_input(status_line: &str) -> bool:
+    if not status_line.starts_with("?? "): return false
+    let path = status_line.slice(3, status_line.len())
+    path.starts_with("examples/") or path.starts_with("docs/") or (path.ends_with(".md") and not path.contains("/"))
+
 // The tracked tree is as committed and nothing untracked could be a build
-// input; an untracked path under examples/ is a user's own program.
+// input.
 fn green_worktree_is_clean(root: &str) -> bool:
     let args: Vec[str] = Vec.new()
     args.push("status")
@@ -69,7 +77,7 @@ fn green_worktree_is_clean(root: &str) -> bool:
     let status_lines = green_git_output(root, &args, "status").split("\n")
     for i in 0..status_lines.len() as i32:
         let line = status_lines.get(i)
-        if line.len() > 0 and not line.starts_with("?? examples/"): return false
+        if line.len() > 0 and not green_untracked_is_not_input(line): return false
     true
 
 /// The commit at which the sources under `root` were recorded green, or "":

@@ -26,4 +26,11 @@ fn main:
     assert(green_identity_inputs(top_after_docs_edit) == inputs)
     // A change to a source tree does.
     assert(green_identity_inputs(top.replace("040000 tree 3333\tsrc", "040000 tree 7777\tsrc")) != inputs)
+    // The clean check applies the same rule to untracked paths: a document or
+    // a user's program cannot dirty a tree whose identity does not see it
+    // (an untracked docs/feature_plans/ draft refused main's reseed 2026-09-22).
+    for harmless in ["?? docs/feature_plans/with-ui.md", "?? examples/spiral/", "?? NOTES.md"]:
+        assert(green_untracked_is_not_input(harmless))
+    for input in ["?? src/New.w", "?? build/x.w", "?? lib/std/notes.md", " M src/Sema.w", "?? test/behavior/t.w"]:
+        assert(not green_untracked_is_not_input(input))
     print("ok")
