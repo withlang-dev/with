@@ -1251,9 +1251,17 @@ fn compilation_execute_binary_link_plan(debug_info: bool, plan: CompilationBinar
     var owned = move plan
     let t_link = profile_now()
     let link_result = link_stage_result_for_command(move owned.command)
+    let keep_units = runtime_getenv("WITH_KEEP_UNIT_OBJECTS").len() > 0
     if not link_result.ok:
         compilation_debug_init("build_binary_to_path:link FAILED")
-        compilation_cleanup_build_products(owned.obj_path, owned.bin_path)
+        // A failed link is when the unit objects are needed most: an
+        // undefined or duplicate symbol across codegen units is read off
+        // them with nm (#1331).
+        if keep_units:
+            runtime_eprint(f"note: WITH_KEEP_UNIT_OBJECTS: the unit objects are kept at {owned.obj_path} and {owned.obj_path}.u<k>.o")
+            compilation_cleanup_build_products("", owned.bin_path)
+        else:
+            compilation_cleanup_build_products(owned.obj_path, owned.bin_path)
         return link_result
     if profile_enabled():
         profile_emit("link", t_link, "")
@@ -1266,7 +1274,7 @@ fn compilation_execute_binary_link_plan(debug_info: bool, plan: CompilationBinar
         return link_stage_result_fail()
     // WITH_KEEP_UNIT_OBJECTS=1 leaves the linked objects beside the binary, for
     // diffing the unit a failed fixpoint names.
-    if runtime_getenv("WITH_KEEP_UNIT_OBJECTS").len() > 0: return link_result
+    if keep_units: return link_result
     compilation_remove_file_best_effort(owned.obj_path)
     compilation_remove_unit_objects_best_effort(owned.obj_path)
     link_result
