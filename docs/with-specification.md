@@ -9192,6 +9192,16 @@ live after a successful `init`, dead after destruction. Its storage begins as
 `Drop` is armed only when initialization establishes production; storage
 existence alone never arms foreign destruction.
 
+An in-place resource is **pinned**: its representation has one address from
+the creation of the resource value until foreign destruction completes, and
+moving the resource value does not move the representation. The facade may
+declare an in-place resource `movable` when trusted evidence establishes that
+no operation retains the representation's address; this is never inferred.
+Raw and borrowed access to a pinned representation yields a pointer that
+remains valid for the borrow regardless of moves of the resource value.
+Pinning applies to the representation's own storage, not to memory it
+references.
+
 **Never half-model unsafely.** A partial model is acceptable when the missing
 fact only removes capability: ownership known but status uninterpreted, a
 child dependent until independence is known, a C string left as a borrowed
