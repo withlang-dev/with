@@ -2646,7 +2646,11 @@ impl Sema:
         let str_sym = intern.intern("str")
         let tp_count = ct_type_decl_tp_count(out, decl)
         let tp_start = ct_type_decl_tp_start(out, decl)
-        let self_type = out.add_node(NodeKind.NK_TYPE_NAMED, start, end, intern.intern("Self"), 0, 0)
+        // The trait observes (`fn to_str(self: &Self)`); the derived method
+        // takes `&self` and matches the pointee, so a `T: Display` view such
+        // as `print[T: Display](v: &T)` reaches it without consuming.
+        let self_type_named = out.add_node(NodeKind.NK_TYPE_NAMED, start, end, intern.intern("Self"), 0, 0)
+        let self_type = out.add_node(NodeKind.NK_TYPE_REF, start, end, self_type_named as i32, 0, 0)
         let ret_type = out.add_node(NodeKind.NK_TYPE_NAMED, start, end, str_sym, 0, 0)
 
         let te_start = self.get_type_d1(resolved)
@@ -2671,11 +2675,12 @@ impl Sema:
         let arm_start = out.extra_len()
         for ai in 0..arms.len() as i32:
             out.add_extra(arms[ai])
-        let subject = out.ct_build_ident(decl, self_sym)
-        let body = out.add_node(NodeKind.NK_MATCH, start, end, subject, arm_start, variant_count)
+        let self_ident = out.ct_build_ident(decl, self_sym)
+        let subject = out.add_node(NodeKind.NK_UNARY, start, end, UnaryOp.UOP_DEREF, self_ident, 0)
+        let body = out.add_node(NodeKind.NK_MATCH, start, end, subject as i32, arm_start, variant_count)
 
         let param_start = out.extra_len()
-        out.ct_add_fn_param(self_sym, self_type as i32, FN_PARAM_FLAG_MOVE_SELF)
+        out.ct_add_fn_param(self_sym, self_type as i32, FN_PARAM_FLAG_REF_SELF | FN_PARAM_FLAG_SYNTH_RECEIVER)
         let fn_sym = intern.intern(type_name ++ ".to_str")
         let fn_node = out.add_node(NodeKind.NK_FN_DECL, start, end, fn_sym, body as i32, 0)
         out.add_fn_meta(fn_node, FN_META_REQUIRED_UNIT, ret_type as i32, param_start, 1, 0, 0)
