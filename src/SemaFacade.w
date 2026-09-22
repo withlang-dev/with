@@ -70,7 +70,8 @@ impl Sema:
         let sig = self.get_sig(f)
         if sig >= 0 and self.sig_get_param_count(sig) > 0:
             let p0 = self.resolve_alias(self.sig_param_type(sig, 0) as TypeId)
-            if p0 != self.resolve_alias(self.facade_resources[ri].repr_tid as TypeId) and self.get_type_kind(p0) == TypeKind.TY_PTR:
+            let repr = self.resolve_alias(self.facade_resources[ri].repr_tid as TypeId)
+            if p0 != repr and self.get_type_kind(p0) == TypeKind.TY_PTR and not self.facade_void_ptr_accepts(p0, repr):
                 self.emit_error(f"resource '{rname}': '{fname}' takes a pointer to the representation, the in-place shape; the compiler does not render in-place resources yet, so no With type is generated for it (§16.2b.3)", node)
                 return
         // A destroying operation callable as a lend (§16.2b.3): an fn item
@@ -267,6 +268,11 @@ impl Sema:
                     let shown = self.facade_param_display(fn_sym, sig, by)
                     self.emit_error(f"fn '{fname}': destroyed_by {shown} is not callable (§16.2b.9, §16.2b.13)", clause)
                     return c
+                if not self.facade_callable_accepts(sig, by, pi):
+                    let shown = self.facade_param_display(fn_sym, sig, by)
+                    let consumed = self.facade_param_display(fn_sym, sig, pi)
+                    self.emit_error(f"fn '{fname}': destroyed_by {shown} does not take the consumed {consumed} as its first parameter (§16.2b.9, §16.2b.13)", clause)
+                    return c
             c.consumes.push(pi)
             c.consumes_destroyed_by.push(by)
             return c
@@ -442,22 +448,44 @@ impl Sema:
         found
 
     // A destroyer, initializer or drop takes the representation first: the
-    // value itself (a pointer resource) or a pointer to it (in-place).
+    // value itself (a pointer resource), a `void *` that C converts it to, or
+    // a pointer to it (in-place).
     fn facade_accepts_repr(sig: i32, repr_tid: i32) -> bool:
         if self.sig_get_param_count(sig) == 0:
             return false
         let p0 = self.resolve_alias(self.sig_param_type(sig, 0) as TypeId)
         let repr = self.resolve_alias(repr_tid as TypeId)
-        if p0 == repr:
+        if p0 == repr or self.facade_void_ptr_accepts(p0, repr):
             return true
         self.get_type_kind(p0) == TypeKind.TY_PTR and self.resolve_alias(self.get_type_d0(p0) as TypeId) == repr
 
+    // Ruling §61 "the destroyer accepts the representation" is C's own
+    // conversion rule (Eric, 2026-09-22): a `void *` parameter (`*mut c_void`
+    // or `*const c_void` after c_import) accepts every object pointer
+    // representation, typedefs chased through their aliases — never a
+    // function pointer (C does not convert one to `void *`) and never a
+    // by-value representation. Otherwise the type is exact.
+    fn facade_void_ptr_accepts(p0: i32, repr: i32) -> bool:
+        if self.get_type_kind(p0) != TypeKind.TY_PTR or self.is_c_void_like_type(self.get_type_d0(p0)) == 0:
+            return false
+        if self.get_type_kind(repr) != TypeKind.TY_PTR:
+            return false
+        let pointee = self.resolve_alias(self.get_type_d0(repr) as TypeId)
+        let k = self.get_type_kind(pointee)
+        k != TypeKind.TY_FN and k != TypeKind.TY_EXTERN_FN
+
     fn facade_param_is_callable(sig: i32, pi: i32) -> bool:
-        var t = self.resolve_alias(self.sig_param_type(sig, pi) as TypeId)
-        if self.get_type_kind(t) == TypeKind.TY_PTR:
-            t = self.resolve_alias(self.get_type_d0(t) as TypeId)
-        let k = self.get_type_kind(t)
-        k == TypeKind.TY_EXTERN_FN or k == TypeKind.TY_FN
+        self.callable_type_resolved(self.sig_param_type(sig, pi)) != 0
+
+    // The callable parameter `by` (a `destroyed_by`) takes the consumed
+    // parameter `pi` first, under the destroyer rule (facade_accepts_repr).
+    fn facade_callable_accepts(sig: i32, by: i32, pi: i32) -> bool:
+        let callable = self.callable_type_resolved(self.sig_param_type(sig, by))
+        if self.get_type_d1(callable) == 0:
+            return false
+        let p0 = self.resolve_alias(self.type_extra[self.get_type_d0(callable)] as TypeId)
+        let consumed = self.resolve_alias(self.sig_param_type(sig, pi) as TypeId)
+        p0 == consumed or self.facade_void_ptr_accepts(p0, consumed)
 
     // A status constant is a c_import `let` (or a `const`) with a literal
     // initializer: a materialized compile-time value, never a runtime read.

@@ -96,14 +96,15 @@ fn facade_render_resource(pool: AstPool, intern: InternPool, item: i32) -> str:
             return ""
     var out = "type " ++ name ++ " { repr: " ++ repr_text ++ ", live: bool }\n"
     if drop_fn != 0:
-        out = out ++ "impl Drop for " ++ name ++ ":\n    move fn drop():\n        if self.live: " ++ facade_render_call(pool, intern, drop_fn, "self.repr") ++ "\n"
+        out = out ++ "impl Drop for " ++ name ++ ":\n    move fn drop():\n        if self.live: " ++ facade_render_call(pool, intern, drop_fn, facade_render_repr_arg(pool, intern, drop_fn, repr_text)) ++ "\n"
     if destroyers.len() > 0:
         out = out ++ "impl " ++ name ++ ":\n"
         for di in 0..destroyers.len() as i32:
             let d = destroyers[di]
             let dname: str = intern.resolve(pool.get_data0(d as NodeId))
             let (params, args) = facade_render_params(pool, intern, d, 1)
-            let call_args = if args.len() > 0: "self.repr, " ++ args else: "self.repr"
+            let repr_arg = facade_render_repr_arg(pool, intern, d, repr_text)
+            let call_args = if args.len() > 0: repr_arg ++ ", " ++ args else: repr_arg
             out = out ++ "    move fn " ++ dname ++ "(" ++ params ++ ")" ++ facade_render_return(pool, intern, d) ++ ":\n        self.live = false\n        " ++ facade_render_call(pool, intern, d, call_args) ++ "\n"
     if producer != 0 and out_param == 0:
         let pname: str = intern.resolve(pool.get_data0(producer as NodeId))
@@ -137,6 +138,20 @@ fn facade_render_takes_repr_pointer(pool: AstPool, intern: InternPool, decl: i32
         return false
     let p0 = render_type_expr(pool, intern, pool.fn_param_type(pool.fn_meta_param_start(meta), 0) as NodeId)
     p0 == "*mut " ++ repr_text or p0 == "*const " ++ repr_text
+
+// The representation as the destroyer's first argument. A `void *` destroyer
+// (`free`) accepts every object pointer representation (ruling §61 under C's
+// conversion rule; Sema verifies it in facade_void_ptr_accepts); the
+// representation is cast to the parameter's spelling since With converts a
+// `*const T` to `*mut c_void` only explicitly.
+fn facade_render_repr_arg(pool: AstPool, intern: InternPool, decl: i32, repr_text: &str) -> str:
+    let meta = pool.find_fn_meta(decl as NodeId)
+    if meta < 0 or pool.fn_meta_param_count(meta) == 0:
+        return "self.repr"
+    let p0 = render_type_expr(pool, intern, pool.fn_param_type(pool.fn_meta_param_start(meta), 0) as NodeId)
+    if p0 != repr_text and (p0 == "*mut c_void" or p0 == "*const c_void"):
+        return "self.repr as " ++ p0
+    "self.repr"
 
 // `(<params>, <args>)` of the declaration's parameters from index `skip`:
 // c_import spells a C parameter `p` as `__param_p` so no C name collides
