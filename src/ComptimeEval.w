@@ -2897,7 +2897,12 @@ impl ComptimeEvaluator:
         if sym != 0:
             if self.lookup_slot_index(sym) >= 0:
                 return 0
-            if self.find_module_let_decl(sym) != 0:
+            // A bound type parameter shadows a module global of the same
+            // name: `T.name()` inside `print[T]` names the instance's type
+            // even when the calling program has a global `T`.
+            let sema_sym = self.sema.pool_lookup_symbol(self.pool.resolve(sym))
+            let is_type_param = sema_sym != 0 and self.sema.lookup_generic_subst(sema_sym) != 0
+            if not is_type_param and self.find_module_let_decl(sym) != 0:
                 return 0
         self.static_type_expr(node)
 
