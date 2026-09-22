@@ -846,6 +846,16 @@ pub fn run_sdk_cmake_action(ctx: ActionCtx) -> i32:
         configure.push("-DCMAKE_LINKER=" ++ sdk_abs(root, sdk_tool(bootstrap_prefix, "lld-link")))
         configure.push("-DCMAKE_MT=" ++ windows_mt)
         configure.push("-DCMAKE_RC_COMPILER=" ++ sdk_windows_rc_from_mt(windows_mt))
+        // CMake links its executables with `/MANIFEST:EMBED
+        // /MANIFESTINPUT:cmake.version.manifest`, so the linker merges its
+        // own UAC block into that manifest. lld-link writes that block
+        // without an xmlns, and a lld-link built with libxml2 (the LLVM
+        // Windows releases a runner bootstraps from) merges it into
+        // `ms_asmv1:level` attributes Windows rejects: the built cmake.exe
+        // fails to start with "side-by-side configuration is incorrect".
+        // cmake.version.manifest already carries requestedExecutionLevel,
+        // so the linker's block is redundant; leave it out.
+        configure.push("-DCMAKE_EXE_LINKER_FLAGS=/MANIFESTUAC:NO")
     rc = sdk_run_capture(ctx, "cmake-configure", configure, 600000)
     if rc != 0: return rc
     var build: Vec[str] = Vec.new()
