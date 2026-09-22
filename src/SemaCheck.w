@@ -11135,6 +11135,8 @@ impl Sema:
             self.scope_put(binding, elem_type, 0)
         if yields_views != 0 and binding != 0:
             self.scope_set_is_view_bound(binding)
+        if binding != 0 and not self.ast.for_binding_is_pattern(node) and self.type_is_ephemeral_value(elem_type) != 0:
+            self.record_for_binding_view_origins(binding, iterable)
         let for_meta = self.ast.find_for_meta(node)
         var label = 0
         if for_meta >= 0:
@@ -11159,6 +11161,22 @@ impl Sema:
         self.pop_scope()
         self.pop_move_control_flow_context()
         self.ty_void as i32
+
+    // #1297 / D44: `for x in xs` is `xs.iter()`, so the loop binding is a view
+    // produced from the iterated place and carries its origins the way
+    // record_view_producer_origins records them for the spelled call: the
+    // parameter mask, the collected deps, else the iterated place's root (a
+    // local collection, so `&x.field` cannot escape). It registers no borrow
+    // of that root — a whole-root borrow of `self` would reject
+    // `for e in self.items: self.count += 1`; #1317 tracks the missing
+    // live-view check on the iterated collection.
+    fn record_for_binding_view_origins(sym: i32, iterable: i32):
+        let param_mask = self.compute_expr_view_origin_mask(iterable)
+        var deps: Vec[i32] = Vec.new()
+        deps = self.collect_expr_view_deps(iterable, move deps)
+        if deps.len() == 0 and param_mask == 0:
+            deps = self.push_unique_i32(move deps, self.place_root_sym(iterable))
+        self.set_binding_view_deps(sym, param_mask, deps)
 
     fn struct_field_info_by_index(struct_type: i32, index: i32) -> i64:
         if struct_type == 0:
@@ -24808,15 +24826,18 @@ impl Sema:
             if self.get_type_kind(seq_resolved) == TypeKind.TY_ARRAY or self.get_type_kind(seq_resolved) == TypeKind.TY_SLICE:
                 let seq_elem = self.get_type_d0(seq_resolved)
                 return if self.type_needs_drop(seq_elem) != 0 and self.is_copy(seq_elem as TypeId) == 0: 1 else: 0
-            if self.get_type_kind(bare_resolved) == TypeKind.TY_GENERIC_INST and self.get_generic_inst_arg_count(bare_resolved as i32) > 0:
-                if self.pool_resolve(self.get_type_d0(bare_resolved)) == "Vec":
-                    let bare_elem = self.get_generic_inst_arg(bare_resolved as i32, 0)
+            // A `&Vec[T]` / `&HashMap[K, V]` iterable (a borrowed parameter,
+            // a match-bound payload) yields the same views as the owned
+            // collection (#1297).
+            if self.get_type_kind(seq_resolved) == TypeKind.TY_GENERIC_INST and self.get_generic_inst_arg_count(seq_resolved as i32) > 0:
+                if self.pool_resolve(self.get_type_d0(seq_resolved)) == "Vec":
+                    let bare_elem = self.get_generic_inst_arg(seq_resolved as i32, 0)
                     if self.type_needs_drop(bare_elem) != 0 and self.is_copy(bare_elem as TypeId) == 0:
                         return 1
                 // D44: a map's Drop-class keys and values bind as views too.
-                if self.pool_resolve(self.get_type_d0(bare_resolved)) == "HashMap" and self.get_generic_inst_arg_count(bare_resolved as i32) >= 2:
+                if self.pool_resolve(self.get_type_d0(seq_resolved)) == "HashMap" and self.get_generic_inst_arg_count(seq_resolved as i32) >= 2:
                     for ai in 0..2:
-                        let map_elem = self.get_generic_inst_arg(bare_resolved as i32, ai)
+                        let map_elem = self.get_generic_inst_arg(seq_resolved as i32, ai)
                         if self.type_needs_drop(map_elem) != 0 and self.is_copy(map_elem as TypeId) == 0:
                             return 1
         if self.ast.kind(iterable) != NodeKind.NK_CALL:
