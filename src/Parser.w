@@ -4724,45 +4724,32 @@ impl Parser:
         self.advance()
         self.pool.add_node(NodeKind.NK_BOOL_LIT, start, end, val, 0, 0)
 
+    // A char/byte literal is an integer literal value (§22): the same
+    // decoding serves expression position and pattern position (#1295).
     mut fn parse_char_literal() -> NodeId:
         let start = self.current_start()
         let end = self.current_end()
-        let text = self.source.slice(start as i64, end as i64)
+        let value64 = char_literal_value(self.source.slice(start as i64, end as i64)) as i64
         self.advance()
-        // Stage0 parity: char literals lower to integer literals.
-        // Supported escapes mirror bootstrap parser behavior.
-        var value = 0
-        // Support b'X' byte literals as a char-literal token form.
-        let base = if text.len() >= 1 and text[0] == 98: 2 else: 1
-        if text.len() >= base + 3 and text[base] == 92:  // '\'
-            let esc = text[(base + 1)]
-            if esc == 110:  // n
-                value = 10
-            else if esc == 114:  // r
-                value = 13
-            else if esc == 116:  // t
-                value = 9
-            else if esc == 48:  // 0
-                value = 0
-            else if esc == 120 and text.len() >= base + 4:  // xNN
-                let hi = hex_digit_value(text[(base + 2)])
-                let lo = if text.len() >= base + 5: hex_digit_value(text[(base + 3)]) else: -1
-                if hi >= 0 and lo >= 0:
-                    value = hi * 16 + lo
-                else:
-                    value = 0
-            else if esc == 92:  // \
-                value = 92
-            else if esc == 39:  // '
-                value = 39
-            else if esc == 34:  // "
-                value = 34
-            else:
-                value = esc as i32
-        else if text.len() >= base + 2:
-            value = text[base] as i32
-        let value64 = value as i64
         self.pool.add_node(NodeKind.NK_INT_LIT, start, end, ast_int_part0(value64), ast_int_part1(value64), ast_int_part2(value64))
+
+// The integer value of a char literal token's text: `'X'` or `b'X'`, with
+// the escapes the bootstrap parser accepted.
+fn char_literal_value(text: str) -> i32:
+    let base = if text.len() >= 1 and text[0] == 'b': 2 else: 1
+    if text.len() >= base + 3 and text[base] == '\\':
+        let esc = text[(base + 1)]
+        if esc == 'n': return 10
+        if esc == 'r': return 13
+        if esc == 't': return 9
+        if esc == '0': return 0
+        if esc == 'x' and text.len() >= base + 4:
+            let hi = hex_digit_value(text[(base + 2)])
+            let lo = if text.len() >= base + 5: hex_digit_value(text[(base + 3)]) else: -1
+            return if hi >= 0 and lo >= 0: hi * 16 + lo else: 0
+        return esc as i32
+    if text.len() >= base + 2: return text[base] as i32
+    0
 
 // #929: the characters that may follow a backslash in a string literal —
 // the set every decoder accepts (CodegenDispatch decode_string_escapes,
@@ -6227,7 +6214,7 @@ impl Parser:
     mut fn for_binding_should_parse_pattern() -> bool:
         let t = self.peek()
         if t == TokenKind.TK_L_PAREN or t == TokenKind.TK_L_BRACE or t == TokenKind.TK_L_BRACKET or
-           t == TokenKind.TK_DOT_IDENT or t == TokenKind.TK_DOT_DOT or t == TokenKind.TK_INT_LIT or
+           t == TokenKind.TK_DOT_IDENT or t == TokenKind.TK_DOT_DOT or t == TokenKind.TK_INT_LIT or t == TokenKind.TK_CHAR_LIT or
            t == TokenKind.TK_TRUE or t == TokenKind.TK_FALSE or t == TokenKind.TK_STRING_LIT or
            t == TokenKind.TK_REGEX_LIT or t == TokenKind.TK_MINUS:
             return true
@@ -6752,9 +6739,16 @@ impl Parser:
         arm_count
 
     fn is_arm_token(t: i32) -> bool:
-        t == TokenKind.TK_IDENT or t == TokenKind.TK_INT_LIT or t == TokenKind.TK_DOT_IDENT or t == TokenKind.TK_TRUE or t == TokenKind.TK_FALSE or t == TokenKind.TK_STRING_LIT or t == TokenKind.TK_REGEX_LIT or t == TokenKind.TK_MINUS or t == TokenKind.TK_L_BRACKET or t == TokenKind.TK_L_PAREN or t == TokenKind.TK_L_BRACE or t == TokenKind.TK_KW_IN
+        t == TokenKind.TK_IDENT or t == TokenKind.TK_INT_LIT or t == TokenKind.TK_CHAR_LIT or t == TokenKind.TK_DOT_IDENT or t == TokenKind.TK_TRUE or t == TokenKind.TK_FALSE or t == TokenKind.TK_STRING_LIT or t == TokenKind.TK_REGEX_LIT or t == TokenKind.TK_MINUS or t == TokenKind.TK_L_BRACKET or t == TokenKind.TK_L_PAREN or t == TokenKind.TK_L_BRACE or t == TokenKind.TK_KW_IN
 
     // ── Pattern parsing ──────────────────────────────────────────────
+
+    // The value of the integer or char literal token at the cursor, consumed.
+    mut fn pattern_int_value() -> i64:
+        let text = self.source.slice(self.current_start() as i64, self.current_end() as i64)
+        let is_char = self.peek() == TokenKind.TK_CHAR_LIT
+        self.advance()
+        if is_char: char_literal_value(text) as i64 else: parse_i64(text)
 
     mut fn parse_pattern() -> NodeId:
         let start = self.current_start()
@@ -6765,21 +6759,20 @@ impl Parser:
             self.advance()
             return self.pool.add_node(NodeKind.NK_PAT_REST, start, self.prev_end(), 0, 0, 0)
 
-        if t == TokenKind.TK_INT_LIT:
-            let text = self.source.slice(start as i64, end as i64)
-            self.advance()
+        // A char/byte literal is an integer literal value (§22, #1295), so
+        // `'{' =>`, `b'"' =>` and `'a'..='z' =>` are integer patterns.
+        if t == TokenKind.TK_INT_LIT or t == TokenKind.TK_CHAR_LIT:
             // Use full i64 parsing (parse_int clamps to i32 range, which silently
             // truncates pattern literals like META_END = 0x80000000 to i32 max,
             // breaking match dispatch on every value >= 2^31).
-            let val64 = parse_i64(text)
+            let val64 = self.pattern_int_value()
             if self.peek() == TokenKind.TK_DOT_DOT or self.peek() == TokenKind.TK_DOT_DOT_EQ:
                 let inclusive = if self.peek() == TokenKind.TK_DOT_DOT_EQ: 1 else: 0
                 self.advance()
-                let es = self.current_start()
-                let ee = self.current_end()
-                let etext = self.source.slice(es as i64, ee as i64)
-                self.expect(TokenKind.TK_INT_LIT)
-                let eval = parse_int(etext)
+                if self.peek() != TokenKind.TK_INT_LIT and self.peek() != TokenKind.TK_CHAR_LIT:
+                    self.expect(TokenKind.TK_INT_LIT)
+                    return self.poisoned_expr()
+                let eval = self.pattern_int_value() as i32
                 return self.pool.add_node(NodeKind.NK_PAT_RANGE, start, self.prev_end(), val64 as i32, eval, inclusive)
             // Store the i64 value across d0/d1/d2 using the same 3-part encoding
             // as NK_INT_LIT, so int_lit_value() can decode it uniformly.
@@ -6901,7 +6894,7 @@ impl Parser:
                     self.pool.add_extra(payload_patterns[pi])
                 return self.pool.add_node(NodeKind.NK_PAT_VARIANT, start, self.prev_end(), name, extra_start, binding_count)
             // Uppercase = unit variant
-            if name_str.len() > 0 and name_str[0] >= 65 and name_str[0] <= 90:
+            if name_str.len() > 0 and name_str[0] >= 'A' and name_str[0] <= 'Z':
                 if self.peek() == TokenKind.TK_L_BRACE:
                     return self.parse_struct_pattern(name, start)
                 return self.pool.add_node(NodeKind.NK_PAT_VARIANT, start, self.prev_end(), name, 0, 0)
@@ -8116,7 +8109,7 @@ impl Parser:
     mut fn param_binding_should_parse_pattern() -> bool:
         let t = self.peek()
         if t == TokenKind.TK_L_PAREN or t == TokenKind.TK_L_BRACE or t == TokenKind.TK_L_BRACKET or
-           t == TokenKind.TK_DOT_IDENT or t == TokenKind.TK_DOT_DOT or t == TokenKind.TK_INT_LIT or
+           t == TokenKind.TK_DOT_IDENT or t == TokenKind.TK_DOT_DOT or t == TokenKind.TK_INT_LIT or t == TokenKind.TK_CHAR_LIT or
            t == TokenKind.TK_TRUE or t == TokenKind.TK_FALSE or t == TokenKind.TK_STRING_LIT or
            t == TokenKind.TK_REGEX_LIT or t == TokenKind.TK_MINUS:
             return true
