@@ -43,7 +43,8 @@ impl Sema:
     mut fn verify_facade_resource(ri: i32) -> bool:
         let rname: str = self.pool_resolve(self.facade_resources[ri].name)
         let node = self.facade_resources[ri].node
-        let producer = self.facade_resources[ri].producer
+        let producer_count = self.facade_resources[ri].producers.len() as i32
+        let producer = if producer_count > 0: self.facade_resources[ri].producers[0] else: 0
         let init_fn = self.facade_resources[ri].init
         let preinit_fn = self.facade_resources[ri].preinit
         let drop_fn = self.facade_resources[ri].drop
@@ -94,10 +95,12 @@ impl Sema:
         for di in 0..destroyer_count:
             if not self.verify_facade_destroyer(ri, self.facade_resources[ri].destroyers[di]):
                 return false
-        if producer != 0 and self.facade_resources[ri].out_param < 0 and self.facade_op_raw_beyond(producer, -1, true):
-            let pn: str = self.pool_resolve(producer)
-            self.emit_error(f"resource '{rname}': producer '{pn}' is still a raw call after the facade covers its return (a variadic, a raw return, or a raw pointer parameter the facade does not describe); describe it with an fn item (§16.2b.5)", node)
-            return false
+        for pi in 0..producer_count:
+            let p = self.facade_resources[ri].producers[pi]
+            if self.facade_resources[ri].out_params[pi] < 0 and self.facade_op_raw_beyond(p, -1, true):
+                let pn: str = self.pool_resolve(p)
+                self.emit_error(f"resource '{rname}': producer '{pn}' is still a raw call after the facade covers its return (a variadic, a raw return, or a raw pointer parameter the facade does not describe); describe it with an fn item (§16.2b.5)", node)
+                return false
         if init_fn != 0 and not self.verify_facade_init(ri):
             return false
         // An out-parameter producer's constructor is stage 5: Drop and the
@@ -237,7 +240,7 @@ impl Sema:
         let repr_tid = self.resolve_type_expr(repr_node) as i32
         if repr_tid == 0:
             return
-        var r = FacadeResource { name, facade, node: item, repr_tid, producer: 0, out_param: -1, init: 0, preinit: 0, drop: 0, destroyers: Vec.new(), ok_const: 0, borrows: Vec.new(), independent: 0, movable: 0, thread_caps: 0 }
+        var r = FacadeResource { name, facade, node: item, repr_tid, producers: Vec.new(), out_params: Vec.new(), init: 0, preinit: 0, drop: 0, destroyers: Vec.new(), ok_const: 0, borrows: Vec.new(), independent: 0, movable: 0, thread_caps: 0 }
         for ci in 0..clause_count:
             let clause = self.ast.get_extra(extra_start + 1 + ci)
             r = self.collect_resource_clause(rname, move r, clause)
@@ -253,7 +256,11 @@ impl Sema:
             let sig = self.facade_fn_sig(producer, clause)
             if sig < 0:
                 return r
-            r.producer = producer
+            // A resource may have several producers (fopen, fdopen and
+            // tmpfile each produce the FILE that fclose destroys): each
+            // `from` is one constructor over the same destruction contract.
+            r.producers.push(producer)
+            r.out_params.push(-1)
             let out_ref = self.ast.get_extra(ops + 1)
             if out_ref != 0:
                 let pi = self.facade_resolve_param(out_ref, producer, sig)
@@ -264,7 +271,8 @@ impl Sema:
                     let shown = self.facade_param_display(producer, sig, pi)
                     self.emit_error(f"resource '{rname}': the out parameter {shown} is not a pointer to the representation (§16.2b.13)", clause)
                     return r
-                r.out_param = pi
+                let last = r.out_params.len() as i32 - 1
+                r.out_params[last] = pi
             else:
                 let ret = self.resolve_alias(self.sig_return_type(sig) as TypeId)
                 if ret != self.resolve_alias(r.repr_tid as TypeId):
@@ -308,11 +316,13 @@ impl Sema:
             r.ok_const = c
             return r
         if kind == FACADE_CLAUSE_BORROWS:
-            if r.producer == 0:
+            // `borrows` names a parameter of the `from` it follows.
+            if r.producers.len() == 0:
                 self.emit_error(f"resource '{rname}': 'borrows' names a parameter of the producer; state 'from <producer>' first (§16.2b.6)", clause)
                 return r
-            let sig = self.get_sig(r.producer)
-            let pi = self.facade_resolve_param(self.ast.get_extra(ops), r.producer, sig)
+            let producer = r.producers[r.producers.len() as i32 - 1]
+            let sig = self.get_sig(producer)
+            let pi = self.facade_resolve_param(self.ast.get_extra(ops), producer, sig)
             if pi >= 0:
                 r.borrows.push(pi)
             return r

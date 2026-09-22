@@ -409,8 +409,8 @@ type FacadeResource {
     facade: i32,
     node: i32,
     repr_tid: i32,
-    producer: i32,
-    out_param: i32,
+    producers: Vec[i32],  // one per `from` clause (fopen, fdopen, tmpfile → one FILE)
+    out_params: Vec[i32], // parallel to producers; -1 for a direct return
     init: i32,
     preinit: i32,
     drop: i32,

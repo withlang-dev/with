@@ -147,8 +147,7 @@ fn facade_render_resource(pool: AstPool, intern: InternPool, item: i32, methods:
     let extra_start = pool.get_data1(item as NodeId)
     let clause_count = pool.get_data2(item as NodeId)
     let repr_text = render_type_expr(pool, intern, pool.get_extra(extra_start) as NodeId)
-    var producer = 0
-    var out_param = 0
+    let producers: Vec[i32] = Vec.new()
     var drop_fn = 0
     var init_fn = 0
     var preinit_fn = 0
@@ -160,8 +159,9 @@ fn facade_render_resource(pool: AstPool, intern: InternPool, item: i32, methods:
         let kind = pool.get_data0(clause as NodeId)
         let ops = pool.get_data1(clause as NodeId)
         if kind == FACADE_CLAUSE_FROM:
-            producer = facade_render_find_fn(pool, intern, pool.get_extra(ops))
-            out_param = pool.get_extra(ops + 1)
+            // An out-parameter producer's constructor is stage 5.
+            if pool.get_extra(ops + 1) == 0:
+                producers.push(facade_render_find_fn(pool, intern, pool.get_extra(ops)))
         else if kind == FACADE_CLAUSE_INIT:
             init_fn = facade_render_find_fn(pool, intern, pool.get_extra(ops))
         else if kind == FACADE_CLAUSE_PREINIT:
@@ -203,7 +203,10 @@ fn facade_render_resource(pool: AstPool, intern: InternPool, item: i32, methods:
             let repr_arg = facade_render_repr_arg(pool, intern, d, repr_text, "self.repr", pinned)
             let call_args = if args.len() > 0: repr_arg ++ ", " ++ args else: repr_arg
             out = out ++ "    move fn " ++ dname ++ "(" ++ params ++ ")" ++ facade_render_return(pool, intern, d) ++ ":\n        self.live = false\n        " ++ facade_render_call(pool, intern, d, call_args) ++ "\n"
-    if producer != 0 and out_param == 0:
+    for pi in 0..producers.len() as i32:
+        let producer = producers[pi]
+        if producer == 0:
+            continue
         let pname: str = intern.resolve(pool.get_data0(producer as NodeId))
         let (params, args) = facade_render_params(pool, intern, producer, 0)
         out = out ++ "fn " ++ name ++ "." ++ pname ++ "(" ++ params ++ ") -> " ++ name ++ ":\n    " ++ name ++ " { repr: " ++ facade_render_call(pool, intern, producer, args) ++ ", live: true }\n"
