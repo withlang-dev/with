@@ -5613,8 +5613,8 @@ fn bs_check_build_w_workspace_api(ctx: &ActionCtx, compiler_path: &str, base_dir
         "    var saw_checked_symbol = false\n" ++
         "    var saw_complete = false\n" ++
         "    while not saw_complete:\n" ++
-        "        let envelope = ws.wait_for_message()\n" ++
-        "        match envelope.message:\n" ++
+        "        var envelope = ws.wait_for_message()\n" ++
+        "        match move envelope.message:\n" ++
         "            CompilerMessage.Typechecked(decls) =>\n" ++
         "                for decl in decls:\n" ++
         "                    if decl.name == \"checked_symbol\" and decl.kind == DeclKind.function and decl.source.file.ends_with(\"generated/workspace_check.w\"):\n" ++
@@ -5696,37 +5696,37 @@ fn bs_check_build_w_workspace_api(ctx: &ActionCtx, compiler_path: &str, base_dir
         "    opts.output_path = \"out/bin/message-complete\"\n" ++
         "    ws.set_options(opts)\n" ++
         "    ws.begin_intercept()\n" ++
-        "    let pre_parse_envelope = ws.wait_for_message()\n" ++
+        "    var pre_parse_envelope = ws.wait_for_message()\n" ++
         "    var saw_pre_parse = false\n" ++
-        "    match pre_parse_envelope.message:\n" ++
+        "    match move pre_parse_envelope.message:\n" ++
         "        CompilerMessage.Phase(phase) => saw_pre_parse = phase == CompilerPhase.pre_parse\n" ++
         "        _ => saw_pre_parse = false\n" ++
         "    if not saw_pre_parse:\n" ++
         "        ctx.diagnostics().error(\"workspace pre-parse phase message missing\")\n" ++
-        "    let parsed_envelope = ws.wait_for_message()\n" ++
+        "    var parsed_envelope = ws.wait_for_message()\n" ++
         "    var saw_parsed = false\n" ++
-        "    match parsed_envelope.message:\n" ++
+        "    match move parsed_envelope.message:\n" ++
         "        CompilerMessage.Phase(phase) => saw_parsed = phase == CompilerPhase.parsed\n" ++
         "        _ => saw_parsed = false\n" ++
         "    if not saw_parsed:\n" ++
         "        ctx.diagnostics().error(\"workspace parsed phase message missing\")\n" ++
-        "    let pre_typecheck_envelope = ws.wait_for_message()\n" ++
+        "    var pre_typecheck_envelope = ws.wait_for_message()\n" ++
         "    var saw_pre_typecheck = false\n" ++
-        "    match pre_typecheck_envelope.message:\n" ++
+        "    match move pre_typecheck_envelope.message:\n" ++
         "        CompilerMessage.Phase(phase) => saw_pre_typecheck = phase == CompilerPhase.pre_typecheck\n" ++
         "        _ => saw_pre_typecheck = false\n" ++
         "    if not saw_pre_typecheck:\n" ++
         "        ctx.diagnostics().error(\"workspace pre-typecheck phase message missing\")\n" ++
-        "    let type_phase_envelope = ws.wait_for_message()\n" ++
+        "    var type_phase_envelope = ws.wait_for_message()\n" ++
         "    var saw_type_phase = false\n" ++
-        "    match type_phase_envelope.message:\n" ++
+        "    match move type_phase_envelope.message:\n" ++
         "        CompilerMessage.Phase(phase) => saw_type_phase = phase == CompilerPhase.typechecked\n" ++
         "        _ => saw_type_phase = false\n" ++
         "    if not saw_type_phase:\n" ++
         "        ctx.diagnostics().error(\"workspace typechecked phase message missing\")\n" ++
-        "    let type_envelope = ws.wait_for_message()\n" ++
+        "    var type_envelope = ws.wait_for_message()\n" ++
         "    var saw_typechecked = false\n" ++
-        "    match type_envelope.message:\n" ++
+        "    match move type_envelope.message:\n" ++
         "        CompilerMessage.Typechecked(decls) =>\n" ++
         "            for decl in decls:\n" ++
         "                if decl.name == \"main\" and decl.kind == DeclKind.function and decl.source.file.ends_with(\"src/message_complete.w\"):\n" ++
@@ -5734,37 +5734,37 @@ fn bs_check_build_w_workspace_api(ctx: &ActionCtx, compiler_path: &str, base_dir
         "        _ => saw_typechecked = false\n" ++
         "    if not saw_typechecked:\n" ++
         "        ctx.diagnostics().error(\"workspace typechecked message missing main declaration\")\n" ++
-        "    let lowered_envelope = ws.wait_for_message()\n" ++
+        "    var lowered_envelope = ws.wait_for_message()\n" ++
         "    var saw_lowered = false\n" ++
-        "    match lowered_envelope.message:\n" ++
+        "    match move lowered_envelope.message:\n" ++
         "        CompilerMessage.Phase(phase) => saw_lowered = phase == CompilerPhase.lowered_to_mir\n" ++
         "        _ => saw_lowered = false\n" ++
         "    if not saw_lowered:\n" ++
         "        ctx.diagnostics().error(\"workspace lowered-to-mir phase message missing\")\n" ++
-        "    let pre_codegen_envelope = ws.wait_for_message()\n" ++
+        "    var pre_codegen_envelope = ws.wait_for_message()\n" ++
         "    var saw_pre_codegen = false\n" ++
-        "    match pre_codegen_envelope.message:\n" ++
+        "    match move pre_codegen_envelope.message:\n" ++
         "        CompilerMessage.Phase(phase) => saw_pre_codegen = phase == CompilerPhase.pre_codegen\n" ++
         "        _ => saw_pre_codegen = false\n" ++
         "    if not saw_pre_codegen:\n" ++
         "        ctx.diagnostics().error(\"workspace pre-codegen phase message missing\")\n" ++
-        "    let codegen_envelope = ws.wait_for_message()\n" ++
+        "    var codegen_envelope = ws.wait_for_message()\n" ++
         "    var saw_codegen = false\n" ++
-        "    match codegen_envelope.message:\n" ++
+        "    match move codegen_envelope.message:\n" ++
         "        CompilerMessage.Phase(phase) => saw_codegen = phase == CompilerPhase.codegen_done\n" ++
         "        _ => saw_codegen = false\n" ++
         "    if not saw_codegen:\n" ++
         "        ctx.diagnostics().error(\"workspace codegen-done phase message missing\")\n" ++
-        "    let prelink_phase_envelope = ws.wait_for_message()\n" ++
+        "    var prelink_phase_envelope = ws.wait_for_message()\n" ++
         "    var saw_prelink_phase = false\n" ++
-        "    match prelink_phase_envelope.message:\n" ++
+        "    match move prelink_phase_envelope.message:\n" ++
         "        CompilerMessage.Phase(phase) => saw_prelink_phase = phase == CompilerPhase.pre_link\n" ++
         "        _ => saw_prelink_phase = false\n" ++
         "    if not saw_prelink_phase:\n" ++
         "        ctx.diagnostics().error(\"workspace pre-link phase message missing\")\n" ++
-        "    let prelink_envelope = ws.wait_for_message()\n" ++
+        "    var prelink_envelope = ws.wait_for_message()\n" ++
         "    var saw_prelink = false\n" ++
-        "    match prelink_envelope.message:\n" ++
+        "    match move prelink_envelope.message:\n" ++
         "        CompilerMessage.PreLink(command) =>\n" ++
         "            for output in command.outputs:\n" ++
         "                if command.linker.len() > 0 and output.ends_with(\"out/bin/message-complete\"):\n" ++
@@ -5777,16 +5777,16 @@ fn bs_check_build_w_workspace_api(ctx: &ActionCtx, compiler_path: &str, base_dir
         "        _ => saw_prelink = false\n" ++
         "    if not saw_prelink:\n" ++
         "        ctx.diagnostics().error(\"workspace pre-link command message missing\")\n" ++
-        "    let linked_phase_envelope = ws.wait_for_message()\n" ++
+        "    var linked_phase_envelope = ws.wait_for_message()\n" ++
         "    var saw_linked_phase = false\n" ++
-        "    match linked_phase_envelope.message:\n" ++
+        "    match move linked_phase_envelope.message:\n" ++
         "        CompilerMessage.Phase(phase) => saw_linked_phase = phase == CompilerPhase.linked\n" ++
         "        _ => saw_linked_phase = false\n" ++
         "    if not saw_linked_phase:\n" ++
         "        ctx.diagnostics().error(\"workspace linked phase message missing\")\n" ++
-        "    let linked_envelope = ws.wait_for_message()\n" ++
+        "    var linked_envelope = ws.wait_for_message()\n" ++
         "    var saw_linked = false\n" ++
-        "    match linked_envelope.message:\n" ++
+        "    match move linked_envelope.message:\n" ++
         "        CompilerMessage.Linked(command, rc) =>\n" ++
         "            for output in command.outputs:\n" ++
         "                if rc == 0 and output.ends_with(\"out/bin/message-complete\"):\n" ++
@@ -5796,30 +5796,30 @@ fn bs_check_build_w_workspace_api(ctx: &ActionCtx, compiler_path: &str, base_dir
         "        _ => saw_linked = false\n" ++
         "    if not saw_linked:\n" ++
         "        ctx.diagnostics().error(\"workspace linked command message missing\")\n" ++
-        "    let artifact_envelope = ws.wait_for_message()\n" ++
+        "    var artifact_envelope = ws.wait_for_message()\n" ++
         "    var saw_artifact = false\n" ++
-        "    match artifact_envelope.message:\n" ++
+        "    match move artifact_envelope.message:\n" ++
         "        CompilerMessage.Artifact(artifact) => saw_artifact = artifact.kind == ArtifactKind.executable and artifact.path == \"out/bin/message-complete\"\n" ++
         "        _ => saw_artifact = false\n" ++
         "    if not saw_artifact:\n" ++
         "        ctx.diagnostics().error(\"workspace artifact message missing\")\n" ++
-        "    let phase_envelope = ws.wait_for_message()\n" ++
+        "    var phase_envelope = ws.wait_for_message()\n" ++
         "    var saw_phase = false\n" ++
-        "    match phase_envelope.message:\n" ++
+        "    match move phase_envelope.message:\n" ++
         "        CompilerMessage.Phase(phase) => saw_phase = phase == CompilerPhase.complete\n" ++
         "        _ => saw_phase = false\n" ++
         "    if not saw_phase:\n" ++
         "        ctx.diagnostics().error(\"workspace complete phase message missing\")\n" ++
-        "    let envelope = ws.wait_for_message()\n" ++
+        "    var envelope = ws.wait_for_message()\n" ++
         "    var saw_complete = false\n" ++
-        "    match envelope.message:\n" ++
+        "    match move envelope.message:\n" ++
         "        CompilerMessage.Complete(done) => saw_complete = done.rc == 0 and done.workspace_name == \"message-complete\"\n" ++
         "        _ => saw_complete = false\n" ++
         "    if not saw_complete:\n" ++
         "        ctx.diagnostics().error(\"workspace complete message missing\")\n" ++
-        "    let closed_envelope = ws.wait_for_message()\n" ++
+        "    var closed_envelope = ws.wait_for_message()\n" ++
         "    var saw_closed = false\n" ++
-        "    match closed_envelope.message:\n" ++
+        "    match move closed_envelope.message:\n" ++
         "        CompilerMessage.Error(code, message, _) => saw_closed = code == 1 and message == \"Workspace message queue is closed\"\n" ++
         "        _ => saw_closed = false\n" ++
         "    if not saw_closed:\n" ++
@@ -5847,8 +5847,8 @@ fn bs_check_build_w_workspace_api(ctx: &ActionCtx, compiler_path: &str, base_dir
         "    ws.set_options(opts)\n" ++
         "    ws.begin_intercept()\n" ++
         "    while true:\n" ++
-        "        let envelope = ws.wait_for_message()\n" ++
-        "        match envelope.message:\n" ++
+        "        var envelope = ws.wait_for_message()\n" ++
+        "        match move envelope.message:\n" ++
         "            CompilerMessage.PreLink(command) =>\n" ++
         "                var replacement = command\n" ++
         "                replacement.linker = \"/bin/false\"\n" ++
@@ -5878,8 +5878,8 @@ fn bs_check_build_w_workspace_api(ctx: &ActionCtx, compiler_path: &str, base_dir
         "    ws.set_options(opts)\n" ++
         "    ws.begin_intercept()\n" ++
         "    while true:\n" ++
-        "        let envelope = ws.wait_for_message()\n" ++
-        "        match envelope.message:\n" ++
+        "        var envelope = ws.wait_for_message()\n" ++
+        "        match move envelope.message:\n" ++
         "            CompilerMessage.PreLink(command) =>\n" ++
         "                var replacement = command\n" ++
         "                let empty: Vec[str] = Vec.new()\n" ++
@@ -5910,8 +5910,8 @@ fn bs_check_build_w_workspace_api(ctx: &ActionCtx, compiler_path: &str, base_dir
         "    ws.set_options(opts)\n" ++
         "    ws.begin_intercept()\n" ++
         "    while true:\n" ++
-        "        let envelope = ws.wait_for_message()\n" ++
-        "        match envelope.message:\n" ++
+        "        var envelope = ws.wait_for_message()\n" ++
+        "        match move envelope.message:\n" ++
         "            CompilerMessage.PreLink(command) =>\n" ++
         "                var replacement = command\n" ++
         "                replacement.cwd = ctx.project_info().project_root() ++ \"/missing-link-cwd\"\n" ++
@@ -5941,8 +5941,8 @@ fn bs_check_build_w_workspace_api(ctx: &ActionCtx, compiler_path: &str, base_dir
         "    ws.set_options(opts)\n" ++
         "    ws.begin_intercept()\n" ++
         "    while true:\n" ++
-        "        let envelope = ws.wait_for_message()\n" ++
-        "        match envelope.message:\n" ++
+        "        var envelope = ws.wait_for_message()\n" ++
+        "        match move envelope.message:\n" ++
         "            CompilerMessage.Phase(phase) =>\n" ++
         "                if phase == CompilerPhase.pre_link:\n" ++
         "                    ws.add_string(\"src/too_late.w\", \"pub fn too_late -> i32: 1\\n\")\n" ++
@@ -5975,8 +5975,8 @@ fn bs_check_build_w_workspace_api(ctx: &ActionCtx, compiler_path: &str, base_dir
         "    var saw_generated_decl = false\n" ++
         "    var saw_complete = false\n" ++
         "    while not saw_complete:\n" ++
-        "        let envelope = ws.wait_for_message()\n" ++
-        "        match envelope.message:\n" ++
+        "        var envelope = ws.wait_for_message()\n" ++
+        "        match move envelope.message:\n" ++
         "            CompilerMessage.Typechecked(decls) =>\n" ++
         "                if envelope.generation == 1 and not saw_first_typechecked:\n" ++
         "                    saw_first_typechecked = true\n" ++
@@ -6168,20 +6168,20 @@ fn bs_check_build_w_workspace_api(ctx: &ActionCtx, compiler_path: &str, base_dir
         "        ctx.diagnostics().error(\"parallel intercept workspace failed\")\n" ++
         "    var saw_a = false\n" ++
         "    while not saw_a:\n" ++
-        "        let envelope = ws1.wait_for_message()\n" ++
+        "        var envelope = ws1.wait_for_message()\n" ++
         "        if envelope.workspace_name != \"parallel-intercept-a\":\n" ++
         "            ctx.diagnostics().error(\"parallel intercept workspace a identity failed\")\n" ++
-        "        match envelope.message:\n" ++
+        "        match move envelope.message:\n" ++
         "            CompilerMessage.Complete(done) => saw_a = done.rc == 0 and done.workspace_name == \"parallel-intercept-a\"\n" ++
         "            CompilerMessage.Error(_, message, _) => ctx.diagnostics().error(message)\n" ++
         "            _ => false\n" ++
         "    ws1.end_intercept()\n" ++
         "    var saw_b = false\n" ++
         "    while not saw_b:\n" ++
-        "        let envelope = ws2.wait_for_message()\n" ++
+        "        var envelope = ws2.wait_for_message()\n" ++
         "        if envelope.workspace_name != \"parallel-intercept-b\":\n" ++
         "            ctx.diagnostics().error(\"parallel intercept workspace b identity failed\")\n" ++
-        "        match envelope.message:\n" ++
+        "        match move envelope.message:\n" ++
         "            CompilerMessage.Complete(done) => saw_b = done.rc == 0 and done.workspace_name == \"parallel-intercept-b\"\n" ++
         "            CompilerMessage.Error(_, message, _) => ctx.diagnostics().error(message)\n" ++
         "            _ => false\n" ++

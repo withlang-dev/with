@@ -316,8 +316,8 @@ pub fn pcre2_count_generated_errors(ctx: &ActionCtx, generated_dir: &str, print_
     var saw_complete = false
     var rc = result.rc
     while not saw_complete:
-        let envelope = ws.wait_for_message()
-        match envelope.message:
+        var envelope = ws.wait_for_message()
+        match move envelope.message:
             CompilerMessage.Complete(done) =>
                 rc = done.rc
                 saw_complete = true
