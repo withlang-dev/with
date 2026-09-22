@@ -16,15 +16,14 @@ module nebula.schema
 
 // --- Domain Types ---
 
-// `@[derive(Debug, Clone)]` belongs on both of these (§11.8); it returns
-// once #1289 (derive on enums generates nothing) and #1288 (Debug derive
-// fails on an f64 field) are fixed.
+@[derive(Debug, Clone)]
 pub enum Status {
     Active
     | Warning(str)
     | Fatal(code: i32)
 }
 
+@[derive(Debug, Clone)]
 pub type Telemetry {
     device_id: str,
     temp: f64 = 0.0,
