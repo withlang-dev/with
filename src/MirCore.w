@@ -3053,6 +3053,25 @@ fn mir_validate_call_unit_argument(mir_mod: &MirModule, body: &MirBody, callee_o
         if param_ty > 0 and mir_mod.mir_get_type_kind(mir_mod.mir_resolve_alias(param_ty)) != TypeKind.TY_VOID: return ai
     -1
 
+// #1230: a call through a fn-typed VALUE passes exactly the arguments its
+// type declares; codegen adds the environment pointer itself. A lowering
+// that consulted a same-named module fn appended that fn's `loc = src()`
+// default and only LLVM's verifier objected. Extern fn types (variadic)
+// and named callees are not judged here. Returns the declared count when
+// the call disagrees with it, else -1.
+fn mir_validate_indirect_call_arity(mir_mod: &MirModule, body: &MirBody, callee_operand: i32, call_id: i32) -> i32:
+    if call_id < 0 or call_id >= body.call_arg_starts.len() or body.call_intrinsic(call_id) != MirIntrinsic.NONE: return -1
+    if callee_operand < 0 or callee_operand >= body.operand_kinds.len(): return -1
+    let callee_kind = body.operand_kinds[callee_operand]
+    if callee_kind != OperandKind.OK_COPY and callee_kind != OperandKind.OK_MOVE: return -1
+    let callee_ty = mir_validate_operand_type(mir_mod, body, callee_operand)
+    if callee_ty <= 0: return -1
+    let resolved = mir_mod.mir_resolve_alias(callee_ty)
+    if mir_mod.mir_get_type_kind(resolved) != TypeKind.TY_FN: return -1
+    let declared = mir_mod.mir_get_type_d1(resolved)
+    if body.call_arg_counts[call_id] == declared: return -1
+    declared
+
 fn mir_validate_is_compare_op(op: i32) -> bool:
     op == BinaryOp.OP_EQ or op == BinaryOp.OP_NEQ or op == BinaryOp.OP_LT or op == BinaryOp.OP_GT or op == BinaryOp.OP_LTE or op == BinaryOp.OP_GTE
 
@@ -3213,6 +3232,9 @@ fn validate_typed_mir_body(mir_mod: &MirModule, body: &MirBody) -> MirValidation
             let unit_arg = mir_validate_call_unit_argument(mir_mod, body, d0, d1)
             if unit_arg >= 0:
                 return mir_validation_fail(body.fn_sym, span, f"call argument {unit_arg} is Unit but the callee parameter is not")
+            let declared_arity = mir_validate_indirect_call_arity(mir_mod, body, d0, d1)
+            if declared_arity >= 0:
+                return mir_validation_fail(body.fn_sym, span, f"indirect call passes {body.call_arg_counts[d1]} argument(s) but the callee's fn type declares {declared_arity}")
 
             let carrier_place = body.call_pipeline_receiver_place(d1)
             if carrier_place >= 0:
