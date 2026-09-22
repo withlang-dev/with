@@ -10263,6 +10263,17 @@ impl MirBuilder:
         var type_name = self.sema.pool_resolve_symbol(type_name_sym)
         if type_name.len() == 0:
             type_name = self.pool.resolve_symbol(type_name_sym)
+        // Channel endpoints are classified here, not by name in codegen, so
+        // the MIR call carries its intrinsic: the suspension checker sees the
+        // park, and the lowering adds the §14.7 cancellation point (#1293).
+        if type_name == "Sender":
+            if method_name == "send": return MirIntrinsic.CHAN_SEND
+            if method_name == "close": return MirIntrinsic.CHAN_CLOSE
+            return MirIntrinsic.NONE
+        if type_name == "Receiver":
+            if method_name == "recv": return MirIntrinsic.CHAN_RECV
+            if method_name == "close": return MirIntrinsic.CHAN_CLOSE
+            return MirIntrinsic.NONE
         if type_name == "Task" or type_name == "ScopedTask":
             if method_name == "cancel": return MirIntrinsic.FIBER_CANCEL
             if method_name == "is_done": return MirIntrinsic.FIBER_IS_DONE
