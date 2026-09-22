@@ -1849,6 +1849,16 @@ pub fn build(ctx: BuildCtx) -> Build:
     // sdk-clang-main may have just added.
     clang_resource = clang_resource.dep("sdk-clang-main")
     clang_resource = clang_resource.input("out/command/sdk-clang-main/done")
+    // It also bakes which SDK it looked at and what that SDK had: a lane
+    // builds the compiler once under the fetched asset (generation zero)
+    // and again under the source-built SDK, and a generated file keyed on
+    // neither kept the asset's `wasm backend: false` while the second link
+    // pulled the real backend archives (linux-aarch64, 2026-09-22).
+    let sdk_lib_dir = comp_llvm_prefix_for_root(ctx.project_info().project_root()) ++ "/lib"
+    clang_resource = clang_resource.arg("llvm-prefix=" ++ sdk_lib_dir)
+    clang_resource = clang_resource.arg("wasm-backend=" ++ (if comp_sdk_has_wasm_backend(ctx.fs(), sdk_lib_dir): "yes" else: "no"))
+    let sdk_driver = ctx.fs().host_exists(sdk_lib_dir ++ "/libclangMain.a") or ctx.fs().host_exists(sdk_lib_dir ++ "/clangMain.lib")
+    clang_resource = clang_resource.arg("clang-driver=" ++ (if sdk_driver: "yes" else: "no"))
     clang_resource.action = generate_embedded_clang_resource_action
     out = out.add_target(clang_resource)
 
