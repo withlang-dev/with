@@ -94,7 +94,7 @@ impl Sema:
         for di in 0..destroyer_count:
             if not self.verify_facade_destroyer(ri, self.facade_resources[ri].destroyers[di]):
                 return false
-        if producer != 0 and self.facade_resources[ri].out_param < 0 and self.ci_function_requires_raw_abi(producer) != 0:
+        if producer != 0 and self.facade_resources[ri].out_param < 0 and self.facade_op_raw_beyond(producer, -1, true):
             let pn: str = self.pool_resolve(producer)
             self.emit_error(f"resource '{rname}': producer '{pn}' is still a raw call after the facade covers its return (a variadic, a raw return, or a raw pointer parameter the facade does not describe); describe it with an fn item (§16.2b.5)", node)
             return false
@@ -125,7 +125,7 @@ impl Sema:
             let cn: str = self.pool_resolve(self.facade_resources[ri].ok_const)
             self.emit_error(f"resource '{rname}': 'ok {cn}' names a status but 'init {iname}' returns nothing to compare it with (§16.2b.4)", node)
             return false
-        if self.ci_function_requires_raw_abi(init_fn) != 0:
+        if self.facade_op_raw_beyond(init_fn, 0, false):
             self.emit_error(f"resource '{rname}': 'init {iname}' is still a raw call after the facade covers the storage (a variadic, a raw return, or a raw pointer parameter the facade does not describe); describe it with an fn item (§16.2b.5)", node)
             return false
         // A pinned resource's representation lives in its cell (D54): every
@@ -139,7 +139,7 @@ impl Sema:
                 if not self.verify_facade_pinned_op(ri, self.facade_resources[ri].destroyers[di]):
                     return false
         let preinit_fn = self.facade_resources[ri].preinit
-        if preinit_fn != 0 and self.ci_function_requires_raw_abi(preinit_fn) != 0:
+        if preinit_fn != 0 and self.facade_op_raw_beyond(preinit_fn, -1, true):
             let pn: str = self.pool_resolve(preinit_fn)
             self.emit_error(f"resource '{rname}': 'preinit {pn}' is still a raw call after the facade covers its return (a variadic or a raw pointer parameter the facade does not describe); describe it with an fn item (§16.2b.5)", node)
             return false
@@ -190,7 +190,7 @@ impl Sema:
             if not consumes_repr:
                 self.emit_error(f"resource '{rname}': '{fname}' destroys the resource but the fn item describing it lends its parameters; a destroying operation must not be callable as a lend — state 'destroys' on the fn item (§16.2b.3)", node)
                 return false
-        if self.ci_function_requires_raw_abi(f) != 0:
+        if self.facade_op_raw_beyond(f, 0, false):
             self.emit_error(f"resource '{rname}': '{fname}' is still a raw call after the facade covers the representation (a variadic, a raw return, or a raw pointer parameter the facade does not describe); describe it with an fn item (§16.2b.5)", node)
             return false
         true
@@ -650,14 +650,14 @@ fn facade_clause_name(kind: i32) -> str:
 //
 // A facade covers a declaration's surface: a described fn lends every
 // parameter by default (§16.2b.5 — the facade's assertion, recorded as
-// review), and `consumes`/`destroys`/`retains` are stronger statements of
-// the same coverage; a resource's producer covers its return (direct) or
-// its out parameter, and a resource's drop/destroys/init/preinit covers the
-// parameter that takes the representation. A covered surface is not raw
-// (ci_function_requires_raw_abi), so the call needs no `unsafe`. Nothing is
-// inferred from a name: an undescribed pointer return stays raw. Symbols
-// are matched by text — the facade's symbols live in the user's pool, the
-// c_import declaration's in its own.
+// review), and `consumes`/`retains` are stronger statements of the same
+// coverage. A parameter that takes a resource's representation is not
+// covered, nor the one a `destroys` item destroys: the resource is their
+// safe surface, and its rendering calls the C operation inside `unsafe {}`.
+// A covered surface is not raw (ci_function_requires_raw_abi), so the call
+// needs no `unsafe`. Nothing is inferred from a name: an undescribed
+// pointer return stays raw. Symbols are matched by text — the facade's
+// symbols live in the user's pool, the c_import declaration's in its own.
 
 impl Sema:
     fn facade_contract_for(fn_sym: i32) -> i32:
@@ -676,28 +676,59 @@ impl Sema:
             return false
         a == b or self.safe_symbol_text(a) == self.safe_symbol_text(b)
 
+    // A resource is the safe surface of its representation (§16.2b.5: "With
+    // proves the resource is live, unmoved and undestroyed"): the rendered
+    // constructor, Drop, destroyers and lend methods call the C operation in
+    // an inner `unsafe {}` (compiler/FacadeRender.w). The raw C name is never
+    // lifted by a resource clause — a safe `db_close(d.repr)` would destroy
+    // through C and let Drop destroy again, which "is not expressible in safe
+    // code" (§16.2b.5), and a safe raw producer call would hand back a
+    // pointer nothing destroys. Raw access remains raw (ruling §14).
     fn facade_covers_return(fn_sym: i32) -> bool:
         let ci = self.facade_contract_for(fn_sym)
-        if ci >= 0:
-            if self.foreign_contracts[ci].returns_borrow_resource != 0 or self.foreign_contracts[ci].returns_static_tid != 0:
-                return true
+        ci >= 0 and (self.foreign_contracts[ci].returns_borrow_resource != 0 or self.foreign_contracts[ci].returns_static_tid != 0)
+
+    // An fn item covers its parameters, except the one a `destroys` item
+    // destroys and any that takes a resource's representation (or a pointer
+    // to it): those are reached through the resource, never as a raw value.
+    fn facade_covers_param(fn_sym: i32, pi: i32) -> bool:
+        let ci = self.facade_contract_for(fn_sym)
+        if ci < 0:
+            return false
+        if pi == 0 and self.foreign_contracts[ci].destroys != 0:
+            return false
+        not self.facade_param_takes_resource(fn_sym, pi)
+
+    fn facade_param_takes_resource(fn_sym: i32, pi: i32) -> bool:
+        let sig = self.get_sig(fn_sym)
+        if sig < 0 or pi >= self.sig_get_param_count(sig):
+            return false
+        let p = self.resolve_alias(self.sig_param_type(sig, pi) as TypeId)
+        let pointee = if self.get_type_kind(p) == TypeKind.TY_PTR: self.resolve_alias(self.get_type_d0(p) as TypeId) else: 0 as TypeId
         for i in 0..self.facade_resources.len() as i32:
-            if self.facade_resources[i].out_param < 0 and self.facade_same_fn(self.facade_resources[i].producer, fn_sym):
-                return true
-            if self.facade_same_fn(self.facade_resources[i].preinit, fn_sym):
-                return true
+            let repr = self.resolve_alias(self.facade_resources[i].repr_tid as TypeId)
+            if self.get_type_kind(repr) == TypeKind.TY_PTR or self.facade_resources[i].init != 0:
+                if p == repr or pointee == repr:
+                    return true
         false
 
-    fn facade_covers_param(fn_sym: i32, pi: i32) -> bool:
-        if self.facade_contract_for(fn_sym) >= 0:
+    // Raw classification of an operation a resource calls, apart from the
+    // parameter that receives the representation (`repr_param`, -1 for none)
+    // and, for a producer, the return it produces: the rendered method or
+    // constructor exposes every other parameter safely, so any of those that
+    // is still raw is a shape the facade must describe (§16.2b.5).
+    fn facade_op_raw_beyond(fn_sym: i32, repr_param: i32, skip_return: bool) -> bool:
+        let sig = self.get_sig(fn_sym)
+        if sig < 0:
+            return self.ci_function_requires_raw_abi(fn_sym) != 0
+        if self.sig_is_variadic(sig) != 0:
             return true
-        for i in 0..self.facade_resources.len() as i32:
-            if self.facade_resources[i].out_param == pi and self.facade_same_fn(self.facade_resources[i].producer, fn_sym):
+        if not skip_return and self.ci_type_requires_raw_contract(self.sig_return_type(sig)) != 0 and not self.facade_covers_return(fn_sym):
+            return true
+        for pi in 0..self.sig_get_param_count(sig):
+            if pi == repr_param:
+                continue
+            let pty = self.sig_param_type(sig, pi)
+            if self.ci_type_requires_raw_contract(pty) != 0 and self.ci_type_is_const_c_string_input(pty) == 0 and not self.facade_covers_param(fn_sym, pi):
                 return true
-            if pi == 0:
-                if self.facade_same_fn(self.facade_resources[i].drop, fn_sym) or self.facade_same_fn(self.facade_resources[i].init, fn_sym):
-                    return true
-                for di in 0..self.facade_resources[i].destroyers.len() as i32:
-                    if self.facade_same_fn(self.facade_resources[i].destroyers[di], fn_sym):
-                        return true
         false

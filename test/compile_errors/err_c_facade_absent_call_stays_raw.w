@@ -4,7 +4,7 @@
 // (behav/parser twin: c_facade_lend_call_needs_no_unsafe) stays raw without
 // one — nothing is inferred from a name (ruling §60).
 
-use c_import("typedef struct db db;\nint db_open(const char* path, db** out);\nvoid db_close(db* d);\nint db_count(db* d);\n")
+use c_import("typedef struct db db;\nint db_open(const char* path, db** out);\nvoid db_close(db* d);\nint db_count(char* label);\n")
 
 fn main:
     let n = db_count(null)

@@ -3,7 +3,8 @@
 // D51 §16.2b.3 stage 4a: a facade's resources are rendered as ordinary With
 // — `type R { repr, live }`, `impl Drop for R` calling the `drop` operation,
 // each `destroys` operation as a `move fn` method, and a direct-return
-// producer as the safe constructor `R.<producer>` — over prototype-only C,
+// producer as the safe constructor `R.<producer>`, a lend of the pointer
+// representation as a `&self` method — over prototype-only C,
 // so this test only checks (phase lane). Nothing here is `unsafe`.
 
 use c_import("typedef struct db db;
@@ -31,7 +32,7 @@ c facade dbl:
 
 fn main:
     let d = Database.db_new(3)
-    let n = db_count(d.repr)
+    let n = d.db_count()
     let status = d.db_close_v2(n)
     let t = Texture.tok_load("a.png")
     let held: Vec[Texture] = Vec.new()

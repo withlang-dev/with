@@ -29,12 +29,12 @@
 // destroyer clears the bit and Drop checks it, the way std.regex's Regex arms
 // its pcre2 free. Stage 4b's in-place resources arm the same bit from `init`.
 //
-// A raw call is spelled bare: the facade covers the destroyer's first
-// parameter and the producer's return (SemaFacade.w facade_covers_*), so the
-// c_import extern is not raw there, and an `unsafe` block around a call that
-// needs none is itself an error. A translated `static inline` body that
-// c_import marked `unsafe fn` is the one callee that still demands `unsafe`,
-// and that is read off its AST. A `*const i8` parameter is presented as `str`:
+// The rendering is the safe surface of the representation; the C name stays
+// raw (SemaFacade.w facade_covers_param: a safe `db_close(d.repr)` would
+// destroy through C and let Drop destroy again, §16.2b.5). So each C call
+// the rendering makes sits in an inner `unsafe {}` when the callee is raw
+// (facade_render_call), and bare when it is not — an `unsafe` block around
+// a call that needs none is itself an error. A `*const i8` parameter is presented as `str`:
 // the c_import extern lends a `str` to a `const char *` (§16.3c, D47), and
 // the resource's constructor passes the `str` straight through.
 //
@@ -66,10 +66,83 @@ pub fn facade_render_block(pool: AstPool, intern: InternPool, facade: i32) -> st
     for i in 0..count:
         let item = pool.get_extra(extra_start + i)
         if pool.kind(item as NodeId) == NodeKind.NK_FACADE_RESOURCE:
-            out = out ++ facade_render_resource(pool, intern, item)
+            out = out ++ facade_render_resource(pool, intern, item, facade_render_lend_methods(pool, intern, facade, item))
     out
 
-fn facade_render_resource(pool: AstPool, intern: InternPool, item: i32) -> str:
+// A lend operation on a pointer resource, rendered as a `&self` method of the
+// resource (§16.2b.5: "once a resource is modeled, its facade-exposed
+// operations borrow it"; With proves the receiver live, unmoved and
+// undestroyed, which it cannot prove of a raw pointer — so the C name stays
+// raw, SemaFacade.w facade_covers_param). An fn item whose first parameter
+// takes the representation of exactly one pointer resource of this block —
+// or the one its `of` names (§16.2b.3) — and that states nothing stronger
+// than a lend (`lend`, `of`, `rename`, `preserves`) becomes
+//
+//     impl R:
+//         fn <name>(<args after the representation>) -> <ret>:
+//             unsafe { <name>(self.repr, <args>) }
+//
+// under its C name, or its `rename`. Anything else stays as stated: a
+// consuming, destroying or retaining item is not a lend, and an in-place or
+// by-value representation is not reached through a pointer here.
+fn facade_render_lend_methods(pool: AstPool, intern: InternPool, facade: i32, resource: i32) -> str:
+    let rname: str = intern.resolve(pool.get_data0(resource as NodeId))
+    let repr = facade_render_unalias(pool, intern, render_type_expr(pool, intern, pool.get_extra(pool.get_data1(resource as NodeId)) as NodeId))
+    if not repr.starts_with("*"):
+        return ""
+    let extra_start = pool.get_data1(facade as NodeId)
+    let count = pool.get_data2(facade as NodeId)
+    var out = ""
+    for i in 0..count:
+        let item = pool.get_extra(extra_start + i)
+        if pool.kind(item as NodeId) != NodeKind.NK_FACADE_FN:
+            continue
+        var of_sym = 0
+        var rename = 0
+        var lends = true
+        let cstart = pool.get_data1(item as NodeId)
+        for ci in 0..pool.get_data2(item as NodeId):
+            let clause = pool.get_extra(cstart + ci)
+            let kind = pool.get_data0(clause as NodeId)
+            let ops = pool.get_data1(clause as NodeId)
+            if kind == FACADE_CLAUSE_OF: of_sym = pool.get_extra(ops)
+            else if kind == FACADE_CLAUSE_RENAME: rename = pool.get_extra(ops)
+            else if kind != FACADE_CLAUSE_LEND and kind != FACADE_CLAUSE_PRESERVES: lends = false
+        if not lends:
+            continue
+        let decl = facade_render_find_fn(pool, intern, pool.get_data0(item as NodeId))
+        if decl == 0 or facade_render_param_count(pool, decl) == 0:
+            continue
+        let meta = pool.find_fn_meta(decl as NodeId)
+        let p0 = facade_render_unalias(pool, intern, render_type_expr(pool, intern, pool.fn_param_type(pool.fn_meta_param_start(meta), 0) as NodeId))
+        if p0 != repr:
+            continue
+        if of_sym != 0:
+            let of_name: str = intern.resolve(of_sym)
+            if of_name != rname:
+                continue
+        else if facade_render_resources_wrapping(pool, intern, facade, repr) != 1:
+            continue
+        let fname: str = intern.resolve(pool.get_data0(decl as NodeId))
+        var mname: str = fname.clone()
+        if rename != 0:
+            mname = intern.resolve(rename)
+        let (params, args) = facade_render_params(pool, intern, decl, 1)
+        let call_args = if args.len() > 0: "self.repr, " ++ args else: "self.repr"
+        out = out ++ "    fn " ++ mname ++ "(" ++ params ++ ")" ++ facade_render_return(pool, intern, decl) ++ ":\n        " ++ facade_render_call(pool, intern, decl, call_args) ++ "\n"
+    out
+
+fn facade_render_resources_wrapping(pool: AstPool, intern: InternPool, facade: i32, repr: &str) -> i32:
+    let extra_start = pool.get_data1(facade as NodeId)
+    var n = 0
+    for i in 0..pool.get_data2(facade as NodeId):
+        let item = pool.get_extra(extra_start + i)
+        if pool.kind(item as NodeId) == NodeKind.NK_FACADE_RESOURCE:
+            let r = facade_render_unalias(pool, intern, render_type_expr(pool, intern, pool.get_extra(pool.get_data1(item as NodeId)) as NodeId))
+            if r == repr: n = n + 1
+    n
+
+fn facade_render_resource(pool: AstPool, intern: InternPool, item: i32, methods: &str) -> str:
     let name: str = intern.resolve(pool.get_data0(item as NodeId))
     let extra_start = pool.get_data1(item as NodeId)
     let clause_count = pool.get_data2(item as NodeId)
@@ -121,8 +194,8 @@ fn facade_render_resource(pool: AstPool, intern: InternPool, item: i32) -> str:
     var out = "type " ++ name ++ " { repr: " ++ field ++ ", live: bool }\n"
     if drop_fn != 0:
         out = out ++ "impl Drop for " ++ name ++ ":\n    move fn drop():\n        if self.live: " ++ facade_render_call(pool, intern, drop_fn, facade_render_repr_arg(pool, intern, drop_fn, repr_text, "self.repr", pinned)) ++ "\n"
-    if destroyers.len() > 0:
-        out = out ++ "impl " ++ name ++ ":\n"
+    if destroyers.len() > 0 or methods.len() > 0:
+        out = out ++ "impl " ++ name ++ ":\n" ++ methods
         for di in 0..destroyers.len() as i32:
             let d = destroyers[di]
             let dname: str = intern.resolve(pool.get_data0(d as NodeId))
@@ -286,14 +359,37 @@ fn facade_render_return(pool: AstPool, intern: InternPool, decl: i32) -> str:
         return ""
     " -> " ++ text
 
-// The call, inside `unsafe { }` only when the callee is a translated inline
-// body that c_import marked `unsafe fn`; a covered extern is not raw and an
-// `unsafe` block with nothing unsafe in it is an error.
+// The call, inside `unsafe { }` exactly when the callee is raw: a translated
+// inline body that c_import marked `unsafe fn`, a variadic, or a pointer in
+// its signature other than a `const char *` input (SemaDecl.w
+// ci_function_requires_raw_abi, read here off the AST). A resource never
+// lifts the raw C name (SemaFacade.w facade_covers_param): its rendering is
+// the safe surface, and an `unsafe` block with nothing unsafe in it is an
+// error, so the two classifications must agree — a disagreement is loud.
 fn facade_render_call(pool: AstPool, intern: InternPool, decl: i32, args: &str) -> str:
     let fname: str = intern.resolve(pool.get_data0(decl as NodeId))
     let call = fname ++ "(" ++ args ++ ")"
-    if pool.kind(decl as NodeId) == NodeKind.NK_FN_DECL:
+    if facade_render_is_raw(pool, intern, decl): "unsafe { " ++ call ++ " }" else: call
+
+fn facade_render_is_raw(pool: AstPool, intern: InternPool, decl: i32) -> bool:
+    let kind = pool.kind(decl as NodeId)
+    if kind == NodeKind.NK_FN_DECL:
         let body = pool.get_data1(decl as NodeId)
         if body != 0 and pool.kind(body as NodeId) == NodeKind.NK_UNSAFE_BLOCK and pool.get_data2(body as NodeId) == UNSAFE_ORIGIN_FN_BODY:
-            return "unsafe { " ++ call ++ " }"
-    call
+            return true
+    if kind == NodeKind.NK_EXTERN_FN and (pool.get_data2(decl as NodeId) & 1) != 0:
+        return true
+    let meta = pool.find_fn_meta(decl as NodeId)
+    if meta < 0:
+        return false
+    let ret = pool.fn_meta_ret(meta)
+    if ret != 0 and facade_render_type_is_raw(facade_render_unalias(pool, intern, render_type_expr(pool, intern, ret as NodeId))):
+        return true
+    let start = pool.fn_meta_param_start(meta)
+    for pi in 0..pool.fn_meta_param_count(meta):
+        let p = facade_render_unalias(pool, intern, render_type_expr(pool, intern, pool.fn_param_type(start, pi) as NodeId))
+        if p != "*const i8" and p != "*const c_char" and facade_render_type_is_raw(p):
+            return true
+    false
+
+fn facade_render_type_is_raw(text: &str) -> bool: text.starts_with("*") or text.starts_with("&") or text.starts_with("[") or text.starts_with("fn(") or text.starts_with("extern")
