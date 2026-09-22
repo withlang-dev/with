@@ -1686,10 +1686,7 @@ impl MirDropStateBlocks:
     // The input state of `bb` (see load_input), sharing the stored chunks.
     mut fn input(bb: i32) -> MirDropStateMap:
         self.load_input(bb)
-        var refs: Vec[i32] = Vec.new()
-        for c in 0..self.width():
-            refs.push(self.scratch.refs[c])
-        MirDropStateMap { refs, own: Vec.new() }
+        MirDropStateMap { refs: self.scratch.refs.clone(), own: Vec.new() }
 
     // Recompute the out-state of `bb` in `scratch`; store it and return true
     // when it differs from the stored one (or none was stored yet).
@@ -1778,10 +1775,7 @@ fn mir_drop_state_blocks_new(body: &MirBody) -> MirDropStateBlocks:
             let slot: i32 = fill[s]
             preds[slot] = bb
             fill[s] = slot + 1
-    var scratch_refs: Vec[i32] = Vec.new()
-    for c in 0..keys.chunk_count():
-        scratch_refs.push(entry[c])
-    let scratch = MirDropStateMap { refs: scratch_refs, own: Vec.new() }
+    let scratch = MirDropStateMap { refs: entry.clone(), own: Vec.new() }
     MirDropStateBlocks { keys, rows, entry, scratch, computed, pred_starts, preds, succ_starts, succs }
 
 // Every block's out-state at the dataflow fixpoint. One sweep in block order is
