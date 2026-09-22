@@ -4889,6 +4889,25 @@ impl Codegen:
                 return di
         -1
 
+    // #681 units: a concrete specialization is defined by the unit that owns
+    // its MIR body, not by whichever unit happens to call it. Before, bodies
+    // were generated only on demand: a specialization whose callers all sat
+    // in other units was demoted there and never defined by its owner, and
+    // the link came up undefined (`_print__sema__..=16` referenced from
+    // t.o.u7.o, defined by no unit).
+    mut fn gen_owned_specializations():
+        if self.unit_total <= 1:
+            return
+        for bi in 0..self.mir_fn_syms_len():
+            let body_sym = self.mir_fn_sym_at(bi)
+            if body_sym == 0 or not self.unit_owns(body_sym):
+                continue
+            let specialization = self.sema.concrete_specialization_by_sym.get(body_sym)
+            if specialization.is_none() or self.fn_values.contains(self.codegen_sym_for_sema_sym(body_sym)):
+                continue
+            let sig_idx: i32 = self.sema.concrete_specialization_sigs[specialization.unwrap()]
+            self.ensure_concrete_mir_function(0, sig_idx, body_sym, body_sym, "owned specialization " ++ self.sema_symbol_text(body_sym))
+
     mut fn gen_mir_only_functions():
         for bi in 0..self.mir_fn_syms_len() as i32:
             let body_sym = self.mir_fn_sym_at(bi as i64)
@@ -5986,7 +6005,11 @@ impl Codegen:
         self.fn_fn_types.insert(mono_sym, fn_type)
         if is_async:
             self.async_fn_ret_types.insert(mono_sym, ret_ty)
-        self.gen_function_mir_mono(mono_sym, 0, body)
+        // #681 units: the specialization's body belongs to the unit its MIR
+        // body was packed into; any other unit that calls it only declares it
+        // (gen_owned_specializations defines it in the owner, caller or not).
+        if self.unit_owns(sema_sym):
+            self.gen_function_mir_mono(mono_sym, 0, body)
         ConcreteMirFunction { sym: mono_sym, value: function, fn_type, sig: sig_idx }
 
     mut fn call_concrete_mir_function(concrete: &ConcreteMirFunction, args_start: i32, arg_node_base_index: i32, args: &Vec[i64], arg_count: i32, call_context: &str, call_node: i32) -> i64:
@@ -6331,6 +6354,7 @@ impl Codegen:
                     if tp_count == 0 and self.sema.generic_fn_node_for_symbol(name_sym) == 0 and not is_generic_struct_method:
                         if self.unit_owns(name_sym):
                             self.gen_function_dispatch_at(decl, i)
+        self.gen_owned_specializations()
         self.gen_mir_only_functions()
         self.gen_generator_next_functions_from_mir()
 
