@@ -10348,7 +10348,7 @@ impl Sema:
         let bind_kind = self.get_type_kind(self.resolve_alias(bind_type))
         if bind_kind == TypeKind.TY_REF or self.view_projection_exprs.contains(value):
             self.scope_set_is_view_bound(name)
-        if self.scope_is_view_bound(name) != 0 or self.type_has_drop_impl(bind_type as i32) != 0 or self.type_is_ephemeral_value(bind_type as i32) != 0:
+        if self.scope_is_view_bound(name) != 0 or self.type_has_drop_impl(bind_type as i32) != 0 or self.type_is_ephemeral_value(bind_type as i32) != 0 or self.closure_expr_has_by_place_captures(value) != 0:
             self.record_view_binding_from_expr(name, value)
         else:
             self.clear_binding_view_deps(name)
@@ -10688,6 +10688,23 @@ impl Sema:
                 let tk = self.get_type_kind(self.resolve_alias(ty as TypeId))
                 if tk == TypeKind.TY_REF:
                     out = self.push_unique_i32(move out, sym)
+            return out
+        if kind == NodeKind.NK_CLOSURE:
+            // §12.4: a non-move closure's non-Copy captures are views of their
+            // places; a captured view binding contributes its own origins.
+            if self.ast.is_move_closure(node) == 0:
+                for ci in 0..self.closure_capture_summary_count(node):
+                    let cap_sym = self.closure_capture_summary_sym(node, ci)
+                    let cap_dep_count = self.binding_view_dep_count(cap_sym)
+                    for di in 0..cap_dep_count:
+                        out = self.push_unique_i32(move out, self.binding_view_dep_at(cap_sym, di))
+                    var is_view = (self.closure_capture_summary_eff(node, ci) & EFF_CAPTURE_BY_PLACE) != 0
+                    if not is_view:
+                        let cap_ty = self.scope_lookup(cap_sym)
+                        if cap_ty > 0 and self.get_type_kind(self.resolve_alias(cap_ty as TypeId)) == TypeKind.TY_REF:
+                            is_view = true
+                    if is_view:
+                        out = self.push_unique_i32(move out, cap_sym)
             return out
         if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_CAST or kind == NodeKind.NK_COMPTIME or kind == NodeKind.NK_UNSAFE_BLOCK or kind == NodeKind.NK_NO_SUSPEND:
             out = self.collect_expr_view_deps(self.ast.get_data0(node), move out)
@@ -15916,6 +15933,50 @@ impl Sema:
             return self.resolve_alias(visible_tid as TypeId) as i32
         0
 
+    // §12.4: "Invoking a closure is checked exactly like invoking a function:
+    // if a closure consumes ... a capture, those effects apply to the
+    // originating captured place." A non-move closure holds its non-Copy
+    // captures by place, so a call whose body consumes one (`() => c`) moves
+    // `c` out of its binding (the body blanks it, reset-on-move); a second
+    // call is the ordinary use-after-move, reported here at the call (#1481).
+    // A closure passed as a direct argument is applied at that call: the
+    // callee may invoke it, and the caller's binding cannot be read after.
+    mut fn apply_closure_capture_consumes(closure_node: i32, call_node: i32):
+        if closure_node <= 0 or self.ast.is_move_closure(closure_node) != 0:
+            return
+        for ci in 0..self.closure_capture_summary_count(closure_node):
+            let cap_sym = self.closure_capture_summary_sym(closure_node, ci)
+            let cap_eff = self.closure_capture_summary_eff(closure_node, ci)
+            if (cap_eff & (EFF_CONSUME | EFF_ESCAPE_VALUE)) == 0 or self.scope_has(cap_sym) == 0:
+                continue
+            if self.is_copy(self.scope_lookup(cap_sym) as TypeId) != 0:
+                continue
+            if self.scope_lookup_state(cap_sym) == VarState.MOVED:
+                let cap_name: str = with_str_clone_ref(self.pool_resolve(cap_sym))
+                self.emit_error("use of moved value '" ++ cap_name ++ "': calling this closure moves `" ++ cap_name ++ "` out of its capture, and an earlier call already did (§12.4)", call_node)
+                continue
+            // The closure is spent with its capture: a binding that holds it
+            // is moved too, so a later call is the ordinary use-after-move and
+            // the binding's view of the consumed place is no longer live
+            // (marked first: moving the place checks its live views).
+            for bi in 0..self.bind_names.len() as i32:
+                let holder: i32 = self.bind_names[bi]
+                if self.binding_closure_nodes.contains(holder) and self.binding_closure_nodes.get(holder).unwrap() == closure_node:
+                    self.scope_set_state(holder, VarState.MOVED)
+            self.scope_set_state(cap_sym, VarState.MOVED)
+
+    // A non-move closure that captures a non-Copy local holds a view of that
+    // local's place (§12.4); the binding that holds the closure carries those
+    // origins like any view binding, so the container and return escape
+    // checks see them.
+    fn closure_expr_has_by_place_captures(node: i32) -> i32:
+        if node == 0 or self.ast.kind(node) != NodeKind.NK_CLOSURE:
+            return 0
+        for ci in 0..self.closure_capture_summary_count(node):
+            if (self.closure_capture_summary_eff(node, ci) & EFF_CAPTURE_BY_PLACE) != 0:
+                return 1
+        0
+
     mut fn check_closure(node: i32) -> i32:
         let body = self.ast.get_data0(node)
         let extra_start = self.ast.get_data1(node)
@@ -16130,14 +16191,15 @@ impl Sema:
 
         let is_non_escaping = self.closure_direct_arg_depth > 0 and direct_arg_escapes == 0 and self.ast.is_move_closure(node) == 0
 
+        // §12.4: "Captures are by place regardless of whether the type is
+        // Copy; a read through a capture of a Copy value copies it. `move ||`
+        // transfers ownership, which for a Copy value is a copy." Every
+        // capture of a non-move closure carries its real effects on the
+        // originating place; only `move ||` snapshots.
         let closure_capture_effs: Vec[i32] = Vec.new()
+        let by_place = if self.ast.is_move_closure(node) == 0: EFF_CAPTURE_BY_PLACE else: 0
         for ci in 0..closure_capture_syms.len() as i32:
-            let summary_cap_sym = closure_capture_syms[ci]
-            let summary_cap_ty = self.scope_lookup(summary_cap_sym)
-            if self.ast.is_by_place_closure(node) == 0 and self.ast.is_move_closure(node) == 0 and summary_cap_ty != 0 and self.is_copy(summary_cap_ty as TypeId) != 0:
-                closure_capture_effs.push(0)
-            else:
-                closure_capture_effs.push(self.current_fn_param_effs[ci])
+            closure_capture_effs.push(self.current_fn_param_effs[ci] | by_place)
         self.set_closure_capture_summary(node, closure_capture_syms, closure_capture_effs)
         while self.current_fn_param_syms.len() > 0:
             self.current_fn_param_syms.pop()
@@ -16161,21 +16223,20 @@ impl Sema:
         // receiving parameter does not let the closure escape the call.
         if is_non_escaping:
             self.ast.mark_non_escaping_closure(node)
-            // Register borrows for captured variables.
-            // Non-escaping closures capture non-Copy values by reference —
-            // register those as borrows so the borrow checker can detect
-            // conflicts with other borrows. Copy captures are value snapshots,
-            // so mutating the closure's copy does not borrow the original place.
+            // Register borrows for captured variables for the duration of
+            // the call the closure is an argument of. A let-bound closure
+            // captures by place too (§12.4), but its borrow is the binding's
+            // own view provenance (collect_expr_view_deps records the
+            // captured places on the binding), which expires at its last use.
+            // Every capture is held by place, Copy or not — register each
+            // as a borrow so the borrow checker can detect conflicts with
+            // other borrows and sibling arguments.
             // If the variable is only accessed through field paths, register
             // field-level borrows for disjoint capture checking.
             var ci = 0
             while ci < outer_count:
                 let cap_sym: i32 = self.bind_names[ci]
                 if not self.binding_index_is_global(ci, cap_sym) and self.expr_uses_symbol(body, cap_sym) != 0:
-                    let cap_ty: i32 = self.bind_types[ci]
-                    if self.ast.is_by_place_closure(node) == 0 and self.is_copy(cap_ty as TypeId) != 0:
-                        ci = ci + 1
-                        continue
                     if self.capture_is_field_only(body, cap_sym) != 0:
                         // Field-level capture: register borrow per field path
                         // Clear transient capture field storage
@@ -16198,8 +16259,14 @@ impl Sema:
                         self.check_borrow_create_direct(cap_sym, bk, 0, path_start, 0, node)
                 ci = ci + 1
 
-        // Escaping closures (including move closures) consume non-Copy captures.
-        // Mark captured non-Copy variables as moved so subsequent uses error.
+        // §12.4: a closure that is not `move` captures a non-Copy local BY
+        // PLACE whether it is a direct argument or let-bound (`let f = ||
+        // xs.push(1); f() // mutates xs` is the spec's own example): creating
+        // it moves nothing. Only `move ||` transfers ownership at creation.
+        // A body that consumes a capture carries that effect, and every call
+        // applies it to the originating place (apply_closure_capture_consumes)
+        // — #1481: the old move-at-creation copied the bytes into the
+        // environment while the outer binding kept and dropped them.
         let is_escaping = not is_non_escaping
         if is_escaping:
             var ebi = 0
@@ -16218,25 +16285,22 @@ impl Sema:
                 if emitted_capability_escape == 0 and self.is_tool_capability_type(cap_ty2):
                     self.emit_error("capability-bearing closure cannot escape into runtime code", node)
                     emitted_capability_escape = 1
-            // docs/completed/mut.md Rev 8 §9.4 / §15.9 — a mutating closure may not
-            // escape the scope containing the captured place. If the closure
-            // is in escape position (e.g., returned, stored in a long-lived
-            // binding) AND mutates any capture, warn.
-            var emitted_escape_warn = 0
-            var ci = 0
-            while ci < outer_count:
-                let cap_sym: i32 = self.bind_names[ci]
-                if not self.binding_index_is_global(ci, cap_sym) and self.expr_uses_symbol(body, cap_sym) != 0:
-                    let cap_ty: i32 = self.bind_types[ci]
-                    if self.is_copy(cap_ty as TypeId) == 0:
-                        self.scope_set_state(cap_sym, VarState.MOVED)
-                        self.effect_note_origin_node = node
-                        self.note_param_effect(cap_sym, EFF_CONSUME)
-                        self.effect_note_origin_node = 0
-                    if emitted_escape_warn == 0 and self.ast.is_move_closure(node) == 0 and self.ast.is_by_place_closure(node) == 0 and self.is_copy(cap_ty as TypeId) == 0 and self.expr_mutates_place(body, cap_sym) != 0:
-                        self.emit_error("closure that mutates captured place cannot escape its defining scope (§15.9)", node)
-                        emitted_escape_warn = 1
-                ci = ci + 1
+            // `move ||` consumes its non-Copy captures at creation (§12.4).
+            // A closure that leaves its frame with a by-place capture is
+            // rejected where it leaves (check_returned_closure_env, the
+            // container escape checks over its view deps).
+            if self.ast.is_move_closure(node) != 0:
+                var ci = 0
+                while ci < outer_count:
+                    let cap_sym: i32 = self.bind_names[ci]
+                    if not self.binding_index_is_global(ci, cap_sym) and self.expr_uses_symbol(body, cap_sym) != 0:
+                        let cap_ty: i32 = self.bind_types[ci]
+                        if self.is_copy(cap_ty as TypeId) == 0:
+                            self.scope_set_state(cap_sym, VarState.MOVED)
+                            self.effect_note_origin_node = node
+                            self.note_param_effect(cap_sym, EFF_CONSUME)
+                            self.effect_note_origin_node = 0
+                    ci = ci + 1
 
         // Use callee return type for partial application closures
         var closure_ret_ty = if body_ty != 0: body_ty as i32 else: self.ty_i32 as i32
@@ -17257,10 +17321,7 @@ impl Sema:
                             let cap_tk = self.get_type_kind(self.resolve_alias(cap_tid as TypeId))
                             if cap_tk == TypeKind.TY_REF:
                                 closure_view_deps = self.push_unique_i32(move closure_view_deps, cap_sym)
-                if (cap_eff & (EFF_CONSUME | EFF_ESCAPE_VALUE)) != 0 and self.scope_has(cap_sym) != 0:
-                    let cap_tid = self.scope_lookup(cap_sym)
-                    if self.is_copy(cap_tid as TypeId) == 0:
-                        self.scope_set_state(cap_sym, VarState.MOVED)
+            self.apply_closure_capture_consumes(closure_node, node)
             let ret_tk = self.get_type_kind(self.resolve_alias(self.get_type_d2(fn_tid) as TypeId))
             if ret_tk == TypeKind.TY_REF:
                 self.set_expr_view_deps(node, closure_view_mask, closure_view_deps)
@@ -17709,6 +17770,7 @@ impl Sema:
             if is_closure_arg:
                 self.closure_direct_arg_escape_flags.pop()
                 self.closure_direct_arg_depth = self.closure_direct_arg_depth - 1
+                self.apply_closure_capture_consumes(arg_node, node)
             // #895: a variadic argument is passed BY VALUE (C default promotions;
             // D27 value context). An element/Copy view reaching a variadic slot
             // has no param type to drive materialization, so demand it here — else
@@ -22705,6 +22767,7 @@ impl Sema:
             if mc_is_closure:
                 self.closure_direct_arg_escape_flags.pop()
                 self.closure_direct_arg_depth = self.closure_direct_arg_depth - 1
+                self.apply_closure_capture_consumes(mc_arg_node, node)
             let mc_iter_idx = self.maybe_register_iter_of_self_borrow(mc_arg_node)
             if mc_iter_idx >= 0:
                 mc_iter_borrow_idxs.push(mc_iter_idx)

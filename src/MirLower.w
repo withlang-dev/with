@@ -14307,13 +14307,24 @@ impl MirBuilder:
         let ret_ty = if is_async: self.sema.unwrap_task_type(callable_ty) as i32 else: self.sema.get_type_d2(callable_ty)
         if ret_ty == 0:
             sema_phase_bug(f"BUG: anonymous body lacks a concrete return type: node={node}")
+        // #1481 (§12.4): a non-move closure holds a non-Copy local by place; a
+        // call whose body consumes it blanks the place through the capture
+        // pointer (reset-on-move inside the body). This frame's scope-exit
+        // drop of the local must therefore keep its null guard — Stage 4
+        // elides the guard for a local never recorded as moved.
+        if not is_async and self.ast.is_move_closure(node) == 0:
+            for ci in 0..captures.len():
+                let consumed_local = self.lookup_local(captures[ci])
+                if consumed_local >= 0 and self.sema.closure_capture_consumes(node, ci) != 0 and self.sema.type_needs_drop_frozen(self.local_type(consumed_local)) != 0:
+                    self.body.mark_local_ever_moved(consumed_local)
         var child = MirBuilder.init(self.sema, self.ast, self.pool, body_sym)
         child.contextual_fact_sig_idx = if not is_async and captures.len() > 0: 0 else: self.contextual_fact_sig_idx
         child.body.anonymous_type = ty
         child.body.anonymous_capture_count = captures.len()
         child.body.local_type_ids[0] = ret_ty
         child.push_scope()
-        for sym in captures:
+        for ci in 0..captures.len():
+            let sym = captures[ci]
             let local = self.lookup_local(sym)
             let capture_ty = if local >= 0: self.local_type(local) else: self.lookup_alias_type(sym)
             if capture_ty == 0:

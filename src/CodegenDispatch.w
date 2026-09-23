@@ -1866,7 +1866,14 @@ impl Codegen:
                 let indirect_value_ty_opt = self.mir_indirect_value_local_types.get(local_id)
                 if indirect_value_ty_opt.is_some():
                     let indirect_value_ty = indirect_value_ty_opt.unwrap() as i64
-                    if indirect_value_ty != 0 and wl_get_type_kind(indirect_value_ty) != wl_pointer_type_kind():
+                    // A by-place capture whose VALUE is itself a pointer (a
+                    // captured `*mut T` or `&T`, §12.4 by place regardless of
+                    // Copy) is recorded in mir_ref_capture_local_types; its
+                    // slot holds the outer place's address, so the read still
+                    // goes through it. Skipping that read handed `mk(2, slot)`
+                    // the address of the outer `slot` as the slot.
+                    let pointer_valued_capture = self.mir_ref_capture_local_types.get(local_id).is_some()
+                    if indirect_value_ty != 0 and (pointer_valued_capture or wl_get_type_kind(indirect_value_ty) != wl_pointer_type_kind()):
                         let indirect_ptr = wl_build_load(self.builder, ptr_ty, ptr)
                         loaded = wl_build_load(self.builder, indirect_value_ty, indirect_ptr)
                         ptr_ty = indirect_value_ty
@@ -5654,6 +5661,12 @@ impl Codegen:
             if p_count == 0:
                 let alloc_ty = wl_get_allocated_type(ptr)
                 if alloc_ty != 0 and wl_get_type_kind(alloc_ty) == wl_pointer_type_kind():
+                    // A by-place capture of a pointer-valued binding (`&T`,
+                    // `*mut T`): the slot holds the outer binding's address,
+                    // the pointer value is one load further (§12.4).
+                    if self.mir_ref_capture_local_types.get(local_id).is_some():
+                        let outer_slot = wl_build_load(self.builder, alloc_ty, ptr)
+                        return wl_build_load(self.builder, alloc_ty, outer_slot)
                     return wl_build_load(self.builder, alloc_ty, ptr)
                 let ptr_ty_opt = self.mir_local_types.get(local_id)
                 if ptr_ty_opt.is_some():
@@ -17326,18 +17339,19 @@ impl Codegen:
             with_eprint("internal error: capturing closure reached extern C function pointer lowering")
             self.had_error = 1
 
-        let can_capture_by_ref = self.pool.is_non_escaping_closure(node) == 1 and self.pool.is_move_closure(node) == 0
+        // §12.4 / #1481: every non-move closure captures a non-Copy value by
+        // place (a pointer to the outer slot), let-bound or direct argument;
+        // only `move ||` copies the bytes into the environment.
+        let can_capture_by_ref = self.pool.is_move_closure(node) == 0
         let force_by_place_capture = self.pool.is_by_place_closure(node) == 1 and self.pool.is_move_closure(node) == 0
         let capture_ref_modes: Vec[i32] = Vec.new()
         for ci in 0..capture_count:
             let sym = captures[ci]
-            var by_ref = 0
-            if force_by_place_capture:
-                by_ref = 1
-            else if can_capture_by_ref:
-                let sema_ty = closure_body.local_type_ids[ci + 1]
-                if self.sema.is_copy_frozen(sema_ty as TypeId) == 0:
-                    by_ref = 1
+            // §12.4: "Captures are by place regardless of whether the type
+            // is Copy" — a Copy capture is a pointer to the outer slot too;
+            // a read through it copies. Only `move ||` copies into the
+            // environment.
+            let by_ref = if force_by_place_capture or can_capture_by_ref: 1 else: 0
             capture_ref_modes.push(by_ref)
 
         // Build capture struct type from captured variable types

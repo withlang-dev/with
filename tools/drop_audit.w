@@ -343,6 +343,26 @@ fn sc_closure_assign_twice() -> str:
     "    run_twice(() => a = mk(a.id + 1, slot))\n" ++
     "    let _k = 0\n"
 
+// #1481 (§12.4): a let-bound closure captures by place too — the spec's
+// `let f = || xs.push(1); f()` — so an assignment through it drops the old
+// value at the original place (1) and the new one at scope exit (2).
+fn sc_closure_let_bound_assign() -> str:
+    "fn go(slot: *mut i32):\n" ++
+    "    var a = mk(1, slot)\n" ++
+    "    let f = () => a = mk(2, slot)\n" ++
+    "    f()\n" ++
+    "    let _k = 0\n"
+
+// #1481: a closure whose body returns its capture consumes the place when
+// called — the value moves out once (dropped as `b`), the blanked place
+// frees nothing at scope exit. let-bound and direct-argument forms.
+fn sc_closure_consume(direct: bool) -> str:
+    "fn run_r(f: fn() -> R) -> R: f()\n" ++
+    "fn go(slot: *mut i32):\n" ++
+    "    let a = mk(1, slot)\n" ++
+    (if direct: "    let b = run_r(() => a)\n" else: "    let f: fn() -> R = () => a\n    let b = f()\n") ++
+    "    let _k = 0\n"
+
 fn sc_vec_elem() -> str:
     "fn go(slot: *mut i32):\n" ++
     "    var v: Vec[R] = Vec.new()\n" ++
@@ -653,6 +673,9 @@ fn build_cells():
     for sh in ["bare", "field", "tuple", "option", "enum", "boxbare", "rcbare", "boxfield"]:
         cells.push(cell("closure_assign/" ++ sh, sc_closure_assign(sh), 3))
     cells.push(cell("closure_assign_twice/bare", sc_closure_assign_twice(), 6))
+    cells.push(cell("closure_let_bound_assign/bare", sc_closure_let_bound_assign(), 3))
+    cells.push(cell("closure_consume_direct/bare", sc_closure_consume(true), 1))
+    cells.push(cell("closure_consume_let_bound/bare", sc_closure_consume(false), 1))
     for sh in ["result", "option", "enum", "nested", "struct"]:
         for subj in ["temp", "local"]:
             let local = subj == "local"

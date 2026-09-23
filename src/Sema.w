@@ -311,6 +311,9 @@ const EFF_ESCAPE_VALUE: i32 = 8   // owned value escapes the call (return / glob
 const EFF_ESCAPE_VIEW: i32  = 16  // view into parameter escapes (return &param.field)
 const EFF_RAW_PTR_VALIDITY: i32 = 32  // raw pointer parameter validity is caller-guaranteed
 const EFF_DECLARED_MASK: i32 = EFF_READ | EFF_WRITE | EFF_CONSUME | EFF_ESCAPE_VALUE | EFF_ESCAPE_VIEW
+// Closure capture summaries only (§12.4): the capture is a non-Copy place the
+// non-move closure holds by place — a view of that local, not a snapshot.
+const EFF_CAPTURE_BY_PLACE: i32 = 64
 
 enum ReceiverMode: i32:
     None = 0
@@ -6517,6 +6520,12 @@ impl Sema:
             return 0
         let start = self.closure_capture_summary_starts.get(closure_node).unwrap()
         self.closure_capture_summary_data[(start + idx * 2)]
+
+    // 1 when calling the closure moves capture `idx` out of its place (§12.4:
+    // the body consumes or returns it) — MirLower keeps that local's drop
+    // guard, since the body blanks the place through the capture (#1481).
+    fn closure_capture_consumes(closure_node: i32, idx: i32) -> i32:
+        if (self.closure_capture_summary_eff(closure_node, idx) & (EFF_CONSUME | EFF_ESCAPE_VALUE)) != 0: 1 else: 0
 
     fn closure_capture_summary_eff(closure_node: i32, idx: i32) -> i32:
         if not self.closure_capture_summary_starts.contains(closure_node):
