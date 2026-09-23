@@ -352,6 +352,22 @@ fn sc_display(form: &str) -> str:
     "    let text = f\"{v:?}\"\n" ++
     "    let _n = text.len()\n"
 
+// #1403 (§13.5/§13.6): a comprehension clause's refutable pattern skips the
+// elements it does not match. Over consuming iteration a skipped element is
+// the clause's to drop (exactly once, at the skip); a bound one moves into
+// the result. Over a view, nothing moves. Every R (1 + 2 + 4) drops once.
+fn sc_comprehension_skip(form: &str) -> str:
+    var fill = "    var v: Vec[(i32, R)] = Vec.new()\n    v.push((0, mk(1, slot)))\n    v.push((1, mk(2, slot)))\n    v.push((0, mk(4, slot)))\n"
+    var comp = "[r for (0, r) in v.into_iter()]"
+    if form == "option":
+        fill = "    var v: Vec[Option[R]] = Vec.new()\n    v.push(Some(mk(1, slot)))\n    v.push(None)\n    v.push(Some(mk(2, slot)))\n    v.push(Some(mk(4, slot)))\n"
+        comp = "[r for Some(r) in v.into_iter()]"
+    else if form == "view":
+        comp = "[r.id for (0, r) in v]"
+    "fn go(slot: *mut i32):\n" ++ fill ++
+    "    let kept = " ++ comp ++ "\n" ++
+    "    let _n = kept.len()\n"
+
 // #1365 (§9.7, §2.4): `let PAT = subject else: <diverge>` consumes its
 // subject on both paths. The failing path drops the whole subject — whichever
 // variant it holds — exactly once before it diverges; the matching path moves
@@ -567,6 +583,8 @@ fn build_cells():
             cells.push(cell("let_else_hit_" ++ subj ++ "/" ++ sh, sc_let_else(sh, true, "return", local), le_sum(sh, true)))
             for exit in ["return", "break", "continue"]:
                 cells.push(cell("let_else_miss_" ++ exit ++ "_" ++ subj ++ "/" ++ sh, sc_let_else(sh, false, exit, local), le_sum(sh, false)))
+    for form in ["tuple", "option", "view"]:
+        cells.push(cell("comprehension_skip_" ++ form ++ "/bare", sc_comprehension_skip(form), 7))
     for form in ["inline", "block", "field"]:
         cells.push(cell("let_else_consume_hit_" ++ form ++ "/bare", sc_let_else_consume(form, true), 9))
         cells.push(cell("let_else_consume_miss_" ++ form ++ "/bare", sc_let_else_consume(form, false), 10))

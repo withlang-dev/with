@@ -7325,8 +7325,27 @@ impl MirBuilder:
             return
         self.bind_for_element(for_node, pat_or_sym, item_place, elem_ty, body_expr)
 
-    mut fn bind_comprehension_element(comp_node: i32, pat_or_sym: i32, item_place: i32, elem_ty: i32, span_node: i32):
+    // §13.6: a comprehension clause's `for PATTERN in EXPR` is §13.5's
+    // iteration, whose refutable pattern skips the elements it does not
+    // match (#1403: the pattern was only bound, so `[v for Some(v) in opts]`
+    // bound None's absent payload). The skip edge continues at `continue_bb`
+    // — the clause's next element — through a block that drops the element
+    // when the clause owns it (`owns_item`: consuming iteration moved it out
+    // of the iterator's Option, and nothing else will drop it). Views and
+    // Copy elements are left alone. The generic-iterator clause passes its
+    // header: nothing its per-iteration scope binds exists on this edge.
+    mut fn bind_comprehension_element(comp_node: i32, pat_or_sym: i32, item_place: i32, elem_ty: i32, span_node: i32, owns_item: bool, continue_bb: i32):
         if self.ast.comprehension_binding_is_pattern(comp_node, pat_or_sym):
+            let matched_bb = self.new_block()
+            let skip_bb = self.new_block()
+            self.lower_pattern_match(item_place, pat_or_sym, matched_bb, skip_bb)
+            // Filled only after the match terminated the current block: a
+            // block's statements are appended contiguously.
+            self.switch_to(skip_bb)
+            if owns_item and self.sema.type_needs_drop_frozen(elem_ty) != 0:
+                self.emit_drop_stmt(item_place, "comprehension-skip", self.ast.get_start(span_node))
+            self.terminate(TermKind.TK_GOTO, continue_bb, 0, 0, 0)
+            self.switch_to(matched_bb)
             let _ = self.lower_pattern(pat_or_sym, item_place)
             return
         if pat_or_sym != 0:
@@ -7488,7 +7507,7 @@ impl MirBuilder:
         self.terminate(TermKind.TK_SWITCH_INT, cmp_result, table, exit_bb, 0)
 
         self.switch_to(body_bb)
-        self.bind_comprehension_element(comp_node, pat_or_sym, counter_place, elem_ty, iter_expr)
+        self.bind_comprehension_element(comp_node, pat_or_sym, counter_place, elem_ty, iter_expr, false, inc_bb)
         self.lower_comprehension_body(comp_node, clause_index, out_place, out_elem_ty, inc_bb)
 
         self.switch_to(inc_bb)
@@ -7543,7 +7562,7 @@ impl MirBuilder:
         self.terminate(TermKind.TK_SWITCH_INT, cmp_result, table, exit_bb, 0)
 
         self.switch_to(body_bb)
-        self.bind_comprehension_element(comp_node, pat_or_sym, counter_place, elem_ty, range_node)
+        self.bind_comprehension_element(comp_node, pat_or_sym, counter_place, elem_ty, range_node, false, inc_bb)
         self.lower_comprehension_body(comp_node, clause_index, out_place, out_elem_ty, inc_bb)
 
         self.switch_to(inc_bb)
@@ -7596,7 +7615,7 @@ impl MirBuilder:
 
         self.switch_to(body_bb)
         let elem_place = self.lower_sequence_element(slice_place, counter_local, iter_ty, elem_ty, self.ast.get_start(iter_expr))
-        self.bind_comprehension_element(comp_node, pat_or_sym, elem_place, elem_ty, iter_expr)
+        self.bind_comprehension_element(comp_node, pat_or_sym, elem_place, elem_ty, iter_expr, false, inc_bb)
         self.lower_comprehension_body(comp_node, clause_index, out_place, out_elem_ty, inc_bb)
 
         self.switch_to(inc_bb)
@@ -7666,7 +7685,7 @@ impl MirBuilder:
             self.emit_vec_get_ref_into(vec_place, counter_place, elem_place, self.ast.get_start(iter_expr))
         else:
             self.emit_vec_get_into(vec_place, counter_place, elem_place, self.ast.get_start(iter_expr))
-        self.bind_comprehension_element(comp_node, pat_or_sym, elem_place, elem_ty, iter_expr)
+        self.bind_comprehension_element(comp_node, pat_or_sym, elem_place, elem_ty, iter_expr, false, inc_bb)
         self.lower_comprehension_body(comp_node, clause_index, out_place, out_elem_ty, inc_bb)
 
         self.switch_to(inc_bb)
@@ -7755,10 +7774,12 @@ impl MirBuilder:
         // #614b + D33: the binding lives in a per-iteration scope so an
         // owned Drop element drops once on the back-edge — including
         // filter-skipped iterations — never again at function exit. All
-        // paths join before the single pop, mirroring lower_comprehension_
-        // body's filter shape with one shared continue edge.
+        // bound paths join before the single pop, mirroring lower_compre-
+        // hension_body's filter shape with one shared continue edge. A
+        // pattern-skipped element (#1403) bound nothing: it drops whole in
+        // its skip block and returns to the header without the pop.
         self.push_scope()
-        self.bind_comprehension_element(comp_node, pat_or_sym, item_place, elem_ty, iter_expr)
+        self.bind_comprehension_element(comp_node, pat_or_sym, item_place, elem_ty, iter_expr, true, header_bb)
         let clause_extra = self.comprehension_clause_start(comp_node)
         let clause_filter = self.ast.get_extra(clause_extra + clause_index * 3 + 2)
         let iter_join_bb = self.new_block()
