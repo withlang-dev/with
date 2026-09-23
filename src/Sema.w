@@ -6098,6 +6098,53 @@ impl Sema:
     // their cleanup is invisible, so a field let may observe them (D22),
     // while a user-Drop-bearing field stays an explicit ownership transfer
     // (err_use_after_move_*_field pins).
+    // The same, seeing no destructor through a reference or raw pointer: a
+    // `&W` field owns nothing, so the value's own drop runs no destructor
+    // of W. `type_has_drop_impl(&W)` answers as for `W` (get_type_name looks
+    // through references, #1492), so this walks the shape itself.
+    mut fn type_owns_user_drop(tid: i32) -> i32:
+        if tid == 0:
+            return 0
+        let resolved = self.resolve_alias(tid as TypeId)
+        let tk = self.get_type_kind(resolved)
+        if tk == TypeKind.TY_REF or tk == TypeKind.TY_PTR:
+            return 0
+        if self.type_has_drop_impl(resolved as i32) != 0:
+            return 1
+        if self.needs_drop_visit.contains(resolved as i32):
+            return 0
+        self.needs_drop_visit.insert(resolved as i32)
+        var result = 0
+        if tk == TypeKind.TY_GENERIC_INST:
+            for ai in 0..self.get_generic_inst_arg_count(resolved as i32):
+                if self.type_owns_user_drop(self.get_generic_inst_arg(resolved as i32, ai)) != 0:
+                    result = 1
+                    break
+        else if tk == TypeKind.TY_TUPLE:
+            let te_start = self.get_type_d0(resolved)
+            for ei in 0..self.get_type_d1(resolved):
+                if self.type_owns_user_drop(self.type_extra[(te_start + ei)]) != 0:
+                    result = 1
+                    break
+        else if tk == TypeKind.TY_ARRAY or tk == TypeKind.TY_RANGE:
+            result = self.type_owns_user_drop(self.get_type_d0(resolved))
+        else:
+            for fi in 0..self.type_reflection_field_count(resolved as i32):
+                let fty = self.type_reflection_field_type(resolved as i32, fi)
+                if self.type_owns_user_drop(fty) != 0:
+                    result = 1
+                    break
+            var vidx = 0
+            while vidx < self.type_reflection_variant_count(resolved as i32) and result == 0:
+                for pi in 0..self.type_reflection_variant_payload_count(resolved as i32, vidx):
+                    let pty = self.type_reflection_variant_payload_type(resolved as i32, vidx, pi)
+                    if self.type_owns_user_drop(pty) != 0:
+                        result = 1
+                        break
+                vidx = vidx + 1
+        let _ = self.needs_drop_visit.remove(resolved as i32)
+        result
+
     mut fn type_carries_user_drop(tid: i32) -> i32:
         if tid == 0:
             return 0
@@ -6225,7 +6272,7 @@ impl Sema:
             // facade resource) as much as `S` itself. Shallow
             // type_has_drop_impl let an `Option[S]` declared before its
             // origin drop after it.
-            let view_has_drop = self.type_carries_user_drop(view_ty)
+            let view_has_drop = self.type_owns_user_drop(view_ty)
             let active_view = self.binding_depends_on_origin(view_sym, origin_sym) != 0 and self.binding_has_active_borrow_from(view_sym, origin_sym) != 0
             if active_view or (view_has_drop != 0 and self.binding_value_depends_on_origin(view_sym, origin_sym) != 0):
                 let err_node = if node != 0: node else: self.binding_decl_node(view_sym)

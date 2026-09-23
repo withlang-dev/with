@@ -11096,10 +11096,29 @@ impl Sema:
                     union_mask = union_mask | self.compute_expr_view_origin_mask(origin_arg)
                     let dep_len_before = concrete_deps.len() as i32
                     concrete_deps = self.collect_expr_view_deps(origin_arg, move concrete_deps)
-                    if concrete_deps.len() as i32 == dep_len_before:
+                    // The result may reference the origin argument's own
+                    // storage, so a VALUE argument is an origin itself — an
+                    // ephemeral value carrying views (`tok`, a dependent
+                    // facade child) as much as an owned container with none.
+                    // Only a reference argument is transparent: its storage
+                    // is the pointee, whose origins the collect found. An
+                    // ephemeral receiver's deps alone let a view of it
+                    // outlive it (§21.1 Rule 6, §5.5).
+                    if concrete_deps.len() as i32 == dep_len_before or self.expr_type_is_value(origin_arg):
                         concrete_deps = self.push_unique_i32(move concrete_deps, self.place_root_sym(origin_arg))
         if union_mask != 0 or concrete_deps.len() > 0:
             self.set_expr_view_deps(call_node, union_mask, concrete_deps)
+
+    // Whether an argument expression is a value (not a reference or raw
+    // pointer): its own storage is what a view of it points into.
+    fn expr_type_is_value(node: i32) -> bool:
+        if not self.typed_expr_types.contains(node):
+            return false
+        let ty: i32 = self.typed_expr_types.get(node).unwrap()
+        if ty == 0:
+            return false
+        let tk = self.get_type_kind(self.resolve_alias(ty as TypeId))
+        tk != TypeKind.TY_REF and tk != TypeKind.TY_PTR
 
     fn record_generator_call_ref_origins(call_node: i32, sig_idx: i32, param_offset: i32, extra_start: i32, arg_count: i32, has_resolved: i32):
         if call_node == 0 or sig_idx < 0:

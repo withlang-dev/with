@@ -74,3 +74,18 @@ static inline void cur_close(cur *c) { if (c->owner != 0) { c->owner->open = c->
 typedef struct { db *owner; int id; int pos; } iter_state;
 static inline void it_init(iter_state *it, db *d, int id) { it->owner = d; it->id = id; it->pos = 0; d->open = d->open + 1; }
 static inline void it_end(iter_state *it) { it->owner->open = it->owner->open - 1; log_push(it->owner->log, 8000 + it->id); }
+
+/* `ok`-projected production of a dependent child (ruling §18): id 0 fails
+ * with nothing produced, a negative id fails AFTER producing (the handle
+ * is the caller's to finalize), id 99 "succeeds" producing nothing. */
+#define ST_OK 0
+static inline int st_prepare(db *d, int id, st **out) {
+    if (id == 0) { return 7; }
+    if (id == 99) { return 0; }
+    *out = st_make(d, id < 0 ? -id : id);
+    if (id < 0) { return 8; }
+    return 0;
+}
+/* Borrowed return (ruling §26): the db a statement was prepared on. */
+static inline db *st_db(st *s) { return s->owner; }
+static inline db *st_db_or_null(st *s, int give) { return give ? s->owner : 0; }

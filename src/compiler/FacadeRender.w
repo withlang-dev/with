@@ -71,10 +71,11 @@
 //         let status = unsafe { db_prepare(d.repr, sql, &raw mut slot) }
 //         (status, if slot == null: None else: Some(Statement { parent: d, repr: slot, live: true }))
 //
-// Not rendered: under `ok`, an out-parameter producer of a dependent
-// resource (its failed-but-produced state would be a dependent value inside
-// `<R>Error`, which is not ruled) — facade_render_producer_pending; Sema
-// reports it at the resource.
+// A dependent resource under `ok` (ruling §18: the error "may" own the
+// failure-state resource "where required"): its `<R>Error` never owns the
+// child, since an error escapes scopes and a dependent value cannot; a
+// failure that still produced is destroyed in the constructor at once, and
+// the error is `Failed | NothingProduced` (facade_render_out_producer).
 // Nothing is ever rendered as a placeholder: a resource the renderer cannot
 // express yields no text, the facade-level diagnostic names it, and Sema's
 // verify_facade_resources reports a resource that passed every check without
@@ -94,7 +95,7 @@ pub fn facade_render_block(pool: AstPool, intern: InternPool, facade: i32, ci: &
     for i in 0..count:
         let item = pool.get_extra(extra_start + i)
         if pool.kind(item as NodeId) == NodeKind.NK_FACADE_RESOURCE:
-            out = out ++ facade_render_resource(pool, intern, ci, item, facade_render_lend_methods(pool, intern, ci, item))
+            out = out ++ facade_render_resource(pool, intern, ci, item, facade_render_lend_methods(pool, intern, ci, item, true), facade_render_lend_methods(pool, intern, ci, item, false))
     out
 
 // A lend operation on a pointer resource, rendered as a `&self` method of the
@@ -113,7 +114,7 @@ pub fn facade_render_block(pool: AstPool, intern: InternPool, facade: i32, ci: &
 // under its C name, or its `rename`. Anything else stays as stated: a
 // consuming, destroying or retaining item is not a lend, and an in-place or
 // by-value representation is not reached through a pointer here.
-fn facade_render_lend_methods(pool: AstPool, intern: InternPool, ci: &Vec[i32], resource: i32) -> str:
+fn facade_render_lend_methods(pool: AstPool, intern: InternPool, ci: &Vec[i32], resource: i32, with_borrowed_returns: bool) -> str:
     let rname: str = intern.resolve(pool.get_data0(resource as NodeId))
     let repr = facade_render_unalias(pool, intern, render_type_expr(pool, intern, pool.get_extra(pool.get_data1(resource as NodeId)) as NodeId))
     if not repr.starts_with("*"):
@@ -125,6 +126,8 @@ fn facade_render_lend_methods(pool: AstPool, intern: InternPool, ci: &Vec[i32], 
         var of_sym = 0
         var rename = 0
         var lends = true
+        var borrow_res = 0
+        var borrow_from = 0
         let cstart = pool.get_data1(item as NodeId)
         for k in 0..pool.get_data2(item as NodeId):
             let clause = pool.get_extra(cstart + k)
@@ -132,6 +135,9 @@ fn facade_render_lend_methods(pool: AstPool, intern: InternPool, ci: &Vec[i32], 
             let ops = pool.get_data1(clause as NodeId)
             if kind == FACADE_CLAUSE_OF: of_sym = pool.get_extra(ops)
             else if kind == FACADE_CLAUSE_RENAME: rename = pool.get_extra(ops)
+            else if kind == FACADE_CLAUSE_RETURNS_BORROW:
+                borrow_res = pool.get_extra(ops)
+                borrow_from = pool.get_extra(ops + 1)
             else if kind != FACADE_CLAUSE_LEND and kind != FACADE_CLAUSE_PRESERVES: lends = false
         if not lends:
             continue
@@ -154,8 +160,75 @@ fn facade_render_lend_methods(pool: AstPool, intern: InternPool, ci: &Vec[i32], 
             mname = intern.resolve(rename)
         let (params, args) = facade_render_params(pool, intern, decl, 1)
         let call_args = if args.len() > 0: "self.repr, " ++ args else: "self.repr"
+        if borrow_res != 0:
+            if not with_borrowed_returns:
+                continue
+            // `returns borrow R from param N` (ruling §26): the result is a
+            // `Borrowed<R>` — no Drop, dependent on the parameter named —
+            // and, unknown nullability being nullable (§16.2b.8), an Option
+            // of it (facade_render_borrowed_type).
+            let from = facade_render_param_ref(pool, intern, decl, borrow_from)
+            if from < 0:
+                continue
+            let origin = if from == 0: "self" else: facade_render_param_name(pool, intern, pool.fn_meta_param_start(meta), from)
+            let bname = facade_render_borrowed_name(intern.resolve(borrow_res))
+            let handle = facade_render_fresh("repr", facade_render_param_names(pool, intern, decl))
+            out = out ++ "    fn " ++ mname ++ "(" ++ params ++ ") -> Option[" ++ bname ++ "]:\n        let " ++ handle ++ " = " ++ facade_render_call(pool, intern, decl, call_args) ++ "\n        if " ++ handle ++ " == null: None else: Some(" ++ bname ++ " { origin: " ++ origin ++ ", repr: " ++ handle ++ " })\n"
+            continue
         out = out ++ "    fn " ++ mname ++ "(" ++ params ++ ")" ++ facade_render_return(pool, intern, decl) ++ ":\n        " ++ facade_render_call(pool, intern, decl, call_args) ++ "\n"
     out
+
+// The borrowed value a `returns borrow R from param N` operation yields
+// (ruling §26, spec §16.2b.6): "no Drop; cannot outlive the named origin;
+// cannot independently be consumed or destroyed". It is the distinct type
+// `Borrowed<R>` (D59's precedent: a resource state with its own surface is
+// its own type), ephemeral and holding a view of the origin resource — the
+// one the operation's param N receives — so the ordinary origin analysis
+// keeps it inside the origin's life; it carries R's lend methods (the
+// non-destroying, non-consuming ones) over the same `repr` field, and none
+// of R's destroyers or Drop:
+//
+//     type BorrowedDatabase = ephemeral { origin: &Statement, repr: *mut sqlite3 }
+//     impl BorrowedDatabase:
+//         fn sqlite3_errmsg() -> *const i8:
+//             unsafe { sqlite3_errmsg(self.repr) }
+//
+// Rendered beside `R`, once, with the origin resource of the first item that
+// borrows R; Sema refuses a second item borrowing R from another resource
+// (one borrowed type, one origin type). "" when no item borrows R.
+fn facade_render_borrowed_type(pool: AstPool, intern: InternPool, ci: &Vec[i32], resource: i32, repr_text: &str, methods: &str) -> str:
+    let rname: str = intern.resolve(pool.get_data0(resource as NodeId))
+    let items = facade_render_all_items(pool, NodeKind.NK_FACADE_FN)
+    for i in 0..items.len() as i32:
+        let item = items[i]
+        let cstart = pool.get_data1(item as NodeId)
+        for k in 0..pool.get_data2(item as NodeId):
+            let clause = pool.get_extra(cstart + k)
+            if pool.get_data0(clause as NodeId) != FACADE_CLAUSE_RETURNS_BORROW:
+                continue
+            let ops = pool.get_data1(clause as NodeId)
+            let res_name: str = intern.resolve(pool.get_extra(ops))
+            if res_name != rname:
+                continue
+            let decl = facade_render_find_fn(pool, intern, ci, pool.get_data0(item as NodeId))
+            if decl == 0:
+                continue
+            let from = facade_render_param_ref(pool, intern, decl, pool.get_extra(ops + 1))
+            let meta = pool.find_fn_meta(decl as NodeId)
+            if from < 0 or meta < 0:
+                continue
+            let origin = facade_render_received(pool, intern, render_type_expr(pool, intern, pool.fn_param_type(pool.fn_meta_param_start(meta), from) as NodeId))
+            if origin <= 0:
+                continue
+            let oname: str = intern.resolve(pool.get_data0(origin as NodeId))
+            let bname = facade_render_borrowed_name(rname)
+            var out = "type " ++ bname ++ " = ephemeral { origin: &" ++ oname ++ ", repr: " ++ repr_text ++ " }\n"
+            if methods.len() > 0:
+                out = out ++ "impl " ++ bname ++ ":\n" ++ methods
+            return out
+    ""
+
+pub fn facade_render_borrowed_name(name: &str) -> str: "Borrowed" ++ name
 
 fn facade_render_resources_wrapping(pool: AstPool, intern: InternPool, repr: &str) -> i32:
     let items = facade_render_all_items(pool, NodeKind.NK_FACADE_RESOURCE)
@@ -181,7 +254,7 @@ fn facade_render_all_items(pool: AstPool, kind: NodeKind) -> Vec[i32]:
                 out.push(item)
     out
 
-fn facade_render_resource(pool: AstPool, intern: InternPool, ci: &Vec[i32], item: i32, methods: &str) -> str:
+fn facade_render_resource(pool: AstPool, intern: InternPool, ci: &Vec[i32], item: i32, methods: &str, plain_methods: &str) -> str:
     let name: str = intern.resolve(pool.get_data0(item as NodeId))
     let extra_start = pool.get_data1(item as NodeId)
     let clause_count = pool.get_data2(item as NodeId)
@@ -285,18 +358,20 @@ fn facade_render_resource(pool: AstPool, intern: InternPool, ci: &Vec[i32], item
             let ret = facade_render_return(pool, intern, init_fn)
             if ret.len() > 0:
                 status_type = ret.slice(4, ret.len())
-    // A failure that still produced a dependent resource would be owned by
-    // `<R>Error.FailedWithResource` (§16.2b.4) while it depends on its
-    // parents (§16.2b.6), and an `error` declaration cannot carry a dependent
-    // value: that projection is not ruled, so none of those producers gets a
-    // constructor (facade_render_producer_pending; Sema says so at the
-    // resource) and the error type is not rendered.
-    let dependent_failure = failed_state and deps.slot_res.len() > 0
-    if status_type.len() > 0 and not dependent_failure:
-        out = out ++ facade_render_error_type(pool, intern, name, repr_text, status_type, failed_state, drop_fn)
+    // The generated error never owns a dependent child (ruling §18: the
+    // error "may" own the failure-state resource "where required" — an
+    // error escapes scopes, a dependent value cannot). A dependent
+    // resource's failure that still produced is destroyed at once in the
+    // constructor (facade_render_out_producer) and its error carries no
+    // `FailedWithResource`.
+    let dependent = deps.slot_res.len() > 0
+    if status_type.len() > 0:
+        out = out ++ facade_render_error_type(pool, intern, name, repr_text, status_type, failed_state, failed_state and not dependent, drop_fn)
+    // Borrowed returns of this resource (ruling §26): `Borrowed<R>`.
+    out = out ++ facade_render_borrowed_type(pool, intern, ci, item, repr_text, plain_methods)
     for pi in 0..producers.len() as i32:
         let producer = producers[pi]
-        if producer == 0 or facade_render_producer_pending(pool, intern, producer, out_refs[pi], ok_sym, deps.slot_res.len() > 0) != 0:
+        if producer == 0:
             continue
         let pname: str = intern.resolve(pool.get_data0(producer as NodeId))
         let made_deps = facade_render_dep_values(pool, intern, &deps, pi, producer)
@@ -304,7 +379,7 @@ fn facade_render_resource(pool: AstPool, intern: InternPool, ci: &Vec[i32], item
             let slot = facade_render_param_ref(pool, intern, producer, out_refs[pi])
             if slot < 0:
                 continue
-            out = out ++ facade_render_out_producer(pool, intern, name, repr_text, producer, slot, ok_sym, made_deps)
+            out = out ++ facade_render_out_producer(pool, intern, name, repr_text, producer, slot, ok_sym, made_deps, drop_fn)
             continue
         let (params, args) = facade_render_params_but(pool, intern, producer, 0, -1, "")
         let call = facade_render_call(pool, intern, producer, args)
@@ -657,7 +732,7 @@ fn facade_render_init(pool: AstPool, intern: InternPool, name: &str, repr_text: 
 // C name (`Database.sqlite3_open`): presentation — `Database.open`, prefix
 // shortening, `rename` — is §16.2b.11, the plan's stage 8, so the C name is
 // not the final spelling.
-fn facade_render_out_producer(pool: AstPool, intern: InternPool, name: &str, repr_text: &str, producer: i32, slot: i32, ok_sym: i32, deps: &str) -> str:
+fn facade_render_out_producer(pool: AstPool, intern: InternPool, name: &str, repr_text: &str, producer: i32, slot: i32, ok_sym: i32, deps: &str, drop_fn: i32) -> str:
     let pname: str = intern.resolve(pool.get_data0(producer as NodeId))
     let taken = facade_render_param_names(pool, intern, producer)
     let slot_var = facade_render_fresh("slot", taken)
@@ -676,7 +751,13 @@ fn facade_render_out_producer(pool: AstPool, intern: InternPool, name: &str, rep
     var out = head ++ " -> Result[" ++ name ++ ", " ++ err ++ "]:\n" ++ null_slot ++ "    let " ++ status ++ " = " ++ call ++ "\n"
     out = out ++ "    if " ++ status ++ " != " ++ intern.resolve(ok_sym) ++ ":\n"
     out = out ++ "        if " ++ slot_var ++ " == null: return Err(" ++ err ++ ".Failed(" ++ status ++ "))\n"
-    out = out ++ "        return Err(" ++ err ++ ".FailedWithResource(" ++ status ++ ", " ++ facade_render_failed_name(name) ++ " { repr: " ++ slot_var ++ " }))\n"
+    if deps.len() > 0:
+        // A dependent resource: the generated error never owns a child
+        // (see facade_render_error_type), so a failure that still produced
+        // is destroyed here, exactly once, and reported as `Failed`.
+        out = out ++ "        " ++ facade_render_call(pool, intern, drop_fn, facade_render_repr_arg(pool, intern, drop_fn, repr_text, slot_var, false)) ++ "\n        return Err(" ++ err ++ ".Failed(" ++ status ++ "))\n"
+    else:
+        out = out ++ "        return Err(" ++ err ++ ".FailedWithResource(" ++ status ++ ", " ++ facade_render_failed_name(name) ++ " { repr: " ++ slot_var ++ " }))\n"
     out = out ++ "    if " ++ slot_var ++ " == null: return Err(" ++ err ++ ".NothingProduced(" ++ status ++ "))\n"
     out ++ "    Ok(" ++ made ++ ")\n"
 
@@ -697,7 +778,9 @@ pub fn facade_render_failed_name(name: &str) -> str: "Failed" ++ name
 //         | NothingProduced(status: S)
 //
 // `FailedWithResource` and `NothingProduced` exist only when an
-// out-parameter producer is projected; a failed in-place init produced
+// out-parameter producer is projected, and `FailedWithResource` only when
+// the resource is not dependent (a dependent one is destroyed in the
+// constructor instead, ruling §18); a failed in-place init produced
 // nothing, and a successful one produced, so its error type is `Failed`
 // alone.
 //
@@ -712,7 +795,7 @@ pub fn facade_render_failed_name(name: &str) -> str: "Failed" ++ name
 //     impl Drop for FailedDatabase:
 //         move fn drop():
 //             unsafe { sqlite3_close(self.repr) }
-fn facade_render_error_type(pool: AstPool, intern: InternPool, name: &str, repr_text: &str, status_type: &str, failed_state: bool, drop_fn: i32) -> str:
+fn facade_render_error_type(pool: AstPool, intern: InternPool, name: &str, repr_text: &str, status_type: &str, out_param: bool, failed_state: bool, drop_fn: i32) -> str:
     let err = facade_render_error_name(name)
     var out = ""
     if failed_state:
@@ -720,21 +803,10 @@ fn facade_render_error_type(pool: AstPool, intern: InternPool, name: &str, repr_
         out = "type " ++ failed ++ " { repr: " ++ repr_text ++ " }\nimpl Drop for " ++ failed ++ ":\n    move fn drop():\n        " ++ facade_render_call(pool, intern, drop_fn, facade_render_repr_arg(pool, intern, drop_fn, repr_text, "self.repr", false)) ++ "\n"
     out = out ++ "error " ++ err ++ " =\n    | Failed(status: " ++ status_type ++ ")\n"
     if failed_state:
-        out = out ++ "    | FailedWithResource(status: " ++ status_type ++ ", resource: " ++ facade_render_failed_name(name) ++ ")\n    | NothingProduced(status: " ++ status_type ++ ")\n"
+        out = out ++ "    | FailedWithResource(status: " ++ status_type ++ ", resource: " ++ facade_render_failed_name(name) ++ ")\n"
+    if out_param:
+        out = out ++ "    | NothingProduced(status: " ++ status_type ++ ")\n"
     out
-
-// Why no constructor is rendered for a producer (0: one is). 1 — under `ok`
-// a failed out-parameter producer that still produced hands its resource to
-// `<R>Error.FailedWithResource` (§16.2b.4), and a dependent resource's
-// failed state depends on its parents too (§16.2b.6): an `error`
-// declaration cannot carry a dependent value, and that projection is not
-// ruled. SemaFacade.w facade_producer_pending makes the same classification
-// from the signatures and reports it at the resource; its net refuses any
-// other producer left without a constructor.
-fn facade_render_producer_pending(pool: AstPool, intern: InternPool, producer: i32, out_ref: i32, ok_sym: i32, dependent: bool) -> i32:
-    if ok_sym != 0 and out_ref != 0 and dependent and facade_render_return(pool, intern, producer).len() > 0:
-        return 1
-    0
 
 fn facade_render_has_clause(pool: AstPool, resource: i32, kind: i32) -> bool:
     let extra_start = pool.get_data1(resource as NodeId)

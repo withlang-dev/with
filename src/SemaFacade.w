@@ -28,28 +28,7 @@ impl Sema:
                 self.collect_c_facade(di, decl)
         self.verify_facade_resources()
         self.report_facade_layout_errors()
-        self.report_facade_borrowed_returns()
-
-    // Ruling §26 (spec §16.2b.6): `returns borrow R from param N` states that
-    // the operation's result is a borrowed `R` — no Drop, no longer than its
-    // origin, never consumed or destroyed. The facts are collected and
-    // verified (collect_fn_clause), but the surface is not rendered: the
-    // borrowed modeled value has no With type yet — `&R` needs an `R` to
-    // point at, and C returns only the representation — and that type is not
-    // ruled. The operation stays raw C, which removes capability and grants
-    // none (§16.2b.3), and the facade says so rather than staying silent.
-    mut fn report_facade_borrowed_returns():
-        for ci in 0..self.foreign_contracts.len() as i32:
-            let res = self.foreign_contracts[ci].returns_borrow_resource
-            if res == 0:
-                continue
-            self.update_decl_source_context(self.foreign_contracts[ci].decl)
-            let fname: str = self.pool_resolve(self.foreign_contracts[ci].fn_sym)
-            let rn: str = self.pool_resolve(res)
-            let from = self.foreign_contracts[ci].returns_borrow_from
-            let sig = self.get_sig(self.foreign_contracts[ci].fn_sym)
-            let shown = if sig >= 0: self.facade_param_display(self.foreign_contracts[ci].fn_sym, sig, from) else: f"param {from}"
-            self.emit_warning(f"fn '{fname}': no safe operation is rendered for 'returns borrow {rn} from param {from}' ({shown}): a borrowed '{rn}' returned by C has no With type yet — the ruling's borrowed modeled value is not ruled — so '{fname}' stays raw C (§16.2b.6)", self.foreign_contracts[ci].node)
+        self.verify_facade_borrowed_returns()
 
     // Stage 4a/4b: the facade-level checks that need every facade's facts (an
     // fn item may describe a destroyer from a block declared after the
@@ -134,10 +113,6 @@ impl Sema:
         for pi in 0..producer_count:
             let p = self.facade_resources[ri].producers[pi]
             let slot = self.facade_resources[ri].out_params[pi]
-            // A producer the renderer gives no constructor (reported below)
-            // exposes nothing to classify.
-            if self.facade_producer_pending(ri, pi) == 1:
-                continue
             let pn: str = self.pool_resolve(p)
             if slot < 0 and self.facade_op_raw_beyond(p, -1, true):
                 self.emit_error(f"resource '{rname}': producer '{pn}' is still a raw call after the facade covers its return (a variadic, a raw return, or a raw pointer parameter the facade does not describe); describe it with an fn item (§16.2b.5)", node)
@@ -206,8 +181,6 @@ impl Sema:
     // status-returning out-parameter producer, or a status-returning `init`),
     // and whether that error can hold a failed-state resource `Failed<R>` (an
     // out-parameter producer: failure may still produce, ruling §18).
-    // A dependent resource whose failure could still produce renders no
-    // projection at all (facade_producer_pending).
     fn facade_projects_status(ri: i32) -> bool:
         if self.facade_resources[ri].ok_const == 0:
             return false
@@ -215,9 +188,14 @@ impl Sema:
         if init_fn != 0:
             let isig = self.get_sig(init_fn)
             return isig >= 0 and self.get_type_kind(self.resolve_alias(self.sig_return_type(isig) as TypeId)) != TypeKind.TY_VOID
-        self.facade_has_failed_state(ri) and not self.facade_resource_dependent(ri)
+        self.facade_has_failed_state(ri)
 
+    // A dependent resource has no failed state to own: its error is
+    // `Failed | NothingProduced`, and a failure that still produced is
+    // destroyed in the constructor (ruling §18; FacadeRender.w).
     fn facade_has_failed_state(ri: i32) -> bool:
+        if self.facade_resource_dependent(ri):
+            return false
         if self.facade_resources[ri].ok_const == 0:
             return false
         for pi in 0..self.facade_resources[ri].producers.len() as i32:
@@ -261,6 +239,12 @@ impl Sema:
             if self.facade_has_failed_state(ri):
                 names.push(facade_render_failed_name(rname))
                 roles.push("the type of a resource a failed producer still produced")
+        for ci in 0..self.foreign_contracts.len() as i32:
+            if self.foreign_contracts[ci].returns_borrow_resource == self.facade_resources[ri].name:
+                let bfn: str = self.pool_resolve(self.foreign_contracts[ci].fn_sym)
+                names.push(facade_render_borrowed_name(rname))
+                roles.push(f"the type of the borrowed '{rname}' that '{bfn}' returns")
+                break
         let fname: str = self.pool_resolve(self.facade_resources[ri].facade)
         let rendered_file = "<facade " ++ fname ++ ">"
         for ni in 0..names.len() as i32:
@@ -346,41 +330,18 @@ impl Sema:
             k = k + 1
         f"{file}:{line}:{col}"
 
-    // Why a producer gets no constructor (FacadeRender.w
-    // facade_render_producer_pending makes the same classification from the
-    // AST; the renderer and this agree or the net below is loud). 0: it gets
-    // one. 1: under `ok`, a failure of this out-parameter producer that still
-    // produced would be owned by `<R>Error.FailedWithResource` (§16.2b.4),
-    // and a dependent resource's failed state depends on its parents too
-    // (§16.2b.6) — an `error` declaration cannot carry a dependent value, and
-    // that projection is not ruled.
-    fn facade_producer_pending(ri: i32, pi: i32) -> i32:
-        if self.facade_resources[ri].ok_const == 0 or self.facade_resources[ri].out_params[pi] < 0:
-            return 0
-        let sig = self.get_sig(self.facade_resources[ri].producers[pi])
-        let ret = if sig >= 0: self.sig_return_type(sig) else: 0
-        if ret == 0 or self.get_type_kind(self.resolve_alias(ret as TypeId)) == TypeKind.TY_VOID:
-            return 0
-        if self.facade_resource_dependent(ri): 1 else: 0
-
     // The constructor net: every producer of a verified resource has its
-    // rendered `R.<producer>`, or is pending — then the resource says why, as
-    // a warning, since the program is still correct without the constructor
-    // and nothing unsafe is exposed. A producer that is neither is a renderer
-    // defect. The rendered type's shape is checked against the dependency
-    // facts the same way (verify_facade_dependency_shape).
+    // rendered `R.<producer>`; one without is a renderer defect. The
+    // rendered type's shape is checked against the dependency facts the same
+    // way (verify_facade_dependency_shape), and the facade's dependency
+    // facts become the constructors' declared summaries.
     mut fn verify_facade_constructors(ri: i32):
         let rname: str = self.pool_resolve(self.facade_resources[ri].name)
         let node = self.facade_resources[ri].node
-        let cn: str = self.pool_resolve(self.facade_resources[ri].ok_const)
         for pi in 0..self.facade_resources[ri].producers.len() as i32:
             let p = self.facade_resources[ri].producers[pi]
             let pn: str = self.pool_resolve(p)
-            let pending = self.facade_producer_pending(ri, pi)
-            if pending == 1:
-                let err = facade_render_error_name(rname)
-                self.emit_warning(f"resource '{rname}': no constructor is rendered for producer '{pn}': under 'ok {cn}' a failure that still produced a '{rname}' is owned by '{err}.FailedWithResource', and a dependent '{rname}' depends on its parents there too; an 'error' type cannot carry a dependent value, and that projection is not ruled (§16.2b.4, §16.2b.6)", node)
-            else if not self.facade_constructor_rendered(ri, p):
+            if not self.facade_constructor_rendered(ri, p):
                 self.emit_error(f"resource '{rname}': producer '{pn}' passed every facade check but no constructor '{rname}.{pn}' was rendered; the renderer cannot express this shape and did not say so — a compiler defect (§16.2b.4)", node)
         self.verify_facade_dependency_shape(ri)
         self.apply_facade_dependency_effects(ri)
@@ -1568,6 +1529,10 @@ impl Sema:
     // the facade resource it carries, if any.
     fn with_facade_dependency_notes(diag0: Diagnostic, tid: i32) -> Diagnostic:
         var diag = diag0
+        let ci = self.facade_borrowed_contract_in(tid, 0)
+        if ci >= 0:
+            diag.add_note(self.facade_borrowed_note(ci))
+            return diag
         let ri = self.facade_dependent_resource_in(tid, 0)
         if ri < 0:
             return diag
@@ -1578,6 +1543,137 @@ impl Sema:
         if help.len() > 0:
             diag.add_help(help)
         diag
+
+    // ── borrowed returns (ruling §26, spec §16.2b.6) ─────────────────────
+    //
+    // `returns borrow R from param N`: "The result: has no Drop; cannot
+    // outlive the named origin; cannot independently be consumed or
+    // destroyed. Nullable borrowed returns become Option of the borrowed
+    // modeled value." The renderer (FacadeRender.w facade_render_borrowed_type)
+    // makes that value the distinct type `Borrowed<R>` — ephemeral, holding a
+    // view of the origin resource, carrying R's lend methods and none of its
+    // destroyers — and the operation a method of the resource its param 0
+    // receives, `Option[Borrowed<R>]`. Verified here (§61): the origin
+    // parameter receives exactly one resource, the operation's first
+    // parameter does (so it has a resource to be a method of), and every
+    // item borrowing R names one origin resource, since `Borrowed<R>` holds
+    // one view type. The net checks the type and the method were rendered,
+    // and the method's signature gets the origin as a declared summary, as
+    // the constructors do (apply_facade_dependency_effects).
+    mut fn verify_facade_borrowed_returns():
+        for ci in 0..self.foreign_contracts.len() as i32:
+            let res = self.foreign_contracts[ci].returns_borrow_resource
+            if res == 0:
+                continue
+            self.update_decl_source_context(self.foreign_contracts[ci].decl)
+            let fn_sym = self.foreign_contracts[ci].fn_sym
+            let node = self.foreign_contracts[ci].node
+            let fname: str = self.pool_resolve(fn_sym)
+            let rn: str = self.pool_resolve(res)
+            let from = self.foreign_contracts[ci].returns_borrow_from
+            let sig = self.get_sig(fn_sym)
+            if sig < 0:
+                continue
+            let origin = self.facade_param_receives(fn_sym, from)
+            let shown = self.facade_param_display(fn_sym, sig, from)
+            if origin.len() != 1:
+                let n = origin.len()
+                let why = if n == 0: "receives no modeled resource, and With does not invent an origin (§16.2b.7)" else: "receives a representation several resources wrap; the facade has not assigned it (§16.2b.3)"
+                self.emit_error(f"fn '{fname}': 'returns borrow {rn} from param {from}' names {shown}, which {why}; a borrowed '{rn}' is a view of the resource its origin parameter receives (§16.2b.6)", node)
+                continue
+            let recv0 = self.facade_param_receives(fn_sym, 0)
+            let ci0 = self.facade_contract_for(fn_sym)
+            if recv0.len() != 1 or self.foreign_contracts[ci0].destroys != 0 or self.foreign_contracts[ci0].consumes.len() > 0 or self.foreign_contracts[ci0].retains.len() > 0:
+                let shown0 = self.facade_param_display(fn_sym, sig, 0)
+                self.emit_error(f"fn '{fname}': 'returns borrow {rn}' is presented as a lend method of the resource its first parameter receives, and {shown0} receives none it can be a method of (one pointer resource, with nothing stronger than a lend stated) (§16.2b.6)", node)
+                continue
+            // One `Borrowed<R>`, one origin view type.
+            var clash = false
+            for cj in 0..ci:
+                if self.foreign_contracts[cj].returns_borrow_resource != res:
+                    continue
+                let other = self.facade_param_receives(self.foreign_contracts[cj].fn_sym, self.foreign_contracts[cj].returns_borrow_from)
+                if other.len() == 1 and other[0] != origin[0]:
+                    let on: str = self.pool_resolve(self.facade_resources[origin[0]].name)
+                    let oth: str = self.pool_resolve(self.facade_resources[other[0]].name)
+                    let ofn: str = self.pool_resolve(self.foreign_contracts[cj].fn_sym)
+                    let bn = facade_render_borrowed_name(rn)
+                    self.emit_error(f"fn '{fname}' returns a borrowed '{rn}' from a '{on}', and fn '{ofn}' from a '{oth}'; '{bn}' holds a view of one origin resource, and a borrowed value with several origin types is not ruled (§16.2b.6)", node)
+                    clash = true
+                    break
+            if clash or self.diags.has_errors():
+                continue
+            // The net: the type and the method exist.
+            let bn = facade_render_borrowed_name(rn)
+            let bsym = self.pool_lookup_symbol(bn)
+            if bsym == 0 or not self.facade_ephemeral_struct_declared(bsym):
+                self.emit_error(f"fn '{fname}': 'returns borrow {rn}' passed every facade check but no type '{bn}' was rendered; the renderer cannot express this shape and did not say so — a compiler defect (§16.2b.6)", node)
+                continue
+            let host: str = self.pool_resolve(self.facade_resources[recv0[0]].name)
+            let msym = if self.foreign_contracts[ci].rename != 0: self.foreign_contracts[ci].rename else: fn_sym
+            let mname: str = self.pool_resolve(msym)
+            let mtext = host ++ "." ++ mname
+            let msig: i32 = if self.sig_text_index.contains(mtext): self.sig_text_index.get(mtext).unwrap() else: -1
+            if msig < 0:
+                self.emit_error(f"fn '{fname}': 'returns borrow {rn}' passed every facade check but no method '{host}.{mname}' was rendered — a compiler defect (§16.2b.6)", node)
+                continue
+            let eff = self.sig_param_effect(msig, from) | EFF_ESCAPE_VIEW
+            self.set_sig_param_effect(msig, from, eff)
+            self.set_sig_param_direct_effect(msig, from, eff)
+            self.set_sig_param_view_origin(msig, from, self.sig_param_view_origin(msig, from) | sema_param_origin_bit(from))
+
+    fn facade_ephemeral_struct_declared(sym: i32) -> bool:
+        for di in 0..self.ast.decl_count():
+            let decl = self.ast.get_decl(di)
+            if self.ast.kind(decl) == NodeKind.NK_TYPE_DECL and self.ast.get_data0(decl) == sym:
+                let packed = self.ast.get_data2(decl)
+                return type_decl_sub_kind(packed) == TypeDeclKind.Struct as i32 and type_decl_is_ephemeral(packed) != 0
+        false
+
+    // The contract whose `Borrowed<R>` a type carries, or -1.
+    fn facade_borrowed_contract_in(tid: i32, depth: i32) -> i32:
+        if tid <= 0 or depth > 6 or self.foreign_contracts.len() == 0:
+            return -1
+        let r = self.resolve_alias(tid as TypeId)
+        let kind = self.get_type_kind(r)
+        let name = self.get_type_name(r)
+        if name != 0:
+            let tn: str = self.pool_resolve(name)
+            for ci in 0..self.foreign_contracts.len() as i32:
+                let res = self.foreign_contracts[ci].returns_borrow_resource
+                if res != 0 and facade_render_borrowed_name(self.pool_resolve(res)) == tn:
+                    return ci
+        if kind == TypeKind.TY_GENERIC_INST:
+            for ai in 0..self.get_generic_inst_arg_count(r as i32):
+                let found = self.facade_borrowed_contract_in(self.get_generic_inst_arg(r as i32, ai), depth + 1)
+                if found >= 0:
+                    return found
+        else if kind == TypeKind.TY_TUPLE:
+            let te_start = self.get_type_d0(r)
+            for ei in 0..self.get_type_d1(r):
+                let found = self.facade_borrowed_contract_in(self.type_extra[(te_start + ei)], depth + 1)
+                if found >= 0:
+                    return found
+        else if kind == TypeKind.TY_REF or kind == TypeKind.TY_ARRAY:
+            return self.facade_borrowed_contract_in(self.get_type_d0(r), depth + 1)
+        -1
+
+    // §8, §57: what a borrowed value is borrowed from, and the clause.
+    fn facade_borrowed_note(ci: i32) -> str:
+        let fn_sym = self.foreign_contracts[ci].fn_sym
+        let fname: str = self.pool_resolve(fn_sym)
+        let rn: str = self.pool_resolve(self.foreign_contracts[ci].returns_borrow_resource)
+        let bn = facade_render_borrowed_name(rn)
+        let from = self.foreign_contracts[ci].returns_borrow_from
+        let facade: str = self.pool_resolve(self.foreign_contracts[ci].facade)
+        let sig = self.get_sig(fn_sym)
+        let shown = if sig >= 0: self.facade_param_display(fn_sym, sig, from) else: f"param {from}"
+        let origin = self.facade_param_receives(fn_sym, from)
+        let osym = if origin.len() > 0: self.facade_resources[origin[0]].name else: 0
+        var on = "?"
+        if osym != 0:
+            on = self.pool_resolve(osym)
+        f"borrowed: '{bn}' is borrowed from the '{on}' that '{fname}' receives as {shown} — stated by 'returns borrow {rn} from param {from}' in facade {facade}; it has no Drop and cannot outlive that origin (§16.2b.6)"
 
 // The resource a deprecated `owns: ["ctor -> dtor"]` c_import entry spells
 // (compiler/Frontend.w project_owned_annotations_frontend): the producer's
