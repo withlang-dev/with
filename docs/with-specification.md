@@ -5785,28 +5785,52 @@ Closure captures are **by place**. Unlike function parameters
 lexically next to the variables it captures — by-place capture stays
 visible to the reader, so no signature is needed:
 
-- For `Copy` values, default capture copies the value.
-- For non-`Copy` values, default capture is by place: the closure
-  observes or mutates the original place according to its body.
-- `move ||` captures transfer ownership into the closure.
+- Captures are by place regardless of whether the type is `Copy`; a
+  read through a capture of a `Copy` value copies it. The closure
+  observes, mutates or consumes the original place according to its
+  body.
+- `move ||` transfers ownership, which for a `Copy` value is a copy.
 
 Closure bodies receive inferred effect summaries over their captures.
 Invoking a closure is checked exactly like invoking a function: if a
 closure consumes, mutates, returns, or returns a view derived from a
-capture, those effects apply to the originating captured place.
+capture, those effects apply to the originating captured place. A
+capture is therefore one of three kinds of view of its place — read,
+mutate, or consume. A closure that consumes a capture is a consuming
+view: it may be invoked once, and that invocation moves the captured
+place; if it is never invoked, the place remains owned and is dropped
+by its own scope.
+
+A non-`move` closure holds a view of each captured place while it is
+alive, under the ordinary exclusivity rules (§5): mutating a place in
+the enclosing scope while a closure holding a read capture of it is
+alive is an error. A snapshot is spelled `move ||`.
+
+A `move ||` closure owns its environment: it is an ordinary value that
+may be returned, stored, or sent across a channel when every capture
+is `Send`. A non-`move` closure is a view of its frame (§12.2) and may
+not be returned.
 
 ```with
 let xs = Vec.new()
 let f = || xs.push(1)   // capture effect on xs: {write}
 f()                     // mutates xs
 
-let n = 42
-let g = || n + 1        // n is Copy, captured by copy
-let m = g()             // n remains unchanged
+var n = 42
+let g = || n += 1       // n is captured by place: {write}
+g()                     // n is 43
+
+let k = 42
+let s = move || k + 1   // move: s holds its own copy of k
+let m = s()             // k unchanged, m is 43
 
 let owned = Vec.from([1, 2, 3])
 let h = move || owned.len()
-// owned is invalid after closure creation
+// owned is invalid after closure creation; h owns it
+
+let ys = Vec.from([1])
+let c = || take(ys)     // consuming view of ys
+c()                     // moves ys; a second c() is an error
 ```
 
 ---
