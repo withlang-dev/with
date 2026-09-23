@@ -6,6 +6,11 @@ use std.collections.hash_index.HashIndex
 use std.time
 use std.process
 use std.builtins
+use std.io
+use std.fs
+use std.string
+
+extern fn with_exec_argv_capture_input(args: &str, stdout_path: &str, stderr_path: &str, timeout_ms: i32, stdin_path: &str) -> i32
 
 fn slotmap_work(n: i32):
     var slots = SlotMap[i32].new()
@@ -155,6 +160,39 @@ fn trie_work(n: i32):
     assert(trie.len() == n - n / 2)
     n
 
+// #1352: stdin.lines() and read_all() read this executable's stdin, so a
+// sample is a child run of it (`stdin-lines`/`read-all` mode) with stdin
+// redirected from a file of n lines; the spawn is a constant per sample and
+// the file is written once, by the first sample. Every other line is CRLF.
+fn stdin_line(i: i32): f"line {i}"
+
+fn stdin_child(mode: &str, n: i32):
+    let path = f"out/tmp/stdlib-complexity-stdin-{n}.txt"
+    if not file_exists(path):
+        var text = StringBuilder.new()
+        for i in 0..n:
+            text.push_str(stdin_line(i))
+            text.push_str(if i % 2 == 0: "\n" else: "\r\n")
+        assert(mkdir_p("out/tmp") == 0 and write_file(path, text.to_str()) == 0)
+    let rc = unsafe { with_exec_argv_capture_input(f"{args()[0]}\0{mode}\0{n}\0", path ++ ".out", path ++ ".err", 120000, path) }
+    assert(rc == 0)
+    n
+
+fn stdin_lines_work(n: i32): stdin_child("stdin-lines", n)
+fn read_all_work(n: i32): stdin_child("read-all", n)
+
+fn stdin_lines_child(n: i32):
+    let lines = stdin.lines()
+    assert(lines.len() == n)
+    for i in 0..n: assert(lines[i] == stdin_line(i))
+
+fn read_all_child(n: i32):
+    let text = read_all()
+    var newlines = 0
+    for i in 0..text.len():
+        if text[i] == '\n': newlines = newlines + 1
+    assert(newlines == n and text.ends_with(stdin_line(n - 1) ++ "\r\n"))
+
 fn btree_map_ascending(n: i32): btree_map_work(n, false)
 fn btree_map_descending(n: i32): btree_map_work(n, true)
 fn btree_set_ascending(n: i32): btree_set_work(n, false)
@@ -214,6 +252,10 @@ fn allocations:
 
 if args().len() > 1 and args()[1] == "allocations":
     allocations()
+else if args().len() > 2 and args()[1] == "stdin-lines":
+    stdin_lines_child(parse(args()[2]))
+else if args().len() > 2 and args()[1] == "read-all":
+    read_all_child(parse(args()[2]))
 else:
     measure("vec", vec_work, 4000, 0)
     measure("vec-iter", borrowed_work, 4000, 0)
@@ -228,4 +270,6 @@ else:
     measure("sorted-vec", sorted_vec_work, 4000, 0)
     measure("binary-heap", binary_heap_work, 4000, 0)
     measure("trie", trie_work, 2000, 0)
+    measure("stdin-lines", stdin_lines_work, 10000, 0)
+    measure("stdin-read-all", read_all_work, 100000, 0)
     measure("hash-index", hash_index_work, 4000, 0)

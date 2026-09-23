@@ -41,28 +41,28 @@ pub fn read_bytes(count: i32) -> str:
     with_read_bytes_stdin(count)
 
 /// Read all of stdin into memory.
+// One growing buffer: `out = out ++ chunk` copied everything read so far on
+// every 4 KiB chunk, quadratic in the input (#1352).
 pub fn read_all() -> str:
-    var out = ""
+    var out = StringBuilder.new()
     while true:
-        let chunk = with_read_bytes_stdin(4096)
+        let chunk = with_read_bytes_stdin(65536)
         if chunk.len() == 0:
             break
-        out = out ++ chunk
-    out
-
-fn io_strip_trailing_cr(s: str) -> str:
-    if s.len() > 0 and s[s.len() - 1] == 13:
-        return s.slice(0, s.len() - 1)
-    s
+        out.push_str(chunk)
+    out.to_str()
 
 /// Read stdin as newline-stripped lines.
+// A CRLF line loses its `\r` in place. Draining the split with remove(0)
+// shifted every remaining line once per line, quadratic in the line count
+// (#1352: `with -n` ran over two minutes on 16 MB).
 pub fn Stdin.lines(self: &Self) -> Vec[str]:
     let _ = self
-    var raw_lines = lines(read_all())
-    let out: Vec[str] = Vec.new()
-    while raw_lines.len() > 0:
-        let line = raw_lines.remove(0)
-        out.push(io_strip_trailing_cr(line))
+    var out = lines(read_all())
+    for i in 0..out.len():
+        let n = out[i].len()
+        if n > 0 and out[i][n - 1] == '\r':
+            out[i] = out[i].slice(0, n - 1)
     out
 
 /// Write raw bytes to stdout (no newline, no flush).
