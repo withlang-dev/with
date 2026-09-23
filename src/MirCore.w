@@ -3365,6 +3365,36 @@ fn mir_validate_call_unit_argument(mir_mod: &MirModule, body: &MirBody, callee_o
         if param_ty > 0 and mir_mod.mir_get_type_kind(mir_mod.mir_resolve_alias(param_ty)) != TypeKind.TY_VOID: return ai
     -1
 
+// #1443: a monomorphized generic call whose argument is the value `T` where
+// the callee's parameter is `&T` lost a borrow. A direct call may pass the
+// place value and let codegen take its address (a struct's LLVM type is not a
+// pointer), but a generic receiver's `&Self` must be the reference itself: a
+// std Box and `&Box` both lower to `ptr`, so codegen passed the Box as the
+// reference and the callee read through the wrong pointer (the contract
+// lower_generic_receiver_arg states). Returns the argument index, else -1.
+fn mir_validate_call_missing_borrow(mir_mod: &MirModule, body: &MirBody, callee_operand: i32, call_id: i32) -> i32:
+    if call_id < 0 or call_id >= body.call_arg_starts.len(): return -1
+    if body.call_intrinsic(call_id) != MirIntrinsic.GENERIC_CALL: return -1
+    if callee_operand < 0 or callee_operand >= body.operand_kinds.len() or body.operand_kinds[callee_operand] != OperandKind.OK_CONSTANT: return -1
+    let callee_const = body.operand_d0[callee_operand]
+    if callee_const < 0 or callee_const >= body.const_kinds.len() or body.const_kinds[callee_const] != ConstKind.CK_FN: return -1
+    let mono = body.call_mono_sym(call_id)
+    let callee_idx = mir_mod.find_body(if mono != 0: mono else: body.const_d0[callee_const])
+    if callee_idx < 0: return -1
+    let callee = &mir_mod.bodies[callee_idx]
+    let arg_start = body.call_arg_starts[call_id]
+    for ai in 0..body.call_arg_counts[call_id]:
+        if ai >= callee.n_params: break
+        let param_ty = mir_mod.mir_resolve_alias(callee.local_type_ids[ai + 1])
+        if mir_mod.mir_get_type_kind(param_ty) != TypeKind.TY_REF: continue
+        let arg_ty = mir_validate_operand_type(mir_mod, body, body.call_arg_operands[arg_start + ai])
+        if arg_ty <= 0: continue
+        let arg_resolved = mir_mod.mir_resolve_alias(arg_ty)
+        let arg_kind = mir_mod.mir_get_type_kind(arg_resolved)
+        if arg_kind == TypeKind.TY_REF or arg_kind == TypeKind.TY_PTR: continue
+        if arg_resolved == mir_mod.mir_resolve_alias(mir_mod.mir_get_type_d0(param_ty)): return ai
+    -1
+
 // #1230: a call through a fn-typed VALUE passes exactly the arguments its
 // type declares; codegen adds the environment pointer itself. A lowering
 // that consulted a same-named module fn appended that fn's `loc = src()`
@@ -3556,6 +3586,9 @@ fn validate_typed_mir_body(mir_mod: &MirModule, body: &MirBody) -> MirValidation
             let declared_arity = mir_validate_indirect_call_arity(mir_mod, body, d0, d1)
             if declared_arity >= 0:
                 return mir_validation_fail(body.fn_sym, span, f"indirect call passes {body.call_arg_counts[d1]} argument(s) but the callee's fn type declares {declared_arity}")
+            let unborrowed = mir_validate_call_missing_borrow(mir_mod, body, d0, d1)
+            if unborrowed >= 0:
+                return mir_validation_fail(body.fn_sym, span, f"call argument {unborrowed} is a value where the callee parameter is a reference to it (a missing borrow)")
 
             let carrier_place = body.call_pipeline_receiver_place(d1)
             if carrier_place >= 0:

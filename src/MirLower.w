@@ -10369,18 +10369,24 @@ impl MirBuilder:
     // cannot recover the lost indirection later (behav_box_as_ref pins this).
     // Only the sig-demands-ref/receiver-is-bare-owner case diverts; every
     // other shape keeps the plain autoderef result.
+    // #1443: the contract is judged against the place the autoderef walk
+    // reached, not the receiver expression. `next.as_ref()` with `next: &Box[L]`
+    // (a binding projected from a `&L` subject) walks to `next.*`; the
+    // expression is already `&Box[L]`, so judging it found no autoref and
+    // passed the Box value where `as_ref` takes `&Box` — the callee read the
+    // list node itself as the box, and recursion returned the head or crashed.
     mut fn lower_generic_receiver_arg(recv_node: i32, method_sym: i32, sig_idx: i32) -> i32:
         let raw_op = self.lower_receiver_with_method_autoderef_for_method(recv_node, method_sym)
         if sig_idx < 0 or self.sema.sig_get_param_count(sig_idx) <= 0:
             return raw_op
-        let expected = self.sema.sig_param_type(sig_idx, 0)
-        let actual = self.expr_type(recv_node)
-        if expected == 0 or actual == 0 or self.sema.can_auto_ref_arg_frozen(expected, actual) == 0:
-            return raw_op
         if self.body.operand_kinds[raw_op] != OperandKind.OK_COPY:
             return raw_op
         let place: i32 = self.body.operand_d0[raw_op]
-        self.operand_for_place_arg(place, actual, expected, self.ast.get_start(recv_node))
+        let expected = self.sema.sig_param_type(sig_idx, 0)
+        let reached = self.place_local_type(place)
+        if expected == 0 or reached == 0 or self.sema.can_auto_ref_arg_frozen(expected, reached) == 0:
+            return raw_op
+        self.operand_for_place_arg(place, reached, expected, self.ast.get_start(recv_node))
 
     mut fn lower_receiver_with_method_autoderef_for_method(recv_node: i32, method_sym: i32) -> i32:
         if self.has_contextual_copy_adjustment(recv_node) != 0:

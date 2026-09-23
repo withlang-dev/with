@@ -292,6 +292,55 @@ pub fn mir_test_discriminant_repr_dest() -> Unit:
     assert(discriminant_dest_verdict(false).contains("discriminant of a ty=3 enum is its repr ty=2, assigned to ty=1"))
     assert(discriminant_dest_verdict(true) == "")
 
+// #1443: a monomorphized generic call passing the value where the callee's
+// parameter is a reference to it. `next.as_ref()` with `next: &Box[L]` passed
+// `next.*` — a Box and `&Box` are both `ptr`, so the callee read the node as
+// the box. Types: 1 Unit, 2 the struct standing in for Box[L], 3 `&` of it.
+fn missing_borrow_verdict(arg_is_ref: bool, generic: bool) -> str:
+    var mir_mod = MirModule.init()
+    for kind in [0, TypeKind.TY_VOID, TypeKind.TY_STRUCT, TypeKind.TY_REF]:
+        mir_mod.sema_type_kinds.push(kind)
+        mir_mod.sema_type_d0.push(0)
+        mir_mod.sema_type_d1.push(0)
+        mir_mod.sema_type_d2.push(0)
+    let unit_ty = 1
+    let box_ty = 2
+    let ref_ty = 3
+    mir_mod.sema_type_d0[ref_ty] = box_ty
+    var callee = MirBody.init_for_fn(20)
+    callee.new_local(ref_ty, 0, 0, 0)
+    callee.n_params = 1
+    let callee_entry = callee.new_block()
+    callee.set_terminator(callee_entry, TermKind.TK_RETURN, 0, 0, 0, 0, 0)
+    mir_mod.add_body(callee)
+    var body = MirBody.init_for_fn(1)
+    let recv_local = body.new_temp(ref_ty)
+    let recv_place = body.new_place(recv_local)
+    let deref_place = body.new_deref_place(recv_place, box_ty)
+    let arg_place = if arg_is_ref: recv_place else: deref_place
+    let result_local = body.new_temp(unit_ty)
+    let result_place = body.new_place(result_local)
+    let entry = body.new_block()
+    let done = body.new_block()
+    let callee_const = body.new_const(ConstKind.CK_FN, 2, 0, 0, unit_ty)
+    let callee_operand = body.new_operand(OperandKind.OK_CONSTANT, callee_const)
+    let args: Vec[i32] = Vec.new()
+    args.push(body.new_operand(OperandKind.OK_COPY, arg_place))
+    let call_id = body.new_call_args(&args)
+    if generic:
+        body.set_call_intrinsic(call_id, MirIntrinsic.GENERIC_CALL)
+        body.set_call_contract(call_id, 0, 20)
+    body.set_terminator(entry, TermKind.TK_CALL, callee_operand, call_id, result_place, done, 0)
+    body.set_terminator(done, TermKind.TK_RETURN, 0, 0, 0, 0, 0)
+    let err = validate_typed_mir_body(mir_mod, body)
+    with_str_clone_ref(err.message)
+
+pub fn mir_test_generic_call_missing_borrow() -> Unit:
+    assert(missing_borrow_verdict(false, true).contains("call argument 0 is a value where the callee parameter is a reference to it"))
+    assert(missing_borrow_verdict(true, true) == "")
+    // A direct call may pass the place value; codegen takes its address.
+    assert(missing_borrow_verdict(false, false) == "")
+
 // #1394: a variant payload moved out on one arm and the whole enum dropped
 // at the join, with no reset-on-move blank of the payload. This is #1363's
 // MIR (`_8 = move _6<as v0>.f0`, then `drop(_6)`): the enum drop glue frees
