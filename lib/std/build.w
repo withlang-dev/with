@@ -3160,7 +3160,7 @@ pub fn Build.__driver_run_action(self: &Self, ctx: BuildCtx, action_name: &str) 
                 return 1
             let scratch_path = tool_action_scratch_dir(target.name)
             let scratch_abs = if ctx.fs.root.len() == 0 or ctx.fs.root == ".":
-                scratch_path
+                scratch_path.clone()
             else if ctx.fs.root.ends_with("/"):
                 ctx.fs.root ++ scratch_path
             else:

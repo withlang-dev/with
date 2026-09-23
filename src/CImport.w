@@ -670,16 +670,6 @@ fn process_c_import_with_defines(header_spec: &str, defines: &Vec[str]) -> str:
 
     output.push_str(ci_render_missing_pointer_opaques(session, count))
 
-    // Pre-scan: collect extern var names for macro reference detection
-    var extern_vars = ""
-    var evi = 0
-    while evi < count:
-        if with_cimport_decl_kind(session, evi) == CK_VAR:
-            let evname = with_cimport_decl_name(session, evi)
-            if evname.len() > 0 and evname[0] != 95:
-                extern_vars = extern_vars ++ "|" ++ evname ++ "|"
-        evi = evi + 1
-
     let macro_session = with_cimport_parse_macros(include_text)
     if macro_session != 0:
         g_migrate_macro_values = ci_collect_object_macro_values(macro_session)
@@ -740,7 +730,7 @@ fn process_c_import_with_defines(header_spec: &str, defines: &Vec[str]) -> str:
     output.push_str(ci_detect_member_functions(session, count, translated_structs))
     // Extract macros using a separate preprocessor pass
     if macro_session != 0:
-        output.push_str(ci_translate_macros(macro_session, session, extern_vars, include_text))
+        output.push_str(ci_translate_macros(macro_session, session, include_text))
         with_cimport_dispose_macros(macro_session)
     with_cimport_dispose(session)
     ci_fn_decl_index_reset()
@@ -1163,7 +1153,7 @@ fn ci_translate_anon_record_cursor(session: i64, decl_cursor: i32, synth_name: &
         let child = with_ci_child(session, decl_cursor, i)
         if with_ci_cursor_kind(session, child) == CK_FIELD:
             let raw_name = with_ci_cursor_spelling(session, child)
-            var actual_name = if raw_name.len() > 0: raw_name else: f"anon_{anon_idx}"
+            var actual_name = if raw_name.len() > 0: raw_name.clone() else: f"anon_{anon_idx}"
             var field_ty = with_ci_type_translated(session, with_ci_cursor_type(session, child))
             let anon_decl = ci_field_cursor_anon_record_decl(session, child)
             if anon_decl >= 0:
@@ -2829,7 +2819,7 @@ fn ci_function_macro_alias_target(session: i64, indices: &HashMap[str, i32], val
         name = next
     -1
 
-fn ci_translate_macros(session: i64, type_session: i64, extern_vars: &str, macro_source: &str) -> str:
+fn ci_translate_macros(session: i64, type_session: i64, macro_source: &str) -> str:
     let count = with_cimport_macro_count(session)
     // Match the previous backward lookup: the last definition wins. Build
     // once so private expansion and aliases never scan a whole SDK header.
@@ -3118,13 +3108,14 @@ fn ci_translate_macros(session: i64, type_session: i64, extern_vars: &str, macro
             if compound_literal_result.len() == 0 and offsetof_result.len() == 0 and ci_object_macro_has_call_shape(stripped):
                 ci_record_untranslated_object_macro(name, macro_is_system)
                 continue
+            // offsetof is size_t: its type is clang's semantic one, like any
+            // other macro's. (A `c_int` branch keyed on offsetof_result read
+            // the binding after this line moved it, so it never ran; #1380.)
             let cast_expr_result = if offsetof_result.len() > 0: offsetof_result else: ci_translate_c_expr(stripped, "", known_values)
             let semantic_expr_ty = ci_lookup_known(name, object_macro_types)
             var cast_expr_ty = ""
             if compound_literal_result.len() > 0:
                 cast_expr_ty = compound_literal_ty
-            else if offsetof_result.len() > 0:
-                cast_expr_ty = "c_int"
             else if semantic_expr_ty.len() > 0:
                 // clang's semantic type is the one type position that did not
                 // go through ci_unsafe_fn_ptr_type, so a raw C function pointer
@@ -3197,21 +3188,12 @@ fn ci_translate_macros(session: i64, type_session: i64, extern_vars: &str, macro
                     if not ci_migrate_shared_decl_add("let", safe_name, let_line):
                         output = output ++ let_line ++ "\n"
                 else:
-                    // Try expression translation — may reference extern vars
-                    let expr_result = cast_expr_result
-                    if expr_result.len() > 0:
-                        let safe_name = ci_escape_reserved(name)
-                        with_cimport_mark_name_emitted(name)
-                        let expr_ty = if cast_expr_ty.len() > 0: cast_expr_ty else: "c_int"
-                        if ci_expr_references_var(expr_result, extern_vars):
-                            // References a mutable extern var — emit as function
-                            output = output ++ ci_render_generated_fn_body("fn " ++ safe_name ++ "() -> " ++ expr_ty, "    " ++ expr_result) ++ "\n"
-                        else:
-                            let let_line = "let " ++ safe_name ++ ": " ++ expr_ty ++ " = " ++ expr_result
-                            if not ci_migrate_shared_decl_add("let", safe_name, let_line):
-                                output = output ++ let_line ++ "\n"
-                    else:
-                        ci_record_untranslated_object_macro(name, macro_is_system)
+                    // No typed translation and no constant value: the macro
+                    // has no standalone With spelling (§16.2). A fallback here
+                    // re-read cast_expr_result after macro_expr_result took it,
+                    // so it only ever saw "" (#1380); run, it typed an
+                    // initializer list `{ .a = 3 }` as a `c_int` global.
+                    ci_record_untranslated_object_macro(name, macro_is_system)
     probes.close()
     g_migrate_macro_session = 0
     g_macro_type_names = ""
@@ -3769,28 +3751,6 @@ fn ci_translate_postfix(base: &str, rest: &str, params: &str, known: &str) -> st
         else:
             return ""
     result
-
-// Check if expression references any extern var from the pipe-delimited list
-fn ci_expr_references_var(expr: &str, extern_vars: &str) -> bool:
-    if extern_vars.len() == 0:
-        return false
-    // Scan extern_vars for |name| patterns and check if expr contains each name
-    var pos = 0
-    let vlen = extern_vars.len() as i32
-    while pos < vlen:
-        if extern_vars[pos] == 124:  // '|'
-            let name_start = pos + 1
-            var name_end = name_start
-            while name_end < vlen and extern_vars[name_end] != 124:
-                name_end = name_end + 1
-            if name_end > name_start:
-                let var_name = extern_vars.slice(name_start as i64, name_end as i64)
-                if ci_str_contains(expr, var_name):
-                    return true
-            pos = name_end
-        else:
-            pos = pos + 1
-    false
 
 // Check if expression is already boolean (comparison, logical, or != 0)
 fn ci_is_bool_expr(s: &str) -> bool:

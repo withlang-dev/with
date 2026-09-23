@@ -4365,15 +4365,15 @@ impl Codegen:
         let name_sym = self.sema.fn_decl_semantic_symbol_at(fn_node, self.pool.get_data0(fn_node), decl_index)
         let raw_name_str = self.intern.resolve(name_sym)
         let sema_name_str = self.sema_symbol_text(name_sym)
-        let name_str = if sema_name_str.len() > 0: sema_name_str else: with_str_clone_ref(raw_name_str)
+        let name_str = if sema_name_str.len() > 0: sema_name_str.clone() else: with_str_clone_ref(raw_name_str)
         if name_sym == 0:
             return
         let parsed_name = if sema_name_str.len() == 0 and name_str.len() == 0: self.fn_decl_name_from_node(fn_node) else: ""
         let alias_text =
             if sema_name_str.len() > 0:
-                sema_name_str
+                sema_name_str.clone()
             else:
-                parsed_name
+                parsed_name.clone()
         let alias_sym = if alias_text.len() > 0: self.intern.intern(alias_text) else: 0
         let flags = self.pool.get_data2(fn_node)
         let meta = self.pool.find_fn_meta(fn_node)

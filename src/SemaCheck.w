@@ -9848,6 +9848,8 @@ impl Sema:
         self.drop_control_flow_depth = saved_drop_cf_then
         if pushed_regex_capture_scope != 0:
             self.pop_scope()
+        if in_value_context:
+            self.mark_arm_tail_consumed(then_body)
         let then_is_never = if self.get_type_kind(self.resolve_alias(then_type as TypeId)) == TypeKind.TY_NEVER: 1 else: 0
         let then_exit_states = self.save_scope_states()
         let then_exit_mf = self.save_moved_field_state()   // #695
@@ -9874,6 +9876,8 @@ impl Sema:
             self.infer_tail_node = saved_infer_tail
             self.pop_move_control_flow_context()
             self.drop_control_flow_depth = saved_drop_cf_else
+            if in_value_context:
+                self.mark_arm_tail_consumed(else_body)
             else_is_never = if self.get_type_kind(self.resolve_alias(else_type as TypeId)) == TypeKind.TY_NEVER: 1 else: 0
             if in_value_context:
                 let join_nodes: Vec[i32] = Vec.new()
@@ -13093,6 +13097,8 @@ impl Sema:
                 self.record_transparent_view_origins(arm_body, arm_body)
             self.pop_scope()
             self.pop_move_control_flow_context()
+            if match_is_value:
+                self.mark_arm_tail_consumed(arm_body)
             // Union this arm's exit move-state into the merge unless the arm diverges.
             if self.get_type_kind(self.resolve_alias(arm_type as TypeId)) != TypeKind.TY_NEVER:
                 let arm_exit_states = self.save_scope_states()
@@ -24998,6 +25004,21 @@ impl Sema:
         else:
             help = if named != 0: "clone it (`" ++ place ++ ".clone()`), or restructure so the owner transfers it — a vacate needs a `var` base or a `mut fn` receiver" else: "clone the field, or restructure so the owner transfers it — a vacate needs a `var` base or a `mut fn` receiver" ++ ""
         self.emit_error_with_help("a field never moves out implicitly (§2.2, D32)", node, help)
+
+    // #1380 (§2.2): a value-context `if`/`match` arm whose tail is a whole
+    // binding yields that binding by value: MirLower moves it into the join
+    // temp (`_9 = move _1; _1 = zst`) whatever consumes the join — only
+    // projected place reads join as a view (lower_if, #747 03g). Mark it in
+    // the arm's own move state, before the branch merge, exactly as `let p = a`
+    // does. Only a binding that outlives the arm is marked (block and pattern
+    // locals are gone; §29.8 forbids shadowing, so a live name is the outer
+    // one); a nested `if`/`match` tail is a value context of its own.
+    mut fn mark_arm_tail_consumed(arm: i32):
+        var n = arm
+        while n != 0 and (self.ast.kind(n) == NodeKind.NK_BLOCK or self.ast.kind(n) == NodeKind.NK_GROUPED):
+            n = if self.ast.kind(n) == NodeKind.NK_BLOCK: self.ast.get_data2(n) else: self.ast.get_data0(n)
+        if n != 0 and self.ast.kind(n) == NodeKind.NK_IDENT and self.scope_has(self.ast.get_data0(n)) != 0:
+            self.mark_moved_if_consumed(n)
 
     mut fn mark_moved_if_consumed(node: i32):
         if node == 0:

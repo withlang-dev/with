@@ -2120,7 +2120,7 @@ impl ComptimeEvaluator:
             return ""
         let exe = parts.get(0)
         let resolved = comptime_effect_resolve_executable(exe)
-        let key = if resolved.len() > 0: resolved else: with_str_clone_ref(exe)
+        let key = if resolved.len() > 0: resolved.clone() else: with_str_clone_ref(exe)
         for i in 0..self.tool_identity_paths.len() as i32:
             if self.tool_identity_paths[i] == key:
                 return with_str_clone_ref(self.tool_identity_values[i])
@@ -5594,7 +5594,7 @@ impl ComptimeEvaluator:
             if not has_glob:
                 return self.fail(node, "glob pattern contains no wildcards: " ++ pattern)
             let glob_base = if last_clean_slash < 0: "." else: pattern.slice(0, last_clean_slash as i64)
-            let glob_suffix = if last_clean_slash < 0: pattern else: pattern.slice((last_clean_slash + 1) as i64, pattern.len())
+            let glob_suffix = if last_clean_slash < 0: pattern.clone() else: pattern.slice((last_clean_slash + 1) as i64, pattern.len())
             let resolved_base = self.capability_resolve_project_path(record, glob_base, method, node)
             if self.had_error != 0:
                 return comptime_control_error()
@@ -5605,7 +5605,7 @@ impl ComptimeEvaluator:
                 let abs_file = raw_files[gi]
                 let rel_file = self.capability_project_relative_path(record, abs_file)
                 let base_prefix = if glob_base == ".": "" else: glob_base ++ "/"
-                let rel_to_base = if base_prefix.len() > 0 and rel_file.starts_with(base_prefix): rel_file.slice(base_prefix.len(), rel_file.len()) else: rel_file
+                let rel_to_base = if base_prefix.len() > 0 and rel_file.starts_with(base_prefix): rel_file.slice(base_prefix.len(), rel_file.len()) else: rel_file.clone()
                 let file_segs = comptime_glob_split_by_slash(rel_to_base)
                 if comptime_glob_segments_match(pat_segs, 0, file_segs, 0):
                     results.push(rel_file)

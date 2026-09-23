@@ -248,7 +248,7 @@ pub fn run_publish_release_asset_action(ctx: ActionCtx) -> i32:
             "source_sha=" ++ source_sha ++ "\n" ++
             "version=" ++ tag ++ "\n" ++
             "channel=" ++ channel ++ "\n" ++
-            "builder=" ++ (if builder.len() > 0: builder else: "unknown") ++ "\n" ++
+            "builder=" ++ (if builder.len() > 0: builder.clone() else: "unknown") ++ "\n" ++
             "fixpoint=verified\n" ++
             "built_at=" ++ built_at ++ "\n"
         if fs.write_text(provenance, text) != 0: return rp_fail(&ctx, "could not write " ++ provenance)

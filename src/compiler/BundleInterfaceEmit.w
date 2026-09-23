@@ -771,7 +771,7 @@ impl BundleEmitter:
                 self.refuse("has no methods to print; an empty trait impl has no interface spelling")
                 continue
             let head = "impl " ++ (if trait_sym != 0: trait_name ++ " for " else: "") ++ type_name ++ ":\n"
-            let export_name = type_name ++ "." ++ (if trait_sym != 0: trait_name else: "")
+            let export_name = type_name ++ "." ++ (if trait_sym != 0: trait_name.clone() else: "")
             self.push_export(BX_IMPL, mod_path, export_name, head ++ body, "impl\t" ++ mod_path ++ "\t" ++ type_name ++ "\t" ++ (if trait_sym != 0: trait_name else: "-") ++ "\n" ++ rows)
 
     mut fn emit_type(sema: &Sema, di: i32, node: i32):

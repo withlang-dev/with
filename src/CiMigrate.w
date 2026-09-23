@@ -1148,16 +1148,6 @@ fn ci_migrate_file_body(input_path: &str, output_path: &str, project_active: boo
     g_macro_type_names = ci_collect_macro_type_names(session)
     g_macro_type_aliases = ci_collect_macro_type_aliases(session)
 
-    // Collect extern var names for macro reference detection
-    var extern_vars = ""
-    var evi = 0
-    while evi < count:
-        if with_cimport_decl_kind(session, evi) == CK_VAR:
-            let evname = with_cimport_decl_name(session, evi)
-            if evname.len() > 0 and evname[0] != 95:
-                extern_vars = extern_vars ++ "|" ++ evname ++ "|"
-        evi = evi + 1
-
     // Track emitted structs for typedef resolution
     var translated_structs = ""
 
@@ -1224,7 +1214,7 @@ fn ci_migrate_file_body(input_path: &str, output_path: &str, project_active: boo
     output_parts.push(ci_detect_member_functions(session, count, translated_structs))
     // Macro translation via separate preprocessor pass
     if macro_session != 0:
-        output_parts.push(ci_translate_macros(macro_session, session, extern_vars, macro_include))
+        output_parts.push(ci_translate_macros(macro_session, session, macro_include))
         with_cimport_dispose_macros(macro_session)
     with_cimport_dispose(session)
     g_migrate_macro_values = HashMap.new()
