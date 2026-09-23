@@ -5,6 +5,8 @@
 //! expect-stdout: 100
 //! expect-stdout: 100
 //! expect-stdout: 7
+//! expect-stdout: 40
+//! expect-stdout: 5
 
 // #1394: a value moved out of an enum variant's payload is reset-on-move
 // (§2.5.1): the payload slot is blanked on the moving path, so the enum's
@@ -12,6 +14,7 @@
 // and every carrier eliminator that did not hand-roll the subject's
 // ownership left the enum drop to free the payload the result owned.
 use std.builtins.print_i64
+use std.result.ContextError
 
 fn numbers() -> Vec[i32]:
     var v: Vec[i32] = Vec.new()
@@ -23,6 +26,17 @@ fn failing() -> Result[i32, Vec[i32]]: Err(numbers())
 type Holder { items: Vec[i32], n: i32 }
 
 fn held() -> Option[Holder]: Some(Holder { items: numbers(), n: 7 })
+
+error Fault =
+    Code(n: i32)
+
+fn faulty(fail: bool) -> Result[i32, Fault]:
+    if fail: Err(.Code(1)) else: Ok(5)
+
+fn heap_message() -> str:
+    var s = ""
+    for _ in 0..40: s = s ++ "m"
+    s
 
 fn main:
     // `map` passes the Err payload through into the new Result.
@@ -56,3 +70,11 @@ fn main:
         Some(x) if x.n > 10 => print_i64(-3)
         Some(x) => print_i64(x.n)
         None => print_i64(0)
+    // `context` owns its message on both paths: the Err arm moves it into
+    // the ContextError, the Ok arm drops it.
+    match faulty(true).context(heap_message()):
+        Ok(v) => print_i64(v)
+        Err(e) => print_i64(e.display().len())
+    match faulty(false).context(heap_message()):
+        Ok(v) => print_i64(v)
+        Err(_) => print_i64(-4)

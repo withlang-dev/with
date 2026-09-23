@@ -12681,8 +12681,19 @@ impl MirBuilder:
         var mapper_op = 0
         var context_message_op = 0
         var context_fn_op = 0
+        // `context(message)` owns its message on both paths: the Err arm
+        // moves it into the ContextError, the Ok arm drops it. Held in the
+        // call's own local, it was a statement temp the flush dropped after
+        // the Err arm had moved it (a DOUBLE FREE of the message).
+        var context_message_local = -1
         if method_name == "context":
             context_message_op = self.lower_expr(self.ast.get_extra(arg_start))
+            let message_ty = self.operand_type(context_message_op)
+            if self.body.operand_kinds[context_message_op] == OperandKind.OK_MOVE and self.sema.type_needs_drop_frozen(message_ty) != 0:
+                context_message_local = self.new_temp(message_ty)
+                let message_place = self.place_for_local(context_message_local)
+                self.assign_operand_to_place(message_place, context_message_op, span)
+                context_message_op = self.body.new_operand(OperandKind.OK_MOVE, message_place)
         else if method_name == "with_context":
             context_fn_op = self.lower_expr(self.ast.get_extra(arg_start))
         else:
@@ -12737,6 +12748,9 @@ impl MirBuilder:
         else:
             ok_fields.push(self.operand_for_place(ok_payload_place, source_ok_ty))
         self.assign_enum_variant_to_place(result_place, result_ty, self.sema.syms.ok, ok_fields, span)
+        if context_message_local >= 0:
+            let unused_message = self.place_for_local(context_message_local)
+            self.emit_drop_stmt(unused_message, "context-message-unused", span)
         self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
 
         self.switch_to(err_bb)
