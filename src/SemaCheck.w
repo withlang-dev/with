@@ -2302,6 +2302,22 @@ impl Sema:
         // Push function scope
         self.push_scope()
 
+        // `Self` in the body is the method's own declaration, resolved from
+        // the body's module: collect_fn_decl binds it for the signature and
+        // unbinds it, so a `Self { .. }` literal in the body was untyped and
+        // MirLower resolved it by NAME through the flat map, which names the
+        // newest declaration of that name in any module (#1457).
+        let saved_body_self = if self.named_types.contains(self.syms.self_type): self.named_types.get(self.syms.self_type).unwrap() else: 0
+        // A generic owner's methods are checked per instantiation with `Self`
+        // in the substitution (check_fn_body_concrete), so only a
+        // non-generic owner binds here.
+        let body_owner_sym = self.method_decl_owner_symbol(node, self.ast.get_data0(node))
+        var body_self_tid = if body_owner_sym != 0: self.lookup_named_type_visible(body_owner_sym) else: 0
+        if body_self_tid != 0 and self.type_decl_nodes.contains(body_owner_sym) and self.type_decl_tp_count(self.type_decl_nodes.get(body_owner_sym).unwrap()) != 0:
+            body_self_tid = 0
+        if body_self_tid != 0:
+            self.named_types.insert(self.syms.self_type, body_self_tid)
+
         // Set up associated type bindings if inside a trait impl
         self.assoc_type_bindings.clear()
         if self.method_impl_nodes.contains(fn_name):
@@ -2647,6 +2663,11 @@ impl Sema:
             self.implicit_binding_types.pop()
             self.implicit_binding_syms.pop()
         self.pop_scope()
+        if body_self_tid != 0:
+            if saved_body_self != 0:
+                self.named_types.insert(self.syms.self_type, saved_body_self)
+            else:
+                self.named_types.remove(self.syms.self_type)
         self.borrow_kinds = saved_borrow_kinds
         self.borrow_places = saved_borrow_places
         self.borrow_fields = saved_borrow_fields
@@ -13249,6 +13270,10 @@ impl Sema:
             let self_bound = self.named_types.get(self.syms.self_type)
             if self_bound.is_some():
                 tid = self_bound.unwrap()
+            else:
+                // Never silent: an untyped literal was lowered by name (#1457).
+                self.emit_error("`Self` is not bound here: a `Self { .. }` literal needs an enclosing method of a type", node)
+                return 0
         if tid != 0 and self.pool_resolve(name) == "Self":
             let self_lit_res = self.resolve_alias(tid as TypeId)
             if self.get_type_kind(self_lit_res) == TypeKind.TY_GENERIC_INST:

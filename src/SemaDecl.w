@@ -1424,6 +1424,20 @@ impl Sema:
         self.method_symbol_flags.insert(next_fn_sym, 1)
         self.fn_decl_source_paths.insert(next_fn_sym, with_str_clone_ref(self.current_module_path))
 
+    // Whether two declarations of one method symbol belong to different
+    // types that share a name (#1457): distinct declaring files, a method
+    // owner, and more than one registered declaration of the owner's name.
+    fn method_decls_collide_across_types(existing_node: i32, node: i32, parsed_fn_name: i32) -> bool:
+        let owner = self.method_decl_owner_symbol(node, parsed_fn_name)
+        if owner == 0 or owner != self.method_decl_owner_symbol(existing_node, self.ast.get_data0(existing_node)):
+            return false
+        var declared = 0
+        var i = self.named_type_candidate_head(owner)
+        while i >= 0:
+            declared = declared + 1
+            i = self.named_type_candidate_next[i]
+        declared > 1
+
     fn fn_decl_has_refutable_param_pattern(node: i32) -> i32:
         let meta = self.ast.find_fn_meta(node)
         if meta < 0:
@@ -1543,6 +1557,18 @@ impl Sema:
                         let fn_name_str: str = self.pool_resolve(fn_name)
                         self.emit_error(f"function '{fn_name_str}' is already defined", node)
                         return
+                else if self.method_decls_collide_across_types(existing_node, node, parsed_fn_name):
+                    // Two modules each declare a type of this name with a
+                    // method of this name. Both methods share one symbol, so
+                    // the later one shadowed the earlier and its body was never
+                    // checked (invalid MIR, "body index map mismatch"). Until a
+                    // method's symbol carries its declaration (#1457, the
+                    // method half), the collision is reported here.
+                    let owner_text: str = self.pool_resolve(self.method_decl_owner_symbol(node, parsed_fn_name))
+                    let method_text: str = self.pool_resolve(self.method_decl_name_symbol(parsed_fn_name))
+                    let other_path: str = self.decl_source_path_for_index(existing_di)
+                    self.emit_error(f"method '{method_text}' is declared for two different types named '{owner_text}' (the other is in {other_path}); a method name shared by same-named types in two modules is not supported yet (#1457)", node)
+                    return
         if self.ast.is_no_alloc_fn_node(node as NodeId) != 0:
             self.no_alloc_fns.insert(fn_name, 1)
 
