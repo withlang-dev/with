@@ -186,6 +186,46 @@ pub fn build_graph_assemble_to_object(root: &str, target: &BuildGraphTarget) -> 
         build_graph_rt_eprint("error: compile_asm_object target '" ++ target.name ++ "' failed")
     rc
 
+// The files a standard target read that it does not declare, recorded as its
+// discovered dependencies. An assembled object is made from its source and
+// from every file the source pulls in by `.incbin`/`.include` (#1423, #1435):
+// an embed target's assembly names its blobs by path only, so a blob whose
+// bytes changed leaves the source identical, and without these the object
+// stayed fresh over the old bytes.
+pub fn build_graph_discovered_inputs(root: &str, target: &BuildGraphTarget) -> Vec[str]:
+    var paths: Vec[str] = Vec.new()
+    if target.kind != 13 or target.entry.len() == 0: return paths
+    let text = build_graph_rt_read_file(build_graph_resolve_project_path(root, target.entry))
+    var start: i64 = 0
+    while start < text.len():
+        var end = start
+        while end < text.len() and text[end] != '\n': end = end + 1
+        let path = build_graph_asm_directive_path(text.slice(start, end))
+        // A relative operand is opened against the working directory, which
+        // is the project root during a build.
+        if path.len() > 0: paths.push(build_graph_resolve_project_path(root, path))
+        start = end + 1
+    paths
+
+// The unescaped quoted operand of an `.incbin`/`.include` line, "" for any
+// other line (the inverse of build_graph_asm_quote_path).
+fn build_graph_asm_directive_path(line: &str) -> str:
+    var i: i64 = 0
+    while i < line.len() and (line[i] == ' ' or line[i] == '\t'): i = i + 1
+    let rest = line.slice(i, line.len())
+    let directive_len = if rest.starts_with(".incbin"): 7 else if rest.starts_with(".include"): 8 else: 0
+    if directive_len == 0: return ""
+    var j: i64 = directive_len
+    while j < rest.len() and (rest[j] == ' ' or rest[j] == '\t'): j = j + 1
+    if j >= rest.len() or rest[j] != '"': return ""
+    var path = ""
+    j = j + 1
+    while j < rest.len() and rest[j] != '"':
+        if rest[j] == '\\' and j + 1 < rest.len(): j = j + 1
+        path = path ++ rest.slice(j, j + 1)
+        j = j + 1
+    path
+
 pub fn build_graph_compile_ir_to_object(root: &str, target: &BuildGraphTarget) -> i32:
     if target.entry.len() == 0 or target.output.len() == 0:
         build_graph_rt_eprint("error: compile_llvm_ir_object target '" ++ target.name ++ "' requires source and output paths")

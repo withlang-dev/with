@@ -206,11 +206,8 @@ fn add_cross_rt_targets(out0: Build, ctx: &BuildCtx, tag: &str, p: &str, group_n
     for pi in 0..plans.len() as i32:
         out = wo_bundle_targets(move out, ctx, plans[pi], release_compiler_bin("with"), "build")
         cross_embedded = target_with_wo_blobs(move cross_embedded, plans[pi])
+    let cross_embedded_obj = embedded_objects_object(p ++ "embedded-objects-object", &cross_embedded, triple)
     out = out.add_target(cross_embedded)
-
-    var cross_embedded_obj = target_new(.CompileAsmObject, p ++ "embedded-objects-object", dir ++ "/embedded_objects.s").output(dir ++ "/embedded_objects.o")
-    cross_embedded_obj = cross_embedded_obj.arg("triple=" ++ triple)
-    cross_embedded_obj = cross_embedded_obj.dep(p ++ "embedded-objects-asm")
     out = out.add_target(cross_embedded_obj)
 
     var cross_ld_rsp = target_new(.Action, p ++ "llvm-link-metadata", "").output(dir ++ "/llvm_ld.rsp")
@@ -398,6 +395,18 @@ fn empty_file_target(name: &str, output: &str) -> Target:
     target.action = run_write_empty_file_action
     target = target.write_scope(build_project_dirname(output))
     target
+
+// The object assembled from an embed target's assembly. The assembly names
+// each blob by path (`.incbin`), so its text is unchanged when a blob's bytes
+// change and early cutoff keeps the object fresh over the old bytes: the
+// blobs are the object's inputs too (#1423, #1435). `triple` is "" for the
+// host.
+fn embedded_objects_object(name: &str, embed: &Target, triple: &str) -> Target:
+    var obj = target_new(.CompileAsmObject, build_owned_text(name), build_owned_text(embed.output)).output(build_project_dirname(embed.output) ++ "/embedded_objects.o")
+    if triple.len() > 0: obj = obj.arg("triple=" ++ triple)
+    for i in 0..embed.inputs.len():
+        obj = obj.input(build_owned_text(embed.inputs[i]))
+    obj.dep(build_owned_text(embed.name))
 
 // Every platform runtime object the compiler can serve from its own binary.
 // src/compiler/Link.w declares an extern per entry, so EVERY host must define
@@ -2069,9 +2078,8 @@ pub fn build(ctx: BuildCtx) -> Build:
         stage_embedded_objects = stage_embedded_objects.dep(build_owned_text(bootstrap_embedded_objects.deps[i]))
     for pi in 0..corpus_plans.len() as i32:
         stage_embedded_objects = target_with_wo_blobs(move stage_embedded_objects, corpus_plans[pi])
+    let stage_embedded_objects_obj = embedded_objects_object("stage-embedded-objects-object", &stage_embedded_objects, "")
     out = out.add_target(stage_embedded_objects)
-    var stage_embedded_objects_obj = target_new(.CompileAsmObject, "stage-embedded-objects-object", "out/stage/lib/embedded_objects.s").output("out/stage/lib/embedded_objects.o")
-    stage_embedded_objects_obj = stage_embedded_objects_obj.dep("stage-embedded-objects-asm")
     out = out.add_target(stage_embedded_objects_obj)
 
     // Stage1 precedes the tree's bundle, so only its embedding keeps empty
@@ -2079,9 +2087,8 @@ pub fn build(ctx: BuildCtx) -> Build:
     for pi in 0..corpus_plans.len() as i32:
         out = add_empty_wo_blob_targets(move out, "bootstrap-", "out/bootstrap-lib", corpus_plans[pi].name)
         bootstrap_embedded_objects = target_with_empty_wo_blobs(move bootstrap_embedded_objects, "bootstrap-", "out/bootstrap-lib", corpus_plans[pi].name)
+    let bootstrap_embedded_objects_obj = embedded_objects_object("bootstrap-embedded-objects-object", &bootstrap_embedded_objects, "")
     out = out.add_target(bootstrap_embedded_objects)
-    var bootstrap_embedded_objects_obj = target_new(.CompileAsmObject, "bootstrap-embedded-objects-object", "out/bootstrap-lib/embedded_objects.s").output("out/bootstrap-lib/embedded_objects.o")
-    bootstrap_embedded_objects_obj = bootstrap_embedded_objects_obj.dep("bootstrap-embedded-objects-asm")
     out = out.add_target(bootstrap_embedded_objects_obj)
 
     var bootstrap_runtime = target_new(.Group, "bootstrap-runtime", "")
@@ -2398,10 +2405,8 @@ pub fn build(ctx: BuildCtx) -> Build:
         let esym3 = empty_syms[ei3]
         if esym3 != host_runtime.platform_symbol:
             embedded_objects = embedded_objects.dep(empty_platform_blob_target("empty-", esym3))
+    let embedded_objects_obj = embedded_objects_object("embedded-objects-object", &embedded_objects, "")
     out = out.add_target(embedded_objects)
-
-    var embedded_objects_obj = target_new(.CompileAsmObject, "embedded-objects-object", "out/lib/embedded_objects.s").output("out/lib/embedded_objects.o")
-    embedded_objects_obj = embedded_objects_obj.dep("embedded-objects-asm")
     out = out.add_target(embedded_objects_obj)
 
     var runtime = target_new(.Group, "runtime", "")
@@ -2492,11 +2497,8 @@ pub fn build(ctx: BuildCtx) -> Build:
     for pi in 0..corpus_plans_windows_x86_64.len() as i32:
         out = wo_bundle_targets(move out, ctx, corpus_plans_windows_x86_64[pi], release_compiler_bin("with"), "build")
         cross_win_embedded = target_with_wo_blobs(move cross_win_embedded, corpus_plans_windows_x86_64[pi])
+    let cross_win_embedded_obj = embedded_objects_object("cross-win-embedded-objects-object", &cross_win_embedded, cross_windows_triple())
     out = out.add_target(cross_win_embedded)
-
-    var cross_win_embedded_obj = target_new(.CompileAsmObject, "cross-win-embedded-objects-object", cross_windows_dir() ++ "/embedded_objects.s").output(cross_windows_dir() ++ "/embedded_objects.o")
-    cross_win_embedded_obj = cross_win_embedded_obj.arg("triple=" ++ cross_windows_triple())
-    cross_win_embedded_obj = cross_win_embedded_obj.dep("cross-win-embedded-objects-asm")
     out = out.add_target(cross_win_embedded_obj)
 
     var cross_win_ld_rsp = target_new(.Action, "cross-win-llvm-link-metadata", "").output(cross_windows_dir() ++ "/llvm_ld.rsp")
@@ -2572,11 +2574,8 @@ pub fn build(ctx: BuildCtx) -> Build:
     for pi in 0..corpus_plans_windows_aarch64.len() as i32:
         out = wo_bundle_targets(move out, ctx, corpus_plans_windows_aarch64[pi], release_compiler_bin("with"), "build")
         cross_winarm_embedded = target_with_wo_blobs(move cross_winarm_embedded, corpus_plans_windows_aarch64[pi])
+    let cross_winarm_embedded_obj = embedded_objects_object("cross-winarm-embedded-objects-object", &cross_winarm_embedded, cross_windows_aarch64_triple())
     out = out.add_target(cross_winarm_embedded)
-
-    var cross_winarm_embedded_obj = target_new(.CompileAsmObject, "cross-winarm-embedded-objects-object", cross_windows_aarch64_dir() ++ "/embedded_objects.s").output(cross_windows_aarch64_dir() ++ "/embedded_objects.o")
-    cross_winarm_embedded_obj = cross_winarm_embedded_obj.arg("triple=" ++ cross_windows_aarch64_triple())
-    cross_winarm_embedded_obj = cross_winarm_embedded_obj.dep("cross-winarm-embedded-objects-asm")
     out = out.add_target(cross_winarm_embedded_obj)
 
     var cross_winarm_ld_rsp = target_new(.Action, "cross-winarm-llvm-link-metadata", "").output(cross_windows_aarch64_dir() ++ "/llvm_ld.rsp")

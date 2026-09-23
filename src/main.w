@@ -2412,7 +2412,7 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
         if standard_result.handled:
             if standard_result.rc != 0:
                 return standard_result.rc
-            build_cache_record(root, target, no_strings, no_strings)
+            build_cache_record(root, target, build_graph_discovered_inputs(root, target), no_strings)
             completed_targets.push(with_str_clone_ref(target.name))
             continue
         if target.kind == 23:
