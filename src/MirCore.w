@@ -527,6 +527,9 @@ pub type MirModule {
     // Result's symbol: the one two-argument enum whose variants carry its
     // arguments in declaration order (Ok(T), Err(E)).
     sema_result_sym: i32,
+    // Task and ScopedTask: the handle types the fiber intrinsics take (#1464).
+    sema_task_sym: i32,
+    sema_scoped_task_sym: i32,
     // #1394: every type a body moves out of a sub-place (a field, a tuple
     // element, a variant payload) that has drop glue. The ownership
     // validator asks it whether a vacated sub-place is one the whole
@@ -552,6 +555,8 @@ fn MirModule.init -> MirModule:
         sema_box_sym: 0,
         sema_option_sym: 0,
         sema_result_sym: 0,
+        sema_task_sym: 0,
+        sema_scoped_task_sym: 0,
         sema_moved_drop_types: HashMap.new(),
     }
 
@@ -3510,7 +3515,53 @@ fn mir_validate_cast_supported(mir_mod: &MirModule, src_ty: i32, dst_ty: i32) ->
         return false
     true
 
+// #1464: a field or tuple projection names a component of an aggregate. A
+// scalar has none; the place's declared type hid the error — `copy _7.f0`
+// read a Task handle's fiber id out of a local MIR typed as the awaited i32,
+// declared as i32, and passed verification.
+fn mir_validate_scalar_field_projection(mir_mod: &MirModule, body: &MirBody) -> str:
+    for place in 0..body.place_locals.len() as i32:
+        let proj_count = body.place_proj_counts[place]
+        let proj_start = body.place_proj_starts[place]
+        for pi in 0..proj_count:
+            let kind = body.proj_kinds[(proj_start + pi)]
+            if kind != ProjKind.PK_FIELD and kind != ProjKind.PK_TUPLE_INDEX:
+                continue
+            let base_ty = mir_validate_place_prefix_type(mir_mod, body, place, proj_count - pi)
+            if base_ty <= 0:
+                continue
+            let base_kind = mir_mod.mir_get_type_kind(mir_mod.mir_resolve_alias(base_ty))
+            if base_kind == TypeKind.TY_INT or base_kind == TypeKind.TY_FLOAT or base_kind == TypeKind.TY_BOOL or base_kind == TypeKind.TY_VOID or base_kind == TypeKind.TY_NEVER:
+                return f"place {mir_place_text(body, place)} projects component {body.proj_d0[(proj_start + pi)]} of a scalar (ty={base_ty})"
+    ""
+
+// #1464: the fiber intrinsics take a task handle. A handle in a local typed
+// as the awaited value (`async fn f(): 1` typed its calls `i32`) is a Task
+// stored where MIR believes a T lives.
+fn mir_validate_task_operand(mir_mod: &MirModule, body: &MirBody, call_id: i32) -> str:
+    if call_id < 0 or call_id >= body.call_arg_starts.len():
+        return ""
+    let intrinsic = body.call_intrinsic(call_id)
+    if intrinsic != MirIntrinsic.FIBER_AWAIT and intrinsic != MirIntrinsic.FIBER_CANCEL:
+        return ""
+    if body.call_arg_counts[call_id] <= 0 or mir_mod.sema_task_sym == 0:
+        return ""
+    let task_ty = mir_validate_operand_type(mir_mod, body, body.call_arg_operands[body.call_arg_starts[call_id]])
+    if task_ty <= 0:
+        return ""
+    var resolved = mir_mod.mir_resolve_alias(task_ty)
+    if mir_mod.mir_get_type_kind(resolved) == TypeKind.TY_REF:
+        resolved = mir_mod.mir_resolve_alias(mir_mod.mir_get_type_d0(resolved))
+    if mir_mod.mir_get_type_kind(resolved) == TypeKind.TY_GENERIC_INST:
+        let base = mir_mod.mir_get_type_d0(resolved)
+        if base == mir_mod.sema_task_sym or base == mir_mod.sema_scoped_task_sym:
+            return ""
+    f"fiber intrinsic's task operand is ty={task_ty}, not a Task or ScopedTask handle"
+
 fn validate_typed_mir_body(mir_mod: &MirModule, body: &MirBody) -> MirValidationError:
+    let scalar_projection = mir_validate_scalar_field_projection(mir_mod, body)
+    if scalar_projection.len() > 0:
+        return mir_validation_fail(body.fn_sym, 0, scalar_projection)
     let stmt_count = body.stmt_count()
     for si in 0..stmt_count:
         let stmt_kind = body.stmt_kinds[si]
@@ -3627,6 +3678,9 @@ fn validate_typed_mir_body(mir_mod: &MirModule, body: &MirBody) -> MirValidation
             let dest_is_unit = dest_ty > 0 and mir_mod.mir_get_type_kind(resolved_dest) == TypeKind.TY_VOID
             if body.call_intrinsic(d1) == MirIntrinsic.VEC_PUSH and not dest_is_unit:
                 return mir_validation_fail(body.fn_sym, span, "Vec.push call destination must be Unit")
+            let task_operand = mir_validate_task_operand(mir_mod, body, d1)
+            if task_operand.len() > 0:
+                return mir_validation_fail(body.fn_sym, span, task_operand)
             let unit_arg = mir_validate_call_unit_argument(mir_mod, body, d0, d1)
             if unit_arg >= 0:
                 return mir_validation_fail(body.fn_sym, span, f"call argument {unit_arg} is Unit but the callee parameter is not")

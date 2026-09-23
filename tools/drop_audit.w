@@ -387,6 +387,18 @@ fn sc_field_join_view(form: &str) -> str:
     "        let x = " ++ join ++ "\n" ++
     "        let _k = x.id + h.r.id\n"
 
+// #1464 (§14.4, §14.7): a task handle in a local owns the result buffer its
+// `.await` frees, and the awaited R drops once. An unannotated async fn's
+// call was typed as the awaited T, so the handle sat in an R-typed local
+// (the base run of the inferred cell dies with no output).
+fn sc_async_await(annotated: bool) -> str:
+    let ret = if annotated: " -> R" else: ""
+    "async fn make(slot: *mut i32)" ++ ret ++ ": mk(1, slot)\n" ++
+    "fn go(slot: *mut i32):\n" ++
+    "    let t = make(slot)\n" ++
+    "    let r = t.await\n" ++
+    "    let _k = r.id\n"
+
 // #1365 (§9.7, §2.4): `let PAT = subject else: <diverge>` consumes its
 // subject on both paths. The failing path drops the whole subject — whichever
 // variant it holds — exactly once before it diverges; the matching path moves
@@ -606,6 +618,8 @@ fn build_cells():
         cells.push(cell("comprehension_skip_" ++ form ++ "/bare", sc_comprehension_skip(form), 7))
     for form in ["if", "match", "block", "recv"]:
         cells.push(cell("field_join_view_" ++ form ++ "/field", sc_field_join_view(form), 1))
+    cells.push(cell("async_await_inferred/bare", sc_async_await(false), 1))
+    cells.push(cell("async_await_annotated/bare", sc_async_await(true), 1))
     for form in ["inline", "block", "field"]:
         cells.push(cell("let_else_consume_hit_" ++ form ++ "/bare", sc_let_else_consume(form, true), 9))
         cells.push(cell("let_else_consume_miss_" ++ form ++ "/bare", sc_let_else_consume(form, false), 10))

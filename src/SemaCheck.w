@@ -2484,11 +2484,18 @@ impl Sema:
             if self.return_value_type_compatible(body_expected_ret as i32, body_ty as i32) == 0 and body_materializes_copy == 0:
                 self.emit_error("return type mismatch", body)
         if not has_ret_annotation:
+            // §14.4: calling an `async fn` returns a `Task[T]` handle; the body
+            // yields the T. An annotated signature is wrapped at declaration
+            // (fn_signature_return_type); the inferred one was stored bare, so
+            // a call of `async fn double(x: i32): x * 2` was typed `i32` and its
+            // Task handle lived in i32-typed MIR locals (#1464).
             if trait_contract.ok != 0 and trait_contract.ret_type != 0:
-                self.set_sig_return_type(sig_idx, trait_contract.ret_type)
+                let contract_ret = self.fn_signature_return_type(flags, trait_contract.ret_type as TypeId)
+                self.set_sig_return_type(sig_idx, contract_ret as i32)
             else:
                 let inferred_ret = self.infer_unannotated_function_return_type(body, body_ty)
-                self.set_sig_return_type(sig_idx, inferred_ret)
+                let sig_ret = self.fn_signature_return_type(flags, inferred_ret as TypeId)
+                self.set_sig_return_type(sig_idx, sig_ret as i32)
             self.body_typed_sigs.insert(sig_idx, 1)
         else if body_expected_ret != 0 and body_expected_ret != self.ty_void and body_ty == self.ty_void:
             let explicit_void_results_ok = self.check_body_explicit_value_results(body, 1, body_expected_ret as i32, "return type mismatch")

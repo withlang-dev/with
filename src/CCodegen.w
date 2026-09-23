@@ -4071,7 +4071,7 @@ impl CCodegen:
             if self.sema.sig_get_param_count(si) != arg_count:
                 continue
             let sym_text = cc_intern_resolve(self.intern, sym)
-            let ret_tid = self.sema.sig_return_type(si)
+            let ret_tid = self.c_sig_return_type(si)
             if self.is_void_tid(want_ret_tid) == 0 and self.strict_type_match(want_ret_tid, ret_tid) == 0:
                 continue
             var params_ok = 1
@@ -4135,7 +4135,7 @@ impl CCodegen:
                 continue
             if self.sema.sig_get_param_count(sig_idx) != argc:
                 continue
-            let ret_tid = self.sema.sig_return_type(sig_idx)
+            let ret_tid = self.c_sig_return_type(sig_idx)
             if self.is_void_tid(want_ret_tid) == 0 and self.strict_type_match(want_ret_tid, ret_tid) == 0:
                 continue
             var params_ok = 1
@@ -4177,7 +4177,7 @@ impl CCodegen:
                 continue
             if self.sema.sig_get_param_count(si) != arg_count:
                 continue
-            let ret_tid = self.sema.sig_return_type(si)
+            let ret_tid = self.c_sig_return_type(si)
             if self.is_void_tid(want_ret_tid) == 0 and self.strict_type_match(want_ret_tid, ret_tid) == 0:
                 continue
             var params_ok = 1
@@ -4213,7 +4213,7 @@ impl CCodegen:
                 continue
             if self.sema.sig_get_param_count(si) != arg_count:
                 continue
-            let ret_tid = self.sema.sig_return_type(si)
+            let ret_tid = self.c_sig_return_type(si)
             if self.type_match(dest_tid, ret_tid) == 0:
                 continue
             var params_ok = 1
@@ -4692,7 +4692,7 @@ impl CCodegen:
                 continue
             let owner = cc_owner_prefix(sym_text)
             let owner_matched = if preferred_owner.len() > 0 and owner == preferred_owner: 1 else: 0
-            let ret_tid = self.sema.sig_return_type(si)
+            let ret_tid = self.c_sig_return_type(si)
             if self.is_void_tid(want_ret_tid) == 0 and self.strict_type_match(want_ret_tid, ret_tid) == 0:
                 continue
             var params_ok = 1
@@ -4768,7 +4768,7 @@ impl CCodegen:
             let owner = cc_owner_prefix(sym_text)
             if owner != owner_text and cc_str_ends_with(owner, "." ++ owner_text) == 0:
                 continue
-            let ret_tid = self.sema.sig_return_type(si)
+            let ret_tid = self.c_sig_return_type(si)
             if self.is_void_tid(want_ret_tid) == 0 and self.strict_type_match(want_ret_tid, ret_tid) == 0:
                 continue
             var params_ok = 1
@@ -5446,17 +5446,26 @@ impl CCodegen:
             return self.fn_c_name(body_method)
         self.extern_call_name(fn_sym, body, args_id, dest_place)
 
+    // The C backend has no fiber runtime: an `async fn` is emitted as a
+    // synchronous C function that returns the awaited T (its body type), and a
+    // call of it yields that T. Every signature return type read here goes
+    // through this, so the `Task[T]` a Sema signature declares (§14.4; #1464
+    // made the inferred ones agree with the annotated ones) never names a C
+    // type the backend does not define (`Task_Unit_ task_cancel_point()`).
+    fn c_sig_return_type(sig_idx: i32) -> i32:
+        self.sema.unwrap_task_type(self.sema.sig_return_type(sig_idx) as TypeId) as i32
+
     mut fn call_return_tid_for_fn_sym(body: &MirBody, fn_sym: i32, args_id: i32, dest_place: i32, fallback: i32) -> i32:
         let fn_body_sym = self.canonical_body_sym(fn_sym)
         if fn_body_sym != 0:
             let body_sig = self.sig_index_for_sym(fn_body_sym)
             if body_sig >= 0:
-                return self.sema.sig_return_type(body_sig)
+                return self.c_sig_return_type(body_sig)
         let owner_named = self.owner_named_body_sym(body, fn_sym, args_id)
         if owner_named != 0:
             let owner_named_sig = self.sig_index_for_sym(owner_named)
             if owner_named_sig >= 0:
-                return self.sema.sig_return_type(owner_named_sig)
+                return self.c_sig_return_type(owner_named_sig)
         let builtin_method_ret = self.unqualified_builtin_method_ret_tid(body, fn_sym, args_id)
         if builtin_method_ret != 0:
             return builtin_method_ret
@@ -5464,25 +5473,25 @@ impl CCodegen:
         if inferred_named > 0:
             let named_sig = self.sig_index_for_sym(inferred_named)
             if named_sig >= 0:
-                return self.sema.sig_return_type(named_sig)
+                return self.c_sig_return_type(named_sig)
         let inferred_method = self.infer_qualified_method_sym(body, fn_sym, args_id, dest_place)
         if inferred_method > 0:
             let method_sig = self.sig_index_for_sym(inferred_method)
             if method_sig >= 0:
-                return self.sema.sig_return_type(method_sig)
+                return self.c_sig_return_type(method_sig)
         let owner_method = self.infer_owner_method_sym(body, fn_sym, args_id, dest_place)
         if owner_method > 0:
             let owner_sig = self.sig_index_for_sym(owner_method)
             if owner_sig >= 0:
-                return self.sema.sig_return_type(owner_sig)
+                return self.c_sig_return_type(owner_sig)
         let body_method = self.infer_body_method_sym(body, fn_sym, args_id, dest_place)
         if body_method > 0:
             let body_sig = self.sig_index_for_sym(body_method)
             if body_sig >= 0:
-                return self.sema.sig_return_type(body_sig)
+                return self.c_sig_return_type(body_sig)
         let sig_idx = self.sig_index_for_sym(fn_sym)
         if sig_idx >= 0:
-            return self.sema.sig_return_type(sig_idx)
+            return self.c_sig_return_type(sig_idx)
         let raw = cc_intern_resolve(self.intern, fn_sym)
         if raw == "with_str_concat_ref" or raw == "with_fs_read_file" or raw == "int_to_string":
             return self.sema.ty_str as i32
@@ -5565,7 +5574,7 @@ impl CCodegen:
         if body.call_requires_contract(args_id):
             let sig_idx = body.call_sig_index(args_id)
             if sig_idx >= 0:
-                return self.sema.sig_return_type(sig_idx)
+                return self.c_sig_return_type(sig_idx)
         let builtin_ret = self.call_builtin_ret_tid(body, callee_operand, args_id, dest_place)
         if builtin_ret != 0:
             return builtin_ret
@@ -5588,7 +5597,7 @@ impl CCodegen:
             if inferred > 0:
                 let sig_idx = self.sig_index_for_sym(inferred)
                 if sig_idx >= 0:
-                    return self.sema.sig_return_type(sig_idx)
+                    return self.c_sig_return_type(sig_idx)
             return fallback
 
         if ok == OperandKind.OK_CONSTANT:
@@ -5603,7 +5612,7 @@ impl CCodegen:
             if inferred > 0:
                 let sig_idx = self.sig_index_for_sym(inferred)
                 if sig_idx >= 0:
-                    return self.sema.sig_return_type(sig_idx)
+                    return self.c_sig_return_type(sig_idx)
             return fallback
 
         fallback
@@ -5624,7 +5633,7 @@ impl CCodegen:
         let sig_idx = self.sig_index_for_sym(fn_sym)
         if sig_idx < 0:
             return 0
-        self.sema.sig_return_type(sig_idx)
+        self.c_sig_return_type(sig_idx)
 
     mut fn infer_local_tid_impl(body: &MirBody, local_id: i32) -> i32:
         let declared = self.local_declared_tid(body, local_id)
@@ -7883,7 +7892,7 @@ impl CCodegen:
                             inferred = self.prefer_inferred_tid(inferred, p_tid)
 
                         if self.field_place_matches(body, dest_place, resolved_struct, field_sym) != 0:
-                            let ret_tid = self.sema.sig_return_type(sig_idx)
+                            let ret_tid = self.c_sig_return_type(sig_idx)
                             inferred = self.prefer_inferred_tid(inferred, ret_tid)
 
                 let start = body.bb_stmt_starts[bb]
@@ -8294,7 +8303,7 @@ impl CCodegen:
             return f"    goto bb{d0};"
         if tk == TermKind.TK_RETURN:
             let sig_idx = self.body_sig_index(body.fn_sym)
-            let ret_tid = if sig_idx >= 0: self.sema.sig_return_type(sig_idx) else:
+            let ret_tid = if sig_idx >= 0: self.c_sig_return_type(sig_idx) else:
                 if body.local_type_ids.len() as i32 > 0: body.local_type_ids.get(0) else: self.sema.ty_void
             if self.is_void_tid(ret_tid) != 0:
                 return "    return;"
@@ -8491,7 +8500,7 @@ impl CCodegen:
                 acc = self.collect_fn_types_from_tid(move acc, body.local_type_ids[li])
             let sig_idx = self.body_sig_index(body.fn_sym)
             if sig_idx >= 0:
-                acc = self.collect_fn_types_from_tid(move acc, self.sema.sig_return_type(sig_idx))
+                acc = self.collect_fn_types_from_tid(move acc, self.c_sig_return_type(sig_idx))
                 let param_count = self.sema.sig_get_param_count(sig_idx)
                 for pi in 0..param_count:
                     acc = self.collect_fn_types_from_tid(move acc, self.sema.sig_param_type(sig_idx, pi))
@@ -8541,7 +8550,7 @@ impl CCodegen:
                 acc = self.collect_struct_types_from_tid(move acc, tid)
             let sig_idx = self.body_sig_index(body.fn_sym)
             if sig_idx >= 0:
-                let ret_tid = self.sema.sig_return_type(sig_idx)
+                let ret_tid = self.c_sig_return_type(sig_idx)
                 acc = self.collect_struct_types_from_tid(move acc, ret_tid)
                 let param_count = self.sema.sig_get_param_count(sig_idx)
                 for pi in 0..param_count:
@@ -8939,7 +8948,7 @@ impl CCodegen:
         else:
             if param_count == 0:
                 params = "void"
-        let ret_tid = self.sema.sig_return_type(sig_idx)
+        let ret_tid = self.c_sig_return_type(sig_idx)
         let name = self.extern_sym_c_name(fn_sym) ++ "(" ++ params ++ ")"
         if self.type_is_pointer_to_array(ret_tid):
             return "extern " ++ self.c_decl(ret_tid, name) ++ ";\n"
@@ -9044,7 +9053,7 @@ impl CCodegen:
         let fn_sym = body.fn_sym
         let fn_name = self.fn_c_name(fn_sym)
         let sig_idx = self.body_sig_index(fn_sym)
-        let ret_tid = if sig_idx >= 0: self.sema.sig_return_type(sig_idx) else:
+        let ret_tid = if sig_idx >= 0: self.c_sig_return_type(sig_idx) else:
             if body.local_type_ids.len() > 0: body.local_type_ids.get(0) else: self.sema.ty_void
         var params = ""
         let param_count = if sig_idx >= 0: self.sema.sig_get_param_count(sig_idx) else: 0
@@ -9452,7 +9461,7 @@ impl CCodegen:
                 continue
             if self.local_global_sym(body, li) != 0:
                 continue
-            let declared_tid = if li == 0 and sig_idx >= 0: self.sema.sig_return_type(sig_idx) else:
+            let declared_tid = if li == 0 and sig_idx >= 0: self.c_sig_return_type(sig_idx) else:
                 if li < body.local_type_ids.len() as i32: body.local_type_ids[li] else: self.sema.ty_i32
             var use_tid = declared_tid
             let declared_resolved = self.sema.resolve_alias(declared_tid)
@@ -9597,7 +9606,7 @@ impl CCodegen:
             return ""
         let main_name = self.fn_c_name(main_sym)
         let sig_idx = self.sema.get_sig(main_sym)
-        let ret_tid = if sig_idx >= 0: self.sema.sig_return_type(sig_idx) else: self.sema.ty_void
+        let ret_tid = if sig_idx >= 0: self.c_sig_return_type(sig_idx) else: self.sema.ty_void
         var out = "int main(int argc, char** argv) " ++ cc_lbrace() ++ "\n"
         out = out ++ "    with_runtime_set_argv(argc, argv);\n"
         out = out ++ self.emit_runtime_fiber_config_call()

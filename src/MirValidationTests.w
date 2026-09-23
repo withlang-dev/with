@@ -535,3 +535,75 @@ pub fn mir_test_move_through_reference() -> Unit:
     assert(move_through_verdict(TypeKind.TY_REF, false, true) == "")
     assert(move_through_verdict(TypeKind.TY_REF, true, false) == "")
     assert(move_through_verdict(TypeKind.TY_PTR, true, true) == "")
+
+// #1464: a field projection on a scalar local. MirLower typed an unannotated
+// `async fn`'s Task handle as the awaited i32 and lower_single_await read the
+// fiber id as `.f0` of it, declaring the place i32; the verifier took the
+// declared type and passed it. The base is an i32 local, or a tuple (i32, i32)
+// for the control; the place declares i32 either way.
+fn scalar_projection_verdict(base_is_scalar: bool) -> str:
+    var mir_mod = MirModule.init()
+    for kind in [0, TypeKind.TY_INT, TypeKind.TY_TUPLE]:
+        mir_mod.sema_type_kinds.push(kind)
+        mir_mod.sema_type_d0.push(0)
+        mir_mod.sema_type_d1.push(if kind == TypeKind.TY_TUPLE: 2 else: 0)
+        mir_mod.sema_type_d2.push(0)
+    mir_mod.sema_type_extra.push(1)
+    mir_mod.sema_type_extra.push(1)
+    let int_ty = 1
+    let tuple_ty = 2
+    var body = MirBody.init_for_fn(1)
+    let base_local = body.new_temp(if base_is_scalar: int_ty else: tuple_ty)
+    let base = body.new_place(base_local)
+    let field = body.new_field_place(base, 0, int_ty)
+    let dest_local = body.new_temp(int_ty)
+    let dest = body.new_place(dest_local)
+    let entry = body.new_block()
+    let field_read = body.new_operand(OperandKind.OK_COPY, field)
+    let read = body.new_rvalue(RvalueKind.RK_USE, field_read, 0, 0)
+    body.push_stmt(entry, StmtKind.Assign, dest, read, 0)
+    body.set_terminator(entry, TermKind.TK_RETURN, 0, 0, 0, 0, 0)
+    let err = validate_typed_mir_body(mir_mod, body)
+    with_str_clone_ref(err.message)
+
+pub fn mir_test_scalar_field_projection() -> Unit:
+    assert(scalar_projection_verdict(true).contains("of a scalar"))
+    assert(scalar_projection_verdict(false) == "")
+
+// #1464: a fiber intrinsic whose task operand is not a task handle — the
+// awaited value's type standing where the Task[T] lives. Type 2 is the
+// generic instance Task[i32] (base symbol 9, the module's Task symbol).
+fn task_operand_verdict(operand_is_task: bool) -> str:
+    var mir_mod = MirModule.init()
+    for kind in [0, TypeKind.TY_INT, TypeKind.TY_GENERIC_INST]:
+        mir_mod.sema_type_kinds.push(kind)
+        mir_mod.sema_type_d0.push(if kind == TypeKind.TY_GENERIC_INST: 9 else: 0)
+        mir_mod.sema_type_d1.push(0)
+        mir_mod.sema_type_d2.push(if kind == TypeKind.TY_GENERIC_INST: 1 else: 0)
+    mir_mod.sema_type_extra.push(1)
+    mir_mod.sema_task_sym = 9
+    let int_ty = 1
+    let task_ty = 2
+    var body = MirBody.init_for_fn(1)
+    let handle_local = body.new_temp(if operand_is_task: task_ty else: int_ty)
+    let handle = body.new_place(handle_local)
+    let result_local = body.new_temp(int_ty)
+    let result = body.new_place(result_local)
+    let entry = body.new_block()
+    let done = body.new_block()
+    let args: Vec[i32] = Vec.new()
+    args.push(body.new_operand(OperandKind.OK_COPY, handle))
+    let owns = body.new_const(ConstKind.CK_INT, 1, 0, 0, int_ty)
+    args.push(body.new_operand(OperandKind.OK_CONSTANT, owns))
+    let call_id = body.new_call_args(&args)
+    body.set_call_intrinsic(call_id, MirIntrinsic.FIBER_AWAIT)
+    let unit_const = body.new_const(ConstKind.CK_UNIT, 0, 0, 0, int_ty)
+    let unit_callee = body.new_operand(OperandKind.OK_CONSTANT, unit_const)
+    body.set_terminator(entry, TermKind.TK_CALL, unit_callee, call_id, result, done, 0)
+    body.set_terminator(done, TermKind.TK_RETURN, 0, 0, 0, 0, 0)
+    let err = validate_typed_mir_body(mir_mod, body)
+    with_str_clone_ref(err.message)
+
+pub fn mir_test_task_operand() -> Unit:
+    assert(task_operand_verdict(false).contains("not a Task or ScopedTask handle"))
+    assert(task_operand_verdict(true) == "")
