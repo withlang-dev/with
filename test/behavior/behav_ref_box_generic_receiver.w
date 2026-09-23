@@ -75,17 +75,17 @@ fn main:
     print(f"sum={sum(&l)}")
     let e = Expr.Add(Box.new(Expr.Neg(Box.new(Expr.Num(5)))), Box.new(Expr.Num(12)))
     print(f"eval={eval(&e)}")
-    let b = Box.new(41)
+    let b: Box[i64] = Box.new(41)
     print(f"first={first(&b)}")
-    let nine = Box.new(9)
+    let nine: Box[i64] = Box.new(9)
     print(f"double={double(&nine)}")
-    let w = Wrap { inner: 40, tag: 2 }
+    let w: Wrap[i64] = Wrap { inner: 40, tag: 2 }
     print(f"wrap={via_ref(&w)}")
-    let r = Rc.new(77)
+    let r: Rc[i64] = Rc.new(77)
     print(f"rc={peek(&r)}")
     let n = Node { val: 1, child: Box.new(10) }
     print(f"field={child_of(&n)}")
-    let bw = Box.new(Wrap { inner: 1, tag: 33 })
+    let bw = Box.new(Wrap { inner: 1i64, tag: 33 })
     print(f"box-deref={bw.tag_of()} {via_box(&bw)}")
     var v: Vec[Box[i64]] = Vec.new()
     v.push(Box.new(3))

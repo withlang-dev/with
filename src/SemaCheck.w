@@ -949,9 +949,39 @@ impl Sema:
         self.can_auto_ref_arg(expected, actual)
 
     mut fn call_arg_type_compatible(expected: i32, actual: i32) -> i32:
+        if self.value_aggregate_repr_differs(expected, actual):
+            return 0
         if self.call_arg_type_compatible_base(expected, actual) != 0:
             return 1
         self.can_contextually_copy_ref(expected, actual)
+
+    mut fn emit_aggregate_assignment_mismatch(target: i32, value: i32, node: i32):
+        self.emit_error("type mismatch in assignment: the place is `" ++ self.type_name(target) ++ "` but the value is `" ++ self.type_name(value) ++ "`; an aggregate's elements do not convert", node)
+
+    // #1368: the structural relation lets any int match any int inside a
+    // tuple, array or generic instance, but no conversion reshapes an
+    // aggregate value: a `(i32, i32)` is not a `(i64, i64)` in memory. A
+    // value whose aggregate elements differ in representation from the
+    // demanded type is a mismatch at a call, a return, an assignment and a
+    // struct field, as at an annotated binding (check_binding_annotation,
+    // #1354). The demand may also auto-reference the value (`&T` from `T`),
+    // materialize a Copy view (`T` from `&T`), or pass a view along.
+    mut fn value_aggregate_repr_differs(expected: i32, actual: i32) -> bool:
+        if expected == 0 or actual == 0:
+            return false
+        if self.aggregate_repr_differs(expected as TypeId, actual as TypeId, 0) != 0:
+            return true
+        let er = self.resolve_alias(expected as TypeId)
+        let ar = self.resolve_alias(actual as TypeId)
+        let e_ref = self.get_type_kind(er) == TypeKind.TY_REF
+        let a_ref = self.get_type_kind(ar) == TypeKind.TY_REF
+        if e_ref and a_ref:
+            return self.aggregate_repr_differs(self.get_type_d0(er) as TypeId, self.get_type_d0(ar) as TypeId, 0) != 0
+        if e_ref:
+            return self.aggregate_repr_differs(self.get_type_d0(er) as TypeId, ar, 0) != 0
+        if a_ref:
+            return self.aggregate_repr_differs(er, self.get_type_d0(ar) as TypeId, 0) != 0
+        false
 
     mut fn note_call_arg_coercion(expected: i32, actual: i32, arg_node: i32, err_node: i32):
         if self.can_auto_ref_arg(expected, actual) != 0:
@@ -5703,6 +5733,9 @@ impl Sema:
     mut fn return_value_type_compatible(expected: i32, actual: i32) -> i32:
         if expected == 0 or actual == 0:
             return 1
+        // #1368: an aggregate's elements do not convert on return either.
+        if self.value_aggregate_repr_differs(expected, actual):
+            return 0
         if self.types_compatible(expected, actual) != 0:
             return 1
         if self.arithmetic_result_type(expected as TypeId, actual as TypeId) != 0:
@@ -5712,6 +5745,8 @@ impl Sema:
             let base_sym = self.get_generic_inst_base(expected_resolved as i32)
             if base_sym == self.syms.result and self.get_generic_inst_arg_count(expected_resolved as i32) == 2:
                 let ok_type = self.get_generic_inst_arg(expected_resolved as i32, 0)
+                if self.value_aggregate_repr_differs(ok_type, actual):
+                    return 0
                 if self.types_compatible(ok_type, actual) != 0:
                     return 1
                 if self.arithmetic_result_type(ok_type as TypeId, actual as TypeId) != 0:
@@ -11225,7 +11260,9 @@ impl Sema:
                 self.note_returned_transparent_view_effects(value)
                 self.check_returned_ephemeral_value_origins(value, node)
             if self.current_return_type != 0 and val_type != 0:
-                let compat = if self.has_contextual_copy_adjustment(value) != 0: 1 else: self.types_compatible(self.current_return_type as i32, val_type as i32)
+                // #1368: see value_aggregate_repr_differs.
+                let repr_differs = self.value_aggregate_repr_differs(self.current_return_type as i32, val_type as i32)
+                let compat = if repr_differs: 0 else: if self.has_contextual_copy_adjustment(value) != 0: 1 else: self.types_compatible(self.current_return_type as i32, val_type as i32)
                 let arith = if compat == 0: self.arithmetic_result_type(self.current_return_type, val_type) else: 1 as TypeId
                 if compat == 0:
                     if arith == 0:
@@ -11349,7 +11386,9 @@ impl Sema:
                 self.check_mutation_against_views(base_expr, node)
 
             if expected_value_type != 0 and value_type != 0:
-                if self.types_compatible(expected_value_type as TypeId, value_type as TypeId) == 0 and self.has_contextual_copy_adjustment(value) == 0:
+                if self.value_aggregate_repr_differs(expected_value_type, value_type):
+                    self.emit_aggregate_assignment_mismatch(expected_value_type, value_type, node)
+                else if self.types_compatible(expected_value_type as TypeId, value_type as TypeId) == 0 and self.has_contextual_copy_adjustment(value) == 0:
                     if self.arithmetic_result_type(expected_value_type as TypeId, value_type as TypeId) == 0:
                         self.emit_error("type mismatch in assignment", node)
 
@@ -11444,7 +11483,9 @@ impl Sema:
                 let assign_value_resolved = self.resolve_alias(value_type as TypeId)
                 if self.get_type_kind(assign_value_resolved) != TypeKind.TY_REF and self.get_type_kind(assign_value_resolved) != TypeKind.TY_NEVER:
                     self.emit_error("cannot assign an owned value to a reference-typed binding; annotate the binding's declared type to take an owned copy (e.g. `var x: T = ...`)", node)
-            if self.types_compatible(target_type as i32, value_type as i32) == 0 and self.has_contextual_copy_adjustment(value) == 0:
+            if self.value_aggregate_repr_differs(target_type as i32, value_type as i32):
+                self.emit_aggregate_assignment_mismatch(target_type as i32, value_type as i32, node)
+            else if self.types_compatible(target_type as i32, value_type as i32) == 0 and self.has_contextual_copy_adjustment(value) == 0:
                 if self.arithmetic_result_type(target_type, value_type) == 0:
                     self.emit_error("type mismatch in assignment", node)
 
@@ -12955,6 +12996,9 @@ impl Sema:
             else:
                 self.check_expr(elem)
             self.check_ephemeral_task_storage(elem, "array")
+            // #1368: an aggregate element's own elements do not convert.
+            if expected_elem != 0 and self.value_aggregate_repr_differs(expected_elem, et as i32):
+                self.emit_error("type mismatch in sequence literal element: expected `" ++ self.type_name(expected_elem) ++ "`, got `" ++ self.type_name(et as i32) ++ "`; an aggregate's elements do not convert", elem)
             elem_nodes.push(elem)
             elem_origins.push(elem)
             elem_types.push(et as i32)
@@ -13295,11 +13339,13 @@ impl Sema:
                         // *const i8) — pointer-type mixing is the unsafe
                         // tier's concern, not this check's.
                         let f_int_to_ptr = field_expected_kind == TypeKind.TY_PTR and (field_value_kind == TypeKind.TY_INT or field_value_kind == TypeKind.TY_PTR)
+                        // #1368: an aggregate's elements do not convert into a field.
+                        let f_repr_differs = self.value_aggregate_repr_differs(field_expected, val_ty as i32)
                         if not f_int_to_ptr and
                            self.type_is_union(field_expected) == 0 and
                            self.type_is_dyn_object(field_expected_resolved) == 0 and
-                           self.types_compatible(field_expected, val_ty as i32) == 0 and
-                           self.has_contextual_copy_adjustment(f_value) == 0:
+                           (f_repr_differs or (self.types_compatible(field_expected, val_ty as i32) == 0 and
+                           self.has_contextual_copy_adjustment(f_value) == 0)):
                             let f_label = if f_name != 0: "'" ++ self.pool_resolve(f_name) ++ "'" else: f"#{fi}"
                             self.emit_error("type mismatch in struct literal field " ++ f_label ++ ": expected " ++ self.type_name(field_expected) ++ ", got " ++ self.type_name(val_ty as i32), f_value)
                     if not self.ephemeral_types.contains(name):
@@ -17633,8 +17679,9 @@ impl Sema:
                 self.check_ephemeral_task_storage(if payload_arg_node > 0: payload_arg_node else: node, "enum payload")
                 if expected_ty != 0 and arg_ty != 0:
                     let payload_materializes_copy = self.record_contextual_copy_adjustment(payload_arg_node, expected_ty, arg_ty)
-                    if self.types_compatible(expected_ty, arg_ty) == 0 and payload_materializes_copy == 0:
-                        if self.arithmetic_result_type(expected_ty, arg_ty) == 0:
+                    // #1368: an aggregate payload's elements do not convert.
+                    if self.value_aggregate_repr_differs(expected_ty, arg_ty) or (self.types_compatible(expected_ty, arg_ty) == 0 and payload_materializes_copy == 0):
+                        if self.value_aggregate_repr_differs(expected_ty, arg_ty) or self.arithmetic_result_type(expected_ty, arg_ty) == 0:
                             let variant_name2: str = with_str_clone_ref(self.pool_resolve(fn_sym))
                             self.emit_argument_type_mismatch(variant_name2, fn_sym, ai, ai, expected_ty, arg_ty, if payload_arg_node > 0: payload_arg_node else: node)
             let resolved_variant_sym = self.qualified_enum_variant_sym(final_variant_ty as i32, fn_sym)
@@ -22501,8 +22548,9 @@ impl Sema:
                 self.check_ephemeral_task_storage(if static_payload_arg_node > 0: static_payload_arg_node else: node, "enum payload")
                 if expected_ty != 0 and arg_ty != 0:
                     let static_payload_materializes_copy = self.record_contextual_copy_adjustment(static_payload_arg_node, expected_ty, arg_ty)
-                    if self.types_compatible(expected_ty, arg_ty) == 0 and static_payload_materializes_copy == 0:
-                        if self.arithmetic_result_type(expected_ty, arg_ty) == 0:
+                    // #1368: an aggregate payload's elements do not convert.
+                    if self.value_aggregate_repr_differs(expected_ty, arg_ty) or (self.types_compatible(expected_ty, arg_ty) == 0 and static_payload_materializes_copy == 0):
+                        if self.value_aggregate_repr_differs(expected_ty, arg_ty) or self.arithmetic_result_type(expected_ty, arg_ty) == 0:
                             let owner_name = self.type_name(obj_type)
                             let variant_name: str = with_str_clone_ref(self.pool_resolve(field))
                             self.emit_argument_type_mismatch(owner_name ++ "." ++ variant_name, field, ai, ai, expected_ty, arg_ty, if static_payload_arg_node > 0: static_payload_arg_node else: node)
