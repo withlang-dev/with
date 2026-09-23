@@ -5,7 +5,7 @@
 //! expect-stdout: multiline miss
 //! expect-stdout: -3 1
 //! expect-stdout: -4 1
-//! expect-stdout: bare miss
+//! expect-stdout: option miss
 //! expect-stdout: -5 1
 //! expect-stdout: loud miss
 //! expect-stdout: i0
@@ -24,7 +24,8 @@
 
 // #1382: the else branch of `let PATTERN = EXPR else` takes every body form
 // a block takes (§29.13): inline item, indented multi-statement block, braced
-// inline and braced multi-line. The `else` without `:` follows §9.7's examples.
+// inline and braced multi-line, and a bare `else` takes one diverging
+// expression on the same line (§9.7, D58); on the next line it needs `else:`.
 
 enum Shape:
     Named(i32)
@@ -55,9 +56,9 @@ fn bare_inline(o: Option[i32]) -> i32:
     let Some(v) = o else return -4
     v
 
-fn bare_indented(o: Option[i32]) -> i32:
-    let Some(v) = o else
-        print("bare miss")
+fn indented_option(o: Option[i32]) -> i32:
+    let Some(v) = o else:
+        print("option miss")
         return -5
     v
 
@@ -95,7 +96,7 @@ fn main:
     print(f"{braced(None)} {braced(Some(1))}")
     print(f"{braced_multiline(None)} {braced_multiline(Some(1))}")
     print(f"{bare_inline(None)} {bare_inline(Some(1))}")
-    print(f"{bare_indented(None)} {bare_indented(Some(1))}")
+    print(f"{indented_option(None)} {indented_option(Some(1))}")
     print(f"{nested_control(None, true)} {nested_control(Some(1), true)}")
     print(f"{qualified(Shape.Named(3))} {qualified(Shape.Empty)} {shorthand_unit(Shape.Named(1))}")
     print(f"{tuple((Some(1), 2))} {tuple((None, 2))}")

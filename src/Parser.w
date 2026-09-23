@@ -7180,15 +7180,25 @@ impl Parser:
             else_body = self.parse_let_else_body(start)
         self.let_pattern_node(start, pat, value, else_body, is_mut, type_ann)
 
-    // The else branch of `let PATTERN = EXPR else BODY` (§9.7) takes the body
-    // forms of §29.13: inline item, indented block, braced. #1382: the newline
-    // after `else:` must reach parse_block_or_expr — it is what selects the
-    // indented-block form; skipping it first parsed only the block's first
-    // statement. An indented block must sit deeper than the line holding its
-    // `let` (§29.13: a colon ending the line with no indented block is a
-    // syntax error), or the next statement is silently taken as the branch.
+    // The else branch of `let PATTERN = EXPR else` (§9.7, D58) is a body in
+    // one of the §29.13 forms (inline item, indented block, braced) or a
+    // single diverging expression on the same line as `else`. A bare `else`
+    // ending the line is the no-introducer shape §29.13 rejects everywhere
+    // else: the error names the fix, and parsing continues as if the colon
+    // were there so the indented branch raises nothing further. #1382: the
+    // newline after `else:` must reach parse_block_or_expr — it is what
+    // selects the indented-block form. An indented block must sit deeper
+    // than the line holding its `let` (§29.13: a colon ending the line with
+    // no indented block is a syntax error), or the next statement is
+    // silently taken as the branch.
     mut fn parse_let_else_body(let_start: i32) -> NodeId:
-        if self.peek() == TokenKind.TK_COLON: self.advance()
+        if self.peek() == TokenKind.TK_COLON:
+            self.advance()
+        else if self.peek() == TokenKind.TK_NEWLINE:
+            let span = Span { file: self.file_id, start: self.prev_start(), end: self.prev_end() }
+            var diag = Diagnostic.err("expected ':' after 'else': a let-else branch on the next line is a body (§9.7)", span)
+            diag.add_help("write `else:` to introduce the indented block; only a single diverging expression may follow a bare `else`, on the same line")
+            self.diags.emit(move diag)
         if self.peek() == TokenKind.TK_NEWLINE:
             var line_start = let_start - column_of(self.source, let_start)
             while self.source[line_start] == ' ' or self.source[line_start] == '\t':
