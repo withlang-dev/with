@@ -5405,22 +5405,19 @@ impl Codegen:
                     self.mir_local_values.insert(dst_local, ssa_value)
                     self.mir_local_types.insert(dst_local, ssa_ty)
                     return true
-            if dst_ptr == 0:
-                if has_projections:
-                    with_eprint(f"error: cannot lower projected assignment in '{self.intern.resolve(self.current_function_name_sym)}' (MIR place {d0})")
-                    self.had_error = 1
-                    return false
-                let value_ty = wl_type_of(value)
-                // When sema type is str but value is a pointer (c_import coercion),
-                // use the str type for the alloca so the coerced struct fits.
-                let alloca_ty = if dst_ty != 0 and self.is_str_type(dst_ty) and wl_get_type_kind(value_ty) == wl_pointer_type_kind(): dst_ty else: value_ty
-                dst_ptr = self.mir_get_or_create_local_ptr(dst_local, alloca_ty)
-                self.mir_local_types.insert(dst_local, alloca_ty)
+            let creates_slot = dst_ptr == 0
+            if creates_slot and has_projections:
+                with_eprint(f"error: cannot lower projected assignment in '{self.intern.resolve(self.current_function_name_sym)}' (MIR place {d0})")
+                self.had_error = 1
+                return false
             var final_ty = dst_ty
             if final_ty == 0:
-                let final_ty_opt = self.mir_local_types.get(dst_local)
-                if final_ty_opt.is_some():
-                    final_ty = final_ty_opt.unwrap() as i64
+                if creates_slot:
+                    final_ty = wl_type_of(value)
+                else:
+                    let final_ty_opt = self.mir_local_types.get(dst_local)
+                    if final_ty_opt.is_some():
+                        final_ty = final_ty_opt.unwrap() as i64
             if final_ty == 0: return false
             var coerced = value
             if wl_type_of(value) != final_ty:
@@ -5438,6 +5435,20 @@ impl Codegen:
                         let operand_id = body.rval_d0[d1]
                         src_unsigned = self.mir_operand_is_unsigned(body, operand_id)
                     coerced = self.mir_coerce_value_to_sema_type(value, final_ty, dst_sema_ty, src_unsigned)
+            // A memory local's first assignment creates its slot, typed as the
+            // value the store below writes (#1444). Sizing it by the value
+            // BEFORE coercion stored the i32 a u8 discriminant was widened to
+            // through a 1-byte slot, and a match read garbage. Not by the
+            // declared type either: a coercion that does not apply leaves the
+            // value as it is (a Task handle `{ i32, ptr }` in a local MIR
+            // types as the awaited T, #1464; a Unit value), and the slot must
+            // hold those bytes. When sema type is str but the value is a
+            // pointer (c_import coercion), the str slot is kept.
+            if creates_slot:
+                let stored_ty = wl_type_of(coerced)
+                let alloca_ty = if dst_ty != 0 and self.is_str_type(dst_ty) and wl_get_type_kind(wl_type_of(value)) == wl_pointer_type_kind(): dst_ty else: stored_ty
+                dst_ptr = self.mir_get_or_create_local_ptr(dst_local, alloca_ty)
+                self.mir_local_types.insert(dst_local, alloca_ty)
             // Bitpacked field store: read-modify-write the backing integer
             let bp_store_proj = self.bitpacked_place_proj.get(d0)
             if bp_store_proj.is_some():

@@ -258,6 +258,40 @@ pub fn mir_test_indirect_call_arity() -> Unit:
     assert(indirect_arity_verdict(0).contains("declares 1"))
     assert(indirect_arity_verdict(1) == "")
 
+// #1444: a discriminant enum's discriminant is a value of its repr type.
+// MirLower assigned every discriminant to an i32 temp; codegen then stored
+// that i32 through the u8 slot it sized from the loaded value, and a match on
+// a u8 enum picked the wrong arm. This verifier said ok.
+fn discriminant_dest_verdict(dest_is_repr: bool) -> str:
+    var mir_mod = MirModule.init()
+    for kind in [0, TypeKind.TY_INT, TypeKind.TY_INT, TypeKind.TY_ENUM]:
+        mir_mod.sema_type_kinds.push(kind)
+        mir_mod.sema_type_d0.push(0)
+        mir_mod.sema_type_d1.push(0)
+        mir_mod.sema_type_d2.push(0)
+    let i32_ty = 1
+    let u8_ty = 2
+    let enum_ty = 3
+    mir_mod.sema_type_d0[i32_ty] = 32
+    mir_mod.sema_type_d0[u8_ty] = 8
+    mir_mod.sema_type_d1[u8_ty] = 1
+    mir_mod.sema_disc_repr_types.insert(enum_ty, u8_ty)
+    var body = MirBody.init_for_fn(1)
+    let subject_local = body.new_temp(enum_ty)
+    let subject = body.new_place(subject_local)
+    let dest_local = body.new_temp(if dest_is_repr: u8_ty else: i32_ty)
+    let dest = body.new_place(dest_local)
+    let entry = body.new_block()
+    let disc = body.new_rvalue(RvalueKind.RK_DISCRIMINANT, subject, 0, 0)
+    body.push_stmt(entry, StmtKind.Assign, dest, disc, 0)
+    body.set_terminator(entry, TermKind.TK_RETURN, 0, 0, 0, 0, 0)
+    let err = validate_typed_mir_body(mir_mod, body)
+    with_str_clone_ref(err.message)
+
+pub fn mir_test_discriminant_repr_dest() -> Unit:
+    assert(discriminant_dest_verdict(false).contains("discriminant of a ty=3 enum is its repr ty=2, assigned to ty=1"))
+    assert(discriminant_dest_verdict(true) == "")
+
 // #1394: a variant payload moved out on one arm and the whole enum dropped
 // at the join, with no reset-on-move blank of the payload. This is #1363's
 // MIR (`_8 = move _6<as v0>.f0`, then `drop(_6)`): the enum drop glue frees

@@ -3487,8 +3487,17 @@ fn validate_typed_mir_body(mir_mod: &MirModule, body: &MirBody) -> MirValidation
                 if mir_validate_place_type(mir_mod, body, rv_d1) == 0:
                     return mir_validation_fail(body.fn_sym, span, "ref rvalue does not resolve to a concrete place type")
             else if rk == RvalueKind.RK_ADDR_OF or rk == RvalueKind.RK_DISCRIMINANT or rk == RvalueKind.RK_LEN:
-                if mir_validate_place_type(mir_mod, body, rv_d0) == 0:
+                let rv_place_ty = mir_validate_place_type(mir_mod, body, rv_d0)
+                if rv_place_ty == 0:
                     return mir_validation_fail(body.fn_sym, span, "place-based rvalue does not resolve to a concrete place type")
+                // #1444 (§4.4a): a discriminant enum's discriminant is a value
+                // of its repr type; a narrower or wider destination reads or
+                // writes the wrong bytes (a u8 discriminant stored into an
+                // i32 temp picked the wrong match arm).
+                if rk == RvalueKind.RK_DISCRIMINANT:
+                    let repr = mir_validate_enum_repr_type(mir_mod, rv_place_ty)
+                    if repr != 0 and mir_mod.mir_resolve_alias(dest_ty) != mir_mod.mir_resolve_alias(repr):
+                        return mir_validation_fail(body.fn_sym, span, f"discriminant of a ty={rv_place_ty} enum is its repr ty={repr}, assigned to ty={dest_ty}")
             else if rk == RvalueKind.RK_SLICE:
                 if mir_validate_place_type(mir_mod, body, rv_d0) == 0:
                     return mir_validation_fail(body.fn_sym, span, "slice base does not resolve to a concrete place type")

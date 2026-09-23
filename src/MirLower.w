@@ -8692,9 +8692,16 @@ impl MirBuilder:
         self.switch_to(dead_bb)
         self.unit_operand()
 
+    // #1444 (§4.4a): a discriminant enum's discriminant is its repr value
+    // (`u8` … `u64`); every other enum's tag is i32.
+    mut fn enum_discriminant_type(place: i32) -> i32:
+        let repr = self.sema.enum_repr_type(self.place_local_type(place))
+        if repr != 0: repr else: self.sema.ty_i32 as i32
+
     mut fn lower_enum_discriminant(place: i32) -> i32:
         let rv = self.body.new_rvalue(RvalueKind.RK_DISCRIMINANT, place, 0, 0)
-        let disc_local = self.new_temp(self.sema.ty_i32)
+        let disc_ty = self.enum_discriminant_type(place)
+        let disc_local = self.new_temp(disc_ty)
         let disc_place = self.place_for_local(disc_local)
         self.body.push_stmt(self.cur_bb, StmtKind.Assign, disc_place, rv, 0)
         self.body.new_operand(OperandKind.OK_COPY, disc_place)
