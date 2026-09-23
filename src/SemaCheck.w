@@ -2542,6 +2542,7 @@ impl Sema:
             else if body_materializes_copy == 0 and self.type_is_ephemeral_value(body_ty as i32) != 0:
                 self.note_returned_transparent_view_effects(body)
                 self.check_returned_ephemeral_value_origins(body, body)
+            self.check_returned_closure_env(body, body)
         if body_expected_ret != 0 and body_expected_ret != self.ty_void and body_ty != 0 and body_ty != self.ty_void and body_ty != self.ty_never and self.body_has_explicit_value_result(body, 1) != 0:
             if self.return_value_type_compatible(body_expected_ret as i32, body_ty as i32) == 0 and body_materializes_copy == 0:
                 self.emit_error("return type mismatch", body)
@@ -9955,6 +9956,8 @@ impl Sema:
                 // (check_returned_ephemeral_value_origins after check_expr) runs post
                 // scope-teardown, so it cannot see a container binding's origins.
                 self.check_returned_ephemeral_value_origins(tail, tail)
+            if node == self.body_tail_block and tail_is_value != 0 and self.stmt_pos_depth == 0:
+                self.check_returned_closure_env(tail, tail)
         self.expire_dead_borrows_in_block(extra_start, stmt_count, stmt_count, 0)
 
         self.current_block_extra_start = saved_block_extra
@@ -11586,6 +11589,7 @@ impl Sema:
             else if self.has_contextual_copy_adjustment(value) == 0 and self.type_is_ephemeral_value(val_type as i32) != 0:
                 self.note_returned_transparent_view_effects(value)
                 self.check_returned_ephemeral_value_origins(value, node)
+            self.check_returned_closure_env(value, node)
             if self.current_return_type != 0 and val_type != 0:
                 // #1368: see value_aggregate_repr_differs.
                 let repr_differs = self.value_aggregate_repr_differs(self.current_return_type as i32, val_type as i32)
@@ -15976,6 +15980,41 @@ impl Sema:
             if (self.closure_capture_summary_eff(node, ci) & EFF_CAPTURE_BY_PLACE) != 0:
                 return 1
         0
+
+    // #1567 / §12.2: a closure's environment lives in the frame that created
+    // it — a by-place capture is a view of a local of that frame, and the
+    // copied Copy captures sit in a slot of that frame too. Returning such a
+    // closure hands out a pointer into a dead frame, so it is rejected here
+    // until closure values own their environment.
+    mut fn check_returned_closure_env(expr_node: i32, report_node: i32):
+        var peeled = expr_node
+        while peeled != 0 and self.ast.kind(peeled) == NodeKind.NK_GROUPED:
+            peeled = self.ast.get_data0(peeled)
+        if peeled == 0:
+            return
+        var closure_node = 0
+        if self.ast.kind(peeled) == NodeKind.NK_CLOSURE:
+            closure_node = peeled
+        else if self.ast.kind(peeled) == NodeKind.NK_IDENT:
+            // A binding's closure node is trusted only while its by-place
+            // origins are recorded on the binding (the map is keyed by name
+            // and outlives the scope that made it).
+            let sym = self.ast.get_data0(peeled)
+            if self.binding_closure_nodes.contains(sym) and self.binding_view_dep_count(sym) > 0:
+                closure_node = self.binding_closure_nodes.get(sym).unwrap()
+        if closure_node == 0:
+            return
+        let count = self.closure_capture_summary_count(closure_node)
+        if count == 0:
+            return
+        if self.ast.is_move_closure(closure_node) == 0:
+            for ci in 0..count:
+                let cap_sym = self.closure_capture_summary_sym(closure_node, ci)
+                if (self.closure_capture_summary_eff(closure_node, ci) & EFF_CAPTURE_BY_PLACE) != 0:
+                    let cap_name: str = with_str_clone_ref(self.pool_resolve(cap_sym))
+                    self.emit_error("returned closure captures `" ++ cap_name ++ "` by place and may outlive it (§12.2, §12.4); a returned closure must own its environment (`move ||`, #1567, not yet implemented)", report_node)
+                    return
+        self.emit_error("returned `move` closure keeps its environment in this call's frame, which dies at return; a returned closure must own its environment (#1567, not yet implemented)", report_node)
 
     mut fn check_closure(node: i32) -> i32:
         let body = self.ast.get_data0(node)
