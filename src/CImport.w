@@ -1103,6 +1103,9 @@ fn ci_record_decl_directly_demoted_cursor(session: i64, decl_cursor: i32) -> boo
     while i < nc:
         let child = with_ci_child(session, decl_cursor, i)
         if with_ci_cursor_kind(session, child) == CK_FIELD:
+            // §16.9: a record with bitfields is opaque, named or not.
+            if with_ci_cursor_is_bitfield(session, child) != 0:
+                return true
             let anon_decl = ci_field_cursor_anon_record_decl(session, child)
             if anon_decl >= 0:
                 if ci_record_decl_directly_demoted_cursor(session, anon_decl):
@@ -1217,14 +1220,17 @@ fn ci_translate_anon_record_cursor(session: i64, decl_cursor: i32, synth_name: &
 // type is itself demoted to opaque.
 
 fn ci_collect_demoted_types(session: i64, count: i32) -> str:
-    // Pass 1: collect directly demoted structs/unions
+    // Pass 1: collect directly demoted structs/unions. A leading underscore
+    // is a tag like any other: ci_translate_struct emits `_DCB` (winbase.h,
+    // bitfields) and `_SCOPE_TABLE_AMD64`, so they are demoted by the same
+    // rules — skipping them emitted bitfields as whole-word fields (#1396).
     var demoted = ""
     var i = 0
     while i < count:
         let kind = with_cimport_decl_kind(session, i)
         if kind == CK_STRUCT or kind == CK_UNION:
             let name = with_cimport_decl_name(session, i)
-            if name.len() > 0 and name[0] != 95:
+            if name.len() > 0:
                 if ci_is_directly_demoted(session, i, count):
                     demoted = demoted ++ "|" ++ name ++ "|"
         i = i + 1
@@ -1238,7 +1244,7 @@ fn ci_collect_demoted_types(session: i64, count: i32) -> str:
             let kind = with_cimport_decl_kind(session, i)
             if kind == CK_STRUCT or kind == CK_UNION:
                 let name = with_cimport_decl_name(session, i)
-                if name.len() > 0 and name[0] != 95:
+                if name.len() > 0:
                     if not ci_str_contains(demoted, "|" ++ name ++ "|"):
                         if ci_has_demoted_field(session, i, demoted):
                             demoted = demoted ++ "|" ++ name ++ "|"
@@ -1267,6 +1273,19 @@ fn ci_is_directly_demoted(session: i64, idx: i32, count: i32) -> bool:
             if ci_record_decl_directly_demoted_cursor(session, anon_decl):
                 return true
         fi = fi + 1
+    // A field placed below its natural alignment (`#pragma pack(2)`:
+    // wingdi.h's BITMAPFILEHEADER puts a DWORD at offset 2) has no With
+    // spelling: §16.4 rule 2 forbids `@[align(N)]` under the natural
+    // alignment, and `@[packed]` would drop the record's own alignment to 1.
+    // Like a bitfield layout, it imports opaque — usable by pointer — rather
+    // than as a declaration that fails to compile (#1396).
+    if with_cimport_struct_is_packed(session, idx) == 0 and with_cimport_decl_kind(session, idx) != CK_UNION:
+        fi = 0
+        while fi < field_count:
+            let align_n = ci_compute_field_alignment(session, idx, fi, field_count)
+            if align_n > 0 and align_n < with_cimport_struct_field_align(session, idx, fi) and with_cimport_struct_field_size(session, idx, fi) != 0:
+                return true
+            fi = fi + 1
     // Unsupported or opaque field type
     fi = 0
     while fi < field_count:
