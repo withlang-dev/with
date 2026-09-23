@@ -5351,7 +5351,14 @@ impl Parser:
         // function-pointer type (`extern "C" fn(...) -> T` or `fn(...) -> T`) begins
         // with a token that cannot start an expression. Indexing a value by such a
         // token is never valid, so parse a type and store it as the index node.
-        if self.peek() == TokenKind.TK_KW_EXTERN or self.peek() == TokenKind.TK_KW_FN:
+        // A raw pointer type is the same: `*` then `mut` or `const` never
+        // dereferences anything (`sizeof[*mut c_void]()`, which c_import emits
+        // for C's `sizeof(PVOID)`; #1396's winnt.h reached it next).
+        var starts_ptr_type = false
+        if self.peek() == TokenKind.TK_STAR and self.pos + 1 < self.tokens.len():
+            let after_star = self.tokens.get_tag(self.pos + 1)
+            starts_ptr_type = after_star == TokenKind.TK_KW_MUT or after_star == TokenKind.TK_KW_CONST
+        if self.peek() == TokenKind.TK_KW_EXTERN or self.peek() == TokenKind.TK_KW_FN or starts_ptr_type:
             let ty = self.parse_type_expr()
             self.skip_newlines()
             self.expect(TokenKind.TK_R_BRACKET)
