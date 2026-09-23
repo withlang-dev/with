@@ -13189,47 +13189,17 @@ impl Sema:
     mut fn emit_partial_statement_match_warning(message: &str, node: i32):
         self.emit_warning_code(message, node, "partial-statement-match")
 
-    // D43: a match with an empty arm, or a partial match on a bool or enum
-    // subject, is never a value (§9.7 requires an expression-position match to
-    // be exhaustive). Other subjects keep their existing value reading.
-    fn match_has_missing_arm(subject_type: i32, extra_start: i32, arm_count: i32) -> i32:
-        var has_catchall = 0
+    // D43: a match with an empty arm, or a partial match, is never a value
+    // (§9.7 requires an expression-position match to be exhaustive). Partial
+    // is the same pattern-matrix answer check_match_exhaustiveness gives
+    // (#1388); a sealed-trait subject keeps its value reading.
+    mut fn match_has_missing_arm(subject_type: i32, extra_start: i32, arm_count: i32) -> i32:
         for ai in 0..arm_count:
             let arm_node = self.ast.get_extra(extra_start + ai)
             if self.branch_arm_is_empty(self.ast.get_data1(arm_node)) != 0: return 1
-            if self.ast.get_data2(arm_node) == 0 and sema_pattern_is_catchall(self.ast, self.ast.get_data0(arm_node)): has_catchall = 1
-        if has_catchall != 0 or subject_type == 0: return 0
-        let resolved = self.resolve_alias(subject_type)
-        var tk = self.get_type_kind(resolved)
-        var enum_resolved = resolved
-        if tk == TypeKind.TY_GENERIC_INST:
-            let base_tid = self.lookup_named_type_visible(self.get_generic_inst_base(resolved as i32))
-            if base_tid != 0 and self.get_type_kind(self.resolve_alias(base_tid as TypeId)) == TypeKind.TY_ENUM:
-                enum_resolved = self.resolve_alias(base_tid as TypeId)
-                tk = TypeKind.TY_ENUM
-        if tk == TypeKind.TY_BOOL:
-            var has_true = 0
-            var has_false = 0
-            for ai in 0..arm_count:
-                let arm_node = self.ast.get_extra(extra_start + ai)
-                let pat = self.ast.get_data0(arm_node)
-                if self.ast.get_data2(arm_node) != 0 or self.ast.kind(pat) != NodeKind.NK_PAT_BOOL: continue
-                if self.ast.get_data0(pat) != 0: has_true = 1
-                else: has_false = 1
-            return if has_true == 0 or has_false == 0: 1 else: 0
-        if tk != TypeKind.TY_ENUM: return 0
-        var pos = self.get_type_d1(enum_resolved)
-        for vi in 0..self.get_type_d2(enum_resolved):
-            let v_name_sym = self.type_extra[pos]
-            var covered = 0
-            for ai in 0..arm_count:
-                let arm_node = self.ast.get_extra(extra_start + ai)
-                if self.ast.get_data2(arm_node) == 0 and sema_pattern_covers_variant(self.ast, self.ast.get_data0(arm_node), v_name_sym):
-                    covered = 1
-                    break
-            if covered == 0: return 1
-            pos = pos + 2 + self.type_extra[(pos + 1)]
-        0
+        if subject_type == 0: return 0
+        if self.get_type_kind(self.exh_shape_type(subject_type) as TypeId) == TypeKind.TY_TRAIT_OBJ: return 0
+        if self.match_missing_witness(subject_type, extra_start, arm_count).len() > 0: 1 else: 0
 
     mut fn check_match_exhaustiveness(node: i32, subject_type: i32, extra_start: i32, arm_count: i32, require_exhaustive: i32, warn_partial_statement_match: i32):
         if subject_type == 0:
@@ -13318,11 +13288,25 @@ impl Sema:
                         return
             return
 
-        // Enum exhaustiveness
-        if tk != TypeKind.TY_ENUM:
-            return
         if require_exhaustive == 0 and warn_partial_statement_match == 0:
             return
+        // Enum exhaustiveness: first the variants the arms name.
+        if tk == TypeKind.TY_ENUM and self.check_match_enum_variants(node, enum_resolved as i32, extra_start, arm_count, require_exhaustive) == 0:
+            return
+        // #1388: then every value, the inside of payloads, fields and tuple
+        // elements included — `Point { x: 0, y }` alone does not cover a
+        // Point, nor `Some(5)` an Option[i32], nor `0` an i32 (#994).
+        let witness = self.match_missing_witness(subject_type, extra_start, arm_count)
+        if witness.len() == 0:
+            return
+        let subject_text = self.type_name(subject_type)
+        if require_exhaustive != 0:
+            self.emit_error_with_help(f"non-exhaustive match on '{subject_text}': `{witness}` is not covered", node, "add an arm that matches it, or a `_` arm")
+        else:
+            self.emit_partial_statement_match_warning(f"partial statement-position match on '{subject_text}': `{witness}` is not covered", node)
+
+    // The top-level variant check; 0 when a missing variant was reported.
+    mut fn check_match_enum_variants(node: i32, enum_resolved: i32, extra_start: i32, arm_count: i32, require_exhaustive: i32) -> i32:
         let te_start = self.get_type_d1(enum_resolved)
         let variant_count = self.get_type_d2(enum_resolved)
         // Collect all variant name syms
@@ -13349,8 +13333,9 @@ impl Sema:
                     self.emit_error("non-exhaustive match: missing variant '" ++ variant_name ++ "'", node)
                 else:
                     self.emit_partial_statement_match_warning("partial statement-position match: missing variant '" ++ variant_name ++ "'", node)
-                return
+                return 0
             pos = pos + 2 + pc
+        1
 
 fn sema_pattern_is_catchall(ast: AstPool, pat: i32) -> bool:
     if pat == 0:
@@ -13382,6 +13367,486 @@ fn sema_pattern_covers_variant(ast: AstPool, pat: i32, variant_sym: i32) -> bool
             if sema_pattern_covers_variant(ast, inner, variant_sym):
                 return true
     false
+
+// #1388 (§9.7): exhaustiveness reads the whole pattern, not only its
+// top-level constructor. A pattern-matrix usefulness check (Maranget,
+// "Warnings for pattern matching", JFP 2007): one row per unguarded arm, one
+// column per subvalue still to test. A column's type fixes its
+// constructors: bool has `true`/`false`, an enum its variants, a tuple or a
+// struct its single constructor, a bounded integer the intervals its literal
+// and range patterns cut it into. Every other type (str, floats, dynamic
+// slices, 64-bit-unsigned and wider integers) is open: only a catch-all
+// covers it. `witness` names one value no row matches, per column.
+type SemaPatRows { cells: Vec[i32], count: i32 }
+type SemaPatMissing { missing: bool, witness: Vec[str] }
+
+enum SemaExhClass: i32:
+    Open = 0
+    Bool = 1
+    Enum = 2
+    Tuple = 3
+    Struct = 4
+    Int = 5
+
+impl Sema:
+    // The subject's own type: patterns see through `&` (§9.7 reference
+    // pattern ergonomics).
+    fn exh_shape_type(ty: i32) -> i32:
+        var t = ty
+        while t != 0:
+            let r = self.resolve_alias(t as TypeId)
+            if self.get_type_kind(r) != TypeKind.TY_REF:
+                return r as i32
+            t = self.get_type_d0(r)
+        0
+
+    // Field count of a struct (or generic struct instance); -1 otherwise.
+    fn exh_struct_field_count(ty: i32) -> i32:
+        let r = self.resolve_alias(ty as TypeId)
+        let tk = self.get_type_kind(r)
+        if tk == TypeKind.TY_STRUCT:
+            return self.get_type_d2(r)
+        if tk == TypeKind.TY_GENERIC_INST:
+            let base_tid = self.type_reflection_base_template(self.get_generic_inst_base(r as i32))
+            if base_tid != 0 and self.get_type_kind(self.resolve_alias(base_tid as TypeId)) == TypeKind.TY_STRUCT:
+                return self.get_type_d2(self.resolve_alias(base_tid as TypeId))
+        -1
+
+    fn exh_class(ty: i32) -> SemaExhClass:
+        if ty == 0:
+            return SemaExhClass.Open
+        let tk = self.get_type_kind(ty as TypeId)
+        if tk == TypeKind.TY_BOOL:
+            return SemaExhClass.Bool
+        if tk == TypeKind.TY_INT:
+            return SemaExhClass.Int
+        if tk == TypeKind.TY_TUPLE:
+            return SemaExhClass.Tuple
+        if self.enum_pattern_type(ty) != 0:
+            return SemaExhClass.Enum
+        if self.exh_struct_field_count(ty) >= 0:
+            return SemaExhClass.Struct
+        SemaExhClass.Open
+
+    // A fixed-size array matched by a slice pattern is decided at compile
+    // time (§9.7): the pattern either matches every value or none.
+    fn exh_slice_always_matches(pat: i32, ty: i32) -> bool:
+        if ty == 0 or self.get_type_kind(ty as TypeId) != TypeKind.TY_ARRAY:
+            return false
+        let len = self.get_type_d1(ty as TypeId)
+        let s_extra = self.ast.get_data0(pat)
+        let head = self.ast.get_data1(pat)
+        let tail = self.ast.get_extra(s_extra + 1 + head)
+        if self.ast.get_extra(s_extra) != 0: len >= head + tail else: len == head
+
+    // The pattern a row presents for a value of shape `ty`; 0 is a catch-all.
+    fn exh_head(pat: i32, ty: i32) -> i32:
+        var p = pat
+        while p != 0:
+            let k = self.ast.kind(p)
+            if k == NodeKind.NK_PAT_WILDCARD or k == NodeKind.NK_PAT_IDENT or k == NodeKind.NK_PAT_REST:
+                return 0
+            if k == NodeKind.NK_PAT_AT_BINDING:
+                p = self.ast.get_data1(p)
+                continue
+            if k == NodeKind.NK_PAT_TUPLE and self.ast.get_data1(p) == 0:
+                return 0
+            if k == NodeKind.NK_PAT_SLICE and self.exh_slice_always_matches(p, ty):
+                return 0
+            return p
+        0
+
+    // An or-pattern contributes one row per alternative.
+    fn exh_alternatives(pat: i32, ty: i32) -> Vec[i32]:
+        let out: Vec[i32] = Vec.new()
+        let h = self.exh_head(pat, ty)
+        if h != 0 and self.ast.kind(h) == NodeKind.NK_PAT_OR:
+            let or_start = self.ast.get_data0(h)
+            for oi in 0..self.ast.get_data1(h):
+                let alts = self.exh_alternatives(self.ast.get_extra(or_start + oi), ty)
+                for ai in 0..alts.len() as i32:
+                    out.push(alts[ai])
+            return out
+        out.push(h)
+        out
+
+    fn exh_constructor_count(cls: SemaExhClass, ty: i32) -> i32:
+        if cls == SemaExhClass.Bool:
+            return 2
+        if cls == SemaExhClass.Enum:
+            return self.type_reflection_variant_count(ty)
+        1
+
+    // The variant a variant pattern names, compared unqualified; the
+    // for-comprehension markers name Some/Ok and None/Err (check_pattern).
+    fn exh_variant_name(h: i32, ty: i32) -> i32:
+        let name = self.ast.get_data0(h)
+        let text = self.pool_resolve(name)
+        if text == "_Payload":
+            return if self.enum_has_variant(ty, self.syms.some) != 0: self.syms.some else: self.syms.ok
+        if text == "_Empty":
+            return if self.enum_has_variant(ty, self.syms.none) != 0: self.syms.none else: self.syms.err
+        self.unqualified_enum_variant_sym(name)
+
+    // Which constructor of the column a head pattern is; -1 for a pattern
+    // that tests a value without being a constructor (a literal, a named
+    // constant, a regex): it covers no constructor as a whole.
+    fn exh_constructor_of(h: i32, cls: SemaExhClass, ty: i32) -> i32:
+        let k = self.ast.kind(h)
+        if cls == SemaExhClass.Bool:
+            if k != NodeKind.NK_PAT_BOOL:
+                return -1
+            return if self.ast.get_data0(h) != 0: 1 else: 0
+        if cls == SemaExhClass.Tuple:
+            return if k == NodeKind.NK_PAT_TUPLE: 0 else: -1
+        if cls == SemaExhClass.Struct:
+            if k == NodeKind.NK_PAT_STRUCT:
+                return 0
+            if k == NodeKind.NK_PAT_VARIANT and self.ast.get_data2(h) != 0 and not self.pattern_value_syms.contains(h):
+                return 0
+            return -1
+        if cls == SemaExhClass.Enum:
+            if k != NodeKind.NK_PAT_VARIANT and k != NodeKind.NK_PAT_ENUM_SHORTHAND:
+                return -1
+            if self.pattern_value_syms.contains(h):
+                return -1
+            let name = self.exh_variant_name(h, ty)
+            for vi in 0..self.type_reflection_variant_count(ty):
+                if self.unqualified_enum_variant_sym(self.type_reflection_variant_name(ty, vi)) == name:
+                    return vi
+        -1
+
+    mut fn exh_constructor_field_types(cls: SemaExhClass, ty: i32, ctor: i32) -> Vec[i32]:
+        var out: Vec[i32] = Vec.new()
+        if cls == SemaExhClass.Tuple:
+            let elem_start = self.get_type_d0(ty as TypeId)
+            for ti in 0..self.get_type_d1(ty as TypeId):
+                out.push(self.type_extra[(elem_start + ti)])
+        else if cls == SemaExhClass.Struct:
+            for fi in 0..self.exh_struct_field_count(ty):
+                out.push(self.type_reflection_field_type(ty, fi))
+        else if cls == SemaExhClass.Enum:
+            out = self.enum_variant_payload_types(ty, self.type_reflection_variant_name(ty, ctor))
+        out
+
+    // The sub-patterns a head pattern of constructor `ctor` gives each of
+    // its `arity` fields; 0 (a catch-all) for a field it leaves unstated.
+    fn exh_constructor_fields(h: i32, cls: SemaExhClass, ty: i32, arity: i32) -> Vec[i32]:
+        let out: Vec[i32] = Vec.new()
+        if h == 0:
+            for _ in 0..arity:
+                out.push(0)
+            return out
+        let k = self.ast.kind(h)
+        if k == NodeKind.NK_PAT_TUPLE:
+            let t_start = self.ast.get_data0(h)
+            let t_count = self.ast.get_data1(h)
+            for ti in 0..arity:
+                out.push(if ti < t_count: self.ast.get_extra(t_start + ti) else: 0)
+            return out
+        if k == NodeKind.NK_PAT_STRUCT:
+            let s_start = self.ast.get_data1(h)
+            let s_count = self.ast.get_data2(h)
+            for fi in 0..arity:
+                let fname = self.type_reflection_field_name(ty, fi)
+                var fpat = 0
+                for si in 0..s_count:
+                    if self.ast.get_extra(s_start + 1 + si * 2) == fname:
+                        fpat = self.ast.get_extra(s_start + 1 + si * 2 + 1)
+                out.push(fpat)
+            return out
+        // Variant payloads and positional struct fields: in order, `..`
+        // standing for every remaining one. An entry that is not a pattern
+        // node inside this pattern is a plain binding (MirLower's
+        // pattern_payload_node reads the same shape).
+        let p_start = self.ast.get_data1(h)
+        let p_count = self.ast.get_data2(h)
+        var rest = false
+        for pi in 0..arity:
+            var entry = 0
+            if not rest and pi < p_count:
+                entry = self.ast.get_extra(p_start + pi)
+                if entry == h or not self.ast.is_pattern_node(entry) or self.ast.get_start(entry) < self.ast.get_start(h) or self.ast.get_end(entry) > self.ast.get_end(h):
+                    entry = 0
+                else if self.ast.kind(entry) == NodeKind.NK_PAT_REST:
+                    rest = true
+                    entry = 0
+            out.push(entry)
+        out
+
+    // Bounds of a bounded integer column; open when the type's range does
+    // not fit an i64 interval (u64, usize, 128-bit).
+    fn exh_int_domain_open(ty: i32) -> bool:
+        let bits = self.get_type_d0(ty as TypeId)
+        let signed = self.get_type_d1(ty as TypeId)
+        bits > 64 or (bits == 64 and signed == 0)
+
+    fn exh_int_domain_lo(ty: i32) -> i64:
+        let bits = self.get_type_d0(ty as TypeId)
+        if self.get_type_d1(ty as TypeId) == 0:
+            return 0
+        let one: i64 = 1
+        if bits >= 64: -9223372036854775807 - 1 else: 0 - (one << (bits - 1) as u64)
+
+    fn exh_int_domain_hi(ty: i32) -> i64:
+        let bits = self.get_type_d0(ty as TypeId)
+        let one: i64 = 1
+        if self.get_type_d1(ty as TypeId) == 0:
+            if bits >= 64: return 9223372036854775807
+            return (one << bits as u64) - 1
+        if bits >= 64: 9223372036854775807 else: (one << (bits - 1) as u64) - 1
+
+    // The value interval an integer head covers, as [lo, hi]; hi < lo when
+    // it is not an integer literal or range (a named constant, say).
+    fn exh_int_interval_lo(h: i32) -> i64:
+        let k = self.ast.kind(h)
+        if k == NodeKind.NK_PAT_INT:
+            return self.ast.int_lit_value(h as NodeId)
+        if k == NodeKind.NK_PAT_RANGE:
+            return self.ast.get_data0(h) as i64
+        1
+
+    fn exh_int_interval_hi(h: i32) -> i64:
+        let k = self.ast.kind(h)
+        if k == NodeKind.NK_PAT_INT:
+            return self.ast.int_lit_value(h as NodeId)
+        if k == NodeKind.NK_PAT_RANGE:
+            let hi = self.ast.get_data1(h) as i64
+            return if self.ast.get_data2(h) != 0: hi else: hi - 1
+        0
+
+    fn exh_render(cls: SemaExhClass, ty: i32, ctor: i32, fields: &Vec[str]) -> str:
+        if cls == SemaExhClass.Bool:
+            return if ctor != 0: "true" else: "false"
+        var parts = ""
+        if cls == SemaExhClass.Struct:
+            var omitted = false
+            for fi in 0..fields.len() as i32:
+                if fields[fi] == "_":
+                    omitted = true
+                    continue
+                let fname: str = with_str_clone_ref(self.pool_resolve(self.type_reflection_field_name(ty, fi)))
+                parts = if parts.len() == 0: fname ++ ": " ++ fields[fi] else: parts ++ ", " ++ fname ++ ": " ++ fields[fi]
+            if omitted:
+                parts = if parts.len() == 0: ".." else: parts ++ ", .."
+            let sname: str = with_str_clone_ref(self.pool_resolve(self.get_type_d0(ty as TypeId)))
+            return sname ++ " { " ++ parts ++ " }"
+        for fi in 0..fields.len() as i32:
+            parts = if fi == 0: fields[fi].clone() else: parts ++ ", " ++ fields[fi]
+        if cls == SemaExhClass.Tuple:
+            return if fields.len() == 1: "(" ++ parts ++ ",)" else: "(" ++ parts ++ ")"
+        let vname: str = with_str_clone_ref(self.pool_resolve(self.unqualified_enum_variant_sym(self.type_reflection_variant_name(ty, ctor))))
+        if fields.len() == 0: vname else: vname ++ "(" ++ parts ++ ")"
+
+    // Is some value of the columns `tys` matched by no row of `m`?
+    mut fn exh_missing(m: &SemaPatRows, tys: &Vec[i32]) -> SemaPatMissing:
+        let width = tys.len() as i32
+        if m.count == 0:
+            let all: Vec[str] = Vec.new()
+            for _ in 0..width:
+                all.push("_")
+            return SemaPatMissing { missing: true, witness: all }
+        if width == 0:
+            return SemaPatMissing { missing: false, witness: Vec.new() }
+        let ty = self.exh_shape_type(tys[0])
+        let cls = self.exh_class(ty)
+        // Column 0's heads, one per or-alternative, and the row each came from.
+        let heads: Vec[i32] = Vec.new()
+        let origins: Vec[i32] = Vec.new()
+        for ri in 0..m.count:
+            let alts = self.exh_alternatives(m.cells[ri * width], ty)
+            for ai in 0..alts.len() as i32:
+                heads.push(alts[ai])
+                origins.push(ri)
+        let rest_tys: Vec[i32] = Vec.new()
+        for ci in 1..width:
+            rest_tys.push(tys[ci])
+
+        if cls == SemaExhClass.Int and not self.exh_int_domain_open(ty):
+            return self.exh_missing_int(m, &heads, &origins, &rest_tys, ty)
+
+        if cls == SemaExhClass.Bool or cls == SemaExhClass.Enum or cls == SemaExhClass.Tuple or cls == SemaExhClass.Struct:
+            let ctor_count = self.exh_constructor_count(cls, ty)
+            var first_absent = -1
+            for ctor in 0..ctor_count:
+                var present = cls == SemaExhClass.Tuple or cls == SemaExhClass.Struct
+                for hi in 0..heads.len() as i32:
+                    if heads[hi] != 0 and self.exh_constructor_of(heads[hi], cls, ty) == ctor:
+                        present = true
+                        break
+                if not present and first_absent < 0:
+                    first_absent = ctor
+            if first_absent < 0:
+                // Every constructor appears: a value is missing only inside one.
+                for ctor in 0..ctor_count:
+                    let field_tys = self.exh_constructor_field_types(cls, ty, ctor)
+                    let arity = field_tys.len() as i32
+                    let sub_tys: Vec[i32] = Vec.new()
+                    for fi in 0..arity:
+                        sub_tys.push(field_tys[fi])
+                    for ci in 0..rest_tys.len() as i32:
+                        sub_tys.push(rest_tys[ci])
+                    let sub_width = sub_tys.len() as i32
+                    let cells: Vec[i32] = Vec.new()
+                    var count = 0
+                    for hi in 0..heads.len() as i32:
+                        let h = heads[hi]
+                        if h != 0 and self.exh_constructor_of(h, cls, ty) != ctor:
+                            continue
+                        let fields = self.exh_constructor_fields(h, cls, ty, arity)
+                        for fi in 0..arity:
+                            cells.push(fields[fi])
+                        for ci in 1..width:
+                            cells.push(m.cells[origins[hi] * width + ci])
+                        count = count + 1
+                    let sub = self.exh_missing(SemaPatRows { cells: cells, count: count }, &sub_tys)
+                    if sub.missing:
+                        let field_ws: Vec[str] = Vec.new()
+                        for fi in 0..arity:
+                            field_ws.push(sub.witness[fi].clone())
+                        let w: Vec[str] = Vec.new()
+                        w.push(self.exh_render(cls, ty, ctor, &field_ws))
+                        for ci in arity..sub_width:
+                            w.push(sub.witness[ci].clone())
+                        return SemaPatMissing { missing: true, witness: w }
+                return SemaPatMissing { missing: false, witness: Vec.new() }
+            let dflt = self.exh_default_rows(m, &heads, &origins, width)
+            let sub = self.exh_missing(dflt, &rest_tys)
+            if not sub.missing:
+                return sub
+            let field_tys = self.exh_constructor_field_types(cls, ty, first_absent)
+            let blanks: Vec[str] = Vec.new()
+            for _ in 0..field_tys.len() as i32:
+                blanks.push("_")
+            let w: Vec[str] = Vec.new()
+            w.push(self.exh_render(cls, ty, first_absent, &blanks))
+            for ci in 0..sub.witness.len() as i32:
+                w.push(sub.witness[ci].clone())
+            return SemaPatMissing { missing: true, witness: w }
+
+        // Open column: only the catch-all rows reach the next column.
+        let dflt = self.exh_default_rows(m, &heads, &origins, width)
+        let sub = self.exh_missing(dflt, &rest_tys)
+        if not sub.missing:
+            return sub
+        let w: Vec[str] = Vec.new()
+        w.push("_")
+        for ci in 0..sub.witness.len() as i32:
+            w.push(sub.witness[ci].clone())
+        SemaPatMissing { missing: true, witness: w }
+
+    // The rows whose column-0 head is a catch-all, without that column.
+    fn exh_default_rows(m: &SemaPatRows, heads: &Vec[i32], origins: &Vec[i32], width: i32) -> SemaPatRows:
+        let cells: Vec[i32] = Vec.new()
+        var count = 0
+        for hi in 0..heads.len() as i32:
+            if heads[hi] != 0:
+                continue
+            for ci in 1..width:
+                cells.push(m.cells[origins[hi] * width + ci])
+            count = count + 1
+        SemaPatRows { cells: cells, count: count }
+
+    // A bounded integer column: the heads' literal and range intervals cut
+    // the type's range into segments no head straddles. When every segment
+    // lies inside some head, each segment is a constructor; otherwise the
+    // first uncovered segment (nearest zero) is the witness.
+    mut fn exh_missing_int(m: &SemaPatRows, heads: &Vec[i32], origins: &Vec[i32], rest_tys: &Vec[i32], ty: i32) -> SemaPatMissing:
+        let width = rest_tys.len() as i32 + 1
+        let dom_lo = self.exh_int_domain_lo(ty)
+        let dom_hi = self.exh_int_domain_hi(ty)
+        let cuts: Vec[i64] = Vec.new()
+        cuts.push(dom_lo)
+        for hi in 0..heads.len() as i32:
+            let h = heads[hi]
+            if h == 0:
+                continue
+            let lo = self.exh_int_interval_lo(h)
+            let top = self.exh_int_interval_hi(h)
+            if top < lo or top < dom_lo or lo > dom_hi:
+                continue
+            if lo > dom_lo:
+                cuts.push(lo)
+            if top < dom_hi:
+                cuts.push(top + 1)
+        // Sort and dedupe the segment starts.
+        for i in 1..cuts.len() as i32:
+            var j = i
+            while j > 0 and cuts[j - 1] > cuts[j]:
+                let t: i64 = cuts[j]
+                cuts[j] = cuts[j - 1]
+                cuts[j - 1] = t
+                j = j - 1
+        let starts: Vec[i64] = Vec.new()
+        for i in 0..cuts.len() as i32:
+            if starts.len() == 0 or starts[starts.len() as i32 - 1] != cuts[i]:
+                starts.push(cuts[i])
+        var witness_set = false
+        var witness_value: i64 = 0
+        for si in 0..starts.len() as i32:
+            let seg_lo = starts[si]
+            let seg_hi = if si + 1 < starts.len() as i32: starts[si + 1] - 1 else: dom_hi
+            var covered = false
+            for hi in 0..heads.len() as i32:
+                let h = heads[hi]
+                if h != 0 and self.exh_int_interval_lo(h) <= seg_lo and seg_hi <= self.exh_int_interval_hi(h):
+                    covered = true
+                    break
+            if covered:
+                continue
+            let near = if seg_lo <= 0 and 0 <= seg_hi: 0 else if seg_lo > 0: seg_lo else: seg_hi
+            let near_abs = if near < 0: 0 - near else: near
+            let best_abs = if witness_value < 0: 0 - witness_value else: witness_value
+            if not witness_set or near_abs < best_abs or (near_abs == best_abs and near > witness_value):
+                witness_set = true
+                witness_value = near
+        if witness_set:
+            let dflt = self.exh_default_rows(m, heads, origins, width)
+            let sub = self.exh_missing(dflt, rest_tys)
+            if not sub.missing:
+                return sub
+            // With no literal in the column any value is the witness.
+            let w: Vec[str] = Vec.new()
+            w.push(if starts.len() == 1: "_" else: int_to_string(witness_value))
+            for ci in 0..sub.witness.len() as i32:
+                w.push(sub.witness[ci].clone())
+            return SemaPatMissing { missing: true, witness: w }
+        for si in 0..starts.len() as i32:
+            let seg_lo = starts[si]
+            let seg_hi = if si + 1 < starts.len() as i32: starts[si + 1] - 1 else: dom_hi
+            let cells: Vec[i32] = Vec.new()
+            var count = 0
+            for hi in 0..heads.len() as i32:
+                let h = heads[hi]
+                if h != 0 and not (self.exh_int_interval_lo(h) <= seg_lo and seg_hi <= self.exh_int_interval_hi(h)):
+                    continue
+                for ci in 1..width:
+                    cells.push(m.cells[origins[hi] * width + ci])
+                count = count + 1
+            let sub = self.exh_missing(SemaPatRows { cells: cells, count: count }, rest_tys)
+            if sub.missing:
+                let w: Vec[str] = Vec.new()
+                w.push(int_to_string(seg_lo))
+                for ci in 0..sub.witness.len() as i32:
+                    w.push(sub.witness[ci].clone())
+                return SemaPatMissing { missing: true, witness: w }
+        SemaPatMissing { missing: false, witness: Vec.new() }
+
+    // A value of `subject_type` that no unguarded arm of the match
+    // matches, or "" when the arms are exhaustive.
+    mut fn match_missing_witness(subject_type: i32, extra_start: i32, arm_count: i32) -> str:
+        let cells: Vec[i32] = Vec.new()
+        var count = 0
+        for ai in 0..arm_count:
+            let arm_node = self.ast.get_extra(extra_start + ai)
+            if self.ast.get_data2(arm_node) != 0:
+                continue
+            cells.push(self.ast.get_data0(arm_node))
+            count = count + 1
+        let tys: Vec[i32] = Vec.new()
+        tys.push(subject_type)
+        let r = self.exh_missing(SemaPatRows { cells: cells, count: count }, &tys)
+        if not r.missing: "" else: r.witness[0].clone()
 
 impl Sema:
     fn generic_type_param_index(tp_start: i32, tp_count: i32, param_sym: i32) -> i32:
@@ -14488,14 +14953,30 @@ impl Sema:
         if kind == NodeKind.NK_PAT_STRUCT:
             let sp_extra = self.ast.get_data1(node)
             let sp_count = self.ast.get_data2(node)
-            let has_rest = self.ast.get_extra(sp_extra)
-            var field_start = 0
-            var field_count = 0
             let subject_shape_type = self.pattern_subject_shape_type(subject_type)
             let resolved = self.resolve_alias(subject_shape_type as TypeId)
-            if self.get_type_kind(resolved) == TypeKind.TY_STRUCT:
-                field_start = self.get_type_d1(resolved)
-                field_count = self.get_type_d2(resolved)
+            let resolved_kind = self.get_type_kind(resolved)
+            // #1388: a struct pattern reads the fields of a struct subject;
+            // anything else has no fields to test, and MIR would bind or
+            // test nothing (an enum subject once reached codegen untyped).
+            var struct_ok = resolved_kind != TypeKind.TY_ERR and subject_type != 0
+            if struct_ok and self.exh_struct_field_count(resolved as i32) < 0:
+                self.emit_error("struct pattern requires a struct subject, found '" ++ self.type_name(subject_type) ++ "'", node)
+                struct_ok = false
+            let pat_type_name = self.ast.get_data0(node)
+            if struct_ok and pat_type_name != 0 and self.get_type_d0(resolved) != pat_type_name and self.resolve_alias(self.lookup_named_type_visible(pat_type_name) as TypeId) != resolved:
+                self.emit_error("struct pattern '" ++ self.pool_resolve(pat_type_name) ++ "' does not match subject type '" ++ self.type_name(subject_type) ++ "'", node)
+                struct_ok = false
+            if not struct_ok:
+                // A rejected pattern still binds its names, so the error stands alone.
+                for spi in 0..sp_count:
+                    let f_pat = self.ast.get_extra(sp_extra + 1 + spi * 2 + 1)
+                    if f_pat != 0:
+                        self.check_pattern(f_pat, 0)
+                    else:
+                        self.scope_put(self.ast.get_extra(sp_extra + 1 + spi * 2), 0, 0)
+                return
+            let field_count = self.type_reflection_field_count(resolved as i32)
             let first_named = if sp_count > 0: self.ast.get_extra(sp_extra + 1) else: 0
             // A rejected pattern still binds its names, so the error stands alone.
             let drop_owner = self.drop_pattern_gate(node, subject_type, first_named)
@@ -14522,10 +15003,11 @@ impl Sema:
                 let f_pat = self.ast.get_extra(sp_extra + 1 + spi * 2 + 1)
                 var field_ty = 0
                 for fi in 0..field_count:
-                    let name_sym = self.type_extra[(field_start + fi * 3)]
-                    if name_sym == f_name:
-                        field_ty = self.type_extra[(field_start + fi * 3 + 1)]
+                    if self.type_reflection_field_name(resolved as i32, fi) == f_name:
+                        field_ty = self.type_reflection_field_type(resolved as i32, fi)
                         break
+                if field_ty == 0:
+                    self.emit_error("struct pattern names no field '" ++ self.pool_resolve(f_name) ++ "' of '" ++ self.type_name(subject_type) ++ "'", node)
                 let binding_ty = self.pattern_child_subject_type(subject_type, field_ty)
                 // #607: destructuring a needs-drop field (incl. Vec[Drop]) out of a
                 // by-value struct is a move into the binding; the pattern-lowering

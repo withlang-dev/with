@@ -8892,7 +8892,8 @@ impl MirBuilder:
             let sp_has_rest = self.ast.get_extra(sp_extra)
             let sp_tail_count = self.ast.get_extra(sp_extra + 1 + sp_head)
             // Get array length from scrutinee sema type
-            let sp_arr_ty = self.place_local_type(scrutinee_place)
+            let sp_shape_place = self.pattern_shape_place(scrutinee_place)
+            let sp_arr_ty = self.sema.resolve_alias(self.place_local_type(sp_shape_place) as TypeId) as i32
             let sp_arr_tk = self.sema.get_type_kind(sp_arr_ty)
             if sp_arr_tk == TypeKind.TY_ARRAY:
                 let sp_arr_len = self.sema.get_type_d1(sp_arr_ty)
@@ -8910,8 +8911,55 @@ impl MirBuilder:
                         self.terminate(TermKind.TK_GOTO, fail_bb, 0, 0, 0)
                 return
 
-        // Other patterns (struct) are conservatively accepted here.
-        self.terminate(TermKind.TK_GOTO, arm_bb, 0, 0, 0)
+        // #1388: a named-field struct pattern tests every refutable field
+        // sub-pattern, exactly as the positional and tuple forms do. This
+        // used to fall into the accept-everything default below, so
+        // `Point { x: 0, y }` matched any `x`.
+        if pk == NodeKind.NK_PAT_STRUCT:
+            let s_start = self.ast.get_data1(pat_node)
+            let s_count = self.ast.get_data2(pat_node)
+            let struct_subject_place = self.pattern_shape_place(scrutinee_place)
+            let struct_ty = self.place_local_type(struct_subject_place)
+            var cur_test_bb = self.cur_bb
+            for si in 0..s_count:
+                let field_pat = self.ast.get_extra(s_start + 1 + si * 2 + 1)
+                if field_pat == 0:
+                    continue
+                let field_pk = self.ast.kind(field_pat)
+                if field_pk == NodeKind.NK_PAT_WILDCARD or field_pk == NodeKind.NK_PAT_IDENT:
+                    continue
+                let field_name = self.ast.get_extra(s_start + 1 + si * 2)
+                let field_ty = self.struct_pattern_field_type(struct_ty, field_name)
+                if field_ty == 0:
+                    self.terminate(TermKind.TK_GOTO, fail_bb, 0, 0, 0)
+                    return
+                let field_place = self.body.new_field_place(struct_subject_place, field_name, field_ty)
+                let child_place = self.pattern_child_subject_place(scrutinee_place, field_place, self.ast.get_start(pat_node))
+                let next_test_bb = self.new_block()
+                self.switch_to(cur_test_bb)
+                self.lower_pattern_match(child_place, field_pat, next_test_bb, fail_bb)
+                cur_test_bb = next_test_bb
+            self.switch_to(cur_test_bb)
+            self.terminate(TermKind.TK_GOTO, arm_bb, 0, 0, 0)
+            return
+
+        // A pattern with no test lowering must not match silently: a
+        // pattern that reaches here would otherwise accept every value.
+        eprint(f"error: pattern kind {pk as i32} has no match-test lowering")
+        self.mark_unsupported()
+        self.terminate(TermKind.TK_GOTO, fail_bb, 0, 0, 0)
+
+    // The type of the field a named-field struct pattern names, read from
+    // the subject's struct (or generic struct instance) type. Sema has
+    // rejected an unknown field; reaching one here is loud.
+    mut fn struct_pattern_field_type(struct_ty: i32, field_name: i32) -> i32:
+        let resolved = self.sema.resolve_alias(struct_ty as TypeId) as i32
+        for fi in 0..self.sema.type_reflection_field_count(resolved):
+            if self.sema.type_reflection_field_name(resolved, fi) == field_name:
+                return self.sema.type_reflection_field_type_frozen(resolved, fi)
+        eprint("error: struct pattern field reached MIR lowering without a field of the subject type")
+        self.mark_unsupported()
+        0
 
     mut fn lower_pattern(pat_node: i32, scrutinee_place: i32) -> Vec[i32]:
         let out: Vec[i32] = Vec.new()
@@ -9074,10 +9122,16 @@ impl MirBuilder:
             let s_start = self.ast.get_data1(pat_node)
             let s_count = self.ast.get_data2(pat_node)
             let struct_subject_place = self.pattern_shape_place(scrutinee_place)
+            let struct_ty = self.place_local_type(struct_subject_place)
             for si in 0..s_count:
                 let field_name = self.ast.get_extra(s_start + 1 + si * 2)
                 let field_pat = self.ast.get_extra(s_start + 1 + si * 2 + 1)
-                let field_place = self.body.new_field_place(struct_subject_place, field_name, 0)
+                // A generic struct instance's field type is the substituted
+                // one; left 0 the place had no MIR type.
+                let field_ty = self.struct_pattern_field_type(struct_ty, field_name)
+                if field_ty == 0:
+                    return out
+                let field_place = self.body.new_field_place(struct_subject_place, field_name, field_ty)
                 let child_place = self.pattern_child_subject_place(scrutinee_place, field_place, self.ast.get_start(pat_node))
                 if field_pat != 0:
                     let inner = self.lower_pattern(field_pat, child_place)
