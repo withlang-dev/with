@@ -2510,6 +2510,11 @@ When a function's return type implements the `Default` trait and the
 body's last expression is `Unit` (a statement like `print`), the
 compiler implicitly returns `T.default()`.
 
+The implicit default applies only when the tail's own type is `Unit`. A
+tail of any other type is the body's value: it must match the declared
+return type or it is a type error. The compiler never discards a tail's
+value to substitute `T.default()`.
+
 ```
 // Before: manual trailing 0
 fn demo_strings -> i32:
@@ -3416,7 +3421,9 @@ type; a value on one path and fall-off on another is a missing return
 same way.
 
 An assignment `place = value` is an expression whose type is the type of
-`place`; in statement or tail position its value is discarded.
+`place`. In statement position its value is discarded. As the tail of a body
+whose declared return type is not `Unit`, the body yields a read of `place`
+after the store, under the ordinary copy and move rules.
 
 Function bodies support three interchangeable forms (§29.13):
 
