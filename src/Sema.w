@@ -2768,6 +2768,13 @@ fn Sema.init(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Sema:
     cstr_field_types.push(s.ty_i64 as i32)
     s.ty_cstr = s.register_builtin_struct_type("CStr", cstr_field_names, cstr_field_types, 2) as TypeId
     s.ty_cstr_view = s.add_type(TypeKind.TY_REF, s.ty_cstr, 0, 0)
+    // A `CStr` is a view of NUL-terminated bytes something else owns — a C
+    // string literal's static storage, a `CString`, a modeled resource or a
+    // foreign-state domain (D51 §41, spec §16.2b.8) — never the owner, so
+    // the value is ephemeral (§5): it takes the origins of what produced it,
+    // cannot be stored past them, and a borrowed `CStr` a facade returns is
+    // kept inside its origin's life by the ordinary view analysis.
+    s.ephemeral_types.insert(s.pool_intern("CStr"), 1)
 
     // Sub-byte and non-standard integer widths for bitpacked structs.
     for w in 1..8:

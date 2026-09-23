@@ -108,6 +108,85 @@ impl CStr:
     /// outlives the C storage.
     pub fn to_owned() -> str: with_str_from_bytes(self.ptr as *const u8, self.len)
 
+    /// The bytes as With text, validated (D51 §41, spec §16.2b.8): a view of
+    /// the same storage — no copy — when every byte is well-formed UTF-8, or
+    /// `Err(.InvalidAt(offset))` naming the first byte that is not. Nothing
+    /// is repaired silently; `to_str_lossy` makes repair explicit. `str` and
+    /// `CStr` share a `{ptr, len}` layout, so the view is a reinterpret.
+    pub fn to_str() -> Result[&str, Utf8Error]:
+        let bad = unsafe { utf8_first_invalid(self.ptr as *const u8, self.len) }
+        if bad >= 0: return Err(.InvalidAt(bad))
+        Ok(unsafe { (self as *const CStr as *const str) as &str })
+
+    /// An owned copy with every ill-formed sequence replaced by U+FFFD, the
+    /// replacement character — repair spelled out (D51 §41).
+    pub fn to_str_lossy() -> str:
+        var sb = StringBuilder.new()
+        var i: i64 = 0
+        while i < self.len:
+            let n = unsafe { utf8_sequence_len(self.ptr as *const u8, i, self.len) }
+            if n == 0:
+                sb.push_byte(0xEF as u8)
+                sb.push_byte(0xBF as u8)
+                sb.push_byte(0xBD as u8)
+                i = i + 1
+            else:
+                for k in 0..n:
+                    sb.push_byte(unsafe { self.ptr[i + k] } as u8)
+                i = i + n
+        sb.to_str()
+
+/// Why a `CStr` is not With text.
+pub enum Utf8Error:
+    /// The byte offset of the first ill-formed sequence.
+    InvalidAt(i64)
+
+/// The length of the well-formed UTF-8 sequence at byte `i` of `p[0..n]`
+/// (RFC 3629: no overlongs, no surrogates, nothing past U+10FFFF), or 0 when
+/// the bytes there are ill-formed or truncated. The caller vouches that
+/// `p[0..n]` is readable — a `CStr`'s own bytes.
+unsafe fn utf8_sequence_len(p: *const u8, i: i64, n: i64) -> i64:
+    let b0 = p[i] as i32
+    if b0 < 0x80: return 1
+    var need: i64 = 0
+    var lo = 0x80
+    var hi = 0xBF
+    if b0 >= 0xC2 and b0 <= 0xDF:
+        need = 1
+    else if b0 == 0xE0:
+        need = 2
+        lo = 0xA0
+    else if (b0 >= 0xE1 and b0 <= 0xEC) or b0 == 0xEE or b0 == 0xEF:
+        need = 2
+    else if b0 == 0xED:
+        need = 2
+        hi = 0x9F
+    else if b0 == 0xF0:
+        need = 3
+        lo = 0x90
+    else if b0 >= 0xF1 and b0 <= 0xF3:
+        need = 3
+    else if b0 == 0xF4:
+        need = 3
+        hi = 0x8F
+    else:
+        return 0
+    if i + need >= n: return 0
+    for k in 1..need + 1:
+        let b = p[i + k] as i32
+        let (l, h) = if k == 1: (lo, hi) else: (0x80, 0xBF)
+        if b < l or b > h: return 0
+    need + 1
+
+/// The offset of the first ill-formed UTF-8 sequence in `p[0..n]`, or -1.
+unsafe fn utf8_first_invalid(p: *const u8, n: i64) -> i64:
+    var i: i64 = 0
+    while i < n:
+        let k = utf8_sequence_len(p, i, n)
+        if k == 0: return i
+        i = i + k
+    -1
+
 /// View the NUL-terminated string C handed back (§16.1). The caller vouches
 /// that `ptr` is non-null, NUL-terminated, and stays valid while the view is
 /// used: that is the one fact With cannot check.
