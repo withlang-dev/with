@@ -2643,6 +2643,17 @@ impl MirBuilder:
             return self.variant_index(ok_sym)
         1
 
+    // Whether `operand_id` moves a whole compiler temporary — a call or
+    // operator result that no binding, field, or global owns. An observer of
+    // such an operand is its last user and must leave it to a drop
+    // (materialize_operand registers one); a place any owner holds is only
+    // read.
+    fn operand_moves_owned_temp(operand_id: i32) -> bool:
+        if operand_id < 0 or operand_id >= self.body.operand_kinds.len() or self.body.operand_kinds[operand_id] != OperandKind.OK_MOVE:
+            return false
+        let local = mir_place_plain_local(&self.body, self.body.operand_d0[operand_id])
+        local > 0 and self.body.local_is_user_var[local] == 0 and self.body.local_is_global[local] == 0
+
     mut fn materialize_operand(operand_id: i32, type_id: i32, span: i32) -> i32:
         let temp = self.new_temp(type_id)
         let place = self.place_for_local(temp)
@@ -3568,13 +3579,8 @@ impl MirBuilder:
             else if seg_kind == FStringSegmentKind.EXPR:
                 let expr_node = self.ast.get_extra(pos + 1)
                 let spec_node = self.ast.get_extra(pos + 2)
-                var expr_op = self.lower_expr(expr_node)
-                // Formatting observes its interpolant: every FmtBuffer writer
-                // and fmt_to_str read the value and leave it to its owner. A
-                // place lowered as a value read `move u.name` (#1394), a move no
-                // reset follows, and the owner's drop frees it as a live value.
-                if expr_op >= 0 and expr_op < self.body.operand_kinds.len() and self.body.operand_kinds[expr_op] == OperandKind.OK_MOVE:
-                    expr_op = self.body.new_operand(OperandKind.OK_COPY, self.body.operand_d0[expr_op])
+                let lowered_op = self.lower_expr(expr_node)
+                var expr_op = self.observe_interpolant(lowered_op, self.ast.get_start(expr_node))
                 var resolved_ty = if self.expr_type(expr_node) > 0: self.sema.resolve_alias(self.expr_type(expr_node)) else: 0
                 var borrowed_str_ref_op = -1
                 // A view interpolant formats its POINTEE — formatting observes
@@ -3598,7 +3604,8 @@ impl MirBuilder:
                 var handled = false
                 if spec_node != 0:
                     if borrowed_str_ref_op >= 0:
-                        expr_op = self.lower_str_clone_ref(borrowed_str_ref_op, node)
+                        let clone_op = self.lower_str_clone_ref(borrowed_str_ref_op, node)
+                        expr_op = self.observe_interpolant(clone_op, self.ast.get_start(expr_node))
                     let spec_flags = self.ast.get_data0(spec_node)
                     let spec_mode = spec_flags & 255
                     let spec_width = self.ast.get_data1(spec_node)
@@ -3637,6 +3644,22 @@ impl MirBuilder:
 
         // Step 3: Finalize buffer to str
         self.lower_fstring_buf_finish(buf_op, node)
+
+    // Formatting observes its interpolant: every FmtBuffer writer and
+    // fmt_to_str read the value and leave it to its owner. A place read as
+    // `move u.name` (#1394) is read in place — a move no reset follows would
+    // let the owner's drop free it as a live value. An owned temporary
+    // (`t.slice(0, 2)`, `a ++ b`, the clone a spec'd view formats) has no
+    // owner but this statement: it becomes a statement temp, dropped at the
+    // boundary once the f-string is built (#1390).
+    mut fn observe_interpolant(op: i32, span: i32) -> i32:
+        if op < 0 or op >= self.body.operand_kinds.len() or self.body.operand_kinds[op] != OperandKind.OK_MOVE:
+            return op
+        var place: i32 = self.body.operand_d0[op]
+        if self.operand_moves_owned_temp(op):
+            let ty = self.operand_type(op)
+            place = self.materialize_operand(op, ty, span)
+        self.body.new_operand(OperandKind.OK_COPY, place)
 
     mut fn lower_fstring_buf_new(node: i32) -> i32:
         let fn_op = self.const_operand(ConstKind.CK_FN, self.pool.intern("fmt_buf_new"), self.sema.ty_i32)

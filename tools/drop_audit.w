@@ -326,6 +326,17 @@ fn sc_vec_elem() -> str:
     "    v.push(mk(2, slot))\n" ++
     "    let _k = 0\n"
 
+// #1390: an f-string hole observes its value. An owned temporary there — the
+// R a call builds, the str a call returns — has only its statement to drop
+// it: exactly once, never leaked (the allocator verdict), never freed while
+// the hole still reads it.
+fn sc_fstring_hole(form: &str) -> str:
+    let hole = if form == "field": "{mk(1, slot).id}" else if form == "method": "{mk(1, slot).label()}" else if form == "concat": "{mk(1, slot).label() ++ \"!\"}" else if form == "slice": "{mk(1, slot).label().slice(0, 1)}" else: "{mk(1, slot).label().slice(0, 1):>6}"
+    "extend R:\n    fn label() -> str: f\"r{self.id}\"\n" ++
+    "fn go(slot: *mut i32):\n" ++
+    "    let text = f\"<" ++ hole ++ ">\"\n" ++
+    "    let _n = text.len()\n"
+
 // #1365 (§9.7, §2.4): `let PAT = subject else: <diverge>` consumes its
 // subject on both paths. The failing path drops the whole subject — whichever
 // variant it holds — exactly once before it diverges; the matching path moves
@@ -511,6 +522,8 @@ fn build_cells():
     cells.push(cell("recv_move_consume/bare", sc_recv_move(), 1))
     cells.push(cell("recv_bare_self_replace/bare", sc_recv_replace(), 3))
     cells.push(cell("vec_elem_drop/vec", sc_vec_elem(), 3))
+    for form in ["field", "method", "concat", "slice", "spec"]:
+        cells.push(cell("fstring_hole_temp_" ++ form ++ "/bare", sc_fstring_hole(form), 1))
     for sh in ["result", "option", "enum", "nested", "struct"]:
         for subj in ["temp", "local"]:
             let local = subj == "local"
