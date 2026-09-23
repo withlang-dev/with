@@ -225,7 +225,7 @@ impl Codegen:
                 let sema_text = self.sema_symbol_text(name_sym)
                 if sema_text.len() > 0:
                     cg_sym = self.intern.intern(sema_text)
-                let named_ty = self.resolve_named_type(cg_sym)
+                let named_ty = self.resolve_defined_named_type(cg_sym)
                 if named_ty != 0:
                     return named_ty
                 // Disc enum without payloads: return repr type

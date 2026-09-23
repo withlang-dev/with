@@ -59,6 +59,12 @@ enum AtomicOrdering: i32:
     ACQ_REL = 3
     SEQ_CST = 4
 
+// #1430: where a named type declaration's LLVM body is (Codegen.type_body_state).
+const TYPE_BODY_NONE: i32 = 0
+const TYPE_BODY_PENDING: i32 = 1
+const TYPE_BODY_DEFINING: i32 = 2
+const TYPE_BODY_DEFINED: i32 = 3
+
 
 // Inline assembly
 
@@ -249,6 +255,17 @@ type Codegen {
     disc_enum_variant_values: Vec[i32],
     disc_enum_has_payload: Vec[i32],
     disc_enum_variant_payloads: Vec[i64],
+
+    // #1430: named type bodies, defined in dependency order. Per declaration
+    // index: its registered type symbol and TYPE_BODY_* state; per symbol: the
+    // declaration that defines it; how many are still pending (0 once Pass 0b
+    // is done, which makes the reference hook free). type_layout_complete
+    // memoizes the LLVM types proven to hold no opaque placeholder by value.
+    type_body_decl: HashMap[i32, i32],
+    type_body_sym: Vec[i32],
+    type_body_state: Vec[i32],
+    type_bodies_pending: i32,
+    type_layout_complete: HashMap[i64, i32],
 
     // Generic functions/structs: sym → node
     generic_fns: HashMap[i32, i32],
@@ -959,6 +976,11 @@ fn Codegen.init_with_opt(module_name: &str, opt_level: i32) -> Codegen:
         disc_enum_variant_values: Vec.new(),
         disc_enum_has_payload: Vec.new(),
         disc_enum_variant_payloads: Vec.new(),
+        type_body_decl: HashMap.new(),
+        type_body_sym: Vec.new(),
+        type_body_state: Vec.new(),
+        type_bodies_pending: 0,
+        type_layout_complete: HashMap.new(),
         generic_fns: HashMap.new(),
         generic_structs: HashMap.new(),
         generic_struct_methods: HashMap.new(),
@@ -1372,7 +1394,51 @@ impl Codegen:
         if dl == 0:
             self.had_error = 1
             return 0
+        if not self.layout_is_complete(ty):
+            return 0
         wl_abi_size_of(dl, ty)
+
+    mut fn abi_align_of(ty: i64) -> i64:
+        let dl = wl_get_module_data_layout(self.llmod)
+        if ty == 0 or dl == 0:
+            self.had_error = 1
+            return 1
+        if not self.layout_is_complete(ty):
+            return 1
+        wl_abi_align_of(dl, ty) as i64
+
+    // #1430: LLVM sizes a named struct by whatever body it has when asked. A
+    // declared-but-undefined body sizes to 0 (or aborts later, in SROA), so an
+    // enum whose payload type was declared after it lost its payload. Every
+    // layout query first proves that no body-less placeholder is reachable by
+    // value; one that is, is a compiler bug — reported, never sized.
+    mut fn layout_is_complete(ty: i64) -> bool:
+        let hole = self.first_opaque_by_value(ty, 0)
+        if hole == 0:
+            return true
+        let name = wl_get_struct_name(hole)
+        with_eprint(f"BUG: layout requested for a type holding '{name}' by value before '{name}' has a body (#1430)")
+        self.had_error = 1
+        false
+
+    // The first body-less named struct `ty` holds by value, else 0. A pointer
+    // ends the walk: an indirection never needs its pointee's body. A nesting
+    // deeper than any finite type (a by-value cycle Sema missed) is reported
+    // at the struct where the walk gives up.
+    mut fn first_opaque_by_value(ty: i64, depth: i32) -> i64:
+        let kind = wl_get_type_kind(ty)
+        if kind == wl_array_type_kind():
+            return self.first_opaque_by_value(wl_get_element_type(ty), depth + 1)
+        if kind != wl_struct_type_kind() or self.type_layout_complete.contains(ty):
+            return 0
+        if wl_is_opaque_struct(ty) or depth > 1024:
+            return ty
+        for i in 0..wl_count_struct_elem_types(ty):
+            let hole = self.first_opaque_by_value(wl_struct_get_type_at(ty, i), depth + 1)
+            if hole != 0:
+                return hole
+        self.type_layout_complete.insert(ty, 1)
+        0
 
     // MIR is shared read-only via raw pointer: the caller retains ownership
     // and must keep the module alive through generation. Removes the per-cg
@@ -2650,7 +2716,7 @@ impl Codegen:
                     let bound = self.type_binding_types[tbi]
                     if bound != 0:
                         return bound
-            let named = self.resolve_named_type(sym)
+            let named = self.resolve_defined_named_type(sym)
             if named != 0:
                 return named
             let sema_tid = self.sema.resolve_type_expr_frozen(type_node)
@@ -2667,7 +2733,7 @@ impl Codegen:
                     let bound = self.type_binding_types[tbi]
                     if bound != 0:
                         return bound
-            let named = self.resolve_named_type(sym)
+            let named = self.resolve_defined_named_type(sym)
             if named != 0:
                 return named
             let sema_tid = self.sema.resolve_type_expr_frozen(type_node)
@@ -2909,6 +2975,107 @@ impl Codegen:
             return prim
         self.resolve_user_named_type(self.shadow_lookup_sym(sym))
 
+    // A type reference defines the referenced declaration's body first (#1430),
+    // so a body is always laid out from complete member types, whatever the
+    // declaration order.
+    mut fn resolve_defined_named_type(sym: i32) -> i64:
+        if self.type_bodies_pending == 0:
+            return self.resolve_named_type(sym)
+        let registered = if sym == self.sym_Self and self.current_method_owner_sym != 0: self.current_method_owner_sym else: sym
+        self.define_type_on_reference(self.shadow_lookup_sym(registered))
+        self.resolve_named_type(sym)
+
+    // ── Named type bodies in dependency order (#1430) ──────────────────
+    //
+    // Pass 0b walks type declarations in source order, but a body must never
+    // be laid out from a member type whose own body is still a placeholder:
+    // LLVM sizes a placeholder as 0, so `enum Outer: Inner(i: InnerE)` above
+    // `enum InnerE` truncated Outer's payload. A reference to a declaration
+    // whose body is pending defines that body on the spot, depth first, so
+    // every body is defined after the bodies it holds by value — a topological
+    // order of the type graph computed while resolving it. A reference to a
+    // body being defined is legal only through an indirection (Sema rejects
+    // by-value cycles as a dependency loop); it returns the placeholder, and
+    // layout_is_complete refuses to size anything that holds one by value.
+
+    // Record every declaration Pass 0b defines, under the symbol it registers.
+    mut fn register_type_bodies():
+        self.type_body_decl = HashMap.new()
+        self.type_body_sym = Vec.new()
+        self.type_body_state = Vec.new()
+        self.type_bodies_pending = 0
+        for i in 0..self.pool.decl_count():
+            self.type_body_sym.push(0)
+            self.type_body_state.push(TYPE_BODY_NONE)
+            if self.sema.decl_is_lazy_skipped(i):
+                continue
+            let decl = self.pool.get_decl(i)
+            if self.pool.kind(decl) != NodeKind.NK_TYPE_DECL:
+                continue
+            let raw_sym = self.pool.get_data0(decl)
+            if raw_sym == 0 or self.intern.resolve(raw_sym).len() == 0:
+                continue
+            let sub_kind = type_decl_sub_kind(self.pool.get_data2(decl))
+            let generic = self.type_decl_tp_count(decl) > 0
+            if sub_kind == TypeDeclKind.DiscEnum or sub_kind == TypeDeclKind.Union or (not generic and (sub_kind == TypeDeclKind.Struct or sub_kind == TypeDeclKind.Enum)):
+                let name_sym = self.shadow_reg_sym(raw_sym, i)
+                self.type_body_sym[i] = name_sym
+                self.type_body_state[i] = TYPE_BODY_PENDING
+                self.type_bodies_pending = self.type_bodies_pending + 1
+                // Two declarations registering one symbol share one LLVM type;
+                // the first is the one a reference defines, as in source order.
+                if not self.type_body_decl.contains(name_sym):
+                    self.type_body_decl.insert(name_sym, i)
+
+    mut fn define_type_on_reference(sym: i32):
+        if not self.type_body_decl.contains(sym):
+            return
+        let di: i32 = self.type_body_decl.get(sym).unwrap()
+        if self.type_body_state[di] == TYPE_BODY_PENDING:
+            self.define_type_body(di)
+
+    // Define declaration `di`'s body once, in its own module's context and
+    // with no generic frame active: a non-generic body names no parameters.
+    mut fn define_type_body(di: i32):
+        if self.type_body_state[di] != TYPE_BODY_PENDING:
+            return
+        self.type_body_state[di] = TYPE_BODY_DEFINING
+        self.type_bodies_pending = self.type_bodies_pending - 1
+        let saved_file = with_str_clone_ref(self.current_decl_source_file)
+        let saved_module = with_str_clone_ref(self.sema.current_module_path)
+        let saved_len = self.type_bindings_len
+        let saved_syms = self.type_binding_syms
+        let saved_types = self.type_binding_types
+        self.type_binding_syms = Vec.new()
+        self.type_binding_types = Vec.new()
+        self.type_bindings_len = 0
+        self.sync_decl_context(di)
+        let decl = self.pool.get_decl(di)
+        let name_sym: i32 = self.type_body_sym[di]
+        let sub_kind = type_decl_sub_kind(self.pool.get_data2(decl))
+        if sub_kind == TypeDeclKind.Struct:
+            self.declare_struct_type(name_sym, decl)
+        else if sub_kind == TypeDeclKind.Enum:
+            self.declare_enum_type(name_sym, decl)
+        else if sub_kind == TypeDeclKind.DiscEnum:
+            self.declare_disc_enum_type(name_sym, decl)
+        else if sub_kind == TypeDeclKind.Union:
+            self.declare_union_type(name_sym, decl)
+        self.type_bindings_len = saved_len
+        self.type_binding_syms = saved_syms
+        self.type_binding_types = saved_types
+        self.current_decl_source_file = saved_file
+        self.sema.current_module_path = saved_module
+        self.type_body_state[di] = TYPE_BODY_DEFINED
+
+    // After Pass 0b every registered body is defined; anything else is a bug.
+    mut fn verify_type_bodies_defined():
+        for di in 0..self.type_body_state.len() as i32:
+            let state: i32 = self.type_body_state[di]
+            if state == TYPE_BODY_PENDING or state == TYPE_BODY_DEFINING:
+                with_eprint("BUG: type '" ++ self.intern.resolve(self.type_body_sym[di]) ++ "' has no body after Pass 0b (#1430)")
+                self.had_error = 1
+
     mut fn type_expr_to_sema_type(type_node: i32) -> i32:
         if type_node == 0:
             return self.sema.ty_void as i32
@@ -3108,7 +3275,10 @@ impl Codegen:
 
         let te_start = self.sema.get_type_d1(base_tid)
         let variant_count = self.sema.get_type_d2(base_tid)
-        let v_start = self.enum_variant_names.len() as i32
+        // Reserve the variant range before resolving a payload: resolving one
+        // can define another enum or instantiate another generic enum, and
+        // each pushes its own range (#1430).
+        let v_start = self.reserve_enum_variants(variant_count)
         var pos = te_start
         var max_payload_size: i64 = 0
         var invalid_layout = 0
@@ -3129,8 +3299,8 @@ impl Codegen:
                     if sz > max_payload_size:
                         max_payload_size = sz
             let cg_variant_name = self.sema_sym_to_codegen_sym(variant_name)
-            self.enum_variant_names.push(if cg_variant_name != 0: cg_variant_name else: variant_name)
-            self.enum_variant_payloads.push(payload_ty)
+            self.enum_variant_names[v_start + vi] = if cg_variant_name != 0: cg_variant_name else: variant_name
+            self.enum_variant_payloads[v_start + vi] = payload_ty
             pos = pos + 2 + payload_count
 
         if invalid_layout != 0:
@@ -3354,7 +3524,7 @@ impl Codegen:
             // std-tier tid to the aliased LLVM slot.
             if self.sema.type_sym_is_shadowed(sym) != 0 and self.sema.type_tid_std_tier(resolved_tid) != 0:
                 cg_sym = self.shadow_alias_for(cg_sym)
-            return self.resolve_named_type(cg_sym)
+            return self.resolve_defined_named_type(cg_sym)
         if tk == TypeKind.TY_TUPLE:
             let elem_start = self.sema.get_type_d0(resolved_tid)
             let elem_count = self.sema.get_type_d1(resolved_tid)
@@ -3896,7 +4066,6 @@ impl Codegen:
             // Build padded LLVM struct type (Zig-style approach).
             // Walk fields, insert [N x i8] padding arrays between fields
             // to match the C ABI layout specified by @[align(N)] annotations.
-            let dl = wl_get_module_data_layout(self.llmod)
             let padded_types: Vec[i64] = Vec.new()
             var byte_offset: i64 = 0
             var use_packed = false
@@ -3905,7 +4074,7 @@ impl Codegen:
             for fi in 0..field_count:
                 let f_ty = ft_vec[fi]
                 let explicit_align = self.pool.get_extra(align_base + fi) as i64
-                let natural_align = if dl != 0: wl_abi_align_of(dl, f_ty) as i64 else: 1
+                let natural_align = self.abi_align_of(f_ty)
                 let field_align = if explicit_align > 0: explicit_align else: natural_align
                 if field_align > max_align:
                     max_align = field_align
@@ -3926,7 +4095,7 @@ impl Codegen:
                 self.struct_llvm_field_indices[field_start + fi] = padded_types.len() as i32
 
                 padded_types.push(f_ty)
-                let f_size = if dl != 0: wl_abi_size_of(dl, f_ty) else: wl_size_of(f_ty)
+                let f_size = self.abi_size_of(f_ty)
                 byte_offset = byte_offset + f_size
 
             // Tail padding to align struct size to max alignment
@@ -4015,10 +4184,12 @@ impl Codegen:
         let enum_name: str = with_str_clone_ref(self.intern.resolve(name_sym))
 
         // Find the largest payload to determine enum struct size.
-        // Enum is { i32 tag, [N x i8] payload }.
+        // Enum is { i32 tag, [N x i8] payload }. Resolving a payload type
+        // defines its body first (#1430), so the size below is never a
+        // placeholder's; the variant range is reserved before that recursion.
         var max_payload_size: i64 = 0
         var invalid_layout = 0
-        let v_starts = self.enum_variant_names.len() as i32
+        let v_starts = self.reserve_enum_variants(variant_count)
         var offset = extra_start + 1
         for vi in 0..variant_count:
             let v_name = self.pool.get_extra(offset)
@@ -4043,8 +4214,8 @@ impl Codegen:
                     if sz > max_payload_size:
                         max_payload_size = sz
                 offset = offset + v_payload_count
-            self.enum_variant_names.push(v_name)
-            self.enum_variant_payloads.push(payload_ty)
+            self.enum_variant_names[v_starts + vi] = v_name
+            self.enum_variant_payloads[v_starts + vi] = payload_ty
 
         if invalid_layout != 0:
             return
@@ -4063,6 +4234,15 @@ impl Codegen:
         self.enum_variant_starts[idx] = v_starts
         self.enum_variant_counts[idx] = variant_count
 
+    // Claim `count` consecutive rows of the enum variant columns; the caller
+    // fills them after resolving payloads, which may claim rows of its own.
+    mut fn reserve_enum_variants(count: i32) -> i32:
+        let start = self.enum_variant_names.len() as i32
+        for vi in 0..count:
+            self.enum_variant_names.push(0)
+            self.enum_variant_payloads.push(0)
+        start
+
     mut fn declare_disc_enum_type(name_sym: i32, type_node: i32):
         let extra_start = self.pool.get_data1(type_node)
         let repr_type_node = self.pool.get_extra(extra_start)
@@ -4071,17 +4251,33 @@ impl Codegen:
         if repr_ty == 0:
             return
 
+        // Whether any variant carries a payload decides the representation a
+        // reference sees (the repr integer, or the tagged struct), so it is
+        // registered with the rows below before any payload is resolved: a
+        // payload's resolution can define another enum on demand (#1430).
+        var any_has_payload = 0
+        var scan = extra_start + 2
+        for vi in 0..variant_count:
+            let scan_count = self.pool.get_extra(scan + 2)
+            if scan_count > 0:
+                any_has_payload = 1
+            scan = scan + 3 + scan_count
+
         let idx = self.disc_enum_repr_types.len() as i32
         self.disc_enum_name_syms.push(name_sym)
         self.disc_enum_repr_types.push(repr_ty)
         let v_start = self.disc_enum_variant_names.len() as i32
         self.disc_enum_variant_starts.push(v_start)
         self.disc_enum_variant_counts.push(variant_count)
+        self.disc_enum_has_payload.push(any_has_payload)
         self.disc_enum_type_map.insert(name_sym, idx)
+        for vi in 0..variant_count:
+            self.disc_enum_variant_names.push(0)
+            self.disc_enum_variant_values.push(0)
+            self.disc_enum_variant_payloads.push(0)
 
         // First pass: collect variant info and compute max payload size
         var max_payload_size: i64 = 0
-        var any_has_payload = 0
         var offset = extra_start + 2
         for vi in 0..variant_count:
             let v_name = self.pool.get_extra(offset)
@@ -4089,7 +4285,6 @@ impl Codegen:
             let payload_count = self.pool.get_extra(offset + 2)
             var payload_ty: i64 = 0
             if payload_count > 0:
-                any_has_payload = 1
                 let payload_fields: Vec[i64] = Vec.new()
                 for pi in 0..payload_count:
                     let payload_type_node = self.pool.get_extra(offset + 3 + pi)
@@ -4102,11 +4297,9 @@ impl Codegen:
                     if sz > max_payload_size:
                         max_payload_size = sz
             offset = offset + 3 + payload_count
-            self.disc_enum_variant_names.push(v_name)
-            self.disc_enum_variant_values.push(disc_value)
-            self.disc_enum_variant_payloads.push(payload_ty)
-
-        self.disc_enum_has_payload.push(any_has_payload)
+            self.disc_enum_variant_names[v_start + vi] = v_name
+            self.disc_enum_variant_values[v_start + vi] = disc_value
+            self.disc_enum_variant_payloads[v_start + vi] = payload_ty
 
         // If any variant has payload, also register in the regular enum tables
         // so the existing match payload extraction code can find the type info.
@@ -6269,11 +6462,17 @@ impl Codegen:
                 self.predeclare_struct_type(name_sym)
                 continue
 
-        // Pass 0b: define struct/enum bodies and type aliases.
+        // Pass 0b: define struct/enum/union bodies and type aliases. A body a
+        // reference already defined (a type used before its declaration,
+        // #1430) is not defined again; see define_type_body.
+        self.register_type_bodies()
         for i in 0..self.pool.decl_count():
             if self.sema.decl_is_lazy_skipped(i):
                 continue
             self.sync_decl_context(i)
+            if self.type_body_state[i] != TYPE_BODY_NONE:
+                self.define_type_body(i)
+                continue
             let decl = self.pool.get_decl(i)
             let kind = self.pool.kind(decl)
             if kind != NodeKind.NK_TYPE_DECL:
@@ -6284,23 +6483,8 @@ impl Codegen:
                 continue
             name_sym = self.shadow_reg_sym(name_sym, i)
             let sub_kind = type_decl_sub_kind(self.pool.get_data2(decl))
-            if sub_kind == TypeDeclKind.Struct:
-                if self.type_decl_tp_count(decl) == 0:
-                    self.declare_struct_type(name_sym, decl)
-                continue
-            if sub_kind == TypeDeclKind.Enum:
-                if self.type_decl_tp_count(decl) > 0:
-                    continue
-                self.declare_enum_type(name_sym, decl)
-                continue
-            if sub_kind == TypeDeclKind.DiscEnum:
-                self.declare_disc_enum_type(name_sym, decl)
-                continue
             if sub_kind == TypeDeclKind.Opaque:
                 // Opaque type: predeclared in pass 0a, no body set (stays opaque)
-                continue
-            if sub_kind == TypeDeclKind.Union:
-                self.declare_union_type(name_sym, decl)
                 continue
             if sub_kind == TypeDeclKind.Distinct:
                 // Distinct type: transparent — same LLVM type as inner type.
@@ -6311,6 +6495,7 @@ impl Codegen:
                 let aliased_node = self.pool.get_extra(extra_start)
                 let resolved = self.resolve_type(aliased_node)
                 self.type_aliases.insert(name_sym, resolved)
+        self.verify_type_bodies_defined()
 
         if self.had_error != 0:
             return 1
