@@ -671,15 +671,22 @@ fn process_c_import_with_defines(header_spec: &str, defines: &Vec[str]) -> str:
         with_cimport_mark_name_emitted("with_ctzll")
         with_cimport_mark_name_emitted("with_abs")
 
+    // The runtime calls a translated inline body makes: malloc/free lower to
+    // with_alloc/with_free, and memcpy/memmove/memset/memcmp (and their
+    // `__builtin___*_chk` forms) to with_mem*. The migrate preamble declares
+    // the same set; this one lacked the mem* four, so windows.h's
+    // RtlZeroMemory-style bodies named an undeclared `with_memset` (#1417).
     if with_cimport_is_name_emitted("with_alloc") == 0:
         output.push_str("extern fn with_alloc(size: i64) -> *mut u8\n")
         output.push_str("extern fn with_alloc_zeroed(count: i64, size: i64) -> *mut u8\n")
         output.push_str("extern fn with_realloc(ptr: *mut u8, old_size: i64, new_size: i64) -> *mut u8\n")
         output.push_str("extern fn with_free(ptr: *mut u8) -> Unit\n")
-        with_cimport_mark_name_emitted("with_alloc")
-        with_cimport_mark_name_emitted("with_alloc_zeroed")
-        with_cimport_mark_name_emitted("with_realloc")
-        with_cimport_mark_name_emitted("with_free")
+        output.push_str("extern fn with_memcpy(dst: *mut u8, src: *const u8, n: i64) -> *mut u8\n")
+        output.push_str("extern fn with_memmove(dst: *mut u8, src: *const u8, n: i64) -> *mut u8\n")
+        output.push_str("extern fn with_memset(dst: *mut u8, c: i32, n: i64) -> *mut u8\n")
+        output.push_str("extern fn with_memcmp(a: *const u8, b: *const u8, n: i64) -> i32\n")
+        for support in ["with_alloc", "with_alloc_zeroed", "with_realloc", "with_free", "with_memcpy", "with_memmove", "with_memset", "with_memcmp"]:
+            with_cimport_mark_name_emitted(support)
 
     output.push_str(ci_render_missing_pointer_opaques(session, count))
 
@@ -705,7 +712,7 @@ fn process_c_import_with_defines(header_spec: &str, defines: &Vec[str]) -> str:
     while i < count:
         let kind = with_cimport_decl_kind(session, i)
         if kind == CK_FUNCTION:
-            output.push_str(ci_translate_function(session, i, translated_structs))
+            output.push_str(ci_translate_function(session, i, translated_structs, demoted_types))
         else if kind == CK_STRUCT or kind == CK_UNION:
             let struct_result = ci_translate_struct(session, i, kind == CK_UNION, translated_structs, demoted_types, count)
             output.push_str(struct_result)
@@ -1536,7 +1543,59 @@ fn ci_emit_buf_wrapper(session: i64, idx: i32, name: &str) -> str:
     let body = checks ++ ptr_lets ++ "    " ++ ret_prefix ++ "unsafe { " ++ raw_name ++ "(" ++ call_args ++ ") }\n"
     raw_decl ++ "fn " ++ safe_name ++ "(" ++ wrapper_params ++ ") -> " ++ ret_render ++ ":\n" ++ body
 
-fn ci_translate_function(session: i64, idx: i32, known_structs: &str) -> str:
+// §16.9: a record c_import demotes to opaque (a bitfield, a sub-alignment
+// field, a field of a demoted type) has no layout in With. The demoted record
+// a C type holds by value — through arrays too — or "".
+fn ci_type_demoted_record(session: i64, type_idx: i32, demoted: &str) -> str:
+    if type_idx < 0:
+        return ""
+    var ty = with_ci_type_canonical(session, type_idx)
+    var kind = with_ci_type_kind(session, ty)
+    while kind == CXT_ConstantArray or kind == CXT_IncompleteArray or kind == CXT_VariableArray:
+        ty = with_ci_type_canonical(session, with_ci_type_array_element(session, ty))
+        kind = with_ci_type_kind(session, ty)
+    if kind != CXT_Record:
+        return ""
+    let name = ci_trim(with_ci_type_translated(session, ty))
+    if name.len() > 0 and ci_str_contains(demoted, "|" ++ name ++ "|"): name else: ""
+
+// The demoted record whose layout `cursor`'s subtree needs, or "": a field
+// access through it (`p->f`, `(*p).f`, `s.f`), a value of its type (a local,
+// a deref, a compound literal, a by-value parameter or call result), or a
+// type operand of sizeof/alignof/offsetof. A pointer to it needs no layout;
+// neither does a cast to such a pointer.
+fn ci_cursor_needs_demoted_layout(session: i64, cursor: i32, demoted: &str) -> str:
+    let kind = with_ci_cursor_kind(session, cursor)
+    let nc = with_ci_num_children(session, cursor)
+    if kind == CXK_MEMBER_REF and nc > 0:
+        var base_ty = with_ci_type_canonical(session, with_ci_cursor_type(session, with_ci_child(session, cursor, 0)))
+        if with_ci_type_kind(session, base_ty) == CXT_Pointer:
+            base_ty = with_ci_type_pointee(session, base_ty)
+        let through = ci_type_demoted_record(session, base_ty, demoted)
+        if through.len() > 0:
+            return through
+    let is_expr = kind >= 100 and kind < 200
+    if is_expr or kind == CXK_VAR_DECL or kind == 10:  // 10: CXCursor_ParmDecl
+        let held = ci_type_demoted_record(session, with_ci_cursor_type(session, cursor), demoted)
+        if held.len() > 0:
+            return held
+    for ci in 0..nc:
+        let child = with_ci_child(session, cursor, ci)
+        // 43: CXCursor_TypeRef — a written type. Under a cast it names a
+        // pointer's pointee; under any other expression (sizeof, alignof,
+        // offsetof, va_arg) the type itself is measured or read.
+        if with_ci_cursor_kind(session, child) == 43:
+            if is_expr and kind != CXK_CSTYLE_CAST:
+                let measured = ci_type_demoted_record(session, with_ci_cursor_type(session, child), demoted)
+                if measured.len() > 0:
+                    return measured
+            continue
+        let inner = ci_cursor_needs_demoted_layout(session, child, demoted)
+        if inner.len() > 0:
+            return inner
+    ""
+
+fn ci_translate_function(session: i64, idx: i32, known_structs: &str, demoted_types: &str) -> str:
     // B9: fresh per-function temp counter.
     ci_temp_reset()
     let name = with_cimport_decl_name(session, idx)
@@ -1579,8 +1638,24 @@ fn ci_translate_function(session: i64, idx: i32, known_structs: &str) -> str:
         let si_ret = with_cimport_fn_return_type_translated(session, idx)
         if ci_cimport_type_is_raw_abi(si_ret):
             si_raw = true
+        // A body over a record imported opaque (winnt.h's FORCEINLINE
+        // TpInitializeCallbackEnviron writes `_TP_CALLBACK_ENVIRON_V3`,
+        // which holds a bitfield record) cannot be expressed: With has no
+        // layout for the record. Omit the function with the reason instead
+        // of emitting a body that fails to type-check (#1417). An inline
+        // function has no symbol an extern could bind, so the omission is
+        // inexpressible, not raw-modelable: a C shim is the way in.
+        let definition = ci_fn_definition_cursor(session, idx)
+        if definition >= 0:
+            let fn_ty = with_ci_cursor_type(session, definition)
+            var opaque_record = ci_type_demoted_record(session, with_ci_type_result(session, fn_ty), demoted_types)
+            if opaque_record.len() == 0:
+                opaque_record = ci_cursor_needs_demoted_layout(session, definition, demoted_types)
+            if opaque_record.len() > 0:
+                ci_record_omitted_symbol_cat(name, ci_get_decl_location(session, name), "inexpressible", "inline body needs the layout of '" ++ opaque_record ++ "', which c_import imports opaque (§16.9)")
+                return ""
         ci_migrate_set_unsafe_function_body_context(si_raw)
-        let body = ci_try_translate_fn_body(session, idx)
+        let body = ci_try_translate_fn_body_at(session, idx, definition)
         ci_migrate_set_unsafe_function_body_context(false)
         let unrendered = ci_print_take_unknowns()
         if unrendered.len() > 0:
@@ -2898,6 +2973,9 @@ fn ci_translate_macros(session: i64, type_session: i64, macro_source: &str) -> s
     var output = ""
     var known_values = ""
     var known_macro_returns = ""
+    // NAME=value for every macro emitted as an integer literal by the
+    // semantic path, which does not extend known_values (#1417's fold).
+    var literal_values = ""
     var blank_macros = ""
     let object_macro_types = ci_collect_object_macro_type_map(session, macro_source)
     g_migrate_macro_session = session
@@ -2965,6 +3043,21 @@ fn ci_translate_macros(session: i64, type_session: i64, macro_source: &str) -> s
                     if ci_str_contains(value, "__attribute__((cleanup"):
                         ci_record_untranslated_macro(name)
                         continue
+                    // A parameter is a binding (§9.7): an uppercase-initial C
+                    // parameter (winnt.h's DEFINE_ENUM_FLAG_OPERATORS(ENUMTYPE),
+                    // MIN(A, B)) parses as a variant pattern. It takes the
+                    // wrapper parameters' `p_` prefix, and the body names the
+                    // binding (#1417).
+                    var bindings: Vec[str] = Vec.new()
+                    var renamed = false
+                    for bpi in 0..param_count:
+                        let raw_param = with_cimport_macro_param_name(session, fn_index, bpi)
+                        let binding = ci_escape_param_name(raw_param)
+                        if binding != ci_escape_reserved(raw_param):
+                            renamed = true
+                        bindings.push(binding)
+                    if renamed:
+                        value = ci_macro_substitute_arguments(session, fn_index, value, &bindings)
                     // Empty function-like macro: #define FOO(x) → void function
                     if ci_trim(value).len() == 0:
                         var empty_params = ""
@@ -2972,8 +3065,7 @@ fn ci_translate_macros(session: i64, type_session: i64, macro_source: &str) -> s
                         while epi < param_count:
                             if epi > 0:
                                 empty_params = empty_params ++ ", "
-                            let epname = ci_escape_reserved(with_cimport_macro_param_name(session, fn_index, epi))
-                            empty_params = empty_params ++ epname ++ ": i32"
+                            empty_params = empty_params ++ bindings[epi] ++ ": i32"
                             epi = epi + 1
                         let r = ci_render_generated_fn_body("fn " ++ safe_name ++ "(" ++ empty_params ++ ") -> Unit", "    return")
                         with_cimport_mark_name_emitted(name)
@@ -2986,7 +3078,7 @@ fn ci_translate_macros(session: i64, type_session: i64, macro_source: &str) -> s
                     var type_params = ""
                     var pi = 0
                     while pi < param_count:
-                        let pname = ci_escape_reserved(with_cimport_macro_param_name(session, fn_index, pi))
+                        let pname = bindings[pi]
                         param_names = param_names ++ "|" ++ pname ++ "|"
                         if pi > 0:
                             param_decl = param_decl ++ ", "
@@ -3008,10 +3100,12 @@ fn ci_translate_macros(session: i64, type_session: i64, macro_source: &str) -> s
 
                     // Identity macro: #define CLITERAL(type) (type)
                     if translated.len() == 0 and param_count == 1:
-                        let original_param = with_cimport_macro_param_name(session, fn_index, 0)
-                        let safe_param = ci_escape_reserved(original_param)
+                        // The body names the raw parameter, or its binding
+                        // once an uppercase parameter was renamed.
+                        let body_param = if renamed: bindings[0].clone() else: with_cimport_macro_param_name(session, fn_index, 0)
+                        let safe_param = bindings[0].clone()
                         let stripped_identity = ci_strip_parens(ci_trim(work_value))
-                        if stripped_identity == original_param:
+                        if stripped_identity == body_param:
                             let r = ci_render_generated_fn_body("fn " ++ safe_name ++ "[T](" ++ safe_param ++ ": T) -> T", "    " ++ safe_param)
                             with_cimport_mark_name_emitted(name)
                             if not ci_migrate_shared_decl_add("fn", safe_name, r):
@@ -3030,7 +3124,7 @@ fn ci_translate_macros(session: i64, type_session: i64, macro_source: &str) -> s
                     if translated.len() == 0 and ci_has_stringify(work_value, param_names):
                         // Simple #x → identity function (returns the string of the expression)
                         if param_count == 1:
-                            let p0 = ci_escape_reserved(with_cimport_macro_param_name(session, fn_index, 0))
+                            let p0 = bindings[0].clone()
                             let body_trimmed = ci_trim(work_value)
                             if body_trimmed == "#" ++ p0 or body_trimmed == "(#" ++ p0 ++ ")":
                                 let r = ci_render_generated_fn_body("fn " ++ safe_name ++ "(x: str) -> str", "    x")
@@ -3180,7 +3274,12 @@ fn ci_translate_macros(session: i64, type_session: i64, macro_source: &str) -> s
             // offsetof is size_t: its type is clang's semantic one, like any
             // other macro's. (A `c_int` branch keyed on offsetof_result read
             // the binding after this line moved it, so it never ran; #1380.)
+            // An object macro's value has C's types, sizeof's size_t included
+            // (#1417); a function-like macro's body is generic over its
+            // parameters' T, where an unsigned sizeof would not unify.
+            g_ci_sizeof_as_size_t = not ci_translate_in_migrate_mode()
             let cast_expr_result = if offsetof_result.len() > 0: offsetof_result else: ci_translate_c_expr(stripped, "", known_values)
+            g_ci_sizeof_as_size_t = false
             let semantic_expr_ty = ci_lookup_known(name, object_macro_types)
             var cast_expr_ty = ""
             if compound_literal_result.len() > 0:
@@ -3229,6 +3328,19 @@ fn ci_translate_macros(session: i64, type_session: i64, macro_source: &str) -> s
                         output = output ++ ref_line ++ "\n"
                     continue
                 with_cimport_mark_name_emitted(name)
+                // A C comparison or logical operator yields an int 0 or 1;
+                // its translation is a With `bool`. A system header's macro
+                // is never probed and folded, so winapifamily.h's
+                // `(WINAPI_FAMILY == WINAPI_FAMILY_DESKTOP_APP)` reached
+                // here typed `c_int` with a `bool` value (#1417). The value
+                // follows the C type: folded to 0 or 1 over the constants
+                // emitted so far, else the bool converted to it.
+                if ci_int_type_is_c_integer(cast_expr_ty) and ci_translation_is_bool_valued(macro_expr_result):
+                    let folded = ci_fold_c_predicate(stripped, known_values ++ literal_values)
+                    macro_expr_result = if folded.len() > 0: folded else: "((" ++ ci_strip_parens(ci_trim(macro_expr_result)) ++ ") as " ++ cast_expr_ty ++ ")"
+                // Only this fold reads it, so no other translation changes.
+                if ci_is_int_literal(macro_expr_result):
+                    literal_values = literal_values ++ name ++ "=" ++ ci_strip_int_suffix(macro_expr_result) ++ "|"
                 // #775: clang's semantic type for a folded macro can be
                 // narrower than the folded VALUE (UINT_MAX's (__INT_MAX__
                 // *2U +1U) reports int but folds to 0xffffffff). When the
@@ -3292,6 +3404,9 @@ fn ci_translate_macros(session: i64, type_session: i64, macro_source: &str) -> s
 // level fails at once and the text is reported untranslated.
 let CI_EXPR_SCAN_BUDGET: i64 = 64 * 1024 * 1024
 var g_ci_expr_depth = 0
+// Set while an imported object macro's value is translated: its sizeof is
+// C's size_t (#1417).
+var g_ci_sizeof_as_size_t = false
 var g_ci_expr_scanned: i64 = 0
 
 fn ci_expr_budget_spent(s: &str) -> bool:
@@ -3564,7 +3679,14 @@ fn ci_parse_unary_expr(s: &str, params: &str, known: &str) -> str:
     if c0 == 126:
         let inner = ci_parse_cast_expr(t.slice(1, t.len()), params, known)
         if inner.len() > 0:
-            return "(0 - " ++ inner ++ " - 1)"
+            // C's `~` keeps its operand's type and never overflows; With's
+            // `~` is the same operator. `0 - x - 1` is only right for a
+            // signed x: over an unsigned one (winnt.h's
+            // `~(sizeof(PVOID)-1)`) it underflows. Migrated corpora keep
+            // their committed spelling (their outputs are pinned) (#1417).
+            if ci_translate_in_migrate_mode():
+                return "(0 - " ++ inner ++ " - 1)"
+            return "(~" ++ inner ++ ")"
         return ""
     // Address-of: &expr (but not &&)
     if c0 == 38 and t.len() > 1 and t[1] != 38:
@@ -3589,7 +3711,13 @@ fn ci_parse_unary_expr(s: &str, params: &str, known: &str) -> str:
                     return "sizeof[T]()"
                 let rendered = ci_render_sizeof_type(inner)
                 if rendered.len() > 0:
-                    return rendered
+                    // C's sizeof is a size_t, unsigned; With's is an i64.
+                    // Mixed with unsigned operands in an imported object
+                    // macro (winnt.h's TOKEN_INTEGRITY_LEVEL_MAX_SIZE,
+                    // `((DWORD)sizeof(T) + sizeof(PVOID) - 1) & ~(...)`)
+                    // the signed value failed to type-check, so there it
+                    // crosses as the size_t it is (#1417).
+                    return if g_ci_sizeof_as_size_t: "(" ++ rendered ++ " as usize)" else: rendered
         return ""
     // alignof / _Alignof
     if ci_starts_with(t, "alignof") or ci_starts_with(t, "_Alignof") or ci_starts_with(t, "__alignof__") or ci_starts_with(t, "__alignof"):
@@ -3822,6 +3950,138 @@ fn ci_translate_postfix(base: &str, rest: &str, params: &str, known: &str) -> st
     result
 
 // Check if expression is already boolean (comparison, logical, or != 0)
+// True when a translated expression's outermost operator yields a `bool`:
+// a comparison, `and`, `or`, or `not`. ci_is_bool_expr answers "contains
+// one anywhere", which an `(if a == b: 1 else: 0)` also does.
+fn ci_translation_is_bool_valued(expr: &str) -> bool:
+    let t = ci_strip_parens(ci_trim(expr))
+    if ci_starts_with(t, "not "):
+        return true
+    // An `if` expression's condition is not its value.
+    if ci_starts_with(t, "if "):
+        return false
+    var depth = 0
+    var in_string = false
+    var i = 0
+    while i < t.len() as i32:
+        let c = t[i]
+        if in_string:
+            if c == '\\':
+                i = i + 1
+            else if c == '"':
+                in_string = false
+        else if c == '"':
+            in_string = true
+        else if c == '(' or c == '[':
+            depth = depth + 1
+        else if c == ')' or c == ']':
+            depth = depth - 1
+        else if depth == 0 and c == ' ':
+            for op in [" == ", " != ", " < ", " > ", " <= ", " >= ", " and ", " or "]:
+                if ci_str_matches_at(t, i, op):
+                    return true
+        i = i + 1
+    false
+
+// A C comparison or logical expression over integer constants, folded to
+// C's int result "0" or "1"; "" when an operand is not a constant. The
+// leaves are ci_eval_const_expr_ctx's, which has no comparison operators;
+// this is used only for a predicate macro (#1417), so no other macro's
+// evaluation changes.
+fn ci_fold_c_predicate(s: &str, known: &str) -> str:
+    let t = ci_trim(ci_strip_parens(ci_trim(s)))
+    if t.len() == 0:
+        return ""
+    for logical in ["||", "&&"]:
+        let at = ci_find_op_at_depth0(t, logical)
+        if at >= 0:
+            let lhs = ci_fold_c_predicate(t.slice(0, at as i64), known)
+            let rhs = ci_fold_c_predicate(t.slice(at as i64 + 2, t.len()), known)
+            if lhs.len() == 0 or rhs.len() == 0:
+                return ""
+            let l = ci_parse_i64(lhs) != 0
+            let r = ci_parse_i64(rhs) != 0
+            let v = if logical == "||": l or r else: l and r
+            return if v: "1" else: "0"
+    // C binds `&`, `^`, `|` and `?:` looser than a comparison: splitting
+    // `A & B == C` at `==` would group it wrongly. Leave those unfolded.
+    if ci_has_depth0_bitwise_or_ternary(t):
+        return ""
+    for equality in ["==", "!="]:
+        let at = ci_find_op_at_depth0(t, equality)
+        if at >= 0:
+            let lhs = ci_fold_c_predicate(t.slice(0, at as i64), known)
+            let rhs = ci_fold_c_predicate(t.slice(at as i64 + 2, t.len()), known)
+            if lhs.len() == 0 or rhs.len() == 0:
+                return ""
+            let same = ci_parse_i64(lhs) == ci_parse_i64(rhs)
+            let v = if equality == "==": same else: not same
+            return if v: "1" else: "0"
+    let rel = ci_find_relational_op(t)
+    if rel >= 0:
+        let width = if rel + 1 < t.len() as i32 and t[rel + 1] == '=': 2 else: 1
+        let lhs = ci_fold_c_predicate(t.slice(0, rel as i64), known)
+        let rhs = ci_fold_c_predicate(t.slice((rel + width) as i64, t.len()), known)
+        if lhs.len() == 0 or rhs.len() == 0:
+            return ""
+        let a = ci_parse_i64(lhs)
+        let b = ci_parse_i64(rhs)
+        let less = t[rel] == '<'
+        let v = if width == 2: (if less: a <= b else: a >= b) else: (if less: a < b else: a > b)
+        return if v: "1" else: "0"
+    if t[0] == '!' and not (t.len() > 1 and t[1] == '='):
+        let inner = ci_fold_c_predicate(t.slice(1, t.len()), known)
+        if inner.len() == 0:
+            return ""
+        return if ci_parse_i64(inner) == 0: "1" else: "0"
+    ci_eval_const_expr_ctx(t, known)
+
+fn ci_has_depth0_bitwise_or_ternary(s: &str) -> bool:
+    var depth = 0
+    var i = 0
+    let n = s.len() as i32
+    while i < n:
+        let c = s[i]
+        if c == '(':
+            depth = depth + 1
+        else if c == ')':
+            depth = depth - 1
+        else if depth == 0:
+            if c == '?' or c == '^':
+                return true
+            if c == '&' or c == '|':
+                if i + 1 < n and s[i + 1] == c:
+                    i = i + 2
+                    continue
+                return true
+        i = i + 1
+    false
+
+// The first `<`, `>`, `<=` or `>=` at paren depth 0 — not a shift, not an
+// arrow — or -1.
+fn ci_find_relational_op(s: &str) -> i32:
+    var depth = 0
+    var i = 0
+    let n = s.len() as i32
+    while i < n:
+        let c = s[i]
+        if c == '(':
+            depth = depth + 1
+        else if c == ')':
+            depth = depth - 1
+        else if depth == 0 and (c == '<' or c == '>'):
+            let next = if i + 1 < n: s[i + 1] else: 0
+            let prev = if i > 0: s[i - 1] else: 0
+            if next == c:
+                i = i + 2
+                continue
+            if c == '>' and prev == '-':
+                i = i + 1
+                continue
+            return i
+        i = i + 1
+    -1
+
 fn ci_is_bool_expr(s: &str) -> bool:
     if ci_str_contains(s, " == ") or ci_str_contains(s, " != "): return true
     if ci_str_contains(s, " < ") or ci_str_contains(s, " > "): return true
@@ -12218,23 +12478,13 @@ fn ci_indent_str(level: i32) -> str:
 // Tries to translate a static inline function body using AST walking.
 // Returns "" on failure; callers must omit the generated surface or fail loudly.
 
-fn ci_try_translate_fn_body(session: i64, decl_idx: i32) -> str:
-    // A record left by a body that bailed elsewhere must not be charged to
-    // this one: every caller takes the records right after this returns.
-    let _stale = ci_print_take_unknowns()
-    ci_clear_bail_location()
-    // B9: fresh per-function temp counter. This path is called
-    // from ci_translate_function's static-inline branch — which
-    // already resets — but also from other call sites for header
-    // body translation, so reset here too.
-    ci_temp_reset()
-    // Use the new cursor-based API to find the function body.
-    // Match by NAME first (reliable), fall back to index matching.
+// The definition cursor of function `decl_idx`, or -1 when the header only
+// declares it. Matched by NAME (reliable for system header functions); a
+// definition wins over a declaration.
+fn ci_fn_definition_cursor(session: i64, decl_idx: i32) -> i32:
     let root = with_ci_root_cursor(session)
     let n = with_ci_num_children(session, root)
     let target_name = with_cimport_decl_name(session, decl_idx)
-
-    // Name-based search (most reliable — handles system header functions correctly)
     var found_cursor = -1
     var i = 0
     while i < n:
@@ -12250,18 +12500,30 @@ fn ci_try_translate_fn_body(session: i64, decl_idx: i32) -> str:
                 if found_cursor < 0:
                     found_cursor = child
         i = i + 1
+    if found_cursor < 0 or with_ci_cursor_is_definition(session, found_cursor) == 0:
+        return -1
+    found_cursor
 
+fn ci_try_translate_fn_body(session: i64, decl_idx: i32) -> str:
+    ci_try_translate_fn_body_at(session, decl_idx, ci_fn_definition_cursor(session, decl_idx))
+
+fn ci_try_translate_fn_body_at(session: i64, decl_idx: i32, found_cursor: i32) -> str:
+    // A record left by a body that bailed elsewhere must not be charged to
+    // this one: every caller takes the records right after this returns.
+    let _stale = ci_print_take_unknowns()
+    ci_clear_bail_location()
+    // B9: fresh per-function temp counter. This path is called
+    // from ci_translate_function's static-inline branch — which
+    // already resets — but also from other call sites for header
+    // body translation, so reset here too.
+    ci_temp_reset()
     if found_cursor < 0:
-        return ""
-
-    // Check if this cursor is a definition (has a body)
-    if with_ci_cursor_is_definition(session, found_cursor) == 0:
         return ""
 
     // Find the CompoundStmt child (the function body)
     let nc = with_ci_num_children(session, found_cursor)
     var body_cursor = -1
-    i = 0
+    var i = 0
     while i < nc:
         let child = with_ci_child(session, found_cursor, i)
         if with_ci_cursor_kind(session, child) == CXK_COMPOUND_STMT:

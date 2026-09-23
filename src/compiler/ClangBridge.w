@@ -931,6 +931,22 @@ unsafe fn translate_parameter_type(s: *mut CImportSession, ty: CXType, depth: i3
         return session_strdup(s, &buf as *const [2048]u8 as *const u8)
     translate_type_recursive(s, ty, depth, 0)
 
+/// True when clang spells `ty` with MSVC's `__unaligned` qualifier. libclang
+/// reports only const, volatile and restrict as qualifier predicates, and
+/// prints `__unaligned` among the leading qualifier words.
+unsafe fn type_is_unaligned_qualified(ty: CXType) -> bool:
+    let spelling = clang_getTypeSpelling(ty)
+    let words = make_str(clang_getCString(spelling))
+    clang_disposeString(spelling)
+    var found = false
+    for word in words.split(" "):
+        if word == "__unaligned":
+            found = true
+            break
+        if word != "const" and word != "volatile" and word != "restrict":
+            break
+    found
+
 unsafe fn translate_type_recursive_mode(s: *mut CImportSession, ty: CXType, depth: i32, is_last_struct_field: i32, preserve_incomplete_arrays: i32) -> *mut u8:
     if depth > MAX_TYPE_DEPTH:
         return session_strdup(s, "__UNSUPPORTED:type too complex\0" as *const u8)
@@ -986,8 +1002,14 @@ unsafe fn translate_type_recursive_mode(s: *mut CImportSession, ty: CXType, dept
             if fn_str as i64 == 0: return session_strdup(s, "*const i8\0" as *const u8)
             return fn_str
         let qual = if is_volatile != 0: "volatile\0" as *const u8 else: if is_const != 0: "const\0" as *const u8 else: "mut\0" as *const u8
-        // void pointer
-        if can_pointee.kind == CXType_Void:
+        // void pointer, and a pointer to an MSVC `__unaligned` pointee
+        // (winnt.h's UNALIGNED: `METARECORD UNALIGNED *PMETARECORD`). With
+        // has no unaligned pointer: a `*T` read assumes T's alignment, which
+        // the C contract says the address may not have. The address crosses
+        // as an untyped pointer, and a read through it names its type with
+        // an explicit cast (#1417). Its spelling was `*mut __unaligned
+        // struct tagMETARECORD`, which the import failed to parse.
+        if can_pointee.kind == CXType_Void or type_is_unaligned_qualified(pointee):
             var buf: [64]u8 = [0 as u8; 64]
             var pos: i64 = 0
             buf_append_str(&raw mut buf as *mut [64]u8 as *mut u8, &raw mut pos, 64, "*\0" as *const u8)
@@ -1072,6 +1094,10 @@ unsafe fn translate_type_recursive_mode(s: *mut CImportSession, ty: CXType, dept
             bare = (bare as i64 + 6) as *const u8
         if bare as i64 != 0 and c_strncmp(bare, "volatile \0" as *const u8, 9) == 0:
             bare = (bare as i64 + 9) as *const u8
+        // MSVC's `__unaligned` qualifies the object, not the record's name
+        // (a pointer to one imports untyped, above; #1417).
+        if bare as i64 != 0 and c_strncmp(bare, "__unaligned \0" as *const u8, 12) == 0:
+            bare = (bare as i64 + 12) as *const u8
         if bare as i64 != 0 and c_strncmp(bare, "struct \0" as *const u8, 7) == 0:
             bare = (bare as i64 + 7) as *const u8
         else if bare as i64 != 0 and c_strncmp(bare, "union \0" as *const u8, 6) == 0:
