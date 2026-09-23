@@ -10738,6 +10738,10 @@ impl Sema:
         let kind = self.ast.kind(node)
         if kind == NodeKind.NK_PAT_IDENT or kind == NodeKind.NK_PAT_TYPED_BIND:
             return if self.is_copy(self.scope_lookup(self.ast.get_data0(node)) as TypeId) == 0: 1 else: 0
+        // A named tuple rest takes the elements it covers (#1366).
+        if kind == NodeKind.NK_PAT_REST:
+            let rest_name = self.ast.get_data0(node)
+            return if rest_name != 0 and self.is_copy(self.scope_lookup(rest_name) as TypeId) == 0: 1 else: 0
         if kind == NodeKind.NK_PAT_AT_BINDING:
             if self.is_copy(self.scope_lookup(self.ast.get_data0(node)) as TypeId) == 0:
                 return 1
@@ -11716,6 +11720,9 @@ impl Sema:
         let kind = self.ast.kind(node)
         if kind == NodeKind.NK_PAT_IDENT or kind == NodeKind.NK_PAT_TYPED_BIND:
             acc.push(self.ast.get_data0(node))
+        else if kind == NodeKind.NK_PAT_REST:
+            if self.ast.get_data0(node) != 0:
+                acc.push(self.ast.get_data0(node))
         else if kind == NodeKind.NK_PAT_AT_BINDING:
             acc.push(self.ast.get_data0(node))
             acc = self.collect_pattern_binding_syms(self.ast.get_data1(node), move acc)
@@ -13976,8 +13983,17 @@ impl Sema:
         if k == NodeKind.NK_PAT_TUPLE:
             let t_start = self.ast.get_data0(h)
             let t_count = self.ast.get_data1(h)
+            // A `..` covers the middle elements as catch-alls (#1366).
+            let rest = self.ast.tuple_pattern_rest_index(h)
             for ti in 0..arity:
-                out.push(if ti < t_count: self.ast.get_extra(t_start + ti) else: 0)
+                var entry = 0
+                if rest < 0:
+                    entry = if ti < t_count: self.ast.get_extra(t_start + ti) else: 0
+                else if ti < rest:
+                    entry = self.ast.get_extra(t_start + ti)
+                else if ti >= arity - (t_count - 1 - rest):
+                    entry = self.ast.get_extra(t_start + t_count - (arity - ti))
+                out.push(entry)
             return out
         if k == NodeKind.NK_PAT_STRUCT:
             let s_start = self.ast.get_data1(h)
@@ -15132,7 +15148,7 @@ impl Sema:
             return
 
         if kind == NodeKind.NK_PAT_REST:
-            self.emit_error("rest pattern '..' is only valid inside a payload pattern list", node)
+            self.emit_error("rest pattern '..' is only valid inside a payload or tuple pattern list", node)
             return
 
         if kind == NodeKind.NK_PAT_IDENT:
@@ -15269,6 +15285,10 @@ impl Sema:
                     if rest_pos >= 0:
                         self.emit_error("variant pattern can contain only one '..' rest pattern", inner_pat)
                         return
+                    // A payload list has no type to bind its rest as (#1366).
+                    if self.ast.get_data0(inner_pat) != 0:
+                        self.emit_error("a named rest '..name' binds only in a tuple pattern; write '..' here", inner_pat)
+                        return
                     rest_pos = bi
             if rest_pos >= 0:
                 if rest_pos != bind_count - 1:
@@ -15350,12 +15370,38 @@ impl Sema:
                 return
             let elem_start = self.get_type_d0(resolved)
             let elem_count = self.get_type_d1(resolved)
-            if t_count != elem_count:
+            // §9.7 `let (head, ..tail)` (#1366): one `..` stands for the
+            // elements between the patterns before it and the patterns after
+            // it; `..name` binds them as a tuple.
+            let rest = self.ast.tuple_pattern_rest_index(node)
+            if rest < 0 and t_count != elem_count:
                 self.emit_error("tuple pattern arity mismatch", node)
                 return
+            if rest >= 0:
+                for ri in rest + 1..t_count:
+                    let later = self.ast.get_extra(t_extra + ri)
+                    if later > 0 and self.ast.kind(later) == NodeKind.NK_PAT_REST:
+                        self.emit_error("a tuple pattern can contain only one '..'", later)
+                        return
+                if t_count - 1 > elem_count:
+                    self.emit_error(f"tuple pattern arity mismatch: {t_count - 1} patterns besides '..', and the tuple has {elem_count} elements", node)
+                    return
             for ti in 0..t_count:
-                let elem_ty: i32 = self.type_extra[(elem_start + ti)]
-                self.check_pattern(self.ast.get_extra(t_extra + ti), self.pattern_child_subject_type(subject_type, elem_ty))
+                let elem_pat = self.ast.get_extra(t_extra + ti)
+                if ti == rest:
+                    let rest_name = self.ast.get_data0(elem_pat)
+                    if rest_name != 0:
+                        let covered: Vec[i32] = Vec.new()
+                        for ci in rest..rest + elem_count - (t_count - 1):
+                            covered.push(self.pattern_child_subject_type(subject_type, self.type_extra[(elem_start + ci)]))
+                        // Nothing covered binds `()` (§4.8 unit), typed like `()` itself.
+                        let rest_ty = if covered.len() == 0: self.ty_void as i32 else: self.ensure_tuple_type(covered, covered.len() as i32) as i32
+                        self.typed_expr_types.insert(elem_pat, rest_ty)
+                        self.scope_put(rest_name, rest_ty, self.pattern_bind_mut)
+                    continue
+                let si = self.ast.tuple_pattern_subject_index(node, ti, elem_count)
+                let elem_ty: i32 = self.type_extra[(elem_start + si)]
+                self.check_pattern(elem_pat, self.pattern_child_subject_type(subject_type, elem_ty))
             return
 
         if kind == NodeKind.NK_PAT_SLICE:
@@ -16361,7 +16407,8 @@ impl Sema:
             let elem_start = self.get_type_d0(shape as TypeId)
             let elem_count = self.get_type_d1(shape as TypeId)
             for i in 0..count:
-                let elem_ty = if i < elem_count: self.type_extra[(elem_start + i)] else: 0
+                let si = self.ast.tuple_pattern_subject_index(node, i, elem_count)
+                let elem_ty = if si >= 0 and si < elem_count: self.type_extra[(elem_start + si)] else: 0
                 if self.pattern_is_refutable_for(self.ast.get_extra(start + i), elem_ty) != 0:
                     return 1
             return 0
@@ -16405,7 +16452,8 @@ impl Sema:
             let elem_count = self.get_type_d1(shape as TypeId)
             var any = false
             for i in 0..count:
-                if i < elem_count and self.report_fixed_array_slice_mismatch(self.ast.get_extra(start + i), self.type_extra[(elem_start + i)]):
+                let si = self.ast.tuple_pattern_subject_index(node, i, elem_count)
+                if si >= 0 and si < elem_count and self.report_fixed_array_slice_mismatch(self.ast.get_extra(start + i), self.type_extra[(elem_start + si)]):
                     any = true
             return any
         if kind == NodeKind.NK_PAT_STRUCT:

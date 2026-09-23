@@ -7087,12 +7087,27 @@ impl ComptimeEvaluator:
             if value.kind != ComptimeValueKind.CV_TUPLE:
                 return 0
             let count = self.ast.get_data1(pat)
-            if value.extra_count != count:
-                return 0
             let extra_start = self.ast.get_data0(pat)
+            // §9.7 tuple rest (#1366): `..` covers the middle elements and
+            // `..name` binds them as a tuple, as check_pattern types it.
+            let rest = self.ast.tuple_pattern_rest_index(pat)
+            if rest < 0 and value.extra_count != count:
+                return 0
+            if rest >= 0 and value.extra_count < count - 1:
+                return 0
             for i in 0..count:
                 let elem_pat = self.ast.get_extra(extra_start + i)
-                let elem_value = self.extra_value_at((value.extra_start + i) as i64)
+                if i == rest:
+                    let rest_name = self.ast.get_data0(elem_pat)
+                    if rest_name != 0:
+                        let covered = value.extra_count - (count - 1)
+                        let start = self.extra_values.len() as i32
+                        for ci in 0..covered:
+                            self.push_extra_value(self.extra_value_at((value.extra_start + rest + ci) as i64))
+                        self.bind_value(rest_name, comptime_value_tuple(self.node_type_or(elem_pat, 0), start, covered), 0)
+                    continue
+                let si = self.ast.tuple_pattern_subject_index(pat, i, value.extra_count)
+                let elem_value = self.extra_value_at((value.extra_start + si) as i64)
                 if self.match_pattern(elem_pat, elem_value, node) == 0:
                     return 0
             return 1

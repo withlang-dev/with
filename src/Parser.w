@@ -6880,7 +6880,12 @@ impl Parser:
 
         if t == TokenKind.TK_DOT_DOT:
             self.advance()
-            return self.pool.add_node(NodeKind.NK_PAT_REST, start, self.prev_end(), 0, 0, 0)
+            // `..name` binds the elements the rest covers (§9.7 `let (head,
+            // ..tail)`); d0 is the name, 0 for a bare `..` (#1366).
+            var rest_name = 0
+            if self.peek() == TokenKind.TK_IDENT:
+                rest_name = self.expect_ident()
+            return self.pool.add_node(NodeKind.NK_PAT_REST, start, self.prev_end(), rest_name, 0, 0)
 
         // A char/byte literal is an integer literal value (§22, #1295), so
         // `'{' =>`, `b'"' =>` and `'a'..='z' =>` are integer patterns.

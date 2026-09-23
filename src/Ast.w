@@ -1828,6 +1828,22 @@ impl AstPool:
             return false
         ast_is_pattern_kind(self.kind(node as NodeId))
 
+    // Tuple rest patterns (§9.7 `let (head, ..tail)`, #1366): the position
+    // of the first `..` in an NK_PAT_TUPLE, -1 when it has none.
+    fn tuple_pattern_rest_index(pat: i32) -> i32:
+        let start = self.get_data0(pat)
+        for i in 0..self.get_data1(pat):
+            let elem = self.get_extra(start + i)
+            if elem > 0 and self.kind(elem as NodeId) == NodeKind.NK_PAT_REST:
+                return i
+        -1
+
+    // The subject element that element `i` of a tuple pattern matches: the
+    // same position before the rest, counted from the end after it.
+    fn tuple_pattern_subject_index(pat: i32, i: i32, subject_count: i32) -> i32:
+        let rest = self.tuple_pattern_rest_index(pat)
+        if rest < 0 or i < rest: i else: subject_count - (self.get_data1(pat) - i)
+
     // NK_FOR / comprehension binding slots hold an untagged union: a plain
     // binding stores the SYMBOL id, a pattern binding stores the pattern
     // NODE id. The parser records which case it built (key = parent,binding).
@@ -1998,7 +2014,7 @@ impl AstPool:
 // NodeKind.NK_PAT_SLICE:     d0=extra_start, d1=head_count, d2=rest(sym,0=none)
 //                   extra: [has_rest(0/1), head_syms..., tail_count, tail_syms...]
 // NodeKind.NK_PAT_TYPED_BIND:  d0=binding(sym), d1=type(sym), d2=0
-// NodeKind.NK_PAT_REST:      d0=0, d1=0, d2=0
+// NodeKind.NK_PAT_REST:      d0=name (0 for a bare `..`), d1=0, d2=0
 // NodeKind.NK_MATCH_OP:     d0=lhs(str expr), d1=regex expr, d2=0
 // NodeKind.NK_NEG_MATCH_OP: d0=lhs(str expr), d1=regex expr, d2=0
 // NodeKind.NK_PAT_REGEX:    d0=pattern_sym, d1=flags_sym, d2=0

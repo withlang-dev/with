@@ -968,6 +968,14 @@ impl ResolveState:
             self.add_binding(current_scope, name_sym, d)
             return
 
+        // A named tuple rest `..tail` (#1366) binds its name.
+        if kind == NodeKind.NK_PAT_REST:
+            let rest_sym = pool.get_data0(pat)
+            if rest_sym != 0:
+                let d = self.add_def(module_id, parent_def, DefKind.DK_LOCAL, rest_sym, pool.get_start(pat), pool.get_end(pat))
+                self.add_binding(current_scope, rest_sym, d)
+            return
+
         if kind == NodeKind.NK_PAT_AT_BINDING:
             let name_sym = pool.get_data0(pat)
             let d = self.add_def(module_id, parent_def, DefKind.DK_LOCAL, name_sym, pool.get_start(pat), pool.get_end(pat))

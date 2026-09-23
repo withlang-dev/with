@@ -9258,7 +9258,8 @@ impl MirBuilder:
                 return
             let elem_start = self.sema.get_type_d0(tuple_scrut_resolved)
             let elem_count = self.sema.get_type_d1(tuple_scrut_resolved)
-            if tup_count != elem_count:
+            let tup_rest = self.ast.tuple_pattern_rest_index(pat_node)
+            if (tup_rest < 0 and tup_count != elem_count) or (tup_rest >= 0 and tup_count - 1 > elem_count):
                 with_eprint("error: tuple pattern arity mismatch reached MIR lowering")
                 self.mark_unsupported()
                 self.terminate(TermKind.TK_GOTO, fail_bb, 0, 0, 0)
@@ -9268,10 +9269,12 @@ impl MirBuilder:
             for ti in 0..tup_count:
                 let elem_pat = self.ast.get_extra(tup_start + ti)
                 let elem_pk = self.ast.kind(elem_pat)
-                if elem_pk == NodeKind.NK_PAT_WILDCARD or elem_pk == NodeKind.NK_PAT_IDENT:
+                // A `..` (named or not) matches whatever it covers (#1366).
+                if elem_pk == NodeKind.NK_PAT_WILDCARD or elem_pk == NodeKind.NK_PAT_IDENT or elem_pk == NodeKind.NK_PAT_REST:
                     continue
-                let elem_ty: i32 = self.sema.type_extra[(elem_start + ti)]
-                let elem_place = self.body.new_tuple_index_place(tuple_subject_place, ti, elem_ty)
+                let elem_si = self.ast.tuple_pattern_subject_index(pat_node, ti, elem_count)
+                let elem_ty: i32 = self.sema.type_extra[(elem_start + elem_si)]
+                let elem_place = self.body.new_tuple_index_place(tuple_subject_place, elem_si, elem_ty)
                 let next_test = self.new_block()
                 self.switch_to(cur_test_bb)
                 self.lower_pattern_match(elem_place, elem_pat, next_test, fail_bb)
@@ -9392,31 +9395,95 @@ impl MirBuilder:
         0
 
     // A pattern binding takes its value out of the subject. The move is
-    // logged (binding local, subject place) so a failed match guard can put
+    // logged (binding place, subject place) so a failed match guard can put
     // it back (see lower_match).
     mut fn bind_pattern_value(local_place: i32, op: i32, span: i32):
-        if op >= 0 and op < self.body.operand_kinds.len() and self.body.operand_kinds[op] == OperandKind.OK_MOVE:
-            self.pattern_move_log.push(self.body.place_locals[local_place])
-            self.pattern_move_log.push(self.body.operand_d0[op])
+        self.log_pattern_move(local_place, op)
         self.assign_operand_to_place(local_place, op, span)
 
+    mut fn log_pattern_move(bind_place: i32, op: i32):
+        if op >= 0 and op < self.body.operand_kinds.len() and self.body.operand_kinds[op] == OperandKind.OK_MOVE:
+            self.pattern_move_log.push(bind_place)
+            self.pattern_move_log.push(self.body.operand_d0[op])
+
     // Undo the binding moves logged since `start`, newest first: each value
-    // goes back to the subject place it came from and its binding is blanked,
-    // so the binding's scheduled drop frees nothing.
+    // goes back to the subject place it came from and its binding place is
+    // blanked, so the binding's scheduled drop frees nothing. A binding place
+    // is a whole local, or one element of a tuple rest binding (#1366).
     mut fn restore_pattern_moves(start: i32):
         var i = self.pattern_move_log.len() as i32 - 2
         while i >= start:
-            let local: i32 = self.pattern_move_log[i]
+            let bind_place: i32 = self.pattern_move_log[i]
             let src_place: i32 = self.pattern_move_log[i + 1]
-            let local_place = self.place_for_local(local)
-            let back = self.body.new_operand(OperandKind.OK_MOVE, local_place)
+            let back = self.body.new_operand(OperandKind.OK_MOVE, bind_place)
             let back_rv = self.body.new_rvalue(RvalueKind.RK_USE, back, 0, 0)
             self.body.push_stmt(self.cur_bb, StmtKind.Assign, src_place, back_rv, 0)
-            let zop = self.body.gen_zero_operand(self.local_type(local))
+            let zop = self.body.gen_zero_operand(self.place_local_type(bind_place))
             let blank_rv = self.body.new_rvalue(RvalueKind.RK_USE, zop, 0, 0)
-            self.body.push_stmt(self.cur_bb, StmtKind.Assign, local_place, blank_rv, 0)
-            self.body.mark_local_ever_moved(local)
+            self.body.push_stmt(self.cur_bb, StmtKind.Assign, bind_place, blank_rv, 0)
+            self.body.mark_local_ever_moved(self.body.place_locals[bind_place])
             i = i - 2
+
+    // The `..` of a tuple pattern (§9.7, #1366) over subject elements
+    // first..first+covered. A bare `..` discards each one as `_` does (a Drop
+    // element moves into an anonymous local that drops at scope exit). A
+    // `..name` binds them as one tuple of the type check_pattern recorded on
+    // the rest node; each moved element is logged against its slot in that
+    // tuple so a failed guard can put it back.
+    mut fn lower_tuple_rest_pattern(rest_pat: i32, scrutinee_place: i32, tuple_place: i32, elem_start: i32, first: i32, covered: i32) -> Vec[i32]:
+        let out: Vec[i32] = Vec.new()
+        let span = self.ast.get_start(rest_pat)
+        let rest_name = self.ast.get_data0(rest_pat)
+        let child_places: Vec[i32] = Vec.new()
+        for ci in 0..covered:
+            let elem_ty: i32 = self.sema.type_extra[(elem_start + first + ci)]
+            let field_place = self.body.new_tuple_index_place(tuple_place, first + ci, elem_ty)
+            child_places.push(self.pattern_child_subject_place(scrutinee_place, field_place, span))
+        if rest_name == 0:
+            for ci in 0..covered:
+                let child = child_places[ci]
+                let wc_ty = self.place_local_type(child)
+                if self.type_needs_value_drop(wc_ty) != 0 and self.pattern_subject_observed == 0:
+                    let wc_local = self.body.new_local(wc_ty, 0, 0, 1)
+                    self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, wc_local, 0, span)
+                    self.schedule_drop(wc_local, DropKind.DK_VALUE)
+                    let wc_op = self.body.new_operand(OperandKind.OK_MOVE, child)
+                    let wc_place = self.place_for_local(wc_local)
+                    self.bind_pattern_value(wc_place, wc_op, span)
+            return out
+        let rest_ty = self.expr_type(rest_pat)
+        if rest_ty == 0:
+            eprint("error: tuple rest binding reached MIR lowering without the type Sema records for it")
+            self.mark_unsupported()
+            return out
+        let local_id = self.body.new_local(rest_ty, self.pattern_bind_mut, rest_name, 1)
+        self.bind_local(rest_name, local_id)
+        self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, local_id, 0, span)
+        if self.type_needs_value_drop(rest_ty) != 0:
+            self.schedule_drop(local_id, DropKind.DK_VALUE)
+        let local_place = self.place_for_local(local_id)
+        let fields: Vec[i32] = Vec.new()
+        let names: Vec[i32] = Vec.new()
+        for ci in 0..covered:
+            let child = child_places[ci]
+            let moves = self.type_needs_value_drop(self.place_local_type(child)) != 0
+            let op = self.body.new_operand(if moves: OperandKind.OK_MOVE else: OperandKind.OK_COPY, child)
+            if moves:
+                let slot_ty = self.place_local_type(child)
+                let slot = self.body.new_tuple_index_place(local_place, ci, slot_ty)
+                self.log_pattern_move(slot, op)
+            fields.push(op)
+            names.push(0)
+        if covered == 0:
+            let unit = self.unit_operand()
+            self.assign_operand_to_place(local_place, unit, span)
+        else:
+            let fid = self.body.new_agg_fields(fields, names)
+            let rv = self.body.new_rvalue(RvalueKind.RK_AGGREGATE, 0, fid, 0)
+            self.body.push_stmt(self.cur_bb, StmtKind.Assign, local_place, rv, span)
+        out.push(local_id)
+        out.push(scrutinee_place)
+        out
 
     mut fn lower_pattern(pat_node: i32, scrutinee_place: i32) -> Vec[i32]:
         let out: Vec[i32] = Vec.new()
@@ -9560,15 +9627,23 @@ impl MirBuilder:
                 return out
             let elem_start = self.sema.get_type_d0(tuple_bind_scrut_resolved)
             let elem_count = self.sema.get_type_d1(tuple_bind_scrut_resolved)
-            if t_count != elem_count:
+            let t_rest = self.ast.tuple_pattern_rest_index(pat_node)
+            if (t_rest < 0 and t_count != elem_count) or (t_rest >= 0 and t_count - 1 > elem_count):
                 with_eprint("error: tuple pattern arity mismatch reached MIR binding lowering")
                 self.mark_unsupported()
                 return out
 
             for ti in 0..t_count:
                 let elem_pat = self.ast.get_extra(t_start + ti)
-                let elem_ty: i32 = self.sema.type_extra[(elem_start + ti)]
-                let field_place = self.body.new_tuple_index_place(tuple_subject_place, ti, elem_ty)
+                if ti == t_rest:
+                    let covered = elem_count - (t_count - 1)
+                    let rest_out = self.lower_tuple_rest_pattern(elem_pat, scrutinee_place, tuple_subject_place, elem_start, t_rest, covered)
+                    for i in 0..rest_out.len():
+                        out.push(rest_out[i])
+                    continue
+                let si = self.ast.tuple_pattern_subject_index(pat_node, ti, elem_count)
+                let elem_ty: i32 = self.sema.type_extra[(elem_start + si)]
+                let field_place = self.body.new_tuple_index_place(tuple_subject_place, si, elem_ty)
                 let child_place = self.pattern_child_subject_place(scrutinee_place, field_place, self.ast.get_start(pat_node))
                 let inner = self.lower_pattern(elem_pat, child_place)
                 for i in 0..inner.len():

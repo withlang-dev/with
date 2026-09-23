@@ -1085,6 +1085,10 @@ fn render_pattern(pool: AstPool, intern: InternPool, node: NodeId) -> str:
             out.push_str("..")
         return out.to_str() ++ " " ++ render_rbrace()
 
+    if kind == NodeKind.NK_PAT_REST:
+        let rest_name = pool.get_data0(node)
+        return if rest_name != 0: ".." ++ intern.resolve(rest_name) else: ".."
+
     f"<pat:{kind}>"
 
 fn render_type_expr(pool: AstPool, intern: InternPool, node: NodeId) -> str:
