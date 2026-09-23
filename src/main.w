@@ -3088,8 +3088,15 @@ fn run_run_command(source_file: &str, selected_target_hint: &str, opt_level: i32
     comp.set_prelude_mode(prelude_mode)
     comp.set_debug_info(debug_info)
     comp.set_target_kind(cli_platform_target_kind)
-    let bin_path = comp.build_binary(source_file)
+    // The binary, its object and the object's nm report live in a directory
+    // of this invocation's own (#1374). Named by the source alone
+    // (out/<stem>, out/<stem>.o, out/<stem>.o.undef), two `with run`s of one
+    // program in one directory rewrote and deleted each other's files mid-link:
+    // a link that read the other's emptied report linked no runtime at all.
+    let run_dir = link_stage_output_dir_for_source(source_file) ++ f"/run.{with_getpid()}.{with_clock_nanos()}"
+    let bin_path = comp.build_binary_to_path(source_file, run_dir ++ "/" ++ link_stage_basename(link_stage_output_path_for_source(source_file)))
     if bin_path == "":
+        let _ = build_graph_rt_remove_tree(run_dir)
         with_eprint("error: run failed")
         return 1
     comp.print_warnings()
@@ -3100,7 +3107,7 @@ fn run_run_command(source_file: &str, selected_target_hint: &str, opt_level: i32
         build_graph_rt_exec_binary(bin_path)
     else:
         build_graph_rt_exec_argv(bin_path ++ "\0" ++ prog_args)
-    cleanup_binary_artifacts(bin_path)
+    let _ = build_graph_rt_remove_tree(run_dir)
     run_rc
 
 // A wasm program runs through its emitted JS host under node (WITH_NODE
