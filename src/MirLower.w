@@ -3199,6 +3199,12 @@ impl MirBuilder:
                 let expr_node = self.ast.get_extra(pos + 1)
                 let spec_node = self.ast.get_extra(pos + 2)
                 var expr_op = self.lower_expr(expr_node)
+                // Formatting observes its interpolant: every FmtBuffer writer
+                // and fmt_to_str read the value and leave it to its owner. A
+                // place lowered as a value read `move u.name` (#1394), a move no
+                // reset follows, and the owner's drop frees it as a live value.
+                if expr_op >= 0 and expr_op < self.body.operand_kinds.len() and self.body.operand_kinds[expr_op] == OperandKind.OK_MOVE:
+                    expr_op = self.body.new_operand(OperandKind.OK_COPY, self.body.operand_d0[expr_op])
                 var resolved_ty = if self.expr_type(expr_node) > 0: self.sema.resolve_alias(self.expr_type(expr_node)) else: 0
                 var borrowed_str_ref_op = -1
                 // A view interpolant formats its POINTEE — formatting observes
@@ -3654,6 +3660,16 @@ impl MirBuilder:
             return 0
         let resolved = self.sema.resolve_alias(tid as TypeId)
         if self.sema.get_type_kind(resolved) == TypeKind.TY_STR: 1 else: 0
+
+    fn type_id_is_str_or_str_ref(tid: i32) -> i32:
+        if self.type_id_is_str(tid) != 0:
+            return 1
+        if tid == 0:
+            return 0
+        let resolved = self.sema.resolve_alias(tid as TypeId)
+        if self.sema.get_type_kind(resolved) != TypeKind.TY_REF:
+            return 0
+        self.type_id_is_str(self.sema.get_type_d0(resolved))
 
     fn string_alias_index(local_id: i32) -> i32:
         for i in 0..self.string_alias_local_ids.len():
@@ -4373,15 +4389,18 @@ impl MirBuilder:
             self.expected_type = saved_expected
         // String comparisons observe places. The opposite operand supplies
         // type context, but that context does not demand an owned string copy.
-        let observes_strings = is_cmp and self.type_id_is_str(lhs_ty) != 0 and self.type_id_is_str(rhs_ty) != 0
-        let lhs = if observes_strings: self.lower_observer_probe_arg(lhs_expr) else: self.lower_expr(lhs_expr)
+        // An owned side compared with a `&str` observes too: lowered as a
+        // value it read `move v.text` (#1394), a move no reset follows and
+        // the owner's drop frees again.
+        let observes_strings = is_cmp and self.type_id_is_str_or_str_ref(lhs_ty) != 0 and self.type_id_is_str_or_str_ref(rhs_ty) != 0
+        let lhs = if observes_strings and self.type_id_is_str(lhs_ty) != 0: self.lower_observer_probe_arg(lhs_expr) else: self.lower_expr(lhs_expr)
         if self.is_bare_none(rhs_expr) and (lhs_tk == TypeKind.TY_PTR or lhs_tk == TypeKind.TY_REF):
             self.expected_type = lhs_ty
         else if is_cmp and lhs_ty != 0:
             self.expected_type = lhs_ty
         else:
             self.expected_type = saved_expected
-        let rhs = if observes_strings: self.lower_observer_probe_arg(rhs_expr) else: self.lower_expr(rhs_expr)
+        let rhs = if observes_strings and self.type_id_is_str(rhs_ty) != 0: self.lower_observer_probe_arg(rhs_expr) else: self.lower_expr(rhs_expr)
         self.expected_type = saved_expected
         let rv = self.body.new_rvalue(RvalueKind.RK_BIN_OP, op, lhs, rhs)
         var ty = self.expr_type(node)
