@@ -1024,6 +1024,30 @@ and posted on it, then marked ready. Lanes run only nightly and on
 dispatch — post-hoc evidence, never on a push. The SDK is built only on
 release (`sdk-release.yml`).
 
+### Dependent PRs are a `gh stack`, never hand-chained bases
+When PRs depend on each other (a battery's chain), they are a GitHub stack
+made with the `gh stack` extension (`gh extension install github/gh-stack`;
+exit code 9 means stacks are not enabled for the repo). Never stack by hand
+with `gh pr edit --base <other-pr-branch>` or by pushing cumulative branches:
+hand-chaining merged #1357 into a dead branch, and squash-merging the top of a
+cumulative chain (#1360) landed five PRs as one commit (2026-09-22).
+
+- **Create/update:** branches live in staging worktrees, so use
+  `gh stack link --base main <bottom> … <top>` (branch names or PR numbers,
+  bottom to top; no local tracking). It pushes branches, creates missing PRs,
+  and fixes each base to the layer below. Each layer holds only its own
+  commits on top of the layer below.
+- **Draft until green:** link as drafts; mark the stack ready
+  (`gh stack link --open …`, or `gh pr ready` per PR) only after the batch's
+  battery is green and posted.
+- **Merge:** the whole stack or up to one PR, in order, all-or-nothing:
+  `gh stack merge <top-pr> --yes --squash` or the stack UI. Never merge a
+  middle layer by hand.
+- **Main moved:** `gh stack rebase` from a checkout of the stack (merged
+  parents are replayed with `--onto`), then `gh stack push`; a rebase that
+  resolves conflicts needs a new battery before the stack is ready again.
+- **Independent PRs are not stacked.** A single-PR batch has base `main`.
+
 ### Every PR must be bootstrappable
 Each PR must be green and buildable from a tagged seed release that already
 exists in the repo before it merges — if a change needs a newer seed, tag a
