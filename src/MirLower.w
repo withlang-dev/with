@@ -1086,18 +1086,23 @@ impl MirBuilder:
             return DropKind.DK_TASK_EPHEMERAL
         DropKind.DK_TASK_DETACHED
 
-    mut fn emit_task_cancel_call(task_op: i32, intrinsic: MirIntrinsic, node: i32):
-        let cancel_args: Vec[i32] = Vec.new()
-        cancel_args.push(task_op)
-        let cancel_call_id = self.body.new_call_args(cancel_args)
-        self.body.set_call_intrinsic(cancel_call_id, intrinsic)
-        self.body.set_call_ast_node(cancel_call_id, node)
-        let cancel_result_local = self.new_temp(self.sema.ty_i32)
-        let cancel_result_place = self.place_for_local(cancel_result_local)
-        let after_cancel_bb = self.new_block()
-        let cancel_unit = self.unit_operand()
-        self.terminate(TermKind.TK_CALL, cancel_unit, cancel_call_id, cancel_result_place, after_cancel_bb)
-        self.switch_to(after_cancel_bb)
+    // A runtime intrinsic on one task or scope handle (cancel, detach, the
+    // scope's await-all / join-all / destroy). Codegen yields each one's
+    // status as an i32 0, so its destination is an i32 temp: an untyped
+    // destination has no concrete MIR type, and validate-all refused every
+    // scope program for it (#1411).
+    mut fn emit_handle_call(handle_op: i32, intrinsic: MirIntrinsic, node: i32):
+        let args: Vec[i32] = Vec.new()
+        args.push(handle_op)
+        let call_id = self.body.new_call_args(args)
+        self.body.set_call_intrinsic(call_id, intrinsic)
+        self.body.set_call_ast_node(call_id, node)
+        let status_local = self.new_temp(self.sema.ty_i32)
+        let status_place = self.place_for_local(status_local)
+        let after_bb = self.new_block()
+        let callee = self.unit_operand()
+        self.terminate(TermKind.TK_CALL, callee, call_id, status_place, after_bb)
+        self.switch_to(after_bb)
 
     mut fn emit_drop_entry(local_id: i32, drop_kind: i32):
         // Stage 6: M7 drop flags are retired. Conditional moves are handled by the
@@ -1120,68 +1125,27 @@ impl MirBuilder:
         if drop_kind == DropKind.DK_TASK_DETACHED:
             let task_place = self.place_for_local(local_id)
             let task_op = self.body.new_operand(OperandKind.OK_COPY, task_place)
-            self.emit_task_cancel_call(task_op, MirIntrinsic.FIBER_DETACH_CANCEL, 0)
+            self.emit_handle_call(task_op, MirIntrinsic.FIBER_DETACH_CANCEL, 0)
             self.body.push_stmt(self.cur_bb, StmtKind.StorageDead, local_id, 0, 0)
             return
         if drop_kind == DropKind.DK_TASK_EPHEMERAL:
             let cancel_place = self.place_for_local(local_id)
             let cancel_op = self.body.new_operand(OperandKind.OK_COPY, cancel_place)
-            self.emit_task_cancel_call(cancel_op, MirIntrinsic.FIBER_CANCEL, 0)
+            self.emit_handle_call(cancel_op, MirIntrinsic.FIBER_CANCEL, 0)
             let await_place = self.place_for_local(local_id)
             let await_op = self.body.new_operand(OperandKind.OK_COPY, await_place)
             self.lower_cleanup_await(await_op, 0)
             self.body.push_stmt(self.cur_bb, StmtKind.StorageDead, local_id, 0, 0)
             return
-        if drop_kind == DropKind.DK_ASYNC_SCOPE:
+        if drop_kind == DropKind.DK_ASYNC_SCOPE or drop_kind == DropKind.DK_THREAD_SCOPE:
             let scope_place = self.place_for_local(local_id)
-            let scope_op = self.body.new_operand(OperandKind.OK_COPY, scope_place)
-            let await_all_args: Vec[i32] = Vec.new()
-            await_all_args.push(scope_op)
-            let await_all_call_id = self.body.new_call_args(await_all_args)
-            self.body.set_call_intrinsic(await_all_call_id, MirIntrinsic.SCOPE_AWAIT_ALL)
-            let await_all_result = self.new_temp(0)
-            let await_all_place = self.place_for_local(await_all_result)
-            let after_await_all_bb = self.new_block()
-            let await_all_unit = self.unit_operand()
-            self.terminate(TermKind.TK_CALL, await_all_unit, await_all_call_id, await_all_place, after_await_all_bb)
-            self.switch_to(after_await_all_bb)
-
-            let destroy_args: Vec[i32] = Vec.new()
-            destroy_args.push(self.body.new_operand(OperandKind.OK_COPY, scope_place))
-            let destroy_call_id = self.body.new_call_args(destroy_args)
-            self.body.set_call_intrinsic(destroy_call_id, MirIntrinsic.SCOPE_DESTROY)
-            let destroy_result = self.new_temp(0)
-            let destroy_place = self.place_for_local(destroy_result)
-            let after_destroy_bb = self.new_block()
-            let destroy_unit = self.unit_operand()
-            self.terminate(TermKind.TK_CALL, destroy_unit, destroy_call_id, destroy_place, after_destroy_bb)
-            self.switch_to(after_destroy_bb)
-            self.body.push_stmt(self.cur_bb, StmtKind.StorageDead, local_id, 0, 0)
-            return
-        if drop_kind == DropKind.DK_THREAD_SCOPE:
-            let scope_place = self.place_for_local(local_id)
-            let scope_op = self.body.new_operand(OperandKind.OK_COPY, scope_place)
-            let join_all_args: Vec[i32] = Vec.new()
-            join_all_args.push(scope_op)
-            let join_all_call_id = self.body.new_call_args(join_all_args)
-            self.body.set_call_intrinsic(join_all_call_id, MirIntrinsic.THREAD_SCOPE_JOIN_ALL)
-            let join_all_result = self.new_temp(0)
-            let join_all_place = self.place_for_local(join_all_result)
-            let after_join_all_bb = self.new_block()
-            let join_all_unit = self.unit_operand()
-            self.terminate(TermKind.TK_CALL, join_all_unit, join_all_call_id, join_all_place, after_join_all_bb)
-            self.switch_to(after_join_all_bb)
-
-            let destroy_args: Vec[i32] = Vec.new()
-            destroy_args.push(self.body.new_operand(OperandKind.OK_COPY, scope_place))
-            let destroy_call_id = self.body.new_call_args(destroy_args)
-            self.body.set_call_intrinsic(destroy_call_id, MirIntrinsic.THREAD_SCOPE_DESTROY)
-            let destroy_result = self.new_temp(0)
-            let destroy_place = self.place_for_local(destroy_result)
-            let after_destroy_bb = self.new_block()
-            let destroy_unit = self.unit_operand()
-            self.terminate(TermKind.TK_CALL, destroy_unit, destroy_call_id, destroy_place, after_destroy_bb)
-            self.switch_to(after_destroy_bb)
+            let is_async = drop_kind == DropKind.DK_ASYNC_SCOPE
+            let settle = if is_async: MirIntrinsic.SCOPE_AWAIT_ALL else: MirIntrinsic.THREAD_SCOPE_JOIN_ALL
+            let destroy = if is_async: MirIntrinsic.SCOPE_DESTROY else: MirIntrinsic.THREAD_SCOPE_DESTROY
+            let settle_op = self.body.new_operand(OperandKind.OK_COPY, scope_place)
+            self.emit_handle_call(settle_op, settle, 0)
+            let destroy_op = self.body.new_operand(OperandKind.OK_COPY, scope_place)
+            self.emit_handle_call(destroy_op, destroy, 0)
             self.body.push_stmt(self.cur_bb, StmtKind.StorageDead, local_id, 0, 0)
             return
         let place = self.body.new_place(local_id)
@@ -6245,7 +6209,7 @@ impl MirBuilder:
             return self.unit_operand()
         if self.sema.detached_task_stmt_nodes.contains(node):
             let task_op = self.lower_expr(node)
-            self.emit_task_cancel_call(task_op, MirIntrinsic.FIBER_DETACH, node)
+            self.emit_handle_call(task_op, MirIntrinsic.FIBER_DETACH, node)
             return self.unit_operand()
         let saved_expected = self.expected_type
         let kind = self.ast.kind(node)
@@ -10921,7 +10885,7 @@ impl MirBuilder:
         let recv_op = self.lower_receiver_with_method_autoderef_for_method(self_expr, method_sym)
         let stable_op = self.materialize_operand(recv_op, recv_type, self.ast.get_start(self_expr))
         let task_op = self.body.new_operand(OperandKind.OK_COPY, stable_op)
-        self.emit_task_cancel_call(task_op, MirIntrinsic.FIBER_CANCEL, node)
+        self.emit_handle_call(task_op, MirIntrinsic.FIBER_CANCEL, node)
         let await_op = self.body.new_operand(OperandKind.OK_COPY, stable_op)
         self.lower_cleanup_await(await_op, node)
         self.unit_operand()
@@ -11588,7 +11552,7 @@ impl MirBuilder:
         var ci = start_idx
         while ci < task_ops.len():
             let task_op = task_ops[ci]
-            self.emit_task_cancel_call(task_op, MirIntrinsic.FIBER_CANCEL, node)
+            self.emit_handle_call(task_op, MirIntrinsic.FIBER_CANCEL, node)
             self.lower_cleanup_await(task_op, node)
             ci = ci + 1
 
