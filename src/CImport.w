@@ -1640,22 +1640,23 @@ fn ci_detect_member_functions(session: i64, count: i32, known_structs: &str) -> 
     // §16.2a no_methods: true — suppress all auto-method/constructor generation.
     if g_cimport_no_methods_all != 0:
         return ""
-    var output = ""
-    var emitted_methods = ""
-    // Pre-compute snake_case prefixes for all known structs.
-    // known_structs is pipe-delimited: "|Foo||Bar||Baz|"
-    var struct_names: Vec[str] = Vec.new()
-    var struct_prefixes: Vec[str] = Vec.new()
+    var output = StringBuilder.new()
+    var emitted_methods: HashMap[str, bool] = HashMap.new()
+    // Pre-compute snake_case prefixes for all known structs, keyed by name:
+    // windows.h has thousands of structs and functions, and a scan of the
+    // pipe-delimited list per function was the rest of its c_import (#1387).
+    // known_structs is pipe-delimited: "|Foo||Bar||Baz|"; the first entry wins.
+    var struct_prefixes: HashMap[str, str] = HashMap.new()
     var si = 0
     while si < known_structs.len() as i32:
-        if known_structs[si] == 124:
+        if known_structs[si] == '|':
             var se = si + 1
-            while se < known_structs.len() as i32 and known_structs[se] != 124:
+            while se < known_structs.len() as i32 and known_structs[se] != '|':
                 se = se + 1
             if se > si + 1:
                 let sname = known_structs.slice((si + 1) as i64, se as i64)
-                struct_prefixes.push(ci_compute_snake_prefix(sname))
-                struct_names.push(sname)
+                if not struct_prefixes.contains(sname):
+                    struct_prefixes.insert(ci_ir_owned_text(sname), ci_compute_snake_prefix(sname))
             si = se
         else:
             si = si + 1
@@ -1673,47 +1674,35 @@ fn ci_detect_member_functions(session: i64, count: i32, known_structs: &str) -> 
                 if param_count > 0:
                     let first_param_type = with_cimport_fn_param_type_translated(session, i, 0)
                     let struct_name = ci_extract_struct_name_from_ptr(first_param_type)
-                    if struct_name.len() > 0 and ci_str_contains(known_structs, "|" ++ struct_name ++ "|") and not ci_no_methods_for_type(struct_name):
+                    if struct_name.len() > 0 and struct_prefixes.contains(struct_name) and not ci_no_methods_for_type(struct_name):
                         // Try snake_case prefix first, fall back to case-insensitive
-                        var method_name = ""
-                        var sj = 0
-                        while sj < struct_names.len() as i32:
-                            if struct_names[sj] == struct_name:
-                                method_name = ci_strip_snake_prefix(name, struct_prefixes[sj])
-                                break
-                            sj = sj + 1
+                        var method_name = ci_strip_snake_prefix(name, struct_prefixes.get(struct_name) ?? "")
                         if method_name.len() == 0:
                             method_name = ci_strip_struct_prefix(name, struct_name)
                         if method_name.len() > 0:
-                            let method_key = "|" ++ struct_name ++ "." ++ method_name ++ "|"
-                            if not ci_str_contains(emitted_methods, method_key):
-                                emitted_methods = emitted_methods ++ method_key
+                            let method_key = struct_name ++ "." ++ method_name
+                            if not emitted_methods.contains(method_key):
+                                emitted_methods.insert(method_key, true)
                                 let wrapper = ci_emit_member_fn_wrapper(session, i, struct_name, method_name, first_param_type)
                                 if wrapper.len() > 0:
-                                    output = output ++ wrapper
+                                    output.push_str(wrapper)
                                     matched = true
                 // Constructor detection: returns *S without self param
                 if not matched:
                     let ret_struct = ci_extract_struct_name_from_ptr(ret_type)
-                    if ret_struct.len() > 0 and ci_str_contains(known_structs, "|" ++ ret_struct ++ "|") and not ci_no_methods_for_type(ret_struct):
-                        var method_name = ""
-                        var sj = 0
-                        while sj < struct_names.len() as i32:
-                            if struct_names[sj] == ret_struct:
-                                method_name = ci_strip_snake_prefix(name, struct_prefixes[sj])
-                                break
-                            sj = sj + 1
+                    if ret_struct.len() > 0 and struct_prefixes.contains(ret_struct) and not ci_no_methods_for_type(ret_struct):
+                        var method_name = ci_strip_snake_prefix(name, struct_prefixes.get(ret_struct) ?? "")
                         if method_name.len() == 0:
                             method_name = ci_strip_struct_prefix(name, ret_struct)
                         if method_name.len() > 0:
-                            let method_key = "|" ++ ret_struct ++ "." ++ method_name ++ "|"
-                            if not ci_str_contains(emitted_methods, method_key):
-                                emitted_methods = emitted_methods ++ method_key
+                            let method_key = ret_struct ++ "." ++ method_name
+                            if not emitted_methods.contains(method_key):
+                                emitted_methods.insert(method_key, true)
                                 let wrapper = ci_emit_constructor_wrapper(session, i, ret_struct, method_name)
                                 if wrapper.len() > 0:
-                                    output = output ++ wrapper
+                                    output.push_str(wrapper)
         i = i + 1
-    output
+    output.to_str()
 
 // Extract struct name from pointer type: "*mut Foo" → "Foo", "*const Foo" → "Foo"
 fn ci_extract_struct_name_from_ptr(ty: &str) -> str:
