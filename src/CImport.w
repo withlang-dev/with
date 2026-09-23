@@ -3244,14 +3244,36 @@ fn ci_translate_macros(session: i64, type_session: i64, extern_vars: &str, macro
 // splitting into LHS (already parsed at this level) and
 // RHS (parsed at the next higher precedence level).
 
+// #1387: when a level's split fails, the level hands the whole text to the
+// next level (a cast before a unary operator, `(T)-1`, depends on it), so on
+// text that is not an expression the work multiplies across the levels' split
+// points — 373 KB of winnt.h grew to 29 GB. Every level entry spends the bytes
+// it scans from one budget per top-level translation; once it is spent, every
+// level fails at once and the text is reported untranslated.
+let CI_EXPR_SCAN_BUDGET: i64 = 64 * 1024 * 1024
+var g_ci_expr_depth = 0
+var g_ci_expr_scanned: i64 = 0
+
+fn ci_expr_budget_spent(s: &str) -> bool:
+    g_ci_expr_scanned = g_ci_expr_scanned + s.len()
+    g_ci_expr_scanned > CI_EXPR_SCAN_BUDGET
+
 fn ci_translate_c_expr(s: &str, params: &str, known: &str) -> str:
+    let top = g_ci_expr_depth == 0
+    if top:
+        g_ci_expr_scanned = 0
+    g_ci_expr_depth = g_ci_expr_depth + 1
     let trimmed = ci_strip_parens(ci_trim(s))
-    if trimmed.len() == 0:
+    let result = if trimmed.len() == 0: "" else: ci_parse_cond_expr(trimmed, params, known)
+    g_ci_expr_depth = g_ci_expr_depth - 1
+    if top and g_ci_expr_scanned > CI_EXPR_SCAN_BUDGET:
+        eprint(f"warning: c_import: a C expression of {s.len()} bytes exceeded the translator's scan budget ({CI_EXPR_SCAN_BUDGET} bytes); left untranslated")
         return ""
-    ci_parse_cond_expr(trimmed, params, known)
+    result
 
 // Level 0: Ternary conditional  cond ? then : else
 fn ci_parse_cond_expr(s: &str, params: &str, known: &str) -> str:
+    if ci_expr_budget_spent(s): return ""
     let t0 = ci_strip_parens(ci_trim(s))
     if t0.len() == 0:
         return ""
@@ -3272,6 +3294,7 @@ fn ci_parse_cond_expr(s: &str, params: &str, known: &str) -> str:
 
 // Level 1: Logical OR  ||
 fn ci_parse_or_expr(s: &str, params: &str, known: &str) -> str:
+    if ci_expr_budget_spent(s): return ""
     let pos = ci_find_op_at_depth0(s, "||")
     if pos >= 0:
         let lhs = ci_parse_or_expr(s.slice(0, pos as i64), params, known)
@@ -3282,6 +3305,7 @@ fn ci_parse_or_expr(s: &str, params: &str, known: &str) -> str:
 
 // Level 2: Logical AND  &&
 fn ci_parse_and_expr(s: &str, params: &str, known: &str) -> str:
+    if ci_expr_budget_spent(s): return ""
     let pos = ci_find_op_at_depth0(s, "&&")
     if pos >= 0:
         let lhs = ci_parse_and_expr(s.slice(0, pos as i64), params, known)
@@ -3292,6 +3316,7 @@ fn ci_parse_and_expr(s: &str, params: &str, known: &str) -> str:
 
 // Level 3: Bitwise OR  |  (not ||)
 fn ci_parse_bitor_expr(s: &str, params: &str, known: &str) -> str:
+    if ci_expr_budget_spent(s): return ""
     let pos = ci_find_single_op_at_depth0(s, 124, 124)  // '|' but not '||'
     if pos >= 0:
         let lhs = ci_parse_bitor_expr(s.slice(0, pos as i64), params, known)
@@ -3302,6 +3327,7 @@ fn ci_parse_bitor_expr(s: &str, params: &str, known: &str) -> str:
 
 // Level 4: Bitwise XOR  ^
 fn ci_parse_bitxor_expr(s: &str, params: &str, known: &str) -> str:
+    if ci_expr_budget_spent(s): return ""
     let pos = ci_find_char_op_at_depth0(s, 94)  // '^'
     if pos >= 0:
         let lhs = ci_parse_bitxor_expr(s.slice(0, pos as i64), params, known)
@@ -3312,6 +3338,7 @@ fn ci_parse_bitxor_expr(s: &str, params: &str, known: &str) -> str:
 
 // Level 5: Bitwise AND  &  (not &&)
 fn ci_parse_bitand_expr(s: &str, params: &str, known: &str) -> str:
+    if ci_expr_budget_spent(s): return ""
     let pos = ci_find_single_op_at_depth0(s, 38, 38)  // '&' but not '&&'
     if pos >= 0:
         let lhs = ci_parse_bitand_expr(s.slice(0, pos as i64), params, known)
@@ -3322,6 +3349,7 @@ fn ci_parse_bitand_expr(s: &str, params: &str, known: &str) -> str:
 
 // Level 6: Equality  == !=
 fn ci_parse_eq_expr(s: &str, params: &str, known: &str) -> str:
+    if ci_expr_budget_spent(s): return ""
     let pos_eq = ci_find_op_at_depth0(s, "==")
     let pos_neq = ci_find_op_at_depth0(s, "!=")
     let pos = if pos_eq >= 0 and (pos_neq < 0 or pos_eq < pos_neq): pos_eq else: pos_neq
@@ -3336,6 +3364,7 @@ fn ci_parse_eq_expr(s: &str, params: &str, known: &str) -> str:
 
 // Level 7: Relational  < > <= >=
 fn ci_parse_rel_expr(s: &str, params: &str, known: &str) -> str:
+    if ci_expr_budget_spent(s): return ""
     // Find rightmost relational op at depth 0 (to get left-to-right assoc)
     var best_pos = -1
     var best_len = 0
@@ -3372,6 +3401,7 @@ fn ci_parse_rel_expr(s: &str, params: &str, known: &str) -> str:
 
 // Level 8: Shift  << >>
 fn ci_parse_shift_expr(s: &str, params: &str, known: &str) -> str:
+    if ci_expr_budget_spent(s): return ""
     let pos_shl = ci_find_op_at_depth0(s, "<<")
     let pos_shr = ci_find_op_at_depth0(s, ">>")
     let pos = if pos_shl >= 0 and (pos_shr < 0 or pos_shl < pos_shr): pos_shl else: pos_shr
@@ -3391,6 +3421,7 @@ fn ci_parse_shift_expr(s: &str, params: &str, known: &str) -> str:
 
 // Level 9: Additive  + -
 fn ci_parse_add_expr(s: &str, params: &str, known: &str) -> str:
+    if ci_expr_budget_spent(s): return ""
     // Find rightmost + or - at depth 0, but not after another operator (unary)
     var best_pos = -1
     var depth = 0
@@ -3416,6 +3447,7 @@ fn ci_parse_add_expr(s: &str, params: &str, known: &str) -> str:
 
 // Level 10: Multiplicative  * / %
 fn ci_parse_mul_expr(s: &str, params: &str, known: &str) -> str:
+    if ci_expr_budget_spent(s): return ""
     // Find rightmost * / % at depth 0
     var best_pos = -1
     var depth = 0
@@ -3440,6 +3472,7 @@ fn ci_parse_mul_expr(s: &str, params: &str, known: &str) -> str:
 
 // Level 11: Cast  (type)expr
 fn ci_parse_cast_expr(s: &str, params: &str, known: &str) -> str:
+    if ci_expr_budget_spent(s): return ""
     let t = ci_trim(s)
     if t.len() > 0 and t[0] == 40:
         let cast_end = ci_find_matching_paren(t, 0)
@@ -3463,6 +3496,7 @@ fn ci_parse_cast_expr(s: &str, params: &str, known: &str) -> str:
 
 // Level 12: Unary  ! ~ - & * sizeof alignof
 fn ci_parse_unary_expr(s: &str, params: &str, known: &str) -> str:
+    if ci_expr_budget_spent(s): return ""
     let t = ci_trim(s)
     if t.len() == 0:
         return ""
@@ -3533,6 +3567,7 @@ fn ci_parse_unary_expr(s: &str, params: &str, known: &str) -> str:
 
 // Level 13: Postfix  .field ->field [idx] (args)  and primary
 fn ci_parse_postfix_expr(s: &str, params: &str, known: &str) -> str:
+    if ci_expr_budget_spent(s): return ""
     let trimmed = ci_trim(s)
     let t = ci_strip_parens(trimmed)
     if t.len() == 0:
