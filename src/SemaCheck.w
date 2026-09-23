@@ -22825,6 +22825,15 @@ impl Sema:
         if self.iterator_element_type(obj_type as i32) != 0 and self.iterator_operation_known_but_unimplemented(method_name):
             self.emit_error("iterator operation '" ++ method_name ++ "' from §13.3 is not implemented yet", node)
             return 0
+        // A resource a failed producer still produced (`FailedDatabase`,
+        // spec §16.2b.4) admits only the operations its facade states are
+        // valid on the failure state; there is no clause for that yet, so it
+        // admits none (Eric, 2026-09-23, on #1426).
+        let failed_of = self.facade_failed_state_resource(self.type_name(recv_type as i32))
+        if failed_of >= 0:
+            let rname: str = self.pool_resolve(self.facade_resources[failed_of].name)
+            self.emit_error_with_help("unknown method '" ++ method_name ++ "' for type '" ++ receiver_name ++ "': a failed '" ++ rname ++ "' — the resource a failed producer still produced — admits only the operations its facade states are valid on the failure state, and a facade cannot state any yet; its Drop destroys it (§16.2b.4)", node, "its representation is the field `repr`, under the raw C rules (`unsafe`)")
+            return 0
         self.emit_error("unknown method '" ++ method_name ++ "' for type '" ++ receiver_name ++ "'", node)
         0
 

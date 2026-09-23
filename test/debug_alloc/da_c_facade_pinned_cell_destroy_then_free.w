@@ -3,8 +3,10 @@
 // state — Drop runs the facade's `drop` first (`z_end` reads and clears
 // the state through the address `z_init` kept) and the Box field frees
 // the cell after. Every path that moves the value (rebinding, a Vec, a
-// function argument, a return) frees its one cell exactly once, and a
-// failed init (Drop unarmed) still frees its cell: no leak, no double
+// function argument, a return) frees its one cell exactly once. A failed
+// init under `ok` is `Err(StreamError.Failed(status))` (stage 5, Eric
+// 2026-09-23 on #1426): its cell is freed with no destruction call — the
+// one such path — and no `Stream` is ever built over it. No leak, no double
 // free, no read of a freed cell under the debug allocator.
 use c_import("#define Z_OK 0
 typedef struct z_stream_s { int state; struct z_stream_s* strm; } z_stream;
@@ -21,16 +23,14 @@ c facade zl:
 
 fn check(s: &Stream) -> c_int: unsafe { z_check(s.repr.as_ptr()) }
 fn take(s: Stream) -> c_int: check(s)
-fn give() -> Stream:
-    let (_, s) = Stream.z_init(0)
-    s
+fn give() -> Stream: Stream.z_init(0).unwrap()
 
 fn main:
-    let (_, a) = Stream.z_init(0)
+    let a = Stream.z_init(0).unwrap()
     let b = move a
     var v: Vec[Stream] = Vec.new()
     v.push(b)
     v.push(give())
     let n = check(v[0]) + check(v[1]) + take(give())
-    let (_, failed) = Stream.z_init(1)
-    print(f"{n} {failed.live}")
+    let failed = Stream.z_init(1).is_err()
+    print(f"{n} {failed}")

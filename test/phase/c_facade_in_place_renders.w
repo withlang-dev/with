@@ -1,15 +1,19 @@
 //! expect-check-stdout: ok
 
-// D51 §16.2b.3/§16.2b.4 stage 4b: an in-place resource is rendered as
-// ordinary With — `type R { repr, live }`, storage `Repr {}` or the
-// `preinit` operation's result, `R.<init>` calling the C initializer over a
-// pointer to the storage and arming Drop by the `ok` status, Drop and each
-// `destroys` operation passing the address of the representation — over
-// prototype-only C, so this test only checks (phase lane). Three resources
-// wrap one representation (§14); `z_streamp` is the pointer typedef zlib
-// spells, resolved through the alias. `InflateStream` and `DeflateStream`
-// are pinned (a Box cell, D54); `Ctx` is `movable` and renders by value.
-// Nothing here is `unsafe`.
+// D51 §16.2b.3/§16.2b.4: an in-place resource is rendered as ordinary With —
+// `type R { repr, live }`, storage `Repr {}` or the `preinit` operation's
+// result, `R.<init>` calling the C initializer over a pointer to the
+// storage, Drop and each `destroys` operation passing the address of the
+// representation — over prototype-only C, so this test only checks (phase
+// lane). With `ok` the constructor is the Result projection (stage 5, Eric
+// 2026-09-23 on #1426): `InflateStream.inflateInit()` is
+// `Result[InflateStream, InflateStreamError]`, and the failed branch never
+// holds an `InflateStream`; without `ok` a status-returning init yields
+// `(status, R)`. Three resources wrap one representation (§14); `z_streamp`
+// is the pointer typedef zlib spells, resolved through the alias.
+// `InflateStream` and `DeflateStream` are pinned (a Box cell, D54); `Ctx` is
+// `movable` and renders by value. Nothing here is `unsafe`. Constructors
+// keep the C name; presentation (`InflateStream.init`) is §16.2b.11, stage 8.
 
 use c_import("typedef struct { int state; } z_stream;
 typedef z_stream *z_streamp;
@@ -41,11 +45,16 @@ c facade zlib:
     fn inflateReset
         destroys
 
+fn inflate_reset() -> Result[c_int, InflateStreamError]:
+    let inflater = InflateStream.inflateInit()?
+    Ok(inflater.inflateReset(15))
+
 fn main:
-    let (status, inflater) = InflateStream.inflateInit()
-    let reset = inflater.inflateReset(15)
+    let reset = match inflate_reset():
+        Ok(r) => r
+        Err(InflateStreamError.Failed(status)) => status
     let (dstatus, deflater) = DeflateStream.deflateInit(9, 6)
     let ctx = Ctx.ctx_init()
     let held: Vec[DeflateStream] = Vec.new()
     held.push(deflater)
-    print(f"{status} {reset} {dstatus} {ctx.live}")
+    print(f"{reset} {dstatus} {ctx.live}")

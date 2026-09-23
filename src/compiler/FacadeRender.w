@@ -55,16 +55,17 @@
 // The three production forms (spec §16.2b.4, ruling §15): a direct return
 // (above), a pointer out-parameter (facade_render_out_producer: NULL slot,
 // call, inspect — `(status, Option[R])`), and in-place `init`
-// (facade_render_init).
+// (facade_render_init). With `ok CONST` a status-returning producer is
+// projected onto `Result[R, <R>Error]` instead (facade_render_error_type).
+// Constructors keep the C name (`Database.sqlite3_open`); presentation is
+// §16.2b.11, the plan's stage 8.
 //
 // Not rendered: a producer whose resource depends on what it receives (stage
-// 6), and the `Result`-shaped projection of `ok` over an out-parameter
-// producer (awaiting its ruling) — facade_render_producer_pending; Sema
-// reports each at the resource. Nothing is ever rendered as a placeholder: a
-// resource the renderer cannot express yields no text, the facade-level
-// diagnostic names it, and Sema's verify_facade_resources reports a resource
-// that passed every check without becoming a type, or a producer without its
-// constructor.
+// 6) — facade_render_producer_pending; Sema reports it at the resource.
+// Nothing is ever rendered as a placeholder: a resource the renderer cannot
+// express yields no text, the facade-level diagnostic names it, and Sema's
+// verify_facade_resources reports a resource that passed every check without
+// becoming a type, or a producer without its constructor.
 
 use Ast
 use InternPool
@@ -231,16 +232,35 @@ fn facade_render_resource(pool: AstPool, intern: InternPool, ci: &Vec[i32], item
             let repr_arg = facade_render_repr_arg(pool, intern, d, repr_text, "self.repr", pinned)
             let call_args = if args.len() > 0: repr_arg ++ ", " ++ args else: repr_arg
             out = out ++ "    move fn " ++ dname ++ "(" ++ params ++ ")" ++ facade_render_return(pool, intern, d) ++ ":\n        self.live = false\n        " ++ facade_render_call(pool, intern, d, call_args) ++ "\n"
+    // `ok CONST` projects every status-returning producer — an out-parameter
+    // producer or the in-place `init` — onto `Result[R, <R>Error]`
+    // (facade_render_error_type); only out-parameter production can still
+    // produce on failure, so only it adds the failed-state resource.
+    var status_type = ""
+    var failed_state = false
+    if ok_sym != 0:
+        for pi in 0..producers.len() as i32:
+            let ret = if producers[pi] != 0 and out_refs[pi] != 0: facade_render_return(pool, intern, producers[pi]) else: ""
+            if ret.len() > 0:
+                failed_state = true
+                if status_type.len() == 0:
+                    status_type = ret.slice(4, ret.len())
+        if init_fn != 0:
+            let ret = facade_render_return(pool, intern, init_fn)
+            if ret.len() > 0:
+                status_type = ret.slice(4, ret.len())
+    if status_type.len() > 0:
+        out = out ++ facade_render_error_type(pool, intern, name, repr_text, status_type, failed_state, drop_fn)
     for pi in 0..producers.len() as i32:
         let producer = producers[pi]
-        if producer == 0 or facade_render_producer_pending(pool, intern, producer, out_refs[pi], borrows, ok_sym) != 0:
+        if producer == 0 or facade_render_producer_pending(pool, intern, producer, out_refs[pi], borrows) != 0:
             continue
         let pname: str = intern.resolve(pool.get_data0(producer as NodeId))
         if out_refs[pi] != 0:
             let slot = facade_render_param_ref(pool, intern, producer, out_refs[pi])
             if slot < 0:
                 continue
-            out = out ++ facade_render_out_producer(pool, intern, name, repr_text, producer, slot)
+            out = out ++ facade_render_out_producer(pool, intern, name, repr_text, producer, slot, ok_sym)
             continue
         let (params, args) = facade_render_params(pool, intern, producer, 0)
         let call = facade_render_call(pool, intern, producer, args)
@@ -265,13 +285,21 @@ fn facade_render_resource(pool: AstPool, intern: InternPool, ci: &Vec[i32], item
 // representation's ordinary zeroed construction `Repr {}` (every field of an
 // imported struct carries its zero default; ruling §67 consumes that rule)
 // or the `preinit` operation's result — then the C initializer over a
-// pointer to it, then the arming bit. `live` is set only when initialization
-// establishes production (§13.2): with `ok CONST` a status other than the
-// constant leaves Drop unarmed and the storage still cleans up as ordinary
-// With; without `ok` the status is uninterpreted (§16.2b.4), so the resource
-// is live and the status is handed back unread. A status-returning init
-// yields `(status, R)`, the low-level model every projection sits over; a
-// void init yields `R`.
+// pointer to it. A void init yields `R`. A status-returning init without
+// `ok` yields `(status, R)`: the status is uninterpreted (§16.2b.4), the
+// facade's `init` is the production evidence, and the status is handed back
+// unread.
+//
+// With `ok CONST` the result is the Result projection (Eric, 2026-09-23, on
+// #1426), `Result[R, <R>Error]`, where `<R>Error` has the one variant
+// `Failed(status)` (a failed init produced nothing — §16.2b.3: "Drop is armed
+// only when initialization establishes production"). A failed init returns
+// `Err` before the storage becomes an `R`, so no `R` — armed or not — ever
+// holds storage C did not initialize, and no destroyer can reach it. The
+// storage is then dropped as ordinary With storage: for a pinned resource
+// that is the one path on which the Box cell is freed with no destruction
+// call, because nothing was produced to destroy (ruling §13.2: "the foreign
+// destructor does not run … ordinary With storage cleanup still occurs").
 //
 // Pinned (the default, D54): the storage is a Box cell the value owns, so
 // the cell exists — with its one address — from the construction of R,
@@ -279,13 +307,18 @@ fn facade_render_resource(pool: AstPool, intern: InternPool, ci: &Vec[i32], item
 // destruction operation runs in R's own Drop before the field's Drop frees
 // the cell (the cell outlives the C state, never the reverse).
 //
-//     fn R.init(<preinit args>, <init args after self>) -> (c_int, R):
+//     fn R.init(<preinit args>, <init args after self>) -> Result[R, RError]:
 //         var repr = Box.new(Repr {})                     // or Box.new(preinit(<preinit args>))
 //         let status = init(repr.as_mut_ptr(), <args>)
-//         (status, R { repr, live: status == OK })         // `live: true` without ok
+//         if status != OK: return Err(RError.Failed(status))   // the cell is freed; no destroyer
+//         Ok(R { repr: repr, live: true })
 //
 // `movable`: the same over a by-value field — `var repr = Repr {}` and
 // `init(&raw mut repr, <args>)`.
+//
+// The constructor is named after the C initializer (`Stream.inflateInit`):
+// presentation — `Stream.init`, prefix shortening, `rename` — is §16.2b.11,
+// the plan's stage 8; the C name is not the final spelling.
 fn facade_render_init(pool: AstPool, intern: InternPool, name: &str, repr_text: &str, init_fn: i32, preinit_fn: i32, ok_sym: i32, pinned: bool) -> str:
     let iname: str = intern.resolve(pool.get_data0(init_fn as NodeId))
     // The storage and status locals are spelled apart from every parameter
@@ -310,59 +343,131 @@ fn facade_render_init(pool: AstPool, intern: InternPool, name: &str, repr_text: 
     let ret = facade_render_return(pool, intern, init_fn)
     let call_args = if iargs.len() > 0: storage_arg ++ ", " ++ iargs else: storage_arg
     let call = facade_render_call(pool, intern, init_fn, call_args)
-    var out = "fn " ++ name ++ "." ++ iname ++ "(" ++ params ++ ")"
+    let out = "fn " ++ name ++ "." ++ iname ++ "(" ++ params ++ ")"
+    let made = name ++ " { repr: " ++ repr ++ ", live: true }"
     if ret.len() == 0:
         if ok_sym != 0:
             return ""
-        return out ++ " -> " ++ name ++ ":\n    var " ++ repr ++ " = " ++ storage ++ "\n    " ++ call ++ "\n    " ++ name ++ " { repr: " ++ repr ++ ", live: true }\n"
-    let armed = if ok_sym != 0: status ++ " == " ++ intern.resolve(ok_sym) else: "true"
-    out ++ " -> (" ++ ret.slice(4, ret.len()) ++ ", " ++ name ++ "):\n    var " ++ repr ++ " = " ++ storage ++ "\n    let " ++ status ++ " = " ++ call ++ "\n    (" ++ status ++ ", " ++ name ++ " { repr: " ++ repr ++ ", live: " ++ armed ++ " })\n"
+        return out ++ " -> " ++ name ++ ":\n    var " ++ repr ++ " = " ++ storage ++ "\n    " ++ call ++ "\n    " ++ made ++ "\n"
+    if ok_sym == 0:
+        return out ++ " -> (" ++ ret.slice(4, ret.len()) ++ ", " ++ name ++ "):\n    var " ++ repr ++ " = " ++ storage ++ "\n    let " ++ status ++ " = " ++ call ++ "\n    (" ++ status ++ ", " ++ made ++ ")\n"
+    let err = facade_render_error_name(name)
+    out ++ " -> Result[" ++ name ++ ", " ++ err ++ "]:\n    var " ++ repr ++ " = " ++ storage ++ "\n    let " ++ status ++ " = " ++ call ++ "\n    if " ++ status ++ " != " ++ intern.resolve(ok_sym) ++ ": return Err(" ++ err ++ ".Failed(" ++ status ++ "))\n    Ok(" ++ made ++ ")\n"
 
 // An out-parameter producer's constructor (ruling §16, spec §16.2b.4). The
 // physical commitment: initialize the slot to NULL, call, inspect the slot —
 // non-null is a produced resource whose ownership begins at once, null is
-// none. That is production, not success: the status is kept beside it, so a
-// failed call that still produced (a failed `sqlite3_open` hands back a
-// handle that must be closed, ruling §18) yields `Some(R)`, and its Drop runs
-// the destroyer exactly once like any other. With no status convention the
-// status is uninterpreted and handed back unread:
+// none. That is production, not success. With no status convention the
+// status is uninterpreted and handed back unread beside it, so a failed call
+// that still produced (a failed `sqlite3_open` hands back a handle that must
+// be closed, ruling §18) yields `Some(R)`, whose Drop runs the destroyer
+// exactly once:
 //
 //     fn R.p(<params but the slot>) -> (S, Option[R]):
 //         var slot: Repr = null
 //         let status = unsafe { p(<args>, &raw mut slot, <args>) }
 //         (status, if slot == null: None else: Some(R { repr: slot, live: true }))
 //
+// With `ok CONST` the result is the Result projection instead (Eric,
+// 2026-09-23, on #1426) — one call surface per production form, and the
+// low-level pair is not rendered beside it. Every combination of status and
+// slot stays distinct:
+//
+//     fn R.p(<params but the slot>) -> Result[R, RError]:
+//         var slot: Repr = null
+//         let status = unsafe { p(<args>, &raw mut slot, <args>) }
+//         if status != OK:
+//             if slot == null: return Err(RError.Failed(status))
+//             return Err(RError.FailedWithResource(status, FailedR { repr: slot }))
+//         if slot == null: return Err(RError.NothingProduced(status))
+//         Ok(R { repr: slot, live: true })
+//
+// "Status OK, nothing produced" violates the C contract the facade states
+// (`ok` says what success is; a success that produced nothing is not one it
+// can hand back as an `R`), and it is its own variant: `Failed` with an OK
+// status would read as a contradiction. A failure that produced is owned by
+// the error (FailedWithResource), whose Drop destroys it exactly once.
+//
 // A producer returning nothing yields `Option[R]`. The locals are spelled
-// apart from the parameters (facade_render_fresh).
-fn facade_render_out_producer(pool: AstPool, intern: InternPool, name: &str, repr_text: &str, producer: i32, slot: i32) -> str:
+// apart from the parameters (facade_render_fresh). The constructor keeps the
+// C name (`Database.sqlite3_open`): presentation — `Database.open`, prefix
+// shortening, `rename` — is §16.2b.11, the plan's stage 8, so the C name is
+// not the final spelling.
+fn facade_render_out_producer(pool: AstPool, intern: InternPool, name: &str, repr_text: &str, producer: i32, slot: i32, ok_sym: i32) -> str:
     let pname: str = intern.resolve(pool.get_data0(producer as NodeId))
     let taken = facade_render_param_names(pool, intern, producer)
     let slot_var = facade_render_fresh("slot", taken)
     let (params, args) = facade_render_params_but(pool, intern, producer, 0, slot, "&raw mut " ++ slot_var)
     let call = facade_render_call(pool, intern, producer, args)
-    let made = "if " ++ slot_var ++ " == null: None else: Some(" ++ name ++ " { repr: " ++ slot_var ++ ", live: true })"
+    let made = name ++ " { repr: " ++ slot_var ++ ", live: true }"
     let head = "fn " ++ name ++ "." ++ pname ++ "(" ++ params ++ ")"
     let null_slot = "    var " ++ slot_var ++ ": " ++ repr_text ++ " = null\n"
     let ret = facade_render_return(pool, intern, producer)
     if ret.len() == 0:
-        return head ++ " -> Option[" ++ name ++ "]:\n" ++ null_slot ++ "    " ++ call ++ "\n    " ++ made ++ "\n"
+        return head ++ " -> Option[" ++ name ++ "]:\n" ++ null_slot ++ "    " ++ call ++ "\n    if " ++ slot_var ++ " == null: None else: Some(" ++ made ++ ")\n"
     let status = facade_render_fresh("status", taken)
-    head ++ " -> (" ++ ret.slice(4, ret.len()) ++ ", Option[" ++ name ++ "]):\n" ++ null_slot ++ "    let " ++ status ++ " = " ++ call ++ "\n    (" ++ status ++ ", " ++ made ++ ")\n"
+    if ok_sym == 0:
+        return head ++ " -> (" ++ ret.slice(4, ret.len()) ++ ", Option[" ++ name ++ "]):\n" ++ null_slot ++ "    let " ++ status ++ " = " ++ call ++ "\n    (" ++ status ++ ", if " ++ slot_var ++ " == null: None else: Some(" ++ made ++ "))\n"
+    let err = facade_render_error_name(name)
+    var out = head ++ " -> Result[" ++ name ++ ", " ++ err ++ "]:\n" ++ null_slot ++ "    let " ++ status ++ " = " ++ call ++ "\n"
+    out = out ++ "    if " ++ status ++ " != " ++ intern.resolve(ok_sym) ++ ":\n"
+    out = out ++ "        if " ++ slot_var ++ " == null: return Err(" ++ err ++ ".Failed(" ++ status ++ "))\n"
+    out = out ++ "        return Err(" ++ err ++ ".FailedWithResource(" ++ status ++ ", " ++ facade_render_failed_name(name) ++ " { repr: " ++ slot_var ++ " }))\n"
+    out = out ++ "    if " ++ slot_var ++ " == null: return Err(" ++ err ++ ".NothingProduced(" ++ status ++ "))\n"
+    out ++ "    Ok(" ++ made ++ ")\n"
 
-// Why no constructor is rendered for a producer (0: one is).
-// 1 — the produced resource depends on what the producer receives: the
-//     resource states `borrows`, or a parameter other than the out slot takes
-//     a resource's representation (unknown independence means dependency,
-//     §16.2b.6). Dependency is modeled by the plan's stage 6; a constructor
-//     that dropped it could outlive its parent.
-// 2 — `ok` over a status-returning out-parameter producer: the Result-shaped
-//     projection (§16.2b.4) awaits its ruling; the low-level `(status,
-//     Option[R])` constructor without the projection would leave the clause
-//     unread.
-// SemaFacade.w facade_producer_pending makes the same classification from
-// the signatures and reports it at the resource; its net refuses any other
-// producer left without a constructor.
-fn facade_render_producer_pending(pool: AstPool, intern: InternPool, producer: i32, out_ref: i32, borrows: bool, ok_sym: i32) -> i32:
+// The names the Result projection renders beside a resource `R`: its error
+// type and the type of a resource a failed producer still produced. Sema
+// (SemaFacade.w facade_generated_type_names) refuses a program in which
+// either name already denotes another type.
+pub fn facade_render_error_name(name: &str) -> str: name ++ "Error"
+pub fn facade_render_failed_name(name: &str) -> str: "Failed" ++ name
+
+// `<R>Error` (Eric, 2026-09-23, on #1426): an `error` declaration, so it
+// composes with §10.9 (`error AppError from DatabaseError`) and gets the
+// generated Error/Debug/Display.
+//
+//     error DatabaseError =
+//         | Failed(status: S)
+//         | FailedWithResource(status: S, resource: FailedDatabase)
+//         | NothingProduced(status: S)
+//
+// `FailedWithResource` and `NothingProduced` exist only when an
+// out-parameter producer is projected; a failed in-place init produced
+// nothing, and a successful one produced, so its error type is `Failed`
+// alone.
+//
+// The resource a failed producer still produced is `Failed<R>`, not `R`: the
+// failure state admits only the operations the facade states are valid on
+// it, the facade has no clause for that yet, and so it admits none — no lend
+// methods, no destroyers, only raw access to its representation under the
+// raw C rules. Its Drop runs the facade's `drop` exactly once: dropping the
+// error, or whatever took the resource out of it, destroys it.
+//
+//     type FailedDatabase { repr: *mut sqlite3 }
+//     impl Drop for FailedDatabase:
+//         move fn drop():
+//             unsafe { sqlite3_close(self.repr) }
+fn facade_render_error_type(pool: AstPool, intern: InternPool, name: &str, repr_text: &str, status_type: &str, failed_state: bool, drop_fn: i32) -> str:
+    let err = facade_render_error_name(name)
+    var out = ""
+    if failed_state:
+        let failed = facade_render_failed_name(name)
+        out = "type " ++ failed ++ " { repr: " ++ repr_text ++ " }\nimpl Drop for " ++ failed ++ ":\n    move fn drop():\n        " ++ facade_render_call(pool, intern, drop_fn, facade_render_repr_arg(pool, intern, drop_fn, repr_text, "self.repr", false)) ++ "\n"
+    out = out ++ "error " ++ err ++ " =\n    | Failed(status: " ++ status_type ++ ")\n"
+    if failed_state:
+        out = out ++ "    | FailedWithResource(status: " ++ status_type ++ ", resource: " ++ facade_render_failed_name(name) ++ ")\n    | NothingProduced(status: " ++ status_type ++ ")\n"
+    out
+
+// Why no constructor is rendered for a producer (0: one is). 1 — the
+// produced resource depends on what the producer receives: the resource
+// states `borrows`, or a parameter other than the out slot takes a
+// resource's representation (unknown independence means dependency,
+// §16.2b.6). Dependency is modeled by the plan's stage 6; a constructor that
+// dropped it could outlive its parent. SemaFacade.w facade_producer_pending
+// makes the same classification from the signatures and reports it at the
+// resource; its net refuses any other producer left without a constructor.
+fn facade_render_producer_pending(pool: AstPool, intern: InternPool, producer: i32, out_ref: i32, borrows: bool) -> i32:
     if borrows:
         return 1
     let slot = if out_ref != 0: facade_render_param_ref(pool, intern, producer, out_ref) else: -1
@@ -373,8 +478,6 @@ fn facade_render_producer_pending(pool: AstPool, intern: InternPool, producer: i
     for pi in 0..pool.fn_meta_param_count(meta):
         if pi != slot and facade_render_takes_resource(pool, intern, render_type_expr(pool, intern, pool.fn_param_type(start, pi) as NodeId)):
             return 1
-    if out_ref != 0 and ok_sym != 0 and facade_render_return(pool, intern, producer).len() > 0:
-        return 2
     0
 
 // Whether a parameter type takes a resource's representation, or a pointer

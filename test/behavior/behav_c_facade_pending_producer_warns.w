@@ -7,11 +7,10 @@ use pre_d_build_runner
 // resource's representation, or a resource that `borrows`, produces a
 // dependent resource (spec §16.2b.6: unknown independence means dependency);
 // a constructor that dropped the dependency could outlive its parent, and
-// dependency is modeled by the plan's stage 6. `ok` over a status-returning
-// out-parameter producer projects to a Result-shaped API (§16.2b.4) whose
-// surface awaits a ruling. Every other producer has its constructor
-// (`Database.db_new` here); the positional reason prints the resolved C
-// parameter (§57).
+// dependency is modeled by the plan's stage 6. Every other producer has its
+// constructor — `Database.db_new`, and `Database.db_open`, whose `ok`
+// projection is `Result[Database, DatabaseError]` — and draws no warning;
+// the positional reason prints the resolved C parameter (§57).
 fn main:
     let case_dir = p7_prepare_case("c_facade_pending_producer_warns", "pendwarn")
     p7_write(case_dir, "main.w", "use c_import(\"typedef struct db db;
@@ -52,6 +51,6 @@ fn main:
     assert(checked.stderr.contains("resource 'Statement': no constructor is rendered for producer 'st_new': it receives a resource's representation (param 0: *mut db d), so what it produces depends on it"))
     assert(checked.stderr.contains("resource 'Statement': no constructor is rendered for producer 'st_open': it receives a resource's representation (param 0: *mut db d)"))
     assert(checked.stderr.contains("resource 'Tokens': no constructor is rendered for producer 'tk_new': the resource borrows from param 0: *const i8 text"))
-    assert(checked.stderr.contains("resource 'Database': no constructor is rendered for producer 'db_open': 'ok DB_OK' projects its status to a Result-shaped API (§16.2b.4) whose surface is not yet ruled"))
+    assert(not checked.stderr.contains("producer 'db_open'"))
     assert(not checked.stderr.contains("producer 'db_new'"))
     print("ok")
