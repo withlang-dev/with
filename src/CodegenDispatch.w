@@ -2510,6 +2510,27 @@ impl Codegen:
         args.push(self.build_str_ref_from_value(rhs))
         self.call_internal_runtime_fn("with_str_concat_ref", param_types, args, 2, str_ty)
 
+    // A compound display (an enum variant's payloads, a struct's fields, an
+    // option's payload) joins parts that are all its own: literals and the
+    // strs coerce_typed_val_to_str returns. The join frees both inputs — each
+    // was an intermediate the result supersedes (#1392: every payload display
+    // leaked its pieces). with_str_free leaves a literal alone; its buffer is
+    // not an owned payload.
+    mut fn mir_fmt_join(lhs: i64, rhs: i64) -> i64:
+        let str_ty = self.resolve_named_type(self.intern.intern("str"))
+        let lhs_ref = self.build_str_ref_from_value(lhs)
+        let rhs_ref = self.build_str_ref_from_value(rhs)
+        let param_types: Vec[i64] = Vec.new()
+        param_types.push(wl_ptr_type(self.context))
+        param_types.push(wl_ptr_type(self.context))
+        let args: Vec[i64] = Vec.new()
+        args.push(lhs_ref)
+        args.push(rhs_ref)
+        let joined = self.call_internal_runtime_fn("with_str_concat_ref", param_types, args, 2, str_ty)
+        self.mir_emit_str_free_ptr(lhs_ref)
+        self.mir_emit_str_free_ptr(rhs_ref)
+        joined
+
     mut fn mir_str_concat_n(body: &MirBody, args_id: i32, move_first: i32) -> i64:
         let str_ty = self.resolve_named_type(self.intern.intern("str"))
         if args_id < 0 or args_id >= body.call_arg_starts.len() as i32:
@@ -2883,9 +2904,10 @@ impl Codegen:
                     effective_sema_ty = recovered
                     resolved = recovered
                     tk = self.mir_display_type_kind(resolved)
+        // The result is the caller's own str, never the value itself: MIR drops
+        // a formatted result as a statement temp, and a compound display frees
+        // each formatted part once joined (#1392). A str is copied.
         if tk == TypeKind.TY_STR:
-            if val_ty == str_ty:
-                return val
             return self.call_runtime_str_fn_ref("with_fmt_str_ref", val, str_ty)
         if tk == TypeKind.TY_ENUM:
             return self.gen_display_enum(val, effective_sema_ty, str_ty)
@@ -2896,7 +2918,10 @@ impl Codegen:
         // (D61); Sema registered it with the enum that holds it.
         if tk == TypeKind.TY_STRUCT or tk == TypeKind.TY_GENERIC_INST or tk == TypeKind.TY_TUPLE or tk == TypeKind.TY_ARRAY or tk == TypeKind.TY_SLICE:
             return self.call_debug_formatter(val, effective_sema_ty, str_ty)
-        self.coerce_val_to_str_ext(val, str_ty, self.mir_sema_type_is_unsigned(effective_sema_ty))
+        let text = self.coerce_val_to_str_ext(val, str_ty, self.mir_sema_type_is_unsigned(effective_sema_ty))
+        if text == val:
+            return self.call_runtime_str_fn_ref("with_fmt_str_ref", val, str_ty)
+        text
 
     // D61 (§15.4.7): the `:?` text of a value outside an f-string buffer —
     // an unwrap/expect panic's Err payload. The inline rows format here;
@@ -2964,17 +2989,17 @@ impl Codegen:
         let payload_count = self.mir_enum_variant_payload_count(enum_sema_ty, variant_idx)
         if payload_count <= 0:
             return result
-        result = self.mir_str_concat(result, self.gen_string_literal_raw("("))
+        result = self.mir_fmt_join(result, self.gen_string_literal_raw("("))
         for pi in 0..payload_count:
             if pi > 0:
-                result = self.mir_str_concat(result, self.gen_string_literal_raw(", "))
+                result = self.mir_fmt_join(result, self.gen_string_literal_raw(", "))
             let payload_val = self.gen_enum_payload_field_value(val, enum_sema_ty, variant_idx, pi)
             if payload_val == 0:
                 sema_phase_bug(f"BUG: no payload value for enum type {enum_sema_ty} variant {variant_idx} field {pi} while formatting")
             let payload_sema_ty = self.mir_enum_payload_sema_type(enum_sema_ty, variant_idx, pi)
             let payload_str = self.coerce_typed_val_to_str(payload_val, payload_sema_ty, str_ty)
-            result = self.mir_str_concat(result, payload_str)
-        result = self.mir_str_concat(result, self.gen_string_literal_raw(")"))
+            result = self.mir_fmt_join(result, payload_str)
+        result = self.mir_fmt_join(result, self.gen_string_literal_raw(")"))
         result
 
     // Option[&T] is a nullable pointer, not a tag + payload struct (D22: the
@@ -2982,8 +3007,8 @@ impl Codegen:
     // any other value is the address of the T the option observes. The
     // tag/payload walk in gen_display_enum would read a struct that is not
     // there, so this formats the two shapes directly. Formatting observes:
-    // the pointee is loaded and formatted as its own type (a str pointee
-    // reaches the concat as the borrowed value, which concat only reads).
+    // the pointee is loaded and formatted as its own type (a str pointee is
+    // copied, and the join frees the copy).
     mut fn gen_display_nullable_option(val: i64, enum_sema_ty: i32, str_ty: i64) -> i64:
         let variant_count = self.mir_enum_variant_count(enum_sema_ty)
         var some_idx = -1
@@ -3009,9 +3034,9 @@ impl Codegen:
         wl_position_at_end(self.builder, some_bb)
         let payload_str = self.coerce_typed_val_to_str(val, ref_sema, str_ty)
         var some_str = self.gen_string_literal_raw(self.mir_enum_variant_name(enum_sema_ty, some_idx))
-        some_str = self.mir_str_concat(some_str, self.gen_string_literal_raw("("))
-        some_str = self.mir_str_concat(some_str, payload_str)
-        some_str = self.mir_str_concat(some_str, self.gen_string_literal_raw(")"))
+        some_str = self.mir_fmt_join(some_str, self.gen_string_literal_raw("("))
+        some_str = self.mir_fmt_join(some_str, payload_str)
+        some_str = self.mir_fmt_join(some_str, self.gen_string_literal_raw(")"))
         wl_build_store(self.builder, some_str, result_ptr)
         wl_build_br(self.builder, merge_bb)
         wl_position_at_end(self.builder, merge_bb)

@@ -337,6 +337,21 @@ fn sc_fstring_hole(form: &str) -> str:
     "    let text = f\"<" ++ hole ++ ">\"\n" ++
     "    let _n = text.len()\n"
 
+// #1392: the built-in display of an enum or struct formats each part into a
+// str of its own and joins them. Every part and every intermediate join is
+// freed exactly once; a str payload is copied first, so the value keeps its
+// own. (R itself has no display — its fields are raw pointers — so these
+// cells format values beside it; the allocator verdict is the check.)
+fn sc_display(form: &str) -> str:
+    let value = if form == "enum": "Tag.Named(r.id, \"n\" ++ \"m\")" else if form == "nested": "Some(Tag.Named(r.id, \"n\" ++ \"m\"))" else: "Row { n: r.id, s: \"a\" ++ \"b\" }"
+    "enum Tag:\n    Named(i32, str)\n    Bare\n" ++
+    "type Row { n: i32, s: str }\n" ++
+    "fn go(slot: *mut i32):\n" ++
+    "    let r = mk(1, slot)\n" ++
+    "    let v = " ++ value ++ "\n" ++
+    "    let text = f\"{v:?}\"\n" ++
+    "    let _n = text.len()\n"
+
 // #1365 (§9.7, §2.4): `let PAT = subject else: <diverge>` consumes its
 // subject on both paths. The failing path drops the whole subject — whichever
 // variant it holds — exactly once before it diverges; the matching path moves
@@ -524,6 +539,8 @@ fn build_cells():
     cells.push(cell("vec_elem_drop/vec", sc_vec_elem(), 3))
     for form in ["field", "method", "concat", "slice", "spec"]:
         cells.push(cell("fstring_hole_temp_" ++ form ++ "/bare", sc_fstring_hole(form), 1))
+    for form in ["enum", "nested", "struct"]:
+        cells.push(cell("display_parts_" ++ form ++ "/" ++ form, sc_display(form), 1))
     for sh in ["result", "option", "enum", "nested", "struct"]:
         for subj in ["temp", "local"]:
             let local = subj == "local"
