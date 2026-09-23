@@ -2323,7 +2323,11 @@ impl Sema:
                         // refutability note would only pile on.
                         let unresolved_variant = self.ast.kind(ppat) == NodeKind.NK_PAT_VARIANT and
                             not self.comp_resolved.contains(ppat) and not self.pattern_value_syms.contains(ppat)
-                        if not unresolved_variant and self.pattern_is_refutable(ppat) != 0 and self.fn_is_clause_body_symbol(fn_name) == 0:
+                        // A slice pattern over a fixed-size array parameter is
+                        // decided by its length, as in a let (#1367).
+                        let ppat_ty = self.sig_param_type(sig_idx, pi)
+                        let ppat_mismatch = self.report_fixed_array_slice_mismatch(ppat, ppat_ty)
+                        if not unresolved_variant and not ppat_mismatch and self.pattern_is_refutable_for(ppat, ppat_ty) != 0 and self.fn_is_clause_body_symbol(fn_name) == 0:
                             self.emit_error("refutable parameter pattern requires another function clause or an else", ppat)
 
         // Effect tracking: save outer state and populate for this function
@@ -16310,7 +16314,11 @@ impl Sema:
             val_type = ann_type
         if val_type != 0 and val_type != self.ty_void:
             self.typed_expr_types.insert(value, val_type as i32)
-        if else_body == 0 and self.pattern_is_refutable(pattern) != 0:
+        // §9.7: a slice pattern over a fixed-size array is decided at compile
+        // time. One that can never match is an error in any let; one that
+        // always matches is irrefutable and needs no else (#1367).
+        let slice_mismatch = self.report_fixed_array_slice_mismatch(pattern, val_type as i32)
+        if else_body == 0 and not slice_mismatch and self.pattern_is_refutable_for(pattern, val_type as i32) != 0:
             self.emit_error("let ... else requires an else branch for refutable patterns", node)
         self.pattern_subject_node = value
         // §9.7: `var PATTERN = ...` binds every name it introduces mutably (#1354).
@@ -16333,6 +16341,86 @@ impl Sema:
             if else_kind != TypeKind.TY_NEVER:
                 self.emit_error("let ... else requires a diverging else branch", else_body)
         self.ty_void as i32
+
+    // Refutability against the subject's type (§9.7). The type is what
+    // decides a slice pattern over a fixed-size array: `[a, b, c]` against
+    // `[3]T` always matches. Tuple elements, struct fields and at-bindings
+    // pass their own types down; everything else is the untyped rule.
+    mut fn pattern_is_refutable_for(node: i32, subject_type: i32) -> i32:
+        if node == 0:
+            return 0
+        let kind = self.ast.kind(node)
+        let shape = if subject_type != 0: self.resolve_alias(self.pattern_subject_shape_type(subject_type) as TypeId) as i32 else: 0
+        if kind == NodeKind.NK_PAT_SLICE:
+            return if self.exh_slice_always_matches(node, shape): 0 else: 1
+        if kind == NodeKind.NK_PAT_AT_BINDING:
+            return self.pattern_is_refutable_for(self.ast.get_data1(node), subject_type)
+        if kind == NodeKind.NK_PAT_TUPLE and shape != 0 and self.get_type_kind(shape as TypeId) == TypeKind.TY_TUPLE:
+            let start = self.ast.get_data0(node)
+            let count = self.ast.get_data1(node)
+            let elem_start = self.get_type_d0(shape as TypeId)
+            let elem_count = self.get_type_d1(shape as TypeId)
+            for i in 0..count:
+                let elem_ty = if i < elem_count: self.type_extra[(elem_start + i)] else: 0
+                if self.pattern_is_refutable_for(self.ast.get_extra(start + i), elem_ty) != 0:
+                    return 1
+            return 0
+        if kind == NodeKind.NK_PAT_STRUCT and shape != 0:
+            let fstart = self.ast.get_data1(node)
+            let fcount = self.ast.get_data2(node)
+            for fi in 0..fcount:
+                let field_pat = self.ast.get_extra(fstart + 1 + fi * 2 + 1)
+                if field_pat == 0:
+                    continue
+                let field_ty = self.struct_field_type(shape, self.ast.get_extra(fstart + 1 + fi * 2))
+                if self.pattern_is_refutable_for(field_pat, field_ty) != 0:
+                    return 1
+            return 0
+        self.pattern_is_refutable(node)
+
+    // A slice pattern that can never match a fixed-size array (§9.7: `[a, b,
+    // c]` matches exactly 3 elements) is reported, once per pattern, with the
+    // lengths. Returns whether any was reported.
+    mut fn report_fixed_array_slice_mismatch(node: i32, subject_type: i32) -> bool:
+        if node == 0 or subject_type == 0:
+            return false
+        let kind = self.ast.kind(node)
+        let shape = self.resolve_alias(self.pattern_subject_shape_type(subject_type) as TypeId) as i32
+        if kind == NodeKind.NK_PAT_SLICE:
+            if self.get_type_kind(shape as TypeId) != TypeKind.TY_ARRAY or self.exh_slice_always_matches(node, shape):
+                return false
+            let s_extra = self.ast.get_data0(node)
+            let head = self.ast.get_data1(node)
+            let tail = self.ast.get_extra(s_extra + 1 + head)
+            let len = self.get_type_d1(shape as TypeId)
+            let want = if self.ast.get_extra(s_extra) != 0: f"at least {head + tail} elements" else: f"exactly {head} elements"
+            self.emit_error(f"this slice pattern never matches: it matches {want}, and the array has {len} (§9.7)", node)
+            return true
+        if kind == NodeKind.NK_PAT_AT_BINDING:
+            return self.report_fixed_array_slice_mismatch(self.ast.get_data1(node), subject_type)
+        if kind == NodeKind.NK_PAT_TUPLE and self.get_type_kind(shape as TypeId) == TypeKind.TY_TUPLE:
+            let start = self.ast.get_data0(node)
+            let count = self.ast.get_data1(node)
+            let elem_start = self.get_type_d0(shape as TypeId)
+            let elem_count = self.get_type_d1(shape as TypeId)
+            var any = false
+            for i in 0..count:
+                if i < elem_count and self.report_fixed_array_slice_mismatch(self.ast.get_extra(start + i), self.type_extra[(elem_start + i)]):
+                    any = true
+            return any
+        if kind == NodeKind.NK_PAT_STRUCT:
+            let fstart = self.ast.get_data1(node)
+            let fcount = self.ast.get_data2(node)
+            var any = false
+            for fi in 0..fcount:
+                let field_pat = self.ast.get_extra(fstart + 1 + fi * 2 + 1)
+                if field_pat == 0:
+                    continue
+                let field_ty = self.struct_field_type(shape, self.ast.get_extra(fstart + 1 + fi * 2))
+                if self.report_fixed_array_slice_mismatch(field_pat, field_ty):
+                    any = true
+            return any
+        false
 
     fn pattern_is_refutable(node: i32) -> i32:
         if node == 0:
