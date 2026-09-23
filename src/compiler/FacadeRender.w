@@ -1,5 +1,5 @@
-// FacadeRender — D51 §16.2b stage 4a: a `c facade` block's resources rendered
-// as ordinary With (docs/modeled-c-implementation-plan.md, stage 4).
+// FacadeRender — D51 §16.2b stages 4-5: a `c facade` block's resources
+// rendered as ordinary With (docs/modeled-c-implementation-plan.md).
 //
 // The Frontend calls facade_render_block after every source file and every
 // `<c_import …>` translation is parsed and before Sema, and splices the text
@@ -52,11 +52,19 @@
 // destroyer takes its address, is handed `&raw mut self.repr` over a
 // by-value field. The `init` constructor is facade_render_init below.
 //
-// Not rendered here: an out-parameter producer's constructor (stage 5; its
-// Drop and destroyers are rendered). Nothing is ever rendered as a
-// placeholder: a resource the renderer cannot express yields no text, the
-// facade-level diagnostic names it, and Sema's verify_facade_resources
-// reports a resource that passed every check without becoming a type.
+// The three production forms (spec §16.2b.4, ruling §15): a direct return
+// (above), a pointer out-parameter (facade_render_out_producer: NULL slot,
+// call, inspect — `(status, Option[R])`), and in-place `init`
+// (facade_render_init).
+//
+// Not rendered: a producer whose resource depends on what it receives (stage
+// 6), and the `Result`-shaped projection of `ok` over an out-parameter
+// producer (awaiting its ruling) — facade_render_producer_pending; Sema
+// reports each at the resource. Nothing is ever rendered as a placeholder: a
+// resource the renderer cannot express yields no text, the facade-level
+// diagnostic names it, and Sema's verify_facade_resources reports a resource
+// that passed every check without becoming a type, or a producer without its
+// constructor.
 
 use Ast
 use InternPool
@@ -165,6 +173,8 @@ fn facade_render_resource(pool: AstPool, intern: InternPool, ci: &Vec[i32], item
     let clause_count = pool.get_data2(item as NodeId)
     let repr_text = render_type_expr(pool, intern, pool.get_extra(extra_start) as NodeId)
     let producers: Vec[i32] = Vec.new()
+    let out_refs: Vec[i32] = Vec.new()   // parallel to producers; 0 for a direct return
+    var borrows = false
     var drop_fn = 0
     var init_fn = 0
     var preinit_fn = 0
@@ -176,9 +186,10 @@ fn facade_render_resource(pool: AstPool, intern: InternPool, ci: &Vec[i32], item
         let kind = pool.get_data0(clause as NodeId)
         let ops = pool.get_data1(clause as NodeId)
         if kind == FACADE_CLAUSE_FROM:
-            // An out-parameter producer's constructor is stage 5.
-            if pool.get_extra(ops + 1) == 0:
-                producers.push(facade_render_find_fn(pool, intern, ci, pool.get_extra(ops)))
+            producers.push(facade_render_find_fn(pool, intern, ci, pool.get_extra(ops)))
+            out_refs.push(pool.get_extra(ops + 1))
+        else if kind == FACADE_CLAUSE_BORROWS:
+            borrows = true
         else if kind == FACADE_CLAUSE_INIT:
             init_fn = facade_render_find_fn(pool, intern, ci, pool.get_extra(ops))
         else if kind == FACADE_CLAUSE_PREINIT:
@@ -222,9 +233,15 @@ fn facade_render_resource(pool: AstPool, intern: InternPool, ci: &Vec[i32], item
             out = out ++ "    move fn " ++ dname ++ "(" ++ params ++ ")" ++ facade_render_return(pool, intern, d) ++ ":\n        self.live = false\n        " ++ facade_render_call(pool, intern, d, call_args) ++ "\n"
     for pi in 0..producers.len() as i32:
         let producer = producers[pi]
-        if producer == 0:
+        if producer == 0 or facade_render_producer_pending(pool, intern, producer, out_refs[pi], borrows, ok_sym) != 0:
             continue
         let pname: str = intern.resolve(pool.get_data0(producer as NodeId))
+        if out_refs[pi] != 0:
+            let slot = facade_render_param_ref(pool, intern, producer, out_refs[pi])
+            if slot < 0:
+                continue
+            out = out ++ facade_render_out_producer(pool, intern, name, repr_text, producer, slot)
+            continue
         let (params, args) = facade_render_params(pool, intern, producer, 0)
         let call = facade_render_call(pool, intern, producer, args)
         if facade_render_unalias(pool, intern, repr_text).starts_with("*"):
@@ -300,6 +317,87 @@ fn facade_render_init(pool: AstPool, intern: InternPool, name: &str, repr_text: 
         return out ++ " -> " ++ name ++ ":\n    var " ++ repr ++ " = " ++ storage ++ "\n    " ++ call ++ "\n    " ++ name ++ " { repr: " ++ repr ++ ", live: true }\n"
     let armed = if ok_sym != 0: status ++ " == " ++ intern.resolve(ok_sym) else: "true"
     out ++ " -> (" ++ ret.slice(4, ret.len()) ++ ", " ++ name ++ "):\n    var " ++ repr ++ " = " ++ storage ++ "\n    let " ++ status ++ " = " ++ call ++ "\n    (" ++ status ++ ", " ++ name ++ " { repr: " ++ repr ++ ", live: " ++ armed ++ " })\n"
+
+// An out-parameter producer's constructor (ruling §16, spec §16.2b.4). The
+// physical commitment: initialize the slot to NULL, call, inspect the slot —
+// non-null is a produced resource whose ownership begins at once, null is
+// none. That is production, not success: the status is kept beside it, so a
+// failed call that still produced (a failed `sqlite3_open` hands back a
+// handle that must be closed, ruling §18) yields `Some(R)`, and its Drop runs
+// the destroyer exactly once like any other. With no status convention the
+// status is uninterpreted and handed back unread:
+//
+//     fn R.p(<params but the slot>) -> (S, Option[R]):
+//         var slot: Repr = null
+//         let status = unsafe { p(<args>, &raw mut slot, <args>) }
+//         (status, if slot == null: None else: Some(R { repr: slot, live: true }))
+//
+// A producer returning nothing yields `Option[R]`. The locals are spelled
+// apart from the parameters (facade_render_fresh).
+fn facade_render_out_producer(pool: AstPool, intern: InternPool, name: &str, repr_text: &str, producer: i32, slot: i32) -> str:
+    let pname: str = intern.resolve(pool.get_data0(producer as NodeId))
+    let taken = facade_render_param_names(pool, intern, producer)
+    let slot_var = facade_render_fresh("slot", taken)
+    let (params, args) = facade_render_params_but(pool, intern, producer, 0, slot, "&raw mut " ++ slot_var)
+    let call = facade_render_call(pool, intern, producer, args)
+    let made = "if " ++ slot_var ++ " == null: None else: Some(" ++ name ++ " { repr: " ++ slot_var ++ ", live: true })"
+    let head = "fn " ++ name ++ "." ++ pname ++ "(" ++ params ++ ")"
+    let null_slot = "    var " ++ slot_var ++ ": " ++ repr_text ++ " = null\n"
+    let ret = facade_render_return(pool, intern, producer)
+    if ret.len() == 0:
+        return head ++ " -> Option[" ++ name ++ "]:\n" ++ null_slot ++ "    " ++ call ++ "\n    " ++ made ++ "\n"
+    let status = facade_render_fresh("status", taken)
+    head ++ " -> (" ++ ret.slice(4, ret.len()) ++ ", Option[" ++ name ++ "]):\n" ++ null_slot ++ "    let " ++ status ++ " = " ++ call ++ "\n    (" ++ status ++ ", " ++ made ++ ")\n"
+
+// Why no constructor is rendered for a producer (0: one is).
+// 1 — the produced resource depends on what the producer receives: the
+//     resource states `borrows`, or a parameter other than the out slot takes
+//     a resource's representation (unknown independence means dependency,
+//     §16.2b.6). Dependency is modeled by the plan's stage 6; a constructor
+//     that dropped it could outlive its parent.
+// 2 — `ok` over a status-returning out-parameter producer: the Result-shaped
+//     projection (§16.2b.4) awaits its ruling; the low-level `(status,
+//     Option[R])` constructor without the projection would leave the clause
+//     unread.
+// SemaFacade.w facade_producer_pending makes the same classification from
+// the signatures and reports it at the resource; its net refuses any other
+// producer left without a constructor.
+fn facade_render_producer_pending(pool: AstPool, intern: InternPool, producer: i32, out_ref: i32, borrows: bool, ok_sym: i32) -> i32:
+    if borrows:
+        return 1
+    let slot = if out_ref != 0: facade_render_param_ref(pool, intern, producer, out_ref) else: -1
+    let meta = pool.find_fn_meta(producer as NodeId)
+    if meta < 0:
+        return 0
+    let start = pool.fn_meta_param_start(meta)
+    for pi in 0..pool.fn_meta_param_count(meta):
+        if pi != slot and facade_render_takes_resource(pool, intern, render_type_expr(pool, intern, pool.fn_param_type(start, pi) as NodeId)):
+            return 1
+    if out_ref != 0 and ok_sym != 0 and facade_render_return(pool, intern, producer).len() > 0:
+        return 2
+    0
+
+// Whether a parameter type takes a resource's representation, or a pointer
+// to it (a pointer resource's, or an in-place one's): Sema's
+// facade_param_takes_resource over the AST's text.
+fn facade_render_takes_resource(pool: AstPool, intern: InternPool, ptext: &str) -> bool:
+    let p = facade_render_unalias(pool, intern, ptext)
+    let items = facade_render_all_items(pool, NodeKind.NK_FACADE_RESOURCE)
+    for i in 0..items.len() as i32:
+        let res = items[i]
+        let repr = facade_render_unalias(pool, intern, render_type_expr(pool, intern, pool.get_extra(pool.get_data1(res as NodeId)) as NodeId))
+        if not repr.starts_with("*") and not facade_render_has_clause(pool, res, FACADE_CLAUSE_INIT):
+            continue
+        if p == repr or p == "*mut " ++ repr or p == "*const " ++ repr:
+            return true
+    false
+
+fn facade_render_has_clause(pool: AstPool, resource: i32, kind: i32) -> bool:
+    let extra_start = pool.get_data1(resource as NodeId)
+    for k in 0..pool.get_data2(resource as NodeId):
+        if pool.get_data0(pool.get_extra(extra_start + 1 + k) as NodeId) == kind:
+            return true
+    false
 
 // The declaring node of a function the facade names, by text: a c_import
 // translation and the facade may hold the same name under different symbols.
@@ -383,7 +481,12 @@ pub fn facade_render_unalias(pool: AstPool, intern: InternPool, text: &str) -> s
 // `(<params>, <args>)` of the declaration's parameters from index `skip`:
 // c_import spells a C parameter `p` as `__param_p` so no C name collides
 // with a With keyword; the resource spells it as the header does.
-fn facade_render_params(pool: AstPool, intern: InternPool, decl: i32, skip: i32) -> (str, str):
+fn facade_render_params(pool: AstPool, intern: InternPool, decl: i32, skip: i32) -> (str, str): facade_render_params_but(pool, intern, decl, skip, -1, "")
+
+// The same with parameter `slot` withheld from `<params>` and passed as
+// `slot_arg` in `<args>`: an out-parameter producer's slot is the
+// constructor's own local, never the caller's (§16.2b.4).
+fn facade_render_params_but(pool: AstPool, intern: InternPool, decl: i32, skip: i32, slot: i32, slot_arg: &str) -> (str, str):
     let meta = pool.find_fn_meta(decl as NodeId)
     var params = ""
     var args = ""
@@ -391,12 +494,16 @@ fn facade_render_params(pool: AstPool, intern: InternPool, decl: i32, skip: i32)
         return (params, args)
     let start = pool.fn_meta_param_start(meta)
     for pi in skip..pool.fn_meta_param_count(meta):
+        if args.len() > 0:
+            args = args ++ ", "
+        if pi == slot:
+            args = args ++ slot_arg
+            continue
         let pname = facade_render_param_name(pool, intern, start, pi)
         let ptype = render_type_expr(pool, intern, pool.fn_param_type(start, pi) as NodeId)
         let shown = if ptype == "*const i8" or ptype == "*const c_char": "str" else: ptype
         if params.len() > 0:
             params = params ++ ", "
-            args = args ++ ", "
         params = params ++ pname ++ ": " ++ shown
         args = args ++ pname
     (params, args)
@@ -427,6 +534,37 @@ fn facade_render_fresh(base: &str, taken: &str) -> str:
     while names.contains(", " ++ name ++ ", "):
         name = name ++ "_"
     name
+
+// The parameter index a facade `param` reference names (`param N`,
+// `param name`, `param type T`), or -1: Sema's facade_resolve_param resolves
+// the same reference against the signature and reports a miss.
+fn facade_render_param_ref(pool: AstPool, intern: InternPool, decl: i32, ref_node: i32) -> i32:
+    let meta = pool.find_fn_meta(decl as NodeId)
+    if meta < 0 or ref_node == 0:
+        return -1
+    let count = pool.fn_meta_param_count(meta)
+    let start = pool.fn_meta_param_start(meta)
+    let rk = pool.get_data0(ref_node as NodeId)
+    if rk == FACADE_PARAM_REF_INDEX:
+        let digits: str = intern.resolve(pool.get_data1(ref_node as NodeId))
+        var idx = 0
+        for i in 0..digits.len() as i32:
+            idx = idx * 10 + (digits[i] - '0') as i32
+        return if idx < count: idx else: -1
+    if rk == FACADE_PARAM_REF_NAME:
+        let want: str = intern.resolve(pool.get_data1(ref_node as NodeId))
+        for pi in 0..count:
+            if facade_render_param_name(pool, intern, start, pi) == want:
+                return pi
+        return -1
+    let want = facade_render_unalias(pool, intern, render_type_expr(pool, intern, pool.get_data1(ref_node as NodeId) as NodeId))
+    var found = -1
+    var matches = 0
+    for pi in 0..count:
+        if facade_render_unalias(pool, intern, render_type_expr(pool, intern, pool.fn_param_type(start, pi) as NodeId)) == want:
+            matches = matches + 1
+            found = pi
+    if matches == 1: found else: -1
 
 fn facade_render_return(pool: AstPool, intern: InternPool, decl: i32) -> str:
     let meta = pool.find_fn_meta(decl as NodeId)

@@ -30,10 +30,11 @@ impl Sema:
     // fn item may describe a destroyer from a block declared after the
     // resource). Each is "never half-model unsafely" (ruling §9, §16.2b.3) or
     // a shape the renderer (compiler/FacadeRender.w) cannot express, reported
-    // here and never emitted as a placeholder. The last check is the net
+    // here and never emitted as a placeholder. The last checks are the net
     // under the renderer itself: a resource that passed every check must
-    // have become a With type, or the renderer stayed silent over a shape
-    // the checks did not name.
+    // have become a With type, and each of its producers a constructor or a
+    // reported pending one (verify_facade_constructors), or the renderer
+    // stayed silent over a shape the checks did not name.
     mut fn verify_facade_resources():
         for ri in 0..self.facade_resources.len() as i32:
             // A diagnostic's span is read in the current source file: the
@@ -41,9 +42,12 @@ impl Sema:
             // visited (a rendered `<facade …>` file, whose lines it would
             // quote).
             self.update_decl_source_context(self.facade_resources[ri].decl)
-            if self.verify_facade_resource(ri) and self.facade_resources[ri].drop != 0 and not self.diags.has_errors() and not self.facade_resource_rendered(ri):
-                let rname: str = self.pool_resolve(self.facade_resources[ri].name)
-                self.emit_error(f"resource '{rname}' passed every facade check but no With type was rendered for it; the renderer cannot express this shape and did not say so — a compiler defect (§16.2b.3)", self.facade_resources[ri].node)
+            if self.verify_facade_resource(ri) and self.facade_resources[ri].drop != 0 and not self.diags.has_errors():
+                if not self.facade_resource_rendered(ri):
+                    let rname: str = self.pool_resolve(self.facade_resources[ri].name)
+                    self.emit_error(f"resource '{rname}' passed every facade check but no With type was rendered for it; the renderer cannot express this shape and did not say so — a compiler defect (§16.2b.3)", self.facade_resources[ri].node)
+                else:
+                    self.verify_facade_constructors(ri)
 
     mut fn verify_facade_resource(ri: i32) -> bool:
         let rname: str = self.pool_resolve(self.facade_resources[ri].name)
@@ -102,15 +106,133 @@ impl Sema:
                 return false
         for pi in 0..producer_count:
             let p = self.facade_resources[ri].producers[pi]
-            if self.facade_resources[ri].out_params[pi] < 0 and self.facade_op_raw_beyond(p, -1, true):
-                let pn: str = self.pool_resolve(p)
+            let slot = self.facade_resources[ri].out_params[pi]
+            // A dependent producer renders no constructor (reported below);
+            // its resource parameter is reached through dependency, never raw.
+            if self.facade_producer_pending(ri, pi) == 1:
+                continue
+            let pn: str = self.pool_resolve(p)
+            if slot < 0 and self.facade_op_raw_beyond(p, -1, true):
                 self.emit_error(f"resource '{rname}': producer '{pn}' is still a raw call after the facade covers its return (a variadic, a raw return, or a raw pointer parameter the facade does not describe); describe it with an fn item (§16.2b.5)", node)
                 return false
+            if slot >= 0 and self.facade_op_raw_beyond(p, slot, false):
+                self.emit_error(f"resource '{rname}': producer '{pn}' is still a raw call after the facade covers its out parameter (a variadic, a raw status return, or a raw pointer parameter the facade does not describe); describe it with an fn item (§16.2b.5)", node)
+                return false
+        if self.facade_resources[ri].ok_const != 0 and init_fn == 0 and not self.verify_facade_ok_producers(ri):
+            return false
         if init_fn != 0 and not self.verify_facade_init(ri):
             return false
-        // An out-parameter producer's constructor is stage 5: Drop and the
-        // destroyers are rendered, the constructor is not — not a silence.
         true
+
+    // `ok CONST` interprets a producer's status (§16.2b.4): an out-parameter
+    // producer's return. A direct return is the resource itself and a void
+    // producer returns nothing, so a resource none of whose producers returns
+    // a status gives the clause nothing to read. The status is compared with
+    // an imported integer constant, so it is an integer (a C enum is one).
+    mut fn verify_facade_ok_producers(ri: i32) -> bool:
+        let rname: str = self.pool_resolve(self.facade_resources[ri].name)
+        let node = self.facade_resources[ri].node
+        let cn: str = self.pool_resolve(self.facade_resources[ri].ok_const)
+        var statuses = 0
+        var shapes = ""
+        for pi in 0..self.facade_resources[ri].producers.len() as i32:
+            let p = self.facade_resources[ri].producers[pi]
+            let pn: str = self.pool_resolve(p)
+            let sig = self.get_sig(p)
+            let ret = self.sig_return_type(sig)
+            let void_ret = ret == 0 or self.get_type_kind(self.resolve_alias(ret as TypeId)) == TypeKind.TY_VOID
+            if self.facade_resources[ri].out_params[pi] < 0:
+                shapes = shapes ++ (if shapes.len() > 0: ", " else: "") ++ f"'{pn}' returns the resource itself"
+                continue
+            if void_ret:
+                shapes = shapes ++ (if shapes.len() > 0: ", " else: "") ++ f"'{pn}' returns nothing"
+                continue
+            if self.get_type_kind(self.numeric_operand_type(ret)) != TypeKind.TY_INT:
+                let rt: str = self.type_name(ret)
+                self.emit_error(f"resource '{rname}': 'ok {cn}' compares an integer status, but producer '{pn}' returns {rt} (§16.2b.4)", node)
+                return false
+            statuses = statuses + 1
+        if statuses == 0 and shapes.len() == 0:
+            self.emit_error(f"resource '{rname}': 'ok {cn}' names a status, but '{rname}' has no producer to read one from (§16.2b.4)", node)
+            return false
+        if statuses == 0:
+            self.emit_error(f"resource '{rname}': 'ok {cn}' names a status, but no producer returns one to compare it with: {shapes} (§16.2b.4)", node)
+            return false
+        true
+
+    // Why a producer gets no constructor (FacadeRender.w
+    // facade_render_producer_pending makes the same classification from the
+    // AST; the renderer and this agree or the net below is loud). 0: it gets
+    // one. 1: what it produces depends on what it receives — the resource
+    // states `borrows`, or a parameter other than the out slot takes a
+    // resource's representation (unknown independence means dependency,
+    // §16.2b.6) — and dependency is not modeled yet. 2: `ok` over a
+    // status-returning out-parameter producer, whose Result-shaped projection
+    // (§16.2b.4) is not yet ruled.
+    fn facade_producer_pending(ri: i32, pi: i32) -> i32:
+        if self.facade_resources[ri].borrows.len() > 0:
+            return 1
+        let p = self.facade_resources[ri].producers[pi]
+        let slot = self.facade_resources[ri].out_params[pi]
+        let sig = self.get_sig(p)
+        if sig < 0:
+            return 0
+        for i in 0..self.sig_get_param_count(sig):
+            if i != slot and self.facade_param_takes_resource(p, i):
+                return 1
+        let ret = self.sig_return_type(sig)
+        if slot >= 0 and self.facade_resources[ri].ok_const != 0 and ret != 0 and self.get_type_kind(self.resolve_alias(ret as TypeId)) != TypeKind.TY_VOID:
+            return 2
+        0
+
+    // The constructor net: every producer of a verified resource has its
+    // rendered `R.<producer>`, or is pending — then the resource says why, as
+    // a warning, since the program is still correct without the constructor
+    // and nothing unsafe is exposed. A producer that is neither is a renderer
+    // defect.
+    mut fn verify_facade_constructors(ri: i32):
+        let rname: str = self.pool_resolve(self.facade_resources[ri].name)
+        let node = self.facade_resources[ri].node
+        for pi in 0..self.facade_resources[ri].producers.len() as i32:
+            let p = self.facade_resources[ri].producers[pi]
+            let pn: str = self.pool_resolve(p)
+            let pending = self.facade_producer_pending(ri, pi)
+            if pending == 1:
+                let why = self.facade_dependency_reason(ri, pi)
+                self.emit_warning(f"resource '{rname}': no constructor is rendered for producer '{pn}': {why}, and a dependent resource is not modeled yet — a constructor that dropped the dependency could outlive what it depends on (§16.2b.6)", node)
+            else if pending == 2:
+                let cn: str = self.pool_resolve(self.facade_resources[ri].ok_const)
+                self.emit_warning(f"resource '{rname}': no constructor is rendered for producer '{pn}': 'ok {cn}' projects its status to a Result-shaped API (§16.2b.4) whose surface is not yet ruled; without 'ok' the constructor yields (status, Option[{rname}])", node)
+            else if not self.facade_constructor_rendered(ri, p):
+                self.emit_error(f"resource '{rname}': producer '{pn}' passed every facade check but no constructor '{rname}.{pn}' was rendered; the renderer cannot express this shape and did not say so — a compiler defect (§16.2b.4)", node)
+
+    // What a pending-dependency producer depends on, with the resolved C
+    // parameter (§57).
+    fn facade_dependency_reason(ri: i32, pi: i32) -> str:
+        let p = self.facade_resources[ri].producers[pi]
+        let sig = self.get_sig(p)
+        if self.facade_resources[ri].borrows.len() > 0:
+            let b = self.facade_resources[ri].borrows[0]
+            if b >= self.sig_get_param_count(sig):
+                return "the resource states 'borrows'"
+            let shown = self.facade_param_display(p, sig, b)
+            return f"the resource borrows from {shown}"
+        let slot = self.facade_resources[ri].out_params[pi]
+        for i in 0..self.sig_get_param_count(sig):
+            if i != slot and self.facade_param_takes_resource(p, i):
+                let shown = self.facade_param_display(p, sig, i)
+                return f"it receives a resource's representation ({shown}), so what it produces depends on it"
+        "it depends on what it receives"
+
+    fn facade_constructor_rendered(ri: i32, p: i32) -> bool:
+        let rname: str = self.pool_resolve(self.facade_resources[ri].name)
+        let pn: str = self.pool_resolve(p)
+        let want = rname ++ "." ++ pn
+        for di in 0..self.ast.decl_count():
+            let decl = self.ast.get_decl(di)
+            if self.ast.kind(decl) == NodeKind.NK_FN_DECL and self.safe_symbol_text(self.ast.get_data0(decl)) == want:
+                return true
+        false
 
     // In-place initialization (ruling §13, §16.2b.4): `init` takes a pointer
     // to the storage — a by-value first parameter would initialize a copy —
@@ -132,6 +254,11 @@ impl Sema:
         if self.facade_resources[ri].ok_const != 0 and self.get_type_kind(self.resolve_alias(self.sig_return_type(isig) as TypeId)) == TypeKind.TY_VOID:
             let cn: str = self.pool_resolve(self.facade_resources[ri].ok_const)
             self.emit_error(f"resource '{rname}': 'ok {cn}' names a status but 'init {iname}' returns nothing to compare it with (§16.2b.4)", node)
+            return false
+        if self.facade_resources[ri].ok_const != 0 and self.get_type_kind(self.numeric_operand_type(self.sig_return_type(isig))) != TypeKind.TY_INT:
+            let cn: str = self.pool_resolve(self.facade_resources[ri].ok_const)
+            let rt: str = self.type_name(self.sig_return_type(isig))
+            self.emit_error(f"resource '{rname}': 'ok {cn}' compares an integer status, but 'init {iname}' returns {rt} (§16.2b.4)", node)
             return false
         if self.facade_op_raw_beyond(init_fn, 0, false):
             self.emit_error(f"resource '{rname}': 'init {iname}' is still a raw call after the facade covers the storage (a variadic, a raw return, or a raw pointer parameter the facade does not describe); describe it with an fn item (§16.2b.5)", node)
@@ -271,10 +398,24 @@ impl Sema:
                 let pi = self.facade_resolve_param(out_ref, producer, sig)
                 if pi < 0:
                     return r
+                // Out-parameter production initializes the slot to NULL and
+                // inspects it after the call (ruling §16, spec §16.2b.4):
+                // it produces a pointer resource. A by-value representation
+                // has no NULL to inspect; C filling caller storage is the
+                // in-place shape.
+                if self.get_type_kind(self.resolve_alias(r.repr_tid as TypeId)) != TypeKind.TY_PTR:
+                    let pn: str = self.pool_resolve(producer)
+                    let rt: str = self.type_name(r.repr_tid)
+                    self.emit_error_with_help(f"resource '{rname}': 'from {pn}(out param …)' produces through a pointer out parameter, which is initialized to NULL and inspected after the call; '{rname}' wraps {rt}, which has no NULL (§16.2b.4)", clause, f"a resource C initializes in caller storage is produced in place: 'init {pn}(self)'")
+                    return r
                 let pty = self.resolve_alias(self.sig_param_type(sig, pi) as TypeId)
                 if self.get_type_kind(pty) != TypeKind.TY_PTR or not self.facade_same_type(self.get_type_d0(pty), r.repr_tid):
                     let shown = self.facade_param_display(producer, sig, pi)
                     self.emit_error(f"resource '{rname}': the out parameter {shown} is not a pointer to the representation (§16.2b.13)", clause)
+                    return r
+                if self.get_type_d1(pty) == 0:
+                    let shown = self.facade_param_display(producer, sig, pi)
+                    self.emit_error(f"resource '{rname}': the out parameter {shown} is a pointer to const; C cannot store the produced resource through it (§16.2b.4, §16.2b.13)", clause)
                     return r
                 let last = r.out_params.len() as i32 - 1
                 r.out_params[last] = pi
