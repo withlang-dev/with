@@ -3841,12 +3841,23 @@ unsafe fn source_range_spelling_offsets(range: CXSourceRange, file: *mut *mut u8
     *file = start_file
     1
 
-unsafe fn source_range_preferred_text_offsets(range: CXSourceRange, file: *mut *mut u8, start_off: *mut u32, end_off: *mut u32) -> i32:
+// A macro-expanded cursor's spelling range can start in the macro body and
+// end in an invocation argument: `DEFINE_GUID(name, ...)` expands to
+// `EXTERN_C const GUID name`, so the VarDecl's spelling starts at `extern` on
+// the #define line and ends at `name` in the invocation. Both ends lie in one
+// file, but the text between them is everything from the #define to the
+// invocation (15.6k lines of winnt.h, #1387), not the cursor's source. The
+// invocation (expansion start) falls strictly inside such a range; a range
+// wholly in the body or wholly in one argument does not straddle it.
+unsafe fn source_range_spelling_is_mixed(range: CXSourceRange, spelling_file: *mut u8, spelling_start: u32, spelling_end: u32) -> bool:
     var expansion_file: *mut u8 = 0 as *mut u8
     var expansion_start: u32 = 0
     var expansion_end: u32 = 0
-    let has_expansion = source_range_expansion_offsets(range, &raw mut expansion_file, &raw mut expansion_start, &raw mut expansion_end)
+    if source_range_expansion_offsets(range, &raw mut expansion_file, &raw mut expansion_start, &raw mut expansion_end) == 0:
+        return false
+    clang_File_isEqual(spelling_file, expansion_file) != 0 and spelling_start < expansion_start and spelling_end > expansion_start
 
+unsafe fn source_range_preferred_text_offsets(range: CXSourceRange, file: *mut *mut u8, start_off: *mut u32, end_off: *mut u32) -> i32:
     var spelling_file: *mut u8 = 0 as *mut u8
     var spelling_start: u32 = 0
     var spelling_end: u32 = 0
@@ -3856,13 +3867,16 @@ unsafe fn source_range_preferred_text_offsets(range: CXSourceRange, file: *mut *
         // Macro cursors often expand to the invocation token. Prefer spelling
         // when the cursor is wholly in the macro body or wholly in an argument;
         // avoid mixed body+argument ranges because those span unrelated text.
-        if has_expansion == 0 or clang_File_isEqual(spelling_file, expansion_file) == 0 or spelling_start >= expansion_start or spelling_end <= expansion_start:
+        if not source_range_spelling_is_mixed(range, spelling_file, spelling_start, spelling_end):
             *file = spelling_file
             *start_off = spelling_start
             *end_off = spelling_end
             return 1
 
-    if has_expansion != 0:
+    var expansion_file: *mut u8 = 0 as *mut u8
+    var expansion_start: u32 = 0
+    var expansion_end: u32 = 0
+    if source_range_expansion_offsets(range, &raw mut expansion_file, &raw mut expansion_start, &raw mut expansion_end) != 0:
         *file = expansion_file
         *start_off = expansion_start
         *end_off = expansion_end
@@ -3931,6 +3945,9 @@ unsafe fn cursor_spelling_text_from_cursor(s: *mut CImportSession, cursor: CXCur
     if source_range_spelling_offsets(range, &raw mut file, &raw mut start_off, &raw mut end_off) == 0:
         return ""
     if end_off <= start_off: return ""
+    // #1387: a body+argument spelling range spans unrelated text; the cursor
+    // has no spelling text of its own.
+    if source_range_spelling_is_mixed(range, file, start_off, end_off): return ""
     var buf_size: u64 = 0
     let contents = clang_getFileContents((*s).tu, file, &raw mut buf_size)
     if contents as i64 == 0 or end_off as u64 > buf_size: return ""

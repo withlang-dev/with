@@ -13750,6 +13750,9 @@ fn ci_expand_string_macro_sequence_depth(session: i64, s: &str, depth: i32) -> s
         return ci_concat_strings(segments)
     ""
 
+// A byte that, directly before `=`, makes it part of an operator token.
+fn ci_is_eq_operator_prefix(c: i32): c == '=' or c == '!' or c == '<' or c == '>' or c == '+' or c == '-' or c == '*' or c == '/' or c == '%' or c == '&' or c == '|' or c == '^'
+
 fn ci_extract_var_initializer_text(s: &str) -> str:
     let text = ci_strip_c_comments(s)
     let slen = text.len() as i32
@@ -13779,10 +13782,12 @@ fn ci_extract_var_initializer_text(s: &str) -> str:
         if c == 93: bracket_depth = bracket_depth - 1
         if c == 123: brace_depth = brace_depth + 1
         if c == 125: brace_depth = brace_depth - 1
-        if paren_depth == 0 and bracket_depth == 0 and brace_depth == 0 and c == 61:
+        if paren_depth == 0 and bracket_depth == 0 and brace_depth == 0 and c == '=':
+            // The declarator's `=` stands alone: `==`, `!=`, `<=`, `>=` and
+            // compound assignments are operators, not an initializer (#1387).
             let prev = if i > 0: text[(i - 1)] else: 0
             let next = if i + 1 < slen: text[(i + 1)] else: 0
-            if prev != 61 and next != 61:
+            if next != '=' and not ci_is_eq_operator_prefix(prev):
                 eq_pos = i
                 break
         i = i + 1
@@ -14361,8 +14366,14 @@ fn ci_var_initializer_text_from_cursor(session: i64, var_cursor: i32) -> str:
     init_src
 
 fn ci_var_init_expr_from_decl_source_for_type(session: i64, var_cursor: i32, target_type: &str) -> str:
-    var raw_decl_src = with_ci_cursor_source_text(session, var_cursor)
-    var init_src = ci_var_initializer_text_from_cursor(session, var_cursor)
+    // #1387: the declaration's own text holds an initializer only when
+    // libclang parsed one. Mining the text of a declaration clang says has
+    // none can only find some other `=` (a DEFINE_GUID var's text ran from
+    // its #define to its invocation and met `#if _MSC_VER >= 1200` first).
+    // Without one, only migrate's raw-source lookup by name remains.
+    let has_init = with_ci_var_initializer(session, var_cursor) >= 0
+    var raw_decl_src = if has_init: with_ci_cursor_source_text(session, var_cursor) else: ""
+    var init_src = if has_init: ci_var_initializer_text_from_cursor(session, var_cursor) else: ""
     let var_name = with_ci_cursor_spelling(session, var_cursor)
     if init_src.len() == 0:
         init_src = ci_preprocessed_var_initializer_by_name(var_name)
