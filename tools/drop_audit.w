@@ -399,6 +399,24 @@ fn sc_async_await(annotated: bool) -> str:
     "    let r = t.await\n" ++
     "    let _k = r.id\n"
 
+// #1412 (§13.4): a generator yields an R built with statement temporaries
+// (an f-string part beside it); each yielded R drops once in the consumer,
+// the temporaries once on the suspending path, and a `let` moved into the
+// yield is not dropped again from the saved state (a named str that stays
+// in the state is #1548, not this cell). `stop` breaks after the
+// first element: the abandoned generator state drops nothing twice.
+fn sc_generator_yield(stop: bool) -> str:
+    let body = if stop: "        let _k = r.id\n        break\n" else: "        let _k = r.id\n"
+    "gen fn each(slot: *mut i32) -> R:\n" ++
+    "    var i = 1\n" ++
+    "    while i < 3:\n" ++
+    "        let r = mk(i, slot)\n" ++
+    "        let _n = f\"t{i}\".len()\n" ++
+    "        yield r\n" ++
+    "        i += 1\n" ++
+    "fn go(slot: *mut i32):\n" ++
+    "    for r in each(slot):\n" ++ body
+
 // #1365 (§9.7, §2.4): `let PAT = subject else: <diverge>` consumes its
 // subject on both paths. The failing path drops the whole subject — whichever
 // variant it holds — exactly once before it diverges; the matching path moves
@@ -620,6 +638,8 @@ fn build_cells():
         cells.push(cell("field_join_view_" ++ form ++ "/field", sc_field_join_view(form), 1))
     cells.push(cell("async_await_inferred/bare", sc_async_await(false), 1))
     cells.push(cell("async_await_annotated/bare", sc_async_await(true), 1))
+    cells.push(cell("generator_yield_full/bare", sc_generator_yield(false), 3))
+    cells.push(cell("generator_yield_stop/bare", sc_generator_yield(true), 1))
     for form in ["inline", "block", "field"]:
         cells.push(cell("let_else_consume_hit_" ++ form ++ "/bare", sc_let_else_consume(form, true), 9))
         cells.push(cell("let_else_consume_miss_" ++ form ++ "/bare", sc_let_else_consume(form, false), 10))

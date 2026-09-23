@@ -6633,9 +6633,27 @@ impl MirBuilder:
         self.consume_moved_operand(result)
         self.body.new_operand(OperandKind.OK_COPY, moved_place)
 
+    // A yield suspends: lower_generator_next_body saves the generator's
+    // named locals into its state and returns. Statement temporaries are not
+    // part of the state, so the yielded expression's temps drop and its
+    // moved-from sources blank here, on the suspending path, before the save
+    // (#1412). Left to the statement's own flush they ran on the resume path,
+    // which never initialized them — a drop of garbage (`fmt_to_str`'s part of
+    // `yield f"n{i}"`), and a state that saved a local the yield had moved
+    // (`yield w`) still owned the value the caller received. The yielded value
+    // itself moves into a local of its own first, out of reach of the flush.
     mut fn lower_generator_yield(node: i32) -> i32:
         let inner = self.ast.get_data0(node)
-        let value_op = if inner != 0: self.lower_expr(inner) else: self.unit_operand()
+        var value_op = self.unit_operand()
+        if inner != 0:
+            let yield_frame = self.push_stmt_temp_frame()
+            let raw_op = self.lower_expr(inner)
+            let yielded_ty = self.operand_type(raw_op)
+            let yielded_local = self.new_temp(yielded_ty)
+            let yielded_place = self.place_for_local(yielded_local)
+            self.assign_operand_to_place(yielded_place, raw_op, self.ast.get_start(inner))
+            self.finish_stmt_temp_frame(yield_frame)
+            value_op = self.operand_for_place(yielded_place, yielded_ty)
         let resume_bb = self.new_block()
         let yield_idx = self.generator_yield_count
         self.generator_yield_count = self.generator_yield_count + 1
@@ -15982,7 +16000,13 @@ fn lower_generator_next_body(sema: &Sema, source: &MirBody, fn_node: i32) -> Mir
             let sk = source.stmt_kinds[stmt_id]
             var sd0: i32 = source.stmt_d0[stmt_id]
             let sd1 = source.stmt_d1[stmt_id]
-            if sk == StmtKind.StorageLive or sk == StmtKind.StorageDead or sk == StmtKind.Drop:
+            // StorageLive/StorageDead name a local; a Drop names a PLACE, and
+            // places are copied one for one (their base locals remapped
+            // above). Remapping a Drop's place id as a local id dropped
+            // whichever place came next (#1412: `_5 = move _10;
+            // drop(_10)` freed the str the yield then handed to the caller,
+            // and the temp the drop was for leaked).
+            if sk == StmtKind.StorageLive or sk == StmtKind.StorageDead:
                 sd0 = mir_gen_remap_local(&local_map, sd0)
             out.push_stmt(new_bb, sk, sd0, sd1, source.stmt_spans[stmt_id])
 
