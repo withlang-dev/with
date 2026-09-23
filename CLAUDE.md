@@ -1015,9 +1015,11 @@ If any step fails, continue debugging until it passes.
 ## Bootstrap Rules
 
 ### Changes land via pull request
-All changes reach `main` through a reviewed PR — no direct pushes. Branch
-protection enforces this (one approving review; admins exempt for release and
-seed operations). Batch related commits into one PR the way the battery
+All changes reach `main` through a PR — no direct pushes. Branch protection
+requires a PR with zero approvals (Eric, 2026-09-23): the seed-driven battery
+is the gate (D56), and a stack merge cannot bypass a review rule, so a
+required approval blocked `gh stack merge` on the maintainer's own PRs.
+Batch related commits into one PR the way the battery
 discipline batches them. The GitHub lanes are not a merge signal (D56: a
 lane takes hours); a PR is a draft until its seed-driven battery is green
 and posted on it, then marked ready. Lanes run only nightly and on
