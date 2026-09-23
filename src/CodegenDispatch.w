@@ -1919,13 +1919,19 @@ impl Codegen:
         let kind = self.mir_type_kind_at(resolved)
         if kind == TypeKind.TY_INT:
             return self.mir_type_d1_at(resolved) == 0
+        // A discriminant enum's value is its repr (§4.4a): `Kind: u8` with
+        // `Hi = 200` widens as the u8 200, not the i8 -56 (#1454).
+        if kind == TypeKind.TY_ENUM:
+            let repr = self.sema.enum_repr_type(resolved)
+            return repr != 0 and self.mir_sema_type_is_unsigned(repr)
         // A view binding (`let b = v[i]`, `let c = s[i]`) is typed &u8 but the
         // value being widened is the loaded byte: its signedness is the
         // pointee's (#1017).
         if kind == TypeKind.TY_REF:
             let pointee = self.mir_resolve_alias_at(self.mir_type_d0_at(resolved))
-            if self.mir_type_kind_at(pointee) == TypeKind.TY_INT:
-                return self.mir_type_d1_at(pointee) == 0
+            let pointee_kind = self.mir_type_kind_at(pointee)
+            if pointee_kind == TypeKind.TY_INT or pointee_kind == TypeKind.TY_ENUM:
+                return self.mir_sema_type_is_unsigned(pointee)
         false
 
     fn mir_sema_type_is_raw_pointer_or_ref(sema_ty: i32) -> bool:
