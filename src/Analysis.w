@@ -686,8 +686,8 @@ fn analysis_collect_diagnostics(report: &AnalysisReport, sema: &Sema):
         if subject.len() == 0:
             for di in 0..sema.decl_source_file_ids.len() as i32:
                 if sema.decl_source_file_ids[di] == diag.primary.file:
-                subject = sema.decl_source_path_for_index(di)
-                break
+                    subject = sema.decl_source_path_for_index(di)
+                    break
         let subject_source = sema.source_text_for_file_id(diag.primary.file)
         if subject_source.len() > 0:
             fact.line = analysis_line_for_offset(subject_source, diag.primary.start)

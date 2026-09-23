@@ -3,6 +3,6 @@
 fn g() -> str:
     let s = "hello"
     'done:
-    "v=" ++ s
+        "v=" ++ s
 fn main:
     print(f"[{g()}]")

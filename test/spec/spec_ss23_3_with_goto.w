@@ -19,7 +19,7 @@ fn goto_path(jump: bool) -> str:
             goto 'done
         step = "after"
     'done:
-    return LOG ++ "|" ++ step
+        return LOG ++ "|" ++ step
 
 fn main:
     print(f"jump=[{goto_path(true)}] nojump=[{goto_path(false)}]")

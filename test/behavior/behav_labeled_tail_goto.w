@@ -6,7 +6,7 @@ fn f(jump: bool) -> i32:
         goto 'done
     x = 99
     'done:
-    x = x + 7
-    x
+        x = x + 7
+        x
 fn main:
     print(f"[{f(true)}]")

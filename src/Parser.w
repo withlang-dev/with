@@ -101,6 +101,12 @@ pub type Parser {
     // omit initializers (typed NK_INTERFACE_* nodes fill the slots). Off for
     // every `.w`, so ordinary source never admits a bodyless declaration.
     interface_mode: i32,
+    // §29.13 Form 2: the column of the innermost indented list being parsed
+    // (a block's statements, a match's arms, a declaration's members; 0 at
+    // the top level). A construct in that list starts on a line indented to
+    // it, so the body its end-of-line introducer opens must sit deeper
+    // (#1391).
+    block_indent: i32,
 }
 
 // Pipe-form enum variants before they are written to the extras pool:
@@ -198,6 +204,7 @@ fn Parser.init_with_pool(tokens: TokenList, source: &str, file_id: i32, intern: 
         top_level_stmts: Vec.new(),
         explicit_main_decl: 0,
         interface_mode: 0,
+        block_indent: 0,
     }
 
 impl Parser:
@@ -2995,6 +3002,15 @@ impl Parser:
             self.diags.emit(move diag)
         true
 
+    // A trait/impl method's colon body: the members are the declaration's
+    // indented list, so the body sits deeper than the member's line (#1391).
+    mut fn parse_member_body(member_start: i32) -> NodeId:
+        let saved_block_indent = self.block_indent
+        self.block_indent = line_indent_of(self.source, member_start)
+        let body = self.parse_block_or_expr()
+        self.block_indent = saved_block_indent
+        body
+
     mut fn skip_member_separators(form: DeclBody):
         if form == DeclBody.Braced: self.skip_separators() else: self.skip_newlines()
 
@@ -3114,7 +3130,7 @@ impl Parser:
             var method_body: NodeId = 0 as NodeId
             if self.peek() == TokenKind.TK_COLON:
                 self.advance()
-                method_body = self.parse_block_or_expr()
+                method_body = self.parse_member_body(method_start)
             else if self.peek() == TokenKind.TK_L_BRACE:
                 self.advance()
                 method_body = self.parse_braced_body()
@@ -3397,7 +3413,7 @@ impl Parser:
                     break
             else if self.peek() == TokenKind.TK_COLON:
                 self.advance()
-                body = self.parse_block_or_expr()
+                body = self.parse_member_body(method_start)
             else if self.peek() == TokenKind.TK_L_BRACE:
                 self.advance()
                 body = self.parse_braced_body()
@@ -3548,8 +3564,9 @@ impl Parser:
                     self.emit_error("expected ':' or '{' after pipeline match")
                     lhs = self.poisoned_expr()
                     continue
-                if not inline_match:
-                    self.skip_newlines()
+                if not inline_match and not self.skip_to_indented_body():
+                    lhs = self.poisoned_expr()
+                    continue
                 let arm_count = if inline_match: self.parse_inline_match_arms() else: self.parse_match_arms()
                 let arms_start = if arm_count > 0: self.pool.extra_len() - arm_count else: self.pool.extra_len()
                 lhs = self.pool.add_node(NodeKind.NK_MATCH, self.pool.get_start(lhs), self.prev_end(), lhs, arms_start, arm_count)
@@ -6670,8 +6687,8 @@ impl Parser:
         else:
             self.emit_error("expected ':' or '{' after match subject")
             return self.poisoned_expr()
-        if not inline_match:
-            self.skip_newlines()
+        if not inline_match and not self.skip_to_indented_body():
+            return self.poisoned_expr()
         let arm_count = if inline_match: self.parse_inline_match_arms() else: self.parse_match_arms()
         let extra_start = if arm_count > 0: self.pool.extra_len() - arm_count else: self.pool.extra_len()
         self.pool.add_node(NodeKind.NK_MATCH, start, self.prev_end(), subject, extra_start, arm_count)
@@ -6679,6 +6696,7 @@ impl Parser:
     mut fn parse_match_arms() -> i32:
         var arms: Vec[i32] = Vec.new()
         var arm_col = -1
+        let saved_block_indent = self.block_indent
 
         while self.peek() != TokenKind.TK_EOF:
             let t = self.peek()
@@ -6690,6 +6708,9 @@ impl Parser:
                 break
             if arm_col < 0:
                 arm_col = cur_col
+                // An arm body opened by `=>` at end of line sits deeper than
+                // the arms (§29.13).
+                self.block_indent = arm_col
 
             let arm_start = self.current_start()
             var pattern: NodeId = 0 as NodeId
@@ -6758,6 +6779,7 @@ impl Parser:
                 self.pos = save
                 break
 
+        self.block_indent = saved_block_indent
         let arm_count = arms.len() as i32
         for ai in 0..arm_count:
             self.pool.add_extra(arms[ai])
@@ -7177,7 +7199,7 @@ impl Parser:
         var else_body: NodeId = 0
         if self.peek() == TokenKind.TK_KW_ELSE:
             self.advance()
-            else_body = self.parse_let_else_body(start)
+            else_body = self.parse_let_else_body()
         self.let_pattern_node(start, pat, value, else_body, is_mut, type_ann)
 
     // The else branch of `let PATTERN = EXPR else` (§9.7, D58) is a body in
@@ -7187,11 +7209,9 @@ impl Parser:
     // else: the error names the fix, and parsing continues as if the colon
     // were there so the indented branch raises nothing further. #1382: the
     // newline after `else:` must reach parse_block_or_expr — it is what
-    // selects the indented-block form. An indented block must sit deeper
-    // than the line holding its `let` (§29.13: a colon ending the line with
-    // no indented block is a syntax error), or the next statement is
-    // silently taken as the branch.
-    mut fn parse_let_else_body(let_start: i32) -> NodeId:
+    // selects the indented-block form, and where a block that does not sit
+    // deeper than the `let` is reported (§29.13, #1391).
+    mut fn parse_let_else_body() -> NodeId:
         if self.peek() == TokenKind.TK_COLON:
             self.advance()
         else if self.peek() == TokenKind.TK_NEWLINE:
@@ -7199,18 +7219,6 @@ impl Parser:
             var diag = Diagnostic.err("expected ':' after 'else': a let-else branch on the next line is a body (§9.7)", span)
             diag.add_help("write `else:` to introduce the indented block; only a single diverging expression may follow a bare `else`, on the same line")
             self.diags.emit(move diag)
-        if self.peek() == TokenKind.TK_NEWLINE:
-            var line_start = let_start - column_of(self.source, let_start)
-            while self.source[line_start] == ' ' or self.source[line_start] == '\t':
-                line_start = line_start + 1
-            let let_indent = column_of(self.source, line_start)
-            let save = self.pos
-            self.skip_newlines()
-            let dedented = self.peek() == TokenKind.TK_EOF or column_of(self.source, self.current_start()) <= let_indent
-            self.pos = save
-            if dedented:
-                self.emit_error_span("expected an indented block after 'else'", let_start, self.prev_end())
-                return self.poisoned_expr()
         self.parse_block_or_expr()
 
     // Whether the tokens after `let`/`var` begin a pattern rather than a
@@ -7278,7 +7286,7 @@ impl Parser:
         if self.peek() == TokenKind.TK_KW_ELSE and name_str.len() > 0 and name_str[0] >= 'A' and name_str[0] <= 'Z':
             self.advance()
             let pat = self.pool.add_node(NodeKind.NK_PAT_VARIANT, name_start, name_end, name_sym, 0, 0)
-            let else_body = self.parse_let_else_body(start)
+            let else_body = self.parse_let_else_body()
             return self.let_pattern_node(start, pat, value, else_body, is_mut, type_ann)
         var flags = 0
         if is_mut:
@@ -7800,16 +7808,46 @@ impl Parser:
             self.emit_error("expected ':' or '{' to introduce body")
             return self.parse_block_or_expr()
 
+    // A body introducer (`:`, `=>`, a let-else `else`) ending the line opens an
+    // indented block (§29.13 Form 2). The block must sit deeper than the list
+    // holding the construct (`block_indent`): a line at or left of it is the
+    // construct's next sibling, never its body, and taking it as the body
+    // turned one missing indent into errors about everything after it
+    // (#1391). With the cursor just past the introducer, skips to the body's
+    // first token and returns true, or reports once at the introducer and
+    // returns false with the sibling left to the enclosing list. An
+    // introducer that does not end the line is an inline body: true, nothing
+    // skipped.
+    mut fn skip_to_indented_body() -> bool:
+        if self.peek() != TokenKind.TK_NEWLINE:
+            return true
+        let intro_start = self.prev_start()
+        let intro_end = self.prev_end()
+        let save = self.pos
+        self.skip_newlines()
+        if self.peek() != TokenKind.TK_EOF and column_of(self.source, self.current_start()) > self.block_indent:
+            return true
+        self.pos = save
+        let intro = self.source.slice(intro_start as i64, intro_end as i64)
+        var diag = Diagnostic.err("expected an indented block after '" ++ intro ++ "'", Span { file: self.file_id, start: intro_start, end: intro_end })
+        diag.add_help("a '" ++ intro ++ "' that ends the line opens a body on the lines below it, indented deeper than the line that holds the '" ++ intro ++ "' (§29.13)")
+        self.diags.emit(move diag)
+        false
+
     mut fn parse_block_or_expr() -> NodeId:
         if self.peek() != TokenKind.TK_NEWLINE:
             return self.parse_expr()
-
-        self.skip_newlines()
-        if self.peek() == TokenKind.TK_EOF:
-            self.emit_error("expected expression")
+        if not self.skip_to_indented_body():
             return self.poisoned_expr()
 
         let block_col = column_of(self.source, self.current_start())
+        let saved_block_indent = self.block_indent
+        self.block_indent = block_col
+        let body = self.parse_indented_block(block_col)
+        self.block_indent = saved_block_indent
+        body
+
+    mut fn parse_indented_block(block_col: i32) -> NodeId:
         var stmts: Vec[i32] = Vec.new()
         var last_expr = self.parse_expr()
 
@@ -7858,7 +7896,12 @@ impl Parser:
             self.advance()
             return self.pool.add_node(NodeKind.NK_BLOCK, brace_start, end, 0, 0, 0)
 
+        // Indentation inside braces is insignificant (§29.13 Form 3), so a
+        // statement's own line is the level a colon body inside it must
+        // exceed (#1391).
+        let saved_block_indent = self.block_indent
         var stmts: Vec[i32] = Vec.new()
+        self.block_indent = line_indent_of(self.source, self.current_start())
         var last_expr = self.parse_expr()
 
         while true:
@@ -7871,10 +7914,12 @@ impl Parser:
                 if self.peek() == TokenKind.TK_R_BRACE or self.peek() == TokenKind.TK_EOF:
                     break
                 stmts.push(last_expr as i32)
+                self.block_indent = line_indent_of(self.source, self.current_start())
                 last_expr = self.parse_expr()
                 continue
             break
 
+        self.block_indent = saved_block_indent
         self.expect(TokenKind.TK_R_BRACE)
 
         if stmts.len() == 0:

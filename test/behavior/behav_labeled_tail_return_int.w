@@ -4,6 +4,6 @@
 fn f() -> i32:
     let s = 42
     'done:
-    s
+        s
 fn main:
     print(f"[{f()}]")

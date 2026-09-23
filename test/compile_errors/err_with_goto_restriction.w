@@ -14,7 +14,7 @@ fn f(j: bool) -> i32:
             goto 'inside
     for i in 0..3:
         'inside:
-        return i
+            return i
     return -1
 
 fn main:

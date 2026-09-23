@@ -8,7 +8,7 @@ impl Drop for R:
 fn f() -> R:
     let x = 5
     'done:
-    R { id: x }
+        R { id: x }
 fn main:
     var saved = 0
     {
