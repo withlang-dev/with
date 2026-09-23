@@ -1270,8 +1270,7 @@ impl MirBuilder:
     mut fn emit_defers_for_range(start: i32, end: i32):
         var i = end - 1
         while i >= start:
-            let defer_body = self.defer_nodes[i]
-            self.emit_deferred_body(defer_body)
+            self.emit_deferred_body(self.defer_nodes[i])
             i = i - 1
 
     mut fn emit_drops_for_range(start: i32, end: i32):
@@ -1324,8 +1323,7 @@ impl MirBuilder:
     mut fn emit_errdefers_for_return():
         var i = self.errdefer_nodes.len() as i32 - 1
         while i >= 0:
-            let errdefer_body = self.errdefer_nodes[i]
-            self.emit_deferred_body(errdefer_body)
+            self.emit_deferred_body(self.errdefer_nodes[i])
             i = i - 1
 
     fn push_control_target(label: i32, target_kind: i32, continue_bb: i32, break_bb: i32, result_place: i32) -> Unit:

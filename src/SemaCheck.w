@@ -9455,7 +9455,9 @@ impl Sema:
             // value; only an un-materialized view escapes (gate mirrors 9618).
             let tail_materializes = self.has_contextual_copy_adjustment(tail) != 0 or (self.current_return_type != 0 and self.can_contextually_copy_ref(self.current_return_type as i32, tail_type as i32) != 0)
             if tail_kind == TypeKind.TY_REF and tail_materializes == 0:
-                self.check_returned_view_origins(tail, tail)
+                // Only the body block's tail is the return (#1406): an inner
+                // block's tail escapes just that block's own bindings.
+                self.check_view_escape_origins(tail, tail, if node == self.body_tail_block: -1 else: block_scope_start)
             else if tail_materializes == 0 and self.type_is_ephemeral_value(tail_type as i32) != 0 and tail_is_value != 0 and self.stmt_pos_depth == 0 and self.current_return_type != 0 and self.current_return_type != self.ty_void:
                 // #625 (decisions.md D2): a tail-position return of an ephemeral value
                 // (struct or container) is escape-checked HERE, in-scope, while the
@@ -10199,7 +10201,23 @@ impl Sema:
         if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_CAST or kind == NodeKind.NK_COMPTIME or kind == NodeKind.NK_UNSAFE_BLOCK or kind == NodeKind.NK_NO_SUSPEND:
             out = self.collect_expr_view_deps(self.ast.get_data0(node), move out)
             return out
-        if kind == NodeKind.NK_FIELD_ACCESS or kind == NodeKind.NK_COMPUTED_FIELD_ACCESS or kind == NodeKind.NK_INDEX:
+        // #1406 (§3.4, §21.1 rule 10, D27): an element view carries the
+        // origins check_index recorded on it (record_view_producer_origins:
+        // the base's own origins, else the base's root — `v` for an owned
+        // `v[i]`). Recursing into the base alone found nothing for an owned
+        // `v`, so the element's origin was lost wherever the view flowed —
+        // an if/match arm, a tuple, a variant payload, a transparent call
+        // argument, a field projection — and a `v.push` while the view was
+        // live read freed memory.
+        if kind == NodeKind.NK_INDEX:
+            let index_dep_count = self.expr_view_dep_count(node)
+            if index_dep_count > 0:
+                for i in 0..index_dep_count:
+                    out = self.push_unique_i32(move out, self.expr_view_dep_at(node, i))
+                return out
+            out = self.collect_expr_view_deps(self.ast.get_data0(node), move out)
+            return out
+        if kind == NodeKind.NK_FIELD_ACCESS or kind == NodeKind.NK_COMPUTED_FIELD_ACCESS:
             out = self.collect_expr_view_deps(self.ast.get_data0(node), move out)
             return out
         if kind == NodeKind.NK_UNARY:
@@ -10420,7 +10438,9 @@ impl Sema:
         // narrowly: only a view-bound binding whose initializer is a bare
         // index place — a call or projection result keeps its collected deps
         // (a fallback through place_root_sym there manufactured phantom
-        // receiver views).
+        // receiver views). A Vec/array/slice element now carries its root
+        // through collect_expr_view_deps wherever it flows (#1406); this
+        // covers the index places check_index records no origins for.
         if deps.len() == 0 and param_mask == 0 and self.scope_is_view_bound(sym) != 0:
             var peeled_place = expr_node
             while peeled_place != 0 and self.ast.kind(peeled_place) == NodeKind.NK_GROUPED:
@@ -10614,15 +10634,37 @@ impl Sema:
                 return
 
     mut fn check_returned_view_origins(expr_node: i32, report_node: i32):
+        self.check_view_escape_origins(expr_node, report_node, -1)
+
+    // #1406 (§21.1): the origin dies before the view's destination when it is
+    // a stack local of the function (a return, `block_scope_start < 0`), or a
+    // binding declared inside the block whose tail yields the view (an inner
+    // block: `let x = if c: { let w = …; w[0] } else: …`). An inner block's
+    // tail view of an outer binding does not escape anything — the enclosing
+    // binding or return checks it where it lands.
+    fn view_origin_escapes(sym: i32, block_scope_start: i32) -> i32:
+        if block_scope_start < 0:
+            return self.view_origin_is_stack_local(sym)
+        if sym == 0:
+            return 0
+        if self.scope_binding_index(sym) >= block_scope_start: 1 else: 0
+
+    mut fn report_view_escape(origin_sym: i32, report_node: i32, block_scope_start: i32):
+        let origin_name: str = with_str_clone_ref(self.pool_resolve(origin_sym))
+        if block_scope_start < 0:
+            self.emit_error("returned view may outlive its origin '" ++ origin_name ++ "'", report_node)
+        else:
+            self.emit_error("view may outlive its origin '" ++ origin_name ++ "', which is dropped at the end of this block", report_node)
+
+    mut fn check_view_escape_origins(expr_node: i32, report_node: i32, block_scope_start: i32):
         if expr_node == 0:
             return
         if self.reject_view_into_temporary(expr_node, "returns") != 0:
             return
         if self.ast.kind(expr_node) == NodeKind.NK_UNARY and self.ast.get_data0(expr_node) == UnaryOp.UOP_REF:
             let origin_sym = self.ref_storage_root_sym(self.ast.get_data1(expr_node))
-            if self.view_origin_is_stack_local(origin_sym) != 0:
-                let origin_name: str = with_str_clone_ref(self.pool_resolve(origin_sym))
-                self.emit_error("returned view may outlive its origin '" ++ origin_name ++ "'", report_node)
+            if self.view_origin_escapes(origin_sym, block_scope_start) != 0:
+                self.report_view_escape(origin_sym, report_node, block_scope_start)
                 return
         if self.ast.kind(expr_node) == NodeKind.NK_CALL:
             let callee = self.ast.get_data0(expr_node)
@@ -10648,14 +10690,17 @@ impl Sema:
                                 continue
                             let origin_arg = if has_resolved != 0: self.get_resolved_call_arg(expr_node, origin_pi) else: self.ast.get_extra(extra_start + origin_pi)
                             let origin_sym = self.place_root_sym(origin_arg)
-                            if self.view_origin_is_stack_local(origin_sym) != 0:
-                                let origin_name: str = with_str_clone_ref(self.pool_resolve(origin_sym))
-                                self.emit_error("returned view may outlive its origin '" ++ origin_name ++ "'", report_node)
+                            if self.view_origin_escapes(origin_sym, block_scope_start) != 0:
+                                self.report_view_escape(origin_sym, report_node, block_scope_start)
                                 return
         if self.ast.kind(expr_node) == NodeKind.NK_IDENT:
             let view_sym = self.ast.get_data0(expr_node)
             let view_ty = self.scope_lookup(view_sym)
-            if view_ty > 0:
+            // A view binding of unknown provenance is conservatively rejected
+            // where it leaves its scope: the function for a return, its own
+            // block for an inner block's tail.
+            let view_leaves_scope = block_scope_start < 0 or self.scope_binding_index(view_sym) >= block_scope_start
+            if view_ty > 0 and view_leaves_scope:
                 let view_tk = self.get_type_kind(self.resolve_alias(view_ty as TypeId))
                 if view_tk == TypeKind.TY_REF and self.param_index_for_sym(view_sym) < 0 and self.binding_view_origin_mask(view_sym) == 0 and self.binding_view_dep_count(view_sym) == 0:
                     if self.binding_value_nodes.contains(view_sym):
@@ -10663,13 +10708,13 @@ impl Sema:
                         let init_kind = self.ast.kind(init_node)
                         if init_kind == NodeKind.NK_UNARY and self.ast.get_data0(init_node) == UnaryOp.UOP_REF:
                             let origin_sym = self.ref_storage_root_sym(self.ast.get_data1(init_node))
-                            if self.view_origin_is_stack_local(origin_sym) != 0:
-                                let origin_name: str = with_str_clone_ref(self.pool_resolve(origin_sym))
-                                self.emit_error("returned view may outlive its origin '" ++ origin_name ++ "'", report_node)
+                            if self.view_origin_escapes(origin_sym, block_scope_start) != 0:
+                                self.report_view_escape(origin_sym, report_node, block_scope_start)
                                 return
                         if init_kind == NodeKind.NK_CALL or init_kind == NodeKind.NK_FIELD_ACCESS or init_kind == NodeKind.NK_UNARY:
                             let view_name: str = with_str_clone_ref(self.pool_resolve(view_sym))
-                            self.emit_error("returned view may outlive its origin via local binding '" ++ view_name ++ "'", report_node)
+                            let what = if block_scope_start < 0: "returned view" else: "view"
+                            self.emit_error(what ++ " may outlive its origin via local binding '" ++ view_name ++ "'", report_node)
                             return
         var deps: Vec[i32] = Vec.new()
         deps = self.collect_expr_view_deps(expr_node, move deps)
@@ -10677,9 +10722,8 @@ impl Sema:
             let origin_sym = deps[i]
             if origin_sym == 0:
                 continue
-            if self.view_origin_is_stack_local(origin_sym) != 0:
-                let origin_name: str = with_str_clone_ref(self.pool_resolve(origin_sym))
-                self.emit_error("returned view may outlive its origin '" ++ origin_name ++ "'", report_node)
+            if self.view_origin_escapes(origin_sym, block_scope_start) != 0:
+                self.report_view_escape(origin_sym, report_node, block_scope_start)
                 return
 
     fn expr_type_is_generator_state(expr_node: i32) -> i32:
