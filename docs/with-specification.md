@@ -5728,15 +5728,12 @@ let p = Point { x: 1, y: 2 }
 print(f"{p:?}")    // prints "Point { x: 1, y: 2 }"
 ```
 
-Debug formatting is generated inline by the compiler at compile time
-— each struct field is extracted and formatted without trait dispatch
-or runtime reflection. For primitives, `:?` produces the same output
-as default display, except strings are quoted (`"hello"` instead of
-`hello`).
-
-A `Debug` trait exists in the standard library for manual
-implementations, but the `:?` f-string specifier does not dispatch
-through it. The compiler generates the formatting directly.
+Debug formatting is generated inline by the compiler at compile time,
+without runtime reflection. A type with an explicit `impl Debug` is
+formatted by its `debug_str`, at top level and nested alike; every other
+type uses the generated form (§15.4.7). For primitives, `:?` produces the
+same output as default display, except that strings are quoted and
+escaped.
 
 ---
 
@@ -8631,9 +8628,14 @@ Available for all types. Prints a structural representation:
 |------|-------------|
 | integer | Same as default: `42` |
 | float | Same as default: `3.14` |
-| str | Quoted: `"hello"` |
+| str | Quoted and escaped: `"a\"b"`, `"café"` |
 | bool | `true` / `false` |
 | struct | `TypeName { field: value, field: value }` |
+| enum | `Variant`, or `Variant(payload, payload)` |
+| `Option[T]` / `Result[T, E]` | `Some(value)` / `None`, `Ok(value)` / `Err(error)` |
+| `Vec[T]`, array, slice | `[elem, elem]` |
+| `HashMap[K, V]` | `{key: value, key: value}`, entries ordered by the Debug text of their keys |
+| `BTreeMap[K, V]` | `{key: value, key: value}`, in key order |
 
 ```
 f"{42:?}"        // "42"
@@ -8641,9 +8643,15 @@ f"{name:?}"      // "\"hi\""   (name = "hi")
 f"{point:?}"     // "Point { x: 1, y: 2 }"
 ```
 
-Debug mode for structs generates inline formatting code at compile
-time — each field is extracted and formatted. No runtime reflection
-or trait dispatch is used.
+Debug is recursive: every struct field, enum payload, and collection
+element is formatted with `:?`, so a value formats the same at every
+depth. A type with an explicit `impl Debug` is formatted by its
+`debug_str` at every depth; every other type uses the compiler-generated
+form. `:?` needs no derive: `@[derive(Debug)]` provides the `Debug` trait,
+for code that names it as a bound. A `str` is quoted and escaped: `"` as
+`\"`, `\` as `\\`, and the control characters U+0000–U+001F and U+007F as
+`\n`, `\t`, `\r`, `\0`, or `\xHH`; every other character, including
+printable non-ASCII, appears as itself.
 
 #### 15.4.8 Compile-Time Validation
 
