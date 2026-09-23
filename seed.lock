@@ -8,9 +8,15 @@
 #
 # `<asset>.version=` pins one platform to another release while it cannot
 # bootstrap the newest seed; say which issue, and remove it when fixed.
-version=v0.15.2.0
-with-darwin-aarch64=79a63ff91d5d9260463adf3e08ff43bdd5446d070eac2ca56ef543ae05484075
+version=nightly-20260922-local-1-8c859a7d0559
+with-darwin-aarch64=7c3ed98385f310fc006427039012e4a57e7ec18eef87b192150587ca712fa4fb
+# The darwin seed is a nightly-channel prerelease cut from 8c859a7d so the
+# stage chain carries #1325's cross-unit specialization ownership (#1359).
+# Linux stays on v0.15.2.0 until its nightly legs publish a newer asset
+# (#1386, #1369, #1376).
+with-linux-x86_64.version=v0.15.2.0
 with-linux-x86_64=eaa955602fd96e960ea3cfcb2f41be4013380dce646e45a93422d67ce9003869
+with-linux-aarch64.version=v0.15.2.0
 with-linux-aarch64=3e54f7839dbf9549233a19753c897fb08f493fa8cfafeeec25b62fa87a43aac3
 # Both Windows seeds are v0.15.2.1 (the #1081 fixes): x86_64 built natively
 # by the ladder v0.15.1.8 -> af7db8ce -> main and fixpoint-verified; aarch64
