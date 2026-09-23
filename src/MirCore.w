@@ -2147,7 +2147,90 @@ fn mir_drop_vacated_message(keys: &MirDropStateKeys, state: &MirDropStateMap, bo
     let child_state = mir_drop_state_name(state.get(keys, child))
     "drop of " ++ mir_place_text(body, place_id) ++ " frees " ++ keys.names[child] ++ f", which a path reaching it moved out ({child_state}) and nothing reset (§2.5.1)"
 
+// #1415: a move out of a drop-bearing place projected through a reference
+// (`_4 = move _1.*.p` through `&self`). A reference never owns its pointee,
+// so the frame can neither own the moved value nor reset its source: both
+// the referent's owner and the destination free it. That is never valid MIR
+// (§2.2 D32: a field vacates only through a `var` base or a `mut fn`
+// receiver, whose place carries no deref; D22: a view never becomes an
+// owner). A raw pointer's pointee (the unsafe tier) and a Box's are owned
+// through the pointer and stay legal.
+fn mir_move_through_reference(mir_mod: &MirModule, body: &MirBody, operand_id: i32) -> str:
+    if operand_id < 0 or operand_id >= body.operand_kinds.len() or body.operand_kinds[operand_id] != OperandKind.OK_MOVE:
+        return ""
+    let place = body.operand_d0[operand_id]
+    if place < 0 or place >= body.place_locals.len():
+        return ""
+    let proj_start = body.place_proj_starts[place]
+    let proj_count = body.place_proj_counts[place]
+    for pi in 0..proj_count:
+        if body.proj_kinds[(proj_start + pi)] != ProjKind.PK_DEREF:
+            continue
+        let pointer_ty = mir_mod.mir_resolve_alias(mir_validate_place_prefix_type(mir_mod, body, place, proj_count - pi))
+        if mir_mod.mir_get_type_kind(pointer_ty) != TypeKind.TY_REF:
+            continue
+        if not mir_mod.sema_moved_drop_types.contains(mir_validate_place_type(mir_mod, body, place)):
+            return ""
+        return "moves out of " ++ mir_place_text(body, place) ++ " through a reference, which does not own it (§2.2 D32, D22)"
+    ""
+
+// The operands a statement's rvalue reads, decoded as note_rvalue does.
+fn mir_rvalue_operands(body: &MirBody, rval_id: i32) -> Vec[i32]:
+    var ops: Vec[i32] = Vec.new()
+    if rval_id < 0 or rval_id >= body.rval_kinds.len():
+        return ops
+    let kind: i32 = body.rval_kinds[rval_id]
+    let d0: i32 = body.rval_d0[rval_id]
+    let d1: i32 = body.rval_d1[rval_id]
+    let d2: i32 = body.rval_d2[rval_id]
+    if kind == RvalueKind.RK_USE or kind == RvalueKind.RK_CAST:
+        ops.push(d0)
+    else if kind == RvalueKind.RK_BIN_OP or kind == RvalueKind.RK_SLICE:
+        ops.push(d1)
+        ops.push(d2)
+    else if kind == RvalueKind.RK_UN_OP:
+        ops.push(d1)
+    else if kind == RvalueKind.RK_AGGREGATE and d1 >= 0 and d1 < body.agg_field_starts.len():
+        for i in 0..body.agg_field_counts[d1]:
+            ops.push(body.agg_field_operands[body.agg_field_starts[d1] + i])
+    else if kind == RvalueKind.RK_STR_CONCAT_N and d0 >= 0 and d0 < body.call_arg_starts.len():
+        for i in 0..body.call_arg_counts[d0]:
+            ops.push(body.call_arg_operands[body.call_arg_starts[d0] + i])
+    ops
+
+// Every move of a statement or terminator checked by the #1415 rule.
+fn validate_moves_through_references(mir_mod: &MirModule, body: &MirBody) -> str:
+    for bb in 0..body.block_count():
+        let stmt_start = body.bb_stmt_starts[bb]
+        for si in 0..body.bb_stmt_counts[bb]:
+            let stmt_id = stmt_start + si
+            if body.stmt_kind(stmt_id) != StmtKind.Assign:
+                continue
+            let ops = mir_rvalue_operands(body, body.stmt_data1(stmt_id))
+            for oi in 0..ops.len():
+                let err = mir_move_through_reference(mir_mod, body, ops[oi])
+                if err.len() > 0:
+                    return f"fn sym{body.fn_sym} stmt{stmt_id} span={body.stmt_spans[stmt_id]}: " ++ err
+        let tk = body.term_kind(bb)
+        var term_ops: Vec[i32] = Vec.new()
+        if tk == TermKind.TK_SWITCH_INT:
+            term_ops.push(body.term_data0(bb))
+        else if tk == TermKind.TK_CALL:
+            term_ops.push(body.term_data0(bb))
+            let args_id = body.term_data1(bb)
+            if args_id >= 0 and args_id < body.call_arg_starts.len():
+                for ai in 0..body.call_arg_counts[args_id]:
+                    term_ops.push(body.call_arg_operands[body.call_arg_starts[args_id] + ai])
+        for oi in 0..term_ops.len():
+            let err = mir_move_through_reference(mir_mod, body, term_ops[oi])
+            if err.len() > 0:
+                return f"fn sym{body.fn_sym} bb{bb}: " ++ err
+    ""
+
 fn validate_ownership_body(mir_mod: &MirModule, body: &MirBody) -> str:
+    let through_reference = validate_moves_through_references(mir_mod, body)
+    if through_reference.len() > 0:
+        return through_reference
     var blocks = mir_drop_state_compute_blocks(body)
     let key_places = mir_drop_state_key_places(blocks.keys)
     for bb in 0..body.block_count():

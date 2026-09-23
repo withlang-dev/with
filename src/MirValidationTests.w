@@ -333,3 +333,37 @@ pub fn mir_test_vacated_payload_drop() -> Unit:
     assert(vacated_payload_verdict(2, true) == "")
     // A payload with no drop glue is not freed again by the enum's drop.
     assert(vacated_payload_verdict(0, false) == "")
+
+// #1415: `_4 = move _1.*.p` through `&self` — a move out of a reference's
+// pointee — passed validate-all, and both owners freed the value. A raw
+// pointer's pointee is owned through the pointer (the unsafe tier) and
+// stays legal; so is a copy through a reference.
+fn move_through_verdict(pointer_kind: i32, moves: bool, drops: bool) -> str:
+    var mir_mod = MirModule.init()
+    for kind in [0, TypeKind.TY_INT, pointer_kind]:
+        mir_mod.sema_type_kinds.push(kind)
+        mir_mod.sema_type_d0.push(if kind == pointer_kind: 1 else: 0)
+        mir_mod.sema_type_d1.push(0)
+        mir_mod.sema_type_d2.push(0)
+    let value_ty = 1
+    let pointer_ty = 2
+    if drops: mir_mod.sema_moved_drop_types.insert(value_ty, 1)
+    var body = MirBody.init_for_fn(1)
+    body.n_params = 1
+    let pointer_local = body.new_temp(pointer_ty)
+    let pointer = body.new_place(pointer_local)
+    let pointee = body.new_deref_place(pointer, value_ty)
+    let dest_local = body.new_temp(value_ty)
+    let dest = body.new_place(dest_local)
+    let entry = body.new_block()
+    let read = body.new_operand(if moves: OperandKind.OK_MOVE else: OperandKind.OK_COPY, pointee)
+    let rv = body.new_rvalue(RvalueKind.RK_USE, read, 0, 0)
+    body.push_stmt(entry, StmtKind.Assign, dest, rv, 0)
+    body.set_terminator(entry, TermKind.TK_RETURN, 0, 0, 0, 0, 0)
+    validate_ownership_body(mir_mod, body)
+
+pub fn mir_test_move_through_reference() -> Unit:
+    assert(move_through_verdict(TypeKind.TY_REF, true, true).contains("moves out of _1.* through a reference"))
+    assert(move_through_verdict(TypeKind.TY_REF, false, true) == "")
+    assert(move_through_verdict(TypeKind.TY_REF, true, false) == "")
+    assert(move_through_verdict(TypeKind.TY_PTR, true, true) == "")
