@@ -13873,9 +13873,11 @@ impl Sema:
     // A fixed-size array matched by a slice pattern is decided at compile
     // time (§9.7): the pattern either matches every value or none.
     fn exh_slice_always_matches(pat: i32, ty: i32) -> bool:
-        if ty == 0 or self.get_type_kind(ty as TypeId) != TypeKind.TY_ARRAY:
+        // A borrowed array is decided by its length the same way (#1389).
+        let shape = if ty != 0: self.resolve_alias(self.pattern_subject_shape_type(ty) as TypeId) as i32 else: 0
+        if shape == 0 or self.get_type_kind(shape as TypeId) != TypeKind.TY_ARRAY:
             return false
-        let len = self.get_type_d1(ty as TypeId)
+        let len = self.get_type_d1(shape as TypeId)
         let s_extra = self.ast.get_data0(pat)
         let head = self.ast.get_data1(pat)
         let tail = self.ast.get_extra(s_extra + 1 + head)
@@ -15026,6 +15028,24 @@ impl Sema:
             return self.get_type_d0(resolved)
         subject_type
 
+    // The element type of a sequence a slice pattern observes in place: a
+    // borrowed fixed-size array, a slice, or a Vec, owned or borrowed. 0 for
+    // an owned array (taken apart by value) and for anything that is not a
+    // sequence (#1389).
+    fn slice_pattern_seq_elem(subject_type: i32) -> i32:
+        if subject_type == 0:
+            return 0
+        let direct = self.resolve_alias(subject_type as TypeId)
+        let shape = self.resolve_alias(self.pattern_subject_shape_type(subject_type) as TypeId)
+        let kind = self.get_type_kind(shape)
+        if kind == TypeKind.TY_ARRAY:
+            return if self.get_type_kind(direct) == TypeKind.TY_REF: self.get_type_d0(shape) else: 0
+        if kind == TypeKind.TY_SLICE:
+            return self.get_type_d0(shape)
+        if kind == TypeKind.TY_GENERIC_INST and self.get_generic_inst_base(shape as i32) == self.syms.vec and self.get_generic_inst_arg_count(shape as i32) == 1:
+            return self.get_generic_inst_arg(shape as i32, 0)
+        0
+
     fn pattern_subject_ref_mutability(subject_type: i32) -> i32:
         if subject_type == 0:
             return -1
@@ -15409,15 +15429,24 @@ impl Sema:
             let head_count = self.ast.get_data1(node)
             let rest_sym = self.ast.get_data2(node)
             var elem_type = 0
-            let resolved = self.resolve_alias(subject_type)
-            let stk = self.get_type_kind(resolved)
-            if stk == TypeKind.TY_ARRAY:
-                elem_type = self.get_type_d0(resolved)
-            if stk == TypeKind.TY_SLICE:
-                elem_type = self.get_type_d0(resolved)
             let has_rest = self.ast.get_extra(s_extra)
-            if stk == TypeKind.TY_SLICE and has_rest != 0 and rest_sym != 0:
-                self.emit_error("slice rest binding for dynamic slices is not implemented yet", node)
+            // §9.7 slice patterns (#1389). An owned fixed-size array is taken
+            // apart by value. Any other sequence is observed in place, and
+            // its elements bind as views (D27: element access observes): a
+            // borrowed array, a slice, and a Vec (owned or borrowed). The
+            // length is known at compile time for arrays and tested at
+            // run time otherwise.
+            let seq_elem = self.slice_pattern_seq_elem(subject_type)
+            let resolved = self.resolve_alias(subject_type)
+            if self.get_type_kind(resolved) == TypeKind.TY_ARRAY:
+                elem_type = self.get_type_d0(resolved)
+            else if seq_elem != 0:
+                elem_type = self.ensure_exact_type(TypeKind.TY_REF, seq_elem, 0, 0) as i32
+                let shape_kind = self.get_type_kind(self.resolve_alias(self.pattern_subject_shape_type(subject_type) as TypeId))
+                if shape_kind != TypeKind.TY_ARRAY and has_rest != 0 and rest_sym != 0:
+                    self.emit_error("slice rest binding for dynamic slices is not implemented yet", node)
+            else if subject_type != 0 and self.get_type_kind(resolved) != TypeKind.TY_ERR:
+                self.emit_error("a slice pattern requires an array, slice or Vec subject, found '" ++ self.type_name(subject_type) ++ "'", node)
             for hi in 0..head_count:
                 let h_sym = self.ast.get_extra(s_extra + 1 + hi)
                 if h_sym != 0:

@@ -9343,6 +9343,27 @@ impl MirBuilder:
                     else:
                         self.terminate(TermKind.TK_GOTO, fail_bb, 0, 0, 0)
                 return
+            // A slice or Vec (owned or borrowed): the length is tested at run
+            // time, `==` without a rest and `>=` with one (#1389).
+            if self.slice_pattern_dyn_kind(sp_arr_ty) != 0:
+                let sp_span = self.ast.get_start(pat_node)
+                let sp_base = self.slice_pattern_dyn_base(sp_shape_place, sp_arr_ty, sp_span)
+                let sp_len = self.slice_pattern_dyn_len(sp_base, sp_arr_ty, sp_span)
+                let sp_need = self.int_const_operand((sp_head + sp_tail_count) as i64, self.sema.ty_i64)
+                let sp_len_op = self.body.new_operand(OperandKind.OK_COPY, sp_len)
+                let sp_op = if sp_has_rest != 0: BinaryOp.OP_GTE else: BinaryOp.OP_EQ
+                let sp_cmp_rv = self.body.new_rvalue(RvalueKind.RK_BIN_OP, sp_op, sp_len_op, sp_need)
+                let sp_cmp_local = self.new_temp(self.sema.ty_bool)
+                let sp_cmp = self.place_for_local(sp_cmp_local)
+                self.body.push_stmt(self.cur_bb, StmtKind.Assign, sp_cmp, sp_cmp_rv, sp_span)
+                let sp_vals: Vec[i32] = Vec.new()
+                sp_vals.push(1)
+                let sp_targets: Vec[i32] = Vec.new()
+                sp_targets.push(arm_bb)
+                let sp_table = self.body.new_switch_table(sp_vals, sp_targets)
+                let sp_cmp_op = self.body.new_operand(OperandKind.OK_COPY, sp_cmp)
+                self.terminate(TermKind.TK_SWITCH_INT, sp_cmp_op, sp_table, fail_bb, 0)
+                return
 
         // #1388: a named-field struct pattern tests every refutable field
         // sub-pattern, exactly as the positional and tuple forms do. This
@@ -9423,6 +9444,137 @@ impl MirBuilder:
             self.body.push_stmt(self.cur_bb, StmtKind.Assign, bind_place, blank_rv, 0)
             self.body.mark_local_ever_moved(self.body.place_locals[bind_place])
             i = i - 2
+
+    // Slice patterns over a sequence observed in place (§9.7, #1389): 1 for a
+    // slice, 2 for a Vec, 0 for anything else (an array is decided at
+    // compile time).
+    fn slice_pattern_dyn_kind(seq_ty: i32) -> i32:
+        if seq_ty <= 0:
+            return 0
+        let resolved = self.sema.resolve_alias(seq_ty as TypeId) as i32
+        let kind = self.sema.get_type_kind(resolved)
+        if kind == TypeKind.TY_SLICE:
+            return 1
+        if kind == TypeKind.TY_GENERIC_INST and self.sema.get_generic_inst_base(resolved) == self.sema.syms.vec:
+            return 2
+        0
+
+    // The place a slice pattern reads its sequence from. A Vec is read where
+    // it is (the VEC_ intrinsics take its place, through a deref included).
+    // A slice view is copied out first: RK_LEN does not see through a deref
+    // projection (see lower_sequence_place).
+    mut fn slice_pattern_dyn_base(shape_place: i32, seq_ty: i32, span: i32) -> i32:
+        if self.slice_pattern_dyn_kind(seq_ty) != 1:
+            return shape_place
+        let view_local = self.new_temp(seq_ty)
+        let view_place = self.place_for_local(view_local)
+        let view_op = self.body.new_operand(OperandKind.OK_COPY, shape_place)
+        self.assign_operand_to_place(view_place, view_op, span)
+        view_place
+
+    // The run-time length (i64) of the sequence at `base`, in a temp.
+    mut fn slice_pattern_dyn_len(base: i32, seq_ty: i32, span: i32) -> i32:
+        let len_local = self.new_temp(self.sema.ty_i64)
+        let len_place = self.place_for_local(len_local)
+        if self.slice_pattern_dyn_kind(seq_ty) == 1:
+            let len_rv = self.body.new_rvalue(RvalueKind.RK_LEN, base, 0, 0)
+            self.body.push_stmt(self.cur_bb, StmtKind.Assign, len_place, len_rv, span)
+            return len_place
+        let len_args: Vec[i32] = Vec.new()
+        len_args.push(self.body.new_operand(OperandKind.OK_COPY, base))
+        let len_args_id = self.body.new_call_args(len_args)
+        self.body.set_call_intrinsic(len_args_id, MirIntrinsic.VEC_LEN)
+        let after_bb = self.new_block()
+        let unit = self.unit_operand()
+        self.terminate(TermKind.TK_CALL, unit, len_args_id, len_place, after_bb)
+        self.switch_to(after_bb)
+        len_place
+
+    // The bindings of a slice pattern whose subject is observed in place — a
+    // borrowed array, a slice, or a Vec, owned or borrowed: each named element
+    // binds as a view `&T` of the element (D27: element access observes). A
+    // rest over a borrowed array binds the remaining count, as over an owned
+    // one (§9.7); Sema reports a named rest over a slice or Vec.
+    mut fn lower_slice_pattern_views(pat_node: i32, scrutinee_place: i32) -> Vec[i32]:
+        let out: Vec[i32] = Vec.new()
+        let span = self.ast.get_start(pat_node)
+        let sp_extra = self.ast.get_data0(pat_node)
+        let head = self.ast.get_data1(pat_node)
+        let tail = self.ast.get_extra(sp_extra + 1 + head)
+        let has_rest = self.ast.get_extra(sp_extra)
+        let rest_sym = self.ast.get_data2(pat_node)
+        let shape_place = self.pattern_shape_place(scrutinee_place)
+        let seq_ty = self.sema.resolve_alias(self.place_local_type(shape_place) as TypeId) as i32
+        let seq_kind = self.sema.get_type_kind(seq_ty)
+        let seq_dyn = self.slice_pattern_dyn_kind(seq_ty)
+        var elem_ty = 0
+        if seq_kind == TypeKind.TY_ARRAY or seq_kind == TypeKind.TY_SLICE:
+            elem_ty = self.sema.get_type_d0(seq_ty)
+        else if seq_dyn == 2 and self.sema.get_generic_inst_arg_count(seq_ty) == 1:
+            elem_ty = self.sema.get_generic_inst_arg(seq_ty, 0)
+        let view_ty = if elem_ty != 0: self.sema.find_exact_type(TypeKind.TY_REF, elem_ty, 0, 0) as i32 else: 0
+        if view_ty == 0:
+            eprint("error: slice pattern reached MIR binding lowering without the element view type Sema records")
+            self.mark_unsupported()
+            return out
+        let base = self.slice_pattern_dyn_base(shape_place, seq_ty, span)
+        let arr_len = if seq_kind == TypeKind.TY_ARRAY: self.sema.get_type_d1(seq_ty) else: 0
+        var len_place = -1
+        if seq_dyn != 0 and tail > 0:
+            len_place = self.slice_pattern_dyn_len(base, seq_ty, span)
+        for i in 0..head + tail:
+            let sym = if i < head: self.ast.get_extra(sp_extra + 1 + i) else: self.ast.get_extra(sp_extra + 2 + head + (i - head))
+            if sym == 0:
+                continue
+            // Element i counts from the front for the head; the tail counts
+            // from the end: index len - (tail - t).
+            let from_end = if i < head: 0 else: tail - (i - head)
+            let local_id = self.body.new_local(view_ty, self.pattern_bind_mut, sym, 1)
+            self.bind_local(sym, local_id)
+            self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, local_id, 0, span)
+            let local_place = self.place_for_local(local_id)
+            if seq_dyn == 0:
+                let elem_index = if i < head: i else: arr_len - from_end
+                let elem_place = self.body.new_field_place(base, elem_index, elem_ty)
+                let view_rv = self.body.new_rvalue(RvalueKind.RK_REF, BorrowKind.SHARED, elem_place, 0)
+                self.body.push_stmt(self.cur_bb, StmtKind.Assign, local_place, view_rv, span)
+            else:
+                let idx_local = self.new_temp(self.sema.ty_i64)
+                let idx_place = self.place_for_local(idx_local)
+                if i < head:
+                    let idx_op = self.int_const_operand(i as i64, self.sema.ty_i64)
+                    let idx_rv = self.body.new_rvalue(RvalueKind.RK_USE, idx_op, 0, 0)
+                    self.body.push_stmt(self.cur_bb, StmtKind.Assign, idx_place, idx_rv, span)
+                else:
+                    let len_op = self.body.new_operand(OperandKind.OK_COPY, len_place)
+                    let back_op = self.int_const_operand(from_end as i64, self.sema.ty_i64)
+                    let idx_rv = self.body.new_rvalue(RvalueKind.RK_BIN_OP, BinaryOp.OP_SUB, len_op, back_op)
+                    self.body.push_stmt(self.cur_bb, StmtKind.Assign, idx_place, idx_rv, span)
+                if seq_dyn == 1:
+                    let elem_place = self.body.new_index_place(base, idx_local, elem_ty)
+                    let view_rv = self.body.new_rvalue(RvalueKind.RK_REF, BorrowKind.SHARED, elem_place, 0)
+                    self.body.push_stmt(self.cur_bb, StmtKind.Assign, local_place, view_rv, span)
+                else:
+                    let ref_args: Vec[i32] = Vec.new()
+                    ref_args.push(self.body.new_operand(OperandKind.OK_COPY, base))
+                    ref_args.push(self.body.new_operand(OperandKind.OK_COPY, idx_place))
+                    let ref_args_id = self.body.new_call_args(ref_args)
+                    self.body.set_call_intrinsic(ref_args_id, MirIntrinsic.VEC_GET_REF)
+                    let after_bb = self.new_block()
+                    let unit = self.unit_operand()
+                    self.terminate(TermKind.TK_CALL, unit, ref_args_id, local_place, after_bb)
+                    self.switch_to(after_bb)
+            out.push(local_id)
+            out.push(scrutinee_place)
+        if has_rest != 0 and rest_sym != 0 and seq_kind == TypeKind.TY_ARRAY:
+            let rest_local = self.body.new_local(self.sema.ty_i64 as i32, self.pattern_bind_mut, rest_sym, 1)
+            self.bind_local(rest_sym, rest_local)
+            self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, rest_local, 0, span)
+            let count_op = self.int_const_operand((arr_len - head - tail) as i64, self.sema.ty_i64)
+            let rest_place = self.place_for_local(rest_local)
+            self.assign_operand_to_place(rest_place, count_op, span)
+            out.push(rest_local)
+        out
 
     // The `..` of a tuple pattern (§9.7, #1366) over subject elements
     // first..first+covered. A bare `..` discards each one as `_` does (a Drop
@@ -9751,14 +9903,18 @@ impl MirBuilder:
         if pk == NodeKind.NK_PAT_SLICE:
             let sp_extra = self.ast.get_data0(pat_node)
             let sp_head_count = self.ast.get_data1(pat_node)
-            // Get element type from scrutinee's array type
-            let sp_arr_ty = self.place_local_type(scrutinee_place)
-            var sp_elem_ty = self.sema.ty_i32 as i32
+            // A borrowed array, a slice or a Vec is observed in place: its
+            // elements bind as views (#1389). Only an owned array is taken
+            // apart below.
+            if self.pattern_subject_ref_mutability(scrutinee_place) >= 0 or self.slice_pattern_dyn_kind(self.place_local_type(scrutinee_place)) != 0:
+                return self.lower_slice_pattern_views(pat_node, scrutinee_place)
+            let sp_arr_ty = self.sema.resolve_alias(self.place_local_type(scrutinee_place) as TypeId) as i32
             let sp_arr_tk = self.sema.get_type_kind(sp_arr_ty)
-            if sp_arr_tk == TypeKind.TY_ARRAY:
-                let ety = self.sema.get_type_d0(sp_arr_ty)
-                if ety != 0:
-                    sp_elem_ty = ety
+            if sp_arr_tk != TypeKind.TY_ARRAY or self.sema.get_type_d0(sp_arr_ty) == 0:
+                eprint("error: slice pattern reached MIR binding lowering with a subject that is not an array, slice or Vec")
+                self.mark_unsupported()
+                return out
+            let sp_elem_ty = self.sema.get_type_d0(sp_arr_ty)
             // extras: [has_rest, head_sym0, head_sym1, ..., tail_count, tail_sym0, ...]
             let sp_arr_len = if sp_arr_tk == TypeKind.TY_ARRAY: self.sema.get_type_d1(sp_arr_ty) else: 0
             // Bind head variables
