@@ -408,6 +408,7 @@ type FacadeResource {
     name: i32,
     facade: i32,
     node: i32,
+    decl: i32,            // the `c facade` block's declaration index: diagnostics name its file
     repr_tid: i32,
     producers: Vec[i32],  // one per `from` clause (fopen, fdopen, tmpfile → one FILE)
     out_params: Vec[i32], // parallel to producers; -1 for a direct return

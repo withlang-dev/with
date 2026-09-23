@@ -23,7 +23,7 @@ impl Sema:
             self.update_decl_source_context(di)
             let decl = self.ast.get_decl(di)
             if self.ast.kind(decl) == NodeKind.NK_C_FACADE:
-                self.collect_c_facade(decl)
+                self.collect_c_facade(di, decl)
         self.verify_facade_resources()
 
     // Stage 4a/4b: the facade-level checks that need every facade's facts (an
@@ -36,6 +36,11 @@ impl Sema:
     // the checks did not name.
     mut fn verify_facade_resources():
         for ri in 0..self.facade_resources.len() as i32:
+            // A diagnostic's span is read in the current source file: the
+            // resource's own facade block, not the last declaration pass 3
+            // visited (a rendered `<facade …>` file, whose lines it would
+            // quote).
+            self.update_decl_source_context(self.facade_resources[ri].decl)
             if self.verify_facade_resource(ri) and self.facade_resources[ri].drop != 0 and not self.diags.has_errors() and not self.facade_resource_rendered(ri):
                 let rname: str = self.pool_resolve(self.facade_resources[ri].name)
                 self.emit_error(f"resource '{rname}' passed every facade check but no With type was rendered for it; the renderer cannot express this shape and did not say so — a compiler defect (§16.2b.3)", self.facade_resources[ri].node)
@@ -198,7 +203,7 @@ impl Sema:
             return false
         true
 
-    mut fn collect_c_facade(node: i32):
+    mut fn collect_c_facade(di: i32, node: i32):
         let facade = self.ast.get_data0(node)
         let extra_start = self.ast.get_data1(node)
         let count = self.ast.get_data2(node)
@@ -212,7 +217,7 @@ impl Sema:
         for i in 0..count:
             let item = self.ast.get_extra(extra_start + i)
             if self.ast.kind(item) == NodeKind.NK_FACADE_RESOURCE:
-                self.collect_facade_resource(facade, item)
+                self.collect_facade_resource(di, facade, item)
         for i in 0..count:
             let item = self.ast.get_extra(extra_start + i)
             if self.ast.kind(item) == NodeKind.NK_FACADE_FN:
@@ -228,7 +233,7 @@ impl Sema:
 
     // ── resources ────────────────────────────────────────────────────────
 
-    mut fn collect_facade_resource(facade: i32, item: i32):
+    mut fn collect_facade_resource(decl: i32, facade: i32, item: i32):
         let name = self.ast.get_data0(item)
         let rname: str = self.pool_resolve(name)
         if self.facade_resource_index.contains(name):
@@ -240,7 +245,7 @@ impl Sema:
         let repr_tid = self.resolve_type_expr(repr_node) as i32
         if repr_tid == 0:
             return
-        var r = FacadeResource { name, facade, node: item, repr_tid, producers: Vec.new(), out_params: Vec.new(), init: 0, preinit: 0, drop: 0, destroyers: Vec.new(), ok_const: 0, borrows: Vec.new(), independent: 0, movable: 0, thread_caps: 0 }
+        var r = FacadeResource { name, facade, node: item, decl, repr_tid, producers: Vec.new(), out_params: Vec.new(), init: 0, preinit: 0, drop: 0, destroyers: Vec.new(), ok_const: 0, borrows: Vec.new(), independent: 0, movable: 0, thread_caps: 0 }
         for ci in 0..clause_count:
             let clause = self.ast.get_extra(extra_start + 1 + ci)
             r = self.collect_resource_clause(rname, move r, clause)
