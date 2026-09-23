@@ -8,6 +8,7 @@ use Mir
 use Ast
 use InternPool
 use Sema
+use render
 use compiler.EmbeddedStdlib
 use Overflow
 use std.collections.HashMap
@@ -1078,11 +1079,23 @@ impl CCodegen:
                 return 1
         0
 
+    // A declaration's own type node resolves where it is declared: frozen
+    // resolution judges visibility from sema.current_module_path, and the
+    // globals of an engine corpus compiled in-unit (std.re's
+    // `extern var _pcre2_utf8_table1: *c_int`) name types user code cannot
+    // see (#705, #1362).
+    mut fn resolve_decl_type_frozen(decl: NodeId, type_node: i32) -> i32:
+        let saved = with_str_clone_ref(self.sema.current_module_path)
+        self.sema.current_module_path = self.decl_source_path(decl)
+        let tid = self.sema.resolve_type_expr_frozen(type_node) as i32
+        self.sema.current_module_path = saved
+        tid
+
     mut fn global_decl_tid(decl: NodeId) -> i32:
         let dk = self.ast.kind(decl)
         if dk == NodeKind.NK_EXTERN_VAR:
             let type_node = self.ast.get_data1(decl)
-            let tid = self.sema.resolve_type_expr_frozen(type_node) as i32
+            let tid = self.resolve_decl_type_frozen(decl, type_node)
             if tid != 0:
                 return tid
             return self.sema.ty_i32 as i32
@@ -1092,7 +1105,7 @@ impl CCodegen:
         let type_extra_packed = flags / 16
         if type_extra_packed > 0:
             let type_node = self.ast.get_extra(type_extra_packed - 1)
-            let tid = self.sema.resolve_type_expr_frozen(type_node) as i32
+            let tid = self.resolve_decl_type_frozen(decl, type_node)
             if tid != 0:
                 return tid
         let value = self.ast.get_data1(decl)
@@ -7497,6 +7510,13 @@ impl CCodegen:
 
         ""
 
+    // The spelling of a `sizeof[T]` type argument, for diagnostics.
+    fn type_arg_text(type_node: i32) -> str:
+        let kind = self.ast.kind(type_node)
+        if kind == NodeKind.NK_IDENT or kind == NodeKind.NK_TYPE_NAMED:
+            return cc_intern_resolve(self.intern, self.ast.get_data0(type_node))
+        render_type_expr(self.ast, self.intern, type_node as NodeId)
+
     fn generic_call_type_arg_node(body: &MirBody, args_id: i32) -> i32:
         let call_node = body.call_ast_node(args_id)
         if call_node <= 0 or call_node >= self.ast.node_count() or self.ast.kind(call_node) != NodeKind.NK_CALL:
@@ -7535,7 +7555,7 @@ impl CCodegen:
                 return "\n"
             let target_tid = self.sema.resolve_type_level_arg_expr_frozen(type_node)
             if target_tid == 0:
-                self.fail("emit-c could not resolve the type argument for " ++ name)
+                self.fail("emit-c could not resolve the type argument '" ++ self.type_arg_text(type_node) ++ "' of " ++ name ++ " in '" ++ cc_intern_resolve(self.intern, body.fn_sym) ++ "' (resolved from module '" ++ self.sema.current_module_path ++ "')")
                 return "\n"
             let type_text = self.c_decl(target_tid, "")
             let op = if name == "sizeof" or name == "size_of": "sizeof" else: "_Alignof"
@@ -9326,6 +9346,17 @@ impl CCodegen:
         if sig_idx < 0:
             return ""
         self.enter_line_file(fn_sym)
+        // Frozen name resolution (a `sizeof[T]` type argument through
+        // resolve_type_level_arg_expr_frozen) judges visibility from
+        // sema.current_module_path. Point it at the DECLARING module, as
+        // Codegen.enter_decl does for the LLVM backend (#705). Left at the
+        // root, std.re.pcre2_study's find_minlength (compiled in-unit under
+        // --emit-c) resolved `sizeof[pcre2_real_code_8]` as if the user had
+        // written it, and an engine corpus type is invisible to user code
+        // (#1362): the emitter failed before any LLVM-only refusal fired.
+        let decl_path = self.sema.fn_symbol_source_path(fn_sym)
+        if decl_path.len() > 0:
+            self.sema.current_module_path = decl_path
         let fn_sig = self.emit_fn_decl(body)
         let param_count = if sig_idx >= 0: self.sema.sig_get_param_count(sig_idx) else: 0
         let out = COut.new()
