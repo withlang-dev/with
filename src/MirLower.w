@@ -4766,7 +4766,7 @@ impl MirBuilder:
         self.switch_to(fail_bb)
         let ret_place = self.place_for_local(0)
         let ret_ty: i32 = self.body.local_type_ids.get(0)
-        let break_downcast = self.body.new_downcast_place(branch_place, break_idx, branch_ty)
+        let break_downcast = self.body.new_downcast_place(branch_place, break_idx)
         let break_payload_place = self.body.new_field_place(break_downcast, 0, break_ty)
         let break_op = self.operand_for_place(break_payload_place, break_ty)
         let from_break_args: Vec[i32] = Vec.new()
@@ -4782,7 +4782,7 @@ impl MirBuilder:
         self.switch_to(pass_bb)
         let result_local = self.new_temp(continue_ty)
         let result_place = self.place_for_local(result_local)
-        let continue_downcast = self.body.new_downcast_place(branch_place, continue_idx, branch_ty)
+        let continue_downcast = self.body.new_downcast_place(branch_place, continue_idx)
         let payload_place = self.body.new_field_place(continue_downcast, 0, continue_ty)
         let pass_op = self.operand_for_place(payload_place, continue_ty)
         self.assign_operand_to_place(result_place, pass_op, self.ast.get_start(expr))
@@ -6840,7 +6840,7 @@ impl MirBuilder:
         self.switch_to(body_bb)
         let item_local = self.new_temp(elem_ty)
         let item_place = self.place_for_local(item_local)
-        let downcast_place = self.body.new_downcast_place(next_place, some_idx, next_ret_ty)
+        let downcast_place = self.body.new_downcast_place(next_place, some_idx)
         let payload_place = self.body.new_field_place(downcast_place, 0, elem_ty)
         // Drop-class elements MOVE out of the Option temp (the `?` idiom) —
         // a copy leaves the stale Some to double-drop the payload at cleanup.
@@ -7318,7 +7318,7 @@ impl MirBuilder:
         self.switch_to(body_bb)
         let item_local = self.new_temp(elem_ty)
         let item_place = self.place_for_local(item_local)
-        let downcast_place = self.body.new_downcast_place(next_place, some_idx, next_ret_ty)
+        let downcast_place = self.body.new_downcast_place(next_place, some_idx)
         let payload_place = self.body.new_field_place(downcast_place, 0, elem_ty)
         // Drop-class elements MOVE out of the Option temp (the `?` idiom) —
         // a copy leaves the stale Some to double-drop the payload at cleanup.
@@ -8212,7 +8212,7 @@ impl MirBuilder:
         self.terminate(TermKind.TK_SWITCH_INT, disc, table, exit_bb, 0)
         self.switch_to(bind_bb)
         let some_index = self.enum_variant_index_for_type(opt_ty, self.sema.syms.some)
-        let downcast_place = self.body.new_downcast_place(opt_place, some_index, opt_ty)
+        let downcast_place = self.body.new_downcast_place(opt_place, some_index)
         let payload_place = self.body.new_field_place(downcast_place, 0, elem_ty)
         self.bind_for_element_or_skip(for_node, pat_or_sym, payload_place, elem_ty, body_expr, header_bb)
         // #771 (the #729 loop shape): stmt temps created INSIDE the body must
@@ -8750,7 +8750,7 @@ impl MirBuilder:
                     disc_idx = self.sema.disc_values.get(variant_sym).unwrap()
             var success_bb = arm_bb
             var needs_payload_checks = false
-            let variant_place = self.body.new_downcast_place(variant_subject_place, variant_idx, 0)
+            let variant_place = self.body.new_downcast_place(variant_subject_place, variant_idx)
             for bi in 0..payload_count:
                 let inner_pat = self.pattern_payload_node(pat_node, self.ast.get_extra(payload_start + bi))
                 if inner_pat == 0:
@@ -9079,7 +9079,7 @@ impl MirBuilder:
             let bind_start = self.ast.get_data1(pat_node)
             let bind_count = self.ast.get_data2(pat_node)
             let variant_subject_place = self.pattern_shape_place(scrutinee_place)
-            let variant_place = self.body.new_downcast_place(variant_subject_place, self.variant_index(variant_sym), 0)
+            let variant_place = self.body.new_downcast_place(variant_subject_place, self.variant_index(variant_sym))
             for bi in 0..bind_count:
                 let raw = self.ast.get_extra(bind_start + bi)
                 let inner_pat = self.pattern_payload_node(pat_node, raw)
@@ -11268,7 +11268,7 @@ impl MirBuilder:
             self.mark_unsupported()
             return self.unit_operand()
 
-        let variant_place = self.body.new_downcast_place(enum_place, variant_index, enum_ty)
+        let variant_place = self.body.new_downcast_place(enum_place, variant_index)
         if payload_count == 1:
             let payload_ty = payloads.get(0)
             let field_place = self.body.new_field_place(variant_place, 0, payload_ty)
@@ -11454,7 +11454,7 @@ impl MirBuilder:
                 if err_idx < 0:
                     self.mark_unsupported()
                 else:
-                    let err_downcast = self.body.new_downcast_place(value_place, err_idx, value_ty)
+                    let err_downcast = self.body.new_downcast_place(value_place, err_idx)
                     let err_payload_place = self.body.new_field_place(err_downcast, 0, source_err_ty)
                     var target_err_op = self.operand_for_place(err_payload_place, source_err_ty)
                     let conversion_chain = self.sema.error_conversion_chain_frozen(target_err_ty, source_err_ty)
@@ -11515,7 +11515,7 @@ impl MirBuilder:
         self.switch_to(pass_bb)
         let result_local = self.new_temp(result_ty)
         let result_place = self.place_for_local(result_local)
-        let downcast_place = self.body.new_downcast_place(value_place, self.success_variant_index(), value_ty)
+        let downcast_place = self.body.new_downcast_place(value_place, self.success_variant_index())
         let payload_place = self.body.new_field_place(downcast_place, 0, result_ty)
         let pass_op = self.body.new_operand(if self.sema.is_copy_frozen(result_ty) != 0: OperandKind.OK_COPY else: OperandKind.OK_MOVE, payload_place)
         self.assign_operand_to_place(result_place, pass_op, self.ast.get_start(span_node))
@@ -11617,7 +11617,7 @@ impl MirBuilder:
         let result_place = self.place_for_local(result_local)
 
         self.switch_to(some_bb)
-        let downcast_place = self.body.new_downcast_place(value_place, self.success_variant_index(), value_ty)
+        let downcast_place = self.body.new_downcast_place(value_place, self.success_variant_index())
         let payload_place = self.body.new_field_place(downcast_place, 0, payload_ty)
         let some_op = self.lower_contextual_join_place_arm(node, D22_JOIN_ROLE_CARRIER_PAYLOAD, payload_place, self.ast.get_start(expr))
         self.assign_operand_to_place(result_place, some_op, self.ast.get_start(expr))
@@ -11822,7 +11822,7 @@ impl MirBuilder:
 
         self.switch_to(some_bb)
         let some_idx = self.enum_variant_index_for_type(value_ty, self.sema.syms.some)
-        let some_downcast = self.body.new_downcast_place(value_place, some_idx, value_ty)
+        let some_downcast = self.body.new_downcast_place(value_place, some_idx)
         let inner_result_place = self.body.new_field_place(some_downcast, 0, inner_result_ty)
         let inner_disc = self.lower_enum_discriminant(inner_result_place)
         let inner_vals: Vec[i32] = Vec.new()
@@ -11834,7 +11834,7 @@ impl MirBuilder:
 
         self.switch_to(inner_ok_bb)
         let ok_idx = self.enum_variant_index_for_type(inner_result_ty, self.sema.syms.ok)
-        let ok_downcast = self.body.new_downcast_place(inner_result_place, ok_idx, inner_result_ty)
+        let ok_downcast = self.body.new_downcast_place(inner_result_place, ok_idx)
         let ok_payload_place = self.body.new_field_place(ok_downcast, 0, inner_ok_ty)
         let some_option_local = self.new_temp(result_ok_ty)
         let some_option_place = self.place_for_local(some_option_local)
@@ -11848,7 +11848,7 @@ impl MirBuilder:
 
         self.switch_to(inner_err_bb)
         let err_idx = self.enum_variant_index_for_type(inner_result_ty, self.sema.syms.err)
-        let err_downcast = self.body.new_downcast_place(inner_result_place, err_idx, inner_result_ty)
+        let err_downcast = self.body.new_downcast_place(inner_result_place, err_idx)
         let err_payload_place = self.body.new_field_place(err_downcast, 0, inner_err_ty)
         let err_fields: Vec[i32] = Vec.new()
         err_fields.push(self.operand_for_place(err_payload_place, inner_err_ty))
@@ -11895,7 +11895,7 @@ impl MirBuilder:
 
         self.switch_to(err_bb)
         let err_idx = self.enum_variant_index_for_type(value_ty, self.sema.syms.err)
-        let err_downcast = self.body.new_downcast_place(value_place, err_idx, value_ty)
+        let err_downcast = self.body.new_downcast_place(value_place, err_idx)
         let err_payload_place = self.body.new_field_place(err_downcast, 0, inner_err_ty)
         let err_result_local = self.new_temp(result_some_ty)
         let err_result_place = self.place_for_local(err_result_local)
@@ -11909,7 +11909,7 @@ impl MirBuilder:
 
         self.switch_to(ok_bb)
         let ok_idx = self.enum_variant_index_for_type(value_ty, self.sema.syms.ok)
-        let ok_downcast = self.body.new_downcast_place(value_place, ok_idx, value_ty)
+        let ok_downcast = self.body.new_downcast_place(value_place, ok_idx)
         let inner_option_place = self.body.new_field_place(ok_downcast, 0, inner_option_ty)
         let inner_disc = self.lower_enum_discriminant(inner_option_place)
         let inner_vals: Vec[i32] = Vec.new()
@@ -11926,7 +11926,7 @@ impl MirBuilder:
 
         self.switch_to(inner_some_bb)
         let some_idx = self.enum_variant_index_for_type(inner_option_ty, self.sema.syms.some)
-        let some_downcast = self.body.new_downcast_place(inner_option_place, some_idx, inner_option_ty)
+        let some_downcast = self.body.new_downcast_place(inner_option_place, some_idx)
         let some_payload_place = self.body.new_field_place(some_downcast, 0, inner_some_ty)
         let ok_result_local = self.new_temp(result_some_ty)
         let ok_result_place = self.place_for_local(ok_result_local)
@@ -12004,7 +12004,7 @@ impl MirBuilder:
 
         self.switch_to(some_bb)
         let some_idx = self.enum_variant_index_for_type(value_ty, self.sema.syms.some)
-        let some_downcast = self.body.new_downcast_place(value_place, some_idx, value_ty)
+        let some_downcast = self.body.new_downcast_place(value_place, some_idx)
         let inner_place = self.body.new_field_place(some_downcast, 0, inner_option_ty)
         let inner_op = self.operand_for_place(inner_place, inner_option_ty)
         self.assign_operand_to_place(result_place, inner_op, span)
@@ -12056,7 +12056,7 @@ impl MirBuilder:
 
         self.switch_to(wanted_bb)
         let variant_idx = self.enum_variant_index_for_type(value_ty, wanted_variant)
-        let downcast = self.body.new_downcast_place(value_place, variant_idx, value_ty)
+        let downcast = self.body.new_downcast_place(value_place, variant_idx)
         let payload_place = self.body.new_field_place(downcast, 0, payload_ty)
         let some_fields: Vec[i32] = Vec.new()
         let ok_err_payload_op = self.operand_for_place(payload_place, payload_ty)
@@ -12128,10 +12128,10 @@ impl MirBuilder:
 
         self.switch_to(right_some_bb)
         let left_idx = self.enum_variant_index_for_type(left_ty, self.sema.syms.some)
-        let left_downcast = self.body.new_downcast_place(left_place, left_idx, left_ty)
+        let left_downcast = self.body.new_downcast_place(left_place, left_idx)
         let left_payload_place = self.body.new_field_place(left_downcast, 0, left_elem_ty)
         let right_idx = self.enum_variant_index_for_type(right_ty, self.sema.syms.some)
-        let right_downcast = self.body.new_downcast_place(right_place, right_idx, right_ty)
+        let right_downcast = self.body.new_downcast_place(right_place, right_idx)
         let right_payload_place = self.body.new_field_place(right_downcast, 0, right_elem_ty)
         let tuple_fields: Vec[i32] = Vec.new()
         tuple_fields.push(self.operand_for_place(left_payload_place, left_elem_ty))
@@ -12200,7 +12200,7 @@ impl MirBuilder:
 
         self.switch_to(some_bb)
         let some_idx = self.enum_variant_index_for_type(value_ty, self.sema.syms.some)
-        let some_downcast = self.body.new_downcast_place(value_place, some_idx, value_ty)
+        let some_downcast = self.body.new_downcast_place(value_place, some_idx)
         let tuple_place = self.body.new_field_place(some_downcast, 0, tuple_ty)
         let left_place = self.body.new_tuple_index_place(tuple_place, 0, left_elem_ty)
         let right_place = self.body.new_tuple_index_place(tuple_place, 1, right_elem_ty)
@@ -12327,7 +12327,7 @@ impl MirBuilder:
 
         self.switch_to(item_success_bb)
         let success_idx = self.enum_variant_index_for_type(wrapper_ty, success_variant)
-        let success_downcast = self.body.new_downcast_place(wrapper_place, success_idx, wrapper_ty)
+        let success_downcast = self.body.new_downcast_place(wrapper_place, success_idx)
         let success_payload_place = self.body.new_field_place(success_downcast, 0, output_elem_ty)
         let success_payload_op = self.operand_for_place(success_payload_place, output_elem_ty)
         self.emit_vec_push(out_vec_place, success_payload_op, span)
@@ -12339,7 +12339,7 @@ impl MirBuilder:
             self.assign_enum_variant_to_place(result_place, result_ty, failure_variant, fail_fields, span)
         else:
             let failure_idx = self.enum_variant_index_for_type(wrapper_ty, failure_variant)
-            let failure_downcast = self.body.new_downcast_place(wrapper_place, failure_idx, wrapper_ty)
+            let failure_downcast = self.body.new_downcast_place(wrapper_place, failure_idx)
             let failure_payload_place = self.body.new_field_place(failure_downcast, 0, failure_payload_ty)
             let fail_fields2: Vec[i32] = Vec.new()
             fail_fields2.push(self.operand_for_place(failure_payload_place, failure_payload_ty))
@@ -12414,7 +12414,7 @@ impl MirBuilder:
 
         self.switch_to(some_bb)
         let some_idx = self.enum_variant_index_for_type(value_ty, self.sema.syms.some)
-        let downcast_place = self.body.new_downcast_place(value_place, some_idx, value_ty)
+        let downcast_place = self.body.new_downcast_place(value_place, some_idx)
         let payload_place = self.body.new_field_place(downcast_place, 0, payload_ty)
         if method_name == "filter":
             let filter_args: Vec[i32] = Vec.new()
@@ -12547,7 +12547,7 @@ impl MirBuilder:
 
         self.switch_to(ok_bb)
         let ok_idx = self.enum_variant_index_for_type(value_ty, self.sema.syms.ok)
-        let ok_downcast = self.body.new_downcast_place(value_place, ok_idx, value_ty)
+        let ok_downcast = self.body.new_downcast_place(value_place, ok_idx)
         let ok_payload_place = self.body.new_field_place(ok_downcast, 0, source_ok_ty)
         let ok_fields: Vec[i32] = Vec.new()
         if method_name == "map":
@@ -12562,7 +12562,7 @@ impl MirBuilder:
             self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
             self.switch_to(err_bb)
             let err_idx2 = self.enum_variant_index_for_type(value_ty, self.sema.syms.err)
-            let err_downcast2 = self.body.new_downcast_place(value_place, err_idx2, value_ty)
+            let err_downcast2 = self.body.new_downcast_place(value_place, err_idx2)
             let err_payload_place2 = self.body.new_field_place(err_downcast2, 0, source_err_ty)
             let err_fields2: Vec[i32] = Vec.new()
             err_fields2.push(self.operand_for_place(err_payload_place2, source_err_ty))
@@ -12584,7 +12584,7 @@ impl MirBuilder:
 
         self.switch_to(err_bb)
         let err_idx = self.enum_variant_index_for_type(value_ty, self.sema.syms.err)
-        let err_downcast = self.body.new_downcast_place(value_place, err_idx, value_ty)
+        let err_downcast = self.body.new_downcast_place(value_place, err_idx)
         let err_payload_place = self.body.new_field_place(err_downcast, 0, source_err_ty)
         let err_fields: Vec[i32] = Vec.new()
         if method_name == "map_err":
@@ -12694,7 +12694,7 @@ impl MirBuilder:
         let result_place = self.place_for_local(result_local)
 
         self.switch_to(some_bb)
-        let downcast_place = self.body.new_downcast_place(value_place, self.success_variant_index(), value_ty)
+        let downcast_place = self.body.new_downcast_place(value_place, self.success_variant_index())
         let payload_place = self.body.new_field_place(downcast_place, 0, payload_ty)
         let some_op = self.lower_contextual_join_place_arm(node, D22_JOIN_ROLE_CARRIER_PAYLOAD, payload_place, self.ast.get_start(self_expr))
         self.assign_operand_to_place(result_place, some_op, self.ast.get_start(self_expr))
@@ -12761,7 +12761,7 @@ impl MirBuilder:
         self.terminate(TermKind.TK_SWITCH_INT, disc, table, failure_bb, 0)
 
         self.switch_to(success_bb)
-        let success_downcast = self.body.new_downcast_place(value_place, self.success_variant_index(), value_ty)
+        let success_downcast = self.body.new_downcast_place(value_place, self.success_variant_index())
         let success_payload_place = self.body.new_field_place(success_downcast, 0, payload_ty)
         let success_payload_op = self.lower_contextual_join_place_arm(node, D22_JOIN_ROLE_CARRIER_PAYLOAD, success_payload_place, span)
         self.assign_operand_to_place(result_place, success_payload_op, span)
@@ -12781,7 +12781,7 @@ impl MirBuilder:
                 self.mark_unsupported()
                 return self.unit_operand()
             let err_idx = self.enum_variant_index_for_type(value_ty, self.sema.syms.err)
-            let err_downcast = self.body.new_downcast_place(value_place, err_idx, value_ty)
+            let err_downcast = self.body.new_downcast_place(value_place, err_idx)
             let err_payload_place = self.body.new_field_place(err_downcast, 0, err_ty)
             call_args.push(self.operand_for_place(err_payload_place, err_ty))
         let lazy_exact_op = self.lower_call_with_operand_args(fallback_op, call_args, lazy_ty, node)
@@ -13110,7 +13110,7 @@ impl MirBuilder:
         self.success_variant_index()
 
     mut fn lower_optional_chain_field(result_place: i32, result_ty: i32, base_place: i32, base_ty: i32, payload_ty: i32, success_idx: i32, success_sym: i32, member_sym: i32, span: i32):
-        let downcast_place = self.body.new_downcast_place(base_place, success_idx, base_ty)
+        let downcast_place = self.body.new_downcast_place(base_place, success_idx)
         let payload_place = self.body.new_field_place(downcast_place, 0, payload_ty)
         let field_ty = self.sema.struct_field_type_frozen(payload_ty, member_sym)
         if field_ty == 0:
@@ -13304,7 +13304,7 @@ impl MirBuilder:
             self.mark_unsupported()
             return
 
-        let downcast_place = self.body.new_downcast_place(base_place, success_idx, base_ty)
+        let downcast_place = self.body.new_downcast_place(base_place, success_idx)
         let payload_place = self.body.new_field_place(downcast_place, 0, payload_ty)
         let method_name = self.pool.resolve_symbol(member_sym)
         let arg_count = self.ast.optional_chain_arg_count(extra_start)
@@ -13514,7 +13514,7 @@ impl MirBuilder:
             if err_idx < 0:
                 self.mark_unsupported()
             else:
-                let err_downcast = self.body.new_downcast_place(base_place, err_idx, base_ty)
+                let err_downcast = self.body.new_downcast_place(base_place, err_idx)
                 let err_payload_place = self.body.new_field_place(err_downcast, 0, result_err_ty)
                 let err_fields: Vec[i32] = Vec.new()
                 err_fields.push(self.operand_for_place(err_payload_place, result_err_ty))

@@ -363,6 +363,7 @@ extern fn LLVMDisposeErrorMessage(msg: *mut u8)
 // Printing
 extern fn LLVMDumpValue(v: *mut u8)
 extern fn LLVMPrintModuleToString(m: *mut u8) -> *mut u8
+extern fn LLVMPrintTypeToString(ty: *mut u8) -> *mut u8
 
 // Debug info
 extern fn LLVMCreateDIBuilder(m: *mut u8) -> *mut u8
@@ -1384,6 +1385,18 @@ pub fn wl_print_ir(m: i64) -> Unit:
             let len = c_strlen(ir as *const u8)
             let _ = rt_write(1, ir as *const u8, len as u64)
             LLVMDisposeMessage(ir)
+
+// The textual LLVM type (`{ ptr, i64 }`, `%Option_i32`), for diagnostics.
+pub fn wl_print_type(ty: i64) -> str:
+    if ty == 0:
+        return "<none>"
+    unsafe:
+        let text = LLVMPrintTypeToString(ty as *mut u8)
+        if text as i64 == 0:
+            return "<none>"
+        let out = with_str_from_bytes(text as *const u8, c_strlen(text as *const u8))
+        LLVMDisposeMessage(text)
+        out
 
 // ── Vec data pointer helper ─────────────────────────────────────
 

@@ -1164,9 +1164,13 @@ impl Codegen:
                 // The walk gave up (a field GEP on a base with no LLVM
                 // struct): an untyped projection is the #1280 shape, not a
                 // blind spot.
-                self.analysis_fail(f"place {place_id} in {name}: projection could not be typed by codegen but its MIR type {sema_ty} ({self.sema.type_name(sema_ty)}) is kind {wl_get_type_kind(want)}; {detail}")
+                self.analysis_fail(f"place {place_id} in {name}: projection could not be typed by codegen but its MIR type {sema_ty} ({self.sema.type_name(sema_ty)}) lowers to {wl_print_type(want)}; {detail}")
                 continue
-            self.analysis_fail(f"place {place_id} in {name}: projection lowers to LLVM type kind {wl_get_type_kind(got)} but its MIR type {sema_ty} ({self.sema.type_name(sema_ty)}) is kind {wl_get_type_kind(want)}; {detail}")
+            // Name both types: two distinct struct types share a kind, and
+            // "kind 10 but ... kind 10" read as a contradiction (#1381).
+            let got_text = wl_print_type(got)
+            let want_text = wl_print_type(want)
+            self.analysis_fail(f"place {place_id} in {name}: projection lowers to LLVM type {got_text} but its MIR type {sema_ty} ({self.sema.type_name(sema_ty)}) lowers to {want_text}; {detail}")
 
     mut fn mir_place_projected_type(body: &MirBody, place_id: i32) -> i64:
         if place_id < 0 or place_id >= body.place_locals.len() as i32:

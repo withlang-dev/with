@@ -835,8 +835,13 @@ impl MirBody:
 
     mut fn new_deref_place(base: i32, sema_ty: i32): self.new_place_with_projection(base, ProjKind.PK_DEREF, 0, sema_ty)
 
-    mut fn new_downcast_place(base: i32, variant_idx: i32, sema_ty: i32) -> i32:
-        self.new_place_with_projection(base, ProjKind.PK_DOWNCAST, variant_idx, sema_ty)
+    // #1381: a downcast place has no type of its own. It names a variant's
+    // payload layout — the variant struct codegen projects through — and
+    // is only ever the base of a payload field place, which carries the
+    // payload's type. Typing it as the enum (as most producers did) made
+    // MIR and codegen disagree on every `??`/`unwrap_or`.
+    mut fn new_downcast_place(base: i32, variant_idx: i32) -> i32:
+        self.new_place_with_projection(base, ProjKind.PK_DOWNCAST, variant_idx, 0)
 
     mut fn new_rvalue(kind: i32, d0: i32, d1: i32, d2: i32) -> i32:
         let id = self.rval_kinds.len() as i32
@@ -3189,6 +3194,9 @@ fn mir_validate_place_prefix_type(mir_mod: &MirModule, body: &MirBody, place_id:
 
         if proj_kind == ProjKind.PK_DOWNCAST:
             if not mir_validate_variant_exists(mir_mod, current_ty, proj_d0):
+                return 0
+            // A place that ends in a downcast is not a value (#1381).
+            if pi == proj_count - 1:
                 return 0
             active_variant_idx = proj_d0
             continue
