@@ -209,6 +209,14 @@ type Codegen {
     // under `name$std`, the user decl keeps the plain name. Populated during
     // type registration; read-only afterwards.
     shadow_alias_map: HashMap[i32, i32],
+    // #1446: two modules may each declare a type with the same name. Sema
+    // keeps one TypeId per declaration; the first declaration of a name keeps
+    // the plain codegen symbol and every later one registers under
+    // `name$<tid>`, keyed here by its resolved TypeId. `nominal_split_names`
+    // holds the plain names that have more than one declaration, so a by-name
+    // type lookup knows to ask Sema which declaration a type node means.
+    nominal_alias_by_tid: HashMap[i32, i32],
+    nominal_split_names: HashMap[i32, i32],
     struct_llvm_types: Vec[i64],
     struct_index_syms: Vec[i32],
     struct_field_starts: Vec[i32],
@@ -942,6 +950,8 @@ fn Codegen.init_with_opt(module_name: &str, opt_level: i32) -> Codegen:
         analysis_call_abis: HashMap.new(),
         struct_type_map: HashMap.new(),
         shadow_alias_map: HashMap.new(),
+        nominal_alias_by_tid: HashMap.new(),
+        nominal_split_names: HashMap.new(),
         struct_llvm_types: Vec.new(),
         struct_index_syms: Vec.new(),
         struct_field_starts: Vec.new(),
@@ -2716,6 +2726,9 @@ impl Codegen:
                     let bound = self.type_binding_types[tbi]
                     if bound != 0:
                         return bound
+            let split_ty = self.resolve_split_named_type(sym, type_node)
+            if split_ty != 0:
+                return split_ty
             let named = self.resolve_defined_named_type(sym)
             if named != 0:
                 return named
@@ -2733,6 +2746,9 @@ impl Codegen:
                     let bound = self.type_binding_types[tbi]
                     if bound != 0:
                         return bound
+            let split_ty = self.resolve_split_named_type(sym, type_node)
+            if split_ty != 0:
+                return split_ty
             let named = self.resolve_defined_named_type(sym)
             if named != 0:
                 return named
@@ -2969,7 +2985,7 @@ impl Codegen:
     fn resolve_named_type(sym: i32) -> i64:
         // Resolve Self to current method owner type
         if sym == self.sym_Self and self.current_method_owner_sym != 0:
-            return self.resolve_user_named_type(self.shadow_lookup_sym(self.current_method_owner_sym))
+            return self.resolve_user_named_type(self.split_owner_sym(self.shadow_lookup_sym(self.current_method_owner_sym)))
         let prim = self.resolve_primitive_named_type(sym)
         if prim != 0:
             return prim
@@ -2981,8 +2997,10 @@ impl Codegen:
     mut fn resolve_defined_named_type(sym: i32) -> i64:
         if self.type_bodies_pending == 0:
             return self.resolve_named_type(sym)
-        let registered = if sym == self.sym_Self and self.current_method_owner_sym != 0: self.current_method_owner_sym else: sym
-        self.define_type_on_reference(self.shadow_lookup_sym(registered))
+        // `Self` is the owner declaration resolve_named_type picks: for a name
+        // two modules declare, the one visible from the method's module (#1446).
+        let registered = if sym == self.sym_Self and self.current_method_owner_sym != 0: self.split_owner_sym(self.shadow_lookup_sym(self.current_method_owner_sym)) else: self.shadow_lookup_sym(sym)
+        self.define_type_on_reference(registered)
         self.resolve_named_type(sym)
 
     // ── Named type bodies in dependency order (#1430) ──────────────────
@@ -3018,12 +3036,16 @@ impl Codegen:
             let sub_kind = type_decl_sub_kind(self.pool.get_data2(decl))
             let generic = self.type_decl_tp_count(decl) > 0
             if sub_kind == TypeDeclKind.DiscEnum or sub_kind == TypeDeclKind.Union or (not generic and (sub_kind == TypeDeclKind.Struct or sub_kind == TypeDeclKind.Enum)):
-                let name_sym = self.shadow_reg_sym(raw_sym, i)
+                // #1446: a later declaration of a name another module also
+                // declares registers under its own `name$<tid>` symbol, so
+                // each declaration has its own LLVM type and its own body.
+                let name_sym = self.nominal_decl_sym(decl as i32, self.shadow_reg_sym(raw_sym, i))
                 self.type_body_sym[i] = name_sym
                 self.type_body_state[i] = TYPE_BODY_PENDING
                 self.type_bodies_pending = self.type_bodies_pending + 1
-                // Two declarations registering one symbol share one LLVM type;
-                // the first is the one a reference defines, as in source order.
+                // Declarations still sharing one symbol (one TypeId declared
+                // twice) share one LLVM type; the first is the one a reference
+                // defines, as in source order.
                 if not self.type_body_decl.contains(name_sym):
                     self.type_body_decl.insert(name_sym, i)
 
@@ -3082,6 +3104,11 @@ impl Codegen:
         let kind = self.pool.kind(type_node)
         if kind == NodeKind.NK_IDENT or kind == NodeKind.NK_TYPE_NAMED:
             let sym = self.pool.get_data0(type_node)
+            // #1446: a split name is the declaration Sema resolves here.
+            if self.nominal_split_names.contains(sym):
+                let split_tid = self.sema.resolve_type_expr_frozen(type_node) as i32
+                if split_tid > 0:
+                    return split_tid
             let name = self.codegen_symbol_text(sym)
             let sema_sym = if name.len() > 0: self.sema.pool_lookup_symbol(name) else: 0
             let lookup_sym = if sema_sym != 0: sema_sym else: sym
@@ -3524,7 +3551,7 @@ impl Codegen:
             // std-tier tid to the aliased LLVM slot.
             if self.sema.type_sym_is_shadowed(sym) != 0 and self.sema.type_tid_std_tier(resolved_tid) != 0:
                 cg_sym = self.shadow_alias_for(cg_sym)
-            return self.resolve_defined_named_type(cg_sym)
+            return self.resolve_defined_named_type(self.nominal_cg_sym_for_tid(resolved_tid as i32, cg_sym))
         if tk == TypeKind.TY_TUPLE:
             let elem_start = self.sema.get_type_d0(resolved_tid)
             let elem_count = self.sema.get_type_d1(resolved_tid)
@@ -3753,6 +3780,101 @@ impl Codegen:
         if self.shadow_alias_map.contains(name_sym):
             return self.shadow_alias_map.get(name_sym).unwrap()
         name_sym
+
+    // ── #1446: one codegen symbol per type declaration ─────────────────
+
+    // The resolved Sema TypeId a type declaration defines, or 0.
+    fn type_decl_sema_tid(decl: i32) -> i32:
+        let opt = self.sema.type_decl_tids.get(decl)
+        if not opt.is_some():
+            return 0
+        self.sema.resolve_alias(opt.unwrap() as TypeId) as i32
+
+    // Run before any type registers: a name that more than one TypeId
+    // declares keeps its plain symbol for the first declaration in decl
+    // order, and each later declaration gets `name$<tid>`. Registration used
+    // the bare name for all of them, so the second declaration's body
+    // overwrote the first's one LLVM struct and the first module's values
+    // were read through the second's layout.
+    mut fn collect_nominal_aliases():
+        var first_tids: HashMap[i32, i32] = HashMap.new()
+        for i in 0..self.pool.decl_count():
+            if self.sema.decl_is_lazy_skipped(i):
+                continue
+            let decl = self.pool.get_decl(i)
+            if self.pool.kind(decl) != NodeKind.NK_TYPE_DECL:
+                continue
+            let sub_kind = type_decl_sub_kind(self.pool.get_data2(decl))
+            let nominal = sub_kind == TypeDeclKind.Struct or sub_kind == TypeDeclKind.Enum or sub_kind == TypeDeclKind.DiscEnum or sub_kind == TypeDeclKind.Opaque or sub_kind == TypeDeclKind.Union
+            if not nominal or self.type_decl_tp_count(decl) > 0:
+                continue
+            let bare = self.pool.get_data0(decl)
+            if bare == 0 or self.intern.resolve(bare).len() == 0:
+                continue
+            let name_sym = self.shadow_reg_sym(bare, i)
+            let tid = self.type_decl_sema_tid(decl as i32)
+            if tid <= 0:
+                continue
+            let first = first_tids.get(name_sym)
+            if not first.is_some():
+                first_tids.insert(name_sym, tid)
+                continue
+            if first.unwrap() == tid or self.nominal_alias_by_tid.contains(tid):
+                continue
+            self.nominal_split_names.insert(name_sym, 1)
+            let alias_text = self.intern.resolve(name_sym) ++ f"${tid}"
+            self.nominal_alias_by_tid.insert(tid, self.intern.intern(alias_text))
+
+    // The codegen symbol a type declaration registers under.
+    fn nominal_decl_sym(decl: i32, name_sym: i32) -> i32:
+        if not self.nominal_split_names.contains(name_sym):
+            return name_sym
+        self.nominal_cg_sym_for_tid(self.type_decl_sema_tid(decl), name_sym)
+
+    // The codegen symbol of the resolved struct/enum TypeId whose plain
+    // symbol is `cg_sym`.
+    fn nominal_cg_sym_for_tid(resolved_tid: i32, cg_sym: i32) -> i32:
+        let alias = self.nominal_alias_by_tid.get(resolved_tid)
+        if alias.is_some(): alias.unwrap() else: cg_sym
+
+    // The codegen symbol of a MIR type's nominal, through references — the
+    // aliased symbol for a later declaration of a split name, where
+    // mir_type_name_at alone gives the shared plain name.
+    fn mir_type_cg_name_at(tid: i32) -> i32:
+        var resolved = self.mir_resolve_alias_at(tid)
+        var tk = self.mir_type_kind_at(resolved)
+        while tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF:
+            resolved = self.mir_resolve_alias_at(self.mir_type_d0_at(resolved))
+            tk = self.mir_type_kind_at(resolved)
+        let name = self.mir_type_name_at(resolved)
+        if name == 0:
+            return 0
+        self.nominal_cg_sym_for_tid(resolved, self.sema_sym_to_codegen_sym(name))
+
+    // `Self` in a method of a split name is the declaration visible from the
+    // method's own module (sync_decl_context set it), not the name's first
+    // registration.
+    fn split_owner_sym(owner_sym: i32) -> i32:
+        if not self.nominal_split_names.contains(owner_sym):
+            return owner_sym
+        let sema_owner = self.codegen_sema_sym_for(owner_sym)
+        if sema_owner == 0:
+            return owner_sym
+        let tid = self.sema.lookup_named_type_visible(sema_owner)
+        if tid <= 0:
+            return owner_sym
+        self.nominal_cg_sym_for_tid(self.sema.resolve_alias(tid as TypeId) as i32, owner_sym)
+
+    // A type node naming a split name means the declaration Sema resolves it
+    // to from the declaring module (sync_decl_context set it), never the
+    // name's first registration. 0 when the name is not split.
+    mut fn resolve_split_named_type(sym: i32, type_node: i32) -> i64:
+        if not self.nominal_split_names.contains(sym):
+            return 0
+        let split_tid = self.sema.resolve_type_expr_frozen(type_node) as i32
+        if split_tid <= 0:
+            return 0
+        self.sema_type_to_llvm(split_tid)
 
     fn current_fn_is_std_tier() -> i32:
         if self.current_function_name_sym == 0:
@@ -6418,6 +6540,7 @@ impl Codegen:
         self.declare_builtin_str_type()
         self.declare_builtin_cstr_type()
         self.predeclare_generator_state_types()
+        self.collect_nominal_aliases()
 
         // Pass 0a: predeclare all struct/enum names so forward references resolve.
         for i in 0..self.pool.decl_count():
@@ -6433,6 +6556,7 @@ impl Codegen:
             if name_sym == 0 or name_str.len() == 0:
                 continue
             name_sym = self.shadow_reg_sym(name_sym, i)
+            name_sym = self.nominal_decl_sym(decl as i32, name_sym)
             let sub_kind = type_decl_sub_kind(self.pool.get_data2(decl))
             if sub_kind == TypeDeclKind.Distinct:
                 continue

@@ -225,6 +225,7 @@ impl Codegen:
                 let sema_text = self.sema_symbol_text(name_sym)
                 if sema_text.len() > 0:
                     cg_sym = self.intern.intern(sema_text)
+                cg_sym = self.nominal_cg_sym_for_tid(resolved, cg_sym)
                 let named_ty = self.resolve_defined_named_type(cg_sym)
                 if named_ty != 0:
                     return named_ty
@@ -1207,9 +1208,9 @@ impl Codegen:
                     if base_local >= 0 and base_local < body.local_type_ids.len() as i32:
                         let sema_ty = body.local_type_ids[base_local]
                         if sema_ty > 0:
-                            let type_name_sym = self.mir_type_name_at(sema_ty)
+                            let type_name_sym = self.mir_type_cg_name_at(sema_ty)
                             if type_name_sym != 0:
-                                cur_ty = self.resolve_named_type(self.sema_sym_to_codegen_sym(type_name_sym))
+                                cur_ty = self.resolve_named_type(type_name_sym)
                     // Fallback: use method owner type for self parameter
                     if (cur_ty == 0 or wl_get_type_kind(cur_ty) == wl_pointer_type_kind()) and self.current_method_owner_sym != 0:
                         let proj_owner_ty = self.current_method_owner_llvm_type()
@@ -1397,9 +1398,9 @@ impl Codegen:
                     if base_local >= 0 and base_local < body.local_type_ids.len() as i32:
                         let sema_ty = body.local_type_ids[base_local]
                         if sema_ty > 0:
-                            let type_name_sym = self.mir_type_name_at(sema_ty)
+                            let type_name_sym = self.mir_type_cg_name_at(sema_ty)
                             if type_name_sym != 0:
-                                cur_ty = self.resolve_named_type(self.sema_sym_to_codegen_sym(type_name_sym))
+                                cur_ty = self.resolve_named_type(type_name_sym)
                             if cur_ty == 0:
                                 cur_ty = self.mir_sema_type_to_llvm(sema_ty)
                     // Fallback: use method owner type for self parameter
@@ -2022,7 +2023,7 @@ impl Codegen:
         let owner = self.current_method_owner_from_name()
         if owner == 0:
             return 0
-        let named_ty = self.resolve_named_type(owner)
+        let named_ty = self.resolve_named_type(self.split_owner_sym(owner))
         if named_ty != 0:
             return named_ty
         let owner_sema = self.mono_struct_sema_type(owner)
@@ -3404,7 +3405,7 @@ impl Codegen:
                 let substituted_llvm = self.mir_sema_type_to_llvm(substituted_payload)
                 if substituted_llvm != 0:
                     return substituted_llvm
-        let enum_sym = self.sema_sym_to_codegen_sym(self.mir_type_name_at(enum_sema_ty))
+        let enum_sym = self.mir_type_cg_name_at(enum_sema_ty)
         if enum_sym <= 0:
             return 0
         let et_opt = self.enum_type_map.get(enum_sym)
@@ -6620,7 +6621,7 @@ impl Codegen:
             let live_tk = self.sema.get_type_kind(live_resolved)
             if live_tk == TypeKind.TY_STRUCT or live_tk == TypeKind.TY_ENUM:
                 let live_name_sym = self.sema.get_type_d0(live_resolved)
-                let live_cg_sym = self.sema_sym_to_codegen_sym(live_name_sym)
+                let live_cg_sym = self.nominal_cg_sym_for_tid(live_resolved as i32, self.sema_sym_to_codegen_sym(live_name_sym))
                 if live_cg_sym != 0 and (self.struct_type_map.get(live_cg_sym).is_some() or self.enum_type_map.get(live_cg_sym).is_some()):
                     return live_cg_sym
                 if self.struct_type_map.get(live_name_sym).is_some() or self.enum_type_map.get(live_name_sym).is_some():
@@ -6648,7 +6649,7 @@ impl Codegen:
             return 0
         if tk == TypeKind.TY_STRUCT:
             let name_sym = self.mir_type_d0_at(resolved)
-            let cg_sym = self.sema_sym_to_codegen_sym(name_sym)
+            let cg_sym = self.nominal_cg_sym_for_tid(resolved, self.sema_sym_to_codegen_sym(name_sym))
             if cg_sym != 0 and self.struct_type_map.get(cg_sym).is_some():
                 return cg_sym
             if self.struct_type_map.get(name_sym).is_some():
@@ -6656,7 +6657,7 @@ impl Codegen:
             return 0
         if tk == TypeKind.TY_ENUM:
             let name_sym = self.mir_type_d0_at(resolved)
-            let cg_sym = self.sema_sym_to_codegen_sym(name_sym)
+            let cg_sym = self.nominal_cg_sym_for_tid(resolved, self.sema_sym_to_codegen_sym(name_sym))
             if cg_sym != 0 and self.enum_type_map.get(cg_sym).is_some():
                 return cg_sym
             if self.enum_type_map.get(name_sym).is_some():
