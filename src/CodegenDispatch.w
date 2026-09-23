@@ -1256,10 +1256,16 @@ impl Codegen:
                         return 0
                 else if wl_get_type_kind(cur_ty) == wl_array_type_kind():
                     cur_ty = wl_get_element_type(cur_ty)
-                else if fi < wl_count_struct_elem_types(cur_ty):
-                    cur_ty = wl_struct_get_type_at(cur_ty, fi)
                 else:
-                    return 0
+                    // The LLVM body may hold padding members (`@[align(N)]`):
+                    // index it by the field's LLVM position, as the GEP walk
+                    // does. The source index read the padding array's type
+                    // and the field printed <unsupported> (#1445).
+                    let proj_llvm_fi = self.get_llvm_field_index(cur_ty, fi)
+                    if proj_llvm_fi < wl_count_struct_elem_types(cur_ty):
+                        cur_ty = wl_struct_get_type_at(cur_ty, proj_llvm_fi)
+                    else:
+                        return 0
                 active_variant_idx = -1
             else if pk == 2: // ProjKind.PK_DEREF
                 // Resolve pointee type from base local's sema type (via MIR snapshot)
