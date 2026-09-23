@@ -734,6 +734,12 @@ impl Sema:
                 let completed = self.complete_contextual_join_arm(arm_nodes[ai], final_type)
                 if completed != 0:
                     resolved_arm_types[ai] = completed
+            else if arm_roles[ai] == D22_JOIN_ROLE_LAZY_RESULT and self.type_is_generic_base_of(resolved_arm_types[ai], final_type) != 0:
+                // #1378: a lazy fallback's bare generic result (`() =>
+                // Vec.new()` returns `Vec`) is the join's type; the owning
+                // eliminator completes the closure to match
+                // (complete_lazy_fallback_result).
+                resolved_arm_types[ai] = final_type
 
         let final_resolved = self.resolve_alias(final_type as TypeId)
         let final_is_ref = if self.get_type_kind(final_resolved) == TypeKind.TY_REF: 1 else: 0
@@ -842,6 +848,39 @@ impl Sema:
         roles.push(D22_JOIN_ROLE_CARRIER_PAYLOAD)
         roles.push(default_role)
         self.resolve_contextual_join(expected, &nodes, &origins, &types, &roles, report_node, join_name)
+
+    // `bare` is the uninstantiated generic declaration that `inst` instantiates
+    // (`Vec` for `Vec[i32]`): what a constructor with no expected type
+    // (`Vec.new()`) is typed as until context completes it.
+    fn type_is_generic_base_of(bare: i32, inst: i32) -> i32:
+        if bare == 0 or inst == 0:
+            return 0
+        let bare_resolved = self.resolve_alias(bare as TypeId)
+        let inst_resolved = self.resolve_alias(inst as TypeId)
+        let bare_kind = self.get_type_kind(bare_resolved)
+        if self.get_type_kind(inst_resolved) != TypeKind.TY_GENERIC_INST or (bare_kind != TypeKind.TY_STRUCT and bare_kind != TypeKind.TY_ENUM):
+            return 0
+        if self.get_generic_inst_base(inst_resolved as i32) == self.get_type_d0(bare_resolved): 1 else: 0
+
+    // #1378 (§10: `unwrap_or_else[U]((fn(E) -> U)) -> Join[T, U]`): a lazy
+    // fallback's result is a join input, so the closure is checked with no
+    // expected return and `(_) => Vec.new()` infers the bare base `Vec`. Once
+    // the join settles on `Vec[i32]` only one meaning is left: the closure
+    // returns the join's type. Complete its function type so MIR builds the
+    // body against it — left bare, the closure's return local had no LLVM type
+    // (`BUG: closure result lacks LLVM type`, gen_closure).
+    mut fn complete_lazy_fallback_result(default_node: i32, fn_ty: i32, joined: i32):
+        if default_node <= 0 or self.ast.kind(default_node) != NodeKind.NK_CLOSURE:
+            return
+        if self.type_is_generic_base_of(self.get_type_d2(fn_ty), joined) == 0:
+            return
+        let param_count = self.get_type_d1(fn_ty)
+        let params: Vec[i32] = Vec.new()
+        for pi in 0..param_count:
+            params.push(self.fn_type_param_type(fn_ty, pi))
+        let completed = self.ensure_fn_type(params, param_count, joined as TypeId) as i32
+        if completed != 0:
+            self.typed_expr_types.insert(default_node, completed)
 
     fn lazy_default_origin_node(node: i32) -> i32:
         if node > 0 and self.ast.kind(node) == NodeKind.NK_CLOSURE:
@@ -19429,7 +19468,9 @@ impl Sema:
                 return 0
             let default_ty = self.get_type_d2(fn_ty2)
             let join_expected = if self.has_expected_type != 0: self.expected_expr_type as i32 else: 0
-            return self.resolve_contextual_default_join(join_expected, recv_node, elem_ty, 0, self.lazy_default_origin_node(default_node), default_ty, D22_JOIN_ROLE_LAZY_RESULT, node, "Option.unwrap_or_else")
+            let joined = self.resolve_contextual_default_join(join_expected, recv_node, elem_ty, 0, self.lazy_default_origin_node(default_node), default_ty, D22_JOIN_ROLE_LAZY_RESULT, node, "Option.unwrap_or_else")
+            self.complete_lazy_fallback_result(default_node, fn_ty2, joined)
+            return joined
         if method_name == "zip":
             if arg_count != 1:
                 self.emit_error("Option.zip() expects exactly one argument", node)
@@ -19576,7 +19617,9 @@ impl Sema:
             return mapped_ty
         if method_name == "unwrap_or_else":
             let join_expected = if self.has_expected_type != 0: self.expected_expr_type as i32 else: 0
-            return self.resolve_contextual_default_join(join_expected, recv_node, ok_ty, 0, self.lazy_default_origin_node(default_node), mapped_ty, D22_JOIN_ROLE_LAZY_RESULT, node, "Result.unwrap_or_else")
+            let joined = self.resolve_contextual_default_join(join_expected, recv_node, ok_ty, 0, self.lazy_default_origin_node(default_node), mapped_ty, D22_JOIN_ROLE_LAZY_RESULT, node, "Result.unwrap_or_else")
+            self.complete_lazy_fallback_result(default_node, self.callable_fn_type(arg_types.get(0) as TypeId), joined)
+            return joined
         if method_name == "inspect":
             let inspect_fn = self.callable_fn_type(arg_types.get(0) as TypeId)
             let ok_ref_ty = self.ensure_exact_type(TypeKind.TY_REF, ok_ty, 0, 0) as i32
