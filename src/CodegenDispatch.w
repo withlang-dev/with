@@ -3600,7 +3600,9 @@ impl Codegen:
                         let first_val = self.mir_eval_operand(body, first_op, struct_ty)
                         return self.coerce_value_to_type(first_val, struct_ty)
                     return wl_const_null(struct_ty)
-                // d0 == 1: enum variant construction; d2 = variant index
+                // d0 == 1: enum variant construction; d2 = variant index. The
+                // tag stored is that variant's discriminant (#1455, §4.4a: a
+                // payload discriminant enum's tag is the discriminant value).
                 if d0 == 1 and struct_ty != 0 and wl_get_type_kind(struct_ty) == wl_struct_type_kind():
                     let ev_tag = d2
                     let ev_alloca = self.create_entry_alloca(struct_ty)
@@ -3608,7 +3610,8 @@ impl Codegen:
                     // Store tag in field 0
                     let ev_tag_ty = wl_struct_get_type_at(struct_ty, 0)
                     let ev_tag_ptr = wl_build_struct_gep(self.builder, struct_ty, ev_alloca, 0)
-                    wl_build_store(self.builder, wl_const_int(ev_tag_ty, ev_tag as i64, 0), ev_tag_ptr)
+                    let ev_disc = if dest_sema_ty > 0: self.mir_enum_variant_discriminant(dest_sema_ty, ev_tag) else: ev_tag as i64
+                    wl_build_store(self.builder, wl_const_int(ev_tag_ty, ev_disc, 0), ev_tag_ptr)
                     // Store payload in field 1 if any
                     if agg_count > 0 and wl_count_struct_elem_types(struct_ty) > 1:
                         let ev_payload_ty = self.mir_enum_variant_payload_llvm_type(dest_sema_ty, ev_tag)

@@ -3560,6 +3560,16 @@ fn validate_typed_mir_body(mir_mod: &MirModule, body: &MirBody) -> MirValidation
                 // (`first([5, 6])` reached codegen this way and segfaulted).
                 if mir_mod.mir_get_type_kind(mir_mod.mir_resolve_alias(dest_ty)) == TypeKind.TY_SLICE:
                     return mir_validation_fail(body.fn_sym, span, f"aggregate assigned to a slice-typed place (ty={dest_ty}); a slice is produced by `slice`, never built from fields")
+                // #1455 (§4.4a): an enum aggregate names its variant by index —
+                // the payload layout and the downcast key; codegen writes that
+                // variant's discriminant as the tag. A discriminant here
+                // (`Move(i32, i32) = 7` built as variant 7 of 2) reached codegen,
+                // which found no payload type for variant 7.
+                let agg_enum = mir_mod.mir_resolve_alias(dest_ty)
+                if rv_d0 == 1 and mir_mod.mir_get_type_kind(agg_enum) == TypeKind.TY_ENUM:
+                    let variant_count = mir_mod.mir_get_type_d2(agg_enum)
+                    if rv_d2 < 0 or rv_d2 >= variant_count:
+                        return mir_validation_fail(body.fn_sym, span, f"enum aggregate names variant {rv_d2} of a ty={dest_ty} enum with {variant_count} variants; an aggregate carries the variant index, not its discriminant")
             else if rk == RvalueKind.RK_REF:
                 if mir_validate_place_type(mir_mod, body, rv_d1) == 0:
                     return mir_validation_fail(body.fn_sym, span, "ref rvalue does not resolve to a concrete place type")

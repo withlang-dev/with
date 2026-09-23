@@ -2606,7 +2606,7 @@ impl MirBuilder:
             return index
         self.variant_index(variant_sym)
 
-    mut fn enum_variant_discriminant_for_type(enum_ty: i32, variant_sym: i32) -> i32:
+    fn enum_variant_discriminant_for_type(enum_ty: i32, variant_sym: i32) -> i32:
         let disc = self.sema.enum_variant_discriminant_for_type(enum_ty, variant_sym)
         if disc >= 0:
             return disc
@@ -3608,9 +3608,11 @@ impl MirBuilder:
             var vl_result_ty = if self.expected_type != 0 and self.sema.enum_variant_discriminant_for_type(self.expected_type, vl_sym) >= 0: self.expected_type else: type_id
             if vl_result_ty == 0 or vl_result_ty == self.sema.ty_void as i32:
                 vl_result_ty = vl_decl_ty
-            var vl_variant_idx = self.enum_variant_discriminant_for_type(vl_result_ty, vl_sym)
+            // #1455: the aggregate names its variant by index; only the
+            // payloadless repr constant below is the discriminant.
+            var vl_variant_idx = self.sema.enum_variant_index_for_type(vl_result_ty, vl_sym)
             if vl_variant_idx < 0:
-                vl_variant_idx = self.enum_variant_discriminant_for_type(vl_decl_ty, vl_sym)
+                vl_variant_idx = self.sema.enum_variant_index_for_type(vl_decl_ty, vl_sym)
             if vl_variant_idx < 0:
                 vl_variant_idx = self.sema.variant_lookup.get(vl_sym).unwrap()
             // Match the qualified and shorthand variant lowering paths:
@@ -3618,7 +3620,7 @@ impl MirBuilder:
             let vl_resolved = self.sema.resolve_alias(vl_decl_ty)
             let vl_is_disc_enum = self.sema.disc_repr_types.contains(vl_resolved as i32)
             if vl_is_disc_enum and not self.sema.disc_has_payload.contains(vl_resolved as i32):
-                var vl_disc_val = vl_variant_idx
+                var vl_disc_val = self.enum_variant_discriminant_for_type(vl_decl_ty, vl_sym)
                 if self.sema.disc_values.contains(vl_sym):
                     vl_disc_val = self.sema.disc_values.get(vl_sym).unwrap()
                 else:
@@ -10548,8 +10550,8 @@ impl MirBuilder:
             self.expected_type = saved_expected
             names.push(0)
         let fid = self.body.new_agg_fields(fields, names)
-        let tag = self.enum_variant_discriminant_for_type(result_ty, variant_sym)
-        let rv = self.body.new_rvalue(RvalueKind.RK_AGGREGATE, 1, fid, tag)
+        let variant_idx = self.enum_variant_index_for_type(result_ty, variant_sym)
+        let rv = self.body.new_rvalue(RvalueKind.RK_AGGREGATE, 1, fid, variant_idx)
         let tmp = self.new_temp(result_ty)
         let place = self.place_for_local(tmp)
         self.body.push_stmt(self.cur_bb, StmtKind.Assign, place, rv, self.ast.get_start(node))
@@ -11447,8 +11449,8 @@ impl MirBuilder:
         for _ in 0..fields.len():
             names.push(0)
         let fid = self.body.new_agg_fields(fields, names)
-        let tag = self.enum_variant_discriminant_for_type(result_ty, variant_sym)
-        let rv = self.body.new_rvalue(RvalueKind.RK_AGGREGATE, 1, fid, tag)
+        let variant_idx = self.enum_variant_index_for_type(result_ty, variant_sym)
+        let rv = self.body.new_rvalue(RvalueKind.RK_AGGREGATE, 1, fid, variant_idx)
         self.body.push_stmt(self.cur_bb, StmtKind.Assign, result_place, rv, span)
         // #693: moved payload operands must be consumed (see the ctor twin).
         for cfi in 0..fields.len():
@@ -13841,36 +13843,35 @@ impl MirBuilder:
                         let fa_qual_name = fa_type_name ++ "." ++ fa_field_name
                         let fa_qual_sym = self.sema.pool_lookup_symbol(fa_qual_name)
                         if self.sema.variant_lookup.contains(fa_qual_sym):
-                            let fa_disc_tag = self.enum_variant_discriminant_for_type(fa_base_ty, fa_qual_sym)
-                            // Plain enums are always lowered as full aggregate values.
-                            // Only payloadless discriminant enums lower to their repr integer.
+                            // Plain enums are always lowered as full aggregate values
+                            // (naming the variant by index, #1455). Only payloadless
+                            // discriminant enums lower to their repr integer.
                             let fa_is_disc_enum = self.sema.disc_repr_types.contains(fa_resolved as i32)
                             if not fa_is_disc_enum or self.sema.disc_has_payload.contains(fa_resolved as i32):
                                 let fa_fields: Vec[i32] = Vec.new()
                                 let fa_names: Vec[i32] = Vec.new()
                                 let fa_fid = self.body.new_agg_fields(fa_fields, fa_names)
-                                let fa_rv = self.body.new_rvalue(RvalueKind.RK_AGGREGATE, 1, fa_fid, fa_disc_tag)
+                                let fa_rv = self.body.new_rvalue(RvalueKind.RK_AGGREGATE, 1, fa_fid, self.enum_variant_index_for_type(fa_base_ty, fa_qual_sym))
                                 let fa_tmp = self.new_temp(fa_base_ty)
                                 let fa_place = self.place_for_local(fa_tmp)
                                 self.body.push_stmt(self.cur_bb, StmtKind.Assign, fa_place, fa_rv, self.ast.get_start(node))
                                 return self.body.new_operand(OperandKind.OK_COPY, fa_place)
-                            return self.int_const_operand(fa_disc_tag, fa_base_ty)
+                            return self.int_const_operand(self.enum_variant_discriminant_for_type(fa_base_ty, fa_qual_sym), fa_base_ty)
                         // Also try bare variant sym (some enums register just "Red")
                         if self.sema.variant_lookup.contains(fa_field_sym):
                             let fa_var_tid = self.sema.variant_type_ids.get(fa_field_sym).unwrap()
                             if fa_var_tid == fa_resolved:
-                                let fa_disc_tag2 = self.enum_variant_discriminant_for_type(fa_base_ty, fa_field_sym)
                                 let fa_is_disc_enum2 = self.sema.disc_repr_types.contains(fa_resolved as i32)
                                 if not fa_is_disc_enum2 or self.sema.disc_has_payload.contains(fa_resolved as i32):
                                     let fa_fields2: Vec[i32] = Vec.new()
                                     let fa_names2: Vec[i32] = Vec.new()
                                     let fa_fid2 = self.body.new_agg_fields(fa_fields2, fa_names2)
-                                    let fa_rv2 = self.body.new_rvalue(RvalueKind.RK_AGGREGATE, 1, fa_fid2, fa_disc_tag2)
+                                    let fa_rv2 = self.body.new_rvalue(RvalueKind.RK_AGGREGATE, 1, fa_fid2, self.enum_variant_index_for_type(fa_base_ty, fa_field_sym))
                                     let fa_tmp2 = self.new_temp(fa_base_ty)
                                     let fa_place2 = self.place_for_local(fa_tmp2)
                                     self.body.push_stmt(self.cur_bb, StmtKind.Assign, fa_place2, fa_rv2, self.ast.get_start(node))
                                     return self.body.new_operand(OperandKind.OK_COPY, fa_place2)
-                                return self.int_const_operand(fa_disc_tag2, fa_base_ty)
+                                return self.int_const_operand(self.enum_variant_discriminant_for_type(fa_base_ty, fa_field_sym), fa_base_ty)
             let place = self.lower_field_access(node)
             self.mark_string_place_copied(place)
             let fa_val_ty = self.expr_type(node)
@@ -14134,7 +14135,8 @@ impl MirBuilder:
                         vc_result_ty = self.expected_type
                     if vc_result_ty == 0 or vc_result_ty == self.sema.ty_void as i32:
                         vc_result_ty = self.sema.variant_type_ids.get(vc_sym).unwrap()
-                    var vc_variant_idx = self.enum_variant_discriminant_for_type(vc_result_ty, vc_sym)
+                    // #1455: the aggregate names its variant by index.
+                    var vc_variant_idx = self.sema.enum_variant_index_for_type(vc_result_ty, vc_sym)
                     if vc_variant_idx < 0:
                         vc_variant_idx = self.sema.variant_lookup.get(vc_sym).unwrap()
                     let vc_payload_tys = self.sema.enum_variant_payload_types_frozen(vc_result_ty, vc_sym)
@@ -14560,9 +14562,8 @@ impl MirBuilder:
             if (vs_result_ty == 0 or vs_result_ty == self.sema.ty_void as i32) and self.expected_type != 0 and self.expected_type != self.sema.ty_void as i32:
                 vs_result_ty = self.expected_type
             vs_name_sym = self.resolve_comprehension_marker_variant(vs_name_sym, vs_result_ty)
-            var vs_variant_idx = self.enum_variant_discriminant_for_type(vs_result_ty, vs_name_sym)
-            if vs_variant_idx < 0:
-                vs_variant_idx = self.variant_index(vs_name_sym)
+            // #1455: the aggregate names its variant by index.
+            let vs_variant_idx = self.enum_variant_index_for_type(vs_result_ty, vs_name_sym)
             // Plain enums are always lowered as full aggregate values.
             // Only payloadless discriminant enums lower to their repr integer.
             if self.sema.variant_lookup.contains(vs_name_sym):
@@ -14579,7 +14580,7 @@ impl MirBuilder:
                             let vs_de_place = self.place_for_local(vs_de_tmp)
                             self.body.push_stmt(self.cur_bb, StmtKind.Assign, vs_de_place, vs_de_rv, self.ast.get_start(node))
                             return self.body.new_operand(OperandKind.OK_COPY, vs_de_place)
-                        return self.int_const_operand(vs_variant_idx, vs_result_ty)
+                        return self.int_const_operand(self.enum_variant_discriminant_for_type(vs_result_ty, vs_name_sym), vs_result_ty)
             let vs_fields: Vec[i32] = Vec.new()
             let vs_names: Vec[i32] = Vec.new()
             let vs_payload_tys = self.sema.enum_variant_payload_types_frozen(vs_result_ty, vs_name_sym)

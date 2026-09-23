@@ -332,7 +332,7 @@ fn mir_rvalue_text(body: &MirBody, rval_id: i32, pool: &InternPool, sema: &Sema)
         return "addr_of(" ++ mir_place_text_named(body, d0, pool, sema) ++ ")"
 
     if k == RvalueKind.RK_AGGREGATE:
-        return f"aggregate(kind={d0}, tag={d2}, fields=[{mir_agg_fields_text(body, d1, pool, sema)}])"
+        return f"aggregate(kind={d0}, variant={d2}, fields=[{mir_agg_fields_text(body, d1, pool, sema)}])"
 
     if k == RvalueKind.RK_DISCRIMINANT:
         return "discriminant(" ++ mir_place_text_named(body, d0, pool, sema) ++ ")"

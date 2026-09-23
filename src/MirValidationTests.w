@@ -292,6 +292,34 @@ pub fn mir_test_discriminant_repr_dest() -> Unit:
     assert(discriminant_dest_verdict(false).contains("discriminant of a ty=3 enum is its repr ty=2, assigned to ty=1"))
     assert(discriminant_dest_verdict(true) == "")
 
+// #1455: an enum aggregate names its variant by index. `Move(i32, i32) = 7`
+// was built as `aggregate(kind=1, tag=7)` of a two-variant enum; codegen
+// looked up variant 7's payload type and failed. This verifier said ok.
+fn enum_aggregate_verdict(variant: i32) -> str:
+    var mir_mod = MirModule.init()
+    for kind in [0, TypeKind.TY_ENUM]:
+        mir_mod.sema_type_kinds.push(kind)
+        mir_mod.sema_type_d0.push(0)
+        mir_mod.sema_type_d1.push(0)
+        mir_mod.sema_type_d2.push(0)
+    let enum_ty = 1
+    mir_mod.sema_type_d2[enum_ty] = 2
+    var body = MirBody.init_for_fn(1)
+    let dest_local = body.new_temp(enum_ty)
+    let dest = body.new_place(dest_local)
+    let entry = body.new_block()
+    let fields: Vec[i32] = Vec.new()
+    let names: Vec[i32] = Vec.new()
+    let field_table = body.new_agg_fields(&fields, &names)
+    let agg = body.new_rvalue(RvalueKind.RK_AGGREGATE, 1, field_table, variant)
+    body.push_stmt(entry, StmtKind.Assign, dest, agg, 0)
+    body.set_terminator(entry, TermKind.TK_RETURN, 0, 0, 0, 0, 0)
+    with_str_clone_ref(validate_typed_mir_body(mir_mod, body).message)
+
+pub fn mir_test_enum_aggregate_variant_index() -> Unit:
+    assert(enum_aggregate_verdict(7).contains("enum aggregate names variant 7 of a ty=1 enum with 2 variants"))
+    assert(enum_aggregate_verdict(1) == "")
+
 // #1443: a monomorphized generic call passing the value where the callee's
 // parameter is a reference to it. `next.as_ref()` with `next: &Box[L]` passed
 // `next.*` — a Box and `&Box` are both `ptr`, so the callee read the node as
