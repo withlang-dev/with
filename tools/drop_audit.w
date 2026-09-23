@@ -319,6 +319,30 @@ fn sc_recv_replace() -> str:
     "    var a = mk(1, slot)\n" ++
     "    a.renew(slot)\n"
 
+// #1486 (§12.4): a non-escaping closure captures a non-Copy local by place
+// and assigns it. The old value drops at the ORIGINAL place (id 1), the new
+// one at scope exit (id 2) — exactly once each, through the capture pointer.
+// The audit was blind to closures before this cell: the drop of the old
+// value freed the closure's pointer slot instead of what it points at.
+fn sc_closure_assign(shape: &str) -> str:
+    shape_decls(shape) ++
+    "fn run_unit(f: fn() -> Unit): f()\n" ++
+    "fn go(slot: *mut i32):\n" ++
+    "    var a" ++ shape_ann(shape) ++ " = " ++ shape_mk(shape, "1") ++ "\n" ++
+    // `.Some(...)` inside a closure loses its captures (#1570): spell `Some`.
+    "    run_unit(() => a = " ++ shape_mk(shape, "2").replace(".Some(", "Some(") ++ ")\n" ++
+    "    let _k = 0\n"
+
+// The same assignment made twice by one non-escaping closure: 1 + 2 + 3.
+// The next id is read from the by-place capture itself (a Copy counter
+// capture is a snapshot today, #1486's open i32 question).
+fn sc_closure_assign_twice() -> str:
+    "fn run_twice(f: fn() -> Unit):\n    f()\n    f()\n" ++
+    "fn go(slot: *mut i32):\n" ++
+    "    var a = mk(1, slot)\n" ++
+    "    run_twice(() => a = mk(a.id + 1, slot))\n" ++
+    "    let _k = 0\n"
+
 fn sc_vec_elem() -> str:
     "fn go(slot: *mut i32):\n" ++
     "    var v: Vec[R] = Vec.new()\n" ++
@@ -626,6 +650,9 @@ fn build_cells():
         cells.push(cell("fstring_hole_temp_" ++ form ++ "/bare", sc_fstring_hole(form), 1))
     for form in ["enum", "nested", "struct"]:
         cells.push(cell("display_parts_" ++ form ++ "/" ++ form, sc_display(form), 1))
+    for sh in ["bare", "field", "tuple", "option", "enum", "boxbare", "rcbare", "boxfield"]:
+        cells.push(cell("closure_assign/" ++ sh, sc_closure_assign(sh), 3))
+    cells.push(cell("closure_assign_twice/bare", sc_closure_assign_twice(), 6))
     for sh in ["result", "option", "enum", "nested", "struct"]:
         for subj in ["temp", "local"]:
             let local = subj == "local"

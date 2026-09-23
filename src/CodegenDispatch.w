@@ -5154,6 +5154,29 @@ impl Codegen:
         let arg_start = self.mir_type_d1_at(resolved)
         self.mir_type_extra_at(arg_start)
 
+    // The address a `drop(place)` statement frees. One rule for the three
+    // drop paths (Box, Rc/Arc, structural), matching the load and store
+    // paths (mir_try_place_ptr_for_ref, the Assign arm): a projection-free
+    // local that is an INDIRECT value local — a by-place closure capture
+    // (§12.4) or an in-place parameter — holds a pointer to the value's real
+    // storage, so the drop reads through it. #1486: a closure assigning a
+    // captured `str` (`() => c = compute("x")`) dropped the old value at the
+    // pointer SLOT: `with_str_free_drop_origin(ptr %slot, ..)` freed the
+    // slot's bytes as a str (the outer address as the data pointer) and
+    // crashed, while the store right after it correctly wrote through
+    // `load ptr, ptr %slot`.
+    mut fn mir_drop_place_ptr(body: &MirBody, place_id: i32, create_ty: i64) -> i64:
+        var ptr = self.mir_place_ptr(body, place_id, false, 0)
+        if ptr == 0 and create_ty != 0:
+            ptr = self.mir_place_ptr(body, place_id, true, create_ty)
+        if ptr == 0:
+            return 0
+        if body.place_proj_counts[place_id] == 0:
+            let indirect = self.mir_indirect_value_local_ptr(body.place_locals[place_id], ptr)
+            if indirect != 0:
+                return indirect
+        ptr
+
     mut fn mir_emit_refcount_drop_place(body: &MirBody, place_id: i32, sema_ty: i32) -> bool:
         let rc_kind = self.mir_sema_type_refcount_kind(sema_ty)
         if rc_kind == 0:
@@ -5161,9 +5184,7 @@ impl Codegen:
         let handle_ty = self.mir_sema_type_to_llvm(sema_ty)
         if handle_ty == 0:
             return false
-        var handle_ptr = self.mir_place_ptr(body, place_id, false, 0)
-        if handle_ptr == 0:
-            handle_ptr = self.mir_place_ptr(body, place_id, true, handle_ty)
+        let handle_ptr = self.mir_drop_place_ptr(body, place_id, handle_ty)
         if handle_ptr == 0:
             return false
 
@@ -5232,9 +5253,7 @@ impl Codegen:
         let box_ty = self.mir_sema_type_to_llvm(sema_ty)
         if box_ty == 0:
             return false
-        var ptr = self.mir_place_ptr(body, place_id, false, 0)
-        if ptr == 0:
-            ptr = self.mir_place_ptr(body, place_id, true, box_ty)
+        let ptr = self.mir_drop_place_ptr(body, place_id, box_ty)
         if ptr == 0:
             return false
         let value = wl_build_load(self.builder, box_ty, ptr)
@@ -5290,9 +5309,15 @@ impl Codegen:
         if drop_ty == 0:
             let local_id = body.place_locals[place_id]
             drop_ty = self.mir_local_llvm_type(body, local_id)
-        var ptr = self.mir_place_ptr(body, place_id, false, 0)
-        if ptr == 0 and drop_ty != 0:
-            ptr = self.mir_place_ptr(body, place_id, true, drop_ty)
+        let ptr = self.mir_drop_place_ptr(body, place_id, drop_ty)
+        // An indirect local's LLVM local type is the pointer SLOT (`ptr`); the
+        // value behind it has the indirect value type. Without this the str
+        // case still dropped (its glue is chosen by sema type) but a struct
+        // capture emitted no drop at all: the `ptr` type has no drop glue.
+        if drop_proj_count == 0:
+            let indirect_ty = self.mir_indirect_value_local_types.get(body.place_locals[place_id])
+            if indirect_ty.is_some():
+                drop_ty = indirect_ty.unwrap() as i64
         if ptr != 0:
             if drop_ty != 0:
                 if drop_sema_ty > 0:
