@@ -5228,8 +5228,15 @@ impl Codegen:
             box_done_bb = wl_append_bb(self.context, self.current_function, "drop.box.done")
             wl_build_cond_br(self.builder, live, live_bb, box_done_bb)
             wl_position_at_end(self.builder, live_bb)
+        // The pointee is dropped by its type, as a Box inside a payload drops
+        // through Box's Drop. By its LLVM type alone an enum pointee found no
+        // struct fields and no Drop impl, so `Box[L]` of a recursive enum freed
+        // the box and leaked the Box inside the L it held (#1456).
         if payload_ty != 0:
-            self.mir_emit_drop_ptr(heap_ptr, payload_ty)
+            if payload_sema_ty > 0:
+                self.mir_emit_drop_ptr_for_sema_type(heap_ptr, payload_ty, payload_sema_ty)
+            else:
+                self.mir_emit_drop_ptr(heap_ptr, payload_ty)
         self.mir_emit_with_free_ptr(heap_ptr)
         if needs_null_guard:
             wl_build_br(self.builder, box_done_bb)
