@@ -740,6 +740,14 @@ impl Sema:
                 // eliminator completes the closure to match
                 // (complete_lazy_fallback_result).
                 resolved_arm_types[ai] = final_type
+            else if arm_roles[ai] == D22_JOIN_ROLE_EXPR and arm_nodes[ai] > 0 and self.type_is_generic_base_of(resolved_arm_types[ai], final_type) != 0:
+                // #1393: a constructor with no expected type (`Vec.new()`)
+                // is the bare generic `Vec`; the join settled it. Record the
+                // settled type on the arm itself, so lowering it does not
+                // depend on the surrounding expectation (`&o.unwrap_or(
+                // Vec.new())`, `o.unwrap_or(Vec.new()).len()`).
+                self.typed_expr_types.insert(arm_nodes[ai], final_type)
+                resolved_arm_types[ai] = final_type
 
         let final_resolved = self.resolve_alias(final_type as TypeId)
         let final_is_ref = if self.get_type_kind(final_resolved) == TypeKind.TY_REF: 1 else: 0
