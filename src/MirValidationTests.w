@@ -411,11 +411,96 @@ fn vacated_payload_verdict(arm: i32, payload_drops: bool) -> str:
     validate_ownership_body(mir_mod, body)
 
 pub fn mir_test_vacated_payload_drop() -> Unit:
-    assert(vacated_payload_verdict(0, true).contains("drop of _2 frees _2<as v0>.f0, which a path reaching it moved out (Maybe)"))
+    assert(vacated_payload_verdict(0, true).contains("drop of _2 frees _2<as v0>.f0, which a path reaching it moved out (MaybeMoved)"))
     assert(vacated_payload_verdict(1, true) == "")
     assert(vacated_payload_verdict(2, true) == "")
     // A payload with no drop glue is not freed again by the enum's drop.
     assert(vacated_payload_verdict(0, false) == "")
+
+// #1414: a move of a drop-bearing place a path reaching it already moved
+// out. A failed match guard's arm bound `move _3<as v0>.f0` and the next arm
+// bound it again: a double free that validate-all passed. `shape`:
+//   0  moved on one arm, moved again at the join (MaybeMoved)
+//   1  moved on one arm and re-initialized there, moved at the join
+//   2  moved twice on one path (Moved)
+//   3  initialized on one arm only, moved at the join (Maybe: not judged —
+//      a path that never wrote the place is not a path that moved it)
+//   4  moved on one arm, passed by move to a call at the join (not judged:
+//      a call argument OK_MOVE is a borrow for some receivers until #1505)
+fn moved_twice_verdict(shape: i32, drops: bool) -> str:
+    var mir_mod = MirModule.init()
+    for kind in [0, TypeKind.TY_INT, TypeKind.TY_STRUCT, TypeKind.TY_VOID]:
+        mir_mod.sema_type_kinds.push(kind)
+        mir_mod.sema_type_d0.push(0)
+        mir_mod.sema_type_d1.push(0)
+        mir_mod.sema_type_d2.push(0)
+    let flag_ty = 1
+    let value_ty = 2
+    let unit_ty = 3
+    if drops: mir_mod.sema_moved_drop_types.insert(value_ty, 1)
+    var body = MirBody.init_for_fn(1)
+    body.n_params = 1
+    let flag_local = body.new_temp(flag_ty)
+    let flag = body.new_place(flag_local)
+    let value_local = body.new_temp(value_ty)
+    let value = body.new_place(value_local)
+    let first_local = body.new_temp(value_ty)
+    let first = body.new_place(first_local)
+    let second_local = body.new_temp(value_ty)
+    let second = body.new_place(second_local)
+    let result_local = body.new_temp(unit_ty)
+    let result = body.new_place(result_local)
+    let entry = body.new_block()
+    let moving = body.new_block()
+    let other = body.new_block()
+    let join = body.new_block()
+    let done = body.new_block()
+    let blank = body.new_const(ConstKind.CK_ZERO_SIZED, 0, 0, 0, value_ty)
+    let blank_op = body.new_operand(OperandKind.OK_CONSTANT, blank)
+    let init = body.new_rvalue(RvalueKind.RK_USE, blank_op, 0, 0)
+    let move_op = body.new_operand(OperandKind.OK_MOVE, value)
+    let take = body.new_rvalue(RvalueKind.RK_USE, move_op, 0, 0)
+    body.push_stmt(entry, StmtKind.StorageLive, value_local, 0, 0)
+    if shape != 3:
+        body.push_stmt(entry, StmtKind.Assign, value, init, 0)
+    if shape == 2:
+        body.push_stmt(entry, StmtKind.Assign, first, take, 0)
+    let vals: Vec[i32] = Vec.new()
+    vals.push(1)
+    let targets: Vec[i32] = Vec.new()
+    targets.push(moving)
+    let table = body.new_switch_table(&vals, &targets)
+    let flag_op = body.new_operand(OperandKind.OK_COPY, flag)
+    body.set_terminator(entry, TermKind.TK_SWITCH_INT, flag_op, table, other, 0, 0)
+    if shape == 3:
+        body.push_stmt(moving, StmtKind.Assign, value, init, 0)
+    else if shape != 2:
+        body.push_stmt(moving, StmtKind.Assign, first, take, 0)
+    if shape == 1:
+        body.push_stmt(moving, StmtKind.Assign, value, init, 0)
+    body.set_terminator(moving, TermKind.TK_GOTO, join, 0, 0, 0, 0)
+    body.set_terminator(other, TermKind.TK_GOTO, join, 0, 0, 0, 0)
+    if shape == 4:
+        let callee_const = body.new_const(ConstKind.CK_FN, 2, 0, 0, unit_ty)
+        let callee = body.new_operand(OperandKind.OK_CONSTANT, callee_const)
+        let args: Vec[i32] = Vec.new()
+        args.push(move_op)
+        let call_id = body.new_call_args(&args)
+        body.set_terminator(join, TermKind.TK_CALL, callee, call_id, result, done, 0)
+    else:
+        body.push_stmt(join, StmtKind.Assign, second, take, 0)
+        body.set_terminator(join, TermKind.TK_GOTO, done, 0, 0, 0, 0)
+    body.set_terminator(done, TermKind.TK_RETURN, 0, 0, 0, 0, 0)
+    validate_ownership_body(mir_mod, body)
+
+pub fn mir_test_move_of_moved_place() -> Unit:
+    assert(moved_twice_verdict(0, true).contains("move of _2, which a path reaching it already moved out (MaybeMoved)"))
+    assert(moved_twice_verdict(1, true) == "")
+    assert(moved_twice_verdict(2, true).contains("move of _2, which a path reaching it already moved out (Moved)"))
+    assert(moved_twice_verdict(3, true) == "")
+    assert(moved_twice_verdict(4, true) == "")
+    // A value with no drop glue is not freed twice.
+    assert(moved_twice_verdict(0, false) == "")
 
 // #1415: `_4 = move _1.*.p` through `&self` — a move out of a reference's
 // pointee — passed validate-all, and both owners freed the value. A raw

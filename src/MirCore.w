@@ -1130,6 +1130,9 @@ enum MirDropState: i32:
     Uninit = 0
     Init = 1
     Moved = 2
+    // Paths disagree and none of them moved the place out: initialized on
+    // some, uninitialized on others (a match result temp whose no-arm path
+    // never wrote it).
     Maybe = 3
     // Some path reaching here never touched the place at all — not even the
     // reset-on-move blank — so its memory is stack garbage there. A drop of
@@ -1138,6 +1141,11 @@ enum MirDropState: i32:
     // A projection key no path has touched yet. Never printed; joins as
     // Uninit against Uninit and as MaybeGarbage against anything else.
     Absent = 5
+    // Paths disagree and at least one of them moved the place out. Kept
+    // apart from Maybe so a move reaching it is a use after move, while a
+    // move of a Maybe place is not judged (its uninitialized paths are the
+    // lowering's unreachable ones as often as real ones, #1414).
+    MaybeMoved = 6
 
 // Drop-state dataflow over one body. Every place the transfer functions can
 // mention is interned once per body into a dense key table (locals first, so
@@ -1336,6 +1344,8 @@ fn mir_drop_state_join(a: i32, b: i32) -> i32:
         return if a == MirDropState.Uninit: MirDropState.Uninit else: MirDropState.MaybeGarbage
     if a == MirDropState.MaybeGarbage or b == MirDropState.MaybeGarbage:
         return MirDropState.MaybeGarbage
+    if a == MirDropState.Moved or a == MirDropState.MaybeMoved or b == MirDropState.Moved or b == MirDropState.MaybeMoved:
+        return MirDropState.MaybeMoved
     MirDropState.Maybe
 
 impl MirDropStateMap:
@@ -1532,6 +1542,8 @@ fn mir_drop_state_name(state: i32) -> str:
         return "Moved"
     if state == MirDropState.Maybe:
         return "Maybe"
+    if state == MirDropState.MaybeMoved:
+        return "MaybeMoved"
     if state == MirDropState.MaybeGarbage:
         return "MaybeGarbage"
     if state == MirDropState.Absent:
@@ -1957,7 +1969,7 @@ fn mir_ownership_term_event(body: &MirBody, bb: i32, target: &str) -> str:
 fn mir_drop_plan_action(state: i32) -> str:
     if state == MirDropState.Init:
         return "drop"
-    if state == MirDropState.Maybe:
+    if state == MirDropState.Maybe or state == MirDropState.MaybeMoved:
         return "conditional"
     if state == MirDropState.Moved:
         return "skip"
@@ -2088,13 +2100,14 @@ pub fn mir_cleanup_edge_spec_ok(spec: &str) -> i32:
         return 0
     1
 
-// Moved-ness of a drop state for the vacated-sub-place rule: Init < Maybe <
-// Moved; -1 for a state that holds no value to compare (never initialized,
-// dropped, garbage).
+// Moved-ness of a drop state for the vacated-sub-place rule: Init < Maybe,
+// MaybeMoved < Moved; -1 for a state that holds no value to compare (never
+// initialized, dropped, garbage). Maybe keeps the rank it had before
+// MaybeMoved split from it (#1414), so this rule's verdicts do not move.
 fn mir_drop_state_moved_rank(state: i32) -> i32:
     if state == MirDropState.Init:
         return 0
-    if state == MirDropState.Maybe:
+    if state == MirDropState.Maybe or state == MirDropState.MaybeMoved:
         return 1
     if state == MirDropState.Moved:
         return 2
@@ -2198,6 +2211,45 @@ fn mir_rvalue_operands(body: &MirBody, rval_id: i32) -> Vec[i32]:
             ops.push(body.call_arg_operands[body.call_arg_starts[d0] + i])
     ops
 
+// The operands a terminator reads, decoded as transfer_term does.
+fn mir_term_operands(body: &MirBody, bb: i32) -> Vec[i32]:
+    let tk = body.term_kind(bb)
+    var term_ops: Vec[i32] = Vec.new()
+    if tk == TermKind.TK_SWITCH_INT:
+        term_ops.push(body.term_data0(bb))
+    else if tk == TermKind.TK_CALL:
+        term_ops.push(body.term_data0(bb))
+        let args_id = body.term_data1(bb)
+        if args_id >= 0 and args_id < body.call_arg_starts.len():
+            for ai in 0..body.call_arg_counts[args_id]:
+                term_ops.push(body.call_arg_operands[body.call_arg_starts[args_id] + ai])
+    term_ops
+
+// #1414: a move out of a drop-bearing place that a path reaching it already
+// moved out (Moved, or MaybeMoved at a join) with nothing re-initializing
+// it. Both destinations then own the one value and each frees it: a failed
+// match guard's arm bound `move _3<as v0>.f0`, and the next arm bound it
+// again (the #1394 double free, validate-all: ok). A place Maybe
+// initialized is not judged here: MaybeMoved is exactly "moved on a path".
+// Statement moves only: three lowerings pass a receiver the callee borrows
+// as an OK_MOVE call argument (`ch in s`, IndexPlace get/set, a generator's
+// next), so a call's "second move" is a borrow until #1505 lowers them as
+// borrows.
+fn mir_move_of_moved_place(mir_mod: &MirModule, body: &MirBody, keys: &MirDropStateKeys, state: &MirDropStateMap, ops: &Vec[i32]) -> str:
+    for oi in 0..ops.len():
+        let op = ops[oi]
+        if op < 0 or op >= body.operand_kinds.len() or body.operand_kinds[op] != OperandKind.OK_MOVE:
+            continue
+        let place = body.operand_d0[op]
+        let moved = state.place(keys, place)
+        if moved != MirDropState.Moved and moved != MirDropState.MaybeMoved:
+            continue
+        if not mir_mod.sema_moved_drop_types.contains(mir_validate_place_type(mir_mod, body, place)):
+            continue
+        let moved_name = mir_drop_state_name(moved)
+        return "move of " ++ mir_place_text(body, place) ++ f", which a path reaching it already moved out ({moved_name}) and nothing re-initialized: two owners free one value (§2.5.1)"
+    ""
+
 // Every move of a statement or terminator checked by the #1415 rule.
 fn validate_moves_through_references(mir_mod: &MirModule, body: &MirBody) -> str:
     for bb in 0..body.block_count():
@@ -2211,16 +2263,7 @@ fn validate_moves_through_references(mir_mod: &MirModule, body: &MirBody) -> str
                 let err = mir_move_through_reference(mir_mod, body, ops[oi])
                 if err.len() > 0:
                     return f"fn sym{body.fn_sym} stmt{stmt_id} span={body.stmt_spans[stmt_id]}: " ++ err
-        let tk = body.term_kind(bb)
-        var term_ops: Vec[i32] = Vec.new()
-        if tk == TermKind.TK_SWITCH_INT:
-            term_ops.push(body.term_data0(bb))
-        else if tk == TermKind.TK_CALL:
-            term_ops.push(body.term_data0(bb))
-            let args_id = body.term_data1(bb)
-            if args_id >= 0 and args_id < body.call_arg_starts.len():
-                for ai in 0..body.call_arg_counts[args_id]:
-                    term_ops.push(body.call_arg_operands[body.call_arg_starts[args_id] + ai])
+        let term_ops = mir_term_operands(body, bb)
         for oi in 0..term_ops.len():
             let err = mir_move_through_reference(mir_mod, body, term_ops[oi])
             if err.len() > 0:
@@ -2264,6 +2307,10 @@ fn validate_ownership_body(mir_mod: &MirModule, body: &MirBody) -> str:
                 let vacated = mir_drop_vacated_subplace(mir_mod, body, blocks.keys, state, key_places, d0)
                 if vacated >= 0:
                     return f"fn sym{body.fn_sym} stmt{stmt_id} span={span}: " ++ mir_drop_vacated_message(blocks.keys, state, body, d0, vacated)
+            if kind == StmtKind.Assign and blocks.computed[bb] != 0:
+                let twice = mir_move_of_moved_place(mir_mod, body, blocks.keys, state, mir_rvalue_operands(body, body.stmt_data1(stmt_id)))
+                if twice.len() > 0:
+                    return f"fn sym{body.fn_sym} stmt{stmt_id} span={span}: " ++ twice
             state.transfer_stmt(blocks.keys, body, stmt_id)
         if body.term_kind(bb) == TermKind.TK_CALL or body.term_kind(bb) == TermKind.TK_DROP_AND_GOTO:
             let place_id = if body.term_kind(bb) == TermKind.TK_CALL: body.term_data2(bb) else: body.term_data0(bb)
