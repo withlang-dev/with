@@ -6933,7 +6933,10 @@ impl Sema:
         if kind == NodeKind.NK_COMPTIME_ERROR:
             if self.in_concrete_generic_body != 0:
                 self.emit_reachable_comptime_error(node)
-            return TypeKind.TY_NEVER as TypeId
+            // The Never type, not the TY_NEVER kind number read as a type id
+            // (that id is usize: `fn f -> i32: comptime_error("..")` was a
+            // usize tail).
+            return self.ty_never
 
         if kind == NodeKind.NK_DEFER or kind == NodeKind.NK_ERRDEFER:
             let saved = self.in_defer

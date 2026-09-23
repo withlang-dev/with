@@ -2672,6 +2672,14 @@ impl MirBuilder:
     mut fn unit_operand() -> i32:
         self.const_operand(ConstKind.CK_UNIT, 0, self.sema.ty_void)
 
+    // The Unit value `unit_operand` makes (a zero constant of another type is
+    // a value).
+    fn operand_is_unit_value(operand_id: i32) -> bool:
+        if operand_id < 0 or operand_id >= self.body.operand_kinds.len() or self.body.operand_kinds[operand_id] != OperandKind.OK_CONSTANT:
+            return false
+        let c: i32 = self.body.operand_d0[operand_id]
+        c >= 0 and c < self.body.const_kinds.len() and self.body.const_kinds[c] == ConstKind.CK_UNIT and self.body.const_types[c] == self.sema.ty_void as i32
+
     mut fn try_eval_const(node: i32) -> i64:
         let kind = self.ast.kind(node)
         if kind == NodeKind.NK_INT_LIT:
@@ -15147,9 +15155,24 @@ fn lower_fn_with_sig(builder: MirBuilder, fn_node: i32, sig_idx: i32) -> Lowered
         let tail_raw = builder.lower_tail_expr(body_expr)
         let tail_adj = builder.adjust_ret_operand_auto_ref(tail_raw, body_expr, ret_ty, builder.ast.get_end(fn_node))
         let body_result = if tail_adj >= 0: tail_adj else: tail_raw
-        if body_falls_through != 0 and builder.operand_type(body_result) == builder.sema.ty_void:
+        // §4.10: the implicit default applies only when the tail's own type is
+        // Unit — Sema's type of the body (as the closure path reads it), never
+        // the lowered operand's. A place MIR cannot type (a str's `.len`
+        // projection) read as Unit, so `fn f(v: &str) -> i64: v.len`
+        // discarded its value and returned 0.
+        let sema_body_ty = builder.expr_type(body_expr)
+        let tail_is_unit = sema_body_ty == 0 or sema_body_ty == builder.sema.ty_void as i32
+        // After a diverging tail (`comptime_error(..)`, a panic) the slot is
+        // filled in a block nothing reaches.
+        let tail_diverges = sema_body_ty == builder.sema.ty_never as i32
+        if body_falls_through != 0 and (tail_is_unit or (tail_diverges and builder.operand_is_unit_value(body_result))):
             builder.lower_implicit_default_return(ret_ty, builder.ast.get_end(fn_node))
         else:
+            // A value tail that lowered to no value would reach the typed
+            // return slot as Unit; say so here, where the cause is known.
+            if body_falls_through != 0 and not tail_diverges and builder.operand_is_unit_value(body_result):
+                let bug_fn = builder.pool.resolve(builder.body.fn_sym)
+                sema_phase_bug(f"BUG: `{bug_fn}`'s body is typed {builder.sema.type_name(sema_body_ty)} but lowered to no value; §4.10 never defaults a non-Unit tail (body node={body_expr})")
             body_result
 
     // Implicit Ok wrapping: if return type is Result[T, E] and body type is T,
