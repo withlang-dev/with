@@ -1160,10 +1160,12 @@ impl Sema:
     // ── Type dependency cycle detection ──────────────────────────────
 
     // Collect named types that a type expression directly embeds (by value).
-    // Pointers, references, and slices are indirections — not followed.
-    // Collect named types that a type expression directly embeds (by value).
     // Results are accumulated in self.cycle_dep_syms / self.cycle_dep_nodes.
-    // Pointers, references, and slices are indirections — not followed.
+    // Pointers, references, slices and functions are indirections — not
+    // followed. A generic instance embeds its declaration, and each argument
+    // the declaration holds by value (#1439: `Option[E]` holds E by value, so
+    // `enum E: A(o: Option[E])` is infinite; `Vec[E]` / `Box[E]` hold it
+    // behind a pointer and stay legal).
     fn collect_value_type_deps(type_node: i32):
         if type_node == 0:
             return
@@ -1190,8 +1192,87 @@ impl Sema:
             // Option embeds the inner type by value.
             self.collect_value_type_deps(self.ast.get_data0(type_node))
             return
-        // NodeKind.NK_TYPE_PTR, NodeKind.NK_TYPE_REF, NodeKind.NK_TYPE_SLICE, NodeKind.NK_TYPE_GENERIC,
+        if kind == NodeKind.NK_TYPE_GENERIC:
+            let base = self.ast.get_data0(type_node)
+            if self.type_decl_nodes.contains(base):
+                self.cycle_dep_syms.push(base)
+                self.cycle_dep_nodes.push(type_node)
+            let args_start = self.ast.get_data1(type_node)
+            for ai in 0..self.ast.get_data2(type_node):
+                if self.generic_holds_param_by_value(base, ai, 0):
+                    self.collect_value_type_deps(self.ast.get_extra(args_start + ai))
+            return
+        // NodeKind.NK_TYPE_PTR, NodeKind.NK_TYPE_REF, NodeKind.NK_TYPE_SLICE,
         // NodeKind.NK_TYPE_FN, NodeKind.NK_TYPE_EXTERN_FN: all provide indirection — do not follow.
+
+    // The type nodes a declaration holds by value: struct fields, enum
+    // payloads, an alias's or distinct type's target.
+    fn type_decl_value_type_nodes(decl: i32) -> Vec[i32]:
+        let out: Vec[i32] = Vec.new()
+        let extra_start = self.ast.get_data1(decl)
+        let sub_kind = type_decl_sub_kind(self.ast.get_data2(decl))
+        if sub_kind == TypeDeclKind.Struct:
+            let field_count = self.ast.get_extra(extra_start)
+            for fi in 0..field_count:
+                out.push(self.ast.get_extra(extra_start + 1 + fi * 3 + 1))
+        if sub_kind == TypeDeclKind.Enum or sub_kind == TypeDeclKind.DiscEnum:
+            let variant_start = if sub_kind == TypeDeclKind.DiscEnum: extra_start + 2 else: extra_start + 1
+            let variant_count = if sub_kind == TypeDeclKind.DiscEnum: self.ast.get_extra(extra_start + 1) else: self.ast.get_extra(extra_start)
+            var epos = variant_start
+            for vi in 0..variant_count:
+                epos = epos + 1  // v_name
+                if sub_kind == TypeDeclKind.DiscEnum:
+                    epos = epos + 1  // discriminant node (0 = auto)
+                let payload_count = self.ast.get_extra(epos)
+                epos = epos + 1
+                for pi in 0..payload_count:
+                    out.push(self.ast.get_extra(epos))
+                    epos = epos + 1
+        if sub_kind == TypeDeclKind.Alias or sub_kind == TypeDeclKind.Distinct:
+            out.push(self.ast.get_extra(extra_start))
+        out
+
+    // Does generic type `base` hold its `param_index`-th type parameter by
+    // value — as a field or payload, inside a tuple / array / `?T`, or as an
+    // argument another generic holds by value? The depth bound only ends the
+    // walk on a generic that holds itself; that is a cycle the graph reports.
+    fn generic_holds_param_by_value(base: i32, param_index: i32, depth: i32) -> bool:
+        if depth > 16 or not self.type_decl_nodes.contains(base):
+            return false
+        let decl: i32 = self.type_decl_nodes.get(base).unwrap()
+        if param_index >= self.type_decl_tp_count(decl):
+            return false
+        var pos = self.type_decl_tp_start(decl)
+        for _ in 0..param_index:
+            pos = pos + 2 + self.ast.get_extra(pos + 1)
+        let param_sym = self.ast.get_extra(pos)
+        for value_node in self.type_decl_value_type_nodes(decl):
+            if self.type_node_holds_sym_by_value(value_node, param_sym, depth):
+                return true
+        false
+
+    fn type_node_holds_sym_by_value(type_node: i32, sym: i32, depth: i32) -> bool:
+        if type_node == 0:
+            return false
+        let kind = self.ast.kind(type_node)
+        if kind == NodeKind.NK_TYPE_NAMED:
+            let named = self.ast.get_data0(type_node)
+            return named == sym or self.canonical_symbol_by_text(named) == self.canonical_symbol_by_text(sym)
+        if kind == NodeKind.NK_TYPE_ARRAY or kind == NodeKind.NK_TYPE_OPTIONAL:
+            return self.type_node_holds_sym_by_value(self.ast.get_data0(type_node), sym, depth)
+        if kind == NodeKind.NK_TYPE_TUPLE:
+            let extra_start = self.ast.get_data0(type_node)
+            for ei in 0..self.ast.get_data1(type_node):
+                if self.type_node_holds_sym_by_value(self.ast.get_extra(extra_start + ei), sym, depth):
+                    return true
+            return false
+        if kind == NodeKind.NK_TYPE_GENERIC:
+            let base = self.ast.get_data0(type_node)
+            let args_start = self.ast.get_data1(type_node)
+            for ai in 0..self.ast.get_data2(type_node):
+                if self.type_node_holds_sym_by_value(self.ast.get_extra(args_start + ai), sym, depth) and self.generic_holds_param_by_value(base, ai, depth + 1):
+                    return true
+        false
 
     mut fn check_type_cycles():
         // Build directed graph: for each type decl, find value-type deps.
@@ -1228,62 +1309,20 @@ impl Sema:
             if self.ast.kind(decl) != NodeKind.NK_TYPE_DECL:
                 continue
             let name = self.ast.get_data0(decl)
-            let extra_start = self.ast.get_data1(decl)
-            let packed_kind = self.ast.get_data2(decl)
-            let sub_kind = type_decl_sub_kind(packed_kind)
-
-            if sub_kind == TypeDeclKind.Struct:
-                let field_count = self.ast.get_extra(extra_start)
-                for fi in 0..field_count:
-                    let base = extra_start + 1 + fi * 3
-                    let f_type_node = self.ast.get_extra(base + 1)
-                    let before = self.cycle_dep_syms.len() as i32
-                    self.collect_value_type_deps(f_type_node)
-                    let after = self.cycle_dep_syms.len() as i32
-                    for di2 in before..after:
-                        edge_from.push(name)
-                        edge_to.push(self.cycle_dep_syms[di2])
-                        edge_node.push(self.cycle_dep_nodes[di2])
-
-            if sub_kind == TypeDeclKind.Enum or sub_kind == TypeDeclKind.DiscEnum:
-                let variant_start = if sub_kind == TypeDeclKind.DiscEnum: extra_start + 2 else: extra_start + 1
-                let variant_count = if sub_kind == TypeDeclKind.DiscEnum: self.ast.get_extra(extra_start + 1) else: self.ast.get_extra(extra_start)
-                var epos = variant_start
-                for vi in 0..variant_count:
-                    epos = epos + 1  // v_name
-                    if sub_kind == TypeDeclKind.DiscEnum:
-                        epos = epos + 1  // discriminant node (0 = auto)
-                    let payload_count = self.ast.get_extra(epos)
-                    epos = epos + 1
-                    for pi in 0..payload_count:
-                        let pt_node = self.ast.get_extra(epos)
-                        epos = epos + 1
-                        let before = self.cycle_dep_syms.len() as i32
-                        self.collect_value_type_deps(pt_node)
-                        let after = self.cycle_dep_syms.len() as i32
-                        for di2 in before..after:
-                            edge_from.push(name)
-                            edge_to.push(self.cycle_dep_syms[di2])
-                            edge_node.push(self.cycle_dep_nodes[di2])
-
-            if sub_kind == TypeDeclKind.Alias:
-                let aliased_node = self.ast.get_extra(extra_start)
+            let tp_start = self.type_decl_tp_start(decl)
+            let tp_count = self.type_decl_tp_count(decl)
+            for value_node in self.type_decl_value_type_nodes(decl):
                 let before = self.cycle_dep_syms.len() as i32
-                self.collect_value_type_deps(aliased_node)
+                self.collect_value_type_deps(value_node)
                 let after = self.cycle_dep_syms.len() as i32
                 for di2 in before..after:
+                    let to_sym: i32 = self.cycle_dep_syms[di2]
+                    // A generic's own parameter is not the type that happens
+                    // to share its name (`Option[T]` with a user `type T`).
+                    if tp_count > 0 and self.type_param_exists(tp_start, tp_count, to_sym) != 0:
+                        continue
                     edge_from.push(name)
-                    edge_to.push(self.cycle_dep_syms[di2])
-                    edge_node.push(self.cycle_dep_nodes[di2])
-
-            if sub_kind == TypeDeclKind.Distinct:
-                let inner_node = self.ast.get_extra(extra_start)
-                let before = self.cycle_dep_syms.len() as i32
-                self.collect_value_type_deps(inner_node)
-                let after = self.cycle_dep_syms.len() as i32
-                for di2 in before..after:
-                    edge_from.push(name)
-                    edge_to.push(self.cycle_dep_syms[di2])
+                    edge_to.push(to_sym)
                     edge_node.push(self.cycle_dep_nodes[di2])
 
         if edge_from.len() == 0:
