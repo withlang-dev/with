@@ -2311,6 +2311,8 @@ pub fn build(ctx: BuildCtx) -> Build:
     stage2_debug_lines = stage2_debug_lines.input("src/Lexer.w")
     stage2_debug_lines = stage2_debug_lines.arg("anchor=Sema.check_mutation_against_views|src/SemaCheck.w|fn check_mutation_against_views(")
     stage2_debug_lines = stage2_debug_lines.arg("anchor=Lexer.skip_whitespace|src/Lexer.w|fn skip_whitespace(")
+    // Its parameters and a `let` are variables of that subprogram (#1348).
+    stage2_debug_lines = stage2_debug_lines.arg("vars=Sema.check_mutation_against_views|self,place_node,err_node,ref_name")
     stage2_debug_lines = stage2_debug_lines.write_scope("out/command/stage2-debug-lines")
     stage2_debug_lines = stage2_debug_lines.dep("stage2")
     out = out.add_target(stage2_debug_lines)

@@ -1440,6 +1440,16 @@ pub fn run_debug_lines_check_action(ctx: ActionCtx) -> i32:
     var anchors = 0
     let args = ctx.args()
     for i in 0..args.len() as i32:
+        let vars_spec = comp_arg_after(args[i], "vars=")
+        if vars_spec.len() > 0:
+            let vars_parts = vars_spec.split("|")
+            if vars_parts.len() != 2:
+                return comp_fail(ctx, "vars must be symbol|name,name,...: " ++ vars_spec)
+            let vars_line = comp_debug_lines_check_vars(ctx, tool_path, comp_abs(root, dwarf_path), capture_dir, vars_parts[0], vars_parts[1])
+            if vars_line.len() == 0:
+                return 1
+            report = report ++ vars_line ++ "\n"
+            continue
         let spec = comp_arg_after(args[i], "anchor=")
         if spec.len() == 0:
             continue
@@ -1518,6 +1528,30 @@ fn comp_debug_lines_check_anchor(ctx: &ActionCtx, tool_path: &str, dwarf_path: &
         comp_fail(ctx, f"anchor {symbol}: the line table at {low_pc} does not name {comp_path_basename(source)} (rc {looked.rc}); see " ++ comp_join(capture_dir, label ++ ".lookup.stdout"))
         return ""
     f"ok {symbol}: {decl_file}:{decl_line}, line table at {low_pc} in {comp_path_basename(source)}"
+
+// One `vars=` verdict line, or "" after reporting the failure: the
+// subprogram's DWARF names each listed parameter or binding (#1348: no
+// function had a variable record, and lldb's `frame variable` said "no
+// variable information is available in debug info for this compile unit").
+fn comp_debug_lines_check_vars(ctx: &ActionCtx, tool_path: &str, dwarf_path: &str, capture_dir: &str, symbol: &str, names: &str) -> str:
+    let root = ctx.project_info().project_root()
+    let label = comp_replace_all(symbol, ".", "_") ++ ".vars"
+    let argv: Vec[str] = Vec.new()
+    argv.push(compiler_owned_text(tool_path))
+    argv.push("--name=" ++ symbol)
+    argv.push("--show-children")
+    argv.push(compiler_owned_text(dwarf_path))
+    let named = ctx.process_runner().run_capture(argv, comp_abs(root, comp_join(capture_dir, label ++ ".stdout")), comp_abs(root, comp_join(capture_dir, label ++ ".stderr")), 300000)
+    if named.rc != 0:
+        comp_fail(ctx, f"vars {symbol}: llvm-dwarfdump --name exited {named.rc}")
+        return ""
+    let wanted = names.split(",")
+    for i in 0..wanted.len() as i32:
+        let name = wanted[i]
+        if not named.stdout.contains("DW_AT_name\t(\"" ++ name ++ "\")"):
+            comp_fail(ctx, f"vars {symbol}: no DWARF variable named `{name}`; see " ++ comp_join(capture_dir, label ++ ".stdout"))
+            return ""
+    f"ok {symbol}: variables {names}"
 
 fn comp_json_escape(text: &str) -> str:
     var out = ""

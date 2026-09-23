@@ -378,6 +378,8 @@ extern fn LLVMDIBuilderCreateCompileUnit(b: *mut u8, lang: i32, file: *mut u8, p
 extern fn LLVMDIBuilderCreateSubroutineType(b: *mut u8, file: *mut u8, params: *const *mut u8, count: u32, flags: i32) -> *mut u8
 extern fn LLVMDIBuilderCreateFunction(b: *mut u8, scope: *mut u8, name: *const u8, name_len: u64, linkage: *const u8, linkage_len: u64, file: *mut u8, line: u32, ty: *mut u8, is_local: i32, is_def: i32, scope_line: u32, flags: i32, is_opt: i32) -> *mut u8
 extern fn LLVMSetSubprogram(fn_val: *mut u8, sp: *mut u8)
+extern fn LLVMGetSubprogram(fn_val: *mut u8) -> *mut u8
+extern fn LLVMDISubprogramGetLine(sp: *mut u8) -> u32
 extern fn LLVMDIBuilderCreateDebugLocation(ctx: *mut u8, line: u32, col: u32, scope: *mut u8, inlined: *mut u8) -> *mut u8
 extern fn LLVMSetCurrentDebugLocation2(b: *mut u8, loc: *mut u8)
 extern fn LLVMGetCurrentDebugLocation2(b: *mut u8) -> *mut u8
@@ -389,7 +391,8 @@ extern fn LLVMDIBuilderCreateUnspecifiedType(b: *mut u8, name: *const u8, name_l
 extern fn LLVMDIBuilderCreateAutoVariable(b: *mut u8, scope: *mut u8, name: *const u8, name_len: u64, file: *mut u8, line: u32, ty: *mut u8, preserve: i32, flags: i32, align: u32) -> *mut u8
 extern fn LLVMDIBuilderCreateParameterVariable(b: *mut u8, scope: *mut u8, name: *const u8, name_len: u64, arg_no: u32, file: *mut u8, line: u32, ty: *mut u8, preserve: i32, flags: i32) -> *mut u8
 extern fn LLVMDIBuilderCreateExpression(b: *mut u8, ops: *const i64, count: u64) -> *mut u8
-extern fn LLVMDIBuilderInsertDeclareRecordAtEnd(b: *mut u8, storage: *mut u8, var_info: *mut u8, expr: *mut u8, loc: *mut u8, block: *mut u8)
+extern fn LLVMDIBuilderInsertDeclareRecordBefore(b: *mut u8, storage: *mut u8, var_info: *mut u8, expr: *mut u8, loc: *mut u8, instr: *mut u8) -> *mut u8
+extern fn LLVMIsAArgument(v: *mut u8) -> *mut u8
 extern fn LLVMDIBuilderCreateLexicalBlock(b: *mut u8, scope: *mut u8, file: *mut u8, line: u32, col: u32) -> *mut u8
 
 // Atomics
@@ -1482,6 +1485,10 @@ pub fn wl_di_set_subprogram(function: i64, subprogram: i64) -> Unit:
     unsafe:
         LLVMSetSubprogram(function as *mut u8, subprogram as *mut u8)
 
+pub fn wl_di_get_subprogram(function: i64) -> i64: unsafe { LLVMGetSubprogram(function as *mut u8) } as i64
+
+pub fn wl_di_subprogram_line(subprogram: i64) -> i32: unsafe { LLVMDISubprogramGetLine(subprogram as *mut u8) } as i32
+
 pub fn wl_di_create_debug_location(context: i64, line: i32, col: i32, scope: i64) -> i64:
     unsafe:
         LLVMDIBuilderCreateDebugLocation(context as *mut u8, line as u32, col as u32, scope as *mut u8, 0 as *mut u8) as i64
@@ -1503,6 +1510,7 @@ pub fn wl_dwarf_ate_boolean() -> i32: 2
 pub fn wl_dwarf_ate_float() -> i32: 4
 pub fn wl_dwarf_ate_signed() -> i32: 5
 pub fn wl_dwarf_ate_unsigned() -> i32: 7
+pub fn wl_dwarf_ate_unsigned_char() -> i32: 8
 
 // DI type constructors
 
@@ -1550,9 +1558,21 @@ pub fn wl_di_create_expression(builder: i64) -> i64:
     unsafe:
         LLVMDIBuilderCreateExpression(builder as *mut u8, 0 as *const i64, 0) as i64
 
-pub fn wl_di_insert_declare_at_end(builder: i64, storage: i64, var_info: i64, expr: i64, debug_loc: i64, block: i64) -> Unit:
+// `DW_OP_deref`: the variable is at the address its storage holds.
+pub fn wl_di_create_deref_expression(builder: i64) -> i64:
+    var ops: [1]i64 = [0x06 as i64; 1]
     unsafe:
-        LLVMDIBuilderInsertDeclareRecordAtEnd(builder as *mut u8, storage as *mut u8, var_info as *mut u8, expr as *mut u8, debug_loc as *mut u8, block as *mut u8)
+        LLVMDIBuilderCreateExpression(builder as *mut u8, &ops[0] as *const i64, 1) as i64
+
+pub fn wl_di_insert_declare_before(builder: i64, storage: i64, var_info: i64, expr: i64, debug_loc: i64, instr: i64) -> Unit:
+    unsafe:
+        let _ = LLVMDIBuilderInsertDeclareRecordBefore(builder as *mut u8, storage as *mut u8, var_info as *mut u8, expr as *mut u8, debug_loc as *mut u8, instr as *mut u8)
+
+pub fn wl_is_argument(v: i64) -> bool: v != 0 and unsafe { LLVMIsAArgument(v as *mut u8) } as i64 != 0
+
+pub fn wl_is_alloca(v: i64) -> bool: v != 0 and unsafe { LLVMIsAAllocaInst(v as *mut u8) } as i64 != 0
+
+pub fn wl_di_current_location(builder: i64) -> i64: unsafe { LLVMGetCurrentDebugLocation2(builder as *mut u8) } as i64
 
 pub fn wl_di_create_lexical_block(builder: i64, scope: i64, file: i64, line: i32, col: i32) -> i64:
     unsafe:

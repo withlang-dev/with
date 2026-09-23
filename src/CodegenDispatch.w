@@ -16110,12 +16110,7 @@ impl Codegen:
                 continue
             let stmt_start = body.bb_stmt_starts[bb]
             let stmt_count = body.bb_stmt_counts[bb]
-            // Push a lexical block scope for non-entry BBs
-            if bb > 0 and stmt_count > 0:
-                let first_span = body.stmt_spans[stmt_start]
-                if first_span > 0:
-                    self.di_current_scope = saved_fn_scope
-                    self.debug_push_lexical_block(first_span)
+            self.debug_enter_mir_block(body, bb, saved_fn_scope)
             for si in 0..stmt_count:
                 let stmt_id = stmt_start + si
                 let stmt_span = body.stmt_spans[stmt_id]
@@ -16168,7 +16163,7 @@ impl Codegen:
                 wl_position_at_end(self.builder, ubb)
                 wl_build_unreachable(self.builder)
 
-
+        self.debug_declare_mir_locals(body, function, 1, param_count)
         self.run_mir_cleanup_passes(function, name_str)
 
         self.expected_type = saved_expected
@@ -16233,11 +16228,27 @@ impl Codegen:
         let saved_tail_allocas = self.tailrec_param_allocas
         let saved_loops = self.capture_loop_state()
         let saved_bb = wl_get_insert_block(self.builder)
+        let saved_debug = self.debug_save_state()
 
         // Set up fresh function state
         self.current_function = function
         self.current_function_name_sym = mono_sym
         self.current_function_node = fn_node
+        // #1348: a specialization is a function of its own in the debug info:
+        // a subprogram in its template's file, its statements' lines, its
+        // variables. It is emitted in the middle of another function, whose
+        // scope and location it must neither use nor keep.
+        if self.di_builder != 0:
+            var decl_node = self.debug_decl_node_for(body.fn_sym)
+            if decl_node == 0: decl_node = self.debug_decl_node_for(mono_sym)
+            if decl_node > 0:
+                self.debug_enter_named(decl_node, mono_sym, name_str, function)
+                self.debug_set_location(self.pool.get_start(decl_node))
+            else:
+                // No declaration to name its lines: no subprogram, and no
+                // location borrowed from the enclosing function.
+                self.di_current_scope = 0
+                self.debug_clear_location()
         self.current_ret_type = wl_get_return_type(fn_type)
         let saved_tb_syms = self.type_binding_syms
         let saved_tb_tys = self.type_binding_types
@@ -16548,6 +16559,7 @@ impl Codegen:
                 let _ = wl_build_ret(self.builder, self.build_default_value(self.current_ret_type))
 
         let reachable_bbs = self.mir_reachable_blocks(body)
+        let mono_fn_scope = self.di_current_scope
         for bb in 0..body.block_count():
             if bb < 0 or bb >= self.mir_bb_values.len() as i32:
                 continue
@@ -16558,8 +16570,11 @@ impl Codegen:
                 continue
             let stmt_start = body.bb_stmt_starts[bb]
             let stmt_count = body.bb_stmt_counts[bb]
+            self.debug_enter_mir_block(body, bb, mono_fn_scope)
             for si in 0..stmt_count:
                 let stmt_id = stmt_start + si
+                if body.stmt_spans[stmt_id] > 0:
+                    self.debug_set_location(body.stmt_spans[stmt_id])
                 if not self.mir_emit_stmt(body, stmt_id):
                     let fail_bb = wl_get_insert_block(self.builder)
                     if fail_bb != 0 and wl_get_bb_terminator(fail_bb) == 0:
@@ -16567,10 +16582,13 @@ impl Codegen:
                     break
             let term_bb = wl_get_insert_block(self.builder)
             if term_bb != 0 and wl_get_bb_terminator(term_bb) == 0:
+                if body.bb_term_spans[bb] > 0:
+                    self.debug_set_location(body.bb_term_spans[bb])
                 let ok = self.mir_emit_term(body, bb)
                 let after_term_bb = wl_get_insert_block(self.builder)
                 if not ok and after_term_bb != 0 and wl_get_bb_terminator(after_term_bb) == 0:
                     wl_build_unreachable(self.builder)
+        self.di_current_scope = mono_fn_scope
 
         if self.mir_default_unreachable_bbs.len() as i32 > 0:
             let ubb = self.mir_default_unreachable_bbs.get(0)
@@ -16578,9 +16596,11 @@ impl Codegen:
                 wl_position_at_end(self.builder, ubb)
                 wl_build_unreachable(self.builder)
 
+        self.debug_declare_mir_locals(body, function, 1, param_count)
         self.run_mir_cleanup_passes(function, name_str)
 
         // Restore all codegen state
+        self.debug_restore_state(&saved_debug)
         self.current_function = saved_fn
         self.current_function_name_sym = saved_fn_name_sym
         self.current_function_node = saved_fn_node
@@ -17309,6 +17329,12 @@ impl Codegen:
         // Return lowering reads this closure's descriptor, never the enclosing
         // function's. With closures return directly; C closures use the C ABI.
         self.current_function_name_sym = closure_sym
+        // #1348: the closure is a subprogram of its own, declared at its
+        // node; its code never carries the enclosing function's scope.
+        let saved_debug = self.debug_save_state()
+        if self.di_builder != 0:
+            self.debug_enter_named(node, closure_sym, wl_get_value_name(closure_fn), closure_fn)
+            self.debug_set_location(self.pool.get_start(node))
         let entry = wl_append_bb(self.context, closure_fn, "entry")
         wl_position_at_end(self.builder, entry)
 
@@ -17459,6 +17485,7 @@ impl Codegen:
             let _ = wl_build_ret(self.builder, wl_const_int(ret_ty, 0, 0))
 
         // Emit MIR statements and terminators
+        let closure_scope = self.di_current_scope
         for cl_bb in 0..closure_body.block_count():
             if cl_bb < 0 or cl_bb >= self.mir_bb_values.len() as i32:
                 continue
@@ -17466,24 +17493,31 @@ impl Codegen:
             wl_position_at_end(self.builder, cl_llbb)
             let cl_stmt_start = closure_body.bb_stmt_starts[cl_bb]
             let cl_stmt_count = closure_body.bb_stmt_counts[cl_bb]
+            self.debug_enter_mir_block(closure_body, cl_bb, closure_scope)
             for cl_si in 0..cl_stmt_count:
                 let cl_stmt_id = cl_stmt_start + cl_si
+                if closure_body.stmt_spans[cl_stmt_id] > 0:
+                    self.debug_set_location(closure_body.stmt_spans[cl_stmt_id])
                 if not self.mir_emit_stmt(closure_body, cl_stmt_id):
                     let fail_bb = wl_get_insert_block(self.builder)
                     if fail_bb != 0 and wl_get_bb_terminator(fail_bb) == 0:
                         wl_build_unreachable(self.builder)
             let term_bb = wl_get_insert_block(self.builder)
             if term_bb != 0 and wl_get_bb_terminator(term_bb) == 0:
+                if closure_body.bb_term_spans[cl_bb] > 0:
+                    self.debug_set_location(closure_body.bb_term_spans[cl_bb])
                 if not self.mir_emit_term(closure_body, cl_bb):
                     let after_term_bb = wl_get_insert_block(self.builder)
                     if after_term_bb != 0 and wl_get_bb_terminator(after_term_bb) == 0:
                         let _ = wl_build_ret(self.builder, wl_const_int(ret_ty, 0, 0))
+        self.di_current_scope = closure_scope
 
         if self.mir_default_unreachable_bbs.len() as i32 > 0:
             let ubb = self.mir_default_unreachable_bbs.get(0)
             if wl_get_bb_terminator(ubb) == 0:
                 wl_position_at_end(self.builder, ubb)
                 wl_build_unreachable(self.builder)
+        self.debug_declare_mir_locals(closure_body, closure_fn, capture_count + 1, param_count)
 
         // Restore outer MIR state
         self.mir_local_ptrs = saved_mir_locals
@@ -17500,6 +17534,7 @@ impl Codegen:
         self.current_function_name_sym = saved_fn_name_sym
         self.async_block_rbuf = saved_async_rbuf
         wl_position_at_end(self.builder, saved_bb)
+        self.debug_restore_state(&saved_debug)
         self.local_allocas = saved_allocas
         self.local_types = saved_types
         self.local_muts = saved_muts

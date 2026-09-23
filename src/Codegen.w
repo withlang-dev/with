@@ -87,6 +87,15 @@ extern fn with_sysinfo_arch() -> str
 
 // ── Codegen state ─────────────────────────────────────────────────
 
+// Codegen.debug_save_state: the debug scope, file and builder location of
+// the function being emitted, restored after a nested function's emission.
+type CodegenDebugState {
+    scope: i64,
+    file_id: i32,
+    file: i64,
+    location: i64,
+}
+
 type Codegen {
     // LLVM handles
     context: i64,
@@ -1254,27 +1263,117 @@ impl Codegen:
         if self.di_builder != 0:
             wl_di_finalize(self.di_builder)
 
-    mut fn debug_enter_function(fn_node: i32, fn_sym: i32, function: i64):
+    mut fn debug_enter_function(fn_node: i32, fn_sym: i32, function: i64) -> i64:
         if self.di_builder == 0:
-            return
+            return 0
         let fn_name = self.intern.resolve(fn_sym).clone()
         if fn_name.len() == 0:
-            return
-        // Every location in the function is a byte offset into the file its
-        // declaration was parsed from; the subprogram, its lexical blocks and
-        // its line numbers all name that file (they named the root, so every
-        // function of every imported module read as `main.w:<garbage>`).
-        self.di_fn_file_id = self.pool.file(fn_node) as i32
+            return 0
+        self.debug_enter_named(fn_node, fn_sym, fn_name, function)
+
+    // A subprogram named `name` for `function`, declared at `fn_node`; the
+    // current scope from here on. Every location in the function is a byte
+    // offset into the file its declaration was parsed from; the subprogram,
+    // its lexical blocks and its line numbers all name that file (they named
+    // the root, so every function of every imported module read as
+    // `main.w:<garbage>`).
+    mut fn debug_enter_named(fn_node: i32, key_sym: i32, name: &str, function: i64) -> i64:
+        self.di_fn_file_id = if fn_node > 0: self.pool.file(fn_node) as i32 else: 0
         self.di_fn_file = self.debug_file_for_id(self.di_fn_file_id)
-        let span = self.pool.get_start(fn_node)
+        let span = if fn_node > 0: self.pool.get_start(fn_node) else: 0
         let fn_line = if span > 0: self.debug_line_col(span).0 else: 1
         let sub_type = wl_di_create_subroutine_type(self.di_builder, self.di_fn_file, 0, 0)
         let subprogram = wl_di_create_function(
-            self.di_builder, self.di_fn_file, fn_name, fn_name,
+            self.di_builder, self.di_fn_file, name, name,
             self.di_fn_file, fn_line, sub_type, 1, fn_line, 0)
         wl_di_set_subprogram(function, subprogram)
-        self.di_fn_subprograms.insert(fn_sym, subprogram)
+        self.di_fn_subprograms.insert(key_sym, subprogram)
         self.di_current_scope = subprogram
+        subprogram
+
+    // The declaration a specialization's body came from: its concrete
+    // specialization node, else the symbol's declaration (the generic
+    // template), else 0.
+    fn debug_decl_node_for(sym: i32) -> i32:
+        if sym == 0:
+            return 0
+        let spec = self.sema.concrete_specialization_by_sym.get(sym)
+        if spec.is_some():
+            return self.sema.concrete_specialization_nodes[spec.unwrap()]
+        self.sema.fn_symbol_decl_node(sym)
+
+    // The debug state of the function being emitted, for a function emitted
+    // in the middle of it (a specialization instantiated on demand, a
+    // closure): its subprogram, file and the builder's current location.
+    fn debug_save_state() -> CodegenDebugState:
+        CodegenDebugState {
+            scope: self.di_current_scope,
+            file_id: self.di_fn_file_id,
+            file: self.di_fn_file,
+            location: if self.di_builder != 0: wl_di_current_location(self.builder) else: 0,
+        }
+
+    mut fn debug_restore_state(state: &CodegenDebugState):
+        self.di_current_scope = state.scope
+        self.di_fn_file_id = state.file_id
+        self.di_fn_file = state.file
+        if self.di_builder != 0:
+            wl_di_set_current_location(self.builder, state.location)
+
+    // DWARF variables (#1348) for the MIR locals a debugger can name: the
+    // parameters (MIR locals first_param .. first_param + param_count - 1,
+    // numbered from 1) and the user bindings (`let`/`var`, patterns,
+    // captures), each at the storage the body left it in — a stack slot of
+    // this function or, for a parameter passed by address, the argument
+    // itself. Temporaries and module-level proxies have no source name and
+    // get none. A `let` is declared at the line of its first assignment.
+    // Records go before the entry block's terminator, after every slot. A
+    // function without a subprogram of its own gets none.
+    mut fn debug_declare_mir_locals(body: &MirBody, function: i64, first_param: i32, param_count: i32):
+        if self.di_builder == 0:
+            return
+        let subprogram = wl_di_get_subprogram(function)
+        if subprogram == 0:
+            return
+        let entry_term = wl_get_bb_terminator(wl_get_entry_bb(function))
+        if entry_term == 0:
+            return
+        let local_count = body.local_names.len() as i32
+        var first_spans: Vec[i32] = Vec.new()
+        for _ in 0..local_count: first_spans.push(0)
+        for si in 0..body.stmt_kinds.len() as i32:
+            if body.stmt_kinds[si] != StmtKind.Assign: continue
+            let place = body.stmt_d0[si]
+            if place < 0 or place >= body.place_locals.len() as i32 or body.place_proj_counts[place] != 0: continue
+            let local = body.place_locals[place]
+            if local > 0 and local < local_count and first_spans[local] == 0:
+                first_spans[local] = body.stmt_spans[si]
+        let fn_line = wl_di_subprogram_line(subprogram)
+        let expr = wl_di_create_expression(self.di_builder)
+        // A slot that holds the value's address (a parameter passed by
+        // pointer and spilled, a closure's by-reference capture).
+        let deref = wl_di_create_deref_expression(self.di_builder)
+        for li in 1..local_count:
+            let name_sym = body.local_names[li]
+            if name_sym == 0 or body.local_is_global[li] != 0: continue
+            let is_param = li >= first_param and li < first_param + param_count
+            if not is_param and body.local_is_user_var[li] == 0: continue
+            let slot = self.mir_local_ptrs.get(li)
+            if not slot.is_some(): continue
+            let storage: i64 = slot.unwrap()
+            if not wl_is_alloca(storage) and not wl_is_argument(storage): continue
+            let name = self.intern.resolve(name_sym)
+            if name.len() == 0 or name.starts_with("__") or name.starts_with("$"): continue
+            let span = first_spans[li]
+            let line = if is_param or span <= 0: fn_line else: self.debug_line_col(span).0
+            let ty = self.debug_get_di_type(self.mir_type_to_live_sema_type(body.local_type_ids[li]))
+            let variable = if is_param:
+                wl_di_create_parameter_variable(self.di_builder, subprogram, name, li - first_param + 1, self.di_fn_file, line, ty)
+            else:
+                wl_di_create_auto_variable(self.di_builder, subprogram, name, self.di_fn_file, line, ty)
+            let location = wl_di_create_debug_location(self.context, line, 0, subprogram)
+            let indirect = self.mir_indirect_value_local_types.contains(li) and wl_is_alloca(storage)
+            wl_di_insert_declare_before(self.di_builder, storage, variable, if indirect: deref else: expr, location, entry_term)
 
     // The OS entry wrapper (wrap_main_for_exit) calls, and at -O1 inlines,
     // the user's main. Without a subprogram of its own the inlined body
@@ -1346,6 +1445,16 @@ impl Codegen:
         let block = wl_di_create_lexical_block(self.di_builder, self.di_current_scope, self.di_fn_file, line, col)
         self.di_current_scope = block
 
+    // A non-entry MIR block with statements is a lexical block of the
+    // function's scope `fn_scope`.
+    mut fn debug_enter_mir_block(body: &MirBody, bb: i32, fn_scope: i64):
+        if bb == 0 or body.bb_stmt_counts[bb] == 0:
+            return
+        let first_span = body.stmt_spans[body.bb_stmt_starts[bb]]
+        if first_span > 0:
+            self.di_current_scope = fn_scope
+            self.debug_push_lexical_block(first_span)
+
     fn debug_get_di_type(sema_tid: i32) -> i64:
         let cached = self.di_type_cache.get(sema_tid)
         if cached.is_some():
@@ -1377,8 +1486,13 @@ impl Codegen:
             let width = self.sema.get_type_d0(sema_tid)
             return wl_di_create_basic_type(self.di_builder, f"f{width}", width as i64, wl_dwarf_ate_float())
         if kind == 5:
-            // TypeKind.TY_STR
-            return wl_di_create_unspecified_type(self.di_builder, "str")
+            // TypeKind.TY_STR: { ptr, len }, so a debugger shows the bytes.
+            let byte_ty = wl_di_create_basic_type(self.di_builder, "u8", 8, wl_dwarf_ate_unsigned_char())
+            let len_ty = wl_di_create_basic_type(self.di_builder, "i64", 64, wl_dwarf_ate_signed())
+            let members: Vec[i64] = Vec.new()
+            members.push(wl_di_create_member_type(self.di_builder, self.di_file, "ptr", self.di_file, 0, 64, 64, 0, wl_di_create_pointer_type(self.di_builder, byte_ty, 64)))
+            members.push(wl_di_create_member_type(self.di_builder, self.di_file, "len", self.di_file, 0, 64, 64, 64, len_ty))
+            return wl_di_create_struct_type(self.di_builder, self.di_file, "str", self.di_file, 0, 128, 64, vec_data_i64(&members), 2)
         if kind == 4:
             // TypeKind.TY_VOID
             return wl_di_create_unspecified_type(self.di_builder, "void")
