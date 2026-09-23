@@ -6709,22 +6709,7 @@ impl Parser:
                 in_guard_expr = self.pool.add_node(NodeKind.NK_BINARY, arm_start, self.prev_end(), BinaryOp.OP_IN, bind_ref2, collection_expr2)
                 self.pool.set_membership_arg(in_guard_expr, self.pool.add_extra(bind_ref2))
             else:
-                pattern = self.parse_pattern()
-
-            // Or-pattern: A | B | C
-            if self.peek() == TokenKind.TK_PIPE:
-                let or_patterns: Vec[i32] = Vec.new()
-                or_patterns.push(pattern as i32)
-                while self.peek() == TokenKind.TK_PIPE:
-                    self.advance()
-                    self.skip_newlines()
-                    let alt = self.parse_pattern()
-                    or_patterns.push(alt as i32)
-                let or_start = self.pool.extra_len()
-                let or_count = or_patterns.len() as i32
-                for oi in 0..or_count:
-                    self.pool.add_extra(or_patterns[oi])
-                pattern = self.pool.add_node(NodeKind.NK_PAT_OR, arm_start, self.prev_end(), or_start, or_count, 0)
+                pattern = self.parse_or_pattern()
 
             // Guard clause
             var guard: NodeId = 0 as NodeId
@@ -6796,20 +6781,7 @@ impl Parser:
                 in_guard_expr = self.pool.add_node(NodeKind.NK_BINARY, arm_start, self.prev_end(), BinaryOp.OP_IN, bind_ref2, collection_expr2)
                 self.pool.set_membership_arg(in_guard_expr, self.pool.add_extra(bind_ref2))
             else:
-                pattern = self.parse_pattern()
-            if self.peek() == TokenKind.TK_PIPE:
-                let or_patterns: Vec[i32] = Vec.new()
-                or_patterns.push(pattern as i32)
-                while self.peek() == TokenKind.TK_PIPE:
-                    self.advance()
-                    self.skip_newlines()
-                    let alt = self.parse_pattern()
-                    or_patterns.push(alt as i32)
-                let or_start = self.pool.extra_len()
-                let or_count = or_patterns.len() as i32
-                for oi in 0..or_count:
-                    self.pool.add_extra(or_patterns[oi])
-                pattern = self.pool.add_node(NodeKind.NK_PAT_OR, arm_start, self.prev_end(), or_start, or_count, 0)
+                pattern = self.parse_or_pattern()
             var guard: NodeId = 0 as NodeId
             if in_guard_expr != 0:
                 guard = in_guard_expr
@@ -6846,6 +6818,24 @@ impl Parser:
         t == TokenKind.TK_IDENT or t == TokenKind.TK_INT_LIT or t == TokenKind.TK_CHAR_LIT or t == TokenKind.TK_DOT_IDENT or t == TokenKind.TK_TRUE or t == TokenKind.TK_FALSE or t == TokenKind.TK_STRING_LIT or t == TokenKind.TK_REGEX_LIT or t == TokenKind.TK_MINUS or t == TokenKind.TK_L_BRACKET or t == TokenKind.TK_L_PAREN or t == TokenKind.TK_L_BRACE or t == TokenKind.TK_KW_IN
 
     // ── Pattern parsing ──────────────────────────────────────────────
+
+    // A top-level pattern: `A | B | C` (§30.6 OR_PAT) or a single pattern.
+    // Match arms and `let` share it, so the two never disagree on a pattern.
+    mut fn parse_or_pattern() -> NodeId:
+        let start = self.current_start()
+        let first = self.parse_pattern()
+        if self.peek() != TokenKind.TK_PIPE: return first
+        let or_patterns: Vec[i32] = Vec.new()
+        or_patterns.push(first as i32)
+        while self.peek() == TokenKind.TK_PIPE:
+            self.advance()
+            self.skip_newlines()
+            or_patterns.push(self.parse_pattern() as i32)
+        let or_start = self.pool.extra_len()
+        let or_count = or_patterns.len() as i32
+        for oi in 0..or_count:
+            self.pool.add_extra(or_patterns[oi])
+        self.pool.add_node(NodeKind.NK_PAT_OR, start, self.prev_end(), or_start, or_count, 0)
 
     // The value of the integer or char literal token at the cursor, consumed.
     mut fn pattern_int_value() -> i64:
@@ -7180,10 +7170,46 @@ impl Parser:
         var else_body: NodeId = 0
         if self.peek() == TokenKind.TK_KW_ELSE:
             self.advance()
-            if self.peek() == TokenKind.TK_COLON: self.advance()
-            self.skip_newlines()
-            else_body = self.parse_block_or_expr()
+            else_body = self.parse_let_else_body(start)
         self.let_pattern_node(start, pat, value, else_body, is_mut, type_ann)
+
+    // The else branch of `let PATTERN = EXPR else BODY` (§9.7) takes the body
+    // forms of §29.13: inline item, indented block, braced. #1382: the newline
+    // after `else:` must reach parse_block_or_expr — it is what selects the
+    // indented-block form; skipping it first parsed only the block's first
+    // statement. An indented block must sit deeper than the line holding its
+    // `let` (§29.13: a colon ending the line with no indented block is a
+    // syntax error), or the next statement is silently taken as the branch.
+    mut fn parse_let_else_body(let_start: i32) -> NodeId:
+        if self.peek() == TokenKind.TK_COLON: self.advance()
+        if self.peek() == TokenKind.TK_NEWLINE:
+            var line_start = let_start - column_of(self.source, let_start)
+            while self.source[line_start] == ' ' or self.source[line_start] == '\t':
+                line_start = line_start + 1
+            let let_indent = column_of(self.source, line_start)
+            let save = self.pos
+            self.skip_newlines()
+            let dedented = self.peek() == TokenKind.TK_EOF or column_of(self.source, self.current_start()) <= let_indent
+            self.pos = save
+            if dedented:
+                self.emit_error_span("expected an indented block after 'else'", let_start, self.prev_end())
+                return self.poisoned_expr()
+        self.parse_block_or_expr()
+
+    // Whether the tokens after `let`/`var` begin a pattern rather than a
+    // plain name binding (§30.4 LET_STMT is `'let' PATTERN`). Every head a
+    // match arm accepts goes to the one pattern parser (#1373). A bare
+    // capitalized name before `=` stays ambiguous until `else` shows up
+    // (`let N = 5` binds; `let Empty = s else: ...` matches).
+    fn let_head_is_pattern() -> bool:
+        let t = self.peek()
+        if t == TokenKind.TK_IDENT:
+            let next = if self.pos + 1 < self.tokens.len(): self.tokens.get_tag(self.pos + 1) else: TokenKind.TK_EOF
+            if next == TokenKind.TK_DOT or next == TokenKind.TK_DOT_IDENT or next == TokenKind.TK_AT: return true
+            let s = self.current_start()
+            let upper = self.source[s] >= 'A' and self.source[s] <= 'Z'
+            return upper and (next == TokenKind.TK_L_PAREN or next == TokenKind.TK_L_BRACE or next == TokenKind.TK_PIPE)
+        t != TokenKind.TK_KW_IN and self.is_arm_token(t)
 
     mut fn parse_let_binding() -> NodeId:
         let start = self.current_start()
@@ -7195,116 +7221,17 @@ impl Parser:
             is_mut = true
             self.advance()
 
-        // Destructuring patterns use the normal pattern tree so the
-        // bindings share the same Sema/MIR path as patterns elsewhere (§9.7).
-        if self.peek() == TokenKind.TK_L_PAREN or self.peek() == TokenKind.TK_L_BRACE or self.peek() == TokenKind.TK_L_BRACKET:
-            let pat = self.parse_pattern()
+        // Patterns use the normal pattern tree so the bindings share the same
+        // Sema/MIR path as patterns elsewhere (§9.7).
+        if self.let_head_is_pattern():
+            let pat = self.parse_or_pattern()
             return self.parse_let_pattern_rest(start, pat, is_mut)
 
-        // Let-else: with variant shorthand: let .Some(v) = expr else: body
-        if self.peek() == TokenKind.TK_DOT_IDENT:
-            let dot_start = self.current_start()
-            let dot_end = self.current_end()
-            let dot_text = self.source.slice((dot_start + 1) as i64, dot_end as i64)
-            let dot_sym = self.intern.intern(dot_text)
-            self.advance()
-            if self.peek() == TokenKind.TK_L_PAREN:
-                self.advance()
-                self.skip_newlines()
-                let payload_patterns: Vec[i32] = Vec.new()
-                while self.peek() != TokenKind.TK_R_PAREN and self.peek() != TokenKind.TK_EOF:
-                    payload_patterns.push(self.parse_pattern() as i32)
-                    self.skip_newlines()
-                    if self.peek() == TokenKind.TK_COMMA:
-                        self.advance()
-                        self.skip_newlines()
-                self.skip_newlines()
-                self.expect(TokenKind.TK_R_PAREN)
-                let type_ann = self.parse_let_pattern_type_ann()
-                if self.expect(TokenKind.TK_EQ) == 0:
-                    return self.poisoned_expr()
-                self.skip_newlines()
-                let value = self.parse_expr()
-                self.expect(TokenKind.TK_KW_ELSE)
-                if self.peek() == TokenKind.TK_COLON: self.advance()
-                self.skip_newlines()
-                let else_body = self.parse_block_or_expr()
-                let extra_start = self.pool.extra_len()
-                let binding_count = payload_patterns.len() as i32
-                for pi in 0..binding_count:
-                    self.pool.add_extra(payload_patterns[pi])
-                let pat = self.pool.add_node(NodeKind.NK_PAT_ENUM_SHORTHAND, dot_start, self.prev_end(), dot_sym, extra_start, binding_count)
-                return self.let_pattern_node(start, pat, value, else_body, is_mut, type_ann)
-            if self.peek() == TokenKind.TK_EQ:
-                self.advance()
-                self.skip_newlines()
-                let value = self.parse_expr()
-                if self.peek() == TokenKind.TK_KW_ELSE:
-                    self.advance()
-                    if self.peek() == TokenKind.TK_COLON: self.advance()
-                    self.skip_newlines()
-                    let else_body = self.parse_block_or_expr()
-                    let pat = self.pool.add_node(NodeKind.NK_PAT_ENUM_SHORTHAND, dot_start, self.prev_end(), dot_sym, 0, 0)
-                    return self.let_pattern_node(start, pat, value, else_body, is_mut, 0)
-
+        let name_start = self.current_start()
         let name_sym = self.expect_ident()
         if name_sym == 0:
             return self.poisoned_expr()
-        let name_str = self.intern.resolve(name_sym)
-        let is_upper = name_str.len() > 0 and name_str[0] >= 'A' and name_str[0] <= 'Z'
-
-        // Named struct pattern: let Req { name, email } = req (§9.7, #1299) —
-        // the same node a match arm builds, so Sema's Drop gate (#1291)
-        // and MirLower see one pattern form.
-        if is_upper and self.peek() == TokenKind.TK_L_BRACE:
-            let pat = self.parse_struct_pattern(name_sym, start)
-            return self.parse_let_pattern_rest(start, pat, is_mut)
-
-        // Let-else: variant: let Some(x) = expr else: body
-        if is_upper and self.peek() == TokenKind.TK_L_PAREN:
-            self.advance()
-            self.skip_newlines()
-            let payload_patterns: Vec[i32] = Vec.new()
-            while self.peek() != TokenKind.TK_R_PAREN and self.peek() != TokenKind.TK_EOF:
-                payload_patterns.push(self.parse_pattern() as i32)
-                self.skip_newlines()
-                if self.peek() == TokenKind.TK_COMMA:
-                    self.advance()
-                    self.skip_newlines()
-            self.skip_newlines()
-            self.expect(TokenKind.TK_R_PAREN)
-            let type_ann = self.parse_let_pattern_type_ann()
-            if self.expect(TokenKind.TK_EQ) == 0:
-                return self.poisoned_expr()
-            self.skip_newlines()
-            let value = self.parse_expr()
-            self.expect(TokenKind.TK_KW_ELSE)
-            if self.peek() == TokenKind.TK_COLON: self.advance()
-            self.skip_newlines()
-            let else_body = self.parse_block_or_expr()
-            let extra_start = self.pool.extra_len()
-            let binding_count = payload_patterns.len() as i32
-            for pi in 0..binding_count:
-                self.pool.add_extra(payload_patterns[pi])
-            let pat = self.pool.add_node(NodeKind.NK_PAT_VARIANT, start, self.prev_end(), name_sym, extra_start, binding_count)
-            return self.let_pattern_node(start, pat, value, else_body, is_mut, type_ann)
-
-        if is_upper and self.peek() == TokenKind.TK_EQ:
-            self.advance()
-            self.skip_newlines()
-            let value = self.parse_expr()
-            if self.peek() == TokenKind.TK_KW_ELSE:
-                self.advance()
-                if self.peek() == TokenKind.TK_COLON: self.advance()
-                self.skip_newlines()
-                let else_body = self.parse_block_or_expr()
-                let pat = self.pool.add_node(NodeKind.NK_PAT_VARIANT, start, self.prev_end(), name_sym, 0, 0)
-                return self.let_pattern_node(start, pat, value, else_body, is_mut, 0)
-            // Normal let binding
-            var flags = 0
-            if is_mut:
-                flags = 1
-            return self.pool.add_node(NodeKind.NK_LET_BINDING, start, self.prev_end(), name_sym, value, flags)
+        let name_end = self.prev_end()
 
         var type_ann: NodeId = 0 as NodeId
         if self.peek() == TokenKind.TK_COLON:
@@ -7328,6 +7255,14 @@ impl Parser:
         self.advance()  // consume '='
         self.skip_newlines()
         let value = self.parse_expr()
+        // A capitalized name followed by `else` is a unit variant pattern
+        // (`let Empty = s else: ...`, §9.7); without `else` it binds a name.
+        let name_str = self.intern.resolve(name_sym)
+        if self.peek() == TokenKind.TK_KW_ELSE and name_str.len() > 0 and name_str[0] >= 'A' and name_str[0] <= 'Z':
+            self.advance()
+            let pat = self.pool.add_node(NodeKind.NK_PAT_VARIANT, name_start, name_end, name_sym, 0, 0)
+            let else_body = self.parse_let_else_body(start)
+            return self.let_pattern_node(start, pat, value, else_body, is_mut, type_ann)
         var flags = 0
         if is_mut:
             flags = 1
