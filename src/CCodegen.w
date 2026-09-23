@@ -1091,27 +1091,35 @@ impl CCodegen:
         self.sema.current_module_path = saved
         tid
 
+    // The type a global is emitted with, or 0 after a loud failure. A global
+    // whose type cannot be recovered is never declared `int`: an extern var
+    // of another C type would read the wrong bytes, and a `let` would store
+    // its value truncated (#1429).
     mut fn global_decl_tid(decl: NodeId) -> i32:
         let dk = self.ast.kind(decl)
-        if dk == NodeKind.NK_EXTERN_VAR:
-            let type_node = self.ast.get_data1(decl)
-            let tid = self.resolve_decl_type_frozen(decl, type_node)
-            if tid != 0:
-                return tid
-            return self.sema.ty_i32 as i32
-        if dk != NodeKind.NK_LET_DECL:
+        if dk != NodeKind.NK_EXTERN_VAR and dk != NodeKind.NK_LET_DECL:
             return 0
-        let flags = self.ast.get_data2(decl)
-        let type_extra_packed = flags / 16
-        if type_extra_packed > 0:
-            let type_node = self.ast.get_extra(type_extra_packed - 1)
+        let name = cc_intern_resolve(self.intern, self.ast.get_data0(decl))
+        let what = if dk == NodeKind.NK_EXTERN_VAR: "extern var" else: "global"
+        var type_node = 0
+        if dk == NodeKind.NK_EXTERN_VAR:
+            type_node = self.ast.get_data1(decl)
+        else:
+            let type_extra_packed = self.ast.get_data2(decl) / 16
+            if type_extra_packed > 0:
+                type_node = self.ast.get_extra(type_extra_packed - 1)
+        if type_node != 0:
             let tid = self.resolve_decl_type_frozen(decl, type_node)
-            if tid != 0:
-                return tid
+            if tid == 0:
+                let spelling = self.type_arg_text(type_node)
+                let declaring = self.decl_source_path(decl)
+                self.fail(f"emit-c could not resolve the type '{spelling}' of {what} '{name}' (resolved from module '{declaring}')")
+            return tid
         let value = self.ast.get_data1(decl)
         if self.sema.typed_expr_types.contains(value):
             return self.sema.typed_expr_types.get(value).unwrap()
-        self.sema.ty_i32 as i32
+        self.fail(f"emit-c has no type for {what} '{name}': it has no annotation and Sema recorded no type for its initializer")
+        0
 
     fn local_global_sym(body: &MirBody, local_id: i32) -> i32:
         if local_id <= 0 or local_id >= body.local_names.len() as i32:
