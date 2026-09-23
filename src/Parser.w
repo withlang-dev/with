@@ -1544,6 +1544,8 @@ impl Parser:
             var packed_kind = pack_type_decl_kind(TypeDeclKind.DiscEnum, is_ephemeral)
             if self.pending_specified != 0:
                 packed_kind = packed_kind + TDK_FLAG_SPECIFIED
+            if self.pending_flags != 0:
+                packed_kind = packed_kind + TDK_FLAG_FLAGS
             let node = self.pool.add_node(NodeKind.NK_TYPE_DECL, start, self.prev_end(), name, extra_start, packed_kind)
             return self.finish_type_decl(node)
 
@@ -1773,6 +1775,10 @@ impl Parser:
         var packed_kind = pack_type_decl_kind(sub_kind, is_ephemeral)
         if is_disc_enum and self.pending_specified != 0:
             packed_kind = packed_kind + TDK_FLAG_SPECIFIED
+        // @[flags] doubles the auto-increment of an enum with an explicit
+        // repr (§4.4a); on a backing-less enum it never did (#1482 asks).
+        if repr_type_node != 0 and self.pending_flags != 0:
+            packed_kind = packed_kind + TDK_FLAG_FLAGS
         let node = self.pool.add_node(NodeKind.NK_TYPE_DECL, start, self.prev_end(), name, extra_start, packed_kind)
         return self.finish_type_decl(node)
 
@@ -2080,8 +2086,8 @@ impl Parser:
 
     mut fn parse_enum_variants_block() -> i32:
         // Parses a backing-less enum body. Collects each variant's name, payloads,
-        // and an optional explicit discriminant (auto-incrementing from the last
-        // value). If no variant carries a payload, the enum is fieldless and an
+        // and an optional explicit discriminant (the value node; Sema computes
+        // the auto-incremented ones). If no variant carries a payload, the enum is fieldless and an
         // i32 backing is inferred — it is emitted in discriminant-enum format and
         // `pending_inferred_disc_repr` records the synthesized backing node so the
         // caller marks the declaration as a disc enum. With payloads it stays a
@@ -2094,7 +2100,6 @@ impl Parser:
         var payloads_flat: Vec[i32] = Vec.new()
         var variant_count = 0
         var variant_col = -1
-        var current_disc = 0
         var has_payload = 0
 
         while self.peek() != TokenKind.TK_EOF:
@@ -2132,27 +2137,14 @@ impl Parser:
                             self.advance()
                 self.expect(TokenKind.TK_R_PAREN)
             // Optional explicit discriminant (meaningful only for fieldless enums).
+            var disc_node = 0
             if self.peek() == TokenKind.TK_EQ:
                 self.advance()
                 self.skip_newlines()
-                var negate = 0
-                if self.peek() == TokenKind.TK_MINUS:
-                    negate = 1
-                    self.advance()
-                if self.peek() == TokenKind.TK_INT_LIT:
-                    let text = self.source.slice(self.current_start() as i64, self.current_end() as i64)
-                    let val = parse_i64(text) as i32
-                    if negate != 0:
-                        current_disc = 0 - val
-                    else:
-                        current_disc = val
-                    self.advance()
-                else:
-                    self.emit_error("expected integer literal for discriminant value")
+                disc_node = self.parse_disc_value_node()
             names.push(vname)
-            discs.push(current_disc)
+            discs.push(disc_node)
             pcounts.push(pcount)
-            current_disc = current_disc + 1
             variant_count = variant_count + 1
             self.skip_newlines()
             if self.peek() == TokenKind.TK_COMMA:
@@ -2195,13 +2187,27 @@ impl Parser:
                 pidx2 = pidx2 + 1
         extra_start
 
+    // §4.4a: an explicit discriminant `= N` / `= -N` is an integer literal;
+    // Sema evaluates it against the repr and computes the auto-incremented
+    // ones (a parser counter in i32 truncated wider values, #1451). Returns
+    // the value node — the literal, or a negation of it.
+    mut fn parse_disc_value_node() -> i32:
+        let start = self.current_start()
+        var negate = false
+        if self.peek() == TokenKind.TK_MINUS:
+            negate = true
+            self.advance()
+        if self.peek() != TokenKind.TK_INT_LIT:
+            self.emit_error("expected integer literal for discriminant value")
+            return 0
+        let lit = self.parse_int_literal()
+        if not negate:
+            return lit as i32
+        self.pool.add_node(NodeKind.NK_UNARY, start, self.prev_end(), UnaryOp.UOP_NEGATE, lit as i32, 0) as i32
+
     mut fn parse_disc_enum_variants(repr_type_node: i32) -> i32:
         var variants: Vec[i32] = Vec.new()
         var variant_count = 0
-        var current_disc = 0
-
-        if self.pending_flags != 0:
-            current_disc = 1
 
         if self.peek() == TokenKind.TK_PIPE:
             self.advance()
@@ -2231,41 +2237,23 @@ impl Parser:
                         self.advance()
                 self.expect(TokenKind.TK_R_PAREN)
 
-            // Optional explicit discriminant: = value
+            // Optional explicit discriminant: = value (0 = auto-increment)
+            var disc_node = 0
             var has_explicit_disc = 0
             if self.peek() == TokenKind.TK_EQ:
                 has_explicit_disc = 1
                 self.advance()
                 self.skip_newlines()
-                var negate = 0
-                if self.peek() == TokenKind.TK_MINUS:
-                    negate = 1
-                    self.advance()
-                if self.peek() == TokenKind.TK_INT_LIT:
-                    let text = self.source.slice(self.current_start() as i64, self.current_end() as i64)
-                    let val = parse_i64(text) as i32
-                    if negate != 0:
-                        current_disc = 0 - val
-                    else:
-                        current_disc = val
-                    self.advance()
-                else:
-                    self.emit_error("expected integer literal for discriminant value")
+                disc_node = self.parse_disc_value_node()
             if self.pending_specified != 0 and has_explicit_disc == 0:
                 self.emit_error("@[specified] requires explicit discriminant value")
 
             variants.push(vname)
-            variants.push(current_disc)
+            variants.push(disc_node)
             variants.push(payloads.len() as i32)
             for pi in 0..payloads.len() as i32:
                 variants.push(payloads[pi])
             variant_count = variant_count + 1
-
-            // Auto-increment for next variant
-            if self.pending_flags != 0:
-                current_disc = current_disc * 2
-            else:
-                current_disc = current_disc + 1
 
             self.skip_newlines()
             if self.peek() == TokenKind.TK_PIPE:
@@ -2288,9 +2276,6 @@ impl Parser:
         self.skip_newlines()
         var variants: Vec[i32] = Vec.new()
         var variant_count = 0
-        var current_disc = 0
-        if self.pending_flags != 0:
-            current_disc = 1
 
         while self.peek() != TokenKind.TK_R_BRACE and self.peek() != TokenKind.TK_EOF:
             if self.peek() == TokenKind.TK_PIPE or self.peek() == TokenKind.TK_COMMA:
@@ -2319,37 +2304,21 @@ impl Parser:
                         self.emit_error("expected ',' or ')' in enum payload")
                         self.advance()
                 self.expect(TokenKind.TK_R_PAREN)
+            var disc_node = 0
             var has_explicit_disc = 0
             if self.peek() == TokenKind.TK_EQ:
                 has_explicit_disc = 1
                 self.advance()
                 self.skip_newlines()
-                var negate = 0
-                if self.peek() == TokenKind.TK_MINUS:
-                    negate = 1
-                    self.advance()
-                if self.peek() == TokenKind.TK_INT_LIT:
-                    let text = self.source.slice(self.current_start() as i64, self.current_end() as i64)
-                    let val = parse_i64(text) as i32
-                    if negate != 0:
-                        current_disc = 0 - val
-                    else:
-                        current_disc = val
-                    self.advance()
-                else:
-                    self.emit_error("expected integer literal for discriminant value")
+                disc_node = self.parse_disc_value_node()
             if self.pending_specified != 0 and has_explicit_disc == 0:
                 self.emit_error("@[specified] requires explicit discriminant value")
             variants.push(vname)
-            variants.push(current_disc)
+            variants.push(disc_node)
             variants.push(payloads.len() as i32)
             for pi in 0..payloads.len() as i32:
                 variants.push(payloads[pi])
             variant_count = variant_count + 1
-            if self.pending_flags != 0:
-                current_disc = current_disc * 2
-            else:
-                current_disc = current_disc + 1
             self.skip_newlines()
             if self.peek() == TokenKind.TK_PIPE or self.peek() == TokenKind.TK_COMMA:
                 self.advance()
@@ -2367,10 +2336,7 @@ impl Parser:
     mut fn parse_disc_enum_variants_block(repr_type_node: i32) -> i32:
         var variants: Vec[i32] = Vec.new()
         var variant_count = 0
-        var current_disc = 0
         var variant_col = -1
-        if self.pending_flags != 0:
-            current_disc = 1
 
         while self.peek() != TokenKind.TK_EOF:
             let cur_col = column_of(self.source, self.current_start())
@@ -2402,37 +2368,21 @@ impl Parser:
                         self.emit_error("expected ',' or ')' in enum payload")
                         self.advance()
                 self.expect(TokenKind.TK_R_PAREN)
+            var disc_node = 0
             var has_explicit_disc = 0
             if self.peek() == TokenKind.TK_EQ:
                 has_explicit_disc = 1
                 self.advance()
                 self.skip_newlines()
-                var negate = 0
-                if self.peek() == TokenKind.TK_MINUS:
-                    negate = 1
-                    self.advance()
-                if self.peek() == TokenKind.TK_INT_LIT:
-                    let text = self.source.slice(self.current_start() as i64, self.current_end() as i64)
-                    let val = parse_i64(text) as i32
-                    if negate != 0:
-                        current_disc = 0 - val
-                    else:
-                        current_disc = val
-                    self.advance()
-                else:
-                    self.emit_error("expected integer literal for discriminant value")
+                disc_node = self.parse_disc_value_node()
             if self.pending_specified != 0 and has_explicit_disc == 0:
                 self.emit_error("@[specified] requires explicit discriminant value")
             variants.push(vname)
-            variants.push(current_disc)
+            variants.push(disc_node)
             variants.push(payloads.len() as i32)
             for pi in 0..payloads.len() as i32:
                 variants.push(payloads[pi])
             variant_count = variant_count + 1
-            if self.pending_flags != 0:
-                current_disc = current_disc * 2
-            else:
-                current_disc = current_disc + 1
             self.skip_newlines()
             if self.peek() == TokenKind.TK_COMMA:
                 self.advance()

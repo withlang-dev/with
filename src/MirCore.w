@@ -463,7 +463,7 @@ pub type MirBody {
     // Switch tables
     switch_table_starts: Vec[i32],
     switch_table_counts: Vec[i32],
-    switch_table_vals: Vec[i32],
+    switch_table_vals: Vec[i64],
     switch_table_targets: Vec[i32],
 
     // Aggregate field tables
@@ -876,7 +876,7 @@ fn mir_const_int_value(body: &MirBody, const_id: i32) -> i64:
     )
 
 impl MirBody:
-    mut fn new_switch_table(vals: &Vec[i32], targets: &Vec[i32]) -> i32:
+    mut fn new_switch_table(vals: &Vec[i64], targets: &Vec[i32]) -> i32:
         let id = self.switch_table_starts.len() as i32
         let start = self.switch_table_vals.len() as i32
         let count = vals.len() as i32

@@ -8250,7 +8250,7 @@ impl CCodegen:
         let count = body.switch_table_counts[d1]
         var out = ""
         for i in 0..count:
-            let val = body.switch_table_vals[(start + i)]
+            let val: i64 = body.switch_table_vals[(start + i)]
             let tgt = body.switch_table_targets[(start + i)]
             let head = if i == 0: "if" else: "else if"
             out = out ++ "    " ++ head ++ f" ({cond} == {val}) " ++ cc_lbrace() ++ "\n"

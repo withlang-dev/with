@@ -259,6 +259,8 @@ const FACADE_PARAM_REF_NAME: i32 = 0
 const FACADE_PARAM_REF_INDEX: i32 = 1
 const FACADE_PARAM_REF_TYPE: i32 = 2
 const TDK_FLAG_REPR_C: i32 = 256
+// @[flags] on a discriminant enum (§4.4a): auto-increment doubles.
+const TDK_FLAG_FLAGS: i32 = 512
 
 fn pack_type_decl_kind(sub_kind: i32, is_ephemeral: i32) -> i32:
     if is_ephemeral != 0:
@@ -288,6 +290,9 @@ fn type_decl_is_specified(packed: i32) -> i32:
 
 fn type_decl_is_error(packed: i32) -> i32:
     (packed / TDK_FLAG_ERROR) % 2
+
+fn type_decl_is_flags(packed: i32) -> i32:
+    (packed / TDK_FLAG_FLAGS) % 2
 
 // Fn decl flag bits (stored in data2 field)
 @[flags]

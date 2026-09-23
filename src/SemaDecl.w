@@ -934,16 +934,32 @@ impl Sema:
             let payload_counts: Vec[i32] = Vec.new()
             let payload_tids: Vec[i32] = Vec.new()
             var epos = extra_start + 2
-            var disc_vals: Vec[i32] = Vec.new()
+            // §4.4a: each variant's discriminant is its `= N` literal, else the
+            // previous value plus one (doubled under @[flags]), from 0 (1 under
+            // @[flags]). An i64: a parser counter in i32 truncated wider values
+            // and a negative one read as "no discriminant" (#1451).
+            let doubling = type_decl_is_flags(self.ast.get_data2(node)) != 0
+            var disc_vals: Vec[i64] = Vec.new()
             for vi in 0..variant_count:
                 let v_name = self.ast.get_extra(epos)
                 epos = epos + 1
-                let disc_value = self.ast.get_extra(epos)
+                let disc_node = self.ast.get_extra(epos)
                 epos = epos + 1
                 let payload_count = self.ast.get_extra(epos)
                 epos = epos + 1
                 variant_names.push(v_name)
                 payload_counts.push(payload_count)
+                var disc_value: i64 = if doubling: 1 else: 0
+                if disc_node != 0:
+                    let literal = self.ast.int_literal_expr_i64(disc_node)
+                    if literal.ok == 0:
+                        self.emit_error(f"discriminant of variant `{self.pool_resolve(v_name)}` does not fit a 64-bit integer", disc_node)
+                    disc_value = literal.value
+                else if vi > 0:
+                    // An owned i64, not the element view: `view + 1` is
+                    // computed at i32 (#1477).
+                    let prev_disc: i64 = disc_vals[vi - 1]
+                    disc_value = if doubling: prev_disc * 2 else: prev_disc + 1
                 // Check for duplicate discriminant values
                 for prev in 0..disc_vals.len() as i32:
                     if disc_vals[prev] == disc_value:
@@ -976,6 +992,9 @@ impl Sema:
             self.record_named_type_with_pub(name, tid as i32, decl_is_pub, node)
             self.record_type_decl_tid(node, tid as i32)
             self.disc_repr_types.insert(tid as i32, repr_type_tid as i32)
+            self.disc_value_starts.insert(tid as i32, self.disc_value_list.len() as i32)
+            for disc in disc_vals:
+                self.disc_value_list.push(disc)
             // Check if any variant has payloads
             var any_payload = 0
             var check_pos = te_start
@@ -987,24 +1006,21 @@ impl Sema:
                     any_payload = 1
             if any_payload != 0:
                 self.disc_has_payload.insert(tid as i32, 1)
-            // Re-register variants with actual enum TypeId and store disc values.
+            // Re-register variants with actual enum TypeId.
             // Register BOTH bare name (for unqualified pattern matching) and
             // qualified name "TypeName.Variant" (for explicit EnumType.Variant access).
             let type_name_str: str = with_str_clone_ref(self.pool_resolve(name))
             var vpos = te_start
             for vi in 0..variant_count:
                 let v_name: i32 = self.type_extra[vpos]
-                let disc_val = disc_vals[vi]
                 self.variant_lookup.insert(v_name, vi)
                 self.variant_type_ids.insert(v_name, tid as i32)
-                self.disc_values.insert(v_name, disc_val)
                 // Also register qualified name for EnumType.Variant lookup
                 let v_name_str = self.pool_resolve(v_name)
                 let qual_name = type_name_str ++ "." ++ v_name_str
                 let qual_sym = self.pool_intern(qual_name)
                 self.variant_lookup.insert(qual_sym, vi)
                 self.variant_type_ids.insert(qual_sym, tid as i32)
-                self.disc_values.insert(qual_sym, disc_val)
                 let pc = self.type_extra[(vpos + 1)]
                 vpos = vpos + 2 + pc
 
@@ -1175,7 +1191,7 @@ impl Sema:
                 for vi in 0..variant_count:
                     epos = epos + 1  // v_name
                     if sub_kind == TypeDeclKind.DiscEnum:
-                        epos = epos + 1  // disc_value
+                        epos = epos + 1  // discriminant node (0 = auto)
                     let payload_count = self.ast.get_extra(epos)
                     epos = epos + 1
                     for pi in 0..payload_count:
@@ -2933,7 +2949,7 @@ impl Sema:
         pos = pos + 1
         for vi in 0..variant_count:
             pos = pos + 1 // variant name
-            pos = pos + 1 // disc value
+            pos = pos + 1 // discriminant node (0 = auto)
             let payload_count = self.ast.get_extra(pos)
             pos = pos + 1 + payload_count
         pos
@@ -3098,7 +3114,7 @@ impl Sema:
                 pos = pos + 1
                 for vi in 0..variant_count:
                     pos = pos + 1 // variant name
-                    pos = pos + 1 // disc value
+                    pos = pos + 1 // discriminant node (0 = auto)
                     let payload_count = self.ast.get_extra(pos)
                     pos = pos + 1
                     for pi in 0..payload_count:

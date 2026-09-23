@@ -639,7 +639,10 @@ pub type Sema {
     imported_variant_owners: HashMap[i32, i32],
     // Discriminant enum data
     disc_repr_types: HashMap[i32, i32],
-    disc_values: HashMap[i32, i32],
+    // Per declaration (#1451): enum TypeId -> start of its variants' values in
+    // disc_value_list, in variant order.
+    disc_value_starts: HashMap[i32, i32],
+    disc_value_list: Vec[i64],
     disc_has_payload: HashMap[i32, i32],
     bitpacked_types: HashMap[i32, i32],  // type_id → 1 if bitpacked
     packed_types: HashMap[i32, i32],     // type_id → 1 if repr(packed)/@[packed]
@@ -1949,7 +1952,6 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
     let variant_type_ids = sema_new_map_i32_i32()
     let imported_variant_owners = sema_new_map_i32_i32()
     let disc_repr_types = sema_new_map_i32_i32()
-    let disc_values = sema_new_map_i32_i32()
     let disc_has_payload = sema_new_map_i32_i32()
     let trait_lookup = sema_new_map_i32_i32()
     let impl_lookup = sema_new_map_i32_i32()
@@ -2118,7 +2120,8 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         variant_type_ids,
         imported_variant_owners,
         disc_repr_types,
-        disc_values,
+        disc_value_starts: sema_new_map_i32_i32(),
+        disc_value_list: Vec.new(),
         disc_has_payload,
         bitpacked_types: sema_new_map_i32_i32(),
         packed_types: sema_new_map_i32_i32(),

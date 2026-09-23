@@ -415,7 +415,7 @@ fn vacated_payload_verdict(arm: i32, payload_drops: bool) -> str:
     let init = body.new_rvalue(RvalueKind.RK_USE, enum_blank_op, 0, 0)
     body.push_stmt(entry, StmtKind.StorageLive, subject_local, 0, 0)
     body.push_stmt(entry, StmtKind.Assign, subject, init, 0)
-    let vals: Vec[i32] = Vec.new()
+    let vals: Vec[i64] = Vec.new()
     vals.push(1)
     let targets: Vec[i32] = Vec.new()
     targets.push(moving)

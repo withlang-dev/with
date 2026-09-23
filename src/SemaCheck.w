@@ -14625,24 +14625,28 @@ impl Sema:
             pos = pos + 2 + payload_count
         -1
 
-    fn enum_variant_discriminant_for_type(enum_tid: i32, variant_sym: i32) -> i32:
+    // §4.4a: the discriminant of a variant of `enum_tid`. Every i64 is a
+    // discriminant (`B = -3`), so there is no "absent" value: a caller asks
+    // enum_variant_index_for_type whether the variant exists (a -1 sentinel
+    // here read `B = -3` as absent and lowered it as its index 1, #1451).
+    fn enum_variant_discriminant_for_type(enum_tid: i32, variant_sym: i32) -> i64:
         let enum_decl = self.enum_variant_decl_type(enum_tid)
-        if enum_decl == 0:
-            return -1
         let bare_variant_sym = self.unqualified_enum_variant_sym(variant_sym)
-        let index = self.enum_variant_index_for_type(enum_decl, bare_variant_sym)
+        let index = if enum_decl == 0: -1 else: self.enum_variant_index_for_type(enum_decl, bare_variant_sym)
         if index < 0:
-            return -1
-        // disc_values is keyed by bare and qualified variant syms across every
-        // repr enum in the program. An ordinary enum's discriminant is its
-        // variant index; consulting the global map for it would read an
-        // unrelated repr enum's same-named variant (a foreign `None = 0`
-        // inverts Option.is_none).
-        if not self.disc_repr_types.contains(enum_decl):
-            return index
-        let qualified = self.qualified_enum_variant_sym(enum_decl, bare_variant_sym)
-        if self.disc_values.contains(qualified):
-            return self.disc_values.get(qualified).unwrap()
+            sema_phase_bug(f"discriminant asked of variant '{self.pool_resolve(variant_sym)}' that type {enum_tid} does not declare")
+        self.enum_variant_discriminant_at(enum_decl, index)
+
+    // The discriminant of variant `index` of the enum declaration `enum_decl`:
+    // its declared or auto-incremented value for a repr enum, its index for
+    // every other enum. Read from the declaration's own table: a by-name map
+    // held every repr enum's variants, so a lookup by name answered for
+    // whichever enum last declared it (an unrelated `None = 0` inverted
+    // Option.is_none; two repr enums with an `X` shared one value).
+    fn enum_variant_discriminant_at(enum_decl: i32, index: i32) -> i64:
+        let start = self.disc_value_starts.get(enum_decl)
+        if start.is_some() and index >= 0 and index < self.get_type_d2(enum_decl):
+            return self.disc_value_list[start.unwrap() + index]
         index
 
     mut fn enum_accessor_return_type(enum_tid: i32, variant_sym: i32, accessor_kind: i32) -> i32:
@@ -23278,22 +23282,7 @@ impl Sema:
         let base_tid = self.type_reflection_variant_base(tid)
         if base_tid == 0:
             return 0
-        if not self.disc_repr_types.contains(base_tid):
-            return variant_index as i64
-        let name_sym = self.type_reflection_variant_name(tid, variant_index)
-        if name_sym == 0:
-            return variant_index as i64
-        let type_name_sym = self.get_type_d0(base_tid)
-        if type_name_sym != 0:
-            let qual_name = self.pool_resolve(type_name_sym) ++ "." ++ self.pool_resolve(name_sym)
-            // Enum checking interns qualified variants before storing disc_values;
-            // reflection and codegen only look them up. A bare-name fallback is
-            // unsafe: disc_values is name-keyed, so a DiscEnum `None = 0` would
-            // shadow a payload enum's `Option.None` (implicit disc = index).
-            let qual_sym = self.pool_lookup_symbol(qual_name)
-            if qual_sym != 0 and self.disc_values.contains(qual_sym):
-                return self.disc_values.get(qual_sym).unwrap() as i64
-        variant_index as i64
+        self.enum_variant_discriminant_at(base_tid, variant_index)
 
     mut fn type_reflection_variant_payload_type(tid: i32, variant_index: i32, payload_index: i32) -> i32:
         let base_tid = self.type_reflection_variant_base(tid)

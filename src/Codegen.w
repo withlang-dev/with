@@ -269,7 +269,7 @@ type Codegen {
     disc_enum_variant_starts: Vec[i32],
     disc_enum_variant_counts: Vec[i32],
     disc_enum_variant_names: Vec[i32],
-    disc_enum_variant_values: Vec[i32],
+    disc_enum_variant_values: Vec[i64],
     disc_enum_has_payload: Vec[i32],
     disc_enum_variant_payloads: Vec[i64],
 
@@ -4150,7 +4150,7 @@ impl Codegen:
             var pos = extra_start + 2
             for vi in 0..variant_count:
                 pos = pos + 1 // variant name
-                pos = pos + 1 // disc value
+                pos = pos + 1 // discriminant node (0 = auto)
                 let payload_count = self.pool.get_extra(pos)
                 pos = pos + 1 + payload_count
             return pos + 1
@@ -4516,12 +4516,19 @@ impl Codegen:
             self.disc_enum_variant_values.push(0)
             self.disc_enum_variant_payloads.push(0)
 
-        // First pass: collect variant info and compute max payload size
+        // First pass: collect variant info and compute max payload size. A
+        // variant's discriminant is Sema's (the AST holds only an explicit
+        // `= N` node; Sema computes the auto-incremented ones, #1451).
+        let sema_tid = self.type_decl_sema_tid(type_node)
+        if sema_tid == 0:
+            with_eprint(f"error: discriminant enum '{self.intern.resolve(name_sym)}' has no checked type")
+            self.had_error = 1
+            return
         var max_payload_size: i64 = 0
         var offset = extra_start + 2
         for vi in 0..variant_count:
             let v_name = self.pool.get_extra(offset)
-            let disc_value = self.pool.get_extra(offset + 1)
+            let disc_value = self.sema.enum_variant_discriminant_at(sema_tid, vi)
             let payload_count = self.pool.get_extra(offset + 2)
             var payload_ty: i64 = 0
             if payload_count > 0:
@@ -4582,14 +4589,14 @@ impl Codegen:
         let end_bb = wl_append_bb(self.context, self.current_function, "from_int.end")
         let sw = wl_build_switch(self.builder, input, default_bb, v_count)
         for vi in 0..v_count:
-            let disc_val = self.disc_enum_variant_values[(v_start + vi)]
+            let disc_val: i64 = self.disc_enum_variant_values[(v_start + vi)]
             let case_bb = wl_append_bb(self.context, self.current_function, "from_int.case")
-            wl_add_case(sw, wl_const_int(repr_ty, disc_val as i64, 1), case_bb)
+            wl_add_case(sw, wl_const_int(repr_ty, disc_val, 1), case_bb)
             wl_position_at_end(self.builder, case_bb)
             // Some(disc_val) = { tag=0, payload=disc_val }
             var some_val = wl_get_undef(opt_ty)
             some_val = wl_build_insert_value(self.builder, some_val, wl_const_int(i32_ty, 0, 0), 0)
-            some_val = wl_build_insert_value(self.builder, some_val, wl_const_int(repr_ty, disc_val as i64, 1), 1)
+            some_val = wl_build_insert_value(self.builder, some_val, wl_const_int(repr_ty, disc_val, 1), 1)
             wl_build_store(self.builder, some_val, result_alloca)
             wl_build_br(self.builder, end_bb)
         wl_position_at_end(self.builder, default_bb)

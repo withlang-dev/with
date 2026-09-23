@@ -4063,7 +4063,7 @@ impl ComptimeEvaluator:
                 let enum_tid = self.sema.variant_type_ids.get(sym).unwrap()
                 let enum_resolved = self.sema.resolve_alias(enum_tid as TypeId)
                 if self.sema.disc_repr_types.contains(enum_resolved as i32) and not self.sema.disc_has_payload.contains(enum_resolved as i32):
-                    return if self.sema.disc_values.contains(sym): self.sema.disc_values.get(sym).unwrap() else: self.sema.variant_lookup.get(sym).unwrap()
+                    return self.sema.enum_variant_discriminant_for_type(enum_resolved as i32, sym) as i32
         default_value
 
     fn workspace_bool_option(options: &ComptimeValue, field_name: &str, default_value: bool) -> bool:
@@ -5175,7 +5175,7 @@ impl ComptimeEvaluator:
                 let enum_tid = self.sema.variant_type_ids.get(sym).unwrap()
                 let enum_resolved = self.sema.resolve_alias(enum_tid as TypeId)
                 if self.sema.disc_repr_types.contains(enum_resolved as i32) and not self.sema.disc_has_payload.contains(enum_resolved as i32):
-                    return if self.sema.disc_values.contains(sym): self.sema.disc_values.get(sym).unwrap() else: self.sema.variant_lookup.get(sym).unwrap()
+                    return self.sema.enum_variant_discriminant_for_type(enum_resolved as i32, sym) as i32
         let _ = self.fail(node, "ArchiveEntry.kind must be ArchiveEntryKind")
         -1
 
@@ -6547,9 +6547,9 @@ impl ComptimeEvaluator:
             if cv_trace:
                 with_eprint(f"[comptime] disc_variant miss: enum ty={enum_resolved as i32} repr={self.sema.disc_repr_types.contains(enum_resolved as i32)} payload={self.sema.disc_has_payload.contains(enum_resolved as i32)}")
             return self.unsupported(node)
-        let disc = if self.sema.disc_values.contains(sym): self.sema.disc_values.get(sym).unwrap() else: self.sema.variant_lookup.get(sym).unwrap()
+        let disc = self.sema.enum_variant_discriminant_for_type(enum_resolved as i32, sym)
         let repr_ty = self.sema.disc_repr_types.get(enum_resolved as i32).unwrap()
-        comptime_control_value(comptime_value_int(self.node_type_or(node, repr_ty), disc as i64))
+        comptime_control_value(comptime_value_int(self.node_type_or(node, repr_ty), disc))
 
     mut fn eval_variant_shorthand(node: i32) -> ComptimeControl:
         let arg_count = self.ast.get_data2(node)

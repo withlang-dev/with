@@ -2701,7 +2701,7 @@ impl Codegen:
                 let v_start = self.disc_enum_variant_starts[de_idx]
                 let v_count = self.disc_enum_variant_counts[de_idx]
                 if variant_idx < v_count:
-                    return self.disc_enum_variant_values[(v_start + variant_idx)] as i64
+                    return self.disc_enum_variant_values[(v_start + variant_idx)]
         variant_idx as i64
 
     fn mir_enum_tag_value(val: i64) -> i64:
@@ -11501,12 +11501,10 @@ impl Codegen:
                 var recv_some_disc: i64 = 0
                 var recv_none_disc: i64 = 1
                 if recv_opt_sema > 0:
-                    let sd = self.sema.enum_variant_discriminant_for_type(recv_opt_sema, self.sema.syms.some)
-                    let nd = self.sema.enum_variant_discriminant_for_type(recv_opt_sema, self.sema.syms.none)
-                    if sd >= 0:
-                        recv_some_disc = sd as i64
-                    if nd >= 0:
-                        recv_none_disc = nd as i64
+                    if self.sema.enum_variant_index_for_type(recv_opt_sema, self.sema.syms.some) >= 0:
+                        recv_some_disc = self.sema.enum_variant_discriminant_for_type(recv_opt_sema, self.sema.syms.some)
+                    if self.sema.enum_variant_index_for_type(recv_opt_sema, self.sema.syms.none) >= 0:
+                        recv_none_disc = self.sema.enum_variant_discriminant_for_type(recv_opt_sema, self.sema.syms.none)
                 let recv_tag_ty = wl_struct_get_type_at(recv_opt_ty, 0)
                 let recv_ok = wl_build_icmp(self.builder, wl_int_eq(), recv_status, wl_const_int(wl_i32_type(self.context), 0, 0))
                 let recv_tag = wl_build_select(self.builder, recv_ok, wl_const_int(recv_tag_ty, recv_some_disc, 0), wl_const_int(recv_tag_ty, recv_none_disc, 0))
@@ -15689,7 +15687,7 @@ impl Codegen:
                 let target_bb = body.switch_table_targets[case_start]
                 if target_bb >= 0 and target_bb < self.mir_bb_values.len() as i32:
                     let case_target = self.mir_bb_values[target_bb]
-                    let val = body.switch_table_vals[case_start]
+                    let val: i64 = body.switch_table_vals[case_start]
                     if val != 0:
                         wl_build_cond_br(self.builder, cond, case_target, default_bb)
                     else:
@@ -15702,9 +15700,9 @@ impl Codegen:
             for ci in 0..case_count:
                 let target_bb = body.switch_table_targets[(case_start + ci)]
                 if target_bb >= 0 and target_bb < self.mir_bb_values.len() as i32:
-                    let val = body.switch_table_vals[(case_start + ci)]
+                    let val: i64 = body.switch_table_vals[(case_start + ci)]
                     let case_target = self.mir_bb_values[target_bb]
-                    wl_add_case(sw, wl_const_int(int_ty, val as i64, 1), case_target)
+                    wl_add_case(sw, wl_const_int(int_ty, val, 1), case_target)
             return true
 
         if tk == TermKind.TK_CALL:
@@ -17193,9 +17191,9 @@ impl Codegen:
                         is_disc = true
                         let de_idx = de_opt.unwrap()
                         let dv_start = self.disc_enum_variant_starts[de_idx]
-                        let disc_val = self.disc_enum_variant_values[(dv_start + vi)]
+                        let disc_val: i64 = self.disc_enum_variant_values[(dv_start + vi)]
                         let repr_ty = self.disc_enum_repr_types[de_idx]
-                        tag_val = wl_const_int(repr_ty, disc_val as i64, 1)
+                        tag_val = wl_const_int(repr_ty, disc_val, 1)
                 if not is_disc:
                     tag_val = wl_const_int(wl_i32_type(self.context), vi as i64, 0)
                 wl_build_store(self.builder, tag_val, tag_ptr)

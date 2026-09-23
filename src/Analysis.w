@@ -1280,14 +1280,16 @@ fn analysis_audit_phase(report: &AnalysisReport, sema: &Sema, mir_mod: &MirModul
             if sema.get_type_kind(ti as TypeId) == TypeKind.TY_GENERIC_INST and not sema.generic_struct_field_index_type_cache.contains(sema_pair_key(ti, fi)):
                 report.fail(f"type {ti} field {fi}: generic field-type cache miss")
         if sema.get_type_kind(ti as TypeId) == TypeKind.TY_ENUM and sema.disc_repr_types.contains(ti):
+            if not sema.disc_value_starts.contains(ti):
+                report.fail(f"type {ti}: no per-declaration discriminant table")
             let variant_count = sema.type_reflection_variant_count(ti)
             let type_sym = sema.get_type_d0(ti as TypeId)
             for vi in 0..variant_count:
                 let variant_sym = sema.type_reflection_variant_name(ti, vi)
                 let qualified = sema.pool_resolve(type_sym) ++ "." ++ sema.pool_resolve(variant_sym)
                 let qualified_sym = sema.pool_lookup_symbol(qualified)
-                if qualified_sym == 0 or not sema.disc_values.contains(qualified_sym):
-                    report.fail(f"type {ti} variant {vi}: qualified discriminant lookup miss")
+                if qualified_sym == 0 or not sema.variant_lookup.contains(qualified_sym):
+                    report.fail(f"type {ti} variant {vi}: qualified variant lookup miss")
     for si in 0..sema.concrete_specialization_syms.len() as i32:
         let mono = sema.concrete_specialization_syms[si]
         let sig = sema.concrete_specialization_sigs[si]

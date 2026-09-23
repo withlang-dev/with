@@ -135,11 +135,14 @@ fn render_decl(pool: AstPool, intern: InternPool, node: NodeId, indent: i32) -> 
                 out.push_str(make_indent(indent + 2))
                 let vname = intern.resolve(pool.get_extra(ep))
                 ep = ep + 1
-                let disc_val = pool.get_extra(ep)
+                // The explicit `= N` node, 0 when the value is auto-incremented.
+                let disc_node = pool.get_extra(ep)
                 ep = ep + 1
                 let payload_count = pool.get_extra(ep)
                 ep = ep + 1
-                out.push_str(f"{vname} = {disc_val}")
+                out.push_str(vname)
+                if disc_node != 0:
+                    out.push_str(" = " ++ render_expr(pool, intern, disc_node as NodeId, 0))
                 if payload_count > 0:
                     out.push_str("(")
                     for pi in 0..payload_count:
@@ -1244,7 +1247,7 @@ fn type_decl_is_pub(pool: AstPool, extra_start: i32, sub_kind: i32) -> bool:
         let variant_count = pool.get_extra(extra_start + 1)
         for vi in 0..variant_count:
             ep = ep + 1  // name
-            ep = ep + 1  // disc value
+            ep = ep + 1  // discriminant node (0 = auto)
             let payload_count = pool.get_extra(ep)
             ep = ep + 1 + payload_count
         return pool.get_extra(ep) == Visibility.Public
