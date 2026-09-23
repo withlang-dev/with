@@ -1164,6 +1164,24 @@ fn dbg_ledger_first_drop_len(addr: i64) -> i64:
         probes = probes + 1
     0
 
+// Whether the ledger holds `addr` as an allocation that was freed and not
+// reused since. Read-only; the caller holds the allocator lock.
+fn dbg_ledger_freed(addr: i64) -> i32:
+    if dbg_base == 0:
+        return 0
+    var slot = (addr >> 4) & (DBG_CAP - 1)
+    var probes: i64 = 0
+    while probes < DBG_CAP:
+        let e = dbg_entry_addr(slot)
+        let a = unsafe *(e as *const i64)
+        if a == 0:
+            return 0
+        if a == addr:
+            return if unsafe *((e + 16) as *const i64) != 0: 1 else: 0
+        slot = (slot + 1) & (DBG_CAP - 1)
+        probes = probes + 1
+    0
+
 fn dbg_mark_root(addr: i64, reason_ptr: i64, reason_len: i64):
     if dbg_base == 0:
         return
@@ -2825,16 +2843,22 @@ pub fn with_vec_free_drop_origin(v: *mut u8, drop_origin: *const u8, drop_origin
 // WITH_ALLOC_SYSTEM=1 the range tables don't track, so strs leak there —
 // the safe direction for a diagnostic mode.
 pub fn with_str_free(s: *mut u8) -> Unit:
-    let p = unsafe *(s as *const *mut u8)
-    if p as i64 != 0 and rt_payload_start_is_owned(p as *const u8) != 0:
-        rt_free(p)
-    unsafe *(s as *mut i64) = 0
-    unsafe *((s as i64 + 8) as *mut i64) = 0
+    with_str_free_drop_origin(s, 0 as *const u8, 0)
 
 pub fn with_str_free_drop_origin(s: *mut u8, drop_origin: *const u8, drop_origin_len: i64) -> Unit:
     let p = unsafe *(s as *const *mut u8)
     if p as i64 != 0 and rt_payload_start_is_owned(p as *const u8) != 0:
         rt_free_with_drop_origin(p, drop_origin, drop_origin_len)
+    else if p as i64 != 0 and dbg_on() != 0:
+        // #1363: the ownership check above turns a second free of a str
+        // buffer into a silent no-op (the freed block is no longer an owned
+        // payload), so the debug allocator never saw `read_file(p).unwrap_or("")`
+        // free its result twice. The ledger still knows the block: a str
+        // naming a freed, not-reused allocation start is a double free.
+        rt_allocator_lock()
+        if dbg_ledger_freed(p as i64) != 0:
+            dbg_report_double_free(p as i64, dbg_ledger_size(p as i64), dbg_ledger_origin(p as i64), dbg_ledger_first_drop_ptr(p as i64), dbg_ledger_first_drop_len(p as i64), drop_origin as i64, drop_origin_len)
+        rt_allocator_unlock()
     unsafe *(s as *mut i64) = 0
     unsafe *((s as i64 + 8) as *mut i64) = 0
 
