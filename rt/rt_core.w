@@ -443,7 +443,7 @@ fn rt_range_table_grow(base: i64, cap: i64, count: i32, cap_out: *mut i64) -> i6
     let new_cap = if cap == 0: RT_ALLOC_RANGE_CAP as i64 else: cap * 2
     let p = rt_mmap((new_cap * 16) as u64)
     if p as i64 == 0:
-        rt_exit(99)
+        rt_alloc_report_out_of_memory(new_cap * 16)
     if base != 0:
         rt_memcpy(p, base as *const u8, (count as i64) * 8)
         rt_memcpy((p as i64 + new_cap * 8) as *mut u8, (base + cap * 8) as *const u8, (count as i64) * 8)
@@ -987,6 +987,17 @@ fn rt_alloc_report_limit_exceeded(requested: i64, limit: i64):
     dbg_puts("\n" as *const u8, 1)
     rt_exit(125)
 
+// The system refused memory. Say so before exiting: a bare exit 99 left the
+// Windows c_import UATs with empty logs after the compiler grew to 29 GB
+// (#1387). Writes straight to fd 2 — the allocator cannot allocate here.
+fn rt_alloc_report_out_of_memory(requested: i64):
+    dbg_puts("with: out of memory: requested=" as *const u8, 31)
+    dbg_put_i64(requested)
+    dbg_puts(" committed=" as *const u8, 11)
+    dbg_put_i64(rt_alloc_committed_bytes)
+    dbg_puts(" bytes\n" as *const u8, 7)
+    rt_exit(99)
+
 fn rt_alloc_reserve_mmap_bytes(total: i64):
     if total <= 0:
         return
@@ -1285,7 +1296,7 @@ fn rt_alloc_unlocked(size_arg: i64) -> *mut u8:
         let p = rt_libc_malloc(total)
         if p as i64 == 0:
             rt_alloc_release_mmap_bytes(total)
-            rt_exit(99)
+            rt_alloc_report_out_of_memory(total)
         unsafe *(p as *mut i64) = size
         let payload = (p as i64 + RT_ALLOC_HEADER_SIZE) as *mut u8
         rt_memset(payload, 0, size)
@@ -1298,7 +1309,7 @@ fn rt_alloc_unlocked(size_arg: i64) -> *mut u8:
         let p = rt_mmap(total as u64)
         if p as i64 == 0:
             rt_alloc_release_mmap_bytes(total)
-            rt_exit(99)
+            rt_alloc_report_out_of_memory(total)
         // Store allocation size in header
         unsafe *(p as *mut i64) = size
         rt_record_large_range(p as i64, total)
@@ -1325,7 +1336,7 @@ fn rt_alloc_unlocked(size_arg: i64) -> *mut u8:
         let new_slab = rt_mmap(RT_PAGE_SIZE as u64)
         if new_slab as i64 == 0:
             rt_alloc_release_mmap_bytes(RT_PAGE_SIZE)
-            rt_exit(99)
+            rt_alloc_report_out_of_memory(RT_PAGE_SIZE)
         slab_ptr = new_slab as i64
         slab_remaining = RT_PAGE_SIZE
         rt_record_slab_range(slab_ptr, RT_PAGE_SIZE)
