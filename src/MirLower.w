@@ -36,6 +36,14 @@ type MirMoveStateSnapshot {
     field_path_syms: Vec[i32],
 }
 
+// The lazy fallback arm of a carrier eliminator (`??`, unwrap_or,
+// unwrap_or_else — spec §10: lazy branch selection) runs on one path only,
+// so it is framed like one of lower_if's branches (#1363).
+type MirLazyArmFrame {
+    move_state: MirMoveStateSnapshot,
+    temp_frame: i32,
+}
+
 fn mir_clone_i32_vec(values: &Vec[i32]) -> Vec[i32]:
     let out: Vec[i32] = Vec.new()
     for i in 0..values.len():
@@ -447,6 +455,38 @@ impl MirBuilder:
         self.moved_field_path_counts = mir_clone_i32_vec(&snapshot.field_path_counts)
         self.moved_field_path_kinds = mir_clone_i32_vec(&snapshot.field_path_kinds)
         self.moved_field_path_syms = mir_clone_i32_vec(&snapshot.field_path_syms)
+
+    // Open the lazy fallback arm of `??` / unwrap_or / unwrap_or_else. A value
+    // the fallback consumes (`r.unwrap_or(d)`, `o ?? d`) moves on this path
+    // only: its reset-on-move flushes inside the arm and its moved mark is
+    // forgotten after it, so the owner keeps its guarded scope-exit drop and
+    // frees the value on the path that never took it (#1363: the owned
+    // default leaked on every success path).
+    mut fn begin_lazy_arm() -> MirLazyArmFrame:
+        let move_state = self.save_move_state()
+        self.field_move_in_branch = self.field_move_in_branch + 1
+        MirLazyArmFrame { move_state, temp_frame: self.push_stmt_temp_frame() }
+
+    mut fn end_lazy_arm(frame: &MirLazyArmFrame):
+        self.finish_stmt_temp_frame(frame.temp_frame)
+        self.field_move_in_branch = self.field_move_in_branch - 1
+        self.restore_move_state(&frame.move_state)
+
+    // A carrier eliminator decomposes its materialized subject the way `?`
+    // does (#605/#606): the success arm moves the payload out, the failure
+    // arm consumes what is left (an Err payload, or nothing). The subject's
+    // own scheduled drop is retired; left live, the enum's variant-aware drop
+    // glue freed the payload the result now owns (#1042 for `??`; #1363 for
+    // unwrap_or and unwrap_or_else: `read_file(p).unwrap_or("")` returned a
+    // str over a freed buffer). Returns the subject's local, or -1 when the
+    // subject is not a plain local (nothing of ours was scheduled).
+    mut fn retire_decomposed_carrier(value_place: i32) -> i32:
+        let local = mir_place_plain_local(&self.body, value_place)
+        if local >= 0:
+            self.cancel_stmt_temp_for_local(local)
+            self.cancel_scheduled_value_drop_for_local(local)
+            self.mark_local_value_moved(local)
+        local
 
     mut fn cancel_scheduled_value_drop_for_local(local_id: i32) -> Unit:
         var i = self.drop_local_ids.len() as i32 - 1
@@ -11488,34 +11528,25 @@ impl MirBuilder:
         self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
 
         self.switch_to(none_bb)
-        // `??` decomposes its subject like `?` does (#605/#606): on the
-        // success path the payload moved out above, so the subject must not
-        // reach its scope-exit drop — the Result/Option's variant-aware drop
-        // glue freed the moved-out str again (a `read_file(p) ?? ""` result
-        // dangled over reused memory: double free in the gunzip helper). On
-        // this path nothing moved out, so the subject — an Err payload, or
-        // nothing — is dropped here, explicitly.
-        let dq_scrut_local = mir_place_plain_local(&self.body, value_place)
-        if dq_scrut_local >= 0:
+        // On this path nothing moved out, so the subject — an Err payload, or
+        // nothing — is dropped here, once; then its cleanup is retired before
+        // lowering a default that may itself return from the function.
+        if mir_place_plain_local(&self.body, value_place) >= 0:
             self.emit_drop_stmt(value_place, "coalesce-default", self.ast.get_start(expr))
-            // Both arms have decomposed the carrier: the success arm moved
-            // its payload, and this arm dropped it. Retire its cleanup before
-            // lowering a default that may itself return from the function.
-            self.cancel_stmt_temp_for_local(dq_scrut_local)
-            self.cancel_scheduled_value_drop_for_local(dq_scrut_local)
-            self.mark_local_value_moved(dq_scrut_local)
-        // #772: a stmt-temp frame + divergence guard, exactly like lower_if's
+        let dq_scrut_local = self.retire_decomposed_carrier(value_place)
+        // #772: a lazy-arm frame + divergence guard, exactly like lower_if's
         // branches. A diverging default (`?? return e`) leaves a Unit operand
         // in its unreachable continuation; assigning it into the typed join
         // result is the void-into-int/str invalid MIR the validator rejects.
-        let dq_temp_frame = self.push_stmt_temp_frame()
+        let dq_arm = self.begin_lazy_arm()
         let default_op = self.lower_expr(default_expr)
         if self.sema.body_can_fall_through(default_expr) != 0:
             self.assign_operand_to_place(result_place, default_op, self.ast.get_start(default_expr))
-        self.finish_stmt_temp_frame(dq_temp_frame)
+        self.end_lazy_arm(&dq_arm)
         self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
 
         self.switch_to(join_bb)
+        self.mark_local_value_moved(dq_scrut_local)
         self.forget_string_flow_facts()
         if self.sema.is_copy_frozen(result_ty) != 0:
             return self.body.new_operand(OperandKind.OK_COPY, result_place)
@@ -11883,7 +11914,12 @@ impl MirBuilder:
         self.assign_operand_to_place(result_place, inner_op, span)
         self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
 
+        // #1363: the Some arm moved the inner Option out (a variant-payload
+        // move registers no reset-on-move), and a None owns nothing — the
+        // subject is fully decomposed; its enum drop glue freed the payload
+        // the result owns.
         self.switch_to(join_bb)
+        self.retire_decomposed_carrier(value_place)
         self.forget_string_flow_facts()
         self.operand_for_place(result_place, result_ty)
 
@@ -12520,8 +12556,12 @@ impl MirBuilder:
             self.switch_to(some_bb)
             self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
 
+            // Nothing moves out of a Unit payload: the subject keeps its
+            // scheduled drop (an Err payload is freed at scope exit).
             self.switch_to(none_bb)
+            let unit_arm = self.begin_lazy_arm()
             let _ = self.lower_method_arg_or_unit(node, arg_start, arg_count, 0)
+            self.end_lazy_arm(&unit_arm)
             self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
 
             self.switch_to(join_bb)
@@ -12538,12 +12578,23 @@ impl MirBuilder:
         self.assign_operand_to_place(result_place, some_op, self.ast.get_start(self_expr))
         self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
 
+        // #1363: the success arm moved the payload out; the materialized
+        // subject's scope-exit drop (the enum glue) then freed it under the
+        // result — `read_file(p).unwrap_or("")` read a freed buffer. Here, on
+        // the failure path, nothing moved out: drop what is left (an Err
+        // payload, or nothing) once, and retire the subject's own drop.
         self.switch_to(none_bb)
+        if mir_place_plain_local(&self.body, value_place) >= 0:
+            self.emit_drop_stmt(value_place, "unwrap-or-default", self.ast.get_start(node))
+        let uo_scrut_local = self.retire_decomposed_carrier(value_place)
+        let uo_arm = self.begin_lazy_arm()
         let default_op = self.lower_method_arg_or_unit(node, arg_start, arg_count, 0)
         self.assign_operand_to_place(result_place, default_op, self.ast.get_start(node))
+        self.end_lazy_arm(&uo_arm)
         self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
 
         self.switch_to(join_bb)
+        self.mark_local_value_moved(uo_scrut_local)
         self.forget_string_flow_facts()
         if self.sema.is_copy_frozen(result_ty) != 0:
             return self.body.new_operand(OperandKind.OK_COPY, result_place)
@@ -12594,7 +12645,13 @@ impl MirBuilder:
         self.assign_operand_to_place(result_place, success_payload_op, span)
         self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
 
+        // #1363: both arms decompose the subject — the success arm moved the
+        // payload out, this arm moves the Err payload into the fallback (a
+        // None has none) — so its own scope-exit drop is retired; left live,
+        // the enum glue freed the payload the result owns.
         self.switch_to(failure_bb)
+        let uoe_scrut_local = self.retire_decomposed_carrier(value_place)
+        let uoe_arm = self.begin_lazy_arm()
         let call_args: Vec[i32] = Vec.new()
         if self.is_result_type(value_ty) != 0:
             let err_ty = self.generic_inst_arg_type(value_ty, self.sema.syms.result, 1)
@@ -12609,9 +12666,11 @@ impl MirBuilder:
         let lazy_exact_place = self.materialize_operand(lazy_exact_op, lazy_ty, span)
         let default_op = self.lower_contextual_join_place_arm(node, D22_JOIN_ROLE_LAZY_RESULT, lazy_exact_place, span)
         self.assign_operand_to_place(result_place, default_op, span)
+        self.end_lazy_arm(&uoe_arm)
         self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
 
         self.switch_to(join_bb)
+        self.mark_local_value_moved(uoe_scrut_local)
         self.forget_string_flow_facts()
         self.operand_for_place(result_place, result_ty)
 
@@ -13233,6 +13292,13 @@ impl MirBuilder:
                 sema_phase_bug(f"BUG: anonymous parameter lacks a concrete type: node={node} parameter={i}")
             let local = child.body.new_local(param_ty, 1, sym, 1)
             child.bind_local(sym, local)
+            // §3.8/D5: a plain `T` parameter consumes — every call site moves
+            // the argument in and blanks its source without dropping it — so
+            // the body owns it and drops what it did not move on (#1363: an
+            // unused `(_) => ""` fallback leaked the Err payload; any unused
+            // owned closure argument leaked).
+            if self.sema.is_copy_frozen(param_ty) == 0:
+                child.schedule_drop(local, DropKind.DK_VALUE)
         child.body.n_params = captures.len() + param_count
         child.expected_type = ret_ty
         let frame = child.push_stmt_temp_frame()
