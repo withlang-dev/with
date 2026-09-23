@@ -124,16 +124,24 @@ pub fn p7_build_target_args(target: &str) -> str:
 pub fn p7_build_target_no_deps_args(target: &str) -> str:
     p7_argv_append(p7_argv_append(p7_argv_append("", "build"), target), "--no-deps")
 
+// The label names the case (a mode, a target) in the failure report: a
+// runner that loops over cases and fails without saying which one sends the
+// reader back to rerun every case by hand.
 pub fn p7_assert_success(result: &P7Run, label: &str) -> Unit:
     if result.rc != 0:
+        print(f"FAILED [{label}]: rc={result.rc}")
         print("stdout:\n" ++ result.stdout)
         print("stderr:\n" ++ result.stderr)
     assert(result.rc == 0)
 
 pub fn p7_assert_failure_contains(result: &P7Run, needle: &str, label: &str) -> Unit:
-    let _ = label
+    let found = result.stderr.contains(needle) or result.stdout.contains(needle)
+    if result.rc == 0 or not found:
+        print(f"FAILED [{label}]: rc={result.rc}, expected a failure mentioning `{needle}`")
+        print("stdout:\n" ++ result.stdout)
+        print("stderr:\n" ++ result.stderr)
     assert(result.rc != 0)
-    assert(result.stderr.contains(needle) or result.stdout.contains(needle))
+    assert(found)
 
 pub fn p7_assert_file_contains(case_dir: &str, rel_path: &str, needle: &str) -> Unit:
     let text = read_file(p7_join(case_dir, rel_path)).unwrap()

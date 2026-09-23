@@ -4730,6 +4730,16 @@ impl MirBuilder:
         targets.push(pass_bb as i32)
         let table = self.body.new_switch_table(vals, targets)
         self.terminate(TermKind.TK_SWITCH_INT, disc, table, fail_bb, 0)
+        // ControlFlow has one payload per variant and each arm below moves it
+        // out (Break into from_break, Continue into the result), so branch()'s
+        // result is fully decomposed on both paths, exactly as `?` decomposes
+        // a Result. Its temp drop freed the payload again: the Break payload,
+        // now owned by the returned carrier, was freed by the return cleanup,
+        // and the Continue payload at the end of the statement — the caller
+        // read freed memory and freed it a second time. #1363's debug
+        // allocator fix made this visible (behav_return_temporary_cleanup's
+        // user-try and user-errdefer modes).
+        self.retire_decomposed_carrier(branch_place)
 
         self.switch_to(fail_bb)
         let ret_place = self.place_for_local(0)
@@ -11325,11 +11335,7 @@ impl MirBuilder:
         // out on the pass path, or into the propagated error on the fail path. Consume
         // the materialized scrutinee so the enum payload-drop does not also free the
         // extracted value (double-free).
-        let qm_scrut_local = mir_place_plain_local(&self.body, value_place)
-        if qm_scrut_local >= 0:
-            self.cancel_stmt_temp_for_local(qm_scrut_local)
-            self.cancel_scheduled_value_drop_for_local(qm_scrut_local)
-            self.mark_local_value_moved(qm_scrut_local)
+        self.retire_decomposed_carrier(value_place)
 
         let pass_bb = self.new_block()
         let fail_bb = self.new_block()
