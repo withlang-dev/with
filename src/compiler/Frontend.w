@@ -421,6 +421,11 @@ impl Zcu:
                 if fs_cached.len() > 0:
                     if self.trace_c_import_cache != 0:
                         runtime_eprint("c_import cache hit (fs)")
+                    // What the translator printed on the miss, printed again:
+                    // a header warns on every build, not only the first (#1465).
+                    let warnings = c_import_fs_cache_warnings(cache_key)
+                    if warnings.len() > 0:
+                        runtime_eprint(warnings.slice(0, warnings.len() - 1))
                     synthetic = fs_cached
                     self.c_import_cache_store(cache_key, synthetic)
                     // Populate dedup table so subsequent c_imports don't re-emit these names
@@ -465,7 +470,7 @@ impl Zcu:
                     // Store to file-system cache only when the expansion is not shaped
                     // by another c_import's dedup state.
                     if synthetic.len() > 0 and c_import_count == 1:
-                        c_import_fs_cache_store(cache_key, synthetic)
+                        c_import_fs_cache_store(cache_key, synthetic, c_import_warnings())
 
             if synthetic.len() == 0:
                 continue
@@ -889,14 +894,24 @@ fn c_import_fs_cache_lookup(cache_key: &str) -> str:
         return ""
     runtime_read_file(path)
 
-fn c_import_fs_cache_store(cache_key: &str, value: &str):
+// The warnings the translation printed (c_import_warnings), stored beside
+// it: a hit replays them, so a build prints the same thing hit or miss.
+fn c_import_fs_cache_warnings(cache_key: &str) -> str:
+    let path = c_import_fs_cache_entry_path(cache_key, ".warnings")
+    if path.len() == 0:
+        return ""
+    runtime_read_file(path)
+
+fn c_import_fs_cache_store(cache_key: &str, value: &str, warnings: &str):
     let dir = c_import_fs_cache_dir()
     if dir.len() == 0:
         return
     runtime_mkdir_p(dir)
-    // Write the manifest before the content: a partial entry then lacks the
-    // content and reads as a plain miss instead of an unvalidated hit.
+    // Write the manifest and the warnings before the content: a partial entry
+    // then lacks the content and reads as a plain miss instead of a hit that
+    // is unvalidated or silent.
     runtime_write_file(c_import_fs_cache_entry_path(cache_key, ".deps"), c_import_build_deps_manifest(c_import_included_files()))
+    runtime_write_file(c_import_fs_cache_entry_path(cache_key, ".warnings"), warnings)
     runtime_write_file(c_import_fs_cache_entry_path(cache_key, ".w"), value)
 
 impl Zcu:

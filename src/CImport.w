@@ -19,6 +19,7 @@ extern fn with_str_clone_ref(s: &str) -> str
 var g_ci_realpath_cache_paths: Vec[str] = Vec.new()
 var g_ci_realpath_cache_values: Vec[str] = Vec.new()
 var g_cimport_last_error: str = ""
+var g_cimport_warnings: str = ""
 var g_cimport_untranslated_macros: str = ""
 var g_cimport_omitted_symbol_names: Vec[str] = Vec.new()
 var g_cimport_omitted_symbol_reasons: Vec[str] = Vec.new()
@@ -243,6 +244,17 @@ fn c_import_last_error() -> str:
     // freed the global's buffer (g_cimport_included_files' large block was
     // munmapped; the cache-store reader faulted on the dangling header).
     g_cimport_last_error ++ ""
+
+// Every warning the translator prints goes through ci_warn: it is printed
+// now and kept, byte for byte, with the translation, so the persistent
+// c_import cache stores it and a hit prints it again (#1465). A warning
+// printed any other way is lost on the next build.
+fn ci_warn(message: &str):
+    eprint(message)
+    g_cimport_warnings = g_cimport_warnings ++ message ++ "\n"
+
+// What the last translation printed to stderr ("" or newline-terminated).
+fn c_import_warnings() -> str: g_cimport_warnings ++ ""
 
 fn c_import_untranslated_macros_clear():
     g_cimport_untranslated_macros = ""
@@ -549,6 +561,7 @@ fn process_c_import(header_spec: &str) -> str:
 
 fn process_c_import_with_defines(header_spec: &str, defines: &Vec[str]) -> str:
     c_import_last_error_clear()
+    g_cimport_warnings = ""
     c_import_untranslated_macros_clear()
     c_import_omitted_symbols_clear()
     c_import_included_files_clear()
@@ -3294,7 +3307,7 @@ fn ci_translate_c_expr(s: &str, params: &str, known: &str) -> str:
     let result = if trimmed.len() == 0: "" else: ci_parse_cond_expr(trimmed, params, known)
     g_ci_expr_depth = g_ci_expr_depth - 1
     if top and g_ci_expr_scanned > CI_EXPR_SCAN_BUDGET:
-        eprint(f"warning: c_import: a C expression of {s.len()} bytes exceeded the translator's scan budget ({CI_EXPR_SCAN_BUDGET} bytes); left untranslated")
+        ci_warn(f"warning: c_import: a C expression of {s.len()} bytes exceeded the translator's scan budget ({CI_EXPR_SCAN_BUDGET} bytes); left untranslated")
         return ""
     result
 
