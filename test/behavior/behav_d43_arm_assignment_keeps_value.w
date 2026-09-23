@@ -1,10 +1,11 @@
 //! expect-stdout: ok
 
-// §9.1 / D43 (Eric, 2026-09-22): an assignment is discarded only as a
-// function's or closure's own body tail. A written arm of a tail `if`/`match`
-// — bare or as an arm block's tail — keeps the place's type, so the arms join
-// as values and the function returns the assigned value. (#1319 discarded
-// every block's assignment tail; this is its narrowing.)
+// §9.1 / D43 (Eric, 2026-09-22): a written arm of a tail `if`/`match` —
+// bare or as an arm block's tail — keeps the place's type, so the arms join
+// as values and the function returns the assigned value. D60 (2026-09-23)
+// makes the body's own tail the same rule under a declared non-Unit return:
+// it yields a read of its place; only an unannotated or `-> Unit` body
+// discards its own tail assignment.
 
 var seen: i32 = 0
 var hits: i32 = 0
@@ -26,12 +27,12 @@ fn pick_match(n: i32) -> i32:
             hits += 1
             seen = 40
 
-// The body's own tail is still discarded: §4.10 supplies i32.default().
+// D60: the body's own tail under `-> i32` is a read of `seen`.
 fn body_tail -> i32:
     hits += 1
     seen = 50
 
-// A closure body block is a body too.
+// A closure body block under `fn() -> i32` is a body too.
 fn via_closure() -> i32:
     var n = 0
     let f: fn() -> i32 = () =>
@@ -46,8 +47,8 @@ fn main:
     assert(pick_match(0) == 30)
     assert(pick_match(1) == 40)
     assert(seen == 40)
-    assert(body_tail() == 0)
+    assert(body_tail() == 50)
     assert(seen == 50)
     assert(hits == 5)
-    assert(via_closure() == 0)
+    assert(via_closure() == 11)
     print("ok")

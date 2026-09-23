@@ -5756,11 +5756,18 @@ impl MirBuilder:
         self.assign_operand_to_place(place, rhs, self.ast.get_start(place_expr))
         rhs
 
-    mut fn lower_assign(place_expr: i32, rhs_expr: i32):
+    // Lowers the store of `place_expr = rhs_expr`. With `read_back` it
+    // returns the §9.1 / D60 value of a tail assignment — a read of the place
+    // after the store (read_assigned_place) — else -1.
+    mut fn lower_assign(place_expr: i32, rhs_expr: i32, read_back: bool) -> i32:
         // Multi-index assignment: a[i, j] = value → call multi_index_set
         if self.ast.kind(place_expr) == NodeKind.NK_MULTI_INDEX or self.is_runtime_pair_multi_index(place_expr) != 0:
+            // Sema types a multi-index store Unit (check_assign), so it is
+            // never a tail read.
+            if read_back:
+                sema_phase_bug(f"BUG: a multi-index assignment reached a tail read: node={place_expr}")
             self.lower_multi_index_set(place_expr, rhs_expr)
-            return
+            return -1
         if self.ast.kind(place_expr) == NodeKind.NK_INDEX:
             var ip_base_ty = self.expr_type(self.ast.get_data0(place_expr))
             while ip_base_ty > 0 and self.sema.get_type_kind(self.sema.resolve_alias(ip_base_ty)) == TypeKind.TY_REF:
@@ -5809,14 +5816,36 @@ impl MirBuilder:
                     let ret_place = self.place_for_local(0)
                     self.terminate(TermKind.TK_CALL, ip_fn_op, ip_args_id, ret_place, ip_next_bb)
                     self.switch_to(ip_next_bb)
-                    return
+                    if not read_back:
+                        return -1
+                    // The place of a user IndexPlace is its `get`: read it back
+                    // with the receiver and index this store evaluated once.
+                    let ip_recv_kind: i32 = self.body.operand_kinds[ip_recv_op]
+                    let ip_recv_place: i32 = self.body.operand_d0[ip_recv_op]
+                    if ip_recv_kind != OperandKind.OK_COPY and ip_recv_kind != OperandKind.OK_MOVE:
+                        sema_phase_bug(f"BUG: a tail read of an IndexPlace store has no receiver place: node={place_expr}")
+                    let ip_rb_sym = self.sema.pool_lookup_symbol("get")
+                    let ip_rb_fn = self.sema.lookup_method_fn(ip_type_sym, ip_rb_sym)
+                    let ip_rb_ty = self.assignment_place_value_type(place_expr)
+                    let ip_rb_args: Vec[i32] = Vec.new()
+                    ip_rb_args.push(self.body.new_operand(ip_recv_kind, ip_recv_place))
+                    ip_rb_args.push(self.body.new_operand(OperandKind.OK_COPY, ip_idx_place))
+                    let ip_rb_args_id = self.body.new_call_args(ip_rb_args)
+                    let ip_rb_tmp = self.new_temp(ip_rb_ty)
+                    let ip_rb_place = self.place_for_local(ip_rb_tmp)
+                    let ip_rb_next = self.new_block()
+                    let ip_rb_fn_op = self.const_operand(ConstKind.CK_FN, ip_rb_fn, ip_rb_ty)
+                    self.terminate(TermKind.TK_CALL, ip_rb_fn_op, ip_rb_args_id, ip_rb_place, ip_rb_next)
+                    self.switch_to(ip_rb_next)
+                    return self.read_assigned_place(place_expr, ip_rb_place)
         // §6.3 compound assignment single-evaluation: xs[f()] += g() must
         // evaluate f() and g() exactly once.  The parser desugars += to
         // NK_ASSIGN(target, NK_BINARY(op, target, rhs)) sharing the same AST
         // node for both occurrences of target.  Detect this and lower as a
         // single read-modify-write through the place.
-        if self.try_lower_string_self_concat_assign(place_expr, rhs_expr) >= 0:
-            return
+        let append_place = self.try_lower_string_self_concat_assign(place_expr, rhs_expr)
+        if append_place >= 0:
+            return if read_back: self.read_assigned_place(place_expr, append_place) else: -1
 
         if self.ast.kind(rhs_expr) == NodeKind.NK_BINARY and self.ast.get_data1(rhs_expr) == place_expr:
             let ca_op = self.ast.get_data0(rhs_expr)
@@ -5827,7 +5856,7 @@ impl MirBuilder:
             let ca_inc = self.lower_expr(ca_inc_expr)
             let ca_result = self.lower_bin_op_operand(ca_op, ca_cur, ca_inc, ca_elem_ty, self.ast.get_start(place_expr))
             self.assign_operand_to_place(ca_place, ca_result, self.ast.get_start(place_expr))
-            return
+            return if read_back: self.read_assigned_place(place_expr, ca_place) else: -1
 
         let place = self.lower_expr_place(place_expr)
         let saved_expected = self.expected_type
@@ -5840,6 +5869,40 @@ impl MirBuilder:
         let rhs = self.lower_expr(rhs_expr)
         self.expected_type = saved_expected
         let _ = self.finish_assignment_to_place(place_expr, place, dest_ty, rhs, rhs_reset_start, rhs_field_reset_start, rhs_move_temp_start)
+        if read_back: self.read_assigned_place(place_expr, place) else: -1
+
+    // §9.1 / D60: a tail assignment's value is a read of its place after the
+    // store, under the ordinary copy and move rules — exactly the operand the
+    // place spelled as the tail would lower to (lower_var, the field and
+    // deref arms of lower_expr). Sema admitted only reads those rules allow
+    // (check_tail_read_place: a global, field or element of a type that needs
+    // drop is an error there), so a whole local moves out and the rest copy.
+    mut fn read_assigned_place(place_expr: i32, place: i32) -> i32:
+        let ty = self.assignment_place_value_type(place_expr)
+        var target = place_expr
+        while target != 0 and (self.ast.kind(target) == NodeKind.NK_GROUPED or self.ast.kind(target) == NodeKind.NK_NO_SUSPEND):
+            target = self.ast.get_data0(target)
+        let local = mir_place_plain_local(&self.body, place)
+        let whole_local = local >= 0 and self.ast.kind(target) == NodeKind.NK_IDENT and self.body.local_is_global[local] == 0
+        let is_copy = self.sema.is_copy_frozen(ty) != 0
+        if whole_local:
+            if is_copy:
+                self.mark_string_base_fields_may_alias(local)
+                return self.body.new_operand(OperandKind.OK_COPY, place)
+            return self.body.new_operand(OperandKind.OK_MOVE, place)
+        // A raw pointee reads bitwise, as `unsafe *p` does; a value that owns
+        // nothing carries nothing out.
+        if not is_copy and self.assign_target_is_raw_pointer_store(place_expr) == 0 and self.sema.type_needs_drop_frozen(ty) != 0:
+            sema_phase_bug(f"BUG: a tail assignment reads an owning place Sema should have rejected: node={place_expr} type={ty}")
+        // A projected place (a field, an element, a pointee, a global) is read
+        // now, into a temp: the block's scope-exit drops run before the
+        // caller consumes the tail operand, and the base they free — the Vec
+        // behind `v[i]` — must not be read after them.
+        self.mark_string_place_copied(place)
+        let read_tmp = self.new_temp(ty)
+        let read_place = self.place_for_local(read_tmp)
+        self.assign_operand_to_place(read_place, self.body.new_operand(OperandKind.OK_COPY, place), self.ast.get_start(place_expr))
+        self.body.new_operand(if is_copy: OperandKind.OK_COPY else: OperandKind.OK_MOVE, read_place)
 
     // True when an assignment target is a direct deref or index through a
     // raw pointer (`*p = v`, `p[i] = v` with p: *const/*mut T), unwrapping
@@ -5923,7 +5986,7 @@ impl MirBuilder:
 
         if kind == NodeKind.NK_ASSIGN:
             let target = self.ast.get_data0(node)
-            self.lower_assign(target, self.ast.get_data1(node))
+            let _ = self.lower_assign(target, self.ast.get_data1(node), false)
             return self.lower_expr_place(target)
 
         if kind == NodeKind.NK_CALL:
@@ -6196,13 +6259,21 @@ impl MirBuilder:
 
         self.switch_to(cont_bb)
 
-    // A function or closure body in the value role. §9.1: an assignment in
-    // tail position is discarded, so the body yields Unit and the caller
-    // supplies the implicit result (§4.9 / §4.10) — the verdict Sema recorded
-    // in discard_body_tail (#1296). Only the body's own tail is discarded; an
-    // arm's assignment keeps its value (D43, Eric 2026-09-22).
+    // A function or closure body in the value role. §9.1: a body's own
+    // assignment tail is discarded only when the body declares no return or
+    // `Unit` — the verdict Sema recorded in discard_body_tail — so the body
+    // yields Unit and the caller supplies the implicit result (§4.9 / §4.10).
+    // Under a declared non-Unit return it is the body's value, a read of its
+    // place (D60, tail_reads_place); an arm's assignment keeps its value (D43).
     mut fn lower_tail_expr(node: i32) -> i32:
-        if self.sema.tail_is_discarded(node): self.lower_expr_discard(node) else: self.lower_expr(node)
+        if self.sema.tail_is_discarded(self.sema.fn_body_inner(node)): self.lower_expr_discard(node) else: self.lower_expr(node)
+
+    // The tail-read assignment (§9.1 / D60) a block tail spells, or 0.
+    fn tail_read_assign_node(tail: i32) -> i32:
+        var n = tail
+        while n != 0 and self.ast.kind(n) == NodeKind.NK_GROUPED:
+            n = self.ast.get_data0(n)
+        if n != 0 and self.ast.kind(n) == NodeKind.NK_ASSIGN and self.sema.tail_reads_place(n): n else: 0
 
     mut fn lower_expr_discard(node: i32) -> i32:
         if node == 0:
@@ -6328,7 +6399,7 @@ impl MirBuilder:
                 self.finish_stmt_temp_frame(stmt_frame)
                 continue
             if sk == NodeKind.NK_ASSIGN:
-                self.lower_assign(self.ast.get_data0(stmt), self.ast.get_data1(stmt))
+                let _ = self.lower_assign(self.ast.get_data0(stmt), self.ast.get_data1(stmt), false)
                 self.finish_stmt_temp_frame(stmt_frame)
                 continue
             if sk == NodeKind.NK_RETURN:
@@ -6378,11 +6449,18 @@ impl MirBuilder:
 
         var result = self.unit_operand()
         if tail_expr != 0:
-            // §9.1: a body block's assignment tail is discarded (Sema typed the
-            // body Unit); an arm block's tail is not.
+            // §9.1: a body block's assignment tail is discarded when Sema typed
+            // the body Unit; an arm block's tail is not.
             if want_result != 0 and not self.sema.tail_is_discarded(tail_expr):
-                self.cancel_scheduled_value_drop_for_receiver_expr(tail_expr)
+                // D60: a tail assignment reads its place back after the store,
+                // so the local it moves out of keeps its drop through the store
+                // (an early `?` exit in the value still frees the old value).
+                let tail_read = self.tail_read_assign_node(tail_expr)
+                if tail_read == 0:
+                    self.cancel_scheduled_value_drop_for_receiver_expr(tail_expr)
                 result = self.lower_expr(tail_expr)
+                if tail_read != 0:
+                    self.cancel_scheduled_value_drop_for_receiver_expr(self.ast.get_data0(tail_read))
                 result = self.materialize_tail_field_move(result, tail_expr)
             else:
                 let tail_frame = self.push_stmt_temp_frame()
@@ -14010,6 +14088,10 @@ impl MirBuilder:
         if kind == NodeKind.NK_ASSIGN:
             let target = self.ast.get_data0(node)
             let rhs_node = self.ast.get_data1(node)
+            // §9.1 / D60: an assignment the body returns stores as a statement
+            // does, then yields a read of its place.
+            if self.sema.tail_reads_place(node):
+                return self.lower_assign(target, rhs_node, true)
             let append_place = self.try_lower_string_self_concat_assign(target, rhs_node)
             if append_place >= 0:
                 self.mark_string_place_copied(append_place)

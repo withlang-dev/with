@@ -2427,12 +2427,20 @@ impl Sema:
         self.infer_tail_node = if body_expected_ret == 0 and self.fn_decl_is_entry_point(node) == 0: body else: 0
         self.infer_tail_is_closure = 0
         let saved_body_tail_block = self.body_tail_block
-        self.body_tail_block = body
+        let saved_body_tail_discards = self.body_tail_discards
+        let source_body = self.fn_body_inner(body)
+        self.body_tail_block = source_body
+        // §9.1 / D60: under a declared non-Unit return the body's tail
+        // assignment is its value; with no annotation (D43) or `-> Unit` it
+        // is a statement.
+        let body_tail_discards = body_expected_ret == 0 or body_expected_ret == self.ty_void
+        self.body_tail_discards = body_tail_discards
         let checked_body_ty = self.check_expr(body)
         self.body_tail_block = saved_body_tail_block
-        // §9.1: a single-statement assignment body is discarded, exactly as
+        self.body_tail_discards = saved_body_tail_discards
+        // §9.1: a single-statement assignment body is discarded exactly when
         // check_block discards the body block's assignment tail.
-        let body_ty = if self.discard_body_tail(body) != 0: self.ty_void else: checked_body_ty
+        let body_ty = if self.discard_body_tail(source_body, body_tail_discards) != 0: self.ty_void else: checked_body_ty
         self.infer_tail_node = saved_infer_tail
         self.infer_tail_is_closure = saved_infer_closure
         self.stamp_move_site_liveness(body_site_start)
@@ -2447,6 +2455,10 @@ impl Sema:
         self.expected_expr_type = saved_expected_et
         self.has_expected_type = saved_has_et
         self.typed_expr_types.insert(body, body_ty as i32)
+        // §9.1 / D60: an assignment the body returns yields a read of its
+        // place. Under a `Unit` return (declared, or a trait's contract, as
+        // for `drop`) the tail is a statement: nothing is returned or read.
+        self.record_returned_tail_reads(body, if body_expected_ret != 0: body_expected_ret as i32 else: body_ty as i32, body_ty as i32)
         // D32 (§2.2): returns do not all route through mark_moved_if_consumed,
         // so check the returned tail explicitly — a bare non-Copy field here
         // is an implicit field move and errors at the move site. Unannotated
@@ -2515,7 +2527,7 @@ impl Sema:
                             if self.types_compatible(ok_type, body_ty) != 0 or self.arithmetic_result_type(ok_type, body_ty) != 0:
                                 ok_wrapped = true
                     if not ok_wrapped:
-                        self.emit_error("return type mismatch", body)
+                        self.emit_return_mismatch("return type mismatch", body)
 
         // @[tailrec] enforcement: verify all recursive calls are in tail position
         if (flags / FnFlags.TAILREC) % 2 == 1:
@@ -5747,6 +5759,10 @@ impl Sema:
         if kind == NodeKind.NK_CAST:
             self.note_returned_place_effect(self.ast.get_data0(node), effect)
             return
+        // §9.1 / D60: a returned assignment returns a read of its place.
+        if kind == NodeKind.NK_ASSIGN and self.tail_reads_place(node):
+            self.note_returned_place_effect(self.ast.get_data0(node), effect)
+            return
         // D17: returning a non-Copy FIELD as owned takes the field (blank +
         // partial-drop machinery) and writes the root — per returned leaf, so
         // each match arm / if branch weakens by its own projection shape.
@@ -5900,17 +5916,20 @@ impl Sema:
             return self.body_return_type_info(self.ast.get_data0(node))
         info
 
-    // §9.1: an assignment is an expression typed as its place, but in
-    // statement or tail position its value is discarded (#1296) — the body is
-    // Unit and §4.9 / §4.10 supply the implicit result. "Tail position" is a
-    // function's or closure's OWN body tail: the single-statement body or the
-    // last statement of the body block (Eric, 2026-09-22, reading §9.1 with
-    // D43's pinned test). A written arm of a tail `if`/`match`, bare or as an
-    // arm block's tail, keeps the place's type and joins under D43
-    // (err_d43_cannot_infer_match.w). discard_body_tail is the one verdict:
-    // the fn body, the closure body and check_block (for body_tail_block
-    // only) ask it, and MirLower lowers exactly the recorded tails in discard
-    // mode (tail_is_discarded).
+    // §9.1: an assignment `place = value` is an expression whose type is the
+    // type of `place`. In statement position its value is discarded. As the
+    // tail of a body whose declared return type is not `Unit`, the body yields
+    // a read of `place` after the store, under the ordinary copy and move
+    // rules (D60). So a body's OWN tail assignment — the single-statement body
+    // or the last statement of the body block — is discarded only when the
+    // body has no declared return (D43 infers `Unit` from it) or declares
+    // `Unit` (body_tail_discards). A written arm of a tail `if`/`match`, bare
+    // or as an arm block's tail, keeps the place's type and joins under D43
+    // (err_d43_cannot_infer_match.w). discard_body_tail is the one discard
+    // verdict: the fn body, the closure body and check_block (for
+    // body_tail_block only) ask it, and MirLower lowers exactly the recorded
+    // tails in discard mode (tail_is_discarded). §4.10's implicit default then
+    // applies only because the tail's own type is `Unit`.
     fn expr_is_assignment(node: i32) -> i32:
         if node == 0:
             return 0
@@ -5921,13 +5940,134 @@ impl Sema:
             return self.expr_is_assignment(self.ast.get_data0(node))
         0
 
-    mut fn discard_body_tail(tail: i32) -> i32:
+    mut fn discard_body_tail(tail: i32, discards: bool) -> i32:
         if self.expr_is_assignment(tail) == 0:
             return 0
+        var assign = tail
+        while self.ast.kind(assign) == NodeKind.NK_GROUPED:
+            assign = self.ast.get_data0(assign)
+        // A body checked again under the other verdict (a closure seen first
+        // without its expected type) keeps only the latest one.
+        if not discards:
+            self.discarded_tails.remove(tail)
+            return 0
         self.discarded_tails.insert(tail, 1)
+        self.tail_read_assigns.remove(assign)
         1
 
     fn tail_is_discarded(node: i32): node != 0 and self.discarded_tails.contains(node)
+
+    // An `unsafe fn` body is its source body inside the implicit unsafe
+    // block the parser wraps it in; §9.1's tail rule reads the source body,
+    // as for every other fn (D43: body forms do not change typing).
+    fn fn_body_inner(body: i32) -> i32:
+        if body != 0 and self.ast.kind(body) == NodeKind.NK_UNSAFE_BLOCK and self.ast.get_data2(body) == UNSAFE_ORIGIN_FN_BODY: self.ast.get_data0(body) else: body
+
+    // §9.1 / D60: the assignment whose value the body returns is lowered as
+    // its store followed by a read of its place (MirLower, ComptimeEval).
+    fn tail_reads_place(node: i32): node != 0 and self.tail_read_assigns.contains(node)
+
+    fn recorded_value_type(node: i32) -> bool:
+        let ty = self.recorded_expr_type_or_zero(node)
+        ty != 0 and ty != self.ty_void as i32 and ty != self.ty_never as i32
+
+    // The body returns a value only when its return type (declared, or
+    // inferred from the tail) and its tail's type are both not Unit/Never.
+    mut fn record_returned_tail_reads(body: i32, ret_tid: i32, body_ty: i32):
+        let returns_value = ret_tid != 0 and ret_tid != self.ty_void as i32 and ret_tid != self.ty_never as i32
+        if returns_value and body_ty != 0 and body_ty != self.ty_void as i32 and body_ty != self.ty_never as i32:
+            self.record_tail_reads(body, ret_tid)
+
+    // §9.1 / D60: every assignment the body's value reaches — the body's own
+    // tail when it was not discarded, and through blocks and groupings the
+    // arms of a tail `if`/`match` that is a value — yields a read of its
+    // place after the store. Record each for the lowering and hold the read
+    // to the ordinary copy and move rules the same tail spelled as the place
+    // would meet. Runs once the body is typed: `ret_tid` is the declared or
+    // inferred non-Unit return type.
+    mut fn record_tail_reads(node: i32, ret_tid: i32):
+        if node == 0 or self.tail_is_discarded(node):
+            return
+        let kind = self.ast.kind(node)
+        if kind == NodeKind.NK_ASSIGN:
+            // A multi-index store is a `multi_index_set` call; check_assign
+            // types it Unit, so it is no value to read.
+            if self.is_runtime_multi_index_node(self.ast.get_data0(node)) != 0:
+                return
+            self.tail_read_assigns.insert(node, 1)
+            self.check_tail_read_place(node, ret_tid)
+            return
+        if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_UNSAFE_BLOCK or kind == NodeKind.NK_NO_SUSPEND:
+            self.record_tail_reads(self.ast.get_data0(node), ret_tid)
+            return
+        if kind == NodeKind.NK_BLOCK:
+            if self.recorded_value_type(node):
+                self.record_tail_reads(self.ast.get_data2(node), ret_tid)
+            return
+        if kind == NodeKind.NK_IF_EXPR:
+            // An `if` without `else` is never a value (§9.1).
+            if self.ast.get_data2(node) != 0 and self.recorded_value_type(node):
+                self.record_tail_reads(self.ast.get_data1(node), ret_tid)
+                self.record_tail_reads(self.ast.get_data2(node), ret_tid)
+            return
+        if kind == NodeKind.NK_MATCH:
+            if self.recorded_value_type(node):
+                let arm_start = self.ast.get_data1(node)
+                for ai in 0..self.ast.get_data2(node):
+                    let arm = self.ast.get_extra(arm_start + ai)
+                    self.record_tail_reads(self.ast.get_data1(arm), ret_tid)
+
+    // The ordinary rules for the read, keyed on the place: a global of a type
+    // that needs drop is never moved out of (D52, §9.1c), a field never moves
+    // out implicitly (D32, §2.2), and an element is observed, never moved out
+    // of its collection (D27) — each exactly the error the tail spelled as
+    // the place reports. A whole local moves (the body ends there); a Copy
+    // place copies. A returned view (`&T`, `*T`) reads without moving.
+    mut fn check_tail_read_place(assign: i32, ret_tid: i32):
+        var target = self.ast.get_data0(assign)
+        while target != 0 and (self.ast.kind(target) == NodeKind.NK_GROUPED or self.ast.kind(target) == NodeKind.NK_NO_SUSPEND):
+            target = self.ast.get_data0(target)
+        if target == 0 or ret_tid == 0:
+            return
+        let ret_kind = self.get_type_kind(self.resolve_alias(ret_tid as TypeId))
+        if ret_kind == TypeKind.TY_REF or ret_kind == TypeKind.TY_PTR:
+            return
+        let place_ty = self.assignment_target_value_type(target, self.recorded_expr_type_or_zero(target)) as i32
+        if place_ty == 0 or self.is_copy(place_ty as TypeId) != 0:
+            return
+        let help = "a tail assignment yields a read of its place after the store (§9.1)"
+        let tk = self.ast.kind(target)
+        if tk == NodeKind.NK_IDENT:
+            let global_opt = self.global_value_ident_nodes.get(target)
+            if global_opt.is_some() and self.type_needs_drop(place_ty) != 0:
+                self.emit_error_with_help("cannot move out of global `" ++ self.pool_resolve(global_opt.unwrap()) ++ "`: a global always holds a value; clone it (`.clone()`) instead", target, help)
+            return
+        let place = render_expr(self.ast, self.pool, target as NodeId, 0)
+        if tk == NodeKind.NK_INDEX and not self.index_expr_is_type_level(self.ast.get_data0(target)):
+            self.emit_error_with_help("cannot move out of element `" ++ place ++ "`: an element is observed, never moved out of its collection (D27); clone it (`.clone()`) instead", target, help)
+            return
+        if tk == NodeKind.NK_FIELD_ACCESS and self.returned_field_moves(target) and not self.field_move_diag_nodes.contains(target):
+            self.field_move_diag_nodes.insert(target, 1)
+            self.emit_error_with_help("a field never moves out implicitly (§2.2, D32)", target, "a tail assignment yields a read of `" ++ place ++ "` after the store (§9.1); return `" ++ place ++ ".clone()` after the assignment to keep the owner whole")
+
+    // A tail whose type does not match the declared return is an error even
+    // when it is an assignment (§4.10): report it at the assignment and name
+    // the read it yields.
+    mut fn emit_return_mismatch(msg: &str, body: i32):
+        var n = body
+        while n != 0:
+            let k = self.ast.kind(n)
+            if k == NodeKind.NK_GROUPED or k == NodeKind.NK_UNSAFE_BLOCK or k == NodeKind.NK_NO_SUSPEND:
+                n = self.ast.get_data0(n)
+            else if k == NodeKind.NK_BLOCK:
+                n = self.ast.get_data2(n)
+            else:
+                break
+        if not self.tail_reads_place(n):
+            self.emit_error(msg, body)
+            return
+        let place = render_expr(self.ast, self.pool, self.ast.get_data0(n) as NodeId, 0)
+        self.emit_error_with_help(msg, n, "the tail assignment yields a read of `" ++ place ++ "` after the store (§9.1); the implicit default applies only to a `Unit` tail (§4.10)")
 
     mut fn infer_unannotated_function_return_type(body: i32, body_ty: TypeId) -> i32:
         let info = self.body_return_type_info(body)
@@ -9430,8 +9570,10 @@ impl Sema:
             if ret_is_void and self.ast.kind(tail) == NodeKind.NK_MATCH:
                 self.match_in_stmt_pos = 1
             // §9.1: the body block's assignment tail is discarded, so the body
-            // is Unit. An arm block's tail keeps the place's type (D43).
-            let tail_discarded = node == self.body_tail_block and self.discard_body_tail(tail) != 0
+            // is Unit — unless the body declares a non-Unit return (D60), when
+            // the tail is its value. An arm block's tail keeps the place's
+            // type (D43).
+            let tail_discarded = node == self.body_tail_block and self.discard_body_tail(tail, self.body_tail_discards) != 0
             let tail_is_value = not tail_discarded and (self.current_value_expr_root == node or (self.stmt_pos_depth == 0 and self.current_return_type != 0 and self.current_return_type != self.ty_void) or (self.has_expected_type != 0 and self.expected_expr_type != 0 and self.expected_expr_type != self.ty_void))
             if tail_is_value:
                 self.current_value_expr_root = tail
@@ -10201,6 +10343,12 @@ impl Sema:
         if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_CAST or kind == NodeKind.NK_COMPTIME or kind == NodeKind.NK_UNSAFE_BLOCK or kind == NodeKind.NK_NO_SUSPEND:
             out = self.collect_expr_view_deps(self.ast.get_data0(node), move out)
             return out
+        // §9.1 / D60: an assignment's value is its stored value, which a tail
+        // reads back from the place — it views whatever either one views.
+        if kind == NodeKind.NK_ASSIGN:
+            out = self.collect_expr_view_deps(self.ast.get_data0(node), move out)
+            out = self.collect_expr_view_deps(self.ast.get_data1(node), move out)
+            return out
         // #1406 (§3.4, §21.1 rule 10, D27): an element view carries the
         // origins check_index recorded on it (record_view_producer_origins:
         // the base's own origins, else the base's root — `v` for an owned
@@ -10323,6 +10471,9 @@ impl Sema:
             return self.expr_view_origin_mask(node)
         if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_CAST or kind == NodeKind.NK_COMPTIME or kind == NodeKind.NK_UNSAFE_BLOCK or kind == NodeKind.NK_NO_SUSPEND:
             return self.compute_expr_view_origin_mask(self.ast.get_data0(node))
+        // §9.1 / D60: the stored value and the place a tail reads it back from.
+        if kind == NodeKind.NK_ASSIGN:
+            return self.compute_expr_view_origin_mask(self.ast.get_data0(node)) | self.compute_expr_view_origin_mask(self.ast.get_data1(node))
         if kind == NodeKind.NK_FIELD_ACCESS or kind == NodeKind.NK_COMPUTED_FIELD_ACCESS or kind == NodeKind.NK_INDEX:
             return self.compute_expr_view_origin_mask(self.ast.get_data0(node))
         if kind == NodeKind.NK_UNARY:
@@ -10658,6 +10809,11 @@ impl Sema:
 
     mut fn check_view_escape_origins(expr_node: i32, report_node: i32, block_scope_start: i32):
         if expr_node == 0:
+            return
+        // §9.1 / D60: a tail assignment yields a read of its place; the place
+        // carries the stored value's origins from the store on.
+        if self.ast.kind(expr_node) == NodeKind.NK_ASSIGN:
+            self.check_view_escape_origins(self.ast.get_data0(expr_node), report_node, block_scope_start)
             return
         if self.reject_view_into_temporary(expr_node, "returns") != 0:
             return
@@ -15316,15 +15472,23 @@ impl Sema:
         self.infer_tail_node = if expected_ret_ty == 0: body else: 0
         self.infer_tail_is_closure = 1
         let saved_body_tail_block = self.body_tail_block
+        let saved_body_tail_discards = self.body_tail_discards
         self.body_tail_block = body
+        // §9.1 / D60: the expected function type's result is the closure's
+        // declared return; a non-Unit one makes a tail assignment its value.
+        let body_tail_discards = expected_ret_ty == 0 or expected_ret_ty == self.ty_void as i32
+        self.body_tail_discards = body_tail_discards
         let checked_body_ty = if expected_ret_ty != 0: self.check_expr_with_expected(body, expected_ret_ty as TypeId) else: self.check_expr_value_context(body)
         self.body_tail_block = saved_body_tail_block
-        // §9.1: an assignment closure body is discarded, as in check_block; the
-        // recorded type is the verdict MirLower reads for the implicit default.
-        let body_discarded = self.discard_body_tail(body) != 0
+        self.body_tail_discards = saved_body_tail_discards
+        // §9.1: an assignment closure body is discarded exactly as check_block
+        // discards one; the recorded type is the verdict MirLower reads for
+        // the implicit default.
+        let body_discarded = self.discard_body_tail(body, body_tail_discards) != 0
         let body_ty = if body_discarded: self.ty_void else: checked_body_ty
         if body_discarded:
             self.typed_expr_types.insert(body, self.ty_void as i32)
+        self.record_returned_tail_reads(body, if expected_ret_ty != 0: expected_ret_ty else: body_ty as i32, body_ty as i32)
         self.infer_tail_node = saved_infer_tail
         self.infer_tail_is_closure = saved_infer_closure
         if expected_extern_fn != 0:
@@ -15373,14 +15537,12 @@ impl Sema:
                         let closure_ok_type = self.get_generic_inst_arg(closure_ret_resolved as i32, 0)
                         if self.types_compatible(closure_ok_type, body_ty) != 0 or self.arithmetic_result_type(closure_ok_type, body_ty) != 0:
                             closure_ok_wrapped = true
-                var closure_default_from_side_effect = false
-                if self.type_has_default_value(expected_ret_ty) != 0:
-                    for closure_bi in 0..self.bind_names.len() as i32:
-                        if self.expr_mutates_place(body, self.bind_names[closure_bi]) != 0:
-                            closure_default_from_side_effect = true
-                            break
-                if not closure_ok_wrapped and not closure_default_from_side_effect:
-                    self.emit_error("closure return type mismatch", body)
+                // §4.10: a tail of any other type than Unit is the body's
+                // value — a mismatched one is an error even when the body
+                // also mutates a capture; its value is never discarded for
+                // the implicit default.
+                if not closure_ok_wrapped:
+                    self.emit_return_mismatch("closure return type mismatch", body)
         self.pop_label_frame()
         self.emit_unused_label_warnings()
         self.restore_label_registry(saved_label_registry)
@@ -25463,10 +25625,15 @@ impl Sema:
             // either; the ident record survives the body scope's pop.
             let _ = self.reject_move_out_of_global(expr, ret_tid)
             return
-        if k != NodeKind.NK_FIELD_ACCESS:
-            return
+        if k == NodeKind.NK_FIELD_ACCESS and self.returned_field_moves(expr):
+            self.d32_emit_implicit_field_move_error(expr)
+
+    // Whether returning the field read `expr` by value moves the field out —
+    // an implicit field move (D32) unless a contextual copy, the owner's own
+    // drop, or a Copy / drop-free field makes it no move at all.
+    mut fn returned_field_moves(expr: i32) -> bool:
         if self.d32_base_is_type_name(expr) != 0:
-            return
+            return false
         // The tail call (fn-body epilogue) runs after the body block's scope
         // was popped, so helpers here must never RE-CHECK the base chain — a
         // re-check of a block-local base emits phantom "undefined variable"
@@ -25481,12 +25648,12 @@ impl Sema:
             field_ty = self.field_access_type_no_diagnostic(expr)
             self.suppress_errors = self.suppress_errors - 1
         if field_ty == 0 or self.is_copy(field_ty as TypeId) != 0 or self.type_needs_drop(field_ty) == 0:
-            return
+            return false
         if with_getenv_str("WITH_D32_DEBUG").len() > 0:
             let d32r = self.resolve_alias(field_ty as TypeId)
             with_eprint(f"[d32] arm=return node={expr} field_ty={field_ty} resolved={d32r as i32} kind={self.get_type_kind(d32r)} name={self.type_name(field_ty)}")
         if self.has_contextual_copy_adjustment(expr) != 0:
-            return
+            return false
         // §2.4: inside the owner's own drop fields are freely consumable.
         // Drop returns Unit so only check_return's call can arrive here.
         if self.current_drop_type_sym != 0:
@@ -25494,8 +25661,8 @@ impl Sema:
             let d_owner = self.drop_owner_for_field_access(expr)
             self.suppress_errors = self.suppress_errors - 1
             if d_owner == self.current_drop_type_sym:
-                return
-        self.d32_emit_implicit_field_move_error(expr)
+                return false
+        true
 
     fn drop_owner_for_fn_symbol(fn_sym: i32) -> i32:
         let text = self.pool_resolve(fn_sym)

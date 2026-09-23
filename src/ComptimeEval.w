@@ -7005,11 +7005,15 @@ impl ComptimeEvaluator:
         let value_signal = self.eval_expr(self.ast.get_data1(node))
         if value_signal.kind != ComptimeControlKind.CTL_VALUE:
             return value_signal
-        if self.ast.kind(target) == NodeKind.NK_FIELD_ACCESS:
-            return self.assign_struct_field_value(target, value_signal.value, node)
-        if self.ast.kind(target) != NodeKind.NK_IDENT:
+        let target_kind = self.ast.kind(target)
+        if target_kind != NodeKind.NK_FIELD_ACCESS and target_kind != NodeKind.NK_IDENT:
             return self.fail(node, "comptime assignment only supports local identifiers and struct fields")
-        self.assign_value(self.ast.get_data0(target), value_signal.value, node)
+        let stored = if target_kind == NodeKind.NK_FIELD_ACCESS: self.assign_struct_field_value(target, value_signal.value, node) else: self.assign_value(self.ast.get_data0(target), value_signal.value, node)
+        // §9.1 / D60: an assignment the body returns yields a read of its
+        // place after the store, as it does at runtime.
+        if stored.kind != ComptimeControlKind.CTL_VALUE or not self.sema.tail_reads_place(node):
+            return stored
+        self.eval_expr(target)
 
     mut fn eval_if(node: i32) -> ComptimeControl:
         let cond_signal = self.eval_expr(self.ast.get_data0(node))
