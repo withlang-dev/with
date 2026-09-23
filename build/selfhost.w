@@ -1260,6 +1260,13 @@ pub fn run_cli_selfhost_one_liner_action(ctx: ActionCtx) -> i32:
     rc = bs_expect_cli_input_success_exact(ctx, compiler_path, "one-liner-p-semicolon", bs_one_liner_args("-p", "line = line.upper(); line = line ++ \"!\""), "a\n", "A!")
     if rc != 0: return rc
 
+    // The code is spliced verbatim: a multi-line string literal keeps its
+    // continuation lines' bytes (#1334: each gained four spaces of indent).
+    rc = bs_expect_cli_input_success_exact(ctx, compiler_path, "one-liner-p-multiline-literal", bs_one_liner_args("-p", "line = \"a\n  b\""), "x\n", "a\n  b")
+    if rc != 0: return rc
+    rc = bs_expect_cli_input_success_exact(ctx, compiler_path, "one-liner-n-multiline-literal", bs_one_liner_args("-n", "print(\"c\nd\")"), "x\n", "c\nd")
+    if rc != 0: return rc
+
     rc = bs_expect_cli_input_success_exact(ctx, compiler_path, "one-liner-regex-numbered", bs_one_liner_args("-n", "if line =~ /error (\\d+)/: print($1)"), "error 42\n", "42")
     if rc != 0: return rc
 
@@ -1397,6 +1404,14 @@ pub fn run_cli_selfhost_one_liner_action(ctx: ActionCtx) -> i32:
     if diag_p.rc == 0:
         return bs_fail(ctx, "one-liner malformed -p unexpectedly succeeded")
     rc = bs_assert_contains(ctx, diag_p.stderr, "<cli -p #1>", "one_liners")
+    if rc != 0: return rc
+
+    // A diagnostic on a later line of the code names that line's own column
+    // (the indented splice reported `2:5` for a statement at column 1).
+    let diag_line2 = bs_run_cli_capture_input(ctx, compiler_path, "one-liner-diag-n-line2", bs_one_liner_args("-n", "var a = 1\nlet b: str = a"), "a\n", 120000)
+    if diag_line2.rc == 0:
+        return bs_fail(ctx, "one-liner with a type error on its second line unexpectedly succeeded")
+    rc = bs_assert_contains(ctx, diag_line2.stderr, "<cli -n #1>:2:1", "one_liners")
     if rc != 0: return rc
 
     let diag_capture = bs_run_cli_capture_input(ctx, compiler_path, "one-liner-diag-fstring-capture", bs_one_liner_args("-n", "if line =~ /(?<kind>error|warning) (\\d+)/: print(f\"{kind}\")"), "error 42\n", 120000)

@@ -556,16 +556,6 @@ fn cli_rewrite_semicolons(code: &str) -> str:
         out.push_str(code.slice(cursor as i64, code.len()))
     out.to_str()
 
-fn cli_indent_code(code: &str, indent: &str) -> str:
-    var out = StringBuilder.with_capacity(code.len() + indent.len())
-    out.push_str(indent)
-    for i in 0..code.len() as i32:
-        let ch = code[i]
-        out.push_str(code.slice(i as i64, (i + 1) as i64))
-        if ch == 10 and i + 1 < code.len() as i32:
-            out.push_str(indent)
-    out.to_str()
-
 // §16.5: the C header path beside an artifact (libfoo.a -> libfoo.h).
 fn c_header_path_for(artifact_path: &str) -> str:
     var dot = -1
@@ -669,30 +659,26 @@ fn cli_build_synthetic_source(one: &CliOneLiner) -> CliSyntheticSource:
             syn = cli_synthetic_add_mapping(move syn, start, rewritten, "<cli -e #" ++ f"{i + 1}" ++ ">")
         syn.source = source.to_str()
         return syn
+    // The per-line loop takes a brace body (§29.13, the same AST as the
+    // indented form), so the code is spliced verbatim at column 0. Indenting
+    // every line of it to fit an indented body also indented the continuation
+    // lines of a multi-line string literal, changing its value (#1334), and
+    // shifted every column after the first line of the code away from what
+    // its diagnostics' mapping expects.
     source.push_str("var nr: i64 = 0\n")
-    if one.mode == CliOneLinerMode.Lines:
-        source.push_str("for line in stdin.lines():\n")
-        source.push_str("    nr = nr + 1\n")
-        for i in 0..one.code_parts.len() as i32:
-            let rewritten = cli_rewrite_semicolons(one.code_parts[i])
-            let indented = cli_indent_code(rewritten, "    ")
-            let start = source.len() as i32 + 4
-            source.push_str(indented)
-            source.push_str("\n")
-            syn = cli_synthetic_add_mapping(move syn, start, rewritten, "<cli -n #" ++ f"{i + 1}" ++ ">")
-        syn.source = source.to_str()
-        return syn
-    source.push_str("for __line in stdin.lines():\n")
-    source.push_str("    nr = nr + 1\n")
-    source.push_str("    var line = __line.clone()\n")
-    for i in 0..one.code_parts.len() as i32:
+    let lines_mode = one.mode == CliOneLinerMode.Lines
+    source.push_str(if lines_mode: "for line in stdin.lines() {\n" else: "for __line in stdin.lines() {\n")
+    source.push_str("nr = nr + 1\n")
+    if not lines_mode: source.push_str("var line = __line.clone()\n")
+    let flag = if lines_mode: "-n" else: "-p"
+    for i in 0..one.code_parts.len():
         let rewritten = cli_rewrite_semicolons(one.code_parts[i])
-        let indented = cli_indent_code(rewritten, "    ")
-        let start = source.len() as i32 + 4
-        source.push_str(indented)
+        let start = source.len() as i32
+        source.push_str(rewritten)
         source.push_str("\n")
-        syn = cli_synthetic_add_mapping(move syn, start, rewritten, "<cli -p #" ++ f"{i + 1}" ++ ">")
-    source.push_str("    print(line)\n")
+        syn = cli_synthetic_add_mapping(move syn, start, rewritten, f"<cli {flag} #{i + 1}>")
+    if not lines_mode: source.push_str("print(line)\n")
+    source.push_str("}\n")
     syn.source = source.to_str()
     syn
 
