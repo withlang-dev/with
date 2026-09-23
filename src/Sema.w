@@ -1299,6 +1299,7 @@ pub type Sema {
     named_type_candidate_tids: Vec[i32],       // parallel type id for candidate
     named_type_candidate_paths: Vec[str],      // defining module path or "" for global
     named_type_candidate_pub: Vec[i32],        // parallel public flag
+    named_type_candidate_ci: Vec[i32],         // parallel: 1 when a c_import expansion declared it
     named_type_candidate_heads: HashMap[i32, i32], // symbol -> newest candidate index
     named_type_candidate_next: Vec[i32],       // previous candidate for the same symbol
     decl_visibility_syms: Vec[i32],            // top-level symbol visibility candidates
@@ -2537,6 +2538,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         named_type_candidate_tids: Vec.new(),
         named_type_candidate_paths: sema_new_vec_str(),
         named_type_candidate_pub: Vec.new(),
+        named_type_candidate_ci: Vec.new(),
         named_type_candidate_heads: sema_new_map_i32_i32(),
         named_type_candidate_next: Vec.new(),
         decl_visibility_syms: Vec.new(),
@@ -2755,7 +2757,7 @@ impl Sema:
         self.record_named_type(sym, tid)
 
     mut fn record_named_type(sym: i32, tid: i32) -> Unit:
-        self.record_named_type_with_pub(sym, tid, 1)
+        self.record_named_type_with_pub(sym, tid, 1, 0)
 
     fn named_type_candidate_head(sym: i32) -> i32:
         if self.named_type_candidate_heads.contains(sym):
@@ -2775,7 +2777,8 @@ impl Sema:
                 candidate_index,
             )
 
-    mut fn record_named_type_with_pub(sym: i32, tid: i32, is_pub: i32) -> Unit:
+    // `decl_node` is the declaring type declaration, 0 for a builtin.
+    mut fn record_named_type_with_pub(sym: i32, tid: i32, is_pub: i32, decl_node: i32) -> Unit:
         self.named_types.insert(sym, tid)
         self.index_named_type_candidate(sym, self.named_type_candidate_syms.len() as i32)
         self.named_type_candidate_syms.push(sym)
@@ -2783,6 +2786,25 @@ impl Sema:
         let path = self.current_module_path.clone()
         self.named_type_candidate_paths.push(sema_owned_text(path))
         self.named_type_candidate_pub.push(is_pub)
+        let di = if decl_node != 0: self.find_decl_index(decl_node) else: -1
+        let from_c_import = di >= 0 and di < self.decl_is_c_import.len() as i32 and self.decl_is_c_import[di] != 0
+        self.named_type_candidate_ci.push(if from_c_import: 1 else: 0)
+
+    // The modules that write `use c_import(...)`, by path symbol. Registered
+    // before declarations are collected: a c_import expansion's types are
+    // resolved during collection (#1372). build_ci_scoping adds the rest of
+    // the c_import scoping facts after collection.
+    mut fn register_c_import_modules():
+        for di in 0..self.ast.decl_count():
+            if di < self.decl_source_paths.len() as i32 and self.ast.kind(self.ast.get_decl(di)) == NodeKind.NK_C_IMPORT:
+                let path_sym = self.pool_intern(self.decl_source_paths[di])
+                self.ci_modules.insert(path_sym, 1)
+
+    fn current_module_uses_c_import() -> bool:
+        if self.current_module_path.len() == 0:
+            return false
+        let path_sym = self.pool_lookup_symbol(self.current_module_path)
+        path_sym != 0 and self.ci_modules.contains(path_sym)
 
     fn record_decl_visibility(sym: i32, node: i32, is_pub: i32) -> Unit:
         if sym == 0:
@@ -3237,6 +3259,22 @@ impl Sema:
             else if candidate_visible != 0:
                 return candidate_tid
             i = self.named_type_candidate_next[i]
+        // A module that uses c_import shares the program's C declarations,
+        // as symbol_visible_from_current already lets it for values
+        // (is_ci_visible, "a c_import symbol is visible when the current
+        // module itself uses c_import"). The frontend emits a shared C
+        // declaration once, into the first importing module, and a later
+        // importer's expansion names it: the root's <stdlib.h> named the
+        // `c_ulonglong` its imported module's <stdio.h> had emitted, and
+        // type lookup alone applied module privacy to it (#1372). A
+        // declaration visible by the ordinary rules — the module's own
+        // first (§18.1) — wins over this.
+        if self.current_module_uses_c_import():
+            i = self.named_type_candidate_head(sym)
+            while i >= 0:
+                if self.named_type_candidate_ci[i] != 0:
+                    return self.named_type_candidate_tids[i]
+                i = self.named_type_candidate_next[i]
         if gated != 0 and saw_recorded != 0:
             let bridged = self.std_fallback_bridge_path(sym)
             if bridged.len() > 0:

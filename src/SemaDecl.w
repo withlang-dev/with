@@ -237,6 +237,7 @@ impl Sema:
 
     mut fn collect_declarations():
         self.prepare_interface_demand()
+        self.register_c_import_modules()
         self.collecting_types = 1
         // Pass 1: collect named types and traits first so functions can refer
         // to imported or forward-declared types regardless of declaration order.
@@ -854,7 +855,7 @@ impl Sema:
             for fi in 0..field_count:
                 self.type_extra.push(self.ast.get_extra(align_base + fi))
             let tid = self.add_type(TypeKind.TY_STRUCT, name, te_start, field_count)
-            self.record_named_type_with_pub(name, tid as i32, decl_is_pub)
+            self.record_named_type_with_pub(name, tid as i32, decl_is_pub, node)
             self.record_type_decl_tid(node, tid as i32)
             if type_decl_is_bitpacked(packed_kind) != 0:
                 self.bitpacked_types.insert(tid as i32, 1)
@@ -908,7 +909,7 @@ impl Sema:
                     self.type_extra.push(payload_tids[payload_cursor])
                     payload_cursor = payload_cursor + 1
             let tid = self.add_type(TypeKind.TY_ENUM, name, te_start, variant_count)
-            self.record_named_type_with_pub(name, tid as i32, decl_is_pub)
+            self.record_named_type_with_pub(name, tid as i32, decl_is_pub, node)
             self.record_type_decl_tid(node, tid as i32)
             // Re-register variants with actual enum TypeId (bare + qualified names)
             let plain_type_name_str: str = with_str_clone_ref(self.pool_resolve(name))
@@ -972,7 +973,7 @@ impl Sema:
                     self.type_extra.push(payload_tids[payload_cursor])
                     payload_cursor = payload_cursor + 1
             let tid = self.add_type(TypeKind.TY_ENUM, name, te_start, variant_count)
-            self.record_named_type_with_pub(name, tid as i32, decl_is_pub)
+            self.record_named_type_with_pub(name, tid as i32, decl_is_pub, node)
             self.record_type_decl_tid(node, tid as i32)
             self.disc_repr_types.insert(tid as i32, repr_type_tid as i32)
             // Check if any variant has payloads
@@ -1011,7 +1012,7 @@ impl Sema:
             let aliased_node = self.ast.get_extra(extra_start)
             let target = self.resolve_type_expr(aliased_node)
             let tid = self.add_type(TypeKind.TY_ALIAS, target as i32, 0, 0)
-            self.record_named_type_with_pub(name, tid as i32, decl_is_pub)
+            self.record_named_type_with_pub(name, tid as i32, decl_is_pub, node)
             self.record_type_decl_tid(node, tid as i32)
 
         if sub_kind == TypeDeclKind.Distinct:
@@ -1028,7 +1029,7 @@ impl Sema:
             self.type_extra.push(inner as i32)
             self.type_extra.push(0)
             let tid = self.add_type(TypeKind.TY_STRUCT, name, te_start, 1)
-            self.record_named_type_with_pub(name, tid as i32, decl_is_pub)
+            self.record_named_type_with_pub(name, tid as i32, decl_is_pub, node)
             self.record_type_decl_tid(node, tid as i32)
             self.distinct_type_names.insert(name, tid as i32)
 
@@ -1036,7 +1037,7 @@ impl Sema:
             // Opaque type: register as struct with 0 fields
             let te_start = self.type_extra.len() as i32
             let tid = self.add_type(TypeKind.TY_STRUCT, name, te_start, 0)
-            self.record_named_type_with_pub(name, tid as i32, decl_is_pub)
+            self.record_named_type_with_pub(name, tid as i32, decl_is_pub, node)
             self.record_type_decl_tid(node, tid as i32)
 
         if sub_kind == TypeDeclKind.Union:
@@ -1068,7 +1069,7 @@ impl Sema:
             for fi in 0..field_count:
                 self.type_extra.push(self.ast.get_extra(align_base + fi))
             let tid = self.add_type(TypeKind.TY_STRUCT, name, te_start, field_count)
-            self.record_named_type_with_pub(name, tid as i32, decl_is_pub)
+            self.record_named_type_with_pub(name, tid as i32, decl_is_pub, node)
             self.record_type_decl_tid(node, tid as i32)
 
         if self.ast.is_must_use_type_node(node) != 0:
