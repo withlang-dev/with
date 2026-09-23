@@ -14,6 +14,7 @@
 use Sema
 use Ast
 use InternPool
+use Diagnostic
 use compiler.FacadeRender
 
 impl Sema:
@@ -26,6 +27,29 @@ impl Sema:
             if self.ast.kind(decl) == NodeKind.NK_C_FACADE:
                 self.collect_c_facade(di, decl)
         self.verify_facade_resources()
+        self.report_facade_layout_errors()
+        self.report_facade_borrowed_returns()
+
+    // Ruling §26 (spec §16.2b.6): `returns borrow R from param N` states that
+    // the operation's result is a borrowed `R` — no Drop, no longer than its
+    // origin, never consumed or destroyed. The facts are collected and
+    // verified (collect_fn_clause), but the surface is not rendered: the
+    // borrowed modeled value has no With type yet — `&R` needs an `R` to
+    // point at, and C returns only the representation — and that type is not
+    // ruled. The operation stays raw C, which removes capability and grants
+    // none (§16.2b.3), and the facade says so rather than staying silent.
+    mut fn report_facade_borrowed_returns():
+        for ci in 0..self.foreign_contracts.len() as i32:
+            let res = self.foreign_contracts[ci].returns_borrow_resource
+            if res == 0:
+                continue
+            self.update_decl_source_context(self.foreign_contracts[ci].decl)
+            let fname: str = self.pool_resolve(self.foreign_contracts[ci].fn_sym)
+            let rn: str = self.pool_resolve(res)
+            let from = self.foreign_contracts[ci].returns_borrow_from
+            let sig = self.get_sig(self.foreign_contracts[ci].fn_sym)
+            let shown = if sig >= 0: self.facade_param_display(self.foreign_contracts[ci].fn_sym, sig, from) else: f"param {from}"
+            self.emit_warning(f"fn '{fname}': no safe operation is rendered for 'returns borrow {rn} from param {from}' ({shown}): a borrowed '{rn}' returned by C has no With type yet — the ruling's borrowed modeled value is not ruled — so '{fname}' stays raw C (§16.2b.6)", self.foreign_contracts[ci].node)
 
     // Stage 4a/4b: the facade-level checks that need every facade's facts (an
     // fn item may describe a destroyer from a block declared after the
@@ -105,11 +129,13 @@ impl Sema:
         for di in 0..destroyer_count:
             if not self.verify_facade_destroyer(ri, self.facade_resources[ri].destroyers[di]):
                 return false
+        if not self.verify_facade_dependency(ri):
+            return false
         for pi in 0..producer_count:
             let p = self.facade_resources[ri].producers[pi]
             let slot = self.facade_resources[ri].out_params[pi]
-            // A dependent producer renders no constructor (reported below);
-            // its resource parameter is reached through dependency, never raw.
+            // A producer the renderer gives no constructor (reported below)
+            // exposes nothing to classify.
             if self.facade_producer_pending(ri, pi) == 1:
                 continue
             let pn: str = self.pool_resolve(p)
@@ -180,6 +206,8 @@ impl Sema:
     // status-returning out-parameter producer, or a status-returning `init`),
     // and whether that error can hold a failed-state resource `Failed<R>` (an
     // out-parameter producer: failure may still produce, ruling §18).
+    // A dependent resource whose failure could still produce renders no
+    // projection at all (facade_producer_pending).
     fn facade_projects_status(ri: i32) -> bool:
         if self.facade_resources[ri].ok_const == 0:
             return false
@@ -187,7 +215,7 @@ impl Sema:
         if init_fn != 0:
             let isig = self.get_sig(init_fn)
             return isig >= 0 and self.get_type_kind(self.resolve_alias(self.sig_return_type(isig) as TypeId)) != TypeKind.TY_VOID
-        self.facade_has_failed_state(ri)
+        self.facade_has_failed_state(ri) and not self.facade_resource_dependent(ri)
 
     fn facade_has_failed_state(ri: i32) -> bool:
         if self.facade_resources[ri].ok_const == 0:
@@ -207,7 +235,7 @@ impl Sema:
     // clause for that yet, so it admits none (method lookup names this).
     fn facade_failed_state_resource(type_name: &str) -> i32:
         for ri in 0..self.facade_resources.len() as i32:
-            if self.facade_has_failed_state(ri):
+            if self.facade_projects_status(ri) and self.facade_has_failed_state(ri):
                 let rname: str = self.pool_resolve(self.facade_resources[ri].name)
                 if facade_render_failed_name(rname) == type_name:
                     return ri
@@ -321,58 +349,41 @@ impl Sema:
     // Why a producer gets no constructor (FacadeRender.w
     // facade_render_producer_pending makes the same classification from the
     // AST; the renderer and this agree or the net below is loud). 0: it gets
-    // one. 1: what it produces depends on what it receives — the resource
-    // states `borrows`, or a parameter other than the out slot takes a
-    // resource's representation (unknown independence means dependency,
-    // §16.2b.6) — and dependency is not modeled yet.
+    // one. 1: under `ok`, a failure of this out-parameter producer that still
+    // produced would be owned by `<R>Error.FailedWithResource` (§16.2b.4),
+    // and a dependent resource's failed state depends on its parents too
+    // (§16.2b.6) — an `error` declaration cannot carry a dependent value, and
+    // that projection is not ruled.
     fn facade_producer_pending(ri: i32, pi: i32) -> i32:
-        if self.facade_resources[ri].borrows.len() > 0:
-            return 1
-        let p = self.facade_resources[ri].producers[pi]
-        let slot = self.facade_resources[ri].out_params[pi]
-        let sig = self.get_sig(p)
-        if sig < 0:
+        if self.facade_resources[ri].ok_const == 0 or self.facade_resources[ri].out_params[pi] < 0:
             return 0
-        for i in 0..self.sig_get_param_count(sig):
-            if i != slot and self.facade_param_takes_resource(p, i):
-                return 1
-        0
+        let sig = self.get_sig(self.facade_resources[ri].producers[pi])
+        let ret = if sig >= 0: self.sig_return_type(sig) else: 0
+        if ret == 0 or self.get_type_kind(self.resolve_alias(ret as TypeId)) == TypeKind.TY_VOID:
+            return 0
+        if self.facade_resource_dependent(ri): 1 else: 0
 
     // The constructor net: every producer of a verified resource has its
     // rendered `R.<producer>`, or is pending — then the resource says why, as
     // a warning, since the program is still correct without the constructor
     // and nothing unsafe is exposed. A producer that is neither is a renderer
-    // defect.
+    // defect. The rendered type's shape is checked against the dependency
+    // facts the same way (verify_facade_dependency_shape).
     mut fn verify_facade_constructors(ri: i32):
         let rname: str = self.pool_resolve(self.facade_resources[ri].name)
         let node = self.facade_resources[ri].node
+        let cn: str = self.pool_resolve(self.facade_resources[ri].ok_const)
         for pi in 0..self.facade_resources[ri].producers.len() as i32:
             let p = self.facade_resources[ri].producers[pi]
             let pn: str = self.pool_resolve(p)
             let pending = self.facade_producer_pending(ri, pi)
             if pending == 1:
-                let why = self.facade_dependency_reason(ri, pi)
-                self.emit_warning(f"resource '{rname}': no constructor is rendered for producer '{pn}': {why}, and a dependent resource is not modeled yet — a constructor that dropped the dependency could outlive what it depends on (§16.2b.6)", node)
+                let err = facade_render_error_name(rname)
+                self.emit_warning(f"resource '{rname}': no constructor is rendered for producer '{pn}': under 'ok {cn}' a failure that still produced a '{rname}' is owned by '{err}.FailedWithResource', and a dependent '{rname}' depends on its parents there too; an 'error' type cannot carry a dependent value, and that projection is not ruled (§16.2b.4, §16.2b.6)", node)
             else if not self.facade_constructor_rendered(ri, p):
                 self.emit_error(f"resource '{rname}': producer '{pn}' passed every facade check but no constructor '{rname}.{pn}' was rendered; the renderer cannot express this shape and did not say so — a compiler defect (§16.2b.4)", node)
-
-    // What a pending-dependency producer depends on, with the resolved C
-    // parameter (§57).
-    fn facade_dependency_reason(ri: i32, pi: i32) -> str:
-        let p = self.facade_resources[ri].producers[pi]
-        let sig = self.get_sig(p)
-        if self.facade_resources[ri].borrows.len() > 0:
-            let b = self.facade_resources[ri].borrows[0]
-            if b >= self.sig_get_param_count(sig):
-                return "the resource states 'borrows'"
-            let shown = self.facade_param_display(p, sig, b)
-            return f"the resource borrows from {shown}"
-        let slot = self.facade_resources[ri].out_params[pi]
-        for i in 0..self.sig_get_param_count(sig):
-            if i != slot and self.facade_param_takes_resource(p, i):
-                let shown = self.facade_param_display(p, sig, i)
-                return f"it receives a resource's representation ({shown}), so what it produces depends on it"
-        "it depends on what it receives"
+        self.verify_facade_dependency_shape(ri)
+        self.apply_facade_dependency_effects(ri)
 
     fn facade_constructor_rendered(ri: i32, p: i32) -> bool:
         let rname: str = self.pool_resolve(self.facade_resources[ri].name)
@@ -498,7 +509,7 @@ impl Sema:
         for i in 0..count:
             let item = self.ast.get_extra(extra_start + i)
             if self.ast.kind(item) == NodeKind.NK_FACADE_FN:
-                self.collect_facade_fn(facade, item)
+                self.collect_facade_fn(di, facade, item)
 
     mut fn collect_facade_domain(item: i32):
         let name = self.ast.get_data0(item)
@@ -522,7 +533,7 @@ impl Sema:
         let repr_tid = self.resolve_type_expr(repr_node) as i32
         if repr_tid == 0:
             return
-        var r = FacadeResource { name, facade, node: item, decl, repr_tid, producers: Vec.new(), out_params: Vec.new(), init: 0, preinit: 0, drop: 0, destroyers: Vec.new(), ok_const: 0, borrows: Vec.new(), independent: 0, movable: 0, thread_caps: 0 }
+        var r = FacadeResource { name, facade, node: item, decl, repr_tid, producers: Vec.new(), out_params: Vec.new(), init: 0, preinit: 0, drop: 0, destroyers: Vec.new(), ok_const: 0, borrows: Vec.new(), borrows_owner: Vec.new(), borrows_nodes: Vec.new(), last_producer: -2, independent: 0, independent_node: 0, movable: 0, thread_caps: 0 }
         for ci in 0..clause_count:
             let clause = self.ast.get_extra(extra_start + 1 + ci)
             r = self.collect_resource_clause(rname, move r, clause)
@@ -543,6 +554,7 @@ impl Sema:
             // `from` is one constructor over the same destruction contract.
             r.producers.push(producer)
             r.out_params.push(-1)
+            r.last_producer = r.producers.len() as i32 - 1
             let out_ref = self.ast.get_extra(ops + 1)
             if out_ref != 0:
                 let pi = self.facade_resolve_param(out_ref, producer, sig)
@@ -598,7 +610,9 @@ impl Sema:
                 let fnm: str = self.pool_resolve(f)
                 self.emit_error(f"resource '{rname}': '{fnm}' does not take the representation as its first parameter (§16.2b.13)", clause)
                 return r
-            if kind == FACADE_CLAUSE_INIT: r.init = f
+            if kind == FACADE_CLAUSE_INIT:
+                r.init = f
+                r.last_producer = FACADE_DEP_INIT
             else if kind == FACADE_CLAUSE_DROP: r.drop = f
             else: r.destroyers.push(f)
             return r
@@ -611,18 +625,35 @@ impl Sema:
             r.ok_const = c
             return r
         if kind == FACADE_CLAUSE_BORROWS:
-            // `borrows` names a parameter of the `from` it follows.
-            if r.producers.len() == 0:
-                self.emit_error(f"resource '{rname}': 'borrows' names a parameter of the producer; state 'from <producer>' first (§16.2b.6)", clause)
+            // `borrows` names a parameter of the producer stated before it:
+            // a `from`, or the `init` (spec §16.2b.6 — "a facade may make the
+            // relationship precise").
+            if r.last_producer == -2:
+                self.emit_error(f"resource '{rname}': 'borrows' names a parameter of the producer; state 'from <producer>' first, or 'init <fn>(self)' (§16.2b.6)", clause)
                 return r
-            let producer = r.producers[r.producers.len() as i32 - 1]
+            let producer = if r.last_producer == FACADE_DEP_INIT: r.init else: r.producers[r.last_producer]
             let sig = self.get_sig(producer)
+            if sig < 0:
+                return r
             let pi = self.facade_resolve_param(self.ast.get_extra(ops), producer, sig)
-            if pi >= 0:
-                r.borrows.push(pi)
+            if pi < 0:
+                return r
+            let shown = self.facade_param_display(producer, sig, pi)
+            let pn: str = self.pool_resolve(producer)
+            let slot = if r.last_producer == FACADE_DEP_INIT: 0 else: r.out_params[r.last_producer]
+            if pi == slot:
+                let what = if r.last_producer == FACADE_DEP_INIT: "the storage 'init' initializes" else: "the out parameter the resource is produced through"
+                self.emit_error(f"resource '{rname}': 'borrows' names {shown} of '{pn}', {what}; 'borrows' names a parent resource the producer receives (§16.2b.6)", clause)
+                return r
+            // That the parameter receives a modeled resource is verified once
+            // every facade's resources are known (verify_facade_dependency).
+            r.borrows.push(pi)
+            r.borrows_owner.push(r.last_producer)
+            r.borrows_nodes.push(clause)
             return r
         if kind == FACADE_CLAUSE_INDEPENDENT:
             r.independent = 1
+            r.independent_node = clause
             return r
         if kind == FACADE_CLAUSE_MOVABLE:
             r.movable = 1
@@ -644,7 +675,7 @@ impl Sema:
 
     // ── fn items ─────────────────────────────────────────────────────────
 
-    mut fn collect_facade_fn(facade: i32, item: i32):
+    mut fn collect_facade_fn(decl: i32, facade: i32, item: i32):
         let fn_sym = self.ast.get_data0(item)
         let fname: str = self.pool_resolve(fn_sym)
         let sig = self.facade_fn_sig(fn_sym, item)
@@ -653,7 +684,7 @@ impl Sema:
         if self.foreign_contract_index.contains(fn_sym):
             self.emit_error(f"fn '{fname}' is described twice in this facade (§16.2b)", item)
             return
-        var c = ForeignContract { fn_sym, facade, node: item, lend: 0, destroys: 0, consumes: Vec.new(), consumes_destroyed_by: Vec.new(), retains: Vec.new(), retains_by: Vec.new(), returns_borrow_resource: 0, returns_borrow_from: -1, returns_static_tid: 0, preserves_params: Vec.new(), preserves_domains: Vec.new(), of_resource: 0, rename: 0, callback_thread_any: 0, callback_consumes: Vec.new() }
+        var c = ForeignContract { fn_sym, decl, facade, node: item, lend: 0, destroys: 0, consumes: Vec.new(), consumes_destroyed_by: Vec.new(), retains: Vec.new(), retains_by: Vec.new(), returns_borrow_resource: 0, returns_borrow_from: -1, returns_static_tid: 0, preserves_params: Vec.new(), preserves_domains: Vec.new(), of_resource: 0, rename: 0, callback_thread_any: 0, callback_consumes: Vec.new() }
         let extra_start = self.ast.get_data1(item)
         let clause_count = self.ast.get_data2(item)
         for ci in 0..clause_count:
@@ -1044,10 +1075,509 @@ impl Sema:
         for pi in 0..self.sig_get_param_count(sig):
             if pi == repr_param:
                 continue
+            // A parameter receiving another resource is presented as a
+            // borrow of it (FacadeRender.w facade_render_params_but).
+            if self.facade_param_presentable(fn_sym, pi):
+                continue
             let pty = self.sig_param_type(sig, pi)
             if self.ci_type_requires_raw_contract(pty) != 0 and self.ci_type_is_const_c_string_input(pty) == 0 and not self.facade_covers_param(fn_sym, pi):
                 return true
         false
+
+// ── stage 6: dependency (ruling §26-§30, spec §16.2b.6) ─────────────────
+//
+// A producer that receives modeled resources produces a resource dependent
+// on them, unless the facade says otherwise: "unknown independence means
+// dependency" (a wrong dependency only rejects programs, ruling §27).
+// `independent` states the resource depends on nothing it was made from;
+// `borrows param N` names exactly what one producer's result depends on
+// (the producer stated before it, a `from` or the `init`). The renderer
+// (compiler/FacadeRender.w facade_render_deps) makes the same
+// classification from the AST and renders a dependent resource as an
+// ephemeral struct holding a view of each parent, so the ordinary origin
+// and ephemeral analysis (§21.1, §22) enforces it; nothing new is added to
+// that analysis. What this section adds is the §61 verification, the net
+// under the renderer, and the provenance every dependency diagnostic
+// prints (§8, §57).
+
+impl Sema:
+    // The resources whose representation parameter `pi` of `fn_sym`
+    // receives (FacadeRender.w facade_render_received): a pointer resource's
+    // handle or an in-place resource's storage, by value or by address — the
+    // line facade_param_takes_resource draws. A by-value token is not
+    // recognized by its type (`int` is an `Fd` and every other integer).
+    fn facade_param_receives(fn_sym: i32, pi: i32) -> Vec[i32]:
+        let out: Vec[i32] = Vec.new()
+        let sig = self.get_sig(fn_sym)
+        if sig < 0 or pi < 0 or pi >= self.sig_get_param_count(sig):
+            return out
+        let p = self.resolve_alias(self.sig_param_type(sig, pi) as TypeId)
+        let pointee = if self.get_type_kind(p) == TypeKind.TY_PTR: self.get_type_d0(p) else: 0
+        for i in 0..self.facade_resources.len() as i32:
+            let repr = self.resolve_alias(self.facade_resources[i].repr_tid as TypeId)
+            if self.get_type_kind(repr) != TypeKind.TY_PTR and self.facade_resources[i].init == 0:
+                continue
+            if self.facade_same_type(p as i32, repr as i32) or (pointee != 0 and self.facade_same_type(pointee, repr as i32)):
+                out.push(i)
+        out
+
+    // Whether a borrow `&R` of resource `ri` can hand parameter `pi` what C
+    // declares (FacadeRender.w facade_render_received_arg): the
+    // representation of a pointer resource or by-value token, the cell of a
+    // pinned in-place resource, or a movable one through a const pointer.
+    fn facade_received_presentable(ri: i32, fn_sym: i32, pi: i32) -> bool:
+        let sig = self.get_sig(fn_sym)
+        let p = self.resolve_alias(self.sig_param_type(sig, pi) as TypeId)
+        let repr = self.resolve_alias(self.facade_resources[ri].repr_tid as TypeId)
+        let pinned = self.facade_resources[ri].init != 0 and self.facade_resources[ri].movable == 0
+        if self.facade_same_type(p as i32, repr as i32):
+            return not pinned
+        if self.get_type_kind(repr) == TypeKind.TY_PTR:
+            return false
+        if pinned:
+            return true
+        self.get_type_d1(p) == 0
+
+    // Why a borrow cannot present that parameter, for the diagnostic.
+    fn facade_received_unpresentable_reason(ri: i32, fn_sym: i32, pi: i32) -> str:
+        let sig = self.get_sig(fn_sym)
+        let p = self.resolve_alias(self.sig_param_type(sig, pi) as TypeId)
+        let repr = self.resolve_alias(self.facade_resources[ri].repr_tid as TypeId)
+        let rname: str = self.pool_resolve(self.facade_resources[ri].name)
+        if self.facade_same_type(p as i32, repr as i32):
+            return f"'{rname}' is pinned in place, and a copy of its representation is not the resource (§16.2b.3)"
+        if self.get_type_kind(repr) == TypeKind.TY_PTR:
+            return f"it points at '{rname}''s handle, through which C could replace or release it"
+        f"it is a mutable pointer to '{rname}''s movable representation, which a shared borrow cannot hand out"
+
+    fn facade_param_presentable(fn_sym: i32, pi: i32) -> bool:
+        let recv = self.facade_param_receives(fn_sym, pi)
+        recv.len() == 1 and self.facade_received_presentable(recv[0], fn_sym, pi)
+
+    // A resource's producers, as owners of dependencies: each `from` by its
+    // index, and the `init` as FACADE_DEP_INIT.
+    fn facade_owners(ri: i32) -> Vec[i32]:
+        let out: Vec[i32] = Vec.new()
+        for pi in 0..self.facade_resources[ri].producers.len() as i32:
+            out.push(pi)
+        if self.facade_resources[ri].init != 0:
+            out.push(FACADE_DEP_INIT)
+        out
+
+    fn facade_owner_fn(ri: i32, owner: i32) -> i32: if owner == FACADE_DEP_INIT: self.facade_resources[ri].init else: self.facade_resources[ri].producers[owner]
+
+    // The parameter an owner never receives a parent through: the out slot,
+    // or the storage `init` initializes.
+    fn facade_owner_skip(ri: i32, owner: i32) -> i32: if owner == FACADE_DEP_INIT: 0 else: self.facade_resources[ri].out_params[owner]
+
+    // The parameters producer `owner`'s result depends on (spec §16.2b.6):
+    // none under `independent`, the ones its `borrows` clauses name, and
+    // otherwise every parameter receiving a resource.
+    fn facade_producer_parents(ri: i32, owner: i32) -> Vec[i32]:
+        let out: Vec[i32] = Vec.new()
+        if self.facade_resources[ri].independent != 0:
+            return out
+        var stated = false
+        for bi in 0..self.facade_resources[ri].borrows.len() as i32:
+            if self.facade_resources[ri].borrows_owner[bi] == owner:
+                stated = true
+                out.push(self.facade_resources[ri].borrows[bi])
+        if stated:
+            return out
+        let f = self.facade_owner_fn(ri, owner)
+        let sig = self.get_sig(f)
+        if sig < 0:
+            return out
+        let skip = self.facade_owner_skip(ri, owner)
+        for pi in 0..self.sig_get_param_count(sig):
+            if pi != skip and self.facade_param_receives(f, pi).len() > 0:
+                out.push(pi)
+        out
+
+    fn facade_resource_dependent(ri: i32) -> bool:
+        let owners = self.facade_owners(ri)
+        for oi in 0..owners.len() as i32:
+            if self.facade_owner_fn(ri, owners[oi]) != 0 and self.facade_producer_parents(ri, owners[oi]).len() > 0:
+                return true
+        false
+
+    // The clause that states producer `owner`'s dependency on parameter
+    // `pi`, or 0 for the conservative default.
+    fn facade_borrows_clause(ri: i32, owner: i32, pi: i32) -> i32:
+        for bi in 0..self.facade_resources[ri].borrows.len() as i32:
+            if self.facade_resources[ri].borrows_owner[bi] == owner and self.facade_resources[ri].borrows[bi] == pi:
+                return self.facade_resources[ri].borrows_nodes[bi]
+        0
+
+    // Ruling §61 for dependency: the facts are consistent, every `borrows`
+    // names a parameter receiving a resource, and every resource a producer
+    // receives is one known resource a borrow can present — the constructor
+    // takes `&P` for it (§16.2b.3: an unassigned representation is rejected,
+    // naming the candidates).
+    mut fn verify_facade_dependency(ri: i32) -> bool:
+        let rname: str = self.pool_resolve(self.facade_resources[ri].name)
+        let node = self.facade_resources[ri].node
+        if self.facade_resources[ri].independent != 0 and self.facade_resources[ri].borrows.len() > 0:
+            self.emit_error_with_help(f"resource '{rname}' states both 'independent' and 'borrows'; 'independent' says it depends on nothing its producers receive, 'borrows' names what it depends on (§16.2b.6)", self.facade_resources[ri].independent_node, "keep 'borrows' if the resource depends on the parameters it names, 'independent' if the C API guarantees it depends on nothing it was made from")
+            return false
+        for bi in 0..self.facade_resources[ri].borrows.len() as i32:
+            let owner = self.facade_resources[ri].borrows_owner[bi]
+            let f = self.facade_owner_fn(ri, owner)
+            let pi = self.facade_resources[ri].borrows[bi]
+            if self.facade_param_receives(f, pi).len() == 0:
+                let sig = self.get_sig(f)
+                let shown = self.facade_param_display(f, sig, pi)
+                let pn: str = self.pool_resolve(f)
+                self.emit_error(f"resource '{rname}': 'borrows' names {shown} of '{pn}', which receives no modeled resource; a resource depends on the parent resources its producer receives, and With does not invent an origin for anything else (§16.2b.6, §16.2b.7)", self.facade_resources[ri].borrows_nodes[bi])
+                return false
+        let owners = self.facade_owners(ri)
+        for oi in 0..owners.len() as i32:
+            let owner = owners[oi]
+            let f = self.facade_owner_fn(ri, owner)
+            let sig = self.get_sig(f)
+            if f == 0 or sig < 0:
+                continue
+            let pn: str = self.pool_resolve(f)
+            let skip = self.facade_owner_skip(ri, owner)
+            for pi in 0..self.sig_get_param_count(sig):
+                if pi == skip:
+                    continue
+                let recv = self.facade_param_receives(f, pi)
+                if recv.len() == 0:
+                    continue
+                let shown = self.facade_param_display(f, sig, pi)
+                if recv.len() > 1:
+                    var names = ""
+                    for k in 0..recv.len() as i32:
+                        let cn: str = self.pool_resolve(self.facade_resources[recv[k]].name)
+                        names = names ++ (if k > 0: ", " else: "") ++ f"'{cn}'"
+                    self.emit_error(f"resource '{rname}': producer '{pn}' receives {shown}, a representation several resources wrap ({names}); the constructor cannot tell which resource it borrows (§16.2b.3)", node)
+                    return false
+                if not self.facade_received_presentable(recv[0], f, pi):
+                    let why = self.facade_received_unpresentable_reason(recv[0], f, pi)
+                    let cn: str = self.pool_resolve(self.facade_resources[recv[0]].name)
+                    self.emit_error(f"resource '{rname}': producer '{pn}' receives {shown}, which a borrow of '{cn}' cannot hand to C: {why} (§16.2b.6)", node)
+                    return false
+        let preinit_fn = self.facade_resources[ri].preinit
+        if preinit_fn != 0:
+            let psig = self.get_sig(preinit_fn)
+            for pi in 0..self.sig_get_param_count(psig):
+                if self.facade_param_receives(preinit_fn, pi).len() > 0:
+                    let shown = self.facade_param_display(preinit_fn, psig, pi)
+                    let pn: str = self.pool_resolve(preinit_fn)
+                    self.emit_error(f"resource '{rname}': 'preinit {pn}' receives {shown}; preinit only constructs storage, and a resource an in-place resource depends on is received by its 'init' (§16.2b.4, §16.2b.6)", node)
+                    return false
+        true
+
+    // The plan's one gap: "the producer call publishes the parent origin onto
+    // the binding". A constructor's call site ties its result to the
+    // arguments through the constructor's effect summary (a parameter that
+    // escapes as a view, and its origin — §21.1 Rule 6), and that summary is
+    // inferred from the body when the body is checked. The rendered
+    // constructors are spliced after every user declaration, so every call
+    // is checked before the body it calls: the summary was empty and the
+    // dependency unenforced. The facade states the dependency, so the
+    // signature carries it as a declared summary, the way an interface
+    // declaration's origin is declared (D39, apply_interface_declared_effects):
+    // each parent parameter escapes as a view of itself. The body, checked
+    // later, infers the same summary from `R { parent: p, … }`.
+    mut fn apply_facade_dependency_effects(ri: i32):
+        let rname: str = self.pool_resolve(self.facade_resources[ri].name)
+        let owners = self.facade_owners(ri)
+        for oi in 0..owners.len() as i32:
+            let owner = owners[oi]
+            let f = self.facade_owner_fn(ri, owner)
+            let parents = self.facade_producer_parents(ri, owner)
+            if f == 0 or parents.len() == 0:
+                continue
+            let pn: str = self.pool_resolve(f)
+            let sig = self.facade_constructor_sig(rname ++ "." ++ pn)
+            if sig < 0:
+                continue
+            // The constructor's parameters are C's, less the out slot; an
+            // in-place constructor's are preinit's, then init's after `self`.
+            var shift = 0
+            if owner == FACADE_DEP_INIT and self.facade_resources[ri].preinit != 0:
+                shift = self.sig_get_param_count(self.get_sig(self.facade_resources[ri].preinit))
+            let slot = self.facade_owner_skip(ri, owner)
+            for k in 0..parents.len() as i32:
+                let c_pi: i32 = parents[k]
+                var pi = c_pi
+                if owner == FACADE_DEP_INIT:
+                    pi = shift + c_pi - 1
+                else if slot >= 0 and c_pi > slot:
+                    pi = c_pi - 1
+                let eff = self.sig_param_effect(sig, pi) | EFF_ESCAPE_VIEW
+                self.set_sig_param_effect(sig, pi, eff)
+                self.set_sig_param_direct_effect(sig, pi, eff)
+                self.set_sig_param_view_origin(sig, pi, self.sig_param_view_origin(sig, pi) | sema_param_origin_bit(pi))
+
+    // The signature of a rendered constructor `R.p`, or -1.
+    fn facade_constructor_sig(want: &str) -> i32:
+        for di in 0..self.ast.decl_count():
+            let decl = self.ast.get_decl(di)
+            if self.ast.kind(decl) == NodeKind.NK_FN_DECL and self.safe_symbol_text(self.ast.get_data0(decl)) == want:
+                return self.get_sig(self.fn_decl_semantic_symbol(decl, self.ast.get_data0(decl)))
+        -1
+
+    // The net under the renderer: a dependent resource was rendered as an
+    // ephemeral struct, an independent one as an ordinary one. A
+    // disagreement means the renderer and these facts classified the
+    // producers differently, and the analysis would enforce the wrong thing.
+    mut fn verify_facade_dependency_shape(ri: i32):
+        let name = self.facade_resources[ri].name
+        let dependent = self.facade_resource_dependent(ri)
+        for di in 0..self.ast.decl_count():
+            let decl = self.ast.get_decl(di)
+            if self.ast.kind(decl) != NodeKind.NK_TYPE_DECL or self.ast.get_data0(decl) != name:
+                continue
+            let packed = self.ast.get_data2(decl)
+            if type_decl_sub_kind(packed) != TypeDeclKind.Struct as i32:
+                continue
+            let rendered_ephemeral = type_decl_is_ephemeral(packed) != 0
+            if rendered_ephemeral != dependent:
+                let rname: str = self.pool_resolve(name)
+                let says = if dependent: "depends on what its producers receive" else: "depends on nothing its producers receive"
+                self.emit_error(f"resource '{rname}' {says}, but its rendered type disagrees; the renderer and the dependency facts classified its producers differently — a compiler defect (§16.2b.6)", self.facade_resources[ri].node)
+            return
+
+    // The dependent resource a type carries — itself, or inside an
+    // `Option`, `Result`, tuple, collection or reference — or -1.
+    fn facade_dependent_resource_in(tid: i32, depth: i32) -> i32:
+        if tid <= 0 or depth > 6 or self.facade_resources.len() == 0:
+            return -1
+        let r = self.resolve_alias(tid as TypeId)
+        let kind = self.get_type_kind(r)
+        let name = self.get_type_name(r)
+        if name != 0 and self.facade_resource_index.contains(name):
+            let ri: i32 = self.facade_resource_index.get(name).unwrap()
+            if self.facade_resource_dependent(ri):
+                return ri
+        if kind == TypeKind.TY_GENERIC_INST:
+            for ai in 0..self.get_generic_inst_arg_count(r as i32):
+                let found = self.facade_dependent_resource_in(self.get_generic_inst_arg(r as i32, ai), depth + 1)
+                if found >= 0:
+                    return found
+        else if kind == TypeKind.TY_TUPLE:
+            let te_start = self.get_type_d0(r)
+            for ei in 0..self.get_type_d1(r):
+                let found = self.facade_dependent_resource_in(self.type_extra[(te_start + ei)], depth + 1)
+                if found >= 0:
+                    return found
+        else if kind == TypeKind.TY_REF or kind == TypeKind.TY_ARRAY:
+            return self.facade_dependent_resource_in(self.get_type_d0(r), depth + 1)
+        -1
+
+    // A facade `param` reference as written: `param 0`, `param db`,
+    // `param type *mut sqlite3`.
+    fn facade_param_ref_text(ref_node: i32, f: i32, pi: i32) -> str:
+        let rk = self.ast.get_data0(ref_node)
+        if rk == FACADE_PARAM_REF_INDEX or rk == FACADE_PARAM_REF_NAME:
+            let t: str = self.pool_resolve(self.ast.get_data1(ref_node))
+            return "param " ++ t
+        "param type " ++ self.type_name(self.sig_param_type(self.get_sig(f), pi))
+
+    // What a dependent resource depends on and why (§8, §57): for each
+    // parent, the producer receiving it with the resolved C parameter, and
+    // the evidence — the facade clause stating it, or the conservative
+    // default.
+    fn facade_dependency_notes(ri: i32) -> Vec[str]:
+        let out: Vec[str] = Vec.new()
+        let rname: str = self.pool_resolve(self.facade_resources[ri].name)
+        let fname: str = self.pool_resolve(self.facade_resources[ri].facade)
+        let owners = self.facade_owners(ri)
+        for oi in 0..owners.len() as i32:
+            let owner = owners[oi]
+            let f = self.facade_owner_fn(ri, owner)
+            let sig = self.get_sig(f)
+            if f == 0 or sig < 0:
+                continue
+            let pn: str = self.pool_resolve(f)
+            let parents = self.facade_producer_parents(ri, owner)
+            for k in 0..parents.len() as i32:
+                let pi = parents[k]
+                let recv = self.facade_param_receives(f, pi)
+                if recv.len() == 0:
+                    continue
+                let parent: str = self.pool_resolve(self.facade_resources[recv[0]].name)
+                let shown = self.facade_param_display(f, sig, pi)
+                let clause = self.facade_borrows_clause(ri, owner, pi)
+                let evidence = if clause != 0: "stated by 'borrows " ++ self.facade_param_ref_text(self.ast.get_extra(self.ast.get_data1(clause)), f, pi) ++ f"' in facade {fname}" else: f"conservative default of facade {fname}: unknown independence means dependency"
+                out.push(f"dependency: '{rname}' depends on '{parent}', which producer '{pn}' receives as {shown} — {evidence} (§16.2b.6)")
+        out
+
+    // The fix a conservative dependency admits (§8: "declare this producer
+    // independent if the C API guarantees independence"), or "" when every
+    // dependency is stated by `borrows`.
+    fn facade_dependency_help(ri: i32) -> str:
+        let owners = self.facade_owners(ri)
+        for oi in 0..owners.len() as i32:
+            let parents = self.facade_producer_parents(ri, owners[oi])
+            for k in 0..parents.len() as i32:
+                if self.facade_borrows_clause(ri, owners[oi], parents[k]) == 0:
+                    let rname: str = self.pool_resolve(self.facade_resources[ri].name)
+                    let fname: str = self.pool_resolve(self.facade_resources[ri].facade)
+                    return f"if the C API guarantees '{rname}' does not depend on the resources its producers receive, state 'independent' on resource '{rname}' in facade {fname}; if it depends on only some of them, name those with 'borrows param N'"
+        ""
+
+    // Ruling §30 (spec §16.2b.6): an ephemeral value stored where it cannot
+    // live is the general §5 error — unless its ephemerality comes from a
+    // facade resource, which is the self-referential layout the ruling names
+    // (`type App { db: Database, stmt: Statement }`). That one is reported
+    // with the dependency's provenance and a fix, which needs the facade
+    // facts, and declarations are checked before the facades are collected:
+    // it waits for report_facade_layout_errors. `container` is the declaring
+    // node (a type or a global), for the fix.
+    mut fn emit_ephemeral_storage_error(msg: &str, node: i32, tid: i32, container: i32):
+        if self.suppress_errors != 0:
+            return
+        if tid <= 0 or not self.type_mentions_facade_rendered(tid, 0):
+            self.emit_error(msg, node)
+            return
+        for i in 0..self.facade_layout_nodes.len() as i32:
+            if self.facade_layout_nodes[i] == node:
+                return
+        if self.facade_resources.len() > 0:
+            // The facts exist already (a local declaration inside a body).
+            self.emit_facade_layout_error(msg, node, tid, container)
+            return
+        self.facade_layout_nodes.push(node)
+        self.facade_layout_tids.push(tid)
+        self.facade_layout_containers.push(container)
+        self.facade_layout_files.push(self.local_file_id)
+        self.facade_layout_msgs.push(with_str_clone_ref(msg))
+
+    // Whether a type is, or carries, one a facade block rendered (read from
+    // the declarations' files, since the facade facts may not exist yet).
+    fn type_mentions_facade_rendered(tid: i32, depth: i32) -> bool:
+        if tid <= 0 or depth > 6:
+            return false
+        let r = self.resolve_alias(tid as TypeId)
+        let kind = self.get_type_kind(r)
+        let name = self.get_type_name(r)
+        if name != 0:
+            for di in 0..self.ast.decl_count():
+                let decl = self.ast.get_decl(di)
+                if self.ast.kind(decl) == NodeKind.NK_TYPE_DECL and self.ast.get_data0(decl) == name and self.facade_decl_file_name(di).starts_with("<facade "):
+                    return true
+        if kind == TypeKind.TY_GENERIC_INST:
+            for ai in 0..self.get_generic_inst_arg_count(r as i32):
+                if self.type_mentions_facade_rendered(self.get_generic_inst_arg(r as i32, ai), depth + 1):
+                    return true
+        else if kind == TypeKind.TY_TUPLE:
+            let te_start = self.get_type_d0(r)
+            for ei in 0..self.get_type_d1(r):
+                if self.type_mentions_facade_rendered(self.type_extra[(te_start + ei)], depth + 1):
+                    return true
+        else if kind == TypeKind.TY_REF or kind == TypeKind.TY_ARRAY:
+            return self.type_mentions_facade_rendered(self.get_type_d0(r), depth + 1)
+        false
+
+    mut fn report_facade_layout_errors():
+        let saved_file = self.local_file_id
+        for i in 0..self.facade_layout_nodes.len() as i32:
+            self.local_file_id = self.facade_layout_files[i]
+            self.emit_facade_layout_error(self.facade_layout_msgs[i], self.facade_layout_nodes[i], self.facade_layout_tids[i], self.facade_layout_containers[i])
+        self.local_file_id = saved_file
+        self.facade_layout_nodes.clear()
+
+    // The §30 error: what the stored resource depends on and why, and — for
+    // a struct — the fix that compiles: hold each parent by borrow in an
+    // ephemeral struct, so the struct lives no longer than the parents.
+    mut fn emit_facade_layout_error(msg: &str, node: i32, tid: i32, container: i32):
+        let ri = self.facade_dependent_resource_in(tid, 0)
+        if ri < 0:
+            // Not a dependent resource after all (a facade that failed its
+            // checks renders nothing it could depend on): the general error.
+            self.emit_error(msg, node)
+            return
+        let rname: str = self.pool_resolve(self.facade_resources[ri].name)
+        let parents = self.facade_parent_names(ri)
+        var cname = ""
+        var fix = ""
+        var holds_parent = false
+        if container != 0 and self.ast.kind(container) == NodeKind.NK_TYPE_DECL and type_decl_sub_kind(self.ast.get_data2(container)) == TypeDeclKind.Struct as i32:
+            cname = with_str_clone_ref(self.pool_resolve(self.ast.get_data0(container)))
+            let extra_start = self.ast.get_data1(container)
+            let field_count = self.ast.get_extra(extra_start)
+            var fields = ""
+            for fi in 0..field_count:
+                let base = extra_start + 1 + fi * 3
+                let fname: str = self.pool_resolve(self.ast.get_extra(base))
+                let ftid = self.resolve_type_expr(self.ast.get_extra(base + 1)) as i32
+                var shown = self.type_name(ftid)
+                let fname_sym = self.get_type_name(self.resolve_alias(ftid as TypeId))
+                if fname_sym != 0 and self.facade_resource_index.contains(fname_sym):
+                    let pri: i32 = self.facade_resource_index.get(fname_sym).unwrap()
+                    if self.facade_is_parent_of(ri, pri):
+                        shown = "&" ++ shown
+                        holds_parent = true
+                fields = fields ++ (if fi > 0: ", " else: "") ++ fname ++ ": " ++ shown
+            fix = f"type {cname} = ephemeral {{ {fields} }}"
+        let what = if cname.len() > 0: f"'{cname}' stores" else: "this stores"
+        let layout = if holds_parent: f"; a type holding a {parents} and a '{rname}' that depends on it is a self-referential layout" else: ""
+        var diag = Diagnostic.err(f"{what} a '{rname}', which depends on its {parents} and cannot be stored in a non-ephemeral type{layout} (§16.2b.6)", Span { file: self.local_file_id, start: self.ast.get_start(node), end: self.ast.get_end(node) })
+        let notes = self.facade_dependency_notes(ri)
+        for i in 0..notes.len() as i32:
+            diag.add_note(notes[i])
+        if fix.len() > 0:
+            let how = if holds_parent: "borrow the parent instead of owning it, so " ++ cname ++ " lives no longer than it" else: "make " ++ cname ++ " ephemeral, so it lives no longer than the parent"
+            diag.add_help(f"{how}: `{fix}`; or keep the '{rname}' in a local declared after its parent")
+        else:
+            diag.add_help(f"keep the '{rname}' in a local declared after its parent, or in an ephemeral value that borrows the parent")
+        let independence = self.facade_dependency_help(ri)
+        if independence.len() > 0:
+            diag.add_help(independence)
+        self.diags.emit(move diag)
+
+    // `'Database'`, or `'Database' and 'Cache'`: the resources `ri` depends on.
+    fn facade_parent_names(ri: i32) -> str:
+        var out = ""
+        let seen: Vec[i32] = Vec.new()
+        let owners = self.facade_owners(ri)
+        for oi in 0..owners.len() as i32:
+            let f = self.facade_owner_fn(ri, owners[oi])
+            let parents = self.facade_producer_parents(ri, owners[oi])
+            for k in 0..parents.len() as i32:
+                let recv = self.facade_param_receives(f, parents[k])
+                if recv.len() == 0:
+                    continue
+                var dup = false
+                for s in 0..seen.len() as i32:
+                    if seen[s] == recv[0]:
+                        dup = true
+                if dup:
+                    continue
+                seen.push(recv[0])
+                let pn: str = self.pool_resolve(self.facade_resources[recv[0]].name)
+                out = out ++ (if out.len() > 0: " and " else: "") ++ "'" ++ pn ++ "'"
+        out
+
+    fn facade_is_parent_of(ri: i32, parent: i32) -> bool:
+        let owners = self.facade_owners(ri)
+        for oi in 0..owners.len() as i32:
+            let f = self.facade_owner_fn(ri, owners[oi])
+            let parents = self.facade_producer_parents(ri, owners[oi])
+            for k in 0..parents.len() as i32:
+                let recv = self.facade_param_receives(f, parents[k])
+                if recv.len() > 0 and recv[0] == parent:
+                    return true
+        false
+
+    // A diagnostic about a value of type `tid` gains the dependency facts of
+    // the facade resource it carries, if any.
+    fn with_facade_dependency_notes(diag0: Diagnostic, tid: i32) -> Diagnostic:
+        var diag = diag0
+        let ri = self.facade_dependent_resource_in(tid, 0)
+        if ri < 0:
+            return diag
+        let notes = self.facade_dependency_notes(ri)
+        for i in 0..notes.len() as i32:
+            diag.add_note(notes[i])
+        let help = self.facade_dependency_help(ri)
+        if help.len() > 0:
+            diag.add_help(help)
+        diag
 
 // The resource a deprecated `owns: ["ctor -> dtor"]` c_import entry spells
 // (compiler/Frontend.w project_owned_annotations_frontend): the producer's

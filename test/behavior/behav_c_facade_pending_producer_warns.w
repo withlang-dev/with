@@ -2,20 +2,21 @@
 
 use pre_d_build_runner
 
-// D51 stage 5: a producer the renderer does not give a constructor says so
-// at its resource, and the program still checks. A producer that receives a
-// resource's representation, or a resource that `borrows`, produces a
-// dependent resource (spec §16.2b.6: unknown independence means dependency);
-// a constructor that dropped the dependency could outlive its parent, and
-// dependency is modeled by the plan's stage 6. Every other producer has its
-// constructor — `Database.db_new`, and `Database.db_open`, whose `ok`
-// projection is `Result[Database, DatabaseError]` — and draws no warning;
-// the positional reason prints the resolved C parameter (§57).
+// D51 stage 6: a producer that receives a resource gets its constructor — the
+// received resource is a borrow `&P`, and the product depends on it (spec
+// §16.2b.6: unknown independence means dependency) — so stage 5's "no
+// constructor" warning for it is gone. One shape still renders none, and says
+// so at its resource: under `ok`, an out-parameter producer's failure that
+// still produced is owned by `<R>Error.FailedWithResource` (§16.2b.4), and a
+// dependent resource's failed state depends on its parents too; an `error`
+// declaration cannot carry a dependent value, and that projection is not
+// ruled. A `returns borrow` operation is collected and verified but has no
+// With type for its borrowed result yet, and says so at the fn item.
 fn main:
     let case_dir = p7_prepare_case("c_facade_pending_producer_warns", "pendwarn")
     p7_write(case_dir, "main.w", "use c_import(\"typedef struct db db;
 typedef struct st st;
-typedef struct tk tk;
+typedef struct rw rw;
 #define DB_OK 0
 db* db_new(int flags);
 int db_open(const char* path, db** out);
@@ -23,8 +24,9 @@ void db_close(db* d);
 st* st_new(db* d, int n);
 int st_open(db* d, st** out);
 void st_free(st* s);
-tk* tk_new(const char* text);
-void tk_free(tk* t);
+int rw_open(db* d, rw** out);
+void rw_free(rw* r);
+db* st_db(st* s);
 \")
 
 c facade dep:
@@ -37,20 +39,25 @@ c facade dep:
         from st_new
         from st_open(out param 1)
         drop st_free
-    resource Tokens wraps *mut tk
-        from tk_new
-        drop tk_free
-        borrows param 0
+    resource Row wraps *mut rw
+        from rw_open(out param out)
+        drop rw_free
+        ok DB_OK
+    fn st_db
+        returns borrow Database from param 0
 
 fn main:
-    let d = Database.db_new(0)
+    let d = Database.db_new(0).unwrap()
+    let s = Statement.st_new(d, 1)
+    let (status, t) = Statement.st_open(d)
     print(\"ok\")
 ")
     let checked = p7_run(case_dir, "pending-warn", "check\0main.w\0")
     p7_assert_success(checked, "with check")
-    assert(checked.stderr.contains("resource 'Statement': no constructor is rendered for producer 'st_new': it receives a resource's representation (param 0: *mut db d), so what it produces depends on it"))
-    assert(checked.stderr.contains("resource 'Statement': no constructor is rendered for producer 'st_open': it receives a resource's representation (param 0: *mut db d)"))
-    assert(checked.stderr.contains("resource 'Tokens': no constructor is rendered for producer 'tk_new': the resource borrows from param 0: *const i8 text"))
+    assert(checked.stderr.contains("resource 'Row': no constructor is rendered for producer 'rw_open': under 'ok DB_OK' a failure that still produced a 'Row' is owned by 'RowError.FailedWithResource', and a dependent 'Row' depends on its parents there too"))
+    assert(checked.stderr.contains("fn 'st_db': no safe operation is rendered for 'returns borrow Database from param 0' (param 0: *mut st s)"))
+    assert(not checked.stderr.contains("producer 'st_new'"))
+    assert(not checked.stderr.contains("producer 'st_open'"))
     assert(not checked.stderr.contains("producer 'db_open'"))
     assert(not checked.stderr.contains("producer 'db_new'"))
     print("ok")

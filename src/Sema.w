@@ -418,13 +418,18 @@ type FacadeResource {
     drop: i32,
     destroyers: Vec[i32],
     ok_const: i32,
-    borrows: Vec[i32],
+    borrows: Vec[i32],         // the parameter each `borrows` clause names
+    borrows_owner: Vec[i32],   // parallel: the producer it names one of (a `from` index, or FACADE_DEP_INIT)
+    borrows_nodes: Vec[i32],   // parallel: the clause (provenance, §16.2b.2)
+    last_producer: i32,        // the producer clause stated last while collecting (-2: none yet)
     independent: i32,
+    independent_node: i32,
     movable: i32,         // in-place resource declared `movable` (D54); pinned otherwise
     thread_caps: i32,     // bit0 creator, bit1 send, bit2 share, bit3 drop_any_thread
 }
 
 type ForeignContract {
+    decl: i32,            // the `c facade` block's declaration index: diagnostics name its file
     fn_sym: i32,
     facade: i32,
     node: i32,
@@ -583,6 +588,10 @@ pub type Sema {
     // Origin node for the next note_param_effect call (set/cleared by the
     // node-bearing noters; 0 = unknown source construct).
     effect_note_origin_node: i32,
+    // The node that moves a binding (`move x`, a consuming use), for the
+    // diagnostic of a view that outlives the move (§21.1 Rule 7); 0 when the
+    // mover has none to give.
+    move_site_node: i32,
 
     // Extern fn names
     extern_fn_names: HashMap[i32, i32],
@@ -1074,6 +1083,14 @@ pub type Sema {
     foreign_contract_index: HashMap[i32, i32],  // fn sym -> foreign_contracts index
     foreign_contracts: Vec[ForeignContract],
     facade_domains: HashMap[i32, i32],          // domain sym -> kind sym
+    // §30 (spec §16.2b.6): ephemeral-storage errors whose ephemerality a
+    // facade resource supplies, held until the facade facts exist
+    // (SemaFacade.w report_facade_layout_errors).
+    facade_layout_nodes: Vec[i32],
+    facade_layout_tids: Vec[i32],
+    facade_layout_containers: Vec[i32],
+    facade_layout_files: Vec[i32],
+    facade_layout_msgs: Vec[str],
     facade_convention_nodes: Vec[i32],
     // D22 §13.6: field-access exprs whose base is a shared view and whose
     // field type is non-Copy — an owned demand on one is an error.
@@ -2111,6 +2128,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         field_last_use: HashMap.new(),
         effect_prov: HashMap.new(),
         effect_note_origin_node: 0,
+        move_site_node: 0,
         extern_fn_names,
         extern_var_texts,
         retained_extern_params,
@@ -2402,6 +2420,11 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         foreign_contract_index: sema_new_map_i32_i32(),
         foreign_contracts: Vec.new(),
         facade_domains: sema_new_map_i32_i32(),
+        facade_layout_nodes: Vec.new(),
+        facade_layout_tids: Vec.new(),
+        facade_layout_containers: Vec.new(),
+        facade_layout_files: Vec.new(),
+        facade_layout_msgs: Vec.new(),
         facade_convention_nodes: Vec.new(),
         contextual_join_arm_types: Vec.new(),
         contextual_join_arm_kinds: Vec.new(),
@@ -5448,7 +5471,7 @@ impl Sema:
         let opt = self.scope_name_map.get(sym)
         if opt.is_some():
             if state == VarState.MOVED:
-                self.check_live_views_for_origin(sym, sym)
+                self.check_live_views_for_origin(sym, self.move_site_node)
                 self.clear_moved_fields_for_binding(sym)
             else if state == VarState.LIVE:
                 self.clear_moved_fields_for_binding(sym)
@@ -6122,19 +6145,29 @@ impl Sema:
         let _ = self.needs_drop_visit.remove(resolved as i32)
         result
 
-    mut fn emit_implicit_drop_view_use_error(view_sym: i32, origin_sym: i32, origin_node: i32):
+    // `moved`: `origin_node` moves or consumes the origin (a `move`, a
+    // consuming call, a `move fn` receiver) while the view still lives; the
+    // error is that site. Otherwise the origin went out of scope first.
+    mut fn emit_implicit_drop_view_use_error(view_sym: i32, origin_sym: i32, origin_node: i32, moved: bool):
         let view_name = self.pool_resolve(view_sym)
         let origin_name = self.pool_resolve(origin_sym)
         let view_node = self.binding_decl_node(view_sym)
-        let primary_node = if view_node != 0: view_node else: origin_node
+        let primary_node = if moved and origin_node != 0: origin_node else: if view_node != 0: view_node else: origin_node
         let primary_start = if primary_node != 0: self.ast.get_start(primary_node) else: 0
         let primary_end = if primary_node != 0: self.ast.get_end(primary_node) else: 0
-        var diag = Diagnostic.err("implicit drop of `" ++ view_name ++ "` uses `&" ++ origin_name ++ "` after `" ++ origin_name ++ "` is destroyed (§21.1 Rule 7)", Span { file: self.local_file_id, start: primary_start, end: primary_end })
+        let fate = if moved: "moved" else: "destroyed"
+        var diag = Diagnostic.err("implicit drop of `" ++ view_name ++ "` uses `&" ++ origin_name ++ "` after `" ++ origin_name ++ "` is " ++ fate ++ " (§21.1 Rule 7)", Span { file: self.local_file_id, start: primary_start, end: primary_end })
         if view_node != 0:
             diag.add_label(Span { file: self.local_file_id, start: self.ast.get_start(view_node), end: self.ast.get_end(view_node) }, "Drop value retaining the borrow is declared here")
         if origin_node != 0:
-            diag.add_label(Span { file: self.local_file_id, start: self.ast.get_start(origin_node), end: self.ast.get_end(origin_node) }, "`" ++ origin_name ++ "` is destroyed before `" ++ view_name ++ "` drops")
-        diag.add_help("declare `" ++ view_name ++ "` after `" ++ origin_name ++ "`, or clear/drop `" ++ view_name ++ "` before `" ++ origin_name ++ "` goes out of scope")
+            let what = if moved: "`" ++ origin_name ++ "` is moved here while `" ++ view_name ++ "` still borrows it" else: "`" ++ origin_name ++ "` is destroyed before `" ++ view_name ++ "` drops"
+            diag.add_label(Span { file: self.local_file_id, start: self.ast.get_start(origin_node), end: self.ast.get_end(origin_node) }, what)
+        if moved:
+            diag.add_help("drop or finish with `" ++ view_name ++ "` before `" ++ origin_name ++ "` is moved or consumed")
+        else:
+            diag.add_help("declare `" ++ view_name ++ "` after `" ++ origin_name ++ "`, or clear/drop `" ++ view_name ++ "` before `" ++ origin_name ++ "` goes out of scope")
+        // §8, §57: a facade resource that depends on the origin says why.
+        diag = self.with_facade_dependency_notes(move diag, self.scope_lookup(view_sym))
         self.diags.emit(move diag)
 
     mut fn emit_returned_view_origin_use_error(view_sym: i32, use_node: i32):
@@ -6155,6 +6188,7 @@ impl Sema:
         if use_node != 0:
             diag.add_label(Span { file: self.local_file_id, start: self.ast.get_start(use_node), end: self.ast.get_end(use_node) }, "view is used here after a possible origin died")
         diag.add_help("copy the data out before the origin's scope ends, or declare `" ++ origin_name ++ "` in the outer scope")
+        diag = self.with_facade_dependency_notes(move diag, self.scope_lookup(view_sym))
         self.diags.emit(move diag)
 
     fn binding_decl_node(sym: i32) -> i32:
@@ -6184,17 +6218,30 @@ impl Sema:
                 continue
             if self.bind_states[bi] != VarState.LIVE:
                 continue
-            let view_ty = self.bind_types[bi]
-            let view_has_drop = self.type_has_drop_impl(view_ty)
+            let view_ty: i32 = self.bind_types[bi]
+            // Rule 7's "variable implementing Drop" is any value whose drop
+            // runs a destructor retaining the borrow: `Option[S]`, `(i32,
+            // Option[S])` or `Vec[S]` of an ephemeral Drop `S` (a dependent
+            // facade resource) as much as `S` itself. Shallow
+            // type_has_drop_impl let an `Option[S]` declared before its
+            // origin drop after it.
+            let view_has_drop = self.type_carries_user_drop(view_ty)
             let active_view = self.binding_depends_on_origin(view_sym, origin_sym) != 0 and self.binding_has_active_borrow_from(view_sym, origin_sym) != 0
             if active_view or (view_has_drop != 0 and self.binding_value_depends_on_origin(view_sym, origin_sym) != 0):
                 let err_node = if node != 0: node else: self.binding_decl_node(view_sym)
+                let moved = node != 0 and node == self.move_site_node
                 if view_has_drop != 0:
-                    self.emit_implicit_drop_view_use_error(view_sym, origin_sym, err_node)
+                    self.emit_implicit_drop_view_use_error(view_sym, origin_sym, err_node, moved)
+                    return
+                if self.suppress_errors != 0:
                     return
                 let view_name: str = with_str_clone_ref(self.pool_resolve(view_sym))
                 let origin_name: str = with_str_clone_ref(self.pool_resolve(origin_sym))
-                self.emit_error("view '" ++ view_name ++ "' may outlive its origin '" ++ origin_name ++ "'", err_node)
+                let start = self.ast.get_start(err_node)
+                let end = self.ast.get_end(err_node)
+                var diag = Diagnostic.err("view '" ++ view_name ++ "' may outlive its origin '" ++ origin_name ++ "'", Span { file: self.local_file_id, start: start, end: end })
+                diag = self.with_facade_dependency_notes(move diag, view_ty)
+                self.diags.emit(move diag)
                 return
 
     fn set_expr_view_deps(expr_node: i32, param_mask: i32, deps: &Vec[i32]):

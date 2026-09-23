@@ -408,10 +408,10 @@ impl Sema:
                 let field_base = extra_start + 1 + fi * 3
                 let field_type_node = self.ast.get_extra(field_base + 1)
                 self.resolve_deferred_value_type_slot(field_slot, field_type_node, "opaque types cannot be stored in struct fields; use a pointer or reference")
-                let field_tid = self.type_extra[field_slot]
+                let field_tid: i32 = self.type_extra[field_slot]
                 if is_ephemeral == 0 and field_tid != 0 and self.type_is_ephemeral_value(field_tid) != 0:
                     let msg = if sub_kind == TypeDeclKind.Union: "ephemeral values cannot be stored in non-ephemeral unions" else: "ephemeral values cannot be stored in non-ephemeral structs"
-                    self.emit_error(msg, field_type_node)
+                    self.emit_ephemeral_storage_error(msg, field_type_node, field_tid, decl)
             // Validate bitpacked field types: must be integer, bool, or nested bitpacked
             if type_decl_is_bitpacked(packed_kind) != 0:
                 for fi in 0..field_count:
@@ -443,9 +443,9 @@ impl Sema:
                     let payload_slot = type_pos + pi
                     let payload_type_node = self.ast.get_extra(ast_pos + pi)
                     self.resolve_deferred_value_type_slot(payload_slot, payload_type_node, "opaque types cannot be stored in enum payloads by value; use a pointer or reference")
-                    let payload_tid = self.type_extra[payload_slot]
+                    let payload_tid: i32 = self.type_extra[payload_slot]
                     if is_ephemeral == 0 and payload_tid != 0 and self.type_is_ephemeral_value(payload_tid) != 0:
-                        self.emit_error("ephemeral values cannot be stored in enum payloads", payload_type_node)
+                        self.emit_ephemeral_storage_error("ephemeral values cannot be stored in enum payloads", payload_type_node, payload_tid, decl)
                 ast_pos = ast_pos + payload_count
                 type_pos = type_pos + payload_count
             return
@@ -472,9 +472,9 @@ impl Sema:
                     let payload_slot = type_pos + pi
                     let payload_type_node = self.ast.get_extra(ast_pos + pi)
                     self.resolve_deferred_value_type_slot(payload_slot, payload_type_node, "opaque types cannot be stored in enum payloads by value; use a pointer or reference")
-                    let payload_tid = self.type_extra[payload_slot]
+                    let payload_tid: i32 = self.type_extra[payload_slot]
                     if is_ephemeral == 0 and payload_tid != 0 and self.type_is_ephemeral_value(payload_tid) != 0:
-                        self.emit_error("ephemeral values cannot be stored in enum payloads", payload_type_node)
+                        self.emit_ephemeral_storage_error("ephemeral values cannot be stored in enum payloads", payload_type_node, payload_tid, decl)
                 ast_pos = ast_pos + payload_count
                 type_pos = type_pos + payload_count
             return
@@ -495,9 +495,9 @@ impl Sema:
             let value_slot = te_start + 1
             let inner_node = self.ast.get_extra(extra_start)
             self.resolve_deferred_value_type_slot(value_slot, inner_node, "opaque types cannot be wrapped by value in distinct types; use a pointer or reference")
-            let inner_tid = self.type_extra[value_slot]
+            let inner_tid: i32 = self.type_extra[value_slot]
             if is_ephemeral == 0 and inner_tid != 0 and self.type_is_ephemeral_value(inner_tid) != 0:
-                self.emit_error("ephemeral values cannot be stored in non-ephemeral distinct types", inner_node)
+                self.emit_ephemeral_storage_error("ephemeral values cannot be stored in non-ephemeral distinct types", inner_node, inner_tid, decl)
 
     fn is_local_decl(decl_index: i32) -> i32:
         let limit = self.ast.local_decl_count()
@@ -836,12 +836,13 @@ impl Sema:
                     if self.ast.kind(f_type_node) == NodeKind.NK_IDENT or self.ast.kind(f_type_node) == NodeKind.NK_TYPE_NAMED:
                         let f_type_sym = self.ast.get_data0(f_type_node)
                         if self.ephemeral_types.contains(f_type_sym):
-                            self.emit_error("ephemeral type '" ++ self.pool_resolve(f_type_sym) ++ "' cannot be stored in non-ephemeral struct", f_type_node)
+                            let f_type_tid = self.resolve_type_expr(f_type_node) as i32
+                            self.emit_ephemeral_storage_error("ephemeral type '" ++ self.pool_resolve(f_type_sym) ++ "' cannot be stored in non-ephemeral struct", f_type_node, f_type_tid, node)
                 let f_tid = self.resolve_type_expr(f_type_node)
                 if self.is_opaque_value_type(f_tid) != 0:
                     self.emit_error("opaque types cannot be stored in struct fields; use a pointer or reference", f_type_node)
                 if is_generic_decl != 0 and not is_ephemeral and f_tid != 0 and self.type_is_ephemeral_value(f_tid as i32) != 0:
-                    self.emit_error("ephemeral values cannot be stored in non-ephemeral structs", f_type_node)
+                    self.emit_ephemeral_storage_error("ephemeral values cannot be stored in non-ephemeral structs", f_type_node, f_tid as i32, node)
                 field_names.push(f_name)
                 field_tids.push(f_tid as i32)
                 field_defaults.push(f_default)
@@ -897,7 +898,7 @@ impl Sema:
                     if self.is_opaque_value_type(pt_tid) != 0:
                         self.emit_error("opaque types cannot be stored in enum payloads by value; use a pointer or reference", pt_node)
                     if is_generic_decl != 0 and not is_ephemeral and pt_tid != 0 and self.type_is_ephemeral_value(pt_tid as i32) != 0:
-                        self.emit_error("ephemeral values cannot be stored in enum payloads", pt_node)
+                        self.emit_ephemeral_storage_error("ephemeral values cannot be stored in enum payloads", pt_node, pt_tid as i32, node)
                     payload_tids.push(pt_tid as i32)
             let te_start = self.type_extra.len() as i32
             var payload_cursor = 0
@@ -1021,7 +1022,7 @@ impl Sema:
             if self.is_opaque_value_type(inner) != 0:
                 self.emit_error("opaque types cannot be wrapped by value in distinct types; use a pointer or reference", inner_node)
             if is_generic_decl != 0 and not is_ephemeral and inner != 0 and self.type_is_ephemeral_value(inner as i32) != 0:
-                self.emit_error("ephemeral values cannot be stored in non-ephemeral distinct types", inner_node)
+                self.emit_ephemeral_storage_error("ephemeral values cannot be stored in non-ephemeral distinct types", inner_node, inner as i32, node)
             // Distinct type: treat as single-field struct
             let te_start = self.type_extra.len() as i32
             let val_sym = self.pool_intern("value")
@@ -1055,7 +1056,7 @@ impl Sema:
                 if self.is_opaque_value_type(f_tid) != 0:
                     self.emit_error("opaque types cannot be stored in union fields; use a pointer or reference", f_type_node)
                 if is_generic_decl != 0 and not is_ephemeral and f_tid != 0 and self.type_is_ephemeral_value(f_tid as i32) != 0:
-                    self.emit_error("ephemeral values cannot be stored in non-ephemeral unions", f_type_node)
+                    self.emit_ephemeral_storage_error("ephemeral values cannot be stored in non-ephemeral unions", f_type_node, f_tid as i32, node)
                 field_names.push(f_name)
                 field_tids.push(f_tid as i32)
                 field_defaults.push(f_default)
@@ -2228,7 +2229,7 @@ impl Sema:
             if self.is_opaque_value_type(bind_ty) != 0:
                 self.emit_error("opaque values cannot be stored by value; use a pointer or reference", type_node)
             if bind_ty != 0 and self.type_is_ephemeral_value(bind_ty as i32) != 0:
-                self.emit_error("ephemeral values cannot be stored in global storage", type_node)
+                self.emit_ephemeral_storage_error("ephemeral values cannot be stored in global storage", type_node, bind_ty as i32, node)
             if self.type_expr_is_collection_with_ref(type_node) != 0:
                 self.emit_error("ephemeral references cannot be stored in generic containers", node)
         let decl_kind = if self.ast.let_decl_is_interface_provided(node): GLOBAL_VALUE_DECL_INTERFACE else: GLOBAL_VALUE_DECL_DEF

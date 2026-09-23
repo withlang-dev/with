@@ -11,12 +11,12 @@ c facade dbl:
         drop db_close
         destroys db_close
         ok DB_OK
+        independent
         thread creator
     resource Statement wraps *mut st
         from db_prepare(out param 2)
         drop st_finalize
         borrows param 0
-        independent
     fn st_db
         returns borrow Database from param 0
         of Statement
