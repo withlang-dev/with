@@ -241,10 +241,9 @@ impl Debug for bool:
         else:
             "false"
 
+// §15.4.7 / D61: quoted and escaped, exactly as `{s:?}` formats it.
 impl Debug for str:
-    fn debug_str() -> str:
-        let value = *self
-        "\"" ++ value ++ "\""
+    fn debug_str() -> str: f"{self:?}"
 
 // #1288: §11.8 derives Debug unconditionally, so every primitive a field can
 // hold formats. The f-string is the one formatter for every width.

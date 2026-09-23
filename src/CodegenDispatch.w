@@ -84,12 +84,14 @@ impl Codegen:
             return
         self.fail_mir_codegen_for_function(fn_node, "no-body")
 
+    // Generator `next` bodies and D61's synthesized `:?` formatters: MIR-only
+    // functions whose signature Sema registered without a declaration.
     mut fn gen_generator_next_functions_from_mir():
         for bi in 0..self.mir_fn_syms_len() as i32:
             let raw_sym = self.mir_fn_sym_at(bi as i64)
             if not self.unit_owns(raw_sym):
                 continue
-            if not self.sema.generator_next_fn_syms.contains(raw_sym):
+            if not self.sema.generator_next_fn_syms.contains(raw_sym) and not self.sema.debug_fmt_synth_syms.contains(raw_sym):
                 continue
             let body = self.mir_body_at(bi as i64)
             let cg_sym = self.codegen_sym_for_sema_sym(raw_sym)
@@ -2775,7 +2777,10 @@ impl Codegen:
                     return val
                 if vk == wl_pointer_type_kind():
                     return self.coerce_ptr_to_str(val)
-                return self.gen_string_literal_raw("<unsupported>")
+                // No silent fallback: Sema rejects every interpolant without
+                // a default display or a `:?` form, and routes aggregates to
+                // their formatter (D61), so no other value reaches here.
+                sema_phase_bug("BUG: formatting reached a value with no display or `:?` form; Sema must reject its type (D61, §15.4.8)")
         let sym = self.intern.intern(fn_name)
         let fv = self.fn_values.get(sym)
         let ft = self.fn_fn_types.get(sym)
@@ -2882,80 +2887,76 @@ impl Codegen:
             if val_ty == str_ty:
                 return val
             return self.call_runtime_str_fn_ref("with_fmt_str_ref", val, str_ty)
-        if tk == TypeKind.TY_STRUCT:
-            return self.gen_debug_struct(val, resolved, str_ty)
         if tk == TypeKind.TY_ENUM:
             return self.gen_display_enum(val, effective_sema_ty, str_ty)
         if tk == TypeKind.TY_GENERIC_INST and self.mir_enum_variant_count(effective_sema_ty) > 0:
             return self.gen_display_enum(val, effective_sema_ty, str_ty)
+        // A payload with no default display (a struct, a collection, a
+        // tuple) shows its Debug form — the one formatter every depth uses
+        // (D61); Sema registered it with the enum that holds it.
+        if tk == TypeKind.TY_STRUCT or tk == TypeKind.TY_GENERIC_INST or tk == TypeKind.TY_TUPLE or tk == TypeKind.TY_ARRAY or tk == TypeKind.TY_SLICE:
+            return self.call_debug_formatter(val, effective_sema_ty, str_ty)
         self.coerce_val_to_str_ext(val, str_ty, self.mir_sema_type_is_unsigned(effective_sema_ty))
 
+    // D61 (§15.4.7): the `:?` text of a value outside an f-string buffer —
+    // an unwrap/expect panic's Err payload. The inline rows format here;
+    // every other type calls the formatter Sema registered for it.
     mut fn gen_debug_format(val: i64, sema_ty: i32, str_ty: i64) -> i64:
-        // Generate debug formatting based on sema type.
         let resolved = self.mir_display_resolved_type(sema_ty)
         let tk = self.mir_display_type_kind(resolved)
-
-        // str → quoted
+        if tk == TypeKind.TY_REF:
+            let pointee = self.mir_display_resolved_type(if resolved < self.mir_type_d0_len() as i32: self.mir_type_d0_at(resolved) else: self.sema.get_type_d0(resolved) as i32)
+            if self.mir_display_type_kind(pointee) == TypeKind.TY_VOID:
+                return self.gen_string_literal_raw("()")
+            let pointee_llvm = self.mir_sema_type_to_llvm(pointee)
+            if pointee_llvm == 0 or wl_get_type_kind(pointee_llvm) == wl_void_type_kind():
+                sema_phase_bug(f"BUG: no loadable LLVM type for `:?` reference pointee {pointee}")
+            return self.gen_debug_format(wl_build_load(self.builder, pointee_llvm, val), pointee, str_ty)
         if resolved == self.sema.ty_str or tk == TypeKind.TY_STR:
             return self.call_runtime_str_fn_ref("with_fmt_str_debug_ref", val, str_ty)
+        if tk == TypeKind.TY_VOID:
+            return self.gen_string_literal_raw("()")
+        if tk == TypeKind.TY_PTR:
+            // A raw pointer's `:?` form is its address, as emit-C formats it.
+            let addr = wl_build_ptr_to_int(self.builder, val, wl_i64_type(self.context))
+            return self.coerce_val_to_str_ext(addr, str_ty, false)
+        if tk == TypeKind.TY_INT or tk == TypeKind.TY_FLOAT or tk == TypeKind.TY_BOOL:
+            return self.coerce_val_to_str_ext(val, str_ty, self.mir_sema_type_is_unsigned(sema_ty))
+        self.call_debug_formatter(val, sema_ty, str_ty)
 
-        // Struct → "TypeName { field: val, field: val }"
-        if tk == TypeKind.TY_STRUCT:
-            return self.gen_debug_struct(val, resolved, str_ty)
+    // "called unwrap on Err: {e:?}" — the error's `:?` form when it has one
+    // (Sema registered it at the unwrap); an error with no `:?` form (a
+    // `dyn Error`) panics with the prefix alone. emit-C builds the same text.
+    mut fn gen_unwrap_err_message(prefix: i64, err_val: i64, err_sema: i32, str_ty: i64) -> i64:
+        var resolved = self.sema.resolve_alias(err_sema as TypeId) as i32
+        while self.sema.get_type_kind(resolved as TypeId) == TypeKind.TY_REF:
+            resolved = self.sema.resolve_alias(self.sema.get_type_d0(resolved as TypeId)) as i32
+        if not self.sema.debug_fmt_is_inline(self.sema.get_type_kind(resolved as TypeId)) and not self.sema.debug_fmt_index.contains(resolved):
+            return prefix
+        let err_dbg = self.gen_debug_format(err_val, err_sema, str_ty)
+        let sep = self.gen_string_literal_raw(": ")
+        let prefix_with_sep = self.mir_str_concat(prefix, sep)
+        self.mir_str_concat(prefix_with_sep, err_dbg)
 
-        // Enums use their compiler-generated variant formatter for now.
-        if tk == TypeKind.TY_ENUM or (tk == TypeKind.TY_GENERIC_INST and self.mir_enum_variant_count(sema_ty) > 0):
-            return self.gen_debug_enum(val, sema_ty, str_ty)
-
-        // Primitives (int, float, bool) → same as default display
-        self.coerce_typed_val_to_str(val, sema_ty, str_ty)
-
-    mut fn gen_debug_struct(val: i64, sema_ty: i32, str_ty: i64) -> i64:
-        // Generate "TypeName { field1: val1, field2: val2 }"
-        let type_name_sym = self.mir_type_d0_at(sema_ty)
-        var type_name = ""
-        if type_name_sym > 0:
-            type_name = self.sema_symbol_text(type_name_sym)
-
-        // Find struct index in codegen tables
-        let cg_sym = self.intern.intern(type_name)
-        let st_opt = self.struct_type_map.get(cg_sym)
-        if not st_opt.is_some():
-            // Unknown struct — return type name only
-            return self.gen_string_literal_raw(type_name ++ " " ++ lbrace() ++ " ... " ++ rbrace())
-
-        let struct_idx = st_opt.unwrap()
-        let f_start = self.struct_field_starts[struct_idx]
-        let f_count = self.struct_field_counts[struct_idx]
-
-        // Build: "TypeName { "
-        var result = self.gen_string_literal_raw(type_name ++ " " ++ lbrace() ++ " ")
-
-        var fi = 0
-        while fi < f_count:
-            let f_name_sym = self.struct_field_names[(f_start + fi)]
-            let f_name: str = with_str_clone_ref(self.intern.resolve(f_name_sym))
-
-            // Separator
-            if fi > 0:
-                result = self.mir_str_concat(result, self.gen_string_literal_raw(", "))
-
-            // "field_name: "
-            result = self.mir_str_concat(result, self.gen_string_literal_raw(f_name ++ ": "))
-
-            // Extract field value and format it
-            let field_val = wl_build_extract_value(self.builder, val, fi)
-            let field_sema_ty = self.mir_struct_field_sema_type(sema_ty, fi)
-            let field_str = self.coerce_typed_val_to_str(field_val, field_sema_ty, str_ty)
-            result = self.mir_str_concat(result, field_str)
-            fi = fi + 1
-
-        // Close " }"
-        result = self.mir_str_concat(result, self.gen_string_literal_raw(" " ++ rbrace()))
-        result
-
-    mut fn gen_debug_enum(val: i64, sema_ty: i32, str_ty: i64) -> i64:
-        self.gen_display_enum(val, sema_ty, str_ty)
+    // Call the `:?` formatter Sema registered for `sema_ty` (D61) on `val`:
+    // the formatter borrows the value, so it is spilled and passed by address.
+    mut fn call_debug_formatter(val: i64, sema_ty: i32, str_ty: i64) -> i64:
+        let resolved = self.sema.resolve_alias(sema_ty as TypeId) as i32
+        let entry_opt = self.sema.debug_fmt_index.get(resolved)
+        if entry_opt.is_none():
+            sema_phase_bug(f"BUG: codegen formats type {resolved} with no registered `:?` formatter (D61)")
+        let entry: i32 = entry_opt.unwrap()
+        let mono: i32 = self.sema.debug_fmt_monos[entry]
+        let sig: i32 = self.sema.debug_fmt_sigs[entry]
+        let name = self.sema_symbol_text(mono).clone()
+        let callee = self.ensure_concrete_mir_function(0, sig, mono, mono, "`:?` formatter " ++ name)
+        if callee.sym == 0:
+            sema_phase_bug(f"BUG: `:?` formatter for type {resolved} has no function (D61)")
+        let slot = self.create_entry_alloca(wl_type_of(val))
+        wl_build_store(self.builder, val, slot)
+        let args: Vec[i64] = Vec.new()
+        args.push(slot)
+        self.build_call_fn_value(callee.sym, callee.value, callee.fn_type, -1, 0, args, 1, name, 0)
 
     mut fn gen_display_enum_variant(val: i64, enum_sema_ty: i32, variant_idx: i32, str_ty: i64) -> i64:
         let variant_name = self.mir_enum_variant_name(enum_sema_ty, variant_idx)
@@ -9342,12 +9343,8 @@ impl Codegen:
                             let err_storage = wl_build_struct_gep(self.builder, carrier_ty, recv, 1)
                             err_val = wl_build_load(self.builder, err_ty, wl_build_bitcast(self.builder, err_storage, wl_ptr_type(self.context)))
                         let str_ty = self.resolve_named_type(self.intern.intern("str"))
-                        let err_dbg = self.gen_debug_format(err_val, err_sema, str_ty)
                         let prefix = if is_expect: user_msg else: self.gen_string_literal_raw("called unwrap on Err")
-                        let sep = self.gen_string_literal_raw(": ")
-                        let prefix_with_sep = self.mir_str_concat(prefix, sep)
-                        let msg = self.mir_str_concat(prefix_with_sep, err_dbg)
-                        self.emit_runtime_panic_value(msg, loc)
+                        self.emit_runtime_panic_value(self.gen_unwrap_err_message(prefix, err_val, err_sema, str_ty), loc)
                     else:
                         let msg = if is_expect: self.mir_str_concat(user_msg, self.gen_string_literal_raw(": None")) else: self.gen_string_literal_raw("called unwrap on None")
                         self.emit_runtime_panic_value(msg, loc)
@@ -9379,12 +9376,8 @@ impl Codegen:
                         err_ty = self.mir_builtin_variant_payload_llvm_type(recv_sema, 1)
                     let err_val = self.extract_result_payload(recv, err_ty)
                     let str_ty = self.resolve_named_type(self.intern.intern("str"))
-                    let err_dbg = self.gen_debug_format(err_val, err_sema, str_ty)
                     let prefix = if is_expect: user_msg else: self.gen_string_literal_raw("called unwrap on Err")
-                    let sep = self.gen_string_literal_raw(": ")
-                    let prefix_with_sep = self.mir_str_concat(prefix, sep)
-                    let msg = self.mir_str_concat(prefix_with_sep, err_dbg)
-                    self.emit_runtime_panic_value(msg, loc)
+                    self.emit_runtime_panic_value(self.gen_unwrap_err_message(prefix, err_val, err_sema, str_ty), loc)
                 else:
                     let msg =
                         if is_expect:

@@ -1,5 +1,5 @@
 //! args: --dump-typed
-//! expect-check-stdout: typed contextual-copy-adjustments=35
+//! expect-check-stdout: typed contextual-copy-adjustments=40
 //! expect-check-stdout: bind view: &i32
 //! expect-check-stdout: bind forwarded: Option[&i32]
 //! expect-check-stdout: bind forwarded_view: &i32
@@ -15,6 +15,13 @@
 //! expect-check-stdout: exact=&Meter owned=Meter target=Meter post=identity
 //! expect-check-stdout-not: bind view: i32
 //! expect-check-stdout-not: bind meter_view: Meter
+// The count includes the prelude: five of them are std.collections' D61 map
+// formatter (debug_entry_order/debug_entry_before), where `order[a]`,
+// `order[b]` and `scratch[k]` — `&i64` element places (D27) — meet an
+// owned `i64` demand (an i64 parameter, an i64 element store) and take the
+// same contextual Copy this fixture pins for `snapshot`. The rule did not
+// move; the prelude gained five sites.
+
 
 // D22 Stage 2 is intentionally check-only. It proves exact carrier/projection
 // types and one Sema-owned adjustment for every independently resolved scalar

@@ -20,7 +20,7 @@ type Named {
 fn test_debug_struct_with_str:
     let n = Named { name: "test", value: 42 }
     let s = f"{n:?}"
-    assert(s == "Named { name: test, value: 42 }")
+    assert(s == "Named { name: \"test\", value: 42 }")
 
 fn test_debug_struct_in_context:
     let p = Point { x: 1, y: 2 }

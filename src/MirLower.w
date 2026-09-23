@@ -3221,6 +3221,299 @@ impl MirBuilder:
         self.register_stmt_temp(result_local, self.sema.ty_str)
         self.body.new_operand(OperandKind.OK_COPY, result_place)
 
+    // ── D61 (§15.4.7): `:?` is recursive ─────────────────────────────
+    //
+    // A value formats the same at every depth: numbers, bool, str, Unit and
+    // raw pointers inline (FMT_DEBUG / FMT_DEBUG_STR — the runtime quotes and
+    // escapes a str), a view as its pointee, and every other type through
+    // the formatter Sema registered for it (debug_fmt_*): an explicit impl's
+    // debug_str, a std collection's formatter method, or a formatter
+    // lower_debug_formatter synthesizes. Each formatter borrows the value
+    // (`&T`) and returns an owned str the statement frame drops after it is
+    // written into the buffer.
+
+    // The place `:?` reads its interpolant from: the place the operand
+    // reads, else (a computed value) a statement temp that owns it.
+    mut fn debug_operand_place(operand: i32, ty: i32, node: i32) -> i32:
+        if operand >= 0 and operand < self.body.operand_kinds.len():
+            let kind = self.body.operand_kinds[operand]
+            if kind == OperandKind.OK_COPY or kind == OperandKind.OK_MOVE:
+                return self.body.operand_d0[operand]
+        self.materialize_operand(operand, ty, self.ast.get_start(node))
+
+    mut fn lower_debug_write_literal(buf_op: i32, text: &str, node: i32):
+        let text_sym = self.pool.intern(text)
+        let literal = self.lower_str_lit(text_sym)
+        self.lower_fstring_buf_write_str(buf_op, literal, node)
+
+    // The inline rows of §15.4.7's table.
+    mut fn lower_debug_write_inline(buf_op: i32, value_op: i32, resolved: i32, node: i32):
+        let kind = self.sema.get_type_kind(resolved as TypeId)
+        if kind == TypeKind.TY_VOID:
+            self.lower_debug_write_literal(buf_op, "()", node)
+            return
+        if kind == TypeKind.TY_NEVER:
+            return
+        let text = if kind == TypeKind.TY_STR: self.lower_fmt_debug_str(value_op, node) else: self.lower_fmt_debug(value_op, resolved, node)
+        self.lower_fstring_buf_write_str(buf_op, text, node)
+
+    // Write the `:?` form of the value at `place` into the f-string buffer.
+    mut fn lower_debug_write_place(buf_op: i32, place: i32, ty: i32, node: i32):
+        let resolved = self.sema.resolve_alias(ty as TypeId) as i32
+        let kind = self.sema.get_type_kind(resolved as TypeId)
+        if kind == TypeKind.TY_REF:
+            let pointee = self.sema.get_type_d0(resolved as TypeId)
+            let pointee_place = self.body.new_deref_place(place, pointee)
+            self.lower_debug_write_place(buf_op, pointee_place, pointee, node)
+            return
+        if self.sema.debug_fmt_is_inline(kind):
+            let value_op = self.body.new_operand(OperandKind.OK_COPY, place)
+            self.lower_debug_write_inline(buf_op, value_op, resolved, node)
+            return
+        let entry_opt = self.sema.debug_fmt_index.get(resolved)
+        if entry_opt.is_none():
+            sema_phase_bug(f"BUG: `:?` reached MIR for type {resolved} with no registered formatter (D61)")
+        let entry: i32 = entry_opt.unwrap()
+        let fn_sym: i32 = self.sema.debug_fmt_fns[entry]
+        let sig: i32 = self.sema.debug_fmt_sigs[entry]
+        let mono: i32 = self.sema.debug_fmt_monos[entry]
+        if fn_sym == 0 or sig < 0:
+            sema_phase_bug(f"BUG: `:?` formatter for type {resolved} was never bound (D61)")
+        let text_place = self.lower_debug_borrowing_call(fn_sym, sig, mono, place, resolved)
+        let text_op = self.body.new_operand(OperandKind.OK_COPY, text_place)
+        self.lower_fstring_buf_write_str(buf_op, text_op, node)
+
+    // Call `fn_sym` (contract `sig`/`mono`) with a borrow of the value at
+    // `place`; the result lands in a statement temp, whose place is returned
+    // (an owned result is dropped with the statement frame).
+    mut fn lower_debug_borrowing_call(fn_sym: i32, sig: i32, mono: i32, place: i32, place_ty: i32) -> i32:
+        let param_ty = self.sema.sig_param_type(sig, 0)
+        let arg = self.operand_for_place_arg(place, place_ty, param_ty, 0)
+        let args: Vec[i32] = Vec.new()
+        args.push(arg)
+        let args_id = self.body.new_call_args(args)
+        self.body.set_call_contract(args_id, sig, mono)
+        let generic_node = self.generic_fn_node_for_sym(fn_sym)
+        if generic_node != 0:
+            self.body.set_call_intrinsic(args_id, MirIntrinsic.GENERIC_CALL)
+            self.body.set_call_ast_node(args_id, generic_node)
+            self.body.require_call_contract(args_id)
+        let ret_ty = self.sema.sig_return_type(sig)
+        let fn_op = self.const_operand(ConstKind.CK_FN, fn_sym, ret_ty)
+        let result_local = self.new_temp(ret_ty)
+        let result_place = self.place_for_local(result_local)
+        let next_bb = self.new_block()
+        self.terminate(TermKind.TK_CALL, fn_op, args_id, result_place, next_bb)
+        self.switch_to(next_bb)
+        self.register_stmt_temp(result_local, ret_ty)
+        result_place
+
+    // The generated form of a synthesized formatter's type, written from
+    // the borrowed value at `place`.
+    mut fn lower_debug_form(buf_op: i32, place: i32, resolved: i32):
+        let kind = self.sema.get_type_kind(resolved as TypeId)
+        if kind == TypeKind.TY_TUPLE:
+            self.lower_debug_write_literal(buf_op, "(", 0)
+            let count = self.sema.get_type_d1(resolved as TypeId)
+            for ei in 0..count:
+                if ei > 0:
+                    self.lower_debug_write_literal(buf_op, ", ", 0)
+                let elem_ty = self.tuple_elem_type(resolved, ei)
+                let elem_place = self.body.new_tuple_index_place(place, ei, elem_ty)
+                self.lower_debug_write_place(buf_op, elem_place, elem_ty, 0)
+            // A one-element tuple reads back as a tuple, not a grouping.
+            self.lower_debug_write_literal(buf_op, if count == 1: ",)" else: ")", 0)
+            return
+        if kind == TypeKind.TY_ARRAY or kind == TypeKind.TY_SLICE:
+            self.lower_debug_sequence(buf_op, place, resolved, 0)
+            return
+        let base = if kind == TypeKind.TY_GENERIC_INST: self.sema.get_generic_inst_base(resolved) else: 0
+        if base != 0 and base == self.sema.syms.vec:
+            self.lower_debug_sequence(buf_op, place, resolved, 1)
+            return
+        if base != 0 and base == self.sema.syms.box:
+            // A Box is transparent, like a view: it formats what it owns,
+            // read through the library's Box.as_ref (`&T`).
+            let entry: i32 = self.sema.debug_fmt_index.get(resolved).unwrap()
+            let accessor: i32 = self.sema.debug_fmt_aux_fns[entry]
+            let accessor_sig: i32 = self.sema.debug_fmt_aux_sigs[entry]
+            let accessor_mono: i32 = self.sema.debug_fmt_aux_monos[entry]
+            if accessor == 0 or accessor_sig < 0:
+                sema_phase_bug(f"BUG: Box `:?` formatter for type {resolved} has no bound as_ref (D61)")
+            let view_place = self.lower_debug_borrowing_call(accessor, accessor_sig, accessor_mono, place, resolved)
+            self.lower_debug_write_place(buf_op, view_place, self.sema.sig_return_type(accessor_sig), 0)
+            return
+        let enum_base = self.sema.debug_fmt_enum_base(resolved)
+        if enum_base != 0:
+            self.lower_debug_enum(buf_op, place, resolved, enum_base)
+            return
+        let name_sym = if base != 0: base else: self.sema.get_type_d0(resolved as TypeId)
+        let type_name = self.sema.pool_resolve(name_sym).clone()
+        let field_count = self.sema.type_reflection_field_count(resolved)
+        if field_count == 0:
+            self.lower_debug_write_literal(buf_op, type_name ++ " {}", 0)
+            return
+        self.lower_debug_write_literal(buf_op, type_name ++ " { ", 0)
+        for fi in 0..field_count:
+            let field_name = self.sema.pool_resolve(self.sema.type_reflection_field_name(resolved, fi)).clone()
+            self.lower_debug_write_literal(buf_op, if fi > 0: ", " ++ field_name ++ ": " else: field_name ++ ": ", 0)
+            let field_ty = self.sema.type_reflection_field_type_frozen(resolved, fi)
+            let field_sym = self.pool.intern(field_name)
+            let field_place = self.body.new_field_place(place, field_sym, field_ty)
+            self.lower_debug_write_place(buf_op, field_place, field_ty, 0)
+        self.lower_debug_write_literal(buf_op, " }", 0)
+
+    // `Variant` or `Variant(payload, payload)`: a switch on the discriminant,
+    // one arm per variant, each arm writing its payloads through the
+    // variant's downcast.
+    mut fn lower_debug_enum(buf_op: i32, place: i32, resolved: i32, enum_base: i32):
+        let disc = self.lower_enum_discriminant(place)
+        let join_bb = self.new_block()
+        let default_bb = self.new_block()
+        let vals: Vec[i32] = Vec.new()
+        let targets: Vec[i32] = Vec.new()
+        let arms: Vec[i32] = Vec.new()
+        let variant_count = self.sema.get_type_d2(enum_base as TypeId)
+        var pos = self.sema.get_type_d1(enum_base as TypeId)
+        let names: Vec[i32] = Vec.new()
+        let payload_counts: Vec[i32] = Vec.new()
+        for vi in 0..variant_count:
+            let variant_sym: i32 = self.sema.type_extra[pos]
+            let payload_count: i32 = self.sema.type_extra[(pos + 1)]
+            names.push(variant_sym)
+            payload_counts.push(payload_count)
+            let arm_bb = self.new_block()
+            arms.push(arm_bb as i32)
+            vals.push(self.enum_variant_discriminant_for_type(resolved, variant_sym))
+            targets.push(arm_bb as i32)
+            pos = pos + 2 + payload_count
+        let table = self.body.new_switch_table(vals, targets)
+        self.terminate(TermKind.TK_SWITCH_INT, disc, table, default_bb, 0)
+        for vi in 0..variant_count:
+            let arm_bb: i32 = arms[vi]
+            let variant_name_sym: i32 = names[vi]
+            let payload_count: i32 = payload_counts[vi]
+            self.switch_to(arm_bb as BlockId)
+            // Each arm's formatted payload texts drop inside the arm: another
+            // arm's path never initializes them (the #771 loop shape).
+            let arm_frame = self.push_stmt_temp_frame()
+            let variant_name = self.sema.pool_resolve(variant_name_sym).clone()
+            self.lower_debug_write_literal(buf_op, variant_name, 0)
+            if payload_count > 0:
+                self.lower_debug_write_literal(buf_op, "(", 0)
+                let variant_place = self.body.new_downcast_place(place, vi)
+                for pi in 0..payload_count:
+                    if pi > 0:
+                        self.lower_debug_write_literal(buf_op, ", ", 0)
+                    let payload_ty = self.enum_payload_type(resolved, vi, pi)
+                    let payload_place = self.body.new_field_place(variant_place, pi, payload_ty)
+                    self.lower_debug_write_place(buf_op, payload_place, payload_ty, 0)
+                self.lower_debug_write_literal(buf_op, ")", 0)
+            self.finish_stmt_temp_frame(arm_frame)
+            self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
+        self.switch_to(default_bb)
+        if self.sema.disc_repr_types.contains(enum_base):
+            // A discriminant enum holds any value of its repr (flag sets,
+            // casts); one no variant names is written as that value.
+            let default_frame = self.push_stmt_temp_frame()
+            let disc_ty = self.operand_type(disc)
+            self.lower_debug_write_inline(buf_op, disc, disc_ty, 0)
+            self.finish_stmt_temp_frame(default_frame)
+            self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
+        else:
+            self.terminate(TermKind.TK_UNREACHABLE, 0, 0, 0, 0)
+        self.switch_to(join_bb)
+
+    // `[elem, elem]` for an array, a slice (`vec_like` 0: element places by
+    // index) or a Vec (`vec_like` 1: its length by VEC_LEN, its element
+    // places by index too).
+    mut fn lower_debug_sequence(buf_op: i32, value_place: i32, resolved: i32, vec_like: i32):
+        self.lower_debug_write_literal(buf_op, "[", 0)
+        var place = value_place
+        if self.sema.get_type_kind(resolved as TypeId) == TypeKind.TY_SLICE:
+            // A slice is a Copy view: read it out of the borrow once — RK_LEN
+            // does not see through a deref projection (lower_sequence_place).
+            let view_local = self.new_temp(resolved)
+            place = self.place_for_local(view_local)
+            let view_op = self.body.new_operand(OperandKind.OK_COPY, value_place)
+            self.assign_operand_to_place(place, view_op, 0)
+        let len_local = self.new_temp(self.sema.ty_i64)
+        let len_place = self.place_for_local(len_local)
+        if vec_like != 0:
+            let len_args: Vec[i32] = Vec.new()
+            len_args.push(self.body.new_operand(OperandKind.OK_COPY, place))
+            let len_args_id = self.body.new_call_args(len_args)
+            self.body.set_call_intrinsic(len_args_id, MirIntrinsic.VEC_LEN)
+            let len_after_bb = self.new_block()
+            let len_unit = self.unit_operand()
+            self.terminate(TermKind.TK_CALL, len_unit, len_args_id, len_place, len_after_bb)
+            self.switch_to(len_after_bb)
+        else:
+            let len_rv = self.sequence_len_rvalue(place, resolved)
+            self.body.push_stmt(self.cur_bb, StmtKind.Assign, len_place, len_rv, 0)
+        let counter_local = self.new_temp(self.sema.ty_i64)
+        let counter_place = self.place_for_local(counter_local)
+        let zero_op = self.int_const_operand(0, self.sema.ty_i64)
+        let zero_rv = self.body.new_rvalue(RvalueKind.RK_USE, zero_op, 0, 0)
+        self.body.push_stmt(self.cur_bb, StmtKind.Assign, counter_place, zero_rv, 0)
+        let header_bb = self.new_block()
+        let body_bb = self.new_block()
+        let exit_bb = self.new_block()
+        self.terminate(TermKind.TK_GOTO, header_bb, 0, 0, 0)
+        // Header: counter < len
+        self.switch_to(header_bb)
+        let more_bb = self.lower_debug_counter_test(counter_place, len_place, BinaryOp.OP_LT, body_bb, exit_bb)
+        let _ = more_bb
+        self.switch_to(body_bb)
+        // The element's formatted text is dropped inside the iteration —
+        // the zero-iteration path never initializes it (#771).
+        let frame = self.push_stmt_temp_frame()
+        // Separator: counter > 0
+        let sep_bb = self.new_block()
+        let elem_bb = self.new_block()
+        let zero_place_local = self.new_temp(self.sema.ty_i64)
+        let zero_place = self.place_for_local(zero_place_local)
+        let zero_again = self.int_const_operand(0, self.sema.ty_i64)
+        let zero_again_rv = self.body.new_rvalue(RvalueKind.RK_USE, zero_again, 0, 0)
+        self.body.push_stmt(self.cur_bb, StmtKind.Assign, zero_place, zero_again_rv, 0)
+        let _sep = self.lower_debug_counter_test(counter_place, zero_place, BinaryOp.OP_GT, sep_bb, elem_bb)
+        self.switch_to(sep_bb)
+        self.lower_debug_write_literal(buf_op, ", ", 0)
+        self.terminate(TermKind.TK_GOTO, elem_bb, 0, 0, 0)
+        self.switch_to(elem_bb)
+        // The element is formatted where it lives (D27: `xs[i]` is the
+        // element place); nothing is copied out of the sequence.
+        let elem_ty = if vec_like != 0: self.sema.get_generic_inst_arg(resolved, 0) else: self.sema.get_type_d0(resolved as TypeId)
+        let elem_place = self.body.new_index_place(place, counter_local, elem_ty)
+        self.lower_debug_write_place(buf_op, elem_place, elem_ty, 0)
+        self.finish_stmt_temp_frame(frame)
+        // Increment: counter += 1
+        let cur_op = self.body.new_operand(OperandKind.OK_COPY, counter_place)
+        let one_op = self.int_const_operand(1, self.sema.ty_i64)
+        let next_rv = self.body.new_rvalue(RvalueKind.RK_BIN_OP, BinaryOp.OP_ADD, cur_op, one_op)
+        self.body.push_stmt(self.cur_bb, StmtKind.Assign, counter_place, next_rv, 0)
+        self.terminate(TermKind.TK_GOTO, header_bb, 0, 0, 0)
+        self.switch_to(exit_bb)
+        self.lower_debug_write_literal(buf_op, "]", 0)
+
+    // Branch on `lhs op rhs` (two i64 places): to `yes_bb` when it holds,
+    // else `no_bb`.
+    mut fn lower_debug_counter_test(lhs_place: i32, rhs_place: i32, op: i32, yes_bb: BlockId, no_bb: BlockId) -> i32:
+        let lhs_op = self.body.new_operand(OperandKind.OK_COPY, lhs_place)
+        let rhs_op = self.body.new_operand(OperandKind.OK_COPY, rhs_place)
+        let test_rv = self.body.new_rvalue(RvalueKind.RK_BIN_OP, op, lhs_op, rhs_op)
+        let test_local = self.new_temp(self.sema.ty_bool)
+        let test_place = self.place_for_local(test_local)
+        self.body.push_stmt(self.cur_bb, StmtKind.Assign, test_place, test_rv, 0)
+        let test_op = self.body.new_operand(OperandKind.OK_COPY, test_place)
+        let vals: Vec[i32] = Vec.new()
+        vals.push(1)
+        let targets: Vec[i32] = Vec.new()
+        targets.push(yes_bb as i32)
+        let table = self.body.new_switch_table(vals, targets)
+        self.terminate(TermKind.TK_SWITCH_INT, test_op, table, no_bb, 0)
+        test_local
+
     mut fn lower_fmt_with_spec(operand: i32, flags: i32, width: i32, precision: i32, sema_ty: i32, node: i32) -> i32:
         // Emit MirIntrinsic.FMT_SPEC with value + spec parameters.
         // args: [value, flags, width, precision, sema_type_id]
@@ -3311,9 +3604,14 @@ impl MirBuilder:
                     let spec_width = self.ast.get_data1(spec_node)
                     let spec_precision = self.ast.get_data2(spec_node)
                     if spec_mode == 63:
-                        // Debug mode: format to str then write
-                        let debug_str = self.lower_fmt_debug(expr_op, resolved_ty, node)
-                        self.lower_fstring_buf_write_str(buf_op, debug_str, node)
+                        // D61 (§15.4.7): `:?` formats the value where it
+                        // lives — its formatter borrows it.
+                        let debug_resolved = self.sema.resolve_alias(resolved_ty as TypeId) as i32
+                        if self.sema.debug_fmt_is_inline(self.sema.get_type_kind(debug_resolved as TypeId)):
+                            self.lower_debug_write_inline(buf_op, expr_op, debug_resolved, node)
+                        else:
+                            let debug_place = self.debug_operand_place(expr_op, resolved_ty, node)
+                            self.lower_debug_write_place(buf_op, debug_place, resolved_ty, node)
                         handled = true
                     else if spec_mode != 0 or spec_width > 0 or spec_precision >= 0 or (spec_flags & 0x1C0000) != 0:
                         // Spec formatting: emit FMT_BUF_WRITE_FMT intrinsic
@@ -3390,7 +3688,11 @@ impl MirBuilder:
         self.terminate(TermKind.TK_CALL, fn_op, args_id, result_place, next_bb)
         self.switch_to(next_bb)
         self.body.set_call_intrinsic(args_id, MirIntrinsic.STR_CLONE_REF)
-        self.body.new_operand(OperandKind.OK_MOVE, result_place)
+        // The clone is a fresh owned str its formatter only observes
+        // (FMT_DEBUG_STR, FMT_BUF_WRITE_FMT): the statement flush drops it.
+        // Unregistered, `{view:?}` and `{view:>5}` leaked one str each.
+        self.register_stmt_temp(result_local, self.sema.ty_str)
+        self.body.new_operand(OperandKind.OK_COPY, result_place)
 
     mut fn lower_fstring_buf_write_fmt(buf_op: i32, val_op: i32, flags: i32, width: i32, precision: i32, sema_ty: i32, node: i32):
         let fn_op = self.const_operand(ConstKind.CK_FN, self.pool.intern("fmt_buf_write_fmt"), self.sema.ty_void)
@@ -15808,6 +16110,34 @@ fn lower_concrete_specialization(sema: Sema, ast_pool: AstPool, pool: InternPool
     sema.generic_subst_type_ids = saved_subst_types
     ConcreteSpecializationLowerResult { sema, lowered }
 
+// D61 (§15.4.7): the body of one synthesized `:?` formatter,
+// `fn(value: &T) -> str`: the generated form of T, every component formatted
+// with `:?` (lower_debug_form). Sema registered the formatter, its signature
+// and every formatter it calls before the specialization fixpoint ended.
+fn lower_debug_formatter(sema: &Sema, ast_pool: AstPool, pool: InternPool, entry: i32) -> MirBody:
+    let fn_sym = sema.debug_fmt_fns[entry]
+    let sig = sema.debug_fmt_sigs[entry]
+    let tid = sema.debug_fmt_tids[entry]
+    var builder = MirBuilder.init(sema, ast_pool, pool, mir_symbol_for_pool(sema, pool, fn_sym))
+    builder.body.local_type_ids[0] = sema.ty_str as i32
+    builder.push_scope()
+    // The formatter borrows the value: the parameter is a view, never dropped here.
+    let param = builder.body.new_local(sema.sig_param_type(sig, 0), 0, pool.intern("value"), 1)
+    builder.body.push_stmt(builder.cur_bb, StmtKind.StorageLive, param, 0, 0)
+    builder.body.n_params = 1
+    let frame = builder.push_stmt_temp_frame()
+    let buf = builder.lower_fstring_buf_new(0)
+    let param_place = builder.place_for_local(param)
+    let value_place = builder.body.new_deref_place(param_place, tid)
+    builder.lower_debug_form(buf, value_place, tid)
+    let text = builder.lower_fstring_buf_finish(buf, 0)
+    let ret_place = builder.place_for_local(0)
+    builder.assign_operand_to_place(ret_place, text, 0)
+    builder.finish_stmt_temp_frame(frame)
+    builder.pop_scope_inline()
+    builder.terminate(TermKind.TK_RETURN, 0, 0, 0, 0)
+    return move builder.body
+
 fn lower_module(input_sema: Sema, ast_pool: AstPool, pool: InternPool) -> MirLowerResult:
     var sema = input_sema
     sema.prepare_source_line_offsets()
@@ -15883,6 +16213,12 @@ fn lower_module(input_sema: Sema, ast_pool: AstPool, pool: InternPool) -> MirLow
         // being dropped.
         if sema.type_kinds.len() as i32 != types_before_drop_registration:
             sema.preregister_mir_types()
+
+    // D61: the synthesized `:?` formatters come last — rechecking a
+    // specialization body registers formatters too — in registration order.
+    for entry in 0..sema.debug_fmt_tids.len() as i32:
+        if sema.debug_fmt_kinds[entry] == DebugFmtKind.SYNTH as i32:
+            mir_mod.add_body(lower_debug_formatter(&sema, ast_pool, pool, entry))
 
     mir_mod.validate_generic_call_contracts(&sema)
 

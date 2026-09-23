@@ -1,16 +1,18 @@
-//! expect-stdout: S.B("x")
-//! expect-stdout: S.C(7, "y")
-//! expect-stdout: S.A
-//! expect-stdout: Wrap { tag: S.C(7, "y"), n: 1 }
-//! expect-stdout: Level.High
+//! expect-stdout: B("x")
+//! expect-stdout: C(7, "y")
+//! expect-stdout: A
+//! expect-stdout: Wrap { tag: C(7, "y"), n: 1 }
+//! expect-stdout: High
 //! expect-stdout: x
 //! expect-stdout: y 7
 
 // #1289: `@[derive(Debug, Clone)]` on an enum generates the impls for data
 // enums (§11.8's own example derives on an enum); it used to be accepted
 // and generate nothing. Payload names are positional in the Debug form
-// (the parser keeps no payload names). Clone clones a non-Copy payload
-// and reads a Copy one; `derive(all)` on an enum takes Debug and Clone.
+// (the parser keeps no payload names). The derived debug_str is the `:?`
+// generated form — `Variant(payload)`, a str quoted (§15.4.7, D61).
+// Clone clones a non-Copy payload and reads a Copy one; `derive(all)` on
+// an enum takes Debug and Clone.
 
 @[derive(Debug, Clone)]
 enum S { A | B(str) | C(code: i32, label: str) }

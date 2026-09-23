@@ -7783,12 +7783,8 @@ impl Sema:
                 // Validate format spec against expression type
                 if spec_node != 0:
                     self.validate_fstring_spec(spec_node, expr_ty as i32, expr_node)
-                else:
-                    // Bare {expr} without spec: reject structs (no default display)
-                    let resolved = if expr_ty != 0: self.resolve_alias(expr_ty) else: 0 as TypeId
-                    let tk = if resolved != 0: self.get_type_kind(resolved) else: 0
-                    if tk == TypeKind.TY_STRUCT:
-                        self.emit_error("struct type has no default display; use :? for debug", expr_node)
+                else if expr_ty != 0:
+                    self.check_display_interpolant(expr_ty as i32, expr_node)
                 pos = pos + 3  // kind + expr + spec
             else:
                 pos = pos + 1
@@ -7829,7 +7825,10 @@ impl Sema:
         if mode == 115:
             if not is_str:
                 self.emit_error("format mode requires string type", spec_node)
-        // ? → any type (always valid)
+        // ? → any type: every component the value holds is registered with
+        // its own formatter (D61).
+        if mode == 63 and expr_ty != 0:
+            let _entry = self.ensure_debug_formatter(expr_ty, expr_node)
         // Field/type compatibility (format-design.md §4.2)
         // precision → floats and strings only
         if precision >= 0:
@@ -7845,6 +7844,274 @@ impl Sema:
         if sign_plus != 0:
             if not is_numeric:
                 self.emit_error("sign '+' requires numeric type", spec_node)
+
+    // §15.4.8: a bare `{expr}` formats the value's default display — a
+    // number, bool, str, raw pointer, or an enum (its variant, and each
+    // payload's display). A struct, collection, tuple or array has none:
+    // the programmer spells `:?`. An enum payload with no default display
+    // of its own shows its Debug form, D61's one formatter, registered here.
+    mut fn check_display_interpolant(tid: i32, node: i32):
+        let resolved = self.resolve_alias(tid as TypeId) as i32
+        let kind = self.get_type_kind(resolved as TypeId)
+        if kind == TypeKind.TY_REF:
+            self.check_display_interpolant(self.get_type_d0(resolved as TypeId), node)
+            return
+        if kind == TypeKind.TY_ERR or kind == TypeKind.TY_VOID or self.debug_fmt_is_inline(kind):
+            return
+        if self.debug_fmt_enum_base(resolved) != 0:
+            self.register_display_payload_formatters(resolved, node, 0)
+            return
+        if kind == TypeKind.TY_STRUCT:
+            self.emit_error("struct type has no default display; use :? for debug", node)
+            return
+        self.emit_error("type '" ++ self.type_name(resolved) ++ "' has no default display; use :? for debug", node)
+
+    mut fn register_display_payload_formatters(enum_ty: i32, node: i32, depth: i32):
+        let components = self.debug_fmt_components(enum_ty)
+        for ci in 0..components.len() as i32:
+            var payload = self.resolve_alias(components[ci] as TypeId) as i32
+            while self.get_type_kind(payload as TypeId) == TypeKind.TY_REF:
+                payload = self.resolve_alias(self.get_type_d0(payload as TypeId)) as i32
+            let kind = self.get_type_kind(payload as TypeId)
+            if kind == TypeKind.TY_ERR or kind == TypeKind.TY_VOID or self.debug_fmt_is_inline(kind):
+                continue
+            // A nested enum displays its own payloads; an enum cannot hold
+            // itself except through a Box or a view, so the depth bound only
+            // guards a view cycle.
+            if self.debug_fmt_enum_base(payload) != 0:
+                if depth < 64:
+                    self.register_display_payload_formatters(payload, node, depth + 1)
+                continue
+            let _ = self.ensure_debug_formatter(payload, node)
+
+    // D61 (§15.4.7): a value `:?` formats in place, with no formatter of its
+    // own — numbers, bool, str (quoted and escaped by the runtime), Unit,
+    // and a raw pointer (its address).
+    fn debug_fmt_is_inline(kind: i32) -> bool:
+        kind == TypeKind.TY_INT or kind == TypeKind.TY_FLOAT or kind == TypeKind.TY_BOOL or
+            kind == TypeKind.TY_STR or kind == TypeKind.TY_VOID or kind == TypeKind.TY_PTR or
+            kind == TypeKind.TY_NEVER
+
+    // Result.unwrap/expect panics with "called unwrap on Err: {e:?}" (both
+    // backends, codegen); the error's formatter is registered here when the
+    // error has a `:?` form. One without (a `dyn Error`) panics without it.
+    mut fn register_unwrap_err_formatter(err_ty: i32, node: i32):
+        if self.debug_fmt_has_form(err_ty):
+            let _ = self.ensure_debug_formatter(err_ty, node)
+
+    // Whether `tid` has a `:?` form at every depth, without registering or
+    // reporting anything: an unwrap's Err panic shows the error's `:?` form
+    // only when it has one (a `dyn Error` has none). A type already being
+    // asked about (debug_fmt_probe_visiting) answers from its other parts,
+    // so a recursive type terminates.
+    mut fn debug_fmt_has_form(tid: i32) -> bool:
+        if tid <= 0:
+            return false
+        let resolved = self.resolve_alias(tid as TypeId) as i32
+        let kind = self.get_type_kind(resolved as TypeId)
+        if kind == TypeKind.TY_REF:
+            return self.debug_fmt_has_form(self.get_type_d0(resolved as TypeId))
+        if self.debug_fmt_is_inline(kind) or self.debug_fmt_index.contains(resolved) or self.debug_fmt_probe_visiting.contains(resolved):
+            return true
+        let structural = kind == TypeKind.TY_STRUCT or kind == TypeKind.TY_ENUM or kind == TypeKind.TY_TUPLE or
+            kind == TypeKind.TY_ARRAY or kind == TypeKind.TY_SLICE or kind == TypeKind.TY_GENERIC_INST
+        if not structural:
+            return false
+        if (kind == TypeKind.TY_STRUCT or kind == TypeKind.TY_ENUM or kind == TypeKind.TY_GENERIC_INST) and self.debug_fmt_explicit_impl(resolved):
+            return true
+        let base = if kind == TypeKind.TY_GENERIC_INST: self.get_generic_inst_base(resolved) else: 0
+        self.debug_fmt_probe_visiting.insert(resolved, 1)
+        var ok = true
+        if base != 0 and (base == self.syms.hashmap or base == self.syms.btreemap):
+            ok = self.debug_fmt_has_form(self.get_generic_inst_arg(resolved, 0)) and self.debug_fmt_has_form(self.get_generic_inst_arg(resolved, 1))
+        else if kind == TypeKind.TY_GENERIC_INST and base != self.syms.vec and base != self.syms.box and
+            self.debug_fmt_enum_base(resolved) == 0 and not self.debug_fmt_generic_struct(resolved):
+            ok = false
+        else:
+            let components = self.debug_fmt_components(resolved)
+            for ci in 0..components.len() as i32:
+                if ok and not self.debug_fmt_has_form(components[ci]):
+                    ok = false
+        self.debug_fmt_probe_visiting.remove(resolved)
+        ok
+
+    // D61: a Debug impl `:?` dispatches through — one the program wrote.
+    // A derived or `error`-generated impl is the generated form itself.
+    mut fn debug_fmt_explicit_impl(resolved: i32) -> bool:
+        let owner = self.method_owner_symbol_for_type(resolved)
+        if owner == 0 or self.ast.is_generated_debug_type(owner):
+            return false
+        self.type_implements_trait(resolved, self.syms.debug_trait) != 0
+
+    mut fn debug_fmt_push(resolved: i32, kind: DebugFmtKind, fn_sym: i32) -> i32:
+        let entry = self.debug_fmt_tids.len() as i32
+        self.debug_fmt_index.insert(resolved, entry)
+        self.debug_fmt_tids.push(resolved)
+        self.debug_fmt_kinds.push(kind as i32)
+        self.debug_fmt_fns.push(fn_sym)
+        self.debug_fmt_sigs.push(-1)
+        self.debug_fmt_monos.push(0)
+        self.debug_fmt_aux_fns.push(0)
+        self.debug_fmt_aux_sigs.push(-1)
+        self.debug_fmt_aux_monos.push(0)
+        entry
+
+    // `method` of `resolved`'s owner — its debug_str, a collection's
+    // formatter, Box's as_ref — or 0.
+    mut fn debug_fmt_method_fn(resolved: i32, method: &str) -> i32:
+        let owner = self.method_owner_symbol_for_type(resolved)
+        let method_sym = self.pool_intern(method)
+        let method_fn = self.lookup_method_fn(owner, method_sym)
+        if method_fn != 0: method_fn else: self.lookup_generic_method_fn(owner, method_sym)
+
+    // `method`'s signature specialized for the concrete owner, or -1 after
+    // an error naming the type.
+    mut fn debug_fmt_method_sig(resolved: i32, method_fn: i32, method: &str, node: i32) -> i32:
+        let owner = self.method_owner_symbol_for_type(resolved)
+        let sig = if method_fn != 0: self.concrete_owner_method_sig(owner, resolved, method_fn) else: -1
+        if sig < 0:
+            self.emit_error("cannot format '" ++ self.type_name(resolved) ++ "' with :?: its " ++ method ++ " method could not be resolved for this type", node)
+        else if self.get_type_kind(self.resolve_alias(self.sig_param_type(sig, 0) as TypeId)) != TypeKind.TY_REF:
+            // The formatter observes: a receiver that consumes cannot be
+            // called on a value `:?` only reads.
+            self.emit_error("cannot format '" ++ self.type_name(resolved) ++ "' with :?: its " ++ method ++ " must observe its receiver (`fn " ++ method ++ "()` or `self: &Self`)", node)
+            return -1
+        sig
+
+    // The method a type's formatter calls (its debug_str, a collection's
+    // formatter), specialized for the concrete owner.
+    mut fn debug_fmt_bind_method(entry: i32, resolved: i32, method: &str, node: i32) -> bool:
+        let method_fn = self.debug_fmt_method_fn(resolved, method)
+        let sig = self.debug_fmt_method_sig(resolved, method_fn, method, node)
+        if sig < 0:
+            return false
+        self.debug_fmt_fns[entry] = method_fn
+        self.debug_fmt_sigs[entry] = sig
+        self.debug_fmt_monos[entry] = self.sig_names[sig]
+        true
+
+    // The formatter `:?` calls for `tid`, registered with every formatter it
+    // reaches (§15.4.7: every field, payload and element is formatted with
+    // `:?`). -1 when the value is formatted inline, or when it cannot be
+    // formatted at all — then the error names the type. The entry exists
+    // before its components are registered, so a recursive type (through
+    // Box, Vec, ...) reaches itself and stops.
+    mut fn ensure_debug_formatter(tid: i32, node: i32) -> i32:
+        if tid <= 0:
+            return -1
+        let resolved = self.resolve_alias(tid as TypeId) as i32
+        let kind = self.get_type_kind(resolved as TypeId)
+        if kind == TypeKind.TY_REF:
+            return self.ensure_debug_formatter(self.get_type_d0(resolved as TypeId), node)
+        if kind == TypeKind.TY_ERR or self.debug_fmt_is_inline(kind):
+            return -1
+        if self.debug_fmt_index.contains(resolved):
+            return self.debug_fmt_index.get(resolved).unwrap()
+        let structural = kind == TypeKind.TY_STRUCT or kind == TypeKind.TY_ENUM or kind == TypeKind.TY_TUPLE or
+            kind == TypeKind.TY_ARRAY or kind == TypeKind.TY_SLICE or kind == TypeKind.TY_GENERIC_INST
+        if not structural:
+            self.emit_error("cannot format a value of type '" ++ self.type_name(resolved) ++ "' with :? — §15.4.7 gives it no Debug form", node)
+            return -1
+        let base = if kind == TypeKind.TY_GENERIC_INST: self.get_generic_inst_base(resolved) else: 0
+        if (kind == TypeKind.TY_STRUCT or kind == TypeKind.TY_ENUM or kind == TypeKind.TY_GENERIC_INST) and self.debug_fmt_explicit_impl(resolved):
+            let entry = self.debug_fmt_push(resolved, DebugFmtKind.IMPL, 0)
+            let _ = self.debug_fmt_bind_method(entry, resolved, "debug_str", node)
+            return entry
+        if base != 0 and (base == self.syms.hashmap or base == self.syms.btreemap):
+            // The collection's own `:?` form lives in std.collections as a
+            // With method; its body's `{k:?}`/`{v:?}` register K and V.
+            let entry = self.debug_fmt_push(resolved, DebugFmtKind.HELPER, 0)
+            let _ = self.debug_fmt_bind_method(entry, resolved, "debug_form", node)
+            return entry
+        if kind == TypeKind.TY_GENERIC_INST and base != self.syms.vec and base != self.syms.box and
+            self.debug_fmt_enum_base(resolved) == 0 and not self.debug_fmt_generic_struct(resolved):
+            self.emit_error("cannot format a value of type '" ++ self.type_name(resolved) ++ "' with :? — §15.4.7 gives it no Debug form", node)
+            return -1
+        let fn_sym = self.pool_intern(f"__with_debug_fmt_{resolved}")
+        let entry = self.debug_fmt_push(resolved, DebugFmtKind.SYNTH, fn_sym)
+        let view_ty = self.ensure_exact_type(TypeKind.TY_REF, resolved, 0, 0) as i32
+        let params: Vec[i32] = Vec.new()
+        params.push(view_ty)
+        let fn_tid = self.ensure_fn_type(params, 1, self.ty_str) as i32
+        let param_start = self.sig_params.len() as i32
+        self.sig_params.push(view_ty)
+        self.add_sig(fn_sym, fn_tid, self.ty_str as i32, param_start, 1, 0)
+        let sig = self.get_sig(fn_sym)
+        self.set_sig_param_effect(sig, 0, EFF_READ)
+        self.set_sig_param_direct_effect(sig, 0, EFF_READ)
+        self.debug_fmt_sigs[entry] = sig
+        self.debug_fmt_monos[entry] = fn_sym
+        self.debug_fmt_synth_syms.insert(fn_sym, entry)
+        if base == self.syms.box:
+            // A Box formats what it owns, read through Box.as_ref: the
+            // backends represent the box differently, its accessor is one.
+            let accessor = self.debug_fmt_method_fn(resolved, "as_ref")
+            let accessor_sig = self.debug_fmt_method_sig(resolved, accessor, "as_ref", node)
+            if accessor_sig >= 0:
+                self.debug_fmt_aux_fns[entry] = accessor
+                self.debug_fmt_aux_sigs[entry] = accessor_sig
+                self.debug_fmt_aux_monos[entry] = self.sig_names[accessor_sig]
+        let components = self.debug_fmt_components(resolved)
+        for ci in 0..components.len() as i32:
+            let _ = self.ensure_debug_formatter(components[ci], node)
+        entry
+
+    // The declared template of a generic inst, by registration truth — a
+    // formatter is registered in whatever module formats the value (a std
+    // collection's body formats the user's element type), so the lookup
+    // cannot depend on which names that module imports.
+    fn debug_fmt_template(resolved: i32) -> i32:
+        let base_tid = self.type_reflection_base_template(self.get_generic_inst_base(resolved))
+        if base_tid == 0: 0 else: self.resolve_alias(base_tid as TypeId) as i32
+
+    fn debug_fmt_generic_struct(resolved: i32) -> bool:
+        let template = self.debug_fmt_template(resolved)
+        template != 0 and self.get_type_kind(template as TypeId) == TypeKind.TY_STRUCT
+
+    // The enum declaration whose variants `resolved` has: itself, or the
+    // template of a generic enum inst (Option[T], Result[T, E], ...). 0 when
+    // `resolved` is not an enum.
+    fn debug_fmt_enum_base(resolved: i32) -> i32:
+        let kind = self.get_type_kind(resolved as TypeId)
+        if kind == TypeKind.TY_ENUM: return resolved
+        if kind != TypeKind.TY_GENERIC_INST: return 0
+        let template = self.debug_fmt_template(resolved)
+        if template != 0 and self.get_type_kind(template as TypeId) == TypeKind.TY_ENUM: template else: 0
+
+    // The types a synthesized formatter formats inside `resolved`, in order.
+    mut fn debug_fmt_components(resolved: i32) -> Vec[i32]:
+        let out: Vec[i32] = Vec.new()
+        let kind = self.get_type_kind(resolved as TypeId)
+        if kind == TypeKind.TY_TUPLE:
+            let te = self.get_type_d0(resolved as TypeId)
+            for ei in 0..self.get_type_d1(resolved as TypeId):
+                out.push(self.type_extra[(te + ei)])
+            return out
+        if kind == TypeKind.TY_ARRAY or kind == TypeKind.TY_SLICE:
+            out.push(self.get_type_d0(resolved as TypeId))
+            return out
+        let base = if kind == TypeKind.TY_GENERIC_INST: self.get_generic_inst_base(resolved) else: 0
+        if base != 0 and (base == self.syms.vec or base == self.syms.box):
+            out.push(self.get_generic_inst_arg(resolved, 0))
+            return out
+        let enum_base = self.debug_fmt_enum_base(resolved)
+        if enum_base != 0:
+            var pos = self.get_type_d1(enum_base as TypeId)
+            for _ in 0..self.get_type_d2(enum_base as TypeId):
+                let variant_sym: i32 = self.type_extra[pos]
+                let payload_count: i32 = self.type_extra[(pos + 1)]
+                if base != 0:
+                    let payloads = self.resolve_generic_enum_payload(resolved, base, variant_sym, payload_count)
+                    for pi in 0..payloads.len() as i32:
+                        out.push(payloads[pi])
+                else:
+                    for pi in 0..payload_count:
+                        out.push(self.type_extra[(pos + 2 + pi)])
+                pos = pos + 2 + payload_count
+            return out
+        for fi in 0..self.type_reflection_field_count(resolved):
+            out.push(self.type_reflection_field_type(resolved, fi))
+        out
 
 type SemaOperatorCandidate {
     sig: i32,
@@ -22810,6 +23077,7 @@ impl Sema:
                         self.emit_error("Result.unwrap() expects no arguments", node)
                         return 0
                     let result_unwrapped = self.get_generic_inst_arg(recv_type, 0)
+                    self.register_unwrap_err_formatter(self.get_generic_inst_arg(recv_type, 1), node)
                     self.record_transparent_view_origins(node, expr)
                     return self.exact_eliminated_payload_type(obj_type as i32, result_unwrapped)
                 if field == self.syms.expect:
@@ -22820,6 +23088,7 @@ impl Sema:
                     if self.check_builtin_method_call_arg("Result.expect", 0, self.ty_str as i32, res_msg_ty, self.ast.get_extra(extra_start)) == 0:
                         return 0
                     let result_expected = self.get_generic_inst_arg(recv_type, 0)
+                    self.register_unwrap_err_formatter(self.get_generic_inst_arg(recv_type, 1), node)
                     self.record_transparent_view_origins(node, expr)
                     return self.exact_eliminated_payload_type(obj_type as i32, result_expected)
                 let result_default_node = if mc_resolved_arg_count > 0:

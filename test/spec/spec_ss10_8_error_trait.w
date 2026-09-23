@@ -34,7 +34,7 @@ fn main:
     assert(dyn_source_is_none(&plain))
 
     assert(describe_display(ParseError.Bad("display")) == "Bad(display)")
-    assert(describe_debug(ParseError.Bad("debug")) == "Bad(debug)")
+    assert(describe_debug(ParseError.Bad("debug")) == "Bad(\"debug\")")
 
     let wrapped = fail_root().context("outer").err().unwrap()
     assert(wrapped.display() == "outer")

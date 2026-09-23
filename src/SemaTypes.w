@@ -33,3 +33,13 @@ type TypeId = i32
 enum BorrowKind: i32:
     SHARED = 0
     EXCLUSIVE = 1
+
+// D61 (§15.4.7): how `:?` formats one registered type (Sema.debug_fmt_*).
+enum DebugFmtKind: i32:
+    // A formatter MirLower synthesizes: struct, enum, tuple, array, slice,
+    // Vec, Box — each component formatted with `:?`.
+    SYNTH = 1
+    // An explicit `impl Debug`: its debug_str, at every depth.
+    IMPL = 2
+    // A std collection's formatter method (HashMap, BTreeMap).
+    HELPER = 3

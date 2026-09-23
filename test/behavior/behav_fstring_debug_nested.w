@@ -15,7 +15,7 @@ type Player {
 fn test_nested_struct_with_primitives:
     let p = Player { name: "alice", score: 42 }
     let s = f"{p:?}"
-    assert(s == "Player { name: alice, score: 42 }")
+    assert(s == "Player { name: \"alice\", score: 42 }")
 
 fn test_simple_vec2:
     let v = Vec2 { x: 1, y: 2 }

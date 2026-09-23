@@ -599,6 +599,9 @@ type AstPoolState {
     fn_effect_pin_bits: Vec[i32],              // effect bitmask
     // NK_COPY_ARG nodes that require a .clone() call (type is Clone-only, not Copy)
     copy_arg_needs_clone: HashMap[i32, i32],   // node → 1
+    // D61: type symbols whose Debug impl the compiler generated (a derive,
+    // an `error` declaration). `:?` formats them with the generated form.
+    generated_debug_type_syms: Vec[i32],
     frozen: i32,
 }
 
@@ -690,6 +693,7 @@ fn AstPool.new -> AstPool:
             fn_effect_pin_params: Vec.new(),
             fn_effect_pin_bits: Vec.new(),
             copy_arg_needs_clone: HashMap.new(),
+            generated_debug_type_syms: Vec.new(),
             frozen: 0,
         }
     let st = ptr
@@ -1611,6 +1615,16 @@ impl AstPool:
     fn is_sealed_trait_node(node: NodeId) -> i32:
         if self.state.sealed_trait_set.contains(node as i32): return 1
         0
+
+    fn mark_generated_debug_type(type_sym: i32):
+        if not self.is_generated_debug_type(type_sym):
+            self.state.generated_debug_type_syms.push(type_sym)
+
+    fn is_generated_debug_type(type_sym: i32) -> bool:
+        for i in 0..self.state.generated_debug_type_syms.len() as i32:
+            if self.state.generated_debug_type_syms[i] == type_sym:
+                return true
+        false
 
     fn mark_extend_impl(node: NodeId):
         self.state.extend_impl_nodes.push(node as i32)

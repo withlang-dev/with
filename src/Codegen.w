@@ -1999,9 +1999,14 @@ impl Codegen:
             if wl_type_of(out) == expected_ty:
                 return out
 
-        // Auto-coerce numeric to str (for f-string interpolation)
+        // Auto-coerce numeric to str (for f-string interpolation), and a C
+        // string pointer. Nothing else: any other value falls to the loud
+        // error below — it once became the text "<unsupported>" (D61).
         let str_ty = self.resolve_named_type(self.intern.intern("str"))
-        if expected_ty == str_ty and out != 0:
+        let out_kind = if out != 0: wl_get_type_kind(wl_type_of(out)) else: 0
+        let out_is_scalar = out_kind == wl_integer_type_kind() or out_kind == wl_float_type_kind() or
+            out_kind == wl_double_type_kind() or out_kind == wl_pointer_type_kind()
+        if expected_ty == str_ty and out_is_scalar:
             let coerced_str = self.coerce_val_to_str(out, str_ty)
             if wl_type_of(coerced_str) == str_ty:
                 return coerced_str
@@ -5303,7 +5308,7 @@ impl Codegen:
     mut fn declare_generator_next_functions():
         for si in 0..self.sema.sig_names.len() as i32:
             let fn_sym: i32 = self.sema.sig_names[si]
-            if not self.sema.generator_next_fn_syms.contains(fn_sym):
+            if not self.sema.generator_next_fn_syms.contains(fn_sym) and not self.sema.debug_fmt_synth_syms.contains(fn_sym):
                 continue
             self.declare_function_from_sig(fn_sym, si, 1)
 

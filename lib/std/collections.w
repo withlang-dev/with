@@ -163,6 +163,71 @@ impl[K: Ord, V] Iterable[(K, V)] for BTreeMap[K, V]:
     fn iter() -> VecIter[(K, V)]:
         self.entries.iter()
 
+// §15.4.7 / D61: the `:?` forms of the maps. The compiler calls these for
+// every map an f-string formats with `:?`, at any depth; `{k:?}` and `{v:?}`
+// are the same recursive formatter, so a map formats the same everywhere.
+
+// `{key: value, key: value}` in key order.
+impl[K: Ord, V] BTreeMap[K, V]:
+    fn debug_form() -> str:
+        let parts: Vec[str] = Vec.with_capacity(self.entries.len())
+        var i: i64 = 0
+        while i < self.entries.len():
+            parts.push(f"{self.key_at(i):?}: {self.value_at(i):?}")
+            i = i + 1
+        "{" ++ parts.join(", ") ++ "}"
+
+// `{key: value, key: value}` ordered by the Debug text of the keys: a key
+// need not be Ord, and the hash order is seeded — a snapshot or a fixpoint
+// would differ run to run. Each key and value is formatted once; the order
+// is a stable merge sort of indices, so equal key text falls back to the
+// value text and the output is byte-identical for equal maps.
+impl[K, V] HashMap[K, V]:
+    fn debug_form() -> str:
+        let keys: Vec[str] = Vec.with_capacity(self.len())
+        let values: Vec[str] = Vec.with_capacity(self.len())
+        for (key, value) in self:
+            keys.push(f"{key:?}")
+            values.push(f"{value:?}")
+        let order = debug_entry_order(&keys, &values)
+        let parts: Vec[str] = Vec.with_capacity(order.len())
+        for i in order:
+            parts.push(f"{keys[i]}: {values[i]}")
+        "{" ++ parts.join(", ") ++ "}"
+
+fn debug_entry_before(keys: &Vec[str], values: &Vec[str], a: i64, b: i64) -> bool:
+    keys[a] < keys[b] or (keys[a] == keys[b] and values[a] < values[b])
+
+// Bottom-up merge sort of 0..n by (key text, value text): n log n
+// comparisons, one scratch buffer, no allocation per comparison.
+fn debug_entry_order(keys: &Vec[str], values: &Vec[str]) -> Vec[i64]:
+    let n = keys.len()
+    let order: Vec[i64] = Vec.with_capacity(n)
+    let scratch: Vec[i64] = Vec.with_capacity(n)
+    for i in 0..n:
+        order.push(i)
+        scratch.push(i)
+    var width: i64 = 1
+    while width < n:
+        var lo: i64 = 0
+        while lo < n:
+            let mid = if lo + width < n: lo + width else: n
+            let hi = if lo + 2 * width < n: lo + 2 * width else: n
+            var a = lo
+            var b = mid
+            for k in lo..hi:
+                if a < mid and (b >= hi or not debug_entry_before(keys, values, order[b], order[a])):
+                    scratch[k] = order[a]
+                    a = a + 1
+                else:
+                    scratch[k] = order[b]
+                    b = b + 1
+            for k in lo..hi:
+                order[k] = scratch[k]
+            lo = hi
+        width = width * 2
+    order
+
 pub fn BTreeSet.new[T]() -> BTreeSet[T]:
     BTreeSet { values: Vec.new() }
 

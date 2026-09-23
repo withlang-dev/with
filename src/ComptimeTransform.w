@@ -139,6 +139,8 @@ fn astpool_clone_deep(src: AstPool) -> AstPool:
         out.mark_sealed_trait((src.state.sealed_trait_nodes[si]) as NodeId)
     for ei in 0..src.state.extend_impl_nodes.len() as i32:
         out.mark_extend_impl((src.state.extend_impl_nodes[ei]) as NodeId)
+    for gi in 0..src.state.generated_debug_type_syms.len() as i32:
+        out.mark_generated_debug_type(src.state.generated_debug_type_syms[gi])
     for ci in 0..src.state.comptime_decl_nodes.len() as i32:
         out.mark_comptime_decl((src.state.comptime_decl_nodes[ci]) as NodeId)
     for ki in 0..src.state.const_decl_nodes.len() as i32:
@@ -2441,9 +2443,6 @@ impl Sema:
         generated.push(impl_node as i32)
         generated
 
-fn ct_build_concat(out: AstPool, decl: i32, lhs: i32, rhs: i32) -> i32:
-    out.ct_build_binary(decl, BinaryOp.OP_CONCAT, lhs, rhs)
-
 fn ct_build_fstring_self(out: AstPool, decl: i32, self_sym: i32, debug_mode: i32, deref_self: i32) -> i32:
     let spec_node =
         if debug_mode != 0:
@@ -2509,6 +2508,10 @@ impl Sema:
             return generated
 
         let debug_impl = self.ct_generate_error_format_impl(out, intern, decl, intern.intern("Debug"), intern.intern("debug_str"), 1, FN_PARAM_FLAG_MOVE_SELF)
+        // D61: the generated debug_str is `f"{self:?}"`, the generated form;
+        // `:?` must not dispatch back through it.
+        if debug_impl.len() > 0:
+            out.mark_generated_debug_type(out.get_data0(decl))
         for i in 0..debug_impl.len() as i32:
             generated.push(debug_impl[i])
 
@@ -2521,32 +2524,6 @@ impl Sema:
             generated.push(error_impl[i])
 
         generated
-
-    // #1289: an enum's Debug arm is `Type.Variant` or `Type.Variant(p0, p1)`
-    // with each payload's own debug_str — positional, as the parser keeps
-    // no payload names.
-    fn ct_enum_debug_body(out: AstPool, intern: InternPool, decl: i32, resolved: TypeId, type_name: &str, self_sym: i32, debug_method_sym: i32) -> i32:
-        let start = out.get_start(decl)
-        let end = out.get_end(decl)
-        let arms: Vec[i32] = Vec.new()
-        var pos = self.get_type_d1(resolved)
-        for _ in 0..self.get_type_d2(resolved):
-            let variant_sym = self.type_extra[pos]
-            let payload_count = self.type_extra[(pos + 1)]
-            let pat = ct_build_variant_bind_pattern(out, intern, decl, variant_sym, payload_count)
-            var body = out.ct_build_string_lit(intern, decl, type_name ++ "." ++ intern.resolve(variant_sym))
-            if payload_count > 0:
-                body = ct_build_concat(out, decl, body, out.ct_build_string_lit(intern, decl, "("))
-                for pi in 0..payload_count:
-                    if pi > 0:
-                        body = ct_build_concat(out, decl, body, out.ct_build_string_lit(intern, decl, ", "))
-                    let no_args: Vec[i32] = Vec.new()
-                    let payload_debug = ct_build_method_call(out, decl, out.ct_build_ident(decl, ct_payload_bind_sym(intern, pi)), debug_method_sym, no_args)
-                    body = ct_build_concat(out, decl, body, payload_debug)
-                body = ct_build_concat(out, decl, body, out.ct_build_string_lit(intern, decl, ")"))
-            arms.push(out.add_node(NodeKind.NK_MATCH_ARM, start, end, pat, body, 0) as i32)
-            pos = pos + 2 + payload_count
-        ct_build_match(out, decl, out.ct_build_ident(decl, self_sym), arms)
 
     fn ct_generate_debug_derive(out: AstPool, intern: InternPool, decl: i32) -> Vec[i32]:
         let generated: Vec[i32] = Vec.new()
@@ -2583,22 +2560,11 @@ impl Sema:
         let self_type = out.add_node(NodeKind.NK_TYPE_REF, start, end, self_pointee_type as i32, 0, 0)
         let ret_type = out.add_node(NodeKind.NK_TYPE_NAMED, start, end, str_sym, 0, 0)
 
-        var body = 0
-        if is_enum:
-            body = self.ct_enum_debug_body(out, intern, decl, resolved, type_name, self_sym, debug_method_sym)
-        else:
-            let te_start = self.get_type_d1(resolved)
-            let field_count = self.get_type_d2(resolved)
-            body = out.ct_build_string_lit(intern, decl, type_name ++ " {")
-            for fi in 0..field_count:
-                let field_sym = self.type_extra[(te_start + fi * 3)]
-                let prefix = if fi == 0: " " else: ", "
-                body = ct_build_concat(out, decl, body, out.ct_build_string_lit(intern, decl, prefix ++ intern.resolve(field_sym) ++ ": "))
-                let field_expr = ct_build_self_field(out, decl, self_sym, field_sym)
-                let no_args: Vec[i32] = Vec.new()
-                let field_debug = ct_build_method_call(out, decl, field_expr, debug_method_sym, no_args)
-                body = ct_build_concat(out, decl, body, field_debug)
-            body = ct_build_concat(out, decl, body, out.ct_build_string_lit(intern, decl, " }"))
+        // §11.8 / D61: the derived debug_str IS the generated form — `f"{self:?}"`
+        // — so `x.debug_str()` and `f"{x:?}"` agree at every depth. `:?`
+        // never dispatches through this impl (AstPool.is_generated_debug_type).
+        let body = ct_build_fstring_self(out, decl, self_sym, 1, 0)
+        out.mark_generated_debug_type(type_name_sym)
 
         let param_start = out.extra_len()
         out.ct_add_fn_param(self_sym, self_type as i32, FN_PARAM_FLAG_REF_SELF)

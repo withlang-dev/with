@@ -1002,6 +1002,29 @@ pub type Sema {
     clone_contract_fns: HashMap[i32, i32],
     clone_contract_sigs: HashMap[i32, i32],
     clone_contract_mono_syms: HashMap[i32, i32],
+    // D61 (§15.4.7): the `:?` formatter registry. Every type an f-string
+    // formats with `:?` that is not formatted inline (numbers, bool, str,
+    // Unit, raw pointers, views of those) has one entry, and so does every
+    // type inside it: an explicit `impl Debug` (its debug_str), a std
+    // collection's formatter method, or a formatter MirLower synthesizes
+    // after the specialization fixpoint. Entries are keyed by resolved
+    // type and kept in registration order (the synthesized bodies' order).
+    debug_fmt_index: HashMap[i32, i32],
+    debug_fmt_tids: Vec[i32],
+    debug_fmt_kinds: Vec[i32],
+    debug_fmt_fns: Vec[i32],
+    debug_fmt_sigs: Vec[i32],
+    debug_fmt_monos: Vec[i32],
+    // A Box entry's accessor (Box[T].as_ref, specialized): the formatter
+    // reads the payload through the library's own view of it.
+    debug_fmt_aux_fns: Vec[i32],
+    debug_fmt_aux_sigs: Vec[i32],
+    debug_fmt_aux_monos: Vec[i32],
+    // Synthesized formatter symbol -> its entry (codegen declares these
+    // MIR-only functions the way it declares generator `next` bodies).
+    debug_fmt_synth_syms: HashMap[i32, i32],
+    // debug_fmt_has_form's in-progress types (a recursion guard).
+    debug_fmt_probe_visiting: HashMap[i32, i32],
     // Auto-deref adjustment sidecar: expression node -> contiguous step range.
     // Step fn 0 means builtin &/* deref; non-zero is a user Deref.deref fn.
     autoderef_step_starts: HashMap[i32, i32],
@@ -2354,6 +2377,17 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         clone_contract_fns: sema_new_map_i32_i32(),
         clone_contract_sigs: sema_new_map_i32_i32(),
         clone_contract_mono_syms: sema_new_map_i32_i32(),
+        debug_fmt_index: sema_new_map_i32_i32(),
+        debug_fmt_tids: Vec.new(),
+        debug_fmt_kinds: Vec.new(),
+        debug_fmt_fns: Vec.new(),
+        debug_fmt_sigs: Vec.new(),
+        debug_fmt_monos: Vec.new(),
+        debug_fmt_aux_fns: Vec.new(),
+        debug_fmt_aux_sigs: Vec.new(),
+        debug_fmt_aux_monos: Vec.new(),
+        debug_fmt_synth_syms: sema_new_map_i32_i32(),
+        debug_fmt_probe_visiting: sema_new_map_i32_i32(),
         autoderef_step_starts: sema_new_map_i32_i32(),
         autoderef_step_counts: sema_new_map_i32_i32(),
         slice_coerce_args: sema_new_map_i32_i32(),

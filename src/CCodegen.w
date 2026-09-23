@@ -1364,10 +1364,24 @@ impl CCodegen:
             return "with_fmt_i64((int64_t)(intptr_t)(" ++ expr ++ "))"
         if tk == TypeKind.TY_INT:
             return "with_fmt_i64((int64_t)(" ++ expr ++ "))"
-        if tk == TypeKind.TY_ENUM and self.type_is_payload_enum(resolved as i32) != 0:
+        if (tk == TypeKind.TY_ENUM or tk == TypeKind.TY_GENERIC_INST) and self.type_is_payload_enum(resolved as i32) != 0:
             return self.payload_enum_format_expr(resolved as i32, expr, context)
-        self.fail("emit-c does not yet support Display formatting for aggregate " ++ context ++ " payloads")
-        "WITH_STR_LIT(\"<unsupported>\")"
+        // A payload with no default display shows its Debug form (D61).
+        self.debug_formatter_call_expr(resolved as i32, expr, context)
+
+    // D61 (§15.4.7): call the `:?` formatter Sema registered for `tid` on the
+    // lvalue `expr` — the formatter borrows it.
+    mut fn debug_formatter_call_expr(tid: i32, expr: &str, context: &str) -> str:
+        let entry_opt = self.sema.debug_fmt_index.get(tid)
+        if entry_opt.is_none():
+            self.fail("no `:?` formatter is registered for the " ++ context ++ " type " ++ self.sema.type_name(tid) ++ " (D61)")
+            return ""
+        let mono = self.sema.debug_fmt_monos[entry_opt.unwrap()]
+        let body_sym = self.canonical_body_sym(mono)
+        if body_sym == 0:
+            self.fail("the `:?` formatter for " ++ self.sema.type_name(tid) ++ " has no lowered body (D61)")
+            return ""
+        self.fn_c_name(body_sym) ++ "(&(" ++ expr ++ "))"
 
     mut fn payload_enum_variant_format_expr(enum_tid: i32, expr: &str, variant_index: i32, context: &str) -> str:
         let name_sym = self.sema.type_reflection_variant_name(enum_tid, variant_index)
@@ -1377,8 +1391,10 @@ impl CCodegen:
         if payload_count <= 0:
             return out
         if payload_count != 1:
+            // The C layout has no multi-payload variants (the type emitter
+            // fails first); this is the same loud failure, never a placeholder.
             self.fail("emit-c does not yet support formatting enum variant '" ++ variant_name ++ "' with multiple payloads in " ++ context)
-            return "WITH_STR_LIT(\"<unsupported>\")"
+            return ""
         let payload_tid = self.sema.type_reflection_variant_payload_type_frozen(enum_tid, variant_index, 0)
         let payload_expr = expr ++ "." ++ self.payload_enum_variant_field(variant_index)
         let payload_text = self.display_format_expr(payload_tid, payload_expr, context)
@@ -1399,23 +1415,40 @@ impl CCodegen:
             vi = vi - 1
         out
 
+    // D61 (§15.4.7): the `:?` text of the lvalue `expr` — the inline rows
+    // here, a view as its pointee, every other type through its registered
+    // formatter (the one the LLVM backend calls: identical text).
     mut fn debug_format_expr(tid: i32, expr: &str, context: &str) -> str:
         let resolved = self.sema.resolve_alias(tid as TypeId)
         let tk = self.sema.get_type_kind(resolved)
-        if tk == TypeKind.TY_ENUM and self.type_is_payload_enum(resolved as i32) != 0:
-            return self.payload_enum_format_expr(resolved as i32, expr, context)
+        if tk == TypeKind.TY_REF:
+            return self.debug_format_expr(self.sema.get_type_d0(resolved), "(*(" ++ expr ++ "))", context)
+        if tk == TypeKind.TY_VOID:
+            return "WITH_STR_LIT(\"()\")"
         if tk == TypeKind.TY_STR:
             return "with_fmt_str_debug_ref(WITH_STR_REF(" ++ expr ++ "))"
         if tk == TypeKind.TY_BOOL:
             return "with_fmt_bool((int32_t)(" ++ expr ++ "))"
         if tk == TypeKind.TY_FLOAT:
             return "with_fmt_f64((double)(" ++ expr ++ "))"
-        if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF:
+        if tk == TypeKind.TY_PTR:
             return "with_fmt_i64((int64_t)(intptr_t)(" ++ expr ++ "))"
         if tk == TypeKind.TY_INT:
-            return "with_fmt_i64((int64_t)(" ++ expr ++ "))"
-        self.fail("emit-c does not yet support Debug formatting for aggregate " ++ context ++ " payloads")
-        "WITH_STR_LIT(\"<unsupported>\")"
+            return self.debug_int_format_expr(resolved as i32, expr)
+        self.debug_formatter_call_expr(resolved as i32, expr, context)
+
+    fn debug_form_available(tid: i32) -> bool:
+        var resolved = self.sema.resolve_alias(tid as TypeId) as i32
+        while self.sema.get_type_kind(resolved as TypeId) == TypeKind.TY_REF:
+            resolved = self.sema.resolve_alias(self.sema.get_type_d0(resolved as TypeId)) as i32
+        self.sema.debug_fmt_is_inline(self.sema.get_type_kind(resolved as TypeId)) or self.sema.debug_fmt_index.contains(resolved)
+
+    // An integer's decimal text by its signedness, as the LLVM backend's
+    // with_fmt_u32/u64 choice formats it: a u64 above i64::MAX is positive.
+    fn debug_int_format_expr(resolved: i32, expr: &str) -> str:
+        if self.sema.get_type_d1(resolved as TypeId) == 0:
+            return "with_fmt_u64((uint64_t)(" ++ expr ++ "))"
+        "with_fmt_i64((int64_t)(" ++ expr ++ "))"
 
     fn fn_type_c_name(tid: i32) -> str:
         let resolved = self.sema.resolve_alias(tid)
@@ -6539,9 +6572,11 @@ impl CCodegen:
                         self.fail("Result.unwrap/expect expects an Err variant")
                         return "    abort();"
                     let err_payload_count = self.sema.type_reflection_variant_payload_count(carrier_tid, err_variant)
-                    if err_payload_count > 0:
+                    let err_tid = if err_payload_count > 0: self.sema.type_reflection_variant_payload_type_frozen(carrier_tid, err_variant, 0) else: 0
+                    // D61: the error's `:?` form when it has one — the LLVM
+                    // backend's gen_unwrap_err_message builds the same text.
+                    if err_payload_count > 0 and self.debug_form_available(err_tid):
                         let err_field = self.payload_enum_variant_field(err_variant)
-                        let err_tid = self.sema.type_reflection_variant_payload_type_frozen(carrier_tid, err_variant, 0)
                         let err_debug = self.debug_format_expr(err_tid, carrier_text ++ "." ++ err_field, "Result.unwrap/expect")
                         let prefix = if is_expect: user_msg else: "WITH_STR_LIT(\"called unwrap on Err\")"
                         panic_msg = "with_str_concat_ref(WITH_STR_REF(with_str_concat_ref(WITH_STR_REF(" ++ prefix ++ "), WITH_STR_REF(WITH_STR_LIT(\": \")))), WITH_STR_REF(" ++ err_debug ++ "))"
@@ -7421,30 +7456,15 @@ impl CCodegen:
             var val_tid = self.operand_tid(body, val_operand)
             if val_tid == 0 or self.is_void_tid(val_tid) != 0:
                 val_tid = self.sema.ty_i64 as i32
-            let resolved = self.sema.resolve_alias(val_tid as TypeId)
-            let tk = self.sema.get_type_kind(resolved)
-            if tk == TypeKind.TY_ENUM and self.type_is_payload_enum(resolved as i32) != 0:
-                let fmt_expr = self.payload_enum_format_expr(resolved as i32, val_text, "fmt.debug")
-                var out_enum = ""
-                if has_ret != 0:
-                    out_enum = out_enum ++ "    " ++ self.place_text(body, dest_place) ++ " = " ++ fmt_expr ++ ";\n"
-                else:
-                    out_enum = out_enum ++ "    (void)(" ++ fmt_expr ++ ");\n"
-                out_enum = out_enum ++ f"    goto bb{next_bb};"
-                return out_enum
-            let fmt_fn = if tk == TypeKind.TY_STR: "with_fmt_str_debug_ref"
-                else if tk == TypeKind.TY_BOOL: "with_fmt_bool"
-                else if tk == TypeKind.TY_FLOAT: "with_fmt_f64"
-                else: "with_fmt_i64"
-            let cast_prefix = if tk == TypeKind.TY_FLOAT: "(double)("
-                else if tk == TypeKind.TY_BOOL: "(int32_t)("
-                else if tk == TypeKind.TY_STR: "WITH_STR_REF("
-                else: "(int64_t)("
+            // D61: MirLower sends only the inline rows (numbers, bool, str,
+            // raw pointers) here; debug_format_expr formats them exactly as
+            // the LLVM backend does.
+            let fmt_expr = self.debug_format_expr(val_tid, val_text, "fmt.debug")
             var out = ""
             if has_ret != 0:
-                out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = " ++ fmt_fn ++ "(" ++ cast_prefix ++ val_text ++ "));\n"
+                out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = " ++ fmt_expr ++ ";\n"
             else:
-                out = out ++ "    (void)" ++ fmt_fn ++ "(" ++ cast_prefix ++ val_text ++ "));\n"
+                out = out ++ "    (void)(" ++ fmt_expr ++ ");\n"
             out = out ++ f"    goto bb{next_bb};"
             return out
 

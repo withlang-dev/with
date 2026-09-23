@@ -1868,15 +1868,47 @@ pub fn with_fmt_bool(b: i32) -> str:
 pub fn with_fmt_str_ref(s: &str) -> str:
     with_str_clone_ref(s)
 
+// §15.4.7 / D61: a `str` under `:?` is quoted and escaped — `"` as `\"`,
+// `\` as `\\`, the controls U+0000–U+001F and U+007F as `\n` `\t` `\r` `\0`
+// or `\xHH` (lowercase hex); every other byte, printable non-ASCII included,
+// as itself. The escaped text is a With string literal that reads back as `s`.
+fn rt_debug_escape_width(b: u8) -> i64:
+    if b == '"' or b == '\\' or b == '\n' or b == '\t' or b == '\r' or b == 0: return 2
+    if b < 32 or b == 127: return 4
+    1
+
+fn rt_debug_hex_digit(v: u8) -> u8: if v < 10: '0' + v else: 'a' + (v - 10)
+
 pub fn with_fmt_str_debug_ref(s: &str) -> str:
     let slen = str_length(s)
-    let out_len = slen + 2
-    let out = rt_alloc(out_len + 1)
-    unsafe *(out as *mut u8) = 34  // '"'
     let sp = str_data(s)
-    if sp as i64 != 0 and slen > 0:
-        rt_memcpy((out as i64 + 1) as *mut u8, sp, slen)
-    unsafe *((out as i64 + slen + 1) as *mut u8) = 34  // '"'
+    var out_len: i64 = 2
+    for i in 0..slen:
+        out_len = out_len + rt_debug_escape_width(unsafe *((sp as i64 + i) as *const u8))
+    let out = rt_alloc(out_len + 1)
+    var w: i64 = 0
+    unsafe *(out as *mut u8) = '"'
+    w = 1
+    for i in 0..slen:
+        let b = unsafe *((sp as i64 + i) as *const u8)
+        let width = rt_debug_escape_width(b)
+        let at = (out as i64 + w) as *mut u8
+        if width == 1:
+            unsafe *at = b
+        else:
+            unsafe *at = '\\'
+            let next = (out as i64 + w + 1) as *mut u8
+            if width == 4:
+                unsafe *next = 'x'
+                unsafe *((out as i64 + w + 2) as *mut u8) = rt_debug_hex_digit(b / 16)
+                unsafe *((out as i64 + w + 3) as *mut u8) = rt_debug_hex_digit(b % 16)
+            else if b == '\n': unsafe *next = 'n'
+            else if b == '\t': unsafe *next = 't'
+            else if b == '\r': unsafe *next = 'r'
+            else if b == 0: unsafe *next = '0'
+            else: unsafe *next = b
+        w = w + width
+    unsafe *((out as i64 + w) as *mut u8) = '"'
     unsafe *((out as i64 + out_len) as *mut u8) = 0
     make_str(out as *const u8, out_len)
 
