@@ -1704,6 +1704,26 @@ fn run_deep_debug_tool_tests_action(ctx: ActionCtx) -> i32:
         return 1
     if deep_debug_analyze_expect(ctx, root, compiler, build_project_abs(root, rebind_input), out_dir, "analyze-audit-rebind", "audit:all", "violations=0 ok") != 0:
         return 1
+    // #1381: a downcast place has no type of its own; typed as the enum it
+    // failed audit:codegen on every `??`/`unwrap_or`. #1394: the payload a
+    // carrier eliminator moves out is reset-on-move, and audit:all's
+    // ownership validator rejects an enum drop that would free it again —
+    // `unwrap_or` and `map`'s Err arm both did.
+    let carrier_input = build_project_join(out_dir, "carrier-input.w")
+    let carrier_source =
+        "fn pick(b: bool) -> Option[str]:\n" ++
+        "    if b: Some(\"a\" ++ \"b\") else: None\n\n" ++
+        "fn main:\n" ++
+        "    let o: Option[i32] = Some(3)\n" ++
+        "    print(f\"{o ?? 0}\")\n" ++
+        "    print(pick(true).unwrap_or(\"none\"))\n" ++
+        "    let r: Result[i32, str] = Err(\"e\" ++ \"!\")\n" ++
+        "    print(f\"{r.map((x) => x + 1).unwrap_or(0)}\")\n"
+    if fs.write_text(carrier_input, carrier_source) != 0:
+        ctx.diagnostics().error("deep-debug-tool-tests: could not write carrier fixture")
+        return 1
+    if deep_debug_analyze_expect(ctx, root, compiler, build_project_abs(root, carrier_input), out_dir, "analyze-audit-carriers", "audit:all", "violations=0 ok") != 0:
+        return 1
     // #1323: `InternPool.resolve` hands out a view into `symbol_texts`; a
     // binding read after anything that interns is a use-after-free (the
     // release compiler segfaulted in ct_generate_debug_derive). The pool sits
