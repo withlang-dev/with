@@ -3684,10 +3684,14 @@ impl Codegen:
             var elem_ty = self.sema_type_to_llvm(elem_tid)
             if elem_ty == 0:
                 elem_ty = wl_i32_type(self.context)
+            // {start, end, inclusive}: the flag is a `bool` field and lowers
+            // like every bool field, to i1 — MIR types the place `bool`, and
+            // an i8 here disagreed with it (audit:codegen, #1413). Both
+            // occupy one byte, so the layout is unchanged.
             let range_fields: Vec[i64] = Vec.new()
             range_fields.push(elem_ty)
             range_fields.push(elem_ty)
-            range_fields.push(wl_i8_type(self.context))
+            range_fields.push(self.sema_type_to_llvm(self.sema.ty_bool as i32))
             return wl_struct_type(self.context, vec_data_i64(&range_fields), 3, 0)
         if tk == TypeKind.TY_ARRAY:
             let elem_tid = self.sema.get_type_d0(resolved_tid)

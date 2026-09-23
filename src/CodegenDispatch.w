@@ -260,11 +260,12 @@ impl Codegen:
             var range_elem_llvm = self.mir_sema_type_to_llvm(range_elem_tid)
             if range_elem_llvm == 0:
                 range_elem_llvm = wl_i32_type(self.context)
-            // Range struct: {start: Elem, end: Elem, inclusive: i8}
+            // Range struct: {start: Elem, end: Elem, inclusive: bool}, the
+            // flag lowered as the bool it is (#1413; see sema_type_to_llvm).
             let range_fields: Vec[i64] = Vec.new()
             range_fields.push(range_elem_llvm)
             range_fields.push(range_elem_llvm)
-            range_fields.push(wl_i8_type(self.context))
+            range_fields.push(self.mir_sema_type_to_llvm(self.sema.ty_bool as i32))
             return wl_struct_type(self.context, vec_data_i64(&range_fields), 3, 0)
         if tk == TypeKind.TY_ARRAY:
             let arr_elem_tid = self.mir_type_d0_at(resolved)

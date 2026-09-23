@@ -7529,7 +7529,7 @@ impl MirBuilder:
     mut fn lower_for_range_var(for_node: i32, pat_or_sym: i32, iter_expr: i32, body_expr: i32, range_ty: i32) -> i32:
         // for i in range_var → extract start/end/inclusive from the range struct,
         // then generate the same counter-based loop as lower_for_range.
-        // Range layout: {start: Elem, end: Elem, inclusive: i8}
+        // Range layout: {start: Elem, end: Elem, inclusive: bool}
         let elem_ty = self.sema.get_type_d0(range_ty)
         let range_op = self.lower_expr(iter_expr)
         let range_place = self.materialize_operand(range_op, range_ty, self.ast.get_start(iter_expr))
