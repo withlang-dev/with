@@ -4270,12 +4270,18 @@ let (Ok({ name, email, .. }), status) = (parse_user(data), 200)
 
 When a pattern might not match, `let ... else` provides the
 fallback. The `else` branch must diverge (`return`, `break`,
-`continue`, `panic`):
+`continue`, `panic`). It is either a body in any of the three forms
+of §29.13, or a single diverging expression written directly after
+`else` on the same line:
 
 ```
 let Some(user) = find_user(id) else return Err(.NotFound)
 let Ok(value) = try_parse(input) else return Err(.ParseError)
 let [first, ..rest] = items else return Err(.Empty)
+
+let Some(user) = find_user(id) else:
+    log(f"no user {id}")
+    return Err(.NotFound)
 ```
 
 **`if let`:**
@@ -4319,10 +4325,10 @@ the body. If any binding fails, the entire `if` is skipped (or the
 for asserting expectations:
 
 ```
-let .TString(key) = self.expect_token("object key")? else
+let .TString(key) = self.expect_token("object key")? else:
     return Err(.UnexpectedChar(self.pos))
 
-let .Colon = self.expect_token("':'")? else
+let .Colon = self.expect_token("':'")? else:
     return Err(.UnexpectedChar(self.pos))
 
 // Cleaner than the match equivalent
@@ -12583,7 +12589,9 @@ by newlines or semicolons. Empty brace body `{}` is legal (returns
 
 **After a construct's header, a body introducer is required.** For all
 constructs, including `if`, `else if`, and `else`, the introducer must be
-`:` or `{`; omitting it is a parse error. `then` is not a body introducer.
+`:` or `{`; omitting it is a parse error. The one exception is the `else`
+of `let ... else` (§9.7), which may instead take a single diverging
+expression on the same line. `then` is not a body introducer.
 
 **Illegal combinations:**
 
@@ -12869,8 +12877,9 @@ CONST_DECL  := 'const' IDENT [ ':' TYPE ] '=' EXPR
 **Variable binding** (§2):
 
 ```
-LET_STMT    := 'let' PATTERN [ ':' TYPE ] '=' EXPR
-VAR_STMT    := 'var' IDENT [ ':' TYPE ] '=' EXPR
+LET_STMT    := 'let' PATTERN [ ':' TYPE ] '=' EXPR [ LET_ELSE ]
+VAR_STMT    := 'var' PATTERN [ ':' TYPE ] '=' EXPR [ LET_ELSE ]
+LET_ELSE    := 'else' ( BODY | EXPR )   // EXPR on the same line; the branch must diverge (§9.7)
 ```
 
 **Control flow** (§9, §13.5a, §13.5b, §13.5c):
