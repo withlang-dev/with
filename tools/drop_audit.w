@@ -399,6 +399,26 @@ fn sc_let_else(shape: &str, hit: bool, exit: &str, local: bool) -> str:
     "    if k: " ++ le_hit(shape) ++ " else: " ++ le_miss(shape) ++ "\n" ++
     "fn go(slot: *mut i32):\n" ++ body
 
+// #1383: the else branch consumes an outer value, then diverges. The value
+// moves on that path only: the matching path still owns it whole (its drop
+// adds 8), the failing path hands it to `eat` (which drops it) after the
+// subject (2) drops. A blank leaking onto the matching path shows as a lost
+// 8 and a leaked block. `form`: inline `else: return eat(..)`, a block else,
+// or a vacated field (`move h.r`).
+fn sc_let_else_consume(form: &str, hit: bool) -> str:
+    let flag = if hit: "true" else: "false"
+    let owner = if form == "field": "    var h = H { r: mk(8, slot) }\n" else: "    let keep = mk(8, slot)\n"
+    let taken = if form == "field": "move h.r" else: "keep"
+    let read = if form == "field": "h.r.id" else: "keep.id"
+    let els = if form == "block": "else:\n        eat(" ++ taken ++ ")\n        return\n" else: "else: return eat(" ++ taken ++ ")\n"
+    "type H { r: R }\n" ++
+    "fn eat(x: R): ()\n" ++
+    "fn make_subject(k: bool, slot: *mut i32) -> Result[R, R]:\n" ++
+    "    if k: Ok(mk(1, slot)) else: Err(mk(2, slot))\n" ++
+    "fn go(slot: *mut i32):\n" ++ owner ++
+    "    let Ok(v) = make_subject(" ++ flag ++ ", slot) " ++ els ++
+    "    let _k = v.id + " ++ read ++ "\n"
+
 fn le_sum(shape: &str, hit: bool) -> i32:
     if not hit: return if shape == "option": 0 else: 2
     if shape == "struct": 5 else: 1
@@ -547,6 +567,9 @@ fn build_cells():
             cells.push(cell("let_else_hit_" ++ subj ++ "/" ++ sh, sc_let_else(sh, true, "return", local), le_sum(sh, true)))
             for exit in ["return", "break", "continue"]:
                 cells.push(cell("let_else_miss_" ++ exit ++ "_" ++ subj ++ "/" ++ sh, sc_let_else(sh, false, exit, local), le_sum(sh, false)))
+    for form in ["inline", "block", "field"]:
+        cells.push(cell("let_else_consume_hit_" ++ form ++ "/bare", sc_let_else_consume(form, true), 9))
+        cells.push(cell("let_else_consume_miss_" ++ form ++ "/bare", sc_let_else_consume(form, false), 10))
     cells.push(pod_cell("pod_vec_scope_exit/EXPECT-CLEAN", "    var v: Vec[i32] = Vec.new()\n    v.push(1)\n"))
     cells.push(pod_cell("pod_vec_reassign/EXPECT-CLEAN", "    var v: Vec[i32] = Vec.new()\n    v.push(1)\n    var w: Vec[i32] = Vec.new()\n    w.push(2)\n    v = w\n"))
     cells

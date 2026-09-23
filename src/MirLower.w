@@ -6419,6 +6419,26 @@ impl MirBuilder:
         let _ = self.lower_pattern(pat, subject_place)
         self.pattern_bind_mut = saved_bind_mut
 
+    // The else branch of a let-else is a branch that diverges (§9.7). Like an
+    // `if` arm (lower_if), its statement temps drop on its own path and the
+    // reset-on-move blanks it queues are flushed on its own path and then
+    // forgotten: left pending, the let-else statement's flush on the
+    // continuing path blanked a value only the else branch consumed (#1383:
+    // `else: return consume(keep)` blanked `keep` for the matched path, which
+    // then read "" and leaked the buffer).
+    mut fn lower_let_else_branch(else_body: i32):
+        let reset_start = self.pending_reset_locals.len() as i32
+        let reset_field_start = self.pending_reset_field_places.len() as i32
+        let move_temp_start = self.pending_move_temp_locals.len() as i32
+        self.field_move_in_branch = self.field_move_in_branch + 1
+        let frame = self.push_stmt_temp_frame()
+        let _ = self.lower_expr(else_body)
+        self.finish_stmt_temp_frame(frame)
+        self.flush_pending_resets_since(reset_start, reset_field_start, move_temp_start)
+        self.field_move_in_branch = self.field_move_in_branch - 1
+        if self.body.term_kind(self.cur_bb) == TermKind.TK_UNREACHABLE:
+            self.terminate(TermKind.TK_UNREACHABLE, 0, 0, 0, 0)
+
     mut fn lower_let_else(node: i32):
         let pat = self.ast.let_pattern(node)
         let rhs = self.ast.get_data1(node)
@@ -6443,9 +6463,9 @@ impl MirBuilder:
                 self.pattern_subject_observed = saved_observed
                 self.terminate(TermKind.TK_GOTO, obs_cont_bb, 0, 0, 0)
                 self.switch_to(obs_fail_bb)
-                let _ = self.lower_expr(else_body)
-                if self.body.term_kind(self.cur_bb) == TermKind.TK_UNREACHABLE:
-                    self.terminate(TermKind.TK_UNREACHABLE, 0, 0, 0, 0)
+                let obs_move_state = self.save_move_state()
+                self.lower_let_else_branch(else_body)
+                self.restore_move_state(&obs_move_state)
                 self.switch_to(obs_cont_bb)
             return
         let rhs_reset_start = self.pending_reset_locals.len() as i32
@@ -6508,9 +6528,7 @@ impl MirBuilder:
         self.emit_pending_resets_since(rhs_reset_start, rhs_reset_field_start, rhs_move_temp_start)
         if self.sema.type_needs_drop_frozen(rhs_ty) != 0:
             self.emit_drop_stmt(rhs_place, "let-else-fail", self.ast.get_start(node))
-        let _ = self.lower_expr(else_body)
-        if self.body.term_kind(self.cur_bb) == TermKind.TK_UNREACHABLE:
-            self.terminate(TermKind.TK_UNREACHABLE, 0, 0, 0, 0)
+        self.lower_let_else_branch(else_body)
         // The else body diverges; its moves never reach the continuation.
         self.restore_move_state(&branch_move_state)
 

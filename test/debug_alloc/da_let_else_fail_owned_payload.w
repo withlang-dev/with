@@ -115,7 +115,58 @@ fn nested_local_continue(k: i32) -> i32:
         total = total + v.len() as i32
     total
 
+// #1383 (§2.2, §9.7): the else branch diverges, so a value it consumes is
+// consumed on that path only. The matching path still owns it whole: its
+// reads see the value and its scope-exit drop frees it. Before the fix Sema
+// rejected the later read, and MIR flushed the else branch's reset-on-move
+// blank on the matching path (`keep` read "" and its buffer leaked).
+fn consume(s: str) -> i32: s.len() as i32
+
+type Holder { f: str, g: str }
+
+fn keep_inline(k: i32) -> i32:
+    let keep = owned("keep")
+    let Ok(v) = vec_or_err(k) else: return consume(keep) - 100
+    keep.len() as i32 + v.len() as i32
+
+fn keep_block(k: i32) -> i32:
+    let keep = owned("keep")
+    let Ok(v) = vec_or_err(k) else:
+        let n = consume(keep)
+        return n - 100
+    keep.len() as i32 + v.len() as i32
+
+fn keep_field(k: i32) -> i32:
+    var h = Holder { f: owned("f"), g: owned("gg") }
+    let Ok(v) = vec_or_err(k) else: return consume(move h.f) - 100
+    h.f.len() as i32 + h.g.len() as i32 + v.len() as i32
+
+fn keep_twice(k: i32) -> i32:
+    let keep = owned("keep")
+    let Ok(v) = vec_or_err(k) else: return consume(keep) - 100
+    let Ok(w) = vec_or_err(k + 1) else: return consume(keep) - 200
+    consume(keep) + v.len() as i32 + w.len() as i32
+
+fn keep_continue(k: i32) -> i32:
+    var total = 0
+    for i in 0..3:
+        let keep = f"k{i}"
+        let Ok(v) = vec_or_err(k - i) else:
+            total = total + consume(keep)
+            continue
+        total = total + keep.len() as i32 + v.len() as i32
+    total
+
 fn main:
+    assert(keep_inline(0) == -96)
+    assert(keep_inline(1) == 5)
+    assert(keep_block(0) == -96)
+    assert(keep_block(1) == 5)
+    assert(keep_field(0) == -99)
+    assert(keep_field(1) == 4)
+    assert(keep_twice(0) == -96)
+    assert(keep_twice(1) == 7)
+    assert(keep_continue(1) == 7)
     assert(int_temp(0) == -1)
     assert(int_temp(3) == 3)
     assert(vec_temp(0) == -1)

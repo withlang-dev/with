@@ -16320,7 +16320,21 @@ impl Sema:
         // binds nothing non-Copy observes the subject in place.
         self.mark_pattern_subject_consumed(node, pattern, value, val_type as i32)
         if else_body != 0:
+            // §2.2/§9.7: the else branch diverges, so a value it moves is
+            // still live on the path that continues past the let-else — the
+            // matched path. Check it as a branch (check_if_expr's shape) and
+            // restore the matched path's move state after it (#1383).
+            let matched_states = self.save_scope_states()
+            let matched_mf = self.save_moved_field_state()
+            let saved_drop_cf = self.drop_control_flow_depth
+            if self.current_drop_type_sym != 0:
+                self.drop_control_flow_depth = self.drop_control_flow_depth + 1
+            self.push_move_control_flow_context(1)
             let else_ty = self.check_expr(else_body)
+            self.pop_move_control_flow_context()
+            self.drop_control_flow_depth = saved_drop_cf
+            self.restore_scope_states(&matched_states)
+            self.restore_moved_field_state(&matched_mf)
             let else_kind = self.get_type_kind(self.resolve_alias(else_ty as TypeId))
             if else_kind != TypeKind.TY_NEVER:
                 self.emit_error("let ... else requires a diverging else branch", else_body)

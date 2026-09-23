@@ -200,6 +200,37 @@ fn sc_divergent_branch(shape: str) -> str:
         "    x\n" ++
         "fn main:\n    let _r = f(3)\n    print(\"ok\")\n"
 
+// moved in a let-else's else branch, which diverges (§9.7): the path that
+// continues past the let-else still owns it (#1383). `exit` is how the else
+// branch leaves: return, or break/continue out of the enclosing loop.
+fn sc_let_else_else_move(shape: &str, exit: &str) -> str:
+    wrap(shape.clone(),
+        "fn pick(n: i32) -> Option[i32]:\n" ++
+        "    if n > 1: return None\n" ++
+        "    Some(n)\n" ++
+        "fn f(n: i32):\n" ++
+        "    for i in 0..n:\n" ++
+        "        let x: " ++ shape_ty(shape) ++ " = mk()\n" ++
+        "        let Some(_v) = pick(i) else:\n" ++
+        "            consume(move x)\n" ++
+        "            " ++ exit ++ "\n" ++
+        "        consume(move x)\n")
+
+// the same move, then a use on the continuing path AFTER a second consume —
+// a genuine use-after-move the fix must still report.
+fn sc_let_else_else_move_then_reuse(shape: &str) -> str:
+    wrap(shape.clone(),
+        "fn pick(n: i32) -> Option[i32]:\n" ++
+        "    if n > 1: return None\n" ++
+        "    Some(n)\n" ++
+        "fn f(n: i32):\n" ++
+        "    let x: " ++ shape_ty(shape) ++ " = mk()\n" ++
+        "    let Some(_v) = pick(n) else:\n" ++
+        "        consume(move x)\n" ++
+        "        return\n" ++
+        "    consume(move x)\n" ++
+        "    consume(move x)\n")
+
 // ── Field values reaching an owned result (#1395, §2.2 D32, §3.8 join) ─────
 // A field never moves out implicitly. `let x = base.p` binds a view (OK);
 // every other position whose value becomes an owned result — an `if`/`match`
@@ -276,6 +307,12 @@ fn build_cells() -> Vec[Cell]:
     cells.push(Cell { name: "inside_fallthrough/vec[FLIPPED:#691]", source: sc_inside_fallthrough("vec"), expect: "MOVE-ERR" })
     cells.push(Cell { name: "before_used_inside/vec", source: sc_before_used_inside("vec"), expect: "MOVE-ERR" })
     cells.push(Cell { name: "divergent_branch/vec", source: sc_divergent_branch("vec"), expect: "OK" })
+
+    // #1383: a move in a let-else's diverging else branch stays on that path.
+    for shape in ["drop", "vec"]:
+        for exit in ["return", "break", "continue"]:
+            cells.push(Cell { name: f"let_else_else_move_{exit}/{shape}", source: sc_let_else_else_move(shape, exit), expect: "OK" })
+        cells.push(Cell { name: f"let_else_else_move_then_reuse/{shape}", source: sc_let_else_else_move_then_reuse(shape), expect: "MOVE-ERR" })
 
     // #1395: a field value reaching an owned result, on every base.
     for shape in ["str", "vec"]:
