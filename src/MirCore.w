@@ -3077,7 +3077,9 @@ fn mir_validate_enum_payload_type(mir_mod: &MirModule, enum_tid: i32, variant_id
         let variant_count = mir_mod.mir_get_type_d2(base_tid)
 
         // Option[T]: one generic arg, exactly one payload-bearing variant.
-        if arg_count == 1 and field_idx == 0:
+        // Only Option: a user `G[T]: A(h: H[T])` has the same shape, and
+        // the guess named `T` (i64) as the payload `H[T]` (#1442).
+        if arg_count == 1 and field_idx == 0 and base_sym == mir_mod.sema_option_sym:
             var pos = te_start
             var payload_variant = -1
             for vi in 0..variant_count:

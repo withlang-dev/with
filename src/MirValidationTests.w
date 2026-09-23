@@ -320,6 +320,58 @@ pub fn mir_test_enum_aggregate_variant_index() -> Unit:
     assert(enum_aggregate_verdict(7).contains("enum aggregate names variant 7 of a ty=1 enum with 2 variants"))
     assert(enum_aggregate_verdict(1) == "")
 
+// #1442: the type the validator derives for an undeclared payload place of a
+// one-parameter generic enum instance. `G[T]: A(h: H[T]) | B(n: i64)` has
+// Option's shape (one parameter, one single-payload variant first), and the
+// Option guess named the argument `i64` as the payload `H[T]`. Types: 1 i64,
+// 2 the enum H, 3 `H[T]`, 4 the enum G, 5 `G[i64]`, 6 the parameter T.
+fn generic_payload_derived(g_is_option: bool) -> i32:
+    var mir_mod = MirModule.init()
+    for kind in [0, TypeKind.TY_INT, TypeKind.TY_ENUM, TypeKind.TY_GENERIC_INST, TypeKind.TY_ENUM, TypeKind.TY_GENERIC_INST, TypeKind.TY_STRUCT]:
+        mir_mod.sema_type_kinds.push(kind)
+        mir_mod.sema_type_d0.push(0)
+        mir_mod.sema_type_d1.push(0)
+        mir_mod.sema_type_d2.push(0)
+    let h_sym = 101
+    let g_sym = 102
+    mir_mod.sema_type_d0[1] = 64
+    mir_mod.sema_type_d1[1] = 1
+    // H: X(t: T) | Y
+    mir_mod.sema_type_d0[2] = h_sym
+    mir_mod.sema_type_d1[2] = mir_mod.sema_type_extra.len() as i32
+    mir_mod.sema_type_d2[2] = 2
+    for word in [201, 1, 6, 202, 0]:
+        mir_mod.sema_type_extra.push(word)
+    // H[T]
+    mir_mod.sema_type_d0[3] = h_sym
+    mir_mod.sema_type_d1[3] = mir_mod.sema_type_extra.len() as i32
+    mir_mod.sema_type_d2[3] = 1
+    mir_mod.sema_type_extra.push(6)
+    // G: A(h: H[T]) | B(n: i64)
+    mir_mod.sema_type_d0[4] = g_sym
+    mir_mod.sema_type_d1[4] = mir_mod.sema_type_extra.len() as i32
+    mir_mod.sema_type_d2[4] = 2
+    for word in [203, 1, 3, 204, 1, 1]:
+        mir_mod.sema_type_extra.push(word)
+    // G[i64]
+    mir_mod.sema_type_d0[5] = g_sym
+    mir_mod.sema_type_d1[5] = mir_mod.sema_type_extra.len() as i32
+    mir_mod.sema_type_d2[5] = 1
+    mir_mod.sema_type_extra.push(1)
+    mir_mod.sema_type_d0[6] = 103
+    if g_is_option:
+        mir_mod.sema_option_sym = g_sym
+    var body = MirBody.init_for_fn(1)
+    let subject_local = body.new_temp(5)
+    let subject = body.new_place(subject_local)
+    let variant = body.new_downcast_place(subject, 0)
+    let payload = body.new_field_place(variant, 0, 0)
+    mir_validate_place_derived_type(mir_mod, body, payload)
+
+pub fn mir_test_generic_payload_not_guessed() -> Unit:
+    assert(generic_payload_derived(false) == 3)
+    assert(generic_payload_derived(true) == 1)
+
 // #1443: a monomorphized generic call passing the value where the callee's
 // parameter is a reference to it. `next.as_ref()` with `next: &Box[L]` passed
 // `next.*` — a Box and `&Box` are both `ptr`, so the callee read the node as
