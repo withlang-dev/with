@@ -12,6 +12,50 @@ use std.collections.HashMap
 extern fn with_str_clone_ref(s: &str) -> str
 extern fn with_eprint(s: &str) -> Unit
 
+// ── Discriminant values (§4.4a) ──────────────────────────────────
+// A discriminant is held as the 64 bits of its repr value; an unsigned
+// repr reads them unsigned (`u64` 18446744073709551615 is all ones).
+
+fn disc_fits_repr(value: i64, bits: i32, signed: bool) -> bool:
+    if bits >= 64:
+        return true
+    if signed:
+        let half = exact_int_pow2_word(bits - 1)
+        return value >= 0 - half and value < half
+    exact_int_uword_lte(value, exact_int_low_mask(bits))
+
+// The auto-incremented discriminant after `prev` — plus one, or doubled
+// under @[flags] — when it is a value of the repr; not ok past it (#1452:
+// the parser incremented after every variant, so a last variant at the
+// repr's maximum overflowed its i32 counter).
+fn disc_auto_next(prev: i64, doubling: bool, bits: i32, signed: bool) -> ExactIntI64:
+    let none = ExactIntI64 { ok: 0, value: 0 }
+    var next: i64 = 0
+    if doubling:
+        if signed:
+            if prev > 4611686018427387903 or prev < -4611686018427387904:
+                return none
+            next = prev * 2
+        else:
+            if prev < 0:
+                return none
+            next = prev +% prev
+    else:
+        if signed:
+            if prev == 9223372036854775807:
+                return none
+            next = prev + 1
+        else:
+            if prev == -1:
+                return none
+            next = prev +% 1
+    if not disc_fits_repr(next, bits, signed):
+        return none
+    ExactIntI64 { ok: 1, value: next }
+
+fn disc_text(value: i64, signed: bool) -> str:
+    if signed or value >= 0: f"{value}" else: f"{value as u64}"
+
 // ── Pass 1: Declaration collection ───────────────────────────────
 
 impl Sema:
@@ -939,6 +983,10 @@ impl Sema:
             // @[flags]). An i64: a parser counter in i32 truncated wider values
             // and a negative one read as "no discriminant" (#1451).
             let doubling = type_decl_is_flags(self.ast.get_data2(node)) != 0
+            let repr_resolved = self.resolve_alias(repr_type_tid)
+            let repr_is_int = self.get_type_kind(repr_resolved) == TypeKind.TY_INT
+            let repr_bits = if repr_is_int: self.get_type_d0(repr_resolved) else: 64
+            let repr_signed = not repr_is_int or self.get_type_d1(repr_resolved) != 0
             var disc_vals: Vec[i64] = Vec.new()
             for vi in 0..variant_count:
                 let v_name = self.ast.get_extra(epos)
@@ -950,20 +998,33 @@ impl Sema:
                 variant_names.push(v_name)
                 payload_counts.push(payload_count)
                 var disc_value: i64 = if doubling: 1 else: 0
+                var disc_ok = true
                 if disc_node != 0:
-                    let literal = self.ast.int_literal_expr_i64(disc_node)
+                    // #1452: a u64 value above i64::MAX is its 64 bits.
+                    var literal = self.ast.int_literal_expr_i64(disc_node)
+                    if literal.ok == 0 and repr_bits == 64 and not repr_signed:
+                        let wide = self.ast.int_literal_expr_bits(disc_node, 64, 0)
+                        if wide.ok != 0:
+                            literal = ExactIntI64 { ok: 1, value: wide.lo }
                     if literal.ok == 0:
-                        self.emit_error(f"discriminant of variant `{self.pool_resolve(v_name)}` does not fit a 64-bit integer", disc_node)
+                        let fit_target = if repr_bits == 64: self.type_name(repr_type_tid) else: "a 64-bit integer"
+                        self.emit_error(f"discriminant of variant `{self.pool_resolve(v_name)}` does not fit {fit_target}", disc_node)
+                        disc_ok = false
                     disc_value = literal.value
                 else if vi > 0:
                     // An owned i64, not the element view: `view + 1` is
                     // computed at i32 (#1477).
                     let prev_disc: i64 = disc_vals[vi - 1]
-                    disc_value = if doubling: prev_disc * 2 else: prev_disc + 1
+                    let next = disc_auto_next(prev_disc, doubling, repr_bits, repr_signed)
+                    if next.ok == 0:
+                        let how = if doubling: "doubled (@[flags])" else: "auto-incremented"
+                        self.emit_error(f"the {how} discriminant of variant `{self.pool_resolve(v_name)}` is past the range of {self.type_name(repr_type_tid)}: the variant before it, `{self.pool_resolve(variant_names[vi - 1])}`, is {disc_text(prev_disc, repr_signed)}", node)
+                        disc_ok = false
+                    disc_value = next.value
                 // Check for duplicate discriminant values
                 for prev in 0..disc_vals.len() as i32:
-                    if disc_vals[prev] == disc_value:
-                        self.emit_error(f"duplicate discriminant value {disc_value}", node)
+                    if disc_ok and disc_vals[prev] == disc_value:
+                        self.emit_error(f"duplicate discriminant value {disc_text(disc_value, repr_signed)}", node)
                 // Check discriminant fits in repr type range
                 if repr_type_tid == self.ty_i8:
                     if disc_value < (-128) or disc_value > 127:

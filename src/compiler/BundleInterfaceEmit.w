@@ -920,9 +920,13 @@ impl BundleEmitter:
                     line = line ++ "(" ++ payloads ++ ")"
                 var disc_row = "-"
                 if is_disc:
+                    // An unsigned repr's value is its bits read unsigned: a
+                    // u64 value above i64::MAX spells as itself (#1452).
                     let disc = sema.type_reflection_variant_discriminant(resolved as i32, vi)
-                    line = line ++ f" = {disc}"
-                    disc_row = f"{disc}"
+                    let repr_ty: i32 = sema.disc_repr_types.get(resolved as i32).unwrap()
+                    let disc_spelling = if disc < 0 and sema.is_unsigned_int_type(repr_ty): f"{disc as u64}" else: f"{disc}"
+                    line = line ++ " = " ++ disc_spelling
+                    disc_row = disc_spelling
                 body = body ++ line ++ "\n"
                 variants_row = variants_row ++ v_name ++ ":" ++ disc_row ++ ":" ++ payloads_row ++ ";"
             decl = head ++ "\n" ++ body
