@@ -230,8 +230,11 @@ fn facade_render_resource(pool: AstPool, intern: InternPool, ci: &Vec[i32], item
         if facade_render_unalias(pool, intern, repr_text).starts_with("*"):
             // Unknown nullability is nullable, never silently non-null
             // (§16.2b.8): a pointer producer yields `Option[R]`, and a NULL
-            // produced nothing — no Drop is armed over it (§16.2b.4).
-            out = out ++ "fn " ++ name ++ "." ++ pname ++ "(" ++ params ++ ") -> Option[" ++ name ++ "]:\n    let repr = " ++ call ++ "\n    if repr == null: None else: Some(" ++ name ++ " { repr, live: true })\n"
+            // produced nothing — no Drop is armed over it (§16.2b.4). The
+            // facade's `from` is the trusted evidence that a non-null return
+            // is the produced resource (§16.2b.4, ruling §19).
+            let repr = facade_render_fresh("repr", args)
+            out = out ++ "fn " ++ name ++ "." ++ pname ++ "(" ++ params ++ ") -> Option[" ++ name ++ "]:\n    let " ++ repr ++ " = " ++ call ++ "\n    if " ++ repr ++ " == null: None else: Some(" ++ name ++ " { repr: " ++ repr ++ ", live: true })\n"
         else:
             out = out ++ "fn " ++ name ++ "." ++ pname ++ "(" ++ params ++ ") -> " ++ name ++ ":\n    " ++ name ++ " { repr: " ++ call ++ ", live: true }\n"
     if init_fn != 0:
@@ -268,8 +271,15 @@ fn facade_render_resource(pool: AstPool, intern: InternPool, ci: &Vec[i32], item
 // `init(&raw mut repr, <args>)`.
 fn facade_render_init(pool: AstPool, intern: InternPool, name: &str, repr_text: &str, init_fn: i32, preinit_fn: i32, ok_sym: i32, pinned: bool) -> str:
     let iname: str = intern.resolve(pool.get_data0(init_fn as NodeId))
-    let storage_arg = facade_render_repr_arg(pool, intern, init_fn, repr_text, "repr", pinned)
-    if storage_arg.len() == 0 or storage_arg == "repr":
+    // The storage and status locals are spelled apart from every parameter
+    // the constructor takes (preinit's, then init's).
+    var taken = facade_render_param_names(pool, intern, init_fn)
+    if preinit_fn != 0:
+        taken = taken ++ ", " ++ facade_render_param_names(pool, intern, preinit_fn)
+    let repr = facade_render_fresh("repr", taken)
+    let status = facade_render_fresh("status", taken)
+    let storage_arg = facade_render_repr_arg(pool, intern, init_fn, repr_text, repr, pinned)
+    if storage_arg.len() == 0 or storage_arg == repr:
         return ""
     let (iparams, iargs) = facade_render_params(pool, intern, init_fn, 1)
     var params = iparams
@@ -287,9 +297,9 @@ fn facade_render_init(pool: AstPool, intern: InternPool, name: &str, repr_text: 
     if ret.len() == 0:
         if ok_sym != 0:
             return ""
-        return out ++ " -> " ++ name ++ ":\n    var repr = " ++ storage ++ "\n    " ++ call ++ "\n    " ++ name ++ " { repr, live: true }\n"
-    let armed = if ok_sym != 0: "status == " ++ intern.resolve(ok_sym) else: "true"
-    out ++ " -> (" ++ ret.slice(4, ret.len()) ++ ", " ++ name ++ "):\n    var repr = " ++ storage ++ "\n    let status = " ++ call ++ "\n    (status, " ++ name ++ " { repr, live: " ++ armed ++ " })\n"
+        return out ++ " -> " ++ name ++ ":\n    var " ++ repr ++ " = " ++ storage ++ "\n    " ++ call ++ "\n    " ++ name ++ " { repr: " ++ repr ++ ", live: true }\n"
+    let armed = if ok_sym != 0: status ++ " == " ++ intern.resolve(ok_sym) else: "true"
+    out ++ " -> (" ++ ret.slice(4, ret.len()) ++ ", " ++ name ++ "):\n    var " ++ repr ++ " = " ++ storage ++ "\n    let " ++ status ++ " = " ++ call ++ "\n    (" ++ status ++ ", " ++ name ++ " { repr: " ++ repr ++ ", live: " ++ armed ++ " })\n"
 
 // The declaring node of a function the facade names, by text: a c_import
 // translation and the facade may hold the same name under different symbols.
@@ -381,9 +391,7 @@ fn facade_render_params(pool: AstPool, intern: InternPool, decl: i32, skip: i32)
         return (params, args)
     let start = pool.fn_meta_param_start(meta)
     for pi in skip..pool.fn_meta_param_count(meta):
-        var pname: str = intern.resolve(pool.fn_param_name(start, pi))
-        if pname.starts_with("__param_"):
-            pname = pname.slice(8, pname.len())
+        let pname = facade_render_param_name(pool, intern, start, pi)
         let ptype = render_type_expr(pool, intern, pool.fn_param_type(start, pi) as NodeId)
         let shown = if ptype == "*const i8" or ptype == "*const c_char": "str" else: ptype
         if params.len() > 0:
@@ -392,6 +400,33 @@ fn facade_render_params(pool: AstPool, intern: InternPool, decl: i32, skip: i32)
         params = params ++ pname ++ ": " ++ shown
         args = args ++ pname
     (params, args)
+
+fn facade_render_param_name(pool: AstPool, intern: InternPool, start: i32, pi: i32) -> str:
+    let pname: str = intern.resolve(pool.fn_param_name(start, pi))
+    if pname.starts_with("__param_"): pname.slice(8, pname.len()) else: pname.clone()
+
+// Every parameter name of the declaration, ", "-separated.
+fn facade_render_param_names(pool: AstPool, intern: InternPool, decl: i32) -> str:
+    let meta = pool.find_fn_meta(decl as NodeId)
+    var names = ""
+    if meta < 0:
+        return names
+    let start = pool.fn_meta_param_start(meta)
+    for pi in 0..pool.fn_meta_param_count(meta):
+        if pi > 0:
+            names = names ++ ", "
+        names = names ++ facade_render_param_name(pool, intern, start, pi)
+    names
+
+// A local the rendering binds, spelled so it is none of `taken` (the
+// constructor's parameter names, ", "-separated): With refuses shadowing, and
+// a C parameter may well be named `repr`, `status` or `slot`.
+fn facade_render_fresh(base: &str, taken: &str) -> str:
+    let names = ", " ++ taken ++ ", "
+    var name: str = base.clone()
+    while names.contains(", " ++ name ++ ", "):
+        name = name ++ "_"
+    name
 
 fn facade_render_return(pool: AstPool, intern: InternPool, decl: i32) -> str:
     let meta = pool.find_fn_meta(decl as NodeId)
