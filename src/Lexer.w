@@ -376,8 +376,14 @@ impl Lexer:
         if ch == CharCode.Dquote:
             return self.lex_string()
 
-        // Number literal
+        // Number literal. After a field-access dot it is a tuple index
+        // (§4.8 `pair.0`): an integer, never the start of a float, so `t.0.1`
+        // is two indices and `t.0.len()` a call on element 0 (#1450).
         if ch >= CharCode.D0 and ch <= CharCode.D9:
+            if self.last_sig_tag == TokenKind.TK_DOT or self.last_sig_tag == TokenKind.TK_QUESTION_DOT:
+                while self.pos < slen and lex_is_digit(src[(self.pos)]):
+                    self.pos = self.pos + 1
+                return TokenKind.TK_INT_LIT
             return self.lex_number()
 
         if ch == CharCode.Dollar:
