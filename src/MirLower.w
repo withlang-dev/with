@@ -14365,7 +14365,11 @@ impl MirBuilder:
         let body_sym = self.prepare_anonymous_body(node, ty, false)
         let tmp = self.new_temp(ty)
         let place = self.place_for_local(tmp)
-        let closure_const = self.body.new_const(ConstKind.CK_CLOSURE, node, body_sym, 0, ty)
+        // d2 = 1 when the closure expression sits inside a loop of this body:
+        // one site then creates a closure per iteration, and codegen gives each
+        // its own environment (#1471, §12.4 Copy capture copies at creation).
+        let in_loop = if self.loop_break_bbs.len() > 0: 1 else: 0
+        let closure_const = self.body.new_const(ConstKind.CK_CLOSURE, node, body_sym, in_loop, ty)
         let op = self.body.new_operand(OperandKind.OK_CONSTANT, closure_const)
         let rv = self.body.new_rvalue(RvalueKind.RK_USE, op, 0, 0)
         self.body.push_stmt(self.cur_bb, StmtKind.Assign, place, rv, self.ast.get_start(node))

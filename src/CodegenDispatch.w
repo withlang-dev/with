@@ -17269,6 +17269,14 @@ impl Codegen:
                 return self.mir_body_at(body_idx)
         sema_phase_bug(f"BUG: anonymous expression lacks MIR constant: node={node} parent={parent.fn_sym}")
 
+    // The closure constant's d2: MirLower sets it when the closure expression
+    // sits inside a loop of `parent` (#1471).
+    fn closure_created_in_loop(parent: &MirBody, node: i32) -> bool:
+        for i in 0..parent.const_kinds.len():
+            if parent.const_kinds[i] == ConstKind.CK_CLOSURE and parent.const_d0[i] == node:
+                return parent.const_d2[i] != 0
+        false
+
     mut fn gen_closure(node: i32, parent: &MirBody) -> i64:
         // Closure: create an anonymous function and return fat pointer {fn_ptr, ctx_ptr}
         // Calling convention: fn(ctx_ptr, params...) -> ret_ty
@@ -17595,7 +17603,22 @@ impl Codegen:
         // Build capture struct on stack and store captured values
         var ctx_ptr = wl_const_null(ptr_ty)
         if not is_extern_closure and capture_count > 0:
-            let cap_alloca = self.create_entry_alloca(cap_struct_type)
+            // #1471 (§12.4: a Copy capture is copied at closure creation): a
+            // closure site inside a loop creates a closure per iteration, and
+            // a stored one (`fs.push(() => i * 10)`, `spawn_os(() => run(i))`)
+            // outlives the iteration. One entry-block slot per SITE made every
+            // closure from the site share one environment, so the last
+            // creation overwrote what the earlier ones captured (threads
+            // spawned in a loop all ran with the last index). Inside a loop the
+            // environment is allocated where the closure is created, so each
+            // evaluation owns its storage for the rest of the frame; outside a
+            // loop the site runs once per frame and keeps its entry slot. The
+            // non-escaping mark cannot select this: a direct argument is
+            // non-escaping by §12.3 even when the callee stores it (#1566).
+            let cap_alloca = if self.closure_created_in_loop(parent, node):
+                wl_build_alloca(self.builder, cap_struct_type)
+            else:
+                self.create_entry_alloca(cap_struct_type)
             for ci in 0..capture_count:
                 let sym = captures[ci]
                 let cap_ty = cap_types[ci]

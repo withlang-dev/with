@@ -422,6 +422,8 @@ fn mir_const_text(body: &MirBody, const_id: i32, pool: &InternPool, sema: &Sema)
         return "const fn <unknown>"
 
     if k == ConstKind.CK_CLOSURE:
+        if body.const_d2[const_id] != 0:
+            return f"const closure(node{d0}, in-loop)"
         return f"const closure(node{d0})"
 
     if k == ConstKind.CK_ASYNC_BLOCK:
