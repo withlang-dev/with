@@ -16051,7 +16051,7 @@ impl CiStmtPool:
 
         let result = stackify_graph(move ctx.state.cfg.graph)
         if not result.ok:
-            g_ci_bail_location = if ctx.state.location.len() > 0: ctx.state.location else: with_ci_cursor_location(session, body_cursor)
+            g_ci_bail_location = if ctx.state.location.len() > 0: ctx.state.location.clone() else: with_ci_cursor_location(session, body_cursor)
             g_ci_bail_message = "stackify: " ++ result.message
             g_ci_bail_kind = CXK_GOTO_STMT
             return 0 as CiStmtId

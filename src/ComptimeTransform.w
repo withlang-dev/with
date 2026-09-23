@@ -2897,11 +2897,20 @@ impl Sema:
         let target_type = ct_build_generic_self_type(out, decl, type_name_sym, tp_start, tp_count)
         let err_type = out.add_node(NodeKind.NK_TYPE_NAMED, start, end, builder_error_sym, 0, 0)
         let build_ret_type = ct_build_result_type(out, intern, decl, target_type, err_type as i32)
+        // D32 (§2.2, #1395): each `??` operand is a field of the consumed
+        // builder, and an owned `??` join moves its operand — so vacate it
+        // explicitly through a `var` rebind (an owned move-self is a read
+        // path), exactly as the SoA push does.
+        let build_owner_sym = intern.intern("__builder")
+        let build_stmts: Vec[i32] = Vec.new()
+        let build_self_ident = out.ct_build_ident(decl, self_sym)
+        build_stmts.push(out.add_node(NodeKind.NK_LET_BINDING, start, end, build_owner_sym, build_self_ident as i32, 1) as i32)
         let field_syms: Vec[i32] = Vec.new()
         let field_values: Vec[i32] = Vec.new()
         for fi5 in 0..field_count:
             let field_sym = self.type_extra[(te_start + fi5 * 3)]
-            let opt_value = ct_build_self_field(out, decl, self_sym, field_sym)
+            let owner_field = ct_build_self_field(out, decl, build_owner_sym, field_sym)
+            let opt_value = out.add_node(NodeKind.NK_MOVE_ARG, start, end, owner_field as i32, 0, 0) as i32
             let default_node = out.get_extra(type_extra_start + 1 + fi5 * 3 + 2)
             var fallback: i32 = 0
             if default_node != 0:
@@ -2921,7 +2930,8 @@ impl Sema:
         for fi6 in 0..field_values.len() as i32:
             out.add_extra(field_syms[fi6])
             out.add_extra(field_values[fi6])
-        let build_body = out.add_node(NodeKind.NK_STRUCT_LIT, start, end, type_name_sym, build_field_extra, field_count)
+        let build_lit = out.add_node(NodeKind.NK_STRUCT_LIT, start, end, type_name_sym, build_field_extra, field_count)
+        let build_body = out.ct_build_block(decl, build_stmts, build_lit as i32)
         let build_param_start = out.extra_len()
         out.ct_add_fn_param(self_sym, builder_self_type as i32, FN_PARAM_FLAG_MOVE_SELF)
         let build_fn_sym = intern.intern(builder_name ++ ".build")

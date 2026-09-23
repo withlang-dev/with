@@ -37,12 +37,12 @@ impl[V] Trie[V]:
 
     /// Stores `value` under `key`; returns the previous value, if any.
     pub mut fn insert(key: &str, value: V) -> Option[V]:
-        let previous = self.lookup(key)
+        var previous = self.lookup(key)
         let slot = unsafe { with_alloc(sizeof[Slot[V]]() as i64) } as *mut Slot[V]
         unsafe { *slot = Slot { compare: slot_unordered, value: value } }
         assert(unsafe { trie_insert_binary(self.trie, trie_key_bytes(key), key.len() as c_int, slot as *mut c_void) } != 0)
         if previous as i64 == 0: return None
-        let old: V = unsafe { (*previous).value }
+        let old: V = unsafe { move previous.value }
         unsafe { with_free(previous as *mut u8) }
         Some(old)
 
@@ -56,10 +56,10 @@ impl[V] Trie[V]:
 
     /// Transfers the value under `key` out.
     pub mut fn remove(key: &str) -> Option[V]:
-        let slot = self.lookup(key)
+        var slot = self.lookup(key)
         if slot as i64 == 0: return None
         assert(unsafe { trie_remove_binary(self.trie, trie_key_bytes(key), key.len() as c_int) } != 0)
-        let value: V = unsafe { (*slot).value }
+        let value: V = unsafe { move slot.value }
         unsafe { with_free(slot as *mut u8) }
         Some(value)
 
@@ -87,9 +87,9 @@ impl[V] Trie[V]:
 
     unsafe fn drop_subtree(node: *mut _TrieNode) -> Unit:
         if node as i64 == 0: return
-        let slot = unsafe { (*node).data } as *mut Slot[V]
+        var slot = unsafe { (*node).data } as *mut Slot[V]
         if slot as i64 != 0:
-            let value: V = unsafe { (*slot).value }
+            let value: V = unsafe { move slot.value }
             drop(value)
             unsafe { with_free(slot as *mut u8) }
         for child in 0..256:

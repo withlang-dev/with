@@ -679,7 +679,7 @@ fn project_config_resolve_header_path(cfg: &ProjectConfig, decl_dir: &str, heade
     let base_dir = if decl_dir.len() > 0:
         project_config_absolutize_path(decl_dir)
     else:
-        if cfg.root_dir.len() > 0: cfg.root_dir else: project_config_absolutize_path(".")
+        if cfg.root_dir.len() > 0: cfg.root_dir.clone() else: project_config_absolutize_path(".")
     let local_candidate = resolve_join(base_dir, header_name)
     if project_config_file_exists(local_candidate):
         return local_candidate

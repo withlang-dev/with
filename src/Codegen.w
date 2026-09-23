@@ -625,7 +625,7 @@ impl Codegen:
     fn analysis_fact_selected(fact: &AnalysisFact) -> bool:
         if self.analysis_query == "audit":
             return true
-        let query = if self.analysis_query.starts_with("matrix:"): self.analysis_query.slice(7, self.analysis_query.len()) else: self.analysis_query
+        let query = if self.analysis_query.starts_with("matrix:"): self.analysis_query.slice(7, self.analysis_query.len()) else: self.analysis_query.clone()
         analysis_fact_matches(fact, query)
 
     fn analysis_text() -> str:

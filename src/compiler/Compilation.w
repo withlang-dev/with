@@ -854,7 +854,7 @@ fn compilation_compiler_hook_call_args(pool: AstPool, intern: InternPool, hook_n
 impl Compilation:
     fn compiler_hook_runner_source(pool: AstPool, source_path: &str, diag_path: &str, emitted_source_path: &str, token: &str) -> str:
         let zcu = &self.zcu
-        let root = if zcu.project_config.root_dir.len() > 0: zcu.project_config.root_dir else: frontend_dirname(source_path)
+        let root = if zcu.project_config.root_dir.len() > 0: zcu.project_config.root_dir.clone() else: frontend_dirname(source_path)
         let hook_count = pool.compiler_hook_count()
         var out = "use std.compiler\n"
         let imported: HashMap[str, i32] = HashMap.new()
@@ -923,7 +923,7 @@ impl Compilation:
             return true
         if not self.config.compiler_hooks_enabled:
             return true
-        let root = if self.zcu.project_config.root_dir.len() > 0: self.zcu.project_config.root_dir else: frontend_dirname(source_path)
+        let root = if self.zcu.project_config.root_dir.len() > 0: self.zcu.project_config.root_dir.clone() else: frontend_dirname(source_path)
         // Hook scratch lives in the system temp dir, never beside the source:
         // rooting it at frontend_dirname scattered pid-stamped runners and
         // dSYM bundles into source test directories (#741). The stamped dir
@@ -995,7 +995,7 @@ impl Compilation:
             return AstPool.new()
         if self.compiler_hook_emitted_source.len() == 0:
             return pool
-        let base_source = if self.zcu.current_source_text.len() > 0: self.zcu.current_source_text else: runtime_read_file(source_path)
+        let base_source = if self.zcu.current_source_text.len() > 0: self.zcu.current_source_text.clone() else: runtime_read_file(source_path)
         let cfg = self.zcu.project_config
         let combined = base_source ++ "\n\n// <with compiler hook emitted source>\n" ++ self.compiler_hook_emitted_source
         self.compiler_hook_emitted_source = ""

@@ -2832,13 +2832,13 @@ impl MirBuilder:
 
 impl MirBuilder:
     mut fn source_location_operand(node: i32) -> i32:
-        let path = if self.sema.current_module_path.len() > 0: self.sema.current_module_path else: "<unknown>"
+        let path = if self.sema.current_module_path.len() > 0: self.sema.current_module_path.clone() else: "<unknown>"
         let loc = self.sema.source_location_for_file_id(self.sema.local_file_id, self.ast.get_start(node))
         self.lower_str_lit(self.pool.intern(f"{path}:{loc.line + 1}:{loc.col + 1}"))
 
     mut fn source_file_operand(node: i32) -> i32:
         let _ = node
-        let path = if self.sema.current_module_path.len() > 0: self.sema.current_module_path else: "<unknown>"
+        let path = if self.sema.current_module_path.len() > 0: self.sema.current_module_path.clone() else: "<unknown>"
         self.lower_str_lit(self.pool.intern(path))
 
     mut fn source_line_operand(node: i32) -> i32:

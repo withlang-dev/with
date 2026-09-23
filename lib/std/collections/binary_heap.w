@@ -55,9 +55,9 @@ impl[T: Ord] BinaryHeap[T]:
 
     /// Transfers the top value out, or `None` when empty.
     pub mut fn pop() -> Option[T]:
-        let slot = unsafe { binary_heap_pop(self.heap) } as *mut Slot[T]
+        var slot = unsafe { binary_heap_pop(self.heap) } as *mut Slot[T]
         if slot as i64 == 0: return None
-        let value: T = unsafe { (*slot).value }
+        let value: T = unsafe { move slot.value }
         unsafe { with_free(slot as *mut u8) }
         Some(value)
 
@@ -73,8 +73,8 @@ impl[T] Drop for BinaryHeap[T]:
         // slot before the engine frees the array.
         let count = unsafe { binary_heap_num_entries(self.heap) } as i32
         for index in 0..count:
-            let slot = unsafe { (*self.heap).values[index] } as *mut Slot[T]
-            let value: T = unsafe { (*slot).value }
+            var slot = unsafe { (*self.heap).values[index] } as *mut Slot[T]
+            let value: T = unsafe { move slot.value }
             drop(value)
             unsafe { with_free(slot as *mut u8) }
         unsafe { binary_heap_free(self.heap) }

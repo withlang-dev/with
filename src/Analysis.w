@@ -677,7 +677,7 @@ fn analysis_collect_diagnostics(report: &AnalysisReport, sema: &Sema):
         fact.source_file = diag.primary.file
         fact.start = diag.primary.start
         fact.end = diag.primary.end
-        fact.name = if diag.code.len() > 0: diag.code else: diag.message
+        fact.name = if diag.code.len() > 0: diag.code.clone() else: diag.message.clone()
         var subject = ""
         for si in 0..sema.source_text_file_ids.len() as i32:
             if sema.source_text_file_ids[si] == diag.primary.file:
@@ -692,7 +692,7 @@ fn analysis_collect_diagnostics(report: &AnalysisReport, sema: &Sema):
         if subject_source.len() > 0:
             fact.line = analysis_line_for_offset(subject_source, diag.primary.start)
             fact.column = analysis_column_for_offset(subject_source, diag.primary.start)
-        fact.path = if subject.len() > 0: subject else: diag.origin_file
+        fact.path = if subject.len() > 0: subject else: diag.origin_file.clone()
         fact.detail = diag.origin_fn ++ ": " ++ diag.message ++ f" subject-file={diag.primary.file}"
         report.add(move fact)
 

@@ -14,9 +14,9 @@ pub fn Holder.new[T]() -> Holder[T]: Holder { p: 0 }
 
 impl[T] Drop for Holder[T]:
     move fn drop():
-        let s = self.p as *mut Slot[T]
+        var s = self.p as *mut Slot[T]
         if s as i64 != 0:
-            let v: T = unsafe { (*s).value }
+            let v: T = unsafe { move s.value }
             drop(v)
 
 type R { id: i32 }

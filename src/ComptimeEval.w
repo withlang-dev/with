@@ -1657,12 +1657,12 @@ unsafe fn comptime_eval_tool_build_result(sema_ptr: *mut Sema, ast: AstPool, poo
     let ctx_value = evaluator.mint_capability(ctx_type, move ctx_record)
     let args: Vec[ComptimeValue] = Vec.new()
     args.push(ctx_value)
-    let signal = evaluator.eval_fn_symbol_call_values(fn_sym, args, call_node)
+    var signal = evaluator.eval_fn_symbol_call_values(fn_sym, args, call_node)
     evaluator.check_workspace_intercepts_finished()
     evaluator.restore_runtime_env()
     let value =
         if evaluator.had_error == 0 and (signal.kind == ComptimeControlKind.CTL_VALUE or signal.kind == ComptimeControlKind.CTL_RETURN):
-            signal.value
+            move signal.value
         else:
             comptime_value_invalid()
     comptime_eval_finish(sema_ptr, evaluator, value)
@@ -1684,12 +1684,12 @@ unsafe fn comptime_eval_tool_action_result(sema_ptr: *mut Sema, ast: AstPool, po
     let ctx_value = evaluator.mint_capability(ctx_type, move ctx_record)
     let args: Vec[ComptimeValue] = Vec.new()
     args.push(ctx_value)
-    let signal = evaluator.eval_fn_symbol_call_values(fn_sym, args, call_node)
+    var signal = evaluator.eval_fn_symbol_call_values(fn_sym, args, call_node)
     evaluator.check_workspace_intercepts_finished()
     evaluator.restore_runtime_env()
     let value =
         if evaluator.had_error == 0 and (signal.kind == ComptimeControlKind.CTL_VALUE or signal.kind == ComptimeControlKind.CTL_RETURN):
-            signal.value
+            move signal.value
         else:
             comptime_value_invalid()
     comptime_eval_finish(sema_ptr, evaluator, value)
@@ -2182,7 +2182,7 @@ impl ComptimeEvaluator:
         if self.strict_effects != 0 and record.inputs.len() == 0 and record.outputs.len() == 0:
             let _ = self.fail(0, "ProcessRunner." ++ method ++ " affects build output but has no declared action inputs or outputs in strict mode")
             return
-        let target = if record.target_name.len() > 0: record.target_name else: "<build>"
+        let target = if record.target_name.len() > 0: record.target_name.clone() else: "<build>"
         var line = "process"
         line = line ++ "\ttarget=" ++ comptime_effect_escape(target)
         line = line ++ "\tmethod=" ++ comptime_effect_escape(method)
@@ -2205,7 +2205,7 @@ impl ComptimeEvaluator:
         if record.network != 0:
             return 0
         let tool = comptime_process_basename(exe)
-        let target = if record.target_name.len() > 0: record.target_name else: "<build>"
+        let target = if record.target_name.len() > 0: record.target_name.clone() else: "<build>"
         let _ = self.fail(node, "ProcessRunner." ++ method ++ " uses network tool '" ++ tool ++ "' for target '" ++ target ++ "' without target.allow_network()")
         1
 
@@ -4871,7 +4871,7 @@ impl ComptimeEvaluator:
         if plan.valid == 0:
             return comptime_workspace_compile_invalid()
         let artifact_kind = if plan.is_migrate != 0: 7 else: self.workspace_artifact_kind_for_output(plan.output_kind)
-        let result_artifact_path = if plan.output_kind == 5 and plan.is_migrate == 0: "" else: plan.final_output
+        let result_artifact_path = if plan.output_kind == 5 and plan.is_migrate == 0: "" else: plan.final_output.clone()
         let plan_name = plan.name
         let native = comptime_execute_workspace_compile_plan(plan)
         let result = self.workspace_build_result_value(plan_name, native.rc, artifact_kind, result_artifact_path, node)
@@ -5855,19 +5855,19 @@ impl ComptimeEvaluator:
             let resolved = self.capability_resolve_project_path(record, path, method, node)
             if self.had_error != 0:
                 return comptime_control_error()
-            let bytes_value = self.extra_value_at((args_signal.value.extra_start + 1) as i64)
+            var bytes_value = self.extra_value_at((args_signal.value.extra_start + 1) as i64)
             let data = if bytes_value.kind == ComptimeValueKind.CV_BYTES:
-                bytes_value.text
+                move bytes_value.text
             else:
                 if bytes_value.kind == ComptimeValueKind.CV_VEC:
                     let parts: Vec[str] = Vec.new()
                     for i in 0..bytes_value.extra_count:
                         let elem = self.extra_value_at((bytes_value.extra_start + i) as i64)
                         parts.push(with_str_from_byte(comptime_value_intlike(elem) as i32))
-                    let assembled = self.concat_comptime_string_parts(node, parts)
+                    var assembled = self.concat_comptime_string_parts(node, parts)
                     if assembled.kind != ComptimeControlKind.CTL_VALUE:
                         return assembled
-                    assembled.value.text
+                    move assembled.value.text
                 else:
                     let _ = self.fail(node, "write_binary second argument must be Vec[u8]")
                     return comptime_control_error()
@@ -7560,7 +7560,7 @@ impl ComptimeEvaluator:
                 if line_value > 0:
                     location.text ++ f":{line_value}"
                 else:
-                    location.text
+                    location.text.clone()
             self.runtime_exit_code = 134
             self.runtime_stderr = "panic at " ++ rendered_location ++ ": " ++ message.text ++ "\n"
             self.had_error = 1

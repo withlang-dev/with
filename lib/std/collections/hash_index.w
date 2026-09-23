@@ -64,10 +64,10 @@ impl[K, V] HashIndex[K, V]:
             var node = unsafe { *((*self.map).bucket + b as u64) }
             while node as i64 != 0:
                 let next = unsafe { (*node).next }
-                let slot = node as *mut HashSlot[K, V]
-                let stored_key: K = unsafe { (*slot).key }
+                var slot = node as *mut HashSlot[K, V]
+                let stored_key: K = unsafe { move slot.key }
                 drop(stored_key)
-                let value: V = unsafe { (*slot).value }
+                let value: V = unsafe { move slot.value }
                 drop(value)
                 unsafe { with_free(slot as *mut u8) }
                 node = next
@@ -126,12 +126,12 @@ impl[K: Hash + Eq, V] HashIndex[K, V]:
 
     /// Transfers the value stored under `key` out; the key is dropped.
     pub mut fn remove(key: &K) -> Option[V]:
-        let slot = self.find(key)
+        var slot = self.find(key)
         if slot as i64 == 0: return None
         unsafe { tommy_hashdyn_remove_existing(self.map, &raw mut (*slot).head.node) }
-        let stored_key: K = unsafe { (*slot).key }
+        let stored_key: K = unsafe { move slot.key }
         drop(stored_key)
-        let value: V = unsafe { (*slot).value }
+        let value: V = unsafe { move slot.value }
         unsafe { with_free(slot as *mut u8) }
         Some(value)
 

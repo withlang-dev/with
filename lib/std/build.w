@@ -1896,7 +1896,7 @@ fn tool_effect_env_text(process_env: &ProcessEnv) -> str:
 fn ProcessRunner.record_process_effect(self: &Self, method: &str, parts: &Vec[str], cwd: &str, timeout_ms: i32, stdin_path: &str, stdout_path: &str, stderr_path: &str, env_text: &str):
     if with_getenv_str("WITH_BUILD_EFFECTS_OUT").len() == 0:
         return
-    let target = if self.target_name.len() > 0: self.target_name else: "<build>"
+    let target = if self.target_name.len() > 0: self.target_name.clone() else: "<build>"
     var line = StringBuilder.new()
     line.push_str("process\ttarget=")
     line.push_str(tool_effect_escape(target))
@@ -2057,7 +2057,7 @@ fn ProcessRunner.require_network_allowed(self: &Self, args: &Vec[str], method: &
         return
     if self.network:
         return
-    let target = if self.target_name.len() > 0: self.target_name else: "<build>"
+    let target = if self.target_name.len() > 0: self.target_name.clone() else: "<build>"
     let tool = tool_process_basename(args.get(0))
     with_eprint("error: ProcessRunner." ++ method ++ " uses network tool '" ++ tool ++ "' for target '" ++ target ++ "' without target.allow_network()\n")
     exit(1)

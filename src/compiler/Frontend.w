@@ -2911,7 +2911,7 @@ impl Zcu:
                     return embedded_fallback
             // Not embedded — fall through to filesystem resolution
 
-        let source_dir = if source_dir_raw.len() > 0: with_str_clone_ref(source_dir_raw) else: self.source_dir
+        let source_dir = if source_dir_raw.len() > 0: with_str_clone_ref(source_dir_raw) else: self.source_dir.clone()
         let has_root_fallback = source_dir != self.source_dir
 
         let primary = frontend_resolve_module_rel(source_dir, rel_primary)

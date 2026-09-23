@@ -249,7 +249,7 @@ impl BuildGraphMaterializer:
             with_eprint(f"[graph] build value start={value.extra_start} count={value.extra_count} extras_len={self.extras.len()}")
             for tf in 0..value.extra_count:
                 let tfv = self.extras[(value.extra_start + tf)]
-                with_eprint(f"[graph] field[{tf}] kind={tfv.kind as i32} text=" ++ (if tfv.kind == ComptimeValueKind.CV_STR: tfv.text else: ""))
+                with_eprint(f"[graph] field[{tf}] kind={tfv.kind as i32} text=" ++ (if tfv.kind == ComptimeValueKind.CV_STR: tfv.text.clone() else: ""))
         let default_target = self.expect_str_field(value, "default_target")
         if package_name.kind == ComptimeValueKind.CV_INVALID or package_version.kind == ComptimeValueKind.CV_INVALID or default_target.kind == ComptimeValueKind.CV_INVALID:
             return self.error("Build has a field with the wrong comptime value type")

@@ -472,7 +472,7 @@ pub fn build_graph_run_corpus_test(root: &str, target: &BuildGraphTarget) -> i32
     let runner_path = if runtime_path_is_absolute(target.entry) or target.entry.contains("/"):
         build_graph_resolve_project_path(root, target.entry)
     else:
-        target.entry
+        target.entry.clone()
     argv = build_graph_argv_append(argv, runner_path)
     for ai in 0..target.args.len() as i32:
         argv = build_graph_argv_append(argv, target.args[ai])
@@ -514,7 +514,7 @@ pub fn build_graph_run_command(root: &str, target: &BuildGraphTarget) -> i32:
     let runner_path = if runtime_path_is_absolute(target.entry) or target.entry.contains("/"):
         build_graph_resolve_project_path(root, target.entry)
     else:
-        target.entry
+        target.entry.clone()
     argv = build_graph_argv_append(argv, runner_path)
     for ai in 0..target.args.len() as i32:
         argv = build_graph_argv_append(argv, target.args[ai])

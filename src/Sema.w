@@ -2763,7 +2763,7 @@ impl Sema:
         self.index_named_type_candidate(sym, self.named_type_candidate_syms.len() as i32)
         self.named_type_candidate_syms.push(sym)
         self.named_type_candidate_tids.push(tid)
-        let path = with_str_clone_ref(self.current_module_path)
+        let path = self.current_module_path.clone()
         self.named_type_candidate_paths.push(sema_owned_text(path))
         self.named_type_candidate_pub.push(is_pub)
 
@@ -2772,7 +2772,7 @@ impl Sema:
             return
         let record = self.decl_visibility_syms.len() as i32
         self.decl_visibility_syms.push(sym)
-        let path = with_str_clone_ref(self.current_module_path)
+        let path = self.current_module_path.clone()
         self.decl_visibility_paths.push(sema_owned_text(path))
         self.decl_visibility_pub.push(is_pub)
         self.decl_visibility_nodes.push(node)

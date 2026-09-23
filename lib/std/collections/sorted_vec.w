@@ -53,9 +53,9 @@ impl[T: Ord] SortedVec[T]:
 
     /// Transfers the value at `index` out; panics out of range.
     pub mut fn remove(index: i32) -> T:
-        let slot = self.slot_at(index)
+        var slot = self.slot_at(index)
         assert(unsafe { sortedarray_remove(self.array, index as c_uint) } != 0)
-        let value: T = unsafe { (*slot).value }
+        let value: T = unsafe { move slot.value }
         unsafe { with_free(slot as *mut u8) }
         value
 
@@ -76,8 +76,8 @@ impl[T: Ord] SortedVec[T]:
     /// Drops every value and empties the collection.
     pub mut fn clear() -> Unit:
         for index in 0..self.len():
-            let slot = self.slot_at(index)
-            let value: T = unsafe { (*slot).value }
+            var slot = self.slot_at(index)
+            let value: T = unsafe { move slot.value }
             drop(value)
             unsafe { with_free(slot as *mut u8) }
         unsafe { sortedarray_clear(self.array) }
@@ -90,8 +90,8 @@ impl[T] Drop for SortedVec[T]:
     move fn drop():
         let len = unsafe { sortedarray_length(self.array) } as i32
         for index in 0..len:
-            let slot = unsafe { sortedarray_get(self.array, index as c_uint) } as *mut Slot[T]
-            let value: T = unsafe { (*slot).value }
+            var slot = unsafe { sortedarray_get(self.array, index as c_uint) } as *mut Slot[T]
+            let value: T = unsafe { move slot.value }
             drop(value)
             unsafe { with_free(slot as *mut u8) }
         unsafe { sortedarray_free(self.array) }

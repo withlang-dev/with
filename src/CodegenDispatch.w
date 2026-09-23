@@ -24,7 +24,7 @@ impl Codegen:
         let decl_index = self.find_decl_index(fn_node)
         let source_path =
             if decl_index >= 0: self.decl_source_path(decl_index)
-            else: self.current_decl_source_file
+            else: self.current_decl_source_file.clone()
         var msg =
             if reason == "lowering-failed":
                 "error: MIR lowering failed for function '" ++ fn_name ++ "'"
@@ -17916,9 +17916,9 @@ impl Codegen:
     fn gen_src_intrinsic(node: i32) -> i64:
         let span_start = self.pool.get_start(node)
         let source_path = if self.current_decl_source_file.len() > 0 and self.current_decl_source_file != "<unknown>":
-            with_str_clone_ref(self.current_decl_source_file)
+            self.current_decl_source_file.clone()
         else:
-            self.source_file
+            self.source_file.clone()
         var source_text = self.source_text.clone()
         if source_path.len() > 0 and source_path != self.source_file:
             let file_text = with_fs_read_file(source_path)
