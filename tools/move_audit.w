@@ -22,8 +22,9 @@
 //   with build :move-audit          # candidate=out/release/bin/with,
 //                                   # baseline=installed `with`
 //
-// Verdicts: OK (compiles) | MOVE-ERR (move diagnostic) | OTHER-ERR (a
-// different compile error — the cell is malformed, fix it).
+// Verdicts: OK (compiles) | MOVE-ERR (move diagnostic) | FIELD-ERR (an
+// implicit field move, §2.2 D32 / D22 §13.6) | OTHER-ERR (a different compile
+// error — the cell is malformed, fix it).
 //
 // Value shapes:
 //   drop  — a Drop struct: single-ownership NOW, flip-independent. These cells
@@ -83,6 +84,7 @@ fn shape_prelude(shape: &str) -> str:
 
 fn shape_ty(shape: &str) -> str:
     if shape == "vec": return "Vec[i32]"
+    if shape == "str": return "str"
     "D"
 
 // ── Scenario builders ─────────────────────────────────────────────────────
@@ -198,8 +200,55 @@ fn sc_divergent_branch(shape: str) -> str:
         "    x\n" ++
         "fn main:\n    let _r = f(3)\n    print(\"ok\")\n"
 
+// ── Field values reaching an owned result (#1395, §2.2 D32, §3.8 join) ─────
+// A field never moves out implicitly. `let x = base.p` binds a view (OK);
+// every other position whose value becomes an owned result — an `if`/`match`
+// arm joined with an owned arm, a `??` operand, a block tail, a `break`
+// value, an inferred-return tail, a consuming argument — is an implicit field
+// move and must fail at the move site (FIELD-ERR), on every base: a `mut fn`
+// receiver, a read `fn` receiver, an owned local. #1395: the arms escaped the
+// D32 funnel; a `mut fn` blanked the field and a read `fn` double-freed it.
+// `.clone()` keeps the owner whole (OK); `move` vacates through a mutable
+// path (OK) and is refused through a read path (FIELD-ERR's sibling, the
+// read-path vacate error, classified OTHER-ERR — not asserted here).
+
+fn field_prelude(shape: &str) -> str:
+    var pre = shape_prelude(shape)
+    if shape == "str":
+        pre = "fn consume(s: str): ()\nfn mk() -> str: \"ab\" ++ \"c\"\n"
+    pre ++ "type H { p: " ++ shape_ty(shape) ++ ", o: Option[" ++ shape_ty(shape) ++ "] }\n" ++
+        "fn mkh() -> H: H { p: mk(), o: Some(mk()) }\n"
+
+fn field_form(form: &str, b: &str) -> str:
+    if form == "plain": return "let _x = " ++ b ++ ".p\n"
+    if form == "if": return "let _x = if c > 0: " ++ b ++ ".p else: mk()\n"
+    if form == "match": return "let _x = match c:\n            0 => mk()\n            _ => " ++ b ++ ".p\n"
+    if form == "coalesce": return "let _x = " ++ b ++ ".o ?? mk()\n"
+    if form == "block": return "let _x = { let _n = c\n            " ++ b ++ ".p }\n"
+    if form == "break": return "let _x = loop:\n            break " ++ b ++ ".p\n"
+    if form == "arg": return "consume(if c > 0: " ++ b ++ ".p else: mk())\n"
+    if form == "clone": return "let _x = if c > 0: " ++ b ++ ".p.clone() else: mk()\n"
+    if form == "move": return "let _x = if c > 0: move " ++ b ++ ".p else: mk()\n"
+    ""
+
+// base ∈ { mutrecv, readrecv, local }; form "retinfer" is an unannotated
+// method/fn whose tail is the join.
+fn sc_field(shape: &str, base: &str, form: &str) -> str:
+    let b = if base == "local": "h" else: "self"
+    var body = ""
+    if form == "retinfer":
+        body = "    if c > 0: " ++ b ++ ".p else: mk()\n"
+    else:
+        body = "    " ++ field_form(form, b)
+    if base == "local":
+        return field_prelude(shape) ++ "fn f(c: i32):\n    var h = mkh()\n" ++ body ++
+            "fn main:\n    let _r = f(3)\n    print(\"ok\")\n"
+    let mode = if base == "mutrecv": "mut fn" else: "fn"
+    field_prelude(shape) ++ "impl H:\n    " ++ mode ++ " f(c: i32):\n    " ++ body.replace("\n    ", "\n        ") ++
+        "fn main:\n    var h = mkh()\n    let _r = h.f(3)\n    print(\"ok\")\n"
+
 // ── A cell: name, source, expected verdict ────────────────────────────────
-// verdict ∈ { "OK", "MOVE-ERR" }.
+// verdict ∈ { "OK", "MOVE-ERR", "FIELD-ERR" }.
 type Cell { name: str, source: str, expect: str }
 
 fn build_cells() -> Vec[Cell]:
@@ -227,6 +276,15 @@ fn build_cells() -> Vec[Cell]:
     cells.push(Cell { name: "inside_fallthrough/vec[FLIPPED:#691]", source: sc_inside_fallthrough("vec"), expect: "MOVE-ERR" })
     cells.push(Cell { name: "before_used_inside/vec", source: sc_before_used_inside("vec"), expect: "MOVE-ERR" })
     cells.push(Cell { name: "divergent_branch/vec", source: sc_divergent_branch("vec"), expect: "OK" })
+
+    // #1395: a field value reaching an owned result, on every base.
+    for shape in ["str", "vec"]:
+        for base in ["mutrecv", "readrecv", "local"]:
+            for form in ["plain", "if", "match", "coalesce", "block", "break", "arg", "retinfer", "clone", "move"]:
+                if form == "move" and base == "readrecv":
+                    continue
+                let expect = if form == "plain" or form == "clone" or form == "move": "OK" else: "FIELD-ERR"
+                cells.push(Cell { name: f"field_{form}/{base}/{shape}", source: sc_field(shape, base, form), expect })
     cells
 
 // ── Runner ─────────────────────────────────────────────────────────────────
@@ -252,6 +310,9 @@ fn classify(with_bin: &str, dir: &str, idx: i32, source: &str) -> str:
     let err = read_file(errp)
     if find_sub(err, "error:") < 0:
         return "OK"
+    // §2.2 D32 / D22 §13.6: an implicit field move, or one through a borrow.
+    if find_sub(err, "a field never moves out implicitly") >= 0 or find_sub(err, "non-Copy field through a borrow") >= 0:
+        return "FIELD-ERR"
     // A move-checker error mentions a moved value or a partial move.
     if find_sub(err, "moved") >= 0 or find_sub(err, "partial move") >= 0:
         return "MOVE-ERR"

@@ -2405,9 +2405,13 @@ impl Sema:
         // is an implicit field move and errors at the move site. Unannotated
         // fns have no ret_type yet; the checked body's own type is the demand
         // (`move fn finish(): self.text` escaped through the gap).
-        if ret_type != 0 and ret_type != self.ty_void as i32:
+        // #1395: an unannotated fn's signature still reads Unit here (D43
+        // sets the inferred return below), so key on the annotation, not on
+        // ret_type == 0 — that test never fired and `mut fn r(c: bool): if c:
+        // self.p else: ""` vacated the receiver's field.
+        if has_ret_annotation and ret_type != 0 and ret_type != self.ty_void as i32:
             self.check_returned_field_move(body, ret_type)
-        else if ret_type == 0 and body_ty != 0 and body_ty != self.ty_void and body_ty != self.ty_never:
+        else if not has_ret_annotation and body_ty != 0 and body_ty != self.ty_void and body_ty != self.ty_never:
             self.check_returned_field_move(body, body_ty as i32)
         if is_gen == 1:
             self.finalize_generator_state_type(node, sig_idx)
@@ -3195,6 +3199,11 @@ impl Sema:
             return
         let value_ty = if value != 0: self.check_expr(value) as i32 else: self.ty_void as i32
         self.merge_loop_break_value_type(target, value_ty, node)
+        // #1395: a break value becomes the loop's owned result.
+        if value != 0:
+            let bv_arms: Vec[i32] = Vec.new()
+            bv_arms.push(value)
+            self.d32_check_owned_join_arms(value_ty, &bv_arms, "break value")
 
     // ── Reachable comptime_error validation ─────────────────────────
 
@@ -8669,6 +8678,10 @@ impl Sema:
             // payload-int into an Option-typed temp (issue43).
             if dj != 0:
                 self.typed_expr_types.insert(node, dj as i32)
+                let dj_arms: Vec[i32] = Vec.new()
+                dj_arms.push(lhs_node)
+                dj_arms.push(rhs_node)
+                self.d32_check_owned_join_arms(dj, &dj_arms, "`??` operand")
             return dj
         // Variant shorthand in comparisons must be typed against the opposite side,
         // not whatever outer expected type is active (for example `bool` from assert()).
@@ -9896,6 +9909,7 @@ impl Sema:
                 self.infer_tail_join = if is_infer_tail: 1 else: 0
                 result_type = self.resolve_contextual_join(outer_expected as i32, &join_nodes, &origin_nodes, &join_types, &join_roles, node, "if") as TypeId
                 self.infer_tail_join = saved_infer_join
+                self.d32_check_owned_join_arms(result_type as i32, &join_nodes, "if arm")
         else:
             if in_value_context and self.current_statement_expr_root == 0 and then_is_never == 0:
                 self.emit_error("if expression requires an else branch unless the then branch diverges", node)
@@ -13128,6 +13142,7 @@ impl Sema:
             self.infer_tail_join = if is_infer_tail: 1 else: 0
             result_type = self.resolve_contextual_join(match_expected as i32, &join_expr_nodes, &join_origin_nodes, &join_expr_types, &join_roles, node, "match") as TypeId
             self.infer_tail_join = saved_infer_join
+            self.d32_check_owned_join_arms(result_type as i32, &join_expr_nodes, "match arm")
         else if stmt_arms_mixed:
             result_type = self.ty_void
 
@@ -22770,7 +22785,7 @@ impl Sema:
             if comptime_value_is_valid(path_value) == 0 or path_value.kind != ComptimeValueKind.CV_STR:
                 self.emit_error("embed_file() argument must be a comptime string", path_node)
                 return self.ty_str as i32
-            let source_path = with_str_clone_ref(self.current_module_path)
+            let source_path = self.current_module_path.clone()
             let read_result = self.read_tracked_embed_file(source_path, path_value.text)
             if not read_result.ok:
                 self.emit_error(read_result.error_msg, node)
@@ -25020,6 +25035,60 @@ impl Sema:
         if n != 0 and self.ast.kind(n) == NodeKind.NK_IDENT and self.scope_has(self.ast.get_data0(n)) != 0:
             self.mark_moved_if_consumed(n)
 
+    // #1395 (§2.2 D32; §3.8 join rule 5): a value that reaches an owned result
+    // — the arm of an owned `if`/`match`/`??` join, a `break` value, a block
+    // tail — is an owned demand on that expression. A bare non-Copy field there
+    // is an implicit field move, exactly as `let x: T = place.field` is, and
+    // errors at the move site; through a shared view it is D22 §13.6's
+    // borrowed-field error. Only `let x = place.field` (no join, no
+    // annotation) binds a view. `conditional` marks a value that moves on
+    // some paths only (a drop body may not consume its own field that way).
+    //
+    // The value is peeled to what it yields — a block's tail, the inside of a
+    // grouping or `unsafe`/`comptime` block. Nested joins are not peeled: an
+    // inner `if`/`match` resolves (and checks) its own arms. This runs after
+    // the value was checked, so the funnel's base queries re-derive in the
+    // leaf's own lexical context: inside an `unsafe` block they are unsafe.
+    mut fn d32_check_owned_value_field(node: i32, conditional: i32, context: &str):
+        var leaf = node
+        var crossed_unsafe = 0
+        while leaf != 0:
+            let k = self.ast.kind(leaf)
+            if k == NodeKind.NK_UNSAFE_BLOCK:
+                crossed_unsafe = 1
+                leaf = self.ast.get_data0(leaf)
+            else if k == NodeKind.NK_GROUPED or k == NodeKind.NK_NO_SUSPEND or k == NodeKind.NK_COMPTIME:
+                leaf = self.ast.get_data0(leaf)
+            else if k == NodeKind.NK_BLOCK:
+                leaf = self.ast.get_data2(leaf)
+            else:
+                break
+        if leaf == 0 or self.ast.kind(leaf) != NodeKind.NK_FIELD_ACCESS:
+            return
+        let fty_opt = self.typed_expr_types.get(leaf)
+        let fty = if fty_opt.is_some(): fty_opt.unwrap() else: 0
+        if fty == 0 or self.is_copy(fty as TypeId) != 0 or self.type_needs_drop(fty) == 0:
+            return
+        let saved_unsafe = self.in_unsafe
+        if crossed_unsafe != 0:
+            self.in_unsafe = 1
+        self.reject_owned_demand_from_view_projection(leaf, 0, context)
+        self.drop_control_flow_depth = self.drop_control_flow_depth + conditional
+        self.mark_moved_if_consumed(leaf)
+        self.drop_control_flow_depth = self.drop_control_flow_depth - conditional
+        self.in_unsafe = saved_unsafe
+
+    // The arms of a resolved join: an owned result consumes every arm (§3.8
+    // join rules 2 and 5); a reference result observes them.
+    mut fn d32_check_owned_join_arms(result_type: i32, arm_nodes: &Vec[i32], context: &str):
+        if result_type == 0:
+            return
+        let rk = self.get_type_kind(self.resolve_alias(result_type as TypeId))
+        if rk == TypeKind.TY_REF or rk == TypeKind.TY_PTR or rk == TypeKind.TY_NEVER:
+            return
+        for ai in 0..arm_nodes.len() as i32:
+            self.d32_check_owned_value_field(arm_nodes[ai], 1, context)
+
     mut fn mark_moved_if_consumed(node: i32):
         if node == 0:
             return
@@ -25099,6 +25168,9 @@ impl Sema:
                     self.effect_note_origin_node = 0
         if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_NO_SUSPEND:
             self.mark_moved_if_consumed(self.ast.get_data0(node))
+        // #1395: a consumed block yields its tail — a field there moves out.
+        if kind == NodeKind.NK_BLOCK or kind == NodeKind.NK_UNSAFE_BLOCK:
+            self.d32_check_owned_value_field(node, 0, "block value")
         // copy: source remains valid — do not mark as consumed.
         if kind == NodeKind.NK_COPY_ARG:
             return
