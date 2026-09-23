@@ -22085,9 +22085,15 @@ impl Sema:
                     if from_int_arg_ty != 0 and self.get_type_kind(self.resolve_alias(from_int_arg_ty as TypeId)) != TypeKind.TY_INT:
                         self.emit_error("from_int() argument must be an integer", self.ast.get_extra(extra_start))
                         return 0
+                // §4.4a: `Type.from_int(n)` is an `Option[Type]` —
+                // `Color.from_int(2)` is `Some(Color.Green)` (#1453: it was
+                // typed the repr's Option). An enum with payload variants has
+                // no value to give a payload variant's discriminant; it keeps
+                // the repr (#1497 asks what it should be).
                 let repr_ty = self.enum_repr_type(enum_resolved as i32)
                 let opt_args: Vec[i32] = Vec.new()
-                let opt_inner = if repr_ty != 0: repr_ty else: self.ty_i32 as i32
+                let repr_or_i32 = if repr_ty != 0: repr_ty else: self.ty_i32 as i32
+                let opt_inner = if self.disc_has_payload.contains(enum_resolved as i32): repr_or_i32 else: enum_resolved as i32
                 opt_args.push(opt_inner)
                 let opt_ty = self.ensure_generic_inst_type(self.syms.option, opt_args, 1) as i32
                 self.typed_expr_types.insert(node, opt_ty)
