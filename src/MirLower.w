@@ -12382,12 +12382,12 @@ impl MirBuilder:
         let payload_place = self.body.new_field_place(downcast_place, 0, payload_ty)
         if method_name == "filter":
             let filter_args: Vec[i32] = Vec.new()
-            // Sema types the predicate's parameter OWNED (`x => x > 3` checks x
-            // as T), so pass by value. The old &T spelling was dormant: before
-            // D22 `find_exact_type(TY_REF, T)` found nothing (no &T in the type
-            // table) and fell back to by-value; D22 programs mint &T constantly,
-            // which activated the mismatch (ptr passed, i32 expected).
-            filter_args.push(self.operand_for_place(payload_place, payload_ty))
+            // §10.5 `(fn(&T) -> bool)`: the predicate observes the payload in
+            // place, like `inspect`; Sema types its parameter `&T`. Passing
+            // it by value moved the payload into the predicate, which freed
+            // it, and then moved it again into the kept `Some` (#1379).
+            let filter_ref_ty = self.sema.find_exact_type(TypeKind.TY_REF, payload_ty, 0, 0) as i32
+            filter_args.push(self.operand_for_place_arg(payload_place, payload_ty, filter_ref_ty, span))
             let keep_op = self.lower_call_with_operand_args(mapper_op, filter_args, self.sema.ty_bool as i32, node)
             let keep_bb = self.new_block()
             let reject_bb = self.new_block()
@@ -12404,12 +12404,22 @@ impl MirBuilder:
             self.assign_enum_variant_to_place(result_place, result_ty, self.sema.syms.some, kept_fields, span)
             self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
 
+            // The predicate only observed: a rejected payload is still the
+            // subject's, and is dropped here, once.
             self.switch_to(reject_bb)
+            if mir_place_plain_local(&self.body, value_place) >= 0:
+                self.emit_drop_stmt(value_place, "filter-reject", span)
             let rejected_fields: Vec[i32] = Vec.new()
             self.assign_enum_variant_to_place(result_place, result_ty, self.sema.syms.none, rejected_fields, span)
             self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
 
+            // #1379: every path decomposed the subject — kept moved the
+            // payload into the result, rejected dropped it, None owns
+            // nothing — so its own scope-exit drop is retired; left live, the
+            // enum glue freed the payload the kept `Some` owns (`drop(_7)`
+            // after `_9 = Some(move _7<as v0>.f0)`).
             self.switch_to(join_bb)
+            self.retire_decomposed_carrier(value_place)
             self.forget_string_flow_facts()
             return self.operand_for_place(result_place, result_ty)
         if method_name == "and_then":
@@ -12445,6 +12455,14 @@ impl MirBuilder:
         self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
 
         self.switch_to(join_bb)
+        // `inspect` observes like `filter` and then moves the payload into
+        // the result's `Some`: the subject is decomposed (#1379 class; it was
+        // a DOUBLE FREE). map / and_then move the payload into a consuming
+        // closure whose body does not drop its owned parameter yet, so the
+        // subject's drop is what frees it; retiring it here would leak —
+        // those two move with the closure-parameter drop (#1363).
+        if method_name == "inspect":
+            self.retire_decomposed_carrier(value_place)
         self.forget_string_flow_facts()
         self.operand_for_place(result_place, result_ty)
 
@@ -12565,6 +12583,14 @@ impl MirBuilder:
         self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
 
         self.switch_to(join_bb)
+        // inspect / inspect_err observe, then move each payload into the
+        // result; context / with_context move the Ok payload through and the
+        // Err payload into the context error. No path hands a payload to a
+        // consuming closure, so the subject is decomposed on every path
+        // (#1379 class; each was a DOUBLE FREE). map / map_err / and_then /
+        // or_else move one payload into a consuming closure (#1363).
+        if method_name == "inspect" or method_name == "inspect_err" or method_name == "context" or method_name == "with_context":
+            self.retire_decomposed_carrier(value_place)
         self.forget_string_flow_facts()
         self.operand_for_place(result_place, result_ty)
 

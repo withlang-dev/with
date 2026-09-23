@@ -19864,6 +19864,16 @@ impl Sema:
         self.emit_error("Vec.traverse() function must return Option or Result", node)
         0
 
+    // §10.5: an observing callback (`filter`, `inspect`, `inspect_err`)
+    // receives `&T`, and MIR passes the payload's address. A parameter
+    // spelled as an owned `T` is not that callback: types_compatible alone
+    // accepted it (`&P` vs `P`) and codegen then met a pointer where the
+    // closure expected a `P` (#1379).
+    mut fn observer_param_accepts(ref_ty: i32, param: i32) -> i32:
+        if self.get_type_kind(self.resolve_alias(param as TypeId)) != TypeKind.TY_REF:
+            return 0
+        self.types_compatible(ref_ty as TypeId, param as TypeId)
+
     mut fn option_combinator_return_type(recv_type: i32, recv_node: i32, method_name: &str, arg_types: &Vec[i32], arg_count: i32, default_node: i32, node: i32) -> i32:
         let elem_ty = self.get_generic_inst_arg(recv_type, 0)
         if method_name == "transpose":
@@ -19999,7 +20009,7 @@ impl Sema:
                 return 0
             let elem_ref_ty = self.ensure_exact_type(TypeKind.TY_REF, elem_ty, 0, 0) as i32
             let inspect_param = self.fn_type_param_type(inspect_fn, 0)
-            if inspect_param != 0 and self.types_compatible(elem_ref_ty as TypeId, inspect_param as TypeId) == 0:
+            if inspect_param != 0 and self.observer_param_accepts(elem_ref_ty, inspect_param) == 0:
                 self.emit_argument_type_mismatch("Option.inspect", 0, 0, 0, elem_ref_ty, inspect_param, node)
             return recv_type
         0
@@ -20087,7 +20097,7 @@ impl Sema:
                 self.emit_error("Result.inspect() expects a one-argument function", node)
             else:
                 let inspect_param = self.fn_type_param_type(inspect_fn, 0)
-                if inspect_param != 0 and self.types_compatible(ok_ref_ty as TypeId, inspect_param as TypeId) == 0:
+                if inspect_param != 0 and self.observer_param_accepts(ok_ref_ty, inspect_param) == 0:
                     self.emit_argument_type_mismatch("Result.inspect", 0, 0, 0, ok_ref_ty, inspect_param, node)
             return recv_type
         if method_name == "inspect_err":
@@ -20097,7 +20107,7 @@ impl Sema:
                 self.emit_error("Result.inspect_err() expects a one-argument function", node)
             else:
                 let inspect_err_param = self.fn_type_param_type(inspect_err_fn, 0)
-                if inspect_err_param != 0 and self.types_compatible(err_ref_ty as TypeId, inspect_err_param as TypeId) == 0:
+                if inspect_err_param != 0 and self.observer_param_accepts(err_ref_ty, inspect_err_param) == 0:
                     self.emit_argument_type_mismatch("Result.inspect_err", 0, 0, 0, err_ref_ty, inspect_err_param, node)
             return recv_type
         0
@@ -20646,10 +20656,12 @@ impl Sema:
                 return self.ensure_fn_type(params3, 0, ret3 as TypeId) as i32
             if method_name == "zip" and arg_index == 0:
                 return 0
+            // §10.5: the filter predicate observes the payload (`fn(&T) ->
+            // bool`); the payload moves once, into the kept `Some` (#1379).
             if field == self.syms.filter and arg_index == 0:
                 let option_elem2 = self.get_generic_inst_arg(resolved as i32, 0)
                 let params2: Vec[i32] = Vec.new()
-                params2.push(option_elem2)
+                params2.push(self.ensure_exact_type(TypeKind.TY_REF, option_elem2, 0, 0) as i32)
                 return self.ensure_fn_type(params2, 1, self.ty_bool) as i32
             if method_name == "inspect" and arg_index == 0:
                 let option_elem4 = self.get_generic_inst_arg(resolved as i32, 0)
@@ -22578,6 +22590,20 @@ impl Sema:
                 if field == self.syms.filter:
                     if mc_resolved_arg_count != 1:
                         self.emit_error("Option.filter() expects exactly one argument", node)
+                        return 0
+                    // §10.5 `(fn(&T) -> bool)`: an explicitly typed owned
+                    // parameter would claim a payload the predicate only sees.
+                    let filter_fn = self.callable_fn_type(arg_types.get(0) as TypeId)
+                    if filter_fn == 0:
+                        self.emit_error("Option.filter() expects a function argument", node)
+                        return 0
+                    if self.get_type_d1(filter_fn) != 1:
+                        self.emit_error("Option.filter() expects a one-argument function", node)
+                        return 0
+                    let filter_ref_ty = self.ensure_exact_type(TypeKind.TY_REF, self.get_generic_inst_arg(recv_type, 0), 0, 0) as i32
+                    let filter_param = self.fn_type_param_type(filter_fn, 0)
+                    if filter_param != 0 and self.observer_param_accepts(filter_ref_ty, filter_param) == 0:
+                        self.emit_argument_type_mismatch("Option.filter", 0, 0, 0, filter_ref_ty, filter_param, node)
                         return 0
                     self.record_transparent_view_origins(node, expr)
                     return recv_type as i32
