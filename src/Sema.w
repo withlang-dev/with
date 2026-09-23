@@ -4447,6 +4447,15 @@ impl Sema:
                     return 0
                 if self.require_std_tier_for_symbol(gi_base_sym, node) == 0:
                     return 0
+                // While the type declarations are being collected, a generic
+                // declared further down is not registered yet: defer, as a
+                // plain named type does (resolve_type_expr). The deferred pass
+                // (resolve_deferred_non_generic_type_decls) resolves the slot
+                // once every declaration is in, and reports a name that is
+                // still unknown then (#1440: declaration order must not
+                // matter).
+                if self.collecting_types != 0:
+                    return 0
                 let gi_name: str = with_str_clone_ref(self.pool_resolve_symbol(gi_base_sym))
                 self.emit_error("unknown type: " ++ gi_name, node)
                 return 0
