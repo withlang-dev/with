@@ -3622,7 +3622,7 @@ pub fn run_emit_c_smoke_action(ctx: ActionCtx) -> i32:
     em_args |> push(bs_abs(root, c_path))
     let emit_result = ctx.process_runner().run_capture(em_args, emit_stdout, emit_stderr, 600000)
     if emit_result.rc != 0:
-        return bs_fail(ctx, f"emit-c compile failed with exit code {emit_result.rc}: " ++ fs.read_text(emit_stderr))
+        return bs_fail(ctx, f"emit-c compile failed with exit code {emit_result.rc}: " ++ emit_result.stderr)
     if not fs.exists(c_path):
         return bs_fail(ctx, "emit-c did not produce " ++ c_path)
 
@@ -3684,7 +3684,7 @@ pub fn run_emit_c_smoke_action(ctx: ActionCtx) -> i32:
     pr_args |> push(bs_abs(root, prelude_c_path))
     let prelude_emit_result = ctx.process_runner().run_capture(pr_args, prelude_emit_stdout, prelude_emit_stderr, 600000)
     if prelude_emit_result.rc != 0:
-        return bs_fail(ctx, f"prelude emit-c compile failed with exit code {prelude_emit_result.rc}: " ++ fs.read_text(prelude_emit_stderr))
+        return bs_fail(ctx, f"prelude emit-c compile failed with exit code {prelude_emit_result.rc}: " ++ prelude_emit_result.stderr)
     if not fs.exists(prelude_c_path):
         return bs_fail(ctx, "prelude emit-c did not produce " ++ prelude_c_path)
     rc = bs_compile_emit_c_output(ctx, root, output_dir, prelude_c_path, prelude_bin_path, "emit-c-prelude-runtime")
@@ -7358,7 +7358,7 @@ pub fn run_build_helper_programs_action(ctx: ActionCtx) -> i32:
         args |> push(bs_abs(root, bs_join(output_dir, name)))
         let result = ctx.process_runner().run_capture(args, stdout_path, stderr_path, 600000)
         if result.rc != 0:
-            return bs_fail(ctx, f"{source} failed to build with exit code {result.rc}: " ++ bs_error_lines(fs.read_text(stderr_path)))
+            return bs_fail(ctx, f"{source} failed to build with exit code {result.rc}: " ++ bs_error_lines(result.stderr))
         if not fs.exists(bs_join(output_dir, name)):
             return bs_fail(ctx, source ++ " built but produced no " ++ name)
     let _ = fs.write_text(bs_join(output_dir, ".stamp"), "ok")
