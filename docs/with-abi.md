@@ -108,7 +108,11 @@ are built per module: `__with_mod_<hash>__<base>`, where `<hash>` is
 `with_str_hash` (FNV) of the canonical module path
 (`module_link_name_for_path`). Runtime ABI symbols (`with_*`) keep their
 bare names. Symbols are not otherwise mangled; the source interface, not
-the symbol, carries types.
+the symbol, carries types. A function whose short name another module's
+declaration takes in the flat merge carries the semantic symbol
+`<name>$in$<module>` (#1350); its module-qualified link name drops the
+`$in$` suffix, so it is `__with_mod_<hash>__<name>` — the name its module
+exports whichever unit compiles it.
 
 For `.wo`: the bundle's objects are built in module-object mode, so every
 exported function is `__with_mod_<hash(canonical path)>__<base>`; the

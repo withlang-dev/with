@@ -22276,7 +22276,7 @@ impl Sema:
             if comptime_value_is_valid(path_value) == 0 or path_value.kind != ComptimeValueKind.CV_STR:
                 self.emit_error("embed_file() argument must be a comptime string", path_node)
                 return self.ty_str as i32
-            let source_path = if self.current_module_path.len() > 0: self.current_module_path else: ""
+            let source_path = with_str_clone_ref(self.current_module_path)
             let read_result = self.read_tracked_embed_file(source_path, path_value.text)
             if not read_result.ok:
                 self.emit_error(read_result.error_msg, node)

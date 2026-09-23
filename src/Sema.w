@@ -2763,7 +2763,7 @@ impl Sema:
         self.index_named_type_candidate(sym, self.named_type_candidate_syms.len() as i32)
         self.named_type_candidate_syms.push(sym)
         self.named_type_candidate_tids.push(tid)
-        let path = if self.current_module_path.len() > 0: self.current_module_path else: ""
+        let path = with_str_clone_ref(self.current_module_path)
         self.named_type_candidate_paths.push(sema_owned_text(path))
         self.named_type_candidate_pub.push(is_pub)
 
@@ -2772,7 +2772,7 @@ impl Sema:
             return
         let record = self.decl_visibility_syms.len() as i32
         self.decl_visibility_syms.push(sym)
-        let path = if self.current_module_path.len() > 0: self.current_module_path else: ""
+        let path = with_str_clone_ref(self.current_module_path)
         self.decl_visibility_paths.push(sema_owned_text(path))
         self.decl_visibility_pub.push(is_pub)
         self.decl_visibility_nodes.push(node)
@@ -2794,7 +2794,7 @@ impl Sema:
             return
         let short_name = name.slice(0, infix)
         self.set_pretty_symbol(sym, short_name)
-        let path = if self.current_module_path.len() > 0: self.current_module_path else: ""
+        let path = with_str_clone_ref(self.current_module_path)
         if self.displaced_fn_record_of.contains(sym):
             let existing: i32 = self.displaced_fn_record_of.get(sym).unwrap()
             self.displaced_fn_paths[existing] = sema_owned_text(path)
