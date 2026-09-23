@@ -1111,8 +1111,29 @@ fn ci_record_decl_directly_demoted_cursor(session: i64, decl_cursor: i32) -> boo
                 let field_ty = with_ci_type_translated(session, with_ci_cursor_type(session, child))
                 if ci_starts_with(field_ty, "__UNSUPPORTED:") or field_ty == "c_void":
                     return true
+                if ci_field_holds_demoted_anon_array(session, child):
+                    return true
         i = i + 1
     false
+
+// #1396: a field holding an array of a member record with no name
+// (`struct { ... } ScopeRecord[1];`) embeds that record by value: an opaque
+// element makes the holder opaque, as a directly held one does.
+fn ci_field_holds_demoted_anon_array(session: i64, field_cursor: i32) -> bool:
+    let elem = with_ci_field_indirect_anon_record(session, field_cursor, 0)
+    elem >= 0 and ci_record_decl_directly_demoted_cursor(session, elem)
+
+fn ci_field_holds_anon_array_with_demoted_field(session: i64, field_cursor: i32, demoted: &str) -> bool:
+    let elem = with_ci_field_indirect_anon_record(session, field_cursor, 0)
+    elem >= 0 and ci_record_decl_has_demoted_field_cursor(session, elem, demoted)
+
+// #1396: the declaration of a member record with no name that a field
+// reaches through an array or pointer, under the bridge's name for it.
+fn ci_translate_indirect_anon_record(session: i64, field_cursor: i32) -> str:
+    let elem = with_ci_field_indirect_anon_record(session, field_cursor, 1)
+    if elem < 0:
+        return ""
+    ci_translate_anon_record_cursor(session, elem, with_ci_anon_record_name(session, elem))
 
 fn ci_record_decl_has_demoted_field_cursor(session: i64, decl_cursor: i32, demoted: &str) -> bool:
     if decl_cursor < 0:
@@ -1129,6 +1150,8 @@ fn ci_record_decl_has_demoted_field_cursor(session: i64, decl_cursor: i32, demot
             else:
                 let field_ty = with_ci_type_translated(session, with_ci_cursor_type(session, child))
                 if ci_field_type_is_demoted(field_ty, demoted):
+                    return true
+                if ci_field_holds_anon_array_with_demoted_field(session, child, demoted):
                     return true
         i = i + 1
     false
@@ -1162,8 +1185,10 @@ fn ci_translate_anon_record_cursor(session: i64, decl_cursor: i32, synth_name: &
                 field_ty = ci_escape_reserved(nested_name)
                 actual_name = if raw_name.len() > 0: raw_name else: f"anon_{anon_idx}"
                 anon_idx = anon_idx + 1
-            else if ci_starts_with(field_ty, "__UNSUPPORTED:") or field_ty == "c_void":
+            else if ci_starts_with(field_ty, "__UNSUPPORTED:") or field_ty == "c_void" or ci_field_holds_demoted_anon_array(session, child):
                 return "type " ++ ci_escape_reserved(synth_name) ++ " = opaque\n"
+            else:
+                nested_decls = nested_decls ++ ci_translate_indirect_anon_record(session, child)
 
             if field_count > 0:
                 fields = fields ++ ", "
@@ -1255,6 +1280,8 @@ fn ci_is_directly_demoted(session: i64, idx: i32, count: i32) -> bool:
             return true
         if ft == "c_void":
             return true
+        if ci_field_holds_demoted_anon_array(session, field_cursor):
+            return true
         fi = fi + 1
     false
 
@@ -1273,6 +1300,8 @@ fn ci_has_demoted_field(session: i64, idx: i32, demoted: &str) -> bool:
         else:
             let ft = with_cimport_struct_field_type_translated(session, idx, fi)
             if ci_field_type_is_demoted(ft, demoted):
+                return true
+            if ci_field_holds_anon_array_with_demoted_field(session, field_cursor, demoted):
                 return true
         fi = fi + 1
     false
@@ -1938,6 +1967,12 @@ fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs: &s
     let name = with_cimport_decl_name(session, idx)
     if name.len() == 0:
         return ""
+    // #1396: a file-scope record with no tag and no typedef name is named by
+    // the first declaration that uses it (ClangBridge); one that nothing uses
+    // — winnt.h's C_ASSERT(TYPE_ALIGNMENT(T)) builds it inside an expression
+    // — has no spelling in C or With, and no declaration to serve.
+    if with_cimport_decl_is_unused_anon_record(session, idx) != 0:
+        return ""
 
     // #750: a system-header record that std.libc already models (rlimit)
     // must not re-declare in MIGRATE output — its preamble imports std.libc.
@@ -2012,6 +2047,8 @@ fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs: &s
             let synth_name = if fname.len() > 0: name ++ "_" ++ fname else: f"{name}_anon_{anon_idx}"
             anon_decls = anon_decls ++ ci_translate_anon_record_cursor(session, anon_decl, synth_name)
             anon_idx = anon_idx + 1
+        else:
+            anon_decls = anon_decls ++ ci_translate_indirect_anon_record(session, field_cursor)
         afi = afi + 1
 
     // Build field list with per-field @[align(N)] annotations.
@@ -12296,9 +12333,12 @@ fn ci_str_replace_last_field(field_str: &str, old_name: &str, new_name: &str) ->
     let start = if last_comma >= 0: last_comma + 1 else: 0
     let prefix = field_str.slice(0, start as i64)
     let last_field = field_str.slice(start as i64, field_str.len())
-    // Replace old_name with new_name in last field segment
-    let replaced = ci_str_replace(last_field, old_name, new_name)
-    prefix ++ replaced
+    // Rename the field, not every occurrence of its spelling: the type of
+    // `ScopeRecord: [1]_SCOPE_ScopeRecord` contains it too (#1396).
+    let at = ci_find_substr(last_field, old_name ++ ": ")
+    if at < 0:
+        return with_str_clone_ref(field_str)
+    prefix ++ last_field.slice(0, at as i64) ++ new_name ++ last_field.slice((at + old_name.len() as i32) as i64, last_field.len())
 
 fn ci_str_replace(text: &str, needle: &str, replacement: &str) -> str:
     if needle.len() == 0:

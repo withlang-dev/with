@@ -424,6 +424,26 @@ type CImportSession:
     // the record's identity — the toolchain libc facade's `CFile wraps *mut
     // FILE` is a pointer to FILE, not to void (D51 ruling §5).
     migration: i32
+    // #1396: records with no tag and no typedef name, and the With name each
+    // one's first user gives it (NULL = nothing uses it). The first
+    // anon_file_scope_count entries are file-scope records; the rest are
+    // member records reached through an array or pointer field.
+    anon_records: *mut CXCursor
+    anon_record_names: *mut *mut u8
+    anon_record_count: i32
+    anon_record_cap: i32
+    anon_file_scope_count: i32
+    // Declaration -> slot above: open addressing on the Decl, -1 empty,
+    // capacity a power of two kept above 10/7 of the count. A lookup only;
+    // no output is ordered by it.
+    anon_hash: *mut i32
+    anon_hash_cap: i64
+    // Every top-level declaration's spelling and every synthesized name, the
+    // names a synthesized one must not take: a hash set of owned C strings
+    // (emitted_name_slot), built on the first name.
+    anon_taken: *mut *mut u8
+    anon_taken_count: i32
+    anon_taken_cap: i32
 
 type ChildCollector:
     session: *mut CImportSession
@@ -1060,6 +1080,12 @@ unsafe fn translate_type_recursive_mode(s: *mut CImportSession, ty: CXType, dept
         // Ask Clang about the declaration so typedefs retain record identity.
         if bare as i64 == 0 or *bare == 0 or clang_Cursor_isAnonymous(clang_getTypeDeclaration(canonical)) != 0:
             clang_disposeString(spelling)
+            // #1396: a file-scope record a declaration uses has the name
+            // that declaration gave it. A member record (`c_void` here) is
+            // named by the record translation that embeds it.
+            let synthesized = session_anon_record_name(s, clang_getTypeDeclaration(canonical))
+            if synthesized as i64 != 0:
+                return session_strdup(s, synthesized)
             return session_strdup(s, "c_void\0" as *const u8)
         let result = session_strdup(s, bare)
         clang_disposeString(spelling)
@@ -1219,6 +1245,42 @@ unsafe fn session_append_decl(s: *mut CImportSession, cursor: CXCursor):
     *dst = cursor
     (*s).decl_count = (*s).decl_count + 1
 
+// C gives a tag declared inside a record the scope the record is in: in
+// `struct _RH { long f; union __MIDL_0009 { long a; } u; };` (wtypes.h) the
+// union is a file-scope type, and in `struct S { enum { A, B } k; };` A and
+// B are file-scope constants. libclang lists such a definition only as the
+// record's child, so the top-level walk never saw it and the field named a
+// type nothing declared. Each one joins the declaration list just before the
+// top-level record that holds it, innermost first, as C declares them.
+@[callconv("c")]
+unsafe fn collect_nested_tag(cursor: CXCursor, parent: CXCursor, data: *mut u8) -> i32:
+    let kind = clang_getCursorKind(cursor)
+    if kind == CXCursor_StructDecl or kind == CXCursor_UnionDecl:
+        let _ = clang_visitChildren(cursor, collect_nested_tag as *const u8, data)
+        if clang_Cursor_isAnonymous(cursor) == 0 and clang_isCursorDefinition(cursor) != 0:
+            session_append_decl(data as *mut CImportSession, cursor)
+    else if kind == CXCursor_EnumDecl:
+        if clang_isCursorDefinition(cursor) != 0:
+            session_append_decl(data as *mut CImportSession, cursor)
+    CXChildVisit_Continue
+
+unsafe fn hoist_nested_tags(s: *mut CImportSession):
+    let old = (*s).decls
+    let n = (*s).decl_count
+    if n == 0: return
+    (*s).decls = 0 as *mut CXCursor
+    (*s).decl_count = 0
+    (*s).decl_cap = 0
+    var i = 0
+    while i < n:
+        let cursor = *((old as i64 + i as i64 * 32) as *const CXCursor)
+        let kind = clang_getCursorKind(cursor)
+        if kind == CXCursor_StructDecl or kind == CXCursor_UnionDecl:
+            let _ = clang_visitChildren(cursor, collect_nested_tag as *const u8, s as *mut u8)
+        session_append_decl(s, cursor)
+        i = i + 1
+    with_free(old as *mut u8)
+
 unsafe fn session_decl_contains(s: *mut CImportSession, cursor: CXCursor) -> bool:
     var i = 0
     while i < (*s).decl_count:
@@ -1279,6 +1341,360 @@ unsafe fn collect_undefined_records(s: *mut CImportSession):
             collect_undefined_record_type(s, clang_getCursorType(cursor), 0)
         else if kind == CXCursor_TypedefDecl:
             collect_undefined_record_type(s, clang_getTypedefDeclUnderlyingType(cursor), 0)
+        i = i + 1
+
+// ── Records with no name (#1396) ────────────────────────────────
+// `struct { int b; } g;` declares a record with no tag and no typedef name;
+// libclang spells its cursor `struct (unnamed at file:line:col)`, which is no
+// With identifier. Each such file-scope record is named after the first
+// declaration, in translation-unit order, whose type uses it: `g_anon` for a
+// variable (also through arrays and pointers), `f_return_anon` / `f_p_anon`
+// for a function's result / parameter `p` (`f_argN_anon` when unnamed),
+// `T_anon` for a typedef reaching it through a pointer or array. A name
+// already spelled by another declaration takes the first free `_2`, `_3`, ...
+// suffix. Every reader — the cursor spelling cache and type translation —
+// answers with that one name. A record no declaration uses (winnt.h's
+// C_ASSERT(TYPE_ALIGNMENT(T)) builds one inside an expression) keeps no name:
+// nothing can refer to it, and CImport does not emit it.
+//
+// A member record with no name that a field holds directly (`struct { int x;
+// } inner;`, or a C11 anonymous member) is named by CImport's record
+// translation, `Parent_field` / `Parent_anon_N`, and translates as `c_void`
+// wherever it is not that field. One a field reaches through an array or a
+// pointer (winnt.h's `struct { ... } ScopeRecord[1];`) is named here by the
+// same rule, `Parent_field`, and type translation spells it: `[1]Parent_field`.
+
+// A declaration cursor's identity is its Decl (data[0]); the parent and
+// first-in-group words differ between a visited cursor and the one
+// clang_getTypeDeclaration returns, which clang_equalCursors ignores too.
+unsafe fn anon_record_hash(decl: CXCursor) -> i64:
+    ci_node_hash(0, decl.data[0], 0, 0)
+
+unsafe fn session_anon_record_slot(s: *mut CImportSession, decl: CXCursor) -> i32:
+    if (*s).anon_hash_cap == 0: return -1
+    let cap = (*s).anon_hash_cap
+    var at = anon_record_hash(decl) & (cap - 1)
+    while true:
+        let e = *(((*s).anon_hash as i64 + at * 4) as *const i32)
+        if e < 0: return -1
+        if clang_equalCursors(*(((*s).anon_records as i64 + e as i64 * 32) as *const CXCursor), decl) != 0:
+            return e
+        at = (at + 1) & (cap - 1)
+    -1
+
+unsafe fn anon_hash_insert(tbl: *mut i32, cap: i64, decl: CXCursor, slot: i32):
+    var at = anon_record_hash(decl) & (cap - 1)
+    while *((tbl as i64 + at * 4) as *const i32) >= 0:
+        at = (at + 1) & (cap - 1)
+    *((tbl as i64 + at * 4) as *mut i32) = slot
+
+unsafe fn session_anon_record_append(s: *mut CImportSession, decl: CXCursor) -> i32:
+    if ((*s).anon_record_count as i64 + 1) * 10 >= (*s).anon_hash_cap * 7:
+        let new_cap = if (*s).anon_hash_cap > 0: (*s).anon_hash_cap * 2 else: 64
+        let tbl = with_alloc(new_cap * 4)
+        with_memset(tbl, -1, new_cap * 4)
+        var i: i32 = 0
+        while i < (*s).anon_record_count:
+            anon_hash_insert(tbl as *mut i32, new_cap, *(((*s).anon_records as i64 + i as i64 * 32) as *const CXCursor), i)
+            i = i + 1
+        if (*s).anon_hash as i64 != 0: with_free((*s).anon_hash as *mut u8)
+        (*s).anon_hash = tbl as *mut i32
+        (*s).anon_hash_cap = new_cap
+    if (*s).anon_record_count >= (*s).anon_record_cap:
+        let new_cap = if (*s).anon_record_cap > 0: (*s).anon_record_cap * 2 else: 16
+        let records = with_alloc(new_cap as i64 * 32)
+        let names = with_alloc(new_cap as i64 * 8)
+        with_memset(names, 0, new_cap as i64 * 8)
+        if (*s).anon_record_count > 0:
+            with_memcpy(records, (*s).anon_records as *const u8, (*s).anon_record_count as i64 * 32)
+            with_memcpy(names, (*s).anon_record_names as *const u8, (*s).anon_record_count as i64 * 8)
+        if (*s).anon_records as i64 != 0: with_free((*s).anon_records as *mut u8)
+        if (*s).anon_record_names as i64 != 0: with_free((*s).anon_record_names as *mut u8)
+        (*s).anon_records = records as *mut CXCursor
+        (*s).anon_record_names = names as *mut *mut u8
+        (*s).anon_record_cap = new_cap
+    let slot = (*s).anon_record_count
+    *(((*s).anon_records as i64 + slot as i64 * 32) as *mut CXCursor) = decl
+    (*s).anon_record_count = slot + 1
+    anon_hash_insert((*s).anon_hash, (*s).anon_hash_cap, decl, slot)
+    slot
+
+/// The synthesized name of a record with no tag and no typedef name — a
+/// file-scope one, or a member one a field reaches through an array or
+/// pointer — or NULL (a named record, a member record held directly, or a
+/// file-scope one nothing uses).
+unsafe fn session_anon_record_name(s: *mut CImportSession, decl: CXCursor) -> *const u8:
+    if (*s).anon_record_count == 0: return 0 as *const u8
+    let kind = clang_getCursorKind(decl)
+    if kind != CXCursor_StructDecl and kind != CXCursor_UnionDecl: return 0 as *const u8
+    let slot = session_anon_record_slot(s, decl)
+    if slot < 0: return 0 as *const u8
+    *(((*s).anon_record_names as i64 + slot as i64 * 8) as *const *mut u8) as *const u8
+
+/// session_anon_record_name for file-scope records only: the name the cursor
+/// spelling cache answers with. A member record keeps clang's spelling there,
+/// which is how CImport recognizes a record it names itself.
+unsafe fn session_file_scope_anon_record_name(s: *mut CImportSession, decl: CXCursor) -> *const u8:
+    if (*s).anon_file_scope_count == 0: return 0 as *const u8
+    let kind = clang_getCursorKind(decl)
+    if kind != CXCursor_StructDecl and kind != CXCursor_UnionDecl: return 0 as *const u8
+    let slot = session_anon_record_slot(s, decl)
+    if slot < 0 or slot >= (*s).anon_file_scope_count: return 0 as *const u8
+    *(((*s).anon_record_names as i64 + slot as i64 * 8) as *const *mut u8) as *const u8
+
+unsafe fn anon_taken_add(s: *mut CImportSession, name: *const u8):
+    if ((*s).anon_taken_count + 1) * 2 > (*s).anon_taken_cap:
+        let old = (*s).anon_taken
+        let old_cap = (*s).anon_taken_cap
+        (*s).anon_taken_cap = if old_cap > 0: old_cap * 2 else: 256
+        (*s).anon_taken = with_alloc((*s).anon_taken_cap as i64 * 8) as *mut *mut u8
+        with_memset((*s).anon_taken as *mut u8, 0, (*s).anon_taken_cap as i64 * 8)
+        var i: i32 = 0
+        while i < old_cap:
+            let entry = *((old as i64 + i as i64 * 8) as *const *mut u8)
+            if entry as i64 != 0:
+                *(emitted_name_slot((*s).anon_taken, (*s).anon_taken_cap, entry as *const u8) as *mut *mut u8) = entry
+            i = i + 1
+        if old as i64 != 0: with_free(old as *mut u8)
+    let slot = emitted_name_slot((*s).anon_taken, (*s).anon_taken_cap, name)
+    if *(slot as *const *const u8) as i64 != 0: return
+    *(slot as *mut *mut u8) = c_strdup(name)
+    (*s).anon_taken_count = (*s).anon_taken_count + 1
+
+unsafe fn anon_record_name_taken(s: *mut CImportSession, name: *const u8) -> bool:
+    if (*s).anon_taken_cap == 0:
+        var di = 0
+        while di < (*s).decl_count:
+            let spelling = clang_getCursorSpelling(*(((*s).decls as i64 + di as i64 * 32) as *const CXCursor))
+            anon_taken_add(s, clang_getCString(spelling))
+            clang_disposeString(spelling)
+            di = di + 1
+    if (*s).anon_taken_count == 0: return false
+    *(emitted_name_slot((*s).anon_taken, (*s).anon_taken_cap, name) as *const *const u8) as i64 != 0
+
+unsafe fn name_anon_record(s: *mut CImportSession, decl: CXCursor, base: *const u8):
+    let slot = session_anon_record_slot(s, decl)
+    if slot < 0: return
+    let name_slot = ((*s).anon_record_names as i64 + slot as i64 * 8) as *mut *mut u8
+    if *name_slot as i64 != 0: return
+    var buf: [1024]u8 = [0 as u8; 1024]
+    var pos: i64 = 0
+    buf_append_str(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, base)
+    let stem = pos
+    var n: i64 = 2
+    while anon_record_name_taken(s, &buf as *const [1024]u8 as *const u8):
+        pos = stem
+        buf_append_str(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, "_\0" as *const u8)
+        buf_append_i64(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, n)
+        n = n + 1
+    *name_slot = c_strdup(&buf as *const [1024]u8 as *const u8)
+    anon_taken_add(s, *name_slot as *const u8)
+
+unsafe fn name_anon_records_in_type(s: *mut CImportSession, ty: CXType, base: *const u8, depth: i32):
+    if depth > MAX_TYPE_DEPTH: return
+    let kind = ty.kind
+    // A typedef names what it reaches; its own declaration is walked too.
+    if kind == CXType_Typedef or kind == CXType_Invalid: return
+    if kind == CXType_Elaborated:
+        name_anon_records_in_type(s, clang_Type_getNamedType(ty), base, depth + 1)
+    else if kind == CXType_Pointer:
+        name_anon_records_in_type(s, clang_getPointeeType(ty), base, depth + 1)
+    else if kind == CXType_ConstantArray or kind == CXType_IncompleteArray or kind == CXType_VariableArray:
+        name_anon_records_in_type(s, clang_getArrayElementType(ty), base, depth + 1)
+    else if kind == CXType_FunctionProto or kind == CXType_FunctionNoProto:
+        name_anon_records_in_type(s, clang_getResultType(ty), base, depth + 1)
+        let n = clang_getNumArgTypes(ty)
+        var i = 0
+        while i < n:
+            name_anon_records_in_type(s, clang_getArgType(ty, i as u32), base, depth + 1)
+            i = i + 1
+    else if kind == CXType_Record:
+        name_anon_record(s, clang_getTypeDeclaration(ty), base)
+    else:
+        // Attribute, paren and typeof sugar: the shape underneath.
+        let modified = clang_Type_getModifiedType(ty)
+        if modified.kind != CXType_Invalid:
+            name_anon_records_in_type(s, modified, base, depth + 1)
+            return
+        let canonical = clang_getCanonicalType(ty)
+        if canonical.kind != kind:
+            name_anon_records_in_type(s, canonical, base, depth + 1)
+
+unsafe fn name_anon_records_used_by(s: *mut CImportSession, ty: CXType, declarator: CXCursor, suffix: *const u8):
+    let spelling = clang_getCursorSpelling(declarator)
+    var buf: [1024]u8 = [0 as u8; 1024]
+    var pos: i64 = 0
+    buf_append_str(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, clang_getCString(spelling))
+    clang_disposeString(spelling)
+    buf_append_str(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, suffix)
+    name_anon_records_in_type(s, ty, &buf as *const [1024]u8 as *const u8, 0)
+
+/// The anonymous record a type reaches through arrays and pointers (not
+/// through a typedef, which names what it reaches), or a null cursor.
+unsafe fn anon_record_behind_indirection(ty: CXType, through: bool, pointers: bool, found: *mut CXCursor, depth: i32) -> bool:
+    if depth > MAX_TYPE_DEPTH: return false
+    let kind = ty.kind
+    if kind == CXType_Elaborated:
+        return anon_record_behind_indirection(clang_Type_getNamedType(ty), through, pointers, found, depth + 1)
+    if kind == CXType_Pointer:
+        if not pointers: return false
+        return anon_record_behind_indirection(clang_getPointeeType(ty), true, pointers, found, depth + 1)
+    if kind == CXType_ConstantArray or kind == CXType_IncompleteArray or kind == CXType_VariableArray:
+        return anon_record_behind_indirection(clang_getArrayElementType(ty), true, pointers, found, depth + 1)
+    if kind == CXType_Record:
+        let decl = clang_getTypeDeclaration(ty)
+        if not through or clang_Cursor_isAnonymous(decl) == 0: return false
+        *found = decl
+        return true
+    if kind == CXType_Typedef or kind == CXType_Invalid: return false
+    let modified = clang_Type_getModifiedType(ty)
+    if modified.kind == CXType_Invalid: return false
+    anon_record_behind_indirection(modified, through, pointers, found, depth + 1)
+
+unsafe fn anon_join(parent: *const u8, sep: *const u8, tail: *const u8, n: i64) -> *mut u8:
+    var buf: [1024]u8 = [0 as u8; 1024]
+    var pos: i64 = 0
+    buf_append_str(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, parent)
+    buf_append_str(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, sep)
+    if n >= 0:
+        buf_append_i64(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, n)
+    else:
+        buf_append_str(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, tail)
+    c_strdup(&buf as *const [1024]u8 as *const u8)
+
+/// A record's member slots in declaration order: every FieldDecl, and every
+/// C11 anonymous member record (which has no FieldDecl), as collect_field
+/// enumerates them — without the per-field strings.
+type MemberCollector:
+    cursors: *mut CXCursor
+    count: i32
+    cap: i32
+
+@[callconv("c")]
+unsafe fn collect_member_slot(cursor: CXCursor, parent: CXCursor, data: *mut u8) -> i32:
+    let mc = data as *mut MemberCollector
+    let kind = clang_getCursorKind(cursor)
+    var take = kind == CXCursor_FieldDecl
+    if (kind == CXCursor_StructDecl or kind == CXCursor_UnionDecl) and clang_Cursor_isAnonymousRecordDecl(cursor) != 0:
+        take = true
+    if not take: return CXChildVisit_Continue
+    if (*mc).count >= (*mc).cap:
+        let new_cap = if (*mc).cap > 0: (*mc).cap * 2 else: 16
+        let buf = with_alloc(new_cap as i64 * 32)
+        if (*mc).count > 0:
+            with_memcpy(buf, (*mc).cursors as *const u8, (*mc).count as i64 * 32)
+        if (*mc).cursors as i64 != 0: with_free((*mc).cursors as *mut u8)
+        (*mc).cursors = buf as *mut CXCursor
+        (*mc).cap = new_cap
+    *(((*mc).cursors as i64 + (*mc).count as i64 * 32) as *mut CXCursor) = cursor
+    (*mc).count = (*mc).count + 1
+    CXChildVisit_Continue
+
+/// Names the member records `record` reaches through an array or pointer
+/// field, recursing into the member records it holds directly under the
+/// names CImport's record translation gives them (`Parent_field`,
+/// `Parent_anon_N` counting every directly held one).
+unsafe fn name_member_anon_records(s: *mut CImportSession, record: CXCursor, parent: *const u8, depth: i32):
+    if depth > MAX_TYPE_DEPTH: return
+    var mc = MemberCollector { cursors: 0 as *mut CXCursor, count: 0, cap: 0 }
+    let _ = clang_visitChildren(record, collect_member_slot as *const u8, &raw mut mc as *mut MemberCollector as *mut u8)
+    var anon_idx: i64 = 0
+    var fi = 0
+    while fi < mc.count:
+        let member = *((mc.cursors as i64 + fi as i64 * 32) as *const CXCursor)
+        let ck = clang_getCursorKind(member)
+        let member_ty = clang_getCursorType(member)
+        var direct = member
+        var is_direct = ck == CXCursor_StructDecl or ck == CXCursor_UnionDecl
+        if not is_direct:
+            let tdecl = clang_getTypeDeclaration(member_ty)
+            let tk = clang_getCursorKind(tdecl)
+            if (tk == CXCursor_StructDecl or tk == CXCursor_UnionDecl) and clang_Cursor_isAnonymous(tdecl) != 0 and session_file_scope_anon_record_name(s, tdecl) as i64 == 0:
+                direct = tdecl
+                is_direct = true
+        var reached = member
+        if is_direct:
+            // A C11 anonymous member has no name (collect_field stores "").
+            var nested = 0 as *mut u8
+            if ck == CXCursor_FieldDecl:
+                let fname = clang_getCursorSpelling(member)
+                let fname_text = clang_getCString(fname)
+                if fname_text as i64 != 0 and *fname_text != 0:
+                    nested = anon_join(parent, "_\0" as *const u8, fname_text, -1)
+                clang_disposeString(fname)
+            if nested as i64 == 0:
+                nested = anon_join(parent, "_anon_\0" as *const u8, 0 as *const u8, anon_idx)
+            anon_idx = anon_idx + 1
+            name_member_anon_records(s, direct, nested as *const u8, depth + 1)
+            with_free(nested)
+        else if ck == CXCursor_FieldDecl and anon_record_behind_indirection(member_ty, false, true, &raw mut reached, 0):
+            if session_anon_record_slot(s, reached) < 0:
+                let slot = session_anon_record_append(s, reached)
+                let fname = clang_getCursorSpelling(member)
+                let nested = anon_join(parent, "_\0" as *const u8, clang_getCString(fname), -1)
+                clang_disposeString(fname)
+                *(((*s).anon_record_names as i64 + slot as i64 * 8) as *mut *mut u8) = nested
+                name_member_anon_records(s, reached, nested as *const u8, depth + 1)
+        fi = fi + 1
+    if mc.cursors as i64 != 0: with_free(mc.cursors as *mut u8)
+
+unsafe fn name_file_scope_anon_records(s: *mut CImportSession):
+    var i = 0
+    while i < (*s).decl_count:
+        let cursor = *(((*s).decls as i64 + i as i64 * 32) as *const CXCursor)
+        let kind = clang_getCursorKind(cursor)
+        if (kind == CXCursor_StructDecl or kind == CXCursor_UnionDecl) and clang_Cursor_isAnonymous(cursor) != 0:
+            let _ = session_anon_record_append(s, cursor)
+        i = i + 1
+    (*s).anon_file_scope_count = (*s).anon_record_count
+    if (*s).anon_file_scope_count > 0:
+        name_file_scope_anon_record_users(s)
+    // Member records behind an array or pointer, under each record's name.
+    i = 0
+    while i < (*s).decl_count:
+        let cursor = *(((*s).decls as i64 + i as i64 * 32) as *const CXCursor)
+        let kind = clang_getCursorKind(cursor)
+        if kind == CXCursor_StructDecl or kind == CXCursor_UnionDecl:
+            if clang_Cursor_isAnonymous(cursor) == 0:
+                let spelling = clang_getCursorSpelling(cursor)
+                name_member_anon_records(s, cursor, clang_getCString(spelling), 0)
+                clang_disposeString(spelling)
+            else:
+                let synthesized = session_file_scope_anon_record_name(s, cursor)
+                if synthesized as i64 != 0:
+                    name_member_anon_records(s, cursor, synthesized, 0)
+        i = i + 1
+
+unsafe fn name_file_scope_anon_record_users(s: *mut CImportSession):
+    var i = 0
+    while i < (*s).decl_count:
+        let cursor = *(((*s).decls as i64 + i as i64 * 32) as *const CXCursor)
+        let kind = clang_getCursorKind(cursor)
+        if kind == CXCursor_VarDecl:
+            name_anon_records_used_by(s, clang_getCursorType(cursor), cursor, "_anon\0" as *const u8)
+        else if kind == CXCursor_TypedefDecl:
+            name_anon_records_used_by(s, clang_getTypedefDeclUnderlyingType(cursor), cursor, "_anon\0" as *const u8)
+        else if kind == CXCursor_FunctionDecl:
+            let fn_type = clang_getCursorType(cursor)
+            name_anon_records_used_by(s, clang_getResultType(fn_type), cursor, "_return_anon\0" as *const u8)
+            let nargs = clang_Cursor_getNumArguments(cursor)
+            var ai = 0
+            while ai < nargs:
+                let arg = clang_Cursor_getArgument(cursor, ai as u32)
+                let arg_spelling = clang_getCursorSpelling(arg)
+                let arg_name = clang_getCString(arg_spelling)
+                var suffix: [256]u8 = [0 as u8; 256]
+                var spos: i64 = 0
+                buf_append_str(&raw mut suffix as *mut [256]u8 as *mut u8, &raw mut spos, 256, "_\0" as *const u8)
+                if arg_name as i64 != 0 and *arg_name != 0:
+                    buf_append_str(&raw mut suffix as *mut [256]u8 as *mut u8, &raw mut spos, 256, arg_name)
+                else:
+                    buf_append_str(&raw mut suffix as *mut [256]u8 as *mut u8, &raw mut spos, 256, "arg\0" as *const u8)
+                    buf_append_i64(&raw mut suffix as *mut [256]u8 as *mut u8, &raw mut spos, 256, ai as i64)
+                clang_disposeString(arg_spelling)
+                buf_append_str(&raw mut suffix as *mut [256]u8 as *mut u8, &raw mut spos, 256, "_anon\0" as *const u8)
+                name_anon_records_used_by(s, clang_getCursorType(arg), cursor, &suffix as *const [256]u8 as *const u8)
+                ai = ai + 1
         i = i + 1
 
 @[callconv("c")]
@@ -1574,7 +1990,9 @@ pub fn with_cimport_parse(header_code: &str) -> i64:
         let root = clang_getTranslationUnitCursor((*s).tu)
         (*s).header_file = 0 as *mut u8
         let _ = clang_visitChildren(root, collect_decl as *const u8, s as *mut u8)
+        hoist_nested_tags(s)
         collect_undefined_records(s)
+        name_file_scope_anon_records(s)
         s as i64
 
 // ── Dispose ─────────────────────────────────────────────────
@@ -1636,6 +2054,22 @@ pub fn with_cimport_dispose(session: i64) -> Unit:
         if (*s).index as i64 != 0: clang_disposeIndex((*s).index)
         if (*s).err_msg as i64 != 0: with_free((*s).err_msg)
         if (*s).decls as i64 != 0: with_free((*s).decls as *mut u8)
+        if (*s).anon_records as i64 != 0:
+            var ani: i32 = 0
+            while ani < (*s).anon_record_count:
+                let an_entry = *(((*s).anon_record_names as i64 + ani as i64 * 8) as *const *mut u8)
+                if an_entry as i64 != 0: with_free(an_entry)
+                ani = ani + 1
+            with_free((*s).anon_records as *mut u8)
+            with_free((*s).anon_record_names as *mut u8)
+        if (*s).anon_hash as i64 != 0: with_free((*s).anon_hash as *mut u8)
+        if (*s).anon_taken as i64 != 0:
+            var ati: i32 = 0
+            while ati < (*s).anon_taken_cap:
+                let at_entry = *(((*s).anon_taken as i64 + ati as i64 * 8) as *const *mut u8)
+                if at_entry as i64 != 0: with_free(at_entry)
+                ati = ati + 1
+            with_free((*s).anon_taken as *mut u8)
         with_free(s as *mut u8)
 
 // ── Error ───────────────────────────────────────────────────
@@ -1705,6 +2139,44 @@ pub fn with_cimport_decl_name(session: i64, idx: i32) -> str:
         // Route through the memoized decl cursor + spelling cache (#747):
         // the driver's pre-scan passes re-query every decl's name.
         with_ci_cursor_spelling(session, with_cimport_decl_cursor(session, idx))
+
+/// #1396: the member record with no name a field reaches through an array
+/// (or, with `through_pointers`, also a pointer), as a stored cursor index,
+/// when the bridge named it (session_anon_record_name); -1 otherwise.
+pub fn with_ci_field_indirect_anon_record(session: i64, field_cursor: i32, through_pointers: i32) -> i32:
+    unsafe:
+        let s = session as *mut CImportSession
+        if s as i64 == 0 or field_cursor < 0 or field_cursor >= (*s).cursor_count: return -1
+        if (*s).anon_record_count <= (*s).anon_file_scope_count: return -1
+        let cursor = *(((*s).cursors as i64 + field_cursor as i64 * 32) as *const CXCursor)
+        if clang_getCursorKind(cursor) != CXCursor_FieldDecl: return -1
+        var reached = cursor
+        if not anon_record_behind_indirection(clang_getCursorType(cursor), false, through_pointers != 0, &raw mut reached, 0): return -1
+        let slot = session_anon_record_slot(s, reached)
+        if slot < (*s).anon_file_scope_count: return -1
+        store_cursor(s, reached)
+
+/// #1396: the name the bridge gave a record with no tag and no typedef name,
+/// or "" (see session_anon_record_name).
+pub fn with_ci_anon_record_name(session: i64, cursor_idx: i32) -> str:
+    unsafe:
+        let s = session as *mut CImportSession
+        if s as i64 == 0 or cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return ""
+        let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
+        make_str(session_anon_record_name(s, cursor))
+
+/// #1396: 1 when the declaration is a file-scope struct/union with no tag
+/// and no typedef name that no declaration uses — nothing can spell it, in C
+/// or in With (winnt.h's C_ASSERT(TYPE_ALIGNMENT(T)) record).
+pub fn with_cimport_decl_is_unused_anon_record(session: i64, idx: i32) -> i32:
+    unsafe:
+        let s = session as *mut CImportSession
+        if s as i64 == 0 or idx < 0 or idx >= (*s).decl_count: return 0
+        let cursor = *(((*s).decls as i64 + idx as i64 * 32) as *const CXCursor)
+        let kind = clang_getCursorKind(cursor)
+        if kind != CXCursor_StructDecl and kind != CXCursor_UnionDecl: return 0
+        if clang_Cursor_isAnonymous(cursor) == 0: return 0
+        if session_file_scope_anon_record_name(s, cursor) as i64 != 0: 0 else: 1
 
 pub fn with_cimport_decl_cursor(session: i64, idx: i32) -> i32:
     unsafe:
@@ -3242,10 +3714,16 @@ pub fn with_ci_cursor_spelling(session: i64, cursor_idx: i32) -> str:
         if (*slot) as i64 != 0:
             return make_str(*slot as *const u8)
         let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
-        let cxs = clang_getCursorSpelling(cursor)
-        let cstr = clang_getCString(cxs)
-        let dup = c_strdup(cstr)
-        clang_disposeString(cxs)
+        // #1396: a file-scope record with no tag and no typedef name is
+        // spelled by the name its first user gave it, everywhere.
+        let synthesized = session_file_scope_anon_record_name(s, cursor)
+        var dup = 0 as *mut u8
+        if synthesized as i64 != 0:
+            dup = c_strdup(synthesized)
+        else:
+            let cxs = clang_getCursorSpelling(cursor)
+            dup = c_strdup(clang_getCString(cxs))
+            clang_disposeString(cxs)
         if dup as i64 == 0:
             return ""
         *slot = dup
