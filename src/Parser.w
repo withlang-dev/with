@@ -7692,21 +7692,35 @@ impl Parser:
         let body = self.parse_block_or_expr()
         self.pool.add_node(NodeKind.NK_CLOSURE, start, self.prev_end(), body, extra_start, 1)
 
+    // `: TYPE` after a closure parameter name, the colon at the cursor.
+    mut fn parse_closure_param_type() -> i32:
+        self.advance()
+        self.parse_type_expr() as i32
+
+    // A closure's parameters are (name, type node) pairs in the extras pool.
+    // They are written after every annotation is parsed: a generic
+    // annotation (`&Vec[i32]`) writes its own argument list to the pool, and
+    // pairs written as they were parsed interleaved with it, so the type slot
+    // read back held the argument, `i32` (#1402).
+    mut fn add_closure_params(params: &Vec[i32]) -> i32:
+        let extra_start = self.pool.extra_len()
+        for pi in 0..params.len() as i32:
+            self.pool.add_extra(params[pi])
+        extra_start
+
     // Parse: (params) [-> RetType] => expr (paren fat-arrow closure)
     // Starts at '(' token.
     mut fn parse_fat_arrow_paren_closure() -> NodeId:
         let start = self.current_start()
         self.advance()  // consume (
         self.skip_newlines()
-        let extra_start = self.pool.extra_len()
-        var param_count = 0
+        var params: Vec[i32] = Vec.new()
         while self.peek() != TokenKind.TK_R_PAREN and self.peek() != TokenKind.TK_EOF:
             if self.peek() == TokenKind.TK_KW_IT:
                 self.emit_error_code("'it' is a reserved keyword and cannot be used as a parameter name", "E0953")
                 self.advance()
-                self.pool.add_extra(0)
-                self.pool.add_extra(0)
-                param_count = param_count + 1
+                params.push(0)
+                params.push(0)
                 if self.peek() == TokenKind.TK_COMMA:
                     self.advance()
                     self.skip_newlines()
@@ -7715,18 +7729,14 @@ impl Parser:
             if p == 0:
                 self.advance()
                 continue
-            self.pool.add_extra(p as i32)
-            if self.peek() == TokenKind.TK_COLON:
-                self.advance()
-                let ty = self.parse_type_expr()
-                self.pool.add_extra(ty as i32)
-            else:
-                self.pool.add_extra(0)
-            param_count = param_count + 1
+            params.push(p as i32)
+            params.push(if self.peek() == TokenKind.TK_COLON: self.parse_closure_param_type() else: 0)
             if self.peek() == TokenKind.TK_COMMA:
                 self.advance()
                 self.skip_newlines()
         self.expect(TokenKind.TK_R_PAREN)
+        let extra_start = self.add_closure_params(&params)
+        let param_count = (params.len() / 2) as i32
         self.skip_newlines()
         // Optional return type
         if self.peek() == TokenKind.TK_ARROW:
@@ -7740,15 +7750,13 @@ impl Parser:
     mut fn parse_closure() -> NodeId:
         let start = self.current_start()
         self.expect(TokenKind.TK_PIPE)
-        let extra_start = self.pool.extra_len()
-        var param_count = 0
+        var params: Vec[i32] = Vec.new()
         while self.peek() != TokenKind.TK_PIPE and self.peek() != TokenKind.TK_EOF:
             if self.peek() == TokenKind.TK_KW_IT:
                 self.emit_error_code("'it' is a reserved keyword and cannot be used as a parameter name", "E0953")
                 self.advance()
-                self.pool.add_extra(0)
-                self.pool.add_extra(0)
-                param_count = param_count + 1
+                params.push(0)
+                params.push(0)
                 if self.peek() == TokenKind.TK_COMMA:
                     self.advance()
                     self.skip_newlines()
@@ -7757,19 +7765,14 @@ impl Parser:
             if p == 0:
                 self.advance()
                 continue
-            self.pool.add_extra(p as i32)
-            // Optional type
-            if self.peek() == TokenKind.TK_COLON:
-                self.advance()
-                let ty = self.parse_type_expr()
-                self.pool.add_extra(ty as i32)
-            else:
-                self.pool.add_extra(0)
-            param_count = param_count + 1
+            params.push(p as i32)
+            params.push(if self.peek() == TokenKind.TK_COLON: self.parse_closure_param_type() else: 0)
             if self.peek() == TokenKind.TK_COMMA:
                 self.advance()
                 self.skip_newlines()
         self.expect(TokenKind.TK_PIPE)
+        let extra_start = self.add_closure_params(&params)
+        let param_count = (params.len() / 2) as i32
         self.skip_newlines()
 
         // Optional return type

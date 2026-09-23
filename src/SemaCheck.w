@@ -15534,7 +15534,12 @@ impl Sema:
         let saved_borrow_len = self.borrow_kinds.len() as i32
 
         self.push_scope()
-        let te_start = self.type_extra.len() as i32
+        // The parameter types are collected first and written to type_extra
+        // after the loop: resolving an annotation can itself append to
+        // type_extra (a new generic instance records its arguments there), and
+        // a list started before the loop would read that argument as a
+        // parameter type (#1402).
+        let param_tys: Vec[i32] = Vec.new()
         // Partial application: if body is NK_CALL, resolve callee param types for placeholders
         var partial_sig = -1
         if self.ast.kind(body) == NodeKind.NK_CALL:
@@ -15566,7 +15571,10 @@ impl Sema:
                                 p_ty = self.sig_param_type(partial_sig, ai)
                             break
             self.scope_put(p_sym, p_ty, 0)
-            self.type_extra.push(p_ty)
+            param_tys.push(p_ty)
+        let te_start = self.type_extra.len() as i32
+        for pti in 0..param_tys.len() as i32:
+            self.type_extra.push(param_tys[pti])
         let saved_label_registry = self.save_label_registry()
         self.reset_label_registry()
         self.collect_function_labels(body)
