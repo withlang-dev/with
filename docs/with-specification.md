@@ -9288,6 +9288,33 @@ When trusted evidence establishes that a pointer-returning producer signals
 failure with `NULL`, its modeled result is `Option[Resource]` and no `ok`
 clause is needed. This is not inferred from the return type alone.
 
+When a producer states `ok`, its constructor returns `Result[R, RError]`,
+where `RError` is an error type the compiler generates for the resource `R`
+(`DatabaseError` for `Database`):
+
+```
+error DatabaseError =
+    Failed(status: c_int)
+    FailedWithResource(status: c_int, resource: Database)
+    NothingProduced(status: c_int)
+```
+
+`Failed` is a failed status with nothing produced. `FailedWithResource` is a
+failed status that still produced the resource. The error owns it and
+destroys it when the error is dropped, and `?` moves that ownership with the
+error. `NothingProduced` is a success status with nothing produced: a
+violated contract, reported as an error. A resource owned by an error admits
+raw access only, unless the facade marks an operation as valid on the failure
+state. A facade that declares or imports a type with the generated name is a
+compile-time error naming both. When `ok` is stated, the
+`(status, Option[Resource])` constructor is not generated.
+
+An in-place producer with `ok` returns the same `Result`, without
+`FailedWithResource`, since a failed initialization produced nothing. On
+failure its storage is released without the destroyer running; this is the
+one case in which a pinned resource's heap cell (§16.2b.3) is freed with no
+destruction call.
+
 #### 16.2b.5 Parameter effects
 
 Foreign resource parameters use one ownership vocabulary:
