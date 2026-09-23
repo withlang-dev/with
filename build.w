@@ -3000,8 +3000,21 @@ pub fn build(ctx: BuildCtx) -> Build:
     test_green = test_green.arg(release_asset_for_host())
     out = out.add_target(test_green)
 
+    // The release compiler checks the build system's own source: the reseed
+    // gate (`:install-user`, #745) runs exactly this, and nothing earlier did,
+    // so a battery went green on sources whose compiler could not become the
+    // seed (2026-09-22: build/sdk.w pushed a `&str` into a Vec[str]). A green
+    // must be reseedable.
+    var reseed_check = target_new(.RunCorpusTest, "reseed-check-build-w", release_compiler_bin("with"))
+    reseed_check = reseed_check.output("out/corpus/reseed-check-build-w")
+    reseed_check = reseed_check.arg("check")
+    reseed_check = reseed_check.arg("build.w")
+    reseed_check = reseed_check.dep("build")
+    out = out.add_target(reseed_check)
+
     var tests = target_new(.Group, "test", "")
     tests = tests.dep("seed-driver")
+    tests = tests.dep("reseed-check-build-w")
     tests = tests.dep("behavior-tests")
     tests = tests.dep("native-compile-error-tests")
     tests = tests.dep("native-codegen-tests")

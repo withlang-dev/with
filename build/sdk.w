@@ -706,10 +706,10 @@ pub fn run_sdk_source_tar_gz_action(ctx: ActionCtx) -> i32:
     sdk_write_text(ctx, marker, "ok\n")
 
 fn sdk_jobs_arg(jobs: &str) -> Vec[str]:
-    let out: Vec[str] = Vec.new()
+    var out: Vec[str] = Vec.new()
     out.push("--parallel")
     if jobs.len() > 0:
-        out.push(jobs)
+        out.push(jobs.clone())
     out
 
 fn sdk_append_jobs(args: Vec[str], jobs: &str) -> Vec[str]:
