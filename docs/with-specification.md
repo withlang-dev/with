@@ -9295,7 +9295,7 @@ where `RError` is an error type the compiler generates for the resource `R`
 ```
 error DatabaseError =
     Failed(status: c_int)
-    FailedWithResource(status: c_int, resource: Database)
+    FailedWithResource(status: c_int, resource: FailedDatabase)
     NothingProduced(status: c_int)
 ```
 
@@ -9305,12 +9305,14 @@ destroys it when the error is dropped, and `?` moves that ownership with the
 error. `NothingProduced` is a success status with nothing produced: a
 violated contract, reported as an error. A resource owned by an error admits
 raw access only, unless the facade marks an operation as valid on the failure
-state. A facade that declares or imports a type with the generated name is a
+state; it is carried as a distinct type (`FailedDatabase`) that has no
+presented methods. A facade that declares or imports a type with the generated name is a
 compile-time error naming both. When `ok` is stated, the
 `(status, Option[Resource])` constructor is not generated.
 
-An in-place producer with `ok` returns the same `Result`, without
-`FailedWithResource`, since a failed initialization produced nothing. On
+An in-place producer with `ok` returns `Result[R, RError]` whose error has
+only `Failed`, since a failed initialization produced nothing and a
+successful one always did. On
 failure its storage is released without the destroyer running; this is the
 one case in which a pinned resource's heap cell (§16.2b.3) is freed with no
 destruction call.

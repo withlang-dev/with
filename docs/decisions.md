@@ -64,6 +64,16 @@ own (ruling §18).
 shortens it (`Database.open`). Examples quoting the C name are not the final
 spelling.
 
+**Amended 2026-09-23** (Eric: "blessed"), from implementing it (#1426):
+- **The failed resource is a distinct type, `FailedDatabase`, with no
+  presented methods.** With `resource: Database`, a `match` moved the handle
+  out as an ordinary `Database` with every method, so "raw access only"
+  could not be enforced. The distinct type still owns the handle and runs
+  the facade's `drop` once.
+- **An in-place `ok` error has only `Failed`.** A successful in-place
+  initialization always produced the resource, so `NothingProduced` could
+  never occur there and every caller would have had to match it.
+
 **Reopens if** a facade needs operations on the failure-state resource
 (the marking clause), or `ok` needs several success constants.
 
