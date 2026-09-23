@@ -257,3 +257,79 @@ pub fn mir_test_indirect_call_arity() -> Unit:
     assert(indirect_arity_verdict(2).contains("indirect call passes 2 argument(s) but the callee's fn type declares 1"))
     assert(indirect_arity_verdict(0).contains("declares 1"))
     assert(indirect_arity_verdict(1) == "")
+
+// #1394: a variant payload moved out on one arm and the whole enum dropped
+// at the join, with no reset-on-move blank of the payload. This is #1363's
+// MIR (`_8 = move _6<as v0>.f0`, then `drop(_6)`): the enum drop glue frees
+// the payload the move's destination owns, and this validator said ok.
+// `arm` picks what the moving arm does: 0 moves the payload, 1 moves it and
+// blanks it (§2.5.1), 2 moves the whole enum instead (a conditional whole
+// move, which the guarded drop handles).
+fn vacated_payload_verdict(arm: i32, payload_drops: bool) -> str:
+    var mir_mod = MirModule.init()
+    for kind in [0, TypeKind.TY_INT, TypeKind.TY_INT, TypeKind.TY_ENUM]:
+        mir_mod.sema_type_kinds.push(kind)
+        mir_mod.sema_type_d0.push(0)
+        mir_mod.sema_type_d1.push(0)
+        mir_mod.sema_type_d2.push(0)
+    let flag_ty = 1
+    let payload_ty = 2
+    let enum_ty = 3
+    mir_mod.sema_type_d0[enum_ty] = 7
+    mir_mod.sema_type_d1[enum_ty] = mir_mod.sema_type_extra.len() as i32
+    mir_mod.sema_type_d2[enum_ty] = 1
+    mir_mod.sema_type_extra.push(0)
+    mir_mod.sema_type_extra.push(1)
+    mir_mod.sema_type_extra.push(payload_ty)
+    if payload_drops: mir_mod.sema_moved_drop_types.insert(payload_ty, 1)
+    var body = MirBody.init_for_fn(1)
+    body.n_params = 1
+    let flag_local = body.new_temp(flag_ty)
+    let flag = body.new_place(flag_local)
+    let subject_local = body.new_temp(enum_ty)
+    let subject = body.new_place(subject_local)
+    let variant = body.new_downcast_place(subject, 0, enum_ty)
+    let payload = body.new_field_place(variant, 0, payload_ty)
+    let taken_local = body.new_temp(payload_ty)
+    let taken = body.new_place(taken_local)
+    let whole_local = body.new_temp(enum_ty)
+    let whole = body.new_place(whole_local)
+    let entry = body.new_block()
+    let moving = body.new_block()
+    let other = body.new_block()
+    let join = body.new_block()
+    let done = body.new_block()
+    let enum_blank = body.new_const(ConstKind.CK_ZERO_SIZED, 0, 0, 0, enum_ty)
+    let enum_blank_op = body.new_operand(OperandKind.OK_CONSTANT, enum_blank)
+    let init = body.new_rvalue(RvalueKind.RK_USE, enum_blank_op, 0, 0)
+    body.push_stmt(entry, StmtKind.StorageLive, subject_local, 0, 0)
+    body.push_stmt(entry, StmtKind.Assign, subject, init, 0)
+    let vals: Vec[i32] = Vec.new()
+    vals.push(1)
+    let targets: Vec[i32] = Vec.new()
+    targets.push(moving)
+    let table = body.new_switch_table(&vals, &targets)
+    let flag_op = body.new_operand(OperandKind.OK_COPY, flag)
+    body.set_terminator(entry, TermKind.TK_SWITCH_INT, flag_op, table, other, 0, 0)
+    let moved_place = if arm == 2: subject else: payload
+    let moved_op = body.new_operand(OperandKind.OK_MOVE, moved_place)
+    let moved = body.new_rvalue(RvalueKind.RK_USE, moved_op, 0, 0)
+    body.push_stmt(moving, StmtKind.Assign, if arm == 2: whole else: taken, moved, 0)
+    if arm == 1:
+        let payload_blank = body.new_const(ConstKind.CK_ZERO_SIZED, 0, 0, 0, payload_ty)
+        let payload_blank_op = body.new_operand(OperandKind.OK_CONSTANT, payload_blank)
+        let reset = body.new_rvalue(RvalueKind.RK_USE, payload_blank_op, 0, 0)
+        body.push_stmt(moving, StmtKind.Assign, payload, reset, 0)
+    body.set_terminator(moving, TermKind.TK_GOTO, join, 0, 0, 0, 0)
+    body.set_terminator(other, TermKind.TK_GOTO, join, 0, 0, 0, 0)
+    body.push_stmt(join, StmtKind.Drop, subject, 0, 0)
+    body.set_terminator(join, TermKind.TK_GOTO, done, 0, 0, 0, 0)
+    body.set_terminator(done, TermKind.TK_RETURN, 0, 0, 0, 0, 0)
+    validate_ownership_body(mir_mod, body)
+
+pub fn mir_test_vacated_payload_drop() -> Unit:
+    assert(vacated_payload_verdict(0, true).contains("drop of _2 frees _2<as v0>.f0, which a path reaching it moved out (Maybe)"))
+    assert(vacated_payload_verdict(1, true) == "")
+    assert(vacated_payload_verdict(2, true) == "")
+    // A payload with no drop glue is not freed again by the enum's drop.
+    assert(vacated_payload_verdict(0, false) == "")

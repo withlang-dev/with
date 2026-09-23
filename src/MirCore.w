@@ -527,6 +527,11 @@ pub type MirModule {
     // Result's symbol: the one two-argument enum whose variants carry its
     // arguments in declaration order (Ok(T), Err(E)).
     sema_result_sym: i32,
+    // #1394: every type a body moves out of a sub-place (a field, a tuple
+    // element, a variant payload) that has drop glue. The ownership
+    // validator asks it whether a vacated sub-place is one the whole
+    // value's drop would free again; MirCore has no Sema to ask.
+    sema_moved_drop_types: HashMap[i32, i32],
 }
 
 // ── MirModule helpers ────────────────────────────────────────────
@@ -547,6 +552,7 @@ fn MirModule.init -> MirModule:
         sema_box_sym: 0,
         sema_option_sym: 0,
         sema_result_sym: 0,
+        sema_moved_drop_types: HashMap.new(),
     }
 
 impl MirModule:
@@ -1383,9 +1389,15 @@ impl MirDropStateMap:
         let id: i32 = keys.place_key[place_id]
         self.set(keys, id, state)
         let base: i32 = keys.base_local[id]
+        // A move out of a sub-place vacates only that sub-place: the whole
+        // value is still there and its drop still runs over it, so the base
+        // keeps its state. Joining Moved into the base made a partial move
+        // read as a conditional whole move (`_4=Maybe`), and the vacated
+        // payload a whole-enum drop freed again read as the same Maybe as
+        // its parent (#1394).
         if body.place_proj_counts[place_id] == 0:
             self.mark_local(keys, base, state)
-        else:
+        else if state != MirDropState.Moved:
             self.set(keys, base, mir_drop_state_join(self.get(keys, base), state))
 
     mut fn note_operand(keys: &MirDropStateKeys, body: &MirBody, operand_id: i32):
@@ -2071,8 +2083,68 @@ pub fn mir_cleanup_edge_spec_ok(spec: &str) -> i32:
         return 0
     1
 
+// Moved-ness of a drop state for the vacated-sub-place rule: Init < Maybe <
+// Moved; -1 for a state that holds no value to compare (never initialized,
+// dropped, garbage).
+fn mir_drop_state_moved_rank(state: i32) -> i32:
+    if state == MirDropState.Init:
+        return 0
+    if state == MirDropState.Maybe:
+        return 1
+    if state == MirDropState.Moved:
+        return 2
+    -1
+
+// The first MIR place naming each drop-state key, -1 for none.
+fn mir_drop_state_key_places(keys: &MirDropStateKeys) -> Vec[i32]:
+    var out: Vec[i32] = Vec.new()
+    for _ in 0..keys.len():
+        out.push(-1)
+    for p in 0..keys.place_key.len():
+        let k: i32 = keys.place_key[p]
+        if out[k] < 0:
+            out[k] = p
+    out
+
+// #1394: the key of a sub-place of `place_id` that the drop of `place_id`
+// would free although a path reaching the drop moved it out and nothing
+// re-initialized it (reset-on-move blanks a moved sub-place, §2.5.1, and the
+// blank re-initializes it), or -1. The defect shape is a sub-place more moved
+// than the place being dropped: a whole conditional move marks the place and
+// every sub-place alike, and a Moved place's drop is elided. #1363 was this:
+// `_8 = move _6<as v0>.f0` on the success arm, then `drop(_6)` at the join —
+// the enum drop glue freed the payload the result owned.
+fn mir_drop_vacated_subplace(mir_mod: &MirModule, body: &MirBody, keys: &MirDropStateKeys, state: &MirDropStateMap, key_places: &Vec[i32], place_id: i32) -> i32:
+    let place_rank = mir_drop_state_moved_rank(state.place(keys, place_id))
+    if place_rank < 0 or place_rank == 2:
+        return -1
+    let place_key: i32 = keys.place_key[place_id]
+    let base: i32 = keys.base_local[place_key]
+    let whole = body.place_proj_counts[place_id] == 0
+    let start: i32 = keys.child_starts[base]
+    let end: i32 = keys.child_starts[base + 1]
+    for i in start..end:
+        let child: i32 = keys.children[i]
+        if child == place_key:
+            continue
+        if not whole and not mir_drop_state_key_is_descendant(keys.names[child], keys.names[place_key]):
+            continue
+        if mir_drop_state_moved_rank(state.get(keys, child)) <= place_rank:
+            continue
+        let child_place: i32 = key_places[child]
+        if child_place < 0:
+            continue
+        if mir_mod.sema_moved_drop_types.contains(mir_validate_place_type(mir_mod, body, child_place)):
+            return child
+    -1
+
+fn mir_drop_vacated_message(keys: &MirDropStateKeys, state: &MirDropStateMap, body: &MirBody, place_id: i32, child: i32) -> str:
+    let child_state = mir_drop_state_name(state.get(keys, child))
+    "drop of " ++ mir_place_text(body, place_id) ++ " frees " ++ keys.names[child] ++ f", which a path reaching it moved out ({child_state}) and nothing reset (§2.5.1)"
+
 fn validate_ownership_body(mir_mod: &MirModule, body: &MirBody) -> str:
     var blocks = mir_drop_state_compute_blocks(body)
+    let key_places = mir_drop_state_key_places(blocks.keys)
     for bb in 0..body.block_count():
         var state = blocks.input(bb)
         let stmt_start = body.bb_stmt_starts[bb]
@@ -2100,6 +2172,10 @@ fn validate_ownership_body(mir_mod: &MirModule, body: &MirBody) -> str:
                 if drop_state == MirDropState.MaybeGarbage or drop_state == MirDropState.Uninit:
                     let state_name = mir_drop_state_name(drop_state)
                     return f"fn sym{body.fn_sym} stmt{stmt_id} span={span}: drop of {drop_key} reaches a path that never initialized it ({state_name})"
+            if kind == StmtKind.Drop and blocks.computed[bb] != 0:
+                let vacated = mir_drop_vacated_subplace(mir_mod, body, blocks.keys, state, key_places, d0)
+                if vacated >= 0:
+                    return f"fn sym{body.fn_sym} stmt{stmt_id} span={span}: " ++ mir_drop_vacated_message(blocks.keys, state, body, d0, vacated)
             state.transfer_stmt(blocks.keys, body, stmt_id)
         if body.term_kind(bb) == TermKind.TK_CALL or body.term_kind(bb) == TermKind.TK_DROP_AND_GOTO:
             let place_id = if body.term_kind(bb) == TermKind.TK_CALL: body.term_data2(bb) else: body.term_data0(bb)
@@ -2113,6 +2189,10 @@ fn validate_ownership_body(mir_mod: &MirModule, body: &MirBody) -> str:
                     let drop_key = mir_place_text(body, place_id)
                     let state_name = mir_drop_state_name(drop_state)
                     return f"fn sym{body.fn_sym} bb{bb}: drop of {drop_key} reaches a path that never initialized it ({state_name})"
+            if body.term_kind(bb) == TermKind.TK_DROP_AND_GOTO and blocks.computed[bb] != 0:
+                let vacated = mir_drop_vacated_subplace(mir_mod, body, blocks.keys, state, key_places, place_id)
+                if vacated >= 0:
+                    return f"fn sym{body.fn_sym} bb{bb}: " ++ mir_drop_vacated_message(blocks.keys, state, body, place_id, vacated)
         state.transfer_term(blocks.keys, body, bb)
     ""
 

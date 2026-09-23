@@ -33,6 +33,26 @@ impl MirModule:
         if sema.type_symbol_is_std_box(sema.syms.box) != 0:
             self.sema_box_sym = sema.syms.box
             self.sema_option_sym = sema.syms.option
+        self.snapshot_moved_drop_types(sema)
+
+    // #1394: the drop-bearing types of every sub-place a body moves out of.
+    // Reads the place type through the typed validator's own walk, so the
+    // ownership validator looks a vacated sub-place up by the same type.
+    mut fn snapshot_moved_drop_types(sema: &Sema):
+        var moved: Vec[i32] = Vec.new()
+        for bi in 0..self.bodies.len():
+            let body = &self.bodies[bi]
+            for op in 0..body.operand_kinds.len():
+                if body.operand_kinds[op] != OperandKind.OK_MOVE:
+                    continue
+                let place = body.operand_d0[op]
+                if place < 0 or place >= body.place_locals.len() or body.place_proj_counts[place] == 0:
+                    continue
+                moved.push(mir_validate_place_type(self, body, place))
+        for i in 0..moved.len():
+            let ty = moved[i]
+            if ty > 0 and not self.sema_moved_drop_types.contains(ty) and sema.type_needs_drop_frozen(ty) != 0:
+                self.sema_moved_drop_types.insert(ty, 1)
 
 
 fn MirBody.init(fn_sym: i32, sema: &Sema) -> MirBody:
