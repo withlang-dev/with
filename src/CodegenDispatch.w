@@ -3412,6 +3412,19 @@ impl Codegen:
                 let substituted_llvm = self.mir_sema_type_to_llvm(substituted_payload)
                 if substituted_llvm != 0:
                     return substituted_llvm
+        // A generic enum instance's variants are registered under its
+        // instance symbol with substituted payloads; the base name is not a
+        // registered enum, so a variant of two or more payloads found no
+        // payload struct (#1441: `G[i64].V(t: T, k: i64)`).
+        let inst_resolved = self.mir_resolve_alias_at(enum_sema_ty)
+        if self.mir_type_kind_at(inst_resolved) == TypeKind.TY_GENERIC_INST and self.get_or_create_generic_enum_type(inst_resolved) != 0:
+            let inst_sym = self.generic_enum_inst_syms.get(inst_resolved)
+            if inst_sym.is_some():
+                let inst_idx = self.enum_type_map.get(inst_sym.unwrap())
+                if inst_idx.is_some():
+                    let inst_start = self.enum_variant_starts[inst_idx.unwrap()]
+                    if variant_idx < self.enum_variant_counts[inst_idx.unwrap()]:
+                        return self.enum_variant_payloads[(inst_start + variant_idx)]
         let enum_sym = self.mir_type_cg_name_at(enum_sema_ty)
         if enum_sym <= 0:
             return 0

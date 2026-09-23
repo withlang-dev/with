@@ -8868,7 +8868,11 @@ impl MirBuilder:
                 let inner_pk = self.ast.kind(inner_pat)
                 if inner_pk == NodeKind.NK_PAT_WILDCARD or inner_pk == NodeKind.NK_PAT_IDENT or inner_pk == NodeKind.NK_PAT_REST:
                     continue
-                let field_place = self.body.new_field_place(variant_place, bi, 0)
+                // The payload's type, substituted for a generic enum instance
+                // (#1441: the validator cannot substitute a user generic's
+                // parameters, so an undeclared place of `V(t: T, k: i64)`
+                // had no type).
+                let field_place = self.body.new_field_place(variant_place, bi, self.enum_payload_type(variant_enum_ty, variant_idx, bi))
                 let next_test_bb = self.new_block()
                 self.switch_to(cur_test_bb as BlockId)
                 self.lower_pattern_match(field_place, inner_pat, next_test_bb, fail_bb)
@@ -9223,7 +9227,9 @@ impl MirBuilder:
                                 self.bind_pattern_value(rp_local_place, rp_op, self.ast.get_start(pat_node))
                             rpi = rpi + 1
                     continue
-                let field_place = self.body.new_field_place(variant_place, bi, 0)
+                // Declared with the payload's substituted type (#1441, as
+                // in the match test above).
+                let field_place = self.body.new_field_place(variant_place, bi, self.enum_payload_type(variant_enum_ty, variant_idx, bi))
                 let child_place = self.pattern_child_subject_place(scrutinee_place, field_place, self.ast.get_start(pat_node))
                 if inner_pat != 0:
                     let inner = self.lower_pattern(inner_pat, child_place)
