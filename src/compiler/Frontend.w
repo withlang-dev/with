@@ -330,6 +330,7 @@ impl Sema:
                     seen_global.insert(imp.target_module, 1)
                     let named = resolved.modules[imp.target_module]
                     self.global_visible_module_paths.insert(frontend_owned_text(named.path), 1)
+        self.record_engine_corpora()
 
 impl Zcu:
     mut fn expand_c_imports_frontend(pool: AstPool) -> AstPool:

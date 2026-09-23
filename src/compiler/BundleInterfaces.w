@@ -66,6 +66,11 @@ pub fn bundle_interface_text(path: &str) -> str:
         return ""
     with_str_clone_ref(found.unwrap())
 
+// A path some registered interface names as a section, even an empty one
+// (a bundle root `bundle.w` holds only `use` lines).
+pub fn bundle_interface_registered(path: &str) -> bool:
+    g_bundle_interface_texts.contains(path)
+
 fn bundle_interface_trim(s: &str) -> str:
     var a: i64 = 0
     var b = s.len()

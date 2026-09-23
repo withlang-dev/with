@@ -16,6 +16,7 @@ use Overflow
 use TargetSpec
 use compiler.TrackedInputs
 use compiler.BundleInterfaces
+use compiler.ModuleSource
 use FnAbi
 use std.collections.HashMap
 use std.collections.HashSet
@@ -1275,6 +1276,7 @@ pub type Sema {
     // and which symbols are visible in each module context.
     decl_source_paths: Vec[str],     // one path per decl index (from Frontend)
     decl_source_file_ids: Vec[i32],  // one file id per decl index (from Frontend)
+    module_path_by_file: HashMap[i32, str], // #1362: file id -> declaring module path (lazy)
     decl_is_c_import: Vec[i32],      // 1 if decl came from c_import, 0 otherwise
     source_text_file_ids: Vec[i32],  // imported/extra source text file ids
     source_text_names: Vec[str],     // source display names aligned with source_text_file_ids
@@ -1290,6 +1292,7 @@ pub type Sema {
     module_index_by_path: HashMap[str, i32],   // path -> module index
     bundle_corpus: str,              // D39: the --bundle-corpus root, "" outside a bundle lane
     global_visible_module_paths: HashMap[str, i32], // prelude-visible modules
+    engine_module_corpus: HashMap[str, i32], // #1362: engine corpus module path -> corpus id
     module_visibility_cache: HashMap[str, i32], // "from->to" -> visibility
     named_type_candidate_syms: Vec[i32],       // every registered named type symbol
     named_type_candidate_tids: Vec[i32],       // parallel type id for candidate
@@ -1386,6 +1389,14 @@ fn sema_tier_path_is_std_implementation(path: &str) -> i32:
     if path.contains("/lib/std/"):
         return 1
     0
+
+// Separator-agnostic: a native Windows source path is backslash-separated.
+fn sema_dirname(path: &str) -> str:
+    var last_slash = -1
+    for i in 0..path.len() as i32:
+        if path[i] == '/' or path[i] == '\\':
+            last_slash = i
+    if last_slash <= 0: "" else: path.slice(0, last_slash as i64)
 
 fn sema_vec_str_contains(v: &Vec[str], s: &str) -> i32:
     for i in 0..v.len() as i32:
@@ -1749,6 +1760,7 @@ impl Sema:
             self.module_import_targets.push(module_import_targets[i])
         for i in 0..module_import_paths.len() as i32:
             self.module_import_paths.push(sema_owned_text(module_import_paths[i]))
+        self.record_engine_corpora()
 
 fn sema_builtin_symbols_zero -> SemaBuiltinSymbols:
     SemaBuiltinSymbols {
@@ -2502,6 +2514,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         ty_field_info: 0, ty_variant_info: 0,
         decl_source_paths: sema_new_vec_str(),
         decl_source_file_ids: Vec.new(),
+        module_path_by_file: HashMap.new(),
         decl_is_c_import: Vec.new(),
         source_text_file_ids: Vec.new(),
         source_text_names: sema_new_vec_str(),
@@ -2517,6 +2530,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         module_index_by_path: sema_new_map_str_i32(),
         bundle_corpus: "",
         global_visible_module_paths: sema_new_map_str_i32(),
+        engine_module_corpus: sema_new_map_str_i32(),
         module_visibility_cache: sema_new_map_str_i32(),
         named_type_candidate_syms: Vec.new(),
         named_type_candidate_tids: Vec.new(),
@@ -2858,20 +2872,25 @@ impl Sema:
             return 0
         self.module_is_visible_from_current(target_path)
 
-    // D29 scaffolding (#750): name-aware visibility. Two rules on top of
+    // D29 scaffolding (#750): name-aware visibility. Three rules on top of
     // decl_visible_from_current, applied before its internal-boundary and
     // reachability shortcuts:
     //   1. std blindness — a std implementation module never resolves a
     //      user-tier declaration. The flat merge let newer user decls hijack
     //      std-internal references (user `type Regex` rebound regex.w).
-    //   2. prelude gate — a std declaration is ambient only for the §18.2
-    //      enumerated names; any other std name resolves from user code only
-    //      through an explicit import path (never the synthetic prelude
-    //      edge). Every std module is gated, not only the prelude closure:
-    //      the modules those import for themselves (the bundle corpora the
-    //      prelude's std.regex reaches, std.re.defs' u128_mul_would_overflow
-    //      and is_alnum) were reachable over the prelude edge and ungated
-    //      (#1362). Replaced by the D fallback tier when #751 lands.
+    //   2. engine corpora are never ambient (§18.2: "Engine packages are
+    //      ordinary explicit dependencies and are never ambient") — a
+    //      migrated corpus a .wo bundle provides (std.re, std.zl,
+    //      std.tommyds, std.c_algorithms: engine_corpus_id) resolves from
+    //      user code only through the user's own `use` of one of its
+    //      modules. The prelude's std.regex importing std.re.* made
+    //      u128_mul_would_overflow and c_int callable with no import, and a
+    //      facade the user imports (std.zlib) re-exports nothing (#1362).
+    //   3. prelude gate — a prelude-closure declaration is ambient only for
+    //      the §18.2 enumerated names; any other resolves from user code
+    //      only through an explicit import path (never the synthetic prelude
+    //      edge), or through the fallback bridge (std_fallback_bridge_path).
+    //      Replaced by the §18.2 fallback tier (#752, after #751).
     fn decl_visible_from_current_gated(target_path: &str, is_pub: i32, sym: i32) -> i32:
         if target_path.len() == 0:
             return 1
@@ -2885,8 +2904,8 @@ impl Sema:
         let target_is_std = sema_tier_path_is_std_implementation(target_path)
         if current_is_std != 0 and target_is_std == 0:
             return 0
-        if current_is_std == 0 and target_is_std != 0:
-            if sema_prelude_gate_allows_name(self.pool_resolve(sym)) == 0:
+        if current_is_std == 0 and target_is_std != 0 and sema_prelude_gate_allows_name(self.pool_resolve(sym)) == 0:
+            if self.engine_corpus_id(target_path) != 0 or self.module_in_prelude_closure(target_path) != 0:
                 if self.module_visible_no_prelude(target_path) == 0:
                     return 0
         self.decl_visible_from_current(target_path, is_pub)
@@ -2894,9 +2913,39 @@ impl Sema:
     fn module_in_prelude_closure(path: &str) -> i32:
         if self.global_visible_module_paths.contains(path): 1 else: 0
 
+    // #1362: the engine corpus a module belongs to, 0 for any other module.
+    fn engine_corpus_id(path: &str) -> i32:
+        let found = self.engine_module_corpus.get(path)
+        if found.is_some(): found.unwrap() else: 0
+
+    // A std module whose directory holds a bundle root (`bundle.w`, written
+    // by build/corpora.w) belongs to a migrated corpus: registered as an
+    // interface section where a .wo bundle provides it, a source file where
+    // the corpus compiles from the tree (stage1, a bundle build).
+    mut fn record_engine_corpora():
+        self.engine_module_corpus = sema_new_map_str_i32()
+        let corpus_ids = sema_new_map_str_i32()
+        for mi in 0..self.module_paths.len() as i32:
+            let path = sema_owned_text(self.module_paths[mi])
+            let canonical = codegen_canonical_module_path(path)
+            if not canonical.starts_with("<embedded-std>/std/"):
+                continue
+            let dir = sema_dirname(canonical)
+            if dir == "<embedded-std>/std":
+                continue
+            if not corpus_ids.contains(dir):
+                let is_engine = bundle_interface_registered(dir ++ "/bundle.w") or module_source_read(sema_dirname(path) ++ "/bundle.w").text.len() > 0
+                corpus_ids.insert(sema_owned_text(dir), if is_engine: corpus_ids.len() as i32 + 1 else: 0)
+            let id: i32 = corpus_ids.get(dir).unwrap()
+            if id != 0:
+                self.engine_module_corpus.insert(sema_owned_text(path), id)
+
     // Reachability over explicit import edges only: the synthetic prelude
     // edge and the global prelude-closure shortcut are excluded, so this
-    // answers "did the user actually import a path to this module?".
+    // answers "did the user actually import a path to this module?". An
+    // engine corpus module is entered only from the start module itself or
+    // from its own corpus (#1362): importing a facade over it (std.zlib)
+    // does not import it.
     fn module_visible_no_prelude(target_path: &str) -> i32:
         if self.current_module_path.len() == 0:
             return 1
@@ -2928,6 +2977,7 @@ impl Sema:
             // #955) presents the surface its .wi would — its corpus siblings
             // reach the importer, its body-only imports (std.libc) do not.
             let corpus_boundary = current != start_idx and self.module_in_bundle_corpus(current)
+            let current_engine = if current == start_idx: -1 else: self.engine_corpus_id(self.module_paths[current])
             if current >= 0 and current < self.module_import_starts.len() as i32:
                 let edge_start = self.module_import_starts[current]
                 let edge_count = self.module_import_counts[current]
@@ -2940,6 +2990,10 @@ impl Sema:
                         let target = self.module_import_targets[idx]
                         if corpus_boundary and not self.module_in_bundle_corpus(target):
                             continue
+                        if current_engine >= 0 and target >= 0 and target < self.module_paths.len() as i32:
+                            let target_engine = self.engine_corpus_id(self.module_paths[target])
+                            if target_engine != 0 and target_engine != current_engine:
+                                continue
                         stack.push(target)
         self.module_visibility_cache.insert(sema_owned_text(cache_key), 0)
         0
@@ -2969,7 +3023,48 @@ impl Sema:
             i = self.decl_visibility_prev[i]
         if saw_candidate == 0:
             return 1
-        0
+        if self.std_fallback_bridge_path(sym).len() > 0: 1 else: 0
+
+    // #1362 bridge, until the §18.2 fallback tier lands (#752): a name that
+    // resolved from user code only because an engine corpus declared it too
+    // (std.string's is_alnum beside std.re.defs', reached over the prelude
+    // edge) keeps resolving — to the unique public declaration of a
+    // non-engine std module, the declaration §18.2's tier 5 names. Closing
+    // the engine leak never turns such a program into an error; a name
+    // with no engine twin keeps the prelude gate (#750). Returns that
+    // declaration's module path, "" when the bridge does not apply.
+    fn std_fallback_bridge_path(sym: i32) -> str:
+        if sym == 0 or self.current_module_path.len() == 0 or sema_tier_path_is_std_implementation(self.current_module_path) != 0:
+            return ""
+        let paths = sema_new_vec_str()
+        let pubs: Vec[i32] = Vec.new()
+        var i = if self.decl_visibility_index.contains(sym): self.decl_visibility_index.get(sym).unwrap() else: -1
+        while i >= 0:
+            paths.push(sema_owned_text(self.decl_visibility_paths[i]))
+            pubs.push(self.decl_visibility_pub[i])
+            i = self.decl_visibility_prev[i]
+        i = self.named_type_candidate_head(sym)
+        while i >= 0:
+            paths.push(sema_owned_text(self.named_type_candidate_paths[i]))
+            pubs.push(self.named_type_candidate_pub[i])
+            i = self.named_type_candidate_next[i]
+        i = if self.displaced_fn_index.contains(sym): self.displaced_fn_index.get(sym).unwrap() else: -1
+        while i >= 0:
+            paths.push(sema_owned_text(self.displaced_fn_paths[i]))
+            pubs.push(self.displaced_fn_pub[i])
+            i = self.displaced_fn_prev[i]
+        var engine_twin_was_ambient = false
+        let modules = sema_new_vec_str()
+        for pi in 0..paths.len() as i32:
+            let path = paths[pi]
+            if pubs[pi] == 0 or sema_tier_path_is_std_implementation(path) == 0:
+                continue
+            if self.engine_corpus_id(path) != 0:
+                if self.module_is_visible_from_current(path) != 0:
+                    engine_twin_was_ambient = true
+            else if sema_vec_str_contains(&modules, path) == 0:
+                modules.push(sema_owned_text(path))
+        if engine_twin_was_ambient and modules.len() as i32 == 1: sema_owned_text(modules[0]) else: ""
 
     fn decl_node_visible_from_current(node: i32) -> i32:
         if node == 0:
@@ -3141,6 +3236,14 @@ impl Sema:
             else if candidate_visible != 0:
                 return candidate_tid
             i = self.named_type_candidate_next[i]
+        if gated != 0 and saw_recorded != 0:
+            let bridged = self.std_fallback_bridge_path(sym)
+            if bridged.len() > 0:
+                i = self.named_type_candidate_head(sym)
+                while i >= 0:
+                    if self.named_type_candidate_paths[i] == bridged:
+                        return self.named_type_candidate_tids[i]
+                    i = self.named_type_candidate_next[i]
         if named_tid != 0 and (saw_recorded == 0 or saw_named_tid == 0):
             return named_tid
         if global_tid != 0:

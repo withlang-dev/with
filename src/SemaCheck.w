@@ -18266,6 +18266,44 @@ impl Sema:
                     self.emit_error("type '" ++ type_str ++ "' does not implement trait '" ++ trait_name ++ "' required by bound '" ++ tp_str ++ ": " ++ trait_name ++ "'", call_node)
             pos = pos + 2 + bound_count
 
+    // A generic declaration's type node names what its own module sees, as
+    // a generic fn body does (check_generic_body switches the same way): the
+    // layout, field, variant or return type of `SortedVec[T] { array: *mut
+    // _SortedArray }` asked for from a user module resolves `_SortedArray`
+    // in std.collections.sorted_vec, never against the user's imports
+    // (#1362: an engine corpus type is never the user's).
+    mut fn resolve_type_expr_in_owner_module(node: i32) -> i32:
+        let owner = self.node_module_path(node)
+        if owner.len() == 0 or owner == self.current_module_path:
+            return self.resolve_type_expr(node) as i32
+        let saved_file_id = self.local_file_id
+        let saved_module_path = with_str_clone_ref(self.current_module_path)
+        let saved_module_has_ci = self.current_module_has_ci
+        self.local_file_id = self.ast.file(node as NodeId) as i32
+        self.current_module_path = with_str_clone_ref(owner)
+        if self.scoping_active != 0:
+            let path_sym = self.pool_lookup_symbol(owner)
+            self.current_module_has_ci = if path_sym != 0 and self.ci_modules.contains(path_sym): 1 else: 0
+        else:
+            self.current_module_has_ci = 0
+        let tid = self.resolve_type_expr(node) as i32
+        self.local_file_id = saved_file_id
+        self.current_module_path = saved_module_path
+        self.current_module_has_ci = saved_module_has_ci
+        tid
+
+    // The module whose declarations came from `node`'s file; "" for a node
+    // no declaration's file holds (synthesized).
+    mut fn node_module_path(node: i32) -> str:
+        let file = self.ast.file(node as NodeId) as i32
+        if self.module_path_by_file.len() == 0:
+            for di in 0..self.decl_source_file_ids.len() as i32:
+                let fid: i32 = self.decl_source_file_ids[di]
+                if di < self.decl_source_paths.len() as i32 and not self.module_path_by_file.contains(fid):
+                    self.module_path_by_file.insert(fid, sema_owned_text(self.decl_source_paths[di]))
+        let found = self.module_path_by_file.get(file)
+        if found.is_some(): with_str_clone_ref(found.unwrap()) else: ""
+
     mut fn resolve_generic_return_type_node(ret_node: i32, tp_start: i32, tp_count: i32) -> i32:
         if ret_node == 0:
             return self.ty_void as i32
@@ -18276,7 +18314,7 @@ impl Sema:
             let sym = self.ast.get_data0(ret_node)
             if self.type_param_exists(tp_start, tp_count, sym) != 0:
                 return self.lookup_generic_subst(sym)
-            return self.resolve_type_expr(ret_node) as i32
+            return self.resolve_type_expr_in_owner_module(ret_node)
 
         if kind == NodeKind.NK_TYPE_REF:
             let pointee = self.resolve_generic_return_type_node(self.ast.get_data0(ret_node), tp_start, tp_count)
