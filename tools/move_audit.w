@@ -260,6 +260,14 @@ fn field_form(form: &str, b: &str) -> str:
     if form == "arg": return "consume(if c > 0: " ++ b ++ ".p else: mk())\n"
     if form == "clone": return "let _x = if c > 0: " ++ b ++ ".p.clone() else: mk()\n"
     if form == "move": return "let _x = if c > 0: move " ++ b ++ ".p else: mk()\n"
+    // #1408 (§3.8 join rule 3): every arm a field place, nothing owned —
+    // the join is a view of the places, no field moves.
+    if form == "ifview": return "let _x = if c > 0: " ++ b ++ ".p else: " ++ b ++ ".p\n"
+    if form == "matchview": return "let _x = match c:\n            0 => " ++ b ++ ".p\n            _ => " ++ b ++ ".p\n"
+    if form == "blockview": return "let _x = if c > 0: { let _n = c\n            " ++ b ++ ".p } else: " ++ b ++ ".p\n"
+    // ...but an owned demand on that join (a consuming argument) still moves
+    // the fields: rule 5, D32.
+    if form == "viewarg": return "consume(if c > 0: " ++ b ++ ".p else: " ++ b ++ ".p)\n"
     ""
 
 // base ∈ { mutrecv, readrecv, local }; form "retinfer" is an unannotated
@@ -317,10 +325,10 @@ fn build_cells() -> Vec[Cell]:
     // #1395: a field value reaching an owned result, on every base.
     for shape in ["str", "vec"]:
         for base in ["mutrecv", "readrecv", "local"]:
-            for form in ["plain", "if", "match", "coalesce", "block", "break", "arg", "retinfer", "clone", "move"]:
+            for form in ["plain", "if", "match", "coalesce", "block", "break", "arg", "retinfer", "clone", "move", "ifview", "matchview", "blockview", "viewarg"]:
                 if form == "move" and base == "readrecv":
                     continue
-                let expect = if form == "plain" or form == "clone" or form == "move": "OK" else: "FIELD-ERR"
+                let expect = if form == "plain" or form == "clone" or form == "move" or form == "ifview" or form == "matchview" or form == "blockview": "OK" else: "FIELD-ERR"
                 cells.push(Cell { name: f"field_{form}/{base}/{shape}", source: sc_field(shape, base, form), expect })
     cells
 

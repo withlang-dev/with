@@ -368,6 +368,25 @@ fn sc_comprehension_skip(form: &str) -> str:
     "    let kept = " ++ comp ++ "\n" ++
     "    let _n = kept.len()\n"
 
+// #1408/#1409 (§3.8 join rule 3): a join of field places is a view — no arm
+// moves its field, and the owner drops the R once at its own scope exit.
+// `form`: an if, a match, a block-tail arm, through a read `fn` receiver.
+fn sc_field_join_view(form: &str) -> str:
+    let join = if form == "match": "match c:\n        true => h.r\n        false => h.r" else if form == "block": "if c: { let _n = 0\n        h.r } else: h.r" else: "if c: h.r else: h.r"
+    if form == "recv":
+        return "type HR { r: R }\n" ++
+            "extend HR:\n    fn look(c: bool) -> i32:\n        let x = if c: self.r else: self.r\n        x.id\n" ++
+            "fn go(slot: *mut i32):\n" ++
+            "    let h = HR { r: mk(1, slot) }\n" ++
+            "    let _k = h.look(true) + h.look(false)\n"
+    "type HR { r: R }\n" ++
+    "fn go(slot: *mut i32):\n" ++
+    "    let h = HR { r: mk(1, slot) }\n" ++
+    "    for i in 0..2:\n" ++
+    "        let c = i == 0\n" ++
+    "        let x = " ++ join ++ "\n" ++
+    "        let _k = x.id + h.r.id\n"
+
 // #1365 (§9.7, §2.4): `let PAT = subject else: <diverge>` consumes its
 // subject on both paths. The failing path drops the whole subject — whichever
 // variant it holds — exactly once before it diverges; the matching path moves
@@ -585,6 +604,8 @@ fn build_cells():
                 cells.push(cell("let_else_miss_" ++ exit ++ "_" ++ subj ++ "/" ++ sh, sc_let_else(sh, false, exit, local), le_sum(sh, false)))
     for form in ["tuple", "option", "view"]:
         cells.push(cell("comprehension_skip_" ++ form ++ "/bare", sc_comprehension_skip(form), 7))
+    for form in ["if", "match", "block", "recv"]:
+        cells.push(cell("field_join_view_" ++ form ++ "/field", sc_field_join_view(form), 1))
     for form in ["inline", "block", "field"]:
         cells.push(cell("let_else_consume_hit_" ++ form ++ "/bare", sc_let_else_consume(form, true), 9))
         cells.push(cell("let_else_consume_miss_" ++ form ++ "/bare", sc_let_else_consume(form, false), 10))

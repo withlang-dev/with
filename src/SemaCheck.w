@@ -10273,9 +10273,10 @@ impl Sema:
                 let join_roles: Vec[i32] = Vec.new()
                 join_roles.push(D22_JOIN_ROLE_EXPR)
                 join_roles.push(D22_JOIN_ROLE_EXPR)
+                let arm_types = self.join_field_arms_as_views(outer_expected as i32, &join_nodes, move join_types)
                 let saved_infer_join = self.infer_tail_join
                 self.infer_tail_join = if is_infer_tail: 1 else: 0
-                result_type = self.resolve_contextual_join(outer_expected as i32, &join_nodes, &origin_nodes, &join_types, &join_roles, node, "if") as TypeId
+                result_type = self.resolve_contextual_join(outer_expected as i32, &join_nodes, &origin_nodes, &arm_types, &join_roles, node, "if") as TypeId
                 self.infer_tail_join = saved_infer_join
                 self.d32_check_owned_join_arms(result_type as i32, &join_nodes, "if arm")
         else:
@@ -10485,6 +10486,13 @@ impl Sema:
             out = self.collect_expr_view_deps(self.ast.get_data0(node), move out)
             return out
         if kind == NodeKind.NK_FIELD_ACCESS or kind == NodeKind.NK_COMPUTED_FIELD_ACCESS:
+            // A field arm a join reads as a view (join_field_arms_as_views)
+            // borrows its place, exactly as `&place.f` does below: the
+            // place's storage root is an origin (#1408).
+            if self.join_field_view_arms.contains(node):
+                let storage_root = self.ref_storage_root_sym(node)
+                if storage_root != 0:
+                    out = self.push_unique_i32(move out, storage_root)
             out = self.collect_expr_view_deps(self.ast.get_data0(node), move out)
             return out
         if kind == NodeKind.NK_UNARY:
@@ -13548,9 +13556,10 @@ impl Sema:
         self.current_for_comprehension_carrier = saved_for_comprehension_carrier
 
         if match_is_value:
+            let arm_types = self.join_field_arms_as_views(match_expected as i32, &join_expr_nodes, move join_expr_types)
             let saved_infer_join = self.infer_tail_join
             self.infer_tail_join = if is_infer_tail: 1 else: 0
-            result_type = self.resolve_contextual_join(match_expected as i32, &join_expr_nodes, &join_origin_nodes, &join_expr_types, &join_roles, node, "match") as TypeId
+            result_type = self.resolve_contextual_join(match_expected as i32, &join_expr_nodes, &join_origin_nodes, &arm_types, &join_roles, node, "match") as TypeId
             self.infer_tail_join = saved_infer_join
             self.d32_check_owned_join_arms(result_type as i32, &join_expr_nodes, "match arm")
         else if stmt_arms_mixed:
@@ -25592,6 +25601,76 @@ impl Sema:
         self.mark_moved_if_consumed(leaf)
         self.drop_control_flow_depth = self.drop_control_flow_depth - conditional
         self.in_unsafe = saved_unsafe
+
+    // §3.8 (#1408, #1409): "A binding names what's there … This is uniform
+    // across field projections and collection element access", and join
+    // rule 3: "If all reaching expressions are compatible shared references,
+    // the result remains a shared reference and carries the union of their
+    // possible origins." An element arm is a view already (check_index types
+    // `v[i]` as `&T`); a field arm is typed by its declared, owned type, so a
+    // join of `self.p` and `self.q` saw two owned arms and the D32 funnel
+    // rejected both as implicit field moves. When every reaching arm is a view
+    // or a place projection of a non-Copy, drop-bearing field whose root
+    // outlives the join, and neither an arm nor the expected type establishes
+    // an owned result (rule 2), the field arms join as views of their places:
+    // each is typed `&F` and recorded in join_field_view_arms, which MirLower
+    // lowers as `ref(shared, place)`. A field of a temporary is no place —
+    // rule 4: "An owned temporary is never implicitly borrowed merely to
+    // force a reference result." Copy fields keep their value join.
+    mut fn join_field_arms_as_views(expected: i32, arm_nodes: &Vec[i32], arm_types: Vec[i32]) -> Vec[i32]:
+        var types = arm_types
+        if expected != 0 and self.get_type_kind(self.resolve_alias(expected as TypeId)) != TypeKind.TY_REF:
+            return types
+        var field_arms = 0
+        for ai in 0..arm_nodes.len() as i32:
+            let ty = types[ai]
+            if ty == 0:
+                return types
+            let kind = self.get_type_kind(self.resolve_alias(ty as TypeId))
+            if kind == TypeKind.TY_NEVER or kind == TypeKind.TY_REF or (arm_nodes[ai] > 0 and self.body_can_fall_through(arm_nodes[ai]) == 0):
+                continue
+            if self.join_field_view_candidate(arm_nodes[ai]) == 0:
+                return types
+            field_arms += 1
+        if field_arms == 0:
+            return types
+        for ai in 0..arm_nodes.len() as i32:
+            let kind = self.get_type_kind(self.resolve_alias(types[ai] as TypeId))
+            if kind == TypeKind.TY_NEVER or kind == TypeKind.TY_REF or (arm_nodes[ai] > 0 and self.body_can_fall_through(arm_nodes[ai]) == 0):
+                continue
+            let leaf = self.join_field_view_candidate(arm_nodes[ai])
+            let view = self.ensure_exact_type(TypeKind.TY_REF, types[ai], 0, 0) as i32
+            self.join_field_view_arms.insert(leaf, view)
+            // A grouping or a block whose tail is the field yields the view.
+            var n: i32 = arm_nodes[ai]
+            while n != leaf:
+                self.typed_expr_types.insert(n, view)
+                n = if self.ast.kind(n) == NodeKind.NK_BLOCK: self.ast.get_data2(n) else: self.ast.get_data0(n)
+            types[ai] = view
+        types
+
+    // The field projection an arm yields (through groupings and block tails)
+    // when it can join as a view of its place, else 0.
+    mut fn join_field_view_candidate(arm: i32) -> i32:
+        let leaf = self.join_arm_leaf(arm)
+        if leaf == 0 or self.ast.kind(leaf) != NodeKind.NK_FIELD_ACCESS or self.d32_base_is_type_name(leaf) != 0:
+            return 0
+        let fty_opt = self.typed_expr_types.get(leaf)
+        let fty = if fty_opt.is_some(): fty_opt.unwrap() else: 0
+        if fty == 0 or self.is_copy(fty as TypeId) != 0 or self.type_needs_drop(fty) == 0:
+            return 0
+        if unpack_place_kind(self.classify_place(leaf)) == PlaceKind.PK_NotPlace:
+            return 0
+        let root = self.place_root_sym(leaf)
+        if root == 0 or self.scope_has(root) == 0:
+            return 0
+        leaf
+
+    fn join_arm_leaf(arm: i32) -> i32:
+        var n = arm
+        while n != 0 and (self.ast.kind(n) == NodeKind.NK_GROUPED or self.ast.kind(n) == NodeKind.NK_BLOCK):
+            n = if self.ast.kind(n) == NodeKind.NK_BLOCK: self.ast.get_data2(n) else: self.ast.get_data0(n)
+        n
 
     // The arms of a resolved join: an owned result consumes every arm (§3.8
     // join rules 2 and 5); a reference result observes them.

@@ -10494,6 +10494,24 @@ impl MirBuilder:
         self.body.push_stmt(self.cur_bb, StmtKind.Assign, temp_place, rv, span)
         self.body.new_operand(OperandKind.OK_COPY, temp_place)
 
+    // §3.8 join rule 3 (#1408, #1409): Sema typed this field arm of a join as
+    // a view (`&F`, join_field_view_arms), so it borrows its place — the
+    // element arm's `ref(shared, v[i])`. Lowered as a value read, the arm
+    // moved the field into the join temp and queued a reset that blanked the
+    // owner's field inside the branch (#1409: later reads saw "").
+    mut fn lower_join_field_view(node: i32) -> i32:
+        let view_ty: i32 = self.sema.join_field_view_arms.get(node).unwrap()
+        let place = self.lower_expr_place(node)
+        if self.place_type_is_str(place) != 0:
+            self.mark_string_place_copied(place)
+        else:
+            self.mark_string_base_fields_may_alias(self.place_base_local(place))
+        let rv = self.body.new_rvalue(RvalueKind.RK_REF, BorrowKind.SHARED, place, 0)
+        let temp = self.new_temp(view_ty)
+        let temp_place = self.place_for_local(temp)
+        self.body.push_stmt(self.cur_bb, StmtKind.Assign, temp_place, rv, self.ast.get_start(node))
+        self.body.new_operand(OperandKind.OK_COPY, temp_place)
+
     mut fn lower_auto_ref_call_arg(arg_node: i32, expected_ty: i32) -> i32:
         if arg_node == 0 or expected_ty == 0:
             return -1
@@ -11722,6 +11740,10 @@ impl MirBuilder:
         if kind == NodeKind.NK_CALL:
             return
         if kind == NodeKind.NK_FIELD_ACCESS:
+            // A field arm of a view join borrows its place (#1408): nothing
+            // moves out, so nothing is blanked (a block-tail arm was, #1409).
+            if self.sema.join_field_view_arms.contains(expr):
+                return
             let root_sym = self.place_expr_root_symbol(expr)
             if root_sym == 0 or self.lookup_local(root_sym) < 0:
                 return
@@ -14046,6 +14068,9 @@ impl MirBuilder:
 
         if node != self.contextual_copy_raw_node and self.has_contextual_copy_adjustment(node) != 0:
             return self.lower_contextual_copy_adjustment(node)
+
+        if self.sema.join_field_view_arms.contains(node):
+            return self.lower_join_field_view(node)
 
         if node == self.pipeline_receiver_override_node and self.pipeline_receiver_override_place >= 0:
             return self.body.new_operand(OperandKind.OK_COPY, self.pipeline_receiver_override_place)
