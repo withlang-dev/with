@@ -1114,6 +1114,7 @@ impl Sema:
                     self.emit_error(f"fn '{fname}': 'nullable param {pi}' is stated twice (§16.2b.8)", clause)
                     return c
             c.nullable_params.push(pi)
+            return c
         if kind == FACADE_CLAUSE_BUFFER:
             // `buffer param P len param L` / `buffer param P capacity param L
             // inout` (D64, §16.2b.8): P and L are one `[]u8` (`[]mut u8`)
@@ -1943,6 +1944,14 @@ impl Sema:
             // cannot present is verify_facade_dependency_shape's error).
             if self.facade_param_receives(fn_sym, pi).len() > 0:
                 continue
+            // A pointer to bytes, scalars, `void` or pointers is
+            // verify_facade_buffer_params's (12b): it names the buffer. A
+            // handle no resource wraps is refused here.
+            let pty_r = self.resolve_alias(pty as TypeId)
+            if self.get_type_kind(pty_r) == TypeKind.TY_PTR:
+                let pk = self.get_type_kind(self.resolve_alias(self.get_type_d0(pty_r) as TypeId))
+                if pk != TypeKind.TY_STRUCT and pk != TypeKind.TY_ENUM and pk != TypeKind.TY_GENERIC_INST:
+                    continue
             let shown = self.facade_param_display(fn_sym, sig, pi)
             let pname = self.facade_param_c_name(fn_sym, pi)
             self.emit_error_with_help(f"fn '{fname}': {shown} is a raw pointer that no clause pairs, so it is not a buffer; a presented operation renders no call without a bounds contract (§16.2b.8)", node, f"pair it with 'buffer param {pname} len param <L>' or 'buffer param {pname} capacity param <L> inout', bind it with 'param {pname} fixed <literal>', or leave the operation raw")
