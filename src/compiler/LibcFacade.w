@@ -30,11 +30,18 @@
 // borrows from the process environment — the domain `environ` — and
 // `strerror` from its own buffer; `strchr`, `strrchr`, `strpbrk` and
 // `strstr` return text borrowed from the string they are lent. Each is
-// presented under its C name as `Option[CStr]`. The string functions and
-// `getenv` state `preserves` on both domains: they read their arguments and
-// nothing else, so a view from `getenv` survives a `strchr` over it —
-// precision the facade grants (§35); every other libc operation keeps the
-// conservative default and invalidates (§38).
+// presented under its C name as `Option[CStr]`. The string functions
+// state `preserves` on both domains: they read their arguments and nothing
+// else, so a view from `getenv` survives a `strchr` over it — precision the
+// facade grants (§35); every other libc operation keeps the conservative
+// default and invalidates (§38). `getenv` does not preserve `environ`: C11
+// 7.22.4.6p4 — the string it points to "may be overwritten by a subsequent
+// call to the getenv function" — so a second getenv invalidates the view
+// an earlier one returned, and a program that needs both copies the first
+// out (`to_owned()`) before the second call. A `preserves` here would grant
+// a capability the standard does not back (ruling: never state what can
+// create unsafety); the runtime's own getenv row (rt/*.w, ruling §52)
+// says the same.
 
 use Ast
 use InternPool
@@ -64,7 +71,6 @@ fn libc_facade_source() -> str:
     domain strerror_text process
     fn getenv
         returns borrow CStr from domain environ
-        preserves domain environ
         preserves domain strerror_text
     fn strerror
         returns borrow CStr from domain strerror_text
