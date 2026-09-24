@@ -4847,6 +4847,11 @@ impl Codegen:
         if tk == TypeKind.TY_STR:
             self.mir_emit_str_free_ptr(ptr)
             return
+        // D63: a callable value owns its environment when its context word
+        // is tagged as a heap cell; the cell's own drop fn frees it.
+        if tk == TypeKind.TY_FN:
+            self.mir_emit_closure_drop_ptr(ptr)
+            return
         // #606 (A5 narrow): a std Vec[T] with a Drop element drops each element then
         // frees the buffer. POD-element Vecs return false here and fall through.
         if tk == TypeKind.TY_GENERIC_INST and self.mir_emit_drop_vec_ptr(ptr, drop_sema_ty):
@@ -11769,7 +11774,110 @@ impl Codegen:
             return true
         if self.mir_emit_ext_channel_scope_intrinsic_call(body, intrinsic, args_id, dest_place, next_bb):
             return true
+        if intrinsic == MirIntrinsic.CLOSURE_CLONE:
+            let cloned_pair = self.mir_emit_closure_clone(body, args_id)
+            self.mir_finish_intrinsic_call(body, dest_place, next_bb, cloned_pair)
+            return true
         false
+
+    // D63: `f.clone()`. A bare function or a view closure copies its pair;
+    // an owned environment is cloned by the cell's clone fn into a new cell
+    // the result owns. A cell without a clone fn (a capture that is neither
+    // Copy nor str) panics — Sema rejects that ahead of time when it can
+    // see the closure.
+    mut fn mir_emit_closure_clone(body: &MirBody, args_id: i32) -> i64:
+        let ptr_ty = wl_ptr_type(self.context)
+        let i64_ty = wl_i64_type(self.context)
+        let pair_ty = self.closure_pair_llvm_type()
+        let recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
+        let result_slot = self.create_entry_alloca(pair_ty)
+        wl_build_store(self.builder, wl_build_load(self.builder, pair_ty, recv_ptr), result_slot)
+        let ctx_slot = wl_build_struct_gep(self.builder, pair_ty, result_slot, 1)
+        let ctx = wl_build_load(self.builder, ptr_ty, ctx_slot)
+        let bits = wl_build_ptr_to_int(self.builder, ctx, i64_ty)
+        let tag = wl_build_and(self.builder, bits, wl_const_int(i64_ty, self.closure_ctx_tag_mask(), 0))
+        let owned = wl_build_icmp(self.builder, wl_int_eq(), tag, wl_const_int(i64_ty, self.closure_ctx_tag_owned(), 0))
+        let owned_bb = wl_append_bb(self.context, self.current_function, "closure.clone.owned")
+        let can_bb = wl_append_bb(self.context, self.current_function, "closure.clone.cell")
+        let cannot_bb = wl_append_bb(self.context, self.current_function, "closure.clone.unclonable")
+        let done_bb = wl_append_bb(self.context, self.current_function, "closure.clone.done")
+        wl_build_cond_br(self.builder, owned, owned_bb, done_bb)
+        wl_position_at_end(self.builder, owned_bb)
+        let cell = wl_build_int_to_ptr(self.builder, wl_build_sub(self.builder, bits, wl_const_int(i64_ty, self.closure_ctx_tag_owned(), 0)), ptr_ty)
+        // The cell starts with the two header pointers; the pair type geps them.
+        let clone_fn = wl_build_load(self.builder, ptr_ty, wl_build_struct_gep(self.builder, pair_ty, cell, 1))
+        let has_clone = wl_build_icmp(self.builder, wl_int_ne(), clone_fn, wl_const_null(ptr_ty))
+        wl_build_cond_br(self.builder, has_clone, can_bb, cannot_bb)
+        wl_position_at_end(self.builder, cannot_bb)
+        self.emit_runtime_panic("cannot clone this `move` closure: a capture is not Clone")
+        wl_position_at_end(self.builder, can_bb)
+        let params: Vec[i64] = Vec.new()
+        params.push(ptr_ty)
+        let clone_ft = wl_function_type(ptr_ty, vec_data_i64(&params), 1, 0)
+        let args: Vec[i64] = Vec.new()
+        args.push(cell)
+        let new_cell = wl_build_call(self.builder, clone_ft, clone_fn, vec_data_i64(&args), 1)
+        let tagged = wl_build_or(self.builder, wl_build_ptr_to_int(self.builder, new_cell, i64_ty), wl_const_int(i64_ty, self.closure_ctx_tag_owned(), 0))
+        wl_build_store(self.builder, wl_build_int_to_ptr(self.builder, tagged, ptr_ty), ctx_slot)
+        wl_build_br(self.builder, done_bb)
+        wl_position_at_end(self.builder, done_bb)
+        wl_build_load(self.builder, pair_ty, result_slot)
+
+    // The per-closure clone fn of an owned cell: a new cell with the same
+    // header, every Copy capture copied and every str capture cloned. Null
+    // (no clone fn) when a capture is any other type.
+    mut fn gen_closure_env_clone_fn(cell_ty: i64, cap_struct_type: i64, cap_sema_types: &Vec[i32], cap_llvm_types: &Vec[i64]) -> i64:
+        let ptr_ty = wl_ptr_type(self.context)
+        let i32_ty = wl_i32_type(self.context)
+        let i64_ty = wl_i64_type(self.context)
+        for ci in 0..cap_sema_types.len():
+            let cap_sema_ty = cap_sema_types[ci]
+            if cap_sema_ty <= 0:
+                return 0
+            if self.sema.is_copy_frozen(cap_sema_ty as TypeId) == 0 and self.sema.get_type_kind(self.sema.resolve_alias(cap_sema_ty as TypeId)) != TypeKind.TY_STR:
+                return 0
+        let fn_name = f"__closure_env_clone_{self.closure_counter}"
+        let params: Vec[i64] = Vec.new()
+        params.push(ptr_ty)
+        let fn_ty = wl_function_type(ptr_ty, vec_data_i64(&params), 1, 0)
+        let clone_fn = wl_add_function(self.llmod, fn_name, fn_ty)
+        wl_set_linkage(clone_fn, wl_internal_linkage())
+        let saved_fn = self.current_function
+        let saved_fn_name_sym = self.current_function_name_sym
+        let saved_fn_node = self.current_function_node
+        let saved_ret_ty = self.current_ret_type
+        let saved_bb = wl_get_insert_block(self.builder)
+        self.current_function = clone_fn
+        self.current_function_name_sym = 0
+        self.current_function_node = 0
+        self.current_ret_type = ptr_ty
+        let entry = wl_append_bb(self.context, clone_fn, "entry")
+        wl_position_at_end(self.builder, entry)
+        let old_cell = wl_get_param(clone_fn, 0)
+        let alloc_fn = self.ensure_box_alloc_fn()
+        let alloc_args: Vec[i64] = Vec.new()
+        let cell_size = self.abi_size_of(cell_ty)
+        alloc_args.push(wl_const_int(i64_ty, cell_size, 0))
+        let new_cell = wl_build_call(self.builder, wl_global_get_value_type(alloc_fn), alloc_fn, vec_data_i64(&alloc_args), 1)
+        self.emit_llvm_memcpy(new_cell, old_cell, cell_size)
+        let old_env = wl_build_struct_gep(self.builder, cell_ty, old_cell, 2)
+        let new_env = wl_build_struct_gep(self.builder, cell_ty, new_cell, 2)
+        for ci in 0..cap_sema_types.len():
+            if self.sema.get_type_kind(self.sema.resolve_alias(cap_sema_types[ci] as TypeId)) == TypeKind.TY_STR:
+                let indices: Vec[i64] = Vec.new()
+                indices.push(wl_const_int(i32_ty, 0, 0))
+                indices.push(wl_const_int(i32_ty, ci as i64, 0))
+                let old_slot = wl_build_gep(self.builder, cap_struct_type, old_env, vec_data_i64(&indices), 2)
+                let new_slot = wl_build_gep(self.builder, cap_struct_type, new_env, vec_data_i64(&indices), 2)
+                wl_build_store(self.builder, self.gen_str_clone_ref(old_slot), new_slot)
+        let _ = wl_build_ret(self.builder, new_cell)
+        self.current_function = saved_fn
+        self.current_function_name_sym = saved_fn_name_sym
+        self.current_function_node = saved_fn_node
+        self.current_ret_type = saved_ret_ty
+        if saved_bb != 0:
+            wl_position_at_end(self.builder, saved_bb)
+        clone_fn
 
     mut fn mir_emit_opt_filter(body: &MirBody, args_id: i32) -> i64:
         let ptr_ty = wl_ptr_type(self.context)
@@ -17307,6 +17415,124 @@ impl Codegen:
                 return self.mir_body_at(body_idx)
         sema_phase_bug(f"BUG: anonymous expression lacks MIR constant: node={node} parent={parent.fn_sym}")
 
+    // D63 (§12.4 "The callable type"): a callable value is the pair
+    // {fn, ctx}. The context word's low two bits say what the value holds:
+    //   00  a view of the creating frame, or no environment at all (a bare
+    //       function's thunk, a non-move closure, an async block);
+    //   01  an inline environment — every capture Copy and the whole
+    //       environment fits the word's upper 62 bits (no allocation);
+    //   10  a heap cell {drop_fn, clone_fn, env} the value OWNS (a move
+    //       closure with a non-Copy or wider environment), freed by drop_fn
+    //       when the value drops, its Drop captures destroyed then.
+    // Only the owned kind has anything to drop; the glue tests the tag.
+    fn closure_ctx_tag_mask() -> i64: 3
+    fn closure_ctx_tag_inline() -> i64: 1
+    fn closure_ctx_tag_owned() -> i64: 2
+    fn closure_inline_env_max_bytes() -> i64: 7
+
+    fn closure_pair_llvm_type() -> i64:
+        let ptr_ty = wl_ptr_type(self.context)
+        let fat_types: Vec[i64] = Vec.new()
+        fat_types.push(ptr_ty)
+        fat_types.push(ptr_ty)
+        wl_struct_type(self.context, vec_data_i64(&fat_types), 2, 0)
+
+    // The owned cell: {drop_fn, clone_fn, env}.
+    fn closure_cell_llvm_type(cap_struct_type: i64) -> i64:
+        let ptr_ty = wl_ptr_type(self.context)
+        let cell_types: Vec[i64] = Vec.new()
+        cell_types.push(ptr_ty)
+        cell_types.push(ptr_ty)
+        cell_types.push(cap_struct_type)
+        wl_struct_type(self.context, vec_data_i64(&cell_types), 3, 0)
+
+    // drop(f) for a callable value at `pair_ptr`: an owned cell is handed to
+    // its drop fn (which drops the captures and frees the cell) and the
+    // context word is cleared so a second drop of the same place is a no-op.
+    mut fn mir_emit_closure_drop_ptr(pair_ptr: i64):
+        let ptr_ty = wl_ptr_type(self.context)
+        let i64_ty = wl_i64_type(self.context)
+        let pair_ty = self.closure_pair_llvm_type()
+        let ctx_slot = wl_build_struct_gep(self.builder, pair_ty, pair_ptr, 1)
+        let ctx = wl_build_load(self.builder, ptr_ty, ctx_slot)
+        let bits = wl_build_ptr_to_int(self.builder, ctx, i64_ty)
+        let tag = wl_build_and(self.builder, bits, wl_const_int(i64_ty, self.closure_ctx_tag_mask(), 0))
+        let owned = wl_build_icmp(self.builder, wl_int_eq(), tag, wl_const_int(i64_ty, self.closure_ctx_tag_owned(), 0))
+        let live_bb = wl_append_bb(self.context, self.current_function, "closure.drop.owned")
+        let done_bb = wl_append_bb(self.context, self.current_function, "closure.drop.done")
+        wl_build_cond_br(self.builder, owned, live_bb, done_bb)
+        wl_position_at_end(self.builder, live_bb)
+        let cell = wl_build_int_to_ptr(self.builder, wl_build_sub(self.builder, bits, wl_const_int(i64_ty, self.closure_ctx_tag_owned(), 0)), ptr_ty)
+        let drop_fn = wl_build_load(self.builder, ptr_ty, cell)
+        let params: Vec[i64] = Vec.new()
+        params.push(ptr_ty)
+        let drop_ft = wl_function_type(wl_void_type(self.context), vec_data_i64(&params), 1, 0)
+        let args: Vec[i64] = Vec.new()
+        args.push(cell)
+        let _ = wl_build_call(self.builder, drop_ft, drop_fn, vec_data_i64(&args), 1)
+        wl_build_store(self.builder, wl_const_null(ptr_ty), ctx_slot)
+        wl_build_br(self.builder, done_bb)
+        wl_position_at_end(self.builder, done_bb)
+
+    // The per-closure drop fn of an owned cell: drops every capture that
+    // needs it (guarded — a consuming body blanks the slot it moved out of),
+    // then frees the cell.
+    mut fn gen_closure_env_drop_fn(cell_ty: i64, cap_struct_type: i64, cap_sema_types: &Vec[i32], cap_llvm_types: &Vec[i64]) -> i64:
+        let ptr_ty = wl_ptr_type(self.context)
+        let i32_ty = wl_i32_type(self.context)
+        let fn_name = f"__closure_env_drop_{self.closure_counter}"
+        let params: Vec[i64] = Vec.new()
+        params.push(ptr_ty)
+        let fn_ty = wl_function_type(wl_void_type(self.context), vec_data_i64(&params), 1, 0)
+        let drop_fn = wl_add_function(self.llmod, fn_name, fn_ty)
+        wl_set_linkage(drop_fn, wl_internal_linkage())
+
+        let saved_fn = self.current_function
+        let saved_fn_name_sym = self.current_function_name_sym
+        let saved_fn_node = self.current_function_node
+        let saved_ret_ty = self.current_ret_type
+        let saved_bb = wl_get_insert_block(self.builder)
+        let saved_needs_guard = self.current_drop_needs_guard
+        let saved_member_depth = self.member_drop_depth
+        let saved_origin_ptr = self.current_drop_origin_ptr
+        let saved_origin_len = self.current_drop_origin_len
+        self.current_function = drop_fn
+        self.current_function_name_sym = 0
+        self.current_function_node = 0
+        self.current_ret_type = wl_void_type(self.context)
+        self.current_drop_needs_guard = true
+        self.member_drop_depth = 0
+        let origin_text = "drop#closure-env " ++ fn_name
+        self.current_drop_origin_ptr = self.const_c_string_pointer(origin_text, ptr_ty)
+        self.current_drop_origin_len = wl_const_int(wl_i64_type(self.context), origin_text.len(), 0)
+
+        let entry = wl_append_bb(self.context, drop_fn, "entry")
+        wl_position_at_end(self.builder, entry)
+        let cell = wl_get_param(drop_fn, 0)
+        let env_ptr = wl_build_struct_gep(self.builder, cell_ty, cell, 2)
+        for ci in 0..cap_sema_types.len():
+            let cap_sema_ty = cap_sema_types[ci]
+            if cap_sema_ty > 0 and self.sema.type_needs_drop_frozen(cap_sema_ty) != 0:
+                let indices: Vec[i64] = Vec.new()
+                indices.push(wl_const_int(i32_ty, 0, 0))
+                indices.push(wl_const_int(i32_ty, ci as i64, 0))
+                let slot = wl_build_gep(self.builder, cap_struct_type, env_ptr, vec_data_i64(&indices), 2)
+                self.mir_emit_drop_ptr_for_sema_type(slot, cap_llvm_types[ci], cap_sema_ty)
+        self.mir_emit_with_free_ptr(cell)
+        let _ = wl_build_ret_void(self.builder)
+
+        self.current_function = saved_fn
+        self.current_function_name_sym = saved_fn_name_sym
+        self.current_function_node = saved_fn_node
+        self.current_ret_type = saved_ret_ty
+        self.current_drop_needs_guard = saved_needs_guard
+        self.member_drop_depth = saved_member_depth
+        self.current_drop_origin_ptr = saved_origin_ptr
+        self.current_drop_origin_len = saved_origin_len
+        if saved_bb != 0:
+            wl_position_at_end(self.builder, saved_bb)
+        drop_fn
+
     // The closure constant's d2: MirLower sets it when the closure expression
     // sits inside a loop of `parent` (#1471).
     fn closure_created_in_loop(parent: &MirBody, node: i32) -> bool:
@@ -17437,9 +17663,39 @@ impl Codegen:
         let entry = wl_append_bb(self.context, closure_fn, "entry")
         wl_position_at_end(self.builder, entry)
 
+        // D63: a `move` closure owns its environment — inline in the context
+        // word when every capture is Copy and it fits, otherwise a heap cell
+        // {drop_fn, clone_fn, env} whose captures the body works on IN PLACE
+        // (a consuming body blanks the slot it moved out of, so the cell's
+        // drop fn never drops it again).
+        let owned_env = not is_extern_closure and capture_count > 0 and self.pool.is_move_closure(node) == 1
+        let cap_sema_types: Vec[i32] = Vec.new()
+        for ci in 0..capture_count:
+            cap_sema_types.push(closure_body.local_type_ids[ci + 1])
+        var env_all_copy = true
+        for ci in 0..capture_count:
+            if self.sema.is_copy_frozen(cap_sema_types[ci] as TypeId) == 0:
+                env_all_copy = false
+        let env_size = if capture_count > 0: self.abi_size_of(cap_struct_type) else: 0
+        let owned_inline = owned_env and env_all_copy and env_size <= self.closure_inline_env_max_bytes()
+        let owned_cell = owned_env and not owned_inline
+        let cell_ty = if owned_cell: self.closure_cell_llvm_type(cap_struct_type) else: 0
+        let i64_ty = wl_i64_type(self.context)
+
         // Load captured values from context pointer (param 0)
         if not is_extern_closure and capture_count > 0:
-            let cap_ptr = wl_get_param(closure_fn, 0)
+            let raw_ctx = wl_get_param(closure_fn, 0)
+            var cap_ptr = raw_ctx
+            if owned_inline:
+                let raw_bits = wl_build_ptr_to_int(self.builder, raw_ctx, i64_ty)
+                let payload = wl_build_lshr(self.builder, raw_bits, wl_const_int(i64_ty, 2, 0))
+                let inline_slot = self.create_entry_alloca(i64_ty)
+                wl_build_store(self.builder, payload, inline_slot)
+                cap_ptr = inline_slot
+            else if owned_cell:
+                let raw_bits = wl_build_ptr_to_int(self.builder, raw_ctx, i64_ty)
+                let cell = wl_build_int_to_ptr(self.builder, wl_build_sub(self.builder, raw_bits, wl_const_int(i64_ty, self.closure_ctx_tag_owned(), 0)), ptr_ty)
+                cap_ptr = wl_build_struct_gep(self.builder, cell_ty, cell, 2)
             for ci in 0..capture_count:
                 let sym = captures[ci]
                 let cap_ty = cap_types[ci]
@@ -17447,7 +17703,11 @@ impl Codegen:
                 indices.push(wl_const_int(i32_ty, 0, 0))
                 indices.push(wl_const_int(i32_ty, ci as i64, 0))
                 let gep = wl_build_gep(self.builder, cap_struct_type, cap_ptr, vec_data_i64(&indices), 2)
-                if capture_ref_modes[ci] != 0:
+                if owned_cell:
+                    // The cell's slot IS the local: reads, writes and the
+                    // reset-on-move of a consuming body all land in the cell.
+                    self.record_local(sym, gep, cap_ty, 1)
+                else if capture_ref_modes[ci] != 0:
                     // Reference capture: keep a local slot that points at the
                     // captured binding's outer storage. MIR indirect-local
                     // metadata below defines the value stored at that outer
@@ -17654,7 +17914,7 @@ impl Codegen:
             // loop the site runs once per frame and keeps its entry slot. The
             // non-escaping mark cannot select this: a direct argument is
             // non-escaping by §12.3 even when the callee stores it (#1566).
-            let cap_alloca = if self.closure_created_in_loop(parent, node):
+            let cap_alloca = if self.closure_created_in_loop(parent, node) and not owned_env:
                 wl_build_alloca(self.builder, cap_struct_type)
             else:
                 self.create_entry_alloca(cap_struct_type)
@@ -17674,7 +17934,35 @@ impl Codegen:
                         // Store the value
                         let val = wl_build_load(self.builder, cap_ty, alloca)
                         wl_build_store(self.builder, val, gep)
+                        // D63 / §2.5: `move ||` transfers ownership — the
+                        // outer binding is reset so its own drop frees
+                        // nothing (its guard stays: MirLower marks it moved).
+                        if owned_env and self.sema.type_needs_drop_frozen(cap_sema_types[ci]) != 0:
+                            self.emit_memset_zero(alloca, self.abi_size_of(cap_ty))
             ctx_ptr = cap_alloca
+            if owned_inline:
+                // The whole environment rides in the context word: bytes in
+                // the upper 62 bits, tag 01 below. No allocation.
+                let word_slot = self.create_entry_alloca(i64_ty)
+                wl_build_store(self.builder, wl_const_int(i64_ty, 0, 0), word_slot)
+                self.emit_llvm_memcpy(word_slot, cap_alloca, env_size)
+                let word = wl_build_load(self.builder, i64_ty, word_slot)
+                let tagged = wl_build_or(self.builder, wl_build_shl(self.builder, word, wl_const_int(i64_ty, 2, 0)), wl_const_int(i64_ty, self.closure_ctx_tag_inline(), 0))
+                ctx_ptr = wl_build_int_to_ptr(self.builder, tagged, ptr_ty)
+            else if owned_cell:
+                // The value owns a heap cell {drop_fn, clone_fn, env}; the
+                // context word carries its address with tag 10.
+                let env_drop_fn = self.gen_closure_env_drop_fn(cell_ty, cap_struct_type, cap_sema_types, cap_orig_types)
+                let env_clone_fn = self.gen_closure_env_clone_fn(cell_ty, cap_struct_type, cap_sema_types, cap_orig_types)
+                let alloc_fn = self.ensure_box_alloc_fn()
+                let alloc_args: Vec[i64] = Vec.new()
+                alloc_args.push(wl_const_int(i64_ty, self.abi_size_of(cell_ty), 0))
+                let cell = wl_build_call(self.builder, wl_global_get_value_type(alloc_fn), alloc_fn, vec_data_i64(&alloc_args), 1)
+                wl_build_store(self.builder, env_drop_fn, wl_build_struct_gep(self.builder, cell_ty, cell, 0))
+                wl_build_store(self.builder, if env_clone_fn != 0: env_clone_fn else: wl_const_null(ptr_ty), wl_build_struct_gep(self.builder, cell_ty, cell, 1))
+                self.emit_llvm_memcpy(wl_build_struct_gep(self.builder, cell_ty, cell, 2), cap_alloca, env_size)
+                let tagged = wl_build_or(self.builder, wl_build_ptr_to_int(self.builder, cell, i64_ty), wl_const_int(i64_ty, self.closure_ctx_tag_owned(), 0))
+                ctx_ptr = wl_build_int_to_ptr(self.builder, tagged, ptr_ty)
 
         if is_extern_closure:
             return closure_fn

@@ -32,7 +32,7 @@ fn main:
     // capture; the global stays the global.
     var n = 100
     let both: fn() -> i32 = () => n + g
-    assert(apply(both) == 103)
+    assert(apply(both.clone()) == 103)   // D63: passing a callable moves it; a view closure clones free
     g = 4
     assert(both() == 104)
 

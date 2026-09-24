@@ -560,6 +560,13 @@ pub type Sema {
     // Parallel to sig_param_effects: bitmask of signature parameter indices that a returned
     // view may originate from when this parameter participates in escape_view.
     sig_param_view_origins: Vec[i32],
+    // D63 call-once: 1 when the body invokes this parameter more than once
+    // (twice, or once inside a loop) — a consuming closure may not be
+    // passed to it.
+    sig_param_invoke_many: Vec[i32],
+    // Per body: how many times each callable binding is invoked (symbol →
+    // count; an invocation inside a loop counts twice).
+    fn_param_invocations: HashMap[i32, i32],
     sig_param_eff_starts: Vec[i32],
     // Parallel signature metadata for value parameters lowered through pointer ABI.
     // This is distinct from semantic reference types: `self: &Self` is already a
@@ -1270,6 +1277,16 @@ pub type Sema {
     closure_capture_summary_data: Vec[i32],
     // Binding -> originating closure node when initialized directly from a closure literal.
     binding_closure_nodes: HashMap[i32, i32],
+    // D63: `f.clone()` call nodes on a callable value (MirLower lowers them
+    // to the CLOSURE_CLONE intrinsic; a bare or view callable copies its
+    // pair, an owned environment is cloned by its cell's clone fn).
+    callable_clone_nodes: HashMap[i32, i32],
+    // D63 call-site checks recorded while bodies are checked and run after
+    // the effect fixpoint, when every callee's escape effects and call-once
+    // flags are complete regardless of declaration order. Six ints per
+    // record: closure node, callee sym, sig, param index, consumes (0/1),
+    // by-place capture sym (0 when none).
+    deferred_closure_arg_checks: Vec[i32],
     binding_view_dep_data: Vec[i32],
     // Expression-level view metadata for call expressions and view-producing nodes.
     expr_view_param_origins: HashMap[i32, i32],
@@ -2201,6 +2218,8 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         sig_param_effects: Vec.new(),
         sig_param_direct_effects: Vec.new(),
         sig_param_view_origins: Vec.new(),
+        sig_param_invoke_many: Vec.new(),
+        fn_param_invocations: sema_new_map_i32_i32(),
         sig_param_eff_starts: Vec.new(),
         sig_value_ref_abi_params: Vec.new(),
         mres_nodes: Vec.new(),
@@ -2608,6 +2627,8 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         closure_capture_summary_counts: sema_new_map_i32_i32(),
         closure_capture_summary_data: Vec.new(),
         binding_closure_nodes: sema_new_map_i32_i32(),
+        callable_clone_nodes: sema_new_map_i32_i32(),
+        deferred_closure_arg_checks: Vec.new(),
         binding_view_dep_data: Vec.new(),
         expr_view_param_origins: sema_new_map_i32_i32(),
         expr_view_into_temporary: sema_new_map_i32_i32(),
@@ -6175,6 +6196,11 @@ impl Sema:
         // #747 / D28 ruling 1: an owned str frees its buffer at scope end.
         if tk == TypeKind.TY_STR:
             return 1
+        // D63: a callable value may own its environment (a `move ||` closure's
+        // heap cell); its drop glue frees it. A bare function or a view
+        // closure carries a tag the glue reads as "nothing to free".
+        if tk == TypeKind.TY_FN:
+            return 1
         if tk == TypeKind.TY_GENERIC_INST:
             let base_sym = self.get_generic_inst_base(resolved as i32)
             // #691/D18 and D22 Stage 6: compiler-modeled collection handles own
@@ -6583,6 +6609,7 @@ impl Sema:
             self.sig_param_effects.push(0)
             self.sig_param_direct_effects.push(0)
             self.sig_param_view_origins.push(0)
+            self.sig_param_invoke_many.push(0)
             self.sig_value_ref_abi_params.push(0)
         self.sig_receiver_modes.push(ReceiverMode.None as i32)
         self.sig_receiver_required_effects.push(0)
@@ -6687,6 +6714,24 @@ impl Sema:
         if pi < 0 or pi >= count:
             return 0
         self.sig_param_view_origins[(start + pi)]
+
+    fn sig_param_invoke_many_at(si: i32, pi: i32) -> i32:
+        if si < 0 or si >= self.sig_param_eff_starts.len() as i32:
+            return 0
+        let start = self.sig_param_eff_starts[si]
+        let count = self.sig_param_counts[si]
+        if pi < 0 or pi >= count or start + pi >= self.sig_param_invoke_many.len() as i32:
+            return 0
+        self.sig_param_invoke_many[(start + pi)]
+
+    mut fn set_sig_param_invoke_many(si: i32, pi: i32, many: i32):
+        if si < 0 or si >= self.sig_param_eff_starts.len() as i32:
+            return
+        let start: i32 = self.sig_param_eff_starts[si]
+        let count = self.sig_param_counts[si]
+        if pi < 0 or pi >= count or start + pi >= self.sig_param_invoke_many.len() as i32:
+            return
+        self.sig_param_invoke_many[(start + pi)] = many
 
     mut fn set_sig_param_view_origin(si: i32, pi: i32, mask: i32):
         if si < 0 or si >= self.sig_param_eff_starts.len() as i32:
@@ -7462,6 +7507,9 @@ impl Sema:
         // write/consume/escape_value effects across the call graph so sig_param_effects is
         // final before any share-place decision (lowering/ABI) reads it.
         self.fixpoint_effect_flow()
+        // D63: closure arguments are judged against their callee's complete
+        // escape effects and call-once flags, whatever the declaration order.
+        self.finalize_closure_arg_checks()
         self.finalize_receiver_requirements()
         self.enforce_receiver_modes()
         // D5 superseded: free-parameter share-place is no longer inferred from
@@ -8129,7 +8177,13 @@ impl Sema:
         // The explicit arm matters: this function's tail DEFAULTS to Copy.
         if tk == TypeKind.TY_STR:
             return 0
-        if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF or tk == TypeKind.TY_FN or tk == TypeKind.TY_EXTERN_FN or tk == TypeKind.TY_GENERIC_FN:
+        // D63 (§12.4 "The callable type"): `fn(A) -> R` is not Copy, bare
+        // functions included — a `move ||` closure owns its environment and
+        // Copy is a property of the type, not of a value's provenance.
+        // `let g = f` moves f; a call through a binding observes it.
+        if tk == TypeKind.TY_FN:
+            return 0
+        if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF or tk == TypeKind.TY_EXTERN_FN or tk == TypeKind.TY_GENERIC_FN:
             return 1
         // c_va_list is C's va_list: opaque bytes a migrated body hands on
         // (gzprintf passes it to gzvprintf, then va_ends it) — Copy, as in C.

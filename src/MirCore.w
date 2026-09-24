@@ -325,6 +325,10 @@ enum MirIntrinsic: i32:
     MAP_SLOT_OCCUPIED
     MAP_KEY_AT
     MAP_VALUE_AT
+    // D63: `f.clone()` on a callable value — copies the pair; an owned
+    // environment (a `move ||` closure's heap cell) is cloned by the cell's
+    // clone fn.
+    CLOSURE_CLONE
 
 // Copy: MirIntrinsic is a lightweight integer tag passed by value, stored in
 // Vec/HashMap, and compared throughout MIR lowering and codegen.

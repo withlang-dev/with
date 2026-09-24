@@ -10684,8 +10684,21 @@ impl MirBuilder:
         self.sema.callable_any_fn_type(expr_tid as TypeId)
 
     mut fn lower_callable_expr(node: i32) -> i32:
-        var operand = self.lower_expr(node)
         var exact_type = self.expr_type(node)
+        // D63 (§12.4): "Calling through a binding or a field observes it and
+        // does not move." A callable is not Copy, so lower_expr would MOVE
+        // the pair out of its place (and leave the place's drop to free the
+        // environment the moved copy also frees — the audit:all violation on
+        // `h.f()`); a place-typed callee is read in place instead.
+        if exact_type != 0 and self.sema.get_type_kind(self.sema.resolve_alias(exact_type as TypeId)) == TypeKind.TY_FN:
+            let callee_kind = self.ast.kind(node)
+            // A bare function NAME is an ident of callable type with no place.
+            let is_local_callable = callee_kind == NodeKind.NK_IDENT and self.lookup_local(self.ast.get_data0(node)) >= 0
+            if is_local_callable or callee_kind == NodeKind.NK_FIELD_ACCESS or callee_kind == NodeKind.NK_INDEX:
+                let callee_place = self.lower_expr_place(node)
+                if callee_place >= 0:
+                    return self.body.new_operand(OperandKind.OK_COPY, callee_place)
+        var operand = self.lower_expr(node)
         if self.sema.callable_any_fn_type(exact_type as TypeId) == 0:
             return operand
         // A callable view (including a collection element) addresses the
@@ -11679,6 +11692,24 @@ impl MirBuilder:
             let resolved_recv = self.sema.resolve_alias(recv_type as TypeId)
             if self.sema.get_type_kind(resolved_recv) == TypeKind.TY_PTR:
                 return self.lower_expr(self_expr)
+        // D63: `f.clone()` on a callable value (Sema recorded the node).
+        if self.sema.callable_clone_nodes.contains(node):
+            let clone_recv_place = self.lower_expr_place(self_expr)
+            if clone_recv_place < 0:
+                sema_phase_bug(f"BUG: callable clone receiver is not a place: node={node}")
+            let clone_fn_op = self.const_operand(ConstKind.CK_FN, method_sym, self.sema.ty_void)
+            let clone_args: Vec[i32] = Vec.new()
+            clone_args.push(self.body.new_operand(OperandKind.OK_COPY, clone_recv_place))
+            let clone_args_id = self.body.new_call_args(clone_args)
+            self.body.set_call_intrinsic(clone_args_id, MirIntrinsic.CLOSURE_CLONE)
+            self.body.set_call_ast_node(clone_args_id, node)
+            let clone_result_local = self.new_temp(recv_type)
+            let clone_result_place = self.place_for_local(clone_result_local)
+            let clone_next_bb = self.new_block()
+            self.terminate(TermKind.TK_CALL, clone_fn_op, clone_args_id, clone_result_place, clone_next_bb)
+            self.switch_to(clone_next_bb)
+            self.register_stmt_temp(clone_result_local, recv_type)
+            return self.body.new_operand(OperandKind.OK_MOVE, clone_result_place)
         if method_name == "join" and self.sema.type_is_scoped_join_handle(recv_type) != 0:
             callee_sym = method_sym
         if self.receiver_is_static_type_expr(self_expr) != 0 and recv_type != 0 and self.sema.enum_has_variant(recv_type, method_sym) != 0:
@@ -14312,10 +14343,15 @@ impl MirBuilder:
         // pointer (reset-on-move inside the body). This frame's scope-exit
         // drop of the local must therefore keep its null guard — Stage 4
         // elides the guard for a local never recorded as moved.
-        if not is_async and self.ast.is_move_closure(node) == 0:
+        if not is_async:
+            let is_move = self.ast.is_move_closure(node) != 0
             for ci in 0..captures.len():
                 let consumed_local = self.lookup_local(captures[ci])
-                if consumed_local >= 0 and self.sema.closure_capture_consumes(node, ci) != 0 and self.sema.type_needs_drop_frozen(self.local_type(consumed_local)) != 0:
+                if consumed_local < 0 or self.sema.type_needs_drop_frozen(self.local_type(consumed_local)) == 0:
+                    continue
+                // D63: `move ||` takes the value at creation — codegen resets
+                // the outer slot — so its drop keeps the guard too.
+                if is_move or self.sema.closure_capture_consumes(node, ci) != 0:
                     self.body.mark_local_ever_moved(consumed_local)
         var child = MirBuilder.init(self.sema, self.ast, self.pool, body_sym)
         child.contextual_fact_sig_idx = if not is_async and captures.len() > 0: 0 else: self.contextual_fact_sig_idx
@@ -14384,7 +14420,13 @@ impl MirBuilder:
         let op = self.body.new_operand(OperandKind.OK_CONSTANT, closure_const)
         let rv = self.body.new_rvalue(RvalueKind.RK_USE, op, 0, 0)
         self.body.push_stmt(self.cur_bb, StmtKind.Assign, place, rv, self.ast.get_start(node))
-        self.body.new_operand(OperandKind.OK_COPY, place)
+        // D63: a callable is not Copy — the closure value is an owned statement
+        // temp (it may own a heap environment), handed on by MOVE so the
+        // receiver owns it and the temp's own drop finds it blank. Passing it
+        // by copy left the temp live: `spawn_os(move () => ..)` freed the
+        // environment the thread freed too (#1605).
+        self.register_stmt_temp(tmp, ty)
+        self.body.new_operand(OperandKind.OK_MOVE, place)
 
     mut fn lower_optional_chain(node: i32) -> i32:
         let base_expr = self.ast.get_data0(node)
@@ -14889,7 +14931,15 @@ impl MirBuilder:
                 let gc_ac = self.ast.get_data2(node)
                 for gc_ai in 0..gc_ac:
                     let gc_arg_node = self.ast.get_extra(gc_as + gc_ai)
-                    gc_args.push(self.lower_expr(gc_arg_node))
+                    let gc_arg_op = self.lower_expr(gc_arg_node)
+                    // `transmute` takes its operand's bytes: a moved place is
+                    // reset (§2.5.1) exactly as an ordinary consumed argument
+                    // is, or its scope-exit drop frees what the result now owns
+                    // (#1605: `spawn_os` transmuted the closure and then freed
+                    // the environment under the thread).
+                    if self.pool.resolve(generic_builtin_sym) == "transmute":
+                        self.consume_moved_operand(gc_arg_op)
+                    gc_args.push(gc_arg_op)
                 let gc_args_id = self.body.new_call_args(gc_args)
                 self.body.set_call_intrinsic(gc_args_id, MirIntrinsic.GENERIC_CALL)
                 self.body.set_call_ast_node(gc_args_id, node)

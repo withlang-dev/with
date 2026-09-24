@@ -4,7 +4,7 @@
 // Copy, so `() => x * 10` holds the parameter `x` by place — a view of
 // this frame — and returning it is a view escape. (Before D62 this was a
 // Copy snapshot in a frame slot that read garbage once `mk` was not
-// inlined.) The owning form, `move () => x * 10`, waits on #1567.
+// inlined.) The owning form is `move () => x * 10` (D63).
 fn mk(x: i32) -> fn() -> i32: () => x * 10
 
 fn main:

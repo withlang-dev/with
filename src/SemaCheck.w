@@ -2392,6 +2392,7 @@ impl Sema:
         if meta >= 0:
             let eff_ps = self.ast.fn_meta_param_start(meta)
             let eff_pc = self.ast.fn_meta_param_count(meta)
+            self.fn_param_invocations = sema_new_map_i32_i32()
             for pi in 0..eff_pc:
                 self.current_fn_param_syms.push(self.ast.fn_param_name(eff_ps, pi))
                 // §9.5/G2 (D6): a `move self` receiver is CONSUMED by the callee, so
@@ -2629,6 +2630,13 @@ impl Sema:
                     self.set_sig_param_view_origin(sig_idx, pi, 0)
                 if raw_validity_param_sym == 0 and (eff & EFF_RAW_PTR_VALIDITY) != 0 and pi < self.current_fn_param_syms.len() as i32:
                     raw_validity_param_sym = self.current_fn_param_syms[pi]
+            // D63 call-once: published for every parameter — a callable
+            // parameter that is only invoked accrues no effect bits, so this
+            // sits outside the `eff != 0` guard above.
+            if sig_idx >= 0 and pi < self.current_fn_param_syms.len() as i32:
+                let invoke_sym = self.current_fn_param_syms[pi]
+                let invocations = if self.fn_param_invocations.contains(invoke_sym): self.fn_param_invocations.get(invoke_sym).unwrap() else: 0
+                self.set_sig_param_invoke_many(sig_idx, pi, if invocations > 1: 1 else: 0)
 
         if raw_validity_param_sym != 0 and self.fn_symbol_is_unsafe(fn_name) == 0:
             let param_name: str = self.pool_resolve(raw_validity_param_sym)
@@ -4053,6 +4061,7 @@ impl Sema:
                 self.sig_param_effects.push(0)
                 self.sig_param_direct_effects.push(0)
                 self.sig_param_view_origins.push(0)
+                self.sig_param_invoke_many.push(0)
                 self.sig_value_ref_abi_params.push(0)
             for svi in 0..saved_vra_count:
                 if svi < param_count and saved_vra[svi] != 0:
@@ -15969,6 +15978,86 @@ impl Sema:
                     self.scope_set_state(holder, VarState.MOVED)
             self.scope_set_state(cap_sym, VarState.MOVED)
 
+    // 1 when calling the closure consumes one of its captures (a consuming
+    // view, §12.4) — such a closure is call-once.
+    mut fn closure_expr_consumes_capture(node: i32) -> i32:
+        if node == 0 or self.ast.kind(node) != NodeKind.NK_CLOSURE:
+            return 0
+        for ci in 0..self.closure_capture_summary_count(node):
+            let cap_eff = self.closure_capture_summary_eff(node, ci)
+            if (cap_eff & (EFF_CONSUME | EFF_ESCAPE_VALUE)) != 0:
+                let cap_ty = self.scope_lookup(self.closure_capture_summary_sym(node, ci))
+                if cap_ty > 0 and self.is_copy(cap_ty as TypeId) == 0:
+                    return 1
+        0
+
+    // D63 (§12.4 "The callable type"), checked where a closure literal is
+    // handed to a parameter: a non-move closure is a view of this frame and
+    // may only reach a callee that neither stores nor returns the parameter
+    // (its ESCAPE_VALUE effect says it does — pass `move () => ...`); a
+    // consuming closure is call-once and may only reach a callee whose body
+    // invokes the parameter at most once (proved from the body; a callee
+    // without a body in this compilation — a bundle interface — may invoke
+    // it any number of times and is refused until a `once` annotation
+    // exists, #1604).
+    mut fn check_closure_arg_against_param(arg_node: i32, callee_sym: i32, sig_idx: i32, param_i: i32, call_node: i32):
+        if arg_node <= 0 or sig_idx < 0:
+            return
+        // A closure literal, or a binding that holds one (`let c = || take(ys);
+        // f(c)`), is checked against the parameter it reaches.
+        var closure_node = 0
+        if self.ast.kind(arg_node) == NodeKind.NK_CLOSURE:
+            closure_node = arg_node
+        else if self.ast.kind(arg_node) == NodeKind.NK_IDENT and self.binding_closure_nodes.contains(self.ast.get_data0(arg_node)) and self.scope_has(self.ast.get_data0(arg_node)) != 0:
+            closure_node = self.binding_closure_nodes.get(self.ast.get_data0(arg_node)).unwrap()
+        if closure_node == 0:
+            return
+        if param_i < 0 or param_i >= self.sig_get_param_count(sig_idx):
+            return
+        // The capture facts are scope-dependent, so they are settled now; the
+        // callee's escape effect and call-once flag are complete only after
+        // the effect fixpoint (the callee may be declared after this call),
+        // so the verdict is deferred to finalize_closure_arg_checks.
+        var by_place_sym = 0
+        if self.ast.is_move_closure(closure_node) == 0:
+            for ci in 0..self.closure_capture_summary_count(closure_node):
+                if by_place_sym == 0 and (self.closure_capture_summary_eff(closure_node, ci) & EFF_CAPTURE_BY_PLACE) != 0:
+                    by_place_sym = self.closure_capture_summary_sym(closure_node, ci)
+        let consumes = self.closure_expr_consumes_capture(closure_node)
+        if by_place_sym == 0 and consumes == 0:
+            return
+        self.deferred_closure_arg_checks.push(closure_node)
+        self.deferred_closure_arg_checks.push(callee_sym)
+        self.deferred_closure_arg_checks.push(sig_idx)
+        self.deferred_closure_arg_checks.push(param_i)
+        self.deferred_closure_arg_checks.push(consumes)
+        self.deferred_closure_arg_checks.push(by_place_sym)
+
+    // Runs after fixpoint_effect_flow: every recorded closure argument is
+    // judged against its callee's final parameter facts.
+    mut fn finalize_closure_arg_checks():
+        let n = self.deferred_closure_arg_checks.len() as i32
+        var i = 0
+        while i + 5 < n:
+            let closure_node: i32 = self.deferred_closure_arg_checks[i]
+            let callee_sym: i32 = self.deferred_closure_arg_checks[(i + 1)]
+            let sig_idx: i32 = self.deferred_closure_arg_checks[(i + 2)]
+            let param_i: i32 = self.deferred_closure_arg_checks[(i + 3)]
+            let consumes: i32 = self.deferred_closure_arg_checks[(i + 4)]
+            let by_place_sym: i32 = self.deferred_closure_arg_checks[(i + 5)]
+            i = i + 6
+            let callee_name: str = with_str_clone_ref(self.pool_resolve(callee_sym))
+            if by_place_sym != 0 and (self.sig_param_effect(sig_idx, param_i) & EFF_ESCAPE_VALUE) != 0:
+                let cap_name: str = with_str_clone_ref(self.pool_resolve(by_place_sym))
+                self.emit_error("closure argument holds `" ++ cap_name ++ "` by place — a view of this frame — and `" ++ callee_name ++ "` stores or returns its parameter (§12.4); pass an owning closure: `move () => ...`", closure_node)
+                continue
+            if consumes != 0:
+                let bodiless = if self.fn_decl_nodes.contains(callee_sym) and self.ast.fn_decl_body_is_interface(self.fn_decl_nodes.get(callee_sym).unwrap() as NodeId): 1 else: 0
+                if self.sig_param_invoke_many_at(sig_idx, param_i) != 0:
+                    self.emit_error("this closure consumes its capture and may be invoked once, but `" ++ callee_name ++ "` invokes its parameter more than once (§12.4)", closure_node)
+                else if bodiless != 0:
+                    self.emit_error("this closure consumes its capture and may be invoked once, but `" ++ callee_name ++ "` has no body in this compilation (a bundle boundary), so it may invoke its parameter any number of times (§12.4; a `once` parameter annotation is #1604)", closure_node)
+
     // A non-move closure that captures a non-Copy local holds a view of that
     // local's place (§12.4); the binding that holds the closure carries those
     // origins like any view binding, so the container and return escape
@@ -16007,14 +16096,15 @@ impl Sema:
         let count = self.closure_capture_summary_count(closure_node)
         if count == 0:
             return
-        if self.ast.is_move_closure(closure_node) == 0:
-            for ci in 0..count:
-                let cap_sym = self.closure_capture_summary_sym(closure_node, ci)
-                if (self.closure_capture_summary_eff(closure_node, ci) & EFF_CAPTURE_BY_PLACE) != 0:
-                    let cap_name: str = with_str_clone_ref(self.pool_resolve(cap_sym))
-                    self.emit_error("returned closure captures `" ++ cap_name ++ "` by place and may outlive it (§12.2, §12.4); a returned closure must own its environment (`move ||`, #1567, not yet implemented)", report_node)
-                    return
-        self.emit_error("returned `move` closure keeps its environment in this call's frame, which dies at return; a returned closure must own its environment (#1567, not yet implemented)", report_node)
+        // D63: a `move ||` closure owns its environment and may be returned.
+        if self.ast.is_move_closure(closure_node) != 0:
+            return
+        for ci in 0..count:
+            let cap_sym = self.closure_capture_summary_sym(closure_node, ci)
+            if (self.closure_capture_summary_eff(closure_node, ci) & EFF_CAPTURE_BY_PLACE) != 0:
+                let cap_name: str = with_str_clone_ref(self.pool_resolve(cap_sym))
+                self.emit_error("returned closure captures `" ++ cap_name ++ "` by place and may outlive it (§12.2, §12.4); a returned closure owns its environment: `move () => ...`", report_node)
+                return
 
     mut fn check_closure(node: i32) -> i32:
         let body = self.ast.get_data0(node)
@@ -16337,7 +16427,11 @@ impl Sema:
                         if self.is_copy(cap_ty as TypeId) == 0:
                             self.scope_set_state(cap_sym, VarState.MOVED)
                             self.effect_note_origin_node = node
-                            self.note_param_effect(cap_sym, EFF_CONSUME)
+                            // D63: the owned environment may leave this frame
+                            // (returned, stored, sent), so a parameter moved into
+                            // it escapes — a caller's non-move closure argument
+                            // must not reach it.
+                            self.note_param_effect(cap_sym, EFF_CONSUME | EFF_ESCAPE_VALUE)
                             self.effect_note_origin_node = 0
                     ci = ci + 1
 
@@ -17454,6 +17548,12 @@ impl Sema:
             let transmute_ty = self.check_transmute_call(node, callee, extra_start, arg_count)
             if transmute_ty != 0:
                 self.typed_expr_types.insert(node, transmute_ty)
+            // The operand's bytes become the result: a non-Copy operand is
+            // consumed, or its binding would drop the value the result now
+            // owns (#1605: `spawn_os` transmuted its `fn` argument and then
+            // dropped it, freeing the closure's environment under the thread).
+            if arg_count >= 1:
+                self.mark_moved_if_consumed(self.ast.get_extra(extra_start))
             return transmute_ty
         if self.is_chan_call(callee) != 0:
             let chan_ty = self.chan_return_type(callee)
@@ -17547,8 +17647,19 @@ impl Sema:
             local_tid = self.scope_lookup(fn_sym)
             if local_tid >= 0:
                 callable_value_tid = self.callable_any_fn_type(local_tid as TypeId)
+                // D63: `fn(A) -> R` is not Copy — `let g = f` or passing `f`
+                // moved it; a later call is a use of the moved value. The
+                // callee ident is resolved here, not through check_expr, so
+                // the moved-state check lives here too.
+                if callable_value_tid != 0 and self.scope_lookup_state(fn_sym) == VarState.MOVED:
+                    let moved_name: str = with_str_clone_ref(self.pool_resolve(fn_sym))
+                    self.emit_error("use of moved value `" ++ moved_name ++ "`: a callable is not Copy (§12.4), so binding or passing it moved it; keep a copy with `" ++ moved_name ++ ".clone()` (free for a function or a non-move closure) or call through the original binding", callee)
                 if self.binding_closure_nodes.contains(fn_sym):
                     callable_closure_node = self.binding_closure_nodes.get(fn_sym).unwrap()
+                // D63 call-once: count this body's invocations of the callable
+                // binding; inside a loop one site counts as many.
+                let seen = if self.fn_param_invocations.contains(fn_sym): self.fn_param_invocations.get(fn_sym).unwrap() else: 0
+                self.fn_param_invocations.insert(fn_sym, seen + (if self.loop_depth > 0: 2 else: 1))
             if local_tid < 0 and self.symbol_visible_from_current(fn_sym) == 0:
                 self.emit_private_symbol_error(fn_sym, callee)
                 return 0
@@ -17810,6 +17921,8 @@ impl Sema:
                 self.closure_direct_arg_escape_flags.pop()
                 self.closure_direct_arg_depth = self.closure_direct_arg_depth - 1
                 self.apply_closure_capture_consumes(arg_node, node)
+            // A closure literal or a binding holding one (D63).
+            self.check_closure_arg_against_param(arg_node, fn_sym, sig_idx, ai + param_offset, node)
             // #895: a variadic argument is passed BY VALUE (C default promotions;
             // D27 value context). An element/Copy view reaching a variadic slot
             // has no param type to drive materialization, so demand it here — else
@@ -22619,6 +22732,25 @@ impl Sema:
         if static_type_sym != 0 and self.is_pending_generic_collection_base(static_type_sym) != 0 and (field == self.syms.new or (static_type_sym == self.syms.vec and early_method_name == "with_capacity")):
             self.note_allocation_site(node, AllocConstructKind.VEC_NEW, 0, 0)
         obj_type = self.adjust_static_receiver_type(expr, obj_type as i32)
+        // D63: `f.clone()` on a callable value. Free for a bare function or
+        // a non-move closure (the pair is copied, nothing is owned); a
+        // `move ||` closure's owned environment is cloned capture by capture
+        // (every capture Clone — checked here when the closure is known,
+        // and by the cell's clone fn otherwise). The receiver is observed,
+        // not moved.
+        if obj_type != 0 and self.get_type_kind(self.resolve_alias(obj_type)) == TypeKind.TY_FN and self.pool_resolve(field) == "clone" and arg_count == 0:
+            if self.ast.kind(expr) == NodeKind.NK_IDENT and self.binding_closure_nodes.contains(self.ast.get_data0(expr)):
+                let known_closure = self.binding_closure_nodes.get(self.ast.get_data0(expr)).unwrap()
+                if self.ast.is_move_closure(known_closure) != 0:
+                    for ci in 0..self.closure_capture_summary_count(known_closure):
+                        let cap_sym = self.closure_capture_summary_sym(known_closure, ci)
+                        let cap_ty = self.scope_lookup(cap_sym)
+                        if cap_ty > 0 and self.is_copy(cap_ty as TypeId) == 0 and self.get_type_kind(self.resolve_alias(cap_ty as TypeId)) != TypeKind.TY_STR:
+                            let cap_name: str = with_str_clone_ref(self.pool_resolve(cap_sym))
+                            self.emit_error("cannot clone this `move` closure: its capture `" ++ cap_name ++ "` is not Copy or str, and cloning an owned environment capture by capture is not implemented for other Clone types yet (#1567)", node)
+            self.callable_clone_nodes.insert(node, 1)
+            self.typed_expr_types.insert(node, obj_type as i32)
+            return obj_type as i32
         if self.no_suspend_scope_depth > 0 and self.method_may_suspend_current_fiber(obj_type as i32, field) != 0:
             self.emit_error_code("direct fiber-aware runtime operation may suspend inside no_suspend block", node, "E0702")
         if self.no_await_guard_scope_depth > 0 and self.method_may_suspend_current_fiber(obj_type as i32, field) != 0 and self.condvar_wait_releases_associated_guard(obj_type as i32, field, extra_start, arg_count) == 0:
@@ -22807,6 +22939,8 @@ impl Sema:
                 self.closure_direct_arg_escape_flags.pop()
                 self.closure_direct_arg_depth = self.closure_direct_arg_depth - 1
                 self.apply_closure_capture_consumes(mc_arg_node, node)
+            // A closure literal or a binding holding one (D63).
+            self.check_closure_arg_against_param(mc_arg_node, field, mc_sig_idx_for_effect, ai + 1, node)
             let mc_iter_idx = self.maybe_register_iter_of_self_borrow(mc_arg_node)
             if mc_iter_idx >= 0:
                 mc_iter_borrow_idxs.push(mc_iter_idx)

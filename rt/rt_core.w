@@ -1444,11 +1444,36 @@ fn rt_free_sized_with_drop_origin(ptr: *mut u8, size_arg: i64, drop_origin: *con
     let _ = size_arg
     rt_free_with_drop_origin(ptr, drop_origin, drop_origin_len)
 
+// D63 (§12.4 "The callable type"): a callable's context word is tagged in
+// its low two bits — 10 marks a heap cell {drop_fn, clone_fn, env} that a
+// `move ||` closure OWNS. The thread that ran the closure releases it:
+// the cell's drop fn drops the captures (guarded: a consumed one is blank)
+// and frees the cell. The drop fn takes the cell as its only parameter, so
+// it is called exactly as a closure is — the pair {drop_fn, cell} with a
+// dummy argument (#1605).
+fn rt_closure_env_release(ctx: *mut u8):
+    let bits = ctx as i64
+    if bits & 3 != 2:
+        return
+    let cell = (bits - 2) as *mut u8
+    let raw = RtThreadClosureRaw { fn_ptr: unsafe *(cell as *const *mut u8), ctx: cell }
+    let release: RtThreadClosureFn = unsafe transmute[RtThreadClosureFn](raw)
+    let _ = release(0 as *mut u8)
+    // The pair was never an owned callable: hand it back as raw words so no
+    // drop glue runs on it (a runtime compiled with the callable glue would
+    // otherwise release the cell a second time).
+    let _spent: RtThreadClosureRaw = unsafe transmute[RtThreadClosureRaw](release)
+
 fn rt_thread_entry(arg: *mut u8) -> *mut u8:
     let start = arg as *mut RtThreadStart
-    let raw = RtThreadClosureRaw { fn_ptr: (unsafe *start).fn_ptr, ctx: (unsafe *start).ctx }
+    let ctx = (unsafe *start).ctx
+    let raw = RtThreadClosureRaw { fn_ptr: (unsafe *start).fn_ptr, ctx: ctx }
     let worker: RtThreadClosureFn = unsafe transmute[RtThreadClosureFn](raw)
     (unsafe *start).result = worker(0 as *mut u8)
+    // The worker's pair goes back to raw words (no glue drop); the owned
+    // environment, if any, is released here, on the thread that used it.
+    let _spent: RtThreadClosureRaw = unsafe transmute[RtThreadClosureRaw](worker)
+    rt_closure_env_release(ctx)
     arg
 
 pub fn with_thread_spawn(fn_ptr: *mut u8, ctx: *mut u8) -> i64:
