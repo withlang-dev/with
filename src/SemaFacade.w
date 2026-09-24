@@ -520,6 +520,7 @@ impl Sema:
                 self.collect_facade_domain(item)
             else if kind == NodeKind.NK_FACADE_CONVENTION:
                 self.facade_convention_nodes.push(item)
+                self.warn_facade_profile_ambiguities(item)
         for i in 0..count:
             let item = self.ast.get_extra(extra_start + i)
             if self.ast.kind(item) == NodeKind.NK_FACADE_RESOURCE:
@@ -528,6 +529,102 @@ impl Sema:
             let item = self.ast.get_extra(extra_start + i)
             if self.ast.kind(item) == NodeKind.NK_FACADE_FN:
                 self.collect_facade_fn(di, facade, item)
+
+    // ── stage 11: convention profiles (ruling §7, §59; spec §16.2b.12) ──
+    //
+    // The frontend applied each adopted profile before the facades rendered
+    // (compiler/FacadeProfile.w) and left one NK_FACADE_PROFILE_MATCH per
+    // outcome on the `use convention` item. A clause it stated is collected
+    // and verified above like any clause; its provenance is the rule it
+    // carries (facade_clause_profile_rule). An ambiguous match contributed
+    // nothing (ruling §7.1), and says so here: the resource may then fail
+    // "never half-model" with no destroy path, and this warning names the
+    // profile, the rule, the item and the clause that resolves it (§8).
+
+    // The `c convention` block a rule belongs to, as a declaration index.
+    fn facade_rule_profile_decl(rule: i32) -> i32:
+        for di in 0..self.ast.decl_count():
+            let decl = self.ast.get_decl(di)
+            if self.ast.kind(decl) != NodeKind.NK_C_CONVENTION: continue
+            let start = self.ast.get_data1(decl)
+            for k in 0..self.ast.get_data2(decl):
+                if self.ast.get_extra(start + k) == rule: return di
+        -1
+
+    // The `c facade` block a `use convention` item sits in, as a declaration
+    // index: the file a shadowing clause or fn item is read in.
+    fn facade_convention_decl(item: i32) -> i32:
+        for di in 0..self.ast.decl_count():
+            let decl = self.ast.get_decl(di)
+            if self.ast.kind(decl) != NodeKind.NK_C_FACADE: continue
+            let start = self.ast.get_data1(decl)
+            for k in 0..self.ast.get_data2(decl):
+                if self.ast.get_extra(start + k) == item: return di
+        -1
+
+    fn facade_rule_profile_name(rule: i32) -> str:
+        let di = self.facade_rule_profile_decl(rule)
+        if di < 0: return "?"
+        self.safe_symbol_text(self.ast.get_data0(self.ast.get_decl(di)))
+
+    fn facade_rule_name(rule: i32) -> str: self.safe_symbol_text(self.ast.get_data0(rule))
+
+    // The rule's template as the profile spells it: `drop *_unref`,
+    // `from *_open(out param 1)`, `fn *_get lend`.
+    fn facade_rule_template_text(rule: i32) -> str:
+        let rx = self.ast.get_data1(rule)
+        let pattern = self.safe_symbol_text(self.ast.get_extra(rx))
+        let template = self.ast.get_extra(rx + 1)
+        let kind = self.ast.get_data0(template)
+        if self.ast.get_extra(rx + 2) != 0: return f"fn {pattern} " ++ facade_clause_name(kind)
+        var text = facade_clause_name(kind) ++ " " ++ pattern
+        if kind == FACADE_CLAUSE_FROM and self.ast.get_extra(self.ast.get_data1(template) + 1) != 0: text = text ++ "(out param …)"
+        if kind == FACADE_CLAUSE_INIT: text = text ++ "(self)"
+        text
+
+    fn facade_rule_is_fn(rule: i32) -> bool: self.ast.get_extra(self.ast.get_data1(rule) + 2) != 0
+
+    // A match record's parts: (rule, status, subject, candidate syms). The
+    // subject is the resource item for a resource rule and the function's
+    // name symbol for an fn rule (0 when the rule matched nothing).
+    fn facade_profile_match(rec: i32) -> (i32, i32, i32, Vec[i32]):
+        let rx = self.ast.get_data2(rec)
+        let cands: Vec[i32] = Vec.new()
+        for i in 0..self.ast.get_extra(rx + 1): cands.push(self.ast.get_extra(rx + 2 + i))
+        (self.ast.get_data0(rec), self.ast.get_data1(rec), self.ast.get_extra(rx), cands)
+
+    fn facade_profile_matches(item: i32) -> Vec[i32]:
+        let out: Vec[i32] = Vec.new()
+        let start = self.ast.get_data0(item)
+        let path_count = self.ast.get_data1(item)
+        for m in 0..self.ast.get_data2(item): out.push(self.ast.get_extra(start + path_count + m))
+        out
+
+    fn facade_profile_subject_text(rule: i32, subject: i32) -> str:
+        if subject == 0: return "no declaration"
+        if self.facade_rule_is_fn(rule): return "'" ++ self.safe_symbol_text(subject) ++ "'"
+        "resource '" ++ self.safe_symbol_text(self.ast.get_data0(subject)) ++ "'"
+
+    fn facade_profile_names(syms: &Vec[i32]) -> str:
+        var out = ""
+        for i in 0..syms.len() as i32:
+            out = out ++ (if i > 0: ", " else: "") ++ self.safe_symbol_text(syms[i])
+        out
+
+    mut fn warn_facade_profile_ambiguities(item: i32):
+        let recs = self.facade_profile_matches(item)
+        for m in 0..recs.len() as i32:
+            let (rule, status, subject, cands) = self.facade_profile_match(recs[m])
+            if status != FACADE_PROFILE_AMBIGUOUS: continue
+            let profile = self.facade_rule_profile_name(rule)
+            let rname = self.facade_rule_name(rule)
+            let template = self.facade_rule_template_text(rule)
+            let what = self.facade_profile_subject_text(rule, subject)
+            if self.facade_rule_is_fn(rule):
+                self.emit_warning(f"use convention {profile}: rules {self.facade_profile_names(&cands)} all match {what}; a profile fact must resolve uniquely, so none of them applies (§16.2b.12) — describe '{self.safe_symbol_text(subject)}' with an fn item to state its contract", item)
+            else:
+                let kind = self.ast.get_data0(self.ast.get_extra(self.ast.get_data1(rule) + 1))
+                self.emit_warning(f"use convention {profile}: rule {rname} ({template}) matches {cands.len() as i32} candidates for {what}: {self.facade_profile_names(&cands)}; a profile fact must resolve uniquely, so the rule contributes nothing (§16.2b.12) — state '{facade_clause_name(kind)} <fn>' on the resource to choose", item)
 
     mut fn collect_facade_domain(item: i32):
         let name = self.ast.get_data0(item)

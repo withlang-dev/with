@@ -68,10 +68,26 @@ fn contract_node_line(sema: &Sema, site: &ContractSite, node: i32) -> i32:
     if node <= 0 or node >= sema.ast.node_count(): return 0
     contract_line(site.source, sema.ast.get_start(node))
 
-// `clause:<name>@<path>:<line>` — the facade clause that stated a fact.
+// `clause:<name>@<path>:<line>` — the facade clause that stated a fact; or
+// `profile:<pkg.vN>:<rule>@<path>:<line>` when an adopted convention
+// profile's rule stated it (stage 11, §16.2b.12): the rule, in the
+// profile's own file.
 fn contract_clause_at(sema: &Sema, site: &ContractSite, clause: i32) -> str:
+    let rule = facade_clause_profile_rule(sema.ast, clause)
+    if rule != 0: return contract_rule_at(sema, rule)
     let name = facade_clause_name(sema.ast.get_data0(clause))
     f"clause:{name}@{site.path}:{contract_node_line(sema, site, clause)}"
+
+fn contract_rule_at(sema: &Sema, rule: i32) -> str:
+    let di = sema.facade_rule_profile_decl(rule)
+    let site = contract_site(sema, di, "", "")
+    f"profile:{sema.facade_rule_profile_name(rule)}:{sema.facade_rule_name(rule)}@{site.path}:{contract_node_line(sema, &site, rule)}"
+
+// The rule that stated an fn item (every clause of a profile's item carries
+// it), or 0 for an item the facade wrote.
+fn contract_item_profile_rule(sema: &Sema, item: i32) -> i32:
+    if sema.ast.kind(item) != NodeKind.NK_FACADE_FN or sema.ast.get_data2(item) == 0: return 0
+    facade_clause_profile_rule(sema.ast, sema.ast.get_extra(sema.ast.get_data1(item)))
 
 fn contract_item_at(sema: &Sema, site: &ContractSite, what: &str, item: i32) -> str:
     f"clause:{what}@{site.path}:{contract_node_line(sema, site, item)}"
@@ -290,7 +306,8 @@ fn contract_collect_fn(report: &AnalysisReport, sema: &Sema, ci: i32, source_pat
     let node = c.node
     let owner = c.facade
     let count = if sig >= 0: sema.sig_get_param_count(sig) else: 0
-    let at = contract_item_at(sema, &site, "fn", node)
+    let rule = contract_item_profile_rule(sema, node)
+    let at = if rule != 0: contract_rule_at(sema, rule) else: contract_item_at(sema, &site, "fn", node)
     let subject = contract_fact(report, sema, &site, -1, CONTRACT_FN, node, c.fn_sym, owner, -1, fname,
         f"fn {fname}; facade:{facade}@{site.path}; {at}")
     if sig < 0:
@@ -499,17 +516,45 @@ fn contract_collect_domain(report: &AnalysisReport, sema: &Sema, di: i32, source
     else:
         contract_row(report, sema, &site, subject, CONTRACT_DOMAIN, d.node, d.name, d.facade, -1, "invalidation", "invalidated by: " ++ contract_list(&invalidators, "no operation") ++ "; preserved across: " ++ contract_list(&preservers, "none"), "default:unknown effect is invalidate; `preserves domain D` states otherwise (§16.2b.7)")
 
+// A `use convention` item is read in its facade block's file.
+fn contract_convention_site(sema: &Sema, item: i32, source_path: &str, source_text: &str) -> ContractSite:
+    let di = sema.facade_convention_decl(item)
+    if di >= 0: return contract_site(sema, di, source_path, source_text)
+    ContractSite { path: with_str_clone_ref(source_path), source: with_str_clone_ref(source_text) }
+
 fn contract_collect_conventions(report: &AnalysisReport, sema: &Sema, source_path: &str, source_text: &str):
     for k in 0..sema.facade_convention_nodes.len() as i32:
         let node = sema.facade_convention_nodes[k]
-        let site = ContractSite { path: with_str_clone_ref(source_path), source: with_str_clone_ref(source_text) }
+        let site = contract_convention_site(sema, node, source_path, source_text)
         let start = sema.ast.get_data0(node)
         let parts: Vec[str] = Vec.new()
         for i in 0..sema.ast.get_data1(node): parts.push(sema.safe_symbol_text(sema.ast.get_extra(start + i)))
         let path = contract_join(&parts, ".")
         let at = contract_item_at(sema, &site, "use convention", node)
         let subject = contract_fact(report, sema, &site, -1, CONTRACT_CONVENTION, node, 0, 0, -1, path, f"use convention {path}; {at}")
-        contract_row(report, sema, &site, subject, CONTRACT_CONVENTION, node, 0, 0, -1, "profile", "adopted; contributes no fact yet — profile resolution is stage 11 (§16.2b.12)", "default:no profile fact exists")
+        // One row per outcome of the profile's rules (stage 11, §16.2b.12):
+        // what each contributed, and why the others did not.
+        let recs = sema.facade_profile_matches(node)
+        if recs.len() == 0:
+            contract_row(report, sema, &site, subject, CONTRACT_CONVENTION, node, 0, 0, -1, "profile", "adopted; no rule was applied (the profile did not resolve, or has no rules)", "default:no profile fact exists")
+        for m in 0..recs.len() as i32:
+            let (rule, status, subject_node, cands) = sema.facade_profile_match(recs[m])
+            let rname = sema.facade_rule_name(rule)
+            let template = sema.facade_rule_template_text(rule)
+            let what = sema.facade_profile_subject_text(rule, subject_node)
+            let prov = contract_rule_at(sema, rule)
+            if status == FACADE_PROFILE_APPLIED:
+                let named = if sema.facade_rule_is_fn(rule): "" else: ": " ++ sema.facade_profile_names(&cands)
+                contract_row(report, sema, &site, subject, CONTRACT_CONVENTION, recs[m], rule, 0, -1, "rule", f"{rname} ({template}) applied to {what}{named}", prov)
+            else if status == FACADE_PROFILE_AMBIGUOUS:
+                let who = if sema.facade_rule_is_fn(rule): f"rules {sema.facade_profile_names(&cands)} all match {what}" else: f"{rname} ({template}) matches {cands.len() as i32} candidates for {what}: {sema.facade_profile_names(&cands)}"
+                contract_row(report, sema, &site, subject, CONTRACT_CONVENTION, recs[m], rule, 0, -1, "rule", f"{who}; ambiguous, contributes nothing (§16.2b.12)", prov)
+            else if status == FACADE_PROFILE_SHADOWED:
+                let by = if sema.facade_rule_is_fn(rule): "an fn item" else: "clause `" ++ facade_clause_name(sema.ast.get_data0(cands[1])) ++ "`"
+                let matched = if sema.facade_rule_is_fn(rule): what else: f"{sema.safe_symbol_text(cands[0])} for {what}"
+                contract_row(report, sema, &site, subject, CONTRACT_CONVENTION, recs[m], rule, 0, -1, "rule", f"{rname} ({template}) matched {matched}; shadowed by {by} at {contract_where(&site, sema, cands[1])}, the facade's explicit statement wins (§16.2b.2)", prov)
+            else:
+                contract_row(report, sema, &site, subject, CONTRACT_CONVENTION, recs[m], rule, 0, -1, "rule", f"{rname} ({template}) matched nothing" ++ (if subject_node != 0 and not sema.facade_rule_is_fn(rule): " for " ++ what else: ""), prov)
 
 fn analysis_collect_foreign_contracts(report: &AnalysisReport, sema: &Sema, source_path: &str, source_text: &str):
     for di in 0..sema.facade_domain_list.len() as i32:
@@ -614,13 +659,39 @@ fn analysis_audit_contract(report: &AnalysisReport, sema: &Sema, source_path: &s
                 let host = contract_resource_name(sema, recv[0])
                 advisories = advisories + 1
                 report.fail(f"contract: advisory: {fname} ({at}) is exposed as a borrow of {host}\n  = heuristic: name segment `{word}` and a signature taking {host}'s representation resemble a destroying operation\n  = this warning does not establish destruction semantics; the contract, the classification and the capability are unchanged\n  = help: declare `destroys` if it destroys the resource, or explicitly declare `lend` to confirm borrowing semantics (§63)")
-    // Profile checks (ambiguous match; profile fact shadowed by an explicit
-    // clause) have nothing to examine until stage 11 resolves a profile:
-    // no profile fact exists in Sema, so they cannot fire.
+    // Profile checks (§63; stage 11, §16.2b.12): an ambiguous match is a
+    // rule that contributed nothing where the facade may have counted on it
+    // — a violation naming the profile, the rule, the item and the clause
+    // that resolves it. A profile fact shadowed by an explicit clause is the
+    // facade expressing its exception (ruling §7.2): a note, so the reader
+    // sees which of the profile's facts the facade replaced.
     let conventions = sema.facade_convention_nodes.len() as i32
-    if conventions > 0:
-        report.note(f"contract-audit: {conventions} `use convention` adopted; profile facts are stage 11, so the ambiguous-match and shadowed-fact checks examined nothing")
-    report.note(f"contract-audit: resources={sema.facade_resources.len() as i32} items={sema.foreign_contracts.len() as i32} domains={sema.facade_domain_list.len() as i32} conventions={conventions} advisories={advisories}")
+    var ambiguous = 0
+    var shadowed = 0
+    for k in 0..conventions:
+        let item = sema.facade_convention_nodes[k]
+        let site = contract_convention_site(sema, item, source_path, source_text)
+        let recs = sema.facade_profile_matches(item)
+        for m in 0..recs.len() as i32:
+            let (rule, status, subject_node, cands) = sema.facade_profile_match(recs[m])
+            let profile = sema.facade_rule_profile_name(rule)
+            let rname = sema.facade_rule_name(rule)
+            let template = sema.facade_rule_template_text(rule)
+            let what = sema.facade_profile_subject_text(rule, subject_node)
+            let rat = contract_rule_at(sema, rule)
+            if status == FACADE_PROFILE_AMBIGUOUS:
+                ambiguous = ambiguous + 1
+                if sema.facade_rule_is_fn(rule):
+                    report.fail(f"contract: ambiguous profile match: profile {profile} rules {sema.facade_profile_names(&cands)} all match {what} ({rat}); a profile fact must resolve uniquely, so none applies; resolve: describe '{sema.safe_symbol_text(subject_node)}' with an fn item stating its contract (§63, §16.2b.12)")
+                else:
+                    let kind = sema.ast.get_data0(sema.ast.get_extra(sema.ast.get_data1(rule) + 1))
+                    report.fail(f"contract: ambiguous profile match: profile {profile} rule {rname} ({template}, {rat}) matches {cands.len() as i32} candidates for {what}: {sema.facade_profile_names(&cands)}; a profile fact must resolve uniquely, so the rule contributes nothing; resolve: state `{facade_clause_name(kind)} <fn>` on the resource to choose (§63, §16.2b.12)")
+            else if status == FACADE_PROFILE_SHADOWED:
+                shadowed = shadowed + 1
+                let by = if sema.facade_rule_is_fn(rule): "the fn item" else: "`" ++ facade_clause_name(sema.ast.get_data0(cands[1])) ++ "`"
+                let matched = if sema.facade_rule_is_fn(rule): what else: f"{sema.safe_symbol_text(cands[0])} for {what}"
+                report.note(f"contract-audit: profile fact shadowed: profile {profile} rule {rname} ({template}, {rat}) matched {matched}, and {by} at {contract_where(&site, sema, cands[1])} states the fact explicitly; the facade's statement wins (§16.2b.2)")
+    report.note(f"contract-audit: resources={sema.facade_resources.len() as i32} items={sema.foreign_contracts.len() as i32} domains={sema.facade_domain_list.len() as i32} conventions={conventions} advisories={advisories} profile-ambiguous={ambiguous} profile-shadowed={shadowed}")
 
 // ── the `contract` view ──────────────────────────────────────────────────
 //
