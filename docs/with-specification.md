@@ -9437,6 +9437,31 @@ type reference legal only when exactly one parameter matches. Because C
 documentation numbers from one, every positional diagnostic prints the
 resolved C parameter (`consumes param 4: void *pApp`).
 
+**Discriminated variadic contracts.** A variadic C function stays variadic
+(§16.3c: a variadic signature is an unmodeled contract and its direct call
+is raw), but a facade may describe a closed set of typed call shapes
+selected by an earlier parameter whose value is known at compile time:
+
+```
+fn curl_easy_setopt
+    variadic param 2 selected by param option:
+        case CURLOPT_NOSIGNAL: c_long
+        case CURLOPT_URL: str
+        case CURLOPT_WRITEFUNCTION: callback param 2 userdata param CURLOPT_WRITEDATA
+```
+
+Each case states the presented With type and contract of the variadic
+argument for that selector value, from which the compiler lowers the actual
+variadic ABI argument; the declaration remains variadic all the way to
+backend lowering, never a fixed-arity redeclaration. Three rules: the
+selector must be a compile-time constant at the call; a listed case renders
+a safe presented call (`easy.setopt(CURLOPT_NOSIGNAL, 1)`); a selector that
+is unlisted, or not known at compile time, is refused on the safe surface
+with a note naming the case to add, and the raw variadic function remains
+available under `unsafe`. A case whose C documentation says the pointed-to
+data is not copied (curl's `CURLOPT_POSTFIELDS`) states its retention as
+§16.2b.5 requires; a bare `str` case is a copied input string (§16.3c).
+
 #### 16.2b.6 Borrowed returns, dependency and independence
 
 An operation may return a borrowed resource:
@@ -9449,6 +9474,30 @@ fn sqlite3_db_handle
 The result has no `Drop`, cannot outlive the named origin, and cannot be
 consumed or destroyed. A nullable borrowed return is `Option` of the borrowed
 value.
+
+**Borrowed record views.** The same clause applies to any imported record
+type, with a resource parameter or a foreign-state domain (§16.2b.7) as the
+origin:
+
+```
+c facade curl:
+    domain version_info process
+    fn curl_version_info
+        returns borrow curl_version_info_data from domain version_info
+```
+
+presents `Option[&curl_version_info_data]`: a view whose lifetime is its
+origin's, whose scalar fields are readable, that has no `Drop` and cannot be
+stored beyond its origin. Which pointer wins which lifetime is the whole
+spelling: a foreign pointer with an owner borrows from the resource; a
+pointer into foreign global state borrows from the domain; only genuinely
+immortal, immutable data is `static` (§16.2b.7), and `static` is never the
+default for "C stored this globally" (curl's version record may change until
+`curl_global_init`). A pointer-typed *field* of a borrowed record is not
+modeled by the record's lifetime alone: it stays a raw pointer until a
+field-level facade fact states its contract (the spelling is a later
+ruling); text meant for printing comes through an operation whose return is
+modeled (`curl_version()` is `returns static CStr`).
 
 **Unknown independence means dependency.** When a producer receives modeled
 resources and produces another, the result is dependent on each candidate

@@ -10,6 +10,53 @@ decision supersedes an earlier one, say so in both.
 
 ---
 
+## D66 — Discriminated variadic contracts; borrowed record views from a resource or domain; `static` stays the strongest case
+
+**Date:** 2026-09-25. **Status:** BDFL ruling (Eric, on the libcurl brief:
+"(a) yes, existing law; (b) yes, with tighter semantics; (c) not `returns
+static Record` as proposed"). §16.2b.5 "Discriminated variadic contracts"
+and §16.2b.6 "Borrowed record views" carry the text.
+
+**Decision.** (a) `curl_easy_init`/`cleanup` is a resource (`from`/`drop`);
+no ruling. (b) A variadic C function stays variadic to the backend ABI —
+never a fixed-arity redeclaration (on Apple arm64 variadic arguments go on
+the stack; a fake prototype links and is wrong) — but a facade may model a
+closed set of typed call shapes selected by an earlier compile-time-known
+discriminator; each listed case states the presented type *and contract*
+(a `long`, a copied `str`, a callback with its userdata pairing, a retained
+pointer where curl documents "not copied", …), so the compiler can lower the
+real variadic argument. Three rules: compile-time-known selector; a listed
+case renders a safe presented call; unlisted or runtime selectors are
+refused on the safe surface and the raw function stays available. This is
+not "variadics are safe now": they stay raw unless the facade closes the
+type hole for that discriminator. (c) Not `returns static Record`.
+`curl_version_info` returns a pointer to a static struct that libcurl may
+alter until `curl_global_init`, so "static address" is not "immutable
+forever". The existing `returns borrow CStr from domain D` generalizes to
+`returns borrow T from domain D` / `from param N` for any imported record:
+a view with a real origin, no `Drop`, no lie about immutability. The
+ladder: pointer with an owner → borrow from the resource; pointer into
+global state → borrow from the domain; genuinely immortal immutable data →
+`static`, the strongest case and never the default. A pointer field inside
+a borrowed record is not modeled by the outer lifetime (pointer spelling
+never establishes string semantics — the D51 rule everywhere else);
+field-level facade evidence (`record … field version CStr from self`
+-shaped) is a later ruling; the UAT reads a scalar field and gets
+printable text from `curl_version()` under `returns static CStr`.
+
+**Why.** All four of this week's facade extensions are one principle:
+buffer clauses model relationships among fixed C parameters; fixed clauses
+model hidden constant parameters; variadic cases model the relationship
+between a discriminator and a vararg; borrowed record views model foreign
+pointers whose lifetime comes from a resource or domain. The C ABI gives
+the representation; the facade supplies the semantic relationship C's type
+spelling cannot express. Rust/Zig/Mojo users hand-write per-option typed
+wrappers over one variadic declaration; Go and Swift need C shims. Only
+Rust (`&'static`) and Mojo (origins) can type the version record's
+lifetime; With's domain origin says more (what may change it, and when).
+
+---
+
 ## D65 — One authoritative producer per semantic fact: Sema decides what, MIR decides where and when, codegen decides how; no stage re-derives another's answer
 
 **Date:** 2026-09-25. **Status:** architecture decision (Eric, endorsing the
