@@ -10693,7 +10693,9 @@ impl MirBuilder:
         if exact_type != 0 and self.sema.get_type_kind(self.sema.resolve_alias(exact_type as TypeId)) == TypeKind.TY_FN:
             let callee_kind = self.ast.kind(node)
             // A bare function NAME is an ident of callable type with no place.
-            let is_local_callable = callee_kind == NodeKind.NK_IDENT and self.lookup_local(self.ast.get_data0(node)) >= 0
+            // A let-alias of a callable place (`let r = c.run`) names that
+            // place too (#1635): read it in place, never move it out.
+            let is_local_callable = callee_kind == NodeKind.NK_IDENT and self.ident_names_local_callable(node)
             if is_local_callable or callee_kind == NodeKind.NK_FIELD_ACCESS or callee_kind == NodeKind.NK_INDEX:
                 let callee_place = self.lower_expr_place(node)
                 if callee_place >= 0:
@@ -14959,6 +14961,19 @@ impl MirBuilder:
                 // self.sema stays live across the mutating lowering call.
                 let math_id: i32 = self.sema.math_builtin_calls.get(node).unwrap()
                 return self.lower_math_builtin_call(node, math_id)
+            // D29 precedence: a lexical binding wins before any module-level
+            // interpretation. A callable held by a local OR by a let-alias of a
+            // place (`let r = c.run` — a view of a non-Copy fn field, D63/§12.4)
+            // is an indirect call through what the binding names; it is not a
+            // variant constructor, a type, a generic fn, or a builtin that
+            // happens to share the text. The builtin branch below gated on
+            // lookup_local only, so an alias-bound callable fell through as an
+            // "unresolved bare function" named after the binding, with its
+            // arguments dropped (#1635: `call const fn sym(r)()`, then codegen's
+            // unhandled GENERIC_CALL FATAL).
+            if self.ast.kind(callee) == NodeKind.NK_IDENT and self.ident_names_local_callable(callee):
+                let lc_call_ty = self.expr_type(node)
+                return self.lower_call(callee, self.ast.get_data1(node), self.ast.get_data2(node), lc_call_ty, node)
             // Check for enum variant constructor call: Some(v), Ok(v), Err(e), etc.
             if self.ast.kind(callee) == NodeKind.NK_IDENT:
                 var vc_sym = self.ast.get_data0(callee)
@@ -15088,12 +15103,12 @@ impl MirBuilder:
                     self.terminate(TermKind.TK_CALL, gc_fn_op, gc_args_id, gc_place, gc_next)
                     self.switch_to(gc_next)
                     return self.call_result_operand(gc_result, gc_place, gc_ret_ty)
-            // Check for builtin calls (embed_file, src, etc.) — no sig, not a local
+            // Check for builtin calls (embed_file, src, etc.) — no sig, not a
+            // local or alias binding (those returned above)
             if self.ast.kind(callee) == NodeKind.NK_IDENT:
                 let bu_sym = self.ast.get_data0(callee)
                 let bu_sig = self.sema.get_sig(bu_sym)
-                let bu_local = self.lookup_local(bu_sym)
-                if bu_sig < 0 and bu_local < 0:
+                if bu_sig < 0 and not self.ident_names_local_callable(callee):
                     // Unresolved bare function — route through gen_call
                     let bu_fn_op = self.const_operand(ConstKind.CK_FN, bu_sym, 0)
                     let bu_args: Vec[i32] = Vec.new()
