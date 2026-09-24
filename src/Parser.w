@@ -4231,6 +4231,11 @@ impl Parser:
             self.emit_error("expected 'param <name>', 'param <N>' or 'param type <T>' (§16.2b.5)")
             return 0
         self.advance()
+        self.parse_facade_param_ref_after(start)
+
+    // The reference after its `param` word (a clause that begins with the
+    // word, `param N fixed <literal>`, has consumed it as the clause word).
+    mut fn parse_facade_param_ref_after(start: i32) -> i32:
         if self.peek() == TokenKind.TK_INT_LIT:
             let digits = self.intern_current()
             self.advance()
@@ -4243,6 +4248,16 @@ impl Parser:
         let name = self.expect_ident()
         if name == 0: return 0
         self.pool.add_node(NodeKind.NK_FACADE_PARAM_REF, start, self.prev_end(), FACADE_PARAM_REF_NAME, name, 0) as i32
+
+    // The literal a fixed argument binds (§16.2b.11): an integer literal,
+    // negated or not, `null`, `true` or `false` — a value whose C type Sema
+    // can check against the parameter's, never an expression.
+    mut fn parse_facade_fixed_literal() -> i32:
+        let t = self.peek()
+        if t == TokenKind.TK_MINUS: return self.parse_unary_negate() as i32
+        if t == TokenKind.TK_INT_LIT or t == TokenKind.TK_KW_NULL or t == TokenKind.TK_TRUE or t == TokenKind.TK_FALSE: return self.parse_primary() as i32
+        self.emit_error("a fixed argument is an integer literal, 'null', 'true' or 'false' (§16.2b.11)")
+        0
 
     mut fn parse_facade_clause(in_resource: bool) -> i32:
         let start = self.current_start()
@@ -4454,6 +4469,49 @@ impl Parser:
             else:
                 self.emit_error("expected 'callback consumes param <ref>' or 'callback param <ref> userdata param <ref>' (§16.2b.9)")
                 return 0
+        else if word == "buffer":
+            // `buffer param P len param L` / `buffer param P capacity param L
+            // inout` (D64, §16.2b.8): the pointer and the integer that
+            // carries its byte length are one byte slice. The pairing is
+            // stated, never inferred from the C types.
+            kind = FACADE_CLAUSE_BUFFER
+            let p = self.parse_facade_param_ref()
+            if p == 0: return 0
+            let is_len = self.current_ident_is("len")
+            let is_cap = self.current_ident_is("capacity")
+            if not is_len and not is_cap:
+                self.emit_error("a buffer pairing is written 'buffer param <P> len param <L>' or 'buffer param <P> capacity param <L> inout' (§16.2b.8)")
+                return 0
+            self.advance()
+            let l = self.parse_facade_param_ref()
+            if l == 0: return 0
+            if self.current_ident_is("inout"):
+                if is_len:
+                    self.emit_error("'len' pairs an input buffer, which C only reads; the length C writes back is 'capacity param <L> inout' (§16.2b.8)")
+                    return 0
+                self.advance()
+            else if is_cap:
+                // The ruling pairs a capacity that C reads and writes back;
+                // an output-only length is not ruled (D64).
+                self.emit_error("a capacity is read on entry and written back: 'buffer param <P> capacity param <L> inout' (§16.2b.8)")
+                return 0
+            ops.push(p)
+            ops.push(l)
+            ops.push(if is_cap: 1 else: 0)
+        else if word == "param":
+            // `param N fixed <literal>` (D64, §16.2b.11): the C parameter is
+            // bound to the literal and leaves the presented signature.
+            kind = FACADE_CLAUSE_FIXED
+            let r = self.parse_facade_param_ref_after(start)
+            if r == 0: return 0
+            if not self.current_ident_is("fixed"):
+                self.emit_error("a fixed argument is written 'param <ref> fixed <literal>' (§16.2b.11)")
+                return 0
+            self.advance()
+            let lit = self.parse_facade_fixed_literal()
+            if lit == 0: return 0
+            ops.push(r)
+            ops.push(lit)
         else:
             self.emit_error("unknown facade clause '" ++ word ++ "' (§16.2b)")
             return 0

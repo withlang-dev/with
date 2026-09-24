@@ -17625,6 +17625,9 @@ impl Sema:
         var callable_closure_node = 0
         if self.ast.kind(callee) == NodeKind.NK_IDENT:
             fn_sym = self.resolve_displaced_fn_ident(self.ast.get_data0(callee), callee)
+            // D64 (§16.2b.8, §16.2b.11): a free operation a facade presents
+            // under the C name is its rendered bridge wherever that is visible.
+            fn_sym = self.facade_bridge_redirect(fn_sym)
             // Resolve for-comprehension _Payload marker to Some or Ok
             let call_name: str = with_str_clone_ref(self.pool_resolve(fn_sym))
             if self.require_std_tier_for_symbol(fn_sym, callee) == 0:
@@ -20504,21 +20507,35 @@ impl Sema:
         let expected_args = param_count - param_offset
         if arg_count != expected_args:
             self.emit_error("wrong argument count", node)
+        // #604 stage 1 applies to a method's arguments as to a free call's
+        // (D64 found the gap: `n.read(buf)` over a `[]mut u8` refused the
+        // array a free `fill(buf)` accepted): a Vec/array argument coerces to
+        // a []T / []mut T parameter, the `[]mut` ones under the call-local
+        // exclusivity pass.
+        let sc_mut_args: Vec[i32] = Vec.new()
+        let sc_all_args: Vec[i32] = Vec.new()
         for ai3 in 0..arg_count:
             let pi3 = ai3 + param_offset
             if pi3 >= param_count:
                 break
             let expected_ty = self.resolve_type_node_with_current_subst(self.ast.fn_param_type(param_start, pi3), concrete_owner)
             let actual_ty = arg_types[ai3]
+            sc_all_args.push(self.ast.get_extra(extra_start + ai3))
             if expected_ty != 0 and actual_ty != 0:
                 let gen_method_arg = self.ast.get_extra(extra_start + ai3)
                 if self.call_arg_type_compatible(expected_ty, actual_ty) == 0:
-                    self.emit_argument_type_mismatch(self.safe_symbol_text(method_fn_sym), method_fn_sym, ai3, pi3, expected_ty, actual_ty, gen_method_arg)
+                    let sc_kind = self.note_slice_coerce_call_arg(expected_ty, actual_ty, gen_method_arg, gen_method_arg)
+                    if sc_kind == 2:
+                        sc_mut_args.push(gen_method_arg)
+                    if sc_kind == 0:
+                        self.emit_argument_type_mismatch(self.safe_symbol_text(method_fn_sym), method_fn_sym, ai3, pi3, expected_ty, actual_ty, gen_method_arg)
                 else:
                     self.note_call_arg_coercion(expected_ty, actual_ty, gen_method_arg, node)
                     // Stage 9 (§16.2b.10): a facade callback method's
                     // userdata under `callback_thread any`.
                     self.facade_check_callback_arg(method_fn_sym, ai3, actual_ty, gen_method_arg)
+        if sc_mut_args.len() > 0:
+            self.check_mut_slice_call_exclusivity(sc_mut_args, sc_all_args)
 
         let concrete_sig = self.check_generic_method_body_concrete(fn_node, method_fn_sym, concrete_owner, owner_tp_start, owner_tp_count, fn_tp_start, fn_tp_count)
         // A facade callback method's call touches the receiver's views
@@ -23363,20 +23380,35 @@ impl Sema:
                     let mc_plain_name = self.pool_resolve(type_name_sym) ++ "." ++ self.pool_resolve(field)
                     let mc_plain_pc = self.sig_get_param_count(sig_idx)
                     let mc_plain_poff = call_param_offset
+                    // #604 stage 1 applies to a method's arguments as to a
+                    // free call's (D64 found the gap: `n.read(buf)` over a
+                    // `[]mut u8` refused the array a free `fill(buf)`
+                    // accepted): a Vec/array argument coerces to a []T /
+                    // []mut T parameter, the `[]mut` ones under the
+                    // call-local exclusivity pass.
+                    let mc_sc_mut_args: Vec[i32] = Vec.new()
+                    let mc_sc_all_args: Vec[i32] = Vec.new()
                     for mc_pai in 0..mc_resolved_arg_count:
                         let mc_plain_pi = mc_pai + mc_plain_poff
                         if mc_plain_pi >= mc_plain_pc:
                             break
                         let mc_exp_ty = self.sig_param_type(sig_idx, mc_plain_pi)
                         let mc_act_ty = arg_types[mc_pai]
+                        mc_sc_all_args.push(if mc_has_resolved_args != 0: self.get_resolved_call_arg(node, mc_pai) else: self.ast.get_extra(extra_start + mc_pai))
                         if mc_exp_ty != 0 and mc_act_ty != 0:
                             if self.type_is_dyn_object(self.resolve_alias(mc_exp_ty)) == 0:
                                 let mc_perr_arg = if mc_has_resolved_args != 0: self.get_resolved_call_arg(node, mc_pai) else: self.ast.get_extra(extra_start + mc_pai)
                                 let mc_compat = self.call_arg_type_compatible(mc_exp_ty, mc_act_ty)
                                 if mc_compat == 0:
-                                    self.emit_argument_type_mismatch(mc_plain_name, method_fn_sym, mc_pai, mc_plain_pi, mc_exp_ty, mc_act_ty, if mc_perr_arg > 0: mc_perr_arg else: node)
+                                    let mc_sc_kind = self.note_slice_coerce_call_arg(mc_exp_ty, mc_act_ty, mc_perr_arg, if mc_perr_arg > 0: mc_perr_arg else: node)
+                                    if mc_sc_kind == 2:
+                                        mc_sc_mut_args.push(mc_perr_arg)
+                                    if mc_sc_kind == 0:
+                                        self.emit_argument_type_mismatch(mc_plain_name, method_fn_sym, mc_pai, mc_plain_pi, mc_exp_ty, mc_act_ty, if mc_perr_arg > 0: mc_perr_arg else: node)
                                 else:
                                     self.note_call_arg_coercion(mc_exp_ty, mc_act_ty, mc_perr_arg, node)
+                    if mc_sc_mut_args.len() > 0:
+                        self.check_mut_slice_call_exclusivity(mc_sc_mut_args, mc_sc_all_args)
                 if mc_resolved_tk == TypeKind.TY_GENERIC_INST:
                     // Check argument types against substituted parameter types
                     let mc_method_name = self.pool_resolve(type_name_sym) ++ "." ++ self.pool_resolve(field)

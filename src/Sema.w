@@ -456,6 +456,12 @@ type ForeignContract {
     callback_userdata_of: Vec[i32],    // … and the userdata parameter M it receives (parallel)
     valid_on_failed: i32,              // `valid on failed`: presented on the failed-state resource too (§16.2b.4)
     nullable_params: Vec[i32],         // `nullable param N`: the facade establishes the parameter accepts NULL (§16.2b.8)
+    buffer_ptr: Vec[i32],              // D64 §16.2b.8: each `buffer param P …` pairing's pointer parameter …
+    buffer_len: Vec[i32],              // … its length parameter (parallel) …
+    buffer_inout: Vec[i32],            // … and 1 for `capacity param L inout`, 0 for `len param L` (parallel)
+    fixed_params: Vec[i32],            // D64 §16.2b.11: each `param N fixed <literal>` parameter …
+    fixed_literals: Vec[i32],          // … and its literal node (parallel)
+    ok_const: i32,                     // `ok CONST` on the fn item: the status contract a copied-back length is presented under (D64)
 }
 
 // A callback method a facade rendered on a resource (stage 9, ruling
@@ -1171,6 +1177,8 @@ pub type Sema {
     // (SemaFacade.w verify_facade_text_return; SemaCheck.w check_call;
     // MirLower.w lower_call).
     facade_presented_syms: HashMap[i32, i32],      // fn sym -> 1
+    facade_bridge_of: HashMap[str, str],           // D64: C name -> the rendered free operation presented under it (`__with_facade_<name>`)
+    facade_bridge_syms: HashMap[i32, i32],         // D64: bridge symbols a call was redirected to (MirLower.w lower_call) -> 1
     facade_presented_calls: HashMap[i32, i32],     // call node -> 1
     // §30 (spec §16.2b.6): ephemeral-storage errors whose ephemerality a
     // facade resource supplies, held until the facade facts exist
@@ -2551,6 +2559,8 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         current_facade_sym: 0,
         current_facade_node: 0,
         facade_presented_syms: sema_new_map_i32_i32(),
+        facade_bridge_of: HashMap.new(),
+        facade_bridge_syms: sema_new_map_i32_i32(),
         facade_presented_calls: sema_new_map_i32_i32(),
         facade_layout_nodes: Vec.new(),
         facade_layout_tids: Vec.new(),

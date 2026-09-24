@@ -33,6 +33,7 @@ impl Sema:
         self.verify_facade_presentation()
         self.verify_facade_failed_state_items()
         self.verify_facade_nullable_items()
+        self.verify_facade_buffers()
         self.verify_facade_borrowed_returns()
         self.verify_facade_text_views()
         self.verify_facade_callback_items()
@@ -256,45 +257,51 @@ impl Sema:
         let fname: str = self.pool_resolve(self.facade_resources[ri].facade)
         let rendered_file = "<facade " ++ fname ++ ">"
         for ni in 0..names.len() as i32:
-            let sym = self.pool_lookup_symbol(names[ni])
-            if sym == 0:
-                continue
-            var own = 0
-            var other = ""
-            var i = if self.decl_visibility_index.contains(sym): self.decl_visibility_index.get(sym).unwrap() else: -1
-            while i >= 0:
-                let node = self.decl_visibility_nodes[i]
-                let path = self.decl_visibility_paths[i]
-                let is_pub = self.decl_visibility_pub[i]
-                i = self.decl_visibility_prev[i]
-                if node == 0 or self.ast.kind(node) != NodeKind.NK_TYPE_DECL:
-                    continue
-                let same_module = path == self.current_module_path
-                let imported = not same_module and (sema_tier_path_is_std_implementation(path) == 0 or self.module_visible_no_prelude(path) != 0) and self.decl_visible_from_current_gated(path, is_pub, sym) != 0
-                if not same_module and not imported:
-                    continue
-                let di = self.find_decl_index(node)
-                let file = self.facade_decl_file_name(di)
-                if file == rendered_file and own == 0:
-                    own = 1
-                    continue
-                if other.len() == 0:
-                    let n = names[ni]
-                    // Another facade's rendering is named by the resource that
-                    // states it, at its own line, never by the rendered text.
-                    let owner = if file.starts_with("<facade "): self.facade_resource_named(n, ri) else: -1
-                    if owner >= 0:
-                        let at = self.facade_decl_location(self.facade_resources[owner].decl, self.facade_resources[owner].node)
-                        other = f"{at} declares the resource '{n}'"
-                    else:
-                        let at = self.facade_decl_location(di, node)
-                        other = if same_module: f"{at} declares a type '{n}' in the same module" else: f"{at} declares a type '{n}', which this module imports"
+            let other = self.facade_generated_name_clash(names[ni], rendered_file, ri)
             if other.len() > 0:
                 let n = names[ni]
                 let role = roles[ni]
                 self.emit_error(f"resource '{rname}' renders '{n}', {role}, and {other}; the compiler never picks between two types of one name — rename one (§16.2b.4)", self.facade_resources[ri].node)
                 return false
         true
+
+    // The other declaration of a type named `name` visible from the current
+    // module — beyond the one the rendering `rendered_file` makes — described
+    // for a diagnostic, or "" when the name is the rendering's alone.
+    fn facade_generated_name_clash(name: &str, rendered_file: &str, except_ri: i32) -> str:
+        let sym = self.pool_lookup_symbol(name)
+        if sym == 0:
+            return ""
+        var own = 0
+        var other = ""
+        var i = if self.decl_visibility_index.contains(sym): self.decl_visibility_index.get(sym).unwrap() else: -1
+        while i >= 0:
+            let node = self.decl_visibility_nodes[i]
+            let path = self.decl_visibility_paths[i]
+            let is_pub = self.decl_visibility_pub[i]
+            i = self.decl_visibility_prev[i]
+            if node == 0 or self.ast.kind(node) != NodeKind.NK_TYPE_DECL:
+                continue
+            let same_module = path == self.current_module_path
+            let imported = not same_module and (sema_tier_path_is_std_implementation(path) == 0 or self.module_visible_no_prelude(path) != 0) and self.decl_visible_from_current_gated(path, is_pub, sym) != 0
+            if not same_module and not imported:
+                continue
+            let di = self.find_decl_index(node)
+            let file = self.facade_decl_file_name(di)
+            if file == rendered_file and own == 0:
+                own = 1
+                continue
+            if other.len() == 0:
+                // Another facade's rendering is named by the resource that
+                // states it, at its own line, never by the rendered text.
+                let owner = if file.starts_with("<facade "): self.facade_resource_named(name, except_ri) else: -1
+                if owner >= 0:
+                    let at = self.facade_decl_location(self.facade_resources[owner].decl, self.facade_resources[owner].node)
+                    other = f"{at} declares the resource '{name}'"
+                else:
+                    let at = self.facade_decl_location(di, node)
+                    other = if same_module: f"{at} declares a type '{name}' in the same module" else: f"{at} declares a type '{name}', which this module imports"
+        other
 
     // A resource of that name other than `except` (another facade block,
     // perhaps in another module, may render the same name).
@@ -846,7 +853,7 @@ impl Sema:
                 return
             self.emit_error(f"fn '{fname}' is described by two facade blocks with different clauses; one function has one contract — restate it word for word or describe it once (§16.2b)", item)
             return
-        var c = ForeignContract { fn_sym, decl, facade, node: item, lend: 0, destroys: 0, consumes: Vec.new(), consumes_destroyed_by: Vec.new(), retains: Vec.new(), retains_by: Vec.new(), returns_borrow_resource: 0, returns_borrow_from: -1, returns_borrow_domain: 0, returns_static_tid: 0, preserves_params: Vec.new(), preserves_domains: Vec.new(), of_resource: 0, rename: 0, callback_thread_any: 0, callback_consumes: Vec.new(), callback_userdata_cb: Vec.new(), callback_userdata_of: Vec.new(), valid_on_failed: 0, nullable_params: Vec.new() }
+        var c = ForeignContract { fn_sym, decl, facade, node: item, lend: 0, destroys: 0, consumes: Vec.new(), consumes_destroyed_by: Vec.new(), retains: Vec.new(), retains_by: Vec.new(), returns_borrow_resource: 0, returns_borrow_from: -1, returns_borrow_domain: 0, returns_static_tid: 0, preserves_params: Vec.new(), preserves_domains: Vec.new(), of_resource: 0, rename: 0, callback_thread_any: 0, callback_consumes: Vec.new(), callback_userdata_cb: Vec.new(), callback_userdata_of: Vec.new(), valid_on_failed: 0, nullable_params: Vec.new(), buffer_ptr: Vec.new(), buffer_len: Vec.new(), buffer_inout: Vec.new(), fixed_params: Vec.new(), fixed_literals: Vec.new(), ok_const: 0 }
         let extra_start = self.ast.get_data1(item)
         let clause_count = self.ast.get_data2(item)
         for ci in 0..clause_count:
@@ -1107,6 +1114,123 @@ impl Sema:
                     self.emit_error(f"fn '{fname}': 'nullable param {pi}' is stated twice (§16.2b.8)", clause)
                     return c
             c.nullable_params.push(pi)
+        if kind == FACADE_CLAUSE_BUFFER:
+            // `buffer param P len param L` / `buffer param P capacity param L
+            // inout` (D64, §16.2b.8): P and L are one `[]u8` (`[]mut u8`)
+            // parameter. The length counts bytes, so P points at bytes; L
+            // is the integer C reads, or — inout — the pointer to the
+            // integer C reads and writes back.
+            let p = self.facade_resolve_param(self.ast.get_extra(ops), fn_sym, sig)
+            if p < 0:
+                return c
+            let l = self.facade_resolve_param(self.ast.get_extra(ops + 1), fn_sym, sig)
+            if l < 0:
+                return c
+            let inout = self.ast.get_extra(ops + 2)
+            let ptype = self.resolve_alias(self.sig_param_type(sig, p) as TypeId)
+            if self.get_type_kind(ptype) != TypeKind.TY_PTR or not self.facade_type_is_byte(self.get_type_d0(ptype)):
+                let shown = self.facade_param_display(fn_sym, sig, p)
+                self.emit_error(f"fn '{fname}': 'buffer param {p}' names {shown}, which is not a pointer to bytes ('char *', 'unsigned char *', 'void *' or a typedef of one); a buffer's length counts bytes, and the clause renders []u8, never an element slice of another type (§16.2b.8)", clause)
+                return c
+            if inout != 0 and self.get_type_d1(ptype) == 0:
+                let shown = self.facade_param_display(fn_sym, sig, p)
+                self.emit_error(f"fn '{fname}': 'buffer param {p} capacity … inout' names {shown}, a const pointer; C cannot write into it — a buffer C fills is 'T *', and an input buffer is paired with 'len' (§16.2b.8)", clause)
+                return c
+            if p == l:
+                let shown = self.facade_param_display(fn_sym, sig, p)
+                self.emit_error(f"fn '{fname}': 'buffer param {p}' pairs {shown} with itself; a pairing names the pointer and the distinct integer that carries its length (§16.2b.8)", clause)
+                return c
+            let ltype = self.resolve_alias(self.sig_param_type(sig, l) as TypeId)
+            if inout == 0:
+                if self.get_type_kind(self.numeric_operand_type(ltype as i32)) != TypeKind.TY_INT:
+                    let shown = self.facade_param_display(fn_sym, sig, l)
+                    self.emit_error(f"fn '{fname}': 'len param {l}' names {shown}, which is not an integer; the length parameter carries the byte count C reads (§16.2b.8)", clause)
+                    return c
+            else if self.get_type_kind(ltype) != TypeKind.TY_PTR or self.get_type_d1(ltype) == 0 or self.get_type_kind(self.numeric_operand_type(self.get_type_d0(ltype))) != TypeKind.TY_INT:
+                let shown = self.facade_param_display(fn_sym, sig, l)
+                self.emit_error(f"fn '{fname}': 'capacity param {l} inout' names {shown}, which is not a pointer to an integer; C reads the capacity through it and writes the produced length back (§16.2b.8)", clause)
+                return c
+            for k in 0..c.buffer_ptr.len() as i32:
+                let taken = if c.buffer_ptr[k] == p or c.buffer_len[k] == p: p else if c.buffer_ptr[k] == l or c.buffer_len[k] == l: l else: -1
+                if taken >= 0:
+                    let shown = self.facade_param_display(fn_sym, sig, taken)
+                    self.emit_error(f"fn '{fname}': {shown} is already part of a buffer pairing; a parameter is paired once (§16.2b.8)", clause)
+                    return c
+            for k in 0..c.fixed_params.len() as i32:
+                if c.fixed_params[k] == p or c.fixed_params[k] == l:
+                    let shown = self.facade_param_display(fn_sym, sig, c.fixed_params[k])
+                    self.emit_error(f"fn '{fname}': {shown} is bound by 'fixed' and cannot also be a buffer or its length (§16.2b.8, §16.2b.11)", clause)
+                    return c
+            c.buffer_ptr.push(p)
+            c.buffer_len.push(l)
+            c.buffer_inout.push(inout)
+            return c
+        if kind == FACADE_CLAUSE_FIXED:
+            // `param N fixed <literal>` (D64, §16.2b.11): the presented call
+            // always passes the literal, which must be a value of the C
+            // parameter's type — the raw operation stays available for any
+            // other value.
+            let pi = self.facade_resolve_param(self.ast.get_extra(ops), fn_sym, sig)
+            if pi < 0:
+                return c
+            let lit = self.ast.get_extra(ops + 1)
+            let ptype = self.resolve_alias(self.sig_param_type(sig, pi) as TypeId)
+            let shown = self.facade_param_display(fn_sym, sig, pi)
+            let lk = self.ast.kind(lit)
+            let is_int = lk == NodeKind.NK_INT_LIT or (lk == NodeKind.NK_UNARY and self.ast.get_data0(lit) == UnaryOp.UOP_NEGATE)
+            if lk == NodeKind.NK_NULL_LIT:
+                if self.get_type_kind(ptype) != TypeKind.TY_PTR:
+                    self.emit_error(f"fn '{fname}': 'param {pi} fixed null' binds {shown}, which is not a pointer (§16.2b.11)", clause)
+                    return c
+            else if lk == NodeKind.NK_BOOL_LIT:
+                if self.resolve_alias(ptype) != self.ty_bool:
+                    self.emit_error(f"fn '{fname}': 'param {pi} fixed' binds a boolean to {shown}, which is not a bool (§16.2b.11)", clause)
+                    return c
+            else if is_int:
+                if self.get_type_kind(self.numeric_operand_type(ptype as i32)) != TypeKind.TY_INT:
+                    self.emit_error(f"fn '{fname}': 'param {pi} fixed' binds an integer to {shown}, which is not an integer (§16.2b.11)", clause)
+                    return c
+                let negative = lk == NodeKind.NK_UNARY or self.ast.int_lit_value(lit) < 0
+                if negative and self.is_unsigned_int_type(self.numeric_operand_type(ptype as i32)):
+                    self.emit_error(f"fn '{fname}': 'param {pi} fixed' binds a negative literal to {shown}, an unsigned integer (§16.2b.11)", clause)
+                    return c
+            else:
+                self.emit_error(f"fn '{fname}': a fixed argument is an integer literal, 'null', 'true' or 'false' (§16.2b.11)", clause)
+                return c
+            if self.facade_param_receives(fn_sym, pi).len() > 0:
+                self.emit_error(f"fn '{fname}': 'param {pi} fixed' binds {shown}, which receives a modeled resource; a resource is passed by the value that owns it, never fixed (§16.2b.11)", clause)
+                return c
+            for k in 0..c.fixed_params.len() as i32:
+                if c.fixed_params[k] == pi:
+                    self.emit_error(f"fn '{fname}': {shown} is fixed twice (§16.2b.11)", clause)
+                    return c
+            for k in 0..c.buffer_ptr.len() as i32:
+                if c.buffer_ptr[k] == pi or c.buffer_len[k] == pi:
+                    self.emit_error(f"fn '{fname}': {shown} is part of a buffer pairing and cannot also be fixed (§16.2b.8, §16.2b.11)", clause)
+                    return c
+            c.fixed_params.push(pi)
+            c.fixed_literals.push(lit)
+            return c
+        if kind == FACADE_CLAUSE_OK:
+            // `ok CONST` on an fn item (D64, §16.2b.8): the status contract
+            // under which a copied-back length is presented — on success
+            // only. A resource's producer states `ok` on the resource
+            // (§16.2b.4); an fn item's `ok` needs a length to present, which
+            // verify_facade_buffers checks once every clause is collected.
+            let const_sym = self.ast.get_extra(ops)
+            let cn: str = self.pool_resolve(const_sym)
+            if not self.facade_status_constant_ok(const_sym):
+                self.emit_error(f"fn '{fname}': 'ok {cn}' names no imported integer constant; a status is compared with a compile-time constant the header declares (§16.2b.4)", clause)
+                return c
+            let ret = self.sig_return_type(sig)
+            if ret == 0 or self.get_type_kind(self.numeric_operand_type(ret)) != TypeKind.TY_INT:
+                let rt: str = if ret == 0: "nothing" else: self.type_name(ret)
+                self.emit_error(f"fn '{fname}': 'ok {cn}' compares an integer status, but the function returns {rt} (§16.2b.4)", clause)
+                return c
+            if c.ok_const != 0:
+                self.emit_error(f"fn '{fname}': 'ok' is stated twice (§16.2b.4)", clause)
+                return c
+            c.ok_const = const_sym
             return c
         let cname = facade_clause_name(kind)
         self.emit_error(f"fn '{fname}': clause '{cname}' applies to a resource, not an fn item (§16.2b)", clause)
@@ -1347,6 +1471,8 @@ fn facade_clause_name(kind: i32) -> str:
     if kind == FACADE_CLAUSE_CALLBACK_USERDATA: return "callback … userdata"
     if kind == FACADE_CLAUSE_VALID_ON_FAILED: return "valid on failed"
     if kind == FACADE_CLAUSE_NULLABLE: return "nullable"
+    if kind == FACADE_CLAUSE_BUFFER: return "buffer"
+    if kind == FACADE_CLAUSE_FIXED: return "param … fixed"
     "callback consumes"
 
 // ── stage 3: raw classification consults the facts ──────────────────────
@@ -1399,6 +1525,11 @@ impl Sema:
         if ci < 0:
             return false
         if pi == 0 and self.foreign_contracts[ci].destroys != 0:
+            return false
+        // A buffer, its length and a fixed argument are reached through the
+        // presented rendering alone (D64): the raw call, which takes a bare
+        // pointer and a length nothing ties to it, stays raw.
+        if self.facade_contract_pairs(ci, pi):
             return false
         not self.facade_param_takes_resource(fn_sym, pi)
 
@@ -1659,6 +1790,175 @@ impl Sema:
                     self.update_decl_source_context(if ci >= 0: self.foreign_contracts[ci].decl else: self.facade_resources[ri].decl)
                     self.emit_error(f"resource '{rname}': '{ca}' is renamed '{na}', and '{cb}' is presented as '{nb}' on '{rname}' too; two operations of one resource cannot share a name — rename one (§16.2b.11)", node)
                     break
+
+    // ── D64: buffer pairing and fixed arguments (§16.2b.8, §16.2b.11) ────
+    //
+    // A pairing or a fixed argument is a fact about the presented call, so
+    // an item carrying one is presented: a lend method of the resource its
+    // first parameter receives, a free operation rendered under its
+    // presented name (FacadeRender.w facade_render_free_ops), or — fixed
+    // arguments only — a producer or callback item. The rendering computes
+    // `capacity = dest.len`, calls C with its address, bounds-checks the
+    // written value against that capacity and returns it as `usize`, on
+    // success only; nothing here reinterprets a parameter. What is verified:
+    // the shapes the rendering can express, the status contract an inout
+    // length needs, the generated `<Fn>Error` name, and the refusal the
+    // ruling states — a raw pointer parameter that no clause pairs is not a
+    // buffer, and a lend or presentation clause on such a function renders
+    // no call (the hole #1625 found: a bare `lend` on `compress`).
+    mut fn verify_facade_buffers():
+        for ci in 0..self.foreign_contracts.len() as i32:
+            self.verify_facade_buffer_item(ci)
+
+    fn facade_contract_presented(ci: i32) -> bool:
+        let c = &self.foreign_contracts[ci]
+        c.lend != 0 or c.rename != 0 or c.of_resource != 0 or c.buffer_ptr.len() > 0 or c.fixed_params.len() > 0 or c.ok_const != 0
+
+    // Whether parameter `pi` is a buffer, a buffer's length, or fixed.
+    fn facade_contract_pairs(ci: i32, pi: i32) -> bool:
+        let c = &self.foreign_contracts[ci]
+        for k in 0..c.buffer_ptr.len() as i32:
+            if c.buffer_ptr[k] == pi or c.buffer_len[k] == pi: return true
+        for k in 0..c.fixed_params.len() as i32:
+            if c.fixed_params[k] == pi: return true
+        false
+
+    // Whether a callback, retention or consumption clause models `pi`.
+    fn facade_contract_models_param(ci: i32, pi: i32) -> bool:
+        let c = &self.foreign_contracts[ci]
+        c.callback_userdata_cb.contains(pi) or c.callback_userdata_of.contains(pi) or c.retains.contains(pi) or c.consumes.contains(pi) or c.consumes_destroyed_by.contains(pi) or c.callback_consumes.contains(pi)
+
+    // The index of the `capacity … inout` pairing, or -1.
+    fn facade_contract_inout(ci: i32) -> i32:
+        let c = &self.foreign_contracts[ci]
+        for k in 0..c.buffer_ptr.len() as i32:
+            if c.buffer_inout[k] != 0: return k
+        -1
+
+    // The out-parameter slot a resource's producer `fn_sym` writes, or -1.
+    fn facade_fn_out_param(fn_sym: i32) -> i32:
+        for ri in 0..self.facade_resources.len() as i32:
+            let r = &self.facade_resources[ri]
+            for k in 0..r.producers.len() as i32:
+                if self.facade_same_fn(r.producers[k], fn_sym): return r.out_params[k]
+        -1
+
+    fn facade_fn_is_destroyer_or_init(fn_sym: i32) -> bool:
+        for ri in 0..self.facade_resources.len() as i32:
+            let r = &self.facade_resources[ri]
+            if self.facade_same_fn(r.init, fn_sym) or self.facade_same_fn(r.preinit, fn_sym) or self.facade_same_fn(r.drop, fn_sym):
+                return true
+            for k in 0..r.destroyers.len() as i32:
+                if self.facade_same_fn(r.destroyers[k], fn_sym): return true
+        false
+
+    // The name a free operation is presented under: its `rename`, or the C
+    // name. Under the C name the rendering is `__with_facade_<name>`
+    // (facade_render_bridge_name) and a call to the C name is redirected to
+    // it where it is visible (facade_bridge_redirect); the raw declaration
+    // stays what C declared, for the bridge's own call and for every module
+    // that imports the header without the facade.
+    fn facade_presented_free_name(ci: i32) -> str:
+        let c = &self.foreign_contracts[ci]
+        let name: str = self.pool_resolve(if c.rename != 0: c.rename else: c.fn_sym)
+        name
+
+    mut fn facade_bridge_redirect(fn_sym: i32) -> i32:
+        if self.facade_bridge_of.len() == 0:
+            return fn_sym
+        let name: str = self.pool_resolve(fn_sym)
+        if not self.facade_bridge_of.contains(name):
+            return fn_sym
+        let bname: str = self.facade_bridge_of.get(name).unwrap()
+        let bsym = self.pool_lookup_symbol(bname)
+        // The bridge's own body calls the C name: the raw operation.
+        if bsym == 0 or bsym == self.current_fn_symbol or self.symbol_visible_from_current(bsym) == 0 or self.get_visible_sig(bsym) < 0:
+            return fn_sym
+        self.facade_bridge_syms.insert(bsym, 1)
+        bsym
+
+    fn facade_type_is_byte(tid: i32) -> bool:
+        let r = self.resolve_alias(tid as TypeId)
+        r == self.ty_u8 or r == self.ty_i8 or self.is_c_void_like_type(r as i32) != 0
+
+    mut fn verify_facade_buffer_item(ci: i32):
+        self.update_decl_source_context(self.foreign_contracts[ci].decl)
+        let fn_sym = self.foreign_contracts[ci].fn_sym
+        let node = self.foreign_contracts[ci].node
+        let fname: str = self.pool_resolve(fn_sym)
+        let sig = self.get_sig(fn_sym)
+        if sig < 0:
+            return
+        let has_pairs = self.foreign_contracts[ci].buffer_ptr.len() > 0
+        let has_fixed = self.foreign_contracts[ci].fixed_params.len() > 0
+        let inout = self.facade_contract_inout(ci)
+        let ok_const = self.foreign_contracts[ci].ok_const
+        let resource_op = self.facade_fn_is_resource_op(fn_sym)
+        let contract_item = self.foreign_contracts[ci].destroys != 0 or self.foreign_contracts[ci].consumes.len() > 0 or self.foreign_contracts[ci].retains.len() > 0 or self.foreign_contracts[ci].callback_userdata_cb.len() > 0 or self.foreign_contracts[ci].callback_consumes.len() > 0 or self.foreign_contracts[ci].callback_thread_any != 0
+        if has_pairs and (resource_op or contract_item):
+            let what = if resource_op: "a resource's own operation (its producer, initializer, drop or destroyer)" else: "a callback, retention or consumption contract"
+            self.emit_error(f"fn '{fname}': a buffer pairing describes a lend or a free operation, and '{fname}' is {what}; a slice in that rendering is not modeled (§16.2b.8)", node)
+            return
+        if has_fixed and self.facade_fn_is_destroyer_or_init(fn_sym):
+            self.emit_error(f"fn '{fname}': a destroyer, initializer or drop takes only what the resource passes it; a fixed argument on '{fname}' is not modeled (§16.2b.11)", node)
+            return
+        let ret = self.sig_return_type(sig)
+        let void_ret = ret == 0 or self.get_type_kind(self.resolve_alias(ret as TypeId)) == TypeKind.TY_VOID
+        if inout >= 0 and (self.foreign_contracts[ci].returns_borrow_resource != 0 or self.foreign_contracts[ci].returns_static_tid != 0):
+            self.emit_error(f"fn '{fname}': 'capacity … inout' presents the length C writes back as the operation's result, and a 'returns' clause presents the return; one operation has one result (§16.2b.8)", node)
+            return
+        if inout >= 0 and not void_ret and ok_const == 0:
+            let rt: str = self.type_name(ret)
+            self.emit_error_with_help(f"fn '{fname}': 'capacity … inout' presents the length C writes back only on success (§16.2b.8), and '{fname}' returns {rt} with no status contract", node, "state the success status: 'ok <CONST>' (§16.2b.4)")
+            return
+        if ok_const != 0 and inout < 0:
+            let cn: str = self.pool_resolve(ok_const)
+            self.emit_error(f"fn '{fname}': 'ok {cn}' states the status contract a copied-back length is presented under, and '{fname}' pairs no 'capacity … inout' buffer, so there is no value to present on success; a producer's status is stated on its resource (§16.2b.4, §16.2b.8)", node)
+            return
+        if not self.facade_contract_presented(ci):
+            return
+        // The refusal: every raw pointer parameter of a presented operation
+        // is reached through some clause — the receiver through its
+        // resource, a C string through the text rule, an out slot through
+        // the producer, a callback through its contract, a buffer through
+        // its pairing, a fixed argument through its literal.
+        let out_param = self.facade_fn_out_param(fn_sym)
+        for pi in 0..self.sig_get_param_count(sig):
+            if pi == out_param or self.facade_contract_pairs(ci, pi) or self.facade_contract_models_param(ci, pi):
+                continue
+            let pty = self.sig_param_type(sig, pi)
+            if self.ci_type_requires_raw_contract(pty) == 0 or self.ci_type_is_const_c_string_input(pty) != 0:
+                continue
+            if self.facade_param_presentable(fn_sym, pi):
+                continue
+            let shown = self.facade_param_display(fn_sym, sig, pi)
+            let pname = self.facade_param_c_name(fn_sym, pi)
+            self.emit_error_with_help(f"fn '{fname}': {shown} is a raw pointer that no clause pairs, so it is not a buffer; a presented operation renders no call without a bounds contract (§16.2b.8)", node, f"pair it with 'buffer param {pname} len param <L>' or 'buffer param {pname} capacity param <L> inout', bind it with 'param {pname} fixed <literal>', or leave the operation raw")
+            return
+        if resource_op or self.diags.has_errors():
+            return
+        let hosted = self.facade_method_host(fn_sym).len() == 1 and not contract_item
+        let presented_name = if hosted: self.facade_presented(self.facade_method_host(fn_sym)[0], fname) else: self.facade_presented_free_name(ci)
+        let facade_name: str = self.pool_resolve(self.foreign_contracts[ci].facade)
+        let rendered_file = "<facade " ++ facade_name ++ ">"
+        if ok_const != 0:
+            let err = facade_render_fn_error_name(presented_name)
+            let other = self.facade_generated_name_clash(err, rendered_file, -1)
+            if other.len() > 0:
+                self.emit_error(f"fn '{fname}' renders '{err}', the error type of its 'ok' projection, and {other}; the compiler never picks between two types of one name — rename one (§16.2b.4)", node)
+                return
+        if hosted or not (has_pairs or has_fixed):
+            return
+        // A free operation passed every check: its rendering must exist, or
+        // the presented call would silently be the raw one.
+        let rendered_name = if self.foreign_contracts[ci].rename != 0: presented_name.clone() else: facade_render_bridge_name(fname)
+        for di in 0..self.ast.decl_count():
+            let decl = self.ast.get_decl(di)
+            if self.ast.kind(decl) == NodeKind.NK_FN_DECL and self.safe_symbol_text(self.ast.get_data0(decl)) == rendered_name and self.facade_decl_file_name(di) == rendered_file:
+                if self.foreign_contracts[ci].rename == 0:
+                    self.facade_bridge_of.insert(fname, rendered_name)
+                return
+        self.emit_error(f"fn '{fname}': its buffer pairing or fixed argument passed every facade check but no '{rendered_name}' was rendered — a compiler defect (§16.2b.8)", node)
 
     // A resource's producers, as owners of dependencies: each `from` by its
     // index, and the `init` as FACADE_DEP_INIT.
@@ -2512,6 +2812,10 @@ impl Sema:
                     continue
                 if self.facade_param_receives(fn_sym, pi).len() > 0 or self.ci_type_is_const_c_string_input(ptid) != 0 or self.facade_param_is_callable(sig, pi):
                     continue
+                // A paired buffer, its length or a fixed argument (D64) is
+                // the rendering's: the slice, or the literal.
+                if self.facade_contract_pairs(ci, pi):
+                    continue
                 // A pointer to a C record is a handle, not a buffer: no
                 // length pairs with it, and a lend of one is the stage-3
                 // default (a facade lends every parameter it does not
@@ -2524,7 +2828,8 @@ impl Sema:
                 self.update_decl_source_context(decl)
                 let fname: str = self.pool_resolve(fn_sym)
                 let shown = self.facade_param_display(fn_sym, sig, pi)
-                self.emit_error_with_help(f"fn '{fname}': a lend would make the call safe, but {shown} is a caller-owned buffer that needs a length contract, and no clause states one yet (#1621); a safe call over a raw pointer with no bounds is the partial model §16.2b.3 forbids — leave the call raw (§16.2b.5, §16.2b.8)", node, "describe the function without a lend until the buffer clause lands, and call it under the raw C rules (`unsafe`)")
+                let pname = self.facade_param_c_name(fn_sym, pi)
+                self.emit_error_with_help(f"fn '{fname}': a lend would make the call safe, but {shown} is a caller-owned buffer that no clause pairs; a safe call over a raw pointer with no bounds is the partial model §16.2b.3 forbids (§16.2b.5, §16.2b.8)", node, f"pair it with 'buffer param {pname} len param <L>' or 'buffer param {pname} capacity param <L> inout', bind it with 'param {pname} fixed <literal>', or leave the operation raw (D64)")
                 break
 
     // ── the failed state (ruling §18; spec §16.2b.4; D59) ─────────────────

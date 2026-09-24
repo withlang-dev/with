@@ -99,8 +99,31 @@ pub fn facade_render_block(pool: AstPool, intern: InternPool, facade: i32, ci: &
         let item = pool.get_extra(extra_start + i)
         if pool.kind(item as NodeId) == NodeKind.NK_FACADE_RESOURCE:
             let text_view = facade_render_text_view(pool, intern, item)
+            out = out ++ facade_render_hosted_fn_errors(pool, intern, ci, item)
             out = out ++ facade_render_resource(pool, intern, ci, item, facade_render_lend_methods(pool, intern, ci, item, true, false) ++ text_view ++ facade_render_callback_methods(pool, intern, ci, item), facade_render_lend_methods(pool, intern, ci, item, false, false) ++ text_view, facade_render_lend_methods(pool, intern, ci, item, false, true))
+    // Free operations (D64): the block's own fn items presented with a
+    // buffer pairing or a fixed argument and hosted by no resource.
+    out = out ++ facade_render_free_ops(pool, intern, ci, facade)
     facade_render_public(out)
+
+// The `<Fn>Error` types of the resource's lend methods that present a
+// copied-back length under `ok` (D64): declared beside the resource, since
+// an error type cannot live inside its impl.
+fn facade_render_hosted_fn_errors(pool: AstPool, intern: InternPool, ci: &Vec[i32], resource: i32) -> str:
+    let repr_text = render_type_expr(pool, intern, pool.get_extra(pool.get_data1(resource as NodeId)) as NodeId)
+    let repr = facade_render_unalias(pool, intern, repr_text)
+    var out = ""
+    let items = facade_render_all_items(pool, NodeKind.NK_FACADE_FN)
+    for i in 0..items.len() as i32:
+        let li = facade_render_lend_item(pool, intern, ci, items[i])
+        if not li.bridged or li.text_view or li.borrow_res != 0 or not facade_render_lend_hosted(pool, intern, &li, resource, repr):
+            continue
+        let bridge = facade_render_bridge(pool, intern, li.decl, 1, -1, "")
+        if not bridge.ok or bridge.cap_var.len() == 0 or facade_render_fn_ok(pool, intern, li.decl) == 0:
+            continue
+        let fname: str = intern.resolve(pool.get_data0(li.decl as NodeId))
+        out = out ++ facade_render_fn_error_type(pool, intern, li.decl, facade_render_present(pool, intern, ci, resource, fname))
+    out
 
 // Everything a facade renders is its module's public surface (spec
 // §16.2b.1: a facade is written in the importing project or shipped by a
@@ -204,7 +227,12 @@ fn facade_render_lend_methods(pool: AstPool, intern: InternPool, ci: &Vec[i32], 
         if repr_arg.len() == 0:
             continue
         let head = if repr_arg.starts_with("&raw mut "): "    mut fn " else: "    fn "
-        let (params, args) = facade_render_params(pool, intern, decl, 1)
+        let bridge = facade_render_bridge(pool, intern, decl, 1, -1, "")
+        if not bridge.ok:
+            continue
+        let params = bridge.params.clone()
+        let args = bridge.args.clone()
+        let pro = facade_render_indent(bridge.prologue, "        ")
         let call_args = if args.len() > 0: repr_arg ++ ", " ++ args else: repr_arg.clone()
         if li.text_view:
             // `returns borrow CStr from …` / `returns static CStr` (ruling
@@ -217,7 +245,7 @@ fn facade_render_lend_methods(pool: AstPool, intern: InternPool, ci: &Vec[i32], 
             // declared summary Sema puts on this method
             // (SemaFacade.w verify_facade_borrowed_returns).
             let handle = facade_render_fresh("repr", facade_render_param_names(pool, intern, decl))
-            out = out ++ head ++ mname ++ "(" ++ params ++ ") -> Option[CStr]:\n        let " ++ handle ++ " = " ++ facade_render_call(pool, intern, decl, call_args) ++ "\n        if " ++ handle ++ " == null: None else: Some(unsafe { CStr.from_ptr(" ++ handle ++ " as *const i8) })\n"
+            out = out ++ head ++ mname ++ "(" ++ params ++ ") -> Option[CStr]:\n" ++ pro ++ "        let " ++ handle ++ " = " ++ facade_render_call(pool, intern, decl, call_args) ++ "\n        if " ++ handle ++ " == null: None else: Some(unsafe { CStr.from_ptr(" ++ handle ++ " as *const i8) })\n"
             continue
         if li.borrow_res != 0:
             if not with_borrowed_returns:
@@ -232,9 +260,10 @@ fn facade_render_lend_methods(pool: AstPool, intern: InternPool, ci: &Vec[i32], 
             let origin = if from == 0: "self" else: facade_render_param_name(pool, intern, pool.fn_meta_param_start(meta), from)
             let bname = facade_render_borrowed_name(intern.resolve(li.borrow_res))
             let handle = facade_render_fresh("repr", facade_render_param_names(pool, intern, decl))
-            out = out ++ head ++ mname ++ "(" ++ params ++ ") -> Option[" ++ bname ++ "]:\n        let " ++ handle ++ " = " ++ facade_render_call(pool, intern, decl, call_args) ++ "\n        if " ++ handle ++ " == null: None else: Some(" ++ bname ++ " { origin: " ++ origin ++ ", repr: " ++ handle ++ " })\n"
+            out = out ++ head ++ mname ++ "(" ++ params ++ ") -> Option[" ++ bname ++ "]:\n" ++ pro ++ "        let " ++ handle ++ " = " ++ facade_render_call(pool, intern, decl, call_args) ++ "\n        if " ++ handle ++ " == null: None else: Some(" ++ bname ++ " { origin: " ++ origin ++ ", repr: " ++ handle ++ " })\n"
             continue
-        out = out ++ head ++ mname ++ "(" ++ params ++ ")" ++ facade_render_return(pool, intern, decl) ++ ":\n        " ++ facade_render_call(pool, intern, decl, call_args) ++ "\n"
+        let (ret, body) = facade_render_bridge_body(pool, intern, decl, &bridge, facade_render_call(pool, intern, decl, call_args), mname, "        ")
+        out = out ++ head ++ mname ++ "(" ++ params ++ ")" ++ ret ++ ":\n" ++ pro ++ body
     out
 
 // The borrowed value a `returns borrow R from param N` operation yields
@@ -629,10 +658,11 @@ type FacadeLendItem {
     borrow_from: i32,
     text_view: bool,
     valid_on_failed: bool,   // rendered on `Failed<R>` too (#1612)
+    bridged: bool,           // states a buffer pairing, a fixed argument or an `ok` (D64)
 }
 
 fn facade_render_lend_item(pool: AstPool, intern: InternPool, ci: &Vec[i32], item: i32) -> FacadeLendItem:
-    var li = FacadeLendItem { decl: 0, of_sym: 0, rename: 0, lends: true, borrow_res: 0, borrow_from: 0, text_view: false, valid_on_failed: false }
+    var li = FacadeLendItem { decl: 0, of_sym: 0, rename: 0, lends: true, borrow_res: 0, borrow_from: 0, text_view: false, valid_on_failed: false, bridged: false }
     let cstart = pool.get_data1(item as NodeId)
     for k in 0..pool.get_data2(item as NodeId):
         let clause = pool.get_extra(cstart + k)
@@ -652,6 +682,10 @@ fn facade_render_lend_item(pool: AstPool, intern: InternPool, ci: &Vec[i32], ite
             if render_type_expr(pool, intern, pool.get_extra(ops) as NodeId) == "CStr": li.text_view = true
             else: li.lends = false
         else if kind == FACADE_CLAUSE_VALID_ON_FAILED: li.valid_on_failed = true
+        // A buffer pairing, a fixed argument and the status contract of a
+        // copied-back length (D64) describe the lend's presented call
+        // (facade_render_bridge); they make nothing stronger than a lend.
+        else if kind == FACADE_CLAUSE_BUFFER or kind == FACADE_CLAUSE_FIXED or kind == FACADE_CLAUSE_OK: li.bridged = true
         else if kind != FACADE_CLAUSE_LEND and kind != FACADE_CLAUSE_PRESERVES: li.lends = false
     if not li.lends:
         return li
@@ -1394,20 +1428,137 @@ fn facade_render_params(pool: AstPool, intern: InternPool, decl: i32, skip: i32)
 // borrow cannot present stays as C declares it (a producer with one renders
 // nothing — facade_render_deps).
 fn facade_render_params_but(pool: AstPool, intern: InternPool, decl: i32, skip: i32, slot: i32, slot_arg: &str) -> (str, str):
+    let bridge = facade_render_bridge(pool, intern, decl, skip, slot, slot_arg)
+    (bridge.params.clone(), bridge.args.clone())
+
+// ── D64: buffer pairing and fixed arguments (§16.2b.8, §16.2b.11) ──────
+//
+// The presented call's parameters, arguments and the prologue that makes
+// them: a fixed argument (`param N fixed <literal>`) leaves the parameter
+// list and its literal is passed; a buffer pairing (`buffer param P len
+// param L`) presents P and L as one `[]u8` — `[]mut u8` for `capacity …
+// inout` — passing the slice's pointer (null for an empty slice) and its
+// byte length; an inout capacity is a local the bridge initializes to the
+// slice's length and hands C the address of (`cap_var`), so the caller's
+// slice is never modified (D64). The body around the call is
+// facade_render_bridge_body. `ok` is false when a clause names a parameter
+// the declaration does not have — Sema's error — and the item renders
+// nothing.
+type FacadeBridge {
+    ok: bool,
+    params: str,
+    args: str,
+    prologue: str,     // lines, each newline-terminated, unindented
+    cap_var: str,      // the inout capacity local, or ""
+    cap_type: str,     // its C integer type
+    cap_of: str,       // the []mut u8 parameter it is the capacity of
+}
+
+// The fn item describing the C function the declaration `decl` names, in
+// any facade block, or 0.
+fn facade_render_fn_item(pool: AstPool, intern: InternPool, decl: i32) -> i32:
+    let want: str = intern.resolve(pool.get_data0(decl as NodeId))
+    let items = facade_render_all_items(pool, NodeKind.NK_FACADE_FN)
+    for i in 0..items.len() as i32:
+        if intern.resolve(pool.get_data0(items[i] as NodeId)) == want:
+            return items[i]
+    0
+
+// The literal `param N fixed <literal>` binds to parameter `pi`, as source
+// text, or "" when the parameter is not fixed.
+fn facade_render_fixed_literal(pool: AstPool, intern: InternPool, decl: i32, pi: i32) -> str:
+    let item = facade_render_fn_item(pool, intern, decl)
+    if item == 0:
+        return ""
+    let cstart = pool.get_data1(item as NodeId)
+    for k in 0..pool.get_data2(item as NodeId):
+        let clause = pool.get_extra(cstart + k)
+        if pool.get_data0(clause as NodeId) != FACADE_CLAUSE_FIXED:
+            continue
+        let ops = pool.get_data1(clause as NodeId)
+        if facade_render_param_ref(pool, intern, decl, pool.get_extra(ops)) != pi:
+            continue
+        return facade_render_literal(pool, pool.get_extra(ops + 1))
+    ""
+
+fn facade_render_literal(pool: AstPool, node: i32) -> str:
+    let kind = pool.kind(node as NodeId)
+    if kind == NodeKind.NK_NULL_LIT: return "null"
+    if kind == NodeKind.NK_BOOL_LIT: return if pool.get_data0(node as NodeId) != 0: "true" else: "false"
+    if kind == NodeKind.NK_INT_LIT: return f"{pool.int_lit_value(node as NodeId)}"
+    if kind == NodeKind.NK_UNARY and pool.get_data0(node as NodeId) == UnaryOp.UOP_NEGATE: return "-" ++ facade_render_literal(pool, pool.get_data1(node as NodeId))
+    ""
+
+// The buffer pairing parameter `pi` takes part in: (the pointer parameter,
+// the length parameter, inout), or (-1, -1, 0).
+fn facade_render_buffer_of(pool: AstPool, intern: InternPool, decl: i32, pi: i32) -> (i32, i32, i32):
+    let item = facade_render_fn_item(pool, intern, decl)
+    if item == 0:
+        return (-1, -1, 0)
+    let cstart = pool.get_data1(item as NodeId)
+    for k in 0..pool.get_data2(item as NodeId):
+        let clause = pool.get_extra(cstart + k)
+        if pool.get_data0(clause as NodeId) != FACADE_CLAUSE_BUFFER:
+            continue
+        let ops = pool.get_data1(clause as NodeId)
+        let p = facade_render_param_ref(pool, intern, decl, pool.get_extra(ops))
+        let l = facade_render_param_ref(pool, intern, decl, pool.get_extra(ops + 1))
+        if p == pi or l == pi:
+            return (p, l, pool.get_extra(ops + 2))
+    (-1, -1, 0)
+
+fn facade_render_bridge(pool: AstPool, intern: InternPool, decl: i32, skip: i32, slot: i32, slot_arg: &str) -> FacadeBridge:
+    var b = FacadeBridge { ok: true, params: "", args: "", prologue: "", cap_var: "", cap_type: "", cap_of: "" }
     let meta = pool.find_fn_meta(decl as NodeId)
-    var params = ""
-    var args = ""
     if meta < 0:
-        return (params, args)
+        return b
     let start = pool.fn_meta_param_start(meta)
+    let taken = facade_render_param_names(pool, intern, decl)
     for pi in skip..pool.fn_meta_param_count(meta):
-        if args.len() > 0:
-            args = args ++ ", "
+        if b.args.len() > 0:
+            b.args = b.args ++ ", "
         if pi == slot:
-            args = args ++ slot_arg
+            b.args = b.args ++ slot_arg
+            continue
+        let fixed = facade_render_fixed_literal(pool, intern, decl, pi)
+        if fixed.len() > 0:
+            b.args = b.args ++ fixed
             continue
         let pname = facade_render_param_name(pool, intern, start, pi)
         let ptype = render_type_expr(pool, intern, pool.fn_param_type(start, pi) as NodeId)
+        let (bp, bl, inout) = facade_render_buffer_of(pool, intern, decl, pi)
+        if bp < 0 and bl >= 0 or bl < 0 and bp >= 0:
+            b.ok = false
+            return b
+        if bp == pi:
+            // The pointer: one slice parameter, whose address C receives.
+            let slicety = if inout != 0: "[]mut u8" else: "[]u8"
+            let addr = if inout != 0: "&raw mut " ++ pname ++ "[0]" else: "&raw const " ++ pname ++ "[0]"
+            let local = facade_render_fresh(pname ++ "_ptr", taken)
+            b.prologue = b.prologue ++ "let " ++ local ++ ": " ++ ptype ++ " = if " ++ pname ++ ".len() == 0: null else: " ++ addr ++ " as " ++ ptype ++ "\n"
+            if b.params.len() > 0:
+                b.params = b.params ++ ", "
+            b.params = b.params ++ pname ++ ": " ++ slicety
+            b.args = b.args ++ local
+            continue
+        if bl == pi:
+            let bname = facade_render_param_name(pool, intern, start, bp)
+            if inout == 0:
+                b.args = b.args ++ "(" ++ bname ++ ".len() as " ++ ptype ++ ")"
+                continue
+            // The capacity C reads and writes back: the bridge's own local,
+            // never the caller's slice length.
+            let unaliased = facade_render_unalias(pool, intern, ptype)
+            if not unaliased.starts_with("*mut "):
+                b.ok = false
+                return b
+            let cap_type = unaliased.slice(5, unaliased.len())
+            b.cap_var = facade_render_fresh("capacity", taken)
+            b.cap_type = cap_type.clone()
+            b.cap_of = bname.clone()
+            b.prologue = b.prologue ++ "var " ++ b.cap_var ++ ": " ++ cap_type ++ " = " ++ bname ++ ".len() as " ++ cap_type ++ "\n"
+            b.args = b.args ++ "&raw mut " ++ b.cap_var
+            continue
         // A `const char *` input is lent (§16.3c, D47), so the rendering
         // observes it as `&str` (§3.8: a function that observes takes `&T`);
         // a plain `str` would consume the caller's string. A text view
@@ -1422,11 +1573,124 @@ fn facade_render_params_but(pool: AstPool, intern: InternPool, decl: i32, skip: 
                 let rname: str = intern.resolve(pool.get_data0(res as NodeId))
                 shown = "&" ++ rname
                 arg = received
-        if params.len() > 0:
-            params = params ++ ", "
-        params = params ++ pname ++ ": " ++ shown
-        args = args ++ arg
-    (params, args)
+        if b.params.len() > 0:
+            b.params = b.params ++ ", "
+        b.params = b.params ++ pname ++ ": " ++ shown
+        b.args = b.args ++ arg
+    b
+
+// Each line of `text` prefixed with `indent`.
+fn facade_render_indent(text: &str, indent: &str) -> str:
+    var out = ""
+    var start = 0
+    while start < text.len() as i32:
+        var end = start
+        while end < text.len() as i32 and text[end] != '\n': end = end + 1
+        out = out ++ indent ++ text.slice(start, end) ++ "\n"
+        start = end + 1
+    out
+
+// The lines around the presented call `call` (D64, §16.2b.8), each indented
+// by `indent`, and the rendered return type. Without an inout capacity the
+// call is the body, returning what C returns. With one, the length C wrote
+// back is bounds-checked against the capacity before it becomes a With
+// value, and presented as the `usize` result — on success only: under the
+// item's `ok CONST` the status is read first and a failure is
+// `Err(<Fn>Error.Failed(status))`; an operation returning nothing always
+// succeeded. A length beyond the capacity is C breaking its contract, and
+// a runtime failure naming the operation and the length, never a trust.
+fn facade_render_bridge_body(pool: AstPool, intern: InternPool, decl: i32, b: &FacadeBridge, call: &str, presented: &str, indent: &str) -> (str, str):
+    if b.cap_var.len() == 0:
+        return (facade_render_return(pool, intern, decl), indent ++ call ++ "\n")
+    let ok_sym = facade_render_fn_ok(pool, intern, decl)
+    let check = indent ++ "if " ++ b.cap_var ++ " > " ++ b.cap_of ++ ".len() as " ++ b.cap_type ++ ": panic(f\"" ++ presented ++ ": C reported {" ++ b.cap_var ++ "} bytes written into a buffer of {" ++ b.cap_of ++ ".len()} bytes (§16.2b.8)\")\n"
+    let result = indent ++ b.cap_var ++ " as usize\n"
+    if ok_sym == 0:
+        return (" -> usize", indent ++ call ++ "\n" ++ check ++ result)
+    let err = facade_render_fn_error_name(presented)
+    let status = facade_render_fresh("status", facade_render_param_names(pool, intern, decl))
+    var body = indent ++ "let " ++ status ++ " = " ++ call ++ "\n"
+    body = body ++ indent ++ "if " ++ status ++ " != " ++ intern.resolve(ok_sym) ++ ": return Err(" ++ err ++ ".Failed(" ++ status ++ "))\n"
+    (" -> Result[usize, " ++ err ++ "]", body ++ check ++ result)
+
+// The `ok CONST` an fn item states for the declaration, or 0.
+fn facade_render_fn_ok(pool: AstPool, intern: InternPool, decl: i32) -> i32:
+    let item = facade_render_fn_item(pool, intern, decl)
+    if item == 0:
+        return 0
+    let cstart = pool.get_data1(item as NodeId)
+    for k in 0..pool.get_data2(item as NodeId):
+        let clause = pool.get_extra(cstart + k)
+        if pool.get_data0(clause as NodeId) == FACADE_CLAUSE_OK:
+            return pool.get_extra(pool.get_data1(clause as NodeId))
+    0
+
+// The rendered name of a free operation presented under its C name.
+pub fn facade_render_bridge_name(cname: &str) -> str: "__with_facade_" ++ cname
+
+// `<Fn>Error`: the error type of a presented operation's `ok` projection,
+// named after its presented name (`compress` → `CompressError`).
+pub fn facade_render_fn_error_name(presented: &str) -> str:
+    if presented.len() == 0: return "Error"
+    presented.slice(0, 1).to_upper() ++ presented.slice(1, presented.len()) ++ "Error"
+
+// The error type an inout operation under `ok` returns: `Failed` alone —
+// nothing is produced, so there is no resource to own.
+fn facade_render_fn_error_type(pool: AstPool, intern: InternPool, decl: i32, presented: &str) -> str:
+    let ret = facade_render_return(pool, intern, decl)
+    if ret.len() == 0:
+        return ""
+    "error " ++ facade_render_fn_error_name(presented) ++ " =\n    | Failed(status: " ++ ret.slice(4, ret.len()) ++ ")\n"
+
+// The free operations a facade block presents (D64): each fn item stating a
+// buffer pairing or a fixed argument whose first parameter takes no
+// resource's representation is rendered as an ordinary function — under
+// its `rename`, or, presented under the C name, as `__with_facade_<name>`,
+// which a call to the C name reaches wherever the rendering is visible
+// (SemaFacade.w facade_bridge_redirect). The raw declaration stays what C
+// declared: the bridge's own body calls it, and a module that imports the
+// header without the facade has the raw operation, under the raw rules.
+//
+//     error CompressError =
+//         | Failed(status: c_int)
+//     fn __with_facade_compress(dest: []mut u8, source: []u8) -> Result[usize, CompressError]:
+//         let dest_ptr: *mut Bytef = if dest.len() == 0: null else: &raw mut dest[0] as *mut Bytef
+//         var capacity: uLongf = dest.len() as uLongf
+//         let source_ptr: *const Bytef = if source.len() == 0: null else: &raw const source[0] as *const Bytef
+//         let status = unsafe { compress(dest_ptr, &raw mut capacity, source_ptr, (source.len() as uLong)) }
+//         if status != Z_OK: return Err(CompressError.Failed(status))
+//         if capacity > dest.len() as uLongf: panic(...)
+//         capacity as usize
+fn facade_render_free_ops(pool: AstPool, intern: InternPool, ci: &Vec[i32], facade: i32) -> str:
+    var out = ""
+    let extra_start = pool.get_data1(facade as NodeId)
+    let resources = facade_render_all_items(pool, NodeKind.NK_FACADE_RESOURCE)
+    for i in 0..pool.get_data2(facade as NodeId):
+        let item = pool.get_extra(extra_start + i)
+        if pool.kind(item as NodeId) != NodeKind.NK_FACADE_FN:
+            continue
+        let li = facade_render_lend_item(pool, intern, ci, item)
+        if not li.lends or not li.bridged or li.decl == 0 or li.text_view or li.borrow_res != 0:
+            continue
+        var hosted = false
+        for ri in 0..resources.len() as i32:
+            let repr = facade_render_unalias(pool, intern, render_type_expr(pool, intern, pool.get_extra(pool.get_data1(resources[ri] as NodeId)) as NodeId))
+            if facade_render_lend_hosted(pool, intern, &li, resources[ri], repr):
+                hosted = true
+        if hosted:
+            continue
+        let decl = li.decl
+        let cname: str = intern.resolve(pool.get_data0(decl as NodeId))
+        let presented: str = intern.resolve(if li.rename != 0: li.rename else: pool.get_data0(decl as NodeId))
+        let bridge = facade_render_bridge(pool, intern, decl, 0, -1, "")
+        if not bridge.ok:
+            continue
+        if bridge.cap_var.len() > 0 and facade_render_fn_ok(pool, intern, decl) != 0:
+            out = out ++ facade_render_fn_error_type(pool, intern, decl, presented)
+        let rendered = if li.rename != 0: presented.clone() else: facade_render_bridge_name(cname)
+        let (result, body) = facade_render_bridge_body(pool, intern, decl, &bridge, facade_render_call(pool, intern, decl, bridge.args), presented, "    ")
+        out = out ++ "fn " ++ rendered ++ "(" ++ bridge.params ++ ")" ++ result ++ ":\n" ++ facade_render_indent(bridge.prologue, "    ") ++ body
+    out
 
 // The C parameter's name as a With parameter: less the translation's
 // `__param_` mark, and escaped as the c_import wrappers escape it — an
@@ -1620,7 +1884,9 @@ fn facade_render_callback_item(pool: AstPool, intern: InternPool, ci: &Vec[i32],
         let ops = pool.get_data1(clause as NodeId)
         if kind == FACADE_CLAUSE_OF: cbi.of_sym = pool.get_extra(ops)
         else if kind == FACADE_CLAUSE_RENAME: cbi.rename = pool.get_extra(ops)
-        else if kind == FACADE_CLAUSE_LEND or kind == FACADE_CLAUSE_PRESERVES: continue
+        // A fixed argument (D64) leaves the presented signature; the
+        // parameter loop below passes its literal (facade_render_fixed_literal).
+        else if kind == FACADE_CLAUSE_LEND or kind == FACADE_CLAUSE_PRESERVES or kind == FACADE_CLAUSE_FIXED: continue
         else if kind == FACADE_CLAUSE_NULLABLE:
             // Rendered for the paired callback alone (Sema refuses the
             // rest, verify_facade_callback_items).
@@ -1681,7 +1947,7 @@ fn facade_render_callback_item(pool: AstPool, intern: InternPool, ci: &Vec[i32],
 fn facade_render_callback_hosted(pool: AstPool, intern: InternPool, cbi: &FacadeCallbackItem, resource: i32, repr: &str) -> bool:
     if cbi.decl == 0:
         return false
-    let li = FacadeLendItem { decl: cbi.decl, of_sym: cbi.of_sym, rename: cbi.rename, lends: true, borrow_res: 0, borrow_from: 0, text_view: false, valid_on_failed: false }
+    let li = FacadeLendItem { decl: cbi.decl, of_sym: cbi.of_sym, rename: cbi.rename, lends: true, borrow_res: 0, borrow_from: 0, text_view: false, valid_on_failed: false, bridged: false }
     facade_render_lend_hosted(pool, intern, &li, resource, repr)
 
 // Whether some callback method of `resource` retains userdata: the
@@ -1808,6 +2074,10 @@ fn facade_render_callback_methods(pool: AstPool, intern: InternPool, ci: &Vec[i3
             args = args ++ ", "
             if pi == cbi.destroy:
                 args = args ++ free
+                continue
+            let fixed = facade_render_fixed_literal(pool, intern, decl, pi)
+            if fixed.len() > 0:
+                args = args ++ fixed
                 continue
             let pname = facade_render_param_name(pool, intern, start, pi)
             let ptype = facade_render_param_type(pool, intern, decl, pi)

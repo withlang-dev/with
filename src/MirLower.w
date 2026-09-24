@@ -10380,11 +10380,21 @@ impl MirBuilder:
         self.body.new_operand(OperandKind.OK_MOVE, math_place)
 
     mut fn lower_call(fn_expr: i32, arg_exprs_start: i32, arg_exprs_count: i32, ret_type_id: i32, node: i32) -> i32:
-        let fn_op = self.lower_callable_expr(fn_expr)
+        var fn_op = self.lower_callable_expr(fn_expr)
         var sig_idx = self.call_sig_for_expr(fn_expr)
         let recorded_sig = self.sema.resolved_call_sigs.get(node)
         if recorded_sig.is_some():
             sig_idx = recorded_sig.unwrap()
+        // D64 (§16.2b.8): a call to the C name of a free operation a facade
+        // presents is the rendered bridge Sema resolved it to (check_call,
+        // facade_bridge_redirect): the callee and its signature are the
+        // bridge's, not the raw declaration's that the ident names.
+        if fn_expr != 0 and self.ast.kind(fn_expr) == NodeKind.NK_IDENT:
+            let bridged: i32 = if self.sema.comp_resolved.contains(node): self.sema.comp_resolved.get(node).unwrap() else: 0
+            if bridged != 0 and bridged != self.ast.get_data0(fn_expr) and self.sema.facade_bridge_syms.contains(bridged):
+                sig_idx = self.call_sig_for_sym(bridged)
+                let bridge_ret = if sig_idx >= 0: self.sema.sig_return_type(sig_idx) else: self.sema.ty_void as i32
+                fn_op = self.const_operand(ConstKind.CK_FN, bridged, bridge_ret)
         let callable_fn_tid = if sig_idx >= 0: 0 else: self.callable_fn_type_for_expr(fn_expr)
         var actual_ret_type_id = ret_type_id
         if (actual_ret_type_id == 0 or actual_ret_type_id == self.sema.ty_void as i32) and sig_idx >= 0:
