@@ -47,6 +47,15 @@ type SemaSourceLocation {
 }
 impl Copy for SemaSourceLocation
 
+// A field path rooted at a scoped binding, in borrow_path_data
+// (field_move_path_for_expr); base_sym 0 names none.
+type FieldMovePath {
+    base_sym: i32,
+    path_start: i32,
+    path_count: i32,
+}
+impl Copy for FieldMovePath
+
 enum VarState: i32:
     LIVE = 0
     MOVED = 1
@@ -5423,25 +5432,35 @@ impl Sema:
                 return 0
         1
 
-    fn field_move_path_for_expr(node: i32) -> i64:
+    // The field path an expression names, rooted at a scoped binding, as a
+    // record: base_sym 0 when it names none. #1631: this was one i64 with
+    // path_start in 16 bits (and its overflow leaking into path_count), but
+    // borrow_path_data is append-only for the whole compilation and passes
+    // 65535 entries in any compiler-sized check; a masked start then read a
+    // stale path, and a sibling field read after `move s.f` was "use of
+    // moved value" whenever the stale bytes held `f`'s symbol — a verdict
+    // that flipped with unrelated source text (src/main.w:3003 on one tree,
+    // :2008 on another).
+    fn field_move_path_for_expr(node: i32) -> FieldMovePath:
+        let none = FieldMovePath { base_sym: 0, path_start: 0, path_count: 0 }
         let base_sym = self.place_root_sym(node)
         if base_sym == 0:
-            return 0
+            return none
         if self.scope_has(base_sym) == 0:
-            return 0
+            return none
         let path_start = self.borrow_path_data.len() as i32
         let path_count = self.borrow_collect_path(node)
         if path_count <= 0:
-            return 0
-        (base_sym as i64) | ((path_start as i64) << 32) | ((path_count as i64) << 48)
+            return none
+        FieldMovePath { base_sym, path_start, path_count }
 
     fn mark_field_moved(node: i32):
-        let packed = self.field_move_path_for_expr(node)
-        if packed == 0:
+        let path = self.field_move_path_for_expr(node)
+        if path.base_sym == 0:
             return
-        let base_sym = (packed & 4294967295) as i32
-        let path_start = ((packed >> 32) & 65535) as i32
-        let path_count = ((packed >> 48) & 65535) as i32
+        let base_sym = path.base_sym
+        let path_start = path.path_start
+        let path_count = path.path_count
         for i in 0..self.moved_field_base_syms.len() as i32:
             if self.moved_field_path_matches(i, base_sym, path_start, path_count) != 0:
                 return
@@ -5455,12 +5474,12 @@ impl Sema:
             self.explicitly_partial_syms.insert(base_sym, 1)
 
     fn field_is_moved(node: i32) -> i32:
-        let packed = self.field_move_path_for_expr(node)
-        if packed == 0:
+        let path = self.field_move_path_for_expr(node)
+        if path.base_sym == 0:
             return 0
-        let base_sym = (packed & 4294967295) as i32
-        let path_start = ((packed >> 32) & 65535) as i32
-        let path_count = ((packed >> 48) & 65535) as i32
+        let base_sym = path.base_sym
+        let path_start = path.path_start
+        let path_count = path.path_count
         for i in 0..self.moved_field_base_syms.len() as i32:
             if self.moved_field_path_matches(i, base_sym, path_start, path_count) != 0:
                 return 1
@@ -5505,12 +5524,12 @@ impl Sema:
         let _ = self.explicitly_partial_syms.remove(sym)
 
     mut fn clear_moved_fields_for_place_expr(node: i32):
-        let packed = self.field_move_path_for_expr(node)
-        if packed == 0:
+        let path = self.field_move_path_for_expr(node)
+        if path.base_sym == 0:
             return
-        let base_sym = (packed & 4294967295) as i32
-        let path_start = ((packed >> 32) & 65535) as i32
-        let path_count = ((packed >> 48) & 65535) as i32
+        let base_sym = path.base_sym
+        let path_start = path.path_start
+        let path_count = path.path_count
         var i = self.moved_field_base_syms.len() as i32 - 1
         while i >= 0:
             if self.moved_field_path_has_prefix(i, base_sym, path_start, path_count) != 0:
