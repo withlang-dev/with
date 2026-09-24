@@ -2823,6 +2823,15 @@ impl Sema:
             let node = self.foreign_contracts[ci].node
             if self.facade_fn_is_resource_op(fn_sym):
                 continue
+            // The refusal guards a RENDERED safe call. A row over a With-declared
+            // `extern fn` (the runtime's own seams — stage 13's `rt/*.w` domain
+            // rows for `rt_libc_write(fd, buf, len)`, `rt_libc_mmap`, …) renders
+            // nothing: it states the foreign-state domain the seam touches for
+            // the runtime-domain audit, and the call stays the raw extern it
+            // always was. Only a c_import translation can be presented as safe
+            // (stage 7 gates presentation on `ci_syms` the same way).
+            if not self.ci_syms.contains(fn_sym):
+                continue
             let sig = self.get_sig(fn_sym)
             if sig < 0:
                 continue
