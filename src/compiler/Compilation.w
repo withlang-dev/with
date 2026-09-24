@@ -1749,7 +1749,14 @@ impl Compilation:
         // last_sema retains the complete declaration/effect state for the flag-day
         // receiver work list and for semantic diagnosis queries.
         if not after_mir and analysis_request_is_semantic_snapshot(inner_request) and self.zcu.last_sema.ast.decl_count() > 0:
-            return compiler_analysis_run(self.zcu.last_sema, self.zcu.last_mir_module, self.zcu.pool, self.zcu.current_source_path, self.zcu.current_source_text, inner_request)
+            var snapshot = compiler_analysis_run(self.zcu.last_sema, self.zcu.last_mir_module, self.zcu.pool, self.zcu.current_source_path, self.zcu.current_source_text, inner_request)
+            // A snapshot over a failed compilation is still shown (it is what
+            // Sema had), but it is never an `ok`: an audit that passes over a
+            // program the compiler refused is a tool that stayed silent.
+            if self.has_errors():
+                snapshot.text = snapshot.text ++ f"{inner_request}: compilation failed (see the diagnostics above); the view is a snapshot of the partial semantics, not a verdict\n"
+                snapshot.status = 1
+            return snapshot
         if pool.decl_count() == 0:
             if inner_request.starts_with("select:") and self.zcu.last_sema.ast.decl_count() > 0:
                 return compiler_analysis_run(self.zcu.last_sema, self.zcu.last_mir_module, self.zcu.pool, self.zcu.current_source_path, self.zcu.current_source_text, inner_request)
