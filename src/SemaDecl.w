@@ -736,21 +736,6 @@ impl Sema:
             return 1
         0
 
-// #379: curated functions whose pointer RETURN is a borrowed, nullable handle.
-// Raw C pointers (`*T`) are natively nullable in With — `== None` and
-// `.unwrap()` work directly (e.g. malloc returns a plain `*mut c_void`), so the
-// return is left as a raw pointer and NOT wrapped in `Option`. This fact only
-// says the *call* is safe; the returned pointer is borrowed (non-owning) and
-// dereferencing it stays `unsafe`. Owning constructors (fopen, strdup) are NOT
-// here — they are resources of the toolchain libc facade (compiler/LibcFacade.w).
-fn ci_overlay_return_is_borrowed_ptr(name: &str) -> i32:
-    if name == "getenv": return 1
-    if name == "strchr": return 1
-    if name == "strpbrk": return 1
-    if name == "strrchr": return 1
-    if name == "strstr": return 1
-    0
-
 // Whether a string literal's interned source text denotes a NUL byte: a raw
 // literal (`\x01raw\x01` prefix) holds its bytes as written; any other spells
 // one as `\0`, `\x00` or `\u{0}`.
@@ -797,13 +782,12 @@ impl Sema:
         for spi in 0..param_count:
             if self.get_type_kind(self.resolve_alias(self.sig_param_type(sig_idx, spi) as TypeId)) == TypeKind.TY_SLICE:
                 return 0
-        let name = self.safe_symbol_text(fn_sym)
-        // A pointer/fn return is raw unless the overlay vouches a borrowed nullable
-        // pointer return. Such a return stays a raw (natively nullable) pointer;
-        // calling is safe and the deref stays unsafe.
-        // D51 stage 3: a surface a facade covers is not raw (SemaFacade.w).
+        // A pointer/fn return is raw unless a facade covers it (D51 stage 3,
+        // SemaFacade.w). The #379 overlay's borrowed nullable pointer returns
+        // (getenv, strchr, …) are items of the toolchain libc facade now
+        // (compiler/LibcFacade.w), presented as `Option[CStr]`.
         if self.ci_type_requires_raw_contract(self.sig_return_type(sig_idx)) != 0:
-            if ci_overlay_return_is_borrowed_ptr(name) == 0 and not self.facade_covers_return(fn_sym):
+            if not self.facade_covers_return(fn_sym):
                 return 1
         for pi in 0..param_count:
             let pty = self.sig_param_type(sig_idx, pi)

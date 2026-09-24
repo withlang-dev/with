@@ -24,6 +24,17 @@
 // rewinddir borrowing the directory), now under the facade rules: each
 // constructor yields `Option[R]` (NULL produced nothing, §16.2b.8), Drop runs
 // the destroyer exactly once, and the raw C names stay raw (§16.2b.5).
+//
+// Stage 7 (ruling §33, §37, §38, §41; spec §16.2b.7-8) adds the borrowed
+// strings the #379 overlay vouched for as raw nullable pointers: `getenv`
+// borrows from the process environment — the domain `environ` — and
+// `strerror` from its own buffer; `strchr`, `strrchr`, `strpbrk` and
+// `strstr` return text borrowed from the string they are lent. Each is
+// presented under its C name as `Option[CStr]`. The string functions and
+// `getenv` state `preserves` on both domains: they read their arguments and
+// nothing else, so a view from `getenv` survives a `strchr` over it —
+// precision the facade grants (§35); every other libc operation keeps the
+// conservative default and invalidates (§38).
 
 use Ast
 use InternPool
@@ -49,6 +60,31 @@ fn libc_facade_source() -> str:
     fn rewinddir
         lend
         of CDir
+    domain environ process
+    domain strerror_text process
+    fn getenv
+        returns borrow CStr from domain environ
+        preserves domain environ
+        preserves domain strerror_text
+    fn strerror
+        returns borrow CStr from domain strerror_text
+        preserves domain environ
+    fn strchr
+        returns borrow CStr from param 0
+        preserves domain environ
+        preserves domain strerror_text
+    fn strrchr
+        returns borrow CStr from param 0
+        preserves domain environ
+        preserves domain strerror_text
+    fn strpbrk
+        returns borrow CStr from param 0
+        preserves domain environ
+        preserves domain strerror_text
+    fn strstr
+        returns borrow CStr from param 0
+        preserves domain environ
+        preserves domain strerror_text
 "
 
 fn libc_facade_has(names: &Vec[str], name: &str) -> bool:
@@ -74,6 +110,11 @@ pub fn libc_facade_select(pool: AstPool, intern: InternPool, ci: &Vec[i32], clai
     let lines = libc_facade_source().split("\n")
     var kept_names: Vec[str] = Vec.new()
     var kept_reprs: Vec[str] = Vec.new()
+    // Domain lines are kept when a kept item names the domain (a
+    // `from domain D` or `preserves domain D` clause) and the program's own
+    // facades do not declare it.
+    var domain_lines: Vec[str] = Vec.new()
+    var domain_names: Vec[str] = Vec.new()
     var body = ""
     var i = 1
     while i < lines.len() as i32:
@@ -87,6 +128,10 @@ pub fn libc_facade_select(pool: AstPool, intern: InternPool, ci: &Vec[i32], clai
             i = i + 1
         let name = libc_facade_operand(header)
         if libc_facade_has(claimed, name):
+            continue
+        if header.trim().starts_with("domain "):
+            domain_lines.push(header.clone())
+            domain_names.push(name.clone())
             continue
         if header.trim().starts_with("resource "):
             let words = header.trim().split(" wraps ")
@@ -130,4 +175,10 @@ pub fn libc_facade_select(pool: AstPool, intern: InternPool, ci: &Vec[i32], clai
                 body = body ++ header ++ "\n"
                 for ci_ in 0..clauses.len() as i32:
                     body = body ++ clauses[ci_] ++ "\n"
-    if body.len() == 0: "" else: lines[0] ++ "\n" ++ body
+    if body.len() == 0:
+        return ""
+    var domains = ""
+    for di in 0..domain_lines.len() as i32:
+        if body.contains(" domain " ++ domain_names[di] ++ "\n"):
+            domains = domains ++ domain_lines[di] ++ "\n"
+    lines[0] ++ "\n" ++ domains ++ body

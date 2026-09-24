@@ -1,26 +1,20 @@
 //! expect-stdout: ok
 
-// #379: strchr is curated -- its `const char*` parameter is `cstr_in` and its
-// pointer return is a borrowed, nullable handle. Calling strchr is therefore
-// safe (no unsafe). The return is a raw, natively-nullable pointer: `== None`
-// and `.unwrap()` work directly (the same way malloc's plain `*mut c_void`
-// return does). The returned pointer is borrowed (non-owning), so dereferencing
-// it stays `unsafe`.
+// D51 stage 7 (ruling §31, §41; spec §16.2b.8): `strchr` is an item of the
+// toolchain libc facade — `returns borrow CStr from param 0` — so the call
+// is safe and its result is `Option[CStr]` borrowed from the string it was
+// lent: `None` when absent, and the text from the hit onwards otherwise,
+// read without `unsafe`. (Until stage 7 this was the #379 overlay's raw,
+// natively nullable pointer, dereferenced in `unsafe`.)
 
 use c_import("char *strchr(const char *s, int c);\n")
 
 fn main:
-    let hit = strchr("hello", 108)   // 'l' -> pointer into "hello"
-    let miss = strchr("hello", 122)  // 'z' -> None
-    if miss != None:
+    let hit = strchr("hello", 'l')
+    let miss = strchr("hello", 'z')
+    if miss.is_some():
         print("bad-miss")
         return
-    if hit == None:
-        print("bad-none")
-        return
-    let p = hit
-    let ch = unsafe { *p }
-    if ch == 108:
-        print("ok")
-    else:
-        print("bad-char")
+    match hit:
+        None => print("bad-none")
+        Some(t) => print(if t.to_str().unwrap() == "llo": "ok" else: "bad-char")
