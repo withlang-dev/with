@@ -1406,8 +1406,11 @@ pub fn facade_render_unalias(pool: AstPool, intern: InternPool, text: &str) -> s
                 target = render_type_expr(pool, intern, pool.get_extra(pool.get_data1(decl)) as NodeId)
                 break
         // `type _IO_FILE = opaque` declares a distinct opaque type, not an
-        // alias of `void` (its target renders as c_void): stop at its name.
-        if target.len() == 0 or target == "c_void" or target == "opaque":
+        // alias of `void`: stop at its name. A true alias of `c_void` —
+        // `typedef void CURL;` translates to `type CURL = c_void` — is
+        // chased through, as Sema's resolve_alias chases it: `*mut CURL` is
+        // the `*mut c_void` the translated declarations spell (D66).
+        if target.len() == 0 or target == "opaque":
             return t
         if target.starts_with("*"):
             return facade_render_unalias(pool, intern, target)

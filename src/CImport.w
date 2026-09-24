@@ -2631,7 +2631,13 @@ fn ci_translate_typedef(session: i64, idx: i32, count: i32) -> str:
     let safe_name = ci_escape_reserved(name)
     with_cimport_mark_name_emitted(name)
     ci_mark_type_name_emitted(name)
-    let rendered = "type " ++ safe_name ++ " = " ++ ci_unsafe_fn_ptr_type(translated) ++ "\n"
+    // `typedef void H;` (curl's `CURL`) names an incomplete object type C
+    // uses only through pointers, and every `H *` in the translation is
+    // spelled `*mut c_void` (ci_translate_type) — so the alias is `c_void`,
+    // never `Unit`: a facade's `resource Easy wraps *mut CURL` must name
+    // the type the translated declarations carry (D66).
+    let target = if translated == "Unit" and underlying == "void": "c_void" else: ci_unsafe_fn_ptr_type(translated)
+    let rendered = "type " ++ safe_name ++ " = " ++ target ++ "\n"
     if ci_migrate_shared_decl_add("type", name, rendered):
         return ""
     rendered
