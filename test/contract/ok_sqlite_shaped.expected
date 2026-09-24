@@ -72,7 +72,7 @@ fn sqlite3_create_function_v2; facade:sqlite@test/contract/ok_sqlite_shaped.w; c
     returns: i32  [default:as declared]
     preserves: domain errno  [clause:preserves@test/contract/ok_sqlite_shaped.w:41]
     invalidates: Database (param 0: *mut sqlite3 db)  [default:unknown effect is invalidate (§16.2b.7)]
-    presentation: Database.sqlite3_create_function_v2; the C name is kept, no unambiguous shortening  [default:presentation sugar from the resource prefix (§16.2b.11)]
+    presentation: Database.create_function_v2  [default:presentation sugar from the resource prefix (§16.2b.11)]
 callback param 5: extern "C" fn(*mut c_void) -> Unit xFunc of sqlite3_create_function_v2; clause:fn@test/contract/ok_sqlite_shaped.w:39
     role: used during this call only; not retained  [default:callback-scope borrow (§16.2b.9)]
     thread: any; captured With state must be Send and Sync  [clause:callback_thread@test/contract/ok_sqlite_shaped.w:42]
@@ -88,7 +88,7 @@ fn sqlite3_trace_v2; facade:sqlite@test/contract/ok_sqlite_shaped.w; clause:fn@t
     effect: param 3: *mut c_void pCtx: retained by Database (param 0: *mut sqlite3 db)  [clause:retains@test/contract/ok_sqlite_shaped.w:45]
     returns: i32  [default:as declared]
     invalidates: Database (param 0: *mut sqlite3 db), domain errno  [default:unknown effect is invalidate (§16.2b.7)]
-    presentation: Database.sqlite3_trace_v2; the C name is kept, no unambiguous shortening  [default:presentation sugar from the resource prefix (§16.2b.11)]
+    presentation: Database.trace_v2  [default:presentation sugar from the resource prefix (§16.2b.11)]
 callback param 2: extern "C" fn(u32, *mut c_void, *mut c_void, *mut c_void) -> i32 xCallback of sqlite3_trace_v2; clause:fn@test/contract/ok_sqlite_shaped.w:43
     role: retained by Database (param 0: *mut sqlite3 db); it lives as long as its owner  [clause:retains@test/contract/ok_sqlite_shaped.w:44]
     thread: the registering thread  [default:callback executes where it was registered (§16.2b.10)]
