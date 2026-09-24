@@ -20,23 +20,23 @@ c facade dbf:
         lend
 
 fn chain(l: Log) -> Result[i32, StatementError]:
-    let db = Database.db_new(l, 3).unwrap()
-    let a = Statement.st_prepare(db, 30)?
-    let b = Statement.st_prepare(db, -31)?
-    Ok(a.st_step() + b.st_step())
+    let db = Database.new(l, 3).unwrap()
+    let a = Statement.prepare(db, 30)?
+    let b = Statement.prepare(db, -31)?
+    Ok(a.step() + b.step())
 
 fn main:
     let l = log_new()
     if true:
-        let db = Database.db_new(l, 1).unwrap()
+        let db = Database.new(l, 1).unwrap()
         for i in 0..3:
-            match Statement.st_prepare(db, -10 - i):
+            match Statement.prepare(db, -10 - i):
                 Err(StatementError.Failed(rc)) => assert(rc == 8)
                 _ => assert(false)
-        match Statement.st_prepare(db, 0):
+        match Statement.prepare(db, 0):
             Err(StatementError.Failed(rc)) => assert(rc == 7)
             _ => assert(false)
-        match Statement.st_prepare(db, 99):
+        match Statement.prepare(db, 99):
             Err(StatementError.NothingProduced(rc)) => assert(rc == 0)
             _ => assert(false)
         // three finalizes, then the close with nothing open

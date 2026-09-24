@@ -40,21 +40,21 @@ c facade forms:
 fn take(d: Database) -> Database: d
 
 fn opened(mode: c_int) -> Option[Database]:
-    let (_, d) = Database.db_open(mode)
+    let (_, d) = Database.open(mode)
     d
 
 fn main:
     var v: Vec[Database] = Vec.new()
-    v.push(Database.db_new(1).unwrap())
-    let none = Database.db_new(-1)
+    v.push(Database.new(1).unwrap())
+    let none = Database.new(-1)
     for mode in 0..4:
-        let (_, d) = Database.db_open(mode)
+        let (_, d) = Database.open(mode)
         match d:
             Some(db) => v.push(take(db))
             None => {}
     let failed_but_produced = opened(2)
-    let made = Database.db_make(1)
-    let nothing = Database.db_make(0)
+    let made = Database.make(1)
+    let nothing = Database.make(0)
     let (_, s) = Stream.z_init(4)
     var cells: Vec[Stream] = Vec.new()
     cells.push(s)

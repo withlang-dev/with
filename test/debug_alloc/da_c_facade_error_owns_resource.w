@@ -14,8 +14,8 @@
 // and `free` are translated into the program, so the ledger sees every
 // handle: a missed destroy is a LEAK, a second one a DOUBLE FREE. Raw access
 // to the failed handle's representation compiles under the raw C rules.
-// Constructors keep the C name (`Database.db_open`); presentation is
-// §16.2b.11, stage 8.
+// `Database.open` is `db_open` under its presented name (§16.2b.11,
+// stage 8).
 use c_import("void *malloc(unsigned long size);
 void *calloc(unsigned long count, unsigned long size);
 void free(void *p);
@@ -43,7 +43,7 @@ c facade dbf:
         ok DB_OK
 
 fn open(closes: Counter, mode: c_int) -> Result[Database, DatabaseError]:
-    let db = Database.db_open(closes, mode)?
+    let db = Database.open(closes, mode)?
     Ok(db)
 
 fn tag_of(closes: Counter, mode: c_int) -> Result[c_int, DatabaseError]:

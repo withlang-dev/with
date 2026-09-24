@@ -18,8 +18,8 @@
 // live (§16.2b.4). `ends` counts every destroyer call through a counter the
 // initializer is handed. `Stream` is `movable` (no operation keeps its
 // address — the facade's claim, D54) and so renders over a by-value field;
-// `Blind` is pinned. Constructors keep the C name (`Stream.z_init`);
-// presentation is §16.2b.11, stage 8.
+// `Blind` is pinned. `Stream.z_init` is the presented constructor name (no
+// prefix of `z_stream` matches `z_init`, §16.2b.11).
 
 use c_import("void *calloc(unsigned long count, unsigned long size);
 void free(void *p);

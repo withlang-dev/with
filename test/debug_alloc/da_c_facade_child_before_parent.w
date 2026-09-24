@@ -35,62 +35,62 @@ fn check_order(l: Log, closes: i32):
     log_reset(l)
 
 fn early(l: Log) -> i32:
-    let db = Database.db_new(l, 2).unwrap()
-    let s = Statement.st_new(db, 21).unwrap()
-    if s.st_step() > 0:
+    let db = Database.new(l, 2).unwrap()
+    let s = Statement.new(db, 21).unwrap()
+    if s.step() > 0:
         return 1
     0
 
 fn fails(l: Log) -> Result[i32, str]:
-    let db = Database.db_new(l, 3).unwrap()
-    let s = Statement.st_new(db, 31).unwrap()
-    let (_, none) = Statement.db_prepare(db, -1)
+    let db = Database.new(l, 3).unwrap()
+    let s = Statement.new(db, 31).unwrap()
+    let (_, none) = Statement.prepare(db, -1)
     if none.is_none():
         return Err("nothing")
-    Ok(s.st_step())
+    Ok(s.step())
 
 fn question(l: Log) -> Result[i32, str]:
     let n = fails(l)?
     Ok(n)
 
 fn uses(d: &Database) -> i32:
-    let s = Statement.st_new(d, 81).unwrap()
-    s.st_step()
+    let s = Statement.new(d, 81).unwrap()
+    s.step()
 
 fn main:
     let l = log_new()
     if true:
-        let db = Database.db_new(l, 1).unwrap()
-        let (_, a) = Statement.db_prepare(db, 10)
-        let b = Statement.st_new(db, 11).unwrap()
-        assert(a.is_some() and b.st_step() == 111)
+        let db = Database.new(l, 1).unwrap()
+        let (_, a) = Statement.prepare(db, 10)
+        let b = Statement.new(db, 11).unwrap()
+        assert(a.is_some() and b.step() == 111)
     check_order(l, 1)
     let _ = early(l)
     check_order(l, 1)
     let _ = question(l)
     check_order(l, 1)
     if true:
-        let db = Database.db_new(l, 4).unwrap()
+        let db = Database.new(l, 4).unwrap()
         for i in 1..4:
-            let s = Statement.st_new(db, 40 + i).unwrap()
+            let s = Statement.new(db, 40 + i).unwrap()
             if i == 3:
                 break
-            assert(s.st_step() > 0)
+            assert(s.step() > 0)
     check_order(l, 1)
     if true:
-        let db = Database.db_new(l, 5).unwrap()
+        let db = Database.new(l, 5).unwrap()
         var all: Vec[Statement] = Vec.new()
         for i in 1..4:
-            all.push(Statement.st_new(db, 50 + i).unwrap())
+            all.push(Statement.new(db, 50 + i).unwrap())
         assert(all.len() == 3)
     check_order(l, 1)
     if true:
-        let db = Database.db_new(l, 6).unwrap()
-        let held = Statement.st_new(db, 61)
+        let db = Database.new(l, 6).unwrap()
+        let held = Statement.new(db, 61)
         assert(held.is_some())
     check_order(l, 1)
     if true:
-        let db = Database.db_new(l, 8).unwrap()
+        let db = Database.new(l, 8).unwrap()
         assert(uses(db) == 881)
     check_order(l, 1)
     log_free(l)
