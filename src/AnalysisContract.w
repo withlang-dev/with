@@ -382,6 +382,13 @@ fn contract_collect_fn(report: &AnalysisReport, sema: &Sema, ci: i32, source_pat
         let origin = if c.returns_borrow_domain != 0: "domain " ++ sema.safe_symbol_text(c.returns_borrow_domain) else: contract_param(sema, c.fn_sym, c.returns_borrow_from) ++ (if contract_received(sema, c.fn_sym, c.returns_borrow_from).len() > 0: " (" ++ contract_received(sema, c.fn_sym, c.returns_borrow_from) ++ ")" else: ", a lent C string")
         let shape = if what == "CStr": "Option[CStr], nullable" else: f"Option[Borrowed{what}], nullable, no Drop"
         contract_row(report, sema, &site, subject, CONTRACT_FN, clause, c.fn_sym, owner, c.returns_borrow_from, "returns", f"borrow {what} from {origin}; {shape}", contract_clause_at(sema, &site, clause))
+    else if c.returns_borrow_record != 0:
+        // D66 (§16.2b.6): a view of an imported record, from a resource
+        // parameter or a foreign-state domain.
+        let clause = contract_clause(sema, node, FACADE_CLAUSE_RETURNS_BORROW, 0)
+        let what = sema.safe_symbol_text(c.returns_borrow_record)
+        let origin = if c.returns_borrow_domain != 0: "domain " ++ sema.safe_symbol_text(c.returns_borrow_domain) else: contract_param(sema, c.fn_sym, c.returns_borrow_from) ++ " (" ++ contract_received(sema, c.fn_sym, c.returns_borrow_from) ++ ")"
+        contract_row(report, sema, &site, subject, CONTRACT_FN, clause, c.fn_sym, owner, c.returns_borrow_from, "returns", f"borrow {what} from {origin}; Option[&{what}], nullable, a view of the record, no Drop; its pointer fields stay raw", contract_clause_at(sema, &site, clause))
     else if c.returns_static_tid != 0:
         let clause = contract_clause(sema, node, FACADE_CLAUSE_RETURNS_STATIC, 0)
         contract_row(report, sema, &site, subject, CONTRACT_FN, clause, c.fn_sym, owner, -1, "returns", "static CStr; valid for the whole program, no origin", contract_clause_at(sema, &site, clause))

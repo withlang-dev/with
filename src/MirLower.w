@@ -11675,7 +11675,11 @@ impl MirBuilder:
         self.lower_cleanup_await(await_op, node)
         self.unit_operand()
 
-    mut fn lower_method_call(self_expr: i32, method_sym: i32, arg_start: i32, arg_count: i32, node: i32) -> i32:
+    mut fn lower_method_call(self_expr: i32, method_sym0: i32, arg_start: i32, arg_count: i32, node: i32) -> i32:
+        // D66 (§16.2b.5): a variadic contract's presented method is the
+        // case method Sema chose for this call (SemaCheck.w check_call);
+        // the AST still names the presented method.
+        let method_sym = if self.sema.facade_variadic_calls.contains(node): self.sema.facade_variadic_calls.get(node).unwrap() else: method_sym0
         // Lower method calls as normal calls with receiver inserted as first arg.
         var callee_sym = if self.sema.comp_resolved.contains(node):
             self.sema.comp_resolved.get(node).unwrap()

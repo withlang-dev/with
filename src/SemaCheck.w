@@ -17594,7 +17594,16 @@ impl Sema:
                 for cai2 in 0..arg_count:
                     self.mark_moved_if_consumed(self.ast.get_extra(extra_start + cai2))
                 return self.check_callable_value_call("", callable_tid, 0, node, extra_start, arg_count, 0, 0, arg_types_for_callable)
-            let ret = self.check_method_call_parts(recv_expr, recv_field, extra_start, arg_count, node, recv_ty as i32)
+            // D66 (§16.2b.5): a variadic contract's presented method is
+            // the case its compile-time selector picks; Sema chooses it
+            // here (SemaFacade.w facade_variadic_retarget_method) and
+            // MirLower.w lower_method_call materializes the choice.
+            var method_field = recv_field
+            if self.facade_variadic_method_names.contains(recv_field):
+                method_field = self.facade_variadic_retarget_method(recv_ty as i32, recv_field, extra_start, arg_count, node)
+                if method_field == 0:
+                    return 0
+            let ret = self.check_method_call_parts(recv_expr, method_field, extra_start, arg_count, node, recv_ty as i32)
             if ret != 0:
                 self.typed_expr_types.insert(node, ret)
             return ret
@@ -17628,6 +17637,11 @@ impl Sema:
             // D64 (§16.2b.8, §16.2b.11): a free operation a facade presents
             // under the C name is its rendered bridge wherever that is visible.
             fn_sym = self.facade_bridge_redirect(fn_sym)
+            // D66 (§16.2b.5): a variadic free operation's presented call is
+            // the case function its compile-time selector picks.
+            fn_sym = self.facade_variadic_redirect_free(fn_sym, extra_start, arg_count, node)
+            if fn_sym == 0:
+                return 0
             // Resolve for-comprehension _Payload marker to Some or Ok
             let call_name: str = with_str_clone_ref(self.pool_resolve(fn_sym))
             if self.require_std_tier_for_symbol(fn_sym, callee) == 0:
@@ -22668,6 +22682,14 @@ impl Sema:
     mut fn check_method_call(callee: i32, extra_start: i32, arg_count: i32, node: i32) -> i32:
         let expr = self.ast.get_data0(callee)
         let field = self.ast.get_data1(callee)
+        // D66 (§16.2b.5): as check_call, the case a variadic contract's
+        // selector picks.
+        if self.facade_variadic_method_names.contains(field):
+            let recv_ty = self.check_expr(expr) as i32
+            let target = self.facade_variadic_retarget_method(recv_ty, field, extra_start, arg_count, node)
+            if target == 0:
+                return 0
+            return self.check_method_call_parts(expr, target, extra_start, arg_count, node, recv_ty)
         self.check_method_call_parts(expr, field, extra_start, arg_count, node, 0)
 
     mut fn resolve_method_implicit_default_args(call_node: i32, sig_idx: i32, method_fn_sym: i32, param_offset: i32, extra_start: i32, arg_count: i32) -> i32:

@@ -34,6 +34,7 @@ impl Sema:
         self.verify_facade_failed_state_items()
         self.verify_facade_nullable_items()
         self.verify_facade_buffers()
+        self.verify_facade_variadic_items()
         self.verify_facade_borrowed_returns()
         self.verify_facade_text_views()
         self.verify_facade_callback_items()
@@ -853,7 +854,7 @@ impl Sema:
                 return
             self.emit_error(f"fn '{fname}' is described by two facade blocks with different clauses; one function has one contract — restate it word for word or describe it once (§16.2b)", item)
             return
-        var c = ForeignContract { fn_sym, decl, facade, node: item, lend: 0, destroys: 0, consumes: Vec.new(), consumes_destroyed_by: Vec.new(), retains: Vec.new(), retains_by: Vec.new(), returns_borrow_resource: 0, returns_borrow_from: -1, returns_borrow_domain: 0, returns_static_tid: 0, preserves_params: Vec.new(), preserves_domains: Vec.new(), of_resource: 0, rename: 0, callback_thread_any: 0, callback_consumes: Vec.new(), callback_userdata_cb: Vec.new(), callback_userdata_of: Vec.new(), valid_on_failed: 0, nullable_params: Vec.new(), buffer_ptr: Vec.new(), buffer_len: Vec.new(), buffer_inout: Vec.new(), fixed_params: Vec.new(), fixed_literals: Vec.new(), ok_const: 0 }
+        var c = ForeignContract { fn_sym, decl, facade, node: item, lend: 0, destroys: 0, consumes: Vec.new(), consumes_destroyed_by: Vec.new(), retains: Vec.new(), retains_by: Vec.new(), returns_borrow_resource: 0, returns_borrow_from: -1, returns_borrow_domain: 0, returns_static_tid: 0, preserves_params: Vec.new(), preserves_domains: Vec.new(), of_resource: 0, rename: 0, callback_thread_any: 0, callback_consumes: Vec.new(), callback_userdata_cb: Vec.new(), callback_userdata_of: Vec.new(), valid_on_failed: 0, nullable_params: Vec.new(), buffer_ptr: Vec.new(), buffer_len: Vec.new(), buffer_inout: Vec.new(), fixed_params: Vec.new(), fixed_literals: Vec.new(), ok_const: 0, variadic_node: 0, variadic_selector: -1, variadic_case_syms: Vec.new(), variadic_case_values: Vec.new(), variadic_case_tids: Vec.new(), variadic_case_kinds: Vec.new(), returns_borrow_record: 0 }
         let extra_start = self.ast.get_data1(item)
         let clause_count = self.ast.get_data2(item)
         for ci in 0..clause_count:
@@ -1014,9 +1015,42 @@ impl Sema:
                     c.returns_borrow_from = from
                 c.returns_borrow_resource = res
                 return c
+            // `returns borrow T from param N` / `from domain D` for an
+            // imported record T (D66, spec §16.2b.6): a view of the record
+            // C points at, with the resource a parameter receives or a
+            // declared foreign-state domain as its origin. A pointer field
+            // of the record stays a raw pointer (a later ruling spells its
+            // contract); `static` stays CStr-only (§16.2b.7).
+            let record_tid = self.facade_imported_record_type(res)
+            if record_tid != 0:
+                let rn: str = self.pool_resolve(res)
+                let ret = self.resolve_alias(self.sig_return_type(sig) as TypeId)
+                if self.get_type_kind(ret) != TypeKind.TY_PTR or self.resolve_alias(self.get_type_d0(ret) as TypeId) != self.resolve_alias(record_tid as TypeId):
+                    let rt: str = self.type_name(self.sig_return_type(sig))
+                    self.emit_error(f"fn '{fname}' returns {rt}, not a pointer to '{rn}'; 'returns borrow {rn}' describes the record C points at (§16.2b.6, §16.2b.13)", clause)
+                    return c
+                if domain != 0:
+                    if not self.facade_domains.contains(domain):
+                        let dn: str = self.pool_resolve(domain)
+                        self.emit_error(f"fn '{fname}': unknown domain '{dn}'; declare it with 'domain {dn} process|thread|resource|static' (§16.2b.7)", clause)
+                        return c
+                    c.returns_borrow_domain = domain
+                else:
+                    let from = self.facade_resolve_param(self.ast.get_extra(ops + 1), fn_sym, sig)
+                    if from < 0:
+                        return c
+                    let origin = self.facade_param_receives(fn_sym, from)
+                    if origin.len() != 1:
+                        let shown = self.facade_param_display(fn_sym, sig, from)
+                        let why = if origin.len() == 0: "receives no modeled resource" else: "receives a representation several resources wrap; the facade has not assigned it (§16.2b.3)"
+                        self.emit_error(f"fn '{fname}': 'returns borrow {rn} from param {from}' names {shown}, which {why}; a borrowed record is a view of the resource its origin parameter receives, or of a domain ('from domain <name>') — With does not invent an origin (§16.2b.6, §16.2b.7)", clause)
+                        return c
+                    c.returns_borrow_from = from
+                c.returns_borrow_record = res
+                return c
             if domain != 0:
                 let rn: str = self.pool_resolve(res)
-                self.emit_error(f"fn '{fname}': 'returns borrow {rn} from domain' — a borrowed resource is a view of the resource a parameter receives ('from param <ref>'); a foreign-state domain is the origin of borrowed memory that no resource owns, a CStr (§16.2b.6, §16.2b.7)", clause)
+                self.emit_error(f"fn '{fname}': 'returns borrow {rn} from domain' — a borrowed resource is a view of the resource a parameter receives ('from param <ref>'); a foreign-state domain is the origin of borrowed memory that no resource owns: a CStr, or an imported record (§16.2b.6, §16.2b.7)", clause)
                 return c
             if not self.facade_resource_index.contains(res):
                 let rn: str = self.pool_resolve(res)
@@ -1211,6 +1245,81 @@ impl Sema:
                     return c
             c.fixed_params.push(pi)
             c.fixed_literals.push(lit)
+            return c
+        if kind == FACADE_CLAUSE_VARIADIC:
+            // `variadic param N selected by param P:` with its cases (D66,
+            // §16.2b.5): a closed set of typed call shapes of a variadic C
+            // function. N is the variadic position itself (the parameter
+            // count: C's parameters are 0..count-1 and the variadic
+            // argument has no name), P an earlier integer or enum
+            // parameter, and each case an imported constant of P's type
+            // with the presented type of the variadic argument for it.
+            if self.sig_is_variadic(sig) == 0:
+                self.emit_error(f"fn '{fname}': 'variadic param …' describes a variadic C function, and '{fname}' is not variadic (§16.2b.5, §16.2b.13)", clause)
+                return c
+            let count = self.sig_get_param_count(sig)
+            let n = self.facade_ref_index_only(self.ast.get_extra(ops))
+            if n != count:
+                let shown_n = if n < 0: "a parameter by name or type" else: f"param {n}"
+                self.emit_error(f"fn '{fname}': 'variadic param' names {shown_n}, but the variadic position of '{fname}' is param {count}: its C parameters are params 0 to {count - 1}, and the variadic argument has no name (§16.2b.5)", clause)
+                return c
+            let p = self.facade_resolve_param(self.ast.get_extra(ops + 1), fn_sym, sig)
+            if p < 0:
+                return c
+            let ptype = self.resolve_alias(self.sig_param_type(sig, p) as TypeId)
+            if self.get_type_kind(self.numeric_operand_type(ptype as i32)) != TypeKind.TY_INT:
+                let shown = self.facade_param_display(fn_sym, sig, p)
+                self.emit_error(f"fn '{fname}': 'selected by param {p}' names {shown}, which is not an integer or enum; the selector is the parameter whose compile-time value picks the case (§16.2b.5)", clause)
+                return c
+            if c.variadic_node != 0:
+                self.emit_error(f"fn '{fname}': 'variadic param …' is stated twice; one variadic function has one closed set of cases (§16.2b.5)", clause)
+                return c
+            let case_count = self.ast.get_data2(clause) - 2
+            for k in 0..case_count:
+                let case_node = self.ast.get_extra(ops + 2 + k)
+                let cops = self.ast.get_data1(case_node)
+                let sel = self.ast.get_extra(cops)
+                let sn: str = self.pool_resolve(sel)
+                let cdecl = self.facade_const_decl(sel)
+                if cdecl == 0:
+                    self.emit_error(f"fn '{fname}': 'case {sn}' names no imported integer constant; a case selector is a compile-time constant the header declares, of the selector parameter's type (§16.2b.5)", case_node)
+                    return c
+                // The constant's declared type is an integer: c_import spells
+                // an enum's constants in the enum's own width and sign
+                // (`CURLOPT_NOSIGNAL: c_uint`) and an enum-typed parameter
+                // as C's `int` (`CURLoption option: c_int`), so the two are
+                // compared as integers, never as one exact type.
+                let ctid = self.facade_const_decl_type(cdecl)
+                if ctid != 0 and self.get_type_kind(self.numeric_operand_type(self.resolve_alias(ctid as TypeId) as i32)) != TypeKind.TY_INT:
+                    let shown = self.facade_param_display(fn_sym, sig, p)
+                    let ctn: str = self.type_name(ctid)
+                    self.emit_error(f"fn '{fname}': 'case {sn}' is a {ctn}, not an integer value of the selector {shown} (§16.2b.5, §16.2b.13)", case_node)
+                    return c
+                let value = self.facade_const_int_value(self.ast.get_data1(cdecl))
+                for j in 0..c.variadic_case_syms.len() as i32:
+                    if c.variadic_case_syms[j] == sel or c.variadic_case_values[j] == value:
+                        let on: str = self.pool_resolve(c.variadic_case_syms[j])
+                        let why = if c.variadic_case_syms[j] == sel: "is listed twice" else: f"has the value of 'case {on}', already listed"
+                        self.emit_error(f"fn '{fname}': 'case {sn}' {why}; one selector value has one case (§16.2b.5)", case_node)
+                        return c
+                let tid = self.resolve_type_expr(self.ast.get_extra(cops + 1)) as i32
+                if tid == 0:
+                    return c
+                let rt = self.resolve_alias(tid as TypeId)
+                var ckind = 0
+                if rt == self.ty_str: ckind = FACADE_VARIADIC_STR
+                else if self.get_type_kind(self.numeric_operand_type(rt as i32)) == TypeKind.TY_INT: ckind = FACADE_VARIADIC_SCALAR
+                if ckind == 0:
+                    let tn: str = self.type_name(tid)
+                    let hint = if self.get_type_kind(rt) == TypeKind.TY_PTR: "; a pointer the callee keeps needs its retention stated, and a callback its userdata pairing — neither is modeled yet (#1652)" else: ""
+                    self.emit_error(f"fn '{fname}': 'case {sn}: {tn}' — a case states an integer C type ('c_long', 'curl_off_t', an enum) or 'str' (a copied input string, §16.3c){hint} (§16.2b.5)", case_node)
+                    return c
+                c.variadic_case_syms.push(sel)
+                c.variadic_case_values.push(value)
+                c.variadic_case_tids.push(tid)
+                c.variadic_case_kinds.push(ckind)
+            c.variadic_node = clause
+            c.variadic_selector = p
             return c
         if kind == FACADE_CLAUSE_OK:
             // `ok CONST` on an fn item (D64, §16.2b.8): the status contract
@@ -1449,6 +1558,250 @@ impl Sema:
             return value != 0 and self.ast.kind(value) == NodeKind.NK_INT_LIT
         false
 
+    // ── discriminated variadic contracts (D66, spec §16.2b.5) ──────────────
+    //
+    // A `param N` reference's index, or -1 for a reference by name or type:
+    // the variadic position has no name to resolve against the signature.
+    fn facade_ref_index_only(ref_node: i32) -> i32:
+        if ref_node == 0 or self.ast.get_data0(ref_node) != FACADE_PARAM_REF_INDEX:
+            return -1
+        let digits: str = self.pool_resolve(self.ast.get_data1(ref_node))
+        var idx = 0
+        for i in 0..digits.len() as i32:
+            idx = idx * 10 + (digits[i] - '0') as i32
+        idx
+
+    // The top-level `let` declaring an integer constant named `sym` — an
+    // enum constant or a `#define` c_import translated as `let NAME: T =
+    // <int>` — or 0. Matched by name: the facade's symbols and the
+    // translation's may be two ids for one text.
+    fn facade_const_decl(sym: i32) -> i32:
+        let want: str = self.pool_resolve(sym)
+        for di in 0..self.ast.decl_count():
+            let decl = self.ast.get_decl(di)
+            if self.ast.kind(decl) != NodeKind.NK_LET_DECL or self.safe_symbol_text(self.ast.get_data0(decl)) != want:
+                continue
+            return if self.facade_const_literal(self.ast.get_data1(decl)) != 0: decl as i32 else: 0
+        0
+
+    // The integer literal beneath an initializer, through `comptime`, a
+    // grouping, a cast and a negation, or 0.
+    fn facade_const_literal(value0: i32) -> i32:
+        var value = value0
+        while value != 0:
+            let k = self.ast.kind(value)
+            if k == NodeKind.NK_COMPTIME or k == NodeKind.NK_GROUPED or k == NodeKind.NK_CAST: value = self.ast.get_data0(value)
+            else if k == NodeKind.NK_UNARY and self.ast.get_data0(value) == UnaryOp.UOP_NEGATE: value = self.ast.get_data1(value)
+            else: break
+        if value != 0 and self.ast.kind(value) == NodeKind.NK_INT_LIT: value else: 0
+
+    fn facade_const_int_value(value0: i32) -> i64:
+        var value = value0
+        var neg = false
+        while value != 0:
+            let k = self.ast.kind(value)
+            if k == NodeKind.NK_COMPTIME or k == NodeKind.NK_GROUPED or k == NodeKind.NK_CAST: value = self.ast.get_data0(value)
+            else if k == NodeKind.NK_UNARY and self.ast.get_data0(value) == UnaryOp.UOP_NEGATE:
+                neg = not neg
+                value = self.ast.get_data1(value)
+            else: break
+        if value == 0 or self.ast.kind(value) != NodeKind.NK_INT_LIT:
+            return 0
+        let v = self.ast.int_lit_value(value)
+        if neg: 0 - v else: v
+
+    // The declared type of a top-level constant, or 0 when it states none.
+    mut fn facade_const_decl_type(decl: i32) -> i32:
+        let ext = self.top_level_let_type_ann_extra(self.ast.get_data2(decl))
+        if ext < 0:
+            return 0
+        let tnode = self.ast.get_extra(ext)
+        if tnode == 0: 0 else: self.resolve_type_expr(tnode) as i32
+
+    // The compile-time value of a selector argument at a call (§16.2b.5:
+    // "the selector must be a compile-time constant at the call"): an
+    // integer literal, or a name of an imported constant that no local
+    // binding shadows — through a cast, a grouping and a negation.
+    fn facade_selector_value(node0: i32) -> (bool, i64):
+        var node = node0
+        var neg = false
+        while node != 0:
+            let k = self.ast.kind(node)
+            if k == NodeKind.NK_COMPTIME or k == NodeKind.NK_GROUPED or k == NodeKind.NK_CAST: node = self.ast.get_data0(node)
+            else if k == NodeKind.NK_UNARY and self.ast.get_data0(node) == UnaryOp.UOP_NEGATE:
+                neg = not neg
+                node = self.ast.get_data1(node)
+            else: break
+        if node == 0:
+            return (false, 0)
+        let k = self.ast.kind(node)
+        if k == NodeKind.NK_INT_LIT:
+            let v = self.ast.int_lit_value(node)
+            return (true, if neg: 0 - v else: v)
+        if k != NodeKind.NK_IDENT:
+            return (false, 0)
+        let sym = self.ast.get_data0(node)
+        if self.scope_binding_is_local(sym):
+            return (false, 0)
+        let decl = self.facade_const_decl(sym)
+        if decl == 0:
+            return (false, 0)
+        let v = self.facade_const_int_value(self.ast.get_data1(decl))
+        (true, if neg: 0 - v else: v)
+
+    // The selector as the diagnostic names it: the constant's name, or the
+    // literal value.
+    fn facade_selector_text(node0: i32) -> str:
+        var node = node0
+        while node != 0:
+            let k = self.ast.kind(node)
+            if k == NodeKind.NK_COMPTIME or k == NodeKind.NK_GROUPED or k == NodeKind.NK_CAST: node = self.ast.get_data0(node)
+            else: break
+        if node != 0 and self.ast.kind(node) == NodeKind.NK_IDENT:
+            let t: str = self.pool_resolve(self.ast.get_data0(node))
+            return t
+        let (known, v) = self.facade_selector_value(node0)
+        if known: f"{v}" else: "the selector"
+
+    // The rendered name of a variadic contract's case (FacadeRender.w
+    // facade_render_variadic_case_name): `<base>__<CONST>`.
+    fn facade_variadic_case_name(base: &str, ci: i32, k: i32) -> str:
+        facade_render_variadic_case_name(base, self.pool_resolve(self.foreign_contracts[ci].variadic_case_syms[k]))
+
+    // Every variadic contract is presented as one method or function per
+    // case, and a call is retargeted to the case its selector picks. This
+    // is the net that each case's rendering exists, and the registry the
+    // call-site retarget reads (`Host.method` for a resource's lend method,
+    // the presented free name otherwise).
+    mut fn verify_facade_variadic_items():
+        for ci in 0..self.foreign_contracts.len() as i32:
+            if self.foreign_contracts[ci].variadic_node == 0:
+                continue
+            self.update_decl_source_context(self.foreign_contracts[ci].decl)
+            let fn_sym = self.foreign_contracts[ci].fn_sym
+            let node = self.foreign_contracts[ci].variadic_node
+            let fname: str = self.pool_resolve(fn_sym)
+            if self.foreign_contracts[ci].destroys != 0 or self.foreign_contracts[ci].consumes.len() > 0 or self.foreign_contracts[ci].retains.len() > 0 or self.foreign_contracts[ci].callback_userdata_cb.len() > 0 or self.foreign_contracts[ci].buffer_ptr.len() > 0 or self.foreign_contracts[ci].returns_borrow_resource != 0 or self.foreign_contracts[ci].returns_static_tid != 0 or self.foreign_contracts[ci].returns_borrow_record != 0:
+                self.emit_error(f"fn '{fname}': a variadic contract describes a lend (with fixed arguments at most); '{fname}' states a stronger clause, and the two renderings are not combined (§16.2b.5)", node)
+                continue
+            if self.facade_fn_is_resource_op(fn_sym):
+                self.emit_error(f"fn '{fname}': a variadic contract describes a lend or a free operation, and '{fname}' is a resource's own operation (its producer, initializer, drop or destroyer) (§16.2b.5)", node)
+                continue
+            if self.diags.has_errors():
+                continue
+            let recv0 = self.facade_method_host(fn_sym)
+            let case_count = self.foreign_contracts[ci].variadic_case_syms.len() as i32
+            if recv0.len() == 1:
+                let host: str = self.pool_resolve(self.facade_resources[recv0[0]].name)
+                let mname = self.facade_presented(recv0[0], fname)
+                if mname.len() == 0:
+                    continue
+                for k in 0..case_count:
+                    let cname = self.facade_variadic_case_name(mname, ci, k)
+                    let mtext = host ++ "." ++ cname
+                    if not self.sig_text_index.contains(mtext):
+                        self.emit_error(f"fn '{fname}': its variadic contract passed every facade check but no method '{mtext}' was rendered — a compiler defect (§16.2b.5)", node)
+                        break
+                self.facade_variadic_ops.insert(host ++ "." ++ mname, ci)
+                self.facade_variadic_method_names.insert(self.pool_intern(mname), 1)
+                continue
+            if recv0.len() > 1:
+                continue
+            let presented = self.facade_presented_free_name(ci)
+            let base = if self.foreign_contracts[ci].rename != 0: presented.clone() else: facade_render_bridge_name(fname)
+            let facade_name: str = self.pool_resolve(self.foreign_contracts[ci].facade)
+            let rendered_file = "<facade " ++ facade_name ++ ">"
+            for k in 0..case_count:
+                let cname = self.facade_variadic_case_name(base, ci, k)
+                var found = false
+                for di in 0..self.ast.decl_count():
+                    let decl = self.ast.get_decl(di)
+                    if self.ast.kind(decl) == NodeKind.NK_FN_DECL and self.safe_symbol_text(self.ast.get_data0(decl)) == cname and self.facade_decl_file_name(di) == rendered_file:
+                        found = true
+                if not found:
+                    self.emit_error(f"fn '{fname}': its variadic contract passed every facade check but no '{cname}' was rendered — a compiler defect (§16.2b.5)", node)
+                    break
+            self.facade_variadic_ops.insert(presented, ci)
+
+    // The case a call's selector argument picks, as the symbol of the
+    // rendered case method or function, or 0 with the refusal reported:
+    // a selector that is unlisted, or not known at compile time, is refused
+    // on the safe surface with the case to add named, and the raw
+    // variadic function stays available under `unsafe` (§16.2b.5).
+    mut fn facade_variadic_pick(ci: i32, base: &str, sel_node: i32, call_node: i32) -> i32:
+        let fname: str = self.pool_resolve(self.foreign_contracts[ci].fn_sym)
+        let facade_name: str = self.pool_resolve(self.foreign_contracts[ci].facade)
+        let p = self.foreign_contracts[ci].variadic_selector
+        let sig = self.get_sig(self.foreign_contracts[ci].fn_sym)
+        let pname = self.facade_param_c_name(self.foreign_contracts[ci].fn_sym, p)
+        let where_text = f"'variadic param {self.sig_get_param_count(sig)} selected by param {pname}:' in facade {facade_name}"
+        let (known, value) = self.facade_selector_value(sel_node)
+        if not known:
+            self.emit_error_with_help(f"fn '{fname}': the selector {pname} must be a compile-time constant at the call — the case it picks decides the type of the variadic argument, and only a listed case is presented safely (§16.2b.5)", call_node, f"pass one of the constants listed under {where_text}, or call the raw {fname} under unsafe")
+            return 0
+        for k in 0..self.foreign_contracts[ci].variadic_case_values.len() as i32:
+            if self.foreign_contracts[ci].variadic_case_values[k] == value:
+                return self.pool_intern(self.facade_variadic_case_name(base, ci, k))
+        let shown = self.facade_selector_text(sel_node)
+        self.emit_error_with_help(f"fn '{fname}': {shown} is not a case of its variadic contract, so the type of its variadic argument is unknown; the safe surface presents only the listed cases (§16.2b.5)", call_node, f"add 'case {shown}: <type>' under {where_text}, or call the raw {fname} under unsafe")
+        0
+
+    // A method call's retarget (SemaCheck.w check_method_call): when the
+    // receiver is a resource hosting a variadic contract presented as
+    // `field`, the symbol of the case method the selector argument picks;
+    // `field` when the call is not one; 0 when the selector was refused.
+    mut fn facade_variadic_retarget_method(recv_ty: i32, field: i32, extra_start: i32, arg_count: i32, node: i32) -> i32:
+        if recv_ty == 0 or not self.facade_variadic_method_names.contains(field):
+            return field
+        var r = self.resolve_alias(recv_ty as TypeId)
+        if self.get_type_kind(r) == TypeKind.TY_REF:
+            r = self.resolve_alias(self.get_type_d0(r) as TypeId)
+        let host_sym = self.get_type_name(r)
+        if host_sym == 0:
+            return field
+        let key = self.pool_resolve(host_sym) ++ "." ++ self.pool_resolve(field)
+        if not self.facade_variadic_ops.contains(key):
+            return field
+        let ci: i32 = self.facade_variadic_ops.get(key).unwrap()
+        let p = self.foreign_contracts[ci].variadic_selector
+        // The receiver is C's param 0: the selector is argument p - 1.
+        if arg_count < p or self.ast.has_call_named_args(node) != 0:
+            return field
+        let target = self.facade_variadic_pick(ci, self.pool_resolve(field), self.ast.get_extra(extra_start + p - 1), node)
+        if target != 0:
+            self.facade_variadic_calls.insert(node, target)
+        target
+
+    // A free call's retarget (SemaCheck.w check_call, beside
+    // facade_bridge_redirect): the case function of a variadic free
+    // operation presented under `fn_sym`'s name, `fn_sym` when the call is
+    // not one, 0 when the selector was refused.
+    mut fn facade_variadic_redirect_free(fn_sym: i32, extra_start: i32, arg_count: i32, node: i32) -> i32:
+        // "The raw variadic function remains available under `unsafe`"
+        // (§16.2b.5): inside an unsafe context the C name is the raw call —
+        // for an unlisted selector, and for the case functions' own bodies.
+        if self.facade_variadic_ops.len() == 0 or self.in_unsafe != 0:
+            return fn_sym
+        let name: str = self.pool_resolve(fn_sym)
+        if not self.facade_variadic_ops.contains(name):
+            return fn_sym
+        let ci: i32 = self.facade_variadic_ops.get(name).unwrap()
+        if self.facade_method_host(self.foreign_contracts[ci].fn_sym).len() == 1:
+            return fn_sym
+        let p = self.foreign_contracts[ci].variadic_selector
+        if arg_count <= p or self.ast.has_call_named_args(node) != 0:
+            return fn_sym
+        let base = if self.foreign_contracts[ci].rename != 0: name.clone() else: facade_render_bridge_name(name)
+        let target = self.facade_variadic_pick(ci, base, self.ast.get_extra(extra_start + p), node)
+        if target == 0:
+            return 0
+        // The case function must be visible here, as a bridge must be.
+        if target == self.current_fn_symbol or self.symbol_visible_from_current(target) == 0 or self.get_visible_sig(target) < 0:
+            return fn_sym
+        self.facade_bridge_syms.insert(target, 1)
+        self.facade_variadic_calls.insert(node, target)
+        target
+
 fn facade_clause_name(kind: i32) -> str:
     if kind == FACADE_CLAUSE_FROM: return "from"
     if kind == FACADE_CLAUSE_INIT: return "init"
@@ -1474,6 +1827,8 @@ fn facade_clause_name(kind: i32) -> str:
     if kind == FACADE_CLAUSE_NULLABLE: return "nullable"
     if kind == FACADE_CLAUSE_BUFFER: return "buffer"
     if kind == FACADE_CLAUSE_FIXED: return "param … fixed"
+    if kind == FACADE_CLAUSE_VARIADIC: return "variadic param … selected by param …"
+    if kind == FACADE_CLAUSE_VARIADIC_CASE: return "case"
     "callback consumes"
 
 // ── stage 3: raw classification consults the facts ──────────────────────
@@ -1818,7 +2173,7 @@ impl Sema:
 
     fn facade_contract_presented(ci: i32) -> bool:
         let c = &self.foreign_contracts[ci]
-        c.lend != 0 or c.rename != 0 or c.of_resource != 0 or c.buffer_ptr.len() > 0 or c.fixed_params.len() > 0 or c.ok_const != 0
+        c.lend != 0 or c.rename != 0 or c.of_resource != 0 or c.buffer_ptr.len() > 0 or c.fixed_params.len() > 0 or c.ok_const != 0 or c.variadic_node != 0 or c.returns_borrow_record != 0
 
     // Whether parameter `pi` is a buffer, a buffer's length, or fixed.
     fn facade_contract_pairs(ci: i32, pi: i32) -> bool:
@@ -2433,6 +2788,9 @@ impl Sema:
             if self.foreign_contracts[ci].returns_static_tid != 0 or (res != 0 and self.pool_resolve(res) == "CStr"):
                 self.verify_facade_text_return(ci)
                 continue
+            if self.foreign_contracts[ci].returns_borrow_record != 0:
+                self.verify_facade_record_return(ci)
+                continue
             if res == 0:
                 continue
             self.update_decl_source_context(self.foreign_contracts[ci].decl)
@@ -2490,6 +2848,102 @@ impl Sema:
             self.set_sig_param_effect(msig, from, eff)
             self.set_sig_param_direct_effect(msig, from, eff)
             self.set_sig_param_view_origin(msig, from, self.sig_param_view_origin(msig, from) | sema_param_origin_bit(from))
+
+    // ── record views (D66, spec §16.2b.6) ────────────────────────────────
+    //
+    // The c_import-translated struct type named `sym`, or 0: an imported
+    // record a `returns borrow T` clause may name. Matched by name — the
+    // facade's symbol and the translation's may be two ids for one text.
+    fn facade_imported_record_type(sym: i32) -> i32:
+        let want: str = self.pool_resolve(sym)
+        for di in 0..self.ast.decl_count():
+            if di >= self.decl_is_c_import.len() as i32 or self.decl_is_c_import[di] == 0:
+                continue
+            let decl = self.ast.get_decl(di)
+            if self.ast.kind(decl) != NodeKind.NK_TYPE_DECL or self.safe_symbol_text(self.ast.get_data0(decl)) != want:
+                continue
+            if type_decl_sub_kind(self.ast.get_data2(decl)) != TypeDeclKind.Struct as i32:
+                return 0
+            return self.lookup_named_type_ambient(self.ast.get_data0(decl))
+        0
+
+    // Whether signature `sig` returns `Option[&T]` for the record named `rn`.
+    fn facade_sig_returns_record_view(sig: i32, rn: &str) -> bool:
+        let ret = self.resolve_alias(self.sig_return_type(sig) as TypeId)
+        if self.get_type_kind(ret) != TypeKind.TY_GENERIC_INST or self.safe_symbol_text(self.get_type_name(ret)) != "Option" or self.get_generic_inst_arg_count(ret as i32) != 1:
+            return false
+        let arg = self.resolve_alias(self.get_generic_inst_arg(ret as i32, 0) as TypeId)
+        if self.get_type_kind(arg) != TypeKind.TY_REF:
+            return false
+        self.safe_symbol_text(self.get_type_name(self.resolve_alias(self.get_type_d0(arg) as TypeId))) == rn
+
+    // `returns borrow T from param N` / `from domain D` for an imported
+    // record T: the view is `Option[&T]`, rendered as a lend method of the
+    // resource param 0 receives (FacadeRender.w facade_render_lend_methods)
+    // or as a free operation's bridge (facade_render_free_ops), reached
+    // under the C name as a D64 bridge is (facade_bridge_redirect). This is
+    // the net that the rendering exists with that result, and the declared
+    // summary that keeps the view inside a resource origin; a domain origin
+    // goes on the call through the effect record (facade_index_call_effects).
+    mut fn verify_facade_record_return(ci: i32):
+        self.update_decl_source_context(self.foreign_contracts[ci].decl)
+        let fn_sym = self.foreign_contracts[ci].fn_sym
+        let node = self.foreign_contracts[ci].node
+        let fname: str = self.pool_resolve(fn_sym)
+        let rn: str = self.pool_resolve(self.foreign_contracts[ci].returns_borrow_record)
+        let sig = self.get_sig(fn_sym)
+        if sig < 0:
+            return
+        let from = self.foreign_contracts[ci].returns_borrow_from
+        let recv0 = self.facade_method_host(fn_sym)
+        let hosted = recv0.len() == 1 and self.foreign_contracts[ci].destroys == 0 and self.foreign_contracts[ci].consumes.len() == 0 and self.foreign_contracts[ci].retains.len() == 0
+        if self.diags.has_errors():
+            return
+        if not hosted:
+            if recv0.len() > 1:
+                return
+            let presented = self.facade_presented_free_name(ci)
+            let rendered_name = if self.foreign_contracts[ci].rename != 0: presented.clone() else: facade_render_bridge_name(fname)
+            let facade_name: str = self.pool_resolve(self.foreign_contracts[ci].facade)
+            let rendered_file = "<facade " ++ facade_name ++ ">"
+            let missing = f"fn '{fname}': 'returns borrow {rn}' passed every facade check but no '{rendered_name}' was rendered — a compiler defect (§16.2b.6)"
+            let wrong = f"fn '{fname}': 'returns borrow {rn}' was rendered as '{rendered_name}' not returning Option[&{rn}] — a compiler defect (§16.2b.6)"
+            var found = false
+            for di in 0..self.ast.decl_count():
+                let decl = self.ast.get_decl(di)
+                if self.ast.kind(decl) == NodeKind.NK_FN_DECL and self.safe_symbol_text(self.ast.get_data0(decl)) == rendered_name and self.facade_decl_file_name(di) == rendered_file:
+                    found = true
+            if not found:
+                self.emit_error(missing, node)
+                return
+            let bsym = self.pool_lookup_symbol(rendered_name)
+            let bsig = if bsym != 0: self.get_sig(bsym) else: -1
+            if bsig < 0 or not self.facade_sig_returns_record_view(bsig, rn):
+                self.emit_error(wrong, node)
+                return
+            if self.foreign_contracts[ci].rename == 0:
+                self.facade_bridge_of.insert(fname, rendered_name)
+            return
+        let host: str = self.pool_resolve(self.facade_resources[recv0[0]].name)
+        let mname = self.facade_presented(recv0[0], fname)
+        let hosts: Vec[str] = Vec.new()
+        hosts.push(host.clone())
+        hosts.push(facade_render_borrowed_name(host))
+        if self.foreign_contracts[ci].valid_on_failed != 0:
+            hosts.push(facade_render_failed_name(host))
+        for hi in 0..hosts.len() as i32:
+            let mtext = hosts[hi] ++ "." ++ mname
+            let msig: i32 = if self.sig_text_index.contains(mtext): self.sig_text_index.get(mtext).unwrap() else: -1
+            if msig < 0:
+                if hi == 0 or hi == 2:
+                    self.emit_error(f"fn '{fname}': 'returns borrow {rn}' passed every facade check but no method '{mtext}' was rendered — a compiler defect (§16.2b.6)", node)
+                continue
+            if not self.facade_sig_returns_record_view(msig, rn):
+                let rt: str = self.type_name(self.sig_return_type(msig))
+                self.emit_error(f"fn '{fname}': 'returns borrow {rn}' was rendered as '{mtext}' returning {rt}, not Option[&{rn}] — a compiler defect (§16.2b.6)", node)
+                continue
+            if from >= 0:
+                self.facade_declare_view_of_param(msig, from)
 
     // ── text views (ruling §32, §40-§42; spec §16.2b.8) ──────────────────
     //
@@ -2620,6 +3074,12 @@ impl Sema:
             self.facade_add_call_effect(sig, fn_sym, ci, self.facade_touch_params_mask(fn_sym, ci, 0), &domains, borrow, borrow_param)
             if ci < 0:
                 continue
+            // A free operation's rendered bridge (D64; D66's case functions
+            // and record views): the presented call touches what the raw
+            // one touches and borrows what it borrows.
+            let bridge_sigs = self.facade_free_bridge_sigs(ci)
+            for bi in 0..bridge_sigs.len() as i32:
+                self.facade_add_call_effect(bridge_sigs[bi], fn_sym, ci, self.facade_touch_params_mask(fn_sym, ci, 0), &domains, borrow, -1)
             // The rendered lend method of the resource param 0 receives: the
             // parameter indices are the C ones (self is 0).
             let recv0 = self.facade_method_host(fn_sym)
@@ -2632,6 +3092,9 @@ impl Sema:
             hosts.push(facade_render_borrowed_name(host) ++ "." ++ mname)
             if self.foreign_contracts[ci].valid_on_failed != 0:
                 hosts.push(facade_render_failed_name(host) ++ "." ++ mname)
+            // A variadic contract's case methods (D66).
+            for k in 0..self.foreign_contracts[ci].variadic_case_syms.len() as i32:
+                hosts.push(host ++ "." ++ self.facade_variadic_case_name(mname, ci, k))
             for hi in 0..hosts.len() as i32:
                 let htext = hosts[hi].clone()
                 if self.sig_text_index.contains(htext):
@@ -2670,6 +3133,33 @@ impl Sema:
                 if mask != 0 or domains.len() > 0:
                     for si in 0..sigs.len() as i32:
                         self.facade_add_call_effect(sigs[si], f, ci, mask, &domains, -1, -1)
+
+    // The signatures of the free renderings presenting contract `ci`: its
+    // D64 bridge under the C name, or the case functions of its variadic
+    // contract (D66) — under the C name or the item's `rename`.
+    fn facade_free_bridge_sigs(ci: i32) -> Vec[i32]:
+        let out: Vec[i32] = Vec.new()
+        if self.facade_method_host(self.foreign_contracts[ci].fn_sym).len() == 1:
+            return out
+        let fname: str = self.pool_resolve(self.foreign_contracts[ci].fn_sym)
+        let names: Vec[str] = Vec.new()
+        let rename = self.foreign_contracts[ci].rename
+        let rename_text: str = self.pool_resolve(if rename != 0: rename else: self.foreign_contracts[ci].fn_sym)
+        if self.facade_bridge_of.contains(fname):
+            let bridge: str = self.facade_bridge_of.get(fname).unwrap()
+            names.push(bridge)
+        else if rename != 0 and (self.foreign_contracts[ci].returns_borrow_record != 0 or self.foreign_contracts[ci].buffer_ptr.len() > 0 or self.foreign_contracts[ci].fixed_params.len() > 0):
+            names.push(rename_text.clone())
+        if self.foreign_contracts[ci].variadic_node != 0:
+            let base = if rename != 0: rename_text.clone() else: facade_render_bridge_name(fname)
+            for k in 0..self.foreign_contracts[ci].variadic_case_syms.len() as i32:
+                names.push(self.facade_variadic_case_name(base, ci, k))
+        for ni in 0..names.len() as i32:
+            let sym = self.pool_lookup_symbol(names[ni])
+            let sig = if sym != 0: self.get_sig(sym) else: -1
+            if sig >= 0 and not self.facade_call_effect_index.contains(sig):
+                out.push(sig)
+        out
 
     mut fn facade_add_call_effect(sig: i32, fn_sym: i32, ci: i32, mask: i32, domains: &Vec[i32], borrow: i32, borrow_param: i32):
         if self.facade_call_effect_index.contains(sig):

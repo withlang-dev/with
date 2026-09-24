@@ -247,6 +247,24 @@ fn facade_render_lend_methods(pool: AstPool, intern: InternPool, ci: &Vec[i32], 
             let handle = facade_render_fresh("repr", facade_render_param_names(pool, intern, decl))
             out = out ++ head ++ mname ++ "(" ++ params ++ ") -> Option[CStr]:\n" ++ pro ++ "        let " ++ handle ++ " = " ++ facade_render_call(pool, intern, decl, call_args) ++ "\n        if " ++ handle ++ " == null: None else: Some(unsafe { CStr.from_ptr(" ++ handle ++ " as *const i8) })\n"
             continue
+        if li.variadic != 0:
+            // A variadic contract (D66, §16.2b.5): one method per case,
+            // `<name>__<CONST>`; Sema retargets the presented call to the
+            // case its selector picks (facade_render_variadic_cases).
+            out = out ++ facade_render_variadic_cases(pool, intern, decl, li.variadic, head, mname, repr_arg, 1, "        ")
+            continue
+        if li.record_view:
+            // `returns borrow T from …` for an imported record T (D66,
+            // §16.2b.6): `Option[&T]`, a view of the record C points at —
+            // NULL is `None` — kept inside its origin by the declared
+            // summary Sema puts on this method (verify_facade_record_return)
+            // or, from a domain, by the call effect (facade_index_call_effects).
+            let view = facade_render_record_view_type(pool, intern, decl)
+            if view.len() == 0:
+                continue
+            let handle = facade_render_fresh("repr", facade_render_param_names(pool, intern, decl))
+            out = out ++ head ++ mname ++ "(" ++ params ++ ") -> Option[" ++ view ++ "]:\n" ++ pro ++ "        let " ++ handle ++ " = " ++ facade_render_call(pool, intern, decl, call_args) ++ "\n        if " ++ handle ++ " == null: None else: Some(unsafe { " ++ handle ++ " as " ++ view ++ " })\n"
+            continue
         if li.borrow_res != 0:
             if not with_borrowed_returns:
                 continue
@@ -661,10 +679,12 @@ type FacadeLendItem {
     text_view: bool,
     valid_on_failed: bool,   // rendered on `Failed<R>` too (#1612)
     bridged: bool,           // states a buffer pairing, a fixed argument or an `ok` (D64)
+    variadic: i32,           // the `variadic param … selected by …` clause (D66 §16.2b.5), or 0
+    record_view: bool,       // `returns borrow T from …` for an imported record T (D66 §16.2b.6): borrow_res is T
 }
 
 fn facade_render_lend_item(pool: AstPool, intern: InternPool, ci: &Vec[i32], item: i32) -> FacadeLendItem:
-    var li = FacadeLendItem { decl: 0, of_sym: 0, rename: 0, lends: true, borrow_res: 0, borrow_from: 0, text_view: false, valid_on_failed: false, bridged: false }
+    var li = FacadeLendItem { decl: 0, of_sym: 0, rename: 0, lends: true, borrow_res: 0, borrow_from: 0, text_view: false, valid_on_failed: false, bridged: false, variadic: 0, record_view: false }
     let cstart = pool.get_data1(item as NodeId)
     for k in 0..pool.get_data2(item as NodeId):
         let clause = pool.get_extra(cstart + k)
@@ -672,12 +692,17 @@ fn facade_render_lend_item(pool: AstPool, intern: InternPool, ci: &Vec[i32], ite
         let ops = pool.get_data1(clause as NodeId)
         if kind == FACADE_CLAUSE_OF: li.of_sym = pool.get_extra(ops)
         else if kind == FACADE_CLAUSE_RENAME: li.rename = pool.get_extra(ops)
+        else if kind == FACADE_CLAUSE_VARIADIC: li.variadic = clause
         else if kind == FACADE_CLAUSE_RETURNS_BORROW:
             li.borrow_res = pool.get_extra(ops)
             li.borrow_from = pool.get_extra(ops + 1)
             if intern.resolve(li.borrow_res) == "CStr":
                 li.text_view = true
                 li.borrow_res = 0
+            // A name no resource carries is an imported record's (D66;
+            // Sema verifies that): a view of the record, not `Borrowed<R>`.
+            else if not facade_render_resource_named(pool, intern, intern.resolve(li.borrow_res)):
+                li.record_view = true
         else if kind == FACADE_CLAUSE_RETURNS_STATIC:
             // `returns static CStr` (ruling §40): a text view of static
             // storage, no origin to keep it inside.
@@ -1675,7 +1700,9 @@ fn facade_render_free_ops(pool: AstPool, intern: InternPool, ci: &Vec[i32], faca
         if pool.kind(item as NodeId) != NodeKind.NK_FACADE_FN:
             continue
         let li = facade_render_lend_item(pool, intern, ci, item)
-        if not li.lends or not li.bridged or li.decl == 0 or li.text_view or li.borrow_res != 0:
+        if not li.lends or li.decl == 0 or li.text_view or (li.borrow_res != 0 and not li.record_view):
+            continue
+        if not li.bridged and li.variadic == 0 and not li.record_view:
             continue
         var hosted = false
         for ri in 0..resources.len() as i32:
@@ -1690,12 +1717,103 @@ fn facade_render_free_ops(pool: AstPool, intern: InternPool, ci: &Vec[i32], faca
         let bridge = facade_render_bridge(pool, intern, decl, 0, -1, "")
         if not bridge.ok:
             continue
+        let base = if li.rename != 0: presented.clone() else: facade_render_bridge_name(cname)
+        if li.variadic != 0:
+            // One function per case (D66, §16.2b.5), `<base>__<CONST>`;
+            // a call to the presented name is retargeted to the case
+            // (SemaFacade.w facade_variadic_redirect_free).
+            out = out ++ facade_render_variadic_cases(pool, intern, decl, li.variadic, "fn ", base, "", 0, "    ")
+            continue
+        if li.record_view:
+            let view = facade_render_record_view_type(pool, intern, decl)
+            if view.len() == 0:
+                continue
+            let handle = facade_render_fresh("repr", facade_render_param_names(pool, intern, decl))
+            out = out ++ "fn " ++ base ++ "(" ++ bridge.params ++ ") -> Option[" ++ view ++ "]:\n" ++ facade_render_indent(bridge.prologue, "    ") ++ "    let " ++ handle ++ " = " ++ facade_render_call(pool, intern, decl, bridge.args) ++ "\n    if " ++ handle ++ " == null: None else: Some(unsafe { " ++ handle ++ " as " ++ view ++ " })\n"
+            continue
         if bridge.cap_var.len() > 0 and facade_render_fn_ok(pool, intern, decl) != 0:
             out = out ++ facade_render_fn_error_type(pool, intern, decl, presented)
         let rendered = if li.rename != 0: presented.clone() else: facade_render_bridge_name(cname)
         let (result, body) = facade_render_bridge_body(pool, intern, decl, &bridge, facade_render_call(pool, intern, decl, bridge.args), presented, "    ")
         out = out ++ "fn " ++ rendered ++ "(" ++ bridge.params ++ ")" ++ result ++ ":\n" ++ facade_render_indent(bridge.prologue, "    ") ++ body
     out
+
+// Whether a facade block of the compilation declares a resource `name`.
+fn facade_render_resource_named(pool: AstPool, intern: InternPool, name: &str) -> bool:
+    let items = facade_render_all_items(pool, NodeKind.NK_FACADE_RESOURCE)
+    for i in 0..items.len() as i32:
+        if intern.resolve(pool.get_data0(items[i] as NodeId)) == name:
+            return true
+    false
+
+// The rendered name of one case of a variadic contract (D66, §16.2b.5):
+// `<base>__<CONST>`, the base being the presented method name, or the free
+// operation's rendered name (`__with_facade_<name>`, or its `rename`).
+pub fn facade_render_variadic_case_name(base: &str, sel: &str) -> str: base ++ "__" ++ sel
+
+// One method or function per case of a `variadic param N selected by
+// param P:` contract (D66, spec §16.2b.5). The declaration stays variadic:
+// each case's rendering calls it with the C parameters before the variadic
+// position as the bridge renders them — the selector stays a parameter, so
+// the call Sema retargets keeps its argument list — and the variadic
+// argument typed as the case states it: an integer C type is passed as
+// that type, `str` as a call-scoped NUL-terminated copy (§16.3c: an
+// interior NUL is a contract violation, reported by name, never
+// truncated). For `curl_easy_setopt` on `Easy`:
+//
+//     fn setopt__CURLOPT_NOSIGNAL(option: CURLoption, value: c_long) -> CURLcode:
+//         unsafe { curl_easy_setopt(self.repr, option, value) }
+//     fn setopt__CURLOPT_URL(option: CURLoption, value: &str) -> CURLcode:
+//         let value_c = match value.to_cstring():
+//             Ok(c) => c
+//             Err(_) => panic("…")
+//         unsafe { curl_easy_setopt(self.repr, option, value_c.as_cstr().ptr()) }
+fn facade_render_variadic_cases(pool: AstPool, intern: InternPool, decl: i32, clause: i32, head: &str, base: &str, repr_arg: &str, skip: i32, indent: &str) -> str:
+    var out = ""
+    let cops = pool.get_data1(clause as NodeId)
+    let case_count = pool.get_data2(clause as NodeId) - 2
+    let taken = facade_render_param_names(pool, intern, decl)
+    let ret = facade_render_return(pool, intern, decl)
+    for k in 0..case_count:
+        let case_node = pool.get_extra(cops + 2 + k)
+        let ops = pool.get_data1(case_node as NodeId)
+        let sel: str = intern.resolve(pool.get_extra(ops))
+        let ty = render_type_expr(pool, intern, pool.get_extra(ops + 1) as NodeId)
+        let bridge = facade_render_bridge(pool, intern, decl, skip, -1, "")
+        if not bridge.ok:
+            continue
+        let value = facade_render_fresh("value", taken)
+        var params = bridge.params.clone()
+        if params.len() > 0: params = params ++ ", "
+        var args = bridge.args.clone()
+        if args.len() > 0: args = args ++ ", "
+        var pro = bridge.prologue.clone()
+        if ty == "str":
+            let cs = value ++ "_c"
+            params = params ++ value ++ ": &str"
+            pro = pro ++ "let " ++ cs ++ " = match " ++ value ++ ".to_cstring():\n    Ok(c) => c\n    Err(_) => panic(\"" ++ base ++ "(" ++ sel ++ "): the text has an interior NUL, which a C string cannot carry (§16.3c)\")\n"
+            args = args ++ cs ++ ".as_cstr().ptr()"
+        else:
+            params = params ++ value ++ ": " ++ ty
+            args = args ++ value
+        let call_args = if repr_arg.len() > 0: repr_arg ++ ", " ++ args else: args.clone()
+        out = out ++ head ++ facade_render_variadic_case_name(base, sel) ++ "(" ++ params ++ ")" ++ ret ++ ":\n" ++ facade_render_indent(pro, indent) ++ indent ++ facade_render_call(pool, intern, decl, call_args) ++ "\n"
+    out
+
+// The view type a `returns borrow T from …` record view presents (D66,
+// §16.2b.6): `&T` for a declaration returning `T *` or `const T *`, or ""
+// when the return is not a pointer (Sema's error names it).
+fn facade_render_record_view_type(pool: AstPool, intern: InternPool, decl: i32) -> str:
+    let meta = pool.find_fn_meta(decl as NodeId)
+    if meta < 0:
+        return ""
+    let ret = pool.fn_meta_ret(meta)
+    if ret == 0:
+        return ""
+    let u = facade_render_unalias(pool, intern, render_type_expr(pool, intern, ret as NodeId))
+    if u.starts_with("*mut "): return "&" ++ u.slice(5, u.len())
+    if u.starts_with("*const "): return "&" ++ u.slice(7, u.len())
+    ""
 
 // The C parameter's name as a With parameter: less the translation's
 // `__param_` mark, and escaped as the c_import wrappers escape it — an
@@ -1952,7 +2070,7 @@ fn facade_render_callback_item(pool: AstPool, intern: InternPool, ci: &Vec[i32],
 fn facade_render_callback_hosted(pool: AstPool, intern: InternPool, cbi: &FacadeCallbackItem, resource: i32, repr: &str) -> bool:
     if cbi.decl == 0:
         return false
-    let li = FacadeLendItem { decl: cbi.decl, of_sym: cbi.of_sym, rename: cbi.rename, lends: true, borrow_res: 0, borrow_from: 0, text_view: false, valid_on_failed: false, bridged: false }
+    let li = FacadeLendItem { decl: cbi.decl, of_sym: cbi.of_sym, rename: cbi.rename, lends: true, borrow_res: 0, borrow_from: 0, text_view: false, valid_on_failed: false, bridged: false, variadic: 0, record_view: false }
     facade_render_lend_hosted(pool, intern, &li, resource, repr)
 
 // Whether some callback method of `resource` retains userdata: the

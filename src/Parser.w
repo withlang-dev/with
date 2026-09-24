@@ -4498,6 +4498,65 @@ impl Parser:
             ops.push(p)
             ops.push(l)
             ops.push(if is_cap: 1 else: 0)
+        else if word == "variadic":
+            // `variadic param N selected by param P:` with `case CONST:
+            // <type>` lines beneath it (D66, §16.2b.5): the closed set of
+            // typed call shapes of a variadic C function, selected by an
+            // earlier parameter whose value is known at compile time. The
+            // declaration stays variadic; each case states the presented
+            // type of the variadic argument for that selector value.
+            kind = FACADE_CLAUSE_VARIADIC
+            let clause_col = column_of(self.source, start)
+            let n = self.parse_facade_param_ref()
+            if n == 0: return 0
+            if not self.current_ident_is("selected"):
+                self.emit_error("a discriminated variadic contract is written 'variadic param <N> selected by param <P>:' with 'case <CONST>: <type>' lines beneath it (§16.2b.5)")
+                return 0
+            self.advance()
+            if not self.current_ident_is("by"):
+                self.emit_error("a discriminated variadic contract is written 'variadic param <N> selected by param <P>:' with 'case <CONST>: <type>' lines beneath it (§16.2b.5)")
+                return 0
+            self.advance()
+            let p = self.parse_facade_param_ref()
+            if p == 0: return 0
+            if self.expect(TokenKind.TK_COLON) == 0: return 0
+            let cases: Vec[i32] = Vec.new()
+            self.skip_newlines()
+            while self.peek() != TokenKind.TK_EOF:
+                let col = column_of(self.source, self.current_start())
+                if col <= clause_col: break
+                let cstart = self.current_start()
+                if not self.current_ident_is("case"):
+                    self.emit_error("expected 'case <CONST>: <type>' beneath 'variadic param … selected by param …:' (§16.2b.5)")
+                    return 0
+                self.advance()
+                let sel = self.expect_ident()
+                if sel == 0: return 0
+                if self.expect(TokenKind.TK_COLON) == 0: return 0
+                // A callback case (`callback param N userdata param CONST`)
+                // pairs two selectors across two calls, and a retained
+                // pointer case (`… retains by param 0`) keeps the argument
+                // past the call; neither is modeled yet (#1652) — refused,
+                // never rendered as a plain value.
+                if self.current_ident_is("callback"):
+                    self.emit_error("a callback case of a variadic contract ('case CONST: callback param N userdata param CONST') is not modeled yet (#1652); leave the case out and set that option through the raw function under unsafe (§16.2b.5, §16.2b.9)")
+                    return 0
+                let ty = self.parse_type_expr()
+                if ty == 0: return 0
+                if self.current_ident_is("retains"):
+                    self.emit_error("a retained case of a variadic contract ('case CONST: <type> retains by param 0') is not modeled yet (#1652); leave the case out and set that option through the raw function under unsafe (§16.2b.5)")
+                    return 0
+                let case_extra = self.pool.extra_len()
+                self.pool.add_extra(sel)
+                self.pool.add_extra(ty as i32)
+                cases.push(self.pool.add_node(NodeKind.NK_FACADE_CLAUSE, cstart, self.prev_end(), FACADE_CLAUSE_VARIADIC_CASE, case_extra, 2) as i32)
+                self.skip_newlines()
+            if cases.len() == 0:
+                self.emit_error("a discriminated variadic contract lists at least one 'case <CONST>: <type>' beneath it (§16.2b.5)")
+                return 0
+            ops.push(n)
+            ops.push(p)
+            for i in 0..cases.len() as i32: ops.push(cases[i])
         else if word == "param":
             // `param N fixed <literal>` (D64, §16.2b.11): the C parameter is
             // bound to the literal and leaves the presented signature.

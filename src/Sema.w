@@ -471,7 +471,18 @@ type ForeignContract {
     fixed_params: Vec[i32],            // D64 §16.2b.11: each `param N fixed <literal>` parameter …
     fixed_literals: Vec[i32],          // … and its literal node (parallel)
     ok_const: i32,                     // `ok CONST` on the fn item: the status contract a copied-back length is presented under (D64)
+    variadic_node: i32,                // D66 §16.2b.5: the `variadic param N selected by param P:` clause, or 0 …
+    variadic_selector: i32,            // … its selector parameter P (-1: none) …
+    variadic_case_syms: Vec[i32],      // … each case's imported constant …
+    variadic_case_values: Vec[i64],    // … that constant's value (parallel) …
+    variadic_case_tids: Vec[i32],      // … the presented type of the variadic argument (parallel) …
+    variadic_case_kinds: Vec[i32],     // … and its kind: FACADE_VARIADIC_SCALAR or FACADE_VARIADIC_STR (parallel)
+    returns_borrow_record: i32,        // D66 §16.2b.6: `returns borrow T from …` for an imported record T (the type's symbol), or 0
 }
+
+// D66 §16.2b.5: what a variadic case's argument is.
+const FACADE_VARIADIC_SCALAR: i32 = 1   // a scalar C type: passed as that type
+const FACADE_VARIADIC_STR: i32 = 2      // `str`: a copied input string (§16.3c), passed as a call-scoped C string
 
 // A callback method a facade rendered on a resource (stage 9, ruling
 // §44-§51; FacadeRender.w facade_render_callback_methods), keyed by the
@@ -1189,6 +1200,14 @@ pub type Sema {
     facade_bridge_of: HashMap[str, str],           // D64: C name -> the rendered free operation presented under it (`__with_facade_<name>`)
     facade_bridge_syms: HashMap[i32, i32],         // D64: bridge symbols a call was redirected to (MirLower.w lower_call) -> 1
     facade_presented_calls: HashMap[i32, i32],     // call node -> 1
+    // D66 (spec §16.2b.5): a discriminated variadic contract is presented
+    // as one method or function per case, chosen at the call by the
+    // selector's compile-time value (SemaFacade.w facade_variadic_retarget;
+    // SemaCheck.w check_method_call / check_call; MirLower.w
+    // lower_method_call / lower_call materialize the choice).
+    facade_variadic_ops: HashMap[str, i32],        // "Host.method" (hosted) or the presented free name -> foreign_contracts index
+    facade_variadic_method_names: HashMap[i32, i32], // a hosted presented method's symbol -> 1 (the cheap pre-check)
+    facade_variadic_calls: HashMap[i32, i32],      // call node -> the case method's symbol Sema chose
     // §30 (spec §16.2b.6): ephemeral-storage errors whose ephemerality a
     // facade resource supplies, held until the facade facts exist
     // (SemaFacade.w report_facade_layout_errors).
@@ -2571,6 +2590,9 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         facade_bridge_of: HashMap.new(),
         facade_bridge_syms: sema_new_map_i32_i32(),
         facade_presented_calls: sema_new_map_i32_i32(),
+        facade_variadic_ops: HashMap.new(),
+        facade_variadic_method_names: sema_new_map_i32_i32(),
+        facade_variadic_calls: sema_new_map_i32_i32(),
         facade_layout_nodes: Vec.new(),
         facade_layout_tids: Vec.new(),
         facade_layout_containers: Vec.new(),
