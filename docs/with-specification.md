@@ -9522,6 +9522,34 @@ cstr.to_owned()        // allocates an owned copy, explicitly
 
 No `char *` becomes `str` silently.
 
+**Buffers.** A C pointer parameter and the integer parameter that carries its
+byte length are one byte slice when the facade pairs them; the pairing is
+stated, never inferred from the C types, because a wrong pairing hands C a
+wrong length:
+
+```
+fn compress
+    buffer param source len param sourceLen          // one input []u8
+    buffer param dest capacity param destLen inout   // one writable []mut u8
+```
+
+`buffer param P len param L` renders `P` and `L` as one `[]u8` parameter; the
+compiler supplies the pointer and the byte length from that one value.
+`buffer param P capacity param L inout` renders `P` and `L` as one `[]mut u8`
+parameter whose length is the capacity C receives on entry; the length C
+writes back is bounds-checked against that capacity before it becomes a
+With value, and it is presented as the operation's `usize` result — the
+caller's slice is not modified. Whether the copied-back length is meaningful
+after a failed call is decided by the operation's status contract (§16.2b.4);
+it is presented only on success. The length counts bytes; the clause renders
+`[]u8`, never an element slice of another type. A raw pointer parameter that
+no clause pairs is not a buffer, and a `lend` or presentation clause on such
+a function is refused rather than rendering a call without a bounds contract.
+
+```
+let n = compress(out, src)?        // no pointer, no length, no unsafe
+```
+
 Caller-owned returned memory is a resource:
 
 ```
@@ -9596,6 +9624,20 @@ fn sqlite3_prepare_v2
 Explicit presentation overrides the automatic convention. Where automatic
 grouping is ambiguous the sugar is omitted and the operation remains
 available under its imported name.
+
+**Fixed arguments.** A facade may bind a C parameter to a literal and remove
+it from the presented signature:
+
+```
+fn sqlite3_prepare_v2
+    param nByte fixed -1
+    param pzTail fixed null
+```
+
+The presented `prepare(sql)` always passes those literals; the raw operation
+stays available for any other value. A fixed argument is a stated facade
+fact, never an inference from the C type, and it is not an optional argument
+a caller may override.
 
 #### 16.2b.12 Convention profiles
 
