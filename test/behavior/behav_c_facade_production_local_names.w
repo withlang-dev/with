@@ -54,7 +54,7 @@ fn main:
     drop(d)
     print(f"out status={st} tag={t2} closes={counter_closes(c)}")
     let ends = unsafe { calloc(1, 4) as *mut c_int }
-    let (ist, s) = Stream.z_init(ends, 4, 7)
+    let (ist, s) = Stream.init(ends, 4, 7)
     let t3 = unsafe { z_tag(&raw const s.repr) }
     drop(s)
     print(f"in place status={ist} tag={t3} ends={unsafe { *ends }}")

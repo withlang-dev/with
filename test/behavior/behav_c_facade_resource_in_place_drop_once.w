@@ -33,11 +33,11 @@ c facade zl:
 fn state(s: &Stream) -> c_int: unsafe { z_state(s.repr.as_ptr()) }
 
 fn scope(ends: *mut c_int) -> c_int:
-    let s = Stream.z_init(ends)
+    let s = Stream.init(ends)
     state(s)
 
 fn early(ends: *mut c_int, flag: bool) -> c_int:
-    let s = Stream.z_init(ends)
+    let s = Stream.init(ends)
     if flag: return state(s)
     print("late")
     state(s)
@@ -45,7 +45,7 @@ fn early(ends: *mut c_int, flag: bool) -> c_int:
 fn take(s: Stream) -> c_int: state(s)
 
 fn give(ends: *mut c_int) -> Stream:
-    let s = Stream.z_init(ends)
+    let s = Stream.init(ends)
     s
 
 fn main:
@@ -55,15 +55,15 @@ fn main:
     let e1 = early(ends, true)
     let e2 = early(ends, false)
     print(f"early {e1} {e2} ends={unsafe { *ends }}")
-    let m = take(Stream.z_init(ends))
+    let m = take(Stream.init(ends))
     print(f"moved-in {m} ends={unsafe { *ends }}")
     let g = give(ends)
     let gs = state(g)
     drop(g)
     print(f"moved-out {gs} ends={unsafe { *ends }}")
     var v: Vec[Stream] = Vec.new()
-    v.push(Stream.z_init(ends))
-    v.push(Stream.z_init(ends))
+    v.push(Stream.init(ends))
+    v.push(Stream.init(ends))
     let s0 = state(v[0])
     let s1 = state(v[1])
     drop(v)

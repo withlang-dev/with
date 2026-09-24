@@ -37,13 +37,13 @@ fn check(s: &Stream) -> c_int: unsafe { z_check(s.repr.as_ptr()) }
 fn take(s: Stream) -> c_int: check(s)
 
 fn make(ends: *mut c_int, misplaced: *mut c_int) -> Stream:
-    let (_, s) = Stream.z_init(ends, misplaced)
+    let (_, s) = Stream.init(ends, misplaced)
     s
 
 fn main:
     let ends = unsafe { calloc(1, 4) as *mut c_int }
     let misplaced = unsafe { calloc(1, 4) as *mut c_int }
-    let (_, a) = Stream.z_init(ends, misplaced)
+    let (_, a) = Stream.init(ends, misplaced)
     print(f"ctor {check(a)}")
     let p = a.repr.as_ptr()
     let b = move a
@@ -55,7 +55,7 @@ fn main:
     drop(v)
     let f = take(make(ends, misplaced))
     print(f"fn {f}")
-    let (_, last) = Stream.z_init(ends, misplaced)
+    let (_, last) = Stream.init(ends, misplaced)
     drop(last)
     print(f"ends={unsafe { *ends }} misplaced={unsafe { *misplaced }}")
     print("ok")

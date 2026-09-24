@@ -50,16 +50,16 @@ c facade zl:
 
 fn main:
     let ends = unsafe { calloc(1, 4) as *mut c_int }
-    let s = Stream.z_init(42, ends, 0).unwrap()
+    let s = Stream.init(42, ends, 0).unwrap()
     print(f"preinit tag={unsafe { z_tag(&raw const s.repr) }} ends={unsafe { *ends }}")
     drop(s)
-    match Stream.z_init(1, ends, 1):
+    match Stream.init(1, ends, 1):
         Ok(_) => print("bad")
         Err(StreamError.Failed(fst)) => print(f"failed status={fst} ends={unsafe { *ends }}")
-    let d = Stream.z_init(2, ends, 0).unwrap()
-    let how = d.z_end_v2(3)
+    let d = Stream.init(2, ends, 0).unwrap()
+    let how = d.end_v2(3)
     print(f"destroys {how} ends={unsafe { *ends }}")
-    let (ust, u) = Blind.z_init(ends, 1)
+    let (ust, u) = Blind.init(ends, 1)
     let ulive = u.live
     drop(u)
     print(f"unread status={ust} live={ulive} ends={unsafe { *ends }}")
