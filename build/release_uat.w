@@ -361,7 +361,7 @@ pub fn run_release_sqlite3_uat_action(ctx: ActionCtx) -> i32:
     ruat_run_c_package_uat(ctx, "c.sqlite3", "sqlite3", "build/release_uat_fixtures/sqlite3_main.w", "lib/facades/sqlite3.w", "sqlite3 UAT passed")
 
 pub fn run_release_libcurl_uat_action(ctx: ActionCtx) -> i32:
-    ruat_run_c_package_uat(ctx, "c.libcurl", "libcurl", "build/release_uat_fixtures/libcurl_main.w", "", "libcurl UAT passed")
+    ruat_run_c_package_uat(ctx, "c.libcurl", "libcurl", "build/release_uat_fixtures/libcurl_main.w", "lib/facades/libcurl.w", "libcurl UAT passed")
 
 pub fn run_release_install_layout_uat_action(ctx: ActionCtx) -> i32:
     let compiler = ruat_compiler_input(ctx)

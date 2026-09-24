@@ -3306,7 +3306,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     var release_libcurl_uat = target_new(.Action, "release-libcurl-uat", "").output("out/release-uat/libcurl.passed")
     release_libcurl_uat.action = run_release_libcurl_uat_action
     release_libcurl_uat = release_libcurl_uat.input(release_platform_asset_bin())
-    release_libcurl_uat = release_libcurl_uat.input("build/release_uat_fixtures/libcurl_main.w")
+    release_libcurl_uat = release_libcurl_uat.input("build/release_uat_fixtures/libcurl_main.w").input("lib/facades/libcurl.w")
     release_libcurl_uat = release_libcurl_uat.write_scope("out/release-uat")
     release_libcurl_uat = release_libcurl_uat.allow_network()
     release_libcurl_uat = release_libcurl_uat.dep("require-last-green")
