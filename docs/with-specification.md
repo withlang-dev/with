@@ -5811,6 +5811,36 @@ may be returned, stored, or sent across a channel when every capture
 is `Send`. A non-`move` closure is a view of its frame (§12.2) and may
 not be returned.
 
+**The callable type.** A callable value has type `fn(A) -> R` whether
+it is a function, a non-`move` closure, or a `move ||` closure. There
+is no second closure type and no trait split. The compiler tracks
+which kind a value is, as it tracks `may_suspend` (§14): a non-`move`
+closure is ephemeral (§5); a `move ||` closure owns its environment
+and drops it, so a struct holding one has `Drop` and cannot be `Copy`;
+a consuming closure may be invoked once.
+
+- `fn(A) -> R` is not `Copy`, including for a bare function: `let g =
+  f` moves `f`. Calling through a binding or a field observes it and
+  does not move. `.clone()` is free for a bare function or a non-`move`
+  closure and requires every capture `Clone` for a `move ||` closure.
+  A use of a moved callable is diagnosed with `.clone()` and
+  calling through the original as the fix-its.
+- A consuming closure may only be handed to a callee that invokes it
+  at most once. Within one compilation the compiler proves this from
+  the callee's body. Across a bundle boundary (§3.4) a parameter may
+  be invoked any number of times, so a consuming closure passed across
+  a bundle is rejected until a `once` parameter annotation exists
+  (deferred).
+- A non-`move` closure passed as an argument is ephemeral in the callee
+  exactly as a `&T` parameter is (Rule 8, §22.1): it may be invoked and
+  passed on, and may not be stored, returned, or captured by a
+  `move ||` closure.
+- A call through `fn(A) -> R` is an indirect call through the pair.
+  When a closure literal reaches a parameter within one compilation,
+  the compiler specializes the callee and the call is direct. Only a
+  captureless closure coerces to an `extern "C"` function pointer
+  (§14.19): C receives the code pointer alone.
+
 ```with
 let xs = Vec.new()
 let f = || xs.push(1)   // capture effect on xs: {write}
