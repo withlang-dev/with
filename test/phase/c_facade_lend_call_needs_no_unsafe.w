@@ -2,7 +2,9 @@
 
 // D51 stage 3 (§16.2b.5): a facade covers a declaration's surface, so the
 // call needs no `unsafe`: db_count is described (lend, the default), and its
-// `char *` label parameter is covered by that description. A parameter that
+// `const char *` label is a lent `str` under the text rules (§16.3c). A
+// mutable `char *` with no length would be a caller-owned buffer, which a
+// lend may not cover (#1621, err_c_facade_lend_unpaired_buffer). A parameter that
 // takes a resource's representation is not lifted on the raw name — the
 // resource is its safe surface (err_c_facade_raw_destroyer_stays_raw.w).
 // The C prototypes have no bodies, so this test only checks (phase lane).
@@ -11,7 +13,7 @@
 use c_import("typedef struct db db;
 int db_open(const char* path, db** out);
 void db_close(db* d);
-int db_count(char* label);
+int db_count(const char* label);
 ")
 
 c facade dbl:

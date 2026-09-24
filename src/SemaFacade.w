@@ -29,6 +29,7 @@ impl Sema:
         self.verify_facade_resources()
         self.report_facade_layout_errors()
         self.verify_facade_assignments()
+        self.verify_facade_buffer_params()
         self.verify_facade_presentation()
         self.verify_facade_failed_state_items()
         self.verify_facade_nullable_items()
@@ -2376,6 +2377,58 @@ impl Sema:
         self.set_sig_param_effect(sig, pi, eff)
         self.set_sig_param_direct_effect(sig, pi, eff)
         self.set_sig_param_view_origin(sig, pi, self.sig_param_view_origin(sig, pi) | sema_param_origin_bit(pi))
+
+    // ── caller-owned buffers (#1621; spec §16.2b.3, §16.2b.8) ─────────────
+    //
+    // A lend covers every parameter it does not name (facade_covers_param),
+    // and so a `lend` on `compress(Bytef *dest, uLongf *destLen, const
+    // Bytef *source, uLong sourceLen)` rendered a SAFE call over raw
+    // pointers with no bounds contract: a caller passing a capacity larger
+    // than its array corrupted memory in safe code — the partial model
+    // §16.2b.3 forbids ("a partial model that could create unsafety is a
+    // compile error"). No clause pairs a buffer with its length yet (a
+    // ruling is pending on #1621), so until one exists a lend-shaped item
+    // — one that states nothing stronger than a lend, hosted or not —
+    // whose C signature has a pointer parameter the facade covers is
+    // refused, naming the parameter. What is not a caller-owned buffer and
+    // stays covered: a parameter receiving a modeled resource (reached
+    // through the resource, §16.2b.5), a `const char *` input (a lent
+    // `str`, §16.3c), and a code pointer (a callback, §16.2b.9). Every
+    // other pointer — `T *`, `void *`, `unsigned char *`, `int *` — is a
+    // buffer or an out slot With holds no contract for; leave the call raw.
+    mut fn verify_facade_buffer_params():
+        for ci in 0..self.foreign_contracts.len() as i32:
+            if self.foreign_contracts[ci].destroys != 0 or self.foreign_contracts[ci].consumes.len() > 0 or self.foreign_contracts[ci].retains.len() > 0 or self.foreign_contracts[ci].callback_userdata_cb.len() > 0 or self.foreign_contracts[ci].callback_thread_any != 0 or self.foreign_contracts[ci].callback_consumes.len() > 0:
+                continue
+            let fn_sym = self.foreign_contracts[ci].fn_sym
+            let decl = self.foreign_contracts[ci].decl
+            let node = self.foreign_contracts[ci].node
+            if self.facade_fn_is_resource_op(fn_sym):
+                continue
+            let sig = self.get_sig(fn_sym)
+            if sig < 0:
+                continue
+            for pi in 0..self.sig_get_param_count(sig):
+                let ptid = self.sig_param_type(sig, pi)
+                let pty = self.resolve_alias(ptid as TypeId)
+                if self.get_type_kind(pty) != TypeKind.TY_PTR:
+                    continue
+                if self.facade_param_receives(fn_sym, pi).len() > 0 or self.ci_type_is_const_c_string_input(ptid) != 0 or self.facade_param_is_callable(sig, pi):
+                    continue
+                // A pointer to a C record is a handle, not a buffer: no
+                // length pairs with it, and a lend of one is the stage-3
+                // default (a facade lends every parameter it does not
+                // name). A buffer is a pointer to bytes, scalars, `void`
+                // or pointers — what a (ptr, len) pair spans.
+                let pointee = self.resolve_alias(self.get_type_d0(pty) as TypeId)
+                let pk = self.get_type_kind(pointee)
+                if pk == TypeKind.TY_STRUCT or pk == TypeKind.TY_ENUM or pk == TypeKind.TY_GENERIC_INST:
+                    continue
+                self.update_decl_source_context(decl)
+                let fname: str = self.pool_resolve(fn_sym)
+                let shown = self.facade_param_display(fn_sym, sig, pi)
+                self.emit_error_with_help(f"fn '{fname}': a lend would make the call safe, but {shown} is a caller-owned buffer that needs a length contract, and no clause states one yet (#1621); a safe call over a raw pointer with no bounds is the partial model §16.2b.3 forbids — leave the call raw (§16.2b.5, §16.2b.8)", node, "describe the function without a lend until the buffer clause lands, and call it under the raw C rules (`unsafe`)")
+                break
 
     // ── the failed state (ruling §18; spec §16.2b.4; D59) ─────────────────
     //
