@@ -265,6 +265,26 @@ presentation override. It compiles and typechecks. **Only then**:
 and libcurl fixtures, `examples/c-interop`, the blog and documentation
 examples are rewritten, and `user-programs-safe` (`build.w:1836`) goes green.
 
+**Stage 12b — what the SQLite facade exposed (#1618, #1612, #1610).** Three
+facade-language gaps stage 12 found and left as findings, closed against
+the canon. Derived decisions (the ruling and the spec are silent on the
+exact spelling; each is recorded here, not in the spec, whose wording only
+Eric blesses):
+
+- **Library-prefix presentation** (#1610). Ruling §54 / spec §16.2b.11
+  permit "shortening prefixes" silently under "a recognizable
+  naming/receiver pattern". The renderer's convention shortens by the
+  representation's struct name (`sqlite3_` for `sqlite3`) and now also by
+  each snake-case component prefix of it (`sqlite3_stmt` → `sqlite3_`;
+  `g_hash_table` → `g_hash_`, `g_`), longest match winning, so
+  `sqlite3_step(sqlite3_stmt *)` is `stmt.step()` with no `rename`. The
+  prefix comes from the representation's struct name only, never from
+  another resource's: a child's producer presented on its parent shortens
+  by the parent's prefixes (`db_new` and `st_new` on `Database` stay
+  `new` and `st_new`, not a clash). Ambiguity keeps failing closed (§55).
+  The SQLite facade keeps the one explicit override §66 requires
+  (`rename prepare`).
+
 **Stage 13 — runtime audit (ruling §52).** Domain facts for the
 `rt_libc_*` / `with_libc_*` seams that touch `errno`, `environ`, `locale`,
 and an audit lane in the shape of `libc-surface-check` (`build/compiler.w:

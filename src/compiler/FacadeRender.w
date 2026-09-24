@@ -295,7 +295,9 @@ fn facade_render_resources_wrapping(pool: AstPool, intern: InternPool, repr: &st
 // type by the naming convention §16.2a already applies to raw imports: the
 // C name less the representation's snake-case prefix (`db_count` on
 // `Database wraps *mut db` is `d.count()`, `sqlite3_prepare_v2` on `*mut
-// sqlite3` is `prepare_v2`), or the `rename` an fn item states. A producer
+// sqlite3` is `prepare_v2`) or less the library prefix the struct name
+// carries (`sqlite3_step` on `*mut sqlite3_stmt` is `step`,
+// facade_render_shorten), or the `rename` an fn item states. A producer
 // whose first parameter receives another resource is presented as a method
 // of that resource too (`db.prepare(sql)` beside `Statement.prepare(db,
 // sql)`, facade_render_receiver_method), and the constructor of a resource
@@ -496,15 +498,35 @@ fn facade_render_struct_name(text: &str) -> str:
 // snake case, `GHashTable` → `g_hash_table_`, or case-insensitively as
 // `Struct_`), or "" when none matches, the remainder is not an identifier,
 // or it is a With keyword or `drop`.
+//
+// The library prefix (#1610): a C library names its types and its
+// functions under one prefix, and an operation of a resource carries the
+// library's, not the struct's — `sqlite3_step(sqlite3_stmt *)`,
+// `curl_easy_perform(CURL *)`, `inflate(z_streamp)`. So each snake-case
+// component prefix of the struct name is tried too (`sqlite3_stmt` →
+// `sqlite3_`; `g_hash_table` → `g_hash_`, `g_`), and the longest matching
+// prefix wins. Being wrong here changes a spelling (§54), and a clash
+// between two operations still fails closed (facade_render_present).
 fn facade_render_shorten(cname: &str, names: &Vec[str]) -> str:
     var best = ""
     for i in 0..names.len() as i32:
         let sname = names[i]
-        var m = ci_strip_snake_prefix(cname, ci_compute_snake_prefix(sname))
+        let snake = ci_compute_snake_prefix(sname)
+        var m = ci_strip_snake_prefix(cname, snake)
         if m.len() == 0:
             m = ci_strip_struct_prefix(cname, sname)
         if m.len() > 0 and (best.len() == 0 or m.len() < best.len()):
             best = m
+        // `snake` ends with the `_` that closes the struct name; every
+        // earlier `_` closes a library prefix.
+        var end = snake.len() as i32 - 1
+        while end > 0:
+            end = end - 1
+            if snake[end] != '_':
+                continue
+            let lib = ci_strip_snake_prefix(cname, snake.slice(0, end + 1))
+            if lib.len() > 0 and (best.len() == 0 or lib.len() < best.len()):
+                best = lib
     if best.len() == 0 or keyword_lookup(best) >= 0:
         return ""
     let c0 = best[0]

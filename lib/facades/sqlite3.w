@@ -113,9 +113,10 @@ c facade sqlite:
         retains param 5 by param 0
         retains param 6 by param 0
         retains param 7 by param 0
-    // Statement operations. The convention shortens by the representation's
-    // name (`sqlite3_stmt_…`), and SQLite spells these `sqlite3_…`, so each
-    // is presented by name (§55). sqlite3_step and sqlite3_reset state no
+    // Statement operations. The convention shortens by the library prefix
+    // the representation's name carries (`sqlite3_` of `sqlite3_stmt`,
+    // #1610): `sqlite3_step` is `stmt.step()`, `sqlite3_column_text` is
+    // `stmt.column_text(i)`. sqlite3_step and sqlite3_reset state no
     // preservation: "The pointers returned are valid until a type
     // conversion occurs as described above, or until sqlite3_step() or
     // sqlite3_reset() or sqlite3_finalize() is called" — every column view
@@ -124,16 +125,12 @@ c facade sqlite:
     // sqlite3_column_int states nothing either.
     fn sqlite3_step
         lend
-        rename step
     fn sqlite3_reset
         lend
-        rename reset
     fn sqlite3_bind_int
         lend
-        rename bind_int
     fn sqlite3_column_int
         lend
-        rename column_int
     // Reads that touch no value: the column count and a column's declared
     // type perform no conversion ("The value returned by
     // sqlite3_column_type() is only meaningful if no automatic type
@@ -141,11 +138,9 @@ c facade sqlite:
     fn sqlite3_column_count
         lend
         preserves param 0
-        rename column_count
     fn sqlite3_column_type
         lend
         preserves param 0
-        rename column_type
     // "The safest policy is to invoke these routines in one of the
     // following ways: sqlite3_column_text() followed by
     // sqlite3_column_bytes() …" — after the text view is taken, the byte
@@ -153,20 +148,17 @@ c facade sqlite:
     fn sqlite3_column_bytes
         lend
         preserves param 0
-        rename column_bytes
     // A NULL column is a NULL pointer: Option[CStr], None for SQL NULL
     // (§41, §43). The bytes are `const unsigned char *` in C — the same
     // NUL-terminated bytes, and `CStr` makes no claim about them.
     fn sqlite3_column_text
         returns borrow CStr from param 0
-        rename column_text
     // "The returned string pointer is valid until either the prepared
     // statement is destroyed by sqlite3_finalize() or until the statement
     // is automatically reprepared by the first call to sqlite3_step()":
     // a view of the statement, and step invalidates it.
     fn sqlite3_column_name
         returns borrow CStr from param 0
-        rename column_name
     // Static text: the library's version string (§40).
     fn sqlite3_libversion
         returns static CStr
