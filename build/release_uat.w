@@ -352,10 +352,10 @@ fn ruat_basename(path: &str) -> str:
     release_uat_owned_text(path)
 
 pub fn run_release_zlib_uat_action(ctx: ActionCtx) -> i32:
-    ruat_run_c_package_uat(ctx, "c.zlib", "zlib", "build/release_uat_fixtures/zlib_main.w", "", "zlib UAT passed")
+    ruat_run_c_package_uat(ctx, "c.zlib", "zlib", "build/release_uat_fixtures/zlib_main.w", "lib/facades/zlib.w", "zlib UAT passed")
 
 pub fn run_release_bzip2_uat_action(ctx: ActionCtx) -> i32:
-    ruat_run_c_package_uat(ctx, "c.bzip2", "bzip2", "build/release_uat_fixtures/bzip2_main.w", "", "bzip2 UAT passed")
+    ruat_run_c_package_uat(ctx, "c.bzip2", "bzip2", "build/release_uat_fixtures/bzip2_main.w", "lib/facades/bzip2.w", "bzip2 UAT passed")
 
 pub fn run_release_sqlite3_uat_action(ctx: ActionCtx) -> i32:
     ruat_run_c_package_uat(ctx, "c.sqlite3", "sqlite3", "build/release_uat_fixtures/sqlite3_main.w", "lib/facades/sqlite3.w", "sqlite3 UAT passed")

@@ -1,37 +1,32 @@
+// Release UAT: zlib through its facade (D64, spec §16.2b.8). The program an
+// application developer writes over `with get c.zlib`: the facade
+// `facades.zlib` is the project's own (§16.2b.1). No `unsafe`, no pointer,
+// no length: `compress(dest, src)` takes two slices and returns the bytes it
+// wrote, `uncompress` the same, and the caller's buffers are what they were.
+use facades.zlib
 use c_import("zlib.h")
-
-unsafe fn same_prefix(a: *const u8, b: *const u8, n: i32) -> bool:
-    var i = 0
-    while i < n:
-        if a[i] != b[i]:
-            return false
-        i = i + 1
-    true
 
 fn main:
     let input = "with zlib roundtrip"
     var compressed: [u8; 256] = [0 as u8; 256]
-    var compressed_len: uLongf = compressed.len() as uLongf
     var output: [u8; 128] = [0 as u8; 128]
-    var output_len: uLongf = output.len() as uLongf
 
-    let rc1 = unsafe { compress(&raw mut compressed[0] as *mut Bytef, &raw mut compressed_len as *mut uLongf, input as *const Bytef, input.len() as uLong) }
-    if rc1 != Z_OK:
+    let Ok(packed) = compress(compressed, input as []u8) else:
         print("zlib compress failed")
         return 1
-
-    let rc2 = unsafe { uncompress(&raw mut output[0] as *mut Bytef, &raw mut output_len as *mut uLongf, &raw const compressed[0] as *const Bytef, compressed_len as uLong) }
-    if rc2 != Z_OK:
+    let Ok(unpacked) = uncompress(output, compressed[..packed]) else:
         print("zlib uncompress failed")
         return 1
 
-    if output_len != input.len() as uLongf:
+    if unpacked != input.len() as usize:
         print("zlib length mismatch")
         return 1
-    if not unsafe { same_prefix(&raw const output[0] as *const u8, input as *const u8, input.len() as i32) }:
-        print("zlib content mismatch")
-        return 1
-    if unsafe { zlibVersion() } == null:
+    let bytes = input as []u8
+    for i in 0..unpacked as i32:
+        if output[i] != bytes[i]:
+            print("zlib content mismatch")
+            return 1
+    if zlibVersion().is_none():
         print("zlib version missing")
         return 1
     print("zlib UAT passed")

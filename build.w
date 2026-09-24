@@ -3276,7 +3276,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     var release_zlib_uat = target_new(.Action, "release-zlib-uat", "").output("out/release-uat/zlib.passed")
     release_zlib_uat.action = run_release_zlib_uat_action
     release_zlib_uat = release_zlib_uat.input(release_platform_asset_bin())
-    release_zlib_uat = release_zlib_uat.input("build/release_uat_fixtures/zlib_main.w")
+    release_zlib_uat = release_zlib_uat.input("build/release_uat_fixtures/zlib_main.w").input("lib/facades/zlib.w")
     release_zlib_uat = release_zlib_uat.write_scope("out/release-uat")
     release_zlib_uat = release_zlib_uat.allow_network()
     release_zlib_uat = release_zlib_uat.dep("require-last-green")
@@ -3286,7 +3286,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     var release_bzip2_uat = target_new(.Action, "release-bzip2-uat", "").output("out/release-uat/bzip2.passed")
     release_bzip2_uat.action = run_release_bzip2_uat_action
     release_bzip2_uat = release_bzip2_uat.input(release_platform_asset_bin())
-    release_bzip2_uat = release_bzip2_uat.input("build/release_uat_fixtures/bzip2_main.w")
+    release_bzip2_uat = release_bzip2_uat.input("build/release_uat_fixtures/bzip2_main.w").input("lib/facades/bzip2.w")
     release_bzip2_uat = release_bzip2_uat.write_scope("out/release-uat")
     release_bzip2_uat = release_bzip2_uat.allow_network()
     release_bzip2_uat = release_bzip2_uat.dep("require-last-green")
