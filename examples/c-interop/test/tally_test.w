@@ -1,8 +1,9 @@
+use c_import("tally.h", link: "tally")
 use tally
 
 @[test]
 fn a_macro_is_a_constant:
-    assert(version() == "1.2")
+    assert(TALLY_VERSION == "1.2")
 
 @[test]
 fn a_struct_crosses_by_value_both_ways:

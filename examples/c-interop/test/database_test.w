@@ -1,45 +1,56 @@
-use database
+use facades.sqlite3
+use c_import("sqlite3.h", link: "sqlite3")
 
-fn seeded -> Result[Database, DbError]:
-    let db = Database.open(":memory:")?
-    db.execute("CREATE TABLE t (name TEXT, n INTEGER)")?
-    db.execute("INSERT INTO t VALUES ('a', 1), (NULL, 2), ('c', 3)")?
+fn seeded -> Database:
+    let db = Database.open(":memory:").unwrap()
+    assert(db.exec("CREATE TABLE t (name TEXT, n INTEGER); INSERT INTO t VALUES ('a', 1), (NULL, 2), ('c', 3)", None, None, null) == SQLITE_OK)
     db
 
+fn message(db: &Database) -> str: db.errmsg().map(m => m.to_str_lossy()) ?? ""
+
 @[test]
-fn execute_reports_rows_changed:
-    let db = seeded().unwrap()
-    assert(db.execute("UPDATE t SET n = n + 1 WHERE n > 1").unwrap() == 2)
+fn exec_reports_rows_changed:
+    let db = seeded()
+    assert(db.exec("UPDATE t SET n = n + 1 WHERE n > 1", None, None, null) == SQLITE_OK)
+    assert(db.changes() == 2)
 
 @[test]
 fn rows_come_back_in_order:
-    let db = seeded().unwrap()
-    let rows = db.prepare("SELECT n FROM t ORDER BY n DESC").unwrap()
+    let db = seeded()
+    let rows = db.prepare("SELECT n FROM t ORDER BY n DESC", -1, null).unwrap()
     var seen = ""
-    while rows.step().unwrap(): seen = seen ++ f"{rows.int(0)} "
+    while rows.step() == SQLITE_ROW: seen = seen ++ f"{rows.column_int(0)} "
     assert(seen == "3 2 1 ")
 
 @[test]
 fn a_null_column_is_none:
-    let db = seeded().unwrap()
-    let rows = db.prepare("SELECT name FROM t ORDER BY n").unwrap()
-    assert(rows.step().unwrap() and rows.text(0) == Some("a"))
-    assert(rows.step().unwrap() and rows.text(0) == None)
+    let db = seeded()
+    let rows = db.prepare("SELECT name FROM t ORDER BY n", -1, null).unwrap()
+    assert(rows.step() == SQLITE_ROW and rows.column_text(0).map(t => t.to_str_lossy()) == Some("a"))
+    assert(rows.step() == SQLITE_ROW and rows.column_text(0).is_none())
 
 @[test]
-fn bound_text_survives_the_call:
-    let db = seeded().unwrap()
-    let find = db.prepare("SELECT n FROM t WHERE name = ?").unwrap()
-    find.bind_text(1, "abc".slice(2, 3)).unwrap()  // a runtime str, not a literal
-    assert(find.step().unwrap() and find.int(0) == 3)
+fn a_bound_parameter_narrows_the_query:
+    let db = seeded()
+    let above = db.prepare("SELECT n FROM t WHERE n > ? ORDER BY n", -1, null).unwrap()
+    assert(above.bind_int(1, 1) == SQLITE_OK)
+    assert(above.step() == SQLITE_ROW and above.column_int(0) == 2)
+    assert(above.step() == SQLITE_ROW and above.column_int(0) == 3)
+    assert(above.step() == SQLITE_DONE)
 
 @[test]
-fn a_c_error_becomes_a_with_error:
-    let db = seeded().unwrap()
-    match db.execute("SELECT * FROM nowhere"):
-        Err(.Failed(code, message)) => assert(code == 1 and message.contains("nowhere"))
-        Ok(_) => assert(false)
+fn a_c_error_becomes_with_values:
+    let db = seeded()
+    assert(db.exec("SELECT * FROM nowhere", None, None, null) != SQLITE_OK)
+    assert(db.errcode() == SQLITE_ERROR and message(&db).contains("nowhere"))
 
 @[test]
-fn a_failed_open_still_closes:
-    assert(Database.open("/no/such/directory/db.sqlite").is_err())
+fn a_failed_open_still_has_its_message:
+    // The handle SQLite produced for a failed open is owned by the error
+    // (`FailedWithResource`) and closed when the error is dropped; the one
+    // operation valid on it is reading why it failed.
+    match Database.open("/no/such/directory/db.sqlite"):
+        Err(DatabaseError.FailedWithResource(status, failed)) =>
+            assert(status == SQLITE_CANTOPEN)
+            assert(failed.errmsg().map(m => m.to_str_lossy()) == Some("unable to open database file"))
+        _ => assert(false)

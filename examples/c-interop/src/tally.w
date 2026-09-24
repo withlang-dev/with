@@ -1,18 +1,20 @@
-// A vendored C library: structs by value, callbacks, a C global, and C that
-// calls With.
-
+// A vendored C library: structs by value, a C global, a callback, and C that
+// calls With. The contracts are in src/facades/tally.w; three of them are ones
+// the facade language cannot state yet (a buffer with an element count, a
+// callback on a function that receives no resource), and those three calls
+// stay raw, here, until the clauses land. Everything `pub` is safe.
 use c_import("tally.h", link: "tally")
-
-pub fn version -> str: TALLY_VERSION
+use facades.tally
 
 // C takes a pointer and a count. An empty slice has no first element to point at.
 fn data(values: []i32) -> *const i32: if values.len() == 0: null else: &raw const values[0]
 
 // TallyRange is C's struct, and With's: it is built, passed and returned by
-// value with no declaration here and no `unsafe`.
+// value with no declaration here.
 pub fn range_of(values: []i32) -> TallyRange:
     unsafe { tally_range(data(values), values.len() as i32) }
 
+// A by-value call is a lend (src/facades/tally.w): no `unsafe`.
 pub fn widened(range: TallyRange, by: i32) -> TallyRange: tally_widen(range, by)
 
 // A C global, read like any other.
