@@ -545,7 +545,7 @@ fn moved_twice_verdict(shape: i32, drops: bool) -> str:
         body.push_stmt(entry, StmtKind.Assign, value, init, 0)
     if shape == 2:
         body.push_stmt(entry, StmtKind.Assign, first, take, 0)
-    let vals: Vec[i32] = Vec.new()
+    let vals: Vec[i64] = Vec.new()
     vals.push(1)
     let targets: Vec[i32] = Vec.new()
     targets.push(moving)
