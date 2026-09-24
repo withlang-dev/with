@@ -227,6 +227,8 @@ fn resolution_span_key(file: i32, offset: i32) -> i64: ((file as i64) << 32) | (
 // inside its span and their calls are in the module's call facts.
 fn resolution_audit_unlowered_calls(report: &AnalysisReport, sema: &Sema, mir_mod: &MirModule, pool: &InternPool, source_path: &str, source_text: &str) -> i32:
     let lowered_nodes: HashMap[i32, i32] = HashMap.new()
+    let elided_nodes: HashMap[i32, i32] = HashMap.new()
+    var elided = 0
     let span_keys: Vec[i64] = Vec.new()
     let span_end_keys: Vec[i64] = Vec.new()
     let span_bodies: Vec[i32] = Vec.new()
@@ -235,6 +237,8 @@ fn resolution_audit_unlowered_calls(report: &AnalysisReport, sema: &Sema, mir_mo
         for ci in 0..body.call_ast_nodes.len() as i32:
             let node = body.call_ast_nodes[ci]
             if node > 0: lowered_nodes.insert(node, bi)
+        for ei in 0..body.elided_call_nodes.len() as i32:
+            elided_nodes.insert(body.elided_call_nodes[ei], bi)
         if body.lowering_failed != 0: continue
         let sema_sym = resolution_sema_sym(sema, pool, body.fn_sym)
         if sema_sym == 0: continue
@@ -264,6 +268,11 @@ fn resolution_audit_unlowered_calls(report: &AnalysisReport, sema: &Sema, mir_mo
         if node <= 0 or node >= sema.ast.node_count(): continue
         if sema.ast.kind(node) != NodeKind.NK_CALL: continue
         if lowered_nodes.contains(node): continue
+        // MIR stated it materialized this call without a call (the index
+        // loop of `for x in v.iter()`).
+        if elided_nodes.contains(node):
+            elided = elided + 1
+            continue
         // An explicit `x.drop()` Sema resolved to the type's Drop impl is
         // materialized by MIR as the drop operation (glue plus field drops),
         // not a call: the same facts MirLower's gate reads (the `drop`
@@ -296,7 +305,7 @@ fn resolution_audit_unlowered_calls(report: &AnalysisReport, sema: &Sema, mir_mo
         let callee = if sig >= 0 and sig < sema.sig_names.len() as i32: with_str_clone_ref(sema.pool_resolve(sema.sig_names[sig])) else: "<unresolved>"
         let fn_name = with_str_clone_ref(pool.resolve(body.fn_sym))
         resolution_violation(report, sema, &site, body, -1, node, fn_name, "Sema resolved this call node to `" ++ callee ++ f"` (signature {sig}) inside a lowered body, MIR lowered no call carrying the node (D65: a call Sema accepted has exactly one MIR call fact)")
-    report.note(f"resolution-audit: drop-impl-calls-materialized-as-drops={drop_calls}")
+    report.note(f"resolution-audit: drop-impl-calls-materialized-as-drops={drop_calls} calls-mir-states-elided={elided}")
     checked
 
 fn resolution_is_drop_impl_call(sema: &Sema, node: i32) -> bool:

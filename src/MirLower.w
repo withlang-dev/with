@@ -5904,6 +5904,9 @@ impl MirBuilder:
             return self.unit_operand()
         let out_local = self.new_temp(target_ty)
         let out_place = self.place_for_local(out_local)
+        // D65: Sema resolved this `new()` to the type's specialization; MIR
+        // builds the aggregate in its place and states the elision.
+        self.body.note_elided_call_node(node)
         self.emit_btree_new_into(out_place, target_ty, self.ast.get_start(node))
         if self.sema.is_copy_frozen(target_ty) != 0:
             return self.body.new_operand(OperandKind.OK_COPY, out_place)
@@ -7278,6 +7281,7 @@ impl MirBuilder:
                                 if recv_name == "Vec":
                                     // .iter() ≡ the implicit form (§13): same
                                     // borrow split as the bare-Vec dispatch.
+                                    self.body.note_elided_call_node(iter_expr)
                                     let it_elem = self.sema.get_generic_inst_arg(recv_resolved as i32, 0)
                                     if self.sema.type_needs_drop_frozen(it_elem) != 0 and self.sema.is_copy_frozen(it_elem) == 0:
                                         return self.lower_for_iter_ref(for_node, pat_or_sym, recv, body_expr)
@@ -7962,6 +7966,7 @@ impl MirBuilder:
                         if self.sema.get_type_kind(recv_resolved) == TypeKind.TY_GENERIC_INST:
                             let recv_name_sym = self.sema.get_type_name(recv_resolved)
                             if recv_name_sym != 0 and self.pool.resolve(recv_name_sym) == "Vec":
+                                self.body.note_elided_call_node(iter_expr)
                                 self.lower_comprehension_vec(comp_node, clause_index, out_place, out_elem_ty, pat_or_sym, recv)
                                 return
 
@@ -12095,6 +12100,9 @@ impl MirBuilder:
             call_args.push(self.source_location_operand(node))
 
         let args_id = self.body.new_call_args(call_args)
+        // D65: the intrinsic materializes this call node (a static
+        // `BTreeMap.new()` Sema resolved to its specialization is MAP_NEW).
+        self.body.set_call_ast_node(args_id, node)
         var ret_type = self.method_call_result_type(node)
         // For static constructors (Vec.new, HashMap.new), expr_type often returns
         // the bare struct type (TypeKind.TY_STRUCT) instead of the generic instance

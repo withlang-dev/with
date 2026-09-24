@@ -506,6 +506,12 @@ pub type MirBody {
     // validator and audit:resolution recognize the call by this mark; the
     // unresolved-bare-function branch that produced #1635 never sets it.
     call_machinery_dispatch: Vec[i32],
+    // D65 (#1647): call nodes Sema resolved that this body materializes
+    // without a call — `for x in v.iter()` and a comprehension over it are
+    // the index loop (`.iter()` is the implicit form, §13). MIR states the
+    // elision instead of staying silent; audit:resolution joins Sema's
+    // resolved call to it.
+    elided_call_nodes: Vec[i32],
 
     // Stage 4 (spec §2.5.2): locals that are ever moved — and therefore
     // reset-on-move (§2.5.1) — recorded at the single pending_reset_locals.push
@@ -728,6 +734,7 @@ fn MirBody.init_for_fn(fn_sym: i32) -> MirBody:
         call_contract_required: Vec.new(),
         call_pipeline_receiver_places: Vec.new(),
         call_machinery_dispatch: Vec.new(),
+        elided_call_nodes: Vec.new(),
         ever_moved_locals: Vec.new(),
     }
 
@@ -1003,6 +1010,9 @@ impl MirBody:
         if call_id < 0 or call_id >= self.call_contract_required.len():
             return false
         self.call_contract_required[call_id] != 0
+
+    mut fn note_elided_call_node(node: i32):
+        if node > 0: self.elided_call_nodes.push(node)
 
     mut fn set_call_machinery_dispatch(call_id: i32):
         if call_id >= 0 and call_id < self.call_machinery_dispatch.len():
