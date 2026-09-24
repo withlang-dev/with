@@ -242,7 +242,9 @@ configuration checks as `report.violations` (producer with no destroy path;
 destroyer presented as a lend; retained callback with no owner; illegal
 thread combination; ambiguous profile match; profile fact shadowed; a
 destroyer-shaped borrow, advisory, suppressed by explicit `lend`). Tests:
-snapshot fixtures. The CLI spelling is settled here (proposed: `contract`).
+snapshot fixtures. The CLI spelling is settled: `with analyze file.w
+contract` prints the view, `audit:contract` (in `audit:all`) the checks
+(landed: `src/AnalysisContract.w`, `test/contract/`).
 
 **Stage 11 — convention profiles (ruling §7, §59).** `use convention
 pkg.vN` resolves through ordinary package rules; unique-or-nothing; explicit

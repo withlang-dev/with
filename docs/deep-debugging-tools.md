@@ -113,7 +113,30 @@ and the actual LLVM marshalling/prologue branches used for production codegen.
 ./out/stage/bin/with-stage2 analyze repro.w 'path:call:main:target_fn'
 ./out/stage/bin/with-stage2 analyze repro.w 'closure:call:main'
 ./out/stage/bin/with-stage2 analyze repro.w 'lldb:kind=call,name~target_fn'
+./out/stage/bin/with-stage2 analyze repro.w contract
+./out/stage/bin/with-stage2 analyze repro.w audit:contract
 ```
+
+`contract` (D51 stage 10, ruling §63; `src/AnalysisContract.w`) prints the
+effective modeled foreign contract of every `c facade` block the program
+sees: per resource its production, status, destroy paths, dependencies,
+thread capabilities, the views borrowed from it and the operations that
+invalidate or preserve them; per fn item each parameter's effect, the
+result's origin, invalidation and presentation; per callback parameter its
+role and thread; per domain its scope, views and invalidators; and each
+`use convention`. Every row ends in its provenance — the facade clause with
+file and line, or `default:` with the conservative rule — and the same rows
+are the `foreign-contract` facts of `select:kind=foreign-contract`.
+`audit:contract` (in `audit:all`) is the ruling's suspicious-configuration
+list: a producer with no destroy path, a destroyer presented as a lend, a
+retained parameter with no lifetime owner, an illegal thread combination,
+and the advisory — a name and shape that resemble a destroyer, exposed as a
+lend, silenced by an explicit `lend`. Each violation names the clause, its
+line and the clause that resolves it; nothing it reports changes a verdict.
+Both read Sema's snapshot, so they run when a facade clause was refused too.
+The profile checks (ambiguous match, shadowed fact) fire only once stage 11
+resolves a convention profile. Fixtures: `test/contract/`
+(`with build contract-view-tests`).
 
 `audit:all` is the proof gate before an expensive build. It validates MIR shape,
 types, and ownership; receiver declaration coverage and finalized contracts;

@@ -827,6 +827,7 @@ call path is a failure, not a blind spot.
 ./out/stage/bin/with-stage2 analyze repro.w 'path:call:caller:callee'
 ./out/stage/bin/with-stage2 analyze repro.w 'closure:call:root_function'
 ./out/stage/bin/with-stage2 analyze repro.w 'lldb:kind=call,name~function_name'
+./out/stage/bin/with-stage2 analyze repro.w contract
 ```
 
 Requests:
@@ -842,7 +843,10 @@ Requests:
 - `select:<query>`, `summary[:<query>]`, `matrix:<query>`: query the same fact
   database. Queries are comma-separated `field=value`, `field!=value`, or
   `field~substring` predicates; run `with analyze file.w help` for fields.
-- `audit:calls|effects|storage|methods|mir|returns|receivers|receiver-surface|phase|pool-views|codegen|trait-tables|all`:
+- `contract` / `audit:contract`: the modeled foreign contract of every
+  `c facade` (ruling §63): each fact with its provenance, and the
+  suspicious-configuration audit (`docs/deep-debugging-tools.md`).
+- `audit:calls|effects|storage|methods|mir|returns|receivers|receiver-surface|phase|pool-views|contract|codegen|trait-tables|all`:
   hard invariants. `all` covers typed/ownership MIR validators, receiver
   declarations/contracts, fixed-point effects, freeze/eager-cache/specialization,
   frozen-phase mutable-Sema re-entry, LLVM declaration ABI, caller marshalling,
