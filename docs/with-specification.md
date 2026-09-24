@@ -11208,6 +11208,7 @@ with fmt                                     # format source
 with doc [--open]                            # generate documentation
 with repl                                    # interactive session
 with init                                    # create a new project
+with uat [<scenario>]                        # run the project's acceptance scenarios (uat/*.uat, §18.5d)
 with migrate <c-sources>                     # translate C to With (§13.5b, §16)
 with emit-c-header <file>                    # emit C declarations for @[c_export] (§16.5)
 with cc <clang arguments>                    # the C compiler inside this binary (§18.8)
@@ -11560,6 +11561,20 @@ names it. The bundle build proves that the interface yields the same
 exported declaration model as the source, records that fingerprint in the
 manifest, and rejects a mismatch before linking.
 
+### 18.5d Acceptance scenarios
+
+A project's `uat/` directory holds acceptance scenarios: plain-text files,
+one per scenario, each a header (`scenario:`, optional `requires:` and
+`platforms:`) followed by steps a person would perform at a terminal — `new
+directory`, `run:`, `write … from …`, `stdin:`, `env`, and `expect …` lines
+for the exit status, output, files and images. `with uat` runs every
+scenario that applies on the host, skips with a reason the ones whose
+`requires:` are unmet, and reports one verdict per scenario and one line
+per failed step. `expect (human):` records a check a person performs; the
+runner prints it and never fails it. Programs a scenario writes into the
+project come from `uat/fixtures/` and are ordinary source files. `with
+init` writes `uat/hello.uat` and `uat/README.md`.
+
 ### 18.6 Standard Library Design
 
 The standard library is layered. Users write idiomatic With code
@@ -11805,7 +11820,7 @@ link = ["custom"]
 
 | Command | Action |
 |---------|--------|
-| `with init` | Create new project with `with.toml` and `src/main.w` |
+| `with init` | Create new project with `with.toml`, `src/main.w`, `test/`, and `uat/hello.uat` (§18.5d) |
 | `with get c.X` | Add C dependency via Conan |
 | `with get c.X@2.78` | Pin specific version |
 | `with get --force-reinstall c.X@2.78` | Delete and recreate the local installed C package |

@@ -1048,6 +1048,10 @@ fn comp_known_missing_flag(item: &str) -> str:
     if item == "--open": return "#537"
     ""
 
+fn comp_known_missing_command(item: &str) -> str:
+    if item == "uat": return "#1659"
+    ""
+
 fn comp_known_missing_module(item: &str) -> str:
     if item == "std.os": return "#476"
     ""
@@ -1085,6 +1089,8 @@ fn comp_inventory_add_errors(errors: Vec[str], label: &str, spec_items: Vec[str]
                 comp_known_missing_module(item)
             else if known_missing_kind == "attribute":
                 comp_known_missing_attribute(item)
+            else if known_missing_kind == "command":
+                comp_known_missing_command(item)
             else:
                 ""
         if known.len() == 0:
@@ -1111,6 +1117,7 @@ fn comp_inventory_known_lines() -> Vec[str]:
     var items: Vec[str] = Vec.new()
     items.push("--open\t#537")
     items.push("--target\t#425")
+    items.push("uat\t#1659")
     items.push("align\t#449")
     items.push("ffi_stack\t§14.19 roadmap")
     items.push("repr\t#449")
@@ -1460,7 +1467,7 @@ pub fn run_check_spec_inventory_action(ctx: ActionCtx) -> i32:
             allowed_attrs.push(compiler_owned_text(item))
     errors = comp_inventory_add_errors(move errors, "attributes", allowed_attrs, comp_impl_attributes(fs), "attribute", "")
 
-    errors = comp_inventory_add_errors(move errors, "cli commands", comp_spec_cli_commands(spec), comp_impl_commands(fs), "", "command")
+    errors = comp_inventory_add_errors(move errors, "cli commands", comp_spec_cli_commands(spec), comp_impl_commands(fs), "command", "command")
     errors = comp_inventory_add_errors(move errors, "cli flags", comp_spec_cli_flags(), comp_impl_flags(fs), "flag", "flag")
     // The spec does not catalogue lib/std (Eric, 2026-09-20): a library is
     // documented by its source, and adding one is not a language change.
