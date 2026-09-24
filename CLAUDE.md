@@ -862,7 +862,10 @@ Requests:
 - `contract` / `audit:contract`: the modeled foreign contract of every
   `c facade` (ruling §63): each fact with its provenance, and the
   suspicious-configuration audit (`docs/deep-debugging-tools.md`).
-- `audit:calls|effects|storage|methods|mir|returns|receivers|receiver-surface|phase|pool-views|contract|codegen|trait-tables|all`:
+- `audit:resolution`: D65 — every MIR callee and argument count agrees with
+  Sema's resolution of the call it lowers (the #1635 class; phase 1 of
+  `docs/mir-sema-hardening.md`).
+- `audit:calls|effects|storage|methods|mir|returns|receivers|receiver-surface|phase|pool-views|contract|resolution|codegen|trait-tables|all`:
   hard invariants. `all` covers typed/ownership MIR validators, receiver
   declarations/contracts, fixed-point effects, freeze/eager-cache/specialization,
   frozen-phase mutable-Sema re-entry, LLVM declaration ABI, caller marshalling,

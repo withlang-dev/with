@@ -18,7 +18,7 @@ and disagreeing.
 | #1605 `spawn_os(move ‖ …)` double free | whether the closure owns its environment | Sema (D63 environment storage) | codegen `spawn_os` path transmuted and dropped independently | leak/double free |
 | stage 13 rows refused by 12b/D64 | whether a facade row renders a safe call | Sema (`ci_syms`: c_import translation vs extern seam) | `verify_facade_buffer_params` refused every row with an unpaired pointer | stack battery red |
 | #1639 / `audit:contract ok` over a refused program | is this MIR / this analysis result valid | the validator (post-Sema invalid MIR = compiler bug) | validators tolerated a 0-arg call to a 1-arg callee; analyze returned `ok` after `has_errors()` | silent |
-| #1631 stage1 ≠ stage2 on `src/main.w:2992` | move state of `actual_options.source_path` | Sema (per operation) + MIR (per path) | (to be pinned) the seed-built stage1 answers differently from the stage2 compiler | iterate tier untrustworthy |
+| #1631 stage1 ≠ stage2 on `src/main.w:2992` | move state of `actual_options.source_path` | Sema (per operation) + MIR (per path) | pinned (PR #1656): `field_move_path_for_expr` packed the path start into 16 bits of an i64; `borrow_path_data` is append-only and passes 65535, so the move query read a stale path — a verdict that depended on unrelated source text | iterate tier untrustworthy |
 
 The pattern predates this week: the transparent `T*`/`T**` divergence that
 produced the FnAbi rule (D6) was the ABI-level instance of the same thing.
@@ -84,6 +84,9 @@ the corresponding `audit:resolution` check when cheap; a review rejects a
 new heuristic that re-derives an owned fact.
 
 ### Phase 1 — `audit:resolution`, callees (would have caught #1635)
+Status: implemented (PR for #1647; `src/AnalysisResolution.w`, the
+comparison in `MirCore.w`, planted fixtures in `test/internals/`). The
+validator half (#1639) landed with it.
 For every MIR call fact with an AST node: the callee MIR resolved (a
 `const fn` symbol, a local/alias place, a closure body, an intrinsic) must
 agree with Sema's resolution for that node (`resolved_call_sigs`,
@@ -154,5 +157,6 @@ compiler named as the culprit).
 - `--validate-all` refuses a MIR call whose callee symbol has no signature
   and no intrinsic (#1639).
 - The seed-built stage1 and the stage2 compiler agree on `src/main.w`
+  (#1631 pinned: not two Sema times but a 16-bit path start; fix PR #1656)
   (#1631 pinned and fixed — its root cause is expected to be a Sema fact
   consulted at two different times).

@@ -138,6 +138,42 @@ The profile checks (ambiguous match, shadowed fact) fire only once stage 11
 resolves a convention profile. Fixtures: `test/contract/`
 (`with build contract-view-tests`).
 
+`audit:resolution` (D65, #1647; `src/AnalysisResolution.w`, in `audit:all`)
+checks that every MIR call agrees with Sema's resolution of the call it
+lowers — Sema decides *what* a call invokes, MIR materializes it, and a
+callee MIR re-derived from an AST spelling is the #1635 class (`let r =
+c.run; r(21)` lowered to a GENERIC_CALL to a function named `r` with the
+argument dropped; every validator stayed silent, #1639). Phase 1 covers
+callees and argument counts. For each MIR call terminator it gathers Sema's
+answer for the call's own node (`get_sig`, `generic_fn_node_for_symbol`,
+`call_callable_types` — the callable type Sema recorded for an indirect
+call — `call_callee_is_builtin`, `resolved_call_sigs`) and compares: a
+`const fn` callee must be a declared signature, a generic template (under
+its GENERIC_CALL mark), a builtin Sema classified, or a body of the module;
+a place callee must be a call Sema resolved through a callable value; the
+argument count must equal that same fact's parameter count (a variadic
+signature or an extern fn type states none); a call node Sema resolved to
+one signature must not lower to another; and a call Sema resolved inside a
+lowered body must have a MIR call fact carrying its node. A call with any
+other intrinsic mark is recognized by its kind and not judged, and so is a
+GENERIC_CALL carrying the machinery-dispatch mark MirLower's one contract
+decision point sets on a Task/ScopedTask/channel/Atomic method, `track`,
+`spawn` or `join` (codegen dispatches those by name and receiver; phase 5
+moves that classification into Sema, and the mark retires with it). Each
+violation names the body, the node's `path:line:column`, MIR's answer,
+Sema's answer and the rule (`select:kind=invariant,detail~resolution:` has
+the same rows). Nothing here is decided from a name: the builtins come from
+Sema's own classification, snapshotted into the MIR module
+(`sema_callable_syms`) for the typed-MIR validator, which refuses a
+`const fn` callee outside the snapshot with no body and no intrinsic mark
+(`--validate-all`, #1639). Planted fixtures: `test/internals/
+analysis_resolution_test.w` (the comparison over a hand-built body and a
+hand-built Sema answer) and `test/internals/mir_unknown_callee_test.w`
+(the validator); the clean corpus is `audit:all` on the contract, closure
+and c_facade fixtures and on `build.w`. Phases 2–5 (codegen mode
+provenance, places and origins, effects, MirLower cleanup):
+`docs/mir-sema-hardening.md`.
+
 `audit:all` is the proof gate before an expensive build. It validates MIR shape,
 types, and ownership; receiver declaration coverage and finalized contracts;
 effect-flow fixed point; frozen caches and specialization bodies; frozen-phase
