@@ -3,8 +3,7 @@
 // The cli-selfhost-project-tests lane compares `with init` output against
 // the doc byte-for-byte, so the embedded template must match exactly.
 
-extern fn with_fs_read_file(path: &str) -> str
-extern fn with_fs_write_file(path: &str, data: &str) -> i32
+use std.fs
 use std.process
 
 fn esc(chunk: str) -> str:
@@ -25,7 +24,7 @@ fn esc(chunk: str) -> str:
             out = out ++ chunk.slice(i as i64, (i + 1) as i64)
     out
 
-let doc = with_fs_read_file("docs/with_for_ai.md")
+let doc = read_file("docs/with_for_ai.md").unwrap_or("")
 if doc.len() == 0:
     eprint("error: could not read docs/with_for_ai.md")
     exit_code(1)
@@ -49,7 +48,7 @@ let out =
     "// Generated from docs/with_for_ai.md by tools/gen_init_templates.w;\n" ++
     "// rerun that tool whenever the guide changes.\n\n" ++
     "pub fn init_ai_guide_template -> str:\n" ++ body ++ "\n"
-if with_fs_write_file("src/InitTemplates.w", out) != 0:
+if write_file("src/InitTemplates.w", out) != 0:
     eprint("error: could not write src/InitTemplates.w")
     exit_code(1)
 print(f"wrote src/InitTemplates.w ({doc.len()} bytes embedded)")

@@ -23,14 +23,14 @@ c facade zl:
 
 fn check(s: &Stream) -> c_int: unsafe { z_check(s.repr.as_ptr()) }
 fn take(s: Stream) -> c_int: check(s)
-fn give() -> Stream: Stream.z_init(0).unwrap()
+fn give() -> Stream: Stream.init(0).unwrap()
 
 fn main:
-    let a = Stream.z_init(0).unwrap()
+    let a = Stream.init(0).unwrap()
     let b = move a
     var v: Vec[Stream] = Vec.new()
     v.push(b)
     v.push(give())
     let n = check(v[0]) + check(v[1]) + take(give())
-    let failed = Stream.z_init(1).is_err()
+    let failed = Stream.init(1).is_err()
     print(f"{n} {failed}")

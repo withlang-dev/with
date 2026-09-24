@@ -28,11 +28,11 @@ c facade zl:
 fn main:
     let ends = counter_new()
     for _ in 0..3:
-        match Stream.z_init(ends, 1):
+        match Stream.init(ends, 1):
             Err(StreamError.Failed(status)) => assert(status == -3)
             Ok(_) => assert(false)
     assert(counter_get(ends) == 0)
-    let live = Stream.z_init(ends, 0).unwrap()
+    let live = Stream.init(ends, 0).unwrap()
     drop(live)
     assert(counter_get(ends) == 1)
     counter_free(ends)

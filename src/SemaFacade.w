@@ -2814,6 +2814,27 @@ impl Sema:
     // `str`, §16.3c), and a code pointer (a callback, §16.2b.9). Every
     // other pointer — `T *`, `void *`, `unsigned char *`, `int *` — is a
     // buffer or an out slot With holds no contract for; leave the call raw.
+    // Whether a facade item names a c_import translation (the symbols
+    // SemaDecl records in `ci_syms` at translation time) rather than a
+    // With-declared `extern fn`. A facade row's symbol comes from
+    // `pool_lookup_symbol(name)` and the translation's from the AST, so the
+    // two may be different symbol ids for one name: compare by name too.
+    // Facade facts are collected (SemaDecl `collect_c_facades`) BEFORE
+    // `ci_syms` is filled, so consult the declaration table directly: the
+    // frontend marks every c_import-translated declaration in
+    // `decl_is_c_import` before Sema runs.
+    fn facade_fn_is_c_import_translation(fn_sym: i32) -> bool:
+        if self.ci_syms.contains(fn_sym):
+            return true
+        let name = self.pool_resolve(fn_sym)
+        for di in 0..self.ast.decl_count():
+            if di >= self.decl_is_c_import.len() as i32 or self.decl_is_c_import[di] == 0:
+                continue
+            let sym = self.ast.get_data0(self.ast.get_decl(di))
+            if sym == fn_sym or (name.len() > 0 and self.pool_resolve(sym) == name):
+                return true
+        false
+
     mut fn verify_facade_buffer_params():
         for ci in 0..self.foreign_contracts.len() as i32:
             if self.foreign_contracts[ci].destroys != 0 or self.foreign_contracts[ci].consumes.len() > 0 or self.foreign_contracts[ci].retains.len() > 0 or self.foreign_contracts[ci].callback_userdata_cb.len() > 0 or self.foreign_contracts[ci].callback_thread_any != 0 or self.foreign_contracts[ci].callback_consumes.len() > 0:
@@ -2830,7 +2851,7 @@ impl Sema:
             // the runtime-domain audit, and the call stays the raw extern it
             // always was. Only a c_import translation can be presented as safe
             // (stage 7 gates presentation on `ci_syms` the same way).
-            if not self.ci_syms.contains(fn_sym):
+            if not self.facade_fn_is_c_import_translation(fn_sym):
                 continue
             let sig = self.get_sig(fn_sym)
             if sig < 0:

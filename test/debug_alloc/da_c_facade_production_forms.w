@@ -55,9 +55,9 @@ fn main:
     let failed_but_produced = opened(2)
     let made = Database.make(1)
     let nothing = Database.make(0)
-    let (_, s) = Stream.z_init(4)
+    let (_, s) = Stream.init(4)
     var cells: Vec[Stream] = Vec.new()
     cells.push(s)
-    let (_, t) = Stream.z_init(2)
+    let (_, t) = Stream.init(2)
     let moved = move t
     print(f"{v.len()} {none.is_some()} {failed_but_produced.is_some()} {made.is_some()} {nothing.is_some()} {cells.len()} {moved.live}")
