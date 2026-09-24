@@ -1,0 +1,23 @@
+foreign-contract view	v1
+resource Object wraps *mut obj; representation: pointer; facade:objs@test/contract/ok_profile_applied.w; clause:resource@test/contract/ok_profile_applied.w:17
+    producer: obj_new -> Object.new; production: direct return; NULL is None  [profile:gobject.v1:new@test/lib/gobject/v1.w:13]
+    status: none; a producer's failure is None, or (status, None) through an out parameter  [default:no status convention is inferred (§16.2b.4)]
+    destroyer: obj_unref; automatic: Drop calls it while the value is live  [profile:gobject.v1:unref@test/lib/gobject/v1.w:15]
+    destroyer: obj_free -> move fn Object.free; alternate: consumes the value and disarms Drop  [profile:gobject.v1:free@test/lib/gobject/v1.w:16]
+    dependency: none via obj_new; it receives no modeled resource  [default:no resource parameter (§16.2b.6)]
+    thread: creator; operations and destruction on the creating thread, ownership stays there  [default:thread creator (§16.2b.10)]
+    invalidation: views invalidated by: obj_unref, obj_free, obj_get_id; preserved across: none  [default:unknown effect is invalidate; `preserves param N` states otherwise (§16.2b.7)]
+fn obj_get_id; facade:objs@test/contract/ok_profile_applied.w; profile:gobject.v1:get@test/lib/gobject/v1.w:17
+    effect: param 0: *mut obj o: lend, an assertion about foreign behavior; receives Object  [profile:gobject.v1:get@test/lib/gobject/v1.w:17]
+    returns: i32  [default:as declared]
+    invalidates: Object (param 0: *mut obj o)  [default:unknown effect is invalidate (§16.2b.7)]
+    presentation: Object.get_id  [default:presentation sugar from the resource prefix (§16.2b.11)]
+use convention gobject.v1; clause:use convention@test/contract/ok_profile_applied.w:16
+    rule: new (from *_new) applied to resource 'Object': obj_new  [profile:gobject.v1:new@test/lib/gobject/v1.w:13]
+    rule: open (from *_open(out param …)) matched nothing for resource 'Object'  [profile:gobject.v1:open@test/lib/gobject/v1.w:14]
+    rule: unref (drop *_unref) applied to resource 'Object': obj_unref  [profile:gobject.v1:unref@test/lib/gobject/v1.w:15]
+    rule: free (destroys *_free) applied to resource 'Object': obj_free  [profile:gobject.v1:free@test/lib/gobject/v1.w:16]
+    rule: get (fn *_get* lend) applied to 'obj_get_id'  [profile:gobject.v1:get@test/lib/gobject/v1.w:17]
+    rule: dispose (fn *_dispose destroys) matched nothing  [profile:gobject.v1:dispose@test/lib/gobject/v1.w:18]
+note: contract-audit: resources=1 items=1 domains=0 conventions=1 advisories=0 profile-ambiguous=0 profile-shadowed=0
+contract-audit: violations=0 ok

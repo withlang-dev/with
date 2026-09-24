@@ -1,4 +1,4 @@
-//! expect-contract: contract-audit: resources=2 items=9 domains=1 conventions=0 advisories=0
+//! expect-contract: contract-audit: resources=2 items=9 domains=1 conventions=0 advisories=0 profile-ambiguous=0 profile-shadowed=0
 //! expect-contract: violations=0 ok
 
 // D51 stage 10 (ruling §63, spec §16.2b): a facaded SQLite-shaped header,

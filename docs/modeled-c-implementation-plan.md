@@ -250,6 +250,67 @@ contract` prints the view, `audit:contract` (in `audit:all`) the checks
 pkg.vN` resolves through ordinary package rules; unique-or-nothing; explicit
 clauses override. Tests: a profile rule with two candidates contributes
 nothing. This stage may follow the SQLite facade, which needs no profile.
+Landed: `src/compiler/FacadeProfile.w` (the pass), `Parser.w
+parse_c_convention`, `SemaFacade.w` (stage 11 section), the contract view's
+`profile:` provenance and the two `audit:contract` checks; fixtures
+`test/lib/gobject/v1.w`, `test/contract/{ok_profile_applied,
+ok_profile_shadowed, bad_profile_ambiguous}.w`,
+`test/behavior/behav_c_facade_profile_supplies_drop.w`,
+`test/compile_errors/err_c_facade_profile_*.w`, `err_c_convention_bad_rule.w`.
+
+*Derived decisions (stage 11; execution detail where the ruling is
+silent, each taking the conservative reading):*
+
+- *A profile's surface.* The ruling gives a profile's content by example
+  only (§59: `*_new -> owned result`, `*_unref -> destroying operation`)
+  and says "the exact package-reference mechanics follow ordinary With
+  package rules" (§7). A profile is the block `c convention pkg.vN:` in the
+  module `pkg.vN` — `use convention pkg.vN` is also the import
+  `use pkg.vN`, so resolution, pinning and provenance are the package's
+  (§18.8: `facade:<package>@<version>`) and nothing is compiler knowledge
+  (§7: "profiles are facade code, not compiler folklore"). Its rules are
+  `<name>: <template>`, the template a facade clause over a name pattern
+  (`unref: drop *_unref`, `open: from *_open(out param 1)`, `init: init
+  *_init(self)`, `free: destroys *_free`) or an fn-item clause (`get: fn
+  *_get lend`, `dispose: fn *_dispose destroys`); `*` matches any run of
+  characters. Rules are named because diagnostics name them (§8:
+  "inferred by convention gobject.v1 rule unref").
+- *What a rule may state.* Only the clause kinds whose validity the pass
+  can judge per candidate from the declaration's shape: production,
+  initialization, automatic and alternate destruction on a resource; lend
+  and destroys on an fn item. A clause that names one function's
+  parameters or origins (`returns borrow … from param N`, `retains`,
+  `consumes`, `preserves`) is stated on that function's fn item; a profile
+  rule that tries is a parse error. Widening this is a later ruling, not a
+  default.
+- *Candidates and uniqueness (§7.1).* A resource rule's candidates are the
+  imported functions whose name matches and whose shape fits the clause
+  (a `drop` takes the representation alone; `destroys`/`init` take it
+  first; `from` returns it or fills the named out parameter) — the same
+  shape Sema's verification reads, so a name that matches but cannot be
+  the operation is not a candidate (`counter_new` beside `obj_new`). An fn
+  rule's candidates are the rules of the profile matching one function
+  whose first parameter receives a resource of the adopting facade: a rule
+  applying to forty operations is the intended use, two rules claiming one
+  operation is the ambiguity. Zero or several candidates contribute
+  nothing; the outcome is recorded either way and the audit reports the
+  ambiguous ones (§63), Sema warns on them, and the resource then fails
+  "never half-model" exactly as one written by hand would.
+- *Overrides (§7.2, §4 "refine, override, or suppress").* An explicit
+  clause of the fact's class shadows the profile's fact: `drop` shadows a
+  `drop` rule; any `from`/`init` shadows a production rule (production is
+  one shape, §16.2b.4); a destroy clause naming the same function shadows
+  a `destroys` rule; any fn item describing the function shadows every fn
+  rule for it (a described fn already states its lend by default,
+  §16.2b.5). Shadowing is a note in the audit, not a violation. A spelling
+  that suppresses a profile fact without replacing it (`not drop`) is not
+  ruled and is not invented.
+- *Where the pass runs.* In the frontend, after `<c_import …>` translation
+  and before the facades render, because the renderer reads clauses off
+  the AST: a profile-stated clause is an ordinary clause on the item by
+  then, verified by Sema like any clause, carrying its rule as a trailing
+  operand (`Ast.w facade_clause_profile_rule`) — the provenance the
+  contract view prints as `profile:pkg.vN:rule@file:line` (§8).
 
 **Stage 12 — the SQLite facade (ruling §66).** Written against the real
 `sqlite3.h`, covering the §66 list: `sqlite3` owned pointer resource,

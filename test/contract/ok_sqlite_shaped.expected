@@ -97,5 +97,5 @@ fn sqlite3_libversion; facade:sqlite@test/contract/ok_sqlite_shaped.w; clause:fn
     returns: static CStr; valid for the whole program, no origin  [clause:returns static@test/contract/ok_sqlite_shaped.w:47]
     invalidates: domain errno  [default:unknown effect is invalidate (§16.2b.7)]
     presentation: the C name is the surface; no resource receives param 0  [default:presentation sugar only groups by resource (§16.2b.11)]
-note: contract-audit: resources=2 items=9 domains=1 conventions=0 advisories=0
+note: contract-audit: resources=2 items=9 domains=1 conventions=0 advisories=0 profile-ambiguous=0 profile-shadowed=0
 contract-audit: violations=0 ok
