@@ -99,7 +99,7 @@ pub fn facade_render_block(pool: AstPool, intern: InternPool, facade: i32, ci: &
         let item = pool.get_extra(extra_start + i)
         if pool.kind(item as NodeId) == NodeKind.NK_FACADE_RESOURCE:
             let text_view = facade_render_text_view(pool, intern, item)
-            out = out ++ facade_render_resource(pool, intern, ci, item, facade_render_lend_methods(pool, intern, ci, item, true) ++ text_view, facade_render_lend_methods(pool, intern, ci, item, false) ++ text_view)
+            out = out ++ facade_render_resource(pool, intern, ci, item, facade_render_lend_methods(pool, intern, ci, item, true) ++ text_view ++ facade_render_callback_methods(pool, intern, ci, item), facade_render_lend_methods(pool, intern, ci, item, false) ++ text_view)
     out
 
 // Owned foreign text (ruling §42, spec §16.2b.8: "Caller-owned returned
@@ -400,6 +400,14 @@ fn facade_render_surface(pool: AstPool, intern: InternPool, ci: &Vec[i32], resou
         var rename: str = ""
         if li.rename != 0: rename = intern.resolve(li.rename)
         s = facade_render_surface_add(s, cname, &prefixes, rename, "a lend method")
+    for i in 0..items.len() as i32:
+        let cb = facade_render_callback_item(pool, intern, ci, items[i])
+        if not facade_render_callback_hosted(pool, intern, &cb, resource, repr):
+            continue
+        let cname: str = intern.resolve(pool.get_data0(cb.decl as NodeId))
+        var rename: str = ""
+        if cb.rename != 0: rename = intern.resolve(cb.rename)
+        s = facade_render_surface_add(s, cname, &prefixes, rename, "a callback method")
     let resources = facade_render_all_items(pool, NodeKind.NK_FACADE_RESOURCE)
     for ri in 0..resources.len() as i32:
         let other = resources[ri]
@@ -708,15 +716,27 @@ fn facade_render_resource(pool: AstPool, intern: InternPool, ci: &Vec[i32], item
     if not deps.ok:
         return ""
     let field = if pinned: "Box[" ++ repr_text ++ "]" else: repr_text.clone()
+    // Stage 9 (ruling §45, spec §16.2b.9): userdata a callback method
+    // retains is kept by the resource — each value in its own Box cell,
+    // handed to C as the pointer, and released after the resource is
+    // destroyed (facade_render_callback_methods) — in two parallel Vecs:
+    // the cells and the one destroy fn per cell that knows its type.
+    let keeps = facade_render_resource_keeps_userdata(pool, intern, ci, item, facade_render_unalias(pool, intern, repr_text))
+    let keep_fields = if keeps: ", retained_ptrs: Vec[*mut c_void], retained_frees: Vec[extern \"C\" fn(*mut c_void) -> Unit]" else: ""
+    let keep_init = if keeps: "retained_ptrs: Vec.new(), retained_frees: Vec.new(), " else: ""
     // A dependent resource is an ephemeral struct carrying a view of each
     // parent (the plan's `ephemeral { parent: &P, repr }`): the ordinary
     // origin and ephemeral-value analysis (§21.1, §22) then keeps it from
     // outliving, or being stored past, what it depends on, drops it before
     // its parents, and refuses a parent's move or destruction while it lives.
     // No reference count or generation check is added (ruling §29).
-    var out = if deps.slot_res.len() > 0: "type " ++ name ++ " = ephemeral { " ++ facade_render_dep_fields(pool, intern, &deps) ++ "repr: " ++ field ++ ", live: bool }\n" else: "type " ++ name ++ " { repr: " ++ field ++ ", live: bool }\n"
+    var out = if deps.slot_res.len() > 0: "type " ++ name ++ " = ephemeral { " ++ facade_render_dep_fields(pool, intern, &deps) ++ "repr: " ++ field ++ ", live: bool" ++ keep_fields ++ " }\n" else: "type " ++ name ++ " { repr: " ++ field ++ ", live: bool" ++ keep_fields ++ " }\n"
     if drop_fn != 0:
         out = out ++ "impl Drop for " ++ name ++ ":\n    move fn drop():\n        if self.live: " ++ facade_render_call(pool, intern, drop_fn, facade_render_repr_arg(pool, intern, drop_fn, repr_text, "self.repr", pinned)) ++ "\n"
+        if keeps:
+            // The retaining origin never outlives what it retains (§25):
+            // the destroyer has run; now the retained values are released.
+            out = out ++ "        for facade_i in 0..self.retained_ptrs.len():\n            let facade_free = self.retained_frees.get(facade_i)\n            facade_free(self.retained_ptrs[facade_i])\n"
     if destroyers.len() > 0 or methods.len() > 0:
         out = out ++ "impl " ++ name ++ ":\n" ++ methods
         for di in 0..destroyers.len() as i32:
@@ -761,7 +781,7 @@ fn facade_render_resource(pool: AstPool, intern: InternPool, ci: &Vec[i32], item
         // The constructor's presented name (§16.2b.11): the C name less the
         // resource's prefix, or the parent's for a resource made from one.
         let pname = facade_render_present(pool, intern, ci, item, intern.resolve(pool.get_data0(producer as NodeId)))
-        let made_deps = facade_render_dep_values(pool, intern, &deps, pi, producer)
+        let made_deps = facade_render_dep_values(pool, intern, &deps, pi, producer) ++ keep_init
         if out_refs[pi] != 0:
             let slot = facade_render_param_ref(pool, intern, producer, out_refs[pi])
             if slot < 0:
@@ -786,7 +806,7 @@ fn facade_render_resource(pool: AstPool, intern: InternPool, ci: &Vec[i32], item
         out = out ++ facade_render_receiver_method(pool, intern, ci, item, producer, -1, pname, result)
     if init_fn != 0:
         let iname = facade_render_present(pool, intern, ci, item, intern.resolve(pool.get_data0(init_fn as NodeId)))
-        let ctor = facade_render_init(pool, intern, name, repr_text, init_fn, iname, preinit_fn, ok_sym, pinned, facade_render_dep_values(pool, intern, &deps, FACADE_DEP_INIT, init_fn))
+        let ctor = facade_render_init(pool, intern, name, repr_text, init_fn, iname, preinit_fn, ok_sym, pinned, facade_render_dep_values(pool, intern, &deps, FACADE_DEP_INIT, init_fn) ++ keep_init)
         if ctor.len() == 0:
             return ""
         out = out ++ ctor
@@ -1448,7 +1468,299 @@ fn facade_render_is_raw(pool: AstPool, intern: InternPool, decl: i32) -> bool:
             return true
     false
 
-fn facade_render_type_is_raw(text: &str) -> bool: text.starts_with("*") or text.starts_with("&") or text.starts_with("[") or text.starts_with("fn(") or text.starts_with("extern")
+fn facade_render_type_is_raw(text: &str) -> bool: text.starts_with("*") or text.starts_with("&") or text.starts_with("[") or text.starts_with("fn(") or text.starts_with("extern") or text.starts_with("unsafe ")
+
+// ── stage 9: callbacks (ruling §44-§47, spec §16.2b.9) ──────────────────
+//
+// A callback contract — an fn item that retains a callback or its userdata
+// (`retains param N by param 0`), consumes userdata with a destroy callback
+// (`consumes param N destroyed_by param M`), types a callback's userdata
+// (`callback param N userdata param M`), or says `callback_thread any` — is
+// a method of the resource its first parameter receives, generic in the
+// userdata type `U` when the item names a userdata. For
+//
+//     int db_exec(db *d, db_cb cb, void *ud, int n);        // db_cb: int (*)(void *, int)
+//     fn db_exec
+//         callback param 1 userdata param 2
+//
+// the userdata is borrowed for the call (§44) and the callback receives it
+// typed — captureless (§12.4: C receives the code pointer alone), so a
+// closure's state lives in `U`:
+//
+//     fn exec[U](cb: extern "C" fn(&U, c_int) -> c_int, ud: &U, n: c_int) -> c_int:
+//         unsafe { db_exec(self.repr, transmute[extern "C" fn(*mut c_void, c_int) -> c_int](cb), ud as *const U as *mut c_void, n) }
+//
+// Retained userdata (`retains param 2 by param 0`) is owned by the resource
+// until it is destroyed (§45): boxed, handed to C as the cell's pointer,
+// and released by the resource's Drop after its destroyer ran, through a
+// destroy fn that knows `U` (a captureless closure over the type parameter):
+//
+//     mut fn register[U](cb: extern "C" fn(&U, c_int) -> c_int, app: U) -> c_int:
+//         let facade_cell = Box.new(app)
+//         let facade_ptr = facade_cell.into_raw() as *mut c_void
+//         let facade_free: extern "C" fn(*mut c_void) -> Unit = facade_q => { let facade_b = (facade_q as *mut U) as Box[U]; drop(facade_b) }
+//         self.retained_ptrs.push(facade_ptr)
+//         self.retained_frees.push(facade_free)
+//         unsafe { db_register(self.repr, transmute[…](cb), facade_ptr) }
+//
+// Consumed userdata (`consumes param 1 destroyed_by param 2`) moves into C
+// (§24): boxed, handed over, and the destroy callback the contract names is
+// withheld from the method — the compiler supplies the one that knows `U`.
+// With never destroys it; C does, through that callback, exactly once:
+//
+//     fn set_owned[U](owned: U) -> c_int:
+//         let facade_cell = Box.new(owned)
+//         let facade_free: extern "C" fn(*mut c_void) -> Unit = …
+//         unsafe { db_set_owned(self.repr, facade_cell.into_raw() as *mut c_void, facade_free) }
+//
+// A callback parameter the item does not pair with a userdata keeps C's
+// type; a `void *` the item does not name stays `*mut c_void`. Reentrancy
+// (§47) is by construction: the callback holds no captures, and reaches
+// the userdata as `&U` — a read view for the call, or of a value the
+// resource owns. What the generic method cannot state — under
+// `callback_thread any` the userdata is Send and Sync (§51) — Sema checks
+// at each call (SemaFacade.w facade_check_callback_arg). The rendered
+// locals are spelled `facade_*` and apart from the C parameters: a local
+// named `free` would resolve to libc's.
+
+type FacadeCallbackItem {
+    decl: i32,        // 0 when the item is not a callback contract
+    of_sym: i32,
+    rename: i32,
+    userdata: i32,    // the userdata parameter (C index), or -1
+    callback: i32,    // the callback parameter paired with cbi, or -1
+    destroy: i32,     // the destroy callback a `consumes … destroyed_by` names (withheld), or -1
+    retained: bool,
+    consumed: bool,
+}
+
+fn facade_render_callback_item(pool: AstPool, intern: InternPool, ci: &Vec[i32], item: i32) -> FacadeCallbackItem:
+    var cbi = FacadeCallbackItem { decl: 0, of_sym: 0, rename: 0, userdata: -1, callback: -1, destroy: -1, retained: false, consumed: false }
+    let cname: str = intern.resolve(pool.get_data0(item as NodeId))
+    if facade_render_is_resource_op(pool, intern, cname):
+        return cbi
+    let decl = facade_render_find_fn(pool, intern, ci, pool.get_data0(item as NodeId))
+    if decl == 0:
+        return cbi
+    var is_callback = false
+    let cstart = pool.get_data1(item as NodeId)
+    for k in 0..pool.get_data2(item as NodeId):
+        let clause = pool.get_extra(cstart + k)
+        let kind = pool.get_data0(clause as NodeId)
+        let ops = pool.get_data1(clause as NodeId)
+        if kind == FACADE_CLAUSE_OF: cbi.of_sym = pool.get_extra(ops)
+        else if kind == FACADE_CLAUSE_RENAME: cbi.rename = pool.get_extra(ops)
+        else if kind == FACADE_CLAUSE_LEND or kind == FACADE_CLAUSE_PRESERVES: continue
+        else if kind == FACADE_CLAUSE_CALLBACK_THREAD: is_callback = true
+        else if kind == FACADE_CLAUSE_CALLBACK_USERDATA:
+            let cb = facade_render_param_ref(pool, intern, decl, pool.get_extra(ops))
+            let ud = facade_render_param_ref(pool, intern, decl, pool.get_extra(ops + 1))
+            if cb < 0 or ud < 0 or (cbi.userdata >= 0 and cbi.userdata != ud) or (cbi.callback >= 0 and cbi.callback != cb):
+                return cbi
+            cbi.userdata = ud
+            cbi.callback = cb
+            is_callback = true
+        else if kind == FACADE_CLAUSE_RETAINS:
+            let a = facade_render_param_ref(pool, intern, decl, pool.get_extra(ops))
+            let by = facade_render_param_ref(pool, intern, decl, pool.get_extra(ops + 1))
+            if a < 0 or by != 0:
+                return cbi
+            let ptext = facade_render_param_type(pool, intern, decl, a)
+            if facade_render_is_userdata_type(pool, intern, ptext):
+                if cbi.userdata >= 0 and cbi.userdata != a:
+                    return cbi
+                cbi.userdata = a
+                cbi.retained = true
+                is_callback = true
+            else if facade_render_is_callable_type(facade_render_unalias(pool, intern, ptext)):
+                is_callback = true
+            else:
+                return cbi
+        else if kind == FACADE_CLAUSE_CONSUMES:
+            let a = facade_render_param_ref(pool, intern, decl, pool.get_extra(ops))
+            let by_ref = pool.get_extra(ops + 1)
+            if by_ref == 0:
+                return cbi
+            let by = facade_render_param_ref(pool, intern, decl, by_ref)
+            if a < 0 or by < 0 or (cbi.userdata >= 0 and cbi.userdata != a) or not facade_render_is_userdata_type(pool, intern, facade_render_param_type(pool, intern, decl, a)):
+                return cbi
+            cbi.userdata = a
+            cbi.destroy = by
+            cbi.consumed = true
+            is_callback = true
+        else:
+            return cbi
+    if not is_callback or (cbi.retained and cbi.consumed):
+        return cbi
+    cbi.decl = decl
+    cbi
+
+// Whether the callback item is a method of `resource` (whose unaliased
+// representation is `repr`): the lend rule (facade_render_lend_hosted).
+fn facade_render_callback_hosted(pool: AstPool, intern: InternPool, cbi: &FacadeCallbackItem, resource: i32, repr: &str) -> bool:
+    if cbi.decl == 0:
+        return false
+    let li = FacadeLendItem { decl: cbi.decl, of_sym: cbi.of_sym, rename: cbi.rename, lends: true, borrow_res: 0, borrow_from: 0, text_view: false }
+    facade_render_lend_hosted(pool, intern, &li, resource, repr)
+
+// Whether some callback method of `resource` retains userdata: the
+// resource carries the retained cells.
+fn facade_render_resource_keeps_userdata(pool: AstPool, intern: InternPool, ci: &Vec[i32], resource: i32, repr: &str) -> bool:
+    let items = facade_render_all_items(pool, NodeKind.NK_FACADE_FN)
+    for i in 0..items.len() as i32:
+        let cbi = facade_render_callback_item(pool, intern, ci, items[i])
+        if cbi.retained and facade_render_callback_hosted(pool, intern, &cbi, resource, repr):
+            return true
+    false
+
+fn facade_render_param_type(pool: AstPool, intern: InternPool, decl: i32, pi: i32) -> str:
+    let meta = pool.find_fn_meta(decl as NodeId)
+    render_type_expr(pool, intern, pool.fn_param_type(pool.fn_meta_param_start(meta), pi) as NodeId)
+
+// A `void *` no resource wraps: a userdata slot.
+fn facade_render_is_userdata_type(pool: AstPool, intern: InternPool, ptext: &str) -> bool:
+    let p = facade_render_unalias(pool, intern, ptext)
+    (p == "*mut c_void" or p == "*const c_void") and facade_render_received(pool, intern, ptext) == 0
+
+fn facade_render_is_callable_type(text: &str) -> bool:
+    text.starts_with("fn(") or text.starts_with("extern \"C\" fn(") or text.starts_with("unsafe extern \"C\" fn(")
+
+// The C callback type less `unsafe` — what the typed callback is
+// transmuted to (a safe extern fn passes where C declares an unsafe one).
+fn facade_render_callback_raw_type(text: &str) -> str:
+    if text.starts_with("unsafe "): text.slice(7, text.len()) else: text.clone()
+
+// The typed callback: the C signature with its one `void *` parameter —
+// where the userdata arrives — spelled `&U`. "" when the signature has
+// none or several (Sema refuses the pairing).
+fn facade_render_callback_type(pool: AstPool, intern: InternPool, text: &str) -> str:
+    let raw = facade_render_callback_raw_type(text)
+    let open = raw.find("(")
+    if open < 0:
+        return ""
+    // The parameter list ends at the parenthesis matching the first.
+    var depth = 0
+    var close: i64 = -1
+    var i = open
+    while i < raw.len() as i32:
+        if raw[i] == '(': depth = depth + 1
+        else if raw[i] == ')':
+            depth = depth - 1
+            if depth == 0:
+                close = i
+                break
+        i = i + 1
+    if close < 0:
+        return ""
+    let params = raw.slice(open + 1, close)
+    // Split at top-level commas.
+    let parts: Vec[str] = Vec.new()
+    var start = 0
+    depth = 0
+    var k = 0
+    while k < params.len() as i32:
+        if params[k] == '(' or params[k] == '[': depth = depth + 1
+        else if params[k] == ')' or params[k] == ']': depth = depth - 1
+        else if params[k] == ',' and depth == 0:
+            parts.push(params.slice(start, k).trim())
+            start = k + 1
+        k = k + 1
+    if params.trim().len() > 0:
+        parts.push(params.slice(start, params.len()).trim())
+    var slots = 0
+    var out = ""
+    for pi in 0..parts.len() as i32:
+        let p = facade_render_unalias(pool, intern, parts[pi])
+        var shown = parts[pi].clone()
+        if p == "*mut c_void" or p == "*const c_void":
+            slots = slots + 1
+            shown = "&U"
+        out = out ++ (if pi > 0: ", " else: "") ++ shown
+    if slots != 1:
+        return ""
+    raw.slice(0, open + 1) ++ out ++ raw.slice(close, raw.len())
+
+// Every callback method of `resource` (see the section comment).
+fn facade_render_callback_methods(pool: AstPool, intern: InternPool, ci: &Vec[i32], resource: i32) -> str:
+    let repr_text = render_type_expr(pool, intern, pool.get_extra(pool.get_data1(resource as NodeId)) as NodeId)
+    let repr = facade_render_unalias(pool, intern, repr_text)
+    let in_place = not repr.starts_with("*") and facade_render_has_clause(pool, resource, FACADE_CLAUSE_INIT)
+    if not repr.starts_with("*") and not in_place:
+        return ""
+    let pinned = in_place and not facade_render_has_clause(pool, resource, FACADE_CLAUSE_MOVABLE)
+    var out = ""
+    let items = facade_render_all_items(pool, NodeKind.NK_FACADE_FN)
+    for i in 0..items.len() as i32:
+        let cbi = facade_render_callback_item(pool, intern, ci, items[i])
+        if not facade_render_callback_hosted(pool, intern, &cbi, resource, repr):
+            continue
+        let decl = cbi.decl
+        let meta = pool.find_fn_meta(decl as NodeId)
+        let fname: str = intern.resolve(pool.get_data0(decl as NodeId))
+        let mname = facade_render_present(pool, intern, ci, resource, fname)
+        let repr_arg = facade_render_repr_arg(pool, intern, decl, repr_text, "self.repr", pinned)
+        if repr_arg.len() == 0:
+            continue
+        let taken = facade_render_param_names(pool, intern, decl)
+        let cell = facade_render_fresh("facade_cell", taken)
+        let ptr = facade_render_fresh("facade_ptr", taken)
+        let free = facade_render_fresh("facade_free", taken)
+        let q = facade_render_fresh("facade_q", taken)
+        let b = facade_render_fresh("facade_b", taken)
+        let generic = cbi.userdata >= 0
+        let kept = cbi.retained or cbi.consumed
+        let start = pool.fn_meta_param_start(meta)
+        var cb_type = ""
+        if cbi.callback >= 0:
+            cb_type = facade_render_callback_type(pool, intern, facade_render_param_type(pool, intern, decl, cbi.callback))
+            if cb_type.len() == 0:
+                continue
+        var params = ""
+        var args = repr_arg.clone()
+        var ud_name = ""
+        for pi in 1..pool.fn_meta_param_count(meta):
+            args = args ++ ", "
+            if pi == cbi.destroy:
+                args = args ++ free
+                continue
+            let pname = facade_render_param_name(pool, intern, start, pi)
+            let ptype = facade_render_param_type(pool, intern, decl, pi)
+            var shown = if ptype == "*const i8" or ptype == "*const c_char": "&str" else: ptype.clone()
+            var arg = pname.clone()
+            if pi == cbi.userdata:
+                ud_name = pname.clone()
+                if kept:
+                    shown = "U"
+                    arg = ptr.clone()
+                else:
+                    shown = "&U"
+                    arg = pname ++ " as *const U as " ++ facade_render_unalias(pool, intern, ptype)
+            else if pi == cbi.callback:
+                shown = cb_type.clone()
+                arg = "transmute[" ++ facade_render_callback_raw_type(facade_render_unalias(pool, intern, ptype)) ++ "](" ++ pname ++ ")"
+            else:
+                let res = facade_render_received(pool, intern, ptype)
+                if res > 0:
+                    let received = facade_render_received_arg(pool, intern, res, ptype, pname)
+                    if received.len() > 0:
+                        let rname: str = intern.resolve(pool.get_data0(res as NodeId))
+                        shown = "&" ++ rname
+                        arg = received
+            if params.len() > 0:
+                params = params ++ ", "
+            params = params ++ pname ++ ": " ++ shown
+            args = args ++ arg
+        let head = (if cbi.retained: "    mut fn " else: "    fn ") ++ mname ++ (if generic: "[U]" else: "") ++ "(" ++ params ++ ")" ++ facade_render_return(pool, intern, decl) ++ ":\n"
+        var body = ""
+        if generic and kept:
+            let ud_type = facade_render_unalias(pool, intern, facade_render_param_type(pool, intern, decl, cbi.userdata))
+            body = body ++ "        let " ++ cell ++ " = Box.new(" ++ ud_name ++ ")\n"
+            body = body ++ "        let " ++ ptr ++ " = " ++ cell ++ ".into_raw() as " ++ ud_type ++ "\n"
+            body = body ++ "        let " ++ free ++ ": extern \"C\" fn(*mut c_void) -> Unit = " ++ q ++ " => { let " ++ b ++ " = (" ++ q ++ " as *mut U) as Box[U]; drop(" ++ b ++ ") }\n"
+            if cbi.retained:
+                body = body ++ "        self.retained_ptrs.push(" ++ ptr ++ " as *mut c_void)\n        self.retained_frees.push(" ++ free ++ ")\n"
+        out = out ++ head ++ body ++ "        " ++ facade_render_call(pool, intern, decl, args) ++ "\n"
+    out
 
 // The shape of the declaration a c_import translation made under `name`:
 // whether there is one, and its return and first parameter types with

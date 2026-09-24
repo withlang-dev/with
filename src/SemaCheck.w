@@ -4966,7 +4966,16 @@ impl Sema:
                 else:
                     self.type_is_send(cap_ty)
             if ok == 0:
-                self.emit_error(context ++ " captures non-" ++ trait_name ++ " value `" ++ self.pool_resolve(cap_sym) ++ "`", closure)
+                let cap_msg = context ++ " captures non-" ++ trait_name ++ " value `" ++ self.pool_resolve(cap_sym) ++ "`"
+                // A modeled foreign resource: name the facade's thread
+                // clause and the one to state (§8, §57; spec §16.2b.10).
+                let cap_name = self.get_type_name(self.resolve_alias(cap_ty as TypeId))
+                if self.facade_thread_caps_for(cap_name) >= 0 and self.suppress_errors == 0:
+                    var diag = Diagnostic.err(cap_msg, Span { file: self.local_file_id, start: self.ast.get_start(closure), end: self.ast.get_end(closure) })
+                    diag.add_note(self.facade_thread_note(cap_name, trait_name))
+                    self.diags.emit(move diag)
+                else:
+                    self.emit_error(cap_msg, closure)
                 return
 
     mut fn callable_non_send_capture_symbol(node: i32) -> i32:
@@ -19718,6 +19727,15 @@ impl Sema:
             let name = self.get_type_d0(resolved)
             if self.ephemeral_types.contains(name):
                 return if trait_sym == self.syms.scoped_send_trait: 1 else: 0
+            // A modeled foreign resource is thread-bound unless its facade
+            // grants `send` / `share` (spec §16.2b.10, ruling §48): the
+            // capability is the facade's, never inferred from the
+            // representation (SemaFacade.w facade_thread_caps_for).
+            let caps = self.facade_thread_caps_for(name)
+            if caps >= 0:
+                if trait_sym == self.syms.sync_trait:
+                    return if (caps & 4) != 0: 1 else: 0
+                return if (caps & 2) != 0: 1 else: 0
             return self.type_struct_fields_satisfy_thread_trait(resolved as i32, trait_sym)
         if tk == TypeKind.TY_ENUM:
             return self.type_enum_payloads_satisfy_thread_trait(resolved as i32, trait_sym)
@@ -20282,8 +20300,14 @@ impl Sema:
                     self.emit_argument_type_mismatch(self.safe_symbol_text(method_fn_sym), method_fn_sym, ai3, pi3, expected_ty, actual_ty, gen_method_arg)
                 else:
                     self.note_call_arg_coercion(expected_ty, actual_ty, gen_method_arg, node)
+                    // Stage 9 (§16.2b.10): a facade callback method's
+                    // userdata under `callback_thread any`.
+                    self.facade_check_callback_arg(method_fn_sym, ai3, actual_ty, gen_method_arg)
 
         let concrete_sig = self.check_generic_method_body_concrete(fn_node, method_fn_sym, concrete_owner, owner_tp_start, owner_tp_count, fn_tp_start, fn_tp_count)
+        // A facade callback method's call touches the receiver's views
+        // (§16.2b.7) through its concrete signature (SemaFacade.w).
+        self.facade_note_callback_method_sig(method_fn_sym, concrete_sig)
         let ret_ty = if concrete_sig >= 0:
             self.sig_return_type(concrete_sig)
         else:
@@ -22500,6 +22524,21 @@ impl Sema:
             if self.try_unit_elide_call_arg(node, arg_count, mc_unit_expected) != 0:
                 mc_resolved_arg_count = 1
         let mc_has_resolved_args = self.has_resolved_call_args(node)
+        // Stage 9 (spec §16.2b.9): a facade callback method's callback
+        // argument is checked against `extern "C" fn(&U, …)` with `U` bound
+        // to the userdata argument's type, so the userdata is checked first
+        // whatever order C declares them in (SemaFacade.w
+        // facade_callback_expected_type).
+        let facade_mi = self.facade_callback_method_for_call(obj_type as i32, field)
+        var facade_ud_node = 0
+        var facade_ud_ty = 0
+        if facade_mi >= 0 and self.facade_callback_methods[facade_mi].callback_param >= 0:
+            let udi = self.facade_callback_methods[facade_mi].userdata_param
+            if udi >= 0 and udi < mc_resolved_arg_count:
+                let ud_node = if mc_has_resolved_args != 0: self.get_resolved_call_arg(node, udi) else: self.ast.get_extra(extra_start + udi)
+                if ud_node > 0:
+                    facade_ud_node = ud_node
+                    facade_ud_ty = self.check_expr_value_context(ud_node) as i32
         for ai in 0..mc_resolved_arg_count:
             let mc_arg_node = if mc_has_resolved_args != 0: self.get_resolved_call_arg(node, ai) else: self.ast.get_extra(extra_start + ai)
             if mc_arg_node == 0:
@@ -22548,7 +22587,11 @@ impl Sema:
                     mc_expected = self.ensure_fn_type(fold_params, 2, fold_acc as TypeId) as i32
             if mc_expected == 0 and ai < mc_static_variant_payload_tys.len() as i32:
                 mc_expected = mc_static_variant_payload_tys[ai]
-            let mc_arg_ty = if mc_expected != 0: self.check_expr_with_expected(mc_arg_node, mc_expected as TypeId) else: self.check_expr_value_context(mc_arg_node)
+            if mc_expected == 0 and facade_mi >= 0 and facade_ud_ty != 0 and ai == self.facade_callback_methods[facade_mi].callback_param:
+                mc_expected = self.facade_callback_expected_type(facade_mi, obj_type as i32, field, facade_ud_ty)
+            let mc_arg_ty = if facade_ud_node != 0 and mc_arg_node == facade_ud_node: facade_ud_ty as TypeId
+                else if mc_expected != 0: self.check_expr_with_expected(mc_arg_node, mc_expected as TypeId)
+                else: self.check_expr_value_context(mc_arg_node)
             arg_types.push(mc_arg_ty as i32)
             // Record the value read before viral view-origin propagation below:
             // storing a copied pointee stores T, not the argument's &T view.

@@ -32,6 +32,7 @@ impl Sema:
         self.verify_facade_presentation()
         self.verify_facade_borrowed_returns()
         self.verify_facade_text_views()
+        self.verify_facade_callback_items()
         self.facade_index_call_effects()
 
     // Stage 4a/4b: the facade-level checks that need every facade's facts (an
@@ -698,7 +699,7 @@ impl Sema:
         if self.foreign_contract_index.contains(fn_sym):
             self.emit_error(f"fn '{fname}' is described twice in this facade (§16.2b)", item)
             return
-        var c = ForeignContract { fn_sym, decl, facade, node: item, lend: 0, destroys: 0, consumes: Vec.new(), consumes_destroyed_by: Vec.new(), retains: Vec.new(), retains_by: Vec.new(), returns_borrow_resource: 0, returns_borrow_from: -1, returns_borrow_domain: 0, returns_static_tid: 0, preserves_params: Vec.new(), preserves_domains: Vec.new(), of_resource: 0, rename: 0, callback_thread_any: 0, callback_consumes: Vec.new() }
+        var c = ForeignContract { fn_sym, decl, facade, node: item, lend: 0, destroys: 0, consumes: Vec.new(), consumes_destroyed_by: Vec.new(), retains: Vec.new(), retains_by: Vec.new(), returns_borrow_resource: 0, returns_borrow_from: -1, returns_borrow_domain: 0, returns_static_tid: 0, preserves_params: Vec.new(), preserves_domains: Vec.new(), of_resource: 0, rename: 0, callback_thread_any: 0, callback_consumes: Vec.new(), callback_userdata_cb: Vec.new(), callback_userdata_of: Vec.new() }
         let extra_start = self.ast.get_data1(item)
         let clause_count = self.ast.get_data2(item)
         for ci in 0..clause_count:
@@ -736,6 +737,13 @@ impl Sema:
                 by = self.facade_resolve_param(by_ref, fn_sym, sig)
                 if by < 0:
                     return c
+                // Ruling §24: transfer with a destructor callback is how
+                // caller-owned userdata moves into C. A consumed resource
+                // handle has its own destroyer (`destroys`, §16.2b.5).
+                if not self.facade_param_is_userdata(fn_sym, sig, pi):
+                    let shown = self.facade_param_display(fn_sym, sig, pi)
+                    self.emit_error(f"fn '{fname}': consumes {shown} destroyed_by …: a destroy callback destroys userdata (a 'void *' no resource wraps); a consumed resource is destroyed by the operation its facade names (§16.2b.5, §16.2b.9)", clause)
+                    return c
                 if not self.facade_param_is_callable(sig, by):
                     let shown = self.facade_param_display(fn_sym, sig, by)
                     self.emit_error(f"fn '{fname}': destroyed_by {shown} is not callable (§16.2b.9, §16.2b.13)", clause)
@@ -745,6 +753,14 @@ impl Sema:
                     let consumed = self.facade_param_display(fn_sym, sig, pi)
                     self.emit_error(f"fn '{fname}': destroyed_by {shown} does not take the consumed {consumed} as its first parameter (§16.2b.9, §16.2b.13)", clause)
                     return c
+            else if self.facade_param_is_userdata(fn_sym, sig, pi):
+                // Never half-model (ruling §9, §24): a `void *` userdata
+                // moved into C with no destruction path is a leak by
+                // contract. A consumed resource handle has its own
+                // destroyer; userdata has only the callback C promises.
+                let shown = self.facade_param_display(fn_sym, sig, pi)
+                self.emit_error_with_help(f"fn '{fname}': consumes {shown}, a 'void *' userdata, with no destroy contract; C would own a value nothing destroys — never half-model unsafely (§16.2b.5, §16.2b.9)", clause, "name the callback C invokes to destroy it: 'consumes param N destroyed_by param M'")
+                return c
             c.consumes.push(pi)
             c.consumes_destroyed_by.push(by)
             return c
@@ -755,9 +771,63 @@ impl Sema:
             let b = self.facade_resolve_param(self.ast.get_extra(ops + 1), fn_sym, sig)
             if b < 0:
                 return c
+            // Ruling §25, §45: retention is by a resource, and lasts until
+            // the retaining resource is destroyed (no release is modeled).
+            if self.facade_param_receives(fn_sym, b).len() != 1:
+                let shown = self.facade_param_display(fn_sym, sig, b)
+                let why = if self.facade_param_receives(fn_sym, b).len() == 0: "receives no modeled resource" else: "receives a representation several resources wrap; the facade has not assigned it (§16.2b.3)"
+                self.emit_error(f"fn '{fname}': 'retains … by' names {shown}, which {why}; a retained value is kept by a resource and released when that resource is destroyed (§16.2b.5, §16.2b.9)", clause)
+                return c
+            // What can be retained: a callback (a code pointer, nothing to
+            // keep), its `void *` userdata (kept by the resource, ruling
+            // §45), or a C string (the #602 raw-call rule, §16.3c).
+            let userdata = self.facade_param_is_userdata(fn_sym, sig, a)
+            let callable = self.facade_param_is_callable(sig, a)
+            if not userdata and not callable and self.ci_type_is_const_c_string_input(self.sig_param_type(sig, a)) == 0:
+                let shown = self.facade_param_display(fn_sym, sig, a)
+                self.emit_error(f"fn '{fname}': retains {shown}; retention is modeled for a callback, its 'void *' userdata, and a C string — nothing else is kept by a resource (§16.2b.9)", clause)
+                return c
+            if (userdata or callable) and b != 0:
+                let shown = self.facade_param_display(fn_sym, sig, b)
+                self.emit_error(f"fn '{fname}': 'retains … by' names {shown}, but a retained callback or userdata is kept by the resource the operation is a method of, its first parameter; retention by another parameter is not modeled (§16.2b.9)", clause)
+                return c
             c.retains.push(a)
             c.retains_by.push(b)
             self.mark_param_retained(fn_sym, a)
+            return c
+        if kind == FACADE_CLAUSE_CALLBACK_USERDATA:
+            // `callback param N userdata param M` (spec §16.2b.9; the
+            // spelling is this stage's — the ruling ties a destroy callback
+            // to its userdata by position, §24, and says nothing for the
+            // others): typing a `void *` as the userdata's With type is
+            // capability-granting, so it is stated, never inferred from
+            // there being one of each.
+            let cb = self.facade_resolve_param(self.ast.get_extra(ops), fn_sym, sig)
+            if cb < 0:
+                return c
+            let ud = self.facade_resolve_param(self.ast.get_extra(ops + 1), fn_sym, sig)
+            if ud < 0:
+                return c
+            if not self.facade_param_is_callable(sig, cb):
+                let shown = self.facade_param_display(fn_sym, sig, cb)
+                self.emit_error(f"fn '{fname}': 'callback param {cb}' names {shown}, which is not callable (§16.2b.9, §16.2b.13)", clause)
+                return c
+            if not self.facade_param_is_userdata(fn_sym, sig, ud):
+                let shown = self.facade_param_display(fn_sym, sig, ud)
+                self.emit_error(f"fn '{fname}': 'userdata param {ud}' names {shown}, which is not a 'void *'; a callback's userdata is the untyped pointer C hands back to it (§16.2b.9)", clause)
+                return c
+            let slot = self.facade_callable_userdata_slot(sig, cb)
+            if slot < 0:
+                let shown = self.facade_param_display(fn_sym, sig, cb)
+                let n = self.facade_callable_userdata_slot_count(sig, cb)
+                self.emit_error(f"fn '{fname}': the callback {shown} has {n} 'void *' parameter(s); a callback receiving userdata has exactly one, which is where the userdata arrives (§16.2b.9)", clause)
+                return c
+            for k in 0..c.callback_userdata_cb.len() as i32:
+                if c.callback_userdata_cb[k] == cb:
+                    self.emit_error(f"fn '{fname}': 'callback param {cb}' is given its userdata twice (§16.2b.9)", clause)
+                    return c
+            c.callback_userdata_cb.push(cb)
+            c.callback_userdata_of.push(ud)
             return c
         if kind == FACADE_CLAUSE_RETURNS_BORROW:
             let res = self.ast.get_extra(ops)
@@ -1013,6 +1083,35 @@ impl Sema:
         let consumed = self.resolve_alias(self.sig_param_type(sig, pi) as TypeId)
         p0 == consumed or self.facade_void_ptr_accepts(p0, consumed)
 
+    // A `void *` parameter that receives no modeled resource: the untyped
+    // userdata slot of a callback contract (ruling §24, §45).
+    fn facade_param_is_userdata(fn_sym: i32, sig: i32, pi: i32) -> bool:
+        self.facade_type_is_void_ptr(self.sig_param_type(sig, pi)) and self.facade_param_receives(fn_sym, pi).len() == 0
+
+    fn facade_type_is_void_ptr(tid: i32) -> bool:
+        let r = self.resolve_alias(tid as TypeId)
+        self.get_type_kind(r) == TypeKind.TY_PTR and self.is_c_void_like_type(self.get_type_d0(r)) != 0
+
+    // The one `void *` parameter of the callable parameter `pi`'s
+    // signature — where its userdata arrives — or -1 when it has none or
+    // several.
+    fn facade_callable_userdata_slot(sig: i32, pi: i32) -> i32:
+        if self.facade_callable_userdata_slot_count(sig, pi) != 1:
+            return -1
+        let callable = self.callable_type_resolved(self.sig_param_type(sig, pi))
+        for k in 0..self.get_type_d1(callable):
+            if self.facade_type_is_void_ptr(self.type_extra[self.get_type_d0(callable) + k]):
+                return k
+        -1
+
+    fn facade_callable_userdata_slot_count(sig: i32, pi: i32) -> i32:
+        let callable = self.callable_type_resolved(self.sig_param_type(sig, pi))
+        var n = 0
+        for k in 0..self.get_type_d1(callable):
+            if self.facade_type_is_void_ptr(self.type_extra[self.get_type_d0(callable) + k]):
+                n = n + 1
+        n
+
     // A status constant is a c_import `let` (or a `const`) with a literal
     // initializer: a materialized compile-time value, never a runtime read.
     fn facade_status_constant_ok(sym: i32) -> bool:
@@ -1048,6 +1147,7 @@ fn facade_clause_name(kind: i32) -> str:
     if kind == FACADE_CLAUSE_RENAME: return "rename"
     if kind == FACADE_CLAUSE_THREAD: return "thread"
     if kind == FACADE_CLAUSE_CALLBACK_THREAD: return "callback_thread"
+    if kind == FACADE_CLAUSE_CALLBACK_USERDATA: return "callback … userdata"
     "callback consumes"
 
 // ── stage 3: raw classification consults the facts ──────────────────────
@@ -2260,6 +2360,284 @@ impl Sema:
         if osym != 0:
             on = self.pool_resolve(osym)
         f"borrowed: '{bn}' is borrowed from the '{on}' that '{fname}' receives as {shown} — stated by 'returns borrow {rn} from param {from}' in facade {facade}; it has no Drop and cannot outlive that origin (§16.2b.6)"
+
+// ── stage 9: callbacks and threads (ruling §44-§51, spec §16.2b.9-10) ───
+//
+// A callback contract — an fn item that retains a callback or its userdata,
+// consumes userdata with a destroy callback, types a callback's userdata
+// (`callback param N userdata param M`), or says `callback_thread any` — is
+// presented as a method of the resource its first parameter receives
+// (compiler/FacadeRender.w facade_render_callback_methods). The method is
+// generic in the userdata type `U`: the callback is `extern "C" fn(&U, …)`
+// (captureless, §12.4 — C receives the code pointer alone) and the userdata
+// `&U` for the call (§44: borrowed for callback scope), `U` owned by the
+// resource until it is destroyed (§45), or `U` moved into C and destroyed
+// by the callback the contract names (§24). What the rendered generic
+// method cannot state is checked at its call sites (SemaCheck.w
+// facade_check_callback_arg): under `callback_thread any` the userdata type
+// is Send and Sync (§51). Thread capabilities (§48-§50) are the resource's
+// (facade_thread_caps_for; SemaCheck.w type_satisfies_thread_trait): a
+// resource is thread-bound unless its facade says `send` / `share`.
+
+impl Sema:
+    // Whether the fn item is a callback contract.
+    fn facade_contract_is_callback_item(ci: i32) -> bool:
+        if self.foreign_contracts[ci].destroys != 0:
+            return false
+        if self.foreign_contracts[ci].callback_userdata_cb.len() > 0 or self.foreign_contracts[ci].callback_thread_any != 0:
+            return true
+        for k in 0..self.foreign_contracts[ci].consumes.len() as i32:
+            if self.foreign_contracts[ci].consumes_destroyed_by[k] >= 0:
+                return true
+        let fn_sym = self.foreign_contracts[ci].fn_sym
+        let sig = self.get_sig(fn_sym)
+        for k in 0..self.foreign_contracts[ci].retains.len() as i32:
+            let a = self.foreign_contracts[ci].retains[k]
+            if sig >= 0 and (self.facade_param_is_userdata(fn_sym, sig, a) or self.facade_param_is_callable(sig, a)):
+                return true
+        false
+
+    // The userdata parameter of a callback contract (C index), or -1: the
+    // one consumed with a destroy callback, retained, or paired with a
+    // callback. One per item (a second is not modeled).
+    fn facade_contract_userdata_param(ci: i32) -> i32:
+        let fn_sym = self.foreign_contracts[ci].fn_sym
+        let sig = self.get_sig(fn_sym)
+        if sig < 0:
+            return -1
+        for k in 0..self.foreign_contracts[ci].consumes.len() as i32:
+            if self.foreign_contracts[ci].consumes_destroyed_by[k] >= 0:
+                return self.foreign_contracts[ci].consumes[k]
+        for k in 0..self.foreign_contracts[ci].retains.len() as i32:
+            if self.facade_param_is_userdata(fn_sym, sig, self.foreign_contracts[ci].retains[k]):
+                return self.foreign_contracts[ci].retains[k]
+        if self.foreign_contracts[ci].callback_userdata_of.len() > 0:
+            return self.foreign_contracts[ci].callback_userdata_of[0]
+        -1
+
+    // Whether the item's userdata is retained by the resource / consumed.
+    fn facade_contract_userdata_retained(ci: i32) -> bool:
+        let fn_sym = self.foreign_contracts[ci].fn_sym
+        let sig = self.get_sig(fn_sym)
+        for k in 0..self.foreign_contracts[ci].retains.len() as i32:
+            if sig >= 0 and self.facade_param_is_userdata(fn_sym, sig, self.foreign_contracts[ci].retains[k]):
+                return true
+        false
+
+    fn facade_contract_userdata_consumed(ci: i32) -> bool:
+        for k in 0..self.foreign_contracts[ci].consumes.len() as i32:
+            if self.foreign_contracts[ci].consumes_destroyed_by[k] >= 0:
+                return true
+        false
+
+    // The callback parameter paired with the item's userdata (C index), or
+    // -1.
+    fn facade_contract_callback_param(ci: i32) -> i32:
+        if self.foreign_contracts[ci].callback_userdata_cb.len() > 0: self.foreign_contracts[ci].callback_userdata_cb[0] else: -1
+
+    // Ruling §61 for callback contracts, and the net under the renderer.
+    mut fn verify_facade_callback_items():
+        for ci in 0..self.foreign_contracts.len() as i32:
+            if not self.facade_contract_is_callback_item(ci):
+                continue
+            self.update_decl_source_context(self.foreign_contracts[ci].decl)
+            let fn_sym = self.foreign_contracts[ci].fn_sym
+            let node = self.foreign_contracts[ci].node
+            let fname: str = self.pool_resolve(fn_sym)
+            let sig = self.get_sig(fn_sym)
+            if sig < 0:
+                continue
+            let recv0 = self.facade_method_host(fn_sym)
+            if recv0.len() != 1 or not self.facade_received_presentable(recv0[0], fn_sym, 0):
+                let shown0 = self.facade_param_display(fn_sym, sig, 0)
+                let why = if recv0.len() == 0: "receives no modeled resource" else: if recv0.len() > 1: "receives a representation several resources wrap; the facade has not assigned it (§16.2b.3)" else: self.facade_received_unpresentable_reason(recv0[0], fn_sym, 0)
+                self.emit_error(f"fn '{fname}': a callback contract is presented as a method of the resource its first parameter receives, and {shown0} {why} (§16.2b.9)", node)
+                continue
+            // §46: a callback receiving ownership is stated, never inferred
+            // — and not yet modeled: the callback receives its userdata as
+            // a borrow (`&U`), and a facade saying otherwise would have
+            // With free what the callback took.
+            if self.foreign_contracts[ci].callback_consumes.len() > 0:
+                self.emit_error(f"fn '{fname}': 'callback consumes' is not modeled yet; a callback receives its userdata as a borrow for the callback's scope (§16.2b.9)", node)
+                continue
+            // A userdata is consumed by C (destroyed by the callback the
+            // contract names) or retained by the resource — never both.
+            if self.facade_contract_userdata_consumed(ci) and self.facade_contract_userdata_retained(ci):
+                let cud = self.facade_contract_userdata_param(ci)
+                let shown = self.facade_param_display(fn_sym, sig, cud)
+                self.emit_error(f"fn '{fname}': {shown} is both consumed ('consumes … destroyed_by': C owns and destroys it) and retained ('retains … by': the resource owns and releases it); state one (§16.2b.5, §16.2b.9)", node)
+                continue
+            // One userdata per item: a consumed-with-destroy userdata, a
+            // retained one and a paired one are the same parameter.
+            let ud = self.facade_contract_userdata_param(ci)
+            var second = -1
+            for k in 0..self.foreign_contracts[ci].consumes.len() as i32:
+                if self.foreign_contracts[ci].consumes_destroyed_by[k] >= 0 and self.foreign_contracts[ci].consumes[k] != ud: second = self.foreign_contracts[ci].consumes[k]
+            for k in 0..self.foreign_contracts[ci].retains.len() as i32:
+                let a = self.foreign_contracts[ci].retains[k]
+                if self.facade_param_is_userdata(fn_sym, sig, a) and a != ud: second = a
+            for k in 0..self.foreign_contracts[ci].callback_userdata_of.len() as i32:
+                if self.foreign_contracts[ci].callback_userdata_of[k] != ud: second = self.foreign_contracts[ci].callback_userdata_of[k]
+            if second >= 0:
+                let s1 = self.facade_param_display(fn_sym, sig, ud)
+                let s2 = self.facade_param_display(fn_sym, sig, second)
+                self.emit_error(f"fn '{fname}' describes two userdata parameters, {s1} and {s2}; a callback contract with more than one userdata is not modeled (§16.2b.9)", node)
+                continue
+            // A retained callback's userdata, and a userdata consumed with
+            // a destroy callback, are what the resource keeps or C
+            // destroys: their type is the caller's `U`, which the callback
+            // must be able to receive — so a callback that gets the userdata
+            // says so (`callback param N userdata param M`), or the userdata
+            // is opaque to it. Nothing to verify beyond the pairing.
+            if self.foreign_contracts[ci].callback_thread_any != 0:
+                var callable_count = 0
+                for pi in 1..self.sig_get_param_count(sig):
+                    if self.facade_param_is_callable(sig, pi): callable_count = callable_count + 1
+                if callable_count == 0:
+                    self.emit_error(f"fn '{fname}': 'callback_thread any' says the callback may run on any thread, but '{fname}' takes no callback (§16.2b.10)", node)
+                    continue
+            // A retained callback runs on the registering thread unless the
+            // facade says otherwise (§51); a consumed userdata's destroy
+            // callback likewise. Nothing more is inferred.
+            if self.diags.has_errors():
+                continue
+            // The net: the method was rendered (a generic template when the
+            // userdata is typed, a signature otherwise).
+            let host: str = self.pool_resolve(self.facade_resources[recv0[0]].name)
+            let mname = self.facade_presented(recv0[0], fname)
+            let mtext = host ++ "." ++ mname
+            let msym = self.pool_lookup_symbol(mtext)
+            let rendered = self.sig_text_index.contains(mtext) or (msym != 0 and self.generic_fn_node_for_symbol(msym) != 0)
+            if not rendered:
+                self.emit_error(f"fn '{fname}': its callback contract passed every facade check but no method '{mtext}' was rendered; the renderer cannot express this shape and did not say so — a compiler defect (§16.2b.9)", node)
+                continue
+            // Rendered indices (`self` excluded): the destroy callback the
+            // contract names is withheld from the method — the compiler
+            // supplies it.
+            var ud_r = -1
+            var cb_r = -1
+            var r = 0
+            let cb = self.facade_contract_callback_param(ci)
+            for pi in 1..self.sig_get_param_count(sig):
+                var withheld = false
+                for k in 0..self.foreign_contracts[ci].consumes.len() as i32:
+                    if self.foreign_contracts[ci].consumes_destroyed_by[k] == pi: withheld = true
+                if withheld:
+                    continue
+                if pi == ud: ud_r = r
+                if pi == cb: cb_r = r
+                r = r + 1
+            // Indexed by the generic template's node: the call-site hooks
+            // hold the method's symbol under whichever spelling the method
+            // table registered, and the node is one. A method with no typed
+            // userdata is not generic and has nothing to check at a call.
+            let mnode = if msym != 0: self.generic_fn_node_for_symbol(msym) else: 0
+            if mnode != 0:
+                self.facade_callback_method_index.insert(mnode, self.facade_callback_methods.len() as i32)
+            self.facade_callback_methods.push(FacadeCallbackMethod { contract: ci, userdata_param: ud_r, callback_param: cb_r, thread_any: self.foreign_contracts[ci].callback_thread_any, retained: if self.facade_contract_userdata_retained(ci): 1 else: 0, consumed: if self.facade_contract_userdata_consumed(ci): 1 else: 0 })
+
+    // The callback method a symbol names, or -1.
+    fn facade_callback_method_for(fn_sym: i32) -> i32:
+        if self.facade_callback_methods.len() == 0 or fn_sym == 0:
+            return -1
+        let node = self.generic_fn_node_for_symbol(fn_sym)
+        if node != 0 and self.facade_callback_method_index.contains(node): self.facade_callback_method_index.get(node).unwrap() else: -1
+
+    // Stage 7's call effects for a callback method's concrete signature
+    // (a generic method has none until a call specializes it): the call
+    // touches the receiver's views unless the item preserves it (§38).
+    mut fn facade_note_callback_method_sig(fn_sym: i32, sig: i32):
+        let mi = self.facade_callback_method_for(fn_sym)
+        if mi < 0 or sig < 0:
+            return
+        let ci = self.facade_callback_methods[mi].contract
+        let c_fn = self.foreign_contracts[ci].fn_sym
+        let domains = self.facade_domains_touched(self.facade_fn_file(c_fn), ci)
+        self.facade_add_call_effect(sig, c_fn, ci, self.facade_touch_params_mask(c_fn, ci, 0), &domains, -1, -1)
+
+    // §51 at a callback method's call: under `callback_thread any` the
+    // userdata type is Send and Sync — the callback reads it from whatever
+    // thread C calls on. `pi` is the rendered index (`self` excluded).
+    mut fn facade_check_callback_arg(fn_sym: i32, pi: i32, actual_ty: i32, arg_node: i32):
+        let mi = self.facade_callback_method_for(fn_sym)
+        if mi < 0 or pi != self.facade_callback_methods[mi].userdata_param or self.facade_callback_methods[mi].thread_any == 0:
+            return
+        var ud_ty = self.resolve_alias(actual_ty as TypeId)
+        if self.get_type_kind(ud_ty) == TypeKind.TY_REF:
+            ud_ty = self.resolve_alias(self.get_type_d0(ud_ty) as TypeId)
+        let send = self.type_is_send(ud_ty as i32) != 0
+        let sync = self.type_is_sync(ud_ty as i32) != 0
+        if send and sync:
+            return
+        let ci = self.facade_callback_methods[mi].contract
+        let fname: str = self.pool_resolve(self.foreign_contracts[ci].fn_sym)
+        let facade: str = self.pool_resolve(self.foreign_contracts[ci].facade)
+        let tn: str = self.type_name(ud_ty as i32)
+        let lacks = if not send and not sync: "neither Send nor Sync" else: if not send: "not Send" else: "not Sync"
+        self.emit_error(f"'{fname}' may invoke its callback from any thread ('callback_thread any' in facade {facade}), so the userdata type must be Send and Sync; '{tn}' is {lacks} (§16.2b.10)", arg_node)
+
+    // The callback method a method call `recv.field(…)` names, or -1.
+    fn facade_callback_method_for_call(recv_type: i32, field: i32) -> i32:
+        if self.facade_callback_methods.len() == 0 or recv_type == 0 or field == 0:
+            return -1
+        let resolved = self.auto_deref_ref_ptr_type(self.resolve_alias(recv_type as TypeId))
+        let owner = self.get_type_name(resolved)
+        if owner == 0:
+            return -1
+        self.facade_callback_method_for(self.lookup_generic_method_fn(owner, field))
+
+    // The expected type of a callback method's callback argument: the
+    // rendered `extern "C" fn(&U, …)` with `U` bound to the userdata
+    // argument's type (the value's type, whether passed as `U` or `&U`).
+    // A closure argument takes its parameter types from it and must be
+    // captureless, and a bare fn coerces to it (§12.4) — which the generic
+    // call path, binding `U` from every argument at once, cannot give it.
+    mut fn facade_callback_expected_type(mi: i32, recv_type: i32, field: i32, ud_ty: i32) -> i32:
+        let resolved = self.auto_deref_ref_ptr_type(self.resolve_alias(recv_type as TypeId))
+        let owner = self.get_type_name(resolved)
+        let fn_sym = self.lookup_generic_method_fn(owner, field)
+        let fn_node = self.generic_fn_node_for_symbol(fn_sym)
+        if fn_node == 0:
+            return 0
+        let meta = self.ast.find_fn_meta(fn_node)
+        if meta < 0 or self.ast.fn_meta_tp_count(meta) != 1:
+            return 0
+        let u_sym = self.ast.get_extra(self.ast.fn_meta_tp_start(meta))
+        var u_ty = self.resolve_alias(ud_ty as TypeId)
+        if self.get_type_kind(u_ty) == TypeKind.TY_REF:
+            u_ty = self.resolve_alias(self.get_type_d0(u_ty) as TypeId)
+        let cb_r = self.facade_callback_methods[mi].callback_param
+        let param_start = self.ast.fn_meta_param_start(meta)
+        if cb_r + 1 >= self.ast.fn_meta_param_count(meta):
+            return 0
+        let p_type_node = self.ast.fn_param_type(param_start, cb_r + 1)
+        let saved_syms = sema_clone_i32_vec(&self.generic_subst_param_syms)
+        let saved_tys = sema_clone_i32_vec(&self.generic_subst_type_ids)
+        self.clear_generic_substitution()
+        self.put_generic_subst(u_sym, u_ty as i32, fn_node)
+        let expected = self.resolve_type_node_with_current_subst(p_type_node, resolved as i32)
+        self.generic_subst_param_syms = saved_syms
+        self.generic_subst_type_ids = saved_tys
+        expected
+
+    // The thread capabilities of the facade resource a struct symbol names
+    // (§48: bit1 send, bit2 share, bit3 drop_any_thread), or -1 for a type
+    // no facade declares.
+    fn facade_thread_caps_for(type_sym: i32) -> i32:
+        if type_sym == 0 or self.facade_resources.len() == 0 or not self.facade_resource_index.contains(type_sym):
+            return -1
+        let ri: i32 = self.facade_resource_index.get(type_sym).unwrap()
+        self.facade_resources[ri].thread_caps
+
+    // §8, §57: why a facade resource is not Send/Sync, and the clause.
+    fn facade_thread_note(type_sym: i32, trait_name: &str) -> str:
+        let ri: i32 = self.facade_resource_index.get(type_sym).unwrap()
+        let rname: str = self.pool_resolve(self.facade_resources[ri].name)
+        let facade: str = self.pool_resolve(self.facade_resources[ri].facade)
+        let caps = self.facade_resources[ri].thread_caps
+        let stated = if caps == 0: "the default, 'thread creator'" else: "its 'thread' clause"
+        let fix = if trait_name == "Sync": "'thread share'" else: "'thread send drop_any_thread'"
+        f"resource '{rname}' is bound to the thread that created it — {stated} in facade {facade}; state {fix} on the resource if the C API allows it (§16.2b.10)"
 
 // The resource a deprecated `owns: ["ctor -> dtor"]` c_import entry spells
 // (compiler/Frontend.w project_owned_annotations_frontend): the producer's

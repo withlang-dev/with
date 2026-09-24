@@ -449,6 +449,23 @@ type ForeignContract {
     rename: i32,
     callback_thread_any: i32,
     callback_consumes: Vec[i32],
+    callback_userdata_cb: Vec[i32],    // `callback param N userdata param M`: the callback parameter N …
+    callback_userdata_of: Vec[i32],    // … and the userdata parameter M it receives (parallel)
+}
+
+// A callback method a facade rendered on a resource (stage 9, ruling
+// §44-§51; FacadeRender.w facade_render_callback_methods), keyed by the
+// method's symbol text (`Database.register`): the fn item, and the indices
+// — in the rendered signature, `self` excluded — of the userdata parameter
+// (-1: none typed), for the checks the rendered generic method cannot state
+// itself: the userdata type is Send and Sync under `callback_thread any`.
+type FacadeCallbackMethod {
+    contract: i32,
+    userdata_param: i32,
+    callback_param: i32,
+    thread_any: i32,
+    retained: i32,
+    consumed: i32,
 }
 
 // A foreign-state domain (ruling §33-§37): ownerless C storage given an
@@ -1148,6 +1165,12 @@ pub type Sema {
     facade_layout_files: Vec[i32],
     facade_layout_msgs: Vec[str],
     facade_convention_nodes: Vec[i32],
+    // Stage 9 (ruling §44-§51, spec §16.2b.9-10): the callback methods the
+    // facades rendered, by method symbol text (SemaFacade.w
+    // index_facade_callback_methods; SemaCheck.w consults them at generic
+    // call sites).
+    facade_callback_methods: Vec[FacadeCallbackMethod],
+    facade_callback_method_index: HashMap[i32, i32],   // the method's generic fn node -> facade_callback_methods index
     // D22 §13.6: field-access exprs whose base is a shared view and whose
     // field type is non-Copy — an owned demand on one is an error.
     view_projection_exprs: HashMap[i32, i32],
@@ -2506,6 +2529,8 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         facade_layout_files: Vec.new(),
         facade_layout_msgs: Vec.new(),
         facade_convention_nodes: Vec.new(),
+        facade_callback_methods: Vec.new(),
+        facade_callback_method_index: sema_new_map_i32_i32(),
         contextual_join_arm_types: Vec.new(),
         contextual_join_arm_kinds: Vec.new(),
         contextual_join_arm_roles: Vec.new(),

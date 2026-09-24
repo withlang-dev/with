@@ -4269,14 +4269,30 @@ impl Parser:
             ops.push(self.intern_current())
             self.advance()
         else if word == "callback":
-            kind = FACADE_CLAUSE_CALLBACK_CONSUMES
-            if not self.current_ident_is("consumes"):
-                self.emit_error("expected 'callback consumes param <ref>' (§16.2b.9)")
+            if self.current_ident_is("consumes"):
+                kind = FACADE_CLAUSE_CALLBACK_CONSUMES
+                self.advance()
+                let r = self.parse_facade_param_ref()
+                if r == 0: return 0
+                ops.push(r)
+            else if self.current_ident_is("param"):
+                // `callback param N userdata param M` (§16.2b.9): the
+                // callback in parameter N receives, in its `void *`
+                // parameter, the value passed as parameter M.
+                kind = FACADE_CLAUSE_CALLBACK_USERDATA
+                let cb = self.parse_facade_param_ref()
+                if cb == 0: return 0
+                if not self.current_ident_is("userdata"):
+                    self.emit_error("a callback's userdata is written 'callback param <ref> userdata param <ref>' (§16.2b.9)")
+                    return 0
+                self.advance()
+                let ud = self.parse_facade_param_ref()
+                if ud == 0: return 0
+                ops.push(cb)
+                ops.push(ud)
+            else:
+                self.emit_error("expected 'callback consumes param <ref>' or 'callback param <ref> userdata param <ref>' (§16.2b.9)")
                 return 0
-            self.advance()
-            let r = self.parse_facade_param_ref()
-            if r == 0: return 0
-            ops.push(r)
         else:
             self.emit_error("unknown facade clause '" ++ word ++ "' (§16.2b)")
             return 0

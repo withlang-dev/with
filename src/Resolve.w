@@ -394,7 +394,7 @@ impl ResolveState:
             // import of std.box — the way the prelude's own `use std.box` is
             // text. Without the edge the D29 gate would refuse the cell's
             // type in the rendered file.
-            if kind == NodeKind.NK_C_FACADE and self.facade_declares_pinned_resource(pool, decl):
+            if kind == NodeKind.NK_C_FACADE and (self.facade_declares_pinned_resource(pool, decl) or self.facade_declares_kept_userdata(pool, decl)):
                 let resolved_path = self.resolve_use_file_dotted(module_id, "std.box")
                 var target_module = -1
                 if resolved_path.len() > 0:
@@ -1131,6 +1131,25 @@ impl ResolveState:
                 if kind == FACADE_CLAUSE_MOVABLE: movable = true
             if has_init and not movable:
                 return true
+        false
+
+    // A facade whose fn item keeps or hands C a userdata value (stage 9,
+    // spec §16.2b.9: `retains … by`, `consumes … destroyed_by`, `callback …
+    // userdata`) renders it through a `Box` cell the same way.
+    fn facade_declares_kept_userdata(pool: AstPool, facade: NodeId) -> bool:
+        let extra_start = pool.get_data1(facade)
+        for i in 0..pool.get_data2(facade):
+            let item = pool.get_extra(extra_start + i)
+            if pool.kind(item as NodeId) != NodeKind.NK_FACADE_FN:
+                continue
+            let clause_start = pool.get_data1(item as NodeId)
+            for ci in 0..pool.get_data2(item as NodeId):
+                let clause = pool.get_extra(clause_start + ci) as NodeId
+                let kind = pool.get_data0(clause)
+                if kind == FACADE_CLAUSE_RETAINS or kind == FACADE_CLAUSE_CALLBACK_USERDATA:
+                    return true
+                if kind == FACADE_CLAUSE_CONSUMES and pool.get_extra(pool.get_data1(clause) + 1) != 0:
+                    return true
         false
 
     fn resolve_use_file_dotted(module_id: i32, dotted: &str) -> str:
