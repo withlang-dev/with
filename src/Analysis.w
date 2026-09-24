@@ -4,6 +4,7 @@
 
 use AnalysisTypes
 use AnalysisContract
+use AnalysisResolution
 use Ast
 use Diagnostic
 use InternPool
@@ -834,7 +835,7 @@ fn analysis_audit_call_contracts(report: &AnalysisReport, sema: &Sema, mir_mod: 
     for bi in 0..mir_mod.bodies.len() as i32:
         let body = &mir_mod.bodies[bi]
         let calls = body.call_arg_starts.len() as i32
-        if body.call_arg_counts.len() as i32 != calls or body.call_intrinsic_kinds.len() as i32 != calls or body.call_ast_nodes.len() as i32 != calls or body.call_sig_indices.len() as i32 != calls or body.call_mono_syms.len() as i32 != calls or body.call_contract_required.len() as i32 != calls or body.call_pipeline_receiver_places.len() as i32 != calls:
+        if body.call_arg_counts.len() as i32 != calls or body.call_intrinsic_kinds.len() as i32 != calls or body.call_ast_nodes.len() as i32 != calls or body.call_sig_indices.len() as i32 != calls or body.call_mono_syms.len() as i32 != calls or body.call_contract_required.len() as i32 != calls or body.call_pipeline_receiver_places.len() as i32 != calls or body.call_machinery_dispatch.len() as i32 != calls:
             report.fail(f"body {body.fn_sym}: MIR call tables are not parallel")
             continue
         for ci in 0..calls:
@@ -2313,7 +2314,8 @@ fn analysis_help() -> str:
         "  matrix:<query>                          compact cross-stage fact matrix\n" ++
         "  explain:call|value|effect|specialization|diagnostic|type|field|expression|method:<text>\n" ++
         "  explain:node:<id>                       bounded AST + Sema type/resolution tree\n" ++
-        "  audit:calls|effects|storage|methods|mir|returns|receivers|receiver-surface|phase|pool-views|contract|codegen|trait-tables|all\n" ++
+        "  audit:calls|effects|storage|methods|mir|returns|receivers|receiver-surface|phase|pool-views|contract|resolution|codegen|trait-tables|all\n" ++
+        "  audit:resolution                        D65: every MIR callee and argument count agrees with Sema's resolution of the call it lowers\n" ++
         "  contract                                the modeled foreign contract (§16.2b): every fact with its provenance, then audit:contract\n" ++
         "  move-sites | seam-sites                 ownership worklists (owned-param call sites; aliasing/blanking seams)\n" ++
         "  path:call:<from>:<to>                   shortest live MIR call path\n" ++
@@ -2344,6 +2346,7 @@ fn compiler_analysis_render(report: &AnalysisReport, request: &str) -> str:
     if request == "audit:receiver-surface": return report.render_verdict("receiver-surface-audit")
     if request == "audit:pool-views": return report.render_verdict("pool-view-audit")
     if request == "audit:contract": return report.render_verdict("contract-audit")
+    if request == "audit:resolution": return report.render_verdict("resolution-audit")
     if request == "contract": return contract_view_render(report)
     if request == "audit:codegen": return report.render_verdict("codegen-contract-audit")
     if request == "audit:trait-tables": return report.render_verdict("trait-table-audit")
@@ -2406,6 +2409,8 @@ fn compiler_analysis_run(sema: &Sema, mir_mod: &MirModule, pool: &InternPool, so
         analysis_audit_pool_views(&report, sema, mir_mod, source_path, source_text)
     else if request == "audit:contract" or request == "contract":
         analysis_audit_contract(&report, sema, source_path, source_text)
+    else if request == "audit:resolution":
+        analysis_audit_resolution(&report, sema, mir_mod, pool, source_path, source_text)
     else if request == "audit:codegen":
         needs_codegen = true
         codegen_query = "audit"
@@ -2424,6 +2429,7 @@ fn compiler_analysis_run(sema: &Sema, mir_mod: &MirModule, pool: &InternPool, so
         analysis_audit_phase(&report, sema, mir_mod)
         analysis_audit_pool_views(&report, sema, mir_mod, source_path, source_text)
         analysis_audit_contract(&report, sema, source_path, source_text)
+        analysis_audit_resolution(&report, sema, mir_mod, pool, source_path, source_text)
         needs_codegen = true
         codegen_query = "audit"
     else if request.starts_with("lldb:"):

@@ -17580,6 +17580,9 @@ impl Sema:
             let recv_ty = self.adjust_static_receiver_type(recv_expr, checked_recv)
             let callable_tid = self.callable_any_fn_type(self.field_access_type_from_obj(recv_ty, recv_field) as TypeId)
             if callable_tid != 0:
+                // D65: this call invokes the stored callable — the one fact
+                // MirLower and audit:resolution read for it.
+                self.call_callable_types.insert(node, callable_tid)
                 // §16.11: calling an unsafe callback field requires an unsafe context.
                 if self.fn_type_is_unsafe(callable_tid) != 0:
                     self.require_unsafe_operation("call to unsafe function pointer requires unsafe context", node)
@@ -17684,6 +17687,11 @@ impl Sema:
             callable_value_tid = self.callable_any_fn_type(self.check_expr(callee) as TypeId)
             if self.ast.kind(callee) == NodeKind.NK_CLOSURE:
                 callable_closure_node = callee
+        // D65 (#1635): a callee that is a callable binding or any other
+        // callable-typed expression is an indirect call through that value.
+        // Sema states it once, here; MIR never re-derives it from the name.
+        if callable_value_tid != 0:
+            self.call_callable_types.insert(node, callable_value_tid)
 
         // §16.11: calling an unsafe callable value requires an unsafe context.
         if callable_value_tid != 0 and self.fn_type_is_unsafe(callable_value_tid) != 0:
@@ -24188,6 +24196,61 @@ impl Sema:
         // A free math builtin (`cos(x)`). Reached only after every user and
         // stdlib resolution has failed, so a user's own `fn cos` shadows it.
         if math_fn_lookup(self.pool_resolve(fn_sym)) >= 0:
+            return 1
+        0
+
+    // D65 (#1647): every symbol is_intrinsic_fn_sym accepts as a call target,
+    // enumerated for the MIR module's callable snapshot: the typed-MIR
+    // validator recognizes a builtin call by this Sema fact, never by a name
+    // of its own (#1639). Keep the two in step.
+    fn intrinsic_fn_syms() -> Vec[i32]:
+        let out: Vec[i32] = Vec.new()
+        out.push(self.syms.channel)
+        out.push(self.syms.send)
+        out.push(self.syms.recv)
+        out.push(self.syms.close)
+        out.push(self.syms.src)
+        out.push(self.syms.embed_file)
+        for id in 0..math_fn_count():
+            let sym = self.pool_lookup_symbol(math_fn_name(id))
+            if sym != 0: out.push(sym)
+        out
+
+    // D65 (#1647): the callee names is_sizeof_or_alignof, is_transmute_call,
+    // is_nameof_call and is_chan_call accept under a type argument
+    // (`sizeof[T]()`), enumerated for the same snapshot. Keep in step with
+    // those predicates.
+    fn generic_builtin_syms() -> Vec[i32]:
+        let out: Vec[i32] = Vec.new()
+        let names = ["sizeof", "size_of", "alignof", "align_of", "transmute", "nameof", "type_name", "chan"]
+        for i in 0..names.len() as i32:
+            let sym = self.pool_lookup_symbol(names[i])
+            if sym != 0: out.push(sym)
+        out
+
+    // D65: Sema's classification of a call node's callee as a builtin the
+    // compiler lowers itself — an ident intrinsic (`embed_file(..)`,
+    // `channel()`), a math builtin, a type-argument builtin (`sizeof[T]()`),
+    // `TypeInfo` access or `std.builtins.drop`. audit:resolution reads this
+    // answer for a MIR callee symbol that has no signature and no generic
+    // template; MirLower's builtin branch must never lower anything else.
+    fn call_callee_is_builtin(node: i32) -> i32:
+        if node <= 0 or node >= self.ast.node_count() or self.ast.kind(node) != NodeKind.NK_CALL:
+            return 0
+        if self.math_builtin_calls.contains(node):
+            return 1
+        let callee = self.ast.get_data0(node)
+        if callee <= 0 or callee >= self.ast.node_count():
+            return 0
+        let kind = self.ast.kind(callee)
+        if kind == NodeKind.NK_IDENT:
+            let sym = self.ast.get_data0(callee)
+            if self.is_intrinsic_fn_sym(sym) != 0 or self.fn_symbol_is_std_builtins_drop(sym) != 0:
+                return 1
+            return 0
+        if self.is_sizeof_or_alignof(callee) != 0 or self.is_transmute_call(callee) != 0 or self.is_nameof_call(callee) != 0 or self.is_chan_call(callee) != 0:
+            return 1
+        if self.typeinfo_module_field(callee) != 0:
             return 1
         0
 

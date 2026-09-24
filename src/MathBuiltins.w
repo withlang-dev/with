@@ -73,6 +73,9 @@ pub fn math_fn_lookup(name: &str) -> i32:
         if t.get(i).name == name: return i
     -1
 
+/// The number of rows: ids are 0..math_fn_count().
+pub fn math_fn_count() -> i32: math_fn_table().len() as i32
+
 /// Operand count: 1 or 2. Every operand shares the argument's float type.
 pub fn math_fn_arity(id: i32) -> i32:
     let t = math_fn_table()

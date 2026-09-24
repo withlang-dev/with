@@ -1168,6 +1168,13 @@ pub type Sema {
     // Typed dump sidecar maps (keyed by span start byte offset)
     typed_expr_types: HashMap[i32, i32],
     typed_binding_types: HashMap[i32, i32],
+    // D65 (#1647): the callable type an indirect call invokes — a call node
+    // whose callee is a callable binding, a callable field or any other
+    // callable-typed expression, keyed by the call node. Sema resolves the
+    // callee here (check_call) and nowhere else; MirLower materializes the
+    // call and `audit:resolution` verifies the MIR callee and argument count
+    // against this fact. Absent for a call Sema resolved to a function symbol.
+    call_callable_types: HashMap[i32, i32],
     // D51 stage 2: facade facts (SemaFacade.w).
     facade_resource_index: HashMap[i32, i32],   // resource sym -> facade_resources index
     facade_resources: Vec[FacadeResource],
@@ -2202,6 +2209,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
     let drop_method_cache = sema_new_map_i32_i32()
     let typed_expr_types = sema_new_map_i32_i32()
     let typed_binding_types = sema_new_map_i32_i32()
+    let call_callable_types = sema_new_map_i32_i32()
     let view_projection_exprs = sema_new_map_i32_i32()
     let join_field_view_arms = sema_new_map_i32_i32()
     let drop_consumed_binding_values = sema_new_map_i32_i32()
@@ -2616,6 +2624,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         regex_capture_name_syms: Vec.new(),
         typed_expr_types,
         typed_binding_types,
+        call_callable_types,
         view_projection_exprs,
         join_field_view_arms,
         drop_consumed_binding_values,

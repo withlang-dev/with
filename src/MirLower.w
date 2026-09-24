@@ -14192,6 +14192,8 @@ impl MirBuilder:
             with_eprint(f"[gc-contract] site={site} name={mach_name} recv_ty={recv_ty} recv_kind={recv_kind} recorded={has_recorded_sig} required={required}")
         if required:
             self.body.require_call_contract(args_id)
+        else:
+            self.body.set_call_machinery_dispatch(args_id)
 
     mut fn lower_resolved_call_with_operand_args(fn_sym: i32, args: &Vec[i32], ret_type: i32, node: i32, require_contract: bool = true) -> i32:
         self.lower_resolved_call_with_operand_args_contract(fn_sym, args, ret_type, node, -1, 0, require_contract)
@@ -16817,6 +16819,7 @@ fn lower_module(input_sema: Sema, ast_pool: AstPool, pool: InternPool) -> MirLow
     // Snapshot only after every specialization has been checked and lowered;
     // no semantic type may appear later in codegen.
     mir_mod.snapshot_sema_types(&sema)
+    mir_mod.snapshot_sema_callables(&sema, pool)
 
     MirLowerResult { sema, mir_module: mir_mod }
 

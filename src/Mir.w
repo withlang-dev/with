@@ -37,6 +37,35 @@ impl MirModule:
             self.sema_option_sym = sema.syms.option
         self.snapshot_moved_drop_types(sema)
 
+    // D65 (#1647, #1639): Sema's call targets, keyed by this module's pool.
+    // Symbol ids belong to their pool (a Sema id probed against the output
+    // pool can select an unrelated symbol), so each is carried across by
+    // name. A signature outranks a generic template of the same name (a
+    // concrete specialization registers its own sig); a builtin never
+    // shadows either.
+    mut fn snapshot_sema_callables(sema: &Sema, pool: InternPool):
+        for si in 0..sema.sig_names.len() as i32:
+            let name = sema.pool_resolve(sema.sig_names[si])
+            if name.len() > 0:
+                self.sema_callable_syms.insert(pool.intern(name), MirCallableClass.Signature as i32)
+        let generic_syms = sema.generic_fn_nodes.keys()
+        for gi in 0..generic_syms.len() as i32:
+            let sym = generic_syms[gi]
+            if sema.generic_fn_node_for_symbol(sym) == 0: continue
+            let mir_sym = pool.intern(sema.pool_resolve(sym))
+            if not self.sema_callable_syms.contains(mir_sym):
+                self.sema_callable_syms.insert(mir_sym, MirCallableClass.Generic as i32)
+        let builtins = sema.intrinsic_fn_syms()
+        for bi in 0..builtins.len() as i32:
+            let mir_sym = pool.intern(sema.pool_resolve(builtins[bi]))
+            if not self.sema_callable_syms.contains(mir_sym):
+                self.sema_callable_syms.insert(mir_sym, MirCallableClass.Intrinsic as i32)
+        let generic_builtins = sema.generic_builtin_syms()
+        for bi in 0..generic_builtins.len() as i32:
+            let mir_sym = pool.intern(sema.pool_resolve(generic_builtins[bi]))
+            if not self.sema_callable_syms.contains(mir_sym):
+                self.sema_callable_syms.insert(mir_sym, MirCallableClass.Intrinsic as i32)
+
     // #1394, #1414: the drop-bearing types of every place a body moves out
     // of — a vacated sub-place (#1394) and a move of an already-moved place
     // (#1414). Reads the place type through the typed validator's own walk,
