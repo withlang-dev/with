@@ -1,0 +1,9 @@
+[package]
+name = "c-interop"
+version = "0.1.0"
+
+[c_import]
+include_paths = ["vendor"]
+
+[link]
+search_paths = ["out/lib"]
