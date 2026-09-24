@@ -81,6 +81,22 @@ workaround when the workaround is a race or a manual lldb session. Before
 building, grep the runtime and the doc for the flag that already exists —
 the address trap sat unmentioned in `rt_core.w` for a month.
 
+**One owner per fact (D65).** Sema decides *what* (declaration, type,
+place/value/view category, origin, effect, capture semantics, call
+target, acceptance); MIR decides *where and when* (CFG, storage,
+path-sensitive move state, drop points, cleanup edges); codegen decides
+*how* (layout, `PassMode`, LLVM representation). A downstream stage may
+propagate, materialize and verify a fact; it may never reconstruct or
+override it from syntax or representation: no LLVM-type → passing-mode
+inference, no MIR-local-lookup → name-meaning inference, no
+AST-spelling → callee inference after Sema. MIR that finds Sema's
+constraints unrealizable on a path reports the contradiction; it never
+picks a different meaning. Post-Sema invalid MIR is a compiler bug.
+When you fix a bug, move its answer to the owner — never add a second
+derivation. `with analyze … audit:resolution` (#1647) is the mechanical
+check; the smell test: if deleting a downstream heuristic could change
+which programs are accepted, the boundary is wrong.
+
 **Deep compiler bugs.** If the repro isn't minimal, run `with reduce` with the
 failing command as the predicate. For MIR lowering, ownership, and codegen bugs,
 reach for the `with check` trace/dump flags (see Stage Debugging) before adding
@@ -827,6 +843,7 @@ call path is a failure, not a blind spot.
 ./out/stage/bin/with-stage2 analyze repro.w 'path:call:caller:callee'
 ./out/stage/bin/with-stage2 analyze repro.w 'closure:call:root_function'
 ./out/stage/bin/with-stage2 analyze repro.w 'lldb:kind=call,name~function_name'
+./out/stage/bin/with-stage2 analyze repro.w contract
 ```
 
 Requests:
@@ -842,7 +859,10 @@ Requests:
 - `select:<query>`, `summary[:<query>]`, `matrix:<query>`: query the same fact
   database. Queries are comma-separated `field=value`, `field!=value`, or
   `field~substring` predicates; run `with analyze file.w help` for fields.
-- `audit:calls|effects|storage|methods|mir|returns|receivers|receiver-surface|phase|pool-views|codegen|trait-tables|all`:
+- `contract` / `audit:contract`: the modeled foreign contract of every
+  `c facade` (ruling §63): each fact with its provenance, and the
+  suspicious-configuration audit (`docs/deep-debugging-tools.md`).
+- `audit:calls|effects|storage|methods|mir|returns|receivers|receiver-surface|phase|pool-views|contract|codegen|trait-tables|all`:
   hard invariants. `all` covers typed/ownership MIR validators, receiver
   declarations/contracts, fixed-point effects, freeze/eager-cache/specialization,
   frozen-phase mutable-Sema re-entry, LLVM declaration ABI, caller marshalling,
