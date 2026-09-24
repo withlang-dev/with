@@ -1378,3 +1378,40 @@ pub fn memmove(dst: *mut u8, src: *const u8, n: i32) -> *mut u8:
 
 pub fn memset(dst: *mut u8, c: i32, n: i32) -> *mut u8:
     with_memset(dst, c, n as i64)
+
+// ── Foreign-state domain rows (ruling §52, spec §16.2b.14) ────────────────
+// Every WASI import above is described here; the `runtime-domain-audit`
+// lane (build/compiler.w) refuses a foreign extern without a row. WASI is
+// not the C library: the C standard justifies no `preserves` for these
+// calls, so each row says nothing and invalidates all three domains
+// ("unknown effect means invalidate", §38). The memory.size/memory.grow
+// declarations are LLVM intrinsics, not foreign calls.
+c facade wasi:
+    domain errno thread
+    domain environ process
+    domain locale process
+    fn args_sizes_get
+    fn args_get
+    fn environ_sizes_get
+    fn environ_get
+    fn clock_time_get
+    fn fd_close
+    fn fd_fdstat_get
+    fn fd_filestat_get
+    fn fd_prestat_get
+    fn fd_prestat_dir_name
+    fn fd_read
+    fn fd_readdir
+    fn fd_seek
+    fn fd_write
+    fn path_create_directory
+    fn path_filestat_get
+    fn path_open
+    fn path_readlink
+    fn path_remove_directory
+    fn path_rename
+    fn path_symlink
+    fn path_unlink_file
+    fn poll_oneoff
+    fn proc_exit
+    fn random_get

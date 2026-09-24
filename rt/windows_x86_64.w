@@ -1477,3 +1477,107 @@ pub fn with_net_recv(sock: i32, max_len: i64) -> str:
 
 pub fn with_net_close(sock: i32) -> i32:
     closesocket(sock as i64)
+
+// ── Foreign-state domain rows (ruling §52, spec §16.2b.14) ────────────────
+// Every foreign call above is described here; the `runtime-domain-audit`
+// lane (build/compiler.w) refuses a foreign extern without a row. "Unknown
+// effect means invalidate" (§38): a Win32 or Winsock row says nothing, so
+// it invalidates all three domains — the C standard does not describe those
+// calls, and a row it cannot justify is never `preserves`. The UCRT rows
+// follow the C standard as the POSIX backends do: C11 7.5p3 (errno: any
+// library function may set it; the `_errno` accessor is the macro's lvalue,
+// 7.5p2), C11 7.22.4.6 (environ: altered by _putenv/SetEnvironmentVariable
+// only), C11 7.11.1.1 (locale: setlocale only, never called here).
+c facade win32:
+    domain errno thread
+    domain environ process
+    domain locale process
+    fn GetLastError
+    fn GetStdHandle
+    fn ReadFile
+    fn WriteFile
+    fn CreateFileW
+    fn CloseHandle
+    fn SetFilePointerEx
+    fn GetCurrentDirectoryW
+    fn SetCurrentDirectoryW
+    fn VirtualAlloc
+    fn VirtualFree
+    fn ExitProcess
+    fn QueryPerformanceCounter
+    fn QueryPerformanceFrequency
+    fn GetSystemTimeAsFileTime
+    fn Sleep
+    fn GetCurrentProcessId
+    fn OpenProcess
+    fn TerminateProcess
+    fn CreateThread
+    fn WaitForSingleObject
+    fn GetExitCodeProcess
+    fn CreateProcessW
+    fn GetEnvironmentVariableW
+    fn SetEnvironmentVariableW
+    fn GetFileAttributesW
+    fn SetFileAttributesW
+    fn GetFileAttributesExW
+    fn CreateDirectoryW
+    fn DeleteFileW
+    fn RemoveDirectoryW
+    fn MoveFileExW
+    fn FindFirstFileW
+    fn FindNextFileW
+    fn FindClose
+    fn CreateSymbolicLinkW
+    fn RtlCaptureStackBackTrace
+    fn GetCurrentProcess
+    fn SymSetOptions
+    fn SymInitialize
+    fn SymFromAddr
+    fn SymGetLineFromAddr64
+    fn GetSystemInfo
+    fn GlobalMemoryStatusEx
+    fn GetComputerNameW
+    fn SystemFunction036
+    fn VirtualProtect
+    fn AddVectoredExceptionHandler
+    fn GetCurrentThreadId
+    fn GetTempPathA
+    fn GetTempFileNameA
+    fn GetFullPathNameA
+    fn __acrt_iob_func
+        preserves domain environ
+        preserves domain locale
+    fn rt_ucrt_errno
+        preserves domain errno
+        preserves domain environ
+        preserves domain locale
+    fn rt_ucrt_fileno
+        preserves domain environ
+        preserves domain locale
+    fn rt_ucrt_fseeki64
+        preserves domain environ
+        preserves domain locale
+    fn rt_ucrt_ftelli64
+        preserves domain environ
+        preserves domain locale
+    fn rt_ucrt_isatty
+        preserves domain environ
+        preserves domain locale
+    fn WSAStartup
+    fn socket
+    fn connect
+    fn rt_libc_bind
+        preserves domain environ
+        preserves domain locale
+    fn listen
+    fn accept
+    fn getsockname
+    fn rt_libc_send
+        preserves domain environ
+        preserves domain locale
+    fn rt_libc_recv
+        preserves domain environ
+        preserves domain locale
+    fn closesocket
+    fn getaddrinfo
+    fn freeaddrinfo

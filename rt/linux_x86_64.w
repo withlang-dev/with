@@ -1303,3 +1303,222 @@ pub fn rt_compat_self_maxrss() -> i64:
     if rt_libc_getrusage(0, ru_base) != 0:
         return 0
     posix_rusage_maxrss(ru_base as *const u8)
+
+// ── Foreign-state domain rows (ruling §52, spec §16.2b.14) ────────────────
+// The runtime is not exempt from the foreign-state model: every foreign
+// call above is described here, and the `runtime-domain-audit` lane
+// (build/compiler.w) refuses a foreign extern without a row. A row states
+// the view effect of the call on each domain the C library owns; "unknown
+// effect means invalidate" (§38), so a row that says nothing invalidates.
+// `preserves` appears only where the C standard says so:
+//   errno   (thread)  — C11 7.5p3: any library function may set errno, so
+//                       no call preserves it; the errno accessor is the
+//                       macro's lvalue itself (7.5p2) and preserves it.
+//   environ (process) — C11 7.22.4.6: altering the environment list is the
+//                       implementation's method — POSIX.1-2017 setenv,
+//                       unsetenv, putenv — and getenv may overwrite the
+//                       text it returned (XSH getenv); those rows do not
+//                       preserve it, every other call does.
+//   locale  (process) — C11 7.11.1.1: setlocale is the function that
+//                       changes the locale; the runtime never calls it.
+c facade libc:
+    domain errno thread
+    domain environ process
+    domain locale process
+    fn rt_libc_write
+        preserves domain environ
+        preserves domain locale
+    fn rt_libc_read
+        preserves domain environ
+        preserves domain locale
+    fn rt_libc_open
+        preserves domain environ
+        preserves domain locale
+    fn rt_libc_close
+        preserves domain environ
+        preserves domain locale
+    fn rt_libc_lseek
+        preserves domain environ
+        preserves domain locale
+    fn rt_libc_fcntl
+        preserves domain environ
+        preserves domain locale
+    fn rt_libc_getcwd
+        preserves domain environ
+        preserves domain locale
+    fn rt_libc_mmap
+        preserves domain environ
+        preserves domain locale
+    fn rt_libc_munmap
+        preserves domain environ
+        preserves domain locale
+    fn rt_libc_getenv
+        preserves domain locale
+    fn rt_libc_stat
+        preserves domain environ
+        preserves domain locale
+    fn rt_libc_chmod
+        preserves domain environ
+        preserves domain locale
+    fn rt_libc_exit
+        preserves domain environ
+        preserves domain locale
+    fn rt_libc_errno_location
+        preserves domain errno
+        preserves domain environ
+        preserves domain locale
+    fn rt_libc_getrandom
+        preserves domain environ
+        preserves domain locale
+    fn rt_libc_sysconf
+        preserves domain environ
+        preserves domain locale
+    fn rt_libc_sigaltstack
+        preserves domain environ
+        preserves domain locale
+    fn rt_libc_sigaction
+        preserves domain environ
+        preserves domain locale
+    fn rt_libc_fileno
+        preserves domain environ
+        preserves domain locale
+    fn rt_libc_fseeko
+        preserves domain environ
+        preserves domain locale
+    fn rt_libc_ftello
+        preserves domain environ
+        preserves domain locale
+    fn rt_libc_isatty
+        preserves domain environ
+        preserves domain locale
+    fn rt_libc_mkstemp
+        preserves domain environ
+        preserves domain locale
+    fn rt_libc_realpath
+        preserves domain environ
+        preserves domain locale
+    fn rt_libc_clock_gettime
+        preserves domain environ
+        preserves domain locale
+    fn rt_libc_nanosleep
+        preserves domain environ
+        preserves domain locale
+    fn rt_libc_getpid
+        preserves domain environ
+        preserves domain locale
+    fn rt_libc_raise
+        preserves domain environ
+        preserves domain locale
+    fn rt_libc_kill
+        preserves domain environ
+        preserves domain locale
+    fn rt_libc_pthread_create
+        preserves domain environ
+        preserves domain locale
+    fn rt_libc_pthread_join
+        preserves domain environ
+        preserves domain locale
+    fn rt_libc_mkdir
+        preserves domain environ
+        preserves domain locale
+    fn rt_libc_unlink
+        preserves domain environ
+        preserves domain locale
+    fn rt_libc_rmdir
+        preserves domain environ
+        preserves domain locale
+    fn rt_libc_rename
+        preserves domain environ
+        preserves domain locale
+    fn rt_libc_symlink
+        preserves domain environ
+        preserves domain locale
+    fn rt_libc_access
+        preserves domain environ
+        preserves domain locale
+    fn rt_libc_lstat
+        preserves domain environ
+        preserves domain locale
+    fn rt_libc_readlink
+        preserves domain environ
+        preserves domain locale
+    fn rt_libc_opendir
+        preserves domain environ
+        preserves domain locale
+    fn rt_libc_readdir
+        preserves domain environ
+        preserves domain locale
+    fn rt_libc_closedir
+        preserves domain environ
+        preserves domain locale
+    fn rt_libc_socket
+        preserves domain environ
+        preserves domain locale
+    fn rt_libc_connect
+        preserves domain environ
+        preserves domain locale
+    fn rt_libc_bind
+        preserves domain environ
+        preserves domain locale
+    fn rt_libc_listen
+        preserves domain environ
+        preserves domain locale
+    fn rt_libc_accept
+        preserves domain environ
+        preserves domain locale
+    fn rt_libc_setsockopt
+        preserves domain environ
+        preserves domain locale
+    fn rt_libc_getsockname
+        preserves domain environ
+        preserves domain locale
+    fn rt_libc_send
+        preserves domain environ
+        preserves domain locale
+    fn rt_libc_recv
+        preserves domain environ
+        preserves domain locale
+    fn rt_libc_getaddrinfo
+        preserves domain environ
+        preserves domain locale
+    fn rt_libc_freeaddrinfo
+        preserves domain environ
+        preserves domain locale
+    fn rt_libc_setenv
+        preserves domain locale
+    fn rt_libc_sigprocmask
+        preserves domain environ
+        preserves domain locale
+    fn rt_libc_fork
+        preserves domain environ
+        preserves domain locale
+    fn rt_libc_setpgid
+        preserves domain environ
+        preserves domain locale
+    fn rt_libc_execv
+        preserves domain environ
+        preserves domain locale
+    fn rt_libc_execvp
+        preserves domain environ
+        preserves domain locale
+    fn rt_libc_waitpid
+        preserves domain environ
+        preserves domain locale
+    fn rt_libc_wait4
+        preserves domain environ
+        preserves domain locale
+    fn rt_libc_getrusage
+        preserves domain environ
+        preserves domain locale
+    fn rt_libc_chdir
+        preserves domain environ
+        preserves domain locale
+    fn rt_libc_dup2
+        preserves domain environ
+        preserves domain locale
+    fn rt_libc_getrlimit
+        preserves domain environ
+        preserves domain locale
+    fn rt_libc_setrlimit
+        preserves domain environ
+        preserves domain locale

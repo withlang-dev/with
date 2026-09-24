@@ -829,3 +829,21 @@ pub fn with_fiber_current_worker_index() -> i32:
 
 pub fn with_fiber_cross_thread_cancels() -> i64:
     0
+
+// ── Foreign-state domain rows (ruling §52, spec §16.2b.14) ────────────────
+// Every foreign call above is described here; the `runtime-domain-audit`
+// lane (build/compiler.w) refuses a foreign extern without a row. "Unknown
+// effect means invalidate" (§38): a Win32 or Winsock row says nothing, so
+// it invalidates all three domains — the C standard does not describe those
+// calls, and a row it cannot justify is never `preserves`. The UCRT rows
+// follow the C standard as the POSIX backends do: C11 7.5p3 (errno: any
+// library function may set it; the `_errno` accessor is the macro's lvalue,
+// 7.5p2), C11 7.22.4.6 (environ: altered by _putenv/SetEnvironmentVariable
+// only), C11 7.11.1.1 (locale: setlocale only, never called here).
+c facade ucrt:
+    domain errno thread
+    domain environ process
+    domain locale process
+    fn abort
+        preserves domain environ
+        preserves domain locale
