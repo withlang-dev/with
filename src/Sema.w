@@ -439,8 +439,9 @@ type ForeignContract {
     consumes_destroyed_by: Vec[i32],   // parallel to consumes; -1 = none
     retains: Vec[i32],
     retains_by: Vec[i32],
-    returns_borrow_resource: i32,
-    returns_borrow_from: i32,
+    returns_borrow_resource: i32,   // a resource, or `CStr` (the borrowed modeled text, §16.2b.8)
+    returns_borrow_from: i32,       // the origin parameter, or -1
+    returns_borrow_domain: i32,     // the origin foreign-state domain (`from domain D`, §16.2b.7), or 0
     returns_static_tid: i32,
     preserves_params: Vec[i32],
     preserves_domains: Vec[i32],
@@ -448,6 +449,35 @@ type ForeignContract {
     rename: i32,
     callback_thread_any: i32,
     callback_consumes: Vec[i32],
+}
+
+// A foreign-state domain (ruling §33-§37): ownerless C storage given an
+// origin. `origin_sym` is the symbol views borrowed from it depend on, as
+// they depend on a binding; `files` are the `<c_import …>` translations of
+// the functions the declaring facade describes — the coarse library whose
+// every operation touches the domain unless it `preserves` it (§34, §38).
+type FacadeDomain {
+    name: i32,
+    kind: i32,          // process | thread | resource | static (sym)
+    facade: i32,
+    node: i32,
+    origin_sym: i32,
+    files: Vec[i32],
+}
+
+// What a call to signature `sig` does to foreign views (ruling §38): the
+// parameters whose received resource's views it invalidates (a bit per
+// parameter; every received resource unless `preserves param N`), the
+// domains it invalidates (its library's, unless `preserves domain D`), and
+// the domain its result borrows from (`returns borrow CStr from domain D`).
+type FacadeCallEffect {
+    sig: i32,
+    fn_sym: i32,             // the C function (its facade fn item is `contract`)
+    contract: i32,           // foreign_contracts index, or -1
+    touch_params: i32,
+    touch_domains: Vec[i32], // facade_domain_list indices
+    borrow_domain: i32,      // facade_domain_list index, or -1
+    borrow_param: i32,       // a presented call's origin parameter (a C string it is lent), or -1
 }
 
 pub type Sema {
@@ -1086,6 +1116,29 @@ pub type Sema {
     foreign_contract_index: HashMap[i32, i32],  // fn sym -> foreign_contracts index
     foreign_contracts: Vec[ForeignContract],
     facade_domains: HashMap[i32, i32],          // domain sym -> kind sym
+    // Stage 7 (ruling §33-§38, spec §16.2b.7): the declared foreign-state
+    // domains with their origin symbols, and per signature — a rendered
+    // facade operation, or the raw C function itself — what a call
+    // invalidates and what its result borrows from a domain
+    // (SemaFacade.w facade_index_call_effects; SemaCheck.w
+    // record_call_view_origins applies them). A view a call invalidated
+    // records the call and the parameter or domain it came through, for
+    // the diagnostic at its next use.
+    facade_domain_list: Vec[FacadeDomain],
+    facade_domain_index: HashMap[i32, i32],     // domain sym -> facade_domain_list index
+    facade_domain_origin_index: HashMap[i32, i32], // origin sym -> facade_domain_list index
+    facade_call_effects: Vec[FacadeCallEffect],
+    facade_call_effect_index: HashMap[i32, i32],   // sig -> facade_call_effects index
+    facade_touch_nodes: HashMap[i32, i32],         // call node -> facade_call_effects index
+    facade_touch_hit_params: HashMap[i32, i32],    // poisoned view sym -> the parameter the origin came through (-1: a domain)
+    current_facade_sym: i32,                       // the `c facade` block being collected
+    // A text-view return on a function that is no resource's method is
+    // presented at the call: the C name stays the surface and the call's
+    // result is `Option[CStr]` in every module that imported it
+    // (SemaFacade.w verify_facade_text_return; SemaCheck.w check_call;
+    // MirLower.w lower_call).
+    facade_presented_syms: HashMap[i32, i32],      // fn sym -> 1
+    facade_presented_calls: HashMap[i32, i32],     // call node -> 1
     // §30 (spec §16.2b.6): ephemeral-storage errors whose ephemerality a
     // facade resource supplies, held until the facade facts exist
     // (SemaFacade.w report_facade_layout_errors).
@@ -2437,6 +2490,16 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         foreign_contract_index: sema_new_map_i32_i32(),
         foreign_contracts: Vec.new(),
         facade_domains: sema_new_map_i32_i32(),
+        facade_domain_list: Vec.new(),
+        facade_domain_index: sema_new_map_i32_i32(),
+        facade_domain_origin_index: sema_new_map_i32_i32(),
+        facade_call_effects: Vec.new(),
+        facade_call_effect_index: sema_new_map_i32_i32(),
+        facade_touch_nodes: sema_new_map_i32_i32(),
+        facade_touch_hit_params: sema_new_map_i32_i32(),
+        current_facade_sym: 0,
+        facade_presented_syms: sema_new_map_i32_i32(),
+        facade_presented_calls: sema_new_map_i32_i32(),
         facade_layout_nodes: Vec.new(),
         facade_layout_tids: Vec.new(),
         facade_layout_containers: Vec.new(),
@@ -6253,6 +6316,41 @@ impl Sema:
         diag = self.with_facade_dependency_notes(move diag, self.scope_lookup(view_sym))
         self.diags.emit(move diag)
 
+    // D51 stage 7 (ruling §38, spec §16.2b.7): a view a foreign call
+    // invalidated — a resource it received without `preserves param N`, or a
+    // domain of its library it did not `preserves` — is used afterwards.
+    // The diagnostic names the call, what the view borrowed from, and the
+    // clause that would state preservation (§57).
+    mut fn emit_facade_invalidated_view_error(view_sym: i32, origin_sym: i32, call_node: i32, binding_node: i32, use_node: i32):
+        let view_name = self.pool_resolve(view_sym)
+        let fx: i32 = self.facade_touch_nodes.get(call_node).unwrap()
+        let fname: str = self.pool_resolve(self.facade_call_effects[fx].fn_sym)
+        let ci = self.facade_call_effects[fx].contract
+        let pi: i32 = if self.facade_touch_hit_params.contains(view_sym): self.facade_touch_hit_params.get(view_sym).unwrap() else: -1
+        let is_domain = self.facade_domain_origin_index.contains(origin_sym)
+        var origin_text = "`" ++ self.pool_resolve(origin_sym) ++ "`"
+        var clause = f"preserves param {pi}"
+        if is_domain:
+            let di: i32 = self.facade_domain_origin_index.get(origin_sym).unwrap()
+            let dn: str = self.pool_resolve(self.facade_domain_list[di].name)
+            origin_text = "foreign-state domain `" ++ dn ++ "`"
+            clause = "preserves domain " ++ dn
+        let primary_start = if use_node != 0: self.ast.get_start(use_node) else: 0
+        let primary_end = if use_node != 0: self.ast.get_end(use_node) else: 0
+        var diag = Diagnostic.err("view `" ++ view_name ++ "` borrows from " ++ origin_text ++ ", which `" ++ fname ++ "` may have invalidated (§16.2b.7)", Span { file: self.local_file_id, start: primary_start, end: primary_end })
+        if binding_node != 0:
+            diag.add_label(Span { file: self.local_file_id, start: self.ast.get_start(binding_node), end: self.ast.get_end(binding_node) }, "view borrowed here")
+        if call_node != 0:
+            diag.add_label(Span { file: self.local_file_id, start: self.ast.get_start(call_node), end: self.ast.get_end(call_node) }, "`" ++ fname ++ "` is called here; its effect on " ++ origin_text ++ " is unknown, and unknown effect means invalidate")
+        if use_node != 0:
+            diag.add_label(Span { file: self.local_file_id, start: self.ast.get_start(use_node), end: self.ast.get_end(use_node) }, "used here after the call")
+        if ci >= 0:
+            let facade: str = self.pool_resolve(self.foreign_contracts[ci].facade)
+            diag.add_help("state `" ++ clause ++ "` on fn " ++ fname ++ " in facade " ++ facade ++ " if it leaves that storage valid, or copy `" ++ view_name ++ "` out (`to_owned()`) before the call")
+        else:
+            diag.add_help("describe " ++ fname ++ " with an fn item in a facade and state `" ++ clause ++ "` if it leaves that storage valid, or copy `" ++ view_name ++ "` out (`to_owned()`) before the call")
+        self.diags.emit(move diag)
+
     mut fn emit_returned_view_origin_use_error(view_sym: i32, use_node: i32):
         let origin_sym = self.binding_poisoned_origin_sym(view_sym)
         if origin_sym == 0:
@@ -6263,6 +6361,9 @@ impl Sema:
         let binding_node = self.binding_poisoned_binding_node(view_sym)
         let primary_start = if use_node != 0: self.ast.get_start(use_node) else: 0
         let primary_end = if use_node != 0: self.ast.get_end(use_node) else: 0
+        if self.facade_touch_nodes.contains(origin_node):
+            self.emit_facade_invalidated_view_error(view_sym, origin_sym, origin_node, binding_node, use_node)
+            return
         var diag = Diagnostic.err("view `" ++ view_name ++ "` may originate from `" ++ origin_name ++ "`, which no longer lives here (§21.1 Rule 6)", Span { file: self.local_file_id, start: primary_start, end: primary_end })
         if binding_node != 0:
             diag.add_label(Span { file: self.local_file_id, start: self.ast.get_start(binding_node), end: self.ast.get_end(binding_node) }, "view origin was recorded here")

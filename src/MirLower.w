@@ -2329,6 +2329,14 @@ impl MirBuilder:
                             return asm_rt as i32
             return self.sema.ty_void as i32
         if kind == NodeKind.NK_CALL:
+            // A presented text-view call (spec §16.2b.8) is the Option[CStr]
+            // Sema typed it, not the callee's pointer (lower_call).
+            if self.sema.facade_presented_calls.contains(node):
+                let opt_sym = self.sema.pool_lookup_symbol("Option")
+                let found = if opt_sym != 0: self.sema.find_generic_inst(opt_sym, self.sema.ty_cstr as i32) else: 0
+                if found == 0:
+                    sema_phase_bug(f"BUG: presented text-view call has no Option[CStr] type: node={node}")
+                return found
             return self.call_return_type(self.ast.get_data0(node))
         if kind == NodeKind.NK_ASSIGN:
             let target_ty = self.expr_type(self.ast.get_data0(node))
@@ -10427,6 +10435,14 @@ impl MirBuilder:
         let args_id = self.body.new_call_args(args)
         self.body.set_call_ast_node(args_id, node)
         self.record_call_contract(args_id, node, sig_idx)
+        // D51 stage 7 (spec §16.2b.8): a presented text-view call is typed
+        // `Option[CStr]` by Sema (check_call) while the C function returns
+        // its pointer: the call itself keeps the callee's type, and the
+        // pointer becomes the view through the prelude's
+        // `cstr_option_from_ptr` (NULL is None) — one place, no placeholder.
+        let presented = self.sema.facade_presented_calls.contains(node)
+        if presented and sig_idx >= 0:
+            actual_ret_type_id = self.sema.sig_return_type(sig_idx)
         // #933: a call whose result has no type is a Sema hole, not a unit
         // value — lowering it as unit once aggregated a void payload into an
         // Option and trapped LLVM. Fail here, naming the call.
@@ -10440,8 +10456,29 @@ impl MirBuilder:
         self.switch_to(next_bb)
         self.register_stmt_temp(result_local, actual_ret_type_id)
 
+        if presented:
+            return self.lower_presented_text_view(result_place, node)
         if self.sema.is_copy_frozen(actual_ret_type_id) != 0:
             return self.body.new_operand(OperandKind.OK_COPY, result_place)
+        self.body.new_operand(OperandKind.OK_MOVE, result_place)
+
+    // The `Option[CStr]` of a presented call's pointer result (above).
+    mut fn lower_presented_text_view(ptr_place: i32, node: i32) -> i32:
+        let conv_sym = self.sema.pool_lookup_symbol("cstr_option_from_ptr")
+        let conv_sig = if conv_sym != 0: self.sema.get_sig(conv_sym) else: -1
+        if conv_sig < 0:
+            sema_phase_bug(f"BUG: presented text-view call has no cstr_option_from_ptr to lower through: node={node}")
+        let fn_op = self.lower_var(conv_sym, 0, 0)
+        let args: Vec[i32] = Vec.new()
+        args.push(self.body.new_operand(OperandKind.OK_COPY, ptr_place))
+        let args_id = self.body.new_call_args(args)
+        let result_ty = self.sema.sig_return_type(conv_sig)
+        let result_local = self.new_temp(result_ty)
+        let result_place = self.place_for_local(result_local)
+        let next_bb = self.new_block()
+        self.terminate(TermKind.TK_CALL, fn_op, args_id, result_place, next_bb)
+        self.switch_to(next_bb)
+        self.register_stmt_temp(result_local, result_ty)
         self.body.new_operand(OperandKind.OK_MOVE, result_place)
 
     // Callable type redirect: like lower_call but uses a pre-resolved fn operand and symbol.

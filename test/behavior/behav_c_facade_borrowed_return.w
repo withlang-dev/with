@@ -9,7 +9,10 @@
 // shows one finalize and one close), cannot outlive the statement, and
 // carries the database's lend methods (`db_id`) and none of its destroyers.
 // Unknown nullability is nullable: the operation that may return NULL and
-// the one that never does both yield an Option.
+// the one that never does both yield an Option. `db_id` states `preserves
+// param 0` (stage 7, ruling §38): the borrowed database is read after a
+// lend on the database it views, and an undescribed lend's unknown effect
+// would invalidate it.
 
 use c_import("c_facade_children.h")
 
@@ -23,6 +26,7 @@ c facade dbf:
         drop st_finalize
     fn db_id
         lend
+        preserves param 0
     fn db_close_v2
         destroys
     fn st_db

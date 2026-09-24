@@ -649,7 +649,10 @@ impl Zcu:
         for i in 0..pool.get_data2(facade as NodeId):
             let item = pool.get_extra(extra_start + i)
             let kind = pool.kind(item as NodeId)
-            if kind != NodeKind.NK_FACADE_RESOURCE and kind != NodeKind.NK_FACADE_FN:
+            // A domain the program declares is its own (§16.2b.7: a facade
+            // may merge domains that name the same state); the toolchain
+            // facade leaves the name to it.
+            if kind != NodeKind.NK_FACADE_RESOURCE and kind != NodeKind.NK_FACADE_FN and kind != NodeKind.NK_FACADE_DOMAIN:
                 continue
             claimed.push(frontend_owned_text(self.pool.resolve(pool.get_data0(item as NodeId))))
             if kind == NodeKind.NK_FACADE_RESOURCE:

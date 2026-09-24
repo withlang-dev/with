@@ -29,6 +29,8 @@ impl Sema:
         self.verify_facade_resources()
         self.report_facade_layout_errors()
         self.verify_facade_borrowed_returns()
+        self.verify_facade_text_views()
+        self.facade_index_call_effects()
 
     // Stage 4a/4b: the facade-level checks that need every facade's facts (an
     // fn item may describe a destroyer from a block declared after the
@@ -456,6 +458,7 @@ impl Sema:
         let facade = self.ast.get_data0(node)
         let extra_start = self.ast.get_data1(node)
         let count = self.ast.get_data2(node)
+        self.current_facade_sym = facade
         for i in 0..count:
             let item = self.ast.get_extra(extra_start + i)
             let kind = self.ast.kind(item)
@@ -479,6 +482,14 @@ impl Sema:
             self.emit_error(f"domain '{dn}' is declared twice (§16.2b.7)", item)
             return
         self.facade_domains.insert(name, self.ast.get_data1(item))
+        // The domain's origin symbol: what a view borrowed from it depends
+        // on, the way a view of a binding depends on the binding's symbol
+        // (spelled so no binding can be named it).
+        let dn: str = self.pool_resolve(name)
+        let origin_sym = self.pool_intern("<domain " ++ dn ++ ">")
+        self.facade_domain_index.insert(name, self.facade_domain_list.len() as i32)
+        self.facade_domain_origin_index.insert(origin_sym, self.facade_domain_list.len() as i32)
+        self.facade_domain_list.push(FacadeDomain { name, kind: self.ast.get_data1(item), facade: self.current_facade_sym, node: item, origin_sym, files: Vec.new() })
 
     // ── resources ────────────────────────────────────────────────────────
 
@@ -645,7 +656,7 @@ impl Sema:
         if self.foreign_contract_index.contains(fn_sym):
             self.emit_error(f"fn '{fname}' is described twice in this facade (§16.2b)", item)
             return
-        var c = ForeignContract { fn_sym, decl, facade, node: item, lend: 0, destroys: 0, consumes: Vec.new(), consumes_destroyed_by: Vec.new(), retains: Vec.new(), retains_by: Vec.new(), returns_borrow_resource: 0, returns_borrow_from: -1, returns_static_tid: 0, preserves_params: Vec.new(), preserves_domains: Vec.new(), of_resource: 0, rename: 0, callback_thread_any: 0, callback_consumes: Vec.new() }
+        var c = ForeignContract { fn_sym, decl, facade, node: item, lend: 0, destroys: 0, consumes: Vec.new(), consumes_destroyed_by: Vec.new(), retains: Vec.new(), retains_by: Vec.new(), returns_borrow_resource: 0, returns_borrow_from: -1, returns_borrow_domain: 0, returns_static_tid: 0, preserves_params: Vec.new(), preserves_domains: Vec.new(), of_resource: 0, rename: 0, callback_thread_any: 0, callback_consumes: Vec.new() }
         let extra_start = self.ast.get_data1(item)
         let clause_count = self.ast.get_data2(item)
         for ci in 0..clause_count:
@@ -708,6 +719,39 @@ impl Sema:
             return c
         if kind == FACADE_CLAUSE_RETURNS_BORROW:
             let res = self.ast.get_extra(ops)
+            let domain = self.ast.get_extra(ops + 2)
+            // `returns borrow CStr from param N` / `from domain D` (ruling
+            // §32, §33, §41; spec §16.2b.8): the borrowed modeled text. Its
+            // origin is the resource or the C string the parameter receives,
+            // or a declared foreign-state domain; With invents none (§31).
+            if self.pool_resolve(res) == "CStr":
+                if not self.facade_type_is_c_string_ptr(self.sig_return_type(sig)):
+                    let rt: str = self.type_name(self.sig_return_type(sig))
+                    self.emit_error(f"fn '{fname}' returns {rt}, not a C string ('char *'); 'returns borrow CStr' describes a NUL-terminated foreign string (§16.2b.8)", clause)
+                    return c
+                if domain != 0:
+                    if not self.facade_domains.contains(domain):
+                        let dn: str = self.pool_resolve(domain)
+                        self.emit_error(f"fn '{fname}': unknown domain '{dn}'; declare it with 'domain {dn} process|thread|resource|static' (§16.2b.7)", clause)
+                        return c
+                    c.returns_borrow_domain = domain
+                else:
+                    let from = self.facade_resolve_param(self.ast.get_extra(ops + 1), fn_sym, sig)
+                    if from < 0:
+                        return c
+                    let origin = self.facade_param_receives(fn_sym, from)
+                    if origin.len() != 1 and self.ci_type_is_const_c_string_input(self.sig_param_type(sig, from)) == 0:
+                        let shown = self.facade_param_display(fn_sym, sig, from)
+                        let why = if origin.len() == 0: "receives no modeled resource and is not a C string" else: "receives a representation several resources wrap; the facade has not assigned it (§16.2b.3)"
+                        self.emit_error(f"fn '{fname}': 'returns borrow CStr from param {from}' names {shown}, which {why}; a borrowed CStr is a view of the resource or the C string its origin parameter receives, or of a domain ('from domain <name>') — With does not invent an origin (§16.2b.7)", clause)
+                        return c
+                    c.returns_borrow_from = from
+                c.returns_borrow_resource = res
+                return c
+            if domain != 0:
+                let rn: str = self.pool_resolve(res)
+                self.emit_error(f"fn '{fname}': 'returns borrow {rn} from domain' — a borrowed resource is a view of the resource a parameter receives ('from param <ref>'); a foreign-state domain is the origin of borrowed memory that no resource owns, a CStr (§16.2b.6, §16.2b.7)", clause)
+                return c
             if not self.facade_resource_index.contains(res):
                 let rn: str = self.pool_resolve(res)
                 self.emit_error(f"fn '{fname}': unknown resource '{rn}' (§16.2b.6)", clause)
@@ -728,6 +772,16 @@ impl Sema:
         if kind == FACADE_CLAUSE_RETURNS_STATIC:
             let tid = self.resolve_type_expr(self.ast.get_extra(ops)) as i32
             if tid == 0:
+                return c
+            // Ruling §40 states `returns static CStr`; static storage of
+            // another type is not ruled and stays as C declares it.
+            if self.resolve_alias(tid as TypeId) != self.ty_cstr:
+                let tn: str = self.type_name(tid)
+                self.emit_error(f"fn '{fname}': 'returns static {tn}' — only 'returns static CStr' is ruled (§16.2b.7); a static pointer of another type stays as C declares it", clause)
+                return c
+            if not self.facade_type_is_c_string_ptr(self.sig_return_type(sig)):
+                let rt: str = self.type_name(self.sig_return_type(sig))
+                self.emit_error(f"fn '{fname}' returns {rt}, not a C string ('char *'); 'returns static CStr' describes a NUL-terminated foreign string (§16.2b.8)", clause)
                 return c
             c.returns_static_tid = tid
             return c
@@ -1563,6 +1617,9 @@ impl Sema:
     mut fn verify_facade_borrowed_returns():
         for ci in 0..self.foreign_contracts.len() as i32:
             let res = self.foreign_contracts[ci].returns_borrow_resource
+            if self.foreign_contracts[ci].returns_static_tid != 0 or (res != 0 and self.pool_resolve(res) == "CStr"):
+                self.verify_facade_text_return(ci)
+                continue
             if res == 0:
                 continue
             self.update_decl_source_context(self.foreign_contracts[ci].decl)
@@ -1621,6 +1678,345 @@ impl Sema:
             self.set_sig_param_effect(msig, from, eff)
             self.set_sig_param_direct_effect(msig, from, eff)
             self.set_sig_param_view_origin(msig, from, self.sig_param_view_origin(msig, from) | sema_param_origin_bit(from))
+
+    // ── text views (ruling §32, §40-§42; spec §16.2b.8) ──────────────────
+    //
+    // `returns borrow CStr from param N`, `returns borrow CStr from domain
+    // D` and `returns static CStr`: the nullable foreign string is
+    // `Option[CStr]`, the `CStr` value being the borrowed modeled text — a
+    // view (Sema.w: `CStr` is ephemeral) of the resource, the C string
+    // parameter, the domain, or static storage the facade names as its
+    // origin. On an operation whose first parameter receives a resource the
+    // renderer makes it a lend method of that resource (FacadeRender.w
+    // facade_render_lend_methods), on `R` and on `Borrowed<R>`; this is the
+    // net that both exist with that result, and the declared summary that
+    // keeps the view inside its origin: escape_view from the origin
+    // parameter — the receiver, or the `&str` it is lent (no summary is
+    // inferable from a value built out of a raw pointer). Static storage
+    // needs none.
+    mut fn verify_facade_text_return(ci: i32):
+        self.update_decl_source_context(self.foreign_contracts[ci].decl)
+        let fn_sym = self.foreign_contracts[ci].fn_sym
+        let node = self.foreign_contracts[ci].node
+        let fname: str = self.pool_resolve(fn_sym)
+        let sig = self.get_sig(fn_sym)
+        if sig < 0:
+            return
+        let from = self.foreign_contracts[ci].returns_borrow_from
+        let domain = self.foreign_contracts[ci].returns_borrow_domain
+        let what = if self.foreign_contracts[ci].returns_static_tid != 0: "returns static CStr" else: "returns borrow CStr"
+        let recv0 = self.facade_param_receives(fn_sym, 0)
+        let hosted = recv0.len() == 1 and self.foreign_contracts[ci].destroys == 0 and self.foreign_contracts[ci].consumes.len() == 0 and self.foreign_contracts[ci].retains.len() == 0
+        if self.diags.has_errors():
+            return
+        if not hosted:
+            // No resource to be a method of: the C name itself is the
+            // surface, as for every lend. The call is presented — its result
+            // is `Option[CStr]` at each call site in a module that imported
+            // it (SemaCheck.w check_call; MirLower.w lower_call turns the
+            // pointer into the view) — and its declaration stays what C
+            // declared, so a module with its own `strchr` extern (std.re)
+            // is untouched; the origin goes on the call through the effect
+            // record (facade_index_call_effects: the C string parameter or
+            // the domain; static needs none).
+            if self.foreign_contracts[ci].rename != 0:
+                self.emit_error(f"fn '{fname}': '{what}' is presented under the C name at its call sites; 'rename' would need a second declaration, which a presented call does not get (§16.2b.8)", node)
+                return
+            self.facade_presented_syms.insert(fn_sym, 1)
+            return
+        let host: str = self.pool_resolve(self.facade_resources[recv0[0]].name)
+        let msym = if self.foreign_contracts[ci].rename != 0: self.foreign_contracts[ci].rename else: fn_sym
+        let mname: str = self.pool_resolve(msym)
+        let hosts: Vec[str] = Vec.new()
+        hosts.push(host.clone())
+        hosts.push(facade_render_borrowed_name(host))
+        for hi in 0..hosts.len() as i32:
+            let mtext = hosts[hi] ++ "." ++ mname
+            let msig: i32 = if self.sig_text_index.contains(mtext): self.sig_text_index.get(mtext).unwrap() else: -1
+            if msig < 0:
+                if hi == 0:
+                    self.emit_error(f"fn '{fname}': '{what}' passed every facade check but no method '{mtext}' was rendered — a compiler defect (§16.2b.8)", node)
+                continue
+            if not self.facade_sig_returns_option_cstr(msig):
+                let rt: str = self.type_name(self.sig_return_type(msig))
+                self.emit_error(f"fn '{fname}': '{what}' was rendered as '{mtext}' returning {rt}, not Option[CStr] — a compiler defect (§16.2b.8)", node)
+                continue
+            if from >= 0:
+                self.facade_declare_view_of_param(msig, from)
+            // A domain origin (`from domain D`) is put on the method by
+            // facade_index_call_effects.
+            let _ = domain
+
+    // ── call effects (ruling §33-§38; spec §16.2b.7) ─────────────────────
+    //
+    // "For every origin touched by a foreign operation, the relevant view
+    // effect is invalidate / preserve. The conservative default is: unknown
+    // effect means invalidate." So a call to a facade operation — the
+    // rendered method, constructor, or the raw C function — invalidates
+    // every view borrowed from each resource it receives, unless its fn
+    // item states `preserves param N`, and every view borrowed from each
+    // foreign-state domain of its library, unless it states `preserves
+    // domain D`. The library of a domain is coarse (§34): the `<c_import …>`
+    // translations of the functions its facade describes. A result stated
+    // `returns borrow CStr from domain D` depends on D's origin symbol.
+    // Indexed per signature here; SemaCheck.w record_call_view_origins
+    // applies it at each call.
+    mut fn facade_index_call_effects():
+        if self.diags.has_errors():
+            return
+        // The files each facade describes: its fn items and resource operations.
+        for ci in 0..self.foreign_contracts.len() as i32:
+            self.facade_domain_note_file(self.foreign_contracts[ci].facade, self.facade_fn_file(self.foreign_contracts[ci].fn_sym))
+        for ri in 0..self.facade_resources.len() as i32:
+            let facade = self.facade_resources[ri].facade
+            for pi in 0..self.facade_resources[ri].producers.len() as i32:
+                self.facade_domain_note_file(facade, self.facade_fn_file(self.facade_resources[ri].producers[pi]))
+            let ops: Vec[i32] = Vec.new()
+            ops.push(self.facade_resources[ri].init)
+            ops.push(self.facade_resources[ri].preinit)
+            ops.push(self.facade_resources[ri].drop)
+            for oi in 0..ops.len() as i32:
+                if ops[oi] != 0:
+                    self.facade_domain_note_file(facade, self.facade_fn_file(ops[oi]))
+            for di in 0..self.facade_resources[ri].destroyers.len() as i32:
+                self.facade_domain_note_file(facade, self.facade_fn_file(self.facade_resources[ri].destroyers[di]))
+        // Every c_import function: the raw call, and the fn item's rendered
+        // method when it has one.
+        for di in 0..self.ast.decl_count():
+            if di >= self.decl_is_c_import.len() as i32 or self.decl_is_c_import[di] == 0:
+                continue
+            let decl = self.ast.get_decl(di)
+            let kind = self.ast.kind(decl)
+            if kind != NodeKind.NK_EXTERN_FN and kind != NodeKind.NK_FN_DECL:
+                continue
+            let fn_sym = self.ast.get_data0(decl)
+            let sig = self.get_sig(fn_sym)
+            if sig < 0:
+                continue
+            let ci = self.facade_contract_for(fn_sym)
+            let file = self.decl_source_file_id_for_index(di)
+            let domains = self.facade_domains_touched(file, ci)
+            let borrow = if ci >= 0 and self.foreign_contracts[ci].returns_borrow_domain != 0: self.facade_domain_index.get(self.foreign_contracts[ci].returns_borrow_domain).unwrap() else: -1
+            // A presented call (facade_presented_syms) borrows from the C
+            // string parameter its item names, a by-value pointer the
+            // ordinary origin rule skips.
+            let borrow_param = if ci >= 0 and self.facade_presented_syms.contains(fn_sym): self.foreign_contracts[ci].returns_borrow_from else: -1
+            if domains.len() == 0 and borrow < 0 and borrow_param < 0 and self.facade_touch_params_mask(fn_sym, ci, 0) == 0:
+                continue
+            self.facade_add_call_effect(sig, fn_sym, ci, self.facade_touch_params_mask(fn_sym, ci, 0), &domains, borrow, borrow_param)
+            if ci < 0:
+                continue
+            // The rendered lend method of the resource param 0 receives: the
+            // parameter indices are the C ones (self is 0).
+            let recv0 = self.facade_param_receives(fn_sym, 0)
+            if recv0.len() != 1:
+                continue
+            let msym = if self.foreign_contracts[ci].rename != 0: self.foreign_contracts[ci].rename else: fn_sym
+            let mname: str = self.pool_resolve(msym)
+            let host: str = self.pool_resolve(self.facade_resources[recv0[0]].name)
+            let hosts: Vec[str] = Vec.new()
+            hosts.push(host ++ "." ++ mname)
+            hosts.push(facade_render_borrowed_name(host) ++ "." ++ mname)
+            for hi in 0..hosts.len() as i32:
+                let htext = hosts[hi].clone()
+                if self.sig_text_index.contains(htext):
+                    self.facade_add_call_effect(self.sig_text_index.get(htext).unwrap(), fn_sym, ci, self.facade_touch_params_mask(fn_sym, ci, 0), &domains, borrow, -1)
+        // Constructors: a producer receiving other resources touches them
+        // (their views), with the out slot removed from the indices as
+        // apply_facade_dependency_effects removes it.
+        for ri in 0..self.facade_resources.len() as i32:
+            let rname: str = self.pool_resolve(self.facade_resources[ri].name)
+            let owners = self.facade_owners(ri)
+            for oi in 0..owners.len() as i32:
+                let owner = owners[oi]
+                let f = self.facade_owner_fn(ri, owner)
+                if f == 0:
+                    continue
+                let pn: str = self.pool_resolve(f)
+                let sig = self.facade_constructor_sig(rname ++ "." ++ pn)
+                if sig < 0:
+                    continue
+                let ci = self.facade_contract_for(f)
+                let domains = self.facade_domains_touched(self.facade_fn_file(f), ci)
+                var shift = 0
+                if owner == FACADE_DEP_INIT and self.facade_resources[ri].preinit != 0:
+                    shift = self.sig_get_param_count(self.get_sig(self.facade_resources[ri].preinit))
+                let slot = self.facade_owner_skip(ri, owner)
+                let raw_mask = self.facade_touch_params_mask(f, ci, if owner == FACADE_DEP_INIT: 1 else: 0)
+                var mask = 0
+                for c_pi in 0..self.sig_get_param_count(self.get_sig(f)):
+                    if (raw_mask & sema_param_origin_bit(c_pi)) == 0 or c_pi == slot:
+                        continue
+                    var pi = c_pi
+                    if owner == FACADE_DEP_INIT:
+                        pi = shift + c_pi - 1
+                    else if slot >= 0 and c_pi > slot:
+                        pi = c_pi - 1
+                    mask = mask | sema_param_origin_bit(pi)
+                if mask != 0 or domains.len() > 0:
+                    self.facade_add_call_effect(sig, f, ci, mask, &domains, -1, -1)
+
+    mut fn facade_add_call_effect(sig: i32, fn_sym: i32, ci: i32, mask: i32, domains: &Vec[i32], borrow: i32, borrow_param: i32):
+        if self.facade_call_effect_index.contains(sig):
+            return
+        let touched: Vec[i32] = Vec.new()
+        for i in 0..domains.len() as i32:
+            touched.push(domains[i])
+        self.facade_call_effect_index.insert(sig, self.facade_call_effects.len() as i32)
+        self.facade_call_effects.push(FacadeCallEffect { sig, fn_sym, contract: ci, touch_params: mask, touch_domains: touched, borrow_domain: borrow, borrow_param })
+
+    // The parameters of `fn_sym` (from `first`) that receive one modeled
+    // resource and are not preserved by its fn item, as origin bits.
+    fn facade_touch_params_mask(fn_sym: i32, ci: i32, first: i32) -> i32:
+        let sig = self.get_sig(fn_sym)
+        if sig < 0:
+            return 0
+        var mask = 0
+        for pi in first..self.sig_get_param_count(sig):
+            if self.facade_param_receives(fn_sym, pi).len() != 1:
+                continue
+            var preserved = false
+            if ci >= 0:
+                for k in 0..self.foreign_contracts[ci].preserves_params.len() as i32:
+                    if self.foreign_contracts[ci].preserves_params[k] == pi: preserved = true
+            if not preserved:
+                mask = mask | sema_param_origin_bit(pi)
+        mask
+
+    // The domains a function declared in `file` touches: those of its
+    // library, less the ones its fn item preserves.
+    fn facade_domains_touched(file: i32, ci: i32) -> Vec[i32]:
+        let out: Vec[i32] = Vec.new()
+        for di in 0..self.facade_domain_list.len() as i32:
+            var in_library = false
+            for fi in 0..self.facade_domain_list[di].files.len() as i32:
+                if self.facade_domain_list[di].files[fi] == file: in_library = true
+            if not in_library:
+                continue
+            var preserved = false
+            if ci >= 0:
+                for k in 0..self.foreign_contracts[ci].preserves_domains.len() as i32:
+                    if self.foreign_contracts[ci].preserves_domains[k] == self.facade_domain_list[di].name: preserved = true
+            if not preserved:
+                out.push(di)
+        out
+
+    mut fn facade_domain_note_file(facade: i32, file: i32):
+        if file == 0:
+            return
+        for di in 0..self.facade_domain_list.len() as i32:
+            if self.facade_domain_list[di].facade != facade:
+                continue
+            var seen = false
+            for fi in 0..self.facade_domain_list[di].files.len() as i32:
+                if self.facade_domain_list[di].files[fi] == file: seen = true
+            if not seen:
+                self.facade_domain_list[di].files.push(file)
+
+    // The source file of the function's c_import declaration — the
+    // `<c_import …>` translation that is its library (§34). A facade
+    // describes imported declarations (§16.2b.13), so an import wins over a
+    // same-named With extern elsewhere (std.libc's `strerror`), whose file
+    // would put the domain in the wrong library.
+    fn facade_fn_file(fn_sym: i32) -> i32:
+        let want: str = self.safe_symbol_text(fn_sym)
+        for di in 0..self.ast.decl_count():
+            if di >= self.decl_is_c_import.len() as i32 or self.decl_is_c_import[di] == 0:
+                continue
+            let decl = self.ast.get_decl(di)
+            let kind = self.ast.kind(decl)
+            if (kind == NodeKind.NK_EXTERN_FN or kind == NodeKind.NK_FN_DECL) and self.safe_symbol_text(self.ast.get_data0(decl)) == want:
+                return self.decl_source_file_id_for_index(di)
+        let node = self.facade_fn_decl_node(fn_sym)
+        if node == 0 or not self.decl_index_by_node.contains(node):
+            return 0
+        self.decl_source_file_id_for_index(self.decl_index_by_node.get(node).unwrap())
+
+    // Whether a call to `fn_sym` from the module being checked is a
+    // presented text-view call (spec §16.2b.8): the fn item presents it,
+    // the symbol is the c_import's, and this module imported it — a module
+    // with its own same-named extern (std.re's `strchr`) is not presented.
+    fn facade_call_is_presented(fn_sym: i32) -> bool:
+        self.facade_presented_syms.contains(fn_sym) and self.ci_syms.contains(fn_sym) and self.current_module_uses_c_import()
+
+    fn facade_call_effect_for(sig: i32) -> i32:
+        if self.facade_call_effect_index.contains(sig): self.facade_call_effect_index.get(sig).unwrap() else: -1
+
+    // Whether a type holds a modeled resource — the resource itself, a
+    // reference to one, a dependent child, an Option of either. Such a
+    // binding is a resource, not a view of one's memory, and a foreign
+    // operation's unknown effect does not invalidate it (§27 dependency is
+    // lifetime; §38 invalidation is of views).
+    fn facade_type_holds_resource(tid: i32, depth: i32) -> bool:
+        if tid <= 0 or depth > 6 or self.facade_resources.len() == 0:
+            return false
+        let r = self.resolve_alias(tid as TypeId)
+        let kind = self.get_type_kind(r)
+        let name = self.get_type_name(r)
+        if name != 0 and kind != TypeKind.TY_REF and kind != TypeKind.TY_PTR:
+            if self.facade_resource_index.contains(name):
+                return true
+        if kind == TypeKind.TY_GENERIC_INST:
+            for ai in 0..self.get_generic_inst_arg_count(r as i32):
+                if self.facade_type_holds_resource(self.get_generic_inst_arg(r as i32, ai), depth + 1):
+                    return true
+        else if kind == TypeKind.TY_TUPLE:
+            let te_start = self.get_type_d0(r)
+            for ei in 0..self.get_type_d1(r):
+                if self.facade_type_holds_resource(self.type_extra[(te_start + ei)], depth + 1):
+                    return true
+        else if kind == TypeKind.TY_REF or kind == TypeKind.TY_ARRAY or kind == TypeKind.TY_PTR:
+            return self.facade_type_holds_resource(self.get_type_d0(r), depth + 1)
+        false
+
+    // The declared summary: the result of signature `sig` is a view of
+    // parameter `pi` (its receiver when 0), as the constructors and
+    // `Borrowed<R>` methods state theirs (apply_facade_dependency_effects).
+    mut fn facade_declare_view_of_param(sig: i32, pi: i32):
+        let eff = self.sig_param_effect(sig, pi) | EFF_ESCAPE_VIEW
+        self.set_sig_param_effect(sig, pi, eff)
+        self.set_sig_param_direct_effect(sig, pi, eff)
+        self.set_sig_param_view_origin(sig, pi, self.sig_param_view_origin(sig, pi) | sema_param_origin_bit(pi))
+
+    // Owned foreign text (ruling §42): every rendered pointer resource over
+    // a C string carries `as_cstr() -> CStr` (FacadeRender.w
+    // facade_render_text_view), a view kept inside the resource's life by
+    // this summary; the same on its `Borrowed<R>`.
+    mut fn verify_facade_text_views():
+        if self.diags.has_errors():
+            return
+        for ri in 0..self.facade_resources.len() as i32:
+            if not self.facade_type_is_c_string_ptr(self.facade_resources[ri].repr_tid) or not self.facade_resource_rendered(ri):
+                continue
+            self.update_decl_source_context(self.facade_resources[ri].decl)
+            let rname: str = self.pool_resolve(self.facade_resources[ri].name)
+            let hosts: Vec[str] = Vec.new()
+            hosts.push(rname.clone())
+            hosts.push(facade_render_borrowed_name(rname))
+            for hi in 0..hosts.len() as i32:
+                let mtext = hosts[hi] ++ "." ++ facade_render_text_view_name()
+                let msig: i32 = if self.sig_text_index.contains(mtext): self.sig_text_index.get(mtext).unwrap() else: -1
+                if msig < 0:
+                    if hi == 0:
+                        self.emit_error(f"resource '{rname}' wraps a C string but no '{mtext}' view was rendered — a compiler defect (§16.2b.8)", self.facade_resources[ri].node)
+                    continue
+                self.facade_declare_view_of_param(msig, 0)
+
+    // A NUL-terminated C string's pointer as c_import spells it: `char *`
+    // and `const char *` alike (`*mut i8`, `*const i8`, aliases chased).
+    fn facade_type_is_c_string_ptr(tid: i32) -> bool:
+        if tid == 0:
+            return false
+        let r = self.resolve_alias(tid as TypeId)
+        if self.get_type_kind(r) != TypeKind.TY_PTR:
+            return false
+        self.resolve_alias(self.get_type_d0(r) as TypeId) == self.ty_i8
+
+    fn facade_sig_returns_option_cstr(sig: i32) -> bool:
+        let r = self.resolve_alias(self.sig_return_type(sig) as TypeId)
+        if self.get_type_kind(r) != TypeKind.TY_GENERIC_INST or self.get_generic_inst_arg_count(r as i32) != 1:
+            return false
+        self.pool_resolve(self.get_type_d0(r)) == "Option" and self.resolve_alias(self.get_generic_inst_arg(r as i32, 0) as TypeId) == self.ty_cstr
 
     fn facade_ephemeral_struct_declared(sym: i32) -> bool:
         for di in 0..self.ast.decl_count():

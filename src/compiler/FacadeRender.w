@@ -95,8 +95,33 @@ pub fn facade_render_block(pool: AstPool, intern: InternPool, facade: i32, ci: &
     for i in 0..count:
         let item = pool.get_extra(extra_start + i)
         if pool.kind(item as NodeId) == NodeKind.NK_FACADE_RESOURCE:
-            out = out ++ facade_render_resource(pool, intern, ci, item, facade_render_lend_methods(pool, intern, ci, item, true), facade_render_lend_methods(pool, intern, ci, item, false))
+            let text_view = facade_render_text_view(pool, intern, item)
+            out = out ++ facade_render_resource(pool, intern, ci, item, facade_render_lend_methods(pool, intern, ci, item, true) ++ text_view, facade_render_lend_methods(pool, intern, ci, item, false) ++ text_view)
     out
+
+// Owned foreign text (ruling §42, spec §16.2b.8: "Caller-owned returned
+// memory is a resource … It exposes a borrowed `CStr` view"): a pointer
+// resource whose representation is a C string — `*mut c_char`, `*const
+// c_char`, strdup's `*mut i8` — carries
+//
+//     fn as_cstr() -> CStr: unsafe { CStr.from_ptr(self.repr as *const i8) }
+//
+// a view of the bytes the resource owns, ephemeral like every `CStr`, and
+// kept inside the resource's life by the declared summary Sema puts on it
+// (SemaFacade.w verify_facade_text_views). The foreign allocator pairing is
+// untouched: the view copies nothing, and `to_owned` is the explicit copy.
+fn facade_render_text_view(pool: AstPool, intern: InternPool, resource: i32) -> str:
+    let repr = facade_render_unalias(pool, intern, render_type_expr(pool, intern, pool.get_extra(pool.get_data1(resource as NodeId)) as NodeId))
+    if not facade_render_is_c_string_ptr(repr):
+        return ""
+    "    fn as_cstr() -> CStr: unsafe { CStr.from_ptr(self.repr as *const i8) }\n"
+
+// A NUL-terminated C string's pointer type as c_import spells it, aliases
+// chased: `char *` is `*mut i8`, `const char *` is `*const i8`.
+pub fn facade_render_is_c_string_ptr(text: &str) -> bool:
+    text == "*mut i8" or text == "*const i8" or text == "*mut c_char" or text == "*const c_char"
+
+pub fn facade_render_text_view_name() -> str: "as_cstr"
 
 // A lend operation on a pointer resource, rendered as a `&self` method of the
 // resource (§16.2b.5: "once a resource is modeled, its facade-exposed
@@ -128,6 +153,7 @@ fn facade_render_lend_methods(pool: AstPool, intern: InternPool, ci: &Vec[i32], 
         var lends = true
         var borrow_res = 0
         var borrow_from = 0
+        var text_view = false
         let cstart = pool.get_data1(item as NodeId)
         for k in 0..pool.get_data2(item as NodeId):
             let clause = pool.get_extra(cstart + k)
@@ -138,6 +164,14 @@ fn facade_render_lend_methods(pool: AstPool, intern: InternPool, ci: &Vec[i32], 
             else if kind == FACADE_CLAUSE_RETURNS_BORROW:
                 borrow_res = pool.get_extra(ops)
                 borrow_from = pool.get_extra(ops + 1)
+                if intern.resolve(borrow_res) == "CStr":
+                    text_view = true
+                    borrow_res = 0
+            else if kind == FACADE_CLAUSE_RETURNS_STATIC:
+                // `returns static CStr` (ruling §40): a text view of static
+                // storage, no origin to keep it inside.
+                if render_type_expr(pool, intern, pool.get_extra(ops) as NodeId) == "CStr": text_view = true
+                else: lends = false
             else if kind != FACADE_CLAUSE_LEND and kind != FACADE_CLAUSE_PRESERVES: lends = false
         if not lends:
             continue
@@ -160,6 +194,19 @@ fn facade_render_lend_methods(pool: AstPool, intern: InternPool, ci: &Vec[i32], 
             mname = intern.resolve(rename)
         let (params, args) = facade_render_params(pool, intern, decl, 1)
         let call_args = if args.len() > 0: "self.repr, " ++ args else: "self.repr"
+        if text_view:
+            // `returns borrow CStr from …` / `returns static CStr` (ruling
+            // §32, §40, §41; spec §16.2b.8): the nullable foreign string is
+            // `Option[CStr]` — the `CStr` value is the borrowed modeled text,
+            // a view (Sema.w: `CStr` is ephemeral) — over the same bytes, no
+            // copy; NULL is `None` (unknown nullability is nullable, §43).
+            // What keeps it inside its origin — the resource `self`, a C
+            // string parameter, a domain, or nothing for static — is the
+            // declared summary Sema puts on this method
+            // (SemaFacade.w verify_facade_borrowed_returns).
+            let handle = facade_render_fresh("repr", facade_render_param_names(pool, intern, decl))
+            out = out ++ "    fn " ++ mname ++ "(" ++ params ++ ") -> Option[CStr]:\n        let " ++ handle ++ " = " ++ facade_render_call(pool, intern, decl, call_args) ++ "\n        if " ++ handle ++ " == null: None else: Some(unsafe { CStr.from_ptr(" ++ handle ++ " as *const i8) })\n"
+            continue
         if borrow_res != 0:
             if not with_borrowed_returns:
                 continue
@@ -924,7 +971,12 @@ fn facade_render_params_but(pool: AstPool, intern: InternPool, decl: i32, skip: 
             continue
         let pname = facade_render_param_name(pool, intern, start, pi)
         let ptype = render_type_expr(pool, intern, pool.fn_param_type(start, pi) as NodeId)
-        var shown = if ptype == "*const i8" or ptype == "*const c_char": "str" else: ptype.clone()
+        // A `const char *` input is lent (§16.3c, D47), so the rendering
+        // observes it as `&str` (§3.8: a function that observes takes `&T`);
+        // a plain `str` would consume the caller's string. A text view
+        // borrowed from it (`returns borrow CStr from param N`) depends on
+        // the caller's string through that borrow.
+        var shown = if ptype == "*const i8" or ptype == "*const c_char": "&str" else: ptype.clone()
         var arg = pname.clone()
         let res = facade_render_received(pool, intern, ptype)
         if res > 0:

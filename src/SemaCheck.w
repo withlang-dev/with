@@ -11344,8 +11344,88 @@ impl Sema:
                     // outlive it (§21.1 Rule 6, §5.5).
                     if concrete_deps.len() as i32 == dep_len_before or self.expr_type_is_value(origin_arg):
                         concrete_deps = self.push_unique_i32(move concrete_deps, self.place_root_sym(origin_arg))
+        // A facade operation (D51 stage 7, ruling §33-§38): its result may
+        // borrow from a foreign-state domain, and the call invalidates the
+        // views borrowed from the resources and domains it touches.
+        let fx = self.facade_call_effect_for(sig_idx)
+        if fx >= 0 and self.facade_call_effects[fx].borrow_domain >= 0:
+            concrete_deps = self.push_unique_i32(move concrete_deps, self.facade_domain_list[self.facade_call_effects[fx].borrow_domain].origin_sym)
+        // A presented call's text is borrowed from the C string it is lent
+        // (`returns borrow CStr from param N` on `strchr`): the argument's
+        // own storage when it is a value, its origins through a reference.
+        if fx >= 0 and self.facade_call_effects[fx].borrow_param >= 0 and self.facade_presented_calls.contains(call_node):
+            let bp = self.facade_call_effects[fx].borrow_param
+            let arg_index = if param_offset == 1: bp - 1 else: bp
+            var origin_arg = 0
+            if param_offset == 1 and bp == 0:
+                origin_arg = recv_node
+            else if arg_index >= 0 and arg_index < arg_count:
+                origin_arg = if has_resolved != 0: self.get_resolved_call_arg(call_node, arg_index) else: self.ast.get_extra(extra_start + arg_index)
+            if origin_arg > 0:
+                union_mask = union_mask | self.compute_expr_view_origin_mask(origin_arg)
+                let dep_len_before = concrete_deps.len() as i32
+                concrete_deps = self.collect_expr_view_deps(origin_arg, move concrete_deps)
+                if concrete_deps.len() as i32 == dep_len_before or self.expr_type_is_value(origin_arg):
+                    concrete_deps = self.push_unique_i32(move concrete_deps, self.place_root_sym(origin_arg))
         if union_mask != 0 or concrete_deps.len() > 0:
             self.set_expr_view_deps(call_node, union_mask, concrete_deps)
+        if fx >= 0:
+            self.facade_apply_call_touches(fx, call_node, sig_idx, param_offset, recv_node, extra_start, arg_count, has_resolved)
+
+    // Ruling §38: "Unknown effect means invalidate." Every live view borrowed
+    // from a resource this call receives without `preserves param N`, or
+    // from a domain of its library it does not `preserves`, is poisoned by
+    // the call: its next use is an error naming the call and the clause
+    // (emit_facade_invalidated_view_error). A binding that holds a resource
+    // — a dependent child, a reference to the resource — is not a view of
+    // its memory and is left alone (§27 is lifetime, not invalidation).
+    fn facade_apply_call_touches(fx: i32, call_node: i32, sig_idx: i32, param_offset: i32, recv_node: i32, extra_start: i32, arg_count: i32, has_resolved: i32):
+        let mask = self.facade_call_effects[fx].touch_params
+        let param_count = self.sig_get_param_count(sig_idx)
+        for pi in 0..param_count:
+            if (mask & sema_param_origin_bit(pi)) == 0:
+                continue
+            var origin_arg = 0
+            if param_offset == 1 and pi == 0:
+                origin_arg = recv_node
+            else:
+                let arg_index = if param_offset == 1: pi - 1 else: pi
+                if arg_index >= 0 and arg_index < arg_count:
+                    origin_arg = if has_resolved != 0: self.get_resolved_call_arg(call_node, arg_index) else: self.ast.get_extra(extra_start + arg_index)
+            if origin_arg <= 0:
+                continue
+            // The resource is the argument's own storage when it is a value
+            // (`db`, a `Borrowed<R>`); through a reference it is the pointee,
+            // whose bindings the reference's deps name.
+            var roots: Vec[i32] = Vec.new()
+            if self.expr_type_is_value(origin_arg):
+                roots.push(self.place_root_sym(origin_arg))
+            else:
+                roots = self.collect_expr_view_deps(origin_arg, move roots)
+                if roots.len() == 0:
+                    roots.push(self.place_root_sym(origin_arg))
+            for ri in 0..roots.len() as i32:
+                self.facade_poison_foreign_views(roots[ri], call_node, fx, pi)
+        for di in 0..self.facade_call_effects[fx].touch_domains.len() as i32:
+            let d: i32 = self.facade_call_effects[fx].touch_domains[di]
+            self.facade_poison_foreign_views(self.facade_domain_list[d].origin_sym, call_node, fx, -1)
+
+    fn facade_poison_foreign_views(origin_sym: i32, call_node: i32, fx: i32, pi: i32):
+        if origin_sym == 0:
+            return
+        for bi in 0..self.bind_names.len() as i32:
+            let view_sym: i32 = self.bind_names[bi]
+            if view_sym == origin_sym or self.bind_states[bi] != VarState.LIVE:
+                continue
+            if self.binding_depends_on_origin(view_sym, origin_sym) == 0:
+                continue
+            if self.facade_type_holds_resource(self.bind_types[bi], 0):
+                continue
+            if self.binding_poisoned_origin_sym(view_sym) != 0:
+                continue
+            self.mark_binding_poisoned_by_origin(view_sym, origin_sym, call_node)
+            self.facade_touch_nodes.insert(call_node, fx)
+            self.facade_touch_hit_params.insert(view_sym, pi)
 
     // Whether an argument expression is a value (not a reference or raw
     // pointer): its own storage is what a view of it points into.
@@ -17694,7 +17774,11 @@ impl Sema:
             return 0
         if self.fn_symbol_is_std_thread_spawn_os(fn_sym) != 0:
             self.record_global_concurrency_evidence(node, "std.thread.spawn_os")
-        if self.fn_symbol_is_unsafe(fn_sym) != 0:
+        // A presented text-view call (spec §16.2b.8) is safe under its
+        // facade item as a covered return is: the pointer C hands back never
+        // reaches the program, only the `Option[CStr]` made of it — the
+        // translated inline body's `unsafe` marking is about that pointer.
+        if self.fn_symbol_is_unsafe(fn_sym) != 0 and not self.facade_call_is_presented(fn_sym):
             if self.require_unsafe_operation("unsafe function call requires unsafe context", node) == 0:
                 return 0
         else if self.fn_symbol_is_raw_c_import(fn_sym) != 0:
@@ -17738,7 +17822,16 @@ impl Sema:
             if self.fn_symbol_is_explicit_alloc_api(fn_sym) != 0:
                 self.note_allocation_site(node, AllocConstructKind.EXPLICIT_API, 0, 0)
             self.note_allocating_callee(node, fn_sym)
-            let ret = self.sig_return_type(sig_idx) as i32
+            var ret = self.sig_return_type(sig_idx) as i32
+            // D51 stage 7 (spec §16.2b.8): a presented text-view return —
+            // `returns borrow CStr …` / `returns static CStr` on a function
+            // that is no resource's method — is `Option[CStr]` at the call,
+            // in a module that imported it (another module's same-named
+            // extern is its own). The declaration keeps C's return type;
+            // MirLower.w lower_call makes the view from the pointer.
+            if self.facade_call_is_presented(fn_sym):
+                ret = self.ensure_option_type_for(self.ty_cstr as i32)
+                self.facade_presented_calls.insert(node, 1)
             // #1196: a callee that takes its type from a body not checked yet
             // reads as Unit. Often that is right (a procedure); check_bodies
             // reports the calls where it was not.

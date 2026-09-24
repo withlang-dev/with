@@ -4203,13 +4203,24 @@ impl Parser:
                 let res = self.expect_ident()
                 if res == 0: return 0
                 if not self.current_ident_is("from"):
-                    self.emit_error("a borrowed return is written 'returns borrow <Resource> from param <ref>' (§16.2b.6)")
+                    self.emit_error("a borrowed return is written 'returns borrow <Resource> from param <ref>' or 'returns borrow CStr from domain <name>' (§16.2b.6, §16.2b.7)")
                     return 0
                 self.advance()
-                let r = self.parse_facade_param_ref()
-                if r == 0: return 0
-                ops.push(res)
-                ops.push(r)
+                // The origin: a parameter (a resource it receives, or the C
+                // string it is lent), or a foreign-state domain (§16.2b.7).
+                if self.current_ident_is("domain"):
+                    self.advance()
+                    let d = self.expect_ident()
+                    if d == 0: return 0
+                    ops.push(res)
+                    ops.push(0)
+                    ops.push(d)
+                else:
+                    let r = self.parse_facade_param_ref()
+                    if r == 0: return 0
+                    ops.push(res)
+                    ops.push(r)
+                    ops.push(0)
             else if self.current_ident_is("static"):
                 self.advance()
                 kind = FACADE_CLAUSE_RETURNS_STATIC
