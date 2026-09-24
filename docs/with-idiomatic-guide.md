@@ -1218,23 +1218,31 @@ Use `c"..."` string literals for NUL-terminated C strings:
 printf(c"hello %d\n".ptr, 42)
 ```
 
-Wrap C resources with `impl Drop` for safe cleanup:
+Model a C resource once, in a facade (§16.2b) — never a hand-written
+wrapper with `unsafe` inside:
 
 ```
-type Database = { handle: *mut sqlite3, path: str }
-
+// ✗ a hand-rolled wrapper: unsafe in application code, and the compiler
+//   knows nothing about the handle's lifetime
+type Database = { handle: *mut sqlite3 }
 impl Drop for Database:
-    fn drop(self: Self):
-        if self.handle != null:
-            unsafe { sqlite3_close(self.handle) }
+    move fn drop(): unsafe { sqlite3_close(self.handle) }
 
-extend Database:
-    fn open(path: str) -> Result[Database, SqliteError]:
-        var handle: *mut sqlite3 = null
-        let rc = unsafe { sqlite3_open(path.as_ptr(), &raw mut handle) }
-        if rc != SQLITE_OK then
-            return Err(.OpenFailed(path, code: rc))
-        Database { handle, path }
+// ✓ idiomatic — the facade states the contract; the compiler generates
+//   Database.open -> Result[Database, DatabaseError], closes it by scope,
+//   and finalizes every Statement before its connection
+c facade sqlite:
+    resource Database wraps *mut sqlite3
+        from sqlite3_open(out param 1)
+        drop sqlite3_close
+        ok SQLITE_OK
+    resource Statement wraps *mut sqlite3_stmt
+        from sqlite3_prepare_v2(out param 3)
+        drop sqlite3_finalize
+        borrows param 0
+        ok SQLITE_OK
+
+let db = Database.open(path)?
 ```
 
 ---

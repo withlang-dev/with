@@ -251,8 +251,12 @@ runtime) that macOS could never show. It includes:
   `use c_import("bzlib.h")`, and an in-memory
   `BZ2_bzBuffToBuffCompress`/`BZ2_bzBuffToBuffDecompress` round trip.
 - `:release-sqlite3-uat`, which validates `with get c.sqlite3`,
-  `use c_import("sqlite3.h")`, and an in-memory `:memory:` database
-  `CREATE TABLE`/`INSERT`/`SELECT` round trip.
+  `use c_import("sqlite3.h")` behind the SQLite facade
+  (`lib/facades/sqlite3.w`, written into the project as
+  `src/facades/sqlite3.w`; D51 ruling §66), and an in-memory `:memory:`
+  database `CREATE TABLE`/`INSERT`/`SELECT` round trip through
+  `Database.open`, `db.exec`, `db.prepare`, `stmt.step` and
+  `stmt.column_int` — no `unsafe`.
 - `:release-libcurl-uat`, which validates `with get c.libcurl`,
   `use c_import("curl/curl.h")`, `curl_global_init`, `curl_easy_init`,
   `curl_easy_setopt`, `curl_version_info`, and cleanup without network access.

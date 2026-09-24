@@ -1017,6 +1017,25 @@ use c_import("sqlite3.h", link: "sqlite3")
 
 Functions imported via `c_import` are callable directly. The import is the opt-in.
 
+A raw C call that takes or returns a pointer needs `unsafe`. An application
+never writes that: the library's **facade** (§16.2b) models the C surface
+once — ownership, destruction, status, borrowed text, callbacks — and the
+program uses the presented methods:
+
+```with
+use facades.sqlite3            // lib/facades/sqlite3.w, the project's own
+use c_import("sqlite3.h")
+
+let Ok(db) = Database.open(":memory:") else:      // closed by its scope
+    print("open failed")
+    return 1
+db.exec("CREATE TABLE t(v INTEGER); INSERT INTO t VALUES (42);", None, null)
+let Ok(stmt) = db.prepare("SELECT v FROM t", -1, null) else:   // finalized before db closes
+    print(f"prepare failed: {db.errmsg().unwrap().to_str().unwrap()}")
+    return 1
+if stmt.step() == SQLITE_ROW: print(stmt.column_int(0))
+```
+
 Manual `extern "C"` functions require `unsafe` to call. Prefer `c_import` when a header is available; manual `extern` declarations are lower-level and should be used only when no header exists or fine-grained control is needed.
 
 ```with

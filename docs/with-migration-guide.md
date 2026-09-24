@@ -1635,14 +1635,14 @@ sqlite3_open(":memory:", &db);
 
 ```with
 // With
+use facades.sqlite3                  // the library's facade (§16.2b)
 use c_import("sqlite3.h", link: "sqlite3")
 
-var db: *mut sqlite3 = null
-sqlite3_open(c":memory:".ptr, &raw mut db)
+let db = Database.open(":memory:")?  // an owned resource; closed by its scope
 ```
 
 `c_import` parses C headers at compile time and makes all `struct`s, `enum`s, `#define` macros, and functions instantly available as With symbols. 
-Imported C functions are directly callable; `unsafe` is still required for raw pointer dereference and raw pointer indexing.
+Imported C functions are directly callable; a call that takes or returns a raw pointer needs `unsafe`, and an application never writes it: a **facade** models the library's ownership, status, borrowed text and callbacks once (`resource Database wraps *mut sqlite3 / from sqlite3_open(out param 1) / drop sqlite3_close / ok SQLITE_OK`), and the program uses the presented methods — `Database.open`, `db.exec`, `db.prepare`, `stmt.step`, `stmt.column_text`.
 
 ## Classes and Methods
 
