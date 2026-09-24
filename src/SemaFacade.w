@@ -30,6 +30,7 @@ impl Sema:
         self.report_facade_layout_errors()
         self.verify_facade_assignments()
         self.verify_facade_presentation()
+        self.verify_facade_failed_state_items()
         self.verify_facade_borrowed_returns()
         self.verify_facade_text_views()
         self.verify_facade_callback_items()
@@ -746,7 +747,7 @@ impl Sema:
                 return
             self.emit_error(f"fn '{fname}' is described by two facade blocks with different clauses; one function has one contract — restate it word for word or describe it once (§16.2b)", item)
             return
-        var c = ForeignContract { fn_sym, decl, facade, node: item, lend: 0, destroys: 0, consumes: Vec.new(), consumes_destroyed_by: Vec.new(), retains: Vec.new(), retains_by: Vec.new(), returns_borrow_resource: 0, returns_borrow_from: -1, returns_borrow_domain: 0, returns_static_tid: 0, preserves_params: Vec.new(), preserves_domains: Vec.new(), of_resource: 0, rename: 0, callback_thread_any: 0, callback_consumes: Vec.new(), callback_userdata_cb: Vec.new(), callback_userdata_of: Vec.new() }
+        var c = ForeignContract { fn_sym, decl, facade, node: item, lend: 0, destroys: 0, consumes: Vec.new(), consumes_destroyed_by: Vec.new(), retains: Vec.new(), retains_by: Vec.new(), returns_borrow_resource: 0, returns_borrow_from: -1, returns_borrow_domain: 0, returns_static_tid: 0, preserves_params: Vec.new(), preserves_domains: Vec.new(), of_resource: 0, rename: 0, callback_thread_any: 0, callback_consumes: Vec.new(), callback_userdata_cb: Vec.new(), callback_userdata_of: Vec.new(), valid_on_failed: 0 }
         let extra_start = self.ast.get_data1(item)
         let clause_count = self.ast.get_data2(item)
         for ci in 0..clause_count:
@@ -976,6 +977,14 @@ impl Sema:
             let pi = self.facade_resolve_param(self.ast.get_extra(ops), fn_sym, sig)
             if pi >= 0:
                 c.callback_consumes.push(pi)
+            return c
+        if kind == FACADE_CLAUSE_VALID_ON_FAILED:
+            // `valid on failed` (spec §16.2b.4: a failed-state resource
+            // "admits raw access only, unless the facade marks an operation
+            // as valid on the failure state"; ruling §18). The shape it may
+            // mark is verified once every resource is known
+            // (verify_facade_failed_state_items).
+            c.valid_on_failed = 1
             return c
         let cname = facade_clause_name(kind)
         self.emit_error(f"fn '{fname}': clause '{cname}' applies to a resource, not an fn item (§16.2b)", clause)
@@ -1214,6 +1223,7 @@ fn facade_clause_name(kind: i32) -> str:
     if kind == FACADE_CLAUSE_THREAD: return "thread"
     if kind == FACADE_CLAUSE_CALLBACK_THREAD: return "callback_thread"
     if kind == FACADE_CLAUSE_CALLBACK_USERDATA: return "callback … userdata"
+    if kind == FACADE_CLAUSE_VALID_ON_FAILED: return "valid on failed"
     "callback consumes"
 
 // ── stage 3: raw classification consults the facts ──────────────────────
@@ -2087,11 +2097,14 @@ impl Sema:
         let hosts: Vec[str] = Vec.new()
         hosts.push(host.clone())
         hosts.push(facade_render_borrowed_name(host))
+        // `valid on failed`: the same view on the failed state (#1612).
+        if self.foreign_contracts[ci].valid_on_failed != 0:
+            hosts.push(facade_render_failed_name(host))
         for hi in 0..hosts.len() as i32:
             let mtext = hosts[hi] ++ "." ++ mname
             let msig: i32 = if self.sig_text_index.contains(mtext): self.sig_text_index.get(mtext).unwrap() else: -1
             if msig < 0:
-                if hi == 0:
+                if hi == 0 or hi == 2:
                     self.emit_error(f"fn '{fname}': '{what}' passed every facade check but no method '{mtext}' was rendered — a compiler defect (§16.2b.8)", node)
                 continue
             if not self.facade_sig_returns_option_cstr(msig):
@@ -2173,6 +2186,8 @@ impl Sema:
             let hosts: Vec[str] = Vec.new()
             hosts.push(host ++ "." ++ mname)
             hosts.push(facade_render_borrowed_name(host) ++ "." ++ mname)
+            if self.foreign_contracts[ci].valid_on_failed != 0:
+                hosts.push(facade_render_failed_name(host) ++ "." ++ mname)
             for hi in 0..hosts.len() as i32:
                 let htext = hosts[hi].clone()
                 if self.sig_text_index.contains(htext):
@@ -2336,6 +2351,66 @@ impl Sema:
         self.set_sig_param_effect(sig, pi, eff)
         self.set_sig_param_direct_effect(sig, pi, eff)
         self.set_sig_param_view_origin(sig, pi, self.sig_param_view_origin(sig, pi) | sema_param_origin_bit(pi))
+
+    // ── the failed state (ruling §18; spec §16.2b.4; D59) ─────────────────
+    //
+    // "A resource owned by an error admits raw access only, unless the
+    // facade marks an operation as valid on the failure state." `valid on
+    // failed` is that mark (stage 12b, #1612): the operation is rendered on
+    // `Failed<R>` too (FacadeRender.w facade_render_error_type), under the
+    // name it has on `R`. What it may mark is a lend or a text view of a
+    // resource that has a failed state — an out-parameter producer under
+    // `ok`, of a resource that depends on nothing (a dependent one's failure
+    // is destroyed in the constructor). A destroying, consuming, retaining
+    // or callback operation, or one returning a borrowed resource, is
+    // refused: the failed state is destroyed by its error's Drop and owns
+    // nothing else, and `Borrowed<R>` holds a view of a live `R`.
+    mut fn verify_facade_failed_state_items():
+        for ci in 0..self.foreign_contracts.len() as i32:
+            if self.foreign_contracts[ci].valid_on_failed == 0:
+                continue
+            self.update_decl_source_context(self.foreign_contracts[ci].decl)
+            let fn_sym = self.foreign_contracts[ci].fn_sym
+            let node = self.foreign_contracts[ci].node
+            let fname: str = self.pool_resolve(fn_sym)
+            let sig = self.get_sig(fn_sym)
+            if sig < 0:
+                continue
+            let recv0 = self.facade_method_host(fn_sym)
+            if recv0.len() != 1:
+                let shown0 = self.facade_param_display(fn_sym, sig, 0)
+                let why = if recv0.len() == 0: "receives no modeled resource" else: "receives a representation several resources wrap; the facade has not assigned it (§16.2b.3)"
+                self.emit_error(f"fn '{fname}': 'valid on failed' marks an operation of the failed state of the resource its first parameter receives, and {shown0} {why} (§16.2b.4)", node)
+                continue
+            let ri = recv0[0]
+            let rname: str = self.pool_resolve(self.facade_resources[ri].name)
+            if not self.facade_has_failed_state(ri):
+                self.emit_error(f"fn '{fname}': 'valid on failed', but '{rname}' has no failed state: a failure that still produced is owned by the error only for an out-parameter producer under 'ok' of a resource that depends on nothing (§16.2b.4)", node)
+                continue
+            let borrow_res = self.foreign_contracts[ci].returns_borrow_resource
+            let borrows_resource = borrow_res != 0 and self.pool_resolve(borrow_res) != "CStr"
+            let stronger = self.foreign_contracts[ci].destroys != 0 or self.foreign_contracts[ci].consumes.len() > 0 or self.foreign_contracts[ci].retains.len() > 0 or self.foreign_contracts[ci].callback_userdata_cb.len() > 0 or self.foreign_contracts[ci].callback_thread_any != 0 or self.foreign_contracts[ci].callback_consumes.len() > 0
+            if stronger or borrows_resource or self.facade_fn_is_resource_op(fn_sym):
+                self.emit_error(f"fn '{fname}': 'valid on failed' marks a lend or a text view of the failed '{rname}'; a failed state is destroyed by its error's Drop and owns nothing else, so a producing, destroying, consuming, retaining or callback operation, or one returning a borrowed resource, cannot be valid on it (§16.2b.4)", node)
+                continue
+            if self.diags.has_errors():
+                continue
+            // The net: the method exists on `Failed<R>`.
+            let mtext = facade_render_failed_name(rname) ++ "." ++ self.facade_presented(ri, fname)
+            if not self.sig_text_index.contains(mtext):
+                self.emit_error(f"fn '{fname}': 'valid on failed' passed every facade check but no method '{mtext}' was rendered; the renderer cannot express this shape and did not say so — a compiler defect (§16.2b.4)", node)
+
+    // Whether the failed state of resource `ri` carries operation `cname`:
+    // its fn item states `valid on failed` (the unknown-method diagnostic
+    // names the rule, SemaCheck.w).
+    fn facade_resource_has_failed_state_items(ri: i32) -> bool:
+        for ci in 0..self.foreign_contracts.len() as i32:
+            if self.foreign_contracts[ci].valid_on_failed == 0:
+                continue
+            let recv0 = self.facade_method_host(self.foreign_contracts[ci].fn_sym)
+            if recv0.len() == 1 and recv0[0] == ri:
+                return true
+        false
 
     // Owned foreign text (ruling §42): every rendered pointer resource over
     // a C string carries `as_cstr() -> CStr` (FacadeRender.w

@@ -24081,13 +24081,14 @@ impl Sema:
             self.emit_error("iterator operation '" ++ method_name ++ "' from §13.3 is not implemented yet", node)
             return 0
         // A resource a failed producer still produced (`FailedDatabase`,
-        // spec §16.2b.4) admits only the operations its facade states are
-        // valid on the failure state; there is no clause for that yet, so it
-        // admits none (Eric, 2026-09-23, on #1426).
+        // spec §16.2b.4) admits only the operations its facade marks
+        // `valid on failed` (stage 12b, #1612; Eric, 2026-09-23, on #1426:
+        // raw access only until the facade can mark them).
         let failed_of = self.facade_failed_state_resource(self.type_name(recv_type as i32))
         if failed_of >= 0:
             let rname: str = self.pool_resolve(self.facade_resources[failed_of].name)
-            self.emit_error_with_help("unknown method '" ++ method_name ++ "' for type '" ++ receiver_name ++ "': a failed '" ++ rname ++ "' — the resource a failed producer still produced — admits only the operations its facade states are valid on the failure state, and a facade cannot state any yet; its Drop destroys it (§16.2b.4)", node, "its representation is the field `repr`, under the raw C rules (`unsafe`)")
+            let marked = if self.facade_resource_has_failed_state_items(failed_of): "the operations its facade marks 'valid on failed'" else: "the operations its facade marks 'valid on failed', and this facade marks none"
+            self.emit_error_with_help("unknown method '" ++ method_name ++ "' for type '" ++ receiver_name ++ "': a failed '" ++ rname ++ "' — the resource a failed producer still produced — admits only " ++ marked ++ "; its Drop destroys it (§16.2b.4)", node, "state 'valid on failed' on the fn item describing an operation the C library documents on the failed handle; its representation is the field `repr`, under the raw C rules (`unsafe`)")
             return 0
         self.emit_error("unknown method '" ++ method_name ++ "' for type '" ++ receiver_name ++ "'", node)
         0

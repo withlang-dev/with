@@ -99,7 +99,7 @@ pub fn facade_render_block(pool: AstPool, intern: InternPool, facade: i32, ci: &
         let item = pool.get_extra(extra_start + i)
         if pool.kind(item as NodeId) == NodeKind.NK_FACADE_RESOURCE:
             let text_view = facade_render_text_view(pool, intern, item)
-            out = out ++ facade_render_resource(pool, intern, ci, item, facade_render_lend_methods(pool, intern, ci, item, true) ++ text_view ++ facade_render_callback_methods(pool, intern, ci, item), facade_render_lend_methods(pool, intern, ci, item, false) ++ text_view)
+            out = out ++ facade_render_resource(pool, intern, ci, item, facade_render_lend_methods(pool, intern, ci, item, true, false) ++ text_view ++ facade_render_callback_methods(pool, intern, ci, item), facade_render_lend_methods(pool, intern, ci, item, false, false) ++ text_view, facade_render_lend_methods(pool, intern, ci, item, false, true))
     facade_render_public(out)
 
 // Everything a facade renders is its module's public surface (spec
@@ -172,7 +172,13 @@ pub fn facade_render_text_view_name() -> str: "as_cstr"
 // consuming, destroying or retaining item is not a lend, a by-value token
 // is not recognized by its type, and an item describing a resource's own
 // producer, initializer or destroyer adds facts to that operation.
-fn facade_render_lend_methods(pool: AstPool, intern: InternPool, ci: &Vec[i32], resource: i32, with_borrowed_returns: bool) -> str:
+//
+// `failed_only` (stage 12b, #1612; spec §16.2b.4): the lends and text
+// views the facade marks `valid on failed`, rendered on the failed-state
+// type `Failed<R>` — the same body over the same `repr` field — and
+// nothing else (a borrowed-resource return holds a view of a live `R`;
+// Sema refuses the mark on one).
+fn facade_render_lend_methods(pool: AstPool, intern: InternPool, ci: &Vec[i32], resource: i32, with_borrowed_returns: bool, failed_only: bool) -> str:
     let repr_text = render_type_expr(pool, intern, pool.get_extra(pool.get_data1(resource as NodeId)) as NodeId)
     let repr = facade_render_unalias(pool, intern, repr_text)
     let in_place = not repr.starts_with("*") and facade_render_has_clause(pool, resource, FACADE_CLAUSE_INIT)
@@ -184,6 +190,8 @@ fn facade_render_lend_methods(pool: AstPool, intern: InternPool, ci: &Vec[i32], 
     for i in 0..items.len() as i32:
         let li = facade_render_lend_item(pool, intern, ci, items[i])
         if not facade_render_lend_hosted(pool, intern, &li, resource, repr):
+            continue
+        if failed_only and (not li.valid_on_failed or li.borrow_res != 0):
             continue
         let decl = li.decl
         let meta = pool.find_fn_meta(decl as NodeId)
@@ -620,10 +628,11 @@ type FacadeLendItem {
     borrow_res: i32,
     borrow_from: i32,
     text_view: bool,
+    valid_on_failed: bool,   // rendered on `Failed<R>` too (#1612)
 }
 
 fn facade_render_lend_item(pool: AstPool, intern: InternPool, ci: &Vec[i32], item: i32) -> FacadeLendItem:
-    var li = FacadeLendItem { decl: 0, of_sym: 0, rename: 0, lends: true, borrow_res: 0, borrow_from: 0, text_view: false }
+    var li = FacadeLendItem { decl: 0, of_sym: 0, rename: 0, lends: true, borrow_res: 0, borrow_from: 0, text_view: false, valid_on_failed: false }
     let cstart = pool.get_data1(item as NodeId)
     for k in 0..pool.get_data2(item as NodeId):
         let clause = pool.get_extra(cstart + k)
@@ -642,6 +651,7 @@ fn facade_render_lend_item(pool: AstPool, intern: InternPool, ci: &Vec[i32], ite
             // storage, no origin to keep it inside.
             if render_type_expr(pool, intern, pool.get_extra(ops) as NodeId) == "CStr": li.text_view = true
             else: li.lends = false
+        else if kind == FACADE_CLAUSE_VALID_ON_FAILED: li.valid_on_failed = true
         else if kind != FACADE_CLAUSE_LEND and kind != FACADE_CLAUSE_PRESERVES: li.lends = false
     if not li.lends:
         return li
@@ -694,7 +704,7 @@ fn facade_render_all_items(pool: AstPool, kind: NodeKind) -> Vec[i32]:
                 out.push(item)
     out
 
-fn facade_render_resource(pool: AstPool, intern: InternPool, ci: &Vec[i32], item: i32, methods: &str, plain_methods: &str) -> str:
+fn facade_render_resource(pool: AstPool, intern: InternPool, ci: &Vec[i32], item: i32, methods: &str, plain_methods: &str, failed_methods: &str) -> str:
     let name: str = intern.resolve(pool.get_data0(item as NodeId))
     let extra_start = pool.get_data1(item as NodeId)
     let clause_count = pool.get_data2(item as NodeId)
@@ -818,7 +828,7 @@ fn facade_render_resource(pool: AstPool, intern: InternPool, ci: &Vec[i32], item
     // `FailedWithResource`.
     let dependent = deps.slot_res.len() > 0
     if status_type.len() > 0:
-        out = out ++ facade_render_error_type(pool, intern, name, repr_text, status_type, failed_state, failed_state and not dependent, drop_fn)
+        out = out ++ facade_render_error_type(pool, intern, name, repr_text, status_type, failed_state, failed_state and not dependent, drop_fn, failed_methods)
     // Borrowed returns of this resource (ruling §26): `Borrowed<R>`.
     out = out ++ facade_render_borrowed_type(pool, intern, ci, item, repr_text, plain_methods)
     for pi in 0..producers.len() as i32:
@@ -1248,22 +1258,28 @@ pub fn facade_render_failed_name(name: &str) -> str: "Failed" ++ name
 // alone.
 //
 // The resource a failed producer still produced is `Failed<R>`, not `R`: the
-// failure state admits only the operations the facade states are valid on
-// it, the facade has no clause for that yet, and so it admits none — no lend
-// methods, no destroyers, only raw access to its representation under the
-// raw C rules. Its Drop runs the facade's `drop` exactly once: dropping the
-// error, or whatever took the resource out of it, destroys it.
+// failure state admits only the operations the facade marks `valid on
+// failed` (stage 12b, #1612; spec §16.2b.4) — the lends and text views of
+// `R` so marked, rendered here over the same `repr` field under the names
+// they have on `R` — and otherwise only raw access to its representation
+// under the raw C rules: no destroyers, no callbacks, no unmarked lend. Its
+// Drop runs the facade's `drop` exactly once: dropping the error, or
+// whatever took the resource out of it, destroys it.
 //
 //     type FailedDatabase { repr: *mut sqlite3 }
 //     impl Drop for FailedDatabase:
 //         move fn drop():
 //             unsafe { sqlite3_close(self.repr) }
-fn facade_render_error_type(pool: AstPool, intern: InternPool, name: &str, repr_text: &str, status_type: &str, out_param: bool, failed_state: bool, drop_fn: i32) -> str:
+//     impl FailedDatabase:
+//         fn errmsg() -> Option[CStr]: …                 // `valid on failed`
+fn facade_render_error_type(pool: AstPool, intern: InternPool, name: &str, repr_text: &str, status_type: &str, out_param: bool, failed_state: bool, drop_fn: i32, failed_methods: &str) -> str:
     let err = facade_render_error_name(name)
     var out = ""
     if failed_state:
         let failed = facade_render_failed_name(name)
         out = "type " ++ failed ++ " { repr: " ++ repr_text ++ " }\nimpl Drop for " ++ failed ++ ":\n    move fn drop():\n        " ++ facade_render_call(pool, intern, drop_fn, facade_render_repr_arg(pool, intern, drop_fn, repr_text, "self.repr", false)) ++ "\n"
+        if failed_methods.len() > 0:
+            out = out ++ "impl " ++ failed ++ ":\n" ++ failed_methods
     out = out ++ "error " ++ err ++ " =\n    | Failed(status: " ++ status_type ++ ")\n"
     if failed_state:
         out = out ++ "    | FailedWithResource(status: " ++ status_type ++ ", resource: " ++ facade_render_failed_name(name) ++ ")\n"

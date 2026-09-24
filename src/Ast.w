@@ -256,6 +256,7 @@ const FACADE_CLAUSE_CALLBACK_THREAD: i32 = 18  // [sym]  (`any`)
 const FACADE_CLAUSE_CALLBACK_CONSUMES: i32 = 19 // [param_ref]
 const FACADE_CLAUSE_MOVABLE: i32 = 20          // []  (in-place resource: not pinned, D54)
 const FACADE_CLAUSE_CALLBACK_USERDATA: i32 = 21 // [callback_ref, userdata_ref]  (`callback param N userdata param M`, §16.2b.9)
+const FACADE_CLAUSE_VALID_ON_FAILED: i32 = 22  // []  (`valid on failed`: presented on the failed-state resource too, §16.2b.4)
 const FACADE_PARAM_REF_NAME: i32 = 0
 const FACADE_PARAM_REF_INDEX: i32 = 1
 const FACADE_PARAM_REF_TYPE: i32 = 2

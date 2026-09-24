@@ -271,6 +271,21 @@ the canon. Derived decisions (the ruling and the spec are silent on the
 exact spelling; each is recorded here, not in the spec, whose wording only
 Eric blesses):
 
+- **`valid on failed`** (#1612). Spec §16.2b.4: a failed-state resource
+  "admits raw access only, unless the facade marks an operation as valid on
+  the failure state"; D59 (amended): "raw access only, until the facade can
+  mark operations valid on the failure state: `sqlite3_errmsg` is,
+  `sqlite3_exec` meaningfully is not." The mark is the fn-item clause
+  `valid on failed`, named after the type it widens (`FailedDatabase`,
+  §16.2b.4). It renders the lend or text view on `Failed<R>` under the name
+  it has on `R`, with the same declared summary (a view of the failed
+  handle). Conservative bounds: only a lend or a text view, only of a
+  resource that has a failed state (an out-parameter producer under `ok`,
+  not dependent — ruling §18); a producing, destroying, consuming, retaining
+  or callback operation, or one returning a borrowed resource, is refused
+  (the failed state is destroyed by its error's Drop and owns nothing else;
+  `Borrowed<R>` holds a view of a live `R`). An unmarked operation stays
+  unavailable, and the diagnostic names the clause.
 - **Library-prefix presentation** (#1610). Ruling §54 / spec §16.2b.11
   permit "shortening prefixes" silently under "a recognizable
   naming/receiver pattern". The renderer's convention shortens by the

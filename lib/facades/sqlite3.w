@@ -83,9 +83,15 @@ c facade sqlite:
     // the error string might be overwritten or deallocated by subsequent
     // calls to other SQLite interface functions": a view of the
     // connection (§32), invalidated by every operation on it that does not
-    // state `preserves` (§38).
+    // state `preserves` (§38). Valid on the failed state too (§16.2b.4,
+    // #1612): "The sqlite3_errmsg() or sqlite3_errmsg16() routines can be
+    // used to obtain an English language description of the error
+    // following a failure of any of the sqlite3_open() routines" — so a
+    // `FailedDatabase` has `errmsg()`, the same view of the failed handle,
+    // which nothing else callable on it invalidates.
     fn sqlite3_errmsg
         returns borrow CStr from param 0
+        valid on failed
     fn sqlite3_errcode
         lend
     fn sqlite3_changes

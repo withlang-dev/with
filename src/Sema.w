@@ -454,6 +454,7 @@ type ForeignContract {
     callback_consumes: Vec[i32],
     callback_userdata_cb: Vec[i32],    // `callback param N userdata param M`: the callback parameter N …
     callback_userdata_of: Vec[i32],    // … and the userdata parameter M it receives (parallel)
+    valid_on_failed: i32,              // `valid on failed`: presented on the failed-state resource too (§16.2b.4)
 }
 
 // A callback method a facade rendered on a resource (stage 9, ruling

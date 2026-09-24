@@ -399,6 +399,10 @@ fn contract_collect_fn(report: &AnalysisReport, sema: &Sema, ci: i32, source_pat
     if c.rename != 0:
         let clause = contract_clause(sema, node, FACADE_CLAUSE_RENAME, 0)
         contract_row(report, sema, &site, subject, CONTRACT_FN, clause, c.rename, owner, -1, "presentation", "rename " ++ sema.safe_symbol_text(c.rename), contract_clause_at(sema, &site, clause))
+    // The failed state (§16.2b.4, #1612).
+    if c.valid_on_failed != 0:
+        let clause = contract_clause(sema, node, FACADE_CLAUSE_VALID_ON_FAILED, 0)
+        contract_row(report, sema, &site, subject, CONTRACT_FN, clause, c.fn_sym, owner, -1, "failed-state", "valid on the failed-state resource too (presented on Failed<R>)", contract_clause_at(sema, &site, clause))
     if hosts.len() == 1 and not sema.facade_fn_is_resource_op(c.fn_sym):
         let host = contract_resource_name(sema, hosts[0])
         let presented = sema.facade_presented(hosts[0], fname)
