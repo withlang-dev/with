@@ -623,7 +623,9 @@ fn facade_render_receiver_method(pool: AstPool, intern: InternPool, ci: &Vec[i32
     let start = pool.fn_meta_param_start(meta)
     var args = "self"
     for pi in 1..pool.fn_meta_param_count(meta):
-        if pi != slot:
+        // A fixed argument (D64) is the constructor's literal, not a
+        // parameter the receiver method forwards.
+        if pi != slot and facade_render_fixed_literal(pool, intern, producer, pi).len() == 0:
             args = args ++ ", " ++ facade_render_param_name(pool, intern, start, pi)
     let child_name: str = intern.resolve(pool.get_data0(child as NodeId))
     "impl " ++ pname ++ ":\n    fn " ++ mname ++ "(" ++ params ++ ") -> " ++ result ++ ": " ++ child_name ++ "." ++ ctor ++ "(" ++ args ++ ")\n"

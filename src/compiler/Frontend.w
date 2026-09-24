@@ -10,6 +10,7 @@ use SemaFacade
 use ComptimeTransform
 use Resolve
 use Span
+extern fn with_getenv_str(name: &str) -> str
 use Diagnostic
 use CImport
 use render
@@ -714,6 +715,10 @@ impl Zcu:
             if text.len() == 0:
                 continue
             let facade_name: str = with_str_clone_ref(self.pool.resolve(out.get_data0(decl)))
+            // WITH_DUMP_FACADE=1: the rendered text, as the parser sees it — a
+            // diagnostic at `<facade NAME>:line:col` points into this.
+            if with_getenv_str("WITH_DUMP_FACADE").len() > 0:
+                eprint("<facade " ++ facade_name ++ ">\n" ++ text)
             let file_id = self.next_file_id
             self.next_file_id = self.next_file_id + 1
             self.add_source_text_mapping(file_id, "<facade " ++ facade_name ++ ">", text)

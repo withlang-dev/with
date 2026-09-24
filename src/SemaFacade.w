@@ -1584,12 +1584,17 @@ impl Sema:
             return true
         if not skip_return and self.ci_type_requires_raw_contract(self.sig_return_type(sig)) != 0 and not self.facade_covers_return(fn_sym):
             return true
+        let ci = self.facade_contract_for(fn_sym)
         for pi in 0..self.sig_get_param_count(sig):
             if pi == repr_param:
                 continue
             // A parameter receiving another resource is presented as a
             // borrow of it (FacadeRender.w facade_render_params_but).
             if self.facade_param_presentable(fn_sym, pi):
+                continue
+            // A fixed argument is the rendering's literal, a paired buffer
+            // its slice (D64): the rendered call supplies them.
+            if ci >= 0 and self.facade_contract_pairs(ci, pi):
                 continue
             let pty = self.sig_param_type(sig, pi)
             if self.ci_type_requires_raw_contract(pty) != 0 and self.ci_type_is_const_c_string_input(pty) == 0 and not self.facade_covers_param(fn_sym, pi):
@@ -1915,7 +1920,11 @@ impl Sema:
             let cn: str = self.pool_resolve(ok_const)
             self.emit_error(f"fn '{fname}': 'ok {cn}' states the status contract a copied-back length is presented under, and '{fname}' pairs no 'capacity … inout' buffer, so there is no value to present on success; a producer's status is stated on its resource (§16.2b.4, §16.2b.8)", node)
             return
-        if not self.facade_contract_presented(ci):
+        // A resource's own operation renders as its constructor or destroyer,
+        // a callback contract as its callback method (stage 9): their
+        // parameters are those renderings' business, and a fixed argument on
+        // one is the literal facade_render_bridge passes.
+        if resource_op or contract_item or not self.facade_contract_presented(ci):
             return
         // The refusal: every raw pointer parameter of a presented operation
         // is reached through some clause — the receiver through its
@@ -1929,15 +1938,18 @@ impl Sema:
             let pty = self.sig_param_type(sig, pi)
             if self.ci_type_requires_raw_contract(pty) == 0 or self.ci_type_is_const_c_string_input(pty) != 0:
                 continue
-            if self.facade_param_presentable(fn_sym, pi):
+            // A parameter that receives a modeled resource is reached through
+            // the resource — the receiver, or a borrow `&P` (a shape a borrow
+            // cannot present is verify_facade_dependency_shape's error).
+            if self.facade_param_receives(fn_sym, pi).len() > 0:
                 continue
             let shown = self.facade_param_display(fn_sym, sig, pi)
             let pname = self.facade_param_c_name(fn_sym, pi)
             self.emit_error_with_help(f"fn '{fname}': {shown} is a raw pointer that no clause pairs, so it is not a buffer; a presented operation renders no call without a bounds contract (§16.2b.8)", node, f"pair it with 'buffer param {pname} len param <L>' or 'buffer param {pname} capacity param <L> inout', bind it with 'param {pname} fixed <literal>', or leave the operation raw")
             return
-        if resource_op or self.diags.has_errors():
+        if self.diags.has_errors():
             return
-        let hosted = self.facade_method_host(fn_sym).len() == 1 and not contract_item
+        let hosted = self.facade_method_host(fn_sym).len() == 1
         let presented_name = if hosted: self.facade_presented(self.facade_method_host(fn_sym)[0], fname) else: self.facade_presented_free_name(ci)
         let facade_name: str = self.pool_resolve(self.foreign_contracts[ci].facade)
         let rendered_file = "<facade " ++ facade_name ++ ">"
