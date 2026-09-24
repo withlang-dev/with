@@ -20,7 +20,7 @@ c facade dbf:
 
 fn main:
     let l = log_new()
-    var db = Database.db_new(l, 1).unwrap()
-    let s = Statement.st_new(db, 10).unwrap()
-    db = Database.db_new(l, 2).unwrap()
-    print(f"{s.st_step()}")
+    var db = Database.new(l, 1).unwrap()
+    let s = Statement.new(db, 10).unwrap()
+    db = Database.new(l, 2).unwrap()
+    print(f"{s.step()}")

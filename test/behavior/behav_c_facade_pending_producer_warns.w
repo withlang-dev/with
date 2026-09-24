@@ -44,12 +44,12 @@ c facade dep:
         returns borrow Database from param 0
 
 fn main:
-    let d = Database.db_new(0).unwrap()
-    let s = Statement.st_new(d, 1)
-    let (status, t) = Statement.st_open(d)
-    let row: Result[Row, RowError] = Row.rw_open(d)
-    let back: Option[BorrowedDatabase] = s.unwrap().st_db()
-    match Row.rw_open(d):
+    let d = Database.new(0).unwrap()
+    let s = Statement.new(d, 1)
+    let (status, t) = Statement.open(d)
+    let row: Result[Row, RowError] = Row.open(d)
+    let back: Option[BorrowedDatabase] = s.unwrap().db()
+    match Row.open(d):
         Err(RowError.Failed(st)) => print(\"failed\")
         Err(RowError.NothingProduced(st)) => print(\"none\")
         Ok(_) => print(\"ok\")

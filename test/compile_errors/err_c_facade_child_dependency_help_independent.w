@@ -32,7 +32,7 @@ c facade dbf:
 
 fn main:
     let l = log_new()
-    let db = Database.db_new(l, 1).unwrap()
-    let s = Statement.st_new(db, 10).unwrap()
+    let db = Database.new(l, 1).unwrap()
+    let s = Statement.new(db, 10).unwrap()
     let moved = db
-    print(f"{s.st_step()}")
+    print(f"{s.step()}")

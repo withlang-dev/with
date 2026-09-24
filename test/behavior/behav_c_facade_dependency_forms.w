@@ -65,45 +65,45 @@ fn witness(l: Log) -> str:
     out
 
 fn take_snapshot(l: Log, id: i32) -> Snapshot:
-    let db = Database.db_new(l, id).unwrap()
-    Snapshot.snap_take(db, 1).unwrap()
+    let db = Database.new(l, id).unwrap()
+    Snapshot.take(db, 1).unwrap()
 
 fn main:
     let l = log_new()
     let kept = take_snapshot(l, 1)
-    let sid = kept.snap_id()
+    let sid = kept.id()
     drop(kept)
     print(f"independent: snapshot {sid} kept past its database: {witness(l)}")
     log_reset(l)
     let keeper = Keeper { snap: take_snapshot(l, 2) }
-    print(f"stored: {keeper.snap.snap_id()}")
+    print(f"stored: {keeper.snap.id()}")
     drop(keeper)
     log_reset(l)
     if true:
-        let a = Database.db_new(l, 2).unwrap()
+        let a = Database.new(l, 2).unwrap()
         var link: Option[Link] = None
         if true:
-            let b = Database.db_new(l, 3).unwrap()
+            let b = Database.new(l, 3).unwrap()
             link = Link.link_new(a, b, 6)
         print(f"link live: {link.is_some()}")
     print(f"borrows param 0: second database closed first: {witness(l)}")
     log_reset(l)
     if true:
-        let src = Database.db_new(l, 3).unwrap()
-        let dest = Database.db_new(l, 4).unwrap()
+        let src = Database.new(l, 3).unwrap()
+        let dest = Database.new(l, 4).unwrap()
         let backup = Backup.backup_init(dest, src, 7)
         print(f"backup live: {backup.is_some()}")
     print(f"two parents: {witness(l)}")
     log_reset(l)
     if true:
-        let db = Database.db_new(l, 5).unwrap()
-        let blank = Cursor.cur_blank(l, 8)
-        let opened = Cursor.cur_open(db, 9)
+        let db = Database.new(l, 5).unwrap()
+        let blank = Cursor.blank(l, 8)
+        let opened = Cursor.open(db, 9)
         print(f"cursors live: {blank.is_some()} {opened.is_some()}")
     print(f"optional parent: {witness(l)}")
     log_reset(l)
     if true:
-        let db = Database.db_new(l, 6).unwrap()
+        let db = Database.new(l, 6).unwrap()
         let iter = Iter.it_init(db, 10)
         print(f"iterator live: {iter.live}")
     print(f"in place: {witness(l)}")

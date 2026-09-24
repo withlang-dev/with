@@ -44,40 +44,40 @@ fn witness(l: Log) -> str:
     out
 
 fn early(l: Log, stop: bool) -> i32:
-    let db = Database.db_new(l, 2).unwrap()
-    let s = Statement.st_new(db, 21).unwrap()
+    let db = Database.new(l, 2).unwrap()
+    let s = Statement.new(db, 21).unwrap()
     if stop:
-        return s.st_step()
+        return s.step()
     0
 
 fn fails(l: Log) -> Result[i32, str]:
-    let db = Database.db_new(l, 3).unwrap()
-    let s = Statement.st_new(db, 31).unwrap()
-    let (status, none) = Statement.db_prepare(db, -1)
+    let db = Database.new(l, 3).unwrap()
+    let s = Statement.new(db, 31).unwrap()
+    let (status, none) = Statement.prepare(db, -1)
     if none.is_none():
         return Err(f"status {status}")
-    Ok(s.st_step())
+    Ok(s.step())
 
 fn question(l: Log) -> Result[i32, str]:
     let n = fails(l)?
     Ok(n)
 
 fn uses(d: &Database) -> i32:
-    let s = Statement.st_new(d, 81).unwrap()
-    s.st_step()
+    let s = Statement.new(d, 81).unwrap()
+    s.step()
 
 fn prepared(d: &Database, id: i32) -> Statement:
-    let (_, s) = Statement.db_prepare(d, id)
+    let (_, s) = Statement.prepare(d, id)
     s.unwrap()
 
 fn main:
     let l = log_new()
     if true:
-        let db = Database.db_new(l, 1).unwrap()
-        let (_, a) = Statement.db_prepare(db, 10)
-        let b = Statement.st_new(db, 11).unwrap()
+        let db = Database.new(l, 1).unwrap()
+        let (_, a) = Statement.prepare(db, 10)
+        let b = Statement.new(db, 11).unwrap()
         let _ = a.is_some()
-        let _ = b.st_step()
+        let _ = b.step()
     print(f"scope: {witness(l)}")
     log_reset(l)
     let _ = early(l, true)
@@ -87,52 +87,52 @@ fn main:
     print(f"question mark: {witness(l)}")
     log_reset(l)
     if true:
-        let db = Database.db_new(l, 4).unwrap()
+        let db = Database.new(l, 4).unwrap()
         for i in 1..4:
-            let s = Statement.st_new(db, 40 + i).unwrap()
+            let s = Statement.new(db, 40 + i).unwrap()
             if i == 3:
                 break
-            let _ = s.st_step()
+            let _ = s.step()
     print(f"loop: {witness(l)}")
     log_reset(l)
     if true:
-        let db = Database.db_new(l, 5).unwrap()
+        let db = Database.new(l, 5).unwrap()
         var all: Vec[Statement] = Vec.new()
         for i in 1..4:
-            all.push(Statement.st_new(db, 50 + i).unwrap())
+            all.push(Statement.new(db, 50 + i).unwrap())
         let _ = all.len()
     print(f"vec: {witness(l)}")
     log_reset(l)
     if true:
-        let db = Database.db_new(l, 6).unwrap()
-        let held = Statement.st_new(db, 61)
+        let db = Database.new(l, 6).unwrap()
+        let held = Statement.new(db, 61)
         let _ = held.is_some()
     print(f"option: {witness(l)}")
     log_reset(l)
     if true:
-        let db = Database.db_new(l, 7).unwrap()
-        match Statement.db_prepare(db, 71):
+        let db = Database.new(l, 7).unwrap()
+        match Statement.prepare(db, 71):
             (0, Some(s)) =>
-                let _ = s.st_step()
+                let _ = s.step()
             _ => ()
     print(f"match: {witness(l)}")
     log_reset(l)
     if true:
-        let db = Database.db_new(l, 8).unwrap()
+        let db = Database.new(l, 8).unwrap()
         let _ = uses(db)
     print(f"helper: {witness(l)}")
     log_reset(l)
     var step = 0
     if true:
-        let db = Database.db_new(l, 9).unwrap()
+        let db = Database.new(l, 9).unwrap()
         let s = prepared(db, 92)
-        step = s.st_step()
+        step = s.step()
     print(f"returned from helper: {step} {witness(l)}")
     log_reset(l)
     if true:
-        let db = Database.db_new(l, 1).unwrap()
-        let s = Statement.st_new(db, 10).unwrap()
-        let t = Statement.st_new(db, 11).unwrap()
-        print(f"steps: {s.st_step()} {t.st_step()}")
+        let db = Database.new(l, 1).unwrap()
+        let s = Statement.new(db, 10).unwrap()
+        let t = Statement.new(db, 11).unwrap()
+        print(f"steps: {s.step()} {t.step()}")
     log_free(l)
     print("ok")

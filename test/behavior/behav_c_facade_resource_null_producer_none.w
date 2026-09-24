@@ -25,10 +25,10 @@ c facade dbl:
 
 fn main:
     let c = counter_new()
-    match Database.db_new(c, -1):
+    match Database.new(c, -1):
         Some(_) => print("bad")
         None => print(f"none closes {counter_get(c)}")
-    match Database.db_new(c, 1):
+    match Database.new(c, 1):
         Some(d) => drop(d)
         None => print("bad")
     print(f"some closes {counter_get(c)}")

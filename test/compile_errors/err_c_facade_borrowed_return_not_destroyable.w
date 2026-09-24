@@ -1,4 +1,4 @@
-//! expect-check-fail: unknown method 'db_close_v2' for type 'BorrowedDatabase'
+//! expect-check-fail: unknown method 'close_v2' for type 'BorrowedDatabase'
 
 // D51 stage 6 (ruling §26: a borrowed return "cannot independently be
 // consumed or destroyed"): the database's destroyers are not presented on
@@ -20,8 +20,8 @@ c facade dbf:
 
 fn main:
     let l = log_new()
-    let db = Database.db_new(l, 1).unwrap()
-    let s = Statement.st_new(db, 10).unwrap()
-    let handle = s.st_db().unwrap()
-    let _ = handle.db_close_v2(0)
+    let db = Database.new(l, 1).unwrap()
+    let s = Statement.new(db, 10).unwrap()
+    let handle = s.db().unwrap()
+    let _ = handle.close_v2(0)
     print("x")

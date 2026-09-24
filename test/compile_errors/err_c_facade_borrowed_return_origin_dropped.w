@@ -19,8 +19,8 @@ c facade dbf:
 
 fn main:
     let l = log_new()
-    let db = Database.db_new(l, 1).unwrap()
-    let s = Statement.st_new(db, 10).unwrap()
-    let handle = s.st_db().unwrap()
+    let db = Database.new(l, 1).unwrap()
+    let s = Statement.new(db, 10).unwrap()
+    let handle = s.db().unwrap()
     drop(s)
     print(f"{handle.repr == null}")

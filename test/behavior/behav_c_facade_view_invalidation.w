@@ -33,12 +33,12 @@ c facade notes:
         lend
 
 fn main:
-    let n = Note.note_new(3).unwrap()
-    let child = Twin.twin_new(n).unwrap()
-    let t = n.note_text().unwrap()
-    let len = n.note_len()
+    let n = Note.new(3).unwrap()
+    let child = Twin.new(n).unwrap()
+    let t = n.text().unwrap()
+    let len = n.len()
     print(f"before: {t.to_str().unwrap()} {len}")
-    let _ = n.note_fill('x', 4)
-    print(f"after fill: {n.note_text().unwrap().to_str().unwrap()}")
-    print(f"child: {child.twin_id()}")
+    let _ = n.fill('x', 4)
+    print(f"after fill: {n.text().unwrap().to_str().unwrap()}")
+    print(f"child: {child.id()}")
     print("ok")

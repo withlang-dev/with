@@ -28,6 +28,8 @@ impl Sema:
                 self.collect_c_facade(di, decl)
         self.verify_facade_resources()
         self.report_facade_layout_errors()
+        self.verify_facade_assignments()
+        self.verify_facade_presentation()
         self.verify_facade_borrowed_returns()
         self.verify_facade_text_views()
         self.facade_index_call_effects()
@@ -344,14 +346,54 @@ impl Sema:
             let p = self.facade_resources[ri].producers[pi]
             let pn: str = self.pool_resolve(p)
             if not self.facade_constructor_rendered(ri, p):
-                self.emit_error(f"resource '{rname}': producer '{pn}' passed every facade check but no constructor '{rname}.{pn}' was rendered; the renderer cannot express this shape and did not say so — a compiler defect (§16.2b.4)", node)
+                let mn = self.facade_presented(ri, pn)
+                self.emit_error(f"resource '{rname}': producer '{pn}' passed every facade check but no constructor '{rname}.{mn}' was rendered; the renderer cannot express this shape and did not say so — a compiler defect (§16.2b.4)", node)
         self.verify_facade_dependency_shape(ri)
         self.apply_facade_dependency_effects(ri)
+
+    // The name operation `cname` is presented under on resource `ri`
+    // (compiler/FacadeRender.w facade_render_present, §16.2b.11): the
+    // renderer's own rule, read here so every net looks for what was
+    // rendered — the C name less the representation's prefix, or the item's
+    // `rename`, or the C name itself where shortening is ambiguous.
+    fn facade_presented(ri: i32, cname: &str) -> str:
+        facade_render_present(self.ast, self.pool, &self.decl_is_c_import, self.facade_resources[ri].node, cname)
+
+    // The resource a producer's first parameter receives when a borrow of it
+    // can hand C the parameter (FacadeRender.w facade_render_receiver): the
+    // receiver `db.prepare(sql)` is a method of, beside the constructor
+    // `Statement.prepare(db, sql)` — or -1.
+    fn facade_receiver_of(f: i32) -> i32:
+        let recv = self.facade_param_receives(f, 0)
+        if recv.len() != 1 or not self.facade_received_presentable(recv[0], f, 0):
+            return -1
+        recv[0]
+
+    // The signatures a producer of `ri` was rendered under: its
+    // constructor, and the receiver method on the parent its first
+    // parameter receives (a `from` producer, never the in-place `init`).
+    fn facade_producer_sigs(ri: i32, owner: i32, f: i32) -> Vec[i32]:
+        let out: Vec[i32] = Vec.new()
+        let rname: str = self.pool_resolve(self.facade_resources[ri].name)
+        let pn: str = self.pool_resolve(f)
+        let sig = self.facade_constructor_sig(rname ++ "." ++ self.facade_presented(ri, pn))
+        if sig >= 0:
+            out.push(sig)
+        if owner == FACADE_DEP_INIT:
+            return out
+        let host = self.facade_receiver_of(f)
+        if host < 0:
+            return out
+        let hn: str = self.pool_resolve(self.facade_resources[host].name)
+        let wsig = self.facade_constructor_sig(hn ++ "." ++ self.facade_presented(host, pn))
+        if wsig >= 0:
+            out.push(wsig)
+        out
 
     fn facade_constructor_rendered(ri: i32, p: i32) -> bool:
         let rname: str = self.pool_resolve(self.facade_resources[ri].name)
         let pn: str = self.pool_resolve(p)
-        let want = rname ++ "." ++ pn
+        let want = rname ++ "." ++ self.facade_presented(ri, pn)
         for di in 0..self.ast.decl_count():
             let decl = self.ast.get_decl(di)
             if self.ast.kind(decl) == NodeKind.NK_FN_DECL and self.safe_symbol_text(self.ast.get_data0(decl)) == want:
@@ -1061,6 +1103,31 @@ impl Sema:
             return false
         not self.facade_param_takes_resource(fn_sym, pi)
 
+    // Whether a parameter of type `p` receives the representation `repr`:
+    // the same type, or — C's own qualification conversion, as the renderer
+    // reads it (FacadeRender.w facade_render_repr_arg) — a `*const T`
+    // parameter receiving a `*mut T` handle: a read-only lend of a pointer
+    // resource (`counter_get(const Counter *)`).
+    fn facade_param_matches_repr(p: i32, repr: i32) -> bool:
+        if self.facade_same_type(p, repr):
+            return true
+        let rp = self.resolve_alias(p as TypeId)
+        let rr = self.resolve_alias(repr as TypeId)
+        if self.get_type_kind(rp) != TypeKind.TY_PTR or self.get_type_kind(rr) != TypeKind.TY_PTR:
+            return false
+        // A `const char *` input is a lent `str` (§16.3c), never the handle
+        // of an owned-text resource (`CHeapStr wraps *mut i8`).
+        if self.facade_type_is_c_string_ptr(repr):
+            return false
+        self.get_type_d1(rp) == 0 and self.get_type_d1(rr) != 0 and self.facade_same_type(self.get_type_d0(rp), self.get_type_d0(rr))
+
+    // The fn item describing the C function named `cname`, or -1.
+    fn facade_contract_named(cname: &str) -> i32:
+        for i in 0..self.foreign_contracts.len() as i32:
+            if self.safe_symbol_text(self.foreign_contracts[i].fn_sym) == cname:
+                return i
+        -1
+
     fn facade_param_takes_resource(fn_sym: i32, pi: i32) -> bool:
         let sig = self.get_sig(fn_sym)
         if sig < 0 or pi >= self.sig_get_param_count(sig):
@@ -1070,7 +1137,7 @@ impl Sema:
         for i in 0..self.facade_resources.len() as i32:
             let repr = self.resolve_alias(self.facade_resources[i].repr_tid as TypeId)
             if self.get_type_kind(repr) == TypeKind.TY_PTR or self.facade_resources[i].init != 0:
-                if self.facade_same_type(p as i32, repr as i32) or (pointee != 0 and self.facade_same_type(pointee, repr as i32)):
+                if self.facade_param_matches_repr(p as i32, repr as i32) or (pointee != 0 and self.facade_same_type(pointee, repr as i32)):
                     return true
         false
 
@@ -1132,7 +1199,7 @@ impl Sema:
             let repr = self.resolve_alias(self.facade_resources[i].repr_tid as TypeId)
             if self.get_type_kind(repr) != TypeKind.TY_PTR and self.facade_resources[i].init == 0:
                 continue
-            if self.facade_same_type(p as i32, repr as i32) or (pointee != 0 and self.facade_same_type(pointee, repr as i32)):
+            if self.facade_param_matches_repr(p as i32, repr as i32) or (pointee != 0 and self.facade_same_type(pointee, repr as i32)):
                 out.push(i)
         out
 
@@ -1145,7 +1212,7 @@ impl Sema:
         let p = self.resolve_alias(self.sig_param_type(sig, pi) as TypeId)
         let repr = self.resolve_alias(self.facade_resources[ri].repr_tid as TypeId)
         let pinned = self.facade_resources[ri].init != 0 and self.facade_resources[ri].movable == 0
-        if self.facade_same_type(p as i32, repr as i32):
+        if self.facade_param_matches_repr(p as i32, repr as i32):
             return not pinned
         if self.get_type_kind(repr) == TypeKind.TY_PTR:
             return false
@@ -1168,6 +1235,131 @@ impl Sema:
     fn facade_param_presentable(fn_sym: i32, pi: i32) -> bool:
         let recv = self.facade_param_receives(fn_sym, pi)
         recv.len() == 1 and self.facade_received_presentable(recv[0], fn_sym, pi)
+
+    // ── stage 8: assignment and presentation (ruling §14, §53-§55) ────────
+
+    // The resources an operation may be a method of: those its first
+    // parameter receives, narrowed to the one its fn item's `of` names when
+    // it names one of them (§16.2b.3: "an operation is callable through a
+    // resource only after the facade assigns it"). Several left means the
+    // facade has not assigned it (verify_facade_assignments); an `of`
+    // naming a resource the parameter does not receive is that error too.
+    fn facade_method_host(fn_sym: i32) -> Vec[i32]:
+        let recv = self.facade_param_receives(fn_sym, 0)
+        let ci = self.facade_contract_for(fn_sym)
+        if ci < 0 or self.foreign_contracts[ci].of_resource == 0 or recv.len() < 2:
+            return recv
+        let want: i32 = self.facade_resource_index.get(self.foreign_contracts[ci].of_resource).unwrap()
+        for i in 0..recv.len() as i32:
+            if recv[i] == want:
+                let one: Vec[i32] = Vec.new()
+                one.push(want)
+                return one
+        recv
+
+    // Ruling §14: "When a foreign representation maps to multiple modeled
+    // resources, an operation is callable through a modeled resource only
+    // after resource assignment is known. An unassigned `z_stream *`
+    // operation is rejected on both modeled resources, with a diagnostic
+    // naming the candidates." An fn item whose first parameter receives a
+    // representation several resources wrap states `of` naming one of them,
+    // or it is not presented on any — and the raw call stays raw (§16.2b.5).
+    // An item describing a resource's own clause operation (its producer,
+    // initializer or destroyer) is assigned by that clause.
+    mut fn verify_facade_assignments():
+        for ci in 0..self.foreign_contracts.len() as i32:
+            let fn_sym = self.foreign_contracts[ci].fn_sym
+            let node = self.foreign_contracts[ci].node
+            let fname: str = self.pool_resolve(fn_sym)
+            let sig = self.get_sig(fn_sym)
+            if sig < 0 or self.facade_fn_is_resource_op(fn_sym):
+                continue
+            let recv = self.facade_param_receives(fn_sym, 0)
+            if recv.len() == 0:
+                continue
+            self.update_decl_source_context(self.foreign_contracts[ci].decl)
+            let shown = self.facade_param_display(fn_sym, sig, 0)
+            var names = ""
+            var ofs = ""
+            for k in 0..recv.len() as i32:
+                let cn: str = self.pool_resolve(self.facade_resources[recv[k]].name)
+                names = names ++ (if k > 0: ", " else: "") ++ f"'{cn}'"
+                ofs = ofs ++ (if k > 0: " or " else: "") ++ f"'of {cn}'"
+            let of_res = self.foreign_contracts[ci].of_resource
+            if of_res != 0:
+                let of_ri: i32 = self.facade_resource_index.get(of_res).unwrap()
+                var received = false
+                for k in 0..recv.len() as i32:
+                    if recv[k] == of_ri: received = true
+                if not received:
+                    let on: str = self.pool_resolve(of_res)
+                    self.emit_error(f"fn '{fname}': 'of {on}' assigns it to a resource {shown} does not receive; it receives {names} — state {ofs} (§16.2b.3)", node)
+                continue
+            if recv.len() > 1:
+                self.emit_error_with_help(f"fn '{fname}': {shown} receives a representation several resources wrap ({names}); an operation is callable through a resource only after the facade assigns it, so '{fname}' is not presented on any of them (§16.2b.3)", node, f"state {ofs} on this fn item")
+
+    // Whether a resource clause names `fn_sym` (`from`, `init`, `preinit`,
+    // `drop`, `destroys`): the clause assigns it.
+    fn facade_fn_is_resource_op(fn_sym: i32) -> bool:
+        for ri in 0..self.facade_resources.len() as i32:
+            let r = &self.facade_resources[ri]
+            if self.facade_same_fn(r.init, fn_sym) or self.facade_same_fn(r.preinit, fn_sym) or self.facade_same_fn(r.drop, fn_sym):
+                return true
+            for k in 0..r.producers.len() as i32:
+                if self.facade_same_fn(r.producers[k], fn_sym): return true
+            for k in 0..r.destroyers.len() as i32:
+                if self.facade_same_fn(r.destroyers[k], fn_sym): return true
+        false
+
+    // Ruling §55: "If automatic grouping is ambiguous, method sugar may
+    // simply be omitted while the underlying modeled foreign operation
+    // remains available." Two operations of one resource that shorten to
+    // one name, or one that shortens to another's imported name, keep
+    // their imported names (compiler/FacadeRender.w facade_render_present),
+    // and this says so, naming the candidates and the `rename` that settles
+    // it — a warning, since the program is valid and every operation is
+    // reachable. Two explicit renames to one name, or a rename to another
+    // operation's name, are an error: the facade said two things.
+    mut fn verify_facade_presentation():
+        for ri in 0..self.facade_resources.len() as i32:
+            let rname: str = self.pool_resolve(self.facade_resources[ri].name)
+            let rnode = self.facade_resources[ri].node
+            let ops = facade_render_presented_ops(self.ast, self.pool, &self.decl_is_c_import, rnode)
+            var noted: Vec[str] = Vec.new()
+            for oi in 0..ops.len() as i32:
+                let cname = ops[oi]
+                let short = facade_render_shortened(self.ast, self.pool, rnode, cname)
+                let clash = facade_render_presentation_clash(self.ast, self.pool, &self.decl_is_c_import, rnode, cname)
+                if clash.len() == 0:
+                    continue
+                var seen = false
+                for k in 0..noted.len() as i32:
+                    if noted[k] == short: seen = true
+                if seen:
+                    continue
+                noted.push(short.clone())
+                let ci = self.facade_contract_named(cname)
+                let node = if ci >= 0: self.foreign_contracts[ci].node else: rnode
+                let decl = if ci >= 0: self.foreign_contracts[ci].decl else: self.facade_resources[ri].decl
+                self.update_decl_source_context(decl)
+                self.emit_warning(f"resource '{rname}': '{cname}' would be presented as '{short}', the name of {clash}; the compiler never picks, so '{cname}' keeps its imported name on '{rname}' — state 'rename' on an fn item describing it to settle the spelling (§16.2b.11)", node)
+            // Two explicit spellings of one name: an error.
+            let renamed = facade_render_renamed_ops(self.ast, self.pool, &self.decl_is_c_import, rnode)
+            for a in 0..renamed.len() as i32:
+                let ca = renamed[a]
+                let na = facade_render_present(self.ast, self.pool, &self.decl_is_c_import, rnode, ca)
+                for b in 0..ops.len() as i32:
+                    let cb = ops[b]
+                    if cb == ca:
+                        continue
+                    let nb = facade_render_present(self.ast, self.pool, &self.decl_is_c_import, rnode, cb)
+                    if nb != na:
+                        continue
+                    let ci = self.facade_contract_named(ca)
+                    let node = if ci >= 0: self.foreign_contracts[ci].node else: rnode
+                    self.update_decl_source_context(if ci >= 0: self.foreign_contracts[ci].decl else: self.facade_resources[ri].decl)
+                    self.emit_error(f"resource '{rname}': '{ca}' is renamed '{na}', and '{cb}' is presented as '{nb}' on '{rname}' too; two operations of one resource cannot share a name — rename one (§16.2b.11)", node)
+                    break
 
     // A resource's producers, as owners of dependencies: each `from` by its
     // index, and the `init` as FACADE_DEP_INIT.
@@ -1305,27 +1497,28 @@ impl Sema:
             let parents = self.facade_producer_parents(ri, owner)
             if f == 0 or parents.len() == 0:
                 continue
-            let pn: str = self.pool_resolve(f)
-            let sig = self.facade_constructor_sig(rname ++ "." ++ pn)
-            if sig < 0:
-                continue
             // The constructor's parameters are C's, less the out slot; an
             // in-place constructor's are preinit's, then init's after `self`.
+            // The receiver method on a parent (`db.prepare(sql)`) has the
+            // same indices: its `self` is C's first parameter.
             var shift = 0
             if owner == FACADE_DEP_INIT and self.facade_resources[ri].preinit != 0:
                 shift = self.sig_get_param_count(self.get_sig(self.facade_resources[ri].preinit))
             let slot = self.facade_owner_skip(ri, owner)
-            for k in 0..parents.len() as i32:
-                let c_pi: i32 = parents[k]
-                var pi = c_pi
-                if owner == FACADE_DEP_INIT:
-                    pi = shift + c_pi - 1
-                else if slot >= 0 and c_pi > slot:
-                    pi = c_pi - 1
-                let eff = self.sig_param_effect(sig, pi) | EFF_ESCAPE_VIEW
-                self.set_sig_param_effect(sig, pi, eff)
-                self.set_sig_param_direct_effect(sig, pi, eff)
-                self.set_sig_param_view_origin(sig, pi, self.sig_param_view_origin(sig, pi) | sema_param_origin_bit(pi))
+            let sigs = self.facade_producer_sigs(ri, owner, f)
+            for si in 0..sigs.len() as i32:
+                let sig = sigs[si]
+                for k in 0..parents.len() as i32:
+                    let c_pi: i32 = parents[k]
+                    var pi = c_pi
+                    if owner == FACADE_DEP_INIT:
+                        pi = shift + c_pi - 1
+                    else if slot >= 0 and c_pi > slot:
+                        pi = c_pi - 1
+                    let eff = self.sig_param_effect(sig, pi) | EFF_ESCAPE_VIEW
+                    self.set_sig_param_effect(sig, pi, eff)
+                    self.set_sig_param_direct_effect(sig, pi, eff)
+                    self.set_sig_param_view_origin(sig, pi, self.sig_param_view_origin(sig, pi) | sema_param_origin_bit(pi))
 
     // The signature of a rendered constructor `R.p`, or -1.
     fn facade_constructor_sig(want: &str) -> i32:
@@ -1638,7 +1831,7 @@ impl Sema:
                 let why = if n == 0: "receives no modeled resource, and With does not invent an origin (§16.2b.7)" else: "receives a representation several resources wrap; the facade has not assigned it (§16.2b.3)"
                 self.emit_error(f"fn '{fname}': 'returns borrow {rn} from param {from}' names {shown}, which {why}; a borrowed '{rn}' is a view of the resource its origin parameter receives (§16.2b.6)", node)
                 continue
-            let recv0 = self.facade_param_receives(fn_sym, 0)
+            let recv0 = self.facade_method_host(fn_sym)
             let ci0 = self.facade_contract_for(fn_sym)
             if recv0.len() != 1 or self.foreign_contracts[ci0].destroys != 0 or self.foreign_contracts[ci0].consumes.len() > 0 or self.foreign_contracts[ci0].retains.len() > 0:
                 let shown0 = self.facade_param_display(fn_sym, sig, 0)
@@ -1667,8 +1860,7 @@ impl Sema:
                 self.emit_error(f"fn '{fname}': 'returns borrow {rn}' passed every facade check but no type '{bn}' was rendered; the renderer cannot express this shape and did not say so — a compiler defect (§16.2b.6)", node)
                 continue
             let host: str = self.pool_resolve(self.facade_resources[recv0[0]].name)
-            let msym = if self.foreign_contracts[ci].rename != 0: self.foreign_contracts[ci].rename else: fn_sym
-            let mname: str = self.pool_resolve(msym)
+            let mname = self.facade_presented(recv0[0], fname)
             let mtext = host ++ "." ++ mname
             let msig: i32 = if self.sig_text_index.contains(mtext): self.sig_text_index.get(mtext).unwrap() else: -1
             if msig < 0:
@@ -1705,7 +1897,7 @@ impl Sema:
         let from = self.foreign_contracts[ci].returns_borrow_from
         let domain = self.foreign_contracts[ci].returns_borrow_domain
         let what = if self.foreign_contracts[ci].returns_static_tid != 0: "returns static CStr" else: "returns borrow CStr"
-        let recv0 = self.facade_param_receives(fn_sym, 0)
+        let recv0 = self.facade_method_host(fn_sym)
         let hosted = recv0.len() == 1 and self.foreign_contracts[ci].destroys == 0 and self.foreign_contracts[ci].consumes.len() == 0 and self.foreign_contracts[ci].retains.len() == 0
         if self.diags.has_errors():
             return
@@ -1725,8 +1917,7 @@ impl Sema:
             self.facade_presented_syms.insert(fn_sym, 1)
             return
         let host: str = self.pool_resolve(self.facade_resources[recv0[0]].name)
-        let msym = if self.foreign_contracts[ci].rename != 0: self.foreign_contracts[ci].rename else: fn_sym
-        let mname: str = self.pool_resolve(msym)
+        let mname = self.facade_presented(recv0[0], fname)
         let hosts: Vec[str] = Vec.new()
         hosts.push(host.clone())
         hosts.push(facade_render_borrowed_name(host))
@@ -1808,11 +1999,10 @@ impl Sema:
                 continue
             // The rendered lend method of the resource param 0 receives: the
             // parameter indices are the C ones (self is 0).
-            let recv0 = self.facade_param_receives(fn_sym, 0)
+            let recv0 = self.facade_method_host(fn_sym)
             if recv0.len() != 1:
                 continue
-            let msym = if self.foreign_contracts[ci].rename != 0: self.foreign_contracts[ci].rename else: fn_sym
-            let mname: str = self.pool_resolve(msym)
+            let mname = self.facade_presented(recv0[0], self.pool_resolve(fn_sym))
             let host: str = self.pool_resolve(self.facade_resources[recv0[0]].name)
             let hosts: Vec[str] = Vec.new()
             hosts.push(host ++ "." ++ mname)
@@ -1832,9 +2022,8 @@ impl Sema:
                 let f = self.facade_owner_fn(ri, owner)
                 if f == 0:
                     continue
-                let pn: str = self.pool_resolve(f)
-                let sig = self.facade_constructor_sig(rname ++ "." ++ pn)
-                if sig < 0:
+                let sigs = self.facade_producer_sigs(ri, owner, f)
+                if sigs.len() == 0:
                     continue
                 let ci = self.facade_contract_for(f)
                 let domains = self.facade_domains_touched(self.facade_fn_file(f), ci)
@@ -1854,7 +2043,8 @@ impl Sema:
                         pi = c_pi - 1
                     mask = mask | sema_param_origin_bit(pi)
                 if mask != 0 or domains.len() > 0:
-                    self.facade_add_call_effect(sig, f, ci, mask, &domains, -1, -1)
+                    for si in 0..sigs.len() as i32:
+                        self.facade_add_call_effect(sigs[si], f, ci, mask, &domains, -1, -1)
 
     mut fn facade_add_call_effect(sig: i32, fn_sym: i32, ci: i32, mask: i32, domains: &Vec[i32], borrow: i32, borrow_param: i32):
         if self.facade_call_effect_index.contains(sig):

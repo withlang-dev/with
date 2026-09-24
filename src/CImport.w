@@ -1842,7 +1842,7 @@ fn ci_extract_struct_name_from_ptr(ty: &str) -> str:
 
 // Compute snake_case prefix from a CamelCase struct name.
 // GHashTable → "g_hash_table_", sqlite3 → "sqlite3_", SDL_Window → "sdl_window_"
-fn ci_compute_snake_prefix(name: &str) -> str:
+pub fn ci_compute_snake_prefix(name: &str) -> str:
     let len = name.len() as i32
     if len == 0:
         return ""
@@ -1892,7 +1892,7 @@ fn ci_char_lower(ch: i32) -> str:
 
 // Check if fn_name starts with the given snake_case prefix.
 // Returns the method name (suffix after prefix) or "" if no match.
-fn ci_strip_snake_prefix(fn_name: &str, prefix: &str) -> str:
+pub fn ci_strip_snake_prefix(fn_name: &str, prefix: &str) -> str:
     let plen = prefix.len() as i32
     let flen = fn_name.len() as i32
     if flen <= plen:
@@ -1904,7 +1904,7 @@ fn ci_strip_snake_prefix(fn_name: &str, prefix: &str) -> str:
 // Strip struct name prefix from function name.
 // "MyStruct_init" with struct "MyStruct" → "init"
 // "mystruct_init" with struct "MyStruct" → "init" (case-insensitive prefix match)
-fn ci_strip_struct_prefix(fn_name: &str, struct_name: &str) -> str:
+pub fn ci_strip_struct_prefix(fn_name: &str, struct_name: &str) -> str:
     let slen = struct_name.len() as i32
     let flen = fn_name.len() as i32
     // Need at least prefix + '_' + one char

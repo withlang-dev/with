@@ -20,7 +20,7 @@ c facade dbf:
 
 fn main:
     let l = log_new()
-    let db = Database.db_new(l, 1).unwrap()
-    let (_, s) = Statement.db_prepare(db, 10)
-    let rc = db.db_close_v2(0)
+    let db = Database.new(l, 1).unwrap()
+    let (_, s) = Statement.prepare(db, 10)
+    let rc = db.close_v2(0)
     print(f"{s.is_some()} {rc}")

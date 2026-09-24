@@ -18,5 +18,5 @@ c facade dbl:
         ok DB_OK
 
 fn main:
-    let (status, db) = Database.db_open("x.db")
+    let (status, db) = Database.open("x.db")
     print(f"{status} {db.is_some()}")

@@ -16,6 +16,6 @@ c facade notes:
 fn main:
     var t: Option[CStr] = None
     if true:
-        let n = Note.note_new(1).unwrap()
-        t = n.note_text()
+        let n = Note.new(1).unwrap()
+        t = n.text()
     print(f"{t.is_some()}")

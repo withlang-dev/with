@@ -31,8 +31,8 @@ c facade dbf:
 
 fn main:
     let l = log_new()
-    let a = Database.db_new(l, 1).unwrap()
-    let b = Database.db_new(l, 2).unwrap()
+    let a = Database.new(l, 1).unwrap()
+    let b = Database.new(l, 2).unwrap()
     let link = Link.link_new(a, b, 3).unwrap()
     drop(a)
     print("end")

@@ -31,7 +31,7 @@ c facade dbf:
 
 fn main:
     let l = log_new()
-    let db = Database.db_new(l, 1).unwrap()
+    let db = Database.new(l, 1).unwrap()
     let iter = Iter.it_init(db, 2)
     drop(db)
     print("end")

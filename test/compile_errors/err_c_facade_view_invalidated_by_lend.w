@@ -16,7 +16,7 @@ c facade notes:
         lend
 
 fn main:
-    let n = Note.note_new(3).unwrap()
-    let t = n.note_text().unwrap()
-    let _ = n.note_fill('x', 4)
+    let n = Note.new(3).unwrap()
+    let t = n.text().unwrap()
+    let _ = n.fill('x', 4)
     print(f"{t.len()}")

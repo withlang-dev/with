@@ -5,7 +5,7 @@
 //! expect-stdout: ok
 
 // D51 stage 7 (ruling §32, §41, §42; spec §16.2b.8): `returns borrow CStr
-// from param 0` on `note_text(note *)` renders `Note.note_text() ->
+// from param 0` on `note_text(note *)` renders `Note.text() ->
 // Option[CStr]` — the nullable foreign string is an Option of the borrowed
 // text, a view of the note that NULL turns into None. Conversion is
 // explicit: `to_str` validates (a `&str` over the same bytes), `to_owned`
@@ -30,11 +30,11 @@ c facade notes:
         preserves param 0
 
 fn main:
-    let n = Note.note_new(7).unwrap()
-    let t = n.note_text().unwrap()
+    let n = Note.new(7).unwrap()
+    let t = n.text().unwrap()
     print(f"text: {t.to_str().unwrap()} len={t.len()} owned={t.to_owned()}")
-    let empty = Note.note_new(-1).unwrap()
-    print(f"empty: {empty.note_text().is_none()}")
+    let empty = Note.new(-1).unwrap()
+    print(f"empty: {empty.text().is_none()}")
     let d = NoteText.strdup("dup").unwrap()
     let v = d.as_cstr()
     print(f"dup: {v.to_str().unwrap()} {v.len()}")

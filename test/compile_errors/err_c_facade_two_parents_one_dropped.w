@@ -32,8 +32,8 @@ c facade dbf:
 
 fn main:
     let l = log_new()
-    let src = Database.db_new(l, 1).unwrap()
-    let dest = Database.db_new(l, 2).unwrap()
+    let src = Database.new(l, 1).unwrap()
+    let dest = Database.new(l, 2).unwrap()
     let backup = Backup.backup_init(dest, src, 3)
     drop(src)
     print("end")

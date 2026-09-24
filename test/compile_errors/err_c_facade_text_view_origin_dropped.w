@@ -12,7 +12,7 @@ c facade notes:
         returns borrow CStr from param 0
 
 fn main:
-    let n = Note.note_new(1).unwrap()
-    let t = n.note_text().unwrap()
+    let n = Note.new(1).unwrap()
+    let t = n.text().unwrap()
     drop(n)
     print(f"{t.len()}")

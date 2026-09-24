@@ -23,6 +23,6 @@ c facade dbf:
 fn main:
     let l = log_new()
     var keep: Option[Statement] = None
-    let db = Database.db_new(l, 1).unwrap()
-    keep = Statement.st_new(db, 10)
+    let db = Database.new(l, 1).unwrap()
+    keep = Statement.new(db, 10)
     print("end")

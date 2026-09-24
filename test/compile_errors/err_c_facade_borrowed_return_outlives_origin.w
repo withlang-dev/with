@@ -20,9 +20,9 @@ c facade dbf:
 
 fn main:
     let l = log_new()
-    let db = Database.db_new(l, 1).unwrap()
+    let db = Database.new(l, 1).unwrap()
     var handle: Option[BorrowedDatabase] = None
     if true:
-        let s = Statement.st_new(db, 10).unwrap()
-        handle = s.st_db()
+        let s = Statement.new(db, 10).unwrap()
+        handle = s.db()
     print(f"{handle.is_some()}")

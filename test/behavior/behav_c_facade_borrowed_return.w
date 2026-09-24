@@ -4,7 +4,7 @@
 //! expect-stdout: ok
 
 // D51 stage 6, ruling §26: `returns borrow Database from param 0` on
-// `st_db(st *)` renders `Statement.st_db() -> Option[BorrowedDatabase]`.
+// `st_db(st *)` renders `Statement.db() -> Option[BorrowedDatabase]`.
 // `BorrowedDatabase` has no Drop (nothing is closed through it — the log
 // shows one finalize and one close), cannot outlive the statement, and
 // carries the database's lend methods (`db_id`) and none of its destroyers.
@@ -45,11 +45,11 @@ fn witness(l: Log) -> str:
 fn main:
     let l = log_new()
     if true:
-        let db = Database.db_new(l, 1).unwrap()
-        let s = Statement.st_new(db, 10).unwrap()
-        let handle = s.st_db().unwrap()
-        print(f"borrowed: id {db.db_id()} through {handle.db_id()}")
-        print(f"nullable: some={s.st_db_or_null(1).is_some()} none={s.st_db_or_null(0).is_none()}")
+        let db = Database.new(l, 1).unwrap()
+        let s = Statement.new(db, 10).unwrap()
+        let handle = s.db().unwrap()
+        print(f"borrowed: id {db.id()} through {handle.id()}")
+        print(f"nullable: some={s.db_or_null(1).is_some()} none={s.db_or_null(0).is_none()}")
     print(f"order: {witness(l)}")
     log_free(l)
     print("ok")

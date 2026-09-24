@@ -29,9 +29,9 @@ c facade dbl:
         destroys
 
 fn destroy_v2() -> *mut db:
-    let a = Database.db_new(1).unwrap()
+    let a = Database.new(1).unwrap()
     let p = a.repr
-    let status = a.db_close_v2(42)
+    let status = a.close_v2(42)
     print(f"status {status}")
     // The observer reads through the pointer (raw C); the resource
     // operations need no `unsafe`.
@@ -41,12 +41,12 @@ fn destroy_v2() -> *mut db:
 fn main:
     let p = destroy_v2()
     unsafe { print(f"still {db_closed(p)}") }
-    let b = Database.db_new(2).unwrap()
+    let b = Database.new(2).unwrap()
     let pb = b.repr
     drop(b)
     unsafe { print(f"dropped {db_closed(pb)}") }
-    let c = Database.db_new(3).unwrap()
+    let c = Database.new(3).unwrap()
     let pc = c.repr
-    c.db_close()
+    c.close()
     unsafe { print(f"same-fn {db_closed(pc)}") }
     print("ok")

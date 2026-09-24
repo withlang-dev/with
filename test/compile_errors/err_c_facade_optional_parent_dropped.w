@@ -31,7 +31,7 @@ c facade dbf:
 
 fn main:
     let l = log_new()
-    let db = Database.db_new(l, 1).unwrap()
-    let opened = Cursor.cur_open(db, 2)
+    let db = Database.new(l, 1).unwrap()
+    let opened = Cursor.open(db, 2)
     drop(db)
     print("end")

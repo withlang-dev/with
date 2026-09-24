@@ -19,8 +19,8 @@ c facade dbf:
         destroys
 
 fn make(l: Log) -> Statement:
-    let db = Database.db_new(l, 1).unwrap()
-    Statement.st_new(db, 10).unwrap()
+    let db = Database.new(l, 1).unwrap()
+    Statement.new(db, 10).unwrap()
 
 fn main:
-    print(f"{make(log_new()).st_step()}")
+    print(f"{make(log_new()).step()}")

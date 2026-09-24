@@ -44,11 +44,11 @@ c facade names:
 
 fn main:
     let c = counter_new()
-    let direct = Database.db_new(c, 5).unwrap()
+    let direct = Database.new(c, 5).unwrap()
     let t = unsafe { db_tag(direct.repr) }
     drop(direct)
     print(f"direct repr={t} closes={counter_closes(c)}")
-    let (st, made) = Database.db_open(c, 9)
+    let (st, made) = Database.open(c, 9)
     let d = made.unwrap()
     let t2 = unsafe { db_tag(d.repr) }
     drop(d)

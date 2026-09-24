@@ -404,5 +404,5 @@ impl TokenList:
         }
 
 // Also expose a keyword_lookup alias for the lexer.
-fn keyword_lookup(text: &str) -> i32:
+pub fn keyword_lookup(text: &str) -> i32:
     tag_from_keyword(text)

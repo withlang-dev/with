@@ -43,10 +43,10 @@ impl StatementCache:
     mut fn step(id: i32) -> i32:
         for i in 0..self.ids.len() as i32:
             if self.ids[i] == id:
-                return self.stmts[i].st_step()
+                return self.stmts[i].step()
         self.ids.push(id)
-        self.stmts.push(Statement.st_new(&*self.db, id).unwrap())
-        self.stmts[self.stmts.len() as i32 - 1].st_step()
+        self.stmts.push(Statement.new(&*self.db, id).unwrap())
+        self.stmts[self.stmts.len() as i32 - 1].step()
 
     fn prepared(): self.stmts.len()
 
@@ -63,7 +63,7 @@ fn witness(l: Log) -> str:
 fn main:
     let l = log_new()
     if true:
-        let db = Database.db_new(l, 1).unwrap()
+        let db = Database.new(l, 1).unwrap()
         if true:
             var cache = StatementCache.over(db)
             let a = cache.step(10)
@@ -77,9 +77,9 @@ fn main:
     print(f"closed after: {witness(l)}")
     log_reset(l)
     if true:
-        let db = Database.db_new(l, 1).unwrap()
-        let app = App { db: db, stmt: Statement.st_new(db, 20).unwrap() }
-        print(f"app: {app.stmt.st_step()}")
+        let db = Database.new(l, 1).unwrap()
+        let app = App { db: db, stmt: Statement.new(db, 20).unwrap() }
+        print(f"app: {app.stmt.step()}")
     print(f"app dropped: {witness(l)}")
     log_free(l)
     print("ok")

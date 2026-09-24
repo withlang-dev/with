@@ -2,7 +2,7 @@
 
 // D51 §16.2b.5: a lend of a resource is safe because With proves the
 // resource live, unmoved and undestroyed — which it cannot prove of a raw
-// pointer. The lend is rendered as the method `d.db_count()`; the C name
+// pointer. The lend is rendered as the method `d.count()`; the C name
 // called on a raw pointer stays raw (a null or dangling handle would reach C).
 
 use c_import("typedef struct db db;

@@ -37,39 +37,39 @@ fn witness(l: Log) -> str:
     out
 
 fn two(l: Log) -> Result[i32, StatementError]:
-    let db = Database.db_new(l, 3).unwrap()
-    let a = Statement.st_prepare(db, 30)?
-    let b = Statement.st_prepare(db, 31)?
-    let c = Statement.st_prepare(db, 0)?
-    Ok(a.st_step() + b.st_step() + c.st_step())
+    let db = Database.new(l, 3).unwrap()
+    let a = Statement.prepare(db, 30)?
+    let b = Statement.prepare(db, 31)?
+    let c = Statement.prepare(db, 0)?
+    Ok(a.step() + b.step() + c.step())
 
 fn main:
     let l = log_new()
     var step = 0
     var shown = ""
     if true:
-        let db = Database.db_new(l, 1).unwrap()
-        let s = Statement.st_prepare(db, 10).unwrap()
-        step = s.st_step()
+        let db = Database.new(l, 1).unwrap()
+        let s = Statement.prepare(db, 10).unwrap()
+        step = s.step()
     print(f"ok: {step} {witness(l)}")
     log_reset(l)
     if true:
-        let db = Database.db_new(l, 1).unwrap()
-        match Statement.st_prepare(db, 0):
+        let db = Database.new(l, 1).unwrap()
+        match Statement.prepare(db, 0):
             Err(e) => shown = f"{e:?}"
             Ok(_) => print("unexpected")
     print(f"failed: {shown} {witness(l)}")
     log_reset(l)
     if true:
-        let db = Database.db_new(l, 2).unwrap()
-        match Statement.st_prepare(db, -20):
+        let db = Database.new(l, 2).unwrap()
+        match Statement.prepare(db, -20):
             Err(e) => shown = f"{e:?}"
             Ok(_) => print("unexpected")
     print(f"failed but produced: {shown} {witness(l)}")
     log_reset(l)
     if true:
-        let db = Database.db_new(l, 2).unwrap()
-        match Statement.st_prepare(db, 99):
+        let db = Database.new(l, 2).unwrap()
+        match Statement.prepare(db, 99):
             Err(e) => shown = f"{e:?}"
             Ok(_) => print("unexpected")
     print(f"nothing produced: {shown} {witness(l)}")
