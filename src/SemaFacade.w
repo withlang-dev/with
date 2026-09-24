@@ -386,7 +386,14 @@ impl Sema:
         if host < 0:
             return out
         let hn: str = self.pool_resolve(self.facade_resources[host].name)
-        let wsig = self.facade_constructor_sig(hn ++ "." ++ self.facade_presented(host, pn))
+        let wtext = hn ++ "." ++ self.facade_presented(host, pn)
+        var wsig = self.facade_constructor_sig(wtext)
+        // The receiver method is rendered inside `impl Host:`, so its
+        // declaration is named by the method alone and its signature by the
+        // qualified text (stage 12: `db.prepare(…)` let a statement outlive
+        // its database while `Statement.prepare(db, …)` refused it).
+        if wsig < 0 and self.sig_text_index.contains(wtext):
+            wsig = self.sig_text_index.get(wtext).unwrap()
         if wsig >= 0:
             out.push(wsig)
         out
@@ -879,7 +886,7 @@ impl Sema:
             if self.pool_resolve(res) == "CStr":
                 if not self.facade_type_is_c_string_ptr(self.sig_return_type(sig)):
                     let rt: str = self.type_name(self.sig_return_type(sig))
-                    self.emit_error(f"fn '{fname}' returns {rt}, not a C string ('char *'); 'returns borrow CStr' describes a NUL-terminated foreign string (§16.2b.8)", clause)
+                    self.emit_error(f"fn '{fname}' returns {rt}, not a C string ('char *' or 'unsigned char *'); 'returns borrow CStr' describes a NUL-terminated foreign string (§16.2b.8)", clause)
                     return c
                 if domain != 0:
                     if not self.facade_domains.contains(domain):
@@ -933,7 +940,7 @@ impl Sema:
                 return c
             if not self.facade_type_is_c_string_ptr(self.sig_return_type(sig)):
                 let rt: str = self.type_name(self.sig_return_type(sig))
-                self.emit_error(f"fn '{fname}' returns {rt}, not a C string ('char *'); 'returns static CStr' describes a NUL-terminated foreign string (§16.2b.8)", clause)
+                self.emit_error(f"fn '{fname}' returns {rt}, not a C string ('char *' or 'unsigned char *'); 'returns static CStr' describes a NUL-terminated foreign string (§16.2b.8)", clause)
                 return c
             c.returns_static_tid = tid
             return c
@@ -2355,14 +2362,18 @@ impl Sema:
                 self.facade_declare_view_of_param(msig, 0)
 
     // A NUL-terminated C string's pointer as c_import spells it: `char *`
-    // and `const char *` alike (`*mut i8`, `*const i8`, aliases chased).
+    // and `const char *` alike (`*mut i8`, `*const i8`, aliases chased),
+    // and `unsigned char *` (`*const u8`): sqlite3_column_text's spelling
+    // of the same NUL-terminated bytes — `CStr` makes no claim about the
+    // bytes (§16.2b.8), so their C signedness is not evidence of anything.
     fn facade_type_is_c_string_ptr(tid: i32) -> bool:
         if tid == 0:
             return false
         let r = self.resolve_alias(tid as TypeId)
         if self.get_type_kind(r) != TypeKind.TY_PTR:
             return false
-        self.resolve_alias(self.get_type_d0(r) as TypeId) == self.ty_i8
+        let pointee = self.resolve_alias(self.get_type_d0(r) as TypeId)
+        pointee == self.ty_i8 or pointee == self.ty_u8
 
     fn facade_sig_returns_option_cstr(sig: i32) -> bool:
         let r = self.resolve_alias(self.sig_return_type(sig) as TypeId)

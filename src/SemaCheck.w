@@ -17681,6 +17681,8 @@ impl Sema:
                 expected_ty = variant_payload_tys[ai]
             else if callable_value_tid != 0:
                 expected_ty = self.fn_type_param_type(callable_value_tid, ai + param_offset)
+            if expected_ty == 0 and arg_node > 0 and self.ast.kind(arg_node) == NodeKind.NK_NULL_LIT:
+                expected_ty = self.null_arg_expected_type(fn_sym, ai + param_offset, false)
             if arg_node == 0:
                 arg_types.push(0)
                 continue
@@ -21559,6 +21561,48 @@ impl Sema:
 
         0
 
+    // A `null` argument takes its pointer type from the parameter it fills
+    // — through a method or a generic function as through a plain one, so
+    // `db.prepare(sql, -1, null)` needs no typed local for the tail pointer
+    // it does not want (§16.2b, D51 stage 12). `ai` is the argument's
+    // index; through a method call the parameter is one further when the
+    // fn takes `self` (`Type.make(null)` is a static fn without one). A
+    // generic template's parameter is used only when its type names no
+    // type parameter of the fn; a method generic through its impl alone is
+    // left to the ordinary path.
+    mut fn null_arg_expected_type(fn_sym: i32, ai: i32, method_call: bool) -> i32:
+        if fn_sym == 0:
+            return 0
+        var param_i = ai
+        if method_call:
+            let node = if self.fn_decl_nodes.contains(fn_sym): self.fn_decl_nodes.get(fn_sym).unwrap() else: self.generic_fn_node_for_symbol(fn_sym)
+            let m = if node != 0: self.ast.find_fn_meta(node) else: -1
+            if m >= 0 and self.ast.fn_meta_param_count(m) > 0 and self.ast.fn_param_name(self.ast.fn_meta_param_start(m), 0) == self.pool_intern("self"):
+                param_i = ai + 1
+        let sig = self.get_sig(fn_sym)
+        if sig >= 0:
+            if param_i >= self.sig_get_param_count(sig):
+                return 0
+            return self.null_literal_target_type(self.sig_param_type(sig, param_i) as TypeId) as i32
+        let fn_node = self.generic_fn_node_for_symbol(fn_sym)
+        if fn_node == 0:
+            return 0
+        let meta = self.ast.find_fn_meta(fn_node)
+        if meta < 0 or param_i >= self.ast.fn_meta_param_count(meta):
+            return 0
+        let tp_count = self.ast.fn_meta_tp_count(meta)
+        if tp_count == 0:
+            return 0
+        let ty_node = self.ast.fn_param_type(self.ast.fn_meta_param_start(meta), param_i)
+        if ty_node == 0:
+            return 0
+        var pos = self.ast.fn_meta_tp_start(meta)
+        for ti in 0..tp_count:
+            if self.type_expr_mentions_type_param(ty_node, self.ast.get_extra(pos)) != 0:
+                return 0
+            pos = pos + 2 + self.ast.get_extra(pos + 1)
+        self.null_literal_target_type(self.resolve_type_expr(ty_node)) as i32
+
     fn method_expected_arg_type(recv_type: i32, field: i32, arg_index: i32) -> i32:
         if recv_type == 0:
             return 0
@@ -22589,6 +22633,9 @@ impl Sema:
                 mc_expected = mc_static_variant_payload_tys[ai]
             if mc_expected == 0 and facade_mi >= 0 and facade_ud_ty != 0 and ai == self.facade_callback_methods[facade_mi].callback_param:
                 mc_expected = self.facade_callback_expected_type(facade_mi, obj_type as i32, field, facade_ud_ty)
+            if mc_expected == 0 and self.ast.kind(mc_arg_node) == NodeKind.NK_NULL_LIT:
+                let mc_null_fn = if mc_method_fn_for_resolution != 0: mc_method_fn_for_resolution else: if mc_owner_sym_for_effect != 0: self.lookup_generic_method_fn(mc_owner_sym_for_effect, field) else: 0
+                mc_expected = self.null_arg_expected_type(mc_null_fn, ai, true)
             let mc_arg_ty = if facade_ud_node != 0 and mc_arg_node == facade_ud_node: facade_ud_ty as TypeId
                 else if mc_expected != 0: self.check_expr_with_expected(mc_arg_node, mc_expected as TypeId)
                 else: self.check_expr_value_context(mc_arg_node)

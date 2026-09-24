@@ -1936,7 +1936,7 @@ pub fn ci_strip_struct_prefix(fn_name: &str, struct_name: &str) -> str:
 /// so a C parameter named `N`, `Z` or `C` (sqlite3.h) would parse as a
 /// refutable pattern and the wrapper body's `N` as an undefined variable.
 /// Such names get a `p_` prefix; reserved names escape as everywhere else.
-fn ci_escape_param_name(pname: &str) -> str:
+pub fn ci_escape_param_name(pname: &str) -> str:
     let escaped = ci_escape_reserved(pname)
     if escaped.len() > 0 and escaped[0] >= 'A' and escaped[0] <= 'Z':
         return "p_" ++ escaped

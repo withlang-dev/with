@@ -100,6 +100,31 @@ pub fn facade_render_block(pool: AstPool, intern: InternPool, facade: i32, ci: &
         if pool.kind(item as NodeId) == NodeKind.NK_FACADE_RESOURCE:
             let text_view = facade_render_text_view(pool, intern, item)
             out = out ++ facade_render_resource(pool, intern, ci, item, facade_render_lend_methods(pool, intern, ci, item, true) ++ text_view ++ facade_render_callback_methods(pool, intern, ci, item), facade_render_lend_methods(pool, intern, ci, item, false) ++ text_view)
+    facade_render_public(out)
+
+// Everything a facade renders is its module's public surface (spec
+// §16.2b.1: a facade is written in the importing project or shipped by a
+// package, and its resource types are used wherever the module is
+// imported — the SQLite facade lives in its own module, stage 12): every
+// rendered type, error, constructor and method is `pub`. A Drop body is
+// the type's own and stays as it is.
+fn facade_render_public(text: &str) -> str:
+    var out = ""
+    var in_drop = false
+    var start = 0
+    while start < text.len() as i32:
+        var end = start
+        while end < text.len() as i32 and text[end] != '\n': end = end + 1
+        let line = text.slice(start, end)
+        if line.starts_with("impl Drop for "): in_drop = true
+        else if line.starts_with("impl "): in_drop = false
+        var shown = line.clone()
+        if line.starts_with("type ") or line.starts_with("error ") or line.starts_with("fn "):
+            shown = "pub " ++ line
+        else if not in_drop and (line.starts_with("    fn ") or line.starts_with("    mut fn ") or line.starts_with("    move fn ")):
+            shown = "    pub " ++ line.slice(4, line.len())
+        out = out ++ shown ++ (if end < text.len() as i32: "\n" else: "")
+        start = end + 1
     out
 
 // Owned foreign text (ruling §42, spec §16.2b.8: "Caller-owned returned
@@ -1365,9 +1390,14 @@ fn facade_render_params_but(pool: AstPool, intern: InternPool, decl: i32, skip: 
         args = args ++ arg
     (params, args)
 
+// The C parameter's name as a With parameter: less the translation's
+// `__param_` mark, and escaped as the c_import wrappers escape it — an
+// uppercase-initial name (sqlite3_column_name's `N`) is a pattern in a
+// parameter list, so it is spelled `p_N` (ci_escape_param_name).
 fn facade_render_param_name(pool: AstPool, intern: InternPool, start: i32, pi: i32) -> str:
     let pname: str = intern.resolve(pool.fn_param_name(start, pi))
-    if pname.starts_with("__param_"): pname.slice(8, pname.len()) else: pname.clone()
+    let bare: str = if pname.starts_with("__param_"): pname.slice(8, pname.len()) else: pname.clone()
+    ci_escape_param_name(bare)
 
 // Every parameter name of the declaration, ", "-separated.
 fn facade_render_param_names(pool: AstPool, intern: InternPool, decl: i32) -> str:
