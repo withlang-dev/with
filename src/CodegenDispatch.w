@@ -5755,6 +5755,21 @@ impl Codegen:
             return raw_val
         let val_ty = wl_type_of(raw_val)
         if wl_get_type_kind(val_ty) == wl_pointer_type_kind():
+            // A bare function item (`const fn`) evaluates to its CODE pointer, not
+            // to a pointer at the callee's referent: a `&fn(A) -> R` parameter is
+            // read as the fat pair {fn, ctx} through the reference, so the item
+            // must first become that pair in a temp, exactly as a binding of it
+            // already is (a binding marshals place-address; the item marshalled
+            // existing-pointer and the callee loaded a pair out of instruction
+            // bytes — the complexity harness jumped to 0x67faa9ba6ffc).
+            if self.mir_type_kind_at(self.mir_resolve_alias_at(sema)) == TypeKind.TY_FN:
+                let pair_ty = self.mir_sema_type_to_llvm(sema)
+                if pair_ty != 0 and wl_get_type_kind(pair_ty) == wl_struct_type_kind():
+                    let pair_val = self.coerce_value_to_type(raw_val, pair_ty)
+                    let pair_tmp = self.create_entry_alloca(pair_ty)
+                    wl_build_store(self.builder, pair_val, pair_tmp)
+                    self.analysis_last_marshal_strategy = AnalysisMarshalStrategy.TemporaryAddress
+                    return pair_tmp
             self.analysis_last_marshal_strategy = AnalysisMarshalStrategy.ExistingPointer
             return raw_val
         let place_ptr = self.mir_try_place_ptr_for_ref(body, operand_id)
