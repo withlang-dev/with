@@ -502,6 +502,7 @@ impl Sema:
         let extra_start = self.ast.get_data1(node)
         let count = self.ast.get_data2(node)
         self.current_facade_sym = facade
+        self.current_facade_node = node
         for i in 0..count:
             let item = self.ast.get_extra(extra_start + i)
             let kind = self.ast.kind(item)
@@ -522,7 +523,31 @@ impl Sema:
         let name = self.ast.get_data0(item)
         if self.facade_domains.contains(name):
             let dn: str = self.pool_resolve(name)
-            self.emit_error(f"domain '{dn}' is declared twice (§16.2b.7)", item)
+            // Ruling §35: a facade "may also merge domains from distinct
+            // imports when they refer to the same actual state" — two facades
+            // declaring `domain errno thread` name one errno (the runtime's
+            // own blocks and a program's libc facade in one unit, D30
+            // rt-in-unit), so the second declaration joins the first: a call
+            // either facade describes touches the one domain. The same
+            // facade declaring it twice, or a different scope, is an error.
+            let di: i32 = self.facade_domain_index.get(name).unwrap()
+            if self.facade_domain_list[di].kind != self.ast.get_data1(item):
+                let have: str = self.pool_resolve(self.facade_domain_list[di].kind)
+                let want: str = self.pool_resolve(self.ast.get_data1(item))
+                self.emit_error(f"domain '{dn}' is '{have}' in facade '{self.pool_resolve(self.facade_domain_list[di].facade)}' and '{want}' here; one state has one scope (§16.2b.7)", item)
+                return
+            // Identity is the block, not the name: the runtime's files each
+            // carry a block named `libc`, and a program may spread one
+            // facade over files too.
+            for bi in 0..self.facade_domain_list[di].blocks.len() as i32:
+                if self.facade_domain_list[di].blocks[bi] == self.current_facade_node:
+                    self.emit_error(f"domain '{dn}' is declared twice (§16.2b.7)", item)
+                    return
+            self.facade_domain_list[di].blocks.push(self.current_facade_node)
+            var known = false
+            for fi in 0..self.facade_domain_list[di].facades.len() as i32:
+                if self.facade_domain_list[di].facades[fi] == self.current_facade_sym: known = true
+            if not known: self.facade_domain_list[di].facades.push(self.current_facade_sym)
             return
         self.facade_domains.insert(name, self.ast.get_data1(item))
         // The domain's origin symbol: what a view borrowed from it depends
@@ -532,7 +557,11 @@ impl Sema:
         let origin_sym = self.pool_intern("<domain " ++ dn ++ ">")
         self.facade_domain_index.insert(name, self.facade_domain_list.len() as i32)
         self.facade_domain_origin_index.insert(origin_sym, self.facade_domain_list.len() as i32)
-        self.facade_domain_list.push(FacadeDomain { name, kind: self.ast.get_data1(item), facade: self.current_facade_sym, node: item, origin_sym, files: Vec.new() })
+        let facades: Vec[i32] = Vec.new()
+        facades.push(self.current_facade_sym)
+        let blocks: Vec[i32] = Vec.new()
+        blocks.push(self.current_facade_node)
+        self.facade_domain_list.push(FacadeDomain { name, kind: self.ast.get_data1(item), facade: self.current_facade_sym, facades, blocks, node: item, origin_sym, files: Vec.new() })
 
     // ── resources ────────────────────────────────────────────────────────
 
@@ -697,7 +726,18 @@ impl Sema:
         if sig < 0:
             return
         if self.foreign_contract_index.contains(fn_sym):
-            self.emit_error(f"fn '{fname}' is described twice in this facade (§16.2b)", item)
+            let prev: i32 = self.foreign_contract_index.get(fn_sym).unwrap()
+            if self.foreign_contracts[prev].decl == decl:
+                self.emit_error(f"fn '{fname}' is described twice in this facade (§16.2b)", item)
+                return
+            // Another block describes it too. The same clauses restated are
+            // the same facts — the runtime's files each carry a block naming
+            // `rt_libc_exit` identically, and meet in one unit (D30
+            // rt-in-unit) — so a word-for-word restatement is accepted;
+            // different clauses are two contracts for one function, refused.
+            if self.facade_item_words(self.foreign_contracts[prev].decl, self.foreign_contracts[prev].node) == self.facade_item_words(decl, item):
+                return
+            self.emit_error(f"fn '{fname}' is described by two facade blocks with different clauses; one function has one contract — restate it word for word or describe it once (§16.2b)", item)
             return
         var c = ForeignContract { fn_sym, decl, facade, node: item, lend: 0, destroys: 0, consumes: Vec.new(), consumes_destroyed_by: Vec.new(), retains: Vec.new(), retains_by: Vec.new(), returns_borrow_resource: 0, returns_borrow_from: -1, returns_borrow_domain: 0, returns_static_tid: 0, preserves_params: Vec.new(), preserves_domains: Vec.new(), of_resource: 0, rename: 0, callback_thread_any: 0, callback_consumes: Vec.new(), callback_userdata_cb: Vec.new(), callback_userdata_of: Vec.new() }
         let extra_start = self.ast.get_data1(item)
@@ -935,6 +975,25 @@ impl Sema:
         c
 
     // ── verification helpers ─────────────────────────────────────────────
+
+    // A facade item's source, one space between words, so two blocks'
+    // statements of the same item compare as facts and not as layout.
+    fn facade_item_words(decl: i32, node: i32) -> str:
+        let source = self.source_text_for_file_id(self.decl_source_file_id_for_index(decl))
+        let start = self.ast.get_start(node)
+        let end = self.ast.get_end(node)
+        if start < 0 or end > source.len() as i32 or start >= end: return ""
+        var out = ""
+        var space = false
+        for i in start..end:
+            let c = source[i]
+            if c == ' ' or c == '\t' or c == '\n' or c == '\r':
+                space = out.len() > 0
+            else:
+                if space: out = out ++ " "
+                space = false
+                out = out ++ source.slice(i as i64, (i + 1) as i64)
+        out
 
     mut fn facade_fn_sig(sym: i32, at: i32) -> i32:
         let sig = self.get_sig(sym)
@@ -2195,7 +2254,10 @@ impl Sema:
         if file == 0:
             return
         for di in 0..self.facade_domain_list.len() as i32:
-            if self.facade_domain_list[di].facade != facade:
+            var declared_by = false
+            for fi in 0..self.facade_domain_list[di].facades.len() as i32:
+                if self.facade_domain_list[di].facades[fi] == facade: declared_by = true
+            if not declared_by:
                 continue
             var seen = false
             for fi in 0..self.facade_domain_list[di].files.len() as i32:

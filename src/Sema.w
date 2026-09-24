@@ -476,7 +476,9 @@ type FacadeCallbackMethod {
 type FacadeDomain {
     name: i32,
     kind: i32,          // process | thread | resource | static (sym)
-    facade: i32,
+    facade: i32,        // the facade that declared it first
+    facades: Vec[i32],  // every facade declaring it: same name and kind name the same state (§35)
+    blocks: Vec[i32],   // the `c facade` block nodes declaring it (a block declares it once)
     node: i32,
     origin_sym: i32,
     files: Vec[i32],
@@ -1149,6 +1151,7 @@ pub type Sema {
     facade_touch_nodes: HashMap[i32, i32],         // call node -> facade_call_effects index
     facade_touch_hit_params: HashMap[i32, i32],    // poisoned view sym -> the parameter the origin came through (-1: a domain)
     current_facade_sym: i32,                       // the `c facade` block being collected
+    current_facade_node: i32,                      // its node: two same-named blocks (one per runtime file) are two blocks
     // A text-view return on a function that is no resource's method is
     // presented at the call: the C name stays the surface and the call's
     // result is `Option[CStr]` in every module that imported it
@@ -2521,6 +2524,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         facade_touch_nodes: sema_new_map_i32_i32(),
         facade_touch_hit_params: sema_new_map_i32_i32(),
         current_facade_sym: 0,
+        current_facade_node: 0,
         facade_presented_syms: sema_new_map_i32_i32(),
         facade_presented_calls: sema_new_map_i32_i32(),
         facade_layout_nodes: Vec.new(),
