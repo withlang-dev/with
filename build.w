@@ -1268,6 +1268,100 @@ fn run_debug_alloc_tests_action(ctx: ActionCtx) -> i32:
     let _ = fs.write_text(build_project_join(out_dir, ".stamp"), "ok")
     0
 
+// D51 stage 10 (ruling §63): the foreign-contract view over
+// test/contract/*.w. Every `//! expect-contract:` line of a fixture must
+// appear in `analyze <fixture> audit:contract` and every
+// `//! expect-contract-not:` line must not; a `bad_` fixture (a planted
+// suspicious configuration) must exit nonzero and an `ok_` one zero, the
+// latter under `audit:all` too; and a fixture with a `.expected` file
+// beside it must print exactly that as its `contract` view. Fixtures are
+// analyzed by their project-relative path, so the snapshots' paths are
+// stable. Regenerate a snapshot by copying the `.contract.stdout` the run
+// leaves in out/contract-view-tests after reading the diff.
+fn contract_view_directives(text: &str, prefix: &str) -> Vec[str]:
+    var out: Vec[str] = Vec.new()
+    let lines = text.split("\n")
+    for i in 0..lines.len() as i32:
+        let line = lines[i]
+        if line.starts_with(prefix):
+            out.push(line.slice(prefix.len(), line.len()))
+    out
+
+fn contract_view_run(ctx: &ActionCtx, root: &str, compiler: &str, fixture: &str, out_dir: &str, name: &str, request: &str) -> (i32, str):
+    let args: Vec[str] = Vec.new()
+    args.push(build_owned_text(compiler))
+    args.push("analyze")
+    args.push(build_owned_text(fixture))
+    args.push(build_owned_text(request))
+    let stdout_rel = build_project_join(out_dir, name)
+    let result = ctx.process_runner().run_capture_cwd(args, build_project_abs(root, stdout_rel), build_project_abs(root, build_project_join(out_dir, name ++ ".stderr")), 120000, root)
+    (result.rc, ctx.fs().read_text(stdout_rel))
+
+fn run_contract_view_tests_action(ctx: ActionCtx) -> i32:
+    let inputs = ctx.inputs()
+    if inputs.len() == 0:
+        ctx.diagnostics().error("contract-view-tests: missing compiler input")
+        return 1
+    let fs = ctx.fs()
+    let out_dir = ctx.output()
+    if fs.mkdir_all(out_dir) != 0:
+        ctx.diagnostics().error("contract-view-tests: could not create output dir: " ++ out_dir)
+        return 1
+    let root = ctx.project_info().project_root()
+    let compiler = build_project_abs(root, inputs.get(0))
+    let fixtures = fs.list_files("test/contract")
+    var checked = 0
+    var errors = 0
+    for i in 0..fixtures.len() as i32:
+        let fixture = fixtures[i]
+        if not fixture.ends_with(".w"):
+            continue
+        checked = checked + 1
+        let base = comp_path_basename(fixture)
+        let stem = base.slice(0, base.len() - 2)
+        let text = fs.read_text(fixture)
+        let planted = base.starts_with("bad_")
+        let (rc, audit) = contract_view_run(ctx, root, compiler, fixture, out_dir, stem ++ ".audit.stdout", "audit:contract")
+        if planted and rc == 0:
+            ctx.diagnostics().error(f"contract-view-tests: {fixture}: audit:contract passed over a planted suspicious configuration")
+            errors = errors + 1
+        if not planted and rc != 0:
+            ctx.diagnostics().error(f"contract-view-tests: {fixture}: audit:contract failed rc={rc}:\n" ++ audit)
+            errors = errors + 1
+        let wanted = contract_view_directives(text, "//! expect-contract: ")
+        for k in 0..wanted.len() as i32:
+            if not audit.contains(wanted[k]):
+                ctx.diagnostics().error("contract-view-tests: " ++ fixture ++ ": audit:contract is missing '" ++ wanted[k] ++ "':\n" ++ audit)
+                errors = errors + 1
+        let unwanted = contract_view_directives(text, "//! expect-contract-not: ")
+        for k in 0..unwanted.len() as i32:
+            if audit.contains(unwanted[k]):
+                ctx.diagnostics().error("contract-view-tests: " ++ fixture ++ ": audit:contract flagged the clean case '" ++ unwanted[k] ++ "':\n" ++ audit)
+                errors = errors + 1
+        if not planted:
+            let (all_rc, all) = contract_view_run(ctx, root, compiler, fixture, out_dir, stem ++ ".all.stdout", "audit:all")
+            if all_rc != 0:
+                ctx.diagnostics().error(f"contract-view-tests: {fixture}: audit:all failed rc={all_rc}:\n" ++ all)
+                errors = errors + 1
+        let (_, view) = contract_view_run(ctx, root, compiler, fixture, out_dir, stem ++ ".contract.stdout", "contract")
+        let expected_path = "test/contract/" ++ stem ++ ".expected"
+        if fs.exists(expected_path):
+            let expected = fs.read_text(expected_path)
+            if view != expected:
+                ctx.diagnostics().error(f"contract-view-tests: {fixture}: the contract view differs from {expected_path}; actual: " ++ build_project_abs(root, build_project_join(out_dir, stem ++ ".contract.stdout")))
+                errors = errors + 1
+        else if not planted:
+            ctx.diagnostics().error(f"contract-view-tests: {fixture}: a clean fixture needs a checked-in {expected_path} snapshot")
+            errors = errors + 1
+    if checked == 0:
+        ctx.diagnostics().error("contract-view-tests: no fixtures under test/contract")
+        return 1
+    if errors > 0:
+        return 1
+    print(f"contract-view-tests: {checked} fixtures; every audit verdict, needle and snapshot agreed")
+    let _ = fs.write_text(build_project_join(out_dir, ".stamp"), "ok")
+    0
+
 // Drop-exactly-once audit matrix (tools/drop_audit.w — the repo-committed
 // successor to the lost drop-audit skill). Candidate = the freshly built
 // release compiler; baseline = the last-green-verified seed (src/main), so
@@ -2745,6 +2839,17 @@ pub fn build(ctx: BuildCtx) -> Build:
     deep_debug_tool_tests = deep_debug_tool_tests.write_scope("out/deep-debug-tool-tests")
     out = out.add_target(deep_debug_tool_tests)
 
+    // D51 stage 10 (ruling §63): the foreign-contract view and audit over
+    // test/contract/*.w — snapshots and planted suspicious configurations.
+    var contract_view_tests = target_new(.Action, "contract-view-tests", "").output("out/contract-view-tests")
+    contract_view_tests = contract_view_tests.allow_parallel()
+    contract_view_tests.action = run_contract_view_tests_action
+    contract_view_tests = contract_view_tests.input(release_compiler_bin("with"))
+    contract_view_tests = contract_view_tests.input("test/contract")
+    contract_view_tests = contract_view_tests.dep("build")
+    contract_view_tests = contract_view_tests.write_scope("out/contract-view-tests")
+    out = out.add_target(contract_view_tests)
+
     // D38: the ABI-defining sources' recorded hash must match — an ABI change
     // without a WITH_ABI_VERSION bump fails the battery (docs/with-abi.md §7).
     var abi_hash_check = target_new(.Action, "abi-hash-check", "").output("out/abi-hash-check/stamp")
@@ -3052,6 +3157,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     tests = tests.dep("lexer-tests")
     tests = tests.dep("parser-tests")
     tests = tests.dep("deep-debug-tool-tests")
+    tests = tests.dep("contract-view-tests")
     tests = tests.dep("abi-hash-check")
     tests = tests.dep("cli-selfhost-smoke-tests")
     tests = tests.dep("cli-selfhost-one-liner-tests")
