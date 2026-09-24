@@ -70,8 +70,10 @@ pub fn run_corpus_prepare_reference_action(ctx: ActionCtx) -> i32:
     let corpus = &owned
     let reference = corpus.upstream.reference.clone()
     if not ctx.fs().is_dir(reference): return corpus_fail(ctx, "missing reference tree " ++ reference)
-    let prepare = corpus.prepare_reference
-    if prepare(&ctx, corpus, &reference) != 0: return 1
+    // D63: a `fn` field is not Copy, so `let prepare = corpus.prepare_reference`
+    // through the borrow binds the field place; calling through that alias is
+    // #1635 (the build runner's own compile died here) — call through the field.
+    if corpus.prepare_reference(&ctx, corpus, &reference) != 0: return 1
     if ctx.fs().write_text(ctx.output(), "ok\n") != 0: return corpus_fail(ctx, "cannot write " ++ ctx.output())
     0
 
@@ -85,12 +87,9 @@ pub fn run_corpus_migrate_action(ctx: ActionCtx) -> i32:
     let source = corpus_scratch(ctx) ++ "/source"
     let generated = corpus_scratch(ctx) ++ "/generated"
     if corpus_reset_dir(ctx, source) != 0 or corpus_reset_dir(ctx, generated) != 0: return 1
-    let stage = corpus.stage
-    if stage(&ctx, corpus, &reference, &source) != 0: return 1
-    let migrate = corpus.migrate
-    if migrate(&ctx, corpus, &source, &generated) != 0: return 1
-    let finish = corpus.finish_generated
-    if finish(&ctx, corpus, &generated) != 0: return 1
+    if corpus.stage(&ctx, corpus, &reference, &source) != 0: return 1
+    if corpus.migrate(&ctx, corpus, &source, &generated) != 0: return 1
+    if corpus.finish_generated(&ctx, corpus, &generated) != 0: return 1
     if corpus_write_bundle_root(ctx, corpus, generated) != 0: return 1
     if corpus.license.len() > 0:
         if corpus_copy(ctx, reference ++ "/" ++ corpus.license, generated ++ "/" ++ corpus.license) != 0: return 1
@@ -103,8 +102,7 @@ pub fn run_corpus_migrate_action(ctx: ActionCtx) -> i32:
 fn corpus_check_generated(ctx: &ActionCtx, corpus: &Corpus, generated: &str) -> i32:
     if corpus_reject_bad_output(ctx, corpus, generated) != 0: return 1
     if corpus_reject_foreign_symbols(ctx, corpus, generated) != 0: return 1
-    let verify = corpus.verify_generated
-    verify(ctx, corpus, generated)
+    corpus.verify_generated(ctx, corpus, generated)
 
 pub fn run_corpus_check_generated_action(ctx: ActionCtx) -> i32:
     let owned = action_corpus(ctx)
@@ -218,8 +216,7 @@ pub fn corpus_pipeline(out: Build, ctx: &BuildCtx, corpus: &Corpus, release_comp
     graph = graph.add_target(root_check)
     graph = graph.add_target(wo_drift_target(ctx, &plan, release_compiler, "build", corpus.corpus_dir ++ "/" ++ corpus.drift_harness, corpus.drift_harness_arg))
 
-    let lanes = corpus.lanes
-    lanes(move graph, ctx, corpus, release_compiler)
+    corpus.lanes(move graph, ctx, corpus, release_compiler)
 
 /// The `wo-drift` group: every corpus's root check and drift lane.
 pub fn corpora_drift_group(ctx: &BuildCtx) -> Target:

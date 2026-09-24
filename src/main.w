@@ -2849,7 +2849,19 @@ fn reseed_gate_smoke(root: &str, compiler_path: &str) -> i32:
     if smoke_rss / 1048576 > 2048:
         with_eprint(f"error: reseed gate: candidate as orchestrator peaked at {smoke_rss / 1048576}M (limit 2048M, #679 tripwire) — the clone-storm class (#757)")
         return 1
-    with_write("[reseed-gate] candidate checks build.w and orchestrates ':" ++ smoke_target ++ "' natively (" ++ build_graph_time_fmt(spent) ++ f", peak {smoke_rss / 1048576}M)\n")
+    // The orchestrator survives a runner compile failure by falling back to
+    // comptime evaluation, so a candidate that cannot compile build.w
+    // natively still exits 0 here — and then dies as the seed on the first
+    // action the evaluator cannot run (`:seed` on `str.trim`, 2026-09-24:
+    // the D63 build passed its battery, was installed and published, and
+    // could not drive `:seed-driver`). The fallback is a warning for the
+    // driver; for the gate it is the failure it exists to catch.
+    let smoke_err_text = with_fs_read_file(smoke_err)
+    if smoke_err_text.contains("build runner compile failed"):
+        with_ewrite(smoke_err_text)
+        with_eprint("error: reseed gate: candidate cannot compile the native build runner (build.w + std.build) and fell back to comptime evaluation; a seed must drive every action natively")
+        return 1
+    with_write("[reseed-gate] candidate checks build.w, compiles the native build runner and orchestrates ':" ++ smoke_target ++ "' natively (" ++ build_graph_time_fmt(spent) ++ f", peak {smoke_rss / 1048576}M)\n")
     0
 
 fn cli_fast_install_blessed(root: &str, target_name: &str) -> i32:
