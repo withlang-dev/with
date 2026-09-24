@@ -3296,7 +3296,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     var release_sqlite3_uat = target_new(.Action, "release-sqlite3-uat", "").output("out/release-uat/sqlite3.passed")
     release_sqlite3_uat.action = run_release_sqlite3_uat_action
     release_sqlite3_uat = release_sqlite3_uat.input(release_platform_asset_bin())
-    release_sqlite3_uat = release_sqlite3_uat.input("build/release_uat_fixtures/sqlite3_main.w")
+    release_sqlite3_uat = release_sqlite3_uat.input("build/release_uat_fixtures/sqlite3_main.w").input("lib/facades/sqlite3.w")
     release_sqlite3_uat = release_sqlite3_uat.write_scope("out/release-uat")
     release_sqlite3_uat = release_sqlite3_uat.allow_network()
     release_sqlite3_uat = release_sqlite3_uat.dep("require-last-green")

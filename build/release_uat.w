@@ -300,7 +300,7 @@ pub fn run_release_migrate_uat_action(ctx: ActionCtx) -> i32:
 
     ruat_write_stamp(ctx)
 
-fn ruat_run_c_package_uat(ctx: &ActionCtx, package: &str, label: &str, fixture: &str, expected_stdout: &str) -> i32:
+fn ruat_run_c_package_uat(ctx: &ActionCtx, package: &str, label: &str, fixture: &str, facade: &str, expected_stdout: &str) -> i32:
     let compiler = ruat_compiler_input(ctx)
     if compiler.len() == 0:
         return ruat_fail(ctx, "missing compiler input")
@@ -324,6 +324,19 @@ fn ruat_run_c_package_uat(ctx: &ActionCtx, package: &str, label: &str, fixture: 
 
     if ctx.fs().write_text(ruat_join(workdir, "src/main.w"), source) != 0:
         return ruat_fail(ctx, "could not write " ++ label ++ " UAT source")
+    // A library facade the program imports (`use facades.<lib>`) is the
+    // project's own until the package ships it (§16.2b.1; ruling §66): it
+    // goes beside the program as src/facades/<lib>.w, where a user writes
+    // it — never resolved by the parent-`lib/` walk into this repository.
+    if facade.len() > 0:
+        let facade_source = if ctx.fs().exists(facade): ctx.fs().read_text(facade) else: ""
+        if facade_source.len() == 0:
+            return ruat_fail(ctx, "could not read " ++ label ++ " facade: " ++ facade)
+        let facade_dir = ruat_join(workdir, "src/facades")
+        if ctx.fs().mkdir_all(facade_dir) != 0:
+            return ruat_fail(ctx, "could not create " ++ facade_dir)
+        if ctx.fs().write_text(ruat_join(facade_dir, ruat_basename(facade)), facade_source) != 0:
+            return ruat_fail(ctx, "could not write " ++ label ++ " facade into the UAT project")
 
     rc = ruat_expect_stdout(ctx, ruat_run_capture_cwd(ctx, compiler, workdir, "run", ruat_argv1(compiler, "run"), 180000), expected_stdout, "with run " ++ label)
     if rc != 0:
@@ -331,17 +344,24 @@ fn ruat_run_c_package_uat(ctx: &ActionCtx, package: &str, label: &str, fixture: 
 
     ruat_write_stamp(ctx)
 
+fn ruat_basename(path: &str) -> str:
+    var i = path.len() as i32 - 1
+    while i >= 0:
+        if path[i] == '/' or path[i] == '\\': return path.slice(i + 1, path.len())
+        i = i - 1
+    release_uat_owned_text(path)
+
 pub fn run_release_zlib_uat_action(ctx: ActionCtx) -> i32:
-    ruat_run_c_package_uat(ctx, "c.zlib", "zlib", "build/release_uat_fixtures/zlib_main.w", "zlib UAT passed")
+    ruat_run_c_package_uat(ctx, "c.zlib", "zlib", "build/release_uat_fixtures/zlib_main.w", "", "zlib UAT passed")
 
 pub fn run_release_bzip2_uat_action(ctx: ActionCtx) -> i32:
-    ruat_run_c_package_uat(ctx, "c.bzip2", "bzip2", "build/release_uat_fixtures/bzip2_main.w", "bzip2 UAT passed")
+    ruat_run_c_package_uat(ctx, "c.bzip2", "bzip2", "build/release_uat_fixtures/bzip2_main.w", "", "bzip2 UAT passed")
 
 pub fn run_release_sqlite3_uat_action(ctx: ActionCtx) -> i32:
-    ruat_run_c_package_uat(ctx, "c.sqlite3", "sqlite3", "build/release_uat_fixtures/sqlite3_main.w", "sqlite3 UAT passed")
+    ruat_run_c_package_uat(ctx, "c.sqlite3", "sqlite3", "build/release_uat_fixtures/sqlite3_main.w", "lib/facades/sqlite3.w", "sqlite3 UAT passed")
 
 pub fn run_release_libcurl_uat_action(ctx: ActionCtx) -> i32:
-    ruat_run_c_package_uat(ctx, "c.libcurl", "libcurl", "build/release_uat_fixtures/libcurl_main.w", "libcurl UAT passed")
+    ruat_run_c_package_uat(ctx, "c.libcurl", "libcurl", "build/release_uat_fixtures/libcurl_main.w", "", "libcurl UAT passed")
 
 pub fn run_release_install_layout_uat_action(ctx: ActionCtx) -> i32:
     let compiler = ruat_compiler_input(ctx)
