@@ -3509,6 +3509,12 @@ fn mir_validate_cast_supported(mir_mod: &MirModule, src_ty: i32, dst_ty: i32) ->
        dst_kind == TypeKind.TY_PTR or dst_kind == TypeKind.TY_REF:
         return true
     if src_kind == TypeKind.TY_STR:
+        // `s as []u8` (D64 needed it: a str is the bytes a buffer pairing
+        // takes): the same {ptr, len} over the same storage, a byte view —
+        // codegen coerces the two-field aggregate (coerce_struct_value).
+        if dst_kind == TypeKind.TY_SLICE:
+            let elem = mir_mod.mir_resolve_alias(mir_mod.mir_get_type_d0(dst_resolved))
+            return mir_mod.mir_get_type_kind(elem) == TypeKind.TY_INT and mir_mod.mir_get_type_d0(elem) == 8 and mir_mod.mir_get_type_d1(elem) == 0
         return dst_kind == TypeKind.TY_PTR or dst_kind == TypeKind.TY_REF or dst_kind == TypeKind.TY_STR
     if src_kind == TypeKind.TY_STRUCT or src_kind == TypeKind.TY_ENUM or src_kind == TypeKind.TY_GENERIC_INST or src_kind == TypeKind.TY_ARRAY or src_kind == TypeKind.TY_SLICE or src_kind == TypeKind.TY_TUPLE:
         // Allow bitpacked struct ↔ integer casts
