@@ -1,44 +1,61 @@
-# UAT plan — scenarios a person can read, a runner that executes them
+# UAT plan — `with uat`: scenarios a person writes, a runner every project has
 
-Status: PLAN (2026-09-25, Eric: "if I was gonna write UATs by hand, no AI,
-it'd be with some set of verbs and nouns"). Replaces the hand-coded actions
-in `build/release_uat.w` with scenario files plus a small interpreter.
-Sequenced after the libcurl campaign (the last `:user-programs-safe` red)
-and before, or alongside, STC phase 3; it is build-layer + tooling work and
-batches freely.
+Status: PLAN (2026-09-25; Eric: "if I was gonna write UATs by hand, no AI,
+it'd be with some set of verbs and nouns" … "make sure it's written in a
+way that users can use too … `with init` should set up their project with
+an example UAT"). This is a **product feature of the toolchain**, not a
+compiler-repo test harness: `with uat` runs a project's acceptance
+scenarios the same way `with test` runs its tests, and `with init` creates
+one. The With compiler's own release UATs (today `build/release_uat.w`) are
+just the first user of it. Sequenced after the libcurl campaign; tooling +
+build-layer work, batches freely; the spec words in §8 need Eric's
+blessing before the command lands (CLI commands are inventoried, §18.5).
 
-## 1. What is wrong with what we have
+## 1. What a user gets
 
-`build/release_uat.w` is a **runner** with the scenarios baked into it:
-nine `run_release_<x>_uat_action(ctx) -> i32` functions, each an imperative
-script (prepare a dir, spawn the compiler, capture, `ruat_expect_*`, return
-1 at the first miss), a third of it path/argv plumbing. What a UAT is for —
-"a user does these things and sees this" — exists only as the call sequence,
-so:
+```
+my-app/
+  with.toml
+  src/main.w
+  test/main_test.w          # unit tests: with test
+  uat/
+    README.md               # the verbs, one page
+    hello.uat               # the scenario `with init` wrote
+    fixtures/               # files a scenario writes into the project, reference images
+```
 
-- the promise cannot be reviewed apart from the mechanism, and coverage
-  cannot be enumerated without reading With;
-- steps are not shared (the C-package cases were factored into
-  `ruat_run_c_package_uat`, the rest re-implement "fresh project → get →
-  build → run → compare");
-- policy hides in helpers (copying `lib/facades/<lib>.w` into the fresh
-  project as `src/facades/<lib>.w`, §16.2b.1, is a language rule living in
-  test code);
-- a missing precondition (no OpenGL on the macOS runner, #1375; no network)
-  reads as a failure, not as "not applicable here";
-- the human expectation ("colored balls moving on a field of black") has no
-  home, so the raylib UAT asserts only "exited 0".
+```
+$ with uat
+uat: hello ....................................... pass  (4 steps, 0.8s)
+uat: 1 scenario: 1 pass
+```
 
-What is right and is kept: end-to-end against the release binary in a fresh
-directory with a real package fetch; exact captured output; the fixture
-programs as contracts (the `unsafe` gate, "never edit a UAT to go green");
-gating on last-green; the process/capture code.
+A scenario is what a person does at a terminal and what they expect to see,
+one step per line. There is no framework vocabulary to learn beyond the
+verbs, no Given/When/Then, no step-definition code: the verbs are the
+runner's.
 
-## 2. The scenario format
+## 2. The scenario written by `with init`
 
-One file per scenario, plain text, one step per line, `#` comments. The
-verbs are the ones a person writes by hand; there is no Given/When/Then
-ceremony.
+`uat/hello.uat`:
+
+```
+scenario: the program prints its greeting
+
+run: with build
+run: ./out/bin/my-app
+expect exit: 0
+expect stdout: Hello, world!
+```
+
+`uat/README.md` (also written by `with init`) is the one-page grammar of §3
+with three worked examples: this one, one with `stdin:`, and one with
+`expect (human):`. `with init` puts the app's own name into the `run:` line.
+
+## 3. The format
+
+One file per scenario in `uat/`, plain text, one step per line, `#`
+comments. Every line is a verb a person would say.
 
 ```
 scenario: sqlite3 from a fresh project
@@ -49,174 +66,205 @@ new directory
 run: with init
 run: with get c.sqlite3@3.53.4
 write src/main.w from fixtures/sqlite3_main.w
-copy facade sqlite3                     # §16.2b.1: the project's own until the package ships it
 run: with run
 expect exit: 0
 expect stdout: sqlite3 UAT passed
 ```
 
 ```
-scenario: raylib spiral
+scenario: spiral
 requires: display, opengl
-platforms: darwin, linux, windows
 
-new directory
-run: with init
-run: with get c.raylib
-write src/main.w from fixtures/raylib_spiral_main.w
-run: with run -- --frames 60 --capture frame.png
+run: with run -- --frames 60 --capture out/frame.png
 expect exit: 0
-expect image: frame.png ~ fixtures/raylib_spiral_frame.png
+expect image: out/frame.png ~ fixtures/spiral_frame.png
 expect (human): colored balls moving on a field of black
 ```
 
-Grammar (whole thing):
+Grammar, complete:
 
 ```
 FILE      := HEADER STEP*
-HEADER    := 'scenario:' TEXT NL ('requires:' NAME (',' NAME)* NL)? ('platforms:' NAME (',' NAME)* NL)?
-STEP      := 'new directory' NL
-           | 'run:' COMMAND NL                        # argv; `with` = the release binary under test
-           | 'run (fails):' COMMAND NL                # the command is expected to exit non-zero
-           | 'write' PATH 'from' FIXTURE NL           # copies uat/fixtures/<FIXTURE> into the project
-           | 'write' PATH ':' NL INDENTED_BLOCK        # inline text (docs, config; not programs — see §4)
-           | 'copy facade' NAME NL                     # lib/facades/<NAME>.w -> src/facades/<NAME>.w
-           | 'env' NAME '=' TEXT NL
-           | 'stdin:' NL INDENTED_BLOCK                # for the next `run:`
+HEADER    := 'scenario:' TEXT NL
+             ('requires:' REQ (',' REQ)* NL)?
+             ('platforms:' NAME (',' NAME)* NL)?
+REQ       := 'network' | 'display' | 'opengl' | 'lib' NAME | 'tool' NAME | 'env' NAME
+STEP      := 'new directory' NL                      # a fresh temp directory becomes the cwd
+           | 'run:' COMMAND NL                       # argv; exit 0 expected unless `run (fails):`
+           | 'run (fails):' COMMAND NL
+           | 'write' PATH 'from' FIXTURE NL          # copy uat/fixtures/<FIXTURE> to PATH
+           | 'write' PATH ':' NL INDENTED_BLOCK       # inline text (config, data)
+           | 'copy' PATH 'to' PATH NL
+           | 'env' NAME '=' TEXT NL                  # for the rest of the scenario
+           | 'stdin:' NL INDENTED_BLOCK               # for the next `run:`
            | 'expect exit:' INT NL
-           | 'expect stdout:' TEXT NL                  # exact, trailing line endings trimmed
+           | 'expect stdout:' TEXT NL                 # exact, trailing line endings trimmed
            | 'expect stdout contains:' TEXT NL
            | 'expect stderr contains:' TEXT NL
-           | 'expect file' PATH 'contains:' TEXT NL
            | 'expect file' PATH 'exists' NL
-           | 'expect image:' PATH '~' FIXTURE NL       # similarity against a reference image (§5)
-           | 'expect (human):' TEXT NL                 # recorded, printed to the release checklist, never executed
+           | 'expect file' PATH 'contains:' TEXT NL
+           | 'expect image:' PATH '~' FIXTURE NL      # similarity to a reference image (§5)
+           | 'expect (human):' TEXT NL                # recorded and reported, never executed
 ```
 
-`requires:` names come from a fixed vocabulary the runner can probe:
-`network`, `display`, `opengl`, `lib <name>` (pkg-config / a link probe),
-`tool <name>` (on PATH), `env <NAME>`. An unmet requirement makes the
-scenario **skipped with the reason**, a verdict distinct from pass/fail.
-`platforms:` restricts where it runs at all.
+Semantics that matter:
 
-## 3. The runner
+- The cwd starts as the project root; `new directory` moves it to a fresh
+  temporary directory (deleted on pass, kept and named in the report on
+  fail). `with` in a `run:` line is the running toolchain binary (so the
+  compiler's own release UATs can point it at the release artifact with
+  `WITH_UAT_WITH=<path>`; a user never needs that).
+- An `expect` applies to the most recent `run:`. Expectations are exact
+  unless the verb says `contains`; output is compared after trimming
+  trailing line endings, the same rule `with test` uses.
+- `requires:` names things the runner can probe. An unmet requirement makes
+  the scenario **skipped, with the reason** — a third verdict beside pass
+  and fail, printed in the report. `platforms:` restricts where a scenario
+  runs at all. A scenario skipped on every host it is asked to run on is
+  reported as such (a suite where everything skips is not green).
+- `expect (human):` is never executed; §5.
 
-`build/uat.w` (With, build layer): a parser for the grammar above, an
-interpreter, a report. Steps map onto the existing process/capture helpers
-in `release_uat.w` (`ruat_run_capture_cwd`, `ruat_expect_*`), which move to
-`build/uat.w` as the step library; the nine actions are deleted once their
-scenarios pass (§7). Each `run:` writes `stdout`/`stderr` capture files under
-`out/uat/<scenario>/<step-N>.{stdout,stderr}`, exactly as today's labels do.
+## 4. `with uat` — the command
 
-The report is per scenario × step:
+```
+with uat                       # every uat/*.uat applicable on this host
+with uat <name>                # one scenario (file stem)
+with uat --list                # scenarios, their requires/platforms, and whether they apply here
+with uat --keep                # keep the temporary directories of passing scenarios too
+```
+
+Exit status: 0 when nothing failed (skips do not fail); the report goes to
+stdout; captures to `out/uat/<scenario>/step-<N>.{stdout,stderr}`; the
+human checks to `out/uat/human-checks.txt`. Report shape:
 
 ```
 uat: sqlite3 from a fresh project ............ pass  (7 steps, 4.1s)
-uat: raylib spiral ............................ skip  (requires display: none)
+uat: spiral ................................... skip  (requires display: none)
 uat: libcurl from a fresh project ............. FAIL  step 6 `run: with run`: exit 1
-        stderr: error: ...                      (out/uat/libcurl/step-6.stderr)
-uat: 8 scenarios: 6 pass, 1 skip, 1 FAIL; 2 human checks recorded (see below)
-human checks for the release host:
-  raylib spiral: colored balls moving on a field of black
+        stderr: error: …                        (out/uat/libcurl/step-6.stderr)
+uat: 3 scenarios: 1 pass, 1 skip, 1 FAIL; 1 human check recorded
+human checks for this host:
+  spiral: colored balls moving on a field of black
 ```
 
-Skips are listed with their reason in the release runbook's output; a
-scenario that is skipped everywhere is a lane bug, not a pass.
-
-## 4. Files and the contract rule
-
-```
-uat/
-  README.md                 the grammar (§2) and the verbs' meaning
-  *.uat                     scenarios
-  fixtures/*.w              user programs — the contracts (moved from build/release_uat_fixtures/)
-  fixtures/*.png            reference images
-```
-
-`uat/fixtures/*.w` keep every rule `build/release_uat_fixtures/` has today:
-they are what an application developer writes; no `unsafe`; a spec change
-updates them in the same change and says so; a compiler/stdlib change that
-breaks one is a defect in the change. `with build :user-programs-safe`
-re-points its input to `uat/fixtures` (and `examples/`). Programs are
-referenced from scenarios, never inlined, so those gates stay mechanical
-and the program stays a normal `.w` file that `with check` and the migrator
-see. Inline `write … :` blocks are for non-program files (a `with.toml`
-line, a data file).
-
-`copy facade <name>` is a verb precisely so the policy is a visible line in
-the scenario; when packages ship facades (§16.2b.8, B.8) the line is deleted
-from the scenarios and nothing else changes.
+Implementation: `src/Uat.w` in the compiler (the parser, the interpreter,
+the report), `with uat` dispatched like `with test`; the step library is
+the process/capture code that `build/release_uat.w` has today, moved into
+the compiler so users get it. The build layer's `:release-uat` target calls
+the same code (§7); nothing about UATs lives in `build/` afterwards.
 
 ## 5. Human and visual expectations
 
-`expect (human):` is not executable. It is recorded: the runner prints every
-human check of every scenario that ran on this host into the report and
-into `out/uat/human-checks.txt`, and `docs/with-release-runbook.md` requires
-the release host to walk that list. It exists so the promise "colored balls
-moving on a field of black" is written where the scenario is, not in a
-runbook paragraph nobody diffs against the test.
+`expect (human):` records a promise the machine cannot check and prints it
+wherever the scenario ran — on a developer's terminal, in CI logs, and on
+the release host's checklist — so "colored balls moving on a field of
+black" is written next to the steps that produce it, not in a runbook
+paragraph nobody diffs against the test. It never passes or fails.
 
-`expect image:` is the mechanical proxy for the same promise where one is
-possible: the program is run with a capture flag it supports (the spiral
-gets `--frames N --capture PATH`, written into the fixture program as a
-normal option — it is what a developer would add to make their own program
-testable), and the runner compares against a reference image with a
-tolerance (mean absolute pixel difference under a threshold; the comparison
-is With over the PNG decoder already in `std`). A first version may support
-only exact size + threshold; a reference image is regenerated deliberately
-by a documented command, never by the runner.
+`expect image:` is the mechanical proxy where the program can capture a
+frame (a normal `--capture PATH` option the developer adds to their own
+program): the runner decodes both PNGs (`std` has the decoder) and passes
+when sizes match and the mean absolute pixel difference is under a
+tolerance (default 2%; `~` may be followed by `within N%`). Reference
+images are regenerated by a deliberate `with uat --record-images <name>`,
+never by a normal run.
 
-## 6. build.w wiring
+## 6. The compiler's own UATs
 
-One action target `uat` (kept name: `release-uat`, so the runbook, the
-`package-<platform>` dependency and CI lanes do not change) whose action
-parses every `uat/*.uat`, runs those applicable on the host, and writes
-`out/release-uat/<scenario>.passed` / `.skipped` outputs plus the report.
-Inputs: the release binary, `uat/`, `lib/facades/`. Per-scenario targets are
-not needed — the graph cache keys on the inputs; the action prints per-
-scenario timing. `WITH_UAT_ONLY=<scenario>` runs one. The `require-last-green`
-gate stays.
+`uat/` at the repo root holds the nine scenarios that replace
+`build/release_uat.w` (table below) and `uat/fixtures/` holds what
+`build/release_uat_fixtures/` holds today, with every rule those files have:
+they are what an application developer writes, no `unsafe`, a spec change
+updates them in the same change and says so, a compiler or stdlib change
+that breaks one is a defect in the change; `with build :user-programs-safe`
+re-points to `uat/fixtures` + `examples`. Programs are referenced from
+scenarios, never inlined, so those gates stay mechanical. The release-only
+policy step "copy `lib/facades/<lib>.w` into the fresh project as
+`src/facades/<lib>.w`" (§16.2b.1, until packages ship facades) becomes a
+visible `copy lib/facades/sqlite3.w to src/facades/sqlite3.w` line that is
+deleted when B.8 lands.
 
-## 7. Migration (one batch, one battery)
-
-| today's action | scenario file |
+| today's action | scenario |
 |---|---|
-| `release-artifact-smoke-uat` | `uat/artifact_smoke.uat` (run the platform-named binary, `--version`, a one-liner) |
+| `release-artifact-smoke-uat` | `uat/artifact_smoke.uat` |
 | `release-fresh-project-uat` | `uat/fresh_project.uat` |
-| `release-migrate-uat` | `uat/migrate_c.uat` (write a tiny C source, `with migrate`, build, run) |
-| `release-zlib-uat`, `-bzip2-`, `-sqlite3-`, `-libcurl-` | `uat/zlib.uat`, `uat/bzip2.uat`, `uat/sqlite3.uat`, `uat/libcurl.uat` |
-| `release-install-layout-uat` | `uat/install_layout.uat` (`expect file … exists` lines) |
-| `release-raylib-spiral-uat` | `uat/raylib_spiral.uat` with `requires: display, opengl` and the human line |
-| `release-one-liner-uat` | `uat/one_liners.uat` (`stdin:` blocks + `run: with -n …`) |
+| `release-migrate-uat` | `uat/migrate_c.uat` |
+| `release-zlib-uat` / `-bzip2-` / `-sqlite3-` / `-libcurl-` | `uat/zlib.uat`, `bzip2.uat`, `sqlite3.uat`, `libcurl.uat` |
+| `release-install-layout-uat` | `uat/install_layout.uat` |
+| `release-raylib-spiral-uat` | `uat/raylib_spiral.uat` (`requires: display, opengl`, the human line) |
+| `release-one-liner-uat` | `uat/one_liners.uat` (`stdin:` blocks) |
 
-Order: (1) `build/uat.w` parser + interpreter + report with the step library
-moved from `release_uat.w`; (2) the nine scenario files, byte-for-byte the
-same expectations as today; (3) `build.w` re-wired, `release_uat.w` deleted,
-`build/release_uat_fixtures` moved to `uat/fixtures`, `user-programs-safe`
-input re-pointed; (4) runbook updated (human checks, skips); (5) `expect
-image:` for the spiral — separate PR, needs the capture flag in the fixture
-program under the "spec change updates the example" rule (it is a program
-change, so it says so in the commit). One audited battery for (1)–(4);
-`:release-uat` itself is the acceptance.
+## 7. build.w wiring
 
-## 8. Acceptance
+One action target, still named `release-uat` (the runbook, the
+`package-<platform>` dependency and the CI lanes do not change), whose
+action runs `with uat` from the repo root with `WITH_UAT_WITH=<release
+binary>` and writes `out/release-uat/<scenario>.passed|.skipped` plus the
+report; inputs: the release binary, `uat/`, `lib/facades/`. The
+`require-last-green` gate stays. The macOS CI runner then reports
+`raylib_spiral: skip (requires display: none)` instead of red — #1375
+closes at the right layer.
 
-- `uat/README.md` grammar; every scenario in `uat/` parses; a planted bad
-  scenario is a parse error naming the line.
-- `with build :release-uat` runs the nine scenarios with the same verdicts
-  as before the migration on the release host, and on the macOS CI runner
-  reports `raylib spiral: skip (requires display: none)` instead of red
-  (#1375 closes).
-- The report lists scenarios × verdicts and the human checks; the runbook
-  points at it.
-- `build/release_uat.w` is gone; no scenario logic lives in With outside
-  the step library.
-- `:user-programs-safe` is green over `uat/fixtures` + `examples`.
+## 8. Spec words (for Eric's blessing; §18.5 and §18.8)
 
-## 9. Not in this plan
+§18.5 toolchain list, one line:
 
-Property-style or randomized UATs; running UATs against an installed
-`with` other than the release binary under test; a Windows-specific verb
-set (the runner's platform probes cover `.exe` suffix and the
-`WITH_UAT_OPENGL32_DLL` placement the spiral needs, as environment, not
-verbs); Gherkin compatibility.
+```
+with uat [<scenario>]                        # run the project's acceptance scenarios (uat/*.uat)
+```
+
+§18.8 command table: `with init` row becomes "Create new project with
+`with.toml`, `src/main.w`, `test/`, and `uat/hello.uat` (§18.5d)".
+
+New §18.5d, proposed text:
+
+> **18.5d Acceptance scenarios.** A project's `uat/` directory holds
+> acceptance scenarios: plain-text files, one per scenario, each a header
+> (`scenario:`, optional `requires:` and `platforms:`) followed by steps a
+> person would perform at a terminal — `new directory`, `run:`, `write …
+> from …`, `stdin:`, `env`, and `expect …` lines for the exit status, output,
+> files and images. `with uat` runs every scenario that applies on the host,
+> skips with a reason the ones whose `requires:` are unmet, and reports one
+> verdict per scenario and one line per failed step. `expect (human):`
+> records a check a person performs; the runner prints it and never fails
+> it. Programs a scenario writes into the project come from `uat/fixtures/`
+> and are ordinary source files. `with init` writes `uat/hello.uat` and
+> `uat/README.md`.
+
+## 9. Order of work (one batch, one battery)
+
+1. `src/Uat.w`: parser, interpreter, report; `with uat`, `--list`, `--keep`,
+   `WITH_UAT_WITH`; `requires:` probes; tests under `test/uat/` (planted
+   scenario files: one per verb, one per verdict, a parse error naming the
+   line).
+2. `with init` writes `uat/hello.uat` and `uat/README.md` (the templates
+   generated the way `src/InitTemplates.w` is, so the README is the same
+   text as this plan's §3); `cli-selfhost-project-tests` asserts the
+   scaffold runs green under `with uat`.
+3. Spec words (§8) landed once blessed; `spec-inventory-check` row.
+4. The nine scenarios, byte-for-byte the same expectations as today;
+   `build/release_uat_fixtures` → `uat/fixtures`; `:release-uat` re-wired;
+   `build/release_uat.w` deleted; `user-programs-safe` re-pointed; runbook
+   updated (skips, human checks).
+5. `expect image:` and the spiral's `--capture` option — separate PR under
+   the "spec change updates the example" rule.
+
+## 10. Acceptance
+
+- A fresh `with init` project runs `with uat` green with the scaffolded
+  scenario; `with uat --list` shows it.
+- `test/uat/` covers every verb and verdict; a bad scenario fails to parse
+  with the line named.
+- `with build :release-uat` yields the same verdicts as before the
+  migration on the release host, and `skip (requires display: none)` on the
+  macOS runner.
+- `build/release_uat.w` is gone; no scenario logic lives in the build layer.
+- `:user-programs-safe` green over `uat/fixtures` + `examples`.
+
+## 11. Not in this plan
+
+Gherkin compatibility; property/randomized scenarios; a step-definition
+plugin API (the verbs are the runner's — a project that needs a new verb
+files an issue, the way it would for `with test`); Windows-specific verbs
+(the runner's platform probes cover the `.exe` suffix and the
+`WITH_UAT_OPENGL32_DLL` placement as environment).
