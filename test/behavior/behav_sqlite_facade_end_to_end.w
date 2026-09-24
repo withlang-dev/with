@@ -49,9 +49,11 @@ fn shout(ctx: *mut sqlite3_context, n: c_int, argv: *mut *mut sqlite3_value):
 fn main:
     print(f"version: {sqlite3_libversion().unwrap().to_str().unwrap().slice(0, 1)}")
     var db = Database.open(":memory:").unwrap()
-    let rc = db.exec("CREATE TABLE t(v INTEGER, s TEXT); INSERT INTO t VALUES (42, 'hi'), (7, NULL);", on_row, Ctx { tag: 1 }, null)
+    // The callback is nullable (#1618): `Some` of the callback and of its
+    // userdata, or `None` for both (behav_sqlite_facade_exec_no_callback).
+    let rc = db.exec("CREATE TABLE t(v INTEGER, s TEXT); INSERT INTO t VALUES (42, 'hi'), (7, NULL);", Some(on_row), Some(Ctx { tag: 1 }), null)
     print(f"exec: {rc}")
-    let aborted = db.exec("SELECT v, s FROM t", on_row, Ctx { tag: 2 }, null)
+    let aborted = db.exec("SELECT v, s FROM t", Some(on_row), Some(Ctx { tag: 2 }), null)
     print(f"exec aborted by the callback: {aborted == SQLITE_ABORT}")
 
     let stmt = db.prepare("SELECT v, s FROM t ORDER BY v DESC", -1, null).unwrap()

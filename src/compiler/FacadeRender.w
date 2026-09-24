@@ -1600,10 +1600,11 @@ type FacadeCallbackItem {
     destroy: i32,     // the destroy callback a `consumes … destroyed_by` names (withheld), or -1
     retained: bool,
     consumed: bool,
+    nullable: bool,   // the paired callback is `nullable` (#1618): `Option[extern "C" fn(&U, …)]`, its userdata `Option[&U]`
 }
 
 fn facade_render_callback_item(pool: AstPool, intern: InternPool, ci: &Vec[i32], item: i32) -> FacadeCallbackItem:
-    var cbi = FacadeCallbackItem { decl: 0, of_sym: 0, rename: 0, userdata: -1, callback: -1, destroy: -1, retained: false, consumed: false }
+    var cbi = FacadeCallbackItem { decl: 0, of_sym: 0, rename: 0, userdata: -1, callback: -1, destroy: -1, retained: false, consumed: false, nullable: false }
     let cname: str = intern.resolve(pool.get_data0(item as NodeId))
     if facade_render_is_resource_op(pool, intern, cname):
         return cbi
@@ -1611,6 +1612,7 @@ fn facade_render_callback_item(pool: AstPool, intern: InternPool, ci: &Vec[i32],
     if decl == 0:
         return cbi
     var is_callback = false
+    var nullable_pi = -1
     let cstart = pool.get_data1(item as NodeId)
     for k in 0..pool.get_data2(item as NodeId):
         let clause = pool.get_extra(cstart + k)
@@ -1619,6 +1621,13 @@ fn facade_render_callback_item(pool: AstPool, intern: InternPool, ci: &Vec[i32],
         if kind == FACADE_CLAUSE_OF: cbi.of_sym = pool.get_extra(ops)
         else if kind == FACADE_CLAUSE_RENAME: cbi.rename = pool.get_extra(ops)
         else if kind == FACADE_CLAUSE_LEND or kind == FACADE_CLAUSE_PRESERVES: continue
+        else if kind == FACADE_CLAUSE_NULLABLE:
+            // Rendered for the paired callback alone (Sema refuses the
+            // rest, verify_facade_callback_items).
+            let npi = facade_render_param_ref(pool, intern, decl, pool.get_extra(ops))
+            if npi < 0 or nullable_pi >= 0:
+                return cbi
+            nullable_pi = npi
         else if kind == FACADE_CLAUSE_CALLBACK_THREAD: is_callback = true
         else if kind == FACADE_CLAUSE_CALLBACK_USERDATA:
             let cb = facade_render_param_ref(pool, intern, decl, pool.get_extra(ops))
@@ -1660,6 +1669,10 @@ fn facade_render_callback_item(pool: AstPool, intern: InternPool, ci: &Vec[i32],
             return cbi
     if not is_callback or (cbi.retained and cbi.consumed):
         return cbi
+    if nullable_pi >= 0:
+        if nullable_pi != cbi.callback or cbi.retained or cbi.consumed:
+            return cbi
+        cbi.nullable = true
     cbi.decl = decl
     cbi
 
@@ -1668,7 +1681,7 @@ fn facade_render_callback_item(pool: AstPool, intern: InternPool, ci: &Vec[i32],
 fn facade_render_callback_hosted(pool: AstPool, intern: InternPool, cbi: &FacadeCallbackItem, resource: i32, repr: &str) -> bool:
     if cbi.decl == 0:
         return false
-    let li = FacadeLendItem { decl: cbi.decl, of_sym: cbi.of_sym, rename: cbi.rename, lends: true, borrow_res: 0, borrow_from: 0, text_view: false }
+    let li = FacadeLendItem { decl: cbi.decl, of_sym: cbi.of_sym, rename: cbi.rename, lends: true, borrow_res: 0, borrow_from: 0, text_view: false, valid_on_failed: false }
     facade_render_lend_hosted(pool, intern, &li, resource, repr)
 
 // Whether some callback method of `resource` retains userdata: the
@@ -1775,6 +1788,10 @@ fn facade_render_callback_methods(pool: AstPool, intern: InternPool, ci: &Vec[i3
         let free = facade_render_fresh("facade_free", taken)
         let q = facade_render_fresh("facade_q", taken)
         let b = facade_render_fresh("facade_b", taken)
+        let ncb = facade_render_fresh("facade_cb", taken)
+        let nud = facade_render_fresh("facade_ud", taken)
+        let nf = facade_render_fresh("facade_f", taken)
+        let nu = facade_render_fresh("facade_u", taken)
         let generic = cbi.userdata >= 0
         let kept = cbi.retained or cbi.consumed
         let start = pool.fn_meta_param_start(meta)
@@ -1786,6 +1803,7 @@ fn facade_render_callback_methods(pool: AstPool, intern: InternPool, ci: &Vec[i3
         var params = ""
         var args = repr_arg.clone()
         var ud_name = ""
+        var cb_name = ""
         for pi in 1..pool.fn_meta_param_count(meta):
             args = args ++ ", "
             if pi == cbi.destroy:
@@ -1800,12 +1818,25 @@ fn facade_render_callback_methods(pool: AstPool, intern: InternPool, ci: &Vec[i3
                 if kept:
                     shown = "U"
                     arg = ptr.clone()
+                else if cbi.nullable:
+                    // A nullable callback's userdata (#1618): absent with
+                    // it — `Option[&U]`, NULL to C for None.
+                    shown = "Option[&U]"
+                    arg = nud.clone()
                 else:
                     shown = "&U"
                     arg = pname ++ " as *const U as " ++ facade_render_unalias(pool, intern, ptype)
             else if pi == cbi.callback:
-                shown = cb_type.clone()
-                arg = "transmute[" ++ facade_render_callback_raw_type(facade_render_unalias(pool, intern, ptype)) ++ "](" ++ pname ++ ")"
+                cb_name = pname.clone()
+                if cbi.nullable:
+                    // `nullable param N` on the paired callback (ruling
+                    // §43, spec §16.2b.8): `Option` of the typed callback,
+                    // NULL to C for None.
+                    shown = "Option[" ++ cb_type ++ "]"
+                    arg = ncb.clone()
+                else:
+                    shown = cb_type.clone()
+                    arg = "transmute[" ++ facade_render_callback_raw_type(facade_render_unalias(pool, intern, ptype)) ++ "](" ++ pname ++ ")"
             else:
                 let res = facade_render_received(pool, intern, ptype)
                 if res > 0:
@@ -1820,6 +1851,18 @@ fn facade_render_callback_methods(pool: AstPool, intern: InternPool, ci: &Vec[i3
             args = args ++ arg
         let head = (if cbi.retained: "    mut fn " else: "    fn ") ++ mname ++ (if generic: "[U]" else: "") ++ "(" ++ params ++ ")" ++ facade_render_return(pool, intern, decl) ++ ":\n"
         var body = ""
+        if cbi.nullable:
+            // The pair is present or absent together (Sema checks each
+            // call, SemaCheck.w check_method_call): each maps to its C
+            // value, NULL for None.
+            let raw_cb = facade_render_callback_raw_type(facade_render_unalias(pool, intern, facade_render_param_type(pool, intern, decl, cbi.callback)))
+            let ud_type = facade_render_unalias(pool, intern, facade_render_param_type(pool, intern, decl, cbi.userdata))
+            body = body ++ "        let " ++ ncb ++ ": " ++ raw_cb ++ " = match " ++ cb_name ++ ":\n            Some(" ++ nf ++ ") => unsafe { transmute[" ++ raw_cb ++ "](" ++ nf ++ ") }\n            None => null\n"
+            // The userdata by transmute, not `as *const U as …`: with no
+            // callback `U` is Unit, and a cast to `*const Unit` traps
+            // codegen (#1626), which a pointer-to-pointer transmute of the
+            // same representation does not.
+            body = body ++ "        let " ++ nud ++ ": " ++ ud_type ++ " = match " ++ ud_name ++ ":\n            Some(" ++ nu ++ ") => unsafe { transmute[" ++ ud_type ++ "](" ++ nu ++ ") }\n            None => null\n"
         if generic and kept:
             let ud_type = facade_render_unalias(pool, intern, facade_render_param_type(pool, intern, decl, cbi.userdata))
             body = body ++ "        let " ++ cell ++ " = Box.new(" ++ ud_name ++ ")\n"

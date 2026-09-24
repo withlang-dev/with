@@ -4266,6 +4266,13 @@ impl Parser:
                 self.emit_error("expected 'valid on failed' (§16.2b.4)")
                 return 0
             self.advance()
+        else if word == "nullable":
+            // `nullable param N` (§16.2b.8: where the header does not
+            // establish nullability, the facade must): the parameter
+            // accepts NULL.
+            kind = FACADE_CLAUSE_NULLABLE
+            let r = self.parse_facade_param_ref()
+            if r == 0: return 0
             ops.push(r)
         else if word == "thread":
             kind = FACADE_CLAUSE_THREAD

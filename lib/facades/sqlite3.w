@@ -99,10 +99,16 @@ c facade sqlite:
     // sqlite3_exec runs its callback once per result row, during the call
     // (§44): the callback and its userdata are borrowed for the call, and
     // the callback receives the userdata typed (`&U`) where C declares
-    // `void *`. The fifth parameter, `char **errmsg`, is the raw out slot
-    // it is in C; `null` declines it.
+    // `void *`. The callback is nullable (§43, #1618): "If the callback
+    // pointer to sqlite3_exec() is NULL, then no callback is ever invoked
+    // and result rows are ignored" — the header
+    // states no nullability, so the facade does, and an absent callback
+    // takes its userdata with it: `db.exec(sql, None, None, null)` runs
+    // DDL and DML with no callback. The fifth parameter, `char **errmsg`,
+    // is the raw out slot it is in C; `null` declines it.
     fn sqlite3_exec
         callback param 2 userdata param 3
+        nullable param 2
     // "sqlite3_create_function_v2 … xDestroy will be invoked when the
     // function is deleted, either by being overloaded or when the database
     // connection closes": the application data (param 4, `void *pApp`)

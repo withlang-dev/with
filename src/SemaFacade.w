@@ -31,6 +31,7 @@ impl Sema:
         self.verify_facade_assignments()
         self.verify_facade_presentation()
         self.verify_facade_failed_state_items()
+        self.verify_facade_nullable_items()
         self.verify_facade_borrowed_returns()
         self.verify_facade_text_views()
         self.verify_facade_callback_items()
@@ -747,7 +748,7 @@ impl Sema:
                 return
             self.emit_error(f"fn '{fname}' is described by two facade blocks with different clauses; one function has one contract — restate it word for word or describe it once (§16.2b)", item)
             return
-        var c = ForeignContract { fn_sym, decl, facade, node: item, lend: 0, destroys: 0, consumes: Vec.new(), consumes_destroyed_by: Vec.new(), retains: Vec.new(), retains_by: Vec.new(), returns_borrow_resource: 0, returns_borrow_from: -1, returns_borrow_domain: 0, returns_static_tid: 0, preserves_params: Vec.new(), preserves_domains: Vec.new(), of_resource: 0, rename: 0, callback_thread_any: 0, callback_consumes: Vec.new(), callback_userdata_cb: Vec.new(), callback_userdata_of: Vec.new(), valid_on_failed: 0 }
+        var c = ForeignContract { fn_sym, decl, facade, node: item, lend: 0, destroys: 0, consumes: Vec.new(), consumes_destroyed_by: Vec.new(), retains: Vec.new(), retains_by: Vec.new(), returns_borrow_resource: 0, returns_borrow_from: -1, returns_borrow_domain: 0, returns_static_tid: 0, preserves_params: Vec.new(), preserves_domains: Vec.new(), of_resource: 0, rename: 0, callback_thread_any: 0, callback_consumes: Vec.new(), callback_userdata_cb: Vec.new(), callback_userdata_of: Vec.new(), valid_on_failed: 0, nullable_params: Vec.new() }
         let extra_start = self.ast.get_data1(item)
         let clause_count = self.ast.get_data2(item)
         for ci in 0..clause_count:
@@ -985,6 +986,29 @@ impl Sema:
             // mark is verified once every resource is known
             // (verify_facade_failed_state_items).
             c.valid_on_failed = 1
+            return c
+        if kind == FACADE_CLAUSE_NULLABLE:
+            // `nullable param N` (ruling §43, spec §16.2b.8: "where safe
+            // modeling requires nullability and the header does not
+            // establish it, the facade … must"): NULL is a value the
+            // parameter accepts. What the rendering makes of it is verified
+            // once the pairing is known (verify_facade_callback_items): a
+            // callback paired with userdata is `Option[extern "C" fn(&U, …)]`
+            // and its userdata `Option[&U]` (#1618). A raw pointer parameter
+            // accepts `null` as C declares it and the clause adds nothing.
+            let pi = self.facade_resolve_param(self.ast.get_extra(ops), fn_sym, sig)
+            if pi < 0:
+                return c
+            let pk = self.get_type_kind(self.resolve_alias(self.sig_param_type(sig, pi) as TypeId))
+            if pk != TypeKind.TY_PTR and not self.facade_param_is_callable(sig, pi):
+                let shown = self.facade_param_display(fn_sym, sig, pi)
+                self.emit_error(f"fn '{fname}': nullable {shown}: not a pointer, NULL is not a value it can take (§16.2b.8, §16.2b.13)", clause)
+                return c
+            for k in 0..c.nullable_params.len() as i32:
+                if c.nullable_params[k] == pi:
+                    self.emit_error(f"fn '{fname}': 'nullable param {pi}' is stated twice (§16.2b.8)", clause)
+                    return c
+            c.nullable_params.push(pi)
             return c
         let cname = facade_clause_name(kind)
         self.emit_error(f"fn '{fname}': clause '{cname}' applies to a resource, not an fn item (§16.2b)", clause)
@@ -1224,6 +1248,7 @@ fn facade_clause_name(kind: i32) -> str:
     if kind == FACADE_CLAUSE_CALLBACK_THREAD: return "callback_thread"
     if kind == FACADE_CLAUSE_CALLBACK_USERDATA: return "callback … userdata"
     if kind == FACADE_CLAUSE_VALID_ON_FAILED: return "valid on failed"
+    if kind == FACADE_CLAUSE_NULLABLE: return "nullable"
     "callback consumes"
 
 // ── stage 3: raw classification consults the facts ──────────────────────
@@ -2412,6 +2437,27 @@ impl Sema:
                 return true
         false
 
+    // `nullable param N` (ruling §43, spec §16.2b.8) is rendered for one
+    // shape in stage 12b: the callback of a `callback param N userdata param
+    // M` pairing (#1618; verify_facade_callback_items checks the pairing). A
+    // raw pointer parameter accepts `null` as C declares it and needs no
+    // clause; a nullable C string (`Option[&str]`) or resource parameter
+    // (`Option[&R]`) is not modeled, and saying so beats rendering the
+    // clause as nothing.
+    mut fn verify_facade_nullable_items():
+        for ci in 0..self.foreign_contracts.len() as i32:
+            if self.foreign_contracts[ci].nullable_params.len() == 0 or self.facade_contract_is_callback_item(ci):
+                continue
+            self.update_decl_source_context(self.foreign_contracts[ci].decl)
+            let fn_sym = self.foreign_contracts[ci].fn_sym
+            let fname: str = self.pool_resolve(fn_sym)
+            let sig = self.get_sig(fn_sym)
+            if sig < 0:
+                continue
+            let pi = self.foreign_contracts[ci].nullable_params[0]
+            let shown = self.facade_param_display(fn_sym, sig, pi)
+            self.emit_error(f"fn '{fname}': nullable {shown}; nullability is rendered for the callback of a 'callback param N userdata param M' pairing (an absent callback takes its userdata with it, §16.2b.9), and a raw pointer parameter accepts null as C declares it — a nullable C string or resource parameter is not modeled (§16.2b.8)", self.foreign_contracts[ci].node)
+
     // Owned foreign text (ruling §42): every rendered pointer resource over
     // a C string carries `as_cstr() -> CStr` (FacadeRender.w
     // facade_render_text_view), a view kept inside the resource's life by
@@ -2644,6 +2690,24 @@ impl Sema:
                 if callable_count == 0:
                     self.emit_error(f"fn '{fname}': 'callback_thread any' says the callback may run on any thread, but '{fname}' takes no callback (§16.2b.10)", node)
                     continue
+            // `nullable param N` on a callback contract (#1618; ruling §43,
+            // spec §16.2b.8-9): the paired callback is rendered
+            // `Option[extern "C" fn(&U, …)]` and its userdata `Option[&U]`
+            // — an absent callback takes its userdata with it, since the
+            // userdata is what the callback receives. A retained or
+            // consumed userdata's callback is kept by C past the call and
+            // is not modeled nullable; nor is any other parameter here.
+            let paired_cb = self.facade_contract_callback_param(ci)
+            var nullable = 0
+            var bad = -1
+            for k in 0..self.foreign_contracts[ci].nullable_params.len() as i32:
+                let npi = self.foreign_contracts[ci].nullable_params[k]
+                if npi == paired_cb and paired_cb >= 0 and ud >= 0 and not self.facade_contract_userdata_retained(ci) and not self.facade_contract_userdata_consumed(ci): nullable = 1
+                else: bad = npi
+            if bad >= 0:
+                let shown = self.facade_param_display(fn_sym, sig, bad)
+                self.emit_error(f"fn '{fname}': nullable {shown}; on a callback contract, nullability is rendered for the callback of a 'callback param N userdata param M' pairing that C uses during the call only — an absent callback takes its userdata with it — and a raw pointer parameter accepts null as C declares it (§16.2b.8, §16.2b.9)", node)
+                continue
             // A retained callback runs on the registering thread unless the
             // facade says otherwise (§51); a consumed userdata's destroy
             // callback likewise. Nothing more is inferred.
@@ -2682,7 +2746,7 @@ impl Sema:
             let mnode = if msym != 0: self.generic_fn_node_for_symbol(msym) else: 0
             if mnode != 0:
                 self.facade_callback_method_index.insert(mnode, self.facade_callback_methods.len() as i32)
-            self.facade_callback_methods.push(FacadeCallbackMethod { contract: ci, userdata_param: ud_r, callback_param: cb_r, thread_any: self.foreign_contracts[ci].callback_thread_any, retained: if self.facade_contract_userdata_retained(ci): 1 else: 0, consumed: if self.facade_contract_userdata_consumed(ci): 1 else: 0 })
+            self.facade_callback_methods.push(FacadeCallbackMethod { contract: ci, userdata_param: ud_r, callback_param: cb_r, thread_any: self.foreign_contracts[ci].callback_thread_any, retained: if self.facade_contract_userdata_retained(ci): 1 else: 0, consumed: if self.facade_contract_userdata_consumed(ci): 1 else: 0, nullable })
 
     // The callback method a symbol names, or -1.
     fn facade_callback_method_for(fn_sym: i32) -> i32:
@@ -2724,6 +2788,11 @@ impl Sema:
         let lacks = if not send and not sync: "neither Send nor Sync" else: if not send: "not Send" else: "not Sync"
         self.emit_error(f"'{fname}' may invoke its callback from any thread ('callback_thread any' in facade {facade}), so the userdata type must be Send and Sync; '{tn}' is {lacks} (§16.2b.10)", arg_node)
 
+    // Whether a call argument spells an absent Option: the `None` variant.
+    fn facade_arg_is_none(node: i32) -> bool:
+        let kind = self.ast.kind(node)
+        (kind == NodeKind.NK_VARIANT_SHORTHAND or kind == NodeKind.NK_IDENT) and self.ast.get_data0(node) == self.syms.none
+
     // The callback method a method call `recv.field(…)` names, or -1.
     fn facade_callback_method_for_call(recv_type: i32, field: i32) -> i32:
         if self.facade_callback_methods.len() == 0 or recv_type == 0 or field == 0:
@@ -2741,6 +2810,22 @@ impl Sema:
     // captureless, and a bare fn coerces to it (§12.4) — which the generic
     // call path, binding `U` from every argument at once, cannot give it.
     mut fn facade_callback_expected_type(mi: i32, recv_type: i32, field: i32, ud_ty: i32) -> i32:
+        self.facade_callback_param_expected_type(mi, recv_type, field, ud_ty, self.facade_callback_methods[mi].callback_param)
+
+    // The userdata type `U` a userdata argument's type binds: the value's
+    // type, whether passed as `U`, `&U` or — a nullable callback's userdata
+    // (#1618) — `Option[&U]`.
+    fn facade_callback_userdata_type(ud_ty: i32) -> i32:
+        var u_ty = self.resolve_alias(ud_ty as TypeId)
+        if self.get_type_kind(u_ty) == TypeKind.TY_GENERIC_INST and self.get_generic_inst_arg_count(u_ty as i32) == 1 and self.pool_resolve(self.get_type_d0(u_ty)) == "Option":
+            u_ty = self.resolve_alias(self.get_generic_inst_arg(u_ty as i32, 0) as TypeId)
+        if self.get_type_kind(u_ty) == TypeKind.TY_REF:
+            u_ty = self.resolve_alias(self.get_type_d0(u_ty) as TypeId)
+        u_ty as i32
+
+    // The rendered type of parameter `r` (rendered index, `self` excluded)
+    // of a callback method, with `U` bound to `ud_ty`'s userdata type.
+    mut fn facade_callback_param_expected_type(mi: i32, recv_type: i32, field: i32, ud_ty: i32, r: i32) -> i32:
         let resolved = self.auto_deref_ref_ptr_type(self.resolve_alias(recv_type as TypeId))
         let owner = self.get_type_name(resolved)
         let fn_sym = self.lookup_generic_method_fn(owner, field)
@@ -2751,14 +2836,11 @@ impl Sema:
         if meta < 0 or self.ast.fn_meta_tp_count(meta) != 1:
             return 0
         let u_sym = self.ast.get_extra(self.ast.fn_meta_tp_start(meta))
-        var u_ty = self.resolve_alias(ud_ty as TypeId)
-        if self.get_type_kind(u_ty) == TypeKind.TY_REF:
-            u_ty = self.resolve_alias(self.get_type_d0(u_ty) as TypeId)
-        let cb_r = self.facade_callback_methods[mi].callback_param
+        let u_ty = self.facade_callback_userdata_type(ud_ty)
         let param_start = self.ast.fn_meta_param_start(meta)
-        if cb_r + 1 >= self.ast.fn_meta_param_count(meta):
+        if r < 0 or r + 1 >= self.ast.fn_meta_param_count(meta):
             return 0
-        let p_type_node = self.ast.fn_param_type(param_start, cb_r + 1)
+        let p_type_node = self.ast.fn_param_type(param_start, r + 1)
         let saved_syms = sema_clone_i32_vec(&self.generic_subst_param_syms)
         let saved_tys = sema_clone_i32_vec(&self.generic_subst_type_ids)
         self.clear_generic_substitution()

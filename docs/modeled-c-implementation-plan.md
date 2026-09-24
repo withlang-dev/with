@@ -286,6 +286,21 @@ Eric blesses):
   (the failed state is destroyed by its error's Drop and owns nothing else;
   `Borrowed<R>` holds a view of a live `R`). An unmarked operation stays
   unavailable, and the diagnostic names the clause.
+- **`nullable param N`** (#1618). Ruling §43 / spec §16.2b.8: "Where safe
+  modeling requires nullability and the header does not establish it, the
+  facade or a trusted convention profile must"; `nullable -> Option`. The
+  clause is the facade's statement, in the ruling's own word, and the
+  rendering is the one nullability already has: `Option`. Rendered for one
+  shape in this stage — the callback of a `callback param N userdata param
+  M` pairing that C uses during the call only: `Option[extern "C" fn(&U,
+  …)]`, and its userdata `Option[&U]`, since the userdata is what the
+  callback receives and is absent with it (`db.exec(sql, None, None,
+  null)`). Sema binds `U` to Unit when both are `None`, and refuses one
+  without the other at the call, naming the pairing. A `nullable` on any
+  other parameter is refused rather than rendered as nothing: a raw pointer
+  accepts `null` as C declares it, and `Option[&str]` / `Option[&R]`
+  parameters are not modeled. Retained or consumed userdata's callbacks are
+  not nullable (C keeps them past the call).
 - **Library-prefix presentation** (#1610). Ruling §54 / spec §16.2b.11
   permit "shortening prefixes" silently under "a recognizable
   naming/receiver pattern". The renderer's convention shortens by the

@@ -455,6 +455,7 @@ type ForeignContract {
     callback_userdata_cb: Vec[i32],    // `callback param N userdata param M`: the callback parameter N …
     callback_userdata_of: Vec[i32],    // … and the userdata parameter M it receives (parallel)
     valid_on_failed: i32,              // `valid on failed`: presented on the failed-state resource too (§16.2b.4)
+    nullable_params: Vec[i32],         // `nullable param N`: the facade establishes the parameter accepts NULL (§16.2b.8)
 }
 
 // A callback method a facade rendered on a resource (stage 9, ruling
@@ -470,6 +471,7 @@ type FacadeCallbackMethod {
     thread_any: i32,
     retained: i32,
     consumed: i32,
+    nullable: i32,    // the callback is nullable (#1618): `Option[extern "C" fn(&U, …)]`, its userdata `Option[&U]`
 }
 
 // A foreign-state domain (ruling §33-§37): ownerless C storage given an

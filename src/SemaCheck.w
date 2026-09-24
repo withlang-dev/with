@@ -22809,9 +22809,35 @@ impl Sema:
         let facade_mi = self.facade_callback_method_for_call(obj_type as i32, field)
         var facade_ud_node = 0
         var facade_ud_ty = 0
+        var facade_nullable = false
         if facade_mi >= 0 and self.facade_callback_methods[facade_mi].callback_param >= 0:
             let udi = self.facade_callback_methods[facade_mi].userdata_param
-            if udi >= 0 and udi < mc_resolved_arg_count:
+            let cbi = self.facade_callback_methods[facade_mi].callback_param
+            facade_nullable = self.facade_callback_methods[facade_mi].nullable != 0
+            var facade_absent = false
+            if facade_nullable and udi >= 0 and udi < mc_resolved_arg_count and cbi >= 0 and cbi < mc_resolved_arg_count:
+                // A nullable callback (#1618, spec §16.2b.8-9): `None` for
+                // the callback is `None` for its userdata too — the
+                // userdata is what the callback receives — and binds `U`
+                // to Unit, which nothing reads. One given without the
+                // other is the pairing violated, named here rather than
+                // left to a type mismatch.
+                let cb_node = if mc_has_resolved_args != 0: self.get_resolved_call_arg(node, cbi) else: self.ast.get_extra(extra_start + cbi)
+                let ud_node = if mc_has_resolved_args != 0: self.get_resolved_call_arg(node, udi) else: self.ast.get_extra(extra_start + udi)
+                let cb_absent = cb_node > 0 and self.facade_arg_is_none(cb_node)
+                let ud_absent = ud_node > 0 and self.facade_arg_is_none(ud_node)
+                if cb_absent != ud_absent:
+                    let mci = self.facade_callback_methods[facade_mi].contract
+                    let cfn: str = self.pool_resolve(self.foreign_contracts[mci].fn_sym)
+                    if cb_absent:
+                        self.emit_error(f"'{cfn}': a userdata given with no callback to receive it; the callback and its userdata are paired ('callback param N userdata param M'), so None for the callback is None for the userdata (§16.2b.9)", ud_node)
+                    else:
+                        self.emit_error(f"'{cfn}': a callback given with no userdata; the callback receives its userdata ('callback param N userdata param M'), so pass one, or None for both when no callback is wanted (§16.2b.9)", cb_node)
+                    return 0
+                if cb_absent:
+                    facade_absent = true
+                    facade_ud_ty = self.ty_void as i32
+            if udi >= 0 and udi < mc_resolved_arg_count and not facade_absent:
                 let ud_node = if mc_has_resolved_args != 0: self.get_resolved_call_arg(node, udi) else: self.ast.get_extra(extra_start + udi)
                 if ud_node > 0:
                     facade_ud_node = ud_node
@@ -22866,6 +22892,11 @@ impl Sema:
                 mc_expected = mc_static_variant_payload_tys[ai]
             if mc_expected == 0 and facade_mi >= 0 and facade_ud_ty != 0 and ai == self.facade_callback_methods[facade_mi].callback_param:
                 mc_expected = self.facade_callback_expected_type(facade_mi, obj_type as i32, field, facade_ud_ty)
+            // An absent nullable callback's userdata: `None` typed as the
+            // rendered `Option[&U]` with `U` Unit (nothing was checked
+            // ahead for it).
+            if mc_expected == 0 and facade_mi >= 0 and facade_nullable and facade_ud_ty != 0 and facade_ud_node == 0 and ai == self.facade_callback_methods[facade_mi].userdata_param:
+                mc_expected = self.facade_callback_param_expected_type(facade_mi, obj_type as i32, field, facade_ud_ty, ai)
             if mc_expected == 0 and self.ast.kind(mc_arg_node) == NodeKind.NK_NULL_LIT:
                 let mc_null_fn = if mc_method_fn_for_resolution != 0: mc_method_fn_for_resolution else: if mc_owner_sym_for_effect != 0: self.lookup_generic_method_fn(mc_owner_sym_for_effect, field) else: 0
                 mc_expected = self.null_arg_expected_type(mc_null_fn, ai, true)
