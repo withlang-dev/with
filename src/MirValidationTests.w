@@ -693,3 +693,133 @@ fn task_operand_verdict(operand_is_task: bool) -> str:
 pub fn mir_test_task_operand() -> Unit:
     assert(task_operand_verdict(false).contains("not a Task or ScopedTask handle"))
     assert(task_operand_verdict(true) == "")
+
+// D65 / #1639: a `const fn` callee the typed validator accounts for — a
+// declared signature, a generic template or a builtin in Sema's snapshot,
+// or a body of the module — and rejects otherwise. This is #1635's MIR: a
+// GENERIC_CALL to a symbol named after a callable binding, the argument
+// dropped, which every validator passed. `mark` is the call's intrinsic
+// (NONE, GENERIC_CALL or STR_LEN as "any other kind"); `class` is the
+// snapshot class of symbol 7 (0 = absent); `has_body` adds a body for it.
+fn unknown_callee_verdict(mark: MirIntrinsic, class: i32, has_body: bool, machinery: bool = false) -> str:
+    var mir_mod = MirModule.init()
+    for kind in [0, TypeKind.TY_VOID, TypeKind.TY_INT]:
+        mir_mod.sema_type_kinds.push(kind)
+        mir_mod.sema_type_d0.push(0)
+        mir_mod.sema_type_d1.push(0)
+        mir_mod.sema_type_d2.push(0)
+    let unit_ty = 1
+    let int_ty = 2
+    if class != 0: mir_mod.sema_callable_syms.insert(7, class)
+    if has_body:
+        var callee = MirBody.init_for_fn(7)
+        let callee_entry = callee.new_block()
+        callee.set_terminator(callee_entry, TermKind.TK_RETURN, 0, 0, 0, 0, 0)
+        mir_mod.add_body(callee)
+    var body = MirBody.init_for_fn(1)
+    let result_local = body.new_temp(int_ty)
+    let result_place = body.new_place(result_local)
+    let entry = body.new_block()
+    let done = body.new_block()
+    let callee_const = body.new_const(ConstKind.CK_FN, 7, 0, 0, unit_ty)
+    let callee_operand = body.new_operand(OperandKind.OK_CONSTANT, callee_const)
+    let args: Vec[i32] = Vec.new()
+    let call_id = body.new_call_args(&args)
+    body.set_call_intrinsic(call_id, mark)
+    if machinery: body.set_call_machinery_dispatch(call_id)
+    body.set_terminator(entry, TermKind.TK_CALL, callee_operand, call_id, result_place, done, 0)
+    body.set_terminator(done, TermKind.TK_RETURN, 0, 0, 0, 0, 0)
+    let err = validate_typed_mir_body(mir_mod, body)
+    with_str_clone_ref(err.message)
+
+pub fn mir_test_unknown_callee() -> Unit:
+    let unknown = "names no function Sema knows"
+    assert(unknown_callee_verdict(MirIntrinsic.GENERIC_CALL, 0, false).contains(unknown))
+    assert(unknown_callee_verdict(MirIntrinsic.NONE, 0, false).contains(unknown))
+    assert(unknown_callee_verdict(MirIntrinsic.NONE, MirCallableClass.Signature as i32, false) == "")
+    assert(unknown_callee_verdict(MirIntrinsic.GENERIC_CALL, MirCallableClass.Signature as i32, false) == "")
+    assert(unknown_callee_verdict(MirIntrinsic.GENERIC_CALL, MirCallableClass.Generic as i32, false) == "")
+    assert(unknown_callee_verdict(MirIntrinsic.GENERIC_CALL, MirCallableClass.Intrinsic as i32, false) == "")
+    // A template or builtin called without the mark that carries its contract.
+    assert(unknown_callee_verdict(MirIntrinsic.NONE, MirCallableClass.Generic as i32, false).contains("without a GENERIC_CALL mark"))
+    assert(unknown_callee_verdict(MirIntrinsic.NONE, MirCallableClass.Intrinsic as i32, false).contains("without a GENERIC_CALL mark"))
+    // A body of the module (a closure, a dispatcher) needs no snapshot entry.
+    assert(unknown_callee_verdict(MirIntrinsic.NONE, 0, true) == "")
+    // Any other intrinsic mark is recognized by its kind; the symbol is not judged.
+    assert(unknown_callee_verdict(MirIntrinsic.STR_LEN, 0, false) == "")
+    // A language-machinery GENERIC_CALL (`s.track(t)`, an Atomic method) carries
+    // the dispatch mark from MirLower's one decision point; #1635's branch never
+    // sets it, so the same MIR without the mark is refused.
+    assert(unknown_callee_verdict(MirIntrinsic.GENERIC_CALL, 0, false, true) == "")
+    assert(unknown_callee_verdict(MirIntrinsic.NONE, 0, false, true).contains(unknown))
+
+// D65 / #1647 phase 1: the audit:resolution comparison over a planted body
+// and a planted Sema answer. `callee_is_place` calls through a fn-typed
+// local (an indirect call); otherwise the callee is `const fn 7`. `mark`
+// is the call's intrinsic; `argc` the MIR argument count; `answer` Sema's
+// record. The comparison (mir_resolution_check_call) reads no Sema.
+fn resolution_verdict(callee_is_place: bool, mark: MirIntrinsic, argc: i32, answer: &CalleeResolution) -> str:
+    var mir_mod = MirModule.init()
+    for kind in [0, TypeKind.TY_VOID, TypeKind.TY_INT, TypeKind.TY_FN]:
+        mir_mod.sema_type_kinds.push(kind)
+        mir_mod.sema_type_d0.push(0)
+        mir_mod.sema_type_d1.push(0)
+        mir_mod.sema_type_d2.push(0)
+    let unit_ty = 1
+    let int_ty = 2
+    let fn_ty = 3
+    mir_mod.sema_type_d0[fn_ty] = mir_mod.sema_type_extra.len() as i32
+    mir_mod.sema_type_d1[fn_ty] = 1
+    mir_mod.sema_type_d2[fn_ty] = int_ty
+    mir_mod.sema_type_extra.push(int_ty)
+    var body = MirBody.init_for_fn(1)
+    let result_local = body.new_temp(int_ty)
+    let result_place = body.new_place(result_local)
+    let entry = body.new_block()
+    let done = body.new_block()
+    var callee_operand = -1
+    if callee_is_place:
+        let callee_local = body.new_temp(fn_ty)
+        let callee_place = body.new_place(callee_local)
+        callee_operand = body.new_operand(OperandKind.OK_COPY, callee_place)
+    else:
+        let callee_const = body.new_const(ConstKind.CK_FN, 7, 0, 0, unit_ty)
+        callee_operand = body.new_operand(OperandKind.OK_CONSTANT, callee_const)
+    let args: Vec[i32] = Vec.new()
+    for i in 0..argc:
+        let argument = body.new_const(ConstKind.CK_INT, i, 0, 0, int_ty)
+        args.push(body.new_operand(OperandKind.OK_CONSTANT, argument))
+    let call_id = body.new_call_args(&args)
+    body.set_call_intrinsic(call_id, mark)
+    body.set_terminator(entry, TermKind.TK_CALL, callee_operand, call_id, result_place, done, 0)
+    body.set_terminator(done, TermKind.TK_RETURN, 0, 0, 0, 0, 0)
+    mir_resolution_check_call(mir_mod, body, entry, answer)
+
+fn resolution_answer(kind: CalleeResolutionKind, param_count: i32, sig: i32, node_sig: i32) -> CalleeResolution:
+    CalleeResolution { kind, name: "r", param_count, sig, sym: 7, node_sig }
+
+pub fn mir_test_resolution_callees() -> Unit:
+    // #1635's MIR: `let r = c.run; r(21)` lowered to a GENERIC_CALL to a
+    // function named `r` with no arguments; Sema resolved an indirect call
+    // through a one-parameter callable.
+    assert(resolution_verdict(false, MirIntrinsic.GENERIC_CALL, 0, resolution_answer(CalleeResolutionKind.Callable, 1, -1, -1)).contains("a function was invented from a binding's name"))
+    // A callee symbol Sema knows nothing about (#1639).
+    assert(resolution_verdict(false, MirIntrinsic.NONE, 1, resolution_answer(CalleeResolutionKind.Unknown, -1, -1, -1)).contains("Sema knows no such function"))
+    // Argument count against the same Sema fact, direct and indirect.
+    assert(resolution_verdict(false, MirIntrinsic.NONE, 1, resolution_answer(CalleeResolutionKind.Signature, 2, 3, -1)).contains("Sema's signature takes 2"))
+    assert(resolution_verdict(true, MirIntrinsic.NONE, 0, resolution_answer(CalleeResolutionKind.Callable, 1, -1, -1)).contains("Sema's callable type takes 1"))
+    // A variadic signature or an extern fn type states no count.
+    assert(resolution_verdict(false, MirIntrinsic.NONE, 3, resolution_answer(CalleeResolutionKind.Signature, -1, 3, -1)) == "")
+    assert(resolution_verdict(true, MirIntrinsic.NONE, 2, resolution_answer(CalleeResolutionKind.Callable, -1, -1, -1)) == "")
+    // An indirect call Sema never resolved as one.
+    assert(resolution_verdict(true, MirIntrinsic.NONE, 1, resolution_answer(CalleeResolutionKind.Unknown, -1, -1, -1)).contains("an indirect call needs Sema's callable type"))
+    // The call node resolved to one signature, the callee is another.
+    assert(resolution_verdict(false, MirIntrinsic.NONE, 1, resolution_answer(CalleeResolutionKind.Signature, 1, 3, 4)).contains("Sema resolved this call node to signature 4"))
+    assert(resolution_verdict(false, MirIntrinsic.NONE, 1, resolution_answer(CalleeResolutionKind.Signature, 1, 3, 3)) == "")
+    // A template or builtin needs the GENERIC_CALL mark; with it they agree.
+    assert(resolution_verdict(false, MirIntrinsic.NONE, 1, resolution_answer(CalleeResolutionKind.Generic, -1, -1, -1)).contains("no GENERIC_CALL mark"))
+    assert(resolution_verdict(false, MirIntrinsic.GENERIC_CALL, 1, resolution_answer(CalleeResolutionKind.Generic, -1, -1, -1)) == "")
+    assert(resolution_verdict(false, MirIntrinsic.NONE, 1, resolution_answer(CalleeResolutionKind.Intrinsic, -1, -1, -1)).contains("as an ordinary function"))
+    assert(resolution_verdict(false, MirIntrinsic.GENERIC_CALL, 1, resolution_answer(CalleeResolutionKind.Intrinsic, -1, -1, -1)) == "")
+    // Any other intrinsic mark is recognized by its kind.
+    assert(resolution_verdict(false, MirIntrinsic.STR_LEN, 1, resolution_answer(CalleeResolutionKind.Unknown, -1, -1, -1)) == "")
