@@ -20,14 +20,14 @@ fn scores -> i32:
         print("could not open an in-memory database")
         return 1
     // No row callback: `None` declines it, and the userdata it would receive.
-    if db.exec("CREATE TABLE users (name TEXT, email TEXT, score INTEGER); INSERT INTO users VALUES ('Alice', NULL, 95), ('Bob', NULL, 82), ('Charlie', NULL, 91)", None, None, null) != SQLITE_OK:
+    if db.exec("CREATE TABLE users (name TEXT, email TEXT, score INTEGER); INSERT INTO users VALUES ('Alice', NULL, 95), ('Bob', NULL, 82), ('Charlie', NULL, 91)", None, None) != SQLITE_OK:
         print(f"seeding failed: {message(&db)}")
         return 1
 
     // A prepared statement depends on its connection: it is finalized before
     // the connection closes, and cannot be stored beside it. Parameters are
     // numbered from 1, as SQLite numbers them.
-    let Ok(ranked) = db.prepare("SELECT name, email, score FROM users WHERE score > ? ORDER BY score DESC", -1, null) else:
+    let Ok(ranked) = db.prepare("SELECT name, email, score FROM users WHERE score > ? ORDER BY score DESC") else:
         print(f"prepare failed: {message(&db)}")
         return 1
     ranked.bind_int(1, 80)
@@ -39,7 +39,7 @@ fn scores -> i32:
         print(f"{name} ({email}): {score}")
 
     // What C reported, as With values: the status, and the message.
-    if db.exec("SELECT * FROM nowhere", None, None, null) != SQLITE_OK:
+    if db.exec("SELECT * FROM nowhere", None, None) != SQLITE_OK:
         print(f"sqlite said {db.errcode()}: {message(&db)}")
     0
 

@@ -83,8 +83,17 @@ c facade sqlite:
         destroys
     // The explicit presentation override (§55): the convention would
     // present sqlite3_prepare_v2 as `prepare_v2`; a connection prepares.
+    // Two fixed arguments (D64, §16.2b.11): "If the nByte argument is
+    // negative, then zSql is read up to the first zero terminator" — the
+    // facade always passes the whole NUL-terminated `str` it lends, so
+    // `nByte` is -1; "If pzTail is not NULL then *pzTail is made to point
+    // to the first byte past the end of the first SQL statement in zSql" —
+    // the presented call prepares one statement and declines the tail, so
+    // `pzTail` is NULL. The raw operation keeps both for any other value.
     fn sqlite3_prepare_v2
         rename prepare
+        param nByte fixed -1
+        param pzTail fixed null
     // "Memory to hold the error message string is managed internally …
     // the error string might be overwritten or deallocated by subsequent
     // calls to other SQLite interface functions": a view of the
@@ -109,12 +118,20 @@ c facade sqlite:
     // pointer to sqlite3_exec() is NULL, then no callback is ever invoked
     // and result rows are ignored" — the header
     // states no nullability, so the facade does, and an absent callback
-    // takes its userdata with it: `db.exec(sql, None, None, null)` runs
+    // takes its userdata with it: `db.exec(sql, None, None)` runs
     // DDL and DML with no callback. The fifth parameter, `char **errmsg`,
-    // is the raw out slot it is in C; `null` declines it.
+    // is fixed to NULL (D64, §16.2b.11): "If the 5th parameter to
+    // sqlite3_exec() is not NULL then any error message is written into
+    // memory obtained from sqlite3_malloc() … To avoid memory leaks, the
+    // application should invoke sqlite3_free() on error message strings
+    // returned through the 5th parameter" — an owned foreign string the
+    // facade would have to model as a resource to present safely; the
+    // presented call declines it, and `db.errmsg()` reads the same message
+    // as a view (§32).
     fn sqlite3_exec
         callback param 2 userdata param 3
         nullable param 2
+        param errmsg fixed null
     // "sqlite3_create_function_v2 … xDestroy will be invoked when the
     // function is deleted, either by being overloaded or when the database
     // connection closes": the application data (param 4, `void *pApp`)
