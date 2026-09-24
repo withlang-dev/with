@@ -1294,6 +1294,151 @@ pub fn run_check_libc_surface_action(ctx: ActionCtx) -> i32:
     print("libc-surface-check: std.libc exports C-standard functions and with_libc_* seams only; the migrator allowlist agrees")
     comp_write_ok_output(ctx)
 
+// ── runtime-domain-audit (ruling §52; spec §16.2b.14) ───────────────────────
+// "Runtime foreign calls must themselves be described by an internal facade
+// or equivalent audited contract data." The rows are the `c facade` block at
+// the end of each rt/*.w file: one `fn` item per foreign extern — an
+// `extern fn` carrying `@[link_name]` or `@[import_module]`, or one whose
+// name is neither an rt_* nor a with_* runtime symbol — under the three libc
+// domains (errno thread, environ process, locale process; ruling §33-§36).
+// The compiler verifies what a row says when the file compiles (a row names
+// a declaration in scope, `preserves domain D` a declared domain); this lane
+// verifies that no foreign call is left unsaid, which the compiler cannot
+// know — a facade may legitimately describe a subset of a user's imports,
+// but the runtime's facade is not a user's (§52: no "runtime calls don't
+// count" exception). An LLVM intrinsic (`link_name("llvm.…")`) is not a
+// foreign call.
+
+/// The lane's verdicts on one runtime source, each "path:line: message".
+fn comp_runtime_domain_violations(path: &str, text: &str) -> Vec[str]:
+    let out: Vec[str] = Vec.new()
+    let lines = comp_split_lines(text)
+    var foreign_names: Vec[str] = Vec.new()
+    var foreign_lines: Vec[i32] = Vec.new()
+    var foreign_links: Vec[str] = Vec.new()
+    var rows = "|"
+    var facades = 0
+    var facade_name = ""
+    var facade_line = 0
+    var domains = "|"
+    var in_facade = false
+    var pending_attr = false
+    var pending_link = ""
+    for i in 0..lines.len() as i32:
+        let line = lines[i]
+        let nr = i + 1
+        if in_facade:
+            let trimmed = comp_trim(line)
+            if trimmed.len() == 0 or trimmed.starts_with("//"): continue
+            if line.starts_with(" "):
+                if trimmed.starts_with("fn "): rows = rows ++ comp_ident_prefix(trimmed.slice(3, trimmed.len())) ++ "|"
+                else if trimmed.starts_with("domain "): domains = domains ++ comp_trim(trimmed.slice(7, trimmed.len())) ++ "|"
+                continue
+            in_facade = false
+        if line.starts_with("@[link_name(") or line.starts_with("@[import_module("):
+            pending_attr = true
+            if line.starts_with("@[link_name("): pending_link = comp_first_quoted(line)
+            continue
+        if line.starts_with("extern fn ") or line.starts_with("pub extern fn "):
+            let after = if line.starts_with("pub "): line.slice(14, line.len()) else: line.slice(10, line.len())
+            let name = comp_ident_prefix(after)
+            let link = if pending_link.len() > 0: pending_link ++ "" else: name ++ ""
+            let runtime_symbol = name.starts_with("rt_") or name.starts_with("with_")
+            let foreign = (pending_attr or not runtime_symbol) and not link.starts_with("llvm.")
+            pending_attr = false
+            pending_link = ""
+            if foreign:
+                foreign_names.push(name)
+                foreign_lines.push(nr)
+                foreign_links.push(link)
+            continue
+        pending_attr = false
+        pending_link = ""
+        if line.starts_with("c facade "):
+            facades = facades + 1
+            facade_name = comp_ident_prefix(line.slice(9, line.len()))
+            facade_line = nr
+            in_facade = true
+    if foreign_names.len() == 0:
+        return out
+    if facades == 0:
+        out.push(f"{path}:{foreign_lines[0]}: runtime file reaches {foreign_names.len()} foreign symbol(s) and has no `c facade` block; describe each foreign extern with an fn row under `domain errno thread`, `domain environ process`, `domain locale process` (ruling §52)")
+        return out
+    if facades > 1:
+        out.push(f"{path}:{facade_line}: {facades} `c facade` blocks; a runtime file has one, holding every domain row (ruling §52)")
+    for required in ["errno thread", "environ process", "locale process"]:
+        if not domains.contains("|" ++ required ++ "|"):
+            out.push(f"{path}:{facade_line}: facade '{facade_name}' does not declare `domain {required}`; the runtime's rows state the effect on every libc domain (ruling §33-§36, §52)")
+    for i in 0..foreign_names.len() as i32:
+        let name = foreign_names[i]
+        if rows.contains("|" ++ name ++ "|"): continue
+        let link = foreign_links[i]
+        out.push(f"{path}:{foreign_lines[i]}: foreign extern '{name}' (C symbol '{link}') has no domain row; add `fn {name}` to facade '{facade_name}' — silence invalidates errno, environ and locale (§38), `preserves domain D` only where the C standard says so (ruling §52)")
+    out
+
+/// The first "quoted" text on a line, or "".
+fn comp_first_quoted(line: &str) -> str:
+    var i = 0
+    while i < line.len() as i32 and line[i] != '"': i = i + 1
+    if i >= line.len() as i32: return ""
+    var j = i + 1
+    while j < line.len() as i32 and line[j] != '"': j = j + 1
+    line.slice((i + 1) as i64, j as i64)
+
+pub fn run_check_runtime_domain_audit_action(ctx: ActionCtx) -> i32:
+    let fs = ctx.fs()
+    var errors = 0
+    var files = 0
+    var externs = 0
+    for path in fs.list_files("rt"):
+        if not path.ends_with(".w"): continue
+        files = files + 1
+        let text = fs.read_text(path)
+        let verdicts = comp_runtime_domain_violations(path, text)
+        for i in 0..verdicts.len() as i32:
+            ctx.diagnostics().error(verdicts[i].clone())
+            errors = errors + 1
+        // Count the rows the file carries, for the report.
+        let lines = comp_split_lines(text)
+        for i in 0..lines.len() as i32:
+            if lines[i].starts_with("    fn "): externs = externs + 1
+    // A lane that stayed silent is a bug: the checked-in fixtures prove it
+    // sees. Each fixture's first line is `//! expect-violation: <text>` (the
+    // lane must report a verdict containing the text) or `//! expect-clean`.
+    let fixture_dir = "test/runtime_domain_audit"
+    var fixtures = 0
+    for path in fs.list_files(fixture_dir):
+        if not path.ends_with(".w"): continue
+        fixtures = fixtures + 1
+        let text = fs.read_text(path)
+        let lines = comp_split_lines(text)
+        let head = if lines.len() > 0: comp_trim(lines[0]) else: ""
+        let verdicts = comp_runtime_domain_violations(path, text)
+        if head.starts_with("//! expect-violation: "):
+            let want = comp_trim(head.slice(22, head.len()))
+            var hit = false
+            for i in 0..verdicts.len() as i32:
+                if verdicts[i].contains(want): hit = true
+            if not hit:
+                var seen = ""
+                for i in 0..verdicts.len() as i32: seen = seen ++ "\n  " ++ verdicts[i]
+                ctx.diagnostics().error(f"{path}: the audit stayed silent on its negative fixture; expected a verdict containing '{want}', got {verdicts.len()}:" ++ seen)
+                errors = errors + 1
+        else if head == "//! expect-clean":
+            for i in 0..verdicts.len() as i32:
+                ctx.diagnostics().error(f"{path}: the audit rejected its clean fixture: " ++ verdicts[i])
+                errors = errors + 1
+        else:
+            ctx.diagnostics().error(f"{path}: a runtime-domain-audit fixture starts with `//! expect-violation: <text>` or `//! expect-clean`")
+            errors = errors + 1
+    if fixtures == 0:
+        ctx.diagnostics().error(f"{fixture_dir}: no fixtures; the lane cannot prove it sees")
+        errors = errors + 1
+    if errors > 0:
+        return comp_fail(ctx, f"{errors} runtime foreign call(s) outside the domain rows (ruling §52)")
+    print(f"runtime-domain-audit: {files} runtime files, {externs} domain rows, every foreign extern described; {fixtures} fixtures agree")
+    comp_write_ok_output(ctx)
+
 pub fn run_check_spec_inventory_action(ctx: ActionCtx) -> i32:
     let fs = ctx.fs()
     if os() == "Windows":
