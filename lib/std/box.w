@@ -30,6 +30,11 @@ impl[T] Box[T]:
     pub fn as_mut_ptr() -> *mut T:
         unsafe { *(self as *const *mut T) }
 
+    /// The cell handed to foreign code that owns it from here on: nothing on
+    /// this side frees it. `ptr as Box[T]` takes it back (a `c facade`
+    /// hands consumed and retained userdata to C this way, §16.2b.9).
+    pub move fn into_raw() -> *mut T: self as *mut T
+
     pub move fn into_inner() -> T:
         let ptr = self as *mut T
         let value = unsafe { *ptr }
