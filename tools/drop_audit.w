@@ -372,7 +372,7 @@ fn sc_comprehension_skip(form: &str) -> str:
 // moves its field, and the owner drops the R once at its own scope exit.
 // `form`: an if, a match, a block-tail arm, through a read `fn` receiver.
 fn sc_field_join_view(form: &str) -> str:
-    let join = if form == "match": "match c:\n        true => h.r\n        false => h.r" else if form == "block": "if c: { let _n = 0\n        h.r } else: h.r" else: "if c: h.r else: h.r"
+    let join = if form == "match": "match c:\n            true => h.r\n            false => h.r" else if form == "block": "if c: { let _n = 0\n        h.r } else: h.r" else: "if c: h.r else: h.r"
     if form == "recv":
         return "type HR { r: R }\n" ++
             "extend HR:\n    fn look(c: bool) -> i32:\n        let x = if c: self.r else: self.r\n        x.id\n" ++
