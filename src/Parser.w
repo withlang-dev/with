@@ -277,7 +277,7 @@ impl Parser:
             return 1
         // D51 §16.2b: `c facade name:` is a declaration; without this an
         // implicit-main file read the block as executable statements.
-        if t == TokenKind.TK_IDENT and self.token_text_is(self.pos, "c") and self.token_text_is(self.pos + 1, "facade"):
+        if t == TokenKind.TK_IDENT and self.token_text_is(self.pos, "c") and (self.token_text_is(self.pos + 1, "facade") or self.token_text_is(self.pos + 1, "convention")):
             return 1
         if t == TokenKind.TK_KW_UNSAFE or t == TokenKind.TK_KW_ASYNC or t == TokenKind.TK_KW_GEN:
             if self.pos + 1 < self.tokens.len() and self.tokens.get_tag(self.pos + 1) == TokenKind.TK_KW_FN:
@@ -1063,6 +1063,10 @@ impl Parser:
         // `c` nor `facade` is taken from user programs.
         if t == TokenKind.TK_IDENT and self.token_text_is(self.pos, "c") and self.token_text_is(self.pos + 1, "facade"):
             return self.parse_c_facade(start)
+        // D51 stage 11 (§16.2b.12): `c convention pkg.vN:` — a convention
+        // profile, the same two-contextual-identifier shape.
+        if t == TokenKind.TK_IDENT and self.token_text_is(self.pos, "c") and self.token_text_is(self.pos + 1, "convention"):
+            return self.parse_c_convention(start)
 
         self.emit_error("expected declaration (fn, type, enum, let, use, extern)")
         0 as NodeId
@@ -4012,6 +4016,132 @@ impl Parser:
         for i in 0..items.len() as i32: self.pool.add_extra(items[i])
         self.pool.add_node(NodeKind.NK_C_FACADE, start, self.prev_end(), name, extra_start, items.len() as i32)
 
+    // ── c convention (D51 stage 11, ruling §7, §59; spec §16.2b.12) ──────
+    //
+    // `c convention pkg.vN:` holds rules, one per line: `<name>: <template>`.
+    // A template is a resource clause over a name pattern (`unref: drop
+    // *_unref`, `new: from *_new`, `open: from *_open(out param 1)`, `init:
+    // init *_init(self)`, `free: destroys *_free`) or an fn-item clause
+    // (`get: fn *_get lend`, `dispose: fn *_dispose destroys`). The pattern
+    // is `*` and name pieces written without spaces; each `*` matches any
+    // run of characters. The block's name is the dotted path a facade
+    // adopts it by, so the profile is the package that ships it.
+    mut fn parse_c_convention(start: i32) -> NodeId:
+        self.advance()
+        self.advance()
+        var name = ""
+        let first = self.expect_ident()
+        if first == 0: return self.poisoned_expr()
+        name = self.intern.resolve(first).clone()
+        while self.peek() == TokenKind.TK_DOT:
+            self.advance()
+            let seg = self.expect_ident()
+            if seg == 0: return self.poisoned_expr()
+            name = name ++ "." ++ self.intern.resolve(seg)
+        if self.expect(TokenKind.TK_COLON) == 0: return self.poisoned_expr()
+        self.skip_newlines()
+        let rules: Vec[i32] = Vec.new()
+        while self.peek() != TokenKind.TK_EOF:
+            let col = column_of(self.source, self.current_start())
+            if col == 0: break
+            let rule = self.parse_convention_rule()
+            if rule == 0: return self.poisoned_expr()
+            rules.push(rule)
+            self.skip_newlines()
+        if rules.len() == 0:
+            self.emit_error(f"c convention {name} is empty; a profile states rules, '<name>: drop *_unref' (§16.2b.12)")
+            return self.poisoned_expr()
+        let extra_start = self.pool.extra_len()
+        for i in 0..rules.len() as i32: self.pool.add_extra(rules[i])
+        self.pool.add_node(NodeKind.NK_C_CONVENTION, start, self.prev_end(), self.intern.intern(name), extra_start, rules.len() as i32)
+
+    // A name pattern: `*` and identifier pieces with no space between them.
+    mut fn parse_convention_pattern() -> i32:
+        var text = ""
+        var last_end = -1
+        while true:
+            let t = self.peek()
+            if t != TokenKind.TK_STAR and t != TokenKind.TK_IDENT and t != TokenKind.TK_INT_LIT: break
+            if last_end >= 0 and self.current_start() != last_end: break
+            text = text ++ self.current_text()
+            last_end = self.current_end()
+            self.advance()
+        if text.len() == 0:
+            self.emit_error("expected a name pattern, '*_unref' or 'g_*_new' (§16.2b.12)")
+            return 0
+        self.intern.intern(text)
+
+    mut fn parse_convention_rule() -> i32:
+        let start = self.current_start()
+        let name = self.expect_ident()
+        if name == 0: return 0
+        if self.expect(TokenKind.TK_COLON) == 0: return 0
+        if self.peek() != TokenKind.TK_IDENT and self.peek() != TokenKind.TK_KW_FN:
+            self.emit_error("a rule is '<name>: from|init|drop|destroys <pattern>' or '<name>: fn <pattern> lend|destroys' (§16.2b.12)")
+            return 0
+        let tstart = self.current_start()
+        var is_fn = 0
+        var kind = 0
+        let ops: Vec[i32] = Vec.new()
+        if self.peek() == TokenKind.TK_KW_FN:
+            self.advance()
+            is_fn = 1
+            let pat = self.parse_convention_pattern()
+            if pat == 0: return 0
+            if not self.current_ident_is("lend") and not self.current_ident_is("destroys"):
+                self.emit_error("a profile fn rule states 'lend' or 'destroys'; a clause naming one function's parameters or origins is stated on that fn item in the facade (§16.2b.12)")
+                return 0
+            kind = if self.current_ident_is("lend"): FACADE_CLAUSE_LEND else: FACADE_CLAUSE_DESTROYS
+            self.advance()
+            if kind == FACADE_CLAUSE_DESTROYS: ops.push(0)
+            let extra_start = self.pool.extra_len()
+            for i in 0..ops.len() as i32: self.pool.add_extra(ops[i])
+            let template = self.pool.add_node(NodeKind.NK_FACADE_CLAUSE, tstart, self.prev_end(), kind, extra_start, ops.len() as i32)
+            return self.convention_rule_node(start, name, pat, template as i32, is_fn)
+        let word = self.current_text()
+        if word == "from": kind = FACADE_CLAUSE_FROM
+        else if word == "init": kind = FACADE_CLAUSE_INIT
+        else if word == "drop": kind = FACADE_CLAUSE_DROP
+        else if word == "destroys": kind = FACADE_CLAUSE_DESTROYS
+        else:
+            self.emit_error("a rule is '<name>: from|init|drop|destroys <pattern>' or '<name>: fn <pattern> lend|destroys' (§16.2b.12)")
+            return 0
+        self.advance()
+        let pat = self.parse_convention_pattern()
+        if pat == 0: return 0
+        ops.push(pat)
+        if kind == FACADE_CLAUSE_FROM:
+            var out_ref = 0
+            if self.peek() == TokenKind.TK_L_PAREN:
+                self.advance()
+                if not self.current_ident_is("out"):
+                    self.emit_error("expected 'out param <ref>' in from <pattern>(...) (§16.2b.4)")
+                    return 0
+                self.advance()
+                out_ref = self.parse_facade_param_ref()
+                if out_ref == 0: return 0
+                if self.expect(TokenKind.TK_R_PAREN) == 0: return 0
+            ops.push(out_ref)
+        else if kind == FACADE_CLAUSE_INIT:
+            if self.peek() == TokenKind.TK_L_PAREN:
+                self.advance()
+                if not self.current_ident_is("self"):
+                    self.emit_error("an in-place initializer rule is written 'init <pattern>(self)' (§16.2b.4)")
+                    return 0
+                self.advance()
+                if self.expect(TokenKind.TK_R_PAREN) == 0: return 0
+        let extra_start = self.pool.extra_len()
+        for i in 0..ops.len() as i32: self.pool.add_extra(ops[i])
+        let template = self.pool.add_node(NodeKind.NK_FACADE_CLAUSE, tstart, self.prev_end(), kind, extra_start, ops.len() as i32)
+        self.convention_rule_node(start, name, pat, template as i32, is_fn)
+
+    mut fn convention_rule_node(start: i32, name: i32, pat: i32, template: i32, is_fn: i32) -> i32:
+        let extra_start = self.pool.extra_len()
+        self.pool.add_extra(pat)
+        self.pool.add_extra(template)
+        self.pool.add_extra(is_fn)
+        self.pool.add_node(NodeKind.NK_FACADE_RULE, start, self.prev_end(), name, extra_start, 3) as i32
+
     mut fn parse_facade_item(col: i32) -> i32:
         let start = self.current_start()
         if self.peek() == TokenKind.TK_KW_USE:
@@ -4031,6 +4161,16 @@ impl Parser:
                 path.push(seg)
             let extra_start = self.pool.extra_len()
             for i in 0..path.len() as i32: self.pool.add_extra(path[i])
+            // The profile resolves through ordinary package rules (ruling
+            // §7, spec §16.2b.12): `use convention gobject.v1` is also the
+            // module import `use gobject.v1`, a synthetic use decl after the
+            // facade so the frontend loads the profile's block. An
+            // unresolved profile is the ordinary unresolved-import error,
+            // naming the package.
+            let use_extra = self.pool.extra_len()
+            for i in 0..path.len() as i32: self.pool.add_extra(path[i])
+            let use_decl = self.pool.add_node(NodeKind.NK_USE_DECL, start, self.prev_end(), use_extra, path.len() as i32, 0)
+            self.pending_post_decls.push(use_decl as i32)
             return self.pool.add_node(NodeKind.NK_FACADE_CONVENTION, start, self.prev_end(), extra_start, path.len() as i32, 0) as i32
         if self.peek() == TokenKind.TK_KW_FN:
             self.advance()

@@ -150,7 +150,8 @@ pub enum NodeKind: i32:
     // NK_FACADE_RESOURCE:   d0=name(sym), d1=extra_start, d2=clause_count; extra=[wraps_type(node), clause(node)...]
     // NK_FACADE_FN:         d0=name(sym), d1=extra_start, d2=clause_count; extra=[clause(node)...]
     // NK_FACADE_DOMAIN:     d0=name(sym), d1=kind(sym: process|thread|resource|static), d2=0
-    // NK_FACADE_CONVENTION: d0=extra_start, d1=path_count, d2=0; extra=[path_sym...]
+    // NK_FACADE_CONVENTION: d0=extra_start, d1=path_count, d2=match_count; extra=[path_sym..., match(node)...]
+    //                       (the matches are written by the frontend's profile pass, stage 11)
     // NK_FACADE_CLAUSE:     d0=FACADE_CLAUSE_*, d1=extra_start, d2=operand_count; extra=[operand...]
     // NK_FACADE_PARAM_REF:  d0=FACADE_PARAM_REF_*, d1=name(sym)|digits(sym)|type(node), d2=0
     NK_C_FACADE = 132
@@ -163,6 +164,19 @@ pub enum NodeKind: i32:
     // The head of a pattern let (§9.7, §30.4): the pattern, whether the
     // statement is `var`, and the optional `: TYPE` of the whole subject.
     NK_LET_PATTERN = 139
+    // D51 stage 11 (ruling §7, §59; spec §16.2b.12): a convention profile,
+    // `c convention pkg.vN:`, a package-shipped block of rules another facade
+    // adopts with `use convention pkg.vN`.
+    // NK_C_CONVENTION:        d0=name(sym: the dotted path), d1=extra_start, d2=rule_count; extra=[rule(node)...]
+    // NK_FACADE_RULE:         d0=rule name(sym), d1=extra_start, d2=3; extra=[pattern(sym), template(NK_FACADE_CLAUSE), is_fn_rule]
+    //                         a resource rule's template is from/init/drop/destroys with the
+    //                         pattern in the fn-sym operand; an fn rule's is the clause the
+    //                         matched fn item states (`fn *_get lend`)
+    // NK_FACADE_PROFILE_MATCH: d0=rule(node), d1=FACADE_PROFILE_*, d2=extra_start;
+    //                         extra=[subject(node: resource item, or the fn's declaring node), candidate_count, candidate_sym...]
+    NK_C_CONVENTION = 140
+    NK_FACADE_RULE = 141
+    NK_FACADE_PROFILE_MATCH = 142
     // Type expressions
     NK_TYPE_NAMED = 80
     NK_TYPE_GENERIC = 81
@@ -261,6 +275,30 @@ const FACADE_CLAUSE_NULLABLE: i32 = 23         // [param_ref]  (`nullable param 
 const FACADE_PARAM_REF_NAME: i32 = 0
 const FACADE_PARAM_REF_INDEX: i32 = 1
 const FACADE_PARAM_REF_TYPE: i32 = 2
+
+// D51 stage 11: a clause a convention profile supplied carries the rule
+// that supplied it as one trailing operand beyond the kind's own (a
+// resource `drop` is [fn_sym]; a profile's is [fn_sym, rule_node]). That
+// operand is the fact's provenance (§16.2b.2): Sema and the contract view
+// read it here, the renderer reads the leading operands as it reads any
+// clause. Only the kinds a profile rule can state have a row.
+fn facade_clause_operand_count(kind: i32) -> i32:
+    if kind == FACADE_CLAUSE_FROM: return 2
+    if kind == FACADE_CLAUSE_INIT or kind == FACADE_CLAUSE_PREINIT or kind == FACADE_CLAUSE_DROP or kind == FACADE_CLAUSE_DESTROYS: return 1
+    if kind == FACADE_CLAUSE_LEND: return 0
+    -1
+
+fn facade_clause_profile_rule(pool: AstPool, clause: i32) -> i32:
+    if clause <= 0 or pool.kind(clause as NodeId) != NodeKind.NK_FACADE_CLAUSE: return 0
+    let own = facade_clause_operand_count(pool.get_data0(clause as NodeId))
+    if own < 0 or pool.get_data2(clause as NodeId) <= own: return 0
+    pool.get_extra(pool.get_data1(clause as NodeId) + own)
+
+// NK_FACADE_PROFILE_MATCH.d1: what a rule's match did for one subject.
+const FACADE_PROFILE_APPLIED: i32 = 0     // one valid candidate; the clause was stated
+const FACADE_PROFILE_AMBIGUOUS: i32 = 1   // several candidates; nothing contributed (ruling §7.1)
+const FACADE_PROFILE_SHADOWED: i32 = 2    // an explicit clause states the fact; the profile's is not (ruling §7.2)
+const FACADE_PROFILE_NONE: i32 = 3        // no candidate
 const TDK_FLAG_REPR_C: i32 = 256
 // @[flags] on a discriminant enum (§4.4a): auto-increment doubles.
 const TDK_FLAG_FLAGS: i32 = 512
@@ -1899,11 +1937,19 @@ impl AstPool:
 //                   d0=name(sym), d1=extra_start, d2=item_count; extra=[item(node)...]
 //                   items: NK_FACADE_RESOURCE (extra=[wraps_type, clause...]),
 //                   NK_FACADE_FN (extra=[clause...]), NK_FACADE_DOMAIN (d1=kind sym),
-//                   NK_FACADE_CONVENTION (extra=[path_sym...]). A clause is
+//                   NK_FACADE_CONVENTION (extra=[path_sym..., match...]). A clause is
 //                   NK_FACADE_CLAUSE d0=FACADE_CLAUSE_* with its operands in extra
 //                   (see the FACADE_CLAUSE_* table); a parameter reference is
 //                   NK_FACADE_PARAM_REF d0=FACADE_PARAM_REF_* (name sym, digits
 //                   sym, or a type node), resolved in stage 2.
+//
+// NodeKind.NK_C_CONVENTION (D51 stage 11, §16.2b.12): `c convention pkg.vN:`,
+//                   d0=name(sym, dotted), d1=extra_start, d2=rule_count; extra=[NK_FACADE_RULE...].
+//                   The frontend's profile pass (Frontend.w apply_convention_profiles_frontend)
+//                   states each uniquely matched rule as a clause on the adopting facade's
+//                   item, with the rule as a trailing operand (facade_clause_profile_rule),
+//                   and records every outcome as an NK_FACADE_PROFILE_MATCH on the
+//                   `use convention` item.
 //
 // NodeKind.NK_TYPE_DECL:     d0=name(sym), d1=extra_start, d2=packed_kind (TypeDeclKind.* + TDK_FLAG_*)
 //                   For struct: extra=[field_count, [field_name, field_type, field_default]*, vis, tp_start, tp_count]
