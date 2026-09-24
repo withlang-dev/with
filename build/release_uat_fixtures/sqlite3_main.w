@@ -12,10 +12,10 @@ fn main:
         print("sqlite3 open failed")
         return 1
     // No row callback (#1618: `None` declines the callback and its userdata).
-    if db.exec("CREATE TABLE t(value INTEGER); INSERT INTO t(value) VALUES (42);", None, null) != SQLITE_OK:
+    if db.exec("CREATE TABLE t(value INTEGER); INSERT INTO t(value) VALUES (42);", None, None) != SQLITE_OK:
         print("sqlite3 exec failed")
         return 1
-    let Ok(stmt) = db.prepare("SELECT value FROM t", -1, null) else:
+    let Ok(stmt) = db.prepare("SELECT value FROM t") else:
         print("sqlite3 prepare failed")
         return 1
     if stmt.step() != SQLITE_ROW:

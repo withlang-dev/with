@@ -1029,8 +1029,8 @@ use c_import("sqlite3.h")
 let Ok(db) = Database.open(":memory:") else:      // closed by its scope
     print("open failed")
     return 1
-db.exec("CREATE TABLE t(v INTEGER); INSERT INTO t VALUES (42);", None, null)
-let Ok(stmt) = db.prepare("SELECT v FROM t", -1, null) else:   // finalized before db closes
+db.exec("CREATE TABLE t(v INTEGER); INSERT INTO t VALUES (42);", None, None)
+let Ok(stmt) = db.prepare("SELECT v FROM t") else:   // finalized before db closes
     print(f"prepare failed: {db.errmsg().unwrap().to_str().unwrap()}")
     return 1
 if stmt.step() == SQLITE_ROW: print(stmt.column_int(0))

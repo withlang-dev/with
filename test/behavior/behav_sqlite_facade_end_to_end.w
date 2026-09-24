@@ -51,12 +51,12 @@ fn main:
     var db = Database.open(":memory:").unwrap()
     // The callback is nullable (#1618): `Some` of the callback and of its
     // userdata, or `None` for both (behav_sqlite_facade_exec_no_callback).
-    let rc = db.exec("CREATE TABLE t(v INTEGER, s TEXT); INSERT INTO t VALUES (42, 'hi'), (7, NULL);", Some(on_row), Some(Ctx { tag: 1 }), null)
+    let rc = db.exec("CREATE TABLE t(v INTEGER, s TEXT); INSERT INTO t VALUES (42, 'hi'), (7, NULL);", Some(on_row), Some(Ctx { tag: 1 }))
     print(f"exec: {rc}")
-    let aborted = db.exec("SELECT v, s FROM t", Some(on_row), Some(Ctx { tag: 2 }), null)
+    let aborted = db.exec("SELECT v, s FROM t", Some(on_row), Some(Ctx { tag: 2 }))
     print(f"exec aborted by the callback: {aborted == SQLITE_ABORT}")
 
-    let stmt = db.prepare("SELECT v, s FROM t ORDER BY v DESC", -1, null).unwrap()
+    let stmt = db.prepare("SELECT v, s FROM t ORDER BY v DESC").unwrap()
     print(f"prepared: cols={stmt.column_count()}")
     assert(stmt.step() == SQLITE_ROW)
     // The int first: `column_int` states no preservation (a column accessor
@@ -72,7 +72,7 @@ fn main:
     print(f"row 2: {v2} {if second.is_none(): "NULL" else: "text"}")
     print(f"done: {stmt.step() == SQLITE_DONE} changes={db.changes()}")
 
-    match db.prepare("SELEKT", -1, null):
+    match db.prepare("SELEKT"):
         Err(StatementError.Failed(status)) => print(f"prepare failed: {status} {db.errmsg().unwrap().to_str().unwrap()}")
         _ => print("unexpected")
 
@@ -82,7 +82,7 @@ fn main:
     let x_func: extern "C" fn(*mut sqlite3_context, c_int, *mut *mut sqlite3_value) -> Unit = shout
     let registered = db.create_function_v2("shout", 0, SQLITE_UTF8, AppData { id: 1, name: "shout" }, x_func, null, null)
     print(f"function registered: {registered}")
-    let call = db.prepare("SELECT shout()", -1, null).unwrap()
+    let call = db.prepare("SELECT shout()").unwrap()
     assert(call.step() == SQLITE_ROW)
     print(f"shout() is NULL: {call.column_text(0).is_none()}")
     drop(call)

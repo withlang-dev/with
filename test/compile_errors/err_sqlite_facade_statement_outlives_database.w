@@ -12,5 +12,5 @@ fn main:
     var keep: Option[Statement] = None
     if true:
         let db = Database.open(":memory:").unwrap()
-        keep = db.prepare("SELECT 1", -1, null).ok()
+        keep = db.prepare("SELECT 1").ok()
     print(f"{keep.is_some()}")

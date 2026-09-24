@@ -12,7 +12,7 @@ use c_import("sqlite3.h", link: "sqlite3")
 
 fn main:
     let db = Database.open(":memory:").unwrap()
-    let stmt = db.prepare("SELECT 'a' UNION ALL SELECT 'b'", -1, null).unwrap()
+    let stmt = db.prepare("SELECT 'a' UNION ALL SELECT 'b'").unwrap()
     assert(stmt.step() == SQLITE_ROW)
     let text = stmt.column_text(0).unwrap()
     let _ = stmt.column_bytes(0)
