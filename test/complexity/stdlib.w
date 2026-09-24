@@ -198,7 +198,7 @@ fn btree_map_descending(n: i32): btree_map_work(n, true)
 fn btree_set_ascending(n: i32): btree_set_work(n, false)
 fn btree_set_descending(n: i32): btree_set_work(n, true)
 
-fn elapsed(work: fn(i32) -> i32, n: i32):
+fn elapsed(work: &fn(i32) -> i32, n: i32):
     let start = now_ns()
     let result = work(n)
     let duration = now_ns() - start
@@ -211,10 +211,10 @@ fn median(a: i64, b: i64, c: i64):
     else:
         if a < c: a else if b < c: c else: b
 
-fn sample(work: fn(i32) -> i32, n: i32):
+fn sample(work: &fn(i32) -> i32, n: i32):
     median(elapsed(work, n), elapsed(work, n), elapsed(work, n))
 
-fn measure(name: &str, work: fn(i32) -> i32, n: i32, issue: i32):
+fn measure(name: &str, work: &fn(i32) -> i32, n: i32, issue: i32):
     let small = sample(work, n)
     let large = sample(work, n * 4)
     let base = if small > 1000000: small else: 1000000
