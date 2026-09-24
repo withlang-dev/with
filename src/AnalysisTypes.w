@@ -39,6 +39,10 @@ pub enum AnalysisFactKind: i32:
     AstNode = 22
     MethodRegistration = 23
     MethodResolution = 24
+    // D51 stage 10 (ruling §63): one effective modeled-C fact with its
+    // provenance, under a resource, fn item, domain, callback or convention
+    // subject row (AnalysisContract.w).
+    ForeignContract = 25
 
 // Stable analysis-domain receiver modes. Keep tools on this public schema rather
 // than exposing Sema's internal ReceiverMode representation.
@@ -253,6 +257,7 @@ fn analysis_kind_name(kind: AnalysisFactKind) -> str:
     if kind == AnalysisFactKind.AstNode: return "ast-node"
     if kind == AnalysisFactKind.MethodRegistration: return "method-registration"
     if kind == AnalysisFactKind.MethodResolution: return "method-resolution"
+    if kind == AnalysisFactKind.ForeignContract: return "foreign-contract"
     "unknown"
 
 fn analysis_slice(text: &str, start: i32, end: i32): text.slice(start as i64, end as i64)
@@ -412,12 +417,12 @@ impl AnalysisReport:
             AnalysisFactKind.Phase, AnalysisFactKind.Invariant, AnalysisFactKind.SourceMatch,
             AnalysisFactKind.Type, AnalysisFactKind.Field, AnalysisFactKind.Expression,
             AnalysisFactKind.AstNode, AnalysisFactKind.MethodRegistration,
-            AnalysisFactKind.MethodResolution,
+            AnalysisFactKind.MethodResolution, AnalysisFactKind.ForeignContract,
         ]
         let stage_counts: Vec[i32] = Vec.new()
         let kind_counts: Vec[i32] = Vec.new()
         for i in 0..8: stage_counts.push(0)
-        for i in 0..25: kind_counts.push(0)
+        for i in 0..26: kind_counts.push(0)
         var total = 0
         for i in 0..self.facts.len() as i32:
             let fact = self.facts[i]

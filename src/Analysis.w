@@ -3,6 +3,7 @@
 // should call this surface rather than reconstruct compiler facts from text.
 
 use AnalysisTypes
+use AnalysisContract
 use Ast
 use Diagnostic
 use InternPool
@@ -718,6 +719,7 @@ fn analysis_collect_sema(report: &AnalysisReport, sema: &Sema, source_path: &str
     analysis_collect_resolved_calls(report, sema, source_path, source_text)
     analysis_collect_method_resolutions(report, sema, source_path, source_text)
     analysis_collect_diagnostics(report, sema)
+    analysis_collect_foreign_contracts(report, sema, source_path, source_text)
 
 fn analysis_operand_kind_name(kind: i32) -> str:
     if kind == OperandKind.OK_COPY: return "copy"
@@ -2311,7 +2313,8 @@ fn analysis_help() -> str:
         "  matrix:<query>                          compact cross-stage fact matrix\n" ++
         "  explain:call|value|effect|specialization|diagnostic|type|field|expression|method:<text>\n" ++
         "  explain:node:<id>                       bounded AST + Sema type/resolution tree\n" ++
-        "  audit:calls|effects|storage|methods|mir|returns|receivers|receiver-surface|phase|pool-views|codegen|trait-tables|all\n" ++
+        "  audit:calls|effects|storage|methods|mir|returns|receivers|receiver-surface|phase|pool-views|contract|codegen|trait-tables|all\n" ++
+        "  contract                                the modeled foreign contract (§16.2b): every fact with its provenance, then audit:contract\n" ++
         "  move-sites | seam-sites                 ownership worklists (owned-param call sites; aliasing/blanking seams)\n" ++
         "  path:call:<from>:<to>                   shortest live MIR call path\n" ++
         "  closure:call:<root>                     live MIR call closure\n" ++
@@ -2340,6 +2343,8 @@ fn compiler_analysis_render(report: &AnalysisReport, request: &str) -> str:
     if request == "audit:receivers": return report.render_verdict("receiver-audit")
     if request == "audit:receiver-surface": return report.render_verdict("receiver-surface-audit")
     if request == "audit:pool-views": return report.render_verdict("pool-view-audit")
+    if request == "audit:contract": return report.render_verdict("contract-audit")
+    if request == "contract": return contract_view_render(report)
     if request == "audit:codegen": return report.render_verdict("codegen-contract-audit")
     if request == "audit:trait-tables": return report.render_verdict("trait-table-audit")
     if request == "audit:all": return report.render_verdict("compiler-analysis-audit")
@@ -2399,6 +2404,8 @@ fn compiler_analysis_run(sema: &Sema, mir_mod: &MirModule, pool: &InternPool, so
         analysis_audit_receiver_surface(&report, sema)
     else if request == "audit:pool-views":
         analysis_audit_pool_views(&report, sema, mir_mod, source_path, source_text)
+    else if request == "audit:contract" or request == "contract":
+        analysis_audit_contract(&report, sema, source_path, source_text)
     else if request == "audit:codegen":
         needs_codegen = true
         codegen_query = "audit"
@@ -2416,6 +2423,7 @@ fn compiler_analysis_run(sema: &Sema, mir_mod: &MirModule, pool: &InternPool, so
         analysis_audit_receivers(&report, sema)
         analysis_audit_phase(&report, sema, mir_mod)
         analysis_audit_pool_views(&report, sema, mir_mod, source_path, source_text)
+        analysis_audit_contract(&report, sema, source_path, source_text)
         needs_codegen = true
         codegen_query = "audit"
     else if request.starts_with("lldb:"):
