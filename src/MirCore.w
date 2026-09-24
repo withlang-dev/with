@@ -498,6 +498,14 @@ pub type MirBody {
     // D21: for a Unit-returning `mut self` pipeline stage, the exact receiver
     // place carried after this call. -1 for ordinary return-value calls.
     call_pipeline_receiver_places: Vec[i32],
+    // D65 (#1647, interim until phase 5): 1 on a GENERIC_CALL that carries no
+    // contract because MirLower's single decision point
+    // (require_generic_call_contract) classified it as language machinery
+    // codegen dispatches by name and receiver (a Task, ScopedTask, channel
+    // endpoint or Atomic method, `track`, `spawn`, `join`). The typed
+    // validator and audit:resolution recognize the call by this mark; the
+    // unresolved-bare-function branch that produced #1635 never sets it.
+    call_machinery_dispatch: Vec[i32],
 
     // Stage 4 (spec §2.5.2): locals that are ever moved — and therefore
     // reset-on-move (§2.5.1) — recorded at the single pending_reset_locals.push
@@ -719,6 +727,7 @@ fn MirBody.init_for_fn(fn_sym: i32) -> MirBody:
         call_mono_syms: Vec.new(),
         call_contract_required: Vec.new(),
         call_pipeline_receiver_places: Vec.new(),
+        call_machinery_dispatch: Vec.new(),
         ever_moved_locals: Vec.new(),
     }
 
@@ -945,6 +954,7 @@ impl MirBody:
         self.call_mono_syms.push(0)
         self.call_contract_required.push(0)
         self.call_pipeline_receiver_places.push(-1)
+        self.call_machinery_dispatch.push(0)
         for i in 0..count:
             self.call_arg_operands.push(operands[i])
         id
@@ -993,6 +1003,15 @@ impl MirBody:
         if call_id < 0 or call_id >= self.call_contract_required.len():
             return false
         self.call_contract_required[call_id] != 0
+
+    mut fn set_call_machinery_dispatch(call_id: i32):
+        if call_id >= 0 and call_id < self.call_machinery_dispatch.len():
+            self.call_machinery_dispatch[call_id] = 1
+
+    fn call_is_machinery_dispatch(call_id: i32) -> bool:
+        if call_id < 0 or call_id >= self.call_machinery_dispatch.len():
+            return false
+        self.call_machinery_dispatch[call_id] != 0
 
     mut fn set_call_pipeline_receiver_place(call_id: i32, place_id: i32):
         if call_id < 0 or call_id >= self.call_pipeline_receiver_places.len():
@@ -3477,6 +3496,33 @@ fn mir_call_const_fn_sym(body: &MirBody, callee_operand: i32) -> i32:
     if callee_const < 0 or callee_const >= body.const_kinds.len() or body.const_kinds[callee_const] != ConstKind.CK_FN: return 0
     body.const_d0[callee_const]
 
+// D65 / #1639: a `const fn` callee names a function Sema accepts as a call
+// target, or a body of this module, or the call carries an intrinsic mark
+// codegen dispatches on. Nothing else reaches codegen: #1635's `r(21)` —
+// a GENERIC_CALL to a symbol named after a callable binding, with the
+// argument dropped — passed every validator and died in codegen. The
+// snapshot (`sema_callable_syms`) is Sema's fact, propagated at lowering;
+// this check names no builtin itself. A NONE-marked direct call needs a
+// signature or a body: a generic template cannot be called without the
+// concrete contract a GENERIC_CALL carries. Returns "" when the callee is
+// accounted for.
+fn mir_validate_call_callee_known(mir_mod: &MirModule, body: &MirBody, callee_operand: i32, call_id: i32) -> str:
+    if call_id < 0 or call_id >= body.call_arg_starts.len(): return ""
+    let intrinsic = body.call_intrinsic(call_id)
+    if intrinsic != MirIntrinsic.NONE and intrinsic != MirIntrinsic.GENERIC_CALL: return ""
+    let sym = mir_call_const_fn_sym(body, callee_operand)
+    if sym == 0:
+        if callee_operand < 0 or callee_operand >= body.operand_kinds.len() or body.operand_kinds[callee_operand] != OperandKind.OK_CONSTANT: return ""
+        return f"call has a constant callee that is no function symbol and no intrinsic mark (intrinsic={intrinsic as i32})"
+    if intrinsic == MirIntrinsic.GENERIC_CALL and (body.call_is_machinery_dispatch(call_id) or body.call_sig_index(call_id) >= 0 or body.call_mono_sym(call_id) != 0): return ""
+    if mir_mod.find_body(sym) >= 0: return ""
+    let class = mir_mod.sema_callable_syms.get(sym)
+    if class.is_none():
+        return f"call to symbol {sym} names no function Sema knows: no signature, no generic template, no intrinsic, and no body in the module (intrinsic={intrinsic as i32}, args={body.call_arg_counts[call_id]}); the callee was re-derived from a spelling, not read from Sema (D65, #1639)"
+    if intrinsic == MirIntrinsic.NONE and class.unwrap() != MirCallableClass.Signature as i32:
+        return f"direct call to symbol {sym} (callable class {class.unwrap()}) without a GENERIC_CALL mark: a generic template or builtin needs the concrete contract that mark carries"
+    ""
+
 // D65 / #1647 phase 1 (audit:resolution): Sema's answer for one MIR call.
 // AnalysisResolution gathers it from Sema; mir_resolution_check_call
 // compares it with the MIR without Sema, so a planted body and a planted
@@ -3535,6 +3581,8 @@ fn mir_resolution_check_call(mir_mod: &MirModule, body: &MirBody, bb: i32, answe
     // documentation ("the CK_FN sym is meaningless — codegen dispatches by
     // intrinsic kind"). DYN_CALL resolves its method through the vtable.
     if intrinsic != MirIntrinsic.NONE and intrinsic != MirIntrinsic.GENERIC_CALL:
+        return ""
+    if intrinsic == MirIntrinsic.GENERIC_CALL and body.call_is_machinery_dispatch(call_id):
         return ""
     if is_place:
         if answer.kind != CalleeResolutionKind.Callable:
@@ -3823,6 +3871,9 @@ fn validate_typed_mir_body(mir_mod: &MirModule, body: &MirBody) -> MirValidation
             let unborrowed = mir_validate_call_missing_borrow(mir_mod, body, d0, d1)
             if unborrowed >= 0:
                 return mir_validation_fail(body.fn_sym, span, f"call argument {unborrowed} is a value where the callee parameter is a reference to it (a missing borrow)")
+            let unknown_callee = mir_validate_call_callee_known(mir_mod, body, d0, d1)
+            if unknown_callee.len() > 0:
+                return mir_validation_fail(body.fn_sym, span, unknown_callee)
 
             let carrier_place = body.call_pipeline_receiver_place(d1)
             if carrier_place >= 0:

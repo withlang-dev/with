@@ -105,6 +105,9 @@ fn unit_argument_verdict(callee_kind: i32, arg_is_unit: bool) -> str:
         mir_mod.sema_type_d2.push(0)
     let unit_ty = 1
     let int_ty = 2
+    // A named callee with no body is a declared signature (D65 snapshot),
+    // not an unknown symbol.
+    mir_mod.sema_callable_syms.insert(2, MirCallableClass.Signature as i32)
     if callee_kind != 0:
         var callee = MirBody.init_for_fn(2)
         callee.new_local(if callee_kind == 2: unit_ty else: int_ty, 0, 0, 0)
@@ -387,6 +390,9 @@ fn missing_borrow_verdict(arg_is_ref: bool, generic: bool) -> str:
     let box_ty = 2
     let ref_ty = 3
     mir_mod.sema_type_d0[ref_ty] = box_ty
+    // The callee symbol is a declared signature (D65 snapshot); its
+    // specialization body is symbol 20.
+    mir_mod.sema_callable_syms.insert(2, MirCallableClass.Signature as i32)
     var callee = MirBody.init_for_fn(20)
     callee.new_local(ref_ty, 0, 0, 0)
     callee.n_params = 1
