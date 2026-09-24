@@ -18,6 +18,7 @@ use compiler.EmbeddedRuntime
 use compiler.EmbeddedClangResource
 use compiler.ModuleSource
 use compiler.FacadeRender
+use compiler.FacadeProfile
 use compiler.LibcFacade
 use TargetSpec
 use FnAbi
@@ -662,6 +663,38 @@ impl Zcu:
                     if pool.get_data0(clause as NodeId) == FACADE_CLAUSE_FROM:
                         claimed.push(frontend_owned_text(self.pool.resolve(pool.get_extra(pool.get_data1(clause as NodeId)))))
         claimed
+
+    // D51 stage 11 (ruling §7, §59; spec §16.2b.12): each `use convention
+    // pkg.vN` item applies its profile (compiler/FacadeProfile.w) to the
+    // facade adopting it, before the facades render — a profile-stated
+    // `drop` is a clause on the resource item by then. The profile's module
+    // was imported by the item's synthetic use decl (Parser.w), so a missing
+    // module is already the unresolved-import error naming the package; a
+    // module that resolved but declares no such block is named here.
+    mut fn apply_convention_profiles_frontend(pool: AstPool) -> AstPool:
+        var out = pool
+        let base_count = out.decl_count()
+        for i in 0..base_count:
+            let decl = out.get_decl(i)
+            if out.kind(decl) != NodeKind.NK_C_FACADE:
+                continue
+            let item_start = out.get_data1(decl)
+            let item_count = out.get_data2(decl)
+            for k in 0..item_count:
+                let item = out.get_extra(item_start + k)
+                if out.kind(item as NodeId) != NodeKind.NK_FACADE_CONVENTION:
+                    continue
+                let dotted = facade_profile_dotted(out, self.pool, item)
+                let profile = facade_profile_find(out, self.pool, &dotted)
+                if profile == 0:
+                    if self.resolve_module_path_frontend(&dotted, self.decl_source_dir_frontend(i)).len() > 0:
+                        let span = Span { file: self.decl_source_file_id_frontend(i), start: out.get_start(item as NodeId), end: out.get_end(item as NodeId) }
+                        var d = Diagnostic.err(f"use convention {dotted}: module '{dotted}' declares no convention profile '{dotted}' (§16.2b.12)", span)
+                        d.add_help(f"a profile is the block `c convention {dotted}:` in the package it is named after; its rules are '<name>: drop *_unref', '<name>: from *_new', '<name>: fn *_get lend'")
+                        self.diagnostics.emit(d)
+                    continue
+                out = facade_profile_apply(out, self.pool, &self.decl_is_c_import, decl as i32, item, profile)
+        out
 
     // D51 §16.2b stage 4a: each `c facade` block's resources, rendered as
     // ordinary With (compiler/FacadeRender.w) once every source file and every
@@ -1870,6 +1903,7 @@ impl Zcu:
         self.trace_c_import_cache = self.read_trace_c_import_cache_frontend()
         pool = self.expand_c_imports_frontend(pool)
         pool = self.inject_toolchain_facades_frontend(pool)
+        pool = self.apply_convention_profiles_frontend(pool)
         pool = self.render_c_facades_frontend(pool)
         if do_profile:
             let cimport_ns = runtime_clock_nanos() - t_cimport
