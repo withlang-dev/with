@@ -4498,6 +4498,9 @@ impl Parser:
             ops.push(p)
             ops.push(l)
             ops.push(if is_cap: 1 else: 0)
+            let elements = self.current_ident_is("elements")
+            if elements: self.advance()
+            ops.push(if elements: 1 else: 0)
         else if word == "variadic":
             // `variadic param N selected by param P:` with `case CONST:
             // <type>` lines beneath it (D66, §16.2b.5): the closed set of

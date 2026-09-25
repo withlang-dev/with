@@ -1113,6 +1113,15 @@ impl Sema:
 
     // ── Type expression resolution ───────────────────────────────────
 
+    // Declaration and specialization both resolve a signature parameter.
+    // In particular, []mut T does not cease to be a parameter because the
+    // signature is being specialized with concrete generic arguments.
+    mut fn resolve_parameter_type_expr(node: i32) -> TypeId:
+        self.in_param_type_position = self.in_param_type_position + 1
+        let tid = self.resolve_type_expr(node)
+        self.in_param_type_position = self.in_param_type_position - 1
+        tid
+
     mut fn resolve_type_expr(node: i32) -> TypeId:
         if node == 0:
             return 0 as TypeId
@@ -4022,7 +4031,7 @@ impl Sema:
         let ps = self.sig_params.len() as i32
         for pi in 0..param_count:
             let p_type_node = self.ast.fn_param_type(param_start, pi)
-            var p_tid = if p_type_node != 0: self.resolve_type_expr(p_type_node) else: 0
+            var p_tid = if p_type_node != 0: self.resolve_parameter_type_expr(p_type_node) else: 0
             if p_type_node != 0 and self.ast.kind(p_type_node) == NodeKind.NK_TYPE_TRAIT_OBJ and self.ast.get_data1(p_type_node) == TYPE_TRAIT_OBJECT_IMPL:
                 if pi < param_concrete_tys.len() as i32:
                     let concrete_param_ty = param_concrete_tys[pi]
@@ -11443,7 +11452,7 @@ impl Sema:
                 if roots.len() == 0:
                     roots.push(self.place_root_sym(origin_arg))
             for ri in 0..roots.len() as i32:
-                self.facade_poison_foreign_views(roots[ri], call_node, fx, pi)
+                self.facade_poison_foreign_views(roots[ri], call_node, fx, self.facade_effect_source_param(fx, pi))
         for di in 0..self.facade_call_effects[fx].touch_domains.len() as i32:
             let d: i32 = self.facade_call_effects[fx].touch_domains[di]
             self.facade_poison_foreign_views(self.facade_domain_list[d].origin_sym, call_node, fx, -1)
@@ -18968,6 +18977,7 @@ impl Sema:
             return
         self.facade_note_callback_method_sig(fn_sym, sig_idx)
         let param_count = self.sig_get_param_count(sig_idx)
+        let slice_mut_args: Vec[i32] = Vec.new()
         for ai in 0..arg_count:
             if ai >= param_count:
                 break
@@ -18979,10 +18989,15 @@ impl Sema:
                 continue
             let arg_node = if ai < arg_nodes.len() as i32: arg_nodes[ai] else: call_node
             if self.call_arg_type_compatible(expected_ty, actual_ty) == 0:
-                self.emit_argument_type_mismatch(self.safe_symbol_text(fn_sym), fn_sym, ai, ai, expected_ty, actual_ty, if arg_node > 0: arg_node else: call_node)
+                let slice_kind = self.note_slice_coerce_call_arg(expected_ty, actual_ty, arg_node, if arg_node > 0: arg_node else: call_node)
+                if slice_kind == 2: slice_mut_args.push(arg_node)
+                if slice_kind == 0:
+                    self.emit_argument_type_mismatch(self.safe_symbol_text(fn_sym), fn_sym, ai, ai, expected_ty, actual_ty, if arg_node > 0: arg_node else: call_node)
             else:
                 self.note_call_arg_coercion(expected_ty, actual_ty, arg_node, call_node)
                 self.facade_check_callback_arg(fn_sym, ai, actual_ty, arg_node)
+        if slice_mut_args.len() > 0:
+            self.check_mut_slice_call_exclusivity(slice_mut_args, arg_nodes)
 
     mut fn check_generic_call(fn_sym: i32, fn_node: i32, arg_types: &Vec[i32], arg_nodes: &Vec[i32], arg_count: i32, call_node: i32) -> i32:
         let meta = self.ast.find_fn_meta(fn_node)

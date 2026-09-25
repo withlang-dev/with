@@ -15084,7 +15084,11 @@ impl MirBuilder:
                 let gc_sym = self.ast.get_data0(callee)
                 if gc_sym == self.sema.syms.src:
                     return self.source_location_operand(node)
-                let gc_fn_sym = self.sema_symbol_for_ast_symbol(gc_sym)
+                // Sema may select a presented facade template under a raw C
+                // spelling. Carry that selection into the MIR callee too;
+                // the concrete signature alone does not change its operand.
+                let gc_selected = self.sema.comp_resolved.get(node)
+                let gc_fn_sym = if gc_selected.is_some(): gc_selected.unwrap() else: self.sema_symbol_for_ast_symbol(gc_sym)
                 if self.sema.fn_symbol_is_std_builtins_drop(gc_sym) != 0:
                     return self.lower_std_drop_call(node)
                 let selected_gc_fn_node = self.sema.resolved_generic_call_nodes.get(node)
