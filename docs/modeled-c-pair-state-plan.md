@@ -1,91 +1,90 @@
-# D66 retained variadic completion (#1652)
+# D66 retained variadic pairs (#1652): implementation notes
 
-Execution notes, subordinate to D51 and the approved D66 amendments in the
-specification and decision log. This file grants no foreign-library facts.
+Execution notes, subordinate to D51, the D66 amendments in the specification
+(§16.2b.5, §16.2b.9) and the decision log. This file grants no
+foreign-library facts.
 
-## Acceptance
+## The ruling, in one paragraph
 
-The critical path is: first setter succeeds, second setter fails, the function
-returns an error, and actual cleanup is safe with retained storage released
-once. Check the corresponding `?` path. A callback-free destroyer may accept
-an incomplete pair; a callback-capable destroyer requires compatibility or a
-modeled reset/unregister before it. Scope exit alone is not an error.
+A callback case of a variadic contract states its C type (`as T`), names the
+selector carrying its userdata (`userdata param CONST`) and states its
+retention (`retains by param 0`, never inferred); the userdata setter is
+implied by the pairing and takes `&U`, the borrow the resource then holds.
+`ok CONST` on the variadic operation is the setters' status contract:
+presentation unchanged, the compiler reads a comparison of the returned code
+against it as the setter's success or failure edge. A resource names its safe
+abandonment path with `abandon <op>`; the op must itself be `callbacks none`,
+and the rendered Drop runs it before the destroyer. Every callback-capable
+operation (anything not `callbacks none`, including the other cases of the
+same setter) is refused where the pair is not proven compatible; a retained
+userdata cannot die or move while held; a retaining resource cannot be
+returned or stored.
 
-Also cover defaults, either setup order, different resources, replacement,
-failure during replacement, ignored status, joins, loops, moves and fields,
-helper calls, borrowed userdata lifetimes, callback reentrancy, and thread
-restrictions. Preserve the variadic C ABI.
+## Owners of facts (D65)
 
-## Owners of facts
+- **Parser** records the case's callback type, paired selector and retaining
+  parameter, and the `abandon` clause (Ast.w FACADE_CLAUSE_VARIADIC_CASE,
+  FACADE_CLAUSE_ABANDON).
+- **Sema** resolves a case into a `ForeignVariadicSlot` (resource, retaining
+  parameter, C callable, its one `void *` position, the paired selector and
+  its value), implies the userdata case, verifies `abandon` (own operation,
+  one parameter, `callbacks none`), accepts `ok` on a variadic operation, and
+  registers a `FacadePairOp` for every operation of a resource with a pair
+  under the concrete signature MIR records on the call
+  (`facade_index_pair_ops`; setters per specialization through
+  `facade_note_pair_op_sig`, with the `U` read off the specialized
+  signature). A callback-only setter binds `U` from the callback argument's
+  own signature (`facade_bind_pair_callback_u`).
+- **Renderer** emits `mut fn <base>__<CB>[U](…, value: <typed callback>)`
+  and `mut fn <base>__<UD>[U](…, value: &U)`, and a Drop that runs the
+  abandonment path before the destroyer (compiler/FacadeRender.w).
+- **MIR** (`MirForeignPairs.w`, after lowering, before codegen) runs the
+  `ForeignPairState.w` place flow over each body: `APPLY` at the receiver of
+  every pair operation, `BORROW`/`MOVE` for references and moves of the
+  resource, `EXPIRE` where a retained origin dies or moves, `ESCAPE` where a
+  resource moves into the return place, a projection or an aggregate,
+  `DESTROY` at drops (callback-capable unless `abandon` or a `callbacks none`
+  drop), `UNKNOWN` after an unmodeled call that receives the resource. A
+  `status == OK` / `status != OK` branch on a setter's result refines its
+  success edge. Violations become diagnostics at the call or statement.
+- **Codegen** transports the values the setters already selected.
 
-- Parser records the explicit callback type, paired selector and retaining
-  parameter. No callback signature or lifetime is inferred from an option name.
-- Sema resolves those clauses and emits slot identities, concrete userdata
-  types, operation effects, success conditions, and retained origins. The
-  `callbacks none` clause carries its source location into the audit.
-- MIR propagates those facts through actual calls, branches, moves and drops.
-  It reports an unsatisfied invocation/lifetime requirement on a reachable
-  path. Generated cleanup, early return and `?` use the same check.
-- Codegen transports the already-selected ABI values. It neither guesses the
-  slot type nor repairs an incomplete pair with an invented callback result.
+## What the flow does not model (conservatively refused, not unsound)
 
-## Work in progress
+- Helper calls: a call the facade does not describe that receives the
+  resource is checked as callback-capable and leaves the pair `UNKNOWN`
+  until a modeled reset. Interprocedural summaries are a later phase.
+- Closure arguments to a callback setter: `U` is bound from a named fn's
+  signature; a closure literal has no parameter types to bind from without
+  an expected type. Pass a named fn (the tally idiom).
+- A retained pointer case (`<type> retains by param N`, curl's
+  CURLOPT_POSTFIELDS) stays refused: the caller's storage would have to
+  outlive the resource as a C string (§16.3c).
+- Reading a chunk's bytes inside a write callback: the `char *` parameter
+  stays raw until a callback buffer clause is ruled; counts are safe today.
 
-`ForeignPairState.w` contains the finite compatibility domain and CFG join.
-An alternative includes callback type, userdata type/origin and the most
-recent setter result that selected the alternative. Unknown failure effects
-retain both possible userdata origins and mark compatibility unknown. A
-failure is treated as preserving old installation only with explicit trusted
-evidence. An unrelated branch must not filter alternatives.
+## Foreign evidence recorded in lib/facades/libcurl.w
 
-The CFG test deliberately numbers cleanup before the error arms that reach
-it, so acceptance cannot rely on a single forward sweep. A distinct absent
-resource state keeps destruction separate from an unreachable CFG edge;
-the construction/destruction loop test verifies storage reuse.
+`curl_easy_setopt` is `callbacks none` (no listed option's page describes a
+callback, and a transfer starts only at `curl_easy_perform`), `ok CURLE_OK`.
+`curl_easy_reset` is the abandonment path, `callbacks none` bounded to the
+modeled option set: libcurl's reset frees MIME parts through their
+`freefunc` (`easy.c` → `Curl_freeset` → `Curl_mime_cleanpart`), an option
+this facade does not list; a MIME case must revisit that line.
+`curl_easy_cleanup` is never `callbacks none` (it may invoke progress and
+header callbacks while closing connections).
 
-Sema now resolves retained-case declarations into `ForeignVariadicSlot`:
-the resource/parameter, C callback type and userdata argument, and paired
-selector value. It checks the actual C signature and distinct selectors.
-The compiler still refuses the resulting safe surface. These declarations
-are not yet specialized per call or propagated to MIR.
+## Tests
 
-Still to wire: Sema's per-slot call descriptors, MIR place/alias transport and
-success-edge refinement, retained-origin constraints (including helper-call
-propagation), and the variadic renderers. The parser accepts the approved
-spelling, but Sema still refuses these cases until the safety checks are
-connected. Do not remove that refusal just to make rendering tests pass.
-
-The safe abandonment operation needs an explicit trusted reset/release fact;
-`callbacks none` alone only says the operation does not invoke callbacks.
-It does not prove failure preserves the installation, reset releases a borrow,
-or background callbacks are absent. A creator-thread callback contract plus
-the library's serialized-use guarantee must justify separate-call setup.
-
-## Foreign evidence and test fixture
-
-`curl_easy_cleanup` can invoke progress/header callbacks, so no unconditional
-`callbacks none` annotation belongs on it. `curl_easy_reset` restores option
-defaults, but its implementation must be checked for applicable callbacks
-before granting no-invocation evidence. Relevant source is also available in
-`.deps/src/cmake-4.2.3/Utilities/cmcurl/lib/{easy,setopt}.c`; this is reference
-material, not a runtime dependency.
-
-Reset is not an unconditional no-callback operation across all libcurl
-features either: this source's `easy.c:1110` calls `Curl_freeset`, whose
-`url.c:198` calls `Curl_mime_cleanpart`; `mime.c:1127` invokes a configured
-`freefunc`. The currently modeled closed option set excludes MIME, but a
-future MIME extension must revisit any no-callback proof for that set.
-The reset probe below establishes the tested write-only setup path, not
-a universal guarantee for arbitrary easy handles.
-
-The tiny inline variadic C fixture using `va_start`/`va_arg` is currently
-omitted by c_import (#1678). Do not substitute a fixed-arity definition for
-its variadic ABI. The required runtime failure test still needs a faithfully
-modeled controllably failing setter; the abstract CFG test is not that proof.
-
-`out/curl-pair-failure-probe.w` confirms a deterministic failure with the real
-variadic ABI: install WRITEFUNCTION successfully, pass a userdata pointer to
-the deliberately invalid LASTENTRY selector, receive UNKNOWN_OPTION, reset,
-and clean up. It runs without a network transfer. This is a raw-library
-fault-injection probe, not evidence that the safe surface or retained-value
-cleanup works, and LASTENTRY must never enter the production facade.
+- `test/behavior/behav_libcurl_facade_callback_pair.w`: the pair over the real
+  library, a `file://` transfer driving the callback (no network).
+- `test/behavior/behav_libcurl_facade_callback_pair_failure.w`: the required
+  acceptance case with the real variadic ABI — first setter succeeds, the
+  second fails (a test facade pairs the callback with `CURLOPT_LASTENTRY`),
+  the function returns an error, Drop resets then cleans up.
+- `test/behavior/behav_c_facade_variadic_callback_pair_check.w`: accepted
+  shapes over a declared setter (either order, reset between runs, a helper
+  handed a proven pair, a sink read between the setter and the run).
+- `test/compile_errors/err_c_facade_variadic_callback_*.w`,
+  `err_c_facade_abandon_invokes.w`: the refusals.
+- `test/internals/foreign_pair_*_test.w`: the abstract domain.
