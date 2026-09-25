@@ -15,7 +15,6 @@ fn clang_resource_owned_text(s: &str): s ++ ""
 
 fn cr_fail(ctx: &ActionCtx, message: &str) -> i32:
     ctx.diagnostics().error("embedded-clang-resource: " ++ message)
-    1
 
 fn cr_dirname(path: &str) -> str:
     var last = -1
@@ -212,7 +211,6 @@ fn cr_generate(ctx: &ActionCtx, include_dir: &str, files: &Vec[str], version: &s
         let source = fs.read_text(path)
         if source.len() > 16000000:
             ctx.diagnostics().error("embedded-clang-resource: header too large: " ++ path)
-            return ""
         let sym = f"CLANG_RES_{i}"
         out = out ++ "let " ++ sym ++ ": str = " ++ cr_raw_string_literal(source) ++ "\n"
         if listing.len() > 0:

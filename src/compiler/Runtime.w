@@ -28,7 +28,7 @@ extern fn with_nanosleep(ns: i64) -> i32
 extern fn with_sysinfo_os() -> str
 extern fn with_sysinfo_arch() -> str
 
-pub fn runtime_eprint(s: &str) -> Unit:
+pub fn runtime_eprint(s: &str):
     with_eprint(s)
 
 pub fn runtime_exec_binary(path: &str) -> i32:

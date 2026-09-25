@@ -12,7 +12,6 @@ type UatRunResult {
 
 fn ruat_fail(ctx: &ActionCtx, message: &str) -> i32:
     ctx.diagnostics().error(ctx.target_name() ++ ": " ++ message)
-    1
 
 fn ruat_join(left: &str, right: &str) -> str:
     if left.len() == 0:

@@ -12,7 +12,6 @@ const RET_RELEASE_VERSION_KEEP: i32 = 5
 
 fn ret_fail(ctx: &ActionCtx, message: &str) -> i32:
     ctx.diagnostics().error(ctx.target_name() ++ ": " ++ message)
-    1
 
 fn ret_write_output_stamp(ctx: &ActionCtx) -> i32:
     let output = ctx.output()
@@ -342,13 +341,11 @@ fn ret_expected_test_marker(ctx: &ActionCtx, target_name: &str, entry: &str) -> 
     let comp_hexes = ret_sha256_hex_list(ctx, ret_safe_label(target_name) ++ "-marker-compiler", comp_files)
     if comp_hexes.len() as i32 != 1:
         ctx.diagnostics().error(ctx.target_name() ++ ": could not hash test compiler for marker " ++ target_name)
-        return ""
     text = text ++ "compiler-sha256:" ++ comp_hexes.get(0) ++ "\n"
     let files = ret_direct_w_files(fs, ret_dirname(entry))
     let file_hexes = ret_sha256_hex_list(ctx, ret_safe_label(target_name) ++ "-marker-files", files)
     if file_hexes.len() != files.len():
         ctx.diagnostics().error(ctx.target_name() ++ ": could not hash test files for marker " ++ target_name)
-        return ""
     for i in 0..files.len() as i32:
         text = text ++ "file:" ++ files[i] ++ ":" ++ file_hexes[i] ++ "\n"
     text
@@ -370,11 +367,9 @@ fn ret_append_test_marker(ctx: &ActionCtx, combined: &str, target_name: &str, en
     let actual = if fs.exists(marker_path): fs.read_text(marker_path) else: ""
     if actual.len() == 0:
         ctx.diagnostics().error(ctx.target_name() ++ ": missing test pass marker " ++ marker_path ++ "; run `with build :test`")
-        return ""
     let expected = ret_expected_test_marker(ctx, target_name, entry)
     if actual != expected:
         ctx.diagnostics().error(ctx.target_name() ++ ": stale test pass marker " ++ marker_path ++ "; run `with build :test`")
-        return ""
     combined ++ "marker:" ++ target_name ++ "\n" ++ actual
 
 fn ret_append_state_file(ctx: &ActionCtx, combined: &str, target_name: &str) -> str:
@@ -382,7 +377,6 @@ fn ret_append_state_file(ctx: &ActionCtx, combined: &str, target_name: &str) -> 
     let state = if ctx.fs().exists(state_path): ctx.fs().read_text(state_path) else: ""
     if state.len() == 0:
         ctx.diagnostics().error(ctx.target_name() ++ ": missing build state " ++ state_path ++ "; run `with build :test`")
-        return ""
     combined ++ "state:" ++ target_name ++ "\n" ++ state ++ "\n"
 
 fn ret_sha256_files_manifest(ctx: &ActionCtx, label: &str, files: &Vec[str]) -> str:
@@ -430,7 +424,6 @@ fn ret_append_file_hashes(combined: &str, ctx: &ActionCtx, label: &str, files: &
     let manifest = ret_sha256_files_manifest(ctx, label, files)
     if files.len() > 0 and manifest.len() == 0:
         ctx.diagnostics().error(ctx.target_name() ++ ": could not hash " ++ label ++ " files")
-        return ""
     combined ++ "files:" ++ label ++ "\n" ++ manifest
 
 fn ret_build_driver_sources_manifest(ctx: &ActionCtx) -> str:
@@ -452,11 +445,9 @@ fn ret_append_test_file_hashes(combined: &str, ctx: &ActionCtx, entry: &str) -> 
     let files = ret_direct_w_files(ctx.fs(), dir)
     if files.len() == 0:
         ctx.diagnostics().error(ctx.target_name() ++ ": no test source files found for " ++ entry)
-        return ""
     let manifest = ret_sha256_files_manifest(ctx, ret_safe_label(entry) ++ "-files", files)
     if manifest.len() == 0:
         ctx.diagnostics().error(ctx.target_name() ++ ": could not hash " ++ entry ++ " files")
-        return ""
     combined ++ "files:" ++ entry ++ "\n" ++ manifest
 
 fn ret_test_green_fingerprint(ctx: &ActionCtx) -> str:

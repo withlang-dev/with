@@ -22,10 +22,10 @@ extern fn rt_compat_self_maxrss() -> i64
 pub fn with_setenv_str(name: &str, value: &str) -> i32:
     rt_compat_setenv_str(name, value)
 
-pub fn with_install_interrupt_handlers() -> Unit:
+pub fn with_install_interrupt_handlers():
     rt_compat_install_interrupt_handlers()
 
-pub fn with_raise_stack_limit() -> Unit:
+pub fn with_raise_stack_limit():
     rt_compat_raise_stack_limit()
 
 pub fn with_interrupt_requested() -> i32:

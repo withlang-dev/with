@@ -96,22 +96,17 @@ pub fn run_examples_tests_action(ctx: ActionCtx) -> i32:
     let inputs = ctx.inputs()
     if inputs.len() == 0:
         ctx.diagnostics().error("examples-tests: missing compiler input")
-        return 1
     let fs = ctx.fs()
     let out_dir = ctx.output()
     if out_dir.len() == 0:
         ctx.diagnostics().error("examples-tests: missing output directory")
-        return 1
     if fs.exists(out_dir) and fs.remove_tree(out_dir) != 0:
         ctx.diagnostics().error("examples-tests: could not remove previous output directory: " ++ out_dir)
-        return 1
     if fs.mkdir_all(out_dir) != 0:
         ctx.diagnostics().error("examples-tests: could not create output directory: " ++ out_dir)
-        return 1
     let root = ctx.project_info().project_root()
     if not fs.exists(inputs.get(0)):
         ctx.diagnostics().error("examples-tests: missing compiler: " ++ inputs.get(0))
-        return 1
     let compiler = ex_abs(root, inputs.get(0))
     var failures = 0
 
@@ -163,7 +158,6 @@ pub fn run_examples_tests_action(ctx: ActionCtx) -> i32:
 
     if failures > 0:
         ctx.diagnostics().error(f"examples-tests: {failures} step(s) failed; an example tracks the current spec (D55 ruling 4): a spec change updates it in the same change, a compiler or stdlib change that breaks it is a defect")
-        return 1
     let total = ex_checked().len() + ex_programs().len() + ex_packages().len() + ex_tests().len()
     let _ = fs.write_text(ex_join(out_dir, ".stamp"), f"ok: {total} example steps\n")
     print(f"examples-tests: {total} steps green")

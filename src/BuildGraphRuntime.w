@@ -146,10 +146,10 @@ pub fn build_graph_rt_cpu_cores() -> i32:
 pub fn build_graph_rt_clock_nanos() -> i64:
     with_clock_nanos()
 
-pub fn build_graph_rt_write(s: &str) -> Unit:
+pub fn build_graph_rt_write(s: &str):
     with_write(s)
 
-pub fn build_graph_rt_eprint(s: &str) -> Unit:
+pub fn build_graph_rt_eprint(s: &str):
     with_eprint(s)
 
 // This process's id (unique temp names for the install kind).

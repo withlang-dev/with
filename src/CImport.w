@@ -203,7 +203,7 @@ let UO_POST_DEC: i32 = 10
 
 // Process a c_import header spec and return synthetic .w source text.
 // Returns "" if the bridge is unavailable or parsing fails.
-pub fn ci_prepare_clang_resource_dir() -> Unit:
+pub fn ci_prepare_clang_resource_dir():
     let dir = ensure_clang_resource_dir()
     if dir.len() > 0:
         with_cimport_set_resource_dir(dir)
@@ -14893,7 +14893,7 @@ pub fn ci_get_bail_kind() -> i32:
 pub fn ci_get_bail_message() -> str:
     g_ci_bail_message.clone()
 
-pub fn ci_clear_bail_location() -> Unit:
+pub fn ci_clear_bail_location():
     g_ci_bail_location = ""
     g_ci_bail_kind = 0
     g_ci_bail_message = ""
@@ -15029,7 +15029,7 @@ fn ci_aggregate_kind_vec(v: &Vec[i32], label: &str):
         eprint(f"  kind={k} count={c}")
         u = u + 1
 
-pub fn ci_dump_raw_fallback_stats() -> Unit:
+pub fn ci_dump_raw_fallback_stats():
     if not ci_raw_stats_enabled():
         return
     ci_aggregate_kind_vec(&g_ci_raw_expr_kinds, "migrate: raw-expr fallback by cursor kind:")

@@ -38,7 +38,6 @@ type StackBudgetReport {
 
 fn comp_fail(ctx: &ActionCtx, message: &str) -> i32:
     ctx.diagnostics().error(ctx.target_name() ++ ": " ++ message)
-    1
 
 fn comp_join(left: &str, right: &str) -> str:
     if left.len() == 0:
@@ -722,10 +721,8 @@ fn comp_check_c_export_path(ctx: &ActionCtx, path: &str) -> i32:
     let budget = comp_c_export_budget(path)
     if budget < 0:
         ctx.diagnostics().error(path ++ ": compiler-owned source has forbidden @[c_export] attributes")
-        return 1
     if count > budget:
         ctx.diagnostics().error(path ++ f": @[c_export] count increased from budget {budget} to {count}")
-        return 1
     if count < budget:
         ctx.diagnostics().warn(path ++ f": @[c_export] count is now {count}; tighten compiler c_export budget from {budget}")
     0
@@ -1262,18 +1259,18 @@ pub fn run_check_libc_surface_action(ctx: ActionCtx) -> i32:
         let line = comp_trim(lines[i])
         let nr = i + 1
         if line.starts_with("pub extern var ") or line.starts_with("extern var "):
-            ctx.diagnostics().error(f"{path}:{nr}: std.libc declares a variable; a libc global is a With function over a with_libc_* seam: " ++ line)
+            eprint("error: " ++ f"{path}:{nr}: std.libc declares a variable; a libc global is a With function over a with_libc_* seam: " ++ line)
             errors = errors + 1
         else if line.starts_with("pub extern fn "):
             let name = comp_ident_prefix(line.slice(14, line.len()))
             exported = exported ++ name ++ "|"
             if not standard.contains("|" ++ name ++ "|"):
-                ctx.diagnostics().error(f"{path}:{nr}: std.libc exports '" ++ name ++ "', which is not a C-standard function; model it as a With function over a with_libc_* seam (rt/rt_core.w)")
+                eprint("error: " ++ f"{path}:{nr}: std.libc exports '" ++ name ++ "', which is not a C-standard function; model it as a With function over a with_libc_* seam (rt/rt_core.w)")
                 errors = errors + 1
         else if line.starts_with("extern fn "):
             let name = comp_ident_prefix(line.slice(10, line.len()))
             if not name.starts_with("with_"):
-                ctx.diagnostics().error(f"{path}:{nr}: std.libc reaches '" ++ name ++ "' directly; a private extern here is a with_* runtime seam")
+                eprint("error: " ++ f"{path}:{nr}: std.libc reaches '" ++ name ++ "' directly; a private extern here is a with_* runtime seam")
                 errors = errors + 1
         else if line.starts_with("pub fn ") or line.starts_with("pub unsafe fn ") or line.starts_with("pub type "):
             let after = if line.starts_with("pub fn "): line.slice(7, line.len()) else if line.starts_with("pub unsafe fn "): line.slice(14, line.len()) else: line.slice(9, line.len())
@@ -1294,7 +1291,7 @@ pub fn run_check_libc_surface_action(ctx: ActionCtx) -> i32:
         seen = seen ++ name ++ "|"
         let key = "|" ++ name ++ "|"
         if exported.contains(key) or preamble.contains(key) or host_spellings.contains(key): continue
-        ctx.diagnostics().error("src/CImport.w admits libc symbol '" ++ name ++ "' that lib/std/libc.w does not export and the migrator preamble does not declare")
+        eprint("error: " ++ "src/CImport.w admits libc symbol '" ++ name ++ "' that lib/std/libc.w does not export and the migrator preamble does not declare")
         errors = errors + 1
     if errors > 0:
         return comp_fail(ctx, f"{errors} std.libc surface violation(s)")
@@ -1403,7 +1400,7 @@ pub fn run_check_runtime_domain_audit_action(ctx: ActionCtx) -> i32:
         let text = fs.read_text(path)
         let verdicts = comp_runtime_domain_violations(path, text)
         for i in 0..verdicts.len() as i32:
-            ctx.diagnostics().error(verdicts[i].clone())
+            eprint("error: " ++ verdicts[i].clone())
             errors = errors + 1
         // Count the rows the file carries, for the report.
         let lines = comp_split_lines(text)
@@ -1429,17 +1426,17 @@ pub fn run_check_runtime_domain_audit_action(ctx: ActionCtx) -> i32:
             if not hit:
                 var seen = ""
                 for i in 0..verdicts.len() as i32: seen = seen ++ "\n  " ++ verdicts[i]
-                ctx.diagnostics().error(f"{path}: the audit stayed silent on its negative fixture; expected a verdict containing '{want}', got {verdicts.len()}:" ++ seen)
+                eprint("error: " ++ f"{path}: the audit stayed silent on its negative fixture; expected a verdict containing '{want}', got {verdicts.len()}:" ++ seen)
                 errors = errors + 1
         else if head == "//! expect-clean":
             for i in 0..verdicts.len() as i32:
-                ctx.diagnostics().error(f"{path}: the audit rejected its clean fixture: " ++ verdicts[i])
+                eprint("error: " ++ f"{path}: the audit rejected its clean fixture: " ++ verdicts[i])
                 errors = errors + 1
         else:
-            ctx.diagnostics().error(f"{path}: a runtime-domain-audit fixture starts with `//! expect-violation: <text>` or `//! expect-clean`")
+            eprint("error: " ++ f"{path}: a runtime-domain-audit fixture starts with `//! expect-violation: <text>` or `//! expect-clean`")
             errors = errors + 1
     if fixtures == 0:
-        ctx.diagnostics().error(f"{fixture_dir}: no fixtures; the lane cannot prove it sees")
+        eprint("error: " ++ f"{fixture_dir}: no fixtures; the lane cannot prove it sees")
         errors = errors + 1
     if errors > 0:
         return comp_fail(ctx, f"{errors} runtime foreign call(s) outside the domain rows (ruling §52)")
@@ -1474,7 +1471,6 @@ pub fn run_check_spec_inventory_action(ctx: ActionCtx) -> i32:
 
     if errors.len() > 0:
         ctx.diagnostics().error(comp_inventory_error_text(errors))
-        return 1
     comp_write_ok_output(ctx)
 
 pub fn run_stack_budget_check_action(ctx: ActionCtx) -> i32:
@@ -2361,11 +2357,9 @@ pub fn run_check_committed_state_action(ctx: ActionCtx) -> i32:
     let manifest = if fs.exists("out/.build-state/blessed-manifest"): fs.read_text("out/.build-state/blessed-manifest") else: ""
     if manifest.len() == 0:
         ctx.diagnostics().error("no blessed manifest found; run `with build :fixpoint` first or pass --force")
-        return 1
     let changed = comp_check_manifest(fs, manifest)
     if changed.len() > 0:
         ctx.diagnostics().error("source files changed since last fixpoint:\n" ++ changed ++ "run `with build :fixpoint` to re-bless, or pass --force")
-        return 1
     fs.write_text("out/command/" ++ ctx.target_name() ++ "/ok", "ok\n")
     0
 

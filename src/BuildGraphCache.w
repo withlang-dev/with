@@ -444,7 +444,7 @@ fn build_cache_test_success_manifest(root: &str, target: &BuildGraphTarget, test
         text = text ++ "file:" ++ path ++ ":" ++ build_cache_sha256_file_content(build_cache_dep_path(root, path)) ++ "\n"
     text
 
-pub fn build_cache_record_test_success(root: &str, target: &BuildGraphTarget, test_files: &Vec[str], test_compiler: &str) -> Unit:
+pub fn build_cache_record_test_success(root: &str, target: &BuildGraphTarget, test_files: &Vec[str], test_compiler: &str):
     build_cache_forget_fingerprints()
     let state_dir = build_cache_state_dir(root)
     let _mkdir = build_graph_rt_mkdir_p(state_dir)
@@ -769,7 +769,7 @@ pub fn build_cache_freshness_reason(root: &str, target: &BuildGraphTarget, dep_r
 pub fn build_cache_check_fresh(root: &str, target: &BuildGraphTarget, dep_rebuilt: bool) -> bool:
     build_cache_freshness_reason(root, target, dep_rebuilt) == "fresh"
 
-pub fn build_cache_record(root: &str, target: &BuildGraphTarget, discovered_deps: &Vec[str], effects: &Vec[str]) -> Unit:
+pub fn build_cache_record(root: &str, target: &BuildGraphTarget, discovered_deps: &Vec[str], effects: &Vec[str]):
     build_cache_forget_fingerprints()
     let state_dir = build_cache_state_dir(root)
     let _ = build_graph_rt_mkdir_p(state_dir)

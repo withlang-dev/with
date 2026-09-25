@@ -189,7 +189,7 @@ impl StackifyGraph:
         self.blocks.push(stackify_empty_block(desc))
         id
 
-    pub mut fn add_param(block: i32, value: i32) -> Unit:
+    pub mut fn add_param(block: i32, value: i32):
         if block < 0 or block >= self.blocks.len() as i32:
             return
         if self.blocks[block].params_count == 0:
@@ -222,7 +222,7 @@ impl StackifyGraph:
             self.succs.push(succs.get(i))
             i = i + 1
 
-    pub mut fn set_br(block: i32, target_block: i32, args: &Vec[i32]) -> Unit:
+    pub mut fn set_br(block: i32, target_block: i32, args: &Vec[i32]):
         if block < 0 or block >= self.blocks.len() as i32:
             return
         let target = self.add_target(target_block, args)
@@ -233,7 +233,7 @@ impl StackifyGraph:
         succs.push(target_block)
         self.set_succs(block, succs)
 
-    pub mut fn set_cond_br(block: i32, cond: i32, true_block: i32, true_args: &Vec[i32], false_block: i32, false_args: &Vec[i32]) -> Unit:
+    pub mut fn set_cond_br(block: i32, cond: i32, true_block: i32, true_args: &Vec[i32], false_block: i32, false_args: &Vec[i32]):
         if block < 0 or block >= self.blocks.len() as i32:
             return
         let first_target = self.targets.len() as i32
@@ -248,7 +248,7 @@ impl StackifyGraph:
         succs.push(false_block)
         self.set_succs(block, succs)
 
-    pub mut fn set_select(block: i32, selector: i32, target_blocks: &Vec[i32], default_block: i32) -> Unit:
+    pub mut fn set_select(block: i32, selector: i32, target_blocks: &Vec[i32], default_block: i32):
         if block < 0 or block >= self.blocks.len() as i32:
             return
         let first_target = self.targets.len() as i32
@@ -272,7 +272,7 @@ impl StackifyGraph:
         succs.push(default_block)
         self.set_succs(block, succs)
 
-    pub mut fn set_select_targets(block: i32, selector: i32, targets_start: i32, targets_count: i32, default_target: i32) -> Unit:
+    pub mut fn set_select_targets(block: i32, selector: i32, targets_start: i32, targets_count: i32, default_target: i32):
         if block < 0 or block >= self.blocks.len() as i32:
             return
         self.blocks[block].term_kind = StackifyTermKind.Select
@@ -290,7 +290,7 @@ impl StackifyGraph:
             succs.push(self.targets[default_target].block)
         self.set_succs(block, succs)
 
-    pub mut fn set_return(block: i32, values: &Vec[i32]) -> Unit:
+    pub mut fn set_return(block: i32, values: &Vec[i32]):
         if block < 0 or block >= self.blocks.len() as i32:
             return
         self.blocks[block].term_kind = StackifyTermKind.Return
@@ -303,7 +303,7 @@ impl StackifyGraph:
         let no_succs: Vec[i32] = Vec.new()
         self.set_succs(block, no_succs)
 
-    pub mut fn set_unreachable(block: i32) -> Unit:
+    pub mut fn set_unreachable(block: i32):
         if block < 0 or block >= self.blocks.len() as i32:
             return
         self.blocks[block].term_kind = StackifyTermKind.Unreachable

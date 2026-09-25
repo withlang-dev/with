@@ -26,7 +26,7 @@ pub fn with_llvm_wasm_backend_missing() -> Unit:
     let _ = h
     0
 
-@[weak] pub fn with_cimport_dispose(s: i64) -> Unit:
+@[weak] pub fn with_cimport_dispose(s: i64):
     let _ = s
 
 @[weak] pub fn with_cimport_error(s: i64) -> str:
@@ -429,17 +429,17 @@ pub fn with_llvm_wasm_backend_missing() -> Unit:
     let _ = i
     0
 
-@[weak] pub fn with_cimport_dispose_macros(s: i64) -> Unit:
+@[weak] pub fn with_cimport_dispose_macros(s: i64):
     let _ = s
 
 @[weak] pub fn with_cimport_is_name_emitted(n: str) -> i32:
     let _ = n
     0
 
-@[weak] pub fn with_cimport_mark_name_emitted(n: str) -> Unit:
+@[weak] pub fn with_cimport_mark_name_emitted(n: str):
     let _ = n
 
-@[weak] pub fn with_cimport_reset_names() -> Unit:
+@[weak] pub fn with_cimport_reset_names():
     let _ = 0
 
 @[weak] pub fn with_cimport_struct_field_is_bitfield(s: i64, i: i32, f: i32) -> i32:
@@ -576,10 +576,10 @@ pub fn with_llvm_wasm_backend_missing() -> Unit:
     let _ = i
     str_c()
 
-@[weak] pub fn with_cimport_add_include_path(path: str) -> Unit:
+@[weak] pub fn with_cimport_add_include_path(path: str):
     let _ = path
 
-@[weak] pub fn with_cimport_clear_include_paths() -> Unit:
+@[weak] pub fn with_cimport_clear_include_paths():
     let _ = 0
 
 @[weak] pub fn with_cimport_typedef_anon_record_field_count(s: i64, i: i32) -> i32:

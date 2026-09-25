@@ -14,7 +14,6 @@ const SDK_LLVM_TAG_TAR_GZ_SHA256: str = "ba534c6835a5b9c2162c806e269799fe41fca95
 
 fn sdk_fail(ctx: &ActionCtx, message: &str) -> i32:
     ctx.diagnostics().error(ctx.target_name() ++ ": " ++ message)
-    1
 
 fn sdk_join(left: &str, right: &str) -> str:
     if left.len() == 0:

@@ -176,7 +176,7 @@ pub fn with_channel_create(capacity: i32, elem_size: i32, drop_fn: *const fn(*mu
     chan_set_i32(ch as i64, CHAN_OFF_RECEIVERS, 1)
     ch as i64
 
-pub fn with_channel_send(ch_handle: i64, value_ptr: *const u8) -> Unit:
+pub fn with_channel_send(ch_handle: i64, value_ptr: *const u8):
     if ch_handle == 0:
         return
     let buffer = chan_buffer(ch_handle)
@@ -252,12 +252,12 @@ pub fn with_channel_try_recv(ch_handle: i64, out_ptr: *mut u8) -> i32:
     chan_set_i32(ch_handle, CHAN_OFF_COUNT, chan_field_i32(ch_handle, CHAN_OFF_COUNT) - 1)
     1
 
-pub fn with_channel_close(ch_handle: i64) -> Unit:
+pub fn with_channel_close(ch_handle: i64):
     if ch_handle == 0:
         return
     chan_set_i32(ch_handle, CHAN_OFF_CLOSED, 1)
 
-pub fn with_channel_destroy(ch_handle: i64) -> Unit:
+pub fn with_channel_destroy(ch_handle: i64):
     if ch_handle == 0:
         return
     channel_free(ch_handle)

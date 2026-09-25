@@ -80,7 +80,7 @@ pub fn p7_prepare_case(name: &str, package_name: &str) -> str:
     assert(write_file(p7_join(case_dir, "src/main.w"), "fn main:\n    print(\"unused\")\n") == 0)
     case_dir
 
-pub fn p7_write(case_dir: &str, rel_path: &str, contents: &str) -> Unit:
+pub fn p7_write(case_dir: &str, rel_path: &str, contents: &str):
     let full = p7_join(case_dir, rel_path)
     let dir = p7_dirname(full)
     assert(mkdir_p(dir) == 0)
@@ -132,14 +132,14 @@ pub fn p7_build_target_no_deps_args(target: &str) -> str:
 // The label names the case (a mode, a target) in the failure report: a
 // runner that loops over cases and fails without saying which one sends the
 // reader back to rerun every case by hand.
-pub fn p7_assert_success(result: &P7Run, label: &str) -> Unit:
+pub fn p7_assert_success(result: &P7Run, label: &str):
     if result.rc != 0:
         print(f"FAILED [{label}]: rc={result.rc}")
         print("stdout:\n" ++ result.stdout)
         print("stderr:\n" ++ result.stderr)
     assert(result.rc == 0)
 
-pub fn p7_assert_failure_contains(result: &P7Run, needle: &str, label: &str) -> Unit:
+pub fn p7_assert_failure_contains(result: &P7Run, needle: &str, label: &str):
     let found = result.stderr.contains(needle) or result.stdout.contains(needle)
     if result.rc == 0 or not found:
         print(f"FAILED [{label}]: rc={result.rc}, expected a failure mentioning `{needle}`")
@@ -148,6 +148,6 @@ pub fn p7_assert_failure_contains(result: &P7Run, needle: &str, label: &str) -> 
     assert(result.rc != 0)
     assert(found)
 
-pub fn p7_assert_file_contains(case_dir: &str, rel_path: &str, needle: &str) -> Unit:
+pub fn p7_assert_file_contains(case_dir: &str, rel_path: &str, needle: &str):
     let text = read_file(p7_join(case_dir, rel_path)).unwrap()
     assert(text.contains(needle))

@@ -585,13 +585,13 @@ pub fn Workspace.name(self: &Self) -> str:
     var loaded = ws_state_load(self.id)
     move loaded.name
 
-pub fn Workspace.add_file(self: &Self, path: &str) -> Unit:
+pub fn Workspace.add_file(self: &Self, path: &str):
     tool_capability_require(self.token, "Workspace")
     var s = ws_state_load(self.id)
     s.files.push(with_str_clone_ref(path))
     ws_state_store(self.id, &s)
 
-pub fn Workspace.add_string(self: &Self, name: &str, source: &str) -> Unit:
+pub fn Workspace.add_string(self: &Self, name: &str, source: &str):
     tool_capability_require(self.token, "Workspace")
     var s = ws_state_load(self.id)
     s.string_names.push(with_str_clone_ref(name))
@@ -603,13 +603,16 @@ pub fn Workspace.options(self: &Self) -> BuildOptions:
     var loaded = ws_state_load(self.id)
     move loaded.options
 
-pub fn Workspace.set_options(self: &Self, options: BuildOptions) -> Unit:
+pub fn Workspace.set_options(self: &Self, options: BuildOptions):
     tool_capability_require(self.token, "Workspace")
     var s = ws_state_load(self.id)
     s.options = options
     s.has_options = true
     ws_state_store(self.id, &s)
 
+// These driver-interpreted operations return Unit at comptime. The native
+// unsupported-operation exit is not their return contract; inferring Never
+// from that fallback would make valid comptime continuation unreachable.
 pub fn Workspace.set_migrate_options(self: &Self, options: MigrateOptions) -> Unit:
     tool_capability_require(self.token, "Workspace")
     with_eprint("error: Workspace.set_migrate_options requires compiler driver comptime evaluation\n")
@@ -662,11 +665,11 @@ pub fn ProjectInfo.package_version(self: &Self) -> &str:
 pub fn ProjectInfo.project_root(self: &Self) -> &str:
     self.root
 
-pub fn Diagnostics.warn(self: &Self, message: &str) -> Unit:
+pub fn Diagnostics.warn(self: &Self, message: &str):
     tool_capability_require(self.token, "Diagnostics")
     with_eprint("warning: " ++ message ++ "\n")
 
-pub fn Diagnostics.error(self: &Self, message: str) -> Unit:
+pub fn Diagnostics.error(self: &Self, message: str):
     tool_capability_require(self.token, "Diagnostics")
     with_eprint("error: " ++ message ++ "\n")
     exit(1)
@@ -2497,17 +2500,14 @@ fn build_download_action(ctx: ActionCtx) -> i32:
     let output_path = ctx.output()
     if args.len() < 2 or output_path.len() == 0:
         ctx.diagnostics().error(ctx.target_name() ++ ": download requires url, sha256, and output")
-        return 1
     let url = args.get(0)
     let sha256 = args.get(1)
     let output_dir = build_path_dirname(output_path)
     if fs.mkdir_all(output_dir) != 0:
         ctx.diagnostics().error(ctx.target_name() ++ ": could not create directory: " ++ output_dir)
-        return 1
     let cmd_dir = "out/command/" ++ ctx.target_name()
     if fs.mkdir_all(cmd_dir) != 0:
         ctx.diagnostics().error(ctx.target_name() ++ ": could not create command directory: " ++ cmd_dir)
-        return 1
     let tmp_path = output_path ++ ".download.tmp"
     let helper = cmd_dir ++ "/https_fetch" ++ build_host_exe_suffix()
     let ws = ctx.create_workspace(ctx.target_name() ++ "-https_fetch")
@@ -2519,7 +2519,6 @@ fn build_download_action(ctx: ActionCtx) -> i32:
     let compile_result = ws.compile()
     if compile_result.status != BuildStatus.ok or compile_result.rc != 0:
         ctx.diagnostics().error(ctx.target_name() ++ ": failed to compile https_fetch helper")
-        return 1
     let fetch_args: Vec[str] = Vec.new()
     fetch_args.push(helper)
     fetch_args.push(with_str_clone_ref(url))
@@ -2532,21 +2531,17 @@ fn build_download_action(ctx: ActionCtx) -> i32:
         else if result.stdout.len() > 0:
             detail = ": " ++ result.stdout
         ctx.diagnostics().error(ctx.target_name() ++ ": HTTPS download failed for " ++ url ++ " (rc=" ++ f"{result.rc}" ++ ")" ++ detail)
-        return 1
     if sha256.len() > 0:
         let actual = fs.sha256_file(tmp_path)
         if actual.len() == 0:
             ctx.diagnostics().error(ctx.target_name() ++ ": could not hash downloaded file")
-            return 1
         if actual != sha256:
-            ctx.diagnostics().error(ctx.target_name() ++ ": sha256 mismatch: expected " ++ sha256 ++ " got " ++ actual)
             let _ = fs.remove_file(tmp_path)
-            return 1
+            ctx.diagnostics().error(ctx.target_name() ++ ": sha256 mismatch: expected " ++ sha256 ++ " got " ++ actual)
     else:
         ctx.diagnostics().warn(ctx.target_name() ++ ": no sha256 checksum specified for download")
     if fs.rename(tmp_path, output_path) != 0:
         ctx.diagnostics().error(ctx.target_name() ++ ": could not publish: " ++ output_path)
-        return 1
     0
 
 fn build_extract_tar_gz_action(ctx: ActionCtx) -> i32:
@@ -2556,15 +2551,12 @@ fn build_extract_tar_gz_action(ctx: ActionCtx) -> i32:
     let output_dir = ctx.output()
     if inputs.len() == 0 or output_dir.len() == 0:
         ctx.diagnostics().error(ctx.target_name() ++ ": extract requires archive input and output dir")
-        return 1
     let archive = inputs.get(0)
     if fs.mkdir_all(output_dir) != 0:
         ctx.diagnostics().error(ctx.target_name() ++ ": could not create output directory: " ++ output_dir)
-        return 1
     let cmd_dir = "out/command/" ++ ctx.target_name()
     if fs.mkdir_all(cmd_dir) != 0:
         ctx.diagnostics().error(ctx.target_name() ++ ": could not create command directory: " ++ cmd_dir)
-        return 1
     let helper = cmd_dir ++ "/zlib_gunzip" ++ build_host_exe_suffix()
     let ws = ctx.create_workspace(ctx.target_name() ++ "-zlib_gunzip")
     ws.add_string(cmd_dir ++ "/zlib_gunzip.w", build_zlib_gunzip_source())
@@ -2575,7 +2567,6 @@ fn build_extract_tar_gz_action(ctx: ActionCtx) -> i32:
     let compile_result = ws.compile()
     if compile_result.status != BuildStatus.ok or compile_result.rc != 0:
         ctx.diagnostics().error(ctx.target_name() ++ ": failed to compile zlib_gunzip helper")
-        return 1
     let tar_path = cmd_dir ++ "/archive.tar"
     let gunzip_args: Vec[str] = Vec.new()
     gunzip_args.push(helper)
@@ -2589,10 +2580,8 @@ fn build_extract_tar_gz_action(ctx: ActionCtx) -> i32:
         else if result.stdout.len() > 0:
             detail = ": " ++ result.stdout
         ctx.diagnostics().error(ctx.target_name() ++ ": gzip decompression failed for " ++ archive ++ " (rc=" ++ f"{result.rc}" ++ ")" ++ detail)
-        return 1
     if fs.extract_tar(tar_path, output_dir) != 0:
         ctx.diagnostics().error(ctx.target_name() ++ ": tar extraction failed for " ++ tar_path)
-        return 1
     0
 
 pub fn Target.target(move self: Self, target: BuildTarget) -> Target:
@@ -3201,7 +3190,7 @@ pub fn Build.__driver_run_action(self: &Self, ctx: BuildCtx, action_name: &str) 
 pub fn __driver_action_name() -> str:
     with_getenv_str("WITH_BUILD_ACTION_NAME")
 
-pub fn __driver_exit(code: i32) -> Unit:
+pub fn __driver_exit(code: i32):
     exit(code)
 
 pub fn Build.emit_graph(self: &Self) -> str:

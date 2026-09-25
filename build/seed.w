@@ -32,7 +32,6 @@ fn seed_abs(root: &str, path: &str) -> str:
 
 fn seed_fail(ctx: &ActionCtx, message: &str) -> i32:
     ctx.diagnostics().error(ctx.target_name() ++ ": " ++ message)
-    1
 
 fn seed_split_nonempty_lines(text: &str) -> Vec[str]:
     let lines: Vec[str] = Vec.new()
@@ -233,9 +232,7 @@ pub fn run_seed_download_action(ctx: ActionCtx) -> i32:
     if tag.len() == 0:
         tag = seed_release_from_api(ctx, repo, asset_name)
         if tag.len() == 0:
-            ctx.diagnostics().error("seed: could not find a release containing asset '" ++ asset_name ++ "'")
-            ctx.diagnostics().error("set SEED_VERSION to a release tag to download a specific seed")
-            return 1
+            ctx.diagnostics().error("seed: could not find a release containing asset '" ++ asset_name ++ "'\nset SEED_VERSION to a release tag to download a specific seed")
         print("latest seed release: " ++ tag)
     let url = "https://github.com/" ++ repo ++ "/releases/download/" ++ tag ++ "/" ++ asset_name
     let output_dir = seed_dirname(output_path)
@@ -288,9 +285,7 @@ pub fn run_deps_download_action(ctx: ActionCtx) -> i32:
     if tag.len() == 0:
         tag = seed_release_from_api(ctx, repo, asset_name)
         if tag.len() == 0:
-            ctx.diagnostics().error("deps: could not find a release containing asset '" ++ asset_name ++ "'")
-            ctx.diagnostics().error("set WITH_LLVM_SDK_VERSION to a release tag, or build it from source: tools/build-static-llvm.sh")
-            return 1
+            ctx.diagnostics().error("deps: could not find a release containing asset '" ++ asset_name ++ "'\nset WITH_LLVM_SDK_VERSION to a release tag, or build it from source: tools/build-static-llvm.sh")
         print("latest SDK release: " ++ tag)
 
     let url = "https://github.com/" ++ repo ++ "/releases/download/" ++ tag ++ "/" ++ asset_name
