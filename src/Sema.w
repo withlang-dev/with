@@ -460,6 +460,7 @@ type ForeignContract {
     of_resource: i32,
     rename: i32,
     callback_thread_any: i32,
+    callbacks_none: i32,             // clause node; 0 means conservatively reentrant
     callback_consumes: Vec[i32],
     callback_userdata_cb: Vec[i32],    // `callback param N userdata param M`: the callback parameter N …
     callback_userdata_of: Vec[i32],    // … and the userdata parameter M it receives (parallel)
@@ -478,12 +479,26 @@ type ForeignContract {
     variadic_case_values: Vec[i64],    // … that constant's value (parallel) …
     variadic_case_tids: Vec[i32],      // … the presented type of the variadic argument (parallel) …
     variadic_case_kinds: Vec[i32],     // … and its kind: FACADE_VARIADIC_SCALAR or FACADE_VARIADIC_STR (parallel)
+    variadic_slots: Vec[ForeignVariadicSlot], // resolved retained cases; no downstream AST interpretation
     returns_borrow_record: i32,        // D66 §16.2b.6: `returns borrow T from …` for an imported record T (the type's symbol), or 0
 }
 
 // D66 §16.2b.5: what a variadic case's argument is.
 const FACADE_VARIADIC_SCALAR: i32 = 1   // a scalar C type: passed as that type
 const FACADE_VARIADIC_STR: i32 = 2      // `str`: a copied input string (§16.3c), passed as a call-scoped C string
+const FACADE_VARIADIC_CALLBACK: i32 = 3
+const FACADE_VARIADIC_RETAINED: i32 = 4
+
+type ForeignVariadicSlot {
+    case_index: i32,
+    clause: i32,
+    resource: i32,
+    retainer_param: i32,
+    callback_type: i32,       // resolved C callable type, or 0 for retained data
+    callback_userdata: i32,   // argument within that callable, or -1
+    userdata_selector: i32,   // imported selector symbol, or 0
+    userdata_value: i64,
+}
 
 // A callback method a facade rendered on a resource (stage 9, ruling
 // §44-§51; FacadeRender.w facade_render_callback_methods), keyed by the

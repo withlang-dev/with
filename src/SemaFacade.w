@@ -854,7 +854,7 @@ impl Sema:
                 return
             self.emit_error(f"fn '{fname}' is described by two facade blocks with different clauses; one function has one contract — restate it word for word or describe it once (§16.2b)", item)
             return
-        var c = ForeignContract { fn_sym, decl, facade, node: item, lend: 0, destroys: 0, consumes: Vec.new(), consumes_destroyed_by: Vec.new(), retains: Vec.new(), retains_by: Vec.new(), returns_borrow_resource: 0, returns_borrow_from: -1, returns_borrow_domain: 0, returns_static_tid: 0, preserves_params: Vec.new(), preserves_domains: Vec.new(), of_resource: 0, rename: 0, callback_thread_any: 0, callback_consumes: Vec.new(), callback_userdata_cb: Vec.new(), callback_userdata_of: Vec.new(), valid_on_failed: 0, nullable_params: Vec.new(), buffer_ptr: Vec.new(), buffer_len: Vec.new(), buffer_inout: Vec.new(), buffer_elements: Vec.new(), fixed_params: Vec.new(), fixed_literals: Vec.new(), ok_const: 0, variadic_node: 0, variadic_selector: -1, variadic_case_syms: Vec.new(), variadic_case_values: Vec.new(), variadic_case_tids: Vec.new(), variadic_case_kinds: Vec.new(), returns_borrow_record: 0 }
+        var c = ForeignContract { fn_sym, decl, facade, node: item, lend: 0, destroys: 0, consumes: Vec.new(), consumes_destroyed_by: Vec.new(), retains: Vec.new(), retains_by: Vec.new(), returns_borrow_resource: 0, returns_borrow_from: -1, returns_borrow_domain: 0, returns_static_tid: 0, preserves_params: Vec.new(), preserves_domains: Vec.new(), of_resource: 0, rename: 0, callback_thread_any: 0, callbacks_none: 0, callback_consumes: Vec.new(), callback_userdata_cb: Vec.new(), callback_userdata_of: Vec.new(), valid_on_failed: 0, nullable_params: Vec.new(), buffer_ptr: Vec.new(), buffer_len: Vec.new(), buffer_inout: Vec.new(), buffer_elements: Vec.new(), fixed_params: Vec.new(), fixed_literals: Vec.new(), ok_const: 0, variadic_node: 0, variadic_selector: -1, variadic_case_syms: Vec.new(), variadic_case_values: Vec.new(), variadic_case_tids: Vec.new(), variadic_case_kinds: Vec.new(), variadic_slots: Vec.new(), returns_borrow_record: 0 }
         let extra_start = self.ast.get_data1(item)
         let clause_count = self.ast.get_data2(item)
         for ci in 0..clause_count:
@@ -870,6 +870,9 @@ impl Sema:
         let ops = self.ast.get_data1(clause)
         if kind == FACADE_CLAUSE_LEND:
             c.lend = 1
+            return c
+        if kind == FACADE_CLAUSE_CALLBACKS_NONE:
+            c.callbacks_none = clause
             return c
         if kind == FACADE_CLAUSE_DESTROYS:
             if self.sig_get_param_count(sig) == 0:
@@ -1315,7 +1318,14 @@ impl Sema:
                     return c
                 let rt = self.resolve_alias(tid as TypeId)
                 var ckind = 0
-                if rt == self.ty_str: ckind = FACADE_VARIADIC_STR
+                let callback_ref = self.ast.get_extra(cops + 2)
+                let retainer_ref = self.ast.get_extra(cops + 4)
+                if callback_ref != 0 or retainer_ref != 0:
+                    let slot = self.facade_resolve_variadic_slot(fn_sym, sig, case_node, tid, k)
+                    if slot.resource < 0: return c
+                    c.variadic_slots.push(slot)
+                    ckind = if callback_ref != 0: FACADE_VARIADIC_CALLBACK else: FACADE_VARIADIC_RETAINED
+                else if rt == self.ty_str: ckind = FACADE_VARIADIC_STR
                 else if self.get_type_kind(self.numeric_operand_type(rt as i32)) == TypeKind.TY_INT: ckind = FACADE_VARIADIC_SCALAR
                 if ckind == 0:
                     let tn: str = self.type_name(tid)
@@ -1328,6 +1338,10 @@ impl Sema:
                 c.variadic_case_kinds.push(ckind)
             c.variadic_node = clause
             c.variadic_selector = p
+            // These resolved contracts must not become a safe callable
+            // surface until MIR enforces their state and lifetime demands.
+            if c.variadic_slots.len() > 0:
+                self.emit_error("this variadic case requires resource-held callback/retention state; its state and cleanup proof is not implemented yet (#1652)", c.variadic_slots[0].clause)
             return c
         if kind == FACADE_CLAUSE_OK:
             // `ok CONST` on an fn item (D64, §16.2b.8): the status contract
@@ -1567,6 +1581,64 @@ impl Sema:
         false
 
     // ── discriminated variadic contracts (D66, spec §16.2b.5) ──────────────
+
+    // Resolve the trusted declaration once, before any presented call is
+    // checked. A case name cannot supply a callback ABI or retaining owner.
+    mut fn facade_resolve_variadic_slot(fn_sym: i32, sig: i32, node: i32, tid: i32, case_index: i32) -> ForeignVariadicSlot:
+        var result = ForeignVariadicSlot { case_index, clause: node, resource: -1, retainer_param: -1, callback_type: 0, callback_userdata: -1, userdata_selector: 0, userdata_value: 0 }
+        let ops = self.ast.get_data1(node)
+        let callback_ref = self.ast.get_extra(ops + 2)
+        let retainer_ref = self.ast.get_extra(ops + 4)
+        let owner = if retainer_ref == 0: 0 else: self.facade_resolve_param(retainer_ref, fn_sym, sig)
+        if owner < 0: return result
+        if callback_ref != 0:
+            if self.facade_ref_index_only(callback_ref) != self.sig_get_param_count(sig):
+                self.emit_error("a variadic callback names the variadic argument position, not a fixed parameter (§16.2b.5)", node)
+                return result
+            let callable = self.callable_type_resolved(tid)
+            if callable == 0 or self.get_type_kind(callable) != TypeKind.TY_EXTERN_FN:
+                self.emit_error("a variadic callback's explicit 'as' type must be a C function pointer (§16.2b.5)", node)
+                return result
+            var slots = 0
+            for pi in 0..self.get_type_d1(callable):
+                if self.facade_type_is_void_ptr(self.type_extra[self.get_type_d0(callable) + pi]):
+                    slots = slots + 1
+                    result.callback_userdata = pi
+            if slots != 1:
+                self.emit_error("a variadic callback's C signature must have exactly one 'void *' userdata parameter (§16.2b.9)", node)
+                return result
+            let paired_ref = self.ast.get_extra(ops + 3)
+            if self.ast.get_data0(paired_ref) != FACADE_PARAM_REF_NAME:
+                self.emit_error("a variadic callback's userdata names an imported selector constant, not a parameter index (§16.2b.5)", node)
+                return result
+            let paired_sym = self.ast.get_data1(paired_ref)
+            let paired_decl = self.facade_const_decl(paired_sym)
+            if paired_decl == 0:
+                self.emit_error("a variadic callback's userdata selector names no imported integer constant (§16.2b.5)", node)
+                return result
+            let paired_tid = self.facade_const_decl_type(paired_decl)
+            if paired_tid == 0 or self.get_type_kind(self.numeric_operand_type(self.resolve_alias(paired_tid))) != TypeKind.TY_INT:
+                self.emit_error("a variadic callback's userdata selector must be an imported integer constant (§16.2b.5)", node)
+                return result
+            result.callback_type = callable
+            result.userdata_selector = paired_sym
+            result.userdata_value = self.facade_const_int_value(self.ast.get_data1(paired_decl))
+            let selector_decl = self.facade_const_decl(self.ast.get_extra(ops))
+            if result.userdata_value == self.facade_const_int_value(self.ast.get_data1(selector_decl)):
+                self.emit_error("a variadic callback and its userdata need distinct selector values (§16.2b.5)", node)
+                return result
+        else:
+            let resolved = self.resolve_alias(tid)
+            if resolved != self.ty_str and self.get_type_kind(resolved) != TypeKind.TY_PTR:
+                self.emit_error("a retained variadic case describes pointer storage, not a scalar value (§16.2b.5)", node)
+                return result
+        let resources = self.facade_param_receives(fn_sym, owner)
+        if resources.len() != 1:
+            self.emit_error("a retained variadic case needs one modeled resource for its retaining parameter (§16.2b.5)", node)
+            return result
+        result.retainer_param = owner
+        result.resource = resources[0]
+        result
     //
     // A `param N` reference's index, or -1 for a reference by name or type:
     // the variadic position has no name to resolve against the signature.
@@ -1830,6 +1902,7 @@ fn facade_clause_name(kind: i32) -> str:
     if kind == FACADE_CLAUSE_RENAME: return "rename"
     if kind == FACADE_CLAUSE_THREAD: return "thread"
     if kind == FACADE_CLAUSE_CALLBACK_THREAD: return "callback_thread"
+    if kind == FACADE_CLAUSE_CALLBACKS_NONE: return "callbacks none"
     if kind == FACADE_CLAUSE_CALLBACK_USERDATA: return "callback … userdata"
     if kind == FACADE_CLAUSE_VALID_ON_FAILED: return "valid on failed"
     if kind == FACADE_CLAUSE_NULLABLE: return "nullable"

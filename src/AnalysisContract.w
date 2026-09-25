@@ -323,6 +323,10 @@ fn contract_collect_fn(report: &AnalysisReport, sema: &Sema, ci: i32, source_pat
         for pi in 0..r.producers.len() as i32:
             if sema.facade_same_fn(r.producers[pi], c.fn_sym): contract_row(report, sema, &site, subject, CONTRACT_FN, r.node, r.name, owner, -1, "role", f"producer of {rname}", contract_item_at(sema, &site, "resource", r.node))
         if sema.facade_same_fn(r.init, c.fn_sym): contract_row(report, sema, &site, subject, CONTRACT_FN, r.node, r.name, owner, 0, "role", f"in-place initializer of {rname}", contract_item_at(sema, &site, "resource", r.node))
+    if c.callbacks_none != 0:
+        contract_row(report, sema, &site, subject, CONTRACT_FN, c.callbacks_none, c.fn_sym, owner, -1, "callbacks", "none: trusted foreign-library guarantee", contract_clause_at(sema, &site, c.callbacks_none))
+    else:
+        contract_row(report, sema, &site, subject, CONTRACT_FN, node, c.fn_sym, owner, -1, "callbacks", "may invoke applicable callbacks", "default:conservatively reentrant (§16.2b.9)")
     // Parameter effects (§16.2b.5): the strongest clause naming each
     // parameter, else the described-fn lend.
     let lend_clause = contract_clause(sema, node, FACADE_CLAUSE_LEND, 0)

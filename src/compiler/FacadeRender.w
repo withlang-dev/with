@@ -713,7 +713,7 @@ fn facade_render_lend_item(pool: AstPool, intern: InternPool, ci: &Vec[i32], ite
         // copied-back length (D64) describe the lend's presented call
         // (facade_render_bridge); they make nothing stronger than a lend.
         else if kind == FACADE_CLAUSE_BUFFER or kind == FACADE_CLAUSE_FIXED or kind == FACADE_CLAUSE_OK: li.bridged = true
-        else if kind != FACADE_CLAUSE_LEND and kind != FACADE_CLAUSE_PRESERVES: li.lends = false
+        else if kind != FACADE_CLAUSE_LEND and kind != FACADE_CLAUSE_PRESERVES and kind != FACADE_CLAUSE_CALLBACKS_NONE: li.lends = false
     if not li.lends:
         return li
     let cname: str = intern.resolve(pool.get_data0(item as NodeId))
@@ -1803,6 +1803,10 @@ fn facade_render_variadic_cases(pool: AstPool, intern: InternPool, decl: i32, cl
     for k in 0..case_count:
         let case_node = pool.get_extra(cops + 2 + k)
         let ops = pool.get_data1(case_node as NodeId)
+        // Sema reports the missing state/lifetime proof. Do not render a
+        // callback or retained case as an ordinary copied value meanwhile.
+        if pool.get_extra(ops + 2) != 0 or pool.get_extra(ops + 4) != 0:
+            continue
         let sel: str = intern.resolve(pool.get_extra(ops))
         let ty = render_type_expr(pool, intern, pool.get_extra(ops + 1) as NodeId)
         let bridge = facade_render_bridge(pool, intern, decl, skip, -1, "")
@@ -2035,7 +2039,7 @@ fn facade_render_callback_item(pool: AstPool, intern: InternPool, ci: &Vec[i32],
         else if kind == FACADE_CLAUSE_RENAME: cbi.rename = pool.get_extra(ops)
         // A fixed argument (D64) leaves the presented signature; the
         // parameter loop below passes its literal (facade_render_fixed_literal).
-        else if kind == FACADE_CLAUSE_LEND or kind == FACADE_CLAUSE_PRESERVES or kind == FACADE_CLAUSE_FIXED or kind == FACADE_CLAUSE_BUFFER or kind == FACADE_CLAUSE_OK: continue
+        else if kind == FACADE_CLAUSE_LEND or kind == FACADE_CLAUSE_PRESERVES or kind == FACADE_CLAUSE_FIXED or kind == FACADE_CLAUSE_BUFFER or kind == FACADE_CLAUSE_OK or kind == FACADE_CLAUSE_CALLBACKS_NONE: continue
         else if kind == FACADE_CLAUSE_NULLABLE:
             // Rendered for the paired callback alone (Sema refuses the
             // rest, verify_facade_callback_items).
