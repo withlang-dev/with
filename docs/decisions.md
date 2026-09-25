@@ -26,6 +26,10 @@ The reference is C's general-conversion rule, including its rounding-dependent
 notation choice: [WG14 DR 233](https://open-std.org/JTC1/SC22/WG14/issues/c99/issue0233.html).
 Tests compare against the host C formatter as well as fixed boundary cases.
 
+Credit: the correctly rounded literal parsing and the exact `:e` digits came
+from Josh Hickson's #1649, which landed on main through #1683's squash
+(a5c6f430) without his authorship; `docs/float-c-format-audit.md` records it.
+
 ---
 
 ## D67 — `with uat`: acceptance scenarios are a toolchain feature every project has; `with init` scaffolds one
