@@ -232,7 +232,11 @@ pub fn codegen_units_emit_generated_all(unit_bc_paths: &Vec[str], obj_path: &str
     while ri < unit_count:
         if jobs[ri].rc != 0 and unit_rc == 0:
             unit_rc = jobs[ri].rc
-        let _ = with_fs_remove_file(unit_bc_paths[ri])
+        // WITH_KEEP_BITCODE=1 leaves each unit's `<obj>.u<k>.gen.bc` beside
+        // the object: `llvm-dis` on it is the only way to read the attributes
+        // and metadata codegen attached, which no disassembly shows.
+        if with_getenv_str("WITH_KEEP_BITCODE").len() == 0:
+            let _ = with_fs_remove_file(unit_bc_paths[ri])
         ri = ri + 1
     if unit_rc != 0:
         runtime_eprint(f"error: codegen-units generated emit failed with exit code {unit_rc}")

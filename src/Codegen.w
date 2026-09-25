@@ -4969,6 +4969,8 @@ impl Codegen:
             wl_add_sret_attr(self.context, function, 0, sret_ty)
         self.apply_c_abi_byval_attrs(function, byval_types, param_count, if has_sret != 0: 1 else: 0)
         self.apply_noalias_param_attrs_with_offset(function, param_start, param_count, if has_sret != 0: 1 else: 0)
+        if not uses_c_abi and is_variadic == 0:
+            self.apply_capture_param_attrs(function, name_sym, sema_sig_idx, param_count, if has_sret != 0: 1 else: 0)
 
         // Whole-program codegen internalizes non-prelude functions because imported
         // modules are duplicated into the current AST. In module-object mode we must
@@ -5286,6 +5288,8 @@ impl Codegen:
         self.with_fn_link_names.insert(self.intern.intern(effective_name), 1)
         if has_sret != 0:
             wl_add_sret_attr(self.context, function, 0, sret_ty)
+        if self.sema.sig_is_variadic(sig_idx) == 0:
+            self.apply_capture_param_attrs(function, fn_sym, sig_idx, param_count, has_sret)
         self.bind_fn_abi(cg_sym, abi_index, function)
         if cg_sym != fn_sym: self.bind_fn_abi(fn_sym, abi_index, function)
         if force_internal != 0:
@@ -5475,6 +5479,48 @@ impl Codegen:
             let flags = self.pool.fn_param_flags(param_start, pi)
             if fn_param_is_noalias(flags) != 0:
                 wl_add_param_attr(self.context, function, actual_idx, "noalias")
+
+    // A With reference is second-class (§3.8, §5): a `&T` parameter cannot be
+    // stored in a field, a global, an escaping closure, or a channel, so the
+    // callee never retains its address. LLVM learns that as `captures(none)`
+    // and can then prove a caller's stack value is not reachable through any
+    // loaded pointer: a Vec header stays in registers across a loop that
+    // stores through the Vec's buffer (bench nbody ran 3x slower than C
+    // reloading and re-checking the header after every store). Three shapes
+    // still let the reference outlive the call and get no attribute: a
+    // returned ephemeral value may be the parameter itself; an ephemeral
+    // in-place parameter (`mut self` on an ephemeral struct) may take the
+    // reference into a field; and an async body's fiber frame holds its
+    // parameters after the call returns its Task.
+    // An in-place receiver or parameter (`mut self`, the value-ref ABI) and
+    // the indirect return slot are the same case: compiler-modeled borrowed
+    // places the callee writes through and cannot name past the call.
+    fn apply_capture_param_attrs(function: i64, fn_sym: i32, sig_idx: i32, param_count: i32, param_offset: i32):
+        if function == 0 or sig_idx < 0 or param_count < 0:
+            return
+        if self.sema.task_fns.contains(fn_sym):
+            return
+        if self.sema.type_is_ephemeral_value(self.sema.sig_return_type(sig_idx)) != 0:
+            return
+        for pi in 0..param_count:
+            if not self.sig_param_is_explicit_ref(sig_idx, pi) and self.sema.type_is_ephemeral_value(self.sema.sig_param_type(sig_idx, pi)) != 0:
+                return
+        let fn_type = wl_global_get_value_type(function)
+        if fn_type == 0 or wl_count_param_types(fn_type) < 0:
+            return
+        let llvm_param_count = wl_count_param_types(fn_type)
+        if param_offset == 1 and llvm_param_count > 0:
+            wl_add_param_attr(self.context, function, 0, "captures")
+        for pi in 0..param_count:
+            let actual_idx = pi + param_offset
+            if actual_idx < 0 or actual_idx >= llvm_param_count:
+                continue
+            if not self.sig_param_is_explicit_ref(sig_idx, pi) and self.sema.sig_param_uses_value_ref_abi(sig_idx, pi) == 0:
+                continue
+            let param_ty = wl_get_fn_param_type(fn_type, actual_idx)
+            if param_ty == 0 or wl_get_type_kind(param_ty) != wl_pointer_type_kind():
+                continue
+            wl_add_param_attr(self.context, function, actual_idx, "captures")
 
     mut fn record_dyn_param(fn_sym: i32, idx: i32, count: i32, trait_sym: i32):
         if not self.fn_dyn_param_starts.get(fn_sym).is_some():
@@ -6505,6 +6551,8 @@ impl Codegen:
             let meta = self.pool.find_fn_meta(fn_node)
             if meta >= 0:
                 self.apply_noalias_param_attrs_with_offset(function, self.pool.fn_meta_param_start(meta), param_count, if has_sret != 0: 1 else: 0)
+        if not is_async:
+            self.apply_capture_param_attrs(function, sema_sym, sig_idx, param_count, if has_sret != 0: 1 else: 0)
         self.fn_values.insert(mono_sym, function)
         self.fn_fn_types.insert(mono_sym, fn_type)
         if is_async:

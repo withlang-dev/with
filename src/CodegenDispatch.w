@@ -4096,7 +4096,9 @@ impl Codegen:
         params.push(wl_ptr_type(self.context))
         params.push(wl_i64_type(self.context))
         let fn_ty = wl_function_type(wl_void_type(self.context), vec_data_i64(&params), 3, 0)
-        wl_add_function(self.llmod, "with_vec_free_drop_origin", fn_ty)
+        let function = wl_add_function(self.llmod, "with_vec_free_drop_origin", fn_ty)
+        wl_add_param_attr(self.context, function, 0, "captures")
+        function
 
     fn mir_emit_with_free_ptr(ptr: i64):
         if ptr == 0:
@@ -4152,17 +4154,8 @@ impl Codegen:
             // callee through a share-place pointer, invisible to this analysis.
             self.mir_call_drop(ptr, ty, drop_fn_val, drop_fn_ty)
             return
-        let i64_ty = wl_i64_type(self.context)
         let i32_ty = wl_i32_type(self.context)
-        let ptr_ty = wl_ptr_type(self.context)
-        let sz = wl_abi_size_of(wl_get_module_data_layout(self.llmod), ty)
-        let zparams: Vec[i64] = Vec.new()
-        zparams.push(ptr_ty)
-        zparams.push(i64_ty)
-        let zargs: Vec[i64] = Vec.new()
-        zargs.push(ptr)
-        zargs.push(wl_const_int(i64_ty, sz, 0))
-        let isz = self.call_internal_runtime_fn("rt_value_is_zero", zparams, zargs, 2, i32_ty)
+        let isz = self.mir_value_is_zero_flag(ptr, ty)
         // rt_value_is_zero returns 1 when the value is the reset sentinel; run the
         // drop only when it is non-zero (isz == 0).
         let run_cond = wl_build_icmp(self.builder, wl_int_eq(), isz, wl_const_int(i32_ty, 0, 0))
@@ -4205,15 +4198,8 @@ impl Codegen:
         if not self.current_drop_needs_guard and self.member_drop_depth == 0:
             self.mir_call_concrete_drop(ptr, ty, concrete)
             return
-        let i64_ty = wl_i64_type(self.context)
         let i32_ty = wl_i32_type(self.context)
-        let zparams: Vec[i64] = Vec.new()
-        zparams.push(wl_ptr_type(self.context))
-        zparams.push(i64_ty)
-        let zargs: Vec[i64] = Vec.new()
-        zargs.push(ptr)
-        zargs.push(wl_const_int(i64_ty, wl_abi_size_of(wl_get_module_data_layout(self.llmod), ty), 0))
-        let is_zero = self.call_internal_runtime_fn("rt_value_is_zero", zparams, zargs, 2, i32_ty)
+        let is_zero = self.mir_value_is_zero_flag(ptr, ty)
         let run = wl_build_icmp(self.builder, wl_int_eq(), is_zero, wl_const_int(i32_ty, 0, 0))
         let run_bb = wl_append_bb(self.context, self.current_function, "drop.generic.live")
         let after_bb = wl_append_bb(self.context, self.current_function, "drop.generic.skip")
@@ -4296,6 +4282,13 @@ impl Codegen:
     mut fn mir_emit_drop_enum_ptr(ptr: i64, ty: i64, enum_sema_ty: i32) -> Unit:
         if ptr == 0 or ty == 0:
             return
+        // A pointer-shaped enum is the Option niche (get_or_create_option_type):
+        // the value is the Some payload's own pointer and null is None. The
+        // tag/payload walk below saw no struct here and returned, so an
+        // `Option[Box[T]]` freed neither the box nor its pointee (#1535).
+        if wl_get_type_kind(ty) == wl_pointer_type_kind():
+            self.mir_emit_drop_nullable_option_ptr(ptr, ty, enum_sema_ty)
+            return
         // Only payload-bearing enums are {tag, data} structs; payloadless enums are
         // bare integers with nothing to drop.
         if wl_get_type_kind(ty) != wl_struct_type_kind() or wl_count_struct_elem_types(ty) < 2:
@@ -4362,6 +4355,78 @@ impl Codegen:
         wl_position_at_end(self.builder, merge_bb)
         self.member_drop_depth = self.member_drop_depth - 1
 
+    // #1535: drop the payload of a nullable-pointer Option in place. The Some
+    // payload (a Box, or a reference that owns nothing) lives at the option's
+    // own address, so its drop reads the same slot; null is None and skips.
+    // A payload moved out was blanked to null by reset-on-move (§2.5.1), so
+    // the null test is also the moved-out guard.
+    mut fn mir_emit_drop_nullable_option_ptr(ptr: i64, ty: i64, enum_sema_ty: i32) -> Unit:
+        let variant_count = self.mir_enum_variant_count(enum_sema_ty)
+        var some_idx = -1
+        for vi in 0..variant_count:
+            if self.mir_enum_variant_payload_count(enum_sema_ty, vi) > 0:
+                some_idx = vi
+        if some_idx < 0:
+            return
+        let payload_sema = self.mir_enum_payload_sema_type(enum_sema_ty, some_idx, 0)
+        if payload_sema <= 0 or self.sema.type_needs_drop_frozen(payload_sema) == 0:
+            return
+        let payload_llvm = self.mir_sema_type_to_llvm(payload_sema)
+        if payload_llvm == 0:
+            return
+        let value = wl_build_load(self.builder, ty, ptr)
+        let live = wl_build_icmp(self.builder, wl_int_ne(), value, wl_const_null(ty))
+        let live_bb = wl_append_bb(self.context, self.current_function, "drop.option.live")
+        let done_bb = wl_append_bb(self.context, self.current_function, "drop.option.done")
+        wl_build_cond_br(self.builder, live, live_bb, done_bb)
+        wl_position_at_end(self.builder, live_bb)
+        // #697: payload drops are member drops — always sentinel-guarded.
+        self.member_drop_depth = self.member_drop_depth + 1
+        self.mir_emit_drop_ptr_for_sema_type(ptr, payload_llvm, payload_sema)
+        self.member_drop_depth = self.member_drop_depth - 1
+        wl_build_br(self.builder, done_bb)
+        wl_position_at_end(self.builder, done_bb)
+
+    // `len()` reads the header's second word ({ptr, len, cap, ...}, the layout
+    // get_or_create_vec_type declares and vec_get_len reads). Inline, the
+    // load folds into the caller's loop; the runtime call it replaced cost a
+    // call per `advance` step in the nbody benchmark and hid the header from
+    // LLVM's alias analysis.
+    fn mir_vec_len_inline(recv_ptr: i64) -> i64:
+        let i64_ty = wl_i64_type(self.context)
+        let indices: Vec[i64] = Vec.new()
+        indices.push(wl_const_int(i64_ty, 8, 0))
+        let len_ptr = wl_build_gep(self.builder, wl_i8_type(self.context), recv_ptr, vec_data_i64(&indices), 1)
+        wl_build_load(self.builder, i64_ty, len_ptr)
+
+    // The reset-on-move sentinel test (§2.5.1): 1 when every byte of the value
+    // at `ptr` is zero. A word-sized value compares inline; larger values
+    // keep the runtime's byte scan. Box and Option payloads are one word, and
+    // the drop of every tree node in the trees benchmark paid a call here.
+    mut fn mir_value_is_zero_flag(ptr: i64, ty: i64) -> i64:
+        let i64_ty = wl_i64_type(self.context)
+        let i32_ty = wl_i32_type(self.context)
+        let size = wl_abi_size_of(wl_get_module_data_layout(self.llmod), ty)
+        if size == 8 or size == 16:
+            let first = wl_build_load(self.builder, i64_ty, ptr)
+            var word = first
+            if size == 16:
+                let indices: Vec[i64] = Vec.new()
+                indices.push(wl_const_int(i64_ty, 8, 0))
+                let second_ptr = wl_build_gep(self.builder, wl_i8_type(self.context), ptr, vec_data_i64(&indices), 1)
+                let second = wl_build_load(self.builder, i64_ty, second_ptr)
+                word = wl_build_or(self.builder, first, second)
+            let zero = wl_build_icmp(self.builder, wl_int_eq(), word, wl_const_int(i64_ty, 0, 0))
+            return wl_build_zext(self.builder, zero, i32_ty)
+        let ptr_ty = wl_ptr_type(self.context)
+        let zparams: Vec[i64] = Vec.new()
+        zparams.push(ptr_ty)
+        zparams.push(i64_ty)
+        let zargs: Vec[i64] = Vec.new()
+        zargs.push(ptr)
+        zargs.push(wl_const_int(i64_ty, size, 0))
+        self.call_internal_runtime_fn("rt_value_is_zero", zparams, zargs, 2, i32_ty)
+
     // #606: recognize a std Vec[T] sema type (one type arg, base symbol == Vec),
     // using the MIR snapshot when available and falling back to live sema tables.
     fn mir_sema_type_is_std_vec(sema_ty: i32) -> bool:
@@ -4424,11 +4489,10 @@ impl Codegen:
             return
         let i64_ty = wl_i64_type(self.context)
         let ptr_ty = wl_ptr_type(self.context)
-        let len_fn = self.ensure_vec_runtime_fn("with_vec_len", i64_ty, 1)
-        let len_ty = self.get_vec_fn_type("with_vec_len", i64_ty, 1)
-        let len_args: Vec[i64] = Vec.new()
-        len_args.push(ptr)
-        let len_val = wl_build_call(self.builder, len_ty, len_fn, vec_data_i64(&len_args), 1)
+        // Length and buffer read inline: the header's address stays out of
+        // every call so the enclosing aggregate can be promoted.
+        let len_val = self.mir_vec_len_inline(ptr)
+        let buffer = wl_build_load(self.builder, ptr_ty, ptr)
         let zero = wl_const_int(i64_ty, 0, 0)
         let has_elems = wl_build_icmp(self.builder, wl_int_sgt(), len_val, zero)
         let entry_bb = wl_get_insert_block(self.builder)
@@ -4438,12 +4502,9 @@ impl Codegen:
 
         wl_position_at_end(self.builder, loop_bb)
         let idx_phi = wl_build_phi(self.builder, i64_ty)
-        let get_fn = self.ensure_vec_runtime_fn("with_vec_get_ptr", ptr_ty, 2)
-        let get_ty = self.get_vec_fn_type("with_vec_get_ptr", ptr_ty, 2)
-        let get_args: Vec[i64] = Vec.new()
-        get_args.push(ptr)
-        get_args.push(idx_phi)
-        let elem_ptr = wl_build_call(self.builder, get_ty, get_fn, vec_data_i64(&get_args), 2)
+        let elem_indices: Vec[i64] = Vec.new()
+        elem_indices.push(idx_phi)
+        let elem_ptr = wl_build_gep(self.builder, elem_ty, buffer, vec_data_i64(&elem_indices), 1)
         // #697: element drops are member drops — always sentinel-guarded (#605
         // blanks a moved-out slot; the guard is what makes that skip real).
         self.member_drop_depth = self.member_drop_depth + 1
@@ -4510,25 +4571,87 @@ impl Codegen:
         let _ = wl_build_call(self.builder, wl_global_get_value_type(free_fn), free_fn, vec_data_i64(&args), 1)
 
     // #606: free a Vec's heap buffer via the runtime helper.
+    // `push` inline: when len < cap, store the element at buffer[len] and
+    // bump len; otherwise the runtime grows and pushes. The common case is
+    // three loads, a compare, a store, and a store, with the buffer and the
+    // length visible to LLVM; the runtime call it replaced copied the element
+    // byte by byte and hid the header from every optimization (bench grow:
+    // 8x C on a push loop, and the reason nbody's length was never a
+    // constant).
+    mut fn mir_emit_vec_push(recv_ptr: i64, elem: i64, elem_ty: i64):
+        let i64_ty = wl_i64_type(self.context)
+        let ptr_ty = wl_ptr_type(self.context)
+        let void_ty = wl_void_type(self.context)
+        let elem_alloca = self.create_entry_alloca(elem_ty)
+        wl_build_store(self.builder, elem, elem_alloca)
+        let len_ptr = self.mir_vec_header_word_ptr(recv_ptr, 8)
+        let len = wl_build_load(self.builder, i64_ty, len_ptr)
+        let cap = wl_build_load(self.builder, i64_ty, self.mir_vec_header_word_ptr(recv_ptr, 16))
+        let fits = wl_build_icmp(self.builder, wl_int_slt(), len, cap)
+        let fast_bb = wl_append_bb(self.context, self.current_function, "vec.push.fast")
+        let slow_bb = wl_append_bb(self.context, self.current_function, "vec.push.slow")
+        let done_bb = wl_append_bb(self.context, self.current_function, "vec.push.done")
+        wl_build_cond_br(self.builder, fits, fast_bb, slow_bb)
+        wl_position_at_end(self.builder, fast_bb)
+        let buffer = wl_build_load(self.builder, ptr_ty, recv_ptr)
+        let indices: Vec[i64] = Vec.new()
+        indices.push(len)
+        let slot = wl_build_gep(self.builder, elem_ty, buffer, vec_data_i64(&indices), 1)
+        wl_build_store(self.builder, elem, slot)
+        wl_build_store(self.builder, wl_build_add(self.builder, len, wl_const_int(i64_ty, 1, 0)), len_ptr)
+        wl_build_br(self.builder, done_bb)
+        wl_position_at_end(self.builder, slow_bb)
+        let push_fn = self.ensure_vec_runtime_fn("with_vec_push", void_ty, 2)
+        let push_ty = self.get_vec_fn_type("with_vec_push", void_ty, 2)
+        let args: Vec[i64] = Vec.new()
+        args.push(recv_ptr)
+        args.push(elem_alloca)
+        let _ = wl_build_call(self.builder, push_ty, push_fn, vec_data_i64(&args), 2)
+        wl_build_br(self.builder, done_bb)
+        wl_position_at_end(self.builder, done_bb)
+
+    // The header word at `offset`, loaded inline ({ptr, len, cap, elem_size}).
+    fn mir_vec_header_word_ptr(ptr: i64, offset: i64) -> i64:
+        let indices: Vec[i64] = Vec.new()
+        indices.push(wl_const_int(wl_i64_type(self.context), offset, 0))
+        wl_build_gep(self.builder, wl_i8_type(self.context), ptr, vec_data_i64(&indices), 1)
+
+    // Free the buffer by value and blank the pointer word. The header's
+    // address never reaches a call, so an aggregate that holds the Vec stays
+    // promotable (see with_vec_free_buffer in the runtime).
     fn mir_emit_vec_free_ptr(ptr: i64) -> Unit:
         if ptr == 0:
             return
-        if self.mir_drop_origin_active():
-            let free_fn = self.ensure_with_vec_free_drop_origin_fn()
-            if free_fn == 0:
-                return
-            let args_tagged: Vec[i64] = Vec.new()
-            args_tagged.push(ptr)
-            args_tagged.push(self.current_drop_origin_ptr)
-            args_tagged.push(self.current_drop_origin_len)
-            let _tagged = wl_build_call(self.builder, wl_global_get_value_type(free_fn), free_fn, vec_data_i64(&args_tagged), 3)
-            return
+        let i64_ty = wl_i64_type(self.context)
+        let ptr_ty = wl_ptr_type(self.context)
         let void_ty = wl_void_type(self.context)
-        let free_fn = self.ensure_vec_runtime_fn("with_vec_free", void_ty, 1)
-        let free_ty = self.get_vec_fn_type("with_vec_free", void_ty, 1)
+        let buffer = wl_build_load(self.builder, ptr_ty, ptr)
+        let cap = wl_build_load(self.builder, i64_ty, self.mir_vec_header_word_ptr(ptr, 16))
+        let elem_size = wl_build_load(self.builder, i64_ty, self.mir_vec_header_word_ptr(ptr, 24))
+        let params: Vec[i64] = Vec.new()
+        params.push(ptr_ty)
+        params.push(i64_ty)
+        params.push(i64_ty)
         let args: Vec[i64] = Vec.new()
-        args.push(ptr)
-        let _ = wl_build_call(self.builder, free_ty, free_fn, vec_data_i64(&args), 1)
+        args.push(buffer)
+        args.push(cap)
+        args.push(elem_size)
+        var name = "with_vec_free_buffer"
+        if self.mir_drop_origin_active():
+            name = "with_vec_free_buffer_drop_origin"
+            params.push(ptr_ty)
+            params.push(i64_ty)
+            args.push(self.current_drop_origin_ptr)
+            args.push(self.current_drop_origin_len)
+        var free_fn = wl_get_named_function(self.llmod, name)
+        let free_ty = wl_function_type(void_ty, vec_data_i64(&params), params.len() as i32, 0)
+        if free_fn == 0:
+            free_fn = wl_add_function(self.llmod, name, free_ty)
+        let _ = wl_build_call(self.builder, free_ty, free_fn, vec_data_i64(&args), args.len() as i32)
+        // Blank the header as the runtime did: a freed Vec reads as empty.
+        wl_build_store(self.builder, wl_const_null(ptr_ty), ptr)
+        wl_build_store(self.builder, wl_const_int(i64_ty, 0, 0), self.mir_vec_header_word_ptr(ptr, 8))
+        wl_build_store(self.builder, wl_const_int(i64_ty, 0, 0), self.mir_vec_header_word_ptr(ptr, 16))
 
     // #691/D18 (§2.5.1, supersedes the A5 narrow form): drop a Vec value at
     // scope exit. Every Vec frees its buffer — ownership is a property of the
@@ -8260,14 +8383,7 @@ impl Codegen:
             let push_elem_ty = self.mir_vec_elem_type(body, push_recv_op)
             if push_elem_ty != 0 and wl_type_of(elem_raw) != push_elem_ty:
                 elem = self.coerce_value_to_type(elem_raw, push_elem_ty)
-            let elem_alloca = self.create_entry_alloca(wl_type_of(elem))
-            wl_build_store(self.builder, elem, elem_alloca)
-            let push_fn = self.ensure_vec_runtime_fn("with_vec_push", void_ty, 2)
-            let push_ty = self.get_vec_fn_type("with_vec_push", void_ty, 2)
-            let args: Vec[i64] = Vec.new()
-            args.push(recv_ptr)
-            args.push(elem_alloca)
-            let _ = wl_build_call(self.builder, push_ty, push_fn, vec_data_i64(&args), 2)
+            self.mir_emit_vec_push(recv_ptr, elem, wl_type_of(elem))
 
         else if intrinsic == MirIntrinsic.VEC_GET:
             let recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
@@ -8300,28 +8416,16 @@ impl Codegen:
 
         else if intrinsic == MirIntrinsic.VEC_LEN:
             let recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
-            let len_fn = self.ensure_vec_runtime_fn("with_vec_len", i64_ty, 1)
-            let len_ty = self.get_vec_fn_type("with_vec_len", i64_ty, 1)
-            let args: Vec[i64] = Vec.new()
-            args.push(recv_ptr)
-            result = wl_build_call(self.builder, len_ty, len_fn, vec_data_i64(&args), 1)
+            result = self.mir_vec_len_inline(recv_ptr)
 
         else if intrinsic == MirIntrinsic.VEC_IS_EMPTY:
             let recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
-            let len_fn = self.ensure_vec_runtime_fn("with_vec_len", i64_ty, 1)
-            let len_ty = self.get_vec_fn_type("with_vec_len", i64_ty, 1)
-            let args: Vec[i64] = Vec.new()
-            args.push(recv_ptr)
-            let raw_len = wl_build_call(self.builder, len_ty, len_fn, vec_data_i64(&args), 1)
+            let raw_len = self.mir_vec_len_inline(recv_ptr)
             result = wl_build_icmp(self.builder, wl_int_eq(), raw_len, wl_const_int(i64_ty, 0, 0))
 
         else if intrinsic == MirIntrinsic.VEC_LEN32 or intrinsic == MirIntrinsic.VEC_LEN64 or intrinsic == MirIntrinsic.VEC_ULEN32:
             let recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
-            let len_fn = self.ensure_vec_runtime_fn("with_vec_len", i64_ty, 1)
-            let len_ty = self.get_vec_fn_type("with_vec_len", i64_ty, 1)
-            let args: Vec[i64] = Vec.new()
-            args.push(recv_ptr)
-            let raw_len = wl_build_call(self.builder, len_ty, len_fn, vec_data_i64(&args), 1)
+            let raw_len = self.mir_vec_len_inline(recv_ptr)
             result = self.mir_convert_len_method_result(raw_len, intrinsic)
 
         else if intrinsic == MirIntrinsic.VEC_SET:
@@ -18614,7 +18718,14 @@ impl Codegen:
         let existing = wl_get_named_function(self.llmod, name)
         if existing != 0: return existing
         let fn_ty = self.get_vec_fn_type(name, ret_ty, param_count)
-        wl_add_function(self.llmod, name, fn_ty)
+        let function = wl_add_function(self.llmod, name, fn_ty)
+        // The runtime reads and rewrites the caller's Vec header through this
+        // pointer and never retains it. Told so (`captures(none)`), LLVM can
+        // prove a store through the buffer cannot alias the header, and keeps
+        // the header's length and data pointer in registers across a loop of
+        // `xs[i]` stores instead of reloading and re-checking them per store.
+        wl_add_param_attr(self.context, function, 0, "captures")
+        function
 
     fn get_vec_fn_type(name: &str, ret_ty: i64, param_count: i32) -> i64:
         let ptr_ty = wl_ptr_type(self.context)

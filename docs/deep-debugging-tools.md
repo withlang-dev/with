@@ -57,8 +57,15 @@ the routes.
    -s 8 -- <addr>`) is the other fast tool; lldb runs with ASLR off, so an
    address from one run is stable in the next. #1014 asks for the first
    free's site to be recorded by default so the plain report names both.
-6. **Read the function's IR or disassembly at the join block.** `--emit-llvm`
-   on the fixture, or `otool -tV bin | awk '/^_fn:/,/^_next:/'`. Two
+6. **Read the function's IR or disassembly at the join block.** `with ir
+   fixture.w` prints the module as codegen built it (stdout, before the
+   LLVM pipeline); `WITH_DUMP_LLIR_PRE=1` / `WITH_DUMP_LLIR_POST=1` on a
+   `with build` print it to stdout either side of the pipeline, which is
+   the only view of the attributes codegen attached (`captures(none)`,
+   `noalias`, `sret`) and of what the pipeline did with them; a
+   multi-unit build keeps each `<obj>.u<k>.gen.bc` under
+   `WITH_KEEP_BITCODE=1` for `llvm-dis`. Or
+   `otool -tV bin | awk '/^_fn:/,/^_next:/'`. (There is no `--emit-llvm`.) Two
    unconditional drop calls after a `switch` merge, with no drop-flag test,
    is the whole diagnosis for the #729 class.
 7. **Confirm with the drop-state view** (`--dump-drop-plan`,
@@ -88,6 +95,19 @@ gate (it must pass on the reduced repro before any build), `matrix` for the
 diverging layer, `lldb:<query>` for breakpoints from real facts, then lldb
 on the compiler branch. `--dump-abi` answers "is this parameter lowered
 consistently at caller and callee" — never infer that from MIR.
+
+### A hot loop reloads a struct's fields after every store
+
+The compiler's own optimized IR (`WITH_DUMP_LLIR_POST=1`) says why. Two
+causes so far, both diagnosed there and neither visible in disassembly: a
+runtime declaration or a `&T` parameter without `captures(none)`, so LLVM
+must assume a loaded pointer can alias the caller's stack value (bench
+nbody, 3x); and drop glue passing an aggregate's field address to a call,
+which keeps the aggregate in memory and, past ~100 explored uses, defeats
+LLVM's capture tracker outright (bench ecs, 1.8x). The test that separates
+"attribute missing" from "address taken" is `opt -O3` on the pre-pipeline
+module with `-capture-tracking-max-uses-to-explore=4096`: if the reloads
+vanish, the address is being taken; fix the glue, never the knob.
 
 ### The compiler crashes or aborts on an input
 

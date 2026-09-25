@@ -318,14 +318,28 @@ fn cstr_len(s: *const u8) -> i64:
 
 // ── Memory helpers ─────────────────────────────────────────────────
 
+// Non-overlapping copy, a word at a time then the tail bytes. The byte loop
+// it replaces was the cost of every Vec growth copy (bench grow).
 fn rt_memcpy(dst: *mut u8, src: *const u8, n: i64):
     var i: i64 = 0
+    while i + 8 <= n:
+        unsafe { *((dst as i64 + i) as *mut i64) = *((src as i64 + i) as *const i64) }
+        i = i + 8
     while i < n:
         unsafe { *((dst as i64 + i) as *mut u8) = src[i] }
         i = i + 1
 
+// Compare a word at a time while the words agree; the first differing word
+// falls to the byte loop for the ordered result. The byte loop it replaces
+// was the cost of every string key comparison (bench words).
 fn rt_memcmp(a: *const u8, b: *const u8, n: i64) -> i32:
     var i: i64 = 0
+    while i + 8 <= n:
+        let wa = unsafe *((a as i64 + i) as *const i64)
+        let wb = unsafe *((b as i64 + i) as *const i64)
+        if wa != wb:
+            break
+        i = i + 8
     while i < n:
         let ca = unsafe a[i]
         let cb = unsafe b[i]
@@ -422,6 +436,78 @@ var slab_remaining: i64 = 0
 var rt_slab_range_base: i64 = 0
 var rt_slab_range_cap: i64 = 0
 var rt_slab_range_count: i32 = 0
+// Page-keyed slab index: every 4 KiB page of every slab maps to its slab's
+// start, in an open-addressing table (key word, start word) of power-of-two
+// capacity, mmap-backed and rebuilt at half load. rt_payload_start_is_owned
+// finds a header's slab in O(1) instead of binary-searching the sorted range
+// table, which every allocation and free paid and which topped the trees
+// benchmark profile. mmap never returns an address inside a page another
+// mapping owns, so a page key names exactly one slab. The sorted range table
+// stays as the forensics and large-range record. Written under the
+// allocator lock like the range tables.
+let RT_OWNED_PAGE_SHIFT: i64 = 12
+let RT_OWNED_TABLE_MIN: i64 = 4096
+var rt_owned_base: i64 = 0
+var rt_owned_cap: i64 = 0
+var rt_owned_count: i64 = 0
+
+fn rt_owned_hash(key: i64, cap: i64) -> i64:
+    ((key *% 7046029254386353131) >> (17 as u32)) & (cap - 1)
+
+fn rt_owned_key_at(base: i64, i: i64) -> i64:
+    unsafe *((base + i * 16) as *const i64)
+
+fn rt_owned_start_at(base: i64, i: i64) -> i64:
+    unsafe *((base + i * 16 + 8) as *const i64)
+
+fn rt_owned_put(base: i64, cap: i64, key: i64, start: i64):
+    var i = rt_owned_hash(key, cap)
+    while rt_owned_key_at(base, i) != 0:
+        i = (i + 1) & (cap - 1)
+    unsafe *((base + i * 16) as *mut i64) = key
+    unsafe *((base + i * 16 + 8) as *mut i64) = start
+
+// Index every page of a slab. Grows the table first when the new pages
+// would push it past half load.
+fn rt_owned_record_slab(start: i64, size: i64):
+    let pages = size >> (RT_OWNED_PAGE_SHIFT as u32)
+    if (rt_owned_count + pages) * 2 > rt_owned_cap:
+        var new_cap = if rt_owned_cap == 0: RT_OWNED_TABLE_MIN else: rt_owned_cap * 2
+        while (rt_owned_count + pages) * 2 > new_cap:
+            new_cap = new_cap * 2
+        let new_base = rt_mmap((new_cap * 16) as u64) as i64
+        if new_base == 0:
+            rt_alloc_report_out_of_memory(new_cap * 16)
+        var i: i64 = 0
+        while i < rt_owned_cap:
+            let key = rt_owned_key_at(rt_owned_base, i)
+            if key != 0:
+                rt_owned_put(new_base, new_cap, key, rt_owned_start_at(rt_owned_base, i))
+            i = i + 1
+        if rt_owned_base != 0:
+            rt_munmap(rt_owned_base as *mut u8, (rt_owned_cap * 16) as u64)
+        rt_owned_base = new_base
+        rt_owned_cap = new_cap
+    var page: i64 = 0
+    while page < pages:
+        rt_owned_put(rt_owned_base, rt_owned_cap, (start >> (RT_OWNED_PAGE_SHIFT as u32)) + page, start)
+        page = page + 1
+    rt_owned_count = rt_owned_count + pages
+
+// The slab holding `header`, or 0.
+fn rt_owned_slab_start(header: i64) -> i64:
+    if rt_owned_cap == 0:
+        return 0
+    let key = header >> (RT_OWNED_PAGE_SHIFT as u32)
+    var i = rt_owned_hash(key, rt_owned_cap)
+    while true:
+        let found = rt_owned_key_at(rt_owned_base, i)
+        if found == 0:
+            return 0
+        if found == key:
+            return rt_owned_start_at(rt_owned_base, i)
+        i = (i + 1) & (rt_owned_cap - 1)
+    0
 
 var rt_large_range_base: i64 = 0
 var rt_large_range_cap: i64 = 0
@@ -467,6 +553,7 @@ fn rt_record_slab_range(start: i64, size: i64):
         i = i - 1
     rt_range_store(rt_slab_range_base, rt_slab_range_cap, i, start, start + size)
     rt_slab_range_count = rt_slab_range_count + 1
+    rt_owned_record_slab(start, size)
 
 fn rt_record_large_range(start: i64, size: i64):
     if rt_large_range_count as i64 >= rt_large_range_cap:
@@ -548,6 +635,16 @@ fn size_class_size(idx: i32) -> i64:
     if idx == 7: return 2048
     4096
 
+// Zero a payload whose size alloc_align_size rounded to a multiple of 16: two
+// word stores per 16 bytes. The byte loop it replaces was the top sample of
+// the trees benchmark's allocation path.
+fn rt_zero_aligned(ptr: i64, n: i64):
+    var i: i64 = 0
+    while i < n:
+        unsafe *((ptr + i) as *mut i64) = 0
+        unsafe *((ptr + i + 8) as *mut i64) = 0
+        i = i + 16
+
 fn alloc_align_size(size_arg: i64) -> i64:
     var size = size_arg
     if size <= 0:
@@ -598,21 +695,10 @@ fn rt_payload_start_is_owned(ptr: *const u8) -> i32:
     if payload < RT_ALLOC_HEADER_SIZE:
         return 0
     let header = payload - RT_ALLOC_HEADER_SIZE
-    // Binary-search the sorted slab ranges for the one with the largest start <=
-    // header (ranges are non-overlapping, so at most one can contain header).
-    var lo = 0
-    var hi = rt_slab_range_count - 1
-    var found = -1
-    while lo <= hi:
-        let mid = (lo + hi) / 2
-        if rt_range_start(rt_slab_range_base, mid) <= header:
-            found = mid
-            lo = mid + 1
-        else:
-            hi = mid - 1
-    if found >= 0:
-        let start = rt_range_start(rt_slab_range_base, found)
-        let end = rt_range_end(rt_slab_range_base, rt_slab_range_cap, found)
+    // The page index names the slab in O(1); every slab is RT_PAGE_SIZE.
+    let start = rt_owned_slab_start(header)
+    if start != 0:
+        let end = start + RT_PAGE_SIZE
         if header >= start and header + RT_ALLOC_HEADER_SIZE <= end:
             let size = unsafe *(header as *const i64)
             if size <= 0 or size > RT_LARGE_THRESHOLD:
@@ -1345,7 +1431,7 @@ fn rt_alloc_unlocked(size_arg: i64) -> *mut u8:
         set_freelist(idx, next)
         alloc_store_small_header(head, cls_size)
         let ptr = small_block_ptr(head)
-        rt_memset(ptr, 0, if alloc_zero_class_on() != 0: cls_size else: size)
+        rt_zero_aligned(ptr as i64, if alloc_zero_class_on() != 0: cls_size else: size)
         return ptr
 
     // Carve from slab
@@ -1376,7 +1462,11 @@ fn rt_alloc_with_origin(size_arg: i64, origin: i64):
     // read them while the lock is still held — checked after unlock it reads a
     // torn table mid-mutation and panics on a healthy allocation (#617). Only the
     // panic itself is deferred past unlock so the panic path cannot deadlock.
-    let payload_ok = rt_payload_start_can_be_owned(ptr)
+    // It checks the allocator's own result, not a caller's pointer, so it is
+    // an assertion and runs with the debug allocator; the free path's check
+    // of caller pointers is unconditional. On every allocation it was a
+    // tenth of the words benchmark.
+    let payload_ok = if dbg_on() != 0: rt_payload_start_can_be_owned(ptr) else: 1
     rt_allocator_unlock()
     if payload_ok == 0:
         with_panic_core("allocator returned invalid payload", "", 0)
@@ -2856,28 +2946,36 @@ pub fn with_vec_clear(v: *mut u8) -> Unit:
 
 // #606: free a Vec's heap buffer and zero its header. Called by the codegen
 // scope-exit drop path for Drop-element Vecs (after element dtors have run).
-pub fn with_vec_free(v: *mut u8) -> Unit:
-    let p = vec_get_ptr_field(v)
-    let cap = vec_get_cap(v)
-    let es = vec_get_elem_size(v)
+// Free a Vec's buffer given the header's words by value. Codegen's drop glue
+// reads the header inline and calls this, so an aggregate holding a Vec
+// never has its address taken by a call: LLVM can promote the whole struct
+// to registers, as it does for the same program in C or Rust (the ECS
+// benchmark reloaded five headers after every store before this).
+pub fn with_vec_free_buffer(p: *mut u8, cap: i64, es: i64) -> Unit:
     if p as i64 != 0 and cap > 0 and es > 0:
         rt_free_sized(p, cap * es)
+
+pub fn with_vec_free(v: *mut u8) -> Unit:
+    with_vec_free_buffer(vec_get_ptr_field(v), vec_get_cap(v), vec_get_elem_size(v))
     vec_set_ptr_field(v, 0 as *mut u8)
     vec_set_len(v, 0)
     vec_set_cap(v, 0)
 
 pub fn with_vec_free_drop_origin(v: *mut u8, drop_origin: *const u8, drop_origin_len: i64) -> Unit:
-    let p = vec_get_ptr_field(v)
-    let cap = vec_get_cap(v)
-    let es = vec_get_elem_size(v)
+    with_vec_free_buffer_drop_origin(vec_get_ptr_field(v), vec_get_cap(v), vec_get_elem_size(v), drop_origin, drop_origin_len)
+    vec_set_ptr_field(v, 0 as *mut u8)
+    vec_set_len(v, 0)
+    vec_set_cap(v, 0)
+
+pub fn with_vec_free_buffer_drop_origin(p: *mut u8, cap: i64, es: i64, drop_origin: *const u8, drop_origin_len: i64) -> Unit:
     if p as i64 != 0 and cap > 0 and es > 0:
         // A header whose cap*elem_size overflows is not a Vec anymore: the
         // memory was freed and reused under us (the lsp-use-std hunt read
         // response-JSON bytes here and trapped on the bare multiply, which
         // disguised heap corruption as arithmetic). Name the corruption.
         if cap > 9223372036854775807 / es:
-            dbg_puts("corrupt vec header at free: addr=" as *const u8, 33)
-            dbg_put_i64(v as i64)
+            dbg_puts("corrupt vec header at free: buffer=" as *const u8, 35)
+            dbg_put_i64(p as i64)
             dbg_puts(" cap=" as *const u8, 5)
             dbg_put_i64(cap)
             dbg_puts(" elem_size=" as *const u8, 11)
@@ -2888,9 +2986,6 @@ pub fn with_vec_free_drop_origin(v: *mut u8, drop_origin: *const u8, drop_origin
             dbg_puts("\n" as *const u8, 1)
             with_panic_core(make_str("corrupt vec header: freed memory reused or overwritten" as *const u8, 54), make_str("" as *const u8, 0), 0)
         rt_free_sized_with_drop_origin(p, cap * es, drop_origin, drop_origin_len)
-    vec_set_ptr_field(v, 0 as *mut u8)
-    vec_set_len(v, 0)
-    vec_set_cap(v, 0)
 
 // #747 (#691 second half): dropping a str frees its buffer. A str place is
 // {data_ptr, len}; only a pointer that is the START of a live allocation
