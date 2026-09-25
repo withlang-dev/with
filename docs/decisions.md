@@ -131,6 +131,33 @@ once. `curl_easy_cleanup` cannot be annotated unconditionally `callbacks none`:
 it can invoke configured progress/header callbacks
 ([libcurl documentation](https://curl.se/libcurl/c/curl_easy_cleanup.html)).
 
+**2026-09-25 amendment — retained variadic pairs (#1652).** Eric approved
+four rulings on the brief, "all four are right", with two additions to (c)
+and one debt. (a) A resource names its safe abandonment path with
+`abandon <operation>`; the operation must itself be `callbacks none`, and
+the compiler runs it before the destroyer on every drop path whose pair
+state is not proven callback-free (a spurious reset costs a call; a missed
+one is unsafe). Per-slot `callbacks none` on a destroyer is rejected as
+name-shaped inference. (b) `ok CONST` on a variadic operation is the D64
+evidence model applied to status: the success condition of its listed
+cases, presentation unchanged; unlisted cases stay raw. (c) Retained
+userdata is a borrow per ruling §25/§45, typed from the callback's own
+parameter mode: shared `&U`, or an exclusive in-place `mut U` borrow when
+the callback mutates it (why Rust needed its scoped `Transfer` type). The
+retention is the ordinary view-liveness borrow, held by the resource, ending
+at reset/unregister, destruction, or the last callback-capable operation;
+inside that window the borrowed place cannot be touched, and the resource is
+ephemeral (no move into long-lived storage, no return). (d) The paired
+userdata setter is implied by the callback case; `retains by param 0` stays
+explicit because retention is never inferred.
+
+**Debt (D65).** Retained userdata now has two models: stage 9's owned box
+(`retains param N by param 0` on a fixed-arity method boxes the value and
+frees it after the destroyer) and the variadic borrow above. The borrow is
+the target model and the box is the legacy form; no third model is to be
+built, and the box is to migrate to the borrow when its fixtures are
+revisited.
+
 ---
 
 ## D65 — One authoritative producer per semantic fact: Sema decides what, MIR decides where and when, codegen decides how; no stage re-derives another's answer

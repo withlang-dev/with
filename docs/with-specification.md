@@ -9478,6 +9478,22 @@ names the selector carrying the paired userdata in another call; the
 callback type and userdata pairing must agree across those calls, with
 retention and lifetime requirements enforced as for other modeled callbacks.
 
+A callback case that states `retains by param N` retains its callback and,
+with it, the paired userdata; the userdata setter for the selector that
+`userdata param CONST` names is implied by the pairing and needs no second
+`case` line, while the retention itself is stated, never inferred. The
+userdata is typed from the callback's own parameter: a shared `&U` where the
+callback receives it shared, an in-place `mut U` borrow where the callback
+mutates it. The retained userdata is that borrow, held by the resource
+(§16.2b.9 "Retained borrows"); it is never a copy or an owned cell.
+
+`ok CONST` on a variadic operation is its status contract (§16.2b.4) for the
+listed cases alone: the evidence model of §16.2b.8 applied to status.
+Presentation is unchanged — the status is still returned as the C
+declaration states it — and the compiler reads a comparison of that status
+against the constant as the success or failure edge of the setter. Unlisted
+cases stay raw, as above.
+
 #### 16.2b.6 Borrowed returns, dependency and independence
 
 An operation may return a borrowed resource:
@@ -9680,17 +9696,49 @@ An operation that could invoke an incomplete or incompatible pair is refused.
 Two-call setup also requires evidence that callbacks cannot run concurrently
 between the calls.
 
+**Retained borrows.** A retained userdata is a borrow the resource holds
+(§16.2b.5 "Retain"): shared when the callback receives it shared, exclusive
+when the callback receives it in place — a collector callback mutates its
+sink, so the sink is an in-place `mut` borrow the foreign library holds. The
+retention is the same borrow that view-liveness models for any other borrow,
+held by the resource, and it ends at a modeled reset or unregister, at the
+resource's destruction, or after the last callback-capable operation that
+can reach it. Under an exclusive retention the program cannot touch the
+borrowed place inside that window: reading a collector's sink back after
+the final `perform` is fine; reading it between the setter and `perform` is
+a use of an exclusively borrowed place and is refused. A resource holding a
+retained borrow is itself ephemeral for that window: it cannot be moved into
+longer-lived storage or returned while the retention lasts. This is the
+property that makes the two-call surface safe without a second type.
+
 Destruction is checked as an actual operation, including cleanup on early
 return and `?`. Leaving a lexical scope is not itself forbidden: a destroy
 path that cannot invoke the affected callback may safely destroy a partially
 configured resource. A callback-capable destroy path must satisfy the same
 pair and lifetime requirements as any other callback-capable operation.
 
-The facade must model a safe way to abandon partial setup: reset, unregister,
-or a safe destruction path. If the first setter succeeds, the second fails,
-and the function returns an error, cleanup must remain safe and release the
-retained state exactly once. A partial-setup error must not trap the programmer
-without a safe cleanup path.
+The facade must model a safe way to abandon partial setup. A resource names
+it:
+
+```
+resource Easy wraps *mut CURL
+    from curl_easy_init
+    drop curl_easy_cleanup
+    abandon curl_easy_reset
+```
+
+The named operation must be one of the resource's own modeled operations
+and itself `callbacks none`, so the abandonment path cannot invoke the
+incomplete pair; an `abandon` naming any other operation is refused. The
+compiler runs the abandon operation before the destroyer on every drop path
+whose pair state is not proven callback-free — early return and `?`
+included — so a spurious reset costs one call and a missed one cannot
+happen. If the first setter succeeds, the second fails, and the function
+returns an error, cleanup must remain safe and release the retained state
+exactly once. A partial-setup error must not trap the programmer without a
+safe cleanup path. A per-operation statement of which callbacks a
+destroyer cannot invoke is not a facade fact: it is name-shaped inference,
+and `callbacks none` stays whole-operation.
 
 #### 16.2b.10 Thread capabilities
 
