@@ -321,6 +321,11 @@ extern fn LLVMSetTailCallKind(call: *mut u8, kind: i32)
 extern fn LLVMInstructionEraseFromParent(v: *mut u8)
 extern fn LLVMIsAStoreInst(v: *mut u8) -> *mut u8
 extern fn LLVMIsALoadInst(v: *mut u8) -> *mut u8
+extern fn LLVMIsACallInst(v: *mut u8) -> *mut u8
+extern fn LLVMIsAFenceInst(v: *mut u8) -> *mut u8
+extern fn LLVMIsAAtomicRMWInst(v: *mut u8) -> *mut u8
+extern fn LLVMIsAAtomicCmpXchgInst(v: *mut u8) -> *mut u8
+extern fn LLVMGetInstructionParent(inst: *mut u8) -> *mut u8
 extern fn LLVMGetOperand(v: *mut u8, index: u32) -> *mut u8
 extern fn LLVMGetVolatile(v: *mut u8) -> i32
 extern fn LLVMIsNull(v: *mut u8) -> i32
@@ -1102,7 +1107,27 @@ pub fn wl_lower_aggregate_copies(f: i64, ctx: i64, dl: i64, min_bytes: i64) -> i
                         if size >= min_bytes:
                             let is_load = LLVMIsALoadInst(value) as i64 != 0 and LLVMGetVolatile(value) == 0
                             let is_zero = LLVMIsNull(value) != 0
-                            if is_load or is_zero:
+                            // A memmove at the store reads the source AFTER
+                            // everything between the load and the store ran;
+                            // the load read it before. The rewrite is sound
+                            // only when nothing in between can write memory
+                            // (#1689: Vec.remove loads the element, calls
+                            // with_vec_remove to shift the buffer, then stores
+                            // the result — the memmove copied the shifted
+                            // element). The bulk moves this pass exists for
+                            // are an adjacent load/store pair.
+                            var safe = true
+                            if is_load:
+                                if LLVMGetInstructionParent(value) as i64 != bb as i64:
+                                    safe = false
+                                else:
+                                    var walk = LLVMGetNextInstruction(value)
+                                    while walk as i64 != inst as i64:
+                                        if walk as i64 == 0 or LLVMIsAStoreInst(walk) as i64 != 0 or LLVMIsACallInst(walk) as i64 != 0 or LLVMIsAFenceInst(walk) as i64 != 0 or LLVMIsAAtomicRMWInst(walk) as i64 != 0 or LLVMIsAAtomicCmpXchgInst(walk) as i64 != 0:
+                                            safe = false
+                                            break
+                                        walk = LLVMGetNextInstruction(walk)
+                            if safe and (is_load or is_zero):
                                 LLVMPositionBuilderBefore(builder, inst)
                                 LLVMSetCurrentDebugLocation2(builder, LLVMInstructionGetDebugLoc(inst))
                                 let len = LLVMConstInt(i64_ty, size as u64, 0)
