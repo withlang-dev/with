@@ -1,6 +1,15 @@
 // ECS update: structure-of-arrays storage, bitmask queries, 1M entities.
 // Timed region: 1000 ticks of movement, damage, and cleanup systems.
 const std = @import("std");
+// Printing goes through libc so the file compiles on every Zig std I/O revision.
+const c = @cImport(@cInclude("stdio.h"));
+
+// std.time.Timer was removed in Zig 0.16; read the monotonic clock directly.
+fn nowNs() u64 {
+    var ts: std.c.timespec = undefined;
+    if (std.c.clock_gettime(.MONOTONIC, &ts) != 0) @panic("clock_gettime failed");
+    return @as(u64, @intCast(ts.sec)) * std.time.ns_per_s + @as(u64, @intCast(ts.nsec));
+}
 
 const ENTITIES: usize = 1_000_000;
 const TICKS: usize = 1000;
@@ -98,22 +107,20 @@ pub fn main() !void {
     }
     const alive_before = w.countAlive();
 
-    var timer = try std.time.Timer.start();
+    const started = nowNs();
     const dt: f32 = 1.0 / 60.0;
     for (0..TICKS) |_| {
         w.systemMovement(dt);
         w.systemDamage(dt);
         w.systemCleanup();
     }
-    const elapsed_ms = @as(f64, @floatFromInt(timer.read())) / 1_000_000.0;
+    const elapsed_ms = @as(f64, @floatFromInt(nowNs() - started)) / 1_000_000.0;
 
     var sum: f64 = 0.0;
     for (0..w.count) |i| {
         if (w.mask[i] & HAS_POS != 0) sum += @as(f64, w.pos[i].x);
     }
-    var out = std.fs.File.stdout().writer(&.{});
-    try out.interface.print("entities {d} alive_before {d} alive_after {d}\n", .{ w.count, alive_before, w.countAlive() });
-    try out.interface.print("elapsed_ms {d:.3}\n", .{elapsed_ms});
-    try out.interface.print("checksum {d:.2}\n", .{sum});
-    try out.interface.flush();
+    _ = c.printf("entities %zu alive_before %zu alive_after %zu\n", w.count, alive_before, w.countAlive());
+    _ = c.printf("elapsed_ms %.3f\n", elapsed_ms);
+    _ = c.printf("checksum %.2f\n", sum);
 }

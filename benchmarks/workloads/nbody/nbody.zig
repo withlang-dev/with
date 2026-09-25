@@ -1,6 +1,15 @@
 // N-body: five-body gravitational integration in f64, 50M steps.
 // Timed region: the integration loop. Checksum: final system energy.
 const std = @import("std");
+// Printing goes through libc so the file compiles on every Zig std I/O revision.
+const c = @cImport(@cInclude("stdio.h"));
+
+// std.time.Timer was removed in Zig 0.16; read the monotonic clock directly.
+fn nowNs() u64 {
+    var ts: std.c.timespec = undefined;
+    if (std.c.clock_gettime(.MONOTONIC, &ts) != 0) @panic("clock_gettime failed");
+    return @as(u64, @intCast(ts.sec)) * std.time.ns_per_s + @as(u64, @intCast(ts.nsec));
+}
 
 const STEPS: usize = 50_000_000;
 const PI: f64 = 3.141592653589793;
@@ -90,12 +99,10 @@ fn advance(dt: f64) void {
 pub fn main() !void {
     offsetMomentum();
     const before = energy();
-    var timer = try std.time.Timer.start();
+    const started = nowNs();
     for (0..STEPS) |_| advance(0.01);
-    const elapsed_ms = @as(f64, @floatFromInt(timer.read())) / 1_000_000.0;
-    var out = std.fs.File.stdout().writer(&.{});
-    try out.interface.print("energy_before {d:.9}\n", .{before});
-    try out.interface.print("elapsed_ms {d:.3}\n", .{elapsed_ms});
-    try out.interface.print("checksum {d:.9}\n", .{energy()});
-    try out.interface.flush();
+    const elapsed_ms = @as(f64, @floatFromInt(nowNs() - started)) / 1_000_000.0;
+    _ = c.printf("energy_before %.9f\n", before);
+    _ = c.printf("elapsed_ms %.3f\n", elapsed_ms);
+    _ = c.printf("checksum %.9f\n", energy());
 }
