@@ -245,3 +245,99 @@ pub fn foreign_pair_origin_live(places: &ForeignPairPlaces, origin: i32) -> bool
     for key in 0..places.values.len():
         if foreign_pair_retains_origin(places.values[key], origin): return true
     false
+
+pub fn foreign_pair_places_equal(a: &ForeignPairPlaces, b: &ForeignPairPlaces) -> bool:
+    if a.values.len() != b.values.len(): return false
+    for key in 0..a.values.len():
+        if not foreign_pair_equal(a.values[key], b.values[key]): return false
+        if a.references[key].len() != b.references[key].len(): return false
+        for i in 0..a.references[key].len():
+            if not b.references[key].contains(a.references[key][i]): return false
+    true
+
+// A normalized MIR operation. The adapter supplies owned-place keys and
+// Sema's call contract; this domain does not inspect AST names or C options.
+pub const FOREIGN_STEP_APPLY: i32 = 0
+pub const FOREIGN_STEP_BORROW: i32 = 1
+pub const FOREIGN_STEP_MOVE: i32 = 2
+pub const FOREIGN_STEP_EXPIRE: i32 = 3
+
+pub type ForeignPairStep {
+    action: i32,
+    place: i32,
+    source: i32,
+    contract: ForeignPairBlock,
+}
+impl Copy for ForeignPairStep
+
+pub type ForeignPairPlaceFlow {
+    inputs: Vec[ForeignPairPlaces],
+    reachable: Vec[bool],
+    // Global step indices, so the MIR adapter can recover exact spans.
+    violations: Vec[i32],
+}
+
+fn foreign_pair_execute_step(places: &ForeignPairPlaces, step: &ForeignPairStep) -> (ForeignPairPlaces, bool):
+    var after = foreign_pair_places_clone(places)
+    var valid = true
+    if step.action == FOREIGN_STEP_APPLY:
+        valid = after.apply_at(step.place, step.contract)
+    else if step.action == FOREIGN_STEP_BORROW:
+        after.borrow(step.place, step.source)
+    else if step.action == FOREIGN_STEP_MOVE:
+        valid = not foreign_pair_origin_live(places, step.source)
+        after.move_place(step.place, step.source)
+    else if step.action == FOREIGN_STEP_EXPIRE:
+        valid = not foreign_pair_origin_live(places, step.place)
+    else:
+        panic("invalid foreign pair transfer action")
+    (move after, valid)
+
+fn foreign_pair_places_edge(source: &ForeignPairPlaces, edge: &ForeignPairEdge) -> (ForeignPairPlaces, bool):
+    var result = foreign_pair_places_clone(source)
+    var reachable = true
+    for key in 0..result.values.len():
+        result.values[key] = foreign_pair_on_edge(source.values[key], edge.guard, edge.succeeded)
+        if result.values[key].alternatives.len() == 0: reachable = false
+    (move result, reachable)
+
+pub fn foreign_pair_place_flow(starts: &Vec[i32], counts: &Vec[i32], steps: &Vec[ForeignPairStep], edges: &Vec[ForeignPairEdge], entry: &ForeignPairPlaces) -> ForeignPairPlaceFlow:
+    assert(starts.len() == counts.len())
+    var inputs: Vec[ForeignPairPlaces] = Vec.new()
+    var outputs: Vec[ForeignPairPlaces] = Vec.new()
+    var reachable: Vec[bool] = Vec.new()
+    for bi in 0..starts.len():
+        inputs.push(foreign_pair_places(entry.values.len() as i32))
+        outputs.push(foreign_pair_places(entry.values.len() as i32))
+        reachable.push(false)
+    var changed = true
+    while changed:
+        changed = false
+        for bi in 0..starts.len() as i32:
+            var incoming = foreign_pair_places_clone(entry)
+            var reached = bi == 0
+            for ei in 0..edges.len():
+                let edge = &edges[ei]
+                if edge.to != bi or not reachable[edge.from]: continue
+                let (along, possible) = foreign_pair_places_edge(outputs[edge.from], edge)
+                if not possible: continue
+                incoming = if reached: foreign_pair_places_join(incoming, along) else: move along
+                reached = true
+            if not reached: continue
+            var outgoing = foreign_pair_places_clone(incoming)
+            for si in starts[bi]..starts[bi] + counts[bi]:
+                let (after, valid) = foreign_pair_execute_step(outgoing, steps[si])
+                outgoing = move after
+            if not reachable[bi] or not foreign_pair_places_equal(outgoing, outputs[bi]): changed = true
+            reachable[bi] = true
+            inputs[bi] = move incoming
+            outputs[bi] = move outgoing
+    let violations: Vec[i32] = Vec.new()
+    for bi in 0..starts.len() as i32:
+        if not reachable[bi]: continue
+        var current = foreign_pair_places_clone(inputs[bi])
+        for si in starts[bi]..starts[bi] + counts[bi]:
+            let (after, valid) = foreign_pair_execute_step(current, steps[si])
+            if not valid: violations.push(si)
+            current = move after
+    ForeignPairPlaceFlow { inputs: move inputs, reachable: move reachable, violations }
