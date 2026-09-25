@@ -9,10 +9,10 @@
 >
 > - **§2.12 `if-to-then`** targets `if COND then STMT`, which is not With
 >   today. The inline form is `if COND: STMT`.
-> - **§2.4 `unit-return`, §2.5 `obvious-return-type`** must skip `pub fn`: a
->   public function requires a written return type (Parser: "public function
->   declarations require an explicit return type"). For the rest, D43 now
->   defines exactly when an unannotated function has a type (it inherits its
+> - **§2.4 `unit-return`, §2.5 `obvious-return-type`** follow §9.1 for public
+>   and private functions alike. The parser's former public-return annotation
+>   requirement had no basis in the specification. D43 now defines exactly
+>   when an unannotated function has a type (it inherits its
 >   tail; a missing arm means `Unit`; mixed written arms do not infer), so
 >   §2.5 can be wider than "a single literal" but must follow D43, and must
 >   leave entry points and tests alone.
