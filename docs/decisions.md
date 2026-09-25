@@ -87,6 +87,13 @@ wrappers over one variadic declaration; Go and Swift need C shims. Only
 Rust (`&'static`) and Mojo (origins) can type the version record's
 lifetime; With's domain origin says more (what may change it, and when).
 
+**2026-09-25 amendment — explicit callback type (#1652).** Eric approved
+`case CURLOPT_WRITEFUNCTION: callback param 2 as curl_write_callback userdata param CURLOPT_WRITEDATA`.
+The `as` type supplies the C signature missing from the variadic header;
+the userdata selector supplies the pairing across calls. Neither is inferred
+from an option name. This closes the type hole in the original example
+without changing D51's callback lifetime or retention requirements.
+
 ---
 
 ## D65 — One authoritative producer per semantic fact: Sema decides what, MIR decides where and when, codegen decides how; no stage re-derives another's answer

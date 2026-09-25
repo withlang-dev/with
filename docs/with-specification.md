@@ -9447,7 +9447,7 @@ fn curl_easy_setopt
     variadic param 2 selected by param option:
         case CURLOPT_NOSIGNAL: c_long
         case CURLOPT_URL: str
-        case CURLOPT_WRITEFUNCTION: callback param 2 userdata param CURLOPT_WRITEDATA
+        case CURLOPT_WRITEFUNCTION: callback param 2 as curl_write_callback userdata param CURLOPT_WRITEDATA
 ```
 
 Each case states the presented With type and contract of the variadic
@@ -9461,6 +9461,14 @@ with a note naming the case to add, and the raw variadic function remains
 available under `unsafe`. A case whose C documentation says the pointed-to
 data is not copied (curl's `CURLOPT_POSTFIELDS`) states its retention as
 §16.2b.5 requires; a bare `str` case is a copied input string (§16.3c).
+
+A callback case explicitly states its C callback type with `as T`, where
+`T` is the imported callback typedef or an explicit C function-pointer type.
+The variadic declaration does not supply that signature, and neither the
+selector name nor the userdata pairing proves it. `userdata param CONST`
+names the selector carrying the paired userdata in another call; the
+callback type and userdata pairing must agree across those calls, with
+retention and lifetime requirements enforced as for other modeled callbacks.
 
 #### 16.2b.6 Borrowed returns, dependency and independence
 
