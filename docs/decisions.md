@@ -141,9 +141,10 @@ one is unsafe). Per-slot `callbacks none` on a destroyer is rejected as
 name-shaped inference. (b) `ok CONST` on a variadic operation is the D64
 evidence model applied to status: the success condition of its listed
 cases, presentation unchanged; unlisted cases stay raw. (c) Retained
-userdata is a borrow per ruling §25/§45, typed from the callback's own
-parameter mode: shared `&U`, or an exclusive in-place `mut U` borrow when
-the callback mutates it (why Rust needed its scoped `Transfer` type). The
+userdata is a borrow per ruling §25/§45: `&U`, and when `U` is a callable
+its capture views (§12.4) decide the retention's mode — a mutate capture
+makes it exclusive (why Rust needed its scoped `Transfer` type; With has no
+in-place parameter mode on a free fn, so the mode is the capture's). The
 retention is the ordinary view-liveness borrow, held by the resource, ending
 at reset/unregister, destruction, or the last callback-capable operation;
 inside that window the borrowed place cannot be touched, and the resource is
