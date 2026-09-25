@@ -783,6 +783,7 @@ fn facade_render_resource(pool: AstPool, intern: InternPool, ci: &Vec[i32], item
     var preinit_fn = 0
     var ok_sym = 0
     var movable = false
+    var abandon_fn = 0
     let destroyers: Vec[i32] = Vec.new()
     for k in 0..clause_count:
         let clause = pool.get_extra(extra_start + 1 + k)
@@ -808,6 +809,8 @@ fn facade_render_resource(pool: AstPool, intern: InternPool, ci: &Vec[i32], item
             movable = true
         else if kind == FACADE_CLAUSE_DROP:
             drop_fn = facade_render_find_fn(pool, intern, ci, pool.get_extra(ops))
+        else if kind == FACADE_CLAUSE_ABANDON:
+            abandon_fn = facade_render_find_fn(pool, intern, ci, pool.get_extra(ops))
         else if kind == FACADE_CLAUSE_DESTROYS:
             destroyers.push(facade_render_find_fn(pool, intern, ci, pool.get_extra(ops)))
     // An in-place resource is pinned unless the facade says `movable` (D54):
@@ -850,7 +853,18 @@ fn facade_render_resource(pool: AstPool, intern: InternPool, ci: &Vec[i32], item
     // No reference count or generation check is added (ruling §29).
     var out = if deps.slot_res.len() > 0: "type " ++ name ++ " = ephemeral { " ++ facade_render_dep_fields(pool, intern, &deps) ++ "repr: " ++ field ++ ", live: bool" ++ keep_fields ++ " }\n" else: "type " ++ name ++ " { repr: " ++ field ++ ", live: bool" ++ keep_fields ++ " }\n"
     if drop_fn != 0:
-        out = out ++ "impl Drop for " ++ name ++ ":\n    move fn drop():\n        if self.live: " ++ facade_render_call(pool, intern, drop_fn, facade_render_repr_arg(pool, intern, drop_fn, repr_text, "self.repr", pinned)) ++ "\n"
+        let drop_call = facade_render_call(pool, intern, drop_fn, facade_render_repr_arg(pool, intern, drop_fn, repr_text, "self.repr", pinned))
+        // `abandon <fn>` (§16.2b.9): the `callbacks none` abandonment path
+        // runs before the destroyer on a drop path whose callback pair is
+        // not proven callback-free. A spurious call costs one call and a
+        // missed one is unsafe, so the rendering runs it on every drop;
+        // MIR proves the pair state at every other callback-capable
+        // operation (MirForeignPairs.w).
+        if abandon_fn != 0 and facade_render_param_count(pool, abandon_fn) == 1 and facade_render_repr_arg(pool, intern, abandon_fn, repr_text, "self.repr", pinned).len() > 0:
+            let abandon_call = facade_render_call(pool, intern, abandon_fn, facade_render_repr_arg(pool, intern, abandon_fn, repr_text, "self.repr", pinned))
+            out = out ++ "impl Drop for " ++ name ++ ":\n    move fn drop():\n        if self.live:\n            " ++ abandon_call ++ "\n            " ++ drop_call ++ "\n"
+        else:
+            out = out ++ "impl Drop for " ++ name ++ ":\n    move fn drop():\n        if self.live: " ++ drop_call ++ "\n"
         if keeps:
             // The retaining origin never outlives what it retains (§25):
             // the destroyer has run; now the retained values are released.
@@ -1803,10 +1817,6 @@ fn facade_render_variadic_cases(pool: AstPool, intern: InternPool, decl: i32, cl
     for k in 0..case_count:
         let case_node = pool.get_extra(cops + 2 + k)
         let ops = pool.get_data1(case_node as NodeId)
-        // Sema reports the missing state/lifetime proof. Do not render a
-        // callback or retained case as an ordinary copied value meanwhile.
-        if pool.get_extra(ops + 2) != 0 or pool.get_extra(ops + 4) != 0:
-            continue
         let sel: str = intern.resolve(pool.get_extra(ops))
         let ty = render_type_expr(pool, intern, pool.get_extra(ops + 1) as NodeId)
         let bridge = facade_render_bridge(pool, intern, decl, skip, -1, "")
@@ -1818,6 +1828,39 @@ fn facade_render_variadic_cases(pool: AstPool, intern: InternPool, decl: i32, cl
         var args = bridge.args.clone()
         if args.len() > 0: args = args ++ ", "
         var pro = bridge.prologue.clone()
+        if pool.get_extra(ops + 2) != 0:
+            // A callback case (D66 §16.2b.5, §16.2b.9): the callback's C
+            // type is the case's explicit `as T`, presented with its one
+            // `void *` spelled `&U` (facade_render_callback_type) as stage
+            // 9's callback methods present theirs; the paired userdata
+            // setter — the selector `userdata param CONST` names — is
+            // implied by the pairing and takes `&U`, the borrow the
+            // resource then holds (§16.2b.9 "Retained borrows"). Both are
+            // methods of the resource (Sema refuses a free retaining
+            // case), generic in `U`, `mut fn` because they change the
+            // resource's foreign state. MIR proves the pair's state at
+            // every callback-capable operation (MirForeignPairs.w).
+            if repr_arg.len() == 0:
+                continue
+            let raw_cb = facade_render_callback_raw_type(facade_render_unalias(pool, intern, ty))
+            let typed_cb = facade_render_callback_type(pool, intern, raw_cb)
+            if typed_cb.len() == 0:
+                continue
+            let ud_ref = pool.get_extra(ops + 3)
+            if ud_ref == 0 or pool.get_data0(ud_ref as NodeId) != FACADE_PARAM_REF_NAME:
+                continue
+            let ud_sel: str = intern.resolve(pool.get_data1(ud_ref as NodeId))
+            let mhead = head.replace("fn ", "mut fn ")
+            let cb_args = repr_arg ++ ", " ++ args ++ "transmute[" ++ raw_cb ++ "](" ++ value ++ ")"
+            out = out ++ mhead ++ facade_render_variadic_case_name(base, sel) ++ "[U](" ++ params ++ value ++ ": " ++ typed_cb ++ ")" ++ ret ++ ":\n" ++ facade_render_indent(pro, indent) ++ indent ++ facade_render_call(pool, intern, decl, cb_args) ++ "\n"
+            let ud_args = repr_arg ++ ", " ++ args ++ value ++ " as *const U as *mut c_void"
+            out = out ++ mhead ++ facade_render_variadic_case_name(base, ud_sel) ++ "[U](" ++ params ++ value ++ ": &U)" ++ ret ++ ":\n" ++ facade_render_indent(pro, indent) ++ indent ++ facade_render_call(pool, intern, decl, ud_args) ++ "\n"
+            continue
+        // A retained pointer case (`… retains by param N`, curl's
+        // CURLOPT_POSTFIELDS) is not modeled yet: Sema reports it; nothing
+        // is rendered as an ordinary copied value meanwhile.
+        if pool.get_extra(ops + 4) != 0:
+            continue
         if ty == "str":
             let cs = value ++ "_c"
             params = params ++ value ++ ": &str"

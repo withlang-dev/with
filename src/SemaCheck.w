@@ -18976,6 +18976,7 @@ impl Sema:
         if sig_idx < 0:
             return
         self.facade_note_callback_method_sig(fn_sym, sig_idx)
+        self.facade_note_pair_op_sig(fn_sym, sig_idx)
         let param_count = self.sig_get_param_count(sig_idx)
         let slice_mut_args: Vec[i32] = Vec.new()
         for ai in 0..arg_count:
@@ -20512,6 +20513,9 @@ impl Sema:
                 if pi2 >= param_count:
                     break
                 self.bind_type_params_from_type_expr(self.ast.fn_param_type(param_start, pi2), arg_types[ai2], fn_tp_start, fn_tp_count, node)
+            // D66 (#1652): a callback-only pair setter's `U` comes from the
+            // callback's own signature (SemaFacade.w).
+            self.facade_bind_pair_callback_u(fn_node, arg_types, arg_count, fn_tp_start, fn_tp_count, node)
         // #600 (§5.1): generic-METHOD calls (Box.new / Rc.new / Arc.new on generic
         // owners) are a fourth checker lane that never reached the ephemeral arg
         // gates. Route each ephemeral arg through the same escape check.
@@ -20589,6 +20593,7 @@ impl Sema:
         // A facade callback method's call touches the receiver's views
         // (§16.2b.7) through its concrete signature (SemaFacade.w).
         self.facade_note_callback_method_sig(method_fn_sym, concrete_sig)
+        self.facade_note_pair_op_sig(method_fn_sym, concrete_sig)
         let ret_ty = if concrete_sig >= 0:
             self.sig_return_type(concrete_sig)
         else:
@@ -22886,6 +22891,9 @@ impl Sema:
         let facade_ud_node = facade_context.userdata_node
         let facade_ud_ty = facade_context.userdata_type
         let facade_nullable = facade_context.nullable
+        // D66 (#1652): a pair callback setter's callback argument is checked
+        // against its own signature as a C function pointer (SemaFacade.w).
+        let facade_pair_cb_arg = self.facade_pair_callback_arg(obj_type as i32, field, mc_resolved_arg_count)
         for ai in 0..mc_resolved_arg_count:
             let mc_arg_node = if mc_has_resolved_args != 0: self.get_resolved_call_arg(node, ai) else: self.ast.get_extra(extra_start + ai)
             if mc_arg_node == 0:
@@ -22936,6 +22944,8 @@ impl Sema:
                 mc_expected = mc_static_variant_payload_tys[ai]
             if mc_expected == 0 and facade_mi >= 0 and facade_ud_ty != 0 and ai == self.facade_callback_methods[facade_mi].callback_param:
                 mc_expected = self.facade_callback_expected_type(facade_mi, obj_type as i32, field, facade_ud_ty)
+            if mc_expected == 0 and ai == facade_pair_cb_arg:
+                mc_expected = self.facade_pair_callback_expected_type(mc_arg_node)
             // An absent nullable callback's userdata: `None` typed as the
             // rendered `Option[&U]` with `U` Unit (nothing was checked
             // ahead for it).

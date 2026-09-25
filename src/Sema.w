@@ -438,6 +438,8 @@ type FacadeResource {
     independent_node: i32,
     movable: i32,         // in-place resource declared `movable` (D54); pinned otherwise
     thread_caps: i32,     // bit0 creator, bit1 send, bit2 share, bit3 drop_any_thread
+    abandon: i32,         // `abandon <fn>` (§16.2b.9): the `callbacks none` operation run before the destroyer on a drop path not proven callback-free, or 0
+    abandon_node: i32,
 }
 
 type ForeignContract {
@@ -488,6 +490,7 @@ const FACADE_VARIADIC_SCALAR: i32 = 1   // a scalar C type: passed as that type
 const FACADE_VARIADIC_STR: i32 = 2      // `str`: a copied input string (§16.3c), passed as a call-scoped C string
 const FACADE_VARIADIC_CALLBACK: i32 = 3
 const FACADE_VARIADIC_RETAINED: i32 = 4
+const FACADE_VARIADIC_USERDATA: i32 = 5 // the userdata setter a callback case implies (§16.2b.5): `&U`, the borrow the resource holds
 
 type ForeignVariadicSlot {
     case_index: i32,
@@ -515,6 +518,21 @@ type FacadeCallbackMethod {
     retained: i32,
     consumed: i32,
     nullable: i32,    // the callback is nullable (#1618): `Option[extern "C" fn(&U, …)]`, its userdata `Option[&U]`
+}
+
+// D66 retained variadic pairs (#1652, §16.2b.9): what one operation of a
+// resource that has a callback pair does to that pair, keyed by the concrete
+// signature MIR records on the call (SemaFacade.w facade_index_pair_ops,
+// facade_note_pair_op_sig). MIR proves the pair's state per place along
+// every path (MirForeignPairs.w); Sema decides what each call means.
+type FacadePairOp {
+    contract: i32,      // foreign_contracts index
+    resource: i32,      // facade_resources index
+    action: i32,        // FOREIGN_PAIR_CALLBACK / _USERDATA / _RESET / _DESTROY / _INVOKE (ForeignPairState.w)
+    slot: i32,          // the contract's variadic slot a setter serves, or -1
+    userdata_tid: i32,  // the concrete `U` a setter installs (the specialization's), or 0
+    guard_ok: i64,      // the setter's success status (`ok CONST` on the operation), or -1: uninterpreted
+    invokes: i32,       // 1 unless the operation is `callbacks none`
 }
 
 // Context shared by free and receiver callback calls. Userdata is checked
@@ -1256,6 +1274,11 @@ pub type Sema {
     // call sites).
     facade_callback_methods: Vec[FacadeCallbackMethod],
     facade_callback_method_index: HashMap[i32, i32],   // the method's generic fn node -> facade_callback_methods index
+    facade_pair_ops: Vec[FacadePairOp],                // D66 #1652: per concrete signature (facade_pair_op_by_sig)
+    facade_pair_op_by_sig: HashMap[i32, i32],
+    facade_pair_setter_contract: HashMap[i32, i32],    // a pair setter's generic fn node -> foreign_contracts index …
+    facade_pair_setter_case: HashMap[i32, i32],        // … and the case it renders (parallel)
+    facade_pair_resources: HashMap[i32, i32],          // resource type symbol -> facade_resources index, for resources with a callback pair
     // D22 §13.6: field-access exprs whose base is a shared view and whose
     // field type is non-Copy — an owned demand on one is an error.
     view_projection_exprs: HashMap[i32, i32],
@@ -2635,6 +2658,11 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         facade_convention_nodes: Vec.new(),
         facade_callback_methods: Vec.new(),
         facade_callback_method_index: sema_new_map_i32_i32(),
+        facade_pair_ops: Vec.new(),
+        facade_pair_op_by_sig: sema_new_map_i32_i32(),
+        facade_pair_setter_contract: sema_new_map_i32_i32(),
+        facade_pair_setter_case: sema_new_map_i32_i32(),
+        facade_pair_resources: sema_new_map_i32_i32(),
         contextual_join_arm_types: Vec.new(),
         contextual_join_arm_kinds: Vec.new(),
         contextual_join_arm_roles: Vec.new(),

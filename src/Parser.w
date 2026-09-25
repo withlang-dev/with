@@ -4324,6 +4324,14 @@ impl Parser:
             kind = FACADE_CLAUSE_INDEPENDENT
         else if word == "movable":
             kind = FACADE_CLAUSE_MOVABLE
+        else if word == "abandon":
+            // `abandon <fn>` (§16.2b.9): the resource's safe abandonment of
+            // partial callback setup. Sema verifies the operation is its own
+            // and `callbacks none`.
+            kind = FACADE_CLAUSE_ABANDON
+            let f = self.expect_ident()
+            if f == 0: return 0
+            ops.push(f)
         else if word == "lend":
             kind = FACADE_CLAUSE_LEND
         else if word == "consumes":

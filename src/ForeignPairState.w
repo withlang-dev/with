@@ -103,6 +103,23 @@ pub const FOREIGN_PAIR_RESET: i32 = 3
 pub const FOREIGN_PAIR_INVOKE: i32 = 4
 pub const FOREIGN_PAIR_DESTROY: i32 = 5
 pub const FOREIGN_PAIR_CREATE: i32 = 6
+// An operation Sema did not model on the resource (a helper call receiving
+// it): the pair may have changed in any way, so it is incompatible until a
+// modeled reset — the retained origins are still held.
+pub const FOREIGN_PAIR_UNKNOWN: i32 = 7
+
+pub fn foreign_pair_unknown(state: &ForeignPairState) -> ForeignPairState:
+    let result = ForeignPairState { alternatives: Vec.new() }
+    for i in 0..state.alternatives.len():
+        foreign_pair_add(result, ForeignPairAlternative { callback_type: -2, userdata_type: -3, userdata_origin: state.alternatives[i].userdata_origin, guard: -1, succeeded: true })
+    result
+
+// Whether any alternative still holds a retained userdata origin: a
+// resource in that state is ephemeral (§16.2b.9) and cannot escape.
+pub fn foreign_pair_retains_any(state: &ForeignPairState) -> bool:
+    for i in 0..state.alternatives.len():
+        if state.alternatives[i].userdata_origin >= 0: return true
+    false
 
 pub fn foreign_pair_absent() -> ForeignPairState:
     let state = ForeignPairState { alternatives: Vec.new() }
@@ -140,6 +157,8 @@ fn foreign_pair_transfer(state: &ForeignPairState, block: &ForeignPairBlock) -> 
         return foreign_pair_initial(true)
     if block.action == FOREIGN_PAIR_DESTROY and state.alternatives.len() > 0:
         return foreign_pair_absent()
+    if block.action == FOREIGN_PAIR_UNKNOWN and state.alternatives.len() > 0:
+        return foreign_pair_unknown(state)
     foreign_pair_on_edge(state, -1, true)
 
 // Every predecessor, including backwards edges, contributes until the finite
@@ -261,6 +280,14 @@ pub const FOREIGN_STEP_APPLY: i32 = 0
 pub const FOREIGN_STEP_BORROW: i32 = 1
 pub const FOREIGN_STEP_MOVE: i32 = 2
 pub const FOREIGN_STEP_EXPIRE: i32 = 3
+// The resource at `place` leaves the function or its frame (returned, or
+// stored into longer-lived storage): valid only while it retains nothing.
+pub const FOREIGN_STEP_ESCAPE: i32 = 4
+
+pub fn foreign_pair_place_retains_any(places: &ForeignPairPlaces, place: i32) -> bool:
+    for i in 0..places.references[place].len():
+        if foreign_pair_retains_any(places.values[places.references[place][i]]): return true
+    false
 
 pub type ForeignPairStep {
     action: i32,
@@ -289,6 +316,8 @@ fn foreign_pair_execute_step(places: &ForeignPairPlaces, step: &ForeignPairStep)
         after.move_place(step.place, step.source)
     else if step.action == FOREIGN_STEP_EXPIRE:
         valid = not foreign_pair_origin_live(places, step.place)
+    else if step.action == FOREIGN_STEP_ESCAPE:
+        valid = not foreign_pair_place_retains_any(places, step.place)
     else:
         panic("invalid foreign pair transfer action")
     (move after, valid)

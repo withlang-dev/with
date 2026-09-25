@@ -7,6 +7,7 @@ use Span
 use Mir
 use MirLower
 use MirSuspendCheck
+use MirForeignPairs
 use AsyncMir
 use AsyncLower
 use CCodegen
@@ -165,6 +166,15 @@ fn compilation_mir_error_span(zcu: &Zcu, pool: AstPool, fn_sym: i32, raw_span: i
         return Span { file: file_id, start: start, end: end }
     let start = if raw_span > 0: raw_span else: 0
     Span { file: 0, start: start, end: start + 1 }
+
+// A span inside the function `fn_sym` is defined in: its file, the given
+// byte range (a MIR pass names a call or statement by its AST node).
+fn compilation_mir_span_range(zcu: &Zcu, pool: AstPool, fn_sym: i32, start: i32, end: i32) -> Span:
+    let decl_index = compilation_find_fn_decl_index(pool, fn_sym)
+    let file_id = if decl_index >= 0: zcu.decl_source_file_id_frontend(decl_index) else: 0
+    let s = if start > 0: start else: 0
+    let e = if end > s: end else: s + 1
+    Span { file: file_id, start: s, end: e }
 
 fn compilation_bool_digit(value: bool) -> str:
     if value: "1" else: "0"
@@ -1973,6 +1983,17 @@ impl Compilation:
         sema.diags = check_no_await_guard_suspends(mir_mod, active_pool, &sema, move _sp_diags)
         if do_profile:
             profile_emit("mir.suspend_check", t_suspend_check, "")
+        // D66 (#1652, §16.2b.9): a resource's callback pair is proven
+        // compatible along every path here, on the lowered CFG.
+        let pair_report = check_foreign_pairs(mir_mod, active_pool, &sema)
+        for fi in 0..pair_report.findings.len() as i32:
+            let finding = &pair_report.findings[fi]
+            var pair_diag = Diagnostic.err(finding.message.clone(), compilation_mir_span_range(self.zcu, active_pool, finding.fn_sym, finding.start, finding.end))
+            if finding.note.len() > 0: pair_diag.add_note(finding.note.clone())
+            if finding.help.len() > 0: pair_diag.add_help(finding.help.clone())
+            sema.diags.emit(move pair_diag)
+        if pair_report.findings.len() > 0 and pairs_dump_enabled():
+            runtime_eprint(f"pair-flow findings={pair_report.findings.len() as i32} diagnostics={sema.diags.count()}")
         if sema.diags.has_errors():
             self.zcu.diagnostics = move sema.diags
             self.zcu.sync_from_sema(move sema)
