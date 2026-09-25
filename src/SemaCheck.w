@@ -7637,6 +7637,8 @@ impl Sema:
                 self.emit_error_with_help("use of moved value", node, "a moved value cannot be used again; if it is moved on only some control-flow paths, reinitialize it on every path before this use, or clone it before the move")
             if sym != self.assign_target_revive_sym:
                 self.note_param_effect(sym, EFF_READ)
+                if is_local:
+                    self.check_read_against_views(sym, node)
             var final_tid = tid
             if self.has_expected_type != 0 and self.expected_expr_type != 0:
                 let pending_tid = self.settle_pending_generic_binding_from_expected(sym, self.expected_expr_type as i32, node)
@@ -24958,17 +24960,39 @@ impl Sema:
         self.borrow_scope_depths.push(self.scope_starts.len() as i32)
         self.borrow_creation_nodes.push(err_node)
 
+    // Whether the expression a binding is initialized from is a non-`move`
+    // closure whose body writes the captured place `sym` (its capture
+    // summary, check_closure).
+    fn closure_capture_writes(expr_node: i32, sym: i32) -> bool:
+        var node = expr_node
+        while node != 0 and self.ast.kind(node) == NodeKind.NK_GROUPED:
+            node = self.ast.get_data0(node)
+        if node == 0 or self.ast.kind(node) != NodeKind.NK_CLOSURE or self.ast.is_move_closure(node) != 0:
+            return false
+        for ci in 0..self.closure_capture_summary_count(node):
+            if self.closure_capture_summary_sym(node, ci) == sym and (self.closure_capture_summary_eff(node, ci) & EFF_WRITE) != 0:
+                return true
+        false
+
     mut fn register_view_binding_borrows(view_sym: i32, creation_node: i32):
         if view_sym == 0:
             return
         let dep_count = self.binding_view_dep_count(view_sym)
+        if sema_debug_borrows_enabled() != 0:
+            with_eprint(f"[borrow] bind {self.pool_resolve(view_sym)} creation={creation_node} deps={dep_count} entries={self.borrow_kinds.len() as i32}")
+            for di in 0..self.borrow_kinds.len() as i32:
+                with_eprint(f"[borrow]   entry{di} place={self.pool_resolve(self.borrow_places[di])} kind={self.borrow_kinds[di]} ref={self.borrow_refs[di]} creation={self.borrow_creation_nodes[di]}")
         for di in 0..dep_count:
             let origin_sym = self.binding_view_dep_at(view_sym, di)
             if origin_sym == 0 or origin_sym == view_sym:
                 continue
             var attached = 0
             for bi in 0..self.borrow_refs.len() as i32:
-                if self.borrow_places[bi] == origin_sym and self.borrow_kinds[bi] == BorrowKind.SHARED and self.borrow_refs[bi] == 0:
+                // The binding names the view: an unnamed shared entry for the
+                // origin, or the exclusive entry this very expression created
+                // (a closure that mutates its capture, check_closure; #1691) —
+                // that one must carry the name too, or it outlives every use.
+                if self.borrow_places[bi] == origin_sym and self.borrow_refs[bi] == 0 and (self.borrow_kinds[bi] == BorrowKind.SHARED or self.borrow_creation_nodes[bi] == creation_node):
                     self.borrow_refs[bi] = view_sym
                     attached = 1
                     break
@@ -24976,7 +25000,11 @@ impl Sema:
                 continue
             let before = self.borrow_refs.len() as i32
             let path_start = self.borrow_path_data.len() as i32
-            self.check_borrow_create_direct(origin_sym, BorrowKind.SHARED, 0, path_start, 0, creation_node)
+            // §12.4 (#1691): a closure that mutates the captured place is an
+            // exclusive view of it for as long as the binding is alive; its
+            // capture summary says which places its body writes.
+            let kind = if self.closure_capture_writes(creation_node, origin_sym): BorrowKind.EXCLUSIVE else: BorrowKind.SHARED
+            self.check_borrow_create_direct(origin_sym, kind, 0, path_start, 0, creation_node)
             if self.borrow_refs.len() as i32 > before:
                 self.borrow_refs[before] = view_sym
 
@@ -25021,6 +25049,50 @@ impl Sema:
                 last_node = tail_use
         last_node
 
+    // §12.4 (D62, #1691): a live closure whose body mutates a captured place
+    // holds an exclusive view of it (check_closure registers it as such), so
+    // reading the place while the closure is alive is refused, as mutating
+    // it under a shared view is (check_mutation_against_views). A view
+    // whose last use is behind this read is dead and is removed.
+    mut fn check_read_against_views(sym: i32, node: i32):
+        if self.borrow_kinds.len() == 0 or sym == 0:
+            return
+        if sema_debug_borrows_enabled() != 0:
+            for di in 0..self.borrow_kinds.len() as i32:
+                with_eprint(f"[borrow] read of {self.pool_resolve(sym)} node={node}: entry{di} place={self.pool_resolve(self.borrow_places[di])} kind={self.borrow_kinds[di]} ref={self.borrow_refs[di]} creation={self.borrow_creation_nodes[di]} depth={self.borrow_scope_depths[di]}")
+        var i = 0
+        while i < self.borrow_kinds.len() as i32:
+            if self.borrow_places[i] != sym or self.borrow_kinds[i] != BorrowKind.EXCLUSIVE:
+                i = i + 1
+                continue
+            let ref_sym = self.borrow_refs[i]
+            if ref_sym == 0 or ref_sym == sym:
+                i = i + 1
+                continue
+            let stmt_root = self.current_statement_expr_root
+            let last_use = self.find_last_use_in_block(self.current_block_extra_start, self.current_block_stmt_count, self.current_block_stmt_index + 1, self.current_block_tail, ref_sym, node)
+            let used_here = stmt_root != 0 and self.expr_uses_symbol(stmt_root, ref_sym) != 0
+            if last_use == 0 and not used_here:
+                if self.for_view_binding_depth(ref_sym) == 0:
+                    self.remove_borrow_at(i)
+                    continue
+                i = i + 1
+                continue
+            let place_name = self.pool_resolve(sym)
+            let ref_name: str = with_str_clone_ref(self.pool_resolve(ref_sym))
+            let creation_node = self.borrow_creation_nodes[i]
+            let binding_node = self.binding_decl_node(ref_sym)
+            let diag = Diagnostic.err("cannot read `" ++ place_name ++ "` while `" ++ ref_name ++ "` is a live mutating view into it", Span { file: self.local_file_id, start: self.ast.get_start(node), end: self.ast.get_end(node) })
+            let view_node = if binding_node != 0: binding_node else: creation_node
+            if view_node != 0:
+                diag.add_label(Span { file: self.local_file_id, start: self.ast.get_start(view_node), end: self.ast.get_end(view_node) }, "`" ++ ref_name ++ "` captures `" ++ place_name ++ "` by place and mutates it (§12.4)")
+            let use_node = if last_use != 0: last_use else: stmt_root
+            if use_node != 0 and use_node != node:
+                diag.add_label(Span { file: self.local_file_id, start: self.ast.get_start(use_node), end: self.ast.get_end(use_node) }, "`" ++ ref_name ++ "` is still used here")
+            diag.add_help("read `" ++ place_name ++ "` after the last use of `" ++ ref_name ++ "`, or take a snapshot with `move ||`")
+            self.diags.emit(move diag)
+            return
+
     mut fn check_mutation_against_views(place_node: i32, err_node: i32):
         let place = self.borrow_root_place(place_node)
         if place == 0:
@@ -25034,11 +25106,11 @@ impl Sema:
                 i = i + 1
                 continue
             let existing_kind = self.borrow_kinds[i]
-            if existing_kind != BorrowKind.SHARED:
-                i = i + 1
-                continue
             let ref_sym = self.borrow_refs[i]
-            if ref_sym == 0:
+            // An unnamed exclusive entry is a call's reborrow; a named one
+            // is a live closure mutating its capture (#1691), which excludes
+            // this mutation exactly as a shared view does.
+            if ref_sym == 0 or (existing_kind != BorrowKind.SHARED and existing_kind != BorrowKind.EXCLUSIVE):
                 i = i + 1
                 continue
             let ex_path_start = self.borrow_path_starts[i]

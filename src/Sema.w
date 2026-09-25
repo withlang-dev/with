@@ -1555,6 +1555,11 @@ fn sema_debug_move_enabled -> i32:
         return 0
     1
 
+// WITH_DEBUG_BORROWS=1: the borrow table at every read and mutation check
+// (SemaCheck.w check_read_against_views, register_view_binding_borrows).
+fn sema_debug_borrows_enabled -> i32:
+    if with_getenv_str("WITH_DEBUG_BORROWS").len() == 0: 0 else: 1
+
 impl Sema:
     fn debug_unknown_type(sym: i32, node: i32, context: &str):
         if sema_debug_stage1_enabled() == 0:
