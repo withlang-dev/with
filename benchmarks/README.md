@@ -43,6 +43,9 @@ checksum <result>
 | `ecs` | Memory bandwidth, branchy loops over structure-of-arrays data | 1M entities with bitmask component queries; 1000 ticks of movement, damage, and cleanup systems. |
 | `nbody` | Scalar floating point in a tight loop | Five-body gravitational integration in `f64`, 50M steps. |
 | `trees` | Allocation and deallocation of many small objects, pointer chasing | Binary trees to depth 18: build, count, free. Go measures its garbage collector here; the others use `malloc` or the language's owning box. |
+| `words` | String building, hashing, map insert and lookup | 30M generated words counted in a string-keyed map, then a 1000-line report built from lookups. C carries a hand-written open-addressing table, as C programs do. |
+| `grow` | Push-built growth of vectors held inside a struct | 800 rounds of 100k rows pushed into three fresh vectors, then folded. Measures push and reallocation, with the containers inside an aggregate. |
+| `buffers` | Mid-size allocation churn | 2M blocks of 8 to 64 KiB, 32 live at once, each with a short contiguous prefix written. The shape of chunked I/O; measures the allocator's path for blocks above a small-object size class. |
 
 ## Keeping the comparison fair
 
@@ -57,17 +60,26 @@ checksum <result>
   the source with a unique trailing comment, so build caches (Go, Zig) cannot
   return a previous result, while their standard-library caches stay warm.
   Rust and With have nothing to warm; they compile the same way every time.
+  Zig is the exception the rule can't accommodate: it compiles the standard
+  library into the project's local cache, which the runner keeps cold, so its
+  compile column measures a first build of a project, about three seconds,
+  rather than an incremental one.
 - **Release means release.** Ratios in the report compare against the fastest
   release-level cell (`O3`, `release`, or `ReleaseFast`). Debug rows are shown
   for the compile-time trade-off, not for speed.
 
 ## Known With gaps the results reflect
 
-- **`trees` peak memory.** A `Box` held inside an `Option` payload is never
-  freed ([withlang-dev/with#1535](https://github.com/withlang-dev/with/issues/1535)),
-  so the With tree nodes leak and peak RSS scales with total allocations
-  instead of the live set. The timing is still a fair allocation benchmark;
-  the memory column is not, until that issue closes.
+- **`buffers`.** Every allocation above 4 KiB is its own `mmap` and
+  `munmap`, so the workload pays two system calls per block. Larger size
+  classes would fix it only together with a decision on whether recycled
+  blocks keep being zeroed on allocation, which the runtime's callers
+  currently rely on; that is a runtime contract question, not a local fix.
+- **`nbody`.** The remaining gap over C is that the body count is a constant
+  in C and folds to one in Rust's `vec!`, so both fully unroll the pair loop
+  and keep every body in registers; With's Vec is built by runtime `push`
+  calls, so LLVM never learns the length. A fixed-array version of the With
+  source runs at C speed.
 
 Two spots in the With sources work around compiler gaps and say so in a
 comment. Both are filed upstream:
