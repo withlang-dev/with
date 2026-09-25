@@ -94,6 +94,21 @@ the userdata selector supplies the pairing across calls. Neither is inferred
 from an option name. This closes the type hole in the original example
 without changing D51's callback lifetime or retention requirements.
 
+**2026-09-25 amendment — callback invocation and partial setup (#1652).**
+Eric approved `callbacks none` as D51 §47's trusted assertion of a verified
+foreign-library guarantee, never a warning suppression. Track callback/userdata
+compatibility on the resource through defaults, replacements, and setter
+failures. Refuse operations that could invoke an incomplete pair; separate-call
+setup also requires that callbacks cannot run concurrently between the calls.
+There is no blanket scope-exit ban: check the actual destroy path, including
+early returns and `?`, for the callbacks it can invoke. A facade must provide
+a modeled safe reset, unregister, or destruction path for abandoning partial
+setup. Required acceptance case: first setter succeeds, second setter fails,
+function returns an error, and cleanup safely releases retained state exactly
+once. `curl_easy_cleanup` cannot be annotated unconditionally `callbacks none`:
+it can invoke configured progress/header callbacks
+([libcurl documentation](https://curl.se/libcurl/c/curl_easy_cleanup.html)).
+
 ---
 
 ## D65 — One authoritative producer per semantic fact: Sema decides what, MIR decides where and when, codegen decides how; no stage re-derives another's answer

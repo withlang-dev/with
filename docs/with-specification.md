@@ -9660,8 +9660,29 @@ callback runs, and With destroys it through no other path.
 affecting the origins the callback captures, according to the captures'
 allowed operations: immutable captures contribute reads, mutable captures
 contribute invalidation, owned captures follow ownership and retention. A
-facade may assert that an operation cannot invoke applicable callbacks; that
-is capability-granting evidence, and absent it the call is reentrant.
+facade states `callbacks none` on an operation only when verified foreign-library
+evidence guarantees that the operation cannot invoke applicable callbacks.
+This is capability-granting trusted evidence, never a warning suppression;
+absent it the call is conservatively reentrant.
+
+**Pairs configured across calls.** The callback and userdata pair belongs to
+the resource. Its state includes the foreign defaults, replacements, and
+setter failures; merely calling both setters does not establish compatibility.
+An operation that could invoke an incomplete or incompatible pair is refused.
+Two-call setup also requires evidence that callbacks cannot run concurrently
+between the calls.
+
+Destruction is checked as an actual operation, including cleanup on early
+return and `?`. Leaving a lexical scope is not itself forbidden: a destroy
+path that cannot invoke the affected callback may safely destroy a partially
+configured resource. A callback-capable destroy path must satisfy the same
+pair and lifetime requirements as any other callback-capable operation.
+
+The facade must model a safe way to abandon partial setup: reset, unregister,
+or a safe destruction path. If the first setter succeeds, the second fails,
+and the function returns an error, cleanup must remain safe and release the
+retained state exactly once. A partial-setup error must not trap the programmer
+without a safe cleanup path.
 
 #### 16.2b.10 Thread capabilities
 
