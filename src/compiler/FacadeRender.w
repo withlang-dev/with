@@ -1692,7 +1692,7 @@ fn facade_render_fn_error_type(pool: AstPool, intern: InternPool, decl: i32, pre
 //         if capacity > dest.len() as uLongf: panic(...)
 //         capacity as usize
 fn facade_render_free_ops(pool: AstPool, intern: InternPool, ci: &Vec[i32], facade: i32) -> str:
-    var out = ""
+    var out = facade_render_callback_ops(pool, intern, ci, 0, facade)
     let extra_start = pool.get_data1(facade as NodeId)
     let resources = facade_render_all_items(pool, NodeKind.NK_FACADE_RESOURCE)
     for i in 0..pool.get_data2(facade as NodeId):
@@ -2152,24 +2152,47 @@ fn facade_render_callback_type(pool: AstPool, intern: InternPool, text: &str) ->
 
 // Every callback method of `resource` (see the section comment).
 fn facade_render_callback_methods(pool: AstPool, intern: InternPool, ci: &Vec[i32], resource: i32) -> str:
-    let repr_text = render_type_expr(pool, intern, pool.get_extra(pool.get_data1(resource as NodeId)) as NodeId)
+    facade_render_callback_ops(pool, intern, ci, resource, 0)
+
+// A callback contract has the same bridge whether presentation supplies a
+// receiver or a free function. Only the receiver and indentation differ.
+fn facade_render_callback_ops(pool: AstPool, intern: InternPool, ci: &Vec[i32], resource: i32, facade: i32) -> str:
+    let hosted = resource != 0
+    let repr_text = if hosted: render_type_expr(pool, intern, pool.get_extra(pool.get_data1(resource as NodeId)) as NodeId) else: ""
     let repr = facade_render_unalias(pool, intern, repr_text)
-    let in_place = not repr.starts_with("*") and facade_render_has_clause(pool, resource, FACADE_CLAUSE_INIT)
-    if not repr.starts_with("*") and not in_place:
+    let in_place = hosted and not repr.starts_with("*") and facade_render_has_clause(pool, resource, FACADE_CLAUSE_INIT)
+    if hosted and not repr.starts_with("*") and not in_place:
         return ""
     let pinned = in_place and not facade_render_has_clause(pool, resource, FACADE_CLAUSE_MOVABLE)
+    let skip = if hosted: 1 else: 0
+    let indent = if hosted: "        " else: "    "
     var out = ""
-    let items = facade_render_all_items(pool, NodeKind.NK_FACADE_FN)
+    let items: Vec[i32] = Vec.new()
+    if hosted:
+        for item in facade_render_all_items(pool, NodeKind.NK_FACADE_FN): items.push(item)
+    else:
+        let start = pool.get_data1(facade as NodeId)
+        for i in 0..pool.get_data2(facade as NodeId):
+            let item = pool.get_extra(start + i)
+            if pool.kind(item as NodeId) == NodeKind.NK_FACADE_FN: items.push(item)
     for i in 0..items.len() as i32:
         let cbi = facade_render_callback_item(pool, intern, ci, items[i])
-        if not facade_render_callback_hosted(pool, intern, &cbi, resource, repr):
+        if cbi.decl == 0:
             continue
+        if hosted:
+            if not facade_render_callback_hosted(pool, intern, &cbi, resource, repr): continue
+        else:
+            var has_host = false
+            for res in facade_render_all_items(pool, NodeKind.NK_FACADE_RESOURCE):
+                let rtext = render_type_expr(pool, intern, pool.get_extra(pool.get_data1(res as NodeId)) as NodeId)
+                if facade_render_callback_hosted(pool, intern, &cbi, res, facade_render_unalias(pool, intern, rtext)): has_host = true
+            if has_host or cbi.retained: continue
         let decl = cbi.decl
         let meta = pool.find_fn_meta(decl as NodeId)
         let fname: str = intern.resolve(pool.get_data0(decl as NodeId))
-        let mname = facade_render_present(pool, intern, ci, resource, fname)
-        let repr_arg = facade_render_repr_arg(pool, intern, decl, repr_text, "self.repr", pinned)
-        if repr_arg.len() == 0:
+        let mname = if hosted: facade_render_present(pool, intern, ci, resource, fname) else: if cbi.rename != 0: intern.resolve(cbi.rename).clone() else: facade_render_bridge_name(fname)
+        let repr_arg = if hosted: facade_render_repr_arg(pool, intern, decl, repr_text, "self.repr", pinned) else: ""
+        if hosted and repr_arg.len() == 0:
             continue
         let taken = facade_render_param_names(pool, intern, decl)
         let cell = facade_render_fresh("facade_cell", taken)
@@ -2193,8 +2216,8 @@ fn facade_render_callback_methods(pool: AstPool, intern: InternPool, ci: &Vec[i3
         var args = repr_arg.clone()
         var ud_name = ""
         var cb_name = ""
-        for pi in 1..pool.fn_meta_param_count(meta):
-            args = args ++ ", "
+        for pi in skip..pool.fn_meta_param_count(meta):
+            if args.len() > 0: args = args ++ ", "
             if pi == cbi.destroy:
                 args = args ++ free
                 continue
@@ -2242,7 +2265,9 @@ fn facade_render_callback_methods(pool: AstPool, intern: InternPool, ci: &Vec[i3
                 params = params ++ ", "
             params = params ++ pname ++ ": " ++ shown
             args = args ++ arg
-        let head = (if cbi.retained: "    mut fn " else: "    fn ") ++ mname ++ (if generic: "[U]" else: "") ++ "(" ++ params ++ ")" ++ facade_render_return(pool, intern, decl) ++ ":\n"
+        let ret = facade_render_return(pool, intern, decl)
+        let shown_ret = if not hosted and ret.len() == 0: " -> Unit" else: ret.clone()
+        let head = (if not hosted: "fn " else: if cbi.retained: "    mut fn " else: "    fn ") ++ mname ++ (if generic: "[U]" else: "") ++ "(" ++ params ++ ")" ++ shown_ret ++ ":\n"
         var body = ""
         if cbi.nullable:
             // The pair is present or absent together (Sema checks each
@@ -2250,20 +2275,20 @@ fn facade_render_callback_methods(pool: AstPool, intern: InternPool, ci: &Vec[i3
             // value, NULL for None.
             let raw_cb = facade_render_callback_raw_type(facade_render_unalias(pool, intern, facade_render_param_type(pool, intern, decl, cbi.callback)))
             let ud_type = facade_render_unalias(pool, intern, facade_render_param_type(pool, intern, decl, cbi.userdata))
-            body = body ++ "        let " ++ ncb ++ ": " ++ raw_cb ++ " = match " ++ cb_name ++ ":\n            Some(" ++ nf ++ ") => unsafe { transmute[" ++ raw_cb ++ "](" ++ nf ++ ") }\n            None => null\n"
+            body = body ++ indent ++ "let " ++ ncb ++ ": " ++ raw_cb ++ " = match " ++ cb_name ++ ":\n" ++ indent ++ "    Some(" ++ nf ++ ") => unsafe { transmute[" ++ raw_cb ++ "](" ++ nf ++ ") }\n" ++ indent ++ "    None => null\n"
             // The userdata by transmute, not `as *const U as …`: with no
             // callback `U` is Unit, and a cast to `*const Unit` traps
             // codegen (#1626), which a pointer-to-pointer transmute of the
             // same representation does not.
-            body = body ++ "        let " ++ nud ++ ": " ++ ud_type ++ " = match " ++ ud_name ++ ":\n            Some(" ++ nu ++ ") => unsafe { transmute[" ++ ud_type ++ "](" ++ nu ++ ") }\n            None => null\n"
+            body = body ++ indent ++ "let " ++ nud ++ ": " ++ ud_type ++ " = match " ++ ud_name ++ ":\n" ++ indent ++ "    Some(" ++ nu ++ ") => unsafe { transmute[" ++ ud_type ++ "](" ++ nu ++ ") }\n" ++ indent ++ "    None => null\n"
         if generic and kept:
             let ud_type = facade_render_unalias(pool, intern, facade_render_param_type(pool, intern, decl, cbi.userdata))
-            body = body ++ "        let " ++ cell ++ " = Box.new(" ++ ud_name ++ ")\n"
-            body = body ++ "        let " ++ ptr ++ " = " ++ cell ++ ".into_raw() as " ++ ud_type ++ "\n"
-            body = body ++ "        let " ++ free ++ ": extern \"C\" fn(*mut c_void) -> Unit = " ++ q ++ " => { let " ++ b ++ " = (" ++ q ++ " as *mut U) as Box[U]; drop(" ++ b ++ ") }\n"
+            body = body ++ indent ++ "let " ++ cell ++ " = Box.new(" ++ ud_name ++ ")\n"
+            body = body ++ indent ++ "let " ++ ptr ++ " = " ++ cell ++ ".into_raw() as " ++ ud_type ++ "\n"
+            body = body ++ indent ++ "let " ++ free ++ ": extern \"C\" fn(*mut c_void) -> Unit = " ++ q ++ " => { let " ++ b ++ " = (" ++ q ++ " as *mut U) as Box[U]; drop(" ++ b ++ ") }\n"
             if cbi.retained:
                 body = body ++ "        self.retained_ptrs.push(" ++ ptr ++ " as *mut c_void)\n        self.retained_frees.push(" ++ free ++ ")\n"
-        out = out ++ head ++ body ++ "        " ++ facade_render_call(pool, intern, decl, args) ++ "\n"
+        out = out ++ head ++ body ++ indent ++ facade_render_call(pool, intern, decl, args) ++ "\n"
     out
 
 // The shape of the declaration a c_import translation made under `name`:

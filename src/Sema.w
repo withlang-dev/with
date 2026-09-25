@@ -492,12 +492,22 @@ const FACADE_VARIADIC_STR: i32 = 2      // `str`: a copied input string (§16.3c
 // itself: the userdata type is Send and Sync under `callback_thread any`.
 type FacadeCallbackMethod {
     contract: i32,
+    receiver_params: i32,
     userdata_param: i32,
     callback_param: i32,
     thread_any: i32,
     retained: i32,
     consumed: i32,
     nullable: i32,    // the callback is nullable (#1618): `Option[extern "C" fn(&U, …)]`, its userdata `Option[&U]`
+}
+
+// Context shared by free and receiver callback calls. Userdata is checked
+// first so its type can give the callback its concrete C signature.
+type FacadeCallbackCall {
+    userdata_node: i32,
+    userdata_type: i32,
+    nullable: bool,
+    valid: bool,
 }
 
 // A foreign-state domain (ruling §33-§37): ownerless C storage given an

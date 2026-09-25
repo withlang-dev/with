@@ -17899,6 +17899,10 @@ impl Sema:
         // Check all arguments (with contextual expected-type propagation when
         // calling a known function signature).
         let has_resolved = self.has_resolved_call_args(node)
+        let facade_mi = self.facade_callback_method_for(fn_sym)
+        let facade_context = self.facade_prepare_callback_call(facade_mi, node, resolved_extra_start, resolved_arg_count)
+        if not facade_context.valid:
+            return 0
         let arg_types: Vec[i32] = Vec.new()
         let checked_arg_nodes: Vec[i32] = Vec.new()
         // docs/completed/mut.md Rev 8 §15.8 — borrow indices to remove after this call's
@@ -17917,6 +17921,9 @@ impl Sema:
                 expected_ty = variant_payload_tys[ai]
             else if callable_value_tid != 0:
                 expected_ty = self.fn_type_param_type(callable_value_tid, ai + param_offset)
+            if expected_ty == 0 and facade_mi >= 0 and facade_context.userdata_type != 0:
+                if ai == self.facade_callback_methods[facade_mi].callback_param or (facade_context.nullable and facade_context.userdata_node == 0 and ai == self.facade_callback_methods[facade_mi].userdata_param):
+                    expected_ty = self.facade_callback_fn_param_expected_type(facade_mi, fn_sym, 0, facade_context.userdata_type, ai)
             if expected_ty == 0 and arg_node > 0 and self.ast.kind(arg_node) == NodeKind.NK_NULL_LIT:
                 expected_ty = self.null_arg_expected_type(fn_sym, ai + param_offset, false)
             if arg_node == 0:
@@ -17940,7 +17947,9 @@ impl Sema:
             let saved_display_join_node = self.display_join_node
             if expected_ty == 0 and sig_idx < 0 and self.generic_param_bounded_by_display(fn_sym, ai + param_offset) != 0:
                 self.display_join_node = arg_node
-            let arg_ty = if expected_ty != 0: self.check_expr_with_expected(arg_node, expected_ty as TypeId) else: self.check_expr_value_context(arg_node)
+            let arg_ty = if facade_context.userdata_node != 0 and arg_node == facade_context.userdata_node: facade_context.userdata_type as TypeId
+                else if expected_ty != 0: self.check_expr_with_expected(arg_node, expected_ty as TypeId)
+                else: self.check_expr_value_context(arg_node)
             self.display_join_node = saved_display_join_node
             if is_closure_arg:
                 self.closure_direct_arg_escape_flags.pop()
@@ -18957,6 +18966,7 @@ impl Sema:
     mut fn check_selected_generic_call_args(fn_sym: i32, sig_idx: i32, arg_types: &Vec[i32], arg_nodes: &Vec[i32], arg_count: i32, call_node: i32):
         if sig_idx < 0:
             return
+        self.facade_note_callback_method_sig(fn_sym, sig_idx)
         let param_count = self.sig_get_param_count(sig_idx)
         for ai in 0..arg_count:
             if ai >= param_count:
@@ -18972,6 +18982,7 @@ impl Sema:
                 self.emit_argument_type_mismatch(self.safe_symbol_text(fn_sym), fn_sym, ai, ai, expected_ty, actual_ty, if arg_node > 0: arg_node else: call_node)
             else:
                 self.note_call_arg_coercion(expected_ty, actual_ty, arg_node, call_node)
+                self.facade_check_callback_arg(fn_sym, ai, actual_ty, arg_node)
 
     mut fn check_generic_call(fn_sym: i32, fn_node: i32, arg_types: &Vec[i32], arg_nodes: &Vec[i32], arg_count: i32, call_node: i32) -> i32:
         let meta = self.ast.find_fn_meta(fn_node)
@@ -22854,41 +22865,12 @@ impl Sema:
         // whatever order C declares them in (SemaFacade.w
         // facade_callback_expected_type).
         let facade_mi = self.facade_callback_method_for_call(obj_type as i32, field)
-        var facade_ud_node = 0
-        var facade_ud_ty = 0
-        var facade_nullable = false
-        if facade_mi >= 0 and self.facade_callback_methods[facade_mi].callback_param >= 0:
-            let udi = self.facade_callback_methods[facade_mi].userdata_param
-            let cbi = self.facade_callback_methods[facade_mi].callback_param
-            facade_nullable = self.facade_callback_methods[facade_mi].nullable != 0
-            var facade_absent = false
-            if facade_nullable and udi >= 0 and udi < mc_resolved_arg_count and cbi >= 0 and cbi < mc_resolved_arg_count:
-                // A nullable callback (#1618, spec §16.2b.8-9): `None` for
-                // the callback is `None` for its userdata too — the
-                // userdata is what the callback receives — and binds `U`
-                // to Unit, which nothing reads. One given without the
-                // other is the pairing violated, named here rather than
-                // left to a type mismatch.
-                let cb_node = if mc_has_resolved_args != 0: self.get_resolved_call_arg(node, cbi) else: self.ast.get_extra(extra_start + cbi)
-                let ud_node = if mc_has_resolved_args != 0: self.get_resolved_call_arg(node, udi) else: self.ast.get_extra(extra_start + udi)
-                let cb_absent = cb_node > 0 and self.facade_arg_is_none(cb_node)
-                let ud_absent = ud_node > 0 and self.facade_arg_is_none(ud_node)
-                if cb_absent != ud_absent:
-                    let mci = self.facade_callback_methods[facade_mi].contract
-                    let cfn: str = self.pool_resolve(self.foreign_contracts[mci].fn_sym)
-                    if cb_absent:
-                        self.emit_error(f"'{cfn}': a userdata given with no callback to receive it; the callback and its userdata are paired ('callback param N userdata param M'), so None for the callback is None for the userdata (§16.2b.9)", ud_node)
-                    else:
-                        self.emit_error(f"'{cfn}': a callback given with no userdata; the callback receives its userdata ('callback param N userdata param M'), so pass one, or None for both when no callback is wanted (§16.2b.9)", cb_node)
-                    return 0
-                if cb_absent:
-                    facade_absent = true
-                    facade_ud_ty = self.ty_void as i32
-            if udi >= 0 and udi < mc_resolved_arg_count and not facade_absent:
-                let ud_node = if mc_has_resolved_args != 0: self.get_resolved_call_arg(node, udi) else: self.ast.get_extra(extra_start + udi)
-                if ud_node > 0:
-                    facade_ud_node = ud_node
-                    facade_ud_ty = self.check_expr_value_context(ud_node) as i32
+        let facade_context = self.facade_prepare_callback_call(facade_mi, node, extra_start, mc_resolved_arg_count)
+        if not facade_context.valid:
+            return 0
+        let facade_ud_node = facade_context.userdata_node
+        let facade_ud_ty = facade_context.userdata_type
+        let facade_nullable = facade_context.nullable
         for ai in 0..mc_resolved_arg_count:
             let mc_arg_node = if mc_has_resolved_args != 0: self.get_resolved_call_arg(node, ai) else: self.ast.get_extra(extra_start + ai)
             if mc_arg_node == 0:

@@ -2233,7 +2233,7 @@ impl Sema:
         let bname: str = self.facade_bridge_of.get(name).unwrap()
         let bsym = self.pool_lookup_symbol(bname)
         // The bridge's own body calls the C name: the raw operation.
-        if bsym == 0 or bsym == self.current_fn_symbol or self.symbol_visible_from_current(bsym) == 0 or self.get_visible_sig(bsym) < 0:
+        if bsym == 0 or bsym == self.current_fn_symbol or self.symbol_visible_from_current(bsym) == 0 or (self.get_visible_sig(bsym) < 0 and self.generic_fn_node_for_symbol(bsym) == 0):
             return fn_sym
         self.facade_bridge_syms.insert(bsym, 1)
         bsym
@@ -3638,10 +3638,14 @@ impl Sema:
             if sig < 0:
                 continue
             let recv0 = self.facade_method_host(fn_sym)
-            if recv0.len() != 1 or not self.facade_received_presentable(recv0[0], fn_sym, 0):
+            let hosted = recv0.len() == 1
+            if recv0.len() > 1 or (hosted and not self.facade_received_presentable(recv0[0], fn_sym, 0)):
                 let shown0 = self.facade_param_display(fn_sym, sig, 0)
                 let why = if recv0.len() == 0: "receives no modeled resource" else: if recv0.len() > 1: "receives a representation several resources wrap; the facade has not assigned it (§16.2b.3)" else: self.facade_received_unpresentable_reason(recv0[0], fn_sym, 0)
                 self.emit_error(f"fn '{fname}': a callback contract is presented as a method of the resource its first parameter receives, and {shown0} {why} (§16.2b.9)", node)
+                continue
+            if not hosted and self.foreign_contracts[ci].retains.len() > 0:
+                self.emit_error(f"fn '{fname}': a retained callback needs its retaining resource modeled; a free callback bridge borrows for the call only (§16.2b.9)", node)
                 continue
             // §46: a callback receiving ownership is stated, never inferred
             // — and not yet modeled: the callback receives its userdata as
@@ -3681,7 +3685,7 @@ impl Sema:
             // is opaque to it. Nothing to verify beyond the pairing.
             if self.foreign_contracts[ci].callback_thread_any != 0:
                 var callable_count = 0
-                for pi in 1..self.sig_get_param_count(sig):
+                for pi in 0..self.sig_get_param_count(sig):
                     if self.facade_param_is_callable(sig, pi): callable_count = callable_count + 1
                 if callable_count == 0:
                     self.emit_error(f"fn '{fname}': 'callback_thread any' says the callback may run on any thread, but '{fname}' takes no callback (§16.2b.10)", node)
@@ -3711,14 +3715,16 @@ impl Sema:
                 continue
             // The net: the method was rendered (a generic template when the
             // userdata is typed, a signature otherwise).
-            let host: str = self.pool_resolve(self.facade_resources[recv0[0]].name)
-            let mname = self.facade_presented(recv0[0], fname)
-            let mtext = host ++ "." ++ mname
+            let host: str = if hosted: self.pool_resolve(self.facade_resources[recv0[0]].name).clone() else: ""
+            let mname = if hosted: self.facade_presented(recv0[0], fname) else: if self.foreign_contracts[ci].rename != 0: self.facade_presented_free_name(ci) else: facade_render_bridge_name(fname)
+            let mtext = if hosted: host ++ "." ++ mname else: mname.clone()
             let msym = self.pool_lookup_symbol(mtext)
             let rendered = self.sig_text_index.contains(mtext) or (msym != 0 and self.generic_fn_node_for_symbol(msym) != 0)
             if not rendered:
                 self.emit_error(f"fn '{fname}': its callback contract passed every facade check but no method '{mtext}' was rendered; the renderer cannot express this shape and did not say so — a compiler defect (§16.2b.9)", node)
                 continue
+            if not hosted and self.foreign_contracts[ci].rename == 0:
+                self.facade_bridge_of.insert(fname, mtext)
             // Rendered indices (`self` excluded): the destroy callback the
             // contract names is withheld from the method — the compiler
             // supplies it.
@@ -3726,7 +3732,7 @@ impl Sema:
             var cb_r = -1
             var r = 0
             let cb = self.facade_contract_callback_param(ci)
-            for pi in 1..self.sig_get_param_count(sig):
+            for pi in (if hosted: 1 else: 0)..self.sig_get_param_count(sig):
                 var withheld = false
                 for k in 0..self.foreign_contracts[ci].consumes.len() as i32:
                     if self.foreign_contracts[ci].consumes_destroyed_by[k] == pi: withheld = true
@@ -3742,7 +3748,7 @@ impl Sema:
             let mnode = if msym != 0: self.generic_fn_node_for_symbol(msym) else: 0
             if mnode != 0:
                 self.facade_callback_method_index.insert(mnode, self.facade_callback_methods.len() as i32)
-            self.facade_callback_methods.push(FacadeCallbackMethod { contract: ci, userdata_param: ud_r, callback_param: cb_r, thread_any: self.foreign_contracts[ci].callback_thread_any, retained: if self.facade_contract_userdata_retained(ci): 1 else: 0, consumed: if self.facade_contract_userdata_consumed(ci): 1 else: 0, nullable })
+            self.facade_callback_methods.push(FacadeCallbackMethod { contract: ci, receiver_params: if hosted: 1 else: 0, userdata_param: ud_r, callback_param: cb_r, thread_any: self.foreign_contracts[ci].callback_thread_any, retained: if self.facade_contract_userdata_retained(ci): 1 else: 0, consumed: if self.facade_contract_userdata_consumed(ci): 1 else: 0, nullable })
 
     // The callback method a symbol names, or -1.
     fn facade_callback_method_for(fn_sym: i32) -> i32:
@@ -3789,6 +3795,38 @@ impl Sema:
         let kind = self.ast.kind(node)
         (kind == NodeKind.NK_VARIANT_SHORTHAND or kind == NodeKind.NK_IDENT) and self.ast.get_data0(node) == self.syms.none
 
+    mut fn facade_prepare_callback_call(mi: i32, node: i32, extra_start: i32, arg_count: i32) -> FacadeCallbackCall:
+        var context = FacadeCallbackCall { userdata_node: 0, userdata_type: 0, nullable: false, valid: true }
+        if mi < 0 or self.facade_callback_methods[mi].callback_param < 0:
+            return context
+        let udi = self.facade_callback_methods[mi].userdata_param
+        let cbi = self.facade_callback_methods[mi].callback_param
+        context.nullable = self.facade_callback_methods[mi].nullable != 0
+        let has_resolved = self.has_resolved_call_args(node)
+        if context.nullable and udi >= 0 and udi < arg_count and cbi >= 0 and cbi < arg_count:
+            let cb_node = if has_resolved != 0: self.get_resolved_call_arg(node, cbi) else: self.ast.get_extra(extra_start + cbi)
+            let ud_node = if has_resolved != 0: self.get_resolved_call_arg(node, udi) else: self.ast.get_extra(extra_start + udi)
+            let cb_absent = cb_node > 0 and self.facade_arg_is_none(cb_node)
+            let ud_absent = ud_node > 0 and self.facade_arg_is_none(ud_node)
+            if cb_absent != ud_absent:
+                let ci = self.facade_callback_methods[mi].contract
+                let cfn: str = self.pool_resolve(self.foreign_contracts[ci].fn_sym)
+                if cb_absent:
+                    self.emit_error(f"'{cfn}': a userdata given with no callback to receive it; the callback and its userdata are paired ('callback param N userdata param M'), so None for the callback is None for the userdata (§16.2b.9)", ud_node)
+                else:
+                    self.emit_error(f"'{cfn}': a callback given with no userdata; the callback receives its userdata ('callback param N userdata param M'), so pass one, or None for both when no callback is wanted (§16.2b.9)", cb_node)
+                context.valid = false
+                return context
+            if cb_absent:
+                context.userdata_type = self.ty_void as i32
+                return context
+        if udi >= 0 and udi < arg_count:
+            let ud_node = if has_resolved != 0: self.get_resolved_call_arg(node, udi) else: self.ast.get_extra(extra_start + udi)
+            if ud_node > 0:
+                context.userdata_node = ud_node
+                context.userdata_type = self.check_expr_value_context(ud_node) as i32
+        context
+
     // The callback method a method call `recv.field(…)` names, or -1.
     fn facade_callback_method_for_call(recv_type: i32, field: i32) -> i32:
         if self.facade_callback_methods.len() == 0 or recv_type == 0 or field == 0:
@@ -3825,6 +3863,9 @@ impl Sema:
         let resolved = self.auto_deref_ref_ptr_type(self.resolve_alias(recv_type as TypeId))
         let owner = self.get_type_name(resolved)
         let fn_sym = self.lookup_generic_method_fn(owner, field)
+        self.facade_callback_fn_param_expected_type(mi, fn_sym, resolved as i32, ud_ty, r)
+
+    mut fn facade_callback_fn_param_expected_type(mi: i32, fn_sym: i32, self_type: i32, ud_ty: i32, r: i32) -> i32:
         let fn_node = self.generic_fn_node_for_symbol(fn_sym)
         if fn_node == 0:
             return 0
@@ -3834,14 +3875,15 @@ impl Sema:
         let u_sym = self.ast.get_extra(self.ast.fn_meta_tp_start(meta))
         let u_ty = self.facade_callback_userdata_type(ud_ty)
         let param_start = self.ast.fn_meta_param_start(meta)
-        if r < 0 or r + 1 >= self.ast.fn_meta_param_count(meta):
+        let pi = r + self.facade_callback_methods[mi].receiver_params
+        if r < 0 or pi >= self.ast.fn_meta_param_count(meta):
             return 0
-        let p_type_node = self.ast.fn_param_type(param_start, r + 1)
+        let p_type_node = self.ast.fn_param_type(param_start, pi)
         let saved_syms = sema_clone_i32_vec(&self.generic_subst_param_syms)
         let saved_tys = sema_clone_i32_vec(&self.generic_subst_type_ids)
         self.clear_generic_substitution()
         self.put_generic_subst(u_sym, u_ty as i32, fn_node)
-        let expected = self.resolve_type_node_with_current_subst(p_type_node, resolved as i32)
+        let expected = self.resolve_type_node_with_current_subst(p_type_node, self_type)
         self.generic_subst_param_syms = saved_syms
         self.generic_subst_type_ids = saved_tys
         expected
