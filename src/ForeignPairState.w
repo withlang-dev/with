@@ -172,3 +172,76 @@ pub fn foreign_pair_flow(blocks: &Vec[ForeignPairBlock], edges: &Vec[ForeignPair
         if (block.action == FOREIGN_PAIR_INVOKE or block.invokes) and not foreign_pair_can_invoke(inputs[bi]):
             violations.push(bi)
     ForeignPairFlow { inputs: move inputs, violations }
+
+// A row over canonical owned places. References name possible storage
+// places; binding a reference replaces its targets instead of unifying
+// resources forever. MIR supplies the canonical keys and move/borrow facts.
+// Multiple possible targets require a weak update: either resource may have
+// been left unchanged. This deliberately loses correlation, never safety.
+pub type ForeignPairPlaces {
+    values: Vec[ForeignPairState],
+    references: Vec[Vec[i32]],
+}
+
+pub fn foreign_pair_places(width: i32) -> ForeignPairPlaces:
+    let values: Vec[ForeignPairState] = Vec.new()
+    let references: Vec[Vec[i32]] = Vec.new()
+    for key in 0..width:
+        values.push(foreign_pair_absent())
+        let targets: Vec[i32] = Vec.new()
+        targets.push(key)
+        references.push(targets)
+    ForeignPairPlaces { values, references }
+
+pub fn foreign_pair_places_clone(source: &ForeignPairPlaces) -> ForeignPairPlaces:
+    var result = foreign_pair_places(source.values.len() as i32)
+    for key in 0..source.values.len():
+        result.values[key] = foreign_pair_on_edge(source.values[key], -1, true)
+        let targets: Vec[i32] = Vec.new()
+        for i in 0..source.references[key].len():
+            targets.push(source.references[key][i])
+        result.references[key] = targets
+    result
+
+pub fn foreign_pair_places_join(a: &ForeignPairPlaces, b: &ForeignPairPlaces) -> ForeignPairPlaces:
+    assert(a.values.len() == b.values.len())
+    var result = foreign_pair_places_clone(a)
+    for key in 0..a.values.len():
+        result.values[key] = foreign_pair_join(a.values[key], b.values[key])
+        let targets: Vec[i32] = Vec.new()
+        for i in 0..a.references[key].len(): targets.push(a.references[key][i])
+        for i in 0..b.references[key].len():
+            let target = b.references[key][i]
+            if not targets.contains(target): targets.push(target)
+        result.references[key] = targets
+    result
+
+impl ForeignPairPlaces:
+    pub mut fn borrow(dest: i32, source: i32) -> Unit:
+        // Snapshot before replacing: assigning a reference to itself is valid.
+        let targets: Vec[i32] = Vec.new()
+        for i in 0..self.references[source].len(): targets.push(self.references[source][i])
+        self.references[dest] = targets
+
+    pub mut fn move_place(dest: i32, source: i32) -> Unit:
+        if dest == source: return
+        self.values[dest] = foreign_pair_on_edge(self.values[source], -1, true)
+        self.values[source] = foreign_pair_absent()
+        // An existing reference to the source still names that storage. Moving
+        // the owner cannot silently retarget it and hide an invalidated borrow.
+
+    pub mut fn apply_at(place: i32, block: &ForeignPairBlock) -> bool:
+        let count = self.references[place].len()
+        if count == 0: return false
+        var valid = true
+        for i in 0..count:
+            let key: i32 = self.references[place][i]
+            if (block.action == FOREIGN_PAIR_INVOKE or block.invokes) and not foreign_pair_can_invoke(self.values[key]): valid = false
+            let after = foreign_pair_transfer(self.values[key], block)
+            self.values[key] = if count == 1: move after else: foreign_pair_join(self.values[key], after)
+        valid
+
+pub fn foreign_pair_origin_live(places: &ForeignPairPlaces, origin: i32) -> bool:
+    for key in 0..places.values.len():
+        if foreign_pair_retains_origin(places.values[key], origin): return true
+    false
