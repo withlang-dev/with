@@ -644,7 +644,7 @@ pub fn build_cache_freshness_reason(root: &str, target: &BuildGraphTarget, dep_r
         return "not cacheable"
     if target.name == "prune" or target.name == "prune-apply":
         return "stale: target is always run"
-    if target.name == "last-green" or target.name == "test-green" or target.name == "require-last-green" or target.name == "check-committed-state" or target.name == "print-version":
+    if target.name == "last-green" or target.name == "test-green" or target.name == "require-last-green" or target.name == "check-committed-state" or target.name == "print-version" or target.name == "unit-return-review":
         return "stale: target is always run"
     // The pinned-driver gate answers "which compiler is running this build",
     // a fact no input names (every action's signature already carries the

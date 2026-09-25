@@ -96,13 +96,18 @@ pub fn p7_dirname(path: &str) -> str:
     path.slice(0, last as i64)
 
 pub fn p7_run(case_dir: &str, label: &str, args_blob: &str) -> P7Run:
+    p7_run_with_compiler(p7_compiler_path(), case_dir, label, args_blob)
+
+// An explicit candidate permits testing a regression against both the fixed
+// compiler and the old seed without disguising either as a stage2 artifact.
+pub fn p7_run_with_compiler(compiler: &str, case_dir: &str, label: &str, args_blob: &str) -> P7Run:
     let capture_dir = p7_join(p7_abs("out/tmp/pre-d-p7-capture"), label)
     let _remove = remove_tree(capture_dir)
     assert(mkdir_p(capture_dir) == 0)
     let stdout_path = p7_join(capture_dir, "stdout.txt")
     let stderr_path = p7_join(capture_dir, "stderr.txt")
     var argv = ""
-    argv = p7_argv_append(argv, p7_compiler_path())
+    argv = p7_argv_append(argv, compiler)
     argv = argv ++ args_blob
     // Each test file runs in its own process. Keep this synchronous child's
     // objects and runtime cache inside its case, then restore the runner env.
