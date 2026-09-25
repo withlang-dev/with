@@ -2650,6 +2650,11 @@ pub fn Target.arg(move self: Target, arg: str) -> Target:
     out.args.push(arg)
     out
 
+// Positive bytes; omitted means report RSS without enforcing a budget.
+// The driver validates and consumes the policy before target dispatch.
+pub fn Target.rss_limit(move self: Target, bytes: i64) -> Target:
+    self.arg(f"rss-limit-bytes={bytes}")
+
 pub fn Target.compiler(move self: Target, compiler: &str) -> Target:
     var out = self
     out.args.push("compiler=" ++ compiler)
@@ -3134,6 +3139,10 @@ fn build_action_ctx(ctx: &BuildCtx, target: &Target) -> ActionCtx:
     let process_outputs = build_action_write_scope(target)
     let ctx_outputs = build_action_outputs(target)
     let scratch_path = tool_action_scratch_dir(target.name)
+    let action_args: Vec[str] = Vec.new()
+    for i in 0..target.args.len() as i32:
+        if not target.args[i].starts_with("rss-limit-bytes="):
+            action_args.push(with_str_clone_ref(target.args[i]))
     ActionCtx {
         token: with_str_clone_ref(ctx.token),
         target_name_value: with_str_clone_ref(target.name),
@@ -3143,7 +3152,7 @@ fn build_action_ctx(ctx: &BuildCtx, target: &Target) -> ActionCtx:
         process_runner_value: ProcessRunner { token: with_str_clone_ref(ctx.token), root: with_str_clone_ref(ctx.fs.root), target_name: with_str_clone_ref(target.name), write_scope: process_outputs, write_scoped: true, network: target.network },
         inputs_value: tool_clone_str_vec(&target.inputs),
         outputs_value: ctx_outputs,
-        args_value: tool_clone_str_vec(&target.args),
+        args_value: action_args,
         timeout_ms_value: target.timeout_ms,
         cwd_value: with_str_clone_ref(target.cwd),
         env_value: tool_clone_str_vec(&target.env),

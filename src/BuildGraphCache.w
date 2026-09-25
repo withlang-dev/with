@@ -40,6 +40,11 @@ pub fn build_cache_state_dir(root: &str) -> str:
 fn build_cache_state_path(root: &str, target_name: &str) -> str:
     build_cache_state_dir(root) ++ "/" ++ target_name ++ ".state"
 
+pub fn build_cache_invalidate_target(root: &str, target_name: &str) -> i32:
+    let path = build_cache_state_path(root, target_name)
+    if build_graph_rt_file_exists(path) == 0: return 0
+    build_graph_rt_remove_file(path)
+
 fn build_cache_effects_path(root: &str, target_name: &str) -> str:
     build_cache_state_dir(root) ++ "/" ++ target_name ++ ".effects"
 
@@ -536,6 +541,8 @@ fn build_cache_signature_parts(target: &BuildGraphTarget, root: &str) -> Vec[Bui
     var parts: Vec[BuildCacheSigPart] = Vec.new()
     var shape = f"{target.kind}:{target.name}:{target.entry}:{target.output}"
     shape = shape ++ f":{target.optimize_mode}:{target.target_kind}"
+    if target.rss_limit_bytes > 0:
+        shape = shape ++ f":rss-limit-bytes={target.rss_limit_bytes}"
     for i in 0..target.args.len() as i32:
         shape = shape ++ ":" ++ target.args[i]
     for i in 0..target.defines.len() as i32:
@@ -877,7 +884,7 @@ fn bcg_put_list(out: &str, items: &Vec[str]) -> str:
 pub fn build_cache_graph_write(root: &str, key: &str, graph: &BuildGraph) -> Unit:
     if not graph.ok:
         return
-    var out = "WGRAPH1\n"
+    var out = "WGRAPH2\n"
     out = bcg_put_str(out, key)
     out = bcg_put_str(out, graph.package_name)
     out = bcg_put_str(out, graph.package_version)
@@ -886,7 +893,7 @@ pub fn build_cache_graph_write(root: &str, key: &str, graph: &BuildGraph) -> Uni
     out = out ++ f"t{graph.targets.len()}\n"
     for i in 0..graph.targets.len() as i32:
         let t = &graph.targets[i]
-        out = out ++ f"i {t.kind} {t.target_kind} {t.optimize_mode} {t.action_fn} {t.timeout_ms} {t.network} {t.parallel}\n"
+        out = out ++ f"i {t.kind} {t.target_kind} {t.optimize_mode} {t.action_fn} {t.timeout_ms} {t.network} {t.parallel} {t.rss_limit_bytes}\n"
         out = bcg_put_str(out, t.name)
         out = bcg_put_str(out, t.entry)
         out = bcg_put_str(out, t.output)
@@ -974,7 +981,7 @@ pub fn build_cache_graph_try_read(root: &str, key: &str) -> BuildGraph:
     if text.len() == 0:
         return graph
     var r = BcgReader { text: text, pos: 0, ok: true }
-    if r.read_line() != "WGRAPH1":
+    if r.read_line() != "WGRAPH2":
         return graph
     if r.read_str() != key or not r.ok:
         return graph
@@ -991,7 +998,7 @@ pub fn build_cache_graph_try_read(root: &str, key: &str) -> BuildGraph:
         if not r.ok or iline.len() < 2 or iline[0] != 105:
             return empty_build_graph()
         let nums = iline.slice(2, iline.len()).split(" ")
-        if nums.len() != 7:
+        if nums.len() != 8:
             return empty_build_graph()
         var t = empty_build_graph_target()
         t.kind = bcg_parse_i64(nums.get(0)) as i32
@@ -1001,6 +1008,7 @@ pub fn build_cache_graph_try_read(root: &str, key: &str) -> BuildGraph:
         t.timeout_ms = bcg_parse_i64(nums.get(4)) as i32
         t.network = bcg_parse_i64(nums.get(5)) as i32
         t.parallel = bcg_parse_i64(nums.get(6)) as i32
+        t.rss_limit_bytes = bcg_parse_i64(nums.get(7))
         t.name = r.read_str()
         t.entry = r.read_str()
         t.output = r.read_str()

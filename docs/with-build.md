@@ -514,10 +514,19 @@ target.extra_output("path")        // additional output file/dir
 target.write_scope("directory")    // broader write root
 target.dep("other-target")         // dependency
 target.arg("value")                // action-specific argument
+target.rss_limit(1073741824)        // optional peak RSS budget in bytes
 target.compiler("out/bin/with")    // compiler override
 target.target(.darwin_aarch64)     // cross-platform target
 target.optimize(.release)          // optimization mode
 ```
+
+RSS is measured and reported without a default limit. `rss_limit(bytes)`
+opts one target into a positive i64 byte budget; a measured peak strictly
+above it makes the build fail with the target name, peak, and limit. The
+compiler repository explicitly budgets its self-compilation targets at
+1 GiB; ordinary application builds do not inherit that policy. A budget
+is checked when the target executes, and changing it invalidates that
+target's cached execution. It does not limit the operating-system allocator.
 
 ---
 

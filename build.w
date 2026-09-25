@@ -528,6 +528,9 @@ fn target_with_compiler_c_export_audit_inputs(target: Target, ctx: &BuildCtx) ->
 
 fn target_with_compiler_source_inputs(target: Target, ctx: &BuildCtx) -> Target:
     var out = target
+    // #679/#1665: only compiler self-compiles inherit this regression budget.
+    // Use the wire spelling until the pinned seed includes Target.rss_limit.
+    out = out.arg("rss-limit-bytes=1073741824")
     let roots: Vec[str] = Vec.new()
     roots.push("src")
     roots.push("rt")

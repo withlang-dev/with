@@ -344,6 +344,18 @@ fn build_graph_rss_fmt(bytes: i64) -> str:
 // orchestrator's high-water DELTA around the target (0 when it stayed under
 // the existing mark — attribution, not absolute footprint).
 // Durations and sizes must never enter hashed build inputs or artifacts.
+// Reporting is unconditional policy-wise; only an explicitly budgeted target
+// may turn a successful build into a memory-budget failure (#1665).
+pub fn build_graph_rss_budget_error(graph: &BuildGraph, name: &str, peak: i64) -> str:
+    for i in 0..graph.targets.len() as i32:
+        let target = &graph.targets[i]
+        if target.name != name: continue
+        let limit: i64 = target.rss_limit_bytes
+        if limit > 0 and peak > limit:
+            return "rss tripwire: target '" ++ name ++ f"' peaked at {peak} bytes (limit {limit} bytes)"
+        return ""
+    ""
+
 pub fn build_graph_times_report(root: &str, names: &Vec[str], ns_list: &Vec[i64], rss_list: &Vec[i64], total_ns: i64) -> Unit:
     if names.len() == 0:
         return

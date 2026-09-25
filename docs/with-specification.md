@@ -11290,6 +11290,17 @@ pub fn build -> Build:
     ctx.new_build().executable(info.package_name(), "src/main.w")
 ```
 
+Build targets have no implicit peak-memory budget. RSS measurement and
+reporting do not by themselves make a successful target fail.
+`Target.rss_limit(bytes)` explicitly sets a positive i64 byte budget for
+that target; a measured peak strictly above the budget fails the build
+with the target name, measured bytes, and configured limit. The policy
+belongs to the declaring graph, survives graph caching and target
+selection, and is not inherited by nested projects. Changing a budget
+invalidates that target's cached execution. The compiler repository's
+self-build targets explicitly opt into their internal regression budget;
+ordinary applications do not inherit it.
+
 The standard build graph API lives in `std.build`. It defines
 `Package`, `Build`, `Target`, `BuildKind`, `BuildTarget`, and
 `OptimizeMode`, plus target construction methods such as

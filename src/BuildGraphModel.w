@@ -20,6 +20,7 @@ pub type BuildGraphTarget {
     args: Vec[str],
     action_fn: i32,
     timeout_ms: i32,
+    rss_limit_bytes: i64,
     cwd: str,
     env: Vec[str],
     network: i32,
@@ -84,6 +85,7 @@ fn build_graph_target_new(kind: i32, name: &str, entry: &str, target_kind: i32, 
         args: Vec.new(),
         action_fn: 0,
         timeout_ms: 0,
+        rss_limit_bytes: 0,
         cwd: "",
         env: Vec.new(),
         network: 0,
@@ -174,6 +176,8 @@ pub fn build_graph_emit(graph: &BuildGraph) -> str:
         out = out ++ f"{target.target_kind}\t"
         out = out ++ f"{target.optimize_mode}\t"
         out = out ++ build_graph_escape(target.output) ++ "\n"
+        if target.rss_limit_bytes > 0:
+            out = out ++ f"arg\t{ti}\trss-limit-bytes={target.rss_limit_bytes}\n"
         for li in 0..target.system_libs.len() as i32:
             out = out ++ "system_lib\t" ++ f"{ti}\t" ++ build_graph_escape(target.system_libs[li]) ++ "\n"
         for ii in 0..target.include_paths.len() as i32:
@@ -341,7 +345,42 @@ pub fn parse_build_graph(text: &str) -> BuildGraph:
     if has_current:
         graph.targets.push(move current)
     graph.ok = true
-    graph
+    build_graph_resolve_rss_budgets(move graph)
+
+// The builder transports this driver policy in an argument so a pinned seed
+// can still compile a graph declaring a budget. Consume it before dispatch:
+// it is metadata, never an argument to a command or action.
+fn build_graph_parse_rss_limit(text: &str):
+    var value: i64 = 0
+    if text.len() == 0: return -1 as i64
+    for i in 0..text.len() as i32:
+        let ch = text[i]
+        if ch < 48 or ch > 57: return -1 as i64
+        let digit = ch - 48
+        if value > (9223372036854775807 - digit as i64) / 10: return -1 as i64
+        value = value * 10 + digit as i64
+    if value > 0: value else: -1 as i64
+
+pub fn build_graph_resolve_rss_budgets(graph: BuildGraph) -> BuildGraph:
+    var out = graph
+    for ti in 0..out.targets.len() as i32:
+        let target = &out.targets[ti]
+        let args: Vec[str] = Vec.new()
+        var limit: i64 = target.rss_limit_bytes
+        for ai in 0..target.args.len() as i32:
+            let arg = &target.args[ai]
+            if arg.starts_with("rss-limit-bytes="):
+                let parsed = build_graph_parse_rss_limit(arg.slice(16, arg.len()))
+                if parsed < 0 or limit != 0:
+                    out.ok = false
+                    out.error_msg = "target '" ++ target.name ++ "': rss limit must be one positive i64 byte count"
+                    return out
+                limit = parsed
+            else:
+                args.push(with_str_clone_ref(arg))
+        out.targets[ti].rss_limit_bytes = limit
+        out.targets[ti].args = args
+    out
 
 pub fn bg_clone_str_vec(values: &Vec[str]) -> Vec[str]:
     let out: Vec[str] = Vec.new()
@@ -370,6 +409,7 @@ fn build_graph_target_deep_copy(t: &BuildGraphTarget) -> BuildGraphTarget:
         args: bg_clone_str_vec(&t.args),
         action_fn: t.action_fn,
         timeout_ms: t.timeout_ms,
+        rss_limit_bytes: t.rss_limit_bytes,
         cwd: with_str_clone_ref(t.cwd),
         env: bg_clone_str_vec(&t.env),
         network: t.network,

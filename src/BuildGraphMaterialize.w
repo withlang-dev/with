@@ -83,6 +83,7 @@ fn build_graph_materialized_target(kind: i32, name: &str, entry: &str, target_ki
         args: Vec.new(),
         action_fn: 0,
         timeout_ms: 0,
+        rss_limit_bytes: 0,
         cwd: "",
         env: Vec.new(),
         network: 0,
@@ -276,6 +277,8 @@ impl BuildGraphMaterializer:
                 return graph
             if with_getenv_str("WITH_TRACE_GRAPH").len() > 0:
                 with_eprint(f"[graph] after-target-{i} dt=" ++ graph.default_target)
+        graph = build_graph_resolve_rss_budgets(move graph)
+        if graph.error_msg.len() > 0: return graph
         graph = build_graph_complete_edges(move graph)
         graph.ok = true
         if with_getenv_str("WITH_TRACE_GRAPH").len() > 0:

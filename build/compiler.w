@@ -346,7 +346,7 @@ fn comp_arg_value(args: &Vec[str], prefix: &str) -> str:
     ""
 
 fn comp_arg_allowed_for_compiler(arg: &str):
-    not arg.starts_with("compiler=") and not arg.starts_with("overflow=") and not arg.starts_with("embedded-object=")
+    not arg.starts_with("compiler=") and not arg.starts_with("overflow=") and not arg.starts_with("embedded-object=") and not arg.starts_with("rss-limit-bytes=")
 
 // Wall-clock budget for one compiler build/ir step. Cold CI hosts can take
 // more than 10 minutes for stage1; emulated hosts (e.g. an x86_64 bootstrap

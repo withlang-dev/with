@@ -1654,6 +1654,8 @@ fn build_runner_postprocess(root: &str, target: &BuildGraphTarget, raw_rc: i32, 
     0
 
 fn build_pool_finalize_retire(root: &str, graph: &BuildGraph, options: &BuildCommandOptions, retire: &PoolRetireResult) -> i32:
+    if retire.rc == 0 and build_graph_enforce_rss(root, graph, retire.name, retire.maxrss) != 0:
+        return 1
     if retire.via_runner == 0:
         return retire.rc
     let ti = build_graph_find_target_index_by_name(graph, retire.name)
@@ -2153,6 +2155,16 @@ var build_graph_quiet_times: bool = false
 fn build_graph_time_eprint(line: &str):
     if not build_graph_quiet_times: with_eprint(line)
 
+fn build_graph_enforce_rss(root: &str, graph: &BuildGraph, name: &str, peak: i64):
+    let message = build_graph_rss_budget_error(graph, name, peak)
+    if message.len() == 0: return 0
+    with_eprint("error: " ++ message)
+    // Workers and synchronous dispatch may already have recorded outputs.
+    // A failed budget must not become a successful cache hit on the next run.
+    if build_cache_invalidate_target(root, name) != 0:
+        with_eprint("error: could not invalidate build cache for '" ++ name ++ "'")
+    1
+
 unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, action_sema: *mut Sema, options: &BuildCommandOptions, survey: bool) -> i32:
     let no_strings: Vec[str] = Vec.new()
     if graph.targets.len() == 0:
@@ -2213,8 +2225,12 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
             let spent = with_clock_nanos() - timing_t0
             timed_names.push(with_str_clone_ref(timing_name))
             timed_ns.push(spent)
-            timed_rss.push(build_graph_rt_self_maxrss() - timing_rss0)
+            let peak = build_graph_rt_self_maxrss() - timing_rss0
+            timed_rss.push(peak)
             build_graph_time_eprint("[time] " ++ timing_name ++ " " ++ build_graph_time_fmt(spent))
+            if build_graph_enforce_rss(root, graph, timing_name, peak) != 0:
+                if not build_graph_quiet_times: build_graph_times_report(root, &timed_names, &timed_ns, &timed_rss, with_clock_nanos() - run_t0)
+                return 1
             timing_name = ""
         if build_graph_kind_removed(target.kind):
             with_eprint("error: build.w target kind " ++ build_graph_kind_name(target.kind) ++ f" ({target.kind}) was removed; regenerate your build graph")
@@ -2571,23 +2587,14 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
         let spent = with_clock_nanos() - timing_t0
         timed_names.push(with_str_clone_ref(timing_name))
         timed_ns.push(spent)
-        timed_rss.push(build_graph_rt_self_maxrss() - timing_rss0)
+        let peak = build_graph_rt_self_maxrss() - timing_rss0
+        timed_rss.push(peak)
         build_graph_time_eprint("[time] " ++ timing_name ++ " " ++ build_graph_time_fmt(spent))
+        if build_graph_enforce_rss(root, graph, timing_name, peak) != 0:
+            if not build_graph_quiet_times: build_graph_times_report(root, &timed_names, &timed_ns, &timed_rss, with_clock_nanos() - run_t0)
+            return 1
     if times_top_level:
         if not build_graph_quiet_times: build_graph_times_report(root, &timed_names, &timed_ns, &timed_rss, with_clock_nanos() - run_t0)
-        // #679 RSS tripwire (Eric, 2026-09-02): measured peak is ~0.5 GB;
-        // any target crossing 1 GB is a memory regression and fails the
-        // build loudly. Raising the limit is a deliberate, visible edit
-        // here — never a silent creep.
-        var rss_trip_rc = 0
-        for tri in 0..timed_rss.len() as i32:
-            let trip_name = if tri < timed_names.len() as i32: with_str_clone_ref(timed_names[tri]) else: "?" ++ ""
-            if timed_rss[tri] > 1073741824:
-                let peak_mb: i64 = timed_rss[tri] / 1048576
-                with_eprint("error: rss tripwire: target '" ++ trip_name ++ f"' peaked at {peak_mb}M (limit 1024M, #679)")
-                rss_trip_rc = 1
-        if rss_trip_rc != 0:
-            return 1
     if survey and survey_failed.len() as i32 > 0:
         with_eprint(f"survey: {survey_failed.len() as i32} target(s) failed:")
         for sfi in 0..survey_failed.len() as i32:
