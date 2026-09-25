@@ -180,10 +180,12 @@ fn resolution_audit_calls(report: &AnalysisReport, sema: &Sema, mir_mod: &MirMod
 
 // The indices 0..keys.len() ordered by key (heap sort). The stdlib has no
 // sort yet; this is the analyzer's own and stays here.
-fn resolution_sorted_by_key(keys: &Vec[i64]) -> Vec[i32]:
+fn resolution_sorted_by_key(keys: &Vec[i64]):
     var order: Vec[i32] = Vec.new()
     let n = keys.len() as i32
     for i in 0..n: order.push(i)
+    // Empty and singleton inputs have no heap parent (n / 2 - 1 is -1).
+    if n < 2: return order
     // sift(root, heap_size): every pass is the same loop.
     var root = n / 2 - 1
     var heap = n
