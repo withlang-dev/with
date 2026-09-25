@@ -8,6 +8,7 @@ resource Object wraps *mut obj; representation: pointer; facade:objs@test/contra
     thread: creator; operations and destruction on the creating thread, ownership stays there  [default:thread creator (§16.2b.10)]
     invalidation: views invalidated by: obj_unref, obj_free, obj_get_id; preserved across: none  [default:unknown effect is invalidate; `preserves param N` states otherwise (§16.2b.7)]
 fn obj_get_id; facade:objs@test/contract/ok_profile_applied.w; profile:gobject.v1:get@test/lib/gobject/v1.w:17
+    callbacks: may invoke applicable callbacks  [default:conservatively reentrant (§16.2b.9)]
     effect: param 0: *mut obj o: lend, an assertion about foreign behavior; receives Object  [profile:gobject.v1:get@test/lib/gobject/v1.w:17]
     returns: i32  [default:as declared]
     invalidates: Object (param 0: *mut obj o)  [default:unknown effect is invalidate (§16.2b.7)]

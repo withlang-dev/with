@@ -24,11 +24,13 @@ resource Statement wraps *mut sqlite3_stmt; representation: pointer; facade:sqli
     invalidation: views invalidated by: sqlite3_prepare_v2, sqlite3_step, sqlite3_finalize, sqlite3_db_handle, sqlite3.prepare_v2, sqlite3.db_handle; preserved across: sqlite3_column_text  [default:unknown effect is invalidate; `preserves param N` states otherwise (§16.2b.7)]
 fn sqlite3_close_v2; facade:sqlite@test/contract/ok_sqlite_shaped.w; clause:fn@test/contract/ok_sqlite_shaped.w:23
     role: alternate destroyer of Database  [clause:resource@test/contract/ok_sqlite_shaped.w:12]
+    callbacks: may invoke applicable callbacks  [default:conservatively reentrant (§16.2b.9)]
     effect: param 0: *mut sqlite3 db: destroys; receives Database  [clause:destroys@test/contract/ok_sqlite_shaped.w:24]
     returns: i32  [default:as declared]
     invalidates: Database (param 0: *mut sqlite3 db), domain errno  [default:unknown effect is invalidate (§16.2b.7)]
 fn sqlite3_prepare_v2; facade:sqlite@test/contract/ok_sqlite_shaped.w; clause:fn@test/contract/ok_sqlite_shaped.w:25
     role: producer of Statement  [clause:resource@test/contract/ok_sqlite_shaped.w:18]
+    callbacks: may invoke applicable callbacks  [default:conservatively reentrant (§16.2b.9)]
     effect: param 0: *mut sqlite3 db: lend, the described fn's assertion; receives Database  [default:a described fn lends its parameters (§16.2b.5)]
     effect: param 1: *const i8 zSql: lend, the described fn's assertion  [default:a described fn lends its parameters (§16.2b.5)]
     effect: param 2: i32 nByte: lend, the described fn's assertion  [default:a described fn lends its parameters (§16.2b.5)]
@@ -37,17 +39,20 @@ fn sqlite3_prepare_v2; facade:sqlite@test/contract/ok_sqlite_shaped.w; clause:fn
     invalidates: Database (param 0: *mut sqlite3 db), Statement (param 3: *mut *mut sqlite3_stmt ppStmt), domain errno  [default:unknown effect is invalidate (§16.2b.7)]
     presentation: rename prepare  [clause:rename@test/contract/ok_sqlite_shaped.w:26]
 fn sqlite3_step; facade:sqlite@test/contract/ok_sqlite_shaped.w; clause:fn@test/contract/ok_sqlite_shaped.w:27
+    callbacks: may invoke applicable callbacks  [default:conservatively reentrant (§16.2b.9)]
     effect: param 0: *mut sqlite3_stmt pStmt: lend, an assertion about foreign behavior; receives Statement  [clause:lend@test/contract/ok_sqlite_shaped.w:28]
     returns: i32  [default:as declared]
     invalidates: Statement (param 0: *mut sqlite3_stmt pStmt), domain errno  [default:unknown effect is invalidate (§16.2b.7)]
     presentation: Statement.step  [default:presentation sugar from the resource prefix (§16.2b.11)]
 fn sqlite3_errmsg; facade:sqlite@test/contract/ok_sqlite_shaped.w; clause:fn@test/contract/ok_sqlite_shaped.w:29
+    callbacks: may invoke applicable callbacks  [default:conservatively reentrant (§16.2b.9)]
     effect: param 0: *mut sqlite3 db: lend, the described fn's assertion; receives Database  [default:a described fn lends its parameters (§16.2b.5)]
     returns: borrow CStr from param 0: *mut sqlite3 db (Database); Option[CStr], nullable  [clause:returns borrow@test/contract/ok_sqlite_shaped.w:30]
     preserves: param 0: *mut sqlite3 db; views of it survive this call  [clause:preserves@test/contract/ok_sqlite_shaped.w:31]
     invalidates: domain errno  [default:unknown effect is invalidate (§16.2b.7)]
     presentation: Database.errmsg  [default:presentation sugar from the resource prefix (§16.2b.11)]
 fn sqlite3_column_text; facade:sqlite@test/contract/ok_sqlite_shaped.w; clause:fn@test/contract/ok_sqlite_shaped.w:32
+    callbacks: may invoke applicable callbacks  [default:conservatively reentrant (§16.2b.9)]
     effect: param 0: *mut sqlite3_stmt pStmt: lend, the described fn's assertion; receives Statement  [default:a described fn lends its parameters (§16.2b.5)]
     effect: param 1: i32 iCol: lend, the described fn's assertion  [default:a described fn lends its parameters (§16.2b.5)]
     returns: borrow CStr from param 0: *mut sqlite3_stmt pStmt (Statement); Option[CStr], nullable  [clause:returns borrow@test/contract/ok_sqlite_shaped.w:33]
@@ -55,6 +60,7 @@ fn sqlite3_column_text; facade:sqlite@test/contract/ok_sqlite_shaped.w; clause:f
     invalidates: domain errno  [default:unknown effect is invalidate (§16.2b.7)]
     presentation: Statement.column_text  [default:presentation sugar from the resource prefix (§16.2b.11)]
 fn sqlite3_db_handle; facade:sqlite@test/contract/ok_sqlite_shaped.w; clause:fn@test/contract/ok_sqlite_shaped.w:35
+    callbacks: may invoke applicable callbacks  [default:conservatively reentrant (§16.2b.9)]
     effect: param 0: *mut sqlite3_stmt pStmt: lend, the described fn's assertion; receives Statement  [default:a described fn lends its parameters (§16.2b.5)]
     returns: borrow Database from param 0: *mut sqlite3_stmt pStmt (Statement); Option[BorrowedDatabase], nullable, no Drop  [clause:returns borrow@test/contract/ok_sqlite_shaped.w:36]
     invalidates: Statement (param 0: *mut sqlite3_stmt pStmt), domain errno  [default:unknown effect is invalidate (§16.2b.7)]
@@ -62,6 +68,7 @@ fn sqlite3_db_handle; facade:sqlite@test/contract/ok_sqlite_shaped.w; clause:fn@
     presentation: rename database  [clause:rename@test/contract/ok_sqlite_shaped.w:38]
     presentation: Statement.database  [clause:rename]
 fn sqlite3_create_function_v2; facade:sqlite@test/contract/ok_sqlite_shaped.w; clause:fn@test/contract/ok_sqlite_shaped.w:39
+    callbacks: may invoke applicable callbacks  [default:conservatively reentrant (§16.2b.9)]
     effect: param 0: *mut sqlite3 db: lend, the described fn's assertion; receives Database  [default:a described fn lends its parameters (§16.2b.5)]
     effect: param 1: *const i8 zName: lend, the described fn's assertion  [default:a described fn lends its parameters (§16.2b.5)]
     effect: param 2: i32 nArg: lend, the described fn's assertion  [default:a described fn lends its parameters (§16.2b.5)]
@@ -82,6 +89,7 @@ callback param 6: extern "C" fn(*mut c_void) -> Unit xDestroy of sqlite3_create_
     thread: any; captured With state must be Send and Sync  [clause:callback_thread@test/contract/ok_sqlite_shaped.w:42]
     reentrancy: the call may invoke it; its captures' origins are affected as their capture modes allow  [default:absent a facade assertion the call is reentrant (§16.2b.9)]
 fn sqlite3_trace_v2; facade:sqlite@test/contract/ok_sqlite_shaped.w; clause:fn@test/contract/ok_sqlite_shaped.w:43
+    callbacks: may invoke applicable callbacks  [default:conservatively reentrant (§16.2b.9)]
     effect: param 0: *mut sqlite3 db: lend, the described fn's assertion; receives Database  [default:a described fn lends its parameters (§16.2b.5)]
     effect: param 1: u32 mask: lend, the described fn's assertion  [default:a described fn lends its parameters (§16.2b.5)]
     effect: param 2: extern "C" fn(u32, *mut c_void, *mut c_void, *mut c_void) -> i32 xCallback: retained by Database (param 0: *mut sqlite3 db)  [clause:retains@test/contract/ok_sqlite_shaped.w:44]
@@ -94,6 +102,7 @@ callback param 2: extern "C" fn(u32, *mut c_void, *mut c_void, *mut c_void) -> i
     thread: the registering thread  [default:callback executes where it was registered (§16.2b.10)]
     reentrancy: the call may invoke it; its captures' origins are affected as their capture modes allow  [default:absent a facade assertion the call is reentrant (§16.2b.9)]
 fn sqlite3_libversion; facade:sqlite@test/contract/ok_sqlite_shaped.w; clause:fn@test/contract/ok_sqlite_shaped.w:46
+    callbacks: may invoke applicable callbacks  [default:conservatively reentrant (§16.2b.9)]
     returns: static CStr; valid for the whole program, no origin  [clause:returns static@test/contract/ok_sqlite_shaped.w:47]
     invalidates: domain errno  [default:unknown effect is invalidate (§16.2b.7)]
     presentation: the C name is the surface; no resource receives param 0  [default:presentation sugar only groups by resource (§16.2b.11)]
