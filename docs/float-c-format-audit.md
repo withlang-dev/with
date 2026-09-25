@@ -4,6 +4,14 @@ D68 resolves #1649's default-display choice to C `%g`: six significant
 digits, notation chosen after rounding, and fractional trailing zeros removed.
 Literal parsing still rounds once directly into the destination float type.
 
+Credit: the single-rounding literal fix (`codegen: round a float literal
+once, into the type it has`) and the exact `:e` digit path with the
+round-trip display that D68 then replaced (`rt: float display prints the
+shortest text that reads back as the same f64`) are Josh Hickson's work in
+#1649. That PR was merged into the `public-return-foundation` branch and
+reached main inside #1683's squash (a5c6f430), which carries his commit
+messages but not his authorship.
+
 ## Exact defects
 
 The fixed formatter converted the integer part to `u64` at `rt_core.w:152`
