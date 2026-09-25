@@ -8,10 +8,10 @@
 #
 # `<asset>.version=` pins one platform to another release while it cannot
 # bootstrap the newest seed; say which issue, and remove it when fixed.
-version=nightly-20260925-local-1-fa33bda543c2
-with-darwin-aarch64=4b9da1360baa3a00006128cd1a4fb9c8eddf8f8e56727483e6198598e1eedcfa
-# The darwin seed is a nightly-channel prerelease cut from 8c859a7d so the
-# stage chain carries #1325's cross-unit specialization ownership (#1359).
+version=nightly-20260925-local-1-8d3cc360cf23
+with-darwin-aarch64=a29eb6b4599035b5a19d60f31a0a3a72ce37db0f8e09752c064855b7119475da
+# The darwin seed includes #1656's field-path fix; the previous seed's
+# 16-bit move paths reject this tree's RSS-budget driver changes (#1665).
 # Linux stays on v0.15.2.0 until its nightly legs publish a newer asset
 # (#1386, #1369, #1376).
 with-linux-x86_64.version=v0.15.2.0

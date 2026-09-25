@@ -3005,15 +3005,7 @@ fn run_build_command(options: BuildCommandOptions, graph_options: &BuildGraphCom
         link_stage_cleanup_current_process_temp_archives()
         return 0
     if actual_options.output_kind == BuildOutputKind.Object:
-        // A copy, not `move actual_options.output_path`: the pinned seed's
-        // move checker packs its field-path arena index into 16 bits
-        // (#1634, fixed in this tree's Sema.w field_move_path_for_expr), so
-        // once the arena passes 65536 entries — it does, by the time this
-        // function is checked — a live field move makes every sibling read
-        // (`actual_options.source_path` below) a false "use of moved value".
-        // The seed must still compile this file; retire the copy with the
-        // next seed cut.
-        var obj_path = actual_options.output_path.clone()
+        var obj_path = move actual_options.output_path
         if obj_path == "":
             obj_path = link_stage_output_path_for_source(actual_options.source_path) ++ ".o"
         let result = comp.emit_object_to_path(actual_options.source_path, obj_path)

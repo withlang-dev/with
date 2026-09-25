@@ -442,9 +442,9 @@ jobs:
             runner: macos-latest
             sdk_host_tag: darwin-arm64
             seed_repo: withlang-dev/with
-            seed_version: nightly-20260925-local-1-fa33bda543c2
+            seed_version: nightly-20260925-local-1-8d3cc360cf23
             seed_asset: with-darwin-aarch64
-            seed_sha256: 4b9da1360baa3a00006128cd1a4fb9c8eddf8f8e56727483e6198598e1eedcfa
+            seed_sha256: a29eb6b4599035b5a19d60f31a0a3a72ce37db0f8e09752c064855b7119475da
             sdk_version: nightly-sdk-test-20260815-680aa139
             sdk_asset: with-llvm-sdk-22.1.6-darwin-aarch64.tar.gz
             sdk_sha256: 4f99fc99a933ee3cf0578336a4fbbbcaaedbbe89112cd49454ea64149c188e6d
