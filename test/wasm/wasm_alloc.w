@@ -1,7 +1,7 @@
 //! expect-stdout: sum=14999850000
 //! expect-stdout: len=4000
 //! expect-stdout: two=2
-//! expect-stdout: f=6.5 0.33333333333333
+//! expect-stdout: f=6.5 0.333333
 
 use std.collections.HashMap
 

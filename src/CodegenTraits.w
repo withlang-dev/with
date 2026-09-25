@@ -2238,13 +2238,13 @@ impl Codegen:
             let str_idx = self.pool.get_data0(float_node)
             if str_idx < 0 or str_idx >= self.pool.state.strings.len() as i32:
                 return 0
-            var fval = with_parse_float_ref(with_str_clone_ref(self.pool.get_string(str_idx)))
+            var float_text = float_literal_value_text(self.pool.get_string(str_idx))
             if float_negate:
-                fval = -fval
+                float_text = "-" ++ float_text
             let llvm_ty = self.sema_type_to_llvm(resolved)
             if llvm_ty == 0:
                 return 0
-            return wl_const_real(llvm_ty, fval)
+            return wl_const_real_of_string(llvm_ty, float_text)
 
         0
 
@@ -2437,19 +2437,19 @@ impl Codegen:
                 float_negate = true
         if self.pool.kind(float_node) == NodeKind.NK_FLOAT_LIT:
             let str_idx = self.pool.get_data0(float_node)
-            var fval: f64 = 0.0
+            var value_text = "0.0"
             if str_idx >= 0 and str_idx < self.pool.state.strings.len() as i32:
                 let float_text = self.pool.get_string(str_idx)
                 if float_text.len() > 0:
-                    fval = with_parse_float_ref(with_str_clone_ref(float_text))
+                    value_text = float_literal_value_text(float_text)
             if float_negate:
-                fval = -fval
+                value_text = "-" ++ value_text
             var global_ty = wl_f64_type(self.context)
             if resolved_binding_ty != 0 and self.sema.get_type_kind(resolved_binding_ty) == TypeKind.TY_FLOAT:
                 let inferred_llvm = self.sema_type_to_llvm(resolved_binding_ty)
                 if inferred_llvm != 0:
                     global_ty = inferred_llvm
-            let _ = self.record_module_binding_global(name_sym, global_ty, wl_const_real(global_ty, fval), is_mut)
+            let _ = self.record_module_binding_global(name_sym, global_ty, wl_const_real_of_string(global_ty, value_text), is_mut)
             return
 
         let runtime_tid =

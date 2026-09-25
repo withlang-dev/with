@@ -1707,13 +1707,13 @@ impl Codegen:
             let fk = wl_get_type_kind(float_ty)
             if fk != wl_float_type_kind() and fk != wl_double_type_kind():
                 float_ty = wl_f64_type(self.context)
-            var fval: f64 = 0.0
-            // ConstKind.CK_FLOAT d0 is an AstPool string table index (from Parser.add_string)
+            // ConstKind.CK_FLOAT d0 is an AstPool string table index (from Parser.add_string).
+            // The literal's own text goes to LLVM, which rounds it once into float_ty.
             if cd >= 0 and cd < self.pool.state.strings.len() as i32:
                 let float_text = self.pool.get_string(cd)
                 if float_text.len() > 0:
-                    fval = with_parse_float_ref(with_str_clone_ref(float_text))
-            return wl_const_real(float_ty, fval)
+                    return wl_const_real_of_string(float_ty, float_literal_value_text(float_text))
+            return wl_const_real(float_ty, 0.0)
 
         if ck == ConstKind.CK_ZERO_SIZED:
             if materialize_ty != 0:
@@ -3887,7 +3887,9 @@ impl Codegen:
                 let ck = wl_get_type_kind(cast_ty)
                 // Float → Int
                 if (vk == wl_float_type_kind() or vk == wl_double_type_kind()) and ck == wl_integer_type_kind():
-                    if src_unsigned:
+                    // The integer destination determines FPToUI vs FPToSI.
+                    // A float source has no integer signedness to consult.
+                    if d1 > 0 and self.mir_sema_type_is_unsigned(d1):
                         return wl_build_fp_to_ui(self.builder, val, cast_ty)
                     return wl_build_fp_to_si(self.builder, val, cast_ty)
                 // Int → Float

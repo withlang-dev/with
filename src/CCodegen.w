@@ -3128,6 +3128,15 @@ impl CCodegen:
             out = out ++ "static const " ++ cstr_c ++ " " ++ view_name ++ " = " ++ cc_lbrace() ++ " .ptr = (const int8_t*)" ++ data_name ++ ", .len = " ++ f"{text.len()}" ++ " " ++ cc_rbrace() ++ ";\n"
         out ++ "\n"
 
+    // A float literal as C source. It differs from the literal's own text twice over:
+    // digit separators are not C (§29.1 permits `3.141_592_653`), and an f32 literal
+    // needs C's `f` suffix, or the C compiler parses it as a double and rounds twice.
+    fn float_literal_c_text(text: &str, tid: i32) -> str:
+        let value = float_literal_value_text(text)
+        if tid != 0 and self.sema.resolve_alias(tid) == self.sema.ty_f32:
+            return value ++ "f"
+        value
+
     mut fn global_init_text(node: i32, tid: i32, source_text: &str) -> str:
         var expr = node
         while expr != 0:
@@ -3149,7 +3158,7 @@ impl CCodegen:
         if kind == NodeKind.NK_FLOAT_LIT:
             let str_idx = self.ast.get_data0(expr)
             if str_idx >= 0 and str_idx < self.ast.state.strings.len() as i32:
-                return with_str_clone_ref(self.ast.get_string(str_idx))
+                return self.float_literal_c_text(self.ast.get_string(str_idx), tid)
             return "0.0"
         if kind == NodeKind.NK_STRING_LIT:
             let text = self.string_literal_node_payload_from_source(expr, source_text)
@@ -3195,7 +3204,7 @@ impl CCodegen:
             return "0"
         if ck == ConstKind.CK_FLOAT:
             if cd != 0:
-                let lit = if cd >= 0 and cd < self.ast.state.strings.len() as i32: with_str_clone_ref(self.ast.get_string(cd)) else: ""
+                let lit = if cd >= 0 and cd < self.ast.state.strings.len() as i32: self.float_literal_c_text(self.ast.get_string(cd), body.const_types[const_id]) else: ""
                 if lit.len() > 0:
                     return lit
             return "0.0"
