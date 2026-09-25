@@ -66,7 +66,6 @@ pub type WoBundle {
 
 fn wo_fail(ctx: &ActionCtx, message: &str) -> i32:
     ctx.diagnostics().error(ctx.target_name() ++ ": " ++ message)
-    1
 
 // A build action's captured output lives in files under out/command/ that
 // never reach the CI log, so a failure naming only a path hides the real

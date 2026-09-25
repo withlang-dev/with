@@ -47,7 +47,6 @@ fn rp_basename(path: &str) -> str:
 
 fn rp_fail(ctx: &ActionCtx, message: &str) -> i32:
     ctx.diagnostics().error(ctx.target_name() ++ ": " ++ message)
-    1
 
 fn rp_split_commas(text: &str) -> Vec[str]:
     var out: Vec[str] = Vec.new()

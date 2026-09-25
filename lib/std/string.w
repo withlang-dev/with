@@ -54,17 +54,17 @@ impl StringBuilder:
     // #919: one grow-to-fit + one memcpy — the old per-byte push loop was
     // ~100x slower natively and interpreted per byte under the comptime
     // evaluator (the test-green 77s anomaly's core).
-    pub mut fn push_str(s: &str) -> Unit:
+    pub mut fn push_str(s: &str):
         unsafe { with_vec_append_bytes((&raw mut self.bytes) as *mut u8, s) }
         return
 
     /// Append one byte.
-    pub mut fn push_byte(b: u8) -> Unit:
+    pub mut fn push_byte(b: u8):
         self.bytes.push(b)
         return
 
     /// Append one byte from an integer code point.
-    pub mut fn push_char(b: i32) -> Unit:
+    pub mut fn push_char(b: i32):
         self.bytes.push(b as u8)
         return
 

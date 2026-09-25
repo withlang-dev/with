@@ -6,16 +6,16 @@
 extern fn rt_libc_abort() -> Unit
 extern fn with_debug_alloc_report_leaks() -> Unit
 
-pub fn with_runtime_init() -> Unit:
+pub fn with_runtime_init():
     let _ = 0
 
-pub fn with_runtime_run() -> Unit:
+pub fn with_runtime_run():
     let _ = 0
 
-pub fn with_runtime_shutdown() -> Unit:
+pub fn with_runtime_shutdown():
     with_debug_alloc_report_leaks()
 
-pub fn with_runtime_run_one_step() -> Unit:
+pub fn with_runtime_run_one_step():
     let _ = 0
 
 pub fn with_runtime_fiber_is_completed(fiber_id: i32) -> i32:
@@ -39,10 +39,10 @@ pub unsafe fn with_runtime_take_panicked_fiber(fiber_id_out: *mut i32, panic_msg
     *panic_msg_len_out = 0
     0
 
-pub fn with_fiber_await(fiber_id: i32) -> Unit:
+pub fn with_fiber_await(fiber_id: i32):
     let _ = fiber_id
 
-pub fn with_fiber_cleanup_await(fiber_id: i32) -> Unit:
+pub fn with_fiber_cleanup_await(fiber_id: i32):
     let _ = fiber_id
 
 pub fn with_fiber_cancel(fiber_id: i32) -> i32:
@@ -66,10 +66,10 @@ pub fn with_fiber_detach_cancel(fiber_id: i32, result_buf: *mut u8) -> i32:
 pub fn with_runtime_current_cancel_requested() -> i32:
     0
 
-pub fn with_runtime_current_set_cancel_requested() -> Unit:
+pub fn with_runtime_current_set_cancel_requested():
     let _ = 0
 
-pub fn with_runtime_current_set_cancelled_return() -> Unit:
+pub fn with_runtime_current_set_cancelled_return():
     let _ = 0
 
 pub fn with_runtime_current_cancelled_return() -> i32:
@@ -79,7 +79,7 @@ pub fn with_runtime_completed_cancelled_return(fiber_id: i32) -> i32:
     let _ = fiber_id
     0
 
-pub fn with_fiber_yield() -> Unit:
+pub fn with_fiber_yield():
     let _ = 0
 
 pub fn with_runtime_has_fibers() -> i32:
@@ -107,7 +107,7 @@ pub fn with_runtime_fiber_running_worker(fiber_id: i32) -> i32:
     let _ = fiber_id
     -1
 
-pub fn with_fiber_panic_capture(msg: *const u8, msg_len: i32) -> Unit:
+pub fn with_fiber_panic_capture(msg: *const u8, msg_len: i32):
     let _ = msg
     let _ = msg_len
     rt_libc_abort()

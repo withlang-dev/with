@@ -86,11 +86,11 @@ type RtStatBuf:
 var rt_argc: i32 = 0
 var rt_argv_raw: i64 = 0
 
-pub fn rt_store_args(argc_val: i32, argv_val: *const *const u8) -> Unit:
+pub fn rt_store_args(argc_val: i32, argv_val: *const *const u8):
     rt_argc = argc_val
     rt_argv_raw = argv_val as i64
 
-pub fn rt_fill_random(buf: *mut u8, len: u64) -> Unit:
+pub fn rt_fill_random(buf: *mut u8, len: u64):
     rt_libc_arc4random_buf(buf, len)
 
 pub fn rt_libc_stdin() -> *mut c_void:
@@ -155,10 +155,10 @@ fn darwin_zero_sigaction(sig: i32):
     let sa_base = (&raw mut sa) as *mut [16]u8 as i64
     let _ = rt_libc_sigaction(sig, sa_base as *const u8, 0 as *mut u8)
 
-pub fn rt_fiber_reset_signal_handler(sig: i32) -> Unit:
+pub fn rt_fiber_reset_signal_handler(sig: i32):
     darwin_zero_sigaction(sig)
 
-pub fn rt_fiber_install_signal_handlers(alt_stack: *mut u8, alt_stack_size: i64, handler: i64) -> Unit:
+pub fn rt_fiber_install_signal_handlers(alt_stack: *mut u8, alt_stack_size: i64, handler: i64):
     var ss: [24]u8 = [0 as u8; 24]
     let ss_base = (&raw mut ss) as *mut [24]u8 as i64
     darwin_store_i64(ss_base, 0, alt_stack as i64)
@@ -275,7 +275,7 @@ pub fn rt_mmap(size: i64) -> *mut u8:
         return 0 as *mut u8
     p
 
-pub fn rt_munmap(ptr: *mut u8, size: i64) -> Unit:
+pub fn rt_munmap(ptr: *mut u8, size: i64):
     let _ = rt_libc_munmap(ptr, size as u64)
 
 // ── Process ─────────────────────────────────────────────────────
@@ -1185,7 +1185,7 @@ pub fn rt_compat_setenv_str(name: &str, value: &str) -> i32:
     with_free(value_buf)
     rc
 
-pub fn rt_compat_install_interrupt_handlers() -> Unit:
+pub fn rt_compat_install_interrupt_handlers():
     var sa: [16]u8 = [0 as u8; 16]
     let sa_base = (&raw mut sa) as *mut [16]u8 as i64
     with_memset(sa_base as *mut u8, 0, POSIX_SIGACTION_SIZE)
@@ -1194,7 +1194,7 @@ pub fn rt_compat_install_interrupt_handlers() -> Unit:
     let _ = rt_libc_sigaction(POSIX_SIGTERM, sa_base as *const u8, 0 as *mut u8)
     let _ = rt_libc_sigaction(POSIX_SIGHUP, sa_base as *const u8, 0 as *mut u8)
 
-pub fn rt_compat_raise_stack_limit() -> Unit:
+pub fn rt_compat_raise_stack_limit():
     var lim: [16]u8 = [0 as u8; 16]
     let lim_base = (&raw mut lim) as *mut [16]u8 as i64
     if rt_libc_getrlimit(POSIX_RLIMIT_STACK, lim_base as *mut u8) != 0:

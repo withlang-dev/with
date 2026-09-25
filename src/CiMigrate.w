@@ -23,7 +23,7 @@ extern fn with_str_clone_ref(s: &str) -> str
 // are pruned. Set via migrate_set_width_slice().
 var g_migrate_width_slice: i32 = 0
 
-pub fn migrate_set_width_slice(val: i32) -> Unit:
+pub fn migrate_set_width_slice(val: i32):
     g_migrate_width_slice = val
 
 // Check whether a C declaration name belongs to a width family
@@ -95,13 +95,13 @@ fn ci_migrate_text_is_blank(text: &str) -> bool:
         i = i + 1
     true
 
-pub fn migrate_set_shared_defs(prefix: &str) -> Unit:
+pub fn migrate_set_shared_defs(prefix: &str):
     g_migrate_shared_defs_prefix = with_str_clone_ref(prefix)
 
-pub fn migrate_set_directory_one_basename(basename: &str) -> Unit:
+pub fn migrate_set_directory_one_basename(basename: &str):
     g_migrate_directory_one_basename = with_str_clone_ref(basename)
 
-pub fn migrate_set_shared_fragment_path(path: &str) -> Unit:
+pub fn migrate_set_shared_fragment_path(path: &str):
     g_migrate_shared_fragment_path = with_str_clone_ref(path)
 
 pub fn migrate_add_include_path(path: &str) -> Unit:
@@ -110,7 +110,7 @@ pub fn migrate_add_include_path(path: &str) -> Unit:
 pub fn migrate_add_forced_include(path: &str) -> Unit:
     g_migrate_forced_includes.push(ci_migrate_fs_path(path))
 
-pub fn migrate_reset_options() -> Unit:
+pub fn migrate_reset_options():
     g_migrate_width_slice = 0
     g_migrate_shared_defs_prefix = ""
     ci_migrate_shared_defs_reset()
@@ -778,6 +778,8 @@ fn ci_migrate_runtime_param_is_borrowed_str(mask: i32, param_index: i32) -> bool
     mask != 0 and param_index >= 0 and (mask & (1 << (param_index as u32))) != 0
 
 // ── Migrate entry points (moved from CImport.w in D3) ─────────
+// D43: the then arm can fall through as Unit, while the else assignment
+// has a str value. Unit deliberately discards that mixed branching tail.
 pub fn migrate_add_define(define: &str) -> Unit:
     // define is "NAME=VALUE" or just "NAME"
     if ci_str_contains(define, "="):
@@ -2067,7 +2069,7 @@ var g_migrate_file_error: str = ""
 // Set via migrate_set_no_c_export().
 var g_migrate_no_c_export: i32 = 0
 
-pub fn migrate_set_no_c_export(val: i32) -> Unit:
+pub fn migrate_set_no_c_export(val: i32):
     g_migrate_no_c_export = val
 
 // When true, the output compiles without the prelude (a .wo bundle corpus,
@@ -2084,14 +2086,14 @@ pub fn migrate_set_prelude_free(val: i32) -> Unit:
 // that are compiled as std modules but still expose C-compatible entrypoints.
 var g_migrate_export_function_defs: i32 = 0
 
-pub fn migrate_set_export_function_defs(val: i32) -> Unit:
+pub fn migrate_set_export_function_defs(val: i32):
     g_migrate_export_function_defs = val
 
 // Block style preference for migrated output.
 // 0 = colon-form (default), 2 = brace-form (--prefer-brace).
 var g_migrate_block_style: i32 = 0
 
-pub fn migrate_set_block_style(val: i32) -> Unit:
+pub fn migrate_set_block_style(val: i32):
     g_migrate_block_style = val
 
 pub fn migrate_prefer_brace() -> bool:
@@ -2099,7 +2101,7 @@ pub fn migrate_prefer_brace() -> bool:
 
 var g_migrate_convert_goto_to_structured: i32 = 0
 
-pub fn migrate_set_convert_goto_to_structured(val: i32) -> Unit:
+pub fn migrate_set_convert_goto_to_structured(val: i32):
     g_migrate_convert_goto_to_structured = val
 
 pub fn migrate_convert_goto_to_structured() -> bool:

@@ -8,7 +8,6 @@ fn package_owned_text(s: &str): s ++ ""
 
 fn pkg_fail(ctx: &ActionCtx, message: &str) -> i32:
     ctx.diagnostics().error(ctx.target_name() ++ ": " ++ message)
-    1
 
 fn pkg_join(left: &str, right: &str) -> str:
     if left.len() == 0:
@@ -485,12 +484,9 @@ fn pkg_version(ctx: &ActionCtx) -> str:
     let version = ctx.env_input("WITH_VERSION")
     if version.len() == 0:
         ctx.diagnostics().error(ctx.target_name() ++ ": set WITH_VERSION, for example WITH_VERSION=v0.14.8")
-        return ""
     let source_version = pkg_trim_line(ctx.fs().read_text("src/version"))
     if source_version != version:
-        ctx.diagnostics().error(ctx.target_name() ++ ": src/version is '" ++ source_version ++ "', expected '" ++ version ++ "'")
-        ctx.diagnostics().error(ctx.target_name() ++ ": update src/version and build the release from that committed version")
-        return ""
+        ctx.diagnostics().error(ctx.target_name() ++ ": src/version is '" ++ source_version ++ "', expected '" ++ version ++ "'\n" ++ ctx.target_name() ++ ": update src/version and build the release from that committed version")
     version
 
 pub fn run_package_bootstrap_c_action(ctx: ActionCtx) -> i32:

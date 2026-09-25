@@ -593,7 +593,7 @@ fn fiber_write_i32(fd: i32, n: i32):
         let _ = rt_libc_write(fd, (&raw const buf as i64 + j as i64) as *const u8, 1)
         j = j - 1
 
-pub fn with_fiber_stack_overflow_handler(sig: i32, info: *const u8, ucontext: *mut u8) -> Unit:
+pub fn with_fiber_stack_overflow_handler(sig: i32, info: *const u8, ucontext: *mut u8):
     let _ = ucontext
     let fault_addr = rt_fiber_fault_addr(info)
     let current = current_worker_fiber()
@@ -615,7 +615,7 @@ pub fn with_fiber_stack_overflow_handler(sig: i32, info: *const u8, ucontext: *m
 fn fiber_install_signal_handlers():
     rt_fiber_install_signal_handlers(alt_stack_ptr(), FIBER_ALT_STACK_SIZE, with_fiber_stack_overflow_handler as i64)
 
-pub unsafe fn with_fiber_bootstrap_load(entry_out: *mut i64, arg_out: *mut i64, result_out: *mut i64) -> Unit:
+pub unsafe fn with_fiber_bootstrap_load(entry_out: *mut i64, arg_out: *mut i64, result_out: *mut i64):
     let current = current_worker_fiber()
     if current == 0:
         *entry_out = 0
@@ -626,7 +626,7 @@ pub unsafe fn with_fiber_bootstrap_load(entry_out: *mut i64, arg_out: *mut i64, 
     *arg_out = fiber_arg_ptr(current)
     *result_out = fiber_result_buf(current) as i64
 
-pub fn with_fiber_bootstrap_finish() -> Unit:
+pub fn with_fiber_bootstrap_finish():
     let worker = current_worker_index()
     let current = worker_current_fibers[worker]
     if current == 0:
@@ -707,7 +707,7 @@ fn scheduler_start_workers():
         worker_handles[i] = handle
         i = i + 1
 
-pub fn with_runtime_core_init() -> Unit:
+pub fn with_runtime_core_init():
     scheduler_init_primitives()
     scheduler_lock()
     scheduler_shutdown_requested = 0
@@ -820,7 +820,7 @@ pub fn with_fiber_spawn(entry_fn: *const u8, arg: *mut u8, result_buf: *mut u8, 
     scheduler_unlock()
     return fiber_id
 
-pub fn with_fiber_yield() -> Unit:
+pub fn with_fiber_yield():
     let worker = current_worker_index()
     let current = worker_current_fibers[worker]
     if current == 0:
@@ -906,12 +906,12 @@ pub fn with_runtime_request_cancel(fiber_id: i32) -> i32:
     scheduler_unlock()
     1
 
-pub fn with_fiber_set_result(value: i64) -> Unit:
+pub fn with_fiber_set_result(value: i64):
     let current = current_worker_fiber()
     if current != 0:
         store_i64(current, FIBER_OFF_RESULT, value)
 
-pub fn with_runtime_current_set_cancelled_return() -> Unit:
+pub fn with_runtime_current_set_cancelled_return():
     let current = current_worker_fiber()
     if current != 0:
         fiber_set_cancelled_return_flag(current, 1)
@@ -932,12 +932,12 @@ pub fn with_runtime_completed_cancelled_return(fiber_id: i32) -> i32:
     scheduler_unlock()
     out
 
-pub fn with_runtime_current_set_cancel_requested() -> Unit:
+pub fn with_runtime_current_set_cancel_requested():
     let current = current_worker_fiber()
     if current != 0:
         fiber_set_cancel_requested(current, 1)
 
-pub fn with_fiber_panic_capture(msg: *const u8, msg_len: i32) -> Unit:
+pub fn with_fiber_panic_capture(msg: *const u8, msg_len: i32):
     let worker = current_worker_index()
     let current = worker_current_fibers[worker]
     if current == 0:
@@ -962,7 +962,7 @@ pub fn with_fiber_panic_capture(msg: *const u8, msg_len: i32) -> Unit:
     with_fiber_switch(current as *mut u8, scheduler_ctx_ptr(worker))
     rt_libc_abort()
 
-pub fn with_runtime_core_shutdown() -> Unit:
+pub fn with_runtime_core_shutdown():
     scheduler_lock()
     scheduler_shutdown_requested = 1
     scheduler_wake_all()
@@ -1002,7 +1002,7 @@ pub fn with_runtime_core_has_fibers() -> i32:
     scheduler_unlock()
     if has: 1 else: 0
 
-pub fn with_runtime_core_run_one_step() -> Unit:
+pub fn with_runtime_core_run_one_step():
     if run_one_fiber_for_worker(current_worker_index()) == 0:
         let _ = rt_nanosleep(1000)
 

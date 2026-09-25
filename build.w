@@ -50,7 +50,6 @@ fn run_cross_unsupported_action(ctx: ActionCtx) -> i32:
         ctx.diagnostics().error("cross: cross-target compilation is not implemented yet; set CROSS_TARGET=<triple> or use `with build --target <triple>` for the compiler diagnostic")
     else:
         ctx.diagnostics().error("cross: cross-target compilation for '" ++ target ++ "' is not implemented yet")
-    1
 
 // ── Cross-target (linux) helpers ────────────────────────────────────
 // Two supported cross tags: "linux_x86_64" and "linux_aarch64". Each
@@ -237,11 +236,9 @@ fn run_cross_linux_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
     let libclang = lib_dir ++ "/libclang.a"
     if not fs.host_exists(libclang):
         ctx.diagnostics().error("cross-llvm-link-metadata: missing " ++ libclang ++ "; extract or build the " ++ cross_llvm_prefix(tag) ++ " LLVM SDK first")
-        return 1
     let lib_files = fs.host_list_files(lib_dir)
     if lib_files.len() == 0:
         ctx.diagnostics().error("cross-llvm-link-metadata: could not list: " ++ lib_dir)
-        return 1
     var clang_archives: Vec[str] = Vec.new()
     var llvm_archives: Vec[str] = Vec.new()
     for i in 0..lib_files.len() as i32:
@@ -264,7 +261,6 @@ fn run_cross_linux_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
     ld_rsp = ld_rsp ++ comp_wasm_backend_alias_lines(comp_sdk_has_wasm_backend(fs, lib_dir), "Linux", false)
     if fs.write_text(output_path, ld_rsp) != 0:
         ctx.diagnostics().error("cross-llvm-link-metadata: could not write: " ++ output_path)
-        return 1
     0
 
 // ── Cross-target (windows_x86_64) helpers ───────────────────────────
@@ -301,11 +297,9 @@ fn run_cross_windows_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
     let libclang = lib_dir ++ "/libclang.lib"
     if not fs.host_exists(libclang):
         ctx.diagnostics().error("cross-windows-llvm-link-metadata: missing " ++ libclang ++ "; extract the with-llvm-sdk-" ++ compiler_llvm_version() ++ "-windows-x86_64 release asset into .deps/")
-        return 1
     let lib_files = fs.host_list_files(lib_dir)
     if lib_files.len() == 0:
         ctx.diagnostics().error("cross-windows-llvm-link-metadata: could not list: " ++ lib_dir)
-        return 1
     var clang_archives: Vec[str] = Vec.new()
     var llvm_archives: Vec[str] = Vec.new()
     for i in 0..lib_files.len() as i32:
@@ -327,7 +321,6 @@ fn run_cross_windows_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
     ld_rsp = ld_rsp ++ comp_wasm_backend_alias_lines(comp_sdk_has_wasm_backend(fs, lib_dir), "Windows", false)
     if fs.write_text(output_path, ld_rsp) != 0:
         ctx.diagnostics().error("cross-windows-llvm-link-metadata: could not write: " ++ output_path)
-        return 1
     0
 
 // ── Cross-target (windows_aarch64) helpers ──────────────────────────
@@ -361,11 +354,9 @@ fn run_cross_windows_aarch64_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
     let libclang = lib_dir ++ "/libclang.lib"
     if not fs.host_exists(libclang):
         ctx.diagnostics().error("cross-windows-aarch64-llvm-link-metadata: missing " ++ libclang ++ "; extract the with-llvm-sdk-" ++ compiler_llvm_version() ++ "-windows-aarch64 release asset into .deps/")
-        return 1
     let lib_files = fs.host_list_files(lib_dir)
     if lib_files.len() == 0:
         ctx.diagnostics().error("cross-windows-aarch64-llvm-link-metadata: could not list: " ++ lib_dir)
-        return 1
     var clang_archives: Vec[str] = Vec.new()
     var llvm_archives: Vec[str] = Vec.new()
     for i in 0..lib_files.len() as i32:
@@ -387,7 +378,6 @@ fn run_cross_windows_aarch64_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
     ld_rsp = ld_rsp ++ comp_wasm_backend_alias_lines(comp_sdk_has_wasm_backend(fs, lib_dir), "Windows", false)
     if fs.write_text(output_path, ld_rsp) != 0:
         ctx.diagnostics().error("cross-windows-aarch64-llvm-link-metadata: could not write: " ++ output_path)
-        return 1
     0
 
 fn empty_file_target(name: &str, output: &str) -> Target:
@@ -1038,7 +1028,6 @@ fn build_copy_generated_compiler_modules(fs: &ToolFs, repo_copy: &str) -> str:
 
 fn issue61_fail(ctx: &ActionCtx, message: &str) -> i32:
     ctx.diagnostics().error("issue61-regression: " ++ message)
-    1
 
 fn issue61_regression_action(ctx: ActionCtx) -> i32:
     let inputs = ctx.inputs()
@@ -1126,7 +1115,6 @@ fn issue61_regression_action(ctx: ActionCtx) -> i32:
 // applied to a pristine repo copy and `check src/main.w` must still say ok.
 fn invariance_fail(ctx: &ActionCtx, message: &str) -> i32:
     ctx.diagnostics().error("invariance-check: " ++ message)
-    1
 
 fn invariance_run_check(ctx: &ActionCtx, compiler_path: &str, repo_copy: &str, label: &str) -> i32:
     let root = ctx.project_info().project_root()
@@ -1223,12 +1211,10 @@ fn run_debug_alloc_tests_action(ctx: ActionCtx) -> i32:
     let inputs = ctx.inputs()
     if inputs.len() == 0:
         ctx.diagnostics().error("debug-alloc-tests: missing compiler input")
-        return 1
     let fs = ctx.fs()
     let out_dir = ctx.output()
     if fs.mkdir_all(out_dir) != 0:
         ctx.diagnostics().error("debug-alloc-tests: could not create output dir: " ++ out_dir)
-        return 1
     // #807: the debug-alloc lane is non-functional on Windows — every fixture
     // exits 1 under --debug-alloc (uniform, not per-test logic). Gate the whole
     // lane off on Windows until the port is root-caused; Linux/macOS stay active.
@@ -1251,7 +1237,6 @@ fn run_debug_alloc_tests_action(ctx: ActionCtx) -> i32:
     let br = ctx.process_runner().run_capture_cwd(build_args, bout, berr, 180000, root)
     if br.rc != 0:
         ctx.diagnostics().error(f"debug-alloc-tests: driver build failed rc={br.rc}; stderr={berr}")
-        return 1
 
     let fixtures = fs.list_files("test/debug_alloc")
     var check_args: Vec[str] = Vec.new()
@@ -1267,7 +1252,6 @@ fn run_debug_alloc_tests_action(ctx: ActionCtx) -> i32:
     let cr = ctx.process_runner().run_capture_cwd(check_args, cout, cerr, 240000, root)
     if cr.rc != 0:
         ctx.diagnostics().error(f"debug-alloc-tests: lane failed rc={cr.rc}\n" ++ cr.stdout)
-        return 1
     let _ = fs.write_text(build_project_join(out_dir, ".stamp"), "ok")
     0
 
@@ -1304,12 +1288,10 @@ fn run_contract_view_tests_action(ctx: ActionCtx) -> i32:
     let inputs = ctx.inputs()
     if inputs.len() == 0:
         ctx.diagnostics().error("contract-view-tests: missing compiler input")
-        return 1
     let fs = ctx.fs()
     let out_dir = ctx.output()
     if fs.mkdir_all(out_dir) != 0:
         ctx.diagnostics().error("contract-view-tests: could not create output dir: " ++ out_dir)
-        return 1
     let root = ctx.project_info().project_root()
     let compiler = build_project_abs(root, inputs.get(0))
     let fixtures = fs.list_files("test/contract")
@@ -1326,39 +1308,38 @@ fn run_contract_view_tests_action(ctx: ActionCtx) -> i32:
         let planted = base.starts_with("bad_")
         let (rc, audit) = contract_view_run(ctx, root, compiler, fixture, out_dir, stem ++ ".audit.stdout", "audit:contract")
         if planted and rc == 0:
-            ctx.diagnostics().error(f"contract-view-tests: {fixture}: audit:contract passed over a planted suspicious configuration")
+            eprint("error: " ++ f"contract-view-tests: {fixture}: audit:contract passed over a planted suspicious configuration")
             errors = errors + 1
         if not planted and rc != 0:
-            ctx.diagnostics().error(f"contract-view-tests: {fixture}: audit:contract failed rc={rc}:\n" ++ audit)
+            eprint("error: " ++ f"contract-view-tests: {fixture}: audit:contract failed rc={rc}:\n" ++ audit)
             errors = errors + 1
         let wanted = contract_view_directives(text, "//! expect-contract: ")
         for k in 0..wanted.len() as i32:
             if not audit.contains(wanted[k]):
-                ctx.diagnostics().error("contract-view-tests: " ++ fixture ++ ": audit:contract is missing '" ++ wanted[k] ++ "':\n" ++ audit)
+                eprint("error: " ++ "contract-view-tests: " ++ fixture ++ ": audit:contract is missing '" ++ wanted[k] ++ "':\n" ++ audit)
                 errors = errors + 1
         let unwanted = contract_view_directives(text, "//! expect-contract-not: ")
         for k in 0..unwanted.len() as i32:
             if audit.contains(unwanted[k]):
-                ctx.diagnostics().error("contract-view-tests: " ++ fixture ++ ": audit:contract flagged the clean case '" ++ unwanted[k] ++ "':\n" ++ audit)
+                eprint("error: " ++ "contract-view-tests: " ++ fixture ++ ": audit:contract flagged the clean case '" ++ unwanted[k] ++ "':\n" ++ audit)
                 errors = errors + 1
         if not planted:
             let (all_rc, all) = contract_view_run(ctx, root, compiler, fixture, out_dir, stem ++ ".all.stdout", "audit:all")
             if all_rc != 0:
-                ctx.diagnostics().error(f"contract-view-tests: {fixture}: audit:all failed rc={all_rc}:\n" ++ all)
+                eprint("error: " ++ f"contract-view-tests: {fixture}: audit:all failed rc={all_rc}:\n" ++ all)
                 errors = errors + 1
         let (_, view) = contract_view_run(ctx, root, compiler, fixture, out_dir, stem ++ ".contract.stdout", "contract")
         let expected_path = "test/contract/" ++ stem ++ ".expected"
         if fs.exists(expected_path):
             let expected = fs.read_text(expected_path)
             if view != expected:
-                ctx.diagnostics().error(f"contract-view-tests: {fixture}: the contract view differs from {expected_path}; actual: " ++ build_project_abs(root, build_project_join(out_dir, stem ++ ".contract.stdout")))
+                eprint("error: " ++ f"contract-view-tests: {fixture}: the contract view differs from {expected_path}; actual: " ++ build_project_abs(root, build_project_join(out_dir, stem ++ ".contract.stdout")))
                 errors = errors + 1
         else if not planted:
-            ctx.diagnostics().error(f"contract-view-tests: {fixture}: a clean fixture needs a checked-in {expected_path} snapshot")
+            eprint("error: " ++ f"contract-view-tests: {fixture}: a clean fixture needs a checked-in {expected_path} snapshot")
             errors = errors + 1
     if checked == 0:
         ctx.diagnostics().error("contract-view-tests: no fixtures under test/contract")
-        return 1
     if errors > 0:
         return 1
     print(f"contract-view-tests: {checked} fixtures; every audit verdict, needle and snapshot agreed")
@@ -1376,7 +1357,6 @@ fn run_drop_audit_action(ctx: ActionCtx) -> i32:
     let out_dir = ctx.output()
     if fs.mkdir_all(out_dir) != 0:
         ctx.diagnostics().error("drop-audit: could not create output dir: " ++ out_dir)
-        return 1
     let root = ctx.project_info().project_root()
     let candidate = build_project_abs(root, ctx.inputs().get(0))
     let baseline = build_project_abs(root, "src/main")
@@ -1395,7 +1375,6 @@ fn run_drop_audit_action(ctx: ActionCtx) -> i32:
     let report = fs.read_text(aout_rel)
     if ar.rc != 0:
         ctx.diagnostics().error(f"drop-audit: regressions vs baseline (rc={ar.rc})\n" ++ report)
-        return 1
     let _ = fs.write_text(build_project_join(out_dir, ".stamp"), "ok")
     let _ = report
     0
@@ -1420,7 +1399,6 @@ fn run_unit_return_review_action(ctx: ActionCtx) -> i32:
     let untracked = ctx.process_runner().run_capture_cwd(untracked_args, build_project_abs(root, build_project_join(out_dir, "untracked.stdout")), build_project_abs(root, build_project_join(out_dir, "untracked.stderr")), 60000, root)
     if untracked.rc != 0 or untracked.stdout.trim().len() > 0:
         ctx.diagnostics().error("unit-return-review: stage new source files so they are included in the review diff\n" ++ untracked.stdout ++ untracked.stderr)
-        return 1
     var args: Vec[str] = Vec.new()
     args.push(build_project_abs(root, ctx.inputs().get(0)))
     args.push("run")
@@ -1432,7 +1410,6 @@ fn run_unit_return_review_action(ctx: ActionCtx) -> i32:
     print(fs.read_text(stdout_rel))
     if result.rc != 0:
         ctx.diagnostics().error("unit-return-review: " ++ fs.read_text(stderr_rel))
-        return 1
     0
 
 fn run_rt_decl_audit_action(ctx: ActionCtx) -> i32:
@@ -1440,7 +1417,6 @@ fn run_rt_decl_audit_action(ctx: ActionCtx) -> i32:
     let out_dir = ctx.output()
     if fs.mkdir_all(out_dir) != 0:
         ctx.diagnostics().error("rt-decl-audit: could not create output dir: " ++ out_dir)
-        return 1
     let root = ctx.project_info().project_root()
     let compiler = build_project_abs(root, ctx.inputs().get(0))
     var args: Vec[str] = Vec.new()
@@ -1454,7 +1430,6 @@ fn run_rt_decl_audit_action(ctx: ActionCtx) -> i32:
     let ar = ctx.process_runner().run_capture_cwd(args, aout, aerr, 600000, root)
     if ar.rc != 0:
         ctx.diagnostics().error(f"rt-decl-audit: runtime declarations diverge (rc={ar.rc})\n" ++ fs.read_text(aout_rel) ++ fs.read_text(aerr_rel))
-        return 1
     print("rt-decl-audit: " ++ build_trim_trailing_line_endings(fs.read_text(aout_rel)))
     let _ = fs.write_text(build_project_join(out_dir, ".stamp"), "ok")
     0
@@ -1472,7 +1447,6 @@ fn run_move_audit_action(ctx: ActionCtx) -> i32:
     let out_dir = ctx.output()
     if fs.mkdir_all(out_dir) != 0:
         ctx.diagnostics().error("move-audit: could not create output dir: " ++ out_dir)
-        return 1
     let root = ctx.project_info().project_root()
     let candidate = build_project_abs(root, ctx.inputs().get(0))
     let baseline = build_project_abs(root, "src/main")
@@ -1491,7 +1465,6 @@ fn run_move_audit_action(ctx: ActionCtx) -> i32:
     let report = fs.read_text(aout_rel)
     if ar.rc != 0:
         ctx.diagnostics().error(f"move-audit: cells disagree with ground truth (rc={ar.rc})\n" ++ report)
-        return 1
     let _ = fs.write_text(build_project_join(out_dir, ".stamp"), "ok")
     let _ = report
     0
@@ -1515,7 +1488,6 @@ fn run_stdlib_complexity_action(ctx: ActionCtx):
     let output = ctx.output()
     if fs.mkdir_all(output) != 0:
         ctx.diagnostics().error("stdlib-complexity: cannot create output directory")
-        return 1
     let root = ctx.project_info().project_root()
     let compiler = build_project_abs(root, ctx.inputs()[0])
     let binary = build_project_abs(root, build_project_join(output, host_bin("stdlib-complexity")))
@@ -1536,7 +1508,6 @@ fn run_stdlib_complexity_action(ctx: ActionCtx):
         build_project_abs(root, stdout_rel), build_project_abs(root, stderr_rel), 300000, root)
     if compiled.rc != 0:
         ctx.diagnostics().error(f"stdlib-complexity: compiler {compiler} exited {compiled.rc}; stdout={stdout_rel} stderr={stderr_rel}\n" ++ fs.read_text(stdout_rel) ++ fs.read_text(stderr_rel))
-        return 1
     let timing_out = build_project_join(output, "timing.stdout")
     let timing_err = build_project_join(output, "timing.stderr")
     var timing_args: Vec[str] = Vec.new()
@@ -1546,7 +1517,6 @@ fn run_stdlib_complexity_action(ctx: ActionCtx):
     if timed.rc != 0:
         ctx.diagnostics().error("stdlib-complexity: result or growth check failed\n" ++
             fs.read_text(timing_out) ++ fs.read_text(timing_err))
-        return 1
     let alloc_out = build_project_join(output, "allocation.stdout")
     let alloc_err = build_project_join(output, "allocation.stderr")
     // The CLI enables the runtime trace only for this child. Compilation and
@@ -1564,20 +1534,16 @@ fn run_stdlib_complexity_action(ctx: ActionCtx):
     let trace = fs.read_text(alloc_err)
     if allocated.rc != 0 or not fs.read_text(alloc_out).contains("allocation results ok"):
         ctx.diagnostics().error("stdlib-complexity: allocation fixture failed\n" ++ trace)
-        return 1
     let empty = complexity_allocation_count(trace, "empty")
     let control = complexity_allocation_count(trace, "control")
     let removal = complexity_allocation_count(trace, "hash-remove")
     if empty != 0 or control <= 0 or removal < 0:
         ctx.diagnostics().error(f"stdlib-complexity: invalid allocation trace empty={empty} control={control} removal={removal}\n" ++ trace)
-        return 1
     if removal == 0:
         ctx.diagnostics().error("stdlib-complexity: XPASS HashMap removal #939; update its expectation with fix evidence")
-        return 1
     let report = fs.read_text(timing_out) ++ f"XFAIL hash-remove-allocation #939 allocations={removal}\n"
     if fs.write_text(build_project_join(output, "report.txt"), report) != 0:
         ctx.diagnostics().error("stdlib-complexity: cannot write report")
-        return 1
     if fs.write_text(build_project_join(output, ".stamp"), "ok") != 0: return 1
     0
 
@@ -1587,7 +1553,6 @@ fn run_fixpoint_diff_action(ctx: ActionCtx) -> i32:
     let out_dir = build_project_dirname(output)
     if fs.mkdir_all(out_dir) != 0:
         ctx.diagnostics().error("fixpoint-diff: could not create output dir: " ++ out_dir)
-        return 1
     let root = ctx.project_info().project_root()
     let compiler = build_project_abs(root, stage_compiler_bin("with-stage2"))
     let left = build_project_abs(root, stage_compiler_obj("with-stage2-fixpoint.o"))
@@ -1601,7 +1566,6 @@ fn run_fixpoint_diff_action(ctx: ActionCtx) -> i32:
     let result = ctx.process_runner().run_capture_cwd(args, build_project_abs(root, output), err_path, 120000, root)
     if result.rc != 0:
         ctx.diagnostics().error("fixpoint-diff: report command failed; stderr=" ++ err_path)
-        return result.rc
     0
 
 fn deep_debug_tool_expect(ctx: &ActionCtx, root: &str, compiler: &str, source_path: &str, out_dir: &str, name: &str, opt_a: &str, opt_b: &str, needle: &str) -> i32:
@@ -1621,10 +1585,8 @@ fn deep_debug_tool_expect(ctx: &ActionCtx, root: &str, compiler: &str, source_pa
     let result = ctx.process_runner().run_capture_cwd(args, stdout_path, stderr_path, 120000, root)
     if result.rc != 0:
         ctx.diagnostics().error(f"deep-debug-tool-tests: {name} failed rc={result.rc}; stdout={stdout_path} stderr={stderr_path}")
-        return result.rc
     if not ctx.fs().read_text(stdout_rel).contains(needle):
         ctx.diagnostics().error("deep-debug-tool-tests: " ++ name ++ " report missing '" ++ needle ++ "'; stdout=" ++ stdout_path)
-        return 1
     0
 
 fn deep_debug_analyze_expect(ctx: &ActionCtx, root: &str, compiler: &str, source_path: &str, out_dir: &str, name: &str, request: &str, needle: &str) -> i32:
@@ -1640,10 +1602,8 @@ fn deep_debug_analyze_expect(ctx: &ActionCtx, root: &str, compiler: &str, source
     let result = ctx.process_runner().run_capture_cwd(args, stdout_path, stderr_path, 120000, root)
     if result.rc != 0:
         ctx.diagnostics().error(f"deep-debug-tool-tests: {name} failed rc={result.rc}; stdout={stdout_path} stderr={stderr_path}")
-        return result.rc
     if not ctx.fs().read_text(stdout_rel).contains(needle):
         ctx.diagnostics().error("deep-debug-tool-tests: " ++ name ++ " report missing '" ++ needle ++ "'; stdout=" ++ stdout_path)
-        return 1
     0
 
 // An audit fixture with a planted defect: the audit must exit nonzero, name
@@ -1662,26 +1622,21 @@ fn deep_debug_analyze_expect_violation(ctx: &ActionCtx, root: &str, compiler: &s
     let result = ctx.process_runner().run_capture_cwd(args, stdout_path, stderr_path, 120000, root)
     if result.rc == 0:
         ctx.diagnostics().error(f"deep-debug-tool-tests: {name} passed over a planted defect; stdout={stdout_path}")
-        return 1
     let text = ctx.fs().read_text(stdout_rel)
     if not text.contains(needle):
         ctx.diagnostics().error("deep-debug-tool-tests: " ++ name ++ " report missing '" ++ needle ++ "'; stdout=" ++ stdout_path)
-        return 1
     if text.contains(absent):
         ctx.diagnostics().error("deep-debug-tool-tests: " ++ name ++ " flagged the clean case '" ++ absent ++ "'; stdout=" ++ stdout_path)
-        return 1
     0
 
 fn run_deep_debug_tool_tests_action(ctx: ActionCtx) -> i32:
     let inputs = ctx.inputs()
     if inputs.len() == 0:
         ctx.diagnostics().error("deep-debug-tool-tests: missing compiler input")
-        return 1
     let fs = ctx.fs()
     let out_dir = ctx.output()
     if fs.mkdir_all(out_dir) != 0:
         ctx.diagnostics().error("deep-debug-tool-tests: could not create output dir: " ++ out_dir)
-        return 1
     let root = ctx.project_info().project_root()
     let compiler = build_project_abs(root, inputs.get(0))
     let reduce_input = build_project_join(out_dir, "reduce-input.w")
@@ -1694,7 +1649,6 @@ fn run_deep_debug_tool_tests_action(ctx: ActionCtx) -> i32:
         "    missing_symbol\n"
     if fs.write_text(reduce_input, reduce_source) != 0:
         ctx.diagnostics().error("deep-debug-tool-tests: could not write reducer fixture")
-        return 1
     var reduce_args: Vec[str] = Vec.new()
     reduce_args.push(build_owned_text(compiler))
     reduce_args.push("reduce")
@@ -1712,11 +1666,9 @@ fn run_deep_debug_tool_tests_action(ctx: ActionCtx) -> i32:
     let reduce_result = ctx.process_runner().run_capture_cwd(reduce_args, reduce_stdout, reduce_stderr, 120000, root)
     if reduce_result.rc != 0:
         ctx.diagnostics().error("deep-debug-tool-tests: reduce failed; stderr=" ++ reduce_stderr)
-        return reduce_result.rc
     let reduced_text = fs.read_text(reduce_output)
     if not reduced_text.contains("missing_symbol"):
         ctx.diagnostics().error("deep-debug-tool-tests: reducer output lost predicate line")
-        return 1
 
     // #1015: --test reduces a `fn test_*` fixture through the runner. The
     // red test needs both of its lines (dropping either turns the failure
@@ -1731,7 +1683,6 @@ fn run_deep_debug_tool_tests_action(ctx: ActionCtx) -> i32:
         "    assert(xs.len() == 1)\n"
     if fs.write_text(reduce_test_input, reduce_test_source) != 0:
         ctx.diagnostics().error("deep-debug-tool-tests: could not write reduce --test fixture")
-        return 1
     var reduce_test_args: Vec[str] = Vec.new()
     reduce_test_args.push(build_owned_text(compiler))
     reduce_test_args.push("reduce")
@@ -1745,22 +1696,18 @@ fn run_deep_debug_tool_tests_action(ctx: ActionCtx) -> i32:
     let reduce_test_result = ctx.process_runner().run_capture_cwd(reduce_test_args, reduce_test_stdout, reduce_test_stderr, 300000, root)
     if reduce_test_result.rc != 0:
         ctx.diagnostics().error("deep-debug-tool-tests: reduce --test failed; stderr=" ++ reduce_test_stderr)
-        return reduce_test_result.rc
     let reduced_test = fs.read_text(reduce_test_output)
     let want_reduced = "fn test_red:\n    let xs: Vec[i32] = Vec.new()\n    assert(xs.len() == 1)\n"
     if reduced_test != want_reduced:
         ctx.diagnostics().error("deep-debug-tool-tests: reduce --test kept the wrong lines:\n" ++ reduced_test)
-        return 1
     if not reduce_test_result.stdout.contains("(3 lines)"):
         ctx.diagnostics().error("deep-debug-tool-tests: reduce --test line count; stdout=" ++ reduce_test_result.stdout)
-        return 1
 
     let left = build_project_join(out_dir, "left.bin")
     let right = build_project_join(out_dir, "right.bin")
     let report = build_project_join(out_dir, "fixpoint-diff.txt")
     if fs.write_text(left, "abc") != 0 or fs.write_text(right, "abd") != 0:
         ctx.diagnostics().error("deep-debug-tool-tests: could not write diff fixtures")
-        return 1
     var diff_args: Vec[str] = Vec.new()
     diff_args.push(build_owned_text(compiler))
     diff_args.push("fixpoint-diff")
@@ -1770,10 +1717,8 @@ fn run_deep_debug_tool_tests_action(ctx: ActionCtx) -> i32:
     let diff_result = ctx.process_runner().run_capture_cwd(diff_args, build_project_abs(root, report), diff_stderr, 120000, root)
     if diff_result.rc != 0:
         ctx.diagnostics().error("deep-debug-tool-tests: fixpoint-diff failed; stderr=" ++ diff_stderr)
-        return diff_result.rc
     if not fs.read_text(report).contains("first-different-offset"):
         ctx.diagnostics().error("deep-debug-tool-tests: fixpoint-diff report missing offset")
-        return 1
 
     let ownership_input = build_project_join(out_dir, "ownership-input.w")
     let ownership_source =
@@ -1805,7 +1750,6 @@ fn run_deep_debug_tool_tests_action(ctx: ActionCtx) -> i32:
         "    choose(true)\n"
     if fs.write_text(ownership_input, ownership_source) != 0:
         ctx.diagnostics().error("deep-debug-tool-tests: could not write ownership fixture")
-        return 1
     let ownership_abs = build_project_abs(root, ownership_input)
     if deep_debug_tool_expect(ctx, root, compiler, ownership_abs, out_dir, "trace-ownership", "--trace-ownership", "main:", "event=") != 0:
         return 1
@@ -1839,7 +1783,6 @@ fn run_deep_debug_tool_tests_action(ctx: ActionCtx) -> i32:
         "    print(f\"{p.vars.len()}\")\n"
     if fs.write_text(rebind_input, rebind_source) != 0:
         ctx.diagnostics().error("deep-debug-tool-tests: could not write rebind fixture")
-        return 1
     if deep_debug_analyze_expect(ctx, root, compiler, build_project_abs(root, rebind_input), out_dir, "analyze-audit-rebind", "audit:all", "violations=0 ok") != 0:
         return 1
     // #1381: a downcast place has no type of its own; typed as the enum it
@@ -1859,7 +1802,6 @@ fn run_deep_debug_tool_tests_action(ctx: ActionCtx) -> i32:
         "    print(f\"{r.map((x) => x + 1).unwrap_or(0)}\")\n"
     if fs.write_text(carrier_input, carrier_source) != 0:
         ctx.diagnostics().error("deep-debug-tool-tests: could not write carrier fixture")
-        return 1
     if deep_debug_analyze_expect(ctx, root, compiler, build_project_abs(root, carrier_input), out_dir, "analyze-audit-carriers", "audit:all", "violations=0 ok") != 0:
         return 1
     // #1323: `InternPool.resolve` hands out a view into `symbol_texts`; a
@@ -1893,7 +1835,6 @@ fn run_deep_debug_tool_tests_action(ctx: ActionCtx) -> i32:
         "    print(dangling(pool, s))\n"
     if fs.write_text(pool_view_input, pool_view_source) != 0:
         ctx.diagnostics().error("deep-debug-tool-tests: could not write pool-view fixture")
-        return 1
     if deep_debug_analyze_expect_violation(ctx, root, compiler, build_project_abs(root, pool_view_input), out_dir, "analyze-pool-views", "audit:pool-views", "pool-view: dangling: `name`", "pool-view: safe") != 0:
         return 1
     if deep_debug_analyze_expect_violation(ctx, root, compiler, build_project_abs(root, pool_view_input), out_dir, "analyze-pool-views-in-all", "audit:all", "pool-view: dangling: `name`", "pool-view: reads_only") != 0:

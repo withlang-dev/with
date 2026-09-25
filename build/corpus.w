@@ -106,7 +106,6 @@ pub fn corpus_no_lanes(out: Build, ctx: &BuildCtx, corpus: &Corpus, release_comp
 
 pub fn corpus_fail(ctx: &ActionCtx, message: &str) -> i32:
     ctx.diagnostics().error(ctx.target_name() ++ ": " ++ message)
-    1
 
 pub fn corpus_abs(ctx: &ActionCtx, path: &str) -> str:
     if path.len() > 0 and path[0] == '/': return corpus_owned_text(path)
@@ -263,10 +262,10 @@ pub fn corpus_reject_bad_output(ctx: &ActionCtx, corpus: &Corpus, generated: &st
         modules = modules + 1
         let text = fs.read_text(path)
         if text.contains("@[c_export("):
-            ctx.diagnostics().error(corpus.name ++ " generated source contains a forbidden c_export attribute in " ++ path)
+            eprint("error: " ++ corpus.name ++ " generated source contains a forbidden c_export attribute in " ++ path)
             errors = errors + 1
         if text.contains("// Bail:") or text.contains("[MIGRATOR_UNTRANSLATED]"):
-            ctx.diagnostics().error(corpus.name ++ " generated source contains untranslatable migrator output in " ++ path)
+            eprint("error: " ++ corpus.name ++ " generated source contains untranslatable migrator output in " ++ path)
             errors = errors + 1
     if modules < corpus.module_floor:
         return corpus_fail(ctx, f"only {modules} generated .w files under " ++ generated ++ f"; expected at least {corpus.module_floor}")
@@ -337,17 +336,17 @@ pub fn corpus_reject_foreign_symbols(ctx: &ActionCtx, corpus: &Corpus, generated
             nr = nr + 1
             let l = corpus_trim(line)
             if l.starts_with("extern var ") or l.starts_with("pub extern var "):
-                ctx.diagnostics().error(corpus.name ++ f" generated source declares a foreign variable at {path}:{nr}: " ++ l)
+                eprint("error: " ++ corpus.name ++ f" generated source declares a foreign variable at {path}:{nr}: " ++ l)
                 errors = errors + 1
             else if l.starts_with("extern fn ") or l.starts_with("pub extern fn "):
                 let head_len = if l.starts_with("pub "): 14 else: 10
                 let name = corpus_ident_prefix(l.slice(head_len, l.len()))
                 if not permitted.contains("|" ++ name ++ "|") and not defined.contains("|" ++ name ++ "|"):
-                    ctx.diagnostics().error(corpus.name ++ f" generated source declares the foreign symbol '" ++ name ++ f"' at {path}:{nr}; std.libc models the C surface, extend it instead")
+                    eprint("error: " ++ corpus.name ++ f" generated source declares the foreign symbol '" ++ name ++ f"' at {path}:{nr}; std.libc models the C surface, extend it instead")
                     errors = errors + 1
         for retired in corpus_retired_host_symbols():
             if text.contains(retired):
-                ctx.diagnostics().error(corpus.name ++ " generated source references the host-only symbol '" ++ retired ++ "' in " ++ path ++ "; the migrator must emit the std.libc model")
+                eprint("error: " ++ corpus.name ++ " generated source references the host-only symbol '" ++ retired ++ "' in " ++ path ++ "; the migrator must emit the std.libc model")
                 errors = errors + 1
     errors
 

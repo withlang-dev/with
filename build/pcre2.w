@@ -161,7 +161,6 @@ fn pcre2_copy_if_missing(ctx: &ActionCtx, src: &str, dst: &str) -> i32:
 
 fn pcre2_fail(ctx: &ActionCtx, message: &str) -> i32:
     ctx.diagnostics().error(ctx.target_name() ++ ": " ++ message)
-    1
 
 fn pcre2_remove_tree_if_exists(ctx: &ActionCtx, path: &str) -> i32:
     let fs = ctx.fs()

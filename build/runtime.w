@@ -6,7 +6,6 @@ fn runtime_owned_text(s: &str): s ++ ""
 
 fn br_fail(ctx: &ActionCtx, message: &str) -> i32:
     ctx.diagnostics().error("compat-runtime-source: " ++ message)
-    1
 
 // Stage-chain ancestor actions live HERE, not in build.w: the root module's
 // use closure spans every build/ file, so a root-defined action's signature
@@ -16,15 +15,12 @@ pub fn run_write_empty_file_action(ctx: ActionCtx) -> i32:
     let output = ctx.output()
     if output.len() == 0:
         ctx.diagnostics().error(ctx.target_name() ++ ": missing output")
-        return 1
     let dir = br_dirname(output)
     let fs = ctx.fs()
     if fs.mkdir_all(dir) != 0:
         ctx.diagnostics().error(ctx.target_name() ++ ": could not create output directory: " ++ dir)
-        return 1
     if fs.write_text(output, "") != 0:
         ctx.diagnostics().error(ctx.target_name() ++ ": could not write: " ++ output)
-        return 1
     0
 
 pub fn prepare_bootstrap_link_root(ctx: &ActionCtx) -> Unit:
@@ -54,10 +50,8 @@ pub fn run_prepare_bootstrap_link_root_action(ctx: ActionCtx) -> i32:
     let output = ctx.output()
     if fs.mkdir_all(br_dirname(output)) != 0:
         ctx.diagnostics().error(ctx.target_name() ++ ": could not create output directory: " ++ br_dirname(output))
-        return 1
     if fs.write_text(output, "ok\n") != 0:
         ctx.diagnostics().error(ctx.target_name() ++ ": could not write: " ++ output)
-        return 1
     0
 
 fn br_join(base: &str, child: &str) -> str:
@@ -226,10 +220,8 @@ fn br_generate_embedded_stdlib(ctx: &ActionCtx, files: &Vec[str]) -> str:
         let source = br_normalize_embedded_source(fs.read_text(path))
         if source.len() == 0:
             ctx.diagnostics().error("compat-runtime-source: failed to read stdlib source: " ++ path)
-            return ""
         if source.len() > 500000:
             ctx.diagnostics().error("compat-runtime-source: stdlib source too large: " ++ path)
-            return ""
         let sym = f"EMBEDDED_STD_{i}"
         out.push_str("let ")
         out.push_str(sym)
@@ -310,10 +302,8 @@ fn br_generate_embedded_runtime(ctx: &ActionCtx, files: &Vec[str]) -> str:
         let source = br_normalize_embedded_source(fs.read_text(path))
         if source.len() == 0:
             ctx.diagnostics().error("compat-runtime-source: failed to read runtime source: " ++ path)
-            return ""
         if source.len() > 500000:
             ctx.diagnostics().error("compat-runtime-source: runtime source too large: " ++ path)
-            return ""
         let sym = f"EMBEDDED_RT_{i}"
         out.push_str("let ")
         out.push_str(sym)

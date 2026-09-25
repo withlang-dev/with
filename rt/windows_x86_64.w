@@ -298,7 +298,7 @@ fn win_alloc_fd(handle: i64) -> i32:
     let _ = CloseHandle(handle)
     -24
 
-pub fn rt_store_args(argc_val: i32, argv_val: *const *const u8) -> Unit:
+pub fn rt_store_args(argc_val: i32, argv_val: *const *const u8):
     rt_argc = argc_val
     rt_argv_raw = argv_val as i64
     // PWD is the runtime's on Windows. The driver reads it for its working
@@ -439,7 +439,7 @@ pub fn rt_getcwd(buf: *mut u8, size: i64) -> i32:
 pub fn rt_mmap(size: i64) -> *mut u8:
     VirtualAlloc(0 as *mut u8, size as u64, MEM_COMMIT_RESERVE, PAGE_READWRITE)
 
-pub fn rt_munmap(ptr: *mut u8, size: i64) -> Unit:
+pub fn rt_munmap(ptr: *mut u8, size: i64):
     let _ = size
     let _free = VirtualFree(ptr, 0, MEM_RELEASE)
 
@@ -498,7 +498,7 @@ pub fn rt_thread_join(handle: i64) -> i32:
         return win_neg_error()
     0
 
-pub fn rt_fill_random(buf: *mut u8, len: u64) -> Unit:
+pub fn rt_fill_random(buf: *mut u8, len: u64):
     if SystemFunction036(buf, len as u32) == 0:
         ExitProcess(1)
 
@@ -547,7 +547,7 @@ pub fn rt_fiber_fault_addr(info: *const u8) -> i64:
     let _ = info
     0
 
-pub fn rt_fiber_reset_signal_handler(sig: i32) -> Unit:
+pub fn rt_fiber_reset_signal_handler(sig: i32):
     let _ = sig
 
 // Arm the fiber stack's guard page. PAGE_GUARD raises STATUS_GUARD_PAGE_VIOLATION
@@ -557,7 +557,7 @@ pub fn rt_fiber_protect_guard(region: *mut u8, len: i64) -> Unit:
     var old: u32 = 0
     let _ = VirtualProtect(region, len as u64, PAGE_READWRITE | PAGE_GUARD, &raw mut old)
 
-pub fn rt_fiber_install_signal_handlers(alt_stack: *mut u8, alt_stack_size: i64, handler: i64) -> Unit:
+pub fn rt_fiber_install_signal_handlers(alt_stack: *mut u8, alt_stack_size: i64, handler: i64):
     let _ = alt_stack
     let _ = alt_stack_size
     let _ = AddVectoredExceptionHandler(1 as u32, handler as *mut u8)
@@ -1144,10 +1144,10 @@ fn win_spawn_argv(args: &str, stdout_path: &str, stderr_path: &str, stdin_path: 
 pub fn rt_compat_setenv_str(name: &str, value: &str) -> i32:
     win_setenv(name, value)
 
-pub fn rt_compat_install_interrupt_handlers() -> Unit:
+pub fn rt_compat_install_interrupt_handlers():
     let _ = 0
 
-pub fn rt_compat_raise_stack_limit() -> Unit:
+pub fn rt_compat_raise_stack_limit():
     let _ = 0
 
 pub fn rt_set_process_memory_limit_bytes(limit: i64) -> i32:
