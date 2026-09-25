@@ -9482,10 +9482,11 @@ A callback case that states `retains by param N` retains its callback and,
 with it, the paired userdata; the userdata setter for the selector that
 `userdata param CONST` names is implied by the pairing and needs no second
 `case` line, while the retention itself is stated, never inferred. The
-userdata is typed from the callback's own parameter: a shared `&U` where the
-callback receives it shared, an in-place `mut U` borrow where the callback
-mutates it. The retained userdata is that borrow, held by the resource
-(§16.2b.9 "Retained borrows"); it is never a copy or an owned cell.
+userdata is `&U`, the borrow the resource holds (§16.2b.9 "Retained
+borrows"). When `U` is a callable, the retention holds its captured places
+under that callable's capture views (§12.4): a mutate capture makes the
+retention exclusive for its window. The retained userdata is never a copy
+or an owned cell.
 
 `ok CONST` on a variadic operation is its status contract (§16.2b.4) for the
 listed cases alone: the evidence model of §16.2b.8 applied to status.
@@ -9697,10 +9698,12 @@ Two-call setup also requires evidence that callbacks cannot run concurrently
 between the calls.
 
 **Retained borrows.** A retained userdata is a borrow the resource holds
-(§16.2b.5 "Retain"): shared when the callback receives it shared, exclusive
-when the callback receives it in place — a collector callback mutates its
-sink, so the sink is an in-place `mut` borrow the foreign library holds. The
-retention is the same borrow that view-liveness models for any other borrow,
+(§16.2b.5 "Retain"): `&U`, and when `U` is a callable, its capture views
+(§12.4) are held with it — shared where the callable reads a captured
+place, exclusive where it mutates one. A collector's sink is captured
+mutably by the callable the handle holds, so the sink is exclusively held
+for the window. The retention is the same borrow that view-liveness models
+for any other borrow,
 held by the resource, and it ends at a modeled reset or unregister, at the
 resource's destruction, or after the last callback-capable operation that
 can reach it. Under an exclusive retention the program cannot touch the
