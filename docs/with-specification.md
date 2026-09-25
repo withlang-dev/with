@@ -8595,7 +8595,7 @@ parsed as a later field. This matches Python's rule.
 | `o` | integers | Octal | `52` |
 | `f` | floats | Fixed-point | `3.140000` |
 | `e` | floats | Scientific notation | `3.14e+00` |
-| `g` | floats | General: shortest of fixed/scientific (default) | `3.14` |
+| `g` | floats | C general format, six significant digits by default | `3.14` |
 | `s` | strings | String (default for strings) | `hello` |
 | `?` | any type | Debug representation | `Point { x: 1, y: 2 }` |
 
@@ -8640,7 +8640,15 @@ Precision on integers is a compile-time error.
 
 #### 15.4.4 Float Formatting
 
-Default (no spec): general format. When precision is specified
+Default (no spec): C `printf("%g")` general format, with six significant
+digits. Round to the requested significant precision first. If the rounded
+scientific exponent is at least -4 and less than the precision, use fixed
+notation; otherwise use scientific notation. Remove trailing fractional
+zeros and an unnecessary decimal point. Default display is not a round-trip
+serialization format. With uses a decimal point independent of locale.
+
+For explicit `g`, precision specifies significant digits; omitted precision
+is six and zero precision means one, as in C. When precision is specified
 without a mode letter, the mode defaults to `f` (fixed-point).
 
 ```

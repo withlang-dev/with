@@ -12,6 +12,7 @@ use InternPool
 use std.collections.HashMap
 
 extern fn with_str_clone_ref(s: &str) -> str
+extern fn str_from_byte(b: i32) -> str
 extern fn with_eprint(s: &str) -> Unit
 extern fn with_alloc(size: i64) -> *mut u8
 extern fn abort() -> Never
@@ -867,6 +868,29 @@ impl AstPool:
         if digit_idx < 0:
             return ""
         with_str_clone_ref(self.get_string(digit_idx))
+
+// A float literal's text with digit separators removed, ready to be turned into a
+// value. §29.1: "Separators are ignored for numeric value parsing", and a float may
+// carry them (`3.141_592_653`). The parser keeps the separators in the stored text,
+// so each consumer that converts text to a value drops them here; integer literals
+// have their own normalized digits (`int_literal_digits`).
+pub fn float_literal_value_text(text: &str) -> str:
+    let len = text.len() as i32
+    var i = 0
+    while i < len:
+        if text[i] == 95:
+            break
+        i = i + 1
+    if i >= len:
+        return with_str_clone_ref(text)
+    var out = ""
+    var j = 0
+    while j < len:
+        let ch = text[j]
+        if ch != 95:
+            out = out ++ str_from_byte(ch)
+        j = j + 1
+    out
 
 const AST_INT_PART_BASE: i64 = 2097152
 const AST_INT_PART_BASE2: i64 = 4398046511104

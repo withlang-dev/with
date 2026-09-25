@@ -1403,6 +1403,38 @@ fn run_drop_audit_action(ctx: ActionCtx) -> i32:
 // tools/rt_decl_audit.w: every `extern fn with_*` declaration in the tree
 // (lib/std, src, tools, test) matches the runtime's definition signature, so
 // a seam such as std.libc's with_libc_* cannot drift from rt/rt_core.w.
+fn run_unit_return_review_action(ctx: ActionCtx) -> i32:
+    let fs = ctx.fs()
+    let out_dir = ctx.output()
+    if fs.mkdir_all(out_dir) != 0: return 1
+    let root = ctx.project_info().project_root()
+    // git diff includes tracked edits and staged new files. Refuse untracked
+    // source rather than silently omit it from this review gate.
+    var untracked_args: Vec[str] = Vec.new()
+    untracked_args.push("git")
+    untracked_args.push("ls-files")
+    untracked_args.push("--others")
+    untracked_args.push("--exclude-standard")
+    untracked_args.push("--")
+    untracked_args.push("*.w")
+    let untracked = ctx.process_runner().run_capture_cwd(untracked_args, build_project_abs(root, build_project_join(out_dir, "untracked.stdout")), build_project_abs(root, build_project_join(out_dir, "untracked.stderr")), 60000, root)
+    if untracked.rc != 0 or untracked.stdout.trim().len() > 0:
+        ctx.diagnostics().error("unit-return-review: stage new source files so they are included in the review diff\n" ++ untracked.stdout ++ untracked.stderr)
+        return 1
+    var args: Vec[str] = Vec.new()
+    args.push(build_project_abs(root, ctx.inputs().get(0)))
+    args.push("run")
+    args.push("tools/unit_return_review.w")
+    args.push(ctx.args().get(0) ++ "")
+    let stdout_rel = build_project_join(out_dir, "review.stdout")
+    let stderr_rel = build_project_join(out_dir, "review.stderr")
+    let result = ctx.process_runner().run_capture_cwd(args, build_project_abs(root, stdout_rel), build_project_abs(root, stderr_rel), 600000, root)
+    print(fs.read_text(stdout_rel))
+    if result.rc != 0:
+        ctx.diagnostics().error("unit-return-review: " ++ fs.read_text(stderr_rel))
+        return 1
+    0
+
 fn run_rt_decl_audit_action(ctx: ActionCtx) -> i32:
     let fs = ctx.fs()
     let out_dir = ctx.output()
@@ -2811,6 +2843,17 @@ pub fn build(ctx: BuildCtx) -> Build:
     drop_audit = drop_audit.dep("build")
     drop_audit = drop_audit.write_scope("out/drop-audit")
     out = out.add_target(drop_audit)
+    var unit_review = target_new(.Action, "unit-return-review", "").output("out/unit-return-review")
+    unit_review.action = run_unit_return_review_action
+    unit_review = unit_review.input(release_compiler_bin("with"))
+    unit_review = unit_review.input("tools/unit_return_review.w")
+    unit_review = unit_review.input("src/UnitReturnReview.w")
+    unit_review = unit_review.input("docs/unit-return-reviews.tsv")
+    let unit_review_base = env("WITH_UNIT_RETURN_BASE")
+    unit_review = unit_review.arg(if unit_review_base.len() > 0: unit_review_base else: "origin/main")
+    unit_review = unit_review.dep("build")
+    unit_review = unit_review.write_scope("out/unit-return-review")
+    out = out.add_target(unit_review)
     var rt_decl_audit = target_new(.Action, "rt-decl-audit", "").output("out/rt-decl-audit")
     rt_decl_audit.action = run_rt_decl_audit_action
     rt_decl_audit = rt_decl_audit.allow_parallel()
@@ -3196,6 +3239,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     tests = tests.dep("libc-surface-check")
     tests = tests.dep("runtime-domain-audit")
     tests = tests.dep("rt-decl-audit")
+    tests = tests.dep("unit-return-review")
     tests = tests.dep("test-green")
     out = out.add_target(tests)
     // The ownership battery in one invocation. The audits are listed before

@@ -1,0 +1,5 @@
+# New explicit Unit return annotations require review; Unit remains legal.
+# Tab-separated: path, normalized signature printed by the gate, semantic reason.
+# Explain the actual choice (e.g. D43 mixed tails, a foreign contract, or a test
+# of explicit spelling). "The compiler requires it" is evidence of a bug,
+# not a justification. No directory, visibility or generated-code exemptions.

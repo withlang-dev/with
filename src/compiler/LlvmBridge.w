@@ -182,6 +182,7 @@ extern fn LLVMGetAllocatedType(v: *mut u8) -> *mut u8
 extern fn LLVMConstInt(ty: *mut u8, val: u64, sign_ext: i32) -> *mut u8
 extern fn LLVMConstIntOfArbitraryPrecision(ty: *mut u8, num_words: u32, words: *const u64) -> *mut u8
 extern fn LLVMConstReal(ty: *mut u8, val: f64) -> *mut u8
+extern fn LLVMConstRealOfString(ty: *mut u8, text: *const u8) -> *mut u8
 extern fn LLVMConstNull(ty: *mut u8) -> *mut u8
 extern fn LLVMGetUndef(ty: *mut u8) -> *mut u8
 extern fn LLVMConstStringInContext(c: *mut u8, s: *const u8, len: u32, dont_null: i32) -> *mut u8
@@ -716,6 +717,14 @@ pub fn wl_const_int_words(ty: i64, lo: i64, hi: i64, word_count: i32) -> i64:
         LLVMConstIntOfArbitraryPrecision(ty as *mut u8, word_count as u32, &words as *const u64) as i64
 
 pub fn wl_const_real(ty: i64, val: f64) -> i64: unsafe { LLVMConstReal(ty as *mut u8, val) as i64 }
+
+// A float literal's own text, rounded once into `ty` by APFloat — the conversion
+// clang uses for the same text. `wl_const_real` takes an f64, so an f32 literal that
+// reaches it has already been rounded to f64 and rounds a second time.
+pub fn wl_const_real_of_string(ty: i64, text: &str) -> i64:
+    unsafe:
+        LLVMConstRealOfString(ty as *mut u8, to_cstr(text)) as i64
+
 pub fn wl_const_null(ty: i64) -> i64: unsafe { LLVMConstNull(ty as *mut u8) as i64 }
 pub fn wl_get_undef(ty: i64) -> i64: unsafe { LLVMGetUndef(ty as *mut u8) as i64 }
 
