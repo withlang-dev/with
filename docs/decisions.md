@@ -215,6 +215,20 @@ own arrays and cannot call a `(T*, n)` API without a C shim. With's
 answer is §16.3c's evidence model: an explicit clause is evidence of the
 same standing as a header annotation.
 
+**2026-09-25 amendment — explicit element counts (#1643).** Eric approved
+the explicit `elements` qualifier: `buffer param P len param L elements`
+and `buffer param P capacity param L inout elements`. These render typed
+`[]T` and `[]mut T` using the C pointer's element type. The compiler checks
+conversion of the slice count to the C count type before the call and checks
+a copied-back count against the original element capacity before returning
+it as `usize`. The caller's slice remains unchanged and copy-back is still
+presented only under the status contract. Unqualified clauses continue to
+count bytes; pointer types and names never select the unit. This replaces
+the original decision's restriction against element slices, not its explicit
+pairing or bounds requirements. Swift's checked-in `SwiftifyImport`
+`CountedBy/NamedParams.swift` and `SizedBy/SimpleRawSpan.swift` likewise
+distinguish element count from byte count and use exact integer conversion.
+
 ---
 
 ## D63 — One callable type: `fn(A) -> R` carries compiler-tracked environment ownership; not `Copy`

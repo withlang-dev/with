@@ -9572,7 +9572,7 @@ cstr.to_owned()        // allocates an owned copy, explicitly
 No `char *` becomes `str` silently.
 
 **Buffers.** A C pointer parameter and the integer parameter that carries its
-byte length are one byte slice when the facade pairs them; the pairing is
+length are one slice when the facade pairs them; the pairing and count unit are
 stated, never inferred from the C types, because a wrong pairing hands C a
 wrong length:
 
@@ -9580,6 +9580,8 @@ wrong length:
 fn compress
     buffer param source len param sourceLen          // one input []u8
     buffer param dest capacity param destLen inout   // one writable []mut u8
+fn tally_total
+    buffer param values len param count elements     // int * + count: []i32
 ```
 
 `buffer param P len param L` renders `P` and `L` as one `[]u8` parameter; the
@@ -9590,8 +9592,22 @@ writes back is bounds-checked against that capacity before it becomes a
 With value, and it is presented as the operation's `usize` result — the
 caller's slice is not modified. Whether the copied-back length is meaningful
 after a failed call is decided by the operation's status contract (§16.2b.4);
-it is presented only on success. The length counts bytes; the clause renders
-`[]u8`, never an element slice of another type. A raw pointer parameter that
+it is presented only on success. Without a qualifier the length counts bytes
+and the clause renders `[]u8` or `[]mut u8`.
+
+An explicit `elements` qualifier changes the count unit to elements:
+`buffer param P len param L elements` renders a typed `[]T`, and
+`buffer param P capacity param L inout elements` renders `[]mut T`, where
+`T` is the C pointer's element type. The compiler derives the pointer and
+element count from that slice. Conversion of the slice length or capacity to
+the C count type is checked before calling C; an unrepresentable count fails
+instead of truncating. A copied-back element count is checked against the
+original element capacity before it becomes the `usize` result. The caller's
+slice remains unchanged, and the same status contract governs whether
+copy-back is valid. Neither the C pointer type nor a parameter name establishes
+the count unit: the facade must state `elements` when that is the contract.
+
+A raw pointer parameter that
 no clause pairs is not a buffer, and a `lend` or presentation clause on such
 a function is refused rather than rendering a call without a bounds contract.
 
