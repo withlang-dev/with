@@ -203,7 +203,7 @@ def run_once(binary, timeout):
             inner = float(parts[1]) / 1000.0
         elif len(parts) == 2 and parts[0] == "checksum":
             checksum = parts[1]
-    return {"wall": elapsed, "inner": inner, "checksum": checksum, "rss": rss, "stdout": proc.stdout, "stderr": proc.stderr}
+    return {"wall": elapsed, "inner": inner, "checksum": checksum, "rss": rss, "stdout": proc.stdout}
 
 
 def measure(workload, lang_key, level, runs, timeout, work_root):
@@ -248,7 +248,7 @@ def measure(workload, lang_key, level, runs, timeout, work_root):
             rsses.append(result["rss"])
         if result["checksum"] is not None:
             checksums.append(result["checksum"])
-        if workload == "hello" and "Hello, World!" not in result["stdout"] + result["stderr"]:
+        if workload == "hello" and "Hello, World!" not in result["stdout"]:
             cell.status, cell.detail = "run-failed", "wrong output"
             return cell
     cell.run_s = statistics.median(walls)
