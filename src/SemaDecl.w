@@ -1831,10 +1831,7 @@ impl Sema:
             if is_local != 0:
                 self.set_pretty_symbol(p_name_sym, self.extract_fn_param_name(node, pi))
             let p_type_node = self.ast.fn_param_type(param_start, pi)
-            // #604 stage 1: `[]mut T` is legal only here (signature param types).
-            self.in_param_type_position = self.in_param_type_position + 1
-            let p_tid = self.resolve_type_expr(p_type_node)
-            self.in_param_type_position = self.in_param_type_position - 1
+            let p_tid = self.resolve_parameter_type_expr(p_type_node)
             let p_flags = self.ast.fn_param_flags(param_start, pi)
             // A D7 mut receiver spells `Self` but uses the share-place ABI: the
             // caller passes an address, so no opaque value is materialized.

@@ -1,7 +1,7 @@
 # C interop
 
 Two C libraries used from With: one the system provides (SQLite) and one
-vendored as source (`vendor/tally.c`). `src/main.w` uses both and contains no
+vendored as source (`vendor/tally.c`). The application uses both without
 `unsafe`. The C contracts live in *facades* (`src/facades/`), ordinary With
 source that states what a header cannot: which call produces a resource,
 which one gives it back, what a returned pointer borrows from.
@@ -50,12 +50,15 @@ library, both directions**
 - `TallyRange` is passed to C and returned from C by value, with no
   declaration on the With side. The facade records the call as a lend.
 - A With function is a C callback. `collect` is an ordinary function handed
-  to `tally_each`; its state travels through the `void *` the library hands
-  back, because a C function pointer has nowhere to keep a closure's captures.
+  to `tally_each`. Its typed userdata borrows a capturing With callable;
+  invoking it pushes into the caller's vector safely. The facade pairs the
+  callback and userdata, and the compiler handles C's `void *` transport.
 - `@[c_export("c_interop_score")]` gives a With function a C name and the C
   ABI. `tally.c` calls it without knowing it is With. For a C project,
   `with emit-c-header src/tally.w` writes the prototype.
-- A slice reaches C as a pointer and a count; an empty one as `null` and `0`.
+- `buffer param values len param count elements` presents a typed slice.
+  The compiler supplies its pointer and checked element count; an empty
+  slice reaches C as `null` and `0`.
 
 **`test/`** runs the real modules: rows and their order, NULL as `None`, a
 bound parameter, a C error as With values, a failed open whose message is
@@ -65,13 +68,6 @@ the empty slice, the C global.
 
 ## Not here yet
 
-- Three calls in `src/tally.w` are still raw (`unsafe`), and
-  `src/facades/tally.w` says why beside each: a buffer with an *element*
-  count (`const int *values, int count`) has no facade clause yet — D64
-  pairs a buffer with a byte length only — and a callback with userdata can
-  only be stated on a function whose first parameter is a modeled resource,
-  which `tally_each` is not. When those clauses land, the three calls move
-  into the facade and `unsafe` leaves this project.
 - Binding text: `sqlite3_bind_text` takes a destructor argument whose safe
   value is the `SQLITE_TRANSIENT` sentinel, a fixed argument the facade
   should bind (`param 4 fixed SQLITE_TRANSIENT`, D64) and does not yet. The

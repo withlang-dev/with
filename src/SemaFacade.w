@@ -854,7 +854,7 @@ impl Sema:
                 return
             self.emit_error(f"fn '{fname}' is described by two facade blocks with different clauses; one function has one contract — restate it word for word or describe it once (§16.2b)", item)
             return
-        var c = ForeignContract { fn_sym, decl, facade, node: item, lend: 0, destroys: 0, consumes: Vec.new(), consumes_destroyed_by: Vec.new(), retains: Vec.new(), retains_by: Vec.new(), returns_borrow_resource: 0, returns_borrow_from: -1, returns_borrow_domain: 0, returns_static_tid: 0, preserves_params: Vec.new(), preserves_domains: Vec.new(), of_resource: 0, rename: 0, callback_thread_any: 0, callback_consumes: Vec.new(), callback_userdata_cb: Vec.new(), callback_userdata_of: Vec.new(), valid_on_failed: 0, nullable_params: Vec.new(), buffer_ptr: Vec.new(), buffer_len: Vec.new(), buffer_inout: Vec.new(), fixed_params: Vec.new(), fixed_literals: Vec.new(), ok_const: 0, variadic_node: 0, variadic_selector: -1, variadic_case_syms: Vec.new(), variadic_case_values: Vec.new(), variadic_case_tids: Vec.new(), variadic_case_kinds: Vec.new(), returns_borrow_record: 0 }
+        var c = ForeignContract { fn_sym, decl, facade, node: item, lend: 0, destroys: 0, consumes: Vec.new(), consumes_destroyed_by: Vec.new(), retains: Vec.new(), retains_by: Vec.new(), returns_borrow_resource: 0, returns_borrow_from: -1, returns_borrow_domain: 0, returns_static_tid: 0, preserves_params: Vec.new(), preserves_domains: Vec.new(), of_resource: 0, rename: 0, callback_thread_any: 0, callback_consumes: Vec.new(), callback_userdata_cb: Vec.new(), callback_userdata_of: Vec.new(), valid_on_failed: 0, nullable_params: Vec.new(), buffer_ptr: Vec.new(), buffer_len: Vec.new(), buffer_inout: Vec.new(), buffer_elements: Vec.new(), fixed_params: Vec.new(), fixed_literals: Vec.new(), ok_const: 0, variadic_node: 0, variadic_selector: -1, variadic_case_syms: Vec.new(), variadic_case_values: Vec.new(), variadic_case_tids: Vec.new(), variadic_case_kinds: Vec.new(), returns_borrow_record: 0 }
         let extra_start = self.ast.get_data1(item)
         let clause_count = self.ast.get_data2(item)
         for ci in 0..clause_count:
@@ -1151,8 +1151,8 @@ impl Sema:
             return c
         if kind == FACADE_CLAUSE_BUFFER:
             // `buffer param P len param L` / `buffer param P capacity param L
-            // inout` (D64, §16.2b.8): P and L are one `[]u8` (`[]mut u8`)
-            // parameter. The length counts bytes, so P points at bytes; L
+            // inout` (D64, §16.2b.8): P and L are one slice parameter.
+            // Without `elements` the length counts bytes; L
             // is the integer C reads, or — inout — the pointer to the
             // integer C reads and writes back.
             let p = self.facade_resolve_param(self.ast.get_extra(ops), fn_sym, sig)
@@ -1162,11 +1162,18 @@ impl Sema:
             if l < 0:
                 return c
             let inout = self.ast.get_extra(ops + 2)
+            let elements = self.ast.get_extra(ops + 3)
             let ptype = self.resolve_alias(self.sig_param_type(sig, p) as TypeId)
-            if self.get_type_kind(ptype) != TypeKind.TY_PTR or not self.facade_type_is_byte(self.get_type_d0(ptype)):
+            if self.get_type_kind(ptype) != TypeKind.TY_PTR or (elements == 0 and not self.facade_type_is_byte(self.get_type_d0(ptype))):
                 let shown = self.facade_param_display(fn_sym, sig, p)
-                self.emit_error(f"fn '{fname}': 'buffer param {p}' names {shown}, which is not a pointer to bytes ('char *', 'unsigned char *', 'void *' or a typedef of one); a buffer's length counts bytes, and the clause renders []u8, never an element slice of another type (§16.2b.8)", clause)
+                self.emit_error(f"fn '{fname}': 'buffer param {p}' names {shown}, which is not a pointer to bytes ('char *', 'unsigned char *', 'void *' or a typedef of one); an unqualified buffer counts bytes and renders []u8; state 'elements' for an element-count contract (§16.2b.8)", clause)
                 return c
+            if elements != 0:
+                let element = self.resolve_alias(self.get_type_d0(ptype) as TypeId)
+                if self.is_c_void_like_type(element as i32) != 0 or self.is_opaque_value_type(element as i32) != 0:
+                    let shown = self.facade_param_display(fn_sym, sig, p)
+                    self.emit_error(f"fn '{fname}': 'buffer param {p} … elements' names {shown}, whose element size is unknown; an element-count buffer requires a complete element type (§16.2b.8)", clause)
+                    return c
             if inout != 0 and self.get_type_d1(ptype) == 0:
                 let shown = self.facade_param_display(fn_sym, sig, p)
                 self.emit_error(f"fn '{fname}': 'buffer param {p} capacity … inout' names {shown}, a const pointer; C cannot write into it — a buffer C fills is 'T *', and an input buffer is paired with 'len' (§16.2b.8)", clause)
@@ -1199,6 +1206,7 @@ impl Sema:
             c.buffer_ptr.push(p)
             c.buffer_len.push(l)
             c.buffer_inout.push(inout)
+            c.buffer_elements.push(elements)
             return c
         if kind == FACADE_CLAUSE_FIXED:
             // `param N fixed <literal>` (D64, §16.2b.11): the presented call
@@ -2189,6 +2197,45 @@ impl Sema:
         let c = &self.foreign_contracts[ci]
         c.callback_userdata_cb.contains(pi) or c.callback_userdata_of.contains(pi) or c.retains.contains(pi) or c.consumes.contains(pi) or c.consumes_destroyed_by.contains(pi) or c.callback_consumes.contains(pi)
 
+    // Sema owns the C-to-presented parameter projection. Effects and
+    // callback argument indices use this same mapping; collapsing a buffer
+    // length must not leave an effect pointing at the next C parameter.
+    fn facade_presented_param_index(ci: i32, source: i32) -> i32:
+        if source < 0: return -1
+        if ci < 0: return source
+        let c = &self.foreign_contracts[ci]
+        var presented = 0
+        for pi in 0..(source + 1):
+            if c.fixed_params.contains(pi) or c.buffer_len.contains(pi) or c.consumes_destroyed_by.contains(pi):
+                if pi == source: return -1
+                continue
+            if pi == source: return presented
+            presented = presented + 1
+        -1
+
+    fn facade_presented_touch_mask(fn_sym: i32, ci: i32) -> i32:
+        let raw = self.facade_touch_params_mask(fn_sym, ci, 0)
+        let sig = self.get_sig(fn_sym)
+        if sig < 0: return 0
+        var mask = 0
+        for pi in 0..self.sig_get_param_count(sig):
+            if (raw & sema_param_origin_bit(pi)) != 0:
+                let projected = self.facade_presented_param_index(ci, pi)
+                if projected >= 0: mask = mask | sema_param_origin_bit(projected)
+        mask
+
+    // Diagnostics name the C parameter the clause must preserve, even
+    // though invalidation applies to its projected With argument.
+    fn facade_effect_source_param(fx: i32, presented: i32) -> i32:
+        let effect = &self.facade_call_effects[fx]
+        let raw_sig = self.get_sig(effect.fn_sym)
+        if effect.contract < 0 or effect.sig == raw_sig or self.facade_fn_is_resource_op(effect.fn_sym):
+            return presented
+        for pi in 0..self.sig_get_param_count(raw_sig):
+            if self.facade_presented_param_index(effect.contract, pi) == presented:
+                return pi
+        presented
+
     // The index of the `capacity … inout` pairing, or -1.
     fn facade_contract_inout(ci: i32) -> i32:
         let c = &self.foreign_contracts[ci]
@@ -2230,6 +2277,10 @@ impl Sema:
         let name: str = self.pool_resolve(fn_sym)
         if not self.facade_bridge_of.contains(name):
             return fn_sym
+        // A translated C body calls C declarations with their C signature.
+        // Presentation applies at the With boundary, never inside C's body.
+        if self.facade_fn_is_c_import_translation(self.current_fn_symbol):
+            return fn_sym
         let bname: str = self.facade_bridge_of.get(name).unwrap()
         let bsym = self.pool_lookup_symbol(bname)
         // The bridge's own body calls the C name: the raw operation.
@@ -2256,10 +2307,16 @@ impl Sema:
         let ok_const = self.foreign_contracts[ci].ok_const
         let resource_op = self.facade_fn_is_resource_op(fn_sym)
         let contract_item = self.foreign_contracts[ci].destroys != 0 or self.foreign_contracts[ci].consumes.len() > 0 or self.foreign_contracts[ci].retains.len() > 0 or self.foreign_contracts[ci].callback_userdata_cb.len() > 0 or self.foreign_contracts[ci].callback_consumes.len() > 0 or self.foreign_contracts[ci].callback_thread_any != 0
-        if has_pairs and (resource_op or contract_item):
+        let callback_item = self.facade_contract_is_callback_item(ci)
+        if has_pairs and (resource_op or (contract_item and not callback_item)):
             let what = if resource_op: "a resource's own operation (its producer, initializer, drop or destroyer)" else: "a callback, retention or consumption contract"
             self.emit_error(f"fn '{fname}': a buffer pairing describes a lend or a free operation, and '{fname}' is {what}; a slice in that rendering is not modeled (§16.2b.8)", node)
             return
+        for pi in 0..self.sig_get_param_count(sig):
+            if self.facade_contract_pairs(ci, pi) and self.facade_contract_models_param(ci, pi):
+                let shown = self.facade_param_display(fn_sym, sig, pi)
+                self.emit_error(f"fn '{fname}': {shown} is both a buffer or fixed parameter and a callback, userdata, retention or consumption parameter; each parameter has one presented contract (§16.2b.8, §16.2b.9)", node)
+                return
         if has_fixed and self.facade_fn_is_destroyer_or_init(fn_sym):
             self.emit_error(f"fn '{fname}': a destroyer, initializer or drop takes only what the resource passes it; a fixed argument on '{fname}' is not modeled (§16.2b.11)", node)
             return
@@ -3079,9 +3136,9 @@ impl Sema:
             // one touches and borrows what it borrows.
             let bridge_sigs = self.facade_free_bridge_sigs(ci)
             for bi in 0..bridge_sigs.len() as i32:
-                self.facade_add_call_effect(bridge_sigs[bi], fn_sym, ci, self.facade_touch_params_mask(fn_sym, ci, 0), &domains, borrow, -1)
-            // The rendered lend method of the resource param 0 receives: the
-            // parameter indices are the C ones (self is 0).
+                self.facade_add_call_effect(bridge_sigs[bi], fn_sym, ci, self.facade_presented_touch_mask(fn_sym, ci), &domains, borrow, -1)
+            // The rendered lend method keeps self at 0 and projects the
+            // remaining parameters through buffer/fixed clauses.
             let recv0 = self.facade_method_host(fn_sym)
             if recv0.len() != 1:
                 continue
@@ -3098,7 +3155,7 @@ impl Sema:
             for hi in 0..hosts.len() as i32:
                 let htext = hosts[hi].clone()
                 if self.sig_text_index.contains(htext):
-                    self.facade_add_call_effect(self.sig_text_index.get(htext).unwrap(), fn_sym, ci, self.facade_touch_params_mask(fn_sym, ci, 0), &domains, borrow, -1)
+                    self.facade_add_call_effect(self.sig_text_index.get(htext).unwrap(), fn_sym, ci, self.facade_presented_touch_mask(fn_sym, ci), &domains, borrow, -1)
         // Constructors: a producer receiving other resources touches them
         // (their views), with the out slot removed from the indices as
         // apply_facade_dependency_effects removes it.
@@ -3728,19 +3785,12 @@ impl Sema:
             // Rendered indices (`self` excluded): the destroy callback the
             // contract names is withheld from the method — the compiler
             // supplies it.
-            var ud_r = -1
-            var cb_r = -1
-            var r = 0
             let cb = self.facade_contract_callback_param(ci)
-            for pi in (if hosted: 1 else: 0)..self.sig_get_param_count(sig):
-                var withheld = false
-                for k in 0..self.foreign_contracts[ci].consumes.len() as i32:
-                    if self.foreign_contracts[ci].consumes_destroyed_by[k] == pi: withheld = true
-                if withheld:
-                    continue
-                if pi == ud: ud_r = r
-                if pi == cb: cb_r = r
-                r = r + 1
+            let receiver_params = if hosted: 1 else: 0
+            let ud_projected = self.facade_presented_param_index(ci, ud)
+            let cb_projected = self.facade_presented_param_index(ci, cb)
+            let ud_r = if ud_projected >= receiver_params: ud_projected - receiver_params else: -1
+            let cb_r = if cb_projected >= receiver_params: cb_projected - receiver_params else: -1
             // Indexed by the generic template's node: the call-site hooks
             // hold the method's symbol under whichever spelling the method
             // table registered, and the node is one. A method with no typed
@@ -3767,7 +3817,7 @@ impl Sema:
         let ci = self.facade_callback_methods[mi].contract
         let c_fn = self.foreign_contracts[ci].fn_sym
         let domains = self.facade_domains_touched(self.facade_fn_file(c_fn), ci)
-        self.facade_add_call_effect(sig, c_fn, ci, self.facade_touch_params_mask(c_fn, ci, 0), &domains, -1, -1)
+        self.facade_add_call_effect(sig, c_fn, ci, self.facade_presented_touch_mask(c_fn, ci), &domains, -1, -1)
 
     // §51 at a callback method's call: under `callback_thread any` the
     // userdata type is Send and Sync — the callback reads it from whatever

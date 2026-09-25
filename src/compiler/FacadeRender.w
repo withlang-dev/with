@@ -1482,6 +1482,7 @@ type FacadeBridge {
     cap_var: str,      // the inout capacity local, or ""
     cap_type: str,     // its C integer type
     cap_of: str,       // the []mut u8 parameter it is the capacity of
+    cap_unit: str,     // bytes or elements, for a bounds diagnostic
 }
 
 // The fn item describing the C function the declaration `decl` names, in
@@ -1521,10 +1522,10 @@ fn facade_render_literal(pool: AstPool, node: i32) -> str:
 
 // The buffer pairing parameter `pi` takes part in: (the pointer parameter,
 // the length parameter, inout), or (-1, -1, 0).
-fn facade_render_buffer_of(pool: AstPool, intern: InternPool, decl: i32, pi: i32) -> (i32, i32, i32):
+fn facade_render_buffer_of(pool: AstPool, intern: InternPool, decl: i32, pi: i32) -> (i32, i32, i32, i32):
     let item = facade_render_fn_item(pool, intern, decl)
     if item == 0:
-        return (-1, -1, 0)
+        return (-1, -1, 0, 0)
     let cstart = pool.get_data1(item as NodeId)
     for k in 0..pool.get_data2(item as NodeId):
         let clause = pool.get_extra(cstart + k)
@@ -1534,79 +1535,104 @@ fn facade_render_buffer_of(pool: AstPool, intern: InternPool, decl: i32, pi: i32
         let p = facade_render_param_ref(pool, intern, decl, pool.get_extra(ops))
         let l = facade_render_param_ref(pool, intern, decl, pool.get_extra(ops + 1))
         if p == pi or l == pi:
-            return (p, l, pool.get_extra(ops + 2))
-    (-1, -1, 0)
+            return (p, l, pool.get_extra(ops + 2), pool.get_extra(ops + 3))
+    (-1, -1, 0, 0)
+
+fn facade_render_empty_bridge() -> FacadeBridge:
+    FacadeBridge { ok: true, params: "", args: "", prologue: "", cap_var: "", cap_type: "", cap_of: "", cap_unit: "" }
+
+// One parameter's projection, shared by ordinary and callback operations.
+// Clauses compose here: there is only one derivation of a buffer's slice,
+// pointer, count conversion, and copy-back storage.
+fn facade_render_bridge_param(pool: AstPool, intern: InternPool, decl: i32, pi: i32) -> FacadeBridge:
+    var b = facade_render_empty_bridge()
+    let meta = pool.find_fn_meta(decl as NodeId)
+    let start = pool.fn_meta_param_start(meta)
+    let taken = facade_render_param_names(pool, intern, decl)
+    let fixed = facade_render_fixed_literal(pool, intern, decl, pi)
+    if fixed.len() > 0:
+        b.args = fixed.clone()
+        return b
+    let pname = facade_render_param_name(pool, intern, start, pi)
+    let ptype = render_type_expr(pool, intern, pool.fn_param_type(start, pi) as NodeId)
+    let (bp, bl, inout, elements) = facade_render_buffer_of(pool, intern, decl, pi)
+    if bp < 0 and bl >= 0 or bl < 0 and bp >= 0:
+        b.ok = false
+        return b
+    if bp == pi:
+        let ptr_type = facade_render_unalias(pool, intern, ptype)
+        let element = if elements == 0: "u8" else: if ptr_type.starts_with("*const "): ptr_type.slice(7, ptr_type.len()) else: if ptr_type.starts_with("*mut "): ptr_type.slice(5, ptr_type.len()) else: ""
+        if element.len() == 0:
+            b.ok = false
+            return b
+        let slicety = (if inout != 0: "[]mut " else: "[]") ++ element
+        let addr = if inout != 0: "&raw mut " ++ pname ++ "[0]" else: "&raw const " ++ pname ++ "[0]"
+        let local = facade_render_fresh(pname ++ "_ptr", taken)
+        b.prologue = "let " ++ local ++ ": " ++ ptype ++ " = if " ++ pname ++ ".len() == 0: null else: " ++ addr ++ " as " ++ ptype ++ "\n"
+        b.params = pname ++ ": " ++ slicety
+        b.args = local.clone()
+        return b
+    if bl == pi:
+        let bname = facade_render_param_name(pool, intern, start, bp)
+        let unaliased = facade_render_unalias(pool, intern, ptype)
+        if inout != 0 and not unaliased.starts_with("*mut "):
+            b.ok = false
+            return b
+        let count_type = if inout == 0: ptype.clone() else: unaliased.slice(5, unaliased.len())
+        let count = facade_render_fresh(bname ++ "_count", taken)
+        let fname: str = intern.resolve(pool.get_data0(decl as NodeId))
+        let unit = if elements != 0: "elements" else: "bytes"
+        b.prologue = (if inout == 0: "let " else: "var ") ++ count ++ ": " ++ count_type ++ " = " ++ bname ++ ".len() as " ++ count_type ++ "\n"
+        b.prologue = b.prologue ++ "if " ++ count ++ " < 0 or " ++ count ++ " as u64 != " ++ bname ++ ".len() as u64: panic(\"" ++ fname ++ ": buffer count in " ++ unit ++ " does not fit the C count type (§16.2b.8)\")\n"
+        b.args = (if inout == 0: "" else: "&raw mut ") ++ count
+        if inout != 0:
+            b.cap_var = count.clone()
+            b.cap_type = count_type.clone()
+            b.cap_of = bname.clone()
+            b.cap_unit = unit.clone()
+        return b
+    var shown = if ptype == "*const i8" or ptype == "*const c_char": "&str" else: ptype.clone()
+    var arg = pname.clone()
+    let res = facade_render_received(pool, intern, ptype)
+    if res > 0:
+        let received = facade_render_received_arg(pool, intern, res, ptype, pname)
+        if received.len() > 0:
+            let rname: str = intern.resolve(pool.get_data0(res as NodeId))
+            shown = "&" ++ rname
+            arg = received
+    b.params = pname ++ ": " ++ shown
+    b.args = arg.clone()
+    b
+
+fn facade_render_append_bridge(initial: FacadeBridge, part: &FacadeBridge) -> FacadeBridge:
+    var b = move initial
+    if not part.ok: b.ok = false
+    if part.params.len() > 0:
+        if b.params.len() > 0: b.params = b.params ++ ", "
+        b.params = b.params ++ part.params
+    if part.args.len() > 0:
+        if b.args.len() > 0: b.args = b.args ++ ", "
+        b.args = b.args ++ part.args
+    b.prologue = b.prologue ++ part.prologue
+    if part.cap_var.len() > 0:
+        b.cap_var = part.cap_var.clone()
+        b.cap_type = part.cap_type.clone()
+        b.cap_of = part.cap_of.clone()
+        b.cap_unit = part.cap_unit.clone()
+    b
 
 fn facade_render_bridge(pool: AstPool, intern: InternPool, decl: i32, skip: i32, slot: i32, slot_arg: &str) -> FacadeBridge:
-    var b = FacadeBridge { ok: true, params: "", args: "", prologue: "", cap_var: "", cap_type: "", cap_of: "" }
+    var b = facade_render_empty_bridge()
     let meta = pool.find_fn_meta(decl as NodeId)
     if meta < 0:
         return b
-    let start = pool.fn_meta_param_start(meta)
-    let taken = facade_render_param_names(pool, intern, decl)
     for pi in skip..pool.fn_meta_param_count(meta):
-        if b.args.len() > 0:
-            b.args = b.args ++ ", "
         if pi == slot:
+            if b.args.len() > 0: b.args = b.args ++ ", "
             b.args = b.args ++ slot_arg
             continue
-        let fixed = facade_render_fixed_literal(pool, intern, decl, pi)
-        if fixed.len() > 0:
-            b.args = b.args ++ fixed
-            continue
-        let pname = facade_render_param_name(pool, intern, start, pi)
-        let ptype = render_type_expr(pool, intern, pool.fn_param_type(start, pi) as NodeId)
-        let (bp, bl, inout) = facade_render_buffer_of(pool, intern, decl, pi)
-        if bp < 0 and bl >= 0 or bl < 0 and bp >= 0:
-            b.ok = false
-            return b
-        if bp == pi:
-            // The pointer: one slice parameter, whose address C receives.
-            let slicety = if inout != 0: "[]mut u8" else: "[]u8"
-            let addr = if inout != 0: "&raw mut " ++ pname ++ "[0]" else: "&raw const " ++ pname ++ "[0]"
-            let local = facade_render_fresh(pname ++ "_ptr", taken)
-            b.prologue = b.prologue ++ "let " ++ local ++ ": " ++ ptype ++ " = if " ++ pname ++ ".len() == 0: null else: " ++ addr ++ " as " ++ ptype ++ "\n"
-            if b.params.len() > 0:
-                b.params = b.params ++ ", "
-            b.params = b.params ++ pname ++ ": " ++ slicety
-            b.args = b.args ++ local
-            continue
-        if bl == pi:
-            let bname = facade_render_param_name(pool, intern, start, bp)
-            if inout == 0:
-                b.args = b.args ++ "(" ++ bname ++ ".len() as " ++ ptype ++ ")"
-                continue
-            // The capacity C reads and writes back: the bridge's own local,
-            // never the caller's slice length.
-            let unaliased = facade_render_unalias(pool, intern, ptype)
-            if not unaliased.starts_with("*mut "):
-                b.ok = false
-                return b
-            let cap_type = unaliased.slice(5, unaliased.len())
-            b.cap_var = facade_render_fresh("capacity", taken)
-            b.cap_type = cap_type.clone()
-            b.cap_of = bname.clone()
-            b.prologue = b.prologue ++ "var " ++ b.cap_var ++ ": " ++ cap_type ++ " = " ++ bname ++ ".len() as " ++ cap_type ++ "\n"
-            b.args = b.args ++ "&raw mut " ++ b.cap_var
-            continue
-        // A `const char *` input is lent (§16.3c, D47), so the rendering
-        // observes it as `&str` (§3.8: a function that observes takes `&T`);
-        // a plain `str` would consume the caller's string. A text view
-        // borrowed from it (`returns borrow CStr from param N`) depends on
-        // the caller's string through that borrow.
-        var shown = if ptype == "*const i8" or ptype == "*const c_char": "&str" else: ptype.clone()
-        var arg = pname.clone()
-        let res = facade_render_received(pool, intern, ptype)
-        if res > 0:
-            let received = facade_render_received_arg(pool, intern, res, ptype, pname)
-            if received.len() > 0:
-                let rname: str = intern.resolve(pool.get_data0(res as NodeId))
-                shown = "&" ++ rname
-                arg = received
-        if b.params.len() > 0:
-            b.params = b.params ++ ", "
-        b.params = b.params ++ pname ++ ": " ++ shown
-        b.args = b.args ++ arg
+        let part = facade_render_bridge_param(pool, intern, decl, pi)
+        b = facade_render_append_bridge(move b, &part)
     b
 
 // Each line of `text` prefixed with `indent`.
@@ -1633,7 +1659,7 @@ fn facade_render_bridge_body(pool: AstPool, intern: InternPool, decl: i32, b: &F
     if b.cap_var.len() == 0:
         return (facade_render_return(pool, intern, decl), indent ++ call ++ "\n")
     let ok_sym = facade_render_fn_ok(pool, intern, decl)
-    let check = indent ++ "if " ++ b.cap_var ++ " > " ++ b.cap_of ++ ".len() as " ++ b.cap_type ++ ": panic(f\"" ++ presented ++ ": C reported {" ++ b.cap_var ++ "} bytes written into a buffer of {" ++ b.cap_of ++ ".len()} bytes (§16.2b.8)\")\n"
+    let check = indent ++ "if " ++ b.cap_var ++ " < 0 or " ++ b.cap_var ++ " as u64 > " ++ b.cap_of ++ ".len() as u64: panic(f\"" ++ presented ++ ": C reported {" ++ b.cap_var ++ "} " ++ b.cap_unit ++ " written into a buffer of {" ++ b.cap_of ++ ".len()} " ++ b.cap_unit ++ " (§16.2b.8)\")\n"
     let result = indent ++ b.cap_var ++ " as usize\n"
     if ok_sym == 0:
         return (" -> usize", indent ++ call ++ "\n" ++ check ++ result)
@@ -2009,7 +2035,7 @@ fn facade_render_callback_item(pool: AstPool, intern: InternPool, ci: &Vec[i32],
         else if kind == FACADE_CLAUSE_RENAME: cbi.rename = pool.get_extra(ops)
         // A fixed argument (D64) leaves the presented signature; the
         // parameter loop below passes its literal (facade_render_fixed_literal).
-        else if kind == FACADE_CLAUSE_LEND or kind == FACADE_CLAUSE_PRESERVES or kind == FACADE_CLAUSE_FIXED: continue
+        else if kind == FACADE_CLAUSE_LEND or kind == FACADE_CLAUSE_PRESERVES or kind == FACADE_CLAUSE_FIXED or kind == FACADE_CLAUSE_BUFFER or kind == FACADE_CLAUSE_OK: continue
         else if kind == FACADE_CLAUSE_NULLABLE:
             // Rendered for the paired callback alone (Sema refuses the
             // rest, verify_facade_callback_items).
@@ -2212,18 +2238,19 @@ fn facade_render_callback_ops(pool: AstPool, intern: InternPool, ci: &Vec[i32], 
             cb_type = facade_render_callback_type(pool, intern, facade_render_param_type(pool, intern, decl, cbi.callback))
             if cb_type.len() == 0:
                 continue
-        var params = ""
-        var args = repr_arg.clone()
+        var bridge = facade_render_empty_bridge()
+        bridge.args = repr_arg.clone()
         var ud_name = ""
         var cb_name = ""
         for pi in skip..pool.fn_meta_param_count(meta):
-            if args.len() > 0: args = args ++ ", "
             if pi == cbi.destroy:
-                args = args ++ free
+                var destroy_part = facade_render_empty_bridge()
+                destroy_part.args = free.clone()
+                bridge = facade_render_append_bridge(move bridge, &destroy_part)
                 continue
-            let fixed = facade_render_fixed_literal(pool, intern, decl, pi)
-            if fixed.len() > 0:
-                args = args ++ fixed
+            if pi != cbi.userdata and pi != cbi.callback:
+                let part = facade_render_bridge_param(pool, intern, decl, pi)
+                bridge = facade_render_append_bridge(move bridge, &part)
                 continue
             let pname = facade_render_param_name(pool, intern, start, pi)
             let ptype = facade_render_param_type(pool, intern, decl, pi)
@@ -2253,22 +2280,17 @@ fn facade_render_callback_ops(pool: AstPool, intern: InternPool, ci: &Vec[i32], 
                 else:
                     shown = cb_type.clone()
                     arg = "transmute[" ++ facade_render_callback_raw_type(facade_render_unalias(pool, intern, ptype)) ++ "](" ++ pname ++ ")"
-            else:
-                let res = facade_render_received(pool, intern, ptype)
-                if res > 0:
-                    let received = facade_render_received_arg(pool, intern, res, ptype, pname)
-                    if received.len() > 0:
-                        let rname: str = intern.resolve(pool.get_data0(res as NodeId))
-                        shown = "&" ++ rname
-                        arg = received
-            if params.len() > 0:
-                params = params ++ ", "
-            params = params ++ pname ++ ": " ++ shown
-            args = args ++ arg
-        let ret = facade_render_return(pool, intern, decl)
+            var callback_part = facade_render_empty_bridge()
+            callback_part.params = pname ++ ": " ++ shown
+            callback_part.args = arg.clone()
+            bridge = facade_render_append_bridge(move bridge, &callback_part)
+        if not bridge.ok:
+            continue
+        let call = facade_render_call(pool, intern, decl, bridge.args)
+        let (ret, call_body) = facade_render_bridge_body(pool, intern, decl, &bridge, call, mname, indent)
         let shown_ret = if not hosted and ret.len() == 0: " -> Unit" else: ret.clone()
-        let head = (if not hosted: "fn " else: if cbi.retained: "    mut fn " else: "    fn ") ++ mname ++ (if generic: "[U]" else: "") ++ "(" ++ params ++ ")" ++ shown_ret ++ ":\n"
-        var body = ""
+        let head = (if not hosted: "fn " else: if cbi.retained: "    mut fn " else: "    fn ") ++ mname ++ (if generic: "[U]" else: "") ++ "(" ++ bridge.params ++ ")" ++ shown_ret ++ ":\n"
+        var body = facade_render_indent(bridge.prologue, indent)
         if cbi.nullable:
             // The pair is present or absent together (Sema checks each
             // call, SemaCheck.w check_method_call): each maps to its C
@@ -2288,7 +2310,9 @@ fn facade_render_callback_ops(pool: AstPool, intern: InternPool, ci: &Vec[i32], 
             body = body ++ indent ++ "let " ++ free ++ ": extern \"C\" fn(*mut c_void) -> Unit = " ++ q ++ " => { let " ++ b ++ " = (" ++ q ++ " as *mut U) as Box[U]; drop(" ++ b ++ ") }\n"
             if cbi.retained:
                 body = body ++ "        self.retained_ptrs.push(" ++ ptr ++ " as *mut c_void)\n        self.retained_frees.push(" ++ free ++ ")\n"
-        out = out ++ head ++ body ++ indent ++ facade_render_call(pool, intern, decl, args) ++ "\n"
+        if bridge.cap_var.len() > 0 and facade_render_fn_ok(pool, intern, decl) != 0:
+            out = out ++ facade_render_fn_error_type(pool, intern, decl, mname)
+        out = out ++ head ++ body ++ call_body ++ "\n"
     out
 
 // The shape of the declaration a c_import translation made under `name`:
