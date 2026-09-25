@@ -217,13 +217,13 @@ pub fn foreign_pair_places_join(a: &ForeignPairPlaces, b: &ForeignPairPlaces) ->
     result
 
 impl ForeignPairPlaces:
-    pub mut fn borrow(dest: i32, source: i32) -> Unit:
+    mut fn borrow(dest: i32, source: i32):
         // Snapshot before replacing: assigning a reference to itself is valid.
         let targets: Vec[i32] = Vec.new()
         for i in 0..self.references[source].len(): targets.push(self.references[source][i])
         self.references[dest] = targets
 
-    pub mut fn move_place(dest: i32, source: i32) -> Unit:
+    mut fn move_place(dest: i32, source: i32):
         if dest == source: return
         self.values[dest] = foreign_pair_on_edge(self.values[source], -1, true)
         self.values[source] = foreign_pair_absent()
