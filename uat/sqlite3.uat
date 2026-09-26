@@ -1,0 +1,10 @@
+scenario: sqlite3 from a fresh project
+requires: network
+
+new directory
+run: with init .
+run: with get c.sqlite3
+write src/main.w from sqlite3_main.w
+copy lib/facades/sqlite3.w to src/facades/sqlite3.w
+run: with run
+expect stdout: sqlite3 UAT passed

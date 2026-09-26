@@ -1,0 +1,10 @@
+scenario: zlib from a fresh project
+requires: network
+
+new directory
+run: with init .
+run: with get c.zlib
+write src/main.w from zlib_main.w
+copy lib/facades/zlib.w to src/facades/zlib.w
+run: with run
+expect stdout: zlib UAT passed

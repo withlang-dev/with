@@ -1,0 +1,20 @@
+scenario: a C file migrates, checks and runs
+
+new directory
+write tiny.c:
+    #define SCALE 2
+
+    struct Pair { int a; int b; };
+
+    int add_pair(struct Pair p) {
+        return (p.a + p.b) * SCALE;
+    }
+
+    int main(void) {
+        struct Pair p = { 20, 1 };
+        return add_pair(p) == 42 ? 0 : 1;
+    }
+run: with migrate tiny.c -o tiny.w --no-c-export --prefer-colon
+expect file tiny.w contains: fn add_pair
+run: with check tiny.w
+run: with run tiny.w

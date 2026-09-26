@@ -1,0 +1,9 @@
+scenario: a fresh project builds and runs
+
+new directory
+run: with init . --name fresh_project_uat
+write src/main.w:
+    fn main:
+        print("fresh project UAT passed")
+run: with run
+expect stdout: fresh project UAT passed

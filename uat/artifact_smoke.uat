@@ -1,0 +1,12 @@
+scenario: the release artifact runs: version, a one-liner, a file
+
+new directory
+run: with version
+expect stdout contains: with 
+run: with -e 'print("artifact smoke")'
+expect stdout: artifact smoke
+write smoke.w:
+    fn main:
+        print("artifact run")
+run: with run smoke.w
+expect stdout: artifact run

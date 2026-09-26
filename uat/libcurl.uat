@@ -1,0 +1,10 @@
+scenario: libcurl from a fresh project
+requires: network
+
+new directory
+run: with init .
+run: with get c.libcurl
+write src/main.w from libcurl_main.w
+copy lib/facades/libcurl.w to src/facades/libcurl.w
+run: with run
+expect stdout: libcurl UAT passed

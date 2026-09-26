@@ -235,57 +235,65 @@ session has one; Linux runs under `xvfb-run` with Mesa's llvmpipe
 in `WITH_UAT_OPENGL32_DLL`, which the spiral UAT places beside the program
 it builds. A pass on one platform says nothing about another: the Windows
 gate found a C-runtime mismatch (prebuilt Conan libraries expect the DLL
-runtime) that macOS could never show. It includes:
+runtime) that macOS could never show.
 
-- `:release-artifact-smoke-uat`, which runs the platform-named release binary
-  asset (`out/release/with-darwin-aarch64`, `with-linux-x86_64`, or
+`:release-uat` runs `with uat` (spec §18.5d) from the repo root with the
+platform-named release asset as the toolchain: every scenario in `uat/*.uat`
+that applies on this host, their fixtures in `uat/fixtures/`. The report is
+the gate — any FAIL fails the target — and `out/release-uat/<scenario>.passed`
+or `.skipped` records what each scenario did on this host; a scenario's
+captures and project live under `out/uat/<scenario>/`. A skip is never a
+pass: a release host must show `.passed` for every scenario its platform
+lists. The scenarios:
+
+- `artifact_smoke`: the platform-named release binary asset
+  (`out/release/with-darwin-aarch64`, `with-linux-x86_64`, or
   `with-windows-x86_64.exe`) through `version`, `-e`, and `run file.w`.
-- `:release-fresh-project-uat`, which validates a clean `with init` project can
-  run with the release asset.
-- `:release-migrate-uat`, which validates a small C source migrates, checks,
-  and runs.
-- `:release-zlib-uat`, which validates the universal non-GUI C package path:
-  `with init`, `with get c.zlib`, `use c_import("zlib.h")`, an in-memory
-  `compress`/`uncompress` round trip, `zlibVersion`, and `with run`.
-- `:release-bzip2-uat`, which validates `with get c.bzip2`,
-  `use c_import("bzlib.h")`, and an in-memory
+- `fresh_project`: a clean `with init` project runs with the release asset.
+- `migrate_c`: a small C source migrates, checks, and runs.
+- `zlib`: the universal non-GUI C package path: `with init`, `with get
+  c.zlib`, `use c_import("zlib.h")`, an in-memory `compress`/`uncompress`
+  round trip, `zlibVersion`, and `with run`.
+- `bzip2`: `with get c.bzip2`, `use c_import("bzlib.h")`, and an in-memory
   `BZ2_bzBuffToBuffCompress`/`BZ2_bzBuffToBuffDecompress` round trip.
-- `:release-sqlite3-uat`, which validates `with get c.sqlite3`,
-  `use c_import("sqlite3.h")` behind the SQLite facade
-  (`lib/facades/sqlite3.w`, written into the project as
+- `sqlite3`: `with get c.sqlite3`, `use c_import("sqlite3.h")` behind the
+  SQLite facade (`lib/facades/sqlite3.w`, copied into the project as
   `src/facades/sqlite3.w`; D51 ruling §66), and an in-memory `:memory:`
   database `CREATE TABLE`/`INSERT`/`SELECT` round trip through
   `Database.open`, `db.exec`, `db.prepare`, `stmt.step` and
   `stmt.column_int` — no `unsafe`.
-- `:release-libcurl-uat`, which validates `with get c.libcurl`,
-  `use c_import("curl/curl.h")`, `curl_global_init`, `curl_easy_init`,
-  `curl_easy_setopt`, `curl_version_info`, and cleanup without network access.
-- `:release-install-layout-uat`, which copies the platform asset into a
-  local install-style `bin/with` layout and runs it from there.
-- `:release-raylib-spiral-uat`, which needs a display with OpenGL 3.3 (a
-  headed host, or the software GL provisions above). It validates the
-  user-facing C interop path end to end: `with init`, `with get c.raylib`,
-  writing the spiral program to the initialized project's `src/main.w`, and
-  `with run`. The generated raylib app renders a deterministic spiral, reads
-  back the rendered framebuffer, counts bright non-background samples in the
-  spiral annulus, and exits non-zero if the visual check fails, or loudly if
-  no window could be created. The fixture is the program a user writes:
+- `libcurl`: `with get c.libcurl`, `use c_import("curl/curl.h")` behind the
+  libcurl facade, a `file://` transfer through a retained write-callback pair
+  (D66) and the failure case, without network access past `with get`.
+- `install_layout`: the platform asset copied into a local install-style
+  `bin/with` layout and run from there.
+- `raylib_spiral` (darwin, linux) and `raylib_spiral_windows`, which need a
+  display with OpenGL 3.3 (a headed host, or the software GL provisions
+  above; the Windows scenario copies `WITH_UAT_OPENGL32_DLL` beside the
+  program `with run` builds). They validate the user-facing C interop path
+  end to end: `with init`, `with get c.raylib`, writing the spiral program
+  to the initialized project's `src/main.w`, and `with run`. The generated
+  raylib app renders a deterministic spiral, reads back the rendered
+  framebuffer, counts bright non-background samples in the spiral annulus,
+  and exits non-zero if the visual check fails, or loudly if no window could
+  be created. The fixture is the program a user writes:
   `InitWindow(900, 600, "...")` and `DrawText("...", ...)` with plain string
   literals, `sin`/`cos` from the language, and no `unsafe`.
-- `:user-programs-safe`, a gate of `:release-uat`: no release UAT fixture and
-  no program under `examples/` says `unsafe`. A red here is a compiler defect
-  (a C surface the compiler has not modeled), never a reason to edit the
-  program.
-- `:release-one-liner-uat`, which validates real shell one-liner workflows:
+- `one_liners`: real shell one-liner workflows:
   `seq 100 | with -n 'if line =~ /^[0-9]$/: print(line)'`,
   `cat names.txt | with -p 'line = line.upper()'`, regex captures, numbered
   pipeline transforms, semicolon-separated transforms, and `--` argument
   passing.
+- `:user-programs-safe`, a gate of `:release-uat`: no UAT fixture and no
+  program under `examples/` says `unsafe`. A red here is a compiler defect
+  (a C surface the compiler has not modeled), never a reason to edit the
+  program.
 
-If any UAT target fails, if the raylib window cannot be created, if the
+If any scenario fails, if the raylib window cannot be created, if the
 framebuffer check does not see the spiral, if any required C package UAT does
 not import/link/run, or if any one-liner prints different stdout than expected,
-the release fails and must not be published.
+the release fails and must not be published. To rerun one scenario by hand:
+`WITH_UAT_WITH=out/release/with-darwin-aarch64 out/release/bin/with uat zlib`.
 
 ### Darwin Release Host
 
