@@ -231,3 +231,91 @@ pub fn await_settled[T, E](tasks: impl IntoIter[Task[Result[T, E]]]) -> Vec[Resu
 pub fn with_concurrency[T](tasks: impl IntoIter[Task[T]], n: i32) -> impl IntoIter[Task[T]]:
     let _ = n
     tasks
+
+// ── Pulling a generator (§13.4) ───────────────────────────────────────────
+// `g.pull()` runs the generator on its own coroutine: a fiber stack from the
+// runtime's pool that only its caller resumes (rt with_fiber_coro_*), never
+// the scheduler. next() resumes it; the generator's consumer body parks the
+// element in next()'s slot and switches back. Sema resolves `g.pull()` on a
+// generator value to gen_pull and rejects a generator that yields views of
+// its own locals or may suspend.
+
+extern fn with_alloc(size: i64) -> *mut u8
+extern fn with_free(ptr: *mut u8) -> Unit
+extern fn with_fiber_coro_new(entry: *const u8, arg: *mut u8) -> i64
+extern fn with_fiber_coro_resume(co: i64) -> Unit
+extern fn with_fiber_coro_suspend(co: i64) -> Unit
+extern fn with_fiber_coro_finish(co: i64) -> Unit
+extern fn with_fiber_coro_free(co: i64) -> Unit
+
+// A pulled generator's state, on the heap so the coroutine's pointer to it
+// stays valid while the Pulled that owns it moves. `run` holds the generator
+// until the coroutine consumes it; `slot` is the Option[T] of the next() in
+// progress.
+type PullCore {
+    co: i64,
+    run: fn(*mut PullCore) -> Unit,
+    slot: *mut u8,
+    stop: bool,
+    done: bool,
+}
+
+/// A generator stepped by `next()` on its own fiber: what `g.pull()` returns
+/// (§13.4). Dropping it before the end stops the generator as a consumer's
+/// `break` does.
+pub type Pulled[T] { core: *mut u8 }
+
+// The coroutine's entry: the generator runs to its end or to a stop, then
+// control returns to the resume for good.
+unsafe fn pull_coro_main(arg: *mut u8):
+    let core = arg as *mut PullCore
+    ((*core).run)(core)
+    (*core).done = true
+    with_fiber_coro_finish((*core).co)
+
+// The generator's consumer body, on the coroutine: hand `x` to the waiting
+// next() and park until the next one; false leaves the generator at its
+// yield (the Pulled is being dropped).
+unsafe fn pull_yield[T](core: *mut PullCore, x: T) -> bool:
+    let slot = (*core).slot as *mut Option[T]
+    *slot = Some(x)
+    with_fiber_coro_suspend((*core).co)
+    not (*core).stop
+
+/// `g.pull()` (§13.4). Nothing runs, and no fiber stack is taken, until the
+/// first `next()`.
+pub fn gen_pull[T](g: impl Gen[T]) -> Pulled[T]:
+    let run = move (core: *mut PullCore) => g.each(x => unsafe { pull_yield(core, x) })
+    let core = with_alloc(sizeof[PullCore]() as i64) as *mut PullCore
+    unsafe { *core = PullCore { co: 0, run: run, slot: 0 as *mut u8, stop: false, done: false } }
+    Pulled { core: core as *mut u8 }
+
+impl[T] Iter[T] for Pulled[T]:
+    mut fn next() -> Option[T]:
+        let core = self.core as *mut PullCore
+        if (unsafe *core).done:
+            return None
+        if (unsafe *core).co == 0:
+            let co = with_fiber_coro_new(pull_coro_main as *const u8, core as *mut u8)
+            if co == 0:
+                panic("g.pull(): no fiber stack could be allocated for the generator")
+            (unsafe *core).co = co
+        var item: Option[T] = None
+        (unsafe *core).slot = &raw mut item as *mut u8
+        with_fiber_coro_resume((unsafe *core).co)
+        (unsafe *core).slot = 0 as *mut u8
+        item
+
+impl[T] Drop for Pulled[T]:
+    move fn drop():
+        let core = self.core as *mut PullCore
+        let co = (unsafe *core).co
+        if co != 0:
+            if not (unsafe *core).done:
+                (unsafe *core).stop = true
+                with_fiber_coro_resume(co)
+            with_fiber_coro_free(co)
+        // The generator, if it never ran, still lives in `run`.
+        let state = unsafe *core
+        drop(state)
+        with_free(core as *mut u8)

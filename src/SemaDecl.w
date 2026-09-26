@@ -1514,6 +1514,7 @@ impl Sema:
         self.generator_fn_state_types.insert(fn_sym, state_tid as i32)
         self.generator_fn_state_syms.insert(fn_sym, state_sym)
         self.generator_state_yield_types.insert(state_tid as i32, yield_ty)
+        self.generator_state_fns.insert(state_tid as i32, fn_sym)
         self.register_generator_gen_impl(state_sym)
         if borrow_receiver:
             self.generator_fn_receiver_views.insert(fn_sym, 1)

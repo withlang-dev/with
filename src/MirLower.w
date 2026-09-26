@@ -12480,7 +12480,12 @@ impl MirBuilder:
                         let gc_idx_sym = self.ast.get_data0(gc_idx_base)
                         if self.lookup_local(gc_idx_sym) < 0 and self.sema.named_types.contains(gc_idx_sym):
                             gc_is_static = true
-                if not gc_is_static:
+                if self.sema.receiver_arg_call_nodes.contains(node):
+                    // Sema resolved the method syntax to a free function
+                    // whose first parameter is the receiver: an ordinary
+                    // argument, passed by that parameter's declared mode.
+                    gc_args.push(self.lower_call_arg(self_expr, gc_sig_idx, 0, 0))
+                else if not gc_is_static:
                     let gc_recv_op =
                         if self.has_contextual_copy_adjustment(self_expr) != 0:
                             self.lower_contextual_copy_adjustment(self_expr)

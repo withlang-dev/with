@@ -1335,6 +1335,24 @@ pub type Sema {
     // Cycle-detection state for the may_suspend / ephemeral-task walkers
     // (reset at each outer query; same pattern as reachable_visiting).
     suspend_visiting: HashMap[i32, i32],
+    // §13.4 `g.pull()`: expr_may_suspend records the first suspension site it
+    // finds at fn_symbol_may_suspend depth suspend_site_record_depth (-1: none).
+    suspend_site_depth: i32,
+    suspend_site_record_depth: i32,
+    suspend_site_node: i32,
+    // §13.4 `g.pull()`: the generator value's type → its gen fn; a gen fn → its
+    // first `yield` that hands out a view of its own locals (and that local);
+    // each checked `g.pull()` node and its gen fn, judged once bodies are done.
+    generator_state_fns: HashMap[i32, i32],
+    generator_local_view_yields: HashMap[i32, i32],
+    generator_local_view_origins: HashMap[i32, i32],
+    gen_pull_nodes: Vec[i32],
+    // A method-call node Sema resolved to a free function that takes the
+    // receiver as its first argument, by that parameter's declared mode
+    // (§13.4 `g.pull()` is `gen_pull(g)`); MIR lowers the receiver as an
+    // ordinary argument, never as a method receiver.
+    receiver_arg_call_nodes: HashMap[i32, i32],
+    gen_pull_fns: Vec[i32],
     eph_task_visiting: HashMap[i32, i32],
     typed_dump_seen_nodes: HashMap[i32, i32],
     typed_dump_visit_budget: i32,
@@ -2724,6 +2742,15 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         ephemeral_task_binding_nodes,
         assign_target_revive_sym: 0,
         suspend_visiting: sema_new_map_i32_i32(),
+        suspend_site_depth: 0,
+        suspend_site_record_depth: -1,
+        suspend_site_node: 0,
+        generator_state_fns: sema_new_map_i32_i32(),
+        generator_local_view_yields: sema_new_map_i32_i32(),
+        generator_local_view_origins: sema_new_map_i32_i32(),
+        gen_pull_nodes: Vec.new(),
+        receiver_arg_call_nodes: sema_new_map_i32_i32(),
+        gen_pull_fns: Vec.new(),
         eph_task_visiting: sema_new_map_i32_i32(),
         typed_dump_seen_nodes,
         typed_dump_visit_budget: 0,
@@ -7740,6 +7767,7 @@ impl Sema:
         // D63: closure arguments are judged against their callee's complete
         // escape effects and call-once flags, whatever the declaration order.
         self.finalize_closure_arg_checks()
+        self.check_generator_pulls()
         self.finalize_receiver_requirements()
         self.enforce_receiver_modes()
         // D5 superseded: free-parameter share-place is no longer inferred from

@@ -4560,10 +4560,12 @@ impl Sema:
         if not self.fn_decl_nodes.contains(fn_sym):
             return 0
         self.suspend_visiting.insert(fn_sym, 1)
+        self.suspend_site_depth += 1
         let fn_node: i32 = self.fn_decl_nodes.get(fn_sym).unwrap()
         // D39: an interface declaration is never async (the parser rejects
         // it), so by declaration it never suspends.
         let result = if self.ast.fn_decl_body_is_interface(fn_node): 0 else: self.expr_may_suspend(self.ast.get_data1(fn_node))
+        self.suspend_site_depth -= 1
         self.suspend_visiting.remove(fn_sym)
         result
 
@@ -4585,40 +4587,65 @@ impl Sema:
         self.suspend_visiting.remove(producer)
         result
 
+    // A suspension point expr_may_suspend found: the first one met at the
+    // depth a site query asked for (generator_suspension_site) is kept.
+    mut fn suspension_site(node: i32) -> i32:
+        if self.suspend_site_depth == self.suspend_site_record_depth and self.suspend_site_node == 0:
+            self.suspend_site_node = node
+        1
+
+    // §13.4 `g.pull()`: the first point in the body of `gen_fn` that may
+    // suspend (§14.3) — an `.await`, a call that may suspend, a loop over a
+    // generator that may — or 0. The same walk as fn_symbol_may_suspend.
+    mut fn generator_suspension_site(gen_fn: i32) -> i32:
+        let saved_depth = self.suspend_site_record_depth
+        self.suspend_site_record_depth = self.suspend_site_depth + 1
+        self.suspend_site_node = 0
+        let may = self.fn_symbol_may_suspend(gen_fn)
+        let site = self.suspend_site_node
+        self.suspend_site_record_depth = saved_depth
+        self.suspend_site_node = 0
+        if may == 0:
+            return 0
+        if site == 0:
+            sema_phase_bug(f"BUG: generator {self.pool_resolve(gen_fn)} may suspend but no suspension site was recorded")
+        site
+
     mut fn expr_may_suspend(node: i32) -> i32:
         if node == 0:
             return 0
         let kind = self.ast.kind(node)
         if kind == NodeKind.NK_AWAIT or kind == NodeKind.NK_SELECT_AWAIT:
-            return 1
+            return self.suspension_site(node)
         if kind == NodeKind.NK_ASYNC_SCOPE:
-            return 1
+            return self.suspension_site(node)
         if kind == NodeKind.NK_ASYNC_BLOCK:
             return 0
         if kind == NodeKind.NK_IDENT:
             let sym = self.ast.get_data0(node)
             if self.binding_closure_nodes.contains(sym):
-                return self.callable_node_may_suspend(self.binding_closure_nodes.get(sym).unwrap())
+                if self.callable_node_may_suspend(self.binding_closure_nodes.get(sym).unwrap()) != 0:
+                    return self.suspension_site(node)
             return 0
         if kind == NodeKind.NK_CALL:
             if self.comp_resolved.contains(node):
                 if self.fn_symbol_may_suspend(self.comp_resolved.get(node).unwrap()) != 0:
-                    return 1
+                    return self.suspension_site(node)
             let callee = self.ast.get_data0(node)
             if self.ast.kind(callee) == NodeKind.NK_IDENT:
                 let callee_sym = self.ast.get_data0(callee)
                 if self.binding_closure_nodes.contains(callee_sym):
                     if self.callable_node_may_suspend(self.binding_closure_nodes.get(callee_sym).unwrap()) != 0:
-                        return 1
+                        return self.suspension_site(node)
                 if self.fn_symbol_may_suspend(callee_sym) != 0:
-                    return 1
+                    return self.suspension_site(node)
             else if self.ast.kind(callee) == NodeKind.NK_FIELD_ACCESS:
                 let recv_expr = self.ast.get_data0(callee)
                 let field = self.ast.get_data1(callee)
                 if self.typed_expr_types.contains(recv_expr):
                     let recv_ty: i32 = self.typed_expr_types.get(recv_expr).unwrap()
                     if self.method_may_suspend_current_fiber(recv_ty, field) != 0:
-                        return 1
+                        return self.suspension_site(node)
                 if self.expr_may_suspend(recv_expr) != 0:
                     return 1
             else if self.expr_may_suspend(callee) != 0:
@@ -4636,7 +4663,7 @@ impl Sema:
                 if self.expr_may_suspend(self.ast.get_extra(extra_start + si)) != 0:
                     return 1
             return self.expr_may_suspend(self.ast.get_data2(node))
-        if kind == NodeKind.NK_CLOSURE or kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_CAST or kind == NodeKind.NK_DEFER or kind == NodeKind.NK_ERRDEFER or kind == NodeKind.NK_LABEL or kind == NodeKind.NK_COPY_ARG or kind == NodeKind.NK_MOVE_ARG or kind == NodeKind.NK_NO_SUSPEND:
+        if kind == NodeKind.NK_CLOSURE or kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_CAST or kind == NodeKind.NK_DEFER or kind == NodeKind.NK_ERRDEFER or kind == NodeKind.NK_LABEL or kind == NodeKind.NK_COPY_ARG or kind == NodeKind.NK_MOVE_ARG or kind == NodeKind.NK_NO_SUSPEND or kind == NodeKind.NK_YIELD:
             return self.expr_may_suspend(self.ast.get_data0(node))
         if kind == NodeKind.NK_UNARY or kind == NodeKind.NK_RETURN:
             return self.expr_may_suspend(self.ast.get_data1(node))
@@ -4691,7 +4718,7 @@ impl Sema:
             if self.expr_may_suspend(self.ast.get_data1(node)) != 0:
                 return 1
             if self.gen_loop_may_suspend(node):
-                return 1
+                return self.suspension_site(node)
             return self.expr_may_suspend(self.ast.get_data2(node))
         if kind == NodeKind.NK_LET_BINDING or kind == NodeKind.NK_LET_DECL:
             return self.expr_may_suspend(self.ast.get_data1(node))
@@ -7210,6 +7237,7 @@ impl Sema:
             // call is through the producer's body parameter, fn(T) -> bool.
             if self.current_gen_yield_type != 0:
                 self.call_callable_types.insert(node, self.generator_body_fn_type(self.current_gen_yield_type as i32))
+                self.note_generator_local_view_yield(node, inner_node)
             return self.ty_void
 
         if kind == NodeKind.NK_COMPTIME:
@@ -11205,6 +11233,92 @@ impl Sema:
             let view_name: str = with_str_clone_ref(self.pool_resolve(0 - verdict))
             let what = if block_scope_start < 0: "returned view" else: "view"
             self.emit_error(what ++ " may outlive its origin via local binding '" ++ view_name ++ "'", report_node)
+
+    // D69 (§13.4 Pulling): a pulled element leaves the generator's frame, so
+    // a yield that hands out a view of the generator's own locals — or of a
+    // statement temporary — is judged as a returned view would be. The first
+    // such yield of each gen fn is recorded; g.pull() of it is rejected there
+    // (check_generator_pulls), and a push consumer is unaffected.
+    mut fn note_generator_local_view_yield(yield_node: i32, inner_node: i32):
+        let gen_fn = self.current_fn_symbol
+        if gen_fn == 0 or self.generator_local_view_yields.contains(gen_fn):
+            return
+        let yield_ty = self.resolve_alias(self.current_gen_yield_type)
+        if self.get_type_kind(yield_ty) != TypeKind.TY_REF and self.type_is_ephemeral_value(yield_ty) == 0:
+            return
+        if self.view_into_temporary_type(inner_node) != 0:
+            self.generator_local_view_yields.insert(gen_fn, yield_node)
+            self.generator_local_view_origins.insert(gen_fn, 0)
+            return
+        let verdict = self.view_escape_origin(inner_node, -1)
+        if verdict == 0:
+            return
+        self.generator_local_view_yields.insert(gen_fn, yield_node)
+        self.generator_local_view_origins.insert(gen_fn, if verdict > 0: verdict else: 0 - verdict)
+
+    // D69 (§13.4 Pulling): `g.pull()` on a generator value is a call of
+    // std.task's `gen_pull(g)`, which consumes the value and returns the
+    // owned Pulled[T] (an Iter[T]). The pull allocates a fiber stack, so it
+    // needs the runtime; whether the generator may be pulled at all waits for
+    // every body's facts (check_generator_pulls).
+    mut fn check_generator_pull(node: i32, recv: i32, gen_ty: i32, arg_count: i32) -> i32:
+        self.require_async_runtime(node, "g.pull()")
+        if arg_count != 0:
+            self.emit_error(f"g.pull() takes no arguments, found {arg_count}", node)
+            return 0
+        if self.type_is_ephemeral_value(gen_ty as TypeId) != 0:
+            self.emit_error("g.pull() of a generator whose arguments are views is not implemented yet (#1732): the pulled iterator would have to be as ephemeral as the generator value; consume the generator with `for`", node)
+            return 0
+        let fn_sym = self.pool_lookup_symbol("gen_pull")
+        let fn_node = self.generic_fn_node_for_symbol(fn_sym)
+        if fn_node == 0 or not self.fn_symbol_source_path(fn_sym).ends_with("std/task.w"):
+            self.emit_error("g.pull() needs std.task's gen_pull, which this build does not include (§13.4: pulling runs the generator on a fiber of the standard runtime)", node)
+            return 0
+        let arg_types: Vec[i32] = Vec.new()
+        let arg_nodes: Vec[i32] = Vec.new()
+        arg_types.push(gen_ty)
+        arg_nodes.push(recv)
+        self.resolved_generic_call_nodes.insert(node, fn_node)
+        let ret = self.check_generic_call(fn_sym, fn_node, arg_types, arg_nodes, 1, node)
+        if ret == 0:
+            return 0
+        // gen_pull takes the generator value by value: the pull consumes it.
+        self.note_place_effect(recv, EFF_CONSUME)
+        self.mark_moved_if_consumed(recv)
+        self.comp_resolved.insert(node, fn_sym)
+        self.receiver_arg_call_nodes.insert(node, 1)
+        self.typed_expr_types.insert(node, ret)
+        self.gen_pull_nodes.push(node)
+        self.gen_pull_fns.push(self.generator_state_fns.get(gen_ty).unwrap())
+        ret
+
+    // D69 (§13.4 Pulling): next() returns an element its caller keeps and
+    // resumes the generator on its own fiber, so a generator that yields a
+    // view of its own locals, or whose body may suspend (§14.3), cannot be
+    // pulled. Judged once every body is checked; the error is at the yield or
+    // the suspension point, labelled with the pull.
+    mut fn check_generator_pulls():
+        for pi in 0..self.gen_pull_nodes.len() as i32:
+            let pull_node: i32 = self.gen_pull_nodes[pi]
+            let gen_fn: i32 = self.gen_pull_fns[pi]
+            let gen_name: str = with_str_clone_ref(self.pool_resolve(gen_fn))
+            if self.generator_local_view_yields.contains(gen_fn):
+                let yield_node: i32 = self.generator_local_view_yields.get(gen_fn).unwrap()
+                let origin: i32 = self.generator_local_view_origins.get(gen_fn).unwrap()
+                let what = if origin != 0: f"a view of the generator's own local '{self.pool_resolve(origin)}'" else: "a view into a temporary of the generator"
+                self.emit_pull_error(f"g.pull() of generator '{gen_name}': this yield hands out {what}, and next() returns an element its caller keeps (§13.4); yield an owned value (`.clone()`), or consume the generator with `for`", yield_node, pull_node)
+            let site = self.generator_suspension_site(gen_fn)
+            if site != 0:
+                self.emit_pull_error(f"g.pull() of generator '{gen_name}': its body may suspend here (§13.4, §14.3), and a pulled generator runs on its own fiber, resumed by next(); consume it with `for` inside the async code instead", site, pull_node)
+
+    mut fn emit_pull_error(msg: &str, site: i32, pull_node: i32):
+        if self.suppress_errors != 0:
+            return
+        let primary = Span { file: self.local_file_id, start: self.ast.get_start(site), end: self.ast.get_end(site) }
+        var diag = Diagnostic.err(msg, primary)
+        diag.add_label(Span { file: self.local_file_id, start: self.ast.get_start(pull_node), end: self.ast.get_end(pull_node) }, "pulled here")
+        diag.set_origin(__FILE__, __FN__, __LINE__ as i32, site)
+        self.diags.emit(move diag)
 
     // The judgment check_view_escape_origins reports (a view into a statement
     // temporary aside): the origin symbol a view in `expr_node` escapes, the
@@ -24868,8 +24982,7 @@ impl Sema:
             self.emit_error("iterator operation '" ++ method_name ++ "' from §13.3 is not implemented yet", node)
             return 0
         if method_name == "pull" and self.generator_state_yield_types.contains(self.resolve_alias(obj_type) as i32):
-            self.emit_error("g.pull() (§13.4: a generator stepped by next() on its own fiber) is not implemented yet (#1725); consume the generator with `for`, or through Gen[T] stages", node)
-            return 0
+            return self.check_generator_pull(node, expr, self.resolve_alias(obj_type) as i32, arg_count)
         // A resource a failed producer still produced (`FailedDatabase`,
         // spec §16.2b.4) admits only the operations its facade marks
         // `valid on failed` (stage 12b, #1612; Eric, 2026-09-23, on #1426:

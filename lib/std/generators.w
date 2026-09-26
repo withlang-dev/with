@@ -8,7 +8,7 @@
 // by answering false.
 //
 // Stages that step a sequence themselves (zip, peekable) take an Iter[T];
-// a generator gives one through `g.pull()` (#1725).
+// a generator gives one through `g.pull()` (std.task Pulled[T]).
 
 /// A pipeline stage: the Gen[T] that `run` produces when it is handed the
 /// consumer's body.
