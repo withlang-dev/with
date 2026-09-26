@@ -906,6 +906,13 @@ impl Sema:
             return 0
         pointee
 
+    // The type an unsuffixed numeric literal takes from its operator peer: a
+    // Copy view of a number is the number (#1477: `&i64 + 1` typed the literal
+    // i32 and computed the sum at i32, truncating the pointee).
+    mut fn literal_peer_type(ty: i32) -> i32:
+        let pointee = self.shared_copy_pointee(ty)
+        if pointee != 0 and self.is_numeric_type(pointee): pointee else: ty
+
     // Called only after exact-type operator/method resolution has declined a
     // user-defined implementation and selected the builtin value operator.
     // The packed result carries the value types used by that resolved operator;
@@ -913,7 +920,16 @@ impl Sema:
     mut fn contextualize_builtin_binary_operands(lhs_node: i32, lhs0: i32, rhs_node: i32, rhs0: i32) -> i64:
         var lhs = lhs0
         var rhs = rhs0
-        if self.record_contextual_copy_adjustment(lhs_node, rhs, lhs) != 0:
+        // A numeric Copy view next to an owned number materializes as its own
+        // pointee and the builtin operator widens from there; taking the
+        // peer's type instead narrowed `&i64 + k: i32` to i32 (#1477).
+        let lhs_num_pointee = self.literal_peer_type(lhs)
+        let rhs_num_pointee = self.literal_peer_type(rhs)
+        if lhs_num_pointee != lhs and self.is_numeric_type(rhs) and self.record_contextual_copy_adjustment(lhs_node, lhs_num_pointee, lhs) != 0:
+            lhs = lhs_num_pointee
+        else if rhs_num_pointee != rhs and self.is_numeric_type(lhs) and self.record_contextual_copy_adjustment(rhs_node, rhs_num_pointee, rhs) != 0:
+            rhs = rhs_num_pointee
+        else if self.record_contextual_copy_adjustment(lhs_node, rhs, lhs) != 0:
             lhs = rhs
         else if self.record_contextual_copy_adjustment(rhs_node, lhs, rhs) != 0:
             rhs = lhs
@@ -9315,13 +9331,15 @@ impl Sema:
                     rhs = self.check_expr_value_context(rhs_node)
                 else if lhs_is_num_lit and self.ast.kind(rhs_node) != NodeKind.NK_VARIANT_SHORTHAND:
                     rhs = self.check_expr_value_context(rhs_node)
-                    lhs = self.check_expr_with_expected(lhs_node, rhs)
+                    let rhs_peer = self.literal_peer_type(rhs as i32)
+                    lhs = self.check_expr_with_expected(lhs_node, rhs_peer as TypeId)
                 else:
                     lhs = self.check_expr_value_context(lhs_node)
                 if self.ast.kind(rhs_node) == NodeKind.NK_VARIANT_SHORTHAND or (rhs == 0 and self.comparison_operand_is_variant_call(rhs_node) != 0):
                     rhs = self.check_expr_with_expected(rhs_node, lhs)
                 else if rhs == 0 and rhs_is_num_lit and not lhs_is_num_lit:
-                    rhs = self.check_expr_with_expected(rhs_node, lhs)
+                    let lhs_peer = self.literal_peer_type(lhs as i32)
+                    rhs = self.check_expr_with_expected(rhs_node, lhs_peer as TypeId)
                 else:
                     if rhs == 0:
                         rhs = self.check_expr_value_context(rhs_node)
@@ -9362,15 +9380,17 @@ impl Sema:
             else:
                 if lhs_is_num_lit:
                     rhs = self.check_expr_value_context(rhs_node)
-                    if self.is_numeric_type(rhs as i32):
-                        lhs = self.check_expr_with_expected(lhs_node, rhs)
+                    let rhs_peer = self.literal_peer_type(rhs as i32)
+                    if self.is_numeric_type(rhs_peer):
+                        lhs = self.check_expr_with_expected(lhs_node, rhs_peer as TypeId)
                     else:
                         lhs = self.check_expr_value_context(lhs_node)
                 else:
                     lhs = self.check_expr_value_context(lhs_node)
                 if rhs == 0:
-                    if rhs_is_num_lit and self.is_numeric_type(lhs as i32):
-                        rhs = self.check_expr_with_expected(rhs_node, lhs)
+                    let lhs_peer = self.literal_peer_type(lhs as i32)
+                    if rhs_is_num_lit and self.is_numeric_type(lhs_peer):
+                        rhs = self.check_expr_with_expected(rhs_node, lhs_peer as TypeId)
                     else:
                         rhs = self.check_expr_value_context(rhs_node)
                 if lhs == 0:
