@@ -18808,7 +18808,11 @@ impl Sema:
             if self.enum_has_variant(qualifier_enum_ty, variant_name) == 0:
                 self.emit_error("variant '" ++ self.pool_resolve(variant_name) ++ "' does not belong to enum '" ++ self.pool_resolve(qualifier_enum_sym) ++ "'", node)
                 return 0
-            return qualifier_enum_ty
+            // The qualifier names the enum; the subject carries its
+            // instantiation. Returning the qualifier's bare `G` typed the
+            // payload of `G[i64].V(t)` as `T` (#1507) and left a nested
+            // `G.A(.X(t))` binding undeclared (#1518).
+            return if subject_enum_sym != 0: subject_enum_ty else: qualifier_enum_ty
         else if subject_enum_sym == 0:
             self.emit_error("variant pattern requires an enum subject", node)
             return 0
