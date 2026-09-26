@@ -14411,6 +14411,7 @@ enum SemaExhClass: i32:
     Struct = 4
     Int = 5
     Slice = 6
+impl Copy for SemaExhClass
 
 impl Sema:
     // The subject's own type: patterns see through `&` (§9.7 reference

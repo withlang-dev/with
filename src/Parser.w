@@ -32,6 +32,7 @@ enum DeclBody:
     Indented    // `:` ends the line; the members are the indented block below it
     Braced      // `{ ... }`: members separated by newlines or semicolons
     Missing     // no introducer where one is required; already reported
+impl Copy for DeclBody
 pub type Parser {
     tokens: TokenList,
     pos: i32,
