@@ -41,7 +41,7 @@ async fn main -> Result[Unit, AppError]:
     let config = load_config(None)
 
     // Open the database; `?` propagates a DbError as AppError.Db
-    let db = Database.open(config.db_path)?
+    let db = Database.open(config.db_path.clone())?
 
     // Initialize the database schema
     db.init_schema()?

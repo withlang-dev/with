@@ -1,8 +1,8 @@
 module domain
 
-type UserId { value: i64 }
+pub type UserId { value: i64 }
 
-type User {
+pub type User {
     id: UserId,
     name: str,
     email: str,
@@ -10,17 +10,17 @@ type User {
     active: bool = true,
 }
 
-enum Role { | Admin | Moderator | Member | Guest }
+pub enum Role { | Admin | Moderator | Member | Guest }
 impl Copy for Role
 
-type UserProfile {
+pub type UserProfile {
     user: User,
     post_count: i32,
     followers: i32,
     last_login: Option[i64] = None,
 }
 
-type CreateUserRequest {
+pub type CreateUserRequest {
     name: str,
     email: str,
     role: Role,
@@ -33,7 +33,7 @@ type UserUpdate {
     active: Option[bool],
 }
 
-type Notification {
+pub type Notification {
     recipient: str,
     subject: str,
     body: str,
