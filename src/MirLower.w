@@ -7432,7 +7432,7 @@ impl MirBuilder:
         // once per iteration on the back-edge/break edge — registered in the
         // function scope it drops again at exit (the drop#17/drop#20 double).
         self.push_scope()
-        self.bind_for_element_or_skip(for_node, pat_or_sym, item_place, elem_ty, body_expr, header_bb)
+        self.bind_for_element_or_skip(for_node, pat_or_sym, item_place, elem_ty, body_expr, header_bb, true)
 
         // #771 (the #729 loop shape): stmt temps created INSIDE the body must
         // drop inside the body, not at the loop exit — the zero-iteration path
@@ -7468,10 +7468,19 @@ impl MirBuilder:
             let item_op = self.body.new_operand(OperandKind.OK_COPY, item_place)
             self.assign_operand_to_place(bind_place, item_op, self.ast.get_start(body_expr))
 
-    mut fn bind_for_element_or_skip(for_node: i32, pat_or_sym: i32, item_place: i32, elem_ty: i32, body_expr: i32, continue_bb: i32):
+    // §13.5 / #1490: a refutable `for PATTERN in …` skips the elements it does
+    // not match. When the loop OWNS the element (consuming iteration moved it
+    // out of the iterator's Option and nothing else will drop it), the skip
+    // edge drops it before continuing — as bind_comprehension_element does.
+    mut fn bind_for_element_or_skip(for_node: i32, pat_or_sym: i32, item_place: i32, elem_ty: i32, body_expr: i32, continue_bb: i32, owns_item: bool):
         if self.ast.for_binding_is_pattern(for_node):
             let matched_bb = self.new_block()
-            self.lower_pattern_match(item_place, pat_or_sym, matched_bb, continue_bb)
+            let skip_bb = self.new_block()
+            self.lower_pattern_match(item_place, pat_or_sym, matched_bb, skip_bb)
+            self.switch_to(skip_bb)
+            if owns_item and self.sema.type_needs_drop_frozen(elem_ty) != 0:
+                self.emit_drop_stmt(item_place, "for-skip", self.ast.get_start(for_node))
+            self.terminate(TermKind.TK_GOTO, continue_bb, 0, 0, 0)
             self.switch_to(matched_bb)
             let _ = self.lower_pattern(pat_or_sym, item_place)
             return
@@ -8106,7 +8115,7 @@ impl MirBuilder:
 
         // Body
         self.switch_to(body_bb)
-        self.bind_for_element_or_skip(for_node, pat_or_sym, counter_place, elem_ty, body_expr, inc_bb)
+        self.bind_for_element_or_skip(for_node, pat_or_sym, counter_place, elem_ty, body_expr, inc_bb, false)
         // #771 (the #729 loop shape): stmt temps created INSIDE the body must
         // drop inside the body, not at the loop exit — the zero-iteration path
         // reaches the exit without initializing them (freed stack garbage).
@@ -8178,7 +8187,7 @@ impl MirBuilder:
 
         // Body: bind loop variable = counter, execute body
         self.switch_to(body_bb)
-        self.bind_for_element_or_skip(for_node, pat_or_sym, counter_place, elem_ty, body_expr, inc_bb)
+        self.bind_for_element_or_skip(for_node, pat_or_sym, counter_place, elem_ty, body_expr, inc_bb, false)
 
         // #614b: establish a per-iteration drop scope around the body and emit its
         // drops on the back-edge. A multi-statement body is an NK_BLOCK that pushes
@@ -8315,7 +8324,7 @@ impl MirBuilder:
         // Body: bind element = slice[counter]
         self.switch_to(body_bb)
         let elem_place = self.lower_sequence_element(slice_place, counter_local, iter_ty, elem_ty, self.ast.get_start(body_expr))
-        self.bind_for_element_or_skip(for_node, pat_or_sym, elem_place, elem_ty, body_expr, inc_bb)
+        self.bind_for_element_or_skip(for_node, pat_or_sym, elem_place, elem_ty, body_expr, inc_bb, false)
 
         // #771 (the #729 loop shape): stmt temps created INSIDE the body must
         // drop inside the body, not at the loop exit — the zero-iteration path
@@ -8413,7 +8422,7 @@ impl MirBuilder:
         self.switch_to(get_after_bb)
 
         // Bind loop variable
-        self.bind_for_element_or_skip(for_node, pat_or_sym, elem_place, elem_ty, body_expr, inc_bb)
+        self.bind_for_element_or_skip(for_node, pat_or_sym, elem_place, elem_ty, body_expr, inc_bb, false)
 
         // #771 (the #729 loop shape): stmt temps created INSIDE the body must
         // drop inside the body, not at the loop exit — the zero-iteration path
@@ -8680,7 +8689,7 @@ impl MirBuilder:
         let elem_place = self.place_for_local(elem_local)
         self.body.push_stmt(self.cur_bb, StmtKind.Assign, elem_place, tuple_rv, span)
 
-        self.bind_for_element_or_skip(for_node, pat_or_sym, elem_place, elem_ty, body_expr, inc_bb)
+        self.bind_for_element_or_skip(for_node, pat_or_sym, elem_place, elem_ty, body_expr, inc_bb, false)
 
         // #771 (the #729 loop shape): stmt temps created INSIDE the body must
         // drop inside the body, not at the loop exit — the zero-iteration path
@@ -8754,7 +8763,7 @@ impl MirBuilder:
         let slot_unit = self.unit_operand()
         self.terminate(TermKind.TK_CALL, slot_unit, slot_args_id, slot_place, slot_after_bb)
         self.switch_to(slot_after_bb)
-        self.bind_for_element_or_skip(for_node, pat_or_sym, slot_place, slot_ty, body_expr, inc_bb)
+        self.bind_for_element_or_skip(for_node, pat_or_sym, slot_place, slot_ty, body_expr, inc_bb, false)
         // #771 (the #729 loop shape): stmt temps created INSIDE the body must
         // drop inside the body, not at the loop exit — the zero-iteration path
         // reaches the exit without initializing them (freed stack garbage).
@@ -8816,7 +8825,7 @@ impl MirBuilder:
         let some_index = self.enum_variant_index_for_type(opt_ty, self.sema.syms.some)
         let downcast_place = self.body.new_downcast_place(opt_place, some_index)
         let payload_place = self.body.new_field_place(downcast_place, 0, elem_ty)
-        self.bind_for_element_or_skip(for_node, pat_or_sym, payload_place, elem_ty, body_expr, header_bb)
+        self.bind_for_element_or_skip(for_node, pat_or_sym, payload_place, elem_ty, body_expr, header_bb, true)
         // #771 (the #729 loop shape): stmt temps created INSIDE the body must
         // drop inside the body, not at the loop exit — the zero-iteration path
         // reaches the exit without initializing them (freed stack garbage).
@@ -8902,7 +8911,7 @@ impl MirBuilder:
         let ref_unit = self.unit_operand()
         self.terminate(TermKind.TK_CALL, ref_unit, ref_args_id, ref_place, ref_after_bb)
         self.switch_to(ref_after_bb)
-        self.bind_for_element_or_skip(for_node, pat_or_sym, ref_place, ref_elem_ty, body_expr, inc_bb)
+        self.bind_for_element_or_skip(for_node, pat_or_sym, ref_place, ref_elem_ty, body_expr, inc_bb, false)
         // #771 (the #729 loop shape): stmt temps created INSIDE the body must
         // drop inside the body, not at the loop exit — the zero-iteration path
         // reaches the exit without initializing them (freed stack garbage).
@@ -9908,7 +9917,14 @@ impl MirBuilder:
             self.bind_pattern_value(outer_place, outer_op, self.ast.get_start(pat_node))
             out.push(outer_local)
             out.push(scrutinee_place)
-            let inner = self.lower_pattern(self.ast.get_data1(pat_node), scrutinee_place)
+            // The outer binding now owns the value. A wildcard inner pattern has
+            // nothing to bind and nothing to discard: A7's discard-move would
+            // take the subject a second time (#1504: the for-comprehension's
+            // `___fail @ _` fail arm freed the Err carrier twice).
+            let inner_pat = self.ast.get_data1(pat_node)
+            if inner_pat != 0 and self.ast.kind(inner_pat) == NodeKind.NK_PAT_WILDCARD:
+                return out
+            let inner = self.lower_pattern(inner_pat, scrutinee_place)
             for i in 0..inner.len():
                 out.push(inner[i])
             return out
@@ -16354,6 +16370,20 @@ impl MirBody:
             let op = self.new_operand(OperandKind.OK_COPY, src_place)
             self.gen_assign_operand(bb, dst, op, span)
 
+    mut fn gen_blank_generator_fields(bb: i32, sema: &Sema, state_tid: i32, span: i32):
+        let resume_sym = mir_gen_resume_field_sym(sema)
+        let field_count = mir_gen_state_field_count(sema, state_tid)
+        for fi in 0..field_count:
+            let field_sym = mir_gen_state_field_sym(sema, state_tid, fi)
+            if field_sym == resume_sym:
+                continue
+            if mir_gen_find_local_by_sym(self, field_sym) < 0:
+                continue
+            let field_ty = mir_gen_state_field_type(sema, state_tid, fi)
+            let dst = self.gen_self_field_place(field_sym, field_ty)
+            let blank = self.gen_zero_operand(field_ty)
+            self.gen_assign_operand(bb, dst, blank, span)
+
     mut fn gen_restore_generator_fields(bb: i32, sema: &Sema, state_tid: i32, span: i32):
         let resume_sym = mir_gen_resume_field_sym(sema)
         let field_count = mir_gen_state_field_count(sema, state_tid)
@@ -16560,6 +16590,11 @@ fn lower_generator_next_body(sema: &Sema, source: &MirBody, fn_node: i32) -> Mir
             switch_targets.push(d1 + 1)
             continue
         if tk == TermKind.TK_RETURN:
+            // Exhausted: the source body's own scope-exit drops just ran on the
+            // restored locals. The state still holds the same bytes, and the
+            // generator value's drop glue would free them again (#1548) — blank
+            // the fields to the reset sentinel so that drop is the guarded no-op.
+            out.gen_blank_generator_fields(new_bb, sema, state_tid, span)
             out.gen_store_resume_state(new_bb, sema, state_tid, -1, span)
             out.gen_assign_option_none(new_bb, opt_ty, span)
             out.set_terminator(new_bb, TermKind.TK_RETURN, 0, 0, 0, 0, span)
@@ -16601,6 +16636,7 @@ fn lower_generator_next_body(sema: &Sema, source: &MirBody, fn_node: i32) -> Mir
     let dispatch_table = out.new_switch_table(switch_vals, switch_targets)
     out.set_terminator(entry_bb as i32, TermKind.TK_SWITCH_INT, switch_op, dispatch_table, done_bb as i32, 0, 0)
 
+    out.is_generator_next = 1
     out
 
 fn mir_fn_is_generic_template(sema: &Sema, ast_pool: AstPool, pool: InternPool, fn_node: i32) -> bool:
