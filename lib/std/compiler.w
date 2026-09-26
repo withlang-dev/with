@@ -122,6 +122,11 @@ pub fn SourceEmitter.emit_source(self: &Self, source: str):
 pub fn SourceLocation.new(file: str, start: i32, end: i32) -> SourceLocation:
     SourceLocation { file, start, end }
 
+// A location is retained by every info record that names it, so a caller
+// attaching one location to several records clones it (§3.8).
+impl Clone for SourceLocation:
+    fn clone(): SourceLocation { file: self.file.clone(), start: self.start, end: self.end }
+
 pub fn ModuleInfo.new(name: str, path: str) -> ModuleInfo:
     ModuleInfo { name, path }
 
