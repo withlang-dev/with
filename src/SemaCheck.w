@@ -23157,7 +23157,9 @@ impl Sema:
             scoped_args.push(self.unwrap_task_type(task_ty as TypeId) as i32)
             return self.ensure_generic_inst_type(self.syms.scoped_task, scoped_args, 1) as i32
 
-        if field == self.syms.spawn_method:
+        // §18.2 (#1303): the receiver's own `spawn` method wins over the
+        // scope-handle builtin; the builtin applies only when nothing resolves.
+        if field == self.syms.spawn_method and mc_sig_idx_for_effect < 0 and mc_method_fn_for_resolution == 0:
             if self.ast.kind(expr) != NodeKind.NK_IDENT or self.is_active_sync_scope_symbol(self.ast.get_data0(expr)) == 0:
                 self.emit_error("spawn() is only available inside scope", node)
                 return 0
