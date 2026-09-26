@@ -10,6 +10,8 @@ use Overflow
 use AnalysisTypes
 use compiler.TrackedInputs
 use MirCore
+use MirLower
+use SemaTypes
 
 extern fn with_str_clone_ref(s: &str) -> str
 extern fn with_eprint(s: &str) -> Unit

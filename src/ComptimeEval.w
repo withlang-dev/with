@@ -17,6 +17,8 @@ use CiMigrate
 use Overflow
 use std.string.StringBuilder
 use TargetSpec
+use SemaTypes
+use compiler.Compilation.Config
 
 extern fn with_eprint(s: &str) -> Unit
 extern fn with_str_clone_ref(s: &str) -> str

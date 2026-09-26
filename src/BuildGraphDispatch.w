@@ -6,6 +6,7 @@ use BuildGraphOps
 use BuildGraphRuntime
 use BuildGraphSupport
 use BuildGraphTools
+use Resolve
 extern fn with_str_clone_ref(s: &str) -> str
 
 pub type BuildGraphDispatchResult {

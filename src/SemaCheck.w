@@ -15,6 +15,9 @@ use MathBuiltins
 use std.builtins.int_to_string
 use std.regex.Regex
 use SemaTypes
+use SemaDecl
+use FnAbi
+use TargetSpec
 
 extern fn with_str_clone_ref(s: &str) -> str
 extern fn with_write(s: &str) -> Unit

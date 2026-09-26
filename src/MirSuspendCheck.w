@@ -5,6 +5,7 @@ use Sema
 use Span
 use std.collections.HashMap
 use MirCore
+use SemaTypes
 
 fn suspend_bit_index(local_count: i32, bb: i32, local: i32) -> i32:
     bb * local_count + local

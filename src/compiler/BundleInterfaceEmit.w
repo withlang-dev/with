@@ -25,6 +25,8 @@ use FnAbi
 use compiler.BundleInterfaces
 use std.string.StringBuilder
 use std.collections.HashMap
+use SemaTypes
+use render
 
 extern fn with_str_clone_ref(s: &str) -> str
 extern fn with_str_cmp_ref(a: &str, b: &str) -> i32

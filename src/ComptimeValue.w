@@ -1,5 +1,6 @@
 use Sema
 use CapabilityRegistry
+use SemaTypes
 
 extern fn with_str_clone_ref(s: &str) -> str
 extern fn with_str_eq_ref(a: &str, b: &str) -> i32

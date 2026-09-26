@@ -22,6 +22,7 @@ use SemaCheck
 use SemaDecl
 use std.collections.HashMap
 use std.collections.HashSet
+use compiler.Runtime
 
 extern fn with_write(s: &str) -> Unit
 extern fn with_eprint(s: &str) -> Unit

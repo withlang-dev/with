@@ -22,6 +22,7 @@ use compiler.Runtime
 use compiler.CodegenUnitsPolicy
 use Mir
 use std.string.parse
+use MirCore
 
 extern fn with_str_clone_ref(s: &str) -> str
 extern fn with_fs_remove_file(path: &str) -> i32

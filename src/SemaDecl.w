@@ -9,6 +9,8 @@ use CapabilityRegistry
 use render
 use SemaCheck
 use std.collections.HashMap
+use compiler.BundleInterfaces
+use SemaTypes
 
 extern fn with_str_clone_ref(s: &str) -> str
 extern fn with_eprint(s: &str) -> Unit

@@ -41,6 +41,15 @@ use Uat
 use TargetSpec
 use compiler.Compilation
 use compiler.ProjectConfig
+use compiler.Compilation.Config
+use Archive
+use compiler.Link
+use std.crypto.sha256.sha256_hash_str
+use std.crypto.sha256.sha256_hex
+use MirCore
+use AnalysisTypes
+use compiler.ConanClient
+use compiler.LockFile
 
 extern fn with_arg_count() -> i32
 extern fn with_str_clone_ref(s: &str) -> str

@@ -26,6 +26,7 @@ use ForeignPairState
 use std.collections.HashMap
 use std.builtins.eprint
 use MirCore
+use SemaTypes
 
 extern fn with_getenv_str(name: &str) -> str
 

@@ -25,6 +25,7 @@ use Ast
 use InternPool
 use Sema
 use SemaFacade
+use SemaTypes
 
 extern fn with_str_clone_ref(s: &str) -> str
 

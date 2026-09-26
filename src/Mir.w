@@ -3,6 +3,7 @@
 use MirCore
 use Sema
 use InternPool
+use SemaTypes
 
 impl MirModule:
     mut fn snapshot_sema_types(sema: &Sema):

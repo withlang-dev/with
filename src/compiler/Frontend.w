@@ -10,6 +10,7 @@ use SemaFacade
 use ComptimeTransform
 use Resolve
 use Span
+use compiler.Compilation.Config
 extern fn with_getenv_str(name: &str) -> str
 use Diagnostic
 use CImport

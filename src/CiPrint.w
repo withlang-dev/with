@@ -15,6 +15,7 @@
 // the placeholders one kind at a time.
 use CiIR
 use CiMigrate
+use CImport
 
 extern fn with_str_clone_ref(s: &str) -> str
 extern fn with_write(s: &str) -> Unit

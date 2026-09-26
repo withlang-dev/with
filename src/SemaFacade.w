@@ -17,6 +17,8 @@ use InternPool
 use Diagnostic
 use ForeignPairState
 use compiler.FacadeRender
+use SemaTypes
+use Span
 
 impl Sema:
     mut fn collect_c_facades():
