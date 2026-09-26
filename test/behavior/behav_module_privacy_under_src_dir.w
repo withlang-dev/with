@@ -34,4 +34,14 @@ fn main:
     p7_assert_failure_contains(private_c, "'c_uint' requires an explicit import", "check src/p2.w")
     let public_ok = p7_run(case_dir, "privacy-src-dir-pub", "check\0src/p3.w\0")
     p7_assert_success(public_ok, "check src/p3.w")
+    // An impl on the other module's private type names the cause at the impl
+    // header, not as "unknown method … for type '&<error>'" at each use.
+    p7_write(case_dir, "src/p4.w", "use cu
+impl Secret:
+    fn twice() -> i32: *self * 2
+fn main:
+    print(greet())
+")
+    let private_impl = p7_run(case_dir, "privacy-src-dir-impl", "check\0src/p4.w\0")
+    p7_assert_failure_contains(private_impl, "symbol 'Secret' is private to module", "check src/p4.w")
     print("ok")
