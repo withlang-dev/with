@@ -17986,7 +17986,11 @@ impl Sema:
                     if gen_meta >= 0 and self.ast.fn_meta_param_count(gen_meta) == 1:
                         let gen_param_start = self.ast.fn_meta_param_start(gen_meta)
                         let gen_param_ty_node = self.ast.fn_param_type(gen_param_start, 0)
-                        let gen_expected_ty = if gen_param_ty_node != 0: self.resolve_type_expr(gen_param_ty_node) as i32 else: 0
+                        // A parameter typed by the callee's own type parameter
+                        // is not a unit parameter; resolving it here reported
+                        // `unknown type 'T'` at the declaration (#1336).
+                        let gen_names_own_tp = gen_param_ty_node != 0 and self.type_node_mentions_unbound_type_param(gen_param_ty_node, self.ast.fn_meta_tp_start(gen_meta), self.ast.fn_meta_tp_count(gen_meta))
+                        let gen_expected_ty = if gen_param_ty_node != 0 and not gen_names_own_tp: self.resolve_type_expr(gen_param_ty_node) as i32 else: 0
                         if self.try_unit_elide_call_arg(node, arg_count, gen_expected_ty) != 0:
                             resolved_arg_count = 1
 
