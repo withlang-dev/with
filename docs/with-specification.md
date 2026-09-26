@@ -11266,6 +11266,28 @@ provide the same name, the import written last in the module shadows the
 others; this is never an ambiguity error. A `use c_import(...)` is an
 import and takes its place in that order.
 
+**Every import is also a namespace**, so a shadowed name stays reachable:
+
+- `use std.math` makes `math`, the last segment of its path, a namespace:
+  `math.PI` names std.math's `PI` whatever else is imported. The full
+  path, `std.math.PI`, names it as well.
+- `use c_import("raylib.h")` makes `raylib`, the header's file name
+  without `.h`, a namespace: `raylib.PI`. A header in a directory takes its
+  file name (`<SDL3/SDL.h>` is `SDL`). A `c_import` of inline C text has
+  no file name and so no default namespace.
+- `use m as n` names the namespace `n` instead. It is needed only when two
+  imports would otherwise share a namespace name.
+
+```
+use c_import("raylib.h")
+use std.math
+
+fn main:
+    print(f"{PI}")          // std.math's PI: the later import
+    print(f"{raylib.PI}")   // raylib's PI, through its namespace
+    print(f"{math.TAU}")
+```
+
 A user-controlled declaration is never shadowed, merged, or
 impl-captured by the fallback tier. If you define `print` — or `Regex` —
 in a module, uses in that module resolve to your definition.
