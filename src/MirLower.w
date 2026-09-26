@@ -5517,6 +5517,23 @@ impl MirBuilder:
             let place = self.place_for_local(temp)
             self.body.push_stmt(self.cur_bb, StmtKind.Assign, place, rv, self.ast.get_start(node))
             return place
+        // §4.8a (#1517): a slice is `(ptr, len)`, and `s.len` reads its length.
+        // Lowered as a `len` field projection, the read yielded 0: no place
+        // projection names a slice's length; RK_LEN does (copied out of the
+        // projected place first, as sequence_len_rvalue's callers do).
+        let base_kind = self.sema.get_type_kind(self.sema.resolve_alias(base_ty as TypeId))
+        if (base_kind == TypeKind.TY_SLICE or base_kind == TypeKind.TY_ARRAY) and self.pool.resolve(field_idx) == "len":
+            var len_src = base
+            if base_kind == TypeKind.TY_SLICE:
+                let viewed_tmp = self.new_temp(base_ty)
+                len_src = self.place_for_local(viewed_tmp)
+                let viewed_op = self.body.new_operand(OperandKind.OK_COPY, base)
+                self.assign_operand_to_place(len_src, viewed_op, self.ast.get_start(node))
+            let len_tmp = self.new_temp(self.sema.ty_i64)
+            let len_place = self.place_for_local(len_tmp)
+            let len_rv = self.sequence_len_rvalue(len_src, base_ty)
+            self.body.push_stmt(self.cur_bb, StmtKind.Assign, len_place, len_rv, self.ast.get_start(node))
+            return len_place
         self.new_projected_field_place(base, field_idx, field_ty)
 
     mut fn lower_user_deref_result_place(place: i32, current_ty: i32, deref_info: &SemaDerefInfo, node: i32) -> i32:
