@@ -16477,6 +16477,8 @@ fn mir_symbol_for_pool(sema: &Sema, pool: InternPool, sym: i32) -> i32:
 
 type LoweredFunction {
     body: MirBody,
+    // The bodies lowered along with it: its closures and gen-loop bodies,
+    // and, for a gen fn's producer, the constructor and `each`.
     anonymous_bodies: Vec[MirBody],
 }
 
@@ -16881,7 +16883,8 @@ impl MirBody:
 
 // D69 (§13.4): calling a gen fn evaluates its arguments into the generator
 // value and runs nothing. The state struct's fields are the parameters in
-// order; each argument moves in.
+// order; each argument moves in, except a generator method's borrowed
+// receiver, whose place the value views.
 fn lower_generator_constructor(sema: &Sema, ast_pool: AstPool, pool: InternPool, fn_node: i32, fn_sym: i32, body_sym: i32, sig_idx: i32) -> MirBody:
     let state_tid: i32 = sema.generator_fn_state_types.get(fn_sym).unwrap()
     var builder = MirBuilder.init(sema, ast_pool, pool, body_sym)
@@ -16891,21 +16894,46 @@ fn lower_generator_constructor(sema: &Sema, ast_pool: AstPool, pool: InternPool,
     let names: Vec[i32] = Vec.new()
     let param_count = sema.sig_get_param_count(sig_idx)
     let meta = ast_pool.find_fn_meta(fn_node)
+    // The parameters are locals 1..=param_count, before any temporary.
     for pi in 0..param_count:
         let p_name = ast_pool.fn_param_name(ast_pool.fn_meta_param_start(meta), pi)
-        let p_ty = sema.sig_param_type(sig_idx, pi)
-        let local_id = builder.body.new_local(p_ty, 0, p_name, 1)
+        let local_id = builder.body.new_local(sema.sig_param_type(sig_idx, pi), 0, p_name, 1)
         builder.body.push_stmt(builder.cur_bb, StmtKind.StorageLive, local_id, 0, span)
         names.push(p_name)
-        let param_place = builder.place_for_local(local_id)
-        fields.push(builder.operand_for_place(param_place, p_ty))
     builder.body.n_params = param_count
+    for pi in 0..param_count:
+        let p_ty = sema.sig_param_type(sig_idx, pi)
+        let param_place = builder.place_for_local(pi + 1)
+        if pi == 0 and sema.generator_fn_receiver_views.contains(fn_sym):
+            // A borrowed receiver is the caller's place (by-place ABI); the
+            // generator value keeps a view of it.
+            let view_ty = sema.type_extra[(sema.get_type_d1(state_tid) + 1)]
+            let view_local = builder.new_temp(view_ty)
+            let view_place = builder.place_for_local(view_local)
+            let view_rv = builder.body.new_rvalue(RvalueKind.RK_REF, BorrowKind.SHARED, param_place, 0)
+            builder.body.push_stmt(builder.cur_bb, StmtKind.Assign, view_place, view_rv, span)
+            fields.push(builder.body.new_operand(OperandKind.OK_COPY, view_place))
+        else:
+            fields.push(builder.operand_for_place(param_place, p_ty))
     let fid = builder.body.new_agg_fields(fields, names)
     let rv = builder.body.new_rvalue(RvalueKind.RK_AGGREGATE, 0, fid, 0)
     let ret_place = builder.place_for_local(0)
     builder.body.push_stmt(builder.cur_bb, StmtKind.Assign, ret_place, rv, span)
     builder.terminate(TermKind.TK_RETURN, 0, 0, 0, 0)
     return move builder.body
+
+// D69 (§13.4): the three functions behind a gen fn, or behind one
+// specialization of a generic gen fn (`fn_sym` is then its specialization
+// symbol, `body_sym` the constructor's body): the producer — the gen fn's
+// body with its consumer's body as a last parameter — whose MIR body leads,
+// then the constructor and `each`.
+fn lower_generator_functions(sema: &Sema, ast_pool: AstPool, pool: InternPool, fn_node: i32, fn_sym: i32, body_sym: i32, sig_idx: i32) -> LoweredFunction:
+    let run_sym: i32 = sema.generator_fn_run_syms.get(fn_sym).unwrap()
+    let producer_builder = MirBuilder.init(sema, ast_pool, pool, mir_symbol_for_pool(sema, pool, run_sym))
+    var lowered = lower_fn_with_sig(move producer_builder, fn_node, sema.get_sig(run_sym))
+    lowered.anonymous_bodies.push(lower_generator_constructor(sema, ast_pool, pool, fn_node, fn_sym, body_sym, sig_idx))
+    lowered.anonymous_bodies.push(lower_generator_each_body(sema, ast_pool, pool, fn_sym))
+    lowered
 
 // D69 (§13.4): the generator value's `move fn each(body)` hands its stored
 // arguments and `body` to the producer, which runs the gen fn's body.
@@ -16927,7 +16955,13 @@ fn lower_generator_each_body(sema: &Sema, ast_pool: AstPool, pool: InternPool, f
         let field_sym: i32 = sema.type_extra[(field_start + fi * 3)]
         let field_ty: i32 = sema.type_extra[(field_start + fi * 3 + 1)]
         let field_place = builder.body.new_field_place(self_place, field_sym, field_ty)
-        args.push(builder.operand_for_place(field_place, field_ty))
+        if fi == 0 and sema.generator_fn_receiver_views.contains(fn_sym):
+            // The producer takes the receiver by place: the place the view
+            // names.
+            let recv_ty = sema.sig_param_type(run_sig, 0)
+            args.push(builder.body.new_operand(OperandKind.OK_COPY, builder.body.new_deref_place(field_place, recv_ty)))
+        else:
+            args.push(builder.operand_for_place(field_place, field_ty))
     let body_place = builder.place_for_local(body_local)
     args.push(builder.operand_for_place(body_place, sema.sig_param_type(each_sig, 1)))
     let args_id = builder.body.new_call_args(args)
@@ -17078,8 +17112,10 @@ fn lower_concrete_specialization(sema: Sema, ast_pool: AstPool, pool: InternPool
     let decl_index = sema.find_decl_index(fn_node)
     if decl_index >= 0:
         sema.update_decl_source_context(decl_index)
-    var builder = MirBuilder.init(&sema, ast_pool, pool, mono_sym)
-    let lowered = lower_fn_with_sig(move builder, fn_node, sig_idx)
+    let lowered = if (ast_pool.get_data2(fn_node) / FnFlags.GEN) % 2 == 1:
+        lower_generator_functions(&sema, ast_pool, pool, fn_node, mono_sym, mono_sym, sig_idx)
+    else:
+        lower_fn_with_sig(MirBuilder.init(&sema, ast_pool, pool, mono_sym), fn_node, sig_idx)
     sema.local_file_id = saved_file_id
     sema.current_module_path = saved_module_path
     sema.current_module_has_ci = saved_module_has_ci
@@ -17147,13 +17183,7 @@ pub fn lower_module(input_sema: Sema, ast_pool: AstPool, pool: InternPool) -> Mi
             let sig_idx = sema.get_sig(fn_sym)
             if sig_idx < 0:
                 continue
-            // D69 (§13.4): the constructor, the producer (the gen fn's body
-            // with its consumer's body as a last parameter), and `each`.
-            let run_sym: i32 = sema.generator_fn_run_syms.get(fn_sym).unwrap()
-            let producer_builder = MirBuilder.init(&sema, ast_pool, pool, mir_symbol_for_pool(&sema, pool, run_sym))
-            mir_mod.add_lowered_function(lower_fn_with_sig(move producer_builder, decl as i32, sema.get_sig(run_sym)))
-            mir_mod.add_body(lower_generator_constructor(&sema, ast_pool, pool, decl as i32, fn_sym, mir_fn_sym, sig_idx))
-            mir_mod.add_body(lower_generator_each_body(&sema, ast_pool, pool, fn_sym))
+            mir_mod.add_lowered_function(lower_generator_functions(&sema, ast_pool, pool, decl as i32, fn_sym, mir_fn_sym, sig_idx))
             continue
         let sig_idx = sema.get_sig(fn_sym)
         var builder = MirBuilder.init(&sema, ast_pool, pool, mir_fn_sym)

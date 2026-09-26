@@ -2320,11 +2320,12 @@ impl Sema:
         let saved_has_gen_yield_type = self.has_gen_yield_type
         let is_gen = (flags / FnFlags.GEN) % 2
         if is_gen == 1:
-            let yield_ty =
-                if self.generator_fn_yield_types.contains(fn_name):
-                    self.generator_fn_yield_types.get(fn_name).unwrap()
-                else:
-                    ret_type
+            // Keyed by the signature's symbol: a generic gen fn's
+            // specializations each have their own element type.
+            let gen_sym = self.sig_names[sig_idx]
+            if not self.generator_fn_yield_types.contains(gen_sym):
+                sema_phase_bug(f"BUG: gen fn body checked under a signature with no generator registered (sig {sig_idx})")
+            let yield_ty: i32 = self.generator_fn_yield_types.get(gen_sym).unwrap()
             self.current_return_type = self.ty_void
             self.current_gen_yield_type = yield_ty as TypeId
             self.has_gen_yield_type = 1
@@ -3943,7 +3944,11 @@ impl Sema:
             self.sig_params.push(p_tid as i32)
 
         let declared_ret_tid = if ret_type_node != 0: self.resolve_type_expr(ret_type_node) else: self.ty_void
-        let ret_tid = self.fn_signature_return_type(self.ast.fn_meta_flags(meta), declared_ret_tid)
+        // D69 (§13.4): each specialization of a generic gen fn has its own
+        // generator value, producer and `each`, keyed by its symbol.
+        let is_gen = (self.ast.fn_meta_flags(meta) / FnFlags.GEN) % 2 == 1
+        let sig_value_ty = if is_gen: self.register_generator(mono_sym, declared_ret_tid as i32, param_start, ps, param_count) as TypeId else: declared_ret_tid
+        let ret_tid = self.fn_signature_return_type(self.ast.fn_meta_flags(meta), sig_value_ty)
 
         var sig_idx = self.get_sig(mono_sym)
         if sig_idx < 0:
@@ -3995,6 +4000,8 @@ impl Sema:
                 with_eprint(f"[vra] mono={self.pool_resolve(mono_sym)} sig={sig_idx} param={abi_pi} vra={cfc_vra} owner={method_owner_sym} self_ty={self_type_id} kind={self.get_type_kind(self.resolve_alias(self_type_id as TypeId))}")
             if cfc_vra != 0:
                 self.set_sig_param_value_ref_abi(sig_idx, abi_pi, 1)
+        if is_gen and self.generator_borrows_receiver(param_start, param_count, ps):
+            self.set_sig_param_value_ref_abi(sig_idx, 0, 1)
 
         // Concrete generic validation must run in the callee's own lexical
         // environment, not inside the caller's active local scopes.
@@ -4565,7 +4572,15 @@ impl Sema:
             return false
         let each_fn: i32 = self.gen_for_each_syms.get(key_node).unwrap()
         let producer: i32 = if self.generator_mir_only_fns.contains(each_fn): self.generator_mir_only_fns.get(each_fn).unwrap() else: each_fn
-        self.fn_symbol_may_suspend(producer) != 0
+        // A generic gen fn's specialization has no declaration of its own:
+        // its body is the generic declaration's.
+        if not self.concrete_specialization_by_sym.contains(producer) or self.suspend_visiting.contains(producer):
+            return self.fn_symbol_may_suspend(producer) != 0
+        let spec_idx: i32 = self.concrete_specialization_by_sym.get(producer).unwrap()
+        self.suspend_visiting.insert(producer, 1)
+        let result = self.expr_may_suspend(self.ast.get_data1(self.concrete_specialization_nodes[spec_idx])) != 0
+        self.suspend_visiting.remove(producer)
+        result
 
     mut fn expr_may_suspend(node: i32) -> i32:
         if node == 0:
@@ -11442,23 +11457,28 @@ impl Sema:
         let tk = self.get_type_kind(self.resolve_alias(ty as TypeId))
         tk != TypeKind.TY_REF and tk != TypeKind.TY_PTR
 
-    fn record_generator_call_ref_origins(call_node: i32, sig_idx: i32, param_offset: i32, extra_start: i32, arg_count: i32, has_resolved: i32):
+    // D69 (§13.4): a generator value holds its arguments, so it views what
+    // each view argument views — a generator method's borrowed receiver
+    // included (`recv_node` when param_offset is 1), which the value holds
+    // as a view of the caller's place.
+    fn record_generator_call_ref_origins(call_node: i32, sig_idx: i32, param_offset: i32, recv_node: i32, extra_start: i32, arg_count: i32, has_resolved: i32):
         if call_node == 0 or sig_idx < 0:
             return
         let ret = self.sig_return_type(sig_idx)
         if not self.generator_state_yield_types.contains(ret):
             return
         let param_count = self.sig_get_param_count(sig_idx)
+        let field_start = self.get_type_d1(ret as TypeId)
         var union_mask = 0
         var concrete_deps: Vec[i32] = Vec.new()
         for pi in 0..param_count:
-            let param_ty = self.sig_param_type(sig_idx, pi)
-            if self.type_is_ephemeral_value(param_ty) == 0:
+            let field_ty = self.type_extra[(field_start + pi * 3 + 1)]
+            if self.type_is_ephemeral_value(field_ty) == 0:
                 continue
             let arg_index = pi - param_offset
-            if arg_index < 0 or arg_index >= arg_count:
+            if arg_index >= arg_count:
                 continue
-            let arg_node = if has_resolved != 0: self.get_resolved_call_arg(call_node, arg_index) else: self.ast.get_extra(extra_start + arg_index)
+            let arg_node = if arg_index < 0: (if pi == 0: recv_node else: 0) else if has_resolved != 0: self.get_resolved_call_arg(call_node, arg_index) else: self.ast.get_extra(extra_start + arg_index)
             if arg_node <= 0:
                 continue
             union_mask = union_mask | self.compute_expr_view_origin_mask(arg_node)
@@ -18599,7 +18619,7 @@ impl Sema:
                 self.check_mut_slice_call_exclusivity(sc_mut_args, sc_all_args)
             self.check_dyn_trait_call_compat(fn_sym, resolved_extra_start, arg_types, resolved_arg_count, param_offset)
             self.record_call_view_origins(node, sig_idx, param_offset, 0, resolved_extra_start, resolved_arg_count, has_resolved)
-            self.record_generator_call_ref_origins(node, sig_idx, param_offset, resolved_extra_start, resolved_arg_count, has_resolved)
+            self.record_generator_call_ref_origins(node, sig_idx, param_offset, 0, resolved_extra_start, resolved_arg_count, has_resolved)
             self.typed_expr_types.insert(node, ret)
             return ret
 
@@ -19484,7 +19504,10 @@ impl Sema:
         // concrete substitutions above. Its concrete signature therefore owns
         // the exact inferred return type; resolving a missing syntax node as
         // Unit here discarded that result and made generic forwarding lie.
-        let resolved_ret = if ret_node == 0 and concrete_sig >= 0:
+        // A gen fn's call returns its generator value, which only the
+        // specialization's signature names (D69).
+        let returns_generator = (self.ast.fn_meta_flags(meta) / FnFlags.GEN) % 2 == 1
+        let resolved_ret = if (ret_node == 0 or returns_generator) and concrete_sig >= 0:
             self.sig_return_type(concrete_sig)
         else:
             let declared_ret = self.resolve_generic_return_type_node(ret_node, tp_start, tp_count)
@@ -21134,6 +21157,7 @@ impl Sema:
             // identical to effect propagation so Option[&T] retains its concrete
             // collection origin at the caller (D22 Rule 10).
             self.record_call_view_origins(node, concrete_sig, recv_param_offset, receiver, extra_start, arg_count, self.has_resolved_call_args(node))
+            self.record_generator_call_ref_origins(node, concrete_sig, recv_param_offset, receiver, extra_start, arg_count, self.has_resolved_call_args(node))
         if ret_ty != 0:
             self.typed_expr_types.insert(node, ret_ty)
         self.generic_subst_param_syms = saved_generic_method_subst_syms
@@ -24034,6 +24058,7 @@ impl Sema:
                     if mc_subst_ret != 0:
                         self.propagate_method_call_param_effects(node, sig_idx, call_param_offset, call_effect_recv, extra_start, mc_resolved_arg_count, mc_has_resolved_args)
                         self.record_call_view_origins(node, sig_idx, call_param_offset, call_effect_recv, extra_start, mc_resolved_arg_count, mc_has_resolved_args)
+                        self.record_generator_call_ref_origins(node, sig_idx, call_param_offset, call_effect_recv, extra_start, mc_resolved_arg_count, mc_has_resolved_args)
                         return mc_subst_ret
                 // A STATIC call has no receiver param: args pair with params from
                 // index 0 and there is no receiver node to absorb param0's
@@ -24045,6 +24070,7 @@ impl Sema:
                 // mirrors mc_plain_poff in the #567 type-check loop above.
                 self.propagate_method_call_param_effects(node, sig_idx, call_param_offset, call_effect_recv, extra_start, mc_resolved_arg_count, mc_has_resolved_args)
                 self.record_call_view_origins(node, sig_idx, call_param_offset, call_effect_recv, extra_start, mc_resolved_arg_count, mc_has_resolved_args)
+                self.record_generator_call_ref_origins(node, sig_idx, call_param_offset, call_effect_recv, extra_start, mc_resolved_arg_count, mc_has_resolved_args)
                 return mc_ret
 
         let concrete_trait_method_ret = self.check_concrete_trait_method_call(recv_type as i32, field, arg_types, extra_start, mc_resolved_arg_count, node, expr, mc_has_resolved_args)

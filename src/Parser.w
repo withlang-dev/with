@@ -3261,7 +3261,7 @@ impl Parser:
         let extra_start = self.pool.extra_len()
         var method_count = 0
 
-        while self.peek() == TokenKind.TK_AT or self.peek() == TokenKind.TK_KW_FN or self.peek() == TokenKind.TK_KW_PUB or self.peek() == TokenKind.TK_KW_UNSAFE or self.peek() == TokenKind.TK_KW_ASYNC or self.peek() == TokenKind.TK_KW_MUT or self.peek() == TokenKind.TK_KW_MOVE or self.peek() == TokenKind.TK_KW_TYPE or (impl_braced and self.peek() == TokenKind.TK_R_BRACE):
+        while self.peek() == TokenKind.TK_AT or self.peek() == TokenKind.TK_KW_FN or self.peek() == TokenKind.TK_KW_PUB or self.peek() == TokenKind.TK_KW_UNSAFE or self.peek() == TokenKind.TK_KW_ASYNC or self.peek() == TokenKind.TK_KW_GEN or self.peek() == TokenKind.TK_KW_MUT or self.peek() == TokenKind.TK_KW_MOVE or self.peek() == TokenKind.TK_KW_TYPE or (impl_braced and self.peek() == TokenKind.TK_R_BRACE):
             if impl_braced and self.peek() == TokenKind.TK_R_BRACE:
                 break
             if not self.decl_member_continues(construct, form, start, introducer_end, method_count + impl_assoc_names.len() as i32):
@@ -3302,6 +3302,12 @@ impl Parser:
             var m_async = 0
             if self.peek() == TokenKind.TK_KW_ASYNC:
                 m_async = 1
+                self.advance()
+            // §13.4: `gen fn` in an impl is a generator method; like `async`,
+            // `gen` precedes a `mut`/`move` receiver mode.
+            var m_gen = 0
+            if self.peek() == TokenKind.TK_KW_GEN:
+                m_gen = 1
                 self.advance()
             // D7 eliminate-self: a `mut`/`move` prefix on a method sets the receiver
             // mode; plain `fn` inside an impl is (P2) a read borrow. `self` is
@@ -3361,7 +3367,7 @@ impl Parser:
             var body: NodeId = 0 as NodeId
             if self.interface_mode != 0:
                 // D39: methods of an interface declaration carry no bodies either.
-                body = self.parse_interface_body(m_tp_count + impl_tp_count, m_async, 0, 0)
+                body = self.parse_interface_body(m_tp_count + impl_tp_count, m_async, m_gen, 0)
                 if body == 0:
                     break
             else if self.peek() == TokenKind.TK_COLON:
@@ -3379,6 +3385,8 @@ impl Parser:
                 flags = flags + FnFlags.PUB
             if m_async != 0:
                 flags = flags + FnFlags.ASYNC
+            if m_gen != 0:
+                flags = flags + FnFlags.GEN
 
             var final_method_body = body
             if m_unsafe != 0:
