@@ -22262,7 +22262,12 @@ impl Sema:
             if self.type_expr_mentions_type_param(ty_node, self.ast.get_extra(pos)) != 0:
                 return 0
             pos = pos + 2 + self.ast.get_extra(pos + 1)
-        self.resolve_type_expr(ty_node) as i32
+        // A template's parameter type stays a parameter type here: `[]mut T`
+        // is legal only in that position (#604), and resolving it as a bare
+        // type expression from the argument check refused every facade whose
+        // generic helper takes an element buffer (#1609 widened this path to
+        // identifier arguments).
+        self.resolve_parameter_type_expr(ty_node) as i32
 
     fn method_expected_arg_type(recv_type: i32, field: i32, arg_index: i32) -> i32:
         if recv_type == 0:
