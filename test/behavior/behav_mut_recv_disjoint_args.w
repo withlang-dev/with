@@ -4,6 +4,11 @@
 // receiver — but disjoint sources stay legal: another binding's fields,
 // pre-bound locals, and Copy scalar fields of the receiver itself (a
 // scalar is copied before the call begins; nothing is retained).
+//
+// `add` consumes its `piece: str`, so a field fed to it is an owned value:
+// a field never moves out implicitly (§2.2, D32) and an unannotated
+// `let piece = a.buf` binds a view (§3.8, D22), so both are spelled
+// `.clone()` — the independent value the consuming parameter takes.
 
 type Acc { buf: str, n: i32 }
 
@@ -19,13 +24,13 @@ fn main:
     var a = Acc { buf: "abc", n: 0 }
     let b = Acc { buf: "wxyz", n: 7 }
 
-    // Sibling binding's field: disjoint.
-    let r1 = a.add(b.buf)
+    // Sibling binding's field: disjoint; cloned because `add` consumes.
+    let r1 = a.add(b.buf.clone())
     assert(r1 == 4)
 
-    // Pre-bound local of the receiver's own field: the binding broke
-    // the retention; this is the rewrite the diagnostic suggests.
-    let piece = a.buf
+    // An owned copy of the receiver's own field: nothing of `a` is retained
+    // across the call.
+    let piece = a.buf.clone()
     let r2 = a.add(piece)
     assert(r2 == 3)
 
