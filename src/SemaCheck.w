@@ -249,11 +249,20 @@ impl Sema:
             return inner_tid
         tid
 
+    // §4 (#1220): a float where an integer is demanded is a narrowing with
+    // two meanings (truncate or round), spelled `x as i32` or `x.round() as
+    // i32`; the operator-promotion arm below (int op float is float) is not
+    // an argument conversion, and codegen then failed with no location.
+    fn float_where_int_demanded(expected: i32, actual: i32) -> bool:
+        self.get_type_kind(self.resolve_alias(expected as TypeId)) == TypeKind.TY_INT and self.get_type_kind(self.resolve_alias(actual as TypeId)) == TypeKind.TY_FLOAT
+
     mut fn builtin_arg_type_compatible(expected: i32, actual: i32) -> i32:
         if expected == 0 or actual == 0:
             return 1
         if self.types_compatible(expected, actual) != 0:
             return 1
+        if self.float_where_int_demanded(expected, actual):
+            return 0
         if self.arithmetic_result_type(expected, actual) != 0:
             return 1
         let actual_unwrapped = self.unwrap_builtin_arg_distinct(actual)
@@ -269,6 +278,8 @@ impl Sema:
             return 1
         if self.types_compatible_frozen(expected, actual) != 0:
             return 1
+        if self.float_where_int_demanded(expected, actual):
+            return 0
         if self.arithmetic_result_type(expected, actual) != 0:
             return 1
         let actual_unwrapped = self.unwrap_builtin_arg_distinct(actual)
