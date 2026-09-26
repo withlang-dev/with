@@ -111,6 +111,9 @@ for line in log.split("\n"):
     var owner = ""
     if line.contains("' is private to module '"):
         owner = quoted_after(line, "is private to module '")
+        // The runtime parsed into the unit (WITH_RT_IN_UNIT) names its modules
+        // under `<embedded-rt>/`; the sources are the tree's rt/*.w.
+        if owner.starts_with("<embedded-rt>/"): owner = owner.slice(14, owner.len())
     else if line.contains("' is not visible from this module") or line.contains("' in its signature; a public signature names only public types"):
         owner = owning_module(sym, &roots)
         if owner.len() == 0:
