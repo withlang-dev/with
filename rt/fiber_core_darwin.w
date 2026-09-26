@@ -8,6 +8,7 @@ extern fn with_alloc_origin(size: i64, origin: i64) -> *mut u8
 extern fn with_free(ptr: *mut u8) -> Unit
 extern fn with_memcpy(dst: *mut u8, src: *const u8, len: i64) -> *mut u8
 extern fn with_memset(dst: *mut u8, val: i32, len: i64) -> *mut u8
+extern fn with_ewrite(s: &str) -> Unit
 @[link_name("mmap")]
 extern fn rt_libc_mmap(addr: *mut u8, len: u64, prot: i32, flags: i32, fd: i32, offset: i64) -> *mut u8
 @[link_name("mprotect")]
@@ -126,6 +127,13 @@ var panicked_fiber_ids: [1024]i32 = [0 as i32; 1024]
 var panicked_fiber_head: i32 = 0
 var panicked_fiber_count: i32 = 0
 var fiber_alt_stack_buf: [131072]u8 = [0 as u8; 131072]
+// §13.4 pulled generators: a coroutine is a pooled fiber block that the
+// scheduler never sees. Its caller resumes it directly and it switches back
+// at each element (with_fiber_coro_*). Per worker: the coroutine whose first
+// resume _with_fiber_start is bootstrapping, and the coroutine running now
+// (the stack-overflow handler checks its guard page too).
+var worker_coro_starting: [8]i64 = [0 as i64; 8]
+var worker_current_coros: [8]i64 = [0 as i64; 8]
 
 fn scheduler_mutex_ptr() -> *mut u8:
     (&raw mut scheduler_mutex) as *mut [16]i64 as *mut u8
@@ -593,21 +601,28 @@ fn fiber_write_i32(fd: i32, n: i32):
         let _ = rt_libc_write(fd, (&raw const buf as i64 + j as i64) as *const u8, 1)
         j = j - 1
 
+fn fiber_guard_hit(f: i64, fault_addr: i64) -> bool:
+    if f == 0:
+        return false
+    let stack = fiber_stack(f)
+    if stack as i64 == 0:
+        return false
+    fault_addr >= stack as i64 - guard_page_size() and fault_addr < stack as i64
+
 pub fn with_fiber_stack_overflow_handler(sig: i32, info: *const u8, ucontext: *mut u8):
     let _ = ucontext
     let fault_addr = rt_fiber_fault_addr(info)
-    let current = current_worker_fiber()
-    if current != 0:
-        let stack = fiber_stack(current)
-        if stack as i64 != 0:
-            let page_sz = guard_page_size()
-            let guard_start = stack as i64 - page_sz
-            let guard_end = stack as i64
-            if fault_addr >= guard_start and fault_addr < guard_end:
-                let _ = rt_libc_write(2, "fatal: fiber stack overflow (fiber #" as *const u8, 36)
-                fiber_write_i32(2, fiber_id(current))
-                let _ = rt_libc_write(2, ")\n" as *const u8, 2)
-                rt_libc_exit(134)
+    let worker = current_worker_index()
+    let coro = worker_current_coros[worker]
+    if fiber_guard_hit(coro, fault_addr):
+        let _ = rt_libc_write(2, "fatal: fiber stack overflow (pulled generator)\n" as *const u8, 47)
+        rt_libc_exit(134)
+    let current = worker_current_fibers[worker]
+    if fiber_guard_hit(current, fault_addr):
+        let _ = rt_libc_write(2, "fatal: fiber stack overflow (fiber #" as *const u8, 36)
+        fiber_write_i32(2, fiber_id(current))
+        let _ = rt_libc_write(2, ")\n" as *const u8, 2)
+        rt_libc_exit(134)
 
     rt_fiber_reset_signal_handler(sig)
     let _ = rt_libc_raise(sig)
@@ -616,7 +631,17 @@ fn fiber_install_signal_handlers():
     rt_fiber_install_signal_handlers(alt_stack_ptr(), FIBER_ALT_STACK_SIZE, with_fiber_stack_overflow_handler as i64)
 
 pub unsafe fn with_fiber_bootstrap_load(entry_out: *mut i64, arg_out: *mut i64, result_out: *mut i64):
-    let current = current_worker_fiber()
+    let worker = current_worker_index()
+    let coro: i64 = worker_coro_starting[worker]
+    if coro != 0:
+        // A coroutine's entry never returns (with_fiber_coro_finish), so
+        // _with_fiber_start never reaches with_fiber_bootstrap_finish for it.
+        worker_coro_starting[worker] = 0
+        *entry_out = fiber_entry_ptr(coro)
+        *arg_out = fiber_arg_ptr(coro)
+        *result_out = 0
+        return
+    let current = worker_current_fibers[worker]
     if current == 0:
         *entry_out = 0
         *arg_out = 0
@@ -738,6 +763,8 @@ pub fn with_runtime_core_init():
     i = 0
     while i < MAX_FIBER_WORKERS:
         worker_current_fibers[i] = 0
+        worker_coro_starting[i] = 0
+        worker_current_coros[i] = 0
         worker_thread_ids[i] = 0
         worker_handles[i] = 0
         worker_set_queue_head(i, 0)
@@ -830,6 +857,99 @@ pub fn with_fiber_yield():
     scheduler_wake_all()
     scheduler_unlock()
     with_fiber_switch(current as *mut u8, scheduler_ctx_ptr(worker))
+
+// ── Coroutines (§13.4 `g.pull()`) ─────────────────────────────────────────
+// A coroutine runs `entry(arg)` on a pooled fiber stack, driven by its caller
+// alone: with_fiber_coro_resume switches into it and returns when it calls
+// with_fiber_coro_suspend or with_fiber_coro_finish. It never enters a run
+// queue, has no fiber id, and is not a scheduled fiber: `current_worker_fiber`
+// stays the caller's. The caller's context lives in a block the coroutine
+// owns (the result-buffer field, unused by coroutines); the coroutine that was
+// running when it was resumed is kept in the free-list field, which is unused
+// while the block is out of the pool.
+
+fn coro_check(co: i64, what: &str):
+    if co == 0 or fiber_id(co) != 0 or fiber_result_buf(co) as i64 == 0:
+        with_ewrite("fatal: with_fiber_coro_" ++ what ++ ": not a live coroutine\n")
+        rt_libc_abort()
+
+fn coro_fatal_state(what: &str):
+    with_ewrite("fatal: with_fiber_coro_" ++ what ++ ": coroutine in the wrong state\n")
+    rt_libc_abort()
+
+/// A coroutine that will run `entry(arg)` at its first resume; 0 when no
+/// fiber stack can be had.
+pub fn with_fiber_coro_new(entry: *const u8, arg: *mut u8) -> i64:
+    scheduler_lock()
+    let f = acquire_fiber()
+    scheduler_unlock()
+    if f == 0:
+        return 0
+    let caller = with_alloc_origin(FIBER_CTX_SIZE, DBG_ALLOC_ORIGIN_FIBER)
+    if caller as i64 == 0:
+        scheduler_lock()
+        recycle_fiber(f)
+        scheduler_unlock()
+        return 0
+    with_memset(caller, 0, FIBER_CTX_SIZE)
+    with_memset(f as *mut u8, 0, FIBER_CTX_SIZE)
+    fiber_set_entry_ptr(f, entry as i64)
+    fiber_set_arg_ptr(f, arg as i64)
+    fiber_set_result_buf(f, caller)
+    fiber_set_id(f, 0)
+    fiber_set_slot(f, -1)
+    fiber_set_next(f, 0)
+    fiber_set_state(f, FIBER_STATE_READY)
+    with_fiber_prepare_initial_context(f as *mut u8, fiber_stack(f), fiber_stack_size(f))
+    f
+
+/// Run the coroutine until it suspends or finishes.
+pub fn with_fiber_coro_resume(co: i64):
+    coro_check(co, "resume")
+    let state = fiber_state(co)
+    if state != FIBER_STATE_READY and state != FIBER_STATE_SUSPENDED:
+        coro_fatal_state("resume")
+    let worker = current_worker_index()
+    if state == FIBER_STATE_READY:
+        worker_coro_starting[worker] = co
+    fiber_set_next(co, worker_current_coros[worker])
+    worker_current_coros[worker] = co
+    fiber_set_state(co, FIBER_STATE_RUNNING)
+    with_fiber_switch(fiber_result_buf(co), co as *mut u8)
+    worker_current_coros[current_worker_index()] = fiber_next(co)
+    fiber_set_next(co, 0)
+
+/// From inside the coroutine: return to the caller's resume; the next resume
+/// continues here.
+pub fn with_fiber_coro_suspend(co: i64):
+    coro_check(co, "suspend")
+    if fiber_state(co) != FIBER_STATE_RUNNING:
+        coro_fatal_state("suspend")
+    fiber_set_state(co, FIBER_STATE_SUSPENDED)
+    with_fiber_switch(co as *mut u8, fiber_result_buf(co))
+
+/// From inside the coroutine, as its last act: return to the caller's resume
+/// for good. The entry must not return; a resume after this is fatal.
+pub fn with_fiber_coro_finish(co: i64):
+    coro_check(co, "finish")
+    if fiber_state(co) != FIBER_STATE_RUNNING:
+        coro_fatal_state("finish")
+    fiber_set_state(co, FIBER_STATE_DONE)
+    with_fiber_switch(co as *mut u8, fiber_result_buf(co))
+    rt_libc_abort()
+
+/// Release a coroutine that has not started or has finished; its stack
+/// returns to the fiber pool.
+pub fn with_fiber_coro_free(co: i64):
+    coro_check(co, "free")
+    let state = fiber_state(co)
+    if state != FIBER_STATE_READY and state != FIBER_STATE_DONE:
+        coro_fatal_state("free")
+    with_free(fiber_result_buf(co))
+    fiber_set_result_buf(co, 0 as *mut u8)
+    scheduler_lock()
+    recycle_fiber(co)
+    scheduler_unlock()
 
 pub unsafe fn with_runtime_take_completed_fiber(fiber_id: i32, panic_msg_out: *mut *const u8, panic_msg_len_out: *mut i32, cancelled_return_out: *mut i32) -> i32:
     *panic_msg_out = 0 as *const u8
