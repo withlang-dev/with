@@ -1184,7 +1184,7 @@ pub fn mir_exact_int_text(ast: &AstPool, node: i32) -> str:
         return with_i64_to_str(ast.int_lit_value(node as NodeId))
     "<exact-int>"
 
-enum MirDropState: i32:
+pub enum MirDropState: i32:
     Uninit = 0
     Init = 1
     Moved = 2
@@ -1900,7 +1900,7 @@ fn mir_drop_state_blocks_new(body: &MirBody) -> MirDropStateBlocks:
 // finite (each place climbs Uninit/Init/Moved → Maybe → MaybeGarbage at most
 // twice), so the bound below is never reached by a converging body; hitting it
 // is a driver bug and fails loudly rather than returning a partial answer.
-fn mir_drop_state_sweep_bound(local_count: i32, block_count: i32) -> i64:
+pub fn mir_drop_state_sweep_bound(local_count: i32, block_count: i32) -> i64:
     3 * (local_count as i64 + 1) * (block_count as i64 + 1) + 2
 
 pub fn mir_drop_state_compute_blocks(body: &MirBody) -> MirDropStateBlocks:
@@ -2356,7 +2356,7 @@ fn validate_moves_through_references(mir_mod: &MirModule, body: &MirBody) -> str
                 return f"fn sym{body.fn_sym} bb{bb}: " ++ err
     ""
 
-fn validate_ownership_body(mir_mod: &MirModule, body: &MirBody) -> str:
+pub fn validate_ownership_body(mir_mod: &MirModule, body: &MirBody) -> str:
     let through_reference = validate_moves_through_references(mir_mod, body)
     if through_reference.len() > 0:
         return through_reference
@@ -3810,7 +3810,7 @@ fn mir_validate_task_operand(mir_mod: &MirModule, body: &MirBody, call_id: i32) 
             return ""
     f"fiber intrinsic's task operand is ty={task_ty}, not a Task or ScopedTask handle"
 
-fn validate_typed_mir_body(mir_mod: &MirModule, body: &MirBody) -> MirValidationError:
+pub fn validate_typed_mir_body(mir_mod: &MirModule, body: &MirBody) -> MirValidationError:
     let scalar_projection = mir_validate_scalar_field_projection(mir_mod, body)
     if scalar_projection.len() > 0:
         return mir_validation_fail(body.fn_sym, 0, scalar_projection)
