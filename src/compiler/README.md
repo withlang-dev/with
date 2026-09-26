@@ -18,8 +18,8 @@ while preserving current compiler behavior.
 - `Link.w`:
   linker/runtime-bridge policy and command construction.
 
-`src/Compilation.w` is now a compatibility shim that re-exports
-`compiler.Compilation` so existing `use Compilation` call sites continue to work.
+Call sites import `compiler.Compilation` directly: imports are not transitive
+(§18.2, #1708), so the former `src/Compilation.w` re-export shim is gone.
 
 ## Current migration state
 

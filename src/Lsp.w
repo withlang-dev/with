@@ -10,7 +10,7 @@ use Parser
 use InternPool
 use Diagnostic
 use Source
-use Compilation
+use compiler.Compilation
 use Fmt
 use compiler.Frontend
 use compiler.Zcu

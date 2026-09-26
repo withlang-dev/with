@@ -10,7 +10,6 @@ use InternPool
 use Diagnostic
 use Source
 use Sema
-use Compilation
 use ComptimeEval
 use ComptimeValue
 use ConanClient
