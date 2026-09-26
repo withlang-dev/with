@@ -12314,7 +12314,7 @@ impl Sema:
             return base
         let payload = self.optional_chain_payload_type(base)
         if payload != 0:
-            let f = self.struct_field_type(payload, member)
+            let f = self.field_access_type_direct(self.resolve_alias(payload as TypeId), member)
             if f == 0:
                 // Not a field (e.g. a method-call form) — keep the receiver type.
                 return base
@@ -12327,7 +12327,7 @@ impl Sema:
         let result_payload = self.optional_chain_result_ok_type(base)
         if result_payload == 0:
             return base
-        let f = self.struct_field_type(result_payload, member)
+        let f = self.field_access_type_direct(self.resolve_alias(result_payload as TypeId), member)
         if f == 0:
             // Not a field (e.g. a method-call form) — keep the receiver type.
             return base
@@ -12341,7 +12341,7 @@ impl Sema:
             return base
         let payload = self.optional_chain_payload_type(base)
         if payload != 0:
-            let f = self.struct_field_type_frozen(payload, member)
+            let f = self.field_access_type_direct_frozen(self.resolve_alias(payload as TypeId), member)
             if f == 0:
                 return base
             let fr = self.resolve_alias(f as TypeId)
@@ -12356,7 +12356,7 @@ impl Sema:
         let result_payload = self.optional_chain_result_ok_type(base)
         if result_payload == 0:
             return base
-        let f = self.struct_field_type_frozen(result_payload, member)
+        let f = self.field_access_type_direct_frozen(self.resolve_alias(result_payload as TypeId), member)
         if f == 0:
             return base
         let err_ty = self.optional_chain_result_err_type(base)

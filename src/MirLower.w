@@ -14120,12 +14120,19 @@ impl MirBuilder:
     mut fn lower_optional_chain_field(result_place: i32, result_ty: i32, base_place: i32, base_ty: i32, payload_ty: i32, success_idx: i32, success_sym: i32, member_sym: i32, span: i32):
         let downcast_place = self.body.new_downcast_place(base_place, success_idx)
         let payload_place = self.body.new_field_place(downcast_place, 0, payload_ty)
-        let field_ty = self.sema.struct_field_type_frozen(payload_ty, member_sym)
+        // §10.3: a tuple element is a field (`o?.1`, #1503); Sema typed the
+        // chain with the same tuple-aware lookup.
+        let field_ty = self.sema.field_access_type_direct_frozen(self.sema.resolve_alias(payload_ty as TypeId), member_sym)
         if field_ty == 0:
             self.mark_unsupported()
             return
 
-        let field_place = self.body.new_field_place(payload_place, member_sym, field_ty)
+        let payload_resolved = self.sema.resolve_alias(payload_ty as TypeId) as i32
+        let tuple_idx = self.tuple_index_from_field_token(payload_resolved, member_sym)
+        let field_place = if tuple_idx >= 0:
+            self.body.new_tuple_index_place(payload_place, tuple_idx, field_ty)
+        else:
+            self.body.new_field_place(payload_place, member_sym, field_ty)
         let field_op_kind = if self.sema.is_copy_frozen(field_ty) != 0: OperandKind.OK_COPY else: OperandKind.OK_MOVE
         let field_op = self.body.new_operand(field_op_kind, field_place)
         if field_ty == result_ty:
