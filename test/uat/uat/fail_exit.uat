@@ -1,0 +1,3 @@
+scenario: a step that exits nonzero
+
+run: with check missing.w

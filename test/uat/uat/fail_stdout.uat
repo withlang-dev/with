@@ -1,0 +1,4 @@
+scenario: output that does not match
+
+run: with -e 'print("stable")'
+expect stdout: nope

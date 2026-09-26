@@ -1,0 +1,13 @@
+uat: bad_header .................................. FAIL  uat/bad_header.uat:2: a scenario starts with 'scenario: <title>'
+uat: bad_verb .................................... FAIL  uat/bad_verb.uat:3: not a step: 'frobnicate: now' (the verbs are in uat/README.md)
+uat: fail_exit ................................... FAIL  step 1 (line 3): `run: with check missing.w`: exit 1
+        stderr: error: check failed during compilation  (out/uat/fail_exit/step-1.stderr)
+uat: fail_stdout ................................. FAIL  step 2 (line 4): stdout was 'stable', expected 'nope'
+uat: human ....................................... pass  (3 steps)
+uat: skip_env .................................... skip  (requires env UAT_TESTS_NO_SUCH_VARIABLE: unset)
+uat: skip_platform ............................... skip  (platforms: darwin not listed)
+uat: stdin ....................................... pass  (4 steps)
+uat: verbs ....................................... pass  (20 steps)
+uat: 9 scenarios: 3 pass, 2 skip, 4 FAIL; 1 human check recorded
+human checks for this host:
+  human: the version reads as a release

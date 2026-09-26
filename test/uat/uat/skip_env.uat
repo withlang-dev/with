@@ -1,0 +1,4 @@
+scenario: skipped for an unset variable
+requires: env UAT_TESTS_NO_SUCH_VARIABLE
+
+run: with --version
