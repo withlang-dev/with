@@ -8636,9 +8636,13 @@ impl Sema:
             if lb >= rb:
                 return lhs_numeric as TypeId
             return rhs_numeric as TypeId
-        if lk == TypeKind.TY_FLOAT:
+        // Only over int (#1711): a float against Unit, bool or str has no
+        // arithmetic type. Answering the float made every caller that asks
+        // "does this promote?" accept it — a D43 tail join of `f64` and
+        // `Unit` arms inferred `f64`, and `let x: f64 = true` type-checked.
+        if lk == TypeKind.TY_FLOAT and rk == TypeKind.TY_INT:
             return lhs_numeric as TypeId
-        if rk == TypeKind.TY_FLOAT:
+        if rk == TypeKind.TY_FLOAT and lk == TypeKind.TY_INT:
             return rhs_numeric as TypeId
         // Wider int wins
         if lk == TypeKind.TY_INT and rk == TypeKind.TY_INT:
