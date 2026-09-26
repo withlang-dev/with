@@ -2419,7 +2419,13 @@ impl Sema:
         // is a statement.
         let body_tail_discards = body_expected_ret == 0 or body_expected_ret == self.ty_void
         self.body_tail_discards = body_tail_discards
-        let checked_body_ty = self.check_expr(body)
+        // D43: `-> Unit` makes the tail statement position in every body
+        // spelling (#1711). check_block checks a block body's tail as a
+        // statement; a single-statement body is that tail, so it is checked
+        // the same way — checked as a value, a tail `match` joined its arms
+        // and an arm's else-less `if` was refused as an expression.
+        let unit_body_stmt = body_expected_ret == self.ty_void and self.ast.kind(source_body) != NodeKind.NK_BLOCK
+        let checked_body_ty = if unit_body_stmt: self.check_expr_statement_context(body) else: self.check_expr(body)
         self.body_tail_block = saved_body_tail_block
         self.body_tail_discards = saved_body_tail_discards
         // §9.1: a single-statement assignment body is discarded exactly when
