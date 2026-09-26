@@ -2835,6 +2835,10 @@ pub fn build(ctx: BuildCtx) -> Build:
     stamp = stamp.input(release_compiler_bin("with") ++ ".unstamped")
     // The ABI stamp is sha256 of this record; a re-record must re-stamp.
     stamp = stamp.input("docs/with-abi.sha256")
+    // A stale record would stamp this compiler with an ABI key its sources
+    // no longer have, so the release build refuses one outright instead of
+    // leaving it for :test to find an hour later (#1716's ninth battery).
+    stamp = stamp.dep("abi-hash-check")
     stamp = target_with_version_inputs(move stamp, ctx)
     stamp = stamp.extra_output("out/command/build")
     stamp = stamp.write_scope("out/release/bin")
