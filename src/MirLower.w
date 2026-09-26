@@ -844,6 +844,26 @@ impl MirBuilder:
         self.stmt_temp_locals.push(local_id)
         self.stmt_temp_drop_depths.push(self.drop_local_ids.len() as i32)
 
+    // The statement-temp slot that owns `local_id`, or -1 (the slot
+    // cancel_stmt_temp_for_local would retire).
+    fn stmt_temp_slot_for_local(local_id: i32) -> i32:
+        var i = self.stmt_temp_locals.len() as i32 - 1
+        while i >= 0:
+            if self.stmt_temp_locals[i] == local_id:
+                return i
+            i = i - 1
+        -1
+
+    // The scheduled value-drop slot of `local_id`, or -1 (the slot
+    // cancel_scheduled_value_drop_for_local would retire).
+    fn scheduled_value_drop_slot_for_local(local_id: i32) -> i32:
+        var i = self.drop_local_ids.len() as i32 - 1
+        while i >= 0:
+            if self.drop_local_ids[i] == local_id and self.drop_kind_owns_value(self.drop_kinds[i]) != 0:
+                return i
+            i = i - 1
+        -1
+
     mut fn cancel_stmt_temp_for_local(local_id: i32) -> Unit:
         var i = self.stmt_temp_locals.len() as i32 - 1
         while i >= 0:
@@ -6734,6 +6754,15 @@ impl MirBuilder:
         // cancelling it after the success path left the failing path with no
         // owner (a `str` Err payload leaked).
         let le_scrut_local = mir_place_plain_local(&self.body, rhs_place)
+        // #1750: the success path keeps the subject's cleanup — what the
+        // bindings moved out is blanked, so it frees only what remains. The
+        // cleanup is retired for the failing path only (below) and re-armed
+        // before the success path; retired on both, the success path left
+        // an owned subject Init at return, which validate-all reports.
+        let le_temp_slot = if le_scrut_local >= 0: self.stmt_temp_slot_for_local(le_scrut_local) else: -1
+        let le_drop_slot = if le_scrut_local >= 0: self.scheduled_value_drop_slot_for_local(le_scrut_local) else: -1
+        let le_drop_kind = if le_drop_slot >= 0: self.drop_kinds[le_drop_slot] else: 0
+        let le_was_moved = le_scrut_local >= 0 and self.local_value_moved(le_scrut_local) != 0
         if le_scrut_local >= 0:
             self.cancel_stmt_temp_for_local(le_scrut_local)
             self.cancel_scheduled_value_drop_for_local(le_scrut_local)
@@ -6755,6 +6784,14 @@ impl MirBuilder:
         self.lower_let_else_branch(else_body)
         // The else body diverges; its moves never reach the continuation.
         self.restore_move_state(&branch_move_state)
+
+        // Re-arm the subject's cleanup for the success path (#1750).
+        if le_temp_slot >= 0:
+            self.stmt_temp_locals[le_temp_slot] = le_scrut_local
+        if le_drop_slot >= 0:
+            self.drop_kinds[le_drop_slot] = le_drop_kind
+        if le_scrut_local >= 0 and not le_was_moved:
+            self.clear_local_value_moved(le_scrut_local)
 
         self.switch_to(success_bb)
         // §9.7: `var PATTERN = ... else` binds every name it introduces mutably (#1354).
