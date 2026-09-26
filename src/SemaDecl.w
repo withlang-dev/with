@@ -1962,6 +1962,7 @@ impl Sema:
             self.add_sig(name, fn_tid, self.ty_void, 0, 0, is_variadic)
             self.extern_decl_sigs.insert(node, self.get_sig(name))
             self.extern_fn_names.insert(name, 1)
+            self.extern_decl_sites.insert(self.current_module_path ++ "\n" ++ self.pool_resolve(name), 1)
             return
 
         let ret_node = self.ast.fn_meta_ret(meta)
@@ -2000,6 +2001,7 @@ impl Sema:
                 if self.sig_param_is_c_va_list_by_place(sig_idx, pi) != 0:
                     self.set_sig_param_value_ref_abi(sig_idx, pi, 1)
         self.extern_fn_names.insert(name, 1)
+        self.extern_decl_sites.insert(self.current_module_path ++ "\n" ++ self.pool_resolve(name), 1)
 
     mut fn collect_extern_var(node: i32, is_local: i32):
         let name = self.ast.get_data0(node)

@@ -6523,6 +6523,19 @@ impl Sema:
             return 1
         0
 
+    // The module being checked declared this extern itself (#1695): its own
+    // declaration governs the call, so another module's declaration of the
+    // same name (std.fs's `strerror`) cannot make the call exempt.
+    fn module_declares_extern(fn_sym: i32) -> bool:
+        self.extern_decl_sites.contains(self.current_module_path ++ "\n" ++ self.pool_resolve(fn_sym))
+
+    // The declaring path that classifies a call to `fn_sym` from the current
+    // module: its own declaration when it has one, else the symbol's.
+    fn extern_classification_path(fn_sym: i32) -> str:
+        if self.module_declares_extern(fn_sym):
+            return with_str_clone_ref(self.current_module_path)
+        self.fn_symbol_source_path(fn_sym)
+
     fn fn_symbol_is_manual_extern(fn_sym: i32) -> i32:
         if not self.extern_fn_names.contains(fn_sym):
             return 0
@@ -6531,7 +6544,7 @@ impl Sema:
         let fn_name = self.pool_resolve(fn_sym)
         if sema_extern_is_compiler_implementation(fn_name, self.current_module_path) != 0:
             return 0
-        if sema_extern_is_compiler_implementation(fn_name, self.fn_symbol_source_path(fn_sym)) != 0:
+        if sema_extern_is_compiler_implementation(fn_name, self.extern_classification_path(fn_sym)) != 0:
             return 0
         if self.manual_extern_requires_unsafe(fn_sym) == 0:
             return 0
@@ -6545,7 +6558,7 @@ impl Sema:
         let fn_name = self.pool_resolve(fn_sym)
         if sema_extern_is_compiler_implementation(fn_name, self.current_module_path) != 0:
             return 0
-        if sema_extern_is_compiler_implementation(fn_name, self.fn_symbol_source_path(fn_sym)) != 0:
+        if sema_extern_is_compiler_implementation(fn_name, self.extern_classification_path(fn_sym)) != 0:
             return 0
         if self.manual_extern_requires_unsafe(fn_sym) != 0:
             return 0

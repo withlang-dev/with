@@ -2322,9 +2322,13 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
                     skipped_targets.push(with_str_clone_ref(target.name))
                     completed_targets.push(with_str_clone_ref(target.name))
                     continue
-        // About to run: remember what its outputs are now.
+        // About to run: remember what its outputs are now, and what its
+        // inputs are (#1654: the record after the run must not describe an
+        // input the action never saw).
         cutoff_names.push(with_str_clone_ref(target.name))
         cutoff_digests.push(build_cache_cutoff_digest(root, target))
+        if build_cache_is_cacheable(target.kind):
+            build_cache_snapshot_inputs(root, target)
         let bootstrap_ready = with_fs_file_exists(runtime_probe_path) != 0 and with_fs_file_exists(link_metadata_path) != 0
         let runner_retry = runner_waits_for_bootstrap and bootstrap_ready
         if target.kind == 23 and (not runner_checked or runner_retry) and not build_action_worker_env_enabled() and not options.strict_effects:

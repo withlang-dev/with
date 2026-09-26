@@ -772,8 +772,42 @@ fn ci_print_expr(exprs: CiExprPool, types: CiTypePool, id: CiExprId, parent_prec
             items = items ++ ci_print_expr(exprs, types, item, 0, 0)
             i = i + 1
         if (ty_id as i32) != 0 and types.kind(ty_id) == CiTypeKind.CT_ARRAY:
+            // C zero-fills the elements an initializer leaves out. A lone
+            // `{ 0 }` is the repeat form; anything shorter than the array is
+            // padded with the element's zero.
+            let size = types.get_d1(ty_id)
+            if size > 0 and count < size:
+                let elem_text = ci_print_type(types, (types.get_d0(ty_id)) as CiTypeId)
+                if count == 1 and items == "0":
+                    return "[0 as " ++ elem_text ++ "; " ++ f"{size}" ++ "]"
+                var padded = items
+                var k = count
+                while k < size:
+                    if padded.len() > 0:
+                        padded = padded ++ ", "
+                    padded = padded ++ "0 as " ++ elem_text
+                    k = k + 1
+                return "[" ++ padded ++ "]"
             return "[" ++ items ++ "]"
         let ty_text = ci_print_type(types, ty_id)
+        // #1653: a typedef'd array (`typedef unsigned char uuid_t[16]`)
+        // arrives as a named type whose text is `[16]u8`; it is an array all
+        // the same, padded from the size in the text.
+        if ci_starts_with_str(ty_text, "["):
+            let size = ci_print_array_len_from_text(ty_text)
+            let elem_text = ci_print_array_elem_from_text(ty_text)
+            if size > 0 and count < size and elem_text.len() > 0:
+                if count == 1 and items == "0":
+                    return "[0 as " ++ elem_text ++ "; " ++ f"{size}" ++ "]"
+                var padded = items
+                var k = count
+                while k < size:
+                    if padded.len() > 0:
+                        padded = padded ++ ", "
+                    padded = padded ++ "0 as " ++ elem_text
+                    k = k + 1
+                return "[" ++ padded ++ "]"
+            return "[" ++ items ++ "]"
         if ty_text.len() > 0 and ty_text != "i32" and not ci_starts_with_str(ty_text, "__UNSUPPORTED"):
             return ty_text ++ " { " ++ items ++ " }"
         return "{ " ++ items ++ " }"
@@ -1250,3 +1284,27 @@ pub fn ci_ir_roundtrip_test -> i32:
     1
 
 let _ci_print_eof_guard = 0
+
+// `[16]u8` → 16 (0 when the text is not `[N]T` with a positive N).
+fn ci_print_array_len_from_text(ty: &str) -> i32:
+    if ty.len() < 3 or ty[0] != '[':
+        return 0
+    var n = 0
+    var i = 1
+    while i < ty.len() as i32 and ty[i] != ']':
+        if ty[i] < '0' or ty[i] > '9':
+            return 0
+        n = n * 10 + (ty[i] - '0')
+        i = i + 1
+    if i >= ty.len() as i32:
+        return 0
+    n
+
+// `[16]u8` → `u8` ("" when the text is not `[N]T`).
+fn ci_print_array_elem_from_text(ty: &str) -> str:
+    var i = 1
+    while i < ty.len() as i32 and ty[i] != ']':
+        i = i + 1
+    if i + 1 >= ty.len() as i32:
+        return ""
+    ty.slice((i + 1) as i64, ty.len())

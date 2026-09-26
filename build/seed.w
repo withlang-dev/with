@@ -226,9 +226,12 @@ pub fn run_seed_download_action(ctx: ActionCtx) -> i32:
         if pinned.len() == 64 and tag.len() > 0 and fs.sha256_file(output_path) == pinned:
             print(output_path ++ " is the pinned seed " ++ tag)
             return 0
+        // #1667: the stale binary stays until the pinned one is downloaded
+        // and verified — it may be the very compiler driving this action
+        // (`WITH=$PWD/src/main src/main build :seed`), which still has to
+        // compile the fetch helper. Removing it first left no seed at all
+        // when the helper's build then failed (exit 127).
         print(output_path ++ " is not the pinned seed; refetching")
-        if fs.remove_file(output_path) != 0:
-            return seed_fail(ctx, "could not remove " ++ output_path)
     if tag.len() == 0:
         tag = seed_release_from_api(ctx, repo, asset_name)
         if tag.len() == 0:
@@ -256,6 +259,9 @@ pub fn run_seed_download_action(ctx: ActionCtx) -> i32:
         if actual != pinned:
             let _remove_bad = fs.remove_file(tmp_path)
             return seed_fail(ctx, asset_name ++ " " ++ tag ++ " digest " ++ actual ++ " does not match seed.lock's " ++ pinned)
+    // Only now does the old seed go: the replacement is verified and beside it.
+    if fs.exists(output_path) and fs.remove_file(output_path) != 0:
+        return seed_fail(ctx, "could not remove " ++ output_path)
     if fs.rename(tmp_path, output_path) != 0:
         return seed_fail(ctx, "could not publish seed: " ++ output_path)
     if fs.chmod(output_path, 0o755) != 0:

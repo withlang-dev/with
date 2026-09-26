@@ -147,6 +147,11 @@ type MovedFieldSnap {
     starts: Vec[i32],
     counts: Vec[i32],
     syms: Vec[i32],
+    // #1655: per-binding foreign-view poison (§16.2b.7) travels with the
+    // field-move set so a domain-touching call on a diverging branch
+    // leaves the fall-through path's views live.
+    poison_syms: Vec[i32],
+    poison_nodes: Vec[i32],
 }
 
 type SemaBuiltinSymbols {
@@ -727,6 +732,11 @@ pub type Sema {
 
     // Extern fn names
     extern_fn_names: HashMap[i32, i32],
+    // "<module path>\n<name>" for every `extern fn` declaration site (#1695):
+    // a module that declares an extern itself is classified by ITS
+    // declaration, not by whichever other module (std.fs) declared the
+    // same name last.
+    extern_decl_sites: HashMap[str, i32],
     extern_var_texts: HashMap[str, i32],  // every collected extern var by name text (has_extern_var_decl)
     // #602: c_import/extern params that RETAIN a passed C-string pointer past
     // the call (§16.3c). Keyed by fn name sym → bitmask of retained param
@@ -2192,6 +2202,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
     let pretty_symbol_names = sema_new_map_i32_str()
     let sig_lookup = sema_new_map_i32_i32()
     let extern_fn_names = sema_new_map_i32_i32()
+    let extern_decl_sites = sema_new_map_str_i32()
     let extern_var_texts = sema_new_map_str_i32()
     let retained_extern_params = sema_new_map_i32_i32()
     let fn_decl_nodes = sema_new_map_i32_i32()
@@ -2349,6 +2360,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         effect_note_origin_node: 0,
         move_site_node: 0,
         extern_fn_names,
+        extern_decl_sites,
         extern_var_texts,
         retained_extern_params,
         fn_decl_nodes,
@@ -5814,6 +5826,8 @@ impl Sema:
             starts: sema_clone_i32_vec(&self.moved_field_path_starts),
             counts: sema_clone_i32_vec(&self.moved_field_path_counts),
             syms: sema_clone_i32_vec(&self.moved_field_path_syms),
+            poison_syms: self.snapshot_poison_syms(),
+            poison_nodes: self.snapshot_poison_nodes(),
         }
 
     mut fn restore_moved_field_state(snap: &MovedFieldSnap):
@@ -5821,6 +5835,7 @@ impl Sema:
         self.moved_field_path_starts = sema_clone_i32_vec(&snap.starts)
         self.moved_field_path_counts = sema_clone_i32_vec(&snap.counts)
         self.moved_field_path_syms = sema_clone_i32_vec(&snap.syms)
+        self.restore_poison(&snap.poison_syms, &snap.poison_nodes)
 
     // Set the live field-move set to the union of two branch-exit snapshots
     // (a field is moved-after iff moved at some non-divergent exit). Concatenation
@@ -5875,6 +5890,43 @@ impl Sema:
         self.moved_field_path_starts = move starts
         self.moved_field_path_counts = move counts
         self.moved_field_path_syms = move syms
+        // Poisoned at the join iff poisoned at some non-divergent exit.
+        var poison_syms: Vec[i32] = Vec.new()
+        var poison_nodes: Vec[i32] = Vec.new()
+        for i in 0..a.poison_syms.len() as i32:
+            if a.poison_syms[i] != 0:
+                poison_syms.push(a.poison_syms[i])
+                poison_nodes.push(a.poison_nodes[i])
+            else if i < b.poison_syms.len() as i32:
+                poison_syms.push(b.poison_syms[i])
+                poison_nodes.push(b.poison_nodes[i])
+            else:
+                poison_syms.push(0)
+                poison_nodes.push(0)
+        self.restore_poison(&poison_syms, &poison_nodes)
+
+    fn snapshot_poison_syms() -> Vec[i32]:
+        var out: Vec[i32] = Vec.new()
+        for i in 0..self.bind_provenance.len() as i32:
+            out.push(self.bind_provenance[i].poisoned_origin_sym)
+        out
+
+    fn snapshot_poison_nodes() -> Vec[i32]:
+        var out: Vec[i32] = Vec.new()
+        for i in 0..self.bind_provenance.len() as i32:
+            out.push(self.bind_provenance[i].poisoned_origin_node)
+        out
+
+    mut fn restore_poison(syms: &Vec[i32], nodes: &Vec[i32]):
+        for i in 0..syms.len() as i32:
+            if i >= self.bind_provenance.len() as i32:
+                break
+            let slot_idx = i as i64
+            with self.bind_provenance.slot(slot_idx) as mut slot:
+                var provenance = slot.get()
+                provenance.poisoned_origin_sym = syms[i]
+                provenance.poisoned_origin_node = nodes[i]
+                slot.set(provenance)
 
     // Conservative union of move-state across two control-flow branches, for the
     // MaybeUninitialized use-checking half (see docs/completed/branch-merge-soundness.md). A

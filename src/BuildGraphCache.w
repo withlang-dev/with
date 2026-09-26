@@ -34,6 +34,35 @@ var build_cache_fp_memo: HashMap[str, str] = HashMap.new()
 pub fn build_cache_forget_fingerprints() -> Unit:
     build_cache_fp_memo = HashMap.new()
 
+// #1654: what each running target's inputs looked like when it was
+// dispatched (target name → "path:hash" lines). A record made after the run
+// compares against this: an input edited while the action ran was never
+// seen by the action, so the output must not be recorded as fresh for it.
+var build_cache_prerun_inputs: HashMap[str, str] = HashMap.new()
+
+pub fn build_cache_snapshot_inputs(root: &str, target: &BuildGraphTarget):
+    let input_paths = build_cache_collect_input_paths(root, target)
+    var lines = ""
+    for idx in 0..input_paths.len() as i32:
+        let path = input_paths[idx]
+        lines = lines ++ path ++ ":" ++ build_cache_fingerprint_file(path) ++ "\n"
+    build_cache_prerun_inputs.insert(with_str_clone_ref(target.name), lines)
+
+// The input whose fingerprint differs from the dispatch-time snapshot, or
+// "" when every input is as the action saw it (or no snapshot was taken).
+fn build_cache_input_moved_during_run(root: &str, target: &BuildGraphTarget) -> str:
+    let snapshot = build_cache_prerun_inputs.get(target.name)
+    if snapshot.is_none():
+        return ""
+    let before = with_str_clone_ref(snapshot.unwrap())
+    let input_paths = build_cache_collect_input_paths(root, target)
+    for idx in 0..input_paths.len() as i32:
+        let path = input_paths[idx]
+        let entry = path ++ ":" ++ build_cache_fingerprint_file(path) ++ "\n"
+        if not before.contains(entry):
+            return build_cache_project_relative(root, path)
+    ""
+
 pub fn build_cache_state_dir(root: &str) -> str:
     root ++ "/out/.build-state"
 
@@ -774,6 +803,17 @@ pub fn build_cache_record(root: &str, target: &BuildGraphTarget, discovered_deps
     let state_dir = build_cache_state_dir(root)
     let _ = build_graph_rt_mkdir_p(state_dir)
     let state_path = build_cache_state_path(root, target.name)
+    // #1654: an input that changed while the action ran was not what the
+    // action compiled. Recording the post-edit fingerprint would call the
+    // stale output fresh forever (no later edit, no `touch`, would re-run
+    // it). Say so, drop the state, and let the next build re-run the target.
+    let moved = build_cache_input_moved_during_run(root, target)
+    if moved.len() > 0:
+        with_eprint("warning: build.w target '" ++ target.name ++ "': input '" ++ moved ++ "' changed while it ran; its output is not recorded and it will run again")
+        let _ = build_cache_invalidate_target(root, target.name)
+        build_cache_prerun_inputs.remove(with_str_clone_ref(target.name))
+        return
+    build_cache_prerun_inputs.remove(with_str_clone_ref(target.name))
     let sig = build_cache_compute_signature(target, root)
     var content = "v2\nsig:" ++ sig ++ "\n" ++ build_cache_signature_part_lines(target, root)
     if build_cache_target_uses_current_compiler(target):
