@@ -2578,6 +2578,11 @@ impl Sema:
                 self.emit_error("missing return", body)
             else if self.type_has_default_value(body_expected_ret as i32) == 0:
                 self.emit_error("return type does not implement Default", body)
+        else if body_expected_ret != 0 and body_ty != 0 and body_ty != self.ty_never and self.resolve_alias(body_expected_ret) == self.ty_never:
+            // #1493: a `-> Never` body must diverge on every path; a valued
+            // tail passed the arm below (types_compatible is one-sided on
+            // Never) and surfaced as a MIR validator failure at the wrong layer.
+            self.emit_error("return type mismatch: a `-> Never` function must not produce a value", body)
         else if body_expected_ret != 0 and body_ty != 0 and body_ty != self.ty_void and body_expected_ret != self.ty_void:
             let explicit_tail_results_ok = self.check_body_explicit_value_results(body, 1, body_expected_ret as i32, "return type mismatch")
             // Check tail expression type against body's expected return type
