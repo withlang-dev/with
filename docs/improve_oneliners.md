@@ -50,6 +50,7 @@ spec.
 | `sed '/pat/d'` | `with -n 'if not line.contains("pat"): print(line)'` |
 | `sed 's/old/new/g'` | `with -p 'line = line.replace("old", "new")'` (all occurrences) |
 | `sed -E 's/^(\w+) +(\d+)/\2 \1/'` | `with -p 'line = /^(\w+)\s+(\d+)/.replace(line, "$2 $1")'` |
+| `sed -E 's/\bit\b/x/g'` | `with -p 'line = /\bit\b/g.replace(line, "x")'` (the `g` flag replaces every match, as in sed; without it, the first) |
 | `sed '3i text'` | `with -n 'if nr == 3: print("text")` ⏎ `print(line)'` |
 | `awk 'NR % 2 == 0'` | `with -n 'if nr % 2 == 0: print(line)'` |
 | `grep -i pat` | `with -n 'if line =~ /pat/i: print(line)'` |
