@@ -796,7 +796,10 @@ fn ci_print_expr(exprs: CiExprPool, types: CiTypePool, id: CiExprId, parent_prec
         return "{ " ++ fields ++ " }"
     if kind == CiExprKind.CIE_UNSAFE:
         let inner = (exprs.get_d0(id)) as CiExprId
-        return "unsafe { " ++ ci_print_expr(exprs, types, inner, 0, wants_ptr) ++ " }"
+        // #1704: the block supplies the unsafe; a raw operation inside it
+        // prints without its own prefix ("redundant unsafe prefix" on every
+        // by-value record parameter).
+        return "unsafe { " ++ ci_print_wrapped_operand(exprs, types, inner, 0, wants_ptr) ++ " }"
 
     ci_print_note_unknown(f"expression kind {kind as i32}")
     "<ci:expr:unknown>"
