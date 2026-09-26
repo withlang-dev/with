@@ -821,6 +821,12 @@ impl Sema:
         let is_std = if sema_tier_path_is_std_implementation(self.current_module_path) != 0: 1 else: 0
         self.type_tid_is_std.insert(resolved, is_std)
 
+    // #1344: a variant name listed twice gave `E.A` two meanings and the
+    // compiler picked one silently (`enum E: A, A`, `error E = | A | A`).
+    mut fn check_duplicate_variant(enum_name: i32, seen: &Vec[i32], v_name: i32, node: i32):
+        if seen.contains(v_name):
+            self.emit_error(f"duplicate variant `{self.pool_resolve(v_name)}` in `{self.pool_resolve(enum_name)}`", node)
+
     mut fn collect_type_decl(node: i32, is_local: i32):
         let name = self.ast.get_data0(node)
         if is_local != 0:
@@ -917,6 +923,7 @@ impl Sema:
                 epos = epos + 1
                 let payload_count = self.ast.get_extra(epos)
                 epos = epos + 1
+                self.check_duplicate_variant(name, &variant_names, v_name, node)
                 variant_names.push(v_name)
                 payload_counts.push(payload_count)
                 for pi in 0..payload_count:
@@ -980,6 +987,7 @@ impl Sema:
                 epos = epos + 1
                 let payload_count = self.ast.get_extra(epos)
                 epos = epos + 1
+                self.check_duplicate_variant(name, &variant_names, v_name, node)
                 variant_names.push(v_name)
                 payload_counts.push(payload_count)
                 var disc_value: i64 = if doubling: 1 else: 0
