@@ -22896,6 +22896,7 @@ impl Sema:
         // D66 (#1652): a pair callback setter's callback argument is checked
         // against its own signature as a C function pointer (SemaFacade.w).
         let facade_pair_cb_arg = self.facade_pair_callback_arg(obj_type as i32, field, mc_resolved_arg_count)
+        let facade_pair_ud_arg = self.facade_pair_userdata_arg(obj_type as i32, field, mc_resolved_arg_count)
         for ai in 0..mc_resolved_arg_count:
             let mc_arg_node = if mc_has_resolved_args != 0: self.get_resolved_call_arg(node, ai) else: self.ast.get_extra(extra_start + ai)
             if mc_arg_node == 0:
@@ -22948,6 +22949,8 @@ impl Sema:
                 mc_expected = self.facade_callback_expected_type(facade_mi, obj_type as i32, field, facade_ud_ty)
             if mc_expected == 0 and ai == facade_pair_cb_arg:
                 mc_expected = self.facade_pair_callback_expected_type(mc_arg_node)
+            if ai == facade_pair_ud_arg:
+                self.facade_note_pair_retention(expr, mc_arg_node)
             // An absent nullable callback's userdata: `None` typed as the
             // rendered `Option[&U]` with `U` Unit (nothing was checked
             // ahead for it).
@@ -25059,6 +25062,29 @@ impl Sema:
                 last_node = tail_use
         last_node
 
+    // A view's last use in the current block — and, when the view was handed
+    // to a pair's userdata setter (§16.2b.9 "Retained borrows"), the
+    // retaining resource's last use: the resource holds the view until its
+    // last callback-capable operation, so the resource's uses are the view's.
+    fn view_last_use(ref_sym: i32, after_node: i32) -> i32:
+        var last = self.find_last_use_in_block(self.current_block_extra_start, self.current_block_stmt_count, self.current_block_stmt_index + 1, self.current_block_tail, ref_sym, after_node)
+        if self.facade_pair_retainers.contains(ref_sym):
+            let retainer: i32 = self.facade_pair_retainers.get(ref_sym).unwrap()
+            let via = self.find_last_use_in_block(self.current_block_extra_start, self.current_block_stmt_count, self.current_block_stmt_index + 1, self.current_block_tail, retainer, after_node)
+            if via != 0 and (last == 0 or self.ast.get_start(via) > self.ast.get_start(last)):
+                last = via
+        last
+
+    fn view_used_in(root: i32, ref_sym: i32) -> bool:
+        if root == 0:
+            return false
+        if self.expr_uses_symbol(root, ref_sym) != 0:
+            return true
+        if self.facade_pair_retainers.contains(ref_sym):
+            let retainer: i32 = self.facade_pair_retainers.get(ref_sym).unwrap()
+            return self.expr_uses_symbol(root, retainer) != 0
+        false
+
     // §12.4 (D62, #1691): a live closure whose body mutates a captured place
     // holds an exclusive view of it (check_closure registers it as such), so
     // reading the place while the closure is alive is refused, as mutating
@@ -25080,8 +25106,8 @@ impl Sema:
                 i = i + 1
                 continue
             let stmt_root = self.current_statement_expr_root
-            let last_use = self.find_last_use_in_block(self.current_block_extra_start, self.current_block_stmt_count, self.current_block_stmt_index + 1, self.current_block_tail, ref_sym, node)
-            let used_here = stmt_root != 0 and self.expr_uses_symbol(stmt_root, ref_sym) != 0
+            let last_use = self.view_last_use(ref_sym, node)
+            let used_here = stmt_root != 0 and self.view_used_in(stmt_root, ref_sym)
             if last_use == 0 and not used_here:
                 if self.for_view_binding_depth(ref_sym) == 0:
                     self.remove_borrow_at(i)
@@ -25132,7 +25158,7 @@ impl Sema:
             let ref_name: str = with_str_clone_ref(self.pool_resolve(ref_sym))
             let creation_node = self.borrow_creation_nodes[i]
             let binding_node = self.binding_decl_node(ref_sym)
-            let last_use = self.find_last_use_in_block(self.current_block_extra_start, self.current_block_stmt_count, self.current_block_stmt_index + 1, self.current_block_tail, ref_sym, err_node)
+            let last_use = self.view_last_use(ref_sym, err_node)
             // A view whose final use is already behind this mutation is dead.
             // This also handles a mutation on a diverging arm: a lexical use
             // after the enclosing branch is not reachable from that mutation.
@@ -25144,7 +25170,7 @@ impl Sema:
             // when this mutation ends the loop, since other paths may not.
             let loop_body_depth = self.for_view_binding_depth(ref_sym)
             let is_loop_view = if loop_body_depth != 0: 1 else: 0
-            if last_use == 0 and self.expr_uses_symbol(err_node, ref_sym) == 0:
+            if last_use == 0 and not self.view_used_in(err_node, ref_sym):
                 if is_loop_view == 0:
                     self.remove_borrow_at(i)
                     continue
@@ -26322,16 +26348,18 @@ impl Sema:
                 bi = bi + 1
                 continue
 
+            // A use of the resource retaining the view is a use of the view
+            // (§16.2b.9 "Retained borrows"; view_used_in).
             var live = 0
             var si = next_stmt_index
             while si < stmt_count:
-                if self.expr_uses_symbol(self.ast.get_extra(block_extra_start + si), ref_sym) != 0:
+                if self.view_used_in(self.ast.get_extra(block_extra_start + si), ref_sym):
                     live = 1
                     break
                 si = si + 1
 
             if live == 0 and tail_node != 0:
-                if self.expr_uses_symbol(tail_node, ref_sym) != 0:
+                if self.view_used_in(tail_node, ref_sym):
                     live = 1
 
             if live == 0:

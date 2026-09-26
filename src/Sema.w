@@ -1279,6 +1279,7 @@ pub type Sema {
     facade_pair_setter_contract: HashMap[i32, i32],    // a pair setter's generic fn node -> foreign_contracts index …
     facade_pair_setter_case: HashMap[i32, i32],        // … and the case it renders (parallel)
     facade_pair_resources: HashMap[i32, i32],          // resource type symbol -> facade_resources index, for resources with a callback pair
+    facade_pair_retainers: HashMap[i32, i32],          // a local handed to a pair's userdata setter -> the resource local retaining it (§16.2b.9: alive while the resource is used)
     // D22 §13.6: field-access exprs whose base is a shared view and whose
     // field type is non-Copy — an owned demand on one is an error.
     view_projection_exprs: HashMap[i32, i32],
@@ -2668,6 +2669,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         facade_pair_setter_contract: sema_new_map_i32_i32(),
         facade_pair_setter_case: sema_new_map_i32_i32(),
         facade_pair_resources: sema_new_map_i32_i32(),
+        facade_pair_retainers: sema_new_map_i32_i32(),
         contextual_join_arm_types: Vec.new(),
         contextual_join_arm_kinds: Vec.new(),
         contextual_join_arm_roles: Vec.new(),

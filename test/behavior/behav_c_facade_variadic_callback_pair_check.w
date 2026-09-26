@@ -5,10 +5,11 @@
 // setter: both halves set in either order with each status checked against
 // the operation's `ok` constant; a reset between a callback-capable
 // operation and a re-setup; a helper that receives the handle with a proven
-// pair; a sink read between the setter and the run (D62: a capturing
-// callable holds its places, and only a callback-capable operation calls
-// it); and the handle destroyed — its Drop runs the abandonment path — on
-// every early return, including one after a first successful setter.
+// pair; a sink read only after the run (§16.2b.9: the handle holds the
+// sink until its last callback-capable operation, so reading it between
+// the setter and the run is refused); and the handle destroyed — its Drop runs
+// the abandonment path — on every early return, including one after a first
+// successful setter.
 use c_import("typedef struct h h;\nh *h_new(void);\nvoid h_free(h *x);\nvoid h_reset(h *x);\nint h_set(h *x, int opt, ...);\nint h_run(h *x);\ntypedef int (*h_cb)(int n, void *ud);\n#define OPT_CB 1\n#define OPT_UD 2\n#define OPT_N 3\n#define H_OK 0\n")
 
 c facade hlib:
@@ -45,9 +46,10 @@ fn callback_first() -> i32:
     if h.set(OPT_CB, on_n) != H_OK: return -1
     if h.set(OPT_UD, sink) != H_OK: return -1
     if h.set(OPT_N, 3) != H_OK: return -1
-    let seen_before = total
+    // `total` is held by `sink`, which `h` retains until its last
+    // callback-capable operation: readable only after the run (§16.2b.9).
     if h.run() != 0: return -1
-    total - seen_before
+    total
 
 fn userdata_first() -> i32:
     var total = 0
