@@ -796,6 +796,21 @@ impl Codegen:
             let body = self.mir_body_at(bi as i64)
             if body.lowering_failed != 0:
                 continue
+            // #1613: a body Codegen never defined has no marshalling to prove —
+            // a `Box.drop__receiver__…` specialization exists in MIR while the
+            // Box drop is emitted inline as glue (mir_emit_box_drop_place), so
+            // its LLVM function stays a declaration. Only a DEFINED function's
+            // calls must each pass through a recorded marshalling branch.
+            var fn_value: i64 = 0
+            let cg = self.fn_values.get(self.codegen_sym_for_sema_sym(body.fn_sym))
+            if cg.is_some():
+                fn_value = cg.unwrap()
+            else:
+                let raw = self.fn_values.get(body.fn_sym)
+                if raw.is_some():
+                    fn_value = raw.unwrap()
+            if fn_value == 0 or wl_is_declaration(fn_value) != 0:
+                continue
             let reachable = self.mir_reachable_blocks(body)
             for bb in 0..body.block_count():
                 if reachable[bb] == 0 or body.term_kind(bb) != TermKind.TK_CALL:

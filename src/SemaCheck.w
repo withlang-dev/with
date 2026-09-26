@@ -4181,6 +4181,10 @@ impl Sema:
         self.current_module_path = saved_generic_module_path
         self.current_module_has_ci = saved_generic_module_has_ci
 
+        // #1600/#1613: a specialization created after finalize_receiver_requirements
+        // ran (a Box.drop__receiver__… drop glue asks for one from MIR) carries
+        // its receiver requirement from its own declared param[0] effect.
+        self.finalize_receiver_requirement_for(sig_idx)
         sig_idx
 
     // ── Expression type checking ─────────────────────────────────────
