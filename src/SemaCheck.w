@@ -25241,6 +25241,39 @@ impl Sema:
         self.borrow_collect_path_inner(node)
         self.borrow_path_data.len() as i32 - start
 
+    // The field path a view binding's initializer projects from `root`,
+    // stored root-to-leaf in borrow_path_data; 0 (the whole root) when the
+    // initializer is not a place rooted at `root`. An index projection views
+    // the whole indexed collection — its element storage can move under any
+    // write to it (#887) — so the path stops at the indexed place.
+    fn view_binding_place_path(node: i32, root: i32) -> i32:
+        var place = node
+        while place != 0 and (self.ast.kind(place) == NodeKind.NK_GROUPED or self.ast.kind(place) == NodeKind.NK_NO_SUSPEND):
+            place = self.ast.get_data0(place)
+        if place == 0 or root == 0 or self.borrow_root_place(place) != root:
+            return 0
+        let start = self.borrow_path_data.len() as i32
+        let _ = self.view_binding_place_path_inner(place)
+        self.borrow_path_data.len() as i32 - start
+
+    // Returns 1 once an index projection has been crossed: the fields below
+    // it are not part of the path.
+    fn view_binding_place_path_inner(node: i32) -> i32:
+        if node == 0:
+            return 0
+        let kind = self.ast.kind(node)
+        if kind == NodeKind.NK_FIELD_ACCESS:
+            if self.view_binding_place_path_inner(self.ast.get_data0(node)) != 0:
+                return 1
+            self.borrow_path_data.push(self.ast.get_data1(node))
+            return 0
+        if kind == NodeKind.NK_INDEX:
+            let _ = self.view_binding_place_path_inner(self.ast.get_data0(node))
+            return 1
+        if kind == NodeKind.NK_COMPUTED_FIELD_ACCESS or kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_NO_SUSPEND:
+            return self.view_binding_place_path_inner(self.ast.get_data0(node))
+        0
+
 // §8.1 sentinel for constant-index path elements. Values < INDEX_PATH_BASE
 // are constant indices encoded as INDEX_PATH_BASE - literal_value. A wildcard
 // (non-constant index) uses INDEX_PATH_WILDCARD which overlaps with everything.
@@ -25400,11 +25433,17 @@ impl Sema:
                 continue
             let before = self.borrow_refs.len() as i32
             let path_start = self.borrow_path_data.len() as i32
+            // §3.8 / D22: a view of a field borrows that field's path, not the
+            // whole root — `let src = self.source; self.pos = …` mutates a
+            // disjoint sibling and leaves the view intact; only a write to the
+            // viewed path or one of its ancestors invalidates it (#1530
+            // registered the root alone and refused every sibling write).
+            let path_count = self.view_binding_place_path(creation_node, origin_sym)
             // §12.4 (#1691): a closure that mutates the captured place is an
             // exclusive view of it for as long as the binding is alive; its
             // capture summary says which places its body writes.
             let kind = if self.closure_capture_writes(creation_node, origin_sym): BorrowKind.EXCLUSIVE else: BorrowKind.SHARED
-            self.check_borrow_create_direct(origin_sym, kind, 0, path_start, 0, creation_node)
+            self.check_borrow_create_direct(origin_sym, kind, 0, path_start, path_count, creation_node)
             if self.borrow_refs.len() as i32 > before:
                 self.borrow_refs[before] = view_sym
 
