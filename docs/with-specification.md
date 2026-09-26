@@ -1,4 +1,4 @@
-# The With Programming Language — Specification v7.2
+# The With Programming Language — Specification v7.3
 
 **Author:** Eric Hartford
 **Status:** Reference specification for prototype implementation
@@ -11,6 +11,13 @@ implementation is still in progress.** The D22 rules are normative now. The
 compiler, comptime evaluator, backends, standard library, diagnostics, and
 tests are NON-COMPLIANT wherever they do not yet implement them. Existing
 implementation behavior must not be treated as precedent against D22.
+**Changelog v7.3:** Generators are push-based (§13.4, D69): a `gen fn`
+is an ordinary function that calls the consumer's loop body at each
+`yield`. A consumer's stop leaves the generator at its `yield`, releasing
+its scopes; a generator may yield views of its own locals; `g.pull()`
+gives a fiber-backed `Iter[T]` where code must step the sequence itself.
+The state-machine model, its no-references-across-`yield` rule, and its
+`.await` prohibition are retired (§13.4, §14.20).
 **Changelog v7.2:** Owning keyed-map lookup has one uniform contract: `get`
 returns `Option[&V]`; ownership transfer is performed by `remove`, which
 returns `Option[V]`. A shared reference to a `Copy` value remains a reference
@@ -5903,17 +5910,13 @@ ephemerality, preventing the caller from knowing the restriction.
 fn find_matches(text: &String, pat: &str) -> Vec[String]:
     text.split(pat) |> map(s => s.to_string()) |> collect()
 
-// 2. Generator that owns its data (lazy, no allocation)
-gen fn find_matches(text: String, pat: String) -> String:
-    for segment in text.split(&pat):
-        yield segment.to_string()
-
-// 3. Callback / visitor pattern (zero allocation, inversion of control)
-fn find_matches(text: &String, pat: &str, f: fn(StrView)):
+// 2. Generator (lazy, zero-copy, no allocation; the caller's `for`
+//    body sees each view while the generator runs, §13.4)
+gen fn find_matches(text: &String, pat: &str) -> StrView:
     for segment in text.split(pat):
-        f(segment)
+        yield segment
 
-// 4. Process inline (no function boundary)
+// 3. Process inline (no function boundary)
 let results = text.split(pat)
     |> filter(s => s.len() > 0)
     |> map(s => s.to_string())
@@ -6167,10 +6170,13 @@ without requiring the entry API's verbose ceremony.
 
 ### 13.4 Generators (`yield`)
 
-Generators produce sequences lazily, suspending between each `yield`.
+A generator produces a sequence by calling `yield` once per element. It
+is an ordinary function whose consumer decides what happens to each
+element: a `for` loop over a generator runs its body at each `yield`,
+inside the generator's call.
 
 ```
-gen fn fibonacci -> Int:
+gen fn fibonacci -> i64:
     var a = 0
     var b = 1
     loop:
@@ -6180,95 +6186,101 @@ gen fn fibonacci -> Int:
         b = next
 
 let first_10 = fibonacci() |> take(10) |> collect[Vec]()
+
+gen fn upto(count: i32) -> i32:
+    for i in 0..count:
+        yield i * 10
+
+for v in upto(4):
+    print(v)                 // 0, 10, 20, 30
 ```
 
-Generators are declared with `gen fn`, use `yield`, and return
-iterators implementing `Iter[T]`.
+**Declaration and call.** `gen fn f(params) -> T` declares a generator
+whose elements have type `T`; the `-> T` names the element type, as
+`async fn f -> T` names the task's result. Calling `f(args)` runs
+nothing: it evaluates the arguments and returns a **generator value**
+that holds them, of a compiler-generated type whose name is not
+denotable. The body runs when the value is consumed. A generator value
+is consumed once.
 
-**Return type convention:** In `gen fn f -> T`, the `-> T`
-specifies the **yielded element type**, not the function's actual
-return type. The function actually returns a **compiler-generated
-iterator type** implementing `Iter[T]` — the generator's state
-struct, whose name is not denotable in source. This is analogous to
-`async fn f -> T` meaning "returns `Task[T]`" — the keyword modifies
-the return type's meaning:
-
-```
-gen fn fibonacci -> Int: ...
-// Actual type of fibonacci(): a generated iterator implementing Iter[Int]
-// Each yield produces an Int
-
-async fn fetch(url: str) -> String: ...
-// Actual type of fetch(url): Task[String]
-```
-
-**Compilation model:** Generators compile to **state machines**, not
-fibers. They do not use the fiber scheduler. They do not imply async.
-They are pure, synchronous iteration constructs. The compiler
-transforms each `yield` point into a state transition, and the
-generator's local variables become fields of the state machine struct.
-This is a compile-time transformation with zero runtime overhead beyond
-the state struct itself.
-
-**No references across `yield` points.** Because generator locals
-become fields of the state machine struct, a reference to a local
-variable that is live across a `yield` would create a self-referential
-struct (the struct contains both the field and a pointer to it).
-Since With has no `Pin`, this is forbidden:
+**`Gen[T]`.** Every generator value implements:
 
 ```
-gen fn bad_generator -> &str:
-    let s = "hello".to_owned()
-    let r = &s           // r borrows s
-    yield r              // ERROR: reference `r` to local `s` is live across yield
-
-gen fn ok_generator -> str:
-    let s = "hello".to_owned()
-    yield s.clone()      // OK: yields an owned value
-    let r = &s           // OK: r does not cross a yield
-    print(r)
+trait Gen[T]:
+    move fn each(body: fn(T) -> bool)
 ```
 
-This restriction does NOT apply to `async fn` — fibers have real
-stacks that don't move, so references across `.await` are safe
-(§14.13). Generators are the exception because they compile to
-movable structs.
+`each` calls `body` once per element, in order, and stops as soon as
+`body` returns `false`. `for x in g:` consumes `g` through `each`. The
+pipeline stages of §13.3 that visit elements in order (`map`, `filter`,
+`take`, `collect`, and the like) accept a `Gen[T]`; a stage that steps a
+sequence itself (`zip`, `peekable`, a bare `next()`) takes an `Iter[T]`
+(see **Pulling** below). Application code never writes
+`each`; implementing `Gen[T]` by hand is library-maintainer work.
 
-**Zero-copy iteration:** Generators cannot yield references to
-their own locals, which means `gen fn tokenize(src: &str) -> &str`
-that yields slices of `src` is impossible (src is stored in the
-state machine, yielding a slice creates a self-referential struct).
-For zero-copy iteration that yields references, use **concrete
-ephemeral iterator structs** (§5.5, §13.1) or the **callback/visitor
-pattern**. Generators are best for owned-value sequences (Fibonacci,
-generated data, transformations).
+**`yield`.** `yield e` hands `e` to the consumer and continues after
+the consumer's body has run. When the consumer has stopped — `break`,
+`return`, `?`, a labeled `break`, or a stage such as `take` that has
+what it needs — `yield` does not return: the generator leaves at that
+`yield` as if by `return`, releasing its scopes in reverse order before
+control reaches the consumer's continuation. A generator cannot observe
+or ignore a stop. `yield` appears only directly in a `gen fn` body, not
+in a `fn` or closure nested in it. `return` in a generator ends the
+sequence and takes no value.
+
+**The consumer's control flow.** In the body of `for x in g:`,
+`break`, `continue`, `return`, `?`, labeled `break` and `continue`, and
+`.await` mean what they mean in any `for` body. They belong to the
+consumer; the compiler carries them across the generator's call.
+
+**Views.** A generator may yield a view of its own locals or of what
+its arguments view. The consumer's body runs while the generator's
+frame is live, so the view is valid for that run of the body and is not
+retained past it (§21.1); keeping an element is spelled `.clone()`.
 
 ```
-// Zero-copy: ephemeral iterator struct
-type TokenIter = ephemeral { source: StrView, pos: usize }
-impl Iter[StrView] for TokenIter: ...
+gen fn nonempty(lines: &Vec[str]) -> &str:
+    for line in lines:
+        if line.len() > 0:
+            yield line                    // a view into the argument
 
-// Zero-copy: callback pattern
-fn each_token(src: &str, f: fn(StrView)): ...
+gen fn labels(count: i32) -> &str:
+    var buf = ""
+    for i in 0..count:
+        buf = f"item-{i}"
+        yield &buf                        // a view of the generator's own local
 ```
 
-**Generators are not coroutines.** They are pull-based (the caller
-drives iteration by calling `next()`), not push-based (no scheduler
-involved). They cannot use `.await`. They cannot be suspended by the
-runtime.
+**Resources.** A generator's resources live in its scopes. Its owned
+locals, `with` scopes, and `defer`s are released when it returns, runs
+off its end, or leaves at a stopped `yield` — including when the
+consumer breaks early. A generator value dropped without being consumed
+never ran; it releases only its arguments.
 
-**Escaping rules:**
+**Pulling.** Code that must step a sequence itself — `zip`, a parser
+asking a lexer for one token, a partly consumed sequence kept in a
+struct — spells `g.pull()`, which returns an owned `Iter[T]` that runs
+the generator on its own fiber (§14.18) and resumes it at each
+`next()`. Dropping the pulled iterator before the end stops the
+generator exactly as a consumer's `break` does. `pull()` is spelled
+because it allocates a fiber stack; it is unavailable in `no_runtime`
+builds. A generator that yields views of its own locals, or whose body
+may suspend (§14.3), cannot be pulled, because `next()` returns an
+element its caller keeps; such a `pull()` is a compile error naming the
+`yield` or the suspension point.
 
-- A `gen fn` that captures **no references** produces a storable
-  iterator. It can be stored in structs, returned from functions,
-  and passed to other threads (if `Send`).
-- A `gen fn` that captures **references** is ephemeral. It follows
-  the same rules as any other ephemeral value.
-- A `gen fn` with **no captures at all** (including the common case
-  of generators that only use their parameters) is always storable.
+**Storing and sending.** A generator value holds only its arguments.
+It is ephemeral when an argument is a view (§5.5), and otherwise it can
+be stored, returned, and sent to another thread when its arguments are
+`Send`.
 
-**State allocation:** Generator state is stack-allocated at the call
-site. It is moved to the heap only if explicitly boxed by the user.
+**Compilation model.** A generator compiles to an ordinary function
+that takes the consumer's body as a function argument; each `yield` is
+a call to it. There is no state struct, no scheduler, and no
+allocation, and generators work in `no_runtime` builds. The body of a
+generator is ordinary code: a `.await` in it suspends the consumer's
+fiber, and the generator's may-suspend effect is the consuming loop's
+(§14.3).
 
 ### 13.5 For-In Loops
 
@@ -8221,18 +8233,18 @@ mechanisms:
 
 |  | `gen fn` | `async fn` |
 |--|---------|-----------|
-| **Mechanism** | State machine (compile-time) | Fiber (runtime) |
-| **Runtime required** | No | Yes |
-| **Suspends** | At `yield` | At compiler-known current-fiber suspension points |
-| **Driver** | Caller calls `next()` | Fiber scheduler |
-| **Allocation** | Stack at call site | Heap stack per fiber |
-| **Storable** | Yes (if no captured refs) | Task handle; storable only when non-ephemeral |
-| **Sendable** | Yes if state is `Send` | Only when non-ephemeral, `T: Send`, and captures are `Send` |
-| **`no_runtime` builds** | Works | Compile error |
+| **Mechanism** | Ordinary call: the generator calls the loop body at each `yield` | Fiber (runtime) |
+| **Runtime required** | No (`pull()` needs fibers) | Yes |
+| **Suspends** | Never by itself; a `.await` in its body suspends the consumer's fiber | At compiler-known current-fiber suspension points |
+| **Driver** | The generator; `pull()` gives a caller-driven `Iter[T]` | Fiber scheduler |
+| **Allocation** | None; the generator value holds its arguments | Heap stack per fiber |
+| **Storable** | Yes, unless an argument is a view | Task handle; storable only when non-ephemeral |
+| **Sendable** | When its arguments are `Send` | Only when non-ephemeral, `T: Send`, and captures are `Send` |
+| **`no_runtime` builds** | Works (without `pull()`) | Compile error |
 
-`gen fn` compiles entirely away — the compiler rewrites it into a
-struct and a `next()` method. It has no scheduler dependency and
-works in `no_runtime` builds. It cannot use `.await`.
+`gen fn` compiles entirely away — it is an ordinary function that
+calls the consumer's loop body at each `yield` (§13.4). It has no
+scheduler dependency and works in `no_runtime` builds.
 
 `async fn` allocates a fiber with a real stack and requires the fiber
 runtime. It can suspend at compiler-known current-fiber suspension
@@ -8378,8 +8390,8 @@ referents — no lifetime annotations needed.
 | References/views | Yes | No | No |
 | `@[no_await_guard]` guards | N/A | N/A | Compile error (§7.9) |
 
-This is the same rule as generators (§14.20): if the suspended
-environment contains ephemerals, the handle is ephemeral. This
+This is the same rule as generator values (§13.4): a value that holds
+an ephemeral is ephemeral. This
 avoids reintroducing lifetime annotations while preserving safety.
 
 ---

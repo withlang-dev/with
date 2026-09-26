@@ -42,7 +42,7 @@ nebula/
 - **Pipeline operators**: Error message construction
 
 ### `session.w` — Fibers, Arenas, Pipelines & Generators
-- **`gen fn`**: `extract_packets` compiles to a state machine, yields lazily
+- **`gen fn`**: `extract_packets` yields lazily; each `yield` runs the caller's loop body (§13.4)
 - **Generator composition**: `sliding_window[T]` over generic slices
 - **`SlotMap`**: Generational arena — handles detect use-after-remove
 - **`select await biased`**: Priority-based multiplexing (IO before timeout)

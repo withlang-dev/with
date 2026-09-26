@@ -4,7 +4,7 @@ module nebula.session
 // Session — Fibers, Generators, Channels & Async Patterns
 //
 // Demonstrates:
-//   - Generators (gen fn) as pull-based lazy sequences
+//   - Generators (gen fn) as lazy sequences
 //   - Async functions and .await
 //   - Channels for cross-fiber communication
 //   - select await for racing futures
@@ -38,8 +38,8 @@ pub error SessionError =
 
 // --- Generator: Packet Extractor ---
 //
-// `gen fn` compiles to a state machine struct, not a fiber.
-// It's purely synchronous: the caller pulls values on demand.
+// `gen fn` is an ordinary function: each `yield` runs the caller's
+// loop body, and nothing runs until the caller iterates (§13.4).
 
 gen fn extract_packets(count: i32) -> Telemetry:
     for i in 0..count:
