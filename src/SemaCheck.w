@@ -11198,11 +11198,28 @@ impl Sema:
             return
         if self.reject_view_into_temporary(expr_node, "returns") != 0:
             return
+        let verdict = self.view_escape_origin(expr_node, block_scope_start)
+        if verdict > 0:
+            self.report_view_escape(verdict, report_node, block_scope_start)
+        else if verdict < 0:
+            let view_name: str = with_str_clone_ref(self.pool_resolve(0 - verdict))
+            let what = if block_scope_start < 0: "returned view" else: "view"
+            self.emit_error(what ++ " may outlive its origin via local binding '" ++ view_name ++ "'", report_node)
+
+    // The judgment check_view_escape_origins reports (a view into a statement
+    // temporary aside): the origin symbol a view in `expr_node` escapes, the
+    // negated symbol of a local view binding of unknown provenance it leaves
+    // through, or 0. §13.4 `g.pull()` asks it of each yield: a pulled element
+    // leaves the generator's frame the way a returned value does.
+    mut fn view_escape_origin(expr_node: i32, block_scope_start: i32) -> i32:
+        if expr_node == 0:
+            return 0
+        if self.ast.kind(expr_node) == NodeKind.NK_ASSIGN:
+            return self.view_escape_origin(self.ast.get_data0(expr_node), block_scope_start)
         if self.ast.kind(expr_node) == NodeKind.NK_UNARY and self.ast.get_data0(expr_node) == UnaryOp.UOP_REF:
             let origin_sym = self.ref_storage_root_sym(self.ast.get_data1(expr_node))
             if self.view_origin_escapes(origin_sym, block_scope_start) != 0:
-                self.report_view_escape(origin_sym, report_node, block_scope_start)
-                return
+                return origin_sym
         if self.ast.kind(expr_node) == NodeKind.NK_CALL:
             let callee = self.ast.get_data0(expr_node)
             if self.ast.kind(callee) == NodeKind.NK_IDENT:
@@ -11228,8 +11245,7 @@ impl Sema:
                             let origin_arg = if has_resolved != 0: self.get_resolved_call_arg(expr_node, origin_pi) else: self.ast.get_extra(extra_start + origin_pi)
                             let origin_sym = self.place_root_sym(origin_arg)
                             if self.view_origin_escapes(origin_sym, block_scope_start) != 0:
-                                self.report_view_escape(origin_sym, report_node, block_scope_start)
-                                return
+                                return origin_sym
         if self.ast.kind(expr_node) == NodeKind.NK_IDENT:
             let view_sym = self.ast.get_data0(expr_node)
             let view_ty = self.scope_lookup(view_sym)
@@ -11246,13 +11262,9 @@ impl Sema:
                         if init_kind == NodeKind.NK_UNARY and self.ast.get_data0(init_node) == UnaryOp.UOP_REF:
                             let origin_sym = self.ref_storage_root_sym(self.ast.get_data1(init_node))
                             if self.view_origin_escapes(origin_sym, block_scope_start) != 0:
-                                self.report_view_escape(origin_sym, report_node, block_scope_start)
-                                return
+                                return origin_sym
                         if init_kind == NodeKind.NK_CALL or init_kind == NodeKind.NK_FIELD_ACCESS or init_kind == NodeKind.NK_UNARY:
-                            let view_name: str = with_str_clone_ref(self.pool_resolve(view_sym))
-                            let what = if block_scope_start < 0: "returned view" else: "view"
-                            self.emit_error(what ++ " may outlive its origin via local binding '" ++ view_name ++ "'", report_node)
-                            return
+                            return 0 - view_sym
         var deps: Vec[i32] = Vec.new()
         deps = self.collect_expr_view_deps(expr_node, move deps)
         for i in 0..deps.len() as i32:
@@ -11260,8 +11272,8 @@ impl Sema:
             if origin_sym == 0:
                 continue
             if self.view_origin_escapes(origin_sym, block_scope_start) != 0:
-                self.report_view_escape(origin_sym, report_node, block_scope_start)
-                return
+                return origin_sym
+        0
 
     fn expr_type_is_generator_state(expr_node: i32) -> i32:
         if expr_node == 0:
