@@ -2582,7 +2582,7 @@ impl Sema:
                 let contract_ret = self.fn_signature_return_type(flags, trait_contract.ret_type as TypeId)
                 self.set_sig_return_type(sig_idx, contract_ret as i32)
             else:
-                let inferred_ret = self.infer_unannotated_function_return_type(body, body_ty)
+                let inferred_ret = self.infer_unannotated_function_return_type(body, body_ty, self.fn_decl_is_entry_point(node))
                 let sig_ret = self.fn_signature_return_type(flags, inferred_ret as TypeId)
                 self.set_sig_return_type(sig_idx, sig_ret as i32)
             self.body_typed_sigs.insert(sig_idx, 1)
@@ -6228,7 +6228,7 @@ impl Sema:
         let place = render_expr(self.ast, self.pool, self.ast.get_data0(n) as NodeId, 0)
         self.emit_error_with_help(msg, n, "the tail assignment yields a read of `" ++ place ++ "` after the store (§9.1); the implicit default applies only to a `Unit` tail (§4.10)")
 
-    mut fn infer_unannotated_function_return_type(body: i32, body_ty: TypeId) -> i32:
+    mut fn infer_unannotated_function_return_type(body: i32, body_ty: TypeId, entry_point: i32) -> i32:
         let info = self.body_return_type_info(body)
         if info.mismatch != 0:
             self.emit_error("return type mismatch", info.mismatch_node)
@@ -6240,9 +6240,11 @@ impl Sema:
             // §4.10 / D43 (#1494): a body that returns a value on one path and
             // falls off the end on another is a missing return, the same as
             // the annotated spelling; it was defaulted to `T.default()`. A
-            // `Result[Unit, E]` body falls off into `Ok(())` (§4.9).
+            // `Result[Unit, E]` body falls off into `Ok(())` (§4.9). `main`,
+            // `@[entry]` and `test_*` do not infer (§4.10): their exit status
+            // is fixed, and `if failed: return 1` with a fall-off is the idiom.
             let falls_off = body_ty == 0 or body_ty == self.ty_void
-            if falls_off and self.body_can_fall_through(body) != 0 and self.type_is_result_of_unit(info.value_type) == 0:
+            if falls_off and entry_point == 0 and self.body_can_fall_through(body) != 0 and self.type_is_result_of_unit(info.value_type) == 0:
                 self.emit_error("missing return", body)
             return info.value_type
         if body_ty != 0:
