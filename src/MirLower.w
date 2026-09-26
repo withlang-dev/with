@@ -11506,6 +11506,20 @@ impl MirBuilder:
         self.body.push_stmt(self.cur_bb, StmtKind.Assign, temp_place, rv, self.ast.get_start(node))
         self.body.new_operand(OperandKind.OK_COPY, temp_place)
 
+    // #933: an enum payload is a call argument — Sema's recorded adjustments
+    // apply in lower_call_arg's order (auto-reference, then the D22
+    // contextual copy, then auto-deref) before a plain lowering, for every
+    // constructor spelling (`.V(x)`, `Enum.V(x)`).
+    mut fn lower_payload_arg(arg_node: i32, payload_ty: i32) -> i32:
+        if payload_ty != 0:
+            let by_ref = self.lower_auto_ref_call_arg(arg_node, payload_ty)
+            if by_ref >= 0: return by_ref
+            let copied = self.lower_auto_copy_ref_call_arg(arg_node, payload_ty)
+            if copied >= 0: return copied
+            let derefed = self.lower_auto_deref_call_arg(arg_node, payload_ty)
+            if derefed >= 0: return derefed
+        self.lower_expr(arg_node)
+
     mut fn lower_auto_ref_call_arg(arg_node: i32, expected_ty: i32) -> i32:
         if arg_node == 0 or expected_ty == 0:
             return -1
@@ -11916,11 +11930,13 @@ impl MirBuilder:
         for i in 0..count:
             let arg_node = if has_resolved != 0: self.sema.get_resolved_call_arg(node, i) else: self.ast.get_extra(arg_start + i)
             let saved_expected = self.expected_type
-            if i < payload_tys.len():
-                let payload_ty = payload_tys[i]
-                if payload_ty != 0:
-                    self.expected_type = payload_ty
-            fields.push(if arg_node == 0: self.unit_operand() else: self.lower_expr(arg_node))
+            let payload_ty = if i < payload_tys.len(): payload_tys[i] else: 0
+            if payload_ty != 0:
+                self.expected_type = payload_ty
+            // #1627: `Option[&Ctx].Some(ctx)` borrows `ctx` as `.Some(ctx)`
+            // and `Some(ctx)` do — the plain lowering moved it into a `&Ctx`
+            // payload slot and blanked it.
+            fields.push(if arg_node == 0: self.unit_operand() else: self.lower_payload_arg(arg_node, payload_ty))
             self.expected_type = saved_expected
             names.push(0)
         let fid = self.body.new_agg_fields(fields, names)
@@ -15688,7 +15704,7 @@ impl MirBuilder:
                             vc_payload_ty = vc_payload_tys[vci]
                             if vc_payload_ty != 0:
                                 self.expected_type = vc_payload_ty
-                        let vc_arg_op = if vc_arg == 0: self.unit_operand() else: self.lower_expr(vc_arg)
+                        let vc_arg_op = if vc_arg == 0: self.unit_operand() else: self.lower_payload_arg(vc_arg, vc_payload_ty)
                         vc_fields.push(vc_arg_op)
                         self.expected_type = saved_expected
                         vc_names.push(0)
@@ -16131,21 +16147,9 @@ impl MirBuilder:
                     vs_payload_ty = vs_payload_tys[vsi]
                     if vs_payload_ty != 0:
                         self.expected_type = vs_payload_ty
-                // #933: a payload is a call argument — apply Sema's recorded
-                // adjustments in lower_call_arg's order (auto-reference, then
-                // the D22 contextual copy) before a plain lowering. Skipping
-                // them stored a `&i32` view where `Option[i32]` demanded the
-                // value (read back as 0) and would store a value where a
-                // reference was expected.
-                var vs_arg_op = -1
-                if vs_payload_ty != 0:
-                    vs_arg_op = self.lower_auto_ref_call_arg(vs_arg, vs_payload_ty)
-                    if vs_arg_op < 0:
-                        vs_arg_op = self.lower_auto_copy_ref_call_arg(vs_arg, vs_payload_ty)
-                    if vs_arg_op < 0:
-                        vs_arg_op = self.lower_auto_deref_call_arg(vs_arg, vs_payload_ty)
-                if vs_arg_op < 0:
-                    vs_arg_op = self.lower_expr(vs_arg)
+                // #933: skipping the payload adjustments stored a `&i32` view
+                // where `Option[i32]` demanded the value (read back as 0).
+                let vs_arg_op = self.lower_payload_arg(vs_arg, vs_payload_ty)
                 vs_fields.push(vs_arg_op)
                 self.expected_type = saved_expected
                 vs_names.push(0)

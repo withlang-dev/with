@@ -1032,6 +1032,17 @@ impl Sema:
             self.reject_owned_demand_from_view_projection(arg_node, expected, "call argument")
             let _ = self.record_contextual_copy_adjustment(arg_node, expected, actual)
 
+    // #1627 (§3.8, D22): an enum payload is a demand like a parameter. A
+    // place against a `&T` payload (`Some(ctx)` for `Option[&Ctx]`) is
+    // auto-referenced — the constructor observes it and the caller's binding
+    // stays valid; Option is transparent to the view's origin.
+    mut fn payload_arg_auto_refs(expected: i32, actual: i32, arg_node: i32) -> bool:
+        if arg_node <= 0 or self.ast.kind(arg_node) == NodeKind.NK_MOVE_ARG or self.can_auto_ref_arg(expected, actual) == 0:
+            return false
+        self.check_borrow_create(arg_node, BorrowKind.SHARED, arg_node)
+        self.auto_ref_payload_args.insert(arg_node, 1)
+        true
+
     mut fn check_builtin_method_call_arg(call_name: &str, arg_index: i32, expected: i32, actual: i32, arg_node: i32) -> i32:
         if expected == 0 or actual == 0:
             return 1
@@ -10761,6 +10772,10 @@ impl Sema:
         // materialized result stops carrying the source view.
         if self.has_contextual_copy_adjustment(node) != 0:
             return out
+        // #1627: an auto-referenced payload is `&place`: the place's storage
+        // root is an origin, with every origin reachable through it.
+        if self.auto_ref_payload_args.contains(node):
+            out = self.push_unique_i32(move out, self.ref_storage_root_sym(node))
         let kind = self.ast.kind(node)
         if kind == NodeKind.NK_IDENT:
             let sym = self.ast.get_data0(node)
@@ -15845,10 +15860,17 @@ impl Sema:
             let arg_node = self.ast.get_extra(args_start + ai)
             if arg_node == 0:
                 continue
+            // #1627: the payload demand decides, as for `Some(x)` and
+            // `Option[T].Some(x)`: a `&T` payload borrows a place, any other
+            // consumes it (#764 — `.Some(ctx)` into `Option[Ctx]` left `ctx`
+            // live over its moved-out bytes).
             if ai < payloads.len() as i32 and payloads[ai] != 0:
-                let _ = self.check_expr_with_expected(arg_node, payloads[ai] as TypeId)
+                let arg_ty = self.check_expr_with_expected(arg_node, payloads[ai] as TypeId)
+                if not self.payload_arg_auto_refs(payloads[ai], arg_ty as i32, arg_node):
+                    self.mark_moved_if_consumed(arg_node)
             else:
                 let _ = self.check_expr_value_context(arg_node)
+                self.mark_moved_if_consumed(arg_node)
 
     fn expected_variant_constructor_type(variant_name: i32) -> i32:
         if self.has_expected_type == 0 or self.expected_expr_type == 0:
@@ -18639,6 +18661,8 @@ impl Sema:
                     if ucm_ptype != 0 and self.ast.kind(ucm_ptype) == NodeKind.NK_TYPE_REF:
                         continue
                 let arg_node = if has_resolved != 0: self.get_resolved_call_arg(node, ai) else: self.ast.get_extra(resolved_extra_start + ai)
+                if ai < variant_payload_tys.len() as i32 and self.payload_arg_auto_refs(variant_payload_tys[ai], arg_types[ai], arg_node):
+                    continue
                 if arg_node > 0:
                     self.mark_moved_if_consumed(arg_node)
 
@@ -23760,7 +23784,7 @@ impl Sema:
             // argument is consumed exactly like a container store below
             // (#714 rule). Without the mark a second use compiled clean and
             // read the move-blanked slot at runtime (Bad() printed empty).
-            if mc_is_static_enum_variant and ai < mc_static_variant_payload_tys.len() as i32:
+            if mc_is_static_enum_variant and ai < mc_static_variant_payload_tys.len() as i32 and not self.payload_arg_auto_refs(mc_static_variant_payload_tys[ai], mc_arg_ty as i32, mc_arg_node):
                 let ctor_arg_kind = self.ast.kind(mc_arg_node)
                 if ctor_arg_kind != NodeKind.NK_MOVE_ARG and ctor_arg_kind != NodeKind.NK_COPY_ARG and self.is_copy(mc_arg_ty as TypeId) == 0:
                     let ctor_root = self.place_root_sym(mc_arg_node)

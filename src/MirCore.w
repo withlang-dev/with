@@ -3573,6 +3573,25 @@ fn mir_validate_call_missing_borrow(mir_mod: &MirModule, body: &MirBody, callee_
         if arg_resolved == mir_mod.mir_resolve_alias(mir_mod.mir_get_type_d0(param_ty)): return ai
     -1
 
+// #1627: the enum aggregate's form of a missing borrow — a payload operand
+// that is a value where the variant's payload is a reference to it.
+// `Option[&Ctx].Some(ctx)` stored `move ctx` into the `&Ctx` slot and every
+// validator passed it; only analyze's use-after-kill saw the blanked `ctx`.
+// Returns the payload index, or -1.
+fn mir_validate_aggregate_missing_borrow(mir_mod: &MirModule, body: &MirBody, enum_ty: i32, variant_idx: i32, fields_id: i32) -> i32:
+    if fields_id < 0 or fields_id >= body.agg_field_starts.len(): return -1
+    let start = body.agg_field_starts[fields_id]
+    for fi in 0..body.agg_field_counts[fields_id]:
+        let payload_ty = mir_mod.mir_resolve_alias(mir_validate_enum_payload_type(mir_mod, enum_ty, variant_idx, fi))
+        if payload_ty <= 0 or mir_mod.mir_get_type_kind(payload_ty) != TypeKind.TY_REF: continue
+        let arg_ty = mir_validate_operand_type(mir_mod, body, body.agg_field_operands[start + fi])
+        if arg_ty <= 0: continue
+        let arg_resolved = mir_mod.mir_resolve_alias(arg_ty)
+        let arg_kind = mir_mod.mir_get_type_kind(arg_resolved)
+        if arg_kind == TypeKind.TY_REF or arg_kind == TypeKind.TY_PTR: continue
+        if arg_resolved == mir_mod.mir_resolve_alias(mir_mod.mir_get_type_d0(payload_ty)): return fi
+    -1
+
 // The `const fn` symbol a call terminator invokes, or 0 when the callee is
 // a place (an indirect call) or a unit operand (an intrinsic with no callee).
 pub fn mir_call_const_fn_sym(body: &MirBody, callee_operand: i32) -> i32:
@@ -3877,6 +3896,10 @@ pub fn validate_typed_mir_body(mir_mod: &MirModule, body: &MirBody) -> MirValida
                     let variant_count = mir_mod.mir_get_type_d2(agg_enum)
                     if rv_d2 < 0 or rv_d2 >= variant_count:
                         return mir_validation_fail(body.fn_sym, span, f"enum aggregate names variant {rv_d2} of a ty={dest_ty} enum with {variant_count} variants; an aggregate carries the variant index, not its discriminant")
+                if rv_d0 == 1:
+                    let unborrowed = mir_validate_aggregate_missing_borrow(mir_mod, body, dest_ty, rv_d2, rv_d1)
+                    if unborrowed >= 0:
+                        return mir_validation_fail(body.fn_sym, span, f"enum payload {unborrowed} is a value where the variant's payload is a reference to it (a missing borrow)")
             else if rk == RvalueKind.RK_REF:
                 if mir_validate_place_type(mir_mod, body, rv_d1) == 0:
                     return mir_validation_fail(body.fn_sym, span, "ref rvalue does not resolve to a concrete place type")

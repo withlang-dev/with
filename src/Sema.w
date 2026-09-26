@@ -1325,6 +1325,10 @@ pub type Sema {
     // auto-referencing, the same rule as a call argument); MirLower emits the
     // shared ref instead of moving the bytes.
     auto_ref_binding_values: HashMap[i32, i32],
+    // #1627: enum payload argument nodes auto-referenced against a `&T`
+    // payload (`Some(ctx)` for `Option[&Ctx]`): each is a view of its place,
+    // exactly as `&ctx` is (collect_expr_view_deps).
+    auto_ref_payload_args: HashMap[i32, i32],
     typed_binding_names: HashMap[i32, i32],
     typed_binding_muts: HashMap[i32, i32],
     ephemeral_task_binding_nodes: HashMap[i32, i32],
@@ -2311,6 +2315,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
     let join_field_view_arms = sema_new_map_i32_i32()
     let drop_consumed_binding_values = sema_new_map_i32_i32()
     let auto_ref_binding_values = sema_new_map_i32_i32()
+    let auto_ref_payload_args = sema_new_map_i32_i32()
     let typed_binding_names = sema_new_map_i32_i32()
     let typed_binding_muts = sema_new_map_i32_i32()
     let ephemeral_task_binding_nodes = sema_new_map_i32_i32()
@@ -2737,6 +2742,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         join_field_view_arms,
         drop_consumed_binding_values,
         auto_ref_binding_values,
+        auto_ref_payload_args,
         typed_binding_names,
         typed_binding_muts,
         ephemeral_task_binding_nodes,
