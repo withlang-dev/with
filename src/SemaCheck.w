@@ -2197,6 +2197,7 @@ impl Sema:
         let saved_borrow_creation_nodes = move self.borrow_creation_nodes
         let saved_for_view_binding_syms = move self.for_view_binding_syms
         let saved_for_view_binding_depths = move self.for_view_binding_depths
+        let saved_for_view_binding_gen_loops = move self.for_view_binding_gen_loops
         self.borrow_kinds = Vec.new()
         self.borrow_places = Vec.new()
         self.borrow_fields = Vec.new()
@@ -2207,6 +2208,7 @@ impl Sema:
         self.borrow_creation_nodes = Vec.new()
         self.for_view_binding_syms = Vec.new()
         self.for_view_binding_depths = Vec.new()
+        self.for_view_binding_gen_loops = Vec.new()
 
         // Push function scope
         self.push_scope()
@@ -2619,6 +2621,7 @@ impl Sema:
         self.borrow_creation_nodes = saved_borrow_creation_nodes
         self.for_view_binding_syms = saved_for_view_binding_syms
         self.for_view_binding_depths = saved_for_view_binding_depths
+        self.for_view_binding_gen_loops = saved_for_view_binding_gen_loops
         self.local_file_id = saved_body_file_id
         self.current_module_path = saved_body_module_path
         self.current_module_has_ci = saved_body_module_has_ci
@@ -7417,6 +7420,7 @@ impl Sema:
                     self.emit_error("element comprehension requires Vec, HashSet, or BTreeSet expected type", node)
                     return 0
             var pushed_scopes = 0
+            let comp_view_count = self.for_view_binding_syms.len() as i32
             let gen_outer_counts: Vec[i32] = Vec.new()
             for ci in 0..clause_count:
                 let base = comp_start + ci * 3
@@ -7426,6 +7430,8 @@ impl Sema:
                 let elem_ty = self.check_comprehension_clause_iterable(iterable)
                 gen_outer_counts.push(if self.gen_for_elem_types.contains(iterable): self.bind_names.len() as i32 else: -1)
                 self.push_scope()
+                if self.gen_for_elem_types.contains(iterable):
+                    self.register_gen_loop_view_borrows(iterable)
                 pushed_scopes = pushed_scopes + 1
                 if self.ast.comprehension_binding_is_pattern(node, binding):
                     self.check_pattern(binding, elem_ty)
@@ -7439,6 +7445,7 @@ impl Sema:
             self.record_gen_comprehension_captures(node, comp_start, &gen_outer_counts)
             for _ in 0..pushed_scopes:
                 self.pop_scope()
+            self.truncate_for_view_bindings(comp_view_count)
             let result_ty = if target_ty != 0: target_ty else: self.ensure_vec_type_for(result_elem as i32)
             if target_ty != 0:
                 let target_resolved = self.resolve_alias(target_ty as TypeId)
@@ -7475,6 +7482,7 @@ impl Sema:
                 key_expected = self.get_generic_inst_arg(expected2 as i32, 0)
                 val_expected = self.get_generic_inst_arg(expected2 as i32, 1)
             var pushed_scopes2 = 0
+            let comp_view_count2 = self.for_view_binding_syms.len() as i32
             let gen_outer_counts2: Vec[i32] = Vec.new()
             for ci2 in 0..clause_count2:
                 let base3 = comp_start2 + 2 + ci2 * 3
@@ -7484,6 +7492,8 @@ impl Sema:
                 let elem_ty2 = self.check_comprehension_clause_iterable(iterable2)
                 gen_outer_counts2.push(if self.gen_for_elem_types.contains(iterable2): self.bind_names.len() as i32 else: -1)
                 self.push_scope()
+                if self.gen_for_elem_types.contains(iterable2):
+                    self.register_gen_loop_view_borrows(iterable2)
                 pushed_scopes2 = pushed_scopes2 + 1
                 if self.ast.comprehension_binding_is_pattern(node, binding2):
                     self.check_pattern(binding2, elem_ty2)
@@ -7518,6 +7528,7 @@ impl Sema:
             self.record_gen_comprehension_captures(node, comp_start2 + 2, &gen_outer_counts2)
             for _ in 0..pushed_scopes2:
                 self.pop_scope()
+            self.truncate_for_view_bindings(comp_view_count2)
             if map_target_ty == 0:
                 let map_args: Vec[i32] = Vec.new()
                 map_args.push(stored_key_ty)
@@ -11461,7 +11472,7 @@ impl Sema:
     // each view argument views — a generator method's borrowed receiver
     // included (`recv_node` when param_offset is 1), which the value holds
     // as a view of the caller's place.
-    fn record_generator_call_ref_origins(call_node: i32, sig_idx: i32, param_offset: i32, recv_node: i32, extra_start: i32, arg_count: i32, has_resolved: i32):
+    mut fn record_generator_call_ref_origins(call_node: i32, sig_idx: i32, param_offset: i32, recv_node: i32, extra_start: i32, arg_count: i32, has_resolved: i32):
         if call_node == 0 or sig_idx < 0:
             return
         let ret = self.sig_return_type(sig_idx)
@@ -11471,6 +11482,8 @@ impl Sema:
         let field_start = self.get_type_d1(ret as TypeId)
         var union_mask = 0
         var concrete_deps: Vec[i32] = Vec.new()
+        self.gen_call_view_place_starts.insert(call_node, self.gen_call_view_place_nodes.len() as i32)
+        var place_count = 0
         for pi in 0..param_count:
             let field_ty = self.type_extra[(field_start + pi * 3 + 1)]
             if self.type_is_ephemeral_value(field_ty) == 0:
@@ -11481,13 +11494,73 @@ impl Sema:
             let arg_node = if arg_index < 0: (if pi == 0: recv_node else: 0) else if has_resolved != 0: self.get_resolved_call_arg(call_node, arg_index) else: self.ast.get_extra(extra_start + arg_index)
             if arg_node <= 0:
                 continue
+            self.gen_call_view_place_nodes.push(self.gen_view_arg_place(arg_node))
+            place_count += 1
             union_mask = union_mask | self.compute_expr_view_origin_mask(arg_node)
             let dep_len_before = concrete_deps.len() as i32
             concrete_deps = self.collect_expr_view_deps(arg_node, move concrete_deps)
             if concrete_deps.len() as i32 == dep_len_before:
                 concrete_deps = self.push_unique_i32(move concrete_deps, self.place_root_sym(arg_node))
+        self.gen_call_view_place_counts.insert(call_node, place_count)
         if union_mask != 0 or concrete_deps.len() > 0:
             self.set_expr_view_deps(call_node, union_mask, concrete_deps)
+
+    // The place a generator's view argument names: the operand of `&place`,
+    // else the argument itself (a view binding, or a borrowed receiver).
+    fn gen_view_arg_place(arg_node: i32) -> i32:
+        var node = arg_node
+        while node != 0 and (self.ast.kind(node) == NodeKind.NK_GROUPED or (self.ast.kind(node) == NodeKind.NK_UNARY and self.ast.get_data0(node) == UnaryOp.UOP_REF)):
+            node = if self.ast.kind(node) == NodeKind.NK_GROUPED: self.ast.get_data0(node) else: self.ast.get_data1(node)
+        node
+
+    // D69 (§13.4, #1734): a generator value's views stay live for the whole
+    // loop that consumes it (`for x in g`, or a comprehension clause, keyed
+    // by `key_node`): the producer runs while every run of the body runs, so
+    // a write to or move of a viewed place in the body is refused like any
+    // mutation under a live view. Each view argument of the generator call
+    // is a shared borrow of the place it names, path-precise (#1530), so a
+    // sibling field stays writable; a generator value reached any other way
+    // (a binding, a field) borrows the roots of its view dependencies. The
+    // borrows name the generator (its binding, or the call as written) and
+    // end with the loop's scope. Call inside the loop's scope.
+    mut fn register_gen_loop_view_borrows(iterable: i32):
+        var node = iterable
+        while node != 0 and self.ast.kind(node) == NodeKind.NK_GROUPED:
+            node = self.ast.get_data0(node)
+        var ref_sym = 0
+        if self.ast.kind(node) == NodeKind.NK_IDENT:
+            ref_sym = self.ast.get_data0(node)
+        else:
+            // The call as its callee names it: `each_line(…)`, `c.walk(…)`.
+            let callee = if self.ast.kind(node) == NodeKind.NK_CALL: self.ast.get_data0(node) else: node
+            let text = render_expr(self.ast, self.pool, callee as NodeId, 0)
+            ref_sym = self.pool_intern(if text.len() > 0 and text.len() < 60 and sema_str_contains_char(text, 10) == 0: text ++ "(…)" else: "the generator")
+        if self.gen_call_view_place_starts.contains(node):
+            let start: i32 = self.gen_call_view_place_starts.get(node).unwrap()
+            let count: i32 = self.gen_call_view_place_counts.get(node).unwrap()
+            for pi in start..start + count:
+                let place_node: i32 = self.gen_call_view_place_nodes[pi]
+                let root = self.borrow_root_place(place_node)
+                if root == 0:
+                    continue
+                let path_start = self.borrow_path_data.len() as i32
+                let path_count = self.borrow_collect_path(place_node)
+                self.register_gen_loop_view_borrow(ref_sym, root, self.borrow_field(place_node), path_start, path_count, iterable)
+            return
+        var deps: Vec[i32] = Vec.new()
+        deps = self.collect_expr_view_deps(node, move deps)
+        for di in 0..deps.len() as i32:
+            if deps[di] != 0 and deps[di] != ref_sym:
+                self.register_gen_loop_view_borrow(ref_sym, deps[di], 0, self.borrow_path_data.len() as i32, 0, iterable)
+
+    mut fn register_gen_loop_view_borrow(ref_sym: i32, root: i32, field: i32, path_start: i32, path_count: i32, err_node: i32):
+        let before = self.borrow_refs.len() as i32
+        self.check_borrow_create_direct(root, BorrowKind.SHARED, field, path_start, path_count, err_node)
+        if self.borrow_refs.len() as i32 > before:
+            self.borrow_refs[before] = ref_sym
+            self.for_view_binding_syms.push(ref_sym)
+            self.for_view_binding_depths.push(self.loop_depth + 1)
+            self.for_view_binding_gen_loops.push(1)
 
     mut fn propagate_call_param_effect(param_eff: i32, arg_node: i32):
         if param_eff == 0 or arg_node <= 0:
@@ -11975,6 +12048,8 @@ impl Sema:
         let for_entry_states = self.save_scope_states()
         let for_view_count = self.for_view_binding_syms.len()
         self.push_scope()
+        if gen_elem != 0:
+            self.register_gen_loop_view_borrows(iterable)
         if self.ast.for_binding_is_pattern(node):
             self.check_pattern(binding, elem_type)
             self.record_pattern_view_bindings(binding, iterable)
@@ -12013,6 +12088,7 @@ impl Sema:
         while self.for_view_binding_syms.len() > for_view_count:
             self.for_view_binding_syms.pop()
             self.for_view_binding_depths.pop()
+            self.for_view_binding_gen_loops.pop()
         self.pop_move_control_flow_context()
         if gen_elem != 0:
             self.record_gen_loop_captures(node, body, 0, -1, outer_binding_count)
@@ -12204,9 +12280,28 @@ impl Sema:
             self.borrow_refs[before] = sym
             self.for_view_binding_syms.push(sym)
             self.for_view_binding_depths.push(self.loop_depth + 1)
+            self.for_view_binding_gen_loops.push(0)
 
     // The loop_depth of the body of the `for` that binds `sym` as a view; 0
     // when `sym` is not a loop view binding. The innermost binding wins.
+    // End the loop views registered since `count` (a comprehension's generator
+    // clauses, #1734).
+    fn truncate_for_view_bindings(count: i32):
+        while self.for_view_binding_syms.len() as i32 > count:
+            self.for_view_binding_syms.pop()
+            self.for_view_binding_depths.pop()
+            self.for_view_binding_gen_loops.pop()
+
+    // Whether the innermost loop view named `sym` is a generator value's view
+    // held across a loop over it (#1734).
+    fn for_view_binding_is_gen_loop(sym: i32) -> bool:
+        var i = self.for_view_binding_syms.len() as i32 - 1
+        while i >= 0:
+            if self.for_view_binding_syms[i] == sym:
+                return self.for_view_binding_gen_loops[i] != 0
+            i -= 1
+        false
+
     fn for_view_binding_depth(sym: i32) -> i32:
         var i = self.for_view_binding_syms.len() as i32 - 1
         while i >= 0:
@@ -25787,11 +25882,15 @@ impl Sema:
             // when this mutation ends the loop, since other paths may not.
             let loop_body_depth = self.for_view_binding_depth(ref_sym)
             let is_loop_view = if loop_body_depth != 0: 1 else: 0
+            // A generator's view (#1734) stays live even when the loop ends
+            // right after the mutation: the stopped generator leaves at its
+            // `yield` through its own scopes and defers, which may read it.
+            let is_gen_loop_view = is_loop_view != 0 and self.for_view_binding_is_gen_loop(ref_sym)
             if last_use == 0 and not self.view_used_in(err_node, ref_sym):
                 if is_loop_view == 0:
                     self.remove_borrow_at(i)
                     continue
-                if self.loop_ends_after_current_stmt(loop_body_depth) != 0:
+                if not is_gen_loop_view and self.loop_ends_after_current_stmt(loop_body_depth) != 0:
                     i = i + 1
                     continue
             let mutation_start = self.ast.get_start(err_node)
@@ -25807,7 +25906,9 @@ impl Sema:
                 let lu_start = self.ast.get_start(last_use)
                 let lu_end = self.ast.get_end(last_use)
                 diag.add_label(Span { file: self.local_file_id, start: lu_start, end: lu_end }, "view is used here after the mutation")
-            if is_loop_view != 0:
+            if is_gen_loop_view:
+                diag.add_note("the generator `" ++ ref_name ++ "` is still running while the loop body runs (§13.4); collect the changes and apply them after the loop")
+            else if is_loop_view != 0:
                 diag.add_note("the loop reads `" ++ place_name ++ "` again on its next iteration; collect the changes and apply them after the loop")
             let ref_ty = self.resolve_alias(self.scope_lookup(ref_sym) as TypeId)
             if self.get_type_kind(ref_ty) == TypeKind.TY_REF:
