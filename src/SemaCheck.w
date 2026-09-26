@@ -18189,6 +18189,11 @@ impl Sema:
                     expected_ty = self.facade_callback_fn_param_expected_type(facade_mi, fn_sym, 0, facade_context.userdata_type, ai)
             if expected_ty == 0 and arg_node > 0 and self.ast.kind(arg_node) == NodeKind.NK_NULL_LIT:
                 expected_ty = self.null_arg_expected_type(fn_sym, ai + param_offset, false)
+            // #1609: a bare fn named as a generic callee's argument takes the
+            // template's `extern "C" fn` parameter type, so §12.4's coercion
+            // applies as it does for a concrete callee.
+            if expected_ty == 0 and sig_idx < 0 and arg_node > 0 and self.ast.kind(arg_node) == NodeKind.NK_IDENT:
+                expected_ty = self.extern_fn_arg_expected_type(fn_sym, ai + param_offset, false)
             if arg_node == 0:
                 arg_types.push(0)
                 continue
@@ -22191,6 +22196,24 @@ impl Sema:
     // type parameter of the fn; a method generic through its impl alone is
     // left to the ordinary path.
     mut fn null_arg_expected_type(fn_sym: i32, ai: i32, method_call: bool) -> i32:
+        let fixed = self.fixed_param_expected_type(fn_sym, ai, method_call)
+        if fixed == 0: 0 else: self.null_literal_target_type(fixed as TypeId) as i32
+
+    // A bare fn coerces to an `extern "C" fn` parameter (§12.4) through a
+    // generic callee as it does through a concrete one: the generic call
+    // path binds the type parameters from every argument at once and gave
+    // the argument no expected type, so `g2(1, my)` was "wrong argument
+    // type" (#1609). Like a null literal, the argument takes the template
+    // parameter's type when that type names no type parameter.
+    mut fn extern_fn_arg_expected_type(fn_sym: i32, ai: i32, method_call: bool) -> i32:
+        let fixed = self.fixed_param_expected_type(fn_sym, ai, method_call)
+        if fixed != 0 and self.get_type_kind(self.resolve_alias(fixed as TypeId)) == TypeKind.TY_EXTERN_FN: fixed else: 0
+
+    // The callee's declared type for argument `ai` when it is fixed by the
+    // signature alone: a concrete callee's parameter type, or a generic
+    // template's parameter type that mentions no type parameter. 0 when the
+    // type depends on inference.
+    mut fn fixed_param_expected_type(fn_sym: i32, ai: i32, method_call: bool) -> i32:
         if fn_sym == 0:
             return 0
         var param_i = ai
@@ -22203,7 +22226,7 @@ impl Sema:
         if sig >= 0:
             if param_i >= self.sig_get_param_count(sig):
                 return 0
-            return self.null_literal_target_type(self.sig_param_type(sig, param_i) as TypeId) as i32
+            return self.sig_param_type(sig, param_i)
         let fn_node = self.generic_fn_node_for_symbol(fn_sym)
         if fn_node == 0:
             return 0
@@ -22221,7 +22244,7 @@ impl Sema:
             if self.type_expr_mentions_type_param(ty_node, self.ast.get_extra(pos)) != 0:
                 return 0
             pos = pos + 2 + self.ast.get_extra(pos + 1)
-        self.null_literal_target_type(self.resolve_type_expr(ty_node)) as i32
+        self.resolve_type_expr(ty_node) as i32
 
     fn method_expected_arg_type(recv_type: i32, field: i32, arg_index: i32) -> i32:
         if recv_type == 0:
@@ -23292,9 +23315,11 @@ impl Sema:
             // ahead for it).
             if mc_expected == 0 and facade_mi >= 0 and facade_nullable and facade_ud_ty != 0 and facade_ud_node == 0 and ai == self.facade_callback_methods[facade_mi].userdata_param:
                 mc_expected = self.facade_callback_param_expected_type(facade_mi, obj_type as i32, field, facade_ud_ty, ai)
-            if mc_expected == 0 and self.ast.kind(mc_arg_node) == NodeKind.NK_NULL_LIT:
+            if mc_expected == 0 and (self.ast.kind(mc_arg_node) == NodeKind.NK_NULL_LIT or self.ast.kind(mc_arg_node) == NodeKind.NK_IDENT):
                 let mc_null_fn = if mc_method_fn_for_resolution != 0: mc_method_fn_for_resolution else: if mc_owner_sym_for_effect != 0: self.lookup_generic_method_fn(mc_owner_sym_for_effect, field) else: 0
-                mc_expected = self.null_arg_expected_type(mc_null_fn, ai, true)
+                // A null literal takes the fixed parameter's pointer type; a
+                // bare fn name takes its `extern "C" fn` type (#1609).
+                mc_expected = if self.ast.kind(mc_arg_node) == NodeKind.NK_NULL_LIT: self.null_arg_expected_type(mc_null_fn, ai, true) else: self.extern_fn_arg_expected_type(mc_null_fn, ai, true)
             let mc_arg_ty = if facade_ud_node != 0 and mc_arg_node == facade_ud_node: facade_ud_ty as TypeId
                 else if mc_expected != 0: self.check_expr_with_expected(mc_arg_node, mc_expected as TypeId)
                 else: self.check_expr_value_context(mc_arg_node)
