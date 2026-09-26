@@ -531,7 +531,7 @@ fn comp_run_compiler_capture(ctx: &ActionCtx, label: &str, argv: Vec[str], stdou
         return comp_fail(ctx, "step '" ++ label ++ "' timed out; stdout=" ++ stdout_path ++ " stderr=" ++ stderr_path)
     if result.rc != 0:
         if result.stderr.len() > 0:
-            ctx.diagnostics().error(result.stderr)
+            ctx.diagnostics().error(result.stderr.clone())
         return comp_fail(ctx, "step '" ++ label ++ f"' failed with exit code {result.rc}; stdout=" ++ stdout_path ++ " stderr=" ++ stderr_path)
     let fs = ctx.fs()
     let _stdout = fs.write_text(stdout_path, result.stdout ++ "\n")
@@ -1522,7 +1522,7 @@ pub fn run_stack_budget_check_action(ctx: ActionCtx) -> i32:
         return comp_fail(ctx, "stack inspection timed out; stdout=" ++ stdout_path ++ " stderr=" ++ stderr_path)
     if result.rc != 0:
         if result.stderr.len() > 0:
-            ctx.diagnostics().error(result.stderr)
+            ctx.diagnostics().error(result.stderr.clone())
         return comp_fail(ctx, f"stack inspection failed with exit code {result.rc}; stdout=" ++ stdout_path ++ " stderr=" ++ stderr_path)
 
     var sizes: Vec[i32] = Vec.new()
@@ -1988,7 +1988,7 @@ pub fn comp_patch_version_binary(ctx: &ActionCtx, input_path: &str, output_path:
         let result = ctx.process_runner().run_capture(codesign_args, comp_abs(root, comp_join(capture_dir, "codesign.stdout")), comp_abs(root, comp_join(capture_dir, "codesign.stderr")), 120000)
         if result.rc != 0:
             if result.stderr.len() > 0:
-                ctx.diagnostics().error(result.stderr)
+                ctx.diagnostics().error(result.stderr.clone())
             return comp_fail(ctx, f"codesign failed with exit code {result.rc}: " ++ tmp_path)
     if fs.rename(tmp_path, output_path) != 0:
         return comp_fail(ctx, "could not rename " ++ tmp_path ++ " to " ++ output_path)

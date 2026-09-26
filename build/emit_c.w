@@ -543,7 +543,7 @@ fn emitc_run_capture_env(ctx: &ActionCtx, label: &str, argv: Vec[str], timeout_m
         let _remove_stderr = fs.remove_file(stderr_rel)
         return 0
     if result.stderr.len() > 0:
-        ctx.diagnostics().error(result.stderr)
+        ctx.diagnostics().error(result.stderr.clone())
     emitc_fail(ctx, "step '" ++ label ++ f"' failed with exit code {result.rc}; stdout=" ++ stdout_rel ++ " stderr=" ++ stderr_rel)
 
 fn emitc_expect_same_version(ctx: &ActionCtx, expected_compiler: &str, actual_compiler: &str) -> i32:
@@ -786,7 +786,7 @@ fn emitc_run_hello(ctx: &ActionCtx, hello_path: &str) -> i32:
     let result = ctx.process_runner().run_capture(argv, emitc_abs(root, stdout_rel), emitc_abs(root, stderr_rel), 120000)
     if result.rc != 0:
         if result.stderr.len() > 0:
-            ctx.diagnostics().error(result.stderr)
+            ctx.diagnostics().error(result.stderr.clone())
         return emitc_fail(ctx, f"hello binary failed with exit code {result.rc}")
     let _remove_stdout = fs.remove_file(stdout_rel)
     let _remove_stderr = fs.remove_file(stderr_rel)

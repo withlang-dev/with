@@ -2102,14 +2102,18 @@ pub fn ProcessRunner.run_spec(self: &Self, spec: ProcessSpec, stdout_path: &str,
     for i in 0..spec.args.len() as i32:
         full_args.push(with_str_clone_ref(spec.args[i]))
     let timeout = if spec.timeout_ms > 0: spec.timeout_ms else: 0
-    if spec.env.vars.len() > 0:
-        if spec.cwd.len() > 0:
-            return self.run_capture_cwd_with_env(full_args, stdout_path, stderr_path, timeout, spec.cwd, spec.env)
-        return self.run_capture_with_env(full_args, stdout_path, stderr_path, timeout, spec.env)
-    if spec.cwd.len() > 0:
-        return self.run_capture_cwd(full_args, stdout_path, stderr_path, timeout, spec.cwd)
-    if spec.stdin_path.len() > 0:
-        return self.run_capture_input(full_args, stdout_path, stderr_path, timeout, spec.stdin_path)
+    // The spec is this call's to consume: its env transfers to the runner
+    // by an explicit vacate (§2.2, D32), never an implicit field move.
+    var owned = spec
+    if owned.env.vars.len() > 0:
+        let env = move owned.env
+        if owned.cwd.len() > 0:
+            return self.run_capture_cwd_with_env(full_args, stdout_path, stderr_path, timeout, owned.cwd, env)
+        return self.run_capture_with_env(full_args, stdout_path, stderr_path, timeout, env)
+    if owned.cwd.len() > 0:
+        return self.run_capture_cwd(full_args, stdout_path, stderr_path, timeout, owned.cwd)
+    if owned.stdin_path.len() > 0:
+        return self.run_capture_input(full_args, stdout_path, stderr_path, timeout, owned.stdin_path)
     self.run_capture(full_args, stdout_path, stderr_path, timeout)
 
 pub fn ActionCtx.target_name(self: &Self) -> &str:
@@ -2392,8 +2396,8 @@ pub fn Build.download(move self: Self, name: str, spec: Download) -> Build:
     target = target.allow_network()
     target = target.write_scope(build_path_dirname(spec.output_path))
     target = target.write_scope("out/command/" ++ name)
-    target = target.arg(spec.url)
-    target = target.arg(spec.sha256)
+    target = target.arg(with_str_clone_ref(spec.url))
+    target = target.arg(with_str_clone_ref(spec.sha256))
     var out = self
     out.add_target(move target)
 
