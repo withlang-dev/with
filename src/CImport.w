@@ -6946,6 +6946,14 @@ impl CiTypePool:
             if (pointee as i32) == 0:
                 return 0 as CiTypeId
             return self.ty_pointer(pointee, 0)
+        // #1653: `[16]u8` is an array type, not a name — an initializer typed
+        // by it prints as `[…]` and pads to the size (uuid.h's UUID_NULL).
+        if ty.len() > 0 and ty[0] == '[':
+            let elem_text = ci_array_element_type(ty)
+            let elem = self.type_from_translated_text(elem_text)
+            if (elem as i32) != 0:
+                let size = ci_array_length_from_type(ty)
+                return self.ty_array(elem, if size > 0: size else: CI_SIZE_INCOMPLETE)
         let name_idx = self.add_string(ci_unsafe_fn_ptr_type(ty))
         self.ty_named(name_idx)
 
@@ -7162,6 +7170,13 @@ impl CiExprPool:
             return value_id
         let value_kind = self.kind(value_id)
         if value_kind == CiExprKind.CIE_INIT_LIST or value_kind == CiExprKind.CIE_DESIGNATED_INIT:
+            // #1653: an array initializer keeps its array type — it carries
+            // the size the padding used and prints as `[…]`. The translated
+            // text `[16]u8` would become a NAMED type and print
+            // `[16]u8 { 0 }`, which is not With (uuid.h's UUID_NULL).
+            let existing = self.get_type(value_id)
+            if (existing as i32) != 0 and types.kind(existing) == CiTypeKind.CT_ARRAY:
+                return value_id
             let ty_id = types.type_from_translated_text(ty)
             if (ty_id as i32) != 0:
                 self.set_type(value_id, ty_id)
