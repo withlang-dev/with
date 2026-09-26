@@ -8096,6 +8096,12 @@ impl Sema:
                 // Validate format spec against expression type
                 if spec_node != 0:
                     self.validate_fstring_spec(spec_node, expr_ty as i32, expr_node)
+                    // A width, alignment or precision pads the value's
+                    // display (§15.4.8), so the value must have one; only `?`
+                    // formats a struct or collection (#1565: `{point:>8}`
+                    // passed and read the struct as a str header).
+                    if expr_ty != 0 and (self.ast.get_data0(spec_node) & 255) == 0:
+                        self.check_display_interpolant(expr_ty as i32, expr_node)
                 else if expr_ty != 0:
                     self.check_display_interpolant(expr_ty as i32, expr_node)
                 pos = pos + 3  // kind + expr + spec

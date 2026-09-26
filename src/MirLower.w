@@ -3638,8 +3638,18 @@ impl MirBuilder:
                             self.lower_debug_write_place(buf_op, debug_place, resolved_ty, node)
                         handled = true
                     else if spec_mode != 0 or spec_width > 0 or spec_precision >= 0 or (spec_flags & 0x1C0000) != 0:
-                        // Spec formatting: emit FMT_BUF_WRITE_FMT intrinsic
-                        self.lower_fstring_buf_write_fmt(buf_op, expr_op, spec_flags, spec_width, spec_precision, resolved_ty, node)
+                        // Spec formatting: emit FMT_BUF_WRITE_FMT intrinsic.
+                        // The writer pads numbers and strs; every other
+                        // value with a display (bool, an enum, §15.4.8) is
+                        // formatted to its display text first and padded as
+                        // that (#1565: a bool with a width printed `1`, and
+                        // an enum's bytes were read as a str header).
+                        let spec_kind = if resolved_ty != 0: self.sema.get_type_kind(resolved_ty as TypeId) else: TypeKind.TY_ERR
+                        if resolved_ty != 0 and resolved_ty != self.sema.ty_str and spec_kind != TypeKind.TY_INT and spec_kind != TypeKind.TY_FLOAT:
+                            let display_op = self.lower_fmt_to_str(expr_op, node)
+                            self.lower_fstring_buf_write_fmt(buf_op, display_op, spec_flags, spec_width, spec_precision, self.sema.ty_str as i32, node)
+                        else:
+                            self.lower_fstring_buf_write_fmt(buf_op, expr_op, spec_flags, spec_width, spec_precision, resolved_ty, node)
                         handled = true
                 if not handled:
                     if resolved_ty == self.sema.ty_str:
