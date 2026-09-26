@@ -11261,6 +11261,11 @@ the module's declaration table.
 4. The prelude
 5. Unique standard-library fallback
 
+**Within explicit imports, the last one wins.** When two explicit imports
+provide the same name, the import written last in the module shadows the
+others; this is never an ambiguity error. A `use c_import(...)` is an
+import and takes its place in that order.
+
 A user-controlled declaration is never shadowed, merged, or
 impl-captured by the fallback tier. If you define `print` — or `Regex` —
 in a module, uses in that module resolve to your definition.

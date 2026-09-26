@@ -10,6 +10,25 @@ decision supersedes an earlier one, say so in both.
 
 ---
 
+## D70 — Within explicit imports, the last one wins
+
+**Date:** 2026-09-26. **Status:** BDFL ruling (Eric: "Easy. which comes
+last shadows the others.").
+
+#1221: `use c_import("raylib.h")` and `use std.math` both provide `PI`,
+and §18.2's precedence tiers did not order two explicit imports. The
+compiler reported "shadowing is not allowed for 'PI'" even when the
+program never used `PI`, and a raylib program had no way to reach
+std.math's `PI`. Rust lets an explicit `use m::X` shadow a glob; Swift
+lets a scoped import beat a module import. The ruling is simpler than
+either: order decides, as it does for any later binding. The import
+written last shadows the earlier ones; there is no ambiguity error among
+explicit imports. A `c_import` is an import. The tiers are unchanged, and
+D29's std-fallback ambiguity rule (tier 5) is unaffected. Supersedes the
+"a use of an ambiguous name is an error" behavior #1221's first fix took.
+
+---
+
 ## D69 — Generators are push-based: a `gen fn` calls the consumer's loop body at each `yield`
 
 **Date:** 2026-09-26. **Status:** BDFL ruling (Eric: "blessed. proceed",
