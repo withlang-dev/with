@@ -285,6 +285,7 @@ impl Sema:
         self.module_import_counts = sema_new_vec_i32()
         self.module_import_targets = sema_new_vec_i32()
         self.module_import_paths = sema_new_vec_str()
+        self.module_import_selected = sema_new_vec_str()
         self.module_index_by_path = HashMap.new()
         self.global_visible_module_paths = HashMap.new()
         self.module_visibility_cache = HashMap.new()
@@ -300,6 +301,7 @@ impl Sema:
                 if imp.target_module >= 0:
                     self.module_import_targets.push(imp.target_module)
                     self.module_import_paths.push(frontend_owned_text(imp.path_text))
+                    self.module_import_selected.push(frontend_owned_text(imp.selected))
                     visible_count = visible_count + 1
             self.module_import_counts.push(visible_count)
             self.module_index_by_path.insert(frontend_owned_text(mod.path), mod.module_id)

@@ -489,6 +489,7 @@ impl Zcu:
                 index_in_module: imp.index_in_module,
                 kind: imp.kind,
                 path_text: zcu_owned_text(imp.path_text),
+                selected: zcu_owned_text(imp.selected),
                 target_module: imp.target_module,
                 span_start: imp.span_start,
                 span_end: imp.span_end,

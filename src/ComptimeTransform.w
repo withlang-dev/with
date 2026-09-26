@@ -3186,6 +3186,7 @@ impl Sema:
         let saved_module_import_counts = sema_clone_i32_vec(&self.module_import_counts)
         let saved_module_import_targets = sema_clone_i32_vec(&self.module_import_targets)
         let saved_module_import_paths = sema_clone_str_vec(&self.module_import_paths)
+        let saved_module_import_selected = sema_clone_str_vec(&self.module_import_selected)
         let saved_global_module_paths = ct_new_vec_str()
         for smi in 0..saved_module_paths.len() as i32:
             let module_path = saved_module_paths[smi]
@@ -3405,7 +3406,7 @@ impl Sema:
         transform_sema.lint_partial_statement_match = self.lint_partial_statement_match
         transform_sema.bundle_corpus = with_str_clone_ref(self.bundle_corpus)
         transform_sema.interface_eager = self.interface_eager
-        transform_sema.copy_module_graph_parts(&saved_module_paths, &saved_module_import_starts, &saved_module_import_counts, &saved_module_import_targets, &saved_module_import_paths, &saved_global_module_paths)
+        transform_sema.copy_module_graph_parts(&saved_module_paths, &saved_module_import_starts, &saved_module_import_counts, &saved_module_import_targets, &saved_module_import_paths, &saved_module_import_selected, &saved_global_module_paths)
         transform_sema.set_tracked_input_context(self.tracked_input_root, self.tracked_input_paths)
         transform_sema.prepare_for_comptime_transform()
         if transform_sema.diags.has_errors():

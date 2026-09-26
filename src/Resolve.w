@@ -69,6 +69,9 @@ pub type ResolvedImport {
     index_in_module: i32,
     kind: i32,
     path_text: str,
+    // §18.2: the names a named import selects, comma-separated (`use m.X`,
+    // `use m.{X, Y}`); "" for a whole-module import (#1221).
+    selected: str,
     target_module: i32,
     span_start: i32,
     span_end: i32,
@@ -376,11 +379,17 @@ impl ResolveState:
                     target_module = self.reserve_module(resolved_path, resolve_dirname(resolved_path), -1)
                 else:
                     self.emit_import_decl_error(module_id, start, end, import_not_found_message(dotted))
+                var selected = ""
+                for si in 0..pool.get_data2(decl):
+                    selected = selected ++ (if si > 0: "," else: "") ++ self.pool.resolve(resolve_extra_or_zero(pool, path_start + path_count + si))
+                if selected.len() == 0:
+                    selected = resolve_dotted_selection(dotted, resolved_path)
                 self.result.imports.push(ResolvedImport {
                     module_id,
                     index_in_module: import_index,
                     kind: ImportKind.IK_USE,
                     path_text: resolve_owned_text(dotted),
+                    selected,
                     target_module,
                     span_start: start,
                     span_end: end,
@@ -406,6 +415,7 @@ impl ResolveState:
                     index_in_module: import_index,
                     kind: ImportKind.IK_USE,
                     path_text: resolve_owned_text("std.box"),
+                    selected: "",
                     target_module,
                     span_start: start,
                     span_end: end,
@@ -420,6 +430,7 @@ impl ResolveState:
                     index_in_module: import_index,
                     kind: ImportKind.IK_C_IMPORT,
                     path_text: resolve_owned_text(header),
+                    selected: "",
                     target_module: -1,
                     span_start: start,
                     span_end: end,
@@ -1106,6 +1117,7 @@ impl ResolveState:
                 index_in_module: import_index,
                 kind: ImportKind.IK_USE,
                 path_text: resolve_owned_text(dotted),
+                selected: resolve_dotted_selection(dotted, resolved_path),
                 target_module,
                 span_start: 0,
                 span_end: 0,
@@ -1288,6 +1300,17 @@ extern fn with_fs_is_dir(path: &str) -> i32
 // frontend's import pass. It names the module; in a tree that has never been
 // built (no out/gen) it also says that generated modules need one
 // `with build` — the miss that cost a debugger session to bisect.
+// A dotted import that resolved to its parent's file (`use std.math.TAU` is
+// std/math.w) names its last segment; one that resolved to its own file
+// (`use std.math`) imports the whole module.
+fn resolve_dotted_selection(dotted: &str, resolved_path: &str) -> str:
+    var last_dot = -1
+    for i in 0..dotted.len() as i32:
+        if dotted[i] == '.': last_dot = i
+    if last_dot <= 0 or resolved_path.len() == 0 or resolved_path.replace("\\", "/").ends_with(dotted.replace(".", "/") ++ ".w"):
+        return ""
+    dotted.slice(last_dot + 1, dotted.len())
+
 pub fn import_not_found_message(dotted: &str) -> str:
     var msg = "import module not found: '" ++ dotted ++ "'"
     if with_fs_is_dir("out/gen") == 0:
