@@ -182,6 +182,11 @@ fn sema_path_is_user_lint_source(path: &str) -> i32:
     // iterations). Advice belongs in modules, not pipelines.
     if path.starts_with("<cli "):
         return 0
+    // #1590: a `<c_import …>` translation is the compiler's rendering of a C
+    // header; advice about its `unsafe` blocks reaches nobody who can edit
+    // them.
+    if path.starts_with("<c_import "):
+        return 0
     1
 
 fn sema_extern_is_compiler_implementation(name: &str, path: &str) -> i32:
@@ -1961,7 +1966,12 @@ impl Sema:
                 if sema_path_is_user_lint_source(path) == 0:
                     continue
                 let node: i32 = self.global_race_access_nodes[i]
-                self.emit_warning("unsafe global access is currently covered by the single-thread proof; keep `unsafe` only if future concurrency is intended", node)
+                // #1590: this pass runs after every body, so the current source
+                // context is whatever file was checked last; the access's own
+                // recorded file locates it (emit_global_data_race_error's shape).
+                var diag = Diagnostic.warn("unsafe global access is currently covered by the single-thread proof; keep `unsafe` only if future concurrency is intended", Span { file: self.global_race_access_files[i], start: self.ast.get_start(node), end: self.ast.get_end(node) })
+                diag.set_origin(__FILE__, __FN__, __LINE__ as i32, node)
+                self.diags.emit(move diag)
 
     mut fn generator_push_state_field(state_tid: i32, field_count: i32, sym: i32, tid: i32, report_node: i32) -> i32:
         if sym == 0 or sym == self.discard_sym:
