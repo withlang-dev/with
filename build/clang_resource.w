@@ -11,6 +11,7 @@ module build.clang_resource
 
 use std.build
 use build.compiler
+use std.sysinfo.arch
 fn clang_resource_owned_text(s: &str): s ++ ""
 
 fn cr_fail(ctx: &ActionCtx, message: &str) -> i32:
