@@ -17751,6 +17751,15 @@ impl Sema:
         if module_path.len() == 0:
             return -1
         let pkg_name: str = with_str_clone_ref(self.pool_resolve(pkg_sym))
+        // `pkg.m(...)` is a qualified extension call only when the module
+        // declares an extension method `m`. A module alias that merely shares
+        // its name with a type the module does not declare (a facade whose
+        // re-export no longer carries under §18.2's non-transitive imports,
+        // #1708: `use Compilation; Compilation.init()`) falls through, so the
+        // ordinary path names the unresolved type instead of demanding a
+        // receiver for a method that does not exist.
+        if not self.module_declares_extension_method(method_sym, module_path, pkg_name):
+            return -1
         let method_name: str = with_str_clone_ref(self.pool_resolve(method_sym))
         if arg_count <= 0:
             self.emit_error("qualified extension method '" ++ pkg_name ++ "." ++ method_name ++ "' requires a receiver argument", node)
@@ -27718,6 +27727,14 @@ impl Sema:
             if self.extension_method_owner_syms[i] == owner_sym and self.extension_method_syms[i] == method_sym and sema_extension_module_path_matches(self.extension_method_paths[i], module_path, alias) != 0:
                 return self.extension_method_fn_syms[i]
         0
+
+    // Whether the module declares an extension method named `method_sym` on
+    // any owner type.
+    fn module_declares_extension_method(method_sym: i32, module_path: &str, alias: &str) -> bool:
+        for i in 0..self.extension_method_owner_syms.len() as i32:
+            if self.extension_method_syms[i] == method_sym and sema_extension_module_path_matches(self.extension_method_paths[i], module_path, alias) != 0:
+                return true
+        false
 
     fn extension_sig_for_module(owner_sym: i32, method_sym: i32, module_path: &str, alias: &str) -> i32:
         for i in 0..self.extension_method_owner_syms.len() as i32:
