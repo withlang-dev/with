@@ -1397,13 +1397,15 @@ type MirDropStateMap {
 fn mir_drop_state_join(a: i32, b: i32) -> i32:
     if a == b:
         return a
-    // A blanked place beside an initialized one is a guarded drop (Maybe);
-    // beside a moved one the moved path is the unsafe one (MaybeMoved);
-    // beside untouched memory the sentinel is not there (MaybeGarbage).
+    // A blanked place beside a live one is the live one: the drop glue frees
+    // nothing on the blanked path, so the join drops and moves as the live
+    // path does. Beside a moved one the moved path is the unsafe one
+    // (MaybeMoved); beside untouched memory the sentinel is not there
+    // (MaybeGarbage).
     if a == MirDropState.Reset or b == MirDropState.Reset:
         let other = if a == MirDropState.Reset: b else: a
         if other == MirDropState.Init or other == MirDropState.Maybe:
-            return MirDropState.Maybe
+            return other
         if other == MirDropState.Moved or other == MirDropState.MaybeMoved:
             return MirDropState.MaybeMoved
         return MirDropState.MaybeGarbage
@@ -1551,6 +1553,9 @@ impl MirDropStateMap:
             // not a value: a moved or dropped place becomes Reset; reading the
             // blank as re-initialization made every moved-out local `Init` at
             // the return and hid the leaks from the validator (#1384, #1488).
+            // Every lowering site blanks a place it has moved from, some after
+            // its StorageDead (`_11 = agg(move _4); StorageDead(_4); _4 = zst`),
+            // so an Uninit place blanks to Reset too.
             if mir_rvalue_is_zero_fill(body, d1) != 0 and self.place(keys, d0) != MirDropState.Init:
                 self.mark_place(keys, body, d0, MirDropState.Reset)
             else:
