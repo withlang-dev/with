@@ -20332,6 +20332,84 @@ impl Sema:
                 return 0
         self.setup_generic_inst_substitution(expected as i32, owner_sym)
 
+    // Whether a type expression names `sym` anywhere. A kind this walk does
+    // not know (fn types, trait objects, @TypeOf) counts as naming it, so a
+    // caller that must not resolve an unbound parameter stays out.
+    fn type_node_mentions_sym(node: i32, sym: i32) -> bool:
+        if node == 0:
+            return false
+        let kind = self.ast.kind(node)
+        if kind == NodeKind.NK_TYPE_NAMED:
+            return self.ast.get_data0(node) == sym
+        if kind == NodeKind.NK_TYPE_REF or kind == NodeKind.NK_TYPE_PTR or kind == NodeKind.NK_TYPE_ARRAY or kind == NodeKind.NK_TYPE_SLICE or kind == NodeKind.NK_TYPE_OPTIONAL:
+            return self.type_node_mentions_sym(self.ast.get_data0(node), sym)
+        if kind == NodeKind.NK_TYPE_TUPLE:
+            let start = self.ast.get_data0(node)
+            for ei in 0..self.ast.get_data1(node):
+                if self.type_node_mentions_sym(self.ast.get_extra(start + ei), sym):
+                    return true
+            return false
+        if kind == NodeKind.NK_TYPE_GENERIC:
+            if self.ast.get_data0(node) == sym:
+                return true
+            let start = self.ast.get_data1(node)
+            for gi in 0..self.ast.get_data2(node):
+                if self.type_node_mentions_sym(self.ast.get_extra(start + gi), sym):
+                    return true
+            return false
+        true
+
+    // Whether a type expression names a parameter of the list that has no
+    // substitution yet.
+    fn type_node_mentions_unbound_type_param(node: i32, tp_start: i32, tp_count: i32) -> bool:
+        var pos = tp_start
+        for ti in 0..tp_count:
+            let tp_name = self.ast.get_extra(pos)
+            if self.lookup_generic_subst(tp_name) == 0 and self.type_node_mentions_sym(node, tp_name):
+                return true
+            pos = pos + 2 + self.ast.get_extra(pos + 1)
+        false
+
+    // §4.2.1: the parameter type at the call site of a static generic method
+    // whose owner the expected type instantiates, `Box.new(Wrap { inner: 1,
+    // tag: 33 })` under `let bw: Box[Wrap[i64]]` (#1569). The argument is
+    // checked against the instantiated parameter, so its literals take that
+    // type; 0 when the parameter still mentions an unbound type parameter.
+    mut fn static_generic_method_expected_arg_type(owner_type: i32, field: i32, arg_index: i32) -> i32:
+        let owner_sym = self.method_owner_symbol_for_type(owner_type)
+        if owner_sym == 0 or not self.type_decl_nodes.contains(owner_sym):
+            return 0
+        let method_fn = self.lookup_generic_method_fn(owner_sym, field)
+        if method_fn == 0:
+            return 0
+        let fn_node = self.generic_fn_node_for_symbol(method_fn)
+        if fn_node == 0:
+            return 0
+        let meta = self.ast.find_fn_meta(fn_node)
+        if meta < 0 or arg_index >= self.ast.fn_meta_param_count(meta):
+            return 0
+        let td_node: i32 = self.type_decl_nodes.get(owner_sym).unwrap()
+        let owner_tp_start = self.type_decl_tp_start(td_node)
+        let owner_tp_count = self.type_decl_tp_count(td_node)
+        if owner_tp_count == 0:
+            return 0
+        let saved_syms = sema_clone_i32_vec(&self.generic_subst_param_syms)
+        let saved_tys = sema_clone_i32_vec(&self.generic_subst_type_ids)
+        self.clear_generic_substitution()
+        let owner_resolved = self.resolve_alias(owner_type as TypeId)
+        let bound = if self.get_type_kind(owner_resolved) == TypeKind.TY_GENERIC_INST and self.get_generic_inst_base(owner_resolved as i32) == owner_sym:
+            self.setup_generic_inst_substitution(owner_resolved as i32, owner_sym)
+        else:
+            self.generic_method_bind_owner_from_expected(owner_sym)
+        let param_node = self.ast.fn_param_type(self.ast.fn_meta_param_start(meta), arg_index)
+        let expected = if bound == 0 or param_node == 0: 0
+            else if self.type_node_mentions_unbound_type_param(param_node, owner_tp_start, owner_tp_count): 0
+            else if self.type_node_mentions_unbound_type_param(param_node, self.ast.fn_meta_tp_start(meta), self.ast.fn_meta_tp_count(meta)): 0
+            else: self.resolve_type_node_with_current_subst(param_node, 0)
+        self.generic_subst_param_syms = saved_syms
+        self.generic_subst_type_ids = saved_tys
+        expected
+
     mut fn bind_type_params_from_self_receiver(arg_tid: i32, tp_start: i32, tp_count: i32, err_node: i32):
         if arg_tid == 0 or tp_count == 0:
             return
@@ -23015,6 +23093,8 @@ impl Sema:
             var mc_expected = self.atomic_method_expected_arg_type(mc_order_type, field, ai)
             if mc_expected == 0:
                 mc_expected = self.method_expected_arg_type(obj_type as i32, field, ai)
+            if mc_expected == 0 and static_type_sym != 0 and self.static_receiver_type_is_known(expr) != 0:
+                mc_expected = self.static_generic_method_expected_arg_type(obj_type as i32, field, ai)
             if mc_expected == 0 and field == self.syms.spawn_method and ai == 0:
                 if self.ast.kind(expr) == NodeKind.NK_IDENT and self.is_active_sync_scope_symbol(self.ast.get_data0(expr)) != 0:
                     let spawn_params: Vec[i32] = Vec.new()
