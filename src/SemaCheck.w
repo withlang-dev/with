@@ -14,6 +14,7 @@ use render
 use MathBuiltins
 use std.builtins.int_to_string
 use std.regex.Regex
+use SemaTypes
 
 extern fn with_str_clone_ref(s: &str) -> str
 extern fn with_write(s: &str) -> Unit

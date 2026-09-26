@@ -2,6 +2,7 @@
 // The data model and ownership validator live in MirCore without Sema/LLVM.
 use MirCore
 use Sema
+use InternPool
 
 impl MirModule:
     mut fn snapshot_sema_types(sema: &Sema):

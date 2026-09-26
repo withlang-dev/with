@@ -15,6 +15,7 @@ use CImport
 use std.collections.HashMap
 use std.string.StringBuilder
 use MathBuiltins
+use MirCore
 
 extern fn with_str_clone_ref(s: &str) -> str
 extern fn with_fs_read_file(path: &str) -> str

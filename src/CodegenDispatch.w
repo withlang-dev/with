@@ -10,6 +10,7 @@ use Overflow
 use AnalysisTypes
 use MathBuiltins
 use std.builtins.int_to_string
+use MirCore
 
 extern fn with_str_clone_ref(s: &str) -> str
 extern fn with_eprint(s: &str) -> Unit

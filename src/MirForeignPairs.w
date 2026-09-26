@@ -25,6 +25,7 @@ use Span
 use ForeignPairState
 use std.collections.HashMap
 use std.builtins.eprint
+use MirCore
 
 extern fn with_getenv_str(name: &str) -> str
 

@@ -10,6 +10,7 @@ use Sema
 use AsyncMir
 use Diagnostic
 use Span
+use MirCore
 
 type AsyncSnapshot {
     live_locals: i32,

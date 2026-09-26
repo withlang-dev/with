@@ -40,6 +40,8 @@ use Analysis
 use ReceiverMigration
 use Uat
 use TargetSpec
+use compiler.Compilation
+use compiler.ProjectConfig
 
 extern fn with_arg_count() -> i32
 extern fn with_str_clone_ref(s: &str) -> str

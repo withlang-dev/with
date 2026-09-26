@@ -10,6 +10,7 @@ use Diagnostic
 use InternPool
 use Mir
 use Sema
+use MirCore
 
 extern fn with_str_clone_ref(s: &str) -> str
 extern fn with_getenv_str(name: &str) -> str

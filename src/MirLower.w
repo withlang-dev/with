@@ -9,6 +9,7 @@ use Sema
 use SemaCheck
 use Overflow
 use MathBuiltins
+use MirCore
 extern fn with_str_clone_ref(s: &str) -> str
 extern fn with_eprint(s: &str) -> Unit
 

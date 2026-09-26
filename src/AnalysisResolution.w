@@ -25,6 +25,7 @@ use Ast
 use InternPool
 use Mir
 use Sema
+use MirCore
 
 extern fn with_str_clone_ref(s: &str) -> str
 

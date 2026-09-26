@@ -9,6 +9,7 @@ use Source
 use Overflow
 use AnalysisTypes
 use compiler.TrackedInputs
+use MirCore
 
 extern fn with_str_clone_ref(s: &str) -> str
 extern fn with_eprint(s: &str) -> Unit

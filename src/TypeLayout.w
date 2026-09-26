@@ -1,6 +1,7 @@
 use Sema
 use Ast
 use TargetSpec
+use SemaTypes
 
 // #1104: C's va_list has the target's own size — a pointer on Darwin and
 // Windows (char *), 24 bytes on SysV x86_64 (__va_list_tag[1]), 32 bytes on

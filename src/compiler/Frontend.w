@@ -29,6 +29,7 @@ use compiler.ProjectConfig
 use compiler.Runtime
 use compiler.TrackedInputs
 use compiler.Zcu
+use InternPool
 // Frontend pipeline: lex -> parse -> import resolution -> sema.
 
 var frontend_cimport_compiler_fingerprint_ready: i32 = 0

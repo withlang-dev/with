@@ -12,6 +12,7 @@ use compiler.Runtime
 use compiler.TrackedInputs
 use compiler.EmbeddedRuntime
 use std.collections.HashMap
+use MirCore
 extern fn with_str_clone_ref(s: &str) -> str
 
 fn zcu_owned_text(text: &str) -> str:
