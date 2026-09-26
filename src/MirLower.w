@@ -5330,7 +5330,13 @@ impl MirBuilder:
             // Sema already typed as the callable itself, yields the code
             // address.
             let ref_res = self.sema.resolve_alias(ref_ty as TypeId)
-            let ref_to_fn = op == UnaryOp.UOP_REF and self.sema.get_type_kind(ref_res) == TypeKind.TY_REF
+            // `&f` handed to a `*const fn(...)` (a raw C function pointer:
+            // `let fp: *const fn(i64) -> i64 = &take_i64`, a struct field, a
+            // call argument) is the code address, whatever Sema typed the
+            // reference expression itself.
+            let expected_res = if self.expected_type != 0: self.sema.resolve_alias(self.expected_type as TypeId) else: 0 as TypeId
+            let expects_raw_fn_ptr = self.expected_type != 0 and self.sema.get_type_kind(expected_res) == TypeKind.TY_PTR
+            let ref_to_fn = op == UnaryOp.UOP_REF and self.sema.get_type_kind(ref_res) == TypeKind.TY_REF and not expects_raw_fn_ptr
             let fn_ty = if ref_to_fn: self.sema.get_type_d0(ref_res) as i32 else: ref_ty
             let fn_addr = self.lower_fn_address(expr, fn_ty)
             if fn_addr >= 0:
