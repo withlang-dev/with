@@ -17202,21 +17202,9 @@ impl Sema:
         let slice_mismatch = self.report_fixed_array_slice_mismatch(pattern, val_type as i32)
         if else_body == 0 and not slice_mismatch and self.pattern_is_refutable_for(pattern, val_type as i32) != 0:
             self.emit_error("let ... else requires an else branch for refutable patterns", node)
-        self.pattern_subject_node = value
-        // §9.7: `var PATTERN = ...` binds every name it introduces mutably (#1354).
-        let saved_bind_mut = self.pattern_bind_mut
-        self.pattern_bind_mut = self.ast.let_pattern_is_mut(node)
-        self.check_pattern(pattern, val_type as i32)
-        self.pattern_bind_mut = saved_bind_mut
-        self.pattern_subject_node = 0
-        self.record_pattern_view_bindings(pattern, value)
-        // #782 arm 2: a pattern let over an owned subject EXTRACTS by value —
-        // MIR moves the bound elements out, so a later use of the subject
-        // (`t.1` after `let (a, b) = t`) reads blanked storage.
-        // mark_moved_if_consumed's gates keep Copy and view subjects live.
-        // #1302: only when a binding takes an owned value; a pattern that
-        // binds nothing non-Copy observes the subject in place.
-        self.mark_pattern_subject_consumed(node, pattern, value, val_type as i32)
+        // The else branch runs only when the pattern did not match, so nothing
+        // the pattern binds exists there: check it before the pattern binds
+        // its names into this scope (#1476).
         if else_body != 0:
             // §2.2/§9.7: the else branch diverges, so a value it moves is
             // still live on the path that continues past the let-else — the
@@ -17236,6 +17224,21 @@ impl Sema:
             let else_kind = self.get_type_kind(self.resolve_alias(else_ty as TypeId))
             if else_kind != TypeKind.TY_NEVER:
                 self.emit_error("let ... else requires a diverging else branch", else_body)
+        self.pattern_subject_node = value
+        // §9.7: `var PATTERN = ...` binds every name it introduces mutably (#1354).
+        let saved_bind_mut = self.pattern_bind_mut
+        self.pattern_bind_mut = self.ast.let_pattern_is_mut(node)
+        self.check_pattern(pattern, val_type as i32)
+        self.pattern_bind_mut = saved_bind_mut
+        self.pattern_subject_node = 0
+        self.record_pattern_view_bindings(pattern, value)
+        // #782 arm 2: a pattern let over an owned subject EXTRACTS by value —
+        // MIR moves the bound elements out, so a later use of the subject
+        // (`t.1` after `let (a, b) = t`) reads blanked storage.
+        // mark_moved_if_consumed's gates keep Copy and view subjects live.
+        // #1302: only when a binding takes an owned value; a pattern that
+        // binds nothing non-Copy observes the subject in place.
+        self.mark_pattern_subject_consumed(node, pattern, value, val_type as i32)
         self.ty_void as i32
 
     // Refutability against the subject's type (§9.7). The type is what
