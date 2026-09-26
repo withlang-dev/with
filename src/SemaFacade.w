@@ -15,6 +15,7 @@ use Sema
 use Ast
 use InternPool
 use Diagnostic
+use ForeignPairState
 use compiler.FacadeRender
 
 impl Sema:
@@ -35,10 +36,12 @@ impl Sema:
         self.verify_facade_nullable_items()
         self.verify_facade_buffers()
         self.verify_facade_variadic_items()
+        self.verify_facade_abandon()
         self.verify_facade_borrowed_returns()
         self.verify_facade_text_views()
         self.verify_facade_callback_items()
         self.facade_index_call_effects()
+        self.facade_index_pair_ops()
 
     // Stage 4a/4b: the facade-level checks that need every facade's facts (an
     // fn item may describe a destroyer from a block declared after the
@@ -692,7 +695,7 @@ impl Sema:
         let repr_tid = self.resolve_type_expr(repr_node) as i32
         if repr_tid == 0:
             return
-        var r = FacadeResource { name, facade, node: item, decl, repr_tid, producers: Vec.new(), out_params: Vec.new(), init: 0, preinit: 0, drop: 0, destroyers: Vec.new(), ok_const: 0, borrows: Vec.new(), borrows_owner: Vec.new(), borrows_nodes: Vec.new(), last_producer: -2, independent: 0, independent_node: 0, movable: 0, thread_caps: 0 }
+        var r = FacadeResource { name, facade, node: item, decl, repr_tid, producers: Vec.new(), out_params: Vec.new(), init: 0, preinit: 0, drop: 0, destroyers: Vec.new(), ok_const: 0, borrows: Vec.new(), borrows_owner: Vec.new(), borrows_nodes: Vec.new(), last_producer: -2, independent: 0, independent_node: 0, movable: 0, thread_caps: 0, abandon: 0, abandon_node: 0 }
         for ci in 0..clause_count:
             let clause = self.ast.get_extra(extra_start + 1 + ci)
             r = self.collect_resource_clause(rname, move r, clause)
@@ -817,6 +820,24 @@ impl Sema:
         if kind == FACADE_CLAUSE_MOVABLE:
             r.movable = 1
             return r
+        if kind == FACADE_CLAUSE_ABANDON:
+            // `abandon <fn>` (§16.2b.9): that the operation is the resource's
+            // own and `callbacks none` is verified once every fn item's
+            // contract is collected (verify_facade_abandon).
+            let f = self.ast.get_extra(ops)
+            let sig = self.facade_fn_sig(f, clause)
+            if sig < 0:
+                return r
+            if not self.facade_accepts_repr(sig, r.repr_tid):
+                let fnm: str = self.pool_resolve(f)
+                self.emit_error(f"resource '{rname}': 'abandon {fnm}' does not take the representation as its first parameter; the abandonment path is one of the resource's own operations (§16.2b.9)", clause)
+                return r
+            if r.abandon != 0:
+                self.emit_error(f"resource '{rname}': 'abandon' is stated twice; a resource has one abandonment path (§16.2b.9)", clause)
+                return r
+            r.abandon = f
+            r.abandon_node = clause
+            return r
         if kind == FACADE_CLAUSE_THREAD:
             let cap_count = self.ast.get_data2(clause)
             for i in 0..cap_count:
@@ -854,7 +875,7 @@ impl Sema:
                 return
             self.emit_error(f"fn '{fname}' is described by two facade blocks with different clauses; one function has one contract — restate it word for word or describe it once (§16.2b)", item)
             return
-        var c = ForeignContract { fn_sym, decl, facade, node: item, lend: 0, destroys: 0, consumes: Vec.new(), consumes_destroyed_by: Vec.new(), retains: Vec.new(), retains_by: Vec.new(), returns_borrow_resource: 0, returns_borrow_from: -1, returns_borrow_domain: 0, returns_static_tid: 0, preserves_params: Vec.new(), preserves_domains: Vec.new(), of_resource: 0, rename: 0, callback_thread_any: 0, callback_consumes: Vec.new(), callback_userdata_cb: Vec.new(), callback_userdata_of: Vec.new(), valid_on_failed: 0, nullable_params: Vec.new(), buffer_ptr: Vec.new(), buffer_len: Vec.new(), buffer_inout: Vec.new(), buffer_elements: Vec.new(), fixed_params: Vec.new(), fixed_literals: Vec.new(), ok_const: 0, variadic_node: 0, variadic_selector: -1, variadic_case_syms: Vec.new(), variadic_case_values: Vec.new(), variadic_case_tids: Vec.new(), variadic_case_kinds: Vec.new(), returns_borrow_record: 0 }
+        var c = ForeignContract { fn_sym, decl, facade, node: item, lend: 0, destroys: 0, consumes: Vec.new(), consumes_destroyed_by: Vec.new(), retains: Vec.new(), retains_by: Vec.new(), returns_borrow_resource: 0, returns_borrow_from: -1, returns_borrow_domain: 0, returns_static_tid: 0, preserves_params: Vec.new(), preserves_domains: Vec.new(), of_resource: 0, rename: 0, callback_thread_any: 0, callbacks_none: 0, callback_consumes: Vec.new(), callback_userdata_cb: Vec.new(), callback_userdata_of: Vec.new(), valid_on_failed: 0, nullable_params: Vec.new(), buffer_ptr: Vec.new(), buffer_len: Vec.new(), buffer_inout: Vec.new(), buffer_elements: Vec.new(), fixed_params: Vec.new(), fixed_literals: Vec.new(), ok_const: 0, variadic_node: 0, variadic_selector: -1, variadic_case_syms: Vec.new(), variadic_case_values: Vec.new(), variadic_case_tids: Vec.new(), variadic_case_kinds: Vec.new(), variadic_slots: Vec.new(), returns_borrow_record: 0 }
         let extra_start = self.ast.get_data1(item)
         let clause_count = self.ast.get_data2(item)
         for ci in 0..clause_count:
@@ -870,6 +891,9 @@ impl Sema:
         let ops = self.ast.get_data1(clause)
         if kind == FACADE_CLAUSE_LEND:
             c.lend = 1
+            return c
+        if kind == FACADE_CLAUSE_CALLBACKS_NONE:
+            c.callbacks_none = clause
             return c
         if kind == FACADE_CLAUSE_DESTROYS:
             if self.sig_get_param_count(sig) == 0:
@@ -1315,7 +1339,14 @@ impl Sema:
                     return c
                 let rt = self.resolve_alias(tid as TypeId)
                 var ckind = 0
-                if rt == self.ty_str: ckind = FACADE_VARIADIC_STR
+                let callback_ref = self.ast.get_extra(cops + 2)
+                let retainer_ref = self.ast.get_extra(cops + 4)
+                if callback_ref != 0 or retainer_ref != 0:
+                    let slot = self.facade_resolve_variadic_slot(fn_sym, sig, case_node, tid, k)
+                    if slot.resource < 0: return c
+                    c.variadic_slots.push(slot)
+                    ckind = if callback_ref != 0: FACADE_VARIADIC_CALLBACK else: FACADE_VARIADIC_RETAINED
+                else if rt == self.ty_str: ckind = FACADE_VARIADIC_STR
                 else if self.get_type_kind(self.numeric_operand_type(rt as i32)) == TypeKind.TY_INT: ckind = FACADE_VARIADIC_SCALAR
                 if ckind == 0:
                     let tn: str = self.type_name(tid)
@@ -1326,8 +1357,37 @@ impl Sema:
                 c.variadic_case_values.push(value)
                 c.variadic_case_tids.push(tid)
                 c.variadic_case_kinds.push(ckind)
+                if ckind == FACADE_VARIADIC_CALLBACK:
+                    // A callback case installs the callback for later
+                    // calls, so it states its retention — never inferred
+                    // (§16.2b.9) — and its paired userdata setter is
+                    // implied by the pairing (§16.2b.5): the selector
+                    // `userdata param CONST` names, taking `&U`.
+                    if retainer_ref == 0:
+                        self.emit_error(f"fn '{fname}': 'case {sn}' installs a callback the library keeps for later calls; state its retention: '… userdata param CONST retains by param 0' (§16.2b.5, §16.2b.9)", case_node)
+                        return c
+                    let slot = &c.variadic_slots[c.variadic_slots.len() as i32 - 1]
+                    let ud_sel = slot.userdata_selector
+                    let ud_value = slot.userdata_value
+                    for j in 0..c.variadic_case_syms.len() as i32:
+                        if c.variadic_case_syms[j] == ud_sel or c.variadic_case_values[j] == ud_value:
+                            let un: str = self.pool_resolve(ud_sel)
+                            let on: str = self.pool_resolve(c.variadic_case_syms[j])
+                            self.emit_error(f"fn '{fname}': 'case {sn}' pairs its userdata with {un}, whose setter the pairing implies, and 'case {on}' lists that selector value too; leave the userdata case out (§16.2b.5)", case_node)
+                            return c
+                    c.variadic_case_syms.push(ud_sel)
+                    c.variadic_case_values.push(ud_value)
+                    c.variadic_case_tids.push(tid)
+                    c.variadic_case_kinds.push(FACADE_VARIADIC_USERDATA)
             c.variadic_node = clause
             c.variadic_selector = p
+            // A retained pointer case (`<type> retains by param N`, curl's
+            // CURLOPT_POSTFIELDS) is not modeled yet: the caller's storage
+            // would have to outlive the resource as a C string (§16.3c).
+            for si in 0..c.variadic_slots.len() as i32:
+                if c.variadic_slots[si].callback_type == 0:
+                    self.emit_error("a retained pointer case of a variadic contract ('case CONST: <type> retains by param N') is not modeled yet (#1652); leave the case out and set that option through the raw function under unsafe (§16.2b.5)", c.variadic_slots[si].clause)
+                    return c
             return c
         if kind == FACADE_CLAUSE_OK:
             // `ok CONST` on an fn item (D64, §16.2b.8): the status contract
@@ -1567,6 +1627,64 @@ impl Sema:
         false
 
     // ── discriminated variadic contracts (D66, spec §16.2b.5) ──────────────
+
+    // Resolve the trusted declaration once, before any presented call is
+    // checked. A case name cannot supply a callback ABI or retaining owner.
+    mut fn facade_resolve_variadic_slot(fn_sym: i32, sig: i32, node: i32, tid: i32, case_index: i32) -> ForeignVariadicSlot:
+        var result = ForeignVariadicSlot { case_index, clause: node, resource: -1, retainer_param: -1, callback_type: 0, callback_userdata: -1, userdata_selector: 0, userdata_value: 0 }
+        let ops = self.ast.get_data1(node)
+        let callback_ref = self.ast.get_extra(ops + 2)
+        let retainer_ref = self.ast.get_extra(ops + 4)
+        let owner = if retainer_ref == 0: 0 else: self.facade_resolve_param(retainer_ref, fn_sym, sig)
+        if owner < 0: return result
+        if callback_ref != 0:
+            if self.facade_ref_index_only(callback_ref) != self.sig_get_param_count(sig):
+                self.emit_error("a variadic callback names the variadic argument position, not a fixed parameter (§16.2b.5)", node)
+                return result
+            let callable = self.callable_type_resolved(tid)
+            if callable == 0 or self.get_type_kind(callable) != TypeKind.TY_EXTERN_FN:
+                self.emit_error("a variadic callback's explicit 'as' type must be a C function pointer (§16.2b.5)", node)
+                return result
+            var slots = 0
+            for pi in 0..self.get_type_d1(callable):
+                if self.facade_type_is_void_ptr(self.type_extra[self.get_type_d0(callable) + pi]):
+                    slots = slots + 1
+                    result.callback_userdata = pi
+            if slots != 1:
+                self.emit_error("a variadic callback's C signature must have exactly one 'void *' userdata parameter (§16.2b.9)", node)
+                return result
+            let paired_ref = self.ast.get_extra(ops + 3)
+            if self.ast.get_data0(paired_ref) != FACADE_PARAM_REF_NAME:
+                self.emit_error("a variadic callback's userdata names an imported selector constant, not a parameter index (§16.2b.5)", node)
+                return result
+            let paired_sym = self.ast.get_data1(paired_ref)
+            let paired_decl = self.facade_const_decl(paired_sym)
+            if paired_decl == 0:
+                self.emit_error("a variadic callback's userdata selector names no imported integer constant (§16.2b.5)", node)
+                return result
+            let paired_tid = self.facade_const_decl_type(paired_decl)
+            if paired_tid == 0 or self.get_type_kind(self.numeric_operand_type(self.resolve_alias(paired_tid))) != TypeKind.TY_INT:
+                self.emit_error("a variadic callback's userdata selector must be an imported integer constant (§16.2b.5)", node)
+                return result
+            result.callback_type = callable
+            result.userdata_selector = paired_sym
+            result.userdata_value = self.facade_const_int_value(self.ast.get_data1(paired_decl))
+            let selector_decl = self.facade_const_decl(self.ast.get_extra(ops))
+            if result.userdata_value == self.facade_const_int_value(self.ast.get_data1(selector_decl)):
+                self.emit_error("a variadic callback and its userdata need distinct selector values (§16.2b.5)", node)
+                return result
+        else:
+            let resolved = self.resolve_alias(tid)
+            if resolved != self.ty_str and self.get_type_kind(resolved) != TypeKind.TY_PTR:
+                self.emit_error("a retained variadic case describes pointer storage, not a scalar value (§16.2b.5)", node)
+                return result
+        let resources = self.facade_param_receives(fn_sym, owner)
+        if resources.len() != 1:
+            self.emit_error("a retained variadic case needs one modeled resource for its retaining parameter (§16.2b.5)", node)
+            return result
+        result.retainer_param = owner
+        result.resource = resources[0]
+        result
     //
     // A `param N` reference's index, or -1 for a reference by name or type:
     // the variadic position has no name to resolve against the signature.
@@ -1707,7 +1825,11 @@ impl Sema:
                 for k in 0..case_count:
                     let cname = self.facade_variadic_case_name(mname, ci, k)
                     let mtext = host ++ "." ++ cname
-                    if not self.sig_text_index.contains(mtext):
+                    // A callback or userdata setter is generic in `U`: a
+                    // template node, not a concrete signature.
+                    let msym = self.pool_lookup_symbol(mtext)
+                    let generic = msym != 0 and self.generic_fn_node_for_symbol(msym) != 0
+                    if not self.sig_text_index.contains(mtext) and not generic:
                         self.emit_error(f"fn '{fname}': its variadic contract passed every facade check but no method '{mtext}' was rendered — a compiler defect (§16.2b.5)", node)
                         break
                 self.facade_variadic_ops.insert(host ++ "." ++ mname, ci)
@@ -1730,6 +1852,39 @@ impl Sema:
                     self.emit_error(f"fn '{fname}': its variadic contract passed every facade check but no '{cname}' was rendered — a compiler defect (§16.2b.5)", node)
                     break
             self.facade_variadic_ops.insert(presented, ci)
+
+    // `abandon <fn>` on a resource (§16.2b.9): the named operation must be
+    // one the resource presents — a lend hosted by it, not its producer,
+    // initializer, drop or destroyer — and itself `callbacks none`, so the
+    // abandonment path cannot invoke an incomplete pair. Any other
+    // operation is refused; nothing about the path is inferred from a name.
+    mut fn verify_facade_abandon():
+        for ri in 0..self.facade_resources.len() as i32:
+            let f = self.facade_resources[ri].abandon
+            if f == 0:
+                continue
+            self.update_decl_source_context(self.facade_resources[ri].decl)
+            let rname: str = self.pool_resolve(self.facade_resources[ri].name)
+            let fnm: str = self.pool_resolve(f)
+            let node = self.facade_resources[ri].abandon_node
+            if self.facade_fn_is_resource_op(f):
+                self.emit_error(f"resource '{rname}': 'abandon {fnm}' names the resource's producer, initializer, drop or destroyer; the abandonment path is an operation that leaves the resource live with its callback setup undone (§16.2b.9)", node)
+                continue
+            let hosts = self.facade_method_host(f)
+            if hosts.len() != 1 or hosts[0] != ri:
+                self.emit_error(f"resource '{rname}': 'abandon {fnm}' is not an operation of '{rname}' (its first parameter does not receive this resource) (§16.2b.9)", node)
+                continue
+            let asig = self.get_sig(f)
+            if asig >= 0 and self.sig_get_param_count(asig) != 1:
+                let n = self.sig_get_param_count(asig)
+                self.emit_error(f"resource '{rname}': 'abandon {fnm}' takes {n} parameters; the abandonment path takes only the representation, since generated cleanup has nothing else to pass it (§16.2b.9)", node)
+                continue
+            var ci = -1
+            for k in 0..self.foreign_contracts.len() as i32:
+                if self.facade_same_fn(self.foreign_contracts[k].fn_sym, f): ci = k
+            if ci < 0 or self.foreign_contracts[ci].callbacks_none == 0:
+                self.emit_error_with_help(f"resource '{rname}': 'abandon {fnm}' names an operation that may invoke callbacks, so it cannot safely abandon an incomplete callback pair (§16.2b.9)", node, f"describe '{fnm}' with an fn item stating 'callbacks none' when verified foreign-library evidence guarantees it invokes none")
+                continue
 
     // The case a call's selector argument picks, as the symbol of the
     // rendered case method or function, or 0 with the refusal reported:
@@ -1820,6 +1975,7 @@ fn facade_clause_name(kind: i32) -> str:
     if kind == FACADE_CLAUSE_BORROWS: return "borrows"
     if kind == FACADE_CLAUSE_INDEPENDENT: return "independent"
     if kind == FACADE_CLAUSE_MOVABLE: return "movable"
+    if kind == FACADE_CLAUSE_ABANDON: return "abandon"
     if kind == FACADE_CLAUSE_LEND: return "lend"
     if kind == FACADE_CLAUSE_CONSUMES: return "consumes"
     if kind == FACADE_CLAUSE_RETAINS: return "retains"
@@ -1830,6 +1986,7 @@ fn facade_clause_name(kind: i32) -> str:
     if kind == FACADE_CLAUSE_RENAME: return "rename"
     if kind == FACADE_CLAUSE_THREAD: return "thread"
     if kind == FACADE_CLAUSE_CALLBACK_THREAD: return "callback_thread"
+    if kind == FACADE_CLAUSE_CALLBACKS_NONE: return "callbacks none"
     if kind == FACADE_CLAUSE_CALLBACK_USERDATA: return "callback … userdata"
     if kind == FACADE_CLAUSE_VALID_ON_FAILED: return "valid on failed"
     if kind == FACADE_CLAUSE_NULLABLE: return "nullable"
@@ -2329,7 +2486,10 @@ impl Sema:
             let rt: str = self.type_name(ret)
             self.emit_error_with_help(f"fn '{fname}': 'capacity … inout' presents the length C writes back only on success (§16.2b.8), and '{fname}' returns {rt} with no status contract", node, "state the success status: 'ok <CONST>' (§16.2b.4)")
             return
-        if ok_const != 0 and inout < 0:
+        // `ok CONST` on a variadic operation is its status contract for the
+        // listed cases (§16.2b.5): the success edge of a setter, read by
+        // MIR; the presentation is unchanged.
+        if ok_const != 0 and inout < 0 and self.foreign_contracts[ci].variadic_node == 0:
             let cn: str = self.pool_resolve(ok_const)
             self.emit_error(f"fn '{fname}': 'ok {cn}' states the status contract a copied-back length is presented under, and '{fname}' pairs no 'capacity … inout' buffer, so there is no value to present on success; a producer's status is stated on its resource (§16.2b.4, §16.2b.8)", node)
             return
@@ -3818,6 +3978,238 @@ impl Sema:
         let c_fn = self.foreign_contracts[ci].fn_sym
         let domains = self.facade_domains_touched(self.facade_fn_file(c_fn), ci)
         self.facade_add_call_effect(sig, c_fn, ci, self.facade_presented_touch_mask(c_fn, ci), &domains, -1, -1)
+
+    // ── D66 retained variadic pairs (#1652, §16.2b.9) ──────────────────────
+    //
+    // A resource with a callback case has a pair state MIR tracks per place
+    // (MirForeignPairs.w). Every operation the resource presents is
+    // registered under the concrete signature MIR records on the call: a
+    // pair setter with the `U` its specialization installs and the success
+    // status its operation's `ok` states; the abandonment path as the reset;
+    // a destroyer; and every other operation as callback-capable unless it
+    // is `callbacks none` — including the other cases of the same variadic
+    // operation, so two-call setup needs `callbacks none` on the setter
+    // (§16.2b.9: "callbacks cannot run concurrently between the calls").
+    mut fn facade_index_pair_ops():
+        for ci in 0..self.foreign_contracts.len() as i32:
+            for si in 0..self.foreign_contracts[ci].variadic_slots.len() as i32:
+                let ri = self.foreign_contracts[ci].variadic_slots[si].resource
+                if ri >= 0:
+                    self.facade_pair_resources.insert(self.facade_resources[ri].name, ri)
+        if self.facade_pair_resources.len() == 0:
+            return
+        for ci in 0..self.foreign_contracts.len() as i32:
+            let fn_sym = self.foreign_contracts[ci].fn_sym
+            let hosts = self.facade_method_host(fn_sym)
+            if hosts.len() != 1:
+                continue
+            let ri = hosts[0]
+            if not self.facade_pair_resources.contains(self.facade_resources[ri].name):
+                continue
+            let fname: str = self.pool_resolve(fn_sym)
+            let host: str = self.pool_resolve(self.facade_resources[ri].name)
+            let mname = self.facade_presented(ri, fname)
+            if mname.len() == 0:
+                continue
+            let invokes = if self.foreign_contracts[ci].callbacks_none != 0: 0 else: 1
+            if self.foreign_contracts[ci].variadic_node != 0:
+                for k in 0..self.foreign_contracts[ci].variadic_case_syms.len() as i32:
+                    let mtext = host ++ "." ++ self.facade_variadic_case_name(mname, ci, k)
+                    let kind = self.foreign_contracts[ci].variadic_case_kinds[k]
+                    if kind == FACADE_VARIADIC_CALLBACK or kind == FACADE_VARIADIC_USERDATA:
+                        // Generic in `U`: registered per specialization
+                        // (facade_note_pair_op_sig) under its generic node.
+                        let msym = self.pool_lookup_symbol(mtext)
+                        let mnode = if msym != 0: self.generic_fn_node_for_symbol(msym) else: 0
+                        if mnode != 0:
+                            self.facade_pair_setter_contract.insert(mnode, ci)
+                            self.facade_pair_setter_case.insert(mnode, k)
+                    else if self.sig_text_index.contains(mtext):
+                        let case_sig: i32 = self.sig_text_index.get(mtext).unwrap()
+                        self.facade_add_pair_op(case_sig, ci, ri, if invokes != 0: FOREIGN_PAIR_INVOKE else: FOREIGN_PAIR_KEEP, -1, 0, -1, invokes)
+                continue
+            let mtext = host ++ "." ++ mname
+            if not self.sig_text_index.contains(mtext):
+                continue
+            let sig: i32 = self.sig_text_index.get(mtext).unwrap()
+            // A `callbacks none` operation keeps the pair as it is; any other
+            // is callback-capable (§16.2b.9: conservatively reentrant).
+            var action = if invokes != 0: FOREIGN_PAIR_INVOKE else: FOREIGN_PAIR_KEEP
+            if self.facade_same_fn(self.facade_resources[ri].abandon, fn_sym): action = FOREIGN_PAIR_RESET
+            else if self.foreign_contracts[ci].destroys != 0: action = FOREIGN_PAIR_DESTROY
+            self.facade_add_pair_op(sig, ci, ri, action, -1, 0, -1, invokes)
+
+    mut fn facade_add_pair_op(sig: i32, ci: i32, ri: i32, action: i32, slot: i32, userdata_tid: i32, guard_ok: i64, invokes: i32):
+        if sig < 0 or self.facade_pair_op_by_sig.contains(sig):
+            return
+        self.facade_pair_op_by_sig.insert(sig, self.facade_pair_ops.len() as i32)
+        self.facade_pair_ops.push(FacadePairOp { contract: ci, resource: ri, action, slot, userdata_tid, guard_ok, invokes })
+
+    // A pair setter's concrete signature, at the call that specializes it
+    // (SemaCheck.w check_selected_generic_call_args / the generic method
+    // path): the `U` it installs is read off the signature Sema built —
+    // the userdata setter's last parameter is `&U`; the callback setter's
+    // last parameter is the callable whose userdata parameter is `&U`.
+    mut fn facade_note_pair_op_sig(fn_sym: i32, sig: i32):
+        if sig < 0 or self.facade_pair_setter_contract.len() == 0 or self.facade_pair_op_by_sig.contains(sig):
+            return
+        let node = self.generic_fn_node_for_symbol(fn_sym)
+        if node == 0 or not self.facade_pair_setter_contract.contains(node):
+            return
+        let ci: i32 = self.facade_pair_setter_contract.get(node).unwrap()
+        let k: i32 = self.facade_pair_setter_case.get(node).unwrap()
+        let kind: i32 = self.foreign_contracts[ci].variadic_case_kinds[k]
+        let case_sym: i32 = self.foreign_contracts[ci].variadic_case_syms[k]
+        var slot = -1
+        for si in 0..self.foreign_contracts[ci].variadic_slots.len() as i32:
+            let s = &self.foreign_contracts[ci].variadic_slots[si]
+            if kind == FACADE_VARIADIC_CALLBACK and s.case_index == k: slot = si
+            if kind == FACADE_VARIADIC_USERDATA and s.userdata_selector == case_sym: slot = si
+        if slot < 0:
+            return
+        let count = self.sig_get_param_count(sig)
+        if count == 0:
+            return
+        let last = self.resolve_alias(self.sig_param_type(sig, count - 1) as TypeId)
+        var u_tid = 0
+        if kind == FACADE_VARIADIC_USERDATA:
+            if self.get_type_kind(last) == TypeKind.TY_REF: u_tid = self.resolve_alias(self.get_type_d0(last) as TypeId) as i32
+        else:
+            let callable = self.callable_type_resolved(last as i32)
+            let ud = self.foreign_contracts[ci].variadic_slots[slot].callback_userdata
+            if callable != 0 and ud >= 0 and ud < self.get_type_d1(callable):
+                let pt = self.resolve_alias(self.type_extra[self.get_type_d0(callable) + ud] as TypeId)
+                if self.get_type_kind(pt) == TypeKind.TY_REF: u_tid = self.resolve_alias(self.get_type_d0(pt) as TypeId) as i32
+        if u_tid == 0:
+            return
+        // A closure literal has a fn type of its own (SemaCheck.w
+        // check_closure adds one per literal); the pair compares the two
+        // setters' `U` by identity, so a callable `U` is its interned
+        // structural type.
+        u_tid = self.facade_pair_canonical_type(u_tid)
+        var guard_ok: i64 = -1
+        let ok_sym = self.foreign_contracts[ci].ok_const
+        if ok_sym != 0:
+            let decl = self.facade_const_decl(ok_sym)
+            if decl != 0: guard_ok = self.facade_const_int_value(self.ast.get_data1(decl))
+        let invokes = if self.foreign_contracts[ci].callbacks_none != 0: 0 else: 1
+        let action = if kind == FACADE_VARIADIC_CALLBACK: FOREIGN_PAIR_CALLBACK else: FOREIGN_PAIR_USERDATA
+        self.facade_add_pair_op(sig, ci, self.foreign_contracts[ci].variadic_slots[slot].resource, action, slot, u_tid, guard_ok, invokes)
+
+    // A callback-only pair setter binds its `U` from the callback
+    // argument's own signature — the parameter at the slot's userdata
+    // position is `&U` — since no userdata argument is in the call to bind
+    // it from (SemaCheck.w check_generic_method_call; the userdata setter
+    // binds `U` from its `&U` argument like any generic method). The
+    // generic binder cannot: it matches the rendered `extern "C" fn(…, &U)`
+    // against a plain `fn` argument, which coerces to it only once `U` is
+    // known (§12.4).
+    mut fn facade_bind_pair_callback_u(fn_node: i32, arg_types: &Vec[i32], arg_count: i32, fn_tp_start: i32, fn_tp_count: i32, node: i32):
+        if fn_tp_count != 1 or arg_count == 0 or self.facade_pair_setter_contract.len() == 0 or not self.facade_pair_setter_contract.contains(fn_node):
+            return
+        let ci: i32 = self.facade_pair_setter_contract.get(fn_node).unwrap()
+        let k: i32 = self.facade_pair_setter_case.get(fn_node).unwrap()
+        if self.foreign_contracts[ci].variadic_case_kinds[k] != FACADE_VARIADIC_CALLBACK:
+            return
+        var slot = -1
+        for si in 0..self.foreign_contracts[ci].variadic_slots.len() as i32:
+            if self.foreign_contracts[ci].variadic_slots[si].case_index == k: slot = si
+        if slot < 0:
+            return
+        let callable = self.callable_type_resolved(arg_types[arg_count - 1])
+        let ud = self.foreign_contracts[ci].variadic_slots[slot].callback_userdata
+        if callable == 0 or ud < 0 or ud >= self.get_type_d1(callable):
+            return
+        let pt = self.resolve_alias(self.type_extra[self.get_type_d0(callable) + ud] as TypeId)
+        if self.get_type_kind(pt) != TypeKind.TY_REF:
+            return
+        let u = self.resolve_alias(self.get_type_d0(pt) as TypeId) as i32
+        let tp_name = self.ast.get_extra(fn_tp_start)
+        if self.lookup_generic_subst(tp_name) == 0:
+            self.put_generic_subst(tp_name, u, node)
+
+    // The argument index of a pair callback setter's callback (its last)
+    // at a method call `recv.field(…)` (SemaCheck.w check_method_call_parts,
+    // `field` already retargeted to the case), or -1.
+    fn facade_pair_callback_arg(recv_type: i32, field: i32, arg_count: i32) -> i32:
+        if self.facade_pair_setter_contract.len() == 0 or recv_type == 0 or field == 0 or arg_count == 0:
+            return -1
+        let resolved = self.auto_deref_ref_ptr_type(self.resolve_alias(recv_type as TypeId))
+        let owner = self.get_type_name(resolved)
+        if owner == 0:
+            return -1
+        let fn_sym = self.lookup_generic_method_fn(owner, field)
+        let node = if fn_sym != 0: self.generic_fn_node_for_symbol(fn_sym) else: 0
+        if node == 0 or not self.facade_pair_setter_contract.contains(node):
+            return -1
+        let ci: i32 = self.facade_pair_setter_contract.get(node).unwrap()
+        let k: i32 = self.facade_pair_setter_case.get(node).unwrap()
+        if self.foreign_contracts[ci].variadic_case_kinds[k] != FACADE_VARIADIC_CALLBACK:
+            return -1
+        arg_count - 1
+
+    // The type a named fn passed as a pair setter's callback is checked
+    // against: its own signature as a C function pointer, to which a bare
+    // fn coerces (§12.4) — as stage 9 hands its callback argument the
+    // rendered `extern "C" fn(&U, …)` (facade_callback_expected_type). A
+    // closure has no signature of its own to read here; it is checked
+    // without an expected type and reported.
+    mut fn facade_pair_callback_expected_type(arg_node: i32) -> i32:
+        if self.ast.kind(arg_node) != NodeKind.NK_IDENT:
+            return 0
+        let sig = self.get_visible_sig(self.ast.get_data0(arg_node))
+        if sig < 0:
+            return 0
+        let params: Vec[i32] = Vec.new()
+        for pi in 0..self.sig_get_param_count(sig):
+            params.push(self.sig_param_type(sig, pi))
+        self.ensure_extern_fn_type(params, params.len() as i32, self.sig_return_type(sig) as TypeId) as i32
+
+    // The interned structural type of a callable `U` (fn types with the
+    // same parameters and return are one type here), any other type as is.
+    mut fn facade_pair_canonical_type(tid: i32) -> i32:
+        let r: i32 = self.resolve_alias(tid as TypeId) as i32
+        let kind: i32 = self.get_type_kind(r as TypeId)
+        if kind != TypeKind.TY_FN and kind != TypeKind.TY_EXTERN_FN:
+            return r
+        let params: Vec[i32] = Vec.new()
+        for pi in 0..self.get_type_d1(r as TypeId):
+            params.push(self.type_extra[self.get_type_d0(r as TypeId) + pi])
+        let ret: i32 = self.get_type_d2(r as TypeId)
+        let canonical: i32 = self.ensure_callable_type(kind, params, params.len() as i32, ret as TypeId, 0) as i32
+        if canonical != 0: canonical else: r
+
+    // The pair operation a concrete call signature performs, or -1.
+    fn facade_pair_op_for_sig(sig: i32) -> i32:
+        if sig < 0 or self.facade_pair_ops.len() == 0 or not self.facade_pair_op_by_sig.contains(sig):
+            return -1
+        self.facade_pair_op_by_sig.get(sig).unwrap()
+
+    // The resource with a callback pair a type is (through a reference), or
+    // -1.
+    fn facade_pair_resource_for_type(tid: i32) -> i32:
+        if tid == 0 or self.facade_pair_resources.len() == 0:
+            return -1
+        var r = self.resolve_alias(tid as TypeId)
+        if self.get_type_kind(r) == TypeKind.TY_REF:
+            r = self.resolve_alias(self.get_type_d0(r) as TypeId)
+        let name = self.get_type_name(r)
+        if name == 0 or not self.facade_pair_resources.contains(name):
+            return -1
+        self.facade_pair_resources.get(name).unwrap()
+
+    // Whether destroying the resource can invoke its callback pair: the
+    // rendered Drop runs the abandonment path first when one is stated
+    // (FacadeRender.w facade_render_resource), else the drop operation is
+    // callback-capable unless `callbacks none`.
+    fn facade_pair_drop_invokes(ri: i32) -> bool:
+        if self.facade_resources[ri].abandon != 0:
+            return false
+        let drop_fn = self.facade_resources[ri].drop
+        for ci in 0..self.foreign_contracts.len() as i32:
+            if self.facade_same_fn(self.foreign_contracts[ci].fn_sym, drop_fn) and self.foreign_contracts[ci].callbacks_none != 0:
+                return false
+        true
 
     // §51 at a callback method's call: under `callback_thread any` the
     // userdata type is Send and Sync — the callback reads it from whatever

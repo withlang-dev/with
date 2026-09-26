@@ -4324,6 +4324,14 @@ impl Parser:
             kind = FACADE_CLAUSE_INDEPENDENT
         else if word == "movable":
             kind = FACADE_CLAUSE_MOVABLE
+        else if word == "abandon":
+            // `abandon <fn>` (§16.2b.9): the resource's safe abandonment of
+            // partial callback setup. Sema verifies the operation is its own
+            // and `callbacks none`.
+            kind = FACADE_CLAUSE_ABANDON
+            let f = self.expect_ident()
+            if f == 0: return 0
+            ops.push(f)
         else if word == "lend":
             kind = FACADE_CLAUSE_LEND
         else if word == "consumes":
@@ -4435,6 +4443,12 @@ impl Parser:
             if ops.len() == 0:
                 self.emit_error("thread capabilities are 'creator', 'send', 'share' and 'drop_any_thread' (§16.2b.10)")
                 return 0
+        else if word == "callbacks":
+            if not self.current_ident_is("none"):
+                self.emit_error("expected 'callbacks none': a trusted guarantee that this operation cannot invoke applicable callbacks (§16.2b.9)")
+                return 0
+            self.advance()
+            kind = FACADE_CLAUSE_CALLBACKS_NONE
         else if word == "callback_thread":
             kind = FACADE_CLAUSE_CALLBACK_THREAD
             if not self.current_ident_is("any"):
@@ -4534,23 +4548,41 @@ impl Parser:
                 let sel = self.expect_ident()
                 if sel == 0: return 0
                 if self.expect(TokenKind.TK_COLON) == 0: return 0
-                // A callback case (`callback param N userdata param CONST`)
-                // pairs two selectors across two calls, and a retained
-                // pointer case (`… retains by param 0`) keeps the argument
-                // past the call; neither is modeled yet (#1652) — refused,
-                // never rendered as a plain value.
+                var callback_ref = 0
+                var userdata_ref = 0
                 if self.current_ident_is("callback"):
-                    self.emit_error("a callback case of a variadic contract ('case CONST: callback param N userdata param CONST') is not modeled yet (#1652); leave the case out and set that option through the raw function under unsafe (§16.2b.5, §16.2b.9)")
-                    return 0
+                    self.advance()
+                    callback_ref = self.parse_facade_param_ref()
+                    if callback_ref == 0: return 0
+                    if self.peek() != TokenKind.TK_KW_AS:
+                        self.emit_error("a variadic callback requires its C type: 'callback param N as T userdata param CONST' (§16.2b.5)")
+                        return 0
+                    self.advance()
                 let ty = self.parse_type_expr()
                 if ty == 0: return 0
+                if callback_ref != 0:
+                    if not self.current_ident_is("userdata"):
+                        self.emit_error("a variadic callback names its paired selector: 'callback param N as T userdata param CONST' (§16.2b.5)")
+                        return 0
+                    self.advance()
+                    userdata_ref = self.parse_facade_param_ref()
+                    if userdata_ref == 0: return 0
+                var retainer_ref = 0
                 if self.current_ident_is("retains"):
-                    self.emit_error("a retained case of a variadic contract ('case CONST: <type> retains by param 0') is not modeled yet (#1652); leave the case out and set that option through the raw function under unsafe (§16.2b.5)")
-                    return 0
+                    self.advance()
+                    if not self.current_ident_is("by"):
+                        self.emit_error("a retained variadic case names its owner: '<type> retains by param N' (§16.2b.5)")
+                        return 0
+                    self.advance()
+                    retainer_ref = self.parse_facade_param_ref()
+                    if retainer_ref == 0: return 0
                 let case_extra = self.pool.extra_len()
                 self.pool.add_extra(sel)
                 self.pool.add_extra(ty as i32)
-                cases.push(self.pool.add_node(NodeKind.NK_FACADE_CLAUSE, cstart, self.prev_end(), FACADE_CLAUSE_VARIADIC_CASE, case_extra, 2) as i32)
+                self.pool.add_extra(callback_ref)
+                self.pool.add_extra(userdata_ref)
+                self.pool.add_extra(retainer_ref)
+                cases.push(self.pool.add_node(NodeKind.NK_FACADE_CLAUSE, cstart, self.prev_end(), FACADE_CLAUSE_VARIADIC_CASE, case_extra, 5) as i32)
                 self.skip_newlines()
             if cases.len() == 0:
                 self.emit_error("a discriminated variadic contract lists at least one 'case <CONST>: <type>' beneath it (§16.2b.5)")

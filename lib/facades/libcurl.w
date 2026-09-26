@@ -15,16 +15,22 @@
 //   curl_easy_cleanup ............................... drop
 //   the variadic setopt, case by case ............... variadic param 2 selected by param option
 //   a long, a copied string, a curl_off_t ........... case CURLOPT_NOSIGNAL / CURLOPT_URL / …
-//   the callback and retained-pointer cases ......... left out (#1652); raw under unsafe
+//   the write callback and its userdata ............. case CURLOPT_WRITEFUNCTION: callback … userdata param CURLOPT_WRITEDATA retains by param 0
+//   abandoning a half-configured pair ............... abandon curl_easy_reset (callbacks none)
+//   the retained-pointer case (POSTFIELDS) .......... left out (#1652); raw under unsafe
 //   the version record as a borrowed record view .... returns borrow curl_version_info_data from domain version_info
 //   its mutator ..................................... curl_global_init (nothing states `preserves` on it)
 //   static text ..................................... curl_version, curl_easy_strerror: returns static CStr
 //   the transfer .................................... curl_easy_perform: lend, presenting the CURLcode
 //
-//     let easy = Easy.new()?                          // None: "something went wrong"
+//     var total = 0
+//     let sink = n => total = total + n               // declared before the handle: it outlives it
+//     var easy = Easy.new()?                          // None: "something went wrong"
 //     easy.setopt(CURLOPT_URL, "https://example.com") // a copied string
 //     easy.setopt(CURLOPT_NOSIGNAL, 1)                // a long
-//     let code = easy.perform()
+//     easy.setopt(CURLOPT_WRITEFUNCTION, on_data)     // the callback, typed over `sink`'s type
+//     easy.setopt(CURLOPT_WRITEDATA, sink)            // its userdata: a borrow the handle holds
+//     let code = easy.perform()                       // proven: both set, both statuses checked
 //     if code != CURLE_OK: print(curl_easy_strerror(code).unwrap())
 use c_import("curl/curl.h", link: "curl")
 
@@ -56,9 +62,15 @@ c facade curl:
     // `drop_any_thread` the manual does not spell, so nothing is granted
     // here (§16.2b.10: never inferred); a facade that adopts the sentence
     // as trusted evidence may state `thread send drop_any_thread`.
+    // curl_easy_cleanup(3) may invoke configured callbacks ("this might
+    // call callbacks" — the progress and header callbacks while closing
+    // connections), so it is never `callbacks none`; abandoning a
+    // half-configured callback pair goes through curl_easy_reset, which the
+    // generated Drop runs before cleanup on every drop path (§16.2b.9).
     resource Easy wraps *mut CURL
         from curl_easy_init
         drop curl_easy_cleanup
+        abandon curl_easy_reset
     // The presentation override (§16.2b.11): the convention would present
     // curl_easy_init as `Easy.easy_init`; a handle is made with `Easy.new`.
     fn curl_easy_init
@@ -74,9 +86,33 @@ c facade curl:
     // reused after curl_easy_setopt returns. The only exception to this
     // rule is really CURLOPT_POSTFIELDS" — so a `char *` option is a
     // copied `str`, and CURLOPT_POSTFIELDS, whose data "is NOT copied",
-    // is not listed (a retained case, #1652), nor are the callback options
-    // (CURLOPT_WRITEFUNCTION with CURLOPT_WRITEDATA, #1652): they are the
-    // raw curl_easy_setopt under unsafe until the pairing is modeled.
+    // is not listed (a retained pointer case, #1652): it is the raw
+    // curl_easy_setopt under unsafe until retention of a string is modeled.
+    //
+    // "Returns CURLE_OK (zero) on success or a non-zero error number" —
+    // `ok CURLE_OK` is the status contract of the listed cases (§16.2b.5):
+    // the setter's success edge, which the compiler reads from a comparison
+    // of the returned code against it; the code is still returned as the
+    // manual states it. `callbacks none`: setting an option installs or
+    // replaces a value on the handle and invokes no callback (none of the
+    // listed options' pages describe one, and a transfer only starts at
+    // curl_easy_perform) — the guarantee two-call callback setup needs
+    // (§16.2b.9: "callbacks cannot run concurrently between the calls").
+    //
+    // The write callback (CURLOPT_WRITEFUNCTION(3)): "Pass a pointer to
+    // your callback function, which should match the prototype shown above"
+    // — `size_t write_callback(char *ptr, size_t size, size_t nmemb, void
+    // *userdata)`, the header's `curl_write_callback` typedef, stated with
+    // `as` because the variadic declaration carries no callback type — "The
+    // userdata argument is set with the CURLOPT_WRITEDATA option", the
+    // pairing across the two calls, and the handle keeps both until reset
+    // or cleanup: `retains by param 0`, never inferred. The userdata setter
+    // for CURLOPT_WRITEDATA ("A data pointer to pass to the write callback")
+    // is implied by the pairing and takes `&U`, the borrow the handle then
+    // holds (§16.2b.9 "Retained borrows"); a program that declares its sink
+    // before the handle keeps it alive past the handle's drop.
+    // Only the byte counts of a chunk reach a callback safely today (its
+    // `char *` parameter stays raw until a callback buffer clause is ruled).
     //   CURLOPT_NOSIGNAL(3):        "Pass a long. If it is 1, libcurl uses
     //                                no functions that install signal handlers"
     //   CURLOPT_URL(3):             "Pass in a pointer to the URL to work
@@ -107,7 +143,10 @@ c facade curl:
     fn curl_easy_setopt
         rename setopt
         preserves domain version_info
+        callbacks none
+        ok CURLE_OK
         variadic param 2 selected by param option:
+            case CURLOPT_WRITEFUNCTION: callback param 2 as curl_write_callback userdata param CURLOPT_WRITEDATA retains by param 0
             case CURLOPT_NOSIGNAL: c_long
             case CURLOPT_URL: str
             case CURLOPT_VERBOSE: c_long
@@ -128,10 +167,18 @@ c facade curl:
         lend
         preserves domain version_info
     // curl_easy_reset(3): "Re-initializes all options previously set on a
-    // specified CURL handle to the default values."
+    // specified CURL handle to the default values. This puts back the handle
+    // to the same state as it was in when it was just created with
+    // curl_easy_init." It is the handle's abandonment path (§16.2b.9): the
+    // `callbacks none` here is bounded to this facade's modeled options —
+    // resetting the write callback and its userdata invokes neither, and
+    // no listed option installs a value reset would call back to free
+    // (libcurl's reset frees MIME parts through their `freefunc`, an option
+    // this facade does not list; a MIME case must revisit this line).
     fn curl_easy_reset
         rename reset
         lend
+        callbacks none
         preserves domain version_info
     // curl_version(3): "Returns a human readable string with the version
     // number of libcurl and some of its important components (like OpenSSL
