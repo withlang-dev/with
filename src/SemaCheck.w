@@ -23090,6 +23090,43 @@ impl Sema:
             return 0
         0
 
+    // #1712: a user method's argument is checked against its declared
+    // parameter type, as check_call checks a free function's — the same
+    // parameter the plain-receiver loop in check_method_call_parts compares
+    // the argument with afterwards. Without it a `.Variant` argument was
+    // typed before its expected type existed and resolved by name across
+    // every enum in scope. A generic method or a generic-instance receiver
+    // takes its parameter type substituted for the receiver's arguments
+    // (static_generic_method_expected_arg_type, which a static call already
+    // asks; an instance call's parameters start after `self`).
+    //
+    // A `&T` parameter publishes none, as before: the argument meets it
+    // through §3.8's auto-ref at the call, and a `&T` expectation on the
+    // argument's own join refuses its owned arms (`m(if c: a ++ b else:
+    // c)`, which check_call also refuses — #1754).
+    mut fn method_sig_expected_arg_type(obj_type: i32, is_static_receiver: bool, field: i32, arg_index: i32) -> i32:
+        if obj_type == 0:
+            return 0
+        let recv = self.auto_deref_ref_ptr_type(self.resolve_alias(obj_type as TypeId))
+        let owner = self.method_owner_symbol_for_type(recv as i32)
+        if owner == 0:
+            return 0
+        var param_ty = 0
+        if self.get_type_kind(recv) == TypeKind.TY_GENERIC_INST or self.lookup_generic_method_fn(owner, field) != 0:
+            if is_static_receiver:
+                return 0
+            param_ty = self.static_generic_method_expected_arg_type(recv as i32, field, arg_index + 1)
+        else:
+            let sig = self.lookup_method_sig(owner, field)
+            let param_i = if is_static_receiver: arg_index else: arg_index + 1
+            if sig < 0 or param_i >= self.sig_get_param_count(sig):
+                return 0
+            param_ty = self.sig_param_type(sig, param_i)
+        if param_ty == 0:
+            return 0
+        let param_kind = self.get_type_kind(self.resolve_alias(param_ty as TypeId))
+        if param_kind == TypeKind.TY_REF or self.type_is_dyn_object(self.resolve_alias(param_ty as TypeId) as i32) != 0: 0 else: param_ty
+
     fn method_arg_stores_value(recv_type: i32, field: i32, arg_index: i32) -> i32:
         if recv_type == 0:
             return 0
@@ -23971,6 +24008,9 @@ impl Sema:
                 // A null literal takes the fixed parameter's pointer type; a
                 // bare fn name takes its `extern "C" fn` type (#1609).
                 mc_expected = if self.ast.kind(mc_arg_node) == NodeKind.NK_NULL_LIT: self.null_arg_expected_type(mc_null_fn, ai, true) else: self.extern_fn_arg_expected_type(mc_null_fn, ai, true)
+            // #1712: otherwise the declared parameter type, as for a free call.
+            if mc_expected == 0:
+                mc_expected = self.method_sig_expected_arg_type(obj_type as i32, static_type_sym != 0 and self.static_receiver_type_is_known(expr) != 0, field, ai)
             let mc_arg_ty = if facade_ud_node != 0 and mc_arg_node == facade_ud_node: facade_ud_ty as TypeId
                 else if mc_expected != 0: self.check_expr_with_expected(mc_arg_node, mc_expected as TypeId)
                 else: self.check_expr_value_context(mc_arg_node)
