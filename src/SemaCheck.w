@@ -11690,6 +11690,13 @@ impl Sema:
                                 let root = self.place_root_sym(arg_node)
                                 if root != 0 and self.scope_has(root) != 0:
                                     self.record_consume_call_site(arg_node, sig_idx, param_i)
+                                    // #714 (§3.8): the plain call consumes; mark the
+                                    // binding moved so a later use diagnoses. The free-call
+                                    // path did this and the method path only recorded the
+                                    // site, so `T.make(p)` / `x.m(p)` then `p` compiled and
+                                    // read the moved-from value (#1588).
+                                    if self.extern_param_is_bit_copy(self.sig_names[sig_idx], sig_idx, param_i) == 0:
+                                        self.mark_moved_if_consumed(arg_node)
                                 else if root == 0 and self.d32_is_field_access(arg_node) != 0:
                                     // #1281: `s.m(make().1)` — the element of a
                                     // temporary is an implicit field move (§2.2).
