@@ -15,13 +15,13 @@ fn main:
     p7_write(case_dir, "src/helper.w", "use helper2\npub fn helper_used() -> i32: deep()\n")
     // main imports helper only: helper2's `deep` is not in scope.
     p7_write(case_dir, "src/main.w", "use helper\nfn main:\n    print(deep())\n")
-    let leak = p7_run(case_dir, "imports_transitive_fn", "check\0src/main.w\0")
+    let leak = p7_run(p7_join(case_dir, "src"), "imports_transitive_fn", "check\0main.w\0")
     assert(leak.rc != 0)
     assert(leak.stderr.contains("deep"))
     // A local named like helper2's global, reached directly or not, is the
     // local (tier 1 over tier 3).
     p7_write(case_dir, "src/main.w", "use helper2\nfn main:\n    let PACKAGE = 2\n    print(PACKAGE + deep())\n")
-    let local_wins = p7_run(case_dir, "imports_local_shadows", "run\0src/main.w\0")
+    let local_wins = p7_run(p7_join(case_dir, "src"), "imports_local_shadows", "run\0main.w\0")
     p7_assert_success(local_wins, "imports_local_shadows")
     assert(local_wins.stdout.contains("3"))
     print("ok")
