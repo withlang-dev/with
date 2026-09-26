@@ -4759,8 +4759,10 @@ impl Sema:
             let clause_count = self.ast.get_data2(node)
             for ci in 0..clause_count:
                 let base = comp_start + ci * 3
-                if self.expr_may_suspend(self.ast.get_extra(base + 1)) != 0 or self.gen_loop_may_suspend(self.ast.get_extra(base + 1)):
+                if self.expr_may_suspend(self.ast.get_extra(base + 1)) != 0:
                     return 1
+                if self.gen_loop_may_suspend(self.ast.get_extra(base + 1)):
+                    return self.suspension_site(self.ast.get_extra(base + 1))
                 if self.expr_may_suspend(self.ast.get_extra(base + 2)) != 0:
                     return 1
             return self.expr_may_suspend(self.ast.get_data0(node))
@@ -4769,8 +4771,10 @@ impl Sema:
             let clause_count = self.ast.get_data1(node)
             for ci in 0..clause_count:
                 let base = comp_start + 2 + ci * 3
-                if self.expr_may_suspend(self.ast.get_extra(base + 1)) != 0 or self.gen_loop_may_suspend(self.ast.get_extra(base + 1)):
+                if self.expr_may_suspend(self.ast.get_extra(base + 1)) != 0:
                     return 1
+                if self.gen_loop_may_suspend(self.ast.get_extra(base + 1)):
+                    return self.suspension_site(self.ast.get_extra(base + 1))
                 if self.expr_may_suspend(self.ast.get_extra(base + 2)) != 0:
                     return 1
             if self.expr_may_suspend(self.ast.get_extra(comp_start)) != 0:
