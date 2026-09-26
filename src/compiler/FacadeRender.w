@@ -205,8 +205,6 @@ fn facade_render_lend_methods(pool: AstPool, intern: InternPool, ci: &Vec[i32], 
     let repr_text = render_type_expr(pool, intern, pool.get_extra(pool.get_data1(resource as NodeId)) as NodeId)
     let repr = facade_render_unalias(pool, intern, repr_text)
     let in_place = not repr.starts_with("*") and facade_render_has_clause(pool, resource, FACADE_CLAUSE_INIT)
-    if not repr.starts_with("*") and not in_place:
-        return ""
     let pinned = in_place and not facade_render_has_clause(pool, resource, FACADE_CLAUSE_MOVABLE)
     var out = ""
     let items = facade_render_all_items(pool, NodeKind.NK_FACADE_FN)
@@ -742,7 +740,13 @@ fn facade_render_lend_hosted(pool: AstPool, intern: InternPool, li: &FacadeLendI
         if p0 != "*mut " ++ repr and p0 != "*const " ++ repr:
             return false
     else:
-        return false
+        // A by-value token is never recognized by its type (`int` is an
+        // `Fd` and every other integer): only the item's own `of` makes the
+        // operation its method, taking the token by value or by address
+        // (#1669; Sema: facade_by_value_of_host).
+        if p0 != repr and p0 != "*mut " ++ repr and p0 != "*const " ++ repr:
+            return false
+        return li.of_sym != 0 and intern.resolve(li.of_sym) == intern.resolve(pool.get_data0(resource as NodeId))
     if li.of_sym != 0:
         let of_name: str = intern.resolve(li.of_sym)
         let rname: str = intern.resolve(pool.get_data0(resource as NodeId))

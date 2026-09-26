@@ -2205,6 +2205,14 @@ impl Sema:
     fn facade_method_host(fn_sym: i32) -> Vec[i32]:
         let recv = self.facade_param_receives(fn_sym, 0)
         let ci = self.facade_contract_for(fn_sym)
+        // A by-value token is never recognized by its type (`int` is an `Fd`
+        // and every other integer, facade_param_receives), so only the
+        // item's own `of` makes an operation its method (#1669).
+        let by_value = self.facade_by_value_of_host(fn_sym)
+        if by_value >= 0:
+            let one: Vec[i32] = Vec.new()
+            one.push(by_value)
+            return one
         if ci < 0 or self.foreign_contracts[ci].of_resource == 0 or recv.len() < 2:
             return recv
         let want: i32 = self.facade_resource_index.get(self.foreign_contracts[ci].of_resource).unwrap()
@@ -2214,6 +2222,29 @@ impl Sema:
                 one.push(want)
                 return one
         recv
+
+    // The by-value token (a resource wrapping neither a pointer nor in-place
+    // storage) the fn item's `of` names, when the operation's first
+    // parameter takes its representation — by value, or by address, which C
+    // writes through — or -1 (§16.2b.3; FacadeRender.w
+    // facade_render_lend_hosted draws the same line).
+    fn facade_by_value_of_host(fn_sym: i32) -> i32:
+        let ci = self.facade_contract_for(fn_sym)
+        if ci < 0 or self.foreign_contracts[ci].of_resource == 0 or not self.facade_resource_index.contains(self.foreign_contracts[ci].of_resource):
+            return -1
+        let ri: i32 = self.facade_resource_index.get(self.foreign_contracts[ci].of_resource).unwrap()
+        let repr = self.resolve_alias(self.facade_resources[ri].repr_tid as TypeId)
+        if self.get_type_kind(repr) == TypeKind.TY_PTR or self.facade_resources[ri].init != 0:
+            return -1
+        let sig = self.get_sig(fn_sym)
+        if sig < 0 or self.sig_get_param_count(sig) == 0:
+            return -1
+        let p = self.resolve_alias(self.sig_param_type(sig, 0) as TypeId)
+        if self.facade_same_type(p as i32, repr as i32):
+            return ri
+        if self.get_type_kind(p) == TypeKind.TY_PTR and self.facade_same_type(self.get_type_d0(p), repr as i32):
+            return ri
+        -1
 
     // Ruling §14: "When a foreign representation maps to multiple modeled
     // resources, an operation is callable through a modeled resource only
@@ -2233,7 +2264,12 @@ impl Sema:
             if sig < 0 or self.facade_fn_is_resource_op(fn_sym):
                 continue
             let recv = self.facade_param_receives(fn_sym, 0)
-            if recv.len() == 0:
+            let of_res = self.foreign_contracts[ci].of_resource
+            // An `of` is checked even when the parameter receives no pointer
+            // or in-place resource: accepted silently, an `of` naming a
+            // by-value token presented nothing and every call to the
+            // renamed method was "unknown method" (#1669).
+            if recv.len() == 0 and of_res == 0:
                 continue
             self.update_decl_source_context(self.foreign_contracts[ci].decl)
             let shown = self.facade_param_display(fn_sym, sig, 0)
@@ -2243,15 +2279,17 @@ impl Sema:
                 let cn: str = self.pool_resolve(self.facade_resources[recv[k]].name)
                 names = names ++ (if k > 0: ", " else: "") ++ f"'{cn}'"
                 ofs = ofs ++ (if k > 0: " or " else: "") ++ f"'of {cn}'"
-            let of_res = self.foreign_contracts[ci].of_resource
             if of_res != 0:
                 let of_ri: i32 = self.facade_resource_index.get(of_res).unwrap()
-                var received = false
+                var received = self.facade_by_value_of_host(fn_sym) == of_ri
                 for k in 0..recv.len() as i32:
                     if recv[k] == of_ri: received = true
                 if not received:
                     let on: str = self.pool_resolve(of_res)
-                    self.emit_error(f"fn '{fname}': 'of {on}' assigns it to a resource {shown} does not receive; it receives {names} — state {ofs} (§16.2b.3)", node)
+                    if recv.len() == 0:
+                        self.emit_error(f"fn '{fname}': 'of {on}' assigns it to a resource {shown} does not receive; it receives no modeled resource (§16.2b.3)", node)
+                    else:
+                        self.emit_error(f"fn '{fname}': 'of {on}' assigns it to a resource {shown} does not receive; it receives {names} — state {ofs} (§16.2b.3)", node)
                 continue
             if recv.len() > 1:
                 self.emit_error_with_help(f"fn '{fname}': {shown} receives a representation several resources wrap ({names}); an operation is callable through a resource only after the facade assigns it, so '{fname}' is not presented on any of them (§16.2b.3)", node, f"state {ofs} on this fn item")
@@ -2517,6 +2555,9 @@ impl Sema:
             // the resource — the receiver, or a borrow `&P` (a shape a borrow
             // cannot present is verify_facade_dependency_shape's error).
             if self.facade_param_receives(fn_sym, pi).len() > 0:
+                continue
+            // A by-value token's receiver by address (#1669): the `of` host.
+            if pi == 0 and self.facade_by_value_of_host(fn_sym) >= 0:
                 continue
             // A pointer to bytes, scalars, `void` or pointers is
             // verify_facade_buffer_params's (12b): it names the buffer. A
