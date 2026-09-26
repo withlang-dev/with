@@ -1,0 +1,8 @@
+scenario: input for the next run
+
+stdin:
+    alpha
+    beta
+run: with -n 'print(line)'
+expect exit: 0
+expect stdout contains: beta

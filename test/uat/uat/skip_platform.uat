@@ -1,0 +1,4 @@
+scenario: skipped on this platform
+platforms: plan9
+
+run: with --version

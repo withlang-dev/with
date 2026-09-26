@@ -1046,7 +1046,6 @@ fn comp_known_missing_flag(item: &str) -> str:
     ""
 
 fn comp_known_missing_command(item: &str) -> str:
-    if item == "uat": return "#1659"
     ""
 
 fn comp_known_missing_module(item: &str) -> str:
@@ -1114,7 +1113,6 @@ fn comp_inventory_known_lines() -> Vec[str]:
     var items: Vec[str] = Vec.new()
     items.push("--open\t#537")
     items.push("--target\t#425")
-    items.push("uat\t#1659")
     items.push("align\t#449")
     items.push("ffi_stack\t§14.19 roadmap")
     items.push("repr\t#449")

@@ -1,0 +1,5 @@
+scenario: a check a person makes
+
+run: with -e 'print("v")'
+expect stdout contains: v
+expect (human): the version reads as a release

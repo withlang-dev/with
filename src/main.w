@@ -38,6 +38,7 @@ use compiler.Runtime
 use compiler.WasmHost
 use Analysis
 use ReceiverMigration
+use Uat
 use TargetSpec
 
 extern fn with_arg_count() -> i32
@@ -1009,6 +1010,10 @@ fn run_cli(argc: i32) -> i32:
         return run_graph_target_command("install-user")
     if cli_command(argc) == "init":
         return run_init_command(argc)
+    if cli_command(argc) == "uat":
+        var uat_argv: Vec[str] = Vec.new()
+        for ai in 0..argc: uat_argv.push(with_arg_at(ai))
+        return run_uat_command(uat_argv)
     if cli_command(argc) == "get":
         return run_get_command(argc)
     if cli_command(argc) == "remove":
@@ -5530,6 +5535,9 @@ fn run_init_command(argc: i32) -> i32:
     let lib_path = resolve_join(src_dir, "lib.w")
     let main_path = resolve_join(src_dir, "main.w")
     let test_path = resolve_join(test_dir, "test_main.w")
+    let uat_dir = resolve_join(target_dir, "uat")
+    let uat_path = resolve_join(uat_dir, "hello.uat")
+    let uat_readme_path = resolve_join(uat_dir, "README.md")
     var created_path = with_str_clone_ref(target_dir)
     if target_dir == ".":
         created_path = with_str_clone_ref(name)
@@ -5587,6 +5595,16 @@ fn run_init_command(argc: i32) -> i32:
         return 1
     if cli_init_write_new_file(test_path, cli_init_test_template()) != 0:
         return 1
+    // §18.5d: every project has an acceptance scenario and the one-page
+    // grammar of the verbs (`with uat` runs them).
+    if not is_lib:
+        if with_fs_mkdir_p(uat_dir) != 0:
+            with_eprint("error: failed to create " ++ uat_dir ++ " directory")
+            return 1
+        if cli_init_write_new_file(uat_path, cli_init_uat_template(name)) != 0:
+            return 1
+        if cli_init_write_new_file(uat_readme_path, cli_init_uat_readme_template(name)) != 0:
+            return 1
 
     if is_lib:
         with_eprint("created " ++ created_path ++ " (library)")
@@ -5603,8 +5621,20 @@ fn run_init_command(argc: i32) -> i32:
     cli_init_report_path(agents_path)
     cli_init_report_path(claude_path)
     cli_init_report_path(test_path)
+    if not is_lib:
+        cli_init_report_path(uat_path)
+        cli_init_report_path(uat_readme_path)
     cli_init_try_git_init(target_dir)
     0
+
+// The scenario every new application starts with (§18.5d): build it, run
+// it, expect its greeting — what `with init`'s main.w prints.
+fn cli_init_uat_template(name: &str) -> str:
+    "scenario: the program prints its greeting\n\nrun: with build\nrun: ./out/bin/" ++ name ++ "\nexpect exit: 0\nexpect stdout: hello from " ++ name ++ "\n"
+
+// The verbs, one page (docs/uat-plan.md §3), with three worked examples.
+fn cli_init_uat_readme_template(name: &str) -> str:
+    "# Acceptance scenarios (`with uat`)\n\nA scenario is what a person does at a terminal and what they expect to\nsee, one step per line, in `uat/<name>.uat`. `with uat` runs every scenario\nthat applies on this host; `with uat <name>` runs one; `with uat --list`\nshows them; `with uat --keep` keeps the temporary directories of passing\nscenarios. Captures land in `out/uat/<name>/`.\n\n```\nscenario: the program prints its greeting\n\nrun: with build\nrun: ./out/bin/" ++ name ++ "\nexpect exit: 0\nexpect stdout: hello from " ++ name ++ "\n```\n\n## The verbs\n\n```\nscenario: <title>                       # first line\nrequires: network, display, opengl, lib <name>, tool <name>, env <NAME>\nplatforms: darwin, linux, windows       # where the scenario runs at all\n\nnew directory                           # a fresh temporary directory becomes the cwd\nrun: <command>                          # exit 0 expected\nrun (fails): <command>                  # a non-zero exit expected\nwrite <path> from <fixture>             # copy uat/fixtures/<fixture> to <path>\nwrite <path>:                           # the indented lines below become the file\n    <text>\ncopy <path> to <path>                   # a project file into the scenario's cwd\nenv <NAME>=<value>                      # for the rest of the scenario\nstdin:                                  # for the next run:\n    <text>\nexpect exit: <int>\nexpect stdout: <text>                   # exact, trailing line endings trimmed\nexpect stdout contains: <text>\nexpect stderr contains: <text>\nexpect file <path> exists\nexpect file <path> contains: <text>\nexpect (human): <text>                  # recorded and printed, never executed\n```\n\n`with` at the head of a `run:` line is the toolchain running the scenario\n(`WITH_UAT_WITH=<path>` overrides it). An `expect` applies to the most\nrecent `run:`. An unmet `requires:` skips the scenario with the reason;\nskips do not fail the suite.\n\n## With input\n\n```\nscenario: the program echoes its input\n\nstdin:\n    hello\nrun: with -n 'print(line)'\nexpect stdout: hello\n```\n\n## With a check a person makes\n\n```\nscenario: the window shows the spiral\nrequires: display\n\nrun: with run -- --frames 60\nexpect exit: 0\nexpect (human): colored balls moving on a field of black\n```\n"
 
 type GetCommandOptions {
     spec: str,

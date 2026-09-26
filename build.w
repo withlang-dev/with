@@ -1284,6 +1284,77 @@ fn contract_view_run(ctx: &ActionCtx, root: &str, compiler: &str, fixture: &str,
     let result = ctx.process_runner().run_capture_cwd(args, build_project_abs(root, stdout_rel), build_project_abs(root, build_project_join(out_dir, name ++ ".stderr")), 120000, root)
     (result.rc, ctx.fs().read_text(stdout_rel))
 
+// `with uat` over test/uat/uat/*.uat (spec §18.5d): the scenarios cover
+// every verb and every verdict — pass, skip (an unmet requirement, a
+// platform not listed), FAIL (a nonzero exit, a mismatch), and a parse
+// error naming the line. The suite runs in out/uat-tests as its own
+// project with the release compiler as the toolchain (WITH_UAT_WITH), and
+// its report — timings removed — must equal test/uat/expected.txt, its
+// `--list` output test/uat/expected-list.txt, and its exit status 1 (the
+// planted failures). Regenerate an expectation by copying the report the
+// run leaves in out/uat-tests after reading the diff.
+fn uat_tests_strip_timings(report: &str) -> str:
+    var out = ""
+    let lines = report.split("\n")
+    for i in 0..lines.len() as i32:
+        var line = build_owned_text(lines[i])
+        let steps = line.find(" steps, ")
+        if steps >= 0 and line.ends_with("s)"):
+            line = line.slice(0, steps) ++ " steps)"
+        out = out ++ line
+        if i + 1 < lines.len() as i32:
+            out = out ++ "\n"
+    out
+
+fn uat_tests_run(ctx: &ActionCtx, root: &str, compiler: &str, out_dir: &str, name: &str, list: bool) -> (i32, str):
+    let args: Vec[str] = Vec.new()
+    args.push(build_owned_text(compiler))
+    args.push("uat")
+    if list:
+        args.push("--list")
+    var envs = process_env()
+    envs = envs.set("WITH_UAT_WITH", build_owned_text(compiler))
+    envs = envs.set("PWD", build_project_abs(root, out_dir))
+    let stdout_rel = build_project_join(out_dir, name)
+    let result = ctx.process_runner().run_capture_cwd_with_env(args, build_project_abs(root, stdout_rel), build_project_abs(root, build_project_join(out_dir, name ++ ".stderr")), 600000, build_project_abs(root, out_dir), envs)
+    (result.rc, ctx.fs().read_text(stdout_rel))
+
+fn run_uat_tests_action(ctx: ActionCtx) -> i32:
+    let inputs = ctx.inputs()
+    if inputs.len() == 0:
+        ctx.diagnostics().error("uat-tests: missing compiler input")
+    let fs = ctx.fs()
+    let out_dir = ctx.output()
+    let _ = fs.remove_tree(out_dir)
+    if fs.mkdir_all(out_dir) != 0:
+        ctx.diagnostics().error("uat-tests: could not create output dir: " ++ out_dir)
+    if fs.copy_tree("test/uat/uat", build_project_join(out_dir, "uat")) != 0:
+        ctx.diagnostics().error("uat-tests: could not copy test/uat/uat")
+    let root = ctx.project_info().project_root()
+    let compiler = build_project_abs(root, inputs.get(0))
+    var errors = 0
+    let (rc, report) = uat_tests_run(ctx, root, compiler, out_dir, "report.stdout", false)
+    if rc != 1:
+        eprint(f"error: uat-tests: `with uat` exited {rc}; the planted failures make 1 the expected status:\n" ++ report)
+        errors = errors + 1
+    let normalized = uat_tests_strip_timings(report)
+    let _ = fs.write_text(build_project_join(out_dir, "report.normalized"), normalized)
+    let expected = fs.read_text("test/uat/expected.txt")
+    if normalized != expected:
+        eprint("error: uat-tests: the report differs from test/uat/expected.txt; actual: " ++ build_project_abs(root, build_project_join(out_dir, "report.normalized")))
+        errors = errors + 1
+    let (list_rc, listing) = uat_tests_run(ctx, root, compiler, out_dir, "list.stdout", true)
+    if list_rc != 0:
+        eprint(f"error: uat-tests: `with uat --list` exited {list_rc}:\n" ++ listing)
+        errors = errors + 1
+    if listing != fs.read_text("test/uat/expected-list.txt"):
+        eprint("error: uat-tests: the listing differs from test/uat/expected-list.txt; actual: " ++ build_project_abs(root, build_project_join(out_dir, "list.stdout")))
+        errors = errors + 1
+    if errors > 0:
+        return 1
+    print("uat-tests: every verb and verdict reported as expected")
+    0
+
 fn run_contract_view_tests_action(ctx: ActionCtx) -> i32:
     let inputs = ctx.inputs()
     if inputs.len() == 0:
@@ -2846,6 +2917,16 @@ pub fn build(ctx: BuildCtx) -> Build:
     contract_view_tests = contract_view_tests.write_scope("out/contract-view-tests")
     out = out.add_target(contract_view_tests)
 
+    // §18.5d: `with uat` over the planted scenarios in test/uat.
+    var uat_tests = target_new(.Action, "uat-tests", "").output("out/uat-tests")
+    uat_tests = uat_tests.allow_parallel()
+    uat_tests.action = run_uat_tests_action
+    uat_tests = uat_tests.input(release_compiler_bin("with"))
+    uat_tests = uat_tests.input("test/uat")
+    uat_tests = uat_tests.dep("build")
+    uat_tests = uat_tests.write_scope("out/uat-tests")
+    out = out.add_target(uat_tests)
+
     // D38: the ABI-defining sources' recorded hash must match — an ABI change
     // without a WITH_ABI_VERSION bump fails the battery (docs/with-abi.md §7).
     var abi_hash_check = target_new(.Action, "abi-hash-check", "").output("out/abi-hash-check/stamp")
@@ -3154,6 +3235,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     tests = tests.dep("parser-tests")
     tests = tests.dep("deep-debug-tool-tests")
     tests = tests.dep("contract-view-tests")
+    tests = tests.dep("uat-tests")
     tests = tests.dep("abi-hash-check")
     tests = tests.dep("cli-selfhost-smoke-tests")
     tests = tests.dep("cli-selfhost-one-liner-tests")

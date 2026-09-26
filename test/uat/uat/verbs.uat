@@ -1,0 +1,24 @@
+scenario: every verb over a fresh project
+
+new directory
+run: with init
+expect exit: 0
+expect file uat/hello.uat exists
+write extra.txt from note.txt
+expect file extra.txt contains: a note from a fixture
+write inline.txt:
+    first line
+    second line
+expect file inline.txt contains: second line
+copy uat/fixtures/note.txt to copied.txt
+expect file copied.txt exists
+env UAT_TESTS_VERB=set
+run: with build
+run: ./out/bin/tmp
+expect exit: 0
+expect stdout: hello from tmp
+expect stdout contains: from tmp
+run (fails): with check missing.w
+expect stderr contains: missing.w
+run: with uat
+expect stdout contains: 1 pass
