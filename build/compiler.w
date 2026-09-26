@@ -1229,7 +1229,7 @@ pub fn run_check_user_programs_safe_action(ctx: ActionCtx) -> i32:
     let fs = ctx.fs()
     var errors = 0
     var files = 0
-    for root in ["build/release_uat_fixtures", "examples"]:
+    for root in ["uat/fixtures", "examples"]:
         if not fs.is_dir(root): continue
         for path in fs.list_files(root):
             if not path.ends_with(".w"): continue

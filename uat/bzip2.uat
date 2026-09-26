@@ -1,0 +1,10 @@
+scenario: bzip2 from a fresh project
+requires: network
+
+new directory
+run: with init .
+run: with get c.bzip2
+write src/main.w from bzip2_main.w
+copy lib/facades/bzip2.w to src/facades/bzip2.w
+run: with run
+expect stdout: bzip2 UAT passed

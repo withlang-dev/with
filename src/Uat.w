@@ -19,6 +19,7 @@ extern fn with_fs_read_file(path: &str) -> str
 extern fn with_fs_file_exists(path: &str) -> i32
 extern fn with_fs_remove_tree(path: &str) -> i32
 extern fn with_fs_list_files(path: &str) -> str
+extern fn with_fs_chmod(path: &str, mode: i32) -> i32
 use std.process
 use TargetSpec
 use std.time
@@ -233,7 +234,14 @@ fn uat_parse(path: &str, text: &str) -> UatScenario:
         else if line.starts_with("expect stdout contains:"):
             sc.steps.push(uat_step(UAT_EXPECT_STDOUT_CONTAINS, uat_rest_after(line, "expect stdout contains:"), "", lineno))
         else if line.starts_with("expect stdout:"):
-            sc.steps.push(uat_step(UAT_EXPECT_STDOUT, uat_rest_after(line, "expect stdout:"), "", lineno))
+            let stdout_text = uat_rest_after(line, "expect stdout:")
+            if stdout_text.len() == 0:
+                // Several lines: an indented block, compared exactly.
+                let (block, next) = uat_indented_block(lines, i)
+                sc.steps.push(uat_step(UAT_EXPECT_STDOUT, uat_trim_trailing_line_endings(block), "", lineno))
+                i = next
+                continue
+            sc.steps.push(uat_step(UAT_EXPECT_STDOUT, stdout_text, "", lineno))
         else if line.starts_with("expect stderr contains:"):
             sc.steps.push(uat_step(UAT_EXPECT_STDERR_CONTAINS, uat_rest_after(line, "expect stderr contains:"), "", lineno))
         else if line.starts_with("expect file "):
@@ -440,9 +448,14 @@ fn uat_run_scenario(sc: &UatScenario, root: &str, self_path: &str, keep: bool) -
         else if verb == UAT_WRITE_INLINE:
             if uat_write_text(uat_join(cwd, step.a), step.b) != 0: return uat_fail(steps, step, "could not write " ++ step.a, "", move human)
         else if verb == UAT_COPY:
-            let src = uat_join(root, step.a)
+            // `copy $NAME to <path>`: the file the environment variable names.
+            // `copy with to <path>`: the toolchain itself, made executable —
+            // an install layout's `bin/with`.
+            let src = if step.a == "with": uat_toolchain(self_path) else if step.a.starts_with("$"): uat_join(root, env(step.a.slice(1, step.a.len()))) else: uat_join(root, step.a)
             if with_fs_file_exists(src) == 0: return uat_fail(steps, step, "nothing to copy at " ++ step.a, "", move human)
-            if uat_write_text(uat_join(cwd, step.b), uat_read_text(src)) != 0: return uat_fail(steps, step, "could not write " ++ step.b, "", move human)
+            let dst = uat_join(cwd, step.b)
+            if uat_write_text(dst, uat_read_text(src)) != 0: return uat_fail(steps, step, "could not write " ++ step.b, "", move human)
+            if step.a == "with" and with_fs_chmod(dst, 493) != 0: return uat_fail(steps, step, "could not make " ++ step.b ++ " executable", "", move human)
         else if verb == UAT_ENV:
             if set_env(step.a, step.b) != 0: return uat_fail(steps, step, "could not set " ++ step.a, "", move human)
         else if verb == UAT_STDIN:

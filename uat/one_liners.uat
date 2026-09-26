@@ -1,0 +1,156 @@
+scenario: one-liners over stdin and arguments
+
+stdin:
+    1
+    2
+    3
+    4
+    5
+    6
+    7
+    8
+    9
+    10
+    11
+    12
+    13
+    14
+    15
+    16
+    17
+    18
+    19
+    20
+    21
+    22
+    23
+    24
+    25
+    26
+    27
+    28
+    29
+    30
+    31
+    32
+    33
+    34
+    35
+    36
+    37
+    38
+    39
+    40
+    41
+    42
+    43
+    44
+    45
+    46
+    47
+    48
+    49
+    50
+    51
+    52
+    53
+    54
+    55
+    56
+    57
+    58
+    59
+    60
+    61
+    62
+    63
+    64
+    65
+    66
+    67
+    68
+    69
+    70
+    71
+    72
+    73
+    74
+    75
+    76
+    77
+    78
+    79
+    80
+    81
+    82
+    83
+    84
+    85
+    86
+    87
+    88
+    89
+    90
+    91
+    92
+    93
+    94
+    95
+    96
+    97
+    98
+    99
+    100
+run: with -n 'if line =~ /^[0-9]$/: print(line)'
+expect stdout:
+    1
+    2
+    3
+    4
+    5
+    6
+    7
+    8
+    9
+write names.txt:
+    Ada Lovelace
+    Grace Hopper
+    Katherine Johnson
+    Margaret Hamilton
+stdin:
+    Ada Lovelace
+    Grace Hopper
+    Katherine Johnson
+    Margaret Hamilton
+run: with -p 'line = line.upper()'
+expect stdout:
+    ADA LOVELACE
+    GRACE HOPPER
+    KATHERINE JOHNSON
+    MARGARET HAMILTON
+stdin:
+    error 42
+    ok
+    warning 7
+run: with -n 'if line =~ /(?<kind>error|warning) (\d+)/: print(f"{nr}: {$kind.upper()} code={$2}")'
+expect stdout:
+    1: ERROR code=42
+    3: WARNING code=7
+stdin:
+    apple
+    banana
+    pear
+run: with -p 'line = f"{nr}:{line.upper()}"'
+expect stdout:
+    1:APPLE
+    2:BANANA
+    3:PEAR
+stdin:
+    abc
+run: with -p 'line = line.upper(); line = line ++ "!"'
+expect stdout: ABC!
+run: with -e 'for arg in args: print(arg.upper())' -- alpha beta gamma
+expect stdout:
+    ALPHA
+    BETA
+    GAMMA

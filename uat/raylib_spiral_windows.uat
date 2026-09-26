@@ -1,0 +1,15 @@
+scenario: the raylib spiral renders through a software OpenGL driver
+requires: network, display, opengl, env WITH_UAT_OPENGL32_DLL
+platforms: windows
+
+new directory
+run: with init .
+run: with get c.raylib
+write src/main.w from raylib_spiral_main.w
+copy $WITH_UAT_OPENGL32_DLL to out/bin/opengl32.dll
+run: with check src/main.w
+expect stdout: ok
+run: with run
+expect exit: 0
+expect stdout contains: raylib spiral UAT passed:
+expect (human): colored balls moving on a field of black

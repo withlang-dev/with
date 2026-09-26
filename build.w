@@ -1355,6 +1355,57 @@ fn run_uat_tests_action(ctx: ActionCtx) -> i32:
     print("uat-tests: every verb and verdict reported as expected")
     0
 
+// `with uat` over uat/*.uat with the release asset (§18.5d). One stamp per
+// scenario — `<name>.passed` or `<name>.skipped` — so the runbook can see
+// which checks this host actually ran; any FAIL fails the target.
+fn run_release_uat_action(ctx: ActionCtx) -> i32:
+    let inputs = ctx.inputs()
+    if inputs.len() == 0:
+        ctx.diagnostics().error("release-uat: missing release asset input")
+    let fs = ctx.fs()
+    let report_rel = ctx.output()
+    let out_dir = build_project_dirname(report_rel)
+    let _ = fs.remove_tree(out_dir)
+    let _ = fs.remove_tree("out/uat")
+    if fs.mkdir_all(out_dir) != 0:
+        ctx.diagnostics().error("release-uat: could not create output dir: " ++ out_dir)
+    let root = ctx.project_info().project_root()
+    let compiler = build_project_abs(root, inputs.get(0))
+    let args: Vec[str] = Vec.new()
+    args.push(compiler.clone())
+    args.push("uat")
+    var envs = process_env()
+    envs = envs.set("WITH_UAT_WITH", compiler.clone())
+    envs = envs.set("PWD", root.clone())
+    let result = ctx.process_runner().run_capture_cwd_with_env(args, build_project_abs(root, report_rel), build_project_abs(root, build_project_join(out_dir, "report.stderr")), 1800000, root.clone(), envs)
+    let report = fs.read_text(report_rel)
+    print(report)
+    var failed = 0
+    let lines = report.split("\n")
+    for i in 0..lines.len() as i32:
+        let line = lines[i]
+        if not line.starts_with("uat: "):
+            continue
+        let dots = line.find(" ....")
+        if dots < 0:
+            continue
+        let name = line.slice(5, dots)
+        let verdict = line.slice(dots, line.len())
+        var stamp = ""
+        if verdict.contains(" pass "):
+            stamp = ".passed"
+        if verdict.contains(" skip "):
+            stamp = ".skipped"
+        if verdict.contains(" FAIL "):
+            failed = failed + 1
+        if stamp.len() > 0:
+            let _ = fs.write_text(build_project_join(out_dir, name ++ stamp), verdict.trim() ++ "\n")
+    if result.rc != 0 or failed > 0:
+        eprint(f"error: release-uat: `with uat` exited {result.rc} with {failed} failing scenario(s); stderr: " ++ build_project_abs(root, build_project_join(out_dir, "report.stderr")))
+        return 1
+    0
+
+
 fn run_contract_view_tests_action(ctx: ActionCtx) -> i32:
     let inputs = ctx.inputs()
     if inputs.len() == 0:
@@ -2118,7 +2169,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     var user_programs_safe = target_new(.Action, "user-programs-safe", "").output("out/.build-state/user-programs-safe.txt")
     user_programs_safe.action = run_check_user_programs_safe_action
     user_programs_safe = user_programs_safe.write_scope("out/.build-state")
-    user_programs_safe = user_programs_safe.input("build/release_uat_fixtures").input("examples")
+    user_programs_safe = user_programs_safe.input("uat/fixtures").input("examples")
     out = out.add_target(user_programs_safe)
 
     var libc_surface = target_new(.Action, "libc-surface-check", "").output("out/.build-state/libc-surface-check.txt")
@@ -3319,111 +3370,21 @@ pub fn build(ctx: BuildCtx) -> Build:
         release_platform_asset = release_platform_asset.dep("build")
         out = out.add_target(release_platform_asset)
 
-    var release_artifact_smoke_uat = target_new(.Action, "release-artifact-smoke-uat", "").output("out/release-uat/artifact-smoke.passed")
-    release_artifact_smoke_uat.action = run_release_artifact_smoke_uat_action
-    release_artifact_smoke_uat = release_artifact_smoke_uat.input(release_platform_asset_bin())
-    release_artifact_smoke_uat = release_artifact_smoke_uat.write_scope("out/release-uat")
-    release_artifact_smoke_uat = release_artifact_smoke_uat.dep("require-last-green")
-    release_artifact_smoke_uat = release_uat_platform_asset_dep(move release_artifact_smoke_uat)
-    out = out.add_target(release_artifact_smoke_uat)
-
-    var release_fresh_project_uat = target_new(.Action, "release-fresh-project-uat", "").output("out/release-uat/fresh-project.passed")
-    release_fresh_project_uat.action = run_release_fresh_project_uat_action
-    release_fresh_project_uat = release_fresh_project_uat.input(release_platform_asset_bin())
-    release_fresh_project_uat = release_fresh_project_uat.write_scope("out/release-uat")
-    release_fresh_project_uat = release_fresh_project_uat.dep("require-last-green")
-    release_fresh_project_uat = release_uat_platform_asset_dep(move release_fresh_project_uat)
-    out = out.add_target(release_fresh_project_uat)
-
-    var release_migrate_uat = target_new(.Action, "release-migrate-uat", "").output("out/release-uat/migrate.passed")
-    release_migrate_uat.action = run_release_migrate_uat_action
-    release_migrate_uat = release_migrate_uat.input(release_platform_asset_bin())
-    release_migrate_uat = release_migrate_uat.write_scope("out/release-uat")
-    release_migrate_uat = release_migrate_uat.dep("require-last-green")
-    release_migrate_uat = release_uat_platform_asset_dep(move release_migrate_uat)
-    out = out.add_target(release_migrate_uat)
-
-    var release_zlib_uat = target_new(.Action, "release-zlib-uat", "").output("out/release-uat/zlib.passed")
-    release_zlib_uat.action = run_release_zlib_uat_action
-    release_zlib_uat = release_zlib_uat.input(release_platform_asset_bin())
-    release_zlib_uat = release_zlib_uat.input("build/release_uat_fixtures/zlib_main.w").input("lib/facades/zlib.w")
-    release_zlib_uat = release_zlib_uat.write_scope("out/release-uat")
-    release_zlib_uat = release_zlib_uat.allow_network()
-    release_zlib_uat = release_zlib_uat.dep("require-last-green")
-    release_zlib_uat = release_uat_platform_asset_dep(move release_zlib_uat)
-    out = out.add_target(release_zlib_uat)
-
-    var release_bzip2_uat = target_new(.Action, "release-bzip2-uat", "").output("out/release-uat/bzip2.passed")
-    release_bzip2_uat.action = run_release_bzip2_uat_action
-    release_bzip2_uat = release_bzip2_uat.input(release_platform_asset_bin())
-    release_bzip2_uat = release_bzip2_uat.input("build/release_uat_fixtures/bzip2_main.w").input("lib/facades/bzip2.w")
-    release_bzip2_uat = release_bzip2_uat.write_scope("out/release-uat")
-    release_bzip2_uat = release_bzip2_uat.allow_network()
-    release_bzip2_uat = release_bzip2_uat.dep("require-last-green")
-    release_bzip2_uat = release_uat_platform_asset_dep(move release_bzip2_uat)
-    out = out.add_target(release_bzip2_uat)
-
-    var release_sqlite3_uat = target_new(.Action, "release-sqlite3-uat", "").output("out/release-uat/sqlite3.passed")
-    release_sqlite3_uat.action = run_release_sqlite3_uat_action
-    release_sqlite3_uat = release_sqlite3_uat.input(release_platform_asset_bin())
-    release_sqlite3_uat = release_sqlite3_uat.input("build/release_uat_fixtures/sqlite3_main.w").input("lib/facades/sqlite3.w")
-    release_sqlite3_uat = release_sqlite3_uat.write_scope("out/release-uat")
-    release_sqlite3_uat = release_sqlite3_uat.allow_network()
-    release_sqlite3_uat = release_sqlite3_uat.dep("require-last-green")
-    release_sqlite3_uat = release_uat_platform_asset_dep(move release_sqlite3_uat)
-    out = out.add_target(release_sqlite3_uat)
-
-    var release_libcurl_uat = target_new(.Action, "release-libcurl-uat", "").output("out/release-uat/libcurl.passed")
-    release_libcurl_uat.action = run_release_libcurl_uat_action
-    release_libcurl_uat = release_libcurl_uat.input(release_platform_asset_bin())
-    release_libcurl_uat = release_libcurl_uat.input("build/release_uat_fixtures/libcurl_main.w").input("lib/facades/libcurl.w")
-    release_libcurl_uat = release_libcurl_uat.write_scope("out/release-uat")
-    release_libcurl_uat = release_libcurl_uat.allow_network()
-    release_libcurl_uat = release_libcurl_uat.dep("require-last-green")
-    release_libcurl_uat = release_uat_platform_asset_dep(move release_libcurl_uat)
-    out = out.add_target(release_libcurl_uat)
-
-    var release_install_layout_uat = target_new(.Action, "release-install-layout-uat", "").output("out/release-uat/install-layout.passed")
-    release_install_layout_uat.action = run_release_install_layout_uat_action
-    release_install_layout_uat = release_install_layout_uat.input(release_platform_asset_bin())
-    release_install_layout_uat = release_install_layout_uat.write_scope("out/release-uat")
-    release_install_layout_uat = release_install_layout_uat.dep("require-last-green")
-    release_install_layout_uat = release_uat_platform_asset_dep(move release_install_layout_uat)
-    out = out.add_target(release_install_layout_uat)
-
-    var release_raylib_spiral_uat = target_new(.Action, "release-raylib-spiral-uat", "").output("out/release-uat/raylib-spiral.passed")
-    release_raylib_spiral_uat.action = run_release_raylib_spiral_uat_action
-    release_raylib_spiral_uat = release_raylib_spiral_uat.input(release_platform_asset_bin())
-    release_raylib_spiral_uat = release_raylib_spiral_uat.input("build/release_uat_fixtures/raylib_spiral_main.w")
+    // The release UATs are `uat/*.uat` (spec §18.5d), run by the release
+    // asset's own `with uat` from the repo root; the report is the gate and
+    // the per-scenario stamps under out/release-uat record what it said.
+    var release_uat = target_new(.Action, "release-uat", "").output("out/release-uat/report.txt")
+    release_uat.action = run_release_uat_action
+    release_uat = release_uat.input(release_platform_asset_bin())
+    release_uat = release_uat.input("uat").input("lib/facades")
     let uat_opengl = ctx.env_input("WITH_UAT_OPENGL32_DLL")
     if uat_opengl.len() > 0:
-        release_raylib_spiral_uat = release_raylib_spiral_uat.input(uat_opengl)
-    release_raylib_spiral_uat = release_raylib_spiral_uat.write_scope("out/release-uat")
-    release_raylib_spiral_uat = release_raylib_spiral_uat.allow_network()
-    release_raylib_spiral_uat = release_raylib_spiral_uat.dep("require-last-green")
-    release_raylib_spiral_uat = release_uat_platform_asset_dep(move release_raylib_spiral_uat)
-    out = out.add_target(release_raylib_spiral_uat)
-
-    var release_one_liner_uat = target_new(.Action, "release-one-liner-uat", "").output("out/release-uat/one-liners.passed")
-    release_one_liner_uat.action = run_release_one_liner_uat_action
-    release_one_liner_uat = release_one_liner_uat.input(release_platform_asset_bin())
-    release_one_liner_uat = release_one_liner_uat.write_scope("out/release-uat")
-    release_one_liner_uat = release_one_liner_uat.dep("require-last-green")
-    release_one_liner_uat = release_uat_platform_asset_dep(move release_one_liner_uat)
-    out = out.add_target(release_one_liner_uat)
-
-    var release_uat = target_new(.Group, "release-uat", "")
+        release_uat = release_uat.input(uat_opengl)
+    release_uat = release_uat.write_scope("out/release-uat").write_scope("out/uat")
+    release_uat = release_uat.allow_network()
+    release_uat = release_uat.dep("require-last-green")
     release_uat = release_uat.dep("user-programs-safe")
-    release_uat = release_uat.dep("release-artifact-smoke-uat")
-    release_uat = release_uat.dep("release-fresh-project-uat")
-    release_uat = release_uat.dep("release-migrate-uat")
-    release_uat = release_uat.dep("release-zlib-uat")
-    release_uat = release_uat.dep("release-bzip2-uat")
-    release_uat = release_uat.dep("release-sqlite3-uat")
-    release_uat = release_uat.dep("release-libcurl-uat")
-    release_uat = release_uat.dep("release-install-layout-uat")
-    release_uat = release_uat.dep("release-raylib-spiral-uat")
-    release_uat = release_uat.dep("release-one-liner-uat")
+    release_uat = release_uat_platform_asset_dep(move release_uat)
     out = out.add_target(release_uat)
 
     var check_committed = target_new(.Action, "check-committed-state", "").output("out/command/check-committed-state/ok")

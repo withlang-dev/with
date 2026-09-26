@@ -1,0 +1,8 @@
+scenario: the compiler runs from an install layout's bin
+
+new directory
+copy with to bin/with
+run: ./bin/with version
+expect stdout contains: with 
+run: ./bin/with -e 'print("installed UAT passed")'
+expect stdout: installed UAT passed
