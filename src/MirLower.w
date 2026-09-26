@@ -3638,8 +3638,18 @@ impl MirBuilder:
                             self.lower_debug_write_place(buf_op, debug_place, resolved_ty, node)
                         handled = true
                     else if spec_mode != 0 or spec_width > 0 or spec_precision >= 0 or (spec_flags & 0x1C0000) != 0:
-                        // Spec formatting: emit FMT_BUF_WRITE_FMT intrinsic
-                        self.lower_fstring_buf_write_fmt(buf_op, expr_op, spec_flags, spec_width, spec_precision, resolved_ty, node)
+                        // Spec formatting: emit FMT_BUF_WRITE_FMT intrinsic.
+                        // The writer pads numbers and strs; every other
+                        // value with a display (bool, an enum, §15.4.8) is
+                        // formatted to its display text first and padded as
+                        // that (#1565: a bool with a width printed `1`, and
+                        // an enum's bytes were read as a str header).
+                        let spec_kind = if resolved_ty != 0: self.sema.get_type_kind(resolved_ty as TypeId) else: TypeKind.TY_ERR
+                        if resolved_ty != 0 and resolved_ty != self.sema.ty_str and spec_kind != TypeKind.TY_INT and spec_kind != TypeKind.TY_FLOAT:
+                            let display_op = self.lower_fmt_to_str(expr_op, node)
+                            self.lower_fstring_buf_write_fmt(buf_op, display_op, spec_flags, spec_width, spec_precision, self.sema.ty_str as i32, node)
+                        else:
+                            self.lower_fstring_buf_write_fmt(buf_op, expr_op, spec_flags, spec_width, spec_precision, resolved_ty, node)
                         handled = true
                 if not handled:
                     if resolved_ty == self.sema.ty_str:
@@ -5452,6 +5462,19 @@ impl MirBuilder:
         // resolved-call contracts exactly that way (gates6 flip).
         if self.sema.type_is_std_box_inst(src_sema_ty) != 0:
             self.consume_moved_operand(op)
+        // §4.4a (#1502): `Kind.Hi as f64` extracts the discriminant (the repr
+        // integer) and then widens it (§4); codegen has no enum→float cast,
+        // so it is lowered as those two.
+        let cast_src_resolved = self.sema.resolve_alias(src_sema_ty as TypeId)
+        if self.sema.get_type_kind(cast_src_resolved) == TypeKind.TY_ENUM and self.sema.get_type_kind(self.sema.resolve_alias(target_type_id as TypeId)) == TypeKind.TY_FLOAT:
+            let repr = self.sema.enum_repr_type(cast_src_resolved as i32)
+            if repr != 0:
+                let repr_rv = self.body.new_rvalue(RvalueKind.RK_CAST, op, repr, src_sema_ty)
+                let repr_tmp = self.new_temp(repr)
+                let repr_place = self.place_for_local(repr_tmp)
+                self.body.push_stmt(self.cur_bb, StmtKind.Assign, repr_place, repr_rv, self.ast.get_start(node))
+                op = self.body.new_operand(OperandKind.OK_COPY, repr_place)
+                src_sema_ty = repr
         let rv = self.body.new_rvalue(RvalueKind.RK_CAST, op, target_type_id, src_sema_ty)
         let temp = self.new_temp(target_type_id)
         let place = self.place_for_local(temp)
@@ -5504,6 +5527,23 @@ impl MirBuilder:
             let place = self.place_for_local(temp)
             self.body.push_stmt(self.cur_bb, StmtKind.Assign, place, rv, self.ast.get_start(node))
             return place
+        // §4.8a (#1517): a slice is `(ptr, len)`, and `s.len` reads its length.
+        // Lowered as a `len` field projection, the read yielded 0: no place
+        // projection names a slice's length; RK_LEN does (copied out of the
+        // projected place first, as sequence_len_rvalue's callers do).
+        let base_kind = self.sema.get_type_kind(self.sema.resolve_alias(base_ty as TypeId))
+        if (base_kind == TypeKind.TY_SLICE or base_kind == TypeKind.TY_ARRAY) and self.pool.resolve(field_idx) == "len":
+            var len_src = base
+            if base_kind == TypeKind.TY_SLICE:
+                let viewed_tmp = self.new_temp(base_ty)
+                len_src = self.place_for_local(viewed_tmp)
+                let viewed_op = self.body.new_operand(OperandKind.OK_COPY, base)
+                self.assign_operand_to_place(len_src, viewed_op, self.ast.get_start(node))
+            let len_tmp = self.new_temp(self.sema.ty_i64)
+            let len_place = self.place_for_local(len_tmp)
+            let len_rv = self.sequence_len_rvalue(len_src, base_ty)
+            self.body.push_stmt(self.cur_bb, StmtKind.Assign, len_place, len_rv, self.ast.get_start(node))
+            return len_place
         self.new_projected_field_place(base, field_idx, field_ty)
 
     mut fn lower_user_deref_result_place(place: i32, current_ty: i32, deref_info: &SemaDerefInfo, node: i32) -> i32:
@@ -14136,12 +14176,19 @@ impl MirBuilder:
     mut fn lower_optional_chain_field(result_place: i32, result_ty: i32, base_place: i32, base_ty: i32, payload_ty: i32, success_idx: i32, success_sym: i32, member_sym: i32, span: i32):
         let downcast_place = self.body.new_downcast_place(base_place, success_idx)
         let payload_place = self.body.new_field_place(downcast_place, 0, payload_ty)
-        let field_ty = self.sema.struct_field_type_frozen(payload_ty, member_sym)
+        // §10.3: a tuple element is a field (`o?.1`, #1503); Sema typed the
+        // chain with the same tuple-aware lookup.
+        let field_ty = self.sema.field_access_type_direct_frozen(self.sema.resolve_alias(payload_ty as TypeId), member_sym)
         if field_ty == 0:
             self.mark_unsupported()
             return
 
-        let field_place = self.body.new_field_place(payload_place, member_sym, field_ty)
+        let payload_resolved = self.sema.resolve_alias(payload_ty as TypeId) as i32
+        let tuple_idx = self.tuple_index_from_field_token(payload_resolved, member_sym)
+        let field_place = if tuple_idx >= 0:
+            self.body.new_tuple_index_place(payload_place, tuple_idx, field_ty)
+        else:
+            self.body.new_field_place(payload_place, member_sym, field_ty)
         let field_op_kind = if self.sema.is_copy_frozen(field_ty) != 0: OperandKind.OK_COPY else: OperandKind.OK_MOVE
         let field_op = self.body.new_operand(field_op_kind, field_place)
         if field_ty == result_ty:

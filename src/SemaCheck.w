@@ -249,11 +249,20 @@ impl Sema:
             return inner_tid
         tid
 
+    // §4 (#1220): a float where an integer is demanded is a narrowing with
+    // two meanings (truncate or round), spelled `x as i32` or `x.round() as
+    // i32`; the operator-promotion arm below (int op float is float) is not
+    // an argument conversion, and codegen then failed with no location.
+    fn float_where_int_demanded(expected: i32, actual: i32) -> bool:
+        self.get_type_kind(self.resolve_alias(expected as TypeId)) == TypeKind.TY_INT and self.get_type_kind(self.resolve_alias(actual as TypeId)) == TypeKind.TY_FLOAT
+
     mut fn builtin_arg_type_compatible(expected: i32, actual: i32) -> i32:
         if expected == 0 or actual == 0:
             return 1
         if self.types_compatible(expected, actual) != 0:
             return 1
+        if self.float_where_int_demanded(expected, actual):
+            return 0
         if self.arithmetic_result_type(expected, actual) != 0:
             return 1
         let actual_unwrapped = self.unwrap_builtin_arg_distinct(actual)
@@ -269,6 +278,8 @@ impl Sema:
             return 1
         if self.types_compatible_frozen(expected, actual) != 0:
             return 1
+        if self.float_where_int_demanded(expected, actual):
+            return 0
         if self.arithmetic_result_type(expected, actual) != 0:
             return 1
         let actual_unwrapped = self.unwrap_builtin_arg_distinct(actual)
@@ -906,6 +917,13 @@ impl Sema:
             return 0
         pointee
 
+    // The type an unsuffixed numeric literal takes from its operator peer: a
+    // Copy view of a number is the number (#1477: `&i64 + 1` typed the literal
+    // i32 and computed the sum at i32, truncating the pointee).
+    mut fn literal_peer_type(ty: i32) -> i32:
+        let pointee = self.shared_copy_pointee(ty)
+        if pointee != 0 and self.is_numeric_type(pointee): pointee else: ty
+
     // Called only after exact-type operator/method resolution has declined a
     // user-defined implementation and selected the builtin value operator.
     // The packed result carries the value types used by that resolved operator;
@@ -913,7 +931,16 @@ impl Sema:
     mut fn contextualize_builtin_binary_operands(lhs_node: i32, lhs0: i32, rhs_node: i32, rhs0: i32) -> i64:
         var lhs = lhs0
         var rhs = rhs0
-        if self.record_contextual_copy_adjustment(lhs_node, rhs, lhs) != 0:
+        // A numeric Copy view next to an owned number materializes as its own
+        // pointee and the builtin operator widens from there; taking the
+        // peer's type instead narrowed `&i64 + k: i32` to i32 (#1477).
+        let lhs_num_pointee = self.literal_peer_type(lhs)
+        let rhs_num_pointee = self.literal_peer_type(rhs)
+        if lhs_num_pointee != lhs and self.is_numeric_type(rhs) and self.record_contextual_copy_adjustment(lhs_node, lhs_num_pointee, lhs) != 0:
+            lhs = lhs_num_pointee
+        else if rhs_num_pointee != rhs and self.is_numeric_type(lhs) and self.record_contextual_copy_adjustment(rhs_node, rhs_num_pointee, rhs) != 0:
+            rhs = rhs_num_pointee
+        else if self.record_contextual_copy_adjustment(lhs_node, rhs, lhs) != 0:
             lhs = rhs
         else if self.record_contextual_copy_adjustment(rhs_node, lhs, rhs) != 0:
             rhs = lhs
@@ -2566,7 +2593,7 @@ impl Sema:
                 let contract_ret = self.fn_signature_return_type(flags, trait_contract.ret_type as TypeId)
                 self.set_sig_return_type(sig_idx, contract_ret as i32)
             else:
-                let inferred_ret = self.infer_unannotated_function_return_type(body, body_ty)
+                let inferred_ret = self.infer_unannotated_function_return_type(body, body_ty, self.fn_decl_is_entry_point(node))
                 let sig_ret = self.fn_signature_return_type(flags, inferred_ret as TypeId)
                 self.set_sig_return_type(sig_idx, sig_ret as i32)
             self.body_typed_sigs.insert(sig_idx, 1)
@@ -2578,6 +2605,11 @@ impl Sema:
                 self.emit_error("missing return", body)
             else if self.type_has_default_value(body_expected_ret as i32) == 0:
                 self.emit_error("return type does not implement Default", body)
+        else if body_expected_ret != 0 and body_ty != 0 and body_ty != self.ty_never and self.resolve_alias(body_expected_ret) == self.ty_never:
+            // #1493: a `-> Never` body must diverge on every path; a valued
+            // tail passed the arm below (types_compatible is one-sided on
+            // Never) and surfaced as a MIR validator failure at the wrong layer.
+            self.emit_error("return type mismatch: a `-> Never` function must not produce a value", body)
         else if body_expected_ret != 0 and body_ty != 0 and body_ty != self.ty_void and body_expected_ret != self.ty_void:
             let explicit_tail_results_ok = self.check_body_explicit_value_results(body, 1, body_expected_ret as i32, "return type mismatch")
             // Check tail expression type against body's expected return type
@@ -6211,7 +6243,7 @@ impl Sema:
         let place = render_expr(self.ast, self.pool, self.ast.get_data0(n) as NodeId, 0)
         self.emit_error_with_help(msg, n, "the tail assignment yields a read of `" ++ place ++ "` after the store (§9.1); the implicit default applies only to a `Unit` tail (§4.10)")
 
-    mut fn infer_unannotated_function_return_type(body: i32, body_ty: TypeId) -> i32:
+    mut fn infer_unannotated_function_return_type(body: i32, body_ty: TypeId, entry_point: i32) -> i32:
         let info = self.body_return_type_info(body)
         if info.mismatch != 0:
             self.emit_error("return type mismatch", info.mismatch_node)
@@ -6220,8 +6252,15 @@ impl Sema:
                 self.emit_error("return type mismatch", info.mismatch_node)
             return self.ty_void as i32
         if info.saw_value_return != 0:
-            if self.body_can_fall_through(body) != 0 and self.type_has_default_value(info.value_type) == 0:
-                self.emit_error("return type does not implement Default", body)
+            // §4.10 / D43 (#1494): a body that returns a value on one path and
+            // falls off the end on another is a missing return, the same as
+            // the annotated spelling; it was defaulted to `T.default()`. A
+            // `Result[Unit, E]` body falls off into `Ok(())` (§4.9). `main`,
+            // `@[entry]` and `test_*` do not infer (§4.10): their exit status
+            // is fixed, and `if failed: return 1` with a fall-off is the idiom.
+            let falls_off = body_ty == 0 or body_ty == self.ty_void
+            if falls_off and entry_point == 0 and self.body_can_fall_through(body) != 0 and self.type_is_result_of_unit(info.value_type) == 0:
+                self.emit_error("missing return", body)
             return info.value_type
         if body_ty != 0:
             return body_ty as i32
@@ -8085,6 +8124,12 @@ impl Sema:
                 // Validate format spec against expression type
                 if spec_node != 0:
                     self.validate_fstring_spec(spec_node, expr_ty as i32, expr_node)
+                    // A width, alignment or precision pads the value's
+                    // display (§15.4.8), so the value must have one; only `?`
+                    // formats a struct or collection (#1565: `{point:>8}`
+                    // passed and read the struct as a str header).
+                    if expr_ty != 0 and (self.ast.get_data0(spec_node) & 255) == 0:
+                        self.check_display_interpolant(expr_ty as i32, expr_node)
                 else if expr_ty != 0:
                     self.check_display_interpolant(expr_ty as i32, expr_node)
                 pos = pos + 3  // kind + expr + spec
@@ -9322,13 +9367,15 @@ impl Sema:
                     rhs = self.check_expr_value_context(rhs_node)
                 else if lhs_is_num_lit and self.ast.kind(rhs_node) != NodeKind.NK_VARIANT_SHORTHAND:
                     rhs = self.check_expr_value_context(rhs_node)
-                    lhs = self.check_expr_with_expected(lhs_node, rhs)
+                    let rhs_peer = self.literal_peer_type(rhs as i32)
+                    lhs = self.check_expr_with_expected(lhs_node, rhs_peer as TypeId)
                 else:
                     lhs = self.check_expr_value_context(lhs_node)
                 if self.ast.kind(rhs_node) == NodeKind.NK_VARIANT_SHORTHAND or (rhs == 0 and self.comparison_operand_is_variant_call(rhs_node) != 0):
                     rhs = self.check_expr_with_expected(rhs_node, lhs)
                 else if rhs == 0 and rhs_is_num_lit and not lhs_is_num_lit:
-                    rhs = self.check_expr_with_expected(rhs_node, lhs)
+                    let lhs_peer = self.literal_peer_type(lhs as i32)
+                    rhs = self.check_expr_with_expected(rhs_node, lhs_peer as TypeId)
                 else:
                     if rhs == 0:
                         rhs = self.check_expr_value_context(rhs_node)
@@ -9345,7 +9392,10 @@ impl Sema:
             else:
                 if lhs_is_bit_lit:
                     rhs = self.check_expr_value_context(rhs_node)
-                    let rhs_num = self.numeric_operand_type(rhs as i32)
+                    // A Copy view of an integer is that integer (#1477): the
+                    // literal beside `v[i]: &u8` takes u8, not i32.
+                    let rhs_peer = self.literal_peer_type(rhs as i32)
+                    let rhs_num = self.numeric_operand_type(rhs_peer)
                     if self.get_type_kind(self.resolve_alias(rhs_num as TypeId)) == TypeKind.TY_INT:
                         lhs = self.check_bitwise_literal_with_expected(lhs_node, rhs_num as TypeId)
                     else:
@@ -9353,7 +9403,8 @@ impl Sema:
                 else:
                     lhs = self.check_expr_value_context(lhs_node)
                 if rhs == 0:
-                    let lhs_num = self.numeric_operand_type(lhs as i32)
+                    let lhs_peer = self.literal_peer_type(lhs as i32)
+                    let lhs_num = self.numeric_operand_type(lhs_peer)
                     if rhs_is_bit_lit and self.get_type_kind(self.resolve_alias(lhs_num as TypeId)) == TypeKind.TY_INT:
                         rhs = self.check_bitwise_literal_with_expected(rhs_node, lhs_num as TypeId)
                     else:
@@ -9369,15 +9420,17 @@ impl Sema:
             else:
                 if lhs_is_num_lit:
                     rhs = self.check_expr_value_context(rhs_node)
-                    if self.is_numeric_type(rhs as i32):
-                        lhs = self.check_expr_with_expected(lhs_node, rhs)
+                    let rhs_peer = self.literal_peer_type(rhs as i32)
+                    if self.is_numeric_type(rhs_peer):
+                        lhs = self.check_expr_with_expected(lhs_node, rhs_peer as TypeId)
                     else:
                         lhs = self.check_expr_value_context(lhs_node)
                 else:
                     lhs = self.check_expr_value_context(lhs_node)
                 if rhs == 0:
-                    if rhs_is_num_lit and self.is_numeric_type(lhs as i32):
-                        rhs = self.check_expr_with_expected(rhs_node, lhs)
+                    let lhs_peer = self.literal_peer_type(lhs as i32)
+                    if rhs_is_num_lit and self.is_numeric_type(lhs_peer):
+                        rhs = self.check_expr_with_expected(rhs_node, lhs_peer as TypeId)
                     else:
                         rhs = self.check_expr_value_context(rhs_node)
                 if lhs == 0:
@@ -10462,8 +10515,14 @@ impl Sema:
         let resolved = self.resolve_alias(t as TypeId)
         if self.get_type_kind(resolved) == TypeKind.TY_NEVER:
             return t
-        if resolved != self.ty_bool:
-            self.emit_error(f"{what} condition must be bool", cond)
+        if resolved == self.ty_bool:
+            return t
+        // D22 contextual Copy (#1472): a condition is an owned `bool` demand,
+        // so a `&bool` element or field view (`if v[i]:`, `if d.flags[i]:`)
+        // materializes its pointee the way `let b: bool = v[i]` does.
+        if self.record_contextual_copy_adjustment(cond, self.ty_bool as i32, t as i32) != 0:
+            return self.ty_bool
+        self.emit_error(f"{what} condition must be bool", cond)
         t
 
 
@@ -12293,7 +12352,7 @@ impl Sema:
             return base
         let payload = self.optional_chain_payload_type(base)
         if payload != 0:
-            let f = self.struct_field_type(payload, member)
+            let f = self.field_access_type_direct(self.resolve_alias(payload as TypeId), member)
             if f == 0:
                 // Not a field (e.g. a method-call form) — keep the receiver type.
                 return base
@@ -12306,7 +12365,7 @@ impl Sema:
         let result_payload = self.optional_chain_result_ok_type(base)
         if result_payload == 0:
             return base
-        let f = self.struct_field_type(result_payload, member)
+        let f = self.field_access_type_direct(self.resolve_alias(result_payload as TypeId), member)
         if f == 0:
             // Not a field (e.g. a method-call form) — keep the receiver type.
             return base
@@ -12320,7 +12379,7 @@ impl Sema:
             return base
         let payload = self.optional_chain_payload_type(base)
         if payload != 0:
-            let f = self.struct_field_type_frozen(payload, member)
+            let f = self.field_access_type_direct_frozen(self.resolve_alias(payload as TypeId), member)
             if f == 0:
                 return base
             let fr = self.resolve_alias(f as TypeId)
@@ -12335,7 +12394,7 @@ impl Sema:
         let result_payload = self.optional_chain_result_ok_type(base)
         if result_payload == 0:
             return base
-        let f = self.struct_field_type_frozen(result_payload, member)
+        let f = self.field_access_type_direct_frozen(self.resolve_alias(result_payload as TypeId), member)
         if f == 0:
             return base
         let err_ty = self.optional_chain_result_err_type(base)
@@ -14317,6 +14376,7 @@ enum SemaExhClass: i32:
     Tuple = 3
     Struct = 4
     Int = 5
+    Slice = 6
 
 impl Sema:
     // The subject's own type: patterns see through `&` (§9.7 reference
@@ -14352,6 +14412,13 @@ impl Sema:
             return SemaExhClass.Int
         if tk == TypeKind.TY_TUPLE:
             return SemaExhClass.Tuple
+        // A dynamic slice or Vec is decided by its length (#1533): the
+        // Vec check precedes the struct one, or a slice pattern on a Vec
+        // column would be a non-constructor of the Vec struct.
+        if tk == TypeKind.TY_SLICE:
+            return SemaExhClass.Slice
+        if tk == TypeKind.TY_GENERIC_INST and self.get_generic_inst_base(ty) == self.syms.vec:
+            return SemaExhClass.Slice
         if self.enum_pattern_type(ty) != 0:
             return SemaExhClass.Enum
         if self.exh_struct_field_count(ty) >= 0:
@@ -14606,6 +14673,9 @@ impl Sema:
         if cls == SemaExhClass.Int and not self.exh_int_domain_open(ty):
             return self.exh_missing_int(m, &heads, &origins, &rest_tys, ty)
 
+        if cls == SemaExhClass.Slice:
+            return self.exh_missing_slice(m, &heads, &origins, &rest_tys)
+
         if cls == SemaExhClass.Bool or cls == SemaExhClass.Enum or cls == SemaExhClass.Tuple or cls == SemaExhClass.Struct:
             let ctor_count = self.exh_constructor_count(cls, ty)
             var first_absent = -1
@@ -14675,6 +14745,64 @@ impl Sema:
         for ci in 0..sub.witness.len() as i32:
             w.push(sub.witness[ci].clone())
         SemaPatMissing { missing: true, witness: w }
+
+    // A slice pattern's fixed element count: its head names plus its tail
+    // names (Parser.parse_slice_pattern's layout).
+    fn exh_slice_fixed_count(h: i32) -> i32:
+        let s_extra = self.ast.get_data0(h)
+        let head = self.ast.get_data1(h)
+        head + self.ast.get_extra(s_extra + 1 + head)
+
+    // Whether a column-0 head matches a sequence of length `n`: an exact
+    // pattern its own length, a rest pattern every length from its fixed
+    // count up. Slice patterns only bind names (§9.7), so the length is
+    // the whole test.
+    fn exh_slice_covers_length(h: i32, n: i32) -> bool:
+        if self.ast.kind(h) != NodeKind.NK_PAT_SLICE:
+            return false
+        let fixed = self.exh_slice_fixed_count(h)
+        if self.ast.get_extra(self.ast.get_data0(h)) != 0: n >= fixed else: n == fixed
+
+    fn exh_render_slice_length(n: i32, open: bool) -> str:
+        var out = "["
+        for i in 0..n:
+            if i > 0:
+                out = out ++ ", "
+            out = out ++ "_"
+        if open:
+            out = out ++ (if n > 0: ", .." else: "..")
+        out ++ "]"
+
+    // A dynamic slice or Vec column (#1533, §9.7): the constructors are the
+    // lengths 0..L and "L+1 or more", L the longest fixed count among the
+    // heads; a length no row covers is the witness (`[_, _]`).
+    mut fn exh_missing_slice(m: &SemaPatRows, heads: &Vec[i32], origins: &Vec[i32], rest_tys: &Vec[i32]) -> SemaPatMissing:
+        let width = rest_tys.len() as i32 + 1
+        var longest = 0
+        for hi in 0..heads.len() as i32:
+            let h = heads[hi]
+            if h != 0 and self.ast.kind(h) == NodeKind.NK_PAT_SLICE:
+                let fixed = self.exh_slice_fixed_count(h)
+                if fixed > longest:
+                    longest = fixed
+        for n in 0..(longest + 2):
+            let cells: Vec[i32] = Vec.new()
+            var count = 0
+            for hi in 0..heads.len() as i32:
+                let h = heads[hi]
+                if h != 0 and not self.exh_slice_covers_length(h, n):
+                    continue
+                for ci in 1..width:
+                    cells.push(m.cells[origins[hi] * width + ci])
+                count = count + 1
+            let sub = self.exh_missing(SemaPatRows { cells: cells, count: count }, rest_tys)
+            if sub.missing:
+                let w: Vec[str] = Vec.new()
+                w.push(self.exh_render_slice_length(n, n > longest))
+                for ci in 0..sub.witness.len() as i32:
+                    w.push(sub.witness[ci].clone())
+                return SemaPatMissing { missing: true, witness: w }
+        SemaPatMissing { missing: false, witness: Vec.new() }
 
     // The rows whose column-0 head is a catch-all, without that column.
     fn exh_default_rows(m: &SemaPatRows, heads: &Vec[i32], origins: &Vec[i32], width: i32) -> SemaPatRows:
@@ -23264,7 +23392,9 @@ impl Sema:
             scoped_args.push(self.unwrap_task_type(task_ty as TypeId) as i32)
             return self.ensure_generic_inst_type(self.syms.scoped_task, scoped_args, 1) as i32
 
-        if field == self.syms.spawn_method:
+        // §18.2 (#1303): the receiver's own `spawn` method wins over the
+        // scope-handle builtin; the builtin applies only when nothing resolves.
+        if field == self.syms.spawn_method and mc_sig_idx_for_effect < 0 and mc_method_fn_for_resolution == 0:
             if self.ast.kind(expr) != NodeKind.NK_IDENT or self.is_active_sync_scope_symbol(self.ast.get_data0(expr)) == 0:
                 self.emit_error("spawn() is only available inside scope", node)
                 return 0

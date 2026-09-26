@@ -7885,8 +7885,9 @@ impl Sema:
             return 1
         if exp_k == TypeKind.TY_FLOAT and act_k == TypeKind.TY_INT:
             return 1
-        if exp_k == TypeKind.TY_INT and act_k == TypeKind.TY_FLOAT:
-            return 1
+        // §4 (#1220): a float where an integer is demanded is a narrowing
+        // (truncate or round: two meanings), spelled with `as`; accepted here,
+        // it surfaced as codegen's "wrong argument type" with no location.
         if exp_k == TypeKind.TY_FN and act_k == TypeKind.TY_FN:
             return self.callable_unsafe_coercion_ok(exp_r as i32, act_r as i32)
         if exp_k == TypeKind.TY_EXTERN_FN and act_k == TypeKind.TY_EXTERN_FN:
@@ -8134,8 +8135,9 @@ impl Sema:
             return 1
         if exp_k == TypeKind.TY_FLOAT and act_k == TypeKind.TY_INT:
             return 1
-        if exp_k == TypeKind.TY_INT and act_k == TypeKind.TY_FLOAT:
-            return 1
+        // §4 (#1220): a float where an integer is demanded is a narrowing
+        // (truncate or round: two meanings), spelled with `as`; accepted here,
+        // it surfaced as codegen's "wrong argument type" with no location.
         if exp_k == TypeKind.TY_FN and act_k == TypeKind.TY_FN:
             return self.callable_unsafe_coercion_ok(exp_r as i32, act_r as i32)
         if exp_k == TypeKind.TY_EXTERN_FN and act_k == TypeKind.TY_EXTERN_FN:
