@@ -2549,7 +2549,7 @@ impl Sema:
                 if body_root != 0:
                     self.note_param_view_origin(body_root, self.compute_expr_view_origin_mask(body), body)
                 self.check_returned_view_origins(body, body)
-            else if body_materializes_copy == 0 and self.type_is_ephemeral_value(body_ty as i32) != 0:
+            else if body_materializes_copy == 0 and (self.type_is_ephemeral_value(body_ty as i32) != 0 or self.expr_is_ephemeral_value(body) != 0):
                 self.note_returned_transparent_view_effects(body)
                 self.check_returned_ephemeral_value_origins(body, body)
             self.check_returned_closure_env(body, body)
@@ -5694,7 +5694,32 @@ impl Sema:
         // #625 (decisions.md D2): a container/struct literal of an ephemeral type is
         // an ephemeral value — needed so Box.new(View{…}) / heap-escape gates fire.
         if kind == NodeKind.NK_STRUCT_LIT or kind == NodeKind.NK_ARRAY_LIT or kind == NodeKind.NK_MAP_LIT:
-            return self.type_is_ephemeral_value(self.cached_or_checked_expr_type(node))
+            if self.type_is_ephemeral_value(self.cached_or_checked_expr_type(node)) != 0:
+                return 1
+            // A literal holding an ephemeral VALUE (a non-`move` closure in a
+            // field, #1638) is ephemeral even when its type is not.
+            if kind == NodeKind.NK_STRUCT_LIT:
+                let field_start = self.ast.get_data1(node)
+                let field_count = self.ast.get_data2(node)
+                for fi in 0..field_count:
+                    if self.expr_is_ephemeral_value(self.ast.get_extra(field_start + fi * 2 + 1)) != 0:
+                        return 1
+                return 0
+            let elem_start = self.ast.get_data0(node)
+            let elem_count = self.ast.get_data1(node)
+            let stride = if kind == NodeKind.NK_MAP_LIT: 2 else: 1
+            for ei in 0..elem_count * stride:
+                if self.expr_is_ephemeral_value(self.ast.get_extra(elem_start + ei)) != 0:
+                    return 1
+            return 0
+        // §12.4 / D63: a non-`move` closure holding a place of this frame is
+        // a view of it — ephemeral as a value, though `fn(A) -> R` the type
+        // is not. Storing it (#1594, #1638) is a store of a view.
+        if kind == NodeKind.NK_CLOSURE and self.ast.is_move_closure(node) == 0:
+            for ci in 0..self.closure_capture_summary_count(node):
+                if (self.closure_capture_summary_eff(node, ci) & EFF_CAPTURE_BY_PLACE) != 0:
+                    return 1
+            return 0
         0
 
     fn scope_body_tail_is_method_call(node: i32, scope_sym: i32, method_sym: i32) -> i32:
@@ -9969,7 +9994,7 @@ impl Sema:
                 // Only the body block's tail is the return (#1406): an inner
                 // block's tail escapes just that block's own bindings.
                 self.check_view_escape_origins(tail, tail, if node == self.body_tail_block: -1 else: block_scope_start)
-            else if tail_materializes == 0 and self.type_is_ephemeral_value(tail_type as i32) != 0 and tail_is_value != 0 and self.stmt_pos_depth == 0 and self.current_return_type != 0 and self.current_return_type != self.ty_void:
+            else if tail_materializes == 0 and (self.type_is_ephemeral_value(tail_type as i32) != 0 or self.expr_is_ephemeral_value(tail) != 0) and tail_is_value != 0 and self.stmt_pos_depth == 0 and self.current_return_type != 0 and self.current_return_type != self.ty_void:
                 // #625 (decisions.md D2): a tail-position return of an ephemeral value
                 // (struct or container) is escape-checked HERE, in-scope, while the
                 // block's binding view-deps are still live. The body-level check
@@ -11606,7 +11631,7 @@ impl Sema:
                 if root != 0:
                     self.note_param_view_origin(root, self.compute_expr_view_origin_mask(value), value)
                 self.check_returned_view_origins(value, node)
-            else if self.has_contextual_copy_adjustment(value) == 0 and self.type_is_ephemeral_value(val_type as i32) != 0:
+            else if self.has_contextual_copy_adjustment(value) == 0 and (self.type_is_ephemeral_value(val_type as i32) != 0 or self.expr_is_ephemeral_value(value) != 0):
                 self.note_returned_transparent_view_effects(value)
                 self.check_returned_ephemeral_value_origins(value, node)
             self.check_returned_closure_env(value, node)
@@ -23011,7 +23036,7 @@ impl Sema:
                 // container is caught by the existing ephemeral-escape checks.
                 // Owned-field "linear" ephemerals (e.g. Workspace{token: str})
                 // carry no view origin, so they stay freely containerizable.
-                if mc_arg_ty as i32 != 0 and self.type_is_ephemeral_value(mc_arg_ty as i32) != 0:
+                if mc_arg_ty as i32 != 0 and (self.type_is_ephemeral_value(mc_arg_ty as i32) != 0 or self.expr_is_ephemeral_value(mc_arg_node) != 0):
                     if self.ast.kind(expr) == NodeKind.NK_IDENT:
                         let mc_recv_sym = self.ast.get_data0(expr)
                         var mc_store_deps: Vec[i32] = Vec.new()
@@ -25502,7 +25527,52 @@ impl Sema:
                 if self.expr_uses_symbol(self.ast.get_extra(extra_start + ai * 3 + 2), sym) != 0:
                     return 1
             return 0
-        0
+        if kind == NodeKind.NK_UNSAFE_BLOCK or kind == NodeKind.NK_COPY_ARG or kind == NodeKind.NK_MOVE_ARG:
+            return self.expr_uses_symbol(self.ast.get_data0(node), sym)
+        if kind == NodeKind.NK_VARIANT_SHORTHAND:
+            let extra_start = self.ast.get_data1(node)
+            let arg_count = self.ast.get_data2(node)
+            for ai in 0..arg_count:
+                if self.expr_uses_symbol(self.ast.get_extra(extra_start + ai), sym) != 0:
+                    return 1
+            return 0
+        if kind == NodeKind.NK_MULTI_INDEX:
+            if self.expr_uses_symbol(self.ast.get_data0(node), sym) != 0:
+                return 1
+            let spec_start = self.ast.get_data1(node)
+            let spec_count = self.ast.get_data2(node)
+            for si in 0..spec_count:
+                let spec = self.ast.get_extra(spec_start + si)
+                if self.expr_uses_symbol(self.ast.get_data0(spec), sym) != 0:
+                    return 1
+                if self.expr_uses_symbol(self.ast.get_data1(spec), sym) != 0:
+                    return 1
+                if self.expr_uses_symbol(self.ast.get_data2(spec) % INDEX_KIND_SHIFT, sym) != 0:
+                    return 1
+            return 0
+        if kind == NodeKind.NK_WITH_IMPLICIT:
+            if self.expr_uses_symbol(self.ast.get_data0(node), sym) != 0:
+                return 1
+            return self.expr_uses_symbol(self.ast.get_data1(node), sym)
+        if kind == NodeKind.NK_ASM_EXPR:
+            // Extras: [output_count, out_type_0.., input_count, in_expr_0..]
+            let asm_extra_start = self.ast.get_data2(node) >> 8
+            if asm_extra_start <= 0:
+                return 0
+            let in_base = asm_extra_start + 1 + self.ast.get_extra(asm_extra_start)
+            let in_count = self.ast.get_extra(in_base)
+            for ii in 0..in_count:
+                if self.expr_uses_symbol(self.ast.get_extra(in_base + 1 + ii), sym) != 0:
+                    return 1
+            return 0
+        // Leaves: nothing below them can name a symbol. Every other kind is
+        // an expression form this walk has no case for — a capture it would
+        // silently miss (#1570, #1598), so it is a compiler bug, not a 0.
+        if kind == NodeKind.NK_INT_LIT or kind == NodeKind.NK_FLOAT_LIT or kind == NodeKind.NK_STRING_LIT or kind == NodeKind.NK_BOOL_LIT or kind == NodeKind.NK_C_STRING_LIT or kind == NodeKind.NK_NULL_LIT or kind == NodeKind.NK_REGEX_LIT or kind == NodeKind.NK_CONTINUE or kind == NodeKind.NK_COMPTIME_ERROR or kind == NodeKind.NK_POISONED_EXPR or kind == NodeKind.NK_FSTRING_SPEC or kind == NodeKind.NK_INDEX_SPEC:
+            return 0
+        if kind == NodeKind.NK_LET_DECL or kind == NodeKind.NK_FN_DECL or kind == NodeKind.NK_TYPE_DECL or kind == NodeKind.NK_USE_DECL or kind == NodeKind.NK_EXTERN_FN or kind == NodeKind.NK_EXTERN_VAR or kind == NodeKind.NK_C_IMPORT or kind == NodeKind.NK_IMPL_DECL or kind == NodeKind.NK_TRAIT_DECL or kind == NodeKind.NK_POISONED_DECL:
+            return 0
+        panic(f"internal error: expr_uses_symbol has no case for node kind {kind}")
 
     fn sync_scope_spawn_worker(node: i32, scope_sym: i32) -> i32:
         if node == 0:

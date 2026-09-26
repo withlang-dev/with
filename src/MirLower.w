@@ -4672,8 +4672,14 @@ impl MirBuilder:
         else if kind == NodeKind.NK_WITH_EXPR or kind == NodeKind.NK_WITH_IMPLICIT or kind == NodeKind.NK_WITH_TUPLE:
             if self.expr_mentions_symbol(self.ast.get_data0(node), sym) != 0: return 1
             self.expr_mentions_symbol(self.ast.get_data1(node), sym)
-        else:
+        else if kind == NodeKind.NK_INT_LIT or kind == NodeKind.NK_FLOAT_LIT or kind == NodeKind.NK_STRING_LIT or kind == NodeKind.NK_BOOL_LIT or kind == NodeKind.NK_C_STRING_LIT or kind == NodeKind.NK_NULL_LIT or kind == NodeKind.NK_REGEX_LIT or kind == NodeKind.NK_CONTINUE or kind == NodeKind.NK_GOTO:
             0
+        else:
+            // This walk guards the string move-first rewrite: a form it has
+            // no case for (f-strings, `.Variant(args)`, `?.`, `=~`, multi-index,
+            // `select`) may well mention the root, so the guard says so and
+            // the rewrite stays off — a silent 0 here was a wrong move.
+            1
 
     fn string_move_first_place_eligible(place: i32) -> i32:
         if self.place_type_is_str(place) == 0:
@@ -5317,9 +5323,31 @@ impl MirBuilder:
 
         if op == UnaryOp.UOP_REF or op == UnaryOp.UOP_RAW_REF_CONST or op == UnaryOp.UOP_RAW_REF_MUT:
             let ref_ty = self.expr_type(node)
-            let fn_addr = self.lower_fn_address(expr, ref_ty)
+            // `&f` on a bare function: when Sema typed it `&fn(A) -> R`
+            // (#1603, §3.7) the value is a reference to the callable — the
+            // callee calls through `read.*` — so the callable lives in a temp
+            // and the reference points at it. Only a raw-ref op, or a `&f`
+            // Sema already typed as the callable itself, yields the code
+            // address.
+            let ref_res = self.sema.resolve_alias(ref_ty as TypeId)
+            // `&f` handed to a `*const fn(...)` (a raw C function pointer:
+            // `let fp: *const fn(i64) -> i64 = &take_i64`, a struct field, a
+            // call argument) is the code address, whatever Sema typed the
+            // reference expression itself.
+            let expected_res = if self.expected_type != 0: self.sema.resolve_alias(self.expected_type as TypeId) else: 0 as TypeId
+            let expects_raw_fn_ptr = self.expected_type != 0 and self.sema.get_type_kind(expected_res) == TypeKind.TY_PTR
+            let ref_to_fn = op == UnaryOp.UOP_REF and self.sema.get_type_kind(ref_res) == TypeKind.TY_REF and not expects_raw_fn_ptr
+            let fn_ty = if ref_to_fn: self.sema.get_type_d0(ref_res) as i32 else: ref_ty
+            let fn_addr = self.lower_fn_address(expr, fn_ty)
             if fn_addr >= 0:
-                return fn_addr
+                if not ref_to_fn:
+                    return fn_addr
+                let fn_place = self.materialize_operand(fn_addr, fn_ty, self.ast.get_start(expr))
+                let fn_rv = self.body.new_rvalue(RvalueKind.RK_REF, BorrowKind.SHARED, fn_place, 0)
+                let fn_ref = self.new_temp(ref_ty)
+                let fn_ref_place = self.place_for_local(fn_ref)
+                self.body.push_stmt(self.cur_bb, StmtKind.Assign, fn_ref_place, fn_rv, self.ast.get_start(node))
+                return self.body.new_operand(OperandKind.OK_COPY, fn_ref_place)
             let place = self.lower_expr_place(expr)
             if self.place_type_is_str(place) != 0:
                 self.mark_string_place_copied(place)
