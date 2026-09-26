@@ -210,6 +210,10 @@ impl str:
     pub fn as_view() -> StrView:
         self
 
+    /// The bytes as a view (§16.5): `s as []u8`, spelled as a method.
+    pub fn as_bytes() -> []u8:
+        (*self) as []u8
+
     /// Copy a `StrView` (or any `&str`) into a fresh owned `str`.
     pub fn to_owned() -> str:
         var sb = StringBuilder.new()

@@ -6034,6 +6034,24 @@ impl Sema:
             return self.body_return_type_info(self.ast.get_data2(node))
         if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_COMPTIME or kind == NodeKind.NK_UNSAFE_BLOCK or kind == NodeKind.NK_NO_SUSPEND:
             return self.body_return_type_info(self.ast.get_data0(node))
+        // A `return` reaches the body through every statement that holds a
+        // block: a let-else's else (#1623: `let Ok(x) = … else: return 1` in
+        // `fn main:` inferred Unit and the MIR return local was void), a
+        // binding's value (`let x = if c: return 1 else: 2`), a `with` body,
+        // a labeled or scoped block.
+        if kind == NodeKind.NK_LET_ELSE:
+            return self.body_return_type_info(self.ast.get_data2(node))
+        if kind == NodeKind.NK_LET_BINDING:
+            return self.body_return_type_info(self.ast.get_data1(node))
+        if kind == NodeKind.NK_TUPLE_DESTRUCTURE:
+            return self.body_return_type_info(self.ast.get_data2(node))
+        if kind == NodeKind.NK_WITH_EXPR or kind == NodeKind.NK_WITH_IMPLICIT or kind == NodeKind.NK_WITH_TUPLE:
+            let source_info = self.body_return_type_info(self.ast.get_data0(node))
+            info = self.combine_body_return_type_info(move info, source_info)
+            let body_info = self.body_return_type_info(self.ast.get_data1(node))
+            return self.combine_body_return_type_info(move info, body_info)
+        if kind == NodeKind.NK_LABEL or kind == NodeKind.NK_SCOPE or kind == NodeKind.NK_ASYNC_SCOPE:
+            return self.body_return_type_info(self.ast.get_data1(node))
         info
 
     // §9.1: an assignment `place = value` is an expression whose type is the
@@ -13308,16 +13326,38 @@ impl Sema:
         if arr_type == 0:
             return 0
 
-        let resolved = self.resolve_alias(arr_type)
-        let tk = self.get_type_kind(resolved)
+        var resolved = self.resolve_alias(arr_type)
+        var tk = self.get_type_kind(resolved)
+        // A range through a reference slices what it names (§3.7).
+        if tk == TypeKind.TY_REF:
+            resolved = self.resolve_alias(self.get_type_d0(resolved) as TypeId)
+            tk = self.get_type_kind(resolved)
         if tk == TypeKind.TY_ARRAY:
             let elem = self.get_type_d0(resolved)
             let result = self.add_type(TypeKind.TY_SLICE, elem, 0, 0) as i32
             self.typed_expr_types.insert(node, result)
+            self.record_view_producer_origins(node, expr)
             return result
         if tk == TypeKind.TY_SLICE:
             self.typed_expr_types.insert(node, resolved as i32)
+            self.record_view_producer_origins(node, expr)
             return resolved as i32
+        // §4.8a: a slice is a view into any contiguous storage — a Vec's
+        // range is `[]T` (#1632) and a str's range is `&str` (#1587); both
+        // observe the base (D27), so the base is the view's origin.
+        if tk == TypeKind.TY_GENERIC_INST and self.get_generic_inst_base(resolved as i32) == self.syms.vec:
+            let elem = self.get_generic_inst_arg(resolved as i32, 0)
+            let result = self.ensure_exact_type(TypeKind.TY_SLICE, elem, 0, 0) as i32
+            self.typed_expr_types.insert(node, result)
+            self.record_view_producer_origins(node, expr)
+            return result
+        if tk == TypeKind.TY_STR:
+            // A `&str` points at the string object, not at a byte range, so a
+            // sub-range has no view type yet (#1587). Name the spellings that
+            // exist rather than hand MIR a valueless expression.
+            self.emit_error("a range of a str has no view type yet (#1587): `s.slice(a, b)` copies the range into a new str; `s.as_bytes()[a..b]` views its bytes", node)
+            return 0
+        self.emit_error("range indexing needs an array, slice or Vec; this is " ++ self.type_name(arr_type as i32), node)
         0
 
     mut fn check_array_literal(node: i32) -> i32:

@@ -450,6 +450,12 @@ impl Sema:
                 0,
                 0
             ) as i32
+        if value.kind == ComptimeValueKind.CV_FLOAT:
+            // #1668: the literal's own text when it came from source, else
+            // 17 significant digits — either way LLVM rounds it once to the
+            // value the evaluator held.
+            let float_idx = pool.add_string(comptime_float_text(value))
+            return pool.add_node(NodeKind.NK_FLOAT_LIT, pool.get_start(node), pool.get_end(node), float_idx, 0, 0) as i32
         if value.kind == ComptimeValueKind.CV_STR:
             // #1246: the value's bytes are already decoded; the literal must
             // carry the raw marker or codegen decodes `\"` a second time.

@@ -5416,7 +5416,7 @@ impl MirBuilder:
         self.body.new_operand(OperandKind.OK_COPY, place)
 
     mut fn lower_cast(expr: i32, target_type_id: i32, node: i32) -> i32:
-        let op = self.lower_expr(expr)
+        var op = self.lower_expr(expr)
         // D22 contextual materialization records the cast target on its source
         // expression. The central adjustment consumer has already copied the
         // pointee and performed this ordinary value cast, so do not cast the
@@ -5428,6 +5428,18 @@ impl MirBuilder:
         var src_sema_ty = self.operand_type(op)
         if src_sema_ty == 0 or src_sema_ty == self.sema.ty_void as i32:
             src_sema_ty = self.expr_type(expr)
+        // `r as []u8` with `r: &str` (or `&[N]T`) views what the reference
+        // names (§3.7): the cast reads the string through the reference. As
+        // a cast of the reference VALUE it took the pointer's bytes for the
+        // string header and read garbage (found writing str.as_bytes()).
+        let src_res = self.sema.resolve_alias(src_sema_ty as TypeId)
+        if self.sema.get_type_kind(src_res) == TypeKind.TY_REF and self.sema.get_type_kind(self.sema.resolve_alias(target_type_id as TypeId)) == TypeKind.TY_SLICE:
+            let pointee = self.sema.get_type_d0(src_res) as i32
+            let pointee_kind = self.sema.get_type_kind(self.sema.resolve_alias(pointee as TypeId))
+            if pointee_kind == TypeKind.TY_STR or pointee_kind == TypeKind.TY_ARRAY or pointee_kind == TypeKind.TY_SLICE:
+                let ref_place = self.materialize_operand(op, src_sema_ty, self.ast.get_start(expr))
+                op = self.body.new_operand(OperandKind.OK_COPY, self.new_deref_place(ref_place))
+                src_sema_ty = pointee
         // A cast consumes its operand only for the transparent std Box value
         // reinterpret (`self as *mut T` in into_inner/drop): the box VALUE is
         // the payload pointer, the move is real, and without reset-on-move

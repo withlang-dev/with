@@ -24,12 +24,14 @@ enum ComptimeValueKind: i32:
     CV_BYTES = 14
     CV_STRING_BUILDER = 15
     CV_STRING_CHUNK = 16
+    CV_FLOAT = 17
 
 pub type ComptimeValue {
     kind: i32,
     type_id: i32,
     data0: i64,
     data1: i64,
+    real: f64,
     text: str,
     text_refs: *mut i64,
     extra_start: i32,
@@ -65,6 +67,7 @@ fn comptime_value_invalid() -> ComptimeValue:
         type_id: 0,
         data0: 0,
         data1: 0,
+        real: 0.0,
         text: "",
         text_refs: 0 as *mut i64,
         extra_start: 0,
@@ -77,6 +80,7 @@ fn comptime_value_void(type_id: i32) -> ComptimeValue:
         type_id,
         data0: 0,
         data1: 0,
+        real: 0.0,
         text: "",
         text_refs: 0 as *mut i64,
         extra_start: 0,
@@ -89,6 +93,7 @@ fn comptime_value_int(type_id: i32, value: i64) -> ComptimeValue:
         type_id,
         data0: value,
         data1: 0,
+        real: 0.0,
         text: "",
         text_refs: 0 as *mut i64,
         extra_start: 0,
@@ -101,11 +106,35 @@ fn comptime_value_bool(value: i32) -> ComptimeValue:
         type_id: 0,
         data0: value as i64,
         data1: 0,
+        real: 0.0,
         text: "",
         text_refs: 0 as *mut i64,
         extra_start: 0,
         extra_count: 0,
     }
+
+// A comptime float (#1668): `real` is the value; `text` is the literal's own
+// spelling when it came straight from source, so a fold-back reproduces the
+// bytes LLVM would have rounded, and "" for a computed value, which folds
+// back at round-trip precision (17 significant digits).
+fn comptime_value_float(type_id: i32, real: f64, text: &str) -> ComptimeValue:
+    ComptimeValue {
+        kind: ComptimeValueKind.CV_FLOAT,
+        type_id,
+        data0: 0,
+        data1: 0,
+        real,
+        text: with_str_clone_ref(text),
+        text_refs: comptime_text_refs(text),
+        extra_start: 0,
+        extra_count: 0,
+    }
+
+fn comptime_float_text(value: &ComptimeValue) -> str:
+    if value.text.len() > 0:
+        return with_str_clone_ref(value.text)
+    let v = value.real
+    f"{v:.17}"
 
 fn comptime_value_str(value: &str) -> ComptimeValue:
     ComptimeValue {
@@ -113,6 +142,7 @@ fn comptime_value_str(value: &str) -> ComptimeValue:
         type_id: 0,
         data0: 0,
         data1: 0,
+        real: 0.0,
         text: with_str_clone_ref(value),
         text_refs: comptime_text_refs(value),
         extra_start: 0,
@@ -125,6 +155,7 @@ fn comptime_value_array(type_id: i32, extra_start: i32, extra_count: i32) -> Com
         type_id,
         data0: 0,
         data1: 0,
+        real: 0.0,
         text: "",
         text_refs: 0 as *mut i64,
         extra_start,
@@ -137,6 +168,7 @@ fn comptime_value_tuple(type_id: i32, extra_start: i32, extra_count: i32) -> Com
         type_id,
         data0: 0,
         data1: 0,
+        real: 0.0,
         text: "",
         text_refs: 0 as *mut i64,
         extra_start,
@@ -149,6 +181,7 @@ fn comptime_value_range(type_id: i32, start_value: i64, end_value: i64, inclusiv
         type_id,
         data0: start_value,
         data1: end_value,
+        real: 0.0,
         text: "",
         text_refs: 0 as *mut i64,
         extra_start: inclusive,
@@ -161,6 +194,7 @@ fn comptime_value_struct(type_id: i32, extra_start: i32, extra_count: i32) -> Co
         type_id,
         data0: 0,
         data1: 0,
+        real: 0.0,
         text: "",
         text_refs: 0 as *mut i64,
         extra_start,
@@ -173,6 +207,7 @@ fn comptime_value_vec(type_id: i32, extra_start: i32, extra_count: i32) -> Compt
         type_id,
         data0: 0,
         data1: 0,
+        real: 0.0,
         text: "",
         text_refs: 0 as *mut i64,
         extra_start,
@@ -185,6 +220,7 @@ fn comptime_value_map(type_id: i32, extra_start: i32, extra_count: i32) -> Compt
         type_id,
         data0: 0,
         data1: 0,
+        real: 0.0,
         text: "",
         text_refs: 0 as *mut i64,
         extra_start,
@@ -197,6 +233,7 @@ fn comptime_value_capability(type_id: i32, capability_kind: i32, handle_id: i32,
         type_id,
         data0: capability_kind as i64,
         data1: handle_id as i64,
+        real: 0.0,
         text: "",
         text_refs: 0 as *mut i64,
         extra_start: generation,
@@ -209,6 +246,7 @@ fn comptime_value_fn(type_id: i32, fn_sym: i32) -> ComptimeValue:
         type_id,
         data0: fn_sym as i64,
         data1: 0,
+        real: 0.0,
         text: "",
         text_refs: 0 as *mut i64,
         extra_start: 0,
@@ -221,6 +259,7 @@ fn comptime_value_enum(type_id: i32, variant_sym: i32, extra_start: i32, extra_c
         type_id,
         data0: variant_sym as i64,
         data1: 0,
+        real: 0.0,
         text: "",
         text_refs: 0 as *mut i64,
         extra_start,
@@ -233,6 +272,7 @@ fn comptime_value_bytes(type_id: i32, data: &str) -> ComptimeValue:
         type_id,
         data0: 0,
         data1: 0,
+        real: 0.0,
         text: with_str_clone_ref(data),
         text_refs: comptime_text_refs(data),
         extra_start: 0,
@@ -245,6 +285,7 @@ fn comptime_value_string_builder(type_id: i32, head: i32, chunk_count: i32, byte
         type_id,
         data0: byte_count,
         data1: 0,
+        real: 0.0,
         text: "",
         text_refs: 0 as *mut i64,
         extra_start: head,
@@ -257,6 +298,7 @@ fn comptime_value_string_chunk(prev: i32, data: &str) -> ComptimeValue:
         type_id: 0,
         data0: prev as i64,
         data1: 0,
+        real: 0.0,
         text: with_str_clone_ref(data),
         text_refs: comptime_text_refs(data),
         extra_start: 0,
@@ -300,6 +342,7 @@ fn comptime_value_kind_name(kind: i32) -> str:
     if kind == ComptimeValueKind.CV_BYTES: return "bytes"
     if kind == ComptimeValueKind.CV_STRING_BUILDER: return "StringBuilder"
     if kind == ComptimeValueKind.CV_STRING_CHUNK: return "string chunk"
+    if kind == ComptimeValueKind.CV_FLOAT: return "float"
     "invalid"
 
 fn comptime_value_format(value: &ComptimeValue, extras: &Vec[ComptimeValue], sema: &Sema) -> str:
@@ -311,6 +354,8 @@ fn comptime_value_format(value: &ComptimeValue, extras: &Vec[ComptimeValue], sem
         if value.data0 != 0:
             return "true"
         return "false"
+    if value.kind == ComptimeValueKind.CV_FLOAT:
+        return comptime_float_text(value)
     if value.kind == ComptimeValueKind.CV_STR:
         return "\"" ++ value.text ++ "\""
     if value.kind == ComptimeValueKind.CV_RANGE:
@@ -388,6 +433,10 @@ fn comptime_values_equal(lhs: &ComptimeValue, rhs: &ComptimeValue, extras: &Vec[
         return 1
     if lhs.kind == ComptimeValueKind.CV_INT or lhs.kind == ComptimeValueKind.CV_BOOL:
         if lhs.data0 == rhs.data0:
+            return 1
+        return 0
+    if lhs.kind == ComptimeValueKind.CV_FLOAT:
+        if lhs.real == rhs.real:
             return 1
         return 0
     if lhs.kind == ComptimeValueKind.CV_STR:
@@ -468,7 +517,7 @@ fn comptime_values_equal(lhs: &ComptimeValue, rhs: &ComptimeValue, extras: &Vec[
 
 // #747: explicit owned copy — ComptimeValue's text is an owned str now.
 pub fn comptime_value_clone(v: &ComptimeValue) -> ComptimeValue:
-    ComptimeValue { kind: v.kind, type_id: v.type_id, data0: v.data0, data1: v.data1, text: with_str_clone_ref(v.text), text_refs: comptime_text_refs(v.text), extra_start: v.extra_start, extra_count: v.extra_count }
+    ComptimeValue { kind: v.kind, type_id: v.type_id, data0: v.data0, data1: v.data1, real: v.real, text: with_str_clone_ref(v.text), text_refs: comptime_text_refs(v.text), extra_start: v.extra_start, extra_count: v.extra_count }
 
 // Read-path share: the evaluator reads a parameter on every loop iteration.
 // Deep-cloning a large immutable string there is quadratic (the build.w source
@@ -479,4 +528,4 @@ pub fn comptime_value_share(v: &ComptimeValue) -> ComptimeValue:
     if v.text_refs as i64 != 0:
         unsafe { *v.text_refs = *v.text_refs + 1 }
     let text_ptr = &raw const v.text as *const str
-    ComptimeValue { kind: v.kind, type_id: v.type_id, data0: v.data0, data1: v.data1, text: unsafe *text_ptr, text_refs: v.text_refs, extra_start: v.extra_start, extra_count: v.extra_count }
+    ComptimeValue { kind: v.kind, type_id: v.type_id, data0: v.data0, data1: v.data1, real: v.real, text: unsafe *text_ptr, text_refs: v.text_refs, extra_start: v.extra_start, extra_count: v.extra_count }

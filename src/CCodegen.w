@@ -3447,6 +3447,11 @@ impl CCodegen:
                     return "((" ++ dst_c ++ ")(" ++ src ++ ".ptr))"
                 if src_tk == TypeKind.TY_STRUCT:
                     return "((" ++ dst_c ++ ")(&(" ++ src ++ ")))"
+            // `s as []u8` (§16.5): the byte view is the string's bytes and
+            // length — a C cast of the str struct is not a slice (the prelude's
+            // str.as_bytes() failed to compile under emit-c).
+            if dst_tk == TypeKind.TY_SLICE and src_tk == TypeKind.TY_STR:
+                return "((" ++ dst_c ++ "){ (uint8_t*)((" ++ src ++ ").ptr), with_len(" ++ src ++ ") })"
             return "((" ++ dst_c ++ ")(" ++ src ++ "))"
         if rk == RvalueKind.RK_DISCRIMINANT:
             return "(" ++ self.place_text(body, d0) ++ ").tag"
