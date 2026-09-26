@@ -7586,80 +7586,26 @@ impl MirBuilder:
     // body runs as the closure `body: fn(T) -> bool`, capturing the enclosing
     // bindings it uses by place. Finishing the body or `continue` answers
     // true; `break` answers false and the generator leaves at its `yield`.
-    // `return`, `?`, cancellation and a break/continue of a label outside
-    // the loop answer false too, having recorded in this frame's flag what
-    // this frame does once `each` returns — and a returned value in this
+    // `return`, `?`, cancellation and a break/continue/goto of a label
+    // outside the loop answer false too, having recorded in this frame's flag
+    // what this frame does once `each` returns — and a returned value in this
     // frame's return slot (Go 1.23's range-over-func rewrite, with the stop
     // automatic: the generator never sees it).
     mut fn lower_for_gen(for_node: i32) -> i32:
         let pat_or_sym = self.ast.get_data0(for_node)
         let iter_expr = self.ast.get_data1(for_node)
         let body_expr = self.ast.get_data2(for_node)
-        let span = self.ast.get_start(for_node)
-        let i32_ty = self.sema.ty_i32 as i32
-        let bool_ty = self.sema.ty_bool as i32
         let elem_ty: i32 = self.sema.gen_for_elem_types.get(for_node).unwrap()
-        let body_fn_ty: i32 = self.sema.gen_for_body_types.get(for_node).unwrap()
-        let each_fn: i32 = self.sema.gen_for_each_syms.get(for_node).unwrap()
-        let each_sig: i32 = self.sema.gen_for_each_sigs.get(for_node).unwrap()
-        let each_mono: i32 = if self.sema.gen_for_each_monos.contains(for_node): self.sema.gen_for_each_monos.get(for_node).unwrap() else: 0
 
         // The generator value moves into `each`.
         let gen_op = self.lower_expr(iter_expr)
-
-        // This frame's side: the flag, and the enclosing function's return
-        // slot, which a `return` in the closure fills through its capture —
-        // this frame's own local 0, or the slot this frame itself captured
-        // when it is a gen-loop closure too.
-        let flag_local = self.new_temp(i32_ty)
-        self.assign_int_to_local(flag_local, GEN_LOOP_DONE, i32_ty)
-        let ret_ty = self.fn_return_type()
-        let ret_slot = if not self.fn_returns_value(): -1 else if self.gen_loop_flag_local >= 0: self.gen_loop_ret_local else: 0
-
-        // The loop body's captures, resolved in this frame. A body that moves
-        // out of a by-place capture blanks the outer slot (#1481); that
-        // slot's scope-exit drop keeps its null guard.
-        let capture_syms: Vec[i32] = Vec.new()
-        let capture_sources: Vec[ClosureCaptureSource] = Vec.new()
-        for ci in 0..self.sema.closure_capture_summary_count(for_node):
-            let sym = mir_symbol_for_pool(self.sema, self.pool, self.sema.closure_capture_summary_sym(for_node, ci))
-            let source = self.closure_capture_source(sym, for_node, ci)
-            if source.value_ty == 0 and self.sema.type_needs_drop_frozen(source.capture_ty) != 0:
-                self.body.mark_local_ever_moved(source.local)
-            capture_syms.push(sym)
-            capture_sources.push(source)
-        let body_local = self.gen_body_local
-        let body_local_ty = if body_local >= 0: self.local_type(body_local) else: 0
-        let label = self.for_label(for_node)
-        let body_sym = self.pool.intern(f"$genloop${self.body.fn_sym}${for_node}")
-        let flag_name = self.pool.intern(f"$genloop_flag${for_node}")
-        let ret_name = self.pool.intern(f"$genloop_ret${for_node}")
-        let gen_body_name = self.pool.intern(f"$genloop_body${for_node}")
-        let item_name = self.pool.intern(f"$genloop_item${for_node}")
-
-        // The closure: the loop body's captures, the protocol's captures,
-        // then the element parameter.
-        var child = MirBuilder.init(self.sema, self.ast, self.pool, body_sym)
-        child.contextual_fact_sig_idx = self.contextual_fact_sig_idx
-        child.body.anonymous_type = body_fn_ty
-        child.body.local_type_ids[0] = bool_ty
-        child.push_scope()
-        for ci in 0..capture_syms.len() as i32:
-            child.bind_capture(capture_syms[ci], capture_sources[ci])
-        child.gen_loop_flag_local = child.add_protocol_capture(flag_local, i32_ty, flag_name)
-        if ret_slot >= 0:
-            child.gen_loop_ret_local = child.add_protocol_capture(ret_slot, ret_ty, ret_name)
-        child.gen_loop_ret_ty = ret_ty
-        if body_local >= 0:
-            child.gen_body_local = child.add_protocol_capture(body_local, body_local_ty, gen_body_name)
-        let capture_count = child.body.anonymous_capture_sources.len() as i32
-        child.body.anonymous_capture_count = capture_count
-        let item_local = child.body.new_local(elem_ty, 1, item_name, 1)
-        child.body.n_params = capture_count + 1
+        let flag_local = self.new_gen_loop_flag()
+        var child = self.begin_gen_loop_closure(for_node, flag_local)
+        let item_local = child.add_gen_loop_item(elem_ty, for_node)
 
         let more_bb = child.new_block()
         let stop_bb = child.new_block()
-        child.push_control_target(label, ControlTargetKind.CT_LOOP, more_bb, stop_bb, -1)
+        child.push_control_target(self.for_label(for_node), ControlTargetKind.CT_LOOP, more_bb, stop_bb, -1)
         child.push_scope()
         // The body's own labels; a goto to any other label of the function
         // leaves the closure (lower_goto).
@@ -7678,7 +7624,122 @@ impl MirBuilder:
         child.assign_bool_to_local(0, false)
         child.terminate(TermKind.TK_RETURN, 0, 0, 0, 0)
         child.pop_scope_inline()
+        self.finish_gen_loop(for_node, gen_op, flag_local, move child)
+
+    // D69 (§13.4, §13.6, #1727): a comprehension clause over a Gen[T] runs
+    // the rest of the comprehension — its filter, the later clauses and the
+    // leaf that adds to the collection — as the closure `each` calls, like
+    // the body of `for x in g`. A comprehension consumes the whole
+    // generator, so the closure answers false only for an exit of the
+    // enclosing function (`?`, cancellation), through the flag. The
+    // collection being built is the closure's capture of the frame's local.
+    mut fn lower_comprehension_gen(comp_node: i32, clause_index: i32, out_place: i32, out_elem_ty: i32, pat_or_sym: i32, iter_expr: i32):
+        let elem_ty: i32 = self.sema.gen_for_elem_types.get(iter_expr).unwrap()
+        let out_local = mir_place_plain_local(&self.body, out_place)
+        if out_local < 0:
+            sema_phase_bug(f"BUG: a comprehension's collection is not a local place (node {comp_node})")
+        let gen_op = self.lower_expr(iter_expr)
+        let flag_local = self.new_gen_loop_flag()
+        var child = self.begin_gen_loop_closure(iter_expr, flag_local)
+        let child_out_local = child.add_protocol_capture(out_local, self.local_type(out_local), self.pool.intern(f"$gencomp_out${iter_expr}"))
+        let item_local = child.add_gen_loop_item(elem_ty, iter_expr)
+        let child_out_place = child.place_for_local(child_out_local)
+
+        let more_bb = child.new_block()
+        child.push_scope()
+        let item_place = child.place_for_local(item_local)
+        child.bind_comprehension_element(comp_node, pat_or_sym, item_place, elem_ty, iter_expr, true, more_bb)
+        let clause_filter = child.ast.get_extra(child.comprehension_clause_start(comp_node) + clause_index * 3 + 2)
+        let join_bb = child.new_block()
+        if clause_filter != 0:
+            let pass_bb = child.new_block()
+            let cond_op = child.lower_expr(clause_filter)
+            let vals: Vec[i64] = Vec.new()
+            vals.push(1)
+            let targets: Vec[i32] = Vec.new()
+            targets.push(pass_bb as i32)
+            let table = child.body.new_switch_table(vals, targets)
+            child.terminate(TermKind.TK_SWITCH_INT, cond_op, table, join_bb, 0)
+            child.switch_to(pass_bb)
+        let leaf_frame = child.push_stmt_temp_frame()
+        child.lower_comprehension_next_or_push(comp_node, clause_index + 1, child_out_place, out_elem_ty)
+        child.finish_stmt_temp_frame(leaf_frame)
+        child.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
+        child.switch_to(join_bb)
+        child.pop_scope_with_goto(more_bb)
+        child.switch_to(more_bb)
+        child.assign_bool_to_local(0, true)
+        child.terminate(TermKind.TK_RETURN, 0, 0, 0, 0)
+        child.pop_scope_inline()
+        let _ = self.finish_gen_loop(iter_expr, gen_op, flag_local, move child)
+
+    // The owning frame's flag for one gen loop: what the loop body's closure
+    // tells this frame to do once `each` returns (GEN_LOOP_*).
+    mut fn new_gen_loop_flag() -> i32:
+        let i32_ty = self.sema.ty_i32 as i32
+        let flag_local = self.new_temp(i32_ty)
+        self.assign_int_to_local(flag_local, GEN_LOOP_DONE, i32_ty)
+        flag_local
+
+    // The closure a gen loop keyed by `key_node` (the NK_FOR, or a
+    // comprehension clause's iterable) runs as: Sema's captures of the body,
+    // then the protocol's — the flag; the enclosing function's return slot,
+    // which a `return` in the closure fills through its capture (this
+    // frame's own local 0, or the slot this frame itself captured when it is
+    // a gen-loop closure too); and a producer's `body` parameter, which a
+    // `yield` in the closure calls. The caller may add captures of its own,
+    // then the element parameter (add_gen_loop_item).
+    mut fn begin_gen_loop_closure(key_node: i32, flag_local: i32) -> MirBuilder:
+        let i32_ty = self.sema.ty_i32 as i32
+        let ret_ty = self.fn_return_type()
+        let ret_slot = if not self.fn_returns_value(): -1 else if self.gen_loop_flag_local >= 0: self.gen_loop_ret_local else: 0
+        // The body's captures, resolved in this frame. A body that moves out
+        // of a by-place capture blanks the outer slot (#1481); that slot's
+        // scope-exit drop keeps its null guard.
+        let capture_syms: Vec[i32] = Vec.new()
+        let capture_sources: Vec[ClosureCaptureSource] = Vec.new()
+        for ci in 0..self.sema.closure_capture_summary_count(key_node):
+            let sym = mir_symbol_for_pool(self.sema, self.pool, self.sema.closure_capture_summary_sym(key_node, ci))
+            let source = self.closure_capture_source(sym, key_node, ci)
+            if source.value_ty == 0 and self.sema.type_needs_drop_frozen(source.capture_ty) != 0:
+                self.body.mark_local_ever_moved(source.local)
+            capture_syms.push(sym)
+            capture_sources.push(source)
+        let body_local = self.gen_body_local
+        var child = MirBuilder.init(self.sema, self.ast, self.pool, self.pool.intern(f"$genloop${self.body.fn_sym}${key_node}"))
+        child.contextual_fact_sig_idx = self.contextual_fact_sig_idx
+        child.body.anonymous_type = self.sema.gen_for_body_types.get(key_node).unwrap()
+        child.body.local_type_ids[0] = self.sema.ty_bool as i32
+        child.push_scope()
+        for ci in 0..capture_syms.len() as i32:
+            child.bind_capture(capture_syms[ci], capture_sources[ci])
+        child.gen_loop_flag_local = child.add_protocol_capture(flag_local, i32_ty, self.pool.intern(f"$genloop_flag${key_node}"))
+        if ret_slot >= 0:
+            child.gen_loop_ret_local = child.add_protocol_capture(ret_slot, ret_ty, self.pool.intern(f"$genloop_ret${key_node}"))
+        child.gen_loop_ret_ty = ret_ty
+        if body_local >= 0:
+            child.gen_body_local = child.add_protocol_capture(body_local, self.local_type(body_local), self.pool.intern(f"$genloop_body${key_node}"))
+        child
+
+    // The gen-loop closure's element parameter, after all its captures.
+    mut fn add_gen_loop_item(elem_ty: i32, key_node: i32) -> i32:
+        let capture_count = self.body.anonymous_capture_sources.len() as i32
+        self.body.anonymous_capture_count = capture_count
+        let item_local = self.body.new_local(elem_ty, 1, self.pool.intern(f"$genloop_item${key_node}"), 1)
+        self.body.n_params = capture_count + 1
+        item_local
+
+    // `g.each(body)` with the finished closure, then the exits the closure
+    // took that leave this frame's loop too, read from the flag.
+    mut fn finish_gen_loop(key_node: i32, gen_op: i32, flag_local: i32, finished_child: MirBuilder) -> i32:
+        var child = finished_child
         child.verify_goto_labels()
+        let span = self.ast.get_start(key_node)
+        let body_fn_ty: i32 = self.sema.gen_for_body_types.get(key_node).unwrap()
+        let each_fn: i32 = self.sema.gen_for_each_syms.get(key_node).unwrap()
+        let each_sig: i32 = self.sema.gen_for_each_sigs.get(key_node).unwrap()
+        let each_mono: i32 = if self.sema.gen_for_each_monos.contains(key_node): self.sema.gen_for_each_monos.get(key_node).unwrap() else: 0
+        let body_sym = child.body.fn_sym
         let used_codes = child.gen_loop_used_codes
         let exit_labels = mir_clone_i32_vec(&child.gen_loop_exit_labels)
         let exit_kinds = mir_clone_i32_vec(&child.gen_loop_exit_kinds)
@@ -7690,7 +7751,7 @@ impl MirBuilder:
         // g.each(body)
         let closure_local = self.new_temp(body_fn_ty)
         let in_loop = if self.loop_break_bbs.len() > 0: 1 else: 0
-        let closure_const = self.body.new_const(ConstKind.CK_CLOSURE, for_node, body_sym, in_loop, body_fn_ty)
+        let closure_const = self.body.new_const(ConstKind.CK_CLOSURE, key_node, body_sym, in_loop, body_fn_ty)
         let closure_const_op = self.body.new_operand(OperandKind.OK_CONSTANT, closure_const)
         let closure_rv = self.body.new_rvalue(RvalueKind.RK_USE, closure_const_op, 0, 0)
         let closure_place = self.place_for_local(closure_local)
@@ -7702,7 +7763,7 @@ impl MirBuilder:
         args.push(gen_op)
         args.push(closure_op)
         let args_id = self.body.new_call_args(args)
-        self.body.set_call_ast_node(args_id, for_node)
+        self.body.set_call_ast_node(args_id, key_node)
         if each_mono != 0:
             self.body.set_call_intrinsic(args_id, MirIntrinsic.GENERIC_CALL)
             self.body.set_call_contract(args_id, each_sig, each_mono)
@@ -8321,6 +8382,9 @@ impl MirBuilder:
         let pat_or_sym = self.ast.get_extra(base)
         let iter_expr = self.ast.get_extra(base + 1)
 
+        if self.sema.gen_for_elem_types.contains(iter_expr):
+            self.lower_comprehension_gen(comp_node, clause_index, out_place, out_elem_ty, pat_or_sym, iter_expr)
+            return
         if self.ast.kind(iter_expr) == NodeKind.NK_RANGE:
             self.lower_comprehension_range(comp_node, clause_index, out_place, out_elem_ty, pat_or_sym, iter_expr)
             return
