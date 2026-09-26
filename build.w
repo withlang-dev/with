@@ -1,4 +1,5 @@
 use std.build
+use std.process
 use build.runtime
 use build.selfhost
 use build.abi

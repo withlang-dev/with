@@ -3540,7 +3540,10 @@ impl Sema:
                     // Spec §18.2: imports are explicit — a name reaches a module
                     // only through its own `use` (or the prelude / std fallback
                     // tiers), never through what an imported module imported.
-                    if current == start_idx:
+                    // Through a std module the walk continues: every public
+                    // std declaration is the lowest resolution tier (§18.2 tier 5,
+                    // #752), so what std.build imports is reachable from build.w.
+                    if current == start_idx or sema_tier_path_is_std_implementation(self.module_paths[current]) != 0:
                         stack.push(self.module_import_targets[(edge_start + ei)])
         self.module_visibility_cache.insert(sema_owned_text(cache_key), 0)
         0
