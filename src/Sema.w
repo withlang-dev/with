@@ -3537,7 +3537,11 @@ impl Sema:
                 let edge_start = self.module_import_starts[current]
                 let edge_count = self.module_import_counts[current]
                 for ei in 0..edge_count:
-                    stack.push(self.module_import_targets[(edge_start + ei)])
+                    // Spec §18.2: imports are explicit — a name reaches a module
+                    // only through its own `use` (or the prelude / std fallback
+                    // tiers), never through what an imported module imported.
+                    if current == start_idx:
+                        stack.push(self.module_import_targets[(edge_start + ei)])
         self.module_visibility_cache.insert(sema_owned_text(cache_key), 0)
         0
 
@@ -5294,11 +5298,11 @@ impl Sema:
                 self.shadow_unseen_global(sym, idx, tid, is_mut)
                 return
             let name: str = with_str_clone_ref(self.pool_resolve(sym))
-            self.emit_error("shadowing is not allowed for '" ++ name ++ "'", node)
+            self.emit_error("shadowing is not allowed for '" ++ name ++ "'" ++ self.shadowed_binding_origin_note(sym, idx), node)
             return
         if self.scope_lookup(sym) >= 0:
             let name: str = with_str_clone_ref(self.pool_resolve(sym))
-            self.emit_error("shadowing is not allowed for '" ++ name ++ "'", node)
+            self.emit_error("shadowing is not allowed for '" ++ name ++ "'" ++ self.shadowed_binding_origin_note(sym, if existing.is_some(): existing.unwrap() else: -1), node)
             return
         self.scope_insert_at(sym, tid, is_mut)
 
@@ -5310,10 +5314,22 @@ impl Sema:
     // pass reports a true same-module shadowing. Every other collision — a
     // local, or a global the module imports — is shadowing.
     fn binding_is_unseen_global(idx: i32, sym: i32) -> bool:
+        // A bundle interface's global (a corpus' `pub let`, std.re's PACKAGE)
+        // is another module's declaration by construction.
+        if self.interface_global_index.contains(sym) and self.interface_global_index.get(sym).unwrap() == idx:
+            return true
+        for ai in 0..self.interface_global_alt_binds.len() as i32:
+            if self.interface_global_alt_binds[ai] == idx:
+                return true
         if not self.global_value_decl_bindings.contains(sym) or self.global_value_decl_bindings.get(sym).unwrap() != idx:
             return false
         let path = self.global_value_decl_paths.get(sym).unwrap()
-        self.current_module_path.len() == 0 or (path != self.current_module_path and self.module_visible_no_prelude(path) == 0)
+        // §18.2 name precedence: a current-module declaration (tier 2) beats
+        // an explicit import (tier 3), so a global another module declared —
+        // seen or not — is shadowed by this module's own declaration of the
+        // name (#1703: std.re's `pub let PACKAGE` vs a program's
+        // `const PACKAGE`), never a "shadowing is not allowed" error.
+        self.current_module_path.len() == 0 or path != self.current_module_path
 
     // A flat-scope global (§9.1c, D52) — a module's `let`/`var`, or a
     // bundle interface's storage — is referenced in place by every body,
@@ -5350,7 +5366,7 @@ impl Sema:
         let current_start = if self.scope_starts.len() > 0: self.scope_starts[(self.scope_starts.len() - 1)] else: 0
         if idx < current_start or self.bind_states[idx] != VarState.MOVED:
             let name: str = with_str_clone_ref(self.pool_resolve(sym))
-            self.emit_error("shadowing is not allowed for '" ++ name ++ "'", node)
+            self.emit_error("shadowing is not allowed for '" ++ name ++ "'" ++ self.shadowed_binding_origin_note(sym, if existing.is_some(): existing.unwrap() else: -1), node)
             return 0
         self.bind_types[idx] = tid
         self.bind_muts[idx] = is_mut
@@ -5434,7 +5450,7 @@ impl Sema:
         let existing_kind = self.global_value_decl_kind(sym)
         if existing_kind == 0:
             let name: str = with_str_clone_ref(self.pool_resolve(sym))
-            self.emit_error("shadowing is not allowed for '" ++ name ++ "'", node)
+            self.emit_error("shadowing is not allowed for '" ++ name ++ "'" ++ self.shadowed_binding_origin_note(sym, existing_idx), node)
             return
 
         // Only an extern declaration may coexist with another declaration of
@@ -5442,7 +5458,7 @@ impl Sema:
         // storage (D39), is one symbol declared twice.
         if existing_kind != GLOBAL_VALUE_DECL_EXTERN and decl_kind != GLOBAL_VALUE_DECL_EXTERN:
             let name: str = with_str_clone_ref(self.pool_resolve(sym))
-            self.emit_error("shadowing is not allowed for '" ++ name ++ "'", node)
+            self.emit_error("shadowing is not allowed for '" ++ name ++ "'" ++ self.shadowed_binding_origin_note(sym, existing_idx), node)
             return
 
         let existing_mut = self.bind_muts[existing_idx]
@@ -8516,3 +8532,15 @@ impl Sema:
         while self.sig_receiver_required_effects.len() as i32 <= si:
             self.sig_receiver_required_effects.push(0)
         self.sig_receiver_required_effects[si] = self.sig_param_effect(si, 0) & EFF_DECLARED_MASK
+    // Where the binding a declaration would shadow came from — the module
+    // whose global it is, a bundle interface's storage, or this scope — so
+    // the diagnostic names the collision instead of a bare name (#1703).
+    fn shadowed_binding_origin_note(sym: i32, idx: i32) -> str:
+        if self.global_value_decl_bindings.contains(sym) and self.global_value_decl_bindings.get(sym).unwrap() == idx:
+            return " (a global of module " ++ self.global_value_decl_paths.get(sym).unwrap() ++ ")"
+        if self.interface_global_index.contains(sym) and self.interface_global_index.get(sym).unwrap() == idx:
+            return " (a bundle interface global)"
+        for ai in 0..self.interface_global_alt_binds.len() as i32:
+            if self.interface_global_alt_binds[ai] == idx:
+                return " (a bundle interface global)"
+        " (bound earlier in this scope)"
