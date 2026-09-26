@@ -101,6 +101,24 @@ pub fn p7_run(case_dir: &str, label: &str, args_blob: &str) -> P7Run:
 // An explicit candidate permits testing a regression against both the fixed
 // compiler and the old seed without disguising either as a stage2 artifact.
 pub fn p7_run_with_compiler(compiler: &str, case_dir: &str, label: &str, args_blob: &str) -> P7Run:
+    // Each test file runs in its own process. Keep this synchronous child's
+    // objects and runtime cache inside its case, then restore the runner env.
+    let previous_out = env("WITH_OUT_DIR").clone()
+    assert(set_env("WITH_OUT_DIR", p7_join(case_dir, "out")) == 0)
+    let result = p7_run_with_compiler_keeping_env(compiler, case_dir, label, args_blob)
+    assert(set_env("WITH_OUT_DIR", previous_out) == 0)
+    result
+
+// The child runs with no WITH_OUT_DIR at all, as a developer's shell does:
+// the compiler resolves its artifact root from the case directory alone.
+pub fn p7_run_without_out_dir(case_dir: &str, label: &str, args_blob: &str) -> P7Run:
+    let previous_out = env("WITH_OUT_DIR").clone()
+    assert(set_env("WITH_OUT_DIR", "") == 0)
+    let result = p7_run_with_compiler_keeping_env(p7_compiler_path(), case_dir, label, args_blob)
+    assert(set_env("WITH_OUT_DIR", previous_out) == 0)
+    result
+
+fn p7_run_with_compiler_keeping_env(compiler: &str, case_dir: &str, label: &str, args_blob: &str) -> P7Run:
     let capture_dir = p7_join(p7_abs("out/tmp/pre-d-p7-capture"), label)
     let _remove = remove_tree(capture_dir)
     assert(mkdir_p(capture_dir) == 0)
@@ -109,12 +127,7 @@ pub fn p7_run_with_compiler(compiler: &str, case_dir: &str, label: &str, args_bl
     var argv = ""
     argv = p7_argv_append(argv, compiler)
     argv = argv ++ args_blob
-    // Each test file runs in its own process. Keep this synchronous child's
-    // objects and runtime cache inside its case, then restore the runner env.
-    let previous_out = env("WITH_OUT_DIR").clone()
-    assert(set_env("WITH_OUT_DIR", p7_join(case_dir, "out")) == 0)
     let rc = unsafe { with_exec_argv_capture_cwd(argv, stdout_path, stderr_path, 300000, case_dir) }
-    assert(set_env("WITH_OUT_DIR", previous_out) == 0)
     P7Run { rc, stdout: read_file(stdout_path).unwrap(), stderr: read_file(stderr_path).unwrap() }
 
 pub fn p7_build_args -> str:

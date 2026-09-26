@@ -1235,10 +1235,12 @@ fn link_stage_resolve_runtime_root() -> str:
     let compiler_dir = if argv0.len() > 0: link_stage_dirname(argv0) else: "."
     let platform_object = link_stage_host_platform_runtime_object()
     let candidates: Vec[str] = Vec.new()
-    // Prefer the current workspace artifact root during bootstrap. This lets
-    // external seed compilers link against the runtime objects generated for
-    // the active tree instead of whatever stdlib/runtime payload the seed
-    // binary happens to carry.
+    // The build drives a link with an explicit artifact root (WITH_OUT_DIR)
+    // when it has prepared that root's objects for this very link: the seed
+    // links stage1 against the runtime it compiled from the active tree
+    // (prepare-bootstrap-link-root), not against the payload the seed binary
+    // happens to carry. Only then is out/lib trusted as-is.
+    let build_owned_root = runtime_getenv("WITH_OUT_DIR").len() > 0
     candidates.push(link_stage_artifact_root() ++ "/lib")
     // Seed-built bootstrap runtime for cold direct `with build` invocations.
     // The canonical stage2-refreshed runtime overwrites out/lib later.
@@ -1251,10 +1253,26 @@ fn link_stage_resolve_runtime_root() -> str:
         let dir = candidates[i]
         let probe = dir ++ "/cimport_stubs.o"
         let platform_probe = if platform_object.len() > 0: dir ++ "/" ++ platform_object else: ""
-        if runtime_read_file(probe).len() > 0 and (platform_probe.len() == 0 or runtime_read_file(platform_probe).len() > 0):
+        if runtime_read_file(probe).len() == 0 or (platform_probe.len() > 0 and runtime_read_file(platform_probe).len() == 0):
+            continue
+        // D30: without the build's say-so an on-disk runtime directory is a
+        // cache of this compiler's embedded objects, and a cache hit is byte
+        // for byte. Anything else was built by another compiler generation
+        // and linking it is #761's corruption class: `with run` in a checkout
+        // whose out/lib predated with_vec_free_buffer_drop_origin linked
+        // that stale rt_core.o and died with an undefined symbol.
+        if build_owned_root or link_stage_runtime_dir_is_this_generation(dir):
             return with_str_clone_ref(dir)
     // Fall back to compiler-relative runtime dir.
     compiler_dir ++ "/runtime"
+
+fn link_stage_runtime_dir_is_this_generation(dir: &str) -> bool:
+    let embedded = link_stage_embedded_runtime_object("rt_core.o")
+    // A binary that carries no runtime can only link from disk.
+    if embedded.len() == 0:
+        return true
+    let on_disk = runtime_read_file(dir ++ "/rt_core.o")
+    on_disk.len() == embedded.len() and on_disk == embedded
 
 // Directory holding the link inputs built FOR the active target:
 // the runtime root itself for native, its cross/<target>/ subdir
