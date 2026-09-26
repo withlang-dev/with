@@ -5452,6 +5452,19 @@ impl MirBuilder:
         // resolved-call contracts exactly that way (gates6 flip).
         if self.sema.type_is_std_box_inst(src_sema_ty) != 0:
             self.consume_moved_operand(op)
+        // §4.4a (#1502): `Kind.Hi as f64` extracts the discriminant (the repr
+        // integer) and then widens it (§4); codegen has no enum→float cast,
+        // so it is lowered as those two.
+        let cast_src_resolved = self.sema.resolve_alias(src_sema_ty as TypeId)
+        if self.sema.get_type_kind(cast_src_resolved) == TypeKind.TY_ENUM and self.sema.get_type_kind(self.sema.resolve_alias(target_type_id as TypeId)) == TypeKind.TY_FLOAT:
+            let repr = self.sema.enum_repr_type(cast_src_resolved as i32)
+            if repr != 0:
+                let repr_rv = self.body.new_rvalue(RvalueKind.RK_CAST, op, repr, src_sema_ty)
+                let repr_tmp = self.new_temp(repr)
+                let repr_place = self.place_for_local(repr_tmp)
+                self.body.push_stmt(self.cur_bb, StmtKind.Assign, repr_place, repr_rv, self.ast.get_start(node))
+                op = self.body.new_operand(OperandKind.OK_COPY, repr_place)
+                src_sema_ty = repr
         let rv = self.body.new_rvalue(RvalueKind.RK_CAST, op, target_type_id, src_sema_ty)
         let temp = self.new_temp(target_type_id)
         let place = self.place_for_local(temp)
