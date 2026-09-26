@@ -52,6 +52,31 @@ fn mir_clone_i32_vec(values: &Vec[i32]) -> Vec[i32]:
         out.push(values[i])
     out
 
+// D69 (§13.4): what a `for` body over a Gen[T], run as a closure, tells the
+// frame that owns the loop when it stops the generator (the flag's values).
+const GEN_LOOP_DONE: i32 = 0
+const GEN_LOOP_RETURN: i32 = 1
+const GEN_LOOP_ERR_RETURN: i32 = 2
+const GEN_LOOP_CANCEL: i32 = 3
+const GEN_LOOP_LABEL_BASE: i32 = 4
+
+fn gen_loop_code_bit(code: i32) -> i32:
+    var bit = 1
+    for _ in 0..code:
+        bit = bit * 2
+    bit
+
+// Where a closure capture comes from in the creating body (bind_capture).
+type ClosureCaptureSource {
+    local: i32,
+    capture_ty: i32,
+    // The place's type when the capture is a reference to an alias place;
+    // 0 for a local captured as itself.
+    value_ty: i32,
+    name: i32,
+}
+impl Copy for ClosureCaptureSource
+
 type LoopInfo {
     label: i32,
     target_kind: i32,
@@ -180,8 +205,26 @@ pub type MirBuilder = ephemeral {
     // call against this exact place. The override is scoped by lower_pipeline.
     pipeline_receiver_override_node: i32,
     pipeline_receiver_override_place: i32,
-    in_generator: i32,
-    generator_yield_count: i32,
+    // D69 (§13.4): the producer's `body` parameter — or a loop closure's
+    // capture of it — while lowering a gen fn's body; -1 elsewhere. A
+    // `yield e` is a call of it.
+    gen_body_local: i32,
+    // D69: set while lowering the body of `for x in g` over a Gen[T] as the
+    // closure `g.each` calls (lower_for_gen); -1 elsewhere. The closure stops
+    // the generator by returning false. What the enclosing frame must then do
+    // — return, or break/continue a label outside the closure — travels in
+    // its flag (a capture); a returned value travels in its return slot
+    // (a capture of the enclosing function's return type, -1 for Unit).
+    gen_loop_flag_local: i32,
+    gen_loop_ret_local: i32,
+    gen_loop_ret_ty: i32,
+    // The outer labels this closure's break/continue leave through the flag:
+    // exit i sets the flag to GEN_LOOP_LABEL_BASE + i.
+    gen_loop_exit_labels: Vec[i32],
+    gen_loop_exit_continues: Vec[i32],
+    // Which of GEN_LOOP_RETURN..GEN_LOOP_CANCEL this closure sets (bit per
+    // code, gen_loop_code_bit), so the owning frame emits only those arms.
+    gen_loop_used_codes: i32,
 
     regex_capture_pat_nodes: Vec[i32],
     regex_capture_opt_places: Vec[i32],
@@ -275,8 +318,13 @@ fn MirBuilder.init(sema: &Sema, ast: AstPool, pool: InternPool, fn_sym: i32) -> 
         contextual_fact_sig_idx: -1,
         pipeline_receiver_override_node: 0,
         pipeline_receiver_override_place: -1,
-        in_generator: 0,
-        generator_yield_count: 0,
+        gen_body_local: -1,
+        gen_loop_flag_local: -1,
+        gen_loop_ret_local: -1,
+        gen_loop_ret_ty: 0,
+        gen_loop_exit_labels: Vec.new(),
+        gen_loop_exit_continues: Vec.new(),
+        gen_loop_used_codes: 0,
         regex_capture_pat_nodes: Vec.new(),
         regex_capture_opt_places: Vec.new(),
         string_alias_local_ids: Vec.new(),
@@ -5204,8 +5252,8 @@ impl MirBuilder:
         self.retire_decomposed_carrier(branch_place)
 
         self.switch_to(fail_bb)
-        let ret_place = self.place_for_local(0)
-        let ret_ty: i32 = self.body.local_type_ids.get(0)
+        let ret_place = self.fn_return_place()
+        let ret_ty = self.fn_return_type()
         let break_downcast = self.body.new_downcast_place(branch_place, break_idx)
         let break_payload_place = self.body.new_field_place(break_downcast, 0, break_ty)
         let break_op = self.operand_for_place(break_payload_place, break_ty)
@@ -5217,7 +5265,7 @@ impl MirBuilder:
         self.emit_errdefers_for_return()
         self.emit_defers_for_return()
         self.emit_drops_for_return()
-        self.terminate(TermKind.TK_RETURN, 0, 0, 0, 0)
+        self.terminate_fn_return(GEN_LOOP_ERR_RETURN)
 
         self.switch_to(pass_bb)
         let result_local = self.new_temp(continue_ty)
@@ -6801,31 +6849,53 @@ impl MirBuilder:
         self.consume_moved_operand(result)
         self.body.new_operand(OperandKind.OK_COPY, moved_place)
 
-    // A yield suspends: lower_generator_next_body saves the generator's
-    // named locals into its state and returns. Statement temporaries are not
-    // part of the state, so the yielded expression's temps drop and its
-    // moved-from sources blank here, on the suspending path, before the save
-    // (#1412). Left to the statement's own flush they ran on the resume path,
-    // which never initialized them — a drop of garbage (`fmt_to_str`'s part of
-    // `yield f"n{i}"`), and a state that saved a local the yield had moved
-    // (`yield w`) still owned the value the caller received. The yielded value
-    // itself moves into a local of its own first, out of reach of the flush.
+    // D69 (§13.4): `yield e` calls the consumer's body with `e` — a plain T
+    // moves in, a view is borrowed for the call. When the body answers false
+    // the consumer has stopped: the generator leaves right here as if by
+    // `return`, its statement temporaries, defers and scopes released on
+    // that path; it can neither observe nor ignore the stop.
     mut fn lower_generator_yield(node: i32) -> i32:
+        if self.gen_body_local < 0:
+            sema_phase_bug("BUG: yield lowered outside a generator body (Sema admits yield only in a gen fn)")
         let inner = self.ast.get_data0(node)
-        var value_op = self.unit_operand()
-        if inner != 0:
-            let yield_frame = self.push_stmt_temp_frame()
-            let raw_op = self.lower_expr(inner)
-            let yielded_ty = self.operand_type(raw_op)
-            let yielded_local = self.new_temp(yielded_ty)
-            let yielded_place = self.place_for_local(yielded_local)
-            self.assign_operand_to_place(yielded_place, raw_op, self.ast.get_start(inner))
-            self.finish_stmt_temp_frame(yield_frame)
-            value_op = self.operand_for_place(yielded_place, yielded_ty)
+        if not self.sema.call_callable_types.contains(node):
+            sema_phase_bug("BUG: Sema recorded no callable type for a yield (D69)")
+        let body_ty: i32 = self.sema.call_callable_types.get(node).unwrap()
+        let elem_ty = self.sema.fn_type_param_type(self.sema.resolve_alias(body_ty as TypeId) as i32, 0)
+        let saved_expected = self.expected_type
+        self.expected_type = elem_ty
+        let raw_op = self.lower_expr(inner)
+        self.expected_type = saved_expected
+        let yielded_local = self.new_temp(elem_ty)
+        let yielded_place = self.place_for_local(yielded_local)
+        self.assign_operand_to_place(yielded_place, raw_op, self.ast.get_start(inner))
+        let value_op = self.operand_for_place(yielded_place, elem_ty)
+        self.consume_moved_operand(value_op)
+        let args: Vec[i32] = Vec.new()
+        args.push(value_op)
+        let args_id = self.body.new_call_args(args)
+        self.body.set_call_ast_node(args_id, node)
+        let body_place = self.place_for_local(self.gen_body_local)
+        let body_op = self.body.new_operand(OperandKind.OK_COPY, body_place)
+        let more_local = self.new_temp(self.sema.ty_bool as i32)
+        let more_place = self.place_for_local(more_local)
+        let after_call = self.new_block()
+        self.terminate_with_span(TermKind.TK_CALL, body_op, args_id, more_place, after_call, self.ast.get_start(node))
+        self.switch_to(after_call)
         let resume_bb = self.new_block()
-        let yield_idx = self.generator_yield_count
-        self.generator_yield_count = self.generator_yield_count + 1
-        self.terminate_with_span(TermKind.TK_YIELD, value_op, resume_bb, yield_idx, 0, self.ast.get_start(node))
+        let stop_bb = self.new_block()
+        let vals: Vec[i64] = Vec.new()
+        vals.push(0)
+        let targets: Vec[i32] = Vec.new()
+        targets.push(stop_bb as i32)
+        let table = self.body.new_switch_table(vals, targets)
+        let more_op = self.body.new_operand(OperandKind.OK_COPY, more_place)
+        self.terminate(TermKind.TK_SWITCH_INT, more_op, table, resume_bb, 0)
+        self.switch_to(stop_bb)
+        self.emit_pending_resets_since(0, 0, 0)
+        self.emit_defers_for_return()
+        self.emit_drops_for_return()
+        self.terminate_fn_return(GEN_LOOP_RETURN)
         self.switch_to(resume_bb)
         self.unit_operand()
 
@@ -6881,11 +6951,10 @@ impl MirBuilder:
                 self.finish_stmt_temp_frame(stmt_frame)
                 continue
             if sk == NodeKind.NK_YIELD:
-                if self.in_generator != 0:
-                    let _ = self.lower_generator_yield(stmt)
-                    self.finish_stmt_temp_frame(stmt_frame)
-                    continue
-            
+                let _ = self.lower_generator_yield(stmt)
+                self.finish_stmt_temp_frame(stmt_frame)
+                continue
+
             if sk == NodeKind.NK_DEFER:
                 let defer_body = self.ast.get_data0(stmt)
                 if defer_body != 0:
@@ -7270,6 +7339,8 @@ impl MirBuilder:
         self.unit_operand()
 
     mut fn lower_for(for_node: i32) -> i32:
+        if self.sema.gen_for_elem_types.contains(for_node):
+            return self.lower_for_gen(for_node)
         let pat_or_sym = self.ast.get_data0(for_node)
         let iter_expr = self.ast.get_data1(for_node)
         let body_expr = self.ast.get_data2(for_node)
@@ -7494,6 +7565,192 @@ impl MirBuilder:
         self.switch_to(exit_bb)
         self.forget_string_flow_facts()
         self.unit_operand()
+
+    // D69 (§13.4): `for x in g` over a Gen[T] is `g.each(body)`; the loop
+    // body runs as the closure `body: fn(T) -> bool`, capturing the enclosing
+    // bindings it uses by place. Finishing the body or `continue` answers
+    // true; `break` answers false and the generator leaves at its `yield`.
+    // `return`, `?`, cancellation and a break/continue of a label outside
+    // the loop answer false too, having recorded in this frame's flag what
+    // this frame does once `each` returns — and a returned value in this
+    // frame's return slot (Go 1.23's range-over-func rewrite, with the stop
+    // automatic: the generator never sees it).
+    mut fn lower_for_gen(for_node: i32) -> i32:
+        let pat_or_sym = self.ast.get_data0(for_node)
+        let iter_expr = self.ast.get_data1(for_node)
+        let body_expr = self.ast.get_data2(for_node)
+        let span = self.ast.get_start(for_node)
+        let i32_ty = self.sema.ty_i32 as i32
+        let bool_ty = self.sema.ty_bool as i32
+        let elem_ty: i32 = self.sema.gen_for_elem_types.get(for_node).unwrap()
+        let body_fn_ty: i32 = self.sema.gen_for_body_types.get(for_node).unwrap()
+        let each_fn: i32 = self.sema.gen_for_each_syms.get(for_node).unwrap()
+        let each_sig: i32 = self.sema.gen_for_each_sigs.get(for_node).unwrap()
+        let each_mono: i32 = if self.sema.gen_for_each_monos.contains(for_node): self.sema.gen_for_each_monos.get(for_node).unwrap() else: 0
+
+        // The generator value moves into `each`.
+        let gen_op = self.lower_expr(iter_expr)
+
+        // This frame's side: the flag, and the enclosing function's return
+        // slot, which a `return` in the closure fills through its capture —
+        // this frame's own local 0, or the slot this frame itself captured
+        // when it is a gen-loop closure too.
+        let flag_local = self.new_temp(i32_ty)
+        self.assign_int_to_local(flag_local, GEN_LOOP_DONE, i32_ty)
+        let ret_ty = self.fn_return_type()
+        let ret_slot = if not self.fn_returns_value(): -1 else if self.gen_loop_flag_local >= 0: self.gen_loop_ret_local else: 0
+
+        // The loop body's captures, resolved in this frame. A body that moves
+        // out of a by-place capture blanks the outer slot (#1481); that
+        // slot's scope-exit drop keeps its null guard.
+        let capture_syms: Vec[i32] = Vec.new()
+        let capture_sources: Vec[ClosureCaptureSource] = Vec.new()
+        for ci in 0..self.sema.closure_capture_summary_count(for_node):
+            let sym = mir_symbol_for_pool(self.sema, self.pool, self.sema.closure_capture_summary_sym(for_node, ci))
+            let source = self.closure_capture_source(sym, for_node, ci)
+            if source.value_ty == 0 and self.sema.type_needs_drop_frozen(source.capture_ty) != 0:
+                self.body.mark_local_ever_moved(source.local)
+            capture_syms.push(sym)
+            capture_sources.push(source)
+        let body_local = self.gen_body_local
+        let body_local_ty = if body_local >= 0: self.local_type(body_local) else: 0
+        let label = self.for_label(for_node)
+        let body_sym = self.pool.intern(f"$genloop${self.body.fn_sym}${for_node}")
+        let flag_name = self.pool.intern(f"$genloop_flag${for_node}")
+        let ret_name = self.pool.intern(f"$genloop_ret${for_node}")
+        let gen_body_name = self.pool.intern(f"$genloop_body${for_node}")
+        let item_name = self.pool.intern(f"$genloop_item${for_node}")
+
+        // The closure: the loop body's captures, the protocol's captures,
+        // then the element parameter.
+        var child = MirBuilder.init(self.sema, self.ast, self.pool, body_sym)
+        child.contextual_fact_sig_idx = self.contextual_fact_sig_idx
+        child.body.anonymous_type = body_fn_ty
+        child.body.local_type_ids[0] = bool_ty
+        child.push_scope()
+        for ci in 0..capture_syms.len() as i32:
+            child.bind_capture(capture_syms[ci], capture_sources[ci])
+        child.gen_loop_flag_local = child.add_protocol_capture(flag_local, i32_ty, flag_name)
+        if ret_slot >= 0:
+            child.gen_loop_ret_local = child.add_protocol_capture(ret_slot, ret_ty, ret_name)
+        child.gen_loop_ret_ty = ret_ty
+        if body_local >= 0:
+            child.gen_body_local = child.add_protocol_capture(body_local, body_local_ty, gen_body_name)
+        let capture_count = child.body.anonymous_capture_sources.len() as i32
+        child.body.anonymous_capture_count = capture_count
+        let item_local = child.body.new_local(elem_ty, 1, item_name, 1)
+        child.body.n_params = capture_count + 1
+
+        let more_bb = child.new_block()
+        let stop_bb = child.new_block()
+        child.push_control_target(label, ControlTargetKind.CT_LOOP, more_bb, stop_bb, -1)
+        child.push_scope()
+        let item_place = child.place_for_local(item_local)
+        child.bind_for_element_or_skip(for_node, pat_or_sym, item_place, elem_ty, body_expr, more_bb, true)
+        let body_frame = child.push_stmt_temp_frame()
+        let _ = child.lower_expr_discard(body_expr)
+        child.finish_stmt_temp_frame(body_frame)
+        child.pop_scope_with_goto(more_bb)
+        child.pop_control_target()
+        child.switch_to(more_bb)
+        child.assign_bool_to_local(0, true)
+        child.terminate(TermKind.TK_RETURN, 0, 0, 0, 0)
+        child.switch_to(stop_bb)
+        child.assign_bool_to_local(0, false)
+        child.terminate(TermKind.TK_RETURN, 0, 0, 0, 0)
+        child.pop_scope_inline()
+        let used_codes = child.gen_loop_used_codes
+        let exit_labels = mir_clone_i32_vec(&child.gen_loop_exit_labels)
+        let exit_continues = mir_clone_i32_vec(&child.gen_loop_exit_continues)
+        var finished = LoweredFunction { body: move child.body, anonymous_bodies: move child.anonymous_bodies }
+        self.anonymous_bodies.push(move finished.body)
+        while finished.anonymous_bodies.len() > 0:
+            self.anonymous_bodies.push(finished.anonymous_bodies.pop().unwrap())
+
+        // g.each(body)
+        let closure_local = self.new_temp(body_fn_ty)
+        let in_loop = if self.loop_break_bbs.len() > 0: 1 else: 0
+        let closure_const = self.body.new_const(ConstKind.CK_CLOSURE, for_node, body_sym, in_loop, body_fn_ty)
+        let closure_const_op = self.body.new_operand(OperandKind.OK_CONSTANT, closure_const)
+        let closure_rv = self.body.new_rvalue(RvalueKind.RK_USE, closure_const_op, 0, 0)
+        let closure_place = self.place_for_local(closure_local)
+        self.body.push_stmt(self.cur_bb, StmtKind.Assign, closure_place, closure_rv, span)
+        let closure_op = self.body.new_operand(OperandKind.OK_MOVE, closure_place)
+        self.consume_moved_operand(gen_op)
+        self.consume_moved_operand(closure_op)
+        let args: Vec[i32] = Vec.new()
+        args.push(gen_op)
+        args.push(closure_op)
+        let args_id = self.body.new_call_args(args)
+        self.body.set_call_ast_node(args_id, for_node)
+        if each_mono != 0:
+            self.body.set_call_intrinsic(args_id, MirIntrinsic.GENERIC_CALL)
+            self.body.set_call_contract(args_id, each_sig, each_mono)
+            self.body.require_call_contract(args_id)
+        else:
+            self.body.set_call_contract(args_id, each_sig, self.sema.sig_names[each_sig])
+        let fn_op = self.const_operand(ConstKind.CK_FN, if each_mono != 0: each_mono else: each_fn, self.sema.ty_void)
+        let each_result = self.new_temp(self.sema.ty_void as i32)
+        let each_result_place = self.place_for_local(each_result)
+        let after_each = self.new_block()
+        self.terminate(TermKind.TK_CALL, fn_op, args_id, each_result_place, after_each)
+        self.switch_to(after_each)
+        self.emit_pending_resets_since(0, 0, 0)
+
+        // Act on the flag: the closure's exits that leave this loop too.
+        let exit_bb = self.new_block()
+        let vals: Vec[i64] = Vec.new()
+        let targets: Vec[i32] = Vec.new()
+        let codes: Vec[i32] = Vec.new()
+        for code in GEN_LOOP_RETURN..GEN_LOOP_LABEL_BASE:
+            if (used_codes / gen_loop_code_bit(code)) % 2 == 1:
+                codes.push(code)
+        for ei in 0..exit_labels.len() as i32:
+            codes.push(GEN_LOOP_LABEL_BASE + ei)
+        let arm_bbs: Vec[BlockId] = Vec.new()
+        for ai in 0..codes.len() as i32:
+            let arm_bb = self.new_block()
+            arm_bbs.push(arm_bb)
+            vals.push(codes[ai] as i64)
+            targets.push(arm_bb as i32)
+        let table = self.body.new_switch_table(vals, targets)
+        let flag_place = self.place_for_local(flag_local)
+        let flag_op = self.body.new_operand(OperandKind.OK_COPY, flag_place)
+        self.terminate(TermKind.TK_SWITCH_INT, flag_op, table, exit_bb, 0)
+        for ai in 0..codes.len() as i32:
+            self.switch_to(arm_bbs[ai])
+            let code = codes[ai]
+            if code == GEN_LOOP_CANCEL:
+                self.emit_cancelled_return()
+            else if code == GEN_LOOP_RETURN or code == GEN_LOOP_ERR_RETURN:
+                self.emit_pending_resets_since(0, 0, 0)
+                if code == GEN_LOOP_ERR_RETURN:
+                    self.emit_errdefers_for_return()
+                self.emit_defers_for_return()
+                self.emit_drops_for_return()
+                self.terminate_fn_return(code)
+            else:
+                let exit_label = exit_labels[code - GEN_LOOP_LABEL_BASE]
+                let is_continue = exit_continues[code - GEN_LOOP_LABEL_BASE] != 0
+                let target = self.find_control_target(exit_label, if is_continue: 1 else: 0)
+                let target_bb = if is_continue: target.continue_bb else: target.break_bb
+                if target_bb >= 0:
+                    self.emit_cleanup_to_target(target)
+                    self.terminate(TermKind.TK_GOTO, target_bb, 0, 0, 0)
+                else:
+                    let _ = self.lower_gen_loop_label_exit(exit_label, is_continue)
+                    self.terminate(TermKind.TK_UNREACHABLE, 0, 0, 0, 0)
+        self.switch_to(exit_bb)
+        self.forget_string_flow_facts()
+        self.unit_operand()
+
+    // A capture the gen-loop protocol adds (the flag, the return slot, the
+    // producer's body): a by-place capture of `source_local` under a name no
+    // binding can spell.
+    mut fn add_protocol_capture(source_local: i32, ty: i32, name: i32) -> i32:
+        let local = self.body.new_local(ty, 0, name, 1)
+        self.body.anonymous_capture_sources.push(source_local)
+        local
 
     fn for_label(for_node: i32) -> i32:
         let for_meta = self.ast.find_for_meta(for_node)
@@ -9020,7 +9277,7 @@ impl MirBuilder:
     mut fn lower_break(node: i32) -> i32:
         let loop_info = self.find_control_target(self.ast.get_data1(node), 0)
         if loop_info.break_bb < 0:
-            return self.unit_operand()
+            return self.lower_gen_loop_label_exit(self.ast.get_data1(node), false)
 
         let value_expr = self.ast.get_data0(node)
         if value_expr != 0:
@@ -9040,7 +9297,7 @@ impl MirBuilder:
     mut fn lower_continue(node: i32) -> i32:
         let loop_info = self.find_control_target(self.ast.get_data0(node), 1)
         if loop_info.continue_bb < 0:
-            return self.unit_operand()
+            return self.lower_gen_loop_label_exit(self.ast.get_data0(node), true)
 
         self.flush_stmt_temp_frame()
         self.emit_cleanup_to_target(loop_info)
@@ -9049,10 +9306,39 @@ impl MirBuilder:
         self.switch_to(after_continue)
         self.unit_operand()
 
+    // D69 (§13.4): a labeled break/continue in a gen-loop closure whose label
+    // is outside the closure leaves the closure — its own scopes released, the
+    // generator stopped — and the flag names the exit for the owning frame.
+    // Sema resolved every label, so outside a gen-loop closure a missing target
+    // is a compiler bug.
+    mut fn lower_gen_loop_label_exit(label: i32, is_continue: bool) -> i32:
+        if self.gen_loop_flag_local < 0:
+            sema_phase_bug(f"BUG: break/continue has no control target (label sym {label})")
+        var exit = -1
+        for ei in 0..self.gen_loop_exit_labels.len() as i32:
+            if self.gen_loop_exit_labels[ei] == label and (self.gen_loop_exit_continues[ei] != 0) == is_continue:
+                exit = ei
+        if exit < 0:
+            exit = self.gen_loop_exit_labels.len() as i32
+            self.gen_loop_exit_labels.push(label)
+            self.gen_loop_exit_continues.push(if is_continue: 1 else: 0)
+        self.emit_pending_resets_since(0, 0, 0)
+        self.emit_defers_for_return()
+        self.emit_drops_for_return()
+        self.terminate_fn_return(GEN_LOOP_LABEL_BASE + exit)
+        let after_exit = self.new_block()
+        self.switch_to(after_exit)
+        self.unit_operand()
+
     mut fn lower_goto(node: i32) -> i32:
         let label = self.ast.get_data0(node)
         let target = self.goto_target_info(label)
         if target.break_bb < 0:
+            // D69: a `goto` out of a `for` body over a Gen[T] would leave the
+            // closure that body runs as; it is not lowered (the whole
+            // function fails loudly rather than drop the jump).
+            if self.gen_loop_flag_local >= 0:
+                self.mark_unsupported()
             return self.unit_operand()
         self.flush_stmt_temp_frame()
         self.emit_cleanup_to_target(target)
@@ -9069,10 +9355,49 @@ impl MirBuilder:
             return self.unit_operand()
         self.lower_expr(stmt)
 
+    // The enclosing function's return type. Inside a gen-loop closure (D69)
+    // a `return` belongs to the function that owns the loop.
+    fn fn_return_type() -> i32:
+        if self.gen_loop_flag_local >= 0: self.gen_loop_ret_ty else: self.body.local_type_ids.get(0)
+
+    // Where a returned value goes: local 0, or, in a gen-loop closure, the
+    // owning frame's return slot through its capture.
+    mut fn fn_return_place() -> i32:
+        if self.gen_loop_flag_local < 0:
+            return self.place_for_local(0)
+        if self.gen_loop_ret_local < 0:
+            sema_phase_bug("BUG: a gen-loop closure returns a value its enclosing function does not return (D69)")
+        self.place_for_local(self.gen_loop_ret_local)
+
+    fn fn_returns_value() -> bool:
+        let ret_ty = self.fn_return_type()
+        ret_ty > 0 and ret_ty != self.sema.ty_void as i32 and ret_ty != self.sema.ty_never as i32
+
+    // Leave the function once its cleanup has run. A gen-loop closure leaves
+    // the closure, stopping the generator, and `code` tells the frame that
+    // owns the loop to leave in turn (lower_for_gen acts on it).
+    mut fn terminate_fn_return(code: i32):
+        if self.gen_loop_flag_local >= 0:
+            if code < GEN_LOOP_LABEL_BASE and (self.gen_loop_used_codes / gen_loop_code_bit(code)) % 2 == 0:
+                self.gen_loop_used_codes = self.gen_loop_used_codes + gen_loop_code_bit(code)
+            self.assign_int_to_local(self.gen_loop_flag_local, code, self.sema.ty_i32 as i32)
+            self.assign_bool_to_local(0, false)
+        self.terminate(TermKind.TK_RETURN, 0, 0, 0, 0)
+
+    mut fn assign_int_to_local(local_id: i32, value: i32, ty: i32):
+        let place = self.place_for_local(local_id)
+        let op = self.int_const_operand(value, ty)
+        self.assign_operand_to_place(place, op, 0)
+
+    mut fn assign_bool_to_local(local_id: i32, value: bool):
+        let place = self.place_for_local(local_id)
+        let op = self.lower_bool_lit(if value: 1 else: 0)
+        self.assign_operand_to_place(place, op, 0)
+
     mut fn lower_return(node: i32) -> i32:
         let value_expr = self.ast.get_data0(node)
         let saved_expected = self.expected_type
-        let ret_ty: i32 = self.body.local_type_ids.get(0)
+        let ret_ty = self.fn_return_type()
         if ret_ty > 0:
             self.expected_type = ret_ty
         if value_expr != 0:
@@ -9089,13 +9414,14 @@ impl MirBuilder:
         let rr_adj = self.adjust_ret_operand_auto_ref(ret_op_raw, value_expr, ret_ty, self.ast.get_start(node))
         let ret_op = if rr_adj >= 0: rr_adj else: ret_op_raw
         self.expected_type = saved_expected
-        let ret_place = self.place_for_local(0)
-        self.assign_operand_to_place(ret_place, ret_op, self.ast.get_start(node))
+        if self.gen_loop_flag_local < 0 or self.fn_returns_value():
+            let ret_place = self.fn_return_place()
+            self.assign_operand_to_place(ret_place, ret_op, self.ast.get_start(node))
 
         self.emit_pending_resets_since(0, 0, 0)
         self.emit_defers_for_return()
         self.emit_drops_for_return()
-        self.terminate(TermKind.TK_RETURN, 0, 0, 0, 0)
+        self.terminate_fn_return(GEN_LOOP_RETURN)
 
         // Keep lowering total by switching to an unreachable continuation block.
         let after_return = self.new_block()
@@ -9218,7 +9544,7 @@ impl MirBuilder:
         self.emit_pending_resets_since(0, 0, 0)
         self.emit_defers_for_return()
         self.emit_drops_for_return()
-        self.terminate(TermKind.TK_RETURN, 0, 0, 0, 0)
+        self.terminate_fn_return(GEN_LOOP_CANCEL)
 
     // §14.7: a cancelled fiber unwinds at a runtime wait instead of parking.
     // Emitted right after a current-fiber wait intrinsic that returns to the
@@ -10841,7 +11167,11 @@ impl MirBuilder:
             return 0
         self.sema.callable_any_fn_type(expr_tid as TypeId)
 
-    mut fn lower_callable_expr(node: i32) -> i32:
+    mut fn lower_callable_expr(callee: i32) -> i32:
+        // `(self.run)(body)` names the same place as `self.run(...)` would.
+        var node = callee
+        while node != 0 and self.ast.kind(node) == NodeKind.NK_GROUPED:
+            node = self.ast.get_data0(node)
         var exact_type = self.expr_type(node)
         // D63 (§12.4): "Calling through a binding or a field observes it and
         // does not move." A callable is not Copy, so lower_expr would MOVE
@@ -12543,8 +12873,8 @@ impl MirBuilder:
         self.terminate(TermKind.TK_SWITCH_INT, disc, table, fail_bb, 0)
 
         self.switch_to(fail_bb)
-        let ret_place = self.place_for_local(0)
-        let ret_ty = self.body.local_type_ids.get(0)
+        let ret_place = self.fn_return_place()
+        let ret_ty = self.fn_return_type()
         let source_err_ty = self.generic_inst_arg_type(value_ty, self.sema.syms.result, 1)
         let target_err_ty = self.generic_inst_arg_type(ret_ty, self.sema.syms.result, 1)
         let source_option_ty = self.generic_inst_arg_type(value_ty, self.sema.syms.option, 0)
@@ -12597,7 +12927,7 @@ impl MirBuilder:
         self.emit_errdefers_for_return()
         self.emit_defers_for_return()
         self.emit_drops_for_return()
-        self.terminate(TermKind.TK_RETURN, 0, 0, 0, 0)
+        self.terminate_fn_return(GEN_LOOP_ERR_RETURN)
 
         // Extract Ok payload via ProjKind.PK_DOWNCAST + field access
         var result_ty = result_ty_hint
@@ -14481,10 +14811,13 @@ impl MirBuilder:
                 let carrier_kind = if self.sema.is_copy_frozen(recv_ty) != 0: OperandKind.OK_COPY else: OperandKind.OK_MOVE
                 return self.body.new_operand(carrier_kind, recv_place)
             return self.lower_method_call(lhs_expr, method_sym, args_start, args_count, node)
-        let fn_op = self.lower_expr(fn_expr)
+        // `collect[Vec]()`: Sema resolved the stage to the generic function
+        // the bracketed callee names (check_generic_pipeline_call).
+        let stage_expr = if fn_expr != 0 and self.ast.kind(fn_expr) == NodeKind.NK_INDEX and self.sema.comp_resolved.contains(node): self.ast.get_data0(fn_expr) else: fn_expr
+        let fn_op = self.lower_expr(stage_expr)
         let callee_sym =
-            if fn_expr != 0 and self.ast.kind(fn_expr) == NodeKind.NK_IDENT:
-                self.ast.get_data0(fn_expr)
+            if stage_expr != 0 and self.ast.kind(stage_expr) == NodeKind.NK_IDENT:
+                self.ast.get_data0(stage_expr)
             else:
                 0
         let arg_nodes: Vec[i32] = Vec.new()
@@ -14493,6 +14826,47 @@ impl MirBuilder:
             arg_nodes.push(self.ast.get_extra(args_start + i))
         let ret_ty = self.expr_type(node)
         self.lower_call_with_arg_nodes(fn_op, callee_sym, arg_nodes, ret_ty, node)
+
+    // §12.4: a closure captures by place. A binding that is a local is
+    // captured as that local; one that names a place without a local of its
+    // own (an alias: a view binding of an element or field) is captured
+    // through a reference to the place, which the closure dereferences.
+    mut fn closure_capture_source(sym: i32, node: i32, index: i32) -> ClosureCaptureSource:
+        let local = self.lookup_local(sym)
+        if local >= 0:
+            return ClosureCaptureSource { local, capture_ty: self.local_type(local), value_ty: 0, name: sym }
+        let alias_place = self.lookup_alias_place(sym)
+        let alias_ty = self.lookup_alias_type(sym)
+        if alias_place < 0 or alias_ty == 0:
+            sema_phase_bug(f"BUG: closure capture names no local or place: node={node} symbol={sym}")
+        // A `move ||` closure snapshots: a Copy place's value is copied into a
+        // local of this frame, which the closure takes.
+        if self.ast.kind(node) == NodeKind.NK_CLOSURE and self.ast.is_move_closure(node) != 0:
+            if self.sema.is_copy_frozen(alias_ty) == 0:
+                sema_phase_bug(f"BUG: a move closure captures a non-Copy view binding by value: node={node} symbol={sym}")
+            let copy_local = self.new_temp(alias_ty)
+            let copy_place = self.place_for_local(copy_local)
+            let copy_op = self.body.new_operand(OperandKind.OK_COPY, alias_place)
+            self.assign_operand_to_place(copy_place, copy_op, self.ast.get_start(node))
+            return ClosureCaptureSource { local: copy_local, capture_ty: alias_ty, value_ty: 0, name: self.pool.intern(f"$capture_copy${node}${index}") }
+        let ref_ty = self.sema.find_exact_type(TypeKind.TY_REF, alias_ty, 0, 0) as i32
+        if ref_ty == 0:
+            sema_phase_bug(f"BUG: closure capture of a place has no preregistered &T: node={node} symbol={sym}")
+        let ref_local = self.new_temp(ref_ty)
+        let rv = self.body.new_rvalue(RvalueKind.RK_REF, BorrowKind.SHARED, alias_place, 0)
+        let ref_place = self.place_for_local(ref_local)
+        self.body.push_stmt(self.cur_bb, StmtKind.Assign, ref_place, rv, self.ast.get_start(node))
+        ClosureCaptureSource { local: ref_local, capture_ty: ref_ty, value_ty: alias_ty, name: self.pool.intern(f"$capture_ref${node}${index}") }
+
+    mut fn bind_capture(sym: i32, source: ClosureCaptureSource):
+        let capture_local = self.body.new_local(source.capture_ty, 0, source.name, 1)
+        self.body.anonymous_capture_sources.push(source.local)
+        if source.value_ty == 0:
+            self.bind_local(sym, capture_local)
+            return
+        let capture_place = self.place_for_local(capture_local)
+        let deref = self.body.new_deref_place(capture_place, source.value_ty)
+        self.bind_alias_place(sym, deref, source.value_ty)
 
     mut fn prepare_anonymous_body(node: i32, ty: i32, is_async: bool) -> i32:
         let body_node = self.ast.get_data0(node)
@@ -14529,6 +14903,10 @@ impl MirBuilder:
                 // the outer slot — so its drop keeps the guard too.
                 if is_move or self.sema.closure_capture_consumes(node, ci) != 0:
                     self.body.mark_local_ever_moved(consumed_local)
+        let capture_sources: Vec[ClosureCaptureSource] = Vec.new()
+        if not is_async:
+            for ci in 0..captures.len() as i32:
+                capture_sources.push(self.closure_capture_source(captures[ci], node, ci))
         var child = MirBuilder.init(self.sema, self.ast, self.pool, body_sym)
         child.contextual_fact_sig_idx = if not is_async and captures.len() > 0: 0 else: self.contextual_fact_sig_idx
         child.body.anonymous_type = ty
@@ -14537,12 +14915,16 @@ impl MirBuilder:
         child.push_scope()
         for ci in 0..captures.len():
             let sym = captures[ci]
-            let local = self.lookup_local(sym)
-            let capture_ty = if local >= 0: self.local_type(local) else: self.lookup_alias_type(sym)
-            if capture_ty == 0:
-                sema_phase_bug(f"BUG: anonymous capture lacks a concrete local type: node={node} symbol={sym}")
-            let capture_local = child.body.new_local(capture_ty, 0, sym, 1)
-            child.bind_local(sym, capture_local)
+            if is_async:
+                let local = self.lookup_local(sym)
+                let capture_ty = if local >= 0: self.local_type(local) else: self.lookup_alias_type(sym)
+                if capture_ty == 0:
+                    sema_phase_bug(f"BUG: anonymous capture lacks a concrete local type: node={node} symbol={sym}")
+                let capture_local = child.body.new_local(capture_ty, 0, sym, 1)
+                child.bind_local(sym, capture_local)
+                child.body.anonymous_capture_sources.push(local)
+            else:
+                child.bind_capture(sym, capture_sources[ci])
         for i in 0..param_count:
             let sym = self.ast.get_extra(param_start + i * 2)
             let param_ty = self.sema.fn_type_param_type(callable_ty, i)
@@ -15766,12 +16148,7 @@ impl MirBuilder:
             return self.lower_single_await(task_op, result_ty, task_inner_ty, node, single_await_owns)
 
         if kind == NodeKind.NK_YIELD:
-            let inner = self.ast.get_data0(node)
-            if self.in_generator != 0:
-                return self.lower_generator_yield(node)
-            if inner != 0:
-                let _ = self.lower_expr(inner)
-            return self.unit_operand()
+            return self.lower_generator_yield(node)
 
         if kind == NodeKind.NK_ASYNC_SCOPE:
             // async scope: d0=name(sym), d1=body(node)
@@ -15994,12 +16371,15 @@ fn lower_fn_with_sig(builder: MirBuilder, fn_node: i32, sig_idx: i32) -> Lowered
         sema_phase_bug("BUG: interface body reached MIR lowering (D39: lower_module skips interface declarations)")
     builder.contextual_fact_sig_idx = sig_idx
     let fn_flags = builder.ast.get_data2(fn_node)
+    // D69: a gen fn's body lowers as its producer, under the producer's
+    // signature; Sema checked it — and keyed its D22 facts — under the gen
+    // fn's own.
+    if (fn_flags / FnFlags.GEN) % 2 == 1 and sig_idx >= 0:
+        builder.contextual_fact_sig_idx = builder.sema.get_sig(builder.sema.generator_mir_only_fns.get(builder.sema.sig_names[sig_idx]).unwrap())
     if sig_idx >= 0:
         var body_ret_ty = builder.sema.sig_return_type(sig_idx)
         if (fn_flags / FnFlags.ASYNC) % 2 == 1:
             body_ret_ty = builder.sema.unwrap_task_type(body_ret_ty as TypeId) as i32
-        if (fn_flags / FnFlags.GEN) % 2 == 1 and builder.in_generator != 0:
-            body_ret_ty = builder.sema.ty_void as i32
         builder.body.local_type_ids[0] = body_ret_ty
     else:
         // No sig — try to get return type from typed_expr_types on body expression
@@ -16066,6 +16446,15 @@ fn lower_fn_with_sig(builder: MirBuilder, fn_node: i32, sig_idx: i32) -> Lowered
                 builder.schedule_drop(local_id, DropKind.DK_VALUE)
             param_locals.push(local_id)
         builder.body.n_params = param_count
+        // D69 (§13.4): a gen fn lowers as its producer, whose last parameter
+        // is the consumer's body; the producer's signature (Sema) types it.
+        if (fn_flags / FnFlags.GEN) % 2 == 1:
+            let body_param_ty = builder.sema.sig_param_type(sig_idx, param_count)
+            let body_local = builder.body.new_local(body_param_ty, 0, builder.pool.intern("__with_gen_body"), 1)
+            builder.body.push_stmt(builder.cur_bb, StmtKind.StorageLive, body_local, 0, builder.ast.get_start(fn_node))
+            builder.schedule_drop(body_local, DropKind.DK_VALUE)
+            builder.gen_body_local = body_local
+            builder.body.n_params = param_count + 1
 
         // Parameter patterns (§9.7): `fn f({ x, y }: Point)` destructures the
         // incoming parameter, binding the pattern's variables. Done after all
@@ -16369,371 +16758,73 @@ impl MirBody:
             self.set_terminator(bb, TermKind.TK_GOTO, 0, 0, 0, 0, span)
             bb = bb + 1
 
-fn mir_gen_resume_field_sym(sema: &Sema) -> i32:
-    sema.pool_lookup_symbol("__with_generator_resume")
-
-fn mir_gen_state_field_start(sema: &Sema, state_tid: i32) -> i32:
-    let resolved = sema.resolve_alias(state_tid as TypeId) as i32
-    if resolved <= 0 or resolved >= sema.type_d1.len():
-        return 0
-    sema.type_d1[resolved]
-
-fn mir_gen_state_field_count(sema: &Sema, state_tid: i32) -> i32:
-    let resolved = sema.resolve_alias(state_tid as TypeId) as i32
-    if sema.generator_state_field_counts.contains(resolved):
-        return sema.generator_state_field_counts.get(resolved).unwrap()
-    if resolved <= 0 or resolved >= sema.type_d2.len():
-        return 0
-    sema.type_d2[resolved]
-
-fn mir_gen_state_field_sym(sema: &Sema, state_tid: i32, field_i: i32) -> i32:
-    let resolved = sema.resolve_alias(state_tid as TypeId) as i32
-    let key = sema_pair_key(resolved, field_i)
-    if sema.generator_state_field_names.contains(key):
-        return sema.generator_state_field_names.get(key).unwrap()
-    let start = mir_gen_state_field_start(sema, state_tid)
-    sema.type_extra[(start + field_i * 3)]
-
-fn mir_gen_state_field_type(sema: &Sema, state_tid: i32, field_i: i32) -> i32:
-    let resolved = sema.resolve_alias(state_tid as TypeId) as i32
-    let key = sema_pair_key(resolved, field_i)
-    if sema.generator_state_field_types.contains(key):
-        return sema.generator_state_field_types.get(key).unwrap()
-    let start = mir_gen_state_field_start(sema, state_tid)
-    sema.type_extra[(start + field_i * 3 + 1)]
-
-fn mir_gen_find_local_by_sym(body: &MirBody, sym: i32) -> i32:
-    if sym == 0:
-        return -1
-    for li in 1..body.local_names.len() as i32:
-        if body.local_names[li] == sym:
-            return li
-    -1
-
 impl MirBody:
-    mut fn gen_self_field_place(field_sym: i32, field_ty: i32) -> i32:
-        let self_place = self.new_place(1)
-        self.new_field_place(self_place, field_sym, field_ty)
-
-    mut fn gen_assign_operand(bb: i32, place: i32, op: i32, span: i32):
-        let rv = self.new_rvalue(RvalueKind.RK_USE, op, 0, 0)
-        self.push_stmt(bb, StmtKind.Assign, place, rv, span)
-
+    // The reset-on-move blank of a value of `tid` (§2.5.1).
     mut fn gen_zero_operand(tid: i32) -> i32:
         let c = self.new_const(ConstKind.CK_ZERO_SIZED, 0, 0, 0, tid)
         self.new_operand(OperandKind.OK_CONSTANT, c)
 
-    mut fn gen_assign_option_some(bb: i32, opt_ty: i32, value_op: i32, span: i32):
-        let fields: Vec[i32] = Vec.new()
-        let names: Vec[i32] = Vec.new()
-        fields.push(value_op)
-        names.push(0)
-        let fid = self.new_agg_fields(fields, names)
-        let rv = self.new_rvalue(RvalueKind.RK_AGGREGATE, 1, fid, 0)
-        let ret_place = self.new_place(0)
-        let _ = opt_ty
-        self.push_stmt(bb, StmtKind.Assign, ret_place, rv, span)
-
-    mut fn gen_assign_option_none(bb: i32, opt_ty: i32, span: i32):
-        let fields: Vec[i32] = Vec.new()
-        let names: Vec[i32] = Vec.new()
-        let fid = self.new_agg_fields(fields, names)
-        let rv = self.new_rvalue(RvalueKind.RK_AGGREGATE, 1, fid, 1)
-        let ret_place = self.new_place(0)
-        let _ = opt_ty
-        self.push_stmt(bb, StmtKind.Assign, ret_place, rv, span)
-
-    mut fn gen_store_resume_state(bb: i32, sema: &Sema, state_tid: i32, value: i64, span: i32):
-        let resume_sym = mir_gen_resume_field_sym(sema)
-        let resume_place = self.gen_self_field_place(resume_sym, sema.ty_i32 as i32)
-        let c = self.new_const(ConstKind.CK_INT, ast_int_part0(value), ast_int_part1(value), ast_int_part2(value), sema.ty_i32 as i32)
-        let op = self.new_operand(OperandKind.OK_CONSTANT, c)
-        self.gen_assign_operand(bb, resume_place, op, span)
-
-    mut fn gen_save_generator_fields(bb: i32, sema: &Sema, state_tid: i32, span: i32):
-        let resume_sym = mir_gen_resume_field_sym(sema)
-        let field_count = mir_gen_state_field_count(sema, state_tid)
-        for fi in 0..field_count:
-            let field_sym = mir_gen_state_field_sym(sema, state_tid, fi)
-            if field_sym == resume_sym:
-                continue
-            let local_id = mir_gen_find_local_by_sym(self, field_sym)
-            if local_id < 0:
-                continue
-            let field_ty = mir_gen_state_field_type(sema, state_tid, fi)
-            let dst = self.gen_self_field_place(field_sym, field_ty)
-            let src_place = self.new_place(local_id)
-            let op = self.new_operand(OperandKind.OK_COPY, src_place)
-            self.gen_assign_operand(bb, dst, op, span)
-
-    mut fn gen_blank_generator_fields(bb: i32, sema: &Sema, state_tid: i32, span: i32):
-        let resume_sym = mir_gen_resume_field_sym(sema)
-        let field_count = mir_gen_state_field_count(sema, state_tid)
-        for fi in 0..field_count:
-            let field_sym = mir_gen_state_field_sym(sema, state_tid, fi)
-            if field_sym == resume_sym:
-                continue
-            if mir_gen_find_local_by_sym(self, field_sym) < 0:
-                continue
-            let field_ty = mir_gen_state_field_type(sema, state_tid, fi)
-            let dst = self.gen_self_field_place(field_sym, field_ty)
-            let blank = self.gen_zero_operand(field_ty)
-            self.gen_assign_operand(bb, dst, blank, span)
-
-    mut fn gen_restore_generator_fields(bb: i32, sema: &Sema, state_tid: i32, span: i32):
-        let resume_sym = mir_gen_resume_field_sym(sema)
-        let field_count = mir_gen_state_field_count(sema, state_tid)
-        for fi in 0..field_count:
-            let field_sym = mir_gen_state_field_sym(sema, state_tid, fi)
-            if field_sym == resume_sym:
-                continue
-            let local_id = mir_gen_find_local_by_sym(self, field_sym)
-            if local_id < 0:
-                continue
-            let field_ty = mir_gen_state_field_type(sema, state_tid, fi)
-            let src = self.gen_self_field_place(field_sym, field_ty)
-            let dst = self.new_place(local_id)
-            let op = self.new_operand(OperandKind.OK_COPY, src)
-            self.gen_assign_operand(bb, dst, op, span)
-
-fn mir_gen_remap_local(local_map: &Vec[i32], local_id: i32) -> i32:
-    if local_id < 0 or local_id >= local_map.len():
-        return local_id
-    local_map[local_id]
-
-fn mir_gen_remap_place_projection_data(source: &MirBody, local_map: &Vec[i32], proj_i: i32) -> i32:
-    let kind = source.proj_kinds[proj_i]
-    let data = source.proj_d0[proj_i]
-    if kind == ProjKind.PK_INDEX:
-        return mir_gen_remap_local(local_map, data)
-    data
-
-fn mir_gen_remap_rvalue(source: &MirBody, local_map: &Vec[i32], rv_id: i32, d_index: i32) -> i32:
-    let rk = source.rval_kinds[rv_id]
-    let raw =
-        if d_index == 0: source.rval_d0[rv_id]
-        else if d_index == 1: source.rval_d1[rv_id]
-        else: source.rval_d2[rv_id]
-    if rk == RvalueKind.RK_REF or rk == RvalueKind.RK_ADDR_OF:
-        if d_index == 1 or (rk == RvalueKind.RK_ADDR_OF and d_index == 0):
-            return raw
-    let _ = local_map
-    raw
-
-fn lower_generator_constructor(sema: &Sema, ast_pool: AstPool, pool: InternPool, fn_node: i32, sig_idx: i32) -> MirBody:
-    let fn_sym = sema.fn_decl_semantic_symbol(fn_node, ast_pool.get_data0(fn_node))
-    let state_tid = sema.generator_fn_state_types.get(fn_sym).unwrap()
-    var builder = MirBuilder.init(sema, ast_pool, pool, fn_sym)
+// D69 (§13.4): calling a gen fn evaluates its arguments into the generator
+// value and runs nothing. The state struct's fields are the parameters in
+// order; each argument moves in.
+fn lower_generator_constructor(sema: &Sema, ast_pool: AstPool, pool: InternPool, fn_node: i32, fn_sym: i32, body_sym: i32, sig_idx: i32) -> MirBody:
+    let state_tid: i32 = sema.generator_fn_state_types.get(fn_sym).unwrap()
+    var builder = MirBuilder.init(sema, ast_pool, pool, body_sym)
     builder.body.local_type_ids[0] = state_tid
-    builder.push_scope()
-
-    let meta = ast_pool.find_fn_meta(fn_node)
-    if meta >= 0:
-        let param_start = ast_pool.fn_meta_param_start(meta)
-        let param_count = ast_pool.fn_meta_param_count(meta)
-        for pi in 0..param_count:
-            let p_name = ast_pool.fn_param_name(param_start, pi)
-            let p_ty = sema.sig_param_type(sig_idx, pi)
-            let local_id = builder.body.new_local(p_ty, 0, p_name, 1)
-            builder.bind_local(p_name, local_id)
-            if builder.local_type_is_str(local_id) != 0:
-                builder.set_string_local_flags(local_id, 1)
-        builder.body.n_params = param_count
-
+    let span = ast_pool.get_start(fn_node)
     let fields: Vec[i32] = Vec.new()
     let names: Vec[i32] = Vec.new()
-    let resume_sym = mir_gen_resume_field_sym(sema)
-    let field_count = mir_gen_state_field_count(sema, state_tid)
-    for fi in 0..field_count:
-        let field_sym = mir_gen_state_field_sym(sema, state_tid, fi)
-        let field_ty = mir_gen_state_field_type(sema, state_tid, fi)
-        names.push(field_sym)
-        if field_sym == resume_sym:
-            fields.push(builder.int_const_operand(0, sema.ty_i32 as i32))
-        else:
-            let local_id = builder.lookup_local(field_sym)
-            if local_id >= 0:
-                fields.push(builder.body.new_operand(OperandKind.OK_COPY, builder.place_for_local(local_id)))
-            else:
-                fields.push(builder.body.gen_zero_operand(field_ty))
+    let param_count = sema.sig_get_param_count(sig_idx)
+    let meta = ast_pool.find_fn_meta(fn_node)
+    for pi in 0..param_count:
+        let p_name = ast_pool.fn_param_name(ast_pool.fn_meta_param_start(meta), pi)
+        let p_ty = sema.sig_param_type(sig_idx, pi)
+        let local_id = builder.body.new_local(p_ty, 0, p_name, 1)
+        builder.body.push_stmt(builder.cur_bb, StmtKind.StorageLive, local_id, 0, span)
+        names.push(p_name)
+        let param_place = builder.place_for_local(local_id)
+        fields.push(builder.operand_for_place(param_place, p_ty))
+    builder.body.n_params = param_count
     let fid = builder.body.new_agg_fields(fields, names)
     let rv = builder.body.new_rvalue(RvalueKind.RK_AGGREGATE, 0, fid, 0)
     let ret_place = builder.place_for_local(0)
-    builder.body.push_stmt(builder.cur_bb, StmtKind.Assign, ret_place, rv, ast_pool.get_start(fn_node))
+    builder.body.push_stmt(builder.cur_bb, StmtKind.Assign, ret_place, rv, span)
     builder.terminate(TermKind.TK_RETURN, 0, 0, 0, 0)
     return move builder.body
 
-fn lower_generator_next_body(sema: &Sema, source: &MirBody, fn_node: i32) -> MirBody:
-    let fn_sym = source.fn_sym
-    let next_sym = sema.generator_fn_next_syms.get(fn_sym).unwrap()
-    let state_tid = sema.generator_fn_state_types.get(fn_sym).unwrap()
-    let yield_ty = sema.generator_fn_yield_types.get(fn_sym).unwrap()
-    let opt_ty = sema.find_option_type_for(yield_ty)
-    var out = MirBody.init(next_sym, sema)
-    out.local_type_ids[0] = opt_ty
-    let entry_bb = out.new_block()
-    let self_sym = sema.pool_lookup_symbol("self")
-    let _self_local = out.new_local(state_tid, 1, self_sym, 1)
-    out.n_params = 1
-
-    let local_map: Vec[i32] = Vec.new()
-    local_map.push(0)
-    for li in 1..source.local_count():
-        let mapped = out.new_local(
-            source.local_type_ids[li],
-            source.local_mutables[li],
-            source.local_names[li],
-            source.local_is_user_var[li],
-        )
-        if source.local_is_global[li] != 0:
-            out.mark_global_local(mapped)
-        local_map.push(mapped)
-
-    for ci in 0..source.const_kinds.len():
-        out.const_kinds.push(source.const_kinds[ci])
-        out.const_d0.push(source.const_d0[ci])
-        out.const_d1.push(source.const_d1[ci])
-        out.const_d2.push(source.const_d2[ci])
-        out.const_types.push(source.const_types[ci])
-
-    for pi in 0..source.place_locals.len():
-        let base_local = mir_gen_remap_local(&local_map, source.place_locals[pi])
-        let proj_start = source.place_proj_starts[pi]
-        let proj_count = source.place_proj_counts[pi]
-        let new_proj_start = out.proj_kinds.len() as i32
-        for ppi in 0..proj_count:
-            let src_proj = proj_start + ppi
-            out.proj_kinds.push(source.proj_kinds[src_proj])
-            out.proj_d0.push(mir_gen_remap_place_projection_data(source, &local_map, src_proj))
-        out.place_locals.push(base_local)
-        out.place_sema_types.push(source.place_sema_types[pi])
-        out.place_proj_starts.push(new_proj_start)
-        out.place_proj_counts.push(proj_count)
-
-    for oi in 0..source.operand_kinds.len():
-        let ok = source.operand_kinds[oi]
-        out.operand_kinds.push(ok)
-        out.operand_d0.push(source.operand_d0[oi])
-
-    for ai in 0..source.agg_field_starts.len():
-        let start = source.agg_field_starts[ai]
-        let count = source.agg_field_counts[ai]
-        out.agg_field_starts.push(out.agg_field_operands.len() as i32)
-        out.agg_field_counts.push(count)
-        for fi in 0..count:
-            out.agg_field_operands.push(source.agg_field_operands[(start + fi)])
-            out.agg_field_name_syms.push(source.agg_field_name_syms[(start + fi)])
-
-    for ca in 0..source.call_arg_starts.len():
-        let start = source.call_arg_starts[ca]
-        let count = source.call_arg_counts[ca]
-        out.call_arg_starts.push(out.call_arg_operands.len() as i32)
-        out.call_arg_counts.push(count)
-        out.call_intrinsic_kinds.push(source.call_intrinsic_kinds[ca])
-        out.call_ast_nodes.push(source.call_ast_nodes[ca])
-        out.call_sig_indices.push(source.call_sig_indices[ca])
-        out.call_mono_syms.push(source.call_mono_syms[ca])
-        out.call_contract_required.push(source.call_contract_required[ca])
-        out.call_pipeline_receiver_places.push(source.call_pipeline_receiver_places[ca])
-        for ai in 0..count:
-            out.call_arg_operands.push(source.call_arg_operands[(start + ai)])
-
-    for ri in 0..source.rval_kinds.len():
-        out.rval_kinds.push(source.rval_kinds[ri])
-        out.rval_d0.push(mir_gen_remap_rvalue(source, &local_map, ri, 0))
-        out.rval_d1.push(mir_gen_remap_rvalue(source, &local_map, ri, 1))
-        out.rval_d2.push(mir_gen_remap_rvalue(source, &local_map, ri, 2))
-
-    for bb in 0..source.block_count():
-        let _ = out.new_block()
-
-    let switch_vals: Vec[i64] = Vec.new()
-    let switch_targets: Vec[i32] = Vec.new()
-    switch_vals.push(0)
-    switch_targets.push(1)
-
-    for bb in 0..source.block_count():
-        let new_bb = bb + 1
-        let start = source.bb_stmt_starts[bb]
-        let count = source.bb_stmt_counts[bb]
-        for si in 0..count:
-            let stmt_id = start + si
-            let sk = source.stmt_kinds[stmt_id]
-            var sd0: i32 = source.stmt_d0[stmt_id]
-            let sd1 = source.stmt_d1[stmt_id]
-            // StorageLive/StorageDead name a local; a Drop names a PLACE, and
-            // places are copied one for one (their base locals remapped
-            // above). Remapping a Drop's place id as a local id dropped
-            // whichever place came next (#1412: `_5 = move _10;
-            // drop(_10)` freed the str the yield then handed to the caller,
-            // and the temp the drop was for leaked).
-            if sk == StmtKind.StorageLive or sk == StmtKind.StorageDead:
-                sd0 = mir_gen_remap_local(&local_map, sd0)
-            out.push_stmt(new_bb, sk, sd0, sd1, source.stmt_spans[stmt_id])
-
-        let tk = source.term_kind(bb)
-        let d0 = source.term_data0(bb)
-        let d1 = source.term_data1(bb)
-        let d2 = source.term_data2(bb)
-        let d3 = source.term_data3(bb)
-        let span = source.bb_term_spans[bb]
-        if tk == TermKind.TK_YIELD:
-            out.gen_save_generator_fields(new_bb, sema, state_tid, span)
-            out.gen_store_resume_state(new_bb, sema, state_tid, (d2 + 1) as i64, span)
-            out.gen_assign_option_some(new_bb, opt_ty, d0, span)
-            out.set_terminator(new_bb, TermKind.TK_RETURN, 0, 0, 0, 0, span)
-            switch_vals.push(d2 + 1)
-            switch_targets.push(d1 + 1)
-            continue
-        if tk == TermKind.TK_RETURN:
-            // Exhausted: the source body's own scope-exit drops just ran on the
-            // restored locals. The state still holds the same bytes, and the
-            // generator value's drop glue would free them again (#1548) — blank
-            // the fields to the reset sentinel so that drop is the guarded no-op.
-            out.gen_blank_generator_fields(new_bb, sema, state_tid, span)
-            out.gen_store_resume_state(new_bb, sema, state_tid, -1, span)
-            out.gen_assign_option_none(new_bb, opt_ty, span)
-            out.set_terminator(new_bb, TermKind.TK_RETURN, 0, 0, 0, 0, span)
-            continue
-        if tk == TermKind.TK_GOTO:
-            out.set_terminator(new_bb, tk, d0 + 1, d1, d2, d3, span)
-            continue
-        if tk == TermKind.TK_SWITCH_INT:
-            let vals: Vec[i64] = Vec.new()
-            let targets: Vec[i32] = Vec.new()
-            let sw_start = source.switch_table_starts[d1]
-            let sw_count = source.switch_table_counts[d1]
-            for si in 0..sw_count:
-                vals.push(source.switch_table_vals[(sw_start + si)])
-                targets.push(source.switch_table_targets[(sw_start + si)] + 1)
-            let new_table = out.new_switch_table(vals, targets)
-            out.set_terminator(new_bb, tk, d0, new_table, d2 + 1, d3, span)
-            continue
-        if tk == TermKind.TK_CALL:
-            out.set_terminator(new_bb, tk, d0, d1, d2, d3 + 1, span)
-            continue
-        if tk == TermKind.TK_DROP_AND_GOTO:
-            out.set_terminator(new_bb, tk, d0, d1 + 1, d2, d3, span)
-            continue
-        out.set_terminator(new_bb, tk, d0, d1, d2, d3, span)
-
-    let done_bb = out.new_block()
-    out.gen_assign_option_none(done_bb as i32, opt_ty, 0)
-    out.set_terminator(done_bb as i32, TermKind.TK_RETURN, 0, 0, 0, 0, 0)
-
-    out.gen_restore_generator_fields(entry_bb as i32, sema, state_tid, 0)
-    let resume_sym = mir_gen_resume_field_sym(sema)
-    let resume_place = out.gen_self_field_place(resume_sym, sema.ty_i32 as i32)
-    let resume_tmp = out.new_temp(sema.ty_i32 as i32)
-    let resume_tmp_place = out.new_place(resume_tmp)
-    let resume_op = out.new_operand(OperandKind.OK_COPY, resume_place)
-    out.gen_assign_operand(entry_bb as i32, resume_tmp_place, resume_op, 0)
-    let switch_op = out.new_operand(OperandKind.OK_COPY, resume_tmp_place)
-    let dispatch_table = out.new_switch_table(switch_vals, switch_targets)
-    out.set_terminator(entry_bb as i32, TermKind.TK_SWITCH_INT, switch_op, dispatch_table, done_bb as i32, 0, 0)
-
-    out.is_generator_next = 1
-    out
+// D69 (§13.4): the generator value's `move fn each(body)` hands its stored
+// arguments and `body` to the producer, which runs the gen fn's body.
+fn lower_generator_each_body(sema: &Sema, ast_pool: AstPool, pool: InternPool, fn_sym: i32) -> MirBody:
+    let each_sym: i32 = sema.generator_fn_each_syms.get(fn_sym).unwrap()
+    let run_sym: i32 = sema.generator_fn_run_syms.get(fn_sym).unwrap()
+    let state_tid: i32 = sema.generator_fn_state_types.get(fn_sym).unwrap()
+    let each_sig = sema.get_sig(each_sym)
+    let run_sig = sema.get_sig(run_sym)
+    var builder = MirBuilder.init(sema, ast_pool, pool, mir_symbol_for_pool(sema, pool, each_sym))
+    builder.body.local_type_ids[0] = sema.ty_void as i32
+    let self_local = builder.body.new_local(state_tid, 0, pool.intern("self"), 1)
+    let body_local = builder.body.new_local(sema.sig_param_type(each_sig, 1), 0, pool.intern("__with_gen_body"), 1)
+    builder.body.n_params = 2
+    let self_place = builder.place_for_local(self_local)
+    let args: Vec[i32] = Vec.new()
+    let field_start = sema.get_type_d1(state_tid)
+    for fi in 0..sema.get_type_d2(state_tid):
+        let field_sym: i32 = sema.type_extra[(field_start + fi * 3)]
+        let field_ty: i32 = sema.type_extra[(field_start + fi * 3 + 1)]
+        let field_place = builder.body.new_field_place(self_place, field_sym, field_ty)
+        args.push(builder.operand_for_place(field_place, field_ty))
+    let body_place = builder.place_for_local(body_local)
+    args.push(builder.operand_for_place(body_place, sema.sig_param_type(each_sig, 1)))
+    let args_id = builder.body.new_call_args(args)
+    builder.body.set_call_contract(args_id, run_sig, sema.sig_names[run_sig])
+    let fn_op = builder.const_operand(ConstKind.CK_FN, run_sym, sema.ty_void as i32)
+    let done_local = builder.new_temp(sema.ty_void as i32)
+    let done_bb = builder.new_block()
+    let done_place = builder.place_for_local(done_local)
+    builder.terminate(TermKind.TK_CALL, fn_op, args_id, done_place, done_bb)
+    builder.switch_to(done_bb)
+    builder.terminate(TermKind.TK_RETURN, 0, 0, 0, 0)
+    return move builder.body
 
 fn mir_fn_is_generic_template(sema: &Sema, ast_pool: AstPool, pool: InternPool, fn_node: i32) -> bool:
     mir_fn_is_generic_template_at(sema, ast_pool, pool, fn_node, -1)
@@ -16774,7 +16865,7 @@ impl MirModule:
                 if child_idx < 0:
                     sema_phase_bug(f"BUG: anonymous expression has no prelowered MIR body: body={body.fn_sym} node={body.const_d0[ci]}")
                 let child = &self.bodies[child_idx]
-                if child.anonymous_type != body.const_types[ci] or child.anonymous_capture_count < 0 or child.anonymous_capture_count > child.n_params:
+                if child.anonymous_type != body.const_types[ci] or child.anonymous_capture_count < 0 or child.anonymous_capture_count > child.n_params or child.anonymous_capture_sources.len() as i32 != child.anonymous_capture_count:
                     sema_phase_bug(f"BUG: anonymous expression/body contract mismatch: body={body.fn_sym} node={body.const_d0[ci]}")
             let call_count = body.call_arg_starts.len() as i32
             if body.call_sig_indices.len() != call_count or body.call_mono_syms.len() as i32 != call_count or body.call_contract_required.len() as i32 != call_count or body.call_pipeline_receiver_places.len() as i32 != call_count:
@@ -16941,15 +17032,13 @@ pub fn lower_module(input_sema: Sema, ast_pool: AstPool, pool: InternPool) -> Mi
             let sig_idx = sema.get_sig(fn_sym)
             if sig_idx < 0:
                 continue
-            var source_builder = MirBuilder.init(&sema, ast_pool, pool, mir_fn_sym)
-            source_builder.in_generator = 1
-            var source = lower_fn_with_sig(move source_builder, decl as i32, sig_idx)
-            let ctor_body = lower_generator_constructor(sema, ast_pool, pool, decl as i32, sig_idx)
-            let next_body = lower_generator_next_body(sema, source.body, decl as i32)
-            mir_mod.add_body(move ctor_body)
-            mir_mod.add_body(move next_body)
-            while source.anonymous_bodies.len() > 0:
-                mir_mod.add_body(source.anonymous_bodies.pop().unwrap())
+            // D69 (§13.4): the constructor, the producer (the gen fn's body
+            // with its consumer's body as a last parameter), and `each`.
+            let run_sym: i32 = sema.generator_fn_run_syms.get(fn_sym).unwrap()
+            let producer_builder = MirBuilder.init(&sema, ast_pool, pool, mir_symbol_for_pool(&sema, pool, run_sym))
+            mir_mod.add_lowered_function(lower_fn_with_sig(move producer_builder, decl as i32, sema.get_sig(run_sym)))
+            mir_mod.add_body(lower_generator_constructor(&sema, ast_pool, pool, decl as i32, fn_sym, mir_fn_sym, sig_idx))
+            mir_mod.add_body(lower_generator_each_body(&sema, ast_pool, pool, fn_sym))
             continue
         let sig_idx = sema.get_sig(fn_sym)
         var builder = MirBuilder.init(&sema, ast_pool, pool, mir_fn_sym)

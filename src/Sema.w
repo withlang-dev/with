@@ -906,18 +906,30 @@ pub type Sema {
     no_alloc_fns: HashMap[i32, i32],
     fn_may_alloc: HashMap[i32, i32],
     fn_stack_sizes: HashMap[i32, i32],
-    // Generator metadata. A `gen fn f(...) -> T` semantically returns an
-    // internal state struct and exposes an internal `next(mut self)` method
-    // returning Option[T].
+    // D69 (§13.4) generator metadata. A `gen fn f(params) -> T` is three
+    // functions: `f` builds the generator value — a compiler-generated struct
+    // holding the arguments, which implements Gen[T]; its `each(body)` method
+    // calls the producer `run(params, body)`, the lowered body of `f`, in
+    // which every `yield e` calls `body(e)`. Keys: the gen fn's symbol, except
+    // generator_state_yield_types (state type id) and generator_mir_only_fns
+    // (run/each symbol → gen fn symbol; MIR-only functions codegen declares).
     generator_fn_yield_types: HashMap[i32, i32],
     generator_fn_state_types: HashMap[i32, i32],
     generator_fn_state_syms: HashMap[i32, i32],
-    generator_fn_next_syms: HashMap[i32, i32],
-    generator_next_fn_syms: HashMap[i32, i32],
+    generator_fn_run_syms: HashMap[i32, i32],
+    generator_fn_each_syms: HashMap[i32, i32],
+    generator_mir_only_fns: HashMap[i32, i32],
     generator_state_yield_types: HashMap[i32, i32],
-    generator_state_field_counts: HashMap[i32, i32],
-    generator_state_field_names: HashMap[i64, i32],
-    generator_state_field_types: HashMap[i64, i32],
+    // D69 (§13.4): `for x in g` over a Gen[T] runs its body as the `body`
+    // closure of `g.each(body)`. Keyed by the NK_FOR node: the element type
+    // T, the closure's type fn(T) -> bool, and the `each` callee (its
+    // signature and specialization symbol for a generic impl). The body's
+    // captures live in the closure capture summary under the same node.
+    gen_for_elem_types: HashMap[i32, i32],
+    gen_for_body_types: HashMap[i32, i32],
+    gen_for_each_syms: HashMap[i32, i32],
+    gen_for_each_sigs: HashMap[i32, i32],
+    gen_for_each_monos: HashMap[i32, i32],
     mutable_global_syms: HashMap[i32, i32],
     // docs/completed/mut.md Rev 8 §12 / §15.12 — symbols declared via `global X = ...`
     // (stable) recorded here. Used by check_assign to emit a specific
@@ -1178,7 +1190,7 @@ pub type Sema {
     debug_fmt_aux_sigs: Vec[i32],
     debug_fmt_aux_monos: Vec[i32],
     // Synthesized formatter symbol -> its entry (codegen declares these
-    // MIR-only functions the way it declares generator `next` bodies).
+    // MIR-only functions the way it declares generator producers).
     debug_fmt_synth_syms: HashMap[i32, i32],
     // debug_fmt_has_form's in-progress types (a recursion guard).
     debug_fmt_probe_visiting: HashMap[i32, i32],
@@ -2222,12 +2234,15 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
     let generator_fn_yield_types = sema_new_map_i32_i32()
     let generator_fn_state_types = sema_new_map_i32_i32()
     let generator_fn_state_syms = sema_new_map_i32_i32()
-    let generator_fn_next_syms = sema_new_map_i32_i32()
-    let generator_next_fn_syms = sema_new_map_i32_i32()
+    let generator_fn_run_syms = sema_new_map_i32_i32()
+    let generator_fn_each_syms = sema_new_map_i32_i32()
+    let generator_mir_only_fns = sema_new_map_i32_i32()
     let generator_state_yield_types = sema_new_map_i32_i32()
-    let generator_state_field_counts = sema_new_map_i32_i32()
-    let generator_state_field_names = sema_new_map_i64_i32()
-    let generator_state_field_types = sema_new_map_i64_i32()
+    let gen_for_elem_types = sema_new_map_i32_i32()
+    let gen_for_body_types = sema_new_map_i32_i32()
+    let gen_for_each_syms = sema_new_map_i32_i32()
+    let gen_for_each_sigs = sema_new_map_i32_i32()
+    let gen_for_each_monos = sema_new_map_i32_i32()
     let mutable_global_syms = sema_new_map_i32_i32()
     let stable_global_syms = sema_new_map_i32_i32()
     let global_value_decl_kinds = sema_new_map_i32_i32()
@@ -2449,12 +2464,15 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         generator_fn_yield_types,
         generator_fn_state_types,
         generator_fn_state_syms,
-        generator_fn_next_syms,
-        generator_next_fn_syms,
+        generator_fn_run_syms,
+        generator_fn_each_syms,
+        generator_mir_only_fns,
         generator_state_yield_types,
-        generator_state_field_counts,
-        generator_state_field_names,
-        generator_state_field_types,
+        gen_for_elem_types,
+        gen_for_body_types,
+        gen_for_each_syms,
+        gen_for_each_sigs,
+        gen_for_each_monos,
         mutable_global_syms,
         stable_global_syms,
         global_value_decl_kinds,
