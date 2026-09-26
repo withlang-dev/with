@@ -1590,7 +1590,7 @@ pub type Sema {
     decl_source_paths: Vec[str],     // one path per decl index (from Frontend)
     decl_source_file_ids: Vec[i32],  // one file id per decl index (from Frontend)
     module_path_by_file: HashMap[i32, str], // #1362: file id -> declaring module path (lazy)
-    decl_is_c_import: Vec[i32],      // 1 if decl came from c_import, 0 otherwise
+    decl_is_c_import: Vec[i32],      // 0 unless the decl came from a c_import; then 1 + the byte offset of that `use c_import` in its module (#1221: import order)
     source_text_file_ids: Vec[i32],  // imported/extra source text file ids
     source_text_names: Vec[str],     // source display names aligned with source_text_file_ids
     source_texts: Vec[str],          // source buffers aligned with source_text_file_ids
@@ -1603,6 +1603,7 @@ pub type Sema {
     module_import_targets: Vec[i32], // flattened target module indices
     module_import_paths: Vec[str],   // flattened import path text aligned with module_import_targets
     module_import_selected: Vec[str], // aligned: the names a named import selects ("X,Y"), "" for a whole module (#1221)
+    module_import_offsets: Vec[i32], // aligned: the `use`'s byte offset in its module — §18.2's import order (#1221)
     module_index_by_path: HashMap[str, i32],   // path -> module index
     bundle_corpus: str,              // D39: the --bundle-corpus root, "" outside a bundle lane
     global_visible_module_paths: HashMap[str, i32], // prelude-visible modules
@@ -2040,15 +2041,16 @@ impl Sema:
             let source_path = source.module_paths[mi]
             if source.global_visible_module_paths.contains(source_path):
                 global_paths.push(sema_owned_text(source_path))
-        self.copy_module_graph_parts(&source.module_paths, &source.module_import_starts, &source.module_import_counts, &source.module_import_targets, &source.module_import_paths, &source.module_import_selected, &global_paths)
+        self.copy_module_graph_parts(&source.module_paths, &source.module_import_starts, &source.module_import_counts, &source.module_import_targets, &source.module_import_paths, &source.module_import_selected, &source.module_import_offsets, &global_paths)
 
-    mut fn copy_module_graph_parts(module_paths: &Vec[str], module_import_starts: &Vec[i32], module_import_counts: &Vec[i32], module_import_targets: &Vec[i32], module_import_paths: &Vec[str], module_import_selected: &Vec[str], global_paths: &Vec[str]):
+    mut fn copy_module_graph_parts(module_paths: &Vec[str], module_import_starts: &Vec[i32], module_import_counts: &Vec[i32], module_import_targets: &Vec[i32], module_import_paths: &Vec[str], module_import_selected: &Vec[str], module_import_offsets: &Vec[i32], global_paths: &Vec[str]):
         self.module_paths = sema_new_vec_str()
         self.module_import_starts = sema_new_vec_i32()
         self.module_import_counts = sema_new_vec_i32()
         self.module_import_targets = sema_new_vec_i32()
         self.module_import_paths = sema_new_vec_str()
         self.module_import_selected = sema_new_vec_str()
+        self.module_import_offsets = sema_new_vec_i32()
         self.module_index_by_path = sema_new_map_str_i32()
         self.global_visible_module_paths = sema_new_map_str_i32()
         self.module_visibility_cache = sema_new_map_str_i32()
@@ -2071,6 +2073,8 @@ impl Sema:
             self.module_import_paths.push(sema_owned_text(module_import_paths[i]))
         for i in 0..module_import_selected.len() as i32:
             self.module_import_selected.push(sema_owned_text(module_import_selected[i]))
+        for i in 0..module_import_offsets.len() as i32:
+            self.module_import_offsets.push(module_import_offsets[i])
         self.record_engine_corpora()
 
 fn sema_builtin_symbols_zero -> SemaBuiltinSymbols:
@@ -2915,6 +2919,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         module_import_targets: Vec.new(),
         module_import_paths: sema_new_vec_str(),
         module_import_selected: sema_new_vec_str(),
+        module_import_offsets: Vec.new(),
         module_index_by_path: sema_new_map_str_i32(),
         bundle_corpus: "",
         global_visible_module_paths: sema_new_map_str_i32(),
@@ -3265,6 +3270,34 @@ impl Sema:
                 chosen = self.displaced_fn_syms[i]
             i = self.displaced_fn_prev[i]
         if chosen == 0:
+            // §18.2 tier 3 (Eric's ruling, #1221/#993): of the fns the
+            // current module's explicit imports provide, the import written
+            // last shadows the others — `use a.helper` then `use b.helper`
+            // calls b's, whatever order the flat merge kept.
+            let cands: Vec[i32] = Vec.new()
+            let cand_paths = sema_new_vec_str()
+            let cand_pub: Vec[i32] = Vec.new()
+            var r = if self.decl_visibility_index.contains(sym): self.decl_visibility_index.get(sym).unwrap() else: -1
+            while r >= 0:
+                // The current module's own fn keeps the short name (tier 2).
+                if self.decl_visibility_paths[r] == self.current_module_path:
+                    return sym
+                cands.push(sym)
+                cand_paths.push(sema_owned_text(self.decl_visibility_paths[r]))
+                cand_pub.push(self.decl_visibility_pub[r])
+                r = self.decl_visibility_prev[r]
+            i = head
+            while i >= 0:
+                cands.push(self.displaced_fn_syms[i])
+                cand_paths.push(sema_owned_text(self.displaced_fn_paths[i]))
+                cand_pub.push(self.displaced_fn_pub[i])
+                i = self.displaced_fn_prev[i]
+            let imported = self.last_import_provider(sym, &cands, &cand_paths, &cand_pub)
+            if imported >= 0:
+                chosen = cands[imported]
+                if chosen == sym:
+                    return sym
+        if chosen == 0:
             if self.decl_visibility_index.contains(sym) and self.symbol_visible_from_current(sym) != 0:
                 return sym
             i = head
@@ -3290,14 +3323,13 @@ impl Sema:
     // from (Zcu.displace_colliding_globals). The flat declaration keeps the
     // short name; each other one is `name$in$<module>`. A reference binds by
     // §18.2 precedence: a lexical binding (untouched); the current module's
-    // own declaration (tier 2); the one explicit import that provides the
-    // name (tier 3 — a c_import provides its values to the module that
-    // imports it, `use m` provides m's public names, `use m.X` or `use
-    // m.{X}` provides X alone, and a named import beats a whole-module one);
-    // else the one declaration the std fallback reaches. Two providers where
-    // the use is decided are ambiguous — at the use, never at the
-    // declarations. The ident is rewritten to the chosen identity, as for a
-    // displaced fn.
+    // own declaration (tier 2); the explicit imports that provide the name
+    // (tier 3), where the import written last shadows the others (Eric's
+    // ruling on #1221) — a `use c_import(...)` takes its place in that order,
+    // `use m` provides m's public names, and `use m.X` / `use m.{X}` provides
+    // X alone; else the one declaration the std fallback reaches (D29: two
+    // std candidates there are an ambiguity). The ident is rewritten to the
+    // chosen identity, as for a displaced fn.
     mut fn resolve_displaced_global_ident(sym: i32, node: i32) -> i32:
         let bound = self.scope_name_map.get(sym)
         if bound.is_some() and not self.binding_index_is_global(bound.unwrap(), sym):
@@ -3320,28 +3352,79 @@ impl Sema:
                 cand_paths.push(sema_owned_text(self.displaced_fn_paths[i]))
                 cand_pub.push(self.displaced_fn_pub[i])
             i = self.displaced_fn_prev[i]
-        let name: str = with_str_clone_ref(self.pool_resolve(sym))
-        let named: Vec[i32] = Vec.new()
-        let imported: Vec[i32] = Vec.new()
+        for ci in 0..cands.len() as i32:
+            if cand_paths[ci] == self.current_module_path and not self.ci_syms.contains(cands[ci]):
+                return self.bind_displaced_global_ident(sym, node, cands[ci])
+        let imported = self.last_import_provider(sym, &cands, &cand_paths, &cand_pub)
+        if imported >= 0:
+            return self.bind_displaced_global_ident(sym, node, cands[imported])
         let fallback: Vec[i32] = Vec.new()
         for ci in 0..cands.len() as i32:
-            let c = cands[ci]
-            let path = cand_paths[ci]
-            if self.ci_syms.contains(c):
-                if self.is_ci_visible(c) != 0: imported.push(ci)
-                continue
-            if path == self.current_module_path:
-                return self.bind_displaced_global_ident(sym, node, c)
-            let provides = if self.decl_visible_from_current(path, cand_pub[ci]) != 0: self.current_import_provides(path, name) else: 0
-            if provides == 2: named.push(ci)
-            else if provides == 1: imported.push(ci)
-            else if self.decl_visible_from_current_gated(path, cand_pub[ci], sym) != 0: fallback.push(ci)
-        let tier = if named.len() > 0: named else if imported.len() > 0: imported else: fallback
-        if tier.len() == 0:
+            if not self.ci_syms.contains(cands[ci]) and self.decl_visible_from_current_gated(cand_paths[ci], cand_pub[ci], sym) != 0:
+                fallback.push(ci)
+        if fallback.len() == 0:
             return sym
-        if tier.len() > 1:
-            self.emit_ambiguous_global_use(name, node, &cands, &cand_paths, &tier)
-        self.bind_displaced_global_ident(sym, node, cands[tier[0]])
+        if fallback.len() > 1:
+            self.emit_ambiguous_fallback_use(with_str_clone_ref(self.pool_resolve(sym)), node, &cand_paths, &fallback)
+        self.bind_displaced_global_ident(sym, node, cands[fallback[0]])
+
+    // §18.2 tier 3 under Eric's #1221 ruling: of the candidates an explicit
+    // import of the current module provides, the one whose import is written
+    // last. -1 when no explicit import provides the name.
+    fn last_import_provider(sym: i32, cands: &Vec[i32], paths: &Vec[str], pubs: &Vec[i32]) -> i32:
+        let name: str = with_str_clone_ref(self.pool_resolve(sym))
+        var best = -1
+        var best_pos = -1
+        for ci in 0..cands.len() as i32:
+            let pos = self.import_position_of(cands[ci], paths[ci], pubs[ci], name)
+            if pos > best_pos:
+                best_pos = pos
+                best = ci
+        best
+
+    // Where the current module's last explicit import providing `name` from
+    // candidate `c` is written (its byte offset), or -1 when none does. A
+    // c_import's declarations are provided by that `use c_import` of their
+    // importing module (Zcu records its offset in decl_is_c_import).
+    fn import_position_of(c: i32, path: &str, is_pub: i32, name: &str) -> i32:
+        if self.ci_syms.contains(c):
+            if path != self.current_module_path:
+                return -1
+            let decl = self.decl_node_of(c, path)
+            let di = if decl != 0: self.find_decl_index(decl) else: -1
+            if di < 0 or di >= self.decl_is_c_import.len() as i32 or self.decl_is_c_import[di] == 0:
+                return -1
+            return self.decl_is_c_import[di] - 1
+        if path == self.current_module_path or self.decl_visible_from_current(path, is_pub) == 0:
+            return -1
+        self.current_import_position(path, name)
+
+    // The offset of the current module's last `use` of the module at `path`
+    // that provides `name` — a whole-module import, or a named import that
+    // selects it — or -1. Direct edges only: imports are not transitive, and
+    // the prelude edge is tier 4, not an explicit import.
+    fn current_import_position(path: &str, name: &str) -> i32:
+        let cur = self.module_index_by_path.get(with_str_clone_ref(self.current_module_path))
+        let target = self.module_index_by_path.get(path)
+        if not cur.is_some() or not target.is_some():
+            return -1
+        let from: i32 = cur.unwrap()
+        let to: i32 = target.unwrap()
+        if from < 0 or from >= self.module_import_starts.len() as i32:
+            return -1
+        var best = -1
+        let start = self.module_import_starts[from]
+        for ei in 0..self.module_import_counts[from]:
+            let idx = start + ei
+            if self.module_import_targets[idx] != to or idx >= self.module_import_offsets.len() as i32:
+                continue
+            let text = self.module_import_paths[idx]
+            if text == "std.prelude" or text == "std.prelude_core" or text == "std.prelude_alloc":
+                continue
+            let selected = if idx < self.module_import_selected.len() as i32: self.module_import_selected[idx].clone() else: ""
+            if (selected.len() == 0 or sema_selection_names(selected, name)) and self.module_import_offsets[idx] > best:
+                best = self.module_import_offsets[idx]
+        best
 
     mut fn bind_displaced_global_ident(sym: i32, node: i32, chosen: i32) -> i32:
         if chosen != sym and node != 0 and self.ast.kind(node) == NodeKind.NK_IDENT and self.ast.get_data0(node) == sym:
@@ -3357,89 +3440,26 @@ impl Sema:
             i = self.decl_visibility_prev[i]
         0
 
-    // What the current module's own imports say about `name` from the module
-    // at `path` (§18.2 tier 3): 2 when a named import selects it (`use m.X`,
-    // `use m.{X}`), 1 when one imports the whole module, 0 when none does.
-    // Direct edges only: imports are not transitive.
-    fn current_import_provides(path: &str, name: &str) -> i32:
-        let cur = self.module_index_by_path.get(with_str_clone_ref(self.current_module_path))
-        let target = self.module_index_by_path.get(path)
-        if not cur.is_some() or not target.is_some():
-            return 0
-        let from: i32 = cur.unwrap()
-        let to: i32 = target.unwrap()
-        if from < 0 or from >= self.module_import_starts.len() as i32:
-            return 0
-        var best = 0
-        let start = self.module_import_starts[from]
-        for ei in 0..self.module_import_counts[from]:
-            let idx = start + ei
-            if self.module_import_targets[idx] != to:
-                continue
-            let selected = if idx < self.module_import_selected.len() as i32: self.module_import_selected[idx].clone() else: ""
-            if selected.len() == 0:
-                if best == 0: best = 1
-            else if sema_selection_names(selected, name):
-                best = 2
-        best
-
-    // The dotted module a use of `path` is spelled with from here: the
-    // current module's own import of it, else its std name.
-    fn import_dotted_for(path: &str) -> str:
-        let cur = self.module_index_by_path.get(with_str_clone_ref(self.current_module_path))
-        let target = self.module_index_by_path.get(path)
-        if cur.is_some() and target.is_some():
-            let from: i32 = cur.unwrap()
-            let to: i32 = target.unwrap()
-            if from >= 0 and from < self.module_import_starts.len() as i32:
-                let start = self.module_import_starts[from]
-                for ei in 0..self.module_import_counts[from]:
-                    let idx = start + ei
-                    if self.module_import_targets[idx] != to:
-                        continue
-                    let text = self.module_import_paths[idx]
-                    let selected = if idx < self.module_import_selected.len() as i32: self.module_import_selected[idx].clone() else: ""
-                    if selected.len() > 0 and not selected.contains(",") and text.ends_with("." ++ selected):
-                        return text.slice(0, text.len() - selected.len() - 1)
-                    return text.clone()
-        let dotted = sema_std_module_dotted(path)
-        if dotted.len() > 0: dotted else: path.clone()
-
-    // Two providers of `name` at the tier that decides this use (§18.2).
-    // The declarations stay legal; the use names every provider and the
-    // spelling that picks one: a named import beats a whole-module one.
-    mut fn emit_ambiguous_global_use(name: &str, node: i32, cands: &Vec[i32], paths: &Vec[str], tier: &Vec[i32]):
+    // D29 (§18.2 tier 5): two standard-library candidates for one name, and
+    // no import that decides it, is a hard ambiguity at the use; each
+    // candidate is offered as the import that picks it.
+    mut fn emit_ambiguous_fallback_use(name: &str, node: i32, paths: &Vec[str], fallback: &Vec[i32]):
         if self.suppress_errors != 0:
             return
-        var providers = ""
-        var picks = ""
-        for ti in 0..tier.len() as i32:
-            let ci = tier[ti]
-            let from_c_import = self.ci_syms.contains(cands[ci])
-            let mod_name = if from_c_import: "" else: self.import_dotted_for(paths[ci])
-            let what = if from_c_import: "this module's c_import" else: "`" ++ mod_name ++ "`"
-            providers = providers ++ (if ti == 0: "" else if ti == tier.len() as i32 - 1: " and " else: ", ") ++ what
-            if not from_c_import:
-                picks = picks ++ (if picks.len() > 0: " or " else: "") ++ "`use " ++ mod_name ++ "." ++ name ++ "`"
-        let verb = if tier.len() == 2: "both provide" else: "each provide"
-        var diag = Diagnostic.err("'" ++ name ++ "' is ambiguous: " ++ providers ++ " " ++ verb ++ " it", Span { file: self.local_file_id, start: self.ast.get_start(node), end: self.ast.get_end(node) })
-        diag.set_origin(__FILE__, __FN__, __LINE__ as i32, node)
-        for ti in 0..tier.len() as i32:
-            let decl = self.global_decl_node_of(cands[tier[ti]], paths[tier[ti]])
-            let di = if decl != 0: self.find_decl_index(decl) else: -1
-            if di >= 0 and di < self.decl_source_file_ids.len() as i32:
-                diag.add_label(Span { file: self.decl_source_file_ids[di], start: self.ast.get_start(decl), end: self.ast.get_end(decl) }, "'" ++ name ++ "' is provided here")
-        if picks.len() > 0:
-            diag.add_help("a named import picks one: " ++ picks)
-        self.diags.emit(move diag)
+        var listed = ""
+        for fi in 0..fallback.len() as i32:
+            let path = paths[fallback[fi]]
+            let dotted = sema_std_module_dotted(path)
+            let mod_name = if dotted.len() > 0: dotted else: path.clone()
+            listed = listed ++ (if fi > 0: " | " else: "") ++ "use " ++ mod_name ++ "." ++ name
+        self.emit_error("'" ++ name ++ "' is ambiguous: several standard-library modules provide it; candidates: " ++ listed, node)
 
-    // The declaration node of the module value `sym` in the module at `path`.
-    fn global_decl_node_of(sym: i32, path: &str) -> i32:
+    // The declaration node of `sym` in the module at `path`.
+    fn decl_node_of(sym: i32, path: &str) -> i32:
         var i = if self.decl_visibility_index.contains(sym): self.decl_visibility_index.get(sym).unwrap() else: -1
         while i >= 0:
-            let decl = self.decl_visibility_nodes[i]
-            if self.decl_visibility_paths[i] == path and decl != 0 and self.ast.kind(decl) == NodeKind.NK_LET_DECL:
-                return decl
+            if self.decl_visibility_paths[i] == path and self.decl_visibility_nodes[i] != 0:
+                return self.decl_visibility_nodes[i]
             i = self.decl_visibility_prev[i]
         0
 

@@ -286,6 +286,7 @@ impl Sema:
         self.module_import_targets = sema_new_vec_i32()
         self.module_import_paths = sema_new_vec_str()
         self.module_import_selected = sema_new_vec_str()
+        self.module_import_offsets = sema_new_vec_i32()
         self.module_index_by_path = HashMap.new()
         self.global_visible_module_paths = HashMap.new()
         self.module_visibility_cache = HashMap.new()
@@ -302,6 +303,7 @@ impl Sema:
                     self.module_import_targets.push(imp.target_module)
                     self.module_import_paths.push(frontend_owned_text(imp.path_text))
                     self.module_import_selected.push(frontend_owned_text(imp.selected))
+                    self.module_import_offsets.push(imp.span_start)
                     visible_count = visible_count + 1
             self.module_import_counts.push(visible_count)
             self.module_index_by_path.insert(frontend_owned_text(mod.path), mod.module_id)
@@ -518,7 +520,10 @@ impl Zcu:
                     ordered.push(dnode as i32)
                     ordered_paths.push(frontend_owned_text(ci_owner_path))
                     ordered_file_ids.push(ci_owner_file_id)
-                    ordered_ci.push(1)  // c_import origin
+                    // c_import origin, carrying where the importing `use c_import`
+                    // sits in its module: §18.2 orders explicit imports by
+                    // position (Sema.import_position_of, #1221).
+                    ordered_ci.push(out.get_start(decl) + 1)
                 di = di + 1
 
             // A requested symbol that was never produced (omitted, untranslated, or
