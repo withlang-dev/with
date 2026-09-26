@@ -7364,6 +7364,11 @@ impl Sema:
             // (use-after-move diagnostics; reassignment heals).
             if self.ast.kind(inner) == NodeKind.NK_FIELD_ACCESS:
                 let fty = self.check_expr(inner)
+                // §21.1 Rules 1-2: a vacate is a write to the field's place, so
+                // it invalidates a live view of it (or of its root) the same
+                // way an assignment does. `let p = x.s; let q = move x.s;
+                // print(p)` read the blanked field (#1530).
+                self.check_mutation_against_views(inner, node)
                 // D32 (§2.2): a vacate is a write — the explicit `move
                 // place.field` needs a mutable path (`var` base or `mut fn`
                 // receiver). Inside the owner's own drop the consumed `self`
@@ -7394,6 +7399,9 @@ impl Sema:
                 self.emit_error("'move' must be applied to a binding identifier or field path", node)
                 return self.check_expr(inner)
             let ty = self.check_expr(inner)
+            // §21.1 Rule 2: a move of a place while a view of it (or of a
+            // field of it) is live is refused, as an assignment is (#1530).
+            self.check_mutation_against_views(inner, node)
             // Explicitly mark the inner binding as moved, even for Copy types.
             let sym = self.ast.get_data0(inner)
             if self.scope_has(sym) != 0:
@@ -10429,6 +10437,7 @@ impl Sema:
         // (as in Rust) — `x` is untouched, so it must not be marked consumed. This
         // keeps `let _ = param` a non-consuming acknowledgement: the param stays
         // share-place (borrowed) instead of being forced to owned.
+        var field_view_let = 0
         if self.pool_resolve(name) != "_" and not self.view_projection_exprs.contains(value):
             // §2.4: a drop-body let of a self field CONSUMES (the 84ebff6d
             // observation rule contradicted the spec — spec_ss02_4 pins the
@@ -10445,7 +10454,13 @@ impl Sema:
                 // D22 outside drop bodies: the binding OBSERVES (MirLower
                 // alias-binds it) — marking would blank the field and reject
                 // legal later base uses (`let saved = a.buf; a.buf = ...`).
-                let _ = value
+                // #1530 (§21.1 Rules 1-2): a non-Copy field view is a view of
+                // its root, registered as a borrow exactly as an element view
+                // is, so a write or a vacate of the field while it is live is
+                // refused. It registered nothing, and `move x.s` / `x.s = …`
+                // under a live `let p = x.s` read the blank.
+                if val_type != 0 and self.is_copy(val_type) == 0:
+                    field_view_let = 1
             else if ann_type != 0 and val_type != 0 and self.can_auto_ref_arg(ann_type as i32, val_type as i32) != 0 and self.place_root_sym(value) != 0:
                 // #1244 / §3.8: `let s: &T = place` auto-references — the
                 // binding observes the place, it does not consume it. The
@@ -10492,7 +10507,7 @@ impl Sema:
         else:
             self.binding_closure_nodes.remove(name)
         let bind_kind = self.get_type_kind(self.resolve_alias(bind_type))
-        if bind_kind == TypeKind.TY_REF or self.view_projection_exprs.contains(value):
+        if bind_kind == TypeKind.TY_REF or self.view_projection_exprs.contains(value) or field_view_let != 0:
             self.scope_set_is_view_bound(name)
         if self.scope_is_view_bound(name) != 0 or self.type_has_drop_impl(bind_type as i32) != 0 or self.type_is_ephemeral_value(bind_type as i32) != 0 or self.closure_expr_has_by_place_captures(value) != 0:
             self.record_view_binding_from_expr(name, value)
@@ -11123,7 +11138,9 @@ impl Sema:
                 peeled_place = self.ast.get_data0(peeled_place)
             // #1244: an auto-referenced initializer (`let s: &T = x`) borrows
             // its root exactly as `&x` does.
-            if peeled_place != 0 and (self.ast.kind(peeled_place) == NodeKind.NK_INDEX or self.auto_ref_binding_values.contains(expr_node)):
+            // #1530: a field view of an owned root (`let p = x.s`, D22)
+            // borrows that root exactly as an element view does.
+            if peeled_place != 0 and (self.ast.kind(peeled_place) == NodeKind.NK_INDEX or self.ast.kind(peeled_place) == NodeKind.NK_FIELD_ACCESS or self.auto_ref_binding_values.contains(expr_node)):
                 let root = self.place_root_sym(peeled_place)
                 if root != 0 and root != sym:
                     deps = self.push_unique_i32(move deps, root)
