@@ -26831,6 +26831,16 @@ impl Sema:
         elems.push(self.traversal_binding_type(self.get_generic_inst_arg(map_inst, 1)))
         self.ensure_tuple_type(elems, 2) as i32
 
+    // D44: `for (k, v) in bt` traverses a BTreeMap's `Vec[(K, V)]` storage in
+    // place, exactly as a Vec of pairs is traversed — a Drop-class pair binds
+    // as a `&(K, V)` view and the tuple pattern projects `&K`/`&V`; a Copy
+    // pair binds by value. The generic `next()` protocol found no `next` on
+    // the map and typed the element `i32`, so the tuple pattern was refused
+    // and a generic body's bindings came back undefined (#1561).
+    mut fn btree_traversal_element_type(map_inst: i32) -> i32:
+        let storage = self.ensure_btree_storage_type(map_inst)
+        if storage == 0: 0 else: self.infer_for_element_type(storage)
+
     mut fn infer_for_element_type(iter_type: i32) -> i32:
         if iter_type == 0:
             return 0
@@ -26855,13 +26865,18 @@ impl Sema:
             let ref_pointee_resolved = self.resolve_alias(ref_pointee as TypeId)
             if self.get_type_kind(ref_pointee_resolved) == TypeKind.TY_GENERIC_INST:
                 let ref_base = self.pool_resolve(self.get_type_d0(ref_pointee_resolved))
-                if ref_base == "Vec" and self.get_generic_inst_arg_count(ref_pointee_resolved as i32) > 0:
+                let ref_is_vec = ref_base == "Vec"
+                let ref_is_hashmap = ref_base == "HashMap"
+                let ref_is_btreemap = ref_base == "BTreeMap"
+                if ref_is_vec and self.get_generic_inst_arg_count(ref_pointee_resolved as i32) > 0:
                     let ref_elem = self.get_generic_inst_arg(ref_pointee_resolved as i32, 0)
                     return self.ensure_exact_type(TypeKind.TY_REF, ref_elem, 0, 0) as i32
                 // #1187: `for (k, v) in &m` and a `&HashMap` parameter iterate
                 // like the map itself; returning 0 left k and v unbound.
-                if ref_base == "HashMap" and self.get_generic_inst_arg_count(ref_pointee_resolved as i32) >= 2:
+                if ref_is_hashmap and self.get_generic_inst_arg_count(ref_pointee_resolved as i32) >= 2:
                     return self.map_traversal_element_type(ref_pointee_resolved as i32)
+                if ref_is_btreemap and self.get_generic_inst_arg_count(ref_pointee_resolved as i32) >= 2:
+                    return self.btree_traversal_element_type(ref_pointee_resolved as i32)
             // #1197: a `&[T]` / `&[N]T` binding iterates the sequence it views.
             let pointee_kind = self.get_type_kind(ref_pointee_resolved)
             if pointee_kind == TypeKind.TY_ARRAY or pointee_kind == TypeKind.TY_SLICE:
@@ -26879,6 +26894,8 @@ impl Sema:
                 return vec_elem
             if base_name == "HashMap" and self.get_generic_inst_arg_count(resolved as i32) >= 2:
                 return self.map_traversal_element_type(resolved as i32)
+            if base_name == "BTreeMap" and self.get_generic_inst_arg_count(resolved as i32) >= 2:
+                return self.btree_traversal_element_type(resolved as i32)
             if base_name == "Receiver" and self.get_generic_inst_arg_count(resolved as i32) > 0:
                 // D10: `for msg in rx:` receives until the channel is closed
                 // and drained. The loop desugars through recv() -> Option[T];
@@ -27752,7 +27769,8 @@ impl Sema:
                     if self.type_needs_drop(bare_elem) != 0 and self.is_copy(bare_elem as TypeId) == 0:
                         return 1
                 // D44: a map's Drop-class keys and values bind as views too.
-                if self.pool_resolve(self.get_type_d0(seq_resolved)) == "HashMap" and self.get_generic_inst_arg_count(seq_resolved as i32) >= 2:
+                let seq_base = self.pool_resolve(self.get_type_d0(seq_resolved))
+                if (seq_base == "HashMap" or seq_base == "BTreeMap") and self.get_generic_inst_arg_count(seq_resolved as i32) >= 2:
                     for ai in 0..2:
                         let map_elem = self.get_generic_inst_arg(seq_resolved as i32, ai)
                         if self.type_needs_drop(map_elem) != 0 and self.is_copy(map_elem as TypeId) == 0:
