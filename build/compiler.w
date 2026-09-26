@@ -7,7 +7,7 @@ use std.string.StringBuilder
 use build.runtime.prepare_bootstrap_link_root
 fn compiler_owned_text(s: &str): s ++ ""
 
-const COMPILER_LLVM_VERSION: str = "22.1.6"
+pub const COMPILER_LLVM_VERSION: str = "22.1.6"
 const COMPILER_FALLBACK_LLVM_PREFIX: str = "/usr/local/llvm"
 
 // Unique fixed-width slot the compiler embeds (src/main.w --version handler);

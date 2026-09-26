@@ -62,12 +62,12 @@ fn link_stage_temp_archives_lock_acquire():
 fn link_stage_temp_archives_lock_release():
     link_stage_temp_archives_lock.store(0, .Release)
 
-type LinkStageEnvVar {
+pub type LinkStageEnvVar {
     name: str,
     value: str,
 }
 
-type LinkStageCommand {
+pub type LinkStageCommand {
     linker: str,
     args: Vec[str],
     cwd: str,
@@ -77,7 +77,7 @@ type LinkStageCommand {
     cleanup_files: Vec[str],
 }
 
-type LinkStageResult {
+pub type LinkStageResult {
     ok: bool,
     rc: i32,
     command: LinkStageCommand,

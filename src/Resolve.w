@@ -115,7 +115,7 @@ type ResolvedUse {
 
 impl Copy for ResolvedUse
 
-type ResolveResult {
+pub type ResolveResult {
     modules: Vec[ResolvedModule],
     imports: Vec[ResolvedImport],
     defs: Vec[ResolvedDef],

@@ -35,7 +35,7 @@ enum BorrowKind: i32:
     EXCLUSIVE = 1
 
 // D61 (§15.4.7): how `:?` formats one registered type (Sema.debug_fmt_*).
-enum DebugFmtKind: i32:
+pub enum DebugFmtKind: i32:
     // A formatter MirLower synthesizes: struct, enum, tuple, array, slice,
     // Vec, Box — each component formatted with `:?`.
     SYNTH = 1

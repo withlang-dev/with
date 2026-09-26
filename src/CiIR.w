@@ -49,7 +49,7 @@ fn ci_ir_free_vec_str(v: &Vec[str]):
 
 // ── CiType ────────────────────────────────────────────────────
 
-type CiTypeId = distinct i32
+pub type CiTypeId = distinct i32
 impl Copy for CiTypeId
 
 enum CiTypeKind: i32:
@@ -76,7 +76,7 @@ type CiTypePoolState {
     frozen: i32,
 }
 
-type CiTypePool {
+pub type CiTypePool {
     state: *mut CiTypePoolState,
 }
 impl Copy for CiTypePool
@@ -193,7 +193,7 @@ impl CiTypePool:
 
 // ── CiExpr ────────────────────────────────────────────────────
 
-type CiExprId = distinct i32
+pub type CiExprId = distinct i32
 impl Copy for CiExprId
 
 enum CiExprKind: i32:
@@ -297,7 +297,7 @@ type CiExprPoolState {
     frozen: i32,
 }
 
-type CiExprPool {
+pub type CiExprPool {
     state: *mut CiExprPoolState,
 }
 impl Copy for CiExprPool
@@ -439,7 +439,7 @@ impl CiExprPool:
 
 // ── CiStmt ────────────────────────────────────────────────────
 
-type CiStmtId = distinct i32
+pub type CiStmtId = distinct i32
 impl Copy for CiStmtId
 
 enum CiStmtKind: i32:
@@ -473,7 +473,7 @@ type CiStmtPoolState {
     frozen: i32,
 }
 
-type CiStmtPool {
+pub type CiStmtPool {
     state: *mut CiStmtPoolState,
 }
 impl Copy for CiStmtPool
@@ -631,7 +631,7 @@ impl CiStmtPool:
 
 // ── CiDecl ────────────────────────────────────────────────────
 
-type CiDeclId = distinct i32
+pub type CiDeclId = distinct i32
 impl Copy for CiDeclId
 
 enum CiDeclKind: i32:
@@ -681,7 +681,7 @@ type CiDeclPoolState {
     frozen: i32,
 }
 
-type CiDeclPool {
+pub type CiDeclPool {
     state: *mut CiDeclPoolState,
 }
 impl Copy for CiDeclPool
@@ -897,7 +897,7 @@ fn ci_project_symbol_key(kind: i32, name: &str) -> str:
         return "t:" ++ name
     "m:" ++ name
 
-type CiProject {
+pub type CiProject {
     module_paths: Vec[str],
     symbols: Vec[CiProjectSymbol],
     types: CiTypePool,

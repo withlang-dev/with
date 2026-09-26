@@ -105,7 +105,7 @@ enum LabelFrameKind: i32:
     LFK_BLOCK = 3
     LFK_LOOP = 4
 
-type LabelRegistryState {
+pub type LabelRegistryState {
     label_syms: Vec[i32],
     label_nodes: Vec[i32],
     label_paths: Vec[str],
@@ -329,7 +329,7 @@ const EFF_DECLARED_MASK: i32 = EFF_READ | EFF_WRITE | EFF_CONSUME | EFF_ESCAPE_V
 // non-move closure holds by place — a view of that local, not a snapshot.
 const EFF_CAPTURE_BY_PLACE: i32 = 64
 
-enum ReceiverMode: i32:
+pub enum ReceiverMode: i32:
     None = 0
     Read = 1
     Mut = 2
@@ -343,7 +343,7 @@ enum WithFormKind: i32:
     Guarded = 1
     GuardedMut = 2
 
-enum AllocConstructKind: i32:
+pub enum AllocConstructKind: i32:
     EXPLICIT_API = 1
     VEC_NEW = 2
     TO_OWNED = 3
@@ -384,7 +384,7 @@ fn sema_effect_bits_text(bits: i32) -> str:
 // remains &T. `owned_value_type` is T, and `target_type` is the destination
 // after any ordinary value coercion. A differing `post_copy_type` records that
 // final coercion explicitly for later MIR/backend consumption.
-type ContextualCopyAdjustment {
+pub type ContextualCopyAdjustment {
     context_sig: i32,
     source_node: i32,
     exact_source_type: i32,
@@ -400,7 +400,7 @@ impl Copy for ContextualCopyAdjustment
 // and diagnostics consume the same classification instead of re-running type
 // inference. `origin_mask`/origin deps record the origins visible at this
 // stage; Stage 4 makes transparent-carrier propagation complete.
-type ContextualJoinDecision {
+pub type ContextualJoinDecision {
     context_sig: i32,
     join_node: i32,
     expected_type: i32,
@@ -422,7 +422,7 @@ impl Copy for ContextualJoinDecision
 // D51 §16.2b stage 2: a facade's facts, each with the node that stated it.
 // Parameter positions are zero-based indices into the fn's signature; -1 is
 // "none". Consumed by stage 3 (raw classification) and later stages.
-type FacadeResource {
+pub type FacadeResource {
     name: i32,
     facade: i32,
     node: i32,
@@ -447,7 +447,7 @@ type FacadeResource {
     abandon_node: i32,
 }
 
-type ForeignContract {
+pub type ForeignContract {
     decl: i32,            // the `c facade` block's declaration index: diagnostics name its file
     fn_sym: i32,
     facade: i32,
@@ -497,7 +497,7 @@ const FACADE_VARIADIC_CALLBACK: i32 = 3
 const FACADE_VARIADIC_RETAINED: i32 = 4
 const FACADE_VARIADIC_USERDATA: i32 = 5 // the userdata setter a callback case implies (§16.2b.5): `&U`, the borrow the resource holds
 
-type ForeignVariadicSlot {
+pub type ForeignVariadicSlot {
     case_index: i32,
     clause: i32,
     resource: i32,
@@ -542,7 +542,7 @@ type FacadePairOp {
 
 // Context shared by free and receiver callback calls. Userdata is checked
 // first so its type can give the callback its concrete C signature.
-type FacadeCallbackCall {
+pub type FacadeCallbackCall {
     userdata_node: i32,
     userdata_type: i32,
     nullable: bool,
@@ -1794,26 +1794,6 @@ fn sema_tier_std_only_module(path: &str) -> i32:
     if path == "std.time" or path.starts_with("std.time."):
         return 1
     0
-
-fn sema_path_is_compiler_owned_implementation(path: &str) -> i32:
-    if path.starts_with("src/") or path.contains("/src/"):
-        return 1
-    if path.starts_with("build/") or path.contains("/build/"):
-        return 1
-    if path.starts_with("rt/") or path.contains("/rt/"):
-        return 1
-    if path.starts_with("out/gen/") or path.contains("/out/gen/"):
-        return 1
-    if sema_tier_path_is_std_implementation(path) != 0:
-        return 1
-    0
-
-fn sema_paths_share_internal_implementation_boundary(a: &str, b: &str) -> i32:
-    if sema_path_is_compiler_owned_implementation(a) == 0:
-        return 0
-    if sema_path_is_compiler_owned_implementation(b) == 0:
-        return 0
-    1
 
 fn sema_path_is_compiler_hook_runner(path: &str) -> i32:
     if path.contains("__with_compiler_hook_runner."):
@@ -3215,7 +3195,14 @@ impl Sema:
             return 1
         if sema_path_is_compiler_hook_runner(self.current_module_path) != 0:
             return 1
-        if sema_paths_share_internal_implementation_boundary(self.current_module_path, target_path) != 0:
+        // The std tier is one implementation: its modules read each other's
+        // private declarations (a migrated engine corpus is generated that
+        // way, D39). #1520: this used to extend to every path under a
+        // `src/`, `build/` or `rt/` directory — the compiler's own tree,
+        // guessed from the directory name — so a user project laid out as
+        // `src/a.w`, `src/b.w` had privacy only when checked from inside
+        // `src/`. The compiler tree now conforms to §18.3 like any project.
+        if sema_tier_path_is_std_implementation(self.current_module_path) != 0 and sema_tier_path_is_std_implementation(target_path) != 0:
             return 1
         if is_pub == 0:
             return 0

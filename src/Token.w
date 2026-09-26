@@ -360,7 +360,7 @@ fn tag_name(tag: i32) -> str:
 
 // A growable list of tokens stored as parallel arrays for
 // cache-friendly iteration over tags alone.
-type TokenList {
+pub type TokenList {
     tags: Vec[i32],
     starts: Vec[i32],
     ends: Vec[i32],

@@ -529,18 +529,18 @@ type Codegen {
     mir_default_unreachable_bbs: Vec[i64],
 }
 
-type DynArgInfo {
+pub type DynArgInfo {
     type_sym: i32,
     use_ptr: i32,
 }
 
-type CallArgValue {
+pub type CallArgValue {
     value: i64,
     cleanup_ptr: i64,
 }
 
 // A call operand that is a string literal, with its decoded text.
-type StrLiteralOperand {
+pub type StrLiteralOperand {
     found: bool,
     text: str,
 }
@@ -6499,7 +6499,7 @@ impl Codegen:
 // Compiles a method body with the struct's type params bound to concrete types.
 // Called lazily when the method is first invoked on a monomorphized struct.
 
-type ConcreteMirFunction {
+pub type ConcreteMirFunction {
     sym: i32,
     value: i64,
     fn_type: i64,

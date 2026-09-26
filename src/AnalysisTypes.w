@@ -94,7 +94,7 @@ pub fn analysis_receiver_keyword(mode: AnalysisReceiverMode) -> str:
     if mode == AnalysisReceiverMode.Move: return "move fn"
     ""
 
-enum AnalysisMarshalStrategy: i32:
+pub enum AnalysisMarshalStrategy: i32:
     DirectValue = 1
     TransparentSlot = 2
     ExistingPointer = 3
@@ -150,7 +150,7 @@ pub type AnalysisReport {
     notes: Vec[str],
 }
 
-type AnalysisBackendResult {
+pub type AnalysisBackendResult {
     report: AnalysisReport,
     status: i32,
 }

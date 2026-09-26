@@ -18,7 +18,7 @@ enum AsyncSuspendKind: i32:
     SelectAwait = 2
     Yield = 3
 
-type AsyncMirBody {
+pub type AsyncMirBody {
     fn_sym: i32,
     flavor: i32,
     state_count: i32,
@@ -36,7 +36,7 @@ type AsyncMirBody {
     suspend_drop_counts: Vec[i32],
 }
 
-type AsyncMirModule {
+pub type AsyncMirModule {
     bodies: Vec[AsyncMirBody],
     body_fn_syms: Vec[i32],
 }

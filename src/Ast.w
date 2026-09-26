@@ -23,7 +23,7 @@ fn ast_pool_phase_bug(message: &str):
 
 // ── Node kinds ───────────────────────────────────────────────────
 
-type NodeId = i32
+pub type NodeId = i32
 
 // Enforced-distinct file id: the pilot for migrating the compiler's id
 // spaces (NodeId/Symbol/TypeId) off transparent i32 aliases. A distinct id
@@ -913,7 +913,7 @@ impl AstPool:
     fn int_lit_value(idx: NodeId) -> i64:
         ast_int_from_parts(self.get_data0(idx), self.get_data1(idx), self.get_data2(idx))
 
-type ExactIntValue {
+pub type ExactIntValue {
     ok: i32,
     overflow: i32,
     lo: i64,
@@ -930,7 +930,7 @@ type ExactIntExpr {
 }
 impl Copy for ExactIntExpr
 
-type ExactIntI64 {
+pub type ExactIntI64 {
     ok: i32,
     value: i64,
 }

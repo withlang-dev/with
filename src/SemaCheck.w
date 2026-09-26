@@ -8499,7 +8499,7 @@ type AutoderefStep {
     step_ty: i32,
 }
 
-type SemaDerefInfo {
+pub type SemaDerefInfo {
     ok: i32,
     target_ty: i32,
     result_ref_ty: i32,

@@ -8,7 +8,7 @@ use InternPool
 use SemaTypes
 use std.collections.HashMap
 
-type BlockId = distinct i32
+pub type BlockId = distinct i32
 impl Copy for BlockId
 impl Copy for TermKind
 
@@ -92,7 +92,7 @@ enum ConstKind: i32:
 // operations. Both LLVM and C backends read these instead of
 // inferring builtin kind from method names at codegen time.
 
-enum MirIntrinsic: i32:
+pub enum MirIntrinsic: i32:
     NONE
     VEC_NEW
     FIXED_STRING_NEW
@@ -1231,7 +1231,7 @@ enum MirDropState: i32:
 // id comparison.
 const MIR_DROP_STATE_CHUNK = 128
 
-type MirDropStateKeys {
+pub type MirDropStateKeys {
     names: Vec[str],
     // Base local of each key (a local's own key has itself).
     base_local: Vec[i32],
@@ -3618,7 +3618,7 @@ enum CalleeResolutionKind: i32:
 
 impl Copy for CalleeResolutionKind
 
-type CalleeResolution {
+pub type CalleeResolution {
     kind: CalleeResolutionKind,
     // Sema's name for the callee (for the report), "" when it has none.
     name: str,

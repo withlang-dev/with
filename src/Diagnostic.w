@@ -24,7 +24,7 @@ type DiagnosticLabel {
 // Legacy alias kept for existing callers.
 type Label = DiagnosticLabel
 
-type Diagnostic {
+pub type Diagnostic {
     severity: i32,
     code: str,
     message: str,
