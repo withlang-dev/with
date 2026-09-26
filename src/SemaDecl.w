@@ -2434,6 +2434,8 @@ impl Sema:
         let flags = self.ast.get_data2(node)
         let decl_is_pub = if (flags / 2) % 2 == 1: 1 else: 0
         self.record_decl_visibility(name, node, decl_is_pub)
+        if self.record_displaced_fn(name, decl_is_pub):
+            self.displaced_global_syms.insert(name, 1)
         let is_mut = flags % 2
         if is_mut != 0:
             self.mutable_global_syms.insert(name, 1)

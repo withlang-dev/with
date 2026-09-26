@@ -1629,6 +1629,7 @@ pub type Sema {
     displaced_fn_paths: Vec[str],              // parallel declaring module path
     displaced_fn_pub: Vec[i32],                // parallel public flag
     displaced_fn_prev: Vec[i32],               // older record for the same short name
+    displaced_global_syms: HashMap[i32, i32],  // #1703: displaced records that are module values, not fns
     // c_import scoping: tracks which symbols are c_import-origin
     ci_syms: HashMap[i32, i32],      // sym → 1 for c_import-origin symbols
     ci_raw_syms: HashMap[i32, i32],  // sym → 1 for c_import raw ABI calls
@@ -2927,6 +2928,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         displaced_fn_paths: sema_new_vec_str(),
         displaced_fn_pub: Vec.new(),
         displaced_fn_prev: Vec.new(),
+        displaced_global_syms: sema_new_map_i32_i32(),
         ci_syms: sema_new_map_i32_i32(),
         ci_raw_syms: sema_new_map_i32_i32(),
         ci_omitted_symbols: HashMap.new(),
@@ -3202,15 +3204,16 @@ impl Sema:
         if node != 0:
             self.decl_visibility_node_index.insert(node, record)
 
-    // #1350: the frontend displaced this fn to `short$in$<module>`
-    // (frontend_displace_fn_decl) because another module's declaration took
-    // the short name. Chain it under the short name for
-    // resolve_displaced_fn_ident; diagnostics keep the short spelling.
-    mut fn record_displaced_fn(sym: i32, is_pub: i32):
+    // #1350: the frontend displaced this fn (or, #1703, this module value) to
+    // `short$in$<module>` (frontend_displace_fn_decl) because another
+    // module's declaration took the short name. Chain it under the short name
+    // for resolve_displaced_fn_ident; diagnostics keep the short spelling.
+    // False when `sym` is not a displaced identity.
+    mut fn record_displaced_fn(sym: i32, is_pub: i32) -> bool:
         let name: str = with_str_clone_ref(self.pool_resolve(sym))
         let infix = name.index_of("$in$")
         if infix <= 0:
-            return
+            return false
         let short_name = name.slice(0, infix)
         self.set_pretty_symbol(sym, short_name)
         let path = with_str_clone_ref(self.current_module_path)
@@ -3218,7 +3221,7 @@ impl Sema:
             let existing: i32 = self.displaced_fn_record_of.get(sym).unwrap()
             self.displaced_fn_paths[existing] = sema_owned_text(path)
             self.displaced_fn_pub[existing] = is_pub
-            return
+            return true
         let short_sym = self.pool_intern(short_name)
         let record = self.displaced_fn_syms.len() as i32
         self.displaced_fn_syms.push(sym)
@@ -3227,6 +3230,7 @@ impl Sema:
         self.displaced_fn_prev.push(if self.displaced_fn_index.contains(short_sym): self.displaced_fn_index.get(short_sym).unwrap() else: -1)
         self.displaced_fn_index.insert(short_sym, record)
         self.displaced_fn_record_of.insert(sym, record)
+        true
 
     // #1350: a bare name some module's displaced fn declares binds, in order:
     // a lexical binding (untouched); the current module's own declaration;
@@ -3237,6 +3241,8 @@ impl Sema:
     mut fn resolve_displaced_fn_ident(sym: i32, node: i32) -> i32:
         if sym == 0 or not self.displaced_fn_index.contains(sym):
             return sym
+        if self.name_has_displaced_global(sym):
+            return self.resolve_displaced_global_ident(sym, node)
         if self.scope_lookup(sym) >= 0:
             return sym
         let head: i32 = self.displaced_fn_index.get(sym).unwrap()
@@ -3253,6 +3259,54 @@ impl Sema:
             while i >= 0 and chosen == 0:
                 if self.decl_visible_from_current_gated(self.displaced_fn_paths[i], self.displaced_fn_pub[i], sym) != 0:
                     chosen = self.displaced_fn_syms[i]
+                i = self.displaced_fn_prev[i]
+        if chosen == 0:
+            return sym
+        if node != 0 and self.ast.kind(node) == NodeKind.NK_IDENT and self.ast.get_data0(node) == sym:
+            self.ast.set_data0(node as NodeId, chosen)
+        chosen
+
+    fn name_has_displaced_global(short_sym: i32) -> bool:
+        var i = if self.displaced_fn_index.contains(short_sym): self.displaced_fn_index.get(short_sym).unwrap() else: -1
+        while i >= 0:
+            if self.displaced_global_syms.contains(self.displaced_fn_syms[i]):
+                return true
+            i = self.displaced_fn_prev[i]
+        false
+
+    // #1703 (§18.2, §18.3): a bare name some module value was displaced from
+    // (Zcu.displace_colliding_globals). The flat declaration keeps the short
+    // name; each other one is `name$in$<module>`. A reference binds, in
+    // order: a lexical binding (untouched); the current module's own
+    // declaration (tier 2 — a c_import's value is an import, not a
+    // declaration); the flat declaration when it is visible here; else a
+    // displaced one this module can see. The ident is rewritten to the chosen
+    // identity, as for a displaced fn.
+    mut fn resolve_displaced_global_ident(sym: i32, node: i32) -> i32:
+        let bound = self.scope_name_map.get(sym)
+        if bound.is_some() and not self.binding_index_is_global(bound.unwrap(), sym):
+            return sym
+        if self.current_module_path.len() == 0:
+            return sym
+        let flat_path = self.global_value_decl_paths.get(sym)
+        if flat_path.is_some() and flat_path.unwrap() == self.current_module_path and not self.ci_syms.contains(sym):
+            return sym
+        let head: i32 = self.displaced_fn_index.get(sym).unwrap()
+        var chosen = 0
+        var i = head
+        while i >= 0 and chosen == 0:
+            let dsym = self.displaced_fn_syms[i]
+            if self.displaced_global_syms.contains(dsym) and self.displaced_fn_paths[i] == self.current_module_path and not self.ci_syms.contains(dsym):
+                chosen = dsym
+            i = self.displaced_fn_prev[i]
+        if chosen == 0:
+            if bound.is_some() and self.is_ci_visible(sym) != 0 and self.symbol_visible_from_current(sym) != 0:
+                return sym
+            i = head
+            while i >= 0 and chosen == 0:
+                let dsym = self.displaced_fn_syms[i]
+                if self.displaced_global_syms.contains(dsym) and self.is_ci_visible(dsym) != 0 and self.decl_visible_from_current_gated(self.displaced_fn_paths[i], self.displaced_fn_pub[i], sym) != 0:
+                    chosen = dsym
                 i = self.displaced_fn_prev[i]
         if chosen == 0:
             return sym
