@@ -17754,15 +17754,15 @@ impl Sema:
         if module_path.len() == 0:
             return -1
         let pkg_name: str = with_str_clone_ref(self.pool_resolve(pkg_sym))
-        // `pkg.m(...)` is a qualified extension call only when the module
-        // declares an extension method `m`. A module alias that merely shares
-        // its name with a type the module does not declare (a facade whose
-        // re-export no longer carries under §18.2's non-transitive imports,
-        // #1708: `use Compilation; Compilation.init()`) falls through, so the
-        // ordinary path names the unresolved type instead of demanding a
-        // receiver for a method that does not exist.
-        if not self.module_declares_extension_method(method_sym, module_path, pkg_name):
-            return -1
+        // A module alias that shares its name with a type this module cannot
+        // see, and declares no extension method `m`, is not the callee's
+        // owner: `use Compilation; Compilation.init()` meant the type, which a
+        // facade module no longer re-exports under §18.2's non-transitive
+        // imports (#1708). Name the invisible type rather than demand a
+        // receiver for a method no module declares.
+        if not self.module_declares_extension_method(method_sym, module_path, pkg_name) and self.named_types.contains(pkg_sym):
+            self.emit_private_symbol_error(pkg_sym, recv_expr)
+            return 0
         let method_name: str = with_str_clone_ref(self.pool_resolve(method_sym))
         if arg_count <= 0:
             self.emit_error("qualified extension method '" ++ pkg_name ++ "." ++ method_name ++ "' requires a receiver argument", node)
