@@ -1486,18 +1486,24 @@ impl Sema:
         0
 
     // D69 (§13.4): the generator value's type — a struct whose fields are the
-    // gen fn's parameters, in order. Calling the gen fn stores its arguments
-    // here and runs nothing; dropping the value unconsumed drops them.
-    mut fn ensure_generator_state_type(fn_sym: i32, yield_ty: i32, param_start: i32, sig_param_start: i32, param_count: i32) -> i32:
+    // gen fn's arguments, in order. Calling the gen fn stores its arguments
+    // here and runs nothing; dropping the value unconsumed drops them. A
+    // generator method's borrowed receiver is held as a view of the caller's
+    // place (generator_borrows_receiver).
+    mut fn ensure_generator_state_type(fn_sym: i32, yield_ty: i32, param_start: i32, sig_param_start: i32, param_count: i32, borrow_receiver: bool) -> i32:
         if self.generator_fn_state_types.contains(fn_sym):
             return self.generator_fn_state_types.get(fn_sym).unwrap()
 
         let state_name = f"__with_generator_state_{fn_sym}"
         let state_sym = self.pool_intern(state_name)
+        let field_types: Vec[i32] = Vec.new()
+        for pi in 0..param_count:
+            let param_ty = self.sig_params[(sig_param_start + pi)]
+            field_types.push(if pi == 0 and borrow_receiver: self.ensure_exact_type(TypeKind.TY_REF, param_ty as TypeId, 0, 0) as i32 else: param_ty)
         let field_start = self.type_extra.len() as i32
         for pi in 0..param_count:
             self.type_extra.push(self.ast.fn_param_name(param_start, pi))
-            self.type_extra.push(self.sig_params[(sig_param_start + pi)])
+            self.type_extra.push(field_types[pi])
             self.type_extra.push(0)
         for _ in 0..param_count:
             self.type_extra.push(0)
@@ -1509,7 +1515,36 @@ impl Sema:
         self.generator_fn_state_syms.insert(fn_sym, state_sym)
         self.generator_state_yield_types.insert(state_tid as i32, yield_ty)
         self.register_generator_gen_impl(state_sym)
+        if borrow_receiver:
+            self.generator_fn_receiver_views.insert(fn_sym, 1)
+        for pi in 0..param_count:
+            if self.type_is_ephemeral_value(field_types[pi]) != 0:
+                self.mark_generator_state_ephemeral(state_tid as i32)
         state_tid as i32
+
+    // D69 (§13.4): a generator method holds its receiver like any other
+    // argument. A borrowed receiver (`fn`, `mut fn`) is the caller's place,
+    // so the generator value holds a view of it — ephemeral, as with any
+    // view argument — and the gen fn and its producer take it by place
+    // (value_ref_abi) whatever the owner type. A `move fn` receiver, or a
+    // `self` spelled as a reference, is an ordinary argument.
+    fn generator_borrows_receiver(param_start: i32, param_count: i32, sig_param_start: i32) -> bool:
+        let mode = self.receiver_mode_from_param(param_start, param_count)
+        if mode == ReceiverMode.None or mode == ReceiverMode.Move:
+            return false
+        let tk = self.get_type_kind(self.resolve_alias(self.sig_params[sig_param_start] as TypeId))
+        tk != TypeKind.TY_REF and tk != TypeKind.TY_PTR
+
+    // Everything behind one gen fn `fn_sym` — a declaration, or a concrete
+    // specialization of a generic one (its specialization symbol): the
+    // generator value's type, which the gen fn's signature returns, and its
+    // producer and `each`. Returns the value's type.
+    mut fn register_generator(fn_sym: i32, yield_ty: i32, param_start: i32, sig_param_start: i32, param_count: i32) -> i32:
+        let borrow_receiver = self.generator_borrows_receiver(param_start, param_count, sig_param_start)
+        let state_tid = self.ensure_generator_state_type(fn_sym, yield_ty, param_start, sig_param_start, param_count, borrow_receiver)
+        let state_sym: i32 = self.generator_fn_state_syms.get(fn_sym).unwrap()
+        self.register_generator_functions(fn_sym, state_sym, state_tid, yield_ty, sig_param_start, param_count, borrow_receiver)
+        state_tid
 
     // The generator value implements Gen[T] (§13.4); its trait argument is
     // generator_state_yield_types[state].
@@ -1543,7 +1578,7 @@ impl Sema:
     // `__with_generator_run_{f}(params, body)` is f's body, lowered with each
     // `yield e` calling `body(e)`; the generator value's `move fn each(body)`
     // hands its stored arguments and `body` to the producer.
-    mut fn register_generator_functions(fn_sym: i32, state_sym: i32, state_tid: i32, yield_ty: i32, sig_param_start: i32, param_count: i32):
+    mut fn register_generator_functions(fn_sym: i32, state_sym: i32, state_tid: i32, yield_ty: i32, sig_param_start: i32, param_count: i32, borrow_receiver: bool):
         if self.generator_fn_run_syms.contains(fn_sym):
             return
         let body_ty = self.generator_body_fn_type(yield_ty)
@@ -1559,6 +1594,8 @@ impl Sema:
         let run_fn_tid = self.add_type(TypeKind.TY_FN, run_fn_extra, param_count + 1, self.ty_void as i32)
         self.add_sig(run_sym, run_fn_tid as i32, self.ty_void as i32, run_param_start, param_count + 1, 0)
         self.set_sig_param_invoke_many(self.get_sig(run_sym), param_count, 1)
+        if borrow_receiver:
+            self.set_sig_param_value_ref_abi(self.get_sig(run_sym), 0, 1)
 
         let each_sym = self.pool_intern(f"__with_generator_each_{fn_sym}")
         let each_param_start = self.sig_params.len() as i32
@@ -1755,9 +1792,6 @@ impl Sema:
         if decl_is_pub != 0:
             self.check_pub_signature_names_public_types(node, fn_name, method_owner_sym, meta)
         self.record_fn_behavior_metadata(fn_name, node, flags)
-        if (flags / FnFlags.GEN) % 2 == 1 and (tp_count > 0 or method_owner_sym != 0):
-            let what = if tp_count > 0: "a generic generator function" else: "a generator method"
-            self.emit_error(f"{what} is not implemented yet (#1724); declare a non-generic `gen fn` at top level", node)
 
         // Record receiver flags here. D7 enforcement runs after body checking and
         // effect fixed point so a missing mode can report the compiler-derived
@@ -1924,14 +1958,7 @@ impl Sema:
                 self.emit_error("gen fn cannot also be async", node)
             if ret_node == 0:
                 self.emit_error("generator function requires a yield type", node)
-            let state_tid = self.ensure_generator_state_type(fn_name, ret_type as i32, param_start, sig_param_start, param_count)
-            for pi in 0..param_count:
-                let p_ty = self.sig_params[(sig_param_start + pi)]
-                if self.type_is_ephemeral_value(p_ty) != 0:
-                    self.mark_generator_state_ephemeral(state_tid)
-            let state_sym: i32 = self.generator_fn_state_syms.get(fn_name).unwrap()
-            self.register_generator_functions(fn_name, state_sym, state_tid, ret_type as i32, sig_param_start, param_count)
-            sig_ret_type = state_tid as TypeId
+            sig_ret_type = self.register_generator(fn_name, ret_type as i32, param_start, sig_param_start, param_count) as TypeId
 
         sig_ret_type = self.fn_signature_return_type(flags, sig_ret_type)
 
@@ -1961,6 +1988,10 @@ impl Sema:
                     self.set_sig_param_value_ref_abi(fn_sig_idx, pi, 1)
                 if self.sig_param_is_c_va_list_by_place(fn_sig_idx, pi) != 0:
                     self.set_sig_param_value_ref_abi(fn_sig_idx, pi, 1)
+            // D69: a generator method takes a borrowed receiver by place, since
+            // its generator value keeps a view of it.
+            if (flags / FnFlags.GEN) % 2 == 1 and self.generator_borrows_receiver(param_start, param_count, sig_param_start):
+                self.set_sig_param_value_ref_abi(fn_sig_idx, 0, 1)
         if dispatch_fn_name != 0:
             let dispatch_sig = self.get_sig(dispatch_fn_name)
             let clause_sig = self.get_sig(fn_name)

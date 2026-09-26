@@ -918,6 +918,10 @@ pub type Sema {
     generator_fn_state_syms: HashMap[i32, i32],
     generator_fn_run_syms: HashMap[i32, i32],
     generator_fn_each_syms: HashMap[i32, i32],
+    // Gen fns whose generator value holds a view of the borrowed receiver
+    // (field 0 is &Self): the constructor stores its place, `each` passes
+    // that place to the producer.
+    generator_fn_receiver_views: HashMap[i32, i32],
     generator_mir_only_fns: HashMap[i32, i32],
     generator_state_yield_types: HashMap[i32, i32],
     // D69 (§13.4): `for x in g` over a Gen[T] runs its body as the `body`
@@ -2236,6 +2240,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
     let generator_fn_state_syms = sema_new_map_i32_i32()
     let generator_fn_run_syms = sema_new_map_i32_i32()
     let generator_fn_each_syms = sema_new_map_i32_i32()
+    let generator_fn_receiver_views = sema_new_map_i32_i32()
     let generator_mir_only_fns = sema_new_map_i32_i32()
     let generator_state_yield_types = sema_new_map_i32_i32()
     let gen_for_elem_types = sema_new_map_i32_i32()
@@ -2466,6 +2471,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         generator_fn_state_syms,
         generator_fn_run_syms,
         generator_fn_each_syms,
+        generator_fn_receiver_views,
         generator_mir_only_fns,
         generator_state_yield_types,
         gen_for_elem_types,

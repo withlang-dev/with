@@ -776,7 +776,12 @@ fn suspend_emit_no_suspend_error(diags: DiagnosticList, sema: &Sema, body: &MirB
             // D69: the loop over a generator runs the generator's body.
             if sema.generator_mir_only_fns.contains(callee):
                 let gen_fn: i32 = sema.generator_mir_only_fns.get(callee).unwrap()
-                diag.add_note("generator `" ++ sema.pool_resolve(gen_fn) ++ "` may suspend, and its body runs inside this loop")
+                // A generic gen fn's specialization is named by its declaration.
+                var gen_name = sema.pool_resolve(gen_fn)
+                if sema.concrete_specialization_by_sym.contains(gen_fn):
+                    let spec_idx: i32 = sema.concrete_specialization_by_sym.get(gen_fn).unwrap()
+                    gen_name = sema.pool_resolve(sema.ast.get_data0(sema.concrete_specialization_nodes[spec_idx]))
+                diag.add_note("generator `" ++ gen_name ++ "` may suspend, and its body runs inside this loop")
             else:
                 diag.add_note("call to may_suspend function `" ++ sema.pool_resolve(callee) ++ "` occurs here")
         else if suspend_call_passes_suspending_closure(body, body_by_fn, body_may_suspend, bb) != 0:
