@@ -60,6 +60,12 @@ const GEN_LOOP_ERR_RETURN: i32 = 2
 const GEN_LOOP_CANCEL: i32 = 3
 const GEN_LOOP_LABEL_BASE: i32 = 4
 
+// How a gen-loop closure's exit to a label outside it continues in the
+// owning frame (MirBuilder.gen_loop_exit_kinds).
+const GEN_EXIT_BREAK: i32 = 0
+const GEN_EXIT_CONTINUE: i32 = 1
+const GEN_EXIT_GOTO: i32 = 2
+
 fn gen_loop_code_bit(code: i32) -> i32:
     var bit = 1
     for _ in 0..code:
@@ -189,6 +195,9 @@ pub type MirBuilder = ephemeral {
     goto_label_drop_depths: Vec[i32],
     goto_label_defer_depths: Vec[i32],
     goto_label_defined: Vec[i32],
+    // Whether a goto targets the label; a target this body never defines
+    // is a phase bug (verify_goto_labels).
+    goto_label_jumped: Vec[i32],
 
     next_temp: i32,
     cur_node: i32,
@@ -218,10 +227,11 @@ pub type MirBuilder = ephemeral {
     gen_loop_flag_local: i32,
     gen_loop_ret_local: i32,
     gen_loop_ret_ty: i32,
-    // The outer labels this closure's break/continue leave through the flag:
-    // exit i sets the flag to GEN_LOOP_LABEL_BASE + i.
+    // The outer labels this closure's break, continue and goto leave through
+    // the flag: exit i sets the flag to GEN_LOOP_LABEL_BASE + i, and its kind
+    // (GEN_EXIT_*) says what the owning frame does at the label.
     gen_loop_exit_labels: Vec[i32],
-    gen_loop_exit_continues: Vec[i32],
+    gen_loop_exit_kinds: Vec[i32],
     // Which of GEN_LOOP_RETURN..GEN_LOOP_CANCEL this closure sets (bit per
     // code, gen_loop_code_bit), so the owning frame emits only those arms.
     gen_loop_used_codes: i32,
@@ -311,6 +321,7 @@ fn MirBuilder.init(sema: &Sema, ast: AstPool, pool: InternPool, fn_sym: i32) -> 
         goto_label_drop_depths: Vec.new(),
         goto_label_defer_depths: Vec.new(),
         goto_label_defined: Vec.new(),
+        goto_label_jumped: Vec.new(),
         next_temp: 0,
         cur_node: 0,
         expected_type: 0,
@@ -323,7 +334,7 @@ fn MirBuilder.init(sema: &Sema, ast: AstPool, pool: InternPool, fn_sym: i32) -> 
         gen_loop_ret_local: -1,
         gen_loop_ret_ty: 0,
         gen_loop_exit_labels: Vec.new(),
-        gen_loop_exit_continues: Vec.new(),
+        gen_loop_exit_kinds: Vec.new(),
         gen_loop_used_codes: 0,
         regex_capture_pat_nodes: Vec.new(),
         regex_capture_opt_places: Vec.new(),
@@ -1413,6 +1424,7 @@ impl MirBuilder:
         self.goto_label_drop_depths.push(0)
         self.goto_label_defer_depths.push(0)
         self.goto_label_defined.push(0)
+        self.goto_label_jumped.push(0)
         self.goto_label_syms.len() as i32 - 1
 
     mut fn collect_goto_label_depths(node: i32, scope_depth: i32):
@@ -1450,7 +1462,10 @@ impl MirBuilder:
             return
         if kind == NodeKind.NK_FOR:
             self.collect_goto_label_depths(self.ast.get_data1(node), scope_depth)
-            self.collect_goto_label_depths(self.ast.get_data2(node), scope_depth)
+            // D69: the body of a `for` over a Gen[T] is lowered as a closure
+            // (lower_for_gen), which collects its own labels.
+            if not self.sema.gen_for_elem_types.contains(node):
+                self.collect_goto_label_depths(self.ast.get_data2(node), scope_depth)
             return
         if kind == NodeKind.NK_MATCH:
             self.collect_goto_label_depths(self.ast.get_data0(node), scope_depth)
@@ -1573,6 +1588,7 @@ impl MirBuilder:
 
     mut fn goto_target_info(label: i32) -> LoopInfo:
         let idx = self.ensure_goto_label(label, -1)
+        self.goto_label_jumped[idx] = 1
         let bb = self.goto_label_bbs[idx]
         if self.goto_label_defined[idx] != 0:
             return LoopInfo {
@@ -7645,6 +7661,9 @@ impl MirBuilder:
         let stop_bb = child.new_block()
         child.push_control_target(label, ControlTargetKind.CT_LOOP, more_bb, stop_bb, -1)
         child.push_scope()
+        // The body's own labels; a goto to any other label of the function
+        // leaves the closure (lower_goto).
+        child.collect_goto_label_depths(body_expr, child.drop_scope_starts.len() as i32)
         let item_place = child.place_for_local(item_local)
         child.bind_for_element_or_skip(for_node, pat_or_sym, item_place, elem_ty, body_expr, more_bb, true)
         let body_frame = child.push_stmt_temp_frame()
@@ -7659,9 +7678,10 @@ impl MirBuilder:
         child.assign_bool_to_local(0, false)
         child.terminate(TermKind.TK_RETURN, 0, 0, 0, 0)
         child.pop_scope_inline()
+        child.verify_goto_labels()
         let used_codes = child.gen_loop_used_codes
         let exit_labels = mir_clone_i32_vec(&child.gen_loop_exit_labels)
-        let exit_continues = mir_clone_i32_vec(&child.gen_loop_exit_continues)
+        let exit_kinds = mir_clone_i32_vec(&child.gen_loop_exit_kinds)
         var finished = LoweredFunction { body: move child.body, anonymous_bodies: move child.anonymous_bodies }
         self.anonymous_bodies.push(move finished.body)
         while finished.anonymous_bodies.len() > 0:
@@ -7731,17 +7751,35 @@ impl MirBuilder:
                 self.terminate_fn_return(code)
             else:
                 let exit_label = exit_labels[code - GEN_LOOP_LABEL_BASE]
-                let is_continue = exit_continues[code - GEN_LOOP_LABEL_BASE] != 0
-                let target = self.find_control_target(exit_label, if is_continue: 1 else: 0)
-                let target_bb = if is_continue: target.continue_bb else: target.break_bb
-                if target_bb >= 0:
-                    self.emit_cleanup_to_target(target)
-                    self.terminate(TermKind.TK_GOTO, target_bb, 0, 0, 0)
-                else:
-                    let _ = self.lower_gen_loop_label_exit(exit_label, is_continue)
-                    self.terminate(TermKind.TK_UNREACHABLE, 0, 0, 0, 0)
+                let _ = self.lower_gen_loop_exit_arm(exit_label, exit_kinds[code - GEN_LOOP_LABEL_BASE])
         self.switch_to(exit_bb)
         self.forget_string_flow_facts()
+        self.unit_operand()
+
+    // In the frame that owns a gen loop, the exit its closure named: a break
+    // or continue of a loop of this frame, or a goto to a label of it, runs
+    // the cleanup of the scopes it leaves and jumps. A target this frame does
+    // not own is outside it too — this frame is itself a gen-loop closure —
+    // and the exit passes on to its owner.
+    mut fn lower_gen_loop_exit_arm(label: i32, kind: i32) -> i32:
+        if kind == GEN_EXIT_GOTO:
+            if self.gen_loop_flag_local >= 0 and self.find_goto_label_index(label) < 0:
+                let _ = self.lower_gen_loop_label_exit(label, kind)
+                self.terminate(TermKind.TK_UNREACHABLE, 0, 0, 0, 0)
+                return self.unit_operand()
+            let goto_target = self.goto_target_info(label)
+            self.emit_cleanup_to_target(goto_target)
+            self.terminate(TermKind.TK_GOTO, goto_target.break_bb, 0, 0, 0)
+            return self.unit_operand()
+        let is_continue = kind == GEN_EXIT_CONTINUE
+        let target = self.find_control_target(label, if is_continue: 1 else: 0)
+        let target_bb = if is_continue: target.continue_bb else: target.break_bb
+        if target_bb >= 0:
+            self.emit_cleanup_to_target(target)
+            self.terminate(TermKind.TK_GOTO, target_bb, 0, 0, 0)
+        else:
+            let _ = self.lower_gen_loop_label_exit(label, kind)
+            self.terminate(TermKind.TK_UNREACHABLE, 0, 0, 0, 0)
         self.unit_operand()
 
     // A capture the gen-loop protocol adds (the flag, the return slot, the
@@ -9277,7 +9315,7 @@ impl MirBuilder:
     mut fn lower_break(node: i32) -> i32:
         let loop_info = self.find_control_target(self.ast.get_data1(node), 0)
         if loop_info.break_bb < 0:
-            return self.lower_gen_loop_label_exit(self.ast.get_data1(node), false)
+            return self.lower_gen_loop_label_exit(self.ast.get_data1(node), GEN_EXIT_BREAK)
 
         let value_expr = self.ast.get_data0(node)
         if value_expr != 0:
@@ -9297,7 +9335,7 @@ impl MirBuilder:
     mut fn lower_continue(node: i32) -> i32:
         let loop_info = self.find_control_target(self.ast.get_data0(node), 1)
         if loop_info.continue_bb < 0:
-            return self.lower_gen_loop_label_exit(self.ast.get_data0(node), true)
+            return self.lower_gen_loop_label_exit(self.ast.get_data0(node), GEN_EXIT_CONTINUE)
 
         self.flush_stmt_temp_frame()
         self.emit_cleanup_to_target(loop_info)
@@ -9306,22 +9344,22 @@ impl MirBuilder:
         self.switch_to(after_continue)
         self.unit_operand()
 
-    // D69 (§13.4): a labeled break/continue in a gen-loop closure whose label
-    // is outside the closure leaves the closure — its own scopes released, the
-    // generator stopped — and the flag names the exit for the owning frame.
-    // Sema resolved every label, so outside a gen-loop closure a missing target
-    // is a compiler bug.
-    mut fn lower_gen_loop_label_exit(label: i32, is_continue: bool) -> i32:
+    // D69 (§13.4): a labeled break/continue, or a goto, in a gen-loop closure
+    // whose label is outside the closure leaves the closure — its own scopes
+    // released, the generator stopped — and the flag names the exit for the
+    // owning frame. Sema resolved every label, so outside a gen-loop closure
+    // a missing target is a compiler bug.
+    mut fn lower_gen_loop_label_exit(label: i32, kind: i32) -> i32:
         if self.gen_loop_flag_local < 0:
-            sema_phase_bug(f"BUG: break/continue has no control target (label sym {label})")
+            sema_phase_bug(f"BUG: break/continue/goto has no target in this body (label sym {label}, exit kind {kind})")
         var exit = -1
         for ei in 0..self.gen_loop_exit_labels.len() as i32:
-            if self.gen_loop_exit_labels[ei] == label and (self.gen_loop_exit_continues[ei] != 0) == is_continue:
+            if self.gen_loop_exit_labels[ei] == label and self.gen_loop_exit_kinds[ei] == kind:
                 exit = ei
         if exit < 0:
             exit = self.gen_loop_exit_labels.len() as i32
             self.gen_loop_exit_labels.push(label)
-            self.gen_loop_exit_continues.push(if is_continue: 1 else: 0)
+            self.gen_loop_exit_kinds.push(kind)
         self.emit_pending_resets_since(0, 0, 0)
         self.emit_defers_for_return()
         self.emit_drops_for_return()
@@ -9330,22 +9368,29 @@ impl MirBuilder:
         self.switch_to(after_exit)
         self.unit_operand()
 
+    // §13.5b: a goto exits scopes to a label of this function. In a gen-loop
+    // closure (D69) a label the closure's own body does not declare is the
+    // owning function's: the goto leaves the closure like a labeled break.
     mut fn lower_goto(node: i32) -> i32:
         let label = self.ast.get_data0(node)
+        if self.gen_loop_flag_local >= 0 and self.find_goto_label_index(label) < 0:
+            return self.lower_gen_loop_label_exit(label, GEN_EXIT_GOTO)
         let target = self.goto_target_info(label)
-        if target.break_bb < 0:
-            // D69: a `goto` out of a `for` body over a Gen[T] would leave the
-            // closure that body runs as; it is not lowered (the whole
-            // function fails loudly rather than drop the jump).
-            if self.gen_loop_flag_local >= 0:
-                self.mark_unsupported()
-            return self.unit_operand()
         self.flush_stmt_temp_frame()
         self.emit_cleanup_to_target(target)
         self.terminate(TermKind.TK_GOTO, target.break_bb, 0, 0, 0)
         let after_goto = self.new_block()
         self.switch_to(after_goto)
         self.unit_operand()
+
+    // Every label a goto of this body targets is defined in it: Sema resolved
+    // each goto to a label of the same function, and a gen-loop closure hands
+    // the owning function's labels to it through the flag. A target left
+    // undefined would lower to a block that traps at run time.
+    fn verify_goto_labels():
+        for idx in 0..self.goto_label_syms.len() as i32:
+            if self.goto_label_jumped[idx] != 0 and self.goto_label_defined[idx] == 0:
+                sema_phase_bug(f"BUG: goto targets label sym {self.goto_label_syms[idx]}, which body {self.body.fn_sym} never defines")
 
     mut fn lower_label(node: i32) -> i32:
         let label = self.ast.get_data0(node)
@@ -14955,6 +15000,7 @@ impl MirBuilder:
         child.finish_stmt_temp_frame(frame)
         child.pop_scope_inline()
         child.terminate(TermKind.TK_RETURN, 0, 0, 0, 0)
+        child.verify_goto_labels()
         var finished = LoweredFunction { body: move child.body, anonymous_bodies: move child.anonymous_bodies }
         self.anonymous_bodies.push(move finished.body)
         while finished.anonymous_bodies.len() > 0:
@@ -16561,6 +16607,7 @@ fn lower_fn_with_sig(builder: MirBuilder, fn_node: i32, sig_idx: i32) -> Lowered
 
     // D32: field vacates need a mutable path — rebind the owned param.
     var owned_builder = builder
+    owned_builder.verify_goto_labels()
     LoweredFunction { body: move owned_builder.body, anonymous_bodies: move owned_builder.anonymous_bodies }
 
 fn lower_fn_clause_dispatcher(sema: &Sema, ast_pool: AstPool, pool: InternPool, group: i32) -> MirBody:
