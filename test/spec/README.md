@@ -78,7 +78,7 @@ the skip directive.
 | 25.62 | `spec_ss14_7_ephemeral_task_cancellation.w` |
 | 25.63 | `spec_ss14_16_scopedsend.w` |
 | 25.64 | `spec_ss02_4_partial_move_from_drop_types.w` |
-| 25.65 | `spec_ss13_4_no_references_across_yield.w` |
+| 25.65 | `spec_ss13_4_generator_views.w` |
 | 25.66 | `spec_ss20b_6_comptime_unreachable_exemption.w` |
 | 25.67 | `spec_ss14_3_may_suspend_analysis.w` |
 | 25.68 | `spec_ss14_19_ffi_callback_no_suspend.w` |
