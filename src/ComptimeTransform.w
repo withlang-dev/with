@@ -8,6 +8,7 @@ use Parser
 use Sema
 use SemaCheck
 use Span
+use SemaTypes
 
 extern fn with_str_clone_ref(s: &str) -> str
 extern fn str_from_byte(b: i32) -> str

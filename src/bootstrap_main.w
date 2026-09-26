@@ -1,4 +1,4 @@
-use Compilation
+use compiler.Compilation
 
 extern fn with_arg_count() -> i32
 extern fn with_arg_at(idx: i32) -> str

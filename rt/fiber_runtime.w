@@ -39,7 +39,7 @@ type RawStr:
     ptr: *const u8
     len: i64
 
-fn make_str(ptr: *const u8, len: i64) -> str:
+pub fn make_str(ptr: *const u8, len: i64) -> str:
     let raw = RawStr { ptr: ptr, len: len }
     let p = &raw as *const str
     unsafe *p

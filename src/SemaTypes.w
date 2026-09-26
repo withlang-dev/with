@@ -1,6 +1,6 @@
 // Type tags shared by semantic analysis and the frozen MIR type tables.
 // Keep this vocabulary independent of the semantic-analysis driver.
-enum TypeKind: i32:
+pub enum TypeKind: i32:
     TY_ERR = 0
     TY_INT = 1
     TY_FLOAT = 2
@@ -28,14 +28,14 @@ enum TypeKind: i32:
     // callee the way the target's C passes va_list (TypeLayout, FnAbi).
     TY_VA_LIST = 21
 
-type TypeId = i32
+pub type TypeId = i32
 
-enum BorrowKind: i32:
+pub enum BorrowKind: i32:
     SHARED = 0
     EXCLUSIVE = 1
 
 // D61 (§15.4.7): how `:?` formats one registered type (Sema.debug_fmt_*).
-enum DebugFmtKind: i32:
+pub enum DebugFmtKind: i32:
     // A formatter MirLower synthesizes: struct, enum, tuple, array, slice,
     // Vec, Box — each component formatted with `:?`.
     SYNTH = 1

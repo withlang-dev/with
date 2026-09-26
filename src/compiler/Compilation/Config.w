@@ -19,12 +19,12 @@ pub type CompilationConfig {
 }
 // #747: str field — owned, non-Copy now; moves/clones spell intent.
 
-fn PRELUDE_FULL -> i32: 0
-fn PRELUDE_CORE -> i32: 1
-fn PRELUDE_NONE -> i32: 2
-fn PRELUDE_ALLOC -> i32: 3
+pub fn PRELUDE_FULL -> i32: 0
+pub fn PRELUDE_CORE -> i32: 1
+pub fn PRELUDE_NONE -> i32: 2
+pub fn PRELUDE_ALLOC -> i32: 3
 
-fn compilation_normalize_prelude_mode(mode: i32) -> i32:
+pub fn compilation_normalize_prelude_mode(mode: i32) -> i32:
     if mode == PRELUDE_CORE():
         return PRELUDE_CORE()
     if mode == PRELUDE_NONE():
@@ -33,7 +33,7 @@ fn compilation_normalize_prelude_mode(mode: i32) -> i32:
         return PRELUDE_ALLOC()
     PRELUDE_FULL()
 
-fn compilation_effective_prelude_mode(mode: i32, no_std: bool, alloc_mode: bool) -> i32:
+pub fn compilation_effective_prelude_mode(mode: i32, no_std: bool, alloc_mode: bool) -> i32:
     let normalized = compilation_normalize_prelude_mode(mode)
     if normalized == PRELUDE_NONE():
         return PRELUDE_NONE()
@@ -43,7 +43,7 @@ fn compilation_effective_prelude_mode(mode: i32, no_std: bool, alloc_mode: bool)
         return PRELUDE_CORE()
     normalized
 
-fn compilation_config_default -> CompilationConfig:
+pub fn compilation_config_default -> CompilationConfig:
     CompilationConfig {
         opt_level: 0,
         no_std: false,
@@ -59,7 +59,7 @@ fn compilation_config_default -> CompilationConfig:
         tool_mode_entry_path: "",
     }
 
-fn compilation_config_from_cli(opt_level: i32, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32) -> CompilationConfig:
+pub fn compilation_config_from_cli(opt_level: i32, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32) -> CompilationConfig:
     var cfg = compilation_config_default()
     cfg.opt_level = opt_level
     cfg.no_std = no_std

@@ -5,31 +5,31 @@ enum DiagSeverity: i32:
     Warning = 2
     Note = 3
 
-fn render_diag_header(severity: i32, code: &str, message: &str) -> str:
+pub fn render_diag_header(severity: i32, code: &str, message: &str) -> str:
     var out = render_severity(severity) ++ ": " ++ message
     if code.len() > 0:
         out = out ++ " [" ++ code ++ "]"
     out
 
-fn render_diag_location(path: &str, line: i32, col: i32) -> str:
+pub fn render_diag_location(path: &str, line: i32, col: i32) -> str:
     f" --> {path}:{line + 1}:{col + 1}"
 
-fn render_diag_source_line(line: i32, text: &str) -> str:
+pub fn render_diag_source_line(line: i32, text: &str) -> str:
     f"{line + 1} | {text}"
 
-fn render_diag_marker_line(col: i32, n: i32) -> str:
+pub fn render_diag_marker_line(col: i32, n: i32) -> str:
     "  | " ++ render_caret_line(col, n)
 
-fn render_diag_label_line(line: i32, col: i32, message: &str) -> str:
+pub fn render_diag_label_line(line: i32, col: i32, message: &str) -> str:
     f"  = label @{line + 1}:{col + 1} {message}"
 
-fn render_diag_label_line_in_file(path: &str, line: i32, col: i32, message: &str) -> str:
+pub fn render_diag_label_line_in_file(path: &str, line: i32, col: i32, message: &str) -> str:
     f"  = label {path}@{line + 1}:{col + 1} {message}"
 
-fn render_diag_note_line(message: &str) -> str:
+pub fn render_diag_note_line(message: &str) -> str:
     "  = note: " ++ message
 
-fn render_diag_help_line(message: &str) -> str:
+pub fn render_diag_help_line(message: &str) -> str:
     "  = help: " ++ message
 
 fn render_severity(severity: i32) -> str:
@@ -41,7 +41,7 @@ fn render_severity(severity: i32) -> str:
         return "note"
     "diag"
 
-fn span_underline_len(start: i32, end: i32) -> i32:
+pub fn span_underline_len(start: i32, end: i32) -> i32:
     let n = end - start
     if n <= 0:
         return 1

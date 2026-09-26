@@ -11,9 +11,12 @@ use Sema
 use render
 use compiler.EmbeddedStdlib
 use Overflow
+use CImport
 use std.collections.HashMap
 use std.string.StringBuilder
 use MathBuiltins
+use MirCore
+use SemaTypes
 
 extern fn with_str_clone_ref(s: &str) -> str
 extern fn with_fs_read_file(path: &str) -> str
@@ -279,7 +282,7 @@ fn cc_builtin_is_str_len(kind: CcBuiltin) -> bool:
 fn cc_builtin_is_arr_len(kind: CcBuiltin) -> bool:
     kind == CcBuiltin.ARR_LEN or kind == CcBuiltin.ARR_LEN32 or kind == CcBuiltin.ARR_LEN64 or kind == CcBuiltin.ARR_ULEN32
 
-type CEmitResult {
+pub type CEmitResult {
     ok: i32,
     source: str,
     err_msg: str,
@@ -351,7 +354,7 @@ impl CCodegen:
     fn intern_intern(s: &str) -> i32:
         self.intern.intern(s)
 
-fn c_emit_module(mir_mod: MirModule, ast: AstPool, intern: InternPool, sema: Sema, source_path: &str, source_text: &str, overflow_mode: i32) -> CEmitResult:
+pub fn c_emit_module(mir_mod: MirModule, ast: AstPool, intern: InternPool, sema: Sema, source_path: &str, source_text: &str, overflow_mode: i32) -> CEmitResult:
     var cg = CCodegen {
         mir_mod,
         ast,

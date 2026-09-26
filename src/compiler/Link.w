@@ -62,12 +62,12 @@ fn link_stage_temp_archives_lock_acquire():
 fn link_stage_temp_archives_lock_release():
     link_stage_temp_archives_lock.store(0, .Release)
 
-type LinkStageEnvVar {
+pub type LinkStageEnvVar {
     name: str,
     value: str,
 }
 
-type LinkStageCommand {
+pub type LinkStageCommand {
     linker: str,
     args: Vec[str],
     cwd: str,
@@ -77,18 +77,18 @@ type LinkStageCommand {
     cleanup_files: Vec[str],
 }
 
-type LinkStageResult {
+pub type LinkStageResult {
     ok: bool,
     rc: i32,
     command: LinkStageCommand,
 }
 
-type LinkStagePlan {
+pub type LinkStagePlan {
     ok: bool,
     command: LinkStageCommand,
 }
 
-fn link_stage_empty_command() -> LinkStageCommand:
+pub fn link_stage_empty_command() -> LinkStageCommand:
     LinkStageCommand {
         linker: "",
         args: Vec.new(),
@@ -99,7 +99,7 @@ fn link_stage_empty_command() -> LinkStageCommand:
         cleanup_files: Vec.new(),
     }
 
-fn link_stage_result_fail() -> LinkStageResult:
+pub fn link_stage_result_fail() -> LinkStageResult:
     LinkStageResult { ok: false, rc: 1, command: link_stage_empty_command() }
 
 fn link_stage_plan_fail() -> LinkStagePlan:
@@ -108,7 +108,7 @@ fn link_stage_plan_fail() -> LinkStagePlan:
 fn link_stage_plan_for_command(command: LinkStageCommand) -> LinkStagePlan:
     LinkStagePlan { ok: true, command }
 
-fn link_stage_result_for_command(command: LinkStageCommand) -> LinkStageResult:
+pub fn link_stage_result_for_command(command: LinkStageCommand) -> LinkStageResult:
     let rc = command.run()
     link_stage_cleanup_files(command.cleanup_files)
     LinkStageResult { ok: rc == 0, rc, command }
@@ -238,7 +238,7 @@ fn link_stage_collect_cleanup_files(extras: &Vec[str]) -> Vec[str]:
             cleanup.push(with_str_clone_ref(extra))
     cleanup
 
-fn link_stage_cleanup_files(files: &Vec[str]):
+pub fn link_stage_cleanup_files(files: &Vec[str]):
     for i in 0..files.len() as i32:
         let _remove = runtime_remove_file(files[i])
 
@@ -249,7 +249,7 @@ fn link_stage_register_temp_archive(path: &str):
     link_stage_temp_archives.push(with_str_clone_ref(path))
     link_stage_temp_archives_lock_release()
 
-fn link_stage_basename(path: &str) -> str:
+pub fn link_stage_basename(path: &str) -> str:
     var last_slash = -1
     for i in 0..path.len() as i32:
         if path[i] == 47:
@@ -1081,7 +1081,7 @@ fn link_stage_undefined_symbols_need_fiber_runtime(undef: &str) -> i32:
 // ── .wo bundles (docs/wo_bundles.md, D38) ─────────────────────────────
 
 // The value of the first manifest line `key <value>…` ("" if absent).
-fn link_stage_bundle_manifest_field(manifest: &str, key: &str) -> str:
+pub fn link_stage_bundle_manifest_field(manifest: &str, key: &str) -> str:
     let want = key ++ " "
     var start: i64 = 0
     while start < manifest.len():
@@ -1387,7 +1387,7 @@ fn link_stage_make_archive(obj_path: &str) -> str:
         link_stage_register_temp_archive(out)
     out
 
-fn link_stage_make_archive_to_path(obj_path: &str, ar_path: &str) -> str:
+pub fn link_stage_make_archive_to_path(obj_path: &str, ar_path: &str) -> str:
     let members: Vec[str] = Vec.new()
     members.push(with_str_clone_ref(obj_path))
     let rc = create_static_archive(ar_path, members)
@@ -1425,7 +1425,7 @@ fn link_stage_undefined_symbols_need_llvm_bridge(undef: &str) -> bool:
         link_stage_undef_contains_symbol(undef, "LLVM") or
         link_stage_undef_contains_symbol(undef, "clang_")
 
-fn link_stage_dirname(path: &str) -> str:
+pub fn link_stage_dirname(path: &str) -> str:
     var last_slash = -1
     for i in 0..path.len():
         if path[i] == 47 or path[i] == 92: // '/' or '\'
@@ -1434,7 +1434,7 @@ fn link_stage_dirname(path: &str) -> str:
         return "."
     path.slice(0, last_slash as i64)
 
-fn link_stage_source_stem(source_path: &str) -> str:
+pub fn link_stage_source_stem(source_path: &str) -> str:
     var last_slash = -1
     for i in 0..source_path.len():
         if source_path[i] == 47 or source_path[i] == 92: // '/' or '\'
@@ -1474,14 +1474,14 @@ fn link_stage_sanitize_relative_dir(path: &str) -> str:
         i = i + 1
     out
 
-fn link_stage_output_dir_for_source(source_path: &str) -> str:
+pub fn link_stage_output_dir_for_source(source_path: &str) -> str:
     let artifact_root = link_stage_artifact_root()
     let dir = link_stage_sanitize_relative_dir(link_stage_dirname(source_path))
     if dir.len() == 0:
         return artifact_root
     artifact_root ++ "/" ++ dir
 
-fn link_stage_output_path_for_source(source_path: &str) -> str:
+pub fn link_stage_output_path_for_source(source_path: &str) -> str:
     let base = link_stage_output_dir_for_source(source_path) ++ "/" ++ link_stage_source_stem(source_path)
     if target_spec_is_wasm():
         return base ++ ".wasm"
@@ -1501,7 +1501,7 @@ fn link_stage_link_object_to_binary_plan(obj_path: &str, bin_path: &str, link_li
     let no_extra_objects: Vec[str] = Vec.new()
     link_stage_link_object_to_binary_plan_with_units(obj_path, no_extra_objects, bin_path, link_libs, link_search_paths, move link_args, needs_async_runtime)
 
-fn link_stage_link_object_to_binary_plan_with_units(obj_path: &str, extra_objects: &Vec[str], bin_path: &str, link_libs: Vec[str], link_search_paths: &Vec[str], link_args: Vec[str], needs_async_runtime: bool) -> LinkStagePlan:
+pub fn link_stage_link_object_to_binary_plan_with_units(obj_path: &str, extra_objects: &Vec[str], bin_path: &str, link_libs: Vec[str], link_search_paths: &Vec[str], link_args: Vec[str], needs_async_runtime: bool) -> LinkStagePlan:
     let extras: Vec[str] = Vec.new()
     // #650 codegen units: sibling .o files are full linker inputs like the
     // primary object (objects always load wholly, so position is irrelevant).

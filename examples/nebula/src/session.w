@@ -92,7 +92,7 @@ fn parse_batch(lines: &Vec[str]) -> Result[Vec[Telemetry], SessionError]:
 //   - `??` on the Option a receive returns
 //   - Result propagation
 
-async fn handle_session(id: i32, rx: Receiver[str]) -> Result[i32, SessionError]:
+pub async fn handle_session(id: i32, rx: Receiver[str]) -> Result[i32, SessionError]:
     var session = Session { id, addr: "127.0.0.1" }
     defer: print(f"[session {id}] cleanup")
 

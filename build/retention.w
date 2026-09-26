@@ -5,6 +5,7 @@ use std.string.StringBuilder
 use std.sysinfo
 use build.seed
 use build.compiler
+use std.process.env
 fn retention_owned_text(s: &str): s ++ ""
 
 const RET_SEED_KEEP: i32 = 5

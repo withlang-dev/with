@@ -754,7 +754,7 @@ fn package_platform_target(name: &str, platform: &str, ctx: &BuildCtx) -> Target
     let asset = release_package_asset_for_platform(platform)
     var target = target_new(.Action, build_owned_text(name), "").output("out/release/" ++ name ++ ".passed")
     target.action = run_package_platform_release_action
-    target = target.arg(asset)
+    target = target.arg(build_owned_text(asset))
     target = target.arg(build_owned_text(platform))
     target = target.arg(release_compiler_bin("with"))
     target = target.arg(compiler_default_llvm_prefix())
@@ -803,7 +803,7 @@ fn package_llvm_sdk_platform_target(name: &str, platform: &str, prefix: &str, bu
     target = target.arg(build_owned_text(platform))
     target = target.arg(build_owned_text(prefix))
     target = target.arg(build_owned_text(build_cache))
-    target = target.arg(asset)
+    target = target.arg(build_owned_text(asset))
     target = target.arg(sdk_base)
     target = target.input(build_owned_text(prefix))
     target = target.input(build_owned_text(build_cache))
@@ -876,8 +876,8 @@ fn sdk_ninja_target(ctx: &BuildCtx) -> Target:
     let build_root = sdk_build_root_arg(ctx, platform)
     var target = target_new(.Action, "sdk-ninja", "").output(output_prefix ++ "/bin/ninja" ++ host_exe_suffix())
     target.action = run_sdk_ninja_action
-    target = target.arg(bootstrap_prefix)
-    target = target.arg(output_prefix)
+    target = target.arg(build_owned_text(bootstrap_prefix))
+    target = target.arg(build_owned_text(output_prefix))
     target = target.arg(sdk_ninja_source_dir())
     target = target.arg(build_root ++ "/ninja-" ++ sdk_host_tag_for_platform(platform))
     target = target.arg(sdk_jobs_arg(ctx))
@@ -897,8 +897,8 @@ fn sdk_cmake_target(ctx: &BuildCtx) -> Target:
     let build_root = sdk_build_root_arg(ctx, platform)
     var target = target_new(.Action, "sdk-cmake", "").output(output_prefix ++ "/bin/cmake" ++ host_exe_suffix())
     target.action = run_sdk_cmake_action
-    target = target.arg(bootstrap_prefix)
-    target = target.arg(output_prefix)
+    target = target.arg(build_owned_text(bootstrap_prefix))
+    target = target.arg(build_owned_text(output_prefix))
     target = target.arg(sdk_cmake_source_dir())
     target = target.arg(build_root ++ "/cmake-" ++ sdk_host_tag_for_platform(platform))
     target = target.arg(sdk_jobs_arg(ctx))
@@ -922,8 +922,8 @@ fn sdk_llvm_target(ctx: &BuildCtx) -> Target:
     let build_root = sdk_build_root_arg(ctx, platform)
     var target = target_new(.Action, "sdk-llvm", "").output(if platform == "windows-x86_64" or platform == "windows-aarch64": output_prefix ++ "/lib/libclang.lib" else: output_prefix ++ "/lib/libclang.a")
     target.action = run_sdk_llvm_action
-    target = target.arg(bootstrap_prefix)
-    target = target.arg(output_prefix)
+    target = target.arg(build_owned_text(bootstrap_prefix))
+    target = target.arg(build_owned_text(output_prefix))
     target = target.arg(sdk_llvm_source_dir())
     target = target.arg(build_root ++ "/llvm-" ++ compiler_llvm_version() ++ "-" ++ sdk_host_tag_for_platform(platform))
     target = target.arg(sdk_jobs_arg(ctx))
@@ -2255,7 +2255,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     bootstrap_embedded_objects = bootstrap_embedded_objects.arg("fiber_asm_o")
     bootstrap_embedded_objects = bootstrap_embedded_objects.input("out/bootstrap-lib/rt_core.o")
     bootstrap_embedded_objects = bootstrap_embedded_objects.arg("rt_core_o")
-    bootstrap_embedded_objects = bootstrap_embedded_objects.input(host_runtime.bootstrap_platform_object)
+    bootstrap_embedded_objects = bootstrap_embedded_objects.input(build_owned_text(host_runtime.bootstrap_platform_object))
     bootstrap_embedded_objects = bootstrap_embedded_objects.arg(build_owned_text(host_runtime.platform_symbol))
     for bi2 in 0..bootstrap_empty_syms.len() as i32:
         let bsym2 = bootstrap_empty_syms[bi2]
@@ -2328,7 +2328,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     prepare_bootstrap_link_root = prepare_bootstrap_link_root.input("rt/cimport_stubs.w")
     prepare_bootstrap_link_root = prepare_bootstrap_link_root.input("rt/rt_core.w")
     prepare_bootstrap_link_root = prepare_bootstrap_link_root.input(build_owned_text(host_runtime.platform_source))
-    prepare_bootstrap_link_root = prepare_bootstrap_link_root.input(host_runtime.compat_source)
+    prepare_bootstrap_link_root = prepare_bootstrap_link_root.input(build_owned_text(host_runtime.compat_source))
     prepare_bootstrap_link_root = prepare_bootstrap_link_root.write_scope("out/lib")
     prepare_bootstrap_link_root = prepare_bootstrap_link_root.write_scope("out/bootstrap-lib")
     prepare_bootstrap_link_root = prepare_bootstrap_link_root.dep("bootstrap-runtime")
@@ -2485,7 +2485,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     // remain for `fixpoint-diff`, which explains a differing object.)
     var fixpoint_compare = target_new(.Action, "fixpoint-compare", "").output("out/.build-state/fixpoint-compare.txt")
     fixpoint_compare.action = run_fixpoint_compare_units_action
-    fixpoint_compare = fixpoint_compare.input(FIXPOINT_STAGE2_UNITS).input(FIXPOINT_STAGE3_UNITS)
+    fixpoint_compare = fixpoint_compare.input(build_owned_text(FIXPOINT_STAGE2_UNITS)).input(build_owned_text(FIXPOINT_STAGE3_UNITS))
     fixpoint_compare = fixpoint_compare.write_scope("out/.build-state")
     fixpoint_compare = fixpoint_compare.dep("stage2").dep("link-compiler")
     out = out.add_target(fixpoint_compare)
@@ -2501,8 +2501,8 @@ pub fn build(ctx: BuildCtx) -> Build:
     var fixpoint_evidence = target_new(.Action, "fixpoint-evidence", "").output("out/.build-state/fixpoint-evidence.json")
     fixpoint_evidence.action = run_fixpoint_evidence_action
     fixpoint_evidence = fixpoint_evidence.input(host_bin("out/bin/with-sha256"))
-    fixpoint_evidence = fixpoint_evidence.input(FIXPOINT_STAGE2_UNITS)
-    fixpoint_evidence = fixpoint_evidence.input(FIXPOINT_STAGE3_UNITS)
+    fixpoint_evidence = fixpoint_evidence.input(build_owned_text(FIXPOINT_STAGE2_UNITS))
+    fixpoint_evidence = fixpoint_evidence.input(build_owned_text(FIXPOINT_STAGE3_UNITS))
     fixpoint_evidence = fixpoint_evidence.input(release_compiler_bin("with"))
     fixpoint_evidence = fixpoint_evidence.write_scope("out/.build-state")
     fixpoint_evidence = fixpoint_evidence.write_scope("out/command/fixpoint-evidence")
@@ -2594,7 +2594,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     embedded_objects = embedded_objects.input("out/lib/rt_core.o")
     embedded_objects = embedded_objects.arg("rt_core_o")
     embedded_objects = embedded_objects.input(build_owned_text(host_runtime.platform_object))
-    embedded_objects = embedded_objects.arg(host_runtime.platform_symbol)
+    embedded_objects = embedded_objects.arg(build_owned_text(host_runtime.platform_symbol))
     for ei2 in 0..empty_syms.len() as i32:
         let esym2 = empty_syms[ei2]
         if esym2 != host_runtime.platform_symbol:
@@ -2815,7 +2815,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     compiler = target_with_compiler_source_inputs(move compiler, ctx)
     compiler = compiler.arg("-O1")
     // stage2's compile of the compiler, unit by unit (see fixpoint-compare).
-    compiler = compiler.arg("unit-digests=" ++ FIXPOINT_STAGE3_UNITS).extra_output(FIXPOINT_STAGE3_UNITS)
+    compiler = compiler.arg("unit-digests=" ++ FIXPOINT_STAGE3_UNITS).extra_output(build_owned_text(FIXPOINT_STAGE3_UNITS))
     compiler = compiler.extra_output("out/command/link-compiler")
     compiler = compiler.timeout(1800000)
     compiler = compiler.write_scope("out/release/bin")

@@ -5,7 +5,7 @@
 extern fn with_fs_read_file(path: &str) -> str
 extern fn with_str_clone_ref(s: &str) -> str
 
-type Source {
+pub type Source {
     path: str,
     text: str,
     line_offsets: Vec[i32],

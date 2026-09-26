@@ -17,6 +17,8 @@ use CiMigrate
 use Overflow
 use std.string.StringBuilder
 use TargetSpec
+use SemaTypes
+use compiler.Compilation.Config
 
 extern fn with_eprint(s: &str) -> Unit
 extern fn with_str_clone_ref(s: &str) -> str
@@ -294,7 +296,7 @@ type ComptimeEvaluator {
     pending_diag: Diagnostic,
 }
 
-type ComptimeEvalResult {
+pub type ComptimeEvalResult {
     value: ComptimeValue,
     extras: Vec[ComptimeValue],
     error_msg: str,
@@ -1152,13 +1154,13 @@ fn comptime_eval_result_invalid() -> ComptimeEvalResult:
 unsafe fn comptime_eval_finish(sema_ptr: *mut Sema, evaluator: ComptimeEvaluator, value: ComptimeValue) -> ComptimeEvalResult:
     var owned = move evaluator
     let has_pending_diag = owned.has_pending_diag
-    let pending_diag = owned.pending_diag
+    let pending_diag = move owned.pending_diag
     let extras = move owned.extra_values
-    let error_msg = owned.last_error_msg
+    let error_msg = move owned.last_error_msg
     let runtime_exit_code = owned.runtime_exit_code
-    let runtime_stderr = owned.runtime_stderr
-    let effect_records = owned.effect_records
-    let synced_sema = owned.sema
+    let runtime_stderr = move owned.runtime_stderr
+    let effect_records = move owned.effect_records
+    let synced_sema = move owned.sema
     *sema_ptr = synced_sema
     if has_pending_diag != 0:
         sema_ptr.diags.emit(move pending_diag)
@@ -1629,7 +1631,7 @@ impl ComptimeEvaluator:
             let _ = self.fail(0, "incomplete workspace interception for '" ++ record.name ++ "': " ++ reason)
             return
 
-unsafe fn comptime_try_eval_expr_result(sema_ptr: *mut Sema, ast: AstPool, pool: InternPool, node: i32) -> ComptimeEvalResult:
+pub unsafe fn comptime_try_eval_expr_result(sema_ptr: *mut Sema, ast: AstPool, pool: InternPool, node: i32) -> ComptimeEvalResult:
     var sema = *sema_ptr
     sema.ast = ast
     sema = sema.prepare_comptime_eval_copy()
@@ -1637,7 +1639,7 @@ unsafe fn comptime_try_eval_expr_result(sema_ptr: *mut Sema, ast: AstPool, pool:
     let value = evaluator.eval_root(node)
     comptime_eval_finish(sema_ptr, evaluator, value)
 
-unsafe fn comptime_force_eval_expr_result(sema_ptr: *mut Sema, ast: AstPool, pool: InternPool, node: i32) -> ComptimeEvalResult:
+pub unsafe fn comptime_force_eval_expr_result(sema_ptr: *mut Sema, ast: AstPool, pool: InternPool, node: i32) -> ComptimeEvalResult:
     var sema = *sema_ptr
     sema.ast = ast
     sema = sema.prepare_comptime_eval_copy()
@@ -1645,15 +1647,15 @@ unsafe fn comptime_force_eval_expr_result(sema_ptr: *mut Sema, ast: AstPool, poo
     let value = evaluator.eval_root(node)
     comptime_eval_finish(sema_ptr, evaluator, value)
 
-unsafe fn comptime_try_eval_expr(sema_ptr: *mut Sema, ast: AstPool, pool: InternPool, node: i32) -> ComptimeValue:
+pub unsafe fn comptime_try_eval_expr(sema_ptr: *mut Sema, ast: AstPool, pool: InternPool, node: i32) -> ComptimeValue:
     var result = comptime_try_eval_expr_result(sema_ptr, ast, pool, node)
     return move result.value
 
-unsafe fn comptime_force_eval_expr(sema_ptr: *mut Sema, ast: AstPool, pool: InternPool, node: i32) -> ComptimeValue:
+pub unsafe fn comptime_force_eval_expr(sema_ptr: *mut Sema, ast: AstPool, pool: InternPool, node: i32) -> ComptimeValue:
     var result = comptime_force_eval_expr_result(sema_ptr, ast, pool, node)
     return move result.value
 
-unsafe fn comptime_eval_tool_build_result(sema_ptr: *mut Sema, ast: AstPool, pool: InternPool, fn_sym: i32, package_name: &str, package_version: &str, project_root: &str, strict_effects: i32, suppress_side_effects: i32) -> ComptimeEvalResult:
+pub unsafe fn comptime_eval_tool_build_result(sema_ptr: *mut Sema, ast: AstPool, pool: InternPool, fn_sym: i32, package_name: &str, package_version: &str, project_root: &str, strict_effects: i32, suppress_side_effects: i32) -> ComptimeEvalResult:
     var sema = *sema_ptr
     sema.ast = ast
     sema = sema.prepare_comptime_eval_copy()
@@ -1681,7 +1683,7 @@ unsafe fn comptime_eval_tool_build_result(sema_ptr: *mut Sema, ast: AstPool, poo
             comptime_value_invalid()
     comptime_eval_finish(sema_ptr, evaluator, value)
 
-unsafe fn comptime_eval_tool_action_result(sema_ptr: *mut Sema, ast: AstPool, pool: InternPool, fn_sym: i32, package_name: &str, package_version: &str, project_root: &str, target_name: &str, inputs: Vec[str], output: &str, extra_outputs: &Vec[str], args_values: Vec[str], write_scopes: &Vec[str], timeout_ms: i32, cwd: &str, env: Vec[str], network: i32, strict_effects: i32) -> ComptimeEvalResult:
+pub unsafe fn comptime_eval_tool_action_result(sema_ptr: *mut Sema, ast: AstPool, pool: InternPool, fn_sym: i32, package_name: &str, package_version: &str, project_root: &str, target_name: &str, inputs: Vec[str], output: &str, extra_outputs: &Vec[str], args_values: Vec[str], write_scopes: &Vec[str], timeout_ms: i32, cwd: &str, env: Vec[str], network: i32, strict_effects: i32) -> ComptimeEvalResult:
     var sema = *sema_ptr
     sema.ast = ast
     sema = sema.prepare_comptime_eval_copy()
@@ -2406,7 +2408,7 @@ impl ComptimeEvaluator:
             let idx = self.lookup_slot_index(sym)
             if idx < 0:
                 return self.fail(node, "comptime collection mutation requires a local identifier receiver")
-            self.update_slot_value(idx, value)
+            self.update_slot_value(idx, comptime_value_clone(&value))
             if self.pipeline_receiver_carrier_depth > 0:
                 return comptime_control_value(value)
             return comptime_control_value(comptime_value_void(self.sema.ty_void as i32))
@@ -3591,7 +3593,7 @@ impl ComptimeEvaluator:
             if self.last_call_has_mut_receiver == 0:
                 return self.fail(node, "comptime mut method did not preserve its receiver value")
             final_receiver = move self.last_call_mut_receiver
-            let write_back = self.write_back_mut_receiver(recv_node, final_receiver, node)
+            let write_back = self.write_back_mut_receiver(recv_node, comptime_value_clone(&final_receiver), node)
             if write_back.kind != ComptimeControlKind.CTL_VALUE:
                 return write_back
 
@@ -3615,10 +3617,10 @@ impl ComptimeEvaluator:
         call_signal
 
     mut fn eval_pipeline_method_call(lhs: i32, method: i32, extra_start: i32, arg_count: i32, node: i32) -> ComptimeControl:
-        let recv_signal = self.eval_expr(lhs)
+        var recv_signal = self.eval_expr(lhs)
         if recv_signal.kind != ComptimeControlKind.CTL_VALUE:
             return recv_signal
-        self.eval_pipeline_method_value(lhs, recv_signal.value, method, extra_start, arg_count, node)
+        self.eval_pipeline_method_value(lhs, move recv_signal.value, method, extra_start, arg_count, node)
 
     fn pipeline_receiver_root_node(node: i32) -> i32:
         var current = node
@@ -3722,7 +3724,7 @@ impl ComptimeEvaluator:
         if lhs_tid == 0 and lhs_signal.value.kind == ComptimeValueKind.CV_STR:
             lhs_tid = self.sema.ty_str as i32
         if lhs_tid != 0 and self.sema.pipeline_method_exists(lhs_tid, fn_sym) != 0:
-            return self.eval_pipeline_method_value(lhs, lhs_signal.value, fn_sym, args_start, arg_count, node)
+            return self.eval_pipeline_method_value(lhs, move lhs_signal.value, fn_sym, args_start, arg_count, node)
         // #766: a transform-folded initializer (#565) reaches here before
         // sema recorded pipeline routing, so the method-exists probe can miss
         // (no lhs type, or an owner lookup that only works post-check). The
@@ -6267,7 +6269,7 @@ impl ComptimeEvaluator:
                 if phase >= 0:
                     record.intercept_phase = phase
                 record.message_cursor = record.message_cursor + 1
-                let record_name = record.name
+                let record_name = record.name.clone()
                 let record_generation = record.generation
                 self.store_workspace_record(workspace_id, record)
                 let envelope = self.compiler_message_envelope_value(record_name, record_generation, message, node)
@@ -6362,7 +6364,7 @@ impl ComptimeEvaluator:
             return self.fail(use_node, "missing constant value")
 
         let saved_file = self.sema.local_file_id
-        let saved_path = self.sema.current_module_path
+        let saved_path = move self.sema.current_module_path
         self.sema.local_file_id = self.decl_file_id(decl)
         self.sema.current_module_path = self.decl_path(decl)
         self.active_global_syms.push(sym)
@@ -6448,10 +6450,10 @@ impl ComptimeEvaluator:
         let count = self.ast.get_data1(node)
         let start = self.extra_values.len() as i32
         for i in 0..count:
-            let elem_signal = self.eval_expr(self.ast.get_extra(extra_start + i))
+            var elem_signal = self.eval_expr(self.ast.get_extra(extra_start + i))
             if elem_signal.kind != ComptimeControlKind.CTL_VALUE:
                 return elem_signal
-            self.push_extra_value(elem_signal.value)
+            self.push_extra_value(move elem_signal.value)
         comptime_control_value(comptime_value_array(self.node_type_or(node, 0), start, count))
 
     mut fn eval_tuple(node: i32) -> ComptimeControl:
@@ -6459,10 +6461,10 @@ impl ComptimeEvaluator:
         let count = self.ast.get_data1(node)
         let start = self.extra_values.len() as i32
         for i in 0..count:
-            let elem_signal = self.eval_expr(self.ast.get_extra(extra_start + i))
+            var elem_signal = self.eval_expr(self.ast.get_extra(extra_start + i))
             if elem_signal.kind != ComptimeControlKind.CTL_VALUE:
                 return elem_signal
-            self.push_extra_value(elem_signal.value)
+            self.push_extra_value(move elem_signal.value)
         comptime_control_value(comptime_value_tuple(self.node_type_or(node, 0), start, count))
 
     mut fn eval_struct_lit(node: i32) -> ComptimeControl:
@@ -6621,7 +6623,7 @@ impl ComptimeEvaluator:
                     if qual_sym != 0 and self.sema.variant_lookup.contains(qual_sym):
                         return self.eval_disc_variant_sym(qual_sym, node)
                     return self.eval_disc_variant_sym(field_sema_sym, node)
-        let base_signal = self.eval_expr(base)
+        var base_signal = self.eval_expr(base)
         if base_signal.kind != ComptimeControlKind.CTL_VALUE:
             return base_signal
         if base_signal.value.kind == ComptimeValueKind.CV_STRING_BUILDER:
@@ -6633,7 +6635,7 @@ impl ComptimeEvaluator:
                     self.sema.type_reflection_field_type(base_signal.value.type_id, field_index)
                 else:
                     0
-            let text = self.materialize_string_builder(base_signal.value, node)
+            let text = self.materialize_string_builder(move base_signal.value, node)
             if self.had_error != 0:
                 return comptime_control_error()
             return comptime_control_value(comptime_value_bytes(field_type, text))
@@ -6702,12 +6704,12 @@ impl ComptimeEvaluator:
                 cursor = cursor + 2
                 if spec_node != 0:
                     return self.fail(node, "comptime f-string format specs are not supported yet")
-                let value_signal = self.eval_expr(expr_node)
+                var value_signal = self.eval_expr(expr_node)
                 if value_signal.kind != ComptimeControlKind.CTL_VALUE:
                     return value_signal
                 if self.had_error != 0:
                     return comptime_control_error()
-                parts.push(self.fstring_segment_text(value_signal.value, expr_node))
+                parts.push(self.fstring_segment_text(move value_signal.value, expr_node))
             else:
                 return self.fail(node, "invalid comptime f-string segment")
         self.concat_comptime_string_parts(node, parts)
@@ -6994,7 +6996,7 @@ impl ComptimeEvaluator:
         self.unsupported(node)
 
     mut fn eval_let_binding(node: i32) -> ComptimeControl:
-        let value_signal = self.eval_expr(self.ast.get_data1(node))
+        var value_signal = self.eval_expr(self.ast.get_data1(node))
         if value_signal.kind != ComptimeControlKind.CTL_VALUE:
             return value_signal
         let flags = self.ast.get_data2(node)
@@ -7013,7 +7015,7 @@ impl ComptimeEvaluator:
             let raw = comptime_value_intlike(&value_signal.value)
             self.bind_value(self.ast.get_data0(node), self.checked_int_value(retype_to, raw), is_mut)
             return comptime_control_value(comptime_value_void(self.sema.ty_void as i32))
-        self.bind_value(self.ast.get_data0(node), value_signal.value, is_mut)
+        self.bind_value(self.ast.get_data0(node), move value_signal.value, is_mut)
         comptime_control_value(comptime_value_void(self.sema.ty_void as i32))
 
     // Returns the integer type this binding's annotation declares, or 0 to
@@ -7042,13 +7044,13 @@ impl ComptimeEvaluator:
 
     mut fn eval_assign(node: i32) -> ComptimeControl:
         let target = self.ast.get_data0(node)
-        let value_signal = self.eval_expr(self.ast.get_data1(node))
+        var value_signal = self.eval_expr(self.ast.get_data1(node))
         if value_signal.kind != ComptimeControlKind.CTL_VALUE:
             return value_signal
         let target_kind = self.ast.kind(target)
         if target_kind != NodeKind.NK_FIELD_ACCESS and target_kind != NodeKind.NK_IDENT:
             return self.fail(node, "comptime assignment only supports local identifiers and struct fields")
-        let stored = if target_kind == NodeKind.NK_FIELD_ACCESS: self.assign_struct_field_value(target, value_signal.value, node) else: self.assign_value(self.ast.get_data0(target), value_signal.value, node)
+        let stored = if target_kind == NodeKind.NK_FIELD_ACCESS: self.assign_struct_field_value(target, value_signal.value, node) else: self.assign_value(self.ast.get_data0(target), move value_signal.value, node)
         // §9.1 / D60: an assignment the body returns yields a read of its
         // place after the store, as it does at runtime.
         if stored.kind != ComptimeControlKind.CTL_VALUE or not self.sema.tail_reads_place(node):
@@ -7409,8 +7411,8 @@ impl ComptimeEvaluator:
         let saved_named_had: Vec[i32] = Vec.new()
         let saved_named_tys: Vec[i32] = Vec.new()
         let snapshot_tp_syms: Vec[i32] = Vec.new()
-        let saved_subst_syms = self.sema.generic_subst_param_syms
-        let saved_subst_tys = self.sema.generic_subst_type_ids
+        let saved_subst_syms = move self.sema.generic_subst_param_syms
+        let saved_subst_tys = move self.sema.generic_subst_type_ids
         self.sema.generic_subst_param_syms = Vec.new()
         self.sema.generic_subst_type_ids = Vec.new()
         for i in 0..tp_syms.len() as i32:
@@ -7516,7 +7518,7 @@ impl ComptimeEvaluator:
                         if comptime_type_name_has_base(result_name, "Vec") != 0 or comptime_type_name_has_base(result_name, "HashMap") != 0:
                             return self.eval_static_collection_new(result_type, node, arg_count)
                 return self.eval_static_type_method_call(recv_type, field, self.ast.get_data1(node), arg_count, node)
-            let recv_signal = self.eval_expr(recv_node)
+            var recv_signal = self.eval_expr(recv_node)
             if recv_signal.kind != ComptimeControlKind.CTL_VALUE:
                 return recv_signal
             if recv_signal.value.kind == ComptimeValueKind.CV_CAPABILITY:
@@ -7524,7 +7526,7 @@ impl ComptimeEvaluator:
             if recv_signal.value.kind == ComptimeValueKind.CV_INT:
                 return self.eval_int_method_call(recv_signal.value, self.node_type_or(recv_node, recv_signal.value.type_id), field, self.ast.get_data1(node), arg_count, node)
             if self.is_string_builder_value(recv_signal.value):
-                return self.eval_string_builder_method_call(recv_node, recv_signal.value, field, self.ast.get_data1(node), arg_count, node)
+                return self.eval_string_builder_method_call(recv_node, move recv_signal.value, field, self.ast.get_data1(node), arg_count, node)
             if recv_signal.value.kind == ComptimeValueKind.CV_STRUCT:
                 let field_index = self.struct_field_index(recv_signal.value.type_id, field)
                 if field_index >= 0:
@@ -7829,7 +7831,6 @@ impl ComptimeEvaluator:
         let caller_fn_sym = if self.active_fn_syms.len() > 0: self.active_fn_syms[(self.active_fn_syms.len() - 1)] else: 0
 
         let saved_file = self.sema.local_file_id
-        let saved_path = self.sema.current_module_path
         let has_generic_subst = if tp_count > 0: 1 else: 0
         let generic_snapshot =
             if has_generic_subst != 0:
@@ -7845,7 +7846,11 @@ impl ComptimeEvaluator:
         // #679: same-file calls (the hot case in interpreted loops) skip the
         // context switch — decl_path clones a str per call otherwise.
         let ctx_file = self.decl_file_id(fn_node)
-        if ctx_file != self.sema.local_file_id or self.sema.current_module_path.len() == 0:
+        // The path moves out only when the context switches: a same-file call
+        // keeps it in place (the alias the seed inferred kept it too).
+        let switch_ctx = ctx_file != self.sema.local_file_id or self.sema.current_module_path.len() == 0
+        let saved_path = if switch_ctx: move self.sema.current_module_path else: ""
+        if switch_ctx:
             self.sema.local_file_id = ctx_file
             self.sema.current_module_path = self.decl_path(fn_node)
         self.active_fn_syms.push(fn_sym)
@@ -7863,11 +7868,11 @@ impl ComptimeEvaluator:
                     self.pop_scope()
                     self.active_fn_syms.pop()
                     self.sema.local_file_id = saved_file
-                    self.sema.current_module_path = saved_path
+                    if switch_ctx: self.sema.current_module_path = saved_path
                     if has_generic_subst != 0:
                         self.restore_generic_substitutions(generic_snapshot)
                     return self.fail(node, "wrong argument count in comptime call")
-                let default_signal = if self.default_arg_uses_call_site(default_node) != 0:
+                var default_signal = if self.default_arg_uses_call_site(default_node) != 0:
                     self.eval_call_site_default_arg(default_node, node, caller_path, caller_text, caller_fn_sym)
                 else:
                     self.eval_expr(default_node)
@@ -7875,11 +7880,11 @@ impl ComptimeEvaluator:
                     self.pop_scope()
                     self.active_fn_syms.pop()
                     self.sema.local_file_id = saved_file
-                    self.sema.current_module_path = saved_path
+                    if switch_ctx: self.sema.current_module_path = saved_path
                     if has_generic_subst != 0:
                         self.restore_generic_substitutions(generic_snapshot)
                     return default_signal
-                self.bind_value(param_name, default_signal.value, param_mut)
+                self.bind_value(param_name, move default_signal.value, param_mut)
 
         let pmeta = self.ast.find_fn_param_pattern_meta(fn_node)
         if pmeta >= 0:
@@ -7897,7 +7902,7 @@ impl ComptimeEvaluator:
                             self.pop_scope()
                             self.active_fn_syms.pop()
                             self.sema.local_file_id = saved_file
-                            self.sema.current_module_path = saved_path
+                            if switch_ctx: self.sema.current_module_path = saved_path
                             if has_generic_subst != 0:
                                 self.restore_generic_substitutions(generic_snapshot)
                             return self.fail(ppat, "comptime argument did not match parameter pattern")
@@ -7915,7 +7920,7 @@ impl ComptimeEvaluator:
         self.pop_scope()
         self.active_fn_syms.pop()
         self.sema.local_file_id = saved_file
-        self.sema.current_module_path = saved_path
+        if switch_ctx: self.sema.current_module_path = saved_path
         if has_generic_subst != 0:
             self.restore_generic_substitutions(generic_snapshot)
         self.last_call_has_mut_receiver = has_mut_receiver

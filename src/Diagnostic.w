@@ -7,7 +7,7 @@ use DiagnosticRender
 extern fn with_eprint(s: &str) -> Unit
 extern fn with_str_clone_ref(s: &str) -> str
 
-enum DiagSeverity: i32:
+pub enum DiagSeverity: i32:
     Error = 1
     Warning = 2
     Note = 3
@@ -24,7 +24,7 @@ type DiagnosticLabel {
 // Legacy alias kept for existing callers.
 type Label = DiagnosticLabel
 
-type Diagnostic {
+pub type Diagnostic {
     severity: i32,
     code: str,
     message: str,

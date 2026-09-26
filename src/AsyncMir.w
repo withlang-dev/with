@@ -7,18 +7,18 @@ use InternPool
 extern fn with_str_clone_ref(s: &str) -> str
 
 // Async body flavors.
-enum AsyncBodyKind: i32:
+pub enum AsyncBodyKind: i32:
     Sync = 0
     Async = 1
     Generator = 2
 
 // Suspension/event kinds.
-enum AsyncSuspendKind: i32:
+pub enum AsyncSuspendKind: i32:
     Await = 1
     SelectAwait = 2
     Yield = 3
 
-type AsyncMirBody {
+pub type AsyncMirBody {
     fn_sym: i32,
     flavor: i32,
     state_count: i32,
@@ -36,7 +36,7 @@ type AsyncMirBody {
     suspend_drop_counts: Vec[i32],
 }
 
-type AsyncMirModule {
+pub type AsyncMirModule {
     bodies: Vec[AsyncMirBody],
     body_fn_syms: Vec[i32],
 }
@@ -132,7 +132,7 @@ fn async_suspend_kind_name(kind: i32) -> str:
         return "yield"
     "unknown"
 
-fn dump_async_mir_module(mod: &AsyncMirModule, pool: InternPool) -> str:
+pub fn dump_async_mir_module(mod: &AsyncMirModule, pool: InternPool) -> str:
     var out = ""
     out = out ++ f"async-mir module bodies={mod.body_count()}"
     out = out ++ f" suspend_points={mod.total_suspend_points()}\n"

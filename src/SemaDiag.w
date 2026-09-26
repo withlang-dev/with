@@ -7,6 +7,7 @@ use Diagnostic
 use InternPool
 use render
 use std.string.StringBuilder
+use SemaTypes
 
 extern fn with_str_clone_ref(s: &str) -> str
 extern fn with_eprint(s: &str) -> Unit

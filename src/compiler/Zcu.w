@@ -12,6 +12,8 @@ use compiler.Runtime
 use compiler.TrackedInputs
 use compiler.EmbeddedRuntime
 use std.collections.HashMap
+use MirCore
+use compiler.EmbeddedStdlib
 extern fn with_str_clone_ref(s: &str) -> str
 
 fn zcu_owned_text(text: &str) -> str:
@@ -23,7 +25,7 @@ fn zcu_new_vec_str -> Vec[str]:
     let out: Vec[str] = Vec{ ptr: 0, len: 0, cap: 0, elem_size: 16 }
     out
 
-fn zcu_debug_init_enabled() -> i32:
+pub fn zcu_debug_init_enabled() -> i32:
     let raw = runtime_getenv("WITH_DEBUG_STAGE1_TRACE")
     if raw.len() == 0:
         return 0
@@ -44,7 +46,7 @@ fn zcu_debug_pool_flow_enabled() -> i32:
 //
 // This is the canonical per-compilation owner of interned semantic state,
 // diagnostics, and source/import context.
-type Zcu {
+pub type Zcu {
     pool: InternPool,
     frontend_pool: InternPool,
     diagnostics: DiagnosticList,

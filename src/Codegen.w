@@ -22,6 +22,8 @@ use FnAbi
 use compiler.EmbeddedBundles
 use compiler.BundleInterfaces
 use AnalysisTypes
+use MirCore
+use SemaTypes
 
 extern fn exit(code: i32) -> Unit
 extern fn with_fs_read_file(path: &str) -> str
@@ -40,7 +42,7 @@ extern fn with_codegen_loop_get_continue(idx: i32) -> i64
 extern fn with_codegen_loop_get_result(idx: i32) -> i64
 
 // Atomic operations
-enum AtomicRmwOp: i32:
+pub enum AtomicRmwOp: i32:
     XCHG = 0
     ADD = 1
     SUB = 2
@@ -52,7 +54,7 @@ enum AtomicRmwOp: i32:
     UMIN = 8
     UMAX = 9
 
-enum AtomicOrdering: i32:
+pub enum AtomicOrdering: i32:
     RELAXED = 0
     ACQUIRE = 1
     RELEASE = 2
@@ -96,7 +98,7 @@ type CodegenDebugState {
     location: i64,
 }
 
-type Codegen {
+pub type Codegen {
     // LLVM handles
     context: i64,
     llmod: i64,
@@ -266,6 +268,7 @@ type Codegen {
     disc_enum_type_map: HashMap[i32, i32],
     disc_enum_name_syms: Vec[i32],
     disc_enum_repr_types: Vec[i64],
+    disc_enum_repr_unsigned: Vec[i32],
     disc_enum_variant_starts: Vec[i32],
     disc_enum_variant_counts: Vec[i32],
     disc_enum_variant_names: Vec[i32],
@@ -528,18 +531,18 @@ type Codegen {
     mir_default_unreachable_bbs: Vec[i64],
 }
 
-type DynArgInfo {
+pub type DynArgInfo {
     type_sym: i32,
     use_ptr: i32,
 }
 
-type CallArgValue {
+pub type CallArgValue {
     value: i64,
     cleanup_ptr: i64,
 }
 
 // A call operand that is a string literal, with its decoded text.
-type StrLiteralOperand {
+pub type StrLiteralOperand {
     found: bool,
     text: str,
 }
@@ -562,7 +565,7 @@ fn Codegen.init(module_name: &str) -> Codegen:
 // aliased — and hands it back via take_sema. The swap leaves a placeholder so
 // every cg teardown path (explicit deinit or scope exit) stays untouched.
 extend Codegen:
-    mut fn take_sema() -> Sema:
+    pub mut fn take_sema() -> Sema:
         var s = move self.sema
         self.sema = Sema.placeholder(InternPool.init(), DiagnosticList.init(), AstPool.new())
         s
@@ -570,12 +573,12 @@ extend Codegen:
     // Take-and-return partners for the pools the analysis backend lends the
     // codegen run (#726): the caller restores them after take_sema, so no
     // still-viewed pool is ever dropped inside the backend seam.
-    mut fn take_pool() -> AstPool:
+    pub mut fn take_pool() -> AstPool:
         var p = self.pool
         self.pool = AstPool.new()
         p
 
-    mut fn take_intern() -> InternPool:
+    pub mut fn take_intern() -> InternPool:
         var i = self.intern
         self.intern = InternPool.init()
         i
@@ -1004,6 +1007,7 @@ fn Codegen.init_with_opt(module_name: &str, opt_level: i32) -> Codegen:
         disc_enum_type_map: HashMap.new(),
         disc_enum_name_syms: Vec.new(),
         disc_enum_repr_types: Vec.new(),
+        disc_enum_repr_unsigned: Vec.new(),
         disc_enum_variant_starts: Vec.new(),
         disc_enum_variant_counts: Vec.new(),
         disc_enum_variant_names: Vec.new(),
@@ -1692,7 +1696,7 @@ impl Codegen:
                 return self.dyn_trait_from_type_node(self.pool.get_extra(g_extra))
         0
 
-fn codegen_hash_type_trait_key(type_sym: i32, trait_sym: i32) -> i32:
+pub fn codegen_hash_type_trait_key(type_sym: i32, trait_sym: i32) -> i32:
     type_sym * 10007 + trait_sym
 
 impl Codegen:
@@ -2798,12 +2802,12 @@ impl Codegen:
     fn create_entry_alloca(ty: i64) -> i64:
         wl_create_entry_alloca(self.builder, self.current_function, ty)
 
-fn vec_data_i64(v: &Vec[i64]) -> i64:
+pub fn vec_data_i64(v: &Vec[i64]) -> i64:
     wl_vec_data_ptr(v as i64)
 
 // Element-wise copy so a caller can hand an owned vector to a consuming
 // sink (e.g. record_c_abi_transform) more than once under spec §3.8.
-fn vec_copy_i64(src: &Vec[i64]) -> Vec[i64]:
+pub fn vec_copy_i64(src: &Vec[i64]) -> Vec[i64]:
     let out: Vec[i64] = Vec.new()
     for i in 0..src.len() as i32:
         out.push(src[i])
@@ -3200,8 +3204,8 @@ impl Codegen:
         let saved_file = with_str_clone_ref(self.current_decl_source_file)
         let saved_module = with_str_clone_ref(self.sema.current_module_path)
         let saved_len = self.type_bindings_len
-        let saved_syms = self.type_binding_syms
-        let saved_types = self.type_binding_types
+        let saved_syms = move self.type_binding_syms
+        let saved_types = move self.type_binding_types
         self.type_binding_syms = Vec.new()
         self.type_binding_types = Vec.new()
         self.type_bindings_len = 0
@@ -3612,8 +3616,8 @@ impl Codegen:
             // User-defined generic structs: monomorphize via type bindings
             if cg_base_sym != 0 and self.generic_structs.contains(cg_base_sym):
                 let saved_len = self.type_bindings_len
-                let saved_syms = self.type_binding_syms
-                let saved_types = self.type_binding_types
+                let saved_syms = move self.type_binding_syms
+                let saved_types = move self.type_binding_types
                 let tp_syms: Vec[i32] = Vec.new()
                 let tp_types: Vec[i64] = Vec.new()
                 let gs_node: i32 = self.generic_structs.get(cg_base_sym).unwrap()
@@ -4526,6 +4530,8 @@ impl Codegen:
         let idx = self.disc_enum_repr_types.len() as i32
         self.disc_enum_name_syms.push(name_sym)
         self.disc_enum_repr_types.push(repr_ty)
+        let repr_sema_ty = self.sema.resolve_type_expr_frozen(repr_type_node)
+        self.disc_enum_repr_unsigned.push(if repr_sema_ty > 0 and self.sema.is_unsigned_int_type(repr_sema_ty): 1 else: 0)
         let v_start = self.disc_enum_variant_names.len() as i32
         self.disc_enum_variant_starts.push(v_start)
         self.disc_enum_variant_counts.push(variant_count)
@@ -4590,11 +4596,19 @@ impl Codegen:
             self.enum_variant_starts[enum_idx] = enum_v_start
             self.enum_variant_counts[enum_idx] = variant_count
 
-    fn gen_disc_enum_from_int_val(de_idx: i32, arg_val: i64) -> i64:
+    fn gen_disc_enum_from_int_val(de_idx: i32, arg_val: i64, arg_unsigned: bool) -> i64:
         let repr_ty = self.disc_enum_repr_types[de_idx]
+        let repr_unsigned = self.disc_enum_repr_unsigned[de_idx] != 0
         let v_start = self.disc_enum_variant_starts[de_idx]
         let v_count = self.disc_enum_variant_counts[de_idx]
-        let input = self.coerce_int(arg_val, repr_ty)
+        // §4.4a: an integer outside the repr's range matches no discriminant.
+        // Compare at a width that holds both the argument and the repr, each
+        // side extended by its own signedness; narrowing the argument to the
+        // repr first made `Tiny.from_int(456)` `Some(Hi = 200)` (#1499).
+        let arg_ty = wl_type_of(arg_val)
+        let i64_ty = wl_i64_type(self.context)
+        let cmp_ty = if wl_get_type_kind(arg_ty) == wl_integer_type_kind() and wl_get_int_type_width(arg_ty) > 64: arg_ty else: i64_ty
+        let input = self.coerce_int_ext(arg_val, cmp_ty, arg_unsigned)
         // Return Option[repr_type]: Some(disc_val) or None
         // Use insertvalue to build Option values directly (no allocas in case blocks)
         let i32_ty = wl_i32_type(self.context)
@@ -4611,7 +4625,7 @@ impl Codegen:
         for vi in 0..v_count:
             let disc_val: i64 = self.disc_enum_variant_values[(v_start + vi)]
             let case_bb = wl_append_bb(self.context, self.current_function, "from_int.case")
-            wl_add_case(sw, wl_const_int(repr_ty, disc_val, 1), case_bb)
+            wl_add_case(sw, wl_const_int(cmp_ty, disc_val, if repr_unsigned: 0 else: 1), case_bb)
             wl_position_at_end(self.builder, case_bb)
             // Some(disc_val) = { tag=0, payload=disc_val }
             var some_val = wl_get_undef(opt_ty)
@@ -5565,7 +5579,7 @@ fn codegen_extern_uses_internal_abi(name: &str, cc_name: &str) -> bool:
         return false
     codegen_is_runtime_abi_symbol(name)
 
-fn codegen_c_abi_needs_byval_attr() -> bool:
+pub fn codegen_c_abi_needs_byval_attr() -> bool:
     let os = target_spec_os()
     let arch = target_spec_arch()
     arch == "x86_64" and (os == "Linux" or os == "Macos")
@@ -5580,7 +5594,7 @@ fn codegen_c_abi_sysv_x86_64() -> bool: target_spec_arch() == "x86_64" and targe
 // c_abi_sysv_classify's verdict for a struct with an unaligned field.
 const CODEGEN_SYSV_MEMORY: i32 = -2
 
-fn codegen_windows_x86_64() -> bool:
+pub fn codegen_windows_x86_64() -> bool:
     let os = target_spec_os()
     let arch = target_spec_arch()
     os == "Windows" and arch == "x86_64"
@@ -6441,8 +6455,8 @@ impl Codegen:
         let mono_idx: i32 = self.struct_type_map.get(mono_sym).unwrap()
         let mono_ty: i64 = self.struct_llvm_types[mono_idx]
 
-        let saved_bind_syms = self.type_binding_syms
-        let saved_bind_tys = self.type_binding_types
+        let saved_bind_syms = move self.type_binding_syms
+        let saved_bind_tys = move self.type_binding_types
         let saved_bind_len = self.type_bindings_len
         let fresh_bind_syms: Vec[i32] = Vec.new()
         let fresh_bind_tys: Vec[i64] = Vec.new()
@@ -6487,7 +6501,7 @@ impl Codegen:
 // Compiles a method body with the struct's type params bound to concrete types.
 // Called lazily when the method is first invoked on a monomorphized struct.
 
-type ConcreteMirFunction {
+pub type ConcreteMirFunction {
     sym: i32,
     value: i64,
     fn_type: i64,

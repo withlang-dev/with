@@ -4,7 +4,9 @@ use std.compiler
 
 fn main:
     let loc = SourceLocation.new("src/main.w", 10, 20)
-    let fun = FunctionInfo.new("main", "run", true, false, 2, "i32", loc)
+    // Both constructors retain their SourceLocation (a plain `T` parameter
+    // consumes, §3.8); the second call takes an independent value.
+    let fun = FunctionInfo.new("main", "run", true, false, 2, "i32", loc.clone())
     let ty = TypeInfo.new("main", "Runner", true, true, "struct", loc)
     var project = ProjectInfo.new()
     project = project.add_module(ModuleInfo.new("main", "src/main.w"))

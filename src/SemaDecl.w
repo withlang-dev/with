@@ -7,7 +7,10 @@ use Diagnostic
 use InternPool
 use CapabilityRegistry
 use render
+use SemaCheck
 use std.collections.HashMap
+use compiler.BundleInterfaces
+use SemaTypes
 
 extern fn with_str_clone_ref(s: &str) -> str
 extern fn with_eprint(s: &str) -> Unit
@@ -2025,7 +2028,7 @@ impl Sema:
             self.mutable_global_syms.insert(name, 1)
         self.register_top_level_global_decl(name, tid, is_mut, node, GLOBAL_VALUE_DECL_EXTERN)
 
-fn sema_str_find_char(text: &str, needle: i32) -> i32:
+pub fn sema_str_find_char(text: &str, needle: i32) -> i32:
     for i in 0..text.len() as i32:
         if text[i] == needle:
             return i
@@ -2259,8 +2262,8 @@ impl Sema:
         if type_node == 0:
             return self.ty_void as i32
         let saved_self = if self.named_types.contains(self.syms.self_type): self.named_types.get(self.syms.self_type).unwrap() else: 0
-        let saved_subst_syms = self.generic_subst_param_syms
-        let saved_subst_tys = self.generic_subst_type_ids
+        let saved_subst_syms = move self.generic_subst_param_syms
+        let saved_subst_tys = move self.generic_subst_type_ids
         self.generic_subst_param_syms = Vec.new()
         self.generic_subst_type_ids = Vec.new()
         if impl_type_tid != 0:
@@ -2565,6 +2568,13 @@ impl Sema:
     mut fn collect_impl_decl(node: i32, is_local_impl: i32) -> Unit:
         let type_name = self.ast.get_data0(node)
         let trait_sym = self.ast.get_data2(node)
+        // §18.3: an impl on another module's private type attaches to nothing;
+        // every method's `self` was silently an error type and each use
+        // surfaced as "unknown method … for type '&<error>'" far from the
+        // cause (#1520 fallout: `impl Codegen:` in CodegenDispatch.w).
+        if self.lookup_named_type_visible(type_name) == 0 and self.private_symbol_path_from_current(type_name).len() > 0:
+            self.emit_private_symbol_error(type_name, node)
+            return
         if trait_sym == 0:
             return
 

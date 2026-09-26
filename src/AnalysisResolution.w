@@ -25,6 +25,8 @@ use Ast
 use InternPool
 use Mir
 use Sema
+use MirCore
+use SemaTypes
 
 extern fn with_str_clone_ref(s: &str) -> str
 
@@ -318,7 +320,7 @@ fn resolution_is_drop_impl_call(sema: &Sema, node: i32) -> bool:
     let recv_ty = sema.typed_expr_types.get(sema.ast.get_data0(callee))
     recv_ty.is_some() and sema.type_has_drop_impl(recv_ty.unwrap()) != 0
 
-fn analysis_audit_resolution(report: &AnalysisReport, sema: &Sema, mir_mod: &MirModule, pool: &InternPool, source_path: &str, source_text: &str):
+pub fn analysis_audit_resolution(report: &AnalysisReport, sema: &Sema, mir_mod: &MirModule, pool: &InternPool, source_path: &str, source_text: &str):
     let calls = resolution_audit_calls(report, sema, mir_mod, pool, source_path, source_text)
     let unlowered = resolution_audit_unlowered_calls(report, sema, mir_mod, pool, source_path, source_text)
     report.note(f"resolution-audit: mir-calls={calls} sema-calls-in-lowered-bodies-without-mir-call={unlowered}")

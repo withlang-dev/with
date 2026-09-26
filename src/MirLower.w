@@ -9,6 +9,8 @@ use Sema
 use SemaCheck
 use Overflow
 use MathBuiltins
+use MirCore
+use SemaTypes
 extern fn with_str_clone_ref(s: &str) -> str
 extern fn with_eprint(s: &str) -> Unit
 
@@ -66,7 +68,7 @@ enum ControlTargetKind: i32:
     CT_LOOP = 1
     CT_BLOCK = 2
 
-type MirBuilder = ephemeral {
+pub type MirBuilder = ephemeral {
     body: MirBody,
     anonymous_bodies: Vec[MirBody],
     cur_bb: BlockId,
@@ -7290,6 +7292,8 @@ impl MirBuilder:
                     // #1187: `for (k, v) in &m` walks m's table in place.
                     if rin_sym != 0 and self.pool.resolve(rin_sym) == "HashMap":
                         return self.lower_for_hashmap(for_node, pat_or_sym, ref_inner, body_expr)
+                    if rin_sym != 0 and self.pool.resolve(rin_sym) == "BTreeMap":
+                        return self.lower_for_btreemap(for_node, pat_or_sym, ref_inner, body_expr)
 
         // Range variable: iter_expr is an ident/expr whose type is TY_RANGE
         let iter_ty = self.expr_type(iter_expr)
@@ -7309,6 +7313,8 @@ impl MirBuilder:
                     // traverses like the map it views.
                     if rp_sym != 0 and self.pool.resolve(rp_sym) == "HashMap":
                         return self.lower_for_hashmap(for_node, pat_or_sym, iter_expr, body_expr)
+                    if rp_sym != 0 and self.pool.resolve(rp_sym) == "BTreeMap":
+                        return self.lower_for_btreemap(for_node, pat_or_sym, iter_expr, body_expr)
                 // #1197: a `&[T]` or `&[N]T` binding (a borrowed parameter)
                 // iterates the slice it views. No branch took it, and the
                 // function failed to lower with no source diagnostic.
@@ -7338,6 +7344,8 @@ impl MirBuilder:
                         return self.lower_for_vec(for_node, pat_or_sym, iter_expr, body_expr)
                     if type_name == "HashMap":
                         return self.lower_for_hashmap(for_node, pat_or_sym, iter_expr, body_expr)
+                    if type_name == "BTreeMap":
+                        return self.lower_for_btreemap(for_node, pat_or_sym, iter_expr, body_expr)
                     if type_name == "Receiver":
                         return self.lower_for_receiver(for_node, pat_or_sym, iter_expr, body_expr)
 
@@ -8403,7 +8411,11 @@ impl MirBuilder:
         else:
             let iter_op = self.lower_expr(iter_expr)
             vec_place = self.materialize_operand(iter_op, iter_ty, self.ast.get_start(iter_expr))
+        self.lower_for_vec_place(for_node, pat_or_sym, vec_place, elem_ty, self.ast.get_start(iter_expr), body_expr)
 
+    // The by-value counter loop over a Vec PLACE (Copy-class elements read
+    // through the borrowed place).
+    mut fn lower_for_vec_place(for_node: i32, pat_or_sym: i32, vec_place: i32, elem_ty: i32, span_start: i32, body_expr: i32) -> i32:
         // Get length via VEC_LEN intrinsic (returns i64)
         let len_local = self.new_temp(self.sema.ty_i64)
         let len_place = self.place_for_local(len_local)
@@ -8421,7 +8433,7 @@ impl MirBuilder:
         let counter_place = self.place_for_local(counter_local)
         let zero_op = self.int_const_operand(0, self.sema.ty_i64)
         let zero_rv = self.body.new_rvalue(RvalueKind.RK_USE, zero_op, 0, 0)
-        self.body.push_stmt(self.cur_bb, StmtKind.Assign, counter_place, zero_rv, self.ast.get_start(iter_expr))
+        self.body.push_stmt(self.cur_bb, StmtKind.Assign, counter_place, zero_rv, span_start)
 
         let header_bb = self.new_block()
         let body_bb = self.new_block()
@@ -8438,7 +8450,7 @@ impl MirBuilder:
         let cmp_rv = self.body.new_rvalue(RvalueKind.RK_BIN_OP, BinaryOp.OP_LT, counter_op, len_op)
         let cmp_local = self.new_temp(self.sema.ty_bool)
         let cmp_place = self.place_for_local(cmp_local)
-        self.body.push_stmt(self.cur_bb, StmtKind.Assign, cmp_place, cmp_rv, self.ast.get_start(iter_expr))
+        self.body.push_stmt(self.cur_bb, StmtKind.Assign, cmp_place, cmp_rv, span_start)
         let cmp_read = self.body.new_operand(OperandKind.OK_COPY, cmp_place)
         let vals: Vec[i64] = Vec.new()
         vals.push(1)
@@ -8477,7 +8489,7 @@ impl MirBuilder:
         let cur_op2 = self.body.new_operand(OperandKind.OK_COPY, counter_place)
         let one_op = self.int_const_operand(1, self.sema.ty_i64)
         let add_rv = self.body.new_rvalue(RvalueKind.RK_BIN_OP, BinaryOp.OP_ADD, cur_op2, one_op)
-        self.body.push_stmt(self.cur_bb, StmtKind.Assign, counter_place, add_rv, self.ast.get_start(iter_expr))
+        self.body.push_stmt(self.cur_bb, StmtKind.Assign, counter_place, add_rv, span_start)
         self.terminate(TermKind.TK_GOTO, header_bb, 0, 0, 0)
 
         self.pop_control_target()
@@ -8642,6 +8654,36 @@ impl MirBuilder:
         let binding_place = self.place_for_local(binding_local)
         self.emit_map_slot_call(intrinsic, map_place, slot_place, binding_place)
         self.body.new_operand(OperandKind.OK_COPY, binding_place)
+
+    // D44 (#1561): `for (k, v) in bt` traverses the BTreeMap's `entries`
+    // (`Vec[(K, V)]`, kept in key order) in place — the Vec loop over that
+    // field place: a Drop-class pair binds as a `&(K, V)` view, a Copy pair
+    // by value. The map itself is only borrowed; a `&BTreeMap` binding
+    // reads through one deref. Sema typed the element the same way
+    // (btree_traversal_element_type).
+    mut fn lower_for_btreemap(for_node: i32, pat_or_sym: i32, iter_expr: i32, body_expr: i32) -> i32:
+        let map_ty = self.expr_type(iter_expr)
+        let mvk = self.ast.kind(iter_expr)
+        var map_place = 0
+        if mvk == NodeKind.NK_IDENT or mvk == NodeKind.NK_FIELD_ACCESS or mvk == NodeKind.NK_INDEX:
+            map_place = self.lower_expr_place(iter_expr)
+        else:
+            let map_op = self.lower_expr(iter_expr)
+            map_place = self.materialize_operand(map_op, map_ty, self.ast.get_start(iter_expr))
+        var resolved_map = self.sema.resolve_alias(map_ty)
+        if self.sema.get_type_kind(resolved_map) == TypeKind.TY_REF:
+            map_place = self.new_deref_place(map_place)
+            resolved_map = self.sema.resolve_alias(self.sema.get_type_d0(resolved_map))
+        let storage_ty = self.btree_storage_vec_type(resolved_map as i32)
+        if storage_ty == 0:
+            self.mark_unsupported()
+            return self.unit_operand()
+        let entries_place = self.body.new_field_place(map_place, self.pool.intern("entries"), storage_ty)
+        let resolved_storage = self.sema.resolve_alias(storage_ty)
+        let pair_ty = self.sema.get_generic_inst_arg(resolved_storage as i32, 0)
+        if self.sema.type_needs_drop_frozen(pair_ty) != 0 and self.sema.is_copy_frozen(pair_ty) == 0:
+            return self.lower_for_iter_ref_place(for_node, pat_or_sym, entries_place, resolved_storage, self.ast.get_start(iter_expr), body_expr)
+        self.lower_for_vec_place(for_node, pat_or_sym, entries_place, pair_ty, self.ast.get_start(iter_expr), body_expr)
 
     mut fn lower_for_hashmap(for_node: i32, pat_or_sym: i32, iter_expr: i32, body_expr: i32) -> i32:
         // for (k, v) in map → materialize map.items() then use the normal Vec loop.
@@ -8898,6 +8940,11 @@ impl MirBuilder:
         if self.sema.get_type_kind(resolved_vec) == TypeKind.TY_REF:
             vec_place = self.new_deref_place(vec_place)
             resolved_vec = self.sema.resolve_alias(self.sema.get_type_d0(resolved_vec))
+        self.lower_for_iter_ref_place(for_node, pat_or_sym, vec_place, resolved_vec, self.ast.get_start(vec_expr), body_expr)
+
+    // The borrow-iterating loop over a Vec PLACE (a binding, a field, a
+    // map's storage): `&T` views of each element, the header never copied.
+    mut fn lower_for_iter_ref_place(for_node: i32, pat_or_sym: i32, vec_place: i32, resolved_vec: i32, span_start: i32, body_expr: i32) -> i32:
         var ref_elem_ty = 0
         if self.sema.get_type_kind(resolved_vec) == TypeKind.TY_GENERIC_INST:
             let inner_ty = self.sema.get_generic_inst_arg(resolved_vec as i32, 0)
@@ -8918,7 +8965,7 @@ impl MirBuilder:
         let counter_place = self.place_for_local(counter_local)
         let zero_op = self.int_const_operand(0, self.sema.ty_i64)
         let zero_rv = self.body.new_rvalue(RvalueKind.RK_USE, zero_op, 0, 0)
-        self.body.push_stmt(self.cur_bb, StmtKind.Assign, counter_place, zero_rv, self.ast.get_start(vec_expr))
+        self.body.push_stmt(self.cur_bb, StmtKind.Assign, counter_place, zero_rv, span_start)
         let header_bb = self.new_block()
         let body_bb = self.new_block()
         let inc_bb = self.new_block()
@@ -8931,7 +8978,7 @@ impl MirBuilder:
         let cmp_rv = self.body.new_rvalue(RvalueKind.RK_BIN_OP, BinaryOp.OP_LT, counter_op, len_op)
         let cmp_local = self.new_temp(self.sema.ty_bool)
         let cmp_place = self.place_for_local(cmp_local)
-        self.body.push_stmt(self.cur_bb, StmtKind.Assign, cmp_place, cmp_rv, self.ast.get_start(vec_expr))
+        self.body.push_stmt(self.cur_bb, StmtKind.Assign, cmp_place, cmp_rv, span_start)
         let cmp_read = self.body.new_operand(OperandKind.OK_COPY, cmp_place)
         let vals: Vec[i64] = Vec.new()
         vals.push(1)
@@ -8963,7 +9010,7 @@ impl MirBuilder:
         let cur_op2 = self.body.new_operand(OperandKind.OK_COPY, counter_place)
         let one_op = self.int_const_operand(1, self.sema.ty_i64)
         let add_rv = self.body.new_rvalue(RvalueKind.RK_BIN_OP, BinaryOp.OP_ADD, cur_op2, one_op)
-        self.body.push_stmt(self.cur_bb, StmtKind.Assign, counter_place, add_rv, self.ast.get_start(vec_expr))
+        self.body.push_stmt(self.cur_bb, StmtKind.Assign, counter_place, add_rv, span_start)
         self.terminate(TermKind.TK_GOTO, header_bb, 0, 0, 0)
         self.pop_control_target()
         self.switch_to(exit_bb)
@@ -16869,7 +16916,7 @@ fn lower_debug_formatter(sema: &Sema, ast_pool: AstPool, pool: InternPool, entry
     builder.terminate(TermKind.TK_RETURN, 0, 0, 0, 0)
     return move builder.body
 
-fn lower_module(input_sema: Sema, ast_pool: AstPool, pool: InternPool) -> MirLowerResult:
+pub fn lower_module(input_sema: Sema, ast_pool: AstPool, pool: InternPool) -> MirLowerResult:
     var sema = input_sema
     sema.prepare_source_line_offsets()
     var mir_mod = MirModule.init()
@@ -16960,7 +17007,7 @@ fn lower_module(input_sema: Sema, ast_pool: AstPool, pool: InternPool) -> MirLow
 
     MirLowerResult { sema, mir_module: mir_mod }
 
-fn collect_tailrec_fn_syms(sema: &Sema, ast_pool: AstPool, pool: InternPool) -> Vec[i32]:
+pub fn collect_tailrec_fn_syms(sema: &Sema, ast_pool: AstPool, pool: InternPool) -> Vec[i32]:
     let tailrec_syms: Vec[i32] = Vec.new()
     for di in 0..ast_pool.decl_count():
         let decl = ast_pool.get_decl(di)

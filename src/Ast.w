@@ -23,7 +23,7 @@ fn ast_pool_phase_bug(message: &str):
 
 // ── Node kinds ───────────────────────────────────────────────────
 
-type NodeId = i32
+pub type NodeId = i32
 
 // Enforced-distinct file id: the pilot for migrating the compiler's id
 // spaces (NodeId/Symbol/TypeId) off transparent i32 aliases. A distinct id
@@ -216,23 +216,23 @@ pub enum NodeKind: i32:
 // With-expression binding encoding in d2:
 // - positive value: immutable binding symbol id
 // - negative value: mutable binding symbol id
-fn encode_with_binding(sym: i32, is_mut: i32) -> i32:
+pub fn encode_with_binding(sym: i32, is_mut: i32) -> i32:
     if is_mut != 0 and sym > 0:
         return 0 - sym
     sym
 
-fn decode_with_binding_sym(encoded: i32) -> i32:
+pub fn decode_with_binding_sym(encoded: i32) -> i32:
     if encoded < 0:
         return 0 - encoded
     encoded
 
-fn decode_with_binding_is_mut(encoded: i32) -> i32:
+pub fn decode_with_binding_is_mut(encoded: i32) -> i32:
     if encoded < 0:
         return 1
     0
 
 // Type decl sub-kinds (stored in data2 field)
-enum TypeDeclKind: i32:
+pub enum TypeDeclKind: i32:
     Alias = 0
     Struct = 1
     Enum = 2
@@ -243,45 +243,45 @@ enum TypeDeclKind: i32:
 
 // Type decl flag bits (combined with TypeDeclKind via arithmetic)
 const TDK_FLAG_EPHEMERAL: i32 = 8
-const TDK_FLAG_PACKED: i32 = 16
-const TDK_FLAG_BITPACKED: i32 = 32
-const TDK_FLAG_SPECIFIED: i32 = 64
-const TDK_FLAG_ERROR: i32 = 128
+pub const TDK_FLAG_PACKED: i32 = 16
+pub const TDK_FLAG_BITPACKED: i32 = 32
+pub const TDK_FLAG_SPECIFIED: i32 = 64
+pub const TDK_FLAG_ERROR: i32 = 128
 
 // D51 §16.2b stage 1: NK_FACADE_CLAUSE.d0 and the operands each kind writes
 // to extra (a 0 operand is "absent"; refs are NK_FACADE_PARAM_REF nodes).
-const FACADE_CLAUSE_FROM: i32 = 1              // [producer_sym, out_param_ref|0]
-const FACADE_CLAUSE_INIT: i32 = 2              // [fn_sym]
-const FACADE_CLAUSE_PREINIT: i32 = 3           // [fn_sym]
-const FACADE_CLAUSE_DROP: i32 = 4              // [fn_sym]
-const FACADE_CLAUSE_DESTROYS: i32 = 5          // [fn_sym|0]   (a resource names one; an fn item is one)
-const FACADE_CLAUSE_OK: i32 = 6                // [const_sym]
-const FACADE_CLAUSE_BORROWS: i32 = 7           // [param_ref]
-const FACADE_CLAUSE_INDEPENDENT: i32 = 8       // []
-const FACADE_CLAUSE_LEND: i32 = 9              // []
-const FACADE_CLAUSE_CONSUMES: i32 = 10         // [param_ref, destroyed_by_ref|0]
-const FACADE_CLAUSE_RETAINS: i32 = 11          // [param_ref, by_ref]
-const FACADE_CLAUSE_RETURNS_BORROW: i32 = 12   // [resource_sym|CStr, from_ref|0, domain_sym|0]
-const FACADE_CLAUSE_RETURNS_STATIC: i32 = 13   // [type(node)]
-const FACADE_CLAUSE_PRESERVES: i32 = 14        // [param_ref|0, domain_sym|0]
-const FACADE_CLAUSE_OF: i32 = 15               // [resource_sym]
-const FACADE_CLAUSE_RENAME: i32 = 16           // [new_sym]
-const FACADE_CLAUSE_THREAD: i32 = 17           // [capability_sym...]
-const FACADE_CLAUSE_CALLBACK_THREAD: i32 = 18  // [sym]  (`any`)
-const FACADE_CLAUSE_CALLBACK_CONSUMES: i32 = 19 // [param_ref]
-const FACADE_CLAUSE_MOVABLE: i32 = 20          // []  (in-place resource: not pinned, D54)
-const FACADE_CLAUSE_CALLBACK_USERDATA: i32 = 21 // [callback_ref, userdata_ref]  (`callback param N userdata param M`, §16.2b.9)
-const FACADE_CLAUSE_VALID_ON_FAILED: i32 = 22  // []  (`valid on failed`: presented on the failed-state resource too, §16.2b.4)
-const FACADE_CLAUSE_NULLABLE: i32 = 23         // [param_ref]  (`nullable param N`: the facade establishes nullability, §16.2b.8)
-const FACADE_CLAUSE_BUFFER: i32 = 24           // [ptr_ref, len_ref, capacity(0|1), elements(0|1)] (D64 §16.2b.8)
-const FACADE_CLAUSE_FIXED: i32 = 25            // [param_ref, literal(node)]  (`param N fixed <literal>`, D64 §16.2b.11)
-const FACADE_CLAUSE_VARIADIC: i32 = 26         // [vararg_ref, selector_ref, case(node)...]  (`variadic param N selected by param P:`, D66 §16.2b.5)
-const FACADE_CLAUSE_VARIADIC_CASE: i32 = 27    // [selector_sym, type(node), callback_ref|0, userdata_selector_ref|0, retainer_ref|0]
-const FACADE_CLAUSE_CALLBACKS_NONE: i32 = 28  // [] trusted no-invocation guarantee (§16.2b.9)
-const FACADE_CLAUSE_ABANDON: i32 = 29          // [fn_sym] resource-only: the `callbacks none` operation run before the destroyer on a drop path not proven callback-free (§16.2b.9)
-const FACADE_PARAM_REF_NAME: i32 = 0
-const FACADE_PARAM_REF_INDEX: i32 = 1
-const FACADE_PARAM_REF_TYPE: i32 = 2
+pub const FACADE_CLAUSE_FROM: i32 = 1              // [producer_sym, out_param_ref|0]
+pub const FACADE_CLAUSE_INIT: i32 = 2              // [fn_sym]
+pub const FACADE_CLAUSE_PREINIT: i32 = 3           // [fn_sym]
+pub const FACADE_CLAUSE_DROP: i32 = 4              // [fn_sym]
+pub const FACADE_CLAUSE_DESTROYS: i32 = 5          // [fn_sym|0]   (a resource names one; an fn item is one)
+pub const FACADE_CLAUSE_OK: i32 = 6                // [const_sym]
+pub const FACADE_CLAUSE_BORROWS: i32 = 7           // [param_ref]
+pub const FACADE_CLAUSE_INDEPENDENT: i32 = 8       // []
+pub const FACADE_CLAUSE_LEND: i32 = 9              // []
+pub const FACADE_CLAUSE_CONSUMES: i32 = 10         // [param_ref, destroyed_by_ref|0]
+pub const FACADE_CLAUSE_RETAINS: i32 = 11          // [param_ref, by_ref]
+pub const FACADE_CLAUSE_RETURNS_BORROW: i32 = 12   // [resource_sym|CStr, from_ref|0, domain_sym|0]
+pub const FACADE_CLAUSE_RETURNS_STATIC: i32 = 13   // [type(node)]
+pub const FACADE_CLAUSE_PRESERVES: i32 = 14        // [param_ref|0, domain_sym|0]
+pub const FACADE_CLAUSE_OF: i32 = 15               // [resource_sym]
+pub const FACADE_CLAUSE_RENAME: i32 = 16           // [new_sym]
+pub const FACADE_CLAUSE_THREAD: i32 = 17           // [capability_sym...]
+pub const FACADE_CLAUSE_CALLBACK_THREAD: i32 = 18  // [sym]  (`any`)
+pub const FACADE_CLAUSE_CALLBACK_CONSUMES: i32 = 19 // [param_ref]
+pub const FACADE_CLAUSE_MOVABLE: i32 = 20          // []  (in-place resource: not pinned, D54)
+pub const FACADE_CLAUSE_CALLBACK_USERDATA: i32 = 21 // [callback_ref, userdata_ref]  (`callback param N userdata param M`, §16.2b.9)
+pub const FACADE_CLAUSE_VALID_ON_FAILED: i32 = 22  // []  (`valid on failed`: presented on the failed-state resource too, §16.2b.4)
+pub const FACADE_CLAUSE_NULLABLE: i32 = 23         // [param_ref]  (`nullable param N`: the facade establishes nullability, §16.2b.8)
+pub const FACADE_CLAUSE_BUFFER: i32 = 24           // [ptr_ref, len_ref, capacity(0|1), elements(0|1)] (D64 §16.2b.8)
+pub const FACADE_CLAUSE_FIXED: i32 = 25            // [param_ref, literal(node)]  (`param N fixed <literal>`, D64 §16.2b.11)
+pub const FACADE_CLAUSE_VARIADIC: i32 = 26         // [vararg_ref, selector_ref, case(node)...]  (`variadic param N selected by param P:`, D66 §16.2b.5)
+pub const FACADE_CLAUSE_VARIADIC_CASE: i32 = 27    // [selector_sym, type(node), callback_ref|0, userdata_selector_ref|0, retainer_ref|0]
+pub const FACADE_CLAUSE_CALLBACKS_NONE: i32 = 28  // [] trusted no-invocation guarantee (§16.2b.9)
+pub const FACADE_CLAUSE_ABANDON: i32 = 29          // [fn_sym] resource-only: the `callbacks none` operation run before the destroyer on a drop path not proven callback-free (§16.2b.9)
+pub const FACADE_PARAM_REF_NAME: i32 = 0
+pub const FACADE_PARAM_REF_INDEX: i32 = 1
+pub const FACADE_PARAM_REF_TYPE: i32 = 2
 
 // D51 stage 11: a clause a convention profile supplied carries the rule
 // that supplied it as one trailing operand beyond the kind's own (a
@@ -295,56 +295,56 @@ fn facade_clause_operand_count(kind: i32) -> i32:
     if kind == FACADE_CLAUSE_LEND: return 0
     -1
 
-fn facade_clause_profile_rule(pool: AstPool, clause: i32) -> i32:
+pub fn facade_clause_profile_rule(pool: AstPool, clause: i32) -> i32:
     if clause <= 0 or pool.kind(clause as NodeId) != NodeKind.NK_FACADE_CLAUSE: return 0
     let own = facade_clause_operand_count(pool.get_data0(clause as NodeId))
     if own < 0 or pool.get_data2(clause as NodeId) <= own: return 0
     pool.get_extra(pool.get_data1(clause as NodeId) + own)
 
 // NK_FACADE_PROFILE_MATCH.d1: what a rule's match did for one subject.
-const FACADE_PROFILE_APPLIED: i32 = 0     // one valid candidate; the clause was stated
-const FACADE_PROFILE_AMBIGUOUS: i32 = 1   // several candidates; nothing contributed (ruling §7.1)
-const FACADE_PROFILE_SHADOWED: i32 = 2    // an explicit clause states the fact; the profile's is not (ruling §7.2)
-const FACADE_PROFILE_NONE: i32 = 3        // no candidate
-const TDK_FLAG_REPR_C: i32 = 256
+pub const FACADE_PROFILE_APPLIED: i32 = 0     // one valid candidate; the clause was stated
+pub const FACADE_PROFILE_AMBIGUOUS: i32 = 1   // several candidates; nothing contributed (ruling §7.1)
+pub const FACADE_PROFILE_SHADOWED: i32 = 2    // an explicit clause states the fact; the profile's is not (ruling §7.2)
+pub const FACADE_PROFILE_NONE: i32 = 3        // no candidate
+pub const TDK_FLAG_REPR_C: i32 = 256
 // @[flags] on a discriminant enum (§4.4a): auto-increment doubles.
-const TDK_FLAG_FLAGS: i32 = 512
+pub const TDK_FLAG_FLAGS: i32 = 512
 
-fn pack_type_decl_kind(sub_kind: i32, is_ephemeral: i32) -> i32:
+pub fn pack_type_decl_kind(sub_kind: i32, is_ephemeral: i32) -> i32:
     if is_ephemeral != 0:
         return sub_kind + TDK_FLAG_EPHEMERAL
     sub_kind
 
-fn type_decl_sub_kind(packed: i32) -> i32:
+pub fn type_decl_sub_kind(packed: i32) -> i32:
     packed % TDK_FLAG_EPHEMERAL
 
-fn type_decl_is_ephemeral(packed: i32) -> i32:
+pub fn type_decl_is_ephemeral(packed: i32) -> i32:
     (packed / TDK_FLAG_EPHEMERAL) % 2
 
-fn type_decl_is_packed(packed: i32) -> i32:
+pub fn type_decl_is_packed(packed: i32) -> i32:
     (packed / TDK_FLAG_PACKED) % 2
 
-fn type_decl_is_bitpacked(packed: i32) -> i32:
+pub fn type_decl_is_bitpacked(packed: i32) -> i32:
     (packed / TDK_FLAG_BITPACKED) % 2
 
 // @[repr(C)] layout. @[repr(packed)] implies repr(C) per §16.4.
-fn type_decl_is_repr_c(packed: i32) -> i32:
+pub fn type_decl_is_repr_c(packed: i32) -> i32:
     if (packed / TDK_FLAG_REPR_C) % 2 != 0:
         return 1
     type_decl_is_packed(packed)
 
-fn type_decl_is_specified(packed: i32) -> i32:
+pub fn type_decl_is_specified(packed: i32) -> i32:
     (packed / TDK_FLAG_SPECIFIED) % 2
 
-fn type_decl_is_error(packed: i32) -> i32:
+pub fn type_decl_is_error(packed: i32) -> i32:
     (packed / TDK_FLAG_ERROR) % 2
 
-fn type_decl_is_flags(packed: i32) -> i32:
+pub fn type_decl_is_flags(packed: i32) -> i32:
     (packed / TDK_FLAG_FLAGS) % 2
 
 // Fn decl flag bits (stored in data2 field)
 @[flags]
-enum FnFlags: i32:
+pub enum FnFlags: i32:
     PUB = 1
     ASYNC = 2
     GEN = 4
@@ -364,42 +364,42 @@ enum FnFlags: i32:
 
 // Metadata packing unit used to encode required-parameter count into
 // fn_meta flags without affecting existing FnFlags.* parity checks.
-const FN_META_REQUIRED_UNIT: i32 = 65536
-const FN_PARAM_STRIDE: i32 = 3
-const TRAIT_METHOD_STRIDE: i32 = 8
-const TRAIT_METHOD_NAME: i32 = 0
-const TRAIT_METHOD_FLAGS: i32 = 1
-const TRAIT_METHOD_PARAM_START: i32 = 2
-const TRAIT_METHOD_PARAM_COUNT: i32 = 3
-const TRAIT_METHOD_RETURN_TYPE: i32 = 4
-const TRAIT_METHOD_DEFAULT_BODY: i32 = 5
-const TRAIT_METHOD_SOURCE_START: i32 = 6
-const TRAIT_METHOD_SOURCE_END: i32 = 7
-const FN_PARAM_FLAG_NOALIAS: i32 = 1
-const FN_PARAM_FLAG_IMPLICIT: i32 = 2
+pub const FN_META_REQUIRED_UNIT: i32 = 65536
+pub const FN_PARAM_STRIDE: i32 = 3
+pub const TRAIT_METHOD_STRIDE: i32 = 8
+pub const TRAIT_METHOD_NAME: i32 = 0
+pub const TRAIT_METHOD_FLAGS: i32 = 1
+pub const TRAIT_METHOD_PARAM_START: i32 = 2
+pub const TRAIT_METHOD_PARAM_COUNT: i32 = 3
+pub const TRAIT_METHOD_RETURN_TYPE: i32 = 4
+pub const TRAIT_METHOD_DEFAULT_BODY: i32 = 5
+pub const TRAIT_METHOD_SOURCE_START: i32 = 6
+pub const TRAIT_METHOD_SOURCE_END: i32 = 7
+pub const FN_PARAM_FLAG_NOALIAS: i32 = 1
+pub const FN_PARAM_FLAG_IMPLICIT: i32 = 2
 // docs/completed/mut.md Rev 8 §5.1 — receiver-place mode `mut self: Self`.
 // Set by the parser when the param name is `self` and was preceded by `mut`.
 // Stored as a flag bit so callers can detect a mutating receiver without
 // reparsing. No semantic effect during the bridge phase (P1..P11);
 // at P11 sema reads this bit to require a mutable place at the call site.
-const FN_PARAM_FLAG_MUT_SELF: i32 = 4
+pub const FN_PARAM_FLAG_MUT_SELF: i32 = 4
 // docs/completed/mutability.md — receiver-mode `self: &Self` (read-only view).
 // Set when param name is `self` and the declared type is a reference (&Self).
-const FN_PARAM_FLAG_REF_SELF: i32 = 8
+pub const FN_PARAM_FLAG_REF_SELF: i32 = 8
 // docs/completed/mutability.md — receiver-mode `move self: Self` (consuming).
 // Set when param name is `self` and was preceded by `move`.
-const FN_PARAM_FLAG_MOVE_SELF: i32 = 16
+pub const FN_PARAM_FLAG_MOVE_SELF: i32 = 16
 // D7: the parser synthesized this receiver from `fn` / `mut fn` / `move fn`.
 // This is distinct from its access mode so analysis and migrations can prove
 // that no source-level `self` parameter remains.
-const FN_PARAM_FLAG_SYNTH_RECEIVER: i32 = 32
+pub const FN_PARAM_FLAG_SYNTH_RECEIVER: i32 = 32
 
 // Multi-index spec kind constants (stored in NK_INDEX_SPEC.d2 high bits)
-const INDEX_SCALAR: i32 = 0
-const INDEX_SLICE: i32 = 1
-const INDEX_ELLIPSIS: i32 = 2
-const INDEX_NEWAXIS: i32 = 3
-const INDEX_KIND_SHIFT: i32 = 268435456  // 1 << 28
+pub const INDEX_SCALAR: i32 = 0
+pub const INDEX_SLICE: i32 = 1
+pub const INDEX_ELLIPSIS: i32 = 2
+pub const INDEX_NEWAXIS: i32 = 3
+pub const INDEX_KIND_SHIFT: i32 = 268435456  // 1 << 28
 
 pub const TYPE_TRAIT_OBJECT_DYN: i32 = 1
 pub const TYPE_TRAIT_OBJECT_IMPL: i32 = 2
@@ -408,27 +408,27 @@ pub const TYPE_TRAIT_OBJECT_IMPL: i32 = 2
 // `unsafe *p` / `unsafe p[i]` raw-access prefix form. d2 marks parser-inserted
 // unsafe-function body wrappers, which are not subject to the unnecessary-block
 // diagnostic.
-const UNSAFE_KIND_BLOCK: i32 = 0
-const UNSAFE_KIND_PREFIX: i32 = 1
-const UNSAFE_ORIGIN_EXPR: i32 = 0
-const UNSAFE_ORIGIN_FN_BODY: i32 = 1
+pub const UNSAFE_KIND_BLOCK: i32 = 0
+pub const UNSAFE_KIND_PREFIX: i32 = 1
+pub const UNSAFE_ORIGIN_EXPR: i32 = 0
+pub const UNSAFE_ORIGIN_FN_BODY: i32 = 1
 
-fn fn_param_is_noalias(flags: i32) -> i32:
+pub fn fn_param_is_noalias(flags: i32) -> i32:
     (flags / FN_PARAM_FLAG_NOALIAS) % 2
 
-fn fn_param_is_implicit(flags: i32) -> i32:
+pub fn fn_param_is_implicit(flags: i32) -> i32:
     (flags / FN_PARAM_FLAG_IMPLICIT) % 2
 
-fn fn_param_is_mut_self(flags: i32) -> i32:
+pub fn fn_param_is_mut_self(flags: i32) -> i32:
     (flags / FN_PARAM_FLAG_MUT_SELF) % 2
 
-fn fn_param_is_ref_self(flags: i32) -> i32:
+pub fn fn_param_is_ref_self(flags: i32) -> i32:
     (flags / FN_PARAM_FLAG_REF_SELF) % 2
 
-fn fn_param_is_move_self(flags: i32) -> i32:
+pub fn fn_param_is_move_self(flags: i32) -> i32:
     (flags / FN_PARAM_FLAG_MOVE_SELF) % 2
 
-fn fn_param_is_synth_receiver(flags: i32) -> i32:
+pub fn fn_param_is_synth_receiver(flags: i32) -> i32:
     (flags / FN_PARAM_FLAG_SYNTH_RECEIVER) % 2
 
 // docs/completed/mut.md Rev 8 §12 — module-level place declarations.
@@ -439,41 +439,41 @@ fn fn_param_is_synth_receiver(flags: i32) -> i32:
 //   bit 3 (mask 8):  LET_FLAG_GLOBAL_VAR — declared via `global var`
 //   bits 4+       :  (type_extra index + 1) * 16   (0 means no type)
 // Plain top-level `let`/`var` (without `global`) leave bits 2/3 clear.
-const LET_FLAG_GLOBAL: i32 = 4
-const LET_FLAG_GLOBAL_VAR: i32 = 8
+pub const LET_FLAG_GLOBAL: i32 = 4
+pub const LET_FLAG_GLOBAL_VAR: i32 = 8
 
-fn let_decl_is_global(flags: i32) -> i32:
+pub fn let_decl_is_global(flags: i32) -> i32:
     (flags / LET_FLAG_GLOBAL) % 2
 
-fn let_decl_is_global_var(flags: i32) -> i32:
+pub fn let_decl_is_global_var(flags: i32) -> i32:
     (flags / LET_FLAG_GLOBAL_VAR) % 2
 
 const C_IMPORT_ALLOW_COUNT_UNIT: i32 = 1024
 const C_IMPORT_NO_METHODS_COUNT_UNIT: i32 = 1048576       // 1024 * 1024
 const C_IMPORT_NO_METHODS_ALL_UNIT: i32 = 1073741824      // 1 << 30
 
-fn c_import_link_count(packed: i32) -> i32:
+pub fn c_import_link_count(packed: i32) -> i32:
     packed % C_IMPORT_ALLOW_COUNT_UNIT
 
-fn c_import_allow_count(packed: i32) -> i32:
+pub fn c_import_allow_count(packed: i32) -> i32:
     (packed / C_IMPORT_ALLOW_COUNT_UNIT) % C_IMPORT_ALLOW_COUNT_UNIT
 
 // Count of per-type `no_methods: "Type"` names stored after the allow group.
-fn c_import_no_methods_count(packed: i32) -> i32:
+pub fn c_import_no_methods_count(packed: i32) -> i32:
     (packed / C_IMPORT_NO_METHODS_COUNT_UNIT) % C_IMPORT_ALLOW_COUNT_UNIT
 
 // 1 when `no_methods: true` disabled auto-methods for the whole import.
-fn c_import_no_methods_all(packed: i32) -> i32:
+pub fn c_import_no_methods_all(packed: i32) -> i32:
     (packed / C_IMPORT_NO_METHODS_ALL_UNIT) % 2
 
 fn pack_c_import_counts(link_count: i32, allow_count: i32) -> i32:
     pack_c_import_counts_ex(link_count, allow_count, 0, 0)
 
-fn pack_c_import_counts_ex(link_count: i32, allow_count: i32, no_methods_count: i32, no_methods_all: i32) -> i32:
+pub fn pack_c_import_counts_ex(link_count: i32, allow_count: i32, no_methods_count: i32, no_methods_all: i32) -> i32:
     link_count + allow_count * C_IMPORT_ALLOW_COUNT_UNIT + no_methods_count * C_IMPORT_NO_METHODS_COUNT_UNIT + no_methods_all * C_IMPORT_NO_METHODS_ALL_UNIT
 
 // Visibility flags
-enum Visibility: i32:
+pub enum Visibility: i32:
     Private = 0
     Public = 1
 
@@ -510,7 +510,7 @@ pub enum BinaryOp: i32:
     OP_MATMUL = 28
 
 // Unary operators
-enum UnaryOp: i32:
+pub enum UnaryOp: i32:
     UOP_NEGATE = 0
     UOP_NOT = 1
     UOP_REF = 2
@@ -523,7 +523,7 @@ enum UnaryOp: i32:
     UOP_RAW_REF_MUT = 8
 
 // Literal suffix metadata (stored out-of-line in AstPool.literal_suffixes)
-enum LiteralSuffix: i32:
+pub enum LiteralSuffix: i32:
     None = 0
     I8 = 1
     I16 = 2
@@ -541,7 +541,7 @@ enum LiteralSuffix: i32:
     F64 = 14
 
 // F-string segment kinds (stored in extra_data)
-enum FStringSegmentKind: i32:
+pub enum FStringSegmentKind: i32:
     LITERAL = 0  // +1 word: string token index (interned symbol)
     EXPR = 1     // +1 word: expression node, +1 word: spec node (0 if none)
 
@@ -897,23 +897,23 @@ pub fn float_literal_value_text(text: &str) -> str:
 const AST_INT_PART_BASE: i64 = 2097152
 const AST_INT_PART_BASE2: i64 = 4398046511104
 
-fn ast_int_part0(value: i64) -> i32:
+pub fn ast_int_part0(value: i64) -> i32:
     (value % AST_INT_PART_BASE) as i32
 
-fn ast_int_part1(value: i64) -> i32:
+pub fn ast_int_part1(value: i64) -> i32:
     ((value / AST_INT_PART_BASE) % AST_INT_PART_BASE) as i32
 
-fn ast_int_part2(value: i64) -> i32:
+pub fn ast_int_part2(value: i64) -> i32:
     (value / AST_INT_PART_BASE2) as i32
 
-fn ast_int_from_parts(d0: i32, d1: i32, d2: i32) -> i64:
+pub fn ast_int_from_parts(d0: i32, d1: i32, d2: i32) -> i64:
     (d0 as i64) + (d1 as i64) * AST_INT_PART_BASE + (d2 as i64) * AST_INT_PART_BASE2
 
 impl AstPool:
     fn int_lit_value(idx: NodeId) -> i64:
         ast_int_from_parts(self.get_data0(idx), self.get_data1(idx), self.get_data2(idx))
 
-type ExactIntValue {
+pub type ExactIntValue {
     ok: i32,
     overflow: i32,
     lo: i64,
@@ -921,7 +921,7 @@ type ExactIntValue {
 }
 impl Copy for ExactIntValue
 
-type ExactIntExpr {
+pub type ExactIntExpr {
     ok: i32,
     overflow: i32,
     negative: i32,
@@ -930,7 +930,7 @@ type ExactIntExpr {
 }
 impl Copy for ExactIntExpr
 
-type ExactIntI64 {
+pub type ExactIntI64 {
     ok: i32,
     value: i64,
 }
@@ -942,7 +942,7 @@ fn exact_int_invalid() -> ExactIntValue:
 fn exact_int_overflow() -> ExactIntValue:
     ExactIntValue { ok: 1, overflow: 1, lo: 0, hi: 0 }
 
-fn exact_int_value(lo: i64, hi: i64) -> ExactIntValue:
+pub fn exact_int_value(lo: i64, hi: i64) -> ExactIntValue:
     ExactIntValue { ok: 1, overflow: 0, lo, hi }
 
 fn exact_int_expr_invalid() -> ExactIntExpr:
@@ -951,21 +951,21 @@ fn exact_int_expr_invalid() -> ExactIntExpr:
 fn exact_int_expr_value(lo: i64, hi: i64, negative: i32) -> ExactIntExpr:
     ExactIntExpr { ok: 1, overflow: 0, negative, lo, hi }
 
-fn exact_int_expr_magnitude(expr: ExactIntExpr) -> ExactIntValue:
+pub fn exact_int_expr_magnitude(expr: ExactIntExpr) -> ExactIntValue:
     ExactIntValue { ok: expr.ok, overflow: expr.overflow, lo: expr.lo, hi: expr.hi }
 
-fn exact_int_sign_bit() -> i64:
+pub fn exact_int_sign_bit() -> i64:
     -9223372036854775807 - 1
 
-fn exact_int_uword_lt(lhs: i64, rhs: i64) -> bool:
+pub fn exact_int_uword_lt(lhs: i64, rhs: i64) -> bool:
     let sign_bit = exact_int_sign_bit()
     (lhs ^ sign_bit) < (rhs ^ sign_bit)
 
-fn exact_int_uword_lte(lhs: i64, rhs: i64) -> bool:
+pub fn exact_int_uword_lte(lhs: i64, rhs: i64) -> bool:
     let sign_bit = exact_int_sign_bit()
     (lhs ^ sign_bit) <= (rhs ^ sign_bit)
 
-fn exact_int_low_mask(bits: i32) -> i64:
+pub fn exact_int_low_mask(bits: i32) -> i64:
     if bits <= 0:
         return 0
     if bits >= 64:
@@ -974,21 +974,21 @@ fn exact_int_low_mask(bits: i32) -> i64:
         return 9223372036854775807
     ((1 as i64) << (bits as u32)) - 1
 
-fn exact_int_pow2_word(bit: i32) -> i64:
+pub fn exact_int_pow2_word(bit: i32) -> i64:
     if bit < 0 or bit >= 64:
         return 0
     if bit == 63:
         return exact_int_sign_bit()
     (1 as i64) << (bit as u32)
 
-fn exact_int_logical_shr_word(value: i64, shift: i32) -> i64:
+pub fn exact_int_logical_shr_word(value: i64, shift: i32) -> i64:
     if shift <= 0:
         return value
     if shift >= 64:
         return 0
     (value >> (shift as u32)) & exact_int_low_mask(64 - shift)
 
-fn exact_int_shl_word(value: i64, shift: i32) -> i64:
+pub fn exact_int_shl_word(value: i64, shift: i32) -> i64:
     if shift <= 0:
         return value
     if shift >= 64:
@@ -998,7 +998,7 @@ fn exact_int_shl_word(value: i64, shift: i32) -> i64:
         out = out +% out
     out
 
-fn exact_int_word_to_f64(value: i64) -> f64:
+pub fn exact_int_word_to_f64(value: i64) -> f64:
     if value >= 0:
         return value as f64
     9223372036854775808.0 + ((value ^ exact_int_sign_bit()) as f64)
@@ -1017,7 +1017,7 @@ fn exact_int_cmp(lhs: ExactIntValue, rhs: ExactIntValue) -> i32:
         return 1
     0
 
-fn exact_int_add_values(lhs: ExactIntValue, rhs: ExactIntValue) -> ExactIntValue:
+pub fn exact_int_add_values(lhs: ExactIntValue, rhs: ExactIntValue) -> ExactIntValue:
     if lhs.ok == 0 or rhs.ok == 0:
         return exact_int_invalid()
     if lhs.overflow != 0 or rhs.overflow != 0:
@@ -1035,7 +1035,7 @@ fn exact_int_add_values(lhs: ExactIntValue, rhs: ExactIntValue) -> ExactIntValue
 fn exact_int_add_small(value: ExactIntValue, digit: i64) -> ExactIntValue:
     exact_int_add_values(value, exact_int_value(digit, 0))
 
-fn exact_int_shl_small(value: ExactIntValue, shift: i32) -> ExactIntValue:
+pub fn exact_int_shl_small(value: ExactIntValue, shift: i32) -> ExactIntValue:
     if value.ok == 0:
         return exact_int_invalid()
     if value.overflow != 0:
@@ -1072,7 +1072,7 @@ fn exact_int_mul_small(value: ExactIntValue, factor: i32) -> ExactIntValue:
                 return addend
     result
 
-fn exact_int_mask_bits(value: ExactIntValue, bits: i32) -> ExactIntValue:
+pub fn exact_int_mask_bits(value: ExactIntValue, bits: i32) -> ExactIntValue:
     if value.ok == 0:
         return exact_int_invalid()
     if value.overflow != 0:
@@ -1099,7 +1099,7 @@ fn exact_int_digit_value(ch: i32) -> i32:
         return ch - 55
     -1
 
-fn exact_int_parse_digits(digits: &str, radix: i32) -> ExactIntValue:
+pub fn exact_int_parse_digits(digits: &str, radix: i32) -> ExactIntValue:
     if radix < 2 or radix > 16:
         return exact_int_invalid()
     var acc = exact_int_value(0, 0)
@@ -1115,7 +1115,7 @@ fn exact_int_parse_digits(digits: &str, radix: i32) -> ExactIntValue:
             return acc
     acc
 
-fn exact_int_fits_unsigned_bits(value: ExactIntValue, bits: i32) -> bool:
+pub fn exact_int_fits_unsigned_bits(value: ExactIntValue, bits: i32) -> bool:
     if value.ok == 0 or value.overflow != 0:
         return false
     if bits <= 0:
@@ -1133,7 +1133,7 @@ fn exact_int_fits_unsigned_bits(value: ExactIntValue, bits: i32) -> bool:
     let max_hi = exact_int_low_mask(hi_bits)
     exact_int_uword_lte(value.hi, max_hi)
 
-fn exact_int_fits_signed_magnitude_bits(value: ExactIntValue, bits: i32) -> bool:
+pub fn exact_int_fits_signed_magnitude_bits(value: ExactIntValue, bits: i32) -> bool:
     if value.ok == 0 or value.overflow != 0:
         return false
     if bits <= 0:
@@ -1142,7 +1142,7 @@ fn exact_int_fits_signed_magnitude_bits(value: ExactIntValue, bits: i32) -> bool
         return exact_int_is_zero(value)
     exact_int_fits_unsigned_bits(value, bits - 1)
 
-fn exact_int_fits_signed_negative_bits(value: ExactIntValue, bits: i32) -> bool:
+pub fn exact_int_fits_signed_negative_bits(value: ExactIntValue, bits: i32) -> bool:
     if value.ok == 0 or value.overflow != 0:
         return false
     if bits <= 0:
@@ -1161,7 +1161,7 @@ fn exact_int_fits_signed_negative_bits(value: ExactIntValue, bits: i32) -> bool:
         return true
     value.hi == limit_hi and value.lo == 0
 
-fn exact_int_try_i64(value: ExactIntValue) -> ExactIntI64:
+pub fn exact_int_try_i64(value: ExactIntValue) -> ExactIntI64:
     if value.ok == 0 or value.overflow != 0:
         return ExactIntI64 { ok: 0, value: 0 }
     if value.hi != 0 or value.lo < 0:
@@ -1875,7 +1875,7 @@ impl AstPool:
 
 fn ast_pattern_binding_key(parent: i32, binding: i32): (parent as i64) * 4294967296 + (binding as i64)
 
-fn ast_is_pattern_kind(kind: i32) -> bool:
+pub fn ast_is_pattern_kind(kind: i32) -> bool:
     kind == NodeKind.NK_PAT_WILDCARD or
     kind == NodeKind.NK_PAT_IDENT or
     kind == NodeKind.NK_PAT_INT or

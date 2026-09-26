@@ -10,6 +10,7 @@ use SemaFacade
 use ComptimeTransform
 use Resolve
 use Span
+use compiler.Compilation.Config
 extern fn with_getenv_str(name: &str) -> str
 use Diagnostic
 use CImport
@@ -29,6 +30,7 @@ use compiler.ProjectConfig
 use compiler.Runtime
 use compiler.TrackedInputs
 use compiler.Zcu
+use InternPool
 // Frontend pipeline: lex -> parse -> import resolution -> sema.
 
 var frontend_cimport_compiler_fingerprint_ready: i32 = 0
@@ -3086,7 +3088,7 @@ fn frontend_normalize_module_path(module_name: &str) -> str:
             out = out ++ module_name.slice(i as i64, (i + 1) as i64)
     out
 
-fn frontend_dirname(path: &str) -> str:
+pub fn frontend_dirname(path: &str) -> str:
     var last_slash = -1
     for i in 0..path.len():
         if path[i] == 47: // '/'

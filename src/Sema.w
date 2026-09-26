@@ -18,8 +18,11 @@ use compiler.TrackedInputs
 use compiler.BundleInterfaces
 use compiler.ModuleSource
 use FnAbi
+use SemaCheck
+use SemaDecl
 use std.collections.HashMap
 use std.collections.HashSet
+use compiler.Runtime
 
 extern fn with_write(s: &str) -> Unit
 extern fn with_eprint(s: &str) -> Unit
@@ -37,7 +40,7 @@ fn sema_profile_report(name: &str, t0: i64):
     with_eprint(f"[profile] sema.{name}  {ns / 1000000}.{(ns % 1000000) / 1000} ms")
 extern fn abort() -> Never
 
-fn sema_phase_bug(message: &str, origin_file: &str = __FILE__, origin_line: u32 = __LINE__, origin_fn: &str = __FN__):
+pub fn sema_phase_bug(message: &str, origin_file: &str = __FILE__, origin_line: u32 = __LINE__, origin_fn: &str = __FN__):
     with_eprint(f"{message} [{origin_file}:{origin_line} {origin_fn}]")
     abort()
 
@@ -56,7 +59,7 @@ type FieldMovePath {
 }
 impl Copy for FieldMovePath
 
-enum VarState: i32:
+pub enum VarState: i32:
     LIVE = 0
     MOVED = 1
 
@@ -79,17 +82,17 @@ fn binding_provenance_empty -> BindingProvenance:
 
 // D39 declared view origin (SemaCheck.declared_view_origin): a parameter
 // index, or one of these.
-const DECLARED_ORIGIN_NONE: i32 = -2
-const DECLARED_ORIGIN_AMBIGUOUS: i32 = -1
+pub const DECLARED_ORIGIN_NONE: i32 = -2
+pub const DECLARED_ORIGIN_AMBIGUOUS: i32 = -1
 
-fn sema_param_origin_bit(pi: i32) -> i32:
+pub fn sema_param_origin_bit(pi: i32) -> i32:
     if pi < 0:
         return 0
     if pi >= 31:
         return -1
     ((1 as i64) << (pi as u32)) as i32
 
-fn sema_param_origin_mask_contains(mask: i32, pi: i32) -> i32:
+pub fn sema_param_origin_mask_contains(mask: i32, pi: i32) -> i32:
     if mask == 0 or pi < 0:
         return 0
     if mask < 0:
@@ -98,14 +101,14 @@ fn sema_param_origin_mask_contains(mask: i32, pi: i32) -> i32:
         return 0
     if (mask & sema_param_origin_bit(pi)) != 0: 1 else: 0
 
-enum LabelFrameKind: i32:
+pub enum LabelFrameKind: i32:
     LFK_BOUNDARY = 0
     LFK_WHILE = 1
     LFK_FOR = 2
     LFK_BLOCK = 3
     LFK_LOOP = 4
 
-type LabelRegistryState {
+pub type LabelRegistryState {
     label_syms: Vec[i32],
     label_nodes: Vec[i32],
     label_paths: Vec[str],
@@ -134,7 +137,7 @@ enum DeriveReq: i32:
     DISPLAY = 7
     BUILDER = 8
 
-enum SemaMagicIdentKind: i32:
+pub enum SemaMagicIdentKind: i32:
     NONE = 0
     FILE = 1
     LINE = 2
@@ -312,24 +315,24 @@ type SemaMethodLookup {
     fn_lookup: HashMap[i64, i32],
 }
 
-const GLOBAL_VALUE_DECL_DEF: i32 = 1
-const GLOBAL_VALUE_DECL_EXTERN: i32 = 2
+pub const GLOBAL_VALUE_DECL_DEF: i32 = 1
+pub const GLOBAL_VALUE_DECL_EXTERN: i32 = 2
 // D39: storage a bundle interface declares; the bundle's object defines it.
-const GLOBAL_VALUE_DECL_INTERFACE: i32 = 3
+pub const GLOBAL_VALUE_DECL_INTERFACE: i32 = 3
 
 // docs/completed/mutability.md §5 — per-parameter effect bits.
-const EFF_READ: i32         = 1   // parameter is read
-const EFF_WRITE: i32        = 2   // parameter place is mutated (implies read)
-const EFF_CONSUME: i32      = 4   // parameter is moved/consumed in the body
-const EFF_ESCAPE_VALUE: i32 = 8   // owned value escapes the call (return / global store)
-const EFF_ESCAPE_VIEW: i32  = 16  // view into parameter escapes (return &param.field)
-const EFF_RAW_PTR_VALIDITY: i32 = 32  // raw pointer parameter validity is caller-guaranteed
-const EFF_DECLARED_MASK: i32 = EFF_READ | EFF_WRITE | EFF_CONSUME | EFF_ESCAPE_VALUE | EFF_ESCAPE_VIEW
+pub const EFF_READ: i32         = 1   // parameter is read
+pub const EFF_WRITE: i32        = 2   // parameter place is mutated (implies read)
+pub const EFF_CONSUME: i32      = 4   // parameter is moved/consumed in the body
+pub const EFF_ESCAPE_VALUE: i32 = 8   // owned value escapes the call (return / global store)
+pub const EFF_ESCAPE_VIEW: i32  = 16  // view into parameter escapes (return &param.field)
+pub const EFF_RAW_PTR_VALIDITY: i32 = 32  // raw pointer parameter validity is caller-guaranteed
+pub const EFF_DECLARED_MASK: i32 = EFF_READ | EFF_WRITE | EFF_CONSUME | EFF_ESCAPE_VALUE | EFF_ESCAPE_VIEW
 // Closure capture summaries only (§12.4): the capture is a non-Copy place the
 // non-move closure holds by place — a view of that local, not a snapshot.
-const EFF_CAPTURE_BY_PLACE: i32 = 64
+pub const EFF_CAPTURE_BY_PLACE: i32 = 64
 
-enum ReceiverMode: i32:
+pub enum ReceiverMode: i32:
     None = 0
     Read = 1
     Mut = 2
@@ -338,12 +341,12 @@ enum ReceiverMode: i32:
 
 impl Copy for ReceiverMode
 
-enum WithFormKind: i32:
+pub enum WithFormKind: i32:
     Binding = 0
     Guarded = 1
     GuardedMut = 2
 
-enum AllocConstructKind: i32:
+pub enum AllocConstructKind: i32:
     EXPLICIT_API = 1
     VEC_NEW = 2
     TO_OWNED = 3
@@ -356,7 +359,7 @@ enum AllocConstructKind: i32:
 
 impl Copy for AllocConstructKind
 
-fn sema_effect_bits_text(bits: i32) -> str:
+pub fn sema_effect_bits_text(bits: i32) -> str:
     let public_bits = bits & EFF_DECLARED_MASK
     var out = ""
     if (public_bits & EFF_READ) != 0:
@@ -384,7 +387,7 @@ fn sema_effect_bits_text(bits: i32) -> str:
 // remains &T. `owned_value_type` is T, and `target_type` is the destination
 // after any ordinary value coercion. A differing `post_copy_type` records that
 // final coercion explicitly for later MIR/backend consumption.
-type ContextualCopyAdjustment {
+pub type ContextualCopyAdjustment {
     context_sig: i32,
     source_node: i32,
     exact_source_type: i32,
@@ -400,7 +403,7 @@ impl Copy for ContextualCopyAdjustment
 // and diagnostics consume the same classification instead of re-running type
 // inference. `origin_mask`/origin deps record the origins visible at this
 // stage; Stage 4 makes transparent-carrier propagation complete.
-type ContextualJoinDecision {
+pub type ContextualJoinDecision {
     context_sig: i32,
     join_node: i32,
     expected_type: i32,
@@ -422,7 +425,7 @@ impl Copy for ContextualJoinDecision
 // D51 §16.2b stage 2: a facade's facts, each with the node that stated it.
 // Parameter positions are zero-based indices into the fn's signature; -1 is
 // "none". Consumed by stage 3 (raw classification) and later stages.
-type FacadeResource {
+pub type FacadeResource {
     name: i32,
     facade: i32,
     node: i32,
@@ -447,7 +450,7 @@ type FacadeResource {
     abandon_node: i32,
 }
 
-type ForeignContract {
+pub type ForeignContract {
     decl: i32,            // the `c facade` block's declaration index: diagnostics name its file
     fn_sym: i32,
     facade: i32,
@@ -491,13 +494,13 @@ type ForeignContract {
 }
 
 // D66 §16.2b.5: what a variadic case's argument is.
-const FACADE_VARIADIC_SCALAR: i32 = 1   // a scalar C type: passed as that type
-const FACADE_VARIADIC_STR: i32 = 2      // `str`: a copied input string (§16.3c), passed as a call-scoped C string
-const FACADE_VARIADIC_CALLBACK: i32 = 3
-const FACADE_VARIADIC_RETAINED: i32 = 4
-const FACADE_VARIADIC_USERDATA: i32 = 5 // the userdata setter a callback case implies (§16.2b.5): `&U`, the borrow the resource holds
+pub const FACADE_VARIADIC_SCALAR: i32 = 1   // a scalar C type: passed as that type
+pub const FACADE_VARIADIC_STR: i32 = 2      // `str`: a copied input string (§16.3c), passed as a call-scoped C string
+pub const FACADE_VARIADIC_CALLBACK: i32 = 3
+pub const FACADE_VARIADIC_RETAINED: i32 = 4
+pub const FACADE_VARIADIC_USERDATA: i32 = 5 // the userdata setter a callback case implies (§16.2b.5): `&U`, the borrow the resource holds
 
-type ForeignVariadicSlot {
+pub type ForeignVariadicSlot {
     case_index: i32,
     clause: i32,
     resource: i32,
@@ -514,7 +517,7 @@ type ForeignVariadicSlot {
 // — in the rendered signature, `self` excluded — of the userdata parameter
 // (-1: none typed), for the checks the rendered generic method cannot state
 // itself: the userdata type is Send and Sync under `callback_thread any`.
-type FacadeCallbackMethod {
+pub type FacadeCallbackMethod {
     contract: i32,
     receiver_params: i32,
     userdata_param: i32,
@@ -530,7 +533,7 @@ type FacadeCallbackMethod {
 // signature MIR records on the call (SemaFacade.w facade_index_pair_ops,
 // facade_note_pair_op_sig). MIR proves the pair's state per place along
 // every path (MirForeignPairs.w); Sema decides what each call means.
-type FacadePairOp {
+pub type FacadePairOp {
     contract: i32,      // foreign_contracts index
     resource: i32,      // facade_resources index
     action: i32,        // FOREIGN_PAIR_CALLBACK / _USERDATA / _RESET / _DESTROY / _INVOKE (ForeignPairState.w)
@@ -542,7 +545,7 @@ type FacadePairOp {
 
 // Context shared by free and receiver callback calls. Userdata is checked
 // first so its type can give the callback its concrete C signature.
-type FacadeCallbackCall {
+pub type FacadeCallbackCall {
     userdata_node: i32,
     userdata_type: i32,
     nullable: bool,
@@ -554,7 +557,7 @@ type FacadeCallbackCall {
 // they depend on a binding; `files` are the `<c_import …>` translations of
 // the functions the declaring facade describes — the coarse library whose
 // every operation touches the domain unless it `preserves` it (§34, §38).
-type FacadeDomain {
+pub type FacadeDomain {
     name: i32,
     kind: i32,          // process | thread | resource | static (sym)
     facade: i32,        // the facade that declared it first
@@ -570,7 +573,7 @@ type FacadeDomain {
 // parameter; every received resource unless `preserves param N`), the
 // domains it invalidates (its library's, unless `preserves domain D`), and
 // the domain its result borrows from (`returns borrow CStr from domain D`).
-type FacadeCallEffect {
+pub type FacadeCallEffect {
     sig: i32,
     fn_sym: i32,             // the C function (its facade fn item is `contract`)
     contract: i32,           // foreign_contracts index, or -1
@@ -1598,7 +1601,7 @@ fn sema_debug_stage1_enabled -> i32:
         return 0
     1
 
-fn sema_debug_move_enabled -> i32:
+pub fn sema_debug_move_enabled -> i32:
     let raw = with_getenv_str("WITH_DEBUG_MOVE")
     if raw.len() == 0:
         return 0
@@ -1606,7 +1609,7 @@ fn sema_debug_move_enabled -> i32:
 
 // WITH_DEBUG_BORROWS=1: the borrow table at every read and mutation check
 // (SemaCheck.w check_read_against_views, register_view_binding_borrows).
-fn sema_debug_borrows_enabled -> i32:
+pub fn sema_debug_borrows_enabled -> i32:
     if with_getenv_str("WITH_DEBUG_BORROWS").len() == 0: 0 else: 1
 
 impl Sema:
@@ -1651,7 +1654,7 @@ impl Sema:
         self.pool.state.symbol_texts.push(owned)
         id
 
-fn sema_tier_path_is_std_implementation(path: &str) -> i32:
+pub fn sema_tier_path_is_std_implementation(path: &str) -> i32:
     if path.starts_with("lib/std/") or path.starts_with("<embedded-std>/"):
         return 1
     if path.contains("/lib/std/"):
@@ -1724,14 +1727,14 @@ fn sema_prelude_gate_allows_name(name: &str) -> i32:
         return 1
     0
 
-fn sema_path_is_std_box_module(path: &str) -> i32:
+pub fn sema_path_is_std_box_module(path: &str) -> i32:
     if path == "lib/std/box.w" or path == "<embedded-std>/std/box.w":
         return 1
     if path.ends_with("/lib/std/box.w") or path.ends_with("\\lib\\std\\box.w"):
         return 1
     0
 
-fn sema_path_is_std_rc_module(path: &str) -> i32:
+pub fn sema_path_is_std_rc_module(path: &str) -> i32:
     if path == "lib/std/rc.w" or path == "<embedded-std>/std/rc.w":
         return 1
     if path.ends_with("/lib/std/rc.w") or path.ends_with("\\lib\\std\\rc.w"):
@@ -1768,7 +1771,7 @@ impl Sema:
             return 0
         sema_path_is_std_rc_module(self.type_decl_source_path(sym))
 
-fn sema_tier_std_only_module(path: &str) -> i32:
+pub fn sema_tier_std_only_module(path: &str) -> i32:
     if path == "std.io" or path.starts_with("std.io."):
         return 1
     if path == "std.fs" or path.starts_with("std.fs."):
@@ -1794,26 +1797,6 @@ fn sema_tier_std_only_module(path: &str) -> i32:
     if path == "std.time" or path.starts_with("std.time."):
         return 1
     0
-
-fn sema_path_is_compiler_owned_implementation(path: &str) -> i32:
-    if path.starts_with("src/") or path.contains("/src/"):
-        return 1
-    if path.starts_with("build/") or path.contains("/build/"):
-        return 1
-    if path.starts_with("rt/") or path.contains("/rt/"):
-        return 1
-    if path.starts_with("out/gen/") or path.contains("/out/gen/"):
-        return 1
-    if sema_tier_path_is_std_implementation(path) != 0:
-        return 1
-    0
-
-fn sema_paths_share_internal_implementation_boundary(a: &str, b: &str) -> i32:
-    if sema_path_is_compiler_owned_implementation(a) == 0:
-        return 0
-    if sema_path_is_compiler_owned_implementation(b) == 0:
-        return 0
-    1
 
 fn sema_path_is_compiler_hook_runner(path: &str) -> i32:
     if path.contains("__with_compiler_hook_runner."):
@@ -1880,7 +1863,7 @@ impl Sema:
         self.emit_error(name ++ " requires std", node)
         0
 
-fn sema_new_map_i32_i32 -> HashMap[i32, i32]:
+pub fn sema_new_map_i32_i32 -> HashMap[i32, i32]:
     HashMap.new()
 
 fn sema_new_map_i32_str -> HashMap[i32, str]:
@@ -1892,26 +1875,26 @@ fn sema_new_map_str_i32 -> HashMap[str, i32]:
 fn sema_new_map_i64_i32 -> HashMap[i64, i32]:
     HashMap.new()
 
-fn sema_new_vec_str -> Vec[str]:
+pub fn sema_new_vec_str -> Vec[str]:
     let out: Vec[str] = Vec{ ptr: 0, len: 0, cap: 0, elem_size: 16 }
     out
 
-fn sema_new_vec_i32 -> Vec[i32]:
+pub fn sema_new_vec_i32 -> Vec[i32]:
     let out: Vec[i32] = Vec.new()
     out
 
-fn sema_owned_text(text: &str) -> str:
+pub fn sema_owned_text(text: &str) -> str:
     if text.len() == 0:
         return ""
     with_str_clone_ref(text)
 
-fn sema_clone_str_vec(values: &Vec[str]) -> Vec[str]:
+pub fn sema_clone_str_vec(values: &Vec[str]) -> Vec[str]:
     let out = sema_new_vec_str()
     for i in 0..values.len() as i32:
         out.push(sema_owned_text(values[i]))
     out
 
-fn sema_clone_i32_vec(values: &Vec[i32]) -> Vec[i32]:
+pub fn sema_clone_i32_vec(values: &Vec[i32]) -> Vec[i32]:
     let out: Vec[i32] = Vec.new()
     for i in 0..values.len() as i32:
         out.push(values[i])
@@ -1922,7 +1905,7 @@ fn sema_clone_i32_vec(values: &Vec[i32]) -> Vec[i32]:
 // map header, leaving both maps pointing at one buffer — two owners that
 // double-free at teardown (Zcu.c_import_omitted_symbols aliased into the round's
 // Sema was exactly this bug). Mirrors sema_clone_str_vec's owned-text policy.
-fn sema_clone_str_str_hashmap(src: &HashMap[str, str]) -> HashMap[str, str]:
+pub fn sema_clone_str_str_hashmap(src: &HashMap[str, str]) -> HashMap[str, str]:
     var out: HashMap[str, str] = HashMap.new()
     let ks = src.keys()
     for i in 0..ks.len() as i32:
@@ -1966,7 +1949,7 @@ impl Sema:
         // text on every comptime eval leaked ~8.5 MB × N evals = GBs of dead copies.
         self
 
-fn sema_pair_key(a: i32, b: i32) -> i64:
+pub fn sema_pair_key(a: i32, b: i32) -> i64:
     (a as i64) * 4294967296 + (b as i64)
 
 fn sema_exact_type_hash(kind: i32, d0: i32, d1: i32, d2: i32) -> i64:
@@ -1983,15 +1966,15 @@ fn sema_pair_lo(key: i64): (key % 4294967296) as i32
 // Key = (sig, pi, bit_idx) with pi < 2^16, bit_idx < 2^8; value = (kind, a, b)
 // with a, b < 2^28. These fns are the only place the field widths appear;
 // encode and decode both live here so they cannot drift apart.
-fn effect_prov_key(sig: i32, pi: i32, bit_idx: i32) -> i64:
+pub fn effect_prov_key(sig: i32, pi: i32, bit_idx: i32) -> i64:
     (sig as i64) * 16777216 + (pi as i64) * 256 + bit_idx as i64
 
 fn effect_prov_val(kind: i64, a: i32, b: i32) -> i64:
     kind * 72057594037927936 + (a as i64) * 268435456 + b as i64
 
-fn effect_prov_val_kind(v: i64): v / 72057594037927936
-fn effect_prov_val_a(v: i64): ((v / 268435456) % 268435456) as i32
-fn effect_prov_val_b(v: i64): (v % 268435456) as i32
+pub fn effect_prov_val_kind(v: i64): v / 72057594037927936
+pub fn effect_prov_val_a(v: i64): ((v / 268435456) % 268435456) as i32
+pub fn effect_prov_val_b(v: i64): (v % 268435456) as i32
 
 impl Sema:
     mut fn copy_module_graph_from(source: &Sema):
@@ -3215,7 +3198,14 @@ impl Sema:
             return 1
         if sema_path_is_compiler_hook_runner(self.current_module_path) != 0:
             return 1
-        if sema_paths_share_internal_implementation_boundary(self.current_module_path, target_path) != 0:
+        // The std tier is one implementation: its modules read each other's
+        // private declarations (a migrated engine corpus is generated that
+        // way, D39). #1520: this used to extend to every path under a
+        // `src/`, `build/` or `rt/` directory — the compiler's own tree,
+        // guessed from the directory name — so a user project laid out as
+        // `src/a.w`, `src/b.w` had privacy only when checked from inside
+        // `src/`. The compiler tree now conforms to §18.3 like any project.
+        if sema_tier_path_is_std_implementation(self.current_module_path) != 0 and sema_tier_path_is_std_implementation(target_path) != 0:
             return 1
         if is_pub == 0:
             return 0
@@ -4394,7 +4384,7 @@ impl Sema:
                 return 0
         self.types_compatible(self.get_type_d2(expected), self.get_type_d2(actual))
 
-fn sema_generic_inst_hash(base_sym: i32, args: &Vec[i32], arg_count: i32) -> i64:
+pub fn sema_generic_inst_hash(base_sym: i32, args: &Vec[i32], arg_count: i32) -> i64:
     var h: i64 = base_sym as i64
     for ai in 0..arg_count:
         h = (h *% 31) +% (args[ai] as i64)
@@ -4947,7 +4937,7 @@ impl Sema:
             return expected as i32
         0
 
-fn sema_node_is_numeric_literal(ast: AstPool, node: i32) -> bool:
+pub fn sema_node_is_numeric_literal(ast: AstPool, node: i32) -> bool:
     if node == 0:
         return false
     let kind = ast.kind(node)
@@ -4956,7 +4946,7 @@ fn sema_node_is_numeric_literal(ast: AstPool, node: i32) -> bool:
 // A bitwise operand written as an int literal under grouping and `~` wrappers
 // (`(~1)`, `~0x3c`) adapts to the other operand's integer type exactly like a
 // bare literal; the mixed-signedness rule is for concretely typed operands.
-fn sema_node_is_bitwise_adaptable_literal(ast: AstPool, node: i32) -> bool:
+pub fn sema_node_is_bitwise_adaptable_literal(ast: AstPool, node: i32) -> bool:
     var cur = node
     while cur != 0:
         let kind = ast.kind(cur)
@@ -7232,7 +7222,7 @@ impl Sema:
             else if declared == ReceiverMode.Mut and required_mode == "move":
                 self.emit_error(f"mut receiver is too weak; compiler effects require `move fn` for '{name}'", node)
 
-fn receiver_required_mode_text(eff: i32) -> str:
+pub fn receiver_required_mode_text(eff: i32) -> str:
     if (eff & (EFF_CONSUME | EFF_ESCAPE_VALUE)) != 0: return "move"
     if (eff & EFF_WRITE) != 0: return "mut"
     "read"
@@ -7741,7 +7731,7 @@ impl Sema:
 
 // ── Utility functions ────────────────────────────────────────────
 
-fn sema_str_has_data(text: &str) -> i32:
+pub fn sema_str_has_data(text: &str) -> i32:
     if text.len() <= 0:
         return 0
     let ptr_ptr = unsafe *(&text as *const *const *const u8)
@@ -7752,7 +7742,7 @@ fn sema_str_has_data(text: &str) -> i32:
         return 0
     1
 
-fn sema_str_contains_char(text: &str, needle: i32) -> i32:
+pub fn sema_str_contains_char(text: &str, needle: i32) -> i32:
     if sema_str_has_data(text) == 0:
         return 0
     var i = 0

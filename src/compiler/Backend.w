@@ -9,6 +9,7 @@ use compiler.Runtime
 use compiler.TrackedInputs
 use compiler.CodegenUnits
 use AnalysisTypes
+use InternPool
 
 fn backend_debug_pool_flow_enabled() -> i32:
     let raw = runtime_getenv("WITH_DEBUG_POOL_FLOW")

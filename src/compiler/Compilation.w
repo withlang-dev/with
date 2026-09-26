@@ -30,6 +30,8 @@ use compiler.Runtime
 use Overflow
 use Analysis
 use TargetSpec
+use MirCore
+use AnalysisTypes
 
 extern fn with_alloc(size: i64) -> *mut u8
 extern fn with_free(ptr: *mut u8) -> Unit
@@ -369,7 +371,7 @@ pub type Compilation {
     emit_c_in_unit: bool,
 }
 
-type CompilationBinaryLinkPlan {
+pub type CompilationBinaryLinkPlan {
     ok: bool,
     obj_path: str,
     bin_path: str,
@@ -1006,7 +1008,7 @@ impl Compilation:
         if self.compiler_hook_emitted_source.len() == 0:
             return pool
         let base_source = if self.zcu.current_source_text.len() > 0: self.zcu.current_source_text.clone() else: runtime_read_file(source_path)
-        let cfg = self.zcu.project_config
+        let cfg = move self.zcu.project_config
         let combined = base_source ++ "\n\n// <with compiler hook emitted source>\n" ++ self.compiler_hook_emitted_source
         self.compiler_hook_emitted_source = ""
         self.compile_source_text_with_config(source_path, combined, move cfg)
@@ -1018,7 +1020,7 @@ impl Compilation:
         self.zcu.pool
 
     mut fn emit_ir(pool: AstPool) -> bool:
-        let source_path = self.zcu.current_source_path
+        let source_path = self.zcu.current_source_path.clone()
         let prepared_pool = self.prepare_pool_after_typecheck_hooks(pool, source_path)
         if prepared_pool.decl_count() == 0:
             return false
@@ -1220,7 +1222,7 @@ impl Compilation:
     mut fn execute_binary_link_plan(plan: CompilationBinaryLinkPlan) -> str:
         if not plan.ok:
             return ""
-        let bin_path = plan.bin_path
+        let bin_path = plan.bin_path.clone()
         var link_result = compilation_execute_binary_link_plan(self.config.debug_info, plan)
         self.last_link_command_available = 1
         self.last_link_command = move link_result.command
@@ -1255,7 +1257,7 @@ fn compilation_write_unit_digests(obj_path: &str) -> bool:
         return false
     true
 
-fn compilation_execute_binary_link_plan(debug_info: bool, plan: CompilationBinaryLinkPlan) -> LinkStageResult:
+pub fn compilation_execute_binary_link_plan(debug_info: bool, plan: CompilationBinaryLinkPlan) -> LinkStageResult:
     if not plan.ok:
         return link_stage_result_fail()
     var owned = move plan
@@ -1946,7 +1948,7 @@ impl Compilation:
         // their final dependent types.
         var lowered = lower_module(move sema, active_pool, self.zcu.pool)
         sema = move lowered.sema
-        let mir_mod = lowered.mir_module
+        let mir_mod = move lowered.mir_module
         sema.freeze_symbols()
         sema.freeze_types()
         let tailrec_syms = collect_tailrec_fn_syms(&sema, active_pool, self.zcu.pool)

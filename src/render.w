@@ -11,7 +11,7 @@ use std.string.StringBuilder
 extern fn str_from_byte(b: i32) -> str
 extern fn with_str_clone_ref(s: &str) -> str
 
-fn render_module(pool: AstPool, intern: InternPool) -> str:
+pub fn render_module(pool: AstPool, intern: InternPool) -> str:
     var out = StringBuilder.new()
     for i in 0..pool.decl_count():
         let decl = pool.get_decl(i)
@@ -325,7 +325,7 @@ fn render_decl(pool: AstPool, intern: InternPool, node: NodeId, indent: i32) -> 
 
     prefix ++ "<unknown decl>"
 
-fn render_expr(pool: AstPool, intern: InternPool, node: NodeId, indent: i32) -> str:
+pub fn render_expr(pool: AstPool, intern: InternPool, node: NodeId, indent: i32) -> str:
     if node == 0:
         return "<null>"
 
@@ -1094,7 +1094,7 @@ fn render_pattern(pool: AstPool, intern: InternPool, node: NodeId) -> str:
 
     f"<pat:{kind}>"
 
-fn render_type_expr(pool: AstPool, intern: InternPool, node: NodeId) -> str:
+pub fn render_type_expr(pool: AstPool, intern: InternPool, node: NodeId) -> str:
     if node == 0:
         return "_"
     let kind = pool.kind(node)
@@ -1232,7 +1232,7 @@ fn array_lit_is_fill(pool: AstPool, extra_start: i32, count: i32) -> bool:
 fn has_flag(flags: i32, bit: i32) -> bool:
     (flags / bit) % 2 == 1
 
-fn type_decl_is_pub(pool: AstPool, extra_start: i32, sub_kind: i32) -> bool:
+pub fn type_decl_is_pub(pool: AstPool, extra_start: i32, sub_kind: i32) -> bool:
     // A union carries the struct body layout (Parser.parse_struct_body).
     if sub_kind == TypeDeclKind.Struct or sub_kind == TypeDeclKind.Union:
         let field_count = pool.get_extra(extra_start)
@@ -1258,7 +1258,7 @@ fn type_decl_is_pub(pool: AstPool, extra_start: i32, sub_kind: i32) -> bool:
     // Alias / distinct: [aliased_type, vis]
     return pool.get_extra(extra_start + 1) == Visibility.Public
 
-fn top_level_let_type_ann(pool: AstPool, flags: i32) -> i32:
+pub fn top_level_let_type_ann(pool: AstPool, flags: i32) -> i32:
     let encoded = flags / 16
     if encoded > 0:
         return pool.get_extra(encoded - 1)

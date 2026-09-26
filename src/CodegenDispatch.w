@@ -10,6 +10,8 @@ use Overflow
 use AnalysisTypes
 use MathBuiltins
 use std.builtins.int_to_string
+use MirCore
+use SemaTypes
 
 extern fn with_str_clone_ref(s: &str) -> str
 extern fn with_eprint(s: &str) -> Unit
@@ -15151,7 +15153,9 @@ impl Codegen:
                             if gc_de_mir_count > 0:
                                 let gc_de_arg_op = body.call_arg_operands[gc_de_mir_start]
                                 let gc_de_arg_val = self.mir_eval_operand(body, gc_de_arg_op, 0)
-                                let gc_result = self.gen_disc_enum_from_int_val(gc_de_type, gc_de_arg_val)
+                                let gc_de_arg_sema_ty = self.mir_operand_sema_type(body, gc_de_arg_op)
+                                let gc_de_arg_unsigned = gc_de_arg_sema_ty != 0 and self.sema.is_unsigned_int_type(gc_de_arg_sema_ty)
+                                let gc_result = self.gen_disc_enum_from_int_val(gc_de_type, gc_de_arg_val, gc_de_arg_unsigned)
                                 if dest_place >= 0 and gc_result != 0:
                                     let gc_ret_ty = wl_type_of(gc_result)
                                     if gc_ret_ty != wl_void_type(self.context):
@@ -16120,8 +16124,8 @@ impl Codegen:
         self.current_function_name_sym = name_sym
         self.current_function_node = fn_node
         self.current_ret_type = wl_get_return_type(fn_type)
-        let saved_tb_syms = self.type_binding_syms
-        let saved_tb_tys = self.type_binding_types
+        let saved_tb_syms = move self.type_binding_syms
+        let saved_tb_tys = move self.type_binding_types
         let saved_tb_len = self.type_bindings_len
         self.set_mono_type_bindings(name_sym)
         let fn_has_sret_opt = self.fn_abi_has_sret(name_sym)
@@ -16537,22 +16541,22 @@ impl Codegen:
         let saved_fn_node = self.current_function_node
         let saved_ret = self.current_ret_type
         let saved_owner = self.current_method_owner_sym
-        let saved_allocas = self.local_allocas
-        let saved_types = self.local_types
-        let saved_muts = self.local_muts
-        let saved_fn_sigs = self.local_fn_sigs
-        let saved_pointees = self.local_pointee_structs
-        let saved_task_locals = self.task_locals
-        let saved_trait_locals = self.trait_locals
-        let saved_trait_concrete = self.trait_local_concrete_types
-        let saved_scope_syms = self.scope_local_syms
-        let saved_scope_allocas = self.scope_local_allocas
-        let saved_scope_types = self.scope_local_types
+        let saved_allocas = move self.local_allocas
+        let saved_types = move self.local_types
+        let saved_muts = move self.local_muts
+        let saved_fn_sigs = move self.local_fn_sigs
+        let saved_pointees = move self.local_pointee_structs
+        let saved_task_locals = move self.task_locals
+        let saved_trait_locals = move self.trait_locals
+        let saved_trait_concrete = move self.trait_local_concrete_types
+        let saved_scope_syms = move self.scope_local_syms
+        let saved_scope_allocas = move self.scope_local_allocas
+        let saved_scope_types = move self.scope_local_types
         let saved_scope_count = self.scope_local_count
-        let saved_defer = self.defer_stack
-        let saved_errdefer = self.errdefer_stack
-        let saved_enum_local_types = self.enum_local_types
-        let saved_sema_local_types = self.local_sema_types
+        let saved_defer = move self.defer_stack
+        let saved_errdefer = move self.errdefer_stack
+        let saved_enum_local_types = move self.enum_local_types
+        let saved_sema_local_types = move self.local_sema_types
         let saved_expected = self.expected_type
         let saved_expected_node = self.expected_type_node
         let saved_result_err = self.current_result_err_symbol
@@ -16560,7 +16564,7 @@ impl Codegen:
         let saved_saw_return = self.current_fn_saw_explicit_return
         let saved_tail_bb = self.tailrec_body_bb
         let saved_tail_sym = self.tailrec_fn_sym
-        let saved_tail_allocas = self.tailrec_param_allocas
+        let saved_tail_allocas = move self.tailrec_param_allocas
         let saved_loops = self.capture_loop_state()
         let saved_bb = wl_get_insert_block(self.builder)
         let saved_debug = self.debug_save_state()
@@ -16585,8 +16589,8 @@ impl Codegen:
                 self.di_current_scope = 0
                 self.debug_clear_location()
         self.current_ret_type = wl_get_return_type(fn_type)
-        let saved_tb_syms = self.type_binding_syms
-        let saved_tb_tys = self.type_binding_types
+        let saved_tb_syms = move self.type_binding_syms
+        let saved_tb_tys = move self.type_binding_types
         let saved_tb_len = self.type_bindings_len
         self.set_mono_type_bindings(mono_sym)
         let fn_has_sret_opt = self.fn_abi_has_sret(mono_sym)
@@ -16644,14 +16648,14 @@ impl Codegen:
         self.tailrec_param_allocas = fresh_tail_allocas
         self.reset_loop_state()
 
-        let saved_mir_locals = self.mir_local_ptrs
-        let saved_mir_values = self.mir_local_values
-        let saved_mir_memory_locals = self.mir_memory_locals
-        let saved_mir_local_types = self.mir_local_types
-        let saved_mir_indirect_value_local_types = self.mir_indirect_value_local_types
-        let saved_mir_ref_capture_local_types = self.mir_ref_capture_local_types
-        let saved_mir_bbs = self.mir_bb_values
-        let saved_mir_default_unreachable_bbs = self.mir_default_unreachable_bbs
+        let saved_mir_locals = move self.mir_local_ptrs
+        let saved_mir_values = move self.mir_local_values
+        let saved_mir_memory_locals = move self.mir_memory_locals
+        let saved_mir_local_types = move self.mir_local_types
+        let saved_mir_indirect_value_local_types = move self.mir_indirect_value_local_types
+        let saved_mir_ref_capture_local_types = move self.mir_ref_capture_local_types
+        let saved_mir_bbs = move self.mir_bb_values
+        let saved_mir_default_unreachable_bbs = move self.mir_default_unreachable_bbs
         let fresh_mir_locals: HashMap[i32, i64] = HashMap.new()
         let fresh_mir_values: HashMap[i32, i64] = HashMap.new()
         let fresh_mir_memory_locals: HashMap[i32, i32] = HashMap.new()
@@ -17294,8 +17298,8 @@ impl Codegen:
             if self.find_binding_type(bind_syms, bind_tys, tp_syms[ti]) == 0:
                 return 0
 
-        let saved_bind_syms = self.type_binding_syms
-        let saved_bind_tys = self.type_binding_types
+        let saved_bind_syms = move self.type_binding_syms
+        let saved_bind_tys = move self.type_binding_types
         let saved_bind_len = self.type_bindings_len
         let fresh_bind_syms: Vec[i32] = Vec.new()
         let fresh_bind_tys: Vec[i64] = Vec.new()
@@ -17774,9 +17778,9 @@ impl Codegen:
         let saved_async_rbuf = self.async_block_rbuf
         self.async_block_rbuf = 0
         let saved_bb = wl_get_insert_block(self.builder)
-        let saved_allocas = self.local_allocas
-        let saved_types = self.local_types
-        let saved_muts = self.local_muts
+        let saved_allocas = move self.local_allocas
+        let saved_types = move self.local_types
+        let saved_muts = move self.local_muts
         let saved_loops = self.capture_loop_state()
         let fresh_closure_locals: HashMap[i32, i64] = HashMap.new()
         let fresh_closure_types: HashMap[i32, i64] = HashMap.new()
@@ -17888,14 +17892,14 @@ impl Codegen:
                 self.record_local_sema_type(p_name, closure_param_sema_types[i])
         // ── MIR-based closure body compilation ──────────────────────
         // Save outer MIR state (gen_closure is called from within MIR codegen)
-        let saved_mir_locals = self.mir_local_ptrs
-        let saved_mir_values = self.mir_local_values
-        let saved_mir_memory_locals = self.mir_memory_locals
-        let saved_mir_local_types = self.mir_local_types
-        let saved_mir_indirect_value_local_types = self.mir_indirect_value_local_types
-        let saved_mir_ref_capture_local_types = self.mir_ref_capture_local_types
-        let saved_mir_bbs = self.mir_bb_values
-        let saved_mir_unreachable = self.mir_default_unreachable_bbs
+        let saved_mir_locals = move self.mir_local_ptrs
+        let saved_mir_values = move self.mir_local_values
+        let saved_mir_memory_locals = move self.mir_memory_locals
+        let saved_mir_local_types = move self.mir_local_types
+        let saved_mir_indirect_value_local_types = move self.mir_indirect_value_local_types
+        let saved_mir_ref_capture_local_types = move self.mir_ref_capture_local_types
+        let saved_mir_bbs = move self.mir_bb_values
+        let saved_mir_unreachable = move self.mir_default_unreachable_bbs
         let fresh_cl_mir_locals: HashMap[i32, i64] = HashMap.new()
         let fresh_cl_mir_values: HashMap[i32, i64] = HashMap.new()
         let fresh_cl_mir_memory_locals: HashMap[i32, i32] = HashMap.new()
@@ -19245,17 +19249,17 @@ impl Codegen:
         let saved_ret = self.current_ret_type
         let saved_async_rbuf = self.async_block_rbuf
         let saved_bb = wl_get_insert_block(self.builder)
-        let saved_allocas = self.local_allocas
-        let saved_types = self.local_types
-        let saved_muts = self.local_muts
+        let saved_allocas = move self.local_allocas
+        let saved_types = move self.local_types
+        let saved_muts = move self.local_muts
         let saved_loops = self.capture_loop_state()
-        let saved_mir_locals = self.mir_local_ptrs
-        let saved_mir_values = self.mir_local_values
-        let saved_mir_memory_locals = self.mir_memory_locals
-        let saved_mir_types = self.mir_local_types
-        let saved_mir_indirect_value_local_types = self.mir_indirect_value_local_types
-        let saved_mir_ref_capture_local_types = self.mir_ref_capture_local_types
-        let saved_mir_bbs = self.mir_bb_values
+        let saved_mir_locals = move self.mir_local_ptrs
+        let saved_mir_values = move self.mir_local_values
+        let saved_mir_memory_locals = move self.mir_memory_locals
+        let saved_mir_types = move self.mir_local_types
+        let saved_mir_indirect_value_local_types = move self.mir_indirect_value_local_types
+        let saved_mir_ref_capture_local_types = move self.mir_ref_capture_local_types
+        let saved_mir_bbs = move self.mir_bb_values
 
         // 5. Fresh context for trampoline body
         self.current_function = tramp_fn

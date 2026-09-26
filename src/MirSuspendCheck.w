@@ -4,6 +4,8 @@ use Mir
 use Sema
 use Span
 use std.collections.HashMap
+use MirCore
+use SemaTypes
 
 fn suspend_bit_index(local_count: i32, bb: i32, local: i32) -> i32:
     bb * local_count + local
@@ -863,7 +865,7 @@ fn suspend_check_no_suspend_body(ast: AstPool, sema: &Sema, body_by_fn: &HashMap
         out = suspend_emit_no_suspend_error(move out, sema, body, body_by_fn, body_may_suspend, site, bb)
     out
 
-fn check_no_await_guard_suspends(mir_mod: &MirModule, ast: AstPool, sema: &Sema, diags: DiagnosticList) -> DiagnosticList:
+pub fn check_no_await_guard_suspends(mir_mod: &MirModule, ast: AstPool, sema: &Sema, diags: DiagnosticList) -> DiagnosticList:
     var out = diags
     let body_by_fn = suspend_build_body_index(mir_mod)
     let body_may_suspend = suspend_compute_may_suspend(mir_mod, body_by_fn)

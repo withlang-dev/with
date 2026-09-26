@@ -14,6 +14,10 @@ use render
 use MathBuiltins
 use std.builtins.int_to_string
 use std.regex.Regex
+use SemaTypes
+use SemaDecl
+use FnAbi
+use TargetSpec
 
 extern fn with_str_clone_ref(s: &str) -> str
 extern fn with_write(s: &str) -> Unit
@@ -30,13 +34,13 @@ const GLOBAL_RACE_ACCESS_WRITE: i32 = 2
 // D22 contextual-join arm classifications. Keep these numeric values stable:
 // typed diagnostics and later MIR consumption read the Sema record directly.
 const D22_JOIN_ARM_OWNED_ANCHOR: i32 = 1
-const D22_JOIN_ARM_MATERIALIZED_REF: i32 = 2
+pub const D22_JOIN_ARM_MATERIALIZED_REF: i32 = 2
 const D22_JOIN_ARM_VIEW: i32 = 3
 const D22_JOIN_ARM_DIVERGING: i32 = 4
 
 const D22_JOIN_ROLE_EXPR: i32 = 0
-const D22_JOIN_ROLE_CARRIER_PAYLOAD: i32 = 1
-const D22_JOIN_ROLE_LAZY_RESULT: i32 = 2
+pub const D22_JOIN_ROLE_CARRIER_PAYLOAD: i32 = 1
+pub const D22_JOIN_ROLE_LAZY_RESULT: i32 = 2
 
 impl Sema:
     mut fn require_async_runtime(node: i32, feature: &str):
@@ -145,7 +149,7 @@ fn sema_path_is_runtime_implementation(path: &str) -> i32:
         return 1
     0
 
-fn sema_path_is_migrated_regex_implementation(path: &str) -> i32:
+pub fn sema_path_is_migrated_regex_implementation(path: &str) -> i32:
     if path.starts_with("lib/std/re/") or path.starts_with("<embedded-std>/std/re/"):
         return 1
     if path.contains("/lib/std/re/") or path.contains("\\lib\\std\\re\\"):
@@ -166,7 +170,7 @@ fn sema_path_is_compiler_source_implementation(path: &str) -> i32:
         return 1
     0
 
-fn sema_path_is_user_lint_source(path: &str) -> i32:
+pub fn sema_path_is_user_lint_source(path: &str) -> i32:
     if path.len() == 0:
         return 1
     if sema_path_is_std_implementation(path) != 0:
@@ -181,6 +185,11 @@ fn sema_path_is_user_lint_source(path: &str) -> i32:
     // inside the wrapper's per-line loop — nothing accumulates across
     // iterations). Advice belongs in modules, not pipelines.
     if path.starts_with("<cli "):
+        return 0
+    // #1590: a `<c_import …>` translation is the compiler's rendering of a C
+    // header; advice about its `unsafe` blocks reaches nobody who can edit
+    // them.
+    if path.starts_with("<c_import "):
         return 0
     1
 
@@ -1961,7 +1970,12 @@ impl Sema:
                 if sema_path_is_user_lint_source(path) == 0:
                     continue
                 let node: i32 = self.global_race_access_nodes[i]
-                self.emit_warning("unsafe global access is currently covered by the single-thread proof; keep `unsafe` only if future concurrency is intended", node)
+                // #1590: this pass runs after every body, so the current source
+                // context is whatever file was checked last; the access's own
+                // recorded file locates it (emit_global_data_race_error's shape).
+                var diag = Diagnostic.warn("unsafe global access is currently covered by the single-thread proof; keep `unsafe` only if future concurrency is intended", Span { file: self.global_race_access_files[i], start: self.ast.get_start(node), end: self.ast.get_end(node) })
+                diag.set_origin(__FILE__, __FN__, __LINE__ as i32, node)
+                self.diags.emit(move diag)
 
     mut fn generator_push_state_field(state_tid: i32, field_count: i32, sym: i32, tid: i32, report_node: i32) -> i32:
         if sym == 0 or sym == self.discard_sym:
@@ -2849,9 +2863,9 @@ impl Sema:
         let saved_value_root = self.current_value_expr_root
         let saved_stmt_root = self.current_statement_expr_root
         let saved_self = if self.named_types.contains(self.syms.self_type): self.named_types.get(self.syms.self_type).unwrap() else: 0
-        let saved_assoc = self.assoc_type_bindings
-        let saved_subst_syms = self.generic_subst_param_syms
-        let saved_subst_tys = self.generic_subst_type_ids
+        let saved_assoc = move self.assoc_type_bindings
+        let saved_subst_syms = move self.generic_subst_param_syms
+        let saved_subst_tys = move self.generic_subst_type_ids
         let fresh_assoc = sema_new_map_i32_i32()
 
         let impl_type_tid = self.lookup_named_type_visible(impl_type_sym)
@@ -4029,8 +4043,8 @@ impl Sema:
 
         let tp_count = tp_syms.len() as i32
 
-        let saved_generic_subst_param_syms = self.generic_subst_param_syms
-        let saved_generic_subst_type_ids = self.generic_subst_type_ids
+        let saved_generic_subst_param_syms = move self.generic_subst_param_syms
+        let saved_generic_subst_type_ids = move self.generic_subst_type_ids
         let saved_types_frozen = self.types_frozen
         self.types_frozen = 0
         self.generic_subst_param_syms = Vec.new()
@@ -4127,29 +4141,29 @@ impl Sema:
 
         // Concrete generic validation must run in the callee's own lexical
         // environment, not inside the caller's active local scopes.
-        let saved_bind_names = self.bind_names
-        let saved_bind_types = self.bind_types
-        let saved_bind_muts = self.bind_muts
-        let saved_bind_states = self.bind_states
-        let saved_bind_is_task = self.bind_is_task
-        let saved_bind_task_used = self.bind_task_used
-        let saved_bind_is_scoped_task = self.bind_is_scoped_task
+        let saved_bind_names = move self.bind_names
+        let saved_bind_types = move self.bind_types
+        let saved_bind_muts = move self.bind_muts
+        let saved_bind_states = move self.bind_states
+        let saved_bind_is_task = move self.bind_is_task
+        let saved_bind_task_used = move self.bind_task_used
+        let saved_bind_is_scoped_task = move self.bind_is_scoped_task
         // #664: bind_is_view_bound is the 9th member of the scope-stack
         // family (scope_insert_at pushes all 9) and the moved_field_* vecs
         // are its satellites; skipping them here left the inner environment
         // pushing view-bound flags into the OUTER vec — lengths diverged and
         // inner bindings read the caller's flags at their aligned indices.
-        let saved_bind_is_view_bound = self.bind_is_view_bound
-        let saved_moved_field_base_syms = self.moved_field_base_syms
-        let saved_moved_field_path_starts = self.moved_field_path_starts
-        let saved_moved_field_path_counts = self.moved_field_path_counts
-        let saved_moved_field_path_syms = self.moved_field_path_syms
-        let saved_bind_provenance = self.bind_provenance
-        let saved_scope_starts = self.scope_starts
-        let saved_scope_name_map = self.scope_name_map
-        let saved_pending_generic_binding_base = self.pending_generic_binding_base
-        let saved_pending_generic_binding_call = self.pending_generic_binding_call
-        let saved_pending_generic_binding_decl = self.pending_generic_binding_decl
+        let saved_bind_is_view_bound = move self.bind_is_view_bound
+        let saved_moved_field_base_syms = move self.moved_field_base_syms
+        let saved_moved_field_path_starts = move self.moved_field_path_starts
+        let saved_moved_field_path_counts = move self.moved_field_path_counts
+        let saved_moved_field_path_syms = move self.moved_field_path_syms
+        let saved_bind_provenance = move self.bind_provenance
+        let saved_scope_starts = move self.scope_starts
+        let saved_scope_name_map = move self.scope_name_map
+        let saved_pending_generic_binding_base = move self.pending_generic_binding_base
+        let saved_pending_generic_binding_call = move self.pending_generic_binding_call
+        let saved_pending_generic_binding_decl = move self.pending_generic_binding_decl
         self.bind_names = Vec.new()
         self.bind_types = Vec.new()
         self.bind_muts = Vec.new()
@@ -7354,6 +7368,11 @@ impl Sema:
             // (use-after-move diagnostics; reassignment heals).
             if self.ast.kind(inner) == NodeKind.NK_FIELD_ACCESS:
                 let fty = self.check_expr(inner)
+                // §21.1 Rules 1-2: a vacate is a write to the field's place, so
+                // it invalidates a live view of it (or of its root) the same
+                // way an assignment does. `let p = x.s; let q = move x.s;
+                // print(p)` read the blanked field (#1530).
+                self.check_mutation_against_views(inner, node)
                 // D32 (§2.2): a vacate is a write — the explicit `move
                 // place.field` needs a mutable path (`var` base or `mut fn`
                 // receiver). Inside the owner's own drop the consumed `self`
@@ -7384,6 +7403,9 @@ impl Sema:
                 self.emit_error("'move' must be applied to a binding identifier or field path", node)
                 return self.check_expr(inner)
             let ty = self.check_expr(inner)
+            // §21.1 Rule 2: a move of a place while a view of it (or of a
+            // field of it) is live is refused, as an assignment is (#1530).
+            self.check_mutation_against_views(inner, node)
             // Explicitly mark the inner binding as moved, even for Copy types.
             let sym = self.ast.get_data0(inner)
             if self.scope_has(sym) != 0:
@@ -8489,7 +8511,7 @@ type AutoderefStep {
     step_ty: i32,
 }
 
-type SemaDerefInfo {
+pub type SemaDerefInfo {
     ok: i32,
     target_ty: i32,
     result_ref_ty: i32,
@@ -10419,6 +10441,7 @@ impl Sema:
         // (as in Rust) — `x` is untouched, so it must not be marked consumed. This
         // keeps `let _ = param` a non-consuming acknowledgement: the param stays
         // share-place (borrowed) instead of being forced to owned.
+        var field_view_let = 0
         if self.pool_resolve(name) != "_" and not self.view_projection_exprs.contains(value):
             // §2.4: a drop-body let of a self field CONSUMES (the 84ebff6d
             // observation rule contradicted the spec — spec_ss02_4 pins the
@@ -10435,7 +10458,13 @@ impl Sema:
                 // D22 outside drop bodies: the binding OBSERVES (MirLower
                 // alias-binds it) — marking would blank the field and reject
                 // legal later base uses (`let saved = a.buf; a.buf = ...`).
-                let _ = value
+                // #1530 (§21.1 Rules 1-2): a non-Copy field view is a view of
+                // its root, registered as a borrow exactly as an element view
+                // is, so a write or a vacate of the field while it is live is
+                // refused. It registered nothing, and `move x.s` / `x.s = …`
+                // under a live `let p = x.s` read the blank.
+                if val_type != 0 and self.is_copy(val_type) == 0:
+                    field_view_let = 1
             else if ann_type != 0 and val_type != 0 and self.can_auto_ref_arg(ann_type as i32, val_type as i32) != 0 and self.place_root_sym(value) != 0:
                 // #1244 / §3.8: `let s: &T = place` auto-references — the
                 // binding observes the place, it does not consume it. The
@@ -10482,7 +10511,7 @@ impl Sema:
         else:
             self.binding_closure_nodes.remove(name)
         let bind_kind = self.get_type_kind(self.resolve_alias(bind_type))
-        if bind_kind == TypeKind.TY_REF or self.view_projection_exprs.contains(value):
+        if bind_kind == TypeKind.TY_REF or self.view_projection_exprs.contains(value) or field_view_let != 0:
             self.scope_set_is_view_bound(name)
         if self.scope_is_view_bound(name) != 0 or self.type_has_drop_impl(bind_type as i32) != 0 or self.type_is_ephemeral_value(bind_type as i32) != 0 or self.closure_expr_has_by_place_captures(value) != 0:
             self.record_view_binding_from_expr(name, value)
@@ -11113,7 +11142,9 @@ impl Sema:
                 peeled_place = self.ast.get_data0(peeled_place)
             // #1244: an auto-referenced initializer (`let s: &T = x`) borrows
             // its root exactly as `&x` does.
-            if peeled_place != 0 and (self.ast.kind(peeled_place) == NodeKind.NK_INDEX or self.auto_ref_binding_values.contains(expr_node)):
+            // #1530: a field view of an owned root (`let p = x.s`, D22)
+            // borrows that root exactly as an element view does.
+            if peeled_place != 0 and (self.ast.kind(peeled_place) == NodeKind.NK_INDEX or self.ast.kind(peeled_place) == NodeKind.NK_FIELD_ACCESS or self.auto_ref_binding_values.contains(expr_node)):
                 let root = self.place_root_sym(peeled_place)
                 if root != 0 and root != sym:
                     deps = self.push_unique_i32(move deps, root)
@@ -11690,6 +11721,13 @@ impl Sema:
                                 let root = self.place_root_sym(arg_node)
                                 if root != 0 and self.scope_has(root) != 0:
                                     self.record_consume_call_site(arg_node, sig_idx, param_i)
+                                    // #714 (§3.8): the plain call consumes; mark the
+                                    // binding moved so a later use diagnoses. The free-call
+                                    // path did this and the method path only recorded the
+                                    // site, so `T.make(p)` / `x.m(p)` then `p` compiled and
+                                    // read the moved-from value (#1588).
+                                    if self.extern_param_is_bit_copy(self.sig_names[sig_idx], sig_idx, param_i) == 0:
+                                        self.mark_moved_if_consumed(arg_node)
                                 else if root == 0 and self.d32_is_field_access(arg_node) != 0:
                                     // #1281: `s.m(make().1)` — the element of a
                                     // temporary is an implicit field move (§2.2).
@@ -14377,6 +14415,7 @@ enum SemaExhClass: i32:
     Struct = 4
     Int = 5
     Slice = 6
+impl Copy for SemaExhClass
 
 impl Sema:
     // The subject's own type: patterns see through `&` (§9.7 reference
@@ -17202,21 +17241,9 @@ impl Sema:
         let slice_mismatch = self.report_fixed_array_slice_mismatch(pattern, val_type as i32)
         if else_body == 0 and not slice_mismatch and self.pattern_is_refutable_for(pattern, val_type as i32) != 0:
             self.emit_error("let ... else requires an else branch for refutable patterns", node)
-        self.pattern_subject_node = value
-        // §9.7: `var PATTERN = ...` binds every name it introduces mutably (#1354).
-        let saved_bind_mut = self.pattern_bind_mut
-        self.pattern_bind_mut = self.ast.let_pattern_is_mut(node)
-        self.check_pattern(pattern, val_type as i32)
-        self.pattern_bind_mut = saved_bind_mut
-        self.pattern_subject_node = 0
-        self.record_pattern_view_bindings(pattern, value)
-        // #782 arm 2: a pattern let over an owned subject EXTRACTS by value —
-        // MIR moves the bound elements out, so a later use of the subject
-        // (`t.1` after `let (a, b) = t`) reads blanked storage.
-        // mark_moved_if_consumed's gates keep Copy and view subjects live.
-        // #1302: only when a binding takes an owned value; a pattern that
-        // binds nothing non-Copy observes the subject in place.
-        self.mark_pattern_subject_consumed(node, pattern, value, val_type as i32)
+        // The else branch runs only when the pattern did not match, so nothing
+        // the pattern binds exists there: check it before the pattern binds
+        // its names into this scope (#1476).
         if else_body != 0:
             // §2.2/§9.7: the else branch diverges, so a value it moves is
             // still live on the path that continues past the let-else — the
@@ -17236,6 +17263,21 @@ impl Sema:
             let else_kind = self.get_type_kind(self.resolve_alias(else_ty as TypeId))
             if else_kind != TypeKind.TY_NEVER:
                 self.emit_error("let ... else requires a diverging else branch", else_body)
+        self.pattern_subject_node = value
+        // §9.7: `var PATTERN = ...` binds every name it introduces mutably (#1354).
+        let saved_bind_mut = self.pattern_bind_mut
+        self.pattern_bind_mut = self.ast.let_pattern_is_mut(node)
+        self.check_pattern(pattern, val_type as i32)
+        self.pattern_bind_mut = saved_bind_mut
+        self.pattern_subject_node = 0
+        self.record_pattern_view_bindings(pattern, value)
+        // #782 arm 2: a pattern let over an owned subject EXTRACTS by value —
+        // MIR moves the bound elements out, so a later use of the subject
+        // (`t.1` after `let (a, b) = t`) reads blanked storage.
+        // mark_moved_if_consumed's gates keep Copy and view subjects live.
+        // #1302: only when a binding takes an owned value; a pattern that
+        // binds nothing non-Copy observes the subject in place.
+        self.mark_pattern_subject_consumed(node, pattern, value, val_type as i32)
         self.ty_void as i32
 
     // Refutability against the subject's type (§9.7). The type is what
@@ -17712,6 +17754,15 @@ impl Sema:
         if module_path.len() == 0:
             return -1
         let pkg_name: str = with_str_clone_ref(self.pool_resolve(pkg_sym))
+        // A module alias that shares its name with a type this module cannot
+        // see, and declares no extension method `m`, is not the callee's
+        // owner: `use Compilation; Compilation.init()` meant the type, which a
+        // facade module no longer re-exports under §18.2's non-transitive
+        // imports (#1708). Name the invisible type rather than demand a
+        // receiver for a method no module declares.
+        if not self.module_declares_extension_method(method_sym, module_path, pkg_name) and self.named_types.contains(pkg_sym):
+            self.emit_private_symbol_error(pkg_sym, recv_expr)
+            return 0
         let method_name: str = with_str_clone_ref(self.pool_resolve(method_sym))
         if arg_count <= 0:
             self.emit_error("qualified extension method '" ++ pkg_name ++ "." ++ method_name ++ "' requires a receiver argument", node)
@@ -18169,6 +18220,11 @@ impl Sema:
                     expected_ty = self.facade_callback_fn_param_expected_type(facade_mi, fn_sym, 0, facade_context.userdata_type, ai)
             if expected_ty == 0 and arg_node > 0 and self.ast.kind(arg_node) == NodeKind.NK_NULL_LIT:
                 expected_ty = self.null_arg_expected_type(fn_sym, ai + param_offset, false)
+            // #1609: a bare fn named as a generic callee's argument takes the
+            // template's `extern "C" fn` parameter type, so §12.4's coercion
+            // applies as it does for a concrete callee.
+            if expected_ty == 0 and sig_idx < 0 and arg_node > 0 and self.ast.kind(arg_node) == NodeKind.NK_IDENT:
+                expected_ty = self.extern_fn_arg_expected_type(fn_sym, ai + param_offset, false)
             if arg_node == 0:
                 arg_types.push(0)
                 continue
@@ -22171,6 +22227,24 @@ impl Sema:
     // type parameter of the fn; a method generic through its impl alone is
     // left to the ordinary path.
     mut fn null_arg_expected_type(fn_sym: i32, ai: i32, method_call: bool) -> i32:
+        let fixed = self.fixed_param_expected_type(fn_sym, ai, method_call)
+        if fixed == 0: 0 else: self.null_literal_target_type(fixed as TypeId) as i32
+
+    // A bare fn coerces to an `extern "C" fn` parameter (§12.4) through a
+    // generic callee as it does through a concrete one: the generic call
+    // path binds the type parameters from every argument at once and gave
+    // the argument no expected type, so `g2(1, my)` was "wrong argument
+    // type" (#1609). Like a null literal, the argument takes the template
+    // parameter's type when that type names no type parameter.
+    mut fn extern_fn_arg_expected_type(fn_sym: i32, ai: i32, method_call: bool) -> i32:
+        let fixed = self.fixed_param_expected_type(fn_sym, ai, method_call)
+        if fixed != 0 and self.get_type_kind(self.resolve_alias(fixed as TypeId)) == TypeKind.TY_EXTERN_FN: fixed else: 0
+
+    // The callee's declared type for argument `ai` when it is fixed by the
+    // signature alone: a concrete callee's parameter type, or a generic
+    // template's parameter type that mentions no type parameter. 0 when the
+    // type depends on inference.
+    mut fn fixed_param_expected_type(fn_sym: i32, ai: i32, method_call: bool) -> i32:
         if fn_sym == 0:
             return 0
         var param_i = ai
@@ -22183,7 +22257,7 @@ impl Sema:
         if sig >= 0:
             if param_i >= self.sig_get_param_count(sig):
                 return 0
-            return self.null_literal_target_type(self.sig_param_type(sig, param_i) as TypeId) as i32
+            return self.sig_param_type(sig, param_i)
         let fn_node = self.generic_fn_node_for_symbol(fn_sym)
         if fn_node == 0:
             return 0
@@ -22201,7 +22275,12 @@ impl Sema:
             if self.type_expr_mentions_type_param(ty_node, self.ast.get_extra(pos)) != 0:
                 return 0
             pos = pos + 2 + self.ast.get_extra(pos + 1)
-        self.null_literal_target_type(self.resolve_type_expr(ty_node)) as i32
+        // A template's parameter type stays a parameter type here: `[]mut T`
+        // is legal only in that position (#604), and resolving it as a bare
+        // type expression from the argument check refused every facade whose
+        // generic helper takes an element buffer (#1609 widened this path to
+        // identifier arguments).
+        self.resolve_parameter_type_expr(ty_node) as i32
 
     fn method_expected_arg_type(recv_type: i32, field: i32, arg_index: i32) -> i32:
         if recv_type == 0:
@@ -23272,9 +23351,11 @@ impl Sema:
             // ahead for it).
             if mc_expected == 0 and facade_mi >= 0 and facade_nullable and facade_ud_ty != 0 and facade_ud_node == 0 and ai == self.facade_callback_methods[facade_mi].userdata_param:
                 mc_expected = self.facade_callback_param_expected_type(facade_mi, obj_type as i32, field, facade_ud_ty, ai)
-            if mc_expected == 0 and self.ast.kind(mc_arg_node) == NodeKind.NK_NULL_LIT:
+            if mc_expected == 0 and (self.ast.kind(mc_arg_node) == NodeKind.NK_NULL_LIT or self.ast.kind(mc_arg_node) == NodeKind.NK_IDENT):
                 let mc_null_fn = if mc_method_fn_for_resolution != 0: mc_method_fn_for_resolution else: if mc_owner_sym_for_effect != 0: self.lookup_generic_method_fn(mc_owner_sym_for_effect, field) else: 0
-                mc_expected = self.null_arg_expected_type(mc_null_fn, ai, true)
+                // A null literal takes the fixed parameter's pointer type; a
+                // bare fn name takes its `extern "C" fn` type (#1609).
+                mc_expected = if self.ast.kind(mc_arg_node) == NodeKind.NK_NULL_LIT: self.null_arg_expected_type(mc_null_fn, ai, true) else: self.extern_fn_arg_expected_type(mc_null_fn, ai, true)
             let mc_arg_ty = if facade_ud_node != 0 and mc_arg_node == facade_ud_node: facade_ud_ty as TypeId
                 else if mc_expected != 0: self.check_expr_with_expected(mc_arg_node, mc_expected as TypeId)
                 else: self.check_expr_value_context(mc_arg_node)
@@ -25179,6 +25260,39 @@ impl Sema:
         self.borrow_collect_path_inner(node)
         self.borrow_path_data.len() as i32 - start
 
+    // The field path a view binding's initializer projects from `root`,
+    // stored root-to-leaf in borrow_path_data; 0 (the whole root) when the
+    // initializer is not a place rooted at `root`. An index projection views
+    // the whole indexed collection — its element storage can move under any
+    // write to it (#887) — so the path stops at the indexed place.
+    fn view_binding_place_path(node: i32, root: i32) -> i32:
+        var place = node
+        while place != 0 and (self.ast.kind(place) == NodeKind.NK_GROUPED or self.ast.kind(place) == NodeKind.NK_NO_SUSPEND):
+            place = self.ast.get_data0(place)
+        if place == 0 or root == 0 or self.borrow_root_place(place) != root:
+            return 0
+        let start = self.borrow_path_data.len() as i32
+        let _ = self.view_binding_place_path_inner(place)
+        self.borrow_path_data.len() as i32 - start
+
+    // Returns 1 once an index projection has been crossed: the fields below
+    // it are not part of the path.
+    fn view_binding_place_path_inner(node: i32) -> i32:
+        if node == 0:
+            return 0
+        let kind = self.ast.kind(node)
+        if kind == NodeKind.NK_FIELD_ACCESS:
+            if self.view_binding_place_path_inner(self.ast.get_data0(node)) != 0:
+                return 1
+            self.borrow_path_data.push(self.ast.get_data1(node))
+            return 0
+        if kind == NodeKind.NK_INDEX:
+            let _ = self.view_binding_place_path_inner(self.ast.get_data0(node))
+            return 1
+        if kind == NodeKind.NK_COMPUTED_FIELD_ACCESS or kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_NO_SUSPEND:
+            return self.view_binding_place_path_inner(self.ast.get_data0(node))
+        0
+
 // §8.1 sentinel for constant-index path elements. Values < INDEX_PATH_BASE
 // are constant indices encoded as INDEX_PATH_BASE - literal_value. A wildcard
 // (non-constant index) uses INDEX_PATH_WILDCARD which overlaps with everything.
@@ -25338,11 +25452,17 @@ impl Sema:
                 continue
             let before = self.borrow_refs.len() as i32
             let path_start = self.borrow_path_data.len() as i32
+            // §3.8 / D22: a view of a field borrows that field's path, not the
+            // whole root — `let src = self.source; self.pos = …` mutates a
+            // disjoint sibling and leaves the view intact; only a write to the
+            // viewed path or one of its ancestors invalidates it (#1530
+            // registered the root alone and refused every sibling write).
+            let path_count = self.view_binding_place_path(creation_node, origin_sym)
             // §12.4 (#1691): a closure that mutates the captured place is an
             // exclusive view of it for as long as the binding is alive; its
             // capture summary says which places its body writes.
             let kind = if self.closure_capture_writes(creation_node, origin_sym): BorrowKind.EXCLUSIVE else: BorrowKind.SHARED
-            self.check_borrow_create_direct(origin_sym, kind, 0, path_start, 0, creation_node)
+            self.check_borrow_create_direct(origin_sym, kind, 0, path_start, path_count, creation_node)
             if self.borrow_refs.len() as i32 > before:
                 self.borrow_refs[before] = view_sym
 
@@ -26786,6 +26906,16 @@ impl Sema:
         elems.push(self.traversal_binding_type(self.get_generic_inst_arg(map_inst, 1)))
         self.ensure_tuple_type(elems, 2) as i32
 
+    // D44: `for (k, v) in bt` traverses a BTreeMap's `Vec[(K, V)]` storage in
+    // place, exactly as a Vec of pairs is traversed — a Drop-class pair binds
+    // as a `&(K, V)` view and the tuple pattern projects `&K`/`&V`; a Copy
+    // pair binds by value. The generic `next()` protocol found no `next` on
+    // the map and typed the element `i32`, so the tuple pattern was refused
+    // and a generic body's bindings came back undefined (#1561).
+    mut fn btree_traversal_element_type(map_inst: i32) -> i32:
+        let storage = self.ensure_btree_storage_type(map_inst)
+        if storage == 0: 0 else: self.infer_for_element_type(storage)
+
     mut fn infer_for_element_type(iter_type: i32) -> i32:
         if iter_type == 0:
             return 0
@@ -26810,13 +26940,18 @@ impl Sema:
             let ref_pointee_resolved = self.resolve_alias(ref_pointee as TypeId)
             if self.get_type_kind(ref_pointee_resolved) == TypeKind.TY_GENERIC_INST:
                 let ref_base = self.pool_resolve(self.get_type_d0(ref_pointee_resolved))
-                if ref_base == "Vec" and self.get_generic_inst_arg_count(ref_pointee_resolved as i32) > 0:
+                let ref_is_vec = ref_base == "Vec"
+                let ref_is_hashmap = ref_base == "HashMap"
+                let ref_is_btreemap = ref_base == "BTreeMap"
+                if ref_is_vec and self.get_generic_inst_arg_count(ref_pointee_resolved as i32) > 0:
                     let ref_elem = self.get_generic_inst_arg(ref_pointee_resolved as i32, 0)
                     return self.ensure_exact_type(TypeKind.TY_REF, ref_elem, 0, 0) as i32
                 // #1187: `for (k, v) in &m` and a `&HashMap` parameter iterate
                 // like the map itself; returning 0 left k and v unbound.
-                if ref_base == "HashMap" and self.get_generic_inst_arg_count(ref_pointee_resolved as i32) >= 2:
+                if ref_is_hashmap and self.get_generic_inst_arg_count(ref_pointee_resolved as i32) >= 2:
                     return self.map_traversal_element_type(ref_pointee_resolved as i32)
+                if ref_is_btreemap and self.get_generic_inst_arg_count(ref_pointee_resolved as i32) >= 2:
+                    return self.btree_traversal_element_type(ref_pointee_resolved as i32)
             // #1197: a `&[T]` / `&[N]T` binding iterates the sequence it views.
             let pointee_kind = self.get_type_kind(ref_pointee_resolved)
             if pointee_kind == TypeKind.TY_ARRAY or pointee_kind == TypeKind.TY_SLICE:
@@ -26834,6 +26969,8 @@ impl Sema:
                 return vec_elem
             if base_name == "HashMap" and self.get_generic_inst_arg_count(resolved as i32) >= 2:
                 return self.map_traversal_element_type(resolved as i32)
+            if base_name == "BTreeMap" and self.get_generic_inst_arg_count(resolved as i32) >= 2:
+                return self.btree_traversal_element_type(resolved as i32)
             if base_name == "Receiver" and self.get_generic_inst_arg_count(resolved as i32) > 0:
                 // D10: `for msg in rx:` receives until the channel is closed
                 // and drained. The loop desugars through recv() -> Option[T];
@@ -27223,6 +27360,13 @@ impl Sema:
             // moved out would transfer blanked storage.
             self.check_whole_use_partially_moved(node)
             let sym = self.ast.get_data0(node)
+            // D52 (§9.1c): a `const` is a value, not a place — every use
+            // materializes it, so consuming one transfers nothing and never
+            // marks the symbol moved. `take(C); take(C)` reported "use of
+            // moved value" at the second use (the method path, #1588, then
+            // refused build.w's `.extra_output(FIXPOINT_STAGE2_UNITS)` twice).
+            if self.const_global_syms.contains(sym) and not self.scope_binding_is_local(sym):
+                return
             if self.scope_has(sym) != 0:
                 let tid = self.scope_lookup(sym)
                 if not self.is_copy(tid as TypeId):
@@ -27587,6 +27731,14 @@ impl Sema:
                 return self.extension_method_fn_syms[i]
         0
 
+    // Whether the module declares an extension method named `method_sym` on
+    // any owner type.
+    fn module_declares_extension_method(method_sym: i32, module_path: &str, alias: &str) -> bool:
+        for i in 0..self.extension_method_owner_syms.len() as i32:
+            if self.extension_method_syms[i] == method_sym and sema_extension_module_path_matches(self.extension_method_paths[i], module_path, alias) != 0:
+                return true
+        false
+
     fn extension_sig_for_module(owner_sym: i32, method_sym: i32, module_path: &str, alias: &str) -> i32:
         for i in 0..self.extension_method_owner_syms.len() as i32:
             if self.extension_method_owner_syms[i] == owner_sym and self.extension_method_syms[i] == method_sym and sema_extension_module_path_matches(self.extension_method_paths[i], module_path, alias) != 0:
@@ -27707,7 +27859,8 @@ impl Sema:
                     if self.type_needs_drop(bare_elem) != 0 and self.is_copy(bare_elem as TypeId) == 0:
                         return 1
                 // D44: a map's Drop-class keys and values bind as views too.
-                if self.pool_resolve(self.get_type_d0(seq_resolved)) == "HashMap" and self.get_generic_inst_arg_count(seq_resolved as i32) >= 2:
+                let seq_base = self.pool_resolve(self.get_type_d0(seq_resolved))
+                if (seq_base == "HashMap" or seq_base == "BTreeMap") and self.get_generic_inst_arg_count(seq_resolved as i32) >= 2:
                     for ai in 0..2:
                         let map_elem = self.get_generic_inst_arg(seq_resolved as i32, ai)
                         if self.type_needs_drop(map_elem) != 0 and self.is_copy(map_elem as TypeId) == 0:

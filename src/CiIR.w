@@ -34,7 +34,7 @@ fn ci_ir_phase_bug(message: &str):
     with_eprint(message)
     abort()
 
-fn ci_ir_owned_text(text: &str) -> str:
+pub fn ci_ir_owned_text(text: &str) -> str:
     if text.len() == 0:
         return ""
     with_str_clone_ref(text)
@@ -49,10 +49,10 @@ fn ci_ir_free_vec_str(v: &Vec[str]):
 
 // ── CiType ────────────────────────────────────────────────────
 
-type CiTypeId = distinct i32
+pub type CiTypeId = distinct i32
 impl Copy for CiTypeId
 
-enum CiTypeKind: i32:
+pub enum CiTypeKind: i32:
     CT_VOID = 1
     CT_BOOL = 2
     CT_INT = 3       // d0 = bits, d1 = is_unsigned (0 or 1)
@@ -64,7 +64,7 @@ enum CiTypeKind: i32:
     CT_FN_PTR = 9    // d0 = ret_ty_id, d1 = params_extra_start, d2 = param_count
     CT_NAMED = 10    // d0 = name_sym_idx  (typedef reference)
 
-const CI_SIZE_INCOMPLETE: i32 = -1
+pub const CI_SIZE_INCOMPLETE: i32 = -1
 
 type CiTypePoolState {
     kinds: Vec[i32],
@@ -76,7 +76,7 @@ type CiTypePoolState {
     frozen: i32,
 }
 
-type CiTypePool {
+pub type CiTypePool {
     state: *mut CiTypePoolState,
 }
 impl Copy for CiTypePool
@@ -193,10 +193,10 @@ impl CiTypePool:
 
 // ── CiExpr ────────────────────────────────────────────────────
 
-type CiExprId = distinct i32
+pub type CiExprId = distinct i32
 impl Copy for CiExprId
 
-enum CiExprKind: i32:
+pub enum CiExprKind: i32:
     // Literals — d0 = string_idx of the already-formatted literal
     // text (decimal digits for ints/chars, suffix-stripped float
     // text, full quoted form for string literals). Printer is
@@ -250,7 +250,7 @@ enum CiExprKind: i32:
     CIE_UNSAFE = 80            // d0 = inner expr
 
 
-enum CiBinOp: i32:
+pub enum CiBinOp: i32:
     CIBO_ADD = 0
     CIBO_SUB = 1
     CIBO_MUL = 2
@@ -280,7 +280,7 @@ enum CiBinOp: i32:
     // value). Used for expressions like `(x = y)`.
     CIBO_ASSIGN = 21
 
-enum CiUnaryOp: i32:
+pub enum CiUnaryOp: i32:
     CIUO_NEG = 0
     CIUO_PLUS = 1
     CIUO_LOGICAL_NOT = 2
@@ -297,7 +297,7 @@ type CiExprPoolState {
     frozen: i32,
 }
 
-type CiExprPool {
+pub type CiExprPool {
     state: *mut CiExprPoolState,
 }
 impl Copy for CiExprPool
@@ -439,10 +439,10 @@ impl CiExprPool:
 
 // ── CiStmt ────────────────────────────────────────────────────
 
-type CiStmtId = distinct i32
+pub type CiStmtId = distinct i32
 impl Copy for CiStmtId
 
-enum CiStmtKind: i32:
+pub enum CiStmtKind: i32:
     CIS_EXPR = 1             // d0 = expr_id
     CIS_RETURN = 2           // d0 = expr_id (0 = bare return)
     CIS_BLOCK = 3            // d0 = stmts_extra_start, d1 = stmts_count, d2 = label_sym (0 if none)
@@ -473,7 +473,7 @@ type CiStmtPoolState {
     frozen: i32,
 }
 
-type CiStmtPool {
+pub type CiStmtPool {
     state: *mut CiStmtPoolState,
 }
 impl Copy for CiStmtPool
@@ -631,10 +631,10 @@ impl CiStmtPool:
 
 // ── CiDecl ────────────────────────────────────────────────────
 
-type CiDeclId = distinct i32
+pub type CiDeclId = distinct i32
 impl Copy for CiDeclId
 
-enum CiDeclKind: i32:
+pub enum CiDeclKind: i32:
     // d0 = name_sym, d1 = ret_ty_id, d2 = body_block_stmt (0 for extern)
     // extra: [param_count, param0_name, param0_ty, param1_name, param1_ty, ...]
     // flags: bit0=is_extern bit1=is_static bit2=is_variadic bit3=is_c_export
@@ -663,9 +663,9 @@ enum CiDeclKind: i32:
 const CID_FLAG_EXTERN: i32 = 1
 const CID_FLAG_STATIC: i32 = 2
 const CID_FLAG_VARIADIC: i32 = 4
-const CID_FLAG_C_EXPORT: i32 = 8
+pub const CID_FLAG_C_EXPORT: i32 = 8
 const CID_FLAG_CONST: i32 = 1          // (same bit as EXTERN, but on CID_VAR_GLOBAL)
-const CID_FLAG_VAR_EXTERN: i32 = 2     // (on CID_VAR_GLOBAL)
+pub const CID_FLAG_VAR_EXTERN: i32 = 2     // (on CID_VAR_GLOBAL)
 const CID_FLAG_DEFINITION: i32 = 4
 const CID_FLAG_VAR_STATIC: i32 = 8
 
@@ -681,7 +681,7 @@ type CiDeclPoolState {
     frozen: i32,
 }
 
-type CiDeclPool {
+pub type CiDeclPool {
     state: *mut CiDeclPoolState,
 }
 impl Copy for CiDeclPool
@@ -827,7 +827,7 @@ impl CiModule:
 // table so ownership and cross-module type resolution come from the
 // compiler rather than shell-side string rewriting.
 
-enum CiProjectSymbolKind: i32:
+pub enum CiProjectSymbolKind: i32:
     CIPS_VAR = 1
     CIPS_FN = 2
     CIPS_TYPE = 3
@@ -897,7 +897,7 @@ fn ci_project_symbol_key(kind: i32, name: &str) -> str:
         return "t:" ++ name
     "m:" ++ name
 
-type CiProject {
+pub type CiProject {
     module_paths: Vec[str],
     symbols: Vec[CiProjectSymbol],
     types: CiTypePool,
