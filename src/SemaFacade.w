@@ -4148,6 +4148,45 @@ impl Sema:
             return -1
         arg_count - 1
 
+    // The argument index of a pair userdata setter's userdata (its last) at
+    // a method call, or -1.
+    fn facade_pair_userdata_arg(recv_type: i32, field: i32, arg_count: i32) -> i32:
+        if self.facade_pair_setter_contract.len() == 0 or recv_type == 0 or field == 0 or arg_count == 0:
+            return -1
+        let resolved = self.auto_deref_ref_ptr_type(self.resolve_alias(recv_type as TypeId))
+        let owner = self.get_type_name(resolved)
+        if owner == 0:
+            return -1
+        let fn_sym = self.lookup_generic_method_fn(owner, field)
+        let node = if fn_sym != 0: self.generic_fn_node_for_symbol(fn_sym) else: 0
+        if node == 0 or not self.facade_pair_setter_contract.contains(node):
+            return -1
+        let ci: i32 = self.facade_pair_setter_contract.get(node).unwrap()
+        let k: i32 = self.facade_pair_setter_case.get(node).unwrap()
+        if self.foreign_contracts[ci].variadic_case_kinds[k] != FACADE_VARIADIC_USERDATA:
+            return -1
+        arg_count - 1
+
+    // §16.2b.9 "Retained borrows": the userdata a setter installs is held by
+    // the resource until reset, destruction or its last callback-capable
+    // operation, so a local handed as userdata stays alive — for the view
+    // checks (SemaCheck.w view_last_use) — as long as the resource local is
+    // used. Recorded when both are plain locals; anything else is the
+    // ordinary rule (MirForeignPairs.w still proves the origin outlives the
+    // retention).
+    mut fn facade_note_pair_retention(recv_expr: i32, arg_node: i32):
+        var recv = recv_expr
+        while recv != 0 and self.ast.kind(recv) == NodeKind.NK_GROUPED: recv = self.ast.get_data0(recv)
+        var arg = arg_node
+        while arg != 0 and self.ast.kind(arg) == NodeKind.NK_GROUPED: arg = self.ast.get_data0(arg)
+        if recv == 0 or arg == 0 or self.ast.kind(recv) != NodeKind.NK_IDENT or self.ast.kind(arg) != NodeKind.NK_IDENT:
+            return
+        let recv_sym = self.ast.get_data0(recv)
+        let arg_sym = self.ast.get_data0(arg)
+        if recv_sym == 0 or arg_sym == 0 or recv_sym == arg_sym or not self.scope_binding_is_local(arg_sym) or not self.scope_binding_is_local(recv_sym):
+            return
+        self.facade_pair_retainers.insert(arg_sym, recv_sym)
+
     // The type a named fn passed as a pair setter's callback is checked
     // against: its own signature as a C function pointer, to which a bare
     // fn coerces (§12.4) — as stage 9 hands its callback argument the
