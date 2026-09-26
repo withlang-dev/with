@@ -1,6 +1,7 @@
 use BuildGraphCache
 use BuildGraphModel
 use BuildGraphOps
+use BuildGraphSupport
 use std.fs
 use std.process
 

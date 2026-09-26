@@ -1,4 +1,4 @@
-//! expect-check-fail: symbol 'private_fn' is private to module
+//! expect-check-fail: symbol 'private_fn' is not visible from this module
 
 use visibility.transitive_mid
 
