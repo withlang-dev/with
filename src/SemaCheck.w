@@ -9375,7 +9375,10 @@ impl Sema:
             else:
                 if lhs_is_bit_lit:
                     rhs = self.check_expr_value_context(rhs_node)
-                    let rhs_num = self.numeric_operand_type(rhs as i32)
+                    // A Copy view of an integer is that integer (#1477): the
+                    // literal beside `v[i]: &u8` takes u8, not i32.
+                    let rhs_peer = self.literal_peer_type(rhs as i32)
+                    let rhs_num = self.numeric_operand_type(rhs_peer)
                     if self.get_type_kind(self.resolve_alias(rhs_num as TypeId)) == TypeKind.TY_INT:
                         lhs = self.check_bitwise_literal_with_expected(lhs_node, rhs_num as TypeId)
                     else:
@@ -9383,7 +9386,8 @@ impl Sema:
                 else:
                     lhs = self.check_expr_value_context(lhs_node)
                 if rhs == 0:
-                    let lhs_num = self.numeric_operand_type(lhs as i32)
+                    let lhs_peer = self.literal_peer_type(lhs as i32)
+                    let lhs_num = self.numeric_operand_type(lhs_peer)
                     if rhs_is_bit_lit and self.get_type_kind(self.resolve_alias(lhs_num as TypeId)) == TypeKind.TY_INT:
                         rhs = self.check_bitwise_literal_with_expected(rhs_node, lhs_num as TypeId)
                     else:
