@@ -417,6 +417,9 @@ pub type MirBody {
     local_names: Vec[i32],
     local_is_user_var: Vec[i32],
     local_is_global: Vec[i32],   // 1: MirLower's proxy for module-level storage, never a user local that shares the name
+    // 1: a generator's `next` body (lower_generator_next_body): its locals live
+    // in the generator state across a yield, so a yield's return owns nothing.
+    is_generator_next: i32,
     n_params: i32,
     // Blocks ending in mutual tail calls (marked by mutual TCO pass).
     mutual_tail_bbs: Vec[i32],
@@ -682,6 +685,7 @@ fn MirBody.init_for_fn(fn_sym: i32) -> MirBody:
         local_names: Vec.new(),
         local_is_user_var: Vec.new(),
         local_is_global: Vec.new(),
+        is_generator_next: 0,
         n_params: 0,
         mutual_tail_bbs: Vec.new(),
         bb_stmt_starts: Vec.new(),
@@ -1200,6 +1204,10 @@ enum MirDropState: i32:
     // move of a Maybe place is not judged (its uninitialized paths are the
     // lowering's unreachable ones as often as real ones, #1414).
     MaybeMoved = 6
+    // Blanked after a move or drop: the place holds the reset-on-move
+    // sentinel and owns nothing (§2.5.1). A drop of it is the guarded no-op;
+    // a move of it is a use after move; at a return it is not a leak.
+    Reset = 7
 
 // Drop-state dataflow over one body. Every place the transfer functions can
 // mention is interned once per body into a dense key table (locals first, so
@@ -1389,6 +1397,16 @@ type MirDropStateMap {
 fn mir_drop_state_join(a: i32, b: i32) -> i32:
     if a == b:
         return a
+    // A blanked place beside an initialized one is a guarded drop (Maybe);
+    // beside a moved one the moved path is the unsafe one (MaybeMoved);
+    // beside untouched memory the sentinel is not there (MaybeGarbage).
+    if a == MirDropState.Reset or b == MirDropState.Reset:
+        let other = if a == MirDropState.Reset: b else: a
+        if other == MirDropState.Init or other == MirDropState.Maybe:
+            return MirDropState.Maybe
+        if other == MirDropState.Moved or other == MirDropState.MaybeMoved:
+            return MirDropState.MaybeMoved
+        return MirDropState.MaybeGarbage
     // A place one path never touched: joining with Uninit is still Uninit
     // (nothing to drop either way); joining with anything else is garbage on
     // the untouched path.
@@ -1529,7 +1547,14 @@ impl MirDropStateMap:
             self.mark_local(keys, d0, MirDropState.Uninit)
         else if kind == StmtKind.Assign:
             self.note_rvalue(keys, body, d1)
-            self.mark_place(keys, body, d0, MirDropState.Init)
+            // The reset-on-move blank (`x = const zst(T)`) stores the sentinel,
+            // not a value: a moved or dropped place becomes Reset; reading the
+            // blank as re-initialization made every moved-out local `Init` at
+            // the return and hid the leaks from the validator (#1384, #1488).
+            if mir_rvalue_is_zero_fill(body, d1) != 0 and self.place(keys, d0) != MirDropState.Init:
+                self.mark_place(keys, body, d0, MirDropState.Reset)
+            else:
+                self.mark_place(keys, body, d0, MirDropState.Init)
         else if kind == StmtKind.Drop:
             self.mark_place(keys, body, d0, MirDropState.Uninit)
 
@@ -1598,6 +1623,8 @@ fn mir_drop_state_name(state: i32) -> str:
         return "Maybe"
     if state == MirDropState.MaybeMoved:
         return "MaybeMoved"
+    if state == MirDropState.Reset:
+        return "Reset"
     if state == MirDropState.MaybeGarbage:
         return "MaybeGarbage"
     if state == MirDropState.Absent:
@@ -2296,7 +2323,7 @@ fn mir_move_of_moved_place(mir_mod: &MirModule, body: &MirBody, keys: &MirDropSt
             continue
         let place = body.operand_d0[op]
         let moved = state.place(keys, place)
-        if moved != MirDropState.Moved and moved != MirDropState.MaybeMoved:
+        if moved != MirDropState.Moved and moved != MirDropState.MaybeMoved and moved != MirDropState.Reset:
             continue
         if not mir_mod.sema_moved_drop_types.contains(mir_validate_place_type(mir_mod, body, place)):
             continue
@@ -2330,6 +2357,22 @@ fn validate_ownership_body(mir_mod: &MirModule, body: &MirBody) -> str:
         return through_reference
     var blocks = mir_drop_state_compute_blocks(body)
     let key_places = mir_drop_state_key_places(blocks.keys)
+    var dropped_local: Vec[i32] = Vec.new()
+    for _ in 0..body.local_type_ids.len():
+        dropped_local.push(0)
+    for bb in 0..body.block_count():
+        let stmt_start = body.bb_stmt_starts[bb]
+        let stmt_count = body.bb_stmt_counts[bb]
+        for si in 0..stmt_count:
+            let stmt_id = stmt_start + si
+            if body.stmt_kind(stmt_id) == StmtKind.Drop:
+                let place_id = body.stmt_data0(stmt_id)
+                if place_id >= 0 and place_id < body.place_locals.len() and body.place_proj_counts[place_id] == 0:
+                    dropped_local[body.place_locals[place_id]] = 1
+        if body.term_kind(bb) == TermKind.TK_DROP_AND_GOTO:
+            let place_id = body.term_data0(bb)
+            if place_id >= 0 and place_id < body.place_locals.len() and body.place_proj_counts[place_id] == 0:
+                dropped_local[body.place_locals[place_id]] = 1
     for bb in 0..body.block_count():
         var state = blocks.input(bb)
         let stmt_start = body.bb_stmt_starts[bb]
@@ -2382,6 +2425,29 @@ fn validate_ownership_body(mir_mod: &MirModule, body: &MirBody) -> str:
                 let vacated = mir_drop_vacated_subplace(mir_mod, body, blocks.keys, state, key_places, place_id)
                 if vacated >= 0:
                     return f"fn sym{body.fn_sym} bb{bb}: " ++ mir_drop_vacated_message(blocks.keys, state, body, place_id, vacated)
+        // #1384 / #1488: a local some `drop` targets is owned storage the lowering
+        // scheduled a drop for. Still Init at a `return`, with no sub-place moved
+        // out or blanked (a partial move leaves a shell nothing needs to free),
+        // it is a leak: no path dropped or moved it.
+        if body.term_kind(bb) == TermKind.TK_RETURN and blocks.computed[bb] != 0 and body.is_generator_next == 0:
+            for k in 0..key_places.len():
+                let place_id: i32 = key_places[k]
+                if place_id < 0 or body.place_proj_counts[place_id] != 0:
+                    continue
+                let local_id = body.place_locals[place_id]
+                if local_id == 0 or dropped_local[local_id] == 0 or body.local_is_global[local_id] != 0:
+                    continue
+                if state.place(blocks.keys, place_id) != MirDropState.Init:
+                    continue
+                var partial = false
+                if local_id + 1 < blocks.keys.child_starts.len() as i32:
+                    for ci in blocks.keys.child_starts[local_id]..blocks.keys.child_starts[local_id + 1]:
+                        let cs = state.get(blocks.keys, blocks.keys.children[ci])
+                        if cs != MirDropState.Init:
+                            partial = true
+                if partial:
+                    continue
+                return f"fn sym{body.fn_sym} bb{bb}: owned local {mir_place_text(body, place_id)} is still Init at return — no path drops or moves it (a leak)"
         state.transfer_term(blocks.keys, body, bb)
     ""
 
