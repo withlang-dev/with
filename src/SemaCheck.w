@@ -10445,8 +10445,14 @@ impl Sema:
         let resolved = self.resolve_alias(t as TypeId)
         if self.get_type_kind(resolved) == TypeKind.TY_NEVER:
             return t
-        if resolved != self.ty_bool:
-            self.emit_error(f"{what} condition must be bool", cond)
+        if resolved == self.ty_bool:
+            return t
+        // D22 contextual Copy (#1472): a condition is an owned `bool` demand,
+        // so a `&bool` element or field view (`if v[i]:`, `if d.flags[i]:`)
+        // materializes its pointee the way `let b: bool = v[i]` does.
+        if self.record_contextual_copy_adjustment(cond, self.ty_bool as i32, t as i32) != 0:
+            return self.ty_bool
+        self.emit_error(f"{what} condition must be bool", cond)
         t
 
 
