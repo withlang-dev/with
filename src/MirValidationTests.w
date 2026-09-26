@@ -1,4 +1,5 @@
 use MirCore
+use SemaTypes
 
 // Construct malformed MIR directly: testing only corrected source lowering
 // would leave the validator's original false-green result untested.
