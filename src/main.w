@@ -805,12 +805,11 @@ fn run_cli(argc: i32) -> i32:
             return 0
         if cli_configure_build_memory_limit() != 0:
             return 1
-        let parsed_build = parse_build_command_options(argc)
+        var parsed_build = parse_build_command_options(argc)
         if not parsed_build.ok:
             with_eprint("error: " ++ parsed_build.error_msg)
             return 1
-        let _sp_build = parsed_build.build
-        return run_build_command(move _sp_build, parsed_build.graph)
+        return run_build_command(move parsed_build.build, parsed_build.graph)
     if cli_command(argc) == "reduce":
         if cli_has_flag(argc, "--help") or cli_has_flag(argc, "-h"):
             print_reduce_usage()

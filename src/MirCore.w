@@ -850,9 +850,9 @@ impl MirBody:
         if base < 0 or base >= self.place_locals.len():
             return self.new_place(0)
 
-        let base_local = self.place_locals[base]
+        let base_local: i32 = self.place_locals[base]
         let base_proj_start: i32 = self.place_proj_starts[base]
-        let base_proj_count = self.place_proj_counts[base]
+        let base_proj_count: i32 = self.place_proj_counts[base]
 
         let new_proj_start = self.proj_kinds.len() as i32
         for i in 0..base_proj_count:

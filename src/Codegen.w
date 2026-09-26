@@ -3202,8 +3202,8 @@ impl Codegen:
         let saved_file = with_str_clone_ref(self.current_decl_source_file)
         let saved_module = with_str_clone_ref(self.sema.current_module_path)
         let saved_len = self.type_bindings_len
-        let saved_syms = self.type_binding_syms
-        let saved_types = self.type_binding_types
+        let saved_syms = move self.type_binding_syms
+        let saved_types = move self.type_binding_types
         self.type_binding_syms = Vec.new()
         self.type_binding_types = Vec.new()
         self.type_bindings_len = 0
@@ -3614,8 +3614,8 @@ impl Codegen:
             // User-defined generic structs: monomorphize via type bindings
             if cg_base_sym != 0 and self.generic_structs.contains(cg_base_sym):
                 let saved_len = self.type_bindings_len
-                let saved_syms = self.type_binding_syms
-                let saved_types = self.type_binding_types
+                let saved_syms = move self.type_binding_syms
+                let saved_types = move self.type_binding_types
                 let tp_syms: Vec[i32] = Vec.new()
                 let tp_types: Vec[i64] = Vec.new()
                 let gs_node: i32 = self.generic_structs.get(cg_base_sym).unwrap()
@@ -6453,8 +6453,8 @@ impl Codegen:
         let mono_idx: i32 = self.struct_type_map.get(mono_sym).unwrap()
         let mono_ty: i64 = self.struct_llvm_types[mono_idx]
 
-        let saved_bind_syms = self.type_binding_syms
-        let saved_bind_tys = self.type_binding_types
+        let saved_bind_syms = move self.type_binding_syms
+        let saved_bind_tys = move self.type_binding_types
         let saved_bind_len = self.type_bindings_len
         let fresh_bind_syms: Vec[i32] = Vec.new()
         let fresh_bind_tys: Vec[i64] = Vec.new()

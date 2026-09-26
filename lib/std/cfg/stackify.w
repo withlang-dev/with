@@ -754,7 +754,7 @@ impl StackifyContext:
         let _ = self.merge_counts.pop()
 
     mut fn do_branch(source: i32, target_index: i32):
-        let target = self.graph.targets[target_index]
+        let target: StackifyTarget = self.graph.targets[target_index]
         let source_rpo = self.analysis.rpo_pos[source]
         let target_rpo = self.analysis.rpo_pos[target.block]
         if self.analysis.merge_nodes[target.block] != 0 or target_rpo <= source_rpo:
@@ -801,7 +801,7 @@ impl StackifyContext:
         while idx < targets_count + 1:
             extra = extra - 1
             let target_index = if idx < targets_count: targets_start + idx else: default_target
-            let target = self.graph.targets[target_index]
+            let target: StackifyTarget = self.graph.targets[target_index]
             let resolved = self.resolve_target(target.block)
             if resolved < 0:
                 self.ok = false

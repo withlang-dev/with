@@ -2859,9 +2859,9 @@ impl Sema:
         let saved_value_root = self.current_value_expr_root
         let saved_stmt_root = self.current_statement_expr_root
         let saved_self = if self.named_types.contains(self.syms.self_type): self.named_types.get(self.syms.self_type).unwrap() else: 0
-        let saved_assoc = self.assoc_type_bindings
-        let saved_subst_syms = self.generic_subst_param_syms
-        let saved_subst_tys = self.generic_subst_type_ids
+        let saved_assoc = move self.assoc_type_bindings
+        let saved_subst_syms = move self.generic_subst_param_syms
+        let saved_subst_tys = move self.generic_subst_type_ids
         let fresh_assoc = sema_new_map_i32_i32()
 
         let impl_type_tid = self.lookup_named_type_visible(impl_type_sym)
@@ -4039,8 +4039,8 @@ impl Sema:
 
         let tp_count = tp_syms.len() as i32
 
-        let saved_generic_subst_param_syms = self.generic_subst_param_syms
-        let saved_generic_subst_type_ids = self.generic_subst_type_ids
+        let saved_generic_subst_param_syms = move self.generic_subst_param_syms
+        let saved_generic_subst_type_ids = move self.generic_subst_type_ids
         let saved_types_frozen = self.types_frozen
         self.types_frozen = 0
         self.generic_subst_param_syms = Vec.new()
@@ -4137,29 +4137,29 @@ impl Sema:
 
         // Concrete generic validation must run in the callee's own lexical
         // environment, not inside the caller's active local scopes.
-        let saved_bind_names = self.bind_names
-        let saved_bind_types = self.bind_types
-        let saved_bind_muts = self.bind_muts
-        let saved_bind_states = self.bind_states
-        let saved_bind_is_task = self.bind_is_task
-        let saved_bind_task_used = self.bind_task_used
-        let saved_bind_is_scoped_task = self.bind_is_scoped_task
+        let saved_bind_names = move self.bind_names
+        let saved_bind_types = move self.bind_types
+        let saved_bind_muts = move self.bind_muts
+        let saved_bind_states = move self.bind_states
+        let saved_bind_is_task = move self.bind_is_task
+        let saved_bind_task_used = move self.bind_task_used
+        let saved_bind_is_scoped_task = move self.bind_is_scoped_task
         // #664: bind_is_view_bound is the 9th member of the scope-stack
         // family (scope_insert_at pushes all 9) and the moved_field_* vecs
         // are its satellites; skipping them here left the inner environment
         // pushing view-bound flags into the OUTER vec — lengths diverged and
         // inner bindings read the caller's flags at their aligned indices.
-        let saved_bind_is_view_bound = self.bind_is_view_bound
-        let saved_moved_field_base_syms = self.moved_field_base_syms
-        let saved_moved_field_path_starts = self.moved_field_path_starts
-        let saved_moved_field_path_counts = self.moved_field_path_counts
-        let saved_moved_field_path_syms = self.moved_field_path_syms
-        let saved_bind_provenance = self.bind_provenance
-        let saved_scope_starts = self.scope_starts
-        let saved_scope_name_map = self.scope_name_map
-        let saved_pending_generic_binding_base = self.pending_generic_binding_base
-        let saved_pending_generic_binding_call = self.pending_generic_binding_call
-        let saved_pending_generic_binding_decl = self.pending_generic_binding_decl
+        let saved_bind_is_view_bound = move self.bind_is_view_bound
+        let saved_moved_field_base_syms = move self.moved_field_base_syms
+        let saved_moved_field_path_starts = move self.moved_field_path_starts
+        let saved_moved_field_path_counts = move self.moved_field_path_counts
+        let saved_moved_field_path_syms = move self.moved_field_path_syms
+        let saved_bind_provenance = move self.bind_provenance
+        let saved_scope_starts = move self.scope_starts
+        let saved_scope_name_map = move self.scope_name_map
+        let saved_pending_generic_binding_base = move self.pending_generic_binding_base
+        let saved_pending_generic_binding_call = move self.pending_generic_binding_call
+        let saved_pending_generic_binding_decl = move self.pending_generic_binding_decl
         self.bind_names = Vec.new()
         self.bind_types = Vec.new()
         self.bind_muts = Vec.new()

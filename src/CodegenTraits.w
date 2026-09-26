@@ -487,8 +487,8 @@ impl Codegen:
         if concrete_ty == 0:
             return self.resolve_type(type_node)
 
-        let saved_syms = self.type_binding_syms
-        let saved_tys = self.type_binding_types
+        let saved_syms = move self.type_binding_syms
+        let saved_tys = move self.type_binding_types
         let saved_len = self.type_bindings_len
         let fresh_syms: Vec[i32] = Vec.new()
         let fresh_tys: Vec[i64] = Vec.new()
@@ -641,22 +641,22 @@ impl Codegen:
         let saved_fn_name_sym = self.current_function_name_sym
         let saved_ret = self.current_ret_type
         let saved_owner = self.current_method_owner_sym
-        let saved_allocas = self.local_allocas
-        let saved_types = self.local_types
-        let saved_muts = self.local_muts
-        let saved_fn_sigs = self.local_fn_sigs
-        let saved_pointees = self.local_pointee_structs
-        let saved_task_locals = self.task_locals
-        let saved_trait_locals = self.trait_locals
-        let saved_trait_concrete = self.trait_local_concrete_types
-        let saved_scope_syms = self.scope_local_syms
-        let saved_scope_allocas = self.scope_local_allocas
-        let saved_scope_types = self.scope_local_types
+        let saved_allocas = move self.local_allocas
+        let saved_types = move self.local_types
+        let saved_muts = move self.local_muts
+        let saved_fn_sigs = move self.local_fn_sigs
+        let saved_pointees = move self.local_pointee_structs
+        let saved_task_locals = move self.task_locals
+        let saved_trait_locals = move self.trait_locals
+        let saved_trait_concrete = move self.trait_local_concrete_types
+        let saved_scope_syms = move self.scope_local_syms
+        let saved_scope_allocas = move self.scope_local_allocas
+        let saved_scope_types = move self.scope_local_types
         let saved_scope_count = self.scope_local_count
-        let saved_defer = self.defer_stack
-        let saved_errdefer = self.errdefer_stack
-        let saved_enum_local_types = self.enum_local_types
-        let saved_sema_local_types = self.local_sema_types
+        let saved_defer = move self.defer_stack
+        let saved_errdefer = move self.errdefer_stack
+        let saved_enum_local_types = move self.enum_local_types
+        let saved_sema_local_types = move self.local_sema_types
         let saved_expected = self.expected_type
         let saved_expected_node = self.expected_type_node
         let saved_result_err = self.current_result_err_symbol
@@ -664,7 +664,7 @@ impl Codegen:
         let saved_saw_return = self.current_fn_saw_explicit_return
         let saved_tail_bb = self.tailrec_body_bb
         let saved_tail_sym = self.tailrec_fn_sym
-        let saved_tail_allocas = self.tailrec_param_allocas
+        let saved_tail_allocas = move self.tailrec_param_allocas
         let saved_loops = self.capture_loop_state()
         let saved_bb = wl_get_insert_block(self.builder)
 
@@ -736,11 +736,11 @@ impl Codegen:
                 self.record_local_pointee_struct(p_name, impl_type_sym)
 
         // ── MIR-based default trait method body compilation ──
-        let saved_mir_locals = self.mir_local_ptrs
-        let saved_mir_local_types = self.mir_local_types
-        let saved_mir_memory_locals = self.mir_memory_locals
-        let saved_mir_bbs = self.mir_bb_values
-        let saved_mir_unreachable = self.mir_default_unreachable_bbs
+        let saved_mir_locals = move self.mir_local_ptrs
+        let saved_mir_local_types = move self.mir_local_types
+        let saved_mir_memory_locals = move self.mir_memory_locals
+        let saved_mir_bbs = move self.mir_bb_values
+        let saved_mir_unreachable = move self.mir_default_unreachable_bbs
         let dtm_fresh_mir_locals: HashMap[i32, i64] = HashMap.new()
         let dtm_fresh_mir_types: HashMap[i32, i64] = HashMap.new()
         let dtm_fresh_mir_bbs: Vec[i64] = Vec.new()
@@ -779,7 +779,7 @@ impl Codegen:
         dtm_builder.finish_stmt_temp_frame(body_frame)
         dtm_builder.pop_scope_inline()
         dtm_builder.terminate(TermKind.TK_RETURN, 0, 0, 0, 0)
-        let dtm_body = dtm_builder.body
+        let dtm_body = move dtm_builder.body
 
         // Set up return alloca (MIR local 0). Void returns keep the dead i32
         // slot the normal MIR emitter uses — alloca of void is invalid LLVM and
@@ -1039,7 +1039,7 @@ impl Codegen:
 
         let entries: Vec[i64] = Vec.new()
         for mi in 0..method_count:
-            let method_sym = self.trait_method_names[(method_start + mi)]
+            let method_sym: i32 = self.trait_method_names[(method_start + mi)]
             let method_flags = self.trait_method_flags[(method_start + mi)]
             let trait_method_idx = method_start + mi
             let param_start = self.trait_method_param_starts[trait_method_idx]
@@ -1505,22 +1505,22 @@ impl Codegen:
         let saved_fn = self.current_function
         let saved_ret = self.current_ret_type
         let saved_owner = self.current_method_owner_sym
-        let saved_allocas = self.local_allocas
-        let saved_types = self.local_types
-        let saved_muts = self.local_muts
-        let saved_fn_sigs = self.local_fn_sigs
-        let saved_pointees = self.local_pointee_structs
-        let saved_tasks = self.task_locals
-        let saved_trait_locals = self.trait_locals
-        let saved_trait_concrete = self.trait_local_concrete_types
-        let saved_scope_syms = self.scope_local_syms
-        let saved_scope_allocas = self.scope_local_allocas
-        let saved_scope_types = self.scope_local_types
+        let saved_allocas = move self.local_allocas
+        let saved_types = move self.local_types
+        let saved_muts = move self.local_muts
+        let saved_fn_sigs = move self.local_fn_sigs
+        let saved_pointees = move self.local_pointee_structs
+        let saved_tasks = move self.task_locals
+        let saved_trait_locals = move self.trait_locals
+        let saved_trait_concrete = move self.trait_local_concrete_types
+        let saved_scope_syms = move self.scope_local_syms
+        let saved_scope_allocas = move self.scope_local_allocas
+        let saved_scope_types = move self.scope_local_types
         let saved_scope_count = self.scope_local_count
-        let saved_defer = self.defer_stack
-        let saved_errdefer = self.errdefer_stack
-        let saved_enum_local_types = self.enum_local_types
-        let saved_sema_local_types = self.local_sema_types
+        let saved_defer = move self.defer_stack
+        let saved_errdefer = move self.errdefer_stack
+        let saved_enum_local_types = move self.enum_local_types
+        let saved_sema_local_types = move self.local_sema_types
         let saved_expected = self.expected_type
         let saved_expected_node = self.expected_type_node
         let saved_result_err = self.current_result_err_symbol
@@ -1528,11 +1528,11 @@ impl Codegen:
         let saved_saw_return = self.current_fn_saw_explicit_return
         let saved_tail_bb = self.tailrec_body_bb
         let saved_tail_sym = self.tailrec_fn_sym
-        let saved_tail_allocas = self.tailrec_param_allocas
+        let saved_tail_allocas = move self.tailrec_param_allocas
         let saved_loops = self.capture_loop_state()
         let saved_bb = wl_get_insert_block(self.builder)
-        let saved_mir_values = self.mir_local_values
-        let saved_mir_memory_locals = self.mir_memory_locals
+        let saved_mir_values = move self.mir_local_values
+        let saved_mir_memory_locals = move self.mir_memory_locals
         // The return terminator lowering reads current_function_name_sym to look
         // up this function's sret ABI (extern_fn_has_sret). If we leave the
         // previously-emitted function's sym here, an init fn inherits that
@@ -1588,10 +1588,10 @@ impl Codegen:
         let entry = wl_append_bb(self.context, function, "entry")
         wl_position_at_end(self.builder, entry)
 
-        let saved_mir_locals = self.mir_local_ptrs
-        let saved_mir_local_types = self.mir_local_types
-        let saved_mir_bbs = self.mir_bb_values
-        let saved_mir_unreachable = self.mir_default_unreachable_bbs
+        let saved_mir_locals = move self.mir_local_ptrs
+        let saved_mir_local_types = move self.mir_local_types
+        let saved_mir_bbs = move self.mir_bb_values
+        let saved_mir_unreachable = move self.mir_default_unreachable_bbs
         self.mir_local_ptrs = HashMap.new()
         self.mir_local_values = HashMap.new()
         self.mir_memory_locals = HashMap.new()
@@ -1613,7 +1613,7 @@ impl Codegen:
         init_builder.assign_operand_to_place(init_ret_place, init_result, self.pool.get_end(value_node))
         init_builder.pop_scope_inline()
         init_builder.terminate(TermKind.TK_RETURN, 0, 0, 0, 0)
-        let init_body = init_builder.body
+        let init_body = move init_builder.body
         // Codegen-synthesized bodies never reach `--dump-mir` (that dumps the
         // Sema-lowered module). WITH_DUMP_INIT_MIR exposes them; #719 was
         // invisible without it.
@@ -1713,9 +1713,9 @@ impl Codegen:
 
     mut fn emit_module_runtime_init_helpers() -> Unit:
         for i in 0..self.module_runtime_init_syms.len() as i32:
-            let name_sym = self.module_runtime_init_syms[i]
-            let value_node = self.module_runtime_init_nodes[i]
-            let result_tid = self.module_runtime_init_type_ids[i]
+            let name_sym: i32 = self.module_runtime_init_syms[i]
+            let value_node: i32 = self.module_runtime_init_nodes[i]
+            let result_tid: i32 = self.module_runtime_init_type_ids[i]
             let global_opt = self.module_constants.get(name_sym)
             if not global_opt.is_some():
                 with_eprint("error: missing global storage for runtime-initialized module constant '" ++ self.intern.resolve(name_sym) ++ "'")
@@ -1907,7 +1907,7 @@ impl Codegen:
         if kind == NodeKind.NK_NULL_LIT:
             return wl_const_null(ptr_ty)
 
-        let current_source_file = self.current_decl_source_file
+        let current_source_file = self.current_decl_source_file.clone()
         let str_value = self.try_eval_const_string(cur, current_source_file, 0)
         if str_value.ok:
             return self.const_c_string_pointer(str_value.text, ptr_ty)
@@ -2387,7 +2387,7 @@ impl Codegen:
                         let _ = self.record_module_binding_global(name_sym, global_ty, init, is_mut)
                         return
 
-        let current_source_file = self.current_decl_source_file
+        let current_source_file = self.current_decl_source_file.clone()
         let str_value = self.try_eval_const_string(value_node, current_source_file, 0)
         if str_value.ok:
             let st_opt = self.struct_type_map.get(self.sym_str)

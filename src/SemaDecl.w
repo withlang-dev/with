@@ -2260,8 +2260,8 @@ impl Sema:
         if type_node == 0:
             return self.ty_void as i32
         let saved_self = if self.named_types.contains(self.syms.self_type): self.named_types.get(self.syms.self_type).unwrap() else: 0
-        let saved_subst_syms = self.generic_subst_param_syms
-        let saved_subst_tys = self.generic_subst_type_ids
+        let saved_subst_syms = move self.generic_subst_param_syms
+        let saved_subst_tys = move self.generic_subst_type_ids
         self.generic_subst_param_syms = Vec.new()
         self.generic_subst_type_ids = Vec.new()
         if impl_type_tid != 0:
