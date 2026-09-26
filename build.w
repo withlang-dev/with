@@ -1907,6 +1907,15 @@ fn run_deep_debug_tool_tests_action(ctx: ActionCtx) -> i32:
         ctx.diagnostics().error("deep-debug-tool-tests: could not write rebind fixture")
     if deep_debug_analyze_expect(ctx, root, compiler, build_project_abs(root, rebind_input), out_dir, "analyze-audit-rebind", "audit:all", "violations=0 ok") != 0:
         return 1
+    // #1600 / #1613: the pinned in-place facade resource (a Box[z_stream] cell,
+    // D54). Its Box.drop specializations are created after the receiver
+    // requirements were finalized and its Box drop is emitted as inline glue,
+    // so the specialization's LLVM function stays a declaration — both were
+    // audit reds over correct programs.
+    if deep_debug_analyze_expect(ctx, root, compiler, build_project_abs(root, "test/behavior/behav_c_facade_resource_in_place_pinned.w"), out_dir, "analyze-audit-in-place-pinned", "audit:all", "violations=0 ok") != 0:
+        return 1
+    if deep_debug_analyze_expect(ctx, root, compiler, build_project_abs(root, "test/behavior/behav_c_facade_resource_in_place_drop_once.w"), out_dir, "analyze-audit-in-place-drop-once", "audit:all", "violations=0 ok") != 0:
+        return 1
     // #1381: a downcast place has no type of its own; typed as the enum it
     // failed audit:codegen on every `??`/`unwrap_or`. #1394: the payload a
     // carrier eliminator moves out is reset-on-move, and audit:all's

@@ -8450,3 +8450,17 @@ impl Sema:
                 else:
                     bi = bi + 1
             i = i - 1
+
+impl Sema:
+    // One signature's receiver requirement from its finalized param[0]
+    // effect — what finalize_receiver_requirements does for every signature
+    // that existed when it ran; specializations created later ask for it
+    // themselves (#1600, #1613).
+    mut fn finalize_receiver_requirement_for(si: i32):
+        if si < 0 or si >= self.sig_receiver_modes.len() as i32:
+            return
+        if self.sig_receiver_mode(si) == ReceiverMode.None or self.sig_get_param_count(si) <= 0:
+            return
+        while self.sig_receiver_required_effects.len() as i32 <= si:
+            self.sig_receiver_required_effects.push(0)
+        self.sig_receiver_required_effects[si] = self.sig_param_effect(si, 0) & EFF_DECLARED_MASK

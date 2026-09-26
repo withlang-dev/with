@@ -873,7 +873,8 @@ fn analysis_audit_effects(report: &AnalysisReport, sema: &Sema):
             continue
         let required = sema.sig_param_effect(si, 0) & EFF_DECLARED_MASK
         if si >= sema.sig_receiver_required_effects.len() as i32 or sema.sig_receiver_required_effects[si] != required:
-            report.fail(f"sig {si}: receiver requirement is not the finalized param[0] effect")
+            let sig_name = sema.pool_resolve(sema.sig_names[si])
+            report.fail(f"sig {si} ({sig_name}): receiver requirement is not the finalized param[0] effect (required={sema.sig_receiver_required_effects[si]} param0={required})")
         if mode == ReceiverMode.Missing:
             report.fail(f"sig {si}: receiver mode is missing")
         else if mode == ReceiverMode.Read and (required & (EFF_WRITE | EFF_CONSUME | EFF_ESCAPE_VALUE)) != 0:
