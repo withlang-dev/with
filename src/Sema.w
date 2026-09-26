@@ -6354,6 +6354,13 @@ impl Sema:
         if tid == 0:
             return 0
         let resolved = self.resolve_alias(tid as TypeId)
+        // A reference or raw pointer is Copy and owns nothing (§3): it never
+        // has a Drop impl, whatever its pointee has. get_type_name names the
+        // pointee, which made a `&Db` field Drop — moved and blanked out of a
+        // `mut self` receiver instead of copied (#1492).
+        let kind = self.get_type_kind(resolved)
+        if kind == TypeKind.TY_REF or kind == TypeKind.TY_PTR:
+            return 0
         var owner_sym = self.get_type_name(resolved)
         if owner_sym == 0 and self.get_type_kind(resolved) == TypeKind.TY_GENERIC_INST:
             owner_sym = self.get_generic_inst_base(resolved as i32)
