@@ -12986,7 +12986,11 @@ impl Sema:
 
         if ftk == TypeKind.TY_ENUM:
             if self.static_receiver_type_is_known(expr) != 0 and self.enum_has_variant(obj_type as i32, field) != 0:
-                return field_base as i32
+                // §4.6: the expected type types a payloadless variant of a
+                // generic enum (`let e: G[i64] = G.E`); the bare `G` has no
+                // representation (#1506, #1558).
+                let expected_variant_ty = self.expected_variant_instance_of(obj_type as i32, field)
+                return if expected_variant_ty != 0: expected_variant_ty else: field_base as i32
             self.emit_error("unknown field '" ++ self.pool_resolve(field) ++ "' for type '" ++ self.type_name(field_base as i32) ++ "'", node)
             return 0
 
@@ -14800,7 +14804,12 @@ impl Sema:
     mut fn infer_generic_enum_variant_type(variant_sym: i32, arg_types: &Vec[i32], arg_count: i32) -> i32:
         if not self.variant_type_ids.contains(variant_sym):
             return 0
-        let enum_tid = self.resolve_alias(self.variant_type_ids.get(variant_sym).unwrap() as TypeId) as i32
+        self.infer_generic_enum_variant_type_of(self.variant_type_ids.get(variant_sym).unwrap(), variant_sym, arg_types, arg_count)
+
+    // The instance of the generic enum `enum_tid` whose variant's payload
+    // types are `arg_types`; 0 when the payloads do not fix every parameter.
+    mut fn infer_generic_enum_variant_type_of(enum_ty: i32, variant_sym: i32, arg_types: &Vec[i32], arg_count: i32) -> i32:
+        let enum_tid = self.resolve_alias(enum_ty as TypeId) as i32
         if self.get_type_kind(enum_tid) != TypeKind.TY_ENUM:
             return 0
         let base_sym = self.get_type_d0(enum_tid)
@@ -15482,6 +15491,15 @@ impl Sema:
                     if self.enum_has_variant(base_tid, variant_name) != 0:
                         return expected as i32
         0
+
+    // The expected type's instance of `enum_tid` for `Enum.Variant`: only an
+    // instance of this enum types the variant (another enum sharing the
+    // variant name does not).
+    fn expected_variant_instance_of(enum_tid: i32, variant_name: i32) -> i32:
+        let expected = self.expected_variant_constructor_type(variant_name)
+        if expected == 0 or self.enum_pattern_owner_sym(expected) != self.enum_pattern_owner_sym(enum_tid):
+            return 0
+        expected
 
     fn qualified_enum_variant_sym(enum_tid: i32, variant_name: i32) -> i32:
         if enum_tid == 0 or variant_name == 0:
@@ -17985,7 +18003,11 @@ impl Sema:
                     if gen_meta >= 0 and self.ast.fn_meta_param_count(gen_meta) == 1:
                         let gen_param_start = self.ast.fn_meta_param_start(gen_meta)
                         let gen_param_ty_node = self.ast.fn_param_type(gen_param_start, 0)
-                        let gen_expected_ty = if gen_param_ty_node != 0: self.resolve_type_expr(gen_param_ty_node) as i32 else: 0
+                        // A parameter typed by the callee's own type parameter
+                        // is not a unit parameter; resolving it here reported
+                        // `unknown type 'T'` at the declaration (#1336).
+                        let gen_names_own_tp = gen_param_ty_node != 0 and self.type_node_mentions_unbound_type_param(gen_param_ty_node, self.ast.fn_meta_tp_start(gen_meta), self.ast.fn_meta_tp_count(gen_meta))
+                        let gen_expected_ty = if gen_param_ty_node != 0 and not gen_names_own_tp: self.resolve_type_expr(gen_param_ty_node) as i32 else: 0
                         if self.try_unit_elide_call_arg(node, arg_count, gen_expected_ty) != 0:
                             resolved_arg_count = 1
 
@@ -18807,7 +18829,11 @@ impl Sema:
             if self.enum_has_variant(qualifier_enum_ty, variant_name) == 0:
                 self.emit_error("variant '" ++ self.pool_resolve(variant_name) ++ "' does not belong to enum '" ++ self.pool_resolve(qualifier_enum_sym) ++ "'", node)
                 return 0
-            return qualifier_enum_ty
+            // The qualifier names the enum; the subject carries its
+            // instantiation. Returning the qualifier's bare `G` typed the
+            // payload of `G[i64].V(t)` as `T` (#1507) and left a nested
+            // `G.A(.X(t))` binding undeclared (#1518).
+            return if subject_enum_sym != 0: subject_enum_ty else: qualifier_enum_ty
         else if subject_enum_sym == 0:
             self.emit_error("variant pattern requires an enum subject", node)
             return 0
@@ -20322,6 +20348,84 @@ impl Sema:
             if self.get_type_kind(self.resolve_alias(expected_arg as TypeId)) == TypeKind.TY_TRAIT_OBJ:
                 return 0
         self.setup_generic_inst_substitution(expected as i32, owner_sym)
+
+    // Whether a type expression names `sym` anywhere. A kind this walk does
+    // not know (fn types, trait objects, @TypeOf) counts as naming it, so a
+    // caller that must not resolve an unbound parameter stays out.
+    fn type_node_mentions_sym(node: i32, sym: i32) -> bool:
+        if node == 0:
+            return false
+        let kind = self.ast.kind(node)
+        if kind == NodeKind.NK_TYPE_NAMED:
+            return self.ast.get_data0(node) == sym
+        if kind == NodeKind.NK_TYPE_REF or kind == NodeKind.NK_TYPE_PTR or kind == NodeKind.NK_TYPE_ARRAY or kind == NodeKind.NK_TYPE_SLICE or kind == NodeKind.NK_TYPE_OPTIONAL:
+            return self.type_node_mentions_sym(self.ast.get_data0(node), sym)
+        if kind == NodeKind.NK_TYPE_TUPLE:
+            let start = self.ast.get_data0(node)
+            for ei in 0..self.ast.get_data1(node):
+                if self.type_node_mentions_sym(self.ast.get_extra(start + ei), sym):
+                    return true
+            return false
+        if kind == NodeKind.NK_TYPE_GENERIC:
+            if self.ast.get_data0(node) == sym:
+                return true
+            let start = self.ast.get_data1(node)
+            for gi in 0..self.ast.get_data2(node):
+                if self.type_node_mentions_sym(self.ast.get_extra(start + gi), sym):
+                    return true
+            return false
+        true
+
+    // Whether a type expression names a parameter of the list that has no
+    // substitution yet.
+    fn type_node_mentions_unbound_type_param(node: i32, tp_start: i32, tp_count: i32) -> bool:
+        var pos = tp_start
+        for ti in 0..tp_count:
+            let tp_name = self.ast.get_extra(pos)
+            if self.lookup_generic_subst(tp_name) == 0 and self.type_node_mentions_sym(node, tp_name):
+                return true
+            pos = pos + 2 + self.ast.get_extra(pos + 1)
+        false
+
+    // §4.2.1: the parameter type at the call site of a static generic method
+    // whose owner the expected type instantiates, `Box.new(Wrap { inner: 1,
+    // tag: 33 })` under `let bw: Box[Wrap[i64]]` (#1569). The argument is
+    // checked against the instantiated parameter, so its literals take that
+    // type; 0 when the parameter still mentions an unbound type parameter.
+    mut fn static_generic_method_expected_arg_type(owner_type: i32, field: i32, arg_index: i32) -> i32:
+        let owner_sym = self.method_owner_symbol_for_type(owner_type)
+        if owner_sym == 0 or not self.type_decl_nodes.contains(owner_sym):
+            return 0
+        let method_fn = self.lookup_generic_method_fn(owner_sym, field)
+        if method_fn == 0:
+            return 0
+        let fn_node = self.generic_fn_node_for_symbol(method_fn)
+        if fn_node == 0:
+            return 0
+        let meta = self.ast.find_fn_meta(fn_node)
+        if meta < 0 or arg_index >= self.ast.fn_meta_param_count(meta):
+            return 0
+        let td_node: i32 = self.type_decl_nodes.get(owner_sym).unwrap()
+        let owner_tp_start = self.type_decl_tp_start(td_node)
+        let owner_tp_count = self.type_decl_tp_count(td_node)
+        if owner_tp_count == 0:
+            return 0
+        let saved_syms = sema_clone_i32_vec(&self.generic_subst_param_syms)
+        let saved_tys = sema_clone_i32_vec(&self.generic_subst_type_ids)
+        self.clear_generic_substitution()
+        let owner_resolved = self.resolve_alias(owner_type as TypeId)
+        let bound = if self.get_type_kind(owner_resolved) == TypeKind.TY_GENERIC_INST and self.get_generic_inst_base(owner_resolved as i32) == owner_sym:
+            self.setup_generic_inst_substitution(owner_resolved as i32, owner_sym)
+        else:
+            self.generic_method_bind_owner_from_expected(owner_sym)
+        let param_node = self.ast.fn_param_type(self.ast.fn_meta_param_start(meta), arg_index)
+        let expected = if bound == 0 or param_node == 0: 0
+            else if self.type_node_mentions_unbound_type_param(param_node, owner_tp_start, owner_tp_count): 0
+            else if self.type_node_mentions_unbound_type_param(param_node, self.ast.fn_meta_tp_start(meta), self.ast.fn_meta_tp_count(meta)): 0
+            else: self.resolve_type_node_with_current_subst(param_node, 0)
+        self.generic_subst_param_syms = saved_syms
+        self.generic_subst_type_ids = saved_tys
+        expected
 
     mut fn bind_type_params_from_self_receiver(arg_tid: i32, tp_start: i32, tp_count: i32, err_node: i32):
         if arg_tid == 0 or tp_count == 0:
@@ -22933,7 +23037,7 @@ impl Sema:
 
         let mc_is_static_enum_variant = self.static_receiver_type_is_known(expr) != 0 and self.enum_has_variant(obj_type, field) != 0
         let mc_static_variant_result_ty = if mc_is_static_enum_variant:
-            let expected_variant_ty = self.expected_variant_constructor_type(field)
+            let expected_variant_ty = self.expected_variant_instance_of(obj_type as i32, field)
             if expected_variant_ty != 0: expected_variant_ty else: obj_type as i32
         else:
             0
@@ -23006,6 +23110,8 @@ impl Sema:
             var mc_expected = self.atomic_method_expected_arg_type(mc_order_type, field, ai)
             if mc_expected == 0:
                 mc_expected = self.method_expected_arg_type(obj_type as i32, field, ai)
+            if mc_expected == 0 and static_type_sym != 0 and self.static_receiver_type_is_known(expr) != 0:
+                mc_expected = self.static_generic_method_expected_arg_type(obj_type as i32, field, ai)
             if mc_expected == 0 and field == self.syms.spawn_method and ai == 0:
                 if self.ast.kind(expr) == NodeKind.NK_IDENT and self.is_active_sync_scope_symbol(self.ast.get_data0(expr)) != 0:
                     let spawn_params: Vec[i32] = Vec.new()
@@ -23372,7 +23478,14 @@ impl Sema:
 
         // Static enum variant constructor: Shape.Rect(1, 2), Option[i32].Some(1)
         if mc_is_static_enum_variant:
-            let payload_tys = mc_static_variant_payload_tys
+            // Nothing expects a type for `let a = G.V(3)`: the payloads fix
+            // `T` the way a bare `V(3)` does.
+            var mc_static_variant_ty = mc_static_variant_result_ty
+            if self.get_type_kind(self.resolve_alias(mc_static_variant_ty as TypeId)) == TypeKind.TY_ENUM:
+                let inferred_variant_ty = self.infer_generic_enum_variant_type_of(mc_static_variant_ty, field, &arg_types, mc_resolved_arg_count)
+                if inferred_variant_ty != 0:
+                    mc_static_variant_ty = inferred_variant_ty
+            let payload_tys = if mc_static_variant_ty != mc_static_variant_result_ty: self.enum_variant_payload_types(mc_static_variant_ty, field) else: mc_static_variant_payload_tys
             let expected = payload_tys.len() as i32
             let static_payload_nodes: Vec[i32] = Vec.new()
             if mc_resolved_arg_count != expected:
@@ -23395,9 +23508,9 @@ impl Sema:
                             let owner_name = self.type_name(obj_type)
                             let variant_name: str = with_str_clone_ref(self.pool_resolve(field))
                             self.emit_argument_type_mismatch(owner_name ++ "." ++ variant_name, field, ai, ai, expected_ty, arg_ty, if static_payload_arg_node > 0: static_payload_arg_node else: node)
-            if self.type_is_ephemeral_value(mc_static_variant_result_ty) != 0:
+            if self.type_is_ephemeral_value(mc_static_variant_ty) != 0:
                 self.record_transparent_view_origins_from_nodes(node, &static_payload_nodes)
-            return mc_static_variant_result_ty
+            return mc_static_variant_ty
 
         if self.static_receiver_type_is_known(expr) != 0 and self.pool_resolve(field) == "from_int":
             let enum_resolved = self.resolve_alias(obj_type)

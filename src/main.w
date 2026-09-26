@@ -151,6 +151,9 @@ type TestDirectives {
     expect_check_stdout: Vec[str],
     expect_check_stdout_not: Vec[str],
     expect_check_fail: str,
+    // Diagnostics a failing check must not print (#1336: an arity fixture
+    // passed while `unknown type 'T'` led its stderr).
+    expect_check_fail_not: Vec[str],
     expect_build_fail: str,
     has_expect_exit: bool,
     expect_exit: i32,
@@ -191,6 +194,7 @@ fn empty_test_directives -> TestDirectives:
         expect_check_stdout: Vec.new(),
         expect_check_stdout_not: Vec.new(),
         expect_check_fail: "",
+        expect_check_fail_not: Vec.new(),
         expect_build_fail: "",
         has_expect_exit: false,
         expect_exit: 0,
@@ -3629,6 +3633,7 @@ fn parse_test_directives_for_target(target: &str) -> TestDirectives:
     let expect_check_stdout_prefix = "//! expect-check-stdout: "
     let expect_check_stdout_not_prefix = "//! expect-check-stdout-not: "
     let expect_check_fail_prefix = "//! expect-check-fail: "
+    let expect_check_fail_not_prefix = "//! expect-check-fail-not: "
     let expect_error_prefix = "//! expect-error: "
     let expect_build_fail_prefix = "//! expect-build-fail: "
     let args_prefix = "//! args: "
@@ -3658,6 +3663,8 @@ fn parse_test_directives_for_target(target: &str) -> TestDirectives:
                 result.expect_check_stdout.push(line.slice(expect_check_stdout_prefix.len(), line.len()))
             else if line.starts_with(expect_check_stdout_not_prefix):
                 result.expect_check_stdout_not.push(line.slice(expect_check_stdout_not_prefix.len(), line.len()))
+            else if line.starts_with(expect_check_fail_not_prefix):
+                result.expect_check_fail_not.push(line.slice(expect_check_fail_not_prefix.len(), line.len()))
             else if line.starts_with(expect_check_fail_prefix):
                 result.expect_check_fail = line.slice(expect_check_fail_prefix.len(), line.len())
             else if line.starts_with(expect_error_prefix):
@@ -3821,6 +3828,12 @@ fn run_test_directive_command(target: &str, directives: &TestDirectives, quiet: 
         if not test_output_contains_expected(result.stderr, directives.expect_check_fail):
             emit_test_stage_error("missing expected check error: " ++ directives.expect_check_fail, target, "check", "")
             return 1
+        for i in 0..directives.expect_check_fail_not.len() as i32:
+            let forbidden = directives.expect_check_fail_not[i]
+            if forbidden.len() > 0 and test_output_contains_expected(result.stderr, forbidden):
+                emit_test_stage_error("unexpected check error: " ++ forbidden, target, "check", "")
+                emit_test_child_stderr(result.stderr)
+                return 1
         return 0
     if directives.expect_build_fail.len() > 0:
         let result = run_test_compiler_command(target, "build", directives)

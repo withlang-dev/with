@@ -14728,11 +14728,13 @@ impl MirBuilder:
                     // `Kind` (#1446's two-module fixture — module a's `Kind.Hi`
                     // was module b's 20, which a's by-name match then matched).
                     let fa_expr_ty = self.expr_type(node)
-                    let fa_expr_is_enum = fa_expr_ty > 0 and self.sema.get_type_kind(self.sema.resolve_alias(fa_expr_ty)) == TypeKind.TY_ENUM
+                    // Sema's type is the instance for a generic enum's
+                    // payloadless variant (`G.E : G[i64]`, #1506); the
+                    // bare `G` by name has no representation.
+                    let fa_expr_is_enum = fa_expr_ty > 0 and self.sema.enum_pattern_type(fa_expr_ty) != 0
                     let fa_base_ty: i32 = if fa_expr_is_enum: fa_expr_ty else: self.sema.named_types.get(fa_base_sym).unwrap()
                     let fa_resolved = self.sema.resolve_alias(fa_base_ty)
-                    let fa_tk = self.sema.get_type_kind(fa_resolved)
-                    if fa_tk == TypeKind.TY_ENUM:
+                    if self.sema.enum_pattern_type(fa_resolved) != 0:
                         // Build qualified variant key: "Color.Red"
                         let fa_type_name = self.sema.pool_resolve(fa_base_sym)
                         let fa_field_name = self.pool.resolve(fa_field)
@@ -14757,7 +14759,7 @@ impl MirBuilder:
                         // Also try bare variant sym (some enums register just "Red")
                         if self.sema.variant_lookup.contains(fa_field_sym):
                             let fa_var_tid = self.sema.variant_type_ids.get(fa_field_sym).unwrap()
-                            if fa_var_tid == fa_resolved:
+                            if self.sema.enum_pattern_owner_sym(fa_var_tid) == self.sema.enum_pattern_owner_sym(fa_resolved):
                                 let fa_is_disc_enum2 = self.sema.disc_repr_types.contains(fa_resolved as i32)
                                 if not fa_is_disc_enum2 or self.sema.disc_has_payload.contains(fa_resolved as i32):
                                     let fa_fields2: Vec[i32] = Vec.new()
