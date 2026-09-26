@@ -7698,10 +7698,21 @@ impl MirBuilder:
             let table = child.body.new_switch_table(vals, targets)
             child.terminate(TermKind.TK_SWITCH_INT, cond_op, table, join_bb, 0)
             child.switch_to(pass_bb)
+        // A filter's pass branch moves on that path only (#1501, as in
+        // lower_comprehension_generic_iter): the join still drops a
+        // filtered-out element.
+        let pass_move_state = child.save_move_state()
+        let pass_reset_start = child.pending_reset_locals.len() as i32
+        let pass_reset_field_start = child.pending_reset_field_places.len() as i32
+        let pass_move_temp_start = child.pending_move_temp_locals.len() as i32
         let leaf_frame = child.push_stmt_temp_frame()
         child.lower_comprehension_next_or_push(comp_node, clause_index + 1, child_out_place, out_elem_ty)
         child.finish_stmt_temp_frame(leaf_frame)
+        if clause_filter != 0:
+            child.flush_pending_resets_since(pass_reset_start, pass_reset_field_start, pass_move_temp_start)
         child.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
+        if clause_filter != 0:
+            child.restore_move_state(&pass_move_state)
         child.switch_to(join_bb)
         child.pop_scope_with_goto(more_bb)
         child.switch_to(more_bb)
@@ -8398,10 +8409,22 @@ impl MirBuilder:
             // #771-style frame: the leaf push is a statement — its
             // reset-on-move flush is what blanks a moved-out binding so
             // the back-edge scope drop is inert for it.
+            // The pass branch is one arm of the filter (#1501): what it
+            // moves is moved on that path only, as in lower_if. Its moved
+            // marks left in place, the join's scope pop saw the binding
+            // moved on every path and skipped the drop of each filtered-out
+            // element; its resets are flushed inside the arm, so the
+            // binding the push took is blank at the join.
+            let pass_move_state = self.save_move_state()
+            let pass_reset_start = self.pending_reset_locals.len() as i32
+            let pass_reset_field_start = self.pending_reset_field_places.len() as i32
+            let pass_move_temp_start = self.pending_move_temp_locals.len() as i32
             let pass_frame = self.push_stmt_temp_frame()
             self.lower_comprehension_next_or_push(comp_node, clause_index + 1, out_place, out_elem_ty)
             self.finish_stmt_temp_frame(pass_frame)
+            self.flush_pending_resets_since(pass_reset_start, pass_reset_field_start, pass_move_temp_start)
             self.terminate(TermKind.TK_GOTO, iter_join_bb, 0, 0, 0)
+            self.restore_move_state(&pass_move_state)
         else:
             let leaf_frame = self.push_stmt_temp_frame()
             self.lower_comprehension_next_or_push(comp_node, clause_index + 1, out_place, out_elem_ty)
