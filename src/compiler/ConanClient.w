@@ -1320,5 +1320,5 @@ fn conan_install_internal(name: &str, version_hint: &str, project_root: &str, de
     conan_install_from_source(name, version, project_root, depth)
 
 // Public API. Returns the concrete installed version, or "" on failure.
-fn conan_install(name: &str, version_hint: &str, project_root: &str, force_reinstall: bool) -> str:
+pub fn conan_install(name: &str, version_hint: &str, project_root: &str, force_reinstall: bool) -> str:
     conan_install_internal(name, version_hint, project_root, 0, force_reinstall)

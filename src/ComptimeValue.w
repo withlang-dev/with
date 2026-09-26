@@ -6,7 +6,7 @@ extern fn with_str_eq_ref(a: &str, b: &str) -> i32
 extern fn with_alloc(size: i64) -> *mut u8
 extern fn with_free(ptr: *mut u8) -> Unit
 
-enum ComptimeValueKind: i32:
+pub enum ComptimeValueKind: i32:
     CV_INVALID = 0
     CV_VOID = 1
     CV_INT = 2
@@ -61,7 +61,7 @@ impl Drop for ComptimeValue:
                     *(&raw mut self.text as *mut i64) = 0
                     *((&raw mut self.text as *mut i64) + 1) = 0
 
-fn comptime_value_invalid() -> ComptimeValue:
+pub fn comptime_value_invalid() -> ComptimeValue:
     ComptimeValue {
         kind: ComptimeValueKind.CV_INVALID,
         type_id: 0,
@@ -74,7 +74,7 @@ fn comptime_value_invalid() -> ComptimeValue:
         extra_count: 0,
     }
 
-fn comptime_value_void(type_id: i32) -> ComptimeValue:
+pub fn comptime_value_void(type_id: i32) -> ComptimeValue:
     ComptimeValue {
         kind: ComptimeValueKind.CV_VOID,
         type_id,
@@ -87,7 +87,7 @@ fn comptime_value_void(type_id: i32) -> ComptimeValue:
         extra_count: 0,
     }
 
-fn comptime_value_int(type_id: i32, value: i64) -> ComptimeValue:
+pub fn comptime_value_int(type_id: i32, value: i64) -> ComptimeValue:
     ComptimeValue {
         kind: ComptimeValueKind.CV_INT,
         type_id,
@@ -100,7 +100,7 @@ fn comptime_value_int(type_id: i32, value: i64) -> ComptimeValue:
         extra_count: 0,
     }
 
-fn comptime_value_bool(value: i32) -> ComptimeValue:
+pub fn comptime_value_bool(value: i32) -> ComptimeValue:
     ComptimeValue {
         kind: ComptimeValueKind.CV_BOOL,
         type_id: 0,
@@ -117,7 +117,7 @@ fn comptime_value_bool(value: i32) -> ComptimeValue:
 // spelling when it came straight from source, so a fold-back reproduces the
 // bytes LLVM would have rounded, and "" for a computed value, which folds
 // back at round-trip precision (17 significant digits).
-fn comptime_value_float(type_id: i32, real: f64, text: &str) -> ComptimeValue:
+pub fn comptime_value_float(type_id: i32, real: f64, text: &str) -> ComptimeValue:
     ComptimeValue {
         kind: ComptimeValueKind.CV_FLOAT,
         type_id,
@@ -130,13 +130,13 @@ fn comptime_value_float(type_id: i32, real: f64, text: &str) -> ComptimeValue:
         extra_count: 0,
     }
 
-fn comptime_float_text(value: &ComptimeValue) -> str:
+pub fn comptime_float_text(value: &ComptimeValue) -> str:
     if value.text.len() > 0:
         return with_str_clone_ref(value.text)
     let v = value.real
     f"{v:.17}"
 
-fn comptime_value_str(value: &str) -> ComptimeValue:
+pub fn comptime_value_str(value: &str) -> ComptimeValue:
     ComptimeValue {
         kind: ComptimeValueKind.CV_STR,
         type_id: 0,
@@ -149,7 +149,7 @@ fn comptime_value_str(value: &str) -> ComptimeValue:
         extra_count: 0,
     }
 
-fn comptime_value_array(type_id: i32, extra_start: i32, extra_count: i32) -> ComptimeValue:
+pub fn comptime_value_array(type_id: i32, extra_start: i32, extra_count: i32) -> ComptimeValue:
     ComptimeValue {
         kind: ComptimeValueKind.CV_ARRAY,
         type_id,
@@ -162,7 +162,7 @@ fn comptime_value_array(type_id: i32, extra_start: i32, extra_count: i32) -> Com
         extra_count,
     }
 
-fn comptime_value_tuple(type_id: i32, extra_start: i32, extra_count: i32) -> ComptimeValue:
+pub fn comptime_value_tuple(type_id: i32, extra_start: i32, extra_count: i32) -> ComptimeValue:
     ComptimeValue {
         kind: ComptimeValueKind.CV_TUPLE,
         type_id,
@@ -175,7 +175,7 @@ fn comptime_value_tuple(type_id: i32, extra_start: i32, extra_count: i32) -> Com
         extra_count,
     }
 
-fn comptime_value_range(type_id: i32, start_value: i64, end_value: i64, inclusive: i32) -> ComptimeValue:
+pub fn comptime_value_range(type_id: i32, start_value: i64, end_value: i64, inclusive: i32) -> ComptimeValue:
     ComptimeValue {
         kind: ComptimeValueKind.CV_RANGE,
         type_id,
@@ -188,7 +188,7 @@ fn comptime_value_range(type_id: i32, start_value: i64, end_value: i64, inclusiv
         extra_count: 0,
     }
 
-fn comptime_value_struct(type_id: i32, extra_start: i32, extra_count: i32) -> ComptimeValue:
+pub fn comptime_value_struct(type_id: i32, extra_start: i32, extra_count: i32) -> ComptimeValue:
     ComptimeValue {
         kind: ComptimeValueKind.CV_STRUCT,
         type_id,
@@ -201,7 +201,7 @@ fn comptime_value_struct(type_id: i32, extra_start: i32, extra_count: i32) -> Co
         extra_count,
     }
 
-fn comptime_value_vec(type_id: i32, extra_start: i32, extra_count: i32) -> ComptimeValue:
+pub fn comptime_value_vec(type_id: i32, extra_start: i32, extra_count: i32) -> ComptimeValue:
     ComptimeValue {
         kind: ComptimeValueKind.CV_VEC,
         type_id,
@@ -214,7 +214,7 @@ fn comptime_value_vec(type_id: i32, extra_start: i32, extra_count: i32) -> Compt
         extra_count,
     }
 
-fn comptime_value_map(type_id: i32, extra_start: i32, extra_count: i32) -> ComptimeValue:
+pub fn comptime_value_map(type_id: i32, extra_start: i32, extra_count: i32) -> ComptimeValue:
     ComptimeValue {
         kind: ComptimeValueKind.CV_MAP,
         type_id,
@@ -227,7 +227,7 @@ fn comptime_value_map(type_id: i32, extra_start: i32, extra_count: i32) -> Compt
         extra_count,
     }
 
-fn comptime_value_capability(type_id: i32, capability_kind: i32, handle_id: i32, generation: i32) -> ComptimeValue:
+pub fn comptime_value_capability(type_id: i32, capability_kind: i32, handle_id: i32, generation: i32) -> ComptimeValue:
     ComptimeValue {
         kind: ComptimeValueKind.CV_CAPABILITY,
         type_id,
@@ -240,7 +240,7 @@ fn comptime_value_capability(type_id: i32, capability_kind: i32, handle_id: i32,
         extra_count: 0,
     }
 
-fn comptime_value_fn(type_id: i32, fn_sym: i32) -> ComptimeValue:
+pub fn comptime_value_fn(type_id: i32, fn_sym: i32) -> ComptimeValue:
     ComptimeValue {
         kind: ComptimeValueKind.CV_FN,
         type_id,
@@ -253,7 +253,7 @@ fn comptime_value_fn(type_id: i32, fn_sym: i32) -> ComptimeValue:
         extra_count: 0,
     }
 
-fn comptime_value_enum(type_id: i32, variant_sym: i32, extra_start: i32, extra_count: i32) -> ComptimeValue:
+pub fn comptime_value_enum(type_id: i32, variant_sym: i32, extra_start: i32, extra_count: i32) -> ComptimeValue:
     ComptimeValue {
         kind: ComptimeValueKind.CV_ENUM,
         type_id,
@@ -266,7 +266,7 @@ fn comptime_value_enum(type_id: i32, variant_sym: i32, extra_start: i32, extra_c
         extra_count,
     }
 
-fn comptime_value_bytes(type_id: i32, data: &str) -> ComptimeValue:
+pub fn comptime_value_bytes(type_id: i32, data: &str) -> ComptimeValue:
     ComptimeValue {
         kind: ComptimeValueKind.CV_BYTES,
         type_id,
@@ -279,7 +279,7 @@ fn comptime_value_bytes(type_id: i32, data: &str) -> ComptimeValue:
         extra_count: 0,
     }
 
-fn comptime_value_string_builder(type_id: i32, head: i32, chunk_count: i32, byte_count: i64) -> ComptimeValue:
+pub fn comptime_value_string_builder(type_id: i32, head: i32, chunk_count: i32, byte_count: i64) -> ComptimeValue:
     ComptimeValue {
         kind: ComptimeValueKind.CV_STRING_BUILDER,
         type_id,
@@ -292,7 +292,7 @@ fn comptime_value_string_builder(type_id: i32, head: i32, chunk_count: i32, byte
         extra_count: chunk_count,
     }
 
-fn comptime_value_string_chunk(prev: i32, data: &str) -> ComptimeValue:
+pub fn comptime_value_string_chunk(prev: i32, data: &str) -> ComptimeValue:
     ComptimeValue {
         kind: ComptimeValueKind.CV_STRING_CHUNK,
         type_id: 0,
@@ -305,27 +305,27 @@ fn comptime_value_string_chunk(prev: i32, data: &str) -> ComptimeValue:
         extra_count: 0,
     }
 
-fn comptime_value_is_valid(value: &ComptimeValue) -> i32:
+pub fn comptime_value_is_valid(value: &ComptimeValue) -> i32:
     if value.kind == ComptimeValueKind.CV_INVALID:
         return 0
     1
 
-fn comptime_value_is_intlike(value: &ComptimeValue) -> i32:
+pub fn comptime_value_is_intlike(value: &ComptimeValue) -> i32:
     if value.kind == ComptimeValueKind.CV_INT or value.kind == ComptimeValueKind.CV_BOOL:
         return 1
     0
 
-fn comptime_value_intlike(value: &ComptimeValue) -> i64:
+pub fn comptime_value_intlike(value: &ComptimeValue) -> i64:
     value.data0
 
-fn comptime_value_truthy(value: &ComptimeValue) -> i32:
+pub fn comptime_value_truthy(value: &ComptimeValue) -> i32:
     if value.kind == ComptimeValueKind.CV_BOOL or value.kind == ComptimeValueKind.CV_INT:
         if value.data0 != 0:
             return 1
         return 0
     -1
 
-fn comptime_value_kind_name(kind: i32) -> str:
+pub fn comptime_value_kind_name(kind: i32) -> str:
     if kind == ComptimeValueKind.CV_VOID: return "void"
     if kind == ComptimeValueKind.CV_INT: return "int"
     if kind == ComptimeValueKind.CV_BOOL: return "bool"
@@ -424,7 +424,7 @@ fn comptime_value_format(value: &ComptimeValue, extras: &Vec[ComptimeValue], sem
         return "<" ++ sema.type_name(value.type_id) ++ ">"
     "<invalid>"
 
-fn comptime_values_equal(lhs: &ComptimeValue, rhs: &ComptimeValue, extras: &Vec[ComptimeValue]) -> i32:
+pub fn comptime_values_equal(lhs: &ComptimeValue, rhs: &ComptimeValue, extras: &Vec[ComptimeValue]) -> i32:
     if lhs.kind != rhs.kind:
         return 0
     if lhs.kind == ComptimeValueKind.CV_INVALID:

@@ -20,15 +20,15 @@ extern fn str_from_byte(b: i32) -> str
 extern fn with_write(s: &str) -> Unit
 extern fn with_alloc(size: i64) -> *mut u8
 
-fn lbrace -> str:
+pub fn lbrace -> str:
     str_from_byte(123)
 
-fn rbrace -> str:
+pub fn rbrace -> str:
     str_from_byte(125)
 
 // ── Statement kinds ──────────────────────────────────────────────
 
-enum StmtKind: i32:
+pub enum StmtKind: i32:
     Assign = 0
     StorageLive = 1
     StorageDead = 2
@@ -37,7 +37,7 @@ enum StmtKind: i32:
 
 // ── Terminator kinds ─────────────────────────────────────────────
 
-enum TermKind: i32:
+pub enum TermKind: i32:
     TK_GOTO = 0
     TK_RETURN = 1
     TK_UNREACHABLE = 2
@@ -50,7 +50,7 @@ enum TermKind: i32:
 
 // ── Rvalue kinds ─────────────────────────────────────────────────
 
-enum RvalueKind: i32:
+pub enum RvalueKind: i32:
     RK_USE = 0
     RK_BIN_OP = 1
     RK_UN_OP = 2
@@ -66,14 +66,14 @@ enum RvalueKind: i32:
 
 // ── Operand kinds ────────────────────────────────────────────────
 
-enum OperandKind: i32:
+pub enum OperandKind: i32:
     OK_COPY = 0
     OK_MOVE = 1
     OK_CONSTANT = 2
 
 // ── Constant kinds ───────────────────────────────────────────────
 
-enum ConstKind: i32:
+pub enum ConstKind: i32:
     CK_INT = 0
     CK_BOOL = 1
     CK_STR = 2
@@ -334,7 +334,7 @@ pub enum MirIntrinsic: i32:
 // Vec/HashMap, and compared throughout MIR lowering and codegen.
 impl Copy for MirIntrinsic
 
-fn mir_len_method_intrinsic(base: MirIntrinsic, method_name: &str) -> MirIntrinsic:
+pub fn mir_len_method_intrinsic(base: MirIntrinsic, method_name: &str) -> MirIntrinsic:
     if method_name == "len":
         return base
     if base == MirIntrinsic.VEC_LEN:
@@ -363,18 +363,18 @@ fn mir_len_method_intrinsic(base: MirIntrinsic, method_name: &str) -> MirIntrins
         if method_name == "ulen32": return MirIntrinsic.SLOTMAP_ULEN32
     MirIntrinsic.NONE
 
-fn mir_intrinsic_is_len32(intrinsic: MirIntrinsic) -> bool:
+pub fn mir_intrinsic_is_len32(intrinsic: MirIntrinsic) -> bool:
     intrinsic == MirIntrinsic.VEC_LEN32 or intrinsic == MirIntrinsic.MAP_LEN32 or intrinsic == MirIntrinsic.STR_LEN32 or intrinsic == MirIntrinsic.ARR_LEN32 or intrinsic == MirIntrinsic.VECRANGE_LEN32 or intrinsic == MirIntrinsic.SLOTMAP_LEN32
 
-fn mir_intrinsic_is_len64(intrinsic: MirIntrinsic) -> bool:
+pub fn mir_intrinsic_is_len64(intrinsic: MirIntrinsic) -> bool:
     intrinsic == MirIntrinsic.VEC_LEN64 or intrinsic == MirIntrinsic.MAP_LEN64 or intrinsic == MirIntrinsic.STR_LEN64 or intrinsic == MirIntrinsic.ARR_LEN64 or intrinsic == MirIntrinsic.VECRANGE_LEN64 or intrinsic == MirIntrinsic.SLOTMAP_LEN64
 
-fn mir_intrinsic_is_ulen32(intrinsic: MirIntrinsic) -> bool:
+pub fn mir_intrinsic_is_ulen32(intrinsic: MirIntrinsic) -> bool:
     intrinsic == MirIntrinsic.VEC_ULEN32 or intrinsic == MirIntrinsic.MAP_ULEN32 or intrinsic == MirIntrinsic.STR_ULEN32 or intrinsic == MirIntrinsic.ARR_ULEN32 or intrinsic == MirIntrinsic.VECRANGE_ULEN32 or intrinsic == MirIntrinsic.SLOTMAP_ULEN32
 
 // ── Projection kinds ─────────────────────────────────────────────
 
-enum ProjKind: i32:
+pub enum ProjKind: i32:
     PK_FIELD = 0
     PK_INDEX = 1
     PK_DEREF = 2
@@ -383,7 +383,7 @@ enum ProjKind: i32:
 
 // ── Drop kind tags for scope scheduling ──────────────────────────
 
-enum DropKind: i32:
+pub enum DropKind: i32:
     DK_VALUE = 0
     DK_STORAGE = 1
     DK_TASK_DETACHED = 2
@@ -566,7 +566,7 @@ pub type MirModule {
     sema_callable_syms: HashMap[i32, i32],
 }
 
-enum MirCallableClass: i32:
+pub enum MirCallableClass: i32:
     Signature = 1
     Generic = 2
     Intrinsic = 3
@@ -913,7 +913,7 @@ impl MirBody:
         self.const_types.push(type_id)
         id
 
-fn mir_const_int_value(body: &MirBody, const_id: i32) -> i64:
+pub fn mir_const_int_value(body: &MirBody, const_id: i32) -> i64:
     ast_int_from_parts(
         body.const_d0[const_id],
         body.const_d1[const_id],
@@ -1124,7 +1124,7 @@ fn mir_clip_text(s: &str, max_len: i32) -> str:
         return s.slice(0, max_len)
     s.slice(0, max_len - 3) ++ "..."
 
-fn mir_place_text(body: &MirBody, place_id: i32) -> str:
+pub fn mir_place_text(body: &MirBody, place_id: i32) -> str:
     if place_id < 0 or place_id >= body.place_locals.len():
         return "_?"
 
@@ -1162,7 +1162,7 @@ fn mir_place_text(body: &MirBody, place_id: i32) -> str:
 
     out
 
-fn mir_exact_int_text(ast: &AstPool, node: i32) -> str:
+pub fn mir_exact_int_text(ast: &AstPool, node: i32) -> str:
     if node == 0:
         return "<exact-int>"
     let kind = ast.kind(node)
@@ -1333,7 +1333,7 @@ impl MirDropStateKeys:
         self.chunk_joins.insert(pair, joined)
         joined
 
-fn mir_drop_state_keys_new(body: &MirBody) -> MirDropStateKeys:
+pub fn mir_drop_state_keys_new(body: &MirBody) -> MirDropStateKeys:
     var names: Vec[str] = Vec.new()
     var base_local: Vec[i32] = Vec.new()
     var index: HashMap[str, i32] = HashMap.new()
@@ -1619,7 +1619,7 @@ impl MirDropStateMap:
             return target ++ "=" ++ mir_drop_state_name(MirDropState.Uninit)
         out
 
-fn mir_drop_state_name(state: i32) -> str:
+pub fn mir_drop_state_name(state: i32) -> str:
     if state == MirDropState.Init:
         return "Init"
     if state == MirDropState.Moved:
@@ -1642,7 +1642,7 @@ fn mir_drop_state_name(state: i32) -> str:
 var mir_local_key_cache: Vec[str] = Vec.new()
 var mir_local_key_cache_lock: Atomic[i32]
 
-fn mir_drop_state_local_key(local_id: i32) -> str:
+pub fn mir_drop_state_local_key(local_id: i32) -> str:
     if local_id < 0:
         return f"_{local_id}"
     // Comptime parallel() lowers MIR on concurrent threads that share this global
@@ -1669,7 +1669,7 @@ fn mir_drop_state_key_is_descendant(key: &str, local_key: &str) -> bool:
     let ch = key[local_key.len()]
     ch == '.' or ch == '[' or ch == '<'
 
-fn mir_drop_state_block_has_successor(body: &MirBody, pred: i32, target: i32) -> bool:
+pub fn mir_drop_state_block_has_successor(body: &MirBody, pred: i32, target: i32) -> bool:
     let kind = body.term_kind(pred)
     let d0 = body.term_data0(pred)
     let d1 = body.term_data1(pred)
@@ -1721,7 +1721,7 @@ fn mir_drop_state_block_successors(body: &MirBody, bb: i32) -> Vec[i32]:
 // out-state row per block (`rows` is blocks × chunks of stored chunk ids,
 // rewritten in place on every store), and the CFG in CSR form so a block's
 // predecessors are a slice, not a terminator scan.
-type MirDropStateBlocks {
+pub type MirDropStateBlocks {
     keys: MirDropStateKeys,
     rows: Vec[i32],
     // The entry state's stored chunk ids (keys.initial, interned once: an
@@ -1903,7 +1903,7 @@ fn mir_drop_state_blocks_new(body: &MirBody) -> MirDropStateBlocks:
 fn mir_drop_state_sweep_bound(local_count: i32, block_count: i32) -> i64:
     3 * (local_count as i64 + 1) * (block_count as i64 + 1) + 2
 
-fn mir_drop_state_compute_blocks(body: &MirBody) -> MirDropStateBlocks:
+pub fn mir_drop_state_compute_blocks(body: &MirBody) -> MirDropStateBlocks:
     let bb_count = body.block_count()
     var blocks = mir_drop_state_blocks_new(body)
     let sweep_bound = mir_drop_state_sweep_bound(body.local_count(), bb_count)
@@ -1939,7 +1939,7 @@ fn mir_drop_state_compute_blocks(body: &MirBody) -> MirDropStateBlocks:
                 dirty[blocks.succs[i]] = 1
     blocks
 
-fn dump_drop_state_body(body: &MirBody, pool: &InternPool) -> str:
+pub fn dump_drop_state_body(body: &MirBody, pool: &InternPool) -> str:
     var out = ""
     let fn_name = if body.fn_sym != 0:
         f"sym{body.fn_sym}({pool.resolve(body.fn_sym)})"
@@ -2020,7 +2020,7 @@ fn mir_ownership_rvalue_move_matches(body: &MirBody, rval_id: i32, target: &str)
         return mir_ownership_operand_move_matches(body, d1, target) or mir_ownership_operand_move_matches(body, d2, target)
     false
 
-fn mir_ownership_stmt_event(body: &MirBody, stmt_id: i32, target: &str) -> str:
+pub fn mir_ownership_stmt_event(body: &MirBody, stmt_id: i32, target: &str) -> str:
     let kind = body.stmt_kind(stmt_id)
     if kind == StmtKind.Assign:
         if mir_ownership_rvalue_move_matches(body, body.stmt_data1(stmt_id), target):
@@ -2034,7 +2034,7 @@ fn mir_ownership_stmt_event(body: &MirBody, stmt_id: i32, target: &str) -> str:
         return "drop"
     "nop"
 
-fn mir_ownership_term_event(body: &MirBody, bb: i32, target: &str) -> str:
+pub fn mir_ownership_term_event(body: &MirBody, bb: i32, target: &str) -> str:
     let kind = body.term_kind(bb)
     if kind == TermKind.TK_CALL:
         if mir_ownership_operand_move_matches(body, body.term_data0(bb), target) or mir_ownership_call_args_move_matches(body, body.term_data1(bb), target):
@@ -2052,7 +2052,7 @@ fn mir_ownership_term_event(body: &MirBody, bb: i32, target: &str) -> str:
         return "goto"
     "term"
 
-fn mir_drop_plan_action(state: i32) -> str:
+pub fn mir_drop_plan_action(state: i32) -> str:
     if state == MirDropState.Init:
         return "drop"
     if state == MirDropState.Maybe or state == MirDropState.MaybeMoved:
@@ -2141,7 +2141,7 @@ fn mir_place_projection_debug_list(mir_mod: &MirModule, body: &MirBody, place_id
         current_ty = mir_projection_next_type(mir_mod, current_ty, pk, pd)
     out ++ "]"
 
-fn dump_place_map_body(mir_mod: &MirModule, body: &MirBody, pool: &InternPool) -> str:
+pub fn dump_place_map_body(mir_mod: &MirModule, body: &MirBody, pool: &InternPool) -> str:
     var out = "fn " ++ mir_debug_body_label(body, pool) ++ "\n"
     for place_id in 0..body.place_locals.len():
         let local_id = body.place_locals[place_id]
@@ -2165,13 +2165,13 @@ fn mir_parse_block_id(text: &str) -> i32:
         return mir_parse_positive_i32(text.slice(2, text.len()))
     mir_parse_positive_i32(text)
 
-fn mir_cleanup_edge_from(target: &str) -> i32:
+pub fn mir_cleanup_edge_from(target: &str) -> i32:
     for i in 0..target.len():
         if target[i] == '-' and i + 1 < target.len() and target[i + 1] == '>':
             return mir_parse_block_id(target.slice(0, i))
     -1
 
-fn mir_cleanup_edge_to(target: &str) -> i32:
+pub fn mir_cleanup_edge_to(target: &str) -> i32:
     for i in 0..target.len():
         if target[i] == '-' and i + 1 < target.len() and target[i + 1] == '>':
             return mir_parse_block_id(target.slice(i + 2, target.len()))
@@ -2456,7 +2456,7 @@ fn validate_ownership_body(mir_mod: &MirModule, body: &MirBody) -> str:
         state.transfer_term(blocks.keys, body, bb)
     ""
 
-fn validate_ownership_mir_module(mir_mod: &MirModule) -> str:
+pub fn validate_ownership_mir_module(mir_mod: &MirModule) -> str:
     let shape = validate_mir_module(mir_mod)
     if shape.len() > 0:
         return "MIR shape: " ++ shape
@@ -2471,13 +2471,13 @@ fn validate_ownership_mir_module(mir_mod: &MirModule) -> str:
             errors = errors ++ err
     errors
 
-fn mir_debug_spec_fn(spec: &str) -> str:
+pub fn mir_debug_spec_fn(spec: &str) -> str:
     for i in 0..spec.len():
         if spec[i] == ':':
             return spec.slice(0, i)
     ""
 
-fn mir_debug_spec_target(spec: &str) -> str:
+pub fn mir_debug_spec_target(spec: &str) -> str:
     for i in 0..spec.len():
         if spec[i] == ':':
             return spec.slice(i + 1, spec.len())
@@ -2488,12 +2488,12 @@ fn mir_debug_body_name(body: &MirBody, pool: &InternPool) -> str:
         return with_str_clone_ref(pool.resolve(body.fn_sym))
     "<anon>"
 
-fn mir_debug_body_label(body: &MirBody, pool: &InternPool) -> str:
+pub fn mir_debug_body_label(body: &MirBody, pool: &InternPool) -> str:
     if body.fn_sym != 0:
         return f"sym{body.fn_sym}(" ++ pool.resolve(body.fn_sym) ++ ")"
     "<anon>"
 
-fn mir_debug_body_matches(body: &MirBody, pool: &InternPool, wanted_fn: &str) -> bool:
+pub fn mir_debug_body_matches(body: &MirBody, pool: &InternPool, wanted_fn: &str) -> bool:
     if wanted_fn.len() == 0:
         return true
     let name = mir_debug_body_name(body, pool)
@@ -2503,7 +2503,7 @@ fn mir_debug_body_matches(body: &MirBody, pool: &InternPool, wanted_fn: &str) ->
         return true
     false
 
-fn mir_debug_mentions(text: &str, target: &str) -> bool:
+pub fn mir_debug_mentions(text: &str, target: &str) -> bool:
     target.len() == 0 or text.contains(target)
 
 fn mir_local_of_operand(body: &MirBody, operand: i32) -> i32:
@@ -2677,7 +2677,7 @@ fn validate_use_after_kill_body(body: &MirBody, pool: &InternPool) -> str:
 pub fn validate_use_after_kill(body: &MirBody, pool: &InternPool) -> str:
     validate_use_after_kill_body(body, pool)
 
-fn validate_all_mir_module(mir_mod: &MirModule) -> str:
+pub fn validate_all_mir_module(mir_mod: &MirModule) -> str:
     let shape = validate_mir_module(mir_mod)
     if shape.len() > 0:
         return "MIR shape: " ++ shape
@@ -2689,7 +2689,7 @@ fn validate_all_mir_module(mir_mod: &MirModule) -> str:
         return "ownership MIR: " ++ ownership
     ""
 
-fn mir_binop_name(op: i32) -> str:
+pub fn mir_binop_name(op: i32) -> str:
     if op == BinaryOp.OP_ADD: return "add"
     if op == BinaryOp.OP_SUB: return "sub"
     if op == BinaryOp.OP_MUL: return "mul"
@@ -2717,7 +2717,7 @@ fn mir_binop_name(op: i32) -> str:
     if op == BinaryOp.OP_NOT_IN: return "not_in"
     f"op{op}"
 
-fn mir_unop_name(op: i32) -> str:
+pub fn mir_unop_name(op: i32) -> str:
     if op == UnaryOp.UOP_NEGATE: return "neg"
     if op == UnaryOp.UOP_NOT: return "not"
     if op == UnaryOp.UOP_REF: return "ref"
@@ -2735,7 +2735,7 @@ fn mir_index_in_range(idx: i32, len: i32) -> bool:
 fn mir_span_in_range(start: i32, count: i32, len: i32) -> bool:
     start >= 0 and count >= 0 and start + count <= len
 
-fn validate_mir_module(mir_mod: &MirModule) -> str:
+pub fn validate_mir_module(mir_mod: &MirModule) -> str:
     let body_count = mir_mod.bodies.len() as i32
     if body_count != mir_mod.body_fn_syms.len():
         return "bodies/body_fn_syms length mismatch"
@@ -3063,7 +3063,7 @@ fn validate_mir_body(body: &MirBody) -> str:
 
     ""
 
-type MirValidationError {
+pub type MirValidationError {
     fn_sym: i32,
     span: i32,
     message: str,
@@ -3083,7 +3083,7 @@ fn mir_validation_fail(fn_sym: i32, span: i32, message: &str) -> MirValidationEr
         message: with_str_clone_ref(message),
     }
 
-fn mir_validation_has_error(err: &MirValidationError) -> bool:
+pub fn mir_validation_has_error(err: &MirValidationError) -> bool:
     err.message.len() > 0
 
 fn mir_validate_find_named_type(mir_mod: &MirModule, type_sym: i32) -> i32:
@@ -3503,7 +3503,7 @@ fn mir_validate_place_prefix_type(mir_mod: &MirModule, body: &MirBody, place_id:
 
     current_ty
 
-fn mir_validate_operand_type(mir_mod: &MirModule, body: &MirBody, operand_id: i32) -> i32:
+pub fn mir_validate_operand_type(mir_mod: &MirModule, body: &MirBody, operand_id: i32) -> i32:
     if operand_id < 0 or operand_id >= body.operand_kinds.len():
         return 0
     let op_kind = body.operand_kinds[operand_id]
@@ -3571,7 +3571,7 @@ fn mir_validate_call_missing_borrow(mir_mod: &MirModule, body: &MirBody, callee_
 
 // The `const fn` symbol a call terminator invokes, or 0 when the callee is
 // a place (an indirect call) or a unit operand (an intrinsic with no callee).
-fn mir_call_const_fn_sym(body: &MirBody, callee_operand: i32) -> i32:
+pub fn mir_call_const_fn_sym(body: &MirBody, callee_operand: i32) -> i32:
     if callee_operand < 0 or callee_operand >= body.operand_kinds.len() or body.operand_kinds[callee_operand] != OperandKind.OK_CONSTANT: return 0
     let callee_const = body.operand_d0[callee_operand]
     if callee_const < 0 or callee_const >= body.const_kinds.len() or body.const_kinds[callee_const] != ConstKind.CK_FN: return 0
@@ -3608,7 +3608,7 @@ fn mir_validate_call_callee_known(mir_mod: &MirModule, body: &MirBody, callee_op
 // AnalysisResolution gathers it from Sema; mir_resolution_check_call
 // compares it with the MIR without Sema, so a planted body and a planted
 // answer exercise the comparison alone (test/internals).
-enum CalleeResolutionKind: i32:
+pub enum CalleeResolutionKind: i32:
     Unknown = 0
     Signature = 1
     Generic = 2
@@ -3635,7 +3635,7 @@ pub type CalleeResolution {
     node_sig: i32,
 }
 
-fn callee_resolution_unknown() -> CalleeResolution:
+pub fn callee_resolution_unknown() -> CalleeResolution:
     CalleeResolution { kind: CalleeResolutionKind.Unknown, name: "", param_count: -1, sig: -1, sym: 0, node_sig: -1 }
 
 fn callee_resolution_kind_name(kind: CalleeResolutionKind) -> str:
@@ -3649,7 +3649,7 @@ fn callee_resolution_kind_name(kind: CalleeResolutionKind) -> str:
 // The D65 rule broken, named for the report: what MIR resolved, what Sema
 // resolved, and the rule. "" when the call agrees with Sema. `bb` is the
 // block whose terminator is the call.
-fn mir_resolution_check_call(mir_mod: &MirModule, body: &MirBody, bb: i32, answer: &CalleeResolution) -> str:
+pub fn mir_resolution_check_call(mir_mod: &MirModule, body: &MirBody, bb: i32, answer: &CalleeResolution) -> str:
     let callee_operand = body.term_data0(bb)
     let call_id = body.term_data1(bb)
     if call_id < 0 or call_id >= body.call_arg_starts.len(): return ""
@@ -3976,7 +3976,7 @@ fn validate_typed_mir_body(mir_mod: &MirModule, body: &MirBody) -> MirValidation
 
     mir_validation_ok()
 
-fn validate_typed_mir_module(mir_mod: &MirModule) -> MirValidationError:
+pub fn validate_typed_mir_module(mir_mod: &MirModule) -> MirValidationError:
     let shape_err = validate_mir_module(mir_mod)
     if shape_err.len() > 0:
         return mir_validation_fail(0, 0, shape_err)

@@ -108,7 +108,7 @@ pub enum AnalysisMarshalStrategy: i32:
 
 impl Copy for AnalysisMarshalStrategy
 
-fn analysis_marshal_strategy_name(strategy: AnalysisMarshalStrategy) -> str:
+pub fn analysis_marshal_strategy_name(strategy: AnalysisMarshalStrategy) -> str:
     if strategy == AnalysisMarshalStrategy.DirectValue: return "direct-value"
     if strategy == AnalysisMarshalStrategy.TransparentSlot: return "transparent-slot"
     if strategy == AnalysisMarshalStrategy.ExistingPointer: return "existing-pointer"
@@ -260,9 +260,9 @@ fn analysis_kind_name(kind: AnalysisFactKind) -> str:
     if kind == AnalysisFactKind.ForeignContract: return "foreign-contract"
     "unknown"
 
-fn analysis_slice(text: &str, start: i32, end: i32): text.slice(start as i64, end as i64)
+pub fn analysis_slice(text: &str, start: i32, end: i32): text.slice(start as i64, end as i64)
 
-fn analysis_find_from(text: &str, needle: &str, start: i32) -> i32:
+pub fn analysis_find_from(text: &str, needle: &str, start: i32) -> i32:
     let n = text.len() as i32
     let m = needle.len() as i32
     if m == 0:
@@ -277,7 +277,7 @@ fn analysis_find_from(text: &str, needle: &str, start: i32) -> i32:
         i = i + 1
     -1
 
-fn analysis_parse_i32(text: &str) -> i32:
+pub fn analysis_parse_i32(text: &str) -> i32:
     if text.len() == 0: return 0
     var sign = 1
     var i = 0
@@ -361,7 +361,7 @@ fn analysis_term_matches(fact: &AnalysisFact, term: &str) -> bool:
         return analysis_parse_i32(actual) & mask == mask
     actual == wanted
 
-fn analysis_fact_matches(fact: &AnalysisFact, query: &str) -> bool:
+pub fn analysis_fact_matches(fact: &AnalysisFact, query: &str) -> bool:
     if query.len() == 0 or query == "all":
         return true
     var start = 0

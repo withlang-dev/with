@@ -66,7 +66,7 @@ enum ControlTargetKind: i32:
     CT_LOOP = 1
     CT_BLOCK = 2
 
-type MirBuilder = ephemeral {
+pub type MirBuilder = ephemeral {
     body: MirBody,
     anonymous_bodies: Vec[MirBody],
     cur_bb: BlockId,
@@ -16914,7 +16914,7 @@ fn lower_debug_formatter(sema: &Sema, ast_pool: AstPool, pool: InternPool, entry
     builder.terminate(TermKind.TK_RETURN, 0, 0, 0, 0)
     return move builder.body
 
-fn lower_module(input_sema: Sema, ast_pool: AstPool, pool: InternPool) -> MirLowerResult:
+pub fn lower_module(input_sema: Sema, ast_pool: AstPool, pool: InternPool) -> MirLowerResult:
     var sema = input_sema
     sema.prepare_source_line_offsets()
     var mir_mod = MirModule.init()
@@ -17005,7 +17005,7 @@ fn lower_module(input_sema: Sema, ast_pool: AstPool, pool: InternPool) -> MirLow
 
     MirLowerResult { sema, mir_module: mir_mod }
 
-fn collect_tailrec_fn_syms(sema: &Sema, ast_pool: AstPool, pool: InternPool) -> Vec[i32]:
+pub fn collect_tailrec_fn_syms(sema: &Sema, ast_pool: AstPool, pool: InternPool) -> Vec[i32]:
     let tailrec_syms: Vec[i32] = Vec.new()
     for di in 0..ast_pool.decl_count():
         let decl = ast_pool.get_decl(di)

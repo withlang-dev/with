@@ -1,6 +1,6 @@
 // Type tags shared by semantic analysis and the frozen MIR type tables.
 // Keep this vocabulary independent of the semantic-analysis driver.
-enum TypeKind: i32:
+pub enum TypeKind: i32:
     TY_ERR = 0
     TY_INT = 1
     TY_FLOAT = 2
@@ -30,7 +30,7 @@ enum TypeKind: i32:
 
 type TypeId = i32
 
-enum BorrowKind: i32:
+pub enum BorrowKind: i32:
     SHARED = 0
     EXCLUSIVE = 1
 

@@ -31,7 +31,7 @@ pub fn migrate_set_width_slice(val: i32):
 // prune_width_family_decls shell function:
 //   - PCRE2_UCHAR16, PCRE2_UCHAR32, PCRE2_SPTR16, PCRE2_SPTR32
 //   - Any identifier ending in _16 or _32
-fn ci_migrate_is_width_family_name(name: &str) -> bool:
+pub fn ci_migrate_is_width_family_name(name: &str) -> bool:
     if g_migrate_width_slice == 0:
         return false
     let len = name.len() as i32
@@ -129,20 +129,20 @@ pub fn migrate_reset_options():
     g_migrate_fn_translated = 0
     g_migrate_fn_translated_total = 0
 
-fn ci_migrate_shared_defs_active() -> bool:
+pub fn ci_migrate_shared_defs_active() -> bool:
     g_migrate_shared_defs_prefix.len() > 0
 
 // True when the output compiles without the prelude: a .wo bundle corpus
 // (build/wo.w builds every corpus `--no-prelude`), or `with migrate
 // --no-prelude`. The preamble then carries the prelude-only vocabulary the
 // translation reaches for (c_void, unreachable) — see ci_migrate_preamble_text.
-fn ci_migrate_output_is_prelude_free() -> bool:
+pub fn ci_migrate_output_is_prelude_free() -> bool:
     g_migrate_prelude_free != 0
 
 // Sema classifies extern declarations in every lib/std module as compiler
 // implementation bindings (sema_extern_is_compiler_implementation). Match
 // that declaration policy for every corpus, without a library-name exception.
-fn ci_migrate_shared_defs_targets_std_zone() -> bool:
+pub fn ci_migrate_shared_defs_targets_std_zone() -> bool:
     ci_starts_with(g_migrate_shared_defs_prefix, "std.")
 
 fn ci_migrate_shared_defs_reset:
@@ -187,7 +187,7 @@ fn ci_migrate_shared_decl_upgrade_opaque_type(name: &str, rendered: &str):
             break
         j = j + 1
 
-fn ci_migrate_shared_decl_add(kind: &str, name: &str, rendered: &str) -> bool:
+pub fn ci_migrate_shared_decl_add(kind: &str, name: &str, rendered: &str) -> bool:
     if not ci_migrate_shared_defs_active():
         return false
     let key = ci_migrate_shared_decl_key(kind, name)
@@ -256,7 +256,7 @@ fn ci_migrate_libc_reset:
     g_migrate_libc_symbols_used = ""
     return
 
-fn ci_migrate_note_libc_symbol(name: &str):
+pub fn ci_migrate_note_libc_symbol(name: &str):
     if name.len() == 0:
         return
     let key = "|" ++ name ++ "|"
@@ -816,7 +816,7 @@ fn ci_capture_macro_values(session: i64):
                 g_migrate_macro_values.insert(ci_ir_owned_text(name), ci_ir_owned_text(value))
         i = i + 1
 
-fn ci_collect_macro_type_names(session: i64) -> str:
+pub fn ci_collect_macro_type_names(session: i64) -> str:
     let count = with_cimport_decl_count(session)
     var names = ""
     var i = 0
@@ -829,7 +829,7 @@ fn ci_collect_macro_type_names(session: i64) -> str:
         i = i + 1
     names
 
-fn ci_collect_macro_type_aliases(session: i64) -> str:
+pub fn ci_collect_macro_type_aliases(session: i64) -> str:
     let count = with_cimport_decl_count(session)
     var aliases = ""
     var i = 0
@@ -1770,7 +1770,7 @@ fn ci_migrate_translate_function(session: i64, idx: i32, known_structs: &str, pr
 
 
 // ── ci_migrate_var_* helpers (moved from CImport.w in D3) ─────
-fn ci_migrate_set_error(msg: &str):
+pub fn ci_migrate_set_error(msg: &str):
     if g_migrate_file_error.len() == 0:
         g_migrate_file_error = with_str_clone_ref(msg)
 
@@ -2067,7 +2067,7 @@ var g_migrate_file_error: str = ""
 // When true, skip @[c_export] attributes and extern fn declarations
 // for functions defined in the same translation unit.
 // Set via migrate_set_no_c_export().
-var g_migrate_no_c_export: i32 = 0
+pub var g_migrate_no_c_export: i32 = 0
 
 pub fn migrate_set_no_c_export(val: i32):
     g_migrate_no_c_export = val

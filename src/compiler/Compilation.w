@@ -369,7 +369,7 @@ pub type Compilation {
     emit_c_in_unit: bool,
 }
 
-type CompilationBinaryLinkPlan {
+pub type CompilationBinaryLinkPlan {
     ok: bool,
     obj_path: str,
     bin_path: str,
@@ -1255,7 +1255,7 @@ fn compilation_write_unit_digests(obj_path: &str) -> bool:
         return false
     true
 
-fn compilation_execute_binary_link_plan(debug_info: bool, plan: CompilationBinaryLinkPlan) -> LinkStageResult:
+pub fn compilation_execute_binary_link_plan(debug_info: bool, plan: CompilationBinaryLinkPlan) -> LinkStageResult:
     if not plan.ok:
         return link_stage_result_fail()
     var owned = move plan

@@ -55,7 +55,7 @@ enum ScopeKind: i32:
     SK_COMPREHENSION = 7
 
 // Module metadata used by --dump-resolved.
-type ResolvedModule {
+pub type ResolvedModule {
     module_id: i32,
     file_id: i32,
     path: str,
@@ -64,7 +64,7 @@ type ResolvedModule {
     decl_count: i32,
 }
 
-type ResolvedImport {
+pub type ResolvedImport {
     module_id: i32,
     index_in_module: i32,
     kind: i32,
@@ -74,7 +74,7 @@ type ResolvedImport {
     span_end: i32,
 }
 
-type ResolvedDef {
+pub type ResolvedDef {
     def_id: i32,
     module_id: i32,
     parent_def: i32,
@@ -86,7 +86,7 @@ type ResolvedDef {
 
 impl Copy for ResolvedDef
 
-type ResolvedScope {
+pub type ResolvedScope {
     scope_id: i32,
     module_id: i32,
     parent_scope: i32,
@@ -96,7 +96,7 @@ type ResolvedScope {
 
 impl Copy for ResolvedScope
 
-type ResolvedBinding {
+pub type ResolvedBinding {
     scope_id: i32,
     symbol: i32,
     def_id: i32,
@@ -104,7 +104,7 @@ type ResolvedBinding {
 
 impl Copy for ResolvedBinding
 
-type ResolvedUse {
+pub type ResolvedUse {
     module_id: i32,
     node_id: i32,
     symbol: i32,
@@ -136,7 +136,7 @@ fn ResolveResult.init -> ResolveResult:
         link_libs: Vec.new(),
     }
 
-type ResolveArtifacts {
+pub type ResolveArtifacts {
     pool: InternPool,
     diags: DiagnosticList,
     result: ResolveResult,
@@ -193,7 +193,7 @@ fn resolve_from_root_pool(root_path: &str, root_text: &str, root_file_id: i32, r
 // registered (#930 — the resolver and the frontend each counted from 1, and
 // an imported module's parse error rendered against the embedded stdlib
 // text that shared its number).
-fn resolve_from_root_pool_with_prefix(root_path: &str, root_text: &str, root_file_id: i32, root_pool: AstPool, pool: InternPool, diags: DiagnosticList, emit_resolve_diags: bool, root_prefix_skip: i32, first_file_id: i32) -> ResolveArtifacts:
+pub fn resolve_from_root_pool_with_prefix(root_path: &str, root_text: &str, root_file_id: i32, root_pool: AstPool, pool: InternPool, diags: DiagnosticList, emit_resolve_diags: bool, root_prefix_skip: i32, first_file_id: i32) -> ResolveArtifacts:
     var state = ResolveState.init(pool, move diags, emit_resolve_diags)
     state.root_prefix_skip = root_prefix_skip
     state.next_file_id = first_file_id
@@ -1294,10 +1294,10 @@ pub fn import_not_found_message(dotted: &str) -> str:
         msg = msg ++ " (build-generated modules live under out/gen; run `with build` once in a fresh checkout)"
     msg
 
-fn resolve_file_exists(path: &str) -> bool:
+pub fn resolve_file_exists(path: &str) -> bool:
     with_fs_read_file(path).len() > 0
 
-fn resolve_parent_lib_candidate(module_dir: &str, rel_path: &str) -> str:
+pub fn resolve_parent_lib_candidate(module_dir: &str, rel_path: &str) -> str:
     var cur = with_str_clone_ref(module_dir)
     while true:
         let lib_dir = resolve_join(cur, "lib")
@@ -1310,7 +1310,7 @@ fn resolve_parent_lib_candidate(module_dir: &str, rel_path: &str) -> str:
         cur = parent
     ""
 
-fn resolve_project_root_candidate(module_dir: &str, rel_path: &str) -> str:
+pub fn resolve_project_root_candidate(module_dir: &str, rel_path: &str) -> str:
     let root = resolve_find_project_root(module_dir)
     if root.len() == 0:
         return ""
@@ -1325,7 +1325,7 @@ fn resolve_project_root_candidate(module_dir: &str, rel_path: &str) -> str:
 
     ""
 
-fn resolve_join(a: &str, b: &str) -> str:
+pub fn resolve_join(a: &str, b: &str) -> str:
     if a.len() == 0:
         return with_str_clone_ref(b)
     if b.len() == 0:
@@ -1336,7 +1336,7 @@ fn resolve_join(a: &str, b: &str) -> str:
         return resolve_normalize_path(a ++ b)
     resolve_normalize_path(a ++ "/" ++ b)
 
-fn resolve_dirname(path: &str) -> str:
+pub fn resolve_dirname(path: &str) -> str:
     var last = -1
     for i in 0..path.len():
         if path[i] == 47:
@@ -1347,7 +1347,7 @@ fn resolve_dirname(path: &str) -> str:
         return "/"
     path.slice(0, last as i64)
 
-fn resolve_normalize_path(path: &str) -> str:
+pub fn resolve_normalize_path(path: &str) -> str:
     if path.len() == 0:
         return with_str_clone_ref(path)
 
@@ -1525,7 +1525,7 @@ fn print_resolved(result: &ResolveResult, pool: InternPool, root_path: &str):
             line = line ++ pool.resolve(result.link_libs[li])
         with_write(line ++ "\n")
 
-fn dump_resolved(result: &ResolveResult, pool: InternPool, root_path: &str) -> str:
+pub fn dump_resolved(result: &ResolveResult, pool: InternPool, root_path: &str) -> str:
     var out = ""
     out = out ++ f"resolved root={root_path} modules={result.modules.len() as i32} defs={result.defs.len() as i32}\n"
 

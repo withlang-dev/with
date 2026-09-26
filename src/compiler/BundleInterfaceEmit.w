@@ -20,6 +20,7 @@
 // are not part of a declaration's contract and are not printed.
 use Ast
 use Sema
+use SemaDecl
 use FnAbi
 use compiler.BundleInterfaces
 use std.string.StringBuilder

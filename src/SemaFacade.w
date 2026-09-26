@@ -1965,7 +1965,7 @@ impl Sema:
         self.facade_variadic_calls.insert(node, target)
         target
 
-fn facade_clause_name(kind: i32) -> str:
+pub fn facade_clause_name(kind: i32) -> str:
     if kind == FACADE_CLAUSE_FROM: return "from"
     if kind == FACADE_CLAUSE_INIT: return "init"
     if kind == FACADE_CLAUSE_PREINIT: return "preinit"

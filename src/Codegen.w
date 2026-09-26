@@ -40,7 +40,7 @@ extern fn with_codegen_loop_get_continue(idx: i32) -> i64
 extern fn with_codegen_loop_get_result(idx: i32) -> i64
 
 // Atomic operations
-enum AtomicRmwOp: i32:
+pub enum AtomicRmwOp: i32:
     XCHG = 0
     ADD = 1
     SUB = 2
@@ -52,7 +52,7 @@ enum AtomicRmwOp: i32:
     UMIN = 8
     UMAX = 9
 
-enum AtomicOrdering: i32:
+pub enum AtomicOrdering: i32:
     RELAXED = 0
     ACQUIRE = 1
     RELEASE = 2
@@ -96,7 +96,7 @@ type CodegenDebugState {
     location: i64,
 }
 
-type Codegen {
+pub type Codegen {
     // LLVM handles
     context: i64,
     llmod: i64,
@@ -563,7 +563,7 @@ fn Codegen.init(module_name: &str) -> Codegen:
 // aliased — and hands it back via take_sema. The swap leaves a placeholder so
 // every cg teardown path (explicit deinit or scope exit) stays untouched.
 extend Codegen:
-    mut fn take_sema() -> Sema:
+    pub mut fn take_sema() -> Sema:
         var s = move self.sema
         self.sema = Sema.placeholder(InternPool.init(), DiagnosticList.init(), AstPool.new())
         s
@@ -571,12 +571,12 @@ extend Codegen:
     // Take-and-return partners for the pools the analysis backend lends the
     // codegen run (#726): the caller restores them after take_sema, so no
     // still-viewed pool is ever dropped inside the backend seam.
-    mut fn take_pool() -> AstPool:
+    pub mut fn take_pool() -> AstPool:
         var p = self.pool
         self.pool = AstPool.new()
         p
 
-    mut fn take_intern() -> InternPool:
+    pub mut fn take_intern() -> InternPool:
         var i = self.intern
         self.intern = InternPool.init()
         i
@@ -1694,7 +1694,7 @@ impl Codegen:
                 return self.dyn_trait_from_type_node(self.pool.get_extra(g_extra))
         0
 
-fn codegen_hash_type_trait_key(type_sym: i32, trait_sym: i32) -> i32:
+pub fn codegen_hash_type_trait_key(type_sym: i32, trait_sym: i32) -> i32:
     type_sym * 10007 + trait_sym
 
 impl Codegen:
@@ -2800,12 +2800,12 @@ impl Codegen:
     fn create_entry_alloca(ty: i64) -> i64:
         wl_create_entry_alloca(self.builder, self.current_function, ty)
 
-fn vec_data_i64(v: &Vec[i64]) -> i64:
+pub fn vec_data_i64(v: &Vec[i64]) -> i64:
     wl_vec_data_ptr(v as i64)
 
 // Element-wise copy so a caller can hand an owned vector to a consuming
 // sink (e.g. record_c_abi_transform) more than once under spec §3.8.
-fn vec_copy_i64(src: &Vec[i64]) -> Vec[i64]:
+pub fn vec_copy_i64(src: &Vec[i64]) -> Vec[i64]:
     let out: Vec[i64] = Vec.new()
     for i in 0..src.len() as i32:
         out.push(src[i])
@@ -5577,7 +5577,7 @@ fn codegen_extern_uses_internal_abi(name: &str, cc_name: &str) -> bool:
         return false
     codegen_is_runtime_abi_symbol(name)
 
-fn codegen_c_abi_needs_byval_attr() -> bool:
+pub fn codegen_c_abi_needs_byval_attr() -> bool:
     let os = target_spec_os()
     let arch = target_spec_arch()
     arch == "x86_64" and (os == "Linux" or os == "Macos")
@@ -5592,7 +5592,7 @@ fn codegen_c_abi_sysv_x86_64() -> bool: target_spec_arch() == "x86_64" and targe
 // c_abi_sysv_classify's verdict for a struct with an unaligned field.
 const CODEGEN_SYSV_MEMORY: i32 = -2
 
-fn codegen_windows_x86_64() -> bool:
+pub fn codegen_windows_x86_64() -> bool:
     let os = target_spec_os()
     let arch = target_spec_arch()
     os == "Windows" and arch == "x86_64"

@@ -7,6 +7,7 @@ use Diagnostic
 use InternPool
 use CapabilityRegistry
 use render
+use SemaCheck
 use std.collections.HashMap
 
 extern fn with_str_clone_ref(s: &str) -> str
@@ -2025,7 +2026,7 @@ impl Sema:
             self.mutable_global_syms.insert(name, 1)
         self.register_top_level_global_decl(name, tid, is_mut, node, GLOBAL_VALUE_DECL_EXTERN)
 
-fn sema_str_find_char(text: &str, needle: i32) -> i32:
+pub fn sema_str_find_char(text: &str, needle: i32) -> i32:
     for i in 0..text.len() as i32:
         if text[i] == needle:
             return i

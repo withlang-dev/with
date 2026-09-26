@@ -23,7 +23,7 @@ fn zcu_new_vec_str -> Vec[str]:
     let out: Vec[str] = Vec{ ptr: 0, len: 0, cap: 0, elem_size: 16 }
     out
 
-fn zcu_debug_init_enabled() -> i32:
+pub fn zcu_debug_init_enabled() -> i32:
     let raw = runtime_getenv("WITH_DEBUG_STAGE1_TRACE")
     if raw.len() == 0:
         return 0

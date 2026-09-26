@@ -107,7 +107,7 @@ fn dump_mir_module(mir_mod: &MirModule, pool: &InternPool, sema: &Sema) -> str:
 // Streaming variant of dump_mir_module to avoid quadratic whole-module
 // concatenation when dumping large MIR corpora.
 
-fn print_mir_module(mir_mod: &MirModule, pool: &InternPool, sema: &Sema):
+pub fn print_mir_module(mir_mod: &MirModule, pool: &InternPool, sema: &Sema):
     with_write(f"mir module functions={mir_mod.bodies.len() as i32}\n")
     for i in 0..mir_mod.bodies.len():
         if i > 0:
@@ -387,7 +387,7 @@ fn mir_rvalue_text(body: &MirBody, rval_id: i32, pool: &InternPool, sema: &Sema)
     return f"rvalue<{k}>({d0}, {d1}, {d2})"
 
 
-fn mir_operand_text(body: &MirBody, operand_id: i32, pool: &InternPool, sema: &Sema) -> str:
+pub fn mir_operand_text(body: &MirBody, operand_id: i32, pool: &InternPool, sema: &Sema) -> str:
     if operand_id < 0 or operand_id >= body.operand_kinds.len():
         return "<op?>"
 
@@ -512,7 +512,7 @@ fn mir_call_args_text(body: &MirBody, args_id: i32, pool: &InternPool, sema: &Se
 // ── Drop-state dump (--dump-drop-state) ──────────────────────────
 
 
-fn dump_drop_state_module(mir_mod: &MirModule, pool: &InternPool, sema: &Sema) -> str:
+pub fn dump_drop_state_module(mir_mod: &MirModule, pool: &InternPool, sema: &Sema) -> str:
     let _ = sema
     var out = f"drop-state module functions={mir_mod.bodies.len() as i32}\n"
     for i in 0..mir_mod.bodies.len():
@@ -555,7 +555,7 @@ fn trace_ownership_body(body: &MirBody, pool: &InternPool, sema: &Sema, spec: &s
     out
 
 
-fn trace_ownership_module(mir_mod: &MirModule, pool: &InternPool, sema: &Sema, spec: &str) -> str:
+pub fn trace_ownership_module(mir_mod: &MirModule, pool: &InternPool, sema: &Sema, spec: &str) -> str:
     let wanted_fn = mir_debug_spec_fn(spec)
     let target = mir_debug_spec_target(spec)
     var out = "trace-ownership " ++ spec ++ "\n"
@@ -606,7 +606,7 @@ fn dump_drop_plan_body(body: &MirBody, pool: &InternPool, sema: &Sema) -> str:
     out
 
 
-fn dump_drop_plan_module(mir_mod: &MirModule, pool: &InternPool, sema: &Sema) -> str:
+pub fn dump_drop_plan_module(mir_mod: &MirModule, pool: &InternPool, sema: &Sema) -> str:
     var out = f"drop-plan module functions={mir_mod.bodies.len() as i32}\n"
     for i in 0..mir_mod.bodies.len():
         if i > 0:
@@ -629,7 +629,7 @@ fn dump_drop_plan_module(mir_mod: &MirModule, pool: &InternPool, sema: &Sema) ->
 // `--dump-drop-plan` diagnostic rides on — so the transfer functions observe the
 // original drops; the Nops are applied afterward.
 
-fn dump_place_map_module(mir_mod: &MirModule, pool: &InternPool, sema: &Sema) -> str:
+pub fn dump_place_map_module(mir_mod: &MirModule, pool: &InternPool, sema: &Sema) -> str:
     let _ = sema
     var out = f"place-map module functions={mir_mod.bodies.len() as i32}\n"
     for i in 0..mir_mod.bodies.len():
@@ -640,7 +640,7 @@ fn dump_place_map_module(mir_mod: &MirModule, pool: &InternPool, sema: &Sema) ->
     out
 
 
-fn trace_cleanup_edge_module(mir_mod: &MirModule, pool: &InternPool, sema: &Sema, spec: &str) -> str:
+pub fn trace_cleanup_edge_module(mir_mod: &MirModule, pool: &InternPool, sema: &Sema, spec: &str) -> str:
     let wanted_fn = mir_debug_spec_fn(spec)
     let target = mir_debug_spec_target(spec)
     let from_bb = mir_cleanup_edge_from(target)
@@ -673,7 +673,7 @@ fn trace_cleanup_edge_module(mir_mod: &MirModule, pool: &InternPool, sema: &Sema
     out
 
 
-fn trace_place_module(mir_mod: &MirModule, pool: &InternPool, sema: &Sema, spec: &str) -> str:
+pub fn trace_place_module(mir_mod: &MirModule, pool: &InternPool, sema: &Sema, spec: &str) -> str:
     let wanted_fn = mir_debug_spec_fn(spec)
     let target = mir_debug_spec_target(spec)
     var out = "trace-place " ++ spec ++ "\n"
@@ -707,7 +707,7 @@ fn trace_place_module(mir_mod: &MirModule, pool: &InternPool, sema: &Sema, spec:
     out
 
 
-fn explain_mir_origin_module(mir_mod: &MirModule, pool: &InternPool, sema: &Sema, spec: &str) -> str:
+pub fn explain_mir_origin_module(mir_mod: &MirModule, pool: &InternPool, sema: &Sema, spec: &str) -> str:
     let wanted_fn = mir_debug_spec_fn(spec)
     let target = mir_debug_spec_target(spec)
     var out = "mir-origin " ++ spec ++ "\n"

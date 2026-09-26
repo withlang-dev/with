@@ -22,7 +22,7 @@ extern fn with_eprint(s: &str) -> Unit
 
 // ── Helpers ────────────────────────────────────────────────────
 
-fn ci_make_indent(n: i32) -> str:
+pub fn ci_make_indent(n: i32) -> str:
     var out = ""
     var i: i32 = 0
     while i < n:
@@ -94,7 +94,7 @@ fn ci_contains_str(s: &str, needle: &str) -> bool:
         i = i + 1
     false
 
-fn ci_strip_one_outer_paren(s: &str) -> str:
+pub fn ci_strip_one_outer_paren(s: &str) -> str:
     if s.len() < 2:
         return with_str_clone_ref(s)
     if s[0] != 40 or s[s.len() - 1] != 41:
@@ -215,7 +215,7 @@ fn ci_float_type_name(bits: i32) -> str:
 // it cheap to change the convention later.
 // Inside an `unsafe fn` body the context is already unsafe, so the prefix is
 // omitted (SemaCheck warns on it); the parentheses stay so precedence does.
-fn ci_wrap_unsafe(inner: &str) -> str:
+pub fn ci_wrap_unsafe(inner: &str) -> str:
     if g_ci_print_in_unsafe_fn: return "(" ++ inner ++ ")"
     "(unsafe " ++ inner ++ ")"
 
@@ -401,7 +401,7 @@ fn ci_type_has_raw_pointer(types: CiTypePool, id: CiTypeId) -> bool:
             i = i + 1
     false
 
-fn ci_print_type(types: CiTypePool, id: CiTypeId) -> str:
+pub fn ci_print_type(types: CiTypePool, id: CiTypeId) -> str:
     if (id as i32) == 0:
         return "<ci:ty:0>"
     let kind = types.kind(id)
@@ -469,7 +469,7 @@ fn ci_field_base_needs_borrow(types: CiTypePool, ty: CiTypeId) -> bool:
             return false
     kind == CiTypeKind.CT_STRUCT or kind == CiTypeKind.CT_NAMED
 
-fn ci_named_type_is_scalar(name: &str) -> bool:
+pub fn ci_named_type_is_scalar(name: &str) -> bool:
     if name == "bool" or name == "void":
         return true
     if name == "usize" or name == "isize":
@@ -482,7 +482,7 @@ fn ci_named_type_is_scalar(name: &str) -> bool:
         return true
     ci_starts_with_str(name, "c_")
 
-fn ci_type_needs_memcpy_assignment(types: CiTypePool, ty: CiTypeId) -> bool:
+pub fn ci_type_needs_memcpy_assignment(types: CiTypePool, ty: CiTypeId) -> bool:
     if (ty as i32) == 0:
         return false
     let kind = types.kind(ty)
@@ -573,7 +573,7 @@ extern fn i64_to_string(n: i64) -> str
 // this position must be emitted as `&base[0] as *mut T`. Also
 // unused in A2; B4 turns it on.
 
-fn ci_print_expr(exprs: CiExprPool, types: CiTypePool, id: CiExprId, parent_prec: i32, wants_ptr: i32) -> str:
+pub fn ci_print_expr(exprs: CiExprPool, types: CiTypePool, id: CiExprId, parent_prec: i32, wants_ptr: i32) -> str:
     if (id as i32) == 0:
         return "<ci:expr:0>"
     let kind = exprs.kind(id)
@@ -858,7 +858,7 @@ pub fn ci_print_take_unknowns() -> Vec[str]:
 
 // ── CiStmt printing ──────────────────────────────────────────
 
-fn ci_print_stmt(stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, id: CiStmtId, depth: i32) -> str:
+pub fn ci_print_stmt(stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, id: CiStmtId, depth: i32) -> str:
     if (id as i32) == 0:
         return ci_make_indent(depth) ++ "<ci:stmt:0>\n"
     let kind = stmts.kind(id)

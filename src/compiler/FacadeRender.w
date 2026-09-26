@@ -651,7 +651,7 @@ fn facade_render_receiver_method(pool: AstPool, intern: InternPool, ci: &Vec[i32
 // Whether `cname` is an operation some resource clause names (`from`,
 // `init`, `preinit`, `drop`, `destroys`): an fn item describing one adds
 // facts to that operation and is not a lend method beside its constructor.
-fn facade_render_is_resource_op(pool: AstPool, intern: InternPool, cname: &str) -> bool:
+pub fn facade_render_is_resource_op(pool: AstPool, intern: InternPool, cname: &str) -> bool:
     let resources = facade_render_all_items(pool, NodeKind.NK_FACADE_RESOURCE)
     for ri in 0..resources.len() as i32:
         let res = resources[ri]
@@ -752,7 +752,7 @@ fn facade_render_lend_hosted(pool: AstPool, intern: InternPool, li: &FacadeLendI
 // Every item of `kind` in every facade block of the compilation: a program's
 // facade may describe an operation of a resource another block declares
 // (its own `fn telldir` lending the toolchain libc facade's `CDir`).
-fn facade_render_all_items(pool: AstPool, kind: NodeKind) -> Vec[i32]:
+pub fn facade_render_all_items(pool: AstPool, kind: NodeKind) -> Vec[i32]:
     let out: Vec[i32] = Vec.new()
     for di in 0..pool.decl_count():
         let decl = pool.get_decl(di)
@@ -1391,7 +1391,7 @@ fn facade_render_find_fn(pool: AstPool, intern: InternPool, ci: &Vec[i32], sym: 
                 fallback = decl as i32
     fallback
 
-fn facade_render_param_count(pool: AstPool, decl: i32) -> i32:
+pub fn facade_render_param_count(pool: AstPool, decl: i32) -> i32:
     let meta = pool.find_fn_meta(decl as NodeId)
     if meta < 0: 0 else: pool.fn_meta_param_count(meta)
 
@@ -1923,7 +1923,7 @@ fn facade_render_fresh(base: &str, taken: &str) -> str:
 // The parameter index a facade `param` reference names (`param N`,
 // `param name`, `param type T`), or -1: Sema's facade_resolve_param resolves
 // the same reference against the signature and reports a miss.
-fn facade_render_param_ref(pool: AstPool, intern: InternPool, decl: i32, ref_node: i32) -> i32:
+pub fn facade_render_param_ref(pool: AstPool, intern: InternPool, decl: i32, ref_node: i32) -> i32:
     let meta = pool.find_fn_meta(decl as NodeId)
     if meta < 0 or ref_node == 0:
         return -1
@@ -2156,7 +2156,7 @@ fn facade_render_resource_keeps_userdata(pool: AstPool, intern: InternPool, ci: 
             return true
     false
 
-fn facade_render_param_type(pool: AstPool, intern: InternPool, decl: i32, pi: i32) -> str:
+pub fn facade_render_param_type(pool: AstPool, intern: InternPool, decl: i32, pi: i32) -> str:
     let meta = pool.find_fn_meta(decl as NodeId)
     render_type_expr(pool, intern, pool.fn_param_type(pool.fn_meta_param_start(meta), pi) as NodeId)
 

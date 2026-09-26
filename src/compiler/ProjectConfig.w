@@ -37,7 +37,7 @@ pub type ProjectConfig {
     lint_partial_statement_match: bool,
 }
 
-fn project_config_default -> ProjectConfig:
+pub fn project_config_default -> ProjectConfig:
     ProjectConfig {
         root_dir: "",
         manifest_path: "",
@@ -116,10 +116,10 @@ pub fn project_config_clone(cfg: &ProjectConfig) -> ProjectConfig:
         lint_partial_statement_match: cfg.lint_partial_statement_match,
     }
 
-fn project_config_file_exists(path: &str) -> bool:
+pub fn project_config_file_exists(path: &str) -> bool:
     runtime_read_file(path).len() > 0
 
-fn project_config_find_root(start_dir: &str) -> str:
+pub fn project_config_find_root(start_dir: &str) -> str:
     var cur = if start_dir.len() > 0: with_str_clone_ref(start_dir) else: "."
     while true:
         let manifest = resolve_join(cur, "with.toml")
@@ -131,7 +131,7 @@ fn project_config_find_root(start_dir: &str) -> str:
         cur = parent
     ""
 
-fn project_config_load_for_source(source_path_raw: &str) -> ProjectConfig:
+pub fn project_config_load_for_source(source_path_raw: &str) -> ProjectConfig:
     let source_path = project_config_absolutize_path(source_path_raw)
     let root = project_config_find_root(resolve_dirname(source_path))
     if root.len() == 0:
@@ -636,7 +636,7 @@ fn project_config_is_string_array_value(value: &str) -> bool:
             return false
     not expect_value or project_config_trim(text.slice(1, text.len() - 1)).len() == 0
 
-fn project_config_resolve_c_import_header(cfg: &ProjectConfig, decl_dir: &str, header_spec_raw: &str) -> str:
+pub fn project_config_resolve_c_import_header(cfg: &ProjectConfig, decl_dir: &str, header_spec_raw: &str) -> str:
     let header_spec = project_config_trim(header_spec_raw)
     if header_spec.len() == 0:
         return with_str_clone_ref(header_spec_raw)
@@ -717,7 +717,7 @@ fn project_config_normalize_absolute_path(path: &str) -> str:
             out = out.slice(0, out.len() - 1)
     out
 
-fn project_config_absolutize_path(path: &str) -> str:
+pub fn project_config_absolutize_path(path: &str) -> str:
     if path.len() == 0:
         return with_str_clone_ref(path)
     if project_config_is_absolute_path(path):

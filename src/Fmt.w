@@ -157,7 +157,7 @@ fn emit_indent(indent: i32) -> str:
 // ── Core formatter ──────────────────────────────────────────────
 
 // style: 0=preserve, 1=prefer-colon, 2=prefer-brace
-fn format_source_styled(source: &str, style: i32) -> str:
+pub fn format_source_styled(source: &str, style: i32) -> str:
     var lexer = Lexer.init(source, 0)
     let tokens = lexer.tokenize_with_comments()
     let count = tokens.len()
@@ -375,7 +375,7 @@ fn format_source_styled(source: &str, style: i32) -> str:
         out = out ++ "\n"
     out
 
-fn format_source(source: &str) -> str:
+pub fn format_source(source: &str) -> str:
     format_source_styled(source, 0)
 
 // Decide whether to emit a space before `cur` given `prev`.

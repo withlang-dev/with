@@ -164,7 +164,7 @@ pub enum TokenKind: i32:
     TK_KW_NO_SUSPEND = 140
 
 // Lookup table: keyword string -> tag. Returns -1 if not a keyword.
-fn tag_from_keyword(s: &str) -> i32:
+pub fn tag_from_keyword(s: &str) -> i32:
     if s == "fn": return TokenKind.TK_KW_FN
     if s == "let": return TokenKind.TK_KW_LET
     if s == "var": return TokenKind.TK_KW_VAR
@@ -225,7 +225,7 @@ fn tag_from_keyword(s: &str) -> i32:
     -1
 
 // Returns a human-readable name for a token tag (for diagnostics).
-fn tag_name(tag: i32) -> str:
+pub fn tag_name(tag: i32) -> str:
     if tag == TokenKind.TK_INT_LIT: return "integer literal"
     if tag == TokenKind.TK_FLOAT_LIT: return "float literal"
     if tag == TokenKind.TK_STRING_LIT: return "string literal"

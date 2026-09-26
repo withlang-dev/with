@@ -1,6 +1,6 @@
 use Ast
 
-type IntArithmeticResult {
+pub type IntArithmeticResult {
     ok: i32,
     overflow: i32,
     value: i64,
@@ -8,13 +8,13 @@ type IntArithmeticResult {
 impl Copy for IntArithmeticResult
 
 fn OVERFLOW_MODE_PANIC -> i32: 0
-fn OVERFLOW_MODE_WRAP -> i32: 1
-fn OVERFLOW_MODE_SATURATE -> i32: 2
+pub fn OVERFLOW_MODE_WRAP -> i32: 1
+pub fn OVERFLOW_MODE_SATURATE -> i32: 2
 
-fn overflow_mode_default -> i32:
+pub fn overflow_mode_default -> i32:
     OVERFLOW_MODE_PANIC()
 
-fn overflow_mode_valid(mode: i32) -> bool:
+pub fn overflow_mode_valid(mode: i32) -> bool:
     mode == OVERFLOW_MODE_PANIC() or mode == OVERFLOW_MODE_WRAP() or mode == OVERFLOW_MODE_SATURATE()
 
 fn overflow_mode_name(mode: i32) -> str:
@@ -24,7 +24,7 @@ fn overflow_mode_name(mode: i32) -> str:
         return "saturate"
     "panic"
 
-fn overflow_mode_parse(value: &str) -> i32:
+pub fn overflow_mode_parse(value: &str) -> i32:
     if value == "panic":
         return OVERFLOW_MODE_PANIC()
     if value == "wrap":
@@ -49,7 +49,7 @@ fn int_width_clamp(width: i32) -> i32:
         return 64
     width
 
-fn int_truncate_to_width(value: i64, width_raw: i32, is_unsigned: bool) -> i64:
+pub fn int_truncate_to_width(value: i64, width_raw: i32, is_unsigned: bool) -> i64:
     let width = int_width_clamp(width_raw)
     if width >= 64:
         return value
@@ -62,19 +62,19 @@ fn int_truncate_to_width(value: i64, width_raw: i32, is_unsigned: bool) -> i64:
         return raw | (~mask)
     raw
 
-fn int_signed_min(width_raw: i32) -> i64:
+pub fn int_signed_min(width_raw: i32) -> i64:
     let width = int_width_clamp(width_raw)
     if width >= 64:
         return exact_int_sign_bit()
     0 - ((1 as i64) << ((width - 1) as u32))
 
-fn int_signed_max(width_raw: i32) -> i64:
+pub fn int_signed_max(width_raw: i32) -> i64:
     let width = int_width_clamp(width_raw)
     if width >= 64:
         return 9223372036854775807
     ((1 as i64) << ((width - 1) as u32)) - 1
 
-fn int_unsigned_max(width_raw: i32) -> i64:
+pub fn int_unsigned_max(width_raw: i32) -> i64:
     let width = int_width_clamp(width_raw)
     if width >= 64:
         return -1
@@ -223,7 +223,7 @@ fn int_effective_overflow_mode(op: i32, mode: i32) -> i32:
         return mode
     OVERFLOW_MODE_PANIC()
 
-fn int_eval_binary_arithmetic(op: i32, lhs: i64, rhs: i64, width: i32, is_unsigned: bool, overflow_mode: i32) -> IntArithmeticResult:
+pub fn int_eval_binary_arithmetic(op: i32, lhs: i64, rhs: i64, width: i32, is_unsigned: bool, overflow_mode: i32) -> IntArithmeticResult:
     let mode = int_effective_overflow_mode(op, overflow_mode)
     if is_unsigned:
         if op == BinaryOp.OP_ADD or op == BinaryOp.OP_ADD_WRAP or op == BinaryOp.OP_ADD_SAT:
@@ -241,7 +241,7 @@ fn int_eval_binary_arithmetic(op: i32, lhs: i64, rhs: i64, width: i32, is_unsign
             return int_signed_mul(lhs, rhs, width, mode)
     int_arith_invalid()
 
-fn int_eval_unary_neg(value: i64, width: i32, overflow_mode: i32) -> IntArithmeticResult:
+pub fn int_eval_unary_neg(value: i64, width: i32, overflow_mode: i32) -> IntArithmeticResult:
     let mode = if overflow_mode_valid(overflow_mode): overflow_mode else: OVERFLOW_MODE_PANIC()
     let v = int_truncate_to_width(value, width, false)
     let min = int_signed_min(width)
@@ -255,7 +255,7 @@ fn int_eval_unary_neg(value: i64, width: i32, overflow_mode: i32) -> IntArithmet
         return int_arith_ok(wrapped)
     int_arith_overflow(wrapped)
 
-fn int_div_overflows(lhs: i64, rhs: i64, width: i32, is_unsigned: bool) -> bool:
+pub fn int_div_overflows(lhs: i64, rhs: i64, width: i32, is_unsigned: bool) -> bool:
     if is_unsigned:
         return false
     rhs == -1 and int_truncate_to_width(lhs, width, false) == int_signed_min(width)

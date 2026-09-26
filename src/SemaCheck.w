@@ -30,13 +30,13 @@ const GLOBAL_RACE_ACCESS_WRITE: i32 = 2
 // D22 contextual-join arm classifications. Keep these numeric values stable:
 // typed diagnostics and later MIR consumption read the Sema record directly.
 const D22_JOIN_ARM_OWNED_ANCHOR: i32 = 1
-const D22_JOIN_ARM_MATERIALIZED_REF: i32 = 2
+pub const D22_JOIN_ARM_MATERIALIZED_REF: i32 = 2
 const D22_JOIN_ARM_VIEW: i32 = 3
 const D22_JOIN_ARM_DIVERGING: i32 = 4
 
 const D22_JOIN_ROLE_EXPR: i32 = 0
-const D22_JOIN_ROLE_CARRIER_PAYLOAD: i32 = 1
-const D22_JOIN_ROLE_LAZY_RESULT: i32 = 2
+pub const D22_JOIN_ROLE_CARRIER_PAYLOAD: i32 = 1
+pub const D22_JOIN_ROLE_LAZY_RESULT: i32 = 2
 
 impl Sema:
     mut fn require_async_runtime(node: i32, feature: &str):
@@ -145,7 +145,7 @@ fn sema_path_is_runtime_implementation(path: &str) -> i32:
         return 1
     0
 
-fn sema_path_is_migrated_regex_implementation(path: &str) -> i32:
+pub fn sema_path_is_migrated_regex_implementation(path: &str) -> i32:
     if path.starts_with("lib/std/re/") or path.starts_with("<embedded-std>/std/re/"):
         return 1
     if path.contains("/lib/std/re/") or path.contains("\\lib\\std\\re\\"):
@@ -166,7 +166,7 @@ fn sema_path_is_compiler_source_implementation(path: &str) -> i32:
         return 1
     0
 
-fn sema_path_is_user_lint_source(path: &str) -> i32:
+pub fn sema_path_is_user_lint_source(path: &str) -> i32:
     if path.len() == 0:
         return 1
     if sema_path_is_std_implementation(path) != 0:

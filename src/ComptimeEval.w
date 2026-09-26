@@ -294,7 +294,7 @@ type ComptimeEvaluator {
     pending_diag: Diagnostic,
 }
 
-type ComptimeEvalResult {
+pub type ComptimeEvalResult {
     value: ComptimeValue,
     extras: Vec[ComptimeValue],
     error_msg: str,
@@ -1629,7 +1629,7 @@ impl ComptimeEvaluator:
             let _ = self.fail(0, "incomplete workspace interception for '" ++ record.name ++ "': " ++ reason)
             return
 
-unsafe fn comptime_try_eval_expr_result(sema_ptr: *mut Sema, ast: AstPool, pool: InternPool, node: i32) -> ComptimeEvalResult:
+pub unsafe fn comptime_try_eval_expr_result(sema_ptr: *mut Sema, ast: AstPool, pool: InternPool, node: i32) -> ComptimeEvalResult:
     var sema = *sema_ptr
     sema.ast = ast
     sema = sema.prepare_comptime_eval_copy()
@@ -1637,7 +1637,7 @@ unsafe fn comptime_try_eval_expr_result(sema_ptr: *mut Sema, ast: AstPool, pool:
     let value = evaluator.eval_root(node)
     comptime_eval_finish(sema_ptr, evaluator, value)
 
-unsafe fn comptime_force_eval_expr_result(sema_ptr: *mut Sema, ast: AstPool, pool: InternPool, node: i32) -> ComptimeEvalResult:
+pub unsafe fn comptime_force_eval_expr_result(sema_ptr: *mut Sema, ast: AstPool, pool: InternPool, node: i32) -> ComptimeEvalResult:
     var sema = *sema_ptr
     sema.ast = ast
     sema = sema.prepare_comptime_eval_copy()
@@ -1645,15 +1645,15 @@ unsafe fn comptime_force_eval_expr_result(sema_ptr: *mut Sema, ast: AstPool, poo
     let value = evaluator.eval_root(node)
     comptime_eval_finish(sema_ptr, evaluator, value)
 
-unsafe fn comptime_try_eval_expr(sema_ptr: *mut Sema, ast: AstPool, pool: InternPool, node: i32) -> ComptimeValue:
+pub unsafe fn comptime_try_eval_expr(sema_ptr: *mut Sema, ast: AstPool, pool: InternPool, node: i32) -> ComptimeValue:
     var result = comptime_try_eval_expr_result(sema_ptr, ast, pool, node)
     return move result.value
 
-unsafe fn comptime_force_eval_expr(sema_ptr: *mut Sema, ast: AstPool, pool: InternPool, node: i32) -> ComptimeValue:
+pub unsafe fn comptime_force_eval_expr(sema_ptr: *mut Sema, ast: AstPool, pool: InternPool, node: i32) -> ComptimeValue:
     var result = comptime_force_eval_expr_result(sema_ptr, ast, pool, node)
     return move result.value
 
-unsafe fn comptime_eval_tool_build_result(sema_ptr: *mut Sema, ast: AstPool, pool: InternPool, fn_sym: i32, package_name: &str, package_version: &str, project_root: &str, strict_effects: i32, suppress_side_effects: i32) -> ComptimeEvalResult:
+pub unsafe fn comptime_eval_tool_build_result(sema_ptr: *mut Sema, ast: AstPool, pool: InternPool, fn_sym: i32, package_name: &str, package_version: &str, project_root: &str, strict_effects: i32, suppress_side_effects: i32) -> ComptimeEvalResult:
     var sema = *sema_ptr
     sema.ast = ast
     sema = sema.prepare_comptime_eval_copy()
@@ -1681,7 +1681,7 @@ unsafe fn comptime_eval_tool_build_result(sema_ptr: *mut Sema, ast: AstPool, poo
             comptime_value_invalid()
     comptime_eval_finish(sema_ptr, evaluator, value)
 
-unsafe fn comptime_eval_tool_action_result(sema_ptr: *mut Sema, ast: AstPool, pool: InternPool, fn_sym: i32, package_name: &str, package_version: &str, project_root: &str, target_name: &str, inputs: Vec[str], output: &str, extra_outputs: &Vec[str], args_values: Vec[str], write_scopes: &Vec[str], timeout_ms: i32, cwd: &str, env: Vec[str], network: i32, strict_effects: i32) -> ComptimeEvalResult:
+pub unsafe fn comptime_eval_tool_action_result(sema_ptr: *mut Sema, ast: AstPool, pool: InternPool, fn_sym: i32, package_name: &str, package_version: &str, project_root: &str, target_name: &str, inputs: Vec[str], output: &str, extra_outputs: &Vec[str], args_values: Vec[str], write_scopes: &Vec[str], timeout_ms: i32, cwd: &str, env: Vec[str], network: i32, strict_effects: i32) -> ComptimeEvalResult:
     var sema = *sema_ptr
     sema.ast = ast
     sema = sema.prepare_comptime_eval_copy()
