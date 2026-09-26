@@ -4557,6 +4557,16 @@ impl Sema:
         self.suspend_visiting.remove(fn_sym)
         result
 
+    // D69 (§13.4): a generator's body runs inside the loop that consumes it
+    // (`for x in g`, or a comprehension clause, keyed by `key_node`), so a
+    // generator whose body may suspend makes that loop so.
+    mut fn gen_loop_may_suspend(key_node: i32) -> bool:
+        if not self.gen_for_each_syms.contains(key_node):
+            return false
+        let each_fn: i32 = self.gen_for_each_syms.get(key_node).unwrap()
+        let producer: i32 = if self.generator_mir_only_fns.contains(each_fn): self.generator_mir_only_fns.get(each_fn).unwrap() else: each_fn
+        self.fn_symbol_may_suspend(producer) != 0
+
     mut fn expr_may_suspend(node: i32) -> i32:
         if node == 0:
             return 0
@@ -4662,13 +4672,8 @@ impl Sema:
         if kind == NodeKind.NK_FOR:
             if self.expr_may_suspend(self.ast.get_data1(node)) != 0:
                 return 1
-            // D69 (§13.4): a generator's body runs inside the loop, so a
-            // generator whose body may suspend makes its consuming loop so.
-            if self.gen_for_each_syms.contains(node):
-                let each_fn: i32 = self.gen_for_each_syms.get(node).unwrap()
-                let producer: i32 = if self.generator_mir_only_fns.contains(each_fn): self.generator_mir_only_fns.get(each_fn).unwrap() else: each_fn
-                if self.fn_symbol_may_suspend(producer) != 0:
-                    return 1
+            if self.gen_loop_may_suspend(node):
+                return 1
             return self.expr_may_suspend(self.ast.get_data2(node))
         if kind == NodeKind.NK_LET_BINDING or kind == NodeKind.NK_LET_DECL:
             return self.expr_may_suspend(self.ast.get_data1(node))
@@ -4709,7 +4714,7 @@ impl Sema:
             let clause_count = self.ast.get_data2(node)
             for ci in 0..clause_count:
                 let base = comp_start + ci * 3
-                if self.expr_may_suspend(self.ast.get_extra(base + 1)) != 0:
+                if self.expr_may_suspend(self.ast.get_extra(base + 1)) != 0 or self.gen_loop_may_suspend(self.ast.get_extra(base + 1)):
                     return 1
                 if self.expr_may_suspend(self.ast.get_extra(base + 2)) != 0:
                     return 1
@@ -4719,7 +4724,7 @@ impl Sema:
             let clause_count = self.ast.get_data1(node)
             for ci in 0..clause_count:
                 let base = comp_start + 2 + ci * 3
-                if self.expr_may_suspend(self.ast.get_extra(base + 1)) != 0:
+                if self.expr_may_suspend(self.ast.get_extra(base + 1)) != 0 or self.gen_loop_may_suspend(self.ast.get_extra(base + 1)):
                     return 1
                 if self.expr_may_suspend(self.ast.get_extra(base + 2)) != 0:
                     return 1
@@ -7397,15 +7402,14 @@ impl Sema:
                     self.emit_error("element comprehension requires Vec, HashSet, or BTreeSet expected type", node)
                     return 0
             var pushed_scopes = 0
+            let gen_outer_counts: Vec[i32] = Vec.new()
             for ci in 0..clause_count:
                 let base = comp_start + ci * 3
                 let binding = self.ast.get_extra(base)
                 let iterable = self.ast.get_extra(base + 1)
                 let filter = self.ast.get_extra(base + 2)
-                let iter_ty = self.check_expr(iterable)
-                self.reject_gen_comprehension_clause(iterable, iter_ty as i32)
-                self.demand_generic_iter_next(iter_ty, iterable, iterable)
-                let elem_ty = self.for_loop_element_type(iterable, iter_ty as i32)
+                let elem_ty = self.check_comprehension_clause_iterable(iterable)
+                gen_outer_counts.push(if self.gen_for_elem_types.contains(iterable): self.bind_names.len() as i32 else: -1)
                 self.push_scope()
                 pushed_scopes = pushed_scopes + 1
                 if self.ast.comprehension_binding_is_pattern(node, binding):
@@ -7417,6 +7421,7 @@ impl Sema:
                     if filter_ty != 0 and self.types_compatible(self.ty_bool as i32, filter_ty as i32) == 0:
                         self.emit_error("comprehension filter must be bool", filter)
             let result_elem = if result_expected != 0: self.check_expr_with_owned_demand(expr, result_expected as TypeId) else: self.check_expr(expr)
+            self.record_gen_comprehension_captures(node, comp_start, &gen_outer_counts)
             for _ in 0..pushed_scopes:
                 self.pop_scope()
             let result_ty = if target_ty != 0: target_ty else: self.ensure_vec_type_for(result_elem as i32)
@@ -7455,15 +7460,14 @@ impl Sema:
                 key_expected = self.get_generic_inst_arg(expected2 as i32, 0)
                 val_expected = self.get_generic_inst_arg(expected2 as i32, 1)
             var pushed_scopes2 = 0
+            let gen_outer_counts2: Vec[i32] = Vec.new()
             for ci2 in 0..clause_count2:
                 let base3 = comp_start2 + 2 + ci2 * 3
                 let binding2 = self.ast.get_extra(base3)
                 let iterable2 = self.ast.get_extra(base3 + 1)
                 let filter2 = self.ast.get_extra(base3 + 2)
-                let iter_ty2 = self.check_expr(iterable2)
-                self.reject_gen_comprehension_clause(iterable2, iter_ty2 as i32)
-                self.demand_generic_iter_next(iter_ty2, iterable2, iterable2)
-                let elem_ty2 = self.for_loop_element_type(iterable2, iter_ty2 as i32)
+                let elem_ty2 = self.check_comprehension_clause_iterable(iterable2)
+                gen_outer_counts2.push(if self.gen_for_elem_types.contains(iterable2): self.bind_names.len() as i32 else: -1)
                 self.push_scope()
                 pushed_scopes2 = pushed_scopes2 + 1
                 if self.ast.comprehension_binding_is_pattern(node, binding2):
@@ -7496,6 +7500,7 @@ impl Sema:
                     return 0
                 let _ = self.record_contextual_copy_adjustment(val_expr, val_pointee, val_ty as i32)
                 stored_val_ty = val_pointee
+            self.record_gen_comprehension_captures(node, comp_start2 + 2, &gen_outer_counts2)
             for _ in 0..pushed_scopes2:
                 self.pop_scope()
             if map_target_ty == 0:
@@ -11990,18 +11995,23 @@ impl Sema:
             self.for_view_binding_depths.pop()
         self.pop_move_control_flow_context()
         if gen_elem != 0:
-            self.record_gen_for_captures(node, body, outer_binding_count)
+            self.record_gen_loop_captures(node, body, 0, -1, outer_binding_count)
         self.ty_void as i32
 
     // D69 (§13.4): the body of `for x in g` over a Gen[T] runs as a closure,
     // so it captures by place every enclosing binding it uses — exactly the
     // places the loop body reads, writes or moves as an ordinary `for` body.
-    mut fn record_gen_for_captures(node: i32, body: i32, outer_count: i32):
+    // A comprehension clause over a Gen[T] (§13.6, #1727) runs the rest of
+    // the comprehension the same way (comp_node != 0; comprehension_rest_uses_symbol).
+    mut fn record_gen_loop_captures(key_node: i32, body: i32, comp_node: i32, clause_index: i32, outer_count: i32):
         let syms: Vec[i32] = Vec.new()
         let effs: Vec[i32] = Vec.new()
         for ci in 0..outer_count:
             let sym: i32 = self.bind_names[ci]
-            if self.binding_index_is_global(ci, sym) or self.expr_uses_symbol(body, sym) == 0:
+            if self.binding_index_is_global(ci, sym):
+                continue
+            let used = if comp_node != 0: self.comprehension_rest_uses_symbol(comp_node, clause_index, sym) else: self.expr_uses_symbol(body, sym) != 0
+            if not used:
                 continue
             var seen = false
             for si in 0..syms.len() as i32:
@@ -12011,7 +12021,33 @@ impl Sema:
                 syms.push(sym)
                 effs.push(EFF_CAPTURE_BY_PLACE)
         self.ensure_capture_ref_types(&syms)
-        self.set_closure_capture_summary(node, syms, effs)
+        self.set_closure_capture_summary(key_node, syms, effs)
+
+    // Whether what runs inside comprehension clause `clause_index` — its
+    // filter, the later clauses and the element (key and value) — names `sym`.
+    fn comprehension_rest_uses_symbol(comp_node: i32, clause_index: i32, sym: i32) -> bool:
+        let is_map = self.ast.kind(comp_node) == NodeKind.NK_MAP_COMPREHENSION
+        let clause_start = if is_map: self.ast.get_data0(comp_node) + 2 else: self.ast.get_data1(comp_node)
+        let clause_count = if is_map: self.ast.get_data1(comp_node) else: self.ast.get_data2(comp_node)
+        if self.expr_uses_symbol(self.ast.get_extra(clause_start + clause_index * 3 + 2), sym) != 0:
+            return true
+        for cj in clause_index + 1..clause_count:
+            if self.expr_uses_symbol(self.ast.get_extra(clause_start + cj * 3 + 1), sym) != 0 or self.expr_uses_symbol(self.ast.get_extra(clause_start + cj * 3 + 2), sym) != 0:
+                return true
+        if is_map:
+            let pair = self.ast.get_data0(comp_node)
+            return self.expr_uses_symbol(self.ast.get_extra(pair), sym) != 0 or self.expr_uses_symbol(self.ast.get_extra(pair + 1), sym) != 0
+        self.expr_uses_symbol(self.ast.get_data0(comp_node), sym) != 0
+
+    // D69 (§13.4, §13.6): each comprehension clause over a Gen[T] records
+    // the captures of the closure the rest of the comprehension runs as.
+    // outer_counts[ci] is how many bindings were in scope before clause ci's
+    // own (-1 when clause ci is not over a generator); every clause binding
+    // is still in scope here.
+    mut fn record_gen_comprehension_captures(comp_node: i32, clause_start: i32, outer_counts: &Vec[i32]):
+        for ci in 0..outer_counts.len() as i32:
+            if outer_counts[ci] >= 0:
+                self.record_gen_loop_captures(self.ast.get_extra(clause_start + ci * 3 + 1), 0, comp_node, ci, outer_counts[ci])
 
     // A capture of a binding that names a place rather than a local of its
     // own is taken through a &T (MirLower's closure_capture_source); make sure
@@ -12022,21 +12058,19 @@ impl Sema:
             if ty > 0:
                 let _ = self.ensure_exact_type(TypeKind.TY_REF, ty, 0, 0)
 
-    // D69: a comprehension clause over a Gen[T] is not lowered yet (#1727).
-    mut fn reject_gen_comprehension_clause(iterable: i32, iter_type: i32):
-        if iter_type == 0:
-            return
-        let resolved = self.resolve_alias(iter_type as TypeId) as i32
-        let owner_sym = self.method_owner_symbol_for_type(resolved)
-        if owner_sym == 0:
-            return
-        let each_sym = self.pool_intern("each")
-        if self.lookup_method_fn(owner_sym, each_sym) == 0 and self.lookup_generic_method_fn(owner_sym, each_sym) == 0:
-            return
-        let next_sym = self.pool_lookup_symbol("next")
-        if next_sym > 0 and (self.lookup_method_fn(owner_sym, next_sym) != 0 or self.lookup_generic_method_fn(owner_sym, next_sym) != 0):
-            return
-        self.emit_error("a comprehension clause over a generator (Gen[T]) is not implemented yet (#1727); use a `for` loop, or `g |> map(f) |> collect[Vec]()`", iterable)
+    // §13.6: a comprehension clause's `for PATTERN in EXPR` is §13.5's
+    // iteration. Over a Gen[T] the rest of the comprehension runs as the
+    // closure `each` calls, keyed by the iterable (D69, #1727), and the
+    // generator value is consumed; anything else steps an Iter[T]. Returns
+    // the element type.
+    mut fn check_comprehension_clause_iterable(iterable: i32) -> i32:
+        let iter_ty = self.check_expr(iterable)
+        let gen_elem = self.resolve_gen_for(iterable, iterable, iter_ty as i32)
+        if gen_elem != 0:
+            self.mark_moved_if_consumed(iterable)
+            return gen_elem
+        self.demand_generic_iter_next(iter_ty, iterable, iterable)
+        self.for_loop_element_type(iterable, iter_ty as i32)
 
     // D69 (§13.4): when `iter_type` implements Gen[T] — a generator value, or
     // a type with `move fn each(body: fn(T) -> bool)` — record the loop's
