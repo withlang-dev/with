@@ -1977,147 +1977,6 @@ impl Sema:
                 diag.set_origin(__FILE__, __FN__, __LINE__ as i32, node)
                 self.diags.emit(move diag)
 
-    mut fn generator_push_state_field(state_tid: i32, field_count: i32, sym: i32, tid: i32, report_node: i32) -> i32:
-        if sym == 0 or sym == self.discard_sym:
-            return field_count
-        for i in 0..field_count:
-            let seen_key = sema_pair_key(state_tid, i)
-            if self.generator_state_field_names.contains(seen_key) and self.generator_state_field_names.get(seen_key).unwrap() == sym:
-                let name: str = with_str_clone_ref(self.pool_resolve(sym))
-                self.emit_error("duplicate generator state binding '" ++ name ++ "'", report_node)
-                return field_count
-        let key = sema_pair_key(state_tid, field_count)
-        self.generator_state_field_names.insert(key, sym)
-        self.generator_state_field_types.insert(key, tid)
-        field_count + 1
-
-    mut fn generator_collect_state_fields(state_tid: i32, node: i32, field_count_in: i32) -> i32:
-        var field_count = field_count_in
-        if node == 0:
-            return field_count
-        let kind = self.ast.kind(node)
-        if kind == NodeKind.NK_LET_BINDING or kind == NodeKind.NK_LET_DECL:
-            let sym = self.ast.get_data0(node)
-            let tid = if self.typed_binding_types.contains(node): self.typed_binding_types.get(node).unwrap() else: self.ty_void as i32
-            field_count = self.generator_push_state_field(state_tid, field_count, sym, tid, node)
-            field_count = self.generator_collect_state_fields(state_tid, self.ast.get_data1(node), field_count)
-            return field_count
-        if kind == NodeKind.NK_BLOCK:
-            let start = self.ast.get_data0(node)
-            let count = self.ast.get_data1(node)
-            for i in 0..count:
-                field_count = self.generator_collect_state_fields(state_tid, self.ast.get_extra(start + i), field_count)
-            field_count = self.generator_collect_state_fields(state_tid, self.ast.get_data2(node), field_count)
-            return field_count
-        if kind == NodeKind.NK_IF_EXPR:
-            field_count = self.generator_collect_state_fields(state_tid, self.ast.get_data0(node), field_count)
-            field_count = self.generator_collect_state_fields(state_tid, self.ast.get_data1(node), field_count)
-            field_count = self.generator_collect_state_fields(state_tid, self.ast.get_data2(node), field_count)
-            return field_count
-        if kind == NodeKind.NK_WHILE:
-            field_count = self.generator_collect_state_fields(state_tid, self.ast.get_data0(node), field_count)
-            field_count = self.generator_collect_state_fields(state_tid, self.ast.get_data1(node), field_count)
-            return field_count
-        if kind == NodeKind.NK_LOOP:
-            field_count = self.generator_collect_state_fields(state_tid, self.ast.get_data0(node), field_count)
-            return field_count
-        if kind == NodeKind.NK_FOR:
-            field_count = self.generator_collect_state_fields(state_tid, self.ast.get_data1(node), field_count)
-            field_count = self.generator_collect_state_fields(state_tid, self.ast.get_data2(node), field_count)
-            return field_count
-        if kind == NodeKind.NK_MATCH:
-            field_count = self.generator_collect_state_fields(state_tid, self.ast.get_data0(node), field_count)
-            let arm_start = self.ast.get_data1(node)
-            let arm_count = self.ast.get_data2(node)
-            for ai in 0..arm_count:
-                let arm = self.ast.get_extra(arm_start + ai)
-                field_count = self.generator_collect_state_fields(state_tid, self.ast.get_data2(arm), field_count)
-                field_count = self.generator_collect_state_fields(state_tid, self.ast.get_data1(arm), field_count)
-            return field_count
-        if kind == NodeKind.NK_RETURN or kind == NodeKind.NK_YIELD or kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_COMPTIME or kind == NodeKind.NK_UNSAFE_BLOCK or kind == NodeKind.NK_NO_SUSPEND:
-            field_count = self.generator_collect_state_fields(state_tid, self.ast.get_data0(node), field_count)
-            return field_count
-        if kind == NodeKind.NK_ASSIGN:
-            field_count = self.generator_collect_state_fields(state_tid, self.ast.get_data0(node), field_count)
-            field_count = self.generator_collect_state_fields(state_tid, self.ast.get_data1(node), field_count)
-            return field_count
-        if kind == NodeKind.NK_BINARY:
-            field_count = self.generator_collect_state_fields(state_tid, self.ast.get_data1(node), field_count)
-            field_count = self.generator_collect_state_fields(state_tid, self.ast.get_data2(node), field_count)
-            return field_count
-        if kind == NodeKind.NK_UNARY:
-            field_count = self.generator_collect_state_fields(state_tid, self.ast.get_data1(node), field_count)
-            return field_count
-        if kind == NodeKind.NK_CALL:
-            field_count = self.generator_collect_state_fields(state_tid, self.ast.get_data0(node), field_count)
-            let start = self.ast.get_data1(node)
-            let count = self.ast.get_data2(node)
-            for ai in 0..count:
-                field_count = self.generator_collect_state_fields(state_tid, self.ast.get_extra(start + ai), field_count)
-            return field_count
-        if kind == NodeKind.NK_FIELD_ACCESS:
-            field_count = self.generator_collect_state_fields(state_tid, self.ast.get_data0(node), field_count)
-            return field_count
-        if kind == NodeKind.NK_COMPUTED_FIELD_ACCESS:
-            field_count = self.generator_collect_state_fields(state_tid, self.ast.get_data0(node), field_count)
-            field_count = self.generator_collect_state_fields(state_tid, self.ast.get_data1(node), field_count)
-            return field_count
-        if kind == NodeKind.NK_INDEX:
-            field_count = self.generator_collect_state_fields(state_tid, self.ast.get_data0(node), field_count)
-            field_count = self.generator_collect_state_fields(state_tid, self.ast.get_data1(node), field_count)
-            let second = self.ast.get_data2(node)
-            if second != 0:
-                field_count = self.generator_collect_state_fields(state_tid, second, field_count)
-            return field_count
-        if kind == NodeKind.NK_SLICE:
-            field_count = self.generator_collect_state_fields(state_tid, self.ast.get_data0(node), field_count)
-            field_count = self.generator_collect_state_fields(state_tid, self.ast.get_data1(node), field_count)
-            field_count = self.generator_collect_state_fields(state_tid, self.ast.get_data2(node), field_count)
-            return field_count
-        field_count
-
-    mut fn finalize_generator_state_type(fn_node: i32, sig_idx: i32):
-        let fn_sym = self.ast.get_data0(fn_node)
-        if not self.generator_fn_state_types.contains(fn_sym):
-            return
-        let state_tid: i32 = self.generator_fn_state_types.get(fn_sym).unwrap()
-        if state_tid <= 0 or state_tid >= self.type_kinds.len() as i32:
-            return
-
-        var field_count = 0
-        let resume_sym = self.pool_intern("__with_generator_resume")
-        field_count = self.generator_push_state_field(state_tid, field_count, resume_sym, self.ty_i32 as i32, fn_node)
-
-        let meta = self.ast.find_fn_meta(fn_node)
-        if meta >= 0:
-            let param_start = self.ast.fn_meta_param_start(meta)
-            let param_count = self.ast.fn_meta_param_count(meta)
-            for pi in 0..param_count:
-                let p_sym = self.ast.fn_param_name(param_start, pi)
-                let p_ty = self.sig_param_type(sig_idx, pi)
-                field_count = self.generator_push_state_field(state_tid, field_count, p_sym, p_ty, fn_node)
-
-        field_count = self.generator_collect_state_fields(state_tid, self.ast.get_data1(fn_node), field_count)
-
-        let field_start = self.type_extra.len() as i32
-        self.generator_state_field_counts.insert(state_tid, field_count)
-        var state_is_ephemeral = 0
-        for fi in 0..field_count:
-            let key = sema_pair_key(state_tid, fi)
-            let field_sym: i32 = self.generator_state_field_names.get(key).unwrap()
-            let field_ty: i32 = self.generator_state_field_types.get(key).unwrap()
-            if self.type_is_ephemeral_value(field_ty) != 0:
-                state_is_ephemeral = 1
-            self.type_extra.push(field_sym)
-            self.type_extra.push(field_ty)
-            self.type_extra.push(0)
-        for _ in 0..field_count:
-            self.type_extra.push(0)
-        self.type_d1[state_tid] = field_start
-        self.type_d2[state_tid] = field_count
-        if state_is_ephemeral != 0:
-            self.mark_generator_state_ephemeral(state_tid)
-
     fn param_type_is_by_value(tid: i32) -> i32:
         if tid <= 0:
             return 0
@@ -2573,8 +2432,6 @@ impl Sema:
             self.check_returned_field_move(body, ret_type)
         else if not has_ret_annotation and body_ty != 0 and body_ty != self.ty_void and body_ty != self.ty_never:
             self.check_returned_field_move(body, body_ty as i32)
-        if is_gen == 1:
-            self.finalize_generator_state_type(node, sig_idx)
         // Tail expression bodies participate in effect inference the same way an
         // explicit `return expr` does. Without this, `fn id(x: T) -> T: x` fails
         // to record escape_value/escape_view on `x`.
@@ -4805,6 +4662,13 @@ impl Sema:
         if kind == NodeKind.NK_FOR:
             if self.expr_may_suspend(self.ast.get_data1(node)) != 0:
                 return 1
+            // D69 (§13.4): a generator's body runs inside the loop, so a
+            // generator whose body may suspend makes its consuming loop so.
+            if self.gen_for_each_syms.contains(node):
+                let each_fn: i32 = self.gen_for_each_syms.get(node).unwrap()
+                let producer: i32 = if self.generator_mir_only_fns.contains(each_fn): self.generator_mir_only_fns.get(each_fn).unwrap() else: each_fn
+                if self.fn_symbol_may_suspend(producer) != 0:
+                    return 1
             return self.expr_may_suspend(self.ast.get_data2(node))
         if kind == NodeKind.NK_LET_BINDING or kind == NodeKind.NK_LET_DECL:
             return self.expr_may_suspend(self.ast.get_data1(node))
@@ -7233,8 +7097,6 @@ impl Sema:
             self.require_async_runtime(node, "await")
             if self.in_comptime_fn != 0:
                 self.emit_error("await is not allowed in comptime", node)
-            if self.has_gen_yield_type != 0:
-                self.emit_error("await is not allowed in generator function", node)
             let inner = self.ast.get_data0(node)
             let inner_ty = self.check_expr(inner)
             if self.ast.kind(inner) == NodeKind.NK_TUPLE:
@@ -7319,9 +7181,12 @@ impl Sema:
                 let arith = if compat == 0: self.arithmetic_result_type(self.current_gen_yield_type, inner) else: 1 as TypeId
                 if compat == 0 and arith == 0 and self.has_contextual_copy_adjustment(inner_node) == 0:
                     self.emit_error("yield type mismatch", node)
-            let inner_kind = self.get_type_kind(self.resolve_alias(inner))
-            if inner_kind == TypeKind.TY_REF:
-                self.check_yielded_view_origins(inner_node, node)
+            // D69 (§13.4): `yield e` calls the consumer's body with `e`, so a
+            // yielded view — of the generator's own locals included — is an
+            // argument borrowed for that call, never retained past it. The
+            // call is through the producer's body parameter, fn(T) -> bool.
+            if self.current_gen_yield_type != 0:
+                self.call_callable_types.insert(node, self.generator_body_fn_type(self.current_gen_yield_type as i32))
             return self.ty_void
 
         if kind == NodeKind.NK_COMPTIME:
@@ -7538,6 +7403,7 @@ impl Sema:
                 let iterable = self.ast.get_extra(base + 1)
                 let filter = self.ast.get_extra(base + 2)
                 let iter_ty = self.check_expr(iterable)
+                self.reject_gen_comprehension_clause(iterable, iter_ty as i32)
                 self.demand_generic_iter_next(iter_ty, iterable, iterable)
                 let elem_ty = self.for_loop_element_type(iterable, iter_ty as i32)
                 self.push_scope()
@@ -7595,6 +7461,7 @@ impl Sema:
                 let iterable2 = self.ast.get_extra(base3 + 1)
                 let filter2 = self.ast.get_extra(base3 + 2)
                 let iter_ty2 = self.check_expr(iterable2)
+                self.reject_gen_comprehension_clause(iterable2, iter_ty2 as i32)
                 self.demand_generic_iter_next(iter_ty2, iterable2, iterable2)
                 let elem_ty2 = self.for_loop_element_type(iterable2, iter_ty2 as i32)
                 self.push_scope()
@@ -11267,73 +11134,6 @@ impl Sema:
             return 1
         0
 
-    mut fn check_yielded_view_origins(expr_node: i32, report_node: i32):
-        if expr_node == 0:
-            return
-        if self.ast.kind(expr_node) == NodeKind.NK_UNARY and self.ast.get_data0(expr_node) == UnaryOp.UOP_REF:
-            let origin_sym = self.ref_storage_root_sym(self.ast.get_data1(expr_node))
-            if self.view_origin_is_stack_local(origin_sym) != 0:
-                let origin_name: str = with_str_clone_ref(self.pool_resolve(origin_sym))
-                self.emit_error("yielded view may outlive its origin '" ++ origin_name ++ "'", report_node)
-                return
-        if self.ast.kind(expr_node) == NodeKind.NK_CALL:
-            let callee = self.ast.get_data0(expr_node)
-            if self.ast.kind(callee) == NodeKind.NK_IDENT:
-                let fn_sym = if self.comp_resolved.contains(expr_node): self.comp_resolved.get(expr_node).unwrap() else: self.ast.get_data0(callee)
-                var sig_idx = self.get_sig(fn_sym)
-                if sig_idx < 0:
-                    let sema_fn_sym = self.pool_lookup_symbol(self.pool_resolve(fn_sym))
-                    sig_idx = self.get_sig(sema_fn_sym)
-                if sig_idx >= 0:
-                    let has_resolved = self.has_resolved_call_args(expr_node)
-                    let extra_start = self.ast.get_data1(expr_node)
-                    let arg_count = if has_resolved != 0: self.get_resolved_call_arg_count(expr_node) else: self.ast.get_data2(expr_node)
-                    let param_count = self.sig_get_param_count(sig_idx)
-                    for pi in 0..param_count:
-                        if (self.sig_param_effect(sig_idx, pi) & EFF_ESCAPE_VIEW) == 0:
-                            continue
-                        let origin_mask = self.sig_param_view_origin(sig_idx, pi)
-                        for origin_pi in 0..param_count:
-                            if sema_param_origin_mask_contains(origin_mask, origin_pi) == 0:
-                                continue
-                            if origin_pi >= arg_count:
-                                continue
-                            let origin_arg = if has_resolved != 0: self.get_resolved_call_arg(expr_node, origin_pi) else: self.ast.get_extra(extra_start + origin_pi)
-                            let origin_sym = self.place_root_sym(origin_arg)
-                            if self.view_origin_is_stack_local(origin_sym) != 0:
-                                let origin_name: str = with_str_clone_ref(self.pool_resolve(origin_sym))
-                                self.emit_error("yielded view may outlive its origin '" ++ origin_name ++ "'", report_node)
-                                return
-        if self.ast.kind(expr_node) == NodeKind.NK_IDENT:
-            let view_sym = self.ast.get_data0(expr_node)
-            let view_ty = self.scope_lookup(view_sym)
-            if view_ty > 0:
-                let view_tk = self.get_type_kind(self.resolve_alias(view_ty as TypeId))
-                if view_tk == TypeKind.TY_REF and self.param_index_for_sym(view_sym) < 0 and self.binding_view_origin_mask(view_sym) == 0 and self.binding_view_dep_count(view_sym) == 0:
-                    if self.binding_value_nodes.contains(view_sym):
-                        let init_node: i32 = self.binding_value_nodes.get(view_sym).unwrap()
-                        let init_kind = self.ast.kind(init_node)
-                        if init_kind == NodeKind.NK_UNARY and self.ast.get_data0(init_node) == UnaryOp.UOP_REF:
-                            let origin_sym = self.ref_storage_root_sym(self.ast.get_data1(init_node))
-                            if self.view_origin_is_stack_local(origin_sym) != 0:
-                                let origin_name: str = with_str_clone_ref(self.pool_resolve(origin_sym))
-                                self.emit_error("yielded view may outlive its origin '" ++ origin_name ++ "'", report_node)
-                                return
-                        if init_kind == NodeKind.NK_CALL or init_kind == NodeKind.NK_FIELD_ACCESS or init_kind == NodeKind.NK_UNARY:
-                            let view_name: str = with_str_clone_ref(self.pool_resolve(view_sym))
-                            self.emit_error("yielded view may outlive its origin via local binding '" ++ view_name ++ "'", report_node)
-                            return
-        var deps: Vec[i32] = Vec.new()
-        deps = self.collect_expr_view_deps(expr_node, move deps)
-        for i in 0..deps.len() as i32:
-            let origin_sym = deps[i]
-            if origin_sym == 0:
-                continue
-            if self.view_origin_is_stack_local(origin_sym) != 0:
-                let origin_name: str = with_str_clone_ref(self.pool_resolve(origin_sym))
-                self.emit_error("yielded view may outlive its origin '" ++ origin_name ++ "'", report_node)
-                return
-
     mut fn check_returned_view_origins(expr_node: i32, report_node: i32):
         self.check_view_escape_origins(expr_node, report_node, -1)
 
@@ -12119,12 +11919,18 @@ impl Sema:
         self.union_clear_last_written()
         // #1349: the iterable is a value (`for p in if c: xs else: ys`).
         let iter_type = self.check_expr_value_context(iterable)
-        let elem_type = self.for_loop_element_type(iterable, iter_type as i32)
-
-        // #912: the for-desugar over a generic iterator IS a next() call, but
-        // no spelled call ever demands the specialization — register it here,
-        // keyed by the for node, so MIR dispatches the concrete next().
-        self.demand_generic_iter_next(iter_type, iterable, node)
+        // D69 (§13.4): a Gen[T] iterable runs the body as the closure its
+        // `each` calls; the generator value is consumed by `each`.
+        let gen_elem = self.resolve_gen_for(node, iterable, iter_type as i32)
+        let elem_type = if gen_elem != 0: gen_elem else: self.for_loop_element_type(iterable, iter_type as i32)
+        let outer_binding_count = self.bind_names.len() as i32
+        if gen_elem != 0:
+            self.mark_moved_if_consumed(iterable)
+        else:
+            // #912: the for-desugar over a generic iterator IS a next() call, but
+            // no spelled call ever demands the specialization — register it here,
+            // keyed by the for node, so MIR dispatches the concrete next().
+            self.demand_generic_iter_next(iter_type, iterable, node)
 
         // §13 implicit iteration: `for x in vec` borrows the collection (the
         // compiler-inserted .iter() form), so no consuming gate applies. Drop-
@@ -12183,7 +11989,131 @@ impl Sema:
             self.for_view_binding_syms.pop()
             self.for_view_binding_depths.pop()
         self.pop_move_control_flow_context()
+        if gen_elem != 0:
+            self.record_gen_for_captures(node, body, outer_binding_count)
         self.ty_void as i32
+
+    // D69 (§13.4): the body of `for x in g` over a Gen[T] runs as a closure,
+    // so it captures by place every enclosing binding it uses — exactly the
+    // places the loop body reads, writes or moves as an ordinary `for` body.
+    mut fn record_gen_for_captures(node: i32, body: i32, outer_count: i32):
+        let syms: Vec[i32] = Vec.new()
+        let effs: Vec[i32] = Vec.new()
+        for ci in 0..outer_count:
+            let sym: i32 = self.bind_names[ci]
+            if self.binding_index_is_global(ci, sym) or self.expr_uses_symbol(body, sym) == 0:
+                continue
+            var seen = false
+            for si in 0..syms.len() as i32:
+                if syms[si] == sym:
+                    seen = true
+            if not seen:
+                syms.push(sym)
+                effs.push(EFF_CAPTURE_BY_PLACE)
+        self.ensure_capture_ref_types(&syms)
+        self.set_closure_capture_summary(node, syms, effs)
+
+    // A capture of a binding that names a place rather than a local of its
+    // own is taken through a &T (MirLower's closure_capture_source); make sure
+    // that type exists before types freeze.
+    fn ensure_capture_ref_types(syms: &Vec[i32]):
+        for si in 0..syms.len() as i32:
+            let ty = self.scope_lookup(syms[si])
+            if ty > 0:
+                let _ = self.ensure_exact_type(TypeKind.TY_REF, ty, 0, 0)
+
+    // D69: a comprehension clause over a Gen[T] is not lowered yet (#1727).
+    mut fn reject_gen_comprehension_clause(iterable: i32, iter_type: i32):
+        if iter_type == 0:
+            return
+        let resolved = self.resolve_alias(iter_type as TypeId) as i32
+        let owner_sym = self.method_owner_symbol_for_type(resolved)
+        if owner_sym == 0:
+            return
+        let each_sym = self.pool_intern("each")
+        if self.lookup_method_fn(owner_sym, each_sym) == 0 and self.lookup_generic_method_fn(owner_sym, each_sym) == 0:
+            return
+        let next_sym = self.pool_lookup_symbol("next")
+        if next_sym > 0 and (self.lookup_method_fn(owner_sym, next_sym) != 0 or self.lookup_generic_method_fn(owner_sym, next_sym) != 0):
+            return
+        self.emit_error("a comprehension clause over a generator (Gen[T]) is not implemented yet (#1727); use a `for` loop, or `g |> map(f) |> collect[Vec]()`", iterable)
+
+    // D69 (§13.4): when `iter_type` implements Gen[T] — a generator value, or
+    // a type with `move fn each(body: fn(T) -> bool)` — record the loop's
+    // `each` callee, its body type fn(T) -> bool and T under the for node, and
+    // return T; 0 when the iterable is not a Gen. An Iter[T] (a `next()`)
+    // keeps the §13.5 protocol.
+    mut fn resolve_gen_for(node: i32, iterable: i32, iter_type: i32) -> i32:
+        if iter_type == 0:
+            return 0
+        let resolved = self.resolve_alias(iter_type as TypeId) as i32
+        let owner_sym = self.method_owner_symbol_for_type(resolved)
+        if owner_sym == 0:
+            return 0
+        let next_sym = self.pool_lookup_symbol("next")
+        if next_sym > 0 and (self.lookup_method_fn(owner_sym, next_sym) != 0 or self.lookup_generic_method_fn(owner_sym, next_sym) != 0):
+            return 0
+        let each_sym = self.pool_intern("each")
+        var each_fn = self.lookup_method_fn(owner_sym, each_sym)
+        var each_sig = self.lookup_method_sig(owner_sym, each_sym)
+        var each_mono = 0
+        if each_sig < 0 and self.get_type_kind(resolved as TypeId) == TypeKind.TY_GENERIC_INST:
+            var generic_owner = owner_sym
+            if not self.type_decl_nodes.contains(generic_owner):
+                let canon = self.canonical_symbol_by_text(generic_owner)
+                if canon != 0 and self.type_decl_nodes.contains(canon):
+                    generic_owner = canon
+            each_fn = self.lookup_generic_method_fn(generic_owner, each_sym)
+            if each_fn == 0:
+                return 0
+            each_sig = self.demand_generic_gen_each(generic_owner, resolved, each_fn, iterable, node)
+            if each_sig < 0:
+                return 0
+            each_mono = self.sig_names[each_sig]
+        if each_fn == 0 or each_sig < 0 or self.sig_get_param_count(each_sig) != 2:
+            return 0
+        let body_ty = self.sig_param_type(each_sig, 1)
+        let body_resolved = self.resolve_alias(body_ty as TypeId)
+        if self.get_type_kind(body_resolved) != TypeKind.TY_FN or self.get_type_d1(body_resolved) != 1 or self.get_type_d2(body_resolved) != self.ty_bool as i32:
+            return 0
+        let elem = self.fn_type_param_type(body_resolved as i32, 0)
+        if elem == 0:
+            return 0
+        self.gen_for_elem_types.insert(node, elem)
+        self.gen_for_body_types.insert(node, body_resolved as i32)
+        self.gen_for_each_syms.insert(node, each_fn)
+        self.gen_for_each_sigs.insert(node, each_sig)
+        if each_mono != 0:
+            self.gen_for_each_monos.insert(node, each_mono)
+        elem
+
+    // The concrete `each` of a generic Gen impl, demanded through the ordinary
+    // generic-method machinery with the receiver alone deciding the
+    // substitution (as demand_generic_iter_next does for next()); the call
+    // contract it records under `key_node` moves to the gen-for tables.
+    mut fn demand_generic_gen_each(owner_sym: i32, owner_type: i32, each_fn: i32, iterable: i32, key_node: i32) -> i32:
+        let had_ty = self.typed_expr_types.contains(key_node)
+        let saved_ty: i32 = if had_ty: self.typed_expr_types.get(key_node).unwrap() else: 0
+        let had_sig = self.resolved_call_sigs.contains(key_node)
+        let saved_sig: i32 = if had_sig: self.resolved_call_sigs.get(key_node).unwrap() else: 0
+        let had_mono = self.resolved_call_mono_syms.contains(key_node)
+        let saved_mono: i32 = if had_mono: self.resolved_call_mono_syms.get(key_node).unwrap() else: 0
+        let no_args: Vec[i32] = Vec.new()
+        let _ = self.check_generic_method_call(owner_sym, owner_type, each_fn, 0, iterable, no_args, 0, -1, key_node)
+        let each_sig: i32 = if self.resolved_call_sigs.contains(key_node): self.resolved_call_sigs.get(key_node).unwrap() else: -1
+        if had_ty:
+            self.typed_expr_types.insert(key_node, saved_ty)
+        else:
+            self.typed_expr_types.remove(key_node)
+        if had_sig:
+            self.resolved_call_sigs.insert(key_node, saved_sig)
+        else:
+            self.resolved_call_sigs.remove(key_node)
+        if had_mono:
+            self.resolved_call_mono_syms.insert(key_node, saved_mono)
+        else:
+            self.resolved_call_mono_syms.remove(key_node)
+        each_sig
 
     // #1297 / D44: `for x in xs` is `xs.iter()`, so the loop binding is a view
     // produced from the iterated place and carries its origins the way
@@ -16607,6 +16537,7 @@ impl Sema:
         let by_place = if self.ast.is_move_closure(node) == 0: EFF_CAPTURE_BY_PLACE else: 0
         for ci in 0..closure_capture_syms.len() as i32:
             closure_capture_effs.push(self.current_fn_param_effs[ci] | by_place)
+        self.ensure_capture_ref_types(&closure_capture_syms)
         self.set_closure_capture_summary(node, closure_capture_syms, closure_capture_effs)
         while self.current_fn_param_syms.len() > 0:
             self.current_fn_param_syms.pop()
@@ -16724,6 +16655,81 @@ impl Sema:
         self.typed_expr_types.insert(node, closure_ty)
         closure_ty
 
+    // A closure literal with an unannotated parameter, passed to a generic
+    // function, is typed from the parameter it lands in once the other
+    // arguments have bound what they bind: `map(g, it * 2)` over a Gen[i32]
+    // types `it` as i32, and U then binds from the closure's result.
+    fn closure_has_untyped_param(node: i32) -> bool:
+        if node <= 0 or self.ast.kind(node) != NodeKind.NK_CLOSURE:
+            return false
+        let extra_start = self.ast.get_data1(node)
+        for pi in 0..self.ast.get_data2(node):
+            if self.ast.get_extra(extra_start + pi * 2 + 1) <= 0:
+                return true
+        false
+
+    // The callable type such a closure is checked against: the parameter's
+    // `fn(A) -> R` under the substitution the other arguments bind, with R
+    // left open (0) while it names an unbound type parameter. 0 when an A
+    // still does, or the parameter is not a callable type.
+    mut fn generic_closure_arg_expected_type(fn_node: i32, arg_types: &Vec[i32], arg_count: i32, arg_index: i32, call_node: i32) -> i32:
+        let meta = self.ast.find_fn_meta(fn_node)
+        if meta < 0:
+            return 0
+        let param_start = self.ast.fn_meta_param_start(meta)
+        let param_count = self.ast.fn_meta_param_count(meta)
+        let tp_start = self.ast.fn_meta_tp_start(meta)
+        let tp_count = self.ast.fn_meta_tp_count(meta)
+        if arg_index >= param_count:
+            return 0
+        let p_node = self.ast.fn_param_type(param_start, arg_index)
+        if p_node == 0 or self.ast.kind(p_node) != NodeKind.NK_TYPE_FN:
+            return 0
+        let saved_syms = sema_clone_i32_vec(&self.generic_subst_param_syms)
+        let saved_tys = sema_clone_i32_vec(&self.generic_subst_type_ids)
+        self.clear_generic_substitution()
+        self.suppress_errors = self.suppress_errors + 1
+        for pi in 0..arg_count:
+            if pi < param_count and pi != arg_index and arg_types[pi] != 0:
+                self.bind_type_params_from_type_expr(self.ast.fn_param_type(param_start, pi), arg_types[pi], tp_start, tp_count, call_node)
+        let fp_start = self.ast.get_data0(p_node)
+        let fp_count = self.ast.get_data1(p_node)
+        let ret_node = self.ast.get_data2(p_node)
+        var expected = 0
+        var bound = true
+        let params: Vec[i32] = Vec.new()
+        for fpi in 0..fp_count:
+            let fp_node = self.ast.get_extra(fp_start + fpi)
+            if self.type_node_mentions_unbound_type_param(fp_node, tp_start, tp_count):
+                bound = false
+                break
+            params.push(self.resolve_type_node_with_current_subst(fp_node, 0))
+        if bound:
+            let ret = if ret_node == 0: self.ty_void as i32 else if self.type_node_mentions_unbound_type_param(ret_node, tp_start, tp_count): 0 else: self.resolve_type_node_with_current_subst(ret_node, 0)
+            expected = self.ensure_fn_type(&params, fp_count, ret as TypeId) as i32
+        self.suppress_errors = self.suppress_errors - 1
+        self.generic_subst_param_syms = saved_syms
+        self.generic_subst_type_ids = saved_tys
+        expected
+
+    // Check the closure arguments deferred until the rest of a generic call's
+    // arguments were typed (closure_has_untyped_param).
+    mut fn check_deferred_generic_closure_args(fn_node: i32, fn_sym: i32, deferred: &Vec[i32], arg_types: Vec[i32], arg_nodes: &Vec[i32], call_node: i32) -> Vec[i32]:
+        var types = arg_types
+        for di in 0..deferred.len() as i32:
+            let ai = deferred[di]
+            let arg_node = arg_nodes[ai]
+            let expected = self.generic_closure_arg_expected_type(fn_node, &types, types.len() as i32, ai, call_node)
+            self.closure_direct_arg_depth = self.closure_direct_arg_depth + 1
+            self.closure_direct_arg_escape_flags.push(0)
+            let ty = if expected != 0: self.check_expr_with_expected(arg_node, expected as TypeId) else: self.check_expr_value_context(arg_node)
+            self.closure_direct_arg_escape_flags.pop()
+            self.closure_direct_arg_depth = self.closure_direct_arg_depth - 1
+            self.apply_closure_capture_consumes(arg_node, call_node)
+            self.check_closure_arg_against_param(arg_node, fn_sym, -1, ai, call_node)
+            types[ai] = ty as i32
+        types
+
     mut fn check_generic_pipeline_call(node: i32, lhs: i32, lhs_ty: i32, rhs: i32) -> i32:
         var callee = rhs
         var args_start = -1
@@ -16732,6 +16738,12 @@ impl Sema:
             callee = self.ast.get_data0(rhs)
             args_start = self.ast.get_data1(rhs)
             args_count = self.ast.get_data2(rhs)
+        // `g |> collect[Vec]()`: the bracket names the collection the stage
+        // builds; the stage itself is the generic function (std.gen).
+        var target_sym = 0
+        if callee != 0 and self.ast.kind(callee) == NodeKind.NK_INDEX and self.ast.kind(self.ast.get_data0(callee)) == NodeKind.NK_IDENT and self.ast.kind(self.ast.get_data1(callee)) == NodeKind.NK_IDENT:
+            target_sym = self.ast.get_data0(self.ast.get_data1(callee))
+            callee = self.ast.get_data0(callee)
         if callee == 0 or self.ast.kind(callee) != NodeKind.NK_IDENT:
             return -1
         let fn_sym = self.resolve_displaced_fn_ident(self.ast.get_data0(callee), callee)
@@ -16743,21 +16755,36 @@ impl Sema:
         if self.symbol_visible_from_current(fn_sym) == 0:
             self.emit_private_symbol_error(fn_sym, callee)
             return 0
-        let arg_types: Vec[i32] = Vec.new()
+        var arg_types: Vec[i32] = Vec.new()
         let arg_nodes: Vec[i32] = Vec.new()
+        let deferred: Vec[i32] = Vec.new()
         arg_types.push(lhs_ty)
         arg_nodes.push(lhs)
         for ai in 0..args_count:
             let arg_node = self.ast.get_extra(args_start + ai)
             arg_nodes.push(arg_node)
-            arg_types.push(self.check_expr_value_context(arg_node) as i32)
+            if self.closure_has_untyped_param(arg_node):
+                deferred.push(ai + 1)
+                arg_types.push(0)
+            else:
+                arg_types.push(self.check_expr_value_context(arg_node) as i32)
         let fn_node = self.select_generic_fn_node(fn_sym, arg_types, args_count + 1, node)
         if fn_node == 0:
             return 0
+        if deferred.len() > 0:
+            arg_types = self.check_deferred_generic_closure_args(fn_node, fn_sym, &deferred, move arg_types, &arg_nodes, node)
         self.resolved_generic_call_nodes.insert(node, fn_node)
         self.emit_no_await_guard_may_suspend_call(node, fn_sym)
         self.note_allocating_callee(node, fn_sym)
         let ret = self.check_generic_call(fn_sym, fn_node, arg_types, arg_nodes, args_count + 1, node)
+        if target_sym != 0 and ret != 0:
+            let ret_resolved = self.resolve_alias(ret as TypeId)
+            let ret_base = if self.get_type_kind(ret_resolved) == TypeKind.TY_GENERIC_INST: self.get_generic_inst_base(ret_resolved as i32) else: self.get_type_name(ret_resolved)
+            if ret_base == 0 or self.pool_resolve(ret_base) != self.pool_resolve(target_sym):
+                let stage: str = with_str_clone_ref(self.pool_resolve(fn_sym))
+                let target: str = with_str_clone_ref(self.pool_resolve(target_sym))
+                self.emit_error(f"`{stage}[{target}]` over a {self.type_name(lhs_ty)} is not available: this `{stage}` builds a {self.type_name(ret)}", callee)
+                return 0
         self.comp_resolved.insert(node, fn_sym)
         self.typed_expr_types.insert(node, ret)
         ret
@@ -18197,12 +18224,16 @@ impl Sema:
         let facade_context = self.facade_prepare_callback_call(facade_mi, node, resolved_extra_start, resolved_arg_count)
         if not facade_context.valid:
             return 0
-        let arg_types: Vec[i32] = Vec.new()
+        var arg_types: Vec[i32] = Vec.new()
         let checked_arg_nodes: Vec[i32] = Vec.new()
         // docs/completed/mut.md Rev 8 §15.8 — borrow indices to remove after this call's
         // arg-loop completes. Iterator-of-self borrows live for the duration of
         // the enclosing call so sibling closures conflict with them.
         let iter_borrow_idxs: Vec[i32] = Vec.new()
+        // A generic callee's unannotated closure arguments wait for the other
+        // arguments (check_deferred_generic_closure_args).
+        let defer_generic_closures = sig_idx < 0 and callable_value_tid == 0 and variant_payload_tys.len() == 0 and self.generic_fn_node_for_symbol(fn_sym) != 0
+        let deferred_closure_args: Vec[i32] = Vec.new()
         for ai in 0..resolved_arg_count:
             let arg_node = if has_resolved != 0: self.get_resolved_call_arg(node, ai) else: self.ast.get_extra(resolved_extra_start + ai)
             checked_arg_nodes.push(arg_node)
@@ -18231,6 +18262,10 @@ impl Sema:
             if arg_node < 0:
                 let bind_sym = 0 - arg_node
                 arg_types.push(self.scope_lookup(bind_sym))
+                continue
+            if defer_generic_closures and expected_ty == 0 and self.closure_has_untyped_param(arg_node):
+                deferred_closure_args.push(ai)
+                arg_types.push(0)
                 continue
             let is_closure_arg = self.ast.kind(arg_node) == NodeKind.NK_CLOSURE
             var closure_arg_escapes = 0
@@ -18549,6 +18584,8 @@ impl Sema:
             let fn_node = self.select_generic_fn_node(fn_sym, arg_types, resolved_arg_count, node)
             if fn_node == 0:
                 return 0
+            if deferred_closure_args.len() > 0:
+                arg_types = self.check_deferred_generic_closure_args(fn_node, fn_sym, &deferred_closure_args, move arg_types, &checked_arg_nodes, node)
             self.resolved_generic_call_nodes.insert(node, fn_node)
             self.emit_no_await_guard_may_suspend_call(node, fn_sym)
             self.note_allocating_callee(node, fn_sym)
@@ -19364,7 +19401,18 @@ impl Sema:
             self.generic_subst_type_ids = saved_generic_call_subst_tys
             return 0
 
-        let spec_key = self.generic_specialization_key(fn_sym, fn_node, tp_start, tp_count)
+        // An `impl Trait` parameter specializes on its argument's concrete
+        // type, which no type parameter names: `take(g, 3)` over a generator
+        // and over a GenStage bind the same T but are different functions.
+        let param_concrete_tys: Vec[i32] = Vec.new()
+        var spec_key = self.generic_specialization_key(fn_sym, fn_node, tp_start, tp_count)
+        for cpi in 0..param_count:
+            var concrete_param_ty = 0
+            let p_type_node = self.ast.fn_param_type(param_start, cpi)
+            if cpi < arg_count and p_type_node != 0 and self.ast.kind(p_type_node) == NodeKind.NK_TYPE_TRAIT_OBJ and self.ast.get_data1(p_type_node) == TYPE_TRAIT_OBJECT_IMPL:
+                concrete_param_ty = arg_types[cpi]
+                spec_key = spec_key ++ f":impl{cpi}={concrete_param_ty}"
+            param_concrete_tys.push(concrete_param_ty)
         let mono_sym = self.pool_intern(f"{self.pool_resolve(fn_sym)}__sema__{spec_key}")
         if self.generic_specialization_cache.contains(spec_key):
             let cached: i32 = self.generic_specialization_cache.get(spec_key).unwrap()
@@ -19388,13 +19436,6 @@ impl Sema:
             tp_syms.push(tp_sym)
             tp_sema_tys.push(self.lookup_generic_subst(tp_sym))
             tp_pos = tp_pos + 2 + bound_count
-        let param_concrete_tys: Vec[i32] = Vec.new()
-        for cpi in 0..param_count:
-            var concrete_param_ty = 0
-            let p_type_node = self.ast.fn_param_type(param_start, cpi)
-            if cpi < arg_count and p_type_node != 0 and self.ast.kind(p_type_node) == NodeKind.NK_TYPE_TRAIT_OBJ and self.ast.get_data1(p_type_node) == TYPE_TRAIT_OBJECT_IMPL:
-                concrete_param_ty = arg_types[cpi]
-            param_concrete_tys.push(concrete_param_ty)
         let concrete_sig = self.check_fn_body_concrete(fn_node, tp_syms, tp_sema_tys, mono_sym, param_concrete_tys)
         if concrete_sig >= 0:
             self.resolved_call_sigs.insert(call_node, concrete_sig)
@@ -19615,6 +19656,21 @@ impl Sema:
                 self.bind_type_params_from_type_expr(inner_node, self.get_type_d0(resolved), tp_start, tp_count, err_node)
             return
 
+        // A callable parameter `fn(A) -> R` binds from the argument's callable
+        // type: a closure literal's parameters and its inferred result.
+        if kind == NodeKind.NK_TYPE_FN:
+            let resolved = self.resolve_alias(arg_tid)
+            if self.get_type_kind(resolved) != TypeKind.TY_FN:
+                return
+            let fn_param_start = self.ast.get_data0(type_node)
+            let fn_param_count = self.ast.get_data1(type_node)
+            if fn_param_count != self.get_type_d1(resolved):
+                return
+            for fpi in 0..fn_param_count:
+                self.bind_type_params_from_type_expr(self.ast.get_extra(fn_param_start + fpi), self.fn_type_param_type(resolved as i32, fpi), tp_start, tp_count, err_node)
+            self.bind_type_params_from_type_expr(self.ast.get_data2(type_node), self.get_type_d2(resolved), tp_start, tp_count, err_node)
+            return
+
         if kind == NodeKind.NK_TYPE_TUPLE:
             let inner_start = self.ast.get_data0(type_node)
             let inner_count = self.ast.get_data1(type_node)
@@ -19654,6 +19710,12 @@ impl Sema:
                 return
             let trait_arg_start: i32 = self.ast.state.impl_trait_type_args[(trait_args_idx + 1)]
             let trait_arg_count: i32 = self.ast.state.impl_trait_type_args[(trait_args_idx + 2)]
+            // D69 (§13.4): a generator value implements Gen[T] with no impl
+            // declaration; T is its element type.
+            let gen_state = self.resolve_alias(arg_tid as TypeId) as i32
+            if self.generator_state_yield_types.contains(gen_state) and self.pool_resolve(trait_sym) == "Gen" and trait_arg_count == 1:
+                self.bind_type_params_from_type_expr(self.ast.get_extra(trait_arg_start), self.generator_state_yield_types.get(gen_state).unwrap(), tp_start, tp_count, err_node)
+                return
             for di in 0..self.ast.decl_count():
                 let decl = self.ast.get_decl(di)
                 if self.ast.kind(decl) != NodeKind.NK_IMPL_DECL:
@@ -20143,14 +20205,6 @@ impl Sema:
 
     mut fn type_struct_fields_satisfy_thread_trait(struct_tid: i32, trait_sym: i32) -> i32:
         let resolved = self.resolve_alias(struct_tid)
-        if self.generator_state_field_counts.contains(resolved as i32):
-            let field_count2: i32 = self.generator_state_field_counts.get(resolved as i32).unwrap()
-            for gi in 0..field_count2:
-                let key = sema_pair_key(resolved as i32, gi)
-                if self.generator_state_field_types.contains(key):
-                    if self.type_satisfies_thread_trait(self.generator_state_field_types.get(key).unwrap(), trait_sym) == 0:
-                        return 0
-            return 1
         let te_start = self.get_type_d1(resolved)
         let field_count = self.get_type_d2(resolved)
         for fi in 0..field_count:
@@ -20576,6 +20630,60 @@ impl Sema:
     // tag: 33 })` under `let bw: Box[Wrap[i64]]` (#1569). The argument is
     // checked against the instantiated parameter, so its literals take that
     // type; 0 when the parameter still mentions an unbound type parameter.
+    // A closure argument of a method call is typed from the method's callable
+    // parameter — the signature's, or a generic owner's under the receiver's
+    // substitution with the result left open while it names an unbound type
+    // parameter — so `g.each(x => ...)` types `x` as the element, never the
+    // i32 an unconstrained closure parameter defaults to.
+    mut fn method_closure_arg_expected_type(owner_type: i32, field: i32, sig_idx: i32, arg_index: i32, param_offset: i32) -> i32:
+        let pi = arg_index + param_offset
+        if sig_idx >= 0:
+            if pi >= self.sig_get_param_count(sig_idx):
+                return 0
+            let sig_param = self.sig_param_type(sig_idx, pi)
+            return if self.get_type_kind(self.resolve_alias(sig_param as TypeId)) == TypeKind.TY_FN: sig_param else: 0
+        let owner_sym = self.method_owner_symbol_for_type(owner_type)
+        if owner_sym == 0 or not self.type_decl_nodes.contains(owner_sym):
+            return 0
+        let method_fn = self.lookup_generic_method_fn(owner_sym, field)
+        let fn_node = if method_fn != 0: self.generic_fn_node_for_symbol(method_fn) else: 0
+        let meta = if fn_node != 0: self.ast.find_fn_meta(fn_node) else: -1
+        if meta < 0 or pi >= self.ast.fn_meta_param_count(meta):
+            return 0
+        let param_node = self.ast.fn_param_type(self.ast.fn_meta_param_start(meta), pi)
+        if param_node == 0 or self.ast.kind(param_node) != NodeKind.NK_TYPE_FN:
+            return 0
+        let td_node: i32 = self.type_decl_nodes.get(owner_sym).unwrap()
+        let owner_tp_start = self.type_decl_tp_start(td_node)
+        let owner_tp_count = self.type_decl_tp_count(td_node)
+        let fn_tp_start = self.ast.fn_meta_tp_start(meta)
+        let fn_tp_count = self.ast.fn_meta_tp_count(meta)
+        let saved_syms = sema_clone_i32_vec(&self.generic_subst_param_syms)
+        let saved_tys = sema_clone_i32_vec(&self.generic_subst_type_ids)
+        self.clear_generic_substitution()
+        let owner_resolved = self.resolve_alias(owner_type as TypeId)
+        if owner_tp_count > 0 and self.get_type_kind(owner_resolved) == TypeKind.TY_GENERIC_INST and self.get_generic_inst_base(owner_resolved as i32) == owner_sym:
+            let _ = self.setup_generic_inst_substitution(owner_resolved as i32, owner_sym)
+        let fp_start = self.ast.get_data0(param_node)
+        let fp_count = self.ast.get_data1(param_node)
+        let ret_node = self.ast.get_data2(param_node)
+        let params: Vec[i32] = Vec.new()
+        var bound = true
+        for fpi in 0..fp_count:
+            let fp_node = self.ast.get_extra(fp_start + fpi)
+            if self.type_node_mentions_unbound_type_param(fp_node, owner_tp_start, owner_tp_count) or self.type_node_mentions_unbound_type_param(fp_node, fn_tp_start, fn_tp_count):
+                bound = false
+                break
+            params.push(self.resolve_type_node_with_current_subst(fp_node, 0))
+        var expected = 0
+        if bound:
+            let ret_open = ret_node != 0 and (self.type_node_mentions_unbound_type_param(ret_node, owner_tp_start, owner_tp_count) or self.type_node_mentions_unbound_type_param(ret_node, fn_tp_start, fn_tp_count))
+            let ret = if ret_node == 0: self.ty_void as i32 else if ret_open: 0 else: self.resolve_type_node_with_current_subst(ret_node, 0)
+            expected = self.ensure_fn_type(&params, fp_count, ret as TypeId) as i32
+        self.generic_subst_param_syms = saved_syms
+        self.generic_subst_type_ids = saved_tys
+        expected
+
     mut fn static_generic_method_expected_arg_type(owner_type: i32, field: i32, arg_index: i32) -> i32:
         let owner_sym = self.method_owner_symbol_for_type(owner_type)
         if owner_sym == 0 or not self.type_decl_nodes.contains(owner_sym):
@@ -20929,7 +21037,10 @@ impl Sema:
 
         let param_offset = if is_static != 0: 0 else: 1
         let expected_args = param_count - param_offset
-        if arg_count != expected_args:
+        // arg_count < 0: a compiler-synthesized call whose receiver alone
+        // decides the specialization (D69's `for` over a generic Gen impl);
+        // it has no argument nodes to check.
+        if arg_count >= 0 and arg_count != expected_args:
             self.emit_error("wrong argument count", node)
         // #604 stage 1 applies to a method's arguments as to a free call's
         // (D64 found the gap: `n.read(buf)` over a `[]mut u8` refused the
@@ -21395,8 +21506,6 @@ impl Sema:
         if tk == TypeKind.TY_REF or tk == TypeKind.TY_PTR:
             resolved = self.resolve_alias(self.get_type_d0(resolved) as TypeId)
         if self.get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:
-            if self.generator_state_yield_types.contains(resolved as i32):
-                return self.get_type_name(resolved)
             return 0
         let owner = self.get_generic_inst_base(resolved as i32)
         if owner == self.syms.veciter or owner == self.syms.veciterref or owner == self.syms.mapiter or owner == self.syms.filteriter or owner == self.syms.filtermapiter or owner == self.syms.takeiter or owner == self.syms.dropiter or owner == self.syms.takewhileiter or owner == self.syms.dropwhileiter or owner == self.syms.zipiter or owner == self.syms.enumerateiter or owner == self.syms.chainiter or owner == self.syms.zipwithiter or owner == self.syms.stepbyiter or owner == self.syms.flatmapiter:
@@ -21414,8 +21523,6 @@ impl Sema:
         if tk == TypeKind.TY_REF or tk == TypeKind.TY_PTR:
             resolved = self.resolve_alias(self.get_type_d0(resolved) as TypeId)
         if self.get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:
-            if self.generator_state_yield_types.contains(resolved as i32):
-                return self.generator_state_yield_types.get(resolved as i32).unwrap()
             return 0
         let owner = self.get_generic_inst_base(resolved as i32)
         if owner == self.syms.veciter:
@@ -23340,6 +23447,8 @@ impl Sema:
                     mc_expected = self.ensure_fn_type(fold_params, 2, fold_acc as TypeId) as i32
             if mc_expected == 0 and ai < mc_static_variant_payload_tys.len() as i32:
                 mc_expected = mc_static_variant_payload_tys[ai]
+            if mc_expected == 0 and mc_is_closure:
+                mc_expected = self.method_closure_arg_expected_type(obj_type as i32, field, mc_sig_idx_for_effect, ai, mc_param_offset_for_resolution)
             if mc_expected == 0 and facade_mi >= 0 and facade_ud_ty != 0 and ai == self.facade_callback_methods[facade_mi].callback_param:
                 mc_expected = self.facade_callback_expected_type(facade_mi, obj_type as i32, field, facade_ud_ty)
             if mc_expected == 0 and ai == facade_pair_cb_arg:
@@ -24590,6 +24699,9 @@ impl Sema:
         let method_name: str = with_str_clone_ref(self.pool_resolve(field))
         if self.iterator_element_type(obj_type as i32) != 0 and self.iterator_operation_known_but_unimplemented(method_name):
             self.emit_error("iterator operation '" ++ method_name ++ "' from §13.3 is not implemented yet", node)
+            return 0
+        if method_name == "pull" and self.generator_state_yield_types.contains(self.resolve_alias(obj_type) as i32):
+            self.emit_error("g.pull() (§13.4: a generator stepped by next() on its own fiber) is not implemented yet (#1725); consume the generator with `for`, or through Gen[T] stages", node)
             return 0
         // A resource a failed producer still produced (`FailedDatabase`,
         // spec §16.2b.4) admits only the operations its facade marks
@@ -28040,8 +28152,6 @@ impl Sema:
             fn_sym = self.lookup_generic_method_fn(type_sym, method_sym)
         if fn_sym == 0:
             return 0
-        if self.generator_next_fn_syms.contains(fn_sym):
-            return 1
         var fn_node = 0
         if self.fn_decl_nodes.contains(fn_sym):
             fn_node = self.fn_decl_nodes.get(fn_sym).unwrap()

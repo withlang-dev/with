@@ -44,9 +44,6 @@ pub enum TermKind: i32:
     TK_SWITCH_INT = 3
     TK_CALL = 4
     TK_DROP_AND_GOTO = 5
-    // Temporary terminator used only before generator lowering. Backends must
-    // not receive MIR containing TK_YIELD.
-    TK_YIELD = 6
 
 // ── Rvalue kinds ─────────────────────────────────────────────────
 
@@ -410,6 +407,9 @@ pub type MirBody {
     lowering_failed: i32,
     anonymous_type: i32,
     anonymous_capture_count: i32,
+    // The creating body's local each capture (locals 1..count) is taken
+    // from, by id (codegen builds the environment from these).
+    anonymous_capture_sources: Vec[i32],
 
     // Locals
     local_type_ids: Vec[i32],
@@ -417,9 +417,6 @@ pub type MirBody {
     local_names: Vec[i32],
     local_is_user_var: Vec[i32],
     local_is_global: Vec[i32],   // 1: MirLower's proxy for module-level storage, never a user local that shares the name
-    // 1: a generator's `next` body (lower_generator_next_body): its locals live
-    // in the generator state across a yield, so a yield's return owns nothing.
-    is_generator_next: i32,
     n_params: i32,
     // Blocks ending in mutual tail calls (marked by mutual TCO pass).
     mutual_tail_bbs: Vec[i32],
@@ -680,12 +677,12 @@ fn MirBody.init_for_fn(fn_sym: i32) -> MirBody:
         lowering_failed: 0,
         anonymous_type: 0,
         anonymous_capture_count: 0,
+        anonymous_capture_sources: Vec.new(),
         local_type_ids: Vec.new(),
         local_mutables: Vec.new(),
         local_names: Vec.new(),
         local_is_user_var: Vec.new(),
         local_is_global: Vec.new(),
-        is_generator_next: 0,
         n_params: 0,
         mutual_tail_bbs: Vec.new(),
         bb_stmt_starts: Vec.new(),
@@ -2434,13 +2431,20 @@ pub fn validate_ownership_body(mir_mod: &MirModule, body: &MirBody) -> str:
         // scheduled a drop for. Still Init at a `return`, with no sub-place moved
         // out or blanked (a partial move leaves a shell nothing needs to free),
         // it is a leak: no path dropped or moved it.
-        if body.term_kind(bb) == TermKind.TK_RETURN and blocks.computed[bb] != 0 and body.is_generator_next == 0:
+        if body.term_kind(bb) == TermKind.TK_RETURN and blocks.computed[bb] != 0:
             for k in 0..key_places.len():
                 let place_id: i32 = key_places[k]
                 if place_id < 0 or body.place_proj_counts[place_id] != 0:
                     continue
                 let local_id = body.place_locals[place_id]
                 if local_id == 0 or dropped_local[local_id] == 0 or body.local_is_global[local_id] != 0:
+                    continue
+                // A closure's capture (locals 1..capture count) is a place of
+                // the creating frame (§12.4) — or, for `move ||`, of the
+                // closure's environment — which drops it: a body that
+                // overwrites it drops the old value first and leaves the new
+                // one to that owner.
+                if local_id <= body.anonymous_capture_count:
                     continue
                 if state.place(blocks.keys, place_id) != MirDropState.Init:
                     continue
