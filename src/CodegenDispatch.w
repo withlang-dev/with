@@ -1543,6 +1543,22 @@ impl Codegen:
                         idx_val = wl_build_zext(self.builder, idx_val, i64_ty)
                     else:
                         idx_val = wl_build_sext(self.builder, idx_val, i64_ty)
+                // The storage may hold a POINTER to the indexed value — a
+                // by-place closure capture or a reference local — while Sema
+                // says the value is a Vec/str/slice/array. Sema owns the
+                // meaning (D65): only a raw-pointer Sema type is pointer
+                // indexing. Load through the pointer and index what it
+                // names, as the field projection above does; keying on the
+                // LLVM `ptr` alone read `xs[1]` through a captured Vec as
+                // `p[1]` — the high half of the data pointer.
+                if wl_get_type_kind(cur_ty) == wl_pointer_type_kind() and cur_sema_ty > 0 and self.mir_type_kind_at(self.mir_resolve_alias_at(cur_sema_ty)) != TypeKind.TY_PTR:
+                    cur_ptr = wl_build_load(self.builder, wl_ptr_type(self.context), cur_ptr)
+                    let pointee_sema = self.mir_unwrap_ref_like_sema_type(cur_sema_ty)
+                    if pointee_sema > 0 and pointee_sema != cur_sema_ty:
+                        cur_sema_ty = pointee_sema
+                    let value_ty = self.mir_sema_type_to_llvm(cur_sema_ty)
+                    if value_ty != 0:
+                        cur_ty = value_ty
                 let index_base_sema_ty = cur_sema_ty
                 let elem_llvm = self.mir_index_elem_llvm_type(index_base_sema_ty, cur_ty)
                 let elem_sema = self.mir_index_elem_sema_type(index_base_sema_ty)
