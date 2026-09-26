@@ -27,7 +27,7 @@ fn intern_debug_init(msg: &str):
     with_eprint("[intern-init] " ++ msg)
 
 type Symbol = i32
-type TypeId = i32
+pub type TypeId = i32
 type ValueId = i32
 
 // ── String arena ──────────────────────────────────────────────────

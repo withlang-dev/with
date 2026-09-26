@@ -28,7 +28,7 @@ pub enum TypeKind: i32:
     // callee the way the target's C passes va_list (TypeLayout, FnAbi).
     TY_VA_LIST = 21
 
-type TypeId = i32
+pub type TypeId = i32
 
 pub enum BorrowKind: i32:
     SHARED = 0
