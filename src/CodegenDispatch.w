@@ -6119,7 +6119,7 @@ impl Codegen:
             args.push(ptrs[i])
             wl_build_call(self.builder, free_ty, free_fn, vec_data_i64(&args), 1)
 
-    mut fn mir_eval_call_operand_info(body: &MirBody, operand_id: i32, expected_ty: i64, expected_sema_ty: i32, is_c_abi_arg: i32, call_context: &str, arg_index: i32) -> CallArgValue:
+    mut fn mir_eval_call_operand_info(body: &MirBody, operand_id: i32, expected_ty: i64, expected_sema_ty: i32, lends_c_strings: i32, call_context: &str, arg_index: i32) -> CallArgValue:
         var eval_expected_ty = expected_ty
         if expected_ty != 0 and wl_get_type_kind(expected_ty) == wl_pointer_type_kind():
             eval_expected_ty = 0
@@ -6129,10 +6129,10 @@ impl Codegen:
             let expected_kind = wl_get_type_kind(expected_ty)
             let actual_kind = wl_get_type_kind(wl_type_of(out))
             let literal_text = self.mir_operand_str_literal(body, operand_id)
-            if is_c_abi_arg != 0 and literal_text.found and expected_kind == wl_pointer_type_kind() and self.sema_type_is_c_char_pointer(expected_sema_ty) != 0:
+            if lends_c_strings != 0 and literal_text.found and expected_kind == wl_pointer_type_kind() and self.sema_type_is_c_char_pointer(expected_sema_ty) != 0:
                 let direct = wl_build_global_string_ptr(self.builder, literal_text.text)
                 return CallArgValue { value: self.enforce_coerced_type(direct, expected_ty, "wrong argument type"), cleanup_ptr: 0 }
-            if is_c_abi_arg != 0 and expected_kind == wl_pointer_type_kind() and self.sema_type_is_c_char_pointer(expected_sema_ty) != 0 and self.sema_type_is_str_value_or_view(self.mir_operand_sema_type(body, operand_id)) != 0:
+            if lends_c_strings != 0 and expected_kind == wl_pointer_type_kind() and self.sema_type_is_c_char_pointer(expected_sema_ty) != 0 and self.sema_type_is_str_value_or_view(self.mir_operand_sema_type(body, operand_id)) != 0:
                 var str_out = out
                 if actual_kind == wl_pointer_type_kind():
                     let str_ty = self.mir_sema_type_to_llvm(self.sema.ty_str as i32)
@@ -15684,7 +15684,13 @@ impl Codegen:
         var abi_sret_buf: i64 = 0
 
         let sema_sig_idx = if callee_raw_fn_sym != 0: self.sema.get_sig(callee_raw_fn_sym) else: -1
-        let is_c_abi_call = if abi.convention == FN_ABI_C: 1 else: 0
+        // §16.3c, D47: a str lent to a `const char *` parameter is a C string
+        // for every callee Sema accepted it for — a C-ABI extern and a
+        // c_imported inline function translated into With alike (Sema's
+        // try_ci_coercion keys on ci_syms, not on the calling convention).
+        // Keying on the convention passed the str header's address to a
+        // translated inline function (#1589).
+        let lends_c_strings = if abi.convention == FN_ABI_C or (callee_raw_fn_sym != 0 and self.sema.ci_syms.contains(callee_raw_fn_sym)): 1 else: 0
         let args: Vec[i64] = Vec.new()
         let call_temp_cleanups: Vec[i64] = Vec.new()
         if is_indirect:
@@ -15801,7 +15807,7 @@ impl Codegen:
                     arg_val = wl_get_undef(self.get_dyn_fat_ptr_type())
                 self.record_codegen_call_argument(body, args_id, operand_id, ai, AnalysisMarshalStrategy.DirectValue, arg_val, arg_val)
             else:
-                let arg_info = self.mir_eval_call_operand_info(body, operand_id, expected_ty, expected_sema_ty, is_c_abi_call, call_context, ai)
+                let arg_info = self.mir_eval_call_operand_info(body, operand_id, expected_ty, expected_sema_ty, lends_c_strings, call_context, ai)
                 arg_val = arg_info.value
                 if arg_info.cleanup_ptr != 0:
                     call_temp_cleanups.push(arg_info.cleanup_ptr)
