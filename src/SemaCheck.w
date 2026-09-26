@@ -27342,6 +27342,13 @@ impl Sema:
             // moved out would transfer blanked storage.
             self.check_whole_use_partially_moved(node)
             let sym = self.ast.get_data0(node)
+            // D52 (§9.1c): a `const` is a value, not a place — every use
+            // materializes it, so consuming one transfers nothing and never
+            // marks the symbol moved. `take(C); take(C)` reported "use of
+            // moved value" at the second use (the method path, #1588, then
+            // refused build.w's `.extra_output(FIXPOINT_STAGE2_UNITS)` twice).
+            if self.const_global_syms.contains(sym) and not self.scope_binding_is_local(sym):
+                return
             if self.scope_has(sym) != 0:
                 let tid = self.scope_lookup(sym)
                 if not self.is_copy(tid as TypeId):
