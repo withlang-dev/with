@@ -15151,7 +15151,9 @@ impl Codegen:
                             if gc_de_mir_count > 0:
                                 let gc_de_arg_op = body.call_arg_operands[gc_de_mir_start]
                                 let gc_de_arg_val = self.mir_eval_operand(body, gc_de_arg_op, 0)
-                                let gc_result = self.gen_disc_enum_from_int_val(gc_de_type, gc_de_arg_val)
+                                let gc_de_arg_sema_ty = self.mir_operand_sema_type(body, gc_de_arg_op)
+                                let gc_de_arg_unsigned = gc_de_arg_sema_ty != 0 and self.sema.is_unsigned_int_type(gc_de_arg_sema_ty)
+                                let gc_result = self.gen_disc_enum_from_int_val(gc_de_type, gc_de_arg_val, gc_de_arg_unsigned)
                                 if dest_place >= 0 and gc_result != 0:
                                     let gc_ret_ty = wl_type_of(gc_result)
                                     if gc_ret_ty != wl_void_type(self.context):

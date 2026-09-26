@@ -266,6 +266,7 @@ type Codegen {
     disc_enum_type_map: HashMap[i32, i32],
     disc_enum_name_syms: Vec[i32],
     disc_enum_repr_types: Vec[i64],
+    disc_enum_repr_unsigned: Vec[i32],
     disc_enum_variant_starts: Vec[i32],
     disc_enum_variant_counts: Vec[i32],
     disc_enum_variant_names: Vec[i32],
@@ -1004,6 +1005,7 @@ fn Codegen.init_with_opt(module_name: &str, opt_level: i32) -> Codegen:
         disc_enum_type_map: HashMap.new(),
         disc_enum_name_syms: Vec.new(),
         disc_enum_repr_types: Vec.new(),
+        disc_enum_repr_unsigned: Vec.new(),
         disc_enum_variant_starts: Vec.new(),
         disc_enum_variant_counts: Vec.new(),
         disc_enum_variant_names: Vec.new(),
@@ -4526,6 +4528,8 @@ impl Codegen:
         let idx = self.disc_enum_repr_types.len() as i32
         self.disc_enum_name_syms.push(name_sym)
         self.disc_enum_repr_types.push(repr_ty)
+        let repr_sema_ty = self.sema.resolve_type_expr_frozen(repr_type_node)
+        self.disc_enum_repr_unsigned.push(if repr_sema_ty > 0 and self.sema.is_unsigned_int_type(repr_sema_ty): 1 else: 0)
         let v_start = self.disc_enum_variant_names.len() as i32
         self.disc_enum_variant_starts.push(v_start)
         self.disc_enum_variant_counts.push(variant_count)
@@ -4590,11 +4594,19 @@ impl Codegen:
             self.enum_variant_starts[enum_idx] = enum_v_start
             self.enum_variant_counts[enum_idx] = variant_count
 
-    fn gen_disc_enum_from_int_val(de_idx: i32, arg_val: i64) -> i64:
+    fn gen_disc_enum_from_int_val(de_idx: i32, arg_val: i64, arg_unsigned: bool) -> i64:
         let repr_ty = self.disc_enum_repr_types[de_idx]
+        let repr_unsigned = self.disc_enum_repr_unsigned[de_idx] != 0
         let v_start = self.disc_enum_variant_starts[de_idx]
         let v_count = self.disc_enum_variant_counts[de_idx]
-        let input = self.coerce_int(arg_val, repr_ty)
+        // §4.4a: an integer outside the repr's range matches no discriminant.
+        // Compare at a width that holds both the argument and the repr, each
+        // side extended by its own signedness; narrowing the argument to the
+        // repr first made `Tiny.from_int(456)` `Some(Hi = 200)` (#1499).
+        let arg_ty = wl_type_of(arg_val)
+        let i64_ty = wl_i64_type(self.context)
+        let cmp_ty = if wl_get_type_kind(arg_ty) == wl_integer_type_kind() and wl_get_int_type_width(arg_ty) > 64: arg_ty else: i64_ty
+        let input = self.coerce_int_ext(arg_val, cmp_ty, arg_unsigned)
         // Return Option[repr_type]: Some(disc_val) or None
         // Use insertvalue to build Option values directly (no allocas in case blocks)
         let i32_ty = wl_i32_type(self.context)
@@ -4611,7 +4623,7 @@ impl Codegen:
         for vi in 0..v_count:
             let disc_val: i64 = self.disc_enum_variant_values[(v_start + vi)]
             let case_bb = wl_append_bb(self.context, self.current_function, "from_int.case")
-            wl_add_case(sw, wl_const_int(repr_ty, disc_val, 1), case_bb)
+            wl_add_case(sw, wl_const_int(cmp_ty, disc_val, if repr_unsigned: 0 else: 1), case_bb)
             wl_position_at_end(self.builder, case_bb)
             // Some(disc_val) = { tag=0, payload=disc_val }
             var some_val = wl_get_undef(opt_ty)
