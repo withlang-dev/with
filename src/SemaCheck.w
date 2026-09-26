@@ -6221,8 +6221,13 @@ impl Sema:
                 self.emit_error("return type mismatch", info.mismatch_node)
             return self.ty_void as i32
         if info.saw_value_return != 0:
-            if self.body_can_fall_through(body) != 0 and self.type_has_default_value(info.value_type) == 0:
-                self.emit_error("return type does not implement Default", body)
+            // §4.10 / D43 (#1494): a body that returns a value on one path and
+            // falls off the end on another is a missing return, the same as
+            // the annotated spelling; it was defaulted to `T.default()`. A
+            // `Result[Unit, E]` body falls off into `Ok(())` (§4.9).
+            let falls_off = body_ty == 0 or body_ty == self.ty_void
+            if falls_off and self.body_can_fall_through(body) != 0 and self.type_is_result_of_unit(info.value_type) == 0:
+                self.emit_error("missing return", body)
             return info.value_type
         if body_ty != 0:
             return body_ty as i32
