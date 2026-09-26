@@ -1,6 +1,6 @@
 // AsyncMir — Wave 9 suspend-aware IR artifact.
 //
-// Async-MIR is a deterministic, explicit view of async/generator lowering
+// Async-MIR is a deterministic, explicit view of async lowering
 // boundaries produced after MIR/borrow phases.
 
 use InternPool
@@ -10,13 +10,11 @@ extern fn with_str_clone_ref(s: &str) -> str
 pub enum AsyncBodyKind: i32:
     Sync = 0
     Async = 1
-    Generator = 2
 
 // Suspension/event kinds.
 pub enum AsyncSuspendKind: i32:
     Await = 1
     SelectAwait = 2
-    Yield = 3
 
 pub type AsyncMirBody {
     fn_sym: i32,
@@ -119,8 +117,6 @@ impl AsyncMirModule:
 fn async_body_flavor_name(flavor: i32) -> str:
     if flavor == AsyncBodyKind.Async:
         return "async"
-    if flavor == AsyncBodyKind.Generator:
-        return "generator"
     "sync"
 
 fn async_suspend_kind_name(kind: i32) -> str:
@@ -128,8 +124,6 @@ fn async_suspend_kind_name(kind: i32) -> str:
         return "await"
     if kind == AsyncSuspendKind.SelectAwait:
         return "select_await"
-    if kind == AsyncSuspendKind.Yield:
-        return "yield"
     "unknown"
 
 pub fn dump_async_mir_module(mod: &AsyncMirModule, pool: InternPool) -> str:

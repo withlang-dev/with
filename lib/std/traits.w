@@ -106,6 +106,13 @@ pub trait Drop:
 pub trait Iter[T]:
     mut fn next() -> Option[T]
 
+/// Generation protocol (§13.4). `each` calls `body` once per element, in
+/// order, and stops as soon as `body` returns `false`. Every generator value
+/// implements it, and `for x in g:` consumes `g` through `each`.
+/// Implementing Gen[T] by hand is library-maintainer work.
+pub trait Gen[T]:
+    move fn each(body: fn(T) -> bool)
+
 /// Membership test. Implement to enable `x in collection` and
 /// `x not in collection`.
 pub trait Contains[T]:

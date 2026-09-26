@@ -1,7 +1,7 @@
 // AsyncLower — Wave 9 MIR -> Async-MIR lowering.
 //
 // This pass runs after MIR construction and records explicit suspend-aware
-// state-machine boundaries for async/generator constructs.
+// boundaries for async constructs.
 
 use Ast
 use InternPool
@@ -92,12 +92,6 @@ impl AsyncLower:
             let fn_body_node = async_ast_get_data1(self.ast, fn_decl as i32)
             self.walk_expr(fn_body_node)
 
-        if flavor != AsyncBodyKind.Generator:
-            for si in 0..async_body_suspend_count(self.cur_body):
-                if self.cur_body.suspend_kinds[si] == AsyncSuspendKind.Yield:
-                    self.emit_error_at_span("yield used outside generator function", self.cur_body.suspend_span_starts[si], self.cur_body.suspend_span_ends[si])
-                    break
-
         self.cur_body.finalize_states()
         self.out_mod.add_body(move self.cur_body)
 
@@ -137,15 +131,12 @@ impl AsyncLower:
                 self.walk_expr(arm_body)
             return
 
-        if kind == NodeKind.NK_YIELD:
-            self.record_suspend(node, AsyncSuspendKind.Yield)
-            self.walk_expr(async_ast_get_data0(self.ast, node))
-            return
-
         if kind == NodeKind.NK_IDENT or kind == NodeKind.NK_INT_LIT or kind == NodeKind.NK_FLOAT_LIT or kind == NodeKind.NK_STRING_LIT or kind == NodeKind.NK_BOOL_LIT or kind == NodeKind.NK_C_STRING_LIT:
             return
 
-        if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_RETURN or kind == NodeKind.NK_DEFER or kind == NodeKind.NK_ERRDEFER or kind == NodeKind.NK_COMPTIME:
+        // D69 (§13.4): a `yield` calls the consumer's body; it is not a
+        // suspension point.
+        if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_RETURN or kind == NodeKind.NK_DEFER or kind == NodeKind.NK_ERRDEFER or kind == NodeKind.NK_COMPTIME or kind == NodeKind.NK_YIELD:
             self.walk_expr(async_ast_get_data0(self.ast, node))
             return
 
@@ -374,8 +365,6 @@ fn async_fn_flavor(ast: AstPool, fn_decl: NodeId) -> i32:
     if (fn_decl as i32) == 0:
         return AsyncBodyKind.Sync
     let flags = ast.get_data2(fn_decl)
-    if (flags / FnFlags.GEN) % 2 == 1:
-        return AsyncBodyKind.Generator
     if (flags / FnFlags.ASYNC) % 2 == 1:
         return AsyncBodyKind.Async
     AsyncBodyKind.Sync

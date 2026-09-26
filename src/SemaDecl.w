@@ -1485,20 +1485,49 @@ impl Sema:
             return 1
         0
 
-    mut fn ensure_generator_state_type(fn_sym: i32, yield_ty: i32) -> i32:
+    // D69 (§13.4): the generator value's type — a struct whose fields are the
+    // gen fn's parameters, in order. Calling the gen fn stores its arguments
+    // here and runs nothing; dropping the value unconsumed drops them.
+    mut fn ensure_generator_state_type(fn_sym: i32, yield_ty: i32, param_start: i32, sig_param_start: i32, param_count: i32) -> i32:
         if self.generator_fn_state_types.contains(fn_sym):
             return self.generator_fn_state_types.get(fn_sym).unwrap()
 
         let state_name = f"__with_generator_state_{fn_sym}"
         let state_sym = self.pool_intern(state_name)
-        let state_tid = self.add_type(TypeKind.TY_STRUCT, state_sym, 0, 0)
+        let field_start = self.type_extra.len() as i32
+        for pi in 0..param_count:
+            self.type_extra.push(self.ast.fn_param_name(param_start, pi))
+            self.type_extra.push(self.sig_params[(sig_param_start + pi)])
+            self.type_extra.push(0)
+        for _ in 0..param_count:
+            self.type_extra.push(0)
+        let state_tid = self.add_type(TypeKind.TY_STRUCT, state_sym, field_start, param_count)
         self.record_named_type(state_sym, state_tid as i32)
         self.pretty_symbol_names.insert(state_sym, sema_owned_text(state_name))
         self.generator_fn_yield_types.insert(fn_sym, yield_ty)
         self.generator_fn_state_types.insert(fn_sym, state_tid as i32)
         self.generator_fn_state_syms.insert(fn_sym, state_sym)
         self.generator_state_yield_types.insert(state_tid as i32, yield_ty)
+        self.register_generator_gen_impl(state_sym)
         state_tid as i32
+
+    // The generator value implements Gen[T] (§13.4); its trait argument is
+    // generator_state_yield_types[state].
+    mut fn register_generator_gen_impl(state_sym: i32):
+        let idx = self.impl_type_syms.len() as i32
+        self.impl_type_syms.push(state_sym)
+        self.impl_starts.push(self.impl_extra.len() as i32)
+        self.impl_counts.push(1)
+        self.impl_extra.push(self.pool_intern("Gen"))
+        self.impl_extra_is_std.push(1)
+        self.impl_lookup.insert(state_sym, idx)
+
+    // The body a generator hands each element to: fn(T) -> bool, where
+    // `false` stops the generator at its `yield` (§13.4).
+    mut fn generator_body_fn_type(yield_ty: i32) -> i32:
+        let params: Vec[i32] = Vec.new()
+        params.push(yield_ty)
+        self.ensure_fn_type(&params, 1, self.ty_bool) as i32
 
     fn mark_generator_state_ephemeral(state_tid: i32):
         if state_tid <= 0:
@@ -1510,31 +1539,52 @@ impl Sema:
         if state_sym != 0:
             self.ephemeral_types.insert(state_sym, 1)
 
-    mut fn register_generator_next_method(fn_sym: i32, state_sym: i32, state_tid: i32, yield_ty: i32):
-        if self.generator_fn_next_syms.contains(fn_sym):
+    // D69 (§13.4): the two MIR-only functions behind a gen fn. The producer
+    // `__with_generator_run_{f}(params, body)` is f's body, lowered with each
+    // `yield e` calling `body(e)`; the generator value's `move fn each(body)`
+    // hands its stored arguments and `body` to the producer.
+    mut fn register_generator_functions(fn_sym: i32, state_sym: i32, state_tid: i32, yield_ty: i32, sig_param_start: i32, param_count: i32):
+        if self.generator_fn_run_syms.contains(fn_sym):
             return
+        let body_ty = self.generator_body_fn_type(yield_ty)
 
-        let next_fn_name = f"__with_generator_next_{fn_sym}"
-        let next_fn_sym = self.pool_intern(next_fn_name)
-        let opt_yield_ty = self.ensure_option_type_for(yield_ty)
+        let run_sym = self.pool_intern(f"__with_generator_run_{fn_sym}")
+        let run_param_start = self.sig_params.len() as i32
+        for pi in 0..param_count:
+            self.sig_params.push(self.sig_params[(sig_param_start + pi)])
+        self.sig_params.push(body_ty)
+        let run_fn_extra = self.type_extra.len() as i32
+        for pi in 0..param_count + 1:
+            self.type_extra.push(self.sig_params[(run_param_start + pi)])
+        let run_fn_tid = self.add_type(TypeKind.TY_FN, run_fn_extra, param_count + 1, self.ty_void as i32)
+        self.add_sig(run_sym, run_fn_tid as i32, self.ty_void as i32, run_param_start, param_count + 1, 0)
+        self.set_sig_param_invoke_many(self.get_sig(run_sym), param_count, 1)
 
-        let next_param_start = self.sig_params.len() as i32
+        let each_sym = self.pool_intern(f"__with_generator_each_{fn_sym}")
+        let each_param_start = self.sig_params.len() as i32
         self.sig_params.push(state_tid)
-        let next_fn_extra = self.type_extra.len() as i32
+        self.sig_params.push(body_ty)
+        let each_fn_extra = self.type_extra.len() as i32
         self.type_extra.push(state_tid)
-        let next_fn_tid = self.add_type(TypeKind.TY_FN, next_fn_extra, 1, opt_yield_ty)
-        self.add_sig(next_fn_sym, next_fn_tid as i32, opt_yield_ty, next_param_start, 1, 0)
-        let next_sig_idx = self.get_sig(next_fn_sym)
-        if next_sig_idx >= 0:
-            self.set_sig_param_value_ref_abi(next_sig_idx, 0, 1)
-            let key = sema_pair_key(state_sym, self.syms.next)
-            self.method_lookup.sig_lookup.insert(key, next_sig_idx)
-            self.method_lookup.fn_lookup.insert(key, next_fn_sym)
+        self.type_extra.push(body_ty)
+        let each_fn_tid = self.add_type(TypeKind.TY_FN, each_fn_extra, 2, self.ty_void as i32)
+        self.add_sig(each_sym, each_fn_tid as i32, self.ty_void as i32, each_param_start, 2, 0)
+        let each_sig_idx = self.get_sig(each_sym)
+        self.set_sig_receiver_mode(each_sig_idx, ReceiverMode.Move)
+        self.set_sig_param_effect(each_sig_idx, 0, EFF_CONSUME)
+        self.set_sig_param_direct_effect(each_sig_idx, 0, EFF_CONSUME)
+        self.set_sig_param_invoke_many(each_sig_idx, 1, 1)
+        let key = sema_pair_key(state_sym, self.pool_intern("each"))
+        self.method_lookup.sig_lookup.insert(key, each_sig_idx)
+        self.method_lookup.fn_lookup.insert(key, each_sym)
 
-        self.generator_fn_next_syms.insert(fn_sym, next_fn_sym)
-        self.generator_next_fn_syms.insert(next_fn_sym, fn_sym)
-        self.method_symbol_flags.insert(next_fn_sym, 1)
-        self.fn_decl_source_paths.insert(next_fn_sym, with_str_clone_ref(self.current_module_path))
+        self.generator_fn_run_syms.insert(fn_sym, run_sym)
+        self.generator_fn_each_syms.insert(fn_sym, each_sym)
+        self.generator_mir_only_fns.insert(run_sym, fn_sym)
+        self.generator_mir_only_fns.insert(each_sym, fn_sym)
+        self.method_symbol_flags.insert(each_sym, 1)
+        self.fn_decl_source_paths.insert(run_sym, with_str_clone_ref(self.current_module_path))
+        self.fn_decl_source_paths.insert(each_sym, with_str_clone_ref(self.current_module_path))
 
     // Whether two declarations of one method symbol belong to different
     // types that share a name (#1457): distinct declaring files, a method
@@ -1705,6 +1755,9 @@ impl Sema:
         if decl_is_pub != 0:
             self.check_pub_signature_names_public_types(node, fn_name, method_owner_sym, meta)
         self.record_fn_behavior_metadata(fn_name, node, flags)
+        if (flags / FnFlags.GEN) % 2 == 1 and (tp_count > 0 or method_owner_sym != 0):
+            let what = if tp_count > 0: "a generic generator function" else: "a generator method"
+            self.emit_error(f"{what} is not implemented yet (#1724); declare a non-generic `gen fn` at top level", node)
 
         // Record receiver flags here. D7 enforcement runs after body checking and
         // effect fixed point so a missing mode can report the compiler-derived
@@ -1864,20 +1917,20 @@ impl Sema:
 
         var sig_ret_type = ret_type
 
-        // For generator functions, the public call returns an internal state value.
-        // The declared return type remains the yield type tracked for `yield expr`.
+        // D69 (§13.4): calling a generator returns its generator value; the
+        // declared return type is the element type `yield` hands on.
         if (flags / FnFlags.GEN) % 2 == 1:
             if (flags / FnFlags.ASYNC) % 2 == 1:
                 self.emit_error("gen fn cannot also be async", node)
             if ret_node == 0:
                 self.emit_error("generator function requires a yield type", node)
-            let state_tid = self.ensure_generator_state_type(fn_name, ret_type as i32)
+            let state_tid = self.ensure_generator_state_type(fn_name, ret_type as i32, param_start, sig_param_start, param_count)
             for pi in 0..param_count:
                 let p_ty = self.sig_params[(sig_param_start + pi)]
                 if self.type_is_ephemeral_value(p_ty) != 0:
                     self.mark_generator_state_ephemeral(state_tid)
             let state_sym: i32 = self.generator_fn_state_syms.get(fn_name).unwrap()
-            self.register_generator_next_method(fn_name, state_sym, state_tid, ret_type as i32)
+            self.register_generator_functions(fn_name, state_sym, state_tid, ret_type as i32, sig_param_start, param_count)
             sig_ret_type = state_tid as TypeId
 
         sig_ret_type = self.fn_signature_return_type(flags, sig_ret_type)

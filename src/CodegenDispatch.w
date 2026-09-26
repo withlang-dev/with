@@ -86,14 +86,14 @@ impl Codegen:
             return
         self.fail_mir_codegen_for_function(fn_node, "no-body")
 
-    // Generator `next` bodies and D61's synthesized `:?` formatters: MIR-only
+    // D69 generator producers and `each` bodies, and D61's synthesized `:?` formatters: MIR-only
     // functions whose signature Sema registered without a declaration.
-    mut fn gen_generator_next_functions_from_mir():
+    mut fn gen_generator_functions_from_mir():
         for bi in 0..self.mir_fn_syms_len() as i32:
             let raw_sym = self.mir_fn_sym_at(bi as i64)
             if not self.unit_owns(raw_sym):
                 continue
-            if not self.sema.generator_next_fn_syms.contains(raw_sym) and not self.sema.debug_fmt_synth_syms.contains(raw_sym):
+            if not self.sema.generator_mir_only_fns.contains(raw_sym) and not self.sema.debug_fmt_synth_syms.contains(raw_sym):
                 continue
             let body = self.mir_body_at(bi as i64)
             let cg_sym = self.codegen_sym_for_sema_sym(raw_sym)
@@ -17680,6 +17680,22 @@ impl Codegen:
             wl_position_at_end(self.builder, saved_bb)
         drop_fn
 
+    // The address of a creating body's local, for a closure capture. An
+    // indirect local (a by-place capture or a place parameter) holds a pointer
+    // to its value in its slot; the capture takes that pointer, not the slot.
+    fn mir_capture_source_ptr(local_id: i32) -> i64:
+        if local_id < 0:
+            return 0
+        let slot_opt = self.mir_local_ptrs.get(local_id)
+        if self.mir_indirect_value_local_types.get(local_id).is_some():
+            if slot_opt.is_some():
+                return wl_build_load(self.builder, wl_ptr_type(self.context), slot_opt.unwrap() as i64)
+            let value_opt = self.mir_local_values.get(local_id)
+            if value_opt.is_some():
+                return value_opt.unwrap() as i64
+            return 0
+        if slot_opt.is_some(): slot_opt.unwrap() as i64 else: 0
+
     // The closure constant's d2: MirLower sets it when the closure expression
     // sits inside a loop of `parent` (#1471).
     fn closure_created_in_loop(parent: &MirBody, node: i32) -> bool:
@@ -17691,10 +17707,12 @@ impl Codegen:
     mut fn gen_closure(node: i32, parent: &MirBody) -> i64:
         // Closure: create an anonymous function and return fat pointer {fn_ptr, ctx_ptr}
         // Calling convention: fn(ctx_ptr, params...) -> ret_ty
-        // NodeKind.NK_CLOSURE layout: d0=body, d1=extra_start, d2=param_count
+        // The retained MIR body is the closure's whole contract: locals
+        // 1..captures are its captures (sources in anonymous_capture_sources),
+        // the rest of its parameters follow. `node` is an NK_CLOSURE, or the
+        // NK_FOR whose body runs as a Gen[T]'s `each` closure (D69).
         let closure_body = self.prepared_anonymous_body(parent, node, ConstKind.CK_CLOSURE)
-        let extra_start = self.pool.get_data1(node)
-        let param_count = self.pool.get_data2(node)
+        let param_count = closure_body.n_params - closure_body.anonymous_capture_count
         let ptr_ty = wl_ptr_type(self.context)
         let i32_ty = wl_i32_type(self.context)
         let closure_kind = self.sema.get_type_kind(self.sema.resolve_alias(closure_body.anonymous_type))
@@ -17874,7 +17892,7 @@ impl Codegen:
 
         // Add params as locals (normal closures skip param 0, the context ptr).
         for i in 0..param_count:
-            let p_name = self.pool.get_extra(extra_start + i * 2)
+            let p_name = closure_body.local_names[capture_count + i + 1]
             let param_val = wl_get_param(closure_fn, i + closure_param_offset)
             let arg = self.fn_abi_arg(closure_abi_index, i)
             if arg.pass == PM_INDIRECT_PLACE:
@@ -17942,7 +17960,7 @@ impl Codegen:
                     let cl_storage_ty = cl_m_ty
                     self.mir_local_types.insert(cl_m_local_id, cl_storage_ty)
                     if capture_ref_modes[cl_mi] != 0:
-                        let cl_sem_ty = self.lookup_capture_sema_type(cl_m_sym)
+                        let cl_sem_ty = closure_body.local_type_ids[cl_m_local_id]
                         if cl_sem_ty != 0:
                             let cl_sem_llvm_ty = self.sema_type_to_llvm(cl_sem_ty)
                             if cl_sem_llvm_ty != 0:
@@ -17958,7 +17976,7 @@ impl Codegen:
 
         // Map param MIR locals to existing LLVM allocas
         for cl_pmi in 0..param_count:
-            let cl_pm_name = self.pool.get_extra(extra_start + cl_pmi * 2)
+            let cl_pm_name = closure_body.local_names[capture_count + cl_pmi + 1]
             let cl_pm_local_id = capture_count + cl_pmi + 1
             let cl_pm_alloca_opt = self.local_allocas.get(cl_pm_name)
             if cl_pm_alloca_opt.is_some():
@@ -18066,9 +18084,15 @@ impl Codegen:
             else:
                 self.create_entry_alloca(cap_struct_type)
             for ci in 0..capture_count:
-                let sym = captures[ci]
                 let cap_ty = cap_types[ci]
-                let alloca = self.lookup_capture_alloca(sym)
+                // The capture's source is a local of the creating body by id
+                // (MirLower resolved the name): a shadowed or same-named
+                // later local is never taken for it, and a source that is
+                // itself a by-place capture of an enclosing closure passes on
+                // the place it points at.
+                let alloca = self.mir_capture_source_ptr(closure_body.anonymous_capture_sources[ci])
+                if alloca == 0:
+                    sema_phase_bug(f"BUG: closure capture {ci} has no storage in its creating body: node={node} parent={parent.fn_sym}")
                 if alloca != 0:
                     let indices: Vec[i64] = Vec.new()
                     indices.push(wl_const_int(i32_ty, 0, 0))

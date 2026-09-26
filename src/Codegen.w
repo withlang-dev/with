@@ -2150,17 +2150,6 @@ impl Codegen:
                 return cg.unwrap()
         0
 
-    fn lookup_capture_sema_type(sym: i32) -> i32:
-        let direct = self.local_sema_types.get(sym)
-        if direct.is_some():
-            return direct.unwrap()
-        let cg_sym = self.sema_sym_to_codegen_sym(sym)
-        if cg_sym != 0 and cg_sym != sym:
-            let cg = self.local_sema_types.get(cg_sym)
-            if cg.is_some():
-                return cg.unwrap()
-        0
-
     fn lookup_local_pointee_struct(sym: i32) -> i32:
         let direct = self.local_pointee_structs.get(sym)
         if direct.is_some():
@@ -4070,23 +4059,8 @@ impl Codegen:
             return self.sema.type_extra[idx]
         0
 
-    fn codegen_generator_state_field_count(state_tid: i32) -> i32:
-        if self.sema.generator_state_field_counts.contains(state_tid):
-            return self.sema.generator_state_field_counts.get(state_tid).unwrap()
-        self.codegen_get_type_d2(state_tid)
-
-    fn codegen_generator_state_field_sym(state_tid: i32, field_i: i32, extra_start: i32) -> i32:
-        let key = sema_pair_key(state_tid, field_i)
-        if self.sema.generator_state_field_names.contains(key):
-            return self.sema.generator_state_field_names.get(key).unwrap()
-        self.codegen_get_type_extra(extra_start + field_i * 3)
-
-    fn codegen_generator_state_field_type(state_tid: i32, field_i: i32, extra_start: i32) -> i32:
-        let key = sema_pair_key(state_tid, field_i)
-        if self.sema.generator_state_field_types.contains(key):
-            return self.sema.generator_state_field_types.get(key).unwrap()
-        self.codegen_get_type_extra(extra_start + field_i * 3 + 1)
-
+    // D69 (§13.4): a generator value is a compiler-generated struct of its gen
+    // fn's arguments, declared here because it has no type declaration.
     fn predeclare_generator_state_types():
         for si in 0..self.sema.sig_names.len() as i32:
             let fn_sym = self.sema.sig_names[si]
@@ -4114,13 +4088,13 @@ impl Codegen:
             return
         let st_type: i64 = self.struct_llvm_types[idx]
         let extra_start = self.codegen_get_type_d1(resolved)
-        let field_count = self.codegen_generator_state_field_count(resolved)
+        let field_count = self.codegen_get_type_d2(resolved)
         let field_start = self.struct_field_names.len() as i32
         self.struct_field_starts[idx] = field_start
         self.struct_field_counts[idx] = field_count
 
         for fi in 0..field_count:
-            let field_sym = self.codegen_generator_state_field_sym(resolved, fi, extra_start)
+            let field_sym = self.codegen_get_type_extra(extra_start + fi * 3)
             self.struct_field_names.push(field_sym)
             self.struct_field_types.push(0)
             self.struct_field_type_nodes.push(0)
@@ -4129,10 +4103,10 @@ impl Codegen:
 
         let field_types: Vec[i64] = Vec.new()
         for fi in 0..field_count:
-            let field_tid = self.codegen_generator_state_field_type(resolved, fi, extra_start)
-            var field_ty = self.mir_sema_type_to_llvm(field_tid)
+            let field_tid = self.codegen_get_type_extra(extra_start + fi * 3 + 1)
+            let field_ty = self.mir_sema_type_to_llvm(field_tid)
             if field_ty == 0:
-                field_ty = self.type_fallback()
+                sema_phase_bug(f"BUG: generator value field {fi} lacks an LLVM type (state type {resolved})")
             self.struct_field_types[field_start + fi] = field_ty
             field_types.push(field_ty)
         wl_struct_set_body(st_type, vec_data_i64(&field_types), field_count, 0)
@@ -5345,10 +5319,12 @@ impl Codegen:
             self.fn_values.insert(fn_sym, function)
             self.fn_fn_types.insert(fn_sym, fn_type)
 
-    mut fn declare_generator_next_functions():
+    // D69 generator producers and `each` bodies, and D61's synthesized `:?`
+    // formatters: MIR-only functions whose signature Sema registered.
+    mut fn declare_generator_functions():
         for si in 0..self.sema.sig_names.len() as i32:
             let fn_sym: i32 = self.sema.sig_names[si]
-            if not self.sema.generator_next_fn_syms.contains(fn_sym) and not self.sema.debug_fmt_synth_syms.contains(fn_sym):
+            if not self.sema.generator_mir_only_fns.contains(fn_sym) and not self.sema.debug_fmt_synth_syms.contains(fn_sym):
                 continue
             self.declare_function_from_sig(fn_sym, si, 1)
 
@@ -6883,7 +6859,7 @@ impl Codegen:
                     self.declare_async_function(decl)
                 else:
                     self.declare_function_at(decl, i)
-        self.declare_generator_next_functions()
+        self.declare_generator_functions()
         self.declare_mir_only_functions()
 
         // Pass 1.3: synthesize missing impl methods from trait defaults.
@@ -6931,7 +6907,7 @@ impl Codegen:
                             self.gen_function_dispatch_at(decl, i)
         self.gen_owned_specializations()
         self.gen_mir_only_functions()
-        self.gen_generator_next_functions_from_mir()
+        self.gen_generator_functions_from_mir()
 
         if self.had_error != 0:
             return 1

@@ -318,10 +318,55 @@ fn suspend_body_has_direct_yield(body: &MirBody) -> i32:
             return 1
     0
 
+// The closure body a call argument hands over, when the argument is the
+// local a closure constant was assigned to; -1 otherwise.
+fn suspend_closure_arg_body(body: &MirBody, body_by_fn: &HashMap[i32, i32], operand_id: i32) -> i32:
+    if operand_id < 0 or operand_id >= body.operand_kinds.len() as i32:
+        return -1
+    let ok = body.operand_kinds[operand_id]
+    if ok != OperandKind.OK_MOVE and ok != OperandKind.OK_COPY:
+        return -1
+    let place = body.operand_d0[operand_id]
+    if place < 0 or place >= body.place_locals.len() as i32 or body.place_proj_counts[place] != 0:
+        return -1
+    let local = body.place_locals[place]
+    for si in 0..body.stmt_kinds.len() as i32:
+        if body.stmt_kinds[si] != StmtKind.Assign:
+            continue
+        let dst = body.stmt_d0[si]
+        if dst < 0 or dst >= body.place_locals.len() as i32 or body.place_locals[dst] != local or body.place_proj_counts[dst] != 0:
+            continue
+        let rv = body.stmt_d1[si]
+        if rv < 0 or rv >= body.rval_kinds.len() as i32 or body.rval_kinds[rv] != RvalueKind.RK_USE:
+            continue
+        let src_op = body.rval_d0[rv]
+        if src_op < 0 or src_op >= body.operand_kinds.len() as i32 or body.operand_kinds[src_op] != OperandKind.OK_CONSTANT:
+            continue
+        let const_id = body.operand_d0[src_op]
+        if const_id >= 0 and const_id < body.const_kinds.len() as i32 and body.const_kinds[const_id] == ConstKind.CK_CLOSURE:
+            return suspend_body_index_for_sym(body_by_fn, body.const_d1[const_id])
+    -1
+
+// §12.3 / D69: a closure handed straight to a call — a `for` body over a
+// Gen[T] among them — runs inside that call, so the call suspends when the
+// closure's body may.
+fn suspend_call_passes_suspending_closure(body: &MirBody, body_by_fn: &HashMap[i32, i32], body_may_suspend: SuspendBits, bb: i32) -> i32:
+    let call_id = body.term_data1(bb)
+    if call_id < 0 or call_id >= body.call_arg_starts.len() as i32:
+        return 0
+    let start = body.call_arg_starts[call_id]
+    for ai in 0..body.call_arg_counts[call_id]:
+        let closure_idx = suspend_closure_arg_body(body, body_by_fn, body.call_arg_operands[(start + ai)])
+        if closure_idx >= 0 and closure_idx < body_may_suspend.vlen() as i32 and body_may_suspend.vget(closure_idx as i64) != 0:
+            return 1
+    0
+
 fn suspend_body_calls_may_suspend(body: &MirBody, body_by_fn: &HashMap[i32, i32], body_may_suspend: SuspendBits) -> i32:
     for bb in 0..body.block_count():
         if body.term_kind(bb) != TermKind.TK_CALL:
             continue
+        if suspend_call_passes_suspending_closure(body, body_by_fn, body_may_suspend, bb) != 0:
+            return 1
         let callee = suspend_callee_sym(body, body.term_data0(bb))
         let callee_idx = suspend_body_index_for_sym(body_by_fn, callee)
         if callee_idx < 0 or callee_idx >= body_may_suspend.vlen() as i32:
@@ -354,6 +399,8 @@ fn suspend_term_may_suspend(body: &MirBody, body_by_fn: &HashMap[i32, i32], body
     if body.term_kind(bb) != TermKind.TK_CALL:
         return 0
     if suspend_term_directly_yields(body, bb) != 0:
+        return 1
+    if suspend_call_passes_suspending_closure(body, body_by_fn, body_may_suspend, bb) != 0:
         return 1
     let callee = suspend_callee_sym(body, body.term_data0(bb))
     let callee_idx = suspend_body_index_for_sym(body_by_fn, callee)
@@ -726,7 +773,14 @@ fn suspend_emit_no_suspend_error(diags: DiagnosticList, sema: &Sema, body: &MirB
         let callee = suspend_callee_sym(body, body.term_data0(bb))
         let callee_idx = suspend_body_index_for_sym(body_by_fn, callee)
         if callee != 0 and callee_idx >= 0 and callee_idx < body_may_suspend.vlen() as i32 and body_may_suspend.vget(callee_idx as i64) != 0:
-            diag.add_note("call to may_suspend function `" ++ sema.pool_resolve(callee) ++ "` occurs here")
+            // D69: the loop over a generator runs the generator's body.
+            if sema.generator_mir_only_fns.contains(callee):
+                let gen_fn: i32 = sema.generator_mir_only_fns.get(callee).unwrap()
+                diag.add_note("generator `" ++ sema.pool_resolve(gen_fn) ++ "` may suspend, and its body runs inside this loop")
+            else:
+                diag.add_note("call to may_suspend function `" ++ sema.pool_resolve(callee) ++ "` occurs here")
+        else if suspend_call_passes_suspending_closure(body, body_by_fn, body_may_suspend, bb) != 0:
+            diag.add_note("a closure passed to this call — or this loop's body — may suspend, and runs inside the call")
         else:
             diag.add_note("this call may yield the current fiber")
     diag.add_help("move the suspension outside the no_suspend block, or remove the no_suspend assertion")
