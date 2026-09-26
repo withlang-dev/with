@@ -40,7 +40,7 @@ pub fn build_cache_forget_fingerprints() -> Unit:
 // seen by the action, so the output must not be recorded as fresh for it.
 var build_cache_prerun_inputs: HashMap[str, str] = HashMap.new()
 
-pub fn build_cache_snapshot_inputs(root: &str, target: &BuildGraphTarget) -> Unit:
+pub fn build_cache_snapshot_inputs(root: &str, target: &BuildGraphTarget):
     let input_paths = build_cache_collect_input_paths(root, target)
     var lines = ""
     for idx in 0..input_paths.len() as i32:
