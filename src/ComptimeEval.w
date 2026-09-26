@@ -22,6 +22,20 @@ extern fn with_eprint(s: &str) -> Unit
 extern fn with_str_clone_ref(s: &str) -> str
 extern fn with_str_from_cstr(s: *const u8) -> str
 extern fn strerror(errnum: i32) -> *mut i8
+extern fn strtod(nptr: *const i8, endptr: *mut *mut i8) -> f64
+
+// #1668: the value of a float literal's text, rounded once the way the
+// backend rounds it (strtod is correctly rounded), so a comptime result
+// agrees with the same arithmetic at run time.
+fn comptime_parse_float(text: &str) -> f64:
+    match float_literal_value_text(text).to_cstring():
+        Ok(c) => unsafe { strtod(c.ptr as *const i8, 0 as *mut *mut i8) }
+        Err(_) => 0.0
+
+fn comptime_float_of(value: &ComptimeValue) -> f64:
+    if value.kind == ComptimeValueKind.CV_FLOAT:
+        return value.real
+    value.data0 as f64
 extern fn with_fs_read_file(path: &str) -> str
 extern fn with_fs_read_file_status(path: &str, status: *mut i32) -> str
 extern fn with_fs_file_exists(path: &str) -> i32
@@ -2679,6 +2693,8 @@ impl ComptimeEvaluator:
     fn comptime_value_semantic_type(value: &ComptimeValue) -> i32:
         if value.type_id != 0:
             return value.type_id
+        if value.kind == ComptimeValueKind.CV_FLOAT:
+            return self.sema.ty_f64 as i32
         if value.kind == ComptimeValueKind.CV_BOOL:
             return self.sema.ty_bool as i32
         if value.kind == ComptimeValueKind.CV_STR:
@@ -6663,6 +6679,8 @@ impl ComptimeEvaluator:
             if value.data0 != 0:
                 return "true"
             return "false"
+        if value.kind == ComptimeValueKind.CV_FLOAT:
+            return comptime_float_text(value)
         let _ = self.fail(node, "comptime f-string does not support " ++ comptime_value_kind_name(value.kind) ++ " interpolation yet")
         ""
 
@@ -6700,6 +6718,8 @@ impl ComptimeEvaluator:
             return inner
         let op = self.ast.get_data0(node)
         let result_ty = self.node_type_or(node, inner.value.type_id)
+        if op == UnaryOp.UOP_NEGATE and inner.value.kind == ComptimeValueKind.CV_FLOAT:
+            return comptime_control_value(comptime_value_float(result_ty, 0.0 - inner.value.real, ""))
         if op == UnaryOp.UOP_NEGATE:
             if comptime_value_is_intlike(inner.value) == 0:
                 return self.fail(node, "unary '-' requires integer comptime values")
@@ -6791,6 +6811,15 @@ impl ComptimeEvaluator:
             let rv = rhs.data0
             if op == BinaryOp.OP_EQ: return comptime_control_value(comptime_value_bool(if lv == rv: 1 else: 0))
             if op == BinaryOp.OP_NEQ: return comptime_control_value(comptime_value_bool(if lv != rv: 1 else: 0))
+        if (lhs.kind == ComptimeValueKind.CV_FLOAT or comptime_value_is_intlike(lhs) != 0) and (rhs.kind == ComptimeValueKind.CV_FLOAT or comptime_value_is_intlike(rhs) != 0) and (lhs.kind == ComptimeValueKind.CV_FLOAT or rhs.kind == ComptimeValueKind.CV_FLOAT):
+            let lf = comptime_float_of(lhs)
+            let rf = comptime_float_of(rhs)
+            if op == BinaryOp.OP_EQ: return comptime_control_value(comptime_value_bool(if lf == rf: 1 else: 0))
+            if op == BinaryOp.OP_NEQ: return comptime_control_value(comptime_value_bool(if lf != rf: 1 else: 0))
+            if op == BinaryOp.OP_LT: return comptime_control_value(comptime_value_bool(if lf < rf: 1 else: 0))
+            if op == BinaryOp.OP_GT: return comptime_control_value(comptime_value_bool(if lf > rf: 1 else: 0))
+            if op == BinaryOp.OP_LTE: return comptime_control_value(comptime_value_bool(if lf <= rf: 1 else: 0))
+            if op == BinaryOp.OP_GTE: return comptime_control_value(comptime_value_bool(if lf >= rf: 1 else: 0))
         self.fail(node, "comparison requires comptime scalar values")
 
     mut fn eval_binary_membership(node: i32, lhs: &ComptimeValue, rhs: &ComptimeValue, negate: i32) -> ComptimeControl:
@@ -6890,6 +6919,17 @@ impl ComptimeEvaluator:
                 return self.fail(node, "string concatenation requires comptime strings")
             return self.concat_comptime_strings(node, lhs.text, rhs.text)
 
+        if lhs.kind == ComptimeValueKind.CV_FLOAT or rhs.kind == ComptimeValueKind.CV_FLOAT:
+            if (lhs.kind != ComptimeValueKind.CV_FLOAT and comptime_value_is_intlike(lhs) == 0) or (rhs.kind != ComptimeValueKind.CV_FLOAT and comptime_value_is_intlike(rhs) == 0):
+                return self.fail(node, "float arithmetic requires numeric comptime values")
+            let lf = comptime_float_of(lhs)
+            let rf = comptime_float_of(rhs)
+            let float_ty = self.node_type_or(node, if lhs.kind == ComptimeValueKind.CV_FLOAT: lhs.type_id else: rhs.type_id)
+            if op == BinaryOp.OP_ADD: return comptime_control_value(comptime_value_float(float_ty, lf + rf, ""))
+            if op == BinaryOp.OP_SUB: return comptime_control_value(comptime_value_float(float_ty, lf - rf, ""))
+            if op == BinaryOp.OP_MUL: return comptime_control_value(comptime_value_float(float_ty, lf * rf, ""))
+            if op == BinaryOp.OP_DIV: return comptime_control_value(comptime_value_float(float_ty, lf / rf, ""))
+            return self.fail(node, "operator is not comptime-evaluable on floats")
         if comptime_value_is_intlike(lhs) == 0 or comptime_value_is_intlike(rhs) == 0:
             return self.fail(node, "operator requires integer comptime values")
         let lv = comptime_value_intlike(lhs)
@@ -8082,6 +8122,9 @@ impl ComptimeEvaluator:
                     return self.fail(node, "comptime integer literal too large")
                 return comptime_control_value(self.checked_int_value(self.comptime_int_literal_type(node, exact.lo, self.sema.ty_i64 as i32), exact.lo))
             return comptime_control_value(self.checked_int_value(self.comptime_int_literal_type(node, fast.value, self.sema.ty_i32 as i32), fast.value))
+        if kind == NodeKind.NK_FLOAT_LIT:
+            let text = self.ast.get_string(self.ast.get_data0(node))
+            return comptime_control_value(comptime_value_float(self.node_type_or(node, self.sema.ty_f64 as i32), comptime_parse_float(text), text))
         if kind == NodeKind.NK_BOOL_LIT:
             return comptime_control_value(comptime_value_bool(self.ast.get_data0(node)))
         if kind == NodeKind.NK_STRING_LIT:
