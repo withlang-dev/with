@@ -14340,6 +14340,7 @@ enum SemaExhClass: i32:
     Tuple = 3
     Struct = 4
     Int = 5
+    Slice = 6
 
 impl Sema:
     // The subject's own type: patterns see through `&` (§9.7 reference
@@ -14375,6 +14376,13 @@ impl Sema:
             return SemaExhClass.Int
         if tk == TypeKind.TY_TUPLE:
             return SemaExhClass.Tuple
+        // A dynamic slice or Vec is decided by its length (#1533): the
+        // Vec check precedes the struct one, or a slice pattern on a Vec
+        // column would be a non-constructor of the Vec struct.
+        if tk == TypeKind.TY_SLICE:
+            return SemaExhClass.Slice
+        if tk == TypeKind.TY_GENERIC_INST and self.get_generic_inst_base(ty) == self.syms.vec:
+            return SemaExhClass.Slice
         if self.enum_pattern_type(ty) != 0:
             return SemaExhClass.Enum
         if self.exh_struct_field_count(ty) >= 0:
@@ -14629,6 +14637,9 @@ impl Sema:
         if cls == SemaExhClass.Int and not self.exh_int_domain_open(ty):
             return self.exh_missing_int(m, &heads, &origins, &rest_tys, ty)
 
+        if cls == SemaExhClass.Slice:
+            return self.exh_missing_slice(m, &heads, &origins, &rest_tys)
+
         if cls == SemaExhClass.Bool or cls == SemaExhClass.Enum or cls == SemaExhClass.Tuple or cls == SemaExhClass.Struct:
             let ctor_count = self.exh_constructor_count(cls, ty)
             var first_absent = -1
@@ -14698,6 +14709,64 @@ impl Sema:
         for ci in 0..sub.witness.len() as i32:
             w.push(sub.witness[ci].clone())
         SemaPatMissing { missing: true, witness: w }
+
+    // A slice pattern's fixed element count: its head names plus its tail
+    // names (Parser.parse_slice_pattern's layout).
+    fn exh_slice_fixed_count(h: i32) -> i32:
+        let s_extra = self.ast.get_data0(h)
+        let head = self.ast.get_data1(h)
+        head + self.ast.get_extra(s_extra + 1 + head)
+
+    // Whether a column-0 head matches a sequence of length `n`: an exact
+    // pattern its own length, a rest pattern every length from its fixed
+    // count up. Slice patterns only bind names (§9.7), so the length is
+    // the whole test.
+    fn exh_slice_covers_length(h: i32, n: i32) -> bool:
+        if self.ast.kind(h) != NodeKind.NK_PAT_SLICE:
+            return false
+        let fixed = self.exh_slice_fixed_count(h)
+        if self.ast.get_extra(self.ast.get_data0(h)) != 0: n >= fixed else: n == fixed
+
+    fn exh_render_slice_length(n: i32, open: bool) -> str:
+        var out = "["
+        for i in 0..n:
+            if i > 0:
+                out = out ++ ", "
+            out = out ++ "_"
+        if open:
+            out = out ++ (if n > 0: ", .." else: "..")
+        out ++ "]"
+
+    // A dynamic slice or Vec column (#1533, §9.7): the constructors are the
+    // lengths 0..L and "L+1 or more", L the longest fixed count among the
+    // heads; a length no row covers is the witness (`[_, _]`).
+    mut fn exh_missing_slice(m: &SemaPatRows, heads: &Vec[i32], origins: &Vec[i32], rest_tys: &Vec[i32]) -> SemaPatMissing:
+        let width = rest_tys.len() as i32 + 1
+        var longest = 0
+        for hi in 0..heads.len() as i32:
+            let h = heads[hi]
+            if h != 0 and self.ast.kind(h) == NodeKind.NK_PAT_SLICE:
+                let fixed = self.exh_slice_fixed_count(h)
+                if fixed > longest:
+                    longest = fixed
+        for n in 0..(longest + 2):
+            let cells: Vec[i32] = Vec.new()
+            var count = 0
+            for hi in 0..heads.len() as i32:
+                let h = heads[hi]
+                if h != 0 and not self.exh_slice_covers_length(h, n):
+                    continue
+                for ci in 1..width:
+                    cells.push(m.cells[origins[hi] * width + ci])
+                count = count + 1
+            let sub = self.exh_missing(SemaPatRows { cells: cells, count: count }, rest_tys)
+            if sub.missing:
+                let w: Vec[str] = Vec.new()
+                w.push(self.exh_render_slice_length(n, n > longest))
+                for ci in 0..sub.witness.len() as i32:
+                    w.push(sub.witness[ci].clone())
+                return SemaPatMissing { missing: true, witness: w }
+        SemaPatMissing { missing: false, witness: Vec.new() }
 
     // The rows whose column-0 head is a catch-all, without that column.
     fn exh_default_rows(m: &SemaPatRows, heads: &Vec[i32], origins: &Vec[i32], width: i32) -> SemaPatRows:
