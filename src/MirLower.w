@@ -8378,8 +8378,12 @@ impl MirBuilder:
         if elem_ty == 0:
             elem_ty = self.sema.ty_i32 as i32
 
-        var out_local = self.new_temp(out_ty)
-        var out_place = self.place_for_local(out_local)
+        // The collection is the statement's temporary from the start, like a
+        // call's result: a `?` or cancellation while the clauses run releases
+        // it and what it holds; the finished value moves out as any result.
+        let out_local = self.new_temp(out_ty)
+        self.register_stmt_temp(out_local, out_ty)
+        let out_place = self.place_for_local(out_local)
         if out_base == self.sema.syms.hashset or out_base == self.sema.syms.hashmap:
             self.emit_map_new_into(out_place, self.ast.get_start(comp_node))
         else if self.is_btreeset_base_sym(out_base) != 0 or self.is_btreemap_base_sym(out_base) != 0:
