@@ -727,6 +727,11 @@ pub type Sema {
 
     // Extern fn names
     extern_fn_names: HashMap[i32, i32],
+    // "<module path>\n<name>" for every `extern fn` declaration site (#1695):
+    // a module that declares an extern itself is classified by ITS
+    // declaration, not by whichever other module (std.fs) declared the
+    // same name last.
+    extern_decl_sites: HashMap[str, i32],
     extern_var_texts: HashMap[str, i32],  // every collected extern var by name text (has_extern_var_decl)
     // #602: c_import/extern params that RETAIN a passed C-string pointer past
     // the call (§16.3c). Keyed by fn name sym → bitmask of retained param
@@ -2192,6 +2197,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
     let pretty_symbol_names = sema_new_map_i32_str()
     let sig_lookup = sema_new_map_i32_i32()
     let extern_fn_names = sema_new_map_i32_i32()
+    let extern_decl_sites = sema_new_map_str_i32()
     let extern_var_texts = sema_new_map_str_i32()
     let retained_extern_params = sema_new_map_i32_i32()
     let fn_decl_nodes = sema_new_map_i32_i32()
@@ -2349,6 +2355,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         effect_note_origin_node: 0,
         move_site_node: 0,
         extern_fn_names,
+        extern_decl_sites,
         extern_var_texts,
         retained_extern_params,
         fn_decl_nodes,
