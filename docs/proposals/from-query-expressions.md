@@ -1,5 +1,7 @@
 # Unified `from` Query Expressions
 
+This feature is dependent on `jq` and `sqlite` being migrated per docs/feature_plans/stdlib_migration.md.  It can't be implemented until that's complete.
+
 ## Overview
 
 With's `from` keyword is a unified query expression that works on any data source. The compiler dispatches to the right query engine based on the source type. One keyword, multiple backends, same position in the grammar.
