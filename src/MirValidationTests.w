@@ -869,3 +869,24 @@ fn aggregate_borrow_verdict(arg_is_ref: bool) -> str:
 pub fn mir_test_enum_aggregate_missing_borrow:
     assert(aggregate_borrow_verdict(false).contains("enum payload 0 is a value where the variant's payload is a reference to it"))
     assert(aggregate_borrow_verdict(true) == "")
+
+// #1736: validate-all skipped a body whose lowering failed — the typed and
+// ownership validators both `continue` past it — and said ok over a
+// comprehension codegen then refused to compile. A module holding such a
+// body is refused; the same module with the body lowered is not.
+fn lowering_failed_verdict(failed: bool) -> str:
+    var mir_mod = MirModule.init()
+    mir_mod.sema_type_kinds.push(0)
+    mir_mod.sema_type_d0.push(0)
+    mir_mod.sema_type_d1.push(0)
+    mir_mod.sema_type_d2.push(0)
+    var body = MirBody.init_for_fn(9)
+    let entry = body.new_block()
+    body.set_terminator(entry, TermKind.TK_RETURN, 0, 0, 0, 0, 0)
+    if failed: body.lowering_failed = 1
+    mir_mod.add_body(body)
+    validate_all_mir_module(mir_mod)
+
+pub fn mir_test_lowering_failed_body:
+    assert(lowering_failed_verdict(true).contains("fn sym9: MIR lowering failed"))
+    assert(lowering_failed_verdict(false) == "")

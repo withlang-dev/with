@@ -2687,6 +2687,13 @@ pub fn validate_all_mir_module(mir_mod: &MirModule) -> str:
     let shape = validate_mir_module(mir_mod)
     if shape.len() > 0:
         return "MIR shape: " ++ shape
+    // #1736: a body whose lowering failed has no MIR to validate, and codegen
+    // refuses to compile it ("MIR lowering failed for function ..."). The
+    // typed and ownership validators skip such a body, so validate-all said
+    // ok over a comprehension the build could not compile.
+    for bi in 0..mir_mod.bodies.len():
+        if mir_mod.bodies[bi].lowering_failed != 0:
+            return f"fn sym{mir_mod.bodies[bi].fn_sym}: MIR lowering failed; the body was not validated and codegen cannot compile it (WITH_MIR_AUDIT=1 names the unsupported node)"
     let typed = validate_typed_mir_module(mir_mod)
     if mir_validation_has_error(typed):
         return "typed MIR: " ++ typed.message
