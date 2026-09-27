@@ -2568,8 +2568,18 @@ impl Sema:
         // References may carry returned-view origins; raw pointers carry raw
         // validity preconditions instead. Neither owns through the parameter.
         var raw_validity_param_sym = 0
+        // A facade declared this signature's summary before any body was
+        // checked (facade_declare_view_of_param: a constructor's dependency
+        // facts, a text/record view's `from param N`); the rendered body
+        // reads a raw pointer and derives no origin of its own, so writing
+        // its findings over the declared ones lost the caller's view tie
+        // whenever this body was checked before the caller — always, once
+        // #1473 checks a view-returning function first.
+        let facade_declared = sig_idx >= 0 and self.facade_declared_effect_sigs.contains(sig_idx)
         for pi in 0..self.current_fn_param_effs.len() as i32:
             var eff: i32 = self.current_fn_param_effs[pi]
+            if facade_declared and sig_idx >= 0:
+                eff = eff | self.sig_param_effect(sig_idx, pi)
             if eff != 0:
                 if sig_idx >= 0:
                     let p_tid = self.sig_param_type(sig_idx, pi)
@@ -2595,10 +2605,11 @@ impl Sema:
                     direct_eff = direct_eff | EFF_CONSUME
                 self.set_sig_param_effect(sig_idx, pi, eff)
                 self.set_sig_param_direct_effect(sig_idx, pi, direct_eff)
+                let declared_origin = if facade_declared: self.sig_param_view_origin(sig_idx, pi) else: 0
                 if (eff & EFF_ESCAPE_VIEW) != 0:
-                    self.set_sig_param_view_origin(sig_idx, pi, self.current_fn_param_origins[pi])
+                    self.set_sig_param_view_origin(sig_idx, pi, self.current_fn_param_origins[pi] | declared_origin)
                 else:
-                    self.set_sig_param_view_origin(sig_idx, pi, 0)
+                    self.set_sig_param_view_origin(sig_idx, pi, declared_origin)
                 if raw_validity_param_sym == 0 and (eff & EFF_RAW_PTR_VALIDITY) != 0 and pi < self.current_fn_param_syms.len() as i32:
                     raw_validity_param_sym = self.current_fn_param_syms[pi]
             // D63 call-once: published for every parameter — a callable

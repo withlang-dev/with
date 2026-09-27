@@ -1533,6 +1533,12 @@ pub type Sema {
     // (D60: a whole local moves), 2 for any other value position (D73: the
     // read is a view of the place, assign_reads_view).
     tail_read_assigns: HashMap[i32, i32],
+    // Signatures whose parameter summaries a `c facade` declares
+    // (facade_declare_view_of_param: constructors' dependency facts, text,
+    // record and Borrowed<R> views): the body check merges its own findings
+    // into them and never replaces them (D65: the facade fact is the owner;
+    // the rendered body reads a raw pointer and can derive no foreign origin).
+    facade_declared_effect_sigs: HashMap[i32, i32],
     // D73: assignment node -> the whole non-Copy local it assigns, when its
     // view (assign_reads_view) is rooted at that local (a view origin).
     assign_view_targets: HashMap[i32, i32],
@@ -2945,6 +2951,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         body_tail_discards: true,
         discarded_tails: sema_new_map_i32_i32(),
         tail_read_assigns: sema_new_map_i32_i32(),
+        facade_declared_effect_sigs: sema_new_map_i32_i32(),
         assign_view_targets: sema_new_map_i32_i32(),
         display_join_node: 0,
         join_assign_arms_as_views: 0,
