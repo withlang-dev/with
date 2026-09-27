@@ -6010,8 +6010,22 @@ impl Codegen:
             let marshaled = self.marshal_ref_addr(body, operand, raw)
             self.record_codegen_call_argument(body, args_id, operand, param_index, self.analysis_last_marshal_strategy, raw, marshaled)
             return marshaled
-        self.record_codegen_call_argument(body, args_id, operand, param_index, AnalysisMarshalStrategy.DirectValue, raw, raw)
-        raw
+        // #1740: a scalar argument takes the parameter's own width here, as
+        // the direct call path's operand evaluation does. An i32 index
+        // widened to a generic method's `index: i64` (BTreeMap.key_at) went
+        // to the call at its source width, and the audit caught the
+        // disagreement with the callee's FnAbi.
+        var marshaled = raw
+        if param_index < self.sema.sig_get_param_count(sig_idx):
+            let param_sema = self.sema.sig_param_type(sig_idx, param_index)
+            let param_kind = self.sema.get_type_kind(self.sema.resolve_alias(param_sema as TypeId))
+            if param_kind == TypeKind.TY_INT or param_kind == TypeKind.TY_FLOAT:
+                let want = self.mir_sema_type_to_llvm(param_sema)
+                if want != 0 and wl_type_of(raw) != want:
+                    let src_unsigned = self.mir_sema_type_is_unsigned(self.mir_operand_sema_type(body, operand))
+                    marshaled = self.mir_coerce_value_to_sema_type(raw, want, param_sema, src_unsigned)
+        self.record_codegen_call_argument(body, args_id, operand, param_index, AnalysisMarshalStrategy.DirectValue, raw, marshaled)
+        marshaled
 
     // Evaluate a contiguous MIR call-argument range under the concrete signature
     // captured in that MIR body. Every user call path uses this function for
