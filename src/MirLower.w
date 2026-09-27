@@ -4466,6 +4466,47 @@ impl MirBuilder:
         for i in 0..self.string_field_alias_flags.len():
             self.string_field_alias_flags[i] = 1
 
+    // #1491: the string flow facts as they stand (lower_if keeps them per
+    // arm and joins them).
+    fn save_string_flow_facts() -> MirStrFlowFacts:
+        var local_ids: Vec[i32] = Vec.new()
+        var local_flags: Vec[i32] = Vec.new()
+        var field_flags: Vec[i32] = Vec.new()
+        for i in 0..self.string_alias_local_ids.len():
+            local_ids.push(self.string_alias_local_ids[i])
+            local_flags.push(self.string_alias_flags[i])
+        for i in 0..self.string_field_alias_flags.len():
+            field_flags.push(self.string_field_alias_flags[i])
+        MirStrFlowFacts { local_ids, local_flags, field_flags }
+
+    // Back to `facts`. A field entry made since reads as may-alias, as a
+    // field with no entry does (string_field_flags).
+    mut fn restore_string_flow_facts(facts: &MirStrFlowFacts):
+        self.string_alias_local_ids = Vec.new()
+        self.string_alias_flags = Vec.new()
+        for i in 0..facts.local_ids.len():
+            self.string_alias_local_ids.push(facts.local_ids[i])
+            self.string_alias_flags.push(facts.local_flags[i])
+        for i in 0..self.string_field_alias_flags.len():
+            self.string_field_alias_flags[i] = str_flow_field_flags(facts, i as i32)
+
+    // The facts where two paths meet: a place may alias if it may on either
+    // path, and is owned only if it is owned on both.
+    mut fn join_string_flow_facts(a: &MirStrFlowFacts, b: &MirStrFlowFacts):
+        var ids: Vec[i32] = Vec.new()
+        for i in 0..a.local_ids.len():
+            ids.push(a.local_ids[i])
+        for i in 0..b.local_ids.len():
+            if str_flow_local_index(a, b.local_ids[i]) < 0:
+                ids.push(b.local_ids[i])
+        self.string_alias_local_ids = Vec.new()
+        self.string_alias_flags = Vec.new()
+        for i in 0..ids.len():
+            self.string_alias_local_ids.push(ids[i])
+            self.string_alias_flags.push(str_flow_join(str_flow_local_flags(a, ids[i]), str_flow_local_flags(b, ids[i])))
+        for i in 0..self.string_field_alias_flags.len():
+            self.string_field_alias_flags[i] = str_flow_join(str_flow_field_flags(a, i as i32), str_flow_field_flags(b, i as i32))
+
     fn operand_string_source_place(operand_id: i32) -> i32:
         if operand_id < 0 or operand_id >= self.body.operand_kinds.len():
             return -1
@@ -6950,6 +6991,13 @@ impl MirBuilder:
             let inner_result = self.lower_expr_discard(self.ast.get_data0(node))
             self.no_suspend_nodes.pop()
             inner_result
+        else if kind == NodeKind.NK_ASSIGN and not self.sema.tail_reads_place(node):
+            // A discarded assignment is a statement, as in a block
+            // (lower_block_mode). As an expression it yields a copy of its
+            // place, so lower_expr marks an in-place `s = s ++ x` may-alias —
+            // and a one-statement `if` arm doing that append (the separator of
+            // a join loop) made every later append of `s` copy it (#1491).
+            self.lower_assign(self.ast.get_data0(node), self.ast.get_data1(node), false)
         else if kind == NodeKind.NK_WITH_EXPR and self.sema.with_form_kinds.contains(node) and (self.sema.with_form_kinds.get(node).unwrap() == WithFormKind.Guarded as i32 or self.sema.with_form_kinds.get(node).unwrap() == WithFormKind.GuardedMut as i32):
             self.cur_node = node
             self.lower_with_guarded_mode(node, 0)
@@ -7211,6 +7259,9 @@ impl MirBuilder:
         let if_entry_bb = self.cur_bb as i32
         let branch_drop_depth = self.drop_local_ids.len() as i32
         let branch_move_state = self.save_move_state()
+        // #1491: each arm starts from the facts at the condition; the join
+        // merges what the arms that reach it leave (join_string_flow_facts).
+        let str_entry = self.save_string_flow_facts()
         // Reset-on-move (spec §2.5.1): only flush resets recorded WITHIN a branch,
         // so an outer-scope move's reset is not pulled inside (and made conditional
         // by) this if.
@@ -7270,6 +7321,9 @@ impl MirBuilder:
         self.flush_pending_resets_since(pending_reset_start, pending_reset_field_start, pending_move_temp_start)
         self.field_move_in_branch = self.field_move_in_branch - 1
         self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
+        let str_then = self.save_string_flow_facts()
+        let then_falls = self.sema.body_can_fall_through(then_expr) != 0
+        self.restore_string_flow_facts(&str_entry)
 
         self.restore_move_state(&branch_move_state)
 
@@ -7292,9 +7346,20 @@ impl MirBuilder:
         self.restore_move_state(&branch_move_state)
 
         self.expected_type = saved_expected
+        let else_falls = else_expr_opt == 0 or self.sema.body_can_fall_through(else_expr_opt) != 0
 
         self.switch_to(join_bb)
-        self.forget_string_flow_facts()
+        // #1491: the join merges the arms' facts. Forgetting them marked every
+        // str may-alias, so `out = out ++ x` after any `if` copied all of
+        // `out` (with_str_concat_n) instead of appending in place: a
+        // separator loop was quadratic.
+        if then_falls and else_falls:
+            let str_else = self.save_string_flow_facts()
+            self.join_string_flow_facts(&str_then, &str_else)
+        else if then_falls:
+            self.restore_string_flow_facts(&str_then)
+        else if not else_falls:
+            self.forget_string_flow_facts()
         if want_result == 0:
             self.last_if_result_view = 0
             return self.unit_operand()
@@ -18108,3 +18173,30 @@ impl MirModule:
 
             self.mark_tailrec_scc_edges(&scc)
         violations
+
+// #1491: the string flow facts at one point (string_alias_local_ids and
+// string_alias_flags, string_field_alias_flags): bit 1 may alias, bit 2 owned.
+type MirStrFlowFacts {
+    local_ids: Vec[i32],
+    local_flags: Vec[i32],
+    field_flags: Vec[i32],
+}
+
+fn str_flow_local_index(facts: &MirStrFlowFacts, local_id: i32) -> i32:
+    for i in 0..facts.local_ids.len():
+        if facts.local_ids[i] == local_id:
+            return i as i32
+    -1
+
+// A local's flags in `facts`: 0 with no entry, as string_local_flags reads
+// a str local without one.
+fn str_flow_local_flags(facts: &MirStrFlowFacts, local_id: i32) -> i32:
+    let i = str_flow_local_index(facts, local_id)
+    if i < 0: 0 else: facts.local_flags[i]
+
+// A field entry's flags in `facts`: one made since reads as may-alias, as a
+// field with no entry does (string_field_flags).
+fn str_flow_field_flags(facts: &MirStrFlowFacts, idx: i32) -> i32:
+    if idx < facts.field_flags.len() as i32: facts.field_flags[idx] else: 1
+
+fn str_flow_join(a: i32, b: i32) -> i32: ((a | b) & 1) | ((a & b) & 2)
