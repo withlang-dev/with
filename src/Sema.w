@@ -3566,7 +3566,51 @@ impl Sema:
             if self.engine_corpus_id(target_path) != 0 or self.module_in_prelude_closure(target_path) != 0:
                 if self.module_visible_no_prelude(target_path) == 0:
                     return 0
+        if target_is_std == 0 and self.unselected_import_path(target_path, sym).len() > 0:
+            return 0
         self.decl_visible_from_current(target_path, is_pub)
+
+    // #1744 (§18.2): a named import introduces the names it selects. When
+    // the current module imports a (non-std) module only by named imports,
+    // a name none of them selects is not visible through them: the import
+    // text of the last such `use` (for the diagnostic), "" when the name is
+    // selected, the module is imported whole, or it is not a direct import.
+    // A std module keeps every public name available through the §18.2
+    // fallback tier. A displaced identity (`name$in$module`, #1350) is
+    // judged by its short name.
+    fn unselected_import_path(target_path: &str, sym: i32) -> str:
+        let cur = self.module_index_by_path.get(with_str_clone_ref(self.current_module_path))
+        let target = self.module_index_by_path.get(target_path)
+        if not cur.is_some() or not target.is_some():
+            return ""
+        let from: i32 = cur.unwrap()
+        let to: i32 = target.unwrap()
+        if from < 0 or from >= self.module_import_starts.len() as i32 or from == to:
+            return ""
+        var name: str = with_str_clone_ref(self.pool_resolve(sym))
+        let infix = name.index_of("$in$")
+        if infix > 0:
+            name = name.slice(0, infix)
+        // A method is reached through a value or its type's name: the
+        // selection governs the names a module spells, and a type name it
+        // spells is judged on its own (`UserService.builder().with_config()`
+        // calls a method of a type the import never names).
+        if name.index_of(".") > 0:
+            return ""
+        var excluded_by = ""
+        let start = self.module_import_starts[from]
+        for ei in 0..self.module_import_counts[from]:
+            let idx = start + ei
+            if self.module_import_targets[idx] != to:
+                continue
+            let text = self.module_import_paths[idx]
+            if text == "std.prelude" or text == "std.prelude_core" or text == "std.prelude_alloc":
+                continue
+            let selected = if idx < self.module_import_selected.len() as i32: self.module_import_selected[idx].clone() else: ""
+            if selected.len() == 0 or sema_selection_names(selected, name):
+                return ""
+            excluded_by = with_str_clone_ref(text)
+        excluded_by
 
     fn module_in_prelude_closure(path: &str) -> i32:
         if self.global_visible_module_paths.contains(path): 1 else: 0
@@ -3730,7 +3774,11 @@ impl Sema:
         let record = self.decl_visibility_node_index.get(node)
         if record.is_some():
             let i: i32 = record.unwrap()
-            return self.decl_visible_from_current(self.decl_visibility_paths[i], self.decl_visibility_pub[i])
+            let path = self.decl_visibility_paths[i]
+            // #1744: a named import that does not select it hides it too.
+            if sema_tier_path_is_std_implementation(path) == 0 and path != self.current_module_path and self.unselected_import_path(path, self.decl_visibility_syms[i]).len() > 0:
+                return 0
+            return self.decl_visible_from_current(path, self.decl_visibility_pub[i])
         1
 
     fn has_extern_var_decl(sym: i32) -> i32:
@@ -3798,6 +3846,18 @@ impl Sema:
 
     mut fn emit_private_symbol_error(sym: i32, node: i32) -> Unit:
         let name: str = with_str_clone_ref(self.pool_resolve(sym))
+        // #1744: a name its module's named imports do not select.
+        var i = if self.decl_visibility_index.contains(sym): self.decl_visibility_index.get(sym).unwrap() else: -1
+        while i >= 0:
+            let decl_path = self.decl_visibility_paths[i]
+            if self.decl_visibility_pub[i] != 0 and sema_tier_path_is_std_implementation(decl_path) == 0:
+                let by = self.unselected_import_path(decl_path, sym)
+                if by.len() > 0:
+                    let infix = name.index_of("$in$")
+                    let short = if infix > 0: name.slice(0, infix) else: name.clone()
+                    self.emit_error("'" ++ short ++ "' is not imported: `use " ++ by ++ "` names only what it selects (§18.2); add `" ++ short ++ "` to that import, or import the whole module", node)
+                    return
+            i = self.decl_visibility_prev[i]
         let gate_note = self.std_gated_import_note(sym)
         if gate_note.len() > 0:
             self.emit_error("'" ++ name ++ "' requires an explicit import (§18.1)" ++ gate_note, node)
