@@ -335,6 +335,9 @@ fn sdk_validate_package_prefix(ctx: &ActionCtx, platform: &str, prefix: &str, bu
         tools.push("cmake")
         tools.push("ninja")
         tools.push("lld")
+        // stage2-debug-lines (:fixpoint) reads ELF and Mach-O line tables
+        // with llvm-dwarfdump; on PE it uses llvm-readobj.
+        tools.push("llvm-dwarfdump")
         tools.push("llvm-nm")
         tools.push("llvm-readobj")
         tools.push("llvm-strip")
@@ -462,6 +465,7 @@ fn sdk_package_tool_selected(rel: &str, platform: &str) -> bool:
         tools.push("bin/ctest")
         tools.push("bin/cpack")
         tools.push("bin/lld")
+        tools.push("bin/llvm-dwarfdump")
         tools.push("bin/llvm-nm")
         tools.push("bin/llvm-readobj")
         tools.push("bin/llvm-strip")
