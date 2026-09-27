@@ -241,12 +241,12 @@ pub fn with_concurrency[T](tasks: impl IntoIter[Task[T]], n: i32) -> impl IntoIt
 // its own locals or may suspend.
 
 extern fn with_alloc(size: i64) -> *mut u8
-extern fn with_free(ptr: *mut u8) -> Unit
+extern fn with_free(ptr: *mut u8)
 extern fn with_fiber_coro_new(entry: *const u8, arg: *mut u8) -> i64
-extern fn with_fiber_coro_resume(co: i64) -> Unit
-extern fn with_fiber_coro_suspend(co: i64) -> Unit
-extern fn with_fiber_coro_finish(co: i64) -> Unit
-extern fn with_fiber_coro_free(co: i64) -> Unit
+extern fn with_fiber_coro_resume(co: i64)
+extern fn with_fiber_coro_suspend(co: i64)
+extern fn with_fiber_coro_finish(co: i64)
+extern fn with_fiber_coro_free(co: i64)
 
 // A pulled generator's state, on the heap so the coroutine's pointer to it
 // stays valid while the Pulled that owns it moves. `run` holds the generator
