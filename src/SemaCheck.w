@@ -11404,6 +11404,9 @@ impl Sema:
     fn view_origin_is_stack_local(sym: i32) -> i32:
         if sym == 0:
             return 0
+        // #1587: a str range view's header lives in this frame.
+        if sym == self.syms.str_range_view:
+            return 1
         let pi = self.param_index_for_sym(sym)
         if pi >= 0:
             // #718 (D5 §3.8): the DECLARED mode decides whether a parameter
@@ -11450,6 +11453,9 @@ impl Sema:
         if self.scope_binding_index(sym) >= block_scope_start: 1 else: 0
 
     mut fn report_view_escape(origin_sym: i32, report_node: i32, block_scope_start: i32):
+        if origin_sym == self.syms.str_range_view:
+            self.emit_error("a string slice cannot be returned yet (#1587): a `&str` points at a string header and the range's header lives in this function's frame; return `s.slice(a, b)` (an owned str) until `&str` carries its own {ptr, len}", report_node)
+            return
         let origin_name: str = with_str_clone_ref(self.pool_resolve(origin_sym))
         if block_scope_start < 0:
             self.emit_error("returned view may outlive its origin '" ++ origin_name ++ "'", report_node)
@@ -13988,11 +13994,21 @@ impl Sema:
             self.record_view_producer_origins(node, expr)
             return result
         if tk == TypeKind.TY_STR:
-            // A `&str` points at the string object, not at a byte range, so a
-            // sub-range has no view type yet (#1587). Name the spellings that
-            // exist rather than hand MIR a valueless expression.
-            self.emit_error("a range of a str has no view type yet (#1587): `s.slice(a, b)` copies the range into a new str; `s.as_bytes()[a..b]` views its bytes", node)
-            return 0
+            // D71 (§4.8a, #1587): a str range is a `&str` view of its bytes
+            // with the base's origins. A `&str` today points at a string
+            // header, so the view's header is a hidden local of this frame
+            // (lower_slice_expr): it carries the sentinel origin
+            // syms.str_range_view too, and a return of it is refused by name
+            // (check_view_escape_origins) until `&str` is its own {ptr, len}.
+            let result = self.ensure_exact_type(TypeKind.TY_REF, self.ty_str as i32, 0, 0) as i32
+            self.typed_expr_types.insert(node, result)
+            self.record_view_producer_origins(node, expr)
+            let param_mask = self.compute_expr_view_origin_mask(expr)
+            var deps: Vec[i32] = Vec.new()
+            deps = self.collect_expr_view_deps(node, move deps)
+            deps = self.push_unique_i32(move deps, self.syms.str_range_view)
+            self.set_expr_view_deps(node, param_mask, deps)
+            return result
         self.emit_error("range indexing needs an array, slice or Vec; this is " ++ self.type_name(arr_type as i32), node)
         0
 

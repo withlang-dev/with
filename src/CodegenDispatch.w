@@ -3929,10 +3929,15 @@ impl Codegen:
             if d0 < 0 or d0 >= body.place_locals.len() as i32:
                 return wl_const_int(wl_i64_type(self.context), 0, 0)
             let local_id = body.place_locals[d0]
-            let place_ty_opt = self.mir_local_types.get(local_id)
-            if not place_ty_opt.is_some():
-                return wl_const_int(wl_i64_type(self.context), 0, 0)
-            let place_ty = place_ty_opt.unwrap() as i64
+            // #1587: the place's PROJECTED type — `len(_2.*)` on a `&str`
+            // local read the pointer local's type and answered 0, so a range
+            // of a `&str` binding (`r[1..]`) panicked out of bounds.
+            var place_ty = self.mir_place_projected_type(body, d0)
+            if place_ty == 0:
+                let place_ty_opt = self.mir_local_types.get(local_id)
+                if not place_ty_opt.is_some():
+                    return wl_const_int(wl_i64_type(self.context), 0, 0)
+                place_ty = place_ty_opt.unwrap() as i64
             if wl_get_type_kind(place_ty) == wl_array_type_kind():
                 return wl_const_int(wl_i64_type(self.context), wl_get_array_length(place_ty), 0)
             if wl_get_type_kind(place_ty) == wl_struct_type_kind() and wl_count_struct_elem_types(place_ty) > 1:
@@ -3955,7 +3960,11 @@ impl Codegen:
             let start_val = self.coerce_int(self.mir_eval_operand(body, d1, i64_ty), i64_ty)
             let end_val = self.coerce_int(self.mir_eval_operand(body, d2, i64_ty), i64_ty)
             let base_len = self.mir_index_len_value(base_sema_ty, base_ty, base_ptr)
-            self.mir_emit_debug_slice_bounds_check(start_val, end_val, base_len)
+            // D71 (§4.8a): a str range is checked in every build, below, with
+            // its own messages; every other base keeps the debug check.
+            let base_is_str = self.mir_type_kind_from_snapshot(base_sema_ty) == TypeKind.TY_STR
+            if not base_is_str:
+                self.mir_emit_debug_slice_bounds_check(start_val, end_val, base_len)
 
             let slice_len = wl_build_sub(self.builder, end_val, start_val)
             let elem_ty = self.mir_index_elem_llvm_type(base_sema_ty, base_ty)
@@ -3971,6 +3980,8 @@ impl Codegen:
             else if base_ty != 0 and wl_get_type_kind(base_ty) == wl_struct_type_kind() and wl_count_struct_elem_types(base_ty) > 0:
                 let data_gep = wl_build_struct_gep(self.builder, base_ty, base_ptr, 0)
                 let raw_ptr = wl_build_load(self.builder, wl_ptr_type(self.context), data_gep)
+                if base_is_str:
+                    self.mir_emit_str_slice_checks(start_val, end_val, base_len, raw_ptr)
                 let indices: Vec[i64] = Vec.new()
                 indices.push(start_val)
                 data_ptr = wl_build_gep(self.builder, elem_ty, raw_ptr, vec_data_i64(&indices), 1)
@@ -6588,6 +6599,46 @@ impl Codegen:
         wl_build_cond_br(self.builder, bad, panic_bb, ok_bb)
         wl_position_at_end(self.builder, panic_bb)
         self.emit_runtime_panic("slice index out of bounds")
+        wl_position_at_end(self.builder, ok_bb)
+
+    // D71 (§4.8a, #1587): a str range panics past the end or inside a UTF-8
+    // character — in every build, not only with debug info: the view would
+    // read outside the string or split a character.
+    fn mir_emit_str_slice_checks(start_val: i64, end_val: i64, len_val: i64, data_ptr: i64):
+        let i64_ty = wl_i64_type(self.context)
+        let zero = wl_const_int(i64_ty, 0, 0)
+        let bad_start = wl_build_icmp(self.builder, wl_int_slt(), start_val, zero)
+        let bad_order = wl_build_icmp(self.builder, wl_int_sgt(), start_val, end_val)
+        let bad_end = wl_build_icmp(self.builder, wl_int_sgt(), end_val, len_val)
+        let bad = wl_build_or(self.builder, wl_build_or(self.builder, bad_start, bad_order), bad_end)
+        let panic_bb = wl_append_bb(self.context, self.current_function, "str.slice.range.panic")
+        let ok_bb = wl_append_bb(self.context, self.current_function, "str.slice.range.ok")
+        wl_build_cond_br(self.builder, bad, panic_bb, ok_bb)
+        wl_position_at_end(self.builder, panic_bb)
+        self.emit_runtime_panic("string slice out of range")
+        wl_position_at_end(self.builder, ok_bb)
+        self.mir_emit_str_char_boundary_check(start_val, len_val, data_ptr)
+        self.mir_emit_str_char_boundary_check(end_val, len_val, data_ptr)
+
+    // A byte `10xxxxxx` continues a character, so an offset at one is inside
+    // it; the offset equal to the length is the boundary after the last one.
+    fn mir_emit_str_char_boundary_check(off_val: i64, len_val: i64, data_ptr: i64):
+        let i8_ty = wl_i8_type(self.context)
+        let inside = wl_build_icmp(self.builder, wl_int_slt(), off_val, len_val)
+        let byte_bb = wl_append_bb(self.context, self.current_function, "str.slice.byte")
+        let panic_bb = wl_append_bb(self.context, self.current_function, "str.slice.boundary.panic")
+        let ok_bb = wl_append_bb(self.context, self.current_function, "str.slice.boundary.ok")
+        wl_build_cond_br(self.builder, inside, byte_bb, ok_bb)
+        wl_position_at_end(self.builder, byte_bb)
+        let indices: Vec[i64] = Vec.new()
+        indices.push(off_val)
+        let byte_ptr = wl_build_gep(self.builder, i8_ty, data_ptr, vec_data_i64(&indices), 1)
+        let byte = wl_build_load(self.builder, i8_ty, byte_ptr)
+        let high_bits = wl_build_and(self.builder, byte, wl_const_int(i8_ty, 192, 0))
+        let continues = wl_build_icmp(self.builder, wl_int_eq(), high_bits, wl_const_int(i8_ty, 128, 0))
+        wl_build_cond_br(self.builder, continues, panic_bb, ok_bb)
+        wl_position_at_end(self.builder, panic_bb)
+        self.emit_runtime_panic("string slice inside a UTF-8 character")
         wl_position_at_end(self.builder, ok_bb)
 
     // A place whose last projection indexes a str: the memory byte is an i8

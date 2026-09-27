@@ -6359,7 +6359,15 @@ impl MirBuilder:
         let base_node = self.ast.get_data0(node)
         let start_node = self.ast.get_data1(node)
         let end_node = self.ast.get_data2(node)
-        let base_place = self.lower_expr_place(base_node)
+        var base_place = self.lower_expr_place(base_node)
+        // A range through a reference slices what it names (§3.7): the base
+        // is the pointee, not the pointer local (`a[1..]` on `a: &[4]i32`
+        // failed codegen: "slice base has no bounds metadata"; #1587).
+        let base_ty = self.expr_type(base_node)
+        var base_res = if base_ty != 0: self.sema.resolve_alias(base_ty as TypeId) else: 0
+        if base_res != 0 and self.sema.get_type_kind(base_res) == TypeKind.TY_REF:
+            base_place = self.new_deref_place(base_place)
+            base_res = self.sema.resolve_alias(self.sema.get_type_d0(base_res) as TypeId)
         let start_op = if start_node != 0:
             self.lower_expr(start_node)
         else:
@@ -6376,6 +6384,20 @@ impl MirBuilder:
 
         let slice_rv = self.body.new_rvalue(RvalueKind.RK_SLICE, base_place, start_op, end_op)
         let slice_ty = self.expr_type(node)
+        // D71 (§4.8a, #1587): a str range is a `&str`. A `&str` points at a
+        // string header, so the range's {ptr, len} is built into a hidden
+        // str local of this frame — a header that owns nothing (no drop is
+        // scheduled) — and the view is a reference to it. Sema refuses to
+        // return such a view (its origin syms.str_range_view is frame-local).
+        if base_res != 0 and self.sema.get_type_kind(base_res) == TypeKind.TY_STR:
+            let header_local = self.new_temp(self.sema.ty_str as i32)
+            let header_place = self.place_for_local(header_local)
+            self.body.push_stmt(self.cur_bb, StmtKind.Assign, header_place, slice_rv, self.ast.get_start(node))
+            let ref_rv = self.body.new_rvalue(RvalueKind.RK_REF, BorrowKind.SHARED, header_place, 0)
+            let ref_local = self.new_temp(slice_ty)
+            let ref_place = self.place_for_local(ref_local)
+            self.body.push_stmt(self.cur_bb, StmtKind.Assign, ref_place, ref_rv, self.ast.get_start(node))
+            return self.body.new_operand(OperandKind.OK_COPY, ref_place)
         let slice_local = self.new_temp(slice_ty)
         let slice_place = self.place_for_local(slice_local)
         self.body.push_stmt(self.cur_bb, StmtKind.Assign, slice_place, slice_rv, self.ast.get_start(node))
