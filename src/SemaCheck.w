@@ -19487,6 +19487,23 @@ impl Sema:
             pos = pos + 2 + payload_count
         0
 
+    // The first variant of enum `enum_tid` that carries a payload, or 0 when
+    // every variant is a unit variant (§4.4a from_int, #1497).
+    fn enum_first_payload_variant(enum_tid: i32) -> i32:
+        let resolved = self.resolve_alias(enum_tid)
+        if self.get_type_kind(resolved) == TypeKind.TY_GENERIC_INST:
+            let base_tid = self.lookup_named_type_visible(self.get_generic_inst_base(resolved))
+            return if base_tid != 0: self.enum_first_payload_variant(base_tid) else: 0
+        if self.get_type_kind(resolved) != TypeKind.TY_ENUM:
+            return 0
+        var pos = self.get_type_d1(resolved)
+        for _ in 0..self.get_type_d2(resolved):
+            let payload_count = self.type_extra[(pos + 1)]
+            if payload_count > 0:
+                return self.type_extra[pos]
+            pos = pos + 2 + payload_count
+        0
+
     fn enum_pattern_owner_sym(type_id: i32) -> i32:
         if type_id == 0:
             return 0
@@ -24380,7 +24397,18 @@ impl Sema:
 
         if self.static_receiver_type_is_known(expr) != 0 and self.pool_resolve(field) == "from_int":
             let enum_resolved = self.resolve_alias(obj_type)
-            if self.disc_repr_types.contains(enum_resolved as i32):
+            // §4.4a (#1497): `from_int` exists only on an enum whose variants
+            // are all unit variants — no value of the enum exists for a
+            // payload variant's discriminant alone. It was the repr's Option
+            // (`Some(7)`) on a discriminant enum and "unknown method" on any
+            // other. A `from_int` the program declares is its own method.
+            let payload_variant = self.enum_first_payload_variant(enum_resolved as i32)
+            if payload_variant != 0:
+                let owner = self.method_owner_symbol_for_type(enum_resolved as i32)
+                if owner == 0 or self.lookup_method_fn(owner, field) == 0:
+                    self.emit_error(f"`{self.type_name(enum_resolved as i32)}.from_int` does not exist: variant `{self.pool_resolve(payload_variant)}` carries a payload, and `from_int` exists only on an enum whose variants are all unit variants (§4.4a)", node)
+                    return 0
+            else if self.disc_repr_types.contains(enum_resolved as i32):
                 if arg_count != 1:
                     self.emit_error("from_int() expects exactly one argument", node)
                     return 0
@@ -24391,14 +24419,9 @@ impl Sema:
                         return 0
                 // §4.4a: `Type.from_int(n)` is an `Option[Type]` —
                 // `Color.from_int(2)` is `Some(Color.Green)` (#1453: it was
-                // typed the repr's Option). An enum with payload variants has
-                // no value to give a payload variant's discriminant; it keeps
-                // the repr (#1497 asks what it should be).
-                let repr_ty = self.enum_repr_type(enum_resolved as i32)
+                // typed the repr's Option).
                 let opt_args: Vec[i32] = Vec.new()
-                let repr_or_i32 = if repr_ty != 0: repr_ty else: self.ty_i32 as i32
-                let opt_inner = if self.disc_has_payload.contains(enum_resolved as i32): repr_or_i32 else: enum_resolved as i32
-                opt_args.push(opt_inner)
+                opt_args.push(enum_resolved as i32)
                 let opt_ty = self.ensure_generic_inst_type(self.syms.option, opt_args, 1) as i32
                 self.typed_expr_types.insert(node, opt_ty)
                 return opt_ty
