@@ -10693,10 +10693,12 @@ impl Sema:
                 let join_roles: Vec[i32] = Vec.new()
                 join_roles.push(D22_JOIN_ROLE_EXPR)
                 join_roles.push(D22_JOIN_ROLE_EXPR)
-                let arm_types = self.join_field_arms_as_views(outer_expected as i32, &join_nodes, move join_types)
+                // #1754: at a `&T` parameter the arms decide the join (no anchor).
+                let if_anchor = if self.borrow_pointee_join_node == node: 0 as TypeId else: outer_expected
+                let arm_types = self.join_field_arms_as_views(if_anchor as i32, &join_nodes, move join_types)
                 let saved_infer_join = self.infer_tail_join
                 self.infer_tail_join = if is_infer_tail: 1 else: 0
-                result_type = self.resolve_contextual_join(outer_expected as i32, &join_nodes, &origin_nodes, &arm_types, &join_roles, node, "if") as TypeId
+                result_type = self.resolve_contextual_join(if_anchor as i32, &join_nodes, &origin_nodes, &arm_types, &join_roles, node, "if") as TypeId
                 self.infer_tail_join = saved_infer_join
                 self.d32_check_owned_join_arms(result_type as i32, &join_nodes, "if arm")
         else:
@@ -14510,10 +14512,12 @@ impl Sema:
         self.current_for_comprehension_carrier = saved_for_comprehension_carrier
 
         if match_is_value:
-            let arm_types = self.join_field_arms_as_views(match_expected as i32, &join_expr_nodes, move join_expr_types)
+            // #1754: at a `&T` parameter the arms decide the join (no anchor).
+            let match_anchor = if self.borrow_pointee_join_node == node: 0 as TypeId else: match_expected
+            let arm_types = self.join_field_arms_as_views(match_anchor as i32, &join_expr_nodes, move join_expr_types)
             let saved_infer_join = self.infer_tail_join
             self.infer_tail_join = if is_infer_tail: 1 else: 0
-            result_type = self.resolve_contextual_join(match_expected as i32, &join_expr_nodes, &join_origin_nodes, &arm_types, &join_roles, node, "match") as TypeId
+            result_type = self.resolve_contextual_join(match_anchor as i32, &join_expr_nodes, &join_origin_nodes, &arm_types, &join_roles, node, "match") as TypeId
             self.infer_tail_join = saved_infer_join
             self.d32_check_owned_join_arms(result_type as i32, &join_expr_nodes, "match arm")
         else if stmt_arms_mixed:
@@ -18953,6 +18957,7 @@ impl Sema:
             if expected_ty == 0 and sig_idx < 0 and self.generic_param_bounded_by_display(fn_sym, ai + param_offset) != 0:
                 self.display_join_node = arg_node
             let arg_ty = if facade_context.userdata_node != 0 and arg_node == facade_context.userdata_node: facade_context.userdata_type as TypeId
+                else if self.join_meets_ref_param(arg_node, expected_ty): self.check_join_arg_at_ref_param(arg_node, expected_ty)
                 else if expected_ty != 0: self.check_expr_with_expected(arg_node, expected_ty as TypeId)
                 else: self.check_expr_value_context(arg_node)
             self.display_join_node = saved_display_join_node
@@ -23300,6 +23305,29 @@ impl Sema:
     // through §3.8's auto-ref at the call, and a `&T` expectation on the
     // argument's own join refuses its owned arms (`m(if c: a ++ b else:
     // c)`, which check_call also refuses — #1754).
+    // #1754 (§3.8, D22 §8.2): an owned `T` meets a `&T` parameter through
+    // auto-ref, so a reference expectation is not an owned anchor for a join
+    // argument (rule 2), and no owned temporary is borrowed to force a
+    // reference result (rule 5). The arms meet `T` (a literal arm is the
+    // owned `str`, a numeric one takes T's width) and decide the join: owned
+    // arms give an owned result the call borrows, view arms a view.
+    fn join_meets_ref_param(arg_node: i32, expected_ty: i32) -> bool:
+        if arg_node <= 0 or expected_ty == 0:
+            return false
+        let k = self.ast.kind(arg_node)
+        if k != NodeKind.NK_IF_EXPR and k != NodeKind.NK_MATCH:
+            return false
+        let r = self.resolve_alias(expected_ty as TypeId)
+        self.get_type_kind(r) == TypeKind.TY_REF and self.get_type_d1(r) == 0 and self.get_type_d0(r) != 0
+
+    mut fn check_join_arg_at_ref_param(arg_node: i32, ref_ty: i32) -> TypeId:
+        let pointee = self.get_type_d0(self.resolve_alias(ref_ty as TypeId))
+        let saved = self.borrow_pointee_join_node
+        self.borrow_pointee_join_node = arg_node
+        let ty = self.check_expr_with_expected(arg_node, pointee as TypeId)
+        self.borrow_pointee_join_node = saved
+        ty
+
     mut fn method_sig_expected_arg_type(obj_type: i32, is_static_receiver: bool, field: i32, arg_index: i32) -> i32:
         if obj_type == 0:
             return 0
@@ -23320,8 +23348,9 @@ impl Sema:
             param_ty = self.sig_param_type(sig, param_i)
         if param_ty == 0:
             return 0
-        let param_kind = self.get_type_kind(self.resolve_alias(param_ty as TypeId))
-        if param_kind == TypeKind.TY_REF or self.type_is_dyn_object(self.resolve_alias(param_ty as TypeId) as i32) != 0: 0 else: param_ty
+        // A `&T` parameter is published too: a join argument meets it through
+        // check_join_arg_at_ref_param (#1754).
+        if self.type_is_dyn_object(self.resolve_alias(param_ty as TypeId) as i32) != 0: 0 else: param_ty
 
     fn method_arg_stores_value(recv_type: i32, field: i32, arg_index: i32) -> i32:
         if recv_type == 0:
@@ -24292,6 +24321,7 @@ impl Sema:
             if mc_expected == 0:
                 mc_expected = self.method_sig_expected_arg_type(obj_type as i32, static_type_sym != 0 and self.static_receiver_type_is_known(expr) != 0, field, ai)
             let mc_arg_ty = if facade_ud_node != 0 and mc_arg_node == facade_ud_node: facade_ud_ty as TypeId
+                else if self.join_meets_ref_param(mc_arg_node, mc_expected): self.check_join_arg_at_ref_param(mc_arg_node, mc_expected)
                 else if mc_expected != 0: self.check_expr_with_expected(mc_arg_node, mc_expected as TypeId)
                 else: self.check_expr_value_context(mc_arg_node)
             arg_types.push(mc_arg_ty as i32)
