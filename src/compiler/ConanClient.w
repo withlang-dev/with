@@ -492,14 +492,19 @@ fn conan_ref_name(req: &str) -> str:
         return ""
     req.slice(0, slash as i64)
 
-fn conan_ref_version(req: &str) -> str:
+// A requirement names `name/version`, optionally followed by `@user/channel`,
+// `#recipe_revision` and `:package_id` (pulseaudio pins
+// `flac/1.4.2#<revision>:<package id>`). The version ends at the first of them.
+pub fn conan_ref_version(req: &str) -> str:
     let slash = conan_find_char(req, 47)
     if slash <= 0:
         return ""
     var end = req.len() as i32
-    let at = conan_find_char(req, 64)
-    if at > slash:
-        end = at
+    for i in (slash + 1)..(req.len() as i32):
+        let ch = req[i]
+        if ch == 64 or ch == 35 or ch == 58:
+            end = i
+            break
     req.slice((slash + 1) as i64, end as i64)
 
 fn conan_json_escape(value: &str) -> str:
@@ -800,6 +805,8 @@ fn conan_fetch_recipe_text(name: &str, version: &str) -> str:
 // over recipe extraction for these; the goal is to shrink this list as
 // extraction proves itself per package (#550).
 fn conan_package_has_table_link_metadata(name: &str, version: &str) -> bool:
+    if version == "system" and conan_system_package_lib(name).len() > 0:
+        return true
     if name == "opengl" and version == "system":
         return true
     if name == "glfw":
@@ -825,10 +832,66 @@ fn conan_link_metadata_with_recipe(name: &str, version: &str, libs: Vec[str], li
         out_args.push(with_str_clone_ref(extracted.lib_paths[i]))
     ConanLibraryScan { lib_paths: out_args, libs: out_libs }
 
+// A `<name>/system` recipe that stands for one library the host provides:
+// Conan Center has no binary and no source for it, only the name to link.
+pub fn conan_system_package_lib(name: &str) -> str:
+    if name == "egl": return "EGL"
+    if name == "libudev": return "udev"
+    ""
+
+// The host library a Linux `<name>/system` package links, given the dirs to
+// search. `-l<name>` needs `lib<name>.so`, which only the -dev package
+// installs; the runtime package installs `lib<name>.so.<N>` alone. So on a
+// host with no development packages, `with get c.raylib` wrote `-lGL` and the
+// program did not link ("cannot find -lGL") though libGL was installed. Returns
+// "" to keep `-l<name>` when the dev symlink is there, and when no soname is
+// either, so the linker's own "cannot find -l<name>" stays the diagnostic;
+// else the path of the highest `lib<name>.so.<N>`, as the symlink would name.
+// Only system packages come here: a Conan package's own archive never gives
+// way to a same-named host library.
+pub fn conan_host_lib_path(dirs: &Vec[str], name: &str) -> str:
+    for d in 0..dirs.len() as i32:
+        if runtime_file_exists(dirs[d] ++ "/lib" ++ name ++ ".so") != 0:
+            return ""
+    for d in 0..dirs.len() as i32:
+        var n = 63
+        while n >= 0:
+            let path = dirs[d] ++ "/lib" ++ name ++ ".so." ++ f"{n}"
+            if runtime_file_exists(path) != 0:
+                return path
+            n = n - 1
+    ""
+
+fn conan_linux_lib_dirs -> Vec[str]:
+    let dirs: Vec[str] = Vec.new()
+    dirs.push("/usr/lib/" ++ (if conan_detect_arch() == "armv8": "aarch64-linux-gnu" else: "x86_64-linux-gnu"))
+    dirs.push("/usr/lib64")
+    dirs.push("/usr/lib")
+    dirs
+
+// A system package's libs, with each one the host has only as a runtime
+// soname moved to a link input by path (conan_host_lib_path).
+fn conan_host_link_inputs(libs: Vec[str], link_args: Vec[str]) -> ConanLibraryScan:
+    if conan_detect_os() != "Linux":
+        return ConanLibraryScan { lib_paths: link_args, libs }
+    let dirs = conan_linux_lib_dirs()
+    var out_libs: Vec[str] = Vec.new()
+    var out_args = link_args
+    for i in 0..libs.len() as i32:
+        let path = conan_host_lib_path(&dirs, libs[i])
+        if path.len() > 0:
+            out_args.push(path)
+        else:
+            out_libs.push(with_str_clone_ref(libs[i]))
+    ConanLibraryScan { lib_paths: out_args, libs: out_libs }
+
 fn conan_known_link_metadata(name: &str, version: &str, libs: Vec[str], link_args: Vec[str]) -> ConanLibraryScan:
     let os = conan_detect_os()
     var out_libs = libs
     var out_args = link_args
+    if version == "system" and conan_system_package_lib(name).len() > 0:
+        out_libs = conan_sorted_insert_unique(move out_libs, conan_system_package_lib(name))
+        return ConanLibraryScan { lib_paths: out_args, libs: out_libs }
     if name == "opengl" and version == "system":
         if os == "Macos":
             out_args.push("-framework")
@@ -886,7 +949,7 @@ fn conan_known_link_metadata(name: &str, version: &str, libs: Vec[str], link_arg
 pub fn conan_write_known_system_package(name: &str, version: &str, project_root: &str) -> bool:
     if version != "system":
         return false
-    if name != "opengl" and name != "xorg":
+    if name != "opengl" and name != "xorg" and conan_system_package_lib(name).len() == 0:
         return false
     let dep_dir = project_root ++ "/.with/deps/c/" ++ name ++ "/" ++ version
     let _clean = runtime_remove_tree(dep_dir)
@@ -903,8 +966,11 @@ pub fn conan_write_known_system_package(name: &str, version: &str, project_root:
     let known = conan_known_link_metadata(name, version, move libs, move link_args)
     let known_libs = known.libs
     let known_link_args = known.lib_paths
+    let host = conan_host_link_inputs(move known_libs, move known_link_args)
+    let host_libs = host.libs
+    let host_link_args = host.lib_paths
     let requires: Vec[str] = Vec.new()
-    conan_write_metadata(dep_dir, name, version, "system", "system", "system", include_paths, lib_paths, known_libs, defines, known_link_args, requires) == 0
+    conan_write_metadata(dep_dir, name, version, "system", "system", "system", include_paths, lib_paths, host_libs, defines, host_link_args, requires) == 0
 
 fn conan_resolve_and_install_requirements(requirements: &Vec[str], project_root: &str, depth: i32, force_reinstall: bool) -> Vec[str]:
     let resolved: Vec[str] = Vec.new()
@@ -1302,10 +1368,12 @@ fn conan_install_internal(name: &str, version_hint: &str, project_root: &str, de
         runtime_eprint("error: could not resolve package " ++ name ++ "/" ++ version_hint ++ " on Conan Center")
         return ""
     let meta_path = project_root ++ "/.with/deps/c/" ++ name ++ "/" ++ version ++ "/metadata.json"
-    if not force_reinstall and runtime_file_exists(meta_path) != 0:
-        return version
+    // A system package describes the host, which changes as packages come and
+    // go, so it is rewritten on every resolve rather than trusted from disk.
     if conan_write_known_system_package(name, version, project_root):
         runtime_eprint("  using system package " ++ name ++ "/" ++ version)
+        return version
+    if not force_reinstall and runtime_file_exists(meta_path) != 0:
         return version
     runtime_eprint("resolving " ++ name ++ "/" ++ version ++ "...")
     let recipe_rev = conan_get_latest_recipe_rev(name, version)
