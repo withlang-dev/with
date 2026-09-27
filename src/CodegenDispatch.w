@@ -4513,7 +4513,7 @@ impl Codegen:
         // #697: element drops are member drops — always sentinel-guarded (#605
         // blanks a moved-out slot; the guard is what makes that skip real).
         self.member_drop_depth = self.member_drop_depth + 1
-        self.mir_emit_drop_ptr_for_sema_type(elem_ptr, elem_ty, elem_sema)
+        self.mir_emit_element_drop(elem_ptr, elem_ty, elem_sema)
         self.member_drop_depth = self.member_drop_depth - 1
         let one = wl_const_int(i64_ty, 1, 0)
         let next_idx = wl_build_add(self.builder, idx_phi, one)
@@ -4530,6 +4530,19 @@ impl Codegen:
         wl_add_incoming(idx_phi, vec_data_i64(&phi_vals), vec_data_i64(&phi_bbs), 2)
 
         wl_position_at_end(self.builder, done_bb)
+
+    // #1557: a collection element of struct type drops through the type's
+    // named drop fn (ensure_structural_drop_fn declares it before emitting
+    // its body). Inlined, a type recursive through its own collection
+    // (`N { next: Vec[N] }`) expanded N -> Vec[N] -> N without end and
+    // overflowed the compiler's stack.
+    mut fn mir_emit_element_drop(ptr: i64, ty: i64, sema_ty: i32):
+        if sema_ty > 0 and self.sema.get_type_kind(self.sema.resolve_alias(sema_ty as TypeId)) == TypeKind.TY_STRUCT:
+            let dfn = self.ensure_structural_drop_fn(sema_ty, ty)
+            if dfn != 0:
+                self.mir_emit_guarded_user_drop(ptr, ty, dfn, wl_global_get_value_type(dfn))
+                return
+        self.mir_emit_drop_ptr_for_sema_type(ptr, ty, sema_ty)
 
     // #747: free a str's buffer via the ownership-checked runtime helper and
     // blank the place. Mirrors the Vec pattern including drop-origin tagging.
@@ -4790,7 +4803,7 @@ impl Codegen:
             key_args.push(idx_phi)
             let key_ptr = wl_build_call(self.builder, key_fn_ty, key_fn, vec_data_i64(&key_args), 2)
             self.member_drop_depth = self.member_drop_depth + 1
-            self.mir_emit_drop_ptr_for_sema_type(key_ptr, key_ty, key_sema)
+            self.mir_emit_element_drop(key_ptr, key_ty, key_sema)
             self.member_drop_depth = self.member_drop_depth - 1
         if drop_value:
             let value_fn = self.ensure_hashmap_slot_runtime_fn("with_hashmap_value_ptr_at", ptr_ty)
@@ -4800,7 +4813,7 @@ impl Codegen:
             value_args.push(idx_phi)
             let value_ptr = wl_build_call(self.builder, value_fn_ty, value_fn, vec_data_i64(&value_args), 2)
             self.member_drop_depth = self.member_drop_depth + 1
-            self.mir_emit_drop_ptr_for_sema_type(value_ptr, value_ty, value_sema)
+            self.mir_emit_element_drop(value_ptr, value_ty, value_sema)
             self.member_drop_depth = self.member_drop_depth - 1
         wl_build_br(self.builder, advance_bb)
 
@@ -4917,7 +4930,7 @@ impl Codegen:
         value_args.push(idx_phi)
         let value_ptr = wl_build_call(self.builder, value_ty, value_fn, vec_data_i64(&value_args), 2)
         self.member_drop_depth = self.member_drop_depth + 1
-        self.mir_emit_drop_ptr_for_sema_type(value_ptr, elem_ty, elem_sema)
+        self.mir_emit_element_drop(value_ptr, elem_ty, elem_sema)
         self.member_drop_depth = self.member_drop_depth - 1
         wl_build_br(self.builder, advance_bb)
 
