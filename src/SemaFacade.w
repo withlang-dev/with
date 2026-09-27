@@ -4527,9 +4527,36 @@ impl Sema:
                 let saved_ctor = self.facade_userdata_ctor
                 if context.nullable:
                     self.facade_userdata_ctor = ud_node
-                context.userdata_type = self.check_expr_value_context(ud_node) as i32
+                if context.nullable and self.ast.kind(ud_node) == NodeKind.NK_VARIANT_SHORTHAND:
+                    context.userdata_type = self.facade_check_userdata_shorthand(ud_node)
+                else:
+                    context.userdata_type = self.check_expr_value_context(ud_node) as i32
                 self.facade_userdata_ctor = saved_ctor
         context
+
+    // #1765 (§4 variant shorthand, §16.2b.9): a nullable callback's userdata
+    // parameter is `Option[&U]`, so a `.Some(x)` there names Option before
+    // `U` is known, and `U` is its payload's type — exactly what `Some(x)`
+    // gives the call form. The payload is checked once, with no expected
+    // type (it binds `U`), and borrowed for the call as the call form's is
+    // (payload_arg_auto_refs with this constructor as the userdata's).
+    mut fn facade_check_userdata_shorthand(node: i32) -> i32:
+        let name = self.ast.get_data0(node)
+        if name != self.syms.some or self.ast.get_data2(node) != 1:
+            return self.check_expr_value_context(node) as i32
+        let payload = self.ast.get_extra(self.ast.get_data1(node))
+        let payload_ty = self.check_expr_value_context(payload) as i32
+        if payload_ty == 0:
+            return 0
+        // The payload slot is `&U` (Option[&U]), as the call form types it.
+        let payload_kind = self.get_type_kind(self.resolve_alias(payload_ty as TypeId))
+        let slot_ty = if payload_kind == TypeKind.TY_REF: payload_ty else: self.ensure_exact_type(TypeKind.TY_REF, payload_ty, 0, 0) as i32
+        let option_ty = self.ensure_option_type_for(slot_ty)
+        self.comp_resolved.insert(node, self.qualified_enum_variant_sym(option_ty, name))
+        self.typed_expr_types.insert(node, option_ty)
+        if not self.payload_arg_auto_refs(slot_ty, payload_ty, payload, node):
+            self.mark_moved_if_consumed(payload)
+        option_ty
 
     // The callback method a method call `recv.field(…)` names, or -1.
     fn facade_callback_method_for_call(recv_type: i32, field: i32) -> i32:
