@@ -3957,17 +3957,21 @@ fn mir_validate_cast_supported(mir_mod: &MirModule, src_ty: i32, dst_ty: i32) ->
     if dst_inner > 0 and dst_inner != dst_ty:
         if mir_validate_cast_supported(mir_mod, src_ty, dst_inner):
             return true
-    if mir_validate_type_compatible_fast(mir_mod, dst_ty, src_ty) != 0 or
-       mir_validate_type_compatible_fast(mir_mod, src_ty, dst_ty) != 0:
-        return true
     let src_resolved = mir_mod.mir_resolve_alias(src_ty)
     let dst_resolved = mir_mod.mir_resolve_alias(dst_ty)
     let src_kind = mir_mod.mir_get_type_kind(src_resolved)
     let dst_kind = mir_mod.mir_get_type_kind(dst_resolved)
+    // §4.4a (#1770): an enum's number is its discriminant, read by
+    // RK_DISCRIMINANT (MirLower.lower_cast); codegen has no arm for a cast
+    // from the enum value, and this rule let one through to it.
+    if src_kind == TypeKind.TY_ENUM and (dst_kind == TypeKind.TY_INT or dst_kind == TypeKind.TY_FLOAT):
+        return false
+    if mir_validate_type_compatible_fast(mir_mod, dst_ty, src_ty) != 0 or
+       mir_validate_type_compatible_fast(mir_mod, src_ty, dst_ty) != 0:
+        return true
     if src_kind == TypeKind.TY_NEVER:
         return true
-    if (src_kind == TypeKind.TY_ENUM and dst_kind == TypeKind.TY_INT) or
-       (src_kind == TypeKind.TY_INT and dst_kind == TypeKind.TY_ENUM):
+    if src_kind == TypeKind.TY_INT and dst_kind == TypeKind.TY_ENUM:
         return true
     if src_kind == TypeKind.TY_PTR or src_kind == TypeKind.TY_REF or
        dst_kind == TypeKind.TY_PTR or dst_kind == TypeKind.TY_REF:
@@ -4169,7 +4173,9 @@ pub fn validate_typed_mir_body(mir_mod: &MirModule, body: &MirBody) -> MirValida
                 let src_ty = if rv_d2 > 0: rv_d2 else: mir_validate_operand_type(mir_mod, body, rv_d0)
                 let cast_ty = if rv_d1 > 0: rv_d1 else: dest_ty
                 if src_ty > 0 and cast_ty > 0 and not mir_validate_cast_supported(mir_mod, src_ty, cast_ty):
-                    return mir_validation_fail(body.fn_sym, span, "unsupported cast in MIR")
+                    let src_kind = mir_mod.mir_get_type_kind(mir_mod.mir_resolve_alias(src_ty))
+                    let cast_kind = mir_mod.mir_get_type_kind(mir_mod.mir_resolve_alias(cast_ty))
+                    return mir_validation_fail(body.fn_sym, span, f"unsupported cast in MIR (src ty={src_ty} kind={src_kind}, target ty={cast_ty} kind={cast_kind})")
             continue
 
         if stmt_kind == StmtKind.Drop:

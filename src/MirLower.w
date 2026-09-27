@@ -5712,23 +5712,34 @@ impl MirBuilder:
             // owners free one value") while codegen dropped it once. The
             // operand is the same place, read.
             op = self.body.new_operand(OperandKind.OK_COPY, self.body.operand_d0[op])
-        // §4.4a (#1502): `Kind.Hi as f64` extracts the discriminant (the repr
-        // integer) and then widens it (§4); codegen has no enum→float cast,
-        // so it is lowered as those two.
-        let cast_src_resolved = self.sema.resolve_alias(src_sema_ty as TypeId)
-        if self.sema.get_type_kind(cast_src_resolved) == TypeKind.TY_ENUM and self.sema.get_type_kind(self.sema.resolve_alias(target_type_id as TypeId)) == TypeKind.TY_FLOAT:
-            let repr = self.sema.enum_repr_type(cast_src_resolved as i32)
-            if repr != 0:
-                let repr_rv = self.body.new_rvalue(RvalueKind.RK_CAST, op, repr, src_sema_ty)
-                let repr_tmp = self.new_temp(repr)
-                let repr_place = self.place_for_local(repr_tmp)
-                self.body.push_stmt(self.cur_bb, StmtKind.Assign, repr_place, repr_rv, self.ast.get_start(node))
-                op = self.body.new_operand(OperandKind.OK_COPY, repr_place)
-                src_sema_ty = repr
-        let rv = self.body.new_rvalue(RvalueKind.RK_CAST, op, target_type_id, src_sema_ty)
-        let temp = self.new_temp(target_type_id)
+        self.lower_value_cast(op, src_sema_ty, target_type_id, self.ast.get_start(node))
+
+    // The value cast of `op` (of `src_ty`) to `target_ty`: every emitter of
+    // an RK_CAST between values goes through here — `as` itself, and the D22
+    // materializations (a contextual copy adjustment, a join arm).
+    //
+    // §4.4a: `value as i32` on an enum extracts the discriminant — the repr
+    // value of a discriminant enum, the tag of an enum with a payload
+    // variant (#1770) — and `as f64` then widens it (§4, #1502). Codegen has
+    // no enum→number cast: an RK_CAST from the enum aggregate reached it and
+    // fell through unchanged (the f-string printed the variant, the addition
+    // was invalid LLVM). The cast is the discriminant read (RK_DISCRIMINANT,
+    // typed by enum_discriminant_type) and, when the target differs, a cast
+    // from the tag's type; the validator refuses an enum→number RK_CAST.
+    mut fn lower_value_cast(op_in: i32, src_ty_in: i32, target_ty: i32, span: i32) -> i32:
+        var op = op_in
+        var src_ty = src_ty_in
+        let target_kind = self.sema.get_type_kind(self.sema.resolve_alias(target_ty as TypeId))
+        if self.enum_type_of(src_ty) != 0 and (target_kind == TypeKind.TY_INT or target_kind == TypeKind.TY_FLOAT):
+            let enum_place = self.materialize_operand(op, src_ty, span)
+            op = self.lower_enum_discriminant(enum_place)
+            src_ty = self.enum_discriminant_type(enum_place)
+            if self.sema.types_identical(src_ty, target_ty):
+                return op
+        let rv = self.body.new_rvalue(RvalueKind.RK_CAST, op, target_ty, src_ty)
+        let temp = self.new_temp(target_ty)
         let place = self.place_for_local(temp)
-        self.body.push_stmt(self.cur_bb, StmtKind.Assign, place, rv, self.ast.get_start(node))
+        self.body.push_stmt(self.cur_bb, StmtKind.Assign, place, rv, span)
         self.body.new_operand(OperandKind.OK_COPY, place)
 
     // `Type.Variant` spelled as a field access on the enum's name — the
@@ -10064,10 +10075,25 @@ impl MirBuilder:
         self.switch_to(dead_bb)
         self.unit_operand()
 
+    // The enum type `ty` names: itself, or the base enum of a generic
+    // instance (`E[i64]`, #1768); 0 for any other type.
+    fn enum_type_of(ty: i32) -> i32:
+        let resolved = self.sema.resolve_alias(ty)
+        let tk = self.sema.get_type_kind(resolved)
+        if tk == TypeKind.TY_ENUM:
+            return resolved
+        if tk != TypeKind.TY_GENERIC_INST:
+            return 0
+        let base_sym = self.sema.get_generic_inst_base(resolved)
+        if not self.sema.named_types.contains(base_sym):
+            return 0
+        let base_tid: i32 = self.sema.named_types.get(base_sym).unwrap()
+        if self.sema.get_type_kind(base_tid) != TypeKind.TY_ENUM: 0 else: base_tid
+
     // #1444 (§4.4a): a discriminant enum's discriminant is its repr value
     // (`u8` … `u64`); every other enum's tag is i32.
     mut fn enum_discriminant_type(place: i32) -> i32:
-        let repr = self.sema.enum_repr_type(self.place_local_type(place))
+        let repr = self.sema.enum_repr_type(self.enum_type_of(self.place_local_type(place)))
         if repr != 0: repr else: self.sema.ty_i32 as i32
 
     mut fn lower_enum_discriminant(place: i32) -> i32:
@@ -11946,11 +11972,7 @@ impl MirBuilder:
         if adjustment.post_copy_type == 0:
             return owned_op
 
-        let rv = self.body.new_rvalue(RvalueKind.RK_CAST, owned_op, adjustment.target_type, adjustment.owned_value_type)
-        let temp = self.new_temp(adjustment.target_type)
-        let place = self.place_for_local(temp)
-        self.body.push_stmt(self.cur_bb, StmtKind.Assign, place, rv, self.ast.get_start(node))
-        self.body.new_operand(OperandKind.OK_COPY, place)
+        self.lower_value_cast(owned_op, adjustment.owned_value_type, adjustment.target_type, self.ast.get_start(node))
 
     fn contextual_join_arm_index_for_role(join_node: i32, role: i32) -> i32:
         if self.has_contextual_join_decision(join_node) == 0:
@@ -11985,11 +12007,7 @@ impl MirBuilder:
 
         if self.sema.resolve_alias(source_type as TypeId) == self.sema.resolve_alias(decision.final_type as TypeId):
             return op
-        let rv = self.body.new_rvalue(RvalueKind.RK_CAST, op, decision.final_type, source_type)
-        let temp = self.new_temp(decision.final_type)
-        let place = self.place_for_local(temp)
-        self.body.push_stmt(self.cur_bb, StmtKind.Assign, place, rv, span)
-        self.body.new_operand(OperandKind.OK_COPY, place)
+        self.lower_value_cast(op, source_type, decision.final_type, span)
 
     // Whether derefs (reference, pointer, user Deref) from `from_ty` reach a
     // type `expected_ty` accepts, directly or by auto-ref: the type-only twin
