@@ -5172,6 +5172,9 @@ impl CCodegen:
             return 0
         if kind == CcBuiltin.VEC_NEW:
             return CC_PSEUDO_TID_VEC
+        // The slot walk's destinations are MirLower's typed temps (#1434).
+        if kind == CcBuiltin.MAP_SLOT_WALK:
+            return self.place_tid_no_infer(body, dest_place)
         if kind == CcBuiltin.VEC_SLOT:
             let hinted = self.call_dest_expected_tid(body, dest_place)
             if hinted != 0 and self.is_void_tid(hinted) == 0:
@@ -6974,6 +6977,41 @@ impl CCodegen:
             return out
         ""
 
+    // D44 map traversal (`for (k, v) in map`, MirLower.lower_for_hashmap)
+    // walks the table's slots: MAP_CAPACITY bounds the walk, an unoccupied
+    // slot is skipped, and an occupied one is read where it lives — a view
+    // destination gets the slot's address, a Copy value destination is
+    // loaded through it. Nothing non-Copy is duplicated (§2.3). The same
+    // runtime accessors as the LLVM backend (#1434).
+    mut fn map_slot_walk_term(body: &MirBody, args_id: i32, dest_place: i32, next_bb: i32, argc: i32, has_ret: i32) -> str:
+        let intrinsic = body.call_intrinsic(args_id)
+        let map_ptr = "(uint8_t*)(intptr_t)(" ++ self.map_recv_text(body, args_id) ++ ")"
+        var value = ""
+        if intrinsic == MirIntrinsic.MAP_CAPACITY:
+            value = "with_hashmap_capacity(" ++ map_ptr ++ ")"
+        else:
+            if argc < 2:
+                self.fail("emit-c: a map slot access expects the map and a slot index")
+                return "    abort();"
+            let slot = "(int64_t)(" ++ self.operand_text(body, self.call_arg_operand(body, args_id, 1)) ++ ")"
+            if intrinsic == MirIntrinsic.MAP_SLOT_OCCUPIED:
+                value = "with_hashmap_slot_occupied(" ++ map_ptr ++ ", " ++ slot ++ ")"
+            else:
+                let at_fn = if intrinsic == MirIntrinsic.MAP_KEY_AT: "with_hashmap_key_ptr_at" else: "with_hashmap_value_ptr_at"
+                let at = at_fn ++ "(" ++ map_ptr ++ ", " ++ slot ++ ")"
+                let dest_tid = self.place_tid_no_infer(body, dest_place)
+                if dest_tid == 0 or self.is_void_tid(dest_tid) != 0:
+                    self.fail("emit-c: a map slot's key or value has no destination type")
+                    return "    abort();"
+                let dest_is_view = self.sema.get_type_kind(self.sema.resolve_alias(dest_tid)) == TypeKind.TY_REF
+                value = if dest_is_view: "((" ++ self.c_type(dest_tid, 0) ++ ")" ++ at ++ ")" else: "(*(" ++ self.c_type(dest_tid, 0) ++ "*)" ++ at ++ ")"
+        var out = ""
+        if has_ret != 0:
+            out = "    " ++ self.place_text(body, dest_place) ++ " = " ++ value ++ ";\n"
+        else:
+            out = "    (void)" ++ value ++ ";\n"
+        out ++ f"    goto bb{next_bb};"
+
     mut fn emit_builtin_vec_extra_call_term(body: &MirBody, kind: CcBuiltin, args_id: i32, dest_place: i32, next_bb: i32, argc: i32, ret_tid: i32, has_ret: i32) -> str:
         if kind == CcBuiltin.MAP_CLEAR:
             if argc < 1:
@@ -7018,8 +7056,7 @@ impl CCodegen:
             return out
 
         if kind == CcBuiltin.MAP_SLOT_WALK:
-            self.fail("emit-c: HashMap traversal (`for (k, v) in map`) lowering is not implemented; use the LLVM backend")
-            return "    abort();"
+            return self.map_slot_walk_term(body, args_id, dest_place, next_bb, argc, has_ret)
         if kind == CcBuiltin.MAP_VALUES or kind == CcBuiltin.MAP_ITEMS:
             self.fail("emit-c: HashMap.values()/items() lowering is not implemented; use keys() or the LLVM backend")
             return "    abort();"
@@ -8971,6 +9008,8 @@ impl CCodegen:
         name == "with_fiber_cancel" or name == "with_fiber_panic_capture" or cc_str_starts_with(name, "with_println_") != 0 or
         name == "with_alloc" or name == "with_free" or name == "with_memcpy" or name == "with_memmove" or
         name == "with_memset" or name == "with_memcmp" or name == "with_hashmap_get_ptr" or
+        name == "with_hashmap_capacity" or name == "with_hashmap_slot_occupied" or
+        name == "with_hashmap_key_ptr_at" or name == "with_hashmap_value_ptr_at" or
         name == "with_clock_nanos" or name == "with_nanosleep" or name == "with_sysinfo_os" or
         name == "with_sysinfo_arch" or name == "with_sysinfo_hostname" or name == "with_eprint" or
         name == "with_write" or name == "with_ewrite" or name == "with_panic" or name == "with_bool_to_str" or
@@ -9677,6 +9716,11 @@ impl CCodegen:
         if self.module_exports_c_name("with_memcmp") == 0:
             out.write("extern int32_t with_memcmp(const void*, const void*, int64_t);\n")
         out.write("extern void* with_hashmap_get_ptr(void*, const void*, int64_t);\n")
+        // D44 map traversal's slot walk (#1434); rt_core's own signatures.
+        out.write("extern int64_t with_hashmap_capacity(uint8_t*);\n")
+        out.write("extern int32_t with_hashmap_slot_occupied(uint8_t*, int64_t);\n")
+        out.write("extern uint8_t* with_hashmap_key_ptr_at(uint8_t*, int64_t);\n")
+        out.write("extern uint8_t* with_hashmap_value_ptr_at(uint8_t*, int64_t);\n")
         out.write("extern int64_t with_clock_nanos(void);\n")
         out.write("extern int32_t with_nanosleep(int64_t);\n")
         out.write("extern with_str with_sysinfo_os(void);\n")
