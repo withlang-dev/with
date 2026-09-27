@@ -807,14 +807,7 @@ impl Codegen:
 
         self.mir_scan_memory_locals(dtm_body)
 
-        // Pre-populate globals
-        for dtm_gli in 0..dtm_body.local_names.len() as i32:
-            let dtm_gl_name = dtm_body.local_names[dtm_gli]
-            if dtm_gl_name != 0 and dtm_body.local_is_global[dtm_gli] != 0:
-                let dtm_gl_mc = self.module_constants.get(dtm_gl_name)
-                if dtm_gl_mc.is_some():
-                    let dtm_global_value: i64 = dtm_gl_mc.unwrap()
-                    self.mir_local_ptrs.insert(dtm_gli, dtm_global_value)
+        self.mir_bind_global_locals(dtm_body)
 
         // Create LLVM basic blocks
         for dtm_bb in 0..dtm_body.block_count():
@@ -1636,14 +1629,7 @@ impl Codegen:
         self.mir_local_ptrs.insert(0, ret_alloca)
         self.mir_local_types.insert(0, ret_ty)
 
-        for gli in 0..init_body.local_names.len() as i32:
-            let gl_name = init_body.local_names[gli]
-            if gl_name == 0 or init_body.local_is_global[gli] == 0:
-                continue
-            let gl_opt = self.module_constants.get(gl_name)
-            if gl_opt.is_some():
-                let global_value: i64 = gl_opt.unwrap()
-                self.mir_local_ptrs.insert(gli, global_value)
+        self.mir_bind_global_locals(init_body)
 
         for bb in 0..init_body.block_count():
             let llbb = wl_append_bb(self.context, function, f"mir.bb{bb}")

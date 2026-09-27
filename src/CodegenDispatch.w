@@ -5776,6 +5776,19 @@ impl Codegen:
         self.mir_default_unreachable_bbs.push(bb)
         bb
 
+    // Every MIR body emitter starts with this: a module global a body names
+    // is a proxy local bound to the global's storage. The generic
+    // specialization emitter skipped it, so a generic body reading its
+    // module's `global var` read an unbound stack slot (#1743).
+    mut fn mir_bind_global_locals(body: &MirBody):
+        for gli in 0..body.local_names.len() as i32:
+            let gl_name = body.local_names[gli]
+            if gl_name != 0 and body.local_is_global[gli] != 0:
+                let gl_mc = self.module_constants.get(gl_name)
+                if gl_mc.is_some():
+                    let global_value: i64 = gl_mc.unwrap()
+                    self.mir_local_ptrs.insert(gli, global_value)
+
     // Every MIR body emitter ends with this: a switch lowering creates the
     // shared default block on demand, and it has no terminator until the body
     // is done. The const-initializer and default-method emitters skipped it,
@@ -16231,14 +16244,7 @@ impl Codegen:
         self.mir_local_types.insert(0, ret_store_ty)
         self.mir_scan_memory_locals(body)
 
-        // Pre-populate mir_local_ptrs for global variable proxy locals
-        for gli in 0..body.local_names.len() as i32:
-            let gl_name = body.local_names[gli]
-            if gl_name != 0 and body.local_is_global[gli] != 0:
-                let gl_mc = self.module_constants.get(gl_name)
-                if gl_mc.is_some():
-                    let global_value: i64 = gl_mc.unwrap()
-                    self.mir_local_ptrs.insert(gli, global_value)
+        self.mir_bind_global_locals(body)
 
         let meta = self.pool.find_fn_meta(fn_node)
         var param_start = 0
@@ -16700,6 +16706,7 @@ impl Codegen:
         self.mir_local_ptrs.insert(0, ret_alloca)
         self.mir_local_types.insert(0, ret_store_ty)
         self.mir_scan_memory_locals(body)
+        self.mir_bind_global_locals(body)
 
         let meta = if fn_node > 0: self.pool.find_fn_meta(fn_node) else: -1
         var param_start = 0
@@ -17996,14 +18003,7 @@ impl Codegen:
                     let cl_pm_ty: i64 = cl_pm_ty_opt.unwrap()
                     self.mir_local_types.insert(cl_pm_local_id, cl_pm_ty)
 
-        // Pre-populate globals
-        for cl_gli in 0..closure_body.local_names.len() as i32:
-            let cl_gl_name = closure_body.local_names[cl_gli]
-            if cl_gl_name != 0 and closure_body.local_is_global[cl_gli] != 0:
-                let cl_gl_mc = self.module_constants.get(cl_gl_name)
-                if cl_gl_mc.is_some():
-                    let cl_global_value: i64 = cl_gl_mc.unwrap()
-                    self.mir_local_ptrs.insert(cl_gli, cl_global_value)
+        self.mir_bind_global_locals(closure_body)
 
         // Create LLVM basic blocks for MIR blocks
         for cl_bb in 0..closure_body.block_count():

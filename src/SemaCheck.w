@@ -4088,6 +4088,32 @@ impl Sema:
         self.pending_generic_binding_base = HashMap.new()
         self.pending_generic_binding_call = HashMap.new()
         self.pending_generic_binding_decl = HashMap.new()
+        // #1743: the callee's lexical environment is its module's, and the
+        // module-level scope (every module's globals, below scope_starts[1])
+        // is part of it: a generic body reads its module's `let`/`const`
+        // exactly as a non-generic body does. Only the caller's locals stay
+        // out. Visibility is still decided per lookup against the callee's
+        // module (update_fn_source_context above).
+        let module_scope_len = if saved_scope_starts.len() > 1: saved_scope_starts[1] else: saved_bind_names.len() as i32
+        for gi in 0..module_scope_len:
+            let gsym = saved_bind_names[gi]
+            self.bind_names.push(gsym)
+            self.bind_types.push(saved_bind_types[gi])
+            self.bind_muts.push(saved_bind_muts[gi])
+            self.bind_states.push(saved_bind_states[gi])
+            self.bind_is_task.push(saved_bind_is_task[gi])
+            self.bind_task_used.push(saved_bind_task_used[gi])
+            self.bind_is_scoped_task.push(saved_bind_is_scoped_task[gi])
+            self.bind_is_view_bound.push(saved_bind_is_view_bound[gi])
+            self.bind_provenance.push(saved_bind_provenance[gi])
+            let mapped = saved_scope_name_map.get(gsym)
+            if mapped.is_some() and mapped.unwrap() == gi:
+                self.scope_name_map.insert(gsym, gi)
+        // A caller local that shadows a module global hid the global's map
+        // entry; the callee does not see the caller's local.
+        for sgi in 0..self.shadowed_global_syms.len() as i32:
+            if self.shadowed_global_indices[sgi] < module_scope_len:
+                self.scope_name_map.insert(self.shadowed_global_syms[sgi], self.shadowed_global_indices[sgi])
 
         // Type-check body with concrete substitutions installed. Generic bodies
         // may still become invalid after instantiation (for example `T + T`
