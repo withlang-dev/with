@@ -785,7 +785,8 @@ fn facade_render_resource(pool: AstPool, intern: InternPool, ci: &Vec[i32], item
     var drop_fn = 0
     var init_fn = 0
     var preinit_fn = 0
-    var ok_sym = 0
+    // `ok C1, C2, …` (§16.2b.4): every listed status is success.
+    let ok_syms: Vec[i32] = Vec.new()
     var movable = false
     var abandon_fn = 0
     let destroyers: Vec[i32] = Vec.new()
@@ -808,7 +809,7 @@ fn facade_render_resource(pool: AstPool, intern: InternPool, ci: &Vec[i32], item
         else if kind == FACADE_CLAUSE_PREINIT:
             preinit_fn = facade_render_find_fn(pool, intern, ci, pool.get_extra(ops))
         else if kind == FACADE_CLAUSE_OK:
-            ok_sym = pool.get_extra(ops)
+            for oi in 0..pool.get_data2(clause as NodeId): ok_syms.push(pool.get_extra(ops + oi))
         else if kind == FACADE_CLAUSE_MOVABLE:
             movable = true
         else if kind == FACADE_CLAUSE_DROP:
@@ -888,7 +889,7 @@ fn facade_render_resource(pool: AstPool, intern: InternPool, ci: &Vec[i32], item
     // produce on failure, so only it adds the failed-state resource.
     var status_type = ""
     var failed_state = false
-    if ok_sym != 0:
+    if ok_syms.len() > 0:
         for pi in 0..producers.len() as i32:
             let ret = if producers[pi] != 0 and out_refs[pi] != 0: facade_render_return(pool, intern, producers[pi]) else: ""
             if ret.len() > 0:
@@ -922,7 +923,7 @@ fn facade_render_resource(pool: AstPool, intern: InternPool, ci: &Vec[i32], item
             let slot = facade_render_param_ref(pool, intern, producer, out_refs[pi])
             if slot < 0:
                 continue
-            let (ctor, result) = facade_render_out_producer(pool, intern, name, repr_text, producer, pname, slot, ok_sym, made_deps, drop_fn)
+            let (ctor, result) = facade_render_out_producer(pool, intern, name, repr_text, producer, pname, slot, &ok_syms, made_deps, drop_fn)
             out = out ++ ctor ++ facade_render_receiver_method(pool, intern, ci, item, producer, slot, pname, result)
             continue
         let (params, args) = facade_render_params_but(pool, intern, producer, 0, -1, "")
@@ -942,7 +943,7 @@ fn facade_render_resource(pool: AstPool, intern: InternPool, ci: &Vec[i32], item
         out = out ++ facade_render_receiver_method(pool, intern, ci, item, producer, -1, pname, result)
     if init_fn != 0:
         let iname = facade_render_present(pool, intern, ci, item, intern.resolve(pool.get_data0(init_fn as NodeId)))
-        let ctor = facade_render_init(pool, intern, name, repr_text, init_fn, iname, preinit_fn, ok_sym, pinned, facade_render_dep_values(pool, intern, &deps, FACADE_DEP_INIT, init_fn) ++ keep_init)
+        let ctor = facade_render_init(pool, intern, name, repr_text, init_fn, iname, preinit_fn, &ok_syms, pinned, facade_render_dep_values(pool, intern, &deps, FACADE_DEP_INIT, init_fn) ++ keep_init)
         if ctor.len() == 0:
             return ""
         out = out ++ ctor
@@ -1209,7 +1210,7 @@ fn facade_render_received_arg(pool: AstPool, intern: InternPool, res: i32, ptext
 // `iname` (§16.2b.11, facade_render_present: `Counter.init` for
 // `counter_init` on `Counter`, `Stream.inflateInit` where no prefix matches,
 // or its `rename`).
-fn facade_render_init(pool: AstPool, intern: InternPool, name: &str, repr_text: &str, init_fn: i32, iname: &str, preinit_fn: i32, ok_sym: i32, pinned: bool, deps: &str) -> str:
+fn facade_render_init(pool: AstPool, intern: InternPool, name: &str, repr_text: &str, init_fn: i32, iname: &str, preinit_fn: i32, ok_syms: &Vec[i32], pinned: bool, deps: &str) -> str:
     // The storage and status locals are spelled apart from every parameter
     // the constructor takes (preinit's, then init's).
     var taken = facade_render_param_names(pool, intern, init_fn)
@@ -1235,13 +1236,33 @@ fn facade_render_init(pool: AstPool, intern: InternPool, name: &str, repr_text: 
     let out = "fn " ++ name ++ "." ++ iname ++ "(" ++ params ++ ")"
     let made = name ++ " { " ++ deps ++ "repr: " ++ repr ++ ", live: true }"
     if ret.len() == 0:
-        if ok_sym != 0:
+        if ok_syms.len() > 0:
             return ""
         return out ++ " -> " ++ name ++ ":\n    var " ++ repr ++ " = " ++ storage ++ "\n    " ++ call ++ "\n    " ++ made ++ "\n"
-    if ok_sym == 0:
-        return out ++ " -> (" ++ ret.slice(4, ret.len()) ++ ", " ++ name ++ "):\n    var " ++ repr ++ " = " ++ storage ++ "\n    let " ++ status ++ " = " ++ call ++ "\n    (" ++ status ++ ", " ++ made ++ ")\n"
+    let status_type = ret.slice(4, ret.len())
+    if ok_syms.len() == 0:
+        return out ++ " -> (" ++ status_type ++ ", " ++ name ++ "):\n    var " ++ repr ++ " = " ++ storage ++ "\n    let " ++ status ++ " = " ++ call ++ "\n    (" ++ status ++ ", " ++ made ++ ")\n"
     let err = facade_render_error_name(name)
-    out ++ " -> Result[" ++ name ++ ", " ++ err ++ "]:\n    var " ++ repr ++ " = " ++ storage ++ "\n    let " ++ status ++ " = " ++ call ++ "\n    if " ++ status ++ " != " ++ intern.resolve(ok_sym) ++ ": return Err(" ++ err ++ ".Failed(" ++ status ++ "))\n    Ok(" ++ made ++ ")\n"
+    out ++ " -> Result[" ++ facade_render_ok_type(ok_syms, status_type, name) ++ ", " ++ err ++ "]:\n    var " ++ repr ++ " = " ++ storage ++ "\n    let " ++ status ++ " = " ++ call ++ "\n    if " ++ facade_render_not_ok(intern, ok_syms, status) ++ ": return Err(" ++ err ++ ".Failed(" ++ status ++ "))\n    Ok(" ++ facade_render_ok_value(ok_syms, status, made) ++ ")\n"
+
+// The failure test of `ok C1, C2, …` over the status local (§16.2b.4, ruling
+// Amendment 1): any listed constant is success, so failure is none of them.
+fn facade_render_not_ok(intern: InternPool, ok_syms: &Vec[i32], status: &str) -> str:
+    var out = ""
+    for k in 0..ok_syms.len() as i32:
+        out = out ++ (if k > 0: " and " else: "") ++ status ++ " != " ++ intern.resolve(ok_syms[k])
+    out
+
+// What the `Ok` side carries (§16.2b.4): the produced value — and, when
+// `ok` lists several success statuses, the status that matched beside it,
+// as `(status, R)`: the order of the pair the facade renders without `ok`
+// (`(status, Option[R])`, an in-place `(status, R)`). One success status
+// needs no carrying: it is the constant.
+fn facade_render_ok_type(ok_syms: &Vec[i32], status_type: &str, name: &str) -> str:
+    if ok_syms.len() > 1: "(" ++ status_type ++ ", " ++ name ++ ")" else: name.clone()
+
+fn facade_render_ok_value(ok_syms: &Vec[i32], status: &str, made: &str) -> str:
+    if ok_syms.len() > 1: "(" ++ status ++ ", " ++ made ++ ")" else: made.clone()
 
 // An out-parameter producer's constructor (ruling §16, spec §16.2b.4). The
 // physical commitment: initialize the slot to NULL, call, inspect the slot —
@@ -1271,6 +1292,11 @@ fn facade_render_init(pool: AstPool, intern: InternPool, name: &str, repr_text: 
 //         if slot == null: return Err(RError.NothingProduced(status))
 //         Ok(R { repr: slot, live: true })
 //
+// `ok C1, C2, …` lists several success statuses (§16.2b.4, ruling
+// Amendment 1): any is success (`status != C1 and status != C2` is failure),
+// and `Ok` carries the one that matched beside the value —
+// `Result[(S, R), RError]`, `Ok((status, R { … }))` (facade_render_ok_type).
+//
 // "Status OK, nothing produced" violates the C contract the facade states
 // (`ok` says what success is; a success that produced nothing is not one it
 // can hand back as an `R`), and it is its own variant: `Failed` with an OK
@@ -1282,7 +1308,7 @@ fn facade_render_init(pool: AstPool, intern: InternPool, name: &str, repr_text: 
 // `R.<pname>`, the producer's presented name (§16.2b.11: `Database.open`
 // for `sqlite3_open`, or its `rename`). Returns the constructor and its
 // result type, which the receiver method repeats.
-fn facade_render_out_producer(pool: AstPool, intern: InternPool, name: &str, repr_text: &str, producer: i32, pname: &str, slot: i32, ok_sym: i32, deps: &str, drop_fn: i32) -> (str, str):
+fn facade_render_out_producer(pool: AstPool, intern: InternPool, name: &str, repr_text: &str, producer: i32, pname: &str, slot: i32, ok_syms: &Vec[i32], deps: &str, drop_fn: i32) -> (str, str):
     let taken = facade_render_param_names(pool, intern, producer)
     let slot_var = facade_render_fresh("slot", taken)
     let (params, args) = facade_render_params_but(pool, intern, producer, 0, slot, "&raw mut " ++ slot_var)
@@ -1295,13 +1321,14 @@ fn facade_render_out_producer(pool: AstPool, intern: InternPool, name: &str, rep
         let result = "Option[" ++ name ++ "]"
         return (head ++ " -> " ++ result ++ ":\n" ++ null_slot ++ "    " ++ call ++ "\n    if " ++ slot_var ++ " == null: None else: Some(" ++ made ++ ")\n", result)
     let status = facade_render_fresh("status", taken)
-    if ok_sym == 0:
-        let result = "(" ++ ret.slice(4, ret.len()) ++ ", Option[" ++ name ++ "])"
+    let status_type = ret.slice(4, ret.len())
+    if ok_syms.len() == 0:
+        let result = "(" ++ status_type ++ ", Option[" ++ name ++ "])"
         return (head ++ " -> " ++ result ++ ":\n" ++ null_slot ++ "    let " ++ status ++ " = " ++ call ++ "\n    (" ++ status ++ ", if " ++ slot_var ++ " == null: None else: Some(" ++ made ++ "))\n", result)
     let err = facade_render_error_name(name)
-    let result = "Result[" ++ name ++ ", " ++ err ++ "]"
+    let result = "Result[" ++ facade_render_ok_type(ok_syms, status_type, name) ++ ", " ++ err ++ "]"
     var out = head ++ " -> " ++ result ++ ":\n" ++ null_slot ++ "    let " ++ status ++ " = " ++ call ++ "\n"
-    out = out ++ "    if " ++ status ++ " != " ++ intern.resolve(ok_sym) ++ ":\n"
+    out = out ++ "    if " ++ facade_render_not_ok(intern, ok_syms, status) ++ ":\n"
     out = out ++ "        if " ++ slot_var ++ " == null: return Err(" ++ err ++ ".Failed(" ++ status ++ "))\n"
     if deps.len() > 0:
         // A dependent resource: the generated error never owns a child
@@ -1311,7 +1338,7 @@ fn facade_render_out_producer(pool: AstPool, intern: InternPool, name: &str, rep
     else:
         out = out ++ "        return Err(" ++ err ++ ".FailedWithResource(" ++ status ++ ", " ++ facade_render_failed_name(name) ++ " { repr: " ++ slot_var ++ " }))\n"
     out = out ++ "    if " ++ slot_var ++ " == null: return Err(" ++ err ++ ".NothingProduced(" ++ status ++ "))\n"
-    (out ++ "    Ok(" ++ made ++ ")\n", result)
+    (out ++ "    Ok(" ++ facade_render_ok_value(ok_syms, status, made) ++ ")\n", result)
 
 // The names the Result projection renders beside a resource `R`: its error
 // type and the type of a resource a failed producer still produced. Sema

@@ -437,7 +437,8 @@ pub type FacadeResource {
     preinit: i32,
     drop: i32,
     destroyers: Vec[i32],
-    ok_const: i32,
+    ok_consts: Vec[i32],       // `ok C1, C2, …` (§16.2b.4): the success statuses as stated, any of them success; empty without `ok`
+    ok_node: i32,              // the `ok` clause (provenance, and a second one is refused), or 0
     borrows: Vec[i32],         // the parameter each `borrows` clause names
     borrows_owner: Vec[i32],   // parallel: the producer it names one of (a `from` index, or FACADE_DEP_INIT)
     borrows_nodes: Vec[i32],   // parallel: the clause (provenance, §16.2b.2)

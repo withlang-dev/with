@@ -220,10 +220,15 @@ fn contract_collect_resource(report: &AnalysisReport, sema: &Sema, ri: i32, sour
         contract_row(report, sema, &site, subject, CONTRACT_RESOURCE, clause, r.init, owner, 0, "init", f"{init} -> {rname}.{sema.facade_presented(ri, init)}; production: in place, Drop armed by init", contract_clause_at(sema, &site, clause))
     if r.producers.len() == 0 and r.init == 0:
         contract_row(report, sema, &site, subject, CONTRACT_RESOURCE, node, 0, owner, -1, "producer", "none; nothing constructs this resource safely", "default:no from/init clause")
-    if r.ok_const != 0:
+    if r.ok_consts.len() > 0:
         let clause = contract_clause(sema, node, FACADE_CLAUSE_OK, 0)
-        let c = sema.safe_symbol_text(r.ok_const)
-        contract_row(report, sema, &site, subject, CONTRACT_RESOURCE, clause, r.ok_const, owner, -1, "status", f"ok {c}; a status-returning producer is Result[{rname}, {rname}Error]", contract_clause_at(sema, &site, clause))
+        var c = ""
+        for k in 0..r.ok_consts.len() as i32:
+            c = c ++ (if k > 0: ", " else: "") ++ sema.safe_symbol_text(r.ok_consts[k])
+        // Several success statuses: the Ok side carries the one that matched
+        // beside the produced value (§16.2b.4).
+        let ok_side = if r.ok_consts.len() > 1: f"(status, {rname})" else: rname.clone()
+        contract_row(report, sema, &site, subject, CONTRACT_RESOURCE, clause, r.ok_consts[0], owner, -1, "status", f"ok {c}; a status-returning producer is Result[{ok_side}, {rname}Error]", contract_clause_at(sema, &site, clause))
     else:
         contract_row(report, sema, &site, subject, CONTRACT_RESOURCE, node, 0, owner, -1, "status", "none; a producer's failure is None, or (status, None) through an out parameter", "default:no status convention is inferred (§16.2b.4)")
     // Destroy paths (§16.2b.3, §16.2b.5).

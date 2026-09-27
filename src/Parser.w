@@ -4338,10 +4338,18 @@ impl Parser:
                     return 0
                 ops.push(0)
         else if word == "ok":
+            // `ok C` or `ok C1, C2, …` (§16.2b.4, ruling Amendment 1): any
+            // listed constant is success. Sema verifies each and where a
+            // list is allowed.
             kind = FACADE_CLAUSE_OK
             let c = self.expect_ident()
             if c == 0: return 0
             ops.push(c)
+            while self.peek() == TokenKind.TK_COMMA:
+                self.advance()
+                let more = self.expect_ident()
+                if more == 0: return 0
+                ops.push(more)
         else if word == "borrows":
             kind = FACADE_CLAUSE_BORROWS
             let r = self.parse_facade_param_ref()

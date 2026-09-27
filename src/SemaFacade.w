@@ -135,7 +135,7 @@ impl Sema:
             if slot >= 0 and self.facade_op_raw_beyond(p, slot, false):
                 self.emit_error(f"resource '{rname}': producer '{pn}' is still a raw call after the facade covers its out parameter (a variadic, a raw status return, or a raw pointer parameter the facade does not describe); describe it with an fn item (§16.2b.5)", node)
                 return false
-        if self.facade_resources[ri].ok_const != 0 and init_fn == 0 and not self.verify_facade_ok_producers(ri):
+        if self.facade_resources[ri].ok_consts.len() > 0 and init_fn == 0 and not self.verify_facade_ok_producers(ri):
             return false
         if init_fn != 0 and not self.verify_facade_init(ri):
             return false
@@ -152,7 +152,7 @@ impl Sema:
     mut fn verify_facade_ok_producers(ri: i32) -> bool:
         let rname: str = self.pool_resolve(self.facade_resources[ri].name)
         let node = self.facade_resources[ri].node
-        let cn: str = self.pool_resolve(self.facade_resources[ri].ok_const)
+        let cn = self.facade_ok_text(ri)
         var statuses = 0
         var shapes = ""
         var first = 0
@@ -197,7 +197,7 @@ impl Sema:
     // and whether that error can hold a failed-state resource `Failed<R>` (an
     // out-parameter producer: failure may still produce, ruling §18).
     fn facade_projects_status(ri: i32) -> bool:
-        if self.facade_resources[ri].ok_const == 0:
+        if self.facade_resources[ri].ok_consts.len() == 0:
             return false
         let init_fn = self.facade_resources[ri].init
         if init_fn != 0:
@@ -211,7 +211,7 @@ impl Sema:
     fn facade_has_failed_state(ri: i32) -> bool:
         if self.facade_resource_dependent(ri):
             return false
-        if self.facade_resources[ri].ok_const == 0:
+        if self.facade_resources[ri].ok_consts.len() == 0:
             return false
         for pi in 0..self.facade_resources[ri].producers.len() as i32:
             if self.facade_resources[ri].out_params[pi] < 0:
@@ -248,7 +248,7 @@ impl Sema:
         names.push(rname.clone())
         roles.push("the resource type")
         if self.facade_projects_status(ri):
-            let cn: str = self.pool_resolve(self.facade_resources[ri].ok_const)
+            let cn = self.facade_ok_text(ri)
             names.push(facade_render_error_name(rname))
             roles.push(f"the error type of its 'ok {cn}' projection")
             if self.facade_has_failed_state(ri):
@@ -441,12 +441,12 @@ impl Sema:
         if self.facade_same_type(self.sig_param_type(isig, 0), repr as i32):
             self.emit_error(f"resource '{rname}': 'init {iname}' takes the representation by value, so it would initialize a copy; an in-place initializer takes a pointer to the storage (§16.2b.4)", node)
             return false
-        if self.facade_resources[ri].ok_const != 0 and self.get_type_kind(self.resolve_alias(self.sig_return_type(isig) as TypeId)) == TypeKind.TY_VOID:
-            let cn: str = self.pool_resolve(self.facade_resources[ri].ok_const)
+        if self.facade_resources[ri].ok_consts.len() > 0 and self.get_type_kind(self.resolve_alias(self.sig_return_type(isig) as TypeId)) == TypeKind.TY_VOID:
+            let cn = self.facade_ok_text(ri)
             self.emit_error(f"resource '{rname}': 'ok {cn}' names a status but 'init {iname}' returns nothing to compare it with (§16.2b.4)", node)
             return false
-        if self.facade_resources[ri].ok_const != 0 and self.get_type_kind(self.numeric_operand_type(self.sig_return_type(isig))) != TypeKind.TY_INT:
-            let cn: str = self.pool_resolve(self.facade_resources[ri].ok_const)
+        if self.facade_resources[ri].ok_consts.len() > 0 and self.get_type_kind(self.numeric_operand_type(self.sig_return_type(isig))) != TypeKind.TY_INT:
+            let cn = self.facade_ok_text(ri)
             let rt: str = self.type_name(self.sig_return_type(isig))
             self.emit_error(f"resource '{rname}': 'ok {cn}' compares an integer status, but 'init {iname}' returns {rt} (§16.2b.4)", node)
             return false
@@ -697,7 +697,7 @@ impl Sema:
         let repr_tid = self.resolve_type_expr(repr_node) as i32
         if repr_tid == 0:
             return
-        var r = FacadeResource { name, facade, node: item, decl, repr_tid, producers: Vec.new(), out_params: Vec.new(), init: 0, preinit: 0, drop: 0, destroyers: Vec.new(), ok_const: 0, borrows: Vec.new(), borrows_owner: Vec.new(), borrows_nodes: Vec.new(), last_producer: -2, independent: 0, independent_node: 0, movable: 0, thread_caps: 0, abandon: 0, abandon_node: 0 }
+        var r = FacadeResource { name, facade, node: item, decl, repr_tid, producers: Vec.new(), out_params: Vec.new(), init: 0, preinit: 0, drop: 0, destroyers: Vec.new(), ok_consts: Vec.new(), ok_node: 0, borrows: Vec.new(), borrows_owner: Vec.new(), borrows_nodes: Vec.new(), last_producer: -2, independent: 0, independent_node: 0, movable: 0, thread_caps: 0, abandon: 0, abandon_node: 0 }
         for ci in 0..clause_count:
             let clause = self.ast.get_extra(extra_start + 1 + ci)
             r = self.collect_resource_clause(rname, move r, clause)
@@ -781,12 +781,26 @@ impl Sema:
             else: r.destroyers.push(f)
             return r
         if kind == FACADE_CLAUSE_OK:
-            let c = self.ast.get_extra(ops)
-            if not self.facade_status_constant_ok(c):
-                let cn: str = self.pool_resolve(c)
-                self.emit_error(f"resource '{rname}': '{cn}' is not an imported compile-time constant (§16.2b.4, §16.2b.13)", clause)
+            // `ok C` or `ok C1, C2, …` (§16.2b.4, ruling Amendment 1): any
+            // listed constant is success. Every one is stated and verified
+            // (§16.2b.13); one success statement per resource.
+            if r.ok_node != 0:
+                self.emit_error(f"resource '{rname}': 'ok' is stated twice; list every success status in one clause: 'ok C1, C2' (§16.2b.4)", clause)
                 return r
-            r.ok_const = c
+            let listed: Vec[i32] = Vec.new()
+            for k in 0..self.ast.get_data2(clause):
+                let c = self.ast.get_extra(ops + k)
+                let cn: str = self.pool_resolve(c)
+                if not self.facade_status_constant_ok(c):
+                    self.emit_error(f"resource '{rname}': '{cn}' is not an imported compile-time constant (§16.2b.4, §16.2b.13)", clause)
+                    return r
+                for j in 0..listed.len() as i32:
+                    if listed[j] == c:
+                        self.emit_error(f"resource '{rname}': 'ok' lists '{cn}' twice (§16.2b.4)", clause)
+                        return r
+                listed.push(c)
+            r.ok_consts = listed
+            r.ok_node = clause
             return r
         if kind == FACADE_CLAUSE_BORROWS:
             // `borrows` names a parameter of the producer stated before it:
@@ -1399,6 +1413,12 @@ impl Sema:
             // verify_facade_buffers checks once every clause is collected.
             let const_sym = self.ast.get_extra(ops)
             let cn: str = self.pool_resolve(const_sym)
+            // Several success statuses are a producer's (§16.2b.4, ruling
+            // Amendment 1: "A producer's `ok` may list several"); the
+            // status contract of an fn item names one.
+            if self.ast.get_data2(clause) > 1:
+                self.emit_error(f"fn '{fname}': 'ok' lists several success statuses, which a producer's 'ok' on its resource may; an fn item's 'ok' — the status contract of a copied-back length or a variadic setter — names one (§16.2b.4)", clause)
+                return c
             if not self.facade_status_constant_ok(const_sym):
                 self.emit_error(f"fn '{fname}': 'ok {cn}' names no imported integer constant; a status is compared with a compile-time constant the header declares (§16.2b.4)", clause)
                 return c
@@ -1627,6 +1647,15 @@ impl Sema:
                 value = self.ast.get_data1(value)
             return value != 0 and self.ast.kind(value) == NodeKind.NK_INT_LIT
         false
+
+    // A resource's success statuses as its `ok` clause states them, for a
+    // diagnostic: `SQLITE_OK`, or `SQLITE_ROW, SQLITE_DONE`.
+    fn facade_ok_text(ri: i32) -> str:
+        var out = ""
+        for k in 0..self.facade_resources[ri].ok_consts.len() as i32:
+            let cn: str = self.pool_resolve(self.facade_resources[ri].ok_consts[k])
+            out = out ++ (if k > 0: ", " else: "") ++ cn
+        out
 
     // ── discriminated variadic contracts (D66, spec §16.2b.5) ──────────────
 
