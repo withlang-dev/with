@@ -1061,6 +1061,10 @@ pub type Sema {
     label_loop_entry_binds: Vec[i32],
     label_break_off: Vec[i32],
     label_break_seen: Vec[i32],
+    // #1733: every loop or labeled block a checked `break` exits, by node.
+    // Whether a `while true` or `loop` falls through is this fact: a syntax
+    // walk looking for the `break` missed one in a let-else's else branch.
+    break_target_nodes: HashMap[i32, i32],
     loop_break_flat: Vec[i32],
     // Parallel to loop_break_flat and sharing its per-frame offset (label_break_off):
     // the loop-entry move-state snapshot, one region per active loop. It lets the
@@ -2645,6 +2649,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         label_loop_entry_binds: Vec.new(),
         label_break_off: Vec.new(),
         label_break_seen: Vec.new(),
+        break_target_nodes: sema_new_map_i32_i32(),
         loop_break_flat: Vec.new(),
         loop_entry_flat: Vec.new(),
         fn_label_syms: Vec.new(),

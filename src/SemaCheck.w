@@ -6273,89 +6273,14 @@ impl Sema:
                 return 1
         0
 
-    // Whether the subtree contains a `break 'label` targeting exactly this
-    // label. Descends into nested loops (their breaks may still target the
-    // outer label) but not closures/fns. Used by body_can_fall_through: a
-    // labeled block containing a break to its OWN label falls through to
-    // its after-edge.
-    fn body_contains_break_to_label(node: i32, label: i32) -> i32:
-        if node == 0 or label == 0:
-            return 0
-        let kind = self.ast.kind(node)
-        if kind == NodeKind.NK_CLOSURE or kind == NodeKind.NK_FN_DECL:
-            return 0
-        if kind == NodeKind.NK_BREAK:
-            if self.ast.get_data1(node) == label: return 1
-            return 0
-        if kind == NodeKind.NK_BLOCK:
-            let extra_start = self.ast.get_data0(node)
-            let stmt_count = self.ast.get_data1(node)
-            for si in 0..stmt_count:
-                if self.body_contains_break_to_label(self.ast.get_extra(extra_start + si), label) != 0:
-                    return 1
-            return self.body_contains_break_to_label(self.ast.get_data2(node), label)
-        if kind == NodeKind.NK_IF_EXPR:
-            if self.body_contains_break_to_label(self.ast.get_data1(node), label) != 0:
-                return 1
-            return self.body_contains_break_to_label(self.ast.get_data2(node), label)
-        if kind == NodeKind.NK_MATCH:
-            let arm_start = self.ast.get_data1(node)
-            let arm_count = self.ast.get_data2(node)
-            for ai in 0..arm_count:
-                if self.body_contains_break_to_label(self.ast.get_extra(arm_start + ai), label) != 0:
-                    return 1
-            return 0
-        if kind == NodeKind.NK_MATCH_ARM:
-            return self.body_contains_break_to_label(self.ast.get_data1(node), label)
-        if kind == NodeKind.NK_LOOP:
-            return self.body_contains_break_to_label(self.ast.get_data0(node), label)
-        if kind == NodeKind.NK_WHILE:
-            return self.body_contains_break_to_label(self.ast.get_data1(node), label)
-        if kind == NodeKind.NK_DO_WHILE:
-            return self.body_contains_break_to_label(self.ast.get_data0(node), label)
-        if kind == NodeKind.NK_FOR:
-            return self.body_contains_break_to_label(self.ast.get_data2(node), label)
-        if kind == NodeKind.NK_LET_BINDING or kind == NodeKind.NK_LET_DECL:
-            return self.body_contains_break_to_label(self.ast.get_data1(node), label)
-        0
-
-    fn body_contains_break(node: i32) -> i32:
-        if node == 0:
-            return 0
-        let kind = self.ast.kind(node)
-        if kind == NodeKind.NK_CLOSURE or kind == NodeKind.NK_FN_DECL:
-            return 0
-        if kind == NodeKind.NK_BREAK:
-            return 1
-        if kind == NodeKind.NK_BLOCK:
-            let extra_start = self.ast.get_data0(node)
-            let stmt_count = self.ast.get_data1(node)
-            for si in 0..stmt_count:
-                if self.body_contains_break(self.ast.get_extra(extra_start + si)) != 0:
-                    return 1
-            return self.body_contains_break(self.ast.get_data2(node))
-        if kind == NodeKind.NK_IF_EXPR:
-            if self.body_contains_break(self.ast.get_data1(node)) != 0:
-                return 1
-            return self.body_contains_break(self.ast.get_data2(node))
-        if kind == NodeKind.NK_MATCH:
-            let arm_start = self.ast.get_data1(node)
-            let arm_count = self.ast.get_data2(node)
-            for ai in 0..arm_count:
-                if self.body_contains_break(self.ast.get_extra(arm_start + ai)) != 0:
-                    return 1
-            return 0
-        if kind == NodeKind.NK_MATCH_ARM:
-            return self.body_contains_break(self.ast.get_data1(node))
-        if kind == NodeKind.NK_LOOP:
-            return 0
-        if kind == NodeKind.NK_WHILE:
-            return 0
-        if kind == NodeKind.NK_DO_WHILE:
-            return 0
-        if kind == NodeKind.NK_FOR:
-            return 0
-        0
+    // Whether a checked `break` exits this loop or labeled block (#1733):
+    // Sema's own resolution of every `break` (check_expr's NK_BREAK arm
+    // records its target), not a walk of the syntax. The walk looked into
+    // blocks, `if`s and `match`es only, so `while true: let Some(x) = e
+    // else: break` read as a loop that never exits — the function "never
+    // fell through" and MIR never stored its result (garbage return).
+    fn is_break_target(node: i32) -> bool:
+        self.break_target_nodes.contains(node)
 
     fn bool_literal_is_true(node: i32) -> i32:
         if node == 0 or self.ast.kind(node) != NodeKind.NK_BOOL_LIT:
@@ -6419,10 +6344,8 @@ impl Sema:
             // #779: a `break` targeting THIS block's own label exits to the
             // block's after-edge — the block itself falls through.
             let bcf_meta = self.ast.find_block_meta(node)
-            if bcf_meta >= 0:
-                let bcf_label = self.ast.block_meta_label(bcf_meta)
-                if bcf_label != 0 and self.body_contains_break_to_label(node, bcf_label) != 0:
-                    return 1
+            if bcf_meta >= 0 and self.ast.block_meta_label(bcf_meta) != 0 and self.is_break_target(node):
+                return 1
             let extra_start = self.ast.get_data0(node)
             let stmt_count = self.ast.get_data1(node)
             for si in 0..stmt_count:
@@ -6451,17 +6374,11 @@ impl Sema:
         if kind == NodeKind.NK_MATCH_ARM:
             return self.body_can_fall_through(self.ast.get_data1(node))
         if kind == NodeKind.NK_LOOP:
-            if self.body_contains_break(self.ast.get_data0(node)) == 0:
-                return 0
-            return 1
+            return if self.is_break_target(node): 1 else: 0
         if kind == NodeKind.NK_WHILE:
-            if self.condition_is_static_true(self.ast.get_data0(node)) != 0 and self.body_contains_break(self.ast.get_data1(node)) == 0:
-                return 0
-            return 1
+            return if self.condition_is_static_true(self.ast.get_data0(node)) != 0 and not self.is_break_target(node): 0 else: 1
         if kind == NodeKind.NK_DO_WHILE:
-            if self.condition_is_static_true(self.ast.get_data1(node)) != 0 and self.body_contains_break(self.ast.get_data0(node)) == 0:
-                return 0
-            return 1
+            return if self.condition_is_static_true(self.ast.get_data1(node)) != 0 and not self.is_break_target(node): 0 else: 1
         1
 
     mut fn check_bitwise_literal_with_expected(node: i32, expected: TypeId) -> TypeId:
@@ -6936,15 +6853,13 @@ impl Sema:
                 self.emit_error_code("break not allowed in defer", node, "E0901")
             let val = self.ast.get_data0(node)
             let label = self.ast.get_data1(node)
+            let target = if label != 0: self.resolve_labeled_control(label, node) else: self.resolve_innermost_loop_control(node, "break")
             if label != 0:
-                let target = self.resolve_labeled_control(label, node)
                 self.mark_function_label_used(label)
-                self.capture_loop_break_move_state(target)
-                self.check_break_value_for_target(target, val, node)
-            else:
-                let target = self.resolve_innermost_loop_control(node, "break")
-                self.capture_loop_break_move_state(target)
-                self.check_break_value_for_target(target, val, node)
+            if target >= 0:
+                self.break_target_nodes.insert(self.label_nodes[target], 1)
+            self.capture_loop_break_move_state(target)
+            self.check_break_value_for_target(target, val, node)
             return self.ty_never
 
         if kind == NodeKind.NK_CONTINUE:
@@ -10177,7 +10092,7 @@ impl Sema:
         // its after-edge — it falls through and must not type as Never, whether
         // the break is a statement or the block's tail. A `break 'label value`
         // gives the block that value's type (§29.13).
-        if result == self.ty_never and block_label != 0 and self.body_contains_break_to_label(node, block_label) != 0:
+        if result == self.ty_never and block_label != 0 and self.is_break_target(node):
             let blk_frame_idx = self.label_syms.len() as i32 - 1
             let blk_break_ty: i32 = if blk_frame_idx >= 0: self.label_break_value_types[blk_frame_idx] else: 0
             result = if blk_break_ty != 0: blk_break_ty as TypeId else: self.ty_void
