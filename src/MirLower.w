@@ -15050,7 +15050,11 @@ impl MirBuilder:
 
         let intrinsic = self.classify_intrinsic(payload_ty, method_name)
         if intrinsic != MirIntrinsic.NONE:
-            let payload_op_kind = if self.sema.is_copy_frozen(payload_ty) != 0: OperandKind.OK_COPY else: OperandKind.OK_MOVE
+            // #1710: a reader intrinsic observes the payload in place.
+            let observes = self.optional_chain_intrinsic_observes(payload_ty, member_sym)
+            if observes and self.place_type_is_str(payload_place) != 0:
+                self.mark_string_place_copied(payload_place)
+            let payload_op_kind = if observes: OperandKind.OK_COPY else: OperandKind.OK_MOVE
             let payload_op = self.body.new_operand(payload_op_kind, payload_place)
             raw_op = self.lower_intrinsic_call_with_receiver_operand(intrinsic, payload_op, payload_ty, member_sym, arg_start, arg_count, raw_ret_ty, node)
         else:
@@ -15274,15 +15278,67 @@ impl MirBuilder:
         self.register_stmt_temp(tmp, ty)
         self.body.new_operand(OperandKind.OK_MOVE, place)
 
+    // Whether an optional chain reads its base in place (#1710): the base is
+    // a place, and the chain takes nothing out of it — a Copy field, a Copy
+    // payload handed to an intrinsic, or a payload lent to a method whose
+    // receiver borrows. A non-Copy field still moves the base into a
+    // temporary (the §10.3 `map` desugar consumes it).
+    fn optional_chain_observes_base(base_expr: i32, base_ty: i32, member_sym: i32, is_call: i32) -> bool:
+        var place_expr = base_expr
+        while place_expr != 0 and self.ast.kind(place_expr) == NodeKind.NK_GROUPED:
+            place_expr = self.ast.get_data0(place_expr)
+        let bk = if place_expr != 0: self.ast.kind(place_expr) else: 0
+        let is_place = bk == NodeKind.NK_IDENT or (bk == NodeKind.NK_FIELD_ACCESS and not self.is_enum_variant_path(place_expr)) or bk == NodeKind.NK_INDEX or (bk == NodeKind.NK_UNARY and self.ast.get_data0(place_expr) == UnaryOp.UOP_DEREF)
+        if not is_place:
+            return false
+        var payload_ty = self.generic_inst_arg_type(base_ty, self.sema.syms.option, 0)
+        if payload_ty == 0:
+            payload_ty = self.generic_inst_arg_type(base_ty, self.sema.syms.result, 0)
+        if payload_ty == 0:
+            return false
+        if is_call == 0:
+            let field_ty = self.sema.field_access_type_direct_frozen(self.sema.resolve_alias(payload_ty as TypeId), member_sym)
+            return field_ty != 0 and self.sema.is_copy_frozen(field_ty) != 0
+        let method_name = self.pool.resolve_symbol(member_sym)
+        if self.classify_intrinsic(payload_ty, method_name) != MirIntrinsic.NONE:
+            return self.optional_chain_intrinsic_observes(payload_ty, member_sym)
+        let recv_resolved = self.sema.auto_deref_ref_ptr_type(payload_ty as TypeId) as i32
+        let owner_sym = self.sema.method_owner_symbol_for_type(recv_resolved)
+        let callee_sym = if owner_sym != 0: self.sema.lookup_method_fn(owner_sym, member_sym) else: 0
+        let sig_idx = if callee_sym != 0: self.call_sig_for_sym(callee_sym) else: -1
+        if sig_idx < 0 or self.sema.sig_get_param_count(sig_idx) == 0:
+            return false
+        let recv_param_ty = self.sema.sig_param_type(sig_idx, 0)
+        recv_param_ty != 0 and self.sema.can_auto_ref_arg_frozen(recv_param_ty, payload_ty) != 0
+
+    // An intrinsic reads a chained payload in place unless its builtin
+    // method consumes the receiver (the ordinary call path's rule,
+    // lower_intrinsic_call).
+    fn optional_chain_intrinsic_observes(payload_ty: i32, member_sym: i32) -> bool:
+        if self.sema.is_copy_frozen(payload_ty) != 0:
+            return true
+        let owner = self.sema.method_owner_symbol_for_type(payload_ty)
+        owner != 0 and self.sema.builtin_method_requires_move_receiver(owner, member_sym) == 0
+
     mut fn lower_optional_chain(node: i32) -> i32:
         let base_expr = self.ast.get_data0(node)
         let member_sym = self.ast.get_data1(node)
         let extra_start = self.ast.get_data2(node)
         let is_call = self.ast.optional_chain_is_call(extra_start)
 
-        let base_op = self.lower_expr(base_expr)
         let base_ty = self.expr_type(base_expr)
-        let base_place = self.materialize_operand(base_op, base_ty, self.ast.get_start(base_expr))
+        // #1710: Sema types the chain as an observation of its base (it marks
+        // nothing moved and carries the base's view origins). A chain that
+        // copies a field out, or lends the payload to a borrowing method,
+        // realizes that by reading through the base's place. Moving the base
+        // into a temporary reset it, and the next chain on the same Option
+        // read `Some(<blank>)`.
+        var base_place = 0
+        if self.optional_chain_observes_base(base_expr, base_ty, member_sym, is_call):
+            base_place = self.lower_expr_place(base_expr)
+        else:
+            let base_op = self.lower_expr(base_expr)
+            base_place = self.materialize_operand(base_op, base_ty, self.ast.get_start(base_expr))
         let option_payload_ty = self.generic_inst_arg_type(base_ty, self.sema.syms.option, 0)
         let result_ok_ty = self.generic_inst_arg_type(base_ty, self.sema.syms.result, 0)
         let result_err_ty = self.generic_inst_arg_type(base_ty, self.sema.syms.result, 1)
