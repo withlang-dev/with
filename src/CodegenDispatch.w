@@ -6025,7 +6025,10 @@ impl Codegen:
                 if want != 0 and wl_type_of(raw) != want:
                     let src_unsigned = self.mir_sema_type_is_unsigned(self.mir_operand_sema_type(body, operand))
                     marshaled = self.mir_coerce_value_to_sema_type(raw, want, param_sema, src_unsigned)
-        self.record_codegen_call_argument(body, args_id, operand, param_index, AnalysisMarshalStrategy.DirectValue, raw, marshaled)
+        // Every caller hands these values to coerce_call_args_for_fn_value
+        // (build_call_fn_value, call_concrete_mir_function), which applies the
+        // callee's FnAbi; the audit judges them as that builder's input.
+        self.record_codegen_call_argument(body, args_id, operand, param_index, AnalysisMarshalStrategy.CallBuilder, raw, marshaled)
         marshaled
 
     // Evaluate a contiguous MIR call-argument range under the concrete signature

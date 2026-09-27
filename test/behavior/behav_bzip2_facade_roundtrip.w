@@ -1,3 +1,4 @@
+//! skip-on: windows no host bzip2 on Windows: this c_imports the host library's header (Linux CI installs it); the release UAT project gets it from `with get`
 //! expect-stdout: bzip2 UAT passed
 
 // D64 (spec §16.2b.8): the release UAT program for bzip2, verbatim below

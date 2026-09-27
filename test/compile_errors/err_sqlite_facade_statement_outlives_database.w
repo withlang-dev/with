@@ -1,3 +1,4 @@
+//! skip-on: windows no host sqlite3 on Windows: this c_imports the host library's header (Linux CI installs it); the release UAT project gets it from `with get`
 //! expect-check-fail: view `keep` may originate from `db`, which no longer lives here (§21.1 Rule 6)
 
 // D51 stage 12 (ruling §27, §29, §66: "sqlite3_stmt as a dependent child

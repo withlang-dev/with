@@ -1,3 +1,4 @@
+//! skip-on: windows no host sqlite3 on Windows: this c_imports the host library's header (Linux CI installs it); the release UAT project gets it from `with get`
 //! expect-check-fail: wrong argument type in call to 'Database.create_function_v2'
 //! expect-check-fail: expects extern "C" fn(Context, i32, *mut *mut sqlite3_value) -> Unit
 

@@ -105,6 +105,9 @@ pub enum AnalysisMarshalStrategy: i32:
     CalleeOwnedCopy = 8
     CalleeDirectValue = 9
     CalleeOwnedPlace = 10
+    // Handed to coerce_call_args_for_fn_value, which applies the callee's
+    // FnAbi (push_call_arg: the indirect copy or the direct value).
+    CallBuilder = 11
 
 impl Copy for AnalysisMarshalStrategy
 
@@ -119,6 +122,7 @@ pub fn analysis_marshal_strategy_name(strategy: AnalysisMarshalStrategy) -> str:
     if strategy == AnalysisMarshalStrategy.CalleeOwnedCopy: return "callee-owned-copy"
     if strategy == AnalysisMarshalStrategy.CalleeDirectValue: return "callee-direct-value"
     if strategy == AnalysisMarshalStrategy.CalleeOwnedPlace: return "callee-owned-place"
+    if strategy == AnalysisMarshalStrategy.CallBuilder: return "call-builder"
     "unknown"
 
 pub type AnalysisFact {

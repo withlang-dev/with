@@ -1,3 +1,4 @@
+//! skip-on: windows no host libcurl on Windows: this c_imports the host library's header (Linux CI installs it); the release UAT project gets it from `with get`
 //! expect-check-fail: add 'case CURLOPT_READDATA: <type>' under 'variadic param 2 selected by param option:' in facade curl, or call the raw curl_easy_setopt under unsafe
 
 // D66 (spec §16.2b.5): an option the facade lists no case for is refused

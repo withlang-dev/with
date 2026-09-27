@@ -1,3 +1,4 @@
+//! skip-on: windows no host sqlite3 on Windows: this c_imports the host library's header (Linux CI installs it); the release UAT project gets it from `with get`
 //! expect-check-fail: 'Context' is a callback-scope handle, borrowed for the callback's invocation, and cannot outlive it
 
 // Spec §16.2b.9 (D71, ruling Amendment 1, #1611): the `Context` SQLite

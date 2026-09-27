@@ -1,3 +1,4 @@
+//! skip-on: windows no host libcurl on Windows: this c_imports the host library's header (Linux CI installs it); the release UAT project gets it from `with get`
 //! expect-check-fail: view `info` borrows from foreign-state domain `version_info`, which `curl_global_cleanup` may have invalidated (§16.2b.7)
 
 // D66 (spec §16.2b.6, §16.2b.7): the version record is a view of libcurl's

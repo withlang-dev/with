@@ -1,3 +1,4 @@
+//! skip-on: windows no host zlib on Windows: this c_imports the host library's header (Linux CI installs it); the release UAT project gets it from `with get`
 //! expect-stdout: zlib UAT passed
 
 // D64 (spec §16.2b.8): the release UAT program for zlib, verbatim below

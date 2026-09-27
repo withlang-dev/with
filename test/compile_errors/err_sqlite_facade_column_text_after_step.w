@@ -1,3 +1,4 @@
+//! skip-on: windows no host sqlite3 on Windows: this c_imports the host library's header (Linux CI installs it); the release UAT project gets it from `with get`
 //! expect-check-fail: view `text` borrows from `stmt`, which `sqlite3_step` may have invalidated (§16.2b.7)
 
 // D51 stage 12 (ruling §38, §66: "view invalidation across statement

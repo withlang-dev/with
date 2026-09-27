@@ -1,3 +1,4 @@
+//! skip-on: windows no host sqlite3 on Windows: this c_imports the host library's header (Linux CI installs it); the release UAT project gets it from `with get`
 //! expect-stdout: version: 3
 //! expect-stdout: exec: 0
 //! expect-stdout: row: tag=2 cols=2

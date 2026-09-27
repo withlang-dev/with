@@ -876,13 +876,18 @@ impl Codegen:
         fact.name = with_str_clone_ref(name)
         // Strategy verdicts are derived before the enum's last use below;
         // analysis_marshal_strategy_name consumes it.
-        let strategy_unmarshaled = strategy == AnalysisMarshalStrategy.DirectValue or strategy == AnalysisMarshalStrategy.MissingSignature
+        let via_call_builder = strategy == AnalysisMarshalStrategy.CallBuilder
+        let strategy_unmarshaled = strategy == AnalysisMarshalStrategy.DirectValue or strategy == AnalysisMarshalStrategy.MissingSignature or via_call_builder
         let strategy_temp_copy = strategy == AnalysisMarshalStrategy.TemporaryAddress and (op_kind == OperandKind.OK_COPY or op_kind == OperandKind.OK_MOVE)
-        let has_copy = strategy == AnalysisMarshalStrategy.TemporaryAddress
+        // A value handed to the call builder is still at its source type; the
+        // builder's push_call_arg makes the indirect copy (#1740's audit on
+        // windows-x86_64: BTreeMap.insert's `str` value).
+        let has_copy = strategy == AnalysisMarshalStrategy.TemporaryAddress or via_call_builder
         fact.detail = analysis_marshal_strategy_name(strategy) ++ f" raw={raw} marshaled={marshaled} sig={sig} fn-abi={descriptor} sema-share={share} ref-table={ref_table} needs-copy={needs_copy}"
         let selected = self.analysis_fact_selected(&fact)
         self.analysis_add(move fact)
-        if selected and has_descriptor and (marshaled == 0 or wl_type_of(marshaled) != self.fn_abi_arg(descriptor, param_index).llvm_ty):
+        let abi_ty = if has_descriptor and via_call_builder: self.fn_abi_arg(descriptor, param_index).source_ty else if has_descriptor: self.fn_abi_arg(descriptor, param_index).llvm_ty else: 0
+        if selected and has_descriptor and (marshaled == 0 or wl_type_of(marshaled) != abi_ty):
             self.analysis_fail(f"call {name} body={body.fn_sym} args={args_id} param={param_index}: marshaled LLVM type disagrees with FnAbi")
         if selected and needs_copy and not has_copy:
             self.analysis_fail(f"call {name} body={body.fn_sym} args={args_id} param={param_index}: indirect value parameter requires an explicit caller copy")
@@ -5217,7 +5222,12 @@ impl Codegen:
                         arg.llvm_ty = packed
                     else if self.c_abi_needs_indirect_param(source_ty):
                         indirect = true
-            else:
+            else if (places[pi] & 1) == 0:
+                // A place parameter (a `mut self` receiver, a value-ref) passes
+                // its address whatever the platform rule says, so it never
+                // needs its type's size. Sizing it anyway made windows-x86_64
+                // report #1430 for a place of an opaque type, which has none:
+                // c_import's `impl db: mut fn close()` for `db_close(db*)`.
                 indirect = self.internal_abi_needs_indirect_param(source_ty)
             arg.pass = fn_abi_argument_pass(places[pi] & 1, convention, indirect or owned_place)
             if arg.pass == PM_INDIRECT or arg.pass == PM_INDIRECT_PLACE:

@@ -1,3 +1,4 @@
+//! skip-on: windows no host sqlite3 on Windows: this c_imports the host library's header (Linux CI installs it); the release UAT project gets it from `with get`
 //! expect-check-fail: capturing closure cannot coerce to extern "C" fn pointer
 
 // D51 stage 12 (ruling §44, §66: "a callback API with userdata"; spec

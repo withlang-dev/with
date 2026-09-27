@@ -29,6 +29,8 @@ extern fn TerminateProcess(handle: i64, code: u32) -> i32
 extern fn CreateThread(attrs: *mut u8, stack_size: u64, start: *mut u8, arg: *mut u8, flags: u32, tid: *mut u32) -> i64
 extern fn WaitForSingleObject(handle: i64, ms: u32) -> u32
 extern fn GetExitCodeProcess(handle: i64, code: *mut u32) -> i32
+extern fn GetCurrentProcess() -> i64
+extern fn K32GetProcessMemoryInfo(process: i64, counters: *mut u8, cb: u32) -> i32
 extern fn CreateProcessW(app: *const u16, cmd: *mut u16, proc_attrs: *mut u8, thread_attrs: *mut u8, inherit_handles: i32, flags: u32, env: *mut u8, cwd: *const u16, startup: *mut u8, proc_info: *mut u8) -> i32
 extern fn GetEnvironmentVariableW(name: *const u16, buf: *mut u16, size: u32) -> u32
 extern fn SetEnvironmentVariableW(name: *const u16, value: *const u16) -> i32
@@ -841,6 +843,19 @@ fn win_process_alloc(handle: i64, pid: i32) -> i32:
             return slot
     -1
 
+// #679/#702 on Windows: a process's peak working set, the counterpart of
+// ru_maxrss (bytes). PROCESS_MEMORY_COUNTERS is cb and PageFaultCount (u32
+// each), then PeakWorkingSetSize at offset 8; 72 bytes on 64-bit Windows.
+var win_last_child_maxrss: i64 = 0
+
+fn win_process_peak_rss(process: i64) -> i64:
+    var counters: [72]u8 = [0 as u8; 72]
+    let base = (&raw mut counters) as *mut [72]u8 as *mut u8
+    unsafe *(base as *mut u32) = 72 as u32
+    if K32GetProcessMemoryInfo(process, base, 72 as u32) == 0:
+        return 0
+    unsafe *((base as i64 + 8) as *const i64)
+
 fn win_wait_process_slot(slot: i32, timeout_ms: i32, consume: bool) -> i32:
     if slot <= 0 or slot >= 256:
         return -1
@@ -852,6 +867,7 @@ fn win_wait_process_slot(slot: i32, timeout_ms: i32, consume: bool) -> i32:
     if wr == WAIT_TIMEOUT:
         let _term = TerminateProcess(h, CAPTURE_TIMEOUT_RC as u32)
         let _wait = WaitForSingleObject(h, INFINITE)
+        win_last_child_maxrss = win_process_peak_rss(h)
         if consume:
             let _close = CloseHandle(h)
             process_handles[slot] = 0
@@ -861,6 +877,7 @@ fn win_wait_process_slot(slot: i32, timeout_ms: i32, consume: bool) -> i32:
         return win_neg_error()
     var code: u32 = 1 as u32
     let _ = GetExitCodeProcess(h, &raw mut code)
+    win_last_child_maxrss = win_process_peak_rss(h)
     if consume:
         let _close = CloseHandle(h)
         process_handles[slot] = 0
@@ -1099,15 +1116,16 @@ pub fn rt_compat_exec_try_wait(pid: i32) -> i32:
         return win_neg_error()
     var code: u32 = 1 as u32
     let _ = GetExitCodeProcess(h, &raw mut code)
+    win_last_child_maxrss = win_process_peak_rss(h)
     let _close = CloseHandle(h)
     process_handles[pid] = 0
     process_ids[pid] = 0
     code as i32
 
 // #679/#702 stubs: RSS accounting is POSIX-only for now (#807-adjacent).
-pub fn rt_compat_exec_child_maxrss() -> i64: 0
+pub fn rt_compat_exec_child_maxrss() -> i64: win_last_child_maxrss
 
-pub fn rt_compat_self_maxrss() -> i64: 0
+pub fn rt_compat_self_maxrss() -> i64: win_process_peak_rss(GetCurrentProcess())
 
 // ---------------------------------------------------------------------------
 // Networking (Winsock2 / ws2_32). Mirrors the POSIX backend in
@@ -1412,6 +1430,8 @@ c facade win32:
     fn CreateThread
     fn WaitForSingleObject
     fn GetExitCodeProcess
+    fn GetCurrentProcess
+    fn K32GetProcessMemoryInfo
     fn CreateProcessW
     fn GetEnvironmentVariableW
     fn SetEnvironmentVariableW
