@@ -99,6 +99,10 @@ pub type Parser {
     implicit_main_has_main_hint: i32,
     top_level_stmts: Vec[i32],
     explicit_main_decl: i32,
+    // §18.5b (D74): the imported module this parse is of, "" for an entry
+    // source. A module file holds declarations; a statement at its top
+    // level is refused by name.
+    module_label: str,
     // D39: `.wi` interface flavor — functions omit bodies and storage globals
     // omit initializers (typed NK_INTERFACE_* nodes fill the slots). Off for
     // every `.w`, so ordinary source never admits a bodyless declaration.
@@ -206,6 +210,7 @@ fn Parser.init_with_pool(tokens: TokenList, source: &str, file_id: i32, intern: 
         implicit_main_has_main_hint: 0,
         top_level_stmts: Vec.new(),
         explicit_main_decl: 0,
+        module_label: "",
         interface_mode: 0,
         block_indent: 0,
     }
@@ -216,6 +221,29 @@ impl Parser:
         self.implicit_main_has_main_hint = self.has_top_level_main_decl()
 
     mut fn enable_interface_mode(): self.interface_mode = 1
+
+    mut fn enable_module_mode(label: &str): self.module_label = label.clone()
+
+    // §18.5b (D74): a token that opens an executable statement, never a
+    // declaration, at a module's top level. `let`/`var` are declarations
+    // there; attributes, `impl`, `trait` and `c facade` were taken above.
+    fn top_level_starts_stmt() -> i32:
+        let t = self.peek()
+        if t == TokenKind.TK_IDENT:
+            return if self.top_level_starts_decl() != 0: 0 else: 1
+        if t == TokenKind.TK_INT_LIT or t == TokenKind.TK_STRING_LIT or t == TokenKind.TK_FLOAT_LIT:
+            return 1
+        if t == TokenKind.TK_KW_IF or t == TokenKind.TK_KW_MATCH or t == TokenKind.TK_KW_FOR or t == TokenKind.TK_KW_WHILE or t == TokenKind.TK_KW_LOOP or t == TokenKind.TK_KW_RETURN or t == TokenKind.TK_KW_WITH or t == TokenKind.TK_KW_DEFER:
+            return 1
+        if t == TokenKind.TK_L_PAREN or t == TokenKind.TK_L_BRACKET or t == TokenKind.TK_MINUS or t == TokenKind.TK_KW_NOT or t == TokenKind.TK_BANG:
+            return 1
+        0
+
+    mut fn emit_module_top_level_stmt(stmt: NodeId):
+        let span = Span { file: self.file_id, start: self.pool.get_start(stmt), end: self.pool.get_end(stmt) }
+        var diag = Diagnostic.err("module '" ++ self.module_label ++ "' holds an executable statement at its top level; a module file holds declarations, and only an entry source runs statements (§18.5b, D74)", span)
+        diag.add_help("move the statement into a function the entry source calls, or make this file the entry source")
+        self.diags.emit(move diag)
 
     // D39 interface mode: the body slot of a declaration. A body in a `.wi`
     // is an error (the object holds the code); the recovery still parses it
@@ -970,6 +998,15 @@ impl Parser:
                 let stmt = self.parse_expr()
                 if stmt != 0:
                     self.record_top_level_stmt(stmt)
+                else:
+                    self.recover_to_top_level()
+            else if self.module_label.len() > 0 and self.top_level_starts_stmt() != 0:
+                // §18.5b (D74): an imported module may not hold executable
+                // statements. The statement is parsed so the error covers it
+                // and the rest of the module is still diagnosed.
+                let stmt = self.parse_expr()
+                if stmt != 0:
+                    self.emit_module_top_level_stmt(stmt)
                 else:
                     self.recover_to_top_level()
             else:

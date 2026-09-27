@@ -3164,6 +3164,7 @@ impl Zcu:
         let tokens = lexer.tokenize()
 
         var parser = Parser.init_with_pool(move tokens, text, file_id, self.pool, move self.diagnostics, target_pool)
+        parser.enable_module_mode(path)
         if src.interface:
             parser.enable_interface_mode()
         let merged_pool = parser.parse_module()

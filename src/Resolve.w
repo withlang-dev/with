@@ -240,6 +240,7 @@ pub fn resolve_from_root_pool_with_prefix(root_path: &str, root_text: &str, root
             var lexer = Lexer.init(text, file_id)
             let tokens = lexer.tokenize()
             var parser = Parser.init(move tokens, text, file_id, state.pool, move state.diags)
+            parser.enable_module_mode(path)
             if src.interface:
                 parser.enable_interface_mode()
             let parsed = parser.parse_module()

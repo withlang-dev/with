@@ -851,7 +851,7 @@ fn run_cli(argc: i32) -> i32:
         comp.configure(opt_level, no_std, alloc_mode, runtime_available)
         comp.set_prelude_mode(prelude_mode)
         comp.set_overflow_mode(driver_internal_overflow_mode())
-        let pool = comp.compile_file(source)
+        let pool = comp.compile_entry_file(source)
         if pool.decl_count() == 0 or comp.has_errors():
             comp.print_warnings()
             with_eprint("error: emit-c-header: compilation failed")
@@ -877,7 +877,7 @@ fn run_cli(argc: i32) -> i32:
         // `--link-bundle` reads the same flags every compiling command does.
         comp.set_link_bundles(&driver_link_bundle_args(argc))
         comp.set_bundle_fingerprint(driver_bundle_corpus_arg(argc), "")
-        let pool = comp.compile_file(source)
+        let pool = comp.compile_entry_file(source)
         if pool.decl_count() == 0:
             with_eprint("error: IR generation failed during compilation")
             return 1
@@ -976,7 +976,7 @@ fn run_cli(argc: i32) -> i32:
             with_eprint("error: --bundle-fingerprint requires --bundle-corpus <rel>")
             return 1
         comp.set_bundle_fingerprint(bundle_corpus, bundle_fingerprint_path)
-        let pool = if source.ends_with(".wi"): comp.compile_bundle_interface_root(source) else: comp.compile_file(source)
+        let pool = if source.ends_with(".wi"): comp.compile_bundle_interface_root(source) else: comp.compile_entry_file(source)
         if pool.decl_count() == 0:
             with_eprint("error: check failed during compilation")
             return 1
