@@ -1085,3 +1085,36 @@ pub fn mir_test_copy_into_consuming_param:
     assert(consuming_param_verdict(true, false, false) == "")
     // A callee that never returns leaves no path to the caller's drop.
     assert(consuming_param_verdict(true, false, true, true) == "")
+
+// #1735: body `fn 7(self: Counter, times: i32)`. `shape` 0 lays the
+// parameter locals out as the signature says; 1 allocates a temporary
+// between them (#1735's generator constructor: `times` read from a
+// `&Counter` slot); 2 gives the body one parameter local fewer.
+fn body_params_verdict(shape: i32) -> str:
+    var mir_mod = MirModule.init()
+    for kind in [0, TypeKind.TY_INT, TypeKind.TY_STRUCT, TypeKind.TY_REF]:
+        mir_mod.sema_type_kinds.push(kind)
+        mir_mod.sema_type_d0.push(if kind == TypeKind.TY_REF: 2 else: 0)
+        mir_mod.sema_type_d1.push(0)
+        mir_mod.sema_type_d2.push(0)
+    let int_ty = 1
+    let counter_ty = 2
+    let ref_ty = 3
+    mir_mod.sema_sig_param_starts.insert(7, 0)
+    for word in [2, counter_ty, 0, int_ty, 0]:
+        mir_mod.sema_sig_param_data.push(word)
+    var body = MirBody.init_for_fn(7)
+    let _ = body.new_temp(counter_ty)
+    if shape == 1:
+        let _ = body.new_temp(ref_ty)
+    if shape != 2:
+        let _ = body.new_temp(int_ty)
+    body.n_params = if shape == 2: 1 else: 2
+    let entry = body.new_block()
+    body.set_terminator(entry, TermKind.TK_RETURN, 0, 0, 0, 0, 0)
+    with_str_clone_ref(validate_typed_mir_body(mir_mod, body).message)
+
+pub fn mir_test_body_params_match_signature:
+    assert(body_params_verdict(0) == "")
+    assert(body_params_verdict(1).contains("parameter 1 is local _2 of ty=3, but the signature's parameter 1 is ty=1"))
+    assert(body_params_verdict(2).contains("the body has 1 parameter local(s), its signature 2 parameter(s)"))

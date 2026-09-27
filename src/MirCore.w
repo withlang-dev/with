@@ -4034,10 +4034,37 @@ fn mir_validate_task_operand(mir_mod: &MirModule, body: &MirBody, call_id: i32) 
             return ""
     f"fiber intrinsic's task operand is ty={task_ty}, not a Task or ScopedTask handle"
 
+// #1735: a body's parameter locals are its signature's parameters, in
+// order (locals 1..=n_params). The generator constructor for `gen mut fn
+// tick(times: i32)` allocated a temporary between them, so `times` was read
+// from a `&Counter` slot and the loop ran zero times; validate-all and
+// audit:all both passed, since no validator compared a body with its
+// signature. The signature is Sema's (sema_sig_param_starts); a closure
+// or a body Sema has no signature for is not judged.
+fn mir_validate_body_params(mir_mod: &MirModule, body: &MirBody) -> str:
+    if body.fn_sym == 0 or body.anonymous_type != 0:
+        return ""
+    let count = mir_sig_param_count(mir_mod, body.fn_sym)
+    if count < 0:
+        return ""
+    if count != body.n_params:
+        return f"the body has {body.n_params} parameter local(s), its signature {count} parameter(s)"
+    for pi in 0..count:
+        let sig_ty = mir_sig_param_type(mir_mod, body.fn_sym, pi)
+        let local_ty = if pi + 1 < body.local_type_ids.len(): body.local_type_ids[pi + 1] else: 0
+        if sig_ty <= 0 or local_ty <= 0:
+            continue
+        if mir_mod.mir_resolve_alias(sig_ty) != mir_mod.mir_resolve_alias(local_ty):
+            return f"parameter {pi} is local _{pi + 1} of ty={local_ty}, but the signature's parameter {pi} is ty={sig_ty}"
+    ""
+
 pub fn validate_typed_mir_body(mir_mod: &MirModule, body: &MirBody) -> MirValidationError:
     let scalar_projection = mir_validate_scalar_field_projection(mir_mod, body)
     if scalar_projection.len() > 0:
         return mir_validation_fail(body.fn_sym, 0, scalar_projection)
+    let params = mir_validate_body_params(mir_mod, body)
+    if params.len() > 0:
+        return mir_validation_fail(body.fn_sym, 0, params)
     let stmt_count = body.stmt_count()
     for si in 0..stmt_count:
         let stmt_kind = body.stmt_kinds[si]
