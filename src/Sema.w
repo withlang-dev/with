@@ -1026,6 +1026,10 @@ pub type Sema {
     // error (D22 §13.6) and the implicit-move error claim the node here,
     // whichever fires first.
     field_move_diag_nodes: HashMap[i32, i32],
+    // §10.3 (D74, #1710): the optional chains that read their base in place
+    // (a Copy field, a borrowing method, a view). A chain absent here takes
+    // its payload out of a temporary. Sema decides; MirLower reads.
+    optional_chain_observing_nodes: HashMap[i32, i32],
     marking_explicit_move: i32,
     moved_field_path_starts: Vec[i32],
     moved_field_path_counts: Vec[i32],
@@ -2615,6 +2619,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         moved_field_base_syms: Vec.new(),
         explicitly_partial_syms: sema_new_map_i32_i32(),
         field_move_diag_nodes: sema_new_map_i32_i32(),
+        optional_chain_observing_nodes: sema_new_map_i32_i32(),
         marking_explicit_move: 0,
         moved_field_path_starts: Vec.new(),
         moved_field_path_counts: Vec.new(),

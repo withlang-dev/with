@@ -7673,6 +7673,7 @@ impl Sema:
                 self.optional_chain_result_type(base as i32, self.ast.get_data1(node))
             self.typed_expr_types.insert(node, result)
             self.record_transparent_view_origins(node, base_node)
+            self.record_optional_chain_verdict(node, base_node, base as i32, extra_start)
             return result as TypeId
 
         if kind == NodeKind.NK_POISONED_EXPR:
@@ -12899,6 +12900,59 @@ impl Sema:
         if result_err_ty != 0:
             return self.optional_chain_wrap_result_for_error_type(raw_ret, result_err_ty)
         self.optional_chain_wrap_result_type(raw_ret)
+
+    // §10.3 (D74, #1710): a chain on a named place reads it. A chain that
+    // takes nothing out (a Copy field, a borrowing method) is recorded as
+    // observing, and MirLower reads the base's place. INTERIM until D22
+    // stage 4 types a named-base chain as `Option[&U]`: a chain that takes
+    // a non-Copy field out, or hands the payload to a consuming method,
+    // still moves the whole base into a temporary, and that move is now
+    // RECORDED — a whole binding is marked moved, a field path partially
+    // moved — so a later use of the base is "use of moved value" instead
+    // of a silent blank. A temporary base is taken apart freely.
+    mut fn record_optional_chain_verdict(node: i32, base_node: i32, base_ty: i32, extra_start: i32):
+        if base_ty == 0:
+            return
+        var payload = self.optional_chain_payload_type(base_ty)
+        if payload == 0:
+            payload = self.optional_chain_result_ok_type(base_ty)
+        if payload == 0:
+            return
+        self.suppress_errors = self.suppress_errors + 1
+        let packed = self.classify_place(base_node)
+        self.suppress_errors = self.suppress_errors - 1
+        if unpack_place_kind(packed) == PlaceKind.PK_NotPlace:
+            return
+        let member = self.ast.get_data1(node)
+        let payload_resolved = self.resolve_alias(payload as TypeId)
+        var observes = false
+        if self.ast.optional_chain_is_call(extra_start) == 0:
+            let field_ty = self.field_access_type_direct(payload_resolved, member)
+            if field_ty == 0:
+                return
+            observes = self.is_copy(field_ty as TypeId) != 0 or self.type_needs_drop(field_ty) == 0
+        else:
+            let recv_resolved = self.auto_deref_ref_ptr_type(payload as TypeId) as i32
+            let owner_sym = self.method_owner_symbol_for_type(recv_resolved)
+            observes = self.is_copy(payload as TypeId) != 0
+            if not observes:
+                if owner_sym != 0 and self.builtin_intrinsic_method_return_type(recv_resolved, owner_sym, member) != 0:
+                    observes = self.builtin_method_requires_move_receiver(owner_sym, member) == 0
+                else:
+                    let sig_idx = if owner_sym != 0: self.lookup_method_sig(owner_sym, member) else: -1
+                    if sig_idx >= 0 and self.sig_get_param_count(sig_idx) > 0:
+                        let recv_param_ty = self.sig_param_type(sig_idx, 0)
+                        observes = recv_param_ty != 0 and self.can_auto_ref_arg(recv_param_ty, payload) != 0
+        if observes:
+            self.optional_chain_observing_nodes.insert(node, 1)
+            return
+        var place_node = base_node
+        while place_node != 0 and self.ast.kind(place_node) == NodeKind.NK_GROUPED:
+            place_node = self.ast.get_data0(place_node)
+        if self.ast.kind(place_node) == NodeKind.NK_IDENT:
+            self.mark_moved_if_consumed(place_node)
+        else if self.ast.kind(place_node) == NodeKind.NK_FIELD_ACCESS:
+            self.mark_field_moved(place_node)
 
     mut fn struct_field_type(struct_type: i32, field: i32) -> i32:
         if struct_type == 0:

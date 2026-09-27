@@ -15283,34 +15283,6 @@ impl MirBuilder:
     // payload handed to an intrinsic, or a payload lent to a method whose
     // receiver borrows. A non-Copy field still moves the base into a
     // temporary (the §10.3 `map` desugar consumes it).
-    fn optional_chain_observes_base(base_expr: i32, base_ty: i32, member_sym: i32, is_call: i32) -> bool:
-        var place_expr = base_expr
-        while place_expr != 0 and self.ast.kind(place_expr) == NodeKind.NK_GROUPED:
-            place_expr = self.ast.get_data0(place_expr)
-        let bk = if place_expr != 0: self.ast.kind(place_expr) else: 0
-        let is_place = bk == NodeKind.NK_IDENT or (bk == NodeKind.NK_FIELD_ACCESS and not self.is_enum_variant_path(place_expr)) or bk == NodeKind.NK_INDEX or (bk == NodeKind.NK_UNARY and self.ast.get_data0(place_expr) == UnaryOp.UOP_DEREF)
-        if not is_place:
-            return false
-        var payload_ty = self.generic_inst_arg_type(base_ty, self.sema.syms.option, 0)
-        if payload_ty == 0:
-            payload_ty = self.generic_inst_arg_type(base_ty, self.sema.syms.result, 0)
-        if payload_ty == 0:
-            return false
-        if is_call == 0:
-            let field_ty = self.sema.field_access_type_direct_frozen(self.sema.resolve_alias(payload_ty as TypeId), member_sym)
-            return field_ty != 0 and self.sema.is_copy_frozen(field_ty) != 0
-        let method_name = self.pool.resolve_symbol(member_sym)
-        if self.classify_intrinsic(payload_ty, method_name) != MirIntrinsic.NONE:
-            return self.optional_chain_intrinsic_observes(payload_ty, member_sym)
-        let recv_resolved = self.sema.auto_deref_ref_ptr_type(payload_ty as TypeId) as i32
-        let owner_sym = self.sema.method_owner_symbol_for_type(recv_resolved)
-        let callee_sym = if owner_sym != 0: self.sema.lookup_method_fn(owner_sym, member_sym) else: 0
-        let sig_idx = if callee_sym != 0: self.call_sig_for_sym(callee_sym) else: -1
-        if sig_idx < 0 or self.sema.sig_get_param_count(sig_idx) == 0:
-            return false
-        let recv_param_ty = self.sema.sig_param_type(sig_idx, 0)
-        recv_param_ty != 0 and self.sema.can_auto_ref_arg_frozen(recv_param_ty, payload_ty) != 0
-
     // An intrinsic reads a chained payload in place unless its builtin
     // method consumes the receiver (the ordinary call path's rule,
     // lower_intrinsic_call).
@@ -15327,14 +15299,14 @@ impl MirBuilder:
         let is_call = self.ast.optional_chain_is_call(extra_start)
 
         let base_ty = self.expr_type(base_expr)
-        // #1710: Sema types the chain as an observation of its base (it marks
-        // nothing moved and carries the base's view origins). A chain that
-        // copies a field out, or lends the payload to a borrowing method,
-        // realizes that by reading through the base's place. Moving the base
+        // #1710 (§10.3, D74): Sema decided whether this chain reads its base
+        // in place (a Copy field, a borrowing method, a view) and recorded
+        // it; such a chain reads through the base's place. Moving the base
         // into a temporary reset it, and the next chain on the same Option
-        // read `Some(<blank>)`.
+        // read `Some(<blank>)`. A chain that is not observing has a
+        // temporary base (a named base that gives a field up is refused).
         var base_place = 0
-        if self.optional_chain_observes_base(base_expr, base_ty, member_sym, is_call):
+        if self.sema.optional_chain_observing_nodes.contains(node):
             base_place = self.lower_expr_place(base_expr)
         else:
             let base_op = self.lower_expr(base_expr)
