@@ -1105,6 +1105,29 @@ pub type Sema {
     current_block_stmt_count: i32,
     current_block_stmt_index: i32,
     current_block_tail: i32,
+    // #1722: every block being checked, outermost first (check_block), and
+    // the statement each is at — the current block is the last. A view's
+    // later use may be in any of them up to the block that declares it.
+    live_block_starts: Vec[i32],
+    live_block_counts: Vec[i32],
+    live_block_indexes: Vec[i32],
+    live_block_tails: Vec[i32],
+    live_block_depths: Vec[i32],
+    // #1722: every loop being checked, outermost first: the part that runs
+    // again (a `while` and its condition; a `loop`'s or `for`'s body), the
+    // scope depth at its entry, and the loop_depth of its body. A view
+    // declared outside a loop and used anywhere in it is used again after
+    // a mutation in it, on the next iteration.
+    live_loop_nodes: Vec[i32],
+    live_loop_depths: Vec[i32],
+    live_loop_body_depths: Vec[i32],
+    // The first block and loop frame of the body being checked: a function,
+    // closure, `async` or scope body (push_label_boundary) starts its own —
+    // a generic callee checked in the middle of its caller must not see the
+    // caller's blocks. live_floor_saved holds the enclosing body's pair.
+    live_block_floor: i32,
+    live_loop_floor: i32,
+    live_floor_saved: Vec[i32],
     // Transient storage for closure field-level capture analysis.
     capture_field_syms: Vec[i32],
     capture_field_kinds: Vec[i32],
@@ -2680,6 +2703,17 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         current_block_stmt_count: 0,
         current_block_stmt_index: 0,
         current_block_tail: 0,
+        live_block_starts: Vec.new(),
+        live_block_counts: Vec.new(),
+        live_block_indexes: Vec.new(),
+        live_block_tails: Vec.new(),
+        live_block_depths: Vec.new(),
+        live_loop_nodes: Vec.new(),
+        live_loop_depths: Vec.new(),
+        live_loop_body_depths: Vec.new(),
+        live_block_floor: 0,
+        live_loop_floor: 0,
+        live_floor_saved: Vec.new(),
         capture_field_syms: Vec.new(),
         capture_field_kinds: Vec.new(),
         call_resolved_arg_starts: sema_new_map_i32_i32(),

@@ -3175,7 +3175,7 @@ impl Sema:
             diag.set_code("unused-label")
             self.diags.emit(move diag)
 
-    fn push_label_boundary() -> Unit:
+    mut fn push_label_boundary() -> Unit:
         self.label_syms.push(0)
         self.label_kinds.push(LabelFrameKind.LFK_BOUNDARY)
         self.label_nodes.push(0)
@@ -3185,6 +3185,12 @@ impl Sema:
         self.label_loop_entry_binds.push(self.bind_names.len() as i32)
         self.label_break_off.push(-1)
         self.label_break_seen.push(0)
+        // #1722: the body behind the boundary has its own blocks and loops
+        // for view liveness; pop_label_frame restores the enclosing floors.
+        self.live_floor_saved.push(self.live_block_floor)
+        self.live_floor_saved.push(self.live_loop_floor)
+        self.live_block_floor = self.live_block_starts.len() as i32
+        self.live_loop_floor = self.live_loop_nodes.len() as i32
 
     mut fn push_label_frame(sym: i32, kind: i32, node: i32) -> Unit:
         if sym != 0:
@@ -3205,9 +3211,12 @@ impl Sema:
         self.label_break_off.push(-1)
         self.label_break_seen.push(0)
 
-    fn pop_label_frame():
+    mut fn pop_label_frame():
         if self.label_syms.len() as i32 == 0:
             return
+        if self.label_kinds[self.label_kinds.len() as i32 - 1] == LabelFrameKind.LFK_BOUNDARY and self.live_floor_saved.len() >= 2:
+            self.live_loop_floor = self.live_floor_saved.pop().unwrap()
+            self.live_block_floor = self.live_floor_saved.pop().unwrap()
         self.label_syms.pop()
         self.label_kinds.pop()
         self.label_nodes.pop()
@@ -6292,6 +6301,15 @@ type SemaIntLiteralValue {
     value: i64,
 }
 
+// A use found by scan_block_frame (0 for none), or how the scanned block
+// was left before any use (stmt_exit_kind).
+type SemaLaterUse {
+    node: i32,
+    exit: i32,
+}
+
+impl Copy for SemaLaterUse
+
 impl Sema:
     fn int_literal_i64_value(node: i32) -> SemaIntLiteralValue:
         if node == 0 or self.ast.kind(node) != NodeKind.NK_INT_LIT:
@@ -6766,6 +6784,8 @@ impl Sema:
             let label = self.ast.get_data2(node)
             self.check_bool_condition(cond, "while")
             self.loop_depth = self.loop_depth + 1
+            // The condition runs again after the body: both are re-run.
+            self.push_live_loop(node, self.scope_starts.len() as i32)
             self.push_label_frame(label, LabelFrameKind.LFK_WHILE, node)
             let while_frame_idx = self.label_syms.len() as i32 - 1
             self.alloc_loop_break_region(while_frame_idx)
@@ -6792,6 +6812,7 @@ impl Sema:
             let while_body_diverges = if self.get_type_kind(self.resolve_alias(while_body_type as TypeId)) == TypeKind.TY_NEVER: 1 else: 0
             self.finalize_loop_move_state(&while_entry_states, while_frame_idx, while_body_diverges, 1, node)
             self.pop_label_frame()
+            self.pop_live_loop()
             self.loop_depth = self.loop_depth - 1
             return self.ty_void
 
@@ -6800,6 +6821,7 @@ impl Sema:
             let cond = self.ast.get_data1(node)
             let label = self.ast.get_data2(node)
             self.loop_depth = self.loop_depth + 1
+            self.push_live_loop(node, self.scope_starts.len() as i32)
             self.push_label_frame(label, LabelFrameKind.LFK_WHILE, node)
             let dw_frame_idx = self.label_syms.len() as i32 - 1
             self.alloc_loop_break_region(dw_frame_idx)
@@ -6814,6 +6836,7 @@ impl Sema:
             let dw_body_diverges = if self.get_type_kind(self.resolve_alias(dw_body_type as TypeId)) == TypeKind.TY_NEVER: 1 else: 0
             self.finalize_loop_move_state(&dw_entry_states, dw_frame_idx, dw_body_diverges, 1, node)
             self.pop_label_frame()
+            self.pop_live_loop()
             self.loop_depth = self.loop_depth - 1
             self.check_bool_condition(cond, "do-while")
             return self.ty_void
@@ -6821,6 +6844,7 @@ impl Sema:
         if kind == NodeKind.NK_LOOP:
             self.union_clear_last_written()
             self.loop_depth = self.loop_depth + 1
+            self.push_live_loop(node, self.scope_starts.len() as i32)
             self.push_scope()
             self.push_label_frame(self.ast.get_data1(node), LabelFrameKind.LFK_LOOP, node)
             let loop_frame_idx = self.label_syms.len() as i32 - 1
@@ -6840,6 +6864,7 @@ impl Sema:
             let result_ty = if loop_frame_idx >= 0: self.label_break_value_types[loop_frame_idx] else: 0
             self.pop_label_frame()
             self.pop_scope()
+            self.pop_live_loop()
             self.loop_depth = self.loop_depth - 1
             let loop_ty = if result_ty != 0: result_ty else: self.ty_never as i32
             self.typed_expr_types.insert(node, loop_ty)
@@ -9981,6 +10006,12 @@ impl Sema:
         self.current_block_extra_start = extra_start
         self.current_block_stmt_count = stmt_count
         self.current_block_tail = tail
+        let live_frame = self.live_block_starts.len() as i32
+        self.live_block_starts.push(extra_start)
+        self.live_block_counts.push(stmt_count)
+        self.live_block_indexes.push(0)
+        self.live_block_tails.push(tail)
+        self.live_block_depths.push(self.scope_starts.len() as i32)
 
         var last_stmt_ty: TypeId = 0 as TypeId
         // Unreachable-code detection: once a statement unconditionally transfers
@@ -9991,6 +10022,7 @@ impl Sema:
         var reported_unreachable = 0
         for i in 0..stmt_count:
             self.current_block_stmt_index = i
+            self.live_block_indexes[live_frame] = i
             let stmt = self.ast.get_extra(extra_start + i)
             let stmt_kind = self.ast.kind(stmt)
             if self.stmt_starts_reachable_region(stmt) != 0:
@@ -10033,6 +10065,8 @@ impl Sema:
         if tail != 0 and block_diverged != 0 and reported_unreachable == 0:
             self.emit_error("unreachable code", tail)
             reported_unreachable = 1
+        // The block is at its tail: past every statement (later_use_of).
+        self.live_block_indexes[live_frame] = stmt_count
         if tail != 0:
             // If the tail is a match in a void/unspecified-return context, treat as statement
             // position so partial enum match is allowed (value is not used).
@@ -10083,6 +10117,12 @@ impl Sema:
                 self.check_returned_closure_env(tail, tail)
         self.expire_dead_borrows_in_block(extra_start, stmt_count, stmt_count, 0)
 
+        while self.live_block_starts.len() as i32 > live_frame:
+            self.live_block_starts.pop()
+            self.live_block_counts.pop()
+            self.live_block_indexes.pop()
+            self.live_block_tails.pop()
+            self.live_block_depths.pop()
         self.current_block_extra_start = saved_block_extra
         self.current_block_stmt_count = saved_block_count
         self.current_block_stmt_index = saved_block_index
@@ -12223,6 +12263,7 @@ impl Sema:
         // loop variable is sound (#613).
         let for_entry_states = self.save_scope_states()
         let for_view_count = self.for_view_binding_syms.len()
+        let for_live_depth = self.scope_starts.len() as i32
         self.push_scope()
         if gen_elem != 0:
             self.register_gen_loop_view_borrows(iterable)
@@ -12253,7 +12294,9 @@ impl Sema:
         let saved_drop_cf_for: i32 = self.drop_control_flow_depth
         if self.current_drop_type_sym != 0:
             self.drop_control_flow_depth = self.drop_control_flow_depth + 1
+        self.push_live_loop(body, for_live_depth)
         let for_body_type = self.check_expr_statement_context(body)
+        self.pop_live_loop()
         self.drop_control_flow_depth = saved_drop_cf_for
         // `for` exits when the iterable is exhausted (like a condition) → has_condition_exit = 1.
         let for_body_diverges = if self.get_type_kind(self.resolve_alias(for_body_type as TypeId)) == TypeKind.TY_NEVER: 1 else: 0
@@ -26473,15 +26516,122 @@ impl Sema:
                 last_node = tail_use
         last_node
 
-    // A view's last use in the current block — and, when the view was handed
-    // to a pair's userdata setter (§16.2b.9 "Retained borrows"), the
-    // retaining resource's last use: the resource holds the view until its
-    // last callback-capable operation, so the resource's uses are the view's.
-    fn view_last_use(ref_sym: i32, after_node: i32) -> i32:
-        var last = self.find_last_use_in_block(self.current_block_extra_start, self.current_block_stmt_count, self.current_block_stmt_index + 1, self.current_block_tail, ref_sym, after_node)
+    // #1722: a loop whose `rerun` part (see live_loop_nodes) is checked now;
+    // `entry_depth` is the scope depth at the loop, before its own scopes.
+    mut fn push_live_loop(rerun: i32, entry_depth: i32):
+        self.live_loop_nodes.push(rerun)
+        self.live_loop_depths.push(entry_depth)
+        self.live_loop_body_depths.push(self.loop_depth)
+
+    mut fn pop_live_loop():
+        self.live_loop_nodes.pop()
+        self.live_loop_depths.pop()
+        self.live_loop_body_depths.pop()
+
+    // How control leaves a statement: 0 on to the next one, 1 out of the
+    // function (`return`), 2 out of the innermost loop (`break`), 3 to its
+    // next iteration (`continue`). A labeled `break`/`continue` is read as
+    // the innermost loop's, which only scans more than it must.
+    fn stmt_exit_kind(stmt: i32) -> i32:
+        if stmt == 0:
+            return 0
+        let kind = self.ast.kind(stmt)
+        if kind == NodeKind.NK_RETURN:
+            return 1
+        if kind == NodeKind.NK_BREAK:
+            return 2
+        if kind == NodeKind.NK_CONTINUE:
+            return 3
+        0
+
+    // The first use of `sym` in block frame `f` from statement `start` on,
+    // stopping at the first statement that leaves the block: its exit kind
+    // (stmt_exit_kind) is returned when no use comes before it. The tail is
+    // read positionally, after `after_node`, as find_last_use_in_block does.
+    fn scan_block_frame(f: i32, start: i32, sym: i32, after_node: i32) -> SemaLaterUse:
+        let extra = self.live_block_starts[f]
+        let count = self.live_block_counts[f]
+        var si = start
+        while si < count:
+            let stmt = self.ast.get_extra(extra + si)
+            if self.expr_uses_symbol(stmt, sym) != 0:
+                return SemaLaterUse { node: stmt, exit: 0 }
+            let exit = self.stmt_exit_kind(stmt)
+            if exit != 0:
+                return SemaLaterUse { node: 0, exit }
+            si = si + 1
+        let tail = self.live_block_tails[f]
+        if tail == 0:
+            return SemaLaterUse { node: 0, exit: 0 }
+        let tail_use = self.find_symbol_use_after_in_span(tail, sym, self.ast.get_end(after_node))
+        if tail_use != 0:
+            return SemaLaterUse { node: tail_use, exit: 0 }
+        SemaLaterUse { node: 0, exit: self.stmt_exit_kind(tail) }
+
+    // A later use of `sym` after `after_node`, reachable from it, within the
+    // scope that holds the view (`view_depth`, the borrow's
+    // borrow_scope_depths): in the current block (as before); else, while
+    // control falls out of the current block, in each enclosing block of this
+    // body; and in every loop it falls through or continues, whose body (a
+    // `while`'s condition too) runs again. A `return` reaches nothing more; a
+    // `break` leaves the innermost loop without running it again.
+    // #1722: only the current block was scanned, so `while k < 2: x.s = ...;
+    // k += 1` followed by `print(p)` dropped `p`'s borrow and accepted the
+    // write — `p` then read the replacement string after the one it viewed
+    // was freed. A single-statement body is no block, which is why the
+    // issue's `for` body was refused.
+    fn later_use_of(sym: i32, after_node: i32, view_depth: i32) -> i32:
+        let current = self.find_last_use_in_block(self.current_block_extra_start, self.current_block_stmt_count, self.current_block_stmt_index + 1, self.current_block_tail, sym, after_node)
+        if current != 0:
+            return current
+        let top = self.live_block_starts.len() as i32 - 1
+        if top < self.live_block_floor:
+            return 0
+        let top_index: i32 = self.live_block_indexes[top]
+        let top_stmt = if top_index < self.live_block_counts[top]: self.ast.get_extra(self.live_block_starts[top] + top_index) else: self.live_block_tails[top]
+        var exit = self.stmt_exit_kind(top_stmt)
+        if exit == 0:
+            exit = self.scan_block_frame(top, top_index + 1, sym, after_node).exit
+        var inner_depth: i32 = 2147483647
+        var li = self.live_loop_nodes.len() as i32 - 1
+        var f = top
+        while f >= self.live_block_floor and self.live_block_depths[f] >= view_depth:
+            let depth: i32 = self.live_block_depths[f]
+            // The loops between the point and this block: entered in it, and
+            // holding the point.
+            while li >= self.live_loop_floor and self.live_loop_depths[li] >= depth and self.live_loop_depths[li] < inner_depth:
+                if exit == 1:
+                    return 0
+                if exit != 2:
+                    let rerun = self.live_loop_nodes[li]
+                    if self.expr_uses_symbol(rerun, sym) != 0:
+                        let again = self.find_symbol_use_after_in_span(rerun, sym, self.ast.get_start(rerun) - 1)
+                        return if again != 0: again else: rerun
+                // Past the loop, control goes on after it.
+                exit = 0
+                li = li - 1
+            if exit == 1:
+                return 0
+            // The current block's own statements were scanned above; an
+            // enclosing block is scanned once control falls out into it.
+            if exit == 0 and f != top:
+                let scan = self.scan_block_frame(f, self.live_block_indexes[f] + 1, sym, after_node)
+                if scan.node != 0:
+                    return scan.node
+                exit = scan.exit
+            inner_depth = depth
+            f = f - 1
+        0
+
+    // A view's last use after this point (later_use_of) — and, when the view
+    // was handed to a pair's userdata setter (§16.2b.9 "Retained borrows"),
+    // the retaining resource's: the resource holds the view until its last
+    // callback-capable operation, so the resource's uses are the view's.
+    fn view_last_use(ref_sym: i32, after_node: i32, view_depth: i32) -> i32:
+        var last = self.later_use_of(ref_sym, after_node, view_depth)
         if self.facade_pair_retainers.contains(ref_sym):
             let retainer: i32 = self.facade_pair_retainers.get(ref_sym).unwrap()
-            let via = self.find_last_use_in_block(self.current_block_extra_start, self.current_block_stmt_count, self.current_block_stmt_index + 1, self.current_block_tail, retainer, after_node)
+            let via = self.later_use_of(retainer, after_node, view_depth)
             if via != 0 and (last == 0 or self.ast.get_start(via) > self.ast.get_start(last)):
                 last = via
         last
@@ -26517,7 +26667,7 @@ impl Sema:
                 i = i + 1
                 continue
             let stmt_root = self.current_statement_expr_root
-            let last_use = self.view_last_use(ref_sym, node)
+            let last_use = self.view_last_use(ref_sym, node, self.borrow_scope_depths[i])
             let used_here = stmt_root != 0 and self.view_used_in(stmt_root, ref_sym)
             if last_use == 0 and not used_here:
                 if self.for_view_binding_depth(ref_sym) == 0:
@@ -26569,7 +26719,7 @@ impl Sema:
             let ref_name: str = with_str_clone_ref(self.pool_resolve(ref_sym))
             let creation_node = self.borrow_creation_nodes[i]
             let binding_node = self.binding_decl_node(ref_sym)
-            let last_use = self.view_last_use(ref_sym, err_node)
+            let last_use = self.view_last_use(ref_sym, err_node, self.borrow_scope_depths[i])
             // A view whose final use is already behind this mutation is dead.
             // This also handles a mutation on a diverging arm: a lexical use
             // after the enclosing branch is not reachable from that mutation.
