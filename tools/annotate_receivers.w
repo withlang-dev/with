@@ -21,7 +21,7 @@ extern fn with_fs_read_file(path: &str) -> str
 extern fn with_fs_list_files(path: &str) -> str
 extern fn with_fs_write_file(path: &str, data: &str) -> i32
 
-fn slice(text: str, a: i32, b: i32): text.slice(a as i64, b as i64)
+fn slice(text: &str, a: i32, b: i32): text.slice(a as i64, b as i64)
 
 type ReceiverModeFacts {
     lines: Vec[i32],
@@ -30,14 +30,14 @@ type ReceiverModeFacts {
     unproven: i32,
 }
 
-fn line_for_offset(text: str, offset: i32) -> i32:
+fn line_for_offset(text: &str, offset: i32) -> i32:
     var line = 1
     for i in 0..offset:
         if text[i] as i32 == 10:
             line = line + 1
     line
 
-fn column_for_offset(text: str, offset: i32) -> i32:
+fn column_for_offset(text: &str, offset: i32) -> i32:
     var start = offset - 1
     while start >= 0 and text[start] as i32 != 10:
         start = start - 1
@@ -48,7 +48,7 @@ fn exact_mode(facts: &ReceiverModeFacts, line: i32, column: i32) -> str:
     var nearest_column = -1
     for i in 0..facts.lines.len() as i32:
         if facts.lines[i] == line and facts.columns[i] == column:
-            return facts.modes[i]
+            return facts.modes[i].clone()
         // AST declaration spans start at modifiers (`pub`, `unsafe`, `async`),
         // while the token rewrite anchors at `fn`. Use the nearest preceding
         // fact on the same line when no exact column exists.
@@ -56,9 +56,9 @@ fn exact_mode(facts: &ReceiverModeFacts, line: i32, column: i32) -> str:
         if facts.lines[i] == line and fact_column < column and fact_column > nearest_column:
             nearest = i
             nearest_column = fact_column
-    if nearest >= 0: facts.modes[nearest] else: ""
+    if nearest >= 0: facts.modes[nearest].clone() else: "".clone()
 
-fn compiler_receiver_modes(path: str) -> ReceiverModeFacts:
+fn compiler_receiver_modes(path: &str) -> ReceiverModeFacts:
     let result = compiler_analyze_file(path, "select:kind=declaration")
     var facts = ReceiverModeFacts {
         lines: Vec.new(),
@@ -87,7 +87,7 @@ fn compiler_receiver_modes(path: str) -> ReceiverModeFacts:
         facts.modes.push(mode)
     facts
 
-fn annotate_file(path: str, exact_facts: &ReceiverModeFacts) -> i32:
+fn annotate_file(path: &str, exact_facts: &ReceiverModeFacts) -> i32:
     let text = unsafe { with_fs_read_file(path) }
     let tlen = text.len() as i32
     if tlen == 0:
@@ -208,7 +208,7 @@ fn annotate_file(path: str, exact_facts: &ReceiverModeFacts) -> i32:
     print(f"{path}: annotated {count}")
     count
 
-fn file_has_mode_less_receiver(path: str) -> bool:
+fn file_has_mode_less_receiver(path: &str) -> bool:
     let text = unsafe { with_fs_read_file(path) }
     if text.len() == 0:
         return false
@@ -254,13 +254,13 @@ fn file_has_mode_less_receiver(path: str) -> bool:
         i = i + 1
     false
 
-fn path_excluded(path: str, excludes: &Vec[str]) -> bool:
+fn path_excluded(path: &str, excludes: &Vec[str]) -> bool:
     for i in 0..excludes.len() as i32:
         if path == excludes[i]:
             return true
     false
 
-fn annotate_integrated_file(path: str, excludes: &Vec[str]) -> i32:
+fn annotate_integrated_file(path: &str, excludes: &Vec[str]) -> i32:
     if path_excluded(path, excludes) or not file_has_mode_less_receiver(path):
         return 0
     let facts = compiler_receiver_modes(path)
@@ -272,7 +272,7 @@ fn annotate_integrated_file(path: str, excludes: &Vec[str]) -> i32:
         return -1
     annotate_file(path, &facts)
 
-fn annotate_integrated_path(path: str, excludes: &Vec[str]) -> i32:
+fn annotate_integrated_path(path: &str, excludes: &Vec[str]) -> i32:
     if path.ends_with(".w"):
         return annotate_integrated_file(path, excludes)
     let listing = unsafe { with_fs_list_files(path) }
@@ -310,9 +310,9 @@ fn main:
                 print("error: --exclude requires a file path")
                 exit_code(1)
             arg = arg + 1
-            excludes.push(argv[arg])
+            excludes.push(argv[arg].clone())
         else:
-            paths.push(argv[arg])
+            paths.push(argv[arg].clone())
         arg = arg + 1
     if paths.len() == 0:
         print("error: no annotation paths supplied")

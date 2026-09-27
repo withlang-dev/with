@@ -5522,8 +5522,8 @@ impl Parser:
                 if arg_name_sym == 0 and seen_named == 1:
                     self.emit_error("positional argument cannot follow named argument")
                 arg_names.push(arg_name_sym)
-                let outer_it = self.saw_implicit_it
                 let outer_it: i32 = self.saw_implicit_it
+                let outer_depth: i32 = self.implicit_it_depth
                 self.saw_implicit_it = 0
                 var arg = self.parse_expr()
                 if self.saw_implicit_it == 1:

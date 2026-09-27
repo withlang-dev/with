@@ -15,7 +15,7 @@ use Sema
 use Mir
 use CiIR
 use CImport
-use Compilation
+use compiler.Compilation
 use ComptimeEval
 use ComptimeValue
 use ConanClient

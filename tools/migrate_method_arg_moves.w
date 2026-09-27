@@ -6,26 +6,24 @@
 //   with run tools/migrate_method_arg_moves.w --apply --last-use <entry.w>
 
 use std.process
+use std.fs
 use AnalysisTypes
 use compiler.Compilation
 use Lexer
 use Token
-
-extern fn with_fs_read_file(path: &str) -> str
-extern fn with_fs_write_file(path: &str, data: &str) -> i32
 
 type OwnershipSite {
     path: str,
     offset: i32,
 }
 
-fn slice(text: str, start: i32, end: i32): text.slice(start as i64, end as i64)
+fn slice(text: &str, start: i32, end: i32): text.slice(start as i64, end as i64)
 
-fn source_path(path: str):
+fn source_path(path: &str) -> str:
     let embedded = "<embedded-std>/"
-    if path.starts_with(embedded): "lib/" ++ slice(path, embedded.len() as i32, path.len() as i32) else: path
+    if path.starts_with(embedded): "lib/" ++ slice(path, embedded.len() as i32, path.len() as i32) else: path.clone()
 
-fn collect_sites(entry: str) -> Vec[OwnershipSite]:
+fn collect_sites(entry: &str) -> Vec[OwnershipSite]:
     let result = compiler_analyze_file(entry, "select:kind=diagnostic")
     let sites: Vec[OwnershipSite] = Vec.new()
     let message = "this parameter takes ownership of a non-Copy value"
@@ -57,7 +55,7 @@ fn collect_sites(entry: str) -> Vec[OwnershipSite]:
 // verdicts each transfer site; only `last-use` sites are provably safe for a
 // mechanical `move` keyword. Design sites (live-after / in-loop) are skipped
 // and reported — they need a human decision, not a keyword.
-fn liveness_lookup(tsv: str, key: str) -> str:
+fn liveness_lookup(tsv: &str, key: &str) -> str:
     var line_start: i64 = 0
     var i: i64 = 0
     while i <= tsv.len():
@@ -66,12 +64,12 @@ fn liveness_lookup(tsv: str, key: str) -> str:
             if line.starts_with(key ++ "\t"):
                 let cols = line.split("\t")
                 if cols.len() >= 5:
-                    return cols.get(4)
+                    return cols.get(4).clone()
             line_start = i + 1
         i = i + 1
     ""
 
-fn offset_line_col(text: str, offset: i32) -> str:
+fn offset_line_col(text: &str, offset: i32) -> str:
     var line = 1
     var col = 1
     var i: i64 = 0
@@ -84,7 +82,7 @@ fn offset_line_col(text: str, offset: i32) -> str:
         i = i + 1
     f"{line}:{col}"
 
-fn line_col_offset(text: str, want_line: i64, want_col: i64) -> i32:
+fn line_col_offset(text: &str, want_line: i64, want_col: i64) -> i32:
     var line: i64 = 1
     var col: i64 = 1
     var i: i64 = 0
@@ -103,7 +101,7 @@ fn line_col_offset(text: str, want_line: i64, want_col: i64) -> i32:
 // filters to last-use). This lets the SEED run the tool while a flip-carrying
 // stage binary supplies the analysis — the tool's own dependency graph is the
 // compiler, which does not compile under the flip until migration completes.
-fn collect_sites_from_tsv(tsv: str) -> Vec[OwnershipSite]:
+fn collect_sites_from_tsv(tsv: &str) -> Vec[OwnershipSite]:
     let sites: Vec[OwnershipSite] = Vec.new()
     var line_start: i64 = 0
     var i: i64 = 0
@@ -116,8 +114,8 @@ fn collect_sites_from_tsv(tsv: str) -> Vec[OwnershipSite]:
                 if cols.len() >= 5 and cols.get(4) == "last-use":
                     let loc = cols.get(0).split(":")
                     if loc.len() >= 3:
-                        let path = loc.get(0)
-                        let text = unsafe { with_fs_read_file(path) }
+                        let path = loc.get(0).clone()
+                        let text = read_file(path).unwrap_or("".clone())
                         if text.len() == 0:
                             print("migrate-method-arg-moves: cannot read " ++ path)
                             exit_code(1)
@@ -129,7 +127,7 @@ fn collect_sites_from_tsv(tsv: str) -> Vec[OwnershipSite]:
         i = i + 1
     sites
 
-fn bcm_parse_i64(s: str) -> i64:
+fn bcm_parse_i64(s: &str) -> i64:
     var out: i64 = 0
     var i: i64 = 0
     while i < s.len():
@@ -140,8 +138,8 @@ fn bcm_parse_i64(s: str) -> i64:
         i = i + 1
     out
 
-fn migrate_file(path: str, sites: &Vec[OwnershipSite], apply: bool, liveness_tsv: str) -> i32:
-    let text = unsafe { with_fs_read_file(path) }
+fn migrate_file(path: &str, sites: &Vec[OwnershipSite], apply: bool, liveness_tsv: &str) -> i32:
+    let text = read_file(path).unwrap_or("".clone())
     if text.len() == 0:
         print("migrate-method-arg-moves: cannot read " ++ path)
         exit_code(1)
@@ -177,10 +175,10 @@ fn migrate_file(path: str, sites: &Vec[OwnershipSite], apply: bool, liveness_tsv
     while i < offsets.len() as i32:
         var j = i
         while j > 0 and offsets[(j - 1)] > offsets[j]:
-            let old_offset = offsets[(j - 1)]
-            let old_label = labels[(j - 1)]
+            let old_offset: i32 = offsets[(j - 1)]
+            let old_label = labels[(j - 1)].clone()
             offsets[(j - 1)] = offsets[j]
-            labels.slot((j - 1) as i64).set(labels[j])
+            labels.slot((j - 1) as i64).set(labels[j].clone())
             offsets[j] = old_offset
             labels.slot(j as i64).set(old_label)
             j = j - 1
@@ -197,7 +195,7 @@ fn migrate_file(path: str, sites: &Vec[OwnershipSite], apply: bool, liveness_tsv
         chunks.push("move ")
         cursor = offset
     chunks.push(slice(text, cursor, text.len() as i32))
-    if unsafe { with_fs_write_file(path, chunks.join("")) } != 0:
+    if write_file(path, chunks.join("")) != 0:
         print("migrate-method-arg-moves: failed to write " ++ path)
         exit_code(1)
     offsets.len() as i32
@@ -223,9 +221,9 @@ fn main:
             if ai >= argv.len() as i32:
                 print("migrate-method-arg-moves: --liveness requires a path")
                 exit_code(1)
-            liveness_path = argv[ai]
+            liveness_path = argv[ai].clone()
         else:
-            entry = arg
+            entry = arg.clone()
         ai = ai + 1
     if entry.len() == 0:
         print("usage: migrate_method_arg_moves [--apply] [--last-use|--liveness <move-sites.tsv>] <entry.w>")
@@ -235,12 +233,12 @@ fn main:
         if liveness_path.len() > 0:
             print("migrate-method-arg-moves: choose --last-use or --liveness, not both")
             exit_code(1)
-        liveness_tsv = compiler_analyze_file(entry, "move-sites").text
+        liveness_tsv = compiler_analyze_file(entry, "move-sites").text.clone()
         if liveness_tsv.len() == 0:
             print("migrate-method-arg-moves: compiler returned no move-site facts")
             exit_code(1)
     else: if liveness_path.len() > 0:
-        liveness_tsv = unsafe { with_fs_read_file(liveness_path) }
+        liveness_tsv = read_file(liveness_path).unwrap_or("".clone())
         if liveness_tsv.len() == 0:
             print("migrate-method-arg-moves: cannot read liveness tsv " ++ liveness_path)
             exit_code(1)
@@ -251,7 +249,7 @@ fn main:
         var seen = false
         for fi in 0..files.len() as i32:
             if files[fi] == path: seen = true
-        if not seen: files.push(path)
+        if not seen: files.push(path.clone())
     var total = 0
     for i in 0..files.len() as i32:
         total = total + migrate_file(files[i], &sites, apply, liveness_tsv)

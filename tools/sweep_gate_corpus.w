@@ -5,20 +5,19 @@
 //
 //   with run tools/sweep_gate_corpus.w <stage1> <list_file> <diag_tmp> [d_corpus_dir]
 use std.process
+use std.fs
 
-extern fn with_fs_read_file(path: &str) -> str
-extern fn with_fs_write_file(path: &str, data: &str) -> i32
-
-fn sh(cmd: str) -> i32:
+fn sh(cmd: &str) -> i32:
     let argv: Vec[str] = Vec.new()
     argv.push("/bin/sh")
     argv.push("-c")
-    argv.push(cmd)
+    argv.push(cmd.clone())
     run(&argv)
 
-fn gate_count(diag_path: str) -> i32:
+fn gate_count(diag_path: &str) -> i32:
     var count = 0
-    for line in with_fs_read_file(diag_path).split("\n"):
+    let text = read_file(diag_path).unwrap_or("".clone())
+    for line in text.split("\n"):
         if line.contains("requires an explicit import"): count = count + 1
     count
 
@@ -29,12 +28,13 @@ if argv.len() < 4:
 let stage1 = argv.get(1)
 let list_file = argv.get(2)
 let diag_tmp = argv.get(3)
-let d_corpus = if argv.len() > 4: argv.get(4) else: ""
+let d_corpus = if argv.len() > 4: argv.get(4).clone() else: "".clone()
 
 var affected = 0
 var fixed = 0
 var stuck = 0
-for f in with_fs_read_file(list_file).split("\n"):
+let list_text = read_file(list_file).unwrap_or("".clone())
+for f in list_text.split("\n"):
     if f.len() == 0: continue
     let _ = sh(stage1 ++ " check " ++ f ++ " 2> " ++ diag_tmp)
     var n = gate_count(diag_tmp)

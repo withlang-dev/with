@@ -7,10 +7,7 @@
 //       with check {file}
 
 use std.process
-
-extern fn with_fs_read_file(path: &str) -> str
-extern fn with_fs_write_file(path: &str, data: &str) -> i32
-extern fn with_fs_remove_file(path: &str) -> i32
+use std.fs
 
 let argv = args()
 if argv.len() < 5:
@@ -26,19 +23,18 @@ if separator < 0 or separator + 1 >= argv.len() as i32:
     print("error: expected '--' followed by a command")
     exit_code(2)
 
-let candidate = unsafe { with_fs_read_file(argv.get(1)) }
-let materialized = argv.get(2)
-if unsafe { with_fs_write_file(materialized, candidate) } != 0:
+let candidate = read_file(argv.get(1)).unwrap_or("".clone())
+let materialized = argv.get(2).clone()
+if write_file(materialized, candidate) != 0:
     print(f"error: could not materialize candidate at {materialized}")
     exit_code(2)
 
 let child: Vec[str] = Vec.new()
 for i in separator + 1..argv.len() as i32:
     let arg = argv[i]
-    child.push(if arg == "{file}": materialized else: arg)
+    child.push(if arg == "{file}": materialized.clone() else: arg.clone())
 let status = run(&child)
-let remove_status = unsafe { with_fs_remove_file(materialized) }
-if remove_status != 0:
+if remove_file(materialized) != 0:
     print(f"error: could not remove materialized candidate {materialized}")
     exit_code(2)
 exit_code(status)

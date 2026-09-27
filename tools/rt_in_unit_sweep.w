@@ -14,7 +14,7 @@ fn arg_or(argv: &Vec[str], i: i32, fallback: &str) -> str:
         return owned(argv[i])
     owned(fallback)
 
-let ROOT = "test/behavior/"
+const ROOT: str = "test/behavior/"
 
 fn in_glob(path: &str) -> bool:
     // The build target globs test/behavior/*.w — companion modules under

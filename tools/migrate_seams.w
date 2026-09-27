@@ -16,15 +16,9 @@
 // human classifies, exactly like move-sites' `design` verdicts.
 
 use std.process
+use std.fs
 
-extern fn with_exec_argv_capture(argv: &str, stdout_path: &str, stderr_path: &str, timeout_ms: i32) -> i32
-extern fn with_fs_read_file(path: &str) -> str
-extern fn with_fs_write_file(path: &str, data: &str) -> i32
-
-fn argv_append(argv: str, arg: str) -> str:
-    if argv.len() == 0: arg else: argv ++ "\x01" ++ arg
-
-fn split_lines(text: str) -> Vec[str]:
+fn split_lines(text: &str) -> Vec[str]:
     let out: Vec[str] = Vec.new()
     var start: i64 = 0
     var i: i64 = 0
@@ -37,7 +31,7 @@ fn split_lines(text: str) -> Vec[str]:
         out.push(text.slice(start, text.len()))
     out
 
-fn split_tabs(line: str) -> Vec[str]:
+fn split_tabs(line: &str) -> Vec[str]:
     let out: Vec[str] = Vec.new()
     var start: i64 = 0
     var i: i64 = 0
@@ -49,7 +43,7 @@ fn split_tabs(line: str) -> Vec[str]:
     out.push(line.slice(start, line.len()))
     out
 
-fn parse_int(text: str) -> i32:
+fn parse_int(text: &str) -> i32:
     var out = 0
     var any = 0
     for i in 0..text.len() as i32:
@@ -75,15 +69,20 @@ fn main:
 
     let out_path = "out/tmp/seam-sites.tsv"
     let err_path = "out/tmp/seam-sites.err"
-    var cmd = argv_append("", compiler)
-    cmd = argv_append(cmd, "analyze")
-    cmd = argv_append(cmd, root)
-    cmd = argv_append(cmd, "seam-sites")
-    let rc = unsafe { with_exec_argv_capture(cmd, out_path, err_path, 600000) }
+    let _ = mkdir_p("out/tmp")
+    var cmd: Vec[str] = Vec.new()
+    cmd.push("/bin/sh")
+    cmd.push("-c")
+    cmd.push("\"$0\" analyze \"$1\" seam-sites > \"$2\" 2> \"$3\"")
+    cmd.push(compiler.clone())
+    cmd.push(root.clone())
+    cmd.push(out_path.clone())
+    cmd.push(err_path.clone())
+    let rc = run(&cmd)
     if rc != 0:
         print("error: seam-sites failed rc=" ++ f"{rc}")
         return
-    let report = with_fs_read_file(out_path)
+    let report = read_file(out_path).unwrap_or("".clone())
 
     var considered = 0
     var actionable = 0

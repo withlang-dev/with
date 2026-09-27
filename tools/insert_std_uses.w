@@ -10,20 +10,18 @@
 // (Reads a saved file, not the live analyze API, so the tool itself never
 // depends on compiling the entry it is repairing.)
 use std.process
+use std.fs
 
-extern fn with_fs_read_file(path: &str) -> str
-extern fn with_fs_write_file(path: &str, data: &str) -> i32
-
-fn source_path(path: str) -> str:
+fn source_path(path: &str) -> str:
     let embedded = "<embedded-std>/"
-    if path.starts_with(embedded): "lib/" ++ path.slice(embedded.len(), path.len()) else: path
+    if path.starts_with(embedded): "lib/" ++ path.slice(embedded.len(), path.len()) else: path.clone()
 
-fn gate_use_line(message: str) -> str:
+fn gate_use_line(message: &str) -> str:
     let parts = message.split("; add: use ")
     if parts.len() < 2: return ""
     "use " ++ parts.get(1)
 
-fn diag_path(loc_line: str) -> str:
+fn diag_path(loc_line: &str) -> str:
     // " --> src/Foo.w:74:17" → "src/Foo.w"
     let parts = loc_line.split("--> ")
     if parts.len() < 2: return ""
@@ -38,7 +36,7 @@ fn diag_path(loc_line: str) -> str:
         i = i - 1
     with_pos.slice(0, cut)
 
-fn header_insert_offset(text: str) -> i64:
+fn header_insert_offset(text: &str) -> i64:
     // After the last `use` line in the leading header (comments/blank/use).
     var last_use_end = -1 as i64
     var line_start = 0 as i64
@@ -55,7 +53,7 @@ fn header_insert_offset(text: str) -> i64:
         line_start = line_end + 1
     if last_use_end >= 0: last_use_end else: line_start
 
-fn vec_contains(v: &Vec[str], s: str) -> bool:
+fn vec_contains(v: &Vec[str], s: &str) -> bool:
     for i in 0..v.len():
         if v.get(i) == s: return true
     false
@@ -71,7 +69,7 @@ if diags_file.len() == 0:
     eprint("usage: insert_std_uses [--apply] <diagnostics.txt>")
     exit_code(2)
 
-let diags = with_fs_read_file(diags_file)
+let diags = read_file(diags_file).unwrap_or("".clone())
 var pair_paths: Vec[str] = Vec.new()
 var pair_lines: Vec[str] = Vec.new()
 var pending_use = ""
@@ -100,7 +98,7 @@ for fi in 0..pair_paths.len() as i32:
     let path = pair_paths[fi]
     if vec_contains(&done_paths, path):
         continue
-    done_paths.push(path)
+    done_paths.push(path.clone())
     var block = ""
     for li in 0..pair_paths.len() as i32:
         if pair_paths[li] == path:
@@ -109,7 +107,7 @@ for fi in 0..pair_paths.len() as i32:
         for line in block.split("\n"):
             if line.len() > 0: print(path ++ ": " ++ line)
         continue
-    let text = with_fs_read_file(path)
+    let text = read_file(path).unwrap_or("".clone())
     if text.len() == 0:
         eprint("insert-std-uses: cannot read " ++ path)
         exit_code(1)
@@ -122,7 +120,7 @@ for fi in 0..pair_paths.len() as i32:
         continue
     let at = header_insert_offset(text)
     let updated = text.slice(0, at) ++ to_insert ++ text.slice(at, text.len())
-    if with_fs_write_file(path, updated) != 0:
+    if write_file(path, updated) != 0:
         eprint("insert-std-uses: cannot write " ++ path)
         exit_code(1)
     for line in to_insert.split("\n"):

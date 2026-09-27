@@ -15,6 +15,7 @@ use build.package
 use build.sdk
 use build.wo
 use build.examples
+use build.tools_lane
 use std.sysinfo
 fn build_owned_text(s: &str): s ++ ""
 
@@ -3150,6 +3151,17 @@ pub fn build(ctx: BuildCtx) -> Build:
     examples_tests = examples_tests.dep("build")
     out = out.add_target(examples_tests)
 
+    // The tools lane (#1335): every tools/*.w is compiled (never run) with
+    // the release compiler, so a tool that stops compiling turns the battery
+    // red instead of rotting until someone reaches for it.
+    var tools_tests = target_new(.Action, "tools-tests", "").output("out/test-graph/tools-tests")
+    tools_tests = tools_tests.allow_parallel()
+    tools_tests.action = run_tools_tests_action
+    tools_tests = tools_tests.input(release_compiler_bin("with"))
+    tools_tests = tools_tests.input("tools")
+    tools_tests = tools_tests.dep("build")
+    out = out.add_target(tools_tests)
+
     // The battery is driven by the PUBLISHED seed pinned in seed.lock, as CI
     // is (build/retention.w): the driver's digest must be the lock's, and
     // every workflow pin must equal the lock. First in :test, so a wrong
@@ -3315,6 +3327,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     tests = tests.dep("cli-selfhost-build-w-tests")
     tests = tests.dep("build-helper-programs")
     tests = tests.dep("examples-tests")
+    tests = tests.dep("tools-tests")
     tests = tests.dep("cli-selfhost-project-tests")
     tests = tests.dep("cli-selfhost-lsp-tests")
     tests = tests.dep("cli-selfhost-edge-tests")

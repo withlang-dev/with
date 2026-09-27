@@ -7,14 +7,11 @@
 //   with run tools/migrate_d22_copy_views.w <candidate-with> [source.w] [--apply]
 
 use std.process
+use std.fs
 use Lexer
 use Token
 
-extern fn with_exec_argv_capture(argv: &str, stdout_path: &str, stderr_path: &str, timeout_ms: i32) -> i32
-extern fn with_fs_read_file(path: &str) -> str
-extern fn with_fs_write_file(path: &str, data: &str) -> i32
-
-fn find_from(text: str, needle: str, start: i64) -> i64:
+fn find_from(text: &str, needle: &str, start: i64) -> i64:
     if needle.len() == 0: return start
     var i = start
     while i + needle.len() <= text.len():
@@ -24,20 +21,20 @@ fn find_from(text: str, needle: str, start: i64) -> i64:
         i = i + 1
     -1
 
-fn line_end(text: str, start: i64) -> i64:
+fn line_end(text: &str, start: i64) -> i64:
     var end = start
     while end < text.len() and text[end] != 10: end = end + 1
     end
 
-fn line_text(text: str, start: i64): text.slice(start, line_end(text, start))
+fn line_text(text: &str, start: i64) -> str: text.slice(start, line_end(text, start))
 
-fn diagnostic_source_path(path: str) -> str:
+fn diagnostic_source_path(path: &str) -> str:
     let embedded_std = "<embedded-std>/"
     if path.starts_with(embedded_std):
         return "lib/" ++ path.slice(embedded_std.len(), path.len())
-    path
+    path.clone()
 
-fn parse_i32_text(text: str) -> i32:
+fn parse_i32_text(text: &str) -> i32:
     var out = 0
     for i in 0..text.len() as i32:
         let b = text[i] as i32
@@ -45,7 +42,7 @@ fn parse_i32_text(text: str) -> i32:
         out = out * 10 + b - 48
     out
 
-fn source_line_start(text: str, wanted: i32) -> i32:
+fn source_line_start(text: &str, wanted: i32) -> i32:
     if wanted <= 1: return 0
     var line = 1
     var i = 0
@@ -56,7 +53,7 @@ fn source_line_start(text: str, wanted: i32) -> i32:
         i = i + 1
     -1
 
-fn source_line_end(text: str, start: i32) -> i32:
+fn source_line_end(text: &str, start: i32) -> i32:
     var i = start
     while i < text.len() as i32 and text[i] as i32 != 10: i = i + 1
     i
@@ -68,16 +65,16 @@ type Edits {
     types: Vec[str],
 }
 
-fn edit_key(path: str, line: i32, name: str): path ++ ":" ++ line.to_string() ++ ":" ++ name
+fn edit_key(path: &str, line: i32, name: &str) -> str: path ++ ":" ++ line.to_string() ++ ":" ++ name
 
-fn has_edit(edits: &Edits, path: str, line: i32, name: str) -> bool:
+fn has_edit(edits: &Edits, path: &str, line: i32, name: &str) -> bool:
     let wanted = edit_key(path, line, name)
     for i in 0..edits.paths.len() as i32:
         if edit_key(edits.paths[i], edits.lines[i], edits.names[i]) == wanted: return true
     false
 
-fn parse_diagnostics(text: str) -> Edits:
-    let edits = Edits { paths: Vec.new(), lines: Vec.new(), names: Vec.new(), types: Vec.new() }
+fn parse_diagnostics(text: &str) -> Edits:
+    var edits = Edits { paths: Vec.new(), lines: Vec.new(), names: Vec.new(), types: Vec.new() }
     let error_prefix = "error: cannot mutate `"
     var pos: i64 = 0
     while true:
@@ -92,7 +89,7 @@ fn parse_diagnostics(text: str) -> Edits:
         if while_at < 0 or live_at < 0:
             pos = block_end
             continue
-        let name = block.slice(while_at + 8, live_at)
+        let name: str = block.slice(while_at + 8, live_at)
 
         let path_at = find_from(block, "\n --> ", 0)
         if path_at < 0:
@@ -126,16 +123,16 @@ fn parse_diagnostics(text: str) -> Edits:
         if type_at < 0 or type_end < 0:
             pos = block_end
             continue
-        let ty = block.slice(type_at + type_prefix.len(), type_end)
+        let ty: str = block.slice(type_at + type_prefix.len(), type_end)
         if not has_edit(&edits, path, binding_line, name):
-            edits.paths.push(path)
+            edits.paths.push(path.clone())
             edits.lines.push(binding_line)
-            edits.names.push(name)
-            edits.types.push(ty)
+            edits.names.push(name.clone())
+            edits.types.push(ty.clone())
         pos = block_end
     edits
 
-fn locate_binding_insert(text: str, line: i32, name: str) -> i32:
+fn locate_binding_insert(text: &str, line: i32, name: &str) -> i32:
     let start = source_line_start(text, line)
     if start < 0: return -1
     let end = source_line_end(text, start)
@@ -153,8 +150,8 @@ fn locate_binding_insert(text: str, line: i32, name: str) -> i32:
         return tokens.get_end(i + 1)
     -1
 
-fn apply_one(path: str, line: i32, name: str, ty: str, apply: bool) -> i32:
-    let text = unsafe { with_fs_read_file(path) }
+fn apply_one(path: &str, line: i32, name: &str, ty: &str, apply: bool) -> i32:
+    let text = read_file(path).unwrap_or("".clone())
     let insert = locate_binding_insert(text, line, name)
     if insert < 0:
         print(f"error: ambiguous D22 binding site {path}:{line} `{name}`")
@@ -162,7 +159,7 @@ fn apply_one(path: str, line: i32, name: str, ty: str, apply: bool) -> i32:
     print(f"{if apply: "migrate" else: "would migrate"}: {path}:{line} let {name}: {ty}")
     if apply:
         let updated = text.slice(0, insert as i64) ++ ": " ++ ty ++ text.slice(insert as i64, text.len())
-        let rc = unsafe { with_fs_write_file(path, updated) }
+        let rc = write_file(path, updated)
         if rc != 0:
             print(f"error: failed to write {path}")
             return -1
@@ -173,26 +170,34 @@ fn main:
     if argv.len() < 2:
         print("usage: migrate_d22_copy_views <candidate-with> [source.w] [--apply]")
         exit_code(2)
-    let candidate = argv.get(1)
-    var source_path = "src/main.w"
+    let candidate = argv.get(1).clone()
+    var source_path = "src/main.w".clone()
     var apply = false
     for ai in 2..argv.len() as i32:
         let arg = argv[ai]
         if arg == "--apply":
             apply = true
         else if source_path == "src/main.w":
-            source_path = arg
+            source_path = arg.clone()
         else:
             print("usage: migrate_d22_copy_views <candidate-with> [source.w] [--apply]")
             exit_code(2)
-    let out_path = "/tmp/with-d22-migrate.stdout"
-    let err_path = "/tmp/with-d22-migrate.stderr"
-    let encoded = candidate ++ "\0check\0" ++ source_path ++ "\0"
-    let rc = unsafe { with_exec_argv_capture(encoded, out_path, err_path, 180000) }
+    let _ = mkdir_p("out/tmp")
+    let out_path = "out/tmp/with-d22-migrate.stdout"
+    let err_path = "out/tmp/with-d22-migrate.stderr"
+    var cmd: Vec[str] = Vec.new()
+    cmd.push("/bin/sh")
+    cmd.push("-c")
+    cmd.push("\"$0\" check \"$1\" > \"$2\" 2> \"$3\"")
+    cmd.push(candidate.clone())
+    cmd.push(source_path.clone())
+    cmd.push(out_path.clone())
+    cmd.push(err_path.clone())
+    let rc = run(&cmd)
     if rc == 0:
         print(f"D22 migration: candidate already accepts {source_path}")
         return
-    let diagnostics = unsafe { with_fs_read_file(err_path) }
+    let diagnostics = read_file(err_path).unwrap_or("".clone())
     let edits = parse_diagnostics(diagnostics)
     if edits.paths.len() == 0:
         print("error: candidate failed but supplied no actionable D22 Copy-view diagnostics")
