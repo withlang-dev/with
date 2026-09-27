@@ -3737,10 +3737,46 @@ fn parse_test_directives_for_target(target: &str) -> TestDirectives:
             else if line.starts_with("//!"):
                 let _ = 0
             else:
+                // #1529: the first line that is not `//!` ends the header. A
+                // directive below it was never read, and its fixture passed
+                // on expectations nobody checked; name it instead.
+                result.directive_error = test_orphan_directive_error(text, i + 1, nr_of_offset(text, i) + 1)
                 return result
             start = i + 1
         i = i + 1
     result
+
+fn nr_of_offset(text: &str, offset: i32) -> i32:
+    var n = 1
+    for k in 0..offset:
+        if text[k] == 10: n = n + 1
+    n
+
+fn test_directive_line_is_known(line: &str) -> bool:
+    let prefixes = ["//! expect-stdout: ", "//! expect-stderr: ", "//! expect-exit: ", "//! expect-check-stdout: ", "//! expect-check-stdout-not: ", "//! expect-check-fail: ", "//! expect-check-fail-not: ", "//! expect-error: ", "//! expect-build-fail: ", "//! args: ", "//! env: ", "//! skip: ", "//! skip-on: ", "//! only-on: ", "//! known-issue: "]
+    for p in prefixes:
+        if line.starts_with(p): return true
+    line == "//! skip" or line == "//! check-only"
+
+// The first directive the header parser would honor that sits after the
+// header ends (`from`, on line `line_no`), as a directive error; "" if none.
+fn test_orphan_directive_error(text: &str, from: i32, line_no: i32) -> str:
+    var start = from
+    var n = line_no
+    let text_len = text.len() as i32
+    var i = from
+    while i <= text_len:
+        if i == text_len or text[i] == 10:
+            if start < i:
+                var line = text.slice(start as i64, i as i64)
+                if line.len() > 0 and line[line.len() as i64 - 1] == 13:
+                    line = line.slice(0, line.len() - 1)
+                if test_directive_line_is_known(line):
+                    return f"directive on line {n} is below the directive header, which ends at the first line that is not `//!`; move it up: {line}"
+            start = i + 1
+            n = n + 1
+        i = i + 1
+    ""
 
 fn test_directives_have_run_expectations(directives: &TestDirectives) -> bool:
     directives.has_expect_exit or directives.expect_stdout.len() > 0 or directives.expect_stderr.len() > 0

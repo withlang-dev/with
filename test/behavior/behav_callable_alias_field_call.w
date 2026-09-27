@@ -1,3 +1,6 @@
+//! expect-stdout: 42
+//! expect-stdout: 21
+//! expect-stdout: 126
 // §12.4 "The callable type" (D63) + "a binding names what's there": a
 // let-bound name for a callable FIELD read through a borrow is an alias of
 // that place (the field is not Copy), and calling through the alias calls
@@ -5,9 +8,6 @@
 // runner's own compile (build/corpora.w:74, `let prepare =
 // corpus.prepare_reference; prepare(...)`) died on this: MirLower read the
 // alias ident as a function NAME and emitted a GENERIC_CALL to `run` (#1635).
-//! expect-stdout: 42
-//! expect-stdout: 21
-//! expect-stdout: 126
 
 type Corp { name: str, run: fn(i32) -> i32 }
 type Holder { inner: Corp }

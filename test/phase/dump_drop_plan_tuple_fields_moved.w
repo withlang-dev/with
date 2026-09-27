@@ -1,11 +1,15 @@
 //! args: --dump-drop-plan
 //! expect-check-stdout: drop-plan module
-// Post-#691 reset-on-move: a moved-out field is blanked (const zst) and
-// truthfully reads Init, while the aggregate itself gets NO drop row — a
-// blanked W must never run drop glue. Each moved-out W drops exactly once
-// via its destination local.
-//! expect-check-stdout: remaining=_2=Maybe, _2.0=Init, _2.1=Init
-//! expect-check-stdout-not: place=_2 
+//! expect-check-stdout: storage-dead local=_2 remaining=_2=Init, _2.0=Reset, _2.1=Reset
+// Reset-on-move (§2.5.1): a moved-out field is blanked (const zst) and reads
+// Reset, the sentinel that owns nothing (#1384, #1488). A move out of a
+// sub-place vacates only that sub-place (#1394), so the tuple itself stays
+// Init. It gets no drop row, and a blanked W never runs drop glue: each
+// moved-out W drops exactly once via its destination local. The dump covers
+// every body, std's included, so the "no drop of `_2`" half is pinned on
+// `run` alone by trace_ownership_tuple_fields_moved.w. (#1529: these
+// expectations sat below the directive header and were never read; the
+// fixture pinned `_2=Maybe` long after the lattice changed.)
 
 type W { slot: *mut i32 }
 
