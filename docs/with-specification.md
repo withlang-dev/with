@@ -8744,6 +8744,9 @@ structural representation:
 | `Vec[T]`, array, slice | `[elem, elem]` |
 | `HashMap[K, V]` | `{key: value, key: value}`, entries ordered by the Debug text of their keys |
 | `BTreeMap[K, V]` | `{key: value, key: value}`, in key order |
+| `HashSet[T]` | `{elem, elem}`, elements ordered by their Debug text |
+| `Box[T]`, `Rc[T]`, `Arc[T]` | The value they hold, formatted with `:?`: `Box.new(5)` is `5` |
+| raw pointer (`*const T`, `*mut T`) | Its address in hexadecimal: `0x16f3a2b40` |
 
 ```
 f"{42:?}"        // "42"
