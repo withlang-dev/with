@@ -963,10 +963,8 @@ pub fn conan_write_known_system_package(name: &str, version: &str, project_root:
     var link_args: Vec[str] = Vec.new()
     if name == "opengl" and conan_detect_os() == "Macos":
         defines = conan_sorted_insert_unique(move defines, "GL_SILENCE_DEPRECATION=1")
-    let known = conan_known_link_metadata(name, version, move libs, move link_args)
-    let known_libs = known.libs
-    let known_link_args = known.lib_paths
-    let host = conan_host_link_inputs(move known_libs, move known_link_args)
+    var known = conan_known_link_metadata(name, version, move libs, move link_args)
+    let host = conan_host_link_inputs(move known.libs, move known.lib_paths)
     let host_libs = host.libs
     let host_link_args = host.lib_paths
     let requires: Vec[str] = Vec.new()
