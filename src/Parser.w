@@ -68,6 +68,7 @@ pub type Parser {
     pending_inferred_disc_repr: i32,
     pending_packed: i32,
     pending_repr_c: i32,
+    pending_pack_n: i32,      // @[repr(packed(N))] (§16.4): N, or 0
     pending_bitpacked: i32,
     pending_weak: i32,
     pending_callconv: i32,
@@ -176,6 +177,7 @@ fn Parser.init_with_pool(tokens: TokenList, source: &str, file_id: i32, intern: 
         pending_inferred_disc_repr: 0,
         pending_packed: 0,
         pending_repr_c: 0,
+        pending_pack_n: 0,
         pending_bitpacked: 0,
         pending_weak: 0,
         pending_callconv: 0,
@@ -605,6 +607,7 @@ impl Parser:
         self.pending_specified = 0
         self.pending_packed = 0
         self.pending_repr_c = 0
+        self.pending_pack_n = 0
         self.pending_bitpacked = 0
         self.pending_weak = 0
         self.pending_callconv = 0
@@ -770,9 +773,11 @@ impl Parser:
                     if self.peek() == TokenKind.TK_R_PAREN:
                         self.advance()
             else if self.is_ident_named("repr"):
-                // §16.4 @[repr(C)] / @[repr(packed)]. repr(packed) implies repr(C),
-                // sets field alignment to 1, and emits unaligned access. repr(C) is
-                // the C ABI layout (source field order, natural alignment).
+                // §16.4 @[repr(C)] / @[repr(packed)] / @[repr(packed(N))].
+                // repr(packed) implies repr(C), sets field alignment to 1, and
+                // emits unaligned access; repr(packed(N)) caps every field's
+                // alignment at N (C's `#pragma pack(N)`). repr(C) is the C ABI
+                // layout (source field order, natural alignment).
                 self.advance()
                 if self.peek() != TokenKind.TK_L_PAREN:
                     self.emit_error("expected '(' after repr in @[repr(...)]")
@@ -780,15 +785,29 @@ impl Parser:
                     self.advance()
                     if self.peek() == TokenKind.TK_IDENT:
                         let repr_text = self.source.slice(self.current_start() as i64, self.current_end() as i64)
-                        if repr_text == "packed":
+                        self.advance()
+                        if repr_text == "packed" and self.peek() == TokenKind.TK_L_PAREN:
+                            self.advance()
+                            var cap = 0
+                            if self.peek() == TokenKind.TK_INT_LIT:
+                                cap = parse_int(self.source.slice(self.current_start() as i64, self.current_end() as i64)) as i32
+                                self.advance()
+                            if cap <= 0 or cap > 65536 or (cap & (cap - 1)) != 0:
+                                self.emit_error("@[repr(packed(N))] takes a power of two from 1 to 65536 (§16.4)")
+                            else:
+                                self.pending_pack_n = cap
+                            if self.peek() == TokenKind.TK_R_PAREN:
+                                self.advance()
+                            else:
+                                self.emit_error("expected ')' after the N of @[repr(packed(N))]")
+                        else if repr_text == "packed":
                             self.pending_packed = 1
                         else if repr_text == "C":
                             self.pending_repr_c = 1
                         else:
-                            self.emit_error("unknown representation '" ++ repr_text ++ "'; expected 'C' or 'packed'")
-                        self.advance()
+                            self.emit_error("unknown representation '" ++ repr_text ++ "'; expected 'C', 'packed' or 'packed(N)'")
                     else:
-                        self.emit_error("expected 'C' or 'packed' in @[repr(...)]")
+                        self.emit_error("expected 'C', 'packed' or 'packed(N)' in @[repr(...)]")
                     if self.peek() == TokenKind.TK_R_PAREN:
                         self.advance()
             else if self.is_ident_named("target"):
@@ -1486,13 +1505,7 @@ impl Parser:
                 self.pool.add_extra(is_pub)
                 self.pool.add_extra(tp_start)
                 self.pool.add_extra(tp_count)
-                var struct_kind = pack_type_decl_kind(TypeDeclKind.Struct, is_ephemeral)
-                if self.pending_packed != 0:
-                    struct_kind = struct_kind + TDK_FLAG_PACKED
-                if self.pending_bitpacked != 0:
-                    struct_kind = struct_kind + TDK_FLAG_BITPACKED
-                if self.pending_repr_c != 0:
-                    struct_kind = struct_kind + TDK_FLAG_REPR_C
+                let struct_kind = self.struct_decl_kind(is_ephemeral)
                 let node = self.pool.add_node(NodeKind.NK_TYPE_DECL, start, self.prev_end(), name, extra_start, struct_kind)
                 return self.finish_type_decl(node)
             repr_type_node = self.parse_type_expr()
@@ -1504,13 +1517,7 @@ impl Parser:
                     self.pool.add_extra(is_pub)
                     self.pool.add_extra(tp_start)
                     self.pool.add_extra(tp_count)
-                    var struct_kind = pack_type_decl_kind(TypeDeclKind.Struct, is_ephemeral)
-                    if self.pending_packed != 0:
-                        struct_kind = struct_kind + TDK_FLAG_PACKED
-                    if self.pending_bitpacked != 0:
-                        struct_kind = struct_kind + TDK_FLAG_BITPACKED
-                    if self.pending_repr_c != 0:
-                        struct_kind = struct_kind + TDK_FLAG_REPR_C
+                    let struct_kind = self.struct_decl_kind(is_ephemeral)
                     let node = self.pool.add_node(NodeKind.NK_TYPE_DECL, start, self.prev_end(), name, extra_start, struct_kind)
                     self.queue_synthetic_copy_impl(name, tp_start, tp_count, start, self.prev_end())
                     return self.finish_type_decl(node)
@@ -1521,13 +1528,7 @@ impl Parser:
             self.pool.add_extra(is_pub)
             self.pool.add_extra(tp_start)
             self.pool.add_extra(tp_count)
-            var struct_kind = pack_type_decl_kind(TypeDeclKind.Struct, is_ephemeral)
-            if self.pending_packed != 0:
-                struct_kind = struct_kind + TDK_FLAG_PACKED
-            if self.pending_bitpacked != 0:
-                struct_kind = struct_kind + TDK_FLAG_BITPACKED
-            if self.pending_repr_c != 0:
-                struct_kind = struct_kind + TDK_FLAG_REPR_C
+            let struct_kind = self.struct_decl_kind(is_ephemeral)
             let node = self.pool.add_node(NodeKind.NK_TYPE_DECL, start, self.prev_end(), name, extra_start, struct_kind)
             if copy_opt_in != 0:
                 self.queue_synthetic_copy_impl(name, tp_start, tp_count, start, self.prev_end())
@@ -1566,13 +1567,7 @@ impl Parser:
             self.pool.add_extra(is_pub)
             self.pool.add_extra(tp_start)
             self.pool.add_extra(tp_count)
-            var struct_kind = pack_type_decl_kind(TypeDeclKind.Struct, is_ephemeral)
-            if self.pending_packed != 0:
-                struct_kind = struct_kind + TDK_FLAG_PACKED
-            if self.pending_bitpacked != 0:
-                struct_kind = struct_kind + TDK_FLAG_BITPACKED
-            if self.pending_repr_c != 0:
-                struct_kind = struct_kind + TDK_FLAG_REPR_C
+            let struct_kind = self.struct_decl_kind(is_ephemeral)
             let node = self.pool.add_node(NodeKind.NK_TYPE_DECL, start, self.prev_end(), name, extra_start, struct_kind)
             return self.finish_type_decl(node)
 
@@ -1799,7 +1794,22 @@ impl Parser:
         let node = self.pool.add_node(NodeKind.NK_TYPE_DECL, start, self.prev_end(), name, extra_start, packed_kind)
         return self.finish_type_decl(node)
 
+    // A struct declaration's kind with its pending layout attributes:
+    // @[packed] / @[repr(packed)], @[bitpacked], @[repr(C)] and
+    // @[repr(packed(N))] (§16.4).
+    fn struct_decl_kind(is_ephemeral: i32) -> i32:
+        var kind = pack_type_decl_kind(TypeDeclKind.Struct, is_ephemeral)
+        if self.pending_packed != 0: kind = kind + TDK_FLAG_PACKED
+        if self.pending_bitpacked != 0: kind = kind + TDK_FLAG_BITPACKED
+        if self.pending_repr_c != 0: kind = kind + TDK_FLAG_REPR_C
+        if self.pending_pack_n != 0: kind = kind + type_decl_pack_bits(self.pending_pack_n)
+        kind
+
     mut fn finish_type_decl(node: NodeId) -> NodeId:
+        // The cap is a struct layout (§16.4); never dropped from another
+        // declaration silently.
+        if self.pending_pack_n != 0 and type_decl_pack_cap(self.pool.get_data2(node)) == 0:
+            self.emit_error("@[repr(packed(N))] caps the alignment of a struct's fields; it applies to a struct declaration (§16.4)")
         self.parse_type_with_clause()
         if self.pending_derive_count > 0:
             self.pool.add_type_meta(node, self.pending_derive_start, self.pending_derive_count)

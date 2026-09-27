@@ -812,12 +812,16 @@ impl BundleEmitter:
             return
         var attrs = ""
         var flags_row = ""
-        if type_decl_is_repr_c(packed) != 0 and type_decl_is_packed(packed) == 0:
+        let pack_cap = type_decl_pack_cap(packed)
+        if type_decl_is_repr_c(packed) != 0 and type_decl_is_packed(packed) == 0 and pack_cap == 0:
             attrs = attrs ++ "@[repr(C)]\n"
             flags_row = flags_row ++ "repr-c,"
         if type_decl_is_packed(packed) != 0:
             attrs = attrs ++ "@[packed]\n"
             flags_row = flags_row ++ "packed,"
+        if pack_cap != 0:
+            attrs = attrs ++ f"@[repr(packed({pack_cap}))]\n"
+            flags_row = flags_row ++ f"packed({pack_cap}),"
         if type_decl_is_bitpacked(packed) != 0:
             attrs = attrs ++ "@[bitpacked]\n"
             flags_row = flags_row ++ "bitpacked,"

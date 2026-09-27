@@ -337,9 +337,28 @@ pub fn type_decl_is_packed(packed: i32) -> i32:
 pub fn type_decl_is_bitpacked(packed: i32) -> i32:
     (packed / TDK_FLAG_BITPACKED) % 2
 
-// @[repr(C)] layout. @[repr(packed)] implies repr(C) per §16.4.
+// @[repr(packed(N))] (§16.4): every field's alignment capped at N, a power
+// of two up to 65536, kept as log2(N) + 1 in the five bits above
+// TDK_FLAG_FLAGS (0: no cap).
+pub const TDK_PACK_UNIT: i32 = 1024
+
+pub fn type_decl_pack_bits(n: i32) -> i32:
+    var e = 1
+    var v = n
+    while v > 1:
+        v = v / 2
+        e = e + 1
+    e * TDK_PACK_UNIT
+
+// The N of @[repr(packed(N))], or 0.
+pub fn type_decl_pack_cap(packed: i32) -> i32:
+    let e = (packed / TDK_PACK_UNIT) % 32
+    if e == 0: 0 else: 1 << ((e - 1) as u32)
+
+// @[repr(C)] layout. @[repr(packed)] and @[repr(packed(N))] imply repr(C)
+// per §16.4.
 pub fn type_decl_is_repr_c(packed: i32) -> i32:
-    if (packed / TDK_FLAG_REPR_C) % 2 != 0:
+    if (packed / TDK_FLAG_REPR_C) % 2 != 0 or type_decl_pack_cap(packed) != 0:
         return 1
     type_decl_is_packed(packed)
 

@@ -899,6 +899,14 @@ impl Sema:
                 self.bitpacked_types.insert(tid as i32, 1)
             if type_decl_is_packed(packed_kind) != 0:
                 self.packed_types.insert(tid as i32, 1)
+            // §16.4 @[repr(packed(N))]: every field's alignment capped at N.
+            // It is a layout of its own, not one to combine with another.
+            let pack_cap = type_decl_pack_cap(packed_kind)
+            if pack_cap != 0:
+                if type_decl_is_packed(packed_kind) != 0 or type_decl_is_bitpacked(packed_kind) != 0:
+                    self.emit_error("@[repr(packed(N))] is a layout of its own; it does not combine with @[packed] or @[bitpacked] (§16.4)", node)
+                else:
+                    self.packed_caps.insert(tid as i32, pack_cap)
             if type_decl_is_repr_c(packed_kind) != 0:
                 self.repr_c_types.insert(tid as i32, 1)
             // §16.4 @[align(N)] validation: power of two, ≤ 65536, ≥ natural.

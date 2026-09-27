@@ -242,6 +242,10 @@ pub type Codegen {
     // and per-field bit offsets/widths for shift/mask codegen
     bitpacked_structs: HashMap[i32, i32],  // struct_idx → bp_info_start (index into bitpacked_field_* Vecs)
     bitpacked_total_bits: HashMap[i32, i32],  // struct_idx → total_bits
+    // §16.4: an LLVM struct type whose C/With alignment exceeds its LLVM ABI
+    // alignment (a repr(packed(N)) body is an LLVM packed struct, alignment
+    // 1) → that alignment, which a struct embedding it is laid out by.
+    struct_declared_align: HashMap[i64, i64],
     bitpacked_backing_types: HashMap[i32, i64],  // struct_idx → LLVM iN type (64-bit pointer)
     bitpacked_by_llvm_type: HashMap[i64, i32],  // LLVM iN type → struct_idx (reverse lookup)
     bitpacked_field_bit_offsets: Vec[i32],  // indexed by bp_info_start + field_idx
@@ -990,6 +994,7 @@ fn Codegen.init_with_opt(module_name: &str, opt_level: i32) -> Codegen:
         struct_llvm_field_indices: Vec.new(),
         bitpacked_structs: HashMap.new(),
         bitpacked_total_bits: HashMap.new(),
+        struct_declared_align: HashMap.new(),
         bitpacked_backing_types: HashMap.new(),
         bitpacked_by_llvm_type: HashMap.new(),
         bitpacked_field_bit_offsets: Vec.new(),
@@ -1540,6 +1545,23 @@ impl Codegen:
         if not self.layout_is_complete(ty):
             return 0
         wl_abi_size_of(dl, ty)
+
+    // §16.4: the alignment a value of LLVM type `ty` has in the C/With
+    // layout — its LLVM ABI alignment, unless a record's declared alignment
+    // exceeds it (struct_declared_align: a repr(packed(N)) record, whose
+    // LLVM body is packed, or a record embedding one); an array's is its
+    // element's.
+    mut fn declared_align_of(ty: i64) -> i64:
+        if ty == 0:
+            return 1
+        let kind = wl_get_type_kind(ty)
+        if kind == wl_array_type_kind():
+            return self.declared_align_of(wl_get_element_type(ty))
+        if kind == wl_struct_type_kind():
+            let declared = self.struct_declared_align.get(ty)
+            if declared.is_some():
+                return declared.unwrap()
+        self.abi_align_of(ty)
 
     mut fn abi_align_of(ty: i64) -> i64:
         let dl = wl_get_module_data_layout(self.llmod)
@@ -4300,20 +4322,39 @@ impl Codegen:
             self.bitpacked_by_llvm_type.insert(backing_ty, idx)
             return
 
-        if has_alignment and not is_packed:
+        // §16.4 @[repr(packed(N))]: every field's alignment capped at N. The
+        // body is an LLVM packed struct with explicit padding, so a field
+        // lands at its capped offset, and its accesses are unaligned
+        // (LlvmBridge.w wl_relax_packed_access_alignment); the record's own
+        // alignment — the largest capped field alignment — is kept in
+        // struct_declared_align, since LLVM's alignment of a packed struct
+        // is 1 and a record embedding this one is laid out by it.
+        let pack_cap = type_decl_pack_cap(packed_kind) as i64
+        var needs_padding = has_alignment or pack_cap > 0
+        if not needs_padding and is_packed == 0:
+            for fi in 0..field_count:
+                if self.declared_align_of(ft_vec[fi]) != self.abi_align_of(ft_vec[fi]):
+                    needs_padding = true
+                    break
+
+        if needs_padding and not is_packed:
             // Build padded LLVM struct type (Zig-style approach).
             // Walk fields, insert [N x i8] padding arrays between fields
-            // to match the C ABI layout specified by @[align(N)] annotations.
+            // to match the C ABI layout specified by @[align(N)] annotations,
+            // a packing cap, and fields whose declared alignment exceeds
+            // their LLVM alignment (a repr(packed(N)) record).
             let padded_types: Vec[i64] = Vec.new()
             var byte_offset: i64 = 0
-            var use_packed = false
+            var use_packed = pack_cap > 0
             var max_align: i64 = 1
 
             for fi in 0..field_count:
                 let f_ty = ft_vec[fi]
                 let explicit_align = self.pool.get_extra(align_base + fi) as i64
-                let natural_align = self.abi_align_of(f_ty)
-                let field_align = if explicit_align > 0: explicit_align else: natural_align
+                let natural_align = self.declared_align_of(f_ty)
+                var field_align = if explicit_align > 0: explicit_align else: natural_align
+                if pack_cap > 0 and field_align > pack_cap:
+                    field_align = pack_cap
                 if field_align > max_align:
                     max_align = field_align
 
@@ -4345,6 +4386,8 @@ impl Codegen:
 
             let packed_flag = if use_packed: 1 else: 0
             wl_struct_set_body(st_type, vec_data_i64(&padded_types), padded_types.len() as i32, packed_flag)
+            if max_align > self.abi_align_of(st_type):
+                self.struct_declared_align.insert(st_type, max_align)
         else:
             // No alignment annotations — identity mapping, direct field types
             wl_struct_set_body(st_type, vec_data_i64(&ft_vec), field_count, is_packed)

@@ -1,8 +1,9 @@
 //! expect-stdout: ok
 
 // #1396: member records with no name held through an array or pointer, tags
-// declared inside a record, and layouts With cannot spell (bitfields, fields
-// under their natural alignment) import as C declares them or opaque; before,
+// declared inside a record, and layouts With cannot spell (bitfields) import
+// as C declares them or opaque — a field under its natural alignment is
+// `@[repr(packed(2))]` since #1421 (behav_c_import_pragma_pack); before,
 // the array field was `c_void`, the nested union an unknown type, and the
 // pack(2) record an `@[align(2)]` under the natural alignment — the import
 // failed to compile.
@@ -27,4 +28,5 @@ fn main:
     let inner_bits: *mut nr_inner_bits = null
     let packed: *mut nr_packed2 = null
     assert(bits == null and inner_bits == null and packed == null)
+    assert(sizeof[nr_packed2]() == 6)
     print("ok")

@@ -1294,18 +1294,15 @@ fn ci_is_directly_demoted(session: i64, idx: i32, count: i32) -> bool:
                 return true
         fi = fi + 1
     // A field placed below its natural alignment (`#pragma pack(2)`:
-    // wingdi.h's BITMAPFILEHEADER puts a DWORD at offset 2) has no With
-    // spelling: §16.4 rule 2 forbids `@[align(N)]` under the natural
-    // alignment, and `@[packed]` would drop the record's own alignment to 1.
-    // Like a bitfield layout, it imports opaque — usable by pointer — rather
-    // than as a declaration that fails to compile (#1396).
-    if with_cimport_struct_is_packed(session, idx) == 0 and with_cimport_decl_kind(session, idx) != CK_UNION:
-        fi = 0
-        while fi < field_count:
-            let align_n = ci_compute_field_alignment(session, idx, fi, field_count)
-            if align_n > 0 and align_n < with_cimport_struct_field_align(session, idx, fi) and with_cimport_struct_field_size(session, idx, fi) != 0:
-                return true
-            fi = fi + 1
+    // wingdi.h's BITMAPFILEHEADER puts a DWORD at offset 2) is spelled
+    // `@[repr(packed(N))]` when that rule reproduces clang's layout exactly
+    // (§16.4, #1421; ci_record_pack_cap). One it does not reproduce has no
+    // With spelling — §16.4 rule 2 forbids `@[align(N)]` under the natural
+    // alignment, and `@[packed]` would drop the record's own alignment to 1
+    // — and like a bitfield layout it imports opaque, usable by pointer,
+    // rather than as an approximation (#1396).
+    if ci_record_has_field_below_natural(session, idx, field_count) and ci_record_pack_cap(session, idx, field_count) == 0:
+        return true
     // Unsupported or opaque field type
     fi = 0
     while fi < field_count:
@@ -2163,6 +2160,8 @@ pub fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs
     // If a field is not naturally aligned, emit @[align(N)] before it.
     // Only fall back to @[packed]+padding for truly packed structs (align==1).
     let is_really_packed = with_cimport_struct_is_packed(session, idx) != 0
+    // `#pragma pack(N)` (§16.4, #1421): the cap alone places every field.
+    let pack_cap = if is_really_packed or is_union: 0 else: ci_record_pack_cap(session, idx, field_count)
     var field_str = ""
     var anon_idx2 = 0
     var fi = 0
@@ -2171,7 +2170,7 @@ pub fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs
             field_str = field_str ++ ", "
 
         // Compute per-field alignment annotation (non-packed non-union only)
-        if not is_really_packed and not is_union:
+        if not is_really_packed and not is_union and pack_cap == 0:
             let align_n = ci_compute_field_alignment(session, idx, fi, field_count)
             if align_n > 0:
                 field_str = field_str ++ f"@[align({align_n})] "
@@ -2208,7 +2207,7 @@ pub fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs
             else:
                 "impl " ++ safe_name ++ ":\n" ++ accessor_method ++ "\n"
 
-    let packed_prefix = if is_really_packed: "@[packed]\n" else: ""
+    let packed_prefix = if is_really_packed: "@[packed]\n" else if pack_cap > 0: f"@[repr(packed({pack_cap}))]\n" else: ""
     let part1 = "type " ++ safe_name
     let part2 = if is_union: part1 ++ " = union \{ " else: part1 ++ " \{ "
     let part3 = part2 ++ field_str
@@ -2218,6 +2217,57 @@ pub fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs
     if ci_migrate_shared_decl_add("type", name, rendered):
         return ""
     rendered
+
+// Whether a struct (not a union, not packed to 1) places a sized field
+// below its natural alignment: `#pragma pack(N)`, `packed, aligned(N)`.
+fn ci_record_has_field_below_natural(session: i64, idx: i32, field_count: i32) -> bool:
+    if with_cimport_struct_is_packed(session, idx) != 0 or with_cimport_decl_kind(session, idx) == CK_UNION:
+        return false
+    var fi = 0
+    while fi < field_count:
+        let align_n = ci_compute_field_alignment(session, idx, fi, field_count)
+        if align_n > 0 and align_n < with_cimport_struct_field_align(session, idx, fi) and with_cimport_struct_field_size(session, idx, fi) != 0:
+            return true
+        fi = fi + 1
+    false
+
+// §16.4 (#1421): the N of `@[repr(packed(N))]` for a struct that places a
+// field below its natural alignment, or 0. `repr(packed(N))` caps every
+// field's alignment at N and the record's at N — C's `#pragma pack(N)` —
+// and the record's alignment is that N whenever the cap moved a field. The
+// layout is recomputed under the rule from clang's own field sizes and
+// natural alignments and must equal clang's at every field offset, the
+// size and the alignment; a record it does not reproduce (a per-field
+// `packed` or `aligned` attribute; `packed, aligned(N)` whose packed
+// offsets are not N-aligned) is 0 and stays opaque.
+fn ci_record_pack_cap(session: i64, idx: i32, field_count: i32) -> i64:
+    if not ci_record_has_field_below_natural(session, idx, field_count):
+        return 0
+    let cap = with_cimport_struct_align(session, idx)
+    if cap <= 1 or (cap & (cap - 1)) != 0:
+        return 0
+    var off: i64 = 0
+    var max_align: i64 = 1
+    var fi = 0
+    while fi < field_count:
+        if with_cimport_struct_field_is_bitfield(session, idx, fi) != 0:
+            return 0
+        let natural = with_cimport_struct_field_align(session, idx, fi)
+        let size = with_cimport_struct_field_size(session, idx, fi)
+        if natural <= 0 or size < 0:
+            return 0
+        let a = if natural > cap: cap else: natural
+        if a > max_align:
+            max_align = a
+        off = (off + a - 1) / a * a
+        if off != with_cimport_struct_field_offset(session, idx, fi):
+            return 0
+        off = off + size
+        fi = fi + 1
+    let size = (off + max_align - 1) / max_align * max_align
+    if max_align != cap or size != with_cimport_struct_size(session, idx):
+        return 0
+    cap
 
 // Compute per-field alignment, ported from Zig's alignmentForField.
 // Returns 0 if naturally aligned (no annotation needed), N if @[align(N)] needed.

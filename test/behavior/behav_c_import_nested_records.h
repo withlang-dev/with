@@ -26,9 +26,9 @@ typedef struct nr_handle {
 } nr_handle;
 
 /* Layouts With cannot spell import opaque: bitfields (a leading underscore
-   is a tag like any other; winbase.h's _DCB), bitfields in a member record,
-   and a field under its natural alignment (wingdi.h's #pragma pack(2)
-   BITMAPFILEHEADER). */
+   is a tag like any other; winbase.h's _DCB) and bitfields in a member
+   record. A field under its natural alignment (wingdi.h's #pragma pack(2)
+   BITMAPFILEHEADER) is `@[repr(packed(2))]` (§16.4, #1421). */
 typedef struct _nr_bits { unsigned int len; unsigned int on: 1; unsigned int off: 1; } nr_bits;
 typedef struct nr_inner_bits { int n; struct { unsigned int flag: 1; } s; } nr_inner_bits;
 #pragma pack(push, 2)

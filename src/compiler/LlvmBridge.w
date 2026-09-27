@@ -330,6 +330,10 @@ extern fn LLVMGetOperand(v: *mut u8, index: u32) -> *mut u8
 extern fn LLVMGetVolatile(v: *mut u8) -> i32
 extern fn LLVMIsNull(v: *mut u8) -> i32
 extern fn LLVMGetAlignment(v: *mut u8) -> u32
+extern fn LLVMIsAGetElementPtrInst(v: *mut u8) -> *mut u8
+extern fn LLVMIsAConstantExpr(v: *mut u8) -> *mut u8
+extern fn LLVMGetConstOpcode(v: *mut u8) -> i32
+extern fn LLVMGetGEPSourceElementType(gep: *mut u8) -> *mut u8
 extern fn LLVMInstructionGetDebugLoc(inst: *mut u8) -> *mut u8
 extern fn LLVMBuildMemMove(b: *mut u8, dst: *mut u8, dst_align: u32, src: *mut u8, src_align: u32, size: *mut u8) -> *mut u8
 extern fn LLVMBuildMemSet(b: *mut u8, ptr: *mut u8, val: *mut u8, len: *mut u8, align: u32) -> *mut u8
@@ -1073,6 +1077,52 @@ pub fn wl_fn_instruction_count(f: i64) -> i32:
                 inst = LLVMGetNextInstruction(inst)
             bb = LLVMGetNextBasicBlock(bb)
     count
+
+// §16.4: a field of a `repr(packed)` or `repr(packed(N))` record sits at an
+// offset its type's alignment need not divide — the record's LLVM body is a
+// packed struct — but LLVMBuildLoad2/LLVMBuildStore give every access the
+// ABI alignment of the type accessed, a promise the optimizer and the
+// target may act on. Each load or store whose address a GEP chain computes
+// through an LLVM packed struct is given alignment 1, the one the address
+// is guaranteed: the target emits an unaligned access ("The compiler emits
+// unaligned loads/stores"). Runs before the per-function cleanup passes;
+// returns the number of accesses relaxed.
+pub fn wl_relax_packed_access_alignment(f: i64) -> i32:
+    var relaxed = 0
+    unsafe:
+        var bb = LLVMGetFirstBasicBlock(f as *mut u8)
+        while bb as i64 != 0:
+            var inst = LLVMGetFirstInstruction(bb)
+            while inst as i64 != 0:
+                let is_load = LLVMIsALoadInst(inst) as i64 != 0
+                let is_store = LLVMIsAStoreInst(inst) as i64 != 0
+                if (is_load or is_store) and LLVMGetAlignment(inst) > 1:
+                    let addr = LLVMGetOperand(inst, if is_load: 0 as u32 else: 1 as u32)
+                    if wl_address_through_packed_struct(addr as i64):
+                        LLVMSetAlignment(inst, 1 as u32)
+                        relaxed = relaxed + 1
+                inst = LLVMGetNextInstruction(inst)
+            bb = LLVMGetNextBasicBlock(bb)
+    relaxed
+
+// Whether the GEP chain computing `addr` indexes an LLVM packed struct at
+// any step (a field of a record nested in a packed record is as unaligned
+// as the record). LLVMGetElementPtr is 29 in llvm-c/Core.h's LLVMOpcode.
+fn wl_address_through_packed_struct(addr: i64) -> bool:
+    var at = addr
+    for _ in 0..32:
+        if at == 0:
+            return false
+        unsafe:
+            let v = at as *mut u8
+            let is_gep = LLVMIsAGetElementPtrInst(v) as i64 != 0 or (LLVMIsAConstantExpr(v) as i64 != 0 and LLVMGetConstOpcode(v) == 29)
+            if not is_gep:
+                return false
+            let src = LLVMGetGEPSourceElementType(v)
+            if src as i64 != 0 and LLVMGetTypeKind(src) == LLVM_StructTypeKind and LLVMIsPackedStruct(src) != 0:
+                return true
+            at = LLVMGetOperand(v, 0 as u32) as i64
+    false
 
 // Aggregate copies as memory operations, the way every LLVM front end emits
 // them. Codegen moves a struct as `store (load %T, src), dst`; SROA then

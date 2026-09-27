@@ -9740,6 +9740,17 @@ impl Sema:
                 if self.packed_types.contains(ref_recv_ty as i32):
                     self.emit_error("cannot create reference to packed field", node)
                     return 0
+                // §16.4 @[repr(packed(N))]: a field placed at alignment N
+                // whose natural alignment exceeds N would give an unaligned
+                // reference; one naturally aligned within the cap would not.
+                let ref_cap = self.type_layout_pack_cap(self.auto_deref_ref_ptr_type(ref_recv_ty) as i32)
+                if ref_cap > 0:
+                    let ref_field_ty = self.check_expr(address_operand_node)
+                    let ref_natural = self.type_layout_align_of(ref_field_ty as i32)
+                    if ref_natural > ref_cap:
+                        let ref_field: str = self.pool_resolve(self.ast.get_data1(address_operand_node))
+                        self.emit_error(f"cannot create a reference to field '{ref_field}' of a repr(packed({ref_cap})) type: its natural alignment {ref_natural} exceeds {ref_cap}, so the reference would be unaligned (§16.4)", node)
+                        return 0
             // docs/completed/mut.md Rev 8 §13 — raw forms produce TY_PTR (*const T / *mut T)
             // and do not participate in borrow tracking. Forming a raw pointer is
             // safe; dereferencing or writing through it requires unsafe (§13.3).

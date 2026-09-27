@@ -16087,6 +16087,9 @@ impl Codegen:
             with_eprint("===== PRE MIR CLEANUP " ++ name_str ++ " =====\n")
             wl_dump_value(function)
             with_eprint("===== END PRE MIR CLEANUP =====\n")
+        // A field of a packed record is accessed unaligned (§16.4), before
+        // any pass reads the alignment (wl_relax_packed_access_alignment).
+        let _ = wl_relax_packed_access_alignment(function)
         // Large aggregate moves become memmove/memset before SROA can
         // scalarize them into a store per leaf (see wl_lower_aggregate_copies).
         let _ = wl_lower_aggregate_copies(function, self.context, wl_get_module_data_layout(self.llmod), 64)

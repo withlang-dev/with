@@ -79,9 +79,32 @@ impl Sema:
         self.generic_subst_type_ids = saved_subst_types
         field_tid
 
+    // §16.4: the alignment every field of a struct is capped at — 1 under
+    // `repr(packed)`, N under `repr(packed(N))` — or 0 when uncapped.
+    fn type_layout_pack_cap(tid: i32) -> i64:
+        let resolved = self.resolve_alias(tid as TypeId) as i32
+        if self.packed_types.contains(resolved):
+            return 1
+        if self.packed_caps.contains(resolved):
+            return self.packed_caps.get(resolved).unwrap() as i64
+        if self.get_type_kind(resolved as TypeId) != TypeKind.TY_GENERIC_INST:
+            return 0
+        let base_sym = self.get_type_d0(resolved as TypeId)
+        if not self.type_decl_nodes.contains(base_sym):
+            return 0
+        let packed = self.ast.get_data2(self.type_decl_nodes.get(base_sym).unwrap())
+        if type_decl_is_packed(packed) != 0:
+            return 1
+        type_decl_pack_cap(packed) as i64
+
+    // A field's alignment under its struct's cap (§16.4).
+    fn type_layout_capped(tid: i32, align: i64) -> i64:
+        let cap = self.type_layout_pack_cap(tid)
+        if cap > 0 and align > cap: cap else: align
+
     mut fn type_layout_generic_struct_field_align(tid: i32, field_index: i32) -> i64:
         let field_tid = self.type_layout_generic_struct_field_type(tid, field_index)
-        self.type_layout_align_of(field_tid)
+        self.type_layout_capped(tid, self.type_layout_align_of(field_tid))
 
     mut fn type_layout_struct_field_align(tid: i32, field_index: i32) -> i64:
         let resolved = self.resolve_alias(tid)
@@ -100,8 +123,8 @@ impl Sema:
         if align_slot >= 0 and align_slot < self.type_extra.len() as i32:
             let explicit = self.type_extra[align_slot]
             if explicit > 0:
-                return explicit as i64
-        natural
+                return self.type_layout_capped(resolved as i32, explicit as i64)
+        self.type_layout_capped(resolved as i32, natural)
 
     mut fn type_layout_struct_field_offset(tid: i32, field_index: i32) -> i64:
         let resolved = self.resolve_alias(tid)

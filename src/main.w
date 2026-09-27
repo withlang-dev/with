@@ -5214,6 +5214,7 @@ fn print_help_attributes:
     with_write(
         "Common attributes:\n\n" ++
         "  @[packed]          Packed struct layout\n" ++
+        "  @[repr(packed(N))] Cap every field's alignment at N (C's #pragma pack(N))\n" ++
         "  @[inline]          Inline hint for functions\n" ++
         "  @[noinline]        Disable inlining for a function\n" ++
         "  @[align(N)]        Per-field alignment inside struct declarations\n\n" ++
