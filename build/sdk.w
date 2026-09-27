@@ -338,6 +338,12 @@ fn sdk_validate_package_prefix(ctx: &ActionCtx, platform: &str, prefix: &str, bu
         // stage2-debug-lines (:fixpoint) reads ELF and Mach-O line tables
         // with llvm-dwarfdump; on PE it uses llvm-readobj.
         tools.push("llvm-dwarfdump")
+        // nightly-release.yml's SDK contract checks these too (its
+        // `for tool in ...` list); a package without them fails that job.
+        tools.push("llvm-ar")
+        tools.push("llvm-config")
+        tools.push("llvm-objcopy")
+        tools.push("llvm-ranlib")
         tools.push("llvm-nm")
         tools.push("llvm-readobj")
         tools.push("llvm-strip")
@@ -466,6 +472,10 @@ fn sdk_package_tool_selected(rel: &str, platform: &str) -> bool:
         tools.push("bin/cpack")
         tools.push("bin/lld")
         tools.push("bin/llvm-dwarfdump")
+        tools.push("bin/llvm-ar")
+        tools.push("bin/llvm-config")
+        tools.push("bin/llvm-objcopy")
+        tools.push("bin/llvm-ranlib")
         tools.push("bin/llvm-nm")
         tools.push("bin/llvm-readobj")
         tools.push("bin/llvm-strip")
