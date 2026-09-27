@@ -866,6 +866,6 @@ fn aggregate_borrow_verdict(arg_is_ref: bool) -> str:
     body.set_terminator(entry, TermKind.TK_RETURN, 0, 0, 0, 0, 0)
     with_str_clone_ref(validate_typed_mir_body(mir_mod, body).message)
 
-pub fn mir_test_enum_aggregate_missing_borrow() -> Unit:
+pub fn mir_test_enum_aggregate_missing_borrow:
     assert(aggregate_borrow_verdict(false).contains("enum payload 0 is a value where the variant's payload is a reference to it"))
     assert(aggregate_borrow_verdict(true) == "")
