@@ -275,7 +275,7 @@ fn dirname(path: &str) -> str:
     if last < 0: return ""
     path.slice(0, last)
 
-fn write_lines(path: &str, lines: &Vec[str]) -> Unit:
+fn write_lines(path: &str, lines: &Vec[str]):
     let dir = dirname(path)
     if dir.len() > 0: assert(mkdir_p(dir) == 0)
     assert(write_file(path, lines.join("\n")) == 0)
@@ -314,7 +314,7 @@ fn pointer_line(id: &str, title: &str, file: &str) -> str:
 
 // ---------------------------------------------------------------- split-spec
 
-fn split_spec -> Unit:
+fn split_spec:
     let chapters = parse_pairs(chapter_table())
     let sections = parse_pairs(section_table())
     let lines = read_lines("docs/with-specification.md")
@@ -499,7 +499,7 @@ fn entry_id(title: &str) -> str:
     if k == 1 or not title.slice(k, title.len()).starts_with(" — "): return ""
     title.slice(0, k)
 
-fn split_decisions -> Unit:
+fn split_decisions:
     let lines = read_lines("docs/decisions.md")
     let n = lines.len() as i32
     var readme: Vec[str] = Vec.new()
@@ -561,7 +561,7 @@ fn reassemble_decisions -> Vec[str]:
 
 // ---------------------------------------------------------------- move
 
-fn move_files -> Unit:
+fn move_files:
     let moves = parse_pairs(move_table())
     for i in 0..moves.len() as i32:
         let src = moves[i].key.clone()
@@ -579,7 +579,7 @@ fn move_files -> Unit:
             exit_code(rc)
     print(f"move: {moves.len()} files moved")
 
-fn list_moves -> Unit:
+fn list_moves:
     let moves = parse_pairs(move_table())
     for i in 0..moves.len() as i32: print(moves[i].key ++ " -> " ++ moves[i].value)
 
@@ -692,7 +692,7 @@ fn text_file(path: &str) -> bool:
     path.ends_with(".json") or path.ends_with(".tsv") or path.ends_with(".lock") or path.ends_with(".gitattributes") or
     path.ends_with("Dockerfile") or path.ends_with(".fish") or path.ends_with(".s")
 
-fn rewrite_refs -> Unit:
+fn rewrite_refs:
     var moves = parse_pairs(move_table())
     // Longest old path first, so no old path is rewritten inside a longer one.
     var sorted: Vec[Pair] = Vec.new()
