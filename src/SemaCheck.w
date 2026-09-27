@@ -8351,7 +8351,16 @@ impl Sema:
             return entry
         if base != 0 and (base == self.syms.hashmap or base == self.syms.btreemap):
             // The collection's own `:?` form lives in std.collections as a
-            // With method; its body's `{k:?}`/`{v:?}` register K and V.
+            // With method; its body's `{k:?}`/`{v:?}` register K and V. A K
+            // or V with no Debug form is an error under the program's `:?`
+            // (§15.4.7, #1564), here: reached through the std body, it named
+            // a line of std/collections.w the program never wrote.
+            let key_ty = self.get_generic_inst_arg(resolved, 0)
+            let value_ty = self.get_generic_inst_arg(resolved, 1)
+            let key_has_form = self.debug_fmt_has_form(key_ty)
+            if not key_has_form or not self.debug_fmt_has_form(value_ty):
+                let _ = self.ensure_debug_formatter(if key_has_form: value_ty else: key_ty, node)
+                return -1
             let entry = self.debug_fmt_push(resolved, DebugFmtKind.HELPER, 0)
             let _ = self.debug_fmt_bind_method(entry, resolved, "debug_form", node)
             return entry
