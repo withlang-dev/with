@@ -1670,24 +1670,32 @@ fn ci_translate_function(session: i64, idx: i32, known_structs: &str, demoted_ty
             if opaque_record.len() > 0:
                 ci_record_omitted_symbol_cat(name, ci_get_decl_location(session, name), "inexpressible", "inline body needs the layout of '" ++ opaque_record ++ "', which c_import imports opaque (§16.9)")
                 return ""
+        // #1678: a `static inline` function's only definition is its body
+        // — no symbol exists for a manual extern to bind — so an omitted
+        // body is inexpressible; a non-static inline may have an external
+        // definition elsewhere, which the raw surface can reach.
+        let body_category = if storage == CX_SC_STATIC: "inexpressible" else: "raw-modelable"
         ci_migrate_set_unsafe_function_body_context(si_raw)
         let body = ci_try_translate_fn_body_at(session, idx, definition)
         ci_migrate_set_unsafe_function_body_context(false)
         let unrendered = ci_print_take_unknowns()
         if unrendered.len() > 0:
-            ci_record_omitted_symbol_cat(name, ci_get_decl_location(session, name), "raw-modelable", "inline body has no rendering for " ++ unrendered[0])
+            ci_record_omitted_symbol_cat(name, ci_get_decl_location(session, name), body_category, "inline body has no rendering for " ++ unrendered[0])
             return ""
         if body.len() > 0:
             with_cimport_mark_name_emitted(name)
             if ci_starts_with(si_ret, "extern \"C\" fn(") or ci_starts_with(si_ret, "fn("):
-                ci_record_omitted_symbol_cat(name, ci_get_decl_location(session, name), "raw-modelable", "inline function returning function pointer not modeled")
+                ci_record_omitted_symbol_cat(name, ci_get_decl_location(session, name), body_category, "inline function returning function pointer not modeled")
                 return ""
             let fn_kw = if si_raw: "unsafe fn " else: "fn "
             if si_raw:
                 ci_record_raw_function_name(name)
             let si_ret_render = ci_unsafe_fn_ptr_type(si_ret)
             return ci_render_generated_fn_body(fn_kw ++ safe_name ++ "(" ++ si_params ++ ") -> " ++ si_ret_render, body)
-        ci_record_omitted_symbol_cat(name, ci_get_decl_location(session, name), "raw-modelable", "inline body translation failed")
+        // The translator's own reason (va_arg, an unsupported builtin, a
+        // record initializer it cannot resolve), not only that it failed.
+        let failed_why = if g_ci_bail_message.len() > 0: "inline body translation failed: " ++ g_ci_bail_message else: "inline body translation failed"
+        ci_record_omitted_symbol_cat(name, ci_get_decl_location(session, name), body_category, failed_why)
         return ""
     if storage == CX_SC_STATIC and is_inline == 0:
         return ""
