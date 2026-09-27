@@ -852,6 +852,12 @@ pub fn run_sdk_cmake_action(ctx: ActionCtx) -> i32:
         configure.push("-DCMAKE_LINKER=" ++ sdk_abs(root, sdk_tool(bootstrap_prefix, "lld-link")))
         configure.push("-DCMAKE_MT=" ++ windows_mt)
         configure.push("-DCMAKE_RC_COMPILER=" ++ sdk_windows_rc_from_mt(windows_mt))
+        // CMake's clang-cl platform module takes the llvm-rc rule (clang
+        // preprocess + `-clang:-MD` depfile flags) when CMAKE_RC_COMPILER_INIT
+        // is llvm-rc, which it defaults to whenever rc.exe is not on PATH, even
+        // with CMAKE_RC_COMPILER naming rc.exe: rc.exe then reads `-clang:-MD`
+        // as a code page, `fatal error RC1205: invalid code page`.
+        configure.push("-DCMAKE_RC_COMPILER_INIT=" ++ sdk_windows_rc_from_mt(windows_mt))
         // CMake links its executables with `/MANIFEST:EMBED
         // /MANIFESTINPUT:cmake.version.manifest`, so the linker merges its
         // own UAC block into that manifest. lld-link writes that block
@@ -1035,6 +1041,12 @@ pub fn run_sdk_llvm_action(ctx: ActionCtx) -> i32:
             return sdk_fail(ctx, "SDK_WINDOWS_MT must name the Windows SDK mt.exe path for Windows SDK rebuilds")
         configure.push("-DCMAKE_MT=" ++ windows_mt)
         configure.push("-DCMAKE_RC_COMPILER=" ++ sdk_windows_rc_from_mt(windows_mt))
+        // CMake's clang-cl platform module takes the llvm-rc rule (clang
+        // preprocess + `-clang:-MD` depfile flags) when CMAKE_RC_COMPILER_INIT
+        // is llvm-rc, which it defaults to whenever rc.exe is not on PATH, even
+        // with CMAKE_RC_COMPILER naming rc.exe: rc.exe then reads `-clang:-MD`
+        // as a code page, `fatal error RC1205: invalid code page`.
+        configure.push("-DCMAKE_RC_COMPILER_INIT=" ++ sdk_windows_rc_from_mt(windows_mt))
     else:
         configure.push("-DCMAKE_C_COMPILER=" ++ sdk_abs(root, sdk_tool(bootstrap_prefix, "clang")))
         configure.push("-DCMAKE_CXX_COMPILER=" ++ sdk_abs(root, sdk_tool(bootstrap_prefix, "clang++")))
