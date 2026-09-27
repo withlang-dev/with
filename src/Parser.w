@@ -97,6 +97,7 @@ pub type Parser {
     pending_post_decls: Vec[i32],
     implicit_main_mode: i32,
     implicit_main_has_main_hint: i32,
+    implicit_main_has_exec_stmt: i32,
     top_level_stmts: Vec[i32],
     explicit_main_decl: i32,
     // §18.5b (D74): the imported module this parse is of, "" for an entry
@@ -208,6 +209,7 @@ fn Parser.init_with_pool(tokens: TokenList, source: &str, file_id: i32, intern: 
         pending_post_decls: Vec.new(),
         implicit_main_mode: 0,
         implicit_main_has_main_hint: 0,
+        implicit_main_has_exec_stmt: 0,
         top_level_stmts: Vec.new(),
         explicit_main_decl: 0,
         module_label: "",
@@ -219,6 +221,41 @@ impl Parser:
     mut fn enable_implicit_main_mode():
         self.implicit_main_mode = 1
         self.implicit_main_has_main_hint = self.has_top_level_main_decl()
+        self.implicit_main_has_exec_stmt = self.has_top_level_exec_stmt()
+
+    // §18.5b (D74): a file is an entry source when its top level holds an
+    // executable statement other than a `let`/`var`. A `let`/`var` alone is
+    // a module-level declaration (a comptime fn or an importer reads it);
+    // only in an entry source do the top-level `let`/`var`s become `main`'s
+    // locals. Without this, `var G = 0` beside a `comptime fn` became a
+    // local of a synthesized main and the fn saw "undefined variable".
+    fn has_top_level_exec_stmt() -> i32:
+        var brace_depth = 0
+        var p = 0
+        while p < self.tokens.len():
+            let tag = self.tokens.get_tag(p)
+            if tag == TokenKind.TK_L_BRACE:
+                brace_depth = brace_depth + 1
+                p = p + 1
+                continue
+            if tag == TokenKind.TK_R_BRACE:
+                if brace_depth > 0:
+                    brace_depth = brace_depth - 1
+                p = p + 1
+                continue
+            if brace_depth != 0 or tag == TokenKind.TK_NEWLINE or tag == TokenKind.TK_SEMICOLON:
+                p = p + 1
+                continue
+            if column_of(self.source, self.tokens.get_start(p)) != 0:
+                p = p + 1
+                continue
+            if tag == TokenKind.TK_IDENT:
+                if not (self.token_text_is(p, "c") and (self.token_text_is(p + 1, "facade") or self.token_text_is(p + 1, "convention"))):
+                    return 1
+            else if tag == TokenKind.TK_INT_LIT or tag == TokenKind.TK_STRING_LIT or tag == TokenKind.TK_FLOAT_LIT or tag == TokenKind.TK_KW_IF or tag == TokenKind.TK_KW_MATCH or tag == TokenKind.TK_KW_FOR or tag == TokenKind.TK_KW_WHILE or tag == TokenKind.TK_KW_LOOP or tag == TokenKind.TK_KW_RETURN or tag == TokenKind.TK_KW_WITH or tag == TokenKind.TK_KW_DEFER or tag == TokenKind.TK_L_PAREN or tag == TokenKind.TK_L_BRACKET or tag == TokenKind.TK_MINUS or tag == TokenKind.TK_KW_NOT or tag == TokenKind.TK_BANG:
+                return 1
+            p = p + 1
+        0
 
     mut fn enable_interface_mode(): self.interface_mode = 1
 
@@ -321,7 +358,7 @@ impl Parser:
                     return 1
             return 0
         if t == TokenKind.TK_KW_LET or t == TokenKind.TK_KW_VAR:
-            if self.implicit_main_mode != 0 and self.implicit_main_has_main_hint == 0:
+            if self.implicit_main_mode != 0 and self.implicit_main_has_main_hint == 0 and self.implicit_main_has_exec_stmt != 0:
                 return 0
             return 1
         0
