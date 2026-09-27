@@ -5638,6 +5638,14 @@ impl MirBuilder:
         // resolved-call contracts exactly that way (gates6 flip).
         if self.sema.type_is_std_box_inst(src_sema_ty) != 0:
             self.consume_moved_operand(op)
+        else if self.body.operand_kinds[op] == OperandKind.OK_MOVE:
+            // #1719: every other cast READS its source. Sema records no move
+            // for a cast (a second `input as []u8` is not a use after move),
+            // and no reset follows, so an OK_MOVE here was a move only in
+            // the MIR record: the drop-state saw `input` moved twice ("two
+            // owners free one value") while codegen dropped it once. The
+            // operand is the same place, read.
+            op = self.body.new_operand(OperandKind.OK_COPY, self.body.operand_d0[op])
         // §4.4a (#1502): `Kind.Hi as f64` extracts the discriminant (the repr
         // integer) and then widens it (§4); codegen has no enum→float cast,
         // so it is lowered as those two.
