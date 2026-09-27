@@ -1544,7 +1544,7 @@ pub fn run_stack_budget_check_action(ctx: ActionCtx) -> i32:
         sizes = comp_stack_collect_after_marker(result.stdout, "DW_CFA_def_cfa_offset:", move sizes)
 
     let report = comp_stack_summarize(binary_path, format, sizes)
-    let max_frame = report.max_frame
+    let max_frame: i32 = report.max_frame
     let report_text = comp_stack_report_text(report, max_frame_budget)
     let report_path = comp_join(output_dir, "report.txt")
     if fs.write_text(report_path, report_text) != 0:
