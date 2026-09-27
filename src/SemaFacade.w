@@ -4307,7 +4307,14 @@ impl Sema:
             let ud_node = if has_resolved != 0: self.get_resolved_call_arg(node, udi) else: self.ast.get_extra(extra_start + udi)
             if ud_node > 0:
                 context.userdata_node = ud_node
+                // A nullable callback's userdata parameter is `Option[&U]`:
+                // the `Some(...)` payload is borrowed for the call, a place or
+                // a temporary alike (payload_arg_auto_refs, #1627).
+                let saved_ctor = self.facade_userdata_ctor
+                if context.nullable:
+                    self.facade_userdata_ctor = ud_node
                 context.userdata_type = self.check_expr_value_context(ud_node) as i32
+                self.facade_userdata_ctor = saved_ctor
         context
 
     // The callback method a method call `recv.field(…)` names, or -1.

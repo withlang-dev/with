@@ -1329,6 +1329,10 @@ pub type Sema {
     // payload (`Some(ctx)` for `Option[&Ctx]`): each is a view of its place,
     // exactly as `&ctx` is (collect_expr_view_deps).
     auto_ref_payload_args: HashMap[i32, i32],
+    // #1627/#1618: the `Some(...)` a nullable facade callback's userdata
+    // argument is, while facade_prepare_callback_call checks it: the
+    // parameter is `Option[&U]`, so its payload is borrowed, not moved.
+    facade_userdata_ctor: i32,
     typed_binding_names: HashMap[i32, i32],
     typed_binding_muts: HashMap[i32, i32],
     ephemeral_task_binding_nodes: HashMap[i32, i32],
@@ -2777,6 +2781,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         drop_consumed_binding_values,
         auto_ref_binding_values,
         auto_ref_payload_args,
+        facade_userdata_ctor: 0,
         typed_binding_names,
         typed_binding_muts,
         ephemeral_task_binding_nodes,

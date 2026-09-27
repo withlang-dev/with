@@ -1035,9 +1035,19 @@ impl Sema:
     // #1627 (§3.8, D22): an enum payload is a demand like a parameter. A
     // place against a `&T` payload (`Some(ctx)` for `Option[&Ctx]`) is
     // auto-referenced — the constructor observes it and the caller's binding
-    // stays valid; Option is transparent to the view's origin.
-    mut fn payload_arg_auto_refs(expected: i32, actual: i32, arg_node: i32) -> bool:
-        if arg_node <= 0 or self.ast.kind(arg_node) == NodeKind.NK_MOVE_ARG or self.can_auto_ref_arg(expected, actual) == 0:
+    // stays valid; Option is transparent to the view's origin. A temporary
+    // (`Some(Ctx { .. })`) is borrowed as a `&T` call argument is: MIR
+    // materializes it and it drops at the end of the statement. The
+    // userdata constructor of a nullable facade callback (`ctor_node`,
+    // facade_prepare_callback_call) is checked with no expected type — its
+    // `U` comes from this payload — and its parameter is `Option[&U]`, so an
+    // owned payload there is borrowed too (#1618).
+    mut fn payload_arg_auto_refs(expected: i32, actual: i32, arg_node: i32, ctor_node: i32) -> bool:
+        if arg_node <= 0 or self.ast.kind(arg_node) == NodeKind.NK_MOVE_ARG:
+            return false
+        let actual_kind = if actual != 0: self.get_type_kind(self.resolve_alias(actual as TypeId)) else: 0
+        let userdata = ctor_node != 0 and ctor_node == self.facade_userdata_ctor and actual != 0 and actual_kind != TypeKind.TY_REF and actual_kind != TypeKind.TY_PTR
+        if not userdata and self.can_auto_ref_arg(expected, actual) == 0:
             return false
         self.check_borrow_create(arg_node, BorrowKind.SHARED, arg_node)
         self.auto_ref_payload_args.insert(arg_node, 1)
@@ -15872,7 +15882,7 @@ impl Sema:
             // live over its moved-out bytes).
             if ai < payloads.len() as i32 and payloads[ai] != 0:
                 let arg_ty = self.check_expr_with_expected(arg_node, payloads[ai] as TypeId)
-                if not self.payload_arg_auto_refs(payloads[ai], arg_ty as i32, arg_node):
+                if not self.payload_arg_auto_refs(payloads[ai], arg_ty as i32, arg_node, node):
                     self.mark_moved_if_consumed(arg_node)
             else:
                 let _ = self.check_expr_value_context(arg_node)
@@ -18844,7 +18854,7 @@ impl Sema:
                     if ucm_ptype != 0 and self.ast.kind(ucm_ptype) == NodeKind.NK_TYPE_REF:
                         continue
                 let arg_node = if has_resolved != 0: self.get_resolved_call_arg(node, ai) else: self.ast.get_extra(resolved_extra_start + ai)
-                if ai < variant_payload_tys.len() as i32 and self.payload_arg_auto_refs(variant_payload_tys[ai], arg_types[ai], arg_node):
+                if ai < variant_payload_tys.len() as i32 and self.payload_arg_auto_refs(variant_payload_tys[ai], arg_types[ai], arg_node, node):
                     continue
                 if arg_node > 0:
                     self.mark_moved_if_consumed(arg_node)
@@ -23967,7 +23977,7 @@ impl Sema:
             // argument is consumed exactly like a container store below
             // (#714 rule). Without the mark a second use compiled clean and
             // read the move-blanked slot at runtime (Bad() printed empty).
-            if mc_is_static_enum_variant and ai < mc_static_variant_payload_tys.len() as i32 and not self.payload_arg_auto_refs(mc_static_variant_payload_tys[ai], mc_arg_ty as i32, mc_arg_node):
+            if mc_is_static_enum_variant and ai < mc_static_variant_payload_tys.len() as i32 and not self.payload_arg_auto_refs(mc_static_variant_payload_tys[ai], mc_arg_ty as i32, mc_arg_node, node):
                 let ctor_arg_kind = self.ast.kind(mc_arg_node)
                 if ctor_arg_kind != NodeKind.NK_MOVE_ARG and ctor_arg_kind != NodeKind.NK_COPY_ARG and self.is_copy(mc_arg_ty as TypeId) == 0:
                     let ctor_root = self.place_root_sym(mc_arg_node)
