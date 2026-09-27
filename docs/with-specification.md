@@ -1,4 +1,4 @@
-# The With Programming Language — Specification v7.4
+# The With Programming Language — Specification v7.5
 
 **Author:** Eric Hartford
 **Status:** Reference specification for prototype implementation
@@ -11,6 +11,9 @@ implementation is still in progress.** The D22 rules are normative now. The
 compiler, comptime evaluator, backends, standard library, diagnostics, and
 tests are NON-COMPLIANT wherever they do not yet implement them. Existing
 implementation behavior must not be treated as precedent against D22.
+**Changelog v7.5:** An assignment's value is a read of the place after the
+store — C's rule under With's view semantics (§9.1, D73); a `Drop` type whose
+all-zero storage is a live value gets a hidden liveness byte (§2.5.1, D72).
 **Changelog v7.4:** Ten rulings from the modeled-C close-out (D71): string
 range slices are `&str` views (§4.8a); a positional collection has no `get`,
 `xs[i]` is the one spelling (§ Element access, D27); `@[flags]` doubles
@@ -655,6 +658,13 @@ neither of which depends on the compiler's static analysis being correct:
   nothing), so the check folds into their ordinary drop; a user `Drop` whose
   body touches the value is guarded so it never runs against a moved-from
   value. A moved-out value's drop does nothing.
+
+  A `Drop` type whose all-zero storage can be a live value (`Fd { n: 0 }`)
+  cannot use its storage as the sentinel. For such a type the compiler adds a
+  hidden liveness byte: the reset clears it and the guard reads it, so a live
+  zero value is destroyed like any other (D72). A type with an owning
+  non-null field keeps the storage test and pays nothing; the programmer
+  writes nothing either way.
 
 **Ownership is a property of the handle, not of its contents.** Every value
 that owns heap — a container, a box, an owned buffer — releases it when its
@@ -3453,10 +3463,15 @@ type; a value on one path and fall-off on another is a missing return
 (§4.10). A closure with no expected function type infers its result the
 same way.
 
-An assignment `place = value` is an expression whose type is the type of
-`place`. In statement position its value is discarded. As the tail of a body
-whose declared return type is not `Unit`, the body yields a read of `place`
-after the store, under the ordinary copy and move rules.
+An assignment `place = value` is an expression; its value is a read of
+`place` after the store (C's rule, C11 §6.5.16, under With's view semantics:
+a read of a place yields a view of it, §3.8, D22). In statement position the
+value is discarded. In any other position — nested (`a = b = e`), an operand
+(`while (n = next()) != 0:`), a binding (`let t = (s = e)`), or the tail of
+a body whose declared return type is not `Unit` (D60) — the assignment yields
+that view under the ordinary rules: a `Copy` demand copies, an owned demand
+on a non-`Copy` view is refused with the clone or move fix-it. The value
+stored is never duplicated (D73).
 
 Function bodies support three interchangeable forms (§29.13):
 
