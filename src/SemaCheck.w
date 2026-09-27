@@ -13820,6 +13820,11 @@ impl Sema:
                 else if target_base == self.syms.hashmap or target_base == self.syms.btreemap:
                     self.emit_error("sequence literal cannot target a map; use [key: value] form", node)
                     return 0
+        // #1739 (§4.3c rule 1): a destination whose collection is named but
+        // whose element type is still undecided (a generic struct's
+        // `items: Vec[T]`) selects the collection; the elements decide T.
+        if target_ty == 0 and expected_elem == 0 and self.collection_literal_hints.contains(node):
+            target_base = self.collection_literal_hints.get(node).unwrap()
         if elem_count == 0:
             if target_ty == 0 and expected_elem != 0:
                 target_ty = self.ensure_exact_type(TypeKind.TY_ARRAY, expected_elem as TypeId, 0, 0) as i32
@@ -13864,6 +13869,10 @@ impl Sema:
         let elem_type = self.resolve_contextual_join(expected_elem, &elem_nodes, &elem_origins, &elem_types, &elem_roles, node, "sequence literal")
         let result: TypeId = if target_ty != 0:
             target_ty as TypeId
+        else if target_base != 0:
+            let hinted_args: Vec[i32] = Vec.new()
+            hinted_args.push(elem_type)
+            self.ensure_generic_inst_type(target_base, hinted_args, 1)
         else:
             // Array types have no side-table payload: reuse the canonical type
             // so frozen MIR lowering sees the same pointee identity as a
@@ -13936,7 +13945,9 @@ impl Sema:
             let args: Vec[i32] = Vec.new()
             args.push(key_ty)
             args.push(val_ty)
-            target_ty = self.ensure_generic_inst_type(self.syms.hashmap, args, 2) as i32
+            // #1739: a generic destination that names the map picks it.
+            let map_base = if self.collection_literal_hints.contains(node): self.collection_literal_hints.get(node).unwrap() else: self.syms.hashmap
+            target_ty = self.ensure_generic_inst_type(map_base, args, 2) as i32
         let target_base2 = if target_ty != 0 and self.get_type_kind(self.resolve_alias(target_ty as TypeId)) == TypeKind.TY_GENERIC_INST:
             self.get_generic_inst_base(self.resolve_alias(target_ty as TypeId) as i32)
         else:
@@ -13998,6 +14009,45 @@ impl Sema:
                     self.emit_error("field default type mismatch for '" ++ self.pool_resolve(f_name) ++ "'; use an explicit `as` cast", f_default)
                 else if self.types_compatible(f_ty as i32, d_ty as i32) == 0 and self.arithmetic_result_type(f_ty, d_ty) == 0 and self.has_contextual_copy_adjustment(f_default) == 0:
                     self.emit_error("field default type mismatch for '" ++ self.pool_resolve(f_name) ++ "'", f_default)
+
+    // #1739: a generic struct literal with no expected instance checks its
+    // fields with no expectation, so `Stack { items: ["p", "q"] }` typed the
+    // element list as the default `[str; 2]` array and `items: Vec[T]` bound
+    // nothing. A sequence or map literal whose declared field type names a
+    // collection builds that collection (§4.3c), and its elements decide T.
+    mut fn hint_generic_struct_literal_collections(td_extra: i32, extra_start: i32, field_count: i32):
+        let declared_count = self.ast.get_extra(td_extra)
+        let positional = if field_count > 0: self.ast.get_extra(extra_start) == 0 else: false
+        for li in 0..field_count:
+            let value = self.ast.get_extra(extra_start + li * 2 + 1)
+            let value_kind = if value > 0: self.ast.kind(value) else: 0
+            if value_kind != NodeKind.NK_ARRAY_LIT and value_kind != NodeKind.NK_MAP_LIT:
+                continue
+            var declared = if positional: li else: -1
+            if not positional:
+                let literal_name = self.ast.get_extra(extra_start + li * 2)
+                for fi in 0..declared_count:
+                    if self.ast.get_extra(td_extra + 1 + fi * 3) == literal_name:
+                        declared = fi
+                        break
+            if declared < 0 or declared >= declared_count:
+                continue
+            self.hint_collection_literal(value, self.ast.get_extra(td_extra + 1 + declared * 3 + 1))
+
+    // A sequence or map literal `value` meeting a declared type `type_node`
+    // that names a collection whose type arguments are still undecided (a
+    // generic struct field, a generic fn parameter) builds that collection.
+    mut fn hint_collection_literal(value: i32, type_node: i32):
+        let value_kind = if value > 0: self.ast.kind(value) else: 0
+        if value_kind != NodeKind.NK_ARRAY_LIT and value_kind != NodeKind.NK_MAP_LIT:
+            return
+        if type_node == 0 or self.ast.kind(type_node) != NodeKind.NK_TYPE_GENERIC:
+            return
+        let base = self.canonical_symbol_by_text(self.ast.get_data0(type_node))
+        let is_sequence = base == self.syms.vec or base == self.syms.hashset or base == self.syms.btreeset
+        let is_map = base == self.syms.hashmap or base == self.syms.btreemap
+        if (value_kind == NodeKind.NK_ARRAY_LIT and is_sequence) or (value_kind == NodeKind.NK_MAP_LIT and is_map):
+            self.collection_literal_hints.insert(value, base)
 
     mut fn infer_struct_literal_generic_type(node: i32, name: i32, td_extra: i32, tp_start: i32, tp_count: i32, extra_start: i32, field_count: i32, val_types: &Vec[i32]) -> i32:
         let declared_count = self.ast.get_extra(td_extra)
@@ -14146,6 +14196,8 @@ impl Sema:
                     let td_node = self.struct_literal_decl_node(name, tid)
                     if td_node != 0 and self.type_decl_tp_count(td_node) == 0:
                         expected_struct_ty = resolved
+                    else if td_node != 0 and type_decl_sub_kind(self.ast.get_data2(td_node)) == TypeDeclKind.Struct:
+                        self.hint_generic_struct_literal_collections(self.ast.get_data1(td_node), extra_start, field_count)
                 // Check field initializers and collect value types
                 let val_types: Vec[i32] = Vec.new()
                 // #626: origins of owned locals coerced into `&T` fields — this
@@ -17165,9 +17217,12 @@ impl Sema:
         let deferred: Vec[i32] = Vec.new()
         arg_types.push(lhs_ty)
         arg_nodes.push(lhs)
+        let pipe_hint_meta = self.ast.find_fn_meta(generic_fn_node)
         for ai in 0..args_count:
             let arg_node = self.ast.get_extra(args_start + ai)
             arg_nodes.push(arg_node)
+            if pipe_hint_meta >= 0 and ai + 1 < self.ast.fn_meta_param_count(pipe_hint_meta):
+                self.hint_collection_literal(arg_node, self.ast.fn_param_type(self.ast.fn_meta_param_start(pipe_hint_meta), ai + 1))
             if self.closure_has_untyped_param(arg_node):
                 deferred.push(ai + 1)
                 arg_types.push(0)
@@ -17208,6 +17263,12 @@ impl Sema:
     mut fn check_pipeline(node: i32) -> i32:
         let lhs = self.ast.get_data0(node)
         let rhs = self.ast.get_data1(node)
+        // #1739: `[1, 2] |> stage()` meets the stage's first parameter.
+        if rhs != 0 and self.ast.kind(rhs) == NodeKind.NK_CALL and self.ast.kind(self.ast.get_data0(rhs)) == NodeKind.NK_IDENT:
+            let stage_fn = self.generic_fn_node_for_symbol(self.ast.get_data0(self.ast.get_data0(rhs)))
+            let stage_meta = if stage_fn != 0: self.ast.find_fn_meta(stage_fn) else: -1
+            if stage_meta >= 0 and self.ast.fn_meta_param_count(stage_meta) > 0:
+                self.hint_collection_literal(lhs, self.ast.fn_param_type(self.ast.fn_meta_param_start(stage_meta), 0))
         let lhs_ty = self.check_expr(lhs)
         if rhs != 0:
             if self.ast.kind(rhs) == NodeKind.NK_CALL:
@@ -18837,6 +18898,8 @@ impl Sema:
         // A generic callee's unannotated closure arguments wait for the other
         // arguments (check_deferred_generic_closure_args).
         let defer_generic_closures = sig_idx < 0 and callable_value_tid == 0 and variant_payload_tys.len() == 0 and self.generic_fn_node_for_symbol(fn_sym) != 0
+        let generic_hint_fn = if sig_idx < 0 and callable_value_tid == 0 and variant_payload_tys.len() == 0: self.generic_fn_node_for_symbol(fn_sym) else: 0
+        let generic_hint_meta = if generic_hint_fn != 0: self.ast.find_fn_meta(generic_hint_fn) else: -1
         let deferred_closure_args: Vec[i32] = Vec.new()
         for ai in 0..resolved_arg_count:
             let arg_node = if has_resolved != 0: self.get_resolved_call_arg(node, ai) else: self.ast.get_extra(resolved_extra_start + ai)
@@ -18882,6 +18945,10 @@ impl Sema:
             if is_closure_arg:
                 self.closure_direct_arg_depth = self.closure_direct_arg_depth + 1
                 self.closure_direct_arg_escape_flags.push(closure_arg_escapes)
+            // #1739: a generic callee's `Vec[T]` parameter names the collection
+            // a literal argument builds; its elements decide T.
+            if expected_ty == 0 and sig_idx < 0 and generic_hint_meta >= 0 and ai + param_offset < self.ast.fn_meta_param_count(generic_hint_meta):
+                self.hint_collection_literal(arg_node, self.ast.fn_param_type(self.ast.fn_meta_param_start(generic_hint_meta), ai + param_offset))
             let saved_display_join_node = self.display_join_node
             if expected_ty == 0 and sig_idx < 0 and self.generic_param_bounded_by_display(fn_sym, ai + param_offset) != 0:
                 self.display_join_node = arg_node

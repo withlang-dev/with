@@ -1209,6 +1209,11 @@ pub type Sema {
     // consumed by MirLower.lower_call_arg to borrow the place instead of
     // moving the collection.
     slice_coerce_args: HashMap[i32, i32],
+    // #1739: a sequence or map literal with no expected instance whose
+    // declared destination names a collection with undecided type
+    // arguments (a generic struct field `items: Vec[T]`): literal node ->
+    // the collection base the literal builds (§4.3c rule 1 and 2).
+    collection_literal_hints: HashMap[i32, i32],
     // D22 Stage 2 contextual-Copy decisions. The node map indexes the single
     // structured record consumed by later stages; expression type inference
     // never reads this sidecar and therefore remains exact.
@@ -2723,6 +2728,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         autoderef_step_starts: sema_new_map_i32_i32(),
         autoderef_step_counts: sema_new_map_i32_i32(),
         slice_coerce_args: sema_new_map_i32_i32(),
+        collection_literal_hints: sema_new_map_i32_i32(),
         contextual_copy_adjustment_indices: sema_new_map_i64_i32(),
         contextual_copy_adjustments: Vec.new(),
         contextual_join_decision_indices: sema_new_map_i64_i32(),
