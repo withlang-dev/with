@@ -1018,3 +1018,10 @@ fn field_redrop_verdict(rewrite: bool) -> str:
 pub fn mir_test_field_redrop:
     assert(field_redrop_verdict(true) == "")
     assert(field_redrop_verdict(false).contains("drop of _1 frees _1.f0 again: a path reaching it dropped that part and nothing wrote it since (Uninit)"))
+
+pub fn mir_test_reset_of_init:
+    assert(drop_state_verdict(6, true).contains("reset of _2 on a path where it was never moved: the value it holds is lost"))
+    assert(drop_state_verdict(7, true) == "")
+    assert(drop_state_verdict(8, true) == "")
+    // A value with no drop glue owns nothing to lose.
+    assert(drop_state_verdict(6, false) == "")

@@ -2481,6 +2481,15 @@ pub fn validate_ownership_body(mir_mod: &MirModule, body: &MirBody) -> str:
                 let twice = mir_move_of_moved_place(mir_mod, body, blocks.keys, state, mir_rvalue_operands(body, body.stmt_data1(stmt_id)))
                 if twice.len() > 0:
                     return f"fn sym{body.fn_sym} stmt{stmt_id} span={span}: " ++ twice
+                // #1487: a reset-on-move blank stores the sentinel over a
+                // place a move left behind. Over a place still Init — no path
+                // moved it — it overwrites a live value without a drop: the
+                // value is lost (a leak) and every later read sees the blank.
+                // Moved, MaybeMoved, Reset, Uninit, Maybe and MaybeGarbage
+                // stay legal (a reset after a move, at a conditional-move
+                // join, a zero-init).
+                if mir_rvalue_is_zero_fill(body, body.stmt_data1(stmt_id)) != 0 and state.place(blocks.keys, d0) == MirDropState.Init and mir_mod.sema_moved_drop_types.contains(mir_validate_place_type(mir_mod, body, d0)):
+                    return f"fn sym{body.fn_sym} stmt{stmt_id} span={span}: reset of {mir_place_text(body, d0)} on a path where it was never moved: the value it holds is lost (§2.5.1)"
             state.transfer_stmt(blocks.keys, body, stmt_id)
         if body.term_kind(bb) == TermKind.TK_CALL and blocks.computed[bb] != 0:
             let twice = mir_move_of_moved_place(mir_mod, body, blocks.keys, state, mir_term_operands(body, bb))
