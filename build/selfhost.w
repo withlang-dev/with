@@ -3191,11 +3191,18 @@ fn bs_check_c_import_names_reset_between_compilations(ctx: &ActionCtx, compiler_
     result.rc
 
 fn bs_compile_emit_c_output(ctx: &ActionCtx, root: &str, case_dir: &str, c_path: &str, bin: &str, label: &str) -> i32:
-    let stdout_path = bs_capture_path(root, case_dir, label ++ "-compile", "stdout")
-    let stderr_path = bs_capture_path(root, case_dir, label ++ "-compile", "stderr")
     let platform_obj = bs_host_platform_runtime_object()
     if platform_obj.len() == 0:
         return bs_fail(ctx, "unsupported host runtime object for emit-c C compile: " ++ os() ++ "/" ++ arch())
+    let cc_result = bs_run_emit_c_compile(ctx, root, case_dir, c_path, bin, label, platform_obj)
+    if cc_result.rc == 0:
+        return 0
+    ctx.diagnostics().error(ctx.target_name() ++ f": {label} C compile failed with exit code {cc_result.rc}\n" ++ cc_result.stderr)
+
+// The host C compiler over one emitted unit and the runtime objects.
+fn bs_run_emit_c_compile(ctx: &ActionCtx, root: &str, case_dir: &str, c_path: &str, bin: &str, label: &str, platform_obj: &str) -> ToolProcessResult:
+    let stdout_path = bs_capture_path(root, case_dir, label ++ "-compile", "stdout")
+    let stderr_path = bs_capture_path(root, case_dir, label ++ "-compile", "stderr")
     var cc_args: Vec[str] = Vec.new()
     cc_args = bs_push_c_compiler(move cc_args)
     cc_args |> push("-O1")
@@ -3220,10 +3227,7 @@ fn bs_compile_emit_c_output(ctx: &ActionCtx, root: &str, case_dir: &str, c_path:
     cc_args |> push(bs_abs(root, "runtime"))
     if os() == "Linux":
         cc_args |> push("-lm")
-    let cc_result = ctx.process_runner().run_capture(cc_args, stdout_path, stderr_path, 120000)
-    if cc_result.rc == 0:
-        return 0
-    ctx.diagnostics().error(ctx.target_name() ++ f": {label} C compile failed with exit code {cc_result.rc}\n" ++ cc_result.stderr)
+    ctx.process_runner().run_capture(cc_args, stdout_path, stderr_path, 120000)
 
 fn bs_check_emit_c_receiver_abi(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
     let root = ctx.project_info().project_root()
@@ -3318,6 +3322,80 @@ fn bs_check_emit_c_collections(ctx: &ActionCtx, compiler_path: &str, case_dir: &
     let run_result = bs_run_binary_capture(ctx, bin, "emit-c-collections-run", 120000)
     if run_result.rc != 0: return run_result.rc
     bs_edge_assert_exact(ctx, bs_trim_trailing_line_endings(run_result.stdout), "ok", "emit_c_collections", "stdout")
+
+// The `//! expect-stdout:` lines of a fixture, joined as the program prints
+// them.
+fn bs_emit_c_expected_stdout(text: &str) -> str:
+    let prefix = "//! expect-stdout: "
+    var out = ""
+    var first = true
+    for line in text.split("\n"):
+        if line.starts_with(prefix):
+            if not first: out = out ++ "\n"
+            out = out ++ line.slice(prefix.len(), line.len())
+            first = false
+    out
+
+// The emit-C behavior corpus, test/emit_c/*.w. Each program runs twice
+// under the compiler under test: `with test` (the LLVM backend, against the
+// program's `//! expect-stdout:` lines), then `--emit-c`, the host C
+// compiler over the runtime objects, and a run whose stdout must be the
+// same lines — a difference is a backend divergence, which a program that
+// merely compiles as C never shows (#1484: globals read zero). Every
+// fixture is surveyed before the verdict.
+fn bs_check_emit_c_fixtures(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
+    let root = ctx.project_info().project_root()
+    let fs = ctx.fs()
+    if fs.mkdir_all(case_dir) != 0:
+        return bs_fail(ctx, "could not create output directory: " ++ case_dir)
+    let platform_obj = bs_host_platform_runtime_object()
+    if platform_obj.len() == 0:
+        return bs_fail(ctx, "unsupported host runtime object for emit-c C compile: " ++ os() ++ "/" ++ arch())
+    var fixtures = 0
+    var failed = 0
+    var report = ""
+    for path in fs.list_files("test/emit_c"):
+        if not path.ends_with(".w"): continue
+        fixtures = fixtures + 1
+        let base = bs_basename(path)
+        let name = base.slice(0, base.len() - 2)
+        let expected = bs_emit_c_expected_stdout(fs.read_text(path))
+        var test_args: Vec[str] = Vec.new()
+        test_args |> push("test")
+        test_args |> push(bs_abs(root, path))
+        let native = bs_run_cli_capture_cwd(ctx, compiler_path, "emit-c-native-" ++ name, &test_args, 300000, root)
+        if native.rc != 0:
+            report = report ++ "\n" ++ path ++ ": the LLVM backend disagrees with the fixture:\n" ++ native.stderr
+            failed = failed + 1
+            continue
+        let c_path = bs_join(case_dir, name ++ ".c")
+        let bin = bs_join(case_dir, name)
+        var emit_args: Vec[str] = Vec.new()
+        emit_args |> push("build")
+        emit_args |> push(bs_abs(root, path))
+        emit_args |> push("--emit-c")
+        emit_args |> push("-o")
+        emit_args |> push(bs_abs(root, c_path))
+        let emitted = bs_run_cli_capture_cwd(ctx, compiler_path, "emit-c-" ++ name, &emit_args, 300000, root)
+        if emitted.rc != 0:
+            report = report ++ "\n" ++ path ++ ": C emission failed:\n" ++ emitted.stderr
+            failed = failed + 1
+            continue
+        let compiled = bs_run_emit_c_compile(ctx, root, case_dir, c_path, bin, "emit-c-" ++ name, platform_obj)
+        if compiled.rc != 0:
+            report = report ++ "\n" ++ path ++ f": the emitted C does not compile (exit {compiled.rc}):\n" ++ compiled.stderr
+            failed = failed + 1
+            continue
+        let run = bs_run_binary_capture(ctx, bin, "emit-c-" ++ name ++ "-run", 120000)
+        let actual = bs_trim_trailing_line_endings(run.stdout)
+        if run.rc != 0 or actual != expected:
+            report = report ++ "\n" ++ path ++ f": the emitted C program exited {run.rc}\nexpected: '" ++ expected ++ "'\nactual: '" ++ actual ++ "'\n" ++ run.stderr
+            failed = failed + 1
+    if fixtures == 0:
+        return bs_fail(ctx, "test/emit_c: no fixtures; the corpus cannot prove the C backend runs")
+    if failed > 0:
+        return bs_fail(ctx, f"{failed} of {fixtures} emit-C fixtures failed:" ++ report)
+    0
 
 fn bs_check_emit_c_generic_intrinsics(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
     // #740 roundtrip: sizeof/alignof/transmute lower to real C rather than
@@ -3735,6 +3813,8 @@ pub fn run_emit_c_smoke_action(ctx: ActionCtx) -> i32:
     rc = bs_check_emit_c_collections(ctx, compiler_path, bs_join(output_dir, "emit_c_collections_case"))
     if rc != 0: return rc
     rc = bs_check_emit_c_generic_intrinsics(ctx, compiler_path, bs_join(output_dir, "emit_c_generic_intrinsics_case"))
+    if rc != 0: return rc
+    rc = bs_check_emit_c_fixtures(ctx, compiler_path, bs_join(output_dir, "emit_c_fixtures"))
     if rc != 0: return rc
     print("EMIT-C SMOKE OK")
     0

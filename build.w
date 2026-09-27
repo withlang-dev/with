@@ -3254,6 +3254,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     emit_c_smoke.action = run_emit_c_smoke_action
     emit_c_smoke = emit_c_smoke.input(release_compiler_bin("with"))
     emit_c_smoke = emit_c_smoke.input("test/hello.w")
+    emit_c_smoke = emit_c_smoke.input("test/emit_c")
     emit_c_smoke = emit_c_smoke.dep("build")
     emit_c_smoke = emit_c_smoke.dep("runtime")
     out = out.add_target(emit_c_smoke)

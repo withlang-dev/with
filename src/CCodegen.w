@@ -3299,6 +3299,28 @@ impl CCodegen:
         let kind = self.sema.get_type_kind(resolved)
         kind == TypeKind.TY_PTR or kind == TypeKind.TY_REF
 
+    // A str or a `&str` view: the operands a comparison reads as text.
+    fn tid_is_str_or_str_view(tid: i32) -> bool:
+        let resolved = self.sema.resolve_alias(tid)
+        let kind = self.sema.get_type_kind(resolved)
+        if kind == TypeKind.TY_STR:
+            return true
+        kind == TypeKind.TY_REF and self.sema.get_type_kind(self.sema.resolve_alias(self.sema.get_type_d0(resolved) as TypeId)) == TypeKind.TY_STR
+
+    // A comparison of two strs, either of them a `&str` view, compares the
+    // text (#293, #785; the LLVM backend's mir_compare_dispatch_kind 1): a
+    // view observes the str it points at, and only raw pointers compare by
+    // address. Ahead of raw_pointer_binop_text, which read two `&str`
+    // operands as pointers (#1560). "" when the operands are not both text.
+    mut fn str_compare_text(body: &MirBody, op: i32, lhs_op: i32, rhs_op: i32) -> str:
+        let is_cmp = op == BinaryOp.OP_EQ or op == BinaryOp.OP_NEQ or op == BinaryOp.OP_LT or op == BinaryOp.OP_GT or op == BinaryOp.OP_LTE or op == BinaryOp.OP_GTE
+        if not is_cmp or not self.tid_is_str_or_str_view(self.operand_tid(body, lhs_op)) or not self.tid_is_str_or_str_view(self.operand_tid(body, rhs_op)):
+            return ""
+        let args = "WITH_STR_REF(" ++ self.str_value_text(body, lhs_op) ++ "), WITH_STR_REF(" ++ self.str_value_text(body, rhs_op) ++ ")"
+        if op == BinaryOp.OP_EQ: return "with_str_eq_ref(" ++ args ++ ")"
+        if op == BinaryOp.OP_NEQ: return "(!with_str_eq_ref(" ++ args ++ "))"
+        "(with_str_cmp_ref(" ++ args ++ ") " ++ self.binop_token(op) ++ " 0)"
+
     mut fn raw_pointer_elem_size_expr(tid: i32) -> str:
         let resolved = self.sema.resolve_alias(tid)
         let kind = self.sema.get_type_kind(resolved)
@@ -3343,51 +3365,16 @@ impl CCodegen:
         if rk == RvalueKind.RK_BIN_OP:
             let lhs = self.operand_text(body, d1)
             let rhs = self.operand_text(body, d2)
-            let lhs_tid_for_raw_ptr = self.operand_tid(body, d1)
-            let rhs_tid_for_raw_ptr = self.operand_tid(body, d2)
-            let raw_ptr_bin = self.raw_pointer_binop_text(d0, lhs, rhs, lhs_tid_for_raw_ptr, rhs_tid_for_raw_ptr)
+            let str_cmp = self.str_compare_text(body, d0, d1, d2)
+            if str_cmp.len() > 0:
+                return str_cmp
+            let lhs_tid = self.operand_tid(body, d1)
+            let rhs_tid = self.operand_tid(body, d2)
+            let raw_ptr_bin = self.raw_pointer_binop_text(d0, lhs, rhs, lhs_tid, rhs_tid)
             if raw_ptr_bin.len() > 0:
                 return raw_ptr_bin
             if d0 == BinaryOp.OP_CONCAT:
                 return "with_str_concat_ref(WITH_STR_REF(" ++ lhs ++ "), WITH_STR_REF(" ++ rhs ++ "))"
-            if d0 == BinaryOp.OP_EQ or d0 == BinaryOp.OP_NEQ:
-                let lhs_tid = self.sema.resolve_alias(self.operand_tid(body, d1))
-                let rhs_tid = self.sema.resolve_alias(self.operand_tid(body, d2))
-                var eq_is_str = self.sema.get_type_kind(lhs_tid) == TypeKind.TY_STR and self.sema.get_type_kind(rhs_tid) == TypeKind.TY_STR
-                var eq_lhs = with_str_clone_ref(lhs)
-                var eq_rhs = with_str_clone_ref(rhs)
-                if not eq_is_str:
-                    // #785: &str operands compare by CONTENT; render pointee
-                    // values (shim locals for &str params are pointers).
-                    var lhs_ref_str = false
-                    if self.sema.get_type_kind(lhs_tid) == TypeKind.TY_REF:
-                        lhs_ref_str = self.sema.get_type_kind(self.sema.resolve_alias(self.sema.get_type_d0(lhs_tid) as TypeId)) == TypeKind.TY_STR
-                    var rhs_ref_str = false
-                    if self.sema.get_type_kind(rhs_tid) == TypeKind.TY_REF:
-                        rhs_ref_str = self.sema.get_type_kind(self.sema.resolve_alias(self.sema.get_type_d0(rhs_tid) as TypeId)) == TypeKind.TY_STR
-                    let lhs_strish = lhs_ref_str or self.sema.get_type_kind(lhs_tid) == TypeKind.TY_STR
-                    let rhs_strish = rhs_ref_str or self.sema.get_type_kind(rhs_tid) == TypeKind.TY_STR
-                    if lhs_strish and rhs_strish and (lhs_ref_str or rhs_ref_str):
-                        eq_is_str = true
-                        eq_lhs = self.str_value_text(body, d1)
-                        eq_rhs = self.str_value_text(body, d2)
-                if eq_is_str:
-                    let eq_expr = "with_str_eq_ref(WITH_STR_REF(" ++ eq_lhs ++ "), WITH_STR_REF(" ++ eq_rhs ++ "))"
-                    if d0 == BinaryOp.OP_EQ:
-                        return eq_expr
-                    return "(!(" ++ eq_expr ++ "))"
-            if d0 == BinaryOp.OP_LT or d0 == BinaryOp.OP_GT or d0 == BinaryOp.OP_LTE or d0 == BinaryOp.OP_GTE:
-                let lhs_tid2 = self.sema.resolve_alias(self.operand_tid(body, d1))
-                let rhs_tid2 = self.sema.resolve_alias(self.operand_tid(body, d2))
-                if self.sema.get_type_kind(lhs_tid2) == TypeKind.TY_STR and self.sema.get_type_kind(rhs_tid2) == TypeKind.TY_STR:
-                    let cmp_expr = "with_str_cmp_ref(WITH_STR_REF(" ++ lhs ++ "), WITH_STR_REF(" ++ rhs ++ "))"
-                    if d0 == BinaryOp.OP_LT:
-                        return "(" ++ cmp_expr ++ " < 0)"
-                    if d0 == BinaryOp.OP_GT:
-                        return "(" ++ cmp_expr ++ " > 0)"
-                    if d0 == BinaryOp.OP_LTE:
-                        return "(" ++ cmp_expr ++ " <= 0)"
-                    return "(" ++ cmp_expr ++ " >= 0)"
             let result_bin_tid = self.sema.resolve_alias(self.rvalue_tid(body, rval_id))
             let result_is_int_bin = self.sema.get_type_kind(result_bin_tid) == TypeKind.TY_INT
             let is_checked_arith_bin = d0 == BinaryOp.OP_ADD or d0 == BinaryOp.OP_SUB or d0 == BinaryOp.OP_MUL or d0 == BinaryOp.OP_DIV or d0 == BinaryOp.OP_MOD
