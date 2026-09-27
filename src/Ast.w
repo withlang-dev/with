@@ -655,6 +655,11 @@ type AstPoolState {
     // D61: type symbols whose Debug impl the compiler generated (a derive,
     // an `error` declaration). `:?` formats them with the generated form.
     generated_debug_type_syms: Vec[i32],
+    // D70 (§18.2): `use m as n` / `use c_import(...) as n` — import decl → n.
+    use_alias_map: HashMap[i32, i32],
+    // D70: field-access nodes Sema resolved through an import namespace and
+    // rewrote into the declaration's ident (Sema.rewrite_namespace_access).
+    namespace_bound_set: HashMap[i32, i32],
     frozen: i32,
 }
 
@@ -740,6 +745,8 @@ fn AstPool.new -> AstPool:
             fn_stack_sizes: HashMap.new(),
             fn_weak_flags: HashMap.new(),
             fn_target_arch: HashMap.new(),
+            use_alias_map: HashMap.new(),
+            namespace_bound_set: HashMap.new(),
             unsafe_fn_type_nodes: HashMap.new(),
             fn_effect_pin_starts: HashMap.new(),
             fn_effect_pin_counts: HashMap.new(),
@@ -1386,6 +1393,26 @@ impl AstPool:
 
     fn trait_method_field(node: NodeId, method: i32, field: i32):
         self.get_extra(self.trait_method_start(node) + method * TRAIT_METHOD_STRIDE + field)
+
+    fn set_use_alias(node: NodeId, alias: i32):
+        self.state.use_alias_map.insert(node as i32, alias)
+
+    // The `as` name of an import decl, 0 when it has none.
+    fn use_alias(node: NodeId) -> i32:
+        let opt = self.state.use_alias_map.get(node as i32)
+        if opt.is_some(): opt.unwrap() else: 0
+
+    // D70: Sema resolved `ns.member` to the declaration `sym`; the node
+    // becomes that ident, marked so no later check re-resolves its short
+    // name by import precedence.
+    mut fn bind_namespace_ident(idx: NodeId, sym: i32):
+        self.state.kinds[(idx as i32)] = NodeKind.NK_IDENT
+        self.state.data0[(idx as i32)] = sym
+        self.state.data1[(idx as i32)] = 0
+        self.state.data2[(idx as i32)] = 0
+        self.state.namespace_bound_set.insert(idx as i32, 1)
+
+    fn is_namespace_bound(idx: NodeId) -> bool: self.state.namespace_bound_set.contains(idx as i32)
 
     mut fn set_data0(idx: NodeId, val: i32):
         self.state.data0[(idx as i32)] = val

@@ -72,6 +72,13 @@ pub type ResolvedImport {
     // §18.2: the names a named import selects, comma-separated (`use m.X`,
     // `use m.{X, Y}`); "" for a whole-module import (#1221).
     selected: str,
+    // D70 (§18.2): the import's namespace name — its `as` name, else a
+    // module's last path segment or a header's file name without `.h`; ""
+    // when it has none (inline C text, the prelude, synthetic edges).
+    namespace: str,
+    // D70: the imported module's dotted path (`std.math` for `use
+    // std.math.TAU`), the full-path spelling of the namespace; "" for a c_import.
+    module_text: str,
     target_module: i32,
     span_start: i32,
     span_end: i32,
@@ -382,14 +389,21 @@ impl ResolveState:
                 var selected = ""
                 for si in 0..pool.get_data2(decl):
                     selected = selected ++ (if si > 0: "," else: "") ++ self.pool.resolve(resolve_extra_or_zero(pool, path_start + path_count + si))
+                var module_text = resolve_owned_text(dotted)
                 if selected.len() == 0:
                     selected = resolve_dotted_selection(dotted, resolved_path)
+                    if selected.len() > 0:
+                        module_text = dotted.slice(0, dotted.len() - selected.len() - 1)
+                let alias = pool.use_alias(decl as NodeId)
+                let namespace = if alias != 0: resolve_owned_text(self.pool.resolve(alias)) else if resolve_is_prelude_path(module_text): "" else: resolve_last_segment(module_text)
                 self.result.imports.push(ResolvedImport {
                     module_id,
                     index_in_module: import_index,
                     kind: ImportKind.IK_USE,
                     path_text: resolve_owned_text(dotted),
                     selected,
+                    namespace,
+                    module_text,
                     target_module,
                     span_start: start,
                     span_end: end,
@@ -416,6 +430,8 @@ impl ResolveState:
                     kind: ImportKind.IK_USE,
                     path_text: resolve_owned_text("std.box"),
                     selected: "",
+                    namespace: "",
+                    module_text: "",
                     target_module,
                     span_start: start,
                     span_end: end,
@@ -431,6 +447,8 @@ impl ResolveState:
                     kind: ImportKind.IK_C_IMPORT,
                     path_text: resolve_owned_text(header),
                     selected: "",
+                    namespace: if pool.use_alias(decl as NodeId) != 0: resolve_owned_text(self.pool.resolve(pool.use_alias(decl as NodeId))) else: resolve_header_namespace(header),
+                    module_text: "",
                     target_module: -1,
                     span_start: start,
                     span_end: end,
@@ -1118,6 +1136,8 @@ impl ResolveState:
                 kind: ImportKind.IK_USE,
                 path_text: resolve_owned_text(dotted),
                 selected: resolve_dotted_selection(dotted, resolved_path),
+                namespace: "",
+                module_text: "",
                 target_module,
                 span_start: 0,
                 span_end: 0,
@@ -1310,6 +1330,39 @@ fn resolve_dotted_selection(dotted: &str, resolved_path: &str) -> str:
     if last_dot <= 0 or resolved_path.len() == 0 or resolved_path.replace("\\", "/").ends_with(dotted.replace(".", "/") ++ ".w"):
         return ""
     dotted.slice(last_dot + 1, dotted.len())
+
+fn resolve_is_prelude_path(dotted: &str) -> bool:
+    dotted == "std.prelude" or dotted == "std.prelude_core" or dotted == "std.prelude_alloc"
+
+fn resolve_last_segment(dotted: &str) -> str:
+    var start = 0
+    for i in 0..dotted.len() as i32:
+        if dotted[i] == '.': start = i + 1
+    dotted.slice(start, dotted.len())
+
+// D70 (§18.2): a header's namespace is its file name without `.h`
+// (`raylib.h` is `raylib`, `<SDL3/SDL.h>` is `SDL`); inline C text, or a
+// name that is no identifier, has none.
+fn resolve_header_namespace(header: &str) -> str:
+    var start = 0
+    var end = header.len() as i32
+    for i in 0..header.len() as i32:
+        let c = header[i]
+        // Inline C text (`"#include <foo.h>\n..."`) is no file name.
+        if c == '\n' or c == ' ' or c == '\t' or c == '#' or c == ';':
+            return ""
+        if c == '/' or c == '\\' or c == '<': start = i + 1
+    if end > start and header[end - 1] == '>': end = end - 1
+    let file = header.slice(start, end)
+    if not file.ends_with(".h") or file.len() <= 2:
+        return ""
+    let name = file.slice(0, file.len() - 2)
+    for i in 0..name.len() as i32:
+        let c = name[i]
+        let ok = (c >= 'a' and c <= 'z') or (c >= 'A' and c <= 'Z') or c == '_' or (i > 0 and c >= '0' and c <= '9')
+        if not ok:
+            return ""
+    name.clone()
 
 pub fn import_not_found_message(dotted: &str) -> str:
     var msg = "import module not found: '" ++ dotted ++ "'"

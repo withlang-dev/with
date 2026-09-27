@@ -2489,7 +2489,17 @@ impl Parser:
                     depth = depth - 1
                 self.advance()
 
-        self.pool.add_node(NodeKind.NK_USE_DECL, start, self.prev_end(), extra_start, path_count, selector_count)
+        // D70 (§18.2): `use m as n` names the import's namespace `n`.
+        let alias = self.parse_import_alias()
+        let node = self.pool.add_node(NodeKind.NK_USE_DECL, start, self.prev_end(), extra_start, path_count, selector_count)
+        if alias != 0: self.pool.set_use_alias(node, alias)
+        node
+
+    mut fn parse_import_alias() -> i32:
+        if self.peek() != TokenKind.TK_KW_AS:
+            return 0
+        self.advance()
+        self.expect_ident()
 
     mut fn parse_c_import(start: i32) -> NodeId:
         self.advance()  // consume c_import
@@ -2708,7 +2718,10 @@ impl Parser:
         self.pool.add_extra(retains_entries.len() as i32)
         for i in 0..retains_entries.len() as i32:
             self.pool.add_extra(retains_entries[i])
-        self.pool.add_node(NodeKind.NK_C_IMPORT, start, self.prev_end(), header_sym, extra_start, pack_c_import_counts_ex(links.len() as i32, allow_untranslated.len() as i32, no_methods_types.len() as i32, no_methods_all))
+        let alias = self.parse_import_alias()
+        let node = self.pool.add_node(NodeKind.NK_C_IMPORT, start, self.prev_end(), header_sym, extra_start, pack_c_import_counts_ex(links.len() as i32, allow_untranslated.len() as i32, no_methods_types.len() as i32, no_methods_all))
+        if alias != 0: self.pool.set_use_alias(node, alias)
+        node
 
     // ── let decl ─────────────────────────────────────────────────────
 

@@ -287,6 +287,11 @@ impl Sema:
         self.module_import_paths = sema_new_vec_str()
         self.module_import_selected = sema_new_vec_str()
         self.module_import_offsets = sema_new_vec_i32()
+        self.ns_modules = sema_new_vec_i32()
+        self.ns_names = sema_new_vec_str()
+        self.ns_fulls = sema_new_vec_str()
+        self.ns_targets = sema_new_vec_i32()
+        self.ns_offsets = sema_new_vec_i32()
         self.module_index_by_path = HashMap.new()
         self.global_visible_module_paths = HashMap.new()
         self.module_visibility_cache = HashMap.new()
@@ -299,6 +304,12 @@ impl Sema:
             var visible_count = 0
             for ii in 0..mod.import_count:
                 let imp = resolved.imports[(mod.import_start + ii)]
+                if imp.namespace.len() > 0 and (imp.target_module >= 0 or imp.module_text.len() == 0):
+                    self.ns_modules.push(mi)
+                    self.ns_names.push(frontend_owned_text(imp.namespace))
+                    self.ns_fulls.push(frontend_owned_text(imp.module_text))
+                    self.ns_targets.push(imp.target_module)
+                    self.ns_offsets.push(imp.span_start)
                 if imp.target_module >= 0:
                     self.module_import_targets.push(imp.target_module)
                     self.module_import_paths.push(frontend_owned_text(imp.path_text))

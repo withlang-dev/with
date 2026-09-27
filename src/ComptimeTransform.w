@@ -3408,6 +3408,7 @@ impl Sema:
         transform_sema.bundle_corpus = with_str_clone_ref(self.bundle_corpus)
         transform_sema.interface_eager = self.interface_eager
         transform_sema.copy_module_graph_parts(&saved_module_paths, &saved_module_import_starts, &saved_module_import_counts, &saved_module_import_targets, &saved_module_import_paths, &saved_module_import_selected, &saved_module_import_offsets, &saved_global_module_paths)
+        transform_sema.copy_import_namespaces(self)
         transform_sema.set_tracked_input_context(self.tracked_input_root, self.tracked_input_paths)
         transform_sema.prepare_for_comptime_transform()
         if transform_sema.diags.has_errors():

@@ -1604,6 +1604,12 @@ pub type Sema {
     module_import_paths: Vec[str],   // flattened import path text aligned with module_import_targets
     module_import_selected: Vec[str], // aligned: the names a named import selects ("X,Y"), "" for a whole module (#1221)
     module_import_offsets: Vec[i32], // aligned: the `use`'s byte offset in its module — §18.2's import order (#1221)
+    // D70 (§18.2): every import's namespace, c_imports included — parallel.
+    ns_modules: Vec[i32],   // the importing module's index
+    ns_names: Vec[str],     // the namespace name (`math`, `raylib`, an `as` name)
+    ns_fulls: Vec[str],     // the module's dotted path (`std.math`), "" for a c_import
+    ns_targets: Vec[i32],   // the imported module's index, -1 for a c_import
+    ns_offsets: Vec[i32],   // the import's byte offset in its module
     module_index_by_path: HashMap[str, i32],   // path -> module index
     bundle_corpus: str,              // D39: the --bundle-corpus root, "" outside a bundle lane
     global_visible_module_paths: HashMap[str, i32], // prelude-visible modules
@@ -2042,6 +2048,18 @@ impl Sema:
             if source.global_visible_module_paths.contains(source_path):
                 global_paths.push(sema_owned_text(source_path))
         self.copy_module_graph_parts(&source.module_paths, &source.module_import_starts, &source.module_import_counts, &source.module_import_targets, &source.module_import_paths, &source.module_import_selected, &source.module_import_offsets, &global_paths)
+        self.copy_import_namespaces(source)
+
+    // D70: std.math, whose transcendental functions are builtins (§17.6a).
+    fn module_path_is_std_math(path: &str) -> bool: sema_std_module_dotted(path) == "std.math"
+
+    // D70: the import namespaces of `source`'s module graph.
+    mut fn copy_import_namespaces(source: &Sema):
+        self.ns_modules = sema_clone_i32_vec(&source.ns_modules)
+        self.ns_names = sema_clone_str_vec(&source.ns_names)
+        self.ns_fulls = sema_clone_str_vec(&source.ns_fulls)
+        self.ns_targets = sema_clone_i32_vec(&source.ns_targets)
+        self.ns_offsets = sema_clone_i32_vec(&source.ns_offsets)
 
     mut fn copy_module_graph_parts(module_paths: &Vec[str], module_import_starts: &Vec[i32], module_import_counts: &Vec[i32], module_import_targets: &Vec[i32], module_import_paths: &Vec[str], module_import_selected: &Vec[str], module_import_offsets: &Vec[i32], global_paths: &Vec[str]):
         self.module_paths = sema_new_vec_str()
@@ -2920,6 +2938,11 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         module_import_paths: sema_new_vec_str(),
         module_import_selected: sema_new_vec_str(),
         module_import_offsets: Vec.new(),
+        ns_modules: Vec.new(),
+        ns_names: sema_new_vec_str(),
+        ns_fulls: sema_new_vec_str(),
+        ns_targets: Vec.new(),
+        ns_offsets: Vec.new(),
         module_index_by_path: sema_new_map_str_i32(),
         bundle_corpus: "",
         global_visible_module_paths: sema_new_map_str_i32(),
@@ -3257,6 +3280,9 @@ impl Sema:
     // checked — never a short-name re-resolution.
     mut fn resolve_displaced_fn_ident(sym: i32, node: i32) -> i32:
         if sym == 0 or not self.displaced_fn_index.contains(sym):
+            return sym
+        // D70: a namespace access already names its declaration.
+        if node > 0 and self.ast.is_namespace_bound(node as NodeId):
             return sym
         if self.name_has_displaced_global(sym):
             return self.resolve_displaced_global_ident(sym, node)
