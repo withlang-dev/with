@@ -472,6 +472,7 @@ impl LspDocument:
         var intern = InternPool.init()
         var diags = DiagnosticList.init()
         var parser = Parser.init(move tokens, self.text, 0, intern, move diags)
+        parser.enable_implicit_main_mode()  // §18.5b (D74): an open root is an entry source
         self.fast_pool = parser.parse_module()
         self.fast_intern = parser.intern
         self.fast_text_len = self.text.len() as i32
@@ -483,7 +484,7 @@ impl LspDocument:
             return
         var comp = Compilation.init()
         comp.set_prelude_mode(2)
-        let pool = comp.compile_source_text(self.path, self.text)
+        let pool = comp.compile_entry_source_text(self.path, self.text)
         self.cached_pool = pool
         self.cached_intern = comp.zcu.pool
         self.cached_diags = move comp.zcu.diagnostics
@@ -688,7 +689,7 @@ impl LspState:
         let use_cache = idx >= 0 and (&self.documents[idx]).cache_valid
         if not use_cache:
             comp.set_prelude_mode(2)
-            let pool = comp.compile_source_text(uri_to_path(uri), text)
+            let pool = comp.compile_entry_source_text(uri_to_path(uri), text)
         let dl = if use_cache: &self.documents[idx].cached_diags else: &comp.zcu.diagnostics
 
         var diags = jarr_start()
@@ -845,7 +846,7 @@ impl LspState:
         let use_cache = idx >= 0 and (&self.documents[idx]).cache_valid
         if not use_cache:
             comp.set_prelude_mode(2)
-            fresh_pool = comp.compile_source_text(uri_to_path(uri), text)
+            fresh_pool = comp.compile_entry_source_text(uri_to_path(uri), text)
         let pool = if use_cache: &self.documents[idx].cached_pool else: &fresh_pool
         let intern = if use_cache: &self.documents[idx].cached_intern else: &comp.zcu.pool
 
@@ -1186,7 +1187,7 @@ impl LspState:
         let use_cache = cidx >= 0 and (&self.documents[cidx]).cache_valid
         if not use_cache:
             comp.set_prelude_mode(2)
-            fresh_pool = comp.compile_source_text(uri_to_path(uri), text)
+            fresh_pool = comp.compile_entry_source_text(uri_to_path(uri), text)
         let pool = if use_cache: &self.documents[cidx].cached_pool else: &fresh_pool
         let intern = if use_cache: &self.documents[cidx].cached_intern else: &comp.zcu.pool
 
@@ -1288,6 +1289,7 @@ fn lsp_parse_file(text: &str) -> LspParseResult:
     var intern = InternPool.init()
     var diags = DiagnosticList.init()
     var parser = Parser.init(move tokens, text, 0, intern, move diags)
+    parser.enable_implicit_main_mode()  // §18.5b (D74): an open root is an entry source
     let pool = parser.parse_module()
     LspParseResult { pool, intern: parser.intern }
 
@@ -1721,7 +1723,7 @@ impl LspState:
         let use_cache = idx >= 0 and (&self.documents[idx]).cache_valid
         if not use_cache:
             comp.set_prelude_mode(2)
-            fresh_pool = comp.compile_source_text(uri_to_path(uri), text)
+            fresh_pool = comp.compile_entry_source_text(uri_to_path(uri), text)
         let pool = if use_cache: &self.documents[idx].cached_pool else: &fresh_pool
         let intern = if use_cache: &self.documents[idx].cached_intern else: &comp.zcu.pool
 
