@@ -4824,6 +4824,30 @@ impl Sema:
             return 0
         1
 
+    // A `fn` value is assignable to a `fn` type only when the signatures are
+    // the same: the same parameter count, each parameter and the result
+    // identical (an integer of another width is a different ABI: an i32
+    // result read as i64 is garbage, #1772), plus the §16.11 unsafe rule.
+    // An unresolved side (type 0) is not yet known and does not decide.
+    fn fn_types_assignable(expected: i32, actual: i32) -> i32:
+        if self.callable_unsafe_coercion_ok(expected, actual) == 0:
+            return 0
+        let param_count = self.get_type_d1(expected)
+        if param_count != self.get_type_d1(actual):
+            return 0
+        let exp_start = self.get_type_d0(expected)
+        let act_start = self.get_type_d0(actual)
+        for pi in 0..param_count:
+            let exp_param = self.type_extra[(exp_start + pi)]
+            let act_param = self.type_extra[(act_start + pi)]
+            if exp_param != 0 and act_param != 0 and not self.types_identical(exp_param, act_param):
+                return 0
+        let exp_ret = self.get_type_d2(expected)
+        let act_ret = self.get_type_d2(actual)
+        if exp_ret != 0 and act_ret != 0 and not self.types_identical(exp_ret, act_ret):
+            return 0
+        1
+
     mut fn fn_types_compatible(expected: i32, actual: i32) -> i32:
         if self.get_type_d1(expected) != self.get_type_d1(actual):
             return 0
@@ -8515,7 +8539,7 @@ impl Sema:
         // (truncate or round: two meanings), spelled with `as`; accepted here,
         // it surfaced as codegen's "wrong argument type" with no location.
         if exp_k == TypeKind.TY_FN and act_k == TypeKind.TY_FN:
-            return self.callable_unsafe_coercion_ok(exp_r as i32, act_r as i32)
+            return self.fn_types_assignable(exp_r as i32, act_r as i32)
         if exp_k == TypeKind.TY_EXTERN_FN and act_k == TypeKind.TY_EXTERN_FN:
             if self.callable_unsafe_coercion_ok(exp_r as i32, act_r as i32) == 0:
                 return 0
@@ -8591,7 +8615,7 @@ impl Sema:
         if exp_k == TypeKind.TY_REF and act_k == TypeKind.TY_PTR:
             return self.pointer_pointees_compatible(exp_r, act_r)
         if exp_k == TypeKind.TY_FN and act_k == TypeKind.TY_FN:
-            return self.callable_unsafe_coercion_ok(exp_r as i32, act_r as i32)
+            return self.fn_types_assignable(exp_r as i32, act_r as i32)
         if exp_k == TypeKind.TY_EXTERN_FN and act_k == TypeKind.TY_EXTERN_FN:
             if self.callable_unsafe_coercion_ok(exp_r as i32, act_r as i32) == 0:
                 return 0
@@ -8765,7 +8789,7 @@ impl Sema:
         // (truncate or round: two meanings), spelled with `as`; accepted here,
         // it surfaced as codegen's "wrong argument type" with no location.
         if exp_k == TypeKind.TY_FN and act_k == TypeKind.TY_FN:
-            return self.callable_unsafe_coercion_ok(exp_r as i32, act_r as i32)
+            return self.fn_types_assignable(exp_r as i32, act_r as i32)
         if exp_k == TypeKind.TY_EXTERN_FN and act_k == TypeKind.TY_EXTERN_FN:
             if self.callable_unsafe_coercion_ok(exp_r as i32, act_r as i32) == 0:
                 return 0
@@ -8846,7 +8870,7 @@ impl Sema:
         if exp_k == TypeKind.TY_REF and act_k == TypeKind.TY_PTR:
             return self.pointer_pointees_compatible_frozen(exp_r, act_r)
         if exp_k == TypeKind.TY_FN and act_k == TypeKind.TY_FN:
-            return self.callable_unsafe_coercion_ok(exp_r as i32, act_r as i32)
+            return self.fn_types_assignable(exp_r as i32, act_r as i32)
         if exp_k == TypeKind.TY_EXTERN_FN and act_k == TypeKind.TY_EXTERN_FN:
             if self.callable_unsafe_coercion_ok(exp_r as i32, act_r as i32) == 0:
                 return 0
