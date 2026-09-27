@@ -4213,7 +4213,7 @@ impl CCodegen:
         var match_sym = 0
         var match_score = -1
         for i in 0..self.mir_mod.body_fn_syms.len() as i32:
-            let cand = self.mir_mod.body_fn_syms[i]
+            let cand: i32 = self.mir_mod.body_fn_syms[i]
             let cand_text = cc_intern_resolve(self.intern, cand)
             if cc_name_matches(cand_text, raw) == 0:
                 continue

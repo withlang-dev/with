@@ -6201,7 +6201,7 @@ impl Sema:
         if sema_debug_move_enabled() != 0:
             let dbg_name = with_str_clone_ref(self.pool_resolve(sym))
             with_eprint(f"[state] sym=" ++ dbg_name ++ f" -> {state}")
-        let opt = self.scope_name_map.get(sym)
+        let opt = self.scope_name_map.get(sym).copied()
         if opt.is_some():
             if state == VarState.MOVED:
                 self.check_live_views_for_origin(sym, self.move_site_node)
@@ -6440,10 +6440,10 @@ impl Sema:
     mut fn capture_loop_break_move_state(frame_idx: i32):
         if frame_idx < 0 or frame_idx >= self.label_break_off.len() as i32:
             return
-        let off = self.label_break_off[frame_idx]
+        let off: i32 = self.label_break_off[frame_idx]
         if off < 0:
             return
-        let boundary = self.label_loop_entry_binds[frame_idx]
+        let boundary: i32 = self.label_loop_entry_binds[frame_idx]
         var i = 0
         while i < boundary:
             if i < self.bind_states.len() as i32 and self.bind_states[i] == VarState.MOVED and self.type_needs_drop(self.bind_types[i]) != 0:
@@ -6468,7 +6468,7 @@ impl Sema:
     mut fn check_loop_continue_carried_move(frame_idx: i32, node: i32):
         if frame_idx < 0 or frame_idx >= self.label_loop_entry_binds.len() as i32:
             return
-        let boundary = self.label_loop_entry_binds[frame_idx]
+        let boundary: i32 = self.label_loop_entry_binds[frame_idx]
         let off = if frame_idx < self.label_break_off.len() as i32: self.label_break_off[frame_idx] else: -1
         let trace_move = runtime_getenv("WITH_TRACE_MOVE").len() > 0
         if trace_move:

@@ -2255,7 +2255,7 @@ fn analysis_call_path(report: &AnalysisReport, from: &str, to: &str) -> str:
     pred.insert(start, 0)
     var qi = 0
     while qi < queue.len() as i32 and not pred.contains(target):
-        let caller = queue[qi]
+        let caller: i32 = queue[qi]
         qi = qi + 1
         for i in 0..report.facts.len() as i32:
             let fact = report.facts[i]
@@ -2290,7 +2290,7 @@ fn analysis_call_closure(report: &AnalysisReport, root: &str) -> str:
     pred.insert(start, 0)
     var qi = 0
     while qi < queue.len() as i32:
-        let caller = queue[qi]
+        let caller: i32 = queue[qi]
         qi = qi + 1
         for i in 0..report.facts.len() as i32:
             let fact = report.facts[i]

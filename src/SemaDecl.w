@@ -1352,7 +1352,7 @@ impl Sema:
             var stack: Vec[i32] = Vec.new()
             stack.push(name)
             while stack.len() > 0:
-                let cur = stack.get(stack.len() - 1)
+                let cur: i32 = stack.get(stack.len() - 1)
                 let cur_color = if color.contains(cur): color.get(cur).unwrap() else: 0
                 if cur_color == 0:
                     // First visit: mark gray.
@@ -2333,15 +2333,15 @@ impl Sema:
         if trait_sym == 0 or impl_node == 0 or not self.trait_lookup.contains(trait_sym):
             return
         let trait_idx: i32 = self.trait_lookup.get(trait_sym).unwrap()
-        let tp_count = self.trait_tp_counts[trait_idx]
+        let tp_count: i32 = self.trait_tp_counts[trait_idx]
         if tp_count <= 0:
             return
         let tta_idx = self.ast.find_impl_trait_type_args(impl_node as NodeId)
         if tta_idx < 0:
             return
-        let arg_start = self.ast.state.impl_trait_type_args[(tta_idx + 1)]
-        let arg_count = self.ast.state.impl_trait_type_args[(tta_idx + 2)]
-        let tp_start = self.trait_tp_starts[trait_idx]
+        let arg_start: i32 = self.ast.state.impl_trait_type_args[(tta_idx + 1)]
+        let arg_count: i32 = self.ast.state.impl_trait_type_args[(tta_idx + 2)]
+        let tp_start: i32 = self.trait_tp_starts[trait_idx]
         var ti = 0
         while ti < tp_count and ti < arg_count:
             let tp_sym: i32 = self.trait_tp_syms[(tp_start + ti)]
@@ -2379,7 +2379,7 @@ impl Sema:
         if impl_type_sym == 0:
             return
         let trait_idx: i32 = self.trait_lookup.get(trait_sym).unwrap()
-        let mt_start = self.trait_method_starts[trait_idx]
+        let mt_start: i32 = self.trait_method_starts[trait_idx]
         let mt_count = self.trait_method_counts[trait_idx]
         let impl_type_tid = self.lookup_named_type_visible(impl_type_sym)
         for mi in 0..mt_count:
@@ -2396,8 +2396,8 @@ impl Sema:
             let type_name: str = with_str_clone_ref(self.pool_resolve(impl_type_sym))
             let method_name: str = with_str_clone_ref(self.pool_resolve(method_sym))
             let fn_sym = self.pool_intern(type_name ++ "." ++ method_name)
-            let param_start = self.trait_method_param_starts[mt_idx]
-            let param_count = self.trait_method_param_counts[mt_idx]
+            let param_start: i32 = self.trait_method_param_starts[mt_idx]
+            let param_count: i32 = self.trait_method_param_counts[mt_idx]
             let sig_param_start = self.sig_params.len() as i32
             for pi in 0..param_count:
                 let p_type_node = self.ast.fn_param_type(param_start, pi)
@@ -3547,7 +3547,7 @@ impl Sema:
     // Validate ordering constraints for Atomic methods.
     // Checks disc enum variant value at sema time.
     mut fn validate_atomic_ordering(method_sym: i32, extra_start: i32, arg_count: i32, node: i32):
-        let method_name = self.pool_resolve_symbol(method_sym)
+        let method_name = self.pool_resolve_symbol(method_sym).clone()
         // store cannot use Acquire(1) or AcqRel(3)
         if method_name == "store" and arg_count >= 2:
             let order_node = self.ast.get_extra(extra_start + 1)

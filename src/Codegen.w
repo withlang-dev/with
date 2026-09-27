@@ -6437,7 +6437,7 @@ impl Codegen:
         let gs_opt = self.generic_structs.get(name_sym)
         if not gs_opt.is_some():
             return 0
-        let type_node = gs_opt.unwrap()
+        let type_node: i32 = gs_opt.unwrap()
         let tp_count = self.type_decl_tp_count(type_node)
         if tp_count <= 0:
             let st_opt = self.struct_type_map.get(name_sym)

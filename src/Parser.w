@@ -598,8 +598,9 @@ impl Parser:
         // Skip tokens until we reach a new line that could start a statement.
         // In an indentation-based language, this means a line at the same or
         // lower indentation level, or a statement keyword.
-        let src = self.source
-        let slen = src.len() as i32
+        // The source is read through `self` each time: a view of it would
+        // outlive the `self.advance()` below (§21.1; #1722).
+        let slen = self.source.len() as i32
         while self.peek() != TokenKind.TK_EOF:
             let t = self.peek()
             let tok_start = self.current_start()
@@ -619,7 +620,7 @@ impl Parser:
                     var ci = tok_start - 1
                     var at_line_start = false
                     while ci >= 0:
-                        let ch = src[ci]
+                        let ch = self.source[ci]
                         if ch == 10:
                             at_line_start = true
                             break

@@ -307,7 +307,7 @@ impl Sema:
         var max_payload_size: i64 = 0
         var pos = te_start
         for _ in 0..variant_count:
-            let payload_count = self.type_extra[(pos + 1)]
+            let payload_count: i32 = self.type_extra[(pos + 1)]
             if payload_count > 0:
                 var payload_size: i64 = 0
                 var payload_align: i64 = 1

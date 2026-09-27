@@ -14423,7 +14423,7 @@ impl Codegen:
 
                 if self.sema.try_branch_fns.contains(gc_node):
                     let try_branch_sym: i32 = self.sema.try_branch_fns.get(gc_node).unwrap()
-                    let try_from_break_sym = self.sema.try_from_break_fns.get(gc_node).unwrap()
+                    let try_from_break_sym: i32 = self.sema.try_from_break_fns.get(gc_node).unwrap()
                     if gc_callee_sym == try_branch_sym or gc_callee_sym == try_from_break_sym:
                         let gc_mir_start = body.call_arg_starts[args_id]
                         let gc_mir_count = body.call_arg_counts[args_id]
@@ -18917,8 +18917,8 @@ impl Codegen:
         for si in 0..self.sema.concrete_specialization_syms.len() as i32:
             if self.sema.concrete_specialization_syms[si] != fn_sym:
                 continue
-            let start = self.sema.concrete_specialization_subst_starts[si]
-            let count = self.sema.concrete_specialization_subst_counts[si]
+            let start: i32 = self.sema.concrete_specialization_subst_starts[si]
+            let count: i32 = self.sema.concrete_specialization_subst_counts[si]
             for ti in 0..count:
                 let p_sym: i32 = self.sema.concrete_specialization_subst_syms[(start + ti)]
                 let p_ty: i32 = self.sema.concrete_specialization_subst_types[(start + ti)]

@@ -263,10 +263,10 @@ impl Codegen:
                 self.had_error = 1
             return 0
         let method_idx = self.trait_method_starts[trait_idx] + method_offset
-        let method_flags = self.trait_method_flags[method_idx]
-        let param_start = self.trait_method_param_starts[method_idx]
-        let param_count = self.trait_method_param_counts[method_idx]
-        let ret_node = self.trait_method_ret_nodes[method_idx]
+        let method_flags: i32 = self.trait_method_flags[method_idx]
+        let param_start: i32 = self.trait_method_param_starts[method_idx]
+        let param_count: i32 = self.trait_method_param_counts[method_idx]
+        let ret_node: i32 = self.trait_method_ret_nodes[method_idx]
 
         let ptr_ty = wl_ptr_type(self.context)
         let param_types: Vec[i64] = Vec.new()
@@ -517,12 +517,12 @@ impl Codegen:
         if trait_sym != 0 and impl_node != 0:
             let tp_count_opt = self.trait_tp_counts.get(trait_sym)
             if tp_count_opt.is_some():
-                let tp_count = tp_count_opt.unwrap()
-                let tp_start = self.trait_tp_starts.get(trait_sym).unwrap()
+                let tp_count: i32 = tp_count_opt.unwrap()
+                let tp_start: i32 = self.trait_tp_starts.get(trait_sym).unwrap()
                 let tta_idx = self.pool.find_impl_trait_type_args(impl_node)
                 if tta_idx >= 0:
-                    let arg_start = self.pool.state.impl_trait_type_args[(tta_idx + 1)]
-                    let arg_count = self.pool.state.impl_trait_type_args[(tta_idx + 2)]
+                    let arg_start: i32 = self.pool.state.impl_trait_type_args[(tta_idx + 1)]
+                    let arg_count: i32 = self.pool.state.impl_trait_type_args[(tta_idx + 2)]
                     var ti = 0
                     while ti < tp_count and ti < arg_count:
                         let tp_sym: i32 = self.trait_tp_flat_syms[(tp_start + ti)]
@@ -555,13 +555,13 @@ impl Codegen:
         if trait_sym != 0 and impl_node != 0:
             let tp_count_opt = self.trait_tp_counts.get(trait_sym)
             if tp_count_opt.is_some():
-                let tp_count = tp_count_opt.unwrap()
-                let tp_start = self.trait_tp_starts.get(trait_sym).unwrap()
+                let tp_count: i32 = tp_count_opt.unwrap()
+                let tp_start: i32 = self.trait_tp_starts.get(trait_sym).unwrap()
                 // Try to bind from explicit trait type args (impl Trait[i32] for Type)
                 let tta_idx = self.pool.find_impl_trait_type_args(impl_node)
                 if tta_idx >= 0:
-                    let arg_start = self.pool.state.impl_trait_type_args[(tta_idx + 1)]
-                    let arg_count = self.pool.state.impl_trait_type_args[(tta_idx + 2)]
+                    let arg_start: i32 = self.pool.state.impl_trait_type_args[(tta_idx + 1)]
+                    let arg_count: i32 = self.pool.state.impl_trait_type_args[(tta_idx + 2)]
                     var ti = 0
                     while ti < tp_count and ti < arg_count:
                         let tp_sym: i32 = self.trait_tp_flat_syms[(tp_start + ti)]
@@ -582,7 +582,7 @@ impl Codegen:
         self.type_bindings_len = saved_len
 
     mut fn generate_default_trait_method_for_impl(impl_type_sym: i32, method_idx: i32):
-        let body_node = self.trait_method_default_bodies[method_idx]
+        let body_node: i32 = self.trait_method_default_bodies[method_idx]
         if body_node == 0:
             return
 
@@ -594,8 +594,8 @@ impl Codegen:
         if self.fn_values.get(fn_sym).is_some():
             return
 
-        let param_start = self.trait_method_param_starts[method_idx]
-        let param_count = self.trait_method_param_counts[method_idx]
+        let param_start: i32 = self.trait_method_param_starts[method_idx]
+        let param_count: i32 = self.trait_method_param_counts[method_idx]
         let ret_node = self.trait_method_ret_nodes[method_idx]
         if with_getenv_str("WITH_DEBUG_DTM").len() > 0:
             with_eprint(f"[dtm] {mangled} method_idx={method_idx} param_start={param_start} param_count={param_count} ret_node={ret_node} body_node={body_node}")
@@ -924,9 +924,9 @@ impl Codegen:
         if not trait_idx_opt.is_some():
             return
         let trait_idx = trait_idx_opt.unwrap()
-        let method_start = self.trait_method_starts[trait_idx]
-        let method_count = self.trait_method_counts[trait_idx]
-        let vtable_ty = self.trait_vtable_types[trait_idx]
+        let method_start: i32 = self.trait_method_starts[trait_idx]
+        let method_count: i32 = self.trait_method_counts[trait_idx]
+        let vtable_ty: i64 = self.trait_vtable_types[trait_idx]
 
         let entries: Vec[i64] = Vec.new()
         for mi in 0..method_count:
@@ -1028,9 +1028,9 @@ impl Codegen:
             return
 
         let trait_idx = trait_idx_opt.unwrap()
-        let method_start = self.trait_method_starts[trait_idx]
-        let method_count = self.trait_method_counts[trait_idx]
-        let vtable_ty = self.trait_vtable_types[trait_idx]
+        let method_start: i32 = self.trait_method_starts[trait_idx]
+        let method_count: i32 = self.trait_method_counts[trait_idx]
+        let vtable_ty: i64 = self.trait_vtable_types[trait_idx]
         let type_name = self.intern.resolve(impl_type_sym).clone()
         let trait_name = self.intern.resolve(trait_sym).clone()
 
@@ -1082,14 +1082,14 @@ impl Codegen:
             return
         let trait_idx = trait_idx_opt.unwrap()
         let trait_text = self.intern.resolve(trait_sym).clone()
-        let method_start = self.trait_method_starts[trait_idx]
-        let method_count = self.trait_method_counts[trait_idx]
-        let vtable_ty = self.trait_vtable_types[trait_idx]
+        let method_start: i32 = self.trait_method_starts[trait_idx]
+        let method_count: i32 = self.trait_method_counts[trait_idx]
+        let vtable_ty: i64 = self.trait_vtable_types[trait_idx]
         let type_name: str = with_str_clone_ref(self.intern.resolve(impl_type_sym))
         let entries: Vec[i64] = Vec.new()
         var used_row = 0
         for mi in 0..method_count:
-            let method_sym = self.trait_method_names[(method_start + mi)]
+            let method_sym: i32 = self.trait_method_names[(method_start + mi)]
             let method_flags = self.trait_method_flags[(method_start + mi)]
             let trait_method_idx = method_start + mi
             let param_start = self.trait_method_param_starts[trait_method_idx]

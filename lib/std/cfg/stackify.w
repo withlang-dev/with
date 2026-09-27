@@ -396,7 +396,7 @@ impl StackifyDfsState:
         stack_idx.push(0)
         while stack_block.len() > 0:
             let top = stack_block.len() - 1
-            let blk = stack_block.get(top)
+            let blk: i32 = stack_block.get(top)
             let idx: i32 = stack_idx.get(top)
             let b = graph.blocks[blk]
             if idx < b.succs_count:

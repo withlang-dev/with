@@ -581,6 +581,31 @@ fn suffix_accept(src: &str, pos: i32, slen: i32, suffix: &str, suf_len: i32) -> 
 fn lex_fstring_quote_source_backslash_count(raw_backslashes: i32) -> i32:
     raw_backslashes / 2
 
+// The end of a raw string whose `r` ends just before `pos`: `#`* `"` ...
+// `"` `#`* with as many closing hashes; an unterminated one ends at the end
+// of the source (the string token still recovers). -1 when no `"` follows
+// the hashes: not a raw string.
+fn lex_raw_string_end(src: &str, pos: i32) -> i32:
+    let slen = src.len() as i32
+    var p = pos
+    var hash_count = 0
+    while p < slen and src[p] == CharCode.Hash:
+        hash_count = hash_count + 1
+        p = p + 1
+    if p >= slen or src[p] != CharCode.Dquote:
+        return -1
+    p = p + 1
+    while p < slen:
+        if src[p] == CharCode.Dquote:
+            var ok = true
+            for hi in 0..hash_count:
+                if p + 1 + hi >= slen or src[p + 1 + hi] != CharCode.Hash:
+                    ok = false
+            if ok:
+                return p + 1 + hash_count
+        p = p + 1
+    slen
+
 impl Lexer:
     mut fn lex_ident() -> i32:
         let src = self.source
@@ -601,11 +626,15 @@ impl Lexer:
                 self.pos = self.pos + 1  // skip closing "
             return TokenKind.TK_C_STRING_LIT
 
-        // r"..." / r#"..."# -> raw string literal (no escapes/interpolation)
+        // r"..." / r#"..."# -> raw string literal (no escapes/interpolation).
+        // Scanned by a pure function and stored as a field write: `src` and
+        // `text` view self.source, and a `mut fn` call on self here would
+        // outlive them (§21.1; #1722).
         if text == "r":
-            let raw_tok = self.lex_raw_string_prefixed()
-            if raw_tok != -1:
-                return raw_tok
+            let raw_end = lex_raw_string_end(src, self.pos)
+            if raw_end >= 0:
+                self.pos = raw_end
+                return TokenKind.TK_STRING_LIT
 
         // f"..." -> interpolated string literal (f prefix + normal string lexing)
         if text == "f" and self.pos < slen and src[(self.pos)] == CharCode.Dquote:
@@ -760,32 +789,6 @@ impl Lexer:
         while self.pos < slen and is_ident_continue(src[(self.pos)]):
             self.pos = self.pos + 1
         TokenKind.TK_DOT_IDENT
-
-    mut fn lex_raw_string_prefixed() -> i32:
-        let src = self.source
-        let slen = src.len() as i32
-        var p = self.pos
-        var hash_count = 0
-        while p < slen and src[p] == CharCode.Hash:
-            hash_count = hash_count + 1
-            p = p + 1
-        if p >= slen or src[p] != CharCode.Dquote:  // opening "
-            return -1
-
-        // Consume opening delimiter.
-        self.pos = p + 1
-        while self.pos < slen:
-            if src[(self.pos)] == CharCode.Dquote:
-                var ok = true
-                for hi in 0..hash_count:
-                    if self.pos + 1 + hi >= slen or src[(self.pos + 1 + hi)] != CharCode.Hash:
-                        ok = false
-                if ok:
-                    self.pos = self.pos + 1 + hash_count
-                    return TokenKind.TK_STRING_LIT
-            self.pos = self.pos + 1
-        // Unterminated raw string: still emit string token for recovery.
-        TokenKind.TK_STRING_LIT
 
     mut fn lex_byte_char_prefixed() -> i32:
         let src = self.source

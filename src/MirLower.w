@@ -715,7 +715,7 @@ impl MirBuilder:
         if path_count == 0:
             self.clear_moved_fields_for_local(base_local)
             return
-        let path_start = self.body.place_proj_starts[place]
+        let path_start: i32 = self.body.place_proj_starts[place]
         var i = self.moved_field_base_locals.len() as i32 - 1
         while i >= 0:
             if self.moved_field_path_has_prefix(i, base_local, path_start, path_count) != 0:
@@ -1080,7 +1080,7 @@ impl MirBuilder:
         if self.stmt_temp_starts.len() == 0:
             return
         let frame_idx = self.stmt_temp_starts.len() as i32 - 1
-        let start = self.stmt_temp_starts[frame_idx]
+        let start: i32 = self.stmt_temp_starts[frame_idx]
         var i = self.stmt_temp_locals.len() as i32 - 1
         while i >= start:
             let local_id: i32 = self.stmt_temp_locals[i]
@@ -1238,7 +1238,7 @@ impl MirBuilder:
             return
 
         let scope_idx = self.drop_scope_starts.len() as i32 - 1
-        let drop_start = self.drop_scope_starts[scope_idx]
+        let drop_start: i32 = self.drop_scope_starts[scope_idx]
         var i = self.drop_local_ids.len() as i32 - 1
         while i >= drop_start:
             self.emit_drop_entry(self.drop_local_ids[i], self.drop_kinds[i])
@@ -1273,7 +1273,7 @@ impl MirBuilder:
             with_eprint(f"[scope] pop depth={self.drop_scope_starts.len() as i32 - 1} bb={self.cur_bb as i32}")
 
         let scope_idx = self.drop_scope_starts.len() as i32 - 1
-        let drop_start = self.drop_scope_starts[scope_idx]
+        let drop_start: i32 = self.drop_scope_starts[scope_idx]
         var i = self.drop_local_ids.len() as i32 - 1
         while i >= drop_start:
             self.emit_drop_entry(self.drop_local_ids[i], self.drop_kinds[i])
@@ -2608,7 +2608,7 @@ impl MirBuilder:
         if local_id < 0 or local_id >= self.body.local_type_ids.len():
             return self.sema.ty_void as i32
         var current_ty = self.body.local_type_ids[local_id] as i32
-        let proj_start = self.body.place_proj_starts[place_id]
+        let proj_start: i32 = self.body.place_proj_starts[place_id]
         let proj_count = self.body.place_proj_counts[place_id]
         var active_variant_idx = -1
 
@@ -2923,7 +2923,7 @@ impl MirBuilder:
         -1
 
     mut fn try_resolve_module_const_type(sym: i32) -> i32:
-        let target_name = self.pool.resolve_symbol(sym)
+        let target_name = self.pool.resolve_symbol(sym).clone()
         for di in 0..self.ast.decl_count():
             let decl = self.ast.get_decl(di)
             if self.ast.kind(decl) != NodeKind.NK_LET_DECL:
@@ -2952,7 +2952,7 @@ impl MirBuilder:
     mut fn mark_unsupported():
         if with_getenv_str("WITH_MIR_AUDIT").len() > 0:
             let node_kind = if self.cur_node != 0: self.ast.kind(self.cur_node) else: 0
-            let fn_name = self.pool.resolve(self.body.fn_sym)
+            let fn_name = self.pool.resolve(self.body.fn_sym).clone()
             var detail = ""
             if self.cur_node != 0:
                 detail = f" span={self.ast.get_start(self.cur_node)}..{self.ast.get_end(self.cur_node)}"
@@ -4560,7 +4560,7 @@ impl MirBuilder:
     mut fn update_string_fields_after_aggregate(aggregate_place: i32, fields_id: i32):
         if aggregate_place < 0 or fields_id < 0 or fields_id >= self.body.agg_field_starts.len():
             return
-        let start = self.body.agg_field_starts[fields_id]
+        let start: i32 = self.body.agg_field_starts[fields_id]
         let count = self.body.agg_field_counts[fields_id]
         for i in 0..count:
             let field_sym: i32 = self.body.agg_field_name_syms[(start + i)]
@@ -7592,7 +7592,7 @@ impl MirBuilder:
             if self.ast.kind(call_callee) == NodeKind.NK_FIELD_ACCESS:
                 let recv = self.ast.get_data0(call_callee)
                 let msym = self.ast.get_data1(call_callee)
-                let mname = self.pool.resolve(msym)
+                let mname = self.pool.resolve(msym).clone()
                 if mname == "iter":
                     let recv_ty = self.expr_type(recv)
                     if recv_ty != 0:
@@ -8635,7 +8635,7 @@ impl MirBuilder:
             if self.ast.kind(call_callee) == NodeKind.NK_FIELD_ACCESS:
                 let recv = self.ast.get_data0(call_callee)
                 let msym = self.ast.get_data1(call_callee)
-                let mname = self.pool.resolve(msym)
+                let mname = self.pool.resolve(msym).clone()
                 if mname == "iter":
                     let recv_ty = self.expr_type(recv)
                     if recv_ty != 0:
@@ -11143,7 +11143,7 @@ impl MirBuilder:
     mut fn record_call_contract(args_id: i32, node: i32, fallback_sig: i32):
         var sig_idx = fallback_sig
         var mono_sym = 0
-        let recorded_sig = self.sema.resolved_call_sigs.get(node)
+        let recorded_sig = self.sema.resolved_call_sigs.get(node).copied()
         let recorded_mono = self.sema.resolved_call_mono_syms.get(node)
         if recorded_sig.is_some():
             sig_idx = recorded_sig.unwrap()
@@ -11190,7 +11190,7 @@ impl MirBuilder:
     mut fn lower_call(fn_expr: i32, arg_exprs_start: i32, arg_exprs_count: i32, ret_type_id: i32, node: i32) -> i32:
         var fn_op = self.lower_callable_expr(fn_expr)
         var sig_idx = self.call_sig_for_expr(fn_expr)
-        let recorded_sig = self.sema.resolved_call_sigs.get(node)
+        let recorded_sig = self.sema.resolved_call_sigs.get(node).copied()
         if recorded_sig.is_some():
             sig_idx = recorded_sig.unwrap()
         // D64 (§16.2b.8): a call to the C name of a free operation a facade
@@ -11302,7 +11302,7 @@ impl MirBuilder:
     // Callable type redirect: like lower_call but uses a pre-resolved fn operand and symbol.
     mut fn lower_call_redirected(fn_op: i32, fn_sym: i32, arg_exprs_start: i32, arg_exprs_count: i32, ret_type_id: i32, node: i32) -> i32:
         var sig_idx = self.call_sig_for_sym(fn_sym)
-        let recorded_sig = self.sema.resolved_call_sigs.get(node)
+        let recorded_sig = self.sema.resolved_call_sigs.get(node).copied()
         if recorded_sig.is_some():
             sig_idx = recorded_sig.unwrap()
         var actual_ret_type_id = ret_type_id
@@ -11342,7 +11342,7 @@ impl MirBuilder:
     // argument (§9.5/#641a). Remaining arg nodes shift to sig positions 1..n.
     mut fn lower_call_with_arg_nodes_recv(fn_op: i32, callee_sym: i32, recv_op: i32, arg_node_vec: &Vec[i32], ret_type_id: i32, node: i32) -> i32:
         var sig_idx = self.call_sig_for_sym(callee_sym)
-        let recorded_sig = self.sema.resolved_call_sigs.get(node)
+        let recorded_sig = self.sema.resolved_call_sigs.get(node).copied()
         if recorded_sig.is_some():
             sig_idx = recorded_sig.unwrap()
         var actual_ret_type_id = ret_type_id
@@ -12477,9 +12477,9 @@ impl MirBuilder:
         let base_ty = self.expr_type(base)
         if base_ty == 0 or base_ty == self.sema.ty_void:
             return MirIntrinsic.NONE
-        var method_name = self.pool.resolve_symbol(method_sym)
+        var method_name = self.pool.resolve_symbol(method_sym).clone()
         if method_name.len() == 0:
-            method_name = self.sema.pool_resolve(method_sym)
+            method_name = self.sema.pool_resolve(method_sym).clone()
         let resolved = self.sema.resolve_alias(base_ty)
         let type_name_sym = self.sema.get_type_name(resolved)
         if type_name_sym == 0:
@@ -12532,9 +12532,9 @@ impl MirBuilder:
                 let type_sym = self.ast.get_data0(self_expr)
                 if ret_name_sym == type_sym:
                     recv_type = ret_type
-        var method_name = self.pool.resolve_symbol(method_sym)
+        var method_name = self.pool.resolve_symbol(method_sym).clone()
         if method_name.len() == 0:
-            method_name = self.sema.pool_resolve(method_sym)
+            method_name = self.sema.pool_resolve(method_sym).clone()
         if method_name == "as_option":
             let resolved_recv = self.sema.resolve_alias(recv_type as TypeId)
             if self.sema.get_type_kind(resolved_recv) == TypeKind.TY_PTR:
@@ -15084,7 +15084,7 @@ impl MirBuilder:
 
     mut fn lower_call_with_receiver_operand(fn_op: i32, callee_sym: i32, recv_op: i32, arg_start: i32, arg_count: i32, ret_type: i32, node: i32) -> i32:
         var sig_idx = self.call_sig_for_sym(callee_sym)
-        let recorded_sig = self.sema.resolved_call_sigs.get(node)
+        let recorded_sig = self.sema.resolved_call_sigs.get(node).copied()
         if recorded_sig.is_some():
             sig_idx = recorded_sig.unwrap()
         let args: Vec[i32] = Vec.new()
@@ -16020,7 +16020,7 @@ impl MirBuilder:
                     // ownership lowering and the eventual ABI contract.
                     let gc_fn_op = self.const_operand(ConstKind.CK_FN, gc_fn_sym, 0)
                     var gc_sig_idx = self.call_sig_for_sym(gc_fn_sym)
-                    let gc_recorded_sig = self.sema.resolved_call_sigs.get(node)
+                    let gc_recorded_sig = self.sema.resolved_call_sigs.get(node).copied()
                     if gc_recorded_sig.is_some():
                         gc_sig_idx = gc_recorded_sig.unwrap()
                     let gc_args: Vec[i32] = Vec.new()
@@ -17119,8 +17119,8 @@ impl MirBody:
                 continue
             // This is a self-tail-call. Transform it.
             // Step 1: Read call args into temp locals (aliasing safety)
-            let arg_start = self.call_arg_starts[args_id]
-            let arg_count = self.call_arg_counts[args_id]
+            let arg_start: i32 = self.call_arg_starts[args_id]
+            let arg_count: i32 = self.call_arg_counts[args_id]
             let n_params = self.n_params
             let span: i32 = self.bb_term_spans[bb]
             // Copy args to temps

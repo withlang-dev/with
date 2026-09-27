@@ -1263,7 +1263,7 @@ impl Sema:
                 if concrete_sym != 0:
                     // Find which trait provides assoc_sym for concrete_sym
                     for ti in 0..self.trait_name_syms.len() as i32:
-                        let at_start_t = self.trait_assoc_starts[ti]
+                        let at_start_t: i32 = self.trait_assoc_starts[ti]
                         let at_count_t = self.trait_assoc_counts[ti]
                         for ai in 0..at_count_t:
                             if self.trait_assoc_names[(at_start_t + ai)] == assoc_sym:
@@ -1715,7 +1715,7 @@ impl Sema:
                 continue
             if mi >= self.module_import_starts.len() as i32:
                 continue
-            let start = self.module_import_starts[mi]
+            let start: i32 = self.module_import_starts[mi]
             let count = self.module_import_counts[mi]
             for ii in 0..count:
                 let idx = start + ii
@@ -2120,7 +2120,7 @@ impl Sema:
         let mt_count = self.trait_method_counts[trait_idx]
         for mi in 0..mt_count:
             let mt_idx = mt_start + mi
-            let method_sym = self.trait_method_names[mt_idx]
+            let method_sym: i32 = self.trait_method_names[mt_idx]
             if self.pool_resolve(method_sym) != method_name:
                 continue
             let impl_type_sym = self.ast.get_data0(impl_node)
@@ -2783,7 +2783,7 @@ impl Sema:
                 self.assoc_type_bindings.insert(at_name, at_tid as i32)
 
         self.push_scope()
-        let param_start = self.trait_method_param_starts[method_idx]
+        let param_start: i32 = self.trait_method_param_starts[method_idx]
         let param_count = self.trait_method_param_counts[method_idx]
         for pi in 0..param_count:
             let p_name = self.ast.fn_param_name(param_start, pi)
@@ -4508,7 +4508,7 @@ impl Sema:
         let start = self.dyn_impl_flat_method_names.len() as i32
         self.dyn_impl_starts.insert(reg_key, start)
         self.dyn_impl_counts.insert(reg_key, 0)
-        let m_start = self.trait_method_starts[trait_idx]
+        let m_start: i32 = self.trait_method_starts[trait_idx]
         let m_count = self.trait_method_counts[trait_idx]
         var rows = 0
         for mi in 0..m_count:
@@ -15569,10 +15569,10 @@ impl Sema:
         var other_first_variant = 0
         var qi = 0
         while qi < queue_types.len() as i32:
-            let current_ty = queue_types[qi]
-            let current_start = queue_starts[qi]
-            let current_count = queue_counts[qi]
-            let current_first = queue_first_variants[qi]
+            let current_ty: i32 = queue_types[qi]
+            let current_start: i32 = queue_starts[qi]
+            let current_count: i32 = queue_counts[qi]
+            let current_first: i32 = queue_first_variants[qi]
             qi = qi + 1
             if best_count >= 0 and current_count >= best_count:
                 continue
@@ -15658,10 +15658,10 @@ impl Sema:
         var other_first_variant = 0
         var qi = 0
         while qi < queue_types.len() as i32:
-            let current_ty = queue_types[qi]
-            let current_start = queue_starts[qi]
-            let current_count = queue_counts[qi]
-            let current_first = queue_first_variants[qi]
+            let current_ty: i32 = queue_types[qi]
+            let current_start: i32 = queue_starts[qi]
+            let current_count: i32 = queue_counts[qi]
+            let current_first: i32 = queue_first_variants[qi]
             qi = qi + 1
             if best_count >= 0 and current_count >= best_count:
                 continue
@@ -20427,7 +20427,7 @@ impl Sema:
                 let impl_args_idx = self.ast.find_impl_trait_type_args(decl as NodeId)
                 if impl_args_idx < 0:
                     continue
-                let impl_arg_start = self.ast.state.impl_trait_type_args[(impl_args_idx + 1)]
+                let impl_arg_start: i32 = self.ast.state.impl_trait_type_args[(impl_args_idx + 1)]
                 let impl_arg_count = self.ast.state.impl_trait_type_args[(impl_args_idx + 2)]
                 let bind_count = if trait_arg_count < impl_arg_count: trait_arg_count else: impl_arg_count
                 for tai in 0..bind_count:
@@ -20772,7 +20772,7 @@ impl Sema:
             let target_base = self.blanket_target_base_syms[bi]
             if target_base != base_sym:
                 continue
-            let impl_node = self.blanket_impl_nodes[bi]
+            let impl_node: i32 = self.blanket_impl_nodes[bi]
             let target_node = self.ast.find_impl_target_type_node(impl_node)
             if target_node == 0:
                 continue
@@ -20781,8 +20781,8 @@ impl Sema:
             let tp_meta = self.ast.find_impl_type_params(impl_node)
             if tp_meta < 0:
                 continue
-            let tp_start = self.ast.state.impl_type_params[(tp_meta + 1)]
-            let tp_count = self.ast.state.impl_type_params[(tp_meta + 2)]
+            let tp_start: i32 = self.ast.state.impl_type_params[(tp_meta + 1)]
+            let tp_count: i32 = self.ast.state.impl_type_params[(tp_meta + 2)]
             let pattern_arg_count = self.ast.get_data2(target_node)
             if pattern_arg_count != self.get_generic_inst_arg_count(resolved as i32):
                 continue
@@ -20917,7 +20917,7 @@ impl Sema:
         let variant_count = self.get_type_d2(resolved)
         var pos = self.get_type_d1(resolved)
         for vi in 0..variant_count:
-            let payload_count = self.type_extra[(pos + 1)]
+            let payload_count: i32 = self.type_extra[(pos + 1)]
             for pi in 0..payload_count:
                 let payload_ty: i32 = self.type_extra[(pos + 2 + pi)]
                 if self.type_satisfies_thread_trait(payload_ty, trait_sym) == 0:
@@ -20960,7 +20960,7 @@ impl Sema:
             let variant_count = self.get_type_d2(base_resolved)
             var epos = self.get_type_d1(base_resolved)
             for vi in 0..variant_count:
-                let payload_count = self.type_extra[(epos + 1)]
+                let payload_count: i32 = self.type_extra[(epos + 1)]
                 for pi in 0..payload_count:
                     let payload_ty = self.substitute_type(self.type_extra[(epos + 2 + pi)], subst_syms, subst_tids, tp_count)
                     if self.type_satisfies_thread_trait(payload_ty, trait_sym) == 0:
@@ -24165,7 +24165,7 @@ impl Sema:
         // not moved.
         if obj_type != 0 and self.get_type_kind(self.resolve_alias(obj_type)) == TypeKind.TY_FN and self.pool_resolve(field) == "clone" and arg_count == 0:
             if self.ast.kind(expr) == NodeKind.NK_IDENT and self.binding_closure_nodes.contains(self.ast.get_data0(expr)):
-                let known_closure = self.binding_closure_nodes.get(self.ast.get_data0(expr)).unwrap()
+                let known_closure: i32 = self.binding_closure_nodes.get(self.ast.get_data0(expr)).unwrap()
                 if self.ast.is_move_closure(known_closure) != 0:
                     for ci in 0..self.closure_capture_summary_count(known_closure):
                         let cap_sym = self.closure_capture_summary_sym(known_closure, ci)
