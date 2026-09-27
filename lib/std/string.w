@@ -139,9 +139,10 @@ impl CStr:
 /// The view of a nullable foreign string a facade presents (D51 §32, §41;
 /// spec §16.2b.8): `None` for NULL, else the `CStr` over the bytes. The
 /// compiler applies it to a presented call's result (MirLower.w lower_call);
-/// the facade clause is what vouches for the pointer.
-pub fn cstr_option_from_ptr(p: *const i8) -> Option[CStr]:
-    if p == null: None else: Some(unsafe { CStr.from_ptr(p) })
+/// the facade clause is what vouches for the pointer, so the conversion is
+/// `unsafe`: its caller guarantees `p` is NULL or a live C string (#1473).
+pub unsafe fn cstr_option_from_ptr(p: *const i8) -> Option[CStr]:
+    if p == null: None else: Some(CStr.from_ptr(p))
 
 /// Why a `CStr` is not With text.
 pub enum Utf8Error:
