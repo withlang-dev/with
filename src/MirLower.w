@@ -5684,10 +5684,16 @@ impl MirBuilder:
         // names (§3.7): the cast reads the string through the reference. As
         // a cast of the reference VALUE it took the pointer's bytes for the
         // string header and read garbage (found writing str.as_bytes()).
+        // #1782: the same through a distinct wrapper (§4.5, zero-cost): `r as
+        // str` with `r: &Name` where `Name = distinct str` names a string, and
+        // so does a `str` target; the reference value cast to the header
+        // printed a garbage byte.
         let src_res = self.sema.resolve_alias(src_sema_ty as TypeId)
-        if self.sema.get_type_kind(src_res) == TypeKind.TY_REF and self.sema.get_type_kind(self.sema.resolve_alias(target_type_id as TypeId)) == TypeKind.TY_SLICE:
+        let cast_target_kind = self.sema.get_type_kind(self.sema.resolve_alias(self.sema.unwrap_builtin_arg_distinct(target_type_id) as TypeId))
+        let cast_target_is_view_or_str = cast_target_kind == TypeKind.TY_SLICE or cast_target_kind == TypeKind.TY_STR or cast_target_kind == TypeKind.TY_ARRAY
+        if self.sema.get_type_kind(src_res) == TypeKind.TY_REF and cast_target_is_view_or_str:
             let pointee = self.sema.get_type_d0(src_res) as i32
-            let pointee_kind = self.sema.get_type_kind(self.sema.resolve_alias(pointee as TypeId))
+            let pointee_kind = self.sema.get_type_kind(self.sema.resolve_alias(self.sema.unwrap_builtin_arg_distinct(pointee) as TypeId))
             if pointee_kind == TypeKind.TY_STR or pointee_kind == TypeKind.TY_ARRAY or pointee_kind == TypeKind.TY_SLICE:
                 let ref_place = self.materialize_operand(op, src_sema_ty, self.ast.get_start(expr))
                 op = self.body.new_operand(OperandKind.OK_COPY, self.new_deref_place(ref_place))
