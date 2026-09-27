@@ -15,6 +15,13 @@ c facade libc:
     domain errno thread
     domain environ process
     domain locale process
+    domain signals process
+    domain signal_mask thread
+    domain cwd process
+    domain fds process
+    domain rlimits process
+    domain children process
+    domain stdio process
     fn rt_libc_write
         preserves domain environ
         preserves domain locale

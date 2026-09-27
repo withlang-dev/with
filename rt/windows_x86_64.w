@@ -1482,7 +1482,8 @@ pub fn with_net_close(sock: i32) -> i32:
 // Every foreign call above is described here; the `runtime-domain-audit`
 // lane (build/compiler.w) refuses a foreign extern without a row. "Unknown
 // effect means invalidate" (§38): a Win32 or Winsock row says nothing, so
-// it invalidates all three domains — the C standard does not describe those
+// it invalidates every declared domain — the three libc domains and the
+// process state (#1608) — the C standard does not describe those
 // calls, and a row it cannot justify is never `preserves`. The UCRT rows
 // follow the C standard as the POSIX backends do: C11 7.5p3 (errno: any
 // library function may set it; the `_errno` accessor is the macro's lvalue,
@@ -1492,6 +1493,13 @@ c facade win32:
     domain errno thread
     domain environ process
     domain locale process
+    domain signals process
+    domain signal_mask thread
+    domain cwd process
+    domain fds process
+    domain rlimits process
+    domain children process
+    domain stdio process
     fn GetLastError
     fn GetStdHandle
     fn ReadFile

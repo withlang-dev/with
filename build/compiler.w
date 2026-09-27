@@ -1302,7 +1302,9 @@ pub fn run_check_libc_surface_action(ctx: ActionCtx) -> i32:
 // the end of each rt/*.w file: one `fn` item per foreign extern — an
 // `extern fn` carrying `@[link_name]` or `@[import_module]`, or one whose
 // name is neither an rt_* nor a with_* runtime symbol — under the three libc
-// domains (errno thread, environ process, locale process; ruling §33-§36).
+// domains (errno thread, environ process, locale process; ruling §33-§36) and
+// the process state POSIX names beyond them (signals, signal_mask, cwd, fds,
+// rlimits, children, stdio; #1608, refinements under §35).
 // The compiler verifies what a row says when the file compiles (a row names
 // a declaration in scope, `preserves domain D` a declared domain); this lane
 // verifies that no foreign call is left unsaid, which the compiler cannot
@@ -1364,18 +1366,18 @@ fn comp_runtime_domain_violations(path: &str, text: &str) -> Vec[str]:
     if foreign_names.len() == 0:
         return out
     if facades == 0:
-        out.push(f"{path}:{foreign_lines[0]}: runtime file reaches {foreign_names.len()} foreign symbol(s) and has no `c facade` block; describe each foreign extern with an fn row under `domain errno thread`, `domain environ process`, `domain locale process` (ruling §52)")
+        out.push(f"{path}:{foreign_lines[0]}: runtime file reaches {foreign_names.len()} foreign symbol(s) and has no `c facade` block; describe each foreign extern with an fn row under the libc domains (`domain errno thread`, `domain environ process`, `domain locale process`) and the process-state domains (ruling §52)")
         return out
     if facades > 1:
         out.push(f"{path}:{facade_line}: {facades} `c facade` blocks; a runtime file has one, holding every domain row (ruling §52)")
-    for required in ["errno thread", "environ process", "locale process"]:
+    for required in ["errno thread", "environ process", "locale process", "signals process", "signal_mask thread", "cwd process", "fds process", "rlimits process", "children process", "stdio process"]:
         if not domains.contains("|" ++ required ++ "|"):
-            out.push(f"{path}:{facade_line}: facade '{facade_name}' does not declare `domain {required}`; the runtime's rows state the effect on every libc domain (ruling §33-§36, §52)")
+            out.push(f"{path}:{facade_line}: facade '{facade_name}' does not declare `domain {required}`; the runtime's rows state the effect on every libc and process-state domain (ruling §33-§36, §52; #1608)")
     for i in 0..foreign_names.len() as i32:
         let name = foreign_names[i]
         if rows.contains("|" ++ name ++ "|"): continue
         let link = foreign_links[i]
-        out.push(f"{path}:{foreign_lines[i]}: foreign extern '{name}' (C symbol '{link}') has no domain row; add `fn {name}` to facade '{facade_name}' — silence invalidates errno, environ and locale (§38), `preserves domain D` only where the C standard says so (ruling §52)")
+        out.push(f"{path}:{foreign_lines[i]}: foreign extern '{name}' (C symbol '{link}') has no domain row; add `fn {name}` to facade '{facade_name}' — silence invalidates every declared domain (§38), `preserves domain D` only where the C standard or POSIX says so (ruling §52)")
     out
 
 /// The first "quoted" text on a line, or "".

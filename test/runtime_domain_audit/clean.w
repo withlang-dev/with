@@ -15,10 +15,17 @@ extern fn rt_write(fd: i32, buf: *const u8, len: u64) -> i64
 extern fn with_alloc(size: i64) -> *mut u8
 
 c facade libc:
-    // the three libc domains (ruling §33-§36)
+    // the three libc domains (ruling §33-§36) and the process state (#1608)
     domain errno thread
     domain environ process
     domain locale process
+    domain signals process
+    domain signal_mask thread
+    domain cwd process
+    domain fds process
+    domain rlimits process
+    domain children process
+    domain stdio process
     fn rt_libc_write
         preserves domain environ
         preserves domain locale
