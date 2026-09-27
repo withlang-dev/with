@@ -3227,7 +3227,7 @@ impl Sema:
         // A derive diagnostic is rendered against the declaring file, not
         // whichever file the pre-sema last checked (it pointed a module's
         // derive error at a `use` line of the importer).
-        let saved_file_id = self.local_file_id
+        let saved_file_id: i32 = self.local_file_id
 
         for di in 0..base_decl_count:
             let decl = out.get_decl(di)

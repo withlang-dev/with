@@ -3228,7 +3228,7 @@ impl Sema:
         0
 
     mut fn validate_copy_derives():
-        let copy_sym = self.syms.copy_trait
+        let copy_sym: i32 = self.syms.copy_trait
         for di in 0..self.ast.decl_count():
             if self.decl_is_lazy_skipped(di):
                 continue
@@ -3297,9 +3297,9 @@ impl Sema:
         0
 
     mut fn validate_generic_type_decls():
-        let saved_file_id = self.local_file_id
+        let saved_file_id: i32 = self.local_file_id
         let saved_module_path = move self.current_module_path
-        let saved_module_has_ci = self.current_module_has_ci
+        let saved_module_has_ci: i32 = self.current_module_has_ci
         for di in 0..self.ast.decl_count():
             if self.decl_is_lazy_skipped(di):
                 continue

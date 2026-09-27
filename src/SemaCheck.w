@@ -1781,7 +1781,7 @@ impl Sema:
             self.check_decl_body_in_order(di)
         // A call typed before its callee's body was: wrong only if that body
         // turned out to produce a value.
-        let saved_file_id = self.local_file_id
+        let saved_file_id: i32 = self.local_file_id
         var ci = 0
         while ci + 3 < self.untyped_callee_calls.len() as i32:
             let call_node: i32 = self.untyped_callee_calls[ci]
@@ -2367,9 +2367,9 @@ impl Sema:
         self.current_fn_sig_idx = sig_idx
 
         // Set current return type
-        let saved_ret = self.current_return_type
-        let saved_gen_yield_type = self.current_gen_yield_type
-        let saved_has_gen_yield_type = self.has_gen_yield_type
+        let saved_ret: i32 = self.current_return_type
+        let saved_gen_yield_type: i32 = self.current_gen_yield_type
+        let saved_has_gen_yield_type: i32 = self.has_gen_yield_type
         let is_gen = (flags / FnFlags.GEN) % 2
         if is_gen == 1:
             // Keyed by the signature's symbol: a generic gen fn's
@@ -10041,7 +10041,7 @@ impl Sema:
 
         let saved_block_extra: i32 = self.current_block_extra_start
         let saved_block_count: i32 = self.current_block_stmt_count
-        let saved_block_index = self.current_block_stmt_index
+        let saved_block_index: i32 = self.current_block_stmt_index
         let saved_block_tail: i32 = self.current_block_tail
         self.current_block_extra_start = extra_start
         self.current_block_stmt_count = stmt_count
@@ -10656,7 +10656,7 @@ impl Sema:
             self.stmt_pos_depth > 0 or self.current_return_type == self.ty_void or (self.current_return_type == 0 and else_body == 0)
         let in_value_context = in_statement_context == 0
         let outer_expected: TypeId = if is_infer_tail: 0 as TypeId else if in_value_context and self.has_expected_type != 0: self.expected_expr_type else: 0 as TypeId
-        let saved_infer_tail = self.infer_tail_node
+        let saved_infer_tail: i32 = self.infer_tail_node
         // Save scope states before then branch so early-return branches don't
         // permanently mark outer variables as MOVED when control continues past the if.
         // Branch move-state join (MaybeUninitialized half — docs/completed/branch-merge-soundness.md):
@@ -19659,10 +19659,10 @@ impl Sema:
     mut fn check_expr_with_expected(node: i32, expected: TypeId) -> TypeId:
         let saved_expected: i32 = self.expected_expr_type
         let saved_has: i32 = self.has_expected_type
-        let saved_statement_root = self.current_statement_expr_root
-        let saved_value_root = self.current_value_expr_root
-        let saved_match_stmt = self.match_in_stmt_pos
-        let saved_stmt_depth = self.stmt_pos_depth
+        let saved_statement_root: i32 = self.current_statement_expr_root
+        let saved_value_root: i32 = self.current_value_expr_root
+        let saved_match_stmt: i32 = self.match_in_stmt_pos
+        let saved_stmt_depth: i32 = self.stmt_pos_depth
         self.expected_expr_type = expected
         self.has_expected_type = if expected != 0: 1 else: 0
         if expected != 0 and expected != self.ty_void:
@@ -20627,7 +20627,7 @@ impl Sema:
             return self.resolve_type_expr(node) as i32
         let saved_file_id: i32 = self.local_file_id
         let saved_module_path = with_str_clone_ref(self.current_module_path)
-        let saved_module_has_ci = self.current_module_has_ci
+        let saved_module_has_ci: i32 = self.current_module_has_ci
         self.local_file_id = self.ast.file(node as NodeId) as i32
         self.current_module_path = with_str_clone_ref(owner)
         if self.scoping_active != 0:

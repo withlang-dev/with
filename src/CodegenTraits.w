@@ -547,7 +547,7 @@ impl Codegen:
         // field cannot be pushed, and pre-flip the bit-copied header aliased
         // the live buffer across a possible realloc).
         let saved_vec_len = self.type_binding_syms.len()
-        let saved_len = self.type_bindings_len
+        let saved_len: i32 = self.type_bindings_len
         let body_node = self.trait_method_default_bodies[method_idx]
         if body_node == 0:
             return

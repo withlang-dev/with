@@ -2499,7 +2499,7 @@ impl Zcu:
             // use-expansion above deduped to a no-op); otherwise (legacy
             // entries) the closure was just appended from initial_count on.
             // Nested USE decls get expanded transitively either way.
-            let prefix_decls = self.prelude_prefix_decls
+            let prefix_decls: i32 = self.prelude_prefix_decls
             var pi = if prefix_decls > 0: 1 else: initial_count
             while (prefix_decls > 0 and pi < prefix_decls) or (prefix_decls == 0 and pi < merged_pool.decl_count()):
                 let decl = merged_pool.get_decl(pi)

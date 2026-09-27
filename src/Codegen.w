@@ -3651,7 +3651,7 @@ impl Codegen:
                     return self.get_or_create_generic_enum_type(resolved_tid)
             // User-defined generic structs: monomorphize via type bindings
             if cg_base_sym != 0 and self.generic_structs.contains(cg_base_sym):
-                let saved_len = self.type_bindings_len
+                let saved_len: i32 = self.type_bindings_len
                 let saved_syms = move self.type_binding_syms
                 let saved_types = move self.type_binding_types
                 let tp_syms: Vec[i32] = Vec.new()
@@ -6060,9 +6060,9 @@ impl Codegen:
         let abi_index = self.compute_fn_abi(ret_ty, orig_param_types, places, if uses_internal_abi: FN_ABI_WITH else: FN_ABI_C, is_variadic)
         let abi = self.fn_abis[abi_index]
         let has_sret = if abi.ret.pass == PM_INDIRECT: 1 else: 0
-        let sret_ty = abi.ret.source_ty
+        let sret_ty: i64 = abi.ret.source_ty
         let byval_types = self.fn_abi_byval_types(abi_index)
-        let fn_type = abi.llvm_ty
+        let fn_type: i64 = abi.llvm_ty
 
         // @[link_name("symbol")] overrides the C symbol this extern links against
         // (stored as a "link_name:" callconv prefix). Otherwise canonicalize the

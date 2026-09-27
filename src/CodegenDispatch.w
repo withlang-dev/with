@@ -19240,7 +19240,7 @@ impl Codegen:
 
     mut fn gen_async_block(node: i32, parent: &MirBody) -> i64:
         let ab_body = self.prepared_anonymous_body(parent, node, ConstKind.CK_ASYNC_BLOCK)
-        let ctx = self.context
+        let ctx: i64 = self.context
         let ptr_ty = wl_ptr_type(ctx)
         let i32_ty = wl_i32_type(ctx)
         let i64_ty = wl_i64_type(ctx)

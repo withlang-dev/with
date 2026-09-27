@@ -3086,7 +3086,7 @@ impl Sema:
         false
 
     mut fn report_facade_layout_errors():
-        let saved_file = self.local_file_id
+        let saved_file: i32 = self.local_file_id
         for i in 0..self.facade_layout_nodes.len() as i32:
             self.local_file_id = self.facade_layout_files[i]
             self.emit_facade_layout_error(self.facade_layout_msgs[i], self.facade_layout_nodes[i], self.facade_layout_tids[i], self.facade_layout_containers[i])
