@@ -88,6 +88,20 @@ impl MirModule:
             let ty = moved[i]
             if ty > 0 and not self.sema_moved_drop_types.contains(ty) and sema.type_needs_drop_frozen(ty) != 0:
                 self.sema_moved_drop_types.insert(ty, 1)
+        // #1559: every dropped place's type with drop glue.
+        var dropped: Vec[i32] = Vec.new()
+        for bi in 0..self.bodies.len():
+            let body = &self.bodies[bi]
+            for si in 0..body.stmt_kinds.len():
+                if body.stmt_kinds[si] == StmtKind.Drop and body.stmt_d0[si] >= 0 and body.stmt_d0[si] < body.place_locals.len():
+                    dropped.push(mir_validate_place_type(self, body, body.stmt_d0[si]))
+            for bb in 0..body.block_count():
+                if body.term_kind(bb) == TermKind.TK_DROP_AND_GOTO and body.term_data0(bb) >= 0 and body.term_data0(bb) < body.place_locals.len():
+                    dropped.push(mir_validate_place_type(self, body, body.term_data0(bb)))
+        for i in 0..dropped.len():
+            let ty = dropped[i]
+            if ty > 0 and not self.sema_dropped_types.contains(ty) and sema.type_needs_drop_frozen(ty) != 0:
+                self.sema_dropped_types.insert(ty, 1)
 
 
 fn MirBody.init(fn_sym: i32, sema: &Sema) -> MirBody:

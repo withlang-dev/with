@@ -554,6 +554,10 @@ pub type MirModule {
     // validator asks it whether a vacated sub-place is one the whole
     // value's drop would free again; MirCore has no Sema to ask.
     sema_moved_drop_types: HashMap[i32, i32],
+    // #1559: the drop-glue types of every place a body drops (a Drop
+    // statement or a drop terminator): a place need not be moved for a
+    // drop of it on a path where it holds no value to free garbage.
+    sema_dropped_types: HashMap[i32, i32],
     // D65 (#1647, #1639): every symbol Sema accepts as a direct call target,
     // keyed by this module's pool: MirCallableClass.Signature for a declared
     // signature, Generic for a generic template, Intrinsic for a builtin
@@ -592,6 +596,7 @@ fn MirModule.init -> MirModule:
         sema_task_sym: 0,
         sema_scoped_task_sym: 0,
         sema_moved_drop_types: HashMap.new(),
+        sema_dropped_types: HashMap.new(),
         sema_callable_syms: HashMap.new(),
     }
 
@@ -1481,10 +1486,15 @@ impl MirDropStateMap:
         // keeps its state. Joining Moved into the base made a partial move
         // read as a conditional whole move (`_4=Maybe`), and the vacated
         // payload a whole-enum drop freed again read as the same Maybe as
-        // its parent (#1394).
+        // its parent (#1394). A sub-place drop (Uninit) is the same: the
+        // drop-before-overwrite of a field (`drop(_4.f); _4.f = move _6`)
+        // leaves the whole value there, and joining Uninit into the base
+        // made it Maybe — "holds no value on a path" (#1559) for a struct
+        // that holds one on every path. The dropped field stays Uninit in
+        // its own key, which the vacated-sub-place rule reads.
         if body.place_proj_counts[place_id] == 0:
             self.mark_local(keys, base, state)
-        else if state != MirDropState.Moved:
+        else if state != MirDropState.Moved and state != MirDropState.Uninit:
             self.set(keys, base, mir_drop_state_join(self.get(keys, base), state))
 
     mut fn note_operand(keys: &MirDropStateKeys, body: &MirBody, operand_id: i32):
@@ -2245,6 +2255,36 @@ fn mir_drop_vacated_message(keys: &MirDropStateKeys, state: &MirDropStateMap, bo
     let child_state = mir_drop_state_name(state.get(keys, child))
     "drop of " ++ mir_place_text(body, place_id) ++ " frees " ++ keys.names[child] ++ f", which a path reaching it moved out ({child_state}) and nothing reset (§2.5.1)"
 
+// #1559: the key of a sub-place of the whole local `place_id` that a path
+// reaching its drop already dropped and nothing wrote again (Uninit, or
+// Maybe at a join), or -1. A sub-place drop no longer turns the whole
+// place Maybe (mark_place): the drop-before-overwrite of a field keeps the
+// whole value. A field dropped and not rewritten is freed again by the
+// whole value's drop glue; this is where that shows.
+fn mir_drop_redropped_subplace(mir_mod: &MirModule, body: &MirBody, keys: &MirDropStateKeys, state: &MirDropStateMap, key_places: &Vec[i32], place_id: i32) -> i32:
+    if body.place_proj_counts[place_id] != 0:
+        return -1
+    let place_key: i32 = keys.place_key[place_id]
+    let whole_state = state.get(keys, place_key)
+    if whole_state != MirDropState.Init and whole_state != MirDropState.Maybe:
+        return -1
+    let base: i32 = keys.base_local[place_key]
+    for i in keys.child_starts[base]..keys.child_starts[base + 1]:
+        let child: i32 = keys.children[i]
+        let child_state = state.get(keys, child)
+        if child_state != MirDropState.Uninit and child_state != MirDropState.Maybe:
+            continue
+        let child_place: i32 = key_places[child]
+        if child_place < 0:
+            continue
+        if mir_mod.sema_dropped_types.contains(mir_validate_place_type(mir_mod, body, child_place)):
+            return child
+    -1
+
+fn mir_drop_redropped_message(keys: &MirDropStateKeys, state: &MirDropStateMap, body: &MirBody, place_id: i32, child: i32) -> str:
+    let child_state = mir_drop_state_name(state.get(keys, child))
+    "drop of " ++ mir_place_text(body, place_id) ++ " frees " ++ keys.names[child] ++ f" again: a path reaching it dropped that part and nothing wrote it since ({child_state}) (§2.5.1)"
+
 // #1415: a move out of a drop-bearing place projected through a reference
 // (`_4 = move _1.*.p` through `&self`). A reference never owns its pointee,
 // so the frame can neither own the moved value nor reset its source: both
@@ -2352,6 +2392,12 @@ fn mir_move_of_moved_place(mir_mod: &MirModule, body: &MirBody, keys: &MirDropSt
 //   (sema_moved_drop_types: the place was moved, so its type is there when
 //   it has glue) frees anything: `Some(move _5); drop(_5)` of a CStr view
 //   is a no-op.
+// - #1559: Maybe is Init on one path and Uninit on another — storage never
+//   written, dead, or already dropped. None of those holds the reset blank
+//   (a StorageLive is not zeroed; a drop does not blank), so the guard does
+//   not protect it: a synthesized enum formatter's per-arm temp, dropped at
+//   the join, freed stack garbage on the arm that never wrote it ("invalid
+//   free"), and validate-all said ok.
 fn mir_whole_drop_verdict(mir_mod: &MirModule, body: &MirBody, place_id: i32, drop_state: i32) -> str:
     let drop_key = mir_place_text(body, place_id)
     let state_name = mir_drop_state_name(drop_state)
@@ -2360,6 +2406,8 @@ fn mir_whole_drop_verdict(mir_mod: &MirModule, body: &MirBody, place_id: i32, dr
     let has_glue = mir_mod.sema_moved_drop_types.contains(mir_validate_place_type(mir_mod, body, place_id))
     if (drop_state == MirDropState.Moved or drop_state == MirDropState.MaybeMoved) and has_glue:
         return f"drop of {drop_key} after a path reaching it moved it out and before its reset ({state_name}): this frees the value its new owner holds (§2.5.1)"
+    if drop_state == MirDropState.Maybe and mir_mod.sema_dropped_types.contains(mir_validate_place_type(mir_mod, body, place_id)):
+        return f"drop of {drop_key} reaches a path where it holds no value — written on one path, never written, dead or already dropped on another ({state_name}); only a reset blank is safe to drop (§2.5.1)"
     ""
 
 // Every move of a statement or terminator checked by the #1415 rule.
@@ -2426,6 +2474,9 @@ pub fn validate_ownership_body(mir_mod: &MirModule, body: &MirBody) -> str:
                 let vacated = mir_drop_vacated_subplace(mir_mod, body, blocks.keys, state, key_places, d0)
                 if vacated >= 0:
                     return f"fn sym{body.fn_sym} stmt{stmt_id} span={span}: " ++ mir_drop_vacated_message(blocks.keys, state, body, d0, vacated)
+                let redropped = mir_drop_redropped_subplace(mir_mod, body, blocks.keys, state, key_places, d0)
+                if redropped >= 0:
+                    return f"fn sym{body.fn_sym} stmt{stmt_id} span={span}: " ++ mir_drop_redropped_message(blocks.keys, state, body, d0, redropped)
             if kind == StmtKind.Assign and blocks.computed[bb] != 0:
                 let twice = mir_move_of_moved_place(mir_mod, body, blocks.keys, state, mir_rvalue_operands(body, body.stmt_data1(stmt_id)))
                 if twice.len() > 0:
@@ -2449,6 +2500,9 @@ pub fn validate_ownership_body(mir_mod: &MirModule, body: &MirBody) -> str:
                 let vacated = mir_drop_vacated_subplace(mir_mod, body, blocks.keys, state, key_places, place_id)
                 if vacated >= 0:
                     return f"fn sym{body.fn_sym} bb{bb}: " ++ mir_drop_vacated_message(blocks.keys, state, body, place_id, vacated)
+                let redropped = mir_drop_redropped_subplace(mir_mod, body, blocks.keys, state, key_places, place_id)
+                if redropped >= 0:
+                    return f"fn sym{body.fn_sym} bb{bb}: " ++ mir_drop_redropped_message(blocks.keys, state, body, place_id, redropped)
         // #1384 / #1488: a local some `drop` targets is owned storage the lowering
         // scheduled a drop for. Still Init at a `return`, with no sub-place moved
         // out or blanked (a partial move leaves a shell nothing needs to free),

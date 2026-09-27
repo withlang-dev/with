@@ -916,7 +916,9 @@ fn drop_state_verdict(shape: i32, drops: bool) -> str:
         mir_mod.sema_type_d2.push(0)
     let flag_ty = 1
     let value_ty = 2
-    if drops: mir_mod.sema_moved_drop_types.insert(value_ty, 1)
+    if drops:
+        mir_mod.sema_moved_drop_types.insert(value_ty, 1)
+        mir_mod.sema_dropped_types.insert(value_ty, 1)
     var body = MirBody.init_for_fn(1)
     body.n_params = 1
     let flag_local = body.new_temp(flag_ty)
@@ -971,3 +973,48 @@ pub fn mir_test_moved_drop:
     assert(drop_state_verdict(3, true) == "")
     // A value with no drop glue frees nothing twice (a moved CStr view).
     assert(drop_state_verdict(0, false) == "")
+
+pub fn mir_test_maybe_uninit_drop:
+    assert(drop_state_verdict(4, true).contains("drop of _2 reaches a path where it holds no value"))
+    assert(drop_state_verdict(4, true).contains("(Maybe)"))
+    assert(drop_state_verdict(5, true) == "")
+    // Storage with no drop glue frees nothing.
+    assert(drop_state_verdict(4, false) == "")
+
+// #1559: a field's drop before it is overwritten (`drop(_1.f0); _1.f0 =
+// v`) keeps the whole value, so the whole's later drop is legal; a field
+// dropped and not written again is freed a second time by the whole's
+// drop. (A sub-place drop used to join Uninit into the whole place, which
+// read as "Maybe" for a struct that holds a value on every path.)
+fn field_redrop_verdict(rewrite: bool) -> str:
+    var mir_mod = MirModule.init()
+    for kind in [0, TypeKind.TY_STRUCT, TypeKind.TY_STRUCT]:
+        mir_mod.sema_type_kinds.push(kind)
+        mir_mod.sema_type_d0.push(0)
+        mir_mod.sema_type_d1.push(0)
+        mir_mod.sema_type_d2.push(0)
+    let whole_ty = 1
+    let field_ty = 2
+    for ty in [whole_ty, field_ty]:
+        mir_mod.sema_moved_drop_types.insert(ty, 1)
+        mir_mod.sema_dropped_types.insert(ty, 1)
+    var body = MirBody.init_for_fn(1)
+    let whole_local = body.new_temp(whole_ty)
+    let whole = body.new_place(whole_local)
+    let field = body.new_field_place(whole, 0, field_ty)
+    let entry = body.new_block()
+    let no_fields: Vec[i32] = Vec.new()
+    let no_field_table = body.new_agg_fields(&no_fields, &no_fields)
+    let init = body.new_rvalue(RvalueKind.RK_AGGREGATE, 0, no_field_table, 0)
+    body.push_stmt(entry, StmtKind.StorageLive, whole_local, 0, 0)
+    body.push_stmt(entry, StmtKind.Assign, whole, init, 0)
+    body.push_stmt(entry, StmtKind.Drop, field, 0, 0)
+    if rewrite:
+        body.push_stmt(entry, StmtKind.Assign, field, init, 0)
+    body.push_stmt(entry, StmtKind.Drop, whole, 0, 0)
+    body.set_terminator(entry, TermKind.TK_RETURN, 0, 0, 0, 0, 0)
+    validate_ownership_body(mir_mod, body)
+
+pub fn mir_test_field_redrop:
+    assert(field_redrop_verdict(true) == "")
+    assert(field_redrop_verdict(false).contains("drop of _1 frees _1.f0 again: a path reaching it dropped that part and nothing wrote it since (Uninit)"))
