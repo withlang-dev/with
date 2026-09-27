@@ -815,6 +815,9 @@ fn comp_spec_subsection(text: &str, heading: &str) -> str:
     var i = start + 1
     while i < text.len() as i32:
         if text[i] == 10:
+            if i + 3 < text.len() as i32 and text.slice((i + 1) as i64, (i + 3) as i64) == "# ":
+                end = i
+                break
             if i + 4 < text.len() as i32 and text.slice((i + 1) as i64, (i + 4) as i64) == "## ":
                 end = i
                 break
@@ -945,7 +948,7 @@ fn comp_spec_cli_commands(spec: &str) -> Vec[str]:
     var commands: Vec[str] = Vec.new()
     commands.push("version")
     commands.push("help")
-    let block = comp_first_fenced_block(comp_spec_subsection(spec, "### 18.5 Toolchain"))
+    let block = comp_first_fenced_block(comp_spec_subsection(spec, "# 18.5 Toolchain"))
     let lines = comp_split_lines(block)
     for i in 0..lines.len() as i32:
         let stripped = comp_trim(lines[i])
@@ -965,7 +968,7 @@ fn comp_spec_cli_commands(spec: &str) -> Vec[str]:
                         commands.push(token)
                 part_start = pi + 1
             pi = pi + 1
-    let package_sec = comp_spec_subsection(spec, "### 18.8 Package Management")
+    let package_sec = comp_spec_subsection(spec, "# 18.8 Package Management")
     var tick = 0
     while tick < package_sec.len() as i32:
         let open = comp_find_from(package_sec, "`", tick)
@@ -1448,10 +1451,16 @@ pub fn run_check_spec_inventory_action(ctx: ActionCtx) -> i32:
     if os() == "Windows":
         print("spec-inventory-check: skipped on Windows (#811)")
         return comp_write_ok_output(ctx)
-    let spec_path = "docs/spec/README.md"
-    if not fs.exists(spec_path):
-        return comp_fail(ctx, "missing " ++ spec_path)
-    let spec = fs.read_text(spec_path)
+    // The specification is one file per chapter under docs/spec/, with the
+    // sections that are not language semantics in its reference subfolders;
+    // the inventory reads every chapter file as one text.
+    let spec_dir = "docs/spec"
+    if not fs.exists(spec_dir ++ "/README.md"):
+        return comp_fail(ctx, "missing " ++ spec_dir ++ "/README.md")
+    var chapters = fs.glob(spec_dir ++ "/*.md")
+    for path in fs.glob(spec_dir ++ "/*/*.md"): chapters.push(compiler_owned_text(path))
+    var spec = ""
+    for path in chapters: spec = spec ++ fs.read_text(path) ++ "\n"
     var errors: Vec[str] = Vec.new()
 
     errors = comp_inventory_add_errors(move errors, "keywords", comp_spec_keywords(spec), comp_impl_keywords(fs), "", "")

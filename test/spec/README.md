@@ -1,6 +1,6 @@
 # Specification Test Cases
 
-Test cases extracted from `docs/spec/README.md` section 25.
+Test cases extracted from `docs/spec/guide/test-cases.md` (§25).
 Each file tests one or more rules from the corresponding spec section.
 
 Spec files started as pseudo-code sketches marked `//! skip`. As compiler

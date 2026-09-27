@@ -2166,7 +2166,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     var spec_inventory = target_new(.Action, "spec-inventory-check", "").output("out/.build-state/spec-inventory-check.txt")
     spec_inventory.action = run_check_spec_inventory_action
     spec_inventory = spec_inventory.write_scope("out/.build-state")
-    spec_inventory = spec_inventory.input("docs/spec/README.md")
+    spec_inventory = spec_inventory.input("docs/spec")
     spec_inventory = spec_inventory.input("src/Token.w")
     // The corpus packages are internal modules (build/corpora.w names them).
     spec_inventory = spec_inventory.input("src/Parser.w")
