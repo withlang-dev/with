@@ -5,7 +5,7 @@
 > `T` consumes. Every imperative, “active work,” and “canonical” claim below is
 > void; do not execute it. Consult the current handoff and decision log before
 > recovering any unrelated backlog item. For D22,
-> `docs/d22-Eric-Ruling.md` is canonical and complete.
+> `docs/meetings/d22-Eric-Ruling.md` is canonical and complete.
 
 **Historical status (2026-07-05; no longer active): PARKED.** At that time Eric
 directed that the entire focus become restoring and fully implementing the
@@ -92,7 +92,7 @@ ones.
 - Soundness tier complete: 9/9 cycles landed, pushed, bootstrapped into the seed
   (HEAD `92ceea13`). All fixpoint + suite green (behavior 814, compile-errors
   698). Seed + installed toolchain updated.
-- `docs/decisions.md` records D2 (#625 viral-escape), D3 (#627 alias split), D4
+- `docs/meetings/2026-07-04-D2-625-containers-of-ephemerals-use-a-viral-escape-model-not-an.md` records D2 (#625 viral-escape), D3 (#627 alias split), D4
   (#602 retains). impl-notes ch. 55–62.
 - The mutability restoration supersedes/absorbs the receiver-param cluster; keep
   the two consistent.

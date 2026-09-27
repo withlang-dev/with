@@ -702,7 +702,7 @@ pub type Sema {
     // Stride-8 records: [arg_node, callee_sig, callee_pi, file_id, root_sym,
     // use_seq, loop_depth, liveness] — liveness stamped at body end (0=unknown,
     // 1=last-use, 2=live-after); backs the `move-sites` analysis request
-    // (docs/deep-debugging-tools.md).
+    // (docs/spec/toolchain/deep-debugging-tools.md).
     consume_call_sites: Vec[i32],
     // move-sites: use sequencing. ONE persistent map per key kind, one owner —
     // bodies are separated by an epoch packed into every value (epoch*2^32 +
@@ -2091,7 +2091,7 @@ fn sema_exact_type_hash(kind: i32, d0: i32, d1: i32, d2: i32) -> i64:
 fn sema_pair_hi(key: i64): (key / 4294967296) as i32
 fn sema_pair_lo(key: i64): (key % 4294967296) as i32
 
-// Effect-provenance packing (docs/deep-debugging-tools.md, explain:effect).
+// Effect-provenance packing (docs/spec/toolchain/deep-debugging-tools.md, explain:effect).
 // Key = (sig, pi, bit_idx) with pi < 2^16, bit_idx < 2^8; value = (kind, a, b)
 // with a, b < 2^28. These fns are the only place the field widths appear;
 // encode and decode both live here so they cannot drift apart.
@@ -6517,7 +6517,7 @@ impl Sema:
     // (check_loop_continue_carried_move) — MUST call this; re-inlining the condition
     // per edge is exactly how #696 happened (the continue edge dropped the
     // entry==LIVE guard). `needs_drop` is passed in (callers already compute it) so
-    // this stays a pure predicate. See docs/decisions.md.
+    // this stays a pure predicate. See docs/meetings/README.md.
     fn is_loop_carried_move(entry_state: i32, cur_state: i32, needs_drop: i32) -> i32:
         if entry_state == VarState.LIVE and cur_state == VarState.MOVED and needs_drop != 0: 1 else: 0
 
@@ -7939,7 +7939,7 @@ impl Sema:
                 projection_only = projection_only + 1
         f"receiver-projection-audit: mismatches={mismatches} projection-only={projection_only} root-paths={root_paths}\n" ++ out
 
-    // D5 (superseded — docs/decisions.md): the effects-based share-place
+    // D5 (superseded — docs/meetings/2026-07-05-D5-historical-share-place-free-parameter-design-superseded.md): the effects-based share-place
     // classifier for FREE parameters is deleted. The signature states the
     // ownership mode: `&T` borrows, plain `T` consumes — a body edit can
     // never silently change a public calling convention again. Receiver

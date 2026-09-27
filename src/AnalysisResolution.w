@@ -18,7 +18,7 @@
 // callee, the argument count against the same Sema fact, the call node's
 // own resolution, and a call Sema resolved inside a lowered body that MIR
 // never lowered. Places/origins (phase 3) and effects (phase 4) follow the
-// plan in docs/mir-sema-hardening.md.
+// plan in docs/spec/implementation/mir-sema-hardening.md.
 
 use AnalysisTypes
 use Ast

@@ -18,5 +18,5 @@ fn main:
     assert(set_env("WITH_STD_OS_TEST", "ok") == 0)
     assert(has_env("WITH_STD_OS_TEST"))
     assert(env("WITH_STD_OS_TEST") == "ok")
-    assert(path_exists("docs/with-specification.md"))
+    assert(path_exists("docs/spec/README.md"))
     print("ok")

@@ -1,4 +1,4 @@
-// lib/std/zl/bundle.w — the zlib .wo bundle root (docs/wo_bundles.md).
+// lib/std/zl/bundle.w — the zlib .wo bundle root (docs/spec/toolchain/wo_bundles.md).
 // Written by build/corpora.w (zlib-migrate) from the migrated module list:
 // one `use` per corpus module; the harness (example, minigzip) is excluded.
 use std.zl.adler32

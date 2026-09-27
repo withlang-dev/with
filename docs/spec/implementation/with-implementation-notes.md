@@ -21,7 +21,7 @@ The spec defines *what* the language guarantees. This document explains
 > preserve exact projected types, and transparent carriers preserve view
 > origins. Notes below that describe the current compiler are evidence about
 > implementation seams, not authority to retain non-compliant behavior. See
-> `docs/d22-Eric-Ruling.md` first: it is canonical and complete, and every
+> `docs/meetings/d22-Eric-Ruling.md` first: it is canonical and complete, and every
 > conflict in these non-normative notes is false. Specification §§3.4, 3.8,
 > 9.7, 10, 13.3, 21.1 and `decisions.md` D22 are conforming projections.
 
@@ -182,7 +182,7 @@ ownership boundary creates an independent value.
 knowledge for selected producers, but does not yet implement D22's general
 transparent-carrier transfer. In particular, a producer origin can be lost at
 an Option eliminator. Do not add another eliminator whitelist. The implementation
-must follow `docs/d22-implementation-plan.md` and use one semantic
+must follow `docs/proposals/d22-implementation-plan.md` and use one semantic
 origin-transfer mechanism shared by all equivalent spellings. It must prove
 both rejection and non-rejection controls from §21.1 Rule 10 before this note is
 marked compliant.
@@ -3224,7 +3224,7 @@ da_pod_vec) until the wide flip is scheduled.
 ## 56. Containers of Ephemerals: Viral-Escape, Not a Ban (spec §5.1, §5.2)
 
 **What was ruled** (BDFL, 2026-07-04, revised after reference review,
-#625; full rationale in `docs/decisions.md` D2): a container of an
+#625; full rationale in `docs/meetings/2026-07-04-D2-625-containers-of-ephemerals-use-a-viral-escape-model-not-an.md` D2): a container of an
 ephemeral element is *itself* ephemeral (§5.2 full virality — restoring
 the original "any generic `F[T]`" and reverting the 6f9160e3 narrowing).
 It is a valid **local** or **by-value parameter**; the **escape** is
@@ -3466,9 +3466,9 @@ guardrail). See decisions.md D4.
 
 **Status (2026-07-23): A new decision has been made, but implementation is
 still in progress.** This section records where the current implementation must
-be reconciled with `docs/d22-Eric-Ruling.md`, the canonical and complete ruling.
+be reconciled with `docs/meetings/d22-Eric-Ruling.md`, the canonical and complete ruling.
 The approved architecture and sequence are in
-`docs/d22-implementation-plan.md`; this non-normative inventory names the
+`docs/proposals/d22-implementation-plan.md`; this non-normative inventory names the
 cross-layer seams that plan must close and cannot amend either document.
 
 - **Lookup contracts:** HashMap, BTreeMap, comptime evaluation, native LLVM,

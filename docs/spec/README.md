@@ -2,7 +2,7 @@
 
 **Author:** Eric Hartford
 **Status:** Reference specification for prototype implementation
-**D22 authority:** `docs/d22-Eric-Ruling.md` is Eric's canonical and complete
+**D22 authority:** `docs/meetings/d22-Eric-Ruling.md` is Eric's canonical and complete
 D22 ruling. This specification records its normative language, but cannot
 amend, narrow, or override it. Any D22 omission or conflict here is a
 specification defect to repair in favor of the ruling.
@@ -109,7 +109,7 @@ including `defer`, `errdefer`, `comptime`, and `unsafe`. `if`, `else if`,
 and `else` use those same body forms; every arm requires `:` or `{`.
 `else if` is a two-token keyword pair parsed as a chain continuation.
 **Changelog v6.7:** Reorganized — extracted test cases to `test/spec/`,
-roadmap to `docs/roadmap.md`, and stdlib API tables to
+roadmap to `docs/proposals/roadmap.md`, and stdlib API tables to
 `docs/libstd-spec.md`. Added grammar appendix (§30). Added labels on
 arbitrary statements and `goto` (§13.5a, §13.5b).
 **Positioning:** Systems programming that feels like a modern language.

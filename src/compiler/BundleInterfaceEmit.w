@@ -1,4 +1,4 @@
-// D39 bundle interfaces (docs/wo_bundles.md, decisions.md D39): the `.wi`
+// D39 bundle interfaces (docs/spec/toolchain/wo_bundles.md, decisions.md D39): the `.wi`
 // emitter and the exported-declaration model the fingerprint hashes.
 //
 // After full Sema — the Sema codegen hands back, or the one `check` froze —
@@ -507,7 +507,7 @@ impl BundleEmitter:
             self.refuse("is an extension method; extensions do not cross a bundle boundary")
             return ""
         if (flags / FnFlags.ASYNC) % 2 != 0 or (flags / FnFlags.GEN) % 2 != 0 or (flags / FnFlags.COMPTIME) % 2 != 0:
-            self.refuse("is async, gen or comptime; a bundle boundary is Level 0 (docs/abi_roadmap.md)")
+            self.refuse("is async, gen or comptime; a bundle boundary is Level 0 (docs/spec/abi/abi_roadmap.md)")
             return ""
         // A variadic function crosses the boundary spelled as in source
         // (`..., ...`): §18.5c makes a .wi ordinary declaration syntax, and
@@ -529,7 +529,7 @@ impl BundleEmitter:
         if cc_sym != 0:
             let cc = with_str_clone_ref(sema.pool_resolve(cc_sym))
             if cc.starts_with("c_export:"):
-                self.refuse("is @[c_export]; a bundle exports a With surface, never a C one (docs/wo_bundles.md)")
+                self.refuse("is @[c_export]; a bundle exports a With surface, never a C one (docs/spec/toolchain/wo_bundles.md)")
             else:
                 self.refuse("carries calling-convention attribute '" ++ cc ++ "', which has no interface spelling")
             return ""
@@ -725,10 +725,10 @@ impl BundleEmitter:
                 continue
             let tp_meta = ast.find_impl_type_params(impl_node)
             if tp_meta >= 0 and ast.state.impl_type_params[(tp_meta + 2)] > 0:
-                self.refuse("is generic; a bundle boundary is Level 0 (docs/abi_roadmap.md)")
+                self.refuse("is generic; a bundle boundary is Level 0 (docs/spec/abi/abi_roadmap.md)")
                 continue
             if ast.find_impl_target_type_node(impl_node) != 0:
-                self.refuse("targets a generic instantiation; a bundle boundary is Level 0 (docs/abi_roadmap.md)")
+                self.refuse("targets a generic instantiation; a bundle boundary is Level 0 (docs/spec/abi/abi_roadmap.md)")
                 continue
             // methods: every fn decl Sema associated with this impl, by name
             var method_names: Vec[str] = Vec.new()
@@ -792,7 +792,7 @@ impl BundleEmitter:
             self.refuse("is ephemeral; not a bundle interface surface")
             return
         if sema.type_decl_tp_count(node) > 0:
-            self.refuse("is generic; a bundle boundary is Level 0 (docs/abi_roadmap.md)")
+            self.refuse("is generic; a bundle boundary is Level 0 (docs/spec/abi/abi_roadmap.md)")
             return
         let type_meta = ast.find_type_meta(node)
         if type_meta >= 0:

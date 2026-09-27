@@ -122,7 +122,7 @@ fn btree_set_work(n: i32, descending: bool):
     assert(entries.len() == n / 2)
     n
 
-// Phase 1 facades over the c-algorithms corpus (docs/stdlib_sourcing_plan.md).
+// Phase 1 facades over the c-algorithms corpus (docs/proposals/stdlib_sourcing_plan.md).
 // SortedVec: ascending insertion appends (no shifting), lookups are binary
 // searches; a descending fill is O(n) per insert by contract and is not
 // measured here.

@@ -6,8 +6,8 @@ bundle merged in #1103 after full build, fixpoint, tests, and both bundle
 drift lanes passed, including the SDK-macro and target-va_list fixes
 (#1107, #1108). Historical before/after
 descriptions below explain the transition. Ruled in direction by Eric
-(decisions.md D38, D39). Companions: `docs/stdlib_sourcing_plan.md`
-(the corpora), `docs/harden_migrate.md` (the migrator), decisions.md D30
+(decisions.md D38, D39). Companions: `docs/proposals/stdlib_sourcing_plan.md`
+(the corpora), `docs/proposals/harden_migrate.md` (the migrator), decisions.md D30
 (runtime objects as a cache), #761 (the mixed-generation corruption
 class this design must never reintroduce).
 
@@ -71,10 +71,10 @@ the compiler. Today `FnAbi`, the `str`/`Vec` headers, view
 representations, the drop protocol, and mangling may change with any
 commit. For `.wo` they change only deliberately:
 
-- `docs/with-abi.md` names the boundary rules; the rules live in
+- `docs/spec/abi/with-abi.md` names the boundary rules; the rules live in
   ABI-owned files (`src/FnAbi.w`, `src/TypeLayout.w`).
 - The `.wo` object key is `corpus content sha × target × sha256(ABI-defining
-  sources)` and nothing else (`docs/abi_roadmap.md`, Level 0). The compiler
+  sources)` and nothing else (`docs/spec/abi/abi_roadmap.md`, Level 0). The compiler
   generation is not in the key. An edit to an ABI-defining file changes
   the key, so every `.wo` is rebuilt once, automatically; nothing has to
   be remembered. `WITH_ABI_VERSION` is a documentation label.
@@ -89,7 +89,7 @@ compiler.
 
 ## How the compiler build uses `.wo`s
 
-1. `build.w` has, per corpus, the pipeline `docs/stdlib_sourcing_plan.md`
+1. `build.w` has, per corpus, the pipeline `docs/proposals/stdlib_sourcing_plan.md`
    describes: pin, reference fetch, whole-corpus migrate, upstream tests.
    Its output is the bundle's `src/` and `tests/`.
 2. A `<corpus>-wo` target compiles `src/` to `obj/<sha>-<target>-abi<N>.o`
@@ -135,7 +135,7 @@ linked by G+k), so two checks replace it:
 
 ## Sequence
 
-1. This note reviewed; `docs/with-abi.md` v1 written by enumerating what
+1. This note reviewed; `docs/spec/abi/with-abi.md` v1 written by enumerating what
    `compute_fn_abi`, the layout tables, and the header types do today (no
    new rules — the version stamps the current convention); the ABI-hash
    check added to the battery.
@@ -153,7 +153,7 @@ linked by G+k), so two checks replace it:
 
 (c-algorithms is the third bundle, 2026-09-13: `lib/std/c_algorithms/`,
 package `std.c_algorithms`, root `bundle.w`, harness `test_cpp.w`. See
-`docs/stdlib_sourcing_plan.md`, "Phase 1 status". TommyDS is the fourth,
+`docs/proposals/stdlib_sourcing_plan.md`, "Phase 1 status". TommyDS is the fourth,
 2026-09-14: `lib/std/tommyds/`, package `std.tommyds`, root `bundle.w`,
 harness `check_.w` (upstream's `check.c`; `check` collides with the
 prelude name), corpora lane `tommyds-test`. See "Phase 2 status" in the
@@ -371,7 +371,7 @@ and, for every declaration whose source module carries a bundle prefix,
 emits a declaration only, exactly as it does for `extern fn`; the body
 comes from the bundle at link time. Sema still checks against the source.
 A bundle module may not define generic functions or comptime bodies (the
-C-shaped boundary of `docs/abi_roadmap.md` Level 0; the bundle build
+C-shaped boundary of `docs/spec/abi/abi_roadmap.md` Level 0; the bundle build
 refuses one), so nothing from a bundle is ever instantiated at a use site.
 Facades (`std.regex`, `std.zlib`) are stdlib source outside the bundle and
 compile in-unit as before. (Batch C revises the bootstrap consequence:
@@ -437,7 +437,7 @@ bundle-provided module to its `.wi`, run ordinary declaration, type and
 layout Sema on it, and never body analysis or MIR for bundle
 implementations. A generic or `comptime` declaration in a bundle module
 is a bundle-build error (Level 0's C-shaped boundary,
-`docs/abi_roadmap.md`).
+`docs/spec/abi/abi_roadmap.md`).
 
 **Callable semantics are the declaration — D39.** No body-inferred
 ownership or effect information is part of an interface. `T` is

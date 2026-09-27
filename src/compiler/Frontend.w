@@ -613,7 +613,7 @@ impl Zcu:
         out
 
     // `owns:`/`borrows:` are deprecated spellings of facade clauses (plan
-    // stage 4, docs/modeled-c-implementation-plan.md; the compatibility
+    // stage 4, docs/proposals/modeled-c-implementation-plan.md; the compatibility
     // precedent is `retains:`, spec §16.3c). Each import's entries are
     // projected into the facade they spell — `owns: ["ctor -> dtor"]` is
     // `resource <Ctor> wraps <ctor's return>` / `from ctor` / `drop dtor`,

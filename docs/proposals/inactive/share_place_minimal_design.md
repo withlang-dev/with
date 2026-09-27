@@ -6,7 +6,7 @@
 > by-place mutation remains current and is governed by D12/D21. Every
 > free-parameter SHARE-PLACE design or implementation directive below is void.
 > For D22,
-> `docs/d22-Eric-Ruling.md` is canonical and every conflict here is false.
+> `docs/meetings/d22-Eric-Ruling.md` is canonical and every conflict here is false.
 
 A from-scratch sketch of the *smallest* thing that is share-place, what each
 reference language already proves works, and what pieces of With must move to fit

@@ -3,7 +3,7 @@
 ## Authority and scope
 
 This is a derivative execution plan for the D27 ruling recorded in
-`docs/decisions.md` and the normative element-access text in the
+`docs/meetings/README.md` and the normative element-access text in the
 specification (beside the operator-trait table). It cannot amend either.
 Where this plan and the ruling disagree, the ruling wins and this plan is
 wrong. The E1–E4 campaign is complete: the acceptance cells live in the active

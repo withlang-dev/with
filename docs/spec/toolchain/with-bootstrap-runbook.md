@@ -4,7 +4,7 @@ This runbook describes how to bring With up on a new release platform and
 produce a single-file compiler binary for that platform.
 
 For publishing an already-supported platform release, use
-`docs/with-release-runbook.md` instead.
+`docs/spec/toolchain/with-release-runbook.md` instead.
 
 ## Goal
 
@@ -59,7 +59,7 @@ Use the repo scripts below only inside this first-platform bootstrap boundary.
 They are not normal post-seed release tools: once the first seed and static SDK
 exist for a platform, repeat SDK production is graph-owned by
 `with build :sdk-ninja`, `with build :sdk-cmake`, `with build :sdk-llvm`, and
-`with build :sdk`. `docs/with-release-runbook.md` reuses the published SDK
+`with build :sdk`. `docs/spec/toolchain/with-release-runbook.md` reuses the published SDK
 asset and updates the installed compiler with `with build :install-user`
 (`src/main` stays the seed pinned in `seed.lock`; `with build :seed` writes it).
 
@@ -116,7 +116,7 @@ not include `bin/ninja` and `bin/cmake`.
 **This is the only runbook that builds the static SDK from LLVM source.**
 Building the `.a` archives and clang's builtin headers from source is a
 bootstrap step — done once per platform, when no seed exists there yet. Once a
-seed exists, a *release* (`docs/with-release-runbook.md`) **reuses** this
+seed exists, a *release* (`docs/spec/toolchain/with-release-runbook.md`) **reuses** this
 already-built SDK and the resources the seed embeds; it never rebuilds LLVM and
 never falls back to a system LLVM. If you find yourself building LLVM during a
 release, you are in the wrong runbook.
@@ -128,7 +128,7 @@ checkouts can fetch it instead of rebuilding:
 with build :package-llvm-sdk
 ```
 
-Publish that asset with the platform's release (see `docs/with-release-runbook.md`
+Publish that asset with the platform's release (see `docs/spec/toolchain/with-release-runbook.md`
 → *Static LLVM SDK asset*). Thereafter `with build :deps` fetches it; LLVM is
 built from source only when `COMPILER_LLVM_VERSION` bumps to an SDK no release
 has published yet.
@@ -544,7 +544,7 @@ Once the new platform passes bootstrap gates:
 
 1. Add the platform asset name to the release packaging scripts.
 2. Add the platform to CI with its static LLVM SDK build/cache step.
-3. Update `docs/with-release-runbook.md` with the new asset name and
+3. Update `docs/spec/toolchain/with-release-runbook.md` with the new asset name and
    post-publish checks.
 4. Publish only after the release runbook gates pass on the final asset.
 

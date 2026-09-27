@@ -1692,7 +1692,7 @@ fn analysis_pool_view_hit(sema: &Sema, body: &MirBody, fn_name: &str, fn_path: &
         f":{analysis_line_for_offset(fn_source, span)} after a call to " ++ sema.pool_resolve(poisoner) ++ ", which reaches " ++
         sema.pool_resolve(grower) ++ " — own the text (`.clone()`) or finish with the view before the call"
 
-// move-sites (docs/deep-debugging-tools.md): classify every recorded
+// move-sites (docs/spec/toolchain/deep-debugging-tools.md): classify every recorded
 // plain-arg-to-owned-param site from the live Sema state. Semantic-snapshot
 // request — its primary use is partitioning an ERROR worklist.
 fn analysis_move_site_file_name(sema: &Sema, file_id: i32, root_path: &str) -> str:
@@ -1760,7 +1760,7 @@ fn analysis_move_sites(sema: &Sema, source_path: &str) -> str:
         out = out ++ f"{file_name}:{line}:{col}\t{root}\t{shape}\t{spellable}\t{live_text}\t{loop_text}\t{callee}\t{callee_pi}\n"
     out ++ f"move-sites: {total} owned-param sites — {keyword} last-use (keyword), {design} design (live-after/in-loop), {unknown} unknown\n"
 
-// seam-sites (docs/deep-debugging-tools.md): inventory the ownership-seam
+// seam-sites (docs/spec/toolchain/deep-debugging-tools.md): inventory the ownership-seam
 // classes behind the #691-flip double-free/leak family from live MIR facts,
 // before they detonate at runtime. Report-mode like move-sites: the output is
 // a burn-down worklist for migrator clients and the future #715/§15.6 gates;
@@ -2101,7 +2101,7 @@ fn analysis_seam_sites(sema: &Sema, mir_mod: &MirModule, source_path: &str, sour
     let total = moves_ref + moves_raw + copies_elem + copies_view + copies_raw + escapes
     out ++ f"seam-sites: {total} findings ({actionable} actionable, {total - actionable} observed) — move-through-ref={moves_ref} move-raw-deref={moves_raw} copy-elem-drop={copies_elem} copy-view-drop={copies_view} copy-raw-deref-drop={copies_raw} retained-unowned-copy={retained} escape-view-consume={escapes}\n"
 
-// explain:effect (docs/deep-debugging-tools.md): walk the first-setter
+// explain:effect (docs/spec/toolchain/deep-debugging-tools.md): walk the first-setter
 // provenance chain for each ownership-forcing bit of a parameter, from the
 // queried signature down to the direct seed. Packing lives in Sema
 // (effect_prov_key / effect_prov_val_*) — the encoder and this decoder share

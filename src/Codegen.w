@@ -342,7 +342,7 @@ pub type Codegen {
     module_object_mode: i32,
     // D38: module link-name prefixes provided by embedded .wo bundles. A
     // function from such a module is declared under its module link name,
-    // never defined, in this unit (docs/wo_bundles.md "Declarations only").
+    // never defined, in this unit (docs/spec/toolchain/wo_bundles.md "Declarations only").
     bundle_prefixes: Vec[str],
     // D38 batch C3: `--bundle-corpus <rel>` — this object IS the bundle of
     // the corpus, so every module whose canonical path lies under it is
@@ -4722,7 +4722,7 @@ impl Codegen:
             return with_str_clone_ref(name)
         fn_abi_anonymous_symbol(sym)
 
-// Symbol-naming rules live in src/FnAbi.w (docs/with-abi.md §5); this is
+// Symbol-naming rules live in src/FnAbi.w (docs/spec/abi/with-abi.md §5); this is
 // the adapter that feeds them the codegen mode.
 impl Codegen:
     // Module link names (`__with_mod_<hash>__<base>`) apply in module-object
@@ -5135,7 +5135,7 @@ impl Codegen:
 
 // #D6: PassMode — the per-parameter ABI classification, the SINGLE source of
 // truth; the rule and the PM_* constants live in src/FnAbi.w
-// (docs/with-abi.md §4). compute_fn_abi combines finalized signature facts
+// (docs/spec/abi/with-abi.md §4). compute_fn_abi combines finalized signature facts
 // with the target's aggregate rules. Declarations, prologues, and calls read
 // the cached descriptor. Extend the classification there, never per-path.
 
@@ -6644,7 +6644,7 @@ impl Codegen:
         // generic call's instance, a dyn vtable row of a prelude error type —
         // private: the importer instantiates its own, and two objects
         // defining one bare external name would never link (D38 batch C3;
-        // docs/abi_roadmap.md Level 0: no instantiation crosses a bundle
+        // docs/spec/abi/abi_roadmap.md Level 0: no instantiation crosses a bundle
         // boundary).
         if self.module_object_mode != 0:
             wl_set_linkage(function, wl_internal_linkage())

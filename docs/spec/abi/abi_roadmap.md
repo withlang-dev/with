@@ -2,8 +2,8 @@
 
 Status: ROADMAP (2026-09-02). Ruled by Eric: the destination is Swift-level
 ABI stability (OS-resident With frameworks); the work proceeds in levels
-and **Level 0 is the current focus**. Companions: `docs/with-abi.md` (the
-convention), `docs/wo_bundles.md` (the Level 0 mechanism), decisions.md
+and **Level 0 is the current focus**. Companions: `docs/spec/abi/with-abi.md` (the
+convention), `docs/spec/toolchain/wo_bundles.md` (the Level 0 mechanism), decisions.md
 D38.
 
 ## Why levels
@@ -28,7 +28,7 @@ public surfaces that need it.
 
 **What:** a migrated corpus compiles once into a `.wo` bundle and is
 reused by every compiler build that leaves the ABI-defining sources
-alone (`docs/wo_bundles.md`). The `.wo` object key is
+alone (`docs/spec/toolchain/wo_bundles.md`). The `.wo` object key is
 
     corpus content sha × target × sha256(ABI-defining sources)
 
@@ -69,7 +69,7 @@ different compiler release.
 
 ## Level 1 — the frozen ABI (a release decision)
 
-**What:** at a chosen release, `docs/with-abi.md` becomes normative and
+**What:** at a chosen release, `docs/spec/abi/with-abi.md` becomes normative and
 frozen: data layout, calling convention and ownership modes, mangling
 (including a spec for specialization names), the runtime entry points
 compiled code calls (small by then, per D30), and the layouts and public

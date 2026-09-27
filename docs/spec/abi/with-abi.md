@@ -2,9 +2,9 @@
 
 Status: DRAFT v4 (2026-09-12), the convention as the compiler implements
 it today, written down so `.wo` bundles (decisions.md D38,
-`docs/wo_bundles.md`) can depend on it. Nothing here is a new rule. The
+`docs/spec/toolchain/wo_bundles.md`) can depend on it. Nothing here is a new rule. The
 sources named in §7 define the ABI; this document describes them, and at
-Level 0 of `docs/abi_roadmap.md` their sha256 — not a version number — is
+Level 0 of `docs/spec/abi/abi_roadmap.md` their sha256 — not a version number — is
 what keys a bundle. `WITH_ABI_VERSION` labels the version history below;
 it becomes a frozen, normative major version at Level 1.
 
@@ -76,7 +76,7 @@ generated code and `rt/rt_core.w`:
 The substrate is LLVM's C calling convention for the target. On top of it
 With decides, per parameter, ONE pass mode from the signature — computed
 once and read by both the callee prologue (`declare_function_from_sig`)
-and every call site (D6; `docs/fn_abi_descriptor_design.md`):
+and every call site (D6; `docs/spec/abi/fn_abi_descriptor_design.md`):
 
 | Signature | Pass mode | Physical form |
 |---|---|---|

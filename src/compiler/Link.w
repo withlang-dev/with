@@ -1078,7 +1078,7 @@ fn link_stage_undefined_symbols_need_fiber_runtime(undef: &str) -> i32:
         return 1
     0
 
-// ── .wo bundles (docs/wo_bundles.md, D38) ─────────────────────────────
+// ── .wo bundles (docs/spec/toolchain/wo_bundles.md, D38) ─────────────────────────────
 
 // The value of the first manifest line `key <value>…` ("" if absent).
 pub fn link_stage_bundle_manifest_field(manifest: &str, key: &str) -> str:

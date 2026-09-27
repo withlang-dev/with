@@ -1,6 +1,6 @@
 module build.wo
 
-// .wo bundles (docs/wo_bundles.md, decisions.md D38/D39): a migrated corpus
+// .wo bundles (docs/spec/toolchain/wo_bundles.md, decisions.md D38/D39): a migrated corpus
 // compiles once into <name>.{o,manifest,wi} and is reused until the corpus,
 // the target or an ABI-defining source changes.
 //
@@ -311,7 +311,7 @@ pub fn target_with_wo_corpus_inputs(target: Target, ctx: &BuildCtx, plan: &WoBun
         out = out.input(wo_owned_text(corpus_files[fi]))
     out
 
-// The wo-drift lane (docs/wo_bundles.md "Lanes"): `<name>-wo-drift`
+// The wo-drift lane (docs/spec/toolchain/wo_bundles.md "Lanes"): `<name>-wo-drift`
 // rebuilds the bundle to a scratch object with the release compiler. The
 // interface, the fingerprint and the manifest's ABI and target must be
 // identical — a difference there is declaration drift the ABI hash did not

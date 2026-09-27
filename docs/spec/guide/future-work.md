@@ -1,5 +1,5 @@
 # 28. Future Work
 
-*Moved to `docs/roadmap.md`.*
+*Moved to `docs/proposals/roadmap.md`.*
 
 ---

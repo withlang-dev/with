@@ -9,7 +9,7 @@ Read `CLAUDE.md` first — the self-host discipline is binding. In particular:
 **own every bug (nothing is "pre-existing"), root cause at the instruction
 level, verify by running not by reasoning, debug tools before grep, no C/
 Python/bash/perl (With one-liners and With tools only), never `git stash`.**
-The route for THIS bug class is fixed by `docs/deep-debugging-tools.md`: a
+The route for THIS bug class is fixed by `docs/spec/toolchain/deep-debugging-tools.md`: a
 free/drop/UAF bug **starts with the native debug allocator**, not with a grep or
 a trace print.
 
@@ -39,7 +39,7 @@ it). Full evidence chain in `c44634d3`.
 path like unix; the instruments that closed the hunt on a box with no
 debugger (a panic backtrace on Windows x64, invalid-free forensics, the
 range-table stand-down announced, a ledger that fits a compiler run); the
-route additions in `docs/deep-debugging-tools.md`. Separately,
+route additions in `docs/spec/toolchain/deep-debugging-tools.md`. Separately,
 `windows-sdk-publish`: every release now republishes its LLVM SDK, which
 is what `with build :deps` needs to provision a Windows box at all.
 
@@ -140,7 +140,7 @@ Windows seed to test a fix, only to reach the bundle step.
 
 ## The route (do this first)
 
-Per `docs/deep-debugging-tools.md`, a free bug starts with the allocator. On a
+Per `docs/spec/toolchain/deep-debugging-tools.md`, a free bug starts with the allocator. On a
 Windows machine, reproduce and instrument:
 
 ```
@@ -207,7 +207,7 @@ crash:
   **v0.15.1.8** via `seed.lock`'s `<asset>.version=` overrides, because no
   Windows seed can build the current tree yet — that is exactly what #1081
   blocks. When you fix the crash: cut a Windows seed, publish it, and move the
-  Windows overrides off v0.15.1.8. See D40 in `docs/decisions.md` for the
+  Windows overrides off v0.15.1.8. See D40 in `docs/meetings/2026-09-04-D40-seed-release-version-numbering-y-is-a-bootstrap.md` for the
   numbering rule (a bootstrap breakage bumps `Y`, resets `Z`).
 - **Version numbering:** if your fix is a plain compiler change that the current
   seeds can still bootstrap, it is a `Z` bump within `v0.15.2.x`. It only bumps

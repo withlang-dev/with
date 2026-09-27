@@ -4,8 +4,8 @@
 lead; the compiler, runtime-facing intrinsics, stdlib, and tests are currently
 non-compliant.
 
-**Authority:** `docs/with-specification.md` §9.5 and §9.6,
-`docs/decisions.md` D21, and requirements `9.5.1.16`–`9.5.1.17` plus
+**Authority:** `docs/spec/functions.md` §9.5 and §9.6,
+`docs/meetings/2026-07-22-D21-unit-returning-mutator-pipelines-thread-the-receiver-place.md` D21, and requirements `9.5.1.16`–`9.5.1.17` plus
 `9.6.1.12`–`9.6.1.19`.
 
 **Sequencing constraint:** This work follows the active #691/D18 ownership

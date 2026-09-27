@@ -1,6 +1,6 @@
 //! expect-stdout: ok
 
-// D5 (superseded — docs/decisions.md): a parameter's ownership mode is
+// D5 (superseded — docs/meetings/2026-07-05-D5-historical-share-place-free-parameter-design-superseded.md): a parameter's ownership mode is
 // DECLARED, never inferred from the body's effects. `&T` borrows (the plain
 // call spelling auto-refs), plain `T` is owned by the callee, and mutation
 // that must reach the caller threads the value take-and-return (D21). The

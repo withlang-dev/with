@@ -1,9 +1,9 @@
 # MIR/Sema hardening — one owner per semantic fact
 
-Status: PLAN (2026-09-25). Decision: `docs/decisions.md` D65. Rule text:
+Status: PLAN (2026-09-25). Decision: `docs/meetings/2026-09-25-D65-one-authoritative-producer-per-semantic-fact-sema-decides.md` D65. Rule text:
 `CLAUDE.md` "One owner per fact". Executable check: `with analyze
 audit:resolution` (#1647). Sequenced after modeled C lands and alongside,
-never ahead of, `docs/stdlib_sourcing_plan.md` phase 3 (STC).
+never ahead of, `docs/proposals/stdlib_sourcing_plan.md` phase 3 (STC).
 
 ## 1. The problem, in this week's bugs
 
@@ -143,7 +143,7 @@ compiler named as the culprit).
   (they touch marshalling → `:drop-audit :move-audit`).
 - Phases 3–4 batch with the bugs that expose them; each bug fix lands its
   audit check in the same PR ("fix, don't file" for the check).
-- Phase 5 after `docs/stdlib_sourcing_plan.md` phase 3 ships — Eric's
+- Phase 5 after `docs/proposals/stdlib_sourcing_plan.md` phase 3 ships — Eric's
   priority order: what users feel first.
 
 ## 6. Acceptance

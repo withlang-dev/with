@@ -3,9 +3,9 @@
 ## Authority and scope
 
 This is a derivative execution plan for D51. The controlling text is
-`docs/Ruling-modeled-C-ownership-effects-conventions-and-foreign-lifetimes.md`
+`docs/meetings/Ruling-modeled-C-ownership-effects-conventions-and-foreign-lifetimes.md`
 (the ruling); the specification carries its conforming projections
-(`docs/modeled-c-spec-projection-draft.md` until blessed, then
+(`docs/proposals/modeled-c-spec-projection-draft.md` until blessed, then
 `with-specification.md` §16.2b and the sentences it replaces). This plan
 cannot amend either. Where this plan and the ruling disagree, the ruling wins
 and this plan is wrong.

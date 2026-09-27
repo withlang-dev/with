@@ -106,6 +106,6 @@ and `else` use those same body forms; every arm requires `:` or `{`.
 ## v6.7
 
 **Changelog v6.7:** Reorganized — extracted test cases to `test/spec/`,
-roadmap to `docs/roadmap.md`, and stdlib API tables to
+roadmap to `docs/proposals/roadmap.md`, and stdlib API tables to
 `docs/libstd-spec.md`. Added grammar appendix (§30). Added labels on
 arbitrary statements and `goto` (§13.5a, §13.5b).

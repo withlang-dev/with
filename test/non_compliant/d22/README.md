@@ -1,7 +1,7 @@
 # D22 NON-COMPLIANT Acceptance Matrix
 
 **Status (2026-07-23): D22 is normative; implementation remains in
-progress.** [`docs/d22-Eric-Ruling.md`](../../../docs/d22-Eric-Ruling.md) is
+progress.** [`docs/meetings/d22-Eric-Ruling.md`](../../../docs/meetings/d22-Eric-Ruling.md) is
 the sole authority for every fixture in this directory. This index records the
 Stage 1 acceptance contract; it does not reinterpret the ruling.
 

@@ -36,7 +36,7 @@ Ephemerality propagates through type constructors:
   borrows a stack local it would outlive is rejected. (BDFL ruling
   2026-07-04, revised after reference-implementation review, #625: this
   is the model of Rust lifetimes and Vale regions — control the escape,
-  not the container. See `docs/decisions.md` D2.)
+  not the container. See `docs/meetings/2026-07-04-D2-625-containers-of-ephemerals-use-a-viral-escape-model-not-an.md` D2.)
 
 ### 5.3 Canonical Ephemeral Types
 

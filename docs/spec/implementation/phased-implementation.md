@@ -1,3 +1,3 @@
 # 26. Phased Implementation
 
-*Moved to `docs/roadmap.md`.*
+*Moved to `docs/proposals/roadmap.md`.*

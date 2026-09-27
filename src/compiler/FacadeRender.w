@@ -1,5 +1,5 @@
 // FacadeRender — D51 §16.2b stages 4-5: a `c facade` block's resources
-// rendered as ordinary With (docs/modeled-c-implementation-plan.md).
+// rendered as ordinary With (docs/proposals/modeled-c-implementation-plan.md).
 //
 // The Frontend calls facade_render_block after every source file and every
 // `<c_import …>` translation is parsed and before Sema, and splices the text

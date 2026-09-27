@@ -1,6 +1,6 @@
 //! expect-stdout: ok
 
-// Trie[V] over the c-algorithms trie (docs/stdlib_sourcing_plan.md Phase 1):
+// Trie[V] over the c-algorithms trie (docs/proposals/stdlib_sourcing_plan.md Phase 1):
 // insert/replace, observing lookups, transfers, prefix traversal in key
 // order, and exactly-once drops of Drop-class values.
 

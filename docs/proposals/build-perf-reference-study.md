@@ -117,7 +117,7 @@ path (BuildGraphCache.w:370-377), and every verdict-cached test target passes
 that the `build` target byte-patches with the git HEAD hash and re-codesigns
 on every commit (build/compiler.w). So all 1,876 banked verdicts are
 invalidated per commit even when `with.unstamped` is byte-identical. D13
-(docs/decisions.md) made the stage chain commit-independent; this key defeats
+(docs/meetings/README.md) made the stage chain commit-independent; this key defeats
 it for exactly the longest phase.
 
 **Adopting it:** Fingerprint `with.unstamped` (or mask the fixed-width

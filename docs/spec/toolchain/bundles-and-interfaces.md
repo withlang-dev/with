@@ -1,6 +1,6 @@
 # 18.5c Bundles and interfaces
 
-A bundle is a migrated corpus compiled once (docs/wo_bundles.md, decisions
+A bundle is a migrated corpus compiled once (docs/spec/toolchain/wo_bundles.md, decisions
 D38, D39): object code, a manifest, a canonical textual module interface
 (.wi), and an interface fingerprint, keyed by corpus content, target, and
 the ABI identity `with version --abi-sha` prints. The compiler embeds the

@@ -10,13 +10,13 @@
 A systems programming language that compiles to native code via LLVM.
 Fast, safe, and designed to feel less hostile than existing native languages.
 
-[Specification](docs/with-specification.md) | [Contributing](CONTRIBUTING.md) | [Editor Support](docs/feature_plans/editor-support.md) | [Devlog](https://github.com/withlang-dev/with/discussions/185)
+[Specification](docs/spec/README.md) | [Contributing](CONTRIBUTING.md) | [Editor Support](docs/proposals/editor-support.md) | [Devlog](https://github.com/withlang-dev/with/discussions/185)
 
 > **Current language-design status (2026-07-23):** D22 has been accepted and
 > documented in specification v7.2, but implementation is still in progress.
 > Owning keyed-map lookup uniformly returns `Option[&V]`; contextual Copy and
 > transparent view-origin propagation complete its ergonomic and safety story.
-> See [`docs/decisions.md`](docs/decisions.md) D22. Current compiler behavior is
+> See [`docs/meetings/2026-07-23-D22-keyed-map-lookup-returns-a-uniform-view-copy-materializes.md`](docs/meetings/2026-07-23-D22-keyed-map-lookup-returns-a-uniform-view-copy-materializes.md) D22. Current compiler behavior is
 > not precedent where the decision marks it NON-COMPLIANT.
 
 ## Why With?
@@ -149,7 +149,7 @@ with build :install-user    # installs to ~/.local/bin/with
 ```
 
 Release publishing uses the checklist in
-[docs/with-release-runbook.md](docs/with-release-runbook.md).
+[docs/spec/toolchain/with-release-runbook.md](docs/spec/toolchain/with-release-runbook.md).
 
 ### Fixpoint Verification
 
@@ -189,15 +189,15 @@ with build :debug-alloc-tests
 ```
 
 The tools are documented in
-[docs/deep-debugging-tools.md](docs/deep-debugging-tools.md) and
-[docs/debug-allocator.md](docs/debug-allocator.md). Contributor workflow details
+[docs/spec/toolchain/deep-debugging-tools.md](docs/spec/toolchain/deep-debugging-tools.md) and
+[docs/spec/toolchain/debug-allocator.md](docs/spec/toolchain/debug-allocator.md). Contributor workflow details
 are in [CONTRIBUTING.md](CONTRIBUTING.md#debugging).
 
 ## Editor Support
 
 The compiler includes a built-in language server (`with lsp`) with diagnostics,
 go-to-definition, hover, and format-on-save. Setup instructions for VSCode,
-Neovim, Vim, Emacs, Zed, and Helix are in [docs/feature_plans/editor-support.md](docs/feature_plans/editor-support.md).
+Neovim, Vim, Emacs, Zed, and Helix are in [docs/proposals/editor-support.md](docs/proposals/editor-support.md).
 
 ## Contributing
 

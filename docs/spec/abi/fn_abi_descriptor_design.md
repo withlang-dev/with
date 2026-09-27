@@ -46,7 +46,7 @@ rewire. Statements that With lacked descriptors describe that earlier compiler.
 > borrowed places such as in-place receivers; it is not the default for a
 > read-only plain `T`.
 >
-> **D22 boundary.** `docs/d22-Eric-Ruling.md` is authoritative. Contextual Copy
+> **D22 boundary.** `docs/meetings/d22-Eric-Ruling.md` is authoritative. Contextual Copy
 > is a semantic expression adjustment after ordinary resolution; it must never
 > choose or mutate a function ABI, overload, receiver mode, or lookup signature.
 > Once resolution establishes an owned `T` demand, the adjusted expression is

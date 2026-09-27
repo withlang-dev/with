@@ -49,7 +49,7 @@ prints are hypotheses, not proof; don't propose a fix or deferral from a
 characterization alone. Deferring is valid only after locating the bug at the
 instruction level and showing the fix needs foundation work you can point to.
 
-**Every bug has a route, and you state it.** `docs/deep-debugging-tools.md`
+**Every bug has a route, and you state it.** `docs/spec/toolchain/deep-debugging-tools.md`
 orders the tools by bug class. Before the first edit for a bug, name the
 route you are on and run its first steps: a drop, free, or leak bug starts
 with the debug allocator, `WITH_ALLOC_NO_REUSE`, the address trap
@@ -104,7 +104,7 @@ trace prints. For fixpoint failures, run `with build :fixpoint-diff` first.
 
 **Memory bugs.** Any drop/lifetime/double-free/use-after-free/leak bug starts
 with the native debug allocator: `--debug-alloc` or `WITH_DEBUG_ALLOC=1` (see
-`docs/debug-allocator.md`), then `tools/debug_drop.w`/`tools/debug_drop*.lldb` to
+`docs/spec/toolchain/debug-allocator.md`), then `tools/debug_drop.w`/`tools/debug_drop*.lldb` to
 turn its verdict into alloc/free sites, the `--dump-drop-state`/`--trace-ownership`/`--dump-drop-plan`
 dumps for MIR ownership state, then `lldb` on the branch that emitted the bad
 drop. Allocator = which memory was mishandled; dumps = which places the compiler
@@ -156,18 +156,18 @@ the body. A function that observes takes `&T`; one that retains a borrowed input
 must make the lifetime valid; one that needs an independent retained value clones
 explicitly. During migrations the compiler may diagnose a legacy read-only `T`
 and offer an exact `&T` fix-it, but canonical mode never silently reinterprets
-the declared type. See specification §3.8 and `docs/decisions.md` D5.
+the declared type. See specification §3.8 and `docs/meetings/2026-07-05-D5-historical-share-place-free-parameter-design-superseded.md` D5.
 
 **Receiver modes are separate.** `fn`/`&self` reads, `mut fn`/`mut self` mutates
 the receiver place in place, `move fn`/`move self` consumes it. Retiring
 free-parameter SHARE-PLACE doesn't change `mut fn` receiver semantics or D21's
 place-threading pipeline rule.
 
-**D22 has one canonical, complete source: `docs/d22-Eric-Ruling.md`** — Eric's
+**D22 has one canonical, complete source: `docs/meetings/d22-Eric-Ruling.md`** — Eric's
 ruling, not a draft or summary. Any document, comment, test, TODO, plan, or
 behavior that conflicts with it is false and non-conforming. Don't edit,
 reinterpret, narrow, or broaden it. The specification and decision log must
-conform to it; `docs/d22-implementation-plan.md` is a derivative execution plan
+conform to it; `docs/proposals/d22-implementation-plan.md` is a derivative execution plan
 and can't amend it.
 
 **D22 map-view and contextual-Copy is still in progress.** `HashMap[K, V].get`
@@ -177,11 +177,11 @@ signature. A `&T` stays a reference during inference and pattern projection,
 including when `T: Copy`; it materializes an independent `T` only once an
 owned-value demand is established. `Option`, `Result`, patterns, `?`, `??`, and
 eliminators are transparent to view origins — they don't erase a borrow. Read the
-ruling first; specification §§3.4, 3.8, 9.7, 10, 13.3, 21.1 and `docs/decisions.md`
+ruling first; specification §§3.4, 3.8, 9.7, 10, 13.3, 21.1 and `docs/meetings/README.md`
 D22 are conforming projections of it. The current compiler is deliberately
 NON-COMPLIANT while D22 is implemented: don't restore conditional `get` returns,
 teach new code that lookup owns/copies, or treat a lost origin through `unwrap`
-as precedent. Follow `docs/d22-implementation-plan.md` and the full NON-COMPLIANT
+as precedent. Follow `docs/proposals/d22-implementation-plan.md` and the full NON-COMPLIANT
 acceptance matrix, not isolated TODOs, so every equivalent spelling shares one
 semantic rule.
 
@@ -190,7 +190,7 @@ access observes; `remove` transfers.** `xs[i]` denotes the element place;
 a positional collection has no `get` (D71): `xs[i]` is the one spelling and panics out-of-range (`Option` is for keyed
 maps, where absence is normal); a binding names what's there, an annotation
 demands what it says. The element-view campaign is done; see
-`docs/d27-implementation-plan.md`. The interim #715 element gate and the
+`docs/proposals/d27-implementation-plan.md`. The interim #715 element gate and the
 over-broad #730 unannotated-let field gate are retired. Serialize/Deserialize
 signatures are correct as declared (`JsonView` is a Copy view token); don't "fix"
 the threaded sink into a borrow.
@@ -210,12 +210,12 @@ a non-`Copy` element out of a container, and follow the D44 entry's
 non-compliance list rather than isolated fixes.
 
 **D51 has one canonical, complete source:
-`docs/Ruling-modeled-C-ownership-effects-conventions-and-foreign-lifetimes.md`**
+`docs/meetings/Ruling-modeled-C-ownership-effects-conventions-and-foreign-lifetimes.md`**
 — Eric's ruling on modeled C, not a draft or summary. Any document, comment,
 test, TODO, plan or behavior that conflicts with it is false and
 non-conforming. Don't edit, reinterpret, narrow or broaden it; the
 specification and decision log must conform to it, and
-`docs/modeled-c-implementation-plan.md` is a derivative execution plan that
+`docs/proposals/modeled-c-implementation-plan.md` is a derivative execution plan that
 can't amend it. Its test for every C-interop inference is *what happens if
 this inference is wrong?*: infer silently only what can at worst remove
 capability or reject a valid program (dependency, invalidation, nullable,
@@ -245,8 +245,8 @@ exact bug that produced the transparent `T*`/`T**` divergence; reintroducing one
 is a regression. `PassMode::IndirectPlace` is a physical mode for compiler-modeled
 borrowed places such as in-place receivers; an explicit `&T` is a reference value
 with the ABI of that reference type; a plain consuming `T` is owned even when its
-physical ABI is indirect. See `docs/decisions.md` D6 and
-`docs/fn_abi_descriptor_design.md`.
+physical ABI is indirect. See `docs/meetings/2026-07-06-D6-fnabi-is-the-single-abi-source-of-truth-compute-once-both.md` D6 and
+`docs/spec/abi/fn_abi_descriptor_design.md`.
 
 ---
 
@@ -377,7 +377,7 @@ confusing reporting problem. The bar is correctness, not coverage.
 
 ## Runtime Architecture
 
-**TRANSITIONAL — D30 (docs/decisions.md) retires this object-boundary design.**
+**TRANSITIONAL — D30 (docs/meetings/2026-08-09-D30-retire-the-internal-runtime-abi-remaining-boundaries-speak-c.md) retires this object-boundary design.**
 Destination: the runtime compiles in-unit like the embedded stdlib; rt objects
 survive only as a (compiler-version, target)-keyed cache whose hits are
 byte-identical to the in-unit result. A runtime object built by a different
@@ -484,7 +484,7 @@ same violation as C in the compiler. With IS a scripting language; there is no
     persistent state and `last` with #957
   - `jq -r .a.b`        →  `with -e 'use std.json` ⏎ `print(JsonDocument.parse(read_all()).root().field("a").field("b").raw())'`
   - `sed -i`, `awk … file` → not yet (#958): `< file` and `with run` until then
-  - The full sed/awk/jq parity matrix and every open gap: `docs/improve_oneliners.md`.
+  - The full sed/awk/jq parity matrix and every open gap: `docs/spec/toolchain/improve_oneliners.md`.
 - **Implicit main** — a `.w` file needs no `fn main`; top-level statements ARE
   the program, and may sit alongside helper `fn` definitions:
   ```
@@ -622,7 +622,7 @@ compiler cannot be recovered.
 
 ## Releases
 
-For release tasks, follow `docs/with-release-runbook.md` — the canonical runbook.
+For release tasks, follow `docs/spec/toolchain/with-release-runbook.md` — the canonical runbook.
 
 Release work is packaging and verification by default. Do not make compiler,
 runtime, stdlib, migrator, build-system, or test changes during a release unless
@@ -637,7 +637,7 @@ release binary asset named `main`; `src/main` is only the local seed path.
 
 ## The Specification Leads
 
-`docs/with-specification.md` is the bible. For D22, `docs/d22-Eric-Ruling.md` is
+`docs/spec/README.md` is the bible. For D22, `docs/meetings/d22-Eric-Ruling.md` is
 the complete controlling ruling: if the spec, requirements, decision summary,
 plan, tests, comments, or code omit or conflict with it, those sources are
 non-conforming and must be repaired to match it. Two rules are otherwise
@@ -670,7 +670,7 @@ all four parts in one brief, then wait for the ruling:
    already rules the question (it often does — the implementation may just be
    non-compliant), and whether the proposal duplicates an existing rule (one
    rule, one normative home).
-3. **Mission fit.** Relate the choice to `docs/mission.md` and `docs/decisions.md`.
+3. **Mission fit.** Relate the choice to `docs/mission.md` and `docs/meetings/README.md`.
    Say which option is most with-y, not just which is safest.
 4. **Predict what Eric would say.** A committed BDFL prediction with confidence,
    derived from his decision record — not a menu of options with no stake. It's
@@ -691,7 +691,7 @@ ruling itself, and the implementation is non-compliant until it conforms.
 
 ## Filing Bugs
 
-If the spec (`docs/with-specification.md`) says something should work and the
+If the spec (`docs/spec/README.md`) says something should work and the
 compiler disagrees, that is a **compiler bug**. Do not silently work around it.
 File an issue with:
 
@@ -704,7 +704,7 @@ File an issue with:
 
 ## Decision Log
 
-`docs/decisions.md` records non-obvious design/architecture decisions and **why**
+`docs/meetings/README.md` records non-obvious design/architecture decisions and **why**
 (context, alternatives, reasoning, what would reopen the call). When you make or
 reverse a judgment call a future maintainer might re-litigate — an
 ownership/safety ruling, a deviation from the reference implementations, a spec
@@ -720,7 +720,7 @@ it terse; it is reasoning, not a changelog.
 
 Read relevant source files. Confirm AST layouts. Verify naming conventions. When
 you can't find something, grep `examples/`, `src/`, and
-`docs/with-specification.md` before assuming it doesn't exist. Never rely on
+`docs/spec/README.md` before assuming it doesn't exist. Never rely on
 memory.
 
 ### Code style — write the least ceremony
@@ -877,10 +877,10 @@ Requests:
   `field~substring` predicates; run `with analyze file.w help` for fields.
 - `contract` / `audit:contract`: the modeled foreign contract of every
   `c facade` (ruling §63): each fact with its provenance, and the
-  suspicious-configuration audit (`docs/deep-debugging-tools.md`).
+  suspicious-configuration audit (`docs/spec/toolchain/deep-debugging-tools.md`).
 - `audit:resolution`: D65 — every MIR callee and argument count agrees with
   Sema's resolution of the call it lowers (the #1635 class; phase 1 of
-  `docs/mir-sema-hardening.md`).
+  `docs/spec/implementation/mir-sema-hardening.md`).
 - `audit:calls|effects|storage|methods|mir|returns|receivers|receiver-surface|phase|pool-views|contract|resolution|codegen|trait-tables|all`:
   hard invariants. `all` covers typed/ownership MIR validators, receiver
   declarations/contracts, fixed-point effects, freeze/eager-cache/specialization,
@@ -917,7 +917,7 @@ must come from `compiler_analyze_file` facts:
 
 The removed receiver/frozen/closure/diagnostic-map tools must not be recreated;
 use `select`, `matrix`, `path`, `closure`, `explain:node`, and the audits
-instead. See `docs/deep-debugging-tools.md`.
+instead. See `docs/spec/toolchain/deep-debugging-tools.md`.
 
 `--dump-abi` prints, per function signature, each parameter's ownership/ABI
 classification — effect flags, `value_ref_abi`, and the current physical passing

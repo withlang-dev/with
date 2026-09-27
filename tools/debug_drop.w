@@ -1,7 +1,7 @@
 // tools/debug_drop.w — native harness driver for the debug allocator.
 //
 // Runs a repro (or a corpus of fixtures) under the native debug allocator
-// (WITH_DEBUG_ALLOC) and reports the verdict. See docs/debug-allocator.md.
+// (WITH_DEBUG_ALLOC) and reports the verdict. See docs/spec/toolchain/debug-allocator.md.
 //
 //   ./out/release/bin/with build tools/debug_drop.w -o out/debug-alloc-tests/debug_drop
 //   out/debug-alloc-tests/debug_drop run   <with-bin> <repro.w>

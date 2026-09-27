@@ -8,7 +8,7 @@ use build.zlib
 use build.c_algorithms
 use build.tommyds
 
-// The corpus registry (docs/wo_bundles.md, docs/stdlib_sourcing_plan.md):
+// The corpus registry (docs/spec/toolchain/wo_bundles.md, docs/proposals/stdlib_sourcing_plan.md):
 // every migrated C corpus the tree carries, in bundle order. build.w, the
 // embedding, the exclusions, the stage/cross/release wiring and the lanes
 // all iterate it, so a corpus is present everywhere it must be by

@@ -1,5 +1,5 @@
 // SemaFacade — D51 §16.2b stage 2: facade facts with provenance and the
-// ruling's §61 verification (docs/modeled-c-implementation-plan.md).
+// ruling's §61 verification (docs/proposals/modeled-c-implementation-plan.md).
 //
 // A `c facade` block is collected after pass 3, when every signature exists:
 // domains and resources first (an fn clause may name either, in any order),

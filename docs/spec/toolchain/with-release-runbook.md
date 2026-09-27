@@ -685,5 +685,5 @@ git rev-parse --short v0.14.3^{}
 Confirm the seed downloader still points at the published asset name:
 
 ```sh
-rg -n 'with-darwin-aarch64|with-linux-x86_64|releases/download/.*/main|seed\.arg\("main"\)' build.w scripts docs/with-release-runbook.md
+rg -n 'with-darwin-aarch64|with-linux-x86_64|releases/download/.*/main|seed\.arg\("main"\)' build.w scripts docs/spec/toolchain/with-release-runbook.md
 ```

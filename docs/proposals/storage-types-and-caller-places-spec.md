@@ -14,13 +14,13 @@ layout context and may become a prelude alias, but nothing here depends
 on it being distinct.
 
 Both are general-purpose language features. The COBOL modernization
-campaign (`docs/COBOL-migrate.md`) is the motivating workload and the
+campaign (`docs/proposals/COBOL-migrate.md`) is the motivating workload and the
 first serious consumer, but no COBOL concept appears in these rules;
 `std.cobol`, `cobol_import`, and `dec[P,S]` are separate proposals
 layered on top.
 
 Status: proposal. Not spec-normative until accepted and merged into
-`docs/with-specification.md` (targets: a new chapter alongside §4 for
+`docs/spec/types.md` (targets: a new chapter alongside §4 for
 Part A; §9 and §21 amendments for Part B; ABI doc for the alias contract).
 
 ---
@@ -357,7 +357,7 @@ function parameters have no equivalent: a plain `T` parameter is owned,
 `&T` is a read view, and there is no way to say "mutate the caller's
 storage" for a non-receiver argument. §1.5 rules out `&mut T` as a
 storable value, and the superseded free-parameter share-place design
-(`docs/share_place_minimal_design.md`) inferred mutation rather than
+(`docs/proposals/inactive/share_place_minimal_design.md`) inferred mutation rather than
 declaring it, which D12/D21 rejected.
 
 This feature adds the missing capability *explicitly*: two parameter
@@ -630,7 +630,7 @@ directly. Exclusivity as specified here does not by itself exclude
 `f(inout global_account)`, so the backend must either prove the stronger
 contract or omit the attribute. `MayAlias` places carry no disjointness
 assumption and never receive it. This is
-an ABI descriptor change (`docs/with-abi.md`, `WITH_ABI_VERSION` bump).
+an ABI descriptor change (`docs/spec/abi/with-abi.md`, `WITH_ABI_VERSION` bump).
 
 ### B.6 What it looks like to library authors
 

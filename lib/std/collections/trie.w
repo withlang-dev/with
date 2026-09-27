@@ -1,5 +1,5 @@
 // std.collections.trie — Trie[V]: a prefix-keyed map over the migrated
-// c-algorithms trie (docs/stdlib_sourcing_plan.md, Phase 1). Keys are the
+// c-algorithms trie (docs/proposals/stdlib_sourcing_plan.md, Phase 1). Keys are the
 // bytes of a `str`; the engine stores one slot pointer per key
 // (std.collections.engine_slot) and the facade owns every value.
 //

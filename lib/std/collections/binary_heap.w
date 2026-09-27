@@ -1,5 +1,5 @@
 // std.collections.binary_heap — BinaryHeap[T]: an owning heap over the
-// migrated c-algorithms binary heap (docs/stdlib_sourcing_plan.md, Phase 1).
+// migrated c-algorithms binary heap (docs/proposals/stdlib_sourcing_plan.md, Phase 1).
 // The engine orders slot pointers through the facade's comparator
 // (std.collections.engine_slot); the facade owns every value.
 //

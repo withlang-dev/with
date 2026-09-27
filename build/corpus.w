@@ -2,7 +2,7 @@ module build.corpus
 
 use std.build
 
-// A migrated C corpus (docs/stdlib_sourcing_plan.md, docs/wo_bundles.md):
+// A migrated C corpus (docs/proposals/stdlib_sourcing_plan.md, docs/spec/toolchain/wo_bundles.md):
 // the facts about one upstream library and the few hooks its pipeline
 // needs. Everything structurally shared — fetching, staging, migration,
 // the bundle root, the generated-tree checks, promotion, the .wo bundle,
@@ -350,7 +350,7 @@ pub fn corpus_reject_foreign_symbols(ctx: &ActionCtx, corpus: &Corpus, generated
                 errors = errors + 1
     errors
 
-/// The .wo bundle root (docs/wo_bundles.md "Root"): one `use` per corpus
+/// The .wo bundle root (docs/spec/toolchain/wo_bundles.md "Root"): one `use` per corpus
 /// module, bytewise by name, so the bundle build reaches every module. The
 /// text is a pure function of the module listing; <stem>-bundle-root-check
 /// checks the promoted root against it.
@@ -364,7 +364,7 @@ pub fn corpus_bundle_root_text(corpus: &Corpus, module_paths: &Vec[str]) -> str:
     var harness = ""
     for excluded in corpus.harness:
         harness = harness ++ (if harness.len() > 0: ", " else: "") ++ excluded
-    var text = "// " ++ corpus.corpus_dir ++ "/bundle.w — the " ++ corpus.name ++ " .wo bundle root (docs/wo_bundles.md).\n"
+    var text = "// " ++ corpus.corpus_dir ++ "/bundle.w — the " ++ corpus.name ++ " .wo bundle root (docs/spec/toolchain/wo_bundles.md).\n"
     text = text ++ "// Written by build/corpora.w (" ++ corpus.stem ++ "-migrate) from the migrated module list:\n"
     text = text ++ "// one `use` per corpus module"
     if harness.len() > 0: text = text ++ "; the harness (" ++ harness ++ ") is excluded"

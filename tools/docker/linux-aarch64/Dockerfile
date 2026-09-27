@@ -10,7 +10,7 @@
 # because the failures are silent: without g++ the stage1 link dies on
 # -lstdc++, and without libxml2 the SDK's ld.lld cannot start — either way the
 # seed prints only "build failed". The SDK, seed, runtime bundle and clone
-# live on the mounted volume (see docs/with-release-runbook.md, "Linux aarch64
+# live on the mounted volume (see docs/spec/toolchain/with-release-runbook.md, "Linux aarch64
 # Release Host"), never in the image, so the image is pin-free.
 FROM ubuntu:24.04
 ENV DEBIAN_FRONTEND=noninteractive

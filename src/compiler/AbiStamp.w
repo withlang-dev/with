@@ -1,4 +1,4 @@
-// The compiler's ABI identity (docs/wo_bundles.md, decisions.md D38).
+// The compiler's ABI identity (docs/spec/toolchain/wo_bundles.md, decisions.md D38).
 //
 // sha256 of docs/with-abi.sha256 — the recorded hashes of the ABI-defining
 // sources — patched into this fixed-width slot POST-LINK by

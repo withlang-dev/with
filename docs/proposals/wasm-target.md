@@ -75,7 +75,7 @@ Both are fixed for every target:
   `i32` for value positions). Definitions and declarations of the same
   runtime symbol disagreed; native ABIs ignore an unused return register.
   Return positions now lower `Unit` to `void` (`resolve_return_type`;
-  ABI v5 in `docs/with-abi.md`).
+  ABI v5 in `docs/spec/abi/with-abi.md`).
 - Codegen declared the HashMap runtime helpers with a one-pointer
   placeholder prototype and called them with the real arguments. A wasm
   object records the declaration as the import signature. The helpers now

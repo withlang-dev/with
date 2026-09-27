@@ -1,4 +1,4 @@
-// A green belongs to the sources (docs/decisions.md D49). `:last-green`
+// A green belongs to the sources (docs/meetings/2026-09-20-D49-green-evidence-is-keyed-on-what-was-tested-git-tree-pinned.md D49). `:last-green`
 // publishes, keyed on what a battery tested — the git tree, the pinned seed
 // that seeded the stage chain, the host — one line per identity in
 // $WITH_GREEN_DIR, else ~/.local/with-green/green.tsv (build/retention.w

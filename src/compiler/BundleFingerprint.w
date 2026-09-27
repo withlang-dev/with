@@ -1,4 +1,4 @@
-// D39 bundle interfaces (docs/wo_bundles.md, decisions.md D39): the
+// D39 bundle interfaces (docs/spec/toolchain/wo_bundles.md, decisions.md D39): the
 // exported-declaration fingerprint.
 //
 // The bundle build proves an interface is exact, not merely parseable:

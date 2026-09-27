@@ -136,7 +136,7 @@ pub enum NodeKind: i32:
     // NK_MAP_COMPREHENSION: d0=extra_start, d1=clause_count, d2=0
     // Extra: [key_expr, value_expr, then per clause: binding, iterable, filter]
     NK_MAP_COMPREHENSION = 129
-    // D39 typed body state (docs/decisions.md): a `.wi` interface declaration
+    // D39 typed body state (docs/meetings/2026-09-02-D39-bundle-interfaces-a-bundle-provided-module-is-its-wi-and.md): a `.wi` interface declaration
     // carries these in place of a source body / initializer. They are real
     // nodes, never a 0 slot — `d1 == 0` on NK_LET_DECL already means a
     // zero-initialized `var x: T` and DEFINES storage; an interface global is

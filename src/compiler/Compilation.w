@@ -367,7 +367,7 @@ pub type Compilation {
     bundle_corpus: str,
     // The emit-C lane links no bundle, so no module may be interface-
     // provided: every embedded bundle's corpus is read from source and
-    // compiled in-unit as C (docs/wo_bundles.md "Retiring the shim", #955).
+    // compiled in-unit as C (docs/spec/toolchain/wo_bundles.md "Retiring the shim", #955).
     emit_c_in_unit: bool,
 }
 
@@ -517,7 +517,7 @@ impl Compilation:
         self.zcu = zcu
         pool
 
-    // D39 `--link-bundle <prefix>` (docs/wo_bundles.md): `<prefix>.o` joins
+    // D39 `--link-bundle <prefix>` (docs/spec/toolchain/wo_bundles.md): `<prefix>.o` joins
     // the link, the manifest's module prefixes make codegen declare (never
     // define) those modules' functions, and `<prefix>.wi` registers with the
     // interface registry so the resolver reads it in place of the source. A
@@ -1341,7 +1341,7 @@ impl Compilation:
             return ""
         with_str_clone_ref(obj_path)
 
-    // D39: write the bundle's `.wi` (docs/wo_bundles.md) to
+    // D39: write the bundle's `.wi` (docs/spec/toolchain/wo_bundles.md) to
     // --emit-bundle-interface; returns the sha256 of its bytes (the
     // manifest's `interface-sha`), "" on refusal.
     fn write_bundle_interface(model: &BundleInterfaceModel) -> str:
@@ -1355,7 +1355,7 @@ impl Compilation:
             return ""
         bundle_text_sha256(rendered.text)
 
-    // D38/D39 (docs/wo_bundles.md): the .wo manifest for the object just
+    // D38/D39 (docs/spec/toolchain/wo_bundles.md): the .wo manifest for the object just
     // emitted — the compiler's ABI identity, the target, the object's file
     // name, the fingerprint and interface-sha of the .wi written beside it
     // (the pairing check --link-bundle makes), and one link-name prefix per
@@ -1531,10 +1531,10 @@ impl Compilation:
     mut fn emit_c(source_path: &str, output_path: &str) -> str:
         // The emit-C lane compiles a corpus in-unit as C; it has no bundle
         // objects to link and no bodies for an interface declaration
-        // (docs/wo_bundles.md), so both are refused here rather than emitted
+        // (docs/spec/toolchain/wo_bundles.md), so both are refused here rather than emitted
         // as stubs.
         if self.link_bundles.len() > 0:
-            runtime_eprint("error: --emit-c cannot link a .wo bundle (--link-bundle): the emit-C lane compiles every module in-unit (docs/wo_bundles.md)")
+            runtime_eprint("error: --emit-c cannot link a .wo bundle (--link-bundle): the emit-C lane compiles every module in-unit (docs/spec/toolchain/wo_bundles.md)")
             return ""
         if source_path.ends_with(".wi"):
             runtime_eprint("error: --emit-c needs source bodies; '" ++ source_path ++ "' is an interface (D39)")

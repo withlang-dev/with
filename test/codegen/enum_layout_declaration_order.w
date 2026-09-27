@@ -7,7 +7,7 @@
 //! expect-stdout: aligned 64 64
 //! expect-stdout: ok
 
-// #1430 (docs/with-abi.md §2): declaration order never changes a layout. Each
+// #1430 (docs/spec/abi/with-abi.md §2): declaration order never changes a layout. Each
 // Late* type is declared before the types it holds by value, each Early* type
 // after them; the pairs are otherwise identical and must lay out identically.
 // Codegen used to size a Late* payload from a bodiless placeholder (0 bytes):

@@ -1293,7 +1293,7 @@ pub fn run_cli_selfhost_one_liner_action(ctx: ActionCtx) -> i32:
     rc = bs_expect_cli_input_success_exact(ctx, compiler_path, "implicit-main-regex-fstring", bs_one_liner_args("run", implicit_src), "error 42\nok\n", "ERROR code=42")
     if rc != 0: return rc
 
-    // sed/awk/coreutils/jq parity (docs/improve_oneliners.md, 2026-09-03):
+    // sed/awk/coreutils/jq parity (docs/spec/toolchain/improve_oneliners.md, 2026-09-03):
     // every idiom that works today stays working. The rows that do not
     // are #957–#961; each joins here when its gap closes.
     let parity_in = "alpha 10 x\nbeta  20 y\ngamma 30 x\nSTART\ndelta 40 y\nEND\nalpha 10 x\n"
@@ -1434,15 +1434,15 @@ fn bs_project_expect_success(ctx: &ActionCtx, compiler_path: &str, case_dir: &st
     result
 
 fn bs_check_init_ai_docs(ctx: &ActionCtx, project_dir: &str, label: &str) -> i32:
-    let expected = if ctx.fs().exists("docs/with_for_ai.md"): ctx.fs().read_text("docs/with_for_ai.md") else: ""
+    let expected = if ctx.fs().exists("docs/spec/guide/with_for_ai.md"): ctx.fs().read_text("docs/spec/guide/with_for_ai.md") else: ""
     if expected.len() == 0:
-        return bs_fail(ctx, "could not read docs/with_for_ai.md")
+        return bs_fail(ctx, "could not read docs/spec/guide/with_for_ai.md")
     let agents = ctx.fs().read_text(bs_join(project_dir, "AGENTS.md"))
     if agents != expected:
-        return bs_fail(ctx, "AGENTS.md did not match docs/with_for_ai.md for " ++ label)
+        return bs_fail(ctx, "AGENTS.md did not match docs/spec/guide/with_for_ai.md for " ++ label)
     let claude = ctx.fs().read_text(bs_join(project_dir, "CLAUDE.md"))
     if claude != expected:
-        return bs_fail(ctx, "CLAUDE.md did not match docs/with_for_ai.md for " ++ label)
+        return bs_fail(ctx, "CLAUDE.md did not match docs/spec/guide/with_for_ai.md for " ++ label)
     0
 
 fn bs_check_init_common_files(ctx: &ActionCtx, project_dir: &str, package_name: &str, label: &str) -> i32:
@@ -7985,7 +7985,7 @@ fn bs_check_object_symbols(ctx: &ActionCtx, compiler_path: &str, nm_tool: &str, 
         if rc != 0: return rc
     0
 
-// ── D39 bundle interfaces (docs/wo_bundles.md, decisions.md D39) ──────────
+// ── D39 bundle interfaces (docs/spec/toolchain/wo_bundles.md, decisions.md D39) ──────────
 // The `.wi` flavor, `--link-bundle`, declared (never body-inferred) callable
 // semantics, and declaration-only codegen for a bundle-provided module.
 // Fixtures: test/bundle_interface/. The bundle object is built from the demo

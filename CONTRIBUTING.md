@@ -282,7 +282,7 @@ with build :fixpoint-diff
 cat out/fixpoint-diff/report.txt
 ```
 
-See [docs/deep-debugging-tools.md](docs/deep-debugging-tools.md) for the exact
+See [docs/spec/toolchain/deep-debugging-tools.md](docs/spec/toolchain/deep-debugging-tools.md) for the exact
 command syntax and limits.
 
 ### Crashes: LLDB
@@ -339,7 +339,7 @@ lldb --batch -s tools/debug_drop_sites.lldb \
 
 Use `tools/debug_drop_fields.lldb` when the allocator verdict points at a
 drop/codegen bug and you need to observe which codegen drop path fired. See
-[docs/debug-allocator.md](docs/debug-allocator.md) and
+[docs/spec/toolchain/debug-allocator.md](docs/spec/toolchain/debug-allocator.md) and
 [test/debug_alloc/README.md](test/debug_alloc/README.md).
 
 ### Host Heap Corruption

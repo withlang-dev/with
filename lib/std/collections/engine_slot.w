@@ -1,5 +1,5 @@
 // std.collections.engine_slot — facade-owned storage for values that a
-// migrated c-algorithms engine indexes by pointer (docs/stdlib_sourcing_plan.md,
+// migrated c-algorithms engine indexes by pointer (docs/proposals/stdlib_sourcing_plan.md,
 // "What containers add to that pattern"). The engines are raw `void*`
 // containers (D37); the facade owns every value, hands the engine one stable
 // heap slot per value, and translates between With ownership and the

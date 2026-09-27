@@ -6,7 +6,7 @@
 > collapsed to pointers. This is a *plan*, not a specification: since D48
 > (`db6f935e`) the language specification no longer catalogues `lib/std`,
 > and each landed module's own document (`docs/regex-spec.md`,
-> `docs/std-encoding-rfc4648.md`, `docs/stdlib_sourcing_plan.md`) is
+> `docs/spec/stdlib/std-encoding-rfc4648.md`, `docs/proposals/stdlib_sourcing_plan.md`) is
 > authoritative for it.
 >
 > **Conformance note (D27, 2026-07-30):** the API sketches below predate the
@@ -101,7 +101,7 @@ tracks first steps).
 
 ## Sourced from corpora
 
-`docs/stdlib_sourcing_plan.md` (ruled 2026-09-12) settles which
+`docs/proposals/stdlib_sourcing_plan.md` (ruled 2026-09-12) settles which
 containers and algorithms are *facades over migrated corpora* rather
 than native modules, and the corpus registry (`build/corpus.w`,
 `build/corpora.w`) wires each corpus as a `.wo` bundle with its upstream
@@ -173,7 +173,7 @@ that touch the filesystem.
 
 #### 1.2 Vec sorting and search — methods on `collections.Vec`
 
-**Resolved by the corpus sourcing plan (Phase 3, STC — pending).** `Vec.sort`, `sort_stable`, `is_sorted`, `binary_search`, `reverse`, `dedup` are the `std.algorithms` facade over STC's migrated algorithm layer (`docs/stdlib_sourcing_plan.md`, facade map rows `sort`/`binary_search`/`lower_bound`/`reverse`/`shuffle`; #940). `stable_sort` is exposed only if upstream's stability contract holds. Already landed from Phase 1: `std.collections.sorted_vec.SortedVec[T]` and `std.collections.binary_heap.BinaryHeap[T]` (c-algorithms). Nothing native is written for this section.
+**Resolved by the corpus sourcing plan (Phase 3, STC — pending).** `Vec.sort`, `sort_stable`, `is_sorted`, `binary_search`, `reverse`, `dedup` are the `std.algorithms` facade over STC's migrated algorithm layer (`docs/proposals/stdlib_sourcing_plan.md`, facade map rows `sort`/`binary_search`/`lower_bound`/`reverse`/`shuffle`; #940). `stable_sort` is exposed only if upstream's stability contract holds. Already landed from Phase 1: `std.collections.sorted_vec.SortedVec[T]` and `std.collections.binary_heap.BinaryHeap[T]` (c-algorithms). Nothing native is written for this section.
 
 #### 1.3 `std.toml` — TOML parser
 
@@ -225,7 +225,7 @@ No serialization in v1. Parse-only.
 
 #### 1.4 `std.encoding` — Base64 and Hex
 
-**Resolved — landed 2026-08-31 (`aacace23`, `f89a4cec`), specified in `docs/std-encoding-rfc4648.md`.** `lib/std/encoding.w` (shared `DecodeError`: `InvalidLength`, `InvalidByte`, `InvalidPadding`, `NonCanonicalBits`) plus `encoding/base64.w` (`base64_encode`/`base64_decode`), `encoding/base64url.w`, `encoding/base16.w` (`base16_encode`/`base16_decode`), `encoding/base32.w`, `encoding/base32hex.w`. Module-prefixed names, `[]u8`/`&str` in, `Result[Vec[u8], DecodeError]` out. Not exposed: `encoded_len`/`decoded_len`, an upper-case hex encoder.
+**Resolved — landed 2026-08-31 (`aacace23`, `f89a4cec`), specified in `docs/spec/stdlib/std-encoding-rfc4648.md`.** `lib/std/encoding.w` (shared `DecodeError`: `InvalidLength`, `InvalidByte`, `InvalidPadding`, `NonCanonicalBits`) plus `encoding/base64.w` (`base64_encode`/`base64_decode`), `encoding/base64url.w`, `encoding/base16.w` (`base16_encode`/`base16_decode`), `encoding/base32.w`, `encoding/base32hex.w`. Module-prefixed names, `[]u8`/`&str` in, `Result[Vec[u8], DecodeError]` out. Not exposed: `encoded_len`/`decoded_len`, an upper-case hex encoder.
 
 #### 1.5 `std.testing` — Test framework utilities
 
@@ -765,7 +765,7 @@ Currently internal to the crypto modules — expose it.
 
 #### 3.9 `std.debug` — Debug utilities
 
-**Status (2026-09-22): not started.** Nothing of `stack_trace`/`on_panic`/`MemoryStats`; the native debug allocator (`docs/debug-allocator.md`) is the existing adjacent tooling.
+**Status (2026-09-22): not started.** Nothing of `stack_trace`/`on_panic`/`MemoryStats`; the native debug allocator (`docs/spec/toolchain/debug-allocator.md`) is the existing adjacent tooling.
 
 ```
 fn stack_trace() -> Vec[StackFrame]
@@ -954,7 +954,7 @@ Refreshed order for the native remainder, by what it unblocks:
 | 17 | `std.debug` | Stack traces, panic hooks |
 | 18 | `std.semver` | Package management support |
 
-Sourced items follow `docs/stdlib_sourcing_plan.md`'s own phase order
+Sourced items follow `docs/proposals/stdlib_sourcing_plan.md`'s own phase order
 (STC, then M\*LIB) and are not re-sequenced here.
 
 ---

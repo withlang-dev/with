@@ -12,8 +12,8 @@ receiver). This is Rust/Zig/Go's rule (presence of receiver discriminates) with
 `self` implicit, so it is strictly less ceremony than any of them.
 
 This document is the implementation plan. The normative surface is amended in
-`docs/with-specification.md` (§2.4, §9.5); the rationale is recorded in
-`docs/decisions.md` (D7).
+`docs/spec/ownership.md` (§2.4, §9.5); the rationale is recorded in
+`docs/meetings/2026-07-07-D7-eliminate-self-the-receiver-mode-is-a-fn-prefix-keyword-self.md` (D7).
 
 ---
 

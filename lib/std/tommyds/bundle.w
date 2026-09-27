@@ -1,4 +1,4 @@
-// lib/std/tommyds/bundle.w — the tommyds .wo bundle root (docs/wo_bundles.md).
+// lib/std/tommyds/bundle.w — the tommyds .wo bundle root (docs/spec/toolchain/wo_bundles.md).
 // Written by build/corpora.w (tommyds-migrate) from the migrated module list:
 // one `use` per corpus module; the harness (check_) is excluded.
 use std.tommyds.defs

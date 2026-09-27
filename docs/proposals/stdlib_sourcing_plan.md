@@ -14,11 +14,11 @@ started**: no `build/stc.w`, no `lib/std/stc/`, no `std.algorithms`; the
 the searches all wait on it, and #937/#938/#939/#940 stay open. **Phase 4
 M\*LIB — not started.** By this document's own "done" bar the plan is
 roughly half implemented; the half users feel (sort, the default map) is the
-open half. `docs/feature_plans/libstd-spec.md` (refreshed the same day)
+open half. `docs/spec/stdlib/libstd-spec.md` (refreshed the same day)
 maps its tiers onto these phases.
 The selections below describe the destination, not completed migrations.
-Module grouping is provisional. Companion: `docs/harden_migrate.md` (the migrator plan
-this campaign exercises), `docs/harden_plan.md` item 7.
+Module grouping is provisional. Companion: `docs/proposals/harden_migrate.md` (the migrator plan
+this campaign exercises), `docs/proposals/harden_plan.md` item 7.
 Phase 0 (PR #1129) and Phase 1 (PR #1138, c-algorithms) are implemented;
 see "Phase 1 status" below.
 
@@ -171,7 +171,7 @@ it. That gives:
 ## The pipeline (pcre2's, reused)
 
 Per corpus (since 2026-09-14 the generic pipeline in `build/corpora.w`
-driven by the registry, `docs/wo_bundles.md` "The corpus registry"; a
+driven by the registry, `docs/spec/toolchain/wo_bundles.md` "The corpus registry"; a
 corpus is a `Corpus` declaration in `build/<corpus>.w` plus its hooks):
 
 1. **Pin.** Upstream release tag, tarball URL, sha256 constant. Re-migration
@@ -191,7 +191,7 @@ corpus is a `Corpus` declaration in `build/<corpus>.w` plus its hooks):
    set in the migrate review) — then the corpus is re-migrated.
 
 Each corpus lands as a **`.wo` bundle** (decisions.md D38,
-`docs/wo_bundles.md`): its migrated source and tests live in the tree, its
+`docs/spec/toolchain/wo_bundles.md`): its migrated source and tests live in the tree, its
 object, manifest and declarations-only interface are compiled once per
 target and With ABI, and a normal compiler build links the existing object
 instead of recompiling the corpus. The compiler embeds every bundle's
@@ -203,9 +203,9 @@ exactly as pcre2's (`lib/std/re/`) and zlib's (`lib/std/zl/`) are —
 generated, never hand-edited, and under the stdlib tree because a bundle's
 symbols hash the module's canonical `<embedded-std>/…` path, which that
 location names whether or not the source is embedded
-(`docs/wo_bundles.md`, "Object build"); facades in `lib/std/collections.w`
+(`docs/spec/toolchain/wo_bundles.md`, "Object build"); facades in `lib/std/collections.w`
 and a new `lib/std/algorithms.w`; a `corpora` battery lane that runs every
-bundle's upstream tests, plus the `wo-drift` lane from `docs/wo_bundles.md`.
+bundle's upstream tests, plus the `wo-drift` lane from `docs/spec/toolchain/wo_bundles.md`.
 
 ## Facade rules
 
@@ -242,7 +242,7 @@ those two do; nothing is a new mechanism.
    shares its dotted path with the facade (`std.zl` / `std.zlib`,
    `std.re` / `std.regex`): the frontend's parent-module import fallback
    would otherwise pull the facade into the `--no-prelude` bundle build
-   (`docs/wo_bundles.md`). `std.regex` imports `std.re` through the
+   (`docs/spec/toolchain/wo_bundles.md`). `std.regex` imports `std.re` through the
    bundle interface; C4 retired the `with_regex_*` runtime shims in #1101.
 2. *A With error type over engine codes.* `ZlibError { code, message }`
    with `zlib_code_error(Z_DATA_ERROR) -> "invalid or corrupt zlib data"`;
@@ -391,7 +391,7 @@ above, with benchmark evidence recorded during implementation.
 ## Phases and gates
 
 **Phase 0 — measure first (small, immediate).**
-The complexity-fixture lane and a stdlib inventory (`docs/stdlib_inventory.md`:
+The complexity-fixture lane and a stdlib inventory (`docs/spec/stdlib/stdlib_inventory.md`:
 every structure and algorithm we need, its complexity contract, current
 status). Engine validation needs this yardstick. SlotMap's native
 free list (#936) lands here too. Gate: lane green on today's containers
@@ -448,7 +448,7 @@ by the M*LIB-backed `BTreeMap`/`BTreeSet` work in Phase 4.
   views of a type without an `lt` method silently compared addresses
   (#1137, fixed in this branch: it is now a diagnostic).
 - The branch's pre-facade compiler commits (31a347d4, 88f0ad31, 92c0c01d)
-  regressed ~16 existing fixtures; root-caused and fixed (`docs/handoff.md`
+  regressed ~16 existing fixtures; root-caused and fixed (`docs/completed/handoff.md`
   §1c), plus the va_list call-site model (e7ddf116). The full battery is
   green at 4832bf0a.
 - Comparisons of user types: ruled (decisions.md D41, 2026-09-13).

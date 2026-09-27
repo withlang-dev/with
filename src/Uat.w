@@ -1,5 +1,5 @@
 // `with uat` — a project's acceptance scenarios (spec §18.5d, D67;
-// docs/uat-plan.md): plain-text files under `uat/`, one scenario each, a
+// docs/proposals/uat-plan.md): plain-text files under `uat/`, one scenario each, a
 // header (`scenario:`, `requires:`, `platforms:`) and one step per line in
 // the verbs a person would say at a terminal. The runner parses every
 // scenario, skips the ones whose requirements this host cannot meet (with
@@ -31,7 +31,7 @@ extern fn with_exec_argv_capture_input(args: &str, stdout_path: &str, stderr_pat
 
 const UAT_RUN_TIMEOUT_MS: i32 = 600000
 
-// Verbs (the grammar of docs/uat-plan.md §3).
+// Verbs (the grammar of docs/proposals/uat-plan.md §3).
 const UAT_NEW_DIRECTORY: i32 = 1
 const UAT_RUN: i32 = 2
 const UAT_RUN_FAILS: i32 = 3
@@ -254,7 +254,7 @@ fn uat_parse(path: &str, text: &str) -> UatScenario:
                     return uat_error(move sc, lineno, "'expect file' is 'expect file <path> exists' or 'expect file <path> contains: <text>'")
                 sc.steps.push(uat_step(UAT_EXPECT_FILE_CONTAINS, rest.slice(0, at).trim().clone(), rest.slice(at + 10, rest.len()).trim().clone(), lineno))
         else if line.starts_with("expect image:"):
-            return uat_error(move sc, lineno, "'expect image:' is not implemented yet (docs/uat-plan.md §5); record the check as 'expect (human):' meanwhile")
+            return uat_error(move sc, lineno, "'expect image:' is not implemented yet (docs/proposals/uat-plan.md §5); record the check as 'expect (human):' meanwhile")
         else if line.starts_with("expect (human):"):
             sc.steps.push(uat_step(UAT_EXPECT_HUMAN, uat_rest_after(line, "expect (human):"), "", lineno))
         else:

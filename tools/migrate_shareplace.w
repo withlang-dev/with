@@ -1,7 +1,7 @@
 // D5-supersession migration: read-only free parameters declared as plain `T`
 // that the (overruled) effects classifier passes as share-place become
 // declared `&T` borrows, so the signature states the ownership mode and the
-// classifier's non-receiver inference can be deleted (docs/decisions.md D5,
+// classifier's non-receiver inference can be deleted (docs/meetings/2026-07-05-D5-historical-share-place-free-parameter-design-superseded.md D5,
 // Eric's ruling: D5 is overruled).
 //
 // Selection comes from live compiler facts, never source scanning:

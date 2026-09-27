@@ -1,4 +1,4 @@
-// D39 bundle interfaces (docs/wo_bundles.md, decisions.md D39): the `.wi`
+// D39 bundle interfaces (docs/spec/toolchain/wo_bundles.md, decisions.md D39): the `.wi`
 // registry.
 //
 // A bundle's interface file holds one `module <canonical path>` line per

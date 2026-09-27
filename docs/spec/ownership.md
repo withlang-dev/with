@@ -111,7 +111,7 @@ The canonical destructor is `move fn drop()` — a destructor always
 consumes, so its receiver mode is `move` (D7; `self` is implicit and never
 written). Any other receiver mode on a `Drop` impl's `drop` is a compile-time
 error with a fix-it. (The explicit form `fn drop(move self: Self)` remains
-accepted during the receiver migration; see `docs/eliminate-self.md`.) Explicit destructor calls are legal
+accepted during the receiver migration; see `docs/proposals/eliminate-self.md`.) Explicit destructor calls are legal
 (Higher RAII): `x.drop()` is an ordinary consuming call that runs the
 destructor body AND the field drop glue, after which the binding is
 consumed — identical to the scope-exit drop, just earlier. The free

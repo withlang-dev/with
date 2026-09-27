@@ -1,5 +1,5 @@
 // std.collections.hash_index — HashIndex[K, V]: a keyed hash index over the
-// migrated TommyDS hashdyn engine (docs/stdlib_sourcing_plan.md, Phase 2:
+// migrated TommyDS hashdyn engine (docs/proposals/stdlib_sourcing_plan.md, Phase 2:
 // "node ownership for intrusive engines"). The engine threads intrusive
 // nodes through power-of-two bucket lists and resizes as it grows; it never
 // allocates a node. The facade owns every node: one heap slot per entry

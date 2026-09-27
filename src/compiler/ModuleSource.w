@@ -1,4 +1,4 @@
-// D39: the one lookup for a module's text (docs/wo_bundles.md). Every phase
+// D39: the one lookup for a module's text (docs/spec/toolchain/wo_bundles.md). Every phase
 // that reads an imported module goes through here — the resolver, the
 // frontend's import merge, and diagnostic source mapping — so a
 // bundle-provided module is its `.wi` section everywhere, with its canonical

@@ -189,7 +189,7 @@ impl Zcu:
             return false
         var backend_pool = pool
         var backend_intern = self.pool
-        // D17/#697: take-and-return (docs/memory-model.md seam rule) — Copy
+        // D17/#697: take-and-return (docs/spec/implementation/memory-model.md seam rule) — Copy
         // handles captured first, sema moved in, handed back on every exit.
         let sema_ast: AstPool = self.last_sema.ast
         let sema_pool: InternPool = self.last_sema.pool

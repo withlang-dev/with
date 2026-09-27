@@ -4,7 +4,7 @@ use std.build
 use build.corpus
 
 // TommyDS v3.0 (amadvance/tommyds), BSD-2-Clause (its LICENSE ships beside
-// the migration). Phase 2 of docs/stdlib_sourcing_plan.md. The generic
+// the migration). Phase 2 of docs/proposals/stdlib_sourcing_plan.md. The generic
 // pipeline (build/corpora.w) fetches, migrates, checks, promotes and
 // bundles it; this module holds the facts and the two hooks TommyDS needs.
 

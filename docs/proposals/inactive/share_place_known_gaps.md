@@ -4,7 +4,7 @@
 > requirements. Free functions use declared `&T` borrow / plain `T` consume
 > modes. The tasks and remedies below are archaeology, not a backlog.
 > Receiver-mode by-place behavior remains governed separately by D12. For D22,
-> `docs/d22-Eric-Ruling.md` is canonical and every conflict here is false.
+> `docs/meetings/d22-Eric-Ruling.md` is canonical and every conflict here is false.
 
 Historically tracked gaps in the share-place calling-convention implementation. Each has a
 deterministic repro and `--dump-abi` evidence. Verify fixes with the
@@ -138,7 +138,7 @@ nothing). NOT an `await`-consume workaround (reverted — violates §14.7).
 
 **Next step (tooling):** the two free sites are `<untagged>` — name them at the
 instruction level before editing runtime code. Run `tools/debug_drop.w` +
-`tools/debug_drop_sites.lldb` on the repro (docs/debug-allocator.md) to get the
+`tools/debug_drop_sites.lldb` on the repro (docs/spec/toolchain/debug-allocator.md) to get the
 exact allocation site and both free call sites of the async entry, then decide
 which free path to drop (the borrowed-await reap, vs the owner's Task drop).
 Verify with `--debug-alloc` (no double free, leak count == 0) and that

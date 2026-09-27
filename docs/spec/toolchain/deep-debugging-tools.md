@@ -192,7 +192,7 @@ hand-built Sema answer) and `test/internals/mir_unknown_callee_test.w`
 (the validator); the clean corpus is `audit:all` on the contract, closure
 and c_facade fixtures and on `build.w`. Phases 2–5 (codegen mode
 provenance, places and origins, effects, MirLower cleanup):
-`docs/mir-sema-hardening.md`.
+`docs/spec/implementation/mir-sema-hardening.md`.
 
 `audit:all` is the proof gate before an expensive build. It validates MIR shape,
 types, and ownership; receiver declaration coverage and finalized contracts;
@@ -334,7 +334,7 @@ One TSV row per deduped `(fn, class, place)`; classes:
 
 Findings are seams, not automatic bugs — a `copy-view-drop` may be a
 deliberate leak-class read — but every double-free root-caused in the D22
-batch (docs/handoff.md, D22 Stage 6 era, §3 roots 15, 18, 19) matches
+batch (docs/completed/handoff.md, D22 Stage 6 era, §3 roots 15, 18, 19) matches
 exactly one of these rows.
 Burn the list down with clones/views (see the `bg_clone_str_vec` /
 `&vec[i]` idioms), or classify a row as intended where the disposition is a

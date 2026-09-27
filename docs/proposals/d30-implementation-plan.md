@@ -3,7 +3,7 @@
 ## Authority and scope
 
 This is a derivative execution plan for the D30 ruling recorded in
-`docs/decisions.md` and the normative §16.3e spec text. It cannot amend
+`docs/meetings/README.md` and the normative §16.3e spec text. It cannot amend
 either. Where this plan and the ruling disagree, the ruling wins and this
 plan is wrong.
 
@@ -321,7 +321,7 @@ direction. Sequencing within R4:
 
 Retire the transitional `with_*` guidance in CLAUDE.md/AGENTS.md (marked
 "operative until the retirement lands"), update the Runtime Architecture
-section, close #761, and record the completion in `docs/decisions.md` D30's
+section, close #761, and record the completion in `docs/meetings/2026-08-09-D30-retire-the-internal-runtime-abi-remaining-boundaries-speak-c.md` D30's
 status line.
 
 ## Open questions that need Eric (none block R1)

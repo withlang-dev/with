@@ -1,4 +1,4 @@
-// lib/std/c_algorithms/bundle.w — the c_algorithms .wo bundle root (docs/wo_bundles.md).
+// lib/std/c_algorithms/bundle.w — the c_algorithms .wo bundle root (docs/spec/toolchain/wo_bundles.md).
 // Written by build/corpora.w (c-algorithms-migrate) from the migrated module list:
 // one `use` per corpus module; the harness (alloc_testing, framework, test_cpp) is excluded.
 use std.c_algorithms.arraylist

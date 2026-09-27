@@ -11,7 +11,7 @@ same lock, with provenance `facade:<package>@<version>`. This file is kept as
 the record of the projection and its traceability to the ruling; the
 specification is now the normative text and the ruling remains canonical.
 Every section below is a conforming projection of
-`docs/Ruling-modeled-C-ownership-effects-conventions-and-foreign-lifetimes.md`
+`docs/meetings/Ruling-modeled-C-ownership-effects-conventions-and-foreign-lifetimes.md`
 (the ruling); where the two differ, the ruling is right. Ruling section
 numbers are given in brackets so each sentence can be traced.
 

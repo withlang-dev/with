@@ -4,7 +4,7 @@
 
 ## Authority and scope
 
-[`docs/d22-Eric-Ruling.md`](d22-Eric-Ruling.md) is the canonical and complete
+[`docs/meetings/d22-Eric-Ruling.md`](d22-Eric-Ruling.md) is the canonical and complete
 D22 ruling. Specification v7.2 must conform to it. This plan is only an ordered
 implementation checklist: it must not narrow, reinterpret, or add semantics to
 the ruling. If this plan conflicts with the ruling, the ruling wins and this
@@ -504,7 +504,7 @@ Convert the former call-site-only Copy restriction fixtures into must-compile
 tests for every newly authorized owned-demand position. Replace every active
 claim that keyed-map `get` returns owned or conditionally-owned values.
 
-All active doctrine must point to `docs/d22-Eric-Ruling.md`. No implementation
+All active doctrine must point to `docs/meetings/d22-Eric-Ruling.md`. No implementation
 comment, handoff, test, or migration tool may narrow or reinterpret it.
 
 ### 9. Verify conformance in an isolated ownership/ABI batch

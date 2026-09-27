@@ -476,7 +476,7 @@ fn target_with_wo_blobs(target: Target, plan: &WoBundle) -> Target:
 
 // `--link-bundle out/wo/<name>` for a stage compile: the interface,
 // declarations-only codegen and the object, exactly what a compiler that
-// embeds the bundle provides (docs/wo_bundles.md "Bootstrap chain").
+// embeds the bundle provides (docs/spec/toolchain/wo_bundles.md "Bootstrap chain").
 fn target_with_link_bundle(target: Target, ctx: &BuildCtx, plan: &WoBundle) -> Target:
     var out = target
     out = out.arg("--link-bundle")
@@ -1208,7 +1208,7 @@ fn invariance_variant_action(ctx: ActionCtx) -> i32:
 
 // Debug-allocator fixture lane: build tools/debug_drop.w, then run it in `check`
 // mode over test/debug_alloc/*.w. Gives the floor eyes for the over/under-drop
-// blind spot it is structurally unable to see. See docs/debug-allocator.md.
+// blind spot it is structurally unable to see. See docs/spec/toolchain/debug-allocator.md.
 fn run_debug_alloc_tests_action(ctx: ActionCtx) -> i32:
     let inputs = ctx.inputs()
     if inputs.len() == 0:
@@ -1617,7 +1617,7 @@ fn run_stdlib_complexity_action(ctx: ActionCtx):
     let binary = build_project_abs(root, build_project_join(output, host_bin("stdlib-complexity")))
     let stdout_rel = build_project_join(output, "compile.stdout")
     let stderr_rel = build_project_join(output, "compile.stderr")
-    // Build-layer code is compiled by the SEED (docs/decisions.md D14; the
+    // Build-layer code is compiled by the SEED (docs/meetings/2026-07-17-D14-verification-tiering-iterate-on-one-stage-battery-gates.md D14; the
     // seed-gated build-layer rule): a collection literal with moved element
     // temporaries is #1122 under seeds before 9ccd1e2d, so argv is pushed.
     var compile_args: Vec[str] = Vec.new()
@@ -2112,7 +2112,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     out = out.add_target(sdk_group_target())
     out = out.add_target(sdk_package_target(ctx))
 
-    // D38 .wo bundles (docs/wo_bundles.md, build/wo.w): one per registered
+    // D38 .wo bundles (docs/spec/toolchain/wo_bundles.md, build/wo.w): one per registered
     // corpus (build/corpora.w), in registry order. stage1 is the first
     // compiler carrying the tree's ABI stamp, so it builds a bundle when the
     // store lacks its corpus; every later stage compiles with --link-bundle
@@ -2166,7 +2166,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     var spec_inventory = target_new(.Action, "spec-inventory-check", "").output("out/.build-state/spec-inventory-check.txt")
     spec_inventory.action = run_check_spec_inventory_action
     spec_inventory = spec_inventory.write_scope("out/.build-state")
-    spec_inventory = spec_inventory.input("docs/with-specification.md")
+    spec_inventory = spec_inventory.input("docs/spec/README.md")
     spec_inventory = spec_inventory.input("src/Token.w")
     // The corpus packages are internal modules (build/corpora.w names them).
     spec_inventory = spec_inventory.input("src/Parser.w")
@@ -2905,7 +2905,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     out = out.add_target(behavior_tests)
 
     // Debug-allocator fixture lane (custom //! expect-debug-alloc directive; run
-    // via tools/debug_drop.w, not the built-in test runner). See docs/debug-allocator.md.
+    // via tools/debug_drop.w, not the built-in test runner). See docs/spec/toolchain/debug-allocator.md.
     var debug_alloc_tests = target_new(.Action, "debug-alloc-tests", "").output("out/debug-alloc-tests")
     debug_alloc_tests = debug_alloc_tests.allow_parallel()
     debug_alloc_tests.action = run_debug_alloc_tests_action
@@ -2994,7 +2994,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     out = out.add_target(uat_tests)
 
     // D38: the ABI-defining sources' recorded hash must match — an ABI change
-    // without a WITH_ABI_VERSION bump fails the battery (docs/with-abi.md §7).
+    // without a WITH_ABI_VERSION bump fails the battery (docs/spec/abi/with-abi.md §7).
     var abi_hash_check = target_new(.Action, "abi-hash-check", "").output("out/abi-hash-check/stamp")
     abi_hash_check = abi_hash_check.allow_parallel()
     abi_hash_check.action = run_abi_hash_check_action
@@ -3032,7 +3032,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     comptime_diff_tests = comptime_diff_tests.dep("selfcheck")
     out = out.add_target(comptime_diff_tests)
 
-    // The wasm32 lane (docs/wasm-target.md): each fixture is compiled for
+    // The wasm32 lane (docs/proposals/wasm-target.md): each fixture is compiled for
     // wasm32 against out/lib/cross/wasm32/ and run through its emitted JS
     // host under node. `with build :wasm-tests`; not in the standing
     // battery because it needs node on PATH.
@@ -3321,7 +3321,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     tests = tests.dep("cli-selfhost-object-symbol-tests")
     tests = tests.dep("bundle-interface-tests")
     tests = tests.dep("wo-drift")
-    // The corpora lane (docs/stdlib_sourcing_plan.md): every migrated
+    // The corpora lane (docs/proposals/stdlib_sourcing_plan.md): every migrated
     // container corpus runs its upstream test programs under With.
     tests = corpora_test_deps(move tests)
     tests = tests.dep("cli-selfhost-build-w-tests")

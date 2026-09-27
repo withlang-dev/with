@@ -4,7 +4,7 @@ use std.build
 use build.corpus
 use build.wo
 
-// PCRE2 10.47 (the 8-bit library), the first .wo bundle (docs/wo_bundles.md).
+// PCRE2 10.47 (the 8-bit library), the first .wo bundle (docs/spec/toolchain/wo_bundles.md).
 // The generic pipeline (build/corpora.w) fetches, migrates, checks,
 // promotes and bundles it; this module holds the facts and PCRE2's hooks:
 // the reference tree needs a generated config.h and a normalized heap test

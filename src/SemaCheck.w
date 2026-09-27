@@ -2420,7 +2420,7 @@ impl Sema:
         let saved_drop_control_flow_depth: i32 = self.drop_control_flow_depth
         self.current_drop_type_sym = self.drop_owner_for_fn_symbol(fn_name)
         self.drop_control_flow_depth = 0
-        // move-sites (docs/deep-debugging-tools.md): per-body use sequencing for
+        // move-sites (docs/spec/toolchain/deep-debugging-tools.md): per-body use sequencing for
         // the transfer-site liveness verdict. Sites recorded during this body
         // are stamped at body end, once every use has been seen. Bodies are
         // separated by an epoch stamped into every entry — one persistent map,
@@ -19352,7 +19352,7 @@ impl Sema:
                             // (no transfer). But an extern param with a DECLARED
                             // consume/escape effect (`@[effect(x: consume)]`, §16.3d)
                             // DOES take ownership, so enforce the `move` for those too
-                            // (G1 — docs/share_place_known_gaps.md). ONE rule with
+                            // (G1 — docs/proposals/inactive/share_place_known_gaps.md). ONE rule with
                             // MirLower's argument lowering: extern_param_is_bit_copy.
                             if self.extern_param_is_bit_copy(fn_sym, sig_idx, param_i) == 0:
                                 // Ownership is about the PARAMETER's ABI, not the
@@ -25211,7 +25211,7 @@ impl Sema:
                 if field == self.syms.clear:
                     return self.ty_void as i32
                 if field == self.syms.get:
-                    // D27 (docs/d27-implementation-plan.md E1): element access
+                    // D27 (docs/proposals/d27-implementation-plan.md E1): element access
                     // observes — get returns a view of vec-owned storage.
                     // remove below stays owned: removal transfers.
                     self.record_builtin_receiver_view_origins(node, expr)

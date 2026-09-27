@@ -4,7 +4,7 @@
 > states the current rule: `&T` borrows and plain `T` consumes. The historical
 > implementation details below are retained only to explain existing code and
 > commits; they are not a backlog. Every “canonical,” “directive,” phase, and
-> imperative below is void. For D22, `docs/d22-Eric-Ruling.md` is canonical and
+> imperative below is void. For D22, `docs/meetings/d22-Eric-Ruling.md` is canonical and
 > every conflict here is false.
 
 The historical target was to restore `docs/completed/mutability.md`, which was

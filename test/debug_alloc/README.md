@@ -66,5 +66,5 @@ construction and escape shape: `leak count=0`, never `DOUBLE FREE`.
   the narrow drop gate (#608, separate from #607; documented here so the
   instrument's view of it is pinned).
 
-See `docs/debug-allocator.md` for the design and `tools/debug_drop*.lldb` for
+See `docs/spec/toolchain/debug-allocator.md` for the design and `tools/debug_drop*.lldb` for
 resolving the source sites behind a flagged address.

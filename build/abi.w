@@ -1,4 +1,4 @@
-// ABI-hash check (docs/with-abi.md §7, decisions.md D38).
+// ABI-hash check (docs/spec/abi/with-abi.md §7, decisions.md D38).
 //
 // The With ABI's rules live in src/FnAbi.w and src/TypeLayout.w. Their
 // sha256s are recorded in docs/with-abi.sha256 next to the version they
@@ -48,7 +48,7 @@ pub fn run_abi_hash_check_action(ctx: ActionCtx) -> i32:
             report = report ++ "  " ++ path ++ ": recorded " ++ expected.slice(0, 16) ++ "… current " ++ actual.slice(0, 16) ++ "…\n"
         checked = checked + 1
     if failed:
-        ctx.diagnostics().error("abi-hash-check: an ABI-defining source changed and docs/with-abi.sha256 was not re-recorded (docs/abi_roadmap.md Level 0 — this hash keys every .wo bundle):\n" ++ report ++ "  Re-record consciously with `shasum -a 256 src/FnAbi.w src/TypeLayout.w > docs/with-abi.sha256`; every .wo rebuilds once.\n  If the convention itself changed, also bump the WITH_ABI_VERSION label in src/FnAbi.w and add a docs/with-abi.md version-history entry.")
+        ctx.diagnostics().error("abi-hash-check: an ABI-defining source changed and docs/with-abi.sha256 was not re-recorded (docs/spec/abi/abi_roadmap.md Level 0 — this hash keys every .wo bundle):\n" ++ report ++ "  Re-record consciously with `shasum -a 256 src/FnAbi.w src/TypeLayout.w > docs/with-abi.sha256`; every .wo rebuilds once.\n  If the convention itself changed, also bump the WITH_ABI_VERSION label in src/FnAbi.w and add a docs/spec/abi/with-abi.md version-history entry.")
     if checked == 0:
         ctx.diagnostics().error("abi-hash-check: " ++ record_path ++ " records no files")
     if fs.write_text(ctx.output(), f"ok {checked} files\n") != 0:

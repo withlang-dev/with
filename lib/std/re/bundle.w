@@ -1,4 +1,4 @@
-// lib/std/re/bundle.w — the pcre2 .wo bundle root (docs/wo_bundles.md).
+// lib/std/re/bundle.w — the pcre2 .wo bundle root (docs/spec/toolchain/wo_bundles.md).
 // Written by build/corpora.w (pcre2-migrate) from the migrated module list:
 // one `use` per corpus module; the harness (pcre2test, pcre2posix) is excluded.
 use std.re.defs

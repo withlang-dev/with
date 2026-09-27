@@ -1,7 +1,7 @@
 # Hardening the whole project: wire the guardrails to where they bite
 
 Status: PLAN (2026-09-01, whole-project assessment). Nothing here is
-implemented yet. Owner: Eric. Companion: `docs/harden_migrate.md` (the
+implemented yet. Owner: Eric. Companion: `docs/proposals/harden_migrate.md` (the
 migrator-specific plan; item 7 below points at it).
 
 ## The diagnosis

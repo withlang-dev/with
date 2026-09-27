@@ -1,4 +1,4 @@
-// FnAbi — the With ABI's rules, in one ABI-owned module (docs/with-abi.md,
+// FnAbi — the With ABI's rules, in one ABI-owned module (docs/spec/abi/with-abi.md,
 // decisions.md D6 and D38).
 //
 // Everything here is a pure rule over already-computed facts: which pass
@@ -9,7 +9,7 @@
 //
 // This file and src/TypeLayout.w are the ABI-defining sources: their sha256
 // (recorded in docs/with-abi.sha256, checked by the abi-hash-check battery
-// target) keys every .wo bundle's object (docs/abi_roadmap.md, Level 0), so
+// target) keys every .wo bundle's object (docs/spec/abi/abi_roadmap.md, Level 0), so
 // an edit here rebuilds every bundle once, automatically, and an ABI rule
 // cannot drift into an unhashed file unnoticed.
 use Resolve
@@ -18,7 +18,7 @@ extern fn with_str_clone_ref(s: &str) -> str
 extern fn with_str_hash(s: &str) -> u64
 extern fn with_getenv_str(name: &str) -> str
 
-// A label for docs/with-abi.md's version history, not the bundle key; it
+// A label for docs/spec/abi/with-abi.md's version history, not the bundle key; it
 // becomes a frozen, normative major version at Level 1 of the roadmap.
 pub const WITH_ABI_VERSION: i32 = 6
 

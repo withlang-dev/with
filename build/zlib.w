@@ -4,7 +4,7 @@ use std.build
 use build.corpus
 
 // zlib 1.3.2 (madler/zlib release tarball), the second .wo bundle
-// (docs/wo_bundles.md "Conforming pcre2 and zlib"). The generic pipeline
+// (docs/spec/toolchain/wo_bundles.md "Conforming pcre2 and zlib"). The generic pipeline
 // (build/corpora.w) fetches, migrates, checks, promotes and bundles it;
 // this module holds the facts, the staging hook, the migrate hook (the two
 // test programs are migrated one at a time after the library) and the

@@ -554,7 +554,7 @@ fn sc_slotmap(kind: &str):
             "    assert(map.len() == 128)\n"
     source
 
-// Phase 1 facade cells (docs/stdlib_sourcing_plan.md "Facade rules"): every
+// Phase 1 facade cells (docs/proposals/stdlib_sourcing_plan.md "Facade rules"): every
 // value a c-algorithms-backed facade holds drops exactly once — empty,
 // full, after partial transfers, and after a cursor abandoned midway.
 // R orders by id through Ord.cmp, which backs the facades' `<` / `>` (§11.7).

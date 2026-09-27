@@ -3,7 +3,7 @@
 //! expect-stdout: tell ok
 //! expect-stdout: ok
 
-// D51 stage 4c (docs/modeled-c-implementation-plan.md: "`owns:`/`borrows:`
+// D51 stage 4c (docs/proposals/modeled-c-implementation-plan.md: "`owns:`/`borrows:`
 // become deprecated spellings with a diagnostic naming the facade clause").
 // Like `retains:` (spec §16.3c), each is accepted as a spelling of the facade
 // clause it names — `owns: ["cwd_owned -> free"]` is the resource

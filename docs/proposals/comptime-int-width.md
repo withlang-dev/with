@@ -505,7 +505,7 @@ open-ended one and may warrant its own issue.
 
 ## Build environment
 
-Resolved. Follow `docs/with-bootstrap-runbook.md` → **Path A**, with one
+Resolved. Follow `docs/spec/toolchain/with-bootstrap-runbook.md` → **Path A**, with one
 deviation: `with build :deps` failed here with
 
 ```

@@ -1,6 +1,6 @@
 //! expect-stdout: ok
 
-// BinaryHeap[T] over the c-algorithms binary heap (docs/stdlib_sourcing_plan.md
+// BinaryHeap[T] over the c-algorithms binary heap (docs/proposals/stdlib_sourcing_plan.md
 // Phase 1): max and min ordering, peek observes, pop transfers, and
 // exactly-once drops of Drop-class values left in a dropped heap.
 

@@ -1,4 +1,4 @@
-// The compiler's embedded .wo bundles (docs/wo_bundles.md, decisions.md D38).
+// The compiler's embedded .wo bundles (docs/spec/toolchain/wo_bundles.md, decisions.md D38).
 //
 // Each bundle's object, manifest and interface are embedded as blobs by the
 // embed_object_files generator (`with_embedded_wo_<name>_o_*`,

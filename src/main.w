@@ -790,7 +790,7 @@ fn run_cli(argc: i32) -> i32:
     let validate_all_flag = cli_has_flag(argc, "--validate-all")
     let debug_info = not cli_has_flag(argc, "-g0") and not cli_has_flag(argc, "--release")
 
-    // --debug-alloc: enable the native debug allocator (see docs/debug-allocator.md)
+    // --debug-alloc: enable the native debug allocator (see docs/spec/toolchain/debug-allocator.md)
     // in the program we are about to run. Runtime-gated via WITH_DEBUG_ALLOC; the
     // flag is just a discoverable front door that sets it for the child process.
     if cli_has_flag(argc, "--debug-alloc"):
@@ -1008,7 +1008,7 @@ fn run_cli(argc: i32) -> i32:
         // and overwrites with `v<base>-g<commit>` + NUL. Keeping the commit
         // out of the compiled source is what lets the compiler build cache
         // across commits — every commit used to change out/gen/main.w and
-        // force a full recompile (see docs/decisions.md D13).
+        // force a full recompile (see docs/meetings/2026-07-17-D13-commit-derived-compiler-versions-are-post-link-metadata.md D13).
         // Read null-terminated so trailing slot padding never reaches stdout.
         if cli_has_flag(argc, "--abi-sha"):
             // D38: the ABI identity this compiler was linked with (compiler.AbiStamp).
@@ -4973,9 +4973,9 @@ fn print_usage:
     with_write("  --no-runtime     Disable the fiber runtime; async constructs are errors\n")
     with_write("  --no-prelude     Disable implicit prelude import\n")
     with_write("  --debug-alloc    Run under the native debug allocator (double-free/leak\n")
-    with_write("                   detection; see docs/debug-allocator.md). Also WITH_DEBUG_ALLOC.\n")
+    with_write("                   detection; see docs/spec/toolchain/debug-allocator.md). Also WITH_DEBUG_ALLOC.\n")
     with_write("  --trace-alloc    Trace allocation requests to stderr while running\n")
-    with_write("                   (also WITH_DEBUG_ALLOC_TRACE=1; see docs/debug-allocator.md).\n")
+    with_write("                   (also WITH_DEBUG_ALLOC_TRACE=1; see docs/spec/toolchain/debug-allocator.md).\n")
     with_write("  --debug-alloc-filter=<mode>\n")
     with_write("                   Leak report filter: all, non-root, roots\n")
     with_write("  --prelude=<mode> Select prelude mode: full, alloc, core, none\n")
@@ -4997,7 +4997,7 @@ fn print_doc_usage:
     with_write("  --open           Best-effort open after successful generation\n")
     with_write("  --no-std         Disable standard library support while checking docs\n")
     with_write("  --debug-alloc    Run under the native debug allocator (double-free/leak\n")
-    with_write("                   detection; see docs/debug-allocator.md). Also WITH_DEBUG_ALLOC.\n")
+    with_write("                   detection; see docs/spec/toolchain/debug-allocator.md). Also WITH_DEBUG_ALLOC.\n")
     with_write("  --debug-alloc-filter=<mode>\n")
     with_write("                   Leak report filter: all, non-root, roots\n")
     with_write("  --prelude=<mode> Select prelude mode: full, alloc, core, none\n")
@@ -5052,7 +5052,7 @@ fn print_build_usage:
     with_write("  --no-runtime     Disable the fiber runtime; async constructs are errors\n")
     with_write("  --no-prelude     Disable implicit prelude import\n")
     with_write("  --debug-alloc    Run under the native debug allocator (double-free/leak\n")
-    with_write("                   detection; see docs/debug-allocator.md). Also WITH_DEBUG_ALLOC.\n")
+    with_write("                   detection; see docs/spec/toolchain/debug-allocator.md). Also WITH_DEBUG_ALLOC.\n")
     with_write("  --debug-alloc-filter=<mode>\n")
     with_write("                   Leak report filter: all, non-root, roots\n")
     with_write("  --prelude=<mode> Select prelude mode: full, alloc, core, none\n")
@@ -5090,7 +5090,7 @@ fn print_test_usage:
     with_write("  --no-runtime     Disable the fiber runtime; async constructs are errors\n")
     with_write("  --no-prelude     Disable implicit prelude import\n")
     with_write("  --debug-alloc    Run under the native debug allocator (double-free/leak\n")
-    with_write("                   detection; see docs/debug-allocator.md). Also WITH_DEBUG_ALLOC.\n")
+    with_write("                   detection; see docs/spec/toolchain/debug-allocator.md). Also WITH_DEBUG_ALLOC.\n")
     with_write("  --trace-alloc    Trace allocation requests to stderr while running tests\n")
     with_write("  --debug-alloc-filter=<mode>\n")
     with_write("                   Leak report filter: all, non-root, roots\n")
@@ -5715,7 +5715,7 @@ fn run_init_command(argc: i32) -> i32:
 fn cli_init_uat_template(name: &str) -> str:
     "scenario: the program prints its greeting\n\nrun: with build\nrun: ./out/bin/" ++ name ++ "\nexpect exit: 0\nexpect stdout: hello from " ++ name ++ "\n"
 
-// The verbs, one page (docs/uat-plan.md §3), with three worked examples.
+// The verbs, one page (docs/proposals/uat-plan.md §3), with three worked examples.
 fn cli_init_uat_readme_template(name: &str) -> str:
     "# Acceptance scenarios (`with uat`)\n\nA scenario is what a person does at a terminal and what they expect to\nsee, one step per line, in `uat/<name>.uat`. `with uat` runs every scenario\nthat applies on this host; `with uat <name>` runs one; `with uat --list`\nshows them; `with uat --keep` keeps the temporary directories of passing\nscenarios. Captures land in `out/uat/<name>/`.\n\n```\nscenario: the program prints its greeting\n\nrun: with build\nrun: ./out/bin/" ++ name ++ "\nexpect exit: 0\nexpect stdout: hello from " ++ name ++ "\n```\n\n## The verbs\n\n```\nscenario: <title>                       # first line\nrequires: network, display, opengl, lib <name>, tool <name>, env <NAME>\nplatforms: darwin, linux, windows       # where the scenario runs at all\n\nnew directory                           # a fresh temporary directory becomes the cwd\nrun: <command>                          # exit 0 expected\nrun (fails): <command>                  # a non-zero exit expected\nwrite <path> from <fixture>             # copy uat/fixtures/<fixture> to <path>\nwrite <path>:                           # the indented lines below become the file\n    <text>\ncopy <path> to <path>                   # a project file into the scenario's cwd\ncopy $NAME to <path>                    # the file the environment variable names\nenv <NAME>=<value>                      # for the rest of the scenario\nstdin:                                  # for the next run:\n    <text>\nexpect exit: <int>\nexpect stdout: <text>                   # exact, trailing line endings trimmed\nexpect stdout contains: <text>\nexpect stderr contains: <text>\nexpect file <path> exists\nexpect file <path> contains: <text>\nexpect (human): <text>                  # recorded and printed, never executed\n```\n\n`with` at the head of a `run:` line is the toolchain running the scenario\n(`WITH_UAT_WITH=<path>` overrides it). An `expect` applies to the most\nrecent `run:`. An unmet `requires:` skips the scenario with the reason;\nskips do not fail the suite.\n\n## With input\n\n```\nscenario: the program echoes its input\n\nstdin:\n    hello\nrun: with -n 'print(line)'\nexpect stdout: hello\n```\n\n## With a check a person makes\n\n```\nscenario: the window shows the spiral\nrequires: display\n\nrun: with run -- --frames 60\nexpect exit: 0\nexpect (human): colored balls moving on a field of black\n```\n"
 

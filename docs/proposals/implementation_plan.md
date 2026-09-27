@@ -2,9 +2,9 @@
 
 > **D22 override (2026-07-23): A new decision has been made, but implementation
 > is still in progress.** This older issue ordering does not contain the D22
-> implementation design. `docs/d22-Eric-Ruling.md` is canonical and complete;
-> specification v7.2, requirements, and `docs/decisions.md` D22 are derivative.
-> The approved sequence is `docs/d22-implementation-plan.md`, which may organize
+> implementation design. `docs/meetings/d22-Eric-Ruling.md` is canonical and complete;
+> specification v7.2, requirements, and `docs/meetings/2026-07-23-D22-keyed-map-lookup-returns-a-uniform-view-copy-materializes.md` D22 are derivative.
+> The approved sequence is `docs/proposals/d22-implementation-plan.md`, which may organize
 > the work but cannot amend the ruling. Do not fold D22 into an old issue by
 > analogy.
 
@@ -113,7 +113,7 @@ is stable.
 - `#444` Borrow checker Rule 7: implicit drop is a use (§21.1)
 - `#362` Make ephemerality provenance-tracked and modular
 - `#378` Implement returned-view origin tracking (§21.1 Rule 6) with the §22.3 diagnostic contract
-- `D22` Follow `docs/d22-implementation-plan.md`: transparent origins, uniform keyed-map views, contextual Copy/joins, explicit ownership boundaries, diagnostics, and cross-backend verification
+- `D22` Follow `docs/proposals/d22-implementation-plan.md`: transparent origins, uniform keyed-map views, contextual Copy/joins, explicit ownership boundaries, diagnostics, and cross-backend verification
 - `#477` Make stdlib guards and borrowed-data iterators canonically ephemeral (§5.3)
 - `#355` Make unproven ephemeral task escape a hard error
 - `#350` Implement position-based Task disposition semantics

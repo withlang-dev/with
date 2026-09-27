@@ -1,6 +1,6 @@
 //! expect-stdout: ok
 
-// HashIndex[K, V] over the TommyDS hashdyn engine (docs/stdlib_sourcing_plan.md
+// HashIndex[K, V] over the TommyDS hashdyn engine (docs/proposals/stdlib_sourcing_plan.md
 // Phase 2): keyed insert/get/remove, replacement transfers the previous
 // value, growth across several resizes, cursor, and exactly-once drops of
 // Drop-class keys and values.

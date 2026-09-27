@@ -1,6 +1,6 @@
 # D27 element-view acceptance matrix (completed)
 
-Versioned per docs/d27-implementation-plan.md stage E0. The original fixtures
+Versioned per docs/proposals/d27-implementation-plan.md stage E0. The original fixtures
 were excluded from the green runner, like ../d22; every cell is now promoted to
 an active behavior or compile-error lane.
 

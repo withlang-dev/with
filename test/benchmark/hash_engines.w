@@ -1,4 +1,4 @@
-// Hash engine benchmark (docs/stdlib_sourcing_plan.md, Phase 2 gate): the
+// Hash engine benchmark (docs/proposals/stdlib_sourcing_plan.md, Phase 2 gate): the
 // three TommyDS engines and the c-algorithms hash table, each called raw
 // with i32 keys, against today's rt_core HashMap and the HashIndex facade,
 // under one compilation. Prints nanoseconds per operation (median of three

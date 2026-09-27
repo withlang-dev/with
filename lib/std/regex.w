@@ -1,6 +1,6 @@
 // std.regex — high-level regex facade over the migrated PCRE2 engine.
 //
-// The engine is the pcre2 .wo bundle (docs/wo_bundles.md, decisions.md D38,
+// The engine is the pcre2 .wo bundle (docs/spec/toolchain/wo_bundles.md, decisions.md D38,
 // D39): `use std.re.*` resolves to the bundle's interface, the calls below
 // are ordinary With calls, and the link selects the bundle on demand.
 

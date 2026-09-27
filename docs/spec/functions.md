@@ -493,7 +493,7 @@ fn Counter.zero() -> Counter: Counter { n: 0 }   # top level: associated
 *Transition:* the explicit receiver-parameter forms (`self: &Self`,
 `mut self: Self`, `move self: Self`) remain accepted while the compiler and
 stdlib migrate to the keyword form; the parser desugars the keyword form to
-them. See `docs/eliminate-self.md` for the phased plan.
+them. See `docs/proposals/eliminate-self.md` for the phased plan.
 
 **Any owner type may be extended, primitives and `str` included — the
 receiver mode decides by-place behavior, not the owner's type (D12).** A `mut fn`

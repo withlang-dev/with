@@ -1307,7 +1307,7 @@ fn rt_alloc_release_mmap_bytes(total: i64):
 // Current committed (reserved) byte count. Exposed for memory profiling: bracket a
 // compile phase (read before/after, accumulate deltas + a call count, print) to
 // localize allocation growth to a phase when the debug allocator's fixed ledger
-// overflows at scale. See docs/debug-allocator.md; a proper call-site profiler is #618.
+// overflows at scale. See docs/spec/toolchain/debug-allocator.md; a proper call-site profiler is #618.
 pub fn with_alloc_committed_bytes() -> i64:
     rt_alloc_committed_bytes
 

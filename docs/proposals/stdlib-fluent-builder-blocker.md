@@ -4,7 +4,7 @@
 (2026-07-22). This file records the retired receiver-returning design; it is
 not an implementation plan.
 
-Replacement plan: `docs/feature_plans/d21-mutator-pipeline-implementation.md`.
+Replacement plan: `docs/proposals/d21-mutator-pipeline-implementation.md`.
 
 The earlier design made `Vec.push` return the receiver so ordinary
 return-value pipelines could chain:

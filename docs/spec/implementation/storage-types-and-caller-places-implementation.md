@@ -323,7 +323,7 @@ own.
 `[u8; K]` / `@[physical]` projection → `memcpy` to aligned temporary and
 typed load; disjoint whole copy → `memcpy`; overlapping assignment →
 `memmove`/temp; `zeroed`). Run under the
-debug allocator (`docs/debug-allocator.md`) to confirm no hidden
+debug allocator (`docs/spec/toolchain/debug-allocator.md`) to confirm no hidden
 allocations.
 
 **Done when.** The S3 behavior tests pass through LLVM on all three
@@ -368,7 +368,7 @@ key includes mode — the `llvm_type_mangle` / mono-cache path). Precisely:
 every signature, type, and monomorphization identity that distinguishes
 parameter *types* must also distinguish parameter *mode* (overload
 resolution, mono cache, bundle interface signature). Link-symbol naming
-policy in `docs/with-abi.md` (semantic symbol names, types carried by the
+policy in `docs/spec/abi/with-abi.md` (semantic symbol names, types carried by the
 source interface) is preserved; do not add mode to external link names
 unless overload implementation already requires type-distinguished link
 names.
@@ -440,7 +440,7 @@ green before P2.
 **Where.** `FnAbi.w`, `Codegen.w` (`declare_function_from_sig`,
 `apply_noalias_param_attrs_with_offset`), `CodegenDispatch.w`
 (`mir_ref_arg_ptr` and the `push_call_arg` arm for indirect place),
-`docs/with-abi.md`, `WITH_ABI_VERSION`.
+`docs/spec/abi/with-abi.md`, `WITH_ABI_VERSION`.
 
 **Descriptor.** Add an aliasing field to the per-arg ABI record:
 `PA_EXCLUSIVE = 0, PA_MAY_ALIAS = 1`. `fn_abi_pass_mode` keeps returning
@@ -512,7 +512,7 @@ function; IR-grep that the call site and the imported declaration carry
 no `noalias`.
 
 **ABI doc.** Bump `WITH_ABI_VERSION`, add the alias field to the
-descriptor table in `docs/with-abi.md`, regenerate `with-abi.sha256`.
+descriptor table in `docs/spec/abi/with-abi.md`, regenerate `with-abi.sha256`.
 
 **Tests.** IR-grep corpus tests for both contracts (`byref` absent;
 `inout` present for a pure callee, absent for a callee touching a
@@ -791,11 +791,11 @@ tool can count them.
 - Spec: new chapter after §4 for Part A; §9.1 gains parameter modes;
   §21 gains the exclusivity principle, reservation, and byref class;
   §16.4 gains one sentence pointing storage overlays elsewhere.
-- `docs/with-abi.md`: alias contract field.
-- `docs/with-idiomatic-guide.md`: when to use `inout` vs. returning a
+- `docs/spec/abi/with-abi.md`: alias contract field.
+- `docs/spec/guide/with-idiomatic-guide.md`: when to use `inout` vs. returning a
   value; when `byref` is appropriate (almost never in new code; it
   records unproven aliasing).
-- `docs/COBOL-migrate.md`: update the mapping table (`REDEFINES` →
+- `docs/proposals/COBOL-migrate.md`: update the mapping table (`REDEFINES` →
   storage overlay, not anonymous union; `PIC X(n)` → `text[N, Enc]`, not
   `FixedString`; `CALL BY REFERENCE` → `byref`, refined to `inout`).
 

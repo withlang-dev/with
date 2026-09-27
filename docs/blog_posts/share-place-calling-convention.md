@@ -5,7 +5,7 @@
 > consumes, with auto-ref preserving call-site ergonomics. This post is retained
 > as design history and must not be read as current documentation. Every later
 > claim that SHARE-PLACE is “current,” “canonical,” or implementation direction
-> is historical and false. For D22 intersections, `docs/d22-Eric-Ruling.md` is
+> is historical and false. For D22 intersections, `docs/meetings/d22-Eric-Ruling.md` is
 > canonical. `mut fn` receivers still mutate their caller's place in place.
 
 There's a trade every systems programmer has made a thousand times without noticing, because it's baked so deep into the languages we use that it looks like the weather.

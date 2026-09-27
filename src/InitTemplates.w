@@ -1,5 +1,5 @@
 // Embedded project templates for `with init`.
-// Generated from docs/with_for_ai.md by tools/gen_init_templates.w;
+// Generated from docs/spec/guide/with_for_ai.md by tools/gen_init_templates.w;
 // rerun that tool whenever the guide changes.
 
 pub fn init_ai_guide_template -> str:

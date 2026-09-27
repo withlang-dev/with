@@ -285,10 +285,10 @@ impl Parser:
     // D39 interface mode: the body slot of a declaration. A body in a `.wi`
     // is an error (the object holds the code); the recovery still parses it
     // so the rest of the file is diagnosed. Generic, async, gen and comptime
-    // functions cannot cross a bundle boundary (Level 0, docs/abi_roadmap.md).
+    // functions cannot cross a bundle boundary (Level 0, docs/spec/abi/abi_roadmap.md).
     mut fn parse_interface_body(tp_count: i32, is_async: i32, is_gen: i32, is_comptime: i32) -> NodeId:
         if tp_count > 0:
-            self.emit_error("interface declarations cannot be generic (D39: a bundle boundary is Level 0, docs/abi_roadmap.md)")
+            self.emit_error("interface declarations cannot be generic (D39: a bundle boundary is Level 0, docs/spec/abi/abi_roadmap.md)")
         if is_async != 0 or is_gen != 0 or is_comptime != 0:
             self.emit_error("interface declarations cannot be async, gen, or comptime functions (D39)")
         if self.peek() == TokenKind.TK_COLON or self.peek() == TokenKind.TK_L_BRACE:
