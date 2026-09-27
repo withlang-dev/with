@@ -6165,6 +6165,23 @@ impl Sema:
     // its store followed by a read of its place (MirLower, ComptimeEval).
     fn tail_reads_place(node: i32): node != 0 and self.tail_read_assigns.contains(node)
 
+    // §9.1 / D73: an assignment in a value position other than the body's
+    // tail yields a view of its place after the store — the read that the
+    // place spelled there would be under D22/D27: a Copy demand copies, an
+    // owned demand on a non-Copy view is refused (view_projection_exprs).
+    fn assign_reads_view(node: i32): node != 0 and (self.tail_read_assigns.get(node) ?? 0) == 2
+
+    // An assignment is a statement when it is the statement being checked
+    // (check_block, check_expr_statement_context set the root), through
+    // any grouping. Every other position is a value position; a body's tail
+    // is re-classified once the body is typed (record_tail_reads,
+    // discard_body_tail).
+    fn assign_in_statement_position(node: i32) -> bool:
+        var root = self.current_statement_expr_root
+        while root != 0 and self.ast.kind(root) == NodeKind.NK_GROUPED:
+            root = self.ast.get_data0(root)
+        root == node
+
     fn recorded_value_type(node: i32) -> bool:
         let ty = self.recorded_expr_type_or_zero(node)
         ty != 0 and ty != self.ty_void as i32 and ty != self.ty_never as i32
@@ -10208,7 +10225,11 @@ impl Sema:
             return
         self.view_projection_exprs.insert(expr, field_ty)
 
-    mut fn reject_owned_demand_from_view_projection(value_node: i32, demanded: i32, context: &str):
+    mut fn reject_owned_demand_from_view_projection(value_node0: i32, demanded: i32, context: &str):
+        // D73: `(s = e)` is the view its assignment yields, through the grouping.
+        var value_node = value_node0
+        while value_node > 0 and self.ast.kind(value_node) == NodeKind.NK_GROUPED:
+            value_node = self.ast.get_data0(value_node)
         if value_node <= 0:
             return
         if not self.view_projection_exprs.contains(value_node):
@@ -10473,7 +10494,11 @@ impl Sema:
         // keeps `let _ = param` a non-consuming acknowledgement: the param stays
         // share-place (borrowed) instead of being forced to owned.
         var field_view_let = 0
-        if self.pool_resolve(name) != "_" and not self.view_projection_exprs.contains(value):
+        // D73: `let t = (s = e)` binds the view the grouped assignment yields.
+        var value_core = value
+        while value_core != 0 and self.ast.kind(value_core) == NodeKind.NK_GROUPED:
+            value_core = self.ast.get_data0(value_core)
+        if self.pool_resolve(name) != "_" and not self.view_projection_exprs.contains(value) and not self.view_projection_exprs.contains(value_core):
             // §2.4: a drop-body let of a self field CONSUMES (the 84ebff6d
             // observation rule contradicted the spec — spec_ss02_4 pins the
             // WFN order: consumed local drops before the remaining-field
@@ -10544,7 +10569,7 @@ impl Sema:
         else:
             self.binding_closure_nodes.remove(name)
         let bind_kind = self.get_type_kind(self.resolve_alias(bind_type))
-        if bind_kind == TypeKind.TY_REF or self.view_projection_exprs.contains(value) or field_view_let != 0:
+        if bind_kind == TypeKind.TY_REF or self.view_projection_exprs.contains(value) or self.view_projection_exprs.contains(value_core) or field_view_let != 0:
             self.scope_set_is_view_bound(name)
         if self.scope_is_view_bound(name) != 0 or self.type_has_drop_impl(bind_type as i32) != 0 or self.type_is_ephemeral_value(bind_type as i32) != 0 or self.closure_expr_has_by_place_captures(value) != 0:
             self.record_view_binding_from_expr(name, value)
@@ -10722,7 +10747,9 @@ impl Sema:
                 join_roles.push(D22_JOIN_ROLE_EXPR)
                 // #1754: at a `&T` parameter the arms decide the join (no anchor).
                 let if_anchor = if self.borrow_pointee_join_node == node: 0 as TypeId else: outer_expected
+                self.join_assign_arms_as_views = if is_infer_tail: 0 else: 1
                 let arm_types = self.join_field_arms_as_views(if_anchor as i32, &join_nodes, move join_types)
+                self.join_assign_arms_as_views = 0
                 let saved_infer_join: i32 = self.infer_tail_join
                 self.infer_tail_join = if is_infer_tail: 1 else: 0
                 result_type = self.resolve_contextual_join(if_anchor as i32, &join_nodes, &origin_nodes, &arm_types, &join_roles, node, "if") as TypeId
@@ -10944,6 +10971,10 @@ impl Sema:
         if kind == NodeKind.NK_ASSIGN:
             out = self.collect_expr_view_deps(self.ast.get_data0(node), move out)
             out = self.collect_expr_view_deps(self.ast.get_data1(node), move out)
+            // D73: in a value position the assignment is a view of its place,
+            // so an owned whole-local target is an origin, as an element's or
+            // field's root is (a join of such arms binds a view of it).
+            out = self.push_unique_i32(move out, self.assign_view_targets.get(node) ?? 0)
             return out
         // #1406 (§3.4, §21.1 rule 10, D27): an element view carries the
         // origins check_index recorded on it (record_view_producer_origins:
@@ -11199,11 +11230,18 @@ impl Sema:
             var peeled_place = expr_node
             while peeled_place != 0 and self.ast.kind(peeled_place) == NodeKind.NK_GROUPED:
                 peeled_place = self.ast.get_data0(peeled_place)
+            // D73: the view an assignment yields is of its target place.
+            var assign_view = false
+            if peeled_place != 0 and self.ast.kind(peeled_place) == NodeKind.NK_ASSIGN and self.assign_reads_view(peeled_place):
+                assign_view = true
+                peeled_place = self.ast.get_data0(peeled_place)
+                while peeled_place != 0 and self.ast.kind(peeled_place) == NodeKind.NK_GROUPED:
+                    peeled_place = self.ast.get_data0(peeled_place)
             // #1244: an auto-referenced initializer (`let s: &T = x`) borrows
             // its root exactly as `&x` does.
             // #1530: a field view of an owned root (`let p = x.s`, D22)
             // borrows that root exactly as an element view does.
-            if peeled_place != 0 and (self.ast.kind(peeled_place) == NodeKind.NK_INDEX or self.ast.kind(peeled_place) == NodeKind.NK_FIELD_ACCESS or self.auto_ref_binding_values.contains(expr_node)):
+            if peeled_place != 0 and (assign_view or self.ast.kind(peeled_place) == NodeKind.NK_INDEX or self.ast.kind(peeled_place) == NodeKind.NK_FIELD_ACCESS or self.auto_ref_binding_values.contains(expr_node)):
                 let root = self.place_root_sym(peeled_place)
                 if root != 0 and root != sym:
                     deps = self.push_unique_i32(move deps, root)
@@ -12182,6 +12220,23 @@ impl Sema:
                 self.clear_binding_view_deps(target_sym)
         else if self.ast.kind(target) == NodeKind.NK_FIELD_ACCESS:
             self.clear_moved_fields_for_place_expr(target)
+
+        // §9.1 / D73: in a value position the assignment yields a read of
+        // `place` after the store, a view (assign_reads_view). A non-Copy
+        // place's view is recorded as a view projection, so an owned demand
+        // on it — `a = b = s`, `let t: str = (s = e)` — is refused at the
+        // demand with the clone fix-it, and the value is never duplicated.
+        if not self.assign_in_statement_position(node):
+            self.tail_read_assigns.insert(node, 2)
+            if target_type != 0 and self.is_copy(target_type) == 0:
+                let tk = self.get_type_kind(self.resolve_alias(target_type))
+                if tk != TypeKind.TY_REF and tk != TypeKind.TY_PTR:
+                    self.view_projection_exprs.insert(node, target_type as i32)
+                    var view_target = target
+                    while view_target != 0 and self.ast.kind(view_target) == NodeKind.NK_GROUPED:
+                        view_target = self.ast.get_data0(view_target)
+                    if view_target != 0 and self.ast.kind(view_target) == NodeKind.NK_IDENT and self.scope_has(self.ast.get_data0(view_target)) != 0:
+                        self.assign_view_targets.insert(node, self.ast.get_data0(view_target))
 
         if target_type != 0:
             return target_type as i32
@@ -14593,7 +14648,9 @@ impl Sema:
         if match_is_value:
             // #1754: at a `&T` parameter the arms decide the join (no anchor).
             let match_anchor = if self.borrow_pointee_join_node == node: 0 as TypeId else: match_expected
+            self.join_assign_arms_as_views = if is_infer_tail: 0 else: 1
             let arm_types = self.join_field_arms_as_views(match_anchor as i32, &join_expr_nodes, move join_expr_types)
+            self.join_assign_arms_as_views = 0
             let saved_infer_join: i32 = self.infer_tail_join
             self.infer_tail_join = if is_infer_tail: 1 else: 0
             result_type = self.resolve_contextual_join(match_anchor as i32, &join_expr_nodes, &join_origin_nodes, &arm_types, &join_roles, node, "match") as TypeId
@@ -26300,7 +26357,7 @@ impl Sema:
             return self.borrow_root_place(self.ast.get_data0(node))
         if kind == NodeKind.NK_INDEX:
             return self.borrow_root_place(self.ast.get_data0(node))
-        if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_NO_SUSPEND:
+        if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_NO_SUSPEND or (kind == NodeKind.NK_ASSIGN and self.assign_reads_view(node)):
             return self.borrow_root_place(self.ast.get_data0(node))
         0
 
@@ -27549,7 +27606,8 @@ impl Sema:
             let carrier = self.pipeline_carrier_kinds.get(node)
             if carrier.is_some() and carrier.unwrap() != 0:
                 return self.place_root_sym(self.ast.get_data0(node))
-        if kind == NodeKind.NK_FIELD_ACCESS or kind == NodeKind.NK_COMPUTED_FIELD_ACCESS or kind == NodeKind.NK_INDEX or kind == NodeKind.NK_MULTI_INDEX or kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_NO_SUSPEND:
+        // D73: an assignment in a value position is a read of its place.
+        if kind == NodeKind.NK_FIELD_ACCESS or kind == NodeKind.NK_COMPUTED_FIELD_ACCESS or kind == NodeKind.NK_INDEX or kind == NodeKind.NK_MULTI_INDEX or kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_NO_SUSPEND or (kind == NodeKind.NK_ASSIGN and self.assign_reads_view(node)):
             return self.place_root_sym(self.ast.get_data0(node))
         // &x.field — strip the reference operator to get the underlying place's root
         if kind == NodeKind.NK_UNARY:
@@ -28474,17 +28532,30 @@ impl Sema:
     // when it can join as a view of its place, else 0.
     mut fn join_field_view_candidate(arm: i32) -> i32:
         let leaf = self.join_arm_leaf(arm)
-        if leaf == 0 or self.ast.kind(leaf) != NodeKind.NK_FIELD_ACCESS or self.d32_base_is_type_name(leaf) != 0:
+        if leaf == 0:
             return 0
-        let fty_opt = self.typed_expr_types.get(leaf)
-        let fty = if fty_opt.is_some(): fty_opt.unwrap() else: 0
+        // D73: an arm that is an assignment yields a view of its place, which
+        // joins as a field view does (`let t = if p: s = e1 else: s = e2`).
+        var place = leaf
+        if self.ast.kind(leaf) == NodeKind.NK_ASSIGN and self.assign_reads_view(leaf) and self.join_assign_arms_as_views != 0:
+            place = self.ast.get_data0(leaf)
+            while place != 0 and self.ast.kind(place) == NodeKind.NK_GROUPED:
+                place = self.ast.get_data0(place)
+            if place == 0 or (self.ast.kind(place) != NodeKind.NK_IDENT and self.ast.kind(place) != NodeKind.NK_FIELD_ACCESS):
+                return 0
+        else if self.ast.kind(leaf) != NodeKind.NK_FIELD_ACCESS or self.d32_base_is_type_name(leaf) != 0:
+            return 0
+        let fty_opt = self.typed_expr_types.get(place)
+        var fty = if fty_opt.is_some(): fty_opt.unwrap() else: 0
+        if place != leaf:
+            fty = self.assignment_target_value_type(place, fty) as i32
         // #1531 (§3.8, D27): a Copy field joins as a view too, as a Copy
         // element does (`if c: v[0] else: v[1]` is `&i32`).
         if fty == 0:
             return 0
-        if unpack_place_kind(self.classify_place(leaf)) == PlaceKind.PK_NotPlace:
+        if unpack_place_kind(self.classify_place(place)) == PlaceKind.PK_NotPlace:
             return 0
-        let root = self.place_root_sym(leaf)
+        let root = self.place_root_sym(place)
         if root == 0 or self.scope_has(root) == 0:
             return 0
         leaf

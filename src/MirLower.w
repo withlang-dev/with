@@ -5974,6 +5974,10 @@ impl MirBuilder:
         let kind = self.ast.kind(node)
         if kind == NodeKind.NK_GROUPED:
             return self.lower_binding_alias_place(self.ast.get_data0(node))
+        // D73: `let t = (s = e)` binds the view of `s` the assignment yields:
+        // the store, then the place itself.
+        if kind == NodeKind.NK_ASSIGN and self.sema.assign_reads_view(node):
+            return self.lower_expr_place(node)
         if kind == NodeKind.NK_UNARY and self.ast.get_data0(node) == UnaryOp.UOP_DEREF and self.sema.view_projection_exprs.contains(node):
             // Sema recorded a non-owning projection through &T. Copying this
             // place into an owning local would free the referent at scope exit.
@@ -6414,15 +6418,17 @@ impl MirBuilder:
         self.assign_operand_to_place(place, rhs, self.ast.get_start(place_expr))
         rhs
 
-    // Lowers the store of `place_expr = rhs_expr`. With `read_back` it
-    // returns the §9.1 / D60 value of a tail assignment — a read of the place
-    // after the store (read_assigned_place) — else -1.
-    mut fn lower_assign(place_expr: i32, rhs_expr: i32, read_back: bool) -> i32:
+    // Lowers the store of `place_expr = rhs_expr`. `read_back` is the §9.1
+    // value the assignment yields — 1 at a body's tail (D60: a read of the
+    // place, a whole local moving), 2 in any other value position (D73: a
+    // view of the place) — read after the store (read_assigned_place); 0 for
+    // a statement, and -1 is returned.
+    mut fn lower_assign(place_expr: i32, rhs_expr: i32, read_back: i32) -> i32:
         // Multi-index assignment: a[i, j] = value → call multi_index_set
         if self.ast.kind(place_expr) == NodeKind.NK_MULTI_INDEX or self.is_runtime_pair_multi_index(place_expr) != 0:
             // Sema types a multi-index store Unit (check_assign), so it is
             // never a tail read.
-            if read_back:
+            if read_back != 0:
                 sema_phase_bug(f"BUG: a multi-index assignment reached a tail read: node={place_expr}")
             self.lower_multi_index_set(place_expr, rhs_expr)
             return -1
@@ -6475,7 +6481,7 @@ impl MirBuilder:
                     let ret_place = self.place_for_local(0)
                     self.terminate(TermKind.TK_CALL, ip_fn_op, ip_args_id, ret_place, ip_next_bb)
                     self.switch_to(ip_next_bb)
-                    if not read_back:
+                    if read_back == 0:
                         return -1
                     // The place of a user IndexPlace is its `get`: read it back
                     // with the receiver and index this store evaluated once.
@@ -6496,7 +6502,7 @@ impl MirBuilder:
                     let ip_rb_fn_op = self.const_operand(ConstKind.CK_FN, ip_rb_fn, ip_rb_ty)
                     self.terminate(TermKind.TK_CALL, ip_rb_fn_op, ip_rb_args_id, ip_rb_place, ip_rb_next)
                     self.switch_to(ip_rb_next)
-                    return self.read_assigned_place(place_expr, ip_rb_place)
+                    return self.read_assigned_place(place_expr, ip_rb_place, read_back)
         // §6.3 compound assignment single-evaluation: xs[f()] += g() must
         // evaluate f() and g() exactly once.  The parser desugars += to
         // NK_ASSIGN(target, NK_BINARY(op, target, rhs)) sharing the same AST
@@ -6504,7 +6510,7 @@ impl MirBuilder:
         // single read-modify-write through the place.
         let append_place = self.try_lower_string_self_concat_assign(place_expr, rhs_expr)
         if append_place >= 0:
-            return if read_back: self.read_assigned_place(place_expr, append_place) else: -1
+            return if read_back != 0: self.read_assigned_place(place_expr, append_place, read_back) else: -1
 
         if self.ast.kind(rhs_expr) == NodeKind.NK_BINARY and self.ast.get_data1(rhs_expr) == place_expr:
             let ca_op = self.ast.get_data0(rhs_expr)
@@ -6515,7 +6521,7 @@ impl MirBuilder:
             let ca_inc = self.lower_expr(ca_inc_expr)
             let ca_result = self.lower_bin_op_operand(ca_op, ca_cur, ca_inc, ca_elem_ty, self.ast.get_start(place_expr))
             self.assign_operand_to_place(ca_place, ca_result, self.ast.get_start(place_expr))
-            return if read_back: self.read_assigned_place(place_expr, ca_place) else: -1
+            return if read_back != 0: self.read_assigned_place(place_expr, ca_place, read_back) else: -1
 
         let place = self.lower_expr_place(place_expr)
         let saved_expected = self.expected_type
@@ -6528,7 +6534,7 @@ impl MirBuilder:
         let rhs = self.lower_expr(rhs_expr)
         self.expected_type = saved_expected
         let _ = self.finish_assignment_to_place(place_expr, place, dest_ty, rhs, rhs_reset_start, rhs_field_reset_start, rhs_move_temp_start)
-        if read_back: self.read_assigned_place(place_expr, place) else: -1
+        if read_back != 0: self.read_assigned_place(place_expr, place, read_back) else: -1
 
     // §9.1 / D60: a tail assignment's value is a read of its place after the
     // store, under the ordinary copy and move rules — exactly the operand the
@@ -6536,8 +6542,15 @@ impl MirBuilder:
     // deref arms of lower_expr). Sema admitted only reads those rules allow
     // (check_tail_read_place: a global, field or element of a type that needs
     // drop is an error there), so a whole local moves out and the rest copy.
-    mut fn read_assigned_place(place_expr: i32, place: i32) -> i32:
+    mut fn read_assigned_place(place_expr: i32, place: i32, mode: i32) -> i32:
         let ty = self.assignment_place_value_type(place_expr)
+        // D73: in a value position other than the tail the read is a view of
+        // the place — the place itself, read; nothing is moved out or
+        // duplicated (Sema refuses an owned demand on a non-Copy one). A str
+        // place with a live view takes the copying concat form later.
+        if mode == 2:
+            self.mark_string_place_copied(place)
+            return self.body.new_operand(OperandKind.OK_COPY, place)
         var target = place_expr
         while target != 0 and (self.ast.kind(target) == NodeKind.NK_GROUPED or self.ast.kind(target) == NodeKind.NK_NO_SUSPEND):
             target = self.ast.get_data0(target)
@@ -6645,7 +6658,7 @@ impl MirBuilder:
 
         if kind == NodeKind.NK_ASSIGN:
             let target = self.ast.get_data0(node)
-            let _ = self.lower_assign(target, self.ast.get_data1(node), false)
+            let _ = self.lower_assign(target, self.ast.get_data1(node), 0)
             return self.lower_expr_place(target)
 
         if kind == NodeKind.NK_CALL:
@@ -6991,13 +7004,13 @@ impl MirBuilder:
             let inner_result = self.lower_expr_discard(self.ast.get_data0(node))
             self.no_suspend_nodes.pop()
             inner_result
-        else if kind == NodeKind.NK_ASSIGN and not self.sema.tail_reads_place(node):
+        else if kind == NodeKind.NK_ASSIGN and (not self.sema.tail_reads_place(node) or self.sema.assign_reads_view(node)):
             // A discarded assignment is a statement, as in a block
             // (lower_block_mode). As an expression it yields a copy of its
             // place, so lower_expr marks an in-place `s = s ++ x` may-alias —
             // and a one-statement `if` arm doing that append (the separator of
             // a join loop) made every later append of `s` copy it (#1491).
-            self.lower_assign(self.ast.get_data0(node), self.ast.get_data1(node), false)
+            self.lower_assign(self.ast.get_data0(node), self.ast.get_data1(node), 0)
         else if kind == NodeKind.NK_WITH_EXPR and self.sema.with_form_kinds.contains(node) and (self.sema.with_form_kinds.get(node).unwrap() == WithFormKind.Guarded as i32 or self.sema.with_form_kinds.get(node).unwrap() == WithFormKind.GuardedMut as i32):
             self.cur_node = node
             self.lower_with_guarded_mode(node, 0)
@@ -7140,7 +7153,7 @@ impl MirBuilder:
                 self.finish_stmt_temp_frame(stmt_frame)
                 continue
             if sk == NodeKind.NK_ASSIGN:
-                let _ = self.lower_assign(self.ast.get_data0(stmt), self.ast.get_data1(stmt), false)
+                let _ = self.lower_assign(self.ast.get_data0(stmt), self.ast.get_data1(stmt), 0)
                 self.finish_stmt_temp_frame(stmt_frame)
                 continue
             if sk == NodeKind.NK_RETURN:
@@ -15915,7 +15928,7 @@ impl MirBuilder:
             // §9.1 / D60: an assignment the body returns stores as a statement
             // does, then yields a read of its place.
             if self.sema.tail_reads_place(node):
-                return self.lower_assign(target, rhs_node, true)
+                return self.lower_assign(target, rhs_node, if self.sema.assign_reads_view(node): 2 else: 1)
             let append_place = self.try_lower_string_self_concat_assign(target, rhs_node)
             if append_place >= 0:
                 self.mark_string_place_copied(append_place)

@@ -1529,12 +1529,21 @@ pub type Sema {
     // §9.1 / D60: the assignments whose value is the body's returned value —
     // the body tail under a declared non-`Unit` return, or an arm of a tail
     // `if`/`match` that the return takes. MirLower lowers each as its store
-    // followed by a read of its place (tail_reads_place).
+    // followed by a read of its place (tail_reads_place): 1 for the tail
+    // (D60: a whole local moves), 2 for any other value position (D73: the
+    // read is a view of the place, assign_reads_view).
     tail_read_assigns: HashMap[i32, i32],
+    // D73: assignment node -> the whole non-Copy local it assigns, when its
+    // view (assign_reads_view) is rooted at that local (a view origin).
+    assign_view_targets: HashMap[i32, i32],
     // D55 (§18.2): the `if`/`match` node that is the argument of a generic
     // parameter bounded by Display (`print(match ..)`). Its arms join under
     // the ordinary rule; when nothing joins, the fix-it is the f-string.
     display_join_node: i32,
+    // D73: 1 while an `if`/`match` join may take an assignment arm as a view
+    // of its place; 0 for the tail join of an unannotated body, whose arms
+    // join as values (D43, D60: the body returns a read of the place).
+    join_assign_arms_as_views: i32,
     // #1196: signatures whose return type has been taken from their body. Until
     // then an unannotated signature reads as Unit, which a caller cannot tell
     // from a function that returns nothing.
@@ -2936,7 +2945,9 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         body_tail_discards: true,
         discarded_tails: sema_new_map_i32_i32(),
         tail_read_assigns: sema_new_map_i32_i32(),
+        assign_view_targets: sema_new_map_i32_i32(),
         display_join_node: 0,
+        join_assign_arms_as_views: 0,
         body_typed_sigs: sema_new_map_i32_i32(),
         untyped_callee_calls: Vec.new(),
         discarded_stmt_node: 0,
