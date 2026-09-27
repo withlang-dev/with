@@ -58,12 +58,19 @@ fn take_slot(record: &str) -> str:
         return path
     ""
 
+// Every target the runner reports as failed: its per-target error line
+// (`error: build.w target 'x' failed …`, `error: build.w test target 'x'
+// failed …`) names it even when the closing survey summary is absent.
 fn failed_targets(log: &str) -> str:
     let text = read_file(log) ?? ""
-    var out = ""
+    var out = " "
     for line in text.split("\n"):
-        if line.starts_with("  failed: "): out = out ++ line.slice(10, line.len()) ++ " "
-    out
+        if not line.starts_with("error: build.w ") or not line.contains("' failed"): continue
+        let quoted = line.split("'")
+        if quoted.len() < 2: continue
+        let name = quoted[1].clone()
+        if not out.contains(" " ++ name ++ " "): out = out ++ name ++ " "
+    out.trim().clone()
 
 fn step(name: &str, cmd: &str, status: &str) -> i32:
     let t0 = now()
