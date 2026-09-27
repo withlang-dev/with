@@ -1657,7 +1657,7 @@ impl CCodegen:
                     tid = ft
                     continue
                 if tk == TypeKind.TY_GENERIC_INST:
-                    let ft = self.vec_synthetic_field_tid(resolved as i32, pd)
+                    let ft = self.generic_inst_field_tid(resolved as i32, pd)
                     if ft != 0:
                         tid = ft
                         continue
@@ -1685,6 +1685,10 @@ impl CCodegen:
             if pk == ProjKind.PK_DEREF:
                 if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF:
                     tid = self.sema.get_type_d0(resolved)
+                    continue
+                let box_pointee = self.std_box_pointee_tid(resolved as i32)
+                if box_pointee != 0:
+                    tid = box_pointee
                     continue
                 return 0
             if pk == ProjKind.PK_DOWNCAST:
@@ -1740,7 +1744,7 @@ impl CCodegen:
                     tid = ft
                     continue
                 if tk == TypeKind.TY_GENERIC_INST:
-                    let ft = self.vec_synthetic_field_tid(resolved as i32, pd)
+                    let ft = self.generic_inst_field_tid(resolved as i32, pd)
                     if ft != 0:
                         tid = ft
                         continue
@@ -1770,6 +1774,10 @@ impl CCodegen:
             if pk == ProjKind.PK_DEREF:
                 if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF:
                     tid = self.sema.get_type_d0(resolved)
+                    continue
+                let box_pointee = self.std_box_pointee_tid(resolved as i32)
+                if box_pointee != 0:
+                    tid = box_pointee
                     continue
                 return 0
             if pk == ProjKind.PK_DOWNCAST:
@@ -1822,7 +1830,7 @@ impl CCodegen:
                     tid = ft
                     continue
                 if tk == TypeKind.TY_GENERIC_INST:
-                    let ft = self.vec_synthetic_field_tid(resolved as i32, pd)
+                    let ft = self.generic_inst_field_tid(resolved as i32, pd)
                     if ft != 0:
                         tid = ft
                         continue
@@ -1849,6 +1857,10 @@ impl CCodegen:
             if pk == ProjKind.PK_DEREF:
                 if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF:
                     tid = self.sema.get_type_d0(resolved)
+                    continue
+                let box_pointee = self.std_box_pointee_tid(resolved as i32)
+                if box_pointee != 0:
+                    tid = box_pointee
                     continue
                 return 0
             if pk == ProjKind.PK_DOWNCAST:
@@ -2002,6 +2014,10 @@ impl CCodegen:
                 return "int64_t"  // opaque handle, same runtime representation as HashMap
             if base_name == "SlotMap":
                 return "int64_t"  // opaque handle, LLVM backend owns SlotMap intrinsics
+            let box_pointee = self.std_box_pointee_tid(resolved as i32)
+            if box_pointee != 0:
+                let pointee = self.c_type(box_pointee, 0)
+                return if pointee == "void": "uint8_t*" else: pointee ++ "*"
             if self.type_is_payload_enum(resolved as i32) != 0:
                 return self.struct_c_name(resolved)
             // Other generic types: treat as opaque struct
@@ -2157,6 +2173,52 @@ impl CCodegen:
         if base_name == "Atomic":
             return 1
         0
+
+    // An instance of a declared generic struct (`Wrap[str]`, std's
+    // `Box[Node]`, `BTreeMap[i32, str]`): Sema's reflection names its fields
+    // and their instantiated types. The containers the C backend models
+    // itself (Vec, HashMap, HashSet, SlotMap, the synthetic structs above)
+    // and payload enums have their own representations (#1562).
+    fn generic_inst_is_declared_struct(tid: i32) -> bool:
+        let resolved = self.sema.resolve_alias(tid)
+        if self.sema.get_type_kind(resolved) != TypeKind.TY_GENERIC_INST or self.std_box_pointee_tid(resolved as i32) != 0:
+            return false
+        if self.generic_inst_needs_struct_def(resolved as i32) != 0 or self.type_is_payload_enum(resolved as i32) != 0:
+            return false
+        let base_name = self.generic_inst_base_name(resolved as i32)
+        if base_name == "Vec" or base_name == "HashMap" or base_name == "HashSet" or base_name == "SlotMap":
+            return false
+        let base_tid = self.sema.type_reflection_base_template(self.sema.get_generic_inst_base(resolved as i32))
+        base_tid != 0 and self.sema.get_type_kind(self.sema.resolve_alias(base_tid as TypeId)) == TypeKind.TY_STRUCT
+
+    // std's `Box[T]` is the pointer to its T, as it is for Sema, MIR (a Box
+    // place dereferences; Box.new casts its `*mut T` to the Box) and the
+    // LLVM backend (sema_type_to_llvm): its T, or 0 for any other type.
+    fn std_box_pointee_tid(tid: i32) -> i32:
+        let resolved = self.sema.resolve_alias(tid)
+        if self.sema.type_is_std_box_inst(resolved as i32) == 0:
+            return 0
+        self.sema.get_generic_inst_arg(resolved as i32, 0)
+
+    // The instantiated type of a declared generic struct's field, or 0.
+    fn generic_struct_field_tid(tid: i32, field_sym: i32) -> i32:
+        let resolved = self.sema.resolve_alias(tid) as i32
+        for fi in 0..self.sema.type_reflection_field_count(resolved):
+            if self.sema.type_reflection_field_name(resolved, fi) == field_sym:
+                return self.sema.type_reflection_field_type_frozen(resolved, fi)
+        0
+
+    // A type the C output holds by value as a struct, so a struct containing
+    // it must follow its definition.
+    fn tid_is_c_struct_value(tid: i32) -> bool:
+        let resolved = self.sema.resolve_alias(tid as TypeId) as i32
+        let kind = self.sema.get_type_kind(resolved as TypeId)
+        kind == TypeKind.TY_STRUCT or kind == TypeKind.TY_TUPLE or self.type_is_payload_enum(resolved) != 0 or self.generic_inst_is_declared_struct(resolved)
+
+    // A field of a generic instance: a declared struct's own field, or a
+    // field the backend synthesizes for a modeled container (Vec's ptr/len).
+    fn generic_inst_field_tid(tid: i32, field_sym: i32) -> i32:
+        if self.generic_inst_is_declared_struct(tid): self.generic_struct_field_tid(tid, field_sym) else: self.vec_synthetic_field_tid(tid, field_sym)
 
     fn vecslot_element_tid(tid: i32) -> i32:
         let resolved = self.sema.resolve_alias(tid)
@@ -2932,7 +2994,7 @@ impl CCodegen:
                     let ft = self.effective_field_tid(resolved as i32, pd, ft_raw)
                     current_tid = ft
                 else if tk == TypeKind.TY_GENERIC_INST:
-                    current_tid = self.vec_synthetic_field_tid(resolved as i32, pd)
+                    current_tid = self.generic_inst_field_tid(resolved as i32, pd)
                 else:
                     current_tid = 0
                 continue
@@ -2967,7 +3029,7 @@ impl CCodegen:
                 if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF:
                     current_tid = self.sema.get_type_d0(resolved)
                 else:
-                    current_tid = 0
+                    current_tid = self.std_box_pointee_tid(resolved as i32)
                 continue
             if pk == ProjKind.PK_DOWNCAST:
                 if self.type_is_payload_enum(current_tid) != 0:
@@ -8137,7 +8199,7 @@ impl CCodegen:
             return "NULL"
         if tk == TypeKind.TY_GENERIC_INST and self.generic_inst_base_name(resolved as i32) == "Vec":
             return "(with_vec)" ++ cc_lbrace() ++ "0" ++ cc_rbrace()
-        if tk == TypeKind.TY_GENERIC_INST and self.generic_inst_needs_struct_def(resolved as i32) != 0:
+        if tk == TypeKind.TY_GENERIC_INST and (self.generic_inst_needs_struct_def(resolved as i32) != 0 or self.generic_inst_is_declared_struct(resolved as i32)):
             return "(" ++ self.c_type(resolved, 0) ++ ")" ++ cc_lbrace() ++ "0" ++ cc_rbrace()
         if tk == TypeKind.TY_STR or tk == TypeKind.TY_STRUCT or tk == TypeKind.TY_TUPLE or tk == TypeKind.TY_FN or self.type_is_payload_enum(resolved as i32) != 0:
             return "(" ++ self.c_type(resolved, 0) ++ ")" ++ cc_lbrace() ++ "0" ++ cc_rbrace()
@@ -8458,6 +8520,17 @@ impl CCodegen:
                 return generic_acc
             if base_name == "Vec" or base_name == "HashMap" or base_name == "HashSet":
                 return acc
+            if self.generic_inst_is_declared_struct(resolved as i32):
+                let cname = self.struct_c_name(resolved as i32)
+                if acc.seen_names.contains(resolved as i32) or acc.seen_c_names.contains(cname):
+                    return acc
+                acc.seen_names.insert(resolved as i32, 1)
+                acc.seen_c_names.insert(cname, 1)
+                acc.out.push(resolved as i32)
+                var inst_acc = acc
+                for fi in 0..self.sema.type_reflection_field_count(resolved as i32):
+                    inst_acc = self.collect_struct_types_from_tid(move inst_acc, self.sema.type_reflection_field_type_frozen(resolved as i32, fi))
+                return inst_acc
         if tk == TypeKind.TY_SLICE:
             let cname = self.struct_c_name(resolved as i32)
             if not acc.seen_names.contains(resolved as i32) and not acc.seen_c_names.contains(cname):
@@ -8468,6 +8541,9 @@ impl CCodegen:
         if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF or tk == TypeKind.TY_ARRAY:
             let inner_tid = self.sema.get_type_d0(resolved)
             return self.collect_struct_types_from_tid(move acc, inner_tid)
+        let box_pointee = self.std_box_pointee_tid(resolved as i32)
+        if box_pointee != 0:
+            return self.collect_struct_types_from_tid(move acc, box_pointee)
         acc
 
     fn synthetic_generic_struct_field_tids(tid: i32) -> Vec[i32]:
@@ -8715,11 +8791,11 @@ impl CCodegen:
                     let base_name = self.generic_inst_base_name(resolved)
                     if base_name == "HashMapEntry":
                         let key_tid = self.sema.resolve_alias(self.sema.get_generic_inst_arg(resolved, 0) as TypeId)
-                        if (self.sema.get_type_kind(key_tid) == TypeKind.TY_STRUCT or self.sema.get_type_kind(key_tid) == TypeKind.TY_TUPLE or self.type_is_payload_enum(key_tid as i32) != 0) and key_tid != resolved and not emitted_names.contains(key_tid as i32):
+                        if self.tid_is_c_struct_value(key_tid as i32) and key_tid != resolved and not emitted_names.contains(key_tid as i32):
                             ready = 0
                     if base_name == "Atomic":
                         let value_tid = self.sema.resolve_alias(self.sema.get_generic_inst_arg(resolved, 0) as TypeId)
-                        if (self.sema.get_type_kind(value_tid) == TypeKind.TY_STRUCT or self.sema.get_type_kind(value_tid) == TypeKind.TY_TUPLE or self.type_is_payload_enum(value_tid as i32) != 0) and value_tid != resolved and not emitted_names.contains(value_tid as i32):
+                        if self.tid_is_c_struct_value(value_tid as i32) and value_tid != resolved and not emitted_names.contains(value_tid as i32):
                             ready = 0
                 else if self.type_is_payload_enum(resolved) != 0:
                     let variant_count = self.sema.type_reflection_variant_count(resolved)
@@ -8727,7 +8803,7 @@ impl CCodegen:
                         let payload_count = self.sema.type_reflection_variant_payload_count(resolved, vi)
                         for pi in 0..payload_count:
                             let field_tid = self.sema.resolve_alias(self.sema.type_reflection_variant_payload_type_frozen(resolved, vi, pi) as TypeId)
-                            if self.sema.get_type_kind(field_tid) != TypeKind.TY_STRUCT and self.sema.get_type_kind(field_tid) != TypeKind.TY_TUPLE and self.type_is_payload_enum(field_tid as i32) == 0:
+                            if not self.tid_is_c_struct_value(field_tid as i32):
                                 continue
                             if field_tid != resolved and not emitted_names.contains(field_tid as i32):
                                 ready = 0
@@ -8741,7 +8817,15 @@ impl CCodegen:
                         if self.check_interrupted() != 0:
                             return ""
                         let field_tid = self.sema.resolve_alias(self.sema.type_extra[(tuple_start + ti)] as TypeId)
-                        if self.sema.get_type_kind(field_tid) != TypeKind.TY_STRUCT and self.sema.get_type_kind(field_tid) != TypeKind.TY_TUPLE and self.type_is_payload_enum(field_tid as i32) == 0:
+                        if not self.tid_is_c_struct_value(field_tid as i32):
+                            continue
+                        if field_tid != resolved and not emitted_names.contains(field_tid as i32):
+                            ready = 0
+                            break
+                else if self.generic_inst_is_declared_struct(resolved):
+                    for fi in 0..self.sema.type_reflection_field_count(resolved):
+                        let field_tid = self.sema.resolve_alias(self.sema.type_reflection_field_type_frozen(resolved, fi) as TypeId)
+                        if not self.tid_is_c_struct_value(field_tid as i32):
                             continue
                         if field_tid != resolved and not emitted_names.contains(field_tid as i32):
                             ready = 0
@@ -8753,7 +8837,7 @@ impl CCodegen:
                         let field_sym: i32 = self.sema.type_extra[(start + fi * 3)]
                         let raw_field_tid: i32 = self.sema.type_extra[(start + fi * 3 + 1)]
                         let field_tid = self.sema.resolve_alias(self.effective_field_tid(resolved, field_sym, raw_field_tid) as TypeId)
-                        if self.sema.get_type_kind(field_tid) != TypeKind.TY_STRUCT and self.sema.get_type_kind(field_tid) != TypeKind.TY_TUPLE and self.type_is_payload_enum(field_tid as i32) == 0:
+                        if not self.tid_is_c_struct_value(field_tid as i32):
                             continue
                         if field_tid != resolved and not emitted_names.contains(field_tid as i32):
                             ready = 0
@@ -8789,7 +8873,7 @@ impl CCodegen:
                 continue
             let name_sym = self.sema.get_type_d0(resolved)
             let count = self.sema.get_type_d2(resolved)
-            if self.type_is_payload_enum(resolved as i32) == 0 and count == 1 and self.sema.distinct_type_names.contains(name_sym):
+            if self.sema.get_type_kind(resolved) == TypeKind.TY_STRUCT and count == 1 and self.sema.distinct_type_names.contains(name_sym):
                 continue  // distinct types get their typedef in the definition pass
             let name = self.struct_c_name(tid)
             out = out ++ "typedef struct " ++ name ++ " " ++ name ++ ";\n"
@@ -8869,6 +8953,13 @@ impl CCodegen:
                 let value_tid = self.sema.get_generic_inst_arg(resolved as i32, 0)
                 out = out ++ "struct " ++ name ++ " " ++ cc_lbrace() ++ "\n"
                 out = out ++ "    " ++ self.c_decl(value_tid, "val") ++ ";\n"
+                out = out ++ cc_rbrace() ++ ";\n\n"
+                continue
+            if self.generic_inst_is_declared_struct(resolved as i32):
+                out = out ++ "struct " ++ name ++ " " ++ cc_lbrace() ++ "\n"
+                for fi in 0..self.sema.type_reflection_field_count(resolved as i32):
+                    let field_name = cc_intern_resolve(self.intern, self.sema.type_reflection_field_name(resolved as i32, fi))
+                    out = out ++ "    " ++ self.c_decl(self.sema.type_reflection_field_type_frozen(resolved as i32, fi), field_name) ++ ";\n"
                 out = out ++ cc_rbrace() ++ ";\n\n"
                 continue
             let start = self.sema.get_type_d1(resolved)
