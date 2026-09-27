@@ -35,6 +35,23 @@ var g_ci_migrate_in_unsafe_function_body: bool = false
 // §16.2a no_methods opt-out. Set per-import before translation.
 var g_cimport_no_methods_all: i32 = 0
 var g_cimport_no_methods_types: Vec[str] = Vec.new()
+// #1753: the object-like macro constants ("|NAME|…") the earlier c_imports of
+// this compilation defined, and the ones the current translation defines. A
+// later header's constant of the same name is its own value, not a
+// duplicate declaration.
+var g_ci_prior_macro_consts: str = "|"
+var g_ci_current_macro_consts: str = "|"
+
+// A compilation's first c_import starts with no earlier constants
+// (Zcu.expand_c_imports_frontend, beside with_cimport_reset_names).
+pub fn ci_reset_macro_consts():
+    g_ci_prior_macro_consts = "|"
+    g_ci_current_macro_consts = "|"
+
+// A macro constant this translation defines (#1753).
+fn ci_mark_macro_const_emitted(name: &str):
+    with_cimport_mark_name_emitted(name)
+    g_ci_current_macro_consts = g_ci_current_macro_consts ++ name ++ "|"
 
 pub fn ci_migrate_set_unsafe_function_body_context(enabled: bool) -> Unit:
     g_ci_migrate_in_unsafe_function_body = enabled
@@ -562,6 +579,8 @@ fn process_c_import(header_spec: &str) -> str:
 pub fn process_c_import_with_defines(header_spec: &str, defines: &Vec[str]) -> str:
     c_import_last_error_clear()
     g_cimport_warnings = ""
+    g_ci_prior_macro_consts = g_ci_prior_macro_consts ++ g_ci_current_macro_consts.slice(1, g_ci_current_macro_consts.len())
+    g_ci_current_macro_consts = "|"
     c_import_untranslated_macros_clear()
     c_import_omitted_symbols_clear()
     c_import_included_files_clear()
@@ -3244,8 +3263,13 @@ pub fn ci_translate_macros(session: i64, type_session: i64, macro_source: &str) 
             blank_macros = blank_macros ++ "|" ++ name ++ "|"
             continue
 
-        // Skip already-emitted names (dedup across c_import calls)
-        if with_cimport_is_name_emitted(name) != 0:
+        // Skip already-emitted names (dedup across c_import calls) — except
+        // a constant an earlier c_import defined: each import provides its
+        // own value (#1753; D70, §18.2: the later import shadows the
+        // earlier, and each stays reachable through its namespace).
+        // A macro the header redefines is one constant of this import.
+        let macro_key = "|" ++ name ++ "|"
+        if ci_str_contains(g_ci_current_macro_consts, macro_key) or (with_cimport_is_name_emitted(name) != 0 and not ci_str_contains(g_ci_prior_macro_consts, macro_key)):
             continue
 
         // Strip __extension__ wrapper (glibc)
@@ -3263,7 +3287,7 @@ pub fn ci_translate_macros(session: i64, type_session: i64, macro_source: &str) 
             let safe_name = ci_escape_reserved(name)
             let int_ty = ci_int_type_from_suffix(stripped)
             let clean_value = ci_strip_int_suffix(stripped)
-            with_cimport_mark_name_emitted(name)
+            ci_mark_macro_const_emitted(name)
             known_values = known_values ++ name ++ "=" ++ clean_value ++ "|"
             // #775: the bridge hands over macro values pre-folded and often
             // suffix-less (UINT_MAX arrives as bare 0xffffffff), so the
@@ -3280,7 +3304,7 @@ pub fn ci_translate_macros(session: i64, type_session: i64, macro_source: &str) 
             let char_val = ci_char_to_int(stripped)
             if char_val.len() > 0:
                 let safe_name = ci_escape_reserved(name)
-                with_cimport_mark_name_emitted(name)
+                ci_mark_macro_const_emitted(name)
                 known_values = known_values ++ name ++ "=" ++ char_val ++ "|"
                 let let_line = "let " ++ safe_name ++ ": c_int = " ++ char_val
                 if not ci_migrate_shared_decl_add("let", safe_name, let_line):
@@ -3289,14 +3313,14 @@ pub fn ci_translate_macros(session: i64, type_session: i64, macro_source: &str) 
             let safe_name = ci_escape_reserved(name)
             let float_ty = ci_float_type_from_suffix(stripped)
             let clean_value = ci_strip_float_suffix(stripped)
-            with_cimport_mark_name_emitted(name)
+            ci_mark_macro_const_emitted(name)
             let let_line = "let " ++ safe_name ++ ": " ++ float_ty ++ " = " ++ clean_value
             if not ci_migrate_shared_decl_add("let", safe_name, let_line):
                 output = output ++ let_line ++ "\n"
         else if ci_is_concatenated_string(stripped) or ci_is_string_literal(stripped):
             let safe_name = ci_escape_reserved(name)
             let concat_value = ci_concat_strings(stripped)
-            with_cimport_mark_name_emitted(name)
+            ci_mark_macro_const_emitted(name)
             let let_line = "let " ++ safe_name ++ " = " ++ concat_value
             if not ci_migrate_shared_decl_add("let", safe_name, let_line):
                 output = output ++ let_line ++ "\n"
@@ -3317,7 +3341,7 @@ pub fn ci_translate_macros(session: i64, type_session: i64, macro_source: &str) 
             if compound_literal_result.len() == 0:
                 let probe_result = if macro_is_system == 0: probes.result(session, macro_source, name) else: ""
                 if probe_result.len() > 0:
-                    with_cimport_mark_name_emitted(name)
+                    ci_mark_macro_const_emitted(name)
                     if not ci_migrate_shared_decl_add("let", ci_escape_reserved(name), probe_result):
                         output = output ++ probe_result ++ "\n"
                     continue
@@ -3378,12 +3402,12 @@ pub fn ci_translate_macros(session: i64, type_session: i64, macro_source: &str) 
                     if ci_escape_reserved(ref) == safe_name or with_cimport_is_name_emitted(ref) == 0:
                         ci_record_untranslated_object_macro(name, macro_is_system)
                         continue
-                    with_cimport_mark_name_emitted(name)
+                    ci_mark_macro_const_emitted(name)
                     let ref_line = "let " ++ safe_name ++ " = " ++ ref
                     if not ci_migrate_shared_decl_add("let", safe_name, ref_line):
                         output = output ++ ref_line ++ "\n"
                     continue
-                with_cimport_mark_name_emitted(name)
+                ci_mark_macro_const_emitted(name)
                 // A C comparison or logical operator yields an int 0 or 1;
                 // its translation is a With `bool`. A system header's macro
                 // is never probed and folded, so winapifamily.h's
@@ -3414,7 +3438,7 @@ pub fn ci_translate_macros(session: i64, type_session: i64, macro_source: &str) 
                 let eval_result = ci_eval_const_expr_ctx(stripped, known_values)
                 if eval_result.len() > 0:
                     let safe_name = ci_escape_reserved(name)
-                    with_cimport_mark_name_emitted(name)
+                    ci_mark_macro_const_emitted(name)
                     known_values = known_values ++ name ++ "=" ++ eval_result ++ "|"
                     // #775: the evaluated constant's TYPE follows its value's
                     // range, not a hardcoded c_int — UINT_MAX evaluates to

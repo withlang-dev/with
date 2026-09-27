@@ -379,6 +379,7 @@ impl Zcu:
         // bridge table across Zcu instances would make a later single-import cache
         // entry omit the required C support prelude.
         with_cimport_reset_names()
+        ci_reset_macro_consts()
 
         // Materialize clang's builtin headers embedded in this binary before
         // libclang parses anything, so c_import is self-contained at runtime (#312).
@@ -480,6 +481,13 @@ impl Zcu:
                         let libclang_error = c_import_last_error()
                         if libclang_error.len() > 0:
                             self.c_import_emit_header_error_detail_frontend(decl, header_spec, libclang_error)
+                            continue
+                        else if with_cimport_available() != 0:
+                            // #1753: libclang read the header and it adds
+                            // nothing the earlier c_imports did not already
+                            // declare; that is not a failure, and the
+                            // hand-written fallback below (for a compiler
+                            // without libclang) knows none of it.
                             continue
                         else:
                             synthetic = self.c_import_expand_header_spec_frontend(header_spec, out, decl)
@@ -2305,7 +2313,9 @@ impl Zcu:
                 let path = self.decl_source_path_frontend(di)
                 if (pass == 0) != (not from_c_import and path == self.current_source_path):
                     continue
-                let owner = if from_c_import: path ++ "/c_import" else: path.clone()
+                // Each c_import is an owner of its own (#1753): two headers
+                // that define one constant are two imports (D70).
+                let owner = if from_c_import: path ++ f"/c_import{self.decl_is_c_import[di]}" else: path.clone()
                 let name = pool.get_data0(decl)
                 if not taken.contains(name):
                     taken.insert(name, frontend_owned_text(owner))
