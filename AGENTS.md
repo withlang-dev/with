@@ -772,6 +772,16 @@ as a commit author, co-author, trailer, or credit line. Do not use
 and/or `with build :dev` (seed → stage1, one self-compile), plus the targeted
 tests for what you touched. Never run the full battery per edit.
 
+**The pre-battery gate is one command:** `src/main build :gate`. It covers
+the fixed list (the release build, the self-check, the build.w check with the
+fresh release binary, abi-hash-check, unit-return-review,
+spec-inventory-check, examples-tests, c-migrator-basic-tests,
+deep-debug-tool-tests, user-programs-safe) plus every test target the last
+battery measured under 60 s; a fresh worktree has no measurements and runs
+the fixed list, and the closing `gate:` line names the measured members.
+Every stack layer runs it before it reports done, and the battery runs it
+first.
+
 **Batch tier — one stack, one battery.** Work that lands in the same window
 goes on ONE stack of PRs (`gh stack`). ONE battery blesses the whole stack,
 once, on its top commit, after every layer is in — never a battery per PR,
@@ -780,11 +790,14 @@ per layer, or per repair:
 with run tools/battery.w
 ```
 It refuses a dirty tree, holds one of two machine-wide battery slots, runs
-`src/main build` under the pinned seed, then `src/main build :battery-checks`
-(fixpoint, the drop and move audits, every test target, user-programs-safe,
-green evidence) as ONE survey, so a red reports every failing target at once.
-Logs, wall times and `out/battery/status.txt` land in `out/battery/`. Then
-`:install-user` once.
+`src/main build :gate` under the pinned seed (a red gate stops it there:
+`RED (gate): <targets>`), then `src/main build :battery-checks` (fixpoint,
+the drop and move audits, every test target, user-programs-safe, green
+evidence) as ONE survey, so a red reports every failing target at once — and
+writes `RED: <target>` to `out/battery/status.txt` the moment each target
+fails, so read the status file, not the end of the log. `--fail-fast` stops
+at the first red for a repair loop. Logs, wall times and
+`out/battery/status.txt` land in `out/battery/`. Then `:install-user` once.
 
 **A red battery:** fix every reported failure on the stack with iterate-tier
 evidence, then run the battery once more. Never add new work to a red stack.
@@ -793,16 +806,26 @@ runs the drop and move audits, and a red is traced to its layer locally.
 
 ### Working efficiently (agents)
 
-Every agent — a subagent or a fresh session — works at the iterate tier only.
-An agent:
+Every agent — a subagent or a fresh session — works at the iterate tier plus
+the gate. An agent:
 
 - runs `with build :dev` and `with test`/`with run` on the tests it wrote or
   touched, and shows each new test FAILING before its fix;
 - never runs `tools/battery.w`, `:test`, a corpus target (`:behavior-tests`,
-  `:native-*`, `:internals-tests`, …), `:drop-audit`, `:move-audit`, or a
-  full `src/main build`: the coordinator runs those once per stack;
+  `:native-*`, `:internals-tests`, …) or `:move-audit` on its own: the
+  coordinator runs those once per stack;
 - never launches a program outside this repository (a user's game, app or
   project). Build it to check it compiles; never run it;
+- runs `src/main build :gate` before it reports a stack layer done, and
+  the checks its files call for first: a change under `src/Mir*.w`,
+  `src/MirLower.w`, `src/MirValidate*.w` or any validator runs
+  `src/main build :deep-debug-tool-tests --no-deps` and `:drop-audit`
+  before reporting; a change under `build/` or to `build.w` checks
+  `build.w` and `lib/std/build.w` with the fresh `out/release/bin/with`;
+- before writing a test fixture, reads one existing test of the same kind
+  (`test/behavior/behav_*.w`): the spellings are `type T:`,
+  `impl Drop for T:` with `move fn drop()`, `//! expect-stdout:` headers,
+  and statements never sit beside `fn main`;
 - commits locally and does not push unless told. A pushed branch always has a
   PR in the stack (`gh stack link --base main …`).
 
