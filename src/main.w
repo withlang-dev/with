@@ -1597,6 +1597,22 @@ fn build_runner_ensure(root: &str, options: &BuildCommandOptions) -> str:
     with_eprint("[build] runner compiled " ++ build_graph_time_fmt(with_clock_nanos() - t0))
     bin_path
 
+// #1797: the runner may be linked now when no runtime directory the link
+// could take belongs to another compiler generation: a complete out/lib or
+// out/bootstrap-lib (the cimport_stubs.o probe Link.w uses) must hold this
+// compiler's rt_core.o byte for byte; an absent one is nothing to mistrust
+// (a user project has neither, and the runner links from the embedded
+// runtime as it always did).
+fn build_runner_runtime_dirs_are_this_generation(root: &str) -> bool:
+    let dirs: Vec[str] = Vec.new()
+    dirs.push("out/lib")
+    dirs.push("out/bootstrap-lib")
+    for i in 0..dirs.len() as i32:
+        let dir = resolve_join(root, dirs[i])
+        if with_fs_file_exists(dir ++ "/cimport_stubs.o") != 0 and not link_stage_runtime_dir_is_this_generation(dir):
+            return false
+    true
+
 fn build_runner_fallback_list_path(root: &str) -> str:
     resolve_join(root, "out/.build-state/runner-fallback.list")
 
@@ -2244,9 +2260,11 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
     // (out/bootstrap-lib: the tree's runtime objects and, on Windows, the
     // LLVM linker metadata), so it is compiled only once that root is this
     // seed's: when prepare-bootstrap-link-root has completed in this run
-    // (executed, or fresh for this seed), or, when that target is not
-    // scheduled, when the root's rt_core.o is byte for byte this compiler's
-    // embedded one. Existence of the files said nothing about which
+    // (executed, or fresh for this seed), or when no complete out/lib or
+    // out/bootstrap-lib belongs to another generation
+    // (build_runner_runtime_dirs_are_this_generation; a project with neither
+    // links the runner from the embedded runtime, as it always did).
+    // Existence of the files said nothing about which
     // generation built them: a seed older than #1720's check linked a
     // 2026-09-22 out/lib, the runner died on an undefined runtime symbol,
     // and the comptime fallback failed the build before stage1. Until the
@@ -2255,8 +2273,6 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
     var bootstrap_root_scheduled = false
     for bi in 0..graph.targets.len() as i32:
         if (&graph.targets[bi]).name == bootstrap_root_target: bootstrap_root_scheduled = true
-    let bootstrap_root_dir = resolve_join(root, "out/bootstrap-lib")
-    let link_metadata_path = resolve_join(root, "out/bootstrap-lib/llvm_ld")
     for ti in 0..graph.targets.len() as i32:
         let target = &graph.targets[ti]
         if timing_name.len() > 0:
@@ -2363,8 +2379,8 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
         if build_cache_is_cacheable(target.kind):
             build_cache_snapshot_inputs(root, target)
         var bootstrap_ready = bootstrap_root_scheduled and completed_targets.contains(bootstrap_root_target)
-        if not bootstrap_ready and not runner_checked and with_fs_file_exists(link_metadata_path) != 0:
-            bootstrap_ready = link_stage_runtime_dir_is_this_generation(bootstrap_root_dir)
+        if not bootstrap_ready and not runner_checked:
+            bootstrap_ready = build_runner_runtime_dirs_are_this_generation(root)
         if target.kind == 23 and not runner_checked and bootstrap_ready and not build_action_worker_env_enabled() and not options.strict_effects:
             runner_checked = true
             runner_path = build_runner_ensure(root, options)
