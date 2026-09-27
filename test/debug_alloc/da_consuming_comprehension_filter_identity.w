@@ -14,7 +14,7 @@
 // filtered out, 1 + 4 the kept ones.
 
 extern fn with_alloc(size: i64) -> *mut u8
-extern fn with_free(ptr: *mut u8) -> Unit
+extern fn with_free(ptr: *mut u8)
 
 type W { ptr: *mut u8, dropped: *mut i32, id: i32 }
 

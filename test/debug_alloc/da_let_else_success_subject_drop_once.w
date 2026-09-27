@@ -10,7 +10,7 @@
 // whose W, if any, drops before the else diverges) and its success path.
 
 extern fn with_alloc(size: i64) -> *mut u8
-extern fn with_free(ptr: *mut u8) -> Unit
+extern fn with_free(ptr: *mut u8)
 
 type W { ptr: *mut u8, drops: *mut i32, n: i32 }
 
