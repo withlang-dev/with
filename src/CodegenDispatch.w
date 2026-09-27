@@ -5776,6 +5776,17 @@ impl Codegen:
         self.mir_default_unreachable_bbs.push(bb)
         bb
 
+    // Every MIR body emitter ends with this: a switch lowering creates the
+    // shared default block on demand, and it has no terminator until the body
+    // is done. The const-initializer and default-method emitters skipped it,
+    // so an `or`/`if` in a module `let` failed LLVM verification (#1483).
+    fn mir_terminate_default_unreachable():
+        if self.mir_default_unreachable_bbs.len() as i32 > 0:
+            let ubb = self.mir_default_unreachable_bbs.get(0)
+            if wl_get_bb_terminator(ubb) == 0:
+                wl_position_at_end(self.builder, ubb)
+                wl_build_unreachable(self.builder)
+
     mut fn mir_try_place_ptr_for_ref(body: &MirBody, operand_id: i32) -> i64:
         if operand_id < 0 or operand_id >= body.operand_kinds.len() as i32:
             return 0
@@ -16508,11 +16519,7 @@ impl Codegen:
 
         self.di_current_scope = saved_fn_scope
 
-        if self.mir_default_unreachable_bbs.len() as i32 > 0:
-            let ubb = self.mir_default_unreachable_bbs.get(0)
-            if wl_get_bb_terminator(ubb) == 0:
-                wl_position_at_end(self.builder, ubb)
-                wl_build_unreachable(self.builder)
+        self.mir_terminate_default_unreachable()
 
         self.debug_declare_mir_locals(body, function, 1, param_count)
         self.run_mir_cleanup_passes(function, name_str)
@@ -16941,11 +16948,7 @@ impl Codegen:
                     wl_build_unreachable(self.builder)
         self.di_current_scope = mono_fn_scope
 
-        if self.mir_default_unreachable_bbs.len() as i32 > 0:
-            let ubb = self.mir_default_unreachable_bbs.get(0)
-            if wl_get_bb_terminator(ubb) == 0:
-                wl_position_at_end(self.builder, ubb)
-                wl_build_unreachable(self.builder)
+        self.mir_terminate_default_unreachable()
 
         self.debug_declare_mir_locals(body, function, 1, param_count)
         self.run_mir_cleanup_passes(function, name_str)
@@ -18042,11 +18045,7 @@ impl Codegen:
                         let _ = wl_build_ret(self.builder, wl_const_int(ret_ty, 0, 0))
         self.di_current_scope = closure_scope
 
-        if self.mir_default_unreachable_bbs.len() as i32 > 0:
-            let ubb = self.mir_default_unreachable_bbs.get(0)
-            if wl_get_bb_terminator(ubb) == 0:
-                wl_position_at_end(self.builder, ubb)
-                wl_build_unreachable(self.builder)
+        self.mir_terminate_default_unreachable()
         self.debug_declare_mir_locals(closure_body, closure_fn, capture_count + 1, param_count)
 
         // Restore outer MIR state

@@ -849,6 +849,7 @@ impl Codegen:
                         else:
                             let _ = wl_build_ret(self.builder, wl_const_int(final_ret_ty, 0, 0))
 
+        self.mir_terminate_default_unreachable()
         // Synthesized bodies must pass the same cleanup + verification as
         // every other function — an invalid synthesized default method
         // previously shipped silently and crashed at runtime (spec_ss11_6).
@@ -1672,6 +1673,7 @@ impl Codegen:
                     let after_term_bb = wl_get_insert_block(self.builder)
                     if after_term_bb != 0 and wl_get_bb_terminator(after_term_bb) == 0:
                         let _ = wl_build_ret(self.builder, wl_const_null(ret_ty))
+        self.mir_terminate_default_unreachable()
 
         self.mir_local_ptrs = saved_mir_locals
         self.mir_local_values = saved_mir_values
