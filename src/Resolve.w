@@ -884,6 +884,7 @@ impl ResolveState:
                 self.add_binding(closure_scope, name_sym, pdef)
                 let ty = resolve_extra_or_zero(pool, param_start + pi * 2 + 1)
                 self.walk_type_expr(pool, module_id, closure_scope, ty)
+            self.walk_type_expr(pool, module_id, closure_scope, pool.closure_ret_type(node))
             self.walk_expr(pool, module_id, parent_def, closure_scope, pool.get_data0(node))
             return
 

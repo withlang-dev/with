@@ -8063,14 +8063,26 @@ impl Parser:
         let extra_start = self.add_closure_params(&params)
         let param_count = (params.len() / 2) as i32
         self.skip_newlines()
-        // Optional return type
-        if self.peek() == TokenKind.TK_ARROW:
-            self.advance()
-            self.parse_type_expr()
-            self.skip_newlines()
+        let ret_type = self.parse_closure_ret_type()
         self.expect(TokenKind.TK_FAT_ARROW)
         let body = self.parse_block_or_expr()
-        self.pool.add_node(NodeKind.NK_CLOSURE, start, self.prev_end(), body, extra_start, param_count)
+        self.add_closure_node(start, body, extra_start, param_count, ret_type)
+
+    // A closure's optional `-> T` (§12, #1508): the result type Sema checks
+    // like a declared return type. It was parsed and discarded.
+    mut fn parse_closure_ret_type() -> i32:
+        if self.peek() != TokenKind.TK_ARROW:
+            return 0
+        self.advance()
+        let ret_type = self.parse_type_expr() as i32
+        self.skip_newlines()
+        ret_type
+
+    mut fn add_closure_node(start: i32, body: NodeId, extra_start: i32, param_count: i32, ret_type: i32) -> NodeId:
+        let node = self.pool.add_node(NodeKind.NK_CLOSURE, start, self.prev_end(), body, extra_start, param_count)
+        if ret_type != 0:
+            self.pool.set_closure_ret_type(node, ret_type)
+        node
 
     mut fn parse_closure() -> NodeId:
         let start = self.current_start()
@@ -8099,12 +8111,7 @@ impl Parser:
         let extra_start = self.add_closure_params(&params)
         let param_count = (params.len() / 2) as i32
         self.skip_newlines()
-
-        // Optional return type
-        if self.peek() == TokenKind.TK_ARROW:
-            self.advance()
-            self.parse_type_expr()
-            self.skip_newlines()
+        let ret_type = self.parse_closure_ret_type()
 
         var body: NodeId = 0 as NodeId
         if self.peek() == TokenKind.TK_L_BRACE:
@@ -8115,7 +8122,7 @@ impl Parser:
             body = self.parse_block_or_expr()
         else:
             body = self.parse_expr()
-        self.pool.add_node(NodeKind.NK_CLOSURE, start, self.prev_end(), body, extra_start, param_count)
+        self.add_closure_node(start, body, extra_start, param_count, ret_type)
 
     mut fn parse_move_closure() -> NodeId:
         let node = self.parse_closure()

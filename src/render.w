@@ -860,7 +860,11 @@ pub fn render_expr(pool: AstPool, intern: InternPool, node: NodeId, indent: i32)
             out.push_str(intern.resolve(p_name))
             if p_type != 0:
                 out.push_str(": " ++ render_type_expr(pool, intern, (p_type) as NodeId))
-        out.push_str("| " ++ render_expr(pool, intern, (body) as NodeId, 0))
+        out.push_str("| ")
+        let ret_type = pool.closure_ret_type(node)
+        if ret_type != 0:
+            out.push_str("-> " ++ render_type_expr(pool, intern, ret_type as NodeId) ++ " ")
+        out.push_str(render_expr(pool, intern, (body) as NodeId, 0))
         return out.to_str()
 
     if kind == NodeKind.NK_ENUM_VARIANT:

@@ -156,6 +156,10 @@ fn astpool_clone_deep(src: AstPool) -> AstPool:
         out.mark_non_escaping_closure((src.state.non_escaping_closure_nodes[ni]) as NodeId)
     for bi in 0..src.state.by_place_closure_nodes.len() as i32:
         out.mark_by_place_closure((src.state.by_place_closure_nodes[bi]) as NodeId)
+    var cri = 0
+    while cri + 1 < src.state.closure_ret_type_nodes.len() as i32:
+        out.set_closure_ret_type((src.state.closure_ret_type_nodes[cri]) as NodeId, src.state.closure_ret_type_nodes[(cri + 1)])
+        cri = cri + 2
 
     var where_meta = 0
     while where_meta < src.state.where_meta.len() as i32:
@@ -989,6 +993,11 @@ impl AstPool:
                 self.mark_non_escaping_closure(cloned as NodeId)
             if self.is_by_place_closure(node) != 0:
                 self.mark_by_place_closure(cloned as NodeId)
+            // The declared `-> T` (§12, #1508) is a type node, shared like
+            // the parameter types.
+            let ret_type = self.closure_ret_type(node)
+            if ret_type != 0:
+                self.set_closure_ret_type(cloned as NodeId, ret_type)
             return cloned
 
         self.ct_clone_leaf(node)

@@ -599,6 +599,9 @@ type AstPoolState {
     move_closure_nodes: Vec[i32],
     non_escaping_closure_nodes: Vec[i32],
     by_place_closure_nodes: Vec[i32],
+    // (closure node, `-> T` type node) pairs: a closure's declared result
+    // (§12, #1508), kept in order for a pool copy.
+    closure_ret_type_nodes: Vec[i32],
     compiler_hook_fn_nodes: Vec[i32],
     compiler_hook_phase_syms: Vec[i32],
     global_allocator_decl_nodes: Vec[i32],
@@ -638,6 +641,7 @@ type AstPoolState {
     move_closure_set: HashMap[i32, i32],
     non_escaping_closure_set: HashMap[i32, i32],
     by_place_closure_set: HashMap[i32, i32],
+    closure_ret_type_map: HashMap[i32, i32],
     compiler_hook_fn_set: HashMap[i32, i32],
     compiler_hook_phase_map: HashMap[i32, i32],
     global_allocator_decl_set: HashMap[i32, i32],
@@ -706,6 +710,7 @@ fn AstPool.new -> AstPool:
             move_closure_nodes: Vec.new(),
             non_escaping_closure_nodes: Vec.new(),
             by_place_closure_nodes: Vec.new(),
+            closure_ret_type_nodes: Vec.new(),
             compiler_hook_fn_nodes: Vec.new(),
             compiler_hook_phase_syms: Vec.new(),
             global_allocator_decl_nodes: Vec.new(),
@@ -738,6 +743,7 @@ fn AstPool.new -> AstPool:
             move_closure_set: HashMap.new(),
             non_escaping_closure_set: HashMap.new(),
             by_place_closure_set: HashMap.new(),
+            closure_ret_type_map: HashMap.new(),
             compiler_hook_fn_set: HashMap.new(),
             compiler_hook_phase_map: HashMap.new(),
             global_allocator_decl_set: HashMap.new(),
@@ -1776,6 +1782,15 @@ impl AstPool:
     fn is_by_place_closure(node: NodeId) -> i32:
         if self.state.by_place_closure_set.contains(node as i32): return 1
         0
+
+    // §12 (#1508): the type node of a closure's `-> T`, which Sema checks
+    // like a declared return type; 0 when the closure states none.
+    fn set_closure_ret_type(node: NodeId, type_node: i32):
+        self.state.closure_ret_type_nodes.push(node as i32)
+        self.state.closure_ret_type_nodes.push(type_node)
+        self.state.closure_ret_type_map.insert(node as i32, type_node)
+
+    fn closure_ret_type(node: NodeId) -> i32: self.state.closure_ret_type_map.get(node as i32) ?? 0
 
     fn add_where_meta(fn_node: NodeId, extra_start: i32, clause_count: i32):
         let idx = self.state.where_meta.len() as i32

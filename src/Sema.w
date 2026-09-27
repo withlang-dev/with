@@ -4689,6 +4689,56 @@ impl Sema:
                 return 0
         self.types_compatible(self.get_type_d2(expected), self.get_type_d2(actual))
 
+    // Whether `a` and `b` are the same type. types_compatible is an
+    // assignability test — every integer accepts every integer, every fn
+    // type every fn type — so a place that needs one exact type (a closure's
+    // declared result against the result its context expects, §12) asks this.
+    fn types_identical(a: i32, b: i32) -> bool:
+        let ar = self.resolve_alias(a as TypeId) as i32
+        let br = self.resolve_alias(b as TypeId) as i32
+        if ar == br:
+            return true
+        let kind = self.get_type_kind(ar as TypeId)
+        if kind != self.get_type_kind(br as TypeId):
+            return false
+        let a0 = self.get_type_d0(ar as TypeId)
+        let b0 = self.get_type_d0(br as TypeId)
+        let a1 = self.get_type_d1(ar as TypeId)
+        let b1 = self.get_type_d1(br as TypeId)
+        if kind == TypeKind.TY_BOOL or kind == TypeKind.TY_VOID or kind == TypeKind.TY_STR or kind == TypeKind.TY_NEVER or kind == TypeKind.TY_VA_LIST:
+            return true
+        // An integer's width and signedness; a float's width.
+        if kind == TypeKind.TY_INT or kind == TypeKind.TY_FLOAT:
+            return a0 == b0 and a1 == b1
+        if kind == TypeKind.TY_STRUCT or kind == TypeKind.TY_ENUM or kind == TypeKind.TY_TRAIT_OBJ:
+            return a0 == b0
+        // The pointee or element, and the mutability, length or inclusivity.
+        if kind == TypeKind.TY_REF or kind == TypeKind.TY_PTR or kind == TypeKind.TY_ARRAY or kind == TypeKind.TY_SLICE or kind == TypeKind.TY_RANGE:
+            return a1 == b1 and self.types_identical(a0, b0)
+        if kind == TypeKind.TY_TUPLE:
+            if a1 != b1:
+                return false
+            for i in 0..a1:
+                if not self.types_identical(self.type_extra[(a0 + i)], self.type_extra[(b0 + i)]):
+                    return false
+            return true
+        if kind == TypeKind.TY_GENERIC_INST:
+            let count = self.get_generic_inst_arg_count(ar)
+            if count != self.get_generic_inst_arg_count(br) or self.canonical_symbol_by_text(a0) != self.canonical_symbol_by_text(b0):
+                return false
+            for i in 0..count:
+                if not self.types_identical(self.get_generic_inst_arg(ar, i), self.get_generic_inst_arg(br, i)):
+                    return false
+            return true
+        if kind == TypeKind.TY_FN or kind == TypeKind.TY_EXTERN_FN:
+            if a1 != b1 or self.fn_type_is_unsafe(ar) != self.fn_type_is_unsafe(br):
+                return false
+            for i in 0..a1:
+                if not self.types_identical(self.type_extra[(a0 + i)], self.type_extra[(b0 + i)]):
+                    return false
+            return self.types_identical(self.get_type_d2(ar as TypeId), self.get_type_d2(br as TypeId))
+        false
+
 pub fn sema_generic_inst_hash(base_sym: i32, args: &Vec[i32], arg_count: i32) -> i64:
     var h: i64 = base_sym as i64
     for ai in 0..arg_count:

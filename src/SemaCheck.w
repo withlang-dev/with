@@ -16748,6 +16748,17 @@ impl Sema:
         var expected_ret_ty = 0
         if expected_fn_tid != 0:
             expected_ret_ty = self.get_type_d2(expected_fn_tid)
+        // §12 (#1508): a closure's `-> T` is checked like a declared return
+        // type — the body must produce T — and T is the closure's result.
+        // A context that expects a closure returning another type is a
+        // mismatch: types_compatible takes any fn type for any other, so
+        // the closure would reach it returning the wrong representation.
+        let declared_ret_node = self.ast.closure_ret_type(node)
+        let declared_ret_ty = if declared_ret_node > 0: self.resolve_type_expr(declared_ret_node) as i32 else: 0
+        if declared_ret_ty != 0:
+            if expected_ret_ty != 0 and not self.types_identical(expected_ret_ty, declared_ret_ty):
+                self.emit_error(f"closure declares `-> {self.type_name(declared_ret_ty)}` where a closure returning `{self.type_name(expected_ret_ty)}` is expected (§12)", declared_ret_node)
+            expected_ret_ty = declared_ret_ty
         // An inferred closure body is a fresh value context. The expected
         // function type constrains its parameters, not its inferred return.
         // D43: a closure with no expected result inherits its tail's type.
@@ -16969,7 +16980,9 @@ impl Sema:
 
         // Use callee return type for partial application closures
         var closure_ret_ty = if body_ty != 0: body_ty as i32 else: self.ty_i32 as i32
-        if partial_sig >= 0:
+        if declared_ret_ty != 0:
+            closure_ret_ty = declared_ret_ty
+        else if partial_sig >= 0:
             closure_ret_ty = self.sig_return_type(partial_sig)
         else if expected_ret_ty != 0:
             closure_ret_ty = expected_ret_ty
