@@ -872,6 +872,18 @@ impl MirBuilder:
                 return
             i = i - 1
 
+    // A call reads its callee: `f(1); f(2)` lowers both as `call copy _f`.
+    // A carrier eliminator (`map`, `and_then`, `inspect`, …) calls the
+    // mapper it lowered on one arm only; handed the lowered temp's `move`
+    // operand as the callee, that arm moved the closure out and the
+    // scope-exit drop still ran on every path (MaybeMoved, #1539's
+    // validator). The mapper is read like any other callee, and its temp
+    // is dropped once at scope exit.
+    mut fn mapper_callee_operand(op: i32) -> i32:
+        if op < 0 or op >= self.body.operand_kinds.len() or self.body.operand_kinds[op] != OperandKind.OK_MOVE:
+            return op
+        self.body.new_operand(OperandKind.OK_COPY, self.body.operand_d0[op])
+
     mut fn consume_moved_operand(operand_id: i32) -> Unit:
         if operand_id < 0 or operand_id >= self.body.operand_kinds.len():
             return
@@ -14307,6 +14319,7 @@ impl MirBuilder:
         var mapper_op = 0
         if not explicit_owner:
             mapper_op = self.lower_expr(self.ast.get_extra(arg_start))
+            mapper_op = self.mapper_callee_operand(mapper_op)
 
         let some_bb = self.new_block()
         let none_bb = self.new_block()
@@ -14461,6 +14474,7 @@ impl MirBuilder:
             context_fn_op = self.lower_expr(self.ast.get_extra(arg_start))
         else:
             mapper_op = self.lower_expr(self.ast.get_extra(arg_start))
+            mapper_op = self.mapper_callee_operand(mapper_op)
 
         let ok_bb = self.new_block()
         let err_bb = self.new_block()
