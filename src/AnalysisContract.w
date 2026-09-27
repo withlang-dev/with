@@ -196,13 +196,18 @@ fn contract_collect_resource(report: &AnalysisReport, sema: &Sema, ri: i32, sour
     let facade = sema.safe_symbol_text(r.facade)
     let repr = sema.type_name(r.repr_tid)
     let is_ptr = sema.get_type_kind(sema.resolve_alias(r.repr_tid as TypeId)) == TypeKind.TY_PTR
-    let shape = if r.init != 0: (if r.movable != 0: "in-place, movable" else: "in-place, pinned") else if is_ptr: "pointer" else: "by-value"
+    let shape = if r.handle != 0: "callback-scope, borrowed for the callback's invocation" else if r.init != 0: (if r.movable != 0: "in-place, movable" else: "in-place, pinned") else if is_ptr: "pointer" else: "by-value"
     let facade_id = f"facade:{facade}@{site.path}"
-    let at = contract_item_at(sema, &site, "resource", r.node)
+    let word = if r.handle != 0: "handle" else: "resource"
+    let at = contract_item_at(sema, &site, word, r.node)
     let subject = contract_fact(report, sema, &site, -1, CONTRACT_RESOURCE, r.node, r.name, r.facade, -1, rname,
-        f"resource {rname} wraps {repr}; representation: {shape}; {facade_id}; {at}")
+        f"{word} {rname} wraps {repr}; representation: {shape}; {facade_id}; {at}")
     let node = r.node
     let owner = r.facade
+    // A callback-scope handle (§16.2b.9): nothing produces or destroys it.
+    if r.handle != 0:
+        contract_row(report, sema, &site, subject, CONTRACT_RESOURCE, node, 0, owner, -1, "producer", "none; C passes it to a callback, which borrows it for its invocation", "handle:callback scope (§16.2b.9)")
+        contract_row(report, sema, &site, subject, CONTRACT_RESOURCE, node, 0, owner, -1, "destroyer", "none; it has no Drop and cannot outlive the callback", "handle:callback scope (§16.2b.9)")
     // Production and initialization state (§16.2b.4).
     for pi in 0..r.producers.len() as i32:
         let p = sema.safe_symbol_text(r.producers[pi])
@@ -218,7 +223,7 @@ fn contract_collect_resource(report: &AnalysisReport, sema: &Sema, ri: i32, sour
         let clause = contract_clause(sema, node, FACADE_CLAUSE_INIT, 0)
         let init = sema.safe_symbol_text(r.init)
         contract_row(report, sema, &site, subject, CONTRACT_RESOURCE, clause, r.init, owner, 0, "init", f"{init} -> {rname}.{sema.facade_presented(ri, init)}; production: in place, Drop armed by init", contract_clause_at(sema, &site, clause))
-    if r.producers.len() == 0 and r.init == 0:
+    if r.producers.len() == 0 and r.init == 0 and r.handle == 0:
         contract_row(report, sema, &site, subject, CONTRACT_RESOURCE, node, 0, owner, -1, "producer", "none; nothing constructs this resource safely", "default:no from/init clause")
     if r.ok_consts.len() > 0:
         let clause = contract_clause(sema, node, FACADE_CLAUSE_OK, 0)
@@ -229,7 +234,7 @@ fn contract_collect_resource(report: &AnalysisReport, sema: &Sema, ri: i32, sour
         // beside the produced value (§16.2b.4).
         let ok_side = if r.ok_consts.len() > 1: f"(status, {rname})" else: rname.clone()
         contract_row(report, sema, &site, subject, CONTRACT_RESOURCE, clause, r.ok_consts[0], owner, -1, "status", f"ok {c}; a status-returning producer is Result[{ok_side}, {rname}Error]", contract_clause_at(sema, &site, clause))
-    else:
+    else if r.handle == 0:
         contract_row(report, sema, &site, subject, CONTRACT_RESOURCE, node, 0, owner, -1, "status", "none; a producer's failure is None, or (status, None) through an out parameter", "default:no status convention is inferred (§16.2b.4)")
     // Destroy paths (§16.2b.3, §16.2b.5).
     if r.drop != 0:
@@ -240,7 +245,7 @@ fn contract_collect_resource(report: &AnalysisReport, sema: &Sema, ri: i32, sour
         let clause = contract_clause(sema, node, FACADE_CLAUSE_DESTROYS, di)
         let d = sema.safe_symbol_text(r.destroyers[di])
         contract_row(report, sema, &site, subject, CONTRACT_RESOURCE, clause, r.destroyers[di], owner, 0, "destroyer", f"{d} -> move fn {rname}.{sema.facade_presented(ri, d)}; alternate: consumes the value and disarms Drop", contract_clause_at(sema, &site, clause))
-    if r.drop == 0 and r.destroyers.len() == 0:
+    if r.drop == 0 and r.destroyers.len() == 0 and r.handle == 0:
         contract_row(report, sema, &site, subject, CONTRACT_RESOURCE, node, 0, owner, -1, "destroyer", "none; no destroy path", "default:no drop/destroys clause")
     // Dependency (§16.2b.6).
     if r.independent != 0:

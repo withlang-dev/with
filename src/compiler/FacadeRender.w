@@ -97,6 +97,9 @@ pub fn facade_render_block(pool: AstPool, intern: InternPool, facade: i32, ci: &
     let count = pool.get_data2(facade as NodeId)
     for i in 0..count:
         let item = pool.get_extra(extra_start + i)
+        if facade_item_is_handle(pool, item):
+            out = out ++ facade_render_handle(pool, intern, ci, item)
+            continue
         if pool.kind(item as NodeId) == NodeKind.NK_FACADE_RESOURCE:
             let text_view = facade_render_text_view(pool, intern, item)
             out = out ++ facade_render_hosted_fn_errors(pool, intern, ci, item)
@@ -166,6 +169,111 @@ fn facade_render_text_view(pool: AstPool, intern: InternPool, resource: i32) -> 
     if not facade_render_is_c_string_ptr(repr):
         return ""
     "    fn as_cstr() -> CStr: unsafe { CStr.from_ptr(self.repr as *const i8) }\n"
+
+// A callback-scope handle (§16.2b.9, ruling Amendment 1, #1611): "A foreign
+// representation that exists only for a callback's invocation … Nothing
+// produces or destroys it, it has no `Drop`, and it is borrowed for the
+// callback's scope and cannot outlive it. Operations stated `of` the handle
+// are its methods, so a callback body calls them safely." It renders as the
+// representation alone in an ephemeral struct — no `live` bit, no Drop, no
+// constructor — with the lends hosted on it (stated `of` it, or on a
+// representation it alone wraps, as for a resource):
+//
+//     type Context = ephemeral { repr: *mut sqlite3_context }
+//     impl Context:
+//         fn result_int(v: c_int): unsafe { sqlite3_result_int(self.repr, v) }
+//
+// A value of it exists only as the argument C passes a callback
+// (facade_render_handle_callback_type), and ephemerality is what keeps it
+// inside the callback: the ordinary analysis (§5, §22) refuses it in global
+// or heap storage, in a non-ephemeral struct, or in anything that outlives
+// the call. Sema refuses a literal of it outside this rendering, so nothing
+// else produces one (SemaCheck.w check_struct_literal).
+fn facade_render_handle(pool: AstPool, intern: InternPool, ci: &Vec[i32], item: i32) -> str:
+    let name: str = intern.resolve(pool.get_data0(item as NodeId))
+    let repr_text = render_type_expr(pool, intern, pool.get_extra(pool.get_data1(item as NodeId)) as NodeId)
+    // A representation that is not a pointer is Sema's error
+    // (verify_facade_handle); nothing is rendered for it.
+    if not facade_render_unalias(pool, intern, repr_text).starts_with("*"):
+        return ""
+    let out = "type " ++ name ++ " = ephemeral { repr: " ++ repr_text ++ " }\n"
+    let methods = facade_render_lend_methods(pool, intern, ci, item, true, false)
+    if methods.len() == 0:
+        return out
+    out ++ "impl " ++ name ++ ":\n" ++ methods
+
+// The handle that alone wraps the (unaliased) representation `repr`, or "".
+fn facade_render_handle_for(pool: AstPool, intern: InternPool, repr: &str) -> str:
+    var found = ""
+    var n = 0
+    for item in facade_render_all_items(pool, NodeKind.NK_FACADE_RESOURCE):
+        if not facade_item_is_handle(pool, item):
+            continue
+        let r = facade_render_unalias(pool, intern, render_type_expr(pool, intern, pool.get_extra(pool.get_data1(item as NodeId)) as NodeId))
+        if r == repr:
+            let hname: str = intern.resolve(pool.get_data0(item as NodeId))
+            found = hname.clone()
+            n = n + 1
+    if n == 1: found else: ""
+
+// The callable type `text` with each parameter C passes as a handle's
+// representation presented as the handle (§16.2b.9): C's
+// `extern "C" fn(*mut sqlite3_context, c_int, *mut *mut sqlite3_value)` is
+// `extern "C" fn(Context, c_int, *mut *mut sqlite3_value)`. The handle is a
+// struct of the one pointer, which each C ABI With targets passes exactly as
+// the pointer (Codegen.w c_abi_direct_struct_param_type: a composite of at
+// most 16 bytes in a general register on AAPCS64, one INTEGER eightbyte on
+// SysV x86_64, an 8-byte aggregate as an integer on Win64; elsewhere LLVM
+// splits the one-element aggregate into its element), so the presented
+// callback is transmuted to C's type and C calls it unchanged. A
+// pointer to a representation (`sqlite3_value **`) is not the handle and
+// stays as C declares it; so does a representation several handles wrap.
+// Returns `text` itself when no parameter is a handle's.
+fn facade_render_handle_callback_type(pool: AstPool, intern: InternPool, text: &str) -> str:
+    // The presented callback is safe With (a safe extern fn passes where C
+    // declares an unsafe one, as for the typed callback).
+    let raw = facade_render_callback_raw_type(facade_render_unalias(pool, intern, text))
+    let open = raw.find("(")
+    if open < 0 or not facade_render_is_callable_type(raw):
+        return text.clone()
+    var depth = 0
+    var close: i64 = -1
+    var i = open
+    while i < raw.len() as i32:
+        if raw[i] == '(': depth = depth + 1
+        else if raw[i] == ')':
+            depth = depth - 1
+            if depth == 0:
+                close = i
+                break
+        i = i + 1
+    if close < 0:
+        return text.clone()
+    let params = raw.slice(open + 1, close)
+    var out = ""
+    var changed = false
+    var start = 0
+    depth = 0
+    var k = 0
+    var index = 0
+    while k <= params.len() as i32:
+        let at_end = k == params.len() as i32
+        if not at_end:
+            if params[k] == '(' or params[k] == '[': depth = depth + 1
+            else if params[k] == ')' or params[k] == ']': depth = depth - 1
+        if at_end or (params[k] == ',' and depth == 0):
+            let part = params.slice(start, k).trim()
+            if part.len() > 0:
+                let handle = facade_render_handle_for(pool, intern, facade_render_unalias(pool, intern, part))
+                let shown = if handle.len() > 0: handle.clone() else: part.clone()
+                if handle.len() > 0: changed = true
+                out = out ++ (if index > 0: ", " else: "") ++ shown
+                index = index + 1
+            start = k + 1
+        k = k + 1
+    if not changed:
+        return text.clone()
+    raw.slice(0, open + 1) ++ out ++ raw.slice(close, raw.len())
 
 // A NUL-terminated C string's pointer type as c_import spells it, aliases
 // chased: `char *` is `*mut i8`, `const char *` is `*const i8`.
@@ -1645,6 +1753,13 @@ fn facade_render_bridge_param(pool: AstPool, intern: InternPool, decl: i32, pi: 
             let rname: str = intern.resolve(pool.get_data0(res as NodeId))
             shown = "&" ++ rname
             arg = received
+    else:
+        // A callback C passes a handle's representation receives the handle
+        // (§16.2b.9); C gets the callback under its own type.
+        let handled = facade_render_handle_callback_type(pool, intern, ptype)
+        if handled != ptype:
+            shown = handled
+            arg = "transmute[" ++ facade_render_callback_raw_type(facade_render_unalias(pool, intern, ptype)) ++ "](" ++ pname ++ ")"
     b.params = pname ++ ": " ++ shown
     b.args = arg.clone()
     b
@@ -2316,6 +2431,9 @@ fn facade_render_callback_ops(pool: AstPool, intern: InternPool, ci: &Vec[i32], 
             cb_type = facade_render_callback_type(pool, intern, facade_render_param_type(pool, intern, decl, cbi.callback))
             if cb_type.len() == 0:
                 continue
+            // A parameter C passes as a handle's representation is the
+            // handle (§16.2b.9).
+            cb_type = facade_render_handle_callback_type(pool, intern, cb_type)
         var bridge = facade_render_empty_bridge()
         bridge.args = repr_arg.clone()
         var ud_name = ""

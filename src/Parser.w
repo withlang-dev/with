@@ -4222,6 +4222,32 @@ impl Parser:
             self.pool.add_extra(repr as i32)
             for i in 0..clauses.len() as i32: self.pool.add_extra(clauses[i])
             return self.pool.add_node(NodeKind.NK_FACADE_RESOURCE, start, self.prev_end(), name, extra_start, clauses.len() as i32) as i32
+        if self.current_ident_is("handle"):
+            // `handle Name wraps *mut T` (§16.2b.9, ruling Amendment 1): a
+            // callback-scope representation. It is a resource item whose one
+            // clause is the FACADE_CLAUSE_HANDLE marker, so an operation is
+            // assigned to it (`of Name`) as to a resource; nothing produces
+            // or destroys it, so it states no clauses of its own.
+            self.advance()
+            let name = self.expect_ident()
+            if name == 0: return 0
+            if not self.current_ident_is("wraps"):
+                self.emit_error("expected 'wraps <representation>' after the handle name (§16.2b.9)")
+                return 0
+            self.advance()
+            let repr = self.parse_type_expr()
+            if repr == 0: return 0
+            let (clauses, ok) = self.parse_facade_clauses(col, true)
+            if not ok: return 0
+            if clauses.len() > 0:
+                self.emit_error("a callback-scope handle states no clauses: nothing produces or destroys it, and its operations are fn items stated 'of' it (§16.2b.9)")
+                return 0
+            let marker_extra = self.pool.extra_len()
+            let marker = self.pool.add_node(NodeKind.NK_FACADE_CLAUSE, start, self.prev_end(), FACADE_CLAUSE_HANDLE, marker_extra, 0)
+            let extra_start = self.pool.extra_len()
+            self.pool.add_extra(repr as i32)
+            self.pool.add_extra(marker as i32)
+            return self.pool.add_node(NodeKind.NK_FACADE_RESOURCE, start, self.prev_end(), name, extra_start, 1) as i32
         if self.current_ident_is("domain"):
             self.advance()
             let name = self.expect_ident()
@@ -4232,7 +4258,7 @@ impl Parser:
                 return 0
             let kind = self.expect_ident()
             return self.pool.add_node(NodeKind.NK_FACADE_DOMAIN, start, self.prev_end(), name, kind, 0) as i32
-        self.emit_error("expected 'resource', 'fn', 'domain' or 'use convention' in c facade (§16.2b)")
+        self.emit_error("expected 'resource', 'handle', 'fn', 'domain' or 'use convention' in c facade (§16.2b)")
         0
 
     // The clauses indented deeper than their item. Collected first and written

@@ -12019,6 +12019,10 @@ impl Sema:
         let target_type = self.assignment_target_value_type(target, target_exact_type as i32)
         let value_type = if target_type != 0: self.check_expr_with_owned_demand(value, target_type) else: self.check_expr(value)
         self.reject_owned_demand_from_view_projection(value, target_type as i32, "assignment")
+        // A facade-rendered type's fields are its rendering's (§16.2b.3).
+        if self.ast.kind(target) == NodeKind.NK_FIELD_ACCESS:
+            let written_recv_ty = self.check_expr(self.ast.get_data0(target)) as i32
+            self.reject_facade_field_write_if_needed(written_recv_ty, node)
         // §16.4 union last-written tracking.
         if self.ast.kind(target) == NodeKind.NK_FIELD_ACCESS:
             let u_recv = self.ast.get_data0(target)
@@ -14085,6 +14089,8 @@ impl Sema:
                     self.emit_error("unknown type '" ++ self.pool_resolve(name) ++ "' in struct literal", node)
             return 0
         if self.reject_tool_capability_construction_if_needed(name, tid, node):
+            return 0
+        if self.reject_facade_type_construction_if_needed(tid as i32, node):
             return 0
         if tid != 0:
             let resolved = self.resolve_alias(tid as TypeId)

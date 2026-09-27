@@ -9,7 +9,7 @@
 //! expect-stdout: prepare failed: 1 near "SELEKT": syntax error
 //! expect-stdout: function registered: 0
 //! expect-stdout: shout called
-//! expect-stdout: shout() is NULL: true
+//! expect-stdout: shout() = 42
 //! expect-stdout: failed open: cantopen=true handle produced
 //! expect-stdout: application data 1 destroyed
 //! expect-stdout: close_v2: 0
@@ -25,9 +25,11 @@
 // for text, None for SQL NULL — with column_bytes and column_name
 // preserving the view, errmsg on a failed prepare, create_function_v2
 // consuming application data that C destroys through xDestroy once, when
-// the connection closes (the Drop line lands before the close line), a
-// failed open that still produced a handle (`FailedWithResource`, closed
-// when the error is dropped), and close_v2 as the explicit destroyer.
+// the connection closes (the Drop line lands before the close line), the
+// registered function setting its result through the callback-scope
+// `Context` SQLite passes it (§16.2b.9), a failed open that still produced
+// a handle (`FailedWithResource`, closed when the error is dropped), and
+// close_v2 as the explicit destroyer.
 use facades.sqlite3
 use c_import("sqlite3.h", link: "sqlite3")
 
@@ -40,11 +42,13 @@ type AppData { id: i32, name: str }
 impl Drop for AppData:
     move fn drop(): print(f"application data {self.id} destroyed")
 
-// The SQL function `shout()`: a retained callback (a code pointer; its
-// application data would be reached through sqlite3_user_data). It sets
-// no result, so the function yields SQL NULL.
-fn shout(ctx: *mut sqlite3_context, n: c_int, argv: *mut *mut sqlite3_value):
+// The SQL function `shout()`: a retained callback (a code pointer). SQLite
+// passes it the function's `Context`, a callback-scope handle (§16.2b.9,
+// ruling Amendment 1, #1611): borrowed for this call, and its operations
+// are its methods, so the body sets the result with no `unsafe`.
+fn shout(ctx: Context, n: c_int, argv: *mut *mut sqlite3_value):
     print("shout called")
+    ctx.result_int(42)
 
 fn main:
     print(f"version: {sqlite3_libversion().unwrap().to_str().unwrap().slice(0, 1)}")
@@ -79,12 +83,12 @@ fn main:
     // A bare fn does not yet coerce to `extern "C" fn` through a generic
     // method's parameter (#1609): the retained callback is named through a
     // typed local. xStep and xFinal are not given (a scalar function).
-    let x_func: extern "C" fn(*mut sqlite3_context, c_int, *mut *mut sqlite3_value) -> Unit = shout
+    let x_func: extern "C" fn(Context, c_int, *mut *mut sqlite3_value) -> Unit = shout
     let registered = db.create_function_v2("shout", 0, SQLITE_UTF8, AppData { id: 1, name: "shout" }, x_func, null, null)
     print(f"function registered: {registered}")
     let call = db.prepare("SELECT shout()").unwrap()
     assert(call.step() == SQLITE_ROW)
-    print(f"shout() is NULL: {call.column_text(0).is_none()}")
+    print(f"shout() = {call.column_int(0)}")
     drop(call)
     drop(stmt)
 

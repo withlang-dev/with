@@ -1,5 +1,5 @@
 //! expect-check-fail: wrong argument type in call to 'Database.create_function_v2'
-//! expect-check-fail: expects extern "C" fn(*mut sqlite3_context, i32, *mut *mut sqlite3_value) -> Unit
+//! expect-check-fail: expects extern "C" fn(Context, i32, *mut *mut sqlite3_value) -> Unit
 
 // D51 stage 12 (ruling §45, §66: "retained callback/userdata lifetime";
 // spec §12.4, §16.2b.9): the function pointers sqlite3_create_function_v2

@@ -29,6 +29,7 @@
 //   a callback API with userdata .................... sqlite3_exec
 //   consume with destroy callback ................... sqlite3_create_function_v2
 //   retained callback lifetime ...................... retains param 5/6/7 by param 0
+//   the function's callback-scope context ........... handle Context (Amendment 1)
 //   thread capability declarations .................. thread creator (see the note)
 //   method presentation from sqlite3_* .............. Database.open, db.exec, stmt.column_text, …
 //   an explicit presentation override ............... rename prepare
@@ -142,6 +143,21 @@ c facade sqlite:
         retains param 5 by param 0
         retains param 6 by param 0
         retains param 7 by param 0
+    // The function's context is a callback-scope handle (§44, §16.2b.9;
+    // ruling Amendment 1): "The context in which an SQL function executes
+    // is stored in an sqlite3_context object. A pointer to an
+    // sqlite3_context object is always first parameter to
+    // application-defined SQL functions" — SQLite makes it for the
+    // invocation and nothing in the program produces or destroys it. xFunc,
+    // xStep and xFinal receive it as a `Context`, borrowed for the call,
+    // and its operations are its methods: the function's body sets its
+    // result with no `unsafe`.
+    handle Context wraps *mut sqlite3_context
+    // "These routines are used by the xFunc or xFinal callbacks that
+    // implement SQL functions and aggregates": they set the result through
+    // the context the callback was given.
+    fn sqlite3_result_int
+        of Context
     // Statement operations. The convention shortens by the library prefix
     // the representation's name carries (`sqlite3_` of `sqlite3_stmt`,
     // #1610): `sqlite3_step` is `stmt.step()`, `sqlite3_column_text` is

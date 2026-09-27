@@ -149,6 +149,7 @@ pub enum NodeKind: i32:
     // D51 modeled C, stage 1 (§16.2b): a `c facade name:` block and its items.
     // NK_C_FACADE:          d0=name(sym), d1=extra_start, d2=item_count; extra=[item(node)...]
     // NK_FACADE_RESOURCE:   d0=name(sym), d1=extra_start, d2=clause_count; extra=[wraps_type(node), clause(node)...]
+    //                       (a `handle Name wraps T` item is one whose only clause is FACADE_CLAUSE_HANDLE, §16.2b.9)
     // NK_FACADE_FN:         d0=name(sym), d1=extra_start, d2=clause_count; extra=[clause(node)...]
     // NK_FACADE_DOMAIN:     d0=name(sym), d1=kind(sym: process|thread|resource|static), d2=0
     // NK_FACADE_CONVENTION: d0=extra_start, d1=path_count, d2=match_count; extra=[path_sym..., match(node)...]
@@ -279,6 +280,7 @@ pub const FACADE_CLAUSE_VARIADIC: i32 = 26         // [vararg_ref, selector_ref,
 pub const FACADE_CLAUSE_VARIADIC_CASE: i32 = 27    // [selector_sym, type(node), callback_ref|0, userdata_selector_ref|0, retainer_ref|0]
 pub const FACADE_CLAUSE_CALLBACKS_NONE: i32 = 28  // [] trusted no-invocation guarantee (§16.2b.9)
 pub const FACADE_CLAUSE_ABANDON: i32 = 29          // [fn_sym] resource-only: the `callbacks none` operation run before the destroyer on a drop path not proven callback-free (§16.2b.9)
+pub const FACADE_CLAUSE_HANDLE: i32 = 30           // [] the parser's marker on the NK_FACADE_RESOURCE a `handle Name wraps *mut T` item makes: a callback-scope handle (§16.2b.9), never written as a clause
 pub const FACADE_PARAM_REF_NAME: i32 = 0
 pub const FACADE_PARAM_REF_INDEX: i32 = 1
 pub const FACADE_PARAM_REF_TYPE: i32 = 2
@@ -294,6 +296,14 @@ fn facade_clause_operand_count(kind: i32) -> i32:
     if kind == FACADE_CLAUSE_INIT or kind == FACADE_CLAUSE_PREINIT or kind == FACADE_CLAUSE_DROP or kind == FACADE_CLAUSE_DESTROYS: return 1
     if kind == FACADE_CLAUSE_LEND: return 0
     -1
+
+// Whether an NK_FACADE_RESOURCE item is a callback-scope handle (§16.2b.9).
+pub fn facade_item_is_handle(pool: AstPool, item: i32) -> bool:
+    if item <= 0 or pool.kind(item as NodeId) != NodeKind.NK_FACADE_RESOURCE: return false
+    let extra_start = pool.get_data1(item as NodeId)
+    for k in 0..pool.get_data2(item as NodeId):
+        if pool.get_data0(pool.get_extra(extra_start + 1 + k) as NodeId) == FACADE_CLAUSE_HANDLE: return true
+    false
 
 pub fn facade_clause_profile_rule(pool: AstPool, clause: i32) -> i32:
     if clause <= 0 or pool.kind(clause as NodeId) != NodeKind.NK_FACADE_CLAUSE: return 0
