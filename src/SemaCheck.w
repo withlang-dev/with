@@ -17180,6 +17180,17 @@ impl Sema:
         self.emit_no_await_guard_may_suspend_call(node, fn_sym)
         self.note_allocating_callee(node, fn_sym)
         let ret = self.check_generic_call(fn_sym, fn_node, arg_types, arg_nodes, args_count + 1, node)
+        // #1741: `g |> stage(a)` is `stage(g, a)`, so its arguments move as
+        // the direct call's do (check_call, #737): a by-value parameter
+        // consumes, a declared `&T` parameter borrows.
+        let pm_meta = self.ast.find_fn_meta(fn_node)
+        for ai in 0..arg_nodes.len() as i32:
+            if pm_meta >= 0 and ai < self.ast.fn_meta_param_count(pm_meta):
+                let pm_ptype = self.ast.fn_param_type(self.ast.fn_meta_param_start(pm_meta), ai)
+                if pm_ptype != 0 and self.ast.kind(pm_ptype) == NodeKind.NK_TYPE_REF:
+                    continue
+            if arg_nodes[ai] > 0:
+                self.mark_moved_if_consumed(arg_nodes[ai])
         if target_sym != 0 and ret != 0:
             let ret_resolved = self.resolve_alias(ret as TypeId)
             let ret_base = if self.get_type_kind(ret_resolved) == TypeKind.TY_GENERIC_INST: self.get_generic_inst_base(ret_resolved as i32) else: self.get_type_name(ret_resolved)
