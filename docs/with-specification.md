@@ -1,4 +1,4 @@
-# The With Programming Language — Specification v7.3
+# The With Programming Language — Specification v7.4
 
 **Author:** Eric Hartford
 **Status:** Reference specification for prototype implementation
@@ -11,6 +11,14 @@ implementation is still in progress.** The D22 rules are normative now. The
 compiler, comptime evaluator, backends, standard library, diagnostics, and
 tests are NON-COMPLIANT wherever they do not yet implement them. Existing
 implementation behavior must not be treated as precedent against D22.
+**Changelog v7.4:** Ten rulings from the modeled-C close-out (D71): string
+range slices are `&str` views (§4.8a); a positional collection has no `get`,
+`xs[i]` is the one spelling (§ Element access, D27); `@[flags]` doubles
+without a representation type and `from_int` requires unit variants
+(§4.4a); a closure's `-> T` is checked (§12); `:?` refuses types with no
+Debug form (§15.4.7); `@[repr(packed(N))]` (§16.4); and the facade gains
+`ok` lists, `valid on failed`, and callback-scope `handle`s (§16.2b.4,
+§16.2b.9; modeled-C ruling Amendment 1).
 **Changelog v7.3:** Generators are push-based (§13.4, D69): a `gen fn`
 is an ordinary function that calls the consumer's loop body at each
 `yield`. A consumer's stop leaves the generator at its `yield`, releasing
@@ -2233,6 +2241,8 @@ enum Perms: i32:
 ```
 
 Bitwise operations work naturally since the enum **is** its integer value.
+An `@[flags]` enum with no representation type doubles the same way in its
+default integer representation; the attribute is never ignored.
 
 **`@[specified]` attribute:** For boundary-facing discriminant enums,
 `@[specified]` requires every variant to provide an explicit value.
@@ -2265,6 +2275,11 @@ returning `.None` for values that don't match any defined discriminant:
 let c = Color.from_int(2)    // Some(Color.Green)
 let x = Color.from_int(99)   // None
 ```
+
+`from_int` exists only on an enum whose variants are all unit variants. No
+value of the enum exists for a payload variant's discriminant alone, so on an
+enum with a payload variant a `from_int` call is a compile error naming that
+variant.
 
 **Casting:** `value as i32` extracts the underlying integer (identity cast).
 
@@ -2437,6 +2452,17 @@ Returning a slice from a function is checked by §21.1 Rule 6: the
 result is tied to the intersection of its possible origin parameters'
 lifetimes, and the program is rejected if any possible origin dies
 before the view's last use. Bounds-checked in debug mode.
+
+**String slices.** A range index on a `str` or `&str` — `s[a..b]`, `s[a..]`,
+`s[..b]`, `s[..]` — is a `&str` view of the bytes from `a` to `b`, with the
+origin and ephemerality of any view (§5, §21.1). Offsets are byte offsets. An
+offset past the end, or one that falls inside a UTF-8 character, panics.
+
+```
+let s = "hello, world"
+let head = s[..5]        // "hello"
+let rest = s[7..]        // "world"
+```
 
 **Exclusivity rules for `[]mut T`:** a mutable slice is an exclusive
 view of its range. While a `[]mut T` is live (NLL: until its last
@@ -5377,12 +5403,12 @@ them.
 `xs[i]` on a collection denotes the element *place*: reading it yields a
 view (`&T`) of collection-owned storage, and writing through it (when the
 base place is mutable) mutates the element via `IndexPlace`, including
-receiver chains such as `xs[i].tags.push(v)`. Positional lookup
-`xs.get(i)` is the observing accessor: it returns `&T`, a read-only view
-of the element. Out-of-range positional access panics — for positional
-access, absence is a bug, not a value, so no `Option` appears. (Keyed
-maps differ: absence is normal there, so `get` returns `Option[&V]` per
-D22.) The ownership-transfer operation is `remove(i) -> T`.
+receiver chains such as `xs[i].tags.push(v)`. A positional collection
+has one spelling for element access, `xs[i]`; it has no positional `get`
+(D71). Out-of-range positional access panics — for positional access,
+absence is a bug, not a value, so no `Option` appears. (Keyed maps differ:
+absence is normal there, so `get` returns `Option[&V]` per D22.) The
+ownership-transfer operation is `remove(i) -> T`.
 
 An element view follows the contextual rules of §3.8 and D22: when
 `T: Copy`, an owned-value demand materializes an independent copy; when
@@ -5745,6 +5771,10 @@ escaped.
 ---
 
 ## 12. Closures and Escaping
+
+A closure may state its result type as a function does: `(x: i32) -> str
+=> f"{x}"`. The annotation is checked like a declared return type — the body
+must produce that type — and it is never dropped.
 
 ### 12.1 Non-Escaping Closures
 
@@ -8696,7 +8726,11 @@ are valid. All other modes are compile-time errors.
 
 #### 15.4.7 Debug Mode `:?`
 
-Available for all types. Prints a structural representation:
+Available for every type in the table below, every type composed of them,
+and every type with an `impl Debug`. A value with no Debug form — a function
+value, a closure, `dyn Trait`, a range, a `va_list` — is a compile error
+under `:?` naming its type; it is never printed as a placeholder. Prints a
+structural representation:
 
 | Type | Debug output |
 |------|-------------|
@@ -9364,7 +9398,11 @@ constant:
 
 ```
 ok SQLITE_OK
+ok SQLITE_ROW, SQLITE_DONE           // several success statuses
 ```
+
+When `ok` lists several constants, any of them is success, and the `Ok` side
+carries the status that matched alongside the produced value.
 
 There is no rule that `0` means success, for C in general or for any library.
 Without `ok`, the status is uninterpreted. A failed status does not imply that
@@ -9395,7 +9433,15 @@ error. `NothingProduced` is a success status with nothing produced: a
 violated contract, reported as an error. A resource owned by an error admits
 raw access only, unless the facade marks an operation as valid on the failure
 state; it is carried as a distinct type (`FailedDatabase`) that has no
-presented methods. A facade that declares or imports a type with the generated name is a
+presented methods except those so marked. The mark is a clause on the
+operation's fn item, and the operation is then presented on the failed type
+as well:
+
+```
+fn sqlite3_errmsg
+    returns borrow CStr from param 0
+    valid on failed
+``` A facade that declares or imports a type with the generated name is a
 compile-time error naming both. When `ok` is stated, the
 `(status, Option[Resource])` constructor is not generated.
 
@@ -9684,6 +9730,21 @@ A value C passes into a With callback is borrowed for the callback's scope;
 it does not become owned because C passed a pointer, and it cannot escape the
 callback without stronger evidence (transfer, a longer-lived origin, or
 static lifetime).
+
+**Callback-scope handles.** A foreign representation that exists only for a
+callback's invocation (`sqlite3_context`, `sqlite3_value`) is declared as a
+handle: nothing produces or destroys it, it has no `Drop`, and it is borrowed
+for the callback's scope and cannot outlive it. Operations on it are its
+methods, stated with `of` as for a resource:
+
+```
+handle Context wraps *mut sqlite3_context
+handle Value wraps *mut sqlite3_value
+fn sqlite3_result_int
+    of Context
+fn sqlite3_value_int
+    of Value
+```
 
 A callback used only during one foreign call needs no retained lifetime. A
 callback C keeps is modeled with `retains`, and its userdata likewise. A
@@ -10110,6 +10171,14 @@ type PackedHeader {
 fields (no padding). The compiler emits unaligned loads/stores.
 Creating a reference to a packed field is a compile error (the
 reference would be unaligned).
+
+`@[repr(packed(N))]`, with `N` a power of two, caps every field's alignment
+at `N`: a field whose natural alignment exceeds `N` is placed at alignment
+`N`, and the record's alignment is at most `N`. It is the layout of C's
+`#pragma pack(N)` and `__attribute__((packed, aligned(N)))`, and `c_import`
+emits it for such records (e.g. `BITMAPFILEHEADER` under `pack(2)`). A
+reference to a field whose natural alignment exceeds `N` is a compile error,
+as for `repr(packed)`.
 
 **Union types:**
 

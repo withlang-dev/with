@@ -187,7 +187,7 @@ semantic rule.
 
 **D27 (decisions.md) extends the doctrine to positional collections: element
 access observes; `remove` transfers.** `xs[i]` denotes the element place;
-`xs.get(i)` returns `&T` (read-only, panics out-of-range — `Option` is for keyed
+a positional collection has no `get` (D71): `xs[i]` is the one spelling and panics out-of-range (`Option` is for keyed
 maps, where absence is normal); a binding names what's there, an annotation
 demands what it says. The element-view campaign is done; see
 `docs/d27-implementation-plan.md`. The interim #715 element gate and the
@@ -491,7 +491,7 @@ same violation as C in the compiler. With IS a scripting language; there is no
   use std.process
   fn shout(s: str): s ++ "!"        // return type inferred
   let argv = args()                      // std.process
-  for i in 1..argv.len() as i32: print(shout(argv.get(i as i64)))
+  for i in 1..argv.len() as i32: print(shout(argv[i]))
   ```
 - **Run without a build step**: `with run tool.w a b` compiles-and-runs and
   forwards `a b` as argv. Reuse the compiler's own modules (`use Lexer`,
@@ -740,7 +740,7 @@ Match the surrounding code, and follow the mission at the character level:
   least-ceremony, not just the lines you came to change.
 - **Unnecessary casts and `unsafe` are defects: fix them on sight, anywhere —
   even in code you are not otherwise editing.** The defaults already cover
-  them: `v[i]`, `v[i] = x`, and `v.get(i)` take an `i32` index; `i32` widens
+  them: `v[i]` and `v[i] = x` take an `i32` index; `i32` widens
   into `i64` arithmetic and comparisons; `for k in 0..n` indexes directly. So
   `.get(i as i64)`, `.set_i32(i as i64, x)`, `v[i as i64]`, and `x as i64`
   where the target already widens are never written — only a narrowing needs

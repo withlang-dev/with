@@ -1956,3 +1956,29 @@ The final guardrail is:
 And the test for every future C-interoperability inference is:
 
 > **What happens if this inference is wrong?**
+
+---
+
+# Amendment 1 (Eric, 2026-09-27)
+
+Blessed as predicted in the modeled-C close-out (D71). It adds facade
+clauses the SQLite facade needed; it does not change any rule above.
+
+**§17, several success statuses.** A producer's `ok` may list several
+compile-time constants (`ok SQLITE_ROW, SQLITE_DONE`). Any of them is
+success, and the success side carries the status that matched alongside the
+produced value. The rule that no integer convention is assumed is unchanged:
+every success status is stated.
+
+**Failure-state operations.** An operation the C contract documents as
+valid on a failed resource is marked on its fn item with `valid on failed`,
+and is presented on the failed-state type as well (`errmsg` on
+`FailedDatabase` after a failed `sqlite3_open`). Without the mark the failed
+resource admits raw access only.
+
+**Callback-scope handles (§44).** A foreign representation that exists only
+for a callback's invocation (`sqlite3_context`, `sqlite3_value`) is declared
+`handle Name wraps *mut T`. Nothing produces or destroys it, it has no
+`Drop`, and it is borrowed for the callback's scope and cannot outlive it.
+Operations stated `of` the handle are its methods, so a callback body calls
+them safely.
