@@ -1,0 +1,24 @@
+foreign-contract view	v1
+resource Stream wraps z_stream_s; representation: in-place, pinned; facade:zl@test/contract/ok_in_place_init.w; clause:resource@test/contract/ok_in_place_init.w:17
+    init: z_init -> Stream.init; production: in place, Drop armed by init  [clause:init@test/contract/ok_in_place_init.w:18]
+    status: none; a producer's failure is None, or (status, None) through an out parameter  [default:no status convention is inferred (§16.2b.4)]
+    destroyer: z_end; automatic: Drop calls it while the value is live  [clause:drop@test/contract/ok_in_place_init.w:19]
+    dependency: none via z_init; it receives no modeled resource  [default:no resource parameter (§16.2b.6)]
+    thread: creator; operations and destruction on the creating thread, ownership stays there  [default:thread creator (§16.2b.10)]
+    invalidation: views invalidated by: z_init, z_check, z_end; preserved across: none  [default:unknown effect is invalidate; `preserves param N` states otherwise (§16.2b.7)]
+fn z_init; facade:zl@test/contract/ok_in_place_init.w; clause:fn@test/contract/ok_in_place_init.w:20
+    role: in-place initializer of Stream  [clause:resource@test/contract/ok_in_place_init.w:17]
+    callbacks: may invoke applicable callbacks  [default:conservatively reentrant (§16.2b.9)]
+    effect: param 0: *mut z_stream_s s: lend, an assertion about foreign behavior; receives Stream  [clause:lend@test/contract/ok_in_place_init.w:21]
+    effect: param 1: *mut i32 ends: lend, an assertion about foreign behavior  [clause:lend@test/contract/ok_in_place_init.w:21]
+    effect: param 2: *mut i32 misplaced: lend, an assertion about foreign behavior  [clause:lend@test/contract/ok_in_place_init.w:21]
+    returns: i32  [default:as declared]
+    invalidates: Stream (param 0: *mut z_stream_s s)  [default:unknown effect is invalidate (§16.2b.7)]
+fn z_check; facade:zl@test/contract/ok_in_place_init.w; clause:fn@test/contract/ok_in_place_init.w:22
+    callbacks: may invoke applicable callbacks  [default:conservatively reentrant (§16.2b.9)]
+    effect: param 0: *const z_stream_s s: lend, an assertion about foreign behavior; receives Stream  [clause:lend@test/contract/ok_in_place_init.w:23]
+    returns: i32  [default:as declared]
+    invalidates: Stream (param 0: *const z_stream_s s)  [default:unknown effect is invalidate (§16.2b.7)]
+    presentation: Stream.check  [default:presentation sugar from the resource prefix (§16.2b.11)]
+note: contract-audit: resources=1 items=2 domains=0 conventions=0 advisories=0 profile-ambiguous=0 profile-shadowed=0
+contract-audit: violations=0 ok

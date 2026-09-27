@@ -2431,6 +2431,14 @@ impl Sema:
 
     // Whether a resource clause names `fn_sym` (`from`, `init`, `preinit`,
     // `drop`, `destroys`): the clause assigns it.
+    // Whether `fn_sym` is a resource's in-place `init` or `preinit`.
+    fn facade_fn_is_init(fn_sym: i32) -> bool:
+        for ri in 0..self.facade_resources.len() as i32:
+            let r = &self.facade_resources[ri]
+            if self.facade_same_fn(r.init, fn_sym) or self.facade_same_fn(r.preinit, fn_sym):
+                return true
+        false
+
     fn facade_fn_is_resource_op(fn_sym: i32) -> bool:
         for ri in 0..self.facade_resources.len() as i32:
             let r = &self.facade_resources[ri]
@@ -3556,6 +3564,15 @@ impl Sema:
             // remaining parameters through buffer/fixed clauses.
             let recv0 = self.facade_method_host(fn_sym)
             if recv0.len() != 1:
+                continue
+            // An in-place producer (`init z_init(self)`) is rendered as the
+            // constructor `R.init(rest…)`, whose signature the constructor
+            // pass above indexed with the storage slot removed. Its first C
+            // parameter is that slot, not a receiver: registering it here
+            // as a lend method of `R` put the slot's bit 0 on the
+            // constructor's first real parameter (#1674's audit caught it on
+            // behav_c_facade_resource_in_place_pinned.w).
+            if self.facade_fn_is_init(fn_sym):
                 continue
             let mname = self.facade_presented(recv0[0], self.pool_resolve(fn_sym))
             let host: str = self.pool_resolve(self.facade_resources[recv0[0]].name)
