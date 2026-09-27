@@ -1128,26 +1128,8 @@ impl Codegen:
     mut fn audit_codegen_place_types(body: &MirBody):
         if self.analysis_enabled == 0 or self.analysis_query != "audit":
             return
-        // Stated exclusion (#1305): the async lowering projects
-        // `Task.fiber_id` (`.f0`) off a call-result local that MIR types as
-        // the awaited T, not Task[T]; codegen's FIBER_* intrinsics agree with
-        // it by convention. Those places are the argument of a fiber
-        // intrinsic call and nothing else; skip exactly them until #1305
-        // types the local as Task[T].
-        let intrinsic_places: HashMap[i32, i32] = HashMap.new()
-        for bb in 0..body.block_count():
-            if body.term_kind(bb) != TermKind.TK_CALL:
-                continue
-            let args_id = body.term_data1(bb)
-            if args_id < 0 or args_id >= body.call_arg_counts.len() as i32 or body.call_intrinsic(args_id) == MirIntrinsic.NONE:
-                continue
-            let arg_start = body.call_arg_starts[args_id]
-            for ai in 0..body.call_arg_counts[args_id]:
-                let op_id = body.call_arg_operands[(arg_start + ai)]
-                if op_id >= 0 and op_id < body.operand_d0.len() as i32:
-                    intrinsic_places.insert(body.operand_d0[op_id], 1)
         for place_id in 0..body.place_locals.len() as i32:
-            if body.place_proj_counts[place_id] == 0 or intrinsic_places.contains(place_id):
+            if body.place_proj_counts[place_id] == 0:
                 continue
             let sema_ty = body.place_sema_types[place_id]
             if sema_ty <= 0:
@@ -5768,6 +5750,18 @@ impl Codegen:
             return true
 
         false
+
+    // #1305: `T` of the awaited `Task[T]`/`ScopedTask[T]`; 0 if the operand
+    // is not a task.
+    fn mir_task_awaited_sema_type(task_sema_ty: i32) -> i32:
+        if task_sema_ty <= 0:
+            return 0
+        let resolved = self.sema.resolve_alias(task_sema_ty as TypeId) as i32
+        if self.sema.type_is_task(resolved) == 0 and self.sema.type_is_scoped_task(resolved) == 0:
+            return 0
+        if self.sema.get_generic_inst_arg_count(resolved) < 1:
+            return 0
+        self.sema.get_generic_inst_arg(resolved, 0)
 
     fn mir_default_unreachable_bb_value() -> i64:
         if self.mir_default_unreachable_bbs.len() as i32 > 0:
@@ -10501,14 +10495,8 @@ impl Codegen:
             // intrinsics emitted by MirLower, with defers in the unwind BB).
             let task_op = self.mir_intrinsic_arg(body, args_id, 0)
             let task_ty = wl_type_of(task_op)
-            // Find the MIR local for the Task to look up its result type
-            var task_mir_local: i32 = -1
             let await_arg_start = body.call_arg_starts[args_id]
             let await_op_id = body.call_arg_operands[await_arg_start]
-            if await_op_id >= 0 and await_op_id < body.operand_d0.len() as i32:
-                let await_place_id = body.operand_d0[await_op_id]
-                if await_place_id >= 0 and await_place_id < body.place_locals.len() as i32:
-                    task_mir_local = body.place_locals[await_place_id]
             // Task = { i32 fiber_id, i8* result_buf }
             let task_alloca = self.create_entry_alloca(task_ty)
             wl_build_store(self.builder, task_op, task_alloca)
@@ -10558,20 +10546,16 @@ impl Codegen:
                         ignore_result = true
             // Load result from buffer, free buffer, store to dest
             if not ignore_result and dest_place >= 0 and dest_place < body.place_locals.len() as i32:
-                var dst_llvm_ty: i64 = 0
-                if task_mir_local >= 0:
-                    let trt_opt = self.async_task_result_types.get(task_mir_local)
-                    if trt_opt.is_some():
-                        dst_llvm_ty = trt_opt.unwrap() as i64
+                // #1305: the awaited value is the Task's own type argument
+                // (Sema's Task[T] / ScopedTask[T] on the awaited operand) —
+                // never a side table keyed by a local id, the last spawn's
+                // type, or an i32 guess.
+                let awaited_sema_ty = self.mir_task_awaited_sema_type(await_task_sema_ty)
+                let dst_llvm_ty = if awaited_sema_ty > 0: self.mir_sema_type_to_llvm(awaited_sema_ty) else: 0
                 if dst_llvm_ty == 0 or dst_llvm_ty == wl_void_type(self.context):
-                    let dst_local = body.place_locals[dest_place]
-                    let dst_sema_ty = body.local_type_ids[dst_local]
-                    dst_llvm_ty = self.mir_sema_type_to_llvm(dst_sema_ty)
-                if dst_llvm_ty == 0 or dst_llvm_ty == wl_void_type(self.context):
-                    if self.last_async_spawn_ret_ty != 0:
-                        dst_llvm_ty = self.last_async_spawn_ret_ty
-                if dst_llvm_ty == 0 or dst_llvm_ty == wl_void_type(self.context):
-                    dst_llvm_ty = wl_i32_type(self.context)
+                    with_eprint(f"error: code generation failed: cannot type the value awaited from `{self.sema.type_name(await_task_sema_ty)}` in '{self.intern.resolve(self.current_function_name_sym)}'")
+                    self.had_error = 1
+                    return false
                 let result_val = wl_build_load(self.builder, dst_llvm_ty, rbuf)
                 let dst_alloca = self.create_entry_alloca(dst_llvm_ty)
                 wl_build_store(self.builder, result_val, dst_alloca)
@@ -19058,7 +19042,6 @@ impl Codegen:
         var task_value = wl_get_undef(task_ty)
         task_value = wl_build_insert_value(self.builder, task_value, fiber_id, 0)
         task_value = wl_build_insert_value(self.builder, task_value, result_buf, 1)
-        self.last_async_spawn_ret_ty = ret_ty
         task_value
 
     mut fn emit_async_fn_spawn(fn_sym: i32, callee: i64, call_ft: i64, args: &Vec[i64], dest_place: i32, body: &MirBody, next_bb: i32) -> bool:
@@ -19157,9 +19140,6 @@ impl Codegen:
             wl_build_store(self.builder, result_buf, rbuf_ptr)
             self.mir_local_ptrs.insert(dst_local, task_alloca)
             self.mir_local_types.insert(dst_local, task_ty)
-            // Store result type for FIBER_AWAIT to load correctly
-            self.async_task_result_types.insert(dst_local as i32, ret_ty)
-            self.last_async_spawn_ret_ty = ret_ty
 
         if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
             wl_build_br(self.builder, self.mir_bb_values[next_bb])
