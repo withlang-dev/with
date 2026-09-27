@@ -410,6 +410,15 @@ impl Sema:
             return if self.types_compatible(expected as TypeId, pointee as TypeId) != 0: 1 else: 0
         self.builtin_arg_type_compatible(expected, pointee)
 
+    // Whether casting the shared reference `ref_ty` (`&T`) to `cast_ty` is the
+    // reference relabeled as a raw pointer to the same pointee (`*const T` or
+    // `*mut T`, §16.11): its address, never a read of `T` (#1777).
+    fn cast_relabels_reference(ref_ty: i32, cast_ty: i32) -> bool:
+        let target = self.resolve_alias(cast_ty as TypeId)
+        if self.get_type_kind(target) != TypeKind.TY_PTR:
+            return false
+        self.resolve_alias(self.get_type_d0(target) as TypeId) == self.resolve_alias(self.get_type_d0(self.resolve_alias(ref_ty as TypeId)) as TypeId)
+
     // `&place as *T` is the blessed address-taking spelling; a cast operand
     // spelled with an explicit borrow must not materialize its pointee.
     fn cast_operand_is_explicit_borrow(node: i32) -> i32:
@@ -7003,9 +7012,15 @@ impl Sema:
                     // still an owned demand — materialize the Copy pointee and
                     // let the cast itself convert (D22 §6.1 step 3). An
                     // explicit `&place` operand keeps address semantics
-                    // (`&array[0] as *T`).
+                    // (`&array[0] as *T`), and so does a `&T` cast to `*T`
+                    // (#1777): the reference already is that pointer, relabeled
+                    // into the raw domain (can_contextually_copy_ref: "a `&T`
+                    // view never decays to `*T`"), where materializing read the
+                    // `T` and turned its value into an address — `r as *const
+                    // i32` on `r: &i32`, and the facade's `ud as *const U` for
+                    // a scalar userdata, a fault in safe code.
                     let cast_src_resolved = self.resolve_alias(src_tid)
-                    if self.get_type_kind(cast_src_resolved) == TypeKind.TY_REF and self.get_type_d1(cast_src_resolved) == 0 and self.cast_operand_is_explicit_borrow(src_node) == 0:
+                    if self.get_type_kind(cast_src_resolved) == TypeKind.TY_REF and self.get_type_d1(cast_src_resolved) == 0 and self.cast_operand_is_explicit_borrow(src_node) == 0 and not self.cast_relabels_reference(cast_src_resolved as i32, cast_tid as i32):
                         let _ = self.record_contextual_copy_adjustment(src_node, self.get_type_d0(cast_src_resolved), src_tid as i32)
             // Store resolved cast type so MIR lowering can read it without
             // calling resolve_type_expr (which would add_type on a shallow-copied Sema).
