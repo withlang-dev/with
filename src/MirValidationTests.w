@@ -513,8 +513,9 @@ pub fn mir_test_vacated_payload_drop() -> Unit:
 //   2  moved twice on one path (Moved)
 //   3  initialized on one arm only, moved at the join (Maybe: not judged —
 //      a path that never wrote the place is not a path that moved it)
-//   4  moved on one arm, passed by move to a call at the join (not judged:
-//      a call argument OK_MOVE is a borrow for some receivers until #1505)
+//   4  moved on one arm, passed by move to a call at the join (MaybeMoved:
+//      call arguments are judged since #1505 lowered borrowed receivers
+//      as reads)
 fn moved_twice_verdict(shape: i32, drops: bool) -> str:
     var mir_mod = MirModule.init()
     for kind in [0, TypeKind.TY_INT, TypeKind.TY_STRUCT, TypeKind.TY_VOID]:
@@ -589,7 +590,8 @@ pub fn mir_test_move_of_moved_place() -> Unit:
     assert(moved_twice_verdict(1, true) == "")
     assert(moved_twice_verdict(2, true).contains("move of _2, which a path reaching it already moved out (Moved)"))
     assert(moved_twice_verdict(3, true) == "")
-    assert(moved_twice_verdict(4, true) == "")
+    assert(moved_twice_verdict(4, true).contains("bb3: move of _2, which a path reaching it already moved out (MaybeMoved)"))
+    assert(moved_twice_verdict(4, false) == "")
     // A value with no drop glue is not freed twice.
     assert(moved_twice_verdict(0, false) == "")
 

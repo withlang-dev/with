@@ -5171,10 +5171,23 @@ impl MirBuilder:
         acc
 
     // `ch in some_str` — emit a STR_CONTAINS_CHAR intrinsic call (recv str, i32 char).
+    // #1505: the operand of a receiver the callee BORROWS — the str of
+    // `ch in s` (codegen calls with_str_contains_char_ref), a user
+    // IndexPlace's `get(self: &Self)` and `set(mut self: Self)` (an
+    // in-place receiver, FnAbi IndirectPlace). lower_expr spells a non-Copy
+    // local as OK_MOVE; as a call argument that told the drop-state the
+    // receiver left on the first call, and the second call "moved a moved
+    // place", while codegen only borrowed it. A receiver place is read.
+    mut fn borrowed_receiver_operand(op: i32) -> i32:
+        if op >= 0 and op < self.body.operand_kinds.len() and self.body.operand_kinds[op] == OperandKind.OK_MOVE:
+            return self.body.new_operand(OperandKind.OK_COPY, self.body.operand_d0[op])
+        op
+
     mut fn lower_str_contains_char(op: i32, lhs_expr: i32, rhs_expr: i32, node: i32) -> i32:
         let fn_op = self.const_operand(ConstKind.CK_FN, 0, self.sema.ty_void)
         let call_args: Vec[i32] = Vec.new()
-        call_args.push(self.lower_receiver_with_method_autoderef(rhs_expr))
+        let recv_op = self.lower_receiver_with_method_autoderef(rhs_expr)
+        call_args.push(self.borrowed_receiver_operand(recv_op))
         call_args.push(self.lower_expr(lhs_expr))
         let args_id = self.body.new_call_args(call_args)
         self.body.set_call_intrinsic(args_id, MirIntrinsic.STR_CONTAINS_CHAR)
@@ -6381,7 +6394,8 @@ impl MirBuilder:
                 let ip_type_sym = self.sema.get_type_name(ip_base_ty)
                 let ip_fn_sym = self.sema.lookup_method_fn(ip_type_sym, ip_set_sym)
                 if ip_fn_sym != 0:
-                    let ip_recv_op = self.lower_expr(self.ast.get_data0(place_expr))
+                    let ip_recv_raw = self.lower_expr(self.ast.get_data0(place_expr))
+                    let ip_recv_op = self.borrowed_receiver_operand(ip_recv_raw)
                     let ip_idx_op = self.lower_expr(self.ast.get_data1(place_expr))
                     let ip_idx_ty = self.expr_type(self.ast.get_data1(place_expr))
                     let ip_idx_tmp = self.new_temp(ip_idx_ty)
@@ -15680,7 +15694,8 @@ impl MirBuilder:
                 let ip_rd_type_sym = self.sema.get_type_name(ip_rd_base_ty)
                 let ip_rd_fn_sym = self.sema.lookup_method_fn(ip_rd_type_sym, ip_get_sym)
                 if ip_rd_fn_sym != 0:
-                    let ip_rd_recv_op = self.lower_expr(self.ast.get_data0(node))
+                    let ip_rd_recv_raw = self.lower_expr(self.ast.get_data0(node))
+                    let ip_rd_recv_op = self.borrowed_receiver_operand(ip_rd_recv_raw)
                     let ip_rd_idx_op = self.lower_expr(self.ast.get_data1(node))
                     let ip_rd_ret_ty = self.expr_type(node)
                     let ip_rd_fn_op = self.const_operand(ConstKind.CK_FN, ip_rd_fn_sym, ip_rd_ret_ty)

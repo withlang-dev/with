@@ -2316,10 +2316,9 @@ fn mir_term_operands(body: &MirBody, bb: i32) -> Vec[i32]:
 // match guard's arm bound `move _3<as v0>.f0`, and the next arm bound it
 // again (the #1394 double free, validate-all: ok). A place Maybe
 // initialized is not judged here: MaybeMoved is exactly "moved on a path".
-// Statement moves only: three lowerings pass a receiver the callee borrows
-// as an OK_MOVE call argument (`ch in s`, IndexPlace get/set, a generator's
-// next), so a call's "second move" is a borrow until #1505 lowers them as
-// borrows.
+// Statement moves and call arguments alike (#1505): a receiver the callee
+// borrows (`ch in s`, IndexPlace get/set) is lowered as the read it is, so
+// an OK_MOVE argument is a move.
 fn mir_move_of_moved_place(mir_mod: &MirModule, body: &MirBody, keys: &MirDropStateKeys, state: &MirDropStateMap, ops: &Vec[i32]) -> str:
     for oi in 0..ops.len():
         let op = ops[oi]
@@ -2413,6 +2412,10 @@ pub fn validate_ownership_body(mir_mod: &MirModule, body: &MirBody) -> str:
                 if twice.len() > 0:
                     return f"fn sym{body.fn_sym} stmt{stmt_id} span={span}: " ++ twice
             state.transfer_stmt(blocks.keys, body, stmt_id)
+        if body.term_kind(bb) == TermKind.TK_CALL and blocks.computed[bb] != 0:
+            let twice = mir_move_of_moved_place(mir_mod, body, blocks.keys, state, mir_term_operands(body, bb))
+            if twice.len() > 0:
+                return f"fn sym{body.fn_sym} bb{bb}: " ++ twice
         if body.term_kind(bb) == TermKind.TK_CALL or body.term_kind(bb) == TermKind.TK_DROP_AND_GOTO:
             let place_id = if body.term_kind(bb) == TermKind.TK_CALL: body.term_data2(bb) else: body.term_data0(bb)
             if place_id < 0 or place_id >= body.place_locals.len():
