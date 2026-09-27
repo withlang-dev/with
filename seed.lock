@@ -15,17 +15,24 @@ with-darwin-aarch64=7456c37b78f284670ce7fac060656ab1f4f243e99a1570736deb9ae65b71
 # `Diagnostics.error` infers Never. The previous seed (8d3cc360) predates
 # public return inference, and main's a5c6f430 compiler embeds the old
 # Unit signature, so neither can evaluate this tree's build layer.
-# Linux stays on v0.15.2.0 until its nightly legs publish a newer asset
-# (#1386, #1369, #1376).
-with-linux-x86_64.version=v0.15.2.0
-with-linux-x86_64=eaa955602fd96e960ea3cfcb2f41be4013380dce646e45a93422d67ce9003869
+# linux-x86_64 is main 2e8defaa, published from a local bootstrap: v0.15.2.1
+# cannot build this tree, so it was laddered through 8c859a7d, 37f3a99f,
+# 8e55d67b, fb6753b4 + the 4f004956 field-move fix, 8db10d1a, and the
+# 607a52f5 hop (a stage1 of a5c6f430 embedding 607a52f5's lib/). The published
+# binary builds main from a fresh checkout to a stage2 == stage3 fixpoint.
+# linux-aarch64 stays on v0.15.2.0 until its nightly legs publish a newer
+# asset (#1386, #1369, #1376).
+with-linux-x86_64.version=nightly-20260926-local-1-2e8defaa18ef
+with-linux-x86_64=ce5c3c4729650b215fb166ac8078fe7c7982b094bc4a1e31401e04eb7e7460d0
 with-linux-aarch64.version=v0.15.2.0
 with-linux-aarch64=3e54f7839dbf9549233a19753c897fb08f493fa8cfafeeec25b62fa87a43aac3
-# Both Windows seeds are v0.15.2.1 (the #1081 fixes): x86_64 built natively
-# by the ladder v0.15.1.8 -> af7db8ce -> main and fixpoint-verified; aarch64
-# cross-built from ea377276 (v0.15.2.1 + the #1089 embed-slot fix), an
-# intermediate seed the native windows-aarch64 lane bootstraps and verifies.
-with-windows-x86_64.exe.version=v0.15.2.1
-with-windows-x86_64.exe=8f4817f2c4a3a916515ec93fd8a8f228bc9cfcd423689c5977dc564efc02a115
+# windows-x86_64 is main 2e8defaa, built natively on a Windows 10 VM by the
+# same ladder as linux-x86_64, from v0.15.2.1; the published binary builds
+# main from a fresh checkout to a stage2 == stage3 fixpoint. windows-aarch64
+# stays on v0.15.2.1: cross-built from ea377276 (v0.15.2.1 + the #1089
+# embed-slot fix), an intermediate seed the native windows-aarch64 lane
+# bootstraps and verifies.
+with-windows-x86_64.exe.version=nightly-20260926-local-1-2e8defaa18ef
+with-windows-x86_64.exe=52ae948ab3f7a677daf950b45f34fd9fa4b398081c8593519540f78c898d02f4
 with-windows-aarch64.exe.version=v0.15.2.1
 with-windows-aarch64.exe=bb3b17c64ad057ddc852a5ee6a61a4e4a224780447013699d490e6f726893c73

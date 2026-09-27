@@ -63,9 +63,9 @@ jobs:
         include:
           - arch: x86_64
             runner: windows-latest
-            seed_version: v0.15.2.1
+            seed_version: nightly-20260926-local-1-2e8defaa18ef
             seed_asset: with-windows-x86_64.exe
-            seed_sha256: 8f4817f2c4a3a916515ec93fd8a8f228bc9cfcd423689c5977dc564efc02a115
+            seed_sha256: 52ae948ab3f7a677daf950b45f34fd9fa4b398081c8593519540f78c898d02f4
             mesa_arch: x64
             mesa_sha256: 418f1938dc48d401538cf6440d3c718e2f456ef2023e44133105263f483e903f
           - arch: aarch64
@@ -233,10 +233,10 @@ jobs:
             runner: ubuntu-latest
             sdk_host_tag: linux-x86_64
             seed_repo: withlang-dev/with
-            seed_version: v0.15.2.0
+            seed_version: nightly-20260926-local-1-2e8defaa18ef
             seed_asset: with-linux-x86_64
-            seed_sha256: eaa955602fd96e960ea3cfcb2f41be4013380dce646e45a93422d67ce9003869
-            sdk_version: nightly-sdk-test-20260815-680aa139
+            seed_sha256: ce5c3c4729650b215fb166ac8078fe7c7982b094bc4a1e31401e04eb7e7460d0
+            sdk_version: nightly-20260926-local-1-2e8defaa18ef
             sdk_asset: with-llvm-sdk-22.1.6-linux-x86_64.tar.gz
             sdk_sha256: c7747403c3556ba9ca6e8f47c5db023798c7c5828c807c4a3b474f0c87db24db
             sdk_sidecar_sha256: e706ecf5c187a47fe908193093a4c0b07042c15308a1ecef365bc8bc2c34d32b
@@ -631,9 +631,9 @@ jobs:
       # predated that fix; a compiler bootstrapped from it self-perpetuates the
       # miscompile and crashes (0xC0000005) compiling any regex literal at comptime.
       # build and :fixpoint never compile a regex, so that poison shipped green.
-      WITH_SEED_VERSION: v0.15.2.1
+      WITH_SEED_VERSION: nightly-20260926-local-1-2e8defaa18ef
       WITH_SEED_ASSET: with-windows-x86_64.exe
-      WITH_SEED_SHA256: 8f4817f2c4a3a916515ec93fd8a8f228bc9cfcd423689c5977dc564efc02a115
+      WITH_SEED_SHA256: 52ae948ab3f7a677daf950b45f34fd9fa4b398081c8593519540f78c898d02f4
       # The Windows LLVM SDK is versioned independently of the nightly-sdk-* used
       # by darwin/linux and ships without .sha256/.manifest sidecars, so we pin the
       # archive digest directly here rather than fetching sidecar files.

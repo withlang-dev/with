@@ -32,11 +32,14 @@ jobs:
       # Fixpoint-verified stable release seed for this platform.
       WITH_SEED_REPO: withlang-dev/with
       WITH_SEED_ASSET: with-linux-x86_64
-      WITH_SEED_VERSION: v0.15.2.0
-      WITH_SEED_SHA256: eaa955602fd96e960ea3cfcb2f41be4013380dce646e45a93422d67ce9003869
+      WITH_SEED_VERSION: nightly-20260926-local-1-2e8defaa18ef
+      WITH_SEED_SHA256: ce5c3c4729650b215fb166ac8078fe7c7982b094bc4a1e31401e04eb7e7460d0
       WITH_SDK_REPO: withlang-dev/with
-      WITH_SDK_VERSION: v0.15.1
-      WITH_SDK_ASSET: with-llvm-sdk-22.1.6-linux-x86_64.tar.zst
+      # Built from build/sdk.w at main 2e8defaa + the llvm-dwarfdump fix: the
+      # WebAssembly backend (#1210) and llvm-dwarfdump (stage2-debug-lines),
+      # which the v0.15.1 SDK lacks.
+      WITH_SDK_VERSION: nightly-20260926-local-1-2e8defaa18ef
+      WITH_SDK_ASSET: with-llvm-sdk-22.1.6-linux-x86_64.tar.gz
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -53,10 +56,12 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p .deps
-          curl -fL --retry 5 --retry-delay 5 --retry-all-errors -o /tmp/sdk.tar.zst \
+          curl -fL --retry 5 --retry-delay 5 --retry-all-errors -o /tmp/sdk.tar.gz \
             "https://github.com/$WITH_SDK_REPO/releases/download/$WITH_SDK_VERSION/$WITH_SDK_ASSET"
-          # asset is .tar.zst; `with build :deps` expects .tar.gz, so extract by hand.
-          zstd -d -c /tmp/sdk.tar.zst | tar -x -C .deps
+          curl -fL --retry 5 --retry-delay 5 --retry-all-errors -o /tmp/sdk.tar.gz.sha256 \
+            "https://github.com/$WITH_SDK_REPO/releases/download/$WITH_SDK_VERSION/$WITH_SDK_ASSET.sha256"
+          printf '%s  %s\n' "$(cut -d' ' -f1 /tmp/sdk.tar.gz.sha256)" /tmp/sdk.tar.gz | sha256sum -c -
+          tar -xzf /tmp/sdk.tar.gz -C .deps
           test -d "$LLVM_PREFIX/bin" || { echo "unexpected SDK layout"; ls -la .deps; exit 1; }
           test -x "$LLVM_PREFIX/bin/lld" || { echo "SDK lld missing"; exit 1; }
 
