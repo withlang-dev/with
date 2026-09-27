@@ -48,7 +48,7 @@ impl Zcu:
             backend_intern = sema_pool
         var cg = Codegen.init_with_opt_and_intern("with_module", opt_level, move backend_intern, move self.last_sema)
         cg.source_file = with_str_clone_ref(self.current_source_path)
-        cg.source_text = move self.current_source_text
+        cg.source_text = with_str_clone_ref(self.current_source_text)
         cg.decl_source_paths = sema_clone_str_vec(&self.decl_source_paths)
         cg.current_decl_source_file = with_str_clone_ref(self.current_source_path)
         cg.add_bundle_prefixes(&self.link_bundle_prefixes)
@@ -135,7 +135,7 @@ impl Zcu:
                 backend_intern = round_sema_pool
             var cg = Codegen.init_with_opt_and_intern(f"with_module_u{k}", opt_level, move backend_intern, move self.last_sema)
             cg.source_file = with_str_clone_ref(self.current_source_path)
-            cg.source_text = move self.current_source_text
+            cg.source_text = with_str_clone_ref(self.current_source_text)
             cg.decl_source_paths = sema_clone_str_vec(&self.decl_source_paths)
             cg.current_decl_source_file = with_str_clone_ref(self.current_source_path)
             cg.add_bundle_prefixes(&self.link_bundle_prefixes)
@@ -197,7 +197,7 @@ impl Zcu:
             backend_intern = sema_pool
         var cg = Codegen.init_with_opt_and_intern("with_module", opt_level, move backend_intern, move self.last_sema)
         cg.source_file = with_str_clone_ref(self.current_source_path)
-        cg.source_text = move self.current_source_text
+        cg.source_text = with_str_clone_ref(self.current_source_text)
         cg.decl_source_paths = sema_clone_str_vec(&self.decl_source_paths)
         cg.current_decl_source_file = with_str_clone_ref(self.current_source_path)
         cg.add_bundle_prefixes(&self.link_bundle_prefixes)
@@ -242,7 +242,7 @@ impl Zcu:
         let backend_intern = if use_sema_pool: move self.last_sema.pool else: move self.pool
         var cg = Codegen.init_with_opt_and_intern("with_analysis", opt_level, move backend_intern, move self.last_sema)
         cg.source_file = with_str_clone_ref(self.current_source_path)
-        cg.source_text = move self.current_source_text
+        cg.source_text = with_str_clone_ref(self.current_source_text)
         cg.decl_source_paths = sema_clone_str_vec(&self.decl_source_paths)
         cg.current_decl_source_file = with_str_clone_ref(self.current_source_path)
         cg.add_bundle_prefixes(&self.link_bundle_prefixes)

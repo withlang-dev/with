@@ -1896,7 +1896,7 @@ impl Compilation:
             sema.emit_config_warnings = 0
         else:
             sema = self.zcu.configure_tracked_input_sema(Sema.init(self.zcu.pool, move self.zcu.diagnostics, active_pool))
-            sema.source_text = move self.zcu.current_source_text
+            sema.source_text = with_str_clone_ref(self.zcu.current_source_text)
             // Clone like Frontend's seam: a bare assignment moves the table out of
             // the Zcu (single-owner Vec), and the backend's module-object pruning
             // then sees empty decl paths and emits every imported module's bodies.
