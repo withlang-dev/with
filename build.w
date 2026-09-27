@@ -3369,6 +3369,19 @@ pub fn build(ctx: BuildCtx) -> Build:
     out = out.add_target(install_file_target("last-green-publish", "out/.build-state/green-store.tsv", green_store_install_path(ctx), "0644", "last-green-record"))
     out = out.add_target(target_new(.Group, "last-green", "").dep("last-green-publish"))
 
+    // `with run tools/battery.w` runs `build`, then this: every check a
+    // battery blesses in ONE survey invocation, so a red reports every failing
+    // target at once instead of one target per battery (Eric, 2026-09-26: "we
+    // need to work efficiently"). Targets run in declaration order, so the
+    // evidence (test-green, then last-green) is recorded after what it blesses.
+    var battery_checks = target_new(.Group, "battery-checks", "")
+    battery_checks = battery_checks.dep("seed-driver")
+    battery_checks = battery_checks.dep("fixpoint")
+    battery_checks = battery_checks.dep("test-with-audits")
+    battery_checks = battery_checks.dep("user-programs-safe")
+    battery_checks = battery_checks.dep("last-green")
+    out = out.add_target(battery_checks)
+
     var require_last_green = target_new(.Action, "require-last-green", "").output("out/command/require-last-green/ok")
     require_last_green.action = run_require_last_green_action
     require_last_green = require_last_green.input(host_bin("out/bin/with-sha256"))
