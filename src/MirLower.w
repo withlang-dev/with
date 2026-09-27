@@ -12835,9 +12835,8 @@ impl MirBuilder:
                 let dyn_next = self.new_block()
                 self.terminate(TermKind.TK_CALL, dyn_fn_op, dyn_args_id, dyn_place, dyn_next)
                 self.switch_to(dyn_next)
-                if self.sema.is_copy_frozen(dyn_ret_ty) != 0:
-                    return self.body.new_operand(OperandKind.OK_COPY, dyn_place)
-                return self.body.new_operand(OperandKind.OK_MOVE, dyn_place)
+                // #1786: a statement temp, as in lower_intrinsic_call.
+                return self.call_result_operand(dyn_result, dyn_place, dyn_ret_ty)
 
         // A bare method symbol is unresolved only when Sema did not record a
         // concrete signature for this call. Inherent impl methods may legitimately
@@ -13151,9 +13150,11 @@ impl MirBuilder:
         if intrinsic == MirIntrinsic.CHAN_SEND or intrinsic == MirIntrinsic.CHAN_RECV:
             self.emit_wait_cancel_check()
 
-        if self.sema.is_copy_frozen(ret_type) != 0:
-            return self.body.new_operand(OperandKind.OK_COPY, result_place)
-        self.body.new_operand(OperandKind.OK_MOVE, result_place)
+        // #1786: the result is a statement temp like every other call's
+        // (lower_call): consumed by a binding or an argument it is cancelled,
+        // discarded (`v.pop()` as a statement) it is dropped at the
+        // statement's end. Unregistered, the popped `Some(payload)` leaked.
+        self.call_result_operand(result_local, result_place, ret_type)
 
     mut fn lower_vtable_call(dyn_expr: i32, _trait_sym: i32, method_sym: i32, args_start: i32, args_count: i32, node: i32) -> i32:
         // Conservative lowering: treat as method call on dynamic receiver.
@@ -15127,9 +15128,8 @@ impl MirBuilder:
             let math_method_name = self.pool.resolve_symbol(method_sym)
             let math_method_id = math_fn_lookup(math_method_name)
             self.body.set_call_math_fn_id(args_id, math_method_id)
-        if self.sema.is_copy_frozen(ret_type) != 0:
-            return self.body.new_operand(OperandKind.OK_COPY, result_place)
-        self.body.new_operand(OperandKind.OK_MOVE, result_place)
+        // #1786: a statement temp, as in lower_intrinsic_call.
+        self.call_result_operand(result_local, result_place, ret_type)
 
     mut fn lower_optional_chain_receiver_operand(payload_place: i32, payload_ty: i32, sig_idx: i32, span: i32) -> i32:
         if sig_idx >= 0 and self.sema.sig_get_param_count(sig_idx) > 0:

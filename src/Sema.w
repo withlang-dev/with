@@ -1528,6 +1528,10 @@ pub type Sema {
     // when the body has no declared return (D43 infers) or declares `Unit`.
     // Under a declared non-`Unit` return the tail is the body's value.
     body_tail_discards: bool,
+    // §9.1: `main`, `@[entry]` and `test_*` functions do not infer; their
+    // tail is statement position whatever expression it is (#1786: a tail
+    // call's `str` was moved into the entry's return slot and leaked).
+    body_tail_is_statement: bool,
     // The assignment tails Sema discarded (body tails only); MirLower lowers
     // exactly these in discard mode.
     discarded_tails: HashMap[i32, i32],
@@ -2955,6 +2959,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         body_tail_block: 0,
         body_tail_holder: 0,
         body_tail_discards: true,
+        body_tail_is_statement: false,
         discarded_tails: sema_new_map_i32_i32(),
         tail_read_assigns: sema_new_map_i32_i32(),
         facade_declared_effect_sigs: sema_new_map_i32_i32(),

@@ -2442,9 +2442,13 @@ impl Sema:
         let saved_body_tail_block: i32 = self.body_tail_block
         let saved_body_tail_holder: i32 = self.body_tail_holder
         let saved_body_tail_discards: bool = self.body_tail_discards
+        let saved_body_tail_is_statement: bool = self.body_tail_is_statement
         let source_body = self.fn_body_inner(body)
         self.body_tail_block = source_body
         self.body_tail_holder = self.body_tail_holder_of(source_body)
+        // §9.1: an entry point's tail is statement position, whatever it is.
+        let body_tail_is_statement = self.fn_decl_is_entry_point(node) != 0
+        self.body_tail_is_statement = body_tail_is_statement
         // §9.1 / D60: under a declared non-Unit return the body's tail
         // assignment is its value; with no annotation (D43) or `-> Unit` it
         // is a statement.
@@ -2460,9 +2464,10 @@ impl Sema:
         self.body_tail_block = saved_body_tail_block
         self.body_tail_holder = saved_body_tail_holder
         self.body_tail_discards = saved_body_tail_discards
+        self.body_tail_is_statement = saved_body_tail_is_statement
         // §9.1: a single-statement assignment body is discarded exactly when
         // check_block discards the body block's assignment tail.
-        let body_ty = if self.discard_body_tail(source_body, body_tail_discards) != 0: self.ty_void else: checked_body_ty
+        let body_ty = if self.discard_body_tail(source_body, body_tail_discards, body_tail_is_statement) != 0: self.ty_void else: checked_body_ty
         self.infer_tail_node = saved_infer_tail
         self.infer_tail_is_closure = saved_infer_closure
         self.stamp_move_site_liveness(body_site_start)
@@ -2476,7 +2481,10 @@ impl Sema:
         self.current_value_expr_root = saved_body_value_root
         self.expected_expr_type = saved_expected_et
         self.has_expected_type = saved_has_et
-        self.typed_expr_types.insert(body, body_ty as i32)
+        // A single-statement entry body discarded as a statement keeps its
+        // own type (#1786), as check_block keeps a block's statement tail's.
+        let body_keeps_type = body_ty == self.ty_void and body_tail_is_statement and self.expr_is_assignment(source_body) == 0
+        self.typed_expr_types.insert(body, (if body_keeps_type: checked_body_ty else: body_ty) as i32)
         // §9.1 / D60: an assignment the body returns yields a read of its
         // place. Under a `Unit` return (declared, or a trait's contract, as
         // for `drop`) the tail is a statement: nothing is returned or read.
@@ -6152,8 +6160,13 @@ impl Sema:
             return self.expr_is_assignment(self.ast.get_data0(node))
         0
 
-    mut fn discard_body_tail(tail: i32, discards: bool) -> i32:
-        if self.expr_is_assignment(tail) == 0:
+    // `is_statement` (§9.1: an entry point's tail is statement position)
+    // discards any tail expression, not only an assignment.
+    mut fn discard_body_tail(tail: i32, discards: bool, is_statement: bool) -> i32:
+        if tail == 0:
+            return 0
+        let is_assign = self.expr_is_assignment(tail) != 0
+        if not is_assign and not is_statement:
             return 0
         var assign = tail
         while self.ast.kind(assign) == NodeKind.NK_GROUPED:
@@ -6164,7 +6177,8 @@ impl Sema:
             self.discarded_tails.remove(tail)
             return 0
         self.discarded_tails.insert(tail, 1)
-        self.tail_read_assigns.remove(assign)
+        if is_assign:
+            self.tail_read_assigns.remove(assign)
         1
 
     fn tail_is_discarded(node: i32): node != 0 and self.discarded_tails.contains(node)
@@ -6198,10 +6212,10 @@ impl Sema:
         holder
 
     // The type a tail-holding wrapper (`unsafe:`, `no_suspend`) yields: Unit
-    // when it holds the body's assignment tail and the body discards it
-    // (D73), else its child's type.
+    // when it holds the body's tail and the body discards it (an assignment
+    // tail, D73; any tail of an entry point, §9.1), else its child's type.
     mut fn wrapper_tail_type(node: i32, body: i32, child_ty: TypeId):
-        if node == self.body_tail_holder and self.discard_body_tail(body, self.body_tail_discards) != 0: self.ty_void else: child_ty
+        if node == self.body_tail_holder and self.discard_body_tail(body, self.body_tail_discards, self.body_tail_is_statement) != 0: self.ty_void else: child_ty
 
     // An `unsafe fn` body is its source body inside the implicit unsafe
     // block the parser wraps it in; §9.1's tail rule reads the source body,
@@ -10170,7 +10184,7 @@ impl Sema:
             // that of the `unsafe:` or plain block it ends in (D73,
             // body_tail_holder). An arm block's tail keeps the place's
             // type (D43).
-            let tail_discarded = node == self.body_tail_holder and self.discard_body_tail(tail, self.body_tail_discards) != 0
+            let tail_discarded = node == self.body_tail_holder and self.discard_body_tail(tail, self.body_tail_discards, self.body_tail_is_statement) != 0
             let tail_is_value = not tail_discarded and (self.current_value_expr_root == node or (self.stmt_pos_depth == 0 and self.current_return_type != 0 and self.current_return_type != self.ty_void) or (self.has_expected_type != 0 and self.expected_expr_type != 0 and self.expected_expr_type != self.ty_void))
             if tail_is_value:
                 self.current_value_expr_root = tail
@@ -10181,6 +10195,10 @@ impl Sema:
                 self.infer_tail_node = tail
             let checked_tail_type = if tail_is_value: self.check_expr(tail) else: self.check_expr_statement_context(tail)
             let tail_type = if tail_discarded: self.ty_void else: checked_tail_type
+            // A discarded statement tail keeps its own type (#1786): MirLower
+            // sizes the call's result temp from it, and a `Unit` there made a
+            // discarded `v.pop()` an undropped unit slot (and a trap).
+            let tail_keeps_type = tail_discarded and self.expr_is_assignment(tail) == 0
             self.infer_tail_node = saved_infer_tail
             if not tail_is_value:
                 self.check_task_statement_disposition(tail)
@@ -10188,7 +10206,7 @@ impl Sema:
             self.match_in_stmt_pos = saved_stmt_pos
             if tail_type as TypeId != self.ty_void and tail_type != 0:
                 result = tail_type
-            self.typed_expr_types.insert(tail, tail_type as i32)
+            self.typed_expr_types.insert(tail, (if tail_keeps_type: checked_tail_type else: tail_type) as i32)
             let tail_kind = self.get_type_kind(self.resolve_alias(tail_type))
             // D22: a tail view materializes when the return demands an owned
             // value; only an un-materialized view escapes (gate mirrors 9618).
@@ -17074,8 +17092,10 @@ impl Sema:
         let saved_body_tail_block: i32 = self.body_tail_block
         let saved_body_tail_holder: i32 = self.body_tail_holder
         let saved_body_tail_discards: bool = self.body_tail_discards
+        let saved_body_tail_is_statement: bool = self.body_tail_is_statement
         self.body_tail_block = body
         self.body_tail_holder = self.body_tail_holder_of(body)
+        self.body_tail_is_statement = false
         // §9.1 / D60: the expected function type's result is the closure's
         // declared return; a non-Unit one makes a tail assignment its value.
         let body_tail_discards = expected_ret_ty == 0 or expected_ret_ty == self.ty_void as i32
@@ -17084,10 +17104,11 @@ impl Sema:
         self.body_tail_block = saved_body_tail_block
         self.body_tail_holder = saved_body_tail_holder
         self.body_tail_discards = saved_body_tail_discards
+        self.body_tail_is_statement = saved_body_tail_is_statement
         // §9.1: an assignment closure body is discarded exactly as check_block
         // discards one; the recorded type is the verdict MirLower reads for
         // the implicit default.
-        let body_discarded = self.discard_body_tail(body, body_tail_discards) != 0
+        let body_discarded = self.discard_body_tail(body, body_tail_discards, false) != 0
         let body_ty = if body_discarded: self.ty_void else: checked_body_ty
         if body_discarded:
             self.typed_expr_types.insert(body, self.ty_void as i32)
