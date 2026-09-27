@@ -12740,6 +12740,7 @@ impl MirBuilder:
                 let gc_has_resolved_args = self.sema.has_resolved_call_args(node)
                 let gc_arg_count = if gc_has_resolved_args != 0: self.sema.get_resolved_call_arg_count(node) else: arg_count
                 let gc_param_offset = if gc_is_static: 0 else: 1
+                let gc_closure_ops: Vec[i32] = Vec.new()
                 for gc_mai in 0..gc_arg_count:
                     let gc_ma_node = if gc_has_resolved_args != 0: self.sema.get_resolved_call_arg(node, gc_mai) else: self.ast.get_extra(arg_start + gc_mai)
                     if self.ast.kind(gc_ma_node) != NodeKind.NK_CLOSURE:
@@ -12750,10 +12751,21 @@ impl MirBuilder:
                         // but its body must already be lowered and retained
                         // here: gen_closure resolves the node through this
                         // body's CK_CLOSURE constant, never from the AST.
-                        gc_args.push(self.lower_closure(0, 0, self.ast.get_data1(gc_ma_node), self.ast.get_data2(gc_ma_node), gc_ma_node))
+                        let gc_closure_op = self.lower_closure(0, 0, self.ast.get_data1(gc_ma_node), self.ast.get_data2(gc_ma_node), gc_ma_node)
+                        gc_closure_ops.push(gc_closure_op)
+                        gc_args.push(gc_closure_op)
                 let gc_args_id = self.body.new_call_args(gc_args)
                 self.body.set_call_intrinsic(gc_args_id, MirIntrinsic.GENERIC_CALL)
                 self.require_generic_call_contract(gc_args_id, callee_sym, method_sym, self_expr, has_recorded_method_sig, "method-gc")
+                // D63: a closure handed to language machinery (`s.spawn(..)`)
+                // is the task's: its move is registered, so the statement
+                // temp that held it is blanked, not dropped under the task.
+                // Left unregistered, the temp's drop followed `move _5` into
+                // the spawn (validate-ownership: a drop of a Moved place,
+                // #1539).
+                if self.body.call_is_machinery_dispatch(gc_args_id):
+                    for gc_ci in 0..gc_closure_ops.len():
+                        self.consume_moved_operand(gc_closure_ops[gc_ci])
                 self.body.set_call_ast_node(gc_args_id, node)
                 self.record_call_contract(gc_args_id, node, gc_sig_idx)
                 var gc_ret_ty = self.method_call_result_type(node)
