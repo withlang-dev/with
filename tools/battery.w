@@ -23,6 +23,7 @@
 // out/.build-state/battery-times.tsv, the ledger the gate reads, and the
 // evaluated-graph cache is dropped so the next `with build` re-reads it.
 // Logs, per-step wall times and out/battery/status.txt land in out/battery/.
+use std.crypto.sha256
 use std.fs
 use std.process
 use std.thread
@@ -37,6 +38,30 @@ fn first_line(path: &str) -> str:
     ""
 
 fn append(path: &str, line: &str): assert(write_file(path, (read_file(path) ?? "") ++ line ++ "\n") == 0)
+
+fn sha256_of_file(path: &str) -> str:
+    let bytes = read_file(path) ?? ""
+    var digest: [32]u8 = [0 as u8; 32]
+    sha256_hash_str(bytes, &raw mut digest[0] as *mut u8)
+    sha256_hex(&digest[0] as *const u8)
+
+// #1797: out/lib, out/bootstrap-lib and out/tmp/with_runtime hold the runtime
+// objects of whichever compiler generation last built here. A seed older
+// than #1720's D30 check links the native build runner against the first
+// complete one and dies on an undefined runtime symbol; the driver then
+// falls back to comptime evaluation, which cannot run every action of this
+// tree, and the build is red before stage1. The seed that drives this
+// battery is recorded; when it changed, those directories go first.
+fn clear_runtime_dirs_on_seed_change():
+    let record = "out/.build-state/battery-seed.sha256"
+    let seed = sha256_of_file("src/main")
+    let previous = first_line(record)
+    if previous == seed: return
+    if previous.len() > 0:
+        print(f"battery: the seed changed ({previous.slice(0, 8)} -> {seed.slice(0, 8)}); removing out/lib, out/bootstrap-lib and out/tmp/with_runtime (#1797)")
+        assert(sh("rm -rf out/lib out/bootstrap-lib out/tmp/with_runtime") == 0)
+    assert(mkdir_p("out/.build-state") == 0)
+    assert(write_file(record, seed ++ "\n") == 0)
 
 // The same rule as build/retention.w's ret_worktree_is_clean: a tracked change
 // dirties the tree; an untracked path dirties it only if it could be a build
@@ -186,6 +211,7 @@ if not file_exists("src/main"):
 if not tree_is_clean():
     eprint("battery: the worktree is not clean (out/battery/git-status.txt); commit first — a battery blesses committed sources")
     exit_code(1)
+clear_runtime_dirs_on_seed_change()
 assert(sh("git rev-parse --short HEAD > out/battery/head.txt") == 0)
 let head = first_line("out/battery/head.txt")
 let cwd = env("PWD")

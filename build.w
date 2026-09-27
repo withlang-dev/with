@@ -2246,6 +2246,12 @@ pub fn build(ctx: BuildCtx) -> Build:
     // sdk-clang-main may have just added.
     clang_resource = clang_resource.dep("sdk-clang-main")
     clang_resource = clang_resource.input("out/command/sdk-clang-main/done")
+    // #1797: this action runs in the native build runner (the pinned seed's
+    // evaluator cannot run it), and the runner links against the bootstrap
+    // link root once that root is this seed's — so the action is ordered
+    // after the root is prepared, or a checkout whose out/ holds another
+    // generation's objects evaluates it at comptime and fails before stage1.
+    clang_resource = clang_resource.dep("prepare-bootstrap-link-root")
     // It also bakes which SDK it looked at and what that SDK had: a lane
     // builds the compiler once under the fetched asset (generation zero)
     // and again under the source-built SDK, and a generated file keyed on

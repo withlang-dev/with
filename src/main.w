@@ -1575,9 +1575,22 @@ fn build_runner_ensure(root: &str, options: &BuildCommandOptions) -> str:
     comp.configure_options(move runner_options)
     comp.set_tool_mode_entry_path(entry_path)
     let no_settings: Vec[str] = Vec.new()
+    // #1797: the runner links exactly as stage1 does — against the bootstrap
+    // link root this run prepared for this seed (prepare-bootstrap-link-root
+    // removes out/lib's stale probes so out/bootstrap-lib is selected), with
+    // WITH_OUT_DIR naming that root as the build's say-so. The caller only
+    // compiles it once that root is this compiler's generation; before, a
+    // seed older than #1720's D30 check took whatever complete directory
+    // was on disk and died on an undefined runtime symbol.
+    let outer_out_dir = with_getenv_str("WITH_OUT_DIR")
+    let _e_in = with_setenv_str("WITH_OUT_DIR", resolve_join(root, "out"))
     let built = comp.build_binary_from_source_to_path_with_build_settings(entry_path, build_runner_entry_source(), bin_path, no_settings, no_settings, no_settings)
+    let _e_out = with_setenv_str("WITH_OUT_DIR", outer_out_dir)
     if built == "" or comp.has_errors():
-        with_eprint("warning: build runner compile failed; actions fall back to comptime evaluation")
+        // Not silent (#1797): the fallback evaluator is the bootstrap path,
+        // and when it cannot run an action the build fails there with a
+        // message about that action, not about this link.
+        with_eprint("error: build runner compile failed (diagnostics above); actions fall back to comptime evaluation by the driver, which may not evaluate every action of this tree. A runtime symbol undefined at the runner's link means a stale out/lib or out/bootstrap-lib from another compiler generation (#1797): remove out/lib, out/bootstrap-lib and out/tmp/with_runtime, then rebuild")
         let _rm = with_fs_remove_file(key_path)
         return ""
     let _k = with_fs_write_file(key_path, key)
@@ -2227,15 +2240,22 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
     var runner_checked = false
     var runner_path = ""
     var runner_fallback: Vec[str] = Vec.new()
-    // #1075/#1074: the runner is compiled at the FIRST action target, before
-    // the bootstrap targets have produced the tree's runtime objects
-    // (out/bootstrap-lib/cimport_stubs.o and friends) and, on Windows, the
-    // LLVM linker metadata (out/bootstrap-lib/llvm_ld). A seed that does not
-    // embed its runtime (linux-aarch64) or cannot link without the metadata
-    // (Windows) fails that first attempt; it is retried once both exist.
-    // Until then actions evaluate at comptime, as before.
-    var runner_waits_for_bootstrap = false
-    let runtime_probe_path = resolve_join(root, "out/bootstrap-lib/cimport_stubs.o")
+    // #1075/#1074/#1797: the runner links against the bootstrap link root
+    // (out/bootstrap-lib: the tree's runtime objects and, on Windows, the
+    // LLVM linker metadata), so it is compiled only once that root is this
+    // seed's: when prepare-bootstrap-link-root has completed in this run
+    // (executed, or fresh for this seed), or, when that target is not
+    // scheduled, when the root's rt_core.o is byte for byte this compiler's
+    // embedded one. Existence of the files said nothing about which
+    // generation built them: a seed older than #1720's check linked a
+    // 2026-09-22 out/lib, the runner died on an undefined runtime symbol,
+    // and the comptime fallback failed the build before stage1. Until the
+    // root is ready, actions evaluate at comptime, as before.
+    let bootstrap_root_target = "prepare-bootstrap-link-root"
+    var bootstrap_root_scheduled = false
+    for bi in 0..graph.targets.len() as i32:
+        if (&graph.targets[bi]).name == bootstrap_root_target: bootstrap_root_scheduled = true
+    let bootstrap_root_dir = resolve_join(root, "out/bootstrap-lib")
     let link_metadata_path = resolve_join(root, "out/bootstrap-lib/llvm_ld")
     for ti in 0..graph.targets.len() as i32:
         let target = &graph.targets[ti]
@@ -2342,16 +2362,12 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
         cutoff_digests.push(build_cache_cutoff_digest(root, target))
         if build_cache_is_cacheable(target.kind):
             build_cache_snapshot_inputs(root, target)
-        let bootstrap_ready = with_fs_file_exists(runtime_probe_path) != 0 and with_fs_file_exists(link_metadata_path) != 0
-        let runner_retry = runner_waits_for_bootstrap and bootstrap_ready
-        if target.kind == 23 and (not runner_checked or runner_retry) and not build_action_worker_env_enabled() and not options.strict_effects:
-            if runner_retry:
-                with_eprint("[build] runner: retrying the compile now that the bootstrap runtime objects and linker metadata exist")
+        var bootstrap_ready = bootstrap_root_scheduled and completed_targets.contains(bootstrap_root_target)
+        if not bootstrap_ready and not runner_checked and with_fs_file_exists(link_metadata_path) != 0:
+            bootstrap_ready = link_stage_runtime_dir_is_this_generation(bootstrap_root_dir)
+        if target.kind == 23 and not runner_checked and bootstrap_ready and not build_action_worker_env_enabled() and not options.strict_effects:
             runner_checked = true
-            runner_waits_for_bootstrap = false
             runner_path = build_runner_ensure(root, options)
-            if runner_path.len() == 0 and not bootstrap_ready:
-                runner_waits_for_bootstrap = true
             if runner_path.len() > 0:
                 runner_fallback = build_runner_load_fallback(root)
                 let _e1 = with_setenv_str("WITH_BUILD_RUNNER_ROOT", root)

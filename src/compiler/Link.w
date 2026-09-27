@@ -1266,7 +1266,7 @@ fn link_stage_resolve_runtime_root() -> str:
     // Fall back to compiler-relative runtime dir.
     compiler_dir ++ "/runtime"
 
-fn link_stage_runtime_dir_is_this_generation(dir: &str) -> bool:
+pub fn link_stage_runtime_dir_is_this_generation(dir: &str) -> bool:
     let embedded = link_stage_embedded_runtime_object("rt_core.o")
     // A binary that carries no runtime can only link from disk.
     if embedded.len() == 0:
