@@ -8078,7 +8078,7 @@ impl Sema:
         let fn_tid = self.sig_type_ids[source_sig]
         let ret = self.sig_ret_types[source_sig]
         let param_start = self.sig_param_starts[source_sig]
-        let param_count = self.sig_param_counts[source_sig]
+        let param_count: i32 = self.sig_param_counts[source_sig]
         let variadic = self.sig_variadic[source_sig]
         self.add_sig(alias, fn_tid, ret, param_start, param_count, variadic)
         let alias_sig = self.get_sig(alias)
