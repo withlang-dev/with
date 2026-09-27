@@ -995,6 +995,9 @@ pub type Sema {
     method_symbol_flags: HashMap[i32, i32],
     method_lookup: SemaMethodLookup,
     drop_method_cache: HashMap[i32, i32],
+    // D72 (§2.5.1, #1431): struct name sym -> 1 when the struct carries the
+    // hidden liveness byte (struct_needs_liveness_byte), 0 otherwise.
+    liveness_byte_cache: HashMap[i32, i32],
     // is_copy cycle guard — HashSet (heap handle) so is_copy can be `&Self` and
     // mutate it through a copied handle (D7 interior-mutability recipe).
     copy_visit_stack: HashSet[i32],
@@ -2389,6 +2392,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
     let extension_method_paths = sema_new_vec_str()
     let qualified_extension_call_nodes = sema_new_map_i32_i32()
     let drop_method_cache = sema_new_map_i32_i32()
+    let liveness_byte_cache = sema_new_map_i32_i32()
     let typed_expr_types = sema_new_map_i32_i32()
     let typed_binding_types = sema_new_map_i32_i32()
     let call_callable_types = sema_new_map_i32_i32()
@@ -2629,6 +2633,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         method_symbol_flags,
         method_lookup,
         drop_method_cache,
+        liveness_byte_cache,
         copy_visit_stack: HashSet.new(),
         needs_drop_visit: HashSet.new(),
         current_drop_type_sym: 0,
@@ -6911,6 +6916,140 @@ impl Sema:
                     vidx = vidx + 1
         let _ = self.needs_drop_visit.remove(resolved as i32)
         result
+
+    // D72 (§2.5.1, #1431): a `Drop` struct whose all-zero storage can be a
+    // live value (`Fd { n: 0 }`) cannot use its storage as the reset
+    // sentinel; the compiler appends a hidden liveness byte that a
+    // construction sets, the reset-on-move blank clears with the rest of the
+    // storage, and the guarded drop reads through the ordinary all-zero test.
+    // A struct with an owning non-null field — a str, a container, a raw
+    // pointer (Box, Rc, a facade resource's repr), a callable, another Drop
+    // value — keeps the storage test and gains no byte. Decided per
+    // declaration, so every instance of a generic struct agrees; a type
+    // parameter counts as a live-zero field (the byte is added, never
+    // withheld, when the answer depends on the argument). Explicit layouts
+    // (packed, bitpacked, repr(C), aligned fields), unions, distinct types
+    // and facade resources (whose `live` field is this byte, D51) are never
+    // changed.
+    mut fn struct_needs_liveness_byte(name_sym: i32) -> i32:
+        if name_sym == 0:
+            return 0
+        let cached = self.liveness_byte_cache.get(name_sym)
+        if cached.is_some():
+            return cached.unwrap()
+        // Recorded before the walk: a self-referential field reads as 0.
+        self.liveness_byte_cache.insert(name_sym, 0)
+        let result = self.struct_decl_needs_liveness_byte(name_sym)
+        self.liveness_byte_cache.insert(name_sym, result)
+        result
+
+    fn struct_liveness_byte_frozen(name_sym: i32) -> i32:
+        self.liveness_byte_cache.get(name_sym) ?? 0
+
+    mut fn struct_decl_needs_liveness_byte(name_sym: i32) -> i32:
+        if not self.type_decl_nodes.contains(name_sym) or self.distinct_type_names.contains(name_sym) or self.facade_resource_index.contains(name_sym):
+            return 0
+        let decl: i32 = self.type_decl_nodes.get(name_sym).unwrap()
+        let packed = self.ast.get_data2(decl)
+        if type_decl_sub_kind(packed) != TypeDeclKind.Struct or type_decl_is_packed(packed) != 0 or type_decl_is_bitpacked(packed) != 0 or type_decl_is_repr_c(packed) != 0:
+            return 0
+        if not self.named_types.contains(name_sym) or self.type_has_drop_impl(self.named_types.get(name_sym).unwrap()) == 0:
+            return 0
+        let extra_start = self.ast.get_data1(decl)
+        let field_count = self.ast.get_extra(extra_start)
+        for fi in 0..field_count:
+            if self.ast.get_extra(extra_start + 1 + field_count * 3 + fi) != 0:
+                return 0
+            if self.type_node_zero_is_sentinel(self.ast.get_extra(extra_start + 1 + fi * 3 + 1), decl) != 0:
+                return 0
+        1
+
+    // Whether a field of this declared type is non-zero whenever it holds a
+    // value, so the enclosing struct's zero storage is the sentinel.
+    mut fn type_node_zero_is_sentinel(node: i32, decl: i32) -> i32:
+        if node == 0:
+            return 0
+        let kind = self.ast.kind(node)
+        if kind == NodeKind.NK_TYPE_PTR or kind == NodeKind.NK_TYPE_REF or kind == NodeKind.NK_TYPE_FN or kind == NodeKind.NK_TYPE_EXTERN_FN or kind == NodeKind.NK_TYPE_SLICE or kind == NodeKind.NK_TYPE_TRAIT_OBJ:
+            return 1
+        if kind == NodeKind.NK_TYPE_OPTIONAL:
+            return 0
+        if kind == NodeKind.NK_TYPE_ARRAY:
+            return self.type_node_zero_is_sentinel(self.ast.get_data0(node), decl)
+        if kind == NodeKind.NK_TYPE_TUPLE:
+            let start = self.ast.get_data0(node)
+            for ei in 0..self.ast.get_data1(node):
+                if self.type_node_zero_is_sentinel(self.ast.get_extra(start + ei), decl) != 0:
+                    return 1
+            return 0
+        if kind == NodeKind.NK_TYPE_NAMED or kind == NodeKind.NK_TYPE_GENERIC:
+            let sym = self.ast.get_data0(node)
+            let tp_start = self.type_decl_tp_start(decl)
+            for ti in 0..self.type_decl_tp_count(decl):
+                if self.ast.get_extra(tp_start + ti) == sym:
+                    return 0
+            if kind == NodeKind.NK_TYPE_GENERIC:
+                return self.generic_base_zero_is_sentinel(sym)
+            let prim = self.primitive_type_by_sym(sym)
+            if prim != 0:
+                return if self.get_type_kind(self.resolve_alias(prim as TypeId)) == TypeKind.TY_STR: 1 else: 0
+            let named = self.lookup_named_type_visible(sym)
+            if named == 0:
+                return 0
+            return self.type_zero_is_sentinel(named)
+        // A type this walk cannot classify keeps the storage test.
+        1
+
+    fn generic_base_zero_is_sentinel(sym: i32) -> i32:
+        if sym == self.syms.vec or sym == self.syms.hashmap or sym == self.syms.hashset or sym == self.syms.slotmap or sym == self.syms.box:
+            return 1
+        let name = self.pool_resolve(sym)
+        if name == "Sender" or name == "Receiver" or name == "Rc" or name == "Arc":
+            return 1
+        0
+
+    mut fn type_zero_is_sentinel(tid: i32) -> i32:
+        if tid == 0:
+            return 0
+        let resolved = self.resolve_alias(tid as TypeId)
+        let tk = self.get_type_kind(resolved)
+        if tk == TypeKind.TY_STR or tk == TypeKind.TY_FN or tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF or tk == TypeKind.TY_SLICE or tk == TypeKind.TY_EXTERN_FN or tk == TypeKind.TY_GENERIC_FN or tk == TypeKind.TY_TRAIT_OBJ:
+            return 1
+        if tk == TypeKind.TY_ARRAY or tk == TypeKind.TY_RANGE:
+            return self.type_zero_is_sentinel(self.get_type_d0(resolved))
+        if tk == TypeKind.TY_TUPLE:
+            let te_start = self.get_type_d0(resolved)
+            for ei in 0..self.get_type_d1(resolved):
+                if self.type_zero_is_sentinel(self.type_extra[(te_start + ei)]) != 0:
+                    return 1
+            return 0
+        if tk == TypeKind.TY_GENERIC_INST:
+            let base_sym = self.get_generic_inst_base(resolved as i32)
+            if self.generic_base_zero_is_sentinel(base_sym) != 0:
+                return 1
+            if self.named_types.contains(base_sym) and self.get_type_kind(self.resolve_alias(self.named_types.get(base_sym).unwrap())) == TypeKind.TY_STRUCT:
+                return self.struct_zero_is_sentinel(base_sym)
+            return 0
+        if tk == TypeKind.TY_STRUCT:
+            return self.struct_zero_is_sentinel(self.get_type_d0(resolved))
+        0
+
+    // A Drop struct is never zero when live: it carries the byte, or an
+    // owning field. A plain struct is the sum of its fields.
+    mut fn struct_zero_is_sentinel(name_sym: i32) -> i32:
+        if name_sym == 0 or not self.type_decl_nodes.contains(name_sym):
+            return 0
+        if self.named_types.contains(name_sym) and self.type_has_drop_impl(self.named_types.get(name_sym).unwrap()) != 0:
+            return 1
+        let decl: i32 = self.type_decl_nodes.get(name_sym).unwrap()
+        if type_decl_sub_kind(self.ast.get_data2(decl)) != TypeDeclKind.Struct:
+            return 0
+        let extra_start = self.ast.get_data1(decl)
+        let field_count = self.ast.get_extra(extra_start)
+        for fi in 0..field_count:
+            if self.type_node_zero_is_sentinel(self.ast.get_extra(extra_start + 1 + fi * 3 + 1), decl) != 0:
+                return 1
+        0
 
     // Whether a value of this type transitively carries a USER Drop impl
     // (W, Vec[W], Holder{item: W}). Narrower than `type_needs_drop`: pure

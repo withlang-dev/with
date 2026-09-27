@@ -2029,6 +2029,10 @@ impl Codegen:
                 return 0
             fields[llvm_idx] = field_val
 
+        // D72: a constant of a struct with the hidden liveness byte is live.
+        let live_idx = self.liveness_byte_indices.get(struct_ty) ?? -1
+        if live_idx >= 0 and live_idx < llvm_field_count:
+            fields[live_idx] = wl_const_int(wl_i8_type(self.context), 1, 0)
         wl_const_named_struct(struct_ty, vec_data_i64(&fields), llvm_field_count)
 
     fn try_eval_const_result_type(node: i32, expected_tid: i32) -> i32:

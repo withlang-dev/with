@@ -34,9 +34,14 @@ a With value type, not as a contract With makes with another language.
 - **Structs:** fields in declaration order, each at the next offset aligned
   to the field's alignment; size rounded up to the struct's alignment
   (`TypeLayout.type_layout_struct_field_offset`). No reordering, no
-  packing, no niche use. `union` types size to the largest member at
-  offset 0. Distinct (newtype) declarations have the layout of their
-  underlying type.
+  packing, no niche use. A `Drop` struct whose all-zero storage can be a
+  live value — no field whose zero is the reset sentinel: a str, a
+  container, a raw pointer, a callable, another `Drop` value — carries one
+  hidden liveness byte after its last field, inside the size rounding
+  (`Sema.struct_needs_liveness_byte`, spec §2.5.1, D72); a construction
+  sets it, the reset blank clears it. `union` types size to the largest
+  member at offset 0. Distinct (newtype) declarations have the layout of
+  their underlying type.
 - **Enums:** a tag followed by the payload area. The tag is the declared
   `repr` type, else 4 bytes; the payload area is the largest variant's
   fields laid out as a struct; the enum is aligned to the larger of the
@@ -171,6 +176,10 @@ layout change there is caught by the `wo-drift` lane, not by this check.
 
 ## Version history
 
+- **v6** (2026-09-27): a `Drop` struct whose all-zero storage can be a live
+  value gains a hidden liveness byte after its fields (§2; spec §2.5.1,
+  D72). Every other layout is unchanged; a bundle built under v5 that
+  exposes such a type sizes it one byte (plus rounding) smaller.
 - **v5** (2026-09-19): a `Unit` result lowers to LLVM `void` in every
   signature. An explicit `-> Unit` had lowered to an `i32` result while an
   absent return type lowered to `void`, so a definition and a declaration of

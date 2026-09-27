@@ -217,6 +217,8 @@ impl Sema:
                 offset = type_layout_align_up(offset, field_align)
                 let field_ty = self.type_layout_generic_struct_field_type(resolved as i32, fi)
                 offset = offset + self.type_layout_size_of(field_ty)
+            // D72 (§2.5.1): the hidden liveness byte follows the fields.
+            offset = offset + self.struct_needs_liveness_byte(base_sym)
             return type_layout_align_up(offset, max_align)
         if tk != TypeKind.TY_STRUCT:
             return 0
@@ -250,6 +252,8 @@ impl Sema:
             offset = type_layout_align_up(offset, field_align)
             let field_tid: i32 = self.type_extra[(te_start + fi * 3 + 1)]
             offset = offset + self.type_layout_size_of(field_tid)
+        // D72 (§2.5.1): the hidden liveness byte follows the fields.
+        offset = offset + self.struct_needs_liveness_byte(name_sym)
         type_layout_align_up(offset, self.type_layout_struct_align_of(resolved as i32))
 
     mut fn type_layout_enum_align_of(tid: i32) -> i64:

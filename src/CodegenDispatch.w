@@ -3809,6 +3809,7 @@ impl Codegen:
                         let coerced_val = self.coerce_value_to_type(val, field_ty)
                         let gep = wl_build_struct_gep(self.builder, struct_ty, alloca, llvm_fi)
                         wl_build_store(self.builder, coerced_val, gep)
+                self.mir_store_liveness_byte(struct_ty, alloca)
                 return wl_build_load(self.builder, struct_ty, alloca)
             return wl_get_undef(fallback_ty)
 
