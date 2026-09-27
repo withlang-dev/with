@@ -1366,12 +1366,10 @@ fn conan_install_internal(name: &str, version_hint: &str, project_root: &str, de
         runtime_eprint("error: could not resolve package " ++ name ++ "/" ++ version_hint ++ " on Conan Center")
         return ""
     let meta_path = project_root ++ "/.with/deps/c/" ++ name ++ "/" ++ version ++ "/metadata.json"
-    // A system package describes the host, which changes as packages come and
-    // go, so it is rewritten on every resolve rather than trusted from disk.
+    if not force_reinstall and runtime_file_exists(meta_path) != 0:
+        return version
     if conan_write_known_system_package(name, version, project_root):
         runtime_eprint("  using system package " ++ name ++ "/" ++ version)
-        return version
-    if not force_reinstall and runtime_file_exists(meta_path) != 0:
         return version
     runtime_eprint("resolving " ++ name ++ "/" ++ version ++ "...")
     let recipe_rev = conan_get_latest_recipe_rev(name, version)
