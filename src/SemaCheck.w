@@ -6804,7 +6804,9 @@ impl Sema:
             // loop; finalize_loop_move_state runs the back-edge use-after-move check
             // and computes the post-loop state (#613).
             self.push_move_control_flow_context(1)
+            let while_scoped = self.enter_body_scope(body)
             let while_body_type = self.check_expr_statement_context(body)
+            self.leave_body_scope(while_scoped)
             self.pop_move_control_flow_context()
             self.drop_control_flow_depth = saved_drop_cf
             if pushed_regex_capture_scope != 0:
@@ -6830,7 +6832,9 @@ impl Sema:
             if self.current_drop_type_sym != 0:
                 self.drop_control_flow_depth = self.drop_control_flow_depth + 1
             self.push_move_control_flow_context(1)
+            let dw_scoped = self.enter_body_scope(body)
             let dw_body_type = self.check_expr_statement_context(body)
+            self.leave_body_scope(dw_scoped)
             self.pop_move_control_flow_context()
             self.drop_control_flow_depth = saved_drop_cf_dw
             let dw_body_diverges = if self.get_type_kind(self.resolve_alias(dw_body_type as TypeId)) == TypeKind.TY_NEVER: 1 else: 0
@@ -10565,6 +10569,19 @@ impl Sema:
         t
 
 
+    // #1559: a body that is no block — `if c:` then one `let` on its own
+    // line, a one-statement `while` body — is its own scope, as a block
+    // body is (check_block opens that one itself).
+    mut fn enter_body_scope(body: i32) -> bool:
+        if body == 0 or self.ast.kind(body) == NodeKind.NK_BLOCK:
+            return false
+        self.push_scope()
+        true
+
+    mut fn leave_body_scope(scoped: bool):
+        if scoped:
+            self.pop_scope()
+
     mut fn check_if_expr(node: i32) -> i32:
         let cond = self.ast.get_data0(node)
         let then_body = self.ast.get_data1(node)
@@ -10619,6 +10636,10 @@ impl Sema:
         // Each arm sees only an independently established enclosing expectation.
         // The first arm never becomes the second arm's expected type: Stage 3's
         // shared resolver decides the join after both exact types are known.
+        // #1559: an arm that is no block (`if c:` then one `let` on its own
+        // line) is still the arm's scope: its binding was visible, and
+        // uninitialized, after an `if` that did not take the arm.
+        let then_scoped = self.enter_body_scope(then_body)
         let then_type = if outer_expected != 0:
             self.check_expr_with_expected(then_body, outer_expected)
         else if in_value_context:
@@ -10628,6 +10649,7 @@ impl Sema:
             self.check_expr_statement_context(then_body)
         else:
             self.check_expr(then_body)
+        self.leave_body_scope(then_scoped)
         self.infer_tail_node = saved_infer_tail
         self.pop_move_control_flow_context()
         self.drop_control_flow_depth = saved_drop_cf_then
@@ -10649,6 +10671,7 @@ impl Sema:
             if self.current_drop_type_sym != 0:
                 self.drop_control_flow_depth = self.drop_control_flow_depth + 1
             self.push_move_control_flow_context(1)
+            let else_scoped = self.enter_body_scope(else_body)
             let else_type = if outer_expected != 0:
                 self.check_expr_with_expected(else_body, outer_expected)
             else if in_value_context:
@@ -10658,6 +10681,7 @@ impl Sema:
                 self.check_expr_statement_context(else_body)
             else:
                 self.check_expr(else_body)
+            self.leave_body_scope(else_scoped)
             self.infer_tail_node = saved_infer_tail
             self.pop_move_control_flow_context()
             self.drop_control_flow_depth = saved_drop_cf_else

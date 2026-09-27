@@ -7254,12 +7254,14 @@ impl MirBuilder:
         // condition above; a temp moved into the branch result is cancelled by
         // assign_operand_to_place before the frame closes.
         let then_temp_frame = self.push_stmt_temp_frame()
+        let then_scoped = self.enter_body_scope(then_expr)
         let then_op = if want_result != 0: self.lower_expr(then_expr) else: self.lower_expr_discard(then_expr)
         // A diverging branch has no value to contribute to the join. lower_return
         // leaves a Unit operand in its unreachable continuation; assigning that
         // operand to the if result place corrupts typed MIR.
         if want_result != 0 and self.sema.body_can_fall_through(then_expr) != 0:
             self.assign_operand_to_place(result_place, then_op, self.ast.get_start(then_expr))
+        self.leave_body_scope(then_scoped)
         self.finish_stmt_temp_frame(then_temp_frame)
         // Reset-on-move (spec §2.5.1): flush this branch's pending source-resets
         // INSIDE the branch, before merging. A move in the branch's tail expression
@@ -7274,12 +7276,14 @@ impl MirBuilder:
         self.switch_to(else_bb)
         self.field_move_in_branch = self.field_move_in_branch + 1
         let else_temp_frame = self.push_stmt_temp_frame()
+        let else_scoped = self.enter_body_scope(else_expr_opt)
         let else_op = if else_expr_opt != 0:
             if want_result != 0: self.lower_expr(else_expr_opt) else: self.lower_expr_discard(else_expr_opt)
         else:
             self.unit_operand()
         if want_result != 0 and (else_expr_opt == 0 or self.sema.body_can_fall_through(else_expr_opt) != 0):
             self.assign_operand_to_place(result_place, else_op, self.ast.get_start(node))
+        self.leave_body_scope(else_scoped)
         self.finish_stmt_temp_frame(else_temp_frame)
         self.flush_pending_resets_since(pending_reset_start, pending_reset_field_start, pending_move_temp_start)
         self.field_move_in_branch = self.field_move_in_branch - 1
@@ -7369,6 +7373,23 @@ impl MirBuilder:
             return self.body.new_operand(OperandKind.OK_COPY, result_place)
         self.body.new_operand(OperandKind.OK_MOVE, result_place)
 
+    // #1559: a body that is no block — `if c:` then one `let` on its own
+    // line, a one-statement `while` body — is still the body's scope: a
+    // binding it declares drops at the body's end, on the body's path.
+    // Lowered in the enclosing scope, its drop landed at that scope's exit,
+    // which the path that never ran the body reaches too — a drop of
+    // uninitialized storage (validate-all: Maybe; cp_patched_text's
+    // `if ...: let _last = file.pop()`). A block opens its own scope.
+    mut fn enter_body_scope(body_expr: i32) -> bool:
+        if body_expr == 0 or self.ast.kind(body_expr) == NodeKind.NK_BLOCK:
+            return false
+        self.push_scope()
+        true
+
+    mut fn leave_body_scope(scoped: bool):
+        if scoped:
+            self.pop_scope_inline()
+
     mut fn lower_loop(body_expr: i32, node: i32) -> i32:
         let header_bb = self.new_block()
         let body_bb = self.new_block()
@@ -7396,7 +7417,9 @@ impl MirBuilder:
         // drop inside the body, not at the loop exit — the zero-iteration path
         // reaches the exit without initializing them (freed stack garbage).
         let loop_body_temp_frame = self.push_stmt_temp_frame()
+        let body_scoped = self.enter_body_scope(body_expr)
         let _ = self.lower_expr_discard(body_expr)
+        self.leave_body_scope(body_scoped)
         self.finish_stmt_temp_frame(loop_body_temp_frame)
         // Reset-on-move (spec §2.5.1): flush body-local resets before the back-edge,
         // so a move in the loop body's tail is reset inside the body (same as lower_if).
@@ -7460,7 +7483,9 @@ impl MirBuilder:
         // drop inside the body, not at the loop exit — the zero-iteration path
         // reaches the exit without initializing them (freed stack garbage).
         let loop_body_temp_frame = self.push_stmt_temp_frame()
+        let body_scoped = self.enter_body_scope(body_expr)
         let _ = self.lower_expr_discard(body_expr)
+        self.leave_body_scope(body_scoped)
         self.finish_stmt_temp_frame(loop_body_temp_frame)
         self.flush_pending_resets_since(pending_reset_start, pending_reset_field_start, pending_move_temp_start)
         self.field_move_in_branch = self.field_move_in_branch - 1
@@ -7485,7 +7510,9 @@ impl MirBuilder:
         // drop inside the body, not at the loop exit — the zero-iteration path
         // reaches the exit without initializing them (freed stack garbage).
         let loop_body_temp_frame = self.push_stmt_temp_frame()
+        let body_scoped = self.enter_body_scope(body_expr)
         let _ = self.lower_expr_discard(body_expr)
+        self.leave_body_scope(body_scoped)
         self.finish_stmt_temp_frame(loop_body_temp_frame)
         self.terminate(TermKind.TK_GOTO, cond_bb, 0, 0, 0)
 
@@ -7722,7 +7749,9 @@ impl MirBuilder:
         // drop inside the body, not at the loop exit — the zero-iteration path
         // reaches the exit without initializing them (freed stack garbage).
         let loop_body_temp_frame = self.push_stmt_temp_frame()
+        let body_scoped = self.enter_body_scope(body_expr)
         let _ = self.lower_expr_discard(body_expr)
+        self.leave_body_scope(body_scoped)
         self.finish_stmt_temp_frame(loop_body_temp_frame)
         self.pop_scope_with_goto(header_bb)
 
@@ -8752,7 +8781,9 @@ impl MirBuilder:
         // drop inside the body, not at the loop exit — the zero-iteration path
         // reaches the exit without initializing them (freed stack garbage).
         let loop_body_temp_frame = self.push_stmt_temp_frame()
+        let body_scoped = self.enter_body_scope(body_expr)
         let _ = self.lower_expr_discard(body_expr)
+        self.leave_body_scope(body_scoped)
         self.finish_stmt_temp_frame(loop_body_temp_frame)
         self.terminate(TermKind.TK_GOTO, inc_bb, 0, 0, 0)
 
@@ -8831,7 +8862,9 @@ impl MirBuilder:
         // drop inside the body, not at the loop exit — the zero-iteration path
         // reaches the exit without initializing them (freed stack garbage).
         let loop_body_temp_frame = self.push_stmt_temp_frame()
+        let body_scoped = self.enter_body_scope(body_expr)
         let _ = self.lower_expr_discard(body_expr)
+        self.leave_body_scope(body_scoped)
         self.finish_stmt_temp_frame(loop_body_temp_frame)
         self.pop_scope_with_goto(inc_bb)
 
@@ -8962,7 +8995,9 @@ impl MirBuilder:
         // drop inside the body, not at the loop exit — the zero-iteration path
         // reaches the exit without initializing them (freed stack garbage).
         let loop_body_temp_frame = self.push_stmt_temp_frame()
+        let body_scoped = self.enter_body_scope(body_expr)
         let _ = self.lower_expr_discard(body_expr)
+        self.leave_body_scope(body_scoped)
         self.finish_stmt_temp_frame(loop_body_temp_frame)
         self.terminate(TermKind.TK_GOTO, inc_bb, 0, 0, 0)
 
@@ -9064,7 +9099,9 @@ impl MirBuilder:
         // drop inside the body, not at the loop exit — the zero-iteration path
         // reaches the exit without initializing them (freed stack garbage).
         let loop_body_temp_frame = self.push_stmt_temp_frame()
+        let body_scoped = self.enter_body_scope(body_expr)
         let _ = self.lower_expr_discard(body_expr)
+        self.leave_body_scope(body_scoped)
         self.finish_stmt_temp_frame(loop_body_temp_frame)
         self.terminate(TermKind.TK_GOTO, inc_bb, 0, 0, 0)
 
@@ -9361,7 +9398,9 @@ impl MirBuilder:
         // drop inside the body, not at the loop exit — the zero-iteration path
         // reaches the exit without initializing them (freed stack garbage).
         let loop_body_temp_frame = self.push_stmt_temp_frame()
+        let body_scoped = self.enter_body_scope(body_expr)
         let _ = self.lower_expr_discard(body_expr)
+        self.leave_body_scope(body_scoped)
         self.finish_stmt_temp_frame(loop_body_temp_frame)
         self.terminate(TermKind.TK_GOTO, inc_bb, 0, 0, 0)
 
@@ -9434,7 +9473,9 @@ impl MirBuilder:
         // drop inside the body, not at the loop exit — the zero-iteration path
         // reaches the exit without initializing them (freed stack garbage).
         let loop_body_temp_frame = self.push_stmt_temp_frame()
+        let body_scoped = self.enter_body_scope(body_expr)
         let _ = self.lower_expr_discard(body_expr)
+        self.leave_body_scope(body_scoped)
         self.finish_stmt_temp_frame(loop_body_temp_frame)
         self.terminate(TermKind.TK_GOTO, inc_bb, 0, 0, 0)
         self.switch_to(inc_bb)
@@ -9496,7 +9537,9 @@ impl MirBuilder:
         // drop inside the body, not at the loop exit — the zero-iteration path
         // reaches the exit without initializing them (freed stack garbage).
         let loop_body_temp_frame = self.push_stmt_temp_frame()
+        let body_scoped = self.enter_body_scope(body_expr)
         let _ = self.lower_expr_discard(body_expr)
+        self.leave_body_scope(body_scoped)
         self.finish_stmt_temp_frame(loop_body_temp_frame)
         self.terminate(TermKind.TK_GOTO, header_bb, 0, 0, 0)
         self.pop_control_target()
@@ -9587,7 +9630,9 @@ impl MirBuilder:
         // drop inside the body, not at the loop exit — the zero-iteration path
         // reaches the exit without initializing them (freed stack garbage).
         let loop_body_temp_frame = self.push_stmt_temp_frame()
+        let body_scoped = self.enter_body_scope(body_expr)
         let _ = self.lower_expr_discard(body_expr)
+        self.leave_body_scope(body_scoped)
         self.finish_stmt_temp_frame(loop_body_temp_frame)
         self.terminate(TermKind.TK_GOTO, inc_bb, 0, 0, 0)
         self.switch_to(inc_bb)
