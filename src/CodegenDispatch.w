@@ -16159,6 +16159,7 @@ impl Codegen:
         self.current_function = function
         self.current_function_name_sym = name_sym
         self.current_function_node = fn_node
+        self.current_function_tier_node = fn_node
         self.current_ret_type = wl_get_return_type(fn_type)
         let saved_tb_syms = move self.type_binding_syms
         let saved_tb_tys = move self.type_binding_types
@@ -16598,6 +16599,10 @@ impl Codegen:
         self.current_function = function
         self.current_function_name_sym = mono_sym
         self.current_function_node = fn_node
+        let saved_tier_node = self.current_function_tier_node
+        var tier_node = if fn_node > 0: fn_node else: self.debug_decl_node_for(body.fn_sym)
+        if tier_node <= 0: tier_node = self.debug_decl_node_for(mono_sym)
+        self.current_function_tier_node = tier_node
         // #1348: a specialization is a function of its own in the debug info:
         // a subprogram in its template's file, its statements' lines, its
         // variables. It is emitted in the middle of another function, whose
@@ -16965,6 +16970,7 @@ impl Codegen:
         self.current_function = saved_fn
         self.current_function_name_sym = saved_fn_name_sym
         self.current_function_node = saved_fn_node
+        self.current_function_tier_node = saved_tier_node
         self.current_ret_type = saved_ret
         self.current_method_owner_sym = saved_owner
         self.local_allocas = saved_allocas

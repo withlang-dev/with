@@ -124,6 +124,10 @@ pub type Codegen {
     current_function: i64,
     current_function_name_sym: i32,
     current_function_node: i32,
+    // The declaration whose module decides by-name type lookups in the body
+    // being emitted: the function's own, or a specialization's template
+    // (#1745). Closures and drop glue emitted inside keep it.
+    current_function_tier_node: i32,
     current_method_owner_sym: i32,
     current_drop_origin_ptr: i64,
     current_drop_origin_len: i64,
@@ -944,6 +948,7 @@ fn Codegen.init_with_opt(module_name: &str, opt_level: i32) -> Codegen:
         current_function: 0,
         current_function_name_sym: 0,
         current_function_node: 0,
+        current_function_tier_node: 0,
         current_method_owner_sym: 0,
         current_drop_origin_ptr: 0,
         current_drop_origin_len: 0,
@@ -3706,10 +3711,8 @@ impl Codegen:
             var cg_sym = self.sema_sym_to_codegen_sym(sym)
             if cg_sym == 0:
                 cg_sym = sym
-            // D29 (#750): a shadowed name's tid carries its tier; route the
-            // std-tier tid to the aliased LLVM slot.
-            if self.sema.type_sym_is_shadowed(sym) != 0 and self.sema.type_tid_std_tier(resolved_tid) != 0:
-                cg_sym = self.shadow_alias_for(cg_sym)
+            // D29 (#750): a shadowed name's std-tier tid routes to its aliased
+            // LLVM slot inside nominal_cg_sym_for_tid.
             return self.resolve_defined_named_type(self.nominal_cg_sym_for_tid(resolved_tid as i32, cg_sym))
         if tk == TypeKind.TY_TUPLE:
             let elem_start = self.sema.get_type_d0(resolved_tid)
@@ -3995,10 +3998,18 @@ impl Codegen:
         self.nominal_cg_sym_for_tid(self.type_decl_sema_tid(decl), name_sym)
 
     // The codegen symbol of the resolved struct/enum TypeId whose plain
-    // symbol is `cg_sym`.
+    // symbol is `cg_sym`: the `$std` slot of a std-tier declaration whose
+    // name a user type shadows (D29, #750), or a later same-named
+    // declaration's `name$tid` (#1446). Every TypeId-to-LLVM path reads it;
+    // the MIR paths applied only the #1446 half, so a std generic body's
+    // private `MutexState` lowered to the user's same-named struct (#1745).
     fn nominal_cg_sym_for_tid(resolved_tid: i32, cg_sym: i32) -> i32:
         let alias = self.nominal_alias_by_tid.get(resolved_tid)
-        if alias.is_some(): alias.unwrap() else: cg_sym
+        if alias.is_some():
+            return alias.unwrap()
+        if resolved_tid > 0 and self.sema.type_tid_std_tier(resolved_tid) != 0 and self.type_sym_shadowed_cg(cg_sym) != 0:
+            return self.shadow_alias_for(cg_sym)
+        cg_sym
 
     // The codegen symbol of a MIR type's nominal, through references — the
     // aliased symbol for a later declaration of a split name, where
@@ -4040,6 +4051,16 @@ impl Codegen:
         self.sema_type_to_llvm(split_tid)
 
     fn current_fn_is_std_tier() -> i32:
+        // #1745: a specialization (`gen_pull__sema__…`,
+        // `Mutex.new__receiver__…`) has no declaration under its own name;
+        // its tier is its template's, which the emitter recorded as the
+        // current tier node. By name alone it read as user code, and
+        // `sizeof[MutexState]` inside std.sync sized the user's MutexState.
+        let node = self.current_function_tier_node
+        if node > 0 and self.pool.kind(node) == NodeKind.NK_FN_DECL:
+            let template_sym = self.codegen_sema_sym_for(self.pool.get_data0(node))
+            if template_sym != 0 and self.sema.fn_decl_source_paths.contains(template_sym):
+                return sema_tier_path_is_std_implementation(self.sema.fn_decl_source_paths.get(template_sym).unwrap())
         if self.current_function_name_sym == 0:
             return 0
         let sema_sym = self.codegen_sema_sym_for(self.current_function_name_sym)
