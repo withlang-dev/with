@@ -529,6 +529,16 @@ embedded and materialized to a cache at first `c_import` (#312);
 
 ---
 
+## Other hosts
+
+The Mac is the release host. When a task needs Linux, `ssh eric-5090`
+(Eric, 2026-09-27). When it needs Windows, make sure the Windows VM on
+eric-5090 is turned on, then `ssh win10`. Both are Eric's machines: build
+and test there the way you would here (the pinned seed drives the battery;
+never `git stash`), and leave nothing running when you are done.
+
+---
+
 ## Build System
 
 ```
