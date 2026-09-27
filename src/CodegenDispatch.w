@@ -2979,9 +2979,12 @@ impl Codegen:
         if tk == TypeKind.TY_VOID:
             return self.gen_string_literal_raw("()")
         if tk == TypeKind.TY_PTR:
-            // A raw pointer's `:?` form is its address, as emit-C formats it.
+            // A raw pointer's `:?` form is its address in hexadecimal,
+            // `0x16f3a2b40` (§15.4.7, #1564): `{:#x}` — the alternate-form
+            // bit (19) of the f-string spec flags, mode 'x' — as emit-C
+            // formats it.
             let addr = wl_build_ptr_to_int(self.builder, val, wl_i64_type(self.context))
-            return self.coerce_val_to_str_ext(addr, str_ty, false)
+            return self.gen_fmt_with_spec(addr, 1 << 19, 0, 0, 'x' as i32, str_ty)
         if tk == TypeKind.TY_INT or tk == TypeKind.TY_FLOAT or tk == TypeKind.TY_BOOL:
             return self.coerce_val_to_str_ext(val, str_ty, self.mir_sema_type_is_unsigned(sema_ty))
         self.call_debug_formatter(val, sema_ty, str_ty)

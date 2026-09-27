@@ -3401,10 +3401,14 @@ impl MirBuilder:
     // `place`; the result lands in a statement temp, whose place is returned
     // (an owned result is dropped with the statement frame).
     mut fn lower_debug_borrowing_call(fn_sym: i32, sig: i32, mono: i32, place: i32, place_ty: i32) -> i32:
-        let param_ty = self.sema.sig_param_type(sig, 0)
-        let arg = self.operand_for_place_arg(place, place_ty, param_ty, 0)
+        self.lower_debug_borrowing_call2(fn_sym, sig, mono, place, place_ty, -1, 0)
+
+    // The same, with a second borrowed argument when `place2` >= 0.
+    mut fn lower_debug_borrowing_call2(fn_sym: i32, sig: i32, mono: i32, place: i32, place_ty: i32, place2: i32, place2_ty: i32) -> i32:
         let args: Vec[i32] = Vec.new()
-        args.push(arg)
+        args.push(self.operand_for_place_arg(place, place_ty, self.sema.sig_param_type(sig, 0), 0))
+        if place2 >= 0:
+            args.push(self.operand_for_place_arg(place2, place2_ty, self.sema.sig_param_type(sig, 1), 0))
         let args_id = self.body.new_call_args(args)
         self.body.set_call_contract(args_id, sig, mono)
         let generic_node = self.generic_fn_node_for_sym(fn_sym)
@@ -3445,17 +3449,20 @@ impl MirBuilder:
         if base != 0 and base == self.sema.syms.vec:
             self.lower_debug_sequence(buf_op, place, resolved, 1)
             return
-        if base != 0 and base == self.sema.syms.box:
-            // A Box is transparent, like a view: it formats what it owns,
-            // read through the library's Box.as_ref (`&T`).
+        if self.sema.debug_fmt_transparent_owner(resolved):
+            // A Box, Rc or Arc is transparent, like a view: it formats the
+            // value it holds, read through the library's as_ref (`&T`).
             let entry: i32 = self.sema.debug_fmt_index.get(resolved).unwrap()
             let accessor: i32 = self.sema.debug_fmt_aux_fns[entry]
             let accessor_sig: i32 = self.sema.debug_fmt_aux_sigs[entry]
             let accessor_mono: i32 = self.sema.debug_fmt_aux_monos[entry]
             if accessor == 0 or accessor_sig < 0:
-                sema_phase_bug(f"BUG: Box `:?` formatter for type {resolved} has no bound as_ref (D61)")
+                sema_phase_bug(f"BUG: `:?` formatter for owner type {resolved} has no bound as_ref (D61)")
             let view_place = self.lower_debug_borrowing_call(accessor, accessor_sig, accessor_mono, place, resolved)
             self.lower_debug_write_place(buf_op, view_place, self.sema.sig_return_type(accessor_sig), 0)
+            return
+        if base != 0 and base == self.sema.syms.hashset:
+            self.lower_debug_set(buf_op, place, resolved)
             return
         let enum_base = self.sema.debug_fmt_enum_base(resolved)
         if enum_base != 0:
@@ -3609,6 +3616,89 @@ impl MirBuilder:
         self.terminate(TermKind.TK_GOTO, header_bb, 0, 0, 0)
         self.switch_to(exit_bb)
         self.lower_debug_write_literal(buf_op, "]", 0)
+
+    // §15.4.7 (#1564): a HashSet's `{elem, elem}`, ordered by the elements'
+    // Debug text. The set has no traversal of its own, so its table is walked
+    // here as a map's is (D44: each element is viewed where it lives, never
+    // copied out), each element's `:?` text is pushed onto a Vec[str], and the
+    // library's HashSet.debug_form_of (Sema bound it as the entry's aux
+    // method) orders and joins the texts.
+    mut fn lower_debug_set(buf_op: i32, set_place: i32, resolved: i32):
+        let entry: i32 = self.sema.debug_fmt_index.get(resolved).unwrap()
+        let join_fn: i32 = self.sema.debug_fmt_aux_fns[entry]
+        let join_sig: i32 = self.sema.debug_fmt_aux_sigs[entry]
+        if join_fn == 0 or join_sig < 0:
+            sema_phase_bug(f"BUG: HashSet `:?` formatter for type {resolved} has no bound debug_form_of (D61)")
+        let elem_ty = self.sema.get_generic_inst_arg(resolved, 0)
+        let view_ty = self.sema.find_exact_type(TypeKind.TY_REF, elem_ty, 0, 0) as i32
+        let texts_ty = self.sema.get_type_d0(self.sema.resolve_alias(self.sema.sig_param_type(join_sig, 1) as TypeId)) as i32
+        if view_ty == 0 or texts_ty == 0:
+            sema_phase_bug(f"BUG: HashSet `:?` formatter for type {resolved} is missing its element view or text Vec type (D61)")
+        let texts_local = self.new_temp(texts_ty)
+        let texts_place = self.place_for_local(texts_local)
+        self.emit_vec_new_into(texts_place, 0)
+        self.register_stmt_temp(texts_local, texts_ty)
+
+        let cap_local = self.new_temp(self.sema.ty_i64)
+        let cap_place = self.place_for_local(cap_local)
+        let cap_args: Vec[i32] = Vec.new()
+        cap_args.push(self.body.new_operand(OperandKind.OK_COPY, set_place))
+        let cap_args_id = self.body.new_call_args(cap_args)
+        self.body.set_call_intrinsic(cap_args_id, MirIntrinsic.MAP_CAPACITY)
+        let cap_after_bb = self.new_block()
+        let cap_callee = self.unit_operand()
+        self.terminate(TermKind.TK_CALL, cap_callee, cap_args_id, cap_place, cap_after_bb)
+        self.switch_to(cap_after_bb)
+
+        let slot_local = self.new_temp(self.sema.ty_i64)
+        let slot_place = self.place_for_local(slot_local)
+        let zero_rv = self.body.new_rvalue(RvalueKind.RK_USE, self.int_const_operand(0, self.sema.ty_i64), 0, 0)
+        self.body.push_stmt(self.cur_bb, StmtKind.Assign, slot_place, zero_rv, 0)
+        let header_bb = self.new_block()
+        let body_bb = self.new_block()
+        let live_bb = self.new_block()
+        let inc_bb = self.new_block()
+        let exit_bb = self.new_block()
+        self.terminate(TermKind.TK_GOTO, header_bb, 0, 0, 0)
+        self.switch_to(header_bb)
+        let _ = self.lower_debug_counter_test(slot_place, cap_place, BinaryOp.OP_LT, body_bb, exit_bb)
+
+        self.switch_to(body_bb)
+        let occupied_local = self.new_temp(self.sema.ty_i32)
+        let occupied_place = self.place_for_local(occupied_local)
+        self.emit_map_slot_call(MirIntrinsic.MAP_SLOT_OCCUPIED, set_place, slot_place, occupied_place)
+        let empty_vals: Vec[i64] = Vec.new()
+        empty_vals.push(0)
+        let empty_targets: Vec[i32] = Vec.new()
+        empty_targets.push(inc_bb as i32)
+        let empty_table = self.body.new_switch_table(empty_vals, empty_targets)
+        let occupied_read = self.body.new_operand(OperandKind.OK_COPY, occupied_place)
+        self.terminate(TermKind.TK_SWITCH_INT, occupied_read, empty_table, live_bb, 0)
+
+        // The element's text moves into the Vec; the iteration's other
+        // temps drop inside it (#771).
+        self.switch_to(live_bb)
+        let frame = self.push_stmt_temp_frame()
+        let view_local = self.new_temp(view_ty)
+        let view_place = self.place_for_local(view_local)
+        self.emit_map_slot_call(MirIntrinsic.MAP_KEY_AT, set_place, slot_place, view_place)
+        let elem_buf = self.lower_fstring_buf_new(0)
+        self.lower_debug_write_place(elem_buf, view_place, view_ty, 0)
+        let text_op = self.lower_fstring_buf_finish(elem_buf, 0)
+        self.consume_moved_operand(text_op)
+        self.emit_vec_push(texts_place, text_op, 0)
+        self.finish_stmt_temp_frame(frame)
+        self.terminate(TermKind.TK_GOTO, inc_bb, 0, 0, 0)
+
+        self.switch_to(inc_bb)
+        let slot_cur = self.body.new_operand(OperandKind.OK_COPY, slot_place)
+        let next_rv = self.body.new_rvalue(RvalueKind.RK_BIN_OP, BinaryOp.OP_ADD, slot_cur, self.int_const_operand(1, self.sema.ty_i64))
+        self.body.push_stmt(self.cur_bb, StmtKind.Assign, slot_place, next_rv, 0)
+        self.terminate(TermKind.TK_GOTO, header_bb, 0, 0, 0)
+
+        self.switch_to(exit_bb)
+        let joined_place = self.lower_debug_borrowing_call2(join_fn, join_sig, self.sema.debug_fmt_aux_monos[entry], set_place, resolved, texts_place, texts_ty)
+        self.lower_fstring_buf_write_str(buf_op, self.body.new_operand(OperandKind.OK_COPY, joined_place), 0)
 
     // Branch on `lhs op rhs` (two i64 places): to `yes_bb` when it holds,
     // else `no_bb`.

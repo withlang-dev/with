@@ -8218,7 +8218,7 @@ impl Sema:
 
     // D61 (§15.4.7): a value `:?` formats in place, with no formatter of its
     // own — numbers, bool, str (quoted and escaped by the runtime), Unit,
-    // and a raw pointer (its address).
+    // and a raw pointer (its address in hexadecimal, #1564).
     fn debug_fmt_is_inline(kind: i32) -> bool:
         kind == TypeKind.TY_INT or kind == TypeKind.TY_FLOAT or kind == TypeKind.TY_BOOL or
             kind == TypeKind.TY_STR or kind == TypeKind.TY_VOID or kind == TypeKind.TY_PTR or
@@ -8256,7 +8256,7 @@ impl Sema:
         var ok = true
         if base != 0 and (base == self.syms.hashmap or base == self.syms.btreemap):
             ok = self.debug_fmt_has_form(self.get_generic_inst_arg(resolved, 0)) and self.debug_fmt_has_form(self.get_generic_inst_arg(resolved, 1))
-        else if kind == TypeKind.TY_GENERIC_INST and base != self.syms.vec and base != self.syms.box and
+        else if kind == TypeKind.TY_GENERIC_INST and base != self.syms.vec and not self.debug_fmt_transparent_owner(resolved) and
             self.debug_fmt_enum_base(resolved) == 0 and not self.debug_fmt_generic_struct(resolved):
             ok = false
         else:
@@ -8364,7 +8364,7 @@ impl Sema:
             let entry = self.debug_fmt_push(resolved, DebugFmtKind.HELPER, 0)
             let _ = self.debug_fmt_bind_method(entry, resolved, "debug_form", node)
             return entry
-        if kind == TypeKind.TY_GENERIC_INST and base != self.syms.vec and base != self.syms.box and
+        if kind == TypeKind.TY_GENERIC_INST and base != self.syms.vec and not self.debug_fmt_transparent_owner(resolved) and
             self.debug_fmt_enum_base(resolved) == 0 and not self.debug_fmt_generic_struct(resolved):
             self.emit_error("cannot format a value of type '" ++ self.type_name(resolved) ++ "' with :? — §15.4.7 gives it no Debug form", node)
             return -1
@@ -8383,19 +8383,45 @@ impl Sema:
         self.debug_fmt_sigs[entry] = sig
         self.debug_fmt_monos[entry] = fn_sym
         self.debug_fmt_synth_syms.insert(fn_sym, entry)
-        if base == self.syms.box:
-            // A Box formats what it owns, read through Box.as_ref: the
-            // backends represent the box differently, its accessor is one.
-            let accessor = self.debug_fmt_method_fn(resolved, "as_ref")
-            let accessor_sig = self.debug_fmt_method_sig(resolved, accessor, "as_ref", node)
-            if accessor_sig >= 0:
-                self.debug_fmt_aux_fns[entry] = accessor
-                self.debug_fmt_aux_sigs[entry] = accessor_sig
-                self.debug_fmt_aux_monos[entry] = self.sig_names[accessor_sig]
+        if self.debug_fmt_transparent_owner(resolved):
+            // A Box, Rc or Arc formats the value it holds (§15.4.7), read
+            // through its as_ref (`&T`): the backends represent a box
+            // differently, its accessor is one.
+            self.debug_fmt_bind_aux(entry, resolved, "as_ref", node)
+        else if base == self.syms.hashset:
+            // `{elem, elem}` ordered by the elements' Debug text (§15.4.7,
+            // #1564). The set has no traversal of its own: the formatter
+            // walks its table (MirLower.lower_debug_set) into a Vec of the
+            // elements' texts, which the library's debug_form_of orders.
+            let _ = self.ensure_exact_type(TypeKind.TY_REF, self.get_generic_inst_arg(resolved, 0), 0, 0)
+            let texts_args: Vec[i32] = Vec.new()
+            texts_args.push(self.ty_str as i32)
+            let texts_ty = self.ensure_generic_inst_type(self.syms.vec, texts_args, 1) as i32
+            let _ = self.ensure_exact_type(TypeKind.TY_REF, texts_ty, 0, 0)
+            self.debug_fmt_bind_aux(entry, resolved, "debug_form_of", node)
         let components = self.debug_fmt_components(resolved)
         for ci in 0..components.len() as i32:
             let _ = self.ensure_debug_formatter(components[ci], node)
         entry
+
+    // The library method a synthesized formatter calls besides the element
+    // formatters (a box's as_ref, a set's debug_form_of), specialized for
+    // the concrete owner.
+    mut fn debug_fmt_bind_aux(entry: i32, resolved: i32, method: &str, node: i32):
+        let method_fn = self.debug_fmt_method_fn(resolved, method)
+        let sig = self.debug_fmt_method_sig(resolved, method_fn, method, node)
+        if sig >= 0:
+            self.debug_fmt_aux_fns[entry] = method_fn
+            self.debug_fmt_aux_sigs[entry] = sig
+            self.debug_fmt_aux_monos[entry] = self.sig_names[sig]
+
+    // §15.4.7 (#1564): `Box[T]`, `Rc[T]` and `Arc[T]` format the value they
+    // hold, never their handle (a raw address).
+    fn debug_fmt_transparent_owner(resolved: i32) -> bool:
+        if self.get_type_kind(resolved as TypeId) != TypeKind.TY_GENERIC_INST:
+            return false
+        let base = self.get_generic_inst_base(resolved)
+        base == self.syms.box or self.type_symbol_is_std_rc_owner(base) != 0
 
     // The declared template of a generic inst, by registration truth — a
     // formatter is registered in whatever module formats the value (a std
@@ -8432,7 +8458,7 @@ impl Sema:
             out.push(self.get_type_d0(resolved as TypeId))
             return out
         let base = if kind == TypeKind.TY_GENERIC_INST: self.get_generic_inst_base(resolved) else: 0
-        if base != 0 and (base == self.syms.vec or base == self.syms.box):
+        if base != 0 and (base == self.syms.vec or base == self.syms.hashset or self.debug_fmt_transparent_owner(resolved)):
             out.push(self.get_generic_inst_arg(resolved, 0))
             return out
         let enum_base = self.debug_fmt_enum_base(resolved)

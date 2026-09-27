@@ -195,6 +195,17 @@ impl[K, V] HashMap[K, V]:
             parts.push(f"{keys[i]}: {values[i]}")
         "{" ++ parts.join(", ") ++ "}"
 
+// `{elem, elem}` ordered by the Debug text of the elements, for the same
+// reason as a HashMap's keys. The set has no traversal of its own: the
+// compiler walks its table, formats each element with `:?`, and hands the
+// texts here (#1564).
+impl[T] HashSet[T]:
+    fn debug_form_of(texts: &Vec[str]) -> str:
+        let parts: Vec[str] = Vec.with_capacity(texts.len())
+        for i in debug_entry_order(texts, texts):
+            parts.push(texts[i].clone())
+        "{" ++ parts.join(", ") ++ "}"
+
 fn debug_entry_before(keys: &Vec[str], values: &Vec[str], a: i64, b: i64) -> bool:
     keys[a] < keys[b] or (keys[a] == keys[b] and values[a] < values[b])
 

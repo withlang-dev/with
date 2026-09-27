@@ -1435,7 +1435,9 @@ impl CCodegen:
         if tk == TypeKind.TY_FLOAT:
             return "with_fmt_f64((double)(" ++ expr ++ "))"
         if tk == TypeKind.TY_PTR:
-            return "with_fmt_i64((int64_t)(intptr_t)(" ++ expr ++ "))"
+            // Its address in hexadecimal (§15.4.7, #1564): `{:#x}`, the
+            // alternate-form flag bit 19 and mode 'x', as the LLVM backend.
+            return f"with_fmt_int_spec((int64_t)(intptr_t)({expr}), 1, (int64_t){1 << 19}, 0, 0, {'x' as i32})"
         if tk == TypeKind.TY_INT:
             return self.debug_int_format_expr(resolved as i32, expr)
         self.debug_formatter_call_expr(resolved as i32, expr, context)
