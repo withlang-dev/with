@@ -681,6 +681,34 @@ pub fn analysis_audit_contract(report: &AnalysisReport, sema: &Sema, source_path
                 let host = contract_resource_name(sema, recv[0])
                 advisories = advisories + 1
                 report.fail(f"contract: advisory: {fname} ({at}) is exposed as a borrow of {host}\n  = heuristic: name segment `{word}` and a signature taking {host}'s representation resemble a destroying operation\n  = this warning does not establish destruction semantics; the contract, the classification and the capability are unchanged\n  = help: declare `destroys` if it destroys the resource, or explicitly declare `lend` to confirm borrowing semantics (§63)")
+    // Rendered call effects (#1674): each view invalidation a call carries
+    // names one of that call's own parameters, and one that holds a modeled
+    // resource. A rendered bridge, method or constructor presents fewer
+    // parameters than its C function (a buffer's length, a fixed argument, a
+    // producer's out slot and a hidden destruction callback are gone), so
+    // its mask is projected from the C indices (facade_presented_touch_mask,
+    // facade_index_call_effects). A mask copied unprojected — `touch(values,
+    // count, owner)`'s bit 2 on the two-parameter `touch(values, owner)` —
+    // left a stale view of `owner` accepted while this audit said `ok`. The
+    // raw C signature's bits index its C parameters and name the ones that
+    // receive a resource (facade_param_receives).
+    for fx in 0..sema.facade_call_effects.len() as i32:
+        let e = &sema.facade_call_effects[fx]
+        let count = sema.sig_get_param_count(e.sig)
+        if count > 31 or e.touch_params == 0:
+            continue
+        let raw = e.sig == sema.get_sig(e.fn_sym)
+        let fname = sema.safe_symbol_text(e.fn_sym)
+        let form = if raw: f"the C call '{fname}'" else: f"the rendered call of '{fname}'"
+        for pi in 0..31:
+            if (e.touch_params & sema_param_origin_bit(pi)) == 0:
+                continue
+            if pi >= count:
+                report.fail(f"contract: {form} invalidates views of its parameter {pi}, and it has {count}; the effect was not projected from the C parameter indices onto the presented ones (#1674, §16.2b.14)")
+                continue
+            let holds = if raw: sema.facade_param_receives(e.fn_sym, pi).len() == 1 else: sema.facade_type_holds_resource(sema.sig_param_type(e.sig, pi), 0)
+            if not holds:
+                report.fail(f"contract: {form} invalidates views of its parameter {pi}, which holds no modeled resource; the effect names the wrong parameter (#1674, §16.2b.14)")
     // Profile checks (§63; stage 11, §16.2b.12): an ambiguous match is a
     // rule that contributed nothing where the facade may have counted on it
     // — a violation naming the profile, the rule, the item and the clause

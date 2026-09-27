@@ -1,0 +1,48 @@
+foreign-contract view	v1
+resource Database wraps *mut db; representation: pointer; facade:proj@test/contract/ok_effect_projection.w; clause:resource@test/contract/ok_effect_projection.w:27
+    producer: db_new -> Database.new; production: direct return; NULL is None  [clause:from@test/contract/ok_effect_projection.w:28]
+    status: none; a producer's failure is None, or (status, None) through an out parameter  [default:no status convention is inferred (§16.2b.4)]
+    destroyer: db_close; automatic: Drop calls it while the value is live  [clause:drop@test/contract/ok_effect_projection.w:29]
+    dependency: none via db_new; it receives no modeled resource  [default:no resource parameter (§16.2b.6)]
+    thread: creator; operations and destruction on the creating thread, ownership stays there  [default:thread creator (§16.2b.10)]
+    invalidation: views invalidated by: db_close; preserved across: st_new  [default:unknown effect is invalidate; `preserves param N` states otherwise (§16.2b.7)]
+resource Other wraps *mut other; representation: pointer; facade:proj@test/contract/ok_effect_projection.w; clause:resource@test/contract/ok_effect_projection.w:30
+    producer: other_new -> Other.new; production: direct return; NULL is None  [clause:from@test/contract/ok_effect_projection.w:31]
+    status: none; a producer's failure is None, or (status, None) through an out parameter  [default:no status convention is inferred (§16.2b.4)]
+    destroyer: other_close; automatic: Drop calls it while the value is live  [clause:drop@test/contract/ok_effect_projection.w:32]
+    dependency: none via other_new; it receives no modeled resource  [default:no resource parameter (§16.2b.6)]
+    thread: creator; operations and destruction on the creating thread, ownership stays there  [default:thread creator (§16.2b.10)]
+    invalidation: views invalidated by: other_close, other_view, st_new, touch; preserved across: none  [default:unknown effect is invalidate; `preserves param N` states otherwise (§16.2b.7)]
+resource Statement wraps *mut st; representation: pointer; facade:proj@test/contract/ok_effect_projection.w; clause:resource@test/contract/ok_effect_projection.w:33
+    producer: st_new -> Statement.new; production: out parameter (param 1: *mut *mut st out); the slot starts NULL and is inspected after the call  [clause:from@test/contract/ok_effect_projection.w:34]
+    status: none; a producer's failure is None, or (status, None) through an out parameter  [default:no status convention is inferred (§16.2b.4)]
+    destroyer: st_free; automatic: Drop calls it while the value is live  [clause:drop@test/contract/ok_effect_projection.w:35]
+    dependency: parent Database via st_new param 0: *mut db d; the product cannot outlive it  [clause:borrows@test/contract/ok_effect_projection.w:36]
+    thread: creator; operations and destruction on the creating thread, ownership stays there  [default:thread creator (§16.2b.10)]
+    invalidation: views invalidated by: st_new, st_free; preserved across: none  [default:unknown effect is invalidate; `preserves param N` states otherwise (§16.2b.7)]
+fn st_new; facade:proj@test/contract/ok_effect_projection.w; clause:fn@test/contract/ok_effect_projection.w:37
+    role: producer of Statement  [clause:resource@test/contract/ok_effect_projection.w:33]
+    callbacks: may invoke applicable callbacks  [default:conservatively reentrant (§16.2b.9)]
+    effect: param 0: *mut db d: lend, the described fn's assertion; receives Database  [default:a described fn lends its parameters (§16.2b.5)]
+    effect: param 1: *mut *mut st out: out parameter producing Statement  [clause:from@test/contract/ok_effect_projection.w:34]
+    effect: param 2: i32 flags: lend, the described fn's assertion  [default:a described fn lends its parameters (§16.2b.5)]
+    effect: param 3: *mut other o: lend, the described fn's assertion; receives Other  [default:a described fn lends its parameters (§16.2b.5)]
+    returns: i32  [default:as declared]
+    preserves: param 0: *mut db d; views of it survive this call  [clause:preserves@test/contract/ok_effect_projection.w:38]
+    invalidates: Statement (param 1: *mut *mut st out), Other (param 3: *mut other o)  [default:unknown effect is invalidate (§16.2b.7)]
+fn other_view; facade:proj@test/contract/ok_effect_projection.w; clause:fn@test/contract/ok_effect_projection.w:39
+    callbacks: may invoke applicable callbacks  [default:conservatively reentrant (§16.2b.9)]
+    effect: param 0: *mut other o: lend, the described fn's assertion; receives Other  [default:a described fn lends its parameters (§16.2b.5)]
+    returns: borrow Value from param 0: *mut other o (Other); Option[&Value], nullable, a view of the record, no Drop; its pointer fields stay raw  [clause:returns borrow@test/contract/ok_effect_projection.w:40]
+    invalidates: Other (param 0: *mut other o)  [default:unknown effect is invalidate (§16.2b.7)]
+    presentation: Other.view  [default:presentation sugar from the resource prefix (§16.2b.11)]
+fn touch; facade:proj@test/contract/ok_effect_projection.w; clause:fn@test/contract/ok_effect_projection.w:41
+    callbacks: may invoke applicable callbacks  [default:conservatively reentrant (§16.2b.9)]
+    effect: param 0: *const u8 values: lend, the described fn's assertion  [default:a described fn lends its parameters (§16.2b.5)]
+    effect: param 1: i32 count: lend, the described fn's assertion  [default:a described fn lends its parameters (§16.2b.5)]
+    effect: param 2: *mut other o: lend, the described fn's assertion; receives Other  [default:a described fn lends its parameters (§16.2b.5)]
+    returns: i32  [default:as declared]
+    invalidates: Other (param 2: *mut other o)  [default:unknown effect is invalidate (§16.2b.7)]
+    presentation: the C name is the surface; no resource receives param 0  [default:presentation sugar only groups by resource (§16.2b.11)]
+note: contract-audit: resources=3 items=3 domains=0 conventions=0 advisories=0 profile-ambiguous=0 profile-shadowed=0
+contract-audit: violations=0 ok
