@@ -1025,3 +1025,63 @@ pub fn mir_test_reset_of_init:
     assert(drop_state_verdict(8, true) == "")
     // A value with no drop glue owns nothing to lose.
     assert(drop_state_verdict(6, false) == "")
+
+// #1742: `call fn 7(copy _1)` where the signature snapshot says parameter
+// 0 of fn 7 takes ownership (`consumes`), and this body also drops `_1`.
+// `moved` passes `move _1` and resets `_1` instead; `dropped` keeps the
+// body's own drop of `_1` after the call; `never` makes fn 7 return Never
+// (with_panic: the drop is on no path the call returns to).
+fn consuming_param_verdict(consumes: bool, moved: bool, dropped: bool, never: bool = false) -> str:
+    var mir_mod = MirModule.init()
+    for kind in [0, TypeKind.TY_VOID, TypeKind.TY_STRUCT]:
+        mir_mod.sema_type_kinds.push(kind)
+        mir_mod.sema_type_d0.push(0)
+        mir_mod.sema_type_d1.push(0)
+        mir_mod.sema_type_d2.push(0)
+    let unit_ty = 1
+    let value_ty = 2
+    mir_mod.sema_moved_drop_types.insert(value_ty, 1)
+    mir_mod.sema_callable_syms.insert(7, MirCallableClass.Signature as i32)
+    mir_mod.sema_sig_param_starts.insert(7, 0)
+    mir_mod.sema_sig_param_data.push(1)
+    mir_mod.sema_sig_param_data.push(value_ty)
+    mir_mod.sema_sig_param_data.push(if consumes: 1 else: 0)
+    if never: mir_mod.sema_never_returning_syms.insert(7, 1)
+    var body = MirBody.init_for_fn(1)
+    let value_local = body.new_temp(value_ty)
+    let value = body.new_place(value_local)
+    let result_local = body.new_temp(unit_ty)
+    let result = body.new_place(result_local)
+    let entry = body.new_block()
+    let after = body.new_block()
+    let no_fields: Vec[i32] = Vec.new()
+    let no_field_table = body.new_agg_fields(&no_fields, &no_fields)
+    let init = body.new_rvalue(RvalueKind.RK_AGGREGATE, 0, no_field_table, 0)
+    body.push_stmt(entry, StmtKind.StorageLive, value_local, 0, 0)
+    body.push_stmt(entry, StmtKind.Assign, value, init, 0)
+    let callee_const = body.new_const(ConstKind.CK_FN, 7, 0, 0, unit_ty)
+    let callee = body.new_operand(OperandKind.OK_CONSTANT, callee_const)
+    let args: Vec[i32] = Vec.new()
+    args.push(body.new_operand(if moved: OperandKind.OK_MOVE else: OperandKind.OK_COPY, value))
+    let call_id = body.new_call_args(&args)
+    body.set_terminator(entry, TermKind.TK_CALL, callee, call_id, result, after, 0)
+    if moved:
+        let blank = body.new_const(ConstKind.CK_ZERO_SIZED, 0, 0, 0, value_ty)
+        let blank_op = body.new_operand(OperandKind.OK_CONSTANT, blank)
+        let reset = body.new_rvalue(RvalueKind.RK_USE, blank_op, 0, 0)
+        body.push_stmt(after, StmtKind.Assign, value, reset, 0)
+    if dropped:
+        body.push_stmt(after, StmtKind.Drop, value, 0, 0)
+    body.set_terminator(after, TermKind.TK_RETURN, 0, 0, 0, 0, 0)
+    validate_ownership_body(mir_mod, body)
+
+pub fn mir_test_copy_into_consuming_param:
+    assert(consuming_param_verdict(true, false, true).contains("copy of _1 into parameter 0 of fn sym7, which takes ownership of it, while this body drops _1 too"))
+    // A parameter that borrows (`&T`, an in-place receiver) leaves the caller the owner.
+    assert(consuming_param_verdict(false, false, true) == "")
+    // A move with its reset hands the value over.
+    assert(consuming_param_verdict(true, true, true) == "")
+    // Without the caller's own drop the callee is the one owner.
+    assert(consuming_param_verdict(true, false, false) == "")
+    // A callee that never returns leaves no path to the caller's drop.
+    assert(consuming_param_verdict(true, false, true, true) == "")

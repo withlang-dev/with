@@ -566,6 +566,17 @@ pub type MirModule {
     // the module and no intrinsic mark, so a callee re-derived from an AST
     // spelling (#1635's `r(21)`) can never reach codegen silently.
     sema_callable_syms: HashMap[i32, i32],
+    // #1735, #1742: each function's Sema signature, by this module's symbol
+    // (the canonical signature of its name, get_sig): the offset of
+    // [param count, then (type, consumes) per parameter] in
+    // sema_sig_param_data. `consumes` is 1 for a parameter that takes
+    // ownership of its argument — a plain `T` that is no in-place receiver
+    // (value_ref_abi), not a `&T` or a raw pointer.
+    sema_sig_param_starts: HashMap[i32, i32],
+    sema_sig_param_data: Vec[i32],
+    // #1742: every function whose signature returns Never (with_panic): a
+    // call to it has no continuation for the caller's drops to run on.
+    sema_never_returning_syms: HashMap[i32, i32],
 }
 
 pub enum MirCallableClass: i32:
@@ -598,6 +609,9 @@ fn MirModule.init -> MirModule:
         sema_moved_drop_types: HashMap.new(),
         sema_dropped_types: HashMap.new(),
         sema_callable_syms: HashMap.new(),
+        sema_sig_param_starts: HashMap.new(),
+        sema_sig_param_data: Vec.new(),
+        sema_never_returning_syms: HashMap.new(),
     }
 
 impl MirModule:
@@ -2410,6 +2424,98 @@ fn mir_whole_drop_verdict(mir_mod: &MirModule, body: &MirBody, place_id: i32, dr
         return f"drop of {drop_key} reaches a path where it holds no value — written on one path, never written, dead or already dropped on another ({state_name}); only a reset blank is safe to drop (§2.5.1)"
     ""
 
+// The Sema signature snapshot of `sym` (sema_sig_param_starts): its
+// parameter count, or -1 when Sema has no signature by that name.
+pub fn mir_sig_param_count(mir_mod: &MirModule, sym: i32) -> i32:
+    let start: i32 = mir_mod.sema_sig_param_starts.get(sym) ?? -1
+    if start < 0: -1 else: mir_mod.sema_sig_param_data[start]
+
+// Parameter `pi`'s type in the signature snapshot of `sym`, 0 when absent.
+pub fn mir_sig_param_type(mir_mod: &MirModule, sym: i32, pi: i32) -> i32:
+    let start: i32 = mir_mod.sema_sig_param_starts.get(sym) ?? -1
+    if start < 0 or pi < 0 or pi >= mir_mod.sema_sig_param_data[start]: 0 else: mir_mod.sema_sig_param_data[start + 1 + pi * 2]
+
+// Whether parameter `pi` of `sym` takes ownership of its argument.
+pub fn mir_sig_param_consumes(mir_mod: &MirModule, sym: i32, pi: i32) -> bool:
+    let start: i32 = mir_mod.sema_sig_param_starts.get(sym) ?? -1
+    start >= 0 and pi >= 0 and pi < mir_mod.sema_sig_param_data[start] and mir_mod.sema_sig_param_data[start + 2 + pi * 2] != 0
+
+// Whether a whole drop of `local` is reachable from block `from` before
+// any statement writes it (a re-initialization or a reset blank).
+fn mir_drop_reachable_before_write(body: &MirBody, from: i32, local: i32) -> bool:
+    var seen: Vec[i32] = Vec.new()
+    for _ in 0..body.block_count():
+        seen.push(0)
+    var work: Vec[i32] = Vec.new()
+    work.push(from)
+    while work.len() > 0:
+        let bb: i32 = work.pop().unwrap()
+        if bb < 0 or bb >= body.block_count() or seen[bb] != 0:
+            continue
+        seen[bb] = 1
+        var written = false
+        for si in body.bb_stmt_starts[bb]..body.bb_stmt_starts[bb] + body.bb_stmt_counts[bb]:
+            let kind = body.stmt_kind(si)
+            let place = body.stmt_data0(si)
+            if place < 0 or place >= body.place_locals.len() or body.place_locals[place] != local or body.place_proj_counts[place] != 0:
+                continue
+            if kind == StmtKind.Drop:
+                return true
+            if kind == StmtKind.Assign:
+                written = true
+                break
+        if written:
+            continue
+        if body.term_kind(bb) == TermKind.TK_DROP_AND_GOTO:
+            let place = body.term_data0(bb)
+            if place >= 0 and place < body.place_locals.len() and body.place_locals[place] == local and body.place_proj_counts[place] == 0:
+                return true
+        for next in mir_drop_state_block_successors(body, bb):
+            work.push(next)
+    false
+
+// #1742: a call argument that is a COPY of a whole local this body drops,
+// at a parameter that takes ownership (a plain `T`, not `&T`, not an
+// in-place receiver): the callee owns the value and the caller frees it
+// too — a drop of the local is reachable after the call returns, before
+// anything writes it. A callee that returns Never (with_panic) has no
+// such path. `g.pull()` lowered its receiver as a method receiver (`copy` of the
+// generator temp) into `gen_pull(g: impl Gen[T])`, the caller's scope-exit
+// drop freed the generator's Vec again — DOUBLE FREE — and validate-all
+// and audit:all both passed. The callee is a direct `const fn`, or a
+// generic call's specialization; machinery dispatch and templates are not
+// judged (their callee name is no signature).
+fn mir_copy_into_consuming_param(mir_mod: &MirModule, body: &MirBody, bb: i32, dropped_local: &Vec[i32]) -> str:
+    let call_id = body.term_data1(bb)
+    if call_id < 0 or call_id >= body.call_arg_starts.len():
+        return ""
+    let intrinsic = body.call_intrinsic(call_id)
+    var sym = 0
+    if intrinsic == MirIntrinsic.NONE:
+        sym = mir_call_const_fn_sym(body, body.term_data0(bb))
+    else if intrinsic == MirIntrinsic.GENERIC_CALL and not body.call_is_machinery_dispatch(call_id):
+        sym = body.call_mono_sym(call_id)
+    if sym == 0 or mir_mod.sema_never_returning_syms.contains(sym):
+        return ""
+    let start = body.call_arg_starts[call_id]
+    for ai in 0..body.call_arg_counts[call_id]:
+        let op = body.call_arg_operands[start + ai]
+        if op < 0 or op >= body.operand_kinds.len() or body.operand_kinds[op] != OperandKind.OK_COPY:
+            continue
+        let place = body.operand_d0[op]
+        if place < 0 or place >= body.place_locals.len() or body.place_proj_counts[place] != 0:
+            continue
+        let local = body.place_locals[place]
+        if local < 0 or local >= dropped_local.len() or dropped_local[local] == 0:
+            continue
+        if not mir_sig_param_consumes(mir_mod, sym, ai):
+            continue
+        if not mir_drop_reachable_before_write(body, body.term_data3(bb), local):
+            continue
+        let place_text = mir_place_text(body, place)
+        return f"copy of {place_text} into parameter {ai} of fn sym{sym}, which takes ownership of it, while this body drops {place_text} too: two owners free one value (§2.5.1)"
+    ""
+
 // Every move of a statement or terminator checked by the #1415 rule.
 fn validate_moves_through_references(mir_mod: &MirModule, body: &MirBody) -> str:
     for bb in 0..body.block_count():
@@ -2495,6 +2601,9 @@ pub fn validate_ownership_body(mir_mod: &MirModule, body: &MirBody) -> str:
             let twice = mir_move_of_moved_place(mir_mod, body, blocks.keys, state, mir_term_operands(body, bb))
             if twice.len() > 0:
                 return f"fn sym{body.fn_sym} bb{bb}: " ++ twice
+            let copied = mir_copy_into_consuming_param(mir_mod, body, bb, dropped_local)
+            if copied.len() > 0:
+                return f"fn sym{body.fn_sym} bb{bb}: " ++ copied
         if body.term_kind(bb) == TermKind.TK_CALL or body.term_kind(bb) == TermKind.TK_DROP_AND_GOTO:
             let place_id = if body.term_kind(bb) == TermKind.TK_CALL: body.term_data2(bb) else: body.term_data0(bb)
             if place_id < 0 or place_id >= body.place_locals.len():

@@ -68,6 +68,29 @@ impl MirModule:
             let mir_sym = pool.intern(sema.pool_resolve(generic_builtins[bi]))
             if not self.sema_callable_syms.contains(mir_sym):
                 self.sema_callable_syms.insert(mir_sym, MirCallableClass.Intrinsic as i32)
+        // #1735, #1742: each name's canonical signature (the one get_sig
+        // answers) — its parameter types and which parameters consume.
+        for si in 0..sema.sig_names.len() as i32:
+            let sema_sym = sema.sig_names[si]
+            if sema.get_sig(sema_sym) != si:
+                continue
+            let name = sema.pool_resolve(sema_sym)
+            if name.len() == 0:
+                continue
+            let mir_sym = pool.intern(name)
+            if self.sema_sig_param_starts.contains(mir_sym):
+                continue
+            if sema.get_type_kind(sema.resolve_alias(sema.sig_return_type(si) as TypeId)) == TypeKind.TY_NEVER:
+                self.sema_never_returning_syms.insert(mir_sym, 1)
+            let count = sema.sig_get_param_count(si)
+            self.sema_sig_param_starts.insert(mir_sym, self.sema_sig_param_data.len() as i32)
+            self.sema_sig_param_data.push(count)
+            for pi in 0..count:
+                let param_ty = sema.sig_param_type(si, pi)
+                let kind = sema.get_type_kind(sema.resolve_alias(param_ty as TypeId))
+                let borrows = kind == TypeKind.TY_REF or kind == TypeKind.TY_PTR or sema.sig_param_uses_value_ref_abi(si, pi) != 0
+                self.sema_sig_param_data.push(param_ty)
+                self.sema_sig_param_data.push(if borrows: 0 else: 1)
 
     // #1394, #1414: the drop-bearing types of every place a body moves out
     // of — a vacated sub-place (#1394) and a move of an already-moved place
