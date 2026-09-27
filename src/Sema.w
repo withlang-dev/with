@@ -1248,6 +1248,10 @@ pub type Sema {
     // arguments (a generic struct field `items: Vec[T]`): literal node ->
     // the collection base the literal builds (§4.3c rule 1 and 2).
     collection_literal_hints: HashMap[i32, i32],
+    // §4.3a (#1478): `[value; N]` with a non-literal count keeps the count
+    // expression as the literal's d2; its evaluated value, by literal node.
+    // MirLower and the comptime evaluator read the count here.
+    array_fill_counts: HashMap[i32, i32],
     // #1754: the if/match argument now being checked at a `&T` parameter;
     // its arms meet `T` and its join has no owned anchor.
     borrow_pointee_join_node: i32,
@@ -2806,6 +2810,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         autoderef_step_counts: sema_new_map_i32_i32(),
         slice_coerce_args: sema_new_map_i32_i32(),
         collection_literal_hints: sema_new_map_i32_i32(),
+        array_fill_counts: sema_new_map_i32_i32(),
         borrow_pointee_join_node: 0,
         contextual_copy_adjustment_indices: sema_new_map_i64_i32(),
         contextual_copy_adjustments: Vec.new(),

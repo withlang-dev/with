@@ -13996,9 +13996,38 @@ impl Sema:
         self.emit_error("range indexing needs an array, slice or Vec; this is " ++ self.type_name(arr_type as i32), node)
         0
 
+    // §4.3a (#1478): `[value; N]` — N is an integer literal or a `const`. A
+    // literal count is desugared by the parser into N copies; a non-literal
+    // count reaches Sema as the literal's d2, is evaluated here and recorded
+    // for MirLower and the comptime evaluator (array_fill_counts). It used
+    // to fall back to ONE copy with no diagnostic, and a typed binding then
+    // read uninitialized tail elements.
+    mut fn array_fill_count(node: i32, count_node: i32) -> i32:
+        let count_ty = self.check_expr(count_node)
+        if count_ty == 0:
+            return -1
+        if self.get_type_kind(self.resolve_alias(count_ty)) != TypeKind.TY_INT:
+            self.emit_error("`[value; N]`: the count must be an integer, got `" ++ self.type_name(count_ty as i32) ++ "` (§4.3a)", count_node)
+            return -1
+        let value = unsafe { comptime_try_eval_expr(self as *mut Sema, self.ast, self.pool, count_node) }
+        if value.kind != ComptimeValueKind.CV_INT:
+            self.emit_error("`[value; N]`: the count is not a compile-time constant; N is an integer literal or a `const` (§4.3a)", count_node)
+            return -1
+        if value.data0 < 0 or value.data0 > 2147483647:
+            self.emit_error(f"`[value; N]`: the count {value.data0} is out of range (§4.3a)", count_node)
+            return -1
+        self.array_fill_counts.insert(node, value.data0 as i32)
+        value.data0 as i32
+
     mut fn check_array_literal(node: i32) -> i32:
         let extra_start = self.ast.get_data0(node)
         let elem_count = self.ast.get_data1(node)
+        let fill_count_node = self.ast.get_data2(node)
+        var array_len = elem_count
+        if fill_count_node != 0:
+            array_len = self.array_fill_count(node, fill_count_node)
+            if array_len < 0:
+                return 0
         var expected_elem = 0
         var target_ty = 0
         var target_base = 0
@@ -14072,6 +14101,19 @@ impl Sema:
                 self.mark_moved_if_consumed(elem)
 
         let elem_type = self.resolve_contextual_join(expected_elem, &elem_nodes, &elem_origins, &elem_types, &elem_roles, node, "sequence literal")
+        // A fill builds an array or a Vec (§4.3a); a set of N copies of one
+        // value is one element, never what was written.
+        if fill_count_node != 0 and target_base != 0 and target_base != self.syms.vec:
+            self.emit_error("`[value; N]` fills an array or a Vec, not a `" ++ self.pool_resolve(target_base) ++ "` (§4.3a)", node)
+            return 0
+        // #1478: a fixed-size destination has the literal's length or the
+        // program is wrong; typing the literal as the annotation regardless
+        // read uninitialized tail elements (`let b: [4]i32 = [7; N]`).
+        if target_ty != 0 and self.get_type_kind(self.resolve_alias(target_ty as TypeId)) == TypeKind.TY_ARRAY:
+            let expected_len = self.get_type_d1(self.resolve_alias(target_ty as TypeId))
+            if expected_len != array_len:
+                self.emit_error(f"array literal has {array_len} elements, but `" ++ self.type_name(target_ty) ++ f"` holds {expected_len} (§4.3a)", node)
+                return 0
         let result: TypeId = if target_ty != 0:
             target_ty as TypeId
         else if target_base != 0:
@@ -14082,7 +14124,7 @@ impl Sema:
             // Array types have no side-table payload: reuse the canonical type
             // so frozen MIR lowering sees the same pointee identity as a
             // spelled `&[N]T` parameter.
-            self.ensure_exact_type(TypeKind.TY_ARRAY, elem_type, elem_count, 0)
+            self.ensure_exact_type(TypeKind.TY_ARRAY, elem_type, array_len, 0)
         self.typed_expr_types.insert(node, result as i32)
         if target_base == self.syms.btreeset:
             let ord_trait = self.pool_lookup_symbol("Ord")

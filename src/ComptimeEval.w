@@ -6447,10 +6447,26 @@ impl ComptimeEvaluator:
 
     mut fn eval_array(node: i32) -> ComptimeControl:
         let extra_start = self.ast.get_data0(node)
-        let count = self.ast.get_data1(node)
+        var count = self.ast.get_data1(node)
+        // §4.3a (#1478): a `[value; N]` with a `const` count holds the one
+        // value; Sema evaluated N (array_fill_counts). Evaluating the value
+        // once per element is what the parser's literal-count desugar does.
+        let fill_count_node = self.ast.get_data2(node)
+        if fill_count_node != 0:
+            // A top-level `const A = [v; N]` is evaluated before its literal
+            // is checked, so the count is evaluated here when Sema has not.
+            if self.sema.array_fill_counts.contains(node):
+                count = self.sema.array_fill_counts.get(node).unwrap()
+            else:
+                var count_signal = self.eval_expr(fill_count_node)
+                if count_signal.kind != ComptimeControlKind.CTL_VALUE:
+                    return count_signal
+                if count_signal.value.kind != ComptimeValueKind.CV_INT or count_signal.value.data0 < 0:
+                    return self.fail(fill_count_node, "`[value; N]`: the count is not a compile-time integer constant (§4.3a)")
+                count = count_signal.value.data0 as i32
         let start = self.extra_values.len() as i32
         for i in 0..count:
-            var elem_signal = self.eval_expr(self.ast.get_extra(extra_start + i))
+            var elem_signal = self.eval_expr(self.ast.get_extra(extra_start + (if fill_count_node != 0: 0 else: i)))
             if elem_signal.kind != ComptimeControlKind.CTL_VALUE:
                 return elem_signal
             self.push_extra_value(move elem_signal.value)

@@ -717,6 +717,10 @@ pub fn render_expr(pool: AstPool, intern: InternPool, node: NodeId, indent: i32)
     if kind == NodeKind.NK_ARRAY_LIT:
         let extra_start = pool.get_data0(node)
         let count = pool.get_data1(node)
+        // §4.3a (#1478): a fill with a non-literal count holds v once and the
+        // count expression in d2.
+        if pool.get_data2(node) != 0:
+            return prefix ++ "[" ++ render_expr(pool, intern, (pool.get_extra(extra_start)) as NodeId, 0) ++ "; " ++ render_expr(pool, intern, (pool.get_data2(node)) as NodeId, 0) ++ "]"
         // The parser desugars `[v; N]` into N copies of v's one node; written
         // elements are distinct nodes. Printing the copies made the dump of
         // `[0 as u8; 16777216]` 150 MB (#1358).

@@ -803,6 +803,9 @@ impl ResolveState:
             let count = pool.get_data1(node)
             for i in 0..count:
                 self.walk_expr(pool, module_id, parent_def, current_scope, resolve_extra_or_zero(pool, start + i))
+            // §4.3a (#1478): a fill's count expression (`[v; N]`, d2) names a const.
+            if kind == NodeKind.NK_ARRAY_LIT and pool.get_data2(node) != 0:
+                self.walk_expr(pool, module_id, parent_def, current_scope, pool.get_data2(node))
             return
 
         if kind == NodeKind.NK_MAP_LIT:

@@ -2128,7 +2128,7 @@ impl AstPool:
 // NodeKind.NK_MATCH:         d0=subject(node), d1=extra_start, d2=arm_count
 // NodeKind.NK_MATCH_ARM:     d0=pattern(node), d1=body(node), d2=guard(node,0=none)
 // NodeKind.NK_TUPLE:         d0=extra_start, d1=elem_count, d2=0
-// NodeKind.NK_ARRAY_LIT:     d0=extra_start, d1=elem_count, d2=0
+// NodeKind.NK_ARRAY_LIT:     d0=extra_start, d1=elem_count, d2=fill count expr (0=written elements; §4.3a `[v; N]` with a non-literal N holds v once, #1478)
 // NodeKind.NK_ARRAY_COMPREHENSION: d0=expr(node), d1=extra_start, d2=clause_count
 //                   extra per clause: [binding(pattern or sym), iterable(node), filter(node,0=none)]
 // NodeKind.NK_MAP_COMPREHENSION: d0=extra_start, d1=clause_count, d2=0

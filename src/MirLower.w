@@ -6296,8 +6296,17 @@ impl MirBuilder:
             return self.lower_btree_seq_literal(node, elem_ty)
         let saved_expected = self.expected_type
         let args: Vec[i32] = Vec.new()
-        for i in 0..elem_count:
-            let elem_node = self.ast.get_extra(elem_start + i)
+        // §4.3a (#1478): a fill with a non-literal count holds its value
+        // once; Sema evaluated the count, and the Vec gets that many copies,
+        // each an evaluation of the value as the written form's are.
+        let fill_count_node = self.ast.get_data2(node)
+        var fill_count = elem_count
+        if fill_count_node != 0:
+            if not self.sema.array_fill_counts.contains(node):
+                sema_phase_bug(f"BUG: array fill count was not resolved by Sema: node={node}")
+            fill_count = self.sema.array_fill_counts.get(node).unwrap()
+        for i in 0..fill_count:
+            let elem_node = self.ast.get_extra(elem_start + (if fill_count_node != 0: 0 else: i))
             if elem_ty != 0:
                 self.expected_type = elem_ty
             args.push(self.lower_expr(elem_node))
@@ -16473,22 +16482,33 @@ impl MirBuilder:
             if collection_op >= 0:
                 return collection_op
             let extra_start = self.ast.get_data0(node)
-            let elem_count = self.ast.get_data1(node)
-            if elem_count > 64:
-                let first_node = self.ast.get_extra(extra_start)
-                var is_fill = true
+            // §4.3a (#1478): a fill with a non-literal count holds its value
+            // once (d1 = 1); Sema evaluated the count (array_fill_counts).
+            let fill_count_node = self.ast.get_data2(node)
+            var elem_count = self.ast.get_data1(node)
+            if fill_count_node != 0:
+                if not self.sema.array_fill_counts.contains(node):
+                    sema_phase_bug(f"BUG: array fill count was not resolved by Sema: node={node}")
+                elem_count = self.sema.array_fill_counts.get(node).unwrap()
+            let first_node = self.ast.get_extra(extra_start)
+            var is_fill = fill_count_node != 0
+            if not is_fill and elem_count > 64:
+                is_fill = true
                 for fi in 1..elem_count:
                     if self.ast.get_extra(extra_start + fi) != first_node:
                         is_fill = false
                         break
-                if is_fill:
-                    let fill_op = self.lower_expr(first_node)
-                    let fill_rv = self.body.new_rvalue(RvalueKind.RK_ARRAY_FILL, fill_op, elem_count, 0)
-                    let fill_ty = self.expr_type(node)
-                    let fill_tmp = self.new_temp(fill_ty)
-                    let fill_place = self.place_for_local(fill_tmp)
-                    self.body.push_stmt(self.cur_bb, StmtKind.Assign, fill_place, fill_rv, self.ast.get_start(node))
-                    return self.body.new_operand(OperandKind.OK_COPY, fill_place)
+            // A Copy fill is one evaluation copied N times; a non-Copy value
+            // is evaluated once per element, as the written form is (over 64
+            // copies the fill rvalue stands, as before).
+            if is_fill and (elem_count > 64 or self.sema.is_copy_frozen(self.expr_type(first_node)) != 0):
+                let fill_op = self.lower_expr(first_node)
+                let fill_rv = self.body.new_rvalue(RvalueKind.RK_ARRAY_FILL, fill_op, elem_count, 0)
+                let fill_ty = self.expr_type(node)
+                let fill_tmp = self.new_temp(fill_ty)
+                let fill_place = self.place_for_local(fill_tmp)
+                self.body.push_stmt(self.cur_bb, StmtKind.Assign, fill_place, fill_rv, self.ast.get_start(node))
+                return self.body.new_operand(OperandKind.OK_COPY, fill_place)
             let arr_fields: Vec[i32] = Vec.new()
             let arr_names: Vec[i32] = Vec.new()
             // #586: elements lower under the ARRAY'S ELEMENT type, not the ambient
@@ -16512,7 +16532,7 @@ impl MirBuilder:
                 if arr_lit_kind == TypeKind.TY_ARRAY or arr_lit_kind == TypeKind.TY_SLICE:
                     arr_elem_expected = self.sema.get_type_d0(arr_lit_resolved)
             for i in 0..elem_count:
-                let elem_node = self.ast.get_extra(extra_start + i)
+                let elem_node = self.ast.get_extra(extra_start + (if fill_count_node != 0: 0 else: i))
                 if arr_elem_expected != 0:
                     self.expected_type = arr_elem_expected
                 let arr_elem_op = self.lower_expr(elem_node)

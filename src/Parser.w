@@ -8047,21 +8047,23 @@ impl Parser:
                 self.advance()  // consume ;
                 let count_expr = self.parse_expr()
                 self.expect(TokenKind.TK_R_BRACKET)
-                // Desugar [value; N] to NodeKind.NK_ARRAY_LIT with N copies of value.
-                // The count is read here, so only an integer literal is known;
-                // a `const` or expression count (§4.3a) is refused loudly
-                // until the fill is a node Sema evaluates (#1478): it used to
-                // fall back to ONE copy, and a typed binding then read
-                // uninitialized tail elements.
+                // Desugar [value; N] to NodeKind.NK_ARRAY_LIT with N copies of value
+                // when N is an integer literal. Any other count (§4.3a: a
+                // `const`, or an expression of them) is kept as the literal's
+                // d2 with the value held once; Sema evaluates it
+                // (array_fill_count) and MirLower and the comptime evaluator
+                // read the count from Sema (#1478: it used to fall back to
+                // ONE copy silently, and a typed binding then read
+                // uninitialized tail elements).
                 var fill_count = -1
                 if self.pool.kind(count_expr) == NodeKind.NK_INT_LIT:
                     let fast = self.pool.int_literal_fast_i64(count_expr)
                     if fast.ok != 0 and fast.value >= 0:
                         fill_count = fast.value as i32
-                if fill_count < 0:
-                    self.emit_error_span("`[value; N]` needs an integer literal count; a `const` or expression count is not evaluated here yet (#1478)", self.pool.get_start(count_expr), self.prev_end())
-                    return self.poisoned_expr()
                 let extra_start = self.pool.extra_len()
+                if fill_count < 0:
+                    self.pool.add_extra(first as i32)
+                    return self.pool.add_node(NodeKind.NK_ARRAY_LIT, start, self.prev_end(), extra_start, 1, count_expr as i32)
                 for fi in 0..fill_count:
                     self.pool.add_extra(first as i32)
                 return self.pool.add_node(NodeKind.NK_ARRAY_LIT, start, self.prev_end(), extra_start, fill_count, 0)
