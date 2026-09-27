@@ -328,6 +328,24 @@ pub fn pack_type_decl_kind(sub_kind: i32, is_ephemeral: i32) -> i32:
 pub fn type_decl_sub_kind(packed: i32) -> i32:
     packed % TDK_FLAG_EPHEMERAL
 
+// An enum declaration's variants in its extras (§4.4a): a plain enum's are
+// `[count, (name, pcount, payloads...)*]`, a discriminant enum's
+// `[repr, count, (name, disc, pcount, payloads...)*]`; both end with
+// `vis, tp_start, tp_count`. One walk serves both: a walker that knew only
+// the plain layout left a generic discriminant enum's payloads unresolved
+// (#1768).
+pub fn type_decl_is_enum(sub_kind: i32) -> bool:
+    sub_kind == TypeDeclKind.Enum or sub_kind == TypeDeclKind.DiscEnum
+
+// The extras index of the variant count.
+pub fn enum_decl_count_index(sub_kind: i32, extra_start: i32) -> i32:
+    if sub_kind == TypeDeclKind.DiscEnum: extra_start + 1 else: extra_start
+
+// The slots before a variant's payload count: its name, plus its
+// discriminant node in a discriminant enum.
+pub fn enum_decl_variant_head(sub_kind: i32) -> i32:
+    if sub_kind == TypeDeclKind.DiscEnum: 2 else: 1
+
 pub fn type_decl_is_ephemeral(packed: i32) -> i32:
     (packed / TDK_FLAG_EPHEMERAL) % 2
 

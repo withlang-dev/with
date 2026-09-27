@@ -15549,19 +15549,20 @@ impl Sema:
             return 0
 
         let extra_start = self.ast.get_data1(td_node)
-        let td_packed = self.ast.get_data2(td_node)
-        if type_decl_sub_kind(td_packed) != TypeDeclKind.Enum:
+        let td_sub_kind = type_decl_sub_kind(self.ast.get_data2(td_node))
+        if not type_decl_is_enum(td_sub_kind):
             return 0
 
         let inferred_args: Vec[i32] = Vec.new()
         for _ in 0..tp_count:
             inferred_args.push(0)
 
-        let variant_count = self.ast.get_extra(extra_start)
-        var pos = extra_start + 1
+        let count_index = enum_decl_count_index(td_sub_kind, extra_start)
+        let variant_count = self.ast.get_extra(count_index)
+        var pos = count_index + 1
         for _ in 0..variant_count:
             let name_sym = self.ast.get_extra(pos)
-            pos = pos + 1
+            pos = pos + enum_decl_variant_head(td_sub_kind)
             let payload_count = self.ast.get_extra(pos)
             pos = pos + 1
             if name_sym == variant_sym:
@@ -15607,27 +15608,19 @@ impl Sema:
         // Walk AST type decl to find variant and re-resolve payload type nodes
         let td_node: i32 = self.type_decl_nodes.get(base_sym).unwrap()
         let td_extra_start = self.ast.get_data1(td_node)
-        let td_packed = self.ast.get_data2(td_node)
-        let td_sub_kind = type_decl_sub_kind(td_packed)
-        if td_sub_kind != TypeDeclKind.Enum:
+        let td_sub_kind = type_decl_sub_kind(self.ast.get_data2(td_node))
+        if not type_decl_is_enum(td_sub_kind):
             self.generic_subst_param_syms = saved_payload_subst_syms
             self.generic_subst_type_ids = saved_payload_subst_tys
             return result
-        // Get type param info for resolve_generic_return_type_node
-        let vc = self.ast.get_extra(td_extra_start)
-        var tp_epos = td_extra_start + 1
-        for tvi in 0..vc:
-            tp_epos = tp_epos + 1
-            let tpc = self.ast.get_extra(tp_epos)
-            tp_epos = tp_epos + 1
-            tp_epos = tp_epos + tpc
-        let tp_start = self.ast.get_extra(tp_epos + 1)
-        let tp_count = self.ast.get_extra(tp_epos + 2)
-        // Now walk variants again to find the matching one
-        var epos = td_extra_start + 1
+        let tp_start = self.type_decl_tp_start(td_node)
+        let tp_count = self.type_decl_tp_count(td_node)
+        let count_index = enum_decl_count_index(td_sub_kind, td_extra_start)
+        let vc = self.ast.get_extra(count_index)
+        var epos = count_index + 1
         for vi in 0..vc:
             let v_name = self.ast.get_extra(epos)
-            epos = epos + 1
+            epos = epos + enum_decl_variant_head(td_sub_kind)
             let pc = self.ast.get_extra(epos)
             epos = epos + 1
             if v_name == variant_name:
@@ -24069,29 +24062,8 @@ impl Sema:
         let td_node: i32 = self.type_decl_nodes.get(decl_sym).unwrap()
         let td_extra_start = self.ast.get_data1(td_node)
         let td_packed = self.ast.get_data2(td_node)
-        let td_sub_kind = type_decl_sub_kind(td_packed)
-        var td_tp_start = 0
-        var td_tp_count = 0
-        if td_sub_kind == TypeDeclKind.Struct:
-            let fc = self.ast.get_extra(td_extra_start)
-            let after = td_extra_start + 1 + fc * 4
-            td_tp_start = self.ast.get_extra(after + 1)
-            td_tp_count = self.ast.get_extra(after + 2)
-        else if td_sub_kind == TypeDeclKind.Alias or td_sub_kind == TypeDeclKind.Distinct:
-            td_tp_start = self.ast.get_extra(td_extra_start + 2)
-            td_tp_count = self.ast.get_extra(td_extra_start + 3)
-        else if td_sub_kind == TypeDeclKind.Enum:
-            // For enum: extra=[variant_count, [var_name, payload_count, payload_type...]*, vis, tp_start, tp_count]
-            let vc = self.ast.get_extra(td_extra_start)
-            var epos = td_extra_start + 1
-            for vi in 0..vc:
-                epos = epos + 1  // var_name
-                let pc = self.ast.get_extra(epos)
-                epos = epos + 1  // payload_count
-                epos = epos + pc  // skip payload type nodes
-            // epos now points at vis
-            td_tp_start = self.ast.get_extra(epos + 1)
-            td_tp_count = self.ast.get_extra(epos + 2)
+        let td_tp_start = self.type_decl_tp_start(td_node)
+        let td_tp_count = self.type_decl_tp_count(td_node)
         if td_tp_count == 0:
             return 0
         let gi_arg_count = self.get_generic_inst_arg_count(gi_tid)
@@ -24134,31 +24106,8 @@ impl Sema:
                 if meta >= 0:
                     let ret_node = self.ast.fn_meta_ret(meta)
                     if ret_node != 0:
-                        let td_node = self.type_decl_nodes.get(type_sym).unwrap()
-                        let td_extra_start = self.ast.get_data1(td_node)
-                        let td_packed = self.ast.get_data2(td_node)
-                        let td_sub_kind = type_decl_sub_kind(td_packed)
-                        var td_tp_start = 0
-                        var td_tp_count = 0
-                        if td_sub_kind == TypeDeclKind.Struct:
-                            let fc = self.ast.get_extra(td_extra_start)
-                            let after = td_extra_start + 1 + fc * 4
-                            td_tp_start = self.ast.get_extra(after + 1)
-                            td_tp_count = self.ast.get_extra(after + 2)
-                        else if td_sub_kind == TypeDeclKind.Alias or td_sub_kind == TypeDeclKind.Distinct:
-                            td_tp_start = self.ast.get_extra(td_extra_start + 2)
-                            td_tp_count = self.ast.get_extra(td_extra_start + 3)
-                        else if td_sub_kind == TypeDeclKind.Enum:
-                            let vc = self.ast.get_extra(td_extra_start)
-                            var epos = td_extra_start + 1
-                            for vi in 0..vc:
-                                epos = epos + 1
-                                let pc = self.ast.get_extra(epos)
-                                epos = epos + 1
-                                epos = epos + pc
-                            td_tp_start = self.ast.get_extra(epos + 1)
-                            td_tp_count = self.ast.get_extra(epos + 2)
-                        out = self.resolve_generic_return_type_node(ret_node, td_tp_start, td_tp_count)
+                        let td_node: i32 = self.type_decl_nodes.get(type_sym).unwrap()
+                        out = self.resolve_generic_return_type_node(ret_node, self.type_decl_tp_start(td_node), self.type_decl_tp_count(td_node))
         self.generic_subst_param_syms = saved_subst_syms
         self.generic_subst_type_ids = saved_subst_tys
         out

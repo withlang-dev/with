@@ -1841,19 +1841,16 @@ impl Parser:
             self.pending_inferred_disc_repr = 0
             // §4.4a (#1482): an @[flags] enum with no representation type
             // doubles in its default integer representation, so it is a
-            // discriminant enum with the inferred i32 even with payloads. A
-            // generic one with a payload variant cannot be yet (#1768).
+            // discriminant enum with the inferred i32 even with payloads.
             let flags = self.pending_flags != 0
             if use_block_body != 0:
-                extra_start = self.parse_enum_variants_block(flags, tp_count > 0)
+                extra_start = self.parse_enum_variants_block(flags)
             else:
-                extra_start = self.parse_enum_variants_braced(flags, tp_count > 0)
+                extra_start = self.parse_enum_variants_braced(flags)
             // A fieldless backing-less enum infers an i32 backing (#309): the
             // variant parser emitted disc-enum format and recorded the backing.
             if self.pending_inferred_disc_repr != 0:
                 sub_kind = TypeDeclKind.DiscEnum
-            else if self.pending_flags != 0:
-                self.emit_error("@[flags] cannot double the discriminants of a generic enum with a payload variant: a generic discriminant enum's payloads are not supported yet (#1768); give it no payload, or drop @[flags]")
 
         self.pool.add_extra(is_pub)
         self.pool.add_extra(tp_start)
@@ -2159,8 +2156,8 @@ impl Parser:
         extra_start
 
     // A braced backing-less enum body: a plain ADT enum, or a discriminant
-    // enum under @[flags] (#1482; a generic one only when fieldless, #1768).
-    mut fn parse_enum_variants_braced(flags: bool, generic: bool) -> i32:
+    // enum under @[flags] (#1482).
+    mut fn parse_enum_variants_braced(flags: bool) -> i32:
         self.pending_inferred_disc_repr = 0
         let synth_pos = self.current_start()
         self.advance()
@@ -2213,15 +2210,15 @@ impl Parser:
             else if self.peek() == TokenKind.TK_IDENT:
                 continue
         self.expect(TokenKind.TK_R_BRACE)
-        self.add_backingless_enum_extras(flags and (not has_payload or not generic), synth_pos, &names, &discs, &pcounts, &payloads_flat)
+        self.add_backingless_enum_extras(flags, synth_pos, &names, &discs, &pcounts, &payloads_flat)
 
-    mut fn parse_enum_variants_block(flags: bool, generic: bool) -> i32:
+    mut fn parse_enum_variants_block(flags: bool) -> i32:
         // Parses a backing-less enum body. Collects each variant's name, payloads,
         // and an optional explicit discriminant (the value node; Sema computes
         // the auto-incremented ones). A fieldless enum infers an i32 backing
-        // (#309), and so does an @[flags] one with payloads (#1482; not a
-        // generic one yet, #1768): it is a discriminant enum. With payloads
-        // and no @[flags] it stays a plain ADT enum.
+        // (#309), and so does an @[flags] one with payloads (#1482): it is a
+        // discriminant enum. With payloads and no @[flags] it stays a plain
+        // ADT enum.
         self.pending_inferred_disc_repr = 0
         let synth_pos = self.current_start()
         var names: Vec[i32] = Vec.new()
@@ -2285,7 +2282,7 @@ impl Parser:
             if next_col != variant_col:
                 break
 
-        self.add_backingless_enum_extras(not has_payload or (flags and not generic), synth_pos, &names, &discs, &pcounts, &payloads_flat)
+        self.add_backingless_enum_extras(not has_payload or flags, synth_pos, &names, &discs, &pcounts, &payloads_flat)
 
     // §4.4a: an explicit discriminant `= N` / `= -N` is an integer literal;
     // Sema evaluates it against the repr and computes the auto-incremented

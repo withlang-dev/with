@@ -2560,25 +2560,7 @@ impl Sema:
     fn type_decl_type_param_count(type_name: i32) -> i32:
         if not self.type_decl_nodes.contains(type_name):
             return 0
-        let td_node = self.type_decl_nodes.get(type_name).unwrap()
-        let td_extra_start = self.ast.get_data1(td_node)
-        let td_packed = self.ast.get_data2(td_node)
-        let td_sub_kind = type_decl_sub_kind(td_packed)
-        if td_sub_kind == TypeDeclKind.Struct:
-            let field_count = self.ast.get_extra(td_extra_start)
-            let after_fields = td_extra_start + 1 + field_count * 4
-            return self.ast.get_extra(after_fields + 2)
-        if td_sub_kind == TypeDeclKind.Alias or td_sub_kind == TypeDeclKind.Distinct:
-            return self.ast.get_extra(td_extra_start + 3)
-        if td_sub_kind == TypeDeclKind.Enum:
-            let variant_count = self.ast.get_extra(td_extra_start)
-            var epos = td_extra_start + 1
-            for vi in 0..variant_count:
-                epos = epos + 1
-                let payload_count = self.ast.get_extra(epos)
-                epos = epos + 1 + payload_count
-            return self.ast.get_extra(epos + 2)
-        0
+        self.type_decl_tp_count(self.type_decl_nodes.get(type_name).unwrap())
 
     // Check if a new direct impl overlaps with any existing blanket impl
     mut fn check_direct_overlap(type_name: i32, trait_sym: i32, node: i32):

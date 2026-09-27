@@ -1,10 +1,10 @@
-//! expect-check-fail: @[flags] cannot double the discriminants of a generic enum with a payload variant
+//! expect-stdout: 4
+//! expect-stdout: 2
 
 // D71 / §4.4a (#1482): an `@[flags]` enum with no representation type
 // doubles in its default integer representation, and the attribute is never
-// ignored. A generic enum with a payload variant cannot be a discriminant
-// enum yet (#1768: its payload type reaches MIR unresolved), so the
-// attribute is refused, not dropped — it was silently ignored (tags 0 1 2).
+// ignored. A generic one with a payload variant was refused until its
+// payloads resolved (#1768); it doubles like any other.
 
 @[flags]
 enum Slot[T]:
@@ -16,3 +16,4 @@ fn bits(s: Slot[i32]) -> i32: s as i32
 
 fn main:
     print(bits(Slot.Gone))
+    print(bits(Slot.Full(7)))
