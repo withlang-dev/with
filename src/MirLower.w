@@ -7780,7 +7780,7 @@ impl MirBuilder:
         let join_bb = child.new_block()
         if clause_filter != 0:
             let pass_bb = child.new_block()
-            let cond_op = child.lower_expr(clause_filter)
+            let cond_op = child.lower_comprehension_filter(clause_filter)
             let vals: Vec[i64] = Vec.new()
             vals.push(1)
             let targets: Vec[i32] = Vec.new()
@@ -8061,6 +8061,24 @@ impl MirBuilder:
             let item_op = self.body.new_operand(OperandKind.OK_COPY, item_place)
             self.assign_operand_to_place(bind_place, item_op, self.ast.get_start(span_node))
 
+    // D33/#912: a value a comprehension stores in its output (a Vec or set
+    // element, a map key or value) MOVES there, and the move is REGISTERED
+    // (consume_moved_operand) so the per-iteration scope drop's moved-skip
+    // and the reset-on-move blank protect what the output now owns — a bare
+    // by-value Drop binding (reachable through consuming/generic iteration;
+    // views demand a clone at check) and an owned temporary alike. lower_expr
+    // may already produce the OK_MOVE (Sema's owned demand) without
+    // registering it — register either way.
+    mut fn move_into_comprehension_output(op: i32, ty: i32) -> i32:
+        if ty <= 0 or self.sema.is_copy_frozen(ty) != 0:
+            return op
+        var moved = op
+        if self.body.operand_kinds[moved] == OperandKind.OK_COPY:
+            moved = self.body.new_operand(OperandKind.OK_MOVE, self.body.operand_d0[moved])
+        if self.body.operand_kinds[moved] == OperandKind.OK_MOVE:
+            self.consume_moved_operand(moved)
+        moved
+
     mut fn lower_comprehension_leaf(comp_node: i32, out_place: i32, out_elem_ty: i32):
         if self.ast.kind(comp_node) == NodeKind.NK_MAP_COMPREHENSION:
             let comp_start = self.ast.get_data0(comp_node)
@@ -8076,12 +8094,18 @@ impl MirBuilder:
             let saved_expected2 = self.expected_type
             if key_ty > 0:
                 self.expected_type = key_ty
-            let key_op = self.lower_expr(key_expr)
+            // #1736: the key and the value move into the map as an element
+            // moves into a Vec. Left unregistered, the last iteration's
+            // `f"k{i}"` key was also dropped at the comprehension's end —
+            // the map freed it again (DOUBLE FREE).
+            let key_raw = self.lower_expr(key_expr)
+            let key_op = self.move_into_comprehension_output(key_raw, key_ty)
             if val_ty > 0:
                 self.expected_type = val_ty
             else:
                 self.expected_type = saved_expected2
-            let val_op = self.lower_expr(val_expr)
+            let val_raw = self.lower_expr(val_expr)
+            let val_op = self.move_into_comprehension_output(val_raw, val_ty)
             self.expected_type = saved_expected2
             let target_base = self.literal_target_base_sym(target_ty)
             if self.is_btreemap_base_sym(target_base) != 0:
@@ -8097,20 +8121,9 @@ impl MirBuilder:
         let saved_expected = self.expected_type
         if out_elem_ty > 0 and out_elem_ty != self.sema.ty_void:
             self.expected_type = out_elem_ty
-        var elem_op = self.lower_expr(expr)
+        let elem_raw = self.lower_expr(expr)
+        let elem_op = self.move_into_comprehension_output(elem_raw, out_elem_ty)
         self.expected_type = saved_expected
-        // D33/#912: a bare by-value Drop binding as the result expr (only
-        // reachable through consuming/generic iteration — views demand clone
-        // at check) must MOVE into the output, and the move must be
-        // REGISTERED (consume_moved_operand) so the per-iteration scope
-        // drop's moved-skip and reset-on-move blank protect what the output
-        // now owns. lower_expr may already produce the OK_MOVE (sema's owned
-        // demand) without registering it — register either way.
-        if out_elem_ty > 0 and self.sema.is_copy_frozen(out_elem_ty) == 0:
-            if self.body.operand_kinds[elem_op] == OperandKind.OK_COPY:
-                elem_op = self.body.new_operand(OperandKind.OK_MOVE, self.body.operand_d0[elem_op])
-            if self.body.operand_kinds[elem_op] == OperandKind.OK_MOVE:
-                self.consume_moved_operand(elem_op)
         let comp_ty = self.expr_type(comp_node)
         let target_base = self.literal_target_base_sym(comp_ty)
         if self.is_btreeset_base_sym(target_base) != 0:
@@ -8142,13 +8155,32 @@ impl MirBuilder:
             return
         self.lower_comprehension_clause(comp_node, clause_index, out_place, out_elem_ty)
 
+    // #1736: a filter is evaluated once per iteration, so its temporaries
+    // drop in the iteration, before the branch (lower_if's condition
+    // frame). Registered in the enclosing statement's frame, every
+    // iteration's temporary but the last leaked: `f"{i}" != "1"`.
+    mut fn lower_comprehension_filter(filter: i32) -> i32:
+        let frame = self.push_stmt_temp_frame()
+        let cond_op = self.lower_expr(filter)
+        self.finish_stmt_temp_frame(frame)
+        cond_op
+
+    // The rest of one iteration — the next clause, or the element pushed
+    // into the output — as one statement: its temporaries drop in the
+    // iteration (#1736: each `f"a{i}"`'s formatted `i` leaked but the
+    // last), and its reset-on-move flush blanks what the push took.
+    mut fn lower_comprehension_iteration(comp_node: i32, clause_index: i32, out_place: i32, out_elem_ty: i32):
+        let frame = self.push_stmt_temp_frame()
+        self.lower_comprehension_next_or_push(comp_node, clause_index + 1, out_place, out_elem_ty)
+        self.finish_stmt_temp_frame(frame)
+
     mut fn lower_comprehension_body(comp_node: i32, clause_index: i32, out_place: i32, out_elem_ty: i32, continue_bb: i32):
         let comp_start = self.comprehension_clause_start(comp_node)
         let filter = self.ast.get_extra(comp_start + clause_index * 3 + 2)
         if filter != 0:
             let pass_bb = self.new_block()
             let skip_bb = self.new_block()
-            let cond_op = self.lower_expr(filter)
+            let cond_op = self.lower_comprehension_filter(filter)
             let vals: Vec[i64] = Vec.new()
             vals.push(1)
             let targets: Vec[i32] = Vec.new()
@@ -8156,15 +8188,24 @@ impl MirBuilder:
             let table = self.body.new_switch_table(vals, targets)
             self.terminate(TermKind.TK_SWITCH_INT, cond_op, table, skip_bb, 0)
 
+            // The pass branch is one arm of the filter (#1501, as in
+            // lower_comprehension_generic_iter): what it moves is moved on
+            // that path only, and its resets are flushed inside the arm.
             self.switch_to(pass_bb)
-            self.lower_comprehension_next_or_push(comp_node, clause_index + 1, out_place, out_elem_ty)
+            let pass_move_state = self.save_move_state()
+            let pass_reset_start = self.pending_reset_locals.len() as i32
+            let pass_reset_field_start = self.pending_reset_field_places.len() as i32
+            let pass_move_temp_start = self.pending_move_temp_locals.len() as i32
+            self.lower_comprehension_iteration(comp_node, clause_index, out_place, out_elem_ty)
+            self.flush_pending_resets_since(pass_reset_start, pass_reset_field_start, pass_move_temp_start)
             self.terminate(TermKind.TK_GOTO, continue_bb, 0, 0, 0)
+            self.restore_move_state(&pass_move_state)
 
             self.switch_to(skip_bb)
             self.terminate(TermKind.TK_GOTO, continue_bb, 0, 0, 0)
             return
 
-        self.lower_comprehension_next_or_push(comp_node, clause_index + 1, out_place, out_elem_ty)
+        self.lower_comprehension_iteration(comp_node, clause_index, out_place, out_elem_ty)
         self.terminate(TermKind.TK_GOTO, continue_bb, 0, 0, 0)
 
     mut fn lower_comprehension_range_var(comp_node: i32, clause_index: i32, out_place: i32, out_elem_ty: i32, pat_or_sym: i32, iter_expr: i32, range_ty: i32):
@@ -8348,6 +8389,9 @@ impl MirBuilder:
         else:
             let iter_op = self.lower_expr(iter_expr)
             vec_place = self.materialize_operand(iter_op, iter_ty, self.ast.get_start(iter_expr))
+        // A &Vec[T] receiver reads through one deref (lower_for_iter_ref).
+        if self.sema.get_type_kind(self.sema.resolve_alias(iter_ty)) == TypeKind.TY_REF:
+            vec_place = self.new_deref_place(vec_place)
         let elem_is_view = self.sema.get_type_kind(self.sema.resolve_alias(elem_ty)) == TypeKind.TY_REF
 
         let len_local = self.new_temp(self.sema.ty_i64)
@@ -8488,7 +8532,7 @@ impl MirBuilder:
         let iter_join_bb = self.new_block()
         if clause_filter != 0:
             let pass_bb = self.new_block()
-            let cond_op = self.lower_expr(clause_filter)
+            let cond_op = self.lower_comprehension_filter(clause_filter)
             let fvals: Vec[i64] = Vec.new()
             fvals.push(1)
             let ftargets: Vec[i32] = Vec.new()
@@ -8546,7 +8590,12 @@ impl MirBuilder:
                 self.lower_comprehension_range_var(comp_node, clause_index, out_place, out_elem_ty, pat_or_sym, iter_expr, range_resolved)
                 return
 
-            let resolved = self.sema.resolve_alias(iter_ty)
+            // A sequence reached through a reference (`ws: &Vec[str]`, a
+            // `&[T]` parameter) is traversed like the sequence itself, as a
+            // `for` does (lower_for_iter_ref, lower_sequence_place). #1736:
+            // `[f(w) for w in ws]` over a `&Vec` parameter fell through to
+            // the generic iterator path and failed MIR lowering.
+            let resolved = self.sema.resolve_alias(self.sequence_iter_type(iter_expr))
             let tk = self.sema.get_type_kind(resolved)
             if tk == TypeKind.TY_SLICE or tk == TypeKind.TY_ARRAY:
                 self.lower_comprehension_slice(comp_node, clause_index, out_place, out_elem_ty, pat_or_sym, iter_expr)
