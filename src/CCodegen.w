@@ -3631,6 +3631,25 @@ impl CCodegen:
                 out = out ++ self.operand_text(body, body.agg_field_operands[(start + i)])
         out ++ cc_rbrace()
 
+    // An array of arrays built from its rows (pcre2's `[[u8; 21]; 17]`
+    // tables): a row is a C array, which no initializer list takes by name,
+    // so each row is copied into a temporary and the temporary into the
+    // destination. "" when the rvalue is not such an aggregate.
+    mut fn aggregate_nested_array_assignment(body: &MirBody, rval_id: i32, dst_tid: i32, dst_place: &str) -> str:
+        if rval_id < 0 or rval_id >= body.rval_kinds.len() as i32 or body.rval_kinds[rval_id] != RvalueKind.RK_AGGREGATE:
+            return ""
+        let elem_tid = self.sema.get_type_d0(self.sema.resolve_alias(dst_tid))
+        if self.sema.get_type_kind(self.sema.resolve_alias(elem_tid as TypeId)) != TypeKind.TY_ARRAY:
+            return ""
+        let fields_id = body.rval_d1[rval_id]
+        if fields_id < 0 or fields_id >= body.agg_field_starts.len() as i32:
+            return ""
+        let start = body.agg_field_starts[fields_id]
+        var out = "    " ++ cc_lbrace() ++ " " ++ self.c_decl(dst_tid, "__with_arr_tmp") ++ ";"
+        for i in 0..body.agg_field_counts[fields_id]:
+            out = out ++ f" memcpy(__with_arr_tmp[{i}], " ++ self.operand_text(body, body.agg_field_operands[(start + i)]) ++ f", sizeof(__with_arr_tmp[{i}]));"
+        out ++ " memcpy(" ++ dst_place ++ ", __with_arr_tmp, sizeof(" ++ dst_place ++ ")); " ++ cc_rbrace()
+
     mut fn aggregate_struct_assignment_with_array_fields(body: &MirBody, rval_id: i32, dst_tid: i32, dst_place: &str) -> str:
         if rval_id < 0 or rval_id >= body.rval_kinds.len() as i32:
             return ""
@@ -8277,6 +8296,9 @@ impl CCodegen:
             if dst_tk == TypeKind.TY_ARRAY:
                 if rval == "0" or rval == "0LL":
                     return "    memset(" ++ dst_place ++ ", 0, sizeof(" ++ dst_place ++ "));"
+                let nested = self.aggregate_nested_array_assignment(body, d1, dst_tid, dst_place)
+                if nested.len() > 0:
+                    return nested
                 let arr_init = self.aggregate_array_initializer(body, d1)
                 if arr_init.len() > 0:
                     return "    " ++ cc_lbrace() ++ " " ++ self.c_decl(dst_tid, "__with_arr_tmp") ++ " = " ++ arr_init ++ "; memcpy(" ++ dst_place ++ ", __with_arr_tmp, sizeof(" ++ dst_place ++ ")); " ++ cc_rbrace()
