@@ -12526,7 +12526,7 @@ impl MirBuilder:
             recv_type = self.type_receiver_type(self_expr)
         if recv_type == 0 or recv_type == self.sema.ty_void:
             // Fall back to call's return type for static constructors (Vec.new())
-                let ret_type = self.method_call_result_type(node)
+            let ret_type = self.method_call_result_type(node)
             let ret_name_sym = self.sema.get_type_name(ret_type)
             if self.ast.kind(self_expr) == NodeKind.NK_IDENT:
                 let type_sym = self.ast.get_data0(self_expr)
