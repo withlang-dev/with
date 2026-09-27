@@ -8353,6 +8353,18 @@ impl Parser:
             if next_col < block_col:
                 self.pos = save
                 break
+            // §29.13 Form 2: a block's statements share its column. A line
+            // deeper than it was taken as its next statement without a word
+            // (#1781): a dedent to a level no enclosing block has (an `if`
+            // body at 12, its next line at 8, `main` at 4) silently joined
+            // the OUTER block, so the line ran with the `if` false, reading a
+            // binding from the arm that never ran. Report it; the line is
+            // still parsed here so the error names it and not what follows.
+            if next_col > block_col:
+                let bad_start = self.current_start()
+                var diag = Diagnostic.err(f"unexpected indentation: this line is indented to column {next_col}, which is no enclosing block's indentation (the block here starts at column {block_col})", Span { file: self.file_id, start: bad_start, end: self.current_end() })
+                diag.add_help("a block's statements all start at its column; a line indented deeper than the statement before it belongs to a body that statement opens with ':' at the end of its line (§29.13)")
+                self.diags.emit(move diag)
 
             stmts.push(last_expr as i32)
             last_expr = self.parse_expr()
