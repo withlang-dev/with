@@ -1931,6 +1931,7 @@ impl Zcu:
         pool = self.apply_convention_profiles_frontend(pool)
         pool = self.render_c_facades_frontend(pool)
         self.displace_colliding_globals(pool)
+        self.displace_c_import_wrappers(pool)
         if do_profile:
             let cimport_ns = runtime_clock_nanos() - t_cimport
             runtime_eprint(f"[profile] frontend.c_import  {cimport_ns / 1000000}.{(cimport_ns % 1000000) / 1000} ms")
@@ -2310,6 +2311,39 @@ impl Zcu:
                     taken.insert(name, frontend_owned_text(owner))
                 else if taken.get(name).unwrap() != owner:
                     frontend_displace_fn_decl(pool, self.pool, decl, owner)
+
+    // #1663: a c_import's modeled wrapper — the safe `fn` CImport renders
+    // over a renamed raw extern for a curated contract (#379: `memchr(__s:
+    // []u8, __c)`) — has its C function's name, and another module may
+    // declare that function as an extern of its own (std.re.defs's `memchr`,
+    // which pcre2_match calls with a pointer and a length). They are two
+    // With declarations with two signatures, not one C symbol declared
+    // twice, but the flat function table held one of them — the wrapper —
+    // and pcre2_match's calls bound to the importer's wrapper. The wrapper is
+    // displaced to its importer's module-qualified identity and the extern
+    // keeps the flat name; Sema binds each module's calls by §18.2
+    // precedence (resolve_displaced_fn_ident: the importer's to its wrapper,
+    // std.re's to its own import).
+    fn displace_c_import_wrappers(pool: AstPool):
+        var extern_names: Vec[i32] = Vec.new()
+        var extern_paths: Vec[str] = Vec.new()
+        for di in 0..pool.decl_count():
+            let decl = pool.get_decl(di) as i32
+            if pool.kind(decl) == NodeKind.NK_EXTERN_FN:
+                extern_names.push(pool.get_data0(decl))
+                extern_paths.push(self.decl_source_path_frontend(di))
+        for di in 0..pool.decl_count():
+            let decl = pool.get_decl(di) as i32
+            if di >= self.decl_is_c_import.len() as i32 or self.decl_is_c_import[di] == 0:
+                continue
+            if not frontend_fn_decl_is_displaceable(pool, self.pool, decl) or frontend_fn_decl_is_method(pool, self.pool, decl):
+                continue
+            let name = pool.get_data0(decl)
+            let path = self.decl_source_path_frontend(di)
+            for e in 0..extern_names.len() as i32:
+                if extern_names[e] == name and extern_paths[e] != path:
+                    frontend_displace_fn_decl(pool, self.pool, decl, path)
+                    break
 
     mut fn parse_interface_chunk(pool: AstPool, path: &str, chunk: &str) -> AstPool:
         var out = pool
