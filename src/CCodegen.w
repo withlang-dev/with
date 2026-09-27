@@ -8972,10 +8972,14 @@ impl CCodegen:
         "extern " ++ self.c_type(ret_tid, 1) ++ " " ++ name ++ ";\n"
 
     // The with_* names the fixed block (emit_module_prelude's `extern …`
-    // lines below) declares with their C spellings.
+    // lines below) declares with their C spellings. The fiber entry points
+    // are named one by one: the block declares five, and a `with_fiber_`
+    // prefix here left every other fiber extern (std.task's coroutine calls
+    // for g.pull()) with no prototype at all.
     fn prelude_block_declares(name: &str) -> bool:
         cc_str_starts_with(name, "with_str_") != 0 or cc_str_starts_with(name, "with_fmt_") != 0 or
-        cc_str_starts_with(name, "with_fiber_") != 0 or cc_str_starts_with(name, "with_println_") != 0 or
+        name == "with_fiber_in_fiber" or name == "with_fiber_await" or name == "with_fiber_cleanup_await" or
+        name == "with_fiber_cancel" or name == "with_fiber_panic_capture" or cc_str_starts_with(name, "with_println_") != 0 or
         name == "with_alloc" or name == "with_free" or name == "with_memcpy" or name == "with_memmove" or
         name == "with_memset" or name == "with_memcmp" or name == "with_hashmap_get_ptr" or
         name == "with_clock_nanos" or name == "with_nanosleep" or name == "with_sysinfo_os" or
