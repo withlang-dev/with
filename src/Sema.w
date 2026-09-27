@@ -1544,7 +1544,8 @@ pub type Sema {
     discarded_stmt_node: i32,
     // check_bodies order (#1196): per declaration 0 unchecked / 1 in progress /
     // 2 done; the node id its subtree starts after; and, for the functions that
-    // take their type from their body, declaration index by name symbol, with
+    // take their type from their body (#1196) or return a view whose origins
+    // their body decides (#1473), declaration index by name symbol, with
     // same-name declarations chained through body_typed_next.
     body_order_state: Vec[i32],
     body_order_lower: Vec[i32],

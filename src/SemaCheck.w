@@ -1795,6 +1795,24 @@ impl Sema:
         self.local_file_id = saved_file_id
         self.validate_global_data_race_accesses()
 
+    // #1473 (§21.1 Rule 6): a function whose declared return is a view — a
+    // reference, or a value carrying one (`Option[&T]`, an ephemeral value) —
+    // records which parameters the result may borrow from when its body is
+    // checked (EFF_ESCAPE_VIEW, sig_param_view_origin), and a call ties its
+    // result to those arguments from that summary (record_call_view_origins).
+    // A caller checked first read an empty summary and tied nothing:
+    // `let r = first(v); v.push(2); print(r)` compiled when `first` was
+    // declared below `main`. Such a function is checked before the first
+    // declaration that calls it, as an unannotated one is (#1196).
+    fn decl_returns_view(decl: i32, di: i32) -> bool:
+        let sig = self.get_sig(self.fn_decl_semantic_symbol_at(decl, self.ast.get_data0(decl), di))
+        if sig < 0:
+            return false
+        let ret = self.sig_return_type(sig)
+        if ret == 0:
+            return false
+        self.get_type_kind(self.resolve_alias(ret as TypeId)) == TypeKind.TY_REF or self.type_is_ephemeral_value(ret) != 0
+
     // Nodes are appended children first, so a declaration's subtree is the ids
     // between the nearest declaration node below it and its own.
     mut fn prepare_body_order(count: i32):
@@ -1817,7 +1835,8 @@ impl Sema:
             let decl = self.ast.get_decl(di)
             if self.ast.kind(decl) != NodeKind.NK_FN_DECL: continue
             let meta = self.ast.find_fn_meta(decl)
-            if meta < 0 or self.ast.fn_meta_ret(meta) != 0 or self.ast.fn_meta_tp_count(meta) != 0 or self.fn_decl_is_entry_point(decl) != 0: continue
+            if meta < 0 or self.ast.fn_meta_tp_count(meta) != 0 or self.fn_decl_is_entry_point(decl) != 0: continue
+            if self.ast.fn_meta_ret(meta) != 0 and not self.decl_returns_view(decl, di): continue
             // A call names it by its bare name: `later(x)`, `self.later()`.
             let parsed = self.ast.get_data0(decl)
             let text: str = with_str_clone_ref(self.pool_resolve(parsed))
