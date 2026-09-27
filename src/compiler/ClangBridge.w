@@ -2311,10 +2311,17 @@ pub fn with_cimport_fn_is_noreturn(session: i64, idx: i32) -> i32:
         let fn_type = clang_getCursorType(cursor)
         let type_spelling = clang_getTypeSpelling(fn_type)
         let type_cstr = clang_getCString(type_spelling)
-        let type_is_noreturn = c_strstr(type_cstr, "noreturn\0" as *const u8) as i64 != 0
+        // GNU noreturn is in the type as exactly this; a bare "noreturn"
+        // substring also matched a parameter type like `noreturn_t` and an
+        // unnamed record's spelling, which carries its header's path.
+        let type_is_noreturn = c_strstr(type_cstr, "__attribute__((noreturn))\0" as *const u8) as i64 != 0
         clang_disposeString(type_spelling)
         if type_is_noreturn: return 1
-        // Check for __attribute__((noreturn)) via tokenization
+        // `_Noreturn` and `[[noreturn]]` are declaration attributes, not part
+        // of the type, and are found by their tokens. Only those tokens: glibc spells `__attribute__ ((__const__))` and __THROW's
+        // `__attribute__ ((__nothrow__))` on hundreds of declarations, and a
+        // match on `__attribute__` itself made each of them `-> Never`
+        // (abs(-3) returned -3 on linux).
         if clang_Cursor_hasAttrs(cursor) == 0: return 0
         let extent = clang_getCursorExtent(cursor)
         let tu = clang_Cursor_getTranslationUnit(cursor)
@@ -2327,7 +2334,7 @@ pub fn with_cimport_fn_is_noreturn(session: i64, idx: i32) -> i32:
             let tok = *((tokens as i64 + ti as i64 * 24) as *const CXToken)  // sizeof(CXToken)=24
             let sp = clang_getTokenSpelling(tu, tok)
             let cstr = clang_getCString(sp)
-            if c_strcmp(cstr, "noreturn\0" as *const u8) == 0 or c_strcmp(cstr, "_Noreturn\0" as *const u8) == 0 or c_strcmp(cstr, "__attribute__\0" as *const u8) == 0:
+            if c_strcmp(cstr, "noreturn\0" as *const u8) == 0 or c_strcmp(cstr, "_Noreturn\0" as *const u8) == 0 or c_strcmp(cstr, "__noreturn__\0" as *const u8) == 0:
                 found = 1
             clang_disposeString(sp)
             if found != 0: break

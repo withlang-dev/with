@@ -50,7 +50,10 @@ jobs:
           sudo apt-get update -qq
           # zstd: extract the SDK tarball. dev libs: the compiler link line uses
           # -lz -lzstd -lxml2 (build/compiler.w), which need the .so dev symlinks.
-          sudo apt-get install -y --no-install-recommends zstd zlib1g-dev libzstd-dev libxml2-dev
+          # bz2, sqlite3, curl: the facade tests c_import the host's bzlib.h,
+          # sqlite3.h and curl/curl.h (a UAT project gets them from `with get`).
+          sudo apt-get install -y --no-install-recommends zstd zlib1g-dev libzstd-dev libxml2-dev \
+            libbz2-dev libsqlite3-dev libcurl4-openssl-dev
 
       - name: Fetch LLVM SDK
         run: |

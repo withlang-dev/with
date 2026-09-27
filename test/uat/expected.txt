@@ -5,7 +5,7 @@ uat: fail_exit ................................... FAIL  step 1 (line 3): `run: 
 uat: fail_stdout ................................. FAIL  step 2 (line 4): stdout was 'stable', expected 'nope'
 uat: human ....................................... pass  (3 steps)
 uat: skip_env .................................... skip  (requires env UAT_TESTS_NO_SUCH_VARIABLE: unset)
-uat: skip_platform ............................... skip  (platforms: darwin not listed)
+uat: skip_platform ............................... skip  (platforms: <host> not listed)
 uat: stdin ....................................... pass  (4 steps)
 uat: verbs ....................................... pass  (20 steps)
 uat: 9 scenarios: 3 pass, 2 skip, 4 FAIL; 1 human check recorded

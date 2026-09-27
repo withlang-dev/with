@@ -4,6 +4,6 @@ uat: fail_exit ................................... applies here
 uat: fail_stdout ................................. applies here
 uat: human ....................................... applies here
 uat: skip_env .................................... skip (requires env UAT_TESTS_NO_SUCH_VARIABLE: unset)  requires: env UAT_TESTS_NO_SUCH_VARIABLE
-uat: skip_platform ............................... skip (platforms: darwin not listed)  platforms: plan9
+uat: skip_platform ............................... skip (platforms: <host> not listed)  platforms: plan9
 uat: stdin ....................................... applies here
 uat: verbs ....................................... applies here

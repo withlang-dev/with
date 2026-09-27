@@ -1411,6 +1411,23 @@ fn uat_tests_strip_timings(report: &str) -> str:
             out = out ++ "\n"
     out
 
+// A platform skip names the host ("(platforms: darwin not listed)"); the
+// golden files say <host>, so the comparison holds on every host.
+fn uat_tests_normalize_host(text: &str) -> str:
+    let open = "(platforms: "
+    let close = " not listed)"
+    var out = ""
+    var rest = build_owned_text(text)
+    while true:
+        let at = rest.find(open)
+        if at < 0: break
+        let tail = rest.slice(at + open.len(), rest.len())
+        let end = tail.find(close)
+        if end < 0: break
+        out = out ++ rest.slice(0, at) ++ open ++ "<host>" ++ close
+        rest = tail.slice(end + close.len(), tail.len())
+    out ++ rest
+
 fn uat_tests_run(ctx: &ActionCtx, root: &str, compiler: &str, out_dir: &str, name: &str, list: bool) -> (i32, str):
     let args: Vec[str] = Vec.new()
     args.push(build_owned_text(compiler))
@@ -1442,7 +1459,7 @@ fn run_uat_tests_action(ctx: ActionCtx) -> i32:
     if rc != 1:
         eprint(f"error: uat-tests: `with uat` exited {rc}; the planted failures make 1 the expected status:\n" ++ report)
         errors = errors + 1
-    let normalized = uat_tests_strip_timings(report)
+    let normalized = uat_tests_normalize_host(uat_tests_strip_timings(report))
     let _ = fs.write_text(build_project_join(out_dir, "report.normalized"), normalized)
     let expected = fs.read_text("test/uat/expected.txt")
     if normalized != expected:
@@ -1452,7 +1469,7 @@ fn run_uat_tests_action(ctx: ActionCtx) -> i32:
     if list_rc != 0:
         eprint(f"error: uat-tests: `with uat --list` exited {list_rc}:\n" ++ listing)
         errors = errors + 1
-    if listing != fs.read_text("test/uat/expected-list.txt"):
+    if uat_tests_normalize_host(listing) != fs.read_text("test/uat/expected-list.txt"):
         eprint("error: uat-tests: the listing differs from test/uat/expected-list.txt; actual: " ++ build_project_abs(root, build_project_join(out_dir, "list.stdout")))
         errors = errors + 1
     if errors > 0:
