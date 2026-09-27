@@ -412,9 +412,9 @@ impl Codegen:
         let wrapper_fn = wl_add_function(self.llmod, wrapper_name, wrapper_ft)
         wl_set_linkage(wrapper_fn, wl_internal_linkage())
 
-        let saved_fn = self.current_function
-        let saved_fn_name_sym = self.current_function_name_sym
-        let saved_ret = self.current_ret_type
+        let saved_fn: i64 = self.current_function
+        let saved_fn_name_sym: i32 = self.current_function_name_sym
+        let saved_ret: i64 = self.current_ret_type
         let saved_bb = wl_get_insert_block(self.builder)
         self.current_function = wrapper_fn
         self.current_function_name_sym = 0
@@ -492,7 +492,7 @@ impl Codegen:
 
         let saved_syms = move self.type_binding_syms
         let saved_tys = move self.type_binding_types
-        let saved_len = self.type_bindings_len
+        let saved_len: i32 = self.type_bindings_len
         let fresh_syms: Vec[i32] = Vec.new()
         let fresh_tys: Vec[i64] = Vec.new()
         self.type_binding_syms = fresh_syms
@@ -640,10 +640,10 @@ impl Codegen:
         self.fn_fn_types.insert(fn_sym, fn_ty)
         self.bind_fn_abi(fn_sym, abi_index, function)
 
-        let saved_fn = self.current_function
-        let saved_fn_name_sym = self.current_function_name_sym
-        let saved_ret = self.current_ret_type
-        let saved_owner = self.current_method_owner_sym
+        let saved_fn: i64 = self.current_function
+        let saved_fn_name_sym: i32 = self.current_function_name_sym
+        let saved_ret: i64 = self.current_ret_type
+        let saved_owner: i32 = self.current_method_owner_sym
         let saved_allocas = move self.local_allocas
         let saved_types = move self.local_types
         let saved_muts = move self.local_muts
@@ -655,18 +655,18 @@ impl Codegen:
         let saved_scope_syms = move self.scope_local_syms
         let saved_scope_allocas = move self.scope_local_allocas
         let saved_scope_types = move self.scope_local_types
-        let saved_scope_count = self.scope_local_count
+        let saved_scope_count: i32 = self.scope_local_count
         let saved_defer = move self.defer_stack
         let saved_errdefer = move self.errdefer_stack
         let saved_enum_local_types = move self.enum_local_types
         let saved_sema_local_types = move self.local_sema_types
-        let saved_expected = self.expected_type
-        let saved_expected_node = self.expected_type_node
-        let saved_result_err = self.current_result_err_symbol
-        let saved_returns_result = self.current_fn_returns_result
-        let saved_saw_return = self.current_fn_saw_explicit_return
-        let saved_tail_bb = self.tailrec_body_bb
-        let saved_tail_sym = self.tailrec_fn_sym
+        let saved_expected: i64 = self.expected_type
+        let saved_expected_node: i32 = self.expected_type_node
+        let saved_result_err: i32 = self.current_result_err_symbol
+        let saved_returns_result: bool = self.current_fn_returns_result
+        let saved_saw_return: bool = self.current_fn_saw_explicit_return
+        let saved_tail_bb: i64 = self.tailrec_body_bb
+        let saved_tail_sym: i32 = self.tailrec_fn_sym
         let saved_tail_allocas = move self.tailrec_param_allocas
         let saved_loops = self.capture_loop_state()
         let saved_bb = wl_get_insert_block(self.builder)
@@ -1499,9 +1499,9 @@ impl Codegen:
         let function = wl_add_function(self.llmod, init_name, ft)
         wl_set_linkage(function, wl_internal_linkage())
 
-        let saved_fn = self.current_function
-        let saved_ret = self.current_ret_type
-        let saved_owner = self.current_method_owner_sym
+        let saved_fn: i64 = self.current_function
+        let saved_ret: i64 = self.current_ret_type
+        let saved_owner: i32 = self.current_method_owner_sym
         let saved_allocas = move self.local_allocas
         let saved_types = move self.local_types
         let saved_muts = move self.local_muts
@@ -1513,18 +1513,18 @@ impl Codegen:
         let saved_scope_syms = move self.scope_local_syms
         let saved_scope_allocas = move self.scope_local_allocas
         let saved_scope_types = move self.scope_local_types
-        let saved_scope_count = self.scope_local_count
+        let saved_scope_count: i32 = self.scope_local_count
         let saved_defer = move self.defer_stack
         let saved_errdefer = move self.errdefer_stack
         let saved_enum_local_types = move self.enum_local_types
         let saved_sema_local_types = move self.local_sema_types
-        let saved_expected = self.expected_type
-        let saved_expected_node = self.expected_type_node
-        let saved_result_err = self.current_result_err_symbol
-        let saved_returns_result = self.current_fn_returns_result
-        let saved_saw_return = self.current_fn_saw_explicit_return
-        let saved_tail_bb = self.tailrec_body_bb
-        let saved_tail_sym = self.tailrec_fn_sym
+        let saved_expected: i64 = self.expected_type
+        let saved_expected_node: i32 = self.expected_type_node
+        let saved_result_err: i32 = self.current_result_err_symbol
+        let saved_returns_result: bool = self.current_fn_returns_result
+        let saved_saw_return: bool = self.current_fn_saw_explicit_return
+        let saved_tail_bb: i64 = self.tailrec_body_bb
+        let saved_tail_sym: i32 = self.tailrec_fn_sym
         let saved_tail_allocas = move self.tailrec_param_allocas
         let saved_loops = self.capture_loop_state()
         let saved_bb = wl_get_insert_block(self.builder)
@@ -1535,7 +1535,7 @@ impl Codegen:
         // previously-emitted function's sym here, an init fn inherits that
         // function's sret decision — on windows that means storing to a null
         // sret param (there is none) and `ret void` against a value return.
-        let saved_fn_name_sym = self.current_function_name_sym
+        let saved_fn_name_sym: i32 = self.current_function_name_sym
 
         let fresh_local_allocas: HashMap[i32, i64] = HashMap.new()
         let fresh_local_types: HashMap[i32, i64] = HashMap.new()

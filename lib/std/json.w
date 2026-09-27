@@ -169,7 +169,7 @@ pub fn JsonParser.new() -> JsonParser:
 unsafe fn alloc_token(parser: *mut JsonParser, tokens: *mut JsonToken, num_tokens: i32) -> i32:
     if parser.toknext >= num_tokens:
         return -1
-    let idx = parser.toknext
+    let idx: i32 = parser.toknext
     parser.toknext = parser.toknext + 1
     let tok = tokens + idx as u64
     tok.start = -1
@@ -189,7 +189,7 @@ unsafe fn fill_token(tokens: *mut JsonToken, idx: i32, tok_type: i32, start: i32
 
 // Parse a primitive (number, boolean, null).
 unsafe fn parse_primitive(parser: *mut JsonParser, js: &str, len: i32, tokens: *mut JsonToken, num_tokens: i32) -> i32:
-    let start = parser.pos
+    let start: i32 = parser.pos
     while parser.pos < len:
         let c = js[parser.pos] as i32
         if c == 0:
@@ -213,7 +213,7 @@ unsafe fn parse_primitive(parser: *mut JsonParser, js: &str, len: i32, tokens: *
 
 // Parse a JSON string with escape handling.
 unsafe fn parse_string(parser: *mut JsonParser, js: &str, len: i32, tokens: *mut JsonToken, num_tokens: i32) -> i32:
-    let start = parser.pos
+    let start: i32 = parser.pos
     // Skip opening quote
     parser.pos = parser.pos + 1
     while parser.pos < len:

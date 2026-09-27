@@ -1461,8 +1461,8 @@ impl Sema:
                         self.emit_error(f"fn '{fname}': 'case {sn}' installs a callback the library keeps for later calls; state its retention: '… userdata param CONST retains by param 0' (§16.2b.5, §16.2b.9)", case_node)
                         return c
                     let slot = &c.variadic_slots[c.variadic_slots.len() as i32 - 1]
-                    let ud_sel = slot.userdata_selector
-                    let ud_value = slot.userdata_value
+                    let ud_sel: i32 = slot.userdata_selector
+                    let ud_value: i64 = slot.userdata_value
                     for j in 0..c.variadic_case_syms.len() as i32:
                         if c.variadic_case_syms[j] == ud_sel or c.variadic_case_values[j] == ud_value:
                             let un: str = self.pool_resolve(ud_sel)
@@ -2479,7 +2479,7 @@ impl Sema:
                 noted.push(short.clone())
                 let ci = self.facade_contract_named(cname)
                 let node = if ci >= 0: self.foreign_contracts[ci].node else: rnode
-                let decl = if ci >= 0: self.foreign_contracts[ci].decl else: self.facade_resources[ri].decl
+                let decl: i32 = if ci >= 0: self.foreign_contracts[ci].decl else: self.facade_resources[ri].decl
                 self.update_decl_source_context(decl)
                 self.emit_warning(f"resource '{rname}': '{cname}' would be presented as '{short}', the name of {clash}; the compiler never picks, so '{cname}' keeps its imported name on '{rname}' — state 'rename' on an fn item describing it to settle the spelling (§16.2b.11)", node)
             // Two explicit spellings of one name: an error.
@@ -4548,7 +4548,7 @@ impl Sema:
                 // A nullable callback's userdata parameter is `Option[&U]`:
                 // the `Some(...)` payload is borrowed for the call, a place or
                 // a temporary alike (payload_arg_auto_refs, #1627).
-                let saved_ctor = self.facade_userdata_ctor
+                let saved_ctor: i32 = self.facade_userdata_ctor
                 if context.nullable:
                     self.facade_userdata_ctor = ud_node
                 if context.nullable and self.ast.kind(ud_node) == NodeKind.NK_VARIANT_SHORTHAND:

@@ -60,7 +60,7 @@ extend World:
     // --- Entity Lifecycle ---
 
     pub mut fn spawn_entity(name: str) -> Entity:
-        let id = self.next_id
+        let id: i32 = self.next_id
         self.next_id += 1
         self.entity_names.push(name)
         self.entity_generations.push(0)

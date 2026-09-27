@@ -15800,7 +15800,7 @@ impl CiGotoSwitchCase:
 
 impl CiGotoCfgContext:
     mut fn lower_case_children(session: i64, cursor: i32, first_child: i32, stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, scope: CiScope, cases: CiGotoSwitchCase):
-        let saved_cases = self.state.switch_cases
+        let saved_cases: CiGotoSwitchCase = self.state.switch_cases
         self.state.switch_cases = cases
         let case_mark = ci_scope_mark(scope)
         var case_scope = scope
@@ -15856,7 +15856,7 @@ impl CiGotoCfgContext:
         self.fail("expected switch case/default in goto CFG", with_ci_cursor_location(session, cursor))
 
     mut fn lower_switch_body(session: i64, body_cursor: i32, stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, scope: CiScope, cases: CiGotoSwitchCase):
-        let saved_cases = self.state.switch_cases
+        let saved_cases: CiGotoSwitchCase = self.state.switch_cases
         self.state.switch_cases = cases
         let nc = with_ci_num_children(session, body_cursor)
         let switch_mark = ci_scope_mark(scope)

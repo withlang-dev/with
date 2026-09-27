@@ -22,7 +22,7 @@ type OutputFile { handle: *mut c_void }
 impl OutputFile:
     mut fn close():
         if self.handle == null: return 0
-        let handle = self.handle
+        let handle: *mut c_void = self.handle
         self.handle = null
         fclose(handle)
 

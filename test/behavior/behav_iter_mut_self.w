@@ -14,7 +14,7 @@ impl Iter[i32] for CountUp:
     fn next(mut self: Self) -> Option[i32]:
         if self.current >= self.limit:
             return .None
-        let val = self.current
+        let val: i32 = self.current
         self.current = self.current + 1
         .Some(val)
 

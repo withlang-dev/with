@@ -1345,7 +1345,7 @@ type ToolArchiveFile { handle: *mut c_void }
 impl ToolArchiveFile:
     mut fn close() -> i32:
         if self.handle == null: return 0
-        let handle = self.handle
+        let handle: *mut c_void = self.handle
         self.handle = null
         fclose(handle)
 

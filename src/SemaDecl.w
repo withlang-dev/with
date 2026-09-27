@@ -1821,7 +1821,7 @@ impl Sema:
                         self.emit_error_with_help("Drop.drop receiver must be 'move self: Self' — a destructor always consumes (§2.4)", node, "write `move fn drop()`")
 
         // Bind Self to method owner type for dot-name methods
-        let self_sym = self.syms.self_type
+        let self_sym: i32 = self.syms.self_type
         var self_type_id = 0
         let fn_name_str = self.pool_resolve(method_base_sym).clone()
         if method_owner_sym != 0:
@@ -2646,7 +2646,7 @@ impl Sema:
         let decl_index = self.find_decl_index(node)
         if decl_index >= 0 and decl_index < self.decl_is_c_import.len() as i32 and self.decl_is_c_import[decl_index] != 0:
             return
-        let threshold = self.copy_warn_threshold
+        let threshold: i64 = self.copy_warn_threshold
         if threshold <= 0 or type_tid <= 0:
             return
         if self.ast.kind(node) == NodeKind.NK_IMPL_DECL and self.ast.find_impl_type_params(node) >= 0:

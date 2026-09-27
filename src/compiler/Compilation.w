@@ -640,7 +640,7 @@ impl Compilation:
     mut fn set_prelude_mode(mode: i32):
         var cfg = move self.config
         cfg.prelude_mode = compilation_normalize_prelude_mode(mode)
-        let cfg_prelude_mode = cfg.prelude_mode
+        let cfg_prelude_mode: i32 = cfg.prelude_mode
         self.config = cfg
         var zcu = move self.zcu
         zcu.set_prelude_mode(cfg_prelude_mode)

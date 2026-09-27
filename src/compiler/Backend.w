@@ -40,8 +40,8 @@ impl Zcu:
         // OWNS the sema for the emission (take-and-return, the lower_module
         // pattern) and every exit path hands it back — last_sema is blank in
         // between, never aliased.
-        let sema_ast = self.last_sema.ast
-        let sema_pool = self.last_sema.pool
+        let sema_ast: AstPool = self.last_sema.ast
+        let sema_pool: InternPool = self.last_sema.pool
         if sema_ast.decl_count() > 0:
             backend_pool = sema_ast
         if sema_pool.state.symbol_texts.len() as i32 > 1:
@@ -191,8 +191,8 @@ impl Zcu:
         var backend_intern = self.pool
         // D17/#697: take-and-return (docs/memory-model.md seam rule) — Copy
         // handles captured first, sema moved in, handed back on every exit.
-        let sema_ast = self.last_sema.ast
-        let sema_pool = self.last_sema.pool
+        let sema_ast: AstPool = self.last_sema.ast
+        let sema_pool: InternPool = self.last_sema.pool
         if sema_ast.decl_count() > 0:
             backend_pool = sema_ast
         if sema_pool.state.symbol_texts.len() as i32 > 1:

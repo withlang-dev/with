@@ -6270,7 +6270,7 @@ impl ComptimeEvaluator:
                     record.intercept_phase = phase
                 record.message_cursor = record.message_cursor + 1
                 let record_name = record.name.clone()
-                let record_generation = record.generation
+                let record_generation: i32 = record.generation
                 self.store_workspace_record(workspace_id, record)
                 let envelope = self.compiler_message_envelope_value(record_name, record_generation, message, node)
                 if envelope.kind == ComptimeValueKind.CV_INVALID:
@@ -6363,7 +6363,7 @@ impl ComptimeEvaluator:
         if value_node == 0:
             return self.fail(use_node, "missing constant value")
 
-        let saved_file = self.sema.local_file_id
+        let saved_file: i32 = self.sema.local_file_id
         let saved_path = move self.sema.current_module_path
         self.sema.local_file_id = self.decl_file_id(decl)
         self.sema.current_module_path = self.decl_path(decl)
@@ -7830,7 +7830,7 @@ impl ComptimeEvaluator:
         let caller_text = self.current_source_text()
         let caller_fn_sym = if self.active_fn_syms.len() > 0: self.active_fn_syms[(self.active_fn_syms.len() - 1)] else: 0
 
-        let saved_file = self.sema.local_file_id
+        let saved_file: i32 = self.sema.local_file_id
         let has_generic_subst = if tp_count > 0: 1 else: 0
         let generic_snapshot =
             if has_generic_subst != 0:

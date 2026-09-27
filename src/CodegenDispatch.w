@@ -2877,7 +2877,7 @@ impl Codegen:
         let has_sret = if abi.ret.pass == PM_INDIRECT: 1 else: 0
         let sret_ty = abi.ret.source_ty
         let byval_types = self.fn_abi_byval_types(abi_index)
-        let fn_type = abi.llvm_ty
+        let fn_type: i64 = abi.llvm_ty
         let func = wl_add_function(self.llmod, name, fn_type)
         if has_sret != 0:
             wl_add_sret_attr(self.context, func, 0, sret_ty)
@@ -5097,12 +5097,12 @@ impl Codegen:
         let fn_ty = wl_function_type(wl_void_type(self.context), vec_data_i64(&params), 1, 0)
         let drop_fn = wl_add_function(self.llmod, fn_name, fn_ty)
 
-        let saved_fn = self.current_function
-        let saved_fn_name_sym = self.current_function_name_sym
-        let saved_fn_node = self.current_function_node
-        let saved_ret_ty = self.current_ret_type
+        let saved_fn: i64 = self.current_function
+        let saved_fn_name_sym: i32 = self.current_function_name_sym
+        let saved_fn_node: i32 = self.current_function_node
+        let saved_ret_ty: i64 = self.current_ret_type
         let saved_bb = wl_get_insert_block(self.builder)
-        let saved_member_depth = self.member_drop_depth
+        let saved_member_depth: i32 = self.member_drop_depth
 
         self.current_function = drop_fn
         self.current_function_name_sym = 0
@@ -5150,15 +5150,15 @@ impl Codegen:
         let drop_fn = wl_add_function(self.llmod, fn_name, fn_ty)
         wl_set_linkage(drop_fn, wl_internal_linkage())
 
-        let saved_fn = self.current_function
-        let saved_fn_name_sym = self.current_function_name_sym
-        let saved_fn_node = self.current_function_node
-        let saved_ret_ty = self.current_ret_type
+        let saved_fn: i64 = self.current_function
+        let saved_fn_name_sym: i32 = self.current_function_name_sym
+        let saved_fn_node: i32 = self.current_function_node
+        let saved_ret_ty: i64 = self.current_ret_type
         let saved_bb = wl_get_insert_block(self.builder)
-        let saved_needs_guard = self.current_drop_needs_guard
-        let saved_member_depth = self.member_drop_depth
-        let saved_origin_ptr = self.current_drop_origin_ptr
-        let saved_origin_len = self.current_drop_origin_len
+        let saved_needs_guard: bool = self.current_drop_needs_guard
+        let saved_member_depth: i32 = self.member_drop_depth
+        let saved_origin_ptr: i64 = self.current_drop_origin_ptr
+        let saved_origin_len: i64 = self.current_drop_origin_len
 
         self.current_function = drop_fn
         self.current_function_name_sym = 0
@@ -5222,15 +5222,15 @@ impl Codegen:
         self.bind_fn_abi(self.intern.intern(fn_name), abi_index, drop_fn)
         wl_set_linkage(drop_fn, wl_internal_linkage())
 
-        let saved_fn = self.current_function
-        let saved_fn_name_sym = self.current_function_name_sym
-        let saved_fn_node = self.current_function_node
-        let saved_ret_ty = self.current_ret_type
+        let saved_fn: i64 = self.current_function
+        let saved_fn_name_sym: i32 = self.current_function_name_sym
+        let saved_fn_node: i32 = self.current_function_node
+        let saved_ret_ty: i64 = self.current_ret_type
         let saved_bb = wl_get_insert_block(self.builder)
-        let saved_needs_guard = self.current_drop_needs_guard
-        let saved_member_depth = self.member_drop_depth
-        let saved_origin_ptr = self.current_drop_origin_ptr
-        let saved_origin_len = self.current_drop_origin_len
+        let saved_needs_guard: bool = self.current_drop_needs_guard
+        let saved_member_depth: i32 = self.member_drop_depth
+        let saved_origin_ptr: i64 = self.current_drop_origin_ptr
+        let saved_origin_len: i64 = self.current_drop_origin_len
 
         self.current_function = drop_fn
         self.current_function_name_sym = 0
@@ -5744,9 +5744,9 @@ impl Codegen:
             return true
 
         if sk == StmtKind.Drop:
-            let saved_origin_ptr = self.current_drop_origin_ptr
-            let saved_origin_len = self.current_drop_origin_len
-            let saved_needs_guard = self.current_drop_needs_guard
+            let saved_origin_ptr: i64 = self.current_drop_origin_ptr
+            let saved_origin_len: i64 = self.current_drop_origin_len
+            let saved_needs_guard: bool = self.current_drop_needs_guard
             self.mir_set_current_drop_origin(d1)
             // Stage 4 (§2.5.2): a local never recorded as moved can never be the
             // reset sentinel, so drop it unconditionally; otherwise keep the guard.
@@ -6201,7 +6201,7 @@ impl Codegen:
             if not src_unsigned:
                 src_unsigned = self.mir_operand_is_str_byte(body, operand_id)
             out = self.mir_coerce_value_to_sema_type(out, expected_ty, expected_sema_ty, src_unsigned)
-        let had_error_before = self.had_error
+        let had_error_before: i32 = self.had_error
         let coerced = self.enforce_coerced_type(out, expected_ty, "wrong argument type")
         if self.had_error != had_error_before:
             self.debug_call_coerce_failure(call_context, 0, arg_index, 0, out, expected_ty)
@@ -7088,7 +7088,7 @@ impl Codegen:
         let mi_kind = self.pool.kind(mi_node)
         let specs_start = if mi_kind == NodeKind.NK_MULTI_INDEX: self.pool.get_data1(mi_node) else: 0
         let specs_count = if mi_kind == NodeKind.NK_INDEX: 2 else: self.pool.get_data2(mi_node)
-        let ctx = self.context
+        let ctx: i64 = self.context
         let spec_fields: Vec[i64] = Vec.new()
         spec_fields.push(wl_i32_type(ctx))
         spec_fields.push(wl_i64_type(ctx))
@@ -12019,10 +12019,10 @@ impl Codegen:
         let fn_ty = wl_function_type(ptr_ty, vec_data_i64(&params), 1, 0)
         let clone_fn = wl_add_function(self.llmod, fn_name, fn_ty)
         wl_set_linkage(clone_fn, wl_internal_linkage())
-        let saved_fn = self.current_function
-        let saved_fn_name_sym = self.current_function_name_sym
-        let saved_fn_node = self.current_function_node
-        let saved_ret_ty = self.current_ret_type
+        let saved_fn: i64 = self.current_function
+        let saved_fn_name_sym: i32 = self.current_function_name_sym
+        let saved_fn_node: i32 = self.current_function_node
+        let saved_ret_ty: i64 = self.current_ret_type
         let saved_bb = wl_get_insert_block(self.builder)
         self.current_function = clone_fn
         self.current_function_name_sym = 0
@@ -15781,7 +15781,7 @@ impl Codegen:
                 let place = if codegen_c_abi_needs_byval_attr(): self.mir_try_place_ptr_for_ref(body, operand_id) else: 0
                 let val = if place == 0: self.mir_eval_operand(body, operand_id, 0) else: 0
                 let arg_ptr = self.push_call_arg(call_abi, ai, val, place)
-                let byval_strategy = self.analysis_last_marshal_strategy
+                let byval_strategy: AnalysisMarshalStrategy = self.analysis_last_marshal_strategy
                 self.record_codegen_call_argument(body, args_id, operand_id, ai, byval_strategy, arg_ptr, arg_ptr)
                 args.push(arg_ptr)
                 continue
@@ -16174,7 +16174,7 @@ impl Codegen:
         self.current_ret_type = wl_get_return_type(fn_type)
         let saved_tb_syms = move self.type_binding_syms
         let saved_tb_tys = move self.type_binding_types
-        let saved_tb_len = self.type_bindings_len
+        let saved_tb_len: i32 = self.type_bindings_len
         self.set_mono_type_bindings(name_sym)
         let fn_has_sret_opt = self.fn_abi_has_sret(name_sym)
         let fn_has_sret = if fn_has_sret_opt.is_some(): fn_has_sret_opt.unwrap() else: 0
@@ -16215,18 +16215,18 @@ impl Codegen:
         self.enum_local_types = fresh_enum_local_types
         self.scope_local_count = 0
 
-        let saved_expected = self.expected_type
-        let saved_expected_node = self.expected_type_node
+        let saved_expected: i64 = self.expected_type
+        let saved_expected_node: i32 = self.expected_type_node
         self.expected_type = self.current_ret_type
         self.expected_type_node = 0
-        let saved_result_err = self.current_result_err_symbol
-        let saved_returns_result = self.current_fn_returns_result
-        let saved_saw_return = self.current_fn_saw_explicit_return
+        let saved_result_err: i32 = self.current_result_err_symbol
+        let saved_returns_result: bool = self.current_fn_returns_result
+        let saved_saw_return: bool = self.current_fn_saw_explicit_return
         self.current_result_err_symbol = 0
         self.current_fn_returns_result = false
         self.current_fn_saw_explicit_return = false
-        let saved_tailrec_bb = self.tailrec_body_bb
-        let saved_tailrec_sym = self.tailrec_fn_sym
+        let saved_tailrec_bb: i64 = self.tailrec_body_bb
+        let saved_tailrec_sym: i32 = self.tailrec_fn_sym
         self.tailrec_body_bb = 0
         self.tailrec_fn_sym = 0
 
@@ -16477,7 +16477,7 @@ impl Codegen:
                 let _ = wl_build_ret(self.builder, self.build_default_value(self.current_ret_type))
 
         let reachable_bbs = self.mir_reachable_blocks(body)
-        let saved_fn_scope = self.di_current_scope
+        let saved_fn_scope: i64 = self.di_current_scope
         for bb in 0..body.block_count():
             if bb < 0 or bb >= self.mir_bb_values.len() as i32:
                 continue
@@ -16573,11 +16573,11 @@ impl Codegen:
         let fn_type = ft.unwrap() as i64
 
         // Save all codegen state (will be restored at end)
-        let saved_fn = self.current_function
-        let saved_fn_name_sym = self.current_function_name_sym
-        let saved_fn_node = self.current_function_node
-        let saved_ret = self.current_ret_type
-        let saved_owner = self.current_method_owner_sym
+        let saved_fn: i64 = self.current_function
+        let saved_fn_name_sym: i32 = self.current_function_name_sym
+        let saved_fn_node: i32 = self.current_function_node
+        let saved_ret: i64 = self.current_ret_type
+        let saved_owner: i32 = self.current_method_owner_sym
         let saved_allocas = move self.local_allocas
         let saved_types = move self.local_types
         let saved_muts = move self.local_muts
@@ -16589,18 +16589,18 @@ impl Codegen:
         let saved_scope_syms = move self.scope_local_syms
         let saved_scope_allocas = move self.scope_local_allocas
         let saved_scope_types = move self.scope_local_types
-        let saved_scope_count = self.scope_local_count
+        let saved_scope_count: i32 = self.scope_local_count
         let saved_defer = move self.defer_stack
         let saved_errdefer = move self.errdefer_stack
         let saved_enum_local_types = move self.enum_local_types
         let saved_sema_local_types = move self.local_sema_types
-        let saved_expected = self.expected_type
-        let saved_expected_node = self.expected_type_node
-        let saved_result_err = self.current_result_err_symbol
-        let saved_returns_result = self.current_fn_returns_result
-        let saved_saw_return = self.current_fn_saw_explicit_return
-        let saved_tail_bb = self.tailrec_body_bb
-        let saved_tail_sym = self.tailrec_fn_sym
+        let saved_expected: i64 = self.expected_type
+        let saved_expected_node: i32 = self.expected_type_node
+        let saved_result_err: i32 = self.current_result_err_symbol
+        let saved_returns_result: bool = self.current_fn_returns_result
+        let saved_saw_return: bool = self.current_fn_saw_explicit_return
+        let saved_tail_bb: i64 = self.tailrec_body_bb
+        let saved_tail_sym: i32 = self.tailrec_fn_sym
         let saved_tail_allocas = move self.tailrec_param_allocas
         let saved_loops = self.capture_loop_state()
         let saved_bb = wl_get_insert_block(self.builder)
@@ -16610,7 +16610,7 @@ impl Codegen:
         self.current_function = function
         self.current_function_name_sym = mono_sym
         self.current_function_node = fn_node
-        let saved_tier_node = self.current_function_tier_node
+        let saved_tier_node: i32 = self.current_function_tier_node
         var tier_node = if fn_node > 0: fn_node else: self.debug_decl_node_for(body.fn_sym)
         if tier_node <= 0: tier_node = self.debug_decl_node_for(mono_sym)
         self.current_function_tier_node = tier_node
@@ -16632,7 +16632,7 @@ impl Codegen:
         self.current_ret_type = wl_get_return_type(fn_type)
         let saved_tb_syms = move self.type_binding_syms
         let saved_tb_tys = move self.type_binding_types
-        let saved_tb_len = self.type_bindings_len
+        let saved_tb_len: i32 = self.type_bindings_len
         self.set_mono_type_bindings(mono_sym)
         let fn_has_sret_opt = self.fn_abi_has_sret(mono_sym)
         let fn_has_sret = if fn_has_sret_opt.is_some(): fn_has_sret_opt.unwrap() else: 0
@@ -16940,7 +16940,7 @@ impl Codegen:
                 let _ = wl_build_ret(self.builder, self.build_default_value(self.current_ret_type))
 
         let reachable_bbs = self.mir_reachable_blocks(body)
-        let mono_fn_scope = self.di_current_scope
+        let mono_fn_scope: i64 = self.di_current_scope
         for bb in 0..body.block_count():
             if bb < 0 or bb >= self.mir_bb_values.len() as i32:
                 continue
@@ -17339,7 +17339,7 @@ impl Codegen:
 
         let saved_bind_syms = move self.type_binding_syms
         let saved_bind_tys = move self.type_binding_types
-        let saved_bind_len = self.type_bindings_len
+        let saved_bind_len: i32 = self.type_bindings_len
         let fresh_bind_syms: Vec[i32] = Vec.new()
         let fresh_bind_tys: Vec[i64] = Vec.new()
         self.type_binding_syms = fresh_bind_syms
@@ -17667,15 +17667,15 @@ impl Codegen:
         let drop_fn = wl_add_function(self.llmod, fn_name, fn_ty)
         wl_set_linkage(drop_fn, wl_internal_linkage())
 
-        let saved_fn = self.current_function
-        let saved_fn_name_sym = self.current_function_name_sym
-        let saved_fn_node = self.current_function_node
-        let saved_ret_ty = self.current_ret_type
+        let saved_fn: i64 = self.current_function
+        let saved_fn_name_sym: i32 = self.current_function_name_sym
+        let saved_fn_node: i32 = self.current_function_node
+        let saved_ret_ty: i64 = self.current_ret_type
         let saved_bb = wl_get_insert_block(self.builder)
-        let saved_needs_guard = self.current_drop_needs_guard
-        let saved_member_depth = self.member_drop_depth
-        let saved_origin_ptr = self.current_drop_origin_ptr
-        let saved_origin_len = self.current_drop_origin_len
+        let saved_needs_guard: bool = self.current_drop_needs_guard
+        let saved_member_depth: i32 = self.member_drop_depth
+        let saved_origin_ptr: i64 = self.current_drop_origin_ptr
+        let saved_origin_len: i64 = self.current_drop_origin_len
         self.current_function = drop_fn
         self.current_function_name_sym = 0
         self.current_function_node = 0
@@ -17829,10 +17829,10 @@ impl Codegen:
         let closure_byval_types = self.fn_abi_byval_types(closure_abi_index)
         self.apply_c_abi_byval_attrs(closure_fn, closure_byval_types, param_count, closure_param_offset)
         // Save current state
-        let saved_fn = self.current_function
-        let saved_ret = self.current_ret_type
-        let saved_fn_name_sym = self.current_function_name_sym
-        let saved_async_rbuf = self.async_block_rbuf
+        let saved_fn: i64 = self.current_function
+        let saved_ret: i64 = self.current_ret_type
+        let saved_fn_name_sym: i32 = self.current_function_name_sym
+        let saved_async_rbuf: i64 = self.async_block_rbuf
         self.async_block_rbuf = 0
         let saved_bb = wl_get_insert_block(self.builder)
         let saved_allocas = move self.local_allocas
@@ -18035,7 +18035,7 @@ impl Codegen:
             let _ = wl_build_ret(self.builder, wl_const_int(ret_ty, 0, 0))
 
         // Emit MIR statements and terminators
-        let closure_scope = self.di_current_scope
+        let closure_scope: i64 = self.di_current_scope
         for cl_bb in 0..closure_body.block_count():
             if cl_bb < 0 or cl_bb >= self.mir_bb_values.len() as i32:
                 continue
@@ -19293,9 +19293,9 @@ impl Codegen:
         let tramp_fn = wl_add_function(self.llmod, tramp_name, tramp_ft)
 
         // 4. Save codegen state
-        let saved_fn = self.current_function
-        let saved_ret = self.current_ret_type
-        let saved_async_rbuf = self.async_block_rbuf
+        let saved_fn: i64 = self.current_function
+        let saved_ret: i64 = self.current_ret_type
+        let saved_async_rbuf: i64 = self.async_block_rbuf
         let saved_bb = wl_get_insert_block(self.builder)
         let saved_allocas = move self.local_allocas
         let saved_types = move self.local_types

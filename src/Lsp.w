@@ -84,7 +84,7 @@ type JsonParser {
 unsafe fn jsmn_alloc_token(parser: *mut JsonParser, tokens: *mut JsonToken, num_tokens: i32) -> i32:
     if parser.toknext >= num_tokens:
         return -1
-    let idx = parser.toknext
+    let idx: i32 = parser.toknext
     parser.toknext = parser.toknext + 1
     let tok = tokens + idx as u64
     tok.start = -1
@@ -102,7 +102,7 @@ unsafe fn jsmn_fill_token(tokens: *mut JsonToken, idx: i32, tok_type: i32, start
     tok.size = 0
 
 unsafe fn jsmn_parse_primitive(parser: *mut JsonParser, js: &str, len: i32, tokens: *mut JsonToken, num_tokens: i32) -> i32:
-    let start = parser.pos
+    let start: i32 = parser.pos
     while parser.pos < len:
         let c = js[parser.pos] as i32
         if c == 0:
@@ -123,7 +123,7 @@ unsafe fn jsmn_parse_primitive(parser: *mut JsonParser, js: &str, len: i32, toke
     0
 
 unsafe fn jsmn_parse_string(parser: *mut JsonParser, js: &str, len: i32, tokens: *mut JsonToken, num_tokens: i32) -> i32:
-    let start = parser.pos
+    let start: i32 = parser.pos
     parser.pos = parser.pos + 1
     while parser.pos < len:
         let c = js[parser.pos] as i32

@@ -16,6 +16,6 @@ fn main:
     let n2 = t.len()
     var b = Box2 { n: 3 }
     let r: &Box2 = b
-    let n3 = r.n
+    let n3: i32 = r.n
     b.n = 4
     print(f"{n1} {n2} {n3}")

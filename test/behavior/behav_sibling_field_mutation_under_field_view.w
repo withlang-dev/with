@@ -27,8 +27,8 @@ fn main:
     var lx = Lexer { source: "ab" ++ "cd", pos: 0, inner: Inner { text: "x" ++ "y", count: 0 }, items: Vec.new() }
     lx.items.push("abc" ++ "")
     let n = lx.scan()
-    let pos = lx.pos
-    let count = lx.inner.count
+    let pos: i32 = lx.pos
+    let count: i32 = lx.inner.count
     let t = lx.nested()
     let e = lx.element()
     print(f"{n} {pos} {count} {t} {e}")

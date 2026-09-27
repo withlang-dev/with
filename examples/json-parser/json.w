@@ -134,7 +134,7 @@ extend Tokenizer:
         result
 
     mut fn read_number() -> Result[f64, JsonError]:
-        let start = self.pos
+        let start: usize = self.pos
         // optional minus
         if self.peek() == Some(b'-'):
             self.pos += 1

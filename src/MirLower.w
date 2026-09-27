@@ -13760,7 +13760,7 @@ impl MirBuilder:
         let wanted_bb = self.new_block()
         let other_bb = self.new_block()
         let join_bb = self.new_block()
-        let wanted_variant = if method_name == "ok": self.sema.syms.ok else: self.sema.syms.err
+        let wanted_variant: i32 = if method_name == "ok": self.sema.syms.ok else: self.sema.syms.err
         let disc = self.lower_enum_discriminant(value_place)
         let vals: Vec[i64] = Vec.new()
         vals.push(self.enum_variant_discriminant_for_type(value_ty, wanted_variant))
@@ -17336,9 +17336,9 @@ fn lower_concrete_specialization(sema: Sema, ast_pool: AstPool, pool: InternPool
         sema.named_types.insert(sym, tid)
         sema.put_generic_subst(sym, tid, fn_node)
 
-    let saved_file_id = sema.local_file_id
+    let saved_file_id: i32 = sema.local_file_id
     let saved_module_path = sema_owned_text(sema.current_module_path)
-    let saved_module_has_ci = sema.current_module_has_ci
+    let saved_module_has_ci: i32 = sema.current_module_has_ci
     let decl_index = sema.find_decl_index(fn_node)
     if decl_index >= 0:
         sema.update_decl_source_context(decl_index)

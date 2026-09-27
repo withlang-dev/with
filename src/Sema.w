@@ -7040,6 +7040,7 @@ impl Sema:
                 let start = self.ast.get_start(err_node)
                 let end = self.ast.get_end(err_node)
                 var diag = Diagnostic.err("view '" ++ view_name ++ "' may outlive its origin '" ++ origin_name ++ "'", Span { file: self.local_file_id, start: start, end: end })
+                diag = self.with_copy_view_fixit(move diag, view_sym, true)
                 diag = self.with_facade_dependency_notes(move diag, view_ty)
                 self.diags.emit(move diag)
                 return

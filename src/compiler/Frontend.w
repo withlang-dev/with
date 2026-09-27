@@ -510,7 +510,7 @@ impl Zcu:
             // c_import error and warning). Its decls keep the importer's
             // module path — ownership is the importer's — but carry this file
             // id, so span reasoning never crosses the two coordinate spaces.
-            let ci_file_id = self.next_file_id
+            let ci_file_id: i32 = self.next_file_id
             self.next_file_id = self.next_file_id + 1
             self.add_source_text_mapping(ci_file_id, "<c_import " ++ header_spec ++ ">", synthetic)
             var lexer = Lexer.init(synthetic, ci_file_id)
@@ -599,7 +599,7 @@ impl Zcu:
     // of decl `owner`, like a `<c_import …>` translation.
     mut fn splice_facade_text_frontend(pool: AstPool, text: &str, file_name: &str, owner: i32) -> AstPool:
         var out = pool
-        let file_id = self.next_file_id
+        let file_id: i32 = self.next_file_id
         self.next_file_id = self.next_file_id + 1
         self.add_source_text_mapping(file_id, file_name, text)
         let before = out.decl_count()
@@ -747,7 +747,7 @@ impl Zcu:
             // diagnostic at `<facade NAME>:line:col` points into this.
             if with_getenv_str("WITH_DUMP_FACADE").len() > 0:
                 eprint("<facade " ++ facade_name ++ ">\n" ++ text)
-            let file_id = self.next_file_id
+            let file_id: i32 = self.next_file_id
             self.next_file_id = self.next_file_id + 1
             self.add_source_text_mapping(file_id, "<facade " ++ facade_name ++ ">", text)
             let before = out.decl_count()
@@ -1860,7 +1860,7 @@ impl Zcu:
         for extra_i in 0..self.extra_source_names.len() as i32:
             let extra_name: str = with_str_clone_ref(self.extra_source_names[extra_i])
             let extra_text = frontend_normalize_source_text(self.extra_source_texts[extra_i])
-            let extra_file_id = self.next_file_id
+            let extra_file_id: i32 = self.next_file_id
             self.next_file_id = self.next_file_id + 1
             self.add_source_text_mapping(extra_file_id, extra_name, extra_text)
             let before = pool.decl_count()
@@ -2357,7 +2357,7 @@ impl Zcu:
 
     mut fn parse_interface_chunk(pool: AstPool, path: &str, chunk: &str) -> AstPool:
         var out = pool
-        let chunk_file_id = self.next_file_id
+        let chunk_file_id: i32 = self.next_file_id
         self.next_file_id = self.next_file_id + 1
         var lexer = Lexer.init(chunk, chunk_file_id)
         let tokens = lexer.tokenize()
@@ -3125,7 +3125,7 @@ impl Zcu:
         // declarations are parsed on demand once every source module is in.
         let on_demand = src.interface and not (self.interface_eager or self.bundle_corpus.len() > 0)
         if on_demand:
-            let section_file_id = self.next_file_id
+            let section_file_id: i32 = self.next_file_id
             self.next_file_id = self.next_file_id + 1
             self.add_source_text_mapping(section_file_id, path, full_text)
             // Path and text go in together, before the imports below recurse
@@ -3156,7 +3156,7 @@ impl Zcu:
         let text = full_text
 
         let before = target_pool.decl_count()
-        let file_id = self.next_file_id
+        let file_id: i32 = self.next_file_id
         self.next_file_id = self.next_file_id + 1
         self.add_source_text_mapping(file_id, path, text)
 

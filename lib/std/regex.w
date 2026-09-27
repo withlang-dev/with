@@ -465,8 +465,8 @@ impl Regex:
                 Some(found) => {
                     // #747: Match is non-Copy — read the span before the push
                     // transfers ownership into the result vector.
-                    let f_start = found.start
-                    let f_end = found.end
+                    let f_start: i32 = found.start
+                    let f_end: i32 = found.end
                     out.push(found)
                     if f_end == f_start:
                         if f_end >= text.len() as i32:
