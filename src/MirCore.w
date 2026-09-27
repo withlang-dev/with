@@ -2334,6 +2334,34 @@ fn mir_move_of_moved_place(mir_mod: &MirModule, body: &MirBody, keys: &MirDropSt
         return "move of " ++ mir_place_text(body, place) ++ f", which a path reaching it already moved out ({moved_name}) and nothing re-initialized: two owners free one value (§2.5.1)"
     ""
 
+// What is wrong with a drop of the whole place `place_id` whose state is
+// `drop_state`, or "". Codegen emits every drop (drop flags are retired,
+// and mir_elaborate_dead_drops has no caller); the null guard skips only a
+// reset blank, so the drop must reach a place every path left owning a
+// value or blanked.
+// - #729 class: MaybeGarbage means some predecessor never touched the
+//   place at all — the join-block temp drop that freed uninitialized stack
+//   passed this validator before the absence-aware join existed. Uninit
+//   means every reachable predecessor missed initialization, as an off-path
+//   defer temp does.
+// - #1539: Moved (or MaybeMoved at a join) means a path moved the value out
+//   and nothing reset the place: the drop frees what the new owner holds.
+//   A generator's next body did `_5 = move _10; drop(_10); _10 = const
+//   zst` — the reset after the drop — and `run --debug-alloc` reported a
+//   DOUBLE FREE that validate-ownership passed. Only a type with drop glue
+//   (sema_moved_drop_types: the place was moved, so its type is there when
+//   it has glue) frees anything: `Some(move _5); drop(_5)` of a CStr view
+//   is a no-op.
+fn mir_whole_drop_verdict(mir_mod: &MirModule, body: &MirBody, place_id: i32, drop_state: i32) -> str:
+    let drop_key = mir_place_text(body, place_id)
+    let state_name = mir_drop_state_name(drop_state)
+    if drop_state == MirDropState.MaybeGarbage or drop_state == MirDropState.Uninit:
+        return f"drop of {drop_key} reaches a path that never initialized it ({state_name})"
+    let has_glue = mir_mod.sema_moved_drop_types.contains(mir_validate_place_type(mir_mod, body, place_id))
+    if (drop_state == MirDropState.Moved or drop_state == MirDropState.MaybeMoved) and has_glue:
+        return f"drop of {drop_key} after a path reaching it moved it out and before its reset ({state_name}): this frees the value its new owner holds (§2.5.1)"
+    ""
+
 // Every move of a statement or terminator checked by the #1415 rule.
 fn validate_moves_through_references(mir_mod: &MirModule, body: &MirBody) -> str:
     for bb in 0..body.block_count():
@@ -2391,18 +2419,9 @@ pub fn validate_ownership_body(mir_mod: &MirModule, body: &MirBody) -> str:
                 if mir_validate_place_type(mir_mod, body, d0) == 0:
                     return f"fn sym{body.fn_sym} stmt{stmt_id} span={span}: ownership target has no concrete MIR type"
             if kind == StmtKind.Drop and body.place_proj_counts[d0] == 0 and blocks.computed[bb] != 0:
-                // #729 class: a drop must only reach places every path has at
-                // least blanked. MaybeGarbage means some predecessor never
-                // touched the place at all — the join-block temp drop that
-                // freed uninitialized stack passed this validator before the
-                // absence-aware join existed. Uninit means every reachable
-                // predecessor missed initialization, as an off-path defer temp
-                // does. Unreachable blocks have no ownership input to check.
-                let drop_key = mir_place_text(body, d0)
-                let drop_state = state.place(blocks.keys, d0)
-                if drop_state == MirDropState.MaybeGarbage or drop_state == MirDropState.Uninit:
-                    let state_name = mir_drop_state_name(drop_state)
-                    return f"fn sym{body.fn_sym} stmt{stmt_id} span={span}: drop of {drop_key} reaches a path that never initialized it ({state_name})"
+                let bad_drop = mir_whole_drop_verdict(mir_mod, body, d0, state.place(blocks.keys, d0))
+                if bad_drop.len() > 0:
+                    return f"fn sym{body.fn_sym} stmt{stmt_id} span={span}: " ++ bad_drop
             if kind == StmtKind.Drop and blocks.computed[bb] != 0:
                 let vacated = mir_drop_vacated_subplace(mir_mod, body, blocks.keys, state, key_places, d0)
                 if vacated >= 0:
@@ -2423,11 +2442,9 @@ pub fn validate_ownership_body(mir_mod: &MirModule, body: &MirBody) -> str:
             if mir_validate_place_type(mir_mod, body, place_id) == 0:
                 return f"fn sym{body.fn_sym} bb{bb}: ownership terminator place has no concrete MIR type"
             if body.term_kind(bb) == TermKind.TK_DROP_AND_GOTO and body.place_proj_counts[place_id] == 0 and blocks.computed[bb] != 0:
-                let drop_state = state.place(blocks.keys, place_id)
-                if drop_state == MirDropState.MaybeGarbage or drop_state == MirDropState.Uninit:
-                    let drop_key = mir_place_text(body, place_id)
-                    let state_name = mir_drop_state_name(drop_state)
-                    return f"fn sym{body.fn_sym} bb{bb}: drop of {drop_key} reaches a path that never initialized it ({state_name})"
+                let bad_drop = mir_whole_drop_verdict(mir_mod, body, place_id, state.place(blocks.keys, place_id))
+                if bad_drop.len() > 0:
+                    return f"fn sym{body.fn_sym} bb{bb}: " ++ bad_drop
             if body.term_kind(bb) == TermKind.TK_DROP_AND_GOTO and blocks.computed[bb] != 0:
                 let vacated = mir_drop_vacated_subplace(mir_mod, body, blocks.keys, state, key_places, place_id)
                 if vacated >= 0:

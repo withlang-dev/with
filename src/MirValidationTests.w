@@ -892,3 +892,82 @@ fn lowering_failed_verdict(failed: bool) -> str:
 pub fn mir_test_lowering_failed_body:
     assert(lowering_failed_verdict(true).contains("fn sym9: MIR lowering failed"))
     assert(lowering_failed_verdict(false) == "")
+
+// #1539, #1559, #1487: the drop-state a whole-place drop or a reset blank
+// reaches. `shape`:
+//   0  written, moved out, dropped (Moved: frees what the new owner holds)
+//   1  written, moved out, reset, dropped (Reset: the blank frees nothing)
+//   2  written; one arm moves it out and does not reset; dropped at the
+//      join (MaybeMoved)
+//   3  written; one arm moves it out and resets it; dropped at the join
+//      (Reset beside Init joins to Init)
+//   4  storage without a value; one arm writes it; dropped at the join
+//      (Maybe: the other path holds no value, not even the blank)
+//   5  zero-initialized storage; one arm writes it; dropped at the join
+//   6  written, then reset though nothing moved it (the value is lost)
+//   7  written, moved out, reset
+//   8  storage without a value, reset (a zero-init)
+fn drop_state_verdict(shape: i32, drops: bool) -> str:
+    var mir_mod = MirModule.init()
+    for kind in [0, TypeKind.TY_INT, TypeKind.TY_STRUCT]:
+        mir_mod.sema_type_kinds.push(kind)
+        mir_mod.sema_type_d0.push(0)
+        mir_mod.sema_type_d1.push(0)
+        mir_mod.sema_type_d2.push(0)
+    let flag_ty = 1
+    let value_ty = 2
+    if drops: mir_mod.sema_moved_drop_types.insert(value_ty, 1)
+    var body = MirBody.init_for_fn(1)
+    body.n_params = 1
+    let flag_local = body.new_temp(flag_ty)
+    let flag = body.new_place(flag_local)
+    let value_local = body.new_temp(value_ty)
+    let value = body.new_place(value_local)
+    let taken_local = body.new_temp(value_ty)
+    let taken = body.new_place(taken_local)
+    let entry = body.new_block()
+    let arm = body.new_block()
+    let other = body.new_block()
+    let join = body.new_block()
+    let blank = body.new_const(ConstKind.CK_ZERO_SIZED, 0, 0, 0, value_ty)
+    let blank_op = body.new_operand(OperandKind.OK_CONSTANT, blank)
+    let reset = body.new_rvalue(RvalueKind.RK_USE, blank_op, 0, 0)
+    let no_fields: Vec[i32] = Vec.new()
+    let no_field_table = body.new_agg_fields(&no_fields, &no_fields)
+    let init = body.new_rvalue(RvalueKind.RK_AGGREGATE, 0, no_field_table, 0)
+    let move_op = body.new_operand(OperandKind.OK_MOVE, value)
+    let take = body.new_rvalue(RvalueKind.RK_USE, move_op, 0, 0)
+    body.push_stmt(entry, StmtKind.StorageLive, value_local, if shape == 5: 1 else: 0, 0)
+    if shape != 4 and shape != 5 and shape != 8:
+        body.push_stmt(entry, StmtKind.Assign, value, init, 0)
+    if shape == 0 or shape == 1 or shape == 7:
+        body.push_stmt(entry, StmtKind.Assign, taken, take, 0)
+    if shape == 1 or shape == 6 or shape == 7 or shape == 8:
+        body.push_stmt(entry, StmtKind.Assign, value, reset, 0)
+    let vals: Vec[i64] = Vec.new()
+    vals.push(1)
+    let targets: Vec[i32] = Vec.new()
+    targets.push(arm)
+    let table = body.new_switch_table(&vals, &targets)
+    let flag_op = body.new_operand(OperandKind.OK_COPY, flag)
+    body.set_terminator(entry, TermKind.TK_SWITCH_INT, flag_op, table, other, 0, 0)
+    if shape == 2 or shape == 3:
+        body.push_stmt(arm, StmtKind.Assign, taken, take, 0)
+    if shape == 3:
+        body.push_stmt(arm, StmtKind.Assign, value, reset, 0)
+    if shape == 4 or shape == 5:
+        body.push_stmt(arm, StmtKind.Assign, value, init, 0)
+    body.set_terminator(arm, TermKind.TK_GOTO, join, 0, 0, 0, 0)
+    body.set_terminator(other, TermKind.TK_GOTO, join, 0, 0, 0, 0)
+    if shape <= 5:
+        body.push_stmt(join, StmtKind.Drop, value, 0, 0)
+    body.set_terminator(join, TermKind.TK_RETURN, 0, 0, 0, 0, 0)
+    validate_ownership_body(mir_mod, body)
+
+pub fn mir_test_moved_drop:
+    assert(drop_state_verdict(0, true).contains("drop of _2 after a path reaching it moved it out and before its reset (Moved)"))
+    assert(drop_state_verdict(1, true) == "")
+    assert(drop_state_verdict(2, true).contains("drop of _2 after a path reaching it moved it out and before its reset (MaybeMoved)"))
+    assert(drop_state_verdict(3, true) == "")
+    // A value with no drop glue frees nothing twice (a moved CStr view).
+    assert(drop_state_verdict(0, false) == "")
