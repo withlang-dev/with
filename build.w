@@ -580,6 +580,109 @@ fn target_with_live_targets(target: Target, graph: &Build) -> Target:
         out = out.arg("live-target=" ++ graph.targets[i].name)
     out
 
+// `with build :gate` (Eric, 2026-09-27): everything a stack must pass before
+// its battery, as one target, so the pre-battery gate is a command and not a
+// checklist an agent remembers. The gate is the fixed list plus every test
+// target the last battery measured under 60 s; a fresh worktree has no
+// measurements and runs the fixed list.
+//
+// The measurements are tools/battery.w's ledger, one line per target in the
+// driver's build-times.tsv format, merged from the gate and the checks of
+// every battery run in this worktree (the driver's own file is per
+// invocation: a `:dev` in between would erase the battery's numbers). The
+// graph is evaluated once per build-source hash (D19/#702), so the ledger is
+// read here at evaluation time and the battery deletes the evaluated-graph
+// cache when it rewrites the ledger; the next invocation re-reads it.
+fn gate_fixed_targets() -> Vec[str]:
+    // `selfcheck` is the stage2 self-check of src/main.w; there is no stage1
+    // variant, and `build` has already built stage2. `reseed-check-build-w`
+    // checks build.w with the fresh release binary, whose embedded stdlib is
+    // this tree's lib/std/build.w: a stdlib file is only checkable through a
+    // `use` (the public-return-type rule applies to it as an entry).
+    // Built by push: the pinned seed evaluating build.w cannot take .len() of a
+    // collection literal (the #1122 class).
+    var fixed: Vec[str] = Vec.new()
+    for name in "build selfcheck reseed-check-build-w abi-hash-check unit-return-review spec-inventory-check examples-tests c-migrator-basic-tests deep-debug-tool-tests user-programs-safe".split(" "): fixed.push(name.clone())
+    fixed
+
+fn gate_times_ledger_path() -> str: "out/.build-state/battery-times.tsv"
+
+// The test lanes: every non-Group target reached from `test` through Group
+// targets only. A Group's deps are its members; a lane's own deps (stage2,
+// build, with-sha256) are prerequisites, never tests. The evidence recorder
+// and the driver gate are the battery's, not the gate's.
+fn gate_test_lanes(graph: &Build) -> Vec[str]:
+    var lanes: Vec[str] = Vec.new()
+    var pending: Vec[str] = Vec.new()
+    pending.push("test")
+    var seen: Vec[str] = Vec.new()
+    var next = 0
+    while next < pending.len() as i32:
+        let name = pending[next].clone()
+        next = next + 1
+        if seen.contains(name): continue
+        seen.push(name.clone())
+        if name == "test-green" or name == "seed-driver": continue
+        for i in 0..graph.targets.len() as i32:
+            let target = &graph.targets[i]
+            if target.name != name: continue
+            if target.kind == BuildKind.Group:
+                for d in 0..target.deps.len() as i32: pending.push(target.deps[d].clone())
+            else:
+                lanes.push(name.clone())
+            break
+    lanes
+
+// The whole seconds of a build-times.tsv duration ("20.0s" -> 20); -1 when
+// the column is not one.
+fn gate_whole_seconds(text: &str) -> i32:
+    var n = 0
+    var digits = 0
+    for i in 0..text.len() as i32:
+        let b = text[i]
+        if b == '.' or b == 's': break
+        if b < '0' or b > '9': return -1
+        n = n * 10 + (b - '0')
+        digits = digits + 1
+    if digits == 0: -1 else: n
+
+fn gate_measured_targets(ctx: &BuildCtx, graph: &Build, fixed: &Vec[str]) -> Vec[str]:
+    let fs = ctx.fs()
+    let ledger = gate_times_ledger_path()
+    let text = if fs.exists(ledger): fs.read_text(ledger) else: ""
+    let lanes = gate_test_lanes(graph)
+    var out: Vec[str] = Vec.new()
+    for line in text.split("\n"):
+        let cols = line.split("\t")
+        if cols.len() < 2: continue
+        let name = cols[0]
+        if not lanes.contains(name) or fixed.contains(name) or out.contains(name): continue
+        let secs = gate_whole_seconds(cols[1])
+        if secs >= 0 and secs < 60: out.push(name.clone())
+    comp_sort_strings(move out)
+
+// The gate's shape, printed at its end. It re-runs when the ledger or the
+// measured list changed (its input and args); `with build --explain gate`
+// lists the shape at any time.
+fn run_gate_shape_action(ctx: ActionCtx) -> i32:
+    var measured = ""
+    var count = 0
+    let args = ctx.args()
+    for i in 0..args.len() as i32:
+        let arg = args[i]
+        if not arg.starts_with("measured="): continue
+        measured = measured ++ " " ++ arg.slice(9, arg.len())
+        count = count + 1
+    let ledger = gate_times_ledger_path()
+    if ctx.fs().exists(ledger):
+        print(f"gate: {count} test target(s) the last battery measured under 60 s:" ++ measured)
+    else:
+        print("gate: no battery measurements (" ++ ledger ++ " missing); the fixed list only")
+    let output = ctx.output()
+    if ctx.fs().mkdir_all(build_project_dirname(output)) != 0 or ctx.fs().write_text(output, "ok" ++ measured ++ "\n") != 0:
+        ctx.diagnostics().error("gate-shape: could not write " ++ output)
+    0
+
 type HostRuntimeSpec:
     platform_source: str
     compat_source: str
@@ -3575,6 +3678,28 @@ pub fn build(ctx: BuildCtx) -> Build:
     prune_apply = prune_apply.write_scope("out/test-graph")
     prune_apply = prune_apply.write_scope("out/command/prune-apply")
     out = out.add_target(prune_apply)
+
+    // `with build :gate` — the pre-battery gate (gate_fixed_targets): the
+    // fixed list plus every test target the last battery measured under
+    // 60 s, then the shape line. Declared after every lane it may name; the
+    // closure runs the deps in this order, so the shape prints last.
+    let gate_fixed = gate_fixed_targets()
+    let gate_measured = gate_measured_targets(ctx, out, gate_fixed)
+    var gate_shape = target_new(.Action, "gate-shape", "").output("out/.build-state/gate-shape.txt")
+    gate_shape.action = run_gate_shape_action
+    gate_shape = gate_shape.write_scope("out/.build-state")
+    if ctx.fs().exists(gate_times_ledger_path()):
+        gate_shape = gate_shape.input(gate_times_ledger_path())
+    for mi in 0..gate_measured.len() as i32:
+        gate_shape = gate_shape.arg("measured=" ++ gate_measured[mi])
+    out = out.add_target(gate_shape)
+    var gate = target_new(.Group, "gate", "")
+    for fi in 0..gate_fixed.len() as i32:
+        gate = gate.dep(gate_fixed[fi].clone())
+    for mi in 0..gate_measured.len() as i32:
+        gate = gate.dep(gate_measured[mi].clone())
+    gate = gate.dep("gate-shape")
+    out = out.add_target(gate)
 
     // Keep the seed-built helper last until every public seed carries the
     // borrowed target lookup. Older seeds invalidate earlier non-Copy graph
