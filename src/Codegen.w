@@ -1563,6 +1563,16 @@ impl Codegen:
                 return declared.unwrap()
         self.abi_align_of(ty)
 
+    // Whether `ty` is, or is an array of, a record with a declared alignment
+    // (struct_declared_align) — a map lookup, no layout query.
+    fn holds_declared_align(ty: i64) -> bool:
+        if ty == 0:
+            return false
+        let kind = wl_get_type_kind(ty)
+        if kind == wl_array_type_kind():
+            return self.holds_declared_align(wl_get_element_type(ty))
+        kind == wl_struct_type_kind() and self.struct_declared_align.get(ty).is_some()
+
     mut fn abi_align_of(ty: i64) -> i64:
         let dl = wl_get_module_data_layout(self.llmod)
         if ty == 0 or dl == 0:
@@ -4329,11 +4339,18 @@ impl Codegen:
         // alignment — the largest capped field alignment — is kept in
         // struct_declared_align, since LLVM's alignment of a packed struct
         // is 1 and a record embedding this one is laid out by it.
+        // Whether a field carries a declared alignment is a lookup in
+        // struct_declared_align, never a layout query: this runs while
+        // bodies are still being defined, and asking a field's ABI alignment
+        // here sized a record holding a not-yet-bodied recursive type by
+        // value (`JV { … Vec[JV] }`, the #1430 guard). A record with a
+        // declared alignment always has its body already (its declaration
+        // set it), so the lookup is complete.
         let pack_cap = type_decl_pack_cap(packed_kind) as i64
         var needs_padding = has_alignment or pack_cap > 0
         if not needs_padding and is_packed == 0:
             for fi in 0..field_count:
-                if self.declared_align_of(ft_vec[fi]) != self.abi_align_of(ft_vec[fi]):
+                if self.holds_declared_align(ft_vec[fi]):
                     needs_padding = true
                     break
 
