@@ -4,6 +4,7 @@ use MirCore
 use Sema
 use InternPool
 use SemaTypes
+use std.string.StringBuilder
 
 impl MirModule:
     mut fn snapshot_sema_types(sema: &Sema):
@@ -514,15 +515,17 @@ fn mir_call_args_text(body: &MirBody, args_id: i32, pool: &InternPool, sema: &Se
 // ── Drop-state dump (--dump-drop-state) ──────────────────────────
 
 
+// #1489: one builder per module dump. Appending each body to a growing
+// str copied the whole dump per body, quadratic over a stage1 module that
+// lowers every embedded corpus body (13k bodies, never finished).
 pub fn dump_drop_state_module(mir_mod: &MirModule, pool: &InternPool, sema: &Sema) -> str:
     let _ = sema
-    var out = f"drop-state module functions={mir_mod.bodies.len() as i32}\n"
+    var out = StringBuilder.new()
+    out.push_str(f"drop-state module functions={mir_mod.bodies.len() as i32}\n")
     for i in 0..mir_mod.bodies.len():
-        if i > 0:
-            out = out ++ "\n"
-        let body = &mir_mod.bodies[i]
-        out = out ++ dump_drop_state_body(body, pool)
-    out
+        if i > 0: out.push_str("\n")
+        out.push_str(dump_drop_state_body(&mir_mod.bodies[i], pool))
+    out.to_str()
 
 
 fn trace_ownership_body(body: &MirBody, pool: &InternPool, sema: &Sema, spec: &str, target: &str) -> str:
@@ -579,7 +582,8 @@ fn mir_drop_plan_place_line(body: &MirBody, pool: &InternPool, sema: &Sema, plac
 
 
 fn dump_drop_plan_body(body: &MirBody, pool: &InternPool, sema: &Sema) -> str:
-    var out = "fn " ++ mir_debug_body_label(body, pool) ++ "\n"
+    var out = StringBuilder.new()
+    out.push_str("fn " ++ mir_debug_body_label(body, pool) ++ "\n")
     var hits = 0
     var blocks = mir_drop_state_compute_blocks(body)
     for bb in 0..body.block_count():
@@ -591,31 +595,30 @@ fn dump_drop_plan_body(body: &MirBody, pool: &InternPool, sema: &Sema) -> str:
             let kind = body.stmt_kind(stmt_id)
             if kind == StmtKind.Drop:
                 let place_id = body.stmt_data0(stmt_id)
-                out = out ++ mir_drop_plan_place_line(body, pool, sema, place_id, state.place(blocks.keys, place_id), f"  bb{bb}.stmt{stmt_id}", mir_stmt_text(body, stmt_id, pool, sema))
+                out.push_str(mir_drop_plan_place_line(body, pool, sema, place_id, state.place(blocks.keys, place_id), f"  bb{bb}.stmt{stmt_id}", mir_stmt_text(body, stmt_id, pool, sema)))
                 hits = hits + 1
             else if kind == StmtKind.StorageDead:
                 let local_key = mir_drop_state_local_key(body.stmt_data0(stmt_id))
-                out = out ++ f"  bb{bb}.stmt{stmt_id} storage-dead local=" ++ local_key ++ " remaining=" ++ state.selected_format(blocks.keys, local_key) ++ "\n"
+                out.push_str(f"  bb{bb}.stmt{stmt_id} storage-dead local=" ++ local_key ++ " remaining=" ++ state.selected_format(blocks.keys, local_key) ++ "\n")
                 hits = hits + 1
             state.transfer_stmt(blocks.keys, body, stmt_id)
         if body.term_kind(bb) == TermKind.TK_DROP_AND_GOTO:
             let place_id = body.term_data0(bb)
-            out = out ++ mir_drop_plan_place_line(body, pool, sema, place_id, state.place(blocks.keys, place_id), f"  bb{bb}.term", mir_term_text(body, bb, pool, sema))
+            out.push_str(mir_drop_plan_place_line(body, pool, sema, place_id, state.place(blocks.keys, place_id), f"  bb{bb}.term", mir_term_text(body, bb, pool, sema)))
             hits = hits + 1
         state.transfer_term(blocks.keys, body, bb)
     if hits == 0:
-        out = out ++ "  <no drop sites>\n"
-    out
+        out.push_str("  <no drop sites>\n")
+    out.to_str()
 
 
 pub fn dump_drop_plan_module(mir_mod: &MirModule, pool: &InternPool, sema: &Sema) -> str:
-    var out = f"drop-plan module functions={mir_mod.bodies.len() as i32}\n"
+    var out = StringBuilder.new()
+    out.push_str(f"drop-plan module functions={mir_mod.bodies.len() as i32}\n")
     for i in 0..mir_mod.bodies.len():
-        if i > 0:
-            out = out ++ "\n"
-        let body = &mir_mod.bodies[i]
-        out = out ++ dump_drop_plan_body(body, pool, sema)
-    out
+        if i > 0: out.push_str("\n")
+        out.push_str(dump_drop_plan_body(&mir_mod.bodies[i], pool, sema))
+    out.to_str()
 
 // Drop elaboration — the "Dead" arm (#614, docs/completed/drop-elaboration-soundness.md).
 // A `StmtKind.Drop` whose place is statically `Moved` at that point is provably
@@ -633,13 +636,12 @@ pub fn dump_drop_plan_module(mir_mod: &MirModule, pool: &InternPool, sema: &Sema
 
 pub fn dump_place_map_module(mir_mod: &MirModule, pool: &InternPool, sema: &Sema) -> str:
     let _ = sema
-    var out = f"place-map module functions={mir_mod.bodies.len() as i32}\n"
+    var out = StringBuilder.new()
+    out.push_str(f"place-map module functions={mir_mod.bodies.len() as i32}\n")
     for i in 0..mir_mod.bodies.len():
-        if i > 0:
-            out = out ++ "\n"
-        let body = &mir_mod.bodies[i]
-        out = out ++ dump_place_map_body(mir_mod, body, pool)
-    out
+        if i > 0: out.push_str("\n")
+        out.push_str(dump_place_map_body(mir_mod, &mir_mod.bodies[i], pool))
+    out.to_str()
 
 
 pub fn trace_cleanup_edge_module(mir_mod: &MirModule, pool: &InternPool, sema: &Sema, spec: &str) -> str:

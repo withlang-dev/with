@@ -7,6 +7,7 @@ use Ast
 use InternPool
 use SemaTypes
 use std.collections.HashMap
+use std.string.StringBuilder
 
 pub type BlockId = distinct i32
 impl Copy for BlockId
@@ -1937,23 +1938,24 @@ pub fn mir_drop_state_compute_blocks(body: &MirBody) -> MirDropStateBlocks:
     blocks
 
 pub fn dump_drop_state_body(body: &MirBody, pool: &InternPool) -> str:
-    var out = ""
+    var out = StringBuilder.new()
     let fn_name = if body.fn_sym != 0:
         f"sym{body.fn_sym}({pool.resolve(body.fn_sym)})"
     else:
         "<anon>"
-    out = out ++ "fn " ++ fn_name ++ " " ++ lbrace() ++ "\n"
+    out.push_str("fn " ++ fn_name ++ " " ++ lbrace() ++ "\n")
     var blocks = mir_drop_state_compute_blocks(body)
     for bb in 0..body.block_count():
         var state = blocks.input(bb)
-        out = out ++ f"  bb{bb} in: " ++ state.format(blocks.keys) ++ "\n"
+        out.push_str(f"  bb{bb} in: " ++ state.format(blocks.keys) ++ "\n")
         let stmt_start: i32 = body.bb_stmt_starts[bb]
         let stmt_count: i32 = body.bb_stmt_counts[bb]
         for si in 0..stmt_count:
             state.transfer_stmt(blocks.keys, body, stmt_start + si)
         state.transfer_term(blocks.keys, body, bb)
-        out = out ++ f"  bb{bb} out: " ++ state.format(blocks.keys) ++ "\n"
-    out ++ rbrace() ++ "\n"
+        out.push_str(f"  bb{bb} out: " ++ state.format(blocks.keys) ++ "\n")
+    out.push_str(rbrace() ++ "\n")
+    out.to_str()
 
 fn mir_ownership_key_matches(key: &str, target: &str) -> bool:
     if target.len() == 0:
