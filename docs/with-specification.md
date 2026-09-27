@@ -13,9 +13,9 @@ tests are NON-COMPLIANT wherever they do not yet implement them. Existing
 implementation behavior must not be treated as precedent against D22.
 **Changelog v7.6:** A module file holds declarations; a file with top-level
 executable statements is an entry source whose statements are its `main`,
-and every command applies the same rule (§18.5b, D74). An optional chain
-that takes a non-`Copy` field out of a named base is a field move, refused
-unless the base is a temporary (§10.3, D74). Examples track §3.8/D27's
+and every command applies the same rule (§18.5b, D74). An optional chain on
+a named place yields a view, `Option[&U]`; an owned demand on a non-`Copy`
+payload gets the clone fix-it (§10.3, D74). Examples track §3.8/D27's
 field-view binding (D74).
 **Changelog v7.5:** An assignment's value is a read of the place after the
 store — C's rule under With's view semantics (§9.1, D73); a `Drop` type whose
@@ -4851,12 +4851,14 @@ let zip = user.address?.city?.zip_code
 - If `field` has type `Option[U]`: `expr?.field` → `expr.and_then(v => v.field)` — result is `Option[U]` (flattened).
 - `expr?.method(args)` → `expr.and_then(v => v.method(args))` when the method returns `Option`/`Result`.
 
-The desugar describes the result, not a move of the base. A chain on a
-named place reads it: a chain whose result takes nothing out (a `Copy`
-field, a borrowing method, a view) leaves the base intact and usable again.
-A chain whose result takes a non-`Copy` field out of the base is a field
-move under §2.2/D32: it is refused unless the base is a temporary, with the
-clone fix-it (D74).
+The desugar describes the result's shape, not a move of the base. A chain
+on a named place reads the place, as any place read does (§3.8, D22): the
+result of `expr?.field` is `Option[&U]`, a view into the base, so the base
+stays intact and usable; an owned demand on that view (`let city:
+Option[str] = profile.address?.city`) copies a `Copy` payload and, for a
+non-`Copy` payload, is refused with the clone fix-it. A chain on a
+temporary (`f()?.field`) yields the owned `Option[U]` (D74; D73 is the same
+rule for assignment).
 
 ```
 type Address { city: Option[str], zip: str }

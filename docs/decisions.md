@@ -26,9 +26,14 @@ decision supersedes an earlier one, say so in both.
    what `with run` accepts.
 2. **Optional chains (§10.3, #1710).** `o?.a` on a named place moved the
    whole base into a temporary with no move recorded, so `o` read empty
-   afterward. A chain that takes nothing out leaves the base intact; a chain
-   that takes a non-`Copy` field out is a D32 field move, refused unless the
-   base is a temporary.
+   afterward. Ruled as D22/D73 already imply: a chain on a named place reads
+   it, so `expr?.field` yields `Option[&U]`, a view; an owned demand on a
+   non-`Copy` payload gets the clone fix-it; a chain on a temporary yields
+   the owned `Option[U]`. (A first draft refused non-`Copy` chains outright,
+   which contradicted §10.3's own `profile.address?.zip` example; the
+   implementing agent caught it.) This is D22's stage-4 chain-view work;
+   until it lands the compiler records the move it makes today, so a later
+   use of the base is "use of moved value" rather than a silent blank.
 3. **Examples (#1531).** The compiler now binds an unannotated `let` of a
    `Copy` field as a view, as §3.8/D27 already said. That refused one line
    each in `examples/json-parser/json.w` and `examples/ecs/src/world.w`;
