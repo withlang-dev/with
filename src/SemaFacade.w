@@ -253,8 +253,8 @@ impl Sema:
 
     // The resource whose failed state a type is (`FailedDatabase` of
     // `Database`), or -1: a failed-state resource admits only the operations
-    // the facade states are valid on the failure state, and there is no
-    // clause for that yet, so it admits none (method lookup names this).
+    // its facade marks `valid on failed` (§16.2b.4, ruling Amendment 1), and
+    // method lookup names the clause when it admits none.
     fn facade_failed_state_resource(type_name: &str) -> i32:
         for ri in 0..self.facade_resources.len() as i32:
             if self.facade_projects_status(ri) and self.facade_has_failed_state(ri):
@@ -3807,9 +3807,12 @@ impl Sema:
     //
     // "A resource owned by an error admits raw access only, unless the
     // facade marks an operation as valid on the failure state." `valid on
-    // failed` is that mark (stage 12b, #1612): the operation is rendered on
-    // `Failed<R>` too (FacadeRender.w facade_render_error_type), under the
-    // name it has on `R`. What it may mark is a lend or a text view of a
+    // failed` is that mark (stage 12b, #1612; ruling Amendment 1: "An
+    // operation the C contract documents as valid on a failed resource is
+    // marked on its fn item with `valid on failed`, and is presented on the
+    // failed-state type as well"): the operation is rendered on `Failed<R>`
+    // too (FacadeRender.w facade_render_error_type), under the name it has
+    // on `R`. What it may mark is a lend, a text view or a record view of a
     // resource that has a failed state — an out-parameter producer under
     // `ok`, of a resource that depends on nothing (a dependent one's failure
     // is destroyed in the constructor). A destroying, consuming, retaining
@@ -3842,7 +3845,7 @@ impl Sema:
             let borrows_resource = borrow_res != 0 and self.pool_resolve(borrow_res) != "CStr"
             let stronger = self.foreign_contracts[ci].destroys != 0 or self.foreign_contracts[ci].consumes.len() > 0 or self.foreign_contracts[ci].retains.len() > 0 or self.foreign_contracts[ci].callback_userdata_cb.len() > 0 or self.foreign_contracts[ci].callback_thread_any != 0 or self.foreign_contracts[ci].callback_consumes.len() > 0
             if stronger or borrows_resource or self.facade_fn_is_resource_op(fn_sym):
-                self.emit_error(f"fn '{fname}': 'valid on failed' marks a lend or a text view of the failed '{rname}'; a failed state is destroyed by its error's Drop and owns nothing else, so a producing, destroying, consuming, retaining or callback operation, or one returning a borrowed resource, cannot be valid on it (§16.2b.4)", node)
+                self.emit_error(f"fn '{fname}': 'valid on failed' marks a lend, a text view or a record view of the failed '{rname}'; a failed state is destroyed by its error's Drop and owns nothing else, so a producing, destroying, consuming, retaining or callback operation, or one returning a borrowed resource, cannot be valid on it (§16.2b.4)", node)
                 continue
             if self.diags.has_errors():
                 continue

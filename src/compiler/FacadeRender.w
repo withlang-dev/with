@@ -304,11 +304,11 @@ pub fn facade_render_text_view_name() -> str: "as_cstr"
 // is not recognized by its type, and an item describing a resource's own
 // producer, initializer or destroyer adds facts to that operation.
 //
-// `failed_only` (stage 12b, #1612; spec §16.2b.4): the lends and text
-// views the facade marks `valid on failed`, rendered on the failed-state
-// type `Failed<R>` — the same body over the same `repr` field — and
-// nothing else (a borrowed-resource return holds a view of a live `R`;
-// Sema refuses the mark on one).
+// `failed_only` (stage 12b, #1612; spec §16.2b.4, ruling Amendment 1): the
+// operations the facade marks `valid on failed` — lends, text views and
+// record views — rendered on the failed-state type `Failed<R>`, the same
+// body over the same `repr` field, and nothing else (a borrowed-resource
+// return holds a view of a live `R`; Sema refuses the mark on one).
 fn facade_render_lend_methods(pool: AstPool, intern: InternPool, ci: &Vec[i32], resource: i32, with_borrowed_returns: bool, failed_only: bool) -> str:
     let repr_text = render_type_expr(pool, intern, pool.get_extra(pool.get_data1(resource as NodeId)) as NodeId)
     let repr = facade_render_unalias(pool, intern, repr_text)
@@ -320,7 +320,7 @@ fn facade_render_lend_methods(pool: AstPool, intern: InternPool, ci: &Vec[i32], 
         let li = facade_render_lend_item(pool, intern, ci, items[i])
         if not facade_render_lend_hosted(pool, intern, &li, resource, repr):
             continue
-        if failed_only and (not li.valid_on_failed or li.borrow_res != 0):
+        if failed_only and (not li.valid_on_failed or (li.borrow_res != 0 and not li.record_view)):
             continue
         let decl = li.decl
         let meta = pool.find_fn_meta(decl as NodeId)
