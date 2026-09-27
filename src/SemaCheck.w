@@ -20007,6 +20007,7 @@ impl Sema:
                 self.check_ephemeral_task_arg_escape(if eg_arg_node > 0: eg_arg_node else: call_node, 0, 0, fn_sym, pi)
 
         // Obligation model: collect and solve trait bounds for each bound type parameter.
+        let bounds_errors_before = self.diags.count_by_severity(DiagSeverity.Error)
         self.check_generic_trait_bounds(tp_start, tp_count, call_node)
         // Also check where clause bounds if present
         let where_idx = self.ast.find_where_meta(fn_node)
@@ -20014,6 +20015,13 @@ impl Sema:
             let where_start: i32 = self.ast.state.where_meta[(where_idx + 1)]
             let where_count: i32 = self.ast.state.where_meta[(where_idx + 2)]
             self.check_generic_trait_bounds(where_start, where_count, call_node)
+        // #1447: a failed bound is the whole story; checking the body under
+        // it reports the bound's consequences in source the caller never
+        // wrote (`print[T: Display]`'s `v.to_str()` inside std).
+        if self.diags.count_by_severity(DiagSeverity.Error) != bounds_errors_before:
+            self.generic_subst_param_syms = saved_generic_call_subst_syms
+            self.generic_subst_type_ids = saved_generic_call_subst_tys
+            return 0
         let ege_before = self.diags.count_by_severity(DiagSeverity.Error)
         self.ensure_generic_substitutions(tp_start, tp_count, param_start, param_count, call_node)
         // #598: an uninferable type param already got its one teaching

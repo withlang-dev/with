@@ -165,6 +165,9 @@ type TestDirectives {
     // passed while `unknown type 'T'` led its stderr).
     expect_check_fail_not: Vec[str],
     expect_build_fail: str,
+    // #1447: a build that must succeed and print these on its stderr (the
+    // warnings a build renders after codegen).
+    expect_build_stderr: Vec[str],
     has_expect_exit: bool,
     expect_exit: i32,
     check_only: bool,
@@ -206,6 +209,7 @@ fn empty_test_directives -> TestDirectives:
         expect_check_fail: "",
         expect_check_fail_not: Vec.new(),
         expect_build_fail: "",
+        expect_build_stderr: Vec.new(),
         has_expect_exit: false,
         expect_exit: 0,
         check_only: false,
@@ -3645,6 +3649,7 @@ fn parse_test_directives_for_target(target: &str) -> TestDirectives:
     let expect_check_fail_not_prefix = "//! expect-check-fail-not: "
     let expect_error_prefix = "//! expect-error: "
     let expect_build_fail_prefix = "//! expect-build-fail: "
+    let expect_build_stderr_prefix = "//! expect-build-stderr: "
     let args_prefix = "//! args: "
     let env_prefix = "//! env: "
     let skip_prefix = "//! skip: "
@@ -3680,6 +3685,8 @@ fn parse_test_directives_for_target(target: &str) -> TestDirectives:
                 result.expect_check_fail = line.slice(expect_error_prefix.len(), line.len())
             else if line.starts_with(expect_build_fail_prefix):
                 result.expect_build_fail = line.slice(expect_build_fail_prefix.len(), line.len())
+            else if line.starts_with(expect_build_stderr_prefix):
+                result.expect_build_stderr.push(line.slice(expect_build_stderr_prefix.len(), line.len()))
             else if line.starts_with(args_prefix):
                 result.extra_args = line.slice(args_prefix.len(), line.len())
             else if line.starts_with(env_prefix):
@@ -3753,7 +3760,7 @@ fn nr_of_offset(text: &str, offset: i32) -> i32:
     n
 
 fn test_directive_line_is_known(line: &str) -> bool:
-    let prefixes = ["//! expect-stdout: ", "//! expect-stderr: ", "//! expect-exit: ", "//! expect-check-stdout: ", "//! expect-check-stdout-not: ", "//! expect-check-fail: ", "//! expect-check-fail-not: ", "//! expect-error: ", "//! expect-build-fail: ", "//! args: ", "//! env: ", "//! skip: ", "//! skip-on: ", "//! only-on: ", "//! known-issue: "]
+    let prefixes = ["//! expect-stdout: ", "//! expect-stderr: ", "//! expect-exit: ", "//! expect-check-stdout: ", "//! expect-check-stdout-not: ", "//! expect-check-fail: ", "//! expect-check-fail-not: ", "//! expect-error: ", "//! expect-build-fail: ", "//! expect-build-stderr: ", "//! args: ", "//! env: ", "//! skip: ", "//! skip-on: ", "//! only-on: ", "//! known-issue: "]
     for p in prefixes:
         if line.starts_with(p): return true
     line == "//! skip" or line == "//! check-only"
@@ -3888,6 +3895,19 @@ fn run_test_directive_command(target: &str, directives: &TestDirectives, quiet: 
         if not test_output_contains_expected(result.stderr, directives.expect_build_fail):
             emit_test_stage_error("missing expected build error: " ++ directives.expect_build_fail, target, "build", "")
             return 1
+        return 0
+    if directives.expect_build_stderr.len() > 0:
+        let result = run_test_compiler_command(target, "build", directives)
+        if result.rc != 0:
+            emit_test_stage_error(f"build failed with exit code {result.rc}", target, "build", "")
+            emit_test_child_stderr(result.stderr)
+            return 1
+        for i in 0..directives.expect_build_stderr.len() as i32:
+            let expected = directives.expect_build_stderr[i]
+            if not test_output_contains_expected(result.stderr, expected):
+                emit_test_stage_error("missing expected build stderr: " ++ expected, target, "build", "")
+                emit_test_child_stderr(result.stderr)
+                return 1
         return 0
     if directives.expect_check_stdout.len() > 0 or directives.expect_check_stdout_not.len() > 0:
         let result = run_test_compiler_command(target, "check", directives)

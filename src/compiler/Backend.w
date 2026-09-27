@@ -48,6 +48,8 @@ impl Zcu:
             backend_intern = sema_pool
         var cg = Codegen.init_with_opt_and_intern("with_module", opt_level, move backend_intern, move self.last_sema)
         cg.source_file = with_str_clone_ref(self.current_source_path)
+        // Cloned, never moved (here and at the other Codegen seams): the root
+        // file's warnings render after codegen (#1447).
         cg.source_text = with_str_clone_ref(self.current_source_text)
         cg.decl_source_paths = sema_clone_str_vec(&self.decl_source_paths)
         cg.current_decl_source_file = with_str_clone_ref(self.current_source_path)
