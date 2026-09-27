@@ -5,6 +5,7 @@
 @[link_name("abort")]
 extern fn rt_libc_abort() -> Unit
 extern fn with_debug_alloc_report_leaks() -> Unit
+extern fn rt_write(fd: i32, buf: *const u8, len: i64) -> i64
 
 pub fn with_runtime_init():
     let _ = 0
@@ -168,3 +169,34 @@ c facade libc:
         preserves domain rlimits
         preserves domain children
         preserves domain stdio
+
+// D69 (#1748): `g.pull()` steps a generator on its own fiber through these.
+// A program linked without the fiber runtime has none to step it on; the
+// std.task definitions still reference them, so each is defined here and
+// stops the program loudly instead of pretending to step.
+fn with_fiber_coro_unavailable() -> Never:
+    let _ = rt_write(2, "fatal: a generator's pull() needs the fiber runtime, which this program was linked without\n" as *const u8, 91)
+    rt_libc_abort()
+    loop:
+        let _ = 0
+
+pub fn with_fiber_coro_new(entry: *const u8, arg: *mut u8) -> i64:
+    let _ = entry
+    let _ = arg
+    with_fiber_coro_unavailable()
+
+pub fn with_fiber_coro_resume(co: i64):
+    let _ = co
+    with_fiber_coro_unavailable()
+
+pub fn with_fiber_coro_suspend(co: i64):
+    let _ = co
+    with_fiber_coro_unavailable()
+
+pub fn with_fiber_coro_finish(co: i64):
+    let _ = co
+    with_fiber_coro_unavailable()
+
+pub fn with_fiber_coro_free(co: i64):
+    let _ = co
+    with_fiber_coro_unavailable()
