@@ -5624,9 +5624,6 @@ impl Sema:
             return 1
         0
 
-    mut fn scope_put(sym: i32, tid: i32, is_mut: i32):
-        self.scope_put_at(sym, tid, is_mut, 0)
-
     fn scope_insert_at(sym: i32, tid: i32, is_mut: i32):
         let idx = self.bind_names.len() as i32
         self.bind_names.push(sym)

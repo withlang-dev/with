@@ -2995,6 +2995,21 @@ impl Parser:
     mut fn skip_member_separators(form: DeclBody):
         if form == DeclBody.Braced: self.skip_separators() else: self.skip_newlines()
 
+    // #1738: a member loop ends at the first token it does not accept. In an
+    // indented body a token still deeper than the declaration's line is a
+    // member line the loop did not recognize; ending there silently parsed
+    // the rest of the body as top-level declarations. Report it and skip the
+    // rest of the body.
+    mut fn reject_unrecognized_member_line(construct: &str, form: DeclBody, start: i32):
+        if form != DeclBody.Indented or self.peek() == TokenKind.TK_EOF:
+            return
+        let decl_indent = line_indent_of(self.source, start)
+        if column_of(self.source, self.current_start()) <= decl_indent:
+            return
+        self.emit_error("expected a member of this `" ++ construct ++ "` (a method or an associated `type`); this line is inside its indented body")
+        while self.peek() != TokenKind.TK_EOF and column_of(self.source, self.current_start()) > decl_indent:
+            self.advance()
+
     mut fn parse_trait_decl(vis: i32):
         let start = self.current_start()
         if self.peek() == TokenKind.TK_KW_PUB:
@@ -3133,6 +3148,7 @@ impl Parser:
             method_flags.push(mflags)
             self.skip_member_separators(form)
 
+        self.reject_unrecognized_member_line("trait", form, start)
         if trait_braced:
             self.expect(TokenKind.TK_R_BRACE)
         let extra_start = self.pool.extra_len()
@@ -3430,6 +3446,7 @@ impl Parser:
             method_count = method_count + 1
             self.skip_member_separators(form)
 
+        self.reject_unrecognized_member_line(construct, form, start)
         if impl_braced:
             self.expect(TokenKind.TK_R_BRACE)
         // Emit impl_decl node. Store assoc types + method_count in extra.

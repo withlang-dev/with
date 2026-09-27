@@ -2292,7 +2292,8 @@ impl Sema:
                 // the provisional A5/#608 POD-container non-freeing (#691
                 // retires that for both paths at once).
                 let p_is_mut = if fn_param_is_mut_self(self.ast.fn_param_flags(param_start, pi)) != 0: 1 else: 0
-                self.scope_put(p_name, p_tid, p_is_mut)
+                let p_type_node = self.ast.fn_param_type(param_start, pi)
+                self.scope_put_at(p_name, p_tid, p_is_mut, if p_type_node != 0: p_type_node else: node)
                 if fn_param_is_implicit(self.ast.fn_param_flags(param_start, pi)) != 0:
                     self.implicit_binding_types.push(p_tid)
                     self.implicit_binding_syms.push(p_name)
@@ -2788,7 +2789,8 @@ impl Sema:
             let p_name = self.ast.fn_param_name(param_start, pi)
             // D12: `mut self` binds mutable — see check_fn_body_with_sig_at.
             let p_is_mut = if fn_param_is_mut_self(self.ast.fn_param_flags(param_start, pi)) != 0: 1 else: 0
-            self.scope_put(p_name, self.sig_param_type(sig_idx, pi), p_is_mut)
+            let p_type_node = self.ast.fn_param_type(param_start, pi)
+            self.scope_put_at(p_name, self.sig_param_type(sig_idx, pi), p_is_mut, if p_type_node != 0: p_type_node else: body)
 
         let ret_tid = self.sig_return_type(sig_idx)
         self.current_return_type = ret_tid as TypeId
@@ -7403,7 +7405,7 @@ impl Sema:
             let body = self.ast.get_data1(node)
             let name = self.ast.get_data0(node)
             self.push_scope()
-            self.scope_put(name, self.ty_void, 0)
+            self.scope_put_at(name, self.ty_void, 0, node)
             self.async_scope_names.push(name)
             let as_saved_label_registry = self.save_label_registry()
             self.reset_label_registry()
@@ -7430,7 +7432,7 @@ impl Sema:
             let body = self.ast.get_data1(node)
             let name = self.ast.get_data0(node)
             self.push_scope()
-            self.scope_put(name, self.ty_i64, 0)
+            self.scope_put_at(name, self.ty_i64, 0, node)
             self.sync_scope_names.push(name)
             let scope_saved_label_registry = self.save_label_registry()
             self.reset_label_registry()
@@ -7472,7 +7474,7 @@ impl Sema:
                     self.emit_error("select await arm requires a Task value", task)
                 let arm_result_ty = self.unwrap_task_type(task_ty)
                 self.push_scope()
-                self.scope_put(arm_name, arm_result_ty as i32, 0)
+                self.scope_put_at(arm_name, arm_result_ty as i32, 0, task)
                 self.scope_set_is_task(arm_name, 0)
                 result = self.check_expr(arm_body)
                 self.pop_scope()
@@ -7516,7 +7518,7 @@ impl Sema:
                 if self.ast.comprehension_binding_is_pattern(node, binding):
                     self.check_pattern(binding, elem_ty)
                 else:
-                    self.scope_put(binding, elem_ty, 0)
+                    self.scope_put_at(binding, elem_ty, 0, iterable)
                 if filter != 0:
                     let filter_ty = self.check_expr(filter)
                     if filter_ty != 0 and self.types_compatible(self.ty_bool as i32, filter_ty as i32) == 0:
@@ -7578,7 +7580,7 @@ impl Sema:
                 if self.ast.comprehension_binding_is_pattern(node, binding2):
                     self.check_pattern(binding2, elem_ty2)
                 else:
-                    self.scope_put(binding2, elem_ty2, 0)
+                    self.scope_put_at(binding2, elem_ty2, 0, iterable2)
                 if filter2 != 0:
                     let filter_ty2 = self.check_expr(filter2)
                     if filter_ty2 != 0 and self.types_compatible(self.ty_bool as i32, filter_ty2 as i32) == 0:
@@ -7922,7 +7924,7 @@ impl Sema:
         while i <= count:
             let sym = self.pool_lookup_symbol("$" ++ i.to_string())
             if sym != 0:
-                self.scope_put(sym, self.ty_str as i32, 0)
+                self.scope_put_at(sym, self.ty_str as i32, 0, regex_node)
             i = i + 1
         let name_count = if self.regex_capture_name_counts.contains(regex_node): self.regex_capture_name_counts.get(regex_node).unwrap() else: 0
         let name_start = if self.regex_capture_name_starts.contains(regex_node): self.regex_capture_name_starts.get(regex_node).unwrap() else: 0
@@ -7930,7 +7932,7 @@ impl Sema:
         while ni < name_count:
             let sym: i32 = self.regex_capture_name_syms[(name_start + ni)]
             if sym != 0:
-                self.scope_put(sym, self.ty_str as i32, 0)
+                self.scope_put_at(sym, self.ty_str as i32, 0, regex_node)
             ni = ni + 1
 
     fn expr_tree_contains_fstring(node: i32) -> i32:
@@ -12289,7 +12291,7 @@ impl Sema:
                 if self.type_is_ephemeral_value(self.scope_lookup(sym)) != 0:
                     self.register_for_binding_borrow(sym, iterable)
         else:
-            self.scope_put(binding, elem_type, 0)
+            self.scope_put_at(binding, elem_type, 0, node)
         if yields_views != 0 and binding != 0:
             self.scope_set_is_view_bound(binding)
         if binding != 0 and not self.ast.for_binding_is_pattern(node) and self.type_is_ephemeral_value(elem_type) != 0:
@@ -12301,7 +12303,7 @@ impl Sema:
             let index_binding = self.ast.for_meta_index_binding(for_meta)
             label = self.ast.for_meta_label(for_meta)
             if index_binding != 0:
-                self.scope_put(index_binding, self.ty_i64 as i32, 0)
+                self.scope_put_at(index_binding, self.ty_i64 as i32, 0, node)
         self.loop_depth = self.loop_depth + 1
         self.push_label_frame(label, LabelFrameKind.LFK_FOR, node)
         let for_frame_idx = self.label_syms.len() as i32 - 1
@@ -16166,7 +16168,7 @@ impl Sema:
 
         if kind == NodeKind.NK_PAT_IDENT:
             let sym = self.ast.get_data0(node)
-            self.scope_put(sym, subject_type, self.pattern_bind_mut)
+            self.scope_put_at(sym, subject_type, self.pattern_bind_mut, node)
             return
 
         if kind == NodeKind.NK_PAT_INT or kind == NodeKind.NK_PAT_BOOL or kind == NodeKind.NK_PAT_STRING:
@@ -16200,9 +16202,9 @@ impl Sema:
             var concrete_type = 0
             concrete_type = self.lookup_named_type_visible(type_sym)
             if concrete_type != 0:
-                self.scope_put(bind_sym, concrete_type, self.pattern_bind_mut)
+                self.scope_put_at(bind_sym, concrete_type, self.pattern_bind_mut, node)
             else:
-                self.scope_put(bind_sym, subject_type, self.pattern_bind_mut)
+                self.scope_put_at(bind_sym, subject_type, self.pattern_bind_mut, node)
             return
 
         if kind == NodeKind.NK_PAT_VARIANT or kind == NodeKind.NK_PAT_ENUM_SHORTHAND:
@@ -16359,7 +16361,7 @@ impl Sema:
         if kind == NodeKind.NK_PAT_AT_BINDING:
             let at_name = self.ast.get_data0(node)
             let inner = self.ast.get_data1(node)
-            self.scope_put(at_name, subject_type, self.pattern_bind_mut)
+            self.scope_put_at(at_name, subject_type, self.pattern_bind_mut, node)
             self.check_pattern(inner, subject_type)
             return
 
@@ -16410,7 +16412,7 @@ impl Sema:
                         // Nothing covered binds `()` (§4.8 unit), typed like `()` itself.
                         let rest_ty = if covered.len() == 0: self.ty_void as i32 else: self.ensure_tuple_type(covered, covered.len() as i32) as i32
                         self.typed_expr_types.insert(elem_pat, rest_ty)
-                        self.scope_put(rest_name, rest_ty, self.pattern_bind_mut)
+                        self.scope_put_at(rest_name, rest_ty, self.pattern_bind_mut, elem_pat)
                     continue
                 let si = self.ast.tuple_pattern_subject_index(node, ti, elem_count)
                 let elem_ty: i32 = self.type_extra[(elem_start + si)]
@@ -16443,14 +16445,14 @@ impl Sema:
             for hi in 0..head_count:
                 let h_sym = self.ast.get_extra(s_extra + 1 + hi)
                 if h_sym != 0:
-                    self.scope_put(h_sym, elem_type, self.pattern_bind_mut)
+                    self.scope_put_at(h_sym, elem_type, self.pattern_bind_mut, node)
             if has_rest != 0 and rest_sym != 0:
-                self.scope_put(rest_sym, self.ty_i64, self.pattern_bind_mut)
+                self.scope_put_at(rest_sym, self.ty_i64, self.pattern_bind_mut, node)
             let tail_count = self.ast.get_extra(s_extra + 1 + head_count)
             for ti in 0..tail_count:
                 let t_sym = self.ast.get_extra(s_extra + 2 + head_count + ti)
                 if t_sym != 0:
-                    self.scope_put(t_sym, elem_type, self.pattern_bind_mut)
+                    self.scope_put_at(t_sym, elem_type, self.pattern_bind_mut, node)
             return
 
         if kind == NodeKind.NK_PAT_STRUCT:
@@ -16477,7 +16479,7 @@ impl Sema:
                     if f_pat != 0:
                         self.check_pattern(f_pat, 0)
                     else:
-                        self.scope_put(self.ast.get_extra(sp_extra + 1 + spi * 2), 0, 0)
+                        self.scope_put_at(self.ast.get_extra(sp_extra + 1 + spi * 2), 0, 0, node)
                 return
             let field_count = self.type_reflection_field_count(resolved as i32)
             let first_named = if sp_count > 0: self.ast.get_extra(sp_extra + 1) else: 0
@@ -16519,7 +16521,7 @@ impl Sema:
                 if f_pat != 0:
                     self.check_pattern(f_pat, binding_ty)
                 else:
-                    self.scope_put(f_name, binding_ty, self.pattern_bind_mut)
+                    self.scope_put_at(f_name, binding_ty, self.pattern_bind_mut, node)
             return
 
     mut fn check_enum_variant(node: i32) -> i32:
@@ -16802,7 +16804,7 @@ impl Sema:
                             if ai < self.sig_get_param_count(partial_sig):
                                 p_ty = self.sig_param_type(partial_sig, ai)
                             break
-            self.scope_put(p_sym, p_ty, 0)
+            self.scope_put_at(p_sym, p_ty, 0, if p_type_node > 0: p_type_node else: node)
             param_tys.push(p_ty)
         let te_start = self.type_extra.len() as i32
         for pti in 0..param_tys.len() as i32:
@@ -17535,7 +17537,7 @@ impl Sema:
             let payload_ty: i32 = self.with_payload_types.get(node).unwrap()
             self.push_scope()
             let had_binding = self.scope_has(name)
-            self.scope_put(name, payload_ty, is_mut)
+            self.scope_put_at(name, payload_ty, is_mut, node)
             self.binding_decl_nodes.insert(name, node)
             self.binding_value_nodes.insert(name, source)
             if had_binding == 0:
@@ -17567,7 +17569,7 @@ impl Sema:
         self.with_form_kinds.insert(node, WithFormKind.Binding)
         self.push_scope()
         let had_binding = self.scope_has(name)
-        self.scope_put(name, source_ty as i32, is_mut)
+        self.scope_put_at(name, source_ty as i32, is_mut, node)
         self.binding_decl_nodes.insert(name, node)
         self.binding_value_nodes.insert(name, source)
         if had_binding == 0:
@@ -17605,7 +17607,7 @@ impl Sema:
             let sym = self.ast.get_extra(extra_start + 2 + i)
             if sym != 0:
                 let elem_ty: i32 = self.type_extra[(te_start + i)]
-                self.scope_put(sym, elem_ty, is_mut)
+                self.scope_put_at(sym, elem_ty, is_mut, node)
                 self.binding_decl_nodes.insert(sym, node)
         // §7.2 Form 2: a `mut` builder body is statements; the block returns the tuple.
         let body_ty = if is_mut != 0: self.check_expr_statement_context(body) else: self.check_expr(body)
@@ -17624,7 +17626,7 @@ impl Sema:
         self.implicit_binding_syms.push(binding_name)
         self.push_scope()
         let had_binding = self.scope_has(binding_name)
-        self.scope_put(binding_name, source_ty as i32, 0)
+        self.scope_put_at(binding_name, source_ty as i32, 0, node)
         if had_binding == 0:
             self.register_pending_generic_binding(binding_name, 0, source, source_ty as i32)
         let body_ty = self.check_expr(body)
@@ -17869,7 +17871,7 @@ impl Sema:
                 if ni < elem_count:
                     bind_ty = self.type_extra[(elem_start + ni)]
                 if n_sym > 0:
-                    self.scope_put(n_sym, bind_ty, 0)
+                    self.scope_put_at(n_sym, bind_ty, 0, node)
                     if self.type_is_ephemeral_value(bind_ty) != 0:
                         self.record_view_binding_from_expr(n_sym, value)
             // Rest binding: bind to sub-tuple of remaining elements
@@ -17885,11 +17887,11 @@ impl Sema:
                     else:
                         rest_elems.push(0)
                 let rest_ty = self.ensure_tuple_type(rest_elems, rest_elem_count)
-                self.scope_put(rest_sym, rest_ty as i32, 0)
+                self.scope_put_at(rest_sym, rest_ty as i32, 0, node)
                 if self.type_is_ephemeral_value(rest_ty as i32) != 0:
                     self.record_view_binding_from_expr(rest_sym, value)
             else if rest_sym > 0:
-                self.scope_put(rest_sym, self.ty_void as i32, 0)
+                self.scope_put_at(rest_sym, self.ty_void as i32, 0, node)
             // Bind elements after rest
             for ni in 0..after_rest:
                 let n_sym = self.ast.get_extra(extra_start + rest_pos + 1 + ni)
@@ -17898,7 +17900,7 @@ impl Sema:
                 if elem_idx >= 0 and elem_idx < elem_count:
                     bind_ty = self.type_extra[(elem_start + elem_idx)]
                 if n_sym > 0:
-                    self.scope_put(n_sym, bind_ty, 0)
+                    self.scope_put_at(n_sym, bind_ty, 0, node)
                     if self.type_is_ephemeral_value(bind_ty) != 0:
                         self.record_view_binding_from_expr(n_sym, value)
         else:
@@ -17913,7 +17915,7 @@ impl Sema:
                         self.emit_error("tuple destructuring arity mismatch", node)
                         emitted_arity_error = 1
                 if n_sym > 0:
-                    self.scope_put(n_sym, bind_ty, 0)
+                    self.scope_put_at(n_sym, bind_ty, 0, node)
                     if self.type_is_ephemeral_value(bind_ty) != 0:
                         self.record_view_binding_from_expr(n_sym, value)
         // #782 arm 2: destructuring CONSUMES the source — MIR moves every
