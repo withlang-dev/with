@@ -6609,6 +6609,14 @@ impl ComptimeEvaluator:
         let idx = self.lookup_slot_index(sym)
         if idx >= 0:
             return comptime_control_value(comptime_value_share(self.slot_values[idx]))
+        // A local `const` in scope where Sema asks (a `[v; N]` count, #1478):
+        // its initializer is a compile-time constant (§9.1b). Only a live
+        // binding (Sema drops a name's decl when its scope ends), and only a
+        // `const` — a local `let` is a runtime value.
+        if self.sema.binding_decl_nodes.contains(sym) and self.sema.binding_value_nodes.contains(sym):
+            let local_decl: i32 = self.sema.binding_decl_nodes.get(sym).unwrap()
+            if self.ast.is_const_decl_node(local_decl as NodeId) != 0:
+                return self.eval_expr(self.sema.binding_value_nodes.get(sym).unwrap())
         let decl = self.find_module_let_decl(sym)
         if decl != 0:
             if self.ast.get_data2(decl) % 2 != 0:

@@ -5,11 +5,14 @@
 //! expect-stdout: 3 0
 //! expect-stdout: 2
 //! expect-stdout: 3 7
+//! expect-stdout: 5 13
 
 // #1478 (§4.3a): `[value; N]` builds N copies of value when N is a `const`
 // or a constant expression, not only an integer literal. The parser's
 // fill desugar handled a literal count only and silently used ONE copy
-// otherwise, so a typed binding read uninitialized tail elements.
+// otherwise, so a typed binding read uninitialized tail elements. A local
+// `const` is a const too (§9.1b); a `let` never is
+// (err_1478_array_fill_const_count, err_1478_array_fill_non_const_count).
 const N = 4
 const HALF = N / 2
 
@@ -27,5 +30,9 @@ fn main:
     let w: Vec[i32] = [9; HALF]
     print(f"{w.len()}")
     print(f"{A.len()} {A[2]}")
+    const M = 5
+    let e = [1; M]
+    let f = [2; (N + M) * 2 - 5]
+    print(f"{e.len()} {f.len()}")
 
 const A = [7; N - 1]

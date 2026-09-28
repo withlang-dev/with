@@ -14018,12 +14018,44 @@ impl Sema:
     // for MirLower and the comptime evaluator (array_fill_counts). It used
     // to fall back to ONE copy with no diagnostic, and a typed binding then
     // read uninitialized tail elements.
+    // §9.1b: a compile-time constant expression — integer literals,
+    // arithmetic, unary negate and `not`, and names of `const`s (casts and
+    // grouping of those too). A `let`, local or module-level, is a runtime
+    // value even when its initializer is a constant ("Difference from
+    // `let`"), so the evaluator's reading of an immutable module `let` does
+    // not make it a count.
+    fn expr_is_const_expr(node: i32) -> bool:
+        if node == 0:
+            return false
+        let kind = self.ast.kind(node)
+        if kind == NodeKind.NK_INT_LIT:
+            return true
+        if kind == NodeKind.NK_GROUPED:
+            return self.expr_is_const_expr(self.ast.get_data0(node))
+        if kind == NodeKind.NK_CAST:
+            return self.expr_is_const_expr(self.ast.get_data0(node))
+        if kind == NodeKind.NK_UNARY:
+            return self.expr_is_const_expr(self.ast.get_data1(node))
+        if kind == NodeKind.NK_BINARY:
+            return self.expr_is_const_expr(self.ast.get_data1(node)) and self.expr_is_const_expr(self.ast.get_data2(node))
+        if kind == NodeKind.NK_IDENT:
+            let sym = self.ast.get_data0(node)
+            if self.scope_binding_is_local(sym):
+                if not self.binding_decl_nodes.contains(sym):
+                    return false
+                return self.ast.is_const_decl_node(self.binding_decl_nodes.get(sym).unwrap() as NodeId) != 0
+            return self.const_global_syms.contains(sym)
+        false
+
     mut fn array_fill_count(node: i32, count_node: i32) -> i32:
         let count_ty = self.check_expr(count_node)
         if count_ty == 0:
             return -1
         if self.get_type_kind(self.resolve_alias(count_ty)) != TypeKind.TY_INT:
             self.emit_error("`[value; N]`: the count must be an integer, got `" ++ self.type_name(count_ty as i32) ++ "` (§4.3a)", count_node)
+            return -1
+        if not self.expr_is_const_expr(count_node):
+            self.emit_error("`[value; N]`: the count is not a compile-time constant; N is an integer literal or a `const` (§4.3a) — a `let` is a runtime value (§9.1b)", count_node)
             return -1
         let value = unsafe { comptime_try_eval_expr(self as *mut Sema, self.ast, self.pool, count_node) }
         if value.kind != ComptimeValueKind.CV_INT:

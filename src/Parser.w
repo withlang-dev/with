@@ -7787,7 +7787,12 @@ impl Parser:
             let type_extra = self.pool.extra_len()
             self.pool.add_extra(type_ann)
             flags = flags + (type_extra + 1) * 2
-        self.pool.add_node(NodeKind.NK_LET_BINDING, start, self.prev_end(), name_sym, value, flags)
+        let binding = self.pool.add_node(NodeKind.NK_LET_BINDING, start, self.prev_end(), name_sym, value, flags)
+        // A local `const` is a const as a module one is (§9.1b): Sema asks
+        // is_const_decl_node whether a name is a compile-time constant (a
+        // `[v; N]` count, #1478); the comptime wrapper alone is folded away.
+        self.pool.mark_const_decl(binding)
+        binding
 
     // ── With expression ──────────────────────────────────────────────
 
