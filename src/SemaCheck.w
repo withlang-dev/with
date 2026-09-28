@@ -18,6 +18,7 @@ use SemaTypes
 use SemaDecl
 use FnAbi
 use TargetSpec
+use compiler.BundleInterfaces
 
 extern fn with_str_clone_ref(s: &str) -> str
 extern fn with_write(s: &str) -> Unit
@@ -2002,6 +2003,13 @@ impl Sema:
                     if self.ast.fn_decl_body_is_interface(decl):
                         self.update_module_context(di)
                         self.apply_interface_declared_effects(decl, fn_name)
+                        // #1827: no body here — its global writes are its
+                        // bundle's exports (record_interface_fn_global_writes).
+                        let interface_sig = self.get_sig(fn_name)
+                        if interface_sig >= 0:
+                            self.global_interface_fns.push(interface_sig)
+                            self.global_interface_fns.push(decl)
+                            self.global_interface_fns.push(self.local_file_id)
                         continue
                     // Skip generic functions
                     let meta = self.ast.find_fn_meta(decl)
@@ -2105,10 +2113,62 @@ impl Sema:
         let body = self.global_effect_body()
         if body == -1:
             return
+        self.push_global_write_record(body, sym, node, self.local_file_id, GLOBAL_WRITE_PLACE)
+
+    mut fn push_global_write_record(body: i32, sym: i32, node: i32, file: i32, kind: i32):
         self.global_write_records.push(body)
         self.global_write_records.push(sym)
         self.global_write_records.push(node)
-        self.global_write_records.push(self.local_file_id)
+        self.global_write_records.push(file)
+        self.global_write_records.push(kind)
+
+    // #1827 (D39, §9.1c): a bundle function's body is not in this
+    // compilation, and its declaration states nothing about globals, so a
+    // call of it counts as writing every global its bundle's interface
+    // exports that can be written at all — a `var`, or a `let` whose value
+    // can change in place (not a scalar, `str` or pointer, D12). Assuming the
+    // write can only refuse a valid program (D51's test); assuming none let a
+    // view of the bundle's storage dangle. Written for the globals some kept
+    // check is about (`checked`, keyed by symbol).
+    mut fn record_interface_fn_global_writes(checked: &HashMap[i32, i32]):
+        let fn_count = self.global_interface_fns.len() as i32 / 3
+        if fn_count == 0:
+            return
+        // The bundle interface globals, as [bundle, symbol] pairs.
+        let exports: Vec[i32] = Vec.new()
+        for bi in 0..self.bind_names.len() as i32:
+            let sym: i32 = self.bind_names[bi]
+            if not checked.contains(sym):
+                continue
+            var path = ""
+            if self.interface_global_index.contains(sym) and self.interface_global_index.get(sym).unwrap() == bi:
+                path = with_str_clone_ref(self.interface_global_paths.get(sym).unwrap())
+            else:
+                for ai in 0..self.interface_global_alt_binds.len() as i32:
+                    if self.interface_global_alt_binds[ai] == bi:
+                        path = with_str_clone_ref(self.interface_global_alt_paths[ai])
+            if path.len() == 0:
+                continue
+            let kind = self.get_type_kind(self.resolve_alias(self.bind_types[bi] as TypeId))
+            let fixed = kind == TypeKind.TY_INT or kind == TypeKind.TY_FLOAT or kind == TypeKind.TY_BOOL or kind == TypeKind.TY_STR or kind == TypeKind.TY_PTR
+            if fixed and self.bind_muts[bi] == 0:
+                continue
+            exports.push(bundle_interface_bundle_id(path))
+            exports.push(sym)
+        if exports.len() == 0:
+            return
+        for fi in 0..fn_count:
+            let sig: i32 = self.global_interface_fns[fi * 3]
+            let node: i32 = self.global_interface_fns[fi * 3 + 1]
+            let file: i32 = self.global_interface_fns[fi * 3 + 2]
+            let bundle = bundle_interface_bundle_id(self.decl_source_path_for_node(node))
+            if bundle < 0:
+                continue
+            var ei = 0
+            while ei + 1 < exports.len() as i32:
+                if exports[ei] == bundle:
+                    self.push_global_write_record(sig, exports[ei + 1], node, file, GLOBAL_WRITE_BUNDLE)
+                ei = ei + 2
 
     // A name that denotes a global's place here: a module `let` or `var`,
     // not a `const` (a value, §9.1c), and not a local that took its name.
@@ -2280,9 +2340,10 @@ impl Sema:
             return "a callable"
         // A specialization's symbol is its template's name, `__sema__` or
         // `__receiver__`, then its key; an extension method's carries
-        // `$ext$` and its extension's key.
+        // `$ext$` and its extension's key, a displaced name `$in$` and its
+        // module (#1703).
         let full: str = with_str_clone_ref(self.pool_resolve(self.sig_names[body]))
-        let parts = full.split("__sema__")[0].split("__receiver__")[0].split("$ext$")
+        let parts = full.split("__sema__")[0].split("__receiver__")[0].split("$ext$")[0].split("$in$")
         "`" ++ parts[0] ++ "`"
 
     // A callable parameter's name (callable_param_body).
@@ -2317,6 +2378,10 @@ impl Sema:
         let check_count = self.global_view_call_checks.len() as i32 / GLOBAL_VIEW_CHECK_STRIDE
         if check_count == 0:
             return
+        var checked: HashMap[i32, i32] = sema_new_map_i32_i32()
+        for ci in 0..check_count:
+            checked.insert(self.global_view_call_checks[ci * GLOBAL_VIEW_CHECK_STRIDE + 1], 1)
+        self.record_interface_fn_global_writes(&checked)
         // The calls that run each body: its target entries, chained.
         var runs_head: HashMap[i32, i32] = sema_new_map_i32_i32()
         let runs_next: Vec[i32] = Vec.new()
@@ -2470,7 +2535,9 @@ impl Sema:
         if write >= 0 and write < self.global_write_records.len() as i32 / GLOBAL_WRITE_STRIDE:
             let write_node: i32 = self.global_write_records[write * GLOBAL_WRITE_STRIDE + 2]
             let write_file: i32 = self.global_write_records[write * GLOBAL_WRITE_STRIDE + 3]
-            diag.add_label(Span { file: write_file, start: self.ast.get_start(write_node), end: self.ast.get_end(write_node) }, "`" ++ name ++ "` is written here")
+            let write_kind: i32 = self.global_write_records[write * GLOBAL_WRITE_STRIDE + 4]
+            let write_label = if write_kind == GLOBAL_WRITE_BUNDLE: "a bundle function, declared here with no body in this program: it counts as writing every global its bundle exports, `" ++ name ++ "` among them (D39: its declaration states no effect on globals)" else: "`" ++ name ++ "` is written here"
+            diag.add_label(Span { file: write_file, start: self.ast.get_start(write_node), end: self.ast.get_end(write_node) }, write_label)
         if last_use != 0:
             diag.add_label(Span { file, start: self.ast.get_start(last_use), end: self.ast.get_end(last_use) }, "view is used here after the call")
         if (flags & 2) != 0:
@@ -7061,7 +7128,11 @@ impl Copy for SemaBorrowLiveness
 // and the body a callable parameter stands for: GLOBAL_PARAM_BODY + its
 // function's signature index * 32 + the parameter's index. (A body is a
 // signature index, -2 - a closure node, or one of these.)
-const GLOBAL_WRITE_STRIDE: i32 = 4
+const GLOBAL_WRITE_STRIDE: i32 = 5
+// What a write record is: a write of the place in the body, or a bundle
+// function's assumed write of a global its bundle exports (#1827).
+const GLOBAL_WRITE_PLACE: i32 = 0
+const GLOBAL_WRITE_BUNDLE: i32 = 1
 const GLOBAL_CALL_STRIDE: i32 = 6
 const GLOBAL_TARGET_STRIDE: i32 = 3
 const GLOBAL_BINDING_STRIDE: i32 = 3

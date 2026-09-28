@@ -1036,6 +1036,10 @@ pub type Sema {
     // A function named as a value (`apply(change)`), keyed by the ident
     // node, to the signature Sema resolved it to (check_ident).
     fn_value_ident_sigs: HashMap[i32, i32],
+    // #1827: a function with no body in this compilation (a bundle interface
+    // declaration, D39), as [signature, declaration node, file]: it writes
+    // every global its bundle's interface exports.
+    global_interface_fns: Vec[i32],
 
     // Hot intrinsic symbols used in semantic dispatch paths.
     syms: SemaBuiltinSymbols,
@@ -2736,6 +2740,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         global_view_call_checks: Vec.new(),
         current_effect_closure: 0,
         fn_value_ident_sigs: sema_new_map_i32_i32(),
+        global_interface_fns: Vec.new(),
         syms: sema_builtin_symbols_zero(),
         method_impl_nodes,
         method_decl_impl_nodes,
