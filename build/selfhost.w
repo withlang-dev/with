@@ -5784,6 +5784,88 @@ fn bs_check_build_w_comptime_with_entry(ctx: &ActionCtx, compiler_path: &str, ba
         return bs_fail(ctx, "duplicate comptime-with default binding unexpectedly succeeded")
     bs_assert_contains(ctx, duplicate.stderr, "duplicate capability binding", "build_w_comptime_with_duplicate")
 
+// #1866: the comptime evaluator is the bootstrap path — it runs every action
+// whenever the native runner cannot be linked yet (`:seed`, any `--no-deps`
+// action in a fresh checkout, #1797). A complete out/lib of another
+// compiler generation refuses the runner (build_runner_runtime_dirs_are_
+// this_generation), so an empty cimport_stubs.o there forces the evaluator
+// without a second compiler. Two cases: a build.w action that prints (D55's
+// generic print[T] had no inferred type arguments at comptime — every
+// printing action failed, #1804's class) and uses the str intrinsics the
+// build layer spells; and this tree's own `:seed` action, the one that
+// tripped first (seed_lock_value trims every lock line).
+fn bs_force_comptime_evaluator(ctx: &ActionCtx, case_dir: &str) -> i32:
+    bs_write_fixture(ctx, bs_join(case_dir, "out/lib/cimport_stubs.o"), "", "foreign-generation out/lib marker")
+
+fn bs_check_build_w_comptime_evaluator(ctx: &ActionCtx, compiler_path: &str, base_dir: &str) -> i32:
+    let fs = ctx.fs()
+    let print_dir = bs_join(base_dir, "evaluator_print")
+    var rc = bs_write_project_manifest(ctx, print_dir, "evaluatorprint")
+    if rc != 0: return rc
+    rc = bs_force_comptime_evaluator(ctx, print_dir)
+    if rc != 0: return rc
+    let print_build =
+        "use std.build\n\n" ++
+        "fn report_action(ctx: ActionCtx) -> i32:\n" ++
+        "    let count = 3\n" ++
+        "    print(\"plain literal\")\n" ++
+        "    print(f\"formatted {count} headers\")\n" ++
+        "    eprint(f\"to stderr {count}\")\n" ++
+        "    let line = \"  key=Value \\n\"\n" ++
+        "    let l = line.trim()\n" ++
+        "    let eq = l.index_of(\"=\")\n" ++
+        "    print(l.slice(0, eq).to_upper() ++ \":\" ++ l.slice(eq + 1, l.len()).to_lower() ++ \":\" ++ \"ab\".repeat(2))\n" ++
+        "    let _ = ctx.fs().write_text(ctx.output(), \"done\")\n" ++
+        "    0\n\n" ++
+        "comptime with BuildCtx as ctx:\n" ++
+        "pub fn build -> Build:\n" ++
+        "    var report = target_new(.Action, \"report\", \"\").output(\"out/report.txt\")\n" ++
+        "    report.action = report_action\n" ++
+        "    ctx.new_build().add_target(report).default(\"report\")\n"
+    rc = bs_build_w_write_fixture(ctx, bs_join(print_dir, "build.w"), print_build, ctx.target_name(), "evaluator print build.w")
+    if rc != 0: return rc
+    let print_result = bs_build_w_expect_success(ctx, compiler_path, print_dir, "build-w-evaluator-print", bs_blob_to_args(bs_argv_append(bs_argv_append("", "build"), ":report")))
+    if print_result.rc != 0: return print_result.rc
+    rc = bs_assert_not_contains(ctx, print_result.stderr, "runner compiled", "build_w_evaluator_print_ran_in_evaluator")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, print_result.stdout, "plain literal", "build_w_evaluator_print_literal")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, print_result.stdout, "formatted 3 headers", "build_w_evaluator_print_fstring")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, print_result.stderr, "to stderr 3", "build_w_evaluator_eprint_fstring")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, print_result.stdout, "KEY:value:abab", "build_w_evaluator_str_intrinsics")
+    if rc != 0: return rc
+    rc = bs_expect_file_contains(ctx, bs_join(print_dir, "out/report.txt"), "done", "build_w_evaluator_print_output")
+    if rc != 0: return rc
+
+    // This tree's build layer, `:seed` under the evaluator: the tree's
+    // pinned src/main is the seed the lock names, so the action verifies it
+    // in place and never fetches.
+    let root = ctx.project_info().project_root()
+    let seed_dir = bs_join(base_dir, "evaluator_seed")
+    if fs.mkdir_all(bs_join(seed_dir, "src")) != 0:
+        return bs_fail(ctx, "could not create " ++ seed_dir)
+    if fs.copy_file(bs_join(root, "build.w"), bs_join(seed_dir, "build.w")) != 0:
+        return bs_fail(ctx, "could not copy build.w into " ++ seed_dir)
+    if fs.copy_file(bs_join(root, "seed.lock"), bs_join(seed_dir, "seed.lock")) != 0:
+        return bs_fail(ctx, "could not copy seed.lock into " ++ seed_dir)
+    if fs.copy_tree(bs_join(root, "build"), bs_join(seed_dir, "build")) != 0:
+        return bs_fail(ctx, "could not copy build/ into " ++ seed_dir)
+    if fs.copy_tree(bs_join(root, "lib"), bs_join(seed_dir, "lib")) != 0:
+        return bs_fail(ctx, "could not copy lib/ into " ++ seed_dir)
+    if fs.copy_tree(bs_join(root, ".github/workflows"), bs_join(seed_dir, ".github/workflows")) != 0:
+        return bs_fail(ctx, "could not copy .github/workflows into " ++ seed_dir)
+    if fs.symlink(bs_join(root, "src/main"), bs_join(seed_dir, "src/main")) != 0:
+        return bs_fail(ctx, "could not link the pinned seed into " ++ seed_dir)
+    rc = bs_force_comptime_evaluator(ctx, seed_dir)
+    if rc != 0: return rc
+    let seed_result = bs_build_w_expect_success(ctx, compiler_path, seed_dir, "build-w-evaluator-seed", bs_blob_to_args(bs_argv_append(bs_argv_append(bs_argv_append("", "build"), ":seed"), "--no-deps")))
+    if seed_result.rc != 0: return seed_result.rc
+    rc = bs_assert_not_contains(ctx, seed_result.stderr, "runner compiled", "build_w_evaluator_seed_ran_in_evaluator")
+    if rc != 0: return rc
+    bs_assert_contains(ctx, seed_result.stdout, "is the pinned seed", "build_w_evaluator_seed_pinned")
+
 fn bs_check_build_w_workspace_api(ctx: &ActionCtx, compiler_path: &str, base_dir: &str) -> i32:
     let file_dir = bs_join(base_dir, "file_workspace")
     var rc = bs_write_project_manifest(ctx, file_dir, "workspacefile")
@@ -7628,6 +7710,8 @@ pub fn run_cli_selfhost_build_w_action(ctx: ActionCtx) -> i32:
     rc = bs_check_build_w_comptime_with_entry(ctx, compiler_path, bs_join(base_dir, "comptime_with"))
     if rc != 0: return rc
     rc = bs_check_build_w_workspace_api(ctx, compiler_path, bs_join(base_dir, "workspace_api"))
+    if rc != 0: return rc
+    rc = bs_check_build_w_comptime_evaluator(ctx, compiler_path, bs_join(base_dir, "comptime_evaluator"))
     if rc != 0: return rc
     rc = bs_check_build_w_test_targets(ctx, compiler_path, base_dir)
     if rc != 0: return rc
