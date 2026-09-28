@@ -1523,6 +1523,11 @@ pub type Sema {
     // record: closure node, callee sym, sig, param index, consumes (0/1),
     // by-place capture sym (0 when none).
     deferred_closure_arg_checks: Vec[i32],
+    // D63 (§12.4): a callable parameter passed on to another callee's
+    // parameter — it is invoked as often as that parameter is. Six ints per
+    // record: caller sig, caller param index, callee sig, callee param index,
+    // argument node, callee sym. Judged after the effect fixpoint.
+    deferred_callable_forwards: Vec[i32],
     binding_view_dep_data: Vec[i32],
     // Expression-level view metadata for call expressions and view-producing nodes.
     expr_view_param_origins: HashMap[i32, i32],
@@ -2985,6 +2990,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         binding_closure_nodes: sema_new_map_i32_i32(),
         callable_clone_nodes: sema_new_map_i32_i32(),
         deferred_closure_arg_checks: Vec.new(),
+        deferred_callable_forwards: Vec.new(),
         binding_view_dep_data: Vec.new(),
         expr_view_param_origins: sema_new_map_i32_i32(),
         expr_view_into_temporary: sema_new_map_i32_i32(),
@@ -8433,6 +8439,9 @@ impl Sema:
         // write/consume/escape_value effects across the call graph so sig_param_effects is
         // final before any share-place decision (lowering/ABI) reads it.
         self.fixpoint_effect_flow()
+        // D63: a callable parameter passed on is invoked as often as the
+        // parameter it reaches; settled before closure arguments are judged.
+        self.propagate_callable_forwards()
         // D63: closure arguments are judged against their callee's complete
         // escape effects and call-once flags, whatever the declaration order.
         self.finalize_closure_arg_checks()
