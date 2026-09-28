@@ -673,6 +673,9 @@ pub type Sema {
     // Per body: how many times each callable binding is invoked (symbol →
     // count; an invocation inside a loop counts twice).
     fn_param_invocations: HashMap[i32, i32],
+    // Per body: the call that made a callable binding's count exceed one
+    // (the site a `once` parameter's error names, §12.4).
+    fn_param_many_nodes: HashMap[i32, i32],
     sig_param_eff_starts: Vec[i32],
     // Parallel signature metadata for value parameters lowered through pointer ABI.
     // This is distinct from semantic reference types: `self: &Self` is already a
@@ -2530,6 +2533,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         sig_param_view_origins: Vec.new(),
         sig_param_invoke_many: Vec.new(),
         fn_param_invocations: sema_new_map_i32_i32(),
+        fn_param_many_nodes: sema_new_map_i32_i32(),
         sig_param_eff_starts: Vec.new(),
         sig_value_ref_abi_params: Vec.new(),
         mres_nodes: Vec.new(),

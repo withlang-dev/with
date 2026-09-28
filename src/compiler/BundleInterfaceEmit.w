@@ -590,10 +590,16 @@ impl BundleEmitter:
             if printed > 0:
                 params = params ++ ", "
             let noalias = fn_param_is_noalias(pflags) != 0
-            params = params ++ (if noalias: "@[noalias] " else: "") ++ pname ++ ": " ++ spelling
-            params_row = params_row ++ pname ++ ":" ++ spelling ++ f":{vra}:{eff}" ++ (if noalias: ":noalias" else: "") ++ ";"
+            // §12.4 (D75): the bundle interface records `once` — a consumer
+            // may pass a consuming closure only to such a parameter.
+            let once = fn_param_is_once(pflags)
+            params = params ++ (if noalias: "@[noalias] " else: "") ++ pname ++ ": " ++ (if once: "once " else: "") ++ spelling
+            params_row = params_row ++ pname ++ ":" ++ spelling ++ f":{vra}:{eff}" ++ (if noalias: ":noalias" else: "") ++ (if once: ":once" else: "") ++ ";"
             printed = printed + 1
-            self.note_effect_disagreement(sema, node, sig, pi, full, pname, eff, origin)
+            // A `once` callable is consumed by its one invocation: the
+            // declared consume is the contract, not a mistaken `&T`.
+            if not once:
+                self.note_effect_disagreement(sema, node, sig, pi, full, pname, eff, origin)
         if is_variadic:
             params = params ++ (if printed > 0: ", ..." else: "...")
             params_row = params_row ++ "...;"

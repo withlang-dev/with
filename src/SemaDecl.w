@@ -1948,6 +1948,9 @@ impl Sema:
             // caller passes an address, so no opaque value is materialized.
             if self.is_opaque_value_type(p_tid) != 0 and self.fn_param_uses_value_ref_abi(param_start, pi, method_owner_sym, self_type_id) == 0:
                 self.emit_error("opaque types cannot be passed by value; use a pointer or reference", p_type_node)
+            // §12.4 (D75): `once` is a promise about invoking a callable.
+            if fn_param_is_once(p_flags) and p_tid != 0 and self.get_type_kind(self.resolve_alias(p_tid)) != TypeKind.TY_FN:
+                self.emit_error("`once` marks a callable parameter (`f: once fn(A) -> R`, §12.4); `" ++ self.type_name(p_tid as i32) ++ "` is not callable", p_type_node)
             // Check for duplicate implicit parameter types (spec §F6)
             if fn_param_is_implicit(p_flags) != 0:
                 for prev in 0..implicit_type_ids.len() as i32:

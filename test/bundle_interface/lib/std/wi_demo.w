@@ -44,6 +44,9 @@ pub fn sum_slice(xs: []i32) -> i32:
 pub fn level_value(l: Level) -> u8: l as u8
 pub fn packet_word(p: &Packet) -> i32: p.word
 pub fn va_size(args: &c_va_list) -> i64: sizeof[c_va_list]()
+// §12.4 (D75): a consuming closure crosses the boundary only to `once`.
+pub fn call_once(f: once fn() -> i32) -> i32: f()
+pub fn call_twice(f: fn() -> i32) -> i32: f() + f()
 impl Pair:
     pub fn sum() -> i32: self.a + self.b
     pub mut fn scale(k: i32) -> Unit:

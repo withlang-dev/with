@@ -1228,7 +1228,7 @@ fn render_params(pool: AstPool, intern: InternPool, param_start: i32, param_coun
             out.push_str("@[noalias] ")
         out.push_str(intern.resolve(name_sym))
         if type_node != 0:
-            out.push_str(": " ++ render_type_expr(pool, intern, (type_node) as NodeId))
+            out.push_str(": " ++ (if fn_param_is_once(flags): "once " else: "") ++ render_type_expr(pool, intern, (type_node) as NodeId))
     out.to_str()
 
 fn array_lit_is_fill(pool: AstPool, extra_start: i32, count: i32) -> bool:

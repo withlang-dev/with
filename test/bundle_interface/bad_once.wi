@@ -1,0 +1,3 @@
+// §12.4 (D75): `once` marks a callable parameter; on any other type it is an
+// error on the declaration.
+pub fn count(n: once i32) -> i32

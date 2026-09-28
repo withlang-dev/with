@@ -8215,14 +8215,17 @@ fn bs_check_bundle_interface(ctx: &ActionCtx, compiler_path: &str, nm_tool: &str
     mutation_names |> push("drop-field")
     mutation_names |> push("discriminant")
     mutation_names |> push("ref-to-owned")
+    mutation_names |> push("once-dropped")
     var mutation_from: Vec[str] = Vec.new()
     mutation_from |> push("pub type Pair { a: i32, b: i32 }")
     mutation_from |> push("High = 200")
     mutation_from |> push("pub fn add(p: &Pair) -> i32")
+    mutation_from |> push("pub fn call_once(f: once fn() -> i32) -> i32")
     var mutation_to: Vec[str] = Vec.new()
     mutation_to |> push("pub type Pair { a: i32 }")
     mutation_to |> push("High = 201")
     mutation_to |> push("pub fn add(p: Pair) -> i32")
+    mutation_to |> push("pub fn call_once(f: fn() -> i32) -> i32")
     for mi in 0..mutation_names.len() as i32:
         let mname = mutation_names[mi]
         if not emitted_wi.contains(mutation_from[mi]):
@@ -8269,7 +8272,17 @@ fn bs_check_bundle_interface(ctx: &ActionCtx, compiler_path: &str, nm_tool: &str
     if built.rc != 0: return bs_fail(ctx, f"consumer build against the bundle interface failed with exit code {built.rc}")
     let ran = bs_run_binary_capture(ctx, consumer, "bundle-interface-consumer-run", 120000)
     if ran.rc != 0: return bs_fail(ctx, f"consumer linked against the bundle failed with exit code {ran.rc}")
-    rc = bs_assert_stdout_exact(ctx, ran, "18 7 80 3 7 2 6 200 3 3 5 42 5", "bundle interface consumer")
+    rc = bs_assert_stdout_exact(ctx, ran, "18 7 80 3 7 2 6 200 3 3 5 42 5 4 6", "bundle interface consumer")
+    if rc != 0: return rc
+
+    // §12.4 (D75): across the boundary a consuming closure may reach only a
+    // parameter the interface declares `once`; `call_twice` does not.
+    let twice_src = bs_join(case_dir, "consume_twice.w")
+    rc = bs_write_fixture(ctx, twice_src, "use std.wi_demo\nfn owned_len(s: str) -> i32: s.len() as i32\nfn main:\n    let word = \"four\".clone()\n    print(call_twice(() => owned_len(word)))\n", "consuming closure to a plain bundle parameter")
+    if rc != 0: return rc
+    let twice_build = bs_run_cli_capture(ctx, compiler_path, "bundle-interface-once-refused", bs_bundle_build_args(twice_src, bundle, bs_join(case_dir, "consume_twice"), false), 120000)
+    if twice_build.rc == 0: return bs_fail(ctx, "a consuming closure passed across the bundle boundary to a parameter not declared `once` was accepted")
+    rc = bs_assert_contains(ctx, twice_build.stderr, "its parameter is not declared `once`", "consuming closure refused at a plain bundle parameter")
     if rc != 0: return rc
 
     // Importing a section without demanding its types must leave their
@@ -8305,6 +8318,8 @@ fn bs_check_bundle_interface(ctx: &ActionCtx, compiler_path: &str, nm_tool: &str
     rc = bs_expect_bundle_refusal(ctx, compiler_path, case_dir, "wi_refuse_const", "const ORIGIN: constant does not fold to a literal")
     if rc != 0: return rc
     rc = bs_expect_bundle_refusal(ctx, compiler_path, case_dir, "wi_refuse_elision", "fn choose: returns a reference with no unambiguous origin")
+    if rc != 0: return rc
+    rc = bs_expect_bundle_refusal(ctx, compiler_path, case_dir, "wi_refuse_once", "is declared `once`, but this body may invoke it more than once")
     if rc != 0: return rc
 
     // Declaration only: the consumer's object references the bundle's
@@ -8355,6 +8370,8 @@ fn bs_check_bundle_interface(ctx: &ActionCtx, compiler_path: &str, nm_tool: &str
     rc = bs_expect_wi_check_error(ctx, compiler_path, "bundle-interface-bad-elision", "test/bundle_interface/bad_elision.wi", "returns a reference with no unambiguous origin")
     if rc != 0: return rc
     rc = bs_expect_wi_check_error(ctx, compiler_path, "bundle-interface-body-in-wi", "test/bundle_interface/body_in_wi.wi", "interface declarations carry no bodies")
+    if rc != 0: return rc
+    rc = bs_expect_wi_check_error(ctx, compiler_path, "bundle-interface-bad-once", "test/bundle_interface/bad_once.wi", "`once` marks a callable parameter")
     if rc != 0: return rc
     bs_expect_wi_check_error(ctx, compiler_path, "bundle-interface-init-in-wi", "test/bundle_interface/init_in_wi.wi", "interface storage declarations carry no initializer")
 

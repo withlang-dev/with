@@ -2460,7 +2460,9 @@ impl Sema:
         // specialization is checked in the middle of its caller's body, and
         // reset the caller's counts: `f(); id(1); f()` counted one call.
         let saved_invocations = move self.fn_param_invocations
+        let saved_many_nodes = move self.fn_param_many_nodes
         self.fn_param_invocations = sema_new_map_i32_i32()
+        self.fn_param_many_nodes = sema_new_map_i32_i32()
         while self.current_fn_param_syms.len() > 0:
             self.current_fn_param_syms.pop()
             self.current_fn_param_effs.pop()
@@ -2744,9 +2746,13 @@ impl Sema:
             // parameter that is only invoked accrues no effect bits, so this
             // sits outside the `eff != 0` guard above.
             if sig_idx >= 0 and pi < self.current_fn_param_syms.len() as i32:
-                let invoke_sym = self.current_fn_param_syms[pi]
-                let invocations = if self.fn_param_invocations.contains(invoke_sym): self.fn_param_invocations.get(invoke_sym).unwrap() else: 0
+                let invoke_sym: i32 = self.current_fn_param_syms[pi]
+                let invocations = self.fn_param_invocations.get(invoke_sym) ?? 0
                 self.set_sig_param_invoke_many(sig_idx, pi, if invocations > 1: 1 else: 0)
+                // §12.4 (D75): `once` is a checked contract.
+                if invocations > 1 and meta >= 0 and fn_param_is_once(self.ast.fn_param_flags(self.ast.fn_meta_param_start(meta), pi)):
+                    let once_name: str = with_str_clone_ref(self.pool_resolve(invoke_sym))
+                    self.emit_error("`" ++ once_name ++ "` is declared `once`, but this body may invoke it more than once — a second call, or a call inside a loop (§12.4)", self.fn_param_many_nodes.get(invoke_sym) ?? node)
 
         if raw_validity_param_sym != 0 and self.fn_symbol_is_unsafe(fn_name) == 0:
             let param_name: str = self.pool_resolve(raw_validity_param_sym)
@@ -2779,6 +2785,7 @@ impl Sema:
         self.current_fn_sig_idx = saved_eff_sig_idx
         self.current_fn_variadic = saved_fn_variadic
         self.fn_param_invocations = saved_invocations
+        self.fn_param_many_nodes = saved_many_nodes
         while self.current_fn_param_syms.len() > 0:
             self.current_fn_param_syms.pop()
             self.current_fn_param_effs.pop()
@@ -17249,22 +17256,31 @@ impl Sema:
         let decl = self.sig_decl_node(sig_idx)
         decl != 0 and self.ast.fn_decl_body_is_interface(decl as NodeId)
 
+    // §12.4 (D75): whether parameter `pi` is declared `once` — the contract
+    // the declaration states and a bundle interface records.
+    fn sig_param_is_once(sig_idx: i32, pi: i32) -> bool:
+        let decl = self.sig_decl_node(sig_idx)
+        if decl == 0:
+            return false
+        let meta = self.ast.find_fn_meta(decl)
+        if meta < 0 or pi < 0 or pi >= self.ast.fn_meta_param_count(meta):
+            return false
+        fn_param_is_once(self.ast.fn_param_flags(self.ast.fn_meta_param_start(meta), pi))
+
     // §12.4: a callee may invoke parameter `pi` more than once when its body
     // does (sig_param_invoke_many, forwarding included), or when it has no
-    // body in this compilation.
+    // body in this compilation and its declaration does not say `once`.
     fn sig_param_may_invoke_many(sig_idx: i32, pi: i32) -> bool:
-        self.sig_param_invoke_many_at(sig_idx, pi) != 0 or self.sig_is_bodiless(sig_idx)
+        self.sig_param_invoke_many_at(sig_idx, pi) != 0 or (self.sig_is_bodiless(sig_idx) and not self.sig_param_is_once(sig_idx, pi))
 
     // D63 (§12.4 "The callable type"), checked where a closure literal is
     // handed to a parameter: a non-move closure is a view of this frame and
     // may only reach a callee that neither stores nor returns the parameter
     // (its ESCAPE_VALUE effect says it does — pass `move () => ...`); a
-    // consuming closure is call-once and may only reach a callee whose body
-    // invokes the parameter at most once (proved from the body; a callee
-    // without a body in this compilation — a bundle interface — may invoke
-    // it any number of times and is refused until a `once` annotation
-    // exists, #1604). A callable parameter passed on is recorded as a
-    // forward (note_callable_forward).
+    // consuming closure is call-once and may only reach a callee that
+    // invokes the parameter at most once — proved from the callee's body,
+    // or, across a bundle boundary, declared `once` (D75). A callable
+    // parameter passed on is recorded as a forward (note_callable_forward).
     mut fn check_closure_arg_against_param(arg_node: i32, callee_sym: i32, sig_idx: i32, param_i: i32, call_node: i32):
         if arg_node <= 0 or sig_idx < 0:
             return
@@ -17320,8 +17336,8 @@ impl Sema:
             if consumes != 0:
                 if self.sig_param_invoke_many_at(sig_idx, param_i) != 0:
                     self.emit_error("this closure consumes its capture and may be invoked once, but `" ++ callee_name ++ "` invokes its parameter more than once (§12.4)", closure_node)
-                else if self.sig_is_bodiless(sig_idx):
-                    self.emit_error("this closure consumes its capture and may be invoked once, but `" ++ callee_name ++ "` has no body in this compilation (a bundle boundary), so it may invoke its parameter any number of times (§12.4; a `once` parameter annotation is #1604)", closure_node)
+                else if self.sig_is_bodiless(sig_idx) and not self.sig_param_is_once(sig_idx, param_i):
+                    self.emit_error("this closure consumes its capture and may be invoked once, but `" ++ callee_name ++ "` has no body in this compilation (a bundle boundary) and its parameter is not declared `once` (`f: once fn(A) -> R`), so it may invoke it any number of times (§12.4)", closure_node)
 
     // Whether a binding's recorded origins name a stack local of this frame
     // (a non-move closure over `xs`, a value holding one).
@@ -17359,7 +17375,8 @@ impl Sema:
     // body published its own count and before closure arguments are judged.
     // Before, `fn apply(f: fn() -> str) -> str: twice(f)` took a consuming
     // closure and `twice` ran it twice (the second call read the
-    // move-blanked capture).
+    // move-blanked capture). A `once` parameter forwarded that way is a body
+    // that may invoke it more than once (D75).
     mut fn propagate_callable_forwards():
         let n = self.deferred_callable_forwards.len() as i32
         var changed = true
@@ -17371,11 +17388,17 @@ impl Sema:
                 let caller_pi: i32 = self.deferred_callable_forwards[(i + 1)]
                 let callee_sig: i32 = self.deferred_callable_forwards[(i + 2)]
                 let callee_pi: i32 = self.deferred_callable_forwards[(i + 3)]
+                let arg_node: i32 = self.deferred_callable_forwards[(i + 4)]
+                let callee_sym: i32 = self.deferred_callable_forwards[(i + 5)]
                 i = i + 6
                 if self.sig_param_invoke_many_at(caller_sig, caller_pi) != 0 or not self.sig_param_may_invoke_many(callee_sig, callee_pi):
                     continue
                 self.set_sig_param_invoke_many(caller_sig, caller_pi, 1)
                 changed = true
+                if self.sig_param_is_once(caller_sig, caller_pi):
+                    let param_name: str = with_str_clone_ref(self.pool_resolve(self.ast.get_data0(arg_node)))
+                    let callee_name: str = with_str_clone_ref(self.pool_resolve(callee_sym))
+                    self.emit_error("`" ++ param_name ++ "` is declared `once`, but `" ++ callee_name ++ "` may invoke its parameter more than once (§12.4)", arg_node)
 
     // A non-move closure that captures a non-Copy local holds a view of that
     // local's place (§12.4); the binding that holds the closure carries those
@@ -19363,8 +19386,10 @@ impl Sema:
                     callable_closure_node = self.binding_closure_nodes.get(fn_sym).unwrap()
                 // D63 call-once: count this body's invocations of the callable
                 // binding; inside a loop one site counts as many.
-                let seen = if self.fn_param_invocations.contains(fn_sym): self.fn_param_invocations.get(fn_sym).unwrap() else: 0
-                self.fn_param_invocations.insert(fn_sym, seen + (if self.loop_depth > 0: 2 else: 1))
+                let invocations = (self.fn_param_invocations.get(fn_sym) ?? 0) + (if self.loop_depth > 0: 2 else: 1)
+                self.fn_param_invocations.insert(fn_sym, invocations)
+                if invocations > 1 and not self.fn_param_many_nodes.contains(fn_sym):
+                    self.fn_param_many_nodes.insert(fn_sym, node)
             if local_tid < 0 and self.symbol_visible_from_current(fn_sym) == 0:
                 self.emit_private_symbol_error(fn_sym, callee)
                 return 0

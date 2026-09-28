@@ -8785,6 +8785,16 @@ impl Parser:
             self.skip_newlines()
         flags
 
+    // Whether the token after the current one can begin a type — so a
+    // contextual keyword before it (`once fn() -> T`) is a keyword, not a
+    // type of that name ending the parameter.
+    mut fn next_token_starts_type() -> bool:
+        let saved_pos: i32 = self.pos
+        self.advance()
+        let next = self.peek()
+        self.pos = saved_pos
+        next != TokenKind.TK_COMMA and next != TokenKind.TK_R_PAREN and next != TokenKind.TK_EQ and next != TokenKind.TK_NEWLINE and next != TokenKind.TK_EOF
+
     mut fn param_binding_should_parse_pattern() -> bool:
         let t = self.peek()
         if t == TokenKind.TK_L_PAREN or t == TokenKind.TK_L_BRACE or t == TokenKind.TK_L_BRACKET or
@@ -8956,6 +8966,11 @@ impl Parser:
                         extra_flags = extra_flags + FN_PARAM_FLAG_IMPLICIT
                         self.advance()
                         self.skip_newlines()
+                // §12.4 (D75): `f: once fn(A) -> R` — the callee invokes `f` at
+                // most once. Contextual: `once` followed by a type.
+                if self.peek() == TokenKind.TK_IDENT and self.intern.resolve(self.intern_current()) == "once" and self.next_token_starts_type():
+                    extra_flags = extra_flags + FN_PARAM_FLAG_ONCE
+                    self.advance()
                 type_node = self.parse_type_expr()
                 // `self: &T` receiver — read-only view.
                 if is_self_param and is_mut == 0 and is_move == 0:
