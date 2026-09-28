@@ -650,7 +650,10 @@ has the C calling convention and is `unsafe` to call. Its body reads the
 variable arguments through `var ap = va_start()`, which yields the target's
 `c_va_list`, and `ap.arg[T]()`, which the compiler lowers for the target; the
 list ends with its scope. The C migrator translates a variadic C definition to
-this form.
+this form. The type of a variadic C function as a value is `extern "C" fn(A,
+..., ...) -> R`: calling through it is raw and its `unsafe` is implied, only an
+`extern "C"` function type may end in `...`, and a variadic and a fixed-arity
+function type are distinct types that never coerce to one another.
 
 The type of a variadic C function as a value is `extern "C" fn(A, B, ...) -> R`,
 where `A, B` stand for its fixed parameters and the trailing `...` is the
