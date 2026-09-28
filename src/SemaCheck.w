@@ -2456,6 +2456,11 @@ impl Sema:
         let saved_eff_param_direct_effs = sema_clone_i32_vec(&self.current_fn_param_direct_effs)
         let saved_eff_param_origins = sema_clone_i32_vec(&self.current_fn_param_origins)
         let saved_eff_param_view_nodes = sema_clone_i32_vec(&self.current_fn_param_view_nodes)
+        // D63: the invocation counts are this body's. A generic callee's
+        // specialization is checked in the middle of its caller's body, and
+        // reset the caller's counts: `f(); id(1); f()` counted one call.
+        let saved_invocations = move self.fn_param_invocations
+        self.fn_param_invocations = sema_new_map_i32_i32()
         while self.current_fn_param_syms.len() > 0:
             self.current_fn_param_syms.pop()
             self.current_fn_param_effs.pop()
@@ -2465,7 +2470,6 @@ impl Sema:
         if meta >= 0:
             let eff_ps = self.ast.fn_meta_param_start(meta)
             let eff_pc = self.ast.fn_meta_param_count(meta)
-            self.fn_param_invocations = sema_new_map_i32_i32()
             for pi in 0..eff_pc:
                 self.current_fn_param_syms.push(self.ast.fn_param_name(eff_ps, pi))
                 // §9.5/G2 (D6): a `move self` receiver is CONSUMED by the callee, so
@@ -2774,6 +2778,7 @@ impl Sema:
         // Restore state
         self.current_fn_sig_idx = saved_eff_sig_idx
         self.current_fn_variadic = saved_fn_variadic
+        self.fn_param_invocations = saved_invocations
         while self.current_fn_param_syms.len() > 0:
             self.current_fn_param_syms.pop()
             self.current_fn_param_effs.pop()
@@ -17232,6 +17237,24 @@ impl Sema:
                     return 1
         0
 
+    // The declaration a signature was registered from, or 0.
+    fn sig_decl_node(sig_idx: i32) -> i32:
+        if sig_idx < 0 or sig_idx >= self.sig_names.len() as i32:
+            return 0
+        self.fn_decl_nodes.get(self.sig_names[sig_idx]) ?? 0
+
+    // §3.4: a signature whose declaration has no body in this compilation —
+    // a bundle interface (D39) — may do anything its declaration allows.
+    fn sig_is_bodiless(sig_idx: i32) -> bool:
+        let decl = self.sig_decl_node(sig_idx)
+        decl != 0 and self.ast.fn_decl_body_is_interface(decl as NodeId)
+
+    // §12.4: a callee may invoke parameter `pi` more than once when its body
+    // does (sig_param_invoke_many, forwarding included), or when it has no
+    // body in this compilation.
+    fn sig_param_may_invoke_many(sig_idx: i32, pi: i32) -> bool:
+        self.sig_param_invoke_many_at(sig_idx, pi) != 0 or self.sig_is_bodiless(sig_idx)
+
     // D63 (§12.4 "The callable type"), checked where a closure literal is
     // handed to a parameter: a non-move closure is a view of this frame and
     // may only reach a callee that neither stores nor returns the parameter
@@ -17240,7 +17263,8 @@ impl Sema:
     // invokes the parameter at most once (proved from the body; a callee
     // without a body in this compilation — a bundle interface — may invoke
     // it any number of times and is refused until a `once` annotation
-    // exists, #1604).
+    // exists, #1604). A callable parameter passed on is recorded as a
+    // forward (note_callable_forward).
     mut fn check_closure_arg_against_param(arg_node: i32, callee_sym: i32, sig_idx: i32, param_i: i32, call_node: i32):
         if arg_node <= 0 or sig_idx < 0:
             return
@@ -17252,6 +17276,7 @@ impl Sema:
         else if self.ast.kind(arg_node) == NodeKind.NK_IDENT and self.binding_closure_nodes.contains(self.ast.get_data0(arg_node)) and self.scope_has(self.ast.get_data0(arg_node)) != 0:
             closure_node = self.binding_closure_nodes.get(self.ast.get_data0(arg_node)).unwrap()
         if closure_node == 0:
+            self.note_callable_forward(arg_node, callee_sym, sig_idx, param_i)
             return
         if param_i < 0 or param_i >= self.sig_get_param_count(sig_idx):
             return
@@ -17293,10 +17318,9 @@ impl Sema:
                 self.emit_error("closure argument holds `" ++ cap_name ++ "` by place — a view of this frame — and `" ++ callee_name ++ "` stores or returns its parameter (§12.4); pass an owning closure: `move () => ...`", closure_node)
                 continue
             if consumes != 0:
-                let bodiless = if self.fn_decl_nodes.contains(callee_sym) and self.ast.fn_decl_body_is_interface(self.fn_decl_nodes.get(callee_sym).unwrap() as NodeId): 1 else: 0
                 if self.sig_param_invoke_many_at(sig_idx, param_i) != 0:
                     self.emit_error("this closure consumes its capture and may be invoked once, but `" ++ callee_name ++ "` invokes its parameter more than once (§12.4)", closure_node)
-                else if bodiless != 0:
+                else if self.sig_is_bodiless(sig_idx):
                     self.emit_error("this closure consumes its capture and may be invoked once, but `" ++ callee_name ++ "` has no body in this compilation (a bundle boundary), so it may invoke its parameter any number of times (§12.4; a `once` parameter annotation is #1604)", closure_node)
 
     // Whether a binding's recorded origins name a stack local of this frame
@@ -17308,6 +17332,50 @@ impl Sema:
             if self.view_origin_is_stack_local(self.binding_view_dep_at(sym, di)) != 0:
                 return true
         false
+    // D63 (§12.4): a callable parameter passed on (`twice(f)`) is invoked as
+    // often as the parameter it reaches. The callee's facts are final only
+    // after every body is checked, so the forward is recorded here and
+    // judged by propagate_callable_forwards.
+    mut fn note_callable_forward(arg_node: i32, callee_sym: i32, sig_idx: i32, param_i: i32):
+        var n = arg_node
+        while n != 0 and (self.ast.kind(n) == NodeKind.NK_GROUPED or self.ast.kind(n) == NodeKind.NK_MOVE_ARG):
+            n = self.ast.get_data0(n)
+        if n == 0 or self.ast.kind(n) != NodeKind.NK_IDENT or self.current_fn_sig_idx < 0:
+            return
+        let caller_pi = self.param_index_for_sym(self.ast.get_data0(n))
+        if caller_pi < 0 or param_i < 0 or param_i >= self.sig_get_param_count(sig_idx):
+            return
+        if self.get_type_kind(self.resolve_alias(self.sig_param_type(self.current_fn_sig_idx, caller_pi) as TypeId)) != TypeKind.TY_FN:
+            return
+        self.deferred_callable_forwards.push(self.current_fn_sig_idx)
+        self.deferred_callable_forwards.push(caller_pi)
+        self.deferred_callable_forwards.push(sig_idx)
+        self.deferred_callable_forwards.push(param_i)
+        self.deferred_callable_forwards.push(n)
+        self.deferred_callable_forwards.push(callee_sym)
+
+    // D63 (§12.4): a parameter forwarded to one that may be invoked more
+    // than once may itself be — to a fixpoint over the forwards, after every
+    // body published its own count and before closure arguments are judged.
+    // Before, `fn apply(f: fn() -> str) -> str: twice(f)` took a consuming
+    // closure and `twice` ran it twice (the second call read the
+    // move-blanked capture).
+    mut fn propagate_callable_forwards():
+        let n = self.deferred_callable_forwards.len() as i32
+        var changed = true
+        while changed:
+            changed = false
+            var i = 0
+            while i + 5 < n:
+                let caller_sig: i32 = self.deferred_callable_forwards[i]
+                let caller_pi: i32 = self.deferred_callable_forwards[(i + 1)]
+                let callee_sig: i32 = self.deferred_callable_forwards[(i + 2)]
+                let callee_pi: i32 = self.deferred_callable_forwards[(i + 3)]
+                i = i + 6
+                if self.sig_param_invoke_many_at(caller_sig, caller_pi) != 0 or not self.sig_param_may_invoke_many(callee_sig, callee_pi):
+                    continue
+                self.set_sig_param_invoke_many(caller_sig, caller_pi, 1)
+                changed = true
 
     // A non-move closure that captures a non-Copy local holds a view of that
     // local's place (§12.4); the binding that holds the closure carries those
@@ -17501,9 +17569,19 @@ impl Sema:
         // declared return; a non-Unit one makes a tail assignment its value.
         let body_tail_discards = expected_ret_ty == 0 or expected_ret_ty == self.ty_void as i32
         self.body_tail_discards = body_tail_discards
+        // §12.4: creating a non-`move` closure moves nothing — a capture the
+        // body consumes is moved by each call (apply_closure_capture_consumes)
+        // through the body's effect summary. Checking the body marked the
+        // outer binding moved at creation, so the first call of
+        // `let c = () => take(ys); c()` (the spec's example) was reported as a
+        // second one ("an earlier call already did").
+        let creation_states = self.save_scope_states()
+        let creation_moved_fields = self.save_moved_field_state()
         self.closure_body_depth = self.closure_body_depth + 1
         let checked_body_ty = if expected_ret_ty != 0: self.check_expr_with_expected(body, expected_ret_ty as TypeId) else: self.check_expr_value_context(body)
         self.closure_body_depth = self.closure_body_depth - 1
+        self.restore_scope_states(&creation_states)
+        self.restore_moved_field_state(&creation_moved_fields)
         self.body_tail_block = saved_body_tail_block
         self.body_tail_holder = saved_body_tail_holder
         self.body_tail_discards = saved_body_tail_discards
@@ -20629,6 +20707,11 @@ impl Sema:
         for ai in 0..arg_count:
             if ai >= param_count:
                 break
+            // D63 (§12.4): the specialization's body is the proof a consuming
+            // closure argument needs — it was never consulted, so a generic
+            // callee ran a call-once closure twice.
+            if ai < arg_nodes.len() as i32:
+                self.check_closure_arg_against_param(arg_nodes[ai], fn_sym, sig_idx, ai, call_node)
             let expected_ty = self.sig_param_type(sig_idx, ai)
             let actual_ty = arg_types[ai]
             if expected_ty == 0 or actual_ty == 0:
