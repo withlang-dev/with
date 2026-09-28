@@ -575,7 +575,7 @@ pub fn test_hash_table_out_of_memory() -> Unit {
 
 }
 
-pub fn test_hash_iterator_key_pair(...) -> Unit {
+pub fn test_hash_iterator_key_pair() -> Unit {
     var __local_hash_table: *mut _HashTable
 
     var __local_iterator: _HashTableIterator

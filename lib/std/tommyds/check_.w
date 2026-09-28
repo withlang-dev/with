@@ -245,7 +245,7 @@ pub unsafe fn start(__param_str: *const i8) -> Unit {
 
 }
 
-pub fn stop(...) -> Unit {
+pub fn stop() -> Unit {
     var __local_the_stop: c_ulonglong = ((nano() as c_ulonglong))
 
     printf(c"%25s %8u [ms], %8u [compare]\n".ptr, the_str, (((((__local_the_stop as c_ulonglong) -% (the_start as c_ulonglong)) as c_ulonglong) / (1000000 as c_ulonglong)) as c_uint), compare_counter)
@@ -487,7 +487,7 @@ pub fn test_alloc() -> Unit {
     (__local_i = ((0 as c_uint)))
 
     while ((if __local_i < 10000000: 1 else: 0) != 0) {
-        unsafe { tommy_allocator_free((&raw mut __local_alloc as *mut tommy_allocator_struct), (unsafe __local_PTR[__local_i])) }
+        unsafe { tommy_allocator_free((&raw mut __local_alloc as *mut tommy_allocator_struct), (__local_PTR[__local_i])) }
 
 
         (__local_i = (__local_i +% 1))
@@ -590,7 +590,7 @@ pub fn test_list() -> Unit {
         ((unsafe __local_VECTOR[__local_i]).value = (unsafe __local_LIST[__local_i]).value)
 
 
-        unsafe { tommy_list_insert_tail((&raw mut __local_list as *mut *mut tommy_node_struct), ((&raw const (unsafe __local_LIST[__local_i]).node as *const tommy_node_struct) as *mut tommy_node_struct), (((&raw const (unsafe __local_LIST[__local_i]) as *const object) as *mut object) as *mut c_void)) }
+        unsafe { tommy_list_insert_tail((&raw mut __local_list as *mut *mut tommy_node_struct), ((&raw const (__local_LIST[__local_i]).node as *const tommy_node_struct) as *mut tommy_node_struct), (((&raw const (__local_LIST[__local_i]) as *const object) as *mut object) as *mut c_void)) }
 
 
         (__local_i = (__local_i +% 1))
@@ -637,7 +637,7 @@ pub fn test_list() -> Unit {
 
         }
 
-        unsafe { tommy_list_insert_tail((&raw mut __local_list as *mut *mut tommy_node_struct), ((&raw const (unsafe __local_LIST[__local_i]).node as *const tommy_node_struct) as *mut tommy_node_struct), (((&raw const (unsafe __local_LIST[__local_i]) as *const object) as *mut object) as *mut c_void)) }
+        unsafe { tommy_list_insert_tail((&raw mut __local_list as *mut *mut tommy_node_struct), ((&raw const (__local_LIST[__local_i]).node as *const tommy_node_struct) as *mut tommy_node_struct), (((&raw const (__local_LIST[__local_i]) as *const object) as *mut object) as *mut c_void)) }
 
 
         (__local_i = (__local_i +% 1))
@@ -669,7 +669,7 @@ pub fn test_list() -> Unit {
         ((unsafe __local_VECTOR[__local_i]).value = (unsafe __local_LIST[__local_i]).value)
 
 
-        unsafe { tommy_list_insert_tail((&raw mut __local_list as *mut *mut tommy_node_struct), ((&raw const (unsafe __local_LIST[__local_i]).node as *const tommy_node_struct) as *mut tommy_node_struct), (((&raw const (unsafe __local_LIST[__local_i]) as *const object) as *mut object) as *mut c_void)) }
+        unsafe { tommy_list_insert_tail((&raw mut __local_list as *mut *mut tommy_node_struct), ((&raw const (__local_LIST[__local_i]).node as *const tommy_node_struct) as *mut tommy_node_struct), (((&raw const (__local_LIST[__local_i]) as *const object) as *mut object) as *mut c_void)) }
 
 
         (__local_i = (__local_i +% 1))
@@ -701,7 +701,7 @@ pub fn test_list() -> Unit {
         ((unsafe __local_VECTOR[__local_i]).value = (unsafe __local_LIST[__local_i]).value)
 
 
-        unsafe { tommy_list_insert_tail((&raw mut __local_list as *mut *mut tommy_node_struct), ((&raw const (unsafe __local_LIST[__local_i]).node as *const tommy_node_struct) as *mut tommy_node_struct), (((&raw const (unsafe __local_LIST[__local_i]) as *const object) as *mut object) as *mut c_void)) }
+        unsafe { tommy_list_insert_tail((&raw mut __local_list as *mut *mut tommy_node_struct), ((&raw const (__local_LIST[__local_i]).node as *const tommy_node_struct) as *mut tommy_node_struct), (((&raw const (__local_LIST[__local_i]) as *const object) as *mut object) as *mut c_void)) }
 
 
         (__local_i = (__local_i +% 1))
@@ -733,7 +733,7 @@ pub fn test_list() -> Unit {
         ((unsafe __local_VECTOR[__local_i]).value = (unsafe __local_LIST[__local_i]).value)
 
 
-        unsafe { tommy_list_insert_tail((&raw mut __local_list as *mut *mut tommy_node_struct), ((&raw const (unsafe __local_LIST[__local_i]).node as *const tommy_node_struct) as *mut tommy_node_struct), (((&raw const (unsafe __local_LIST[__local_i]) as *const object) as *mut object) as *mut c_void)) }
+        unsafe { tommy_list_insert_tail((&raw mut __local_list as *mut *mut tommy_node_struct), ((&raw const (__local_LIST[__local_i]).node as *const tommy_node_struct) as *mut tommy_node_struct), (((&raw const (__local_LIST[__local_i]) as *const object) as *mut object) as *mut c_void)) }
 
 
         (__local_i = (__local_i +% 1))
@@ -789,7 +789,7 @@ pub fn test_tree() -> Unit {
     (__local_i = ((0 as c_uint)))
 
     while ((if __local_i < 250000: 1 else: 0) != 0) {
-        if ((if unsafe { tommy_tree_insert((&raw mut __local_tree as *mut tommy_tree_struct), ((&raw const (unsafe __local_OBJ[__local_i]).node as *const tommy_node_struct) as *mut tommy_node_struct), (((&raw const (unsafe __local_OBJ[__local_i]) as *const object_tree) as *mut object_tree) as *mut c_void)) } != (((&raw const (unsafe __local_OBJ[__local_i]) as *const object_tree) as *mut object_tree)): 1 else: 0) != 0) {
+        if ((if unsafe { tommy_tree_insert((&raw mut __local_tree as *mut tommy_tree_struct), ((&raw const (__local_OBJ[__local_i]).node as *const tommy_node_struct) as *mut tommy_node_struct), (((&raw const (__local_OBJ[__local_i]) as *const object_tree) as *mut object_tree) as *mut c_void)) } != (((&raw const (unsafe __local_OBJ[__local_i]) as *const object_tree) as *mut object_tree)): 1 else: 0) != 0) {
             abort()
         }
 
@@ -825,11 +825,11 @@ pub fn test_tree() -> Unit {
     (__local_i = ((0 as c_uint)))
 
     while ((if __local_i < ((250000 as c_uint) / (2 as c_uint)): 1 else: 0) != 0) {
-        if ((if unsafe { tommy_tree_search((&raw mut __local_tree as *mut tommy_tree_struct), (((&raw const (unsafe __local_OBJ[__local_i]) as *const object_tree) as *mut object_tree) as *mut c_void)) } == 0: 1 else: 0) != 0) {
+        if ((if unsafe { tommy_tree_search((&raw mut __local_tree as *mut tommy_tree_struct), (((&raw const (__local_OBJ[__local_i]) as *const object_tree) as *mut object_tree) as *mut c_void)) } == 0: 1 else: 0) != 0) {
             abort()
         }
 
-        if ((if unsafe { tommy_tree_search_compare((&raw mut __local_tree as *mut tommy_tree_struct), compare, (((&raw const (unsafe __local_OBJ[__local_i]) as *const object_tree) as *mut object_tree) as *mut c_void)) } == 0: 1 else: 0) != 0) {
+        if ((if unsafe { tommy_tree_search_compare((&raw mut __local_tree as *mut tommy_tree_struct), compare, (((&raw const (__local_OBJ[__local_i]) as *const object_tree) as *mut object_tree) as *mut c_void)) } == 0: 1 else: 0) != 0) {
             abort()
         }
 
@@ -846,7 +846,7 @@ pub fn test_tree() -> Unit {
 
         (__local_EXTRA.value = ((__local_i as c_int)))
 
-        if ((if unsafe { tommy_tree_insert((&raw mut __local_tree as *mut tommy_tree_struct), ((&raw const (unsafe *(&raw const __local_EXTRA as *const object_tree)).node as *const tommy_node_struct) as *mut tommy_node_struct), ((&raw mut __local_EXTRA as *mut object_tree) as *mut c_void)) } == ((&raw mut __local_EXTRA as *mut object_tree)): 1 else: 0) != 0) {
+        if ((if unsafe { tommy_tree_insert((&raw mut __local_tree as *mut tommy_tree_struct), ((&raw const (*(&raw const __local_EXTRA as *const object_tree)).node as *const tommy_node_struct) as *mut tommy_node_struct), ((&raw mut __local_EXTRA as *mut object_tree) as *mut c_void)) } == ((&raw mut __local_EXTRA as *mut object_tree)): 1 else: 0) != 0) {
             abort()
         }
 
@@ -859,7 +859,7 @@ pub fn test_tree() -> Unit {
     (__local_i = ((0 as c_uint)))
 
     while ((if __local_i < ((250000 as c_uint) / (2 as c_uint)): 1 else: 0) != 0) {
-        unsafe { tommy_tree_remove_existing((&raw mut __local_tree as *mut tommy_tree_struct), ((&raw const (unsafe __local_OBJ[__local_i]).node as *const tommy_node_struct) as *mut tommy_node_struct)) }
+        unsafe { tommy_tree_remove_existing((&raw mut __local_tree as *mut tommy_tree_struct), ((&raw const (__local_OBJ[__local_i]).node as *const tommy_node_struct) as *mut tommy_node_struct)) }
 
         (__local_i = (__local_i +% 1))
 
@@ -869,7 +869,7 @@ pub fn test_tree() -> Unit {
     (__local_i = ((0 as c_uint)))
 
     while ((if __local_i < ((250000 as c_uint) / (2 as c_uint)): 1 else: 0) != 0) {
-        if ((if unsafe { tommy_tree_remove((&raw mut __local_tree as *mut tommy_tree_struct), (((&raw const (unsafe __local_OBJ[__local_i]) as *const object_tree) as *mut object_tree) as *mut c_void)) } != 0: 1 else: 0) != 0) {
+        if ((if unsafe { tommy_tree_remove((&raw mut __local_tree as *mut tommy_tree_struct), (((&raw const (__local_OBJ[__local_i]) as *const object_tree) as *mut object_tree) as *mut c_void)) } != 0: 1 else: 0) != 0) {
             abort()
         }
 
@@ -881,11 +881,11 @@ pub fn test_tree() -> Unit {
     (__local_i = ((0 as c_uint)))
 
     while ((if __local_i < ((250000 as c_uint) / (2 as c_uint)): 1 else: 0) != 0) {
-        if ((if unsafe { tommy_tree_search((&raw mut __local_tree as *mut tommy_tree_struct), (((&raw const (unsafe __local_OBJ[__local_i]) as *const object_tree) as *mut object_tree) as *mut c_void)) } != 0: 1 else: 0) != 0) {
+        if ((if unsafe { tommy_tree_search((&raw mut __local_tree as *mut tommy_tree_struct), (((&raw const (__local_OBJ[__local_i]) as *const object_tree) as *mut object_tree) as *mut c_void)) } != 0: 1 else: 0) != 0) {
             abort()
         }
 
-        if ((if unsafe { tommy_tree_search_compare((&raw mut __local_tree as *mut tommy_tree_struct), compare, (((&raw const (unsafe __local_OBJ[__local_i]) as *const object_tree) as *mut object_tree) as *mut c_void)) } != 0: 1 else: 0) != 0) {
+        if ((if unsafe { tommy_tree_search_compare((&raw mut __local_tree as *mut tommy_tree_struct), compare, (((&raw const (__local_OBJ[__local_i]) as *const object_tree) as *mut object_tree) as *mut c_void)) } != 0: 1 else: 0) != 0) {
             abort()
         }
 
@@ -898,7 +898,7 @@ pub fn test_tree() -> Unit {
     (__local_i = ((0 as c_uint)))
 
     while ((if __local_i < ((250000 as c_uint) / (2 as c_uint)): 1 else: 0) != 0) {
-        if ((if unsafe { tommy_tree_remove((&raw mut __local_tree as *mut tommy_tree_struct), (((&raw const (unsafe __local_OBJ[((((250000 as c_uint) / (2 as c_uint)) as c_uint) +% (__local_i as c_uint))]) as *const object_tree) as *mut object_tree) as *mut c_void)) } == 0: 1 else: 0) != 0) {
+        if ((if unsafe { tommy_tree_remove((&raw mut __local_tree as *mut tommy_tree_struct), (((&raw const (__local_OBJ[((((250000 as c_uint) / (2 as c_uint)) as c_uint) +% (__local_i as c_uint))]) as *const object_tree) as *mut object_tree) as *mut c_void)) } == 0: 1 else: 0) != 0) {
             abort()
         }
 
@@ -920,7 +920,7 @@ pub fn test_tree() -> Unit {
     (__local_i = ((0 as c_uint)))
 
     while ((if __local_i < 250000: 1 else: 0) != 0) {
-        if ((if unsafe { tommy_tree_insert((&raw mut __local_tree as *mut tommy_tree_struct), ((&raw const (unsafe __local_OBJ[__local_i]).node as *const tommy_node_struct) as *mut tommy_node_struct), (((&raw const (unsafe __local_OBJ[__local_i]) as *const object_tree) as *mut object_tree) as *mut c_void)) } != (((&raw const (unsafe __local_OBJ[__local_i]) as *const object_tree) as *mut object_tree)): 1 else: 0) != 0) {
+        if ((if unsafe { tommy_tree_insert((&raw mut __local_tree as *mut tommy_tree_struct), ((&raw const (__local_OBJ[__local_i]).node as *const tommy_node_struct) as *mut tommy_node_struct), (((&raw const (__local_OBJ[__local_i]) as *const object_tree) as *mut object_tree) as *mut c_void)) } != (((&raw const (unsafe __local_OBJ[__local_i]) as *const object_tree) as *mut object_tree)): 1 else: 0) != 0) {
             abort()
         }
 
@@ -932,7 +932,7 @@ pub fn test_tree() -> Unit {
     (__local_i = ((0 as c_uint)))
 
     while ((if __local_i < 250000: 1 else: 0) != 0) {
-        unsafe { tommy_tree_remove_existing((&raw mut __local_tree as *mut tommy_tree_struct), ((&raw const (unsafe __local_OBJ[__local_i]).node as *const tommy_node_struct) as *mut tommy_node_struct)) }
+        unsafe { tommy_tree_remove_existing((&raw mut __local_tree as *mut tommy_tree_struct), ((&raw const (__local_OBJ[__local_i]).node as *const tommy_node_struct) as *mut tommy_node_struct)) }
 
         (__local_i = (__local_i +% 1))
 
@@ -952,7 +952,7 @@ pub fn test_tree() -> Unit {
     (__local_i = ((0 as c_uint)))
 
     while ((if __local_i < 250000: 1 else: 0) != 0) {
-        if ((if unsafe { tommy_tree_insert((&raw mut __local_tree as *mut tommy_tree_struct), ((&raw const (unsafe __local_OBJ[__local_i]).node as *const tommy_node_struct) as *mut tommy_node_struct), (((&raw const (unsafe __local_OBJ[__local_i]) as *const object_tree) as *mut object_tree) as *mut c_void)) } != (((&raw const (unsafe __local_OBJ[__local_i]) as *const object_tree) as *mut object_tree)): 1 else: 0) != 0) {
+        if ((if unsafe { tommy_tree_insert((&raw mut __local_tree as *mut tommy_tree_struct), ((&raw const (__local_OBJ[__local_i]).node as *const tommy_node_struct) as *mut tommy_node_struct), (((&raw const (__local_OBJ[__local_i]) as *const object_tree) as *mut object_tree) as *mut c_void)) } != (((&raw const (unsafe __local_OBJ[__local_i]) as *const object_tree) as *mut object_tree)): 1 else: 0) != 0) {
             abort()
         }
 
@@ -964,7 +964,7 @@ pub fn test_tree() -> Unit {
     (__local_i = ((0 as c_uint)))
 
     while ((if __local_i < 250000: 1 else: 0) != 0) {
-        unsafe { tommy_tree_remove_existing((&raw mut __local_tree as *mut tommy_tree_struct), ((&raw const (unsafe __local_OBJ[__local_i]).node as *const tommy_node_struct) as *mut tommy_node_struct)) }
+        unsafe { tommy_tree_remove_existing((&raw mut __local_tree as *mut tommy_tree_struct), ((&raw const (__local_OBJ[__local_i]).node as *const tommy_node_struct) as *mut tommy_node_struct)) }
 
         (__local_i = (__local_i +% 1))
 
@@ -1324,7 +1324,7 @@ pub fn test_hashtable() -> Unit {
         (__local_i = ((0 as c_uint)))
 
         while ((if __local_i < __local_n: 1 else: 0) != 0) {
-            unsafe { tommy_hashtable_insert((&raw mut __local_hashtable as *mut tommy_hashtable_struct), ((&raw const (unsafe __local_HASH[__local_i]).node as *const tommy_node_struct) as *mut tommy_node_struct), (((&raw const (unsafe __local_HASH[__local_i]) as *const object_hash) as *mut object_hash) as *mut c_void), ((unsafe __local_HASH[__local_i]).value as c_ulonglong)) }
+            unsafe { tommy_hashtable_insert((&raw mut __local_hashtable as *mut tommy_hashtable_struct), ((&raw const (__local_HASH[__local_i]).node as *const tommy_node_struct) as *mut tommy_node_struct), (((&raw const (__local_HASH[__local_i]) as *const object_hash) as *mut object_hash) as *mut c_void), ((__local_HASH[__local_i]).value as c_ulonglong)) }
 
             (__local_i = (__local_i +% 1))
 
@@ -1350,7 +1350,7 @@ pub fn test_hashtable() -> Unit {
         (__local_i = ((0 as c_uint)))
 
         while ((if __local_i < ((__local_n as c_uint) / (2 as c_uint)): 1 else: 0) != 0) {
-            unsafe { tommy_hashtable_remove_existing((&raw mut __local_hashtable as *mut tommy_hashtable_struct), ((&raw const (unsafe __local_HASH[((((__local_n as c_uint) -% (__local_i as c_uint)) as c_uint) -% (1 as c_uint))]).node as *const tommy_node_struct) as *mut tommy_node_struct)) }
+            unsafe { tommy_hashtable_remove_existing((&raw mut __local_hashtable as *mut tommy_hashtable_struct), ((&raw const (__local_HASH[((((__local_n as c_uint) -% (__local_i as c_uint)) as c_uint) -% (1 as c_uint))]).node as *const tommy_node_struct) as *mut tommy_node_struct)) }
 
             (__local_i = (__local_i +% 1))
 
@@ -1360,7 +1360,7 @@ pub fn test_hashtable() -> Unit {
         (__local_i = ((0 as c_uint)))
 
         while ((if __local_i < ((__local_n as c_uint) / (2 as c_uint)): 1 else: 0) != 0) {
-            if ((if unsafe { tommy_hashtable_remove((&raw mut __local_hashtable as *mut tommy_hashtable_struct), search_callback, (((&raw const (unsafe __local_HASH[((((__local_n as c_uint) -% (__local_i as c_uint)) as c_uint) -% (1 as c_uint))]) as *const object_hash) as *mut object_hash) as *const c_void), ((unsafe __local_HASH[((((__local_n as c_uint) -% (__local_i as c_uint)) as c_uint) -% (1 as c_uint))]).value as c_ulonglong)) } != 0: 1 else: 0) != 0) {
+            if ((if unsafe { tommy_hashtable_remove((&raw mut __local_hashtable as *mut tommy_hashtable_struct), search_callback, (((&raw const (__local_HASH[((((__local_n as c_uint) -% (__local_i as c_uint)) as c_uint) -% (1 as c_uint))]) as *const object_hash) as *mut object_hash) as *const c_void), ((__local_HASH[((((__local_n as c_uint) -% (__local_i as c_uint)) as c_uint) -% (1 as c_uint))]).value as c_ulonglong)) } != 0: 1 else: 0) != 0) {
                 abort()
             }
 
@@ -1372,7 +1372,7 @@ pub fn test_hashtable() -> Unit {
         (__local_i = ((0 as c_uint)))
 
         while ((if __local_i < ((__local_n as c_uint) / (2 as c_uint)): 1 else: 0) != 0) {
-            if ((if unsafe { tommy_hashtable_remove((&raw mut __local_hashtable as *mut tommy_hashtable_struct), search_callback, (((&raw const (unsafe __local_HASH[((((((__local_n as c_uint) / (2 as c_uint)) as c_uint) -% (__local_i as c_uint)) as c_uint) -% (1 as c_uint))]) as *const object_hash) as *mut object_hash) as *const c_void), ((unsafe __local_HASH[((((((__local_n as c_uint) / (2 as c_uint)) as c_uint) -% (__local_i as c_uint)) as c_uint) -% (1 as c_uint))]).value as c_ulonglong)) } == 0: 1 else: 0) != 0) {
+            if ((if unsafe { tommy_hashtable_remove((&raw mut __local_hashtable as *mut tommy_hashtable_struct), search_callback, (((&raw const (__local_HASH[((((((__local_n as c_uint) / (2 as c_uint)) as c_uint) -% (__local_i as c_uint)) as c_uint) -% (1 as c_uint))]) as *const object_hash) as *mut object_hash) as *const c_void), ((__local_HASH[((((((__local_n as c_uint) / (2 as c_uint)) as c_uint) -% (__local_i as c_uint)) as c_uint) -% (1 as c_uint))]).value as c_ulonglong)) } == 0: 1 else: 0) != 0) {
                 abort()
             }
 
@@ -1413,7 +1413,7 @@ pub fn test_hashtable() -> Unit {
 
 
         while ((if __local_i < __local_n: 1 else: 0) != 0) {
-            unsafe { tommy_hashtable_insert((&raw mut __local_hashtable as *mut tommy_hashtable_struct), ((&raw const (unsafe __local_HASH[__local_i]).node as *const tommy_node_struct) as *mut tommy_node_struct), (((&raw const (unsafe __local_HASH[__local_i]) as *const object_hash) as *mut object_hash) as *mut c_void), ((unsafe __local_HASH[__local_i]).value as c_ulonglong)) }
+            unsafe { tommy_hashtable_insert((&raw mut __local_hashtable as *mut tommy_hashtable_struct), ((&raw const (__local_HASH[__local_i]).node as *const tommy_node_struct) as *mut tommy_node_struct), (((&raw const (__local_HASH[__local_i]) as *const object_hash) as *mut object_hash) as *mut c_void), ((__local_HASH[__local_i]).value as c_ulonglong)) }
 
             (__local_i = (__local_i +% 1))
 
@@ -1429,9 +1429,9 @@ pub fn test_hashtable() -> Unit {
         }
 
         while ((if __local_i < 1000000: 1 else: 0) != 0) {
-            unsafe { tommy_hashtable_insert((&raw mut __local_hashtable as *mut tommy_hashtable_struct), ((&raw const (unsafe __local_HASH[__local_i]).node as *const tommy_node_struct) as *mut tommy_node_struct), (((&raw const (unsafe __local_HASH[__local_i]) as *const object_hash) as *mut object_hash) as *mut c_void), ((unsafe __local_HASH[__local_i]).value as c_ulonglong)) }
+            unsafe { tommy_hashtable_insert((&raw mut __local_hashtable as *mut tommy_hashtable_struct), ((&raw const (__local_HASH[__local_i]).node as *const tommy_node_struct) as *mut tommy_node_struct), (((&raw const (__local_HASH[__local_i]) as *const object_hash) as *mut object_hash) as *mut c_void), ((__local_HASH[__local_i]).value as c_ulonglong)) }
 
-            unsafe { tommy_hashtable_remove_existing((&raw mut __local_hashtable as *mut tommy_hashtable_struct), ((&raw const (unsafe __local_HASH[__local_j]).node as *const tommy_node_struct) as *mut tommy_node_struct)) }
+            unsafe { tommy_hashtable_remove_existing((&raw mut __local_hashtable as *mut tommy_hashtable_struct), ((&raw const (__local_HASH[__local_j]).node as *const tommy_node_struct) as *mut tommy_node_struct)) }
 
 
             (__local_i = (__local_i +% 1))
@@ -1442,7 +1442,7 @@ pub fn test_hashtable() -> Unit {
         }
 
         while ((if __local_j < 1000000: 1 else: 0) != 0) {
-            if ((if unsafe { tommy_hashtable_remove((&raw mut __local_hashtable as *mut tommy_hashtable_struct), search_callback, (((&raw const (unsafe __local_HASH[__local_j]) as *const object_hash) as *mut object_hash) as *const c_void), ((unsafe __local_HASH[__local_j]).value as c_ulonglong)) } == 0: 1 else: 0) != 0) {
+            if ((if unsafe { tommy_hashtable_remove((&raw mut __local_hashtable as *mut tommy_hashtable_struct), search_callback, (((&raw const (__local_HASH[__local_j]) as *const object_hash) as *mut object_hash) as *const c_void), ((__local_HASH[__local_j]).value as c_ulonglong)) } == 0: 1 else: 0) != 0) {
                 abort()
             }
 
@@ -1511,7 +1511,7 @@ pub fn test_hashdyn() -> Unit {
         (__local_i = ((0 as c_uint)))
 
         while ((if __local_i < __local_n: 1 else: 0) != 0) {
-            unsafe { tommy_hashdyn_insert((&raw mut __local_hashdyn as *mut tommy_hashdyn_struct), ((&raw const (unsafe __local_HASH[__local_i]).node as *const tommy_node_struct) as *mut tommy_node_struct), (((&raw const (unsafe __local_HASH[__local_i]) as *const object_hash) as *mut object_hash) as *mut c_void), ((unsafe __local_HASH[__local_i]).value as c_ulonglong)) }
+            unsafe { tommy_hashdyn_insert((&raw mut __local_hashdyn as *mut tommy_hashdyn_struct), ((&raw const (__local_HASH[__local_i]).node as *const tommy_node_struct) as *mut tommy_node_struct), (((&raw const (__local_HASH[__local_i]) as *const object_hash) as *mut object_hash) as *mut c_void), ((__local_HASH[__local_i]).value as c_ulonglong)) }
 
             (__local_i = (__local_i +% 1))
 
@@ -1537,7 +1537,7 @@ pub fn test_hashdyn() -> Unit {
         (__local_i = ((0 as c_uint)))
 
         while ((if __local_i < ((__local_n as c_uint) / (2 as c_uint)): 1 else: 0) != 0) {
-            unsafe { tommy_hashdyn_remove_existing((&raw mut __local_hashdyn as *mut tommy_hashdyn_struct), ((&raw const (unsafe __local_HASH[((((__local_n as c_uint) -% (__local_i as c_uint)) as c_uint) -% (1 as c_uint))]).node as *const tommy_node_struct) as *mut tommy_node_struct)) }
+            unsafe { tommy_hashdyn_remove_existing((&raw mut __local_hashdyn as *mut tommy_hashdyn_struct), ((&raw const (__local_HASH[((((__local_n as c_uint) -% (__local_i as c_uint)) as c_uint) -% (1 as c_uint))]).node as *const tommy_node_struct) as *mut tommy_node_struct)) }
 
             (__local_i = (__local_i +% 1))
 
@@ -1547,7 +1547,7 @@ pub fn test_hashdyn() -> Unit {
         (__local_i = ((0 as c_uint)))
 
         while ((if __local_i < ((__local_n as c_uint) / (2 as c_uint)): 1 else: 0) != 0) {
-            if ((if unsafe { tommy_hashdyn_remove((&raw mut __local_hashdyn as *mut tommy_hashdyn_struct), search_callback, (((&raw const (unsafe __local_HASH[((((__local_n as c_uint) -% (__local_i as c_uint)) as c_uint) -% (1 as c_uint))]) as *const object_hash) as *mut object_hash) as *const c_void), ((unsafe __local_HASH[((((__local_n as c_uint) -% (__local_i as c_uint)) as c_uint) -% (1 as c_uint))]).value as c_ulonglong)) } != 0: 1 else: 0) != 0) {
+            if ((if unsafe { tommy_hashdyn_remove((&raw mut __local_hashdyn as *mut tommy_hashdyn_struct), search_callback, (((&raw const (__local_HASH[((((__local_n as c_uint) -% (__local_i as c_uint)) as c_uint) -% (1 as c_uint))]) as *const object_hash) as *mut object_hash) as *const c_void), ((__local_HASH[((((__local_n as c_uint) -% (__local_i as c_uint)) as c_uint) -% (1 as c_uint))]).value as c_ulonglong)) } != 0: 1 else: 0) != 0) {
                 abort()
             }
 
@@ -1559,7 +1559,7 @@ pub fn test_hashdyn() -> Unit {
         (__local_i = ((0 as c_uint)))
 
         while ((if __local_i < ((__local_n as c_uint) / (2 as c_uint)): 1 else: 0) != 0) {
-            if ((if unsafe { tommy_hashdyn_remove((&raw mut __local_hashdyn as *mut tommy_hashdyn_struct), search_callback, (((&raw const (unsafe __local_HASH[((((((__local_n as c_uint) / (2 as c_uint)) as c_uint) -% (__local_i as c_uint)) as c_uint) -% (1 as c_uint))]) as *const object_hash) as *mut object_hash) as *const c_void), ((unsafe __local_HASH[((((((__local_n as c_uint) / (2 as c_uint)) as c_uint) -% (__local_i as c_uint)) as c_uint) -% (1 as c_uint))]).value as c_ulonglong)) } == 0: 1 else: 0) != 0) {
+            if ((if unsafe { tommy_hashdyn_remove((&raw mut __local_hashdyn as *mut tommy_hashdyn_struct), search_callback, (((&raw const (__local_HASH[((((((__local_n as c_uint) / (2 as c_uint)) as c_uint) -% (__local_i as c_uint)) as c_uint) -% (1 as c_uint))]) as *const object_hash) as *mut object_hash) as *const c_void), ((__local_HASH[((((((__local_n as c_uint) / (2 as c_uint)) as c_uint) -% (__local_i as c_uint)) as c_uint) -% (1 as c_uint))]).value as c_ulonglong)) } == 0: 1 else: 0) != 0) {
                 abort()
             }
 
@@ -1600,7 +1600,7 @@ pub fn test_hashdyn() -> Unit {
 
 
         while ((if __local_i < __local_n: 1 else: 0) != 0) {
-            unsafe { tommy_hashdyn_insert((&raw mut __local_hashdyn as *mut tommy_hashdyn_struct), ((&raw const (unsafe __local_HASH[__local_i]).node as *const tommy_node_struct) as *mut tommy_node_struct), (((&raw const (unsafe __local_HASH[__local_i]) as *const object_hash) as *mut object_hash) as *mut c_void), ((unsafe __local_HASH[__local_i]).value as c_ulonglong)) }
+            unsafe { tommy_hashdyn_insert((&raw mut __local_hashdyn as *mut tommy_hashdyn_struct), ((&raw const (__local_HASH[__local_i]).node as *const tommy_node_struct) as *mut tommy_node_struct), (((&raw const (__local_HASH[__local_i]) as *const object_hash) as *mut object_hash) as *mut c_void), ((__local_HASH[__local_i]).value as c_ulonglong)) }
 
             (__local_i = (__local_i +% 1))
 
@@ -1616,9 +1616,9 @@ pub fn test_hashdyn() -> Unit {
         }
 
         while ((if __local_i < 1000000: 1 else: 0) != 0) {
-            unsafe { tommy_hashdyn_insert((&raw mut __local_hashdyn as *mut tommy_hashdyn_struct), ((&raw const (unsafe __local_HASH[__local_i]).node as *const tommy_node_struct) as *mut tommy_node_struct), (((&raw const (unsafe __local_HASH[__local_i]) as *const object_hash) as *mut object_hash) as *mut c_void), ((unsafe __local_HASH[__local_i]).value as c_ulonglong)) }
+            unsafe { tommy_hashdyn_insert((&raw mut __local_hashdyn as *mut tommy_hashdyn_struct), ((&raw const (__local_HASH[__local_i]).node as *const tommy_node_struct) as *mut tommy_node_struct), (((&raw const (__local_HASH[__local_i]) as *const object_hash) as *mut object_hash) as *mut c_void), ((__local_HASH[__local_i]).value as c_ulonglong)) }
 
-            unsafe { tommy_hashdyn_remove_existing((&raw mut __local_hashdyn as *mut tommy_hashdyn_struct), ((&raw const (unsafe __local_HASH[__local_j]).node as *const tommy_node_struct) as *mut tommy_node_struct)) }
+            unsafe { tommy_hashdyn_remove_existing((&raw mut __local_hashdyn as *mut tommy_hashdyn_struct), ((&raw const (__local_HASH[__local_j]).node as *const tommy_node_struct) as *mut tommy_node_struct)) }
 
 
             (__local_i = (__local_i +% 1))
@@ -1629,7 +1629,7 @@ pub fn test_hashdyn() -> Unit {
         }
 
         while ((if __local_j < 1000000: 1 else: 0) != 0) {
-            if ((if unsafe { tommy_hashdyn_remove((&raw mut __local_hashdyn as *mut tommy_hashdyn_struct), search_callback, (((&raw const (unsafe __local_HASH[__local_j]) as *const object_hash) as *mut object_hash) as *const c_void), ((unsafe __local_HASH[__local_j]).value as c_ulonglong)) } == 0: 1 else: 0) != 0) {
+            if ((if unsafe { tommy_hashdyn_remove((&raw mut __local_hashdyn as *mut tommy_hashdyn_struct), search_callback, (((&raw const (__local_HASH[__local_j]) as *const object_hash) as *mut object_hash) as *const c_void), ((__local_HASH[__local_j]).value as c_ulonglong)) } == 0: 1 else: 0) != 0) {
                 abort()
             }
 
@@ -1686,7 +1686,7 @@ pub fn test_hashlin() -> Unit {
     (__local_i = ((0 as c_uint)))
 
     while ((if __local_i < 1000000: 1 else: 0) != 0) {
-        unsafe { tommy_hashlin_insert((&raw mut __local_hashlin as *mut tommy_hashlin_struct), ((&raw const (unsafe __local_HASH[__local_i]).node as *const tommy_node_struct) as *mut tommy_node_struct), (((&raw const (unsafe __local_HASH[__local_i]) as *const object_hash) as *mut object_hash) as *mut c_void), ((unsafe __local_HASH[__local_i]).value as c_ulonglong)) }
+        unsafe { tommy_hashlin_insert((&raw mut __local_hashlin as *mut tommy_hashlin_struct), ((&raw const (__local_HASH[__local_i]).node as *const tommy_node_struct) as *mut tommy_node_struct), (((&raw const (__local_HASH[__local_i]) as *const object_hash) as *mut object_hash) as *mut c_void), ((__local_HASH[__local_i]).value as c_ulonglong)) }
 
         (__local_i = (__local_i +% 1))
 
@@ -1720,7 +1720,7 @@ pub fn test_hashlin() -> Unit {
         (__local_i = ((0 as c_uint)))
 
         while ((if __local_i < __local_n: 1 else: 0) != 0) {
-            unsafe { tommy_hashlin_insert((&raw mut __local_hashlin as *mut tommy_hashlin_struct), ((&raw const (unsafe __local_HASH[__local_i]).node as *const tommy_node_struct) as *mut tommy_node_struct), (((&raw const (unsafe __local_HASH[__local_i]) as *const object_hash) as *mut object_hash) as *mut c_void), ((unsafe __local_HASH[__local_i]).value as c_ulonglong)) }
+            unsafe { tommy_hashlin_insert((&raw mut __local_hashlin as *mut tommy_hashlin_struct), ((&raw const (__local_HASH[__local_i]).node as *const tommy_node_struct) as *mut tommy_node_struct), (((&raw const (__local_HASH[__local_i]) as *const object_hash) as *mut object_hash) as *mut c_void), ((__local_HASH[__local_i]).value as c_ulonglong)) }
 
             (__local_i = (__local_i +% 1))
 
@@ -1746,7 +1746,7 @@ pub fn test_hashlin() -> Unit {
         (__local_i = ((0 as c_uint)))
 
         while ((if __local_i < ((__local_n as c_uint) / (2 as c_uint)): 1 else: 0) != 0) {
-            unsafe { tommy_hashlin_remove_existing((&raw mut __local_hashlin as *mut tommy_hashlin_struct), ((&raw const (unsafe __local_HASH[((((__local_n as c_uint) -% (__local_i as c_uint)) as c_uint) -% (1 as c_uint))]).node as *const tommy_node_struct) as *mut tommy_node_struct)) }
+            unsafe { tommy_hashlin_remove_existing((&raw mut __local_hashlin as *mut tommy_hashlin_struct), ((&raw const (__local_HASH[((((__local_n as c_uint) -% (__local_i as c_uint)) as c_uint) -% (1 as c_uint))]).node as *const tommy_node_struct) as *mut tommy_node_struct)) }
 
             (__local_i = (__local_i +% 1))
 
@@ -1756,7 +1756,7 @@ pub fn test_hashlin() -> Unit {
         (__local_i = ((0 as c_uint)))
 
         while ((if __local_i < ((__local_n as c_uint) / (2 as c_uint)): 1 else: 0) != 0) {
-            if ((if unsafe { tommy_hashlin_remove((&raw mut __local_hashlin as *mut tommy_hashlin_struct), search_callback, (((&raw const (unsafe __local_HASH[((((__local_n as c_uint) -% (__local_i as c_uint)) as c_uint) -% (1 as c_uint))]) as *const object_hash) as *mut object_hash) as *const c_void), ((unsafe __local_HASH[((((__local_n as c_uint) -% (__local_i as c_uint)) as c_uint) -% (1 as c_uint))]).value as c_ulonglong)) } != 0: 1 else: 0) != 0) {
+            if ((if unsafe { tommy_hashlin_remove((&raw mut __local_hashlin as *mut tommy_hashlin_struct), search_callback, (((&raw const (__local_HASH[((((__local_n as c_uint) -% (__local_i as c_uint)) as c_uint) -% (1 as c_uint))]) as *const object_hash) as *mut object_hash) as *const c_void), ((__local_HASH[((((__local_n as c_uint) -% (__local_i as c_uint)) as c_uint) -% (1 as c_uint))]).value as c_ulonglong)) } != 0: 1 else: 0) != 0) {
                 abort()
             }
 
@@ -1768,7 +1768,7 @@ pub fn test_hashlin() -> Unit {
         (__local_i = ((0 as c_uint)))
 
         while ((if __local_i < ((__local_n as c_uint) / (2 as c_uint)): 1 else: 0) != 0) {
-            if ((if unsafe { tommy_hashlin_remove((&raw mut __local_hashlin as *mut tommy_hashlin_struct), search_callback, (((&raw const (unsafe __local_HASH[((((((__local_n as c_uint) / (2 as c_uint)) as c_uint) -% (__local_i as c_uint)) as c_uint) -% (1 as c_uint))]) as *const object_hash) as *mut object_hash) as *const c_void), ((unsafe __local_HASH[((((((__local_n as c_uint) / (2 as c_uint)) as c_uint) -% (__local_i as c_uint)) as c_uint) -% (1 as c_uint))]).value as c_ulonglong)) } == 0: 1 else: 0) != 0) {
+            if ((if unsafe { tommy_hashlin_remove((&raw mut __local_hashlin as *mut tommy_hashlin_struct), search_callback, (((&raw const (__local_HASH[((((((__local_n as c_uint) / (2 as c_uint)) as c_uint) -% (__local_i as c_uint)) as c_uint) -% (1 as c_uint))]) as *const object_hash) as *mut object_hash) as *const c_void), ((__local_HASH[((((((__local_n as c_uint) / (2 as c_uint)) as c_uint) -% (__local_i as c_uint)) as c_uint) -% (1 as c_uint))]).value as c_ulonglong)) } == 0: 1 else: 0) != 0) {
                 abort()
             }
 
@@ -1809,7 +1809,7 @@ pub fn test_hashlin() -> Unit {
 
 
         while ((if __local_i < __local_n: 1 else: 0) != 0) {
-            unsafe { tommy_hashlin_insert((&raw mut __local_hashlin as *mut tommy_hashlin_struct), ((&raw const (unsafe __local_HASH[__local_i]).node as *const tommy_node_struct) as *mut tommy_node_struct), (((&raw const (unsafe __local_HASH[__local_i]) as *const object_hash) as *mut object_hash) as *mut c_void), ((unsafe __local_HASH[__local_i]).value as c_ulonglong)) }
+            unsafe { tommy_hashlin_insert((&raw mut __local_hashlin as *mut tommy_hashlin_struct), ((&raw const (__local_HASH[__local_i]).node as *const tommy_node_struct) as *mut tommy_node_struct), (((&raw const (__local_HASH[__local_i]) as *const object_hash) as *mut object_hash) as *mut c_void), ((__local_HASH[__local_i]).value as c_ulonglong)) }
 
             (__local_i = (__local_i +% 1))
 
@@ -1825,9 +1825,9 @@ pub fn test_hashlin() -> Unit {
         }
 
         while ((if __local_i < 1000000: 1 else: 0) != 0) {
-            unsafe { tommy_hashlin_insert((&raw mut __local_hashlin as *mut tommy_hashlin_struct), ((&raw const (unsafe __local_HASH[__local_i]).node as *const tommy_node_struct) as *mut tommy_node_struct), (((&raw const (unsafe __local_HASH[__local_i]) as *const object_hash) as *mut object_hash) as *mut c_void), ((unsafe __local_HASH[__local_i]).value as c_ulonglong)) }
+            unsafe { tommy_hashlin_insert((&raw mut __local_hashlin as *mut tommy_hashlin_struct), ((&raw const (__local_HASH[__local_i]).node as *const tommy_node_struct) as *mut tommy_node_struct), (((&raw const (__local_HASH[__local_i]) as *const object_hash) as *mut object_hash) as *mut c_void), ((__local_HASH[__local_i]).value as c_ulonglong)) }
 
-            unsafe { tommy_hashlin_remove_existing((&raw mut __local_hashlin as *mut tommy_hashlin_struct), ((&raw const (unsafe __local_HASH[__local_j]).node as *const tommy_node_struct) as *mut tommy_node_struct)) }
+            unsafe { tommy_hashlin_remove_existing((&raw mut __local_hashlin as *mut tommy_hashlin_struct), ((&raw const (__local_HASH[__local_j]).node as *const tommy_node_struct) as *mut tommy_node_struct)) }
 
 
             (__local_i = (__local_i +% 1))
@@ -1838,7 +1838,7 @@ pub fn test_hashlin() -> Unit {
         }
 
         while ((if __local_j < 1000000: 1 else: 0) != 0) {
-            if ((if unsafe { tommy_hashlin_remove((&raw mut __local_hashlin as *mut tommy_hashlin_struct), search_callback, (((&raw const (unsafe __local_HASH[__local_j]) as *const object_hash) as *mut object_hash) as *const c_void), ((unsafe __local_HASH[__local_j]).value as c_ulonglong)) } == 0: 1 else: 0) != 0) {
+            if ((if unsafe { tommy_hashlin_remove((&raw mut __local_hashlin as *mut tommy_hashlin_struct), search_callback, (((&raw const (__local_HASH[__local_j]) as *const object_hash) as *mut object_hash) as *const c_void), ((__local_HASH[__local_j]).value as c_ulonglong)) } == 0: 1 else: 0) != 0) {
                 abort()
             }
 
@@ -1892,7 +1892,7 @@ pub fn test_trie() -> Unit {
     (__local_i = ((0 as c_uint)))
 
     while ((if __local_i < 4000000: 1 else: 0) != 0) {
-        unsafe { tommy_trie_insert((&raw mut __local_trie as *mut tommy_trie_struct), ((&raw const (unsafe __local_OBJ[__local_i]).node as *const tommy_node_struct) as *mut tommy_node_struct), (((&raw const (unsafe __local_OBJ[__local_i]) as *const object_trie) as *mut object_trie) as *mut c_void), ((unsafe __local_OBJ[__local_i]).value as c_ulonglong)) }
+        unsafe { tommy_trie_insert((&raw mut __local_trie as *mut tommy_trie_struct), ((&raw const (__local_OBJ[__local_i]).node as *const tommy_node_struct) as *mut tommy_node_struct), (((&raw const (__local_OBJ[__local_i]) as *const object_trie) as *mut object_trie) as *mut c_void), ((__local_OBJ[__local_i]).value as c_ulonglong)) }
 
         (__local_i = (__local_i +% 1))
 
@@ -1927,7 +1927,7 @@ pub fn test_trie() -> Unit {
     (__local_i = ((0 as c_uint)))
 
     while ((if __local_i < ((4000000 as c_uint) / (2 as c_uint)): 1 else: 0) != 0) {
-        if ((if unsafe { tommy_trie_search((&raw mut __local_trie as *mut tommy_trie_struct), ((unsafe __local_OBJ[__local_i]).value as c_ulonglong)) } == 0: 1 else: 0) != 0) {
+        if ((if unsafe { tommy_trie_search((&raw mut __local_trie as *mut tommy_trie_struct), ((__local_OBJ[__local_i]).value as c_ulonglong)) } == 0: 1 else: 0) != 0) {
             abort()
         }
 
@@ -1941,7 +1941,7 @@ pub fn test_trie() -> Unit {
     (__local_i = ((0 as c_uint)))
 
     while ((if __local_i < ((4000000 as c_uint) / (2 as c_uint)): 1 else: 0) != 0) {
-        unsafe { tommy_trie_remove_existing((&raw mut __local_trie as *mut tommy_trie_struct), ((&raw const (unsafe __local_OBJ[__local_i]).node as *const tommy_node_struct) as *mut tommy_node_struct)) }
+        unsafe { tommy_trie_remove_existing((&raw mut __local_trie as *mut tommy_trie_struct), ((&raw const (__local_OBJ[__local_i]).node as *const tommy_node_struct) as *mut tommy_node_struct)) }
 
         (__local_i = (__local_i +% 1))
 
@@ -1961,7 +1961,7 @@ pub fn test_trie() -> Unit {
     (__local_i = ((0 as c_uint)))
 
     while ((if __local_i < ((4000000 as c_uint) / (2 as c_uint)): 1 else: 0) != 0) {
-        if ((if unsafe { tommy_trie_remove((&raw mut __local_trie as *mut tommy_trie_struct), ((unsafe __local_OBJ[__local_i]).value as c_ulonglong)) } != 0: 1 else: 0) != 0) {
+        if ((if unsafe { tommy_trie_remove((&raw mut __local_trie as *mut tommy_trie_struct), ((__local_OBJ[__local_i]).value as c_ulonglong)) } != 0: 1 else: 0) != 0) {
             abort()
         }
 
@@ -1973,7 +1973,7 @@ pub fn test_trie() -> Unit {
     (__local_i = ((0 as c_uint)))
 
     while ((if __local_i < ((4000000 as c_uint) / (2 as c_uint)): 1 else: 0) != 0) {
-        if ((if unsafe { tommy_trie_search((&raw mut __local_trie as *mut tommy_trie_struct), ((unsafe __local_OBJ[__local_i]).value as c_ulonglong)) } != 0: 1 else: 0) != 0) {
+        if ((if unsafe { tommy_trie_search((&raw mut __local_trie as *mut tommy_trie_struct), ((__local_OBJ[__local_i]).value as c_ulonglong)) } != 0: 1 else: 0) != 0) {
             abort()
         }
 
@@ -1985,7 +1985,7 @@ pub fn test_trie() -> Unit {
     (__local_i = ((0 as c_uint)))
 
     while ((if __local_i < ((4000000 as c_uint) / (2 as c_uint)): 1 else: 0) != 0) {
-        if ((if unsafe { tommy_trie_remove((&raw mut __local_trie as *mut tommy_trie_struct), ((unsafe __local_OBJ[((((4000000 as c_uint) / (2 as c_uint)) as c_uint) +% (__local_i as c_uint))]).value as c_ulonglong)) } == 0: 1 else: 0) != 0) {
+        if ((if unsafe { tommy_trie_remove((&raw mut __local_trie as *mut tommy_trie_struct), ((__local_OBJ[((((4000000 as c_uint) / (2 as c_uint)) as c_uint) +% (__local_i as c_uint))]).value as c_ulonglong)) } == 0: 1 else: 0) != 0) {
             abort()
         }
 
@@ -2030,7 +2030,7 @@ pub fn test_trie_inplace() -> Unit {
     (__local_i = ((0 as c_uint)))
 
     while ((if __local_i < 4000000: 1 else: 0) != 0) {
-        unsafe { tommy_trie_inplace_insert((&raw mut __local_trie_inplace as *mut tommy_trie_inplace_struct), ((&raw const (unsafe __local_OBJ[__local_i]).node as *const tommy_trie_inplace_node_struct) as *mut tommy_trie_inplace_node_struct), (((&raw const (unsafe __local_OBJ[__local_i]) as *const object_trie_inplace) as *mut object_trie_inplace) as *mut c_void), ((unsafe __local_OBJ[__local_i]).value as c_ulonglong)) }
+        unsafe { tommy_trie_inplace_insert((&raw mut __local_trie_inplace as *mut tommy_trie_inplace_struct), ((&raw const (__local_OBJ[__local_i]).node as *const tommy_trie_inplace_node_struct) as *mut tommy_trie_inplace_node_struct), (((&raw const (__local_OBJ[__local_i]) as *const object_trie_inplace) as *mut object_trie_inplace) as *mut c_void), ((__local_OBJ[__local_i]).value as c_ulonglong)) }
 
         (__local_i = (__local_i +% 1))
 
@@ -2061,7 +2061,7 @@ pub fn test_trie_inplace() -> Unit {
     (__local_i = ((0 as c_uint)))
 
     while ((if __local_i < ((4000000 as c_uint) / (2 as c_uint)): 1 else: 0) != 0) {
-        if ((if unsafe { tommy_trie_inplace_search((&raw mut __local_trie_inplace as *mut tommy_trie_inplace_struct), ((unsafe __local_OBJ[__local_i]).value as c_ulonglong)) } == 0: 1 else: 0) != 0) {
+        if ((if unsafe { tommy_trie_inplace_search((&raw mut __local_trie_inplace as *mut tommy_trie_inplace_struct), ((__local_OBJ[__local_i]).value as c_ulonglong)) } == 0: 1 else: 0) != 0) {
             abort()
         }
 
@@ -2075,7 +2075,7 @@ pub fn test_trie_inplace() -> Unit {
     (__local_i = ((0 as c_uint)))
 
     while ((if __local_i < ((4000000 as c_uint) / (2 as c_uint)): 1 else: 0) != 0) {
-        unsafe { tommy_trie_inplace_remove_existing((&raw mut __local_trie_inplace as *mut tommy_trie_inplace_struct), ((&raw const (unsafe __local_OBJ[__local_i]).node as *const tommy_trie_inplace_node_struct) as *mut tommy_trie_inplace_node_struct)) }
+        unsafe { tommy_trie_inplace_remove_existing((&raw mut __local_trie_inplace as *mut tommy_trie_inplace_struct), ((&raw const (__local_OBJ[__local_i]).node as *const tommy_trie_inplace_node_struct) as *mut tommy_trie_inplace_node_struct)) }
 
         (__local_i = (__local_i +% 1))
 
@@ -2087,7 +2087,7 @@ pub fn test_trie_inplace() -> Unit {
     (__local_i = ((0 as c_uint)))
 
     while ((if __local_i < ((4000000 as c_uint) / (2 as c_uint)): 1 else: 0) != 0) {
-        if ((if unsafe { tommy_trie_inplace_remove((&raw mut __local_trie_inplace as *mut tommy_trie_inplace_struct), ((unsafe __local_OBJ[__local_i]).value as c_ulonglong)) } != 0: 1 else: 0) != 0) {
+        if ((if unsafe { tommy_trie_inplace_remove((&raw mut __local_trie_inplace as *mut tommy_trie_inplace_struct), ((__local_OBJ[__local_i]).value as c_ulonglong)) } != 0: 1 else: 0) != 0) {
             abort()
         }
 
@@ -2099,7 +2099,7 @@ pub fn test_trie_inplace() -> Unit {
     (__local_i = ((0 as c_uint)))
 
     while ((if __local_i < ((4000000 as c_uint) / (2 as c_uint)): 1 else: 0) != 0) {
-        if ((if unsafe { tommy_trie_inplace_search((&raw mut __local_trie_inplace as *mut tommy_trie_inplace_struct), ((unsafe __local_OBJ[__local_i]).value as c_ulonglong)) } != 0: 1 else: 0) != 0) {
+        if ((if unsafe { tommy_trie_inplace_search((&raw mut __local_trie_inplace as *mut tommy_trie_inplace_struct), ((__local_OBJ[__local_i]).value as c_ulonglong)) } != 0: 1 else: 0) != 0) {
             abort()
         }
 
@@ -2111,7 +2111,7 @@ pub fn test_trie_inplace() -> Unit {
     (__local_i = ((0 as c_uint)))
 
     while ((if __local_i < ((4000000 as c_uint) / (2 as c_uint)): 1 else: 0) != 0) {
-        if ((if unsafe { tommy_trie_inplace_remove((&raw mut __local_trie_inplace as *mut tommy_trie_inplace_struct), ((unsafe __local_OBJ[((((4000000 as c_uint) / (2 as c_uint)) as c_uint) +% (__local_i as c_uint))]).value as c_ulonglong)) } == 0: 1 else: 0) != 0) {
+        if ((if unsafe { tommy_trie_inplace_remove((&raw mut __local_trie_inplace as *mut tommy_trie_inplace_struct), ((__local_OBJ[((((4000000 as c_uint) / (2 as c_uint)) as c_uint) +% (__local_i as c_uint))]).value as c_ulonglong)) } == 0: 1 else: 0) != 0) {
             abort()
         }
 
@@ -2124,7 +2124,7 @@ pub fn test_trie_inplace() -> Unit {
 
 }
 
-pub fn main(...) -> c_int {
+pub fn main() -> c_int {
     nano_init()
 
     printf(c"Tommy check program.\n".ptr)
