@@ -4961,6 +4961,21 @@ impl Sema:
     fn callable_any_fn_param_type(tid: TypeId, param_i: i32) -> i32:
         self.fn_type_param_type(self.callable_any_fn_type(tid), param_i)
 
+    // §16.11: the unsafe twin of a callable type — the same parameters and
+    // result, unsafe to call. A function whose direct call needs `unsafe`
+    // has this type as a value (#1829).
+    fn unsafe_callable_type(tid: i32) -> i32:
+        let resolved = self.resolve_alias(tid as TypeId) as i32
+        let kind = self.get_type_kind(resolved)
+        if (kind != TypeKind.TY_FN and kind != TypeKind.TY_EXTERN_FN) or self.fn_type_is_unsafe(resolved) != 0:
+            return resolved
+        let param_count = self.get_type_d1(resolved)
+        let start = self.get_type_d0(resolved)
+        let params: Vec[i32] = Vec.new()
+        for pi in 0..param_count:
+            params.push(self.type_extra[(start + pi)])
+        self.ensure_callable_type(kind, params, param_count, self.get_type_d2(resolved) as TypeId, 1) as i32
+
     // §16.11: a safe callable type cannot accept an unsafe callable value; safe→
     // unsafe widening and same-unsafe-ness are allowed.
     fn callable_unsafe_coercion_ok(expected: i32, actual: i32) -> i32:
