@@ -2609,19 +2609,11 @@ impl MirBuilder:
                 vs_sym = self.sema.comp_resolved.get(node).unwrap()
             if self.sema.variant_lookup.contains(vs_sym):
                 return self.sema.variant_type_ids.get(vs_sym).unwrap() as i32
+        // D65: Sema records every range's type (check_expr). Rebuilding it
+        // from the bounds found no range over `&T` element views, answered
+        // void, and a loop counter took the old i32 for-element fallback.
         if kind == NodeKind.NK_RANGE:
-            let range_start = self.ast.get_data0(node)
-            let range_end = self.ast.get_data1(node)
-            let range_inclusive = self.ast.get_data2(node)
-            var range_elem = self.sema.ty_i32 as i32
-            if range_start != 0:
-                range_elem = self.expr_type(range_start)
-            else if range_end != 0:
-                range_elem = self.expr_type(range_end)
-            let range_found = self.sema.find_range_type(range_elem, range_inclusive) as i32
-            if range_found != 0:
-                return range_found
-            return self.sema.ty_void as i32
+            sema_phase_bug(f"BUG: range expression node {node} reached MIR with no Sema type")
         self.sema.ty_void as i32
 
     mut fn place_local_type(place_id: i32) -> i32:
@@ -16685,11 +16677,10 @@ impl MirBuilder:
             let range_start_node = self.ast.get_data0(node)
             let range_end_node = self.ast.get_data1(node)
             let range_inclusive = self.ast.get_data2(node)
-            var range_elem = self.sema.ty_i32 as i32
-            if range_start_node != 0:
-                range_elem = self.expr_type(range_start_node)
-            else if range_end_node != 0:
-                range_elem = self.expr_type(range_end_node)
+            let range_ty = self.expr_type(node)
+            // D65: the element type is Sema's range type's (`..n` starts at
+            // its 0); a bound's own type is `&T` over an element view.
+            let range_elem = self.sema.get_type_d0(self.sema.resolve_alias(range_ty))
             let start_op = if range_start_node != 0: self.lower_expr(range_start_node) else: self.int_const_operand(0, range_elem)
             let end_op = self.lower_expr(range_end_node)
             let incl_op = self.int_const_operand(range_inclusive, self.sema.ty_bool)
@@ -16703,7 +16694,6 @@ impl MirBuilder:
             range_names.push(0)
             let range_fid = self.body.new_agg_fields(range_fields, range_names)
             let range_rv = self.body.new_rvalue(RvalueKind.RK_AGGREGATE, 0, range_fid, 0)
-            let range_ty = self.expr_type(node)
             let range_tmp = self.new_temp(range_ty)
             let range_place = self.place_for_local(range_tmp)
             self.body.push_stmt(self.cur_bb, StmtKind.Assign, range_place, range_rv, self.ast.get_start(node))
