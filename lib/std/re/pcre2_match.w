@@ -634,7 +634,7 @@ pub unsafe fn pcre2_match_8(__param_code: *const pcre2_real_code_8, __param_subj
     }
 
     '__ci_bb_45 {
-        (__local_rc__goto_6967_5 = ((_pcre2_valid_utf_8((*__local_mb__goto_7024_14).check_subject, (((__local_length as c_ulong) -% (((((*__local_mb__goto_7024_14).check_subject as usize) -% (__local_subject as usize)) / sizeof[u8]()) as c_ulong)) as c_ulong), ((&raw const (*__param_match_data).startchar as *const c_ulong) as *mut c_ulong)) as c_int)))
+        (__local_rc__goto_6967_5 = ((_pcre2_valid_utf_8((*__local_mb__goto_7024_14).check_subject, (((__local_length as c_ulong) -% ((((((*__local_mb__goto_7024_14).check_subject as usize) -% (__local_subject as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong)) as c_ulong), ((&raw const (*__param_match_data).startchar as *const c_ulong) as *mut c_ulong)) as c_int)))
         if ((if __local_rc__goto_6967_5 == 0: 1 else: 0) != 0) {
             goto '__ci_bb_48
         } else {
@@ -655,7 +655,7 @@ pub unsafe fn pcre2_match_8(__param_code: *const pcre2_real_code_8, __param_subj
     }
 
     '__ci_bb_49 {
-        ((*__param_match_data).startchar = ((*__param_match_data).startchar +% (((((*__local_mb__goto_7024_14).check_subject as usize) -% (__local_subject as usize)) / sizeof[u8]()) as c_ulong)))
+        ((*__param_match_data).startchar = ((*__param_match_data).startchar +% ((((((*__local_mb__goto_7024_14).check_subject as usize) -% (__local_subject as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong)))
         if ((if not (__local_allow_invalid__goto_7009_6 != 0): 1 else: 0) != 0) {
             (__ci_expr_logic_13 = (if true: 1 else: 0))
         } else {
@@ -747,7 +747,7 @@ pub unsafe fn pcre2_match_8(__param_code: *const pcre2_real_code_8, __param_subj
         ((*__local_mb__goto_7024_14).cb = ((&raw mut __local_cb__goto_7022_21 as *mut pcre2_callout_block_8)))
         (__local_cb__goto_7022_21.version = ((2 as c_uint)))
         (__local_cb__goto_7022_21.subject = __local_subject)
-        (__local_cb__goto_7022_21.subject_length = (((((__local_end_subject__goto_6991_12 as usize) -% (__local_subject as usize)) / sizeof[u8]()) as c_ulong)))
+        (__local_cb__goto_7022_21.subject_length = ((((((__local_end_subject__goto_6991_12 as usize) -% (__local_subject as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong)))
         (__local_cb__goto_7022_21.callout_flags = ((0 as c_uint)))
         ((*__local_mb__goto_7024_14).callout = (*__local_mcontext).callout)
         ((*__local_mb__goto_7024_14).callout_data = (*__local_mcontext).callout_data)
@@ -1433,7 +1433,7 @@ pub unsafe fn pcre2_match_8(__param_code: *const pcre2_real_code_8, __param_subj
     '__ci_bb_138 {
         (__local_pp1__goto_7695_22 = null)
         (__local_pp2__goto_7696_22 = null)
-        (__local_searchlength__goto_7697_22 = (((((__local_end_subject__goto_6991_12 as usize) -% (__local_start_match__goto_6993_12 as usize)) / sizeof[u8]()) as c_ulong)))
+        (__local_searchlength__goto_7697_22 = ((((((__local_end_subject__goto_6991_12 as usize) -% (__local_start_match__goto_6993_12 as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong)))
         if ((if __local_memchr_found_first_cu__goto_6979_12 == null: 1 else: 0) != 0) {
             (__ci_expr_logic_43 = (if true: 1 else: 0))
         } else {
@@ -1447,7 +1447,7 @@ pub unsafe fn pcre2_match_8(__param_code: *const pcre2_real_code_8, __param_subj
     }
 
     '__ci_bb_139 {
-        (__local_start_match__goto_6993_12 = ((memchr(((__local_start_match__goto_6993_12 as *const c_void) as *mut c_void), (__local_first_cu__goto_6983_13 as c_int), (((((__local_end_subject__goto_6991_12 as usize) -% (__local_start_match__goto_6993_12 as usize)) / sizeof[u8]()) as c_ulong) as i64)) as *const u8)))
+        (__local_start_match__goto_6993_12 = ((memchr(((__local_start_match__goto_6993_12 as *const c_void) as *mut c_void), (__local_first_cu__goto_6983_13 as c_int), ((((((__local_end_subject__goto_6991_12 as usize) -% (__local_start_match__goto_6993_12 as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong) as i64)) as *const u8)))
         if ((if __local_start_match__goto_6993_12 == null: 1 else: 0) != 0) {
             goto '__ci_bb_150
         } else {
@@ -1856,7 +1856,7 @@ pub unsafe fn pcre2_match_8(__param_code: *const pcre2_real_code_8, __param_subj
     }
 
     '__ci_bb_182 {
-        if ((if (((__local_end_subject__goto_6991_12 as usize) -% (__local_start_match__goto_6993_12 as usize)) / sizeof[u8]()) < (*__local_re__goto_6969_24).minlength: 1 else: 0) != 0) {
+        if ((if ((((__local_end_subject__goto_6991_12 as usize) -% (__local_start_match__goto_6993_12 as usize)) as c_long) / (sizeof[u8]() as c_long)) < (*__local_re__goto_6969_24).minlength: 1 else: 0) != 0) {
             goto '__ci_bb_184
         } else {
             goto '__ci_bb_185
@@ -1892,7 +1892,7 @@ pub unsafe fn pcre2_match_8(__param_code: *const pcre2_real_code_8, __param_subj
     }
 
     '__ci_bb_186 {
-        (__local_check_length__goto_7877_20 = (((((__local_end_subject__goto_6991_12 as usize) -% (__local_start_match__goto_6993_12 as usize)) / sizeof[u8]()) as c_ulong)))
+        (__local_check_length__goto_7877_20 = ((((((__local_end_subject__goto_6991_12 as usize) -% (__local_start_match__goto_6993_12 as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong)))
         if ((if __local_check_length__goto_7877_20 < 5000: 1 else: 0) != 0) {
             (__ci_expr_logic_74 = (if true: 1 else: 0))
         } else {
@@ -1930,7 +1930,7 @@ pub unsafe fn pcre2_match_8(__param_code: *const pcre2_real_code_8, __param_subj
 
     '__ci_bb_190 {
         (__local_pp__goto_7891_24 = __local_p__goto_7839_18)
-        (__local_p__goto_7839_18 = ((memchr(((__local_pp__goto_7891_24 as *const c_void) as *mut c_void), (__local_req_cu__goto_6985_13 as c_int), (((((__local_end_subject__goto_6991_12 as usize) -% (__local_pp__goto_7891_24 as usize)) / sizeof[u8]()) as c_ulong) as i64)) as *const u8)))
+        (__local_p__goto_7839_18 = ((memchr(((__local_pp__goto_7891_24 as *const c_void) as *mut c_void), (__local_req_cu__goto_6985_13 as c_int), ((((((__local_end_subject__goto_6991_12 as usize) -% (__local_pp__goto_7891_24 as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong) as i64)) as *const u8)))
         if ((if __local_p__goto_7839_18 == null: 1 else: 0) != 0) {
             goto '__ci_bb_193
         } else {
@@ -1939,7 +1939,7 @@ pub unsafe fn pcre2_match_8(__param_code: *const pcre2_real_code_8, __param_subj
     }
 
     '__ci_bb_191 {
-        (__local_p__goto_7839_18 = ((memchr(((__local_p__goto_7839_18 as *const c_void) as *mut c_void), (__local_req_cu__goto_6985_13 as c_int), (((((__local_end_subject__goto_6991_12 as usize) -% (__local_p__goto_7839_18 as usize)) / sizeof[u8]()) as c_ulong) as i64)) as *const u8)))
+        (__local_p__goto_7839_18 = ((memchr(((__local_p__goto_7839_18 as *const c_void) as *mut c_void), (__local_req_cu__goto_6985_13 as c_int), ((((((__local_end_subject__goto_6991_12 as usize) -% (__local_p__goto_7839_18 as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong) as i64)) as *const u8)))
         if ((if __local_p__goto_7839_18 == null: 1 else: 0) != 0) {
             goto '__ci_bb_197
         } else {
@@ -1956,7 +1956,7 @@ pub unsafe fn pcre2_match_8(__param_code: *const pcre2_real_code_8, __param_subj
     }
 
     '__ci_bb_193 {
-        (__local_p__goto_7839_18 = ((memchr(((__local_pp__goto_7891_24 as *const c_void) as *mut c_void), (__local_req_cu2__goto_6986_13 as c_int), (((((__local_end_subject__goto_6991_12 as usize) -% (__local_pp__goto_7891_24 as usize)) / sizeof[u8]()) as c_ulong) as i64)) as *const u8)))
+        (__local_p__goto_7839_18 = ((memchr(((__local_pp__goto_7891_24 as *const c_void) as *mut c_void), (__local_req_cu2__goto_6986_13 as c_int), ((((((__local_end_subject__goto_6991_12 as usize) -% (__local_pp__goto_7891_24 as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong) as i64)) as *const u8)))
         if ((if __local_p__goto_7839_18 == null: 1 else: 0) != 0) {
             goto '__ci_bb_195
         } else {
@@ -2002,7 +2002,7 @@ pub unsafe fn pcre2_match_8(__param_code: *const pcre2_real_code_8, __param_subj
     }
 
     '__ci_bb_202 {
-        (__local_cb__goto_7022_21.start_match = (((((__local_start_match__goto_6993_12 as usize) -% (__local_subject as usize)) / sizeof[u8]()) as c_ulong)))
+        (__local_cb__goto_7022_21.start_match = ((((((__local_start_match__goto_6993_12 as usize) -% (__local_subject as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong)))
         (__local_cb__goto_7022_21.callout_flags = ((*(&raw const __local_cb__goto_7022_21 as *const pcre2_callout_block_8)).callout_flags as c_uint) | (1 as c_uint))
         ((*__local_mb__goto_7024_14).start_used_ptr = __local_start_match__goto_6993_12)
         ((*__local_mb__goto_7024_14).last_used_ptr = __local_start_match__goto_6993_12)
@@ -2370,7 +2370,7 @@ pub unsafe fn pcre2_match_8(__param_code: *const pcre2_real_code_8, __param_subj
 
     '__ci_bb_241 {
         ((*__local_mb__goto_7024_14).check_subject = __local_start_match__goto_6993_12)
-        (__local_rc__goto_6967_5 = ((_pcre2_valid_utf_8(__local_start_match__goto_6993_12, (((__local_length as c_ulong) -% ((((__local_start_match__goto_6993_12 as usize) -% (__local_subject as usize)) / sizeof[u8]()) as c_ulong)) as c_ulong), ((&raw const (*__param_match_data).startchar as *const c_ulong) as *mut c_ulong)) as c_int)))
+        (__local_rc__goto_6967_5 = ((_pcre2_valid_utf_8(__local_start_match__goto_6993_12, (((__local_length as c_ulong) -% (((((__local_start_match__goto_6993_12 as usize) -% (__local_subject as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong)) as c_ulong), ((&raw const (*__param_match_data).startchar as *const c_ulong) as *mut c_ulong)) as c_int)))
         if ((if __local_rc__goto_6967_5 == 0: 1 else: 0) != 0) {
             goto '__ci_bb_242
         } else {
@@ -2430,15 +2430,15 @@ pub unsafe fn pcre2_match_8(__param_code: *const pcre2_real_code_8, __param_subj
         ((*__param_match_data).rc = __ci_expr_ternary_95)
         ((*__param_match_data).subject_length = __local_length)
         ((*__param_match_data).start_offset = __param_start_offset)
-        ((*__param_match_data).startchar = (((((__local_start_match__goto_6993_12 as usize) -% (__local_subject as usize)) / sizeof[u8]()) as c_ulong)))
-        ((*__param_match_data).leftchar = ((((((*__local_mb__goto_7024_14).start_used_ptr as usize) -% (__local_subject as usize)) / sizeof[u8]()) as c_ulong)))
+        ((*__param_match_data).startchar = ((((((__local_start_match__goto_6993_12 as usize) -% (__local_subject as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong)))
+        ((*__param_match_data).leftchar = (((((((*__local_mb__goto_7024_14).start_used_ptr as usize) -% (__local_subject as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong)))
         (__ci_expr_ternary_96 = null)
         if ((if (*__local_mb__goto_7024_14).last_used_ptr > (*__local_mb__goto_7024_14).end_match_ptr: 1 else: 0) != 0) {
             (__ci_expr_ternary_96 = (*__local_mb__goto_7024_14).last_used_ptr)
         } else {
             (__ci_expr_ternary_96 = (*__local_mb__goto_7024_14).end_match_ptr)
         }
-        ((*__param_match_data).rightchar = (((((__ci_expr_ternary_96 as usize) -% (__local_subject as usize)) / sizeof[u8]()) as c_ulong)))
+        ((*__param_match_data).rightchar = ((((((__ci_expr_ternary_96 as usize) -% (__local_subject as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong)))
         if ((if ((__local_options as c_uint) & (16384 as c_uint)) != 0: 1 else: 0) != 0) {
             goto '__ci_bb_251
         } else {
@@ -2526,11 +2526,11 @@ pub unsafe fn pcre2_match_8(__param_code: *const pcre2_real_code_8, __param_subj
         ((*__param_match_data).subject = __local_original_subject__goto_6989_12)
         ((*__param_match_data).subject_length = __local_length)
         ((*__param_match_data).start_offset = __param_start_offset)
-        ((*__param_match_data).ovector[0] = (((((__local_match_partial__goto_6996_12 as usize) -% (__local_subject as usize)) / sizeof[u8]()) as c_ulong)))
-        ((*__param_match_data).ovector[1] = (((((__local_end_subject__goto_6991_12 as usize) -% (__local_subject as usize)) / sizeof[u8]()) as c_ulong)))
-        ((*__param_match_data).startchar = (((((__local_match_partial__goto_6996_12 as usize) -% (__local_subject as usize)) / sizeof[u8]()) as c_ulong)))
-        ((*__param_match_data).leftchar = (((((__local_start_partial__goto_6995_12 as usize) -% (__local_subject as usize)) / sizeof[u8]()) as c_ulong)))
-        ((*__param_match_data).rightchar = (((((__local_end_subject__goto_6991_12 as usize) -% (__local_subject as usize)) / sizeof[u8]()) as c_ulong)))
+        ((*__param_match_data).ovector[0] = ((((((__local_match_partial__goto_6996_12 as usize) -% (__local_subject as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong)))
+        ((*__param_match_data).ovector[1] = ((((((__local_end_subject__goto_6991_12 as usize) -% (__local_subject as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong)))
+        ((*__param_match_data).startchar = ((((((__local_match_partial__goto_6996_12 as usize) -% (__local_subject as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong)))
+        ((*__param_match_data).leftchar = ((((((__local_start_partial__goto_6995_12 as usize) -% (__local_subject as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong)))
+        ((*__param_match_data).rightchar = ((((((__local_end_subject__goto_6991_12 as usize) -% (__local_subject as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong)))
         ((*__param_match_data).rc = ((-2 as c_int)))
         goto '__ci_bb_264
     }
@@ -2590,7 +2590,7 @@ unsafe fn do_callout(__param_F: *mut heapframe, __param_mb: *mut match_block_8, 
 
     ((*__local_cb).mark = (*__param_mb).nomatch_mark)
 
-    ((*__local_cb).current_position = ((((((*__param_F).eptr as usize) -% ((*__param_mb).start_subject as usize)) / sizeof[u8]()) as c_ulong)))
+    ((*__local_cb).current_position = (((((((*__param_F).eptr as usize) -% ((*__param_mb).start_subject as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong)))
 
     ((*__local_cb).pattern_position = (((((((((*__param_F).ecode[1]) as c_int) << (8 as c_uint)) as c_int) | (((*__param_F).ecode[(1 + 1)]) as c_int)) as c_uint) as c_ulong)))
 
@@ -2996,7 +2996,7 @@ unsafe fn match_ref(__param_offset: c_ulong, __param_caseless: c_int, __param_ca
         } else {
             var __ci_expr_logic_20: c_int
 
-            if ((if ((((((*__param_mb).end_subject as usize) -% (__local_eptr as usize)) / sizeof[u8]()) as c_ulong)) < __local_length: 1 else: 0) != 0) {
+            if ((if (((((((*__param_mb).end_subject as usize) -% (__local_eptr as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong)) < __local_length: 1 else: 0) != 0) {
                 (__ci_expr_logic_20 = (if true: 1 else: 0))
             } else {
                 (__ci_expr_logic_20 = (if (if with_memcmp(((__local_p as *const c_void) as *const u8), ((__local_eptr as *const c_void) as *const u8), ((((__local_length as c_ulong) *% (1 as c_ulong)) as c_ulong) as i64)) != 0: 1 else: 0) != 0: 1 else: 0))
@@ -3013,7 +3013,7 @@ unsafe fn match_ref(__param_offset: c_ulong, __param_caseless: c_int, __param_ca
 
     }
 
-    ((*__param_lengthptr) = (((((__local_eptr as usize) -% (__local_eptr_start as usize)) / sizeof[u8]()) as c_ulong)))
+    ((*__param_lengthptr) = ((((((__local_eptr as usize) -% (__local_eptr_start as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong)))
 
     return 0
 
@@ -4736,7 +4736,7 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_3 {
-        (__local_usedsize__goto_765_14 = ((((((__local_N__goto_693_12 as *mut c_char) as usize) -% (((*__param_match_data).heapframes as *mut c_char) as usize)) / sizeof[c_char]()) as c_ulong)))
+        (__local_usedsize__goto_765_14 = (((((((__local_N__goto_693_12 as *mut c_char) as usize) -% (((*__param_match_data).heapframes as *mut c_char) as usize)) as c_long) / (sizeof[c_char]() as c_long)) as c_ulong)))
         if ((if (*__param_match_data).heapframes_size >= ((((0 as c_ulong) -% 1) as c_ulong) / (2 as c_ulong)): 1 else: 0) != 0) {
             goto '__ci_bb_5
         } else {
@@ -4817,7 +4817,7 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_15 {
-        (__local_max_delta__goto_783_18 = (__local_max_delta__goto_783_18 -% (1024 - __local_over_bytes__goto_784_11)))
+        (__local_max_delta__goto_783_18 = (__local_max_delta__goto_783_18 -% ((1024 - __local_over_bytes__goto_784_11) as c_ulong)))
         goto '__ci_bb_16
     }
 
@@ -4855,7 +4855,7 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_21 {
-        ((*__local_F__goto_692_12).last_group_offset = ((((((__local_F__goto_692_12 as *mut c_char) as usize) -% (((*__param_match_data).heapframes as *mut c_char) as usize)) / sizeof[c_char]()) as c_ulong)))
+        ((*__local_F__goto_692_12).last_group_offset = (((((((__local_F__goto_692_12 as *mut c_char) as usize) -% (((*__param_match_data).heapframes as *mut c_char) as usize)) as c_long) / (sizeof[c_char]() as c_long)) as c_ulong)))
         if ((if ((__local_group_frame_type__goto_717_10 as c_uint) & (4294901760 as c_uint)) == 262144: 1 else: 0) != 0) {
             goto '__ci_bb_23
         } else {
@@ -4962,8 +4962,8 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     '__ci_bb_41 {
         (__local_offset__goto_705_12 = ((((((__local_number__goto_715_10 as c_uint) << (1 as c_uint)) as c_uint) -% (2 as c_uint)) as c_ulong)))
         ((*__local_F__goto_692_12).capture_last = __local_number__goto_715_10)
-        ((*__local_F__goto_692_12).ovector[__local_offset__goto_705_12] = ((((((*__local_P__goto_694_12).eptr as usize) -% ((*__param_mb).start_subject as usize)) / sizeof[u8]()) as c_ulong)))
-        ((*__local_F__goto_692_12).ovector[((__local_offset__goto_705_12 as c_ulong) +% (1 as c_ulong))] = ((((((*__local_F__goto_692_12).eptr as usize) -% ((*__param_mb).start_subject as usize)) / sizeof[u8]()) as c_ulong)))
+        ((*__local_F__goto_692_12).ovector[__local_offset__goto_705_12] = (((((((*__local_P__goto_694_12).eptr as usize) -% ((*__param_mb).start_subject as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong)))
+        ((*__local_F__goto_692_12).ovector[((__local_offset__goto_705_12 as c_ulong) +% (1 as c_ulong))] = (((((((*__local_F__goto_692_12).eptr as usize) -% ((*__param_mb).start_subject as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong)))
         if ((if __local_offset__goto_705_12 >= (*__local_F__goto_692_12).offset_top: 1 else: 0) != 0) {
             goto '__ci_bb_49
         } else {
@@ -5267,8 +5267,8 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_93 {
-        ((*__param_match_data).ovector[0] = ((((((*__local_F__goto_692_12).start_match as usize) -% ((*__param_mb).start_subject as usize)) / sizeof[u8]()) as c_ulong)))
-        ((*__param_match_data).ovector[1] = ((((((*__local_F__goto_692_12).eptr as usize) -% ((*__param_mb).start_subject as usize)) / sizeof[u8]()) as c_ulong)))
+        ((*__param_match_data).ovector[0] = (((((((*__local_F__goto_692_12).start_match as usize) -% ((*__param_mb).start_subject as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong)))
+        ((*__param_match_data).ovector[1] = (((((((*__local_F__goto_692_12).eptr as usize) -% ((*__param_mb).start_subject as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong)))
         (__ci_expr_ternary_6 = 0)
         if ((if ((__param_top_bracket as c_int) + 1) > (*__param_match_data).oveccount: 1 else: 0) != 0) {
             (__ci_expr_ternary_6 = (((*__param_match_data).oveccount as c_int)))
@@ -5602,7 +5602,7 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_140 {
-        if ((if ((((*__param_mb).end_subject as usize) -% ((*__local_F__goto_692_12).eptr as usize)) / sizeof[u8]()) < 1: 1 else: 0) != 0) {
+        if ((if (((((*__param_mb).end_subject as usize) -% ((*__local_F__goto_692_12).eptr as usize)) as c_long) / (sizeof[u8]() as c_long)) < 1: 1 else: 0) != 0) {
             goto '__ci_bb_182
         } else {
             goto '__ci_bb_183
@@ -5622,7 +5622,7 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_143 {
-        if ((if (*__local_F__goto_692_12).length > ((((((*__param_mb).end_subject as usize) -% ((*__local_F__goto_692_12).eptr as usize)) / sizeof[u8]()) as c_ulong)): 1 else: 0) != 0) {
+        if ((if (*__local_F__goto_692_12).length > (((((((*__param_mb).end_subject as usize) -% ((*__local_F__goto_692_12).eptr as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong)): 1 else: 0) != 0) {
             goto '__ci_bb_156
         } else {
             goto '__ci_bb_157
@@ -13867,7 +13867,7 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     '__ci_bb_1637 {
         ((*__local_F__goto_692_12).temp_sptr[1] = ((*__local_F__goto_692_12).ecode + ((1 as isize) as usize)) + ((2 as isize) as usize))
         ((*__local_F__goto_692_12).ecode = (*__local_F__goto_692_12).ecode + ((((((((*__local_F__goto_692_12).ecode[1]) as c_int) << (8 as c_uint)) as c_int) | (((*__local_F__goto_692_12).ecode[(1 + 1)]) as c_int)) as c_uint) as usize))
-        ((*__local_F__goto_692_12).temp_size = ((((((*__local_F__goto_692_12).ecode as usize) -% ((*__local_F__goto_692_12).temp_sptr[1] as usize)) / sizeof[u8]()) as c_ulong)))
+        ((*__local_F__goto_692_12).temp_size = (((((((*__local_F__goto_692_12).ecode as usize) -% ((*__local_F__goto_692_12).temp_sptr[1] as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong)))
         goto '__ci_bb_1638
     }
 
@@ -36940,7 +36940,7 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     '__ci_bb_5539 {
         (__local_fc__goto_714_10 = (((((*__local_F__goto_692_12).temp_32[1] as c_uint) -% ((*__local_F__goto_692_12).temp_32[0] as c_uint)) as c_uint)))
-        if ((if __local_fc__goto_714_10 > ((((((*__param_mb).end_subject as usize) -% ((*__local_F__goto_692_12).eptr as usize)) / sizeof[u8]()) as c_uint)): 1 else: 0) != 0) {
+        if ((if __local_fc__goto_714_10 > (((((((*__param_mb).end_subject as usize) -% ((*__local_F__goto_692_12).eptr as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_uint)): 1 else: 0) != 0) {
             goto '__ci_bb_5540
         } else {
             goto '__ci_bb_5541
@@ -39536,7 +39536,7 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     '__ci_bb_5920 {
         (__local_fc__goto_714_10 = (((((*__local_F__goto_692_12).temp_32[1] as c_uint) -% ((*__local_F__goto_692_12).temp_32[0] as c_uint)) as c_uint)))
-        if ((if __local_fc__goto_714_10 > ((((((*__param_mb).end_subject as usize) -% ((*__local_F__goto_692_12).eptr as usize)) / sizeof[u8]()) as c_uint)): 1 else: 0) != 0) {
+        if ((if __local_fc__goto_714_10 > (((((((*__param_mb).end_subject as usize) -% ((*__local_F__goto_692_12).eptr as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_uint)): 1 else: 0) != 0) {
             goto '__ci_bb_5921
         } else {
             goto '__ci_bb_5922
@@ -43381,7 +43381,7 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     '__ci_bb_6567 {
         ((*__local_F__goto_692_12).temp_32[1] = __local_extra_size__goto_5857_16)
         ((*__local_F__goto_692_12).temp_sptr[0] = (*__param_mb).end_subject)
-        ((*__local_F__goto_692_12).temp_size = ((((((*__param_mb).true_end_subject as usize) -% ((*__param_mb).end_subject as usize)) / sizeof[u8]()) as c_ulong)))
+        ((*__local_F__goto_692_12).temp_size = (((((((*__param_mb).true_end_subject as usize) -% ((*__param_mb).end_subject as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong)))
         ((*__local_F__goto_692_12).temp_sptr[1] = (*__local_F__goto_692_12).eptr)
         ((*__local_F__goto_692_12).temp_32[2] = (*__param_mb).moptions)
         ((*__local_F__goto_692_12).eptr = (*__param_mb).start_subject + ((*__local_F__goto_692_12).ovector[__local_offset__goto_705_12] as usize))
@@ -44099,7 +44099,7 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_6694 {
-        if ((if ((__local_number__goto_715_10 as c_long)) > ((((*__local_F__goto_692_12).eptr as usize) -% ((*__param_mb).start_subject as usize)) / sizeof[u8]()): 1 else: 0) != 0) {
+        if ((if ((__local_number__goto_715_10 as c_long)) > (((((*__local_F__goto_692_12).eptr as usize) -% ((*__param_mb).start_subject as usize)) as c_long) / (sizeof[u8]() as c_long)): 1 else: 0) != 0) {
             goto '__ci_bb_6707
         } else {
             goto '__ci_bb_6708
@@ -44207,7 +44207,7 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_6716 {
-        (__local_diff__goto_6252_17 = ((((((*__local_F__goto_692_12).eptr as usize) -% ((*__param_mb).start_subject as usize)) / sizeof[u8]()) as c_long)))
+        (__local_diff__goto_6252_17 = (((((((*__local_F__goto_692_12).eptr as usize) -% ((*__param_mb).start_subject as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_long)))
         (__ci_expr_ternary_812 = 0)
         if ((if __local_diff__goto_6252_17 > 65535: 1 else: 0) != 0) {
             (__ci_expr_ternary_812 = ((65535 as c_int)))
@@ -44555,7 +44555,7 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
         with_memcpy(((((__local_P__goto_694_12 as *mut c_char) + (136 as usize)) as *mut c_void) as *mut u8), ((&(*__local_F__goto_692_12).ovector[0] as *mut c_ulong) as *const u8), (((((*__local_F__goto_692_12).offset_top as c_ulong) *% (sizeof[usize]() as c_ulong)) as c_ulong) as i64))
         ((*__local_P__goto_694_12).offset_top = (*__local_F__goto_692_12).offset_top)
         ((*__local_P__goto_694_12).mark = (*__local_F__goto_692_12).mark)
-        ((*__local_F__goto_692_12).back_frame = ((((((__local_F__goto_692_12 as *mut c_char) as usize) -% ((__local_P__goto_694_12 as *mut c_char) as usize)) / sizeof[c_char]()) as c_ulong)))
+        ((*__local_F__goto_692_12).back_frame = (((((((__local_F__goto_692_12 as *mut c_char) as usize) -% ((__local_P__goto_694_12 as *mut c_char) as usize)) as c_long) / (sizeof[c_char]() as c_long)) as c_ulong)))
         goto '__ci_bb_6782
     }
 
@@ -44751,7 +44751,7 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_6817 {
-        ((*__local_F__goto_692_12).back_frame = ((((((__local_F__goto_692_12 as *mut c_char) as usize) -% ((__local_P__goto_694_12 as *mut c_char) as usize)) / sizeof[c_char]()) as c_ulong)))
+        ((*__local_F__goto_692_12).back_frame = (((((((__local_F__goto_692_12 as *mut c_char) as usize) -% ((__local_P__goto_694_12 as *mut c_char) as usize)) as c_long) / (sizeof[c_char]() as c_long)) as c_ulong)))
         goto '__ci_bb_6818
     }
 
@@ -44899,8 +44899,8 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     '__ci_bb_6850 {
         (__local_offset__goto_705_12 = ((((((__local_number__goto_715_10 as c_uint) << (1 as c_uint)) as c_uint) -% (2 as c_uint)) as c_ulong)))
         ((*__local_F__goto_692_12).capture_last = __local_number__goto_715_10)
-        ((*__local_F__goto_692_12).ovector[__local_offset__goto_705_12] = ((((((*__local_P__goto_694_12).eptr as usize) -% ((*__param_mb).start_subject as usize)) / sizeof[u8]()) as c_ulong)))
-        ((*__local_F__goto_692_12).ovector[((__local_offset__goto_705_12 as c_ulong) +% (1 as c_ulong))] = ((((((*__local_F__goto_692_12).eptr as usize) -% ((*__param_mb).start_subject as usize)) / sizeof[u8]()) as c_ulong)))
+        ((*__local_F__goto_692_12).ovector[__local_offset__goto_705_12] = (((((((*__local_P__goto_694_12).eptr as usize) -% ((*__param_mb).start_subject as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong)))
+        ((*__local_F__goto_692_12).ovector[((__local_offset__goto_705_12 as c_ulong) +% (1 as c_ulong))] = (((((((*__local_F__goto_692_12).eptr as usize) -% ((*__param_mb).start_subject as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong)))
         if ((if __local_offset__goto_705_12 >= (*__local_F__goto_692_12).offset_top: 1 else: 0) != 0) {
             goto '__ci_bb_6854
         } else {

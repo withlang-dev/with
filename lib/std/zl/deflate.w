@@ -1464,7 +1464,7 @@ pub unsafe fn deflateCopy(__param_dest: *mut z_stream_s, __param_source: *mut z_
 
     with_memcpy((((*__local_ds).head as *mut c_void) as *mut u8), (((*__local_ss).head as *const c_void) as *const u8), (((((*__local_ds).hash_size as c_ulong) *% (sizeof[c_ushort]() as c_ulong)) as c_ulong) as i64))
 
-    ((*__local_ds).pending_out = (*__local_ds).pending_buf + ((((((*__local_ss).pending_out as usize) -% ((*__local_ss).pending_buf as usize)) / sizeof[u8]()) as isize) as usize))
+    ((*__local_ds).pending_out = (*__local_ds).pending_buf + (((((((*__local_ss).pending_out as usize) -% ((*__local_ss).pending_buf as usize)) as c_long) / (sizeof[u8]() as c_long)) as isize) as usize))
 
     with_memcpy((((*__local_ds).pending_out as *mut c_void) as *mut u8), (((*__local_ss).pending_out as *const c_void) as *const u8), ((*__local_ss).pending as i64))
 
@@ -2001,7 +2001,7 @@ pub unsafe fn deflateInit2_(__param_strm: *mut z_stream_s, __param_level: c_int,
     if (__ci_expr_logic_0 != 0) {
         (__ci_expr_logic_1 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_1 = (if (if __param_stream_size != sizeof[z_stream_s](): 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_1 = (if (if ((__param_stream_size as c_ulong)) != (sizeof[z_stream_s]() as usize): 1 else: 0) != 0: 1 else: 0))
     }
 
     if (__ci_expr_logic_1 != 0) {
@@ -3518,7 +3518,7 @@ unsafe fn deflate_rle(__param_s: *mut internal_state, __param_flush: c_int) -> i
                     }
                 }
 
-                ((*__param_s).match_length = ((((258 as c_uint) -% ((((__local_strend as usize) -% (__local_scan as usize)) / sizeof[u8]()) as c_uint)) as c_uint)))
+                ((*__param_s).match_length = ((((258 as c_uint) -% (((((__local_strend as usize) -% (__local_scan as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_uint)) as c_uint)))
 
                 if ((if (*__param_s).match_length > (*__param_s).lookahead: 1 else: 0) != 0) {
                     ((*__param_s).match_length = (*__param_s).lookahead)
@@ -3964,7 +3964,7 @@ unsafe fn fill_window(__param_s: *mut internal_state) -> Unit {
     loop {
         (__local_more = (((((((*__param_s).window_size as c_ulong) -% ((*__param_s).lookahead as c_ulong)) as c_ulong) -% ((*__param_s).strstart as c_ulong)) as c_uint)))
 
-        if ((if sizeof[c_int]() <= 2: 1 else: 0) != 0) {
+        if ((if (sizeof[c_int]() as usize) <= 2: 1 else: 0) != 0) {
             var __ci_expr_logic_2: c_int = 0
 
             var __ci_expr_logic_1: c_int = 0
@@ -4486,7 +4486,7 @@ unsafe fn longest_match(__param_s: *mut internal_state, __param_cur_match: c_uin
         }
 
 
-        (__local_len = (((258 - ((((__local_strend as usize) -% (__local_scan as usize)) / sizeof[u8]()) as c_int)) as c_int)))
+        (__local_len = (((258 - (((((__local_strend as usize) -% (__local_scan as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_int)) as c_int)))
 
         (__local_scan = __local_strend - ((258 as isize) as usize))
 

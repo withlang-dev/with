@@ -787,7 +787,7 @@ pub unsafe fn _pcre2_xclass_8(__param_c: c_uint, __param_data: *const u8, __para
 
     var __ci_expr_ternary_41: c_int = 0
 
-    if ((if sizeof[u8]() == 1: 1 else: 0) != 0) {
+    if ((if (sizeof[u8]() as usize) == 1: 1 else: 0) != 0) {
         (__ci_expr_ternary_41 = ((16 as c_int)))
     } else {
         (__ci_expr_ternary_41 = ((4096 as c_int)))

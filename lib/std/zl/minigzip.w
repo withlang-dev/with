@@ -64,7 +64,7 @@ unsafe fn gz_compress(__param_in_: *mut c_void, __param_out: *mut gzFile_s) -> U
     var __local_err: c_int
 
     while true {
-        (__local_len = ((fread((&__local_buf[0] as *mut c_char), (1 as c_ulong), ((16384 * sizeof[c_char]()) as c_ulong), __param_in_) as c_int)))
+        (__local_len = ((fread((&__local_buf[0] as *mut c_char), (1 as c_ulong), ((16384 * (sizeof[c_char]() as usize)) as c_ulong), __param_in_) as c_int)))
 
         if (ferror(__param_in_) != 0) {
             perror(c"fread".ptr)
@@ -136,16 +136,16 @@ unsafe fn file_compress(__param_file: *mut i8, __param_mode: *mut i8) -> Unit {
 
     var __local_out: *mut gzFile_s
 
-    if ((if ((strlen((__param_file as *const i8)) as c_ulong) +% (strlen(c".gz".ptr) as c_ulong)) >= (1025 * sizeof[c_char]()): 1 else: 0) != 0) {
+    if ((if ((strlen((__param_file as *const i8)) as c_ulong) +% (strlen(c".gz".ptr) as c_ulong)) >= (1025 * (sizeof[c_char]() as usize)): 1 else: 0) != 0) {
         fprintf(libc_stderr(), c"%s: filename too long\n".ptr, prog)
 
         exit((1 as c_int))
 
     }
 
-    (__local_end = ((string_copy((&__local_outfile[0] as *mut c_char), (__param_file as *const i8), ((1025 * sizeof[c_char]()) as c_ulong)) as *mut c_char)))
+    (__local_end = ((string_copy((&__local_outfile[0] as *mut c_char), (__param_file as *const i8), ((1025 * (sizeof[c_char]() as usize)) as c_ulong)) as *mut c_char)))
 
-    string_copy(__local_end, c".gz".ptr, ((((1025 * sizeof[c_char]()) as c_ulong) -% ((((__local_end as usize) -% ((&__local_outfile[0] as *mut c_char) as usize)) / sizeof[c_char]()) as c_ulong)) as c_ulong))
+    string_copy(__local_end, c".gz".ptr, ((((1025 * (sizeof[c_char]() as usize)) as c_ulong) -% (((((__local_end as usize) -% ((&__local_outfile[0] as *mut c_char) as usize)) as c_long) / (sizeof[c_char]() as c_long)) as c_ulong)) as c_ulong))
 
     (__local_in_ = fopen((__param_file as *const i8), c"rb".ptr))
 
@@ -187,19 +187,19 @@ unsafe fn file_uncompress(__param_file: *mut i8) -> Unit {
 
     var __local_len: c_ulong = ((strlen((__param_file as *const i8)) as c_ulong))
 
-    if ((if ((__local_len as c_ulong) +% (strlen(c".gz".ptr) as c_ulong)) >= (1025 * sizeof[c_char]()): 1 else: 0) != 0) {
+    if ((if ((__local_len as c_ulong) +% (strlen(c".gz".ptr) as c_ulong)) >= (1025 * (sizeof[c_char]() as usize)): 1 else: 0) != 0) {
         fprintf(libc_stderr(), c"%s: filename too long\n".ptr, prog)
 
         exit((1 as c_int))
 
     }
 
-    string_copy((&__local_buf[0] as *mut c_char), (__param_file as *const i8), ((1025 * sizeof[c_char]()) as c_ulong))
+    string_copy((&__local_buf[0] as *mut c_char), (__param_file as *const i8), ((1025 * (sizeof[c_char]() as usize)) as c_ulong))
 
     var __ci_expr_logic_0: c_int = 0
 
-    if ((if __local_len > (((4 * sizeof[c_char]()) as c_ulong) -% (1 as c_ulong)): 1 else: 0) != 0) {
-        (__ci_expr_logic_0 = (if (if strcmp((((__param_file + (__local_len as usize)) - ((((4 * sizeof[c_char]()) as c_ulong) -% (1 as c_ulong)) as usize)) as *const i8), c".gz".ptr) == 0: 1 else: 0) != 0: 1 else: 0))
+    if ((if __local_len > (((4 * (sizeof[c_char]() as usize)) as c_ulong) -% (1 as c_ulong)): 1 else: 0) != 0) {
+        (__ci_expr_logic_0 = (if (if strcmp((((__param_file + (__local_len as usize)) - ((((4 * (sizeof[c_char]() as usize)) as c_ulong) -% (1 as c_ulong)) as usize)) as *const i8), c".gz".ptr) == 0: 1 else: 0) != 0: 1 else: 0))
     }
 
     if (__ci_expr_logic_0 != 0) {
@@ -214,7 +214,7 @@ unsafe fn file_uncompress(__param_file: *mut i8) -> Unit {
 
         (__local_infile = (&__local_buf[0] as *mut c_char))
 
-        string_copy(((&__local_buf[0] as *mut c_char) + (__local_len as usize)), c".gz".ptr, ((((1025 * sizeof[c_char]()) as c_ulong) -% (__local_len as c_ulong)) as c_ulong))
+        string_copy(((&__local_buf[0] as *mut c_char) + (__local_len as usize)), c".gz".ptr, ((((1025 * (sizeof[c_char]() as usize)) as c_ulong) -% (__local_len as c_ulong)) as c_ulong))
 
     }
 
@@ -259,7 +259,7 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     var __local_outmode: [5]c_char
 
 
-    string_copy((&__local_outmode[0] as *mut c_char), c"wb6 ".ptr, ((5 * sizeof[c_char]()) as c_ulong))
+    string_copy((&__local_outmode[0] as *mut c_char), c"wb6 ".ptr, ((5 * (sizeof[c_char]() as usize)) as c_ulong))
 
     (prog = (((__local_argv[0]) as *mut c_char)))
 

@@ -645,7 +645,7 @@ unsafe fn print_class_8(__param_f: *mut c_void, __param_type_: c_int, __param_co
 
             var __ci_expr_ternary_2: c_int = 0
 
-            if ((if sizeof[u8]() == 1: 1 else: 0) != 0) {
+            if ((if (sizeof[u8]() as usize) == 1: 1 else: 0) != 0) {
                 (__ci_expr_ternary_2 = ((16 as c_int)))
             } else {
                 (__ci_expr_ternary_2 = ((4096 as c_int)))
@@ -882,7 +882,7 @@ unsafe fn pcre2_printint_8(__param_re: *mut pcre2_real_code_8, __param_f: *mut c
     }
 
     '__ci_bb_5 {
-        fprintf(__param_f, c"%3d ".ptr, ((((__local_code__goto_654_34 as usize) -% (__local_codestart__goto_654_12 as usize)) / sizeof[u8]()) as c_int))
+        fprintf(__param_f, c"%3d ".ptr, (((((__local_code__goto_654_34 as usize) -% (__local_codestart__goto_654_12 as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_int))
         goto '__ci_bb_7
     }
 
@@ -1557,7 +1557,7 @@ unsafe fn pcre2_printint_8(__param_re: *mut pcre2_real_code_8, __param_f: *mut c
     }
 
     '__ci_bb_106 {
-        fprintf(__param_f, c"%3d ".ptr, ((((__local_ccode__goto_663_14 as usize) -% (__local_codestart__goto_654_12 as usize)) / sizeof[u8]()) as c_int))
+        fprintf(__param_f, c"%3d ".ptr, (((((__local_ccode__goto_663_14 as usize) -% (__local_codestart__goto_654_12 as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_int))
         goto '__ci_bb_108
     }
 
@@ -1683,7 +1683,7 @@ unsafe fn pcre2_printint_8(__param_re: *mut pcre2_real_code_8, __param_f: *mut c
 
     '__ci_bb_126 {
         fprintf(__param_f, c"%s".ptr, OP_names[(*__local_ccode__goto_663_14)])
-        (__local_extra__goto_667_16 = (__local_extra__goto_667_16 +% (OP_lengths_8[(*__local_ccode__goto_663_14)] as c_int)))
+        (__local_extra__goto_667_16 = (__local_extra__goto_667_16 +% (OP_lengths_8[(*__local_ccode__goto_663_14)] as c_uint)))
         goto '__ci_bb_125
     }
 
@@ -1729,7 +1729,7 @@ unsafe fn pcre2_printint_8(__param_re: *mut pcre2_real_code_8, __param_f: *mut c
     }
 
     '__ci_bb_133 {
-        (__local_extra__goto_667_16 = (__local_extra__goto_667_16 +% (OP_lengths_8[(*__local_ccode__goto_663_14)] as c_int)))
+        (__local_extra__goto_667_16 = (__local_extra__goto_667_16 +% (OP_lengths_8[(*__local_ccode__goto_663_14)] as c_uint)))
         goto '__ci_bb_125
     }
 
@@ -1837,7 +1837,7 @@ unsafe fn pcre2_printint_8(__param_re: *mut pcre2_real_code_8, __param_f: *mut c
     '__ci_bb_148 {
         fprintf(__param_f, c"    %s ".ptr, OP_names[(*__local_code__goto_654_34)])
         print_custring_bylen_8(__param_f, (__local_code__goto_654_34 + ((2 as isize) as usize)), ((__local_code__goto_654_34[1]) as u8))
-        (__local_extra__goto_667_16 = (__local_extra__goto_667_16 +% ((__local_code__goto_654_34[1]) as c_int)))
+        (__local_extra__goto_667_16 = (__local_extra__goto_667_16 +% ((__local_code__goto_654_34[1]) as c_uint)))
         goto '__ci_bb_9
     }
 
@@ -2841,14 +2841,14 @@ pub unsafe fn valid_utf(__param_string: *const u8, __param_length: c_ulong, __pa
         }
 
         if ((if __local_c < 192: 1 else: 0) != 0) {
-            ((*__param_erroroffset) = (((((__local_p as usize) -% (__param_string as usize)) / sizeof[u8]()) as c_ulong)))
+            ((*__param_erroroffset) = ((((((__local_p as usize) -% (__param_string as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong)))
 
             return -22
 
         }
 
         if ((if __local_c >= 254: 1 else: 0) != 0) {
-            ((*__param_erroroffset) = (((((__local_p as usize) -% (__param_string as usize)) / sizeof[u8]()) as c_ulong)))
+            ((*__param_erroroffset) = ((((((__local_p as usize) -% (__param_string as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong)))
 
             return -23
 
@@ -2857,7 +2857,7 @@ pub unsafe fn valid_utf(__param_string: *const u8, __param_length: c_ulong, __pa
         (__local_ab = ((utf8_table4[((__local_c as c_uint) & (63 as c_uint))] as c_uint)))
 
         if ((if __local_length < __local_ab: 1 else: 0) != 0) {
-            ((*__param_erroroffset) = (((((__local_p as usize) -% (__param_string as usize)) / sizeof[u8]()) as c_ulong)))
+            ((*__param_erroroffset) = ((((((__local_p as usize) -% (__param_string as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong)))
 
             match ((__local_ab as c_ulong) -% (__local_length as c_ulong)) {
                 1 => {
@@ -2886,7 +2886,7 @@ pub unsafe fn valid_utf(__param_string: *const u8, __param_length: c_ulong, __pa
         (__local_d = (((*__local_p) as c_uint)))
 
         if ((if ((__local_d as c_uint) & (192 as c_uint)) != 128: 1 else: 0) != 0) {
-            ((*__param_erroroffset) = (((((((__local_p as usize) -% (__param_string as usize)) / sizeof[u8]()) as c_ulong) -% (1 as c_ulong)) as c_ulong)))
+            ((*__param_erroroffset) = ((((((((__local_p as usize) -% (__param_string as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong) -% (1 as c_ulong)) as c_ulong)))
 
             return -8
 
@@ -2897,7 +2897,7 @@ pub unsafe fn valid_utf(__param_string: *const u8, __param_length: c_ulong, __pa
             match __local_ab {
                 1 => {
                     if ((if ((__local_c as c_uint) & (62 as c_uint)) == 0: 1 else: 0) != 0) {
-                        ((*__param_erroroffset) = (((((((__local_p as usize) -% (__param_string as usize)) / sizeof[u8]()) as c_ulong) -% (1 as c_ulong)) as c_ulong)))
+                        ((*__param_erroroffset) = ((((((((__local_p as usize) -% (__param_string as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong) -% (1 as c_ulong)) as c_ulong)))
 
                         return -17
 
@@ -2907,7 +2907,7 @@ pub unsafe fn valid_utf(__param_string: *const u8, __param_length: c_ulong, __pa
                     (__local_p = __local_p + 1)
 
                     if ((if (((*__local_p) as c_int) & (192 as c_int)) != 128: 1 else: 0) != 0) {
-                        ((*__param_erroroffset) = (((((((__local_p as usize) -% (__param_string as usize)) / sizeof[u8]()) as c_ulong) -% (2 as c_ulong)) as c_ulong)))
+                        ((*__param_erroroffset) = ((((((((__local_p as usize) -% (__param_string as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong) -% (2 as c_ulong)) as c_ulong)))
 
                         return -9
 
@@ -2921,7 +2921,7 @@ pub unsafe fn valid_utf(__param_string: *const u8, __param_length: c_ulong, __pa
                     }
 
                     if (__ci_expr_logic_0 != 0) {
-                        ((*__param_erroroffset) = (((((((__local_p as usize) -% (__param_string as usize)) / sizeof[u8]()) as c_ulong) -% (2 as c_ulong)) as c_ulong)))
+                        ((*__param_erroroffset) = ((((((((__local_p as usize) -% (__param_string as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong) -% (2 as c_ulong)) as c_ulong)))
 
                         return -18
 
@@ -2935,7 +2935,7 @@ pub unsafe fn valid_utf(__param_string: *const u8, __param_length: c_ulong, __pa
                     }
 
                     if (__ci_expr_logic_1 != 0) {
-                        ((*__param_erroroffset) = (((((((__local_p as usize) -% (__param_string as usize)) / sizeof[u8]()) as c_ulong) -% (2 as c_ulong)) as c_ulong)))
+                        ((*__param_erroroffset) = ((((((((__local_p as usize) -% (__param_string as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong) -% (2 as c_ulong)) as c_ulong)))
 
                         return -16
 
@@ -2947,7 +2947,7 @@ pub unsafe fn valid_utf(__param_string: *const u8, __param_length: c_ulong, __pa
                     (__local_p = __local_p + 1)
 
                     if ((if (((*__local_p) as c_int) & (192 as c_int)) != 128: 1 else: 0) != 0) {
-                        ((*__param_erroroffset) = (((((((__local_p as usize) -% (__param_string as usize)) / sizeof[u8]()) as c_ulong) -% (2 as c_ulong)) as c_ulong)))
+                        ((*__param_erroroffset) = ((((((((__local_p as usize) -% (__param_string as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong) -% (2 as c_ulong)) as c_ulong)))
 
                         return -9
 
@@ -2957,7 +2957,7 @@ pub unsafe fn valid_utf(__param_string: *const u8, __param_length: c_ulong, __pa
                     (__local_p = __local_p + 1)
 
                     if ((if (((*__local_p) as c_int) & (192 as c_int)) != 128: 1 else: 0) != 0) {
-                        ((*__param_erroroffset) = (((((((__local_p as usize) -% (__param_string as usize)) / sizeof[u8]()) as c_ulong) -% (3 as c_ulong)) as c_ulong)))
+                        ((*__param_erroroffset) = ((((((((__local_p as usize) -% (__param_string as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong) -% (3 as c_ulong)) as c_ulong)))
 
                         return -10
 
@@ -2971,7 +2971,7 @@ pub unsafe fn valid_utf(__param_string: *const u8, __param_length: c_ulong, __pa
                     }
 
                     if (__ci_expr_logic_2 != 0) {
-                        ((*__param_erroroffset) = (((((((__local_p as usize) -% (__param_string as usize)) / sizeof[u8]()) as c_ulong) -% (3 as c_ulong)) as c_ulong)))
+                        ((*__param_erroroffset) = ((((((((__local_p as usize) -% (__param_string as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong) -% (3 as c_ulong)) as c_ulong)))
 
                         return -19
 
@@ -2994,7 +2994,7 @@ pub unsafe fn valid_utf(__param_string: *const u8, __param_length: c_ulong, __pa
                     }
 
                     if (__ci_expr_logic_4 != 0) {
-                        ((*__param_erroroffset) = (((((((__local_p as usize) -% (__param_string as usize)) / sizeof[u8]()) as c_ulong) -% (3 as c_ulong)) as c_ulong)))
+                        ((*__param_erroroffset) = ((((((((__local_p as usize) -% (__param_string as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong) -% (3 as c_ulong)) as c_ulong)))
 
                         return -15
 
@@ -3006,7 +3006,7 @@ pub unsafe fn valid_utf(__param_string: *const u8, __param_length: c_ulong, __pa
                     (__local_p = __local_p + 1)
 
                     if ((if (((*__local_p) as c_int) & (192 as c_int)) != 128: 1 else: 0) != 0) {
-                        ((*__param_erroroffset) = (((((((__local_p as usize) -% (__param_string as usize)) / sizeof[u8]()) as c_ulong) -% (2 as c_ulong)) as c_ulong)))
+                        ((*__param_erroroffset) = ((((((((__local_p as usize) -% (__param_string as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong) -% (2 as c_ulong)) as c_ulong)))
 
                         return -9
 
@@ -3016,7 +3016,7 @@ pub unsafe fn valid_utf(__param_string: *const u8, __param_length: c_ulong, __pa
                     (__local_p = __local_p + 1)
 
                     if ((if (((*__local_p) as c_int) & (192 as c_int)) != 128: 1 else: 0) != 0) {
-                        ((*__param_erroroffset) = (((((((__local_p as usize) -% (__param_string as usize)) / sizeof[u8]()) as c_ulong) -% (3 as c_ulong)) as c_ulong)))
+                        ((*__param_erroroffset) = ((((((((__local_p as usize) -% (__param_string as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong) -% (3 as c_ulong)) as c_ulong)))
 
                         return -10
 
@@ -3026,7 +3026,7 @@ pub unsafe fn valid_utf(__param_string: *const u8, __param_length: c_ulong, __pa
                     (__local_p = __local_p + 1)
 
                     if ((if (((*__local_p) as c_int) & (192 as c_int)) != 128: 1 else: 0) != 0) {
-                        ((*__param_erroroffset) = (((((((__local_p as usize) -% (__param_string as usize)) / sizeof[u8]()) as c_ulong) -% (4 as c_ulong)) as c_ulong)))
+                        ((*__param_erroroffset) = ((((((((__local_p as usize) -% (__param_string as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong) -% (4 as c_ulong)) as c_ulong)))
 
                         return -11
 
@@ -3040,7 +3040,7 @@ pub unsafe fn valid_utf(__param_string: *const u8, __param_length: c_ulong, __pa
                     }
 
                     if (__ci_expr_logic_5 != 0) {
-                        ((*__param_erroroffset) = (((((((__local_p as usize) -% (__param_string as usize)) / sizeof[u8]()) as c_ulong) -% (4 as c_ulong)) as c_ulong)))
+                        ((*__param_erroroffset) = ((((((((__local_p as usize) -% (__param_string as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong) -% (4 as c_ulong)) as c_ulong)))
 
                         return -20
 
@@ -3052,7 +3052,7 @@ pub unsafe fn valid_utf(__param_string: *const u8, __param_length: c_ulong, __pa
                     (__local_p = __local_p + 1)
 
                     if ((if (((*__local_p) as c_int) & (192 as c_int)) != 128: 1 else: 0) != 0) {
-                        ((*__param_erroroffset) = (((((((__local_p as usize) -% (__param_string as usize)) / sizeof[u8]()) as c_ulong) -% (2 as c_ulong)) as c_ulong)))
+                        ((*__param_erroroffset) = ((((((((__local_p as usize) -% (__param_string as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong) -% (2 as c_ulong)) as c_ulong)))
 
                         return -9
 
@@ -3062,7 +3062,7 @@ pub unsafe fn valid_utf(__param_string: *const u8, __param_length: c_ulong, __pa
                     (__local_p = __local_p + 1)
 
                     if ((if (((*__local_p) as c_int) & (192 as c_int)) != 128: 1 else: 0) != 0) {
-                        ((*__param_erroroffset) = (((((((__local_p as usize) -% (__param_string as usize)) / sizeof[u8]()) as c_ulong) -% (3 as c_ulong)) as c_ulong)))
+                        ((*__param_erroroffset) = ((((((((__local_p as usize) -% (__param_string as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong) -% (3 as c_ulong)) as c_ulong)))
 
                         return -10
 
@@ -3072,7 +3072,7 @@ pub unsafe fn valid_utf(__param_string: *const u8, __param_length: c_ulong, __pa
                     (__local_p = __local_p + 1)
 
                     if ((if (((*__local_p) as c_int) & (192 as c_int)) != 128: 1 else: 0) != 0) {
-                        ((*__param_erroroffset) = (((((((__local_p as usize) -% (__param_string as usize)) / sizeof[u8]()) as c_ulong) -% (4 as c_ulong)) as c_ulong)))
+                        ((*__param_erroroffset) = ((((((((__local_p as usize) -% (__param_string as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong) -% (4 as c_ulong)) as c_ulong)))
 
                         return -11
 
@@ -3082,7 +3082,7 @@ pub unsafe fn valid_utf(__param_string: *const u8, __param_length: c_ulong, __pa
                     (__local_p = __local_p + 1)
 
                     if ((if (((*__local_p) as c_int) & (192 as c_int)) != 128: 1 else: 0) != 0) {
-                        ((*__param_erroroffset) = (((((((__local_p as usize) -% (__param_string as usize)) / sizeof[u8]()) as c_ulong) -% (5 as c_ulong)) as c_ulong)))
+                        ((*__param_erroroffset) = ((((((((__local_p as usize) -% (__param_string as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong) -% (5 as c_ulong)) as c_ulong)))
 
                         return -12
 
@@ -3096,7 +3096,7 @@ pub unsafe fn valid_utf(__param_string: *const u8, __param_length: c_ulong, __pa
                     }
 
                     if (__ci_expr_logic_6 != 0) {
-                        ((*__param_erroroffset) = (((((((__local_p as usize) -% (__param_string as usize)) / sizeof[u8]()) as c_ulong) -% (5 as c_ulong)) as c_ulong)))
+                        ((*__param_erroroffset) = ((((((((__local_p as usize) -% (__param_string as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong) -% (5 as c_ulong)) as c_ulong)))
 
                         return -21
 
@@ -3111,7 +3111,7 @@ pub unsafe fn valid_utf(__param_string: *const u8, __param_length: c_ulong, __pa
         }
 
         if ((if __local_ab > 3: 1 else: 0) != 0) {
-            ((*__param_erroroffset) = (((((((__local_p as usize) -% (__param_string as usize)) / sizeof[u8]()) as c_ulong) -% (__local_ab as c_ulong)) as c_ulong)))
+            ((*__param_erroroffset) = ((((((((__local_p as usize) -% (__param_string as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong) -% (__local_ab as c_ulong)) as c_ulong)))
 
             var __ci_expr_ternary_8: c_int = 0
 
@@ -3628,7 +3628,7 @@ unsafe fn pchar(__param_c: c_uint, __param_utf: c_int, __param_f: *mut c_void) -
     if ((if __param_f != null: 1 else: 0) != 0) {
         (__local_n = ((fprintf(__param_f, c"\\x{%02x}".ptr, __local_c) as c_int)))
     } else {
-        (__local_n = ((snprintf((&__local_tempbuffer[0] as *mut c_char), ((16 * sizeof[c_char]()) as c_ulong), c"\\x{%02x}".ptr, __local_c) as c_int)))
+        (__local_n = ((snprintf((&__local_tempbuffer[0] as *mut c_char), ((16 * (sizeof[c_char]() as usize)) as c_ulong), c"\\x{%02x}".ptr, __local_c) as c_int)))
     }
 
     var __ci_expr_ternary_1: c_int = 0
@@ -3695,7 +3695,7 @@ unsafe fn extend_inputline(__param_f: *mut c_void, __param_start: *mut u8, __par
     while true {
         var __local_dlen: c_ulong
 
-        var __local_rlen: c_ulong = ((((pbuffer8_size as c_ulong) -% ((((__local_here as usize) -% (buffer as usize)) / sizeof[u8]()) as c_ulong)) as c_ulong))
+        var __local_rlen: c_ulong = ((((pbuffer8_size as c_ulong) -% (((((__local_here as usize) -% (buffer as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong)) as c_ulong))
 
         if ((if __local_rlen > 1000: 1 else: 0) != 0) {
             var __local_rlen_trunc: c_int = with 0 as __ci_expr_seq_12 {
@@ -3772,9 +3772,9 @@ unsafe fn extend_inputline(__param_f: *mut c_void, __param_start: *mut u8, __par
 
 
         } else {
-            var __local_start_offset: c_ulong = (((((__local_start as usize) -% (buffer as usize)) / sizeof[u8]()) as c_ulong))
+            var __local_start_offset: c_ulong = ((((((__local_start as usize) -% (buffer as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong))
 
-            var __local_here_offset: c_ulong = (((((__local_here as usize) -% (buffer as usize)) / sizeof[u8]()) as c_ulong))
+            var __local_here_offset: c_ulong = ((((((__local_here as usize) -% (buffer as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong))
 
             expand_input_buffers()
 
@@ -6683,7 +6683,7 @@ unsafe fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pct
     }
 
     '__ci_bb_23 {
-        (__local_index__goto_708_7 = ((scan_modifiers((__local_p as *const u8), ((((__local_pp__goto_696_15 as usize) -% (__local_p as usize)) / sizeof[u8]()) as c_ulong)) as c_int)))
+        (__local_index__goto_708_7 = ((scan_modifiers((__local_p as *const u8), (((((__local_pp__goto_696_15 as usize) -% (__local_p as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong)) as c_int)))
         if ((if __local_index__goto_708_7 < 0: 1 else: 0) != 0) {
             goto '__ci_bb_24
         } else {
@@ -6732,9 +6732,9 @@ unsafe fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pct
 
     '__ci_bb_26 {
         colour_begin(31, outfile)
-        fprintf(outfile, c"** Unrecognized modifier \"%.*s\"\n".ptr, ((((__local_ep__goto_696_10 as usize) -% (__local_p as usize)) / sizeof[u8]()) as c_int), __local_p)
+        fprintf(outfile, c"** Unrecognized modifier \"%.*s\"\n".ptr, (((((__local_ep__goto_696_10 as usize) -% (__local_p as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_int), __local_p)
         colour_end(outfile)
-        if ((if (((__local_ep__goto_696_10 as usize) -% (__local_p as usize)) / sizeof[u8]()) == 1: 1 else: 0) != 0) {
+        if ((if ((((__local_ep__goto_696_10 as usize) -% (__local_p as usize)) as c_long) / (sizeof[u8]() as c_long)) == 1: 1 else: 0) != 0) {
             goto '__ci_bb_28
         } else {
             goto '__ci_bb_29
@@ -6790,7 +6790,7 @@ unsafe fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pct
     }
 
     '__ci_bb_34 {
-        if ((if __local_i__goto_706_16 < (((10 * sizeof[c1modstruct]()) as c_ulong) / (sizeof[c1modstruct]() as c_ulong)): 1 else: 0) != 0) {
+        if ((if __local_i__goto_706_16 < (((10 * (sizeof[c1modstruct]() as usize)) as c_ulong) / (sizeof[c1modstruct]() as c_ulong)): 1 else: 0) != 0) {
             goto '__ci_bb_35
         } else {
             goto '__ci_bb_37
@@ -6811,7 +6811,7 @@ unsafe fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pct
     }
 
     '__ci_bb_37 {
-        if ((if __local_i__goto_706_16 >= (((10 * sizeof[c1modstruct]()) as c_ulong) / (sizeof[c1modstruct]() as c_ulong)): 1 else: 0) != 0) {
+        if ((if __local_i__goto_706_16 >= (((10 * (sizeof[c1modstruct]() as usize)) as c_ulong) / (sizeof[c1modstruct]() as c_ulong)): 1 else: 0) != 0) {
             goto '__ci_bb_40
         } else {
             goto '__ci_bb_41
@@ -6828,7 +6828,7 @@ unsafe fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pct
 
     '__ci_bb_40 {
         colour_begin(31, outfile)
-        fprintf(outfile, c"** Unrecognized modifier '%c' in modifier string \"%.*s\"\n".ptr, (*__local_p), ((((__local_ep__goto_696_10 as usize) -% (__local_mp__goto_746_14 as usize)) / sizeof[u8]()) as c_int), __local_mp__goto_746_14)
+        fprintf(outfile, c"** Unrecognized modifier '%c' in modifier string \"%.*s\"\n".ptr, (*__local_p), (((((__local_ep__goto_696_10 as usize) -% (__local_mp__goto_746_14 as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_int), __local_mp__goto_746_14)
         colour_end(outfile)
         return 0
     }
@@ -6938,7 +6938,7 @@ unsafe fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pct
     }
 
     '__ci_bb_54 {
-        (__local_len__goto_707_10 = (((((__local_ep__goto_696_10 as usize) -% (__local_pp__goto_696_15 as usize)) / sizeof[u8]()) as c_ulong)))
+        (__local_len__goto_707_10 = ((((((__local_ep__goto_696_10 as usize) -% (__local_pp__goto_696_15 as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong)))
         (__local_field__goto_703_9 = check_modifier_8(__local_m__goto_704_14, __param_ctx, __param_pctl, __param_dctl, (0 as c_uint)))
         if ((if __local_field__goto_703_9 == null: 1 else: 0) != 0) {
             goto '__ci_bb_61
@@ -6975,7 +6975,7 @@ unsafe fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pct
 
     '__ci_bb_59 {
         colour_begin(31, outfile)
-        fprintf(outfile, c"** Unrecognized modifier '%.*s'\n".ptr, ((((__local_ep__goto_696_10 as usize) -% (__local_p as usize)) / sizeof[u8]()) as c_int), __local_p)
+        fprintf(outfile, c"** Unrecognized modifier '%.*s'\n".ptr, (((((__local_ep__goto_696_10 as usize) -% (__local_p as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_int), __local_p)
         colour_end(outfile)
         return 0
     }
@@ -7149,7 +7149,7 @@ unsafe fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pct
 
     '__ci_bb_83 {
         colour_begin(31, outfile)
-        fprintf(outfile, c"** Invalid value in \"%.*s\"\n".ptr, ((((__local_ep__goto_696_10 as usize) -% (__local_p as usize)) / sizeof[u8]()) as c_int), __local_p)
+        fprintf(outfile, c"** Invalid value in \"%.*s\"\n".ptr, (((((__local_ep__goto_696_10 as usize) -% (__local_p as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_int), __local_p)
         colour_end(outfile)
         return 0
     }
@@ -7195,7 +7195,7 @@ unsafe fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pct
         } else {
             (__ci_expr_ternary_22 = __local_ep__goto_696_10)
         }
-        (__local_len__goto_707_10 = (((((__ci_expr_ternary_22 as usize) -% (__local_pp__goto_696_15 as usize)) / sizeof[u8]()) as c_ulong)))
+        (__local_len__goto_707_10 = ((((((__ci_expr_ternary_22 as usize) -% (__local_pp__goto_696_15 as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong)))
         (__local_i__goto_706_16 = ((0 as c_uint)))
         goto '__ci_bb_93
     }
@@ -7210,7 +7210,7 @@ unsafe fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pct
     }
 
     '__ci_bb_93 {
-        if ((if __local_i__goto_706_16 < (((6 * sizeof[convertstruct]()) as c_ulong) / (sizeof[convertstruct]() as c_ulong)): 1 else: 0) != 0) {
+        if ((if __local_i__goto_706_16 < (((6 * (sizeof[convertstruct]() as usize)) as c_ulong) / (sizeof[convertstruct]() as c_ulong)): 1 else: 0) != 0) {
             goto '__ci_bb_94
         } else {
             goto '__ci_bb_96
@@ -7231,7 +7231,7 @@ unsafe fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pct
     }
 
     '__ci_bb_96 {
-        if ((if __local_i__goto_706_16 >= (((6 * sizeof[convertstruct]()) as c_ulong) / (sizeof[convertstruct]() as c_ulong)): 1 else: 0) != 0) {
+        if ((if __local_i__goto_706_16 >= (((6 * (sizeof[convertstruct]() as usize)) as c_ulong) / (sizeof[convertstruct]() as c_ulong)): 1 else: 0) != 0) {
             goto '__ci_bb_102
         } else {
             goto '__ci_bb_103
@@ -7472,7 +7472,7 @@ unsafe fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pct
     }
 
     '__ci_bb_135 {
-        if ((if __local_i__goto_706_16 < (((7 * sizeof[usize]()) as c_ulong) / (sizeof[usize]() as c_ulong)): 1 else: 0) != 0) {
+        if ((if __local_i__goto_706_16 < (((7 * (sizeof[usize]() as usize)) as c_ulong) / (sizeof[usize]() as c_ulong)): 1 else: 0) != 0) {
             goto '__ci_bb_136
         } else {
             goto '__ci_bb_138
@@ -7497,7 +7497,7 @@ unsafe fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pct
     }
 
     '__ci_bb_138 {
-        if ((if __local_i__goto_706_16 >= (((7 * sizeof[usize]()) as c_ulong) / (sizeof[usize]() as c_ulong)): 1 else: 0) != 0) {
+        if ((if __local_i__goto_706_16 >= (((7 * (sizeof[usize]() as usize)) as c_ulong) / (sizeof[usize]() as c_ulong)): 1 else: 0) != 0) {
             goto '__ci_bb_141
         } else {
             goto '__ci_bb_142
@@ -7744,7 +7744,7 @@ unsafe fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pct
     }
 
     '__ci_bb_173 {
-        if ((if (((((__local_nn__goto_1007_13 + (__local_len__goto_707_10 as usize)) + ((2 as isize) as usize)) as usize) -% ((__local_field__goto_703_9 as *mut c_char) as usize)) / sizeof[c_char]()) > 64: 1 else: 0) != 0) {
+        if ((if ((((((__local_nn__goto_1007_13 + (__local_len__goto_707_10 as usize)) + ((2 as isize) as usize)) as usize) -% ((__local_field__goto_703_9 as *mut c_char) as usize)) as c_long) / (sizeof[c_char]() as c_long)) > 64: 1 else: 0) != 0) {
             goto '__ci_bb_174
         } else {
             goto '__ci_bb_175
@@ -8070,7 +8070,7 @@ unsafe fn print_error_message_file_8(__param_file: *mut c_void, __param_errorcod
 
     var __local_buf: [128]u8
 
-    (__local_len = ((pcre2_get_error_message_8(__param_errorcode, (&__local_buf[0] as *mut u8), ((((128 * sizeof[u8]()) as c_ulong) / (sizeof[u8]() as c_ulong)) as c_ulong)) as c_int)))
+    (__local_len = ((pcre2_get_error_message_8(__param_errorcode, (&__local_buf[0] as *mut u8), ((((128 * (sizeof[u8]() as usize)) as c_ulong) / (sizeof[u8]() as c_ulong)) as c_ulong)) as c_int)))
 
     var __ci_expr_logic_0: c_int = 0
 
@@ -8758,7 +8758,7 @@ fn process_command_8() -> c_int {
 
     (__local_i = ((0 as c_ulong)))
 
-    while ((if __local_i < (((12 * sizeof[cmdstruct]()) as c_ulong) / (sizeof[cmdstruct]() as c_ulong)): 1 else: 0) != 0) {
+    while ((if __local_i < (((12 * (sizeof[cmdstruct]() as usize)) as c_ulong) / (sizeof[cmdstruct]() as c_ulong)): 1 else: 0) != 0) {
         (__local_cmdname = ((cmdlist[__local_i].name as *const c_char)))
 
         (__local_cmdlen = ((strlen(__local_cmdname) as c_ulong)))
@@ -8898,7 +8898,7 @@ fn process_command_8() -> c_int {
 
                     var __local_j: c_ushort = ((1 as c_ushort))
 
-                    while ((if __local_j < (((7 * sizeof[usize]()) as c_ulong) / (sizeof[usize]() as c_ulong)): 1 else: 0) != 0) {
+                    while ((if __local_j < (((7 * (sizeof[usize]() as usize)) as c_ulong) / (sizeof[usize]() as c_ulong)): 1 else: 0) != 0) {
                         var __local_nlen: c_ulong = ((strlen(newlines[__local_j]) as c_ulong))
 
                         var __ci_expr_logic_9: c_int = 0
@@ -9290,7 +9290,7 @@ fn process_command_8() -> c_int {
 
                 (__local_i = ((0 as c_ulong)))
 
-                while ((if __local_i < (((13 * sizeof[coptstruct]()) as c_ulong) / (sizeof[coptstruct]() as c_ulong)): 1 else: 0) != 0) {
+                while ((if __local_i < (((13 * (sizeof[coptstruct]() as usize)) as c_ulong) / (sizeof[coptstruct]() as c_ulong)): 1 else: 0) != 0) {
                     var __local_optlen: c_ulong = ((strlen(coptlist[__local_i].name) as c_ulong))
 
                     var __local_argptr_trail: *const u8
@@ -9334,7 +9334,7 @@ fn process_command_8() -> c_int {
                 }
 
 
-                if ((if __local_i == (((13 * sizeof[coptstruct]()) as c_ulong) / (sizeof[coptstruct]() as c_ulong)): 1 else: 0) != 0) {
+                if ((if __local_i == (((13 * (sizeof[coptstruct]() as usize)) as c_ulong) / (sizeof[coptstruct]() as c_ulong)): 1 else: 0) != 0) {
                     unsafe { colour_begin(31, outfile) }
 
                     fprintf(outfile, c"** Unknown condition: %s\n".ptr, buffer)
@@ -9742,7 +9742,7 @@ fn process_pattern_8() -> c_int {
         (__ci_expr_old_4 = __local_p__goto_2013_10)
         (__local_p__goto_2013_10 = __local_p__goto_2013_10 + 1)
         ((unsafe *__ci_expr_old_4) = ((0 as u8)))
-        (__local_patlen__goto_2019_12 = ((((((__local_p__goto_2013_10 as usize) -% (buffer as usize)) / sizeof[u8]()) - 2) as c_ulong)))
+        (__local_patlen__goto_2019_12 = (((((((__local_p__goto_2013_10 as usize) -% (buffer as usize)) as c_long) / (sizeof[u8]() as c_long)) - 2) as c_ulong)))
         if ((if not (unsafe { decode_modifiers_8(__local_p__goto_2013_10, CTX_PAT, (&raw mut pat_patctl as *mut patctl), (null as *mut datctl)) } != 0): 1 else: 0) != 0) {
             goto '__ci_bb_23
         } else {
@@ -9795,7 +9795,7 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_29 {
-        if ((if __local_k__goto_2012_10 < (((7 * sizeof[c_uint]()) as c_ulong) / (sizeof[u32]() as c_ulong)): 1 else: 0) != 0) {
+        if ((if __local_k__goto_2012_10 < (((7 * (sizeof[c_uint]() as usize)) as c_ulong) / (sizeof[u32]() as c_ulong)): 1 else: 0) != 0) {
             goto '__ci_bb_30
         } else {
             goto '__ci_bb_32
@@ -9900,7 +9900,7 @@ fn process_pattern_8() -> c_int {
 
     '__ci_bb_43 {
         ((unsafe *__local_pt__goto_2130_17) = ((0 as u8)))
-        (__local_patlen__goto_2019_12 = (((((__local_pt__goto_2130_17 as usize) -% (pbuffer8 as usize)) / sizeof[u8]()) as c_ulong)))
+        (__local_patlen__goto_2019_12 = ((((((__local_pt__goto_2130_17 as usize) -% (pbuffer8 as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong)))
         goto '__ci_bb_39
     }
 
@@ -9965,7 +9965,7 @@ fn process_pattern_8() -> c_int {
 
     '__ci_bb_53 {
         unsafe { colour_begin(31, outfile) }
-        fprintf(outfile, c"** Missing closing quote in hex pattern: opening quote is at offset %td.\n".ptr, ((((__local_pq__goto_2143_16 as usize) -% (buffer as usize)) / sizeof[u8]()) - 2))
+        fprintf(outfile, c"** Missing closing quote in hex pattern: opening quote is at offset %td.\n".ptr, (((((__local_pq__goto_2143_16 as usize) -% (buffer as usize)) as c_long) / (sizeof[u8]() as c_long)) - 2))
         unsafe { colour_end(outfile) }
         return PR_SKIP
     }
@@ -9991,7 +9991,7 @@ fn process_pattern_8() -> c_int {
 
     '__ci_bb_57 {
         unsafe { colour_begin(31, outfile) }
-        fprintf(outfile, c"** Unexpected non-hex-digit '%c' at offset %td in hex pattern: quote missing?\n".ptr, __local_c__goto_2131_12, ((((__local_pp__goto_2130_12 as usize) -% (buffer as usize)) / sizeof[u8]()) - 2))
+        fprintf(outfile, c"** Unexpected non-hex-digit '%c' at offset %td in hex pattern: quote missing?\n".ptr, __local_c__goto_2131_12, (((((__local_pp__goto_2130_12 as usize) -% (buffer as usize)) as c_long) / (sizeof[u8]() as c_long)) - 2))
         unsafe { colour_end(outfile) }
         return PR_SKIP
     }
@@ -10022,7 +10022,7 @@ fn process_pattern_8() -> c_int {
 
     '__ci_bb_61 {
         unsafe { colour_begin(31, outfile) }
-        fprintf(outfile, c"** Unexpected non-hex-digit '%c' at offset %td in hex pattern: quote missing?\n".ptr, __local_d__goto_2131_15, ((((__local_pp__goto_2130_12 as usize) -% (buffer as usize)) / sizeof[u8]()) - 1))
+        fprintf(outfile, c"** Unexpected non-hex-digit '%c' at offset %td in hex pattern: quote missing?\n".ptr, __local_d__goto_2131_15, (((((__local_pp__goto_2130_12 as usize) -% (buffer as usize)) as c_long) / (sizeof[u8]() as c_long)) - 1))
         unsafe { colour_end(outfile) }
         return PR_SKIP
     }
@@ -10095,7 +10095,7 @@ fn process_pattern_8() -> c_int {
 
     '__ci_bb_69 {
         ((unsafe *__local_pt__goto_2195_17) = ((0 as u8)))
-        (__local_patlen__goto_2019_12 = (((((__local_pt__goto_2195_17 as usize) -% (pbuffer8 as usize)) / sizeof[u8]()) as c_ulong)))
+        (__local_patlen__goto_2019_12 = ((((((__local_pt__goto_2195_17 as usize) -% (pbuffer8 as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong)))
         if ((if (((unsafe *(&raw const pat_patctl as *const patctl)).control as c_uint) & (131072 as c_uint)) != 0: 1 else: 0) != 0) {
             goto '__ci_bb_91
         } else {
@@ -10142,7 +10142,7 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_76 {
-        (__local_clen__goto_2214_18 = ((((((__local_pe__goto_2209_16 as usize) -% (__local_pc__goto_2200_14 as usize)) / sizeof[u8]()) - 2) as c_ulong)))
+        (__local_clen__goto_2214_18 = (((((((__local_pe__goto_2209_16 as usize) -% (__local_pc__goto_2200_14 as usize)) as c_long) / (sizeof[u8]() as c_long)) - 2) as c_ulong)))
         (__local_i__goto_2215_20 = ((0 as c_uint)))
         (__local_pe__goto_2209_16 = __local_pe__goto_2209_16 + ((2 as isize) as usize))
         (__local_uli__goto_2216_25 = ((strtoul(((__local_pe__goto_2209_16 as *const c_char) as *const i8), ((&raw mut __local_endptr__goto_2217_17 as *mut *mut c_char) as *mut *mut i8), (10 as c_int)) as c_ulong)))
@@ -10210,9 +10210,9 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_85 {
-        (__local_pc_offset__goto_2252_14 = (((((__local_pc__goto_2200_14 as usize) -% (buffer as usize)) / sizeof[u8]()) as c_ulong)))
-        (__local_pp_offset__goto_2253_14 = (((((__local_pp__goto_2195_12 as usize) -% (buffer as usize)) / sizeof[u8]()) as c_ulong)))
-        (__local_pt_offset__goto_2254_14 = (((((__local_pt__goto_2195_17 as usize) -% (pbuffer8 as usize)) / sizeof[u8]()) as c_ulong)))
+        (__local_pc_offset__goto_2252_14 = ((((((__local_pc__goto_2200_14 as usize) -% (buffer as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong)))
+        (__local_pp_offset__goto_2253_14 = ((((((__local_pp__goto_2195_12 as usize) -% (buffer as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong)))
+        (__local_pt_offset__goto_2254_14 = ((((((__local_pt__goto_2195_17 as usize) -% (pbuffer8 as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong)))
         expand_input_buffers()
         (__local_pc__goto_2200_14 = buffer + (__local_pc_offset__goto_2252_14 as usize))
         (__local_pp__goto_2195_12 = buffer + (__local_pp_offset__goto_2253_14 as usize))
@@ -10308,8 +10308,8 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_100 {
-        strncpy((&locale_name[0] as *mut c_char), (((&(unsafe *(&raw const pat_patctl as *const patctl)).locale[0] as *mut c_char) + ((1 as isize) as usize)) as *const i8), ((32 * sizeof[u8]()) as c_ulong))
-        (locale_name[(((32 * sizeof[u8]()) as c_ulong) -% (1 as c_ulong))] = ((0 as u8)))
+        strncpy((&locale_name[0] as *mut c_char), (((&(unsafe *(&raw const pat_patctl as *const patctl)).locale[0] as *mut c_char) + ((1 as isize) as usize)) as *const i8), ((32 * (sizeof[u8]() as usize)) as c_ulong))
+        (locale_name[(((32 * (sizeof[u8]() as usize)) as c_ulong) -% (1 as c_ulong))] = ((0 as u8)))
         if ((if locale_tables != null: 1 else: 0) != 0) {
             goto '__ci_bb_102
         } else {
@@ -12272,7 +12272,7 @@ unsafe fn substitute_case_callout_function_8(__param_input: *const u8, __param_i
     '__ci_bb_0 {
         (__local_written__goto_3242_12 = ((0 as c_ulong)))
         __param_data_ptr
-        if ((if __param_input_len > (((16 * sizeof[u8]()) as c_ulong) / (sizeof[u8]() as c_ulong)): 1 else: 0) != 0) {
+        if ((if __param_input_len > (((16 * (sizeof[u8]() as usize)) as c_ulong) / (sizeof[u8]() as c_ulong)): 1 else: 0) != 0) {
             goto '__ci_bb_1
         } else {
             goto '__ci_bb_2
@@ -12354,7 +12354,7 @@ unsafe fn substitute_case_callout_function_8(__param_input: *const u8, __param_i
     }
 
     '__ci_bb_11 {
-        (__local_i__goto_3259_17 = (__local_i__goto_3259_17 +% __local_num_read__goto_3264_7))
+        (__local_i__goto_3259_17 = (__local_i__goto_3259_17 +% (__local_num_read__goto_3264_7 as c_ulong)))
         if ((if __local_to_case == 3: 1 else: 0) != 0) {
             goto '__ci_bb_13
         } else {
@@ -12384,7 +12384,7 @@ unsafe fn substitute_case_callout_function_8(__param_input: *const u8, __param_i
     }
 
     '__ci_bb_15 {
-        (__local_written__goto_3242_12 = (__local_written__goto_3242_12 +% __local_num_write__goto_3265_7))
+        (__local_written__goto_3242_12 = (__local_written__goto_3242_12 +% (__local_num_write__goto_3265_7 as c_ulong)))
         goto '__ci_bb_17
     }
 
@@ -13078,7 +13078,7 @@ fn copy_and_get_8(__param_utf: c_int, __param_capcount: c_int) -> c_int {
 
         var __local_n: c_uint = (((unsafe *(&raw const dat_datctl as *const datctl)).copy_numbers[__local_i] as c_uint))
 
-        (__local_length = (((((256 * sizeof[u8]()) as c_ulong) / (sizeof[u8]() as c_ulong)) as c_ulong)))
+        (__local_length = (((((256 * (sizeof[u8]() as usize)) as c_ulong) / (sizeof[u8]() as c_ulong)) as c_ulong)))
 
         (__local_rc = ((unsafe { pcre2_substring_copy_bynumber_8(match_data_8, __local_n, (&__local_copybuffer[0] as *mut u8), (&raw mut __local_length as *mut c_ulong)) } as c_int)))
 
@@ -13184,7 +13184,7 @@ fn copy_and_get_8(__param_utf: c_int, __param_capcount: c_int) -> c_int {
         }
 
 
-        (__local_length_1 = (((((256 * sizeof[u8]()) as c_ulong) / (sizeof[u8]() as c_ulong)) as c_ulong)))
+        (__local_length_1 = (((((256 * (sizeof[u8]() as usize)) as c_ulong) / (sizeof[u8]() as c_ulong)) as c_ulong)))
 
         (__local_rc_1 = ((unsafe { pcre2_substring_copy_byname_8(match_data_8, (pbuffer8 as *const u8), (&__local_copybuffer_1[0] as *mut u8), (&raw mut __local_length_1 as *mut c_ulong)) } as c_int)))
 
@@ -13531,7 +13531,7 @@ unsafe fn copy_substitute_string_8(__param_utf: c_int, __param_input: *mut u8, _
 
     ((*__local_output) = ((0 as u8)))
 
-    ((*__param_outlen) = (((((__local_output as usize) -% (__local_output_start as usize)) / sizeof[u8]()) as c_ulong)))
+    ((*__param_outlen) = ((((((__local_output as usize) -% (__local_output_start as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong)))
 
 }
 
@@ -14323,7 +14323,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_45 {
-        (__local_replen__goto_3956_10 = (((((__local_q__goto_3851_14 as usize) -% (__local_start_rep__goto_3852_14 as usize)) / sizeof[u8]()) as c_ulong)))
+        (__local_replen__goto_3956_10 = ((((((__local_q__goto_3851_14 as usize) -% (__local_start_rep__goto_3852_14 as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong)))
         (__ci_expr_logic_10 = 0)
         if ((if __local_i__goto_3955_7 > 0: 1 else: 0) != 0) {
             (__ci_expr_logic_10 = (if (if __local_replen__goto_3956_10 > ((((((0 as c_ulong) -% 1) as c_ulong) -% (__local_needlen__goto_3842_8 as c_ulong)) as c_ulong) / (__local_i__goto_3955_7 as c_ulong)): 1 else: 0) != 0: 1 else: 0))
@@ -14352,8 +14352,8 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_48 {
-        (__local_qoffset__goto_4003_14 = (((((__local_q__goto_3851_14 as usize) -% (dbuffer as usize)) / sizeof[u8]()) as c_ulong)))
-        (__local_rep_offset__goto_4004_14 = (((((__local_start_rep__goto_3852_14 as usize) -% (dbuffer as usize)) / sizeof[u8]()) as c_ulong)))
+        (__local_qoffset__goto_4003_14 = ((((((__local_q__goto_3851_14 as usize) -% (dbuffer as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong)))
+        (__local_rep_offset__goto_4004_14 = ((((((__local_start_rep__goto_3852_14 as usize) -% (dbuffer as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong)))
         goto '__ci_bb_50
     }
 
@@ -14977,7 +14977,7 @@ fn process_data_8() -> c_int {
 
     '__ci_bb_135 {
         ((unsafe *__local_q__goto_3851_14) = ((0 as u8)))
-        (__local_len__goto_3841_8 = (((((__local_q__goto_3851_14 as usize) -% (dbuffer as usize)) / sizeof[u8]()) as c_ulong)))
+        (__local_len__goto_3841_8 = ((((((__local_q__goto_3851_14 as usize) -% (dbuffer as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong)))
         (__local_ulen__goto_3836_12 = ((((__local_len__goto_3841_8 as c_ulong) / (1 as c_ulong)) as c_ulong)))
         (__local_arg_ulen__goto_3836_18 = __local_ulen__goto_3836_12)
         (__ci_expr_logic_38 = 0)
@@ -15306,7 +15306,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_178 {
-        if ((if __local_k__goto_3838_13 < (((3 * sizeof[c_uint]()) as c_ulong) / (sizeof[u32]() as c_ulong)): 1 else: 0) != 0) {
+        if ((if __local_k__goto_3838_13 < (((3 * (sizeof[c_uint]() as usize)) as c_ulong) / (sizeof[u32]() as c_ulong)): 1 else: 0) != 0) {
             goto '__ci_bb_179
         } else {
             goto '__ci_bb_181
@@ -16389,7 +16389,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_315 {
-        unsafe { copy_substitute_string_8(__local_utf__goto_3844_6, __local_pr__goto_4647_12, ((((__local_prend__goto_4647_17 as usize) -% (__local_pr__goto_4647_12 as usize)) / sizeof[u8]()) as c_ulong), rep_in_buffer_8, (&raw mut __local_rlen__goto_4653_17 as *mut c_ulong)) }
+        unsafe { copy_substitute_string_8(__local_utf__goto_3844_6, __local_pr__goto_4647_12, (((((__local_prend__goto_4647_17 as usize) -% (__local_pr__goto_4647_12 as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong), rep_in_buffer_8, (&raw mut __local_rlen__goto_4653_17 as *mut c_ulong)) }
         (__local_full_rlen__goto_4653_23 = __local_rlen__goto_4653_17)
         if ((if (((unsafe *(&raw const dat_datctl as *const datctl)).control as c_uint) & (2147483648 as c_uint)) != 0: 1 else: 0) != 0) {
             goto '__ci_bb_324
@@ -21144,8 +21144,8 @@ fn unittest_8() -> Unit {
     }
 
     '__ci_bb_394 {
-        unsafe { with_memset(((&__local_errorbuffer8__goto_5661_6[0] as *mut c_char) as *mut u8), (0 as c_int), (((256 * sizeof[c_char]()) as c_ulong) as i64)) }
-        (__local_rc__goto_5628_5 = ((unsafe { pcre2_regerror(REG_ASSERT, (null as *const regex_t), (&__local_errorbuffer8__goto_5661_6[0] as *mut c_char), ((256 * sizeof[c_char]()) as c_ulong)) } as c_int)))
+        unsafe { with_memset(((&__local_errorbuffer8__goto_5661_6[0] as *mut c_char) as *mut u8), (0 as c_int), (((256 * (sizeof[c_char]() as usize)) as c_ulong) as i64)) }
+        (__local_rc__goto_5628_5 = ((unsafe { pcre2_regerror(REG_ASSERT, (null as *const regex_t), (&__local_errorbuffer8__goto_5661_6[0] as *mut c_char), ((256 * (sizeof[c_char]() as usize)) as c_ulong)) } as c_int)))
         goto '__ci_bb_397
     }
 
@@ -21162,7 +21162,7 @@ fn unittest_8() -> Unit {
         (__ci_expr_logic_4 = 0)
         (__ci_expr_logic_3 = 0)
         if ((if __local_rc__goto_5628_5 > 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_3 = (if (if __local_rc__goto_5628_5 <= (((256 * sizeof[c_char]()) as c_int)): 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_3 = (if (if __local_rc__goto_5628_5 <= (((256 * (sizeof[c_char]() as usize)) as c_int)): 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_3 != 0) {
             (__ci_expr_logic_4 = (if (if __local_rc__goto_5628_5 == ((strlen((&__local_errorbuffer8__goto_5661_6[0] as *mut c_char)) as c_int) + 1): 1 else: 0) != 0: 1 else: 0))
@@ -21183,7 +21183,7 @@ fn unittest_8() -> Unit {
     }
 
     '__ci_bb_399 {
-        (__local_rc__goto_5628_5 = ((unsafe { pcre2_regerror(REG_NOMATCH, (null as *const regex_t), (&__local_errorbuffer8__goto_5661_6[0] as *mut c_char), ((256 * sizeof[c_char]()) as c_ulong)) } as c_int)))
+        (__local_rc__goto_5628_5 = ((unsafe { pcre2_regerror(REG_NOMATCH, (null as *const regex_t), (&__local_errorbuffer8__goto_5661_6[0] as *mut c_char), ((256 * (sizeof[c_char]() as usize)) as c_ulong)) } as c_int)))
         goto '__ci_bb_402
     }
 
@@ -21200,7 +21200,7 @@ fn unittest_8() -> Unit {
         (__ci_expr_logic_6 = 0)
         (__ci_expr_logic_5 = 0)
         if ((if __local_rc__goto_5628_5 > 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_5 = (if (if __local_rc__goto_5628_5 <= (((256 * sizeof[c_char]()) as c_int)): 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_5 = (if (if __local_rc__goto_5628_5 <= (((256 * (sizeof[c_char]() as usize)) as c_int)): 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_5 != 0) {
             (__ci_expr_logic_6 = (if (if __local_rc__goto_5628_5 == ((strlen((&__local_errorbuffer8__goto_5661_6[0] as *mut c_char)) as c_int) + 1): 1 else: 0) != 0: 1 else: 0))
@@ -21221,7 +21221,7 @@ fn unittest_8() -> Unit {
     }
 
     '__ci_bb_404 {
-        (__local_rc__goto_5628_5 = ((unsafe { pcre2_regerror(((REG_ASSERT - 1) as c_int), (null as *const regex_t), (&__local_errorbuffer8__goto_5661_6[0] as *mut c_char), ((256 * sizeof[c_char]()) as c_ulong)) } as c_int)))
+        (__local_rc__goto_5628_5 = ((unsafe { pcre2_regerror(((REG_ASSERT - 1) as c_int), (null as *const regex_t), (&__local_errorbuffer8__goto_5661_6[0] as *mut c_char), ((256 * (sizeof[c_char]() as usize)) as c_ulong)) } as c_int)))
         goto '__ci_bb_407
     }
 
@@ -21255,7 +21255,7 @@ fn unittest_8() -> Unit {
     }
 
     '__ci_bb_409 {
-        (__local_rc__goto_5628_5 = ((unsafe { pcre2_regerror(((REG_NOMATCH + 1) as c_int), (null as *const regex_t), (&__local_errorbuffer8__goto_5661_6[0] as *mut c_char), ((256 * sizeof[c_char]()) as c_ulong)) } as c_int)))
+        (__local_rc__goto_5628_5 = ((unsafe { pcre2_regerror(((REG_NOMATCH + 1) as c_int), (null as *const regex_t), (&__local_errorbuffer8__goto_5661_6[0] as *mut c_char), ((256 * (sizeof[c_char]() as usize)) as c_ulong)) } as c_int)))
         goto '__ci_bb_412
     }
 
@@ -21319,7 +21319,7 @@ fn unittest_8() -> Unit {
     }
 
     '__ci_bb_419 {
-        unsafe { with_memset(((&__local_errorbuffer__goto_5659_13[0] as *mut u8) as *mut u8), (0 as c_int), (((256 * sizeof[u8]()) as c_ulong) as i64)) }
+        unsafe { with_memset(((&__local_errorbuffer__goto_5659_13[0] as *mut u8) as *mut u8), (0 as c_int), (((256 * (sizeof[u8]() as usize)) as c_ulong) as i64)) }
         (__local_rc__goto_5628_5 = ((unsafe { pcre2_get_error_message_8((-29 as c_int), (&__local_errorbuffer__goto_5659_13[0] as *mut u8), (0 as c_ulong)) } as c_int)))
         goto '__ci_bb_422
     }
@@ -22595,7 +22595,7 @@ fn unittest_8() -> Unit {
     }
 
     '__ci_bb_614 {
-        unsafe { with_memcpy(((&__local_substitute_subject__goto_5651_13[0] as *mut u8) as *mut u8), ((&__local_subject_abcz__goto_5649_13[0] as *mut u8) as *const u8), (((5 * sizeof[u8]()) as c_ulong) as i64)) }
+        unsafe { with_memcpy(((&__local_substitute_subject__goto_5651_13[0] as *mut u8) as *mut u8), ((&__local_subject_abcz__goto_5649_13[0] as *mut u8) as *const u8), (((5 * (sizeof[u8]() as usize)) as c_ulong) as i64)) }
         (__local_rc__goto_5628_5 = ((unsafe { pcre2_match_8((__local_test_compiled_code__goto_5638_13 as *const pcre2_real_code_8), (&__local_substitute_subject__goto_5651_13[0] as *mut u8), ((~(0 as c_ulong)) as c_ulong), (0 as c_ulong), (0 as c_uint), __local_test_match_data__goto_5637_19, (null as *mut pcre2_real_match_context_8)) } as c_int)))
         goto '__ci_bb_617
     }
@@ -22626,8 +22626,8 @@ fn unittest_8() -> Unit {
     }
 
     '__ci_bb_619 {
-        unsafe { with_memcpy(((&__local_substitute_subject__goto_5651_13[0] as *mut u8) as *mut u8), ((&__local_subject_abcz__goto_5649_13[0] as *mut u8) as *const u8), (((5 * sizeof[u8]()) as c_ulong) as i64)) }
-        (__local_sizeval__goto_5630_12 = (((((64 * sizeof[u8]()) as c_ulong) / (sizeof[u8]() as c_ulong)) as c_ulong)))
+        unsafe { with_memcpy(((&__local_substitute_subject__goto_5651_13[0] as *mut u8) as *mut u8), ((&__local_subject_abcz__goto_5649_13[0] as *mut u8) as *const u8), (((5 * (sizeof[u8]() as usize)) as c_ulong) as i64)) }
+        (__local_sizeval__goto_5630_12 = (((((64 * (sizeof[u8]() as usize)) as c_ulong) / (sizeof[u8]() as c_ulong)) as c_ulong)))
         (__local_rc__goto_5628_5 = ((unsafe { pcre2_substitute_8((__local_test_compiled_code__goto_5638_13 as *const pcre2_real_code_8), (&__local_substitute_subject__goto_5651_13[0] as *mut u8), ((~(0 as c_ulong)) as c_ulong), (0 as c_ulong), (65536 as c_uint), __local_test_match_data__goto_5637_19, (null as *mut pcre2_real_match_context_8), (null as *const u8), (0 as c_ulong), (&__local_replace_buf__goto_5669_13[0] as *mut u8), (&raw mut __local_sizeval__goto_5630_12 as *mut c_ulong)) } as c_int)))
         goto '__ci_bb_622
     }
@@ -22658,8 +22658,8 @@ fn unittest_8() -> Unit {
     }
 
     '__ci_bb_624 {
-        unsafe { with_memcpy(((((&__local_substitute_subject__goto_5651_13[0] as *mut u8) + ((1 as isize) as usize)) as *mut c_void) as *mut u8), ((&__local_subject_abcz__goto_5649_13[0] as *mut u8) as *const u8), (((5 * sizeof[u8]()) as c_ulong) as i64)) }
-        (__local_sizeval__goto_5630_12 = (((((64 * sizeof[u8]()) as c_ulong) / (sizeof[u8]() as c_ulong)) as c_ulong)))
+        unsafe { with_memcpy(((((&__local_substitute_subject__goto_5651_13[0] as *mut u8) + ((1 as isize) as usize)) as *mut c_void) as *mut u8), ((&__local_subject_abcz__goto_5649_13[0] as *mut u8) as *const u8), (((5 * (sizeof[u8]() as usize)) as c_ulong) as i64)) }
+        (__local_sizeval__goto_5630_12 = (((((64 * (sizeof[u8]() as usize)) as c_ulong) / (sizeof[u8]() as c_ulong)) as c_ulong)))
         (__local_rc__goto_5628_5 = ((unsafe { pcre2_substitute_8((__local_test_compiled_code__goto_5638_13 as *const pcre2_real_code_8), (((&__local_substitute_subject__goto_5651_13[0] as *mut u8) + ((1 as isize) as usize)) as *const u8), ((~(0 as c_ulong)) as c_ulong), (0 as c_ulong), (65536 as c_uint), __local_test_match_data__goto_5637_19, (null as *mut pcre2_real_match_context_8), (null as *const u8), (0 as c_ulong), (&__local_replace_buf__goto_5669_13[0] as *mut u8), (&raw mut __local_sizeval__goto_5630_12 as *mut c_ulong)) } as c_int)))
         goto '__ci_bb_627
     }
@@ -22690,10 +22690,10 @@ fn unittest_8() -> Unit {
     }
 
     '__ci_bb_629 {
-        unsafe { with_memcpy(((&__local_substitute_subject__goto_5651_13[0] as *mut u8) as *mut u8), ((&__local_subject_abcz__goto_5649_13[0] as *mut u8) as *const u8), (((5 * sizeof[u8]()) as c_ulong) as i64)) }
+        unsafe { with_memcpy(((&__local_substitute_subject__goto_5651_13[0] as *mut u8) as *mut u8), ((&__local_subject_abcz__goto_5649_13[0] as *mut u8) as *const u8), (((5 * (sizeof[u8]() as usize)) as c_ulong) as i64)) }
         (__local_substitute_subject__goto_5651_13[4] = ((89 as u8)))
         (__local_substitute_subject__goto_5651_13[5] = ((0 as u8)))
-        (__local_sizeval__goto_5630_12 = (((((64 * sizeof[u8]()) as c_ulong) / (sizeof[u8]() as c_ulong)) as c_ulong)))
+        (__local_sizeval__goto_5630_12 = (((((64 * (sizeof[u8]() as usize)) as c_ulong) / (sizeof[u8]() as c_ulong)) as c_ulong)))
         (__local_rc__goto_5628_5 = ((unsafe { pcre2_substitute_8((__local_test_compiled_code__goto_5638_13 as *const pcre2_real_code_8), (&__local_substitute_subject__goto_5651_13[0] as *mut u8), ((~(0 as c_ulong)) as c_ulong), (0 as c_ulong), (65536 as c_uint), __local_test_match_data__goto_5637_19, (null as *mut pcre2_real_match_context_8), (null as *const u8), (0 as c_ulong), (&__local_replace_buf__goto_5669_13[0] as *mut u8), (&raw mut __local_sizeval__goto_5630_12 as *mut c_ulong)) } as c_int)))
         goto '__ci_bb_632
     }
@@ -22724,8 +22724,8 @@ fn unittest_8() -> Unit {
     }
 
     '__ci_bb_634 {
-        unsafe { with_memcpy(((&__local_substitute_subject__goto_5651_13[0] as *mut u8) as *mut u8), ((&__local_subject_abcz__goto_5649_13[0] as *mut u8) as *const u8), (((5 * sizeof[u8]()) as c_ulong) as i64)) }
-        (__local_sizeval__goto_5630_12 = (((((64 * sizeof[u8]()) as c_ulong) / (sizeof[u8]() as c_ulong)) as c_ulong)))
+        unsafe { with_memcpy(((&__local_substitute_subject__goto_5651_13[0] as *mut u8) as *mut u8), ((&__local_subject_abcz__goto_5649_13[0] as *mut u8) as *const u8), (((5 * (sizeof[u8]() as usize)) as c_ulong) as i64)) }
+        (__local_sizeval__goto_5630_12 = (((((64 * (sizeof[u8]() as usize)) as c_ulong) / (sizeof[u8]() as c_ulong)) as c_ulong)))
         (__local_rc__goto_5628_5 = ((unsafe { pcre2_substitute_8((__local_test_compiled_code__goto_5638_13 as *const pcre2_real_code_8), (&__local_substitute_subject__goto_5651_13[0] as *mut u8), ((~(0 as c_ulong)) as c_ulong), (1 as c_ulong), (65536 as c_uint), __local_test_match_data__goto_5637_19, (null as *mut pcre2_real_match_context_8), (null as *const u8), (0 as c_ulong), (&__local_replace_buf__goto_5669_13[0] as *mut u8), (&raw mut __local_sizeval__goto_5630_12 as *mut c_ulong)) } as c_int)))
         goto '__ci_bb_637
     }
@@ -22756,8 +22756,8 @@ fn unittest_8() -> Unit {
     }
 
     '__ci_bb_639 {
-        unsafe { with_memcpy(((&__local_substitute_subject__goto_5651_13[0] as *mut u8) as *mut u8), ((&__local_subject_abcz__goto_5649_13[0] as *mut u8) as *const u8), (((5 * sizeof[u8]()) as c_ulong) as i64)) }
-        (__local_sizeval__goto_5630_12 = (((((64 * sizeof[u8]()) as c_ulong) / (sizeof[u8]() as c_ulong)) as c_ulong)))
+        unsafe { with_memcpy(((&__local_substitute_subject__goto_5651_13[0] as *mut u8) as *mut u8), ((&__local_subject_abcz__goto_5649_13[0] as *mut u8) as *const u8), (((5 * (sizeof[u8]() as usize)) as c_ulong) as i64)) }
+        (__local_sizeval__goto_5630_12 = (((((64 * (sizeof[u8]() as usize)) as c_ulong) / (sizeof[u8]() as c_ulong)) as c_ulong)))
         (__local_rc__goto_5628_5 = ((unsafe { pcre2_substitute_8((__local_test_compiled_code__goto_5638_13 as *const pcre2_real_code_8), (&__local_substitute_subject__goto_5651_13[0] as *mut u8), ((~(0 as c_ulong)) as c_ulong), (0 as c_ulong), (((65536 as c_uint) | (4 as c_uint)) as c_uint), __local_test_match_data__goto_5637_19, (null as *mut pcre2_real_match_context_8), (null as *const u8), (0 as c_ulong), (&__local_replace_buf__goto_5669_13[0] as *mut u8), (&raw mut __local_sizeval__goto_5630_12 as *mut c_ulong)) } as c_int)))
         goto '__ci_bb_642
     }
@@ -22788,8 +22788,8 @@ fn unittest_8() -> Unit {
     }
 
     '__ci_bb_644 {
-        unsafe { with_memcpy(((&__local_substitute_subject__goto_5651_13[0] as *mut u8) as *mut u8), ((&__local_subject_abcz__goto_5649_13[0] as *mut u8) as *const u8), (((5 * sizeof[u8]()) as c_ulong) as i64)) }
-        (__local_sizeval__goto_5630_12 = (((((64 * sizeof[u8]()) as c_ulong) / (sizeof[u8]() as c_ulong)) as c_ulong)))
+        unsafe { with_memcpy(((&__local_substitute_subject__goto_5651_13[0] as *mut u8) as *mut u8), ((&__local_subject_abcz__goto_5649_13[0] as *mut u8) as *const u8), (((5 * (sizeof[u8]() as usize)) as c_ulong) as i64)) }
+        (__local_sizeval__goto_5630_12 = (((((64 * (sizeof[u8]() as usize)) as c_ulong) / (sizeof[u8]() as c_ulong)) as c_ulong)))
         (__local_rc__goto_5628_5 = ((unsafe { pcre2_substitute_8((__local_subs_other_code__goto_5670_13 as *const pcre2_real_code_8), (&__local_substitute_subject__goto_5651_13[0] as *mut u8), ((~(0 as c_ulong)) as c_ulong), (0 as c_ulong), (65536 as c_uint), __local_test_match_data__goto_5637_19, (null as *mut pcre2_real_match_context_8), (null as *const u8), (0 as c_ulong), (&__local_replace_buf__goto_5669_13[0] as *mut u8), (&raw mut __local_sizeval__goto_5630_12 as *mut c_ulong)) } as c_int)))
         goto '__ci_bb_647
     }
@@ -23095,7 +23095,7 @@ fn print_newline_config(__param_optval: c_uint, __param_isc: c_int) -> Unit {
         printf(c"  Default newline sequence is ".ptr)
     }
 
-    if ((if __param_optval < (((7 * sizeof[usize]()) as c_ulong) / (sizeof[usize]() as c_ulong)): 1 else: 0) != 0) {
+    if ((if __param_optval < (((7 * (sizeof[usize]() as usize)) as c_ulong) / (sizeof[usize]() as c_ulong)): 1 else: 0) != 0) {
         printf(c"%s\n".ptr, newlines[__param_optval])
     } else {
         printf(c"a non-standard value: %d\n".ptr, __param_optval)
@@ -23225,7 +23225,7 @@ unsafe fn c_option(__param_arg: *const i8) -> c_int {
     if (__ci_expr_logic_0 != 0) {
         (__local_i = ((0 as c_uint)))
 
-        while ((if __local_i < (((13 * sizeof[coptstruct]()) as c_ulong) / (sizeof[coptstruct]() as c_ulong)): 1 else: 0) != 0) {
+        while ((if __local_i < (((13 * (sizeof[coptstruct]() as usize)) as c_ulong) / (sizeof[coptstruct]() as c_ulong)): 1 else: 0) != 0) {
             if ((if strcmp(__param_arg, coptlist[__local_i].name) == 0: 1 else: 0) != 0) {
                 break
             }
@@ -23235,7 +23235,7 @@ unsafe fn c_option(__param_arg: *const i8) -> c_int {
         }
 
 
-        if ((if __local_i >= (((13 * sizeof[coptstruct]()) as c_ulong) / (sizeof[coptstruct]() as c_ulong)): 1 else: 0) != 0) {
+        if ((if __local_i >= (((13 * (sizeof[coptstruct]() as usize)) as c_ulong) / (sizeof[coptstruct]() as c_ulong)): 1 else: 0) != 0) {
             colour_begin(31, libc_stderr())
 
             fprintf(libc_stderr(), c"pcre2test: Unknown -C option \"%s\"\n".ptr, __param_arg)
@@ -23801,7 +23801,7 @@ unsafe fn display_one_modifier(__param_m: *mut modstruct, __param_for_pattern: c
 
     var __local_i: c_ulong = ((0 as c_ulong))
 
-    while ((if __local_i < (((10 * sizeof[c1modstruct]()) as c_ulong) / (sizeof[c1modstruct]() as c_ulong)): 1 else: 0) != 0) {
+    while ((if __local_i < (((10 * (sizeof[c1modstruct]() as usize)) as c_ulong) / (sizeof[c1modstruct]() as c_ulong)): 1 else: 0) != 0) {
         if ((if strcmp((*__param_m).name, c1modlist[__local_i].fullname) == 0: 1 else: 0) != 0) {
             printf(c" (%c)".ptr, c1modlist[__local_i].onechar)
         }
@@ -23828,7 +23828,7 @@ unsafe fn display_selected_modifiers(__param_for_pattern: c_int, __param_title: 
 
     (__local_i = ((0 as c_uint)))
 
-    while ((if __local_i < (((156 * sizeof[modstruct]()) as c_ulong) / (sizeof[modstruct]() as c_ulong)): 1 else: 0) != 0) {
+    while ((if __local_i < (((156 * (sizeof[modstruct]() as usize)) as c_ulong) / (sizeof[modstruct]() as c_ulong)): 1 else: 0) != 0) {
         var __local_is_pattern: c_int = ((1 as c_int))
 
         var __local_m: *mut modstruct = ((&modlist[0] as *mut modstruct) + (__local_i as usize))
@@ -23889,7 +23889,7 @@ unsafe fn display_selected_modifiers(__param_for_pattern: c_int, __param_title: 
 
             var __local_k: c_ulong = ((0 as c_ulong))
 
-            while ((if __local_k < (((10 * sizeof[c1modstruct]()) as c_ulong) / (sizeof[c1modstruct]() as c_ulong)): 1 else: 0) != 0) {
+            while ((if __local_k < (((10 * (sizeof[c1modstruct]() as usize)) as c_ulong) / (sizeof[c1modstruct]() as c_ulong)): 1 else: 0) != 0) {
                 if ((if strcmp((*__local_m).name, c1modlist[__local_k].fullname) == 0: 1 else: 0) != 0) {
                     (__local_extra[__local_n] = (__local_extra[__local_n] +% 4))
 
@@ -24963,7 +24963,7 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int wri
 
     '__ci_bb_119 {
         colour_begin(31, libc_stderr())
-        fprintf(libc_stderr(), c"pcre2test: Invalid value for \"%.*s\"\n".ptr, (((((__local_val__goto_3931_11 - ((1 as isize) as usize)) as usize) -% (__local_arg__goto_3683_9 as usize)) / sizeof[c_char]()) as c_int), __local_arg__goto_3683_9)
+        fprintf(libc_stderr(), c"pcre2test: Invalid value for \"%.*s\"\n".ptr, ((((((__local_val__goto_3931_11 - ((1 as isize) as usize)) as usize) -% (__local_arg__goto_3683_9 as usize)) as c_long) / (sizeof[c_char]() as c_long)) as c_int), __local_arg__goto_3683_9)
         colour_end(libc_stderr())
         (__local_yield___goto_3644_10 = ((1 as c_uint)))
         goto '__ci_bb_6

@@ -186,16 +186,16 @@ pub unsafe fn inflate_fast(__param_strm: *mut z_stream_s, __param_start: c_uint)
         ((*__param_strm).next_out = __local_out__goto_54_24)
         (__ci_expr_ternary_37 = 0)
         if ((if __local_in___goto_52_32 < __local_last__goto_53_32: 1 else: 0) != 0) {
-            (__ci_expr_ternary_37 = (((5 + (((__local_last__goto_53_32 as usize) -% (__local_in___goto_52_32 as usize)) / sizeof[u8]())) as c_long)))
+            (__ci_expr_ternary_37 = (((5 + ((((__local_last__goto_53_32 as usize) -% (__local_in___goto_52_32 as usize)) as c_long) / (sizeof[u8]() as c_long))) as c_long)))
         } else {
-            (__ci_expr_ternary_37 = (((5 - (((__local_in___goto_52_32 as usize) -% (__local_last__goto_53_32 as usize)) / sizeof[u8]())) as c_long)))
+            (__ci_expr_ternary_37 = (((5 - ((((__local_in___goto_52_32 as usize) -% (__local_last__goto_53_32 as usize)) as c_long) / (sizeof[u8]() as c_long))) as c_long)))
         }
         ((*__param_strm).avail_in = ((__ci_expr_ternary_37 as c_uint)))
         (__ci_expr_ternary_38 = 0)
         if ((if __local_out__goto_54_24 < __local_end__goto_56_24: 1 else: 0) != 0) {
-            (__ci_expr_ternary_38 = (((257 + (((__local_end__goto_56_24 as usize) -% (__local_out__goto_54_24 as usize)) / sizeof[u8]())) as c_long)))
+            (__ci_expr_ternary_38 = (((257 + ((((__local_end__goto_56_24 as usize) -% (__local_out__goto_54_24 as usize)) as c_long) / (sizeof[u8]() as c_long))) as c_long)))
         } else {
-            (__ci_expr_ternary_38 = (((257 - (((__local_out__goto_54_24 as usize) -% (__local_end__goto_56_24 as usize)) / sizeof[u8]())) as c_long)))
+            (__ci_expr_ternary_38 = (((257 - ((((__local_out__goto_54_24 as usize) -% (__local_end__goto_56_24 as usize)) as c_long) / (sizeof[u8]() as c_long))) as c_long)))
         }
         ((*__param_strm).avail_out = ((__ci_expr_ternary_38 as c_uint)))
         ((*__local_state__goto_51_31).hold = __local_hold__goto_64_19)
@@ -371,7 +371,7 @@ pub unsafe fn inflate_fast(__param_strm: *mut z_stream_s, __param_start: c_uint)
         (__local_dist__goto_74_14 = (__local_dist__goto_74_14 +% ((__local_hold__goto_64_19 as c_uint) & (((((1 as c_uint) << (__local_op__goto_71_14 as c_uint)) as c_uint) -% (1 as c_uint)) as c_uint))))
         (__local_hold__goto_64_19 = __local_hold__goto_64_19 >> (__local_op__goto_71_14 as c_uint))
         (__local_bits__goto_65_14 = (__local_bits__goto_65_14 -% __local_op__goto_71_14))
-        (__local_op__goto_71_14 = (((((__local_out__goto_54_24 as usize) -% (__local_beg__goto_55_24 as usize)) / sizeof[u8]()) as c_uint)))
+        (__local_op__goto_71_14 = ((((((__local_out__goto_54_24 as usize) -% (__local_beg__goto_55_24 as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_uint)))
         if ((if __local_dist__goto_74_14 > __local_op__goto_71_14: 1 else: 0) != 0) {
             goto '__ci_bb_27
         } else {

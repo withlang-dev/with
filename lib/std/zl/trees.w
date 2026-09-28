@@ -931,7 +931,7 @@ unsafe fn build_tree(__param_s: *mut internal_state, __param_desc: *mut tree_des
         ((*__param_s).opt_len = ((*__param_s).opt_len -% 1))
 
         if (__local_stree != null) {
-            ((*__param_s).static_len = ((*__param_s).static_len -% ((__local_stree[__local_node]).dl.len as c_int)))
+            ((*__param_s).static_len = ((*__param_s).static_len -% ((__local_stree[__local_node]).dl.len as c_ulong)))
         }
 
     }
@@ -1066,7 +1066,7 @@ unsafe fn scan_tree(__param_s: *mut internal_state, __param_tree: *mut ct_data_s
 
         }
         if ((if __local_count < __local_min_count: 1 else: 0) != 0) {
-            ((*__param_s).bl_tree[__local_curlen].fc.freq = (((((*__param_s).bl_tree[__local_curlen].fc.freq as c_int) +% (((__local_count as c_ushort) as c_int) as c_ushort)) as c_ushort)))
+            ((*__param_s).bl_tree[__local_curlen].fc.freq = (((((*__param_s).bl_tree[__local_curlen].fc.freq as c_int) +% (__local_count as c_ushort)) as c_ushort)))
 
         } else {
             if ((if __local_curlen != 0: 1 else: 0) != 0) {

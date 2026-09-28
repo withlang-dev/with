@@ -423,7 +423,7 @@ pub unsafe fn gzseek64(__param_file: *mut gzFile_s, __param_offset: c_longlong, 
 
         var __ci_expr_logic_6: c_int = 0
 
-        if ((if 4 == sizeof[c_longlong](): 1 else: 0) != 0) {
+        if ((if 4 == (sizeof[c_longlong]() as usize): 1 else: 0) != 0) {
             (__ci_expr_logic_6 = (if (if (*(&raw const __local_state.x as *const gzFile_s)).have > gz_intmax(): 1 else: 0) != 0: 1 else: 0))
         }
 

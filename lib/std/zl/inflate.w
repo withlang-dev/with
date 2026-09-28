@@ -3528,7 +3528,7 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
     }
 
     '__ci_bb_517 {
-        ((*__local_state__goto_475_31).back = ((((*__local_state__goto_475_31).back + (*__local_state__goto_475_31).extra) as c_int)))
+        ((*__local_state__goto_475_31).back = (((((*__local_state__goto_475_31).back as c_uint) + (*__local_state__goto_475_31).extra) as c_int)))
         goto '__ci_bb_503
     }
 
@@ -3826,7 +3826,7 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
     }
 
     '__ci_bb_567 {
-        ((*__local_state__goto_475_31).back = ((((*__local_state__goto_475_31).back + (*__local_state__goto_475_31).extra) as c_int)))
+        ((*__local_state__goto_475_31).back = (((((*__local_state__goto_475_31).back as c_uint) + (*__local_state__goto_475_31).extra) as c_int)))
         goto '__ci_bb_553
     }
 
@@ -4954,14 +4954,14 @@ pub unsafe fn inflateCopy(__param_dest: *mut z_stream_s, __param_source: *mut z_
     }
 
     if (__ci_expr_logic_1 != 0) {
-        ((*__local_copy_).lencode = ((((&(*__local_copy_).codes[0] as *mut code) + ((((((*__local_state).lencode as usize) -% ((&(*__local_state).codes[0] as *mut code) as usize)) / sizeof[code]()) as isize) as usize)) as *const code)))
+        ((*__local_copy_).lencode = ((((&(*__local_copy_).codes[0] as *mut code) + (((((((*__local_state).lencode as usize) -% ((&(*__local_state).codes[0] as *mut code) as usize)) as c_long) / (sizeof[code]() as c_long)) as isize) as usize)) as *const code)))
 
-        ((*__local_copy_).distcode = ((((&(*__local_copy_).codes[0] as *mut code) + ((((((*__local_state).distcode as usize) -% ((&(*__local_state).codes[0] as *mut code) as usize)) / sizeof[code]()) as isize) as usize)) as *const code)))
+        ((*__local_copy_).distcode = ((((&(*__local_copy_).codes[0] as *mut code) + (((((((*__local_state).distcode as usize) -% ((&(*__local_state).codes[0] as *mut code) as usize)) as c_long) / (sizeof[code]() as c_long)) as isize) as usize)) as *const code)))
 
     }
 
 
-    ((*__local_copy_).next = (&(*__local_copy_).codes[0] as *mut code) + ((((((*__local_state).next as usize) -% ((&(*__local_state).codes[0] as *mut code) as usize)) / sizeof[code]()) as isize) as usize))
+    ((*__local_copy_).next = (&(*__local_copy_).codes[0] as *mut code) + (((((((*__local_state).next as usize) -% ((&(*__local_state).codes[0] as *mut code) as usize)) as c_long) / (sizeof[code]() as c_long)) as isize) as usize))
 
     if ((if __local_window != 0: 1 else: 0) != 0) {
         with_memcpy(((__local_window as *mut c_void) as *mut u8), (((*__local_state).window as *const c_void) as *const u8), (((*__local_state).whave as c_ulong) as i64))
@@ -5314,7 +5314,7 @@ pub unsafe fn inflateCodesUsed(__param_strm: *mut z_stream_s) -> c_ulong {
 
     (__local_state = (((*__param_strm).state as *mut inflate_state)))
 
-    return ((((((*__local_state).next as usize) -% ((&(*__local_state).codes[0] as *mut code) as usize)) / sizeof[code]()) as c_ulong))
+    return (((((((*__local_state).next as usize) -% ((&(*__local_state).codes[0] as *mut code) as usize)) as c_long) / (sizeof[code]() as c_long)) as c_ulong))
 
 }
 

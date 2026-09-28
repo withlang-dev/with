@@ -251,7 +251,7 @@ pub unsafe fn gzgets(__param_file: *mut gzFile_s, __param_buf: *mut i8, __param_
             (__local_eol = (((memchr((((*(&raw const __local_state.x as *const gzFile_s)).next as *const c_void) as *mut c_void), (10 as c_int), ((__local_n as c_ulong) as i64)) as *const u8) as *mut u8)))
 
             if ((if __local_eol != null: 1 else: 0) != 0) {
-                (__local_n = (((((((__local_eol as usize) -% ((*(&raw const __local_state.x as *const gzFile_s)).next as usize)) / sizeof[u8]()) as c_uint) +% (1 as c_uint)) as c_uint)))
+                (__local_n = ((((((((__local_eol as usize) -% ((*(&raw const __local_state.x as *const gzFile_s)).next as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_uint) +% (1 as c_uint)) as c_uint)))
             }
 
             with_memcpy(((__local_buf as *mut c_void) as *mut u8), (((*(&raw const __local_state.x as *const gzFile_s)).next as *const c_void) as *const u8), ((__local_n as c_ulong) as i64))
@@ -1047,7 +1047,7 @@ unsafe fn gz_skip(__param_state: *mut gz_state) -> c_int {
 
             var __ci_expr_logic_0: c_int = 0
 
-            if ((if 4 == sizeof[c_longlong](): 1 else: 0) != 0) {
+            if ((if 4 == (sizeof[c_longlong]() as usize): 1 else: 0) != 0) {
                 (__ci_expr_logic_0 = (if (if (*(&raw const (*__param_state).x as *const gzFile_s)).have > gz_intmax(): 1 else: 0) != 0: 1 else: 0))
             }
 

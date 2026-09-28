@@ -152,7 +152,7 @@ pub unsafe fn compress2_z(__param_dest: *mut u8, __param_destLen: *mut c_ulong, 
         }
     }
 
-    ((*__param_destLen) = ((((((*(&raw const __local_stream as *const z_stream_s)).next_out as usize) -% (__param_dest as usize)) / sizeof[u8]()) as c_ulong)))
+    ((*__param_destLen) = (((((((*(&raw const __local_stream as *const z_stream_s)).next_out as usize) -% (__param_dest as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong)))
 
     deflateEnd((&raw mut __local_stream as *mut z_stream_s))
 

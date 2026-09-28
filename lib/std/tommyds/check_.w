@@ -224,7 +224,7 @@ pub fn cache_clear() -> Unit {
 
     (__local_i = ((0 as c_uint)))
 
-    while ((if __local_i < (16777216 * sizeof[u8]()): 1 else: 0) != 0) {
+    while ((if __local_i < (16777216 * (sizeof[u8]() as usize)): 1 else: 0) != 0) {
         (the_cache[__local_i] = ((((the_cache[__local_i] as c_int) +% (1 as u8)) as u8)))
 
         (__local_i = (__local_i +% 32))
@@ -375,9 +375,9 @@ pub fn test_hash() -> Unit writes compare_counter {
 
     stop()
 
-    unsafe { with_memset(((&__local_buffer[0] as *mut u8) as *mut u8), (170 as c_int), (((16 * sizeof[u8]()) as c_ulong) as i64)) }
+    unsafe { with_memset(((&__local_buffer[0] as *mut u8) as *mut u8), (170 as c_int), (((16 * (sizeof[u8]() as usize)) as c_ulong) as i64)) }
 
-    (__local_buffer[(((16 * sizeof[u8]()) as c_ulong) -% (1 as c_ulong))] = ((0 as u8)))
+    (__local_buffer[(((16 * (sizeof[u8]() as usize)) as c_ulong) -% (1 as c_ulong))] = ((0 as u8)))
 
     (__local_hash32 = ((0 as c_uint)))
 
