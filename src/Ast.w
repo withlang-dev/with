@@ -704,6 +704,7 @@ type AstPoolState {
     fn_weak_flags: HashMap[i32, i32],
     fn_target_arch: HashMap[i32, i32],   // fn_node → @[target("arch")] arch name sym
     unsafe_fn_type_nodes: HashMap[i32, i32],  // NK_TYPE_FN/EXTERN_FN node → 1 if `unsafe fn(...)`
+    variadic_fn_type_nodes: HashMap[i32, i32],  // NK_TYPE_EXTERN_FN node → 1 if `extern "C" fn(A, ...)` (#1832)
     fn_effect_pin_starts: HashMap[i32, i32],   // fn_node → first entry in fn_effect_pin_*
     fn_effect_pin_counts: HashMap[i32, i32],   // fn_node → entry count
     fn_effect_pin_params: Vec[i32],            // param_name_sym
@@ -815,6 +816,7 @@ fn AstPool.new -> AstPool:
             use_alias_map: HashMap.new(),
             namespace_bound_set: HashMap.new(),
             unsafe_fn_type_nodes: HashMap.new(),
+            variadic_fn_type_nodes: HashMap.new(),
             fn_effect_pin_starts: HashMap.new(),
             fn_effect_pin_counts: HashMap.new(),
             fn_effect_pin_params: Vec.new(),
@@ -1788,6 +1790,11 @@ impl AstPool:
     // §16.11: mark an NK_TYPE_FN/NK_TYPE_EXTERN_FN node as `unsafe fn(...)`.
     fn mark_unsafe_fn_type(node: NodeId):
         self.state.unsafe_fn_type_nodes.insert(node as i32, 1)
+
+    fn mark_variadic_fn_type(node: NodeId):
+        self.state.variadic_fn_type_nodes.insert(node as i32, 1)
+
+    fn is_variadic_fn_type_node(node: NodeId) -> bool: self.state.variadic_fn_type_nodes.contains(node as i32)
 
     fn is_unsafe_fn_type_node(node: NodeId) -> i32:
         if self.state.unsafe_fn_type_nodes.contains(node as i32): return 1

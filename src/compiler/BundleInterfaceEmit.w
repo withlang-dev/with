@@ -309,6 +309,9 @@ impl BundleEmitter:
                 if pi > 0:
                     out = out ++ ", "
                 out = out ++ self.spell(sema, sema.type_extra[(te_start + pi)])
+            // #1832: a C variadic function pointer.
+            if sema.variadic_fn_type_set.contains(resolved as i32):
+                out = out ++ (if param_count > 0: ", ..." else: "...")
             return out ++ ") -> " ++ self.spell(sema, sema.get_type_d2(resolved))
         if tk == TypeKind.TY_PTR:
             let pointee = self.spell(sema, sema.get_type_d0(resolved))

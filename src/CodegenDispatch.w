@@ -455,7 +455,9 @@ impl Codegen:
             sources.push(llvm_ty)
             let reference = self.sema.get_type_kind(self.sema.resolve_alias(tid)) == TypeKind.TY_REF
             places.push(self.sema.callable_param_uses_value_ref_abi(resolved, pi) | (if reference: 2 else: 0))
-        let index = self.compute_fn_abi(ret, sources, places, convention, 0)
+        // #1832: a C variadic function pointer keeps the variadic convention.
+        let variadic = if kind == TypeKind.TY_EXTERN_FN and self.sema.fn_type_is_variadic(resolved): 1 else: 0
+        let index = self.compute_fn_abi(ret, sources, places, convention, variadic)
         self.fn_abi_callables.insert(key, index)
         index
 
@@ -15920,10 +15922,11 @@ impl Codegen:
         // the promoted arguments Sema recorded for that call, with the
         // fixed-argument convention. compute_fn_abi gives that list its one
         // descriptor; the declaration's variadic one never reaches the call.
-        // #1849: a variadic callee's `...` arguments are converted to the
-        // promoted types Sema recorded (the fixed ones read 0).
+        // #1849: a variadic callee's `...` arguments — a function's or a C
+        // variadic pointer's (#1832) — are converted to the promoted types
+        // Sema recorded (the fixed ones read 0).
         let unproto_sig = if callee_raw_fn_sym != 0: self.sema.get_sig(callee_raw_fn_sym) else: -1
-        let c_promoted = if callee_raw_fn_sym != 0: self.sema.c_promoted_arg_types(body.call_ast_node(args_id)) else: Vec.new()
+        let c_promoted = self.sema.c_promoted_arg_types(body.call_ast_node(args_id))
         if unproto_sig >= 0 and self.sema.sig_is_unprototyped(unproto_sig):
             if c_promoted.len() as i32 != arg_count:
                 with_eprint(f"error: call to unprototyped '{self.sema.pool_resolve(callee_raw_fn_sym)}' has {arg_count} argument(s) but Sema recorded {c_promoted.len()} promoted type(s): {call_context}")

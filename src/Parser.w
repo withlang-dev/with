@@ -8557,7 +8557,12 @@ impl Parser:
         self.expect(TokenKind.TK_L_PAREN)
         self.skip_newlines()
         var params: Vec[i32] = Vec.new()
-        if self.peek() != TokenKind.TK_R_PAREN:
+        // #1832: a trailing `...` makes a C variadic function-pointer type.
+        var variadic = false
+        if self.peek() == TokenKind.TK_DOT_DOT_DOT:
+            variadic = true
+            self.advance()
+        else if self.peek() != TokenKind.TK_R_PAREN:
             let ty = self.parse_fn_type_param_type()
             params.push(ty as i32)
             self.skip_newlines()
@@ -8566,10 +8571,17 @@ impl Parser:
                 self.skip_newlines()
                 if self.peek() == TokenKind.TK_R_PAREN:
                     break
+                if self.peek() == TokenKind.TK_DOT_DOT_DOT:
+                    variadic = true
+                    self.advance()
+                    self.skip_newlines()
+                    break
                 let ty2 = self.parse_fn_type_param_type()
                 params.push(ty2 as i32)
                 self.skip_newlines()
         self.skip_newlines()
+        if variadic and kind != NodeKind.NK_TYPE_EXTERN_FN:
+            self.emit_error("only a C function pointer type can be variadic: spell it extern \"C\" fn(..., ...) -> T (§16.2b.5)")
         self.expect(TokenKind.TK_R_PAREN)
         self.expect(TokenKind.TK_ARROW)
         let ret = self.parse_type_expr()
@@ -8577,7 +8589,10 @@ impl Parser:
         for pi in 0..params.len() as i32:
             self.pool.add_extra(params[pi])
         let count = params.len() as i32
-        self.pool.add_node(kind, start, self.prev_end(), extra_start, count, ret)
+        let node = self.pool.add_node(kind, start, self.prev_end(), extra_start, count, ret)
+        if variadic and kind == NodeKind.NK_TYPE_EXTERN_FN:
+            self.pool.mark_variadic_fn_type(node)
+        node
 
     mut fn parse_type_expr() -> NodeId:
         let t = self.peek()
