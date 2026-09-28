@@ -1,3 +1,4 @@
+//! expect-stdout: hello
 //! expect-stdout: ok
 
 fn apply(f: fn() -> i32) -> i32:

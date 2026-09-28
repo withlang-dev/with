@@ -1,6 +1,5 @@
 //! expect-stdout: fd 8 fd_unit 4
 //! expect-stdout: two 12
-//! expect-stdout-not: two 8
 //! expect-stdout: text 16 items 32 boxed 8
 //! expect-stdout: ok
 

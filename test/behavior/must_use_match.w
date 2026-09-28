@@ -1,3 +1,6 @@
+//! expect-stdout: ok status
+//! expect-stdout: ok status
+//! expect-stdout: red
 //! expect-stdout: ok
 
 // Test: @[must_use] type-level tracking enforces exhaustive match.

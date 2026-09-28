@@ -1,3 +1,6 @@
+//! expect-stdout: 7
+//! expect-stdout: 8
+//! expect-stdout: true
 //! expect-stdout: ok
 
 // Test: std.builtins names are available through the ambient prelude.

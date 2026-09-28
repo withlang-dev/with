@@ -1,4 +1,6 @@
 //! expect-stdout: ok
+//! expect-stdout: 1
+//! expect-stdout: 2
 
 // Was test/compile_errors/err_consume_iter_vec_drop.w (#607: `for w in xs` on a
 // Drop-element Vec rejected as "not yet supported"). Eric's #712 ruling landed

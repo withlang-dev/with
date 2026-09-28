@@ -1,6 +1,6 @@
 //! expect-stdout: 171
-//! 171
-//! 17
+//! expect-stdout: 171
+//! expect-stdout: 17
 
 // The conforming spellings around #887's rejection:
 // 1. NLL: the view's last use precedes the mutation — legal (§21.1 rule 4).

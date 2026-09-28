@@ -1,5 +1,5 @@
 //! expect-stdout: 3
-//! 65
+//! expect-stdout: 65
 
 // D31 (§16.11): both blessed intents compile and behave. The address intent
 // (`&raw const place as u64`, and the `&place as *T` pointer spelling) puns a

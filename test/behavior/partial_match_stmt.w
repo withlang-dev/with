@@ -1,3 +1,5 @@
+//! expect-stdout: one
+//! expect-stdout: red matched
 //! expect-stdout: ok
 
 // Test: statement-position match allows partial patterns.

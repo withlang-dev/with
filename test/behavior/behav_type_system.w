@@ -1,3 +1,4 @@
+//! expect-stdout: 42
 //! expect-stdout: ok
 
 // Behavior test: type system
