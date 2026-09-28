@@ -3424,10 +3424,13 @@ pub fn ci_translate_macros(session: i64, type_session: i64, macro_source: &str) 
                         ci_migrate_set_unsafe_function_body_context(false)
                     if translated.len() > 0:
                         // Infer return type from cast expression: (x as c_int) → return c_int
+                        // A macro with no parameters infers the same way (#1879):
+                        // `#define SDL_Unsupported() SDL_SetError("...")` returns
+                        // what SDL_SetError returns, not the `i32` placeholder.
                         var inferred_ret = with_str_clone_ref(ret_type)
                         if ci_translation_is_void_statement(translated):
                             inferred_ret = "Unit"
-                        else if param_count > 0:
+                        else:
                             inferred_ret = ci_infer_macro_return_type_from_expr(type_session, translated, known_macro_returns, ret_type)
                         if ci_strip_parens(ci_trim(translated)) == "NULL" and ci_infer_cast_return_type(translated).len() == 0:
                             ci_record_untranslated_macro(name)
