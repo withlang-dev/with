@@ -1032,7 +1032,10 @@ pub type Sema {
     global_call_targets: Vec[i32],
     global_call_bindings: Vec[i32],
     global_view_call_checks: Vec[i32],
-    current_effect_closure: i32,
+    // The body writes and calls are in when it is not the function being
+    // checked: a closure (-2 - its node) or a default method checked for an
+    // impl (its signature); -1 for the function (global_effect_body).
+    current_effect_body: i32,
     // A function named as a value (`apply(change)`), keyed by the ident
     // node, to the signature Sema resolved it to (check_ident).
     fn_value_ident_sigs: HashMap[i32, i32],
@@ -1040,6 +1043,12 @@ pub type Sema {
     // declaration, D39), as [signature, declaration node, file]: it writes
     // every global its bundle's interface exports.
     global_interface_fns: Vec[i32],
+    // #1827: bodies a call runs that the running program chooses — every
+    // impl of a dyn method, every callable of a callable type, every drop a
+    // type's drop runs — as [kind, a, b]; chained by `a` for lookup.
+    global_dispatchers: Vec[i32],
+    global_dispatcher_heads: HashMap[i32, i32],
+    global_dispatcher_next: Vec[i32],
 
     // Hot intrinsic symbols used in semantic dispatch paths.
     syms: SemaBuiltinSymbols,
@@ -2739,9 +2748,12 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         global_call_targets: Vec.new(),
         global_call_bindings: Vec.new(),
         global_view_call_checks: Vec.new(),
-        current_effect_closure: 0,
+        current_effect_body: -1,
         fn_value_ident_sigs: sema_new_map_i32_i32(),
         global_interface_fns: Vec.new(),
+        global_dispatchers: Vec.new(),
+        global_dispatcher_heads: sema_new_map_i32_i32(),
+        global_dispatcher_next: Vec.new(),
         syms: sema_builtin_symbols_zero(),
         method_impl_nodes,
         method_decl_impl_nodes,

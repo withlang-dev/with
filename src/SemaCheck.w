@@ -2104,10 +2104,12 @@ impl Sema:
         self.record_global_data_race_access(root, report_node, GLOBAL_RACE_ACCESS_WRITE)
 
     // #1819 (§9.1c, §21.1 rule 1): the body a write or a call is in — the
-    // closure being checked (-2 - its node), else the function (its
-    // signature index); -1 outside both (a global's initializer).
+    // closure being checked (-2 - its node) or a trait's default method
+    // checked for an impl (the impl's signature, current_effect_body), else
+    // the function (its signature index); -1 outside all (a global's
+    // initializer).
     fn global_effect_body() -> i32:
-        if self.current_effect_closure != 0: -2 - self.current_effect_closure else: self.current_fn_sig_idx
+        if self.current_effect_body != -1: self.current_effect_body else: self.current_fn_sig_idx
 
     mut fn record_body_global_write(sym: i32, node: i32):
         let body = self.global_effect_body()
@@ -2212,7 +2214,7 @@ impl Sema:
     // closure's own parameters are not the function's.
     fn callable_param_body(sym: i32) -> i32:
         let sig = self.current_fn_sig_idx
-        if self.current_effect_closure != 0 or sig < 0:
+        if self.current_effect_body != -1 or sig < 0:
             return -1
         let pi = self.param_index_for_sym(sym)
         if pi < 0 or pi >= 32 or pi >= self.sig_get_param_count(sig):
@@ -2245,6 +2247,98 @@ impl Sema:
                 out.push(arg)
                 out.push(roots[ri])
         out
+
+    // A callable `bound` handed to parameter `param` of the body `callee`
+    // by call `call` (callable_param_body).
+    mut fn push_global_call_binding(callee: i32, param: i32, bound: i32, call: i32):
+        self.global_call_bindings.push(callee)
+        self.global_call_bindings.push(param)
+        self.global_call_bindings.push(bound)
+        self.global_call_bindings.push(call)
+
+    fn is_param_body(body: i32) -> bool: body >= GLOBAL_PARAM_BODY and body < GLOBAL_DISPATCH_BODY
+
+    fn is_dispatch_body(body: i32) -> bool: body >= GLOBAL_DISPATCH_BODY
+
+    // #1827: the dispatcher body for (kind, a, b), made on first use.
+    mut fn global_dispatcher(kind: i32, a: i32, b: i32) -> i32:
+        var di: i32 = self.global_dispatcher_heads.get(a) ?? -1
+        while di >= 0:
+            if self.global_dispatchers[di * GLOBAL_DISPATCH_STRIDE] == kind and self.global_dispatchers[di * GLOBAL_DISPATCH_STRIDE + 2] == b:
+                return GLOBAL_DISPATCH_BODY + di
+            di = self.global_dispatcher_next[di]
+        let index = self.global_dispatchers.len() as i32 / GLOBAL_DISPATCH_STRIDE
+        self.global_dispatchers.push(kind)
+        self.global_dispatchers.push(a)
+        self.global_dispatchers.push(b)
+        self.global_dispatcher_next.push(self.global_dispatcher_heads.get(a) ?? -1)
+        self.global_dispatcher_heads.insert(a, index)
+        GLOBAL_DISPATCH_BODY + index
+
+    // The bodies of function `fn_sym`, declared at `fn_node`: its own
+    // signature, and every concrete specialization of it.
+    fn push_fn_bodies(out0: Vec[i32], fn_sym: i32, fn_node: i32) -> Vec[i32]:
+        var out = out0
+        let sig = if fn_sym != 0: self.get_sig(fn_sym) else: -1
+        if sig >= 0:
+            out.push(sig)
+        if fn_node != 0:
+            for si in 0..self.concrete_specialization_nodes.len() as i32:
+                if self.concrete_specialization_nodes[si] == fn_node and self.concrete_specialization_sigs[si] >= 0:
+                    out.push(self.concrete_specialization_sigs[si])
+        out
+
+    // The bodies a dispatcher may run (global_dispatcher): every impl of a
+    // dyn method in this compilation.
+    mut fn dispatcher_bodies(index: i32) -> Vec[i32]:
+        var out: Vec[i32] = Vec.new()
+        let kind: i32 = self.global_dispatchers[index * GLOBAL_DISPATCH_STRIDE]
+        let a: i32 = self.global_dispatchers[index * GLOBAL_DISPATCH_STRIDE + 1]
+        let b: i32 = self.global_dispatchers[index * GLOBAL_DISPATCH_STRIDE + 2]
+        if kind == GLOBAL_DISPATCH_DYN:
+            for di in 0..self.ast.decl_count():
+                let decl = self.ast.get_decl(di)
+                if self.ast.kind(decl) != NodeKind.NK_IMPL_DECL or self.ast.get_data2(decl) != a:
+                    continue
+                let method_node = self.impl_decl_method_node(decl, b)
+                if method_node != 0:
+                    out = self.push_fn_bodies(move out, self.ast.get_data0(method_node), method_node)
+                else:
+                    // The trait's default body, checked as this impl's
+                    // method (check_trait_default_method_body_for_impl).
+                    let default_sig = self.lookup_method_sig(self.ast.get_data0(decl), b)
+                    if default_sig >= 0:
+                        out.push(default_sig)
+        out
+
+    // #1827: every dispatcher runs each of its bodies, as a call it makes;
+    // a callable handed to a dispatcher's parameter is handed to each body's.
+    mut fn expand_global_dispatchers():
+        let count = self.global_dispatchers.len() as i32 / GLOBAL_DISPATCH_STRIDE
+        let binding_count = self.global_call_bindings.len() as i32 / GLOBAL_BINDING_STRIDE
+        for di in 0..count:
+            let dispatcher = GLOBAL_DISPATCH_BODY + di
+            let bodies = self.dispatcher_bodies(di)
+            for bi in 0..bodies.len() as i32:
+                let call = self.global_calls.len() as i32 / GLOBAL_CALL_STRIDE
+                self.global_call_targets.push(bodies[bi])
+                self.global_call_targets.push(call)
+                self.global_call_targets.push(0)
+                self.global_calls.push(dispatcher)
+                self.global_calls.push(0)
+                self.global_calls.push(0)
+                self.global_calls.push(self.global_call_targets.len() as i32 / GLOBAL_TARGET_STRIDE - 1)
+                self.global_calls.push(1)
+                self.global_calls.push(bodies[bi])
+            for gi in 0..binding_count:
+                if self.global_call_bindings[gi * GLOBAL_BINDING_STRIDE] != dispatcher:
+                    continue
+                let param: i32 = self.global_call_bindings[gi * GLOBAL_BINDING_STRIDE + 1]
+                let bound: i32 = self.global_call_bindings[gi * GLOBAL_BINDING_STRIDE + 2]
+                let call: i32 = self.global_call_bindings[gi * GLOBAL_BINDING_STRIDE + 3]
+                for bi in 0..bodies.len() as i32:
+                    if bodies[bi] >= 0 and bodies[bi] < GLOBAL_PARAM_BODY:
+                        self.push_global_call_binding(bodies[bi], param, bound, call)
 
     mut fn push_global_view_check(call: i32, sym: i32, view_sym: i32, view_node: i32, last_use: i32, flags: i32):
         self.global_view_call_checks.push(call)
@@ -2286,9 +2380,7 @@ impl Sema:
                 self.global_call_targets.push(call)
                 self.global_call_targets.push(if self.ast.kind(args[ai]) == NodeKind.NK_CLOSURE: 1 else: 0)
                 target_count = target_count + 1
-                self.global_call_bindings.push(call)
-                self.global_call_bindings.push(first_param + ai)
-                self.global_call_bindings.push(bound)
+                self.push_global_call_binding(callee, first_param + ai, bound, call)
         self.global_calls.push(self.global_effect_body())
         self.global_calls.push(call_node)
         self.global_calls.push(self.local_file_id)
@@ -2336,6 +2428,14 @@ impl Sema:
     fn global_effect_body_name(body: i32) -> str:
         if body <= -2:
             return "a closure"
+        if self.is_dispatch_body(body):
+            let index = body - GLOBAL_DISPATCH_BODY
+            let kind: i32 = self.global_dispatchers[index * GLOBAL_DISPATCH_STRIDE]
+            let a: i32 = self.global_dispatchers[index * GLOBAL_DISPATCH_STRIDE + 1]
+            let b: i32 = self.global_dispatchers[index * GLOBAL_DISPATCH_STRIDE + 2]
+            if kind == GLOBAL_DISPATCH_DYN:
+                return "`dyn " ++ with_str_clone_ref(self.pool_resolve(a)) ++ "." ++ with_str_clone_ref(self.pool_resolve(b)) ++ "`"
+            return "a callable"
         if body < 0 or body >= self.sig_names.len() as i32:
             return "a callable"
         // A specialization's symbol is its template's name, `__sema__` or
@@ -2360,7 +2460,7 @@ impl Sema:
     // callable its callee expression names (`f()`).
     fn global_call_callee_name(call: i32) -> str:
         let callee: i32 = self.global_calls[call * GLOBAL_CALL_STRIDE + 5]
-        if callee >= 0 and callee < GLOBAL_PARAM_BODY:
+        if (callee >= 0 and callee < GLOBAL_PARAM_BODY) or self.is_dispatch_body(callee):
             return self.global_effect_body_name(callee)
         let call_node: i32 = self.global_calls[call * GLOBAL_CALL_STRIDE + 1]
         let callee_expr = self.ast.get_data0(call_node)
@@ -2382,6 +2482,7 @@ impl Sema:
         for ci in 0..check_count:
             checked.insert(self.global_view_call_checks[ci * GLOBAL_VIEW_CHECK_STRIDE + 1], 1)
         self.record_interface_fn_global_writes(&checked)
+        self.expand_global_dispatchers()
         // The calls that run each body: its target entries, chained.
         var runs_head: HashMap[i32, i32] = sema_new_map_i32_i32()
         let runs_next: Vec[i32] = Vec.new()
@@ -2395,9 +2496,8 @@ impl Sema:
         let bound_next: Vec[i32] = Vec.new()
         let binding_count = self.global_call_bindings.len() as i32 / GLOBAL_BINDING_STRIDE
         for bi in 0..binding_count:
-            let call: i32 = self.global_call_bindings[bi * GLOBAL_BINDING_STRIDE]
+            let callee: i32 = self.global_call_bindings[bi * GLOBAL_BINDING_STRIDE]
             let param: i32 = self.global_call_bindings[bi * GLOBAL_BINDING_STRIDE + 1]
-            let callee: i32 = self.global_calls[call * GLOBAL_CALL_STRIDE + 5]
             if callee < 0 or callee >= GLOBAL_PARAM_BODY or param >= 32:
                 bound_next.push(-1)
                 continue
@@ -2460,7 +2560,7 @@ impl Sema:
             k = k + 1
             while b >= 0:
                 let bound: i32 = self.global_call_bindings[b * GLOBAL_BINDING_STRIDE + 2]
-                if bound >= GLOBAL_PARAM_BODY:
+                if self.is_param_body(bound):
                     if not seen.contains(bound):
                         seen.insert(bound, 1)
                         work.push(bound)
@@ -2494,7 +2594,7 @@ impl Sema:
             // A closure literal's body met the named views in place.
             if hit >= 0 or (view_sym != 0 and self.global_call_targets[ti * GLOBAL_TARGET_STRIDE + 2] != 0):
                 continue
-            if target >= GLOBAL_PARAM_BODY:
+            if self.is_param_body(target):
                 let b = self.param_binding_writer(target, via, bound_head, bound_next)
                 if b >= 0:
                     hit = ti
@@ -2516,8 +2616,10 @@ impl Sema:
             else: self.global_effect_body_name(body)
         var step: i32 = via.get(body) ?? -1
         while step >= 0:
+            // A dispatcher runs one of its bodies; a body calls the next.
+            let runs = if self.is_dispatch_body(body): ", which may be " else: ", which calls "
             body = self.global_call_targets[step * GLOBAL_TARGET_STRIDE]
-            chain = chain ++ ", which calls " ++ self.global_effect_body_name(body)
+            chain = chain ++ runs ++ self.global_effect_body_name(body)
             step = via.get(body) ?? -1
         let write = -1 - step
         let call_span = Span { file, start: self.ast.get_start(call_node), end: self.ast.get_end(call_node) }
@@ -2528,7 +2630,7 @@ impl Sema:
             diag.add_label(Span { file, start: self.ast.get_start(view_node), end: self.ast.get_end(view_node) }, view_label)
         diag.add_label(call_span, "this call mutates `" ++ name ++ "`: " ++ chain ++ ", which writes it")
         if binding >= 0:
-            let bind_call: i32 = self.global_call_bindings[binding * GLOBAL_BINDING_STRIDE]
+            let bind_call: i32 = self.global_call_bindings[binding * GLOBAL_BINDING_STRIDE + 3]
             let bind_node: i32 = self.global_calls[bind_call * GLOBAL_CALL_STRIDE + 1]
             let bind_file: i32 = self.global_calls[bind_call * GLOBAL_CALL_STRIDE + 2]
             diag.add_label(Span { file: bind_file, start: self.ast.get_start(bind_node), end: self.ast.get_end(bind_node) }, "the callable is passed here")
@@ -2918,8 +3020,8 @@ impl Sema:
         let saved_fn_variadic: i32 = self.current_fn_variadic
         // #1819: this body's writes and calls are its own, not those of a
         // closure being checked when it was instantiated.
-        let saved_effect_closure: i32 = self.current_effect_closure
-        self.current_effect_closure = 0
+        let saved_effect_body: i32 = self.current_effect_body
+        self.current_effect_body = -1
         let saved_eff_param_syms = sema_clone_i32_vec(&self.current_fn_param_syms)
         let saved_eff_param_effs = sema_clone_i32_vec(&self.current_fn_param_effs)
         let saved_eff_param_direct_effs = sema_clone_i32_vec(&self.current_fn_param_direct_effs)
@@ -3256,6 +3358,7 @@ impl Sema:
         self.fn_param_invocations = saved_invocations
         self.fn_param_many_nodes = saved_many_nodes
         self.current_effect_closure = saved_effect_closure
+        self.current_effect_body = saved_effect_body
         while self.current_fn_param_syms.len() > 0:
             self.current_fn_param_syms.pop()
             self.current_fn_param_effs.pop()
@@ -3433,7 +3536,12 @@ impl Sema:
         self.current_return_type = ret_tid as TypeId
         let fn_sym = self.lookup_method_fn(impl_type_sym, method_sym)
         self.current_fn_symbol = fn_sym
+        // #1827: the default body is the impl's method: its writes and calls
+        // are that signature's (a dyn call and a direct one run it).
+        let saved_effect_body: i32 = self.current_effect_body
+        self.current_effect_body = sig_idx
         let body_ty = self.check_expr_with_expected(body, ret_tid as TypeId)
+        self.current_effect_body = saved_effect_body
         self.typed_expr_types.insert(body, body_ty as i32)
         if ret_tid != 0 and ret_tid != self.ty_void and body_ty != 0 and body_ty != self.ty_void and body_ty != self.ty_never:
             let _ = self.check_body_explicit_value_results(body, 1, ret_tid, "return type mismatch")
@@ -7126,8 +7234,10 @@ impl Copy for SemaBorrowLiveness
 // #1819: record strides of Sema.global_write_records, global_calls,
 // global_call_targets, global_call_bindings and global_view_call_checks,
 // and the body a callable parameter stands for: GLOBAL_PARAM_BODY + its
-// function's signature index * 32 + the parameter's index. (A body is a
-// signature index, -2 - a closure node, or one of these.)
+// function's signature index * 32 + the parameter's index. A body is a
+// signature index, -2 - a closure node, a callable parameter's, or a
+// dispatcher's (#1827): GLOBAL_DISPATCH_BODY + its index in
+// Sema.global_dispatchers.
 const GLOBAL_WRITE_STRIDE: i32 = 5
 // What a write record is: a write of the place in the body, or a bundle
 // function's assumed write of a global its bundle exports (#1827).
@@ -7135,9 +7245,13 @@ const GLOBAL_WRITE_PLACE: i32 = 0
 const GLOBAL_WRITE_BUNDLE: i32 = 1
 const GLOBAL_CALL_STRIDE: i32 = 6
 const GLOBAL_TARGET_STRIDE: i32 = 3
-const GLOBAL_BINDING_STRIDE: i32 = 3
+const GLOBAL_BINDING_STRIDE: i32 = 4
 const GLOBAL_VIEW_CHECK_STRIDE: i32 = 6
 const GLOBAL_PARAM_BODY: i32 = 536870912
+const GLOBAL_DISPATCH_BODY: i32 = 1073741824
+const GLOBAL_DISPATCH_STRIDE: i32 = 3
+// A dispatcher runs every impl of a dyn method (a = trait, b = method).
+const GLOBAL_DISPATCH_DYN: i32 = 1
 
 impl Sema:
     fn int_literal_i64_value(node: i32) -> SemaIntLiteralValue:
@@ -18066,8 +18180,8 @@ impl Sema:
         self.current_fn_sig_idx = if closure_capture_syms.len() > 0: 0 else: saved_capture_sig_idx
         // #1819: the body's writes and calls are the closure's: they happen
         // when it runs (note_call_global_effects).
-        let saved_effect_closure: i32 = self.current_effect_closure
-        self.current_effect_closure = node
+        let saved_effect_body: i32 = self.current_effect_body
+        self.current_effect_body = -2 - node
 
         var expected_fn_tid = 0
         if self.has_expected_type != 0 and self.expected_expr_type != 0:
@@ -18295,6 +18409,7 @@ impl Sema:
         self.current_fn_sig_idx = saved_capture_sig_idx
         self.current_fn_variadic = saved_capture_fn_variadic
         self.current_effect_closure = saved_effect_closure
+        self.current_effect_body = saved_effect_body
 
         // Restore borrow state — discard borrows created inside closure body.
         while self.borrow_kinds.len() as i32 > saved_borrow_len:
@@ -25114,6 +25229,17 @@ impl Sema:
         if info.ret_node != 0 and self.ast.kind(info.ret_node) == NodeKind.NK_TYPE_NAMED and self.ast.get_data0(info.ret_node) == self.syms.self_type:
             self.emit_error("dyn trait method return type cannot be Self", node)
             return 0
+        // #1827: a call through the vtable runs one of the method's impls —
+        // any of them in this compilation (global_dispatcher).
+        let dyn_args: Vec[i32] = Vec.new()
+        let dyn_by_place: Vec[bool] = Vec.new()
+        for dai in 0..arg_count:
+            dyn_args.push(self.ast.get_extra(extra_start + dai))
+            let dyn_param_node = if dai + 1 < info.param_count: self.ast.fn_param_type(info.param_start, dai + 1) else: 0
+            dyn_by_place.push(dyn_param_node != 0 and self.ast.kind(dyn_param_node) == NodeKind.NK_TYPE_REF)
+        let dyn_recv_by_place = fn_param_is_move_self(receiver_flags) == 0
+        let dyn_body = self.global_dispatcher(GLOBAL_DISPATCH_DYN, trait_sym, method_sym)
+        self.note_call_global_effects(node, dyn_body, 1, receiver_expr, dyn_recv_by_place, dyn_args, dyn_by_place)
         let ret_ty = self.trait_method_effective_return_type(info.method_flags, info.ret_node)
         if ret_ty != 0:
             self.typed_expr_types.insert(node, ret_ty)
