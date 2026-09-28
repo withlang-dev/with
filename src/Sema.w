@@ -335,6 +335,11 @@ pub const EFF_DECLARED_MASK: i32 = EFF_READ | EFF_WRITE | EFF_CONSUME | EFF_ESCA
 // Closure capture summaries only (§12.4): the capture is a non-Copy place the
 // non-move closure holds by place — a view of that local, not a snapshot.
 pub const EFF_CAPTURE_BY_PLACE: i32 = 64
+// §21.1 (D22, #1783): a view derived from the parameter is stored into the
+// receiver's storage — the caller's place (D21), which outlives the call — so
+// the caller ties its receiver to this argument's origins as `Vec.push` ties a
+// container to its element.
+pub const EFF_STORE_IN_RECEIVER: i32 = 128
 
 pub enum ReceiverMode: i32:
     None = 0
@@ -380,6 +385,9 @@ pub fn sema_effect_bits_text(bits: i32) -> str:
     if (public_bits & EFF_ESCAPE_VIEW) != 0:
         if out.len() > 0: out = out ++ ", "
         out = out ++ "escape_view"
+    if (bits & EFF_STORE_IN_RECEIVER) != 0:
+        if out.len() > 0: out = out ++ ", "
+        out = out ++ "store_in_receiver"
     if out.len() == 0:
         return "none"
     out
@@ -1642,6 +1650,10 @@ pub type Sema {
     current_value_expr_root: i32,
     closure_direct_arg_depth: i32,
     closure_direct_arg_escape_flags: Vec[i32],
+    // > 0 while a closure body is checked: the parameter frame
+    // (current_fn_param_syms, current_fn_sig_idx) is then the closure's
+    // capture frame, not the enclosing function's.
+    closure_body_depth: i32,
     expected_expr_type: TypeId,
     has_expected_type: i32,
     local_file_id: i32,
@@ -3025,6 +3037,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         current_value_expr_root: 0,
         closure_direct_arg_depth: 0,
         closure_direct_arg_escape_flags: Vec.new(),
+        closure_body_depth: 0,
         expected_expr_type: 0,
         has_expected_type: 0,
         local_file_id: 0,
@@ -7344,7 +7357,11 @@ impl Sema:
             // origin drop after it.
             let view_has_drop = self.type_owns_user_drop(view_ty)
             let active_view = self.binding_depends_on_origin(view_sym, origin_sym) != 0 and self.binding_has_active_borrow_from(view_sym, origin_sym) != 0
-            if active_view or (view_has_drop != 0 and self.binding_value_depends_on_origin(view_sym, origin_sym) != 0):
+            // Rule 7 reads the holder's recorded origins as well as its
+            // initializer: a view stored into it later (`h.v.push(&n)`,
+            // `h.keep(&n)`, #1783) is what its destructor reads.
+            let drop_retains = view_has_drop != 0 and (self.binding_value_depends_on_origin(view_sym, origin_sym) != 0 or self.binding_depends_on_origin(view_sym, origin_sym) != 0)
+            if active_view or drop_retains:
                 let err_node = if node != 0: node else: self.binding_decl_node(view_sym)
                 let moved = node != 0 and node == self.move_site_node
                 if view_has_drop != 0:
