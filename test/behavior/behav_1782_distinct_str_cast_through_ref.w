@@ -6,10 +6,9 @@
 // reads what the reference names. `r as str` with `r: &Name` (`Name =
 // distinct str`) cast the reference VALUE (a pointer) to the string header
 // and printed a garbage byte; `r as []u8` already read through.
-// The strings are literals on purpose: the ownership of a non-Copy value
-// cast into or out of a distinct wrapper is a separate defect (a `Name`
-// drop is a no-op and `s as Name` leaves the buffer with `s`), so a cloned
-// string here would double free under the debug allocator.
+// D75 (#1802): the cast through the reference is a view of the caller's
+// string (`&str`), and `s as Name` moves the owned string into the wrapper,
+// so the owned strings here are freed once each.
 type Name = distinct str
 type Tag = distinct str
 
@@ -18,8 +17,8 @@ fn width(n: &Name): print((n as []u8).len())
 fn retag(n: &Name): print((n as Tag) as str)
 
 fn main:
-    let n = "abc" as Name
+    let n = "abc".clone() as Name
     show(n)
     width(n)
-    let t = "xyz" as Name
+    let t = "xyz".clone() as Name
     retag(t)

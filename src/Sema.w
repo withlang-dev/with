@@ -916,6 +916,10 @@ pub type Sema {
     lang_trait_syms: HashMap[i32, i32],
     local_type_names: HashMap[i32, i32],
     distinct_type_names: HashMap[i32, i32],
+    // §4.5 (D75, #1802): the ownership mode of a cast whose target relabels
+    // its source (CastMode, keyed by the NK_CAST node). Absent: an ordinary
+    // value conversion. MirLower materializes the mode; it never re-derives it.
+    cast_modes: HashMap[i32, i32],
     ephemeral_types: HashMap[i32, i32],
     sealed_traits: HashMap[i32, i32],
     // Sealed trait implementors: flat vec of type syms, with start/count per trait
@@ -2639,6 +2643,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         lang_trait_syms,
         local_type_names,
         distinct_type_names: sema_new_map_i32_i32(),
+        cast_modes: sema_new_map_i32_i32(),
         ephemeral_types,
         sealed_traits,
         sealed_impl_types,

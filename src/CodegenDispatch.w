@@ -4985,6 +4985,12 @@ impl Codegen:
             return
         let resolved = self.sema.resolve_alias(drop_sema_ty as TypeId) as i32
         let tk = self.sema.get_type_kind(resolved as TypeId)
+        // §4.5 (D75, #1802): a distinct type has its underlying type's
+        // destructor — the same representation, so the same glue. It had none:
+        // a `Name` over an owned str freed nothing.
+        if tk == TypeKind.TY_STRUCT and self.sema.distinct_type_names.contains(self.sema.get_type_d0(resolved as TypeId)):
+            self.mir_emit_drop_ptr_for_sema_type(ptr, ty, self.sema.type_extra[(self.sema.get_type_d1(resolved as TypeId) + 1)])
+            return
         // #606: tuples have no named type or drop fn; drop each element in place.
         if tk == TypeKind.TY_TUPLE:
             self.mir_emit_drop_tuple_ptr(ptr, ty, resolved)
