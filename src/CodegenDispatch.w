@@ -1989,6 +1989,20 @@ impl Codegen:
             return self.coerce_int_ext(val, target_ty, src_unsigned or self.mir_sema_type_is_unsigned(target_sema_ty))
         self.coerce_value_to_type(val, target_ty)
 
+    // A `Box[C]` operand as a `Box[dyn T]`: the box's pointer is the data
+    // word, C's vtable for `trait_sym` the other. 0 when the operand is not a
+    // box of a concrete type.
+    mut fn mir_box_to_dyn_value(body: &MirBody, operand_id: i32, val: i64, trait_sym: i32) -> i64:
+        let source_resolved = self.mir_resolve_alias_at(self.mir_operand_sema_type(body, operand_id))
+        if self.mir_type_kind_at(source_resolved) != TypeKind.TY_GENERIC_INST or self.mir_type_d2_at(source_resolved) != 1:
+            return 0
+        if self.sema.type_symbol_is_std_box(self.mir_type_d0_at(source_resolved)) == 0:
+            return 0
+        let payload_info = self.mir_dyn_arg_info_from_sema_type(self.mir_type_extra_at(self.mir_type_d1_at(source_resolved)), 1)
+        if payload_info.type_sym == 0 or wl_get_type_kind(wl_type_of(val)) != wl_pointer_type_kind():
+            return 0
+        self.build_dyn_trait_value_from_ptr(val, payload_info.type_sym, trait_sym)
+
     mut fn mir_coerce_operand_to_dyn_trait_target(body: &MirBody, operand_id: i32, val: i64, target_ty: i64, target_sema_ty: i32) -> i64:
         if val == 0 or target_ty == 0:
             return val
@@ -1999,16 +2013,10 @@ impl Codegen:
         let trait_sym = self.mir_dyn_trait_symbol_from_sema_type(target_sema_ty)
         if trait_sym == 0:
             return val
+        let boxed = self.mir_box_to_dyn_value(body, operand_id, val, trait_sym)
+        if boxed != 0:
+            return boxed
         let source_sema_ty = self.mir_operand_sema_type(body, operand_id)
-        let source_resolved = self.mir_resolve_alias_at(source_sema_ty)
-        if self.mir_type_kind_at(source_resolved) == TypeKind.TY_GENERIC_INST:
-            let source_base = self.mir_type_d0_at(source_resolved)
-            if self.sema.type_symbol_is_std_box(source_base) != 0 and self.mir_type_d2_at(source_resolved) == 1:
-                let source_arg_start = self.mir_type_d1_at(source_resolved)
-                let payload_sema_ty = self.mir_type_extra_at(source_arg_start)
-                let payload_info = self.mir_dyn_arg_info_from_sema_type(payload_sema_ty, 1)
-                if payload_info.type_sym != 0 and wl_get_type_kind(wl_type_of(val)) == wl_pointer_type_kind():
-                    return self.build_dyn_trait_value_from_ptr(val, payload_info.type_sym, trait_sym)
         var info = self.mir_dyn_arg_info_from_operand(body, operand_id, val)
         if info.type_sym == 0:
             info = self.mir_dyn_arg_info_from_sema_type(source_sema_ty, 0)
@@ -14511,6 +14519,16 @@ impl Codegen:
         let arg_val = self.mir_eval_operand(body, operand_id, 0)
         if self.llvm_type_is_dyn_fat_ptr(wl_type_of(arg_val)) != 0:
             return arg_val
+        self.mir_dyn_arg_fat_from_value(body, args_id, operand_id, ai, dyn_trait_sym, arg_val)
+
+    // The fat pointer a dyn-trait parameter receives, built from the
+    // evaluated argument `arg_val` (not already fat). A `Box[C]` for a
+    // `Box[dyn T]` parameter is the box with C's vtable (#1854; it was
+    // "cannot lower argument").
+    mut fn mir_dyn_arg_fat_from_value(body: &MirBody, args_id: i32, operand_id: i32, ai: i32, dyn_trait_sym: i32, arg_val: i64) -> i64:
+        let boxed = self.mir_box_to_dyn_value(body, operand_id, arg_val, dyn_trait_sym)
+        if boxed != 0:
+            return boxed
         var dyn_info = self.mir_dyn_arg_info_from_operand(body, operand_id, arg_val)
         if dyn_info.type_sym == 0:
             let dyn_call_node = body.call_ast_node(args_id)
@@ -16003,24 +16021,7 @@ impl Codegen:
                     self.record_codegen_call_argument(body, args_id, operand_id, ai, AnalysisMarshalStrategy.DirectValue, arg_val, arg_val)
                     args.push(arg_val)
                     continue
-                var dyn_info = self.mir_dyn_arg_info_from_operand(body, operand_id, arg_val)
-                if dyn_info.type_sym == 0:
-                    let dyn_call_node = body.call_ast_node(args_id)
-                    if dyn_call_node > 0 and self.pool.kind(dyn_call_node) == NodeKind.NK_CALL:
-                        let dyn_ast_arg_start = self.pool.get_data1(dyn_call_node)
-                        let dyn_ast_arg_count = self.pool.get_data2(dyn_call_node)
-                        if ai < dyn_ast_arg_count:
-                            let dyn_arg_node = self.pool.get_extra(dyn_ast_arg_start + ai)
-                            dyn_info = self.mir_dyn_arg_info_from_ast_node(dyn_arg_node, arg_val)
-                if dyn_info.type_sym != 0:
-                    if dyn_info.use_ptr != 0:
-                        arg_val = self.build_dyn_trait_value_from_ptr(arg_val, dyn_info.type_sym, dyn_trait_sym)
-                    else:
-                        arg_val = self.build_dyn_trait_value(arg_val, dyn_info.type_sym, dyn_trait_sym)
-                else:
-                    with_eprint(f"error: cannot lower argument {ai + 1} to dyn trait '{self.intern.resolve(dyn_trait_sym)}'")
-                    self.had_error = 1
-                    arg_val = wl_get_undef(self.get_dyn_fat_ptr_type())
+                arg_val = self.mir_dyn_arg_fat_from_value(body, args_id, operand_id, ai, dyn_trait_sym, arg_val)
                 self.record_codegen_call_argument(body, args_id, operand_id, ai, AnalysisMarshalStrategy.DirectValue, arg_val, arg_val)
             else:
                 let arg_info = self.mir_eval_call_operand_info(body, operand_id, expected_ty, expected_sema_ty, lends_c_strings, call_context, ai)
