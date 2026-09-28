@@ -60,7 +60,7 @@ fn nested_return(text: &str) -> Result[i32, str]:
 
 fn use_pair(first: &str, second: i32): first.len() + second
 
-fn argument_return(stop: bool) -> i32:
+fn argument_return(stop: bool) -> i64:
     use_pair("temporary argument".clone(), if stop: return 7 else: 3)
 
 fn branch_return(stop: bool) -> str:

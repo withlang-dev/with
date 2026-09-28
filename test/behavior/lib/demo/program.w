@@ -29,7 +29,7 @@ fn program_rec(prog: Program) -> *mut ProgramRec:
     prog as *mut ProgramRec
 
 fn alloc_program(kind: i32) -> Result[Program, DemoError]:
-    let raw = unsafe { malloc(size_of[ProgramRec]()) }
+    let raw = unsafe { malloc(size_of[ProgramRec]() as u64) }
     if raw == None:
         return Err(.OutOfMemory)
     let rec = raw as *mut ProgramRec

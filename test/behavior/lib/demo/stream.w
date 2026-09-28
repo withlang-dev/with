@@ -12,7 +12,7 @@ fn event_rec(event: Event) -> *mut EventRec:
     event as *mut EventRec
 
 fn alloc_event(done: bool) -> Result[Event, DemoError]:
-    let raw = unsafe { malloc(size_of[EventRec]()) }
+    let raw = unsafe { malloc(size_of[EventRec]() as u64) }
     if raw == None:
         return Err(.OutOfMemory)
     let rec = raw as *mut EventRec

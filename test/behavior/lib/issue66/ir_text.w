@@ -11,7 +11,7 @@ pub fn build_program() -> IRProgram:
     prog
 
 pub fn first_float_ip(prog: &IRProgram) -> i32:
-    for ip in 0..prog.insts.len():
+    for ip in 0..prog.insts.len() as i32:
         let inst = prog.insts[ip]
         if inst.dtype == .Float32:
             return ip
