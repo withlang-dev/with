@@ -12,6 +12,7 @@ use compiler.ClangBridge.*
 use compiler.EmbeddedClangResource
 use std.string.StringBuilder
 use TargetSpec
+use MathBuiltins
 
 extern fn with_parse_float_ref(s: &str) -> f64
 extern fn with_str_clone_ref(s: &str) -> str
@@ -9865,6 +9866,9 @@ fn ci_migrate_preamble_extern_call_requires_unsafe(name: &str) -> bool:
     // Extern declarations in std modules have the compiler-implementation
     // policy. Match Sema for all std corpora; ordinary user modules still
     // require the wrapper around their manual pointer-ABI extern calls.
+    // A math builtin call is Sema's own (D42): `unsafe { acos(x) }` is refused
+    // as a block with no unsafe operation (#1876).
+    if ci_is_libm_fn(name): return false
     if ci_migrate_preamble_name_is_modeled_libc(name):
         return not (ci_migrate_shared_defs_active() and ci_migrate_shared_defs_targets_std_zone())
     // with_* compiler-ABI externs stay wrapped even in shared-defs mode: the D30
@@ -17355,14 +17359,11 @@ fn ci_builtin_bit_operand_type(name: &str) -> str:
     if name.ends_with("l") or name == "__builtin_bswap64": return "u64"
     "u32"
 
-fn ci_is_libm_fn(name: &str) -> bool:
-    if name == "sqrt" or name == "pow": return true
-    if name == "floor" or name == "ceil" or name == "round": return true
-    if name == "sin" or name == "cos" or name == "tan": return true
-    if name == "log" or name == "log10" or name == "exp": return true
-    if name == "fabs" or name == "fmod": return true
-    if name == "asin" or name == "acos" or name == "atan" or name == "atan2": return true
-    false
+// D42: the compiler's math builtins (MathBuiltins is the one table Sema,
+// MirLower and codegen read). A C call to one of these names is the builtin
+// call — Sema types it itself and an `extern fn` of the name yields to it
+// (SemaCheck math_extern_yields) — so it is never an unsafe operation (#1876).
+fn ci_is_libm_fn(name: &str) -> bool: math_fn_lookup(name) >= 0
 
 fn ci_libc_symbol_kind_mask(name: &str) -> i32:
     if name == "rlimit": return CI_LIBC_KIND_TYPE
