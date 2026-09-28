@@ -10,7 +10,7 @@ comptime fn str_battery(s: str) -> i32:
     if s.contains("ok"): acc = acc + 100
     if s.starts_with("in"): acc = acc + 200
     if s.ends_with("ce"): acc = acc + 400
-    acc = acc + s.find("var")
+    acc = acc + s.find("var") as i32
     acc = acc + s.byte_at(3)
     acc = acc + s.slice(2, 8).len() as i32
     acc = acc + s.replace("a", "bb").len() as i32

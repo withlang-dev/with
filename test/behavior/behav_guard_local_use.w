@@ -21,7 +21,7 @@ fn test_guarded_with_blocks:
     let value = with m.enter() as data:
         *data + 2
     assert(value == 42)
-    var seen = 0
+    var seen: i64 = 0
     with m.enter_mut() as mut data:
         data = data + 2
         seen = data

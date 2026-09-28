@@ -1,6 +1,6 @@
 //! expect-stdout: ok
 
-fn summarize(arr: [4]i32) -> i32:
+fn summarize(arr: [4]i32) -> i64:
     let [first, ..middle, last] = arr else return -1
     first + middle + last
 

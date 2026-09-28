@@ -21,7 +21,7 @@ fn test_guarded_read_block:
 
 fn test_guarded_mut_block:
     let lock = Mutex[i64].new(40 as i64)
-    var seen = 0
+    var seen: i64 = 0
     with lock.enter_mut() as mut data:
         data = data + 2
         seen = data

@@ -1,7 +1,7 @@
 //! expect-stdout: 5
 
 use std.builtins.int_to_string
-fn get_len[T](x: T) -> i32:
+fn get_len[T](x: T) -> i64:
     x.len()
 
 fn main:

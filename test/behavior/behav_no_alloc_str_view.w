@@ -1,7 +1,7 @@
 //! expect-stdout: ok
 
 @[no_alloc]
-fn view_len(value: &str) -> i32:
+fn view_len(value: &str) -> i64:
     value.len()
 
 fn main:

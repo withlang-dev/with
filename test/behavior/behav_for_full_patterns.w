@@ -37,7 +37,7 @@ fn test_slice_rest_pattern:
         [1, 2, 3],
         [4, 5, 6],
     ]
-    var total = 0
+    var total: i64 = 0
     for [first, ..rest] in rows:
         total = total + first + rest
     assert(total == 9)
