@@ -2,6 +2,7 @@ use ComptimeValue
 use Sema
 use Ast
 use Span
+use Source
 use Diagnostic
 use InternPool
 use TypeLayout
@@ -1731,7 +1732,11 @@ impl ComptimeEvaluator:
         comptime_value_invalid()
 
     mut fn fail(node: i32, msg: &str) -> ComptimeControl:
-        self.last_error_msg = with_str_clone_ref(msg)
+        // The message names its source line: the build driver prints
+        // error_msg alone (the pending diagnostic is not rendered there), and
+        // "generic comptime function expects 1 type argument(s)" over a
+        // 300-line action named nothing (#1866, #1804).
+        self.last_error_msg = self.node_location(node) ++ msg
         if self.had_error == 0 and self.require_success != 0 and self.sema.suppress_errors == 0:
             let start = self.ast.get_start(node)
             let end = self.ast.get_end(node)
@@ -1739,6 +1744,14 @@ impl ComptimeEvaluator:
             self.pending_diag = Diagnostic.err(msg, Span { file: self.sema.local_file_id, start, end })
         self.had_error = 1
         comptime_control_error()
+
+    /// `path:line:col: ` for a node of the current module, "" when unknown.
+    mut fn node_location(node: i32) -> str:
+        let path = self.current_source_path()
+        if node == 0 or path == "<unknown>": return ""
+        let source = Source.from_string(path, self.current_source_text(), 0)
+        let loc = source.offset_to_location(self.ast.get_start(node))
+        f"{path}:{loc.line + 1}:{loc.col + 1}: "
 
     mut fn unsupported(node: i32) -> ComptimeControl:
         self.fail(node, f"expression kind {self.ast.kind(node)} is not comptime-evaluable yet")
