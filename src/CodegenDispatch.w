@@ -1813,22 +1813,26 @@ impl Codegen:
             let sema_text = self.sema_symbol_text(fn_sym)
             if sema_text.len() > 0:
                 translated_sym = self.intern.intern(sema_text)
+            // D65 (§12): MirLower recorded (CK_FN d1 = 1) that Sema typed this
+            // function a With callable value; its form is the FnAbi adapter.
+            let callable_value = body.const_d1[const_id] == 1
+            let callable_ty = if callable_value: self.mir_sema_type_to_llvm(body.const_types[const_id]) else: 0
             let fv_opt = self.fn_values.get(translated_sym)
             if fv_opt.is_some():
                 if self.debug_mir_codegen_enabled():
                     let fn_name = self.function_symbol_name(translated_sym)
                     with_eprint(f"[ck-fn] sym={fn_sym} -> {fn_name}")
                 let fn_val = fv_opt.unwrap() as i64
-                if expected_ty != 0 and wl_get_type_kind(expected_ty) == wl_struct_type_kind():
-                    return self.coerce_value_to_type(fn_val, expected_ty)
+                if callable_value:
+                    return self.gen_fn_to_fat_ptr_thunk(fn_val, callable_ty)
                 return fn_val
             let fn_name = self.function_link_name_for_sym(translated_sym)
             let found = wl_get_named_function(self.llmod, fn_name)
             if found != 0:
                 if self.debug_mir_codegen_enabled():
                     with_eprint(f"[ck-fn] sym={fn_sym} -> {fn_name} (llmod)")
-                if expected_ty != 0 and wl_get_type_kind(expected_ty) == wl_struct_type_kind():
-                    return self.coerce_value_to_type(found, expected_ty)
+                if callable_value:
+                    return self.gen_fn_to_fat_ptr_thunk(found, callable_ty)
                 return found
             with_eprint(f"warning: [ck-fn] NOT FOUND sym={fn_sym} name={fn_name}")
             return wl_get_undef(fallback_ty)
@@ -15918,6 +15922,13 @@ impl Codegen:
         // ConstKind.CK_FN syms are from sema pool — translate to codegen intern pool.
         var callee_fn_sym: i32 = 0
         var callee_raw_fn_sym: i32 = 0
+        // D65: a callable-marked constant (CK_FN d1 = 1; a named function
+        // MirLower placed as the callee of an inline-expanded combinator such
+        // as Option.map) is a call of that callable value — through its
+        // adapter, with the closure ABI — never a direct call of the function
+        // (whose own ABI has no context parameter: the argument counts
+        // disagreed).
+        var callee_is_callable_value = false
         if callee_operand >= 0 and callee_operand < body.operand_kinds.len() as i32:
             let co_k = body.operand_kinds[callee_operand]
             let co_d = body.operand_d0[callee_operand]
@@ -15925,6 +15936,7 @@ impl Codegen:
                 if body.const_kinds[co_d] == ConstKind.CK_FN:
                     let raw_sym = body.const_d0[co_d]
                     callee_raw_fn_sym = raw_sym
+                    callee_is_callable_value = body.const_d1[co_d] == 1
                     // Translate sema pool sym to codegen intern pool sym
                     let sym_text = self.sema_symbol_text(raw_sym)
                     if sym_text.len() > 0:
@@ -15932,7 +15944,7 @@ impl Codegen:
                     else if self.fn_values.get(raw_sym).is_some() or self.fn_fn_types.get(raw_sym).is_some() or self.fn_abi_symbols.contains(raw_sym):
                         callee_fn_sym = raw_sym
 
-        var call_abi = self.fn_abi_symbols.get(callee_fn_sym) ?? -1
+        var call_abi = if callee_is_callable_value: -1 else: self.fn_abi_symbols.get(callee_fn_sym) ?? -1
         if call_abi < 0 and callee_sema_ty > 0:
             call_abi = self.callable_fn_abi(callee_sema_ty, is_indirect)
         if call_abi < 0:
@@ -16380,6 +16392,14 @@ impl Codegen:
             with_eprint("===== INVALID LLVM FUNCTION " ++ name_str ++ " =====\n")
             wl_dump_value(function)
             with_eprint("===== END INVALID LLVM FUNCTION =====\n")
+            // The invalid function alone hides what it calls (a thunk's or
+            // callee's declaration); the pre/post-optimize dumps never run
+            // after a failed verify. WITH_DUMP_LLIR_ON_INVALID=1 prints the
+            // module as it stands.
+            if with_getenv_str("WITH_DUMP_LLIR_ON_INVALID").len() > 0:
+                with_eprint("===== MODULE AT INVALID FUNCTION =====\n")
+                wl_print_ir(self.llmod)
+                with_eprint("===== END MODULE =====\n")
             with_eprint("error: LLVM function verification failed after MIR cleanup for " ++ name_str ++ "\n")
             self.had_error = 1
             return

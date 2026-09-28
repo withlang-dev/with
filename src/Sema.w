@@ -1406,6 +1406,7 @@ pub type Sema {
     // call and `audit:resolution` verifies the MIR callee and argument count
     // against this fact. Absent for a call Sema resolved to a function symbol.
     call_callable_types: HashMap[i32, i32],
+
     // C11 6.5.2.2p6-7: the type each argument of a call to a C function is
     // passed as after the default argument promotions, keyed by the call
     // node: `[count, t0, t1, ...]` from the start. Every argument of an
@@ -1418,6 +1419,12 @@ pub type Sema {
     // NK_EXTERN_FN carries flag bit 1): C calls them with the promoted arguments
     // and the fixed-argument convention, never the variadic one (#1831).
     unprototyped_sigs: HashMap[i32, i32],
+
+    // D65 (§12): an identifier naming a function, used as a value and typed
+    // its With callable `fn(...)` (not an `extern "C" fn`): node -> 1.
+    // MirLower marks its constant, and codegen builds the callable adapter.
+    fn_callable_values: HashMap[i32, i32],
+
     // D51 stage 2: facade facts (SemaFacade.w).
     facade_resource_index: HashMap[i32, i32],   // resource sym -> facade_resources index
     facade_resources: Vec[FacadeResource],
@@ -2573,6 +2580,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
     let typed_expr_types = sema_new_map_i32_i32()
     let typed_binding_types = sema_new_map_i32_i32()
     let call_callable_types = sema_new_map_i32_i32()
+    let fn_callable_values = sema_new_map_i32_i32()
     let view_projection_exprs = sema_new_map_i32_i32()
     let join_field_view_arms = sema_new_map_i32_i32()
     let drop_consumed_binding_values = sema_new_map_i32_i32()
@@ -3047,9 +3055,13 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         typed_expr_types,
         typed_binding_types,
         call_callable_types,
+
         c_promoted_arg_starts: sema_new_map_i32_i32(),
         c_promoted_arg_data: Vec.new(),
         unprototyped_sigs: sema_new_map_i32_i32(),
+
+        fn_callable_values,
+
         view_projection_exprs,
         join_field_view_arms,
         drop_consumed_binding_values,

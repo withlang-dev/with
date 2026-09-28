@@ -8569,6 +8569,10 @@ impl Sema:
                 self.check_expr_with_expected(src_node, cast_tid)
             else:
                 self.check_expr_with_expected(src_node, 0 as TypeId)
+            // D65 (§12): a function cast to a pointer or an integer
+            // (`coro_main as *const u8`) is its code address, not its callable.
+            if cast_tid != 0 and self.get_type_kind(self.resolve_alias(cast_tid)) != TypeKind.TY_FN:
+                self.fn_callable_values.remove(cast_src_null)
             // An explicit cast target is an independently declared value
             // demand. Resolve the cast itself first, then record a permitted
             // &Copy read plus any ordinary post-copy conversion.
@@ -9352,6 +9356,9 @@ impl Sema:
                     self.fn_value_ident_sigs.insert(node, sig_idx)
                     self.note_callable_value(sig_idx, expected as i32)
                     return expected as i32
+            // D65 (§12): a function named as a value (a callee resolves in
+            // check_call, never here) is its With callable form.
+            self.fn_callable_values.insert(node, 1)
             self.typed_expr_types.insert(node, value_tid)
             self.fn_value_ident_sigs.insert(node, sig_idx)
             self.note_callable_value(sig_idx, value_tid)
@@ -19619,6 +19626,9 @@ impl Sema:
         self.in_pipeline_rhs = 1
         let rhs_ty = self.check_expr(rhs)
         self.in_pipeline_rhs = saved
+        // D65 (§12): a function the stage names is the call's callee, not a
+        // callable value (`text |> escape_lexeme`).
+        self.fn_callable_values.remove(rhs)
         if rhs_ty != 0:
             let resolved = self.resolve_alias(rhs_ty)
             if self.get_type_kind(resolved) == TypeKind.TY_FN:

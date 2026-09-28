@@ -504,6 +504,8 @@ fn mir_const_text(body: &MirBody, const_id: i32, pool: &InternPool, sema: &Sema)
         return "const zst(" ++ ty_name ++ ")"
 
     if k == ConstKind.CK_FN:
+        if d0 != 0 and body.const_d1[const_id] == 1:
+            return f"const callable fn sym{d0}"
         if d0 != 0:
             return f"const fn sym{d0}"
         return "const fn <unknown>"
