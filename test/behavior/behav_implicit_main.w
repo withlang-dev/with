@@ -1,4 +1,4 @@
-//! expect-run-output: "7\n"
+//! expect-stdout: 7
 
 use std.builtins.int_to_string
 let x = 3

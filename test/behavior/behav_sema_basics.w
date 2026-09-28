@@ -1,3 +1,4 @@
+//! expect-stdout: 10
 //! expect-stdout: ok
 
 // Behavior test: basic semantic analysis

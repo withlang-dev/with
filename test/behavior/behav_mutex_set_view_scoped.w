@@ -1,4 +1,5 @@
 //! expect-stdout: local: 5
+//! expect-stdout: swapping
 //! expect-stdout: guard swap: 6
 //! expect-stdout: own view: 7
 //! expect-stdout: owned: 9

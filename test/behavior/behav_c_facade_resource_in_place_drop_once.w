@@ -1,4 +1,5 @@
 //! expect-stdout: scope 7 ends=1
+//! expect-stdout: late
 //! expect-stdout: early 7 7 ends=3
 //! expect-stdout: moved-in 7 ends=4
 //! expect-stdout: moved-out 7 ends=5

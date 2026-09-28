@@ -1,3 +1,4 @@
+//! expect-stdout: late
 //! expect-stdout: scope 1
 //! expect-stdout: early 1 1
 //! expect-stdout: moved-in 1
