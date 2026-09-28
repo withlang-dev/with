@@ -1,5 +1,3 @@
-//! expect-stdout:
-
 fn analysis_probe_read(value: &Vec[i32]): value.len()
 fn analysis_probe_write(value: Vec[i32]): value.push(1)
 fn analysis_probe_take(value: Vec[i32]): value
