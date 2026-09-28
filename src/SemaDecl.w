@@ -1978,6 +1978,10 @@ impl Sema:
         let fn_tid = self.add_type(TypeKind.TY_FN, fn_extra_start, param_count, sig_ret_type)
 
         let is_variadic = (flags / FnFlags.VARIADIC) % 2
+        // D75 (§16.2b.5): a `...` definition has the C calling convention;
+        // an async function or a generator has the compiler's own.
+        if is_variadic != 0 and ((flags / FnFlags.ASYNC) % 2 == 1 or (flags / FnFlags.GEN) % 2 == 1):
+            self.emit_error("a function defined with `...` has the C calling convention, so it cannot be async or a generator", node)
         // The flat signature index follows fn_decl_nodes: when an interface
         // declaration yields to a source definition of the same name, the
         // name keeps resolving to the source's signature whatever the

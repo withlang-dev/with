@@ -1230,6 +1230,13 @@ impl MirBuilder:
             self.lower_cleanup_await(await_op, 0)
             self.body.push_stmt(self.cur_bb, StmtKind.StorageDead, local_id, 0, 0)
             return
+        if drop_kind == DropKind.DK_VA_END:
+            // D75 (§16.2b.5): the list `va_start()` started ends with the
+            // scope of the binding that holds it, on every exit edge.
+            let list_op = self.body.new_operand(OperandKind.OK_COPY, self.place_for_local(local_id))
+            self.emit_handle_call(list_op, MirIntrinsic.VA_END, 0)
+            self.body.push_stmt(self.cur_bb, StmtKind.StorageDead, local_id, 0, 0)
+            return
         if drop_kind == DropKind.DK_ASYNC_SCOPE or drop_kind == DropKind.DK_THREAD_SCOPE:
             let scope_place = self.place_for_local(local_id)
             let is_async = drop_kind == DropKind.DK_ASYNC_SCOPE
@@ -6866,6 +6873,18 @@ impl MirBuilder:
         if self.sema.is_copy_frozen(bind_ty) == 0:
             scheduled_drop_kind = self.task_drop_kind_for_binding(node, bind_ty)
 
+        // D75 (§16.2b.5): `var ap = va_start()` starts the list in the
+        // binding's own storage, and the binding's scope end ends it.
+        if rhs_expr != 0 and self.sema.va_start_calls.contains(rhs_expr):
+            let va_place = self.place_for_local(local_id)
+            self.lower_va_start_into(va_place, rhs_expr)
+            if is_discard_binding != 0:
+                self.emit_drop_entry(local_id, DropKind.DK_VA_END)
+                return
+            self.schedule_drop(local_id, DropKind.DK_VA_END)
+            self.bind_local(name_sym, local_id)
+            return
+
         var rhs_is_view_if = 0
         if rhs_expr != 0:
             let place = self.place_for_local(local_id)
@@ -11447,6 +11466,40 @@ impl MirBuilder:
         if self.sema.is_copy_frozen(ret_type_id) != 0:
             return self.body.new_operand(OperandKind.OK_COPY, math_place)
         self.body.new_operand(OperandKind.OK_MOVE, math_place)
+
+    // D75 (§16.2b.5): `va_start()` writes the list into `place`, the storage
+    // of the binding Sema accepted it for (va_start_calls) — the list is
+    // started where it lives, never in a temporary copied out.
+    mut fn lower_va_start_into(place: i32, node: i32):
+        let args: Vec[i32] = Vec.new()
+        let call_id = self.body.new_call_args(args)
+        self.body.set_call_intrinsic(call_id, MirIntrinsic.VA_START)
+        self.body.set_call_ast_node(call_id, node)
+        let after_bb = self.new_block()
+        let callee = self.unit_operand()
+        self.terminate(TermKind.TK_CALL, callee, call_id, place, after_bb)
+        self.switch_to(after_bb)
+
+    // D75: `ap.arg[T]()` with T as Sema decided it (va_arg_calls). The list
+    // is the receiver place: VA_ARG reads the next argument through it and
+    // advances it in place.
+    mut fn lower_va_arg_call(node: i32) -> i32:
+        let arg_ty: i32 = self.sema.va_arg_calls.get(node).unwrap()
+        let callee = self.ast.get_data0(node)
+        let list_place = self.lower_expr_place(self.ast.get_data0(self.ast.get_data0(callee)))
+        let args: Vec[i32] = Vec.new()
+        args.push(self.body.new_operand(OperandKind.OK_COPY, list_place))
+        let call_id = self.body.new_call_args(args)
+        self.body.set_call_intrinsic(call_id, MirIntrinsic.VA_ARG)
+        self.body.set_call_ast_node(call_id, node)
+        let value_local = self.new_temp(arg_ty)
+        let value_place = self.place_for_local(value_local)
+        let after_bb = self.new_block()
+        let unit = self.unit_operand()
+        self.terminate(TermKind.TK_CALL, unit, call_id, value_place, after_bb)
+        self.switch_to(after_bb)
+        self.register_stmt_temp(value_local, arg_ty)
+        self.body.new_operand(OperandKind.OK_COPY, value_place)
 
     mut fn lower_call(fn_expr: i32, arg_exprs_start: i32, arg_exprs_count: i32, ret_type_id: i32, node: i32) -> i32:
         var fn_op = self.lower_callable_expr(fn_expr)
@@ -16120,6 +16173,16 @@ impl MirBuilder:
 
         if kind == NodeKind.NK_CALL:
             let callee = self.ast.get_data0(node)
+            // D75: Sema decided these calls; honor it before any call shape.
+            if self.sema.va_arg_calls.contains(node):
+                return self.lower_va_arg_call(node)
+            if self.sema.va_start_calls.contains(node):
+                // Sema accepts va_start() only as a binding's initializer,
+                // which lower_let_binding starts in place; reaching here
+                // would start a list nothing ends.
+                with_eprint("error: internal: va_start() reached expression lowering outside its binding")
+                self.mark_unsupported()
+                return self.unit_operand()
             if self.ast.kind(callee) == NodeKind.NK_FIELD_ACCESS:
                 // Distinguish method syntax from a callable field like
                 // `ctx.memctl.free(...)`, which should lower as an indirect call.

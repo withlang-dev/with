@@ -20,7 +20,7 @@ extern fn with_getenv_str(name: &str) -> str
 
 // A label for docs/spec/abi/with-abi.md's version history, not the bundle key; it
 // becomes a frozen, normative major version at Level 1 of the roadmap.
-pub const WITH_ABI_VERSION: i32 = 6
+pub const WITH_ABI_VERSION: i32 = 7
 
 // #D6: PassMode — the per-parameter ABI classification, the SINGLE source of
 // truth. fn_abi_pass_mode computes it; both the callee prologue
@@ -94,12 +94,20 @@ pub fn fn_abi_owned_place(drop_receiver: bool, aggregate: bool) -> bool:
 pub fn fn_abi_platform_aggregate_indirect(windows_x86_64: bool, is_aggregate: bool, size: i64) -> bool:
     windows_x86_64 and is_aggregate and size > 8
 
-// C's array typedef on SysV x86_64 decays to the caller's place. Other
-// targets keep value semantics: AAPCS64 uses the ordinary aggregate ABI
-// (including the caller-allocated copy at a foreign C call), and Darwin
-// and Windows represent va_list as a pointer value.
+// C's array typedef on SysV x86_64 (Linux and Darwin alike) decays to the
+// caller's place. Other targets keep value semantics: AAPCS64 uses the
+// ordinary aggregate ABI (including the caller-allocated copy at a foreign
+// C call), and Darwin arm64, Windows and WebAssembly represent va_list as a
+// pointer value.
 pub fn fn_abi_c_va_list_uses_caller_place(os: &str, arch: &str) -> bool:
-    os == "Linux" and arch == "x86_64"
+    arch == "x86_64" and os != "Windows"
+
+// D75 (§16.2b.5): a function defined with a trailing `...` has the C
+// calling convention, whatever else its declaration says — its variable
+// arguments arrive where the target's C caller puts them, and
+// llvm.va_start reads them from there.
+pub fn fn_abi_definition_convention(c_callconv: bool, variadic: bool) -> i32:
+    if c_callconv or variadic: FN_ABI_C else: FN_ABI_WITH
 
 // ── Symbols ─────────────────────────────────────────────────────────────
 

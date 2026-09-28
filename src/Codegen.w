@@ -3117,12 +3117,164 @@ impl Codegen:
     // Shared by named type expressions (including sizeof/alignof) and
     // resolved Sema types. An i8 array would lose the C alignment.
     fn c_va_list_llvm_type() -> i64:
-        let va_size = type_layout_c_va_list_size()
-        if va_size == 8: return wl_ptr_type(self.context)
+        if type_layout_c_va_list_kind() == C_VA_LIST_POINTER: return wl_ptr_type(self.context)
         var fields: Vec[i64] = Vec.new()
-        for i in 0..(va_size / 8) as i32:
+        for i in 0..(type_layout_c_va_list_size() / 8) as i32:
             fields.push(wl_i64_type(self.context))
         wl_struct_type(self.context, vec_data_i64(&fields), fields.len() as i32, 0)
+
+    // ── D75 (§16.2b.5): C variadic definitions ─────────────────────────
+    // `var ap = va_start()` is llvm.va_start on the binding's storage, the
+    // binding's scope end llvm.va_end on it; `ap.arg[T]()` is expanded here
+    // for the target's va_list shape (TypeLayout's c_va_list kind), the way
+    // clang expands va_arg — the LLVM va_arg instruction is not lowered for
+    // every target this compiler emits (AAPCS64 Linux, Windows' 8-byte slots).
+
+    mut fn emit_c_va_list_marker(intrinsic_name: &str, list_ptr: i64):
+        let params: Vec[i64] = Vec.new()
+        params.push(wl_ptr_type(self.context))
+        let ft = wl_function_type(wl_void_type(self.context), vec_data_i64(&params), 1, 0)
+        var func = wl_get_named_function(self.llmod, intrinsic_name)
+        if func == 0:
+            func = wl_add_function(self.llmod, intrinsic_name, ft)
+        let args: Vec[i64] = Vec.new()
+        args.push(list_ptr)
+        let _ = wl_build_call(self.builder, ft, func, vec_data_i64(&args), 1)
+
+    // The next argument of the list at `list_ptr` as `ty` — an integer at
+    // least as wide as C's int, a double or a pointer (Sema refused every
+    // other T) — with the list advanced past it.
+    mut fn emit_c_va_arg(list_ptr: i64, ty: i64) -> i64:
+        let kind = type_layout_c_va_list_kind()
+        let is_fp = wl_get_type_kind(ty) == wl_double_type_kind()
+        var addr: i64 = 0
+        if kind == C_VA_LIST_SYSV_X86_64:
+            addr = self.c_va_arg_sysv_x86_64_addr(list_ptr, is_fp)
+        else if kind == C_VA_LIST_AAPCS64:
+            addr = self.c_va_arg_aapcs64_addr(list_ptr, is_fp)
+        else:
+            addr = self.c_va_arg_pointer_addr(list_ptr, self.c_va_arg_size(ty))
+        wl_build_load(self.builder, ty, addr)
+
+    fn c_va_arg_size(ty: i64) -> i64:
+        let kind = wl_get_type_kind(ty)
+        if kind == wl_integer_type_kind(): return (wl_get_int_type_width(ty) / 8) as i64
+        if kind == wl_pointer_type_kind(): return target_spec_ptr_bytes()
+        8
+
+    fn c_va_byte_offset(base: i64, offset: i64) -> i64:
+        let indices: Vec[i64] = Vec.new()
+        indices.push(offset)
+        wl_build_gep(self.builder, wl_i8_type(self.context), base, vec_data_i64(&indices), 1)
+
+    // Takes the stack slot a list's stack pointer (the field at
+    // `stack_field`) points at and advances the pointer one 8-byte slot.
+    fn c_va_arg_stack_slot(stack_field: i64) -> i64:
+        let area = wl_build_load(self.builder, wl_ptr_type(self.context), stack_field)
+        wl_build_store(self.builder, self.c_va_byte_offset(area, wl_const_int(wl_i64_type(self.context), 8, 0)), stack_field)
+        area
+
+    fn c_va_arg_join(reg_addr: i64, reg_bb: i64, stack_addr: i64, stack_bb: i64) -> i64:
+        let phi = wl_build_phi(self.builder, wl_ptr_type(self.context))
+        let vals: Vec[i64] = Vec.new()
+        vals.push(reg_addr)
+        vals.push(stack_addr)
+        let bbs: Vec[i64] = Vec.new()
+        bbs.push(reg_bb)
+        bbs.push(stack_bb)
+        wl_add_incoming(phi, vec_data_i64(&vals), vec_data_i64(&bbs), 2)
+        phi
+
+    // A char* list (Darwin arm64, Windows, WebAssembly): each argument has
+    // its own slot — 8 bytes on the 64-bit targets, 4 on WebAssembly, where
+    // an argument wider than a slot is first aligned to its size (clang's
+    // emitVoidPtrVAArg with the target's slot size).
+    fn c_va_arg_pointer_addr(list_ptr: i64, size: i64) -> i64:
+        let ptr_ty = wl_ptr_type(self.context)
+        let slot: i64 = if target_spec_is_wasm(): 4 else: 8
+        var addr = wl_build_load(self.builder, ptr_ty, list_ptr)
+        if size > slot:
+            let int_ty = if target_spec_ptr_bytes() == 4: wl_i32_type(self.context) else: wl_i64_type(self.context)
+            let raw = wl_build_ptr_to_int(self.builder, addr, int_ty)
+            let bumped = wl_build_add(self.builder, raw, wl_const_int(int_ty, size - 1, 0))
+            addr = wl_build_int_to_ptr(self.builder, wl_build_and(self.builder, bumped, wl_const_int(int_ty, 0 - size, 1)), ptr_ty)
+        let step = if size > slot: size else: slot
+        wl_build_store(self.builder, self.c_va_byte_offset(addr, wl_const_int(wl_i64_type(self.context), step, 0)), list_ptr)
+        addr
+
+    // SysV x86_64 (__va_list_tag: gp_offset u32 @0, fp_offset u32 @4,
+    // overflow_arg_area @8, reg_save_area @16; psABI §3.5.7): an integer or
+    // pointer comes from the next 8-byte general-register slot of the save
+    // area while gp_offset <= 40, a double from the next 16-byte vector slot
+    // while fp_offset <= 160; after that both come from the overflow area,
+    // 8 bytes each.
+    fn c_va_arg_sysv_x86_64_addr(list_ptr: i64, is_fp: bool) -> i64:
+        let i32_ty = wl_i32_type(self.context)
+        let ptr_ty = wl_ptr_type(self.context)
+        let fields: Vec[i64] = Vec.new()
+        fields.push(i32_ty)
+        fields.push(i32_ty)
+        fields.push(ptr_ty)
+        fields.push(ptr_ty)
+        let tag_ty = wl_struct_type(self.context, vec_data_i64(&fields), 4, 0)
+        let offset_field = wl_build_struct_gep(self.builder, tag_ty, list_ptr, if is_fp: 1 else: 0)
+        let offset = wl_build_load(self.builder, i32_ty, offset_field)
+        let fits = wl_build_icmp(self.builder, wl_int_ule(), offset, wl_const_int(i32_ty, if is_fp: 160 else: 40, 0))
+        let function = wl_get_insert_function(self.builder)
+        let reg_bb = wl_append_bb(self.context, function, "va_arg.reg")
+        let stack_bb = wl_append_bb(self.context, function, "va_arg.stack")
+        let end_bb = wl_append_bb(self.context, function, "va_arg.end")
+        wl_build_cond_br(self.builder, fits, reg_bb, stack_bb)
+        wl_position_at_end(self.builder, reg_bb)
+        let save_area = wl_build_load(self.builder, ptr_ty, wl_build_struct_gep(self.builder, tag_ty, list_ptr, 3))
+        let reg_addr = self.c_va_byte_offset(save_area, offset)
+        wl_build_store(self.builder, wl_build_add(self.builder, offset, wl_const_int(i32_ty, if is_fp: 16 else: 8, 0)), offset_field)
+        wl_build_br(self.builder, end_bb)
+        wl_position_at_end(self.builder, stack_bb)
+        let stack_addr = self.c_va_arg_stack_slot(wl_build_struct_gep(self.builder, tag_ty, list_ptr, 2))
+        wl_build_br(self.builder, end_bb)
+        wl_position_at_end(self.builder, end_bb)
+        self.c_va_arg_join(reg_addr, reg_bb, stack_addr, stack_bb)
+
+    // AAPCS64 (struct __va_list: __stack @0, __gr_top @8, __vr_top @16,
+    // __gr_offs i32 @24, __vr_offs i32 @28; AAPCS64 §B.4): while its offset
+    // is negative, an integer or pointer is at gr_top + gr_offs (8 bytes
+    // each) and a double at vr_top + vr_offs (16 bytes each); an offset
+    // already non-negative, or one this read makes positive, sends the
+    // argument to the stack in 8-byte slots.
+    fn c_va_arg_aapcs64_addr(list_ptr: i64, is_fp: bool) -> i64:
+        let i32_ty = wl_i32_type(self.context)
+        let ptr_ty = wl_ptr_type(self.context)
+        let fields: Vec[i64] = Vec.new()
+        fields.push(ptr_ty)
+        fields.push(ptr_ty)
+        fields.push(ptr_ty)
+        fields.push(i32_ty)
+        fields.push(i32_ty)
+        let list_ty = wl_struct_type(self.context, vec_data_i64(&fields), 5, 0)
+        let offs_field = wl_build_struct_gep(self.builder, list_ty, list_ptr, if is_fp: 4 else: 3)
+        let offs = wl_build_load(self.builder, i32_ty, offs_field)
+        let function = wl_get_insert_function(self.builder)
+        let maybe_reg_bb = wl_append_bb(self.context, function, "va_arg.maybe_reg")
+        let reg_bb = wl_append_bb(self.context, function, "va_arg.reg")
+        let stack_bb = wl_append_bb(self.context, function, "va_arg.stack")
+        let end_bb = wl_append_bb(self.context, function, "va_arg.end")
+        let spent = wl_build_icmp(self.builder, wl_int_sge(), offs, wl_const_int(i32_ty, 0, 0))
+        wl_build_cond_br(self.builder, spent, stack_bb, maybe_reg_bb)
+        wl_position_at_end(self.builder, maybe_reg_bb)
+        let next_offs = wl_build_add(self.builder, offs, wl_const_int(i32_ty, if is_fp: 16 else: 8, 0))
+        wl_build_store(self.builder, next_offs, offs_field)
+        let in_reg = wl_build_icmp(self.builder, wl_int_sle(), next_offs, wl_const_int(i32_ty, 0, 0))
+        wl_build_cond_br(self.builder, in_reg, reg_bb, stack_bb)
+        wl_position_at_end(self.builder, reg_bb)
+        let top = wl_build_load(self.builder, ptr_ty, wl_build_struct_gep(self.builder, list_ty, list_ptr, if is_fp: 2 else: 1))
+        let reg_addr = self.c_va_byte_offset(top, offs)
+        wl_build_br(self.builder, end_bb)
+        wl_position_at_end(self.builder, stack_bb)
+        let stack_addr = self.c_va_arg_stack_slot(wl_build_struct_gep(self.builder, list_ty, list_ptr, 0))
+        wl_build_br(self.builder, end_bb)
+        wl_position_at_end(self.builder, end_bb)
+        self.c_va_arg_join(reg_addr, reg_bb, stack_addr, stack_bb)
 
     fn resolve_user_named_type(sym: i32) -> i64:
         let de_opt = self.disc_enum_type_map.get(sym)
@@ -5017,7 +5169,7 @@ impl Codegen:
         let places: Vec[i32] = Vec.new()
         for api in 0..param_count:
             places.push(self.sig_abi_param_flags(sema_sig_idx, api))
-        let abi_index = self.compute_fn_abi(ret_ty, param_types, places, if uses_c_abi: FN_ABI_C else: FN_ABI_WITH, is_variadic)
+        let abi_index = self.compute_fn_abi(ret_ty, param_types, places, fn_abi_definition_convention(uses_c_abi, is_variadic != 0), is_variadic)
         let abi = self.fn_abis[abi_index]
         let has_sret = if abi.ret.pass == PM_INDIRECT: 1 else: 0
         let sret_ty: i64 = abi.ret.source_ty
@@ -5383,7 +5535,7 @@ impl Codegen:
 
         let places: Vec[i32] = Vec.new()
         for pi in 0..param_count: places.push(self.sig_abi_param_flags(sig_idx, pi))
-        let abi_index = self.compute_fn_abi(ret_ty, param_types, places, FN_ABI_WITH, self.sema.sig_is_variadic(sig_idx))
+        let abi_index = self.compute_fn_abi(ret_ty, param_types, places, fn_abi_definition_convention(false, self.sema.sig_is_variadic(sig_idx) != 0), self.sema.sig_is_variadic(sig_idx))
         let abi = self.fn_abis[abi_index]
         let has_sret = if abi.ret.pass == PM_INDIRECT: 1 else: 0
         let sret_ty: i64 = abi.ret.source_ty

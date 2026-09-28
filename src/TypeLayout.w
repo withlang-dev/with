@@ -3,16 +3,28 @@ use Ast
 use TargetSpec
 use SemaTypes
 
-// #1104: C's va_list has the target's own size — a pointer on Darwin and
-// Windows (char *), 24 bytes on SysV x86_64 (__va_list_tag[1]), 32 bytes on
-// AAPCS64 Linux (struct __va_list). The one layout query codegen and Sema
-// share; llvm.va_start writes exactly this many bytes.
+// #1104, D75: C's va_list has the target's own shape — a pointer into the
+// argument area on Darwin arm64, Windows and WebAssembly (char *), the
+// 24-byte __va_list_tag[1] on every SysV x86_64 (Linux and Darwin), the
+// 32-byte struct __va_list on AAPCS64 Linux. The one layout query codegen
+// and Sema share: llvm.va_start writes exactly this many bytes, and
+// `ap.arg[T]()` reads the argument through this shape.
+pub const C_VA_LIST_POINTER: i32 = 0
+pub const C_VA_LIST_SYSV_X86_64: i32 = 1
+pub const C_VA_LIST_AAPCS64: i32 = 2
+
+pub fn type_layout_c_va_list_kind() -> i32:
+    let arch = target_spec_arch()
+    let os = target_spec_os()
+    if arch == "x86_64" and os != "Windows": return C_VA_LIST_SYSV_X86_64
+    if arch == "aarch64" and os == "Linux": return C_VA_LIST_AAPCS64
+    C_VA_LIST_POINTER
+
 pub fn type_layout_c_va_list_size() -> i64:
-    if target_spec_os() == "Wasi":
-        return target_spec_ptr_bytes()
-    if target_spec_os() != "Linux":
-        return 8
-    if target_spec_arch() == "x86_64": 24 else: 32
+    let kind = type_layout_c_va_list_kind()
+    if kind == C_VA_LIST_SYSV_X86_64: return 24
+    if kind == C_VA_LIST_AAPCS64: return 32
+    target_spec_ptr_bytes()
 
 fn type_layout_align_up(offset: i64, align: i64) -> i64:
     if align <= 1:
@@ -348,7 +360,7 @@ impl Sema:
         if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF or tk == TypeKind.TY_FN or tk == TypeKind.TY_EXTERN_FN or tk == TypeKind.TY_GENERIC_FN or tk == TypeKind.TY_TRAIT_OBJ:
             return target_spec_ptr_bytes()
         if tk == TypeKind.TY_VA_LIST:
-            return if target_spec_os() == "Wasi": target_spec_ptr_bytes() else: 8
+            return if type_layout_c_va_list_kind() == C_VA_LIST_POINTER: target_spec_ptr_bytes() else: 8
         if tk == TypeKind.TY_ARRAY:
             return self.type_layout_align_of(self.get_type_d0(resolved))
         if tk == TypeKind.TY_SLICE:

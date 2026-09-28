@@ -178,6 +178,8 @@ type SemaBuiltinSymbols {
     line_magic: i32,
     fn_magic: i32,
     embed_file: i32,
+    va_start: i32,
+    va_arg_method: i32,
     copy_trait: i32,
     clone_trait: i32,
     send_trait: i32,
@@ -1170,6 +1172,14 @@ pub type Sema {
     // A free math builtin call (`cos(x)`), keyed by the call node, to its
     // MathBuiltins row id. Sema decides once; MirLower reads, never re-derives.
     math_builtin_calls: HashMap[i32, i32],
+    // D75 (§16.2b.5): a `va_start()` call node (→ 1) and an `ap.arg[T]()`
+    // call node (→ T), decided here; MirLower lowers them to VA_START and
+    // VA_ARG and ends each started list with its binding scope.
+    va_start_calls: HashMap[i32, i32],
+    va_arg_calls: HashMap[i32, i32],
+    // The initializer a `let`/`var` binding is checking, so `va_start()`
+    // knows it names a variable (the only place a list starts).
+    va_start_binding_value: i32,
     // #912: the iteration desugar's next() specialization, keyed by the FOR
     // node (loops) or the clause's iterable expression node (comprehensions).
     // A dedicated channel — keying resolved_call_sigs by an expression node
@@ -1490,6 +1500,7 @@ pub type Sema {
     current_fn_param_origins: Vec[i32],// accumulated escape_view origin masks per param
     current_fn_param_view_nodes: Vec[i32], // representative return/view node for escape_view diagnostics
     current_fn_sig_idx: i32,           // sig index of current function (-1 if not in a fn body)
+    current_fn_variadic: i32,          // 1 while checking a `...` definition body (never a closure in it)
     recording_propagated_effect: i32,
 
     // Closure capture summaries: closure node -> flat [capture_sym, effect_bits]* slice.
@@ -2220,6 +2231,8 @@ fn sema_builtin_symbols_zero -> SemaBuiltinSymbols:
         line_magic: 0,
         fn_magic: 0,
         embed_file: 0,
+        va_start: 0,
+        va_arg_method: 0,
         copy_trait: 0,
         clone_trait: 0,
         send_trait: 0,
@@ -2783,6 +2796,9 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         resolved_call_sigs: sema_new_map_i32_i32(),
         resolved_call_mono_syms: sema_new_map_i32_i32(),
         math_builtin_calls: sema_new_map_i32_i32(),
+        va_start_calls: sema_new_map_i32_i32(),
+        va_arg_calls: sema_new_map_i32_i32(),
+        va_start_binding_value: 0,
         iter_next_sigs: sema_new_map_i32_i32(),
         iter_next_mono_syms: sema_new_map_i32_i32(),
         magic_ident_kinds: sema_new_map_i32_i32(),
@@ -2956,6 +2972,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         current_fn_param_origins: Vec.new(),
         current_fn_param_view_nodes: Vec.new(),
         current_fn_sig_idx: -1,
+        current_fn_variadic: 0,
         recording_propagated_effect: 0,
         closure_capture_summary_starts: sema_new_map_i32_i32(),
         closure_capture_summary_counts: sema_new_map_i32_i32(),
@@ -4212,6 +4229,8 @@ impl Sema:
         self.syms.line_magic = self.pool_intern("__LINE__")
         self.syms.fn_magic = self.pool_intern("__FN__")
         self.syms.embed_file = self.pool_intern("embed_file")
+        self.syms.va_start = self.pool_intern("va_start")
+        self.syms.va_arg_method = self.pool_intern("arg")
         self.syms.copy_trait = self.pool_intern("Copy")
         self.syms.clone_trait = self.pool_intern("Clone")
         self.syms.send_trait = self.pool_intern("Send")

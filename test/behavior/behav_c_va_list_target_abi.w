@@ -18,11 +18,13 @@ fn main:
     p7_write(case_dir, "src/indirect_from_pointer.w", "pub unsafe fn indirect_from_pointer(cb: extern \"C\" fn(c_va_list) -> i32, args: *mut c_va_list) -> i32: cb(*args)\n")
     p7_write(case_dir, "src/explicit_pointer.w", "pub fn explicit_pointer(cb: extern \"C\" fn(*mut c_va_list) -> i32, args: *mut c_va_list) -> i32: cb(args)\n")
     p7_write(case_dir, "src/with_callback.w", "pub fn probe(args: c_va_list) -> i32: 7\npub unsafe fn indirect(cb: fn(c_va_list) -> i32, args: c_va_list) -> i32: cb(args)\npub unsafe fn caller(args: c_va_list) -> i32: indirect(probe, args)\n")
-    for target in ["darwin_aarch64", "linux_x86_64", "linux_aarch64", "windows_x86_64", "windows_aarch64"]:
+    // darwin_x86_64 is SysV x86_64 too (D75): its va_list is the 24-byte tag.
+    for target in ["darwin_aarch64", "darwin_x86_64", "linux_x86_64", "linux_aarch64", "windows_x86_64", "windows_aarch64"]:
+        let sysv = target == "linux_x86_64" or target == "darwin_x86_64"
         let flags = "\0--target=" ++ target ++ "\0--no-prelude\0"
         let ir = p7_run(case_dir, "va_list_ir_" ++ target, "ir\0src/probe.w" ++ flags)
         p7_assert_success(ir, "va_list IR for " ++ target)
-        let size = if target == "linux_x86_64": 24 else: if target == "linux_aarch64": 32 else: 8
+        let size = if sysv: 24 else: if target == "linux_aarch64": 32 else: 8
         assert(va_ir_body(ir.stdout, "storage_size").contains(f"ret i64 {size}"))
         assert(va_ir_body(ir.stdout, "box_size").contains(f"ret i64 {size + 8}"))
         assert(va_ir_body(ir.stdout, "box_align").contains("ret i64 8"))
@@ -35,7 +37,7 @@ fn main:
             assert(exported.contains("@va_probe(ptr %0)"))
         let matrix = p7_run(case_dir, "va_list_matrix_" ++ target, "analyze\0src/probe.w\0matrix:name~va_probe" ++ flags)
         p7_assert_success(matrix, "target-specific ABI matrix for " ++ target)
-        if target == "linux_x86_64":
+        if sysv:
             assert(matrix.stdout.contains("value-ref=1"))
             assert(matrix.stdout.contains("place-address"))
         else:
@@ -48,7 +50,7 @@ fn main:
         p7_assert_success(audit, "target-specific ABI audit for " ++ target)
         assert(audit.stdout.contains("violations=0"))
         let returned = p7_run(case_dir, "va_list_return_" ++ target, "ir\0src/return.w" ++ flags)
-        if target == "linux_x86_64":
+        if sysv:
             assert(returned.rc != 0)
             assert(returned.stderr.contains("return type 'c_va_list' is not C-ABI-expressible"))
         else:
@@ -59,14 +61,14 @@ fn main:
         if target == "linux_aarch64":
             assert(forwarded.contains("alloca { i64, i64, i64, i64 }, align 8"))
             assert(not forwarded.contains("@va_probe(ptr %0)"))
-        if target == "linux_x86_64":
+        if sysv:
             assert(forwarded.contains("@va_probe(ptr %0)"))
         let indirect = p7_run(case_dir, "va_list_indirect_" ++ target, "ir\0src/indirect.w" ++ flags)
         p7_assert_success(indirect, "C va_list callback for " ++ target)
         let indirect_body = va_ir_body(indirect.stdout, "indirect")
         if target == "linux_aarch64":
             assert(indirect_body.contains("alloca { i64, i64, i64, i64 }, align 8"))
-        if target == "linux_x86_64":
+        if sysv:
             assert(not indirect_body.contains("alloca { i64, i64, i64 }, align 8"))
         let with_callback = p7_run(case_dir, "va_list_with_callback_" ++ target, "ir\0src/with_callback.w" ++ flags)
         p7_assert_success(with_callback, "With va_list callback for " ++ target)
@@ -75,7 +77,7 @@ fn main:
             p7_assert_success(callback_audit, source ++ " ABI audit for " ++ target)
             assert(callback_audit.stdout.contains("violations=0"))
         let indirect_return = p7_run(case_dir, "va_list_indirect_return_" ++ target, "analyze\0src/indirect_return.w\0audit:all" ++ flags)
-        if target == "linux_x86_64":
+        if sysv:
             assert(indirect_return.rc != 0)
             assert(indirect_return.stderr.contains("not C-ABI-expressible"))
         else:

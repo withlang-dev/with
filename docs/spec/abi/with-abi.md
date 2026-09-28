@@ -176,6 +176,14 @@ layout change there is caught by the `wo-drift` lane, not by this check.
 
 ## Version history
 
+- **v7** (2026-09-28): a function defined with a trailing `...` (D75, spec
+  §16.2b.5) uses the target's C calling convention for its fixed
+  parameters and its return (`fn_abi_definition_convention`); before, only
+  its variable arguments were C's and an aggregate before the `...` took
+  With's convention. `c_va_list` on Darwin x86_64 is SysV's 24-byte
+  `__va_list_tag[1]`, a parameter using the caller's place, as on Linux
+  x86_64 (it was an 8-byte pointer); on WebAssembly it is a pointer (its
+  LLVM type was an empty struct).
 - **v6** (2026-09-27): a `Drop` struct whose all-zero storage can be a live
   value gains a hidden liveness byte after its fields (§2; spec §2.5.1,
   D72). Every other layout is unchanged; a bundle built under v5 that

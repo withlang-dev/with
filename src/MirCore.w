@@ -327,6 +327,13 @@ pub enum MirIntrinsic: i32:
     // environment (a `move ||` closure's heap cell) is cloned by the cell's
     // clone fn.
     CLOSURE_CLONE
+    // D75 (§16.2b.5): C variadic definitions. VA_START starts the list in
+    // its binding (the call destination); VA_ARG reads the next argument
+    // through the list place (arg 0) as the destination's type and advances
+    // it; VA_END ends the list at its binding's scope exit (DK_VA_END).
+    VA_START
+    VA_ARG
+    VA_END
 
 // Copy: MirIntrinsic is a lightweight integer tag passed by value, stored in
 // Vec/HashMap, and compared throughout MIR lowering and codegen.
@@ -390,6 +397,9 @@ pub enum DropKind: i32:
     DK_WITH_GUARD_MUT = 5
     DK_ASYNC_SCOPE = 6
     DK_THREAD_SCOPE = 7
+    // D75: the binding holds a list `va_start()` started; its scope end is
+    // the list's end (llvm.va_end / C's va_end), not a drop of the value.
+    DK_VA_END = 8
 
 // Copy: DropKind is a lightweight integer tag passed by value.
 impl Copy for DropKind

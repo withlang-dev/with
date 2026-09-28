@@ -12014,6 +12014,31 @@ impl Codegen:
             let cloned_pair = self.mir_emit_closure_clone(body, args_id)
             self.mir_finish_intrinsic_call(body, dest_place, next_bb, cloned_pair)
             return true
+        // D75 (§16.2b.5): the list is the binding's storage — VA_START's
+        // destination, VA_ARG's and VA_END's receiver place.
+        if intrinsic == MirIntrinsic.VA_START:
+            let va_list_ty = self.c_va_list_llvm_type()
+            let started = self.mir_place_ptr(body, dest_place, true, va_list_ty)
+            self.emit_c_va_list_marker("llvm.va_start.p0", started)
+            self.mir_finish_intrinsic_call(body, -1, next_bb, 0)
+            return true
+        if intrinsic == MirIntrinsic.VA_END:
+            let ended = self.mir_intrinsic_recv_ptr(body, args_id)
+            self.emit_c_va_list_marker("llvm.va_end.p0", ended)
+            let status = wl_const_int(wl_i32_type(self.context), 0, 0)
+            self.mir_finish_intrinsic_call(body, dest_place, next_bb, status)
+            return true
+        if intrinsic == MirIntrinsic.VA_ARG:
+            let list_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
+            let arg_sema_ty = self.mir_intrinsic_dest_sema_type(body, dest_place)
+            let arg_ty = self.mir_sema_type_to_llvm(arg_sema_ty)
+            if arg_ty == 0:
+                with_eprint("error: internal: `arg[T]()` has no LLVM type for its argument")
+                self.had_error = 1
+                return false
+            let value = self.emit_c_va_arg(list_ptr, arg_ty)
+            self.mir_finish_intrinsic_call(body, dest_place, next_bb, value)
+            return true
         false
 
     // D63: `f.clone()`. A bare function or a view closure copies its pair;

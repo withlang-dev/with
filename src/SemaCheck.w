@@ -2358,6 +2358,7 @@ impl Sema:
 
         // Effect tracking: save outer state and populate for this function
         let saved_eff_sig_idx: i32 = self.current_fn_sig_idx
+        let saved_fn_variadic: i32 = self.current_fn_variadic
         let saved_eff_param_syms = sema_clone_i32_vec(&self.current_fn_param_syms)
         let saved_eff_param_effs = sema_clone_i32_vec(&self.current_fn_param_effs)
         let saved_eff_param_direct_effs = sema_clone_i32_vec(&self.current_fn_param_direct_effs)
@@ -2384,6 +2385,7 @@ impl Sema:
                 self.current_fn_param_origins.push(0)
                 self.current_fn_param_view_nodes.push(0)
         self.current_fn_sig_idx = sig_idx
+        self.current_fn_variadic = self.sig_is_variadic(sig_idx)
 
         // Set current return type
         let saved_ret: i32 = self.current_return_type
@@ -2679,6 +2681,7 @@ impl Sema:
 
         // Restore state
         self.current_fn_sig_idx = saved_eff_sig_idx
+        self.current_fn_variadic = saved_fn_variadic
         while self.current_fn_param_syms.len() > 0:
             self.current_fn_param_syms.pop()
             self.current_fn_param_effs.pop()
@@ -6705,10 +6708,18 @@ impl Sema:
                 if (origin_mask & bit) != 0:
                     self.note_raw_pointer_validity_param(self.current_fn_param_syms[pi])
 
+    fn fn_decl_is_variadic_definition(fn_node: i32) -> bool:
+        fn_node != 0 and self.ast.kind(fn_node) == NodeKind.NK_FN_DECL and (self.ast.get_data2(fn_node) / FnFlags.VARIADIC) % 2 == 1
+
     fn fn_symbol_is_unsafe(fn_sym: i32) -> i32:
         let fn_node = self.fn_symbol_decl_node(fn_sym)
         if fn_node == 0:
             return 0
+        // D75 (§16.2b.5): a function defined with a trailing `...` is unsafe
+        // to call — nothing checks the variable arguments against what its
+        // body reads.
+        if self.fn_decl_is_variadic_definition(fn_node):
+            return 1
         let body = self.ast.get_data1(fn_node)
         if body == 0 or self.ast.kind(body) != NodeKind.NK_UNSAFE_BLOCK:
             return 0
@@ -7950,6 +7961,12 @@ impl Sema:
             // later; the call site no longer knows it spawns — record here.
             if self.task_fns.contains(sym):
                 self.record_global_concurrency_evidence(node, "async function reference")
+            // D75: a variadic definition's value would be a function pointer
+            // whose calls pass no variable arguments and need no `unsafe`;
+            // With has no variadic function-pointer type to give it.
+            if self.fn_decl_is_variadic_definition(self.fn_symbol_decl_node(sym)):
+                self.emit_error("`" ++ self.pool_resolve(sym) ++ "` is defined with `...`: it is called directly (under `unsafe`), never used as a value", node)
+                return 0
             let fn_is_unsafe = self.fn_symbol_is_unsafe(sym)
             if self.has_expected_type != 0 and self.expected_expr_type != 0:
                 let expected = self.resolve_alias(self.expected_expr_type)
@@ -10701,7 +10718,11 @@ impl Sema:
         // Let binding value is expression position — match inside must be exhaustive.
         let saved_match_stmt: i32 = self.match_in_stmt_pos
         self.match_in_stmt_pos = 0
+        // D75: the one place `va_start()` may stand — a binding's initializer.
+        let saved_va_start_value: i32 = self.va_start_binding_value
+        self.va_start_binding_value = value
         let val_type = if ann_type != 0: self.check_expr_with_owned_demand(value, ann_type) else: self.check_expr_value_context(value)
+        self.va_start_binding_value = saved_va_start_value
         self.match_in_stmt_pos = saved_match_stmt
         if ann_type != 0:
             self.reject_owned_demand_from_view_projection(value, ann_type as i32, "typed let binding")
@@ -17280,6 +17301,10 @@ impl Sema:
                     break
         let outer_count = self.bind_names.len() as i32
         let saved_capture_sig_idx: i32 = self.current_fn_sig_idx
+        // A closure has its own frame: `va_start()` in it would start no list
+        // of the enclosing variadic definition.
+        let saved_capture_fn_variadic: i32 = self.current_fn_variadic
+        self.current_fn_variadic = 0
         let saved_capture_syms: Vec[i32] = Vec.new()
         let saved_capture_effs: Vec[i32] = Vec.new()
         let saved_capture_direct_effs: Vec[i32] = Vec.new()
@@ -17525,6 +17550,7 @@ impl Sema:
             self.current_fn_param_origins.push(saved_capture_origins[i])
             self.current_fn_param_view_nodes.push(saved_capture_view_nodes[i])
         self.current_fn_sig_idx = saved_capture_sig_idx
+        self.current_fn_variadic = saved_capture_fn_variadic
 
         // Restore borrow state — discard borrows created inside closure body.
         while self.borrow_kinds.len() as i32 > saved_borrow_len:
@@ -19125,6 +19151,11 @@ impl Sema:
                 let recv_field2 = self.ast.get_data1(generic_method_base)
                 let checked_recv2 = self.check_expr(recv_expr2) as i32
                 let recv_ty2 = self.adjust_static_receiver_type(recv_expr2, checked_recv2)
+                if recv_field2 == self.syms.va_arg_method and self.type_is_c_va_list(recv_ty2) != 0:
+                    let va_arg_ret = self.check_va_arg_call(node, callee, recv_expr2, arg_count)
+                    if va_arg_ret != 0:
+                        self.typed_expr_types.insert(node, va_arg_ret)
+                    return va_arg_ret
                 if recv_field2 == self.syms.collect:
                     if arg_count != 0:
                         self.emit_error("collect[C]() takes no runtime arguments", node)
@@ -26121,6 +26152,8 @@ impl Sema:
             return 1
         if fn_sym == self.syms.src:
             return 1
+        if fn_sym == self.syms.va_start:
+            return 1
         if fn_sym == self.syms.embed_file:
             return 1
         // A free math builtin (`cos(x)`). Reached only after every user and
@@ -26141,6 +26174,7 @@ impl Sema:
         out.push(self.syms.close)
         out.push(self.syms.src)
         out.push(self.syms.embed_file)
+        out.push(self.syms.va_start)
         for id in 0..math_fn_count():
             let sym = self.pool_lookup_symbol(math_fn_name(id))
             if sym != 0: out.push(sym)
@@ -26167,6 +26201,8 @@ impl Sema:
     fn call_callee_is_builtin(node: i32) -> i32:
         if node <= 0 or node >= self.ast.node_count() or self.ast.kind(node) != NodeKind.NK_CALL:
             return 0
+        if self.va_start_calls.contains(node) or self.va_arg_calls.contains(node):
+            return 1
         if self.math_builtin_calls.contains(node):
             return 1
         let callee = self.ast.get_data0(node)
@@ -26241,6 +26277,8 @@ impl Sema:
                     self.emit_error("close() expects channel handle as integer value", self.ast.get_extra(args_start))
                     return 0
             return self.ty_void as i32
+        if fn_sym == self.syms.va_start:
+            return self.check_va_start_call(node, arg_count)
         if fn_sym == self.syms.src:
             if arg_count != 0:
                 self.emit_error("src() takes no arguments", node)
@@ -26305,6 +26343,88 @@ impl Sema:
             self.math_builtin_calls.insert(node, math_id)
             return target as i32
         0
+
+    // D75 (§16.2b.5): `var ap = va_start()` starts the variable arguments of
+    // the function defined with a trailing `...` whose body this is. The
+    // list lives in the variable and ends with the variable's scope, so a
+    // start anywhere else — a temporary, an argument, a closure's body —
+    // would be a list nothing ends.
+    mut fn check_va_start_call(node: i32, arg_count: i32) -> i32:
+        if arg_count != 0:
+            self.emit_error("va_start() takes no arguments: the list begins after the function's last named parameter", node)
+            return 0
+        if self.current_fn_variadic == 0:
+            self.emit_error("va_start() reads the variable arguments of a function defined with a trailing `...` parameter; this body has none", node)
+            return 0
+        if self.va_start_binding_value != node:
+            self.emit_error_with_help("va_start() starts a list that a variable holds", node, "bind it — `var ap = va_start()` — and read with `ap.arg[T]()`; the list ends with the variable's scope")
+            return 0
+        self.va_start_calls.insert(node, 1)
+        self.ty_c_va_list as i32
+
+    // What a C caller passes through `...` has had the default argument
+    // promotions applied (C11 6.5.2.2p6–7): an integer narrower than int
+    // arrives as int and a float as double. `arg[T]()` reads what was passed,
+    // so T is a promoted type; any other T reads bytes the caller never wrote.
+    fn va_arg_type_refusal(tid: i32) -> str:
+        let resolved = self.resolve_alias(tid as TypeId)
+        let kind = self.get_type_kind(resolved)
+        let name = self.type_name(tid)
+        if kind == TypeKind.TY_INT:
+            let bits = self.get_type_d0(resolved)
+            if bits < 32:
+                return f"`arg[{name}]()` reads a type no C caller passes through `...`: the default argument promotions pass an integer narrower than int as int — read `i32` (C's `int`, `c_int` in migrated code) and convert"
+            if bits > 64:
+                return f"`arg[{name}]()`: a {bits}-bit integer is not a C variable-argument type the compiler lowers"
+            return ""
+        if kind == TypeKind.TY_BOOL:
+            return f"`arg[{name}]()` reads a type no C caller passes through `...`: the default argument promotions pass a bool as int — read `i32` and compare it with 0"
+        if kind == TypeKind.TY_FLOAT:
+            if self.get_type_d0(resolved) == 32:
+                return f"`arg[{name}]()` reads a type no C caller passes through `...`: the default argument promotions pass a float as double — read `f64` and convert"
+            return ""
+        if kind == TypeKind.TY_PTR or kind == TypeKind.TY_EXTERN_FN:
+            return ""
+        f"`arg[{name}]()`: a variable argument is read as a promoted C scalar — an integer at least as wide as c_int, f64, a raw pointer or an extern \"C\" function"
+
+    // D75 (§16.2b.5): `ap.arg[T]()` reads the next variable argument of the
+    // list `ap` as T and advances `ap` in place (the compiler lowers it for
+    // the target's va_list). Nothing checks what the caller passed, so the
+    // read is an unsafe operation, as a raw pointer read is.
+    mut fn check_va_arg_call(node: i32, callee: i32, recv_expr: i32, arg_count: i32) -> i32:
+        if arg_count != 0:
+            self.emit_error("`arg[T]()` takes no arguments: it reads the list's next argument", node)
+            return 0
+        let type_node = self.ast.get_data1(callee)
+        let arg_ty = self.resolve_type_level_arg_expr(type_node)
+        if arg_ty == 0:
+            self.emit_error("`arg[T]()` names the argument's type: `ap.arg[c_int]()`", callee)
+            return 0
+        let refusal = self.va_arg_type_refusal(arg_ty as i32)
+        if refusal.len() > 0:
+            self.emit_error(refusal, type_node)
+            return 0
+        // The read advances the list: `ap` is a place the call may change,
+        // and a `let` list is refused as a `let` scalar is (D12).
+        let recv_packed = self.classify_place(recv_expr)
+        if unpack_place_kind(recv_packed) == PlaceKind.PK_NotPlace:
+            self.emit_error("`arg[T]()` advances its list, so the list is a variable: `var ap = va_start()`", recv_expr)
+            return 0
+        if unpack_place_mut(recv_packed) == PlaceMut.PM_ReadOnly or self.place_base_is_read_only_ref(recv_expr) != 0:
+            self.emit_error("`arg[T]()` advances its list, which a read-only place cannot do", node)
+            return 0
+        // A `c_va_list` parameter is rebindable as every parameter is (#645):
+        // a helper reads the list its caller started, as C's does.
+        if self.ast.kind(recv_expr) == NodeKind.NK_IDENT:
+            let recv_sym = self.ast.get_data0(recv_expr)
+            if self.scope_has(recv_sym) != 0 and self.scope_lookup_mut(recv_sym) == 0 and self.param_index_for_sym(recv_sym) < 0:
+                self.emit_error_with_help("cannot advance the list in immutable binding `" ++ self.pool_resolve(recv_sym) ++ "`", node, "bind it with `var`: `var ap = va_start()`")
+                return 0
+        self.check_mutation_against_views(recv_expr, node)
+        if self.require_unsafe_operation("reading a C variable argument requires unsafe context: nothing checks what the caller passed", node) == 0:
+            return 0
+        self.va_arg_calls.insert(node, arg_ty as i32)
+        arg_ty as i32
 
     fn static_receiver_base_sym(expr: i32) -> i32:
         if expr == 0:
