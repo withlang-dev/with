@@ -1,4 +1,4 @@
-# The With Programming Language — Specification v7.8
+# The With Programming Language — Specification v7.9
 
 **Author:** Eric Hartford
 **Status:** Reference specification for prototype implementation
@@ -11,6 +11,7 @@ implementation is still in progress.** The D22 rules are normative now. The
 compiler, comptime evaluator, backends, standard library, diagnostics, and
 tests are NON-COMPLIANT wherever they do not yet implement them. Existing
 implementation behavior must not be treated as precedent against D22.
+**Changelog v7.9:** the type of a variadic C function as a value is `extern "C" fn(A, B, ...) -> R`, its `unsafe` implied, distinct from every fixed-arity function type (§16.2b.5, D75 item 6 extended; #1832).
 **Changelog v7.8:** Process-global C state no safe view reaches is an audited
 effect, not a domain (§16.2b.14, D76); a registering function may present a
 callback's `argv`/`argc` as `&[Value]` and its user data as `&U` (§16.2b.9,

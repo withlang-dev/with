@@ -652,6 +652,12 @@ variable arguments through `var ap = va_start()`, which yields the target's
 list ends with its scope. The C migrator translates a variadic C definition to
 this form.
 
+The type of a variadic C function as a value is `extern "C" fn(A, B, ...) -> R`,
+where `A, B` stand for its fixed parameters and the trailing `...` is the
+literal variadic token: calling through it is raw and its `unsafe` is implied,
+only an `extern "C"` function type may end in `...`, and a variadic and a
+fixed-arity function type are distinct types that never coerce to one another.
+
 #### 16.2b.6 Borrowed returns, dependency and independence
 
 An operation may return a borrowed resource:
