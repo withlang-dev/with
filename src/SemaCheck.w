@@ -3656,7 +3656,6 @@ impl Sema:
         self.current_fn_variadic = saved_fn_variadic
         self.fn_param_invocations = saved_invocations
         self.fn_param_many_nodes = saved_many_nodes
-        self.current_effect_closure = saved_effect_closure
         self.current_effect_body = saved_effect_body
         while self.current_fn_param_syms.len() > 0:
             self.current_fn_param_syms.pop()
@@ -18721,7 +18720,6 @@ impl Sema:
             self.current_fn_param_view_nodes.push(saved_capture_view_nodes[i])
         self.current_fn_sig_idx = saved_capture_sig_idx
         self.current_fn_variadic = saved_capture_fn_variadic
-        self.current_effect_closure = saved_effect_closure
         self.current_effect_body = saved_effect_body
         self.current_fn_bind_start = saved_closure_bind_start
 
