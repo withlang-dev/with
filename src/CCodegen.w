@@ -350,7 +350,8 @@ type CCodegen {
     fat_thunk_keys: HashMap[i64, i32],
     // Set by resolve_call_named_callee when the callee resolved to an
     // observing `_ref` str-builtin runtime fn (unqualified_builtin_method_name):
-    // emit_term must then marshal str VALUE operands as WITH_STR_REF pointers.
+    // emit_term then passes each str-ish operand as the `&str` view the
+    // runtime takes, the str's own {ptr, len} (#1810).
     callee_is_str_builtin_ref: i32,
     // #1484: globals initialized before `main` (prepare_global_init_bodies):
     // each global's symbol, its declaration index (the order they run in,
@@ -358,6 +359,10 @@ type CCodegen {
     global_init_syms: Vec[i32],
     global_init_decl_indices: Vec[i32],
     global_init_fn_syms: Vec[i32],
+    // §16.3c, D47: the C strings a call lends its `const char *` parameters
+    // (call_args_text): each a `with_cstr_lend` of a str or `&str` view,
+    // held in a temp for the call and released after it (emit_term).
+    call_lends: Vec[str],
 }
 
 impl CCodegen:
@@ -414,6 +419,7 @@ pub fn c_emit_module(mir_mod: MirModule, ast: AstPool, intern: InternPool, sema:
         global_init_syms: Vec.new(),
         global_init_decl_indices: Vec.new(),
         global_init_fn_syms: Vec.new(),
+        call_lends: Vec.new(),
     }
     for i in 0..cg.mir_mod.body_fn_syms.len() as i32:
         let sym: i32 = cg.mir_mod.body_fn_syms[i]
@@ -845,6 +851,20 @@ fn cc_emit_checked_unsigned_helpers(c_type: &str, suffix: &str) -> str:
     out = out ++ "static inline " ++ c_type ++ " __with_checked_mod_" ++ suffix ++ "(" ++ c_type ++ " a, " ++ c_type ++ " b) {\n"
     out = out ++ "    if (b == (" ++ c_type ++ ")0) __with_div_zero_panic();\n"
     out = out ++ "    return (" ++ c_type ++ ")(a % b);\n"
+    out = out ++ "}\n"
+    out
+
+// D71 (§4.8a): a str range `s[a..b]` is a `&str` view of its bytes —
+// `{ptr, len}` by value (#1810) — checked in every build as the LLVM
+// backend checks it (CodegenDispatch mir_emit_str_slice_checks): an offset
+// past the end panics, and so does one inside a UTF-8 character (a
+// `10xxxxxx` byte at the offset).
+fn cc_emit_str_range_view_helper -> str:
+    var out = "static inline with_str __with_str_range_view(with_str s, int64_t a, int64_t b) {\n"
+    out = out ++ "    if (a < 0 || a > b || b > s.len) with_panic(WITH_STR_LIT(\"string slice out of range\"), WITH_STR_LIT(\"\"), 0);\n"
+    out = out ++ "    if ((a < s.len && (((uint8_t)s.ptr[a]) & 0xC0) == 0x80) || (b < s.len && (((uint8_t)s.ptr[b]) & 0xC0) == 0x80))\n"
+    out = out ++ "        with_panic(WITH_STR_LIT(\"string slice inside a UTF-8 character\"), WITH_STR_LIT(\"\"), 0);\n"
+    out = out ++ "    return (with_str){ s.ptr + a, b - a };\n"
     out = out ++ "}\n"
     out
 
@@ -1364,18 +1384,26 @@ impl CCodegen:
         out ++ cc_rbrace()
 
 fn cc_str_concat_expr(left: &str, right: &str) -> str:
-    "with_str_concat_ref(WITH_STR_REF(" ++ left ++ "), WITH_STR_REF(" ++ right ++ "))"
+    "with_str_concat_ref(" ++ left ++ ", " ++ right ++ ")"
 
 impl CCodegen:
+    // The kind a formatter dispatches on: a `&str` view formats as the str
+    // it is (#1810, a `{ptr, len}` value); every other type as its own kind.
+    fn fmt_value_kind(resolved: i32) -> i32:
+        if self.sema.type_layout_is_str_view(resolved): TypeKind.TY_STR else: self.sema.get_type_kind(resolved as TypeId)
+
     mut fn display_format_expr(tid: i32, expr: &str, context: &str) -> str:
         let resolved = self.sema.resolve_alias(tid as TypeId)
         let tk = self.sema.get_type_kind(resolved)
         if tk == TypeKind.TY_STR:
-            return "with_fmt_str_ref(WITH_STR_REF(" ++ expr ++ "))"
+            return "with_fmt_str_ref(" ++ expr ++ ")"
         if tk == TypeKind.TY_BOOL:
             return "with_fmt_bool((int32_t)(" ++ expr ++ "))"
         if tk == TypeKind.TY_FLOAT:
             return "with_fmt_f64((double)(" ++ expr ++ "))"
+        // A `&str` view formats as the str it is (#1810).
+        if self.sema.type_layout_is_str_view(resolved as i32):
+            return "with_fmt_str_ref(" ++ expr ++ ")"
         if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF:
             return "with_fmt_i64((int64_t)(intptr_t)(" ++ expr ++ "))"
         if tk == TypeKind.TY_INT:
@@ -1438,11 +1466,14 @@ impl CCodegen:
         let resolved = self.sema.resolve_alias(tid as TypeId)
         let tk = self.sema.get_type_kind(resolved)
         if tk == TypeKind.TY_REF:
+            // A `&str` view is the str's own {ptr, len} (#1810).
+            if self.sema.type_layout_is_str_view(resolved as i32):
+                return self.debug_format_expr(self.sema.get_type_d0(resolved), expr, context)
             return self.debug_format_expr(self.sema.get_type_d0(resolved), "(*(" ++ expr ++ "))", context)
         if tk == TypeKind.TY_VOID:
             return "WITH_STR_LIT(\"()\")"
         if tk == TypeKind.TY_STR:
-            return "with_fmt_str_debug_ref(WITH_STR_REF(" ++ expr ++ "))"
+            return "with_fmt_str_debug_ref(" ++ expr ++ ")"
         if tk == TypeKind.TY_BOOL:
             return "with_fmt_bool((int32_t)(" ++ expr ++ "))"
         if tk == TypeKind.TY_FLOAT:
@@ -1995,6 +2026,10 @@ impl CCodegen:
             if self.type_is_payload_enum(resolved as i32) != 0:
                 return self.struct_c_name(resolved)
             return "int32_t"
+        // #1810: a shared `&str` is a view, `{ptr, len}` by value — the
+        // with_str itself (TypeLayout.type_layout_is_str_view).
+        if self.sema.type_layout_is_str_view(resolved as i32):
+            return "with_str"
         if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF:
             let inner_tid = self.sema.get_type_d0(resolved)
             let inner_resolved = self.sema.resolve_alias(inner_tid)
@@ -2967,6 +3002,15 @@ impl CCodegen:
             return body.const_types[od]
         0
 
+    // #1810: whether `ref(borrow, place)` produces a `&str` view — a shared
+    // borrow of a place laid out as str — rather than a pointer to the place.
+    mut fn ref_rvalue_is_str_view(body: &MirBody, rval_id: i32) -> bool:
+        if rval_id < 0 or rval_id >= body.rval_kinds.len() as i32 or body.rval_kinds[rval_id] != RvalueKind.RK_REF:
+            return false
+        if body.rval_d0[rval_id] == BorrowKind.EXCLUSIVE:
+            return false
+        self.sema.type_layout_repr_is_str(self.place_ref_target_tid(body, body.rval_d1[rval_id]))
+
     mut fn place_text(body: &MirBody, place_id: i32) -> str:
         if place_id < 0 or place_id >= body.place_locals.len() as i32:
             self.fail(f"invalid place id {place_id}")
@@ -3053,7 +3097,10 @@ impl CCodegen:
                 current_tid = 0
                 continue
             if pk == ProjKind.PK_DEREF:
-                out = "(*" ++ out ++ ")"
+                // A `&str` view is itself the str it names (#1810): its own
+                // storage is the header, so there is nothing to dereference.
+                if not self.sema.type_layout_is_str_view(resolved as i32):
+                    out = "(*" ++ out ++ ")"
                 if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF:
                     current_tid = self.sema.get_type_d0(resolved)
                 else:
@@ -3420,6 +3467,8 @@ impl CCodegen:
                 return self.sema.find_exact_type(TypeKind.TY_SLICE, self.sema.get_type_d0(resolved), 0, 0) as i32
             if tk == TypeKind.TY_SLICE:
                 return resolved as i32
+            if tk == TypeKind.TY_STR:
+                return self.sema.find_exact_type(TypeKind.TY_REF, self.sema.ty_str as i32, 0, 0) as i32
             return 0
         0
 
@@ -3444,31 +3493,35 @@ impl CCodegen:
         if op == BinaryOp.OP_SHR: return ">>"
         ""
 
+    // A pointer-valued operand: a raw pointer or a thin reference. A `&str`
+    // view is `{ptr, len}` by value (#1810), never a pointer.
     fn type_is_raw_pointer_tid(tid: i32) -> bool:
         if tid == 0:
             return false
         let resolved = self.sema.resolve_alias(tid)
         let kind = self.sema.get_type_kind(resolved)
-        kind == TypeKind.TY_PTR or kind == TypeKind.TY_REF
+        (kind == TypeKind.TY_PTR or kind == TypeKind.TY_REF) and not self.sema.type_layout_is_str_view(resolved as i32)
 
-    // A str or a `&str` view: the operands a comparison reads as text.
+    // A str, a `&str` view, or a reference to one (`&&str`, an element view
+    // of `[&str; N]`): the operands a comparison reads as text.
     fn tid_is_str_or_str_view(tid: i32) -> bool:
         let resolved = self.sema.resolve_alias(tid)
         let kind = self.sema.get_type_kind(resolved)
         if kind == TypeKind.TY_STR:
             return true
-        kind == TypeKind.TY_REF and self.sema.get_type_kind(self.sema.resolve_alias(self.sema.get_type_d0(resolved) as TypeId)) == TypeKind.TY_STR
+        kind == TypeKind.TY_REF and self.tid_is_str_or_str_view(self.sema.get_type_d0(resolved))
 
-    // A comparison of two strs, either of them a `&str` view, compares the
-    // text (#293, #785; the LLVM backend's mir_compare_dispatch_kind 1): a
-    // view observes the str it points at, and only raw pointers compare by
-    // address. Ahead of raw_pointer_binop_text, which read two `&str`
-    // operands as pointers (#1560). "" when the operands are not both text.
+    // A comparison of two strs, either of them a `&str` view or a reference
+    // to one, compares the text (#293, #785; the LLVM backend's
+    // mir_compare_dispatch_kind 1): a view observes the str it names, and
+    // only raw pointers compare by address. Ahead of raw_pointer_binop_text,
+    // which read two `&str` operands as pointers (#1560). "" when the
+    // operands are not both text.
     mut fn str_compare_text(body: &MirBody, op: i32, lhs_op: i32, rhs_op: i32) -> str:
         let is_cmp = op == BinaryOp.OP_EQ or op == BinaryOp.OP_NEQ or op == BinaryOp.OP_LT or op == BinaryOp.OP_GT or op == BinaryOp.OP_LTE or op == BinaryOp.OP_GTE
         if not is_cmp or not self.tid_is_str_or_str_view(self.operand_tid(body, lhs_op)) or not self.tid_is_str_or_str_view(self.operand_tid(body, rhs_op)):
             return ""
-        let args = "WITH_STR_REF(" ++ self.str_value_text(body, lhs_op) ++ "), WITH_STR_REF(" ++ self.str_value_text(body, rhs_op) ++ ")"
+        let args = self.str_value_text(body, lhs_op) ++ ", " ++ self.str_value_text(body, rhs_op)
         if op == BinaryOp.OP_EQ: return "with_str_eq_ref(" ++ args ++ ")"
         if op == BinaryOp.OP_NEQ: return "(!with_str_eq_ref(" ++ args ++ "))"
         "(with_str_cmp_ref(" ++ args ++ ") " ++ self.binop_token(op) ++ " 0)"
@@ -3526,7 +3579,7 @@ impl CCodegen:
             if raw_ptr_bin.len() > 0:
                 return raw_ptr_bin
             if d0 == BinaryOp.OP_CONCAT:
-                return "with_str_concat_ref(WITH_STR_REF(" ++ lhs ++ "), WITH_STR_REF(" ++ rhs ++ "))"
+                return "with_str_concat_ref(" ++ self.str_value_text(body, d1) ++ ", " ++ self.str_value_text(body, d2) ++ ")"
             let result_bin_tid = self.sema.resolve_alias(self.rvalue_tid(body, rval_id))
             let result_is_int_bin = self.sema.get_type_kind(result_bin_tid) == TypeKind.TY_INT
             let is_checked_arith_bin = d0 == BinaryOp.OP_ADD or d0 == BinaryOp.OP_SUB or d0 == BinaryOp.OP_MUL or d0 == BinaryOp.OP_DIV or d0 == BinaryOp.OP_MOD
@@ -3558,6 +3611,10 @@ impl CCodegen:
             self.fail(f"unsupported unary op {d0}")
             return inner
         if rk == RvalueKind.RK_REF:
+            // A shared reference to a str is the `&str` view: the header's
+            // own {ptr, len}, read out of the place (#1810).
+            if self.ref_rvalue_is_str_view(body, rval_id):
+                return "(" ++ self.place_text(body, d1) ++ ")"
             return "(&" ++ self.place_text(body, d1) ++ ")"
         if rk == RvalueKind.RK_ADDR_OF:
             return "(&" ++ self.place_text(body, d0) ++ ")"
@@ -3570,6 +3627,11 @@ impl CCodegen:
             let slice_tid = self.rvalue_tid(body, rval_id)
             let slice_c = self.c_type(slice_tid, 0)
             var ptr_expr = ""
+            // D71 (§4.8a): a str range is a `&str` view of its bytes, checked
+            // in every build as the LLVM backend checks it — past the end or
+            // inside a UTF-8 character panics.
+            if base_tk == TypeKind.TY_STR:
+                return "__with_str_range_view(" ++ base ++ ", (int64_t)(" ++ start ++ "), (int64_t)(" ++ end_ ++ "))"
             if base_tk == TypeKind.TY_ARRAY:
                 ptr_expr = "&((" ++ base ++ ")[(int64_t)(" ++ start ++ ")])"
             else if base_tk == TypeKind.TY_SLICE:
@@ -3586,8 +3648,25 @@ impl CCodegen:
             let dst_tid = self.sema.resolve_alias(d1)
             let src_tk = self.sema.get_type_kind(src_tid)
             let dst_tk = self.sema.get_type_kind(dst_tid)
+            // #1810: a `&str` view is `{ptr, len}` by value. A raw pointer to
+            // a str header cast to `&str` reads the view out of the header; a
+            // view cast to a raw pointer names a header holding it — its own
+            // storage when it is a place, else a compound literal.
+            if self.sema.type_layout_is_str_view(dst_tid as i32):
+                if self.type_is_raw_pointer_tid(src_tid as i32):
+                    return "(*(const with_str*)(" ++ src ++ "))"
+                return "(" ++ self.str_value_text(body, d0) ++ ")"
+            if (dst_tk == TypeKind.TY_PTR or dst_tk == TypeKind.TY_REF) and self.sema.type_layout_is_str_view(src_tid as i32):
+                return "((" ++ dst_c ++ ")(" ++ self.call_arg_address_text(body, d0, src) ++ "))"
             if dst_tk == TypeKind.TY_PTR or dst_tk == TypeKind.TY_REF:
                 if src_tk == TypeKind.TY_STR:
+                    // #747: a cast to `*const str`/`*mut str` is address-
+                    // preserving — Sema auto-derefs a `&str` source, so the
+                    // operand place IS the referenced str and its address is
+                    // a header pointer. A byte-pointer target (`*const u8`)
+                    // takes the data pointer.
+                    if self.sema.type_layout_repr_is_str(self.sema.get_type_d0(dst_tid)):
+                        return "((" ++ dst_c ++ ")(" ++ self.call_arg_address_text(body, d0, src) ++ "))"
                     return "((" ++ dst_c ++ ")(" ++ src ++ ".ptr))"
                 if src_tk == TypeKind.TY_STRUCT:
                     return "((" ++ dst_c ++ ")(&(" ++ src ++ ")))"
@@ -6000,14 +6079,7 @@ impl CCodegen:
         self.local_ref_target_tid(body, local_id)
 
     mut fn operand_is_pointer_value(body: &MirBody, operand_id: i32) -> i32:
-        let tid = self.operand_tid(body, operand_id)
-        if tid == 0:
-            return 0
-        let resolved = self.sema.resolve_alias(tid)
-        let kind = self.sema.get_type_kind(resolved)
-        if kind == TypeKind.TY_PTR or kind == TypeKind.TY_REF:
-            return 1
-        0
+        if self.type_is_raw_pointer_tid(self.operand_tid(body, operand_id)): 1 else: 0
 
     mut fn call_arg_address_text(body: &MirBody, op_id: i32, arg_text: &str) -> str:
         // A constant operand has no address; materialize it as a C99
@@ -6026,10 +6098,9 @@ impl CCodegen:
         "&((" ++ self.c_type(lit_tid, 0) ++ ")" ++ cc_lbrace() ++ arg_text ++ cc_rbrace() ++ ")"
 
     // Args for an unqualified str-builtin `_ref` callee
-    // (unqualified_builtin_method_name): a str VALUE operand marshals as
-    // WITH_STR_REF(value); a &str operand is already a header pointer
-    // (except a str CONSTANT typed &str, which renders as a VALUE — #785);
-    // scalar operands pass through.
+    // (unqualified_builtin_method_name): each str-ish operand — a str, a
+    // `&str` view, or a reference to one — passes as the view the runtime
+    // takes, the str's own {ptr, len} (#1810); scalar operands pass through.
     mut fn builtin_method_ref_args_text(body: &MirBody, args_id: i32) -> str:
         if args_id < 0 or args_id >= body.call_arg_starts.len() as i32:
             return ""
@@ -6040,16 +6111,10 @@ impl CCodegen:
             if i > 0:
                 out = out ++ ", "
             let op_id = body.call_arg_operands[(start + i)]
-            let arg_text = self.operand_text(body, op_id)
-            let tid = self.sema.resolve_alias(self.operand_tid(body, op_id))
-            let tk = self.sema.get_type_kind(tid)
-            if tk == TypeKind.TY_STR:
-                out = out ++ "WITH_STR_REF(" ++ arg_text ++ ")"
+            if self.tid_is_str_or_str_view(self.operand_tid(body, op_id)):
+                out = out ++ self.str_value_text(body, op_id)
                 continue
-            if tk == TypeKind.TY_REF and self.operand_is_str_const(body, op_id) != 0:
-                out = out ++ "WITH_STR_REF(" ++ arg_text ++ ")"
-                continue
-            out = out ++ arg_text
+            out = out ++ self.operand_text(body, op_id)
         out
 
     mut fn call_args_text(body: &MirBody, args_id: i32, callee_operand: i32) -> str:
@@ -6070,15 +6135,14 @@ impl CCodegen:
                 out = out ++ ", "
             let op_id = body.call_arg_operands[(start + i)]
             let arg_text = self.operand_text(body, op_id)
-            // #785: a str CONSTANT typed &str renders as a with_str VALUE,
-            // but every &str param's C type is const with_str* (decl table +
-            // with_runtime.h are pointer-typed). Decide from the operand's own
-            // type — the sig-gated wraps below depend on callee-sig resolution,
-            // which #783's layout lottery has been observed to flip.
-            if self.operand_is_str_const(body, op_id) != 0:
-                let oc_tid = self.sema.resolve_alias(self.operand_tid(body, op_id))
-                if self.sema.get_type_kind(oc_tid) == TypeKind.TY_REF:
-                    out = out ++ "((with_str[]){ " ++ arg_text ++ " })"
+            // #1810: a `&str` parameter takes the view by value — the str's
+            // own {ptr, len} (TypeLayout.type_layout_is_str_view) — from any
+            // str-ish operand: a str, a view, a str constant, or a reference
+            // to one (dereferenced down to the str by str_value_text).
+            if i < callee_param_count:
+                let view_p_tid = if callee_sig >= 0: self.sema.sig_param_type(callee_sig, i) else: self.sema.fn_type_param_type(callee_fn_tid, i)
+                if self.sema.type_layout_is_str_view(view_p_tid) and self.tid_is_str_or_str_view(self.operand_tid(body, op_id)):
+                    out = out ++ self.str_value_text(body, op_id)
                     continue
             if callee_extern_name == "strtod" and i == 1:
                 out = out ++ "((char **)" ++ arg_text ++ ")"
@@ -6114,16 +6178,31 @@ impl CCodegen:
                     if (p_inner_tk == TypeKind.TY_FN or p_inner_tk == TypeKind.TY_EXTERN_FN) and (arg_tk_for_ptr == TypeKind.TY_FN or arg_tk_for_ptr == TypeKind.TY_EXTERN_FN):
                         out = out ++ arg_text
                         continue
-                    if arg_tk_for_ptr == TypeKind.TY_STR:
+                    // A str or a `&str` view (a value, #1810) to a pointer
+                    // parameter.
+                    if arg_tk_for_ptr == TypeKind.TY_STR or self.sema.type_layout_is_str_view(arg_resolved_for_ptr as i32):
+                        let str_arg = self.str_value_text(body, op_id)
                         if p_inner_tk == TypeKind.TY_STR:
-                            // &str / *str param: pass a HEADER pointer. An
+                            // A `*const str` / `&mut str` param takes a HEADER
+                            // pointer (a `&str` one took the view above). An
                             // array compound literal materializes the value
                             // and decays to with_str* (block lifetime covers
                             // the call). The old .ptr cast passed the DATA
                             // pointer as a header — reads garbage (#785).
-                            out = out ++ "((with_str[]){ " ++ arg_text ++ " })"
+                            out = out ++ "((with_str[]){ " ++ str_arg ++ " })"
                             continue
-                        out = out ++ "((" ++ self.c_type(p_tid, 0) ++ ")((" ++ arg_text ++ ").ptr))"
+                        // §16.3c, D47: a `const char *` parameter borrows a C
+                        // string for the call. A literal is its own
+                        // NUL-terminated bytes; any other str or view — a
+                        // range view is not terminated at its end — is lent
+                        // a NUL-terminated copy (with_cstr_lend), released
+                        // after the call, as the LLVM backend lends it.
+                        if self.sema.sema_type_is_c_char_pointer(p_tid) != 0 and self.operand_is_str_const(body, op_id) == 0:
+                            let lend_name = f"__with_lend{self.call_lends.len()}"
+                            self.call_lends.push("with_cstr_lend(" ++ str_arg ++ ")")
+                            out = out ++ "((" ++ self.c_type(p_tid, 0) ++ ")" ++ lend_name ++ ")"
+                            continue
+                        out = out ++ "((" ++ self.c_type(p_tid, 0) ++ ")((" ++ str_arg ++ ").ptr))"
                         continue
                     if self.operand_ref_target_tid(body, op_id) != 0:
                         out = out ++ arg_text
@@ -6135,9 +6214,9 @@ impl CCodegen:
                         out = out ++ self.call_arg_address_text(body, op_id, arg_text)
                         continue
                     // #785: a str CONSTANT typed &str by expected-type
-                    // propagation renders as a with_str VALUE; a &str param
-                    // needs a real header pointer. The array compound literal
-                    // materializes it with block lifetime.
+                    // propagation renders as a with_str VALUE; a `*const str`
+                    // param needs a real header pointer. The array compound
+                    // literal materializes it with block lifetime.
                     if p_inner_tk == TypeKind.TY_STR and self.operand_is_str_const(body, op_id) != 0:
                         out = out ++ "((with_str[]){ " ++ arg_text ++ " })"
                         continue
@@ -6165,20 +6244,15 @@ impl CCodegen:
             return 0
         if body.const_kinds[cd] == ConstKind.CK_STR: 1 else: 0
 
-    // #785: value-context rendering for a str-ish operand. A &str-typed
-    // operand renders as a pointer (param locals may already deref to
-    // "(*_N)"); this returns the with_str VALUE text either way.
+    // The with_str VALUE of a str-ish operand. A str and a `&str` view both
+    // render as it — a view is the str's own {ptr, len} (#1810); a thin
+    // reference to one (`&&str`, `&mut str`) is dereferenced down to it.
     mut fn str_value_text(body: &MirBody, op_id: i32) -> str:
-        let rendered = self.operand_text(body, op_id)
-        let tid = self.sema.resolve_alias(self.operand_tid(body, op_id))
-        if self.sema.get_type_kind(tid) == TypeKind.TY_REF:
-            let inner = self.sema.resolve_alias(self.sema.get_type_d0(tid) as TypeId)
-            if self.sema.get_type_kind(inner) == TypeKind.TY_STR:
-                if rendered.starts_with("(*"):
-                    return rendered
-                if self.operand_is_str_const(body, op_id) != 0:
-                    return rendered
-                return "(*(" ++ rendered ++ "))"
+        var rendered = self.operand_text(body, op_id)
+        var tid = self.sema.resolve_alias(self.operand_tid(body, op_id)) as i32
+        while self.sema.get_type_kind(tid as TypeId) == TypeKind.TY_REF and not self.sema.type_layout_is_str_view(tid) and self.tid_is_str_or_str_view(tid):
+            rendered = "(*(" ++ rendered ++ "))"
+            tid = self.sema.resolve_alias(self.sema.get_type_d0(tid as TypeId) as TypeId) as i32
         rendered
 
     fn callee_extern_name_from_operand(body: &MirBody, callee_op: i32) -> str:
@@ -6478,7 +6552,7 @@ impl CCodegen:
                 // Copying sizeof(&T) bytes from the element fabricated a pointer
                 // from the element's leading bytes (Option.Some's zero tag became
                 // null) and lost the view entirely.
-                var ref_out = "    " ++ dst ++ " = (" ++ self.c_type(ret_tid, 0) ++ ")with_vec_get_ptr(" ++ recv_ptr ++ ", (int64_t)(" ++ idx ++ "));\n"
+                var ref_out = "    " ++ dst ++ " = " ++ self.ref_from_slot_ptr_text("with_vec_get_ptr(" ++ recv_ptr ++ ", (int64_t)(" ++ idx ++ "))", ret_tid) ++ ";\n"
                 ref_out = ref_out ++ f"    goto bb{next_bb};"
                 return ref_out
             var out = "    memset(&(" ++ dst ++ "), 0, sizeof(" ++ dst ++ "));\n"
@@ -6687,10 +6761,10 @@ impl CCodegen:
                     self.fail("Map.get Option result requires one payload variant and one unit variant")
                     return "    abort();"
                 let payload_tid = self.sema.type_reflection_variant_payload_type_frozen(dst_tid, some_variant, 0)
-                let payload_c = self.c_type(payload_tid, 0)
                 var out = "    " ++ cc_lbrace() ++ " " ++ key_ty ++ " __with_k = " ++ key_text ++ "; void* __with_p = ((" ++ recv ++ ") != 0) ? with_hashmap_get_ptr((void*)(intptr_t)(" ++ recv ++ "), &__with_k, " ++ is_str_key ++ ") : (void*)0;"
                 out = out ++ " if (__with_p != (void*)0) "
-                out = out ++ cc_lbrace() ++ " " ++ dst ++ " = " ++ self.payload_enum_literal(dst_tid, some_variant, "(" ++ payload_c ++ ")__with_p") ++ "; " ++ cc_rbrace()
+                let payload_view = self.ref_from_slot_ptr_text("__with_p", payload_tid)
+                out = out ++ cc_lbrace() ++ " " ++ dst ++ " = " ++ self.payload_enum_literal(dst_tid, some_variant, payload_view) ++ "; " ++ cc_rbrace()
                 out = out ++ " else " ++ cc_lbrace() ++ " " ++ dst ++ " = " ++ self.payload_enum_literal(dst_tid, none_variant, "") ++ "; " ++ cc_rbrace()
                 out = out ++ " " ++ cc_rbrace() ++ "\n"
                 out = out ++ f"    goto bb{next_bb};"
@@ -6761,7 +6835,7 @@ impl CCodegen:
                     self.fail("Option.unwrap/expect expects an enum with a payload-bearing success variant")
                     return "    abort();"
                 let ok_tag = self.sema.type_reflection_variant_discriminant(carrier_tid, payload_variant)
-                var panic_msg = if is_expect: "with_str_concat_ref(WITH_STR_REF(" ++ user_msg ++ "), WITH_STR_REF(WITH_STR_LIT(\": None\")))" else: "WITH_STR_LIT(\"called unwrap on None\")"
+                var panic_msg = if is_expect: "with_str_concat_ref(" ++ user_msg ++ ", WITH_STR_LIT(\": None\"))" else: "WITH_STR_LIT(\"called unwrap on None\")"
                 if is_result:
                     let err_variant = self.payload_enum_named_variant(carrier_tid, self.sema.syms.err)
                     if err_variant < 0:
@@ -6775,7 +6849,7 @@ impl CCodegen:
                         let err_field = self.payload_enum_variant_field(err_variant)
                         let err_debug = self.debug_format_expr(err_tid, carrier_text ++ "." ++ err_field, "Result.unwrap/expect")
                         let prefix = if is_expect: user_msg else: "WITH_STR_LIT(\"called unwrap on Err\")"
-                        panic_msg = "with_str_concat_ref(WITH_STR_REF(with_str_concat_ref(WITH_STR_REF(" ++ prefix ++ "), WITH_STR_REF(WITH_STR_LIT(\": \")))), WITH_STR_REF(" ++ err_debug ++ "))"
+                        panic_msg = "with_str_concat_ref(with_str_concat_ref(" ++ prefix ++ ", WITH_STR_LIT(\": \")), " ++ err_debug ++ ")"
                     else:
                         panic_msg = if is_expect: user_msg else: "WITH_STR_LIT(\"called unwrap on Err\")"
                 var out = "    if ((" ++ carrier_text ++ ").tag != " ++ f"{ok_tag}" ++ ") with_panic(" ++ panic_msg ++ ", " ++ loc_text ++ ", 0);\n"
@@ -6795,7 +6869,7 @@ impl CCodegen:
                 out = out ++ f"    goto bb{next_bb};"
                 return out
             if self.type_is_raw_pointer_tid(opt_tid):
-                let panic_msg2 = if is_expect: "with_str_concat_ref(WITH_STR_REF(" ++ user_msg ++ "), WITH_STR_REF(WITH_STR_LIT(\": None\")))" else: "WITH_STR_LIT(\"called unwrap on None\")"
+                let panic_msg2 = if is_expect: "with_str_concat_ref(" ++ user_msg ++ ", WITH_STR_LIT(\": None\"))" else: "WITH_STR_LIT(\"called unwrap on None\")"
                 var out2 = "    if ((" ++ opt_text ++ ") == NULL) with_panic(" ++ panic_msg2 ++ ", " ++ loc_text ++ ", 0);\n"
                 if has_ret != 0:
                     out2 = out2 ++ "    " ++ dst ++ " = " ++ opt_text ++ ";\n"
@@ -6804,7 +6878,7 @@ impl CCodegen:
                 out2 = out2 ++ f"    goto bb{next_bb};"
                 return out2
             // Option unwrap: value = encoded - 1. Use memcpy to handle with_str/with_vec destinations.
-            let panic_msg3 = if is_expect: "with_str_concat_ref(WITH_STR_REF(" ++ user_msg ++ "), WITH_STR_REF(WITH_STR_LIT(\": None\")))" else: "WITH_STR_LIT(\"called unwrap on None\")"
+            let panic_msg3 = if is_expect: "with_str_concat_ref(" ++ user_msg ++ ", WITH_STR_LIT(\": None\"))" else: "WITH_STR_LIT(\"called unwrap on None\")"
             var out = "    if ((" ++ opt_text ++ ") == 0) with_panic(" ++ panic_msg3 ++ ", " ++ loc_text ++ ", 0);\n"
             if has_ret != 0:
                 out = out ++ "    " ++ cc_lbrace() ++ " int64_t __uw = ((" ++ opt_text ++ ") - 1); memcpy(&(" ++ dst ++ "), &__uw, sizeof(" ++ dst ++ ") < sizeof(__uw) ? sizeof(" ++ dst ++ ") : sizeof(__uw)); " ++ cc_rbrace() ++ "\n"
@@ -6954,9 +7028,9 @@ impl CCodegen:
             let idx = self.operand_text(body, self.call_arg_operand(body, args_id, 1))
             var out = ""
             if has_ret != 0:
-                out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = with_str_byte_at_ref(WITH_STR_REF(" ++ recv ++ "), (int64_t)(" ++ idx ++ "));\n"
+                out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = with_str_byte_at_ref(" ++ recv ++ ", (int64_t)(" ++ idx ++ "));\n"
             else:
-                out = out ++ "    (void)with_str_byte_at_ref(WITH_STR_REF(" ++ recv ++ "), (int64_t)(" ++ idx ++ "));\n"
+                out = out ++ "    (void)with_str_byte_at_ref(" ++ recv ++ ", (int64_t)(" ++ idx ++ "));\n"
             out = out ++ f"    goto bb{next_bb};"
             return out
 
@@ -6969,9 +7043,9 @@ impl CCodegen:
             let end_ = self.operand_text(body, self.call_arg_operand(body, args_id, 2))
             var out = ""
             if has_ret != 0:
-                out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = with_str_slice_ref(WITH_STR_REF(" ++ recv ++ "), (int64_t)(" ++ start ++ "), (int64_t)(" ++ end_ ++ "));\n"
+                out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = with_str_slice_ref(" ++ recv ++ ", (int64_t)(" ++ start ++ "), (int64_t)(" ++ end_ ++ "));\n"
             else:
-                out = out ++ "    (void)with_str_slice_ref(WITH_STR_REF(" ++ recv ++ "), (int64_t)(" ++ start ++ "), (int64_t)(" ++ end_ ++ "));\n"
+                out = out ++ "    (void)with_str_slice_ref(" ++ recv ++ ", (int64_t)(" ++ start ++ "), (int64_t)(" ++ end_ ++ "));\n"
             out = out ++ f"    goto bb{next_bb};"
             return out
 
@@ -6983,9 +7057,9 @@ impl CCodegen:
             let needle = self.operand_text(body, self.call_arg_operand(body, args_id, 1))
             var out = ""
             if has_ret != 0:
-                out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = with_str_contains_ref(WITH_STR_REF(" ++ recv ++ "), WITH_STR_REF(" ++ needle ++ "));\n"
+                out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = with_str_contains_ref(" ++ recv ++ ", " ++ needle ++ ");\n"
             else:
-                out = out ++ "    (void)with_str_contains_ref(WITH_STR_REF(" ++ recv ++ "), WITH_STR_REF(" ++ needle ++ "));\n"
+                out = out ++ "    (void)with_str_contains_ref(" ++ recv ++ ", " ++ needle ++ ");\n"
             out = out ++ f"    goto bb{next_bb};"
             return out
 
@@ -6997,9 +7071,9 @@ impl CCodegen:
             let ch = self.operand_text(body, self.call_arg_operand(body, args_id, 1))
             var out = ""
             if has_ret != 0:
-                out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = with_str_contains_char_ref(WITH_STR_REF(" ++ recv ++ "), (int32_t)(" ++ ch ++ "));\n"
+                out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = with_str_contains_char_ref(" ++ recv ++ ", (int32_t)(" ++ ch ++ "));\n"
             else:
-                out = out ++ "    (void)with_str_contains_char_ref(WITH_STR_REF(" ++ recv ++ "), (int32_t)(" ++ ch ++ "));\n"
+                out = out ++ "    (void)with_str_contains_char_ref(" ++ recv ++ ", (int32_t)(" ++ ch ++ "));\n"
             out = out ++ f"    goto bb{next_bb};"
             return out
 
@@ -7011,9 +7085,9 @@ impl CCodegen:
             let prefix = self.operand_text(body, self.call_arg_operand(body, args_id, 1))
             var out = ""
             if has_ret != 0:
-                out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = with_str_starts_with_ref(WITH_STR_REF(" ++ recv ++ "), WITH_STR_REF(" ++ prefix ++ "));\n"
+                out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = with_str_starts_with_ref(" ++ recv ++ ", " ++ prefix ++ ");\n"
             else:
-                out = out ++ "    (void)with_str_starts_with_ref(WITH_STR_REF(" ++ recv ++ "), WITH_STR_REF(" ++ prefix ++ "));\n"
+                out = out ++ "    (void)with_str_starts_with_ref(" ++ recv ++ ", " ++ prefix ++ ");\n"
             out = out ++ f"    goto bb{next_bb};"
             return out
 
@@ -7025,9 +7099,9 @@ impl CCodegen:
             let suffix = self.operand_text(body, self.call_arg_operand(body, args_id, 1))
             var out = ""
             if has_ret != 0:
-                out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = with_str_ends_with_ref(WITH_STR_REF(" ++ recv ++ "), WITH_STR_REF(" ++ suffix ++ "));\n"
+                out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = with_str_ends_with_ref(" ++ recv ++ ", " ++ suffix ++ ");\n"
             else:
-                out = out ++ "    (void)with_str_ends_with_ref(WITH_STR_REF(" ++ recv ++ "), WITH_STR_REF(" ++ suffix ++ "));\n"
+                out = out ++ "    (void)with_str_ends_with_ref(" ++ recv ++ ", " ++ suffix ++ ");\n"
             out = out ++ f"    goto bb{next_bb};"
             return out
 
@@ -7039,9 +7113,9 @@ impl CCodegen:
             let needle = self.operand_text(body, self.call_arg_operand(body, args_id, 1))
             var out = ""
             if has_ret != 0:
-                out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = with_str_index_of_ref(WITH_STR_REF(" ++ recv ++ "), WITH_STR_REF(" ++ needle ++ "));\n"
+                out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = with_str_index_of_ref(" ++ recv ++ ", " ++ needle ++ ");\n"
             else:
-                out = out ++ "    (void)with_str_index_of_ref(WITH_STR_REF(" ++ recv ++ "), WITH_STR_REF(" ++ needle ++ "));\n"
+                out = out ++ "    (void)with_str_index_of_ref(" ++ recv ++ ", " ++ needle ++ ");\n"
             out = out ++ f"    goto bb{next_bb};"
             return out
 
@@ -7053,9 +7127,9 @@ impl CCodegen:
             let needle = self.operand_text(body, self.call_arg_operand(body, args_id, 1))
             var out = ""
             if has_ret != 0:
-                out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = with_str_index_of_ref(WITH_STR_REF(" ++ recv ++ "), WITH_STR_REF(" ++ needle ++ "));\n"
+                out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = with_str_index_of_ref(" ++ recv ++ ", " ++ needle ++ ");\n"
             else:
-                out = out ++ "    (void)with_str_index_of_ref(WITH_STR_REF(" ++ recv ++ "), WITH_STR_REF(" ++ needle ++ "));\n"
+                out = out ++ "    (void)with_str_index_of_ref(" ++ recv ++ ", " ++ needle ++ ");\n"
             out = out ++ f"    goto bb{next_bb};"
             return out
 
@@ -7067,9 +7141,9 @@ impl CCodegen:
             let delim = self.operand_text(body, self.call_arg_operand(body, args_id, 1))
             var out = ""
             if has_ret != 0:
-                out = out ++ "    with_str_split_vec_ref(&(" ++ self.place_text(body, dest_place) ++ "), WITH_STR_REF(" ++ recv ++ "), WITH_STR_REF(" ++ delim ++ "));\n"
+                out = out ++ "    with_str_split_vec_ref(&(" ++ self.place_text(body, dest_place) ++ "), " ++ recv ++ ", " ++ delim ++ ");\n"
             else:
-                out = out ++ "    " ++ cc_lbrace() ++ " with_vec __with_tmp_split; with_str_split_vec_ref(&__with_tmp_split, WITH_STR_REF(" ++ recv ++ "), WITH_STR_REF(" ++ delim ++ ")); " ++ cc_rbrace() ++ "\n"
+                out = out ++ "    " ++ cc_lbrace() ++ " with_vec __with_tmp_split; with_str_split_vec_ref(&__with_tmp_split, " ++ recv ++ ", " ++ delim ++ "); " ++ cc_rbrace() ++ "\n"
             out = out ++ f"    goto bb{next_bb};"
             return out
 
@@ -7080,9 +7154,9 @@ impl CCodegen:
             let recv = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
             var out = ""
             if has_ret != 0:
-                out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = with_str_trim_ref(WITH_STR_REF(" ++ recv ++ "));\n"
+                out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = with_str_trim_ref(" ++ recv ++ ");\n"
             else:
-                out = out ++ "    (void)with_str_trim_ref(WITH_STR_REF(" ++ recv ++ "));\n"
+                out = out ++ "    (void)with_str_trim_ref(" ++ recv ++ ");\n"
             out = out ++ f"    goto bb{next_bb};"
             return out
 
@@ -7093,9 +7167,9 @@ impl CCodegen:
             let recv = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
             var out = ""
             if has_ret != 0:
-                out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = with_str_to_upper_ref(WITH_STR_REF(" ++ recv ++ "));\n"
+                out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = with_str_to_upper_ref(" ++ recv ++ ");\n"
             else:
-                out = out ++ "    (void)with_str_to_upper_ref(WITH_STR_REF(" ++ recv ++ "));\n"
+                out = out ++ "    (void)with_str_to_upper_ref(" ++ recv ++ ");\n"
             out = out ++ f"    goto bb{next_bb};"
             return out
 
@@ -7106,9 +7180,9 @@ impl CCodegen:
             let recv = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
             var out = ""
             if has_ret != 0:
-                out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = with_str_to_lower_ref(WITH_STR_REF(" ++ recv ++ "));\n"
+                out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = with_str_to_lower_ref(" ++ recv ++ ");\n"
             else:
-                out = out ++ "    (void)with_str_to_lower_ref(WITH_STR_REF(" ++ recv ++ "));\n"
+                out = out ++ "    (void)with_str_to_lower_ref(" ++ recv ++ ");\n"
             out = out ++ f"    goto bb{next_bb};"
             return out
 
@@ -7121,9 +7195,9 @@ impl CCodegen:
             let new_s = self.operand_text(body, self.call_arg_operand(body, args_id, 2))
             var out = ""
             if has_ret != 0:
-                out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = with_str_replace_ref(WITH_STR_REF(" ++ recv ++ "), WITH_STR_REF(" ++ old_s ++ "), WITH_STR_REF(" ++ new_s ++ "));\n"
+                out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = with_str_replace_ref(" ++ recv ++ ", " ++ old_s ++ ", " ++ new_s ++ ");\n"
             else:
-                out = out ++ "    (void)with_str_replace_ref(WITH_STR_REF(" ++ recv ++ "), WITH_STR_REF(" ++ old_s ++ "), WITH_STR_REF(" ++ new_s ++ "));\n"
+                out = out ++ "    (void)with_str_replace_ref(" ++ recv ++ ", " ++ old_s ++ ", " ++ new_s ++ ");\n"
             out = out ++ f"    goto bb{next_bb};"
             return out
 
@@ -7135,9 +7209,9 @@ impl CCodegen:
             let n = self.operand_text(body, self.call_arg_operand(body, args_id, 1))
             var out = ""
             if has_ret != 0:
-                out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = with_str_repeat_ref(WITH_STR_REF(" ++ recv ++ "), (int64_t)(" ++ n ++ "));\n"
+                out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = with_str_repeat_ref(" ++ recv ++ ", (int64_t)(" ++ n ++ "));\n"
             else:
-                out = out ++ "    (void)with_str_repeat_ref(WITH_STR_REF(" ++ recv ++ "), (int64_t)(" ++ n ++ "));\n"
+                out = out ++ "    (void)with_str_repeat_ref(" ++ recv ++ ", (int64_t)(" ++ n ++ "));\n"
             out = out ++ f"    goto bb{next_bb};"
             return out
 
@@ -7154,6 +7228,13 @@ impl CCodegen:
         if out.len() > 0:
             return out
         ""
+
+    // #1810: the `&T` of a runtime slot's address. A thin reference is the
+    // address; a `&str` view is `{ptr, len}` read out of the slot.
+    mut fn ref_from_slot_ptr_text(slot_ptr: &str, ref_tid: i32) -> str:
+        if self.sema.type_layout_is_str_view(ref_tid):
+            return "(*(const with_str*)(" ++ slot_ptr ++ "))"
+        "((" ++ self.c_type(ref_tid, 0) ++ ")" ++ slot_ptr ++ ")"
 
     // D44 map traversal (`for (k, v) in map`, MirLower.lower_for_hashmap)
     // walks the table's slots: MAP_CAPACITY bounds the walk, an unoccupied
@@ -7182,7 +7263,7 @@ impl CCodegen:
                     self.fail("emit-c: a map slot's key or value has no destination type")
                     return "    abort();"
                 let dest_is_view = self.sema.get_type_kind(self.sema.resolve_alias(dest_tid)) == TypeKind.TY_REF
-                value = if dest_is_view: "((" ++ self.c_type(dest_tid, 0) ++ ")" ++ at ++ ")" else: "(*(" ++ self.c_type(dest_tid, 0) ++ "*)" ++ at ++ ")"
+                value = if dest_is_view: self.ref_from_slot_ptr_text(at, dest_tid) else: "(*(" ++ self.c_type(dest_tid, 0) ++ "*)" ++ at ++ ")"
         var out = ""
         if has_ret != 0:
             out = "    " ++ self.place_text(body, dest_place) ++ " = " ++ value ++ ";\n"
@@ -7565,7 +7646,7 @@ impl CCodegen:
                 return "    abort();"
             let buf = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
             let text = self.operand_text(body, self.call_arg_operand(body, args_id, 1))
-            var out = "    with_fmt_buf_write_str_ref((uint8_t*)(" ++ buf ++ "), WITH_STR_REF(" ++ text ++ "));\n"
+            var out = "    with_fmt_buf_write_str_ref((uint8_t*)(" ++ buf ++ "), " ++ text ++ ");\n"
             out = out ++ f"    goto bb{next_bb};"
             return out
 
@@ -7604,12 +7685,12 @@ impl CCodegen:
             let precision = self.operand_text(body, self.call_arg_operand(body, args_id, 4))
             let val_tid = self.operand_tid(body, val_operand)
             let resolved = self.sema.resolve_alias(val_tid as TypeId)
-            let tk = self.sema.get_type_kind(resolved)
+            let tk = self.fmt_value_kind(resolved as i32)
             var out = ""
             if tk == TypeKind.TY_FLOAT:
                 out = out ++ "    with_fmt_buf_write_f64_spec((uint8_t*)(" ++ buf ++ "), (double)(" ++ val ++ "), (int64_t)(" ++ flags ++ "), (int32_t)(" ++ width ++ "), (int32_t)(" ++ precision ++ "), (int32_t)(((" ++ flags ++ ") & 255)));\n"
             else if tk == TypeKind.TY_STR:
-                out = out ++ "    with_fmt_buf_write_str_spec_ref((uint8_t*)(" ++ buf ++ "), WITH_STR_REF(" ++ val ++ "), (int64_t)(" ++ flags ++ "), (int32_t)(" ++ width ++ "), (int32_t)(" ++ precision ++ "));\n"
+                out = out ++ "    with_fmt_buf_write_str_spec_ref((uint8_t*)(" ++ buf ++ "), " ++ val ++ ", (int64_t)(" ++ flags ++ "), (int32_t)(" ++ width ++ "), (int32_t)(" ++ precision ++ "));\n"
             else:
                 out = out ++ "    with_fmt_buf_write_i64_spec((uint8_t*)(" ++ buf ++ "), (int64_t)(" ++ val ++ "), 0, (int64_t)(" ++ flags ++ "), (int32_t)(" ++ width ++ "), (int32_t)(" ++ precision ++ "), (int32_t)(((" ++ flags ++ ") & 255)));\n"
             out = out ++ f"    goto bb{next_bb};"
@@ -7638,8 +7719,11 @@ impl CCodegen:
             if val_tid == 0 or self.is_void_tid(val_tid) != 0:
                 val_tid = self.sema.ty_i64 as i32
             let resolved = self.sema.resolve_alias(val_tid as TypeId)
-            let tk = self.sema.get_type_kind(resolved)
-            if tk == TypeKind.TY_ENUM and self.type_is_payload_enum(resolved as i32) != 0:
+            let tk = self.fmt_value_kind(resolved as i32)
+            // A payload enum — a declared one or a generic instance such as
+            // Option[&str] — formats its variant and payload, as
+            // display_format_expr does for an enum payload.
+            if (tk == TypeKind.TY_ENUM or tk == TypeKind.TY_GENERIC_INST) and self.type_is_payload_enum(resolved as i32) != 0:
                 let fmt_expr = self.payload_enum_format_expr(resolved as i32, val_text, "fmt.to_str")
                 var out_enum = ""
                 if has_ret != 0:
@@ -7654,7 +7738,7 @@ impl CCodegen:
                 else: "with_fmt_i64"
             let cast_prefix = if tk == TypeKind.TY_FLOAT: "(double)("
                 else if tk == TypeKind.TY_BOOL: "(int32_t)("
-                else if tk == TypeKind.TY_STR: "WITH_STR_REF("
+                else if tk == TypeKind.TY_STR: "("
                 else: "(int64_t)("
             var out = ""
             if has_ret != 0:
@@ -7671,9 +7755,9 @@ impl CCodegen:
             let val_text = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
             var out = ""
             if has_ret != 0:
-                out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = with_fmt_str_debug_ref(WITH_STR_REF(" ++ val_text ++ "));\n"
+                out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = with_fmt_str_debug_ref(" ++ val_text ++ ");\n"
             else:
-                out = out ++ "    (void)with_fmt_str_debug_ref(WITH_STR_REF(" ++ val_text ++ "));\n"
+                out = out ++ "    (void)with_fmt_str_debug_ref(" ++ val_text ++ ");\n"
             out = out ++ f"    goto bb{next_bb};"
             return out
 
@@ -7712,7 +7796,7 @@ impl CCodegen:
             if val_tid == 0 or self.is_void_tid(val_tid) != 0:
                 val_tid = self.sema.ty_i64 as i32
             let resolved = self.sema.resolve_alias(val_tid as TypeId)
-            let tk = self.sema.get_type_kind(resolved)
+            let tk = self.fmt_value_kind(resolved as i32)
             var out = ""
             if has_ret != 0:
                 let dst = self.place_text(body, dest_place)
@@ -7720,7 +7804,7 @@ impl CCodegen:
                 if tk == TypeKind.TY_FLOAT:
                     out = out ++ "    " ++ dst ++ " = with_fmt_f64_spec((double)(" ++ val_text ++ "), (int64_t)(" ++ flags_text ++ "), (int32_t)(" ++ width_text ++ "), (int32_t)(" ++ prec_text ++ "), (int32_t)(" ++ mode_text ++ "));\n"
                 else if tk == TypeKind.TY_STR:
-                    out = out ++ "    " ++ dst ++ " = with_fmt_str_spec_ref(WITH_STR_REF(" ++ val_text ++ "), (int64_t)(" ++ flags_text ++ "), (int32_t)(" ++ width_text ++ "), (int32_t)(" ++ prec_text ++ "));\n"
+                    out = out ++ "    " ++ dst ++ " = with_fmt_str_spec_ref(" ++ val_text ++ ", (int64_t)(" ++ flags_text ++ "), (int32_t)(" ++ width_text ++ "), (int32_t)(" ++ prec_text ++ "));\n"
                 else:
                     out = out ++ "    " ++ dst ++ " = with_fmt_int_spec((int64_t)(" ++ val_text ++ "), 0, (int64_t)(" ++ flags_text ++ "), (int32_t)(" ++ width_text ++ "), (int32_t)(" ++ prec_text ++ "), (int32_t)(" ++ mode_text ++ "));\n"
             else:
@@ -8331,6 +8415,9 @@ impl CCodegen:
             return "false"
         if tk == TypeKind.TY_FLOAT:
             return "0.0"
+        // A `&str` view is a with_str value (#1810).
+        if self.sema.type_layout_is_str_view(resolved as i32):
+            return "(with_str)" ++ cc_lbrace() ++ "0" ++ cc_rbrace()
         if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF:
             return "NULL"
         if tk == TypeKind.TY_GENERIC_INST and self.generic_inst_base_name(resolved as i32) == "Vec":
@@ -8480,10 +8567,11 @@ impl CCodegen:
                 let rv_c_for_copy = self.c_type(rv_tid_for_copy, 0)
                 let dst_resolved_for_copy = self.sema.resolve_alias(dst_tid)
                 let dst_kind_for_copy = self.sema.get_type_kind(dst_resolved_for_copy)
-                if dst_kind_for_copy == TypeKind.TY_PTR or dst_kind_for_copy == TypeKind.TY_REF:
+                let dst_is_str_view_for_copy = self.sema.type_layout_is_str_view(dst_resolved_for_copy as i32)
+                if (dst_kind_for_copy == TypeKind.TY_PTR or dst_kind_for_copy == TypeKind.TY_REF) and not dst_is_str_view_for_copy:
                     if rval.len() >= 2 and rval[0] == 40 and rval[1] == 38:
                         return "    " ++ dst_place ++ " = (" ++ dst_c_for_copy ++ ")" ++ rval ++ ";"
-                if dst_kind_for_copy == TypeKind.TY_REF:
+                if dst_kind_for_copy == TypeKind.TY_REF and not dst_is_str_view_for_copy:
                     // #785: a str CONSTANT assigned to a &str-typed local (an
                     // if-join over literals) renders as a with_str VALUE; the
                     // pointer local takes the array-compound-literal address.
@@ -8569,20 +8657,33 @@ impl CCodegen:
             if callee == "/*unresolved_call*/" or callee == "/*ambiguous_call*/" or callee == "/*ambiguous_method*/":
                 let _ = ret_tid
                 return "    abort();"
+            self.call_lends = Vec.new()
             var args = if self.callee_is_str_builtin_ref != 0: self.builtin_method_ref_args_text(body, d1) else: self.call_args_text(body, d1, d0)
             let fat_callee_place = self.indirect_callee_place_id(body, d0, d1)
             if fat_callee_place >= 0:
                 let ctx_text = self.place_text(body, fat_callee_place) ++ ".ctx"
                 args = if args.len() > 0: ctx_text ++ ", " ++ args else: ctx_text
-            var out = ""
+            var call_line = ""
             if self.is_void_tid(ret_tid) != 0:
-                out = out ++ "    " ++ callee ++ "(" ++ args ++ ");\n"
+                call_line = callee ++ "(" ++ args ++ ");"
             else if self.returns_array(ret_tid):
                 // The destination array decays to the callee's out-pointer.
                 let dest = self.place_text(body, d2)
-                out = out ++ "    " ++ callee ++ "(" ++ (if args.len() > 0: dest ++ ", " ++ args else: dest) ++ ");\n"
+                call_line = callee ++ "(" ++ (if args.len() > 0: dest ++ ", " ++ args else: dest) ++ ");"
             else:
-                out = out ++ "    " ++ self.place_text(body, d2) ++ " = " ++ callee ++ "(" ++ args ++ ");\n"
+                call_line = self.place_text(body, d2) ++ " = " ++ callee ++ "(" ++ args ++ ");"
+            var out = ""
+            if self.call_lends.len() == 0:
+                out = "    " ++ call_line ++ "\n"
+            else:
+                // D47: the lent C strings live for the call, then go back.
+                out = "    " ++ cc_lbrace()
+                for li in 0..self.call_lends.len() as i32:
+                    out = out ++ f" uint8_t* __with_lend{li} = " ++ self.call_lends[li] ++ ";"
+                out = out ++ " " ++ call_line
+                for li in 0..self.call_lends.len() as i32:
+                    out = out ++ f" with_cstr_release(__with_lend{li});"
+                out = out ++ " " ++ cc_rbrace() ++ "\n"
             out = out ++ f"    goto bb{d3};"
             return out
         if tk == TermKind.TK_DROP_AND_GOTO:
@@ -9516,6 +9617,10 @@ impl CCodegen:
                 let rk = body.rval_kinds[rval_id]
                 var src_place = -1
                 if rk == RvalueKind.RK_REF:
+                    // A `&str` view is the str's {ptr, len}, not a pointer
+                    // to the place it was read from (#1810).
+                    if self.ref_rvalue_is_str_view(body, rval_id):
+                        continue
                     src_place = body.rval_d1[rval_id]
                 else if rk == RvalueKind.RK_ADDR_OF:
                     src_place = body.rval_d0[rval_id]
@@ -10044,16 +10149,17 @@ impl CCodegen:
         out.write("#include <sys/stat.h>\n")
         out.write("#include \"with_runtime.h\"\n\n")
         out.write(cc_emit_checked_arith_helpers())
+        out.write(cc_emit_str_range_view_helper())
         // Extra declarations for functions used by emitted C but not in with_runtime.h
         out.write("/* Extra runtime declarations */\n")
         out.write("#define fmt_buf_new with_fmt_buf_new\n")
         out.write("#define fmt_buf_finish with_fmt_buf_finish\n")
         out.write("extern uint8_t* with_fmt_buf_new(void);\n")
-        out.write("extern void with_fmt_buf_write_str_ref(uint8_t*, const with_str*);\n")
-        out.write("extern with_str with_str_clone_ref(const with_str*);\n")
+        out.write("extern void with_fmt_buf_write_str_ref(uint8_t*, with_str);\n")
+        out.write("extern with_str with_str_clone_ref(with_str);\n")
         out.write("extern void with_fmt_buf_write_i64_spec(uint8_t*, int64_t, int32_t, int64_t, int32_t, int32_t, int32_t);\n")
         out.write("extern void with_fmt_buf_write_f64_spec(uint8_t*, double, int64_t, int32_t, int32_t, int32_t);\n")
-        out.write("extern void with_fmt_buf_write_str_spec_ref(uint8_t*, const with_str*, int64_t, int32_t, int32_t);\n")
+        out.write("extern void with_fmt_buf_write_str_spec_ref(uint8_t*, with_str, int64_t, int32_t, int32_t);\n")
         out.write("extern with_str with_fmt_buf_finish(uint8_t*);\n")
         if self.module_exports_c_name("with_alloc") == 0:
             out.write("extern void* with_alloc(int64_t);\n")
@@ -10078,28 +10184,31 @@ impl CCodegen:
         out.write("extern with_str with_sysinfo_os(void);\n")
         out.write("extern with_str with_sysinfo_arch(void);\n")
         out.write("extern with_str with_sysinfo_hostname(void);\n")
-        out.write("extern with_str with_str_trim_ref(const with_str*);\n\n")
+        out.write("extern with_str with_str_trim_ref(with_str);\n")
+        // §16.3c, D47: a str lent to a `const char *` parameter.
+        out.write("extern uint8_t* with_cstr_lend(with_str);\n")
+        out.write("extern void with_cstr_release(uint8_t*);\n\n")
         out.write("#ifdef WITH_BOOTSTRAP_TYPES_H\n")
-        out.write("extern with_str with_str_concat_ref(const with_str*, const with_str*);\n")
+        out.write("extern with_str with_str_concat_ref(with_str, with_str);\n")
         out.write("extern with_str with_str_concat_n(const with_str*, int64_t);\n")
         out.write("extern with_str with_str_concat_n_move_first(const with_str*, int64_t);\n")
-        out.write("extern int32_t with_str_cmp_ref(const with_str*, const with_str*);\n")
-        out.write("extern int64_t with_str_len(const with_str*);\n")
-        out.write("extern int32_t with_str_byte_at_ref(const with_str*, int64_t);\n")
-        out.write("extern int32_t with_str_contains_char_ref(const with_str*, int32_t);\n")
+        out.write("extern int32_t with_str_cmp_ref(with_str, with_str);\n")
+        out.write("extern int64_t with_str_len(with_str);\n")
+        out.write("extern int32_t with_str_byte_at_ref(with_str, int64_t);\n")
+        out.write("extern int32_t with_str_contains_char_ref(with_str, int32_t);\n")
         out.write("extern with_str with_str_from_cstr(const uint8_t*);\n")
         out.write("extern with_str with_str_from_bytes(const uint8_t*, int64_t);\n")
         out.write("extern with_str with_i64_to_str(int64_t);\n")
         out.write("extern with_str with_fmt_u32(uint32_t);\n")
         out.write("extern with_str with_fmt_u64(uint64_t);\n")
         out.write("extern with_str with_bool_to_str(int32_t);\n")
-        out.write("extern void with_println_str(const with_str*);\n")
+        out.write("extern void with_println_str(with_str);\n")
         out.write("extern void with_println_i32(int32_t);\n")
         out.write("extern void with_println_i64(int64_t);\n")
-        out.write("extern void with_eprint(const with_str*);\n")
-        out.write("extern void with_write(const with_str*);\n")
+        out.write("extern void with_eprint(with_str);\n")
+        out.write("extern void with_write(with_str);\n")
         out.write("extern void with_println_bool(int32_t);\n")
-        out.write("extern void with_ewrite(const with_str*);\n")
+        out.write("extern void with_ewrite(with_str);\n")
         out.write("extern void with_panic(with_str, with_str, int32_t);\n")
         out.write("extern int32_t with_runtime_configure_fibers(int64_t, int32_t, int32_t);\n")
         out.write("extern int32_t with_fiber_in_fiber(void);\n")
