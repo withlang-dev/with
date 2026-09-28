@@ -1906,6 +1906,8 @@ fn ci_migrate_translate_function(session: i64, idx: i32, known_structs: &str, pr
     ci_migrate_set_unsafe_function_body_context(body_is_unsafe_context)
     let body = ci_try_translate_fn_body(session, idx)
     ci_migrate_set_unsafe_function_body_context(false)
+    // #1878: the declarations the body's locals need, beside the function.
+    let hoisted_decls = ci_take_body_hoisted_decls()
     // A genuinely empty C body ({}) translates to the empty string — that is a
     // successful translation of a no-op function (common: feature-gated stubs
     // such as zlib's tr_static_init once STDC selects the precomputed tables),
@@ -1933,8 +1935,8 @@ fn ci_migrate_translate_function(session: i64, idx: i32, known_structs: &str, pr
         g_migrate_writes_fn_bodies.push(with_str_clone_ref(body_for_emit))
         let writes_mark = if visibility.len() > 0: ci_migrate_writes_mark(safe_name) else: ""
         if migrate_prefer_brace():
-            return export_prefix ++ fn_keyword ++ safe_name ++ "(" ++ params ++ ")" ++ ret_suffix ++ writes_mark ++ " {\n" ++ body_for_emit ++ "}\n\n"
-        return export_prefix ++ fn_keyword ++ safe_name ++ "(" ++ params ++ ")" ++ ret_suffix ++ writes_mark ++ ":\n" ++ body_for_emit ++ "\n"
+            return hoisted_decls ++ export_prefix ++ fn_keyword ++ safe_name ++ "(" ++ params ++ ")" ++ ret_suffix ++ writes_mark ++ " {\n" ++ body_for_emit ++ "}\n\n"
+        return hoisted_decls ++ export_prefix ++ fn_keyword ++ safe_name ++ "(" ++ params ++ ")" ++ ret_suffix ++ writes_mark ++ ":\n" ++ body_for_emit ++ "\n"
 
     // Any body translation failure is fatal. Never emit partial output that
     // merely comments out the source function.

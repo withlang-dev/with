@@ -1879,7 +1879,7 @@ fn ci_translate_function(session: i64, idx: i32, known_structs: &str, demoted_ty
             if si_raw:
                 ci_record_raw_function_name(name)
             let si_ret_render = ci_unsafe_fn_ptr_type(si_ret)
-            return ci_render_generated_fn_body(fn_kw ++ safe_name ++ "(" ++ si_params ++ ") -> " ++ si_ret_render, body)
+            return ci_take_body_hoisted_decls() ++ ci_render_generated_fn_body(fn_kw ++ safe_name ++ "(" ++ si_params ++ ") -> " ++ si_ret_render, body)
         // The translator's own reason (va_arg, an unsupported builtin, a
         // record initializer it cannot resolve), not only that it failed.
         let failed_why = if g_ci_bail_message.len() > 0: "inline body translation failed: " ++ g_ci_bail_message else: "inline body translation failed"
@@ -12866,6 +12866,19 @@ impl CiStmtPool:
                     return CiDeclLoweringIR { updated_scope: scope, stmt_id: 0 as CiStmtId }
                 g_ci_va_deferred_decls = g_ci_va_deferred_decls ++ va_key
                 deferred_va_list = true
+            else if with_ci_cursor_kind(session, child) == CK_STRUCT or with_ci_cursor_kind(session, child) == CK_UNION:
+                // #1878: a record with no tag declared by the local
+                // (`union { float f; Uint32 ui32; } swapper;`) is a With
+                // type of its own, declared beside the function under the
+                // bridge's name for it (§16.1); its layout is the record's,
+                // never opaque — an opaque one is a loud omission.
+                let synth = with_ci_anon_record_name(session, child)
+                if synth.len() > 0:
+                    let rendered = ci_translate_anon_record_cursor(session, child, synth)
+                    if rendered.ends_with("= opaque\n"):
+                        let _ = ci_va_bail(session, child, "local record '" ++ synth ++ "' has no With layout (§16.9)")
+                        return CiDeclLoweringIR { updated_scope: scope, stmt_id: 0 as CiStmtId }
+                    g_ci_body_hoisted_decls = g_ci_body_hoisted_decls ++ rendered
             else if with_ci_cursor_kind(session, child) == CXK_VAR_DECL:
                 let raw_name = with_ci_cursor_spelling(session, child)
                 let escaped = ci_escape_reserved(raw_name)
@@ -13046,10 +13059,21 @@ fn ci_fn_definition_cursor(session: i64, decl_idx: i32) -> i32:
 pub fn ci_try_translate_fn_body(session: i64, decl_idx: i32) -> str:
     ci_try_translate_fn_body_at(session, decl_idx, ci_fn_definition_cursor(session, decl_idx))
 
+// #1878: the module-level declarations a body's locals need (the record
+// with no tag a local declares), taken by the caller that renders the
+// function and emitted beside it.
+var g_ci_body_hoisted_decls: str = ""
+
+pub fn ci_take_body_hoisted_decls() -> str:
+    let taken = g_ci_body_hoisted_decls.clone()
+    g_ci_body_hoisted_decls = ""
+    taken
+
 fn ci_try_translate_fn_body_at(session: i64, decl_idx: i32, found_cursor: i32) -> str:
     // A record left by a body that bailed elsewhere must not be charged to
     // this one: every caller takes the records right after this returns.
     let _stale = ci_print_take_unknowns()
+    g_ci_body_hoisted_decls = ""
     ci_clear_bail_location()
     // B9: fresh per-function temp counter. This path is called
     // from ci_translate_function's static-inline branch — which

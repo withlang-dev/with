@@ -1656,6 +1656,38 @@ unsafe fn name_member_anon_records(s: *mut CImportSession, record: CXCursor, par
         fi = fi + 1
     if mc.cursors as i64 != 0: with_free(mc.cursors as *mut u8)
 
+type LocalAnonNamer:
+    s: *mut CImportSession
+    fn_name: *const u8
+
+/// #1878: a record with no tag a function body's local declares
+/// (`union { float f; Uint32 ui32; } swapper;`) is named `<fn>_<var>_anon`,
+/// so the local's type and the record's own declaration agree on one name
+/// (session_anon_record_name); a local that only points at one it reaches
+/// the same way. Two functions' same-named locals get distinct names
+/// (name_anon_record numbers a taken one).
+@[callconv("c")]
+unsafe fn name_local_anon_record(cursor: CXCursor, parent: CXCursor, data: *mut u8) -> i32:
+    if clang_getCursorKind(cursor) != CXCursor_VarDecl: return CXChildVisit_Recurse
+    let namer = data as *mut LocalAnonNamer
+    let s = (*namer).s
+    var reached = cursor
+    if not anon_record_behind_indirection(clang_getCursorType(cursor), true, true, &raw mut reached, 0): return CXChildVisit_Recurse
+    if session_anon_record_name(s, reached) as i64 != 0: return CXChildVisit_Recurse
+    if session_anon_record_slot(s, reached) < 0:
+        let _ = session_anon_record_append(s, reached)
+    let spelling = clang_getCursorSpelling(cursor)
+    let var_stem = anon_join((*namer).fn_name, "_\0" as *const u8, clang_getCString(spelling), -1)
+    clang_disposeString(spelling)
+    let base = anon_join(var_stem as *const u8, "_anon\0" as *const u8, 0 as *const u8, -1)
+    with_free(var_stem)
+    name_anon_record(s, reached, base as *const u8)
+    let synthesized = session_anon_record_name(s, reached)
+    if synthesized as i64 != 0:
+        name_member_anon_records(s, reached, synthesized, 0)
+    with_free(base)
+    CXChildVisit_Recurse
+
 unsafe fn name_file_scope_anon_records(s: *mut CImportSession):
     var i = 0
     while i < (*s).decl_count:
@@ -1667,6 +1699,7 @@ unsafe fn name_file_scope_anon_records(s: *mut CImportSession):
     (*s).anon_file_scope_count = (*s).anon_record_count
     if (*s).anon_file_scope_count > 0:
         name_file_scope_anon_record_users(s)
+    name_local_anon_records(s)
     // Member records behind an array or pointer, under each record's name.
     i = 0
     while i < (*s).decl_count:
@@ -1713,6 +1746,18 @@ unsafe fn name_file_scope_anon_record_users(s: *mut CImportSession):
                 buf_append_str(&raw mut suffix as *mut [256]u8 as *mut u8, &raw mut spos, 256, "_anon\0" as *const u8)
                 name_anon_records_used_by(s, clang_getCursorType(arg), cursor, &suffix as *const [256]u8 as *const u8)
                 ai = ai + 1
+        i = i + 1
+
+/// #1878: every function definition's locals (name_local_anon_record).
+unsafe fn name_local_anon_records(s: *mut CImportSession):
+    var i = 0
+    while i < (*s).decl_count:
+        let cursor = *(((*s).decls as i64 + i as i64 * 32) as *const CXCursor)
+        if clang_getCursorKind(cursor) == CXCursor_FunctionDecl and clang_isCursorDefinition(cursor) != 0:
+            let fn_spelling = clang_getCursorSpelling(cursor)
+            var namer = LocalAnonNamer { s: s, fn_name: clang_getCString(fn_spelling) }
+            let _ = clang_visitChildren(cursor, name_local_anon_record as *const u8, &raw mut namer as *mut LocalAnonNamer as *mut u8)
+            clang_disposeString(fn_spelling)
         i = i + 1
 
 @[callconv("c")]
