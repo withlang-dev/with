@@ -692,7 +692,8 @@ pub fn run_sdk_source_tar_gz_action(ctx: ActionCtx) -> i32:
         return sdk_fail(ctx, "source download requires pinned SHA-256")
     let fs = ctx.fs()
     if fs.exists(marker):
-        return 0
+        // A tree extracted before the backport existed still gets it.
+        return sdk_patch_llvm_source(ctx, source_dir)
     if fs.mkdir_all(source_root) != 0:
         return sdk_fail(ctx, "could not create source root: " ++ source_root)
     let scratch = sdk_join("out/command", ctx.target_name())
@@ -716,7 +717,63 @@ pub fn run_sdk_source_tar_gz_action(ctx: ActionCtx) -> i32:
         return sdk_fail(ctx, "tar extraction failed for " ++ tar_path)
     if not fs.is_dir(source_dir):
         return sdk_fail(ctx, "source archive did not contain expected directory: " ++ source_dir)
+    rc = sdk_patch_llvm_source(ctx, source_dir)
+    if rc != 0:
+        return rc
     sdk_write_text(ctx, marker, "ok\n")
+
+// #1826: the backport of llvm/llvm-project b8007a8e ("[ld64.lld, llvm-otool]
+// Minimal arm64e.x1 support", main 2026-09-11; no release carries it). Xcode
+// 27's SDK lists the arm64e.x1 slice (CPU_SUBTYPE_ARM64E_X1 = 12) in every
+// .tbd stub, and TextAPI rejects a stub whose target it cannot parse, so our
+// ld64.lld could not read libSystem at all. The two lines lld needs are
+// inserted after their exact anchors; a missing anchor is a failure, never a
+// skipped patch. The patch is pinned to 22.1.6: a version bump must delete
+// it (an LLVM that carries the commit has the line already, and this step
+// refuses to guess at any other tree).
+const SDK_LLVM_PATCH_VERSION: str = "22.1.6"
+
+fn sdk_patch_llvm_source(ctx: &ActionCtx, source_dir: &str) -> i32:
+    if sdk_basename(source_dir) != "llvm-project-llvmorg-" ++ compiler_llvm_version():
+        return 0
+    if compiler_llvm_version() != SDK_LLVM_PATCH_VERSION:
+        return sdk_fail(ctx, "the arm64e.x1 backport (#1826) is written for LLVM " ++ SDK_LLVM_PATCH_VERSION ++ ", not " ++ compiler_llvm_version() ++ ": delete sdk_patch_llvm_source if the new LLVM carries llvm/llvm-project b8007a8e, or re-anchor it")
+    var rc = sdk_insert_line_after(ctx, sdk_join(source_dir, "llvm/include/llvm/TextAPI/Architecture.def"),
+        "ARCHINFO(arm64e, arm64e, MachO::CPU_TYPE_ARM64, MachO::CPU_SUBTYPE_ARM64E, 64)",
+        "ARCHINFO(arm64e_x1, arm64e.x1, MachO::CPU_TYPE_ARM64, MachO::CPU_SUBTYPE_ARM64E_X1, 64)")
+    if rc != 0: return rc
+    sdk_insert_line_after(ctx, sdk_join(source_dir, "llvm/include/llvm/BinaryFormat/MachO.h"),
+        "  CPU_SUBTYPE_ARM64E = 2,",
+        "  CPU_SUBTYPE_ARM64E_X1 = 12,")
+
+// Insert `line` after the one line equal to `anchor`; already present is ok.
+fn sdk_insert_line_after(ctx: &ActionCtx, path: &str, anchor: &str, line: &str) -> i32:
+    let fs = ctx.fs()
+    let text = fs.read_text(path)
+    if text.len() == 0:
+        return sdk_fail(ctx, "arm64e.x1 backport (#1826): could not read " ++ path)
+    var out = StringBuilder.with_capacity(text.len() + line.len() + 1)
+    var anchors = 0
+    let pieces = text.split("\n")
+    // "a\nb\n" splits to [a, b, ""]: a separator between every two pieces
+    // rebuilds the text byte for byte.
+    for i in 0..pieces.len() as i32:
+        let current = pieces[i]
+        if current == line:
+            return 0
+        if i > 0:
+            out.push_str("\n")
+        out.push_str(current)
+        if current == anchor:
+            anchors = anchors + 1
+            out.push_str("\n")
+            out.push_str(line)
+    if anchors != 1:
+        return sdk_fail(ctx, "arm64e.x1 backport (#1826): expected exactly one anchor line in " ++ path ++ f", found {anchors}: `" ++ anchor ++ "`")
+    if fs.write_text(path, out.to_str()) != 0:
+        return sdk_fail(ctx, "arm64e.x1 backport (#1826): could not write " ++ path)
+    print("sdk-llvm-source: applied the arm64e.x1 backport (#1826) to " ++ sdk_basename(path))
+    0
 
 fn sdk_jobs_arg(jobs: &str) -> Vec[str]:
     var out: Vec[str] = Vec.new()
