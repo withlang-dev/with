@@ -28144,13 +28144,11 @@ impl Sema:
             return 0
         if kind == NodeKind.NK_TYPE_PTR or kind == NodeKind.NK_TYPE_OPTIONAL:
             return self.type_expr_contains_ref(self.ast.get_data0(node))
+        // A callable type holds no reference its signature names: `fn(&T) -> R`
+        // takes a view per call and holds none (§16.6, §22.1 rule 1; #1833).
+        // What a closure captures is value-level (§22), not in its type.
         if kind == NodeKind.NK_TYPE_FN or kind == NodeKind.NK_TYPE_EXTERN_FN:
-            let extra_start = self.ast.get_data0(node)
-            let param_count = self.ast.get_data1(node)
-            for pi in 0..param_count:
-                if self.type_expr_contains_ref(self.ast.get_extra(extra_start + pi)) != 0:
-                    return 1
-            return self.type_expr_contains_ref(self.ast.get_data2(node))
+            return 0
         if kind == NodeKind.NK_TYPE_TUPLE:
             let extra_start = self.ast.get_data0(node)
             let elem_count = self.ast.get_data1(node)
@@ -28193,13 +28191,9 @@ impl Sema:
             return 0
         if kind == NodeKind.NK_TYPE_PTR or kind == NodeKind.NK_TYPE_OPTIONAL:
             return self.type_expr_is_collection_with_ref(self.ast.get_data0(node))
+        // A callable type stores nothing its signature names (#1833).
         if kind == NodeKind.NK_TYPE_FN or kind == NodeKind.NK_TYPE_EXTERN_FN:
-            let extra_start = self.ast.get_data0(node)
-            let param_count = self.ast.get_data1(node)
-            for pi in 0..param_count:
-                if self.type_expr_is_collection_with_ref(self.ast.get_extra(extra_start + pi)) != 0:
-                    return 1
-            return self.type_expr_is_collection_with_ref(self.ast.get_data2(node))
+            return 0
         if kind == NodeKind.NK_TYPE_TUPLE:
             let extra_start = self.ast.get_data0(node)
             let elem_count = self.ast.get_data1(node)
