@@ -2342,6 +2342,8 @@ pub fn build(ctx: BuildCtx) -> Build:
     bootstrap_llvm_link_metadata = bootstrap_llvm_link_metadata.extra_output("out/bootstrap-lib/llvm_cc")
     bootstrap_llvm_link_metadata = bootstrap_llvm_link_metadata.extra_output("out/bootstrap-lib/llvm_ld.rsp")
     bootstrap_llvm_link_metadata = bootstrap_llvm_link_metadata.extra_output("out/bootstrap-lib/llvm_ld")
+    // #1826: the SDK link probe captures its output here.
+    bootstrap_llvm_link_metadata = bootstrap_llvm_link_metadata.write_scope("out/command/bootstrap-llvm-link-metadata")
     bootstrap_llvm_link_metadata = bootstrap_llvm_link_metadata.dep("bootstrap-llvm-bridge-object")
     bootstrap_llvm_link_metadata = bootstrap_llvm_link_metadata.dep("bootstrap-clang-bridge-object")
     out = out.add_target(bootstrap_llvm_link_metadata)
@@ -2474,6 +2476,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     llvm_link_metadata = llvm_link_metadata.extra_output("out/lib/llvm_cc")
     llvm_link_metadata = llvm_link_metadata.extra_output("out/lib/llvm_ld.rsp")
     llvm_link_metadata = llvm_link_metadata.extra_output("out/lib/llvm_ld")
+    llvm_link_metadata = llvm_link_metadata.write_scope("out/command/llvm-link-metadata")
     llvm_link_metadata = llvm_link_metadata.dep("llvm-bridge-object")
     llvm_link_metadata = llvm_link_metadata.dep("clang-bridge-object")
     out = out.add_target(llvm_link_metadata)

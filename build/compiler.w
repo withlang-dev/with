@@ -324,18 +324,129 @@ pub fn compiler_default_libclang_archive_path() -> str:
         return prefix ++ "/lib/libclang.lib"
     prefix ++ "/lib/libclang.a"
 
-pub fn comp_host_sdk_path(ctx: &ActionCtx) -> str:
-    let sdkroot = env("SDKROOT")
+const COMP_CLT_SDK = "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk"
+const COMP_XCODE_SDK = "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk"
+
+// The macOS SDK the compiler's own links read: SDKROOT when set, else the
+// Command Line Tools SDK, else Xcode's. SDKROOT is read as the action's own
+// env_input: the actions that bake the path in (llvm_ld.rsp) re-ran on an
+// SDKROOT change only because the sdk-llvm target's graph-level read of it
+// is inherited by every target.
+pub fn comp_host_sdk_path(ctx: &ActionCtx):
+    let sdkroot = ctx.env_input("SDKROOT")
     if sdkroot.len() > 0:
         return sdkroot
     let fs = ctx.fs()
-    let clt = "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk"
-    if fs.host_exists(clt):
-        return clt
-    let xcode = "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk"
-    if fs.host_exists(xcode):
-        return xcode
+    if fs.host_exists(COMP_CLT_SDK):
+        return compiler_owned_text(COMP_CLT_SDK)
+    if fs.host_exists(COMP_XCODE_SDK):
+        return compiler_owned_text(COMP_XCODE_SDK)
     ""
+
+// #1826: the stage links run this build's own ld64.lld over the SDK's .tbd
+// stubs, and a stub whose `targets:` names an architecture that lld does not
+// know cannot be read at all. Xcode 27's SDK lists arm64e.x1-macos in every
+// stub, so libSystem, libc++ and libm were all unreadable and the stage2 link
+// reported hundreds of undefined symbols. The linker is asked, before any
+// stage links: an empty dylib linked against the libraries the stage link
+// reads, with the -arch Link.w's darwin link passes. The linker owns what it
+// can read; the build keeps no second list of architectures.
+fn comp_sdk_link_probe(ctx: &ActionCtx, llvm_ld: &str, sdk_path: &str, label: &str) -> ToolProcessResult:
+    let capture_dir = comp_join("out/command", ctx.target_name())
+    var argv: Vec[str] = Vec.new()
+    argv.push(compiler_owned_text(llvm_ld))
+    argv.push("-arch")
+    argv.push("arm64")
+    argv.push("-platform_version")
+    argv.push("macos")
+    argv.push("11.0")
+    argv.push("11.0")
+    argv.push("-dylib")
+    argv.push("-syslibroot")
+    argv.push(compiler_owned_text(sdk_path))
+    argv.push("-lSystem")
+    argv.push("-lc++")
+    argv.push("-lm")
+    argv.push("-o")
+    argv.push("/dev/null")
+    ctx.process_runner().run_capture(argv, comp_join(capture_dir, label ++ ".stdout"), comp_join(capture_dir, label ++ ".stderr"), 120000)
+
+// The first .tbd stub lld could not parse, as "<stub>:<line>:<col>: <reason>
+// '<entry>'". TextAPI prints the offending source line after its error and
+// underlines the entry (^~~~) on the line after that.
+fn comp_lld_tbd_problem(stderr: &str):
+    let lines = stderr.split("\n")
+    for i in 0..lines.len() as i32:
+        let line = lines[i]
+        let stub_end = line.find(".tbd:")
+        let error_at = line.find(": error: ")
+        if stub_end >= 0 and error_at > stub_end:
+            let problem = line.slice(0, error_at) ++ ": " ++ line.slice(error_at + 9, line.len())
+            if i + 2 >= lines.len() as i32:
+                return problem
+            let source = lines[i + 1]
+            let marks = lines[i + 2]
+            let start = marks.find("^")
+            if start < 0:
+                return problem
+            var end = start + 1
+            while end < marks.len() and marks[end] == '~':
+                end = end + 1
+            if end > source.len():
+                return problem
+            return problem ++ " '" ++ source.slice(start, end) ++ "'"
+    ""
+
+// lld's own error lines, for a failure that is not a stub it could not parse.
+fn comp_lld_error_lines(stderr: &str):
+    var out = ""
+    for line in stderr.split("\n"):
+        if line.find("error: ") >= 0:
+            out = out ++ "\n    " ++ line
+    out
+
+// A default SDK this linker reads, to name in the diagnostic; "" when none.
+fn comp_readable_default_sdk(ctx: &ActionCtx, llvm_ld: &str, unreadable: &str):
+    let fs = ctx.fs()
+    if COMP_CLT_SDK != unreadable and fs.host_exists(COMP_CLT_SDK):
+        if comp_sdk_link_probe(ctx, llvm_ld, COMP_CLT_SDK, "sdk-probe-clt").rc == 0:
+            return compiler_owned_text(COMP_CLT_SDK)
+    if COMP_XCODE_SDK != unreadable and fs.host_exists(COMP_XCODE_SDK):
+        if comp_sdk_link_probe(ctx, llvm_ld, COMP_XCODE_SDK, "sdk-probe-xcode").rc == 0:
+            return compiler_owned_text(COMP_XCODE_SDK)
+    ""
+
+// Refuse, before any stage links, an SDK this build's lld cannot link
+// against, naming the SDK, where it came from, and the entry lld rejected.
+// The SDK is never swapped silently: SDKROOT is the programmer's choice.
+fn comp_require_linkable_host_sdk(ctx: &ActionCtx, llvm_ld: &str, sdk_path: &str) -> i32:
+    if sdk_path.len() == 0:
+        return comp_fail(ctx, "no macOS SDK: SDKROOT is unset and neither " ++ COMP_CLT_SDK ++ " nor " ++ COMP_XCODE_SDK ++ " exists; the compiler's links read libSystem, libc++ and libm from one. Install the Command Line Tools or set SDKROOT.")
+    let capture_dir = comp_join("out/command", ctx.target_name())
+    if ctx.fs().mkdir_all(capture_dir) != 0:
+        return comp_fail(ctx, "could not create capture directory: " ++ capture_dir)
+    let probe = comp_sdk_link_probe(ctx, llvm_ld, sdk_path, "sdk-probe")
+    if probe.rc == 0:
+        return 0
+    let named = if ctx.env_input("SDKROOT").len() > 0: "the macOS SDK SDKROOT names" else: "the default macOS SDK (SDKROOT is unset)"
+    var message = "this build's linker cannot link against " ++ named ++ " (#1826)"
+    message = message ++ "\n  SDK:    " ++ sdk_path
+    message = message ++ "\n  linker: " ++ llvm_ld ++ " (LLVM " ++ COMPILER_LLVM_VERSION ++ ")"
+    let problem = comp_lld_tbd_problem(probe.stderr)
+    if problem.len() > 0:
+        message = message ++ "\n  unreadable: " ++ problem
+        message = message ++ "\n  lld cannot load a stub whose targets this LLVM's TextAPI cannot parse, so the stage links would fail on libSystem, libc++ and libm with undefined symbols."
+    else if probe.timed_out:
+        message = message ++ "\n  the probe link timed out"
+    else:
+        message = message ++ "\n  lld (exit " ++ f"{probe.rc}" ++ "):" ++ comp_lld_error_lines(probe.stderr)
+    let readable = comp_readable_default_sdk(ctx, llvm_ld, sdk_path)
+    if readable.len() > 0:
+        message = message ++ "\n  This linker reads " ++ readable ++ ": set SDKROOT=" ++ readable
+        message = message ++ (if readable == COMP_CLT_SDK: ", or unset SDKROOT (it is the default)." else: ".")
+    else:
+        message = message ++ "\n  Neither default SDK is readable by this linker; set SDKROOT to an SDK it reads (an older one under /Library/Developer/CommandLineTools/SDKs)."
+    comp_fail(ctx, message)
 
 fn comp_arg_value(args: &Vec[str], prefix: &str) -> str:
     for i in 0..args.len() as i32:
@@ -2156,9 +2267,11 @@ pub fn run_generate_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
     ld_rsp = ld_rsp ++ comp_wasm_backend_alias_lines(comp_sdk_has_wasm_backend(fs, llvm_lib_dir), os(), false)
     if os() == "Macos":
         let sdk_path = comp_host_sdk_path(ctx)
-        if sdk_path.len() > 0:
-            rsp = rsp ++ "-isysroot\n" ++ sdk_path ++ "\n"
-            ld_rsp = ld_rsp ++ "-syslibroot\n" ++ sdk_path ++ "\n"
+        let sdk_rc = comp_require_linkable_host_sdk(ctx, llvm_ld, sdk_path)
+        if sdk_rc != 0:
+            return sdk_rc
+        rsp = rsp ++ "-isysroot\n" ++ sdk_path ++ "\n"
+        ld_rsp = ld_rsp ++ "-syslibroot\n" ++ sdk_path ++ "\n"
         rsp = rsp ++ "-lm\n"
         rsp = rsp ++ "-lc++\n"
         ld_rsp = ld_rsp ++ "-lm\n"
