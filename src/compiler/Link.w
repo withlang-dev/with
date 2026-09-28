@@ -1230,24 +1230,34 @@ fn link_stage_compiler_runtime_dir() -> str:
         return "runtime"
     link_stage_dirname(argv0) ++ "/runtime"
 
+// D30, #1815: a link takes runtime and bridge objects of this compiler's
+// generation only (compiler.AbiStamp). Anything else is #761's corruption
+// class: the seed-built runtime linked into stage1-compiled stage2 passed
+// every check because the build's WITH_OUT_DIR used to vouch for out/lib and
+// out/bootstrap-lib whoever had built them. The build now names the root a
+// stage link must use (WITH_RUNTIME_ROOT) and every object set it compiles
+// records its producer's generation in `<dir>/.producer`, so the say-so is
+// checked, not trusted. "" when the build's root is not this generation's:
+// the link fails (link_stage_find_runtime_object_path says why) and never
+// falls back to another directory or to the embedded objects.
 fn link_stage_resolve_runtime_root() -> str:
+    let explicit = runtime_getenv("WITH_RUNTIME_ROOT") ++ ""
+    if explicit.len() > 0:
+        if compiler_generation_is_stamped() and link_stage_runtime_dir_producer(explicit) != compiler_generation():
+            return ""
+        return explicit
     let argv0 = runtime_arg_at(0)
     let compiler_dir = if argv0.len() > 0: link_stage_dirname(argv0) else: "."
     let platform_object = link_stage_host_platform_runtime_object()
     let candidates: Vec[str] = Vec.new()
-    // The build drives a link with an explicit artifact root (WITH_OUT_DIR)
-    // when it has prepared that root's objects for this very link: the seed
-    // links stage1 against the runtime it compiled from the active tree
-    // (prepare-bootstrap-link-root), not against the payload the seed binary
-    // happens to carry. Only then is out/lib trusted as-is.
-    let build_owned_root = runtime_getenv("WITH_OUT_DIR").len() > 0
     candidates.push(link_stage_artifact_root() ++ "/lib")
-    // Seed-built bootstrap runtime for cold direct `with build` invocations.
-    // The canonical stage2-refreshed runtime overwrites out/lib later.
+    // Seed-built bootstrap runtime: the seed's generation, so only a seed
+    // (the build's driver) takes it.
     candidates.push(link_stage_artifact_root() ++ "/bootstrap-lib")
     // <compiler_dir>/runtime/ (symlink to ../lib in out/bin/)
     candidates.push(compiler_dir ++ "/runtime")
-    // <compiler_dir>/../lib/ (direct FHS-style path)
+    // <compiler_dir>/../lib/ (direct FHS-style path): out/bootstrap/lib is
+    // the runtime stage1 compiles for the programs it links (`:dev`).
     candidates.push(compiler_dir ++ "/../lib")
     for i in 0..candidates.len() as i32:
         let dir = candidates[i]
@@ -1255,24 +1265,54 @@ fn link_stage_resolve_runtime_root() -> str:
         let platform_probe = if platform_object.len() > 0: dir ++ "/" ++ platform_object else: ""
         if runtime_read_file(probe).len() == 0 or (platform_probe.len() > 0 and runtime_read_file(platform_probe).len() == 0):
             continue
-        // D30: without the build's say-so an on-disk runtime directory is a
-        // cache of this compiler's embedded objects, and a cache hit is byte
-        // for byte. Anything else was built by another compiler generation
-        // and linking it is #761's corruption class: `with run` in a checkout
-        // whose out/lib predated with_vec_free_buffer_drop_origin linked
-        // that stale rt_core.o and died with an undefined symbol.
-        if build_owned_root or link_stage_runtime_dir_is_this_generation(dir):
+        if link_stage_runtime_dir_is_this_generation(dir):
             return with_str_clone_ref(dir)
     // Fall back to compiler-relative runtime dir.
     compiler_dir ++ "/runtime"
 
+// The generation that compiled a runtime object set, as the build recorded it
+// (build/compiler.w run_write_runtime_producer_action); "" when none is.
+fn link_stage_runtime_dir_producer(dir: &str) -> str:
+    link_stage_read_file_trimmed(dir ++ "/.producer")
+
+// A directory is this compiler's runtime when its .producer names this
+// compiler's generation. One without a .producer (written before #1815, or
+// by hand) is a cache of the embedded runtime, and a cache hit is byte for
+// byte — which vouches for it only when the embedded runtime is itself this
+// generation's: stage1 embeds the seed's.
 pub fn link_stage_runtime_dir_is_this_generation(dir: &str) -> bool:
+    if compiler_generation_is_stamped():
+        let producer = link_stage_runtime_dir_producer(dir)
+        if producer.len() > 0:
+            return producer == compiler_generation()
+        if not link_stage_embedded_runtime_is_this_generation():
+            return false
     let embedded = link_stage_embedded_runtime_object("rt_core.o")
     // A binary that carries no runtime can only link from disk.
     if embedded.len() == 0:
         return true
     let on_disk = runtime_read_file(dir ++ "/rt_core.o")
     on_disk.len() == embedded.len() and on_disk == embedded
+
+// A root whose .producer names another generation: the fallback root
+// (compiler_dir/runtime) is returned without passing the candidate check.
+fn link_stage_runtime_root_is_foreign(root: &str) -> bool:
+    if not compiler_generation_is_stamped():
+        return false
+    let producer = link_stage_runtime_dir_producer(root)
+    producer.len() > 0 and producer != compiler_generation()
+
+fn link_stage_embedded_runtime_is_this_generation() -> bool:
+    not compiler_generation_is_stamped() or compiler_runtime_generation() == compiler_generation()
+
+// Why a link has no runtime root of this compiler's generation (#1815).
+fn link_stage_runtime_generation_refusal() -> str:
+    let explicit = runtime_getenv("WITH_RUNTIME_ROOT") ++ ""
+    if explicit.len() > 0:
+        let producer = link_stage_runtime_dir_producer(explicit)
+        let recorded = if producer.len() > 0: producer else: "none recorded (no .producer)"
+        return "error: WITH_RUNTIME_ROOT=" ++ explicit ++ " holds runtime objects of compiler generation " ++ recorded ++ ", but this compiler is generation " ++ compiler_generation() ++ "; linking them would mix compiler generations (D30, #1815). Compile that root with this compiler."
+    "error: no runtime objects of this compiler's generation (" ++ compiler_generation() ++ ") to link: its embedded runtime is generation " ++ compiler_runtime_generation() ++ " (a stage1 carries the seed's) and no runtime directory holds this generation's; run `with build :dev`, which compiles out/bootstrap/lib with stage1 (D30, #1815)"
 
 // Directory holding the link inputs built FOR the active target:
 // the runtime root itself for native, its cross/<target>/ subdir
@@ -1285,6 +1325,9 @@ fn link_stage_runtime_variant_dir() -> str:
 
 fn link_stage_find_llvm_static_bridge() -> str:
     let root = link_stage_resolve_runtime_root()
+    // The bridges' wl_* functions are this generation's ABI too (#1815).
+    if root.len() == 0 or link_stage_runtime_root_is_foreign(root):
+        return ""
     let variant = link_stage_runtime_variant_dir()
     let bridge_o = variant ++ "/llvm_bridge.o"
     let rsp = variant ++ "/llvm_ld.rsp"
@@ -1317,6 +1360,9 @@ fn link_stage_artifact_root() -> str:
 
 fn link_stage_find_runtime_object_path(name: &str) -> str:
     let root = link_stage_resolve_runtime_root()
+    if root.len() == 0:
+        with_eprint(link_stage_runtime_generation_refusal())
+        return ""
     // Cross targets only ever link runtime objects built for the
     // target; the embedded objects are host-built and never a valid
     // fallback here (§18.5: fail loudly, never link native output).
@@ -1327,9 +1373,15 @@ fn link_stage_find_runtime_object_path(name: &str) -> str:
         with_eprint("error: missing " ++ target_spec_name() ++ " runtime object: " ++ cross_path ++ " (run `with build :cross-rt` first)")
         return ""
     let p = root ++ "/" ++ name
-    if runtime_read_file(p).len() > 0:
+    // The fallback root (compiler_dir/runtime) was not a candidate that
+    // passed: a .producer naming another generation keeps its objects out.
+    if not link_stage_runtime_root_is_foreign(root) and runtime_read_file(p).len() > 0:
         return p
-    // Fall back to embedded runtime objects (self-contained binary)
+    // Fall back to embedded runtime objects (self-contained binary) — when
+    // they are this compiler's generation (#1815).
+    if not link_stage_embedded_runtime_is_this_generation():
+        with_eprint(link_stage_runtime_generation_refusal())
+        return ""
     let tmp_dir = link_stage_artifact_root() ++ "/tmp/with_runtime"
     if runtime_mkdir_p(tmp_dir) != 0:
         return ""

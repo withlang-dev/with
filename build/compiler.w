@@ -24,6 +24,13 @@ const COMPILER_VERSION_SOURCE_SLOT: str = "WITHVERSIONSTAMPv1XXXXXXXXXXXXXXXXXXX
 const COMPILER_ABI_SHA_SENTINEL: str = "WITHABISHASTAMPv1"
 const COMPILER_ABI_SHA_SLOT_WIDTH: i32 = 82
 const COMPILER_ABI_SHA_RECORD: str = "docs/with-abi.sha256"
+// #1815 (D30): the compiler's generation (compiler_generation below) and the
+// generation of the runtime objects it embeds (the `.producer` of the object
+// set it links with), patched into two more slots of the same width
+// (src/compiler/AbiStamp.w). A slot holds a sha256 or `foreign:<sha256>`.
+const COMPILER_GENERATION_SENTINEL: str = "WITHGENSTAMPv1"
+const COMPILER_RUNTIME_GENERATION_SENTINEL: str = "WITHRTGENSTAMPv1"
+const COMPILER_GENERATION_SLOT_WIDTH: i32 = 82
 
 type StackBudgetReport {
     path: str,
@@ -456,7 +463,7 @@ fn comp_arg_value(args: &Vec[str], prefix: &str) -> str:
     ""
 
 fn comp_arg_allowed_for_compiler(arg: &str):
-    not arg.starts_with("compiler=") and not arg.starts_with("overflow=") and not arg.starts_with("embedded-object=") and not arg.starts_with("rss-limit-bytes=")
+    not arg.starts_with("compiler=") and not arg.starts_with("overflow=") and not arg.starts_with("embedded-object=") and not arg.starts_with("rss-limit-bytes=") and not arg.starts_with("runtime-root=") and not arg.starts_with("runtime-producer=")
 
 // Wall-clock budget for one compiler build/ir step. Cold CI hosts can take
 // more than 10 minutes for stage1; emulated hosts (e.g. an x86_64 bootstrap
@@ -577,6 +584,11 @@ fn comp_run_compiler_capture(ctx: &ActionCtx, label: &str, argv: Vec[str], stdou
     let embedded_object = comp_arg_value(ctx.args(), "embedded-object=")
     if embedded_object.len() > 0:
         process_env = process_env.set("WITH_COMPILER_EMBEDDED_OBJECT", comp_abs(root, embedded_object))
+    // #1815: a stage link names its runtime root; the compiler refuses a root
+    // whose .producer is not its own generation (src/compiler/Link.w).
+    let runtime_root = comp_arg_value(ctx.args(), "runtime-root=")
+    if runtime_root.len() > 0:
+        process_env = process_env.set("WITH_RUNTIME_ROOT", comp_abs(root, runtime_root))
     let llvm_prefix = env("LLVM_PREFIX")
     if llvm_prefix.len() > 0:
         process_env = process_env.set("LLVM_PREFIX", llvm_prefix)
@@ -1179,8 +1191,10 @@ fn comp_internal_command(item: &str) -> bool:
 fn comp_internal_flag(item: &str) -> bool:
     // --link-object / --link-bundle / --emit-bundle-manifest are .wo bundle
     // plumbing driven by build.w (docs/spec/toolchain/wo_bundles.md), never hand-written:
-    // internal like --no-prelude.
-    item == "--keep-binary" or item == "--test" or item == "--alloc" or item == "--check" or item == "--c-export-functions" or item == "--contains" or item == "--convert-goto-to-structured" or item == "--debug-alloc-filter" or item == "--deterministic" or item == "--diff" or item == "--dry-run" or item == "--dump-abi" or item == "--emit-bundle-manifest" or item == "--emit-bundle-interface" or item == "--bundle-fingerprint" or item == "--bundle-corpus" or item == "--link-object" or item == "--link-bundle" or item == "--dump-ast" or item == "--dump-async-mir" or item == "--dump-drop-flags" or item == "--dump-drop-plan" or item == "--dump-drop-state" or item == "--dump-mir" or item == "--dump-place-map" or item == "--dump-project-info" or item == "--dump-resolved" or item == "--dump-tokens" or item == "--dump-typed" or item == "--exclude" or item == "--exit-code" or item == "--explain" or item == "--explain-mir-origin" or item == "--filter" or item == "--force" or item == "--force-reinstall" or item == "--from-source" or item == "--freestanding" or item == "--graph" or item == "--help" or item == "--ir-roundtrip" or item == "--lib" or item == "--migrate-one" or item == "--name" or item == "--no-c-export" or item == "--no-deps" or item == "--no-prelude" or item == "--no-runtime" or item == "--out" or item == "--output" or item == "--prefer-brace" or item == "--prefer-colon" or item == "--prefer-curly" or item == "--prelude" or item == "--quiet" or item == "--shared-defs" or item == "--shared-fragment" or item == "--stats" or item == "--survey" or item == "--trace-cleanup-edge" or item == "--trace-ownership" or item == "--trace-place" or item == "--validate-all" or item == "--validate-ownership" or item == "--verbose" or item == "--width-slice" or item == "--version" or item == "-f" or item == "-D" or item == "-g0" or item == "-h" or item == "-I" or item == "-include" or item == "-l" or item == "-o" or item == "-q" or item == "-v" or item == "-w"
+    // internal like --no-prelude. So are `version --generation` and
+    // `--runtime-generation`, which the build reads to stamp and check a
+    // runtime object set's producer (#1815).
+    item == "--generation" or item == "--runtime-generation" or item == "--keep-binary" or item == "--test" or item == "--alloc" or item == "--check" or item == "--c-export-functions" or item == "--contains" or item == "--convert-goto-to-structured" or item == "--debug-alloc-filter" or item == "--deterministic" or item == "--diff" or item == "--dry-run" or item == "--dump-abi" or item == "--emit-bundle-manifest" or item == "--emit-bundle-interface" or item == "--bundle-fingerprint" or item == "--bundle-corpus" or item == "--link-object" or item == "--link-bundle" or item == "--dump-ast" or item == "--dump-async-mir" or item == "--dump-drop-flags" or item == "--dump-drop-plan" or item == "--dump-drop-state" or item == "--dump-mir" or item == "--dump-place-map" or item == "--dump-project-info" or item == "--dump-resolved" or item == "--dump-tokens" or item == "--dump-typed" or item == "--exclude" or item == "--exit-code" or item == "--explain" or item == "--explain-mir-origin" or item == "--filter" or item == "--force" or item == "--force-reinstall" or item == "--from-source" or item == "--freestanding" or item == "--graph" or item == "--help" or item == "--ir-roundtrip" or item == "--lib" or item == "--migrate-one" or item == "--name" or item == "--no-c-export" or item == "--no-deps" or item == "--no-prelude" or item == "--no-runtime" or item == "--out" or item == "--output" or item == "--prefer-brace" or item == "--prefer-colon" or item == "--prefer-curly" or item == "--prelude" or item == "--quiet" or item == "--shared-defs" or item == "--shared-fragment" or item == "--stats" or item == "--survey" or item == "--trace-cleanup-edge" or item == "--trace-ownership" or item == "--trace-place" or item == "--validate-all" or item == "--validate-ownership" or item == "--verbose" or item == "--width-slice" or item == "--version" or item == "-f" or item == "-D" or item == "-g0" or item == "-h" or item == "-I" or item == "-include" or item == "-l" or item == "-o" or item == "-q" or item == "-v" or item == "-w"
 
 fn comp_internal_module(item: &str) -> bool:
     item == "std.builtins" or item == "std.channel" or item == "std.cfg" or item == "std.async" or item == "std.compiler" or item == "std.component" or item == "std.generators" or item == "std.iter" or item == "std.libc" or item == "std.option" or item == "std.prelude" or item == "std.prelude_alloc" or item == "std.prelude_core" or item == "std.result" or item == "std.str" or item == "std.str_abi" or item == "std.sys" or item == "std.sysinfo" or item == "std.task" or item == "std.tls" or item == "std.traits"
@@ -2167,10 +2181,99 @@ fn comp_stamp_compiler_binary(ctx: &ActionCtx, unstamped: &str, output_path: &st
     let version = comp_resolve_compiler_version(ctx)
     if version.len() == 0:
         return comp_fail(ctx, "could not resolve compiler version from src/version")
+    let runtime_generation = comp_runtime_producer_arg(ctx)
+    if runtime_generation.len() == 0:
+        return 1
     let _remove_old = comp_remove_file_if_exists(ctx.fs(), output_path)
-    comp_patch_version_binary(ctx, unstamped, output_path, version)
+    comp_patch_version_binary(ctx, unstamped, output_path, version, runtime_generation)
 
-pub fn comp_patch_version_binary(ctx: &ActionCtx, input_path: &str, output_path: &str, version: &str) -> i32:
+// #1815: the generation of the runtime objects a compiler binary embeds —
+// the `.producer` of the object set its embedding came from, which the
+// target names with `runtime-producer=<dir>/.producer`.
+pub fn comp_runtime_producer_arg(ctx: &ActionCtx) -> str:
+    let producer_path = comp_arg_value(ctx.args(), "runtime-producer=")
+    if producer_path.len() == 0:
+        comp_fail(ctx, "a stamped compiler needs runtime-producer=<dir>/.producer: the generation of the runtime objects it embeds (#1815)")
+        return ""
+    comp_read_runtime_producer(ctx, producer_path)
+
+pub fn comp_read_runtime_producer(ctx: &ActionCtx, producer_path: &str) -> str:
+    let fs = ctx.fs()
+    let generation = if fs.exists(producer_path): comp_trim(fs.read_text(producer_path)) else: ""
+    if generation.len() == 0:
+        comp_fail(ctx, "missing runtime producer stamp: " ++ producer_path ++ " (#1815)")
+        return ""
+    generation
+
+// sha256 of an in-memory string. The build action runs under the comptime
+// evaluator (the seed drives `with build` without the native action runner),
+// which serves ToolFs.sha256_file but not the raw-pointer `sha256_hash_str`
+// (`&raw mut`, NK_UNARY kind 26 — the evaluator does not model raw pointers
+// into a mutable stack buffer). So stage the bytes into the action's own
+// project-relative scratch dir and hash the file: byte-identical to hashing
+// the string directly, and legal under comptime. Bytes from outside the
+// project root (a .wo store slot, a compiler on PATH) are host_read_text by
+// the caller and handed here rather than sha256_file the out-of-root path.
+pub fn compiler_sha256_text(fs: &ToolFs, text: &str) -> str:
+    let scratch = fs.scratch_dir()
+    let _m = fs.mkdir_all(scratch)
+    let staged = scratch ++ "/sha256.in"
+    let _w = fs.write_text(staged, text)
+    fs.sha256_file(staged)
+
+// The .w files under dir, bytewise by path.
+pub fn compiler_w_files(fs: &ToolFs, dir: &str) -> Vec[str]:
+    let listing = fs.list_files(dir)
+    let out: Vec[str] = Vec.new()
+    for i in 0..listing.len() as i32:
+        if listing[i].ends_with(".w"):
+            out.push(compiler_owned_text(listing[i]))
+    comp_sort_strings(move out)
+
+// sha256 over "<path>:<sha256(file)>\n" for every .w file under dir (the
+// build cache's build_cache_hash_directory_w_files shape): a .wo bundle's
+// corpus and compiler keys (build/wo.w) and a compiler's generation.
+pub fn compiler_tree_sha(fs: &ToolFs, dir: &str) -> str:
+    let files = compiler_w_files(fs, dir)
+    var combined = ""
+    for i in 0..files.len() as i32:
+        combined = combined ++ files[i] ++ ":" ++ fs.sha256_file(files[i]) ++ "\n"
+    compiler_sha256_text(fs, combined)
+
+// #1815 (D30): the generation of the compiler this tree builds — its src/
+// (how code compiles) and rt/ (the runtime it compiles). stage1, stage2 and
+// the release of one tree are one generation; the seed that built stage1 is
+// another. Stamped into every compiler binary and recorded beside every
+// runtime object set, so a link can refuse objects of another generation.
+pub fn compiler_generation(fs: &ToolFs) -> str:
+    let dirs = compiler_generation_dirs()
+    var record = ""
+    for di in 0..dirs.len() as i32:
+        record = record ++ dirs[di] ++ " " ++ compiler_tree_sha(fs, dirs[di]) ++ "\n"
+    compiler_sha256_text(fs, record)
+
+pub fn compiler_generation_dirs() -> Vec[str]:
+    let dirs: Vec[str] = Vec.new()
+    dirs.push("src")
+    dirs.push("rt")
+    dirs
+
+// `data` with every `sentinel` slot of `width` bytes overwritten by `value` +
+// NUL; "" when there is no such slot or one runs past the end.
+fn comp_patch_stamp_slots(data: &str, sentinel: &str, value: &str, width: i64) -> str:
+    var out = data.clone()
+    var patched = 0
+    loop:
+        let off = out.find(sentinel) as i64
+        if off < 0:
+            break
+        if off + width > out.len():
+            return ""
+        out = out.slice(0, off) ++ value ++ "\0" ++ out.slice(off + value.len() + 1, out.len())
+        patched = patched + 1
+    if patched == 0: "" else: out
+
+pub fn comp_patch_version_binary(ctx: &ActionCtx, input_path: &str, output_path: &str, version: &str, runtime_generation: &str) -> i32:
     let fs = ctx.fs()
     if input_path.len() == 0:
         return comp_fail(ctx, "requires an input path")
@@ -2225,6 +2328,19 @@ pub fn comp_patch_version_binary(ctx: &ActionCtx, input_path: &str, output_path:
         abi_patched = abi_patched + 1
     if abi_patched == 0:
         return comp_fail(ctx, "ABI stamp sentinel not found in " ++ input_path)
+    // #1815: the compiler's generation, and its embedded runtime's.
+    let generation = compiler_generation(fs)
+    if generation.len() != 64:
+        return comp_fail(ctx, "could not hash src/ and rt/ for the generation stamp")
+    if runtime_generation.len() + 1 > COMPILER_GENERATION_SLOT_WIDTH as i64:
+        return comp_fail(ctx, "runtime generation too long for its stamp slot: " ++ runtime_generation)
+    let with_generation = comp_patch_stamp_slots(data, COMPILER_GENERATION_SENTINEL, generation, COMPILER_GENERATION_SLOT_WIDTH as i64)
+    if with_generation.len() == 0:
+        return comp_fail(ctx, "generation stamp slot missing or truncated in " ++ input_path)
+    let with_runtime = comp_patch_stamp_slots(with_generation, COMPILER_RUNTIME_GENERATION_SENTINEL, runtime_generation, COMPILER_GENERATION_SLOT_WIDTH as i64)
+    if with_runtime.len() == 0:
+        return comp_fail(ctx, "runtime generation stamp slot missing or truncated in " ++ input_path)
+    data = with_runtime
     let output_dir = comp_dirname(output_path)
     if fs.mkdir_all(output_dir) != 0:
         return comp_fail(ctx, "could not create output directory: " ++ output_dir)
@@ -2287,7 +2403,10 @@ pub fn run_patch_version_action(ctx: ActionCtx) -> i32:
     let capture_dir = comp_join("out/command", ctx.target_name())
     if ctx.fs().mkdir_all(capture_dir) != 0:
         return comp_fail(ctx, "could not create capture directory: " ++ capture_dir)
-    comp_patch_version_binary(ctx, unstamped, output_path, version)
+    let runtime_generation = comp_runtime_producer_arg(ctx)
+    if runtime_generation.len() == 0:
+        return 1
+    comp_patch_version_binary(ctx, unstamped, output_path, version, runtime_generation)
 
 // Whether an LLVM SDK's lib dir carries the WebAssembly backend the wasm32
 // target needs (docs/proposals/wasm-target.md). tools/build-static-llvm.sh builds it
@@ -2322,6 +2441,51 @@ pub fn comp_wasm_backend_alias_lines(has_wasm_backend: bool, target_os: &str, dr
         else:
             out = out ++ (if driver_form: "-Wl,--defsym=" else: "--defsym=") ++ name ++ "=" ++ stand_in ++ "\n"
     out
+
+fn comp_is_sha256_hex(text: &str) -> bool:
+    if text.len() != 64:
+        return false
+    for i in 0..text.len():
+        let ch = text[i]
+        if not ((ch >= '0' and ch <= '9') or (ch >= 'a' and ch <= 'f')):
+            return false
+    true
+
+// #1815 (D30): `<dir>/.producer` records which compiler generation compiled
+// the runtime and bridge objects in `dir` — its `version --generation`, or
+// `foreign:<sha256 of the binary>` when it cannot say (a pinned seed older
+// than the flag, an unstamped binary). src/compiler/Link.w links a set only
+// into programs of that generation, and a stamped compiler carries the
+// .producer of the set it embeds (runtime-producer=).
+pub fn run_write_runtime_producer_action(ctx: ActionCtx) -> i32:
+    let output_path = ctx.output()
+    if output_path.len() == 0:
+        return comp_fail(ctx, "requires an output path")
+    let compiler_arg = comp_arg_value(ctx.args(), "compiler=")
+    if compiler_arg.len() == 0:
+        return comp_fail(ctx, "requires compiler= argument")
+    let fs = ctx.fs()
+    let root = ctx.project_info().project_root()
+    let capture_dir = comp_join("out/command", ctx.target_name())
+    if fs.mkdir_all(capture_dir) != 0:
+        return comp_fail(ctx, "could not create capture directory: " ++ capture_dir)
+    let compiler_path = comp_resolve_command_file(ctx, capture_dir, comp_compiler_path(ctx, compiler_arg))
+    var argv: Vec[str] = Vec.new()
+    argv.push(comp_path_for_process(root, compiler_path))
+    argv.push("version")
+    argv.push("--generation")
+    let answer = comp_run_first_line(ctx, capture_dir, "generation", argv, 120000)
+    var generation = answer.clone()
+    if not comp_is_sha256_hex(answer):
+        let binary = if comp_is_absolute_path(compiler_path): fs.host_read_text(compiler_path) else: fs.read_text(compiler_path)
+        if binary.len() == 0:
+            return comp_fail(ctx, "could not read the compiler to fingerprint it: " ++ compiler_path)
+        generation = "foreign:" ++ compiler_sha256_text(fs, binary)
+    if fs.mkdir_all(comp_dirname(output_path)) != 0:
+        return comp_fail(ctx, "could not create output directory: " ++ comp_dirname(output_path))
+    if fs.write_text(output_path, generation ++ "\n") != 0:
+        return comp_fail(ctx, "could not write: " ++ output_path)
+    0
 
 pub fn run_generate_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
     let fs = ctx.fs()

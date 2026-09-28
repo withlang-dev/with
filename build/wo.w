@@ -93,22 +93,6 @@ fn wo_arg_value(args: &Vec[str], prefix: &str) -> str:
             return wo_owned_text(arg.slice(prefix.len(), arg.len()))
     ""
 
-// sha256 of an in-memory string. The build action runs under the comptime
-// evaluator (the seed drives `with build` without the native action runner),
-// which serves ToolFs.sha256_file but not the raw-pointer `sha256_hash_str`
-// (`&raw mut`, NK_UNARY kind 26 — the evaluator does not model raw pointers
-// into a mutable stack buffer). So stage the bytes into the action's own
-// project-relative scratch dir and hash the file: byte-identical to hashing
-// the string directly, and legal under comptime. A store slot can live
-// outside the project root, so its callers host_read_text the file and hand
-// the bytes here rather than sha256_file the out-of-root path.
-fn wo_sha256_text(fs: &ToolFs, text: &str) -> str:
-    let scratch = fs.scratch_dir()
-    let _m = fs.mkdir_all(scratch)
-    let staged = scratch ++ "/wo-sha256.in"
-    let _w = fs.write_text(staged, text)
-    fs.sha256_file(staged)
-
 fn wo_dirname(path: &str) -> str:
     var last: i64 = -1
     for i in 0..path.len():
@@ -176,25 +160,6 @@ pub fn wo_host_target() -> str:
     if host_os == "Windows":
         return "windows_" ++ arch_name
     ""
-
-fn wo_w_files(fs: &ToolFs, dir: &str) -> Vec[str]:
-    let listing = fs.list_files(dir)
-    let out: Vec[str] = Vec.new()
-    for i in 0..listing.len() as i32:
-        let path = listing[i]
-        if path.ends_with(".w"):
-            out.push(wo_owned_text(path))
-    comp_sort_strings(move out)
-
-// sha256 over "<path>:<sha256(file)>\n" for every .w file under dir, bytewise
-// by path (the build cache's build_cache_hash_directory_w_files shape).
-fn wo_corpus_sha(fs: &ToolFs, dir: &str) -> str:
-    let files = wo_w_files(fs, dir)
-    var combined = ""
-    for i in 0..files.len() as i32:
-        let path = files[i]
-        combined = combined ++ path ++ ":" ++ fs.sha256_file(path) ++ "\n"
-    wo_sha256_text(fs, combined)
 
 // The bundle's plan for the host: everything the graph needs to name its
 // targets and paths, none of it hashed text.
@@ -306,7 +271,7 @@ pub fn wo_bundle_targets(out: Build, ctx: &BuildCtx, plan: &WoBundle, compiler: 
 // Every .w file of the corpus as inputs: a corpus edit re-runs the target.
 pub fn target_with_wo_corpus_inputs(target: Target, ctx: &BuildCtx, plan: &WoBundle) -> Target:
     var out = target
-    let corpus_files = wo_w_files(ctx.fs(), plan.corpus_dir)
+    let corpus_files = compiler_w_files(ctx.fs(), plan.corpus_dir)
     for fi in 0..corpus_files.len() as i32:
         out = out.input(wo_owned_text(corpus_files[fi]))
     out
@@ -502,10 +467,10 @@ fn wo_slot_status(fs: &ToolFs, store_prefix: &str, corpus_sha: &str, target: &st
     // the carried-copy rule and failed on symbols the new codegen defines.
     if wo_manifest_field(manifest, "compiler-src-sha") != compiler_src_sha:
         return store_prefix ++ ".manifest was built by compiler sources " ++ wo_manifest_field(manifest, "compiler-src-sha") ++ ", the tree's are " ++ compiler_src_sha
-    let wi_sha = wo_sha256_text(fs, fs.host_read_text(store_prefix ++ ".wi"))
+    let wi_sha = compiler_sha256_text(fs, fs.host_read_text(store_prefix ++ ".wi"))
     if wo_manifest_field(manifest, "interface-sha") != wi_sha:
         return store_prefix ++ ".wi (sha256 " ++ wi_sha ++ ") is not the interface the stored manifest was built with"
-    let object_sha = wo_sha256_text(fs, fs.host_read_text(store_prefix ++ ".o"))
+    let object_sha = compiler_sha256_text(fs, fs.host_read_text(store_prefix ++ ".o"))
     if wo_manifest_field(manifest, "object-sha") != object_sha:
         return store_prefix ++ ".o (sha256 " ++ object_sha ++ ") is not the object the stored manifest was built with"
     ""
@@ -548,12 +513,12 @@ pub fn run_wo_bundle_build_action(ctx: ActionCtx) -> i32:
     let same_named_module = corpus_dir ++ ".w"
     if fs.exists(same_named_module):
         return wo_fail(ctx, "corpus " ++ corpus ++ " shares its package name with the module " ++ same_named_module ++ "; the frontend would load that module into the bundle. Name the corpus package apart from its facade (pcre2's facade std.regex sits over the std.re corpus).")
-    let corpus_sha = wo_corpus_sha(fs, corpus_dir)
+    let corpus_sha = compiler_tree_sha(fs, corpus_dir)
     // The compiler generation that makes the object: the tree's compiler
     // sources (the same for every stage of one build; a stage binary's
     // bytes are not, the seed builds stage1).
-    let compiler_src_sha = wo_corpus_sha(fs, "src")
-    let key = wo_sha256_text(fs, corpus_sha ++ "|" ++ target ++ "|" ++ abi_sha ++ "|" ++ compiler_src_sha)
+    let compiler_src_sha = compiler_tree_sha(fs, "src")
+    let key = compiler_sha256_text(fs, corpus_sha ++ "|" ++ target ++ "|" ++ abi_sha ++ "|" ++ compiler_src_sha)
 
     // Present: the slot holds this corpus, coherently — copy it in.
     let missing = wo_slot_status(fs, store_prefix, corpus_sha, target, abi_sha, compiler_src_sha)
@@ -651,7 +616,7 @@ pub fn run_wo_bundle_build_action(ctx: ActionCtx) -> i32:
         return wo_fail(ctx, "the manifest records abi-sha '" ++ wo_manifest_field(manifest, "abi-sha") ++ "', the slot needs " ++ abi_sha)
     if wo_manifest_field(manifest, "target") != target:
         return wo_fail(ctx, "the compiler names its target '" ++ wo_manifest_field(manifest, "target") ++ "' but build/wo.w planned '" ++ target ++ "' (the plan's target spelling and src/TargetSpec.w target_spec_resolved_name disagree)")
-    if wo_manifest_field(manifest, "interface-sha") != wo_sha256_text(fs, fs.read_text(tmp_wi)):
+    if wo_manifest_field(manifest, "interface-sha") != compiler_sha256_text(fs, fs.read_text(tmp_wi)):
         return wo_fail(ctx, "the manifest's interface-sha is not the sha256 of " ++ tmp_wi)
     if wo_manifest_field(manifest, "fingerprint") != source_fp:
         return wo_fail(ctx, "the manifest's fingerprint is not the source fingerprint")
@@ -659,7 +624,7 @@ pub fn run_wo_bundle_build_action(ctx: ActionCtx) -> i32:
     manifest = manifest ++ "key " ++ key ++ "\n"
     manifest = manifest ++ "corpus-sha " ++ corpus_sha ++ "\n"
     manifest = manifest ++ "compiler-src-sha " ++ compiler_src_sha ++ "\n"
-    manifest = manifest ++ "object-sha " ++ wo_sha256_text(fs, fs.read_text(tmp_o)) ++ "\n"
+    manifest = manifest ++ "object-sha " ++ compiler_sha256_text(fs, fs.read_text(tmp_o)) ++ "\n"
 
     // Into the tree copy: object, interface, then the manifest.
     if fs.rename(tmp_o, prefix ++ ".o") != 0:

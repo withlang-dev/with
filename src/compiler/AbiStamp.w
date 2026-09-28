@@ -17,3 +17,25 @@ pub fn compiler_abi_sha() -> str:
 // sentinel). Bundle keys must never be computed from an unstamped compiler.
 pub fn compiler_abi_sha_is_stamped() -> bool:
     not compiler_abi_sha().starts_with("WITHABISHASTAMP")
+
+// #1815 (D30): which compiler generation this binary is, and which generation
+// built the runtime objects it embeds. A generation is the tree a compiler is
+// built from — sha256 over its src/ and rt/ sources (build/compiler.w
+// compiler_generation) — so stage1, stage2 and the release of one tree are
+// one generation and the seed that built stage1 is another. Both are patched
+// post-link beside the ABI stamp; `with version --generation` and
+// `--runtime-generation` print them. The link stage accepts runtime objects
+// only from this compiler's generation (Link.w): a runtime object set records
+// its producer's generation in `<dir>/.producer`, and a compiler whose
+// embedded runtime came from another generation (stage1 carries the seed's)
+// never falls back to it.
+pub fn compiler_generation() -> str:
+    with_str_from_cstr(c"WITHGENSTAMPv1XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX".ptr)
+
+pub fn compiler_runtime_generation() -> str:
+    with_str_from_cstr(c"WITHRTGENSTAMPv1XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX".ptr)
+
+// An unstamped (hand-linked) compiler knows no generation; the link stage then
+// keeps its pre-#1815 byte-identity rule.
+pub fn compiler_generation_is_stamped() -> bool:
+    not compiler_generation().starts_with("WITHGENSTAMP") and not compiler_runtime_generation().starts_with("WITHRTGENSTAMP")
