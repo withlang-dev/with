@@ -603,9 +603,9 @@ fn spec_file_for(id: &str, chapters: &Vec[Pair], sections: &Vec[Pair]) -> str:
     "docs/spec/README.md"
 
 // A section id starting at `at` in `line` ("§" already consumed).
-fn section_ref_at(line: &str, at: i32) -> str:
+fn section_ref_at(line: &str, at: i64) -> str:
     var k = at
-    let n = line.len() as i32
+    let n = line.len()
     if k >= n or not is_digit(line[k]): return ""
     while k < n and is_digit(line[k]): k = k + 1
     if k < n and is_lower(line[k]) and (k + 1 >= n or not is_lower(line[k + 1])): k = k + 1
@@ -616,10 +616,10 @@ fn section_ref_at(line: &str, at: i32) -> str:
     line.slice(at, k)
 
 // The § reference nearest to `pos` on the line: the first after it, else the last before.
-fn nearest_section_ref(line: &str, pos: i32) -> str:
+fn nearest_section_ref(line: &str, pos: i64) -> str:
     var best_before = ""
-    var i = 0
-    let n = line.len() as i32
+    var i: i64 = 0
+    let n = line.len()
     while i < n:
         let rest = line.slice(i, n)
         let at = rest.find("§")
@@ -640,7 +640,7 @@ fn decision_ref_at(line: &str, at: i32) -> str:
     if k == at + 1 or (k < n and is_alnum(line[k])): return ""
     line.slice(at, k)
 
-fn nearest_decision_ref(line: &str, pos: i32) -> str:
+fn nearest_decision_ref(line: &str, pos: i64) -> str:
     var best_before = ""
     for i in 0..line.len() as i32:
         if line[i] != 'D': continue

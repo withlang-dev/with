@@ -799,7 +799,7 @@ fn emitc_compare_files(ctx: &ActionCtx, left_path: &str, right_path: &str) -> i3
     let left = fs.read_text(left_path)
     let right = fs.read_text(right_path)
     let min_len = if left.len() < right.len(): left.len() else: right.len()
-    var diff_at = -1
+    var diff_at: i64 = -1
     var i = 0
     while i < min_len:
         if left[i] != right[i]:

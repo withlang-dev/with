@@ -828,7 +828,7 @@ fn main:
     var failures = 0
     var regressions = 0
     print("cell\tcandidate" ++ (if baseline.len() > 0: "\tbaseline\tclass" else: ""))
-    for i in 0..cells.len():
+    for i in 0..cells.len() as i32:
         let c = cells[i]
         let cv = run_cell(candidate, candidate_dir, i, c.source, c.expect_sum, c.expect_clean)
         var row = c.name ++ "\t" ++ cv
