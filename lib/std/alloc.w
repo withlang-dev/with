@@ -141,13 +141,13 @@ pub fn FrameArena.alloc(mut self: FrameArena, size: i32) -> *i8:
 pub fn Arena.alloc_zeroed(mut self: Arena, count: i32, size: i32) -> *i8:
     let total = if count > 0 and size > 0: count * size else: 1
     let ptr = self.alloc(total)
-    mem_set(ptr, 0, total as i64)
+    mem_set(ptr, 0, total)
     ptr
 
 pub fn FrameArena.alloc_zeroed(mut self: FrameArena, count: i32, size: i32) -> *i8:
     let total = if count > 0 and size > 0: count * size else: 1
     let ptr = self.alloc(total)
-    mem_set(ptr, 0, total as i64)
+    mem_set(ptr, 0, total)
     ptr
 
 pub fn Arena.mark(self: &Arena) -> i64:
@@ -355,7 +355,7 @@ unsafe fn arena_vec_grow[T](xs: *mut ArenaVec[T]):
     let ptr = (*xs).ptr
     let len = (*xs).len_value
     if ptr as i64 != 0 and len > 0:
-        mem_copy(next as *i8, ptr as *i8, (len * (sizeof[T]() as i32)) as i64)
+        mem_copy(next as *i8, ptr as *i8, len * (sizeof[T]() as i32))
     ((*xs).ptr = next)
     ((*xs).cap_value = new_cap)
 
@@ -364,7 +364,7 @@ pub unsafe fn arena_vec_push[T](xs: *mut ArenaVec[T], value: T) -> Unit:
         arena_vec_grow(xs)
     let len = (*xs).len_value
     let dst = (*xs).ptr + (len as usize)
-    mem_copy(dst as *i8, &value as *const T as *i8, sizeof[T]() as i64)
+    mem_copy(dst as *i8, &value as *const T as *i8, sizeof[T]() as i32)
     ((*xs).len_value = len + 1)
 
 pub unsafe fn arena_vec_get[T](xs: *const ArenaVec[T], index: i32) -> T:
