@@ -4086,6 +4086,13 @@ fn ci_parse_postfix_expr(s: &str, params: &str, known: &str) -> str:
     // Literal values
     if ci_is_int_literal(t):
         let clean_int = ci_strip_int_suffix(t)
+        // A C literal's suffix is its type (C11 6.4.4.1): limits.h's
+        // `__LONG_LONG_MAX__*2ULL+1ULL` is unsigned long long arithmetic,
+        // so it renders `9223372036854775807 * 2u64 + 1u64`, right on its
+        // own whatever the destination (#1820).
+        let suffix = ci_with_int_literal_suffix(t)
+        if suffix.len() > 0:
+            return clean_int ++ suffix
         // A C literal above i64::MAX is unsigned (long long) by C's own
         // conversion rules; With's unsuffixed default ladder stops at i64,
         // so render the suffix C implied. Without it, a call-shaped macro
@@ -13145,12 +13152,16 @@ fn ci_is_int_literal(s: &str) -> bool:
     let hex = s.len() - i >= 2 and s[i] == '0' and (s[i + 1] == 'x' or s[i + 1] == 'X')
     if hex: i = i + 2
     var digits = 0
+    var suffixed = false
     while i < s.len():
         let c = s[i]
         let is_digit = (c >= '0' and c <= '9') or (hex and ((c >= 'a' and c <= 'f') or (c >= 'A' and c <= 'F')))
-        if is_digit:
+        // The suffix ends the literal: `5u64` is a With spelling, not C.
+        if is_digit and not suffixed:
             digits = digits + 1
-        else if not ci_is_int_suffix_char(c):
+        else if ci_is_int_suffix_char(c):
+            suffixed = true
+        else:
             return false
         i = i + 1
     digits > 0
@@ -13328,6 +13339,20 @@ fn ci_int_type_from_suffix(s: &str) -> str:
     if l_count >= 2: return "c_longlong"
     if l_count == 1: return "c_long"
     "c_int"
+
+// The With literal suffix a C integer literal's own suffix gives it, or ""
+// when it has none (C11 6.4.4.1: the first type of the suffix's list that
+// holds the value; `long` is c_import's c_long, i64). `2ULL` is `2u64`.
+fn ci_with_int_literal_suffix(literal: &str) -> str:
+    let digits = ci_strip_int_suffix(literal)
+    if digits.len() == literal.len() or digits.len() == 0 or digits[0] == '-':
+        return ""
+    let c_type = ci_int_type_from_suffix(literal)
+    if c_type == "c_uint":
+        return if ci_int_type_rank(ci_int_annotation_for_value(digits)) > ci_int_type_rank(c_type): "u64" else: "u32"
+    if c_type == "c_long" or c_type == "c_longlong":
+        return if ci_int_literal_exceeds_i64(digits): "u64" else: "i64"
+    "u64"
 
 fn ci_float_type_from_suffix(s: &str) -> str:
     if s.len() == 0:
