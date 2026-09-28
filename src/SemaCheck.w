@@ -2061,6 +2061,13 @@ impl Sema:
             return
         if self.global_value_decl_kind(sym) == 0:
             return
+        // A local that took the name of a global its module cannot see
+        // (shadow_unseen_global) is that local: an access to it is no access
+        // to the global. It was counted as one, so a concurrent program's
+        // own local failed the race proof at its own lines (E0921).
+        let bound = self.scope_name_map.get(sym)
+        if bound.is_some() and not self.binding_index_is_global(bound.unwrap(), sym):
+            return
         if self.global_symbol_is_synchronized(sym) != 0:
             return
         self.global_race_access_syms.push(sym)
