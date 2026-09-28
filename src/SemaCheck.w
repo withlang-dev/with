@@ -21555,7 +21555,20 @@ impl Sema:
                 continue
 
             let arg_ty = arg_types[ai]
-            let concrete_sym = self.dyn_arg_concrete_type_symbol(arg_ty)
+            // An argument that already is this parameter's trait object (a
+            // `Box[dyn T]` for a `Box[dyn T]`, a `&dyn T` for a `&dyn T`)
+            // passes as itself; for a `Box[dyn T]` parameter the implementor
+            // is the boxed value, never the Box. Every such argument was
+            // refused: "type 'Box' does not implement trait 'T'", "argument
+            // cannot be converted to dyn trait object" (#1854).
+            let param_is_box = self.ast.kind(p_type_node) == NodeKind.NK_TYPE_GENERIC
+            let arg_box_payload = self.std_box_payload_type(arg_ty)
+            let arg_object = if param_is_box: arg_box_payload else: self.ref_pointee_type(arg_ty)
+            if arg_object != 0 and self.get_type_kind(self.resolve_alias(arg_object)) == TypeKind.TY_TRAIT_OBJ:
+                if self.dyn_trait_symbol_for_type(arg_object) == trait_sym:
+                    continue
+            let impl_ty = if param_is_box and arg_box_payload != 0: arg_box_payload else: arg_ty
+            let concrete_sym = self.dyn_arg_concrete_type_symbol(impl_ty)
             if concrete_sym == 0:
                 self.emit_error("argument cannot be converted to dyn trait object", self.ast.get_extra(call_extra_start + ai))
                 continue
@@ -25421,6 +25434,22 @@ impl Sema:
             if self.type_symbol_is_std_box(base) != 0 and self.get_generic_inst_arg_count(resolved as i32) == 1:
                 return self.dyn_trait_symbol_for_type(self.get_generic_inst_arg(resolved as i32, 0))
         0
+
+    // The boxed type of a `Box[T]`, else 0.
+    fn std_box_payload_type(tid: i32) -> i32:
+        if tid == 0 or self.type_is_std_box_inst(tid) == 0:
+            return 0
+        self.get_generic_inst_arg(self.resolve_alias(tid) as i32, 0)
+
+    // The pointee of a `&T` or `*T`, else 0.
+    fn ref_pointee_type(tid: i32) -> i32:
+        if tid == 0:
+            return 0
+        let resolved = self.resolve_alias(tid)
+        let tk = self.get_type_kind(resolved)
+        if tk != TypeKind.TY_REF and tk != TypeKind.TY_PTR:
+            return 0
+        self.get_type_d0(resolved)
 
     fn type_is_box_dyn_trait(tid: i32) -> i32:
         if tid == 0:
