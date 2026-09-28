@@ -317,6 +317,10 @@ type SemaMethodLookup {
     fn_lookup: HashMap[i64, i32],
 }
 
+// Identity bits of a callable type beyond its signature (§16.11, #1832).
+pub const CALLABLE_UNSAFE: i32 = 1
+pub const CALLABLE_VARIADIC: i32 = 2
+
 pub const GLOBAL_VALUE_DECL_DEF: i32 = 1
 pub const GLOBAL_VALUE_DECL_EXTERN: i32 = 2
 // D39: storage a bundle interface declares; the bundle's object defines it.
@@ -829,6 +833,10 @@ pub type Sema {
     // §16.11: TY_FN/TY_EXTERN_FN type_id → 1 when the callable is unsafe to
     // call (carries a raw-pointer-validity precondition). Part of type identity.
     unsafe_fn_type_set: HashMap[i32, i32],
+    // #1832: C variadic function-pointer types, `extern "C" fn(A, ...) -> R`.
+    // Variadic-ness is part of the type's identity, and a variadic type is
+    // always unsafe to call (§16.3c: a variadic call is raw).
+    variadic_fn_type_set: HashMap[i32, i32],
     // §16.4 union last-written tracking. Maps a local union variable's name
     // sym → the last-written field sym (0 = tracked-but-unknown after control
     // flow). Absent = untracked (never literal-initialized/assigned) and never
@@ -2665,6 +2673,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         packed_caps: sema_new_map_i32_i32(),
         repr_c_types: sema_new_map_i32_i32(),
         unsafe_fn_type_set: sema_new_map_i32_i32(),
+        variadic_fn_type_set: sema_new_map_i32_i32(),
         union_last_written: sema_new_map_i32_i32(),
         union_tracked_syms: Vec.new(),
         union_in_assign_target: 0,
@@ -4887,8 +4896,9 @@ impl Sema:
         self.find_fn_type_of_kind_u(kind, params, param_count, ret, 0)
 
     // §16.11: unsafe-ness is part of callable type identity, so two signatures
-    // that differ only in unsafe-ness are distinct types.
-    fn find_fn_type_of_kind_u(kind: i32, params: &Vec[i32], param_count: i32, ret: TypeId, is_unsafe: i32) -> TypeId:
+    // that differ only in unsafe-ness are distinct types; so is variadic-ness
+    // (#1832). `flags`: CALLABLE_UNSAFE | CALLABLE_VARIADIC.
+    fn find_fn_type_of_kind_u(kind: i32, params: &Vec[i32], param_count: i32, ret: TypeId, flags: i32) -> TypeId:
         let type_count = self.type_kinds.len() as i32
         for ti in 0..type_count:
             if self.type_kinds[ti] != kind:
@@ -4897,8 +4907,7 @@ impl Sema:
                 continue
             if self.type_d2[ti] != ret as i32:
                 continue
-            let ti_unsafe = if self.unsafe_fn_type_set.contains(ti): 1 else: 0
-            if ti_unsafe != is_unsafe:
+            if self.callable_type_flags(ti) != flags:
                 continue
             let te_start = self.type_d0[ti]
             if self.type_extra_matches(te_start, params, param_count) != 0:
@@ -4917,8 +4926,8 @@ impl Sema:
     fn ensure_extern_fn_type(params: &Vec[i32], param_count: i32, ret: TypeId) -> TypeId:
         self.ensure_callable_type(TypeKind.TY_EXTERN_FN, params, param_count, ret, 0)
 
-    fn ensure_callable_type(kind: i32, params: &Vec[i32], param_count: i32, ret: TypeId, is_unsafe: i32) -> TypeId:
-        let existing = self.find_fn_type_of_kind_u(kind, params, param_count, ret, is_unsafe)
+    fn ensure_callable_type(kind: i32, params: &Vec[i32], param_count: i32, ret: TypeId, flags: i32) -> TypeId:
+        let existing = self.find_fn_type_of_kind_u(kind, params, param_count, ret, flags)
         if existing != 0:
             return existing
         if self.types_frozen != 0:
@@ -4927,9 +4936,19 @@ impl Sema:
         for pi in 0..param_count:
             self.type_extra.push(params[pi])
         let tid = self.add_type(kind, te_start, param_count, ret as i32)
-        if is_unsafe != 0:
+        if (flags & CALLABLE_UNSAFE) != 0:
             self.unsafe_fn_type_set.insert(tid as i32, 1)
+        if (flags & CALLABLE_VARIADIC) != 0:
+            self.variadic_fn_type_set.insert(tid as i32, 1)
         tid
+
+    // The identity bits of a callable type beyond its signature.
+    fn callable_type_flags(tid: i32) -> i32:
+        (if self.unsafe_fn_type_set.contains(tid): CALLABLE_UNSAFE else: 0) | (if self.variadic_fn_type_set.contains(tid): CALLABLE_VARIADIC else: 0)
+
+    // #1832: whether a callable type is a C variadic function pointer.
+    fn fn_type_is_variadic(tid: i32) -> bool:
+        tid != 0 and self.variadic_fn_type_set.contains(self.resolve_alias(tid as TypeId) as i32)
 
     // True when a callable type is an unsafe fn/extern fn type.
     fn fn_type_is_unsafe(tid: i32) -> i32:
@@ -4989,7 +5008,18 @@ impl Sema:
         let params: Vec[i32] = Vec.new()
         for pi in 0..param_count:
             params.push(self.type_extra[(start + pi)])
-        self.ensure_callable_type(kind, params, param_count, self.get_type_d2(resolved) as TypeId, 1) as i32
+        self.ensure_callable_type(kind, params, param_count, self.get_type_d2(resolved) as TypeId, CALLABLE_UNSAFE) as i32
+
+    // #1832: the C variadic function-pointer type of a variadic function's
+    // signature: its fixed parameters, then `...`.
+    fn variadic_callable_type(tid: i32) -> i32:
+        let resolved = self.resolve_alias(tid as TypeId) as i32
+        let param_count = self.get_type_d1(resolved)
+        let start = self.get_type_d0(resolved)
+        let params: Vec[i32] = Vec.new()
+        for pi in 0..param_count:
+            params.push(self.type_extra[(start + pi)])
+        self.ensure_callable_type(TypeKind.TY_EXTERN_FN, params, param_count, self.get_type_d2(resolved) as TypeId, CALLABLE_UNSAFE | CALLABLE_VARIADIC) as i32
 
     // §16.11: a safe callable type cannot accept an unsafe callable value; safe→
     // unsafe widening and same-unsafe-ness are allowed.
@@ -5023,7 +5053,7 @@ impl Sema:
         1
 
     mut fn fn_types_compatible(expected: i32, actual: i32) -> i32:
-        if self.get_type_d1(expected) != self.get_type_d1(actual):
+        if self.get_type_d1(expected) != self.get_type_d1(actual) or self.fn_type_is_variadic(expected) != self.fn_type_is_variadic(actual):
             return 0
         let param_count = self.get_type_d1(expected)
         let exp_start = self.get_type_d0(expected)
@@ -5077,7 +5107,7 @@ impl Sema:
                     return false
             return true
         if kind == TypeKind.TY_FN or kind == TypeKind.TY_EXTERN_FN:
-            if a1 != b1 or self.fn_type_is_unsafe(ar) != self.fn_type_is_unsafe(br):
+            if a1 != b1 or self.callable_type_flags(ar) != self.callable_type_flags(br):
                 return false
             for i in 0..a1:
                 if not self.types_identical(self.type_extra[(a0 + i)], self.type_extra[(b0 + i)]):
@@ -8931,7 +8961,7 @@ impl Sema:
         self.type_implements_trait_frozen(act_pointee, self.get_type_d0(exp_pointee))
 
     fn fn_types_compatible_frozen(expected: i32, actual: i32) -> i32:
-        if self.get_type_d1(expected) != self.get_type_d1(actual):
+        if self.get_type_d1(expected) != self.get_type_d1(actual) or self.fn_type_is_variadic(expected) != self.fn_type_is_variadic(actual):
             return 0
         let param_count = self.get_type_d1(expected)
         let exp_start = self.get_type_d0(expected)

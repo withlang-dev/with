@@ -1461,8 +1461,7 @@ impl Sema:
             // No return annotation on a fn type means Unit, not TY_ERR.
             let ret = if ret_node != 0: self.resolve_type_expr(ret_node) else: self.ty_void
             let fn_kind = if kind == NodeKind.NK_TYPE_EXTERN_FN: TypeKind.TY_EXTERN_FN else: TypeKind.TY_FN
-            let is_unsafe = self.ast.is_unsafe_fn_type_node(node)
-            return self.ensure_callable_type(fn_kind, param_types, param_count, ret, is_unsafe)
+            return self.ensure_callable_type(fn_kind, param_types, param_count, ret, self.fn_type_node_flags(node))
 
         if kind == NodeKind.NK_TYPE_ARRAY:
             let elem = self.resolve_type_expr(self.ast.get_data0(node))
@@ -1708,8 +1707,7 @@ impl Sema:
             // the mutable resolver above — the twins must intern identical types).
             let ret = if ret_node != 0: self.resolve_type_expr_frozen(ret_node) else: self.ty_void
             let fn_kind = if kind == NodeKind.NK_TYPE_EXTERN_FN: TypeKind.TY_EXTERN_FN else: TypeKind.TY_FN
-            let is_unsafe = self.ast.is_unsafe_fn_type_node(node)
-            return self.find_fn_type_of_kind_u(fn_kind, &param_types, param_count, ret, is_unsafe)
+            return self.find_fn_type_of_kind_u(fn_kind, &param_types, param_count, ret, self.fn_type_node_flags(node))
         if kind == NodeKind.NK_TYPE_ARRAY:
             let elem = self.resolve_type_expr_frozen(self.ast.get_data0(node))
             return self.find_exact_type(TypeKind.TY_ARRAY, elem as i32, self.ast.get_data1(node), 0)
@@ -7823,6 +7821,14 @@ impl Sema:
             return 1
         0
 
+    // A callable type node's identity bits. A variadic C function pointer
+    // is unsafe to call whether or not `unsafe` is spelled (§16.3c: a
+    // variadic call is raw), so both spellings are one type (#1832).
+    fn fn_type_node_flags(node: i32) -> i32:
+        if self.ast.is_variadic_fn_type_node(node):
+            return CALLABLE_UNSAFE | CALLABLE_VARIADIC
+        if self.ast.is_unsafe_fn_type_node(node) != 0: CALLABLE_UNSAFE else: 0
+
     // §16.11: why a direct call to `fn_sym` from the module being checked
     // needs an unsafe context — an `unsafe fn`, a raw c_import function, or
     // a manual extern with an unmodeled contract; "" when it does not. One
@@ -9071,6 +9077,12 @@ impl Sema:
             // callable as a value too — its type carries the unsafety, so a
             // call through the value needs the same context (#1829).
             let fn_is_unsafe = self.fn_symbol_unsafe_call_reason(sym, false).len() > 0
+            // #1832: a variadic extern is a C variadic function pointer as a
+            // value, `extern "C" fn(A, ...) -> R` — never a fixed-arity type.
+            if self.sig_is_variadic(sig_idx) != 0 and self.extern_fn_names.contains(sym):
+                let variadic_tid = self.variadic_callable_type(fn_tid)
+                self.typed_expr_types.insert(node, variadic_tid)
+                return variadic_tid
             let value_tid = if fn_is_unsafe: self.unsafe_callable_type(fn_tid) else: fn_tid
             if self.has_expected_type != 0 and self.expected_expr_type != 0:
                 let expected = self.resolve_alias(self.expected_expr_type)
@@ -20047,8 +20059,10 @@ impl Sema:
             self.check_indirect_may_suspend_context(node, closure_node)
         let expected = self.get_type_d1(fn_tid)
         let actual = arg_count + param_offset
+        // #1832: a variadic pointer takes its fixed arguments and any more.
+        let variadic = self.fn_type_is_variadic(fn_tid)
         if self.ast.has_call_named_args(node) == 0 and self.has_resolved_call_args(node) == 0:
-            if actual != expected:
+            if actual != expected and not (variadic and actual > expected):
                 if call_name.len() > 0:
                     self.emit_error(f"callable '{call_name}' expects {expected} argument(s), found {actual}", node)
                 else:
@@ -20439,11 +20453,21 @@ impl Sema:
                 if self.ast.has_call_named_args(node) != 0:
                     self.emit_error("named arguments are not supported for closures or function pointers", node)
                 let arg_types_for_callable: Vec[i32] = Vec.new()
+                let callable_arg_nodes: Vec[i32] = Vec.new()
+                var callable_passed_types = sema_new_map_i32_i32()
                 for cai in 0..arg_count:
                     let arg_node = self.ast.get_extra(extra_start + cai)
                     let expected_ty = self.fn_type_param_type(callable_tid, cai)
                     let arg_ty = if expected_ty != 0: self.check_expr_with_expected(arg_node, expected_ty as TypeId) else: self.check_expr_value_context(arg_node)
+                    // #1832: an argument a variadic pointer's `...` receives.
+                    if expected_ty == 0 and self.fn_type_is_variadic(callable_tid):
+                        let passed_ty = self.materialize_variadic_value_arg(arg_node, arg_ty as i32)
+                        if passed_ty != arg_ty as i32:
+                            callable_passed_types.insert(cai, passed_ty)
                     arg_types_for_callable.push(arg_ty as i32)
+                    callable_arg_nodes.push(arg_node)
+                if self.fn_type_is_variadic(callable_tid):
+                    self.record_c_promoted_args(node, 0, callable_arg_nodes, arg_types_for_callable, callable_passed_types, self.get_type_d1(callable_tid))
                 for cai2 in 0..arg_count:
                     self.mark_moved_if_consumed(self.ast.get_extra(extra_start + cai2))
                 return self.check_callable_value_call("", callable_tid, 0, node, extra_start, arg_count, 0, 0, arg_types_for_callable)
@@ -20844,7 +20868,9 @@ impl Sema:
             // D27 value context). An element/Copy view reaching a variadic slot
             // has no param type to drive materialization, so demand it here — else
             // MIR passes the view's address and the callee reads a pointer.
-            if expected_ty == 0 and sig_idx >= 0 and self.sig_is_variadic(sig_idx) != 0 and (ai + param_offset) >= self.sig_get_param_count(sig_idx):
+            let variadic_slot = if sig_idx >= 0: self.sig_is_variadic(sig_idx) != 0 and (ai + param_offset) >= self.sig_get_param_count(sig_idx)
+                else: callable_value_tid != 0 and self.fn_type_is_variadic(callable_value_tid) and (ai + param_offset) >= self.get_type_d1(callable_value_tid)
+            if expected_ty == 0 and variadic_slot:
                 let passed_ty = self.materialize_variadic_value_arg(arg_node, arg_ty as i32)
                 if passed_ty != arg_ty as i32:
                     variadic_passed_types.insert(ai, passed_ty)
@@ -20891,6 +20917,9 @@ impl Sema:
             self.record_c_promoted_args(node, fn_sym, checked_arg_nodes, arg_types, variadic_passed_types, -1)
         else if sig_idx >= 0 and self.sig_is_variadic(sig_idx) != 0:
             self.record_c_promoted_args(node, fn_sym, checked_arg_nodes, arg_types, variadic_passed_types, self.sig_get_param_count(sig_idx) - param_offset)
+        else if sig_idx < 0 and callable_value_tid != 0 and self.fn_type_is_variadic(callable_value_tid):
+            // #1832: a call through a C variadic function pointer.
+            self.record_c_promoted_args(node, 0, checked_arg_nodes, arg_types, variadic_passed_types, self.get_type_d1(callable_value_tid) - param_offset)
         // Drop iter-of-self borrows in reverse insertion order so indices stay valid.
         var ibi = iter_borrow_idxs.len() as i32 - 1
         while ibi >= 0:

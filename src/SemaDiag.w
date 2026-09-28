@@ -1455,6 +1455,8 @@ impl Sema:
                 if pi > 0:
                     out = out ++ ", "
                 out = out ++ self.type_name(self.type_extra[(te_start + pi)])
+            if self.fn_type_is_variadic(resolved as i32):
+                out = out ++ (if param_count > 0: ", ..." else: "...")
             return out ++ ") -> " ++ self.type_name(self.get_type_d2(resolved))
         if tk == TypeKind.TY_PTR:
             let pointee = self.type_name(self.get_type_d0(resolved))
