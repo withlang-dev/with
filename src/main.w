@@ -1023,6 +1023,17 @@ fn run_cli(argc: i32) -> i32:
                 with_write(compiler_self_id())
             with_write("\n")
             return 0
+        // #1815: the generation this compiler is, and the one its embedded
+        // runtime objects came from (compiler.AbiStamp). The build records
+        // the first beside every runtime object set it compiles (.producer).
+        if cli_has_flag(argc, "--generation"):
+            with_write(compiler_generation())
+            with_write("\n")
+            return 0
+        if cli_has_flag(argc, "--runtime-generation"):
+            with_write(compiler_runtime_generation())
+            with_write("\n")
+            return 0
         with_write("with ")
         with_write(with_str_from_cstr(c"WITHVERSIONSTAMPv1XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX".ptr))
         with_write("\n")
@@ -1611,8 +1622,9 @@ fn build_runner_ensure(root: &str, options: &BuildCommandOptions) -> str:
 
 // #1797: the runner may be linked now when no runtime directory the link
 // could take belongs to another compiler generation: a complete out/lib or
-// out/bootstrap-lib (the cimport_stubs.o probe Link.w uses) must hold this
-// compiler's rt_core.o byte for byte; an absent one is nothing to mistrust
+// out/bootstrap-lib (the cimport_stubs.o probe Link.w uses) must be this
+// compiler's generation (its .producer, or byte for byte its embedded
+// rt_core.o where none is recorded — #1815); an absent one is nothing to mistrust
 // (a user project has neither, and the runner links from the embedded
 // runtime as it always did).
 fn build_runner_runtime_dirs_are_this_generation(root: &str) -> bool:

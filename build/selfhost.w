@@ -324,6 +324,85 @@ pub fn run_embedded_runtime_regression_action(ctx: ActionCtx) -> i32:
         return bs_fail(ctx, "could not remove copied compiler after embedded runtime regression")
     0
 
+// #1815 (D30): a link takes runtime objects of the linking compiler's
+// generation only, and says so when it cannot. The release compiler is one
+// generation with the out/lib it links through (its .producer) and with its
+// embedded runtime; a root the build names (WITH_RUNTIME_ROOT) links when it
+// is that generation and is refused, loudly and with no fallback to other
+// objects, when its .producer names another — the seed-built runtime that
+// stage2 used to link passed every check because nothing asked.
+pub fn run_runtime_generation_regression_action(ctx: ActionCtx) -> i32:
+    let inputs = ctx.inputs()
+    if inputs.len() == 0:
+        return bs_fail(ctx, "missing compiler input")
+    let fs = ctx.fs()
+    let root = ctx.project_info().project_root()
+    let output_dir = ctx.output()
+    if output_dir.len() == 0:
+        return bs_fail(ctx, "missing output directory")
+    if fs.exists(output_dir) and fs.remove_tree(output_dir) != 0:
+        return bs_fail(ctx, "could not remove previous output directory: " ++ output_dir)
+    if fs.mkdir_all(output_dir) != 0:
+        return bs_fail(ctx, "could not create output directory: " ++ output_dir)
+    let compiler = inputs.get(0)
+
+    var gen_args: Vec[str] = Vec.new()
+    gen_args |> push("version")
+    gen_args |> push("--generation")
+    let generation = bs_trim_trailing_line_endings(bs_run_cli_capture(ctx, compiler, "generation", &gen_args, 60000).stdout)
+    var rt_args: Vec[str] = Vec.new()
+    rt_args |> push("version")
+    rt_args |> push("--runtime-generation")
+    let runtime_generation = bs_trim_trailing_line_endings(bs_run_cli_capture(ctx, compiler, "runtime-generation", &rt_args, 60000).stdout)
+    if generation.len() != 64:
+        return bs_fail(ctx, "the release compiler carries no generation stamp: '" ++ generation ++ "'")
+    if runtime_generation != generation:
+        return bs_fail(ctx, "the release compiler embeds runtime generation " ++ runtime_generation ++ ", not its own " ++ generation)
+    let lib_producer = bs_trim_trailing_line_endings(fs.read_text("out/lib/.producer"))
+    if lib_producer != generation:
+        return bs_fail(ctx, "out/lib/.producer is '" ++ lib_producer ++ "', not the release compiler's generation " ++ generation)
+
+    let source_path = bs_join(output_dir, "hello.w")
+    if fs.write_text(source_path, "fn main:\n    print(\"hello\")\n") != 0:
+        return bs_fail(ctx, "could not write " ++ source_path)
+    let foreign_root = bs_join(output_dir, "foreign-root")
+    if fs.mkdir_all(foreign_root) != 0 or fs.write_text(bs_join(foreign_root, ".producer"), "foreign:runtime-generation-regression\n") != 0:
+        return bs_fail(ctx, "could not write " ++ foreign_root ++ "/.producer")
+
+    // This generation's root links, and the program runs.
+    let bin_path = bs_join(output_dir, "hello")
+    var build_args: Vec[str] = Vec.new()
+    build_args |> push(bs_abs(root, compiler))
+    build_args |> push("build")
+    build_args |> push(bs_abs(root, source_path))
+    build_args |> push("-o")
+    build_args |> push(bs_abs(root, bin_path))
+    let same_env = process_env().set("WITH_RUNTIME_ROOT", bs_abs(root, "out/lib"))
+    let same = ctx.process_runner().run_capture_with_env(build_args, bs_abs(root, bs_join(output_dir, "same.stdout")), bs_abs(root, bs_join(output_dir, "same.stderr")), 300000, same_env)
+    if same.rc != 0:
+        return bs_fail(ctx, f"linking through out/lib (this generation) failed with exit code {same.rc}: " ++ same.stderr)
+    var run_args: Vec[str] = Vec.new()
+    run_args |> push(bs_abs(root, bin_path))
+    let ran = ctx.process_runner().run_capture(run_args, bs_abs(root, bs_join(output_dir, "run.stdout")), bs_abs(root, bs_join(output_dir, "run.stderr")), 60000)
+    if ran.rc != 0 or bs_trim_trailing_line_endings(ran.stdout) != "hello":
+        return bs_fail(ctx, f"the program linked through out/lib exited {ran.rc} printing '" ++ ran.stdout ++ "'")
+
+    // Another generation's root is refused, and nothing else links instead.
+    let refused_bin = bs_join(output_dir, "refused")
+    var refused_args: Vec[str] = Vec.new()
+    refused_args |> push(bs_abs(root, compiler))
+    refused_args |> push("build")
+    refused_args |> push(bs_abs(root, source_path))
+    refused_args |> push("-o")
+    refused_args |> push(bs_abs(root, refused_bin))
+    let foreign_env = process_env().set("WITH_RUNTIME_ROOT", bs_abs(root, foreign_root))
+    let refused = ctx.process_runner().run_capture_with_env(refused_args, bs_abs(root, bs_join(output_dir, "refused.stdout")), bs_abs(root, bs_join(output_dir, "refused.stderr")), 300000, foreign_env)
+    if refused.rc == 0 or fs.exists(refused_bin):
+        return bs_fail(ctx, "a WITH_RUNTIME_ROOT of another compiler generation linked (exit 0): the D30 check stayed silent")
+    if not refused.stderr.contains("would mix compiler generations"):
+        return bs_fail(ctx, "a WITH_RUNTIME_ROOT of another compiler generation failed without saying why: " ++ refused.stderr)
+    0
+
 fn bs_run_cli_expect_success(ctx: &ActionCtx, compiler_path: &str, label: &str, args: &Vec[str]) -> SelfhostRunResult:
     let result = bs_run_cli_capture(ctx, compiler_path, label, args, 120000)
     if result.rc != 0:

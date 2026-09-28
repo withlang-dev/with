@@ -45,6 +45,21 @@ fn with_object_target(name: &str, compiler: &str, source: &str, output: &str, op
         target = target.dep(build_owned_text(dep))
     target
 
+// #1815 (D30): `<dir>/.producer` names the compiler generation that compiled
+// the runtime and bridge objects in `dir` (build/compiler.w
+// run_write_runtime_producer_action); src/compiler/Link.w links them only
+// into programs of that generation, and a stamped compiler carries the
+// .producer of the set it embeds (`runtime-producer=`).
+fn runtime_producer_target(name: &str, compiler: &str, dir: &str, object_targets: &Vec[str]) -> Target:
+    var target = target_new(.Action, build_owned_text(name), "").output(dir ++ "/.producer")
+    target.action = run_write_runtime_producer_action
+    target = target.compiler(compiler)
+    target = target.write_scope(build_owned_text(dir))
+    target = target.write_scope("out/command/" ++ name)
+    for i in 0..object_targets.len() as i32:
+        target = target.dep(build_owned_text(object_targets[i]))
+    target
+
 fn run_cross_unsupported_action(ctx: ActionCtx) -> i32:
     let args = ctx.args()
     let target = if args.len() > 0: build_owned_text(args.get(0)) else: ""
@@ -224,6 +239,101 @@ fn add_cross_rt_targets(out0: Build, ctx: &BuildCtx, tag: &str, p: &str, group_n
     cross_rt = cross_rt.dep(p ++ "clang-bridge-object")
     cross_rt = cross_rt.dep(p ++ "llvm-link-metadata")
     out.add_target(cross_rt)
+
+// #1815 (D30): stage1's runtime and bridge objects, compiled by stage1 into
+// out/bootstrap/lib. stage2's code is stage1's codegen, so stage2 links this
+// set (runtime-root=), and stage2 and stage3 embed it for the programs they
+// link; out/bootstrap-lib is the seed's generation and serves stage1 only.
+// Group `stage1-runtime`, part of `:dev` so stage1 run by hand links through
+// it (Link.w's <compiler_dir>/../lib candidate).
+fn add_stage1_runtime_targets(out0: Build, host_runtime: &HostRuntimeSpec, corpus_plans: &Vec[WoBundle]) -> Build:
+    var out = out0
+    let dir = "out/bootstrap/lib"
+    let stage1 = bootstrap_compiler_bin("with-stage1")
+    let objects: Vec[str] = Vec.new()
+    out = out.add_target(with_object_target("stage1-rt-core-object", stage1, "rt/rt_core.w", dir ++ "/rt_core.o", "-O1", "stage1"))
+    objects.push("stage1-rt-core-object")
+    out = out.add_target(with_object_target("stage1-rt-platform-object", stage1, host_runtime.platform_source, dir ++ "/" ++ host_runtime.platform_install_object, "-O1", "stage1"))
+    objects.push("stage1-rt-platform-object")
+    out = out.add_target(with_object_target("stage1-cimport-stubs-object", stage1, "rt/cimport_stubs.w", dir ++ "/cimport_stubs.o", "-O1", "stage1"))
+    objects.push("stage1-cimport-stubs-object")
+    var compat = with_object_target("stage1-compat-runtime-object", stage1, "out/gen/compat_runtime.w", dir ++ "/compat_runtime.o", "-O1", "stage1")
+    compat = compat.dep("compat-runtime-source")
+    out = out.add_target(compat)
+    objects.push("stage1-compat-runtime-object")
+    out = out.add_target(with_object_target("stage1-panic-runtime-object", stage1, "rt/panic_runtime.w", dir ++ "/panic_runtime.o", "-O1", "stage1"))
+    objects.push("stage1-panic-runtime-object")
+    out = out.add_target(with_object_target("stage1-fiber-stubs-object", stage1, "rt/fiber_stubs.w", dir ++ "/fiber_stubs.o", "-O1", "stage1"))
+    objects.push("stage1-fiber-stubs-object")
+    out = out.add_target(with_object_target("stage1-channel-runtime-object", stage1, "rt/channel_runtime.w", dir ++ "/channel_runtime.o", "-O1", "stage1"))
+    objects.push("stage1-channel-runtime-object")
+    out = out.add_target(with_object_target("stage1-fiber-runtime-object", stage1, "rt/fiber_runtime.w", dir ++ "/fiber_runtime.o", "-O1", "stage1"))
+    objects.push("stage1-fiber-runtime-object")
+    out = out.add_target(with_object_target("stage1-fiber-core-object", stage1, host_runtime.fiber_core_source, dir ++ "/fiber.o", "-O1", "stage1"))
+    objects.push("stage1-fiber-core-object")
+    out = out.add_target(target_new(.CompileAsmObject, "stage1-fiber-asm-object", build_owned_text(host_runtime.fiber_asm_source)).output(dir ++ "/fiber_asm.o"))
+    objects.push("stage1-fiber-asm-object")
+    out = out.add_target(with_object_target("stage1-llvm-bridge-object", stage1, "src/compiler/LlvmBridge.w", dir ++ "/llvm_bridge.o", "-O1", "stage1"))
+    objects.push("stage1-llvm-bridge-object")
+    out = out.add_target(with_object_target("stage1-clang-bridge-object", stage1, "src/compiler/ClangBridge.w", dir ++ "/clang_bridge.o", "-O1", "stage1"))
+    objects.push("stage1-clang-bridge-object")
+
+    var metadata = target_new(.Action, "stage1-llvm-link-metadata", "").output(dir ++ "/.llvm-link-ready")
+    metadata.action = run_generate_llvm_link_metadata_action
+    metadata = metadata.dep("sdk-clang-main")
+    metadata = metadata.input("out/command/sdk-clang-main/done")
+    metadata = metadata.input(dir ++ "/llvm_bridge.o")
+    metadata = metadata.input(dir ++ "/clang_bridge.o")
+    metadata = metadata.extra_output(dir ++ "/llvm_link.rsp")
+    metadata = metadata.extra_output(dir ++ "/llvm_cc")
+    metadata = metadata.extra_output(dir ++ "/llvm_ld.rsp")
+    metadata = metadata.extra_output(dir ++ "/llvm_ld")
+    metadata = metadata.dep("stage1-llvm-bridge-object")
+    metadata = metadata.dep("stage1-clang-bridge-object")
+    out = out.add_target(metadata)
+    objects.push("stage1-llvm-link-metadata")
+
+    // The embedding of stage2 and stage3: this set plus the bundle stage1
+    // built. --link-bundle links code into a compiler; it does not embed the
+    // object/interface/manifest for that compiler's consumers.
+    var embedded = target_new(.EmbedObjectFiles, "stage-embedded-objects-asm", "").output("out/stage/lib/embedded_objects.s")
+    let names: Vec[str] = Vec.new()
+    names.push("cimport_stubs")
+    names.push("compat_runtime")
+    names.push("panic_runtime")
+    names.push("fiber_stubs")
+    names.push("channel_runtime")
+    names.push("fiber_runtime")
+    names.push("fiber")
+    names.push("fiber_asm")
+    names.push("rt_core")
+    for ni in 0..names.len() as i32:
+        embedded = embedded.input(dir ++ "/" ++ names[ni] ++ ".o")
+        embedded = embedded.arg(names[ni] ++ "_o")
+    embedded = embedded.input(dir ++ "/" ++ host_runtime.platform_install_object)
+    embedded = embedded.arg(build_owned_text(host_runtime.platform_symbol))
+    let empty_syms = embedded_platform_symbols()
+    for ei in 0..empty_syms.len() as i32:
+        let esym = empty_syms[ei]
+        if esym != host_runtime.platform_symbol:
+            out = out.add_target(empty_file_target(empty_platform_blob_target("stage1-empty-", esym), empty_platform_blob_path(dir, esym)))
+            objects.push(empty_platform_blob_target("stage1-empty-", esym))
+            embedded = embedded.input(empty_platform_blob_path(dir, esym))
+            embedded = embedded.arg(build_owned_text(esym))
+    for oi in 0..objects.len() as i32:
+        embedded = embedded.dep(build_owned_text(objects[oi]))
+    for pi in 0..corpus_plans.len() as i32:
+        embedded = target_with_wo_blobs(move embedded, corpus_plans[pi])
+    let embedded_obj = embedded_objects_object("stage-embedded-objects-object", &embedded, "")
+    out = out.add_target(embedded)
+    out = out.add_target(embedded_obj)
+
+    out = out.add_target(runtime_producer_target("stage1-runtime-producer", stage1, dir, &objects))
+    var group = target_new(.Group, "stage1-runtime", "")
+    for oi in 0..objects.len() as i32:
+        group = group.dep(build_owned_text(objects[oi]))
+    group = group.dep("stage1-runtime-producer")
+    out.add_target(group)
 
 // Generate cross/<tag>/llvm_ld.rsp: the tag's linux LLVM SDK static
 // clang+LLVM archives plus the linux system libraries, mirroring what
@@ -537,6 +647,18 @@ fn target_with_compiler_source_inputs(target: Target, ctx: &BuildCtx) -> Target:
             let path = files[fi]
             if path.ends_with(".w"):
                 out = out.input(build_owned_text(path))
+    out
+
+// The sources a compiler's generation stamp is a digest of (#1815,
+// build/compiler.w compiler_generation): a stamp re-runs when one changes.
+fn target_with_generation_inputs(target: Target, ctx: &BuildCtx) -> Target:
+    var out = target
+    let dirs = compiler_generation_dirs()
+    for di in 0..dirs.len() as i32:
+        let files = ctx.fs().list_files(dirs[di])
+        for fi in 0..files.len() as i32:
+            if files[fi].ends_with(".w"):
+                out = out.input(build_owned_text(files[fi]))
     out
 
 fn build_project_trim_line(text: &str) -> str:
@@ -2408,22 +2530,6 @@ pub fn build(ctx: BuildCtx) -> Build:
         let bsym3 = bootstrap_empty_syms[bi3]
         if bsym3 != host_runtime.platform_symbol:
             bootstrap_embedded_objects = bootstrap_embedded_objects.dep(empty_platform_blob_target("bootstrap-empty-", bsym3))
-    // Stage2 and stage3 use the same bootstrap runtime blobs, but embed the
-    // bundle stage1 built. --link-bundle links code into a compiler; it does
-    // not embed the object/interface/manifest for that compiler's consumers.
-    var stage_embedded_objects = target_new(.EmbedObjectFiles, "stage-embedded-objects-asm", "").output("out/stage/lib/embedded_objects.s")
-    for i in 0..bootstrap_embedded_objects.inputs.len() as i32:
-        stage_embedded_objects = stage_embedded_objects.input(build_owned_text(bootstrap_embedded_objects.inputs[i]))
-    for i in 0..bootstrap_embedded_objects.args.len() as i32:
-        stage_embedded_objects = stage_embedded_objects.arg(build_owned_text(bootstrap_embedded_objects.args[i]))
-    for i in 0..bootstrap_embedded_objects.deps.len() as i32:
-        stage_embedded_objects = stage_embedded_objects.dep(build_owned_text(bootstrap_embedded_objects.deps[i]))
-    for pi in 0..corpus_plans.len() as i32:
-        stage_embedded_objects = target_with_wo_blobs(move stage_embedded_objects, corpus_plans[pi])
-    let stage_embedded_objects_obj = embedded_objects_object("stage-embedded-objects-object", &stage_embedded_objects, "")
-    out = out.add_target(stage_embedded_objects)
-    out = out.add_target(stage_embedded_objects_obj)
-
     // Stage1 precedes the tree's bundle, so only its embedding keeps empty
     // slots. The populated stage object has its own producer and output.
     for pi in 0..corpus_plans.len() as i32:
@@ -2450,6 +2556,13 @@ pub fn build(ctx: BuildCtx) -> Build:
     bootstrap_runtime = bootstrap_runtime.dep("bootstrap-fiber-core-object")
     bootstrap_runtime = bootstrap_runtime.dep("bootstrap-fiber-asm-object")
     bootstrap_runtime = bootstrap_runtime.dep("bootstrap-embedded-objects-object")
+    // #1815: the seed's generation compiled out/bootstrap-lib, so it links
+    // only stage1 (the seed's own link) and is what stage1 embeds.
+    var bootstrap_object_targets: Vec[str] = Vec.new()
+    for bdi in 0..bootstrap_runtime.deps.len() as i32:
+        bootstrap_object_targets.push(build_owned_text(bootstrap_runtime.deps[bdi]))
+    out = out.add_target(runtime_producer_target("bootstrap-runtime-producer", "seed", "out/bootstrap-lib", &bootstrap_object_targets))
+    bootstrap_runtime = bootstrap_runtime.dep("bootstrap-runtime-producer")
     out = out.add_target(bootstrap_runtime)
 
     var prepare_bootstrap_link_root = target_new(.Action, "prepare-bootstrap-link-root", "").output("out/bootstrap-lib/.prepared-link-root")
@@ -2517,7 +2630,20 @@ pub fn build(ctx: BuildCtx) -> Build:
     stage1 = stage1.dep("compiler-no-c-export")
     stage1 = stage1.dep("prepare-bootstrap-link-root")
     stage1 = stage1.dep("with-sha256")
+    // #1815: the seed links stage1 against the runtime it compiled and
+    // stage1 embeds it; a pinned seed older than WITH_RUNTIME_ROOT still
+    // finds it through prepare-bootstrap-link-root.
+    stage1 = stage1.arg("runtime-root=out/bootstrap-lib")
+    stage1 = stage1.arg("runtime-producer=out/bootstrap-lib/.producer")
+    stage1 = stage1.input("out/bootstrap-lib/.producer")
+    stage1 = stage1.dep("bootstrap-runtime-producer")
     out = out.add_target(stage1)
+
+    // #1815 (D30): the runtime and bridge objects stage1 compiles, in
+    // out/bootstrap/lib beside it. stage2 links them (stage1 compiled its
+    // code), stage2 and stage3 embed them, and stage1 run by hand finds them
+    // as <compiler_dir>/../lib — its own embedded runtime is the seed's.
+    out = add_stage1_runtime_targets(move out, &host_runtime, &corpus_plans)
 
     for pi in 0..corpus_plans.len() as i32:
         out = wo_bundle_targets(move out, ctx, corpus_plans[pi], bootstrap_compiler_bin("with-stage1"), "stage1")
@@ -2528,6 +2654,8 @@ pub fn build(ctx: BuildCtx) -> Build:
     // mandatory at commit/reseed/release tier.
     var dev = target_new(.Group, "dev", "")
     dev = dev.dep("stage1")
+    // #1815: the runtime stage1 links its programs with (out/bootstrap/lib).
+    dev = dev.dep("stage1-runtime")
     out = out.add_target(dev)
 
     var stage2 = target_new(.Action, "stage2", "").output(stage_compiler_bin("with-stage2"))
@@ -2549,6 +2677,11 @@ pub fn build(ctx: BuildCtx) -> Build:
     stage2 = stage2.input("out/stage/lib/embedded_objects.o")
     stage2 = stage2.arg("embedded-object=out/stage/lib/embedded_objects.o")
     stage2 = stage2.dep("stage-embedded-objects-object")
+    // #1815: stage1 compiled stage2's code, so stage2 links stage1's runtime.
+    stage2 = stage2.arg("runtime-root=out/bootstrap/lib")
+    stage2 = stage2.arg("runtime-producer=out/bootstrap/lib/.producer")
+    stage2 = stage2.input("out/bootstrap/lib/.producer")
+    stage2 = stage2.dep("stage1-runtime")
     // stage1's compile of the compiler, unit by unit (see fixpoint-compare).
     stage2 = stage2.arg("unit-digests=" ++ FIXPOINT_STAGE2_UNITS).extra_output(FIXPOINT_STAGE2_UNITS)
     out = out.add_target(stage2)
@@ -2572,6 +2705,13 @@ pub fn build(ctx: BuildCtx) -> Build:
     stage3 = stage3.input("out/stage/lib/embedded_objects.o")
     stage3 = stage3.arg("embedded-object=out/stage/lib/embedded_objects.o")
     stage3 = stage3.dep("stage-embedded-objects-object")
+    // #1815: stage2 compiled stage3's code, so stage3 links stage2's runtime.
+    stage3 = stage3.arg("runtime-root=out/lib")
+    stage3 = stage3.arg("runtime-producer=out/bootstrap/lib/.producer")
+    stage3 = stage3.input("out/bootstrap/lib/.producer")
+    stage3 = stage3.input("out/lib/.producer")
+    stage3 = stage3.dep("runtime")
+    stage3 = stage3.dep("llvm-link-metadata")
     out = out.add_target(stage3)
 
     var stage2_fixpoint = target_new(.Action, "stage2-fixpoint-object", "").output(stage_compiler_obj("with-stage2-fixpoint.o"))
@@ -2765,8 +2905,15 @@ pub fn build(ctx: BuildCtx) -> Build:
     out = out.add_target(embedded_objects)
     out = out.add_target(embedded_objects_obj)
 
+    // #1815: stage2's generation compiled out/lib (and its bridges).
+    let lib_objects: Vec[str] = Vec.new()
+    lib_objects.push("embedded-objects-object")
+    lib_objects.push("llvm-link-metadata")
+    out = out.add_target(runtime_producer_target("runtime-producer", stage_compiler_bin("with-stage2"), "out/lib", &lib_objects))
+
     var runtime = target_new(.Group, "runtime", "")
     runtime = runtime.dep("embedded-objects-object")
+    runtime = runtime.dep("runtime-producer")
     for ei4 in 0..empty_syms.len() as i32:
         let esym4 = empty_syms[ei4]
         if esym4 != host_runtime.platform_symbol:
@@ -2965,6 +3112,11 @@ pub fn build(ctx: BuildCtx) -> Build:
     compiler = compiler.dep("compiler-main-source")
     compiler = compiler.dep("llvm-link-metadata")
     compiler = compiler.dep("embedded-objects-object")
+    // #1815: stage2 compiled the release's code and links it with the
+    // runtime it compiled.
+    compiler = compiler.arg("runtime-root=out/lib")
+    compiler = compiler.input("out/lib/.producer")
+    compiler = compiler.dep("runtime-producer")
     for pi in 0..corpus_plans.len() as i32:
         compiler = target_with_link_bundle(move compiler, ctx, corpus_plans[pi])
     out = out.add_target(compiler)
@@ -2982,6 +3134,12 @@ pub fn build(ctx: BuildCtx) -> Build:
     // no longer have, so the release build refuses one outright instead of
     // leaving it for :test to find an hour later (#1716's ninth battery).
     stamp = stamp.dep("abi-hash-check")
+    // #1815: the generation stamps — the tree's sources, and the .producer
+    // of the runtime the release embeds (out/lib).
+    stamp = stamp.arg("runtime-producer=out/lib/.producer")
+    stamp = stamp.input("out/lib/.producer")
+    stamp = stamp.dep("runtime-producer")
+    stamp = target_with_generation_inputs(move stamp, ctx)
     stamp = target_with_version_inputs(move stamp, ctx)
     stamp = stamp.extra_output("out/command/build")
     stamp = stamp.write_scope("out/release/bin")
@@ -3411,6 +3569,15 @@ pub fn build(ctx: BuildCtx) -> Build:
     embedded_runtime_regression = embedded_runtime_regression.dep("build")
     out = out.add_target(embedded_runtime_regression)
 
+    var runtime_generation_regression = target_new(.Action, "runtime-generation-regression", "").output("out/test-graph/runtime-generation-regression")
+    runtime_generation_regression = runtime_generation_regression.allow_parallel()
+    runtime_generation_regression.action = run_runtime_generation_regression_action
+    runtime_generation_regression = runtime_generation_regression.input(release_compiler_bin("with"))
+    runtime_generation_regression = runtime_generation_regression.input("out/lib/.producer")
+    runtime_generation_regression = runtime_generation_regression.dep("build")
+    runtime_generation_regression = runtime_generation_regression.dep("runtime-producer")
+    out = out.add_target(runtime_generation_regression)
+
     var emit_c_smoke = target_new(.Action, "emit-c-smoke", "").output("out/test-graph/emit-c-smoke")
     emit_c_smoke = emit_c_smoke.allow_parallel()
     emit_c_smoke.action = run_emit_c_smoke_action
@@ -3480,6 +3647,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     tests = tests.dep("issue61-regression")
     tests = tests.dep("invariance-check")
     tests = tests.dep("embedded-runtime-regression")
+    tests = tests.dep("runtime-generation-regression")
     tests = tests.dep("emit-c-smoke")
     // Serial lanes run together after the pooled wave, so none of them
     // drains the pool in the middle of it: stdlib-complexity measures

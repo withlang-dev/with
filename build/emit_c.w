@@ -912,7 +912,11 @@ pub fn run_emit_c_roundtrip_action(ctx: ActionCtx) -> i32:
     let version = emitc_trim(fs.read_text("out/gen/version.txt"))
     if version.len() == 0:
         return emitc_fail(ctx, "missing generated compiler version")
-    rc = comp_patch_version_binary(ctx, with_rebuilt_by_roundtrip, with_rebuilt_by_roundtrip, version)
+    // Stamped as the release compiler is (#1815): the rebuild embeds out/lib's
+    // runtime, whose .producer the release's stamp carries.
+    let runtime_generation = comp_read_runtime_producer(ctx, "out/lib/.producer")
+    if runtime_generation.len() == 0: return 1
+    rc = comp_patch_version_binary(ctx, with_rebuilt_by_roundtrip, with_rebuilt_by_roundtrip, version, runtime_generation)
     if rc != 0: return rc
     rc = emitc_compare_files(ctx, compiler_path, with_rebuilt_by_roundtrip)
     if rc != 0:
