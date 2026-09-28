@@ -1013,6 +1013,29 @@ pub type Sema {
     global_race_concurrency_node: i32,
     global_race_concurrency_file: i32,
     global_race_concurrency_reason: str,
+    // #1819 (§9.1c: globals are places; §21.1 rule 1): a call whose callee
+    // writes a global — itself, or through its own calls — writes it at the
+    // call site. Bodies are keyed by sema_global_effect_body: a signature
+    // index, or a closure node. The write fact is the race proof's
+    // (record_global_data_race_access); each is kept with the body it is in,
+    // flattened as [body, sym, node, file]. Every resolved call is kept as
+    // [caller body, call node, file, first target, target count, callee]
+    // over global_call_targets (its callee, and each callable it is handed:
+    // a closure, or a callable parameter of the caller, which the callee
+    // may run), the callables it binds to the callee's parameters as [call,
+    // parameter index, bound body], and a view of a global live across it
+    // as [call, sym, view sym, view node, last use, flags] — judged once
+    // every body is checked (check_calls_against_live_global_views), since a
+    // callee's writes are known only then (forward references, recursion).
+    global_write_records: Vec[i32],
+    global_calls: Vec[i32],
+    global_call_targets: Vec[i32],
+    global_call_bindings: Vec[i32],
+    global_view_call_checks: Vec[i32],
+    current_effect_closure: i32,
+    // A function named as a value (`apply(change)`), keyed by the ident
+    // node, to the signature Sema resolved it to (check_ident).
+    fn_value_ident_sigs: HashMap[i32, i32],
 
     // Hot intrinsic symbols used in semantic dispatch paths.
     syms: SemaBuiltinSymbols,
@@ -2706,6 +2729,13 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         global_race_concurrency_node: 0,
         global_race_concurrency_file: 0,
         global_race_concurrency_reason: "",
+        global_write_records: Vec.new(),
+        global_calls: Vec.new(),
+        global_call_targets: Vec.new(),
+        global_call_bindings: Vec.new(),
+        global_view_call_checks: Vec.new(),
+        current_effect_closure: 0,
+        fn_value_ident_sigs: sema_new_map_i32_i32(),
         syms: sema_builtin_symbols_zero(),
         method_impl_nodes,
         method_decl_impl_nodes,
