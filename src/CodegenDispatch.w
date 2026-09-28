@@ -1210,6 +1210,16 @@ impl Codegen:
                     self.mir_project_field_sema_type(cur_sema_ty, pd)
                 if field_sema_ty > 0:
                     cur_sema_ty = field_sema_ty
+                // §4.5 (#1846): a distinct type is represented as its
+                // underlying type (mir_sema_type_to_llvm), so its one field,
+                // `.value`, is the value itself: the same address, the
+                // underlying type. Indexed as a struct, the underlying str's
+                // data pointer was read as the whole str.
+                let distinct_inner = if active_variant_idx < 0: self.mir_distinct_underlying_sema_type(variant_owner_sema_ty) else: 0
+                if distinct_inner > 0:
+                    cur_sema_ty = distinct_inner
+                    cur_ty = self.mir_sema_type_to_llvm(distinct_inner)
+                    continue
                 if active_variant_idx >= 0 and pd == 0 and self.mir_enum_variant_payload_count(variant_owner_sema_ty, active_variant_idx) == 1:
                     let payload_ty = self.mir_sema_type_to_llvm(field_sema_ty)
                     if payload_ty != 0:
@@ -1408,6 +1418,16 @@ impl Codegen:
                     self.mir_project_field_sema_type(cur_sema_ty, pd)
                 if field_sema_ty > 0:
                     cur_sema_ty = field_sema_ty
+                // §4.5 (#1846): a distinct type is represented as its
+                // underlying type (mir_sema_type_to_llvm), so its one field,
+                // `.value`, is the value itself: the same address, the
+                // underlying type. Indexed as a struct, the underlying str's
+                // data pointer was read as the whole str.
+                let distinct_inner = if active_variant_idx < 0: self.mir_distinct_underlying_sema_type(variant_owner_sema_ty) else: 0
+                if distinct_inner > 0:
+                    cur_sema_ty = distinct_inner
+                    cur_ty = self.mir_sema_type_to_llvm(distinct_inner)
+                    continue
                 if active_variant_idx >= 0 and pd == 0 and self.mir_enum_variant_payload_count(variant_owner_sema_ty, active_variant_idx) == 1:
                     let payload_ty = self.mir_sema_type_to_llvm(field_sema_ty)
                     if payload_ty != 0:
@@ -6924,6 +6944,19 @@ impl Codegen:
                     return 0
                 pos = pos + 2 + payload_count
         0
+
+    // §4.5: the underlying Sema type of a distinct type (through a reference
+    // to one), else 0: the type mir_sema_type_to_llvm represents it as.
+    fn mir_distinct_underlying_sema_type(sema_ty: i32) -> i32:
+        if sema_ty <= 0:
+            return 0
+        let resolved = self.mir_resolve_alias_at(sema_ty)
+        let tk = self.mir_type_kind_at(resolved)
+        if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF:
+            return self.mir_distinct_underlying_sema_type(self.mir_type_d0_at(resolved))
+        if tk != TypeKind.TY_STRUCT or not self.sema.distinct_type_names.contains(self.mir_type_d0_at(resolved)):
+            return 0
+        self.mir_type_extra_at(self.mir_type_d1_at(resolved) + 1)
 
     mut fn mir_project_field_sema_type(agg_ty: i32, field_token: i32) -> i32:
         if agg_ty <= 0:
