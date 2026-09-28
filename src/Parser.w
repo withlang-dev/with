@@ -8362,7 +8362,9 @@ impl Parser:
             // the OUTER block, so the line ran with the `if` false, reading a
             // binding from the arm that never ran. Report it; the line is
             // still parsed here so the error names it and not what follows.
-            if next_col > block_col:
+            // Only a statement that begins its line has an indentation: the
+            // one after `a; b` starts mid-line.
+            if next_col > block_col and next_col == line_indent_of(self.source, self.current_start()):
                 let bad_start = self.current_start()
                 var diag = Diagnostic.err(f"unexpected indentation: this line is indented to column {next_col}, which is no enclosing block's indentation (the block here starts at column {block_col})", Span { file: self.file_id, start: bad_start, end: self.current_end() })
                 diag.add_help("a block's statements all start at its column; a line indented deeper than the statement before it belongs to a body that statement opens with ':' at the end of its line (§29.13)")
