@@ -3378,6 +3378,12 @@ pub fn ci_translate_macros(session: i64, type_session: i64, macro_source: &str) 
         else:
             if ci_object_macro_value_is_type_like(stripped):
                 continue
+            // A macro naming a declared type is a type alias, not a value:
+            // MSVC's <stdlib.h> `#define onexit_t _onexit_t` must not become
+            // `let onexit_t = _onexit_t`.
+            let alias_target = ci_trim(stripped)
+            if ci_is_c_ident(alias_target) and (ci_type_name_is_emitted(alias_target) or ci_type_decl_name_exists(type_session, alias_target)):
+                continue
             // A comma-list object macro (e.g. `#define OP_NAME_LIST "End",
             // "\\A", ...`) is only meaningful expanded inline inside an array
             // initializer `{ OP_NAME_LIST }`; a standalone `let` for it would be
