@@ -117,6 +117,11 @@ fn astpool_clone_deep(src: AstPool) -> AstPool:
         )
         for_meta = for_meta + 3
 
+    var carrier_alt = 0
+    while carrier_alt < src.state.for_carrier_alts.len():
+        out.add_for_carrier_alt(src.state.for_carrier_alts[carrier_alt], src.state.for_carrier_alts[carrier_alt + 1])
+        carrier_alt = carrier_alt + 2
+
     for pbi in 0..src.state.pattern_binding_pairs.len() as i32:
         out.mark_pattern_binding_pair(src.state.pattern_binding_pairs[pbi])
 
@@ -786,6 +791,11 @@ impl AstPool:
                 self.add_for_meta(cloned as NodeId, self.for_meta_index_binding(for_meta), self.for_meta_label(for_meta))
             if self.for_binding_is_pattern(node as NodeId):
                 self.mark_pattern_binding(cloned as NodeId, self.get_data0(node))
+            // §13.6a: the one-clause comprehension reading, over the clone's
+            // own iterable and body.
+            let src_alt = self.for_carrier_alt(node)
+            if src_alt != 0:
+                self.add_for_carrier_alt(cloned, self.build_for_carrier_alt(cloned, self.for_binding_is_pattern(node), self.carrier_alt_payload_sym(src_alt), self.carrier_alt_fail_sym(src_alt)))
             return cloned
 
         if kind == NodeKind.NK_BREAK:

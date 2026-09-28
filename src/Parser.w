@@ -6983,14 +6983,25 @@ impl Parser:
             let not_flag = self.pool.add_node(NodeKind.NK_UNARY, start, start, 1, flag_read, 0)
             let if_else = self.pool.add_node(NodeKind.NK_IF_EXPR, start, self.prev_end(), not_flag, else_body, 0)
             // Build block: { flag_decl; for_node; if_else }
+            self.add_for_carrier_alt(for_node, binding_is_pat != 0, index_binding)
             let block_extra = self.pool.extra_len()
             self.pool.add_extra(flag_decl)
             self.pool.add_extra(for_node)
             for_node = self.pool.add_node(NodeKind.NK_BLOCK, start, self.prev_end(), block_extra, 2, if_else)
         else:
             self.pos = save_pos
+            self.add_for_carrier_alt(for_node, binding_is_pat != 0, index_binding)
 
         for_node
+
+    // §13.6a: `for x in opt:` over an Option or Result is a one-clause
+    // comprehension; Sema, which knows the iterable's type, chooses. A range
+    // literal is never a carrier, and a comprehension clause binds no index.
+    mut fn add_for_carrier_alt(for_node: NodeId, binding_is_pat: bool, index_binding: i32):
+        if index_binding != 0 or self.pool.kind(self.pool.get_data1(for_node)) == NodeKind.NK_RANGE:
+            return
+        let alt = self.pool.build_for_carrier_alt(for_node, binding_is_pat, self.intern.intern("_Payload"), self.intern.intern("___fail_0"))
+        self.pool.add_for_carrier_alt(for_node, alt)
 
     // For-comprehension: for x in a; y in b(x): yield f(x, y)
     // Desugars to nested match on Option (Some/None).
@@ -7053,64 +7064,15 @@ impl Parser:
         else:
             body_expr = self.parse_block_or_expr()
 
-        // Build nested match from inside out
-        // Use placeholder variant names — sema resolves to Some/None or Ok/Err
-        // based on the match subject's type (Option vs Result).
-        let some_sym = self.intern.intern("_Payload")
-        let none_sym = self.intern.intern("_Empty")
-
-        // Innermost: wrap body in Some(body) if yield
-        var inner: NodeId = body_expr
-        if has_yield != 0:
-            // Some(body_expr) — construct as a call to Some
-            let some_callee = self.pool.add_node(NodeKind.NK_IDENT, start, start, some_sym, 0, 0)
-            let some_extra = self.pool.extra_len()
-            self.pool.add_extra(body_expr)
-            inner = self.pool.add_node(NodeKind.NK_CALL, start, self.prev_end(), some_callee, some_extra, 1)
-
-        // Build nested matches from last binding to first
-        var bi = bind_syms.len() as i32 - 1
-        while bi >= 0:
-            let bkind = bind_kinds[bi]
-            if bkind == 1:
-                // Guard: if guard_expr: inner else: None (or void for imperative)
-                let guard_expr = bind_exprs[bi]
-                var guard_else: NodeId = 0 as NodeId
-                if has_yield != 0:
-                    guard_else = self.pool.add_node(NodeKind.NK_VARIANT_SHORTHAND, start, start, none_sym, 0, 0)
-                else:
-                    guard_else = self.pool.add_node(NodeKind.NK_BLOCK, start, start, 0, 0, 0)
-                inner = self.pool.add_node(NodeKind.NK_IF_EXPR, start, self.prev_end(), guard_expr, inner, guard_else)
-            else:
-                // Binding: match source: Some(sym) => inner, None => None/void
-                let source = bind_exprs[bi]
-                let bsym = bind_syms[bi]
-                // Build Some(bsym) pattern — use NK_PAT_IDENT for correct binding
-                let bind_pat = self.pool.add_node(NodeKind.NK_PAT_IDENT, start, start, bsym, 0, 0)
-                let pat_extra = self.pool.extra_len()
-                self.pool.add_extra(bind_pat)
-                let some_pat = self.pool.add_node(NodeKind.NK_PAT_VARIANT, start, start, some_sym, pat_extra, 1)
-                // Build Some arm: Some(bsym) => inner
-                let some_arm = self.pool.add_node(NodeKind.NK_MATCH_ARM, start, self.prev_end(), some_pat, inner, 0)
-                // Build failure arm: at-binding pattern (___fail @ _) captures the
-                // entire matched value. Body returns ___fail — propagating None or
-                // Err(e) unchanged regardless of which enum type it is.
-                let fail_sym = self.intern.intern(f"___fail_{bi}")
-                let wild = self.pool.add_node(NodeKind.NK_PAT_WILDCARD, start, start, 0, 0, 0)
-                let none_pat = self.pool.add_node(NodeKind.NK_PAT_AT_BINDING, start, start, fail_sym, wild, 0)
-                var none_body: NodeId = 0 as NodeId
-                if has_yield != 0:
-                    none_body = self.pool.add_node(NodeKind.NK_IDENT, start, start, fail_sym, 0, 0)
-                else:
-                    none_body = self.pool.add_node(NodeKind.NK_BLOCK, start, start, 0, 0, 0)
-                let none_arm = self.pool.add_node(NodeKind.NK_MATCH_ARM, start, self.prev_end(), none_pat, none_body, 0)
-                // Build match
-                let arms_extra = self.pool.extra_len()
-                self.pool.add_extra(some_arm)
-                self.pool.add_extra(none_arm)
-                inner = self.pool.add_node(NodeKind.NK_MATCH, start, self.prev_end(), source, arms_extra, 2)
-            bi = bi - 1
-        inner
+        // Nested matches, one per clause (AstPool.build_comprehension_match).
+        // The failure arm `___fail_i @ _` captures the whole clause value.
+        let pats: Vec[i32] = Vec.new()
+        let fail_syms: Vec[i32] = Vec.new()
+        for bi in 0..bind_syms.len() as i32:
+            let binds = bind_kinds[bi] == 0
+            pats.push(if binds: self.pool.add_node(NodeKind.NK_PAT_IDENT, start, start, bind_syms[bi], 0, 0) else: 0)
+            fail_syms.push(if binds: self.intern.intern(f"___fail_{bi}") else: 0)
+        self.pool.build_comprehension_match(start, self.prev_end(), self.intern.intern("_Payload"), self.intern.intern("_Empty"), &fail_syms, &pats, &bind_exprs, &bind_kinds, body_expr, has_yield != 0)
 
     mut fn finish_labeled_block(start: i32, label_sym: i32, body: NodeId) -> NodeId:
         if body != 0 and self.pool.kind(body) == NodeKind.NK_BLOCK:

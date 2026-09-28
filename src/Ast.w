@@ -637,6 +637,9 @@ type AstPoolState {
     fn_param_patterns: Vec[i32],
     fn_param_pattern_meta: Vec[i32],
     for_meta: Vec[i32],
+    // §13.6a: (for node, one-clause comprehension match) pairs; see
+    // add_for_carrier_alt.
+    for_carrier_alts: Vec[i32],
     block_meta: Vec[i32],
     must_use_type_nodes: Vec[i32],
     no_await_guard_type_nodes: Vec[i32],
@@ -682,6 +685,7 @@ type AstPoolState {
     impl_trait_type_args_map: HashMap[i32, i32],
     fn_param_pattern_meta_map: HashMap[i32, i32],
     for_meta_map: HashMap[i32, i32],
+    for_carrier_alt_map: HashMap[i32, i32],
     block_meta_map: HashMap[i32, i32],
     fn_param_defaults: HashMap[i64, i32],
     must_use_type_set: HashMap[i32, i32],
@@ -760,6 +764,7 @@ fn AstPool.new -> AstPool:
             fn_param_patterns: Vec.new(),
             fn_param_pattern_meta: Vec.new(),
             for_meta: Vec.new(),
+            for_carrier_alts: Vec.new(),
             block_meta: Vec.new(),
             must_use_type_nodes: Vec.new(),
             no_await_guard_type_nodes: Vec.new(),
@@ -792,6 +797,7 @@ fn AstPool.new -> AstPool:
             impl_trait_type_args_map: HashMap.new(),
             fn_param_pattern_meta_map: HashMap.new(),
             for_meta_map: HashMap.new(),
+            for_carrier_alt_map: HashMap.new(),
             block_meta_map: HashMap.new(),
             fn_param_defaults: HashMap.new(),
             must_use_type_set: HashMap.new(),
@@ -1991,6 +1997,77 @@ impl AstPool:
     fn for_meta_label(meta: i32) -> i32:
         self.state.for_meta[(meta + 2)]
 
+    // §13.6a: a one-clause `for` over an Option or Result is a comprehension,
+    // not a loop, and only Sema knows the iterable's type. The parser records
+    // the comprehension reading beside the loop; Sema adopts it for a carrier.
+    fn add_for_carrier_alt(node: NodeId, alt: NodeId):
+        self.state.for_carrier_alts.push(node)
+        self.state.for_carrier_alts.push(alt)
+        self.state.for_carrier_alt_map.insert(node, alt)
+
+    fn for_carrier_alt(node: i32): self.state.for_carrier_alt_map.get(node) ?? 0
+
+    // The one-clause reading of `for PAT in EXPR: BODY` (build_comprehension_match
+    // over one clause, the yield form when BODY is exactly `yield E`), built
+    // over this for node's own children.
+    fn build_for_carrier_alt(for_node: i32, binding_is_pat: bool, payload_sym: i32, fail_sym: i32) -> NodeId:
+        let start = self.get_start(for_node)
+        let binding = self.get_data0(for_node)
+        let pats: Vec[i32] = Vec.new()
+        pats.push(if binding_is_pat: binding else: self.add_node(NodeKind.NK_PAT_IDENT, start, start, binding, 0, 0))
+        let exprs: Vec[i32] = Vec.new()
+        exprs.push(self.get_data1(for_node))
+        let kinds: Vec[i32] = Vec.new()
+        kinds.push(0)
+        let fail_syms: Vec[i32] = Vec.new()
+        fail_syms.push(fail_sym)
+        let body = self.get_data2(for_node)
+        let yielded = ast_for_body_yield_value(self, body)
+        self.build_comprehension_match(start, self.get_end(for_node), payload_sym, 0, &fail_syms, &pats, &exprs, &kinds, if yielded != 0: yielded else: body, yielded != 0)
+
+    // The placeholder symbols of an alternative build_for_carrier_alt made:
+    // its payload pattern's variant and its failure arm's binding.
+    fn carrier_alt_payload_sym(alt: i32): self.get_data0(self.get_data0(self.get_extra(self.get_data1(alt))))
+
+    fn carrier_alt_fail_sym(alt: i32): self.get_data0(self.get_data0(self.get_extra(self.get_data1(alt) + 1)))
+
+    // §13.6a: a for-comprehension is one nested match per clause. Clause i
+    // binds `pats[i]` from `exprs[i]` (`kinds[i]` 1: an `if` guard):
+    // `match exprs[i]: _Payload(pats[i]) => inner, ___fail_i @ _ => ___fail_i`,
+    // the failure arm `{}` in the statement form. The innermost value is
+    // `body`, wrapped in `_Payload(...)` in the yield form. Sema resolves the
+    // placeholders against each clause's carrier.
+    fn build_comprehension_match(start: i32, end: i32, payload_sym: i32, empty_sym: i32, fail_syms: &Vec[i32], pats: &Vec[i32], exprs: &Vec[i32], kinds: &Vec[i32], body: i32, has_yield: bool) -> NodeId:
+        var inner = body
+        if has_yield:
+            let some_callee = self.add_node(NodeKind.NK_IDENT, start, start, payload_sym, 0, 0)
+            let some_extra = self.extra_len()
+            self.add_extra(body)
+            inner = self.add_node(NodeKind.NK_CALL, start, end, some_callee, some_extra, 1)
+        var bi = exprs.len() - 1
+        while bi >= 0:
+            if kinds[bi] == 1:
+                let guard_else = if has_yield: self.add_node(NodeKind.NK_VARIANT_SHORTHAND, start, start, empty_sym, 0, 0) else: self.add_node(NodeKind.NK_BLOCK, start, start, 0, 0, 0)
+                inner = self.add_node(NodeKind.NK_IF_EXPR, start, end, exprs[bi], inner, guard_else)
+            else:
+                let pat_extra = self.extra_len()
+                self.add_extra(pats[bi])
+                // Spans the comprehension: a payload pattern counts as one only
+                // inside its owner's span (MirBuilder.pattern_payload_node), and
+                // a one-clause `for` passes the user's own binding pattern.
+                let some_pat = self.add_node(NodeKind.NK_PAT_VARIANT, start, end, payload_sym, pat_extra, 1)
+                let some_arm = self.add_node(NodeKind.NK_MATCH_ARM, start, end, some_pat, inner, 0)
+                let wild = self.add_node(NodeKind.NK_PAT_WILDCARD, start, start, 0, 0, 0)
+                let fail_pat = self.add_node(NodeKind.NK_PAT_AT_BINDING, start, start, fail_syms[bi], wild, 0)
+                let fail_body = if has_yield: self.add_node(NodeKind.NK_IDENT, start, start, fail_syms[bi], 0, 0) else: self.add_node(NodeKind.NK_BLOCK, start, start, 0, 0, 0)
+                let fail_arm = self.add_node(NodeKind.NK_MATCH_ARM, start, end, fail_pat, fail_body, 0)
+                let arms_extra = self.extra_len()
+                self.add_extra(some_arm)
+                self.add_extra(fail_arm)
+                inner = self.add_node(NodeKind.NK_MATCH, start, end, exprs[bi], arms_extra, 2)
+            bi = bi - 1
+        inner
+
     fn add_block_meta(node: NodeId, label: i32):
         let idx = self.state.block_meta.len() as i32
         self.state.block_meta.push(node as i32)
@@ -2007,6 +2084,16 @@ impl AstPool:
         self.state.block_meta[(meta + 1)]
 
 fn ast_pattern_binding_key(parent: i32, binding: i32): (parent as i64) * 4294967296 + (binding as i64)
+
+// The value of a `for` body that is exactly `yield E` — inline, or the only
+// line of its block — else 0. §13.6a: that body is the yield form.
+fn ast_for_body_yield_value(pool: AstPool, body: i32) -> i32:
+    var node = body
+    if node != 0 and pool.kind(node) == NodeKind.NK_BLOCK:
+        let count = pool.get_data1(node)
+        let tail = pool.get_data2(node)
+        node = if count == 0: tail else if count == 1 and tail == 0: pool.get_extra(pool.get_data0(node)) else: 0
+    if node != 0 and pool.kind(node) == NodeKind.NK_YIELD: pool.get_data0(node) else: 0
 
 pub fn ast_is_pattern_kind(kind: i32) -> bool:
     kind == NodeKind.NK_PAT_WILDCARD or
