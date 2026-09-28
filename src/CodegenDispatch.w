@@ -3805,8 +3805,18 @@ impl Codegen:
                         if llvm_fi >= struct_field_count:
                             continue
                         let field_ty = wl_struct_get_type_at(struct_ty, llvm_fi)
-                        let val = self.mir_eval_operand(body, op_id, field_ty)
-                        let coerced_val = self.coerce_value_to_type(val, field_ty)
+                        // #1847: a `Box[dyn T]` / `&dyn T` field (Sema's field
+                        // type names a dyn trait) built from a concrete value
+                        // takes the fat pointer (data, vtable), as a `let` of
+                        // that type does (RK_USE). The operand is read as
+                        // itself first: coerced to the pair by LLVM shape
+                        // alone, the bare pointer was taken for a function
+                        // value and aborted codegen (#1818's class).
+                        let field_sema = self.mir_struct_field_sema_type(dest_sema_ty, fi)
+                        let field_is_dyn = self.mir_dyn_trait_symbol_from_sema_type(field_sema) != 0
+                        let val = self.mir_eval_operand(body, op_id, if field_is_dyn: 0 else: field_ty)
+                        let dyn_field_val = if field_is_dyn: self.mir_coerce_operand_to_dyn_trait_target(body, op_id, val, field_ty, field_sema) else: val
+                        let coerced_val = self.coerce_value_to_type(dyn_field_val, field_ty)
                         let gep = wl_build_struct_gep(self.builder, struct_ty, alloca, llvm_fi)
                         wl_build_store(self.builder, coerced_val, gep)
                 self.mir_store_liveness_byte(struct_ty, alloca)
@@ -5013,6 +5023,8 @@ impl Codegen:
             return
         // #606 (A5 narrow): a std Vec[T] with a Drop element drops each element then
         // frees the buffer. POD-element Vecs return false here and fall through.
+        if tk == TypeKind.TY_GENERIC_INST and self.mir_emit_boxed_dyn_drop_ptr(ptr, ty, sema_ty):
+            return
         if tk == TypeKind.TY_GENERIC_INST and self.mir_emit_drop_vec_ptr(ptr, drop_sema_ty):
             return
         if tk == TypeKind.TY_GENERIC_INST and self.mir_emit_drop_hash_collection_ptr(ptr, ty, drop_sema_ty):
@@ -5415,6 +5427,59 @@ impl Codegen:
             wl_position_at_end(self.builder, rc_skip_bb)
         true
 
+    // #1847: a `Box[dyn Trait]` owns the concrete value its fat pointer's
+    // data word addresses; the type is known only to the vtable, whose last
+    // slot drops it in place (dyn_drop_slot; null for a type with no drop).
+    // `fat` is the box's {data, vtable} value; the caller frees the cell.
+    mut fn mir_emit_dyn_payload_drop(fat: i64, payload_sema_ty: i32):
+        let trait_sym = self.mir_dyn_trait_symbol_from_sema_type(payload_sema_ty)
+        let trait_idx_opt = self.trait_map.get(trait_sym)
+        if trait_sym == 0 or not trait_idx_opt.is_some():
+            with_eprint("error: a boxed dyn value's trait has no vtable metadata; its drop cannot run")
+            self.had_error = 1
+            return
+        let trait_idx: i32 = trait_idx_opt.unwrap()
+        let ptr_ty = wl_ptr_type(self.context)
+        let data_ptr = wl_build_extract_value(self.builder, fat, 0)
+        let vtable_ptr = wl_build_extract_value(self.builder, fat, 1)
+        let slot_ptr = wl_build_struct_gep(self.builder, self.trait_vtable_types[trait_idx], vtable_ptr, self.trait_method_counts[trait_idx])
+        let drop_fn = wl_build_load(self.builder, ptr_ty, slot_ptr)
+        let has_drop = wl_build_icmp(self.builder, wl_int_ne(), drop_fn, wl_const_null(ptr_ty))
+        let call_bb = wl_append_bb(self.context, self.current_function, "drop.dyn.call")
+        let done_bb = wl_append_bb(self.context, self.current_function, "drop.dyn.done")
+        wl_build_cond_br(self.builder, has_drop, call_bb, done_bb)
+        wl_position_at_end(self.builder, call_bb)
+        let params: Vec[i64] = Vec.new()
+        params.push(ptr_ty)
+        let fn_ty = wl_function_type(wl_void_type(self.context), vec_data_i64(&params), 1, 0)
+        let args: Vec[i64] = Vec.new()
+        args.push(data_ptr)
+        let _ = wl_build_call(self.builder, fn_ty, drop_fn, vec_data_i64(&args), 1)
+        wl_build_br(self.builder, done_bb)
+        wl_position_at_end(self.builder, done_bb)
+
+    // #1847: a `Box[dyn Trait]` stored in a field, an element or a payload:
+    // its value's drop (mir_emit_dyn_payload_drop), then the cell's free —
+    // Box's own Drop impl would drop a `dyn` value, which names no type.
+    mut fn mir_emit_boxed_dyn_drop_ptr(ptr: i64, ty: i64, sema_ty: i32) -> bool:
+        if not self.mir_sema_type_is_box(sema_ty) or self.llvm_type_is_dyn_fat_ptr(ty) == 0:
+            return false
+        let resolved = self.mir_resolve_alias_at(sema_ty)
+        let payload_sema_ty = self.mir_type_extra_at(self.mir_type_d1_at(resolved))
+        let fat = wl_build_load(self.builder, ty, ptr)
+        let heap_ptr = wl_build_extract_value(self.builder, fat, 0)
+        // A moved-out member is the reset sentinel (#697, §2.5.1).
+        let live = wl_build_icmp(self.builder, wl_int_ne(), heap_ptr, wl_const_null(wl_type_of(heap_ptr)))
+        let live_bb = wl_append_bb(self.context, self.current_function, "drop.box.dyn.live")
+        let done_bb = wl_append_bb(self.context, self.current_function, "drop.box.dyn.done")
+        wl_build_cond_br(self.builder, live, live_bb, done_bb)
+        wl_position_at_end(self.builder, live_bb)
+        self.mir_emit_dyn_payload_drop(fat, payload_sema_ty)
+        self.mir_emit_with_free_ptr(heap_ptr)
+        wl_build_br(self.builder, done_bb)
+        wl_position_at_end(self.builder, done_bb)
+        true
+
     mut fn mir_emit_box_drop_place(body: &MirBody, place_id: i32, sema_ty: i32) -> bool:
         if not self.mir_sema_type_is_box(sema_ty):
             return false
@@ -5458,6 +5523,8 @@ impl Codegen:
                 self.mir_emit_drop_ptr_for_sema_type(heap_ptr, payload_ty, payload_sema_ty)
             else:
                 self.mir_emit_drop_ptr(heap_ptr, payload_ty)
+        else:
+            self.mir_emit_dyn_payload_drop(value, payload_sema_ty)
         self.mir_emit_with_free_ptr(heap_ptr)
         if needs_null_guard:
             wl_build_br(self.builder, box_done_bb)
@@ -8515,7 +8582,13 @@ impl Codegen:
             let push_recv_op = body.call_arg_operands[push_arg_start]
             let push_elem_ty = self.mir_vec_elem_type(body, push_recv_op)
             if push_elem_ty != 0 and wl_type_of(elem_raw) != push_elem_ty:
-                elem = self.coerce_value_to_type(elem_raw, push_elem_ty)
+                // #1847: a concrete value pushed onto a Vec[Box[dyn T]] takes
+                // the fat pointer (data, vtable), as a `let` of that type does.
+                let push_vec_ty = self.mir_unwrap_ref_like_sema_type(self.mir_operand_sema_type(body, push_recv_op))
+                let push_elem_sema = if push_vec_ty > 0 and self.mir_type_kind_at(push_vec_ty) == TypeKind.TY_GENERIC_INST and self.mir_type_d2_at(push_vec_ty) > 0: self.mir_type_extra_at(self.mir_type_d1_at(push_vec_ty)) else: 0
+                let push_elem_op = body.call_arg_operands[(push_arg_start + 1)]
+                let dyn_elem = self.mir_coerce_operand_to_dyn_trait_target(body, push_elem_op, elem_raw, push_elem_ty, push_elem_sema)
+                elem = self.coerce_value_to_type(dyn_elem, push_elem_ty)
             self.mir_emit_vec_push(recv_ptr, elem, wl_type_of(elem))
 
         else if intrinsic == MirIntrinsic.VEC_GET:

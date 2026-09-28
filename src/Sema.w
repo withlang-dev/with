@@ -1061,6 +1061,9 @@ pub type Sema {
     global_consumed_args: HashMap[i32, i32],
     current_fn_bind_start: i32,
     global_user_drop_types: HashMap[i32, i32],
+    // #1847: a dyn method call whose method consumes its receiver (`move
+    // self`), keyed by the call node.
+    dyn_consuming_calls: HashMap[i32, i32],
 
     // Hot intrinsic symbols used in semantic dispatch paths.
     syms: SemaBuiltinSymbols,
@@ -2770,6 +2773,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         global_consumed_args: sema_new_map_i32_i32(),
         current_fn_bind_start: 0,
         global_user_drop_types: sema_new_map_i32_i32(),
+        dyn_consuming_calls: sema_new_map_i32_i32(),
         syms: sema_builtin_symbols_zero(),
         method_impl_nodes,
         method_decl_impl_nodes,

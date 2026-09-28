@@ -25559,6 +25559,9 @@ impl Sema:
                 self.emit_error("consuming dyn trait method requires a Box[dyn Trait] receiver", node)
                 return 0
             self.check_trait_receiver_mode(&info, receiver_expr, node)
+            // #1847: this dyn call consumes its receiver; every other one
+            // observes it (MirLower passes the place, never moves it).
+            self.dyn_consuming_calls.insert(node, 1)
         else:
             self.check_trait_receiver_mode(&info, receiver_expr, node)
 
