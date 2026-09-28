@@ -18,7 +18,10 @@ use SemaTypes
 use SemaDecl
 use FnAbi
 use TargetSpec
+
 use compiler.BundleInterfaces
+
+use Overflow
 
 extern fn with_str_clone_ref(s: &str) -> str
 extern fn with_write(s: &str) -> Unit
@@ -10390,6 +10393,12 @@ fn sema_operator_primitive_name(op: i32) -> str:
     if op == BinaryOp.OP_LT or op == BinaryOp.OP_GT or op == BinaryOp.OP_LTE or op == BinaryOp.OP_GTE: return "cmp"
     ""
 
+// §4.2.2/§4.2.3: the arithmetic operators, checked, wrapping and saturating.
+fn sema_binary_op_is_arithmetic(op: i32) -> bool:
+    op == BinaryOp.OP_ADD or op == BinaryOp.OP_SUB or op == BinaryOp.OP_MUL or op == BinaryOp.OP_DIV or op == BinaryOp.OP_MOD or
+        op == BinaryOp.OP_ADD_WRAP or op == BinaryOp.OP_SUB_WRAP or op == BinaryOp.OP_MUL_WRAP or
+        op == BinaryOp.OP_ADD_SAT or op == BinaryOp.OP_SUB_SAT or op == BinaryOp.OP_MUL_SAT
+
 fn sema_operator_method_name(op: i32) -> str:
     if op == BinaryOp.OP_ADD: return "add"
     if op == BinaryOp.OP_SUB: return "sub"
@@ -10771,23 +10780,99 @@ impl Sema:
             return pointee as TypeId
         peer
 
-    // An expression whose type no operand decides: unsuffixed numeric
-    // literals, grouped, negated, or combined by arithmetic.
-    fn expr_is_untyped_literal_arith(node: i32) -> bool:
+    // Numeric literals — `suffixed` admits a suffixed one — grouped,
+    // negated, or combined by arithmetic.
+    fn expr_is_literal_arith_of(node: i32, suffixed: bool) -> bool:
         if node == 0:
             return false
         let kind = self.ast.kind(node)
         if kind == NodeKind.NK_INT_LIT or kind == NodeKind.NK_FLOAT_LIT:
-            return self.literal_suffix_type(self.ast.literal_suffix(node)) == 0
+            return suffixed or self.literal_suffix_type(self.ast.literal_suffix(node)) == 0
         if kind == NodeKind.NK_GROUPED:
-            return self.expr_is_untyped_literal_arith(self.ast.get_data0(node))
+            return self.expr_is_literal_arith_of(self.ast.get_data0(node), suffixed)
         if kind == NodeKind.NK_UNARY and self.ast.get_data0(node) == UnaryOp.UOP_NEGATE:
-            return self.expr_is_untyped_literal_arith(self.ast.get_data1(node))
-        if kind == NodeKind.NK_BINARY:
-            let op = self.ast.get_data0(node)
-            if op == BinaryOp.OP_ADD or op == BinaryOp.OP_SUB or op == BinaryOp.OP_MUL or op == BinaryOp.OP_DIV or op == BinaryOp.OP_MOD:
-                return self.expr_is_untyped_literal_arith(self.ast.get_data1(node)) and self.expr_is_untyped_literal_arith(self.ast.get_data2(node))
+            return self.expr_is_literal_arith_of(self.ast.get_data1(node), suffixed)
+        if kind == NodeKind.NK_BINARY and sema_binary_op_is_arithmetic(self.ast.get_data0(node)):
+            return self.expr_is_literal_arith_of(self.ast.get_data1(node), suffixed) and self.expr_is_literal_arith_of(self.ast.get_data2(node), suffixed)
         false
+
+    // An expression whose type no operand decides: unsuffixed numeric
+    // literals, grouped, negated, or combined by arithmetic. §4.2.1's
+    // context reaches through it to every literal (#1820), as it reaches a
+    // bare literal.
+    fn expr_is_untyped_literal_arith(node: i32): self.expr_is_literal_arith_of(node, false)
+
+    // A constant made of numeric literals alone, suffixed or not.
+    fn expr_is_literal_arith(node: i32): self.expr_is_literal_arith_of(node, true)
+
+    // The numeric type an enclosing context demands of an untyped literal
+    // expression (§4.2.1), or 0 when the context demands none.
+    fn untyped_literal_context_type() -> TypeId:
+        if self.has_expected_type == 0 or self.expected_expr_type == 0:
+            return 0 as TypeId
+        if self.is_numeric_type(self.expected_expr_type as i32): self.expected_expr_type else: 0 as TypeId
+
+    // §4.2.3: arithmetic is checked, and a literal expression is
+    // evaluated at the type its context gave it. Its value is known here, so
+    // an overflow is a compile error at the operator that overflows, not a
+    // panic at run time (#1820: `let x: u8 = 200 + 100`). Reports only the
+    // node whose own operation overflows; an operand that already failed was
+    // reported when it was checked.
+    mut fn check_literal_arith_fits(node: i32, result: TypeId):
+        let resolved = self.resolve_alias(self.numeric_operand_type(result as i32) as TypeId)
+        if self.get_type_kind(resolved) != TypeKind.TY_INT:
+            return
+        let folded = self.fold_literal_int_arith(node)
+        if folded.ok != 0 and folded.overflow != 0:
+            self.emit_error(f"constant arithmetic overflows `{self.type_name(result as i32)}`: its literals have that type (§4.2.1) and arithmetic is checked (§4.2.3)", node)
+
+    // The value of an integer literal expression at the types Sema
+    // recorded for its nodes. `ok == 0` when an operand cannot be folded or
+    // itself overflowed (already reported); `overflow != 0` when this node's
+    // own operation overflows.
+    fn fold_literal_int_arith(node: i32) -> IntArithmeticResult:
+        let failed = IntArithmeticResult { ok: 0, overflow: 0, value: 0 }
+        if node == 0:
+            return failed
+        let kind = self.ast.kind(node)
+        if kind == NodeKind.NK_GROUPED:
+            return self.fold_literal_int_arith(self.ast.get_data0(node))
+        let ty = if self.typed_expr_types.contains(node): self.typed_expr_types.get(node).unwrap() else: 0
+        let resolved = self.resolve_alias(self.numeric_operand_type(ty) as TypeId)
+        if ty == 0 or self.get_type_kind(resolved) != TypeKind.TY_INT:
+            return failed
+        let bits = self.get_type_d0(resolved)
+        let signed = self.get_type_d1(resolved)
+        if bits > 64:
+            return failed
+        if kind == NodeKind.NK_INT_LIT:
+            let words = self.ast.int_literal_expr_bits(node, bits, signed)
+            if words.ok == 0 or words.overflow != 0:
+                return failed
+            return IntArithmeticResult { ok: 1, overflow: 0, value: int_truncate_to_width(words.lo, bits, signed == 0) }
+        if kind == NodeKind.NK_UNARY:
+            let inner = self.fold_literal_int_arith(self.ast.get_data1(node))
+            if inner.ok == 0 or inner.overflow != 0:
+                return failed
+            return int_eval_unary_neg(inner.value, bits, self.overflow_mode)
+        if kind != NodeKind.NK_BINARY:
+            return failed
+        let lhs = self.fold_literal_int_arith(self.ast.get_data1(node))
+        let rhs = self.fold_literal_int_arith(self.ast.get_data2(node))
+        if lhs.ok == 0 or lhs.overflow != 0 or rhs.ok == 0 or rhs.overflow != 0:
+            return failed
+        let op = self.ast.get_data0(node)
+        if op == BinaryOp.OP_DIV or op == BinaryOp.OP_MOD:
+            // Division by zero is not an overflow; it panics where it runs.
+            if rhs.value == 0:
+                return failed
+            if int_div_overflows(lhs.value, rhs.value, bits, signed == 0):
+                return IntArithmeticResult { ok: 1, overflow: if self.overflow_mode == OVERFLOW_MODE_WRAP() or self.overflow_mode == OVERFLOW_MODE_SATURATE(): 0 else: 1, value: 0 }
+            if signed == 0:
+                let q = ((lhs.value as u64) / (rhs.value as u64)) as i64
+                return IntArithmeticResult { ok: 1, overflow: 0, value: if op == BinaryOp.OP_DIV: q else: lhs.value -% q *% rhs.value }
+            return IntArithmeticResult { ok: 1, overflow: 0, value: if op == BinaryOp.OP_DIV: lhs.value / rhs.value else: lhs.value % rhs.value }
+        int_eval_binary_arithmetic(op, lhs.value, rhs.value, bits, signed == 0, self.overflow_mode)
 
     mut fn check_binary(node: i32) -> i32:
         let op = self.ast.get_data0(node)
@@ -10800,8 +10885,11 @@ impl Sema:
         self.operator_method_reversed.remove(node)
         self.operator_method_derived.remove(node)
         let rhs_node = self.ast.get_data2(node)
-        let lhs_is_num_lit = sema_node_is_numeric_literal(self.ast, lhs_node)
-        let rhs_is_num_lit = sema_node_is_numeric_literal(self.ast, rhs_node)
+        // §4.2.1: an untyped literal operand — a bare unsuffixed literal, or
+        // arithmetic of them (#1820) — takes its type from the peer operand
+        // (rule 3), or, when both are untyped, from the enclosing context.
+        let lhs_is_num_lit = self.expr_is_untyped_literal_arith(lhs_node)
+        let rhs_is_num_lit = self.expr_is_untyped_literal_arith(rhs_node)
         var lhs: TypeId = 0 as TypeId
         var rhs: TypeId = 0 as TypeId
         if op == BinaryOp.OP_DEFAULT:
@@ -10831,6 +10919,11 @@ impl Sema:
                 dj_arms.push(rhs_node)
                 self.d32_check_owned_join_arms(dj, &dj_arms, "`??` operand")
             return dj
+        // A negation's operand is a magnitude (#943) only when it is the
+        // literal itself: in `-(128 + 0)` the 128 is an i8 value, not the
+        // magnitude of i8::MIN.
+        let saved_negated: i32 = self.in_negated_literal_context
+        self.in_negated_literal_context = 0
         // Variant shorthand in comparisons must be typed against the opposite side,
         // not whatever outer expected type is active (for example `bool` from assert()).
         // A payload variant-constructor call (`e == Ok(5)`) needs the same peer
@@ -10902,8 +10995,11 @@ impl Sema:
            op == BinaryOp.OP_ADD_WRAP or op == BinaryOp.OP_SUB_WRAP or op == BinaryOp.OP_MUL_WRAP or
            op == BinaryOp.OP_ADD_SAT or op == BinaryOp.OP_SUB_SAT or op == BinaryOp.OP_MUL_SAT:
             if lhs_is_num_lit and rhs_is_num_lit:
-                lhs = self.check_expr_value_context(lhs_node)
-                rhs = self.check_expr_value_context(rhs_node)
+                // §4.2.1 rule 1 reaches through the operator (#1820): in
+                // `let x: u8 = 1 + 2` both literals are u8, as a bare `3` is.
+                let context = self.untyped_literal_context_type()
+                lhs = if context != 0: self.check_expr_with_expected(lhs_node, context) else: self.check_expr_value_context(lhs_node)
+                rhs = if context != 0: self.check_expr_with_expected(rhs_node, context) else: self.check_expr_value_context(rhs_node)
             else:
                 if lhs_is_num_lit:
                     rhs = self.check_expr_value_context(rhs_node)
@@ -10925,6 +11021,7 @@ impl Sema:
         else:
             lhs = self.check_expr_value_context(lhs_node)
             rhs = self.check_expr_value_context(rhs_node)
+        self.in_negated_literal_context = saved_negated
 
         if lhs == 0 or rhs == 0:
             return 0
@@ -11036,15 +11133,13 @@ impl Sema:
                 // reader never derives it from context — the LLVM constant
                 // folder folded a global's `0 - K` (K: u32) at the
                 // destination element type i16 and read -1 where the same
-                // expression in a body panics (#1773). Only a type an
-                // operand decides: arithmetic of unsuffixed literals alone
-                // was typed from the literal defaults, without the
-                // destination's context (§4.2.1 rule 1 does not reach
-                // through an operator here yet, #1820) — limits.h's
-                // `ULONG_LONG_MAX` (`9223372036854775807 * 2 + 1` into
-                // c_ulonglong) is not an i64 overflow.
-                if not self.expr_is_untyped_literal_arith(node):
-                    self.typed_expr_types.insert(node, result as i32)
+                // expression in a body panics (#1773). Arithmetic of
+                // unsuffixed literals has its context's type (#1820), so
+                // limits.h's `ULONG_LONG_MAX` (`9223372036854775807 * 2 + 1`
+                // into c_ulonglong) is u64 arithmetic here, not i64.
+                self.typed_expr_types.insert(node, result as i32)
+                if self.expr_is_literal_arith(lhs_node) and self.expr_is_literal_arith(rhs_node):
+                    self.check_literal_arith_fits(node, result)
                 return result as i32
             self.emit_error("arithmetic operator requires numeric operands", node)
             return 0
@@ -11089,8 +11184,10 @@ impl Sema:
             self.typed_expr_types.insert(node, bitwise_result as i32)
             return bitwise_result as i32
 
-        // Wrapping arithmetic
+        // Wrapping arithmetic. The type is recorded like the checked
+        // operators' (D65): the constant folder reads it (#1820).
         if op == BinaryOp.OP_ADD_WRAP or op == BinaryOp.OP_SUB_WRAP or op == BinaryOp.OP_MUL_WRAP:
+            self.typed_expr_types.insert(node, lhs as i32)
             return lhs as i32
 
         // Saturating arithmetic — integers only
@@ -11099,6 +11196,7 @@ impl Sema:
             if self.get_type_kind(sat_resolved) == TypeKind.TY_FLOAT:
                 self.emit_error("saturating arithmetic is not defined for floating-point types", node)
                 return 0
+            self.typed_expr_types.insert(node, lhs as i32)
             return lhs as i32
 
         // Concat (++) — both operands must be str
@@ -11155,13 +11253,16 @@ impl Sema:
         // Only signed expectations are threaded: an unsigned one must still
         // reach "cannot negate an unsigned value" below rather than turning
         // into a fit error on the operand.
+        // A float expectation reaches the operand the same way (#1820:
+        // `let x: f32 = -1.5` is an f32 literal negated, not an f64 one).
         var negated_literal = 0
         if op == UnaryOp.UOP_NEGATE:
             negated_literal = 1
             if self.has_expected_type != 0 and self.expected_expr_type != 0:
                 let expected_neg = self.numeric_operand_type(self.expected_expr_type as i32)
                 let resolved_neg = self.resolve_alias(expected_neg as TypeId)
-                if self.get_type_kind(resolved_neg) == TypeKind.TY_INT and self.get_type_d1(resolved_neg) != 0:
+                let neg_kind = self.get_type_kind(resolved_neg)
+                if (neg_kind == TypeKind.TY_INT and self.get_type_d1(resolved_neg) != 0) or neg_kind == TypeKind.TY_FLOAT:
                     expected_operand = self.expected_expr_type as i32
         let saved_negated: i32 = self.in_negated_literal_context
         if negated_literal != 0:
@@ -11176,6 +11277,9 @@ impl Sema:
                 self.emit_error("cannot negate an unsigned value", node)
                 return 0
             if self.is_numeric_type(operand as i32):
+                // Recorded like `~` below: the constant folder reads it
+                // (D65, #1820).
+                self.typed_expr_types.insert(node, operand as i32)
                 return operand as i32
             let neg_method_sym = self.pool_intern("neg")
             if self.type_has_operator_method(operand as i32, neg_method_sym) != 0:
@@ -19684,6 +19788,22 @@ impl Sema:
         let end = self.ast.get_data1(node)
         let inclusive = self.ast.get_data2(node)
         var elem_type: TypeId = self.ty_i32
+        // §4.2.1 rule 3: an untyped literal bound takes its peer's type, so
+        // `0..n` with `n: i64` is a Range[i64] (#1803: the end is an owned
+        // demand of the start's type, and would otherwise narrow).
+        if start != 0 and end != 0 and self.expr_is_untyped_literal_arith(start) and not self.expr_is_untyped_literal_arith(end):
+            let end_exact = self.check_expr_value_context(end)
+            let end_value = self.shared_copy_pointee(end_exact as i32)
+            if end_value != 0:
+                let _ = self.record_contextual_copy_adjustment(end, end_value, end_exact as i32)
+            let peer = if end_value != 0: end_value as TypeId else: end_exact
+            if self.is_numeric_type(peer as i32):
+                let _ = self.check_expr_with_expected(start, peer)
+                return self.ensure_exact_type(TypeKind.TY_RANGE, peer as i32, inclusive, 0) as i32
+            elem_type = self.check_expr_value_context(start)
+            if peer != 0 and self.types_compatible(elem_type, peer) == 0:
+                self.emit_error("range bounds must have compatible types", node)
+            return self.ensure_exact_type(TypeKind.TY_RANGE, elem_type as i32, inclusive, 0) as i32
         if start != 0:
             elem_type = self.check_expr_value_context(start)
             let start_value = self.shared_copy_pointee(elem_type as i32)
