@@ -8235,7 +8235,7 @@ fn show_pattern_info_8() -> c_int {
     if ((if (((unsafe *(&raw const pat_patctl as *const patctl)).control as c_uint) & (((32 as c_uint) | (8192 as c_uint)) as c_uint)) != 0: 1 else: 0) != 0) {
         fprintf(outfile, c"------------------------------------------------------------------\n".ptr)
 
-        unsafe { pcre2_printint_8(compiled_code_8, outfile, ((if (((unsafe *(&raw const pat_patctl as *const patctl)).control as c_uint) & (8192 as c_uint)) != 0: 1 else: 0) as c_int)) }
+        unsafe { pcre2_printint_8(compiled_code_8, outfile, ((if (((*(&raw const pat_patctl as *const patctl)).control as c_uint) & (8192 as c_uint)) != 0: 1 else: 0) as c_int)) }
 
     }
 
@@ -8454,7 +8454,7 @@ fn show_pattern_info_8() -> c_int {
         }
 
         if ((if (unsafe *compiled_code_8).optimization_flags != 7: 1 else: 0) != 0) {
-            unsafe { show_optimize_flags((-1 as c_int), (unsafe *compiled_code_8).optimization_flags, c"Optimizations: ".ptr, c"\n".ptr) }
+            unsafe { show_optimize_flags((-1 as c_int), (*compiled_code_8).optimization_flags, c"Optimizations: ".ptr, c"\n".ptr) }
         }
 
         if (__local_jchanged != 0) {
@@ -8976,7 +8976,7 @@ fn process_command_8() -> c_int {
                 }
 
                 if ((if (unsafe *(&raw const pat_patctl as *const patctl)).jit != 0: 1 else: 0) != 0) {
-                    (jitrc = ((unsafe { pcre2_jit_compile_8(compiled_code_8, (unsafe *(&raw const pat_patctl as *const patctl)).jit) } as c_int)))
+                    (jitrc = ((unsafe { pcre2_jit_compile_8(compiled_code_8, (*(&raw const pat_patctl as *const patctl)).jit) } as c_int)))
 
                 }
 
@@ -9018,7 +9018,7 @@ fn process_command_8() -> c_int {
                 }
 
                 if ((if (unsafe *(&raw const pat_patctl as *const patctl)).jit != 0: 1 else: 0) != 0) {
-                    (jitrc = ((unsafe { pcre2_jit_compile_8(compiled_code_8, (unsafe *(&raw const pat_patctl as *const patctl)).jit) } as c_int)))
+                    (jitrc = ((unsafe { pcre2_jit_compile_8(compiled_code_8, (*(&raw const pat_patctl as *const patctl)).jit) } as c_int)))
 
                 }
 
@@ -10520,7 +10520,7 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_132 {
-        unsafe { show_compile_options((31 as c_int), ((((unsafe *(&raw const pat_patctl as *const patctl)).options as c_uint) & ((~((((((((((((8 as c_uint) | (32 as c_uint)) as c_uint) | (33554432 as c_uint)) as c_uint) | (1024 as c_uint)) as c_uint) | (131072 as c_uint)) as c_uint) | (524288 as c_uint)) as c_uint) | (262144 as c_uint))) as c_uint)) as c_uint), __local_msg__goto_2351_15, c"".ptr) }
+        unsafe { show_compile_options((31 as c_int), ((((*(&raw const pat_patctl as *const patctl)).options as c_uint) & ((~((((((((((((8 as c_uint) | (32 as c_uint)) as c_uint) | (33554432 as c_uint)) as c_uint) | (1024 as c_uint)) as c_uint) | (131072 as c_uint)) as c_uint) | (524288 as c_uint)) as c_uint) | (262144 as c_uint))) as c_uint)) as c_uint), __local_msg__goto_2351_15, c"".ptr) }
         (__local_msg__goto_2351_15 = c"".ptr)
         goto '__ci_bb_133
     }
@@ -10534,7 +10534,7 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_134 {
-        unsafe { show_compile_extra_options((31 as c_int), ((((unsafe *pat_context_8).extra_options as c_uint) & (((~0) as c_uint) as c_uint)) as c_uint), __local_msg__goto_2351_15, c"".ptr) }
+        unsafe { show_compile_extra_options((31 as c_int), ((((*pat_context_8).extra_options as c_uint) & (((~0) as c_uint) as c_uint)) as c_uint), __local_msg__goto_2351_15, c"".ptr) }
         (__local_msg__goto_2351_15 = c"".ptr)
         goto '__ci_bb_135
     }
@@ -10553,7 +10553,7 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_136 {
-        unsafe { show_controls((31 as c_int), ((((unsafe *(&raw const pat_patctl as *const patctl)).control as c_uint) & ((~((((((((((((1 as c_uint) | (2 as c_uint)) as c_uint) | (1024 as c_uint)) as c_uint) | (65536 as c_uint)) as c_uint) | (8388608 as c_uint)) as c_uint) | (16777216 as c_uint)) as c_uint) | (536870912 as c_uint))) as c_uint)) as c_uint), ((((unsafe *(&raw const pat_patctl as *const patctl)).control2 as c_uint) & (((~0) as c_uint) as c_uint)) as c_uint), __local_msg__goto_2351_15) }
+        unsafe { show_controls((31 as c_int), ((((*(&raw const pat_patctl as *const patctl)).control as c_uint) & ((~((((((((((((1 as c_uint) | (2 as c_uint)) as c_uint) | (1024 as c_uint)) as c_uint) | (65536 as c_uint)) as c_uint) | (8388608 as c_uint)) as c_uint) | (16777216 as c_uint)) as c_uint) | (536870912 as c_uint))) as c_uint)) as c_uint), ((((*(&raw const pat_patctl as *const patctl)).control2 as c_uint) & (((~0) as c_uint) as c_uint)) as c_uint), __local_msg__goto_2351_15) }
         (__local_msg__goto_2351_15 = c"".ptr)
         (pat_patctl.control = ((unsafe *(&raw const pat_patctl as *const patctl)).control as c_uint) & (((((((((((((1 as c_uint) | (2 as c_uint)) as c_uint) | (1024 as c_uint)) as c_uint) | (65536 as c_uint)) as c_uint) | (8388608 as c_uint)) as c_uint) | (16777216 as c_uint)) as c_uint) | (536870912 as c_uint)) as c_uint))
         (pat_patctl.control2 = ((unsafe *(&raw const pat_patctl as *const patctl)).control2 as c_uint) & ((0 as c_uint) as c_uint))
@@ -10907,7 +10907,7 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_180 {
-        unsafe { show_controls((31 as c_int), ((((unsafe *(&raw const pat_patctl as *const patctl)).control as c_uint) & ((~((((((((((((((((((((32 as c_uint) | (128 as c_uint)) as c_uint) | (8192 as c_uint)) as c_uint) | (65536 as c_uint)) as c_uint) | (131072 as c_uint)) as c_uint) | (524288 as c_uint)) as c_uint) | (2097152 as c_uint)) as c_uint) | (33554432 as c_uint)) as c_uint) | (67108864 as c_uint)) as c_uint) | (134217728 as c_uint)) as c_uint) | (536870912 as c_uint))) as c_uint)) as c_uint), ((((unsafe *(&raw const pat_patctl as *const patctl)).control2 as c_uint) & ((~(((((((2147483648 as c_uint) as c_uint) | (536870912 as c_uint)) as c_uint) | (32768 as c_uint)) as c_uint) | (1073741824 as c_uint))) as c_uint)) as c_uint), c"** Ignored when compiled pattern is stacked with 'push':".ptr) }
+        unsafe { show_controls((31 as c_int), ((((*(&raw const pat_patctl as *const patctl)).control as c_uint) & ((~((((((((((((((((((((32 as c_uint) | (128 as c_uint)) as c_uint) | (8192 as c_uint)) as c_uint) | (65536 as c_uint)) as c_uint) | (131072 as c_uint)) as c_uint) | (524288 as c_uint)) as c_uint) | (2097152 as c_uint)) as c_uint) | (33554432 as c_uint)) as c_uint) | (67108864 as c_uint)) as c_uint) | (134217728 as c_uint)) as c_uint) | (536870912 as c_uint))) as c_uint)) as c_uint), ((((*(&raw const pat_patctl as *const patctl)).control2 as c_uint) & ((~(((((((2147483648 as c_uint) as c_uint) | (536870912 as c_uint)) as c_uint) | (32768 as c_uint)) as c_uint) | (1073741824 as c_uint))) as c_uint)) as c_uint), c"** Ignored when compiled pattern is stacked with 'push':".ptr) }
         fprintf(outfile, c"\n".ptr)
         goto '__ci_bb_181
     }
@@ -10926,7 +10926,7 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_182 {
-        unsafe { show_controls((31 as c_int), ((((unsafe *(&raw const pat_patctl as *const patctl)).control as c_uint) & (524288 as c_uint)) as c_uint), ((((unsafe *(&raw const pat_patctl as *const patctl)).control2 as c_uint) & (0 as c_uint)) as c_uint), c"** Applies only to compile when pattern is stacked with 'push':".ptr) }
+        unsafe { show_controls((31 as c_int), ((((*(&raw const pat_patctl as *const patctl)).control as c_uint) & (524288 as c_uint)) as c_uint), ((((*(&raw const pat_patctl as *const patctl)).control2 as c_uint) & (0 as c_uint)) as c_uint), c"** Applies only to compile when pattern is stacked with 'push':".ptr) }
         fprintf(outfile, c"\n".ptr)
         goto '__ci_bb_183
     }
@@ -11258,7 +11258,7 @@ fn process_pattern_8() -> c_int {
 
     '__ci_bb_224 {
         (mallocs_called = ((0 as c_int)))
-        (compiled_code_8 = unsafe { pcre2_compile_8(__local_use_pbuffer__goto_2017_12, __local_patlen__goto_2019_12, ((((unsafe *(&raw const pat_patctl as *const patctl)).options as c_uint) | (__local_use_forbid_utf__goto_2018_10 as c_uint)) as c_uint), (&raw mut __local_errorcode__goto_2015_9 as *mut c_int), (&raw mut __local_erroroffset__goto_2021_12 as *mut c_ulong), __local_use_pat_context__goto_2016_24) })
+        (compiled_code_8 = unsafe { pcre2_compile_8(__local_use_pbuffer__goto_2017_12, __local_patlen__goto_2019_12, ((((*(&raw const pat_patctl as *const patctl)).options as c_uint) | (__local_use_forbid_utf__goto_2018_10 as c_uint)) as c_uint), (&raw mut __local_errorcode__goto_2015_9 as *mut c_int), (&raw mut __local_erroroffset__goto_2021_12 as *mut c_ulong), __local_use_pat_context__goto_2016_24) })
         if (malloc_testing != 0) {
             goto '__ci_bb_231
         } else {
@@ -11276,7 +11276,7 @@ fn process_pattern_8() -> c_int {
 
     '__ci_bb_226 {
         (__local_start_time__goto_2727_13 = ((clock() as c_ulong)))
-        (compiled_code_8 = unsafe { pcre2_compile_8(__local_use_pbuffer__goto_2017_12, __local_patlen__goto_2019_12, ((((unsafe *(&raw const pat_patctl as *const patctl)).options as c_uint) | (__local_use_forbid_utf__goto_2018_10 as c_uint)) as c_uint), (&raw mut __local_errorcode__goto_2015_9 as *mut c_int), (&raw mut __local_erroroffset__goto_2021_12 as *mut c_ulong), __local_use_pat_context__goto_2016_24) })
+        (compiled_code_8 = unsafe { pcre2_compile_8(__local_use_pbuffer__goto_2017_12, __local_patlen__goto_2019_12, ((((*(&raw const pat_patctl as *const patctl)).options as c_uint) | (__local_use_forbid_utf__goto_2018_10 as c_uint)) as c_uint), (&raw mut __local_errorcode__goto_2015_9 as *mut c_int), (&raw mut __local_erroroffset__goto_2021_12 as *mut c_ulong), __local_use_pat_context__goto_2016_24) })
         (__local_time_taken__goto_2724_11 = (__local_time_taken__goto_2724_11 +% ((clock() as c_ulong) -% (__local_start_time__goto_2727_13 as c_ulong))))
         if ((if compiled_code_8 != null: 1 else: 0) != 0) {
             goto '__ci_bb_229
@@ -11359,7 +11359,7 @@ fn process_pattern_8() -> c_int {
         (__local_errorcode__goto_2015_9 = ((0 as c_int)))
         (__local_erroroffset__goto_2021_12 = ((0 as c_ulong)))
         (mallocs_until_failure = __local_i__goto_2750_12)
-        (compiled_code_8 = unsafe { pcre2_compile_8(__local_use_pbuffer__goto_2017_12, __local_patlen__goto_2019_12, ((((unsafe *(&raw const pat_patctl as *const patctl)).options as c_uint) | (__local_use_forbid_utf__goto_2018_10 as c_uint)) as c_uint), (&raw mut __local_errorcode__goto_2015_9 as *mut c_int), (&raw mut __local_erroroffset__goto_2021_12 as *mut c_ulong), __local_use_pat_context__goto_2016_24) })
+        (compiled_code_8 = unsafe { pcre2_compile_8(__local_use_pbuffer__goto_2017_12, __local_patlen__goto_2019_12, ((((*(&raw const pat_patctl as *const patctl)).options as c_uint) | (__local_use_forbid_utf__goto_2018_10 as c_uint)) as c_uint), (&raw mut __local_errorcode__goto_2015_9 as *mut c_int), (&raw mut __local_erroroffset__goto_2021_12 as *mut c_ulong), __local_use_pat_context__goto_2016_24) })
         (mallocs_until_failure = ((2147483647 as c_int)))
         (__ci_expr_logic_35 = 0)
         if ((if __local_i__goto_2750_12 < __local_target_mallocs__goto_2750_19: 1 else: 0) != 0) {
@@ -11414,7 +11414,7 @@ fn process_pattern_8() -> c_int {
 
     '__ci_bb_244 {
         (mallocs_called = ((0 as c_int)))
-        (jitrc = ((unsafe { pcre2_jit_compile_8(compiled_code_8, (unsafe *(&raw const pat_patctl as *const patctl)).jit) } as c_int)))
+        (jitrc = ((unsafe { pcre2_jit_compile_8(compiled_code_8, (*(&raw const pat_patctl as *const patctl)).jit) } as c_int)))
         if (malloc_testing != 0) {
             goto '__ci_bb_257
         } else {
@@ -11432,10 +11432,10 @@ fn process_pattern_8() -> c_int {
 
     '__ci_bb_246 {
         (__local_start_time__goto_2794_15 = ((clock() as c_ulong)))
-        (jitrc = ((unsafe { pcre2_jit_compile_8(compiled_code_8, (unsafe *(&raw const pat_patctl as *const patctl)).jit) } as c_int)))
+        (jitrc = ((unsafe { pcre2_jit_compile_8(compiled_code_8, (*(&raw const pat_patctl as *const patctl)).jit) } as c_int)))
         (__local_time_taken__goto_2790_13 = (__local_time_taken__goto_2790_13 +% ((clock() as c_ulong) -% (__local_start_time__goto_2794_15 as c_ulong))))
         unsafe { pcre2_code_free_8(compiled_code_8) }
-        (compiled_code_8 = unsafe { pcre2_compile_8(__local_use_pbuffer__goto_2017_12, __local_patlen__goto_2019_12, ((((unsafe *(&raw const pat_patctl as *const patctl)).options as c_uint) | (__local_use_forbid_utf__goto_2018_10 as c_uint)) as c_uint), (&raw mut __local_errorcode__goto_2015_9 as *mut c_int), (&raw mut __local_erroroffset__goto_2021_12 as *mut c_ulong), __local_use_pat_context__goto_2016_24) })
+        (compiled_code_8 = unsafe { pcre2_compile_8(__local_use_pbuffer__goto_2017_12, __local_patlen__goto_2019_12, ((((*(&raw const pat_patctl as *const patctl)).options as c_uint) | (__local_use_forbid_utf__goto_2018_10 as c_uint)) as c_uint), (&raw mut __local_errorcode__goto_2015_9 as *mut c_int), (&raw mut __local_erroroffset__goto_2021_12 as *mut c_ulong), __local_use_pat_context__goto_2016_24) })
         if ((if compiled_code_8 == null: 1 else: 0) != 0) {
             goto '__ci_bb_249
         } else {
@@ -11534,7 +11534,7 @@ fn process_pattern_8() -> c_int {
 
     '__ci_bb_260 {
         unsafe { pcre2_code_free_8(compiled_code_8) }
-        (compiled_code_8 = unsafe { pcre2_compile_8(__local_use_pbuffer__goto_2017_12, __local_patlen__goto_2019_12, ((((unsafe *(&raw const pat_patctl as *const patctl)).options as c_uint) | (__local_use_forbid_utf__goto_2018_10 as c_uint)) as c_uint), (&raw mut __local_errorcode__goto_2015_9 as *mut c_int), (&raw mut __local_erroroffset__goto_2021_12 as *mut c_ulong), __local_use_pat_context__goto_2016_24) })
+        (compiled_code_8 = unsafe { pcre2_compile_8(__local_use_pbuffer__goto_2017_12, __local_patlen__goto_2019_12, ((((*(&raw const pat_patctl as *const patctl)).options as c_uint) | (__local_use_forbid_utf__goto_2018_10 as c_uint)) as c_uint), (&raw mut __local_errorcode__goto_2015_9 as *mut c_int), (&raw mut __local_erroroffset__goto_2021_12 as *mut c_ulong), __local_use_pat_context__goto_2016_24) })
         if ((if compiled_code_8 == null: 1 else: 0) != 0) {
             goto '__ci_bb_263
         } else {
@@ -11560,7 +11560,7 @@ fn process_pattern_8() -> c_int {
 
     '__ci_bb_264 {
         (mallocs_until_failure = __local_i__goto_2828_14)
-        (jitrc = ((unsafe { pcre2_jit_compile_8(compiled_code_8, (unsafe *(&raw const pat_patctl as *const patctl)).jit) } as c_int)))
+        (jitrc = ((unsafe { pcre2_jit_compile_8(compiled_code_8, (*(&raw const pat_patctl as *const patctl)).jit) } as c_int)))
         (mallocs_until_failure = ((2147483647 as c_int)))
         (__ci_expr_logic_37 = 0)
         if ((if __local_i__goto_2828_14 < __local_target_mallocs__goto_2828_21: 1 else: 0) != 0) {
@@ -13402,7 +13402,7 @@ fn copy_and_get_8(__param_utf: c_int, __param_capcount: c_int) -> c_int {
             while ((if __local_i < __param_capcount: 1 else: 0) != 0) {
                 fprintf(outfile, c"%2dL ".ptr, __local_i)
 
-                unsafe { pchars_8((-1 as c_int), ((unsafe __local_stringlist[__local_i]) as *const u8), ((unsafe __local_lengths[__local_i]) as c_long), __param_utf, outfile) }
+                unsafe { pchars_8((-1 as c_int), ((__local_stringlist[__local_i]) as *const u8), ((__local_lengths[__local_i]) as c_long), __param_utf, outfile) }
 
                 putc((10 as c_int), outfile)
 
@@ -13984,7 +13984,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_1 {
-        unsafe { with_memcpy(((((&(unsafe *(&raw const dat_datctl as *const datctl)).replacement[0] as *mut u8) + ((1 as isize) as usize)) as *mut c_void) as *mut u8), ((((&(unsafe *(&raw const pat_patctl as *const patctl)).replacement[0] as *mut u8) + ((1 as isize) as usize)) as *const c_void) as *const u8), (((((unsafe *(&raw const pat_patctl as *const patctl)).replacement[0] as c_int) + 1) as c_ulong) as i64)) }
+        unsafe { with_memcpy(((((&(*(&raw const dat_datctl as *const datctl)).replacement[0] as *mut u8) + ((1 as isize) as usize)) as *mut c_void) as *mut u8), ((((&(*(&raw const pat_patctl as *const patctl)).replacement[0] as *mut u8) + ((1 as isize) as usize)) as *const c_void) as *const u8), (((((*(&raw const pat_patctl as *const patctl)).replacement[0] as c_int) + 1) as c_ulong) as i64)) }
         goto '__ci_bb_2
     }
 
@@ -15660,7 +15660,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_221 {
-        unsafe { show_controls((31 as c_int), ((((unsafe *(&raw const dat_datctl as *const datctl)).control as c_uint) & ((~((1 as c_uint) | (2 as c_uint))) as c_uint)) as c_uint), ((((unsafe *(&raw const dat_datctl as *const datctl)).control2 as c_uint) & ((~8192) as c_uint)) as c_uint), __local_msg__goto_4396_15) }
+        unsafe { show_controls((31 as c_int), ((((*(&raw const dat_datctl as *const datctl)).control as c_uint) & ((~((1 as c_uint) | (2 as c_uint))) as c_uint)) as c_uint), ((((*(&raw const dat_datctl as *const datctl)).control2 as c_uint) & ((~8192) as c_uint)) as c_uint), __local_msg__goto_4396_15) }
         (__local_msg__goto_4396_15 = c"".ptr)
         goto '__ci_bb_222
     }
@@ -15687,7 +15687,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_225 {
-        (__local_pmatch__goto_4394_15 = (((unsafe { with_alloc(((((sizeof[regmatch_t]() as c_ulong) *% ((unsafe *(&raw const dat_datctl as *const datctl)).oveccount as c_ulong)) as c_ulong) as i64)) } as *mut c_void) as *mut regmatch_t)))
+        (__local_pmatch__goto_4394_15 = (((unsafe { with_alloc(((((sizeof[regmatch_t]() as c_ulong) *% ((*(&raw const dat_datctl as *const datctl)).oveccount as c_ulong)) as c_ulong) as i64)) } as *mut c_void) as *mut regmatch_t)))
         if ((if __local_pmatch__goto_4394_15 == null: 1 else: 0) != 0) {
             goto '__ci_bb_227
         } else {
@@ -15780,7 +15780,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_238 {
-        (__local_rc__goto_4392_7 = ((unsafe { pcre2_regexec(((&raw mut preg as *mut regex_t) as *const regex_t), ((__local_pp__goto_3853_14 as *const c_char) as *const i8), ((unsafe *(&raw const dat_datctl as *const datctl)).oveccount as c_ulong), __local_pmatch__goto_4394_15, __local_eflags__goto_4393_7) } as c_int)))
+        (__local_rc__goto_4392_7 = ((unsafe { pcre2_regexec(((&raw mut preg as *mut regex_t) as *const regex_t), ((__local_pp__goto_3853_14 as *const c_char) as *const i8), ((*(&raw const dat_datctl as *const datctl)).oveccount as c_ulong), __local_pmatch__goto_4394_15, __local_eflags__goto_4393_7) } as c_int)))
         if ((if __local_rc__goto_4392_7 != 0: 1 else: 0) != 0) {
             goto '__ci_bb_239
         } else {
@@ -15940,7 +15940,7 @@ fn process_data_8() -> c_int {
 
     '__ci_bb_260 {
         fprintf(outfile, c"%2d+ ".ptr, (__local_i__goto_4464_12 as c_int))
-        unsafe { pchars_8((-1 as c_int), ((__local_pp__goto_3853_14 + (((unsafe __local_pmatch__goto_4394_15[__local_i__goto_4464_12]).rm_eo as isize) as usize)) as *const u8), (((__local_len__goto_3841_8 as c_ulong) -% ((unsafe __local_pmatch__goto_4394_15[__local_i__goto_4464_12]).rm_eo as c_ulong)) as c_long), __local_utf__goto_3844_6, outfile) }
+        unsafe { pchars_8((-1 as c_int), ((__local_pp__goto_3853_14 + (((__local_pmatch__goto_4394_15[__local_i__goto_4464_12]).rm_eo as isize) as usize)) as *const u8), (((__local_len__goto_3841_8 as c_ulong) -% ((__local_pmatch__goto_4394_15[__local_i__goto_4464_12]).rm_eo as c_ulong)) as c_long), __local_utf__goto_3844_6, outfile) }
         fprintf(outfile, c"\n".ptr)
         goto '__ci_bb_261
     }
@@ -16063,7 +16063,7 @@ fn process_data_8() -> c_int {
 
     '__ci_bb_275 {
         unsafe { pcre2_jit_stack_free_8(jit_stack_8) }
-        (jit_stack_8 = unsafe { pcre2_jit_stack_create_8((1 as c_ulong), ((((unsafe *(&raw const dat_datctl as *const datctl)).jitstack as c_uint) *% (1024 as c_uint)) as c_ulong), (null as *mut pcre2_real_general_context_8)) })
+        (jit_stack_8 = unsafe { pcre2_jit_stack_create_8((1 as c_ulong), ((((*(&raw const dat_datctl as *const datctl)).jitstack as c_uint) *% (1024 as c_uint)) as c_ulong), (null as *mut pcre2_real_general_context_8)) })
         (jit_stack_size_8 = (((unsafe *(&raw const dat_datctl as *const datctl)).jitstack as c_ulong)))
         goto '__ci_bb_276
     }
@@ -16099,7 +16099,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_281 {
-        unsafe { pcre2_set_callout_8(dat_context_8, callout_function_8, (((&raw const (unsafe *(&raw const dat_datctl as *const datctl)).callout_data as *const c_int) as *mut c_int) as *mut c_void)) }
+        unsafe { pcre2_set_callout_8(dat_context_8, callout_function_8, (((&raw const (*(&raw const dat_datctl as *const datctl)).callout_data as *const c_int) as *mut c_int) as *mut c_void)) }
         goto '__ci_bb_283
     }
 
@@ -16364,17 +16364,17 @@ fn process_data_8() -> c_int {
 
     '__ci_bb_310 {
         ((unsafe dfa_workspace[0]) = ((-1 as c_int)))
-        unsafe { pcre2_dfa_match_8((compiled_code_8 as *const pcre2_real_code_8), (__local_pp__goto_3853_14 as *const u8), __local_arg_ulen__goto_3836_18, (unsafe *(&raw const dat_datctl as *const datctl)).offset, (unsafe *(&raw const dat_datctl as *const datctl)).options, match_data_8, __local_use_dat_context__goto_3843_22, dfa_workspace, (1000 as c_ulong)) }
+        unsafe { pcre2_dfa_match_8((compiled_code_8 as *const pcre2_real_code_8), (__local_pp__goto_3853_14 as *const u8), __local_arg_ulen__goto_3836_18, (*(&raw const dat_datctl as *const datctl)).offset, (*(&raw const dat_datctl as *const datctl)).options, match_data_8, __local_use_dat_context__goto_3843_22, dfa_workspace, (1000 as c_ulong)) }
         goto '__ci_bb_308
     }
 
     '__ci_bb_311 {
-        unsafe { pcre2_jit_match_8((compiled_code_8 as *const pcre2_real_code_8), (__local_pp__goto_3853_14 as *const u8), __local_arg_ulen__goto_3836_18, (unsafe *(&raw const dat_datctl as *const datctl)).offset, (unsafe *(&raw const dat_datctl as *const datctl)).options, match_data_8, __local_use_dat_context__goto_3843_22) }
+        unsafe { pcre2_jit_match_8((compiled_code_8 as *const pcre2_real_code_8), (__local_pp__goto_3853_14 as *const u8), __local_arg_ulen__goto_3836_18, (*(&raw const dat_datctl as *const datctl)).offset, (*(&raw const dat_datctl as *const datctl)).options, match_data_8, __local_use_dat_context__goto_3843_22) }
         goto '__ci_bb_313
     }
 
     '__ci_bb_312 {
-        unsafe { pcre2_match_8((compiled_code_8 as *const pcre2_real_code_8), (__local_pp__goto_3853_14 as *const u8), __local_arg_ulen__goto_3836_18, (unsafe *(&raw const dat_datctl as *const datctl)).offset, (unsafe *(&raw const dat_datctl as *const datctl)).options, match_data_8, __local_use_dat_context__goto_3843_22) }
+        unsafe { pcre2_match_8((compiled_code_8 as *const pcre2_real_code_8), (__local_pp__goto_3853_14 as *const u8), __local_arg_ulen__goto_3836_18, (*(&raw const dat_datctl as *const datctl)).offset, (*(&raw const dat_datctl as *const datctl)).options, match_data_8, __local_use_dat_context__goto_3843_22) }
         goto '__ci_bb_313
     }
 
@@ -16491,7 +16491,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_326 {
-        unsafe { copy_substitute_string_8(__local_utf__goto_3844_6, ((&(unsafe *(&raw const dat_datctl as *const datctl)).substitute_subject[0] as *mut u8) + ((1 as isize) as usize)), ((unsafe *(&raw const dat_datctl as *const datctl)).substitute_subject[0] as c_ulong), (&__local_sbuffer__goto_4648_15[0] as *mut u8), (&raw mut __local_slen__goto_4653_54 as *mut c_ulong)) }
+        unsafe { copy_substitute_string_8(__local_utf__goto_3844_6, ((&(*(&raw const dat_datctl as *const datctl)).substitute_subject[0] as *mut u8) + ((1 as isize) as usize)), ((*(&raw const dat_datctl as *const datctl)).substitute_subject[0] as c_ulong), (&__local_sbuffer__goto_4648_15[0] as *mut u8), (&raw mut __local_slen__goto_4653_54 as *mut c_ulong)) }
         if ((if __local_slen__goto_4653_54 > __local_ulen__goto_3836_12: 1 else: 0) != 0) {
             goto '__ci_bb_328
         } else {
@@ -16607,7 +16607,7 @@ fn process_data_8() -> c_int {
     '__ci_bb_343 {
         reset_callout_state()
         (__local_nsize_input__goto_4653_41 = __local_nsize__goto_4653_34)
-        (__local_rc__goto_4646_7 = ((unsafe { pcre2_substitute_8((compiled_code_8 as *const pcre2_real_code_8), (__local_sbptr__goto_4650_16 as *const u8), __local_slen__goto_4653_54, (unsafe *(&raw const dat_datctl as *const datctl)).offset, ((((unsafe *(&raw const dat_datctl as *const datctl)).options as c_uint) | (__local_xoptions__goto_4651_12 as c_uint)) as c_uint), __local_smatch_data__goto_4654_21, __local_use_dat_context__goto_3843_22, (__local_rbptr__goto_4649_16 as *const u8), __local_rlen__goto_4653_17, rep_out_buffer_8, (&raw mut __local_nsize__goto_4653_34 as *mut c_ulong)) } as c_int)))
+        (__local_rc__goto_4646_7 = ((unsafe { pcre2_substitute_8((compiled_code_8 as *const pcre2_real_code_8), (__local_sbptr__goto_4650_16 as *const u8), __local_slen__goto_4653_54, (*(&raw const dat_datctl as *const datctl)).offset, ((((*(&raw const dat_datctl as *const datctl)).options as c_uint) | (__local_xoptions__goto_4651_12 as c_uint)) as c_uint), __local_smatch_data__goto_4654_21, __local_use_dat_context__goto_3843_22, (__local_rbptr__goto_4649_16 as *const u8), __local_rlen__goto_4653_17, rep_out_buffer_8, (&raw mut __local_nsize__goto_4653_34 as *mut c_ulong)) } as c_int)))
         (__ci_expr_logic_74 = 0)
         if (malloc_testing != 0) {
             (__ci_expr_logic_74 = (if (if (((unsafe *(&raw const dat_datctl as *const datctl)).control2 as c_uint) & (1 as c_uint)) == 0: 1 else: 0) != 0: 1 else: 0))
@@ -16622,7 +16622,7 @@ fn process_data_8() -> c_int {
     '__ci_bb_344 {
         (__local_heapframes__goto_4831_23 = (((unsafe *match_data_8).heapframes as *mut c_void)))
         (__local_memory_data__goto_4831_23 = (unsafe *(&raw const (*match_data_8).memctl as *const pcre2_memctl)).memory_data)
-        unsafe { (unsafe *(&raw const (*match_data_8).memctl as *const pcre2_memctl)).free(__local_heapframes__goto_4831_23, __local_memory_data__goto_4831_23) }
+        unsafe { (*(&raw const (*match_data_8).memctl as *const pcre2_memctl)).free(__local_heapframes__goto_4831_23, __local_memory_data__goto_4831_23) }
         ((unsafe *match_data_8).heapframes = ((null as *mut heapframe)))
         ((unsafe *match_data_8).heapframes_size = ((0 as c_ulong)))
         goto '__ci_bb_345
@@ -16679,7 +16679,7 @@ fn process_data_8() -> c_int {
     '__ci_bb_353 {
         (__local_heapframes__goto_4845_7 = (((unsafe *match_data_8).heapframes as *mut c_void)))
         (__local_memory_data__goto_4845_7 = (unsafe *(&raw const (*match_data_8).memctl as *const pcre2_memctl)).memory_data)
-        unsafe { (unsafe *(&raw const (*match_data_8).memctl as *const pcre2_memctl)).free(__local_heapframes__goto_4845_7, __local_memory_data__goto_4845_7) }
+        unsafe { (*(&raw const (*match_data_8).memctl as *const pcre2_memctl)).free(__local_heapframes__goto_4845_7, __local_memory_data__goto_4845_7) }
         ((unsafe *match_data_8).heapframes = ((null as *mut heapframe)))
         ((unsafe *match_data_8).heapframes_size = ((0 as c_ulong)))
         goto '__ci_bb_354
@@ -16698,7 +16698,7 @@ fn process_data_8() -> c_int {
         (mallocs_until_failure = __local_i__goto_4842_14)
         (outfile = null)
         (__local_nsize__goto_4653_34 = __local_nsize_input__goto_4653_41)
-        (__local_rc__goto_4646_7 = ((unsafe { pcre2_substitute_8((compiled_code_8 as *const pcre2_real_code_8), (__local_sbptr__goto_4650_16 as *const u8), __local_slen__goto_4653_54, (unsafe *(&raw const dat_datctl as *const datctl)).offset, ((((unsafe *(&raw const dat_datctl as *const datctl)).options as c_uint) | (__local_xoptions__goto_4651_12 as c_uint)) as c_uint), __local_smatch_data__goto_4654_21, __local_use_dat_context__goto_3843_22, (__local_rbptr__goto_4649_16 as *const u8), __local_rlen__goto_4653_17, rep_out_buffer_8, (&raw mut __local_nsize__goto_4653_34 as *mut c_ulong)) } as c_int)))
+        (__local_rc__goto_4646_7 = ((unsafe { pcre2_substitute_8((compiled_code_8 as *const pcre2_real_code_8), (__local_sbptr__goto_4650_16 as *const u8), __local_slen__goto_4653_54, (*(&raw const dat_datctl as *const datctl)).offset, ((((*(&raw const dat_datctl as *const datctl)).options as c_uint) | (__local_xoptions__goto_4651_12 as c_uint)) as c_uint), __local_smatch_data__goto_4654_21, __local_use_dat_context__goto_3843_22, (__local_rbptr__goto_4649_16 as *const u8), __local_rlen__goto_4653_17, rep_out_buffer_8, (&raw mut __local_nsize__goto_4653_34 as *mut c_ulong)) } as c_int)))
         (mallocs_until_failure = ((2147483647 as c_int)))
         (outfile = __local_saved_outfile__goto_4844_13)
         (__ci_expr_logic_75 = 0)
@@ -17010,7 +17010,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_395 {
-        unsafe { pcre2_dfa_match_8((compiled_code_8 as *const pcre2_real_code_8), (__local_pp__goto_3853_14 as *const u8), __local_arg_ulen__goto_3836_18, (unsafe *(&raw const dat_datctl as *const datctl)).offset, ((((unsafe *(&raw const dat_datctl as *const datctl)).options as c_uint) | (__local_g_notempty__goto_3839_10 as c_uint)) as c_uint), match_data_8, __local_use_dat_context__goto_3843_22, dfa_workspace, (1000 as c_ulong)) }
+        unsafe { pcre2_dfa_match_8((compiled_code_8 as *const pcre2_real_code_8), (__local_pp__goto_3853_14 as *const u8), __local_arg_ulen__goto_3836_18, (*(&raw const dat_datctl as *const datctl)).offset, ((((*(&raw const dat_datctl as *const datctl)).options as c_uint) | (__local_g_notempty__goto_3839_10 as c_uint)) as c_uint), match_data_8, __local_use_dat_context__goto_3843_22, dfa_workspace, (1000 as c_ulong)) }
         goto '__ci_bb_396
     }
 
@@ -17048,7 +17048,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_402 {
-        unsafe { pcre2_jit_match_8((compiled_code_8 as *const pcre2_real_code_8), (__local_pp__goto_3853_14 as *const u8), __local_arg_ulen__goto_3836_18, (unsafe *(&raw const dat_datctl as *const datctl)).offset, ((((unsafe *(&raw const dat_datctl as *const datctl)).options as c_uint) | (__local_g_notempty__goto_3839_10 as c_uint)) as c_uint), match_data_8, __local_use_dat_context__goto_3843_22) }
+        unsafe { pcre2_jit_match_8((compiled_code_8 as *const pcre2_real_code_8), (__local_pp__goto_3853_14 as *const u8), __local_arg_ulen__goto_3836_18, (*(&raw const dat_datctl as *const datctl)).offset, ((((*(&raw const dat_datctl as *const datctl)).options as c_uint) | (__local_g_notempty__goto_3839_10 as c_uint)) as c_uint), match_data_8, __local_use_dat_context__goto_3843_22) }
         goto '__ci_bb_403
     }
 
@@ -17070,7 +17070,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_406 {
-        unsafe { pcre2_match_8((compiled_code_8 as *const pcre2_real_code_8), (__local_pp__goto_3853_14 as *const u8), __local_arg_ulen__goto_3836_18, (unsafe *(&raw const dat_datctl as *const datctl)).offset, ((((unsafe *(&raw const dat_datctl as *const datctl)).options as c_uint) | (__local_g_notempty__goto_3839_10 as c_uint)) as c_uint), match_data_8, __local_use_dat_context__goto_3843_22) }
+        unsafe { pcre2_match_8((compiled_code_8 as *const pcre2_real_code_8), (__local_pp__goto_3853_14 as *const u8), __local_arg_ulen__goto_3836_18, (*(&raw const dat_datctl as *const datctl)).offset, ((((*(&raw const dat_datctl as *const datctl)).options as c_uint) | (__local_g_notempty__goto_3839_10 as c_uint)) as c_uint), match_data_8, __local_use_dat_context__goto_3843_22) }
         goto '__ci_bb_407
     }
 
@@ -17189,7 +17189,7 @@ fn process_data_8() -> c_int {
     '__ci_bb_420 {
         (__local_heapframes__goto_5025_25 = (((unsafe *match_data_8).heapframes as *mut c_void)))
         (__local_memory_data__goto_5025_25 = (unsafe *(&raw const (*match_data_8).memctl as *const pcre2_memctl)).memory_data)
-        unsafe { (unsafe *(&raw const (*match_data_8).memctl as *const pcre2_memctl)).free(__local_heapframes__goto_5025_25, __local_memory_data__goto_5025_25) }
+        unsafe { (*(&raw const (*match_data_8).memctl as *const pcre2_memctl)).free(__local_heapframes__goto_5025_25, __local_memory_data__goto_5025_25) }
         ((unsafe *match_data_8).heapframes = ((null as *mut heapframe)))
         ((unsafe *match_data_8).heapframes_size = ((0 as c_ulong)))
         goto '__ci_bb_421
@@ -17256,7 +17256,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_429 {
-        (__local_capcount__goto_4919_7 = ((unsafe { pcre2_dfa_match_8((compiled_code_8 as *const pcre2_real_code_8), (__local_pp__goto_3853_14 as *const u8), __local_arg_ulen__goto_3836_18, (unsafe *(&raw const dat_datctl as *const datctl)).offset, ((((unsafe *(&raw const dat_datctl as *const datctl)).options as c_uint) | (__local_g_notempty__goto_3839_10 as c_uint)) as c_uint), match_data_8, __local_use_dat_context__goto_3843_22, dfa_workspace, (1000 as c_ulong)) } as c_int)))
+        (__local_capcount__goto_4919_7 = ((unsafe { pcre2_dfa_match_8((compiled_code_8 as *const pcre2_real_code_8), (__local_pp__goto_3853_14 as *const u8), __local_arg_ulen__goto_3836_18, (*(&raw const dat_datctl as *const datctl)).offset, ((((*(&raw const dat_datctl as *const datctl)).options as c_uint) | (__local_g_notempty__goto_3839_10 as c_uint)) as c_uint), match_data_8, __local_use_dat_context__goto_3843_22, dfa_workspace, (1000 as c_ulong)) } as c_int)))
         if ((if __local_capcount__goto_4919_7 == 0: 1 else: 0) != 0) {
             goto '__ci_bb_430
         } else {
@@ -17277,12 +17277,12 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_432 {
-        (__local_capcount__goto_4919_7 = ((unsafe { pcre2_jit_match_8((compiled_code_8 as *const pcre2_real_code_8), (__local_pp__goto_3853_14 as *const u8), __local_arg_ulen__goto_3836_18, (unsafe *(&raw const dat_datctl as *const datctl)).offset, ((((unsafe *(&raw const dat_datctl as *const datctl)).options as c_uint) | (__local_g_notempty__goto_3839_10 as c_uint)) as c_uint), match_data_8, __local_use_dat_context__goto_3843_22) } as c_int)))
+        (__local_capcount__goto_4919_7 = ((unsafe { pcre2_jit_match_8((compiled_code_8 as *const pcre2_real_code_8), (__local_pp__goto_3853_14 as *const u8), __local_arg_ulen__goto_3836_18, (*(&raw const dat_datctl as *const datctl)).offset, ((((*(&raw const dat_datctl as *const datctl)).options as c_uint) | (__local_g_notempty__goto_3839_10 as c_uint)) as c_uint), match_data_8, __local_use_dat_context__goto_3843_22) } as c_int)))
         goto '__ci_bb_434
     }
 
     '__ci_bb_433 {
-        (__local_capcount__goto_4919_7 = ((unsafe { pcre2_match_8((compiled_code_8 as *const pcre2_real_code_8), (__local_pp__goto_3853_14 as *const u8), __local_arg_ulen__goto_3836_18, (unsafe *(&raw const dat_datctl as *const datctl)).offset, ((((unsafe *(&raw const dat_datctl as *const datctl)).options as c_uint) | (__local_g_notempty__goto_3839_10 as c_uint)) as c_uint), match_data_8, __local_use_dat_context__goto_3843_22) } as c_int)))
+        (__local_capcount__goto_4919_7 = ((unsafe { pcre2_match_8((compiled_code_8 as *const pcre2_real_code_8), (__local_pp__goto_3853_14 as *const u8), __local_arg_ulen__goto_3836_18, (*(&raw const dat_datctl as *const datctl)).offset, ((((*(&raw const dat_datctl as *const datctl)).options as c_uint) | (__local_g_notempty__goto_3839_10 as c_uint)) as c_uint), match_data_8, __local_use_dat_context__goto_3843_22) } as c_int)))
         goto '__ci_bb_434
     }
 
@@ -17341,7 +17341,7 @@ fn process_data_8() -> c_int {
     '__ci_bb_443 {
         (__local_heapframes__goto_5065_9 = (((unsafe *match_data_8).heapframes as *mut c_void)))
         (__local_memory_data__goto_5065_9 = (unsafe *(&raw const (*match_data_8).memctl as *const pcre2_memctl)).memory_data)
-        unsafe { (unsafe *(&raw const (*match_data_8).memctl as *const pcre2_memctl)).free(__local_heapframes__goto_5065_9, __local_memory_data__goto_5065_9) }
+        unsafe { (*(&raw const (*match_data_8).memctl as *const pcre2_memctl)).free(__local_heapframes__goto_5065_9, __local_memory_data__goto_5065_9) }
         ((unsafe *match_data_8).heapframes = ((null as *mut heapframe)))
         ((unsafe *match_data_8).heapframes_size = ((0 as c_ulong)))
         goto '__ci_bb_444
@@ -17400,17 +17400,17 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_450 {
-        (__local_capcount__goto_4919_7 = ((unsafe { pcre2_dfa_match_8((compiled_code_8 as *const pcre2_real_code_8), (__local_pp__goto_3853_14 as *const u8), __local_arg_ulen__goto_3836_18, (unsafe *(&raw const dat_datctl as *const datctl)).offset, ((((unsafe *(&raw const dat_datctl as *const datctl)).options as c_uint) | (__local_g_notempty__goto_3839_10 as c_uint)) as c_uint), match_data_8, __local_use_dat_context__goto_3843_22, dfa_workspace, (1000 as c_ulong)) } as c_int)))
+        (__local_capcount__goto_4919_7 = ((unsafe { pcre2_dfa_match_8((compiled_code_8 as *const pcre2_real_code_8), (__local_pp__goto_3853_14 as *const u8), __local_arg_ulen__goto_3836_18, (*(&raw const dat_datctl as *const datctl)).offset, ((((*(&raw const dat_datctl as *const datctl)).options as c_uint) | (__local_g_notempty__goto_3839_10 as c_uint)) as c_uint), match_data_8, __local_use_dat_context__goto_3843_22, dfa_workspace, (1000 as c_ulong)) } as c_int)))
         goto '__ci_bb_448
     }
 
     '__ci_bb_451 {
-        (__local_capcount__goto_4919_7 = ((unsafe { pcre2_jit_match_8((compiled_code_8 as *const pcre2_real_code_8), (__local_pp__goto_3853_14 as *const u8), __local_arg_ulen__goto_3836_18, (unsafe *(&raw const dat_datctl as *const datctl)).offset, ((((unsafe *(&raw const dat_datctl as *const datctl)).options as c_uint) | (__local_g_notempty__goto_3839_10 as c_uint)) as c_uint), match_data_8, __local_use_dat_context__goto_3843_22) } as c_int)))
+        (__local_capcount__goto_4919_7 = ((unsafe { pcre2_jit_match_8((compiled_code_8 as *const pcre2_real_code_8), (__local_pp__goto_3853_14 as *const u8), __local_arg_ulen__goto_3836_18, (*(&raw const dat_datctl as *const datctl)).offset, ((((*(&raw const dat_datctl as *const datctl)).options as c_uint) | (__local_g_notempty__goto_3839_10 as c_uint)) as c_uint), match_data_8, __local_use_dat_context__goto_3843_22) } as c_int)))
         goto '__ci_bb_453
     }
 
     '__ci_bb_452 {
-        (__local_capcount__goto_4919_7 = ((unsafe { pcre2_match_8((compiled_code_8 as *const pcre2_real_code_8), (__local_pp__goto_3853_14 as *const u8), __local_arg_ulen__goto_3836_18, (unsafe *(&raw const dat_datctl as *const datctl)).offset, ((((unsafe *(&raw const dat_datctl as *const datctl)).options as c_uint) | (__local_g_notempty__goto_3839_10 as c_uint)) as c_uint), match_data_8, __local_use_dat_context__goto_3843_22) } as c_int)))
+        (__local_capcount__goto_4919_7 = ((unsafe { pcre2_match_8((compiled_code_8 as *const pcre2_real_code_8), (__local_pp__goto_3853_14 as *const u8), __local_arg_ulen__goto_3836_18, (*(&raw const dat_datctl as *const datctl)).offset, ((((*(&raw const dat_datctl as *const datctl)).options as c_uint) | (__local_g_notempty__goto_3839_10 as c_uint)) as c_uint), match_data_8, __local_use_dat_context__goto_3843_22) } as c_int)))
         goto '__ci_bb_453
     }
 
@@ -17597,7 +17597,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_474 {
-        if ((if unsafe { with_memcmp((((unsafe *match_data_8).subject as *const c_void) as *const u8), ((__local_pp__goto_3853_14 as *const c_void) as *const u8), (__local_ulen__goto_3836_12 as i64)) } != 0: 1 else: 0) != 0) {
+        if ((if unsafe { with_memcmp((((*match_data_8).subject as *const c_void) as *const u8), ((__local_pp__goto_3853_14 as *const c_void) as *const u8), (__local_ulen__goto_3836_12 as i64)) } != 0: 1 else: 0) != 0) {
             goto '__ci_bb_475
         } else {
             goto '__ci_bb_476
@@ -18109,7 +18109,7 @@ fn process_data_8() -> c_int {
 
     '__ci_bb_537 {
         fprintf(outfile, c"%2d+ ".ptr, (__local_i__goto_5229_14 / 2))
-        unsafe { pchars_8((-1 as c_int), ((__local_pp__goto_3853_14 + ((unsafe __local_ovector__goto_3847_13[(__local_i__goto_5229_14 + 1)]) as usize)) as *const u8), (((__local_ulen__goto_3836_12 as c_ulong) -% ((unsafe __local_ovector__goto_3847_13[(__local_i__goto_5229_14 + 1)]) as c_ulong)) as c_long), __local_utf__goto_3844_6, outfile) }
+        unsafe { pchars_8((-1 as c_int), ((__local_pp__goto_3853_14 + ((__local_ovector__goto_3847_13[(__local_i__goto_5229_14 + 1)]) as usize)) as *const u8), (((__local_ulen__goto_3836_12 as c_ulong) -% ((__local_ovector__goto_3847_13[(__local_i__goto_5229_14 + 1)]) as c_ulong)) as c_long), __local_utf__goto_3844_6, outfile) }
         fprintf(outfile, c"\n".ptr)
         goto '__ci_bb_538
     }
@@ -18120,7 +18120,7 @@ fn process_data_8() -> c_int {
 
     '__ci_bb_539 {
         fprintf(outfile, c"MK: ".ptr)
-        unsafe { pchars_8((-1 as c_int), ((unsafe *match_data_8).mark - ((1 as isize) as usize)), (-1 as c_long), __local_utf__goto_3844_6, outfile) }
+        unsafe { pchars_8((-1 as c_int), ((*match_data_8).mark - ((1 as isize) as usize)), (-1 as c_long), __local_utf__goto_3844_6, outfile) }
         fprintf(outfile, c"\n".ptr)
         goto '__ci_bb_540
     }
@@ -18181,7 +18181,7 @@ fn process_data_8() -> c_int {
 
     '__ci_bb_549 {
         fprintf(outfile, c", mark=".ptr)
-        (__local_rubriclength__goto_5379_9 = ((unsafe { pchars_8((-1 as c_int), ((unsafe *match_data_8).mark - ((1 as isize) as usize)), (-1 as c_long), __local_utf__goto_3844_6, outfile) } as c_int)))
+        (__local_rubriclength__goto_5379_9 = ((unsafe { pchars_8((-1 as c_int), ((*match_data_8).mark - ((1 as isize) as usize)), (-1 as c_long), __local_utf__goto_3844_6, outfile) } as c_int)))
         (__local_rubriclength__goto_5379_9 = __local_rubriclength__goto_5379_9 + 7)
         goto '__ci_bb_550
     }
@@ -18189,8 +18189,8 @@ fn process_data_8() -> c_int {
     '__ci_bb_550 {
         fprintf(outfile, c": ".ptr)
         (__local_rubriclength__goto_5379_9 = __local_rubriclength__goto_5379_9 + 15)
-        (__local_backlength__goto_5378_9 = ((unsafe { pchars_8((32 as c_int), ((__local_pp__goto_3853_14 + (__local_leftchar__goto_5377_16 as usize)) as *const u8), ((((unsafe __local_ovector__goto_3847_13[0]) as c_ulong) -% (__local_leftchar__goto_5377_16 as c_ulong)) as c_long), __local_utf__goto_3844_6, outfile) } as c_int)))
-        unsafe { pchars_8((32 as c_int), ((__local_pp__goto_3853_14 + ((unsafe __local_ovector__goto_3847_13[0]) as usize)) as *const u8), ((((unsafe __local_ovector__goto_3847_13[1]) as c_ulong) -% ((unsafe __local_ovector__goto_3847_13[0]) as c_ulong)) as c_long), __local_utf__goto_3844_6, outfile) }
+        (__local_backlength__goto_5378_9 = ((unsafe { pchars_8((32 as c_int), ((__local_pp__goto_3853_14 + (__local_leftchar__goto_5377_16 as usize)) as *const u8), ((((__local_ovector__goto_3847_13[0]) as c_ulong) -% (__local_leftchar__goto_5377_16 as c_ulong)) as c_long), __local_utf__goto_3844_6, outfile) } as c_int)))
+        unsafe { pchars_8((32 as c_int), ((__local_pp__goto_3853_14 + ((__local_ovector__goto_3847_13[0]) as usize)) as *const u8), ((((__local_ovector__goto_3847_13[1]) as c_ulong) -% ((__local_ovector__goto_3847_13[0]) as c_ulong)) as c_long), __local_utf__goto_3844_6, outfile) }
         (__ci_expr_logic_116 = 0)
         if ((if (((unsafe *(&raw const pat_patctl as *const patctl)).control as c_uint) & (524288 as c_uint)) != 0: 1 else: 0) != 0) {
             (__ci_expr_logic_116 = (if jit_was_used != 0: 1 else: 0))
@@ -18352,7 +18352,7 @@ fn process_data_8() -> c_int {
 
     '__ci_bb_574 {
         fprintf(outfile, c", mark = ".ptr)
-        unsafe { pchars_8((-1 as c_int), ((unsafe *match_data_8).mark - ((1 as isize) as usize)), (-1 as c_long), __local_utf__goto_3844_6, outfile) }
+        unsafe { pchars_8((-1 as c_int), ((*match_data_8).mark - ((1 as isize) as usize)), (-1 as c_long), __local_utf__goto_3844_6, outfile) }
         goto '__ci_bb_575
     }
 
@@ -25657,9 +25657,9 @@ var OP_names: [173]*const i8 = [c"End".ptr as *const i8, c"\\A".ptr as *const i8
 let OP_lengths_8: [173]u8 = [(1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (3 as u8), (3 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (2 as u8), (2 as u8), (2 as u8), (2 as u8), (2 as u8), (2 as u8), (2 as u8), (2 as u8), (2 as u8), (2 as u8), (4 as u8), (4 as u8), (4 as u8), (2 as u8), (2 as u8), (2 as u8), (4 as u8), (2 as u8), (2 as u8), (2 as u8), (2 as u8), (2 as u8), (2 as u8), (4 as u8), (4 as u8), (4 as u8), (2 as u8), (2 as u8), (2 as u8), (4 as u8), (2 as u8), (2 as u8), (2 as u8), (2 as u8), (2 as u8), (2 as u8), (4 as u8), (4 as u8), (4 as u8), (2 as u8), (2 as u8), (2 as u8), (4 as u8), (2 as u8), (2 as u8), (2 as u8), (2 as u8), (2 as u8), (2 as u8), (4 as u8), (4 as u8), (4 as u8), (2 as u8), (2 as u8), (2 as u8), (4 as u8), (2 as u8), (2 as u8), (2 as u8), (2 as u8), (2 as u8), (2 as u8), (4 as u8), (4 as u8), (4 as u8), (2 as u8), (2 as u8), (2 as u8), (4 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (5 as u8), (5 as u8), (1 as u8), (1 as u8), (1 as u8), (5 as u8), (33 as u8), (33 as u8), (0 as u8), (0 as u8), (3 as u8), (4 as u8), (5 as u8), (6 as u8), (3 as u8), (6 as u8), (0 as u8), (3 as u8), (3 as u8), (3 as u8), (3 as u8), (3 as u8), (3 as u8), (5 as u8), (3 as u8), (3 as u8), (3 as u8), (3 as u8), (3 as u8), (3 as u8), (3 as u8), (3 as u8), (3 as u8), (3 as u8), (3 as u8), (5 as u8), (5 as u8), (3 as u8), (3 as u8), (3 as u8), (5 as u8), (5 as u8), (3 as u8), (3 as u8), (5 as u8), (3 as u8), (5 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8), (3 as u8), (1 as u8), (3 as u8), (1 as u8), (3 as u8), (1 as u8), (3 as u8), (1 as u8), (3 as u8), (1 as u8), (1 as u8), (1 as u8), (3 as u8), (1 as u8), (1 as u8), (1 as u8), (1 as u8)]
 var cmdlist: [12]cmdstruct = [cmdstruct { name: (("endif" as *mut c_char) as *const c_char), value: CMD_ENDIF }, cmdstruct { name: (("forbid_utf" as *mut c_char) as *const c_char), value: CMD_FORBID_UTF }, cmdstruct { name: (("if" as *mut c_char) as *const c_char), value: CMD_IF }, cmdstruct { name: (("load" as *mut c_char) as *const c_char), value: CMD_LOAD }, cmdstruct { name: (("loadtables" as *mut c_char) as *const c_char), value: CMD_LOADTABLES }, cmdstruct { name: (("newline_default" as *mut c_char) as *const c_char), value: CMD_NEWLINE_DEFAULT }, cmdstruct { name: (("pattern" as *mut c_char) as *const c_char), value: CMD_PATTERN }, cmdstruct { name: (("perltest" as *mut c_char) as *const c_char), value: CMD_PERLTEST }, cmdstruct { name: (("pop" as *mut c_char) as *const c_char), value: CMD_POP }, cmdstruct { name: (("popcopy" as *mut c_char) as *const c_char), value: CMD_POPCOPY }, cmdstruct { name: (("save" as *mut c_char) as *const c_char), value: CMD_SAVE }, cmdstruct { name: (("subject" as *mut c_char) as *const c_char), value: CMD_SUBJECT }]
 var newlines: [7]*const i8 = [(("DEFAULT" as *mut c_char) as *const c_char), (("CR" as *mut c_char) as *const c_char), (("LF" as *mut c_char) as *const c_char), (("CRLF" as *mut c_char) as *const c_char), (("ANY" as *mut c_char) as *const c_char), (("ANYCRLF" as *mut c_char) as *const c_char), (("NUL" as *mut c_char) as *const c_char)]
-var convertlist: [6]convertstruct = [convertstruct { name: (("glob" as *mut c_char) as *const c_char), option: 16 }, convertstruct { name: (("glob_no_starstar" as *mut c_char) as *const c_char), option: 80 }, convertstruct { name: (("glob_no_wild_separator" as *mut c_char) as *const c_char), option: 48 }, convertstruct { name: (("posix_basic" as *mut c_char) as *const c_char), option: 4 }, convertstruct { name: (("posix_extended" as *mut c_char) as *const c_char), option: 8 }, convertstruct { name: (("unset" as *mut c_char) as *const c_char), option: 4294967295 }]
+var convertlist: [6]convertstruct = [convertstruct { name: c"glob".ptr as *const i8, option: 0x00000010 }, convertstruct { name: c"glob_no_starstar".ptr as *const i8, option: 0x00000050 }, convertstruct { name: c"glob_no_wild_separator".ptr as *const i8, option: 0x00000030 }, convertstruct { name: c"posix_basic".ptr as *const i8, option: 0x00000004 }, convertstruct { name: c"posix_extended".ptr as *const i8, option: 0x00000008 }, convertstruct { name: c"unset".ptr as *const i8, option: 4294967295 }]
 var modlist: [156]modstruct = [modstruct { name: (("aftertext" as *mut c_char) as *const c_char), which: 9, type_: 12, value: 1, offset: 4 }, modstruct { name: (("allaftertext" as *mut c_char) as *const c_char), which: 9, type_: 12, value: 2, offset: 4 }, modstruct { name: (("allcaptures" as *mut c_char) as *const c_char), which: 8, type_: 12, value: 4, offset: 4 }, modstruct { name: (("allow_empty_class" as *mut c_char) as *const c_char), which: 2, type_: 20, value: 1, offset: 0 }, modstruct { name: (("allow_lookaround_bsk" as *mut c_char) as *const c_char), which: 0, type_: 20, value: 64, offset: 72 }, modstruct { name: (("allow_surrogate_escapes" as *mut c_char) as *const c_char), which: 0, type_: 20, value: 1, offset: 72 }, modstruct { name: (("allusedtext" as *mut c_char) as *const c_char), which: 9, type_: 12, value: 8, offset: 4 }, modstruct { name: (("allvector" as *mut c_char) as *const c_char), which: 8, type_: 12, value: 2048, offset: 8 }, modstruct { name: (("alt_bsux" as *mut c_char) as *const c_char), which: 2, type_: 20, value: 2, offset: 0 }, modstruct { name: (("alt_circumflex" as *mut c_char) as *const c_char), which: 2, type_: 20, value: 2097152, offset: 0 }, modstruct { name: (("alt_extended_class" as *mut c_char) as *const c_char), which: 2, type_: 20, value: 134217728, offset: 0 }, modstruct { name: (("alt_verbnames" as *mut c_char) as *const c_char), which: 2, type_: 20, value: 4194304, offset: 0 }, modstruct { name: (("altglobal" as *mut c_char) as *const c_char), which: 8, type_: 12, value: 16, offset: 4 }, modstruct { name: (("anchored" as *mut c_char) as *const c_char), which: 6, type_: 20, value: 2147483648, offset: 0 }, modstruct { name: (("ascii_all" as *mut c_char) as *const c_char), which: 0, type_: 20, value: (((((((256 as c_uint) | (512 as c_uint)) as c_uint) | (1024 as c_uint)) as c_uint) | (2048 as c_uint))), offset: 72 }, modstruct { name: (("ascii_bsd" as *mut c_char) as *const c_char), which: 0, type_: 20, value: 256, offset: 72 }, modstruct { name: (("ascii_bss" as *mut c_char) as *const c_char), which: 0, type_: 20, value: 512, offset: 72 }, modstruct { name: (("ascii_bsw" as *mut c_char) as *const c_char), which: 0, type_: 20, value: 1024, offset: 72 }, modstruct { name: (("ascii_digit" as *mut c_char) as *const c_char), which: 0, type_: 20, value: 4096, offset: 72 }, modstruct { name: (("ascii_posix" as *mut c_char) as *const c_char), which: 0, type_: 20, value: 2048, offset: 72 }, modstruct { name: (("auto_callout" as *mut c_char) as *const c_char), which: 2, type_: 20, value: 4, offset: 0 }, modstruct { name: (("auto_possess" as *mut c_char) as *const c_char), which: 0, type_: 21, value: 64, offset: 0 }, modstruct { name: (("auto_possess_off" as *mut c_char) as *const c_char), which: 0, type_: 21, value: 65, offset: 0 }, modstruct { name: (("bad_escape_is_literal" as *mut c_char) as *const c_char), which: 0, type_: 20, value: 2, offset: 72 }, modstruct { name: (("bincode" as *mut c_char) as *const c_char), which: 2, type_: 12, value: 32, offset: 4 }, modstruct { name: (("bsr" as *mut c_char) as *const c_char), which: 0, type_: 13, value: 0, offset: 64 }, modstruct { name: (("callout_capture" as *mut c_char) as *const c_char), which: 4, type_: 12, value: 64, offset: 4 }, modstruct { name: (("callout_data" as *mut c_char) as *const c_char), which: 4, type_: 15, value: 0, offset: 256 }, modstruct { name: (("callout_error" as *mut c_char) as *const c_char), which: 4, type_: 14, value: 0, offset: 240 }, modstruct { name: (("callout_extra" as *mut c_char) as *const c_char), which: 4, type_: 12, value: 1024, offset: 8 }, modstruct { name: (("callout_fail" as *mut c_char) as *const c_char), which: 4, type_: 14, value: 0, offset: 248 }, modstruct { name: (("callout_info" as *mut c_char) as *const c_char), which: 2, type_: 12, value: 128, offset: 4 }, modstruct { name: (("callout_no_where" as *mut c_char) as *const c_char), which: 4, type_: 12, value: 512, offset: 8 }, modstruct { name: (("callout_none" as *mut c_char) as *const c_char), which: 4, type_: 12, value: 256, offset: 4 }, modstruct { name: (("caseless" as *mut c_char) as *const c_char), which: 3, type_: 20, value: 8, offset: 0 }, modstruct { name: (("caseless_restrict" as *mut c_char) as *const c_char), which: 0, type_: 20, value: 128, offset: 72 }, modstruct { name: (("convert" as *mut c_char) as *const c_char), which: 2, type_: 11, value: 0, offset: 140 }, modstruct { name: (("convert_glob_escape" as *mut c_char) as *const c_char), which: 2, type_: 10, value: 0, offset: 148 }, modstruct { name: (("convert_glob_separator" as *mut c_char) as *const c_char), which: 2, type_: 10, value: 0, offset: 152 }, modstruct { name: (("convert_length" as *mut c_char) as *const c_char), which: 2, type_: 16, value: 0, offset: 144 }, modstruct { name: (("copy" as *mut c_char) as *const c_char), which: 4, type_: 19, value: 260, offset: 352 }, modstruct { name: (("copy_matched_subject" as *mut c_char) as *const c_char), which: 4, type_: 20, value: 16384, offset: 0 }, modstruct { name: (("debug" as *mut c_char) as *const c_char), which: 2, type_: 12, value: (((8192 as c_uint) | (131072 as c_uint))), offset: 4 }, modstruct { name: (("depth_limit" as *mut c_char) as *const c_char), which: 1, type_: 16, value: 0, offset: 88 }, modstruct { name: (("dfa" as *mut c_char) as *const c_char), which: 4, type_: 12, value: 512, offset: 4 }, modstruct { name: (("dfa_restart" as *mut c_char) as *const c_char), which: 4, type_: 20, value: 64, offset: 0 }, modstruct { name: (("dfa_shortest" as *mut c_char) as *const c_char), which: 4, type_: 20, value: 128, offset: 0 }, modstruct { name: (("disable_recurseloop_check" as *mut c_char) as *const c_char), which: 4, type_: 20, value: 262144, offset: 0 }, modstruct { name: (("dollar_endonly" as *mut c_char) as *const c_char), which: 2, type_: 20, value: 16, offset: 0 }, modstruct { name: (("dotall" as *mut c_char) as *const c_char), which: 3, type_: 20, value: 32, offset: 0 }, modstruct { name: (("dotstar_anchor" as *mut c_char) as *const c_char), which: 0, type_: 21, value: 66, offset: 0 }, modstruct { name: (("dotstar_anchor_off" as *mut c_char) as *const c_char), which: 0, type_: 21, value: 67, offset: 0 }, modstruct { name: (("dupnames" as *mut c_char) as *const c_char), which: 3, type_: 20, value: 64, offset: 0 }, modstruct { name: (("endanchored" as *mut c_char) as *const c_char), which: 6, type_: 20, value: 536870912, offset: 0 }, modstruct { name: (("escaped_cr_is_lf" as *mut c_char) as *const c_char), which: 0, type_: 20, value: 16, offset: 72 }, modstruct { name: (("expand" as *mut c_char) as *const c_char), which: 2, type_: 12, value: 1024, offset: 4 }, modstruct { name: (("extended" as *mut c_char) as *const c_char), which: 3, type_: 20, value: 128, offset: 0 }, modstruct { name: (("extended_more" as *mut c_char) as *const c_char), which: 3, type_: 20, value: 16777216, offset: 0 }, modstruct { name: (("extra_alt_bsux" as *mut c_char) as *const c_char), which: 0, type_: 20, value: 32, offset: 72 }, modstruct { name: (("find_limits" as *mut c_char) as *const c_char), which: 4, type_: 12, value: 2048, offset: 4 }, modstruct { name: (("find_limits_noheap" as *mut c_char) as *const c_char), which: 4, type_: 12, value: 4096, offset: 4 }, modstruct { name: (("firstline" as *mut c_char) as *const c_char), which: 2, type_: 20, value: 256, offset: 0 }, modstruct { name: (("framesize" as *mut c_char) as *const c_char), which: 2, type_: 12, value: 32768, offset: 8 }, modstruct { name: (("fullbincode" as *mut c_char) as *const c_char), which: 2, type_: 12, value: 8192, offset: 4 }, modstruct { name: (("get" as *mut c_char) as *const c_char), which: 4, type_: 19, value: 300, offset: 416 }, modstruct { name: (("getall" as *mut c_char) as *const c_char), which: 4, type_: 12, value: 16384, offset: 4 }, modstruct { name: (("global" as *mut c_char) as *const c_char), which: 9, type_: 12, value: 32768, offset: 4 }, modstruct { name: (("heap_limit" as *mut c_char) as *const c_char), which: 1, type_: 16, value: 0, offset: 80 }, modstruct { name: (("heapframes_size" as *mut c_char) as *const c_char), which: 8, type_: 12, value: 536870912, offset: 8 }, modstruct { name: (("hex" as *mut c_char) as *const c_char), which: 3, type_: 12, value: 65536, offset: 4 }, modstruct { name: (("info" as *mut c_char) as *const c_char), which: 2, type_: 12, value: 131072, offset: 4 }, modstruct { name: (("jit" as *mut c_char) as *const c_char), which: 2, type_: 17, value: 7, offset: 128 }, modstruct { name: (("jitfast" as *mut c_char) as *const c_char), which: 2, type_: 12, value: 262144, offset: 4 }, modstruct { name: (("jitstack" as *mut c_char) as *const c_char), which: 9, type_: 16, value: 0, offset: 12 }, modstruct { name: (("jitverify" as *mut c_char) as *const c_char), which: 2, type_: 12, value: 524288, offset: 4 }, modstruct { name: (("literal" as *mut c_char) as *const c_char), which: 2, type_: 20, value: 33554432, offset: 0 }, modstruct { name: (("locale" as *mut c_char) as *const c_char), which: 3, type_: 23, value: 32, offset: 160 }, modstruct { name: (("mark" as *mut c_char) as *const c_char), which: 9, type_: 12, value: 1048576, offset: 4 }, modstruct { name: (("match_invalid_utf" as *mut c_char) as *const c_char), which: 2, type_: 20, value: 67108864, offset: 0 }, modstruct { name: (("match_limit" as *mut c_char) as *const c_char), which: 1, type_: 16, value: 0, offset: 84 }, modstruct { name: (("match_line" as *mut c_char) as *const c_char), which: 0, type_: 20, value: 8, offset: 72 }, modstruct { name: (("match_unset_backref" as *mut c_char) as *const c_char), which: 2, type_: 20, value: 512, offset: 0 }, modstruct { name: (("match_word" as *mut c_char) as *const c_char), which: 0, type_: 20, value: 4, offset: 72 }, modstruct { name: (("max_pattern_compiled_length" as *mut c_char) as *const c_char), which: 0, type_: 22, value: 0, offset: 56 }, modstruct { name: (("max_pattern_length" as *mut c_char) as *const c_char), which: 0, type_: 22, value: 0, offset: 48 }, modstruct { name: (("max_varlookbehind" as *mut c_char) as *const c_char), which: 0, type_: 16, value: 0, offset: 76 }, modstruct { name: (("memory" as *mut c_char) as *const c_char), which: 6, type_: 12, value: 2097152, offset: 4 }, modstruct { name: (("multiline" as *mut c_char) as *const c_char), which: 3, type_: 20, value: 1024, offset: 0 }, modstruct { name: (("never_backslash_c" as *mut c_char) as *const c_char), which: 2, type_: 20, value: 1048576, offset: 0 }, modstruct { name: (("never_callout" as *mut c_char) as *const c_char), which: 0, type_: 20, value: 32768, offset: 72 }, modstruct { name: (("never_ucp" as *mut c_char) as *const c_char), which: 2, type_: 20, value: 2048, offset: 0 }, modstruct { name: (("never_utf" as *mut c_char) as *const c_char), which: 2, type_: 20, value: 4096, offset: 0 }, modstruct { name: (("newline" as *mut c_char) as *const c_char), which: 0, type_: 18, value: 0, offset: 0 }, modstruct { name: (("no_auto_capture" as *mut c_char) as *const c_char), which: 2, type_: 20, value: 8192, offset: 0 }, modstruct { name: (("no_auto_possess" as *mut c_char) as *const c_char), which: 3, type_: 20, value: 16384, offset: 0 }, modstruct { name: (("no_bs0" as *mut c_char) as *const c_char), which: 0, type_: 20, value: 16384, offset: 72 }, modstruct { name: (("no_dotstar_anchor" as *mut c_char) as *const c_char), which: 2, type_: 20, value: 32768, offset: 0 }, modstruct { name: (("no_jit" as *mut c_char) as *const c_char), which: 5, type_: 20, value: 8192, offset: 0 }, modstruct { name: (("no_start_optimize" as *mut c_char) as *const c_char), which: 3, type_: 20, value: 65536, offset: 0 }, modstruct { name: (("no_utf_check" as *mut c_char) as *const c_char), which: 6, type_: 20, value: 1073741824, offset: 0 }, modstruct { name: (("notbol" as *mut c_char) as *const c_char), which: 4, type_: 20, value: 1, offset: 0 }, modstruct { name: (("notempty" as *mut c_char) as *const c_char), which: 4, type_: 20, value: 4, offset: 0 }, modstruct { name: (("notempty_atstart" as *mut c_char) as *const c_char), which: 4, type_: 20, value: 8, offset: 0 }, modstruct { name: (("noteol" as *mut c_char) as *const c_char), which: 4, type_: 20, value: 2, offset: 0 }, modstruct { name: (("null_context" as *mut c_char) as *const c_char), which: 6, type_: 12, value: 4194304, offset: 4 }, modstruct { name: (("null_pattern" as *mut c_char) as *const c_char), which: 2, type_: 12, value: 4096, offset: 8 }, modstruct { name: (("null_replacement" as *mut c_char) as *const c_char), which: 4, type_: 12, value: 16384, offset: 8 }, modstruct { name: (("null_subject" as *mut c_char) as *const c_char), which: 4, type_: 12, value: 8192, offset: 8 }, modstruct { name: (("null_substitute_match_data" as *mut c_char) as *const c_char), which: 8, type_: 12, value: 131072, offset: 8 }, modstruct { name: (("offset" as *mut c_char) as *const c_char), which: 4, type_: 22, value: 0, offset: 344 }, modstruct { name: (("offset_limit" as *mut c_char) as *const c_char), which: 1, type_: 22, value: 0, offset: 72 }, modstruct { name: (("optimization_full" as *mut c_char) as *const c_char), which: 0, type_: 21, value: 1, offset: 0 }, modstruct { name: (("optimization_none" as *mut c_char) as *const c_char), which: 0, type_: 21, value: 0, offset: 0 }, modstruct { name: (("ovector" as *mut c_char) as *const c_char), which: 4, type_: 16, value: 0, offset: 340 }, modstruct { name: (("parens_nest_limit" as *mut c_char) as *const c_char), which: 0, type_: 16, value: 0, offset: 68 }, modstruct { name: (("partial_hard" as *mut c_char) as *const c_char), which: 4, type_: 20, value: 32, offset: 0 }, modstruct { name: (("partial_soft" as *mut c_char) as *const c_char), which: 4, type_: 20, value: 16, offset: 0 }, modstruct { name: (("ph" as *mut c_char) as *const c_char), which: 4, type_: 20, value: 32, offset: 0 }, modstruct { name: (("posix" as *mut c_char) as *const c_char), which: 2, type_: 12, value: 8388608, offset: 4 }, modstruct { name: (("posix_nosub" as *mut c_char) as *const c_char), which: 2, type_: 12, value: ((8388608 as c_uint) | (16777216 as c_uint)), offset: 4 }, modstruct { name: (("posix_startend" as *mut c_char) as *const c_char), which: 4, type_: 14, value: 0, offset: 232 }, modstruct { name: (("ps" as *mut c_char) as *const c_char), which: 4, type_: 20, value: 16, offset: 0 }, modstruct { name: (("push" as *mut c_char) as *const c_char), which: 2, type_: 12, value: 33554432, offset: 4 }, modstruct { name: (("pushcopy" as *mut c_char) as *const c_char), which: 2, type_: 12, value: 67108864, offset: 4 }, modstruct { name: (("pushtablescopy" as *mut c_char) as *const c_char), which: 2, type_: 12, value: 134217728, offset: 4 }, modstruct { name: (("python_octal" as *mut c_char) as *const c_char), which: 0, type_: 20, value: 8192, offset: 72 }, modstruct { name: (("recursion_limit" as *mut c_char) as *const c_char), which: 1, type_: 16, value: 0, offset: 88 }, modstruct { name: (("regerror_buffsize" as *mut c_char) as *const c_char), which: 2, type_: 15, value: 0, offset: 156 }, modstruct { name: (("replace" as *mut c_char) as *const c_char), which: 8, type_: 23, value: 100, offset: 16 }, modstruct { name: (("stackguard" as *mut c_char) as *const c_char), which: 2, type_: 16, value: 0, offset: 132 }, modstruct { name: (("start_optimize" as *mut c_char) as *const c_char), which: 0, type_: 21, value: 68, offset: 0 }, modstruct { name: (("start_optimize_off" as *mut c_char) as *const c_char), which: 0, type_: 21, value: 69, offset: 0 }, modstruct { name: (("startchar" as *mut c_char) as *const c_char), which: 8, type_: 12, value: 268435456, offset: 4 }, modstruct { name: (("startoffset" as *mut c_char) as *const c_char), which: 4, type_: 22, value: 0, offset: 344 }, modstruct { name: (("subject_literal" as *mut c_char) as *const c_char), which: 3, type_: 12, value: 256, offset: 8 }, modstruct { name: (("substitute_callout" as *mut c_char) as *const c_char), which: 8, type_: 12, value: 1, offset: 8 }, modstruct { name: (("substitute_case_callout" as *mut c_char) as *const c_char), which: 8, type_: 12, value: 65536, offset: 8 }, modstruct { name: (("substitute_extended" as *mut c_char) as *const c_char), which: 8, type_: 12, value: 2, offset: 8 }, modstruct { name: (("substitute_literal" as *mut c_char) as *const c_char), which: 8, type_: 12, value: 4, offset: 8 }, modstruct { name: (("substitute_matched" as *mut c_char) as *const c_char), which: 8, type_: 12, value: 8, offset: 8 }, modstruct { name: (("substitute_overflow_length" as *mut c_char) as *const c_char), which: 8, type_: 12, value: 16, offset: 8 }, modstruct { name: (("substitute_replacement_only" as *mut c_char) as *const c_char), which: 8, type_: 12, value: 32, offset: 8 }, modstruct { name: (("substitute_skip" as *mut c_char) as *const c_char), which: 8, type_: 16, value: 0, offset: 120 }, modstruct { name: (("substitute_stop" as *mut c_char) as *const c_char), which: 8, type_: 16, value: 0, offset: 124 }, modstruct { name: (("substitute_subject" as *mut c_char) as *const c_char), which: 4, type_: 23, value: 100, offset: 128 }, modstruct { name: (("substitute_unknown_unset" as *mut c_char) as *const c_char), which: 8, type_: 12, value: 64, offset: 8 }, modstruct { name: (("substitute_unset_empty" as *mut c_char) as *const c_char), which: 8, type_: 12, value: 128, offset: 8 }, modstruct { name: (("tables" as *mut c_char) as *const c_char), which: 2, type_: 16, value: 0, offset: 136 }, modstruct { name: (("turkish_casing" as *mut c_char) as *const c_char), which: 0, type_: 20, value: 65536, offset: 72 }, modstruct { name: (("ucp" as *mut c_char) as *const c_char), which: 3, type_: 20, value: 131072, offset: 0 }, modstruct { name: (("ungreedy" as *mut c_char) as *const c_char), which: 2, type_: 20, value: 262144, offset: 0 }, modstruct { name: (("use_length" as *mut c_char) as *const c_char), which: 2, type_: 12, value: 536870912, offset: 4 }, modstruct { name: (("use_offset_limit" as *mut c_char) as *const c_char), which: 2, type_: 20, value: 8388608, offset: 0 }, modstruct { name: (("utf" as *mut c_char) as *const c_char), which: 3, type_: 20, value: 524288, offset: 0 }, modstruct { name: (("utf8_input" as *mut c_char) as *const c_char), which: 2, type_: 12, value: 1073741824, offset: 4 }, modstruct { name: (("zero_terminate" as *mut c_char) as *const c_char), which: 4, type_: 12, value: 2147483648, offset: 4 }]
-var exclusive_pat_controls: [7]c_uint = [((8388608 as c_uint) | (33554432 as c_uint)), ((8388608 as c_uint) | (67108864 as c_uint)), ((8388608 as c_uint) | (134217728 as c_uint)), ((33554432 as c_uint) | (67108864 as c_uint)), ((33554432 as c_uint) | (134217728 as c_uint)), ((67108864 as c_uint) | (134217728 as c_uint)), ((1024 as c_uint) | (65536 as c_uint))]
+var exclusive_pat_controls: [7]c_uint = [(0x00800000 | 0x02000000), (0x00800000 | 0x04000000), (0x00800000 | 0x08000000), (0x02000000 | 0x04000000), (0x02000000 | 0x08000000), (0x04000000 | 0x08000000), (0x00000400 | 0x00010000)]
 var exclusive_dat_controls: [3]c_uint = [(0x00000008 | 0x10000000), (0x00000800 | 0x00400000), (0x00001000 | 0x00400000)]
 var c1modlist: [10]c1modstruct = [c1modstruct { fullname: (("bincode" as *mut c_char) as *const c_char), onechar: 66, index: -1 }, c1modstruct { fullname: (("info" as *mut c_char) as *const c_char), onechar: 73, index: -1 }, c1modstruct { fullname: (("ascii_all" as *mut c_char) as *const c_char), onechar: 97, index: -1 }, c1modstruct { fullname: (("global" as *mut c_char) as *const c_char), onechar: 103, index: -1 }, c1modstruct { fullname: (("caseless" as *mut c_char) as *const c_char), onechar: 105, index: -1 }, c1modstruct { fullname: (("multiline" as *mut c_char) as *const c_char), onechar: 109, index: -1 }, c1modstruct { fullname: (("no_auto_capture" as *mut c_char) as *const c_char), onechar: 110, index: -1 }, c1modstruct { fullname: (("caseless_restrict" as *mut c_char) as *const c_char), onechar: 114, index: -1 }, c1modstruct { fullname: (("dotall" as *mut c_char) as *const c_char), onechar: 115, index: -1 }, c1modstruct { fullname: (("extended" as *mut c_char) as *const c_char), onechar: 120, index: -1 }]
 var coptlist: [13]coptstruct = [coptstruct { name: c"backslash-C".ptr as *const i8, type_: CONF_FIX, value: 1 }, coptstruct { name: c"bsr".ptr as *const i8, type_: CONF_BSR, value: 0 }, coptstruct { name: c"ebcdic".ptr as *const i8, type_: CONF_FIX, value: 0 }, coptstruct { name: c"ebcdic-io".ptr as *const i8, type_: CONF_FIX, value: 0 }, coptstruct { name: c"ebcdic-nl25".ptr as *const i8, type_: CONF_FIX, value: 0 }, coptstruct { name: c"jit".ptr as *const i8, type_: CONF_INT, value: 1 }, coptstruct { name: c"jitusable".ptr as *const i8, type_: CONF_JU, value: 0 }, coptstruct { name: c"linksize".ptr as *const i8, type_: CONF_INT, value: 16 }, coptstruct { name: c"newline".ptr as *const i8, type_: CONF_NL, value: 5 }, coptstruct { name: c"pcre2-16".ptr as *const i8, type_: CONF_FIX, value: 0 }, coptstruct { name: c"pcre2-32".ptr as *const i8, type_: CONF_FIX, value: 0 }, coptstruct { name: c"pcre2-8".ptr as *const i8, type_: CONF_FIX, value: 1 }, coptstruct { name: c"unicode".ptr as *const i8, type_: CONF_INT, value: 9 }]
