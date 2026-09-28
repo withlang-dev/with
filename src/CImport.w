@@ -1658,6 +1658,63 @@ fn ci_cursor_needs_demoted_layout(session: i64, cursor: i32, demoted: &str) -> s
             return inner
     ""
 
+// #1848: the argument types every call to the unprototyped function `name`
+// in this unit passes — clang's own default argument promotions, read off
+// each argument's (implicitly converted) type — as `T0|T1|…`. "" when
+// nothing calls it; `!reason` when the calls disagree, a type has no With
+// spelling, or the function is used as a value (a call needs no pointer).
+pub fn ci_migrate_unprototyped_call_shape(session: i64, name: &str) -> str:
+    let found = ci_migrate_collect_unprototyped_uses(session, with_ci_root_cursor(session), name, "")
+    if found.len() == 0:
+        return ""
+    var shape = ""
+    var calls = 0
+    var refs = 0
+    for entry in found.split("\n"):
+        if entry.len() == 0:
+            continue
+        if entry == "#ref":
+            refs = refs + 1
+            continue
+        if entry.starts_with("!"):
+            return entry.clone()
+        calls = calls + 1
+        if calls == 1:
+            shape = entry.slice(1, entry.len())
+        else if entry.slice(1, entry.len()) != shape:
+            return "!its calls pass different arguments"
+    if refs > calls:
+        return "!it is used as a value"
+    shape
+
+fn ci_migrate_collect_unprototyped_uses(session: i64, cursor: i32, name: &str, acc: str) -> str:
+    var out = acc
+    let kind = with_ci_cursor_kind(session, cursor)
+    if kind == CXK_CALL_EXPR and with_ci_num_children(session, cursor) > 0 and ci_call_callee_name(session, with_ci_child(session, cursor, 0)) == name:
+        var shape = "="
+        for ai in 1..with_ci_num_children(session, cursor):
+            let ty = ci_pointer_type_explicit_mut(with_ci_type_translated(session, with_ci_cursor_type(session, with_ci_child(session, cursor, ai))))
+            if ty.len() == 0 or ci_starts_with(ty, "__UNSUPPORTED:"):
+                return out ++ "!an argument of one of its calls has no With type\n"
+            shape = shape ++ (if ai > 1: "|" else: "") ++ ci_unsafe_fn_ptr_type(ty)
+        out = out ++ shape ++ "\n"
+    else if kind == CXK_DECL_REF and with_ci_cursor_spelling(session, cursor) == name:
+        out = out ++ "#ref\n"
+    for ci in 0..with_ci_num_children(session, cursor):
+        out = ci_migrate_collect_unprototyped_uses(session, with_ci_child(session, cursor, ci), name, out)
+    out
+
+// `T0|T1` as a parameter list `a0: T0, a1: T1`.
+pub fn ci_migrate_unprototyped_params(shape: &str) -> str:
+    if shape.len() == 0:
+        return ""
+    var out = ""
+    var i = 0
+    for ty in shape.split("|"):
+        out = out ++ (if i > 0: ", " else: "") ++ f"a{i}: {ty}"
+        i = i + 1
+    out
+
 // D51 (#1830): whether a call to C function `idx` is raw — its declaration
 // is variadic, or passes or returns a raw-ABI type — or,
 // for an inline function translated with its body, whether that body makes

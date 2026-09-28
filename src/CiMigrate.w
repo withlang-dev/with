@@ -1855,6 +1855,20 @@ fn ci_migrate_translate_function(session: i64, idx: i32, known_structs: &str, pr
         // skip; definitions still translate (and collide loudly).
         if ci_migrate_preamble_declares_runtime_extern(name):
             return ""
+        // #1848: a declaration without a prototype (the fact #1831's
+        // with_cimport_fn_is_unprototyped states). Migrated source is
+        // ordinary With, which has no spelling for an unprototyped call, and
+        // `(...)` is the variadic convention — wrong. C passes each call's
+        // promoted arguments with the fixed-argument convention, so the
+        // declaration is the prototype every call in the unit agrees on.
+        if with_cimport_fn_is_unprototyped(session, idx) != 0:
+            let shape = ci_migrate_unprototyped_call_shape(session, name)
+            if shape.starts_with("!"):
+                return ci_migrate_fail_function(f"migrate: '{name}' is declared without a prototype and {shape.slice(1, shape.len())}, so no prototype describes its calls; declare it with its parameters (C11 6.5.2.2p6)")
+            if shape.len() == 0:
+                return ""
+            params = ci_migrate_unprototyped_params(shape)
+            physical_params = params.clone()
         let owner_path = ci_migrate_project_fn_owner_path(project_active, project, name)
         if ci_migrate_shared_defs_active() and g_migrate_no_c_export != 0 and owner_path.len() > 0:
             return ""
