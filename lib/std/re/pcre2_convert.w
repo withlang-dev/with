@@ -415,7 +415,7 @@ unsafe fn convert_posix(__param_pattype: c_uint, __param_pattern: *const u8, __p
 
     '__ci_bb_8 {
         (__local_clength__goto_179_7 = ((1 as c_int)))
-        (__local_convlength__goto_158_12 = (__local_convlength__goto_158_12 +% (((__local_p__goto_155_14 as usize) -% (__local_pp__goto_156_14 as usize)) / sizeof[u8]())))
+        (__local_convlength__goto_158_12 = (__local_convlength__goto_158_12 +% ((((__local_p__goto_155_14 as usize) -% (__local_pp__goto_156_14 as usize)) / sizeof[u8]()) as c_ulong)))
         if (__param_dummyrun != 0) {
             goto '__ci_bb_10
         } else {
@@ -1436,7 +1436,7 @@ unsafe fn convert_posix(__param_pattype: c_uint, __param_pattern: *const u8, __p
     }
 
     '__ci_bb_161 {
-        (__local_convlength__goto_158_12 = (__local_convlength__goto_158_12 +% (((__local_p__goto_155_14 as usize) -% (__local_pp__goto_156_14 as usize)) / sizeof[u8]())))
+        (__local_convlength__goto_158_12 = (__local_convlength__goto_158_12 +% ((((__local_p__goto_155_14 as usize) -% (__local_pp__goto_156_14 as usize)) / sizeof[u8]()) as c_ulong)))
         ((*__param_bufflenptr) = __local_convlength__goto_158_12)
         (__ci_expr_old_25 = __local_p__goto_155_14)
         (__local_p__goto_155_14 = __local_p__goto_155_14 + 1)
@@ -1646,7 +1646,7 @@ fn convert_glob_char_in_class(__param_class_index: c_int, __param_c: u8) -> c_in
                     return 0
                 }
 
-                if ((if ((((unsafe (__local_cbits + ((64 as isize) as usize))[((__param_c as c_int) / 8)]) as c_int) as c_uint) & (((1 as c_uint) << ((((__param_c as c_int) as c_int) & (7 as c_int)) as c_uint)) as c_uint)) != 0: 1 else: 0) != 0) {
+                if ((if ((((unsafe (__local_cbits + ((64 as isize) as usize))[((__param_c as c_int) / 8)]) as c_int) as c_uint) & (((1 as c_uint) << (((__param_c as c_int) & (7 as c_int)) as c_uint)) as c_uint)) != 0: 1 else: 0) != 0) {
                     return 0
                 }
 
@@ -1668,7 +1668,7 @@ fn convert_glob_char_in_class(__param_class_index: c_int, __param_c: u8) -> c_in
 
             },
             5 => {
-                if ((if ((((unsafe (__local_cbits + ((288 as isize) as usize))[((__param_c as c_int) / 8)]) as c_int) as c_uint) & (((1 as c_uint) << ((((__param_c as c_int) as c_int) & (7 as c_int)) as c_uint)) as c_uint)) != 0: 1 else: 0) != 0) {
+                if ((if ((((unsafe (__local_cbits + ((288 as isize) as usize))[((__param_c as c_int) / 8)]) as c_int) as c_uint) & (((1 as c_uint) << (((__param_c as c_int) & (7 as c_int)) as c_uint)) as c_uint)) != 0: 1 else: 0) != 0) {
                     return 1
                 }
 
@@ -1741,7 +1741,7 @@ fn convert_glob_char_in_class(__param_class_index: c_int, __param_c: u8) -> c_in
 
     }
 
-    return (if ((((unsafe (__local_cbits + ((__local_cbit as isize) as usize))[((__param_c as c_int) / 8)]) as c_int) as c_uint) & (((1 as c_uint) << ((((__param_c as c_int) as c_int) & (7 as c_int)) as c_uint)) as c_uint)) != 0: 1 else: 0)
+    return (if ((((unsafe (__local_cbits + ((__local_cbit as isize) as usize))[((__param_c as c_int) / 8)]) as c_int) as c_uint) & (((1 as c_uint) << (((__param_c as c_int) & (7 as c_int)) as c_uint)) as c_uint)) != 0: 1 else: 0)
 
 }
 

@@ -3649,7 +3649,16 @@ pub fn ci_translate_macros(session: i64, type_session: i64, macro_source: &str) 
                     let mac_range_ann = ci_int_annotation_for_value(ci_strip_int_suffix(macro_expr_result))
                     if ci_int_type_rank(mac_range_ann) > ci_int_type_rank(cast_expr_ty):
                         mac_ann = mac_range_ann
-                let let_line = "let " ++ safe_name ++ ": " ++ mac_ann ++ " = " ++ ci_render_int_value(macro_expr_result)
+                // The constant has the macro's C type. The translated text is
+                // typed by With's rules, which differ from C's usual
+                // conversions (`sizeof` is i64, a mixed-signedness sum takes
+                // its left operand's type), and With converts nothing
+                // implicitly but a widening (#1803), so a computed value
+                // states its C type. Untyped literal arithmetic takes it.
+                var mac_value = ci_render_int_value(macro_expr_result)
+                if ci_init_type_is_numeric_scalar(type_session, mac_ann, -1) and not ci_text_is_literal_arith(mac_value, true):
+                    mac_value = "(" ++ mac_value ++ " as " ++ mac_ann ++ ")"
+                let let_line = "let " ++ safe_name ++ ": " ++ mac_ann ++ " = " ++ mac_value
                 if not ci_migrate_shared_decl_add("let", safe_name, let_line):
                     output = output ++ let_line ++ "\n"
             else:
@@ -8913,6 +8922,23 @@ fn ci_classify_implicit_cast_safe(session: i64, cursor: i32, inner_cursor: i32) 
     // the CIE_CAST output is the same either way.
     CI_CAST_INT_WIDEN
 
+// True when C converts the value of `inner` to the type of `outer` where
+// With converts nothing implicitly (§4.2.6, #1803): a narrower integer, the
+// other signedness at equal width, integer and float either way, a narrower
+// float. With widens the rest itself, so they stay unspelled.
+fn ci_implicit_conversion_needs_as(session: i64, outer: i32, inner: i32) -> bool:
+    let out_bits = with_ci_scalar_type_bits(session, outer)
+    let in_bits = with_ci_scalar_type_bits(session, inner)
+    if out_bits == 0 or in_bits == 0:
+        return false
+    let out_float = with_ci_type_is_float(session, outer) != 0
+    let in_float = with_ci_type_is_float(session, inner) != 0
+    if out_float != in_float:
+        return true
+    if out_bits < in_bits:
+        return true
+    not out_float and out_bits == in_bits and with_ci_type_is_unsigned(session, outer) != with_ci_type_is_unsigned(session, inner)
+
 impl CiExprPool:
     fn lower_implicit_cast(session: i64, cursor: i32, types: CiTypePool, scope: CiScope) -> CiExprId:
         let nc = with_ci_num_children(session, cursor)
@@ -10367,6 +10393,17 @@ impl CiExprPool:
         self.unsafe_expr(call)
 
     fn build_libc_call_value_expr(session: i64, cursor: i32, callee_text: &str, arg_ids: &Vec[i32], types: CiTypePool) -> CiExprId:
+        // The shared preamble declares a size as i64, as with_memcpy's is;
+        // C passes size_t, which does not convert implicitly (#1803).
+        if callee_text == "strncmp" and arg_ids.len() == 3:
+            let size_ty = types.named_type_from_text("i64")
+            if (size_ty as i32) == 0:
+                return 0 as CiExprId
+            let sized_args: Vec[i32] = Vec.new()
+            sized_args.push(arg_ids.get(0))
+            sized_args.push(arg_ids.get(1))
+            sized_args.push((self.cast(size_ty, (arg_ids.get(2)) as CiExprId)) as i32)
+            return self.build_named_call_expr("strncmp", &sized_args)
         let renamed = ci_libc_simple_rename(callee_text)
         if renamed.len() > 0:
             return self.build_named_call_expr(renamed, arg_ids)
@@ -10471,7 +10508,7 @@ impl CiExprPool:
             cast_args.push((self.cast(i64_ty, (arg_ids.get(2)) as CiExprId)) as i32)
             return self.build_named_call_expr("with_memcmp", &cast_args)
         if callee_text == "memchr":
-            if arg_ids.len() != 3:
+            if arg_ids.len() != 3 or (i64_ty as i32) == 0:
                 return 0 as CiExprId
             let c_void_ty = types.named_type_from_text("c_void")
             if (c_void_ty as i32) == 0:
@@ -10480,7 +10517,7 @@ impl CiExprPool:
             let cast_args: Vec[i32] = Vec.new()
             cast_args.push((self.cast(cvoid_ptr, (arg_ids.get(0)) as CiExprId)) as i32)
             cast_args.push(arg_ids.get(1))
-            cast_args.push(arg_ids.get(2))
+            cast_args.push((self.cast(i64_ty, (arg_ids.get(2)) as CiExprId)) as i32)
             let call_id = self.build_named_call_expr("memchr", &cast_args)
             let u8_ty = types.named_type_from_text("u8")
             let u8_ptr = types.ty_pointer(u8_ty, 1)
@@ -10704,6 +10741,21 @@ impl CiStmtPool:
             if with_ci_eval_int_valid(session, cursor) != 0 and not ci_expr_children_need_rvalue_lowering(session, cursor):
                 let text_idx = exprs.add_string(ci_eval_int_text(session, cursor))
                 return ci_value_ir_plain(exprs.int_lit(text_idx, 0 as CiTypeId))
+            // A conversion With does not make implicitly materializes the
+            // same way (#1803): `return clz(v) ^ 31` into an unsigned return,
+            // an int result stored into an unsigned char. It was peeled, and
+            // With narrowed silently where it now refuses.
+            if cast_inner >= 0 and ci_implicit_conversion_needs_as(session, cursor, cast_inner):
+                let conv_inner = self.lower_value_expr_ir(session, cast_inner, exprs, types, scope)
+                if not ci_value_ir_valid(conv_inner):
+                    return ci_value_ir_invalid()
+                let converted = exprs.apply_implicit_cast_to_value_id(session, cursor, cast_inner, conv_inner.value_expr, types, scope)
+                if (converted as i32) == 0:
+                    return ci_value_ir_invalid()
+                return CiValueExprIR {
+                    setup_stmt: conv_inner.setup_stmt,
+                    value_expr: converted,
+                }
             let inner_cursor = ci_find_last_expr_child(session, cursor)
             if inner_cursor >= 0:
                 return self.lower_value_expr_ir(session, inner_cursor, exprs, types, scope)
@@ -10862,6 +10914,13 @@ impl CiStmtPool:
             if ci_value_ir_valid(lhs) and ci_value_ir_valid(rhs) and ci_op >= 0:
                 var lhs_operand = lhs.value_expr
                 var rhs_value = rhs.value_expr
+                // C11 6.5.16.2: `E1 op= E2` computes in the promoted (or
+                // the common) type and converts the result to E1's type as
+                // an assignment does. Where that conversion is not a With
+                // widening — a promoted small operand, a wider or float
+                // right operand — it is spelled (#1803: `ushort += 2` was
+                // computed in c_int and stored into the c_ushort unspelled).
+                var converts_back = false
                 let lhs_ty = exprs.get_type(lhs.value_expr)
                 let lhs_is_ptr = ci_cursor_type_is_pointerish(session, lhs_cursor) or ((lhs_ty as i32) != 0 and types.kind(lhs_ty) == CiTypeKind.CT_POINTER)
                 if lhs_is_ptr and (ci_op == CiBinOp.CIBO_ADD or ci_op == CiBinOp.CIBO_SUB or ci_op == CiBinOp.CIBO_ADD_WRAP or ci_op == CiBinOp.CIBO_SUB_WRAP):
@@ -10875,6 +10934,7 @@ impl CiStmtPool:
                         return ci_value_ir_invalid()
                     if ci_type_is_small_int(lhs_ty_str) or ci_is_large_decimal(ci_print_expr(exprs, types, lhs.value_expr, 0, 0)):
                         lhs_operand = exprs.cast(c_uint_ty, lhs_operand)
+                        converts_back = ci_type_is_small_int(lhs_ty_str)
                     rhs_value = exprs.cast(c_uint_ty, rhs_value)
                 else if ci_op == CiBinOp.CIBO_BIT_AND or ci_op == CiBinOp.CIBO_BIT_OR or ci_op == CiBinOp.CIBO_BIT_XOR:
                     let result_ty = types.type_from_libclang(session, with_ci_cursor_type(session, cursor))
@@ -10884,10 +10944,13 @@ impl CiStmtPool:
                     rhs_value = exprs.cast(result_ty, rhs_value)
                 else:
                     let binary_op = ci_compound_to_binary_op(compound_op)
+                    converts_back = not lhs_is_ptr and ci_implicit_conversion_needs_as(session, lhs_cursor, rhs_cursor)
                     if ci_binary_op_uses_c_integer_promotions(binary_op):
-                        lhs_operand = exprs.promote_c_small_int_operand(session, lhs_cursor, ci_peel_transparent(session, lhs_cursor), lhs_operand, types)
-                        if (lhs_operand as i32) == 0:
+                        let promoted_lhs = exprs.promote_c_small_int_operand(session, lhs_cursor, ci_peel_transparent(session, lhs_cursor), lhs_operand, types)
+                        if (promoted_lhs as i32) == 0:
                             return ci_value_ir_invalid()
+                        converts_back = converts_back or promoted_lhs != lhs_operand
+                        lhs_operand = promoted_lhs
                         rhs_value = exprs.promote_c_small_int_operand(session, rhs_cursor, ci_peel_transparent(session, rhs_cursor), rhs_value, types)
                         if (rhs_value as i32) == 0:
                             return ci_value_ir_invalid()
@@ -10903,7 +10966,12 @@ impl CiStmtPool:
                                 return ci_value_ir_invalid()
                             lhs_operand = exprs.cast_if_needed(result_ty, lhs_operand, lhs_cursor, session, types)
                             rhs_value = exprs.cast_if_needed(result_ty, rhs_value, rhs_cursor, session, types)
-                let rhs_expr = exprs.binary(ci_op, lhs_operand, rhs_value, 0 as CiTypeId)
+                var rhs_expr = exprs.binary(ci_op, lhs_operand, rhs_value, 0 as CiTypeId)
+                if converts_back:
+                    let lhs_c_ty = types.type_from_libclang(session, with_ci_cursor_type(session, lhs_cursor))
+                    if (lhs_c_ty as i32) == 0:
+                        return ci_value_ir_invalid()
+                    rhs_expr = exprs.cast(lhs_c_ty, rhs_expr)
                 let assign_stmt = self.assign(lhs.value_expr, rhs_expr)
                 return CiValueExprIR {
                     setup_stmt: self.merge3_ir( lhs.setup_stmt, rhs.setup_stmt, assign_stmt),
@@ -14610,7 +14678,7 @@ fn ci_split_top_level_items(s: &str) -> Vec[str]:
     parts
 
 fn ci_translate_c_initializer_for_type(session: i64, init_src: &str, ty: &str) -> str:
-    ci_translate_c_initializer_for_cursor_type(session, init_src, ty, -1)
+    ci_translate_c_initializer_for_cursor_type(session, init_src, ty, -1, -1)
 
 fn ci_c_initializer_cast_type_is_void_ptr(cast_type: &str) -> bool:
     var compact = ""
@@ -14658,7 +14726,68 @@ fn ci_c_initializer_decay_array_identifier(session: i64, init_src: &str, ty: &st
     let raw_kw = if target_is_mut: "&raw mut " else: "&raw const "
     "(" ++ raw_kw ++ trimmed ++ "[0] as " ++ ty ++ ")"
 
-fn ci_translate_c_initializer_for_cursor_type(session: i64, init_src: &str, ty: &str, cxtype: i32) -> str:
+/// C's arithmetic scalar types as c_import spells them.
+const CI_NUMERIC_SCALAR_TYPES: [22]str = ["c_char", "c_schar", "c_uchar", "c_short", "c_ushort", "c_int", "c_uint", "c_long", "c_ulong", "c_longlong", "c_ulonglong", "c_longdouble", "i8", "i16", "i32", "i64", "u8", "u16", "u32", "u64", "f32", "f64"]
+
+// A C object type whose initializer converts as an arithmetic value: a
+// scalar spelled by name, or one whose canonical C type is arithmetic.
+fn ci_init_type_is_numeric_scalar(session: i64, ty: &str, cxtype: i32) -> bool:
+    for name in CI_NUMERIC_SCALAR_TYPES:
+        if ty == name: return true
+    if ty == "usize" or ty == "isize":
+        return true
+    if cxtype < 0 or ty.len() == 0 or ty[0] == '[' or ty[0] == '*':
+        return false
+    let kind = with_ci_type_kind(session, with_ci_type_canonical(session, cxtype))
+    kind > CXT_Bool and kind <= CXT_LongDouble
+
+// Clang's cursor for item `index` of initializer list `list`, or -1 when
+// `list` is not an initializer list whose items the text split one to one.
+fn ci_init_list_item_cursor(session: i64, list: i32, index: i32, count: i64) -> i32:
+    if list < 0 or with_ci_cursor_kind(session, list) != CXK_INIT_LIST or with_ci_num_children(session, list) as i64 != count:
+        return -1
+    with_ci_child(session, list, index)
+
+// True when C converts the initializer value at `init` to its object's type
+// where With converts nothing implicitly (ci_implicit_conversion_needs_as).
+fn ci_init_value_needs_as(session: i64, init: i32) -> bool:
+    let kind = with_ci_cursor_kind(session, init)
+    if kind == CXK_PAREN_EXPR:
+        let paren_inner = ci_find_last_expr_child(session, init)
+        return paren_inner >= 0 and ci_init_value_needs_as(session, paren_inner)
+    if kind != 100 and kind != CXK_IMPLICIT_CAST:
+        return false
+    let inner = ci_find_last_expr_child(session, init)
+    inner >= 0 and ci_implicit_conversion_needs_as(session, init, inner)
+
+// Translated text made of numeric literals, parentheses and arithmetic
+// alone: unsuffixed, its type comes from its context (§4.2.1); `suffixed`
+// also admits With's typed literals (`2u64`).
+fn ci_text_is_literal_arith(s: &str, suffixed: bool) -> bool:
+    var i: i64 = 0
+    var saw_digit = false
+    while i < s.len():
+        let c = s[i]
+        if c >= '0' and c <= '9':
+            // One number token: digits, hex digits, `x`, `.`, an exponent.
+            while i < s.len() and ((s[i] >= '0' and s[i] <= '9') or (s[i] >= 'a' and s[i] <= 'f') or (s[i] >= 'A' and s[i] <= 'F') or s[i] == 'x' or s[i] == 'X' or s[i] == '.' or s[i] == '_'):
+                i = i + 1
+            if suffixed and i < s.len() and (s[i] == 'u' or s[i] == 'i'):
+                i = i + 1
+                while i < s.len() and ((s[i] >= '0' and s[i] <= '9') or (s[i] >= 'a' and s[i] <= 'z')):
+                    i = i + 1
+            if i < s.len() and ((s[i] >= 'a' and s[i] <= 'z') or (s[i] >= 'A' and s[i] <= 'Z')):
+                return false
+            saw_digit = true
+            continue
+        if not (c == ' ' or c == '(' or c == ')' or c == '+' or c == '-' or c == '*' or c == '/' or c == '%'):
+            return false
+        i = i + 1
+    saw_digit
+
+fn ci_text_is_untyped_literal_arith(s: &str): ci_text_is_literal_arith(s, false)
+
+fn ci_translate_c_initializer_for_cursor_type(session: i64, init_src: &str, ty: &str, cxtype: i32, init_cursor: i32) -> str:
     let trimmed = ci_trim(init_src)
     if trimmed.len() == 0:
         return ""
@@ -14683,6 +14812,17 @@ fn ci_translate_c_initializer_for_cursor_type(session: i64, init_src: &str, ty: 
             return ""
         if ci_starts_with(translated, ".{") and ty.len() > 0 and ty[0] != 91:
             translated = ty ++ " " ++ translated
+        // C converts an initializer to the object's type as an assignment
+        // does (C11 6.7.9p11); where With converts nothing implicitly but a
+        // widening, the conversion is spelled (#1803: pcre2's `escapes:
+        // [75]c_short = [..., -ESC_A, ...]` of int enumerators). Clang's
+        // initializer says which conversion C makes; without it, a numeric
+        // item that names a value is converted. An untyped literal
+        // expression takes its type from its context.
+        if ci_init_type_is_numeric_scalar(session, ty, cxtype) and not ci_text_is_untyped_literal_arith(translated):
+            let converts = if init_cursor >= 0: ci_init_value_needs_as(session, init_cursor) else: not ci_text_is_literal_arith(translated, true)
+            if converts:
+                return "(" ++ translated ++ " as " ++ ty ++ ")"
         return ci_coerce_init_value_for_type(translated, ty)
 
     let close_brace = ci_find_matching_brace(trimmed, 0)
@@ -14732,7 +14872,7 @@ fn ci_translate_c_initializer_for_cursor_type(session: i64, init_src: &str, ty: 
         rendered_parts.push("[")
         var i = 0
         while i < expanded_items.len() as i32:
-            let item = ci_translate_c_initializer_for_cursor_type(session, expanded_items[i], elem_ty, elem_cxtype)
+            let item = ci_translate_c_initializer_for_cursor_type(session, expanded_items[i], elem_ty, elem_cxtype, ci_init_list_item_cursor(session, init_cursor, i, expanded_items.len()))
             if item.len() == 0:
                 return ""
             if i > 0:
@@ -14757,7 +14897,7 @@ fn ci_translate_c_initializer_for_cursor_type(session: i64, init_src: &str, ty: 
             let field_cxtype = ci_init_list_record_field_cxtype(session, ty, cxtype, i)
             if field_name.len() == 0 or field_ty.len() == 0:
                 return ""
-            let item = ci_translate_c_initializer_for_cursor_type(session, items[i], field_ty, field_cxtype)
+            let item = ci_translate_c_initializer_for_cursor_type(session, items[i], field_ty, field_cxtype, ci_init_list_item_cursor(session, init_cursor, i, items.len()))
             if item.len() == 0:
                 return ""
             if i > 0:
@@ -14770,7 +14910,7 @@ fn ci_translate_c_initializer_for_cursor_type(session: i64, init_src: &str, ty: 
         return field_parts.join("")
 
     if ci_split_top_level_items(inner).len() == 1:
-        return ci_translate_c_initializer_for_cursor_type(session, inner, ty, cxtype)
+        return ci_translate_c_initializer_for_cursor_type(session, inner, ty, cxtype, ci_init_list_item_cursor(session, init_cursor, 0, 1))
     ""
 
 fn ci_preprocess_initializer_text(session: i64, var_cursor: i32, raw_decl_src: &str) -> str:
@@ -15082,7 +15222,7 @@ fn ci_var_init_expr_from_preprocessed_cursor_for_type(session: i64, var_cursor: 
     let cursor_ty_str = with_ci_type_translated(session, with_ci_cursor_type(session, var_cursor))
     let vty_str = if target_type.len() > 0: with_str_clone_ref(target_type) else: cursor_ty_str
     let var_cxtype = with_ci_cursor_type(session, var_cursor)
-    let translated = ci_translate_c_initializer_for_cursor_type(session, preprocessed, vty_str, var_cxtype)
+    let translated = ci_translate_c_initializer_for_cursor_type(session, preprocessed, vty_str, var_cxtype, with_ci_var_initializer(session, var_cursor))
     if ci_var_init_translation_is_valid(vty_str, translated):
         return translated
     ""
@@ -15144,20 +15284,20 @@ fn ci_var_init_expr_from_decl_source_for_type(session: i64, var_cursor: i32, tar
     let var_cxtype = with_ci_cursor_type(session, var_cursor)
     let preprocessed = ci_preprocess_initializer_text(session, var_cursor, raw_decl_src)
     if preprocessed.len() > 0:
-        let translated = ci_translate_c_initializer_for_cursor_type(session, preprocessed, vty_str, var_cxtype)
+        let translated = ci_translate_c_initializer_for_cursor_type(session, preprocessed, vty_str, var_cxtype, with_ci_var_initializer(session, var_cursor))
         if ci_var_init_translation_is_valid(vty_str, translated):
             return translated
     let expanded = ci_expand_string_macro_sequence(session, init_src)
     if expanded.len() > 0:
-        let translated = ci_translate_c_initializer_for_cursor_type(session, expanded, vty_str, var_cxtype)
+        let translated = ci_translate_c_initializer_for_cursor_type(session, expanded, vty_str, var_cxtype, with_ci_var_initializer(session, var_cursor))
         if ci_var_init_translation_is_valid(vty_str, translated):
             return translated
-    let translated = ci_translate_c_initializer_for_cursor_type(session, init_src, vty_str, var_cxtype)
+    let translated = ci_translate_c_initializer_for_cursor_type(session, init_src, vty_str, var_cxtype, with_ci_var_initializer(session, var_cursor))
     if ci_var_init_translation_is_valid(vty_str, translated):
         return translated
     let preprocessed_by_name = ci_preprocessed_var_initializer_by_name(var_name)
     if preprocessed_by_name.len() > 0 and preprocessed_by_name != init_src:
-        let by_name_translated = ci_translate_c_initializer_for_cursor_type(session, preprocessed_by_name, vty_str, var_cxtype)
+        let by_name_translated = ci_translate_c_initializer_for_cursor_type(session, preprocessed_by_name, vty_str, var_cxtype, with_ci_var_initializer(session, var_cursor))
         if ci_var_init_translation_is_valid(vty_str, by_name_translated):
             return by_name_translated
     ""

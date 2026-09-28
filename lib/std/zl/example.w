@@ -420,7 +420,7 @@ unsafe fn test_large_deflate(__param_compr: *mut u8, __param_comprLen: c_ulong, 
 
     (__local_c_stream.next_in = __param_compr)
 
-    (__local_c_stream.avail_in = (((((__param_uncomprLen as c_uint) as c_uint) / (2 as c_uint)) as c_uint)))
+    (__local_c_stream.avail_in = ((((__param_uncomprLen as c_uint) / (2 as c_uint)) as c_uint)))
 
     (__local_err = ((deflate((&raw mut __local_c_stream as *mut z_stream_s), (0 as c_int)) as c_int)))
 
@@ -550,7 +550,7 @@ unsafe fn test_flush(__param_compr: *mut u8, __param_comprLen: *mut c_ulong) -> 
 
     var __local_err: c_int
 
-    var __local_len: c_uint = (((((strlen((&hello[0] as *mut c_char)) as c_uint) as c_uint) +% (1 as c_uint)) as c_uint))
+    var __local_len: c_uint = ((((strlen((&hello[0] as *mut c_char)) as c_uint) +% (1 as c_uint)) as c_uint))
 
     (__local_c_stream.zalloc = zalloc)
 
@@ -664,7 +664,7 @@ unsafe fn test_sync(__param_compr: *mut u8, __param_comprLen: c_ulong, __param_u
 
 
 
-    (__local_d_stream.avail_in = (((((__param_comprLen as c_uint) as c_uint) -% (2 as c_uint)) as c_uint)))
+    (__local_d_stream.avail_in = ((((__param_comprLen as c_uint) -% (2 as c_uint)) as c_uint)))
 
     (__local_err = ((inflateSync((&raw mut __local_d_stream as *mut z_stream_s)) as c_int)))
 
@@ -742,7 +742,7 @@ unsafe fn test_dict_deflate(__param_compr: *mut u8, __param_comprLen: c_ulong) -
 
     (__local_c_stream.next_in = (&hello[0] as *mut u8))
 
-    (__local_c_stream.avail_in = (((((strlen((&hello[0] as *mut c_char)) as c_uint) as c_uint) +% (1 as c_uint)) as c_uint)))
+    (__local_c_stream.avail_in = ((((strlen((&hello[0] as *mut c_char)) as c_uint) +% (1 as c_uint)) as c_uint)))
 
     (__local_err = ((deflate((&raw mut __local_c_stream as *mut z_stream_s), (4 as c_int)) as c_int)))
 

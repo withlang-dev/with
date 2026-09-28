@@ -2293,7 +2293,7 @@ pub unsafe fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param
     }
 
     '__ci_bb_272 {
-        (__local_ng__goto_1347_24 = (((((((__local_entry__goto_1335_35[0]) as c_int) << (8 as c_uint)) as c_int) | (((__local_entry__goto_1335_35[(0 + 1)]) as c_int) as c_int)) as c_uint)))
+        (__local_ng__goto_1347_24 = (((((((__local_entry__goto_1335_35[0]) as c_int) << (8 as c_uint)) as c_int) | ((__local_entry__goto_1335_35[(0 + 1)]) as c_int)) as c_uint)))
         if ((if __local_ng__goto_1347_24 < __local_ovector_count__goto_745_10: 1 else: 0) != 0) {
             goto '__ci_bb_275
         } else {
@@ -2349,7 +2349,7 @@ pub unsafe fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param
     }
 
     '__ci_bb_281 {
-        (__local_group__goto_1055_9 = ((((((((__local_first__goto_1335_22[0]) as c_int) << (8 as c_uint)) as c_int) | (((__local_first__goto_1335_22[(0 + 1)]) as c_int) as c_int)) as c_uint) as c_int)))
+        (__local_group__goto_1055_9 = ((((((((__local_first__goto_1335_22[0]) as c_int) << (8 as c_uint)) as c_int) | ((__local_first__goto_1335_22[(0 + 1)]) as c_int)) as c_uint) as c_int)))
         goto '__ci_bb_282
     }
 
@@ -4758,7 +4758,7 @@ unsafe fn read_name_subst(__param_ptrptr: *mut *const u8, __param_ptrend: *const
             (__ci_expr_logic_3 = (if 1 != 0: 1 else: 0))
         }
         if (__ci_expr_logic_3 != 0) {
-            (__ci_expr_logic_4 = (if (if ((((__param_ctypes[(*__local_ptr__goto_200_12)]) as c_int) as c_int) & (16 as c_int)) != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_4 = (if (if (((__param_ctypes[(*__local_ptr__goto_200_12)]) as c_int) & (16 as c_int)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_4 != 0) {
             goto '__ci_bb_30
@@ -4983,7 +4983,7 @@ unsafe fn default_substitute_case_callout(__param_input: *const u8, __param_inpu
                     (__ci_expr_ternary_6 = ucp_Ll)
                 }
 
-                (__ci_expr_logic_7 = (if (if __local_type_ != __ci_expr_ternary_6: 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_7 = (if (if __local_type_ != ((__ci_expr_ternary_6 as c_uint)): 1 else: 0) != 0: 1 else: 0))
 
             }
 

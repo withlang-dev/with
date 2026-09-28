@@ -30,7 +30,7 @@ fn test_compare_int() -> Unit {
 
     (__local_b = ((2 as c_int)))
 
-    if ((((if not ((if not (unsafe { int_equal(((&raw mut __local_a as *mut c_int) as *mut c_void), ((&raw mut __local_b as *mut c_int) as *mut c_void)) } != 0): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if (((if not ((if not (unsafe { int_equal(((&raw mut __local_a as *mut c_int) as *mut c_void), ((&raw mut __local_b as *mut c_int) as *mut c_void)) } != 0): 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_compare_int".ptr, c"test-cpp.c".ptr, (53 as c_int), c"!int_equal(&a, &b)".ptr)
     } else {
         0
@@ -40,7 +40,7 @@ fn test_compare_int() -> Unit {
 
     (__local_b = ((2 as c_int)))
 
-    if ((((if not (unsafe { int_equal(((&raw mut __local_a as *mut c_int) as *mut c_void), ((&raw mut __local_b as *mut c_int) as *mut c_void)) } != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if (((if not (unsafe { int_equal(((&raw mut __local_a as *mut c_int) as *mut c_void), ((&raw mut __local_b as *mut c_int) as *mut c_void)) } != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_compare_int".ptr, c"test-cpp.c".ptr, (55 as c_int), c"int_equal(&a, &b)".ptr)
     } else {
         0
@@ -63,7 +63,7 @@ fn test_compare_pointer() -> Unit {
 
     (__local_p2 = (((&raw mut __local_b as *mut c_int) as *mut c_void)))
 
-    if ((((if not ((if not (unsafe { pointer_equal(__local_p1, __local_p2) } != 0): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if (((if not ((if not (unsafe { pointer_equal(__local_p1, __local_p2) } != 0): 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_compare_pointer".ptr, c"test-cpp.c".ptr, (64 as c_int), c"!pointer_equal(p1, p2)".ptr)
     } else {
         0
@@ -73,7 +73,7 @@ fn test_compare_pointer() -> Unit {
 
     (__local_p2 = (((&raw mut __local_a as *mut c_int) as *mut c_void)))
 
-    if ((((if not (unsafe { pointer_equal(__local_p1, __local_p2) } != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if (((if not (unsafe { pointer_equal(__local_p1, __local_p2) } != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_compare_pointer".ptr, c"test-cpp.c".ptr, (66 as c_int), c"pointer_equal(p1, p2)".ptr)
     } else {
         0
@@ -88,13 +88,13 @@ fn test_compare_string() -> Unit {
 
     var __local_s3: [6]c_char = [(119 as c_char), (111 as c_char), (114 as c_char), (108 as c_char), (100 as c_char), (0 as c_char)]
 
-    if ((((if not ((if not (unsafe { string_equal((&__local_s1[0] as *mut c_char), (&__local_s3[0] as *mut c_char)) } != 0): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if (((if not ((if not (unsafe { string_equal((&__local_s1[0] as *mut c_char), (&__local_s3[0] as *mut c_char)) } != 0): 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_compare_string".ptr, c"test-cpp.c".ptr, (75 as c_int), c"!string_equal(s1, s3)".ptr)
     } else {
         0
     }
 
-    if ((((if not (unsafe { string_equal((&__local_s1[0] as *mut c_char), (&__local_s2[0] as *mut c_char)) } != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if (((if not (unsafe { string_equal((&__local_s1[0] as *mut c_char), (&__local_s2[0] as *mut c_char)) } != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_compare_string".ptr, c"test-cpp.c".ptr, (76 as c_int), c"string_equal(s1, s2)".ptr)
     } else {
         0
@@ -112,7 +112,7 @@ fn test_hash_int() -> Unit {
 
     (__local_b = ((2 as c_int)))
 
-    if ((((if not ((if unsafe { int_hash(((&raw mut __local_a as *mut c_int) as *mut c_void)) } != unsafe { int_hash(((&raw mut __local_b as *mut c_int) as *mut c_void)) }: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if (((if not ((if unsafe { int_hash(((&raw mut __local_a as *mut c_int) as *mut c_void)) } != unsafe { int_hash(((&raw mut __local_b as *mut c_int) as *mut c_void)) }: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_hash_int".ptr, c"test-cpp.c".ptr, (84 as c_int), c"int_hash(&a) != int_hash(&b)".ptr)
     } else {
         0
@@ -122,7 +122,7 @@ fn test_hash_int() -> Unit {
 
     (__local_b = ((2 as c_int)))
 
-    if ((((if not ((if unsafe { int_hash(((&raw mut __local_a as *mut c_int) as *mut c_void)) } == unsafe { int_hash(((&raw mut __local_b as *mut c_int) as *mut c_void)) }: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if (((if not ((if unsafe { int_hash(((&raw mut __local_a as *mut c_int) as *mut c_void)) } == unsafe { int_hash(((&raw mut __local_b as *mut c_int) as *mut c_void)) }: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_hash_int".ptr, c"test-cpp.c".ptr, (86 as c_int), c"int_hash(&a) == int_hash(&b)".ptr)
     } else {
         0
@@ -145,7 +145,7 @@ fn test_hash_pointer() -> Unit {
 
     (__local_p2 = (((&raw mut __local_b as *mut c_int) as *mut c_void)))
 
-    if ((((if not ((if unsafe { pointer_hash(__local_p1) } != unsafe { pointer_hash(__local_p2) }: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if (((if not ((if unsafe { pointer_hash(__local_p1) } != unsafe { pointer_hash(__local_p2) }: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_hash_pointer".ptr, c"test-cpp.c".ptr, (95 as c_int), c"pointer_hash(p1) != pointer_hash(p2)".ptr)
     } else {
         0
@@ -155,7 +155,7 @@ fn test_hash_pointer() -> Unit {
 
     (__local_p2 = (((&raw mut __local_a as *mut c_int) as *mut c_void)))
 
-    if ((((if not ((if unsafe { pointer_hash(__local_p1) } == unsafe { pointer_hash(__local_p2) }: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if (((if not ((if unsafe { pointer_hash(__local_p1) } == unsafe { pointer_hash(__local_p2) }: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_hash_pointer".ptr, c"test-cpp.c".ptr, (97 as c_int), c"pointer_hash(p1) == pointer_hash(p2)".ptr)
     } else {
         0
@@ -170,13 +170,13 @@ fn test_hash_string() -> Unit {
 
     var __local_s3: [6]c_char = [(119 as c_char), (111 as c_char), (114 as c_char), (108 as c_char), (100 as c_char), (0 as c_char)]
 
-    if ((((if not ((if unsafe { string_hash((&__local_s1[0] as *mut c_char)) } != unsafe { string_hash((&__local_s3[0] as *mut c_char)) }: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if (((if not ((if unsafe { string_hash((&__local_s1[0] as *mut c_char)) } != unsafe { string_hash((&__local_s3[0] as *mut c_char)) }: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_hash_string".ptr, c"test-cpp.c".ptr, (106 as c_int), c"string_hash(s1) != string_hash(s3)".ptr)
     } else {
         0
     }
 
-    if ((((if not ((if unsafe { string_hash((&__local_s1[0] as *mut c_char)) } == unsafe { string_hash((&__local_s2[0] as *mut c_char)) }: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if (((if not ((if unsafe { string_hash((&__local_s1[0] as *mut c_char)) } == unsafe { string_hash((&__local_s2[0] as *mut c_char)) }: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_hash_string".ptr, c"test-cpp.c".ptr, (107 as c_int), c"string_hash(s1) == string_hash(s2)".ptr)
     } else {
         0

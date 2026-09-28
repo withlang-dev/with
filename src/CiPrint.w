@@ -668,7 +668,13 @@ pub fn ci_print_expr(exprs: CiExprPool, types: CiTypePool, id: CiExprId, parent_
     if kind == CiExprKind.CIE_CAST:
         let target = (exprs.get_d0(id)) as CiTypeId
         let operand = (exprs.get_d1(id)) as CiExprId
-        return "(" ++ ci_print_expr(exprs, types, operand, 0, 0) ++ " as " ++ ci_print_type(types, target) ++ ")"
+        let target_text = ci_print_type(types, target)
+        // A conversion to the type the operand was just converted to is the
+        // operand: C's implicit conversions materialize (#1803) where a
+        // lowering may convert the same value again.
+        if exprs.kind(operand) == CiExprKind.CIE_CAST and ci_print_type(types, (exprs.get_d0(operand)) as CiTypeId) == target_text:
+            return ci_print_expr(exprs, types, operand, 0, 0)
+        return "(" ++ ci_print_expr(exprs, types, operand, 0, 0) ++ " as " ++ target_text ++ ")"
     if kind == CiExprKind.CIE_DEREF:
         let operand = (exprs.get_d0(id)) as CiExprId
         let operand_ty = exprs.get_type(operand)

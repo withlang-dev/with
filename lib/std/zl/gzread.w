@@ -215,7 +215,7 @@ pub unsafe fn gzgets(__param_file: *mut gzFile_s, __param_buf: *mut i8, __param_
 
     (__local_str = ((__local_buf as *mut c_char)))
 
-    (__local_left = (((((__param_len as c_uint) as c_uint) -% (1 as c_uint)) as c_uint)))
+    (__local_left = ((((__param_len as c_uint) -% (1 as c_uint)) as c_uint)))
 
     if (__local_left != 0) {
         loop {
@@ -248,10 +248,10 @@ pub unsafe fn gzgets(__param_file: *mut gzFile_s, __param_buf: *mut i8, __param_
             (__local_n = __ci_expr_ternary_7)
 
 
-            (__local_eol = (((memchr((((*(&raw const __local_state.x as *const gzFile_s)).next as *const c_void) as *mut c_void), (10 as c_int), (__local_n as c_ulong)) as *const u8) as *mut u8)))
+            (__local_eol = (((memchr((((*(&raw const __local_state.x as *const gzFile_s)).next as *const c_void) as *mut c_void), (10 as c_int), ((__local_n as c_ulong) as i64)) as *const u8) as *mut u8)))
 
             if ((if __local_eol != null: 1 else: 0) != 0) {
-                (__local_n = ((((((((__local_eol as usize) -% ((*(&raw const __local_state.x as *const gzFile_s)).next as usize)) / sizeof[u8]()) as c_uint) as c_uint) +% (1 as c_uint)) as c_uint)))
+                (__local_n = (((((((__local_eol as usize) -% ((*(&raw const __local_state.x as *const gzFile_s)).next as usize)) / sizeof[u8]()) as c_uint) +% (1 as c_uint)) as c_uint)))
             }
 
             with_memcpy(((__local_buf as *mut c_void) as *mut u8), (((*(&raw const __local_state.x as *const gzFile_s)).next as *const c_void) as *const u8), ((__local_n as c_ulong) as i64))
@@ -560,7 +560,7 @@ unsafe fn gz_load(__param_state: *mut gz_state, __param_buf: *mut u8, __param_le
 
     var __local_get: c_uint
 
-    var __local_max: c_uint = (((((((-1 as c_uint) as c_uint) >> (2 as c_uint)) as c_uint) +% (1 as c_uint)) as c_uint))
+    var __local_max: c_uint = ((((((-1 as c_uint) >> (2 as c_uint)) as c_uint) +% (1 as c_uint)) as c_uint))
 
 
     ((*__param_state).again = ((0 as c_int)))

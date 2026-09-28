@@ -1935,7 +1935,7 @@ pub unsafe fn deflatePrime(__param_strm: *mut z_stream_s, __param_bits: c_int, _
             (__local_put = __local_bits)
         }
 
-        ((*__local_s).bi_buf = ((*__local_s).bi_buf as c_ushort) | ((((((__local_value as c_int) & ((((1 as c_int) << (__local_put as c_uint)) - 1) as c_int)) as c_int) << ((*__local_s).bi_valid as c_uint)) as c_ushort) as c_ushort))
+        ((*__local_s).bi_buf = ((*__local_s).bi_buf as c_ushort) | (((((__local_value as c_int) & ((((1 as c_int) << (__local_put as c_uint)) - 1) as c_int)) as c_int) << ((*__local_s).bi_valid as c_uint)) as c_ushort))
 
         ((*__local_s).bi_valid = (*__local_s).bi_valid + __local_put)
 
@@ -2162,7 +2162,7 @@ pub unsafe fn deflateInit2_(__param_strm: *mut z_stream_s, __param_level: c_int,
 
     ((*__local_s).w_mask = (((((*__local_s).w_size as c_uint) -% (1 as c_uint)) as c_uint)))
 
-    ((*__local_s).hash_bits = (((((__param_memLevel as c_uint) as c_uint) +% (7 as c_uint)) as c_uint)))
+    ((*__local_s).hash_bits = ((((__param_memLevel as c_uint) +% (7 as c_uint)) as c_uint)))
 
     ((*__local_s).hash_size = ((((1 as c_int) << ((*__local_s).hash_bits as c_uint)) as c_uint)))
 
@@ -2182,7 +2182,7 @@ pub unsafe fn deflateInit2_(__param_strm: *mut z_stream_s, __param_level: c_int,
 
     ((*__local_s).pending_buf = (((*__param_strm).zalloc((*__param_strm).opaque_, (*__local_s).lit_bufsize, (4 as c_uint)) as *mut u8)))
 
-    ((*__local_s).pending_buf_size = ((((((*__local_s).lit_bufsize as c_ulong) as c_ulong) *% (4 as c_ulong)) as c_ulong)))
+    ((*__local_s).pending_buf_size = (((((*__local_s).lit_bufsize as c_ulong) *% (4 as c_ulong)) as c_ulong)))
 
     var __ci_expr_logic_14: c_int
 
@@ -2334,7 +2334,7 @@ unsafe fn deflate_stored(__param_s: *mut internal_state, __param_flush: c_int) -
     loop {
         (__local_len = ((65535 as c_uint)))
 
-        (__local_have = ((((((((*__param_s).bi_valid as c_uint) as c_uint) +% (42 as c_uint)) as c_uint) >> (3 as c_uint)) as c_uint)))
+        (__local_have = (((((((*__param_s).bi_valid as c_uint) +% (42 as c_uint)) as c_uint) >> (3 as c_uint)) as c_uint)))
 
         if ((if (*__param_s).strm.avail_out < __local_have: 1 else: 0) != 0) {
             break
@@ -2344,7 +2344,7 @@ unsafe fn deflate_stored(__param_s: *mut internal_state, __param_flush: c_int) -
 
         (__local_left = ((((*__param_s).strstart - (*__param_s).block_start) as c_uint)))
 
-        if ((if __local_len > (((__local_left as c_ulong) as c_ulong) +% ((*__param_s).strm.avail_in as c_ulong)): 1 else: 0) != 0) {
+        if ((if __local_len > ((__local_left as c_ulong) +% ((*__param_s).strm.avail_in as c_ulong)): 1 else: 0) != 0) {
             (__local_len = ((((__local_left as c_uint) +% ((*__param_s).strm.avail_in as c_uint)) as c_uint)))
         }
 
@@ -2587,7 +2587,7 @@ unsafe fn deflate_stored(__param_s: *mut internal_state, __param_flush: c_int) -
         ((*__param_s).high_water = (((*__param_s).strstart as c_ulong)))
     }
 
-    (__local_have = ((((((((*__param_s).bi_valid as c_uint) as c_uint) +% (42 as c_uint)) as c_uint) >> (3 as c_uint)) as c_uint)))
+    (__local_have = (((((((*__param_s).bi_valid as c_uint) +% (42 as c_uint)) as c_uint) >> (3 as c_uint)) as c_uint)))
 
     var __ci_expr_ternary_13: c_ulong = 0
 
@@ -3518,7 +3518,7 @@ unsafe fn deflate_rle(__param_s: *mut internal_state, __param_flush: c_int) -> i
                     }
                 }
 
-                ((*__param_s).match_length = ((((258 as c_uint) -% (((((__local_strend as usize) -% (__local_scan as usize)) / sizeof[u8]()) as c_uint) as c_uint)) as c_uint)))
+                ((*__param_s).match_length = ((((258 as c_uint) -% ((((__local_strend as usize) -% (__local_scan as usize)) / sizeof[u8]()) as c_uint)) as c_uint)))
 
                 if ((if (*__param_s).match_length > (*__param_s).lookahead: 1 else: 0) != 0) {
                     ((*__param_s).match_length = (*__param_s).lookahead)
@@ -3962,7 +3962,7 @@ unsafe fn fill_window(__param_s: *mut internal_state) -> Unit {
 
 
     loop {
-        (__local_more = (((((((*__param_s).window_size as c_ulong) -% (((*__param_s).lookahead as c_ulong) as c_ulong)) as c_ulong) -% (((*__param_s).strstart as c_ulong) as c_ulong)) as c_uint)))
+        (__local_more = (((((((*__param_s).window_size as c_ulong) -% ((*__param_s).lookahead as c_ulong)) as c_ulong) -% ((*__param_s).strstart as c_ulong)) as c_uint)))
 
         if ((if sizeof[c_int]() <= 2: 1 else: 0) != 0) {
             var __ci_expr_logic_2: c_int = 0
@@ -4056,7 +4056,7 @@ unsafe fn fill_window(__param_s: *mut internal_state) -> Unit {
     }
 
     if ((if (*__param_s).high_water < (*__param_s).window_size: 1 else: 0) != 0) {
-        var __local_curr: c_ulong = (((((*__param_s).strstart as c_ulong) +% (((*__param_s).lookahead as c_ulong) as c_ulong)) as c_ulong))
+        var __local_curr: c_ulong = (((((*__param_s).strstart as c_ulong) +% ((*__param_s).lookahead as c_ulong)) as c_ulong))
 
         var __local_init: c_ulong
 
@@ -4186,7 +4186,7 @@ unsafe fn deflateStateCheck(__param_strm: *mut z_stream_s) -> c_int {
 }
 
 unsafe fn lm_init(__param_s: *mut internal_state) -> Unit {
-    ((*__param_s).window_size = (((((2 as c_ulong) as c_ulong) *% ((*__param_s).w_size as c_ulong)) as c_ulong)))
+    ((*__param_s).window_size = ((((2 as c_ulong) *% ((*__param_s).w_size as c_ulong)) as c_ulong)))
 
     loop {
         (((*__param_s).head[(((*__param_s).hash_size as c_uint) -% (1 as c_uint))]) = ((0 as c_ushort)))

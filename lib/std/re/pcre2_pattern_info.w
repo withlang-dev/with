@@ -1393,10 +1393,10 @@ pub unsafe fn pcre2_callout_enumerate_8(__param_code: *const pcre2_real_code_8, 
 
                 },
                 112 => {
-                    (__local_cc = __local_cc + (((((((__local_cc[1]) as c_int) << (8 as c_uint)) as c_int) | (((__local_cc[(1 + 1)]) as c_int) as c_int)) as c_uint) as usize))
+                    (__local_cc = __local_cc + (((((((__local_cc[1]) as c_int) << (8 as c_uint)) as c_int) | ((__local_cc[(1 + 1)]) as c_int)) as c_uint) as usize))
                 },
                 113 => {
-                    (__local_cc = __local_cc + (((((((__local_cc[1]) as c_int) << (8 as c_uint)) as c_int) | (((__local_cc[(1 + 1)]) as c_int) as c_int)) as c_uint) as usize))
+                    (__local_cc = __local_cc + (((((((__local_cc[1]) as c_int) << (8 as c_uint)) as c_int) | ((__local_cc[(1 + 1)]) as c_int)) as c_uint) as usize))
                 },
                 156 => {
                     (__local_cc = __local_cc + ((((_pcre2_OP_lengths_8[(*__local_cc)] as c_int) + ((__local_cc[1]) as c_int)) as isize) as usize))
@@ -1414,9 +1414,9 @@ pub unsafe fn pcre2_callout_enumerate_8(__param_code: *const pcre2_real_code_8, 
                     (__local_cc = __local_cc + ((((_pcre2_OP_lengths_8[(*__local_cc)] as c_int) + ((__local_cc[1]) as c_int)) as isize) as usize))
                 },
                 119 => {
-                    (__local_cb.pattern_position = ((((((((__local_cc[1]) as c_int) << (8 as c_uint)) as c_int) | (((__local_cc[(1 + 1)]) as c_int) as c_int)) as c_uint) as c_ulong)))
+                    (__local_cb.pattern_position = ((((((((__local_cc[1]) as c_int) << (8 as c_uint)) as c_int) | ((__local_cc[(1 + 1)]) as c_int)) as c_uint) as c_ulong)))
 
-                    (__local_cb.next_item_length = ((((((((__local_cc[(1 + 2)]) as c_int) << (8 as c_uint)) as c_int) | (((__local_cc[((1 + 2) + 1)]) as c_int) as c_int)) as c_uint) as c_ulong)))
+                    (__local_cb.next_item_length = ((((((((__local_cc[(1 + 2)]) as c_int) << (8 as c_uint)) as c_int) | ((__local_cc[((1 + 2) + 1)]) as c_int)) as c_uint) as c_ulong)))
 
                     (__local_cb.callout_number = (((__local_cc[(1 + (2 * 2))]) as c_uint)))
 
@@ -1436,15 +1436,15 @@ pub unsafe fn pcre2_callout_enumerate_8(__param_code: *const pcre2_real_code_8, 
 
                 },
                 120 => {
-                    (__local_cb.pattern_position = ((((((((__local_cc[1]) as c_int) << (8 as c_uint)) as c_int) | (((__local_cc[(1 + 1)]) as c_int) as c_int)) as c_uint) as c_ulong)))
+                    (__local_cb.pattern_position = ((((((((__local_cc[1]) as c_int) << (8 as c_uint)) as c_int) | ((__local_cc[(1 + 1)]) as c_int)) as c_uint) as c_ulong)))
 
-                    (__local_cb.next_item_length = ((((((((__local_cc[(1 + 2)]) as c_int) << (8 as c_uint)) as c_int) | (((__local_cc[((1 + 2) + 1)]) as c_int) as c_int)) as c_uint) as c_ulong)))
+                    (__local_cb.next_item_length = ((((((((__local_cc[(1 + 2)]) as c_int) << (8 as c_uint)) as c_int) | ((__local_cc[((1 + 2) + 1)]) as c_int)) as c_uint) as c_ulong)))
 
                     (__local_cb.callout_number = ((0 as c_uint)))
 
-                    (__local_cb.callout_string_offset = ((((((((__local_cc[(1 + (3 * 2))]) as c_int) << (8 as c_uint)) as c_int) | (((__local_cc[((1 + (3 * 2)) + 1)]) as c_int) as c_int)) as c_uint) as c_ulong)))
+                    (__local_cb.callout_string_offset = ((((((((__local_cc[(1 + (3 * 2))]) as c_int) << (8 as c_uint)) as c_int) | ((__local_cc[((1 + (3 * 2)) + 1)]) as c_int)) as c_uint) as c_ulong)))
 
-                    (__local_cb.callout_string_length = ((((((((((((__local_cc[(1 + (2 * 2))]) as c_int) << (8 as c_uint)) as c_int) | (((__local_cc[((1 + (2 * 2)) + 1)]) as c_int) as c_int)) as c_uint) as c_uint) -% (9 as c_uint)) as c_uint) -% (2 as c_uint)) as c_ulong)))
+                    (__local_cb.callout_string_length = (((((((((((__local_cc[(1 + (2 * 2))]) as c_int) << (8 as c_uint)) as c_int) | ((__local_cc[((1 + (2 * 2)) + 1)]) as c_int)) as c_uint) -% (9 as c_uint)) as c_uint) -% (2 as c_uint)) as c_ulong)))
 
                     (__local_cb.callout_string = (__local_cc + (((1 + (4 * 2)) as isize) as usize)) + ((1 as isize) as usize))
 
@@ -1454,7 +1454,7 @@ pub unsafe fn pcre2_callout_enumerate_8(__param_code: *const pcre2_real_code_8, 
                         return __local_rc
                     }
 
-                    (__local_cc = __local_cc + (((((((__local_cc[(1 + (2 * 2))]) as c_int) << (8 as c_uint)) as c_int) | (((__local_cc[((1 + (2 * 2)) + 1)]) as c_int) as c_int)) as c_uint) as usize))
+                    (__local_cc = __local_cc + (((((((__local_cc[(1 + (2 * 2))]) as c_int) << (8 as c_uint)) as c_int) | ((__local_cc[((1 + (2 * 2)) + 1)]) as c_int)) as c_uint) as usize))
 
                 },
                 _ => {

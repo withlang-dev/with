@@ -387,7 +387,7 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
         (__local_have__goto_478_14 = (__local_have__goto_478_14 -% 1))
         (__ci_expr_old_3 = __local_next__goto_476_32)
         (__local_next__goto_476_32 = __local_next__goto_476_32 + 1)
-        (__local_hold__goto_479_19 = (__local_hold__goto_479_19 +% ((((*__ci_expr_old_3) as c_ulong) as c_ulong) << (__local_bits__goto_480_14 as c_uint))))
+        (__local_hold__goto_479_19 = (__local_hold__goto_479_19 +% (((*__ci_expr_old_3) as c_ulong) << (__local_bits__goto_480_14 as c_uint))))
         (__local_bits__goto_480_14 = (__local_bits__goto_480_14 +% 8))
         goto '__ci_bb_24
     }
@@ -469,7 +469,7 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
         if ((if not ((((*__local_state__goto_475_31).wrap as c_int) & (1 as c_int)) != 0): 1 else: 0) != 0) {
             (__ci_expr_logic_5 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_5 = (if (((((((((__local_hold__goto_479_19 as c_uint) as c_uint) & (((((1 as c_uint) << (8 as c_uint)) as c_uint) -% (1 as c_uint)) as c_uint)) as c_uint) << (8 as c_uint)) as c_ulong) +% (((__local_hold__goto_479_19 as c_ulong) >> (8 as c_uint)) as c_ulong)) as c_ulong) % (31 as c_ulong)) != 0: 1 else: 0))
+            (__ci_expr_logic_5 = (if ((((((((__local_hold__goto_479_19 as c_uint) & (((((1 as c_uint) << (8 as c_uint)) as c_uint) -% (1 as c_uint)) as c_uint)) as c_uint) << (8 as c_uint)) as c_ulong) +% (((__local_hold__goto_479_19 as c_ulong) >> (8 as c_uint)) as c_ulong)) as c_ulong) % (31 as c_ulong)) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_5 != 0) {
             goto '__ci_bb_41
@@ -485,7 +485,7 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
     }
 
     '__ci_bb_42 {
-        if ((if (((__local_hold__goto_479_19 as c_uint) as c_uint) & (((((1 as c_uint) << (4 as c_uint)) as c_uint) -% (1 as c_uint)) as c_uint)) != 8: 1 else: 0) != 0) {
+        if ((if ((__local_hold__goto_479_19 as c_uint) & (((((1 as c_uint) << (4 as c_uint)) as c_uint) -% (1 as c_uint)) as c_uint)) != 8: 1 else: 0) != 0) {
             goto '__ci_bb_43
         } else {
             goto '__ci_bb_44
@@ -517,7 +517,7 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
     }
 
     '__ci_bb_47 {
-        (__local_len__goto_486_14 = (((((((__local_hold__goto_479_19 as c_uint) as c_uint) & (((((1 as c_uint) << (4 as c_uint)) as c_uint) -% (1 as c_uint)) as c_uint)) as c_uint) +% (8 as c_uint)) as c_uint)))
+        (__local_len__goto_486_14 = ((((((__local_hold__goto_479_19 as c_uint) & (((((1 as c_uint) << (4 as c_uint)) as c_uint) -% (1 as c_uint)) as c_uint)) as c_uint) +% (8 as c_uint)) as c_uint)))
         if ((if (*__local_state__goto_475_31).wbits == 0: 1 else: 0) != 0) {
             goto '__ci_bb_48
         } else {
@@ -651,7 +651,7 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
         (__local_have__goto_478_14 = (__local_have__goto_478_14 -% 1))
         (__ci_expr_old_8 = __local_next__goto_476_32)
         (__local_next__goto_476_32 = __local_next__goto_476_32 + 1)
-        (__local_hold__goto_479_19 = (__local_hold__goto_479_19 +% ((((*__ci_expr_old_8) as c_ulong) as c_ulong) << (__local_bits__goto_480_14 as c_uint))))
+        (__local_hold__goto_479_19 = (__local_hold__goto_479_19 +% (((*__ci_expr_old_8) as c_ulong) << (__local_bits__goto_480_14 as c_uint))))
         (__local_bits__goto_480_14 = (__local_bits__goto_480_14 +% 8))
         goto '__ci_bb_63
     }
@@ -815,7 +815,7 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
         (__local_have__goto_478_14 = (__local_have__goto_478_14 -% 1))
         (__ci_expr_old_10 = __local_next__goto_476_32)
         (__local_next__goto_476_32 = __local_next__goto_476_32 + 1)
-        (__local_hold__goto_479_19 = (__local_hold__goto_479_19 +% ((((*__ci_expr_old_10) as c_ulong) as c_ulong) << (__local_bits__goto_480_14 as c_uint))))
+        (__local_hold__goto_479_19 = (__local_hold__goto_479_19 +% (((*__ci_expr_old_10) as c_ulong) << (__local_bits__goto_480_14 as c_uint))))
         (__local_bits__goto_480_14 = (__local_bits__goto_480_14 +% 8))
         goto '__ci_bb_89
     }
@@ -953,7 +953,7 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
         (__local_have__goto_478_14 = (__local_have__goto_478_14 -% 1))
         (__ci_expr_old_12 = __local_next__goto_476_32)
         (__local_next__goto_476_32 = __local_next__goto_476_32 + 1)
-        (__local_hold__goto_479_19 = (__local_hold__goto_479_19 +% ((((*__ci_expr_old_12) as c_ulong) as c_ulong) << (__local_bits__goto_480_14 as c_uint))))
+        (__local_hold__goto_479_19 = (__local_hold__goto_479_19 +% (((*__ci_expr_old_12) as c_ulong) << (__local_bits__goto_480_14 as c_uint))))
         (__local_bits__goto_480_14 = (__local_bits__goto_480_14 +% 8))
         goto '__ci_bb_111
     }
@@ -1112,7 +1112,7 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
         (__local_have__goto_478_14 = (__local_have__goto_478_14 -% 1))
         (__ci_expr_old_14 = __local_next__goto_476_32)
         (__local_next__goto_476_32 = __local_next__goto_476_32 + 1)
-        (__local_hold__goto_479_19 = (__local_hold__goto_479_19 +% ((((*__ci_expr_old_14) as c_ulong) as c_ulong) << (__local_bits__goto_480_14 as c_uint))))
+        (__local_hold__goto_479_19 = (__local_hold__goto_479_19 +% (((*__ci_expr_old_14) as c_ulong) << (__local_bits__goto_480_14 as c_uint))))
         (__local_bits__goto_480_14 = (__local_bits__goto_480_14 +% 8))
         goto '__ci_bb_136
     }
@@ -1631,7 +1631,7 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
         (__local_have__goto_478_14 = (__local_have__goto_478_14 -% 1))
         (__ci_expr_old_32 = __local_next__goto_476_32)
         (__local_next__goto_476_32 = __local_next__goto_476_32 + 1)
-        (__local_hold__goto_479_19 = (__local_hold__goto_479_19 +% ((((*__ci_expr_old_32) as c_ulong) as c_ulong) << (__local_bits__goto_480_14 as c_uint))))
+        (__local_hold__goto_479_19 = (__local_hold__goto_479_19 +% (((*__ci_expr_old_32) as c_ulong) << (__local_bits__goto_480_14 as c_uint))))
         (__local_bits__goto_480_14 = (__local_bits__goto_480_14 +% 8))
         goto '__ci_bb_209
     }
@@ -1743,7 +1743,7 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
         (__local_have__goto_478_14 = (__local_have__goto_478_14 -% 1))
         (__ci_expr_old_34 = __local_next__goto_476_32)
         (__local_next__goto_476_32 = __local_next__goto_476_32 + 1)
-        (__local_hold__goto_479_19 = (__local_hold__goto_479_19 +% ((((*__ci_expr_old_34) as c_ulong) as c_ulong) << (__local_bits__goto_480_14 as c_uint))))
+        (__local_hold__goto_479_19 = (__local_hold__goto_479_19 +% (((*__ci_expr_old_34) as c_ulong) << (__local_bits__goto_480_14 as c_uint))))
         (__local_bits__goto_480_14 = (__local_bits__goto_480_14 +% 8))
         goto '__ci_bb_228
     }
@@ -1877,7 +1877,7 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
     }
 
     '__ci_bb_252 {
-        ((*__local_state__goto_475_31).last = (((((__local_hold__goto_479_19 as c_uint) as c_uint) & (((((1 as c_uint) << (1 as c_uint)) as c_uint) -% (1 as c_uint)) as c_uint)) as c_int)))
+        ((*__local_state__goto_475_31).last = ((((__local_hold__goto_479_19 as c_uint) & (((((1 as c_uint) << (1 as c_uint)) as c_uint) -% (1 as c_uint)) as c_uint)) as c_int)))
         goto '__ci_bb_261
     }
 
@@ -1925,7 +1925,7 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
         (__local_have__goto_478_14 = (__local_have__goto_478_14 -% 1))
         (__ci_expr_old_36 = __local_next__goto_476_32)
         (__local_next__goto_476_32 = __local_next__goto_476_32 + 1)
-        (__local_hold__goto_479_19 = (__local_hold__goto_479_19 +% ((((*__ci_expr_old_36) as c_ulong) as c_ulong) << (__local_bits__goto_480_14 as c_uint))))
+        (__local_hold__goto_479_19 = (__local_hold__goto_479_19 +% (((*__ci_expr_old_36) as c_ulong) << (__local_bits__goto_480_14 as c_uint))))
         (__local_bits__goto_480_14 = (__local_bits__goto_480_14 +% 8))
         goto '__ci_bb_257
     }
@@ -1949,7 +1949,7 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
     }
 
     '__ci_bb_264 {
-        if ((((__local_hold__goto_479_19 as c_uint) as c_uint) & (((((1 as c_uint) << (2 as c_uint)) as c_uint) -% (1 as c_uint)) as c_uint)) == 0) {
+        if (((__local_hold__goto_479_19 as c_uint) & (((((1 as c_uint) << (2 as c_uint)) as c_uint) -% (1 as c_uint)) as c_uint)) == 0) {
             goto '__ci_bb_266
         } else {
             goto '__ci_bb_275
@@ -2013,7 +2013,7 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
     }
 
     '__ci_bb_275 {
-        if ((((__local_hold__goto_479_19 as c_uint) as c_uint) & (((((1 as c_uint) << (2 as c_uint)) as c_uint) -% (1 as c_uint)) as c_uint)) == 1) {
+        if (((__local_hold__goto_479_19 as c_uint) & (((((1 as c_uint) << (2 as c_uint)) as c_uint) -% (1 as c_uint)) as c_uint)) == 1) {
             goto '__ci_bb_267
         } else {
             goto '__ci_bb_276
@@ -2021,7 +2021,7 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
     }
 
     '__ci_bb_276 {
-        if ((((__local_hold__goto_479_19 as c_uint) as c_uint) & (((((1 as c_uint) << (2 as c_uint)) as c_uint) -% (1 as c_uint)) as c_uint)) == 2) {
+        if (((__local_hold__goto_479_19 as c_uint) & (((((1 as c_uint) << (2 as c_uint)) as c_uint) -% (1 as c_uint)) as c_uint)) == 2) {
             goto '__ci_bb_273
         } else {
             goto '__ci_bb_274
@@ -2132,7 +2132,7 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
         (__local_have__goto_478_14 = (__local_have__goto_478_14 -% 1))
         (__ci_expr_old_37 = __local_next__goto_476_32)
         (__local_next__goto_476_32 = __local_next__goto_476_32 + 1)
-        (__local_hold__goto_479_19 = (__local_hold__goto_479_19 +% ((((*__ci_expr_old_37) as c_ulong) as c_ulong) << (__local_bits__goto_480_14 as c_uint))))
+        (__local_hold__goto_479_19 = (__local_hold__goto_479_19 +% (((*__ci_expr_old_37) as c_ulong) << (__local_bits__goto_480_14 as c_uint))))
         (__local_bits__goto_480_14 = (__local_bits__goto_480_14 +% 8))
         goto '__ci_bb_291
     }
@@ -2144,7 +2144,7 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
     }
 
     '__ci_bb_296 {
-        ((*__local_state__goto_475_31).length = (((((__local_hold__goto_479_19 as c_uint) as c_uint) & (65535 as c_uint)) as c_uint)))
+        ((*__local_state__goto_475_31).length = ((((__local_hold__goto_479_19 as c_uint) & (65535 as c_uint)) as c_uint)))
         goto '__ci_bb_297
     }
 
@@ -2263,7 +2263,7 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
     }
 
     '__ci_bb_315 {
-        ((*__local_state__goto_475_31).nlen = (((((((__local_hold__goto_479_19 as c_uint) as c_uint) & (((((1 as c_uint) << (5 as c_uint)) as c_uint) -% (1 as c_uint)) as c_uint)) as c_uint) +% (257 as c_uint)) as c_uint)))
+        ((*__local_state__goto_475_31).nlen = ((((((__local_hold__goto_479_19 as c_uint) & (((((1 as c_uint) << (5 as c_uint)) as c_uint) -% (1 as c_uint)) as c_uint)) as c_uint) +% (257 as c_uint)) as c_uint)))
         goto '__ci_bb_324
     }
 
@@ -2311,7 +2311,7 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
         (__local_have__goto_478_14 = (__local_have__goto_478_14 -% 1))
         (__ci_expr_old_38 = __local_next__goto_476_32)
         (__local_next__goto_476_32 = __local_next__goto_476_32 + 1)
-        (__local_hold__goto_479_19 = (__local_hold__goto_479_19 +% ((((*__ci_expr_old_38) as c_ulong) as c_ulong) << (__local_bits__goto_480_14 as c_uint))))
+        (__local_hold__goto_479_19 = (__local_hold__goto_479_19 +% (((*__ci_expr_old_38) as c_ulong) << (__local_bits__goto_480_14 as c_uint))))
         (__local_bits__goto_480_14 = (__local_bits__goto_480_14 +% 8))
         goto '__ci_bb_320
     }
@@ -2331,7 +2331,7 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
     }
 
     '__ci_bb_326 {
-        ((*__local_state__goto_475_31).ndist = (((((((__local_hold__goto_479_19 as c_uint) as c_uint) & (((((1 as c_uint) << (5 as c_uint)) as c_uint) -% (1 as c_uint)) as c_uint)) as c_uint) +% (1 as c_uint)) as c_uint)))
+        ((*__local_state__goto_475_31).ndist = ((((((__local_hold__goto_479_19 as c_uint) & (((((1 as c_uint) << (5 as c_uint)) as c_uint) -% (1 as c_uint)) as c_uint)) as c_uint) +% (1 as c_uint)) as c_uint)))
         goto '__ci_bb_327
     }
 
@@ -2350,7 +2350,7 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
     }
 
     '__ci_bb_329 {
-        ((*__local_state__goto_475_31).ncode = (((((((__local_hold__goto_479_19 as c_uint) as c_uint) & (((((1 as c_uint) << (4 as c_uint)) as c_uint) -% (1 as c_uint)) as c_uint)) as c_uint) +% (4 as c_uint)) as c_uint)))
+        ((*__local_state__goto_475_31).ncode = ((((((__local_hold__goto_479_19 as c_uint) & (((((1 as c_uint) << (4 as c_uint)) as c_uint) -% (1 as c_uint)) as c_uint)) as c_uint) +% (4 as c_uint)) as c_uint)))
         goto '__ci_bb_330
     }
 
@@ -2428,7 +2428,7 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
     '__ci_bb_341 {
         (__ci_expr_old_41 = (*__local_state__goto_475_31).have)
         ((*__local_state__goto_475_31).have = ((*__local_state__goto_475_31).have +% 1))
-        ((*__local_state__goto_475_31).lens[__local_order__goto_491_33[__ci_expr_old_41]] = (((((__local_hold__goto_479_19 as c_uint) as c_uint) & (((((1 as c_uint) << (3 as c_uint)) as c_uint) -% (1 as c_uint)) as c_uint)) as c_ushort)))
+        ((*__local_state__goto_475_31).lens[__local_order__goto_491_33[__ci_expr_old_41]] = ((((__local_hold__goto_479_19 as c_uint) & (((((1 as c_uint) << (3 as c_uint)) as c_uint) -% (1 as c_uint)) as c_uint)) as c_ushort)))
         goto '__ci_bb_350
     }
 
@@ -2476,7 +2476,7 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
         (__local_have__goto_478_14 = (__local_have__goto_478_14 -% 1))
         (__ci_expr_old_40 = __local_next__goto_476_32)
         (__local_next__goto_476_32 = __local_next__goto_476_32 + 1)
-        (__local_hold__goto_479_19 = (__local_hold__goto_479_19 +% ((((*__ci_expr_old_40) as c_ulong) as c_ulong) << (__local_bits__goto_480_14 as c_uint))))
+        (__local_hold__goto_479_19 = (__local_hold__goto_479_19 +% (((*__ci_expr_old_40) as c_ulong) << (__local_bits__goto_480_14 as c_uint))))
         (__local_bits__goto_480_14 = (__local_bits__goto_480_14 +% 8))
         goto '__ci_bb_346
     }
@@ -2568,7 +2568,7 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
     }
 
     '__ci_bb_363 {
-        with_memcpy((&raw mut __local_here__goto_484_10 as *mut u8), (&raw const ((*__local_state__goto_475_31).lencode[(((__local_hold__goto_479_19 as c_uint) as c_uint) & (((((1 as c_uint) << ((*__local_state__goto_475_31).lenbits as c_uint)) as c_uint) -% (1 as c_uint)) as c_uint))]) as *const u8), sizeof[code]())
+        with_memcpy((&raw mut __local_here__goto_484_10 as *mut u8), (&raw const ((*__local_state__goto_475_31).lencode[((__local_hold__goto_479_19 as c_uint) & (((((1 as c_uint) << ((*__local_state__goto_475_31).lenbits as c_uint)) as c_uint) -% (1 as c_uint)) as c_uint))]) as *const u8), sizeof[code]())
         if ((if (((*(&raw const __local_here__goto_484_10 as *const code)).bits as c_uint)) <= __local_bits__goto_480_14: 1 else: 0) != 0) {
             goto '__ci_bb_366
         } else {
@@ -2624,7 +2624,7 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
         (__local_have__goto_478_14 = (__local_have__goto_478_14 -% 1))
         (__ci_expr_old_43 = __local_next__goto_476_32)
         (__local_next__goto_476_32 = __local_next__goto_476_32 + 1)
-        (__local_hold__goto_479_19 = (__local_hold__goto_479_19 +% ((((*__ci_expr_old_43) as c_ulong) as c_ulong) << (__local_bits__goto_480_14 as c_uint))))
+        (__local_hold__goto_479_19 = (__local_hold__goto_479_19 +% (((*__ci_expr_old_43) as c_ulong) << (__local_bits__goto_480_14 as c_uint))))
         (__local_bits__goto_480_14 = (__local_bits__goto_480_14 +% 8))
         goto '__ci_bb_369
     }
@@ -2746,7 +2746,7 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
         (__local_have__goto_478_14 = (__local_have__goto_478_14 -% 1))
         (__ci_expr_old_45 = __local_next__goto_476_32)
         (__local_next__goto_476_32 = __local_next__goto_476_32 + 1)
-        (__local_hold__goto_479_19 = (__local_hold__goto_479_19 +% ((((*__ci_expr_old_45) as c_ulong) as c_ulong) << (__local_bits__goto_480_14 as c_uint))))
+        (__local_hold__goto_479_19 = (__local_hold__goto_479_19 +% (((*__ci_expr_old_45) as c_ulong) << (__local_bits__goto_480_14 as c_uint))))
         (__local_bits__goto_480_14 = (__local_bits__goto_480_14 +% 8))
         goto '__ci_bb_389
     }
@@ -2781,7 +2781,7 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
 
     '__ci_bb_397 {
         (__local_len__goto_486_14 = (((*__local_state__goto_475_31).lens[(((*__local_state__goto_475_31).have as c_uint) -% (1 as c_uint))] as c_uint)))
-        (__local_copy___goto_482_14 = ((((3 as c_uint) +% ((((__local_hold__goto_479_19 as c_uint) as c_uint) & (((((1 as c_uint) << (2 as c_uint)) as c_uint) -% (1 as c_uint)) as c_uint)) as c_uint)) as c_uint)))
+        (__local_copy___goto_482_14 = ((((3 as c_uint) +% (((__local_hold__goto_479_19 as c_uint) & (((((1 as c_uint) << (2 as c_uint)) as c_uint) -% (1 as c_uint)) as c_uint)) as c_uint)) as c_uint)))
         goto '__ci_bb_398
     }
 
@@ -2875,7 +2875,7 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
         (__local_have__goto_478_14 = (__local_have__goto_478_14 -% 1))
         (__ci_expr_old_46 = __local_next__goto_476_32)
         (__local_next__goto_476_32 = __local_next__goto_476_32 + 1)
-        (__local_hold__goto_479_19 = (__local_hold__goto_479_19 +% ((((*__ci_expr_old_46) as c_ulong) as c_ulong) << (__local_bits__goto_480_14 as c_uint))))
+        (__local_hold__goto_479_19 = (__local_hold__goto_479_19 +% (((*__ci_expr_old_46) as c_ulong) << (__local_bits__goto_480_14 as c_uint))))
         (__local_bits__goto_480_14 = (__local_bits__goto_480_14 +% 8))
         goto '__ci_bb_411
     }
@@ -2896,7 +2896,7 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
 
     '__ci_bb_417 {
         (__local_len__goto_486_14 = ((0 as c_uint)))
-        (__local_copy___goto_482_14 = ((((3 as c_uint) +% ((((__local_hold__goto_479_19 as c_uint) as c_uint) & (((((1 as c_uint) << (3 as c_uint)) as c_uint) -% (1 as c_uint)) as c_uint)) as c_uint)) as c_uint)))
+        (__local_copy___goto_482_14 = ((((3 as c_uint) +% (((__local_hold__goto_479_19 as c_uint) & (((((1 as c_uint) << (3 as c_uint)) as c_uint) -% (1 as c_uint)) as c_uint)) as c_uint)) as c_uint)))
         goto '__ci_bb_418
     }
 
@@ -2978,7 +2978,7 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
         (__local_have__goto_478_14 = (__local_have__goto_478_14 -% 1))
         (__ci_expr_old_47 = __local_next__goto_476_32)
         (__local_next__goto_476_32 = __local_next__goto_476_32 + 1)
-        (__local_hold__goto_479_19 = (__local_hold__goto_479_19 +% ((((*__ci_expr_old_47) as c_ulong) as c_ulong) << (__local_bits__goto_480_14 as c_uint))))
+        (__local_hold__goto_479_19 = (__local_hold__goto_479_19 +% (((*__ci_expr_old_47) as c_ulong) << (__local_bits__goto_480_14 as c_uint))))
         (__local_bits__goto_480_14 = (__local_bits__goto_480_14 +% 8))
         goto '__ci_bb_428
     }
@@ -2999,7 +2999,7 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
 
     '__ci_bb_434 {
         (__local_len__goto_486_14 = ((0 as c_uint)))
-        (__local_copy___goto_482_14 = ((((11 as c_uint) +% ((((__local_hold__goto_479_19 as c_uint) as c_uint) & (((((1 as c_uint) << (7 as c_uint)) as c_uint) -% (1 as c_uint)) as c_uint)) as c_uint)) as c_uint)))
+        (__local_copy___goto_482_14 = ((((11 as c_uint) +% (((__local_hold__goto_479_19 as c_uint) & (((((1 as c_uint) << (7 as c_uint)) as c_uint) -% (1 as c_uint)) as c_uint)) as c_uint)) as c_uint)))
         goto '__ci_bb_435
     }
 
@@ -3211,7 +3211,7 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
     }
 
     '__ci_bb_466 {
-        with_memcpy((&raw mut __local_here__goto_484_10 as *mut u8), (&raw const ((*__local_state__goto_475_31).lencode[(((__local_hold__goto_479_19 as c_uint) as c_uint) & (((((1 as c_uint) << ((*__local_state__goto_475_31).lenbits as c_uint)) as c_uint) -% (1 as c_uint)) as c_uint))]) as *const u8), sizeof[code]())
+        with_memcpy((&raw mut __local_here__goto_484_10 as *mut u8), (&raw const ((*__local_state__goto_475_31).lencode[((__local_hold__goto_479_19 as c_uint) & (((((1 as c_uint) << ((*__local_state__goto_475_31).lenbits as c_uint)) as c_uint) -% (1 as c_uint)) as c_uint))]) as *const u8), sizeof[code]())
         if ((if (((*(&raw const __local_here__goto_484_10 as *const code)).bits as c_uint)) <= __local_bits__goto_480_14: 1 else: 0) != 0) {
             goto '__ci_bb_469
         } else {
@@ -3226,7 +3226,7 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
     '__ci_bb_468 {
         (__ci_expr_logic_52 = 0)
         if ((*(&raw const __local_here__goto_484_10 as *const code)).op != 0) {
-            (__ci_expr_logic_52 = (if (if ((((*(&raw const __local_here__goto_484_10 as *const code)).op as c_int) as c_int) & (240 as c_int)) == 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_52 = (if (if (((*(&raw const __local_here__goto_484_10 as *const code)).op as c_int) & (240 as c_int)) == 0: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_52 != 0) {
             goto '__ci_bb_476
@@ -3271,7 +3271,7 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
         (__local_have__goto_478_14 = (__local_have__goto_478_14 -% 1))
         (__ci_expr_old_51 = __local_next__goto_476_32)
         (__local_next__goto_476_32 = __local_next__goto_476_32 + 1)
-        (__local_hold__goto_479_19 = (__local_hold__goto_479_19 +% ((((*__ci_expr_old_51) as c_ulong) as c_ulong) << (__local_bits__goto_480_14 as c_uint))))
+        (__local_hold__goto_479_19 = (__local_hold__goto_479_19 +% (((*__ci_expr_old_51) as c_ulong) << (__local_bits__goto_480_14 as c_uint))))
         (__local_bits__goto_480_14 = (__local_bits__goto_480_14 +% 8))
         goto '__ci_bb_472
     }
@@ -3290,7 +3290,7 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
     }
 
     '__ci_bb_479 {
-        with_memcpy((&raw mut __local_here__goto_484_10 as *mut u8), (&raw const ((*__local_state__goto_475_31).lencode[((((*(&raw const __local_last__goto_485_10 as *const code)).val as c_int) as c_uint) +% ((((((__local_hold__goto_479_19 as c_uint) as c_uint) & (((((1 as c_uint) << ((((*(&raw const __local_last__goto_485_10 as *const code)).bits as c_int) + ((*(&raw const __local_last__goto_485_10 as *const code)).op as c_int)) as c_uint)) as c_uint) -% (1 as c_uint)) as c_uint)) as c_uint) >> ((*(&raw const __local_last__goto_485_10 as *const code)).bits as c_uint)) as c_uint))]) as *const u8), sizeof[code]())
+        with_memcpy((&raw mut __local_here__goto_484_10 as *mut u8), (&raw const ((*__local_state__goto_475_31).lencode[((((*(&raw const __local_last__goto_485_10 as *const code)).val as c_int) as c_uint) +% (((((__local_hold__goto_479_19 as c_uint) & (((((1 as c_uint) << ((((*(&raw const __local_last__goto_485_10 as *const code)).bits as c_int) + ((*(&raw const __local_last__goto_485_10 as *const code)).op as c_int)) as c_uint)) as c_uint) -% (1 as c_uint)) as c_uint)) as c_uint) >> ((*(&raw const __local_last__goto_485_10 as *const code)).bits as c_uint)) as c_uint))]) as *const u8), sizeof[code]())
         if ((if (((((*(&raw const __local_last__goto_485_10 as *const code)).bits as c_int) + ((*(&raw const __local_here__goto_484_10 as *const code)).bits as c_int)) as c_uint)) <= __local_bits__goto_480_14: 1 else: 0) != 0) {
             goto '__ci_bb_482
         } else {
@@ -3342,7 +3342,7 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
         (__local_have__goto_478_14 = (__local_have__goto_478_14 -% 1))
         (__ci_expr_old_53 = __local_next__goto_476_32)
         (__local_next__goto_476_32 = __local_next__goto_476_32 + 1)
-        (__local_hold__goto_479_19 = (__local_hold__goto_479_19 +% ((((*__ci_expr_old_53) as c_ulong) as c_ulong) << (__local_bits__goto_480_14 as c_uint))))
+        (__local_hold__goto_479_19 = (__local_hold__goto_479_19 +% (((*__ci_expr_old_53) as c_ulong) << (__local_bits__goto_480_14 as c_uint))))
         (__local_bits__goto_480_14 = (__local_bits__goto_480_14 +% 8))
         goto '__ci_bb_485
     }
@@ -3396,7 +3396,7 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
     }
 
     '__ci_bb_496 {
-        if (((((*(&raw const __local_here__goto_484_10 as *const code)).op as c_int) as c_int) & (32 as c_int)) != 0) {
+        if ((((*(&raw const __local_here__goto_484_10 as *const code)).op as c_int) & (32 as c_int)) != 0) {
             goto '__ci_bb_497
         } else {
             goto '__ci_bb_498
@@ -3410,7 +3410,7 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
     }
 
     '__ci_bb_498 {
-        if (((((*(&raw const __local_here__goto_484_10 as *const code)).op as c_int) as c_int) & (64 as c_int)) != 0) {
+        if ((((*(&raw const __local_here__goto_484_10 as *const code)).op as c_int) & (64 as c_int)) != 0) {
             goto '__ci_bb_499
         } else {
             goto '__ci_bb_500
@@ -3424,7 +3424,7 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
     }
 
     '__ci_bb_500 {
-        ((*__local_state__goto_475_31).extra = ((((((*(&raw const __local_here__goto_484_10 as *const code)).op as c_uint) as c_uint) & (15 as c_uint)) as c_uint)))
+        ((*__local_state__goto_475_31).extra = (((((*(&raw const __local_here__goto_484_10 as *const code)).op as c_uint) & (15 as c_uint)) as c_uint)))
         ((*__local_state__goto_475_31).mode = ((16201 as i32)))
         goto '__ci_bb_501
     }
@@ -3460,7 +3460,7 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
     }
 
     '__ci_bb_506 {
-        ((*__local_state__goto_475_31).length = ((*__local_state__goto_475_31).length +% (((__local_hold__goto_479_19 as c_uint) as c_uint) & (((((1 as c_uint) << ((*__local_state__goto_475_31).extra as c_uint)) as c_uint) -% (1 as c_uint)) as c_uint))))
+        ((*__local_state__goto_475_31).length = ((*__local_state__goto_475_31).length +% ((__local_hold__goto_479_19 as c_uint) & (((((1 as c_uint) << ((*__local_state__goto_475_31).extra as c_uint)) as c_uint) -% (1 as c_uint)) as c_uint))))
         goto '__ci_bb_515
     }
 
@@ -3508,7 +3508,7 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
         (__local_have__goto_478_14 = (__local_have__goto_478_14 -% 1))
         (__ci_expr_old_54 = __local_next__goto_476_32)
         (__local_next__goto_476_32 = __local_next__goto_476_32 + 1)
-        (__local_hold__goto_479_19 = (__local_hold__goto_479_19 +% ((((*__ci_expr_old_54) as c_ulong) as c_ulong) << (__local_bits__goto_480_14 as c_uint))))
+        (__local_hold__goto_479_19 = (__local_hold__goto_479_19 +% (((*__ci_expr_old_54) as c_ulong) << (__local_bits__goto_480_14 as c_uint))))
         (__local_bits__goto_480_14 = (__local_bits__goto_480_14 +% 8))
         goto '__ci_bb_511
     }
@@ -3528,7 +3528,7 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
     }
 
     '__ci_bb_517 {
-        ((*__local_state__goto_475_31).back = (*__local_state__goto_475_31).back + (*__local_state__goto_475_31).extra)
+        ((*__local_state__goto_475_31).back = ((((*__local_state__goto_475_31).back + (*__local_state__goto_475_31).extra) as c_int)))
         goto '__ci_bb_503
     }
 
@@ -3541,7 +3541,7 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
     }
 
     '__ci_bb_520 {
-        with_memcpy((&raw mut __local_here__goto_484_10 as *mut u8), (&raw const ((*__local_state__goto_475_31).distcode[(((__local_hold__goto_479_19 as c_uint) as c_uint) & (((((1 as c_uint) << ((*__local_state__goto_475_31).distbits as c_uint)) as c_uint) -% (1 as c_uint)) as c_uint))]) as *const u8), sizeof[code]())
+        with_memcpy((&raw mut __local_here__goto_484_10 as *mut u8), (&raw const ((*__local_state__goto_475_31).distcode[((__local_hold__goto_479_19 as c_uint) & (((((1 as c_uint) << ((*__local_state__goto_475_31).distbits as c_uint)) as c_uint) -% (1 as c_uint)) as c_uint))]) as *const u8), sizeof[code]())
         if ((if (((*(&raw const __local_here__goto_484_10 as *const code)).bits as c_uint)) <= __local_bits__goto_480_14: 1 else: 0) != 0) {
             goto '__ci_bb_523
         } else {
@@ -3554,7 +3554,7 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
     }
 
     '__ci_bb_522 {
-        if ((if ((((*(&raw const __local_here__goto_484_10 as *const code)).op as c_int) as c_int) & (240 as c_int)) == 0: 1 else: 0) != 0) {
+        if ((if (((*(&raw const __local_here__goto_484_10 as *const code)).op as c_int) & (240 as c_int)) == 0: 1 else: 0) != 0) {
             goto '__ci_bb_530
         } else {
             goto '__ci_bb_531
@@ -3597,7 +3597,7 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
         (__local_have__goto_478_14 = (__local_have__goto_478_14 -% 1))
         (__ci_expr_old_55 = __local_next__goto_476_32)
         (__local_next__goto_476_32 = __local_next__goto_476_32 + 1)
-        (__local_hold__goto_479_19 = (__local_hold__goto_479_19 +% ((((*__ci_expr_old_55) as c_ulong) as c_ulong) << (__local_bits__goto_480_14 as c_uint))))
+        (__local_hold__goto_479_19 = (__local_hold__goto_479_19 +% (((*__ci_expr_old_55) as c_ulong) << (__local_bits__goto_480_14 as c_uint))))
         (__local_bits__goto_480_14 = (__local_bits__goto_480_14 +% 8))
         goto '__ci_bb_526
     }
@@ -3616,7 +3616,7 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
     }
 
     '__ci_bb_533 {
-        with_memcpy((&raw mut __local_here__goto_484_10 as *mut u8), (&raw const ((*__local_state__goto_475_31).distcode[((((*(&raw const __local_last__goto_485_10 as *const code)).val as c_int) as c_uint) +% ((((((__local_hold__goto_479_19 as c_uint) as c_uint) & (((((1 as c_uint) << ((((*(&raw const __local_last__goto_485_10 as *const code)).bits as c_int) + ((*(&raw const __local_last__goto_485_10 as *const code)).op as c_int)) as c_uint)) as c_uint) -% (1 as c_uint)) as c_uint)) as c_uint) >> ((*(&raw const __local_last__goto_485_10 as *const code)).bits as c_uint)) as c_uint))]) as *const u8), sizeof[code]())
+        with_memcpy((&raw mut __local_here__goto_484_10 as *mut u8), (&raw const ((*__local_state__goto_475_31).distcode[((((*(&raw const __local_last__goto_485_10 as *const code)).val as c_int) as c_uint) +% (((((__local_hold__goto_479_19 as c_uint) & (((((1 as c_uint) << ((((*(&raw const __local_last__goto_485_10 as *const code)).bits as c_int) + ((*(&raw const __local_last__goto_485_10 as *const code)).op as c_int)) as c_uint)) as c_uint) -% (1 as c_uint)) as c_uint)) as c_uint) >> ((*(&raw const __local_last__goto_485_10 as *const code)).bits as c_uint)) as c_uint))]) as *const u8), sizeof[code]())
         if ((if (((((*(&raw const __local_last__goto_485_10 as *const code)).bits as c_int) + ((*(&raw const __local_here__goto_484_10 as *const code)).bits as c_int)) as c_uint)) <= __local_bits__goto_480_14: 1 else: 0) != 0) {
             goto '__ci_bb_536
         } else {
@@ -3668,7 +3668,7 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
         (__local_have__goto_478_14 = (__local_have__goto_478_14 -% 1))
         (__ci_expr_old_56 = __local_next__goto_476_32)
         (__local_next__goto_476_32 = __local_next__goto_476_32 + 1)
-        (__local_hold__goto_479_19 = (__local_hold__goto_479_19 +% ((((*__ci_expr_old_56) as c_ulong) as c_ulong) << (__local_bits__goto_480_14 as c_uint))))
+        (__local_hold__goto_479_19 = (__local_hold__goto_479_19 +% (((*__ci_expr_old_56) as c_ulong) << (__local_bits__goto_480_14 as c_uint))))
         (__local_bits__goto_480_14 = (__local_bits__goto_480_14 +% 8))
         goto '__ci_bb_539
     }
@@ -3708,7 +3708,7 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
 
     '__ci_bb_548 {
         ((*__local_state__goto_475_31).back = (*__local_state__goto_475_31).back + ((*(&raw const __local_here__goto_484_10 as *const code)).bits as c_int))
-        if (((((*(&raw const __local_here__goto_484_10 as *const code)).op as c_int) as c_int) & (64 as c_int)) != 0) {
+        if ((((*(&raw const __local_here__goto_484_10 as *const code)).op as c_int) & (64 as c_int)) != 0) {
             goto '__ci_bb_549
         } else {
             goto '__ci_bb_550
@@ -3723,7 +3723,7 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
 
     '__ci_bb_550 {
         ((*__local_state__goto_475_31).offset = (((*(&raw const __local_here__goto_484_10 as *const code)).val as c_uint)))
-        ((*__local_state__goto_475_31).extra = ((((((*(&raw const __local_here__goto_484_10 as *const code)).op as c_uint) as c_uint) & (15 as c_uint)) as c_uint)))
+        ((*__local_state__goto_475_31).extra = (((((*(&raw const __local_here__goto_484_10 as *const code)).op as c_uint) & (15 as c_uint)) as c_uint)))
         ((*__local_state__goto_475_31).mode = ((16203 as i32)))
         goto '__ci_bb_551
     }
@@ -3758,7 +3758,7 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
     }
 
     '__ci_bb_556 {
-        ((*__local_state__goto_475_31).offset = ((*__local_state__goto_475_31).offset +% (((__local_hold__goto_479_19 as c_uint) as c_uint) & (((((1 as c_uint) << ((*__local_state__goto_475_31).extra as c_uint)) as c_uint) -% (1 as c_uint)) as c_uint))))
+        ((*__local_state__goto_475_31).offset = ((*__local_state__goto_475_31).offset +% ((__local_hold__goto_479_19 as c_uint) & (((((1 as c_uint) << ((*__local_state__goto_475_31).extra as c_uint)) as c_uint) -% (1 as c_uint)) as c_uint))))
         goto '__ci_bb_565
     }
 
@@ -3806,7 +3806,7 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
         (__local_have__goto_478_14 = (__local_have__goto_478_14 -% 1))
         (__ci_expr_old_57 = __local_next__goto_476_32)
         (__local_next__goto_476_32 = __local_next__goto_476_32 + 1)
-        (__local_hold__goto_479_19 = (__local_hold__goto_479_19 +% ((((*__ci_expr_old_57) as c_ulong) as c_ulong) << (__local_bits__goto_480_14 as c_uint))))
+        (__local_hold__goto_479_19 = (__local_hold__goto_479_19 +% (((*__ci_expr_old_57) as c_ulong) << (__local_bits__goto_480_14 as c_uint))))
         (__local_bits__goto_480_14 = (__local_bits__goto_480_14 +% 8))
         goto '__ci_bb_561
     }
@@ -3826,7 +3826,7 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
     }
 
     '__ci_bb_567 {
-        ((*__local_state__goto_475_31).back = (*__local_state__goto_475_31).back + (*__local_state__goto_475_31).extra)
+        ((*__local_state__goto_475_31).back = ((((*__local_state__goto_475_31).back + (*__local_state__goto_475_31).extra) as c_int)))
         goto '__ci_bb_553
     }
 
@@ -4083,7 +4083,7 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
         (__local_have__goto_478_14 = (__local_have__goto_478_14 -% 1))
         (__ci_expr_old_61 = __local_next__goto_476_32)
         (__local_next__goto_476_32 = __local_next__goto_476_32 + 1)
-        (__local_hold__goto_479_19 = (__local_hold__goto_479_19 +% ((((*__ci_expr_old_61) as c_ulong) as c_ulong) << (__local_bits__goto_480_14 as c_uint))))
+        (__local_hold__goto_479_19 = (__local_hold__goto_479_19 +% (((*__ci_expr_old_61) as c_ulong) << (__local_bits__goto_480_14 as c_uint))))
         (__local_bits__goto_480_14 = (__local_bits__goto_480_14 +% 8))
         goto '__ci_bb_603
     }
@@ -4186,7 +4186,7 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
     '__ci_bb_619 {
         (__ci_expr_logic_68 = 0)
         if ((((*__local_state__goto_475_31).wrap as c_int) & (4 as c_int)) != 0) {
-            (__ci_expr_logic_68 = (if (if __local_hold__goto_479_19 != (((*__local_state__goto_475_31).total as c_ulong) & ((4294967295 as c_ulong) as c_ulong)): 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_68 = (if (if __local_hold__goto_479_19 != (((*__local_state__goto_475_31).total as c_ulong) & (4294967295 as c_ulong)): 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_68 != 0) {
             goto '__ci_bb_628
@@ -4239,7 +4239,7 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
         (__local_have__goto_478_14 = (__local_have__goto_478_14 -% 1))
         (__ci_expr_old_67 = __local_next__goto_476_32)
         (__local_next__goto_476_32 = __local_next__goto_476_32 + 1)
-        (__local_hold__goto_479_19 = (__local_hold__goto_479_19 +% ((((*__ci_expr_old_67) as c_ulong) as c_ulong) << (__local_bits__goto_480_14 as c_uint))))
+        (__local_hold__goto_479_19 = (__local_hold__goto_479_19 +% (((*__ci_expr_old_67) as c_ulong) << (__local_bits__goto_480_14 as c_uint))))
         (__local_bits__goto_480_14 = (__local_bits__goto_480_14 +% 8))
         goto '__ci_bb_624
     }
@@ -5094,7 +5094,7 @@ pub unsafe fn inflatePrime(__param_strm: *mut z_stream_s, __param_bits: c_int, _
     if ((if __param_bits > 16: 1 else: 0) != 0) {
         (__ci_expr_logic_0 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_0 = (if (if (((*__local_state).bits as c_uint) +% ((__param_bits as c_uint) as c_uint)) > 32: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_0 = (if (if (((*__local_state).bits as c_uint) +% (__param_bits as c_uint)) > 32: 1 else: 0) != 0: 1 else: 0))
     }
 
     if (__ci_expr_logic_0 != 0) {
@@ -5104,7 +5104,7 @@ pub unsafe fn inflatePrime(__param_strm: *mut z_stream_s, __param_bits: c_int, _
 
     (__local_value = (__local_value as c_int) & ((((1 as c_long) << (__param_bits as c_uint)) - 1) as c_int))
 
-    ((*__local_state).hold = ((*__local_state).hold +% (((__local_value as c_ulong) as c_ulong) << ((*__local_state).bits as c_uint))))
+    ((*__local_state).hold = ((*__local_state).hold +% ((__local_value as c_ulong) << ((*__local_state).bits as c_uint))))
 
     ((*__local_state).bits = ((*__local_state).bits +% (__param_bits as c_uint)))
 
@@ -5138,7 +5138,7 @@ pub unsafe fn inflateMark(__param_strm: *mut z_stream_s) -> c_long {
 
     }
 
-    return (((((((*__local_state).back as c_long) as c_ulong) as c_ulong) << (16 as c_uint)) as c_long) + __ci_expr_ternary_1)
+    return ((((((*__local_state).back as c_long) as c_ulong) << (16 as c_uint)) as c_long) + __ci_expr_ternary_1)
 
 
 }

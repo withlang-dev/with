@@ -134,7 +134,7 @@ pub unsafe fn _pcre2_strcpy_c8_8(__param_str1: *mut u8, __param_str2: *const i8)
 
     ((*__local_t) = ((0 as u8)))
 
-    return (((__local_t as usize) -% (__param_str1 as usize)) / sizeof[u8]())
+    return (((((__local_t as usize) -% (__param_str1 as usize)) / sizeof[u8]()) as c_ulong))
 
 }
 

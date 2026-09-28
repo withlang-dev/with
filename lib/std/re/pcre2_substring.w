@@ -57,7 +57,7 @@ pub unsafe fn pcre2_substring_copy_byname_8(__param_match_data: *mut pcre2_real_
     (__local_entry = __local_first)
 
     while ((if __local_entry <= __local_last: 1 else: 0) != 0) {
-        var __local_n: c_uint = (((((((__local_entry[0]) as c_int) << (8 as c_uint)) as c_int) | (((__local_entry[(0 + 1)]) as c_int) as c_int)) as c_uint))
+        var __local_n: c_uint = (((((((__local_entry[0]) as c_int) << (8 as c_uint)) as c_int) | ((__local_entry[(0 + 1)]) as c_int)) as c_uint))
 
         if ((if __local_n < (*__param_match_data).oveccount: 1 else: 0) != 0) {
             if ((if (*__param_match_data).ovector[((__local_n as c_uint) *% (2 as c_uint))] != (~(0 as c_ulong)): 1 else: 0) != 0) {
@@ -143,7 +143,7 @@ pub unsafe fn pcre2_substring_get_byname_8(__param_match_data: *mut pcre2_real_m
     (__local_entry = __local_first)
 
     while ((if __local_entry <= __local_last: 1 else: 0) != 0) {
-        var __local_n: c_uint = (((((((__local_entry[0]) as c_int) << (8 as c_uint)) as c_int) | (((__local_entry[(0 + 1)]) as c_int) as c_int)) as c_uint))
+        var __local_n: c_uint = (((((((__local_entry[0]) as c_int) << (8 as c_uint)) as c_int) | ((__local_entry[(0 + 1)]) as c_int)) as c_uint))
 
         if ((if __local_n < (*__param_match_data).oveccount: 1 else: 0) != 0) {
             if ((if (*__param_match_data).ovector[((__local_n as c_uint) *% (2 as c_uint))] != (~(0 as c_ulong)): 1 else: 0) != 0) {
@@ -227,7 +227,7 @@ pub unsafe fn pcre2_substring_length_byname_8(__param_match_data: *mut pcre2_rea
     (__local_entry = __local_first)
 
     while ((if __local_entry <= __local_last: 1 else: 0) != 0) {
-        var __local_n: c_uint = (((((((__local_entry[0]) as c_int) << (8 as c_uint)) as c_int) | (((__local_entry[(0 + 1)]) as c_int) as c_int)) as c_uint))
+        var __local_n: c_uint = (((((((__local_entry[0]) as c_int) << (8 as c_uint)) as c_int) | ((__local_entry[(0 + 1)]) as c_int)) as c_uint))
 
         if ((if __local_n < (*__param_match_data).oveccount: 1 else: 0) != 0) {
             if ((if (*__param_match_data).ovector[((__local_n as c_uint) *% (2 as c_uint))] != (~(0 as c_ulong)): 1 else: 0) != 0) {
@@ -394,7 +394,7 @@ pub unsafe fn pcre2_substring_nametable_scan_8(__param_code: *const pcre2_real_c
                 var __ci_expr_ternary_0: c_int = 0
 
                 if ((if __local_first == __local_last: 1 else: 0) != 0) {
-                    (__ci_expr_ternary_0 = ((((((((__local_entry[0]) as c_int) << (8 as c_uint)) as c_int) | (((__local_entry[(0 + 1)]) as c_int) as c_int)) as c_uint) as c_int)))
+                    (__ci_expr_ternary_0 = ((((((((__local_entry[0]) as c_int) << (8 as c_uint)) as c_int) | ((__local_entry[(0 + 1)]) as c_int)) as c_uint) as c_int)))
                 } else {
                     (__ci_expr_ternary_0 = ((-50 as c_int)))
                 }
