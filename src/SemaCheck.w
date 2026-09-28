@@ -18443,6 +18443,8 @@ impl Sema:
                 if self.pool_resolve(p_sym).starts_with("__partial_arg_"):
                     self.emit_error("placeholder partial application does not support named arguments", node)
                     break
+        for cpi in 0..param_count:
+            self.refuse_dyn_by_value_params(self.ast.get_extra(extra_start + cpi * 2 + 1), true)
         let outer_count = self.bind_names.len() as i32
         let saved_capture_sig_idx: i32 = self.current_fn_sig_idx
         // A closure has its own frame: `va_start()` in it would start no list
@@ -25398,6 +25400,40 @@ impl Sema:
             if self.no_await_guard_origin_roots[i] != wait_root:
                 return 0
         1
+
+    // #1852 (§11.3: `dyn Trait` is unsized): a parameter takes a trait object
+    // borrowed (`&dyn T`) or owned (`Box[dyn T]`). A bare `dyn T` names no
+    // value that can be passed, so it is refused where it is written, with
+    // both spellings; it used to compile and never drop what it was given.
+    // `impl T` is a generic parameter, not a trait object. The parameters of
+    // a fn type inside the declared type are parameters too.
+    mut fn refuse_dyn_by_value_params(type_node: i32, is_param: bool):
+        if type_node == 0:
+            return
+        let kind = self.ast.kind(type_node)
+        if kind == NodeKind.NK_TYPE_TRAIT_OBJ:
+            if is_param and self.ast.get_data1(type_node) != TYPE_TRAIT_OBJECT_IMPL and self.suppress_errors == 0:
+                let text = "dyn " ++ self.pool_resolve(self.ast.get_data0(type_node))
+                var diag = Diagnostic.err(f"a parameter cannot take `{text}` by value: a trait object is unsized (§11.3)", Span { file: self.local_file_id, start: self.ast.get_start(type_node), end: self.ast.get_end(type_node) })
+                diag.set_origin(__FILE__, __FN__, __LINE__ as i32, type_node)
+                diag.add_help(f"borrow it: `&{text}`")
+                diag.add_help(f"or own it: `Box[{text}]`")
+                self.diags.emit(move diag)
+            return
+        if kind == NodeKind.NK_TYPE_FN or kind == NodeKind.NK_TYPE_EXTERN_FN:
+            let fn_extra = self.ast.get_data0(type_node)
+            for pi in 0..self.ast.get_data1(type_node):
+                self.refuse_dyn_by_value_params(self.ast.get_extra(fn_extra + pi), true)
+            self.refuse_dyn_by_value_params(self.ast.get_data2(type_node), false)
+            return
+        if kind == NodeKind.NK_TYPE_REF or kind == NodeKind.NK_TYPE_PTR or kind == NodeKind.NK_TYPE_OPTIONAL or kind == NodeKind.NK_TYPE_SLICE or kind == NodeKind.NK_TYPE_ARRAY:
+            self.refuse_dyn_by_value_params(self.ast.get_data0(type_node), false)
+            return
+        if kind == NodeKind.NK_TYPE_GENERIC or kind == NodeKind.NK_TYPE_TUPLE:
+            let arg_extra = if kind == NodeKind.NK_TYPE_GENERIC: self.ast.get_data1(type_node) else: self.ast.get_data0(type_node)
+            let arg_count = if kind == NodeKind.NK_TYPE_GENERIC: self.ast.get_data2(type_node) else: self.ast.get_data1(type_node)
+            for ai in 0..arg_count:
+                self.refuse_dyn_by_value_params(self.ast.get_extra(arg_extra + ai), false)
 
     fn trait_object_from_type_node(type_node: i32) -> i32:
         if type_node == 0:

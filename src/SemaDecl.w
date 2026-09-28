@@ -1922,7 +1922,9 @@ impl Sema:
             let _ = self.register_extension_method_candidate(node, fn_name, parsed_fn_name, -1, decl_index)
             for pi in 0..param_count:
                 let p_type_node = self.ast.fn_param_type(param_start, pi)
+                self.refuse_dyn_by_value_params(p_type_node, true)
                 self.validate_type_expr_with_type_params(p_type_node, self.ast.fn_meta_tp_start(meta), tp_count)
+            self.refuse_dyn_by_value_params(ret_node, false)
             self.validate_type_expr_with_type_params(ret_node, self.ast.fn_meta_tp_start(meta), tp_count)
             // Validate where clause references
             self.validate_where_clause(node, self.ast.fn_meta_tp_start(meta), tp_count)
@@ -1942,6 +1944,7 @@ impl Sema:
             if is_local != 0:
                 self.set_pretty_symbol(p_name_sym, self.extract_fn_param_name(node, pi))
             let p_type_node = self.ast.fn_param_type(param_start, pi)
+            self.refuse_dyn_by_value_params(p_type_node, true)
             let p_tid = self.resolve_parameter_type_expr(p_type_node)
             let p_flags = self.ast.fn_param_flags(param_start, pi)
             // A D7 mut receiver spells `Self` but uses the share-place ABI: the
@@ -1959,6 +1962,7 @@ impl Sema:
                 implicit_type_ids.push(p_tid as i32)
             self.sig_params.push(p_tid as i32)
 
+        self.refuse_dyn_by_value_params(ret_node, false)
         var ret_type = self.resolve_type_expr(ret_node)
         if self.is_opaque_value_type(ret_type) != 0:
             self.emit_error("opaque types cannot be returned by value; use a pointer or reference", ret_node)
@@ -2554,6 +2558,9 @@ impl Sema:
                         if self.pool_resolve(p0_ty_sym) == "Self":
                             let mt_name_str: str = self.pool_resolve(mt_name)
                             self.emit_error(f"trait method '{mt_name_str}' requires an explicit receiver mode: use 'self: &Self', 'mut self: Self', or 'move self: Self'", node)
+            for mpi in 0..mt_param_count:
+                self.refuse_dyn_by_value_params(self.ast.fn_param_type(mt_param_start, mpi), true)
+            self.refuse_dyn_by_value_params(mt_ret_node, false)
             self.trait_method_names.push(mt_name)
             self.trait_method_flags.push(mt_flags)
             self.trait_method_param_starts.push(mt_param_start)
