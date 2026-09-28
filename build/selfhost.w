@@ -4516,6 +4516,49 @@ fn bs_check_migrate_sizeof_pointer_width(ctx: &ActionCtx, compiler_path: &str, c
     if check.rc != 0: return check.rc
     0
 
+// #1848: a declaration without a prototype (`int knr();`) is emitted as the
+// prototype its calls use after C's default argument promotions (a signed
+// char and a float arrive as int and double), never as the variadic
+// `(...)`; calls that disagree refuse the migration loudly.
+fn bs_check_migrate_unprototyped_declaration(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
+    let root = ctx.project_info().project_root()
+    let src = bs_join(case_dir, "unprototyped.c")
+    let out_w = bs_join(case_dir, "unprototyped.w")
+    var rc = bs_write_fixture(ctx, src, "int knr();\n\nint twice(signed char c, float f) {\n  return knr(c, f) * 2 + knr(1, 2.5);\n}\n", "unprototyped declaration")
+    if rc != 0: return rc
+    var args: Vec[str] = Vec.new()
+    args |> push("migrate")
+    args |> push(bs_abs(root, src))
+    args |> push("--no-c-export")
+    args |> push("-o")
+    args |> push(bs_abs(root, out_w))
+    let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-unprototyped-declaration", args)
+    if result.rc != 0: return result.rc
+    let out_text = ctx.fs().read_text(out_w)
+    rc = bs_assert_contains(ctx, out_text, "extern fn knr(a0: c_int, a1: f64) -> c_int", "unprototyped_declaration")
+    if rc != 0: return rc
+    rc = bs_assert_not_contains(ctx, out_text, "fn knr(...)", "unprototyped_declaration")
+    if rc != 0: return rc
+    var check_args: Vec[str] = Vec.new()
+    check_args |> push("check")
+    check_args |> push(bs_abs(root, out_w))
+    let check = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-unprototyped-declaration", check_args)
+    if check.rc != 0: return check.rc
+    let bad_src = bs_join(case_dir, "unprototyped_disagree.c")
+    let bad_w = bs_join(case_dir, "unprototyped_disagree.w")
+    rc = bs_write_fixture(ctx, bad_src, "int knr();\n\nint both(void) {\n  return knr(1) + knr(1, 2);\n}\n", "unprototyped disagreeing calls")
+    if rc != 0: return rc
+    var bad_args: Vec[str] = Vec.new()
+    bad_args |> push("migrate")
+    bad_args |> push(bs_abs(root, bad_src))
+    bad_args |> push("--no-c-export")
+    bad_args |> push("-o")
+    bad_args |> push(bs_abs(root, bad_w))
+    let bad = bs_run_cli_capture_cwd(ctx, compiler_path, "migrate-unprototyped-disagree", bad_args, 180000, case_dir)
+    if bad.rc == 0:
+        return bs_fail(ctx, "migration of disagreeing unprototyped calls unexpectedly succeeded")
+    bs_assert_contains(ctx, bad.stderr, "migrate: 'knr' is declared without a prototype and its calls pass different arguments", "unprototyped_declaration")
+
 fn bs_check_migrate_variadic_stdarg(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
     let root = ctx.project_info().project_root()
     let src = bs_join(case_dir, "variadic_stdarg.c")
@@ -4786,6 +4829,8 @@ pub fn run_cli_selfhost_migrate_basic_action(ctx: ActionCtx) -> i32:
     rc = bs_check_migrate_sizeof_pointer_width(ctx, compiler_path, bs_join(output_dir, "sizeof_pointer_width"))
     if rc != 0: return rc
     rc = bs_check_migrate_variadic_stdarg(ctx, compiler_path, bs_join(output_dir, "variadic_stdarg"))
+    if rc != 0: return rc
+    rc = bs_check_migrate_unprototyped_declaration(ctx, compiler_path, bs_join(output_dir, "unprototyped_declaration"))
     if rc != 0: return rc
     rc = bs_check_migrate_setjmp_rejected(ctx, compiler_path, bs_join(output_dir, "setjmp_rejected"))
     if rc != 0: return rc
