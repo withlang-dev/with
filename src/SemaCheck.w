@@ -7934,6 +7934,22 @@ impl Sema:
             return 1
         0
 
+    // §16.11: why a direct call to `fn_sym` from the module being checked
+    // needs an unsafe context — an `unsafe fn`, a raw c_import function, or
+    // a manual extern with an unmodeled contract; "" when it does not. One
+    // rule for the call and for the function used as a value: the value's
+    // type is unsafe exactly when the call is (#1829). A presented facade
+    // call (§16.2b.8) is safe at its call site; the function's value is not
+    // presented, so a value use passes `presented` false.
+    fn fn_symbol_unsafe_call_reason(fn_sym: i32, presented: bool) -> str:
+        if self.fn_symbol_is_unsafe(fn_sym) != 0 and not presented:
+            return "unsafe function call requires unsafe context"
+        if self.fn_symbol_is_raw_c_import(fn_sym) != 0:
+            return "raw c_import function call requires unsafe context"
+        if self.fn_symbol_is_manual_extern(fn_sym) != 0:
+            return "manual extern function call requires unsafe context"
+        ""
+
     // The module being checked declared this extern itself (#1695): its own
     // declaration governs the call, so another module's declaration of the
     // same name (std.fs's `strerror`) cannot make the call exempt.
@@ -9156,22 +9172,30 @@ impl Sema:
             if self.fn_decl_is_variadic_definition(self.fn_symbol_decl_node(sym)):
                 self.emit_error("`" ++ self.pool_resolve(sym) ++ "` is defined with `...`: it is called directly (under `unsafe`), never used as a value", node)
                 return 0
-            let fn_is_unsafe = self.fn_symbol_is_unsafe(sym)
+            // §16.11: a function whose call needs `unsafe` is an unsafe
+            // callable as a value too — its type carries the unsafety, so a
+            // call through the value needs the same context (#1829).
+            let fn_is_unsafe = self.fn_symbol_unsafe_call_reason(sym, false).len() > 0
+            let value_tid = if fn_is_unsafe: self.unsafe_callable_type(fn_tid) else: fn_tid
             if self.has_expected_type != 0 and self.expected_expr_type != 0:
                 let expected = self.resolve_alias(self.expected_expr_type)
-                if self.get_type_kind(expected) == TypeKind.TY_EXTERN_FN and self.fn_types_compatible(expected, fn_tid) != 0:
-                    // §16.11: an unsafe fn may not coerce to a safe callable type.
-                    if fn_is_unsafe != 0 and self.fn_type_is_unsafe(expected as i32) == 0:
-                        self.emit_error("cannot use unsafe fn where a safe function type is expected; mark the target type 'unsafe fn' or wrap the contract in a safe function", node)
-                        return 0
+                let expected_kind = self.get_type_kind(expected)
+                let matches = if expected_kind == TypeKind.TY_EXTERN_FN: self.fn_types_compatible(expected, fn_tid) != 0
+                    else if expected_kind == TypeKind.TY_FN: self.fn_types_assignable(expected as i32, fn_tid) != 0
+                    else: false
+                // §16.11: an unsafe callable may not coerce to a safe callable type.
+                if matches and fn_is_unsafe and self.fn_type_is_unsafe(expected as i32) == 0:
+                    self.emit_error("cannot use unsafe fn where a safe function type is expected; mark the target type 'unsafe fn' or wrap the contract in a safe function", node)
+                    return 0
+                if matches and expected_kind == TypeKind.TY_EXTERN_FN:
                     self.typed_expr_types.insert(node, expected as i32)
                     self.fn_value_ident_sigs.insert(node, sig_idx)
                     self.note_callable_value(sig_idx, expected as i32)
                     return expected as i32
-            self.typed_expr_types.insert(node, fn_tid)
+            self.typed_expr_types.insert(node, value_tid)
             self.fn_value_ident_sigs.insert(node, sig_idx)
-            self.note_callable_value(sig_idx, fn_tid)
-            return fn_tid
+            self.note_callable_value(sig_idx, value_tid)
+            return value_tid
         if (sig_idx >= 0 or self.generic_fn_node_for_symbol(sym) != 0) and self.symbol_visible_from_current(sym) == 0:
             self.emit_private_symbol_error(sym, node)
             return 0
@@ -21029,14 +21053,9 @@ impl Sema:
         // facade item as a covered return is: the pointer C hands back never
         // reaches the program, only the `Option[CStr]` made of it — the
         // translated inline body's `unsafe` marking is about that pointer.
-        if self.fn_symbol_is_unsafe(fn_sym) != 0 and not self.facade_call_is_presented(fn_sym):
-            if self.require_unsafe_operation("unsafe function call requires unsafe context", node) == 0:
-                return 0
-        else if self.fn_symbol_is_raw_c_import(fn_sym) != 0:
-            if self.require_unsafe_operation("raw c_import function call requires unsafe context", node) == 0:
-                return 0
-        else if self.fn_symbol_is_manual_extern(fn_sym) != 0:
-            if self.require_unsafe_operation("manual extern function call requires unsafe context", node) == 0:
+        let unsafe_call_reason = self.fn_symbol_unsafe_call_reason(fn_sym, self.facade_call_is_presented(fn_sym))
+        if unsafe_call_reason.len() > 0:
+            if self.require_unsafe_operation(unsafe_call_reason, node) == 0:
                 return 0
         else if self.in_unsafe != 0 and sema_name_is_compiler_abi_extern(self.pool_resolve(fn_sym)) != 0:
             // D30 transition: a runtime-ABI call (with_/rt_/wl_) is
