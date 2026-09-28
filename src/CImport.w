@@ -7313,7 +7313,7 @@ impl CiExprPool:
         var item_count = 0
         var i = start
         while i < end:
-            var value = text[i]
+            var value: i32 = text[i]
             if value == 92:
                 if i + 1 >= end:
                     return 0 as CiExprId
@@ -7362,7 +7362,7 @@ impl CiExprPool:
                     i = i + 2
             else:
                 i = i + 1
-            let value_idx = self.add_string(i64_to_string(value as i64))
+            let value_idx = self.add_string(i64_to_string(value))
             let value_lit = self.int_lit(value_idx, 0 as CiTypeId)
             let value_cast = self.cast(elem_ty, value_lit)
             let _ = self.add_extra(value_cast as i32)

@@ -8499,7 +8499,7 @@ impl Codegen:
             let fs_recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
             let fs_ty = self.mir_intrinsic_recv_storage_type(body, args_id, fs_recv_ptr)
             let fs_buf_ty = wl_struct_get_type_at(fs_ty, 0)
-            var fs_cap = 0
+            var fs_cap: i64 = 0
             if wl_get_type_kind(fs_buf_ty) == wl_array_type_kind():
                 fs_cap = wl_get_array_length(fs_buf_ty)
             result = wl_const_int(i64_ty, fs_cap, 0)

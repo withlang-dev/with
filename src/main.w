@@ -3503,7 +3503,7 @@ fn dump_async_mir_artifact(source_file: &str, no_std: bool, alloc_mode: bool, ru
 
 fn escape_dump_lexeme(text: &str) -> str:
     var out = StringBuilder.with_capacity(text.len())
-    var run_start = 0
+    var run_start: i64 = 0
     for i in 0..text.len():
         let ch = text[i]
         var esc = ""
@@ -3521,12 +3521,12 @@ fn escape_dump_lexeme(text: &str) -> str:
             continue
         // Flush the non-special run before this escape.
         if i > run_start:
-            out.push_str(text.slice(run_start as i64, i as i64))
+            out.push_str(text.slice(run_start, i))
         out.push_str(esc)
         run_start = i + 1
     // Flush any remaining non-special run.
     if run_start < text.len():
-        out.push_str(text.slice(run_start as i64, text.len()))
+        out.push_str(text.slice(run_start, text.len()))
     out.to_str()
 
 fn dump_tag_name(tag: i32, lexeme: &str) -> str:

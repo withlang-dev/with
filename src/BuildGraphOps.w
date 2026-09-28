@@ -49,7 +49,7 @@ pub fn build_graph_compare_files(root: &str, target: &BuildGraphTarget, operatio
     let left = build_graph_read_input(operation_name ++ " target '" ++ target.name ++ "'", left_path) ?? return 1
     let right = build_graph_read_input(operation_name ++ " target '" ++ target.name ++ "'", right_path) ?? return 1
     let min_len = if left.len() < right.len(): left.len() else: right.len()
-    var diff_at = -1
+    var diff_at: i64 = -1
     var i = 0
     while i < min_len:
         if left[i] != right[i]:
