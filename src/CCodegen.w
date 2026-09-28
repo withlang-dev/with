@@ -16,6 +16,7 @@ use std.collections.HashMap
 use std.string.StringBuilder
 use MathBuiltins
 use MirCore
+use MirLower
 use SemaTypes
 
 extern fn with_str_clone_ref(s: &str) -> str
@@ -348,6 +349,12 @@ type CCodegen {
     // observing `_ref` str-builtin runtime fn (unqualified_builtin_method_name):
     // emit_term must then marshal str VALUE operands as WITH_STR_REF pointers.
     callee_is_str_builtin_ref: i32,
+    // #1484: globals initialized before `main` (prepare_global_init_bodies):
+    // each global's symbol, its declaration index (the order they run in,
+    // §9.1c) and its synthesized initializer body's function symbol.
+    global_init_syms: Vec[i32],
+    global_init_decl_indices: Vec[i32],
+    global_init_fn_syms: Vec[i32],
 }
 
 impl CCodegen:
@@ -401,6 +408,9 @@ pub fn c_emit_module(mir_mod: MirModule, ast: AstPool, intern: InternPool, sema:
         fat_thunk_tids: Vec.new(),
         fat_thunk_keys: HashMap.new(),
         callee_is_str_builtin_ref: 0,
+        global_init_syms: Vec.new(),
+        global_init_decl_indices: Vec.new(),
+        global_init_fn_syms: Vec.new(),
     }
     for i in 0..cg.mir_mod.body_fn_syms.len() as i32:
         let sym: i32 = cg.mir_mod.body_fn_syms[i]
@@ -3128,28 +3138,30 @@ impl CCodegen:
             return "0"
         "((" ++ cty ++ ")(" ++ cc_exact_uint_expr(words.lo, words.hi) ++ "))"
 
+    // An integer literal (or a negated one) as a C constant of `tid`, or ""
+    // when `node` is not one: the global is then initialized at startup.
     mut fn exact_int_expr_text(node: i32, tid: i32) -> str:
         if tid == 0:
-            return "0"
+            return ""
         let resolved = self.sema.resolve_alias(tid)
         let tk = self.sema.get_type_kind(resolved)
         let cty = self.c_type(tid, 0)
         if tk == TypeKind.TY_FLOAT:
             let expr = self.ast.int_literal_exact_expr(node)
             if expr.ok == 0 or expr.overflow != 0:
-                return "0.0"
+                return ""
             let mag = exact_int_expr_magnitude(expr)
             let mag_text = cc_exact_uint_expr(mag.lo, mag.hi)
             if expr.negative != 0:
                 return "(-((" ++ cty ++ ")(" ++ mag_text ++ ")))"
             return "((" ++ cty ++ ")(" ++ mag_text ++ "))"
         if tk != TypeKind.TY_INT and tk != TypeKind.TY_BOOL:
-            return "0"
+            return ""
         let bits = if tk == TypeKind.TY_BOOL: 1 else: self.sema.get_type_d0(resolved)
         let signed = if tk == TypeKind.TY_INT: self.sema.get_type_d1(resolved) else: 0
         let words = self.ast.int_literal_expr_bits(node, bits, signed)
         if words.ok == 0 or words.overflow != 0:
-            return "0"
+            return ""
         "((" ++ cty ++ ")(" ++ cc_exact_uint_expr(words.lo, words.hi) ++ "))"
 
     mut fn cstr_literal_ref_expr(text: &str, target_tid: i32) -> str:
@@ -3217,6 +3229,16 @@ impl CCodegen:
             return value ++ "f"
         value
 
+    // Zeroed storage for a global: its value until a startup initializer
+    // stores one, or its value when it has no initializer.
+    mut fn global_zero_text(tid: i32) -> str:
+        if self.sema.get_type_kind(self.sema.resolve_alias(tid)) == TypeKind.TY_ARRAY:
+            return cc_lbrace() ++ "0" ++ cc_rbrace()
+        self.zero_value_text(tid)
+
+    // A global's initializer as a C constant, or "" when it is not a literal
+    // C can state — a shift, an array or variant literal, a call (#1484).
+    // Those run at startup: prepare_global_init_bodies lowers them.
     mut fn global_init_text(node: i32, tid: i32, source_text: &str) -> str:
         var expr = node
         while expr != 0:
@@ -3225,13 +3247,9 @@ impl CCodegen:
                 break
             expr = self.ast.get_data0(expr)
         if expr == 0:
-            return self.zero_value_text(tid)
+            return self.global_zero_text(tid)
         let kind = self.ast.kind(expr)
         if kind == NodeKind.NK_INT_LIT or kind == NodeKind.NK_UNARY:
-            let resolved = self.sema.resolve_alias(tid)
-            let tk = self.sema.get_type_kind(resolved)
-            if tk != TypeKind.TY_INT and tk != TypeKind.TY_BOOL and tk != TypeKind.TY_FLOAT:
-                return self.zero_value_text(tid)
             return self.exact_int_expr_text(expr, tid)
         if kind == NodeKind.NK_BOOL_LIT:
             return if self.ast.get_data0(expr) != 0: "true" else: "false"
@@ -3239,7 +3257,7 @@ impl CCodegen:
             let str_idx = self.ast.get_data0(expr)
             if str_idx >= 0 and str_idx < self.ast.state.strings.len() as i32:
                 return self.float_literal_c_text(self.ast.get_string(str_idx), tid)
-            return "0.0"
+            return ""
         if kind == NodeKind.NK_STRING_LIT:
             let text = self.string_literal_node_payload_from_source(expr, source_text)
             let resolved = self.sema.resolve_alias(tid)
@@ -3254,10 +3272,64 @@ impl CCodegen:
             return self.cstr_literal_ref_expr(text, tid)
         if kind == NodeKind.NK_NULL_LIT:
             return "NULL"
+        if kind == NodeKind.NK_ARRAY_LIT:
+            return self.global_array_init_text(expr, tid, source_text)
+        if kind == NodeKind.NK_STRUCT_LIT:
+            return self.global_struct_init_text(expr, tid, source_text)
+        ""
+
+    // An array literal whose every element is a C constant is one too, as
+    // the LLVM backend folds it (try_eval_const_llvm). Lowered at startup
+    // instead, pcre2's 1543-record `_pcre2_ucd_records_8` table became a
+    // function of 1543 temporaries that clang -O1 spent 155 s in SROA on.
+    mut fn global_array_init_text(node: i32, tid: i32, source_text: &str) -> str:
         let resolved = self.sema.resolve_alias(tid)
-        if self.sema.get_type_kind(resolved) == TypeKind.TY_ARRAY:
-            return cc_lbrace() ++ "0" ++ cc_rbrace()
-        self.zero_value_text(tid)
+        if self.sema.get_type_kind(resolved) != TypeKind.TY_ARRAY:
+            return ""
+        let elem_tid = self.sema.get_type_d0(resolved)
+        let extra_start = self.ast.get_data0(node)
+        let count = self.ast.get_data1(node)
+        if count != self.sema.get_type_d1(resolved):
+            return ""
+        var out = cc_lbrace()
+        for i in 0..count:
+            let elem = self.global_init_text(self.ast.get_extra(extra_start + i), elem_tid, source_text)
+            if elem.len() == 0:
+                return ""
+            out = out ++ (if i > 0: ", " ++ elem else: elem)
+        out ++ cc_rbrace()
+
+    // A struct literal that names every field with a C constant, in
+    // declaration order. An omitted field takes its declared default, whose
+    // text lives with the type's declaration, not this global's: that
+    // literal runs at startup instead.
+    mut fn global_struct_init_text(node: i32, tid: i32, source_text: &str) -> str:
+        let resolved = self.sema.resolve_alias(tid)
+        if self.sema.get_type_kind(resolved) != TypeKind.TY_STRUCT:
+            return ""
+        let start = self.sema.get_type_d1(resolved)
+        let count = self.sema.get_type_d2(resolved)
+        if count == 1 and self.sema.distinct_type_names.contains(self.sema.get_type_d0(resolved)):
+            return ""
+        let lit_start = self.ast.get_data1(node)
+        let lit_count = self.ast.get_data2(node)
+        var out = cc_lbrace()
+        for fi in 0..count:
+            let field_sym: i32 = self.sema.type_extra[(start + fi * 3)]
+            let field_name = cc_intern_resolve(self.intern, field_sym)
+            let field_tid = self.effective_field_tid(resolved, field_sym, self.sema.type_extra[(start + fi * 3 + 1)])
+            var value = 0
+            for li in 0..lit_count:
+                let lit_name = self.ast.get_extra(lit_start + li * 2)
+                if (lit_name == 0 and li == fi) or (lit_name != 0 and cc_intern_resolve(self.intern, lit_name) == field_name):
+                    value = self.ast.get_extra(lit_start + li * 2 + 1)
+            if value == 0:
+                return ""
+            let text = self.global_init_text(value, field_tid, source_text)
+            if text.len() == 0:
+                return ""
+            out = out ++ (if fi > 0: ", ." else: ".") ++ field_name ++ " = " ++ text
+        out ++ cc_rbrace()
 
     mut fn const_text(body: &MirBody, const_id: i32) -> str:
         if const_id < 0 or const_id >= body.const_kinds.len() as i32:
@@ -8442,6 +8514,8 @@ impl CCodegen:
         if tk == TermKind.TK_GOTO:
             return f"    goto bb{d0};"
         if tk == TermKind.TK_RETURN:
+            if self.global_init_target(body.fn_sym) != 0:
+                return self.global_init_return_text(body.fn_sym)
             let sig_idx = self.body_sig_index(body.fn_sym)
             let ret_tid = if sig_idx >= 0: self.c_sig_return_type(sig_idx) else:
                 if body.local_type_ids.len() as i32 > 0: body.local_type_ids.get(0) else: self.sema.ty_void
@@ -9034,8 +9108,103 @@ impl CCodegen:
         if tid == 0:
             return ""
         let name = self.global_c_name(sym)
-        let init = self.global_init_text(self.ast.get_data1(decl), tid, self.decl_source_text(decl))
+        var init = self.global_init_text(self.ast.get_data1(decl), tid, self.decl_source_text(decl))
+        if init.len() == 0:
+            // Storage only: the entry wrapper stores the initializer's value.
+            var started = false
+            for i in 0..self.global_init_syms.len() as i32:
+                if self.global_init_syms[i] == sym:
+                    started = true
+            if not started:
+                self.fail(f"emit-c: global '{cc_intern_resolve(self.intern, sym)}' has an initializer with no C constant form and no startup initializer")
+                return ""
+            init = self.global_zero_text(tid)
         "static " ++ self.c_decl(tid, name) ++ " = " ++ init ++ ";\n"
+
+    // #1484: a global whose initializer has no C constant form (a shift, an
+    // array or variant literal, a call) runs before `main`, in declaration
+    // order (§9.1c), as the LLVM backend's __with_init_const_* helpers do.
+    // MirBuilder lowers the initializer into a body of its own that joins the
+    // module, so its types, callees, globals and literals are collected with
+    // every other body's; the emitter writes it as a static function and the
+    // entry wrapper stores its result. A global reached only from another
+    // global's initializer is found by the next round.
+    mut fn prepare_global_init_bodies():
+        let prepared: HashMap[i32, i32] = HashMap.new()
+        var grew = true
+        while grew:
+            grew = false
+            let used_globals = self.collect_referenced_global_syms()
+            for di in 0..self.ast.decl_count():
+                if self.check_interrupted() != 0 or self.had_error != 0:
+                    return
+                if self.sema.decl_is_lazy_skipped(di):
+                    continue
+                let decl = self.ast.get_decl(di)
+                if self.ast.kind(decl) != NodeKind.NK_LET_DECL:
+                    continue
+                let sym = self.ast.get_data0(decl)
+                if prepared.contains(sym) or (self.ast.get_data2(decl) % 2 == 0 and not used_globals.contains(sym)):
+                    continue
+                prepared.insert(sym, 1)
+                let tid = self.global_decl_tid(decl)
+                let value = self.ast.get_data1(decl)
+                if tid == 0 or self.global_init_text(value, tid, self.decl_source_text(decl)).len() > 0:
+                    continue
+                let init_sym = self.intern.intern("__with_init_global_" ++ cc_sanitize_ident(cc_intern_resolve(self.intern, sym)) ++ f"__{sym}")
+                let saved_module = with_str_clone_ref(self.sema.current_module_path)
+                self.sema.current_module_path = self.decl_source_path(decl)
+                let body = self.lower_global_init_body(init_sym, value, tid)
+                self.sema.current_module_path = saved_module
+                let invalid = validate_use_after_kill(&body, &self.intern)
+                if invalid.len() > 0:
+                    self.fail(f"emit-c: the initializer of global '{cc_intern_resolve(self.intern, sym)}' lowered to invalid MIR: {invalid}")
+                    return
+                self.body_fn_map.insert(init_sym, 1)
+                self.mir_mod.body_index_by_fn_sym.insert(init_sym, self.mir_mod.bodies.len() as i32)
+                self.mir_mod.body_fn_syms.push(init_sym)
+                self.mir_mod.bodies.push(body)
+                self.global_init_syms.push(sym)
+                self.global_init_decl_indices.push(di)
+                self.global_init_fn_syms.push(init_sym)
+                grew = true
+
+    // The initializer as the body of `fn init_sym() -> tid`, lowered exactly
+    // as Codegen.emit_module_runtime_init_fn lowers it for the LLVM backend.
+    fn lower_global_init_body(init_sym: i32, value: i32, tid: i32) -> MirBody:
+        var b = MirBuilder.init(self.sema, self.ast, self.intern, init_sym)
+        b.body.local_type_ids[0] = tid
+        b.push_scope()
+        b.expected_type = tid
+        let result = b.lower_expr(value)
+        let ret_place = b.place_for_local(0)
+        b.assign_operand_to_place(ret_place, result, self.ast.get_end(value))
+        b.pop_scope_inline()
+        b.terminate(TermKind.TK_RETURN, 0, 0, 0, 0)
+        move b.body
+
+    // The global an initializer body stores into, or 0 for any other body.
+    fn global_init_target(fn_sym: i32) -> i32:
+        for i in 0..self.global_init_fn_syms.len() as i32:
+            if self.global_init_fn_syms[i] == fn_sym:
+                return self.global_init_syms[i]
+        0
+
+    // An initializer body is `static void f(void)` and its return stores the
+    // value into the global: C returns no arrays, and the value moves into
+    // its storage byte for byte either way.
+    fn global_init_return_text(fn_sym: i32) -> str:
+        let g = self.global_c_name(self.global_init_target(fn_sym))
+        "    memcpy(&" ++ g ++ ", &_0, sizeof(" ++ g ++ "));\n    return;"
+
+    // The entry wrapper's calls, in declaration order (§9.1c).
+    fn global_init_calls_text() -> str:
+        var out = ""
+        for di in 0..self.ast.decl_count():
+            for i in 0..self.global_init_decl_indices.len() as i32:
+                if self.global_init_decl_indices[i] == di:
+                    out = out ++ "    " ++ self.fn_c_name(self.global_init_fn_syms[i]) ++ "();\n"
+        out
 
     mut fn collect_referenced_global_syms() -> HashMap[i32, i32]:
         let used = HashMap[i32, i32].new()
@@ -9236,6 +9405,8 @@ impl CCodegen:
     mut fn emit_fn_decl(body: &MirBody) -> str:
         let fn_sym = body.fn_sym
         let fn_name = self.fn_c_name(fn_sym)
+        if self.global_init_target(fn_sym) != 0:
+            return "static void " ++ fn_name ++ "(void)"
         let sig_idx = self.body_sig_index(fn_sym)
         let ret_tid = if sig_idx >= 0: self.c_sig_return_type(sig_idx) else:
             if body.local_type_ids.len() > 0: body.local_type_ids.get(0) else: self.sema.ty_void
@@ -9566,7 +9737,8 @@ impl CCodegen:
             return ""
         let fn_sym = body.fn_sym
         let sig_idx = self.body_sig_index(fn_sym)
-        if sig_idx < 0:
+        let init_global = self.global_init_target(fn_sym)
+        if sig_idx < 0 and init_global == 0:
             return ""
         self.enter_line_file(fn_sym)
         // Frozen name resolution (a `sizeof[T]` type argument through
@@ -9577,7 +9749,7 @@ impl CCodegen:
         // --emit-c) resolved `sizeof[pcre2_real_code_8]` as if the user had
         // written it, and an engine corpus type is invisible to user code
         // (#1362): the emitter failed before any LLVM-only refusal fired.
-        let decl_path = self.sema.fn_symbol_source_path(fn_sym)
+        let decl_path = if init_global != 0: self.decl_source_path(self.global_decl_node(init_global)) else: self.sema.fn_symbol_source_path(fn_sym)
         if decl_path.len() > 0:
             self.sema.current_module_path = decl_path
         let fn_sig = self.emit_fn_decl(body)
@@ -9786,9 +9958,13 @@ impl CCodegen:
         "        with_panic(WITH_STR_LIT(\"runtime fiber configuration cannot change after fibers exist\"), WITH_STR_LIT(\"\"), 0);\n" ++
         "    }\n"
 
-    fn emit_main_wrapper() -> str:
+    mut fn emit_main_wrapper() -> str:
         let main_sym = self.find_main_sym()
         if main_sym == 0:
+            // A unit without `main` has no entry to run its startup
+            // initializers from; its globals would read zero (#1484).
+            if self.global_init_syms.len() > 0:
+                self.fail(f"emit-c: global '{cc_intern_resolve(self.intern, self.global_init_syms[0])}' is initialized at startup, and this unit has no `main` to run it before")
             return ""
         let main_name = self.fn_c_name(main_sym)
         let sig_idx = self.sema.get_sig(main_sym)
@@ -9797,6 +9973,7 @@ impl CCodegen:
         out = out ++ "    with_runtime_set_argv(argc, argv);\n"
         out = out ++ self.emit_runtime_fiber_config_call()
         out = out ++ "    with_runtime_init();\n"
+        out = out ++ self.global_init_calls_text()
         if self.is_void_tid(ret_tid) != 0:
             out = out ++ "    " ++ main_name ++ "();\n"
             out = out ++ "    with_runtime_shutdown();\n"
@@ -9895,6 +10072,9 @@ impl CCodegen:
         out.write("extern void with_fiber_panic_capture(const uint8_t*, int32_t);\n")
         out.write("\n")
 
+        self.prepare_global_init_bodies()
+        if self.had_error != 0:
+            return ""
         self.prepare_c_type_instantiations()
         if self.had_error != 0:
             return ""
