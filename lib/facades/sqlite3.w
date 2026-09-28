@@ -30,6 +30,8 @@
 //   consume with destroy callback ................... sqlite3_create_function_v2
 //   retained callback lifetime ...................... retains param 5/6/7 by param 0
 //   the function's callback-scope context ........... handle Context (Amendment 1)
+//   the function's arguments and application data ... handle Value; argv … as &[Value],
+//                                                     user_data … as &U (Amendment 2)
 //   thread capability declarations .................. thread creator (see the note)
 //   method presentation from sqlite3_* .............. Database.open, db.exec, stmt.column_text, …
 //   an explicit presentation override ............... rename prepare
@@ -135,14 +137,30 @@ c facade sqlite:
     // positional example). The three function pointers are retained by the
     // connection for as long as it lives (§25, §45); a retained callback is
     // a code pointer C receives alone, so only a captureless fn or closure
-    // is accepted, and the function reaches its application data through
-    // sqlite3_user_data. xDestroy is the compiler's: it is withheld from
-    // the method.
+    // is accepted. xDestroy is the compiler's: it is withheld from the
+    // method.
+    //
+    // The callbacks' arguments and application data (D76, ruling
+    // Amendment 2, §16.2b.9): "Protected sqlite3_value objects are used to
+    // pass parameter information into the functions that implement
+    // application-defined SQL functions" — xFunc and xStep receive them as
+    // `sqlite3_value **` beside their count, `void (*xFunc)(sqlite3_context*,
+    // int, sqlite3_value**)`: parameter 2 of the callback paired with
+    // parameter 1, presented as one `&[Value]`. "The fifth parameter is an
+    // arbitrary pointer. The implementation of the function can gain access
+    // to this pointer using sqlite3_user_data()", and sqlite3_user_data
+    // "returns a copy of the pointer that was the pUserData parameter (the
+    // 5th parameter)": the application data the method boxed, presented to
+    // xFunc, xStep and xFinal as `&U`. The compiler generates the wrapper
+    // C calls; the slice and the `&U` are valid for the invocation only.
     fn sqlite3_create_function_v2
         consumes param 4 destroyed_by param 8
         retains param 5 by param 0
         retains param 6 by param 0
         retains param 7 by param 0
+        callback param xFunc argv param 2 paired with argc param 1 as &[Value]
+        callback param xStep argv param 2 paired with argc param 1 as &[Value]
+        user_data from sqlite3_user_data as &U
     // The function's context is a callback-scope handle (§44, §16.2b.9;
     // ruling Amendment 1): "The context in which an SQL function executes
     // is stored in an sqlite3_context object. A pointer to an
@@ -158,6 +176,14 @@ c facade sqlite:
     // the context the callback was given.
     fn sqlite3_result_int
         of Context
+    // A function's arguments are callback-scope handles too (§16.2b.9):
+    // SQLite makes each `sqlite3_value` for the invocation, and "these
+    // routines extract type, size, and content information from protected
+    // sqlite3_value objects". They are read through the `&[Value]` the
+    // wrapper hands the callback.
+    handle Value wraps *mut sqlite3_value
+    fn sqlite3_value_int
+        of Value
     // Statement operations. The convention shortens by the library prefix
     // the representation's name carries (`sqlite3_` of `sqlite3_stmt`,
     // #1610): `sqlite3_step` is `stmt.step()`, `sqlite3_column_text` is

@@ -4636,23 +4636,74 @@ impl Parser:
                 if r == 0: return 0
                 ops.push(r)
             else if self.current_ident_is("param"):
-                // `callback param N userdata param M` (§16.2b.9): the
-                // callback in parameter N receives, in its `void *`
-                // parameter, the value passed as parameter M.
-                kind = FACADE_CLAUSE_CALLBACK_USERDATA
                 let cb = self.parse_facade_param_ref()
                 if cb == 0: return 0
-                if not self.current_ident_is("userdata"):
-                    self.emit_error("a callback's userdata is written 'callback param <ref> userdata param <ref>' (§16.2b.9)")
-                    return 0
-                self.advance()
-                let ud = self.parse_facade_param_ref()
-                if ud == 0: return 0
-                ops.push(cb)
-                ops.push(ud)
+                if self.current_ident_is("argv"):
+                    // `callback param N argv param A paired with argc param
+                    // C as &[H]` (§16.2b.9, D76): the callback's argument
+                    // vector (its parameter A, `T **`) and the count C
+                    // passes beside it (its parameter C) are one slice of
+                    // the callback-scope handle H wrapping `T *`. The
+                    // pairing is stated, never inferred (as D64's buffer).
+                    kind = FACADE_CLAUSE_CALLBACK_ARGV
+                    self.advance()
+                    let argv = self.parse_facade_param_ref()
+                    if argv == 0: return 0
+                    if not self.current_ident_is("paired"):
+                        self.emit_error("a callback's argument vector is written 'callback param <ref> argv param <A> paired with argc param <C> as &[<Handle>]' (§16.2b.9)")
+                        return 0
+                    self.advance()
+                    if self.peek() != TokenKind.TK_KW_WITH:
+                        self.emit_error("a callback's argument vector is written 'callback param <ref> argv param <A> paired with argc param <C> as &[<Handle>]' (§16.2b.9)")
+                        return 0
+                    self.advance()
+                    if not self.current_ident_is("argc"):
+                        self.emit_error("a callback's argument vector is written 'callback param <ref> argv param <A> paired with argc param <C> as &[<Handle>]' (§16.2b.9)")
+                        return 0
+                    self.advance()
+                    let argc = self.parse_facade_param_ref()
+                    if argc == 0: return 0
+                    if self.expect(TokenKind.TK_KW_AS) == 0: return 0
+                    let ty = self.parse_type_expr()
+                    if ty == 0: return 0
+                    ops.push(cb)
+                    ops.push(argv)
+                    ops.push(argc)
+                    ops.push(ty as i32)
+                else:
+                    // `callback param N userdata param M` (§16.2b.9): the
+                    // callback in parameter N receives, in its `void *`
+                    // parameter, the value passed as parameter M.
+                    kind = FACADE_CLAUSE_CALLBACK_USERDATA
+                    if not self.current_ident_is("userdata"):
+                        self.emit_error("a callback's userdata is written 'callback param <ref> userdata param <ref>' (§16.2b.9)")
+                        return 0
+                    self.advance()
+                    let ud = self.parse_facade_param_ref()
+                    if ud == 0: return 0
+                    ops.push(cb)
+                    ops.push(ud)
             else:
-                self.emit_error("expected 'callback consumes param <ref>' or 'callback param <ref> userdata param <ref>' (§16.2b.9)")
+                self.emit_error("expected 'callback consumes param <ref>', 'callback param <ref> userdata param <ref>' or 'callback param <ref> argv param <A> paired with argc param <C> as &[<Handle>]' (§16.2b.9)")
                 return 0
+        else if word == "user_data":
+            // `user_data from <fn> as &U` (§16.2b.9, D76): the registered
+            // userdata the facade boxed, which C hands back through <fn>
+            // (`sqlite3_user_data(ctx)`), presented to each callback as the
+            // `&U` it is. Which C function returns it is stated, never
+            // inferred from a name or a `void *` return.
+            kind = FACADE_CLAUSE_USER_DATA
+            if not self.current_ident_is("from"):
+                self.emit_error("registered user data is written 'user_data from <fn> as &U' (§16.2b.9)")
+                return 0
+            self.advance()
+            let f = self.expect_ident()
+            if f == 0: return 0
+            if self.expect(TokenKind.TK_KW_AS) == 0: return 0
+            let ty = self.parse_type_expr()
+            if ty == 0: return 0
+            ops.push(f)
+            ops.push(ty as i32)
         else if word == "buffer":
             // `buffer param P len param L` / `buffer param P capacity param L
             // inout` (D64, §16.2b.8): the pointer and the integer that

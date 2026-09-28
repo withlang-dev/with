@@ -14,11 +14,10 @@ use c_import("sqlite3.h", link: "sqlite3")
 
 type AppData { id: i32, name: str, seen: Vec[i32] }
 
-fn silent(ctx: Context, n: c_int, argv: *mut *mut sqlite3_value): ()
+fn silent(ctx: Context, args: &[Value], app: &AppData): ()
 
 fn register(db: &Database, id: i32) -> c_int:
-    let x_func: extern "C" fn(Context, c_int, *mut *mut sqlite3_value) -> Unit = silent
-    db.create_function_v2("silent", 0, SQLITE_UTF8, AppData { id: id, name: f"data {id}", seen: Vec.new() }, x_func, null, null)
+    db.create_function_v2("silent", 0, SQLITE_UTF8, AppData { id: id, name: f"data {id}", seen: Vec.new() }, silent, null, null)
 
 fn early() -> i32:
     let db = Database.open(":memory:").unwrap()

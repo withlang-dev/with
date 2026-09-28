@@ -9,8 +9,8 @@
 //! expect-stdout: done: true changes=2
 //! expect-stdout: prepare failed: 1 near "SELEKT": syntax error
 //! expect-stdout: function registered: 0
-//! expect-stdout: shout called
-//! expect-stdout: shout() = 42
+//! expect-stdout: shout called: 2 argument(s), application data 1 shout
+//! expect-stdout: shout(20, 22) = 42
 //! expect-stdout: failed open: cantopen=true handle produced
 //! expect-stdout: application data 1 destroyed
 //! expect-stdout: close_v2: 0
@@ -27,10 +27,12 @@
 // preserving the view, errmsg on a failed prepare, create_function_v2
 // consuming application data that C destroys through xDestroy once, when
 // the connection closes (the Drop line lands before the close line), the
-// registered function setting its result through the callback-scope
-// `Context` SQLite passes it (§16.2b.9), a failed open that still produced
-// a handle (`FailedWithResource`, closed when the error is dropped), and
-// close_v2 as the explicit destroyer.
+// registered function reading its arguments as `&[Value]` and its
+// application data as `&AppData` and setting its result through the
+// callback-scope `Context` SQLite passes it (§16.2b.9, ruling Amendments 1
+// and 2), a failed open that still produced a handle (`FailedWithResource`,
+// closed when the error is dropped), and close_v2 as the explicit
+// destroyer.
 use facades.sqlite3
 use c_import("sqlite3.h", link: "sqlite3")
 
@@ -39,17 +41,24 @@ fn on_row(c: &Ctx, n: c_int, values: *mut *mut i8, names: *mut *mut i8) -> c_int
     print(f"row: tag={c.tag} cols={n}")
     if c.tag == 2: 1 else: 0
 
-type AppData { id: i32, name: str }
+type AppData { id: i32, name: str, scale: i32 }
 impl Drop for AppData:
     move fn drop(): print(f"application data {self.id} destroyed")
 
-// The SQL function `shout()`: a retained callback (a code pointer). SQLite
-// passes it the function's `Context`, a callback-scope handle (§16.2b.9,
-// ruling Amendment 1, #1611): borrowed for this call, and its operations
-// are its methods, so the body sets the result with no `unsafe`.
-fn shout(ctx: Context, n: c_int, argv: *mut *mut sqlite3_value):
-    print("shout called")
-    ctx.result_int(42)
+// The SQL function `shout(a, b)`: a retained callback (a code pointer).
+// SQLite passes it the function's `Context`, a callback-scope handle
+// (§16.2b.9, ruling Amendment 1, #1611), and its arguments, which the
+// compiler's wrapper presents as a slice of `Value` handles, with the
+// application data the registration boxed as `&AppData` (ruling Amendment
+// 2, D76, #1779). All three are borrowed for this call, and their
+// operations are methods, so the body reads its arguments and data and
+// sets the result with no `unsafe`.
+fn shout(ctx: Context, args: &[Value], app: &AppData):
+    print(f"shout called: {args.len()} argument(s), application data {app.id} {app.name}")
+    var sum = 0
+    for i in 0..args.len() as i32:
+        sum = sum + args[i].int()
+    ctx.result_int(sum * app.scale)
 
 fn main:
     print(f"version: {sqlite3_libversion().unwrap().to_str().unwrap().slice(0, 1)}")
@@ -81,15 +90,12 @@ fn main:
         Err(StatementError.Failed(status)) => print(f"prepare failed: {status} {db.errmsg().unwrap().to_str().unwrap()}")
         _ => print("unexpected")
 
-    // A bare fn does not yet coerce to `extern "C" fn` through a generic
-    // method's parameter (#1609): the retained callback is named through a
-    // typed local. xStep and xFinal are not given (a scalar function).
-    let x_func: extern "C" fn(Context, c_int, *mut *mut sqlite3_value) -> Unit = shout
-    let registered = db.create_function_v2("shout", 0, SQLITE_UTF8, AppData { id: 1, name: "shout" }, x_func, null, null)
+    // xStep and xFinal are not given (a scalar function).
+    let registered = db.create_function_v2("shout", 2, SQLITE_UTF8, AppData { id: 1, name: "shout", scale: 1 }, shout, null, null)
     print(f"function registered: {registered}")
-    let call = db.prepare("SELECT shout()").unwrap()
+    let call = db.prepare("SELECT shout(20, 22)").unwrap()
     assert(call.step() == SQLITE_ROW)
-    print(f"shout() = {call.column_int(0)}")
+    print(f"shout(20, 22) = {call.column_int(0)}")
     drop(call)
     drop(stmt)
 

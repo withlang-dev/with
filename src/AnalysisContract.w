@@ -482,6 +482,19 @@ fn contract_collect_callback(report: &AnalysisReport, sema: &Sema, ci: i32, pi: 
         contract_row(report, sema, site, subject, CONTRACT_CALLBACK, clause, c.fn_sym, owner, pi, "ownership", "the callback owns what C passes it", contract_clause_at(sema, site, clause))
     if not role_stated:
         contract_row(report, sema, site, subject, CONTRACT_CALLBACK, node, c.fn_sym, owner, pi, "role", "used during this call only; not retained", "default:callback-scope borrow (§16.2b.9)")
+    // D76 (§16.2b.9, ruling Amendment 2): what the generated wrapper hands
+    // the program's callback — its argument vector as a slice of a handle,
+    // and the registered user data as `&U` — each for the invocation only.
+    for k in 0..c.argv_cb.len() as i32:
+        if c.argv_cb[k] != pi: continue
+        let clause = c.argv_nodes[k]
+        let hname = contract_resource_name(sema, c.argv_handle[k])
+        contract_row(report, sema, site, subject, CONTRACT_CALLBACK, clause, c.fn_sym, owner, pi, "arguments", f"its param {c.argv_index[k]} paired with its param {c.argc_index[k]}, presented as a slice of {hname}; valid for the invocation only", contract_clause_at(sema, site, clause))
+    let wrapped = sema.facade_contract_wrapped_callbacks(ci)
+    if wrapped.contains(pi):
+        let clause = c.user_data_node
+        let accessor = sema.safe_symbol_text(c.user_data_fn)
+        contract_row(report, sema, site, subject, CONTRACT_CALLBACK, clause, c.fn_sym, owner, pi, "user data", f"the value the facade boxed, read back through {accessor} and presented as &U; valid for the invocation only; the compiler generates the wrapper C calls", contract_clause_at(sema, site, clause))
     // Nullability (§16.2b.8, #1618): the paired callback, absent with its
     // userdata.
     for k in 0..c.nullable_params.len() as i32:

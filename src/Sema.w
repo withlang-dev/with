@@ -497,6 +497,14 @@ pub type ForeignContract {
     variadic_case_kinds: Vec[i32],     // … and its kind: FACADE_VARIADIC_SCALAR or FACADE_VARIADIC_STR (parallel)
     variadic_slots: Vec[ForeignVariadicSlot], // resolved retained cases; no downstream AST interpretation
     returns_borrow_record: i32,        // D66 §16.2b.6: `returns borrow T from …` for an imported record T (the type's symbol), or 0
+    argv_cb: Vec[i32],                 // D76 §16.2b.9: each `callback param N argv param A paired with argc param C as &[H]`: the callback parameter N …
+    argv_index: Vec[i32],              // … A and C, indices into the callback's own parameters …
+    argc_index: Vec[i32],
+    argv_handle: Vec[i32],             // … the handle H (facade_resources index) …
+    argv_nodes: Vec[i32],              // … and the clause (parallel)
+    user_data_fn: i32,                 // D76 §16.2b.9: `user_data from <fn> as &U`: the C function that hands back the registered userdata, or 0 …
+    user_data_handle: i32,             // … the callback-scope handle it takes (facade_resources index), or -1 …
+    user_data_node: i32,               // … and the clause
 }
 
 // D66 §16.2b.5: what a variadic case's argument is.
@@ -532,6 +540,7 @@ pub type FacadeCallbackMethod {
     retained: i32,
     consumed: i32,
     nullable: i32,    // the callback is nullable (#1618): `Option[extern "C" fn(&U, …)]`, its userdata `Option[&U]`
+    wrapped_params: Vec[i32],  // D76: the callbacks a generated wrapper serves (rendered indices), each `extern "C" fn(…, &U)` with `U` the userdata's
 }
 
 // D66 retained variadic pairs (#1652, §16.2b.9): what one operation of a

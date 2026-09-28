@@ -969,7 +969,7 @@ impl Sema:
                 return
             self.emit_error(f"fn '{fname}' is described by two facade blocks with different clauses; one function has one contract — restate it word for word or describe it once (§16.2b)", item)
             return
-        var c = ForeignContract { fn_sym, decl, facade, node: item, lend: 0, destroys: 0, consumes: Vec.new(), consumes_destroyed_by: Vec.new(), retains: Vec.new(), retains_by: Vec.new(), returns_borrow_resource: 0, returns_borrow_from: -1, returns_borrow_domain: 0, returns_static_tid: 0, preserves_params: Vec.new(), preserves_domains: Vec.new(), of_resource: 0, rename: 0, callback_thread_any: 0, callbacks_none: 0, callback_consumes: Vec.new(), callback_userdata_cb: Vec.new(), callback_userdata_of: Vec.new(), valid_on_failed: 0, nullable_params: Vec.new(), buffer_ptr: Vec.new(), buffer_len: Vec.new(), buffer_inout: Vec.new(), buffer_elements: Vec.new(), fixed_params: Vec.new(), fixed_literals: Vec.new(), ok_const: 0, variadic_node: 0, variadic_selector: -1, variadic_case_syms: Vec.new(), variadic_case_values: Vec.new(), variadic_case_tids: Vec.new(), variadic_case_kinds: Vec.new(), variadic_slots: Vec.new(), returns_borrow_record: 0 }
+        var c = ForeignContract { fn_sym, decl, facade, node: item, lend: 0, destroys: 0, consumes: Vec.new(), consumes_destroyed_by: Vec.new(), retains: Vec.new(), retains_by: Vec.new(), returns_borrow_resource: 0, returns_borrow_from: -1, returns_borrow_domain: 0, returns_static_tid: 0, preserves_params: Vec.new(), preserves_domains: Vec.new(), of_resource: 0, rename: 0, callback_thread_any: 0, callbacks_none: 0, callback_consumes: Vec.new(), callback_userdata_cb: Vec.new(), callback_userdata_of: Vec.new(), valid_on_failed: 0, nullable_params: Vec.new(), buffer_ptr: Vec.new(), buffer_len: Vec.new(), buffer_inout: Vec.new(), buffer_elements: Vec.new(), fixed_params: Vec.new(), fixed_literals: Vec.new(), ok_const: 0, variadic_node: 0, variadic_selector: -1, variadic_case_syms: Vec.new(), variadic_case_values: Vec.new(), variadic_case_tids: Vec.new(), variadic_case_kinds: Vec.new(), variadic_slots: Vec.new(), returns_borrow_record: 0, argv_cb: Vec.new(), argv_index: Vec.new(), argc_index: Vec.new(), argv_handle: Vec.new(), argv_nodes: Vec.new(), user_data_fn: 0, user_data_handle: -1, user_data_node: 0 }
         let extra_start = self.ast.get_data1(item)
         let clause_count = self.ast.get_data2(item)
         for ci in 0..clause_count:
@@ -978,7 +978,154 @@ impl Sema:
         self.foreign_contract_index.insert(fn_sym, self.foreign_contracts.len() as i32)
         self.foreign_contracts.push(c)
 
+    // ── D76: callback arguments and registered user data (§16.2b.9) ──────
+    //
+    // Ruling Amendment 2: "A clause on the registering function may present
+    // a callback's argument vector as a slice of a callback-scope handle
+    // (`argv paired with argc as &[Value]`) and its registered user data as
+    // the value the facade boxed (`user_data as &U`). The compiler generates
+    // the wrapper; both are valid for the callback's invocation only."
+    //
+    // The spelling names what the ruling's words leave to position: which
+    // callback (`callback param N`), which of its own parameters are the
+    // vector and the count (`argv param A paired with argc param C`,
+    // counted from zero as every `param N` is — C does not name a function
+    // pointer's parameters), and which C function hands the userdata back
+    // (`user_data from sqlite3_user_data`). Each is capability-granting and
+    // so stated, never inferred from a type's shape or a name: a wrong
+    // pairing reads past the vector, and a wrong accessor reads some other
+    // pointer as `&U`.
+
+    // The callback-scope handle whose representation is `tid`, or -1 (none,
+    // or several: a representation two handles wrap names neither).
+    fn facade_handle_wrapping(tid: i32) -> i32:
+        var found = -1
+        var n = 0
+        for ri in 0..self.facade_resources.len() as i32:
+            if self.facade_resources[ri].handle != 0 and self.facade_same_type(self.facade_resources[ri].repr_tid, tid):
+                found = ri
+                n = n + 1
+        if n == 1: found else: -1
+
+    // `param A` inside the callback parameter `cb_shown` (callable type
+    // `callable`): an index among its parameters, or -1 after the
+    // diagnostic. A C function pointer's parameters have no names the
+    // import keeps, so only the index form resolves.
+    mut fn facade_resolve_callback_param(ref_node: i32, fname: &str, cb_shown: &str, callable: i32, what: &str) -> i32:
+        let count = self.get_type_d1(callable)
+        let idx = self.facade_ref_index_only(ref_node)
+        if idx < 0:
+            self.emit_error(f"fn '{fname}': '{what} param …' names a parameter of the callback {cb_shown}, whose parameters C does not name; refer to it by position, counted from zero ('{what} param 2') (§16.2b.9)", ref_node)
+            return -1
+        if idx >= count:
+            self.emit_error(f"fn '{fname}': the callback {cb_shown} has {count} parameter(s); {what} param {idx} does not exist (parameters count from zero, §16.2b.9)", ref_node)
+            return -1
+        idx
+
+    // Whether the type node spells a slice of the handle named `hname`:
+    // `&[H]` (a view of the slice, the ruling's spelling) or `[]H`.
+    fn facade_type_node_is_handle_slice(node: i32, hname: &str) -> bool:
+        var n = node
+        if n != 0 and self.ast.kind(n) == NodeKind.NK_TYPE_REF and self.ast.get_data1(n) == 0:
+            n = self.ast.get_data0(n)
+        if n == 0 or self.ast.kind(n) != NodeKind.NK_TYPE_SLICE or self.ast.get_data1(n) != 0:
+            return false
+        let elem = self.ast.get_data0(n)
+        elem != 0 and self.ast.kind(elem) == NodeKind.NK_TYPE_NAMED and self.pool_resolve(self.ast.get_data0(elem)) == hname
+
+    mut fn collect_argv_clause(fname: &str, c0: ForeignContract, sig: i32, clause: i32) -> ForeignContract:
+        var c = c0
+        let fn_sym = c.fn_sym
+        let ops = self.ast.get_data1(clause)
+        let cb = self.facade_resolve_param(self.ast.get_extra(ops), fn_sym, sig)
+        if cb < 0:
+            return c
+        let cb_shown = self.facade_param_display(fn_sym, sig, cb)
+        if not self.facade_param_is_callable(sig, cb):
+            self.emit_error(f"fn '{fname}': 'callback param {cb}' names {cb_shown}, which is not callable (§16.2b.9, §16.2b.13)", clause)
+            return c
+        let callable = self.callable_type_resolved(self.sig_param_type(sig, cb))
+        let a = self.facade_resolve_callback_param(self.ast.get_extra(ops + 1), fname, cb_shown, callable, "argv")
+        if a < 0:
+            return c
+        let n = self.facade_resolve_callback_param(self.ast.get_extra(ops + 2), fname, cb_shown, callable, "argc")
+        if n < 0:
+            return c
+        if a == n:
+            self.emit_error(f"fn '{fname}': argv and argc name the same parameter {a} of the callback {cb_shown}; the vector and its count are two (§16.2b.9)", clause)
+            return c
+        let argv_tid = self.resolve_alias(self.type_extra[self.get_type_d0(callable) + a] as TypeId)
+        let argc_tid = self.resolve_alias(self.type_extra[self.get_type_d0(callable) + n] as TypeId)
+        let argv_tn: str = self.type_name(argv_tid as i32)
+        let elem = if self.get_type_kind(argv_tid) == TypeKind.TY_PTR: self.resolve_alias(self.get_type_d0(argv_tid) as TypeId) as i32 else: 0
+        if elem == 0 or self.get_type_kind(elem as TypeId) != TypeKind.TY_PTR:
+            self.emit_error(f"fn '{fname}': argv param {a} of the callback {cb_shown} is {argv_tn}; an argument vector is a pointer to the handles C passes ('T **') (§16.2b.9)", clause)
+            return c
+        let h = self.facade_handle_wrapping(elem)
+        let elem_tn: str = self.type_name(elem)
+        if h < 0:
+            self.emit_error(f"fn '{fname}': argv param {a} of the callback {cb_shown} is a vector of {elem_tn}, which no one callback-scope handle wraps; declare 'handle <Name> wraps {elem_tn}' (§16.2b.9)", clause)
+            return c
+        if self.get_type_kind(argc_tid) != TypeKind.TY_INT:
+            let argc_tn: str = self.type_name(argc_tid as i32)
+            self.emit_error(f"fn '{fname}': argc param {n} of the callback {cb_shown} is {argc_tn}; the count of an argument vector is an integer (§16.2b.9)", clause)
+            return c
+        let hname: str = self.pool_resolve(self.facade_resources[h].name)
+        if not self.facade_type_node_is_handle_slice(self.ast.get_extra(ops + 3), hname):
+            self.emit_error(f"fn '{fname}': the vector of {elem_tn} is presented as a slice of the handle that wraps it, 'as &[{hname}]' (§16.2b.9)", clause)
+            return c
+        for k in 0..c.argv_cb.len() as i32:
+            if c.argv_cb[k] == cb:
+                self.emit_error(f"fn '{fname}': the callback {cb_shown} is given its argument vector twice (§16.2b.9)", clause)
+                return c
+        c.argv_cb.push(cb)
+        c.argv_index.push(a)
+        c.argc_index.push(n)
+        c.argv_handle.push(h)
+        c.argv_nodes.push(clause)
+        c
+
+    mut fn collect_user_data_clause(fname: &str, c0: ForeignContract, clause: i32) -> ForeignContract:
+        var c = c0
+        let ops = self.ast.get_data1(clause)
+        if c.user_data_node != 0:
+            self.emit_error(f"fn '{fname}': 'user_data' is stated twice; a registration has one userdata (§16.2b.9)", clause)
+            return c
+        let accessor = self.ast.get_extra(ops)
+        let aname: str = self.pool_resolve(accessor)
+        let asig = self.facade_fn_sig(accessor, clause)
+        if asig < 0:
+            return c
+        // The accessor reads the userdata off the handle C passes the
+        // callback: one parameter, a handle's representation, and a
+        // `void *` result — the registered pointer, which the clause asserts
+        // is the one this function was given.
+        let h = if self.sig_get_param_count(asig) == 1: self.facade_handle_wrapping(self.sig_param_type(asig, 0)) else: -1
+        if h < 0:
+            self.emit_error(f"fn '{fname}': 'user_data from {aname}': {aname} takes {self.sig_get_param_count(asig)} parameter(s); the accessor of registered user data takes the callback-scope handle C passes the callback, and nothing else (§16.2b.9)", clause)
+            return c
+        if not self.facade_type_is_void_ptr(self.sig_return_type(asig)):
+            let rt: str = self.type_name(self.sig_return_type(asig))
+            self.emit_error(f"fn '{fname}': 'user_data from {aname}': {aname} returns {rt}; registered user data comes back as the 'void *' C was given (§16.2b.9)", clause)
+            return c
+        let ty = self.ast.get_extra(ops + 1)
+        var spelled_u = false
+        if ty != 0 and self.ast.kind(ty) == NodeKind.NK_TYPE_REF and self.ast.get_data1(ty) == 0:
+            let inner = self.ast.get_data0(ty)
+            spelled_u = inner != 0 and self.ast.kind(inner) == NodeKind.NK_TYPE_NAMED and self.pool_resolve(self.ast.get_data0(inner)) == "U"
+        if not spelled_u:
+            self.emit_error(f"fn '{fname}': registered user data is presented as a view of the value the facade boxed, 'user_data from {aname} as &U' (§16.2b.9)", clause)
+            return c
+        c.user_data_fn = accessor
+        c.user_data_handle = h
+        c.user_data_node = clause
+        c
+
     mut fn collect_fn_clause(fname: &str, c0: ForeignContract, sig: i32, clause: i32) -> ForeignContract:
+        if self.ast.get_data0(clause) == FACADE_CLAUSE_CALLBACK_ARGV:
+            return self.collect_argv_clause(fname, c0, sig, clause)
+        if self.ast.get_data0(clause) == FACADE_CLAUSE_USER_DATA:
+            return self.collect_user_data_clause(fname, c0, clause)
         var c = c0
         let fn_sym = c.fn_sym
         let kind = self.ast.get_data0(clause)
@@ -2105,6 +2252,8 @@ pub fn facade_clause_name(kind: i32) -> str:
     if kind == FACADE_CLAUSE_VARIADIC_CASE: return "case"
     if kind == FACADE_CLAUSE_ABANDON: return "abandon"
     if kind == FACADE_CLAUSE_HANDLE: return "handle"
+    if kind == FACADE_CLAUSE_CALLBACK_ARGV: return "callback … argv … paired with argc"
+    if kind == FACADE_CLAUSE_USER_DATA: return "user_data from"
     "callback consumes"
 
 // ── stage 3: raw classification consults the facts ──────────────────────
@@ -2973,7 +3122,9 @@ impl Sema:
                 let found = self.facade_handle_in(self.type_extra[(te_start + ei)], depth + 1)
                 if found >= 0:
                     return found
-        else if kind == TypeKind.TY_REF or kind == TypeKind.TY_ARRAY:
+        else if kind == TypeKind.TY_REF or kind == TypeKind.TY_ARRAY or kind == TypeKind.TY_SLICE:
+            // A slice of handles is the argument vector a generated wrapper
+            // hands a callback (D76): it names the handle as one does.
             return self.facade_handle_in(self.get_type_d0(r), depth + 1)
         -1
 
@@ -3078,7 +3229,7 @@ impl Sema:
             for ei in 0..self.get_type_d1(r):
                 if self.type_mentions_facade_rendered(self.type_extra[(te_start + ei)], depth + 1):
                     return true
-        else if kind == TypeKind.TY_REF or kind == TypeKind.TY_ARRAY:
+        else if kind == TypeKind.TY_REF or kind == TypeKind.TY_ARRAY or kind == TypeKind.TY_SLICE:
             return self.type_mentions_facade_rendered(self.get_type_d0(r), depth + 1)
         false
 
@@ -4026,7 +4177,7 @@ impl Sema:
     fn facade_contract_is_callback_item(ci: i32) -> bool:
         if self.foreign_contracts[ci].destroys != 0:
             return false
-        if self.foreign_contracts[ci].callback_userdata_cb.len() > 0 or self.foreign_contracts[ci].callback_thread_any != 0:
+        if self.foreign_contracts[ci].callback_userdata_cb.len() > 0 or self.foreign_contracts[ci].callback_thread_any != 0 or self.foreign_contracts[ci].user_data_node != 0 or self.foreign_contracts[ci].argv_cb.len() > 0:
             return true
         for k in 0..self.foreign_contracts[ci].consumes.len() as i32:
             if self.foreign_contracts[ci].consumes_destroyed_by[k] >= 0:
@@ -4076,6 +4227,84 @@ impl Sema:
     // -1.
     fn facade_contract_callback_param(ci: i32) -> i32:
         if self.foreign_contracts[ci].callback_userdata_cb.len() > 0: self.foreign_contracts[ci].callback_userdata_cb[0] else: -1
+
+    // D76 (§16.2b.9): the callbacks (C indices) the generated wrapper serves
+    // under `user_data from <fn> as &U` — every callable parameter but the
+    // destroy callback whose own parameters include the handle the accessor
+    // reads, since that handle is how the wrapper finds the registration.
+    fn facade_contract_wrapped_callbacks(ci: i32) -> Vec[i32]:
+        let out: Vec[i32] = Vec.new()
+        let h = self.foreign_contracts[ci].user_data_handle
+        let sig = self.get_sig(self.foreign_contracts[ci].fn_sym)
+        if self.foreign_contracts[ci].user_data_node == 0 or h < 0 or sig < 0:
+            return out
+        for pi in 0..self.sig_get_param_count(sig):
+            if not self.facade_param_is_callable(sig, pi):
+                continue
+            var destroy = false
+            for k in 0..self.foreign_contracts[ci].consumes.len() as i32:
+                if self.foreign_contracts[ci].consumes_destroyed_by[k] == pi: destroy = true
+            if destroy:
+                continue
+            if self.facade_callable_handle_slots(sig, pi, h) > 0:
+                out.push(pi)
+        out
+
+    // How many parameters of the callable parameter `pi` are handle `h`'s
+    // representation.
+    fn facade_callable_handle_slots(sig: i32, pi: i32, h: i32) -> i32:
+        let callable = self.callable_type_resolved(self.sig_param_type(sig, pi))
+        var n = 0
+        for k in 0..self.get_type_d1(callable):
+            if self.facade_same_type(self.type_extra[self.get_type_d0(callable) + k], self.facade_resources[h].repr_tid): n = n + 1
+        n
+
+    // D76 (§16.2b.9): the wrapper the compiler generates reaches the
+    // program's callbacks through the registered userdata, so an argument
+    // vector needs `user_data`; `user_data` needs a userdata the facade
+    // boxes (consumed into C with its destroy callback, or retained by the
+    // resource), since the box is what the accessor hands back; and each
+    // callback it serves receives the accessor's handle exactly once.
+    mut fn verify_facade_wrapped_callbacks(ci: i32, wrapped: &Vec[i32]) -> bool:
+        let fn_sym = self.foreign_contracts[ci].fn_sym
+        let fname: str = self.pool_resolve(fn_sym)
+        let sig = self.get_sig(fn_sym)
+        let ud_node = self.foreign_contracts[ci].user_data_node
+        if ud_node == 0:
+            if self.foreign_contracts[ci].argv_cb.len() > 0:
+                let shown = self.facade_param_display(fn_sym, sig, self.foreign_contracts[ci].argv_cb[0])
+                self.emit_error(f"fn '{fname}': the argument vector of the callback {shown} is presented through a wrapper the compiler generates, which reaches the program's callback through the registered user data; state 'user_data from <fn> as &U' (§16.2b.9)", self.foreign_contracts[ci].argv_nodes[0])
+                return false
+            return true
+        let aname: str = self.pool_resolve(self.foreign_contracts[ci].user_data_fn)
+        let hname: str = self.pool_resolve(self.facade_resources[self.foreign_contracts[ci].user_data_handle].name)
+        if not self.facade_contract_userdata_consumed(ci) and not self.facade_contract_userdata_retained(ci):
+            self.emit_error(f"fn '{fname}': 'user_data from {aname}' presents the value the facade boxed, and '{fname}' boxes none: no 'void *' userdata is consumed with its destroy callback ('consumes param N destroyed_by param M') or retained by the resource ('retains param N by param 0') (§16.2b.9)", ud_node)
+            return false
+        if wrapped.len() == 0:
+            self.emit_error(f"fn '{fname}': 'user_data from {aname}': no callback '{fname}' takes receives the handle '{hname}' that {aname} reads the user data from (§16.2b.9)", ud_node)
+            return false
+        for wi in 0..wrapped.len() as i32:
+            let cb = wrapped[wi]
+            let shown = self.facade_param_display(fn_sym, sig, cb)
+            let slots = self.facade_callable_handle_slots(sig, cb, self.foreign_contracts[ci].user_data_handle)
+            if slots != 1:
+                self.emit_error(f"fn '{fname}': the callback {shown} receives the handle '{hname}' {slots} times; the wrapper reads the user data from the one C passes it (§16.2b.9)", ud_node)
+                return false
+            for k in 0..self.foreign_contracts[ci].callback_userdata_cb.len() as i32:
+                if self.foreign_contracts[ci].callback_userdata_cb[k] == cb:
+                    self.emit_error(f"fn '{fname}': the callback {shown} receives its userdata as a parameter ('callback param N userdata param M') and through {aname} ('user_data'); state one (§16.2b.9)", ud_node)
+                    return false
+        for k in 0..self.foreign_contracts[ci].argv_cb.len() as i32:
+            let cb = self.foreign_contracts[ci].argv_cb[k]
+            var served = false
+            for wi in 0..wrapped.len() as i32:
+                if wrapped[wi] == cb: served = true
+            if not served:
+                let shown = self.facade_param_display(fn_sym, sig, cb)
+                self.emit_error(f"fn '{fname}': the callback {shown} does not receive the handle '{hname}' that {aname} reads the user data from, so no wrapper can reach the program's callback to hand it its arguments (§16.2b.9)", self.foreign_contracts[ci].argv_nodes[k])
+                return false
+        true
 
     // Ruling §61 for callback contracts, and the net under the renderer.
     mut fn verify_facade_callback_items():
@@ -4160,6 +4389,9 @@ impl Sema:
                 let shown = self.facade_param_display(fn_sym, sig, bad)
                 self.emit_error(f"fn '{fname}': nullable {shown}; on a callback contract, nullability is rendered for the callback of a 'callback param N userdata param M' pairing that C uses during the call only — an absent callback takes its userdata with it — and a raw pointer parameter accepts null as C declares it (§16.2b.8, §16.2b.9)", node)
                 continue
+            let wrapped = self.facade_contract_wrapped_callbacks(ci)
+            if not self.verify_facade_wrapped_callbacks(ci, &wrapped):
+                continue
             // A retained callback runs on the registering thread unless the
             // facade says otherwise (§51); a consumed userdata's destroy
             // callback likewise. Nothing more is inferred.
@@ -4193,7 +4425,11 @@ impl Sema:
             let mnode = if msym != 0: self.generic_fn_node_for_symbol(msym) else: 0
             if mnode != 0:
                 self.facade_callback_method_index.insert(mnode, self.facade_callback_methods.len() as i32)
-            self.facade_callback_methods.push(FacadeCallbackMethod { contract: ci, receiver_params: if hosted: 1 else: 0, userdata_param: ud_r, callback_param: cb_r, thread_any: self.foreign_contracts[ci].callback_thread_any, retained: if self.facade_contract_userdata_retained(ci): 1 else: 0, consumed: if self.facade_contract_userdata_consumed(ci): 1 else: 0, nullable })
+            let wrapped_params: Vec[i32] = Vec.new()
+            for wi in 0..wrapped.len() as i32:
+                let projected = self.facade_presented_param_index(ci, wrapped[wi])
+                if projected >= receiver_params: wrapped_params.push(projected - receiver_params)
+            self.facade_callback_methods.push(FacadeCallbackMethod { contract: ci, receiver_params, userdata_param: ud_r, callback_param: cb_r, thread_any: self.foreign_contracts[ci].callback_thread_any, retained: if self.facade_contract_userdata_retained(ci): 1 else: 0, consumed: if self.facade_contract_userdata_consumed(ci): 1 else: 0, nullable, wrapped_params })
 
     // The callback method a symbol names, or -1.
     fn facade_callback_method_for(fn_sym: i32) -> i32:
@@ -4425,7 +4661,7 @@ impl Sema:
     // The type a named fn passed as a pair setter's callback is checked
     // against: its own signature as a C function pointer, to which a bare
     // fn coerces (§12.4) — as stage 9 hands its callback argument the
-    // rendered `extern "C" fn(&U, …)` (facade_callback_expected_type). A
+    // rendered `extern "C" fn(&U, …)` (facade_callback_param_expected_type). A
     // closure has no signature of its own to read here; it is checked
     // without an expected type and reported.
     mut fn facade_pair_callback_expected_type(arg_node: i32) -> i32:
@@ -4513,7 +4749,7 @@ impl Sema:
 
     mut fn facade_prepare_callback_call(mi: i32, node: i32, extra_start: i32, arg_count: i32) -> FacadeCallbackCall:
         var context = FacadeCallbackCall { userdata_node: 0, userdata_type: 0, nullable: false, valid: true }
-        if mi < 0 or self.facade_callback_methods[mi].callback_param < 0:
+        if mi < 0 or (self.facade_callback_methods[mi].callback_param < 0 and self.facade_callback_methods[mi].wrapped_params.len() == 0):
             return context
         let udi = self.facade_callback_methods[mi].userdata_param
         let cbi = self.facade_callback_methods[mi].callback_param
@@ -4577,6 +4813,12 @@ impl Sema:
             self.mark_moved_if_consumed(payload)
         option_ty
 
+    // Whether rendered argument `ai` of callback method `mi` is a callback
+    // the generated wrapper serves (D76): its type is `extern "C" fn(…, &U)`
+    // with `U` the userdata argument's, as a paired callback's is.
+    fn facade_callback_method_wraps(mi: i32, ai: i32) -> bool:
+        mi >= 0 and self.facade_callback_methods[mi].wrapped_params.contains(ai)
+
     // The callback method a method call `recv.field(…)` names, or -1.
     fn facade_callback_method_for_call(recv_type: i32, field: i32) -> i32:
         if self.facade_callback_methods.len() == 0 or recv_type == 0 or field == 0:
@@ -4586,15 +4828,6 @@ impl Sema:
         if owner == 0:
             return -1
         self.facade_callback_method_for(self.lookup_generic_method_fn(owner, field))
-
-    // The expected type of a callback method's callback argument: the
-    // rendered `extern "C" fn(&U, …)` with `U` bound to the userdata
-    // argument's type (the value's type, whether passed as `U` or `&U`).
-    // A closure argument takes its parameter types from it and must be
-    // captureless, and a bare fn coerces to it (§12.4) — which the generic
-    // call path, binding `U` from every argument at once, cannot give it.
-    mut fn facade_callback_expected_type(mi: i32, recv_type: i32, field: i32, ud_ty: i32) -> i32:
-        self.facade_callback_param_expected_type(mi, recv_type, field, ud_ty, self.facade_callback_methods[mi].callback_param)
 
     // The userdata type `U` a userdata argument's type binds: the value's
     // type, whether passed as `U`, `&U` or — a nullable callback's userdata
@@ -4608,7 +4841,14 @@ impl Sema:
         u_ty as i32
 
     // The rendered type of parameter `r` (rendered index, `self` excluded)
-    // of a callback method, with `U` bound to `ud_ty`'s userdata type.
+    // of a callback method, with `U` bound to `ud_ty`'s userdata type. For
+    // a callback argument — the paired one, or one a generated wrapper
+    // serves (D76) — that is `extern "C" fn(…, &U, …)` with `U` bound to the
+    // userdata argument's type (the value's type, whether passed as `U` or
+    // `&U`): a closure argument takes its parameter types from it and must
+    // be captureless, and a bare fn coerces to it (§12.4) — which the
+    // generic call path, binding `U` from every argument at once, cannot
+    // give it.
     mut fn facade_callback_param_expected_type(mi: i32, recv_type: i32, field: i32, ud_ty: i32, r: i32) -> i32:
         let resolved = self.auto_deref_ref_ptr_type(self.resolve_alias(recv_type as TypeId))
         let owner = self.get_type_name(resolved)

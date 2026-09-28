@@ -196,7 +196,11 @@ fn facade_render_handle(pool: AstPool, intern: InternPool, ci: &Vec[i32], item: 
     // (verify_facade_handle); nothing is rendered for it.
     if not facade_render_unalias(pool, intern, repr_text).starts_with("*"):
         return ""
-    let out = "type " ++ name ++ " = ephemeral { repr: " ++ repr_text ++ " }\n"
+    var out = "type " ++ name ++ " = ephemeral { repr: " ++ repr_text ++ " }\n"
+    // A vector of it a callback is passed (D76): the slice the generated
+    // wrapper makes of C's `T **` and count (facade_render_wrapper).
+    if facade_render_handle_sliced(pool, intern, name):
+        out = out ++ "type " ++ facade_render_slice_alias(name) ++ " = []" ++ name ++ "\n"
     let methods = facade_render_lend_methods(pool, intern, ci, item, true, false)
     if methods.len() == 0:
         return out
@@ -233,47 +237,20 @@ fn facade_render_handle_callback_type(pool: AstPool, intern: InternPool, text: &
     // The presented callback is safe With (a safe extern fn passes where C
     // declares an unsafe one, as for the typed callback).
     let raw = facade_render_callback_raw_type(facade_render_unalias(pool, intern, text))
-    let open = raw.find("(")
-    if open < 0 or not facade_render_is_callable_type(raw):
+    if not facade_render_is_callable_type(raw):
         return text.clone()
-    var depth = 0
-    var close: i64 = -1
-    var i = open
-    while i < raw.len() as i32:
-        if raw[i] == '(': depth = depth + 1
-        else if raw[i] == ')':
-            depth = depth - 1
-            if depth == 0:
-                close = i
-                break
-        i = i + 1
-    if close < 0:
+    let (head, parts, tail) = facade_render_callable_parts(raw)
+    if head.len() == 0:
         return text.clone()
-    let params = raw.slice(open + 1, close)
     var out = ""
     var changed = false
-    var start = 0
-    depth = 0
-    var k = 0
-    var index = 0
-    while k <= params.len() as i32:
-        let at_end = k == params.len() as i32
-        if not at_end:
-            if params[k] == '(' or params[k] == '[': depth = depth + 1
-            else if params[k] == ')' or params[k] == ']': depth = depth - 1
-        if at_end or (params[k] == ',' and depth == 0):
-            let part = params.slice(start, k).trim()
-            if part.len() > 0:
-                let handle = facade_render_handle_for(pool, intern, facade_render_unalias(pool, intern, part))
-                let shown = if handle.len() > 0: handle.clone() else: part.clone()
-                if handle.len() > 0: changed = true
-                out = out ++ (if index > 0: ", " else: "") ++ shown
-                index = index + 1
-            start = k + 1
-        k = k + 1
+    for j in 0..parts.len() as i32:
+        let handle = facade_render_handle_for(pool, intern, facade_render_unalias(pool, intern, parts[j]))
+        if handle.len() > 0: changed = true
+        out = out ++ (if j > 0: ", " else: "") ++ (if handle.len() > 0: handle.clone() else: parts[j].clone())
     if not changed:
         return text.clone()
-    raw.slice(0, open + 1) ++ out ++ raw.slice(close, raw.len())
+    head ++ out ++ tail
 
 // A NUL-terminated C string's pointer type as c_import spells it, aliases
 // chased: `char *` is `*mut i8`, `const char *` is `*const i8`.
@@ -2196,6 +2173,46 @@ fn facade_render_type_is_raw(text: &str) -> bool: text.starts_with("*") or text.
 // at each call (SemaFacade.w facade_check_callback_arg). The rendered
 // locals are spelled `facade_*` and apart from the C parameters: a local
 // named `free` would resolve to libc's.
+//
+// D76 (§16.2b.9, ruling Amendment 2): a callback C passes no userdata
+// parameter reaches its registration through an accessor of the handle it
+// is passed (`sqlite3_user_data(ctx)`). `user_data from <fn> as &U` states
+// that accessor, and the compiler generates the wrapper: each callback that
+// receives the accessor's handle is presented as its C type with the handle
+// in place of the representation, a `callback param N argv param A paired
+// with argc param C as &[H]` vector as the one `&[H]`, and `&U` last:
+//
+//     fn sqlite3_create_function_v2
+//         consumes param 4 destroyed_by param 8
+//         callback param xFunc argv param 2 paired with argc param 1 as &[Value]
+//         user_data from sqlite3_user_data as &U
+//
+//     fn create_function_v2[U](…, pApp: U, xFunc: extern "C" fn(Context, &[]Value, &U) -> Unit, …) -> c_int:
+//         let facade_p5: *mut c_void = unsafe { transmute[*mut c_void](xFunc) }
+//         let facade_cell = Box.new((pApp, facade_p5))
+//         let facade_ptr = facade_cell.into_raw() as *mut c_void
+//         let facade_free: extern "C" fn(*mut c_void) -> Unit = …   // frees the Box of the tuple
+//         let facade_w5: extern "C" fn(*mut sqlite3_context, c_int, *mut *mut sqlite3_value) -> Unit = (facade_a0, facade_a1, facade_a2) => {
+//             let facade_d = unsafe { sqlite3_user_data(facade_a0) } as *const (U, *mut c_void)
+//             if facade_a1 < 0: panic(…)
+//             let facade_s: __with_facade_slice_Value = unsafe { transmute[…]((facade_a2 as *const Value, facade_a1 as usize)) }
+//             let facade_g: extern "C" fn(Context, &[]Value, &U) -> Unit = unsafe { transmute[…]((*facade_d).1) }
+//             facade_g(Context { repr: facade_a0 }, &facade_s, unsafe { &(*facade_d).0 })
+//         }
+//         let facade_c5: extern "C" fn(*mut sqlite3_context, …) -> Unit = if facade_p5 == null: null else: facade_w5
+//         unsafe { sqlite3_create_function_v2(self.repr, …, facade_ptr, facade_c5, …, facade_free) }
+//
+// The box the userdata already lived in carries the program's callbacks
+// beside it, as the code pointers they are (captureless, §12.4). A handle
+// is one pointer and `Value` is laid out as `*mut sqlite3_value`, so the
+// vector C passes is the slice's storage as it stands; a slice is `(ptr,
+// len)` (§4.8a). The slice and `&U` are views the callback holds for its
+// invocation only: `[]Value` is ephemeral and `&U` a borrow, so neither can
+// be stored past it (the ordinary analysis, §5, §22). The userdata itself
+// moves into the box C keeps, so it owns what it holds: an ephemeral one is
+// refused there as `Box.new` of one is (§5.1). A C function pointer that is
+// null stays null: the wrapper is installed only for a callback the program
+// gave.
 
 type FacadeCallbackItem {
     decl: i32,        // 0 when the item is not a callback contract
@@ -2207,10 +2224,26 @@ type FacadeCallbackItem {
     retained: bool,
     consumed: bool,
     nullable: bool,   // the paired callback is `nullable` (#1618): `Option[extern "C" fn(&U, …)]`, its userdata `Option[&U]`
+    user_data_fn: i32,       // D76: `user_data from <fn> as &U` — the accessor's symbol, or 0
+    argv_cb: Vec[i32],       // D76: each `callback param N argv param A paired with argc param C as &[H]` — N …
+    argv_index: Vec[i32],    // … A …
+    argc_index: Vec[i32],    // … C …
+    argv_type: Vec[str],     // … and the presented type's text (parallel)
 }
 
+// A `param N` reference by position, or -1 (the index form is the only one
+// a callback's own parameters take; Sema refuses the others).
+fn facade_render_index_ref(pool: AstPool, intern: InternPool, ref_node: i32) -> i32:
+    if ref_node == 0 or pool.get_data0(ref_node as NodeId) != FACADE_PARAM_REF_INDEX:
+        return -1
+    let digits: str = intern.resolve(pool.get_data1(ref_node as NodeId))
+    var idx = 0
+    for i in 0..digits.len() as i32:
+        idx = idx * 10 + (digits[i] - '0') as i32
+    idx
+
 fn facade_render_callback_item(pool: AstPool, intern: InternPool, ci: &Vec[i32], item: i32) -> FacadeCallbackItem:
-    var cbi = FacadeCallbackItem { decl: 0, of_sym: 0, rename: 0, userdata: -1, callback: -1, destroy: -1, retained: false, consumed: false, nullable: false }
+    var cbi = FacadeCallbackItem { decl: 0, of_sym: 0, rename: 0, userdata: -1, callback: -1, destroy: -1, retained: false, consumed: false, nullable: false, user_data_fn: 0, argv_cb: Vec.new(), argv_index: Vec.new(), argc_index: Vec.new(), argv_type: Vec.new() }
     let cname: str = intern.resolve(pool.get_data0(item as NodeId))
     if facade_render_is_resource_op(pool, intern, cname):
         return cbi
@@ -2273,6 +2306,20 @@ fn facade_render_callback_item(pool: AstPool, intern: InternPool, ci: &Vec[i32],
             cbi.destroy = by
             cbi.consumed = true
             is_callback = true
+        else if kind == FACADE_CLAUSE_CALLBACK_ARGV:
+            let cb = facade_render_param_ref(pool, intern, decl, pool.get_extra(ops))
+            let a = facade_render_index_ref(pool, intern, pool.get_extra(ops + 1))
+            let n = facade_render_index_ref(pool, intern, pool.get_extra(ops + 2))
+            if cb < 0 or a < 0 or n < 0:
+                return cbi
+            cbi.argv_cb.push(cb)
+            cbi.argv_index.push(a)
+            cbi.argc_index.push(n)
+            cbi.argv_type.push(render_type_expr(pool, intern, pool.get_extra(ops + 3) as NodeId))
+            is_callback = true
+        else if kind == FACADE_CLAUSE_USER_DATA:
+            cbi.user_data_fn = pool.get_extra(ops)
+            is_callback = true
         else:
             return cbi
     if not is_callback or (cbi.retained and cbi.consumed):
@@ -2281,6 +2328,11 @@ fn facade_render_callback_item(pool: AstPool, intern: InternPool, ci: &Vec[i32],
         if nullable_pi != cbi.callback or cbi.retained or cbi.consumed:
             return cbi
         cbi.nullable = true
+    // The generated wrapper reaches the program's callbacks through the box
+    // the userdata lives in (Sema names each shape it cannot serve,
+    // verify_facade_wrapped_callbacks).
+    if (cbi.user_data_fn != 0 and not cbi.retained and not cbi.consumed) or (cbi.argv_cb.len() > 0 and cbi.user_data_fn == 0):
+        return cbi
     cbi.decl = decl
     cbi
 
@@ -2319,14 +2371,14 @@ fn facade_render_is_callable_type(text: &str) -> bool:
 fn facade_render_callback_raw_type(text: &str) -> str:
     if text.starts_with("unsafe "): text.slice(7, text.len()) else: text.clone()
 
-// The typed callback: the C signature with its one `void *` parameter —
-// where the userdata arrives — spelled `&U`. "" when the signature has
-// none or several (Sema refuses the pairing).
-fn facade_render_callback_type(pool: AstPool, intern: InternPool, text: &str) -> str:
-    let raw = facade_render_callback_raw_type(text)
+// A callable type's text split at its parameter list: the text through the
+// opening parenthesis, each top-level parameter, and the rest from the
+// matching closing parenthesis. ("", [], "") when there is no list.
+fn facade_render_callable_parts(raw: &str) -> (str, Vec[str], str):
+    let parts: Vec[str] = Vec.new()
     let open = raw.find("(")
     if open < 0:
-        return ""
+        return ("", parts, "")
     // The parameter list ends at the parenthesis matching the first.
     var depth = 0
     var close: i64 = -1
@@ -2340,10 +2392,9 @@ fn facade_render_callback_type(pool: AstPool, intern: InternPool, text: &str) ->
                 break
         i = i + 1
     if close < 0:
-        return ""
+        return ("", parts, "")
     let params = raw.slice(open + 1, close)
     // Split at top-level commas.
-    let parts: Vec[str] = Vec.new()
     var start = 0
     depth = 0
     var k = 0
@@ -2356,6 +2407,15 @@ fn facade_render_callback_type(pool: AstPool, intern: InternPool, text: &str) ->
         k = k + 1
     if params.trim().len() > 0:
         parts.push(params.slice(start, params.len()).trim())
+    (raw.slice(0, open + 1), parts, raw.slice(close, raw.len()))
+
+// The typed callback: the C signature with its one `void *` parameter —
+// where the userdata arrives — spelled `&U`. "" when the signature has
+// none or several (Sema refuses the pairing).
+fn facade_render_callback_type(pool: AstPool, intern: InternPool, text: &str) -> str:
+    let (head, parts, tail) = facade_render_callable_parts(facade_render_callback_raw_type(text))
+    if head.len() == 0:
+        return ""
     var slots = 0
     var out = ""
     for pi in 0..parts.len() as i32:
@@ -2367,7 +2427,136 @@ fn facade_render_callback_type(pool: AstPool, intern: InternPool, text: &str) ->
         out = out ++ (if pi > 0: ", " else: "") ++ shown
     if slots != 1:
         return ""
-    raw.slice(0, open + 1) ++ out ++ raw.slice(close, raw.len())
+    head ++ out ++ tail
+
+// ── D76: the generated wrapper (see the section comment) ────────────────
+
+// The alias a handle's slice is transmuted through: `[]H` cannot be
+// spelled as a call's type argument.
+pub fn facade_render_slice_alias(hname: &str) -> str: "__with_facade_slice_" ++ hname
+
+// Whether some `callback … argv … as &[H]` clause presents a vector of the
+// handle named `hname`.
+fn facade_render_handle_sliced(pool: AstPool, intern: InternPool, hname: &str) -> bool:
+    for item in facade_render_all_items(pool, NodeKind.NK_FACADE_FN):
+        let start = pool.get_data1(item as NodeId)
+        for k in 0..pool.get_data2(item as NodeId):
+            let clause = pool.get_extra(start + k)
+            if pool.get_data0(clause as NodeId) != FACADE_CLAUSE_CALLBACK_ARGV:
+                continue
+            let ty = render_type_expr(pool, intern, pool.get_extra(pool.get_data1(clause as NodeId) + 3) as NodeId)
+            if ty == "&[]" ++ hname or ty == "[]" ++ hname:
+                return true
+    false
+
+// The callbacks (C indices) the wrapper serves: every callable parameter
+// but the destroy callback whose own parameters include the accessor's
+// handle representation `hrepr` (Sema: facade_contract_wrapped_callbacks).
+fn facade_render_wrapped_callbacks(pool: AstPool, intern: InternPool, cbi: &FacadeCallbackItem, hrepr: &str) -> Vec[i32]:
+    let out: Vec[i32] = Vec.new()
+    if cbi.user_data_fn == 0 or hrepr.len() == 0:
+        return out
+    let meta = pool.find_fn_meta(cbi.decl as NodeId)
+    for pi in 0..pool.fn_meta_param_count(meta):
+        if pi == cbi.destroy:
+            continue
+        let raw = facade_render_callback_raw_type(facade_render_unalias(pool, intern, facade_render_param_type(pool, intern, cbi.decl, pi)))
+        if not facade_render_is_callable_type(raw):
+            continue
+        let (head, parts, _) = facade_render_callable_parts(raw)
+        if head.len() == 0:
+            continue
+        var hits = 0
+        for j in 0..parts.len() as i32:
+            if facade_render_unalias(pool, intern, parts[j]) == hrepr: hits = hits + 1
+        if hits == 1:
+            out.push(pi)
+    out
+
+// The argv clause stated for callback `pi`, or -1.
+fn facade_render_argv_of(cbi: &FacadeCallbackItem, pi: i32) -> i32:
+    for k in 0..cbi.argv_cb.len() as i32:
+        if cbi.argv_cb[k] == pi:
+            return k
+    -1
+
+// The presented type of a wrapped callback whose C type is `raw`: each
+// handle representation as its handle, the argument vector and its count
+// as the stated slice, and `&U` last.
+fn facade_render_wrapped_type(pool: AstPool, intern: InternPool, cbi: &FacadeCallbackItem, pi: i32, raw: &str) -> str:
+    let (head, parts, tail) = facade_render_callable_parts(raw)
+    if head.len() == 0:
+        return ""
+    let k = facade_render_argv_of(cbi, pi)
+    var out = ""
+    var n = 0
+    for j in 0..parts.len() as i32:
+        if k >= 0 and j == cbi.argc_index[k]:
+            continue
+        var shown = parts[j].clone()
+        if k >= 0 and j == cbi.argv_index[k]:
+            shown = cbi.argv_type[k].clone()
+        else:
+            let handle = facade_render_handle_for(pool, intern, facade_render_unalias(pool, intern, parts[j]))
+            if handle.len() > 0: shown = handle.clone()
+        out = out ++ (if n > 0: ", " else: "") ++ shown
+        n = n + 1
+    head ++ out ++ (if n > 0: ", " else: "") ++ "&U" ++ tail
+
+// The wrapper C calls for wrapped callback `pi` (C type `raw`, presented as
+// `shown`), in the local `wname`: it reads the registration's box through
+// the accessor, builds the slice when an argv clause states one, and calls
+// the program's callback — slot `slot` of the box — with the handles, the
+// slice and `&U`. Each line is prefixed with `indent`.
+fn facade_render_wrapper(pool: AstPool, intern: InternPool, ci: &Vec[i32], cbi: &FacadeCallbackItem, pi: i32, raw: &str, shown: &str, cell_type: &str, slot: i32, wname: &str, taken: &str, indent: &str) -> str:
+    let (head, parts, _) = facade_render_callable_parts(raw)
+    let acc_decl = facade_render_find_fn(pool, intern, ci, cbi.user_data_fn)
+    if head.len() == 0 or acc_decl == 0:
+        return ""
+    let hrepr = facade_render_unalias(pool, intern, facade_render_param_type(pool, intern, acc_decl, 0))
+    let fname: str = intern.resolve(pool.get_data0(cbi.decl as NodeId))
+    let d = facade_render_fresh("facade_d", taken)
+    let s = facade_render_fresh("facade_s", taken)
+    let g = facade_render_fresh("facade_g", taken)
+    var names: Vec[str] = Vec.new()
+    var params = ""
+    var h = -1
+    for j in 0..parts.len() as i32:
+        let a = facade_render_fresh(f"facade_a{j}", taken)
+        names.push(a.clone())
+        params = params ++ (if j > 0: ", " else: "") ++ a
+        if facade_render_unalias(pool, intern, parts[j]) == hrepr: h = j
+    if h < 0:
+        return ""
+    let inner = indent ++ "    "
+    var body = indent ++ "let " ++ wname ++ ": " ++ raw ++ " = (" ++ params ++ ") => {\n"
+    body = body ++ inner ++ "let " ++ d ++ " = " ++ facade_render_call(pool, intern, acc_decl, names[h]) ++ " as *const " ++ cell_type ++ "\n"
+    let k = facade_render_argv_of(cbi, pi)
+    if k >= 0:
+        let argc = names[cbi.argc_index[k]].clone()
+        let argv = names[cbi.argv_index[k]].clone()
+        let vec_type = cbi.argv_type[k].clone()
+        let hname = if vec_type.starts_with("&[]"): vec_type.slice(3, vec_type.len()) else: vec_type.slice(2, vec_type.len())
+        let alias = facade_render_slice_alias(hname)
+        body = body ++ inner ++ "if " ++ argc ++ " < 0: panic(\"" ++ fname ++ ": C passed a callback a negative count for its argument vector (§16.2b.9)\")\n"
+        body = body ++ inner ++ "let " ++ s ++ ": " ++ alias ++ " = unsafe { transmute[" ++ alias ++ "]((" ++ argv ++ " as *const " ++ hname ++ ", " ++ argc ++ " as usize)) }\n"
+    body = body ++ inner ++ "let " ++ g ++ ": " ++ shown ++ " = unsafe { transmute[" ++ shown ++ "]((*" ++ d ++ ")." ++ f"{slot}" ++ ") }\n"
+    var args = ""
+    var n = 0
+    for j in 0..parts.len() as i32:
+        if k >= 0 and j == cbi.argc_index[k]:
+            continue
+        var arg = names[j].clone()
+        if k >= 0 and j == cbi.argv_index[k]:
+            arg = (if cbi.argv_type[k].starts_with("&"): "&" else: "") ++ s
+        else:
+            let handle = facade_render_handle_for(pool, intern, facade_render_unalias(pool, intern, parts[j]))
+            if handle.len() > 0: arg = handle ++ " { repr: " ++ names[j] ++ " }"
+        args = args ++ (if n > 0: ", " else: "") ++ arg
+        n = n + 1
+    args = args ++ (if n > 0: ", " else: "") ++ "unsafe { &(*" ++ d ++ ").0 }"
+    body = body ++ inner ++ g ++ "(" ++ args ++ ")\n"
+    body ++ indent ++ "}\n"
 
 // Every callback method of `resource` (see the section comment).
 fn facade_render_callback_methods(pool: AstPool, intern: InternPool, ci: &Vec[i32], resource: i32) -> str:
@@ -2426,6 +2615,24 @@ fn facade_render_callback_ops(pool: AstPool, intern: InternPool, ci: &Vec[i32], 
         let generic = cbi.userdata >= 0
         let kept = cbi.retained or cbi.consumed
         let start = pool.fn_meta_param_start(meta)
+        // D76: the callbacks a generated wrapper serves, and the box that
+        // carries them beside the userdata (see the D76 section comment).
+        var wrapped: Vec[i32] = Vec.new()
+        if cbi.user_data_fn != 0:
+            let acc_decl = facade_render_find_fn(pool, intern, ci, cbi.user_data_fn)
+            if acc_decl == 0 or not generic or not kept:
+                continue
+            wrapped = facade_render_wrapped_callbacks(pool, intern, &cbi, facade_render_unalias(pool, intern, facade_render_param_type(pool, intern, acc_decl, 0)))
+            if wrapped.len() == 0:
+                continue
+        var cell_type = "U"
+        if wrapped.len() > 0:
+            cell_type = "(U"
+            for _ in 0..wrapped.len() as i32: cell_type = cell_type ++ ", *mut c_void"
+            cell_type = cell_type ++ ")"
+        var wrapped_names: Vec[str] = Vec.new()
+        var wrapped_raw: Vec[str] = Vec.new()
+        var wrapped_shown: Vec[str] = Vec.new()
         var cb_type = ""
         if cbi.callback >= 0:
             cb_type = facade_render_callback_type(pool, intern, facade_render_param_type(pool, intern, decl, cbi.callback))
@@ -2443,6 +2650,19 @@ fn facade_render_callback_ops(pool: AstPool, intern: InternPool, ci: &Vec[i32], 
                 var destroy_part = facade_render_empty_bridge()
                 destroy_part.args = free.clone()
                 bridge = facade_render_append_bridge(move bridge, &destroy_part)
+                continue
+            if wrapped.contains(pi):
+                let wname = facade_render_param_name(pool, intern, start, pi)
+                let raw = facade_render_callback_raw_type(facade_render_unalias(pool, intern, facade_render_param_type(pool, intern, decl, pi)))
+                let wshown = facade_render_wrapped_type(pool, intern, &cbi, pi, raw)
+                var wrapped_part = facade_render_empty_bridge()
+                wrapped_part.ok = wshown.len() > 0
+                wrapped_part.params = wname ++ ": " ++ wshown
+                wrapped_part.args = facade_render_fresh(f"facade_c{pi}", taken)
+                bridge = facade_render_append_bridge(move bridge, &wrapped_part)
+                wrapped_names.push(wname)
+                wrapped_raw.push(raw)
+                wrapped_shown.push(wshown)
                 continue
             if pi != cbi.userdata and pi != cbi.callback:
                 let part = facade_render_bridge_param(pool, intern, decl, pi)
@@ -2487,6 +2707,7 @@ fn facade_render_callback_ops(pool: AstPool, intern: InternPool, ci: &Vec[i32], 
         let shown_ret = if not hosted and ret.len() == 0: " -> Unit" else: ret.clone()
         let head = (if not hosted: "fn " else: if cbi.retained: "    mut fn " else: "    fn ") ++ mname ++ (if generic: "[U]" else: "") ++ "(" ++ bridge.params ++ ")" ++ shown_ret ++ ":\n"
         var body = facade_render_indent(bridge.prologue, indent)
+        var wrapped_failed = false
         if cbi.nullable:
             // The pair is present or absent together (Sema checks each
             // call, SemaCheck.w check_method_call): each maps to its C
@@ -2501,11 +2722,32 @@ fn facade_render_callback_ops(pool: AstPool, intern: InternPool, ci: &Vec[i32], 
             body = body ++ indent ++ "let " ++ nud ++ ": " ++ ud_type ++ " = match " ++ ud_name ++ ":\n" ++ indent ++ "    Some(" ++ nu ++ ") => unsafe { transmute[" ++ ud_type ++ "](" ++ nu ++ ") }\n" ++ indent ++ "    None => null\n"
         if generic and kept:
             let ud_type = facade_render_unalias(pool, intern, facade_render_param_type(pool, intern, decl, cbi.userdata))
-            body = body ++ indent ++ "let " ++ cell ++ " = Box.new(" ++ ud_name ++ ")\n"
+            // The program's callbacks ride in the box as code pointers.
+            var boxed = ud_name.clone()
+            for wi in 0..wrapped.len() as i32:
+                let p = facade_render_fresh(f"facade_p{wrapped[wi]}", taken)
+                body = body ++ indent ++ "let " ++ p ++ ": *mut c_void = unsafe { transmute[*mut c_void](" ++ wrapped_names[wi] ++ ") }\n"
+                boxed = boxed ++ ", " ++ p
+            if wrapped.len() > 0: boxed = "(" ++ boxed ++ ")"
+            body = body ++ indent ++ "let " ++ cell ++ " = Box.new(" ++ boxed ++ ")\n"
             body = body ++ indent ++ "let " ++ ptr ++ " = " ++ cell ++ ".into_raw() as " ++ ud_type ++ "\n"
-            body = body ++ indent ++ "let " ++ free ++ ": extern \"C\" fn(*mut c_void) -> Unit = " ++ q ++ " => { let " ++ b ++ " = (" ++ q ++ " as *mut U) as Box[U]; drop(" ++ b ++ ") }\n"
+            body = body ++ indent ++ "let " ++ free ++ ": extern \"C\" fn(*mut c_void) -> Unit = " ++ q ++ " => { let " ++ b ++ " = (" ++ q ++ " as *mut " ++ cell_type ++ ") as Box[" ++ cell_type ++ "]; drop(" ++ b ++ ") }\n"
             if cbi.retained:
                 body = body ++ "        self.retained_ptrs.push(" ++ ptr ++ " as *mut c_void)\n        self.retained_frees.push(" ++ free ++ ")\n"
+            // Each wrapper, installed only for a callback the program gave:
+            // C's null stays null.
+            for wi in 0..wrapped.len() as i32:
+                let pi = wrapped[wi]
+                let w = facade_render_fresh(f"facade_w{pi}", taken)
+                let wrapper = facade_render_wrapper(pool, intern, ci, &cbi, pi, wrapped_raw[wi], wrapped_shown[wi], cell_type, wi + 1, w, taken, indent)
+                // Nothing is rendered rather than a method with no wrapper
+                // (Sema's net names the method that did not render).
+                if wrapper.len() == 0:
+                    wrapped_failed = true
+                body = body ++ wrapper
+                body = body ++ indent ++ "let " ++ facade_render_fresh(f"facade_c{pi}", taken) ++ ": " ++ wrapped_raw[wi] ++ " = if " ++ facade_render_fresh(f"facade_p{pi}", taken) ++ " == null: null else: " ++ w ++ "\n"
+        if wrapped_failed:
+            continue
         if bridge.cap_var.len() > 0 and facade_render_fn_ok(pool, intern, decl) != 0:
             out = out ++ facade_render_fn_error_type(pool, intern, decl, mname)
         out = out ++ head ++ body ++ call_body ++ "\n"

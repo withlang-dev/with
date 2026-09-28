@@ -1,0 +1,52 @@
+foreign-contract view	v1
+resource Engine wraps *mut eng; representation: pointer; facade:engines@test/contract/ok_callback_arguments.w; clause:resource@test/contract/ok_callback_arguments.w:13
+    producer: eng_new -> Engine.new; production: direct return; NULL is None  [clause:from@test/contract/ok_callback_arguments.w:14]
+    status: none; a producer's failure is None, or (status, None) through an out parameter  [default:no status convention is inferred (§16.2b.4)]
+    destroyer: eng_free; automatic: Drop calls it while the value is live  [clause:drop@test/contract/ok_callback_arguments.w:15]
+    dependency: none via eng_new; it receives no modeled resource  [default:no resource parameter (§16.2b.6)]
+    thread: creator; operations and destruction on the creating thread, ownership stays there  [default:thread creator (§16.2b.10)]
+    invalidation: views invalidated by: eng_free, eng_register; preserved across: none  [default:unknown effect is invalidate; `preserves param N` states otherwise (§16.2b.7)]
+handle Tally wraps *mut ctx; representation: callback-scope, borrowed for the callback's invocation; facade:engines@test/contract/ok_callback_arguments.w; clause:handle@test/contract/ok_callback_arguments.w:16
+    producer: none; C passes it to a callback, which borrows it for its invocation  [handle:callback scope (§16.2b.9)]
+    destroyer: none; it has no Drop and cannot outlive the callback  [handle:callback scope (§16.2b.9)]
+    thread: creator; operations and destruction on the creating thread, ownership stays there  [default:thread creator (§16.2b.10)]
+    invalidation: views invalidated by: ctx_user_data; preserved across: none  [default:unknown effect is invalidate; `preserves param N` states otherwise (§16.2b.7)]
+handle Arg wraps *mut val; representation: callback-scope, borrowed for the callback's invocation; facade:engines@test/contract/ok_callback_arguments.w; clause:handle@test/contract/ok_callback_arguments.w:17
+    producer: none; C passes it to a callback, which borrows it for its invocation  [handle:callback scope (§16.2b.9)]
+    destroyer: none; it has no Drop and cannot outlive the callback  [handle:callback scope (§16.2b.9)]
+    thread: creator; operations and destruction on the creating thread, ownership stays there  [default:thread creator (§16.2b.10)]
+    invalidation: views invalidated by: val_get; preserved across: none  [default:unknown effect is invalidate; `preserves param N` states otherwise (§16.2b.7)]
+fn eng_register; facade:engines@test/contract/ok_callback_arguments.w; clause:fn@test/contract/ok_callback_arguments.w:18
+    callbacks: may invoke applicable callbacks  [default:conservatively reentrant (§16.2b.9)]
+    effect: param 0: *mut eng e: lend, the described fn's assertion; receives Engine  [default:a described fn lends its parameters (§16.2b.5)]
+    effect: param 1: *mut c_void ud: consumes; destroyed by the callback param 4: extern "C" fn(*mut c_void) -> Unit destroy  [clause:consumes@test/contract/ok_callback_arguments.w:19]
+    effect: param 2: extern "C" fn(*mut ctx, i32, *mut *mut val) -> Unit step: retained by Engine (param 0: *mut eng e)  [clause:retains@test/contract/ok_callback_arguments.w:20]
+    effect: param 3: extern "C" fn(*mut ctx) -> Unit fin: retained by Engine (param 0: *mut eng e)  [clause:retains@test/contract/ok_callback_arguments.w:21]
+    effect: param 4: extern "C" fn(*mut c_void) -> Unit destroy: callback, the destroy path of the consumed param 1: *mut c_void ud  [clause:consumes@test/contract/ok_callback_arguments.w:19]
+    returns: i32  [default:as declared]
+    invalidates: Engine (param 0: *mut eng e)  [default:unknown effect is invalidate (§16.2b.7)]
+    presentation: Engine.register  [default:presentation sugar from the resource prefix (§16.2b.11)]
+callback param 2: extern "C" fn(*mut ctx, i32, *mut *mut val) -> Unit step of eng_register; clause:fn@test/contract/ok_callback_arguments.w:18
+    role: retained by Engine (param 0: *mut eng e); it lives as long as its owner  [clause:retains@test/contract/ok_callback_arguments.w:20]
+    arguments: its param 2 paired with its param 1, presented as a slice of Arg; valid for the invocation only  [clause:callback … argv … paired with argc@test/contract/ok_callback_arguments.w:22]
+    user data: the value the facade boxed, read back through ctx_user_data and presented as &U; valid for the invocation only; the compiler generates the wrapper C calls  [clause:user_data from@test/contract/ok_callback_arguments.w:23]
+    thread: the registering thread  [default:callback executes where it was registered (§16.2b.10)]
+    reentrancy: the call may invoke it; its captures' origins are affected as their capture modes allow  [default:absent a facade assertion the call is reentrant (§16.2b.9)]
+callback param 3: extern "C" fn(*mut ctx) -> Unit fin of eng_register; clause:fn@test/contract/ok_callback_arguments.w:18
+    role: retained by Engine (param 0: *mut eng e); it lives as long as its owner  [clause:retains@test/contract/ok_callback_arguments.w:21]
+    user data: the value the facade boxed, read back through ctx_user_data and presented as &U; valid for the invocation only; the compiler generates the wrapper C calls  [clause:user_data from@test/contract/ok_callback_arguments.w:23]
+    thread: the registering thread  [default:callback executes where it was registered (§16.2b.10)]
+    reentrancy: the call may invoke it; its captures' origins are affected as their capture modes allow  [default:absent a facade assertion the call is reentrant (§16.2b.9)]
+callback param 4: extern "C" fn(*mut c_void) -> Unit destroy of eng_register; clause:fn@test/contract/ok_callback_arguments.w:18
+    role: destroy path of the consumed param 1: *mut c_void ud; With destroys it through no other path  [clause:consumes@test/contract/ok_callback_arguments.w:19]
+    thread: the registering thread  [default:callback executes where it was registered (§16.2b.10)]
+    reentrancy: the call may invoke it; its captures' origins are affected as their capture modes allow  [default:absent a facade assertion the call is reentrant (§16.2b.9)]
+fn val_get; facade:engines@test/contract/ok_callback_arguments.w; clause:fn@test/contract/ok_callback_arguments.w:24
+    callbacks: may invoke applicable callbacks  [default:conservatively reentrant (§16.2b.9)]
+    effect: param 0: *mut val v: lend, the described fn's assertion; receives Arg  [default:a described fn lends its parameters (§16.2b.5)]
+    returns: i32  [default:as declared]
+    invalidates: Arg (param 0: *mut val v)  [default:unknown effect is invalidate (§16.2b.7)]
+    presentation: of Arg  [clause:of@test/contract/ok_callback_arguments.w:25]
+    presentation: Arg.get  [default:presentation sugar from the resource prefix (§16.2b.11)]
+note: contract-audit: resources=3 items=2 domains=0 conventions=0 advisories=0 profile-ambiguous=0 profile-shadowed=0
+contract-audit: violations=0 ok

@@ -11,10 +11,9 @@ use c_import("sqlite3.h", link: "sqlite3")
 
 var LAST: Option[Context] = None
 
-fn remember(ctx: Context, n: c_int, argv: *mut *mut sqlite3_value):
+fn remember(ctx: Context, args: &[Value], app: &i32):
     LAST = Some(ctx)
 
 fn main:
     let db = Database.open(":memory:").unwrap()
-    let x_func: extern "C" fn(Context, c_int, *mut *mut sqlite3_value) -> Unit = remember
-    print(f"{db.create_function_v2("remember", 0, SQLITE_UTF8, 0, x_func, null, null)}")
+    print(f"{db.create_function_v2("remember", 0, SQLITE_UTF8, 0, remember, null, null)}")

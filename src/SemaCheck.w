@@ -19220,7 +19220,7 @@ impl Sema:
             else if callable_value_tid != 0:
                 expected_ty = self.fn_type_param_type(callable_value_tid, ai + param_offset)
             if expected_ty == 0 and facade_mi >= 0 and facade_context.userdata_type != 0:
-                if ai == self.facade_callback_methods[facade_mi].callback_param or (facade_context.nullable and facade_context.userdata_node == 0 and ai == self.facade_callback_methods[facade_mi].userdata_param):
+                if ai == self.facade_callback_methods[facade_mi].callback_param or self.facade_callback_method_wraps(facade_mi, ai) or (facade_context.nullable and facade_context.userdata_node == 0 and ai == self.facade_callback_methods[facade_mi].userdata_param):
                     expected_ty = self.facade_callback_fn_param_expected_type(facade_mi, fn_sym, 0, facade_context.userdata_type, ai)
             if expected_ty == 0 and arg_node > 0 and self.ast.kind(arg_node) == NodeKind.NK_NULL_LIT:
                 expected_ty = self.null_arg_expected_type(fn_sym, ai + param_offset, false)
@@ -24495,7 +24495,7 @@ impl Sema:
         // argument is checked against `extern "C" fn(&U, …)` with `U` bound
         // to the userdata argument's type, so the userdata is checked first
         // whatever order C declares them in (SemaFacade.w
-        // facade_callback_expected_type).
+        // facade_callback_param_expected_type).
         let facade_mi = self.facade_callback_method_for_call(obj_type as i32, field)
         let facade_context = self.facade_prepare_callback_call(facade_mi, node, extra_start, mc_resolved_arg_count)
         if not facade_context.valid:
@@ -24559,8 +24559,8 @@ impl Sema:
                 mc_expected = mc_static_variant_payload_tys[ai]
             if mc_expected == 0 and mc_is_closure:
                 mc_expected = self.method_closure_arg_expected_type(obj_type as i32, field, mc_sig_idx_for_effect, ai, mc_param_offset_for_resolution)
-            if mc_expected == 0 and facade_mi >= 0 and facade_ud_ty != 0 and ai == self.facade_callback_methods[facade_mi].callback_param:
-                mc_expected = self.facade_callback_expected_type(facade_mi, obj_type as i32, field, facade_ud_ty)
+            if mc_expected == 0 and facade_mi >= 0 and facade_ud_ty != 0 and (ai == self.facade_callback_methods[facade_mi].callback_param or self.facade_callback_method_wraps(facade_mi, ai)):
+                mc_expected = self.facade_callback_param_expected_type(facade_mi, obj_type as i32, field, facade_ud_ty, ai)
             if mc_expected == 0 and ai == facade_pair_cb_arg:
                 mc_expected = self.facade_pair_callback_expected_type(mc_arg_node)
             if ai == facade_pair_ud_arg:
