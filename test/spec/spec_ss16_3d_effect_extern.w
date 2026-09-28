@@ -7,4 +7,4 @@ extern "C" fn effect_memcpy(dst: *mut u8, src: *const u8, n: usize) -> *mut u8
 extern "C" fn effect_close_handle(handle: *mut u8) -> Unit
 
 fn main:
-    print("ok\n")
+    print("ok")

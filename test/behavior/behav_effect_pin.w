@@ -20,4 +20,4 @@ fn main:
     assert(r2.id == 7)
     let other = Resource { id: 9 }
     assert(read_only(other) == 9)
-    print("ok\n")
+    print("ok")

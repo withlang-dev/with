@@ -9,4 +9,4 @@ fn main:
     let rx = &v.x
     let ry = &v.y
     let sum = *rx + *ry
-    print(int_to_string(sum) ++ "\n")
+    print(int_to_string(sum))
