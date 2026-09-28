@@ -1519,6 +1519,11 @@ pub type Sema {
     // §9.1 / D43: the block that is a function's or closure's own body. Only
     // its tail, never an arm block's, is discarded when it is an assignment.
     body_tail_block: i32,
+    // §9.1 / D73: the node that holds the body's tail — body_tail_block, or
+    // the innermost block, `unsafe:` or `no_suspend` the tail reaches
+    // through them and groupings (body_tail_holder_of). The discard verdict
+    // applies to its assignment tail or child.
+    body_tail_holder: i32,
     // §9.1 / D60: whether that body discards its own assignment tail — true
     // when the body has no declared return (D43 infers) or declares `Unit`.
     // Under a declared non-`Unit` return the tail is the body's value.
@@ -2948,6 +2953,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         infer_tail_is_closure: 0,
         infer_tail_join: 0,
         body_tail_block: 0,
+        body_tail_holder: 0,
         body_tail_discards: true,
         discarded_tails: sema_new_map_i32_i32(),
         tail_read_assigns: sema_new_map_i32_i32(),
