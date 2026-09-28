@@ -5775,7 +5775,9 @@ impl Sema:
             return self.expr_is_ephemeral_task(node)
         // #625 (decisions.md D2): a container/struct literal of an ephemeral type is
         // an ephemeral value — needed so Box.new(View{…}) / heap-escape gates fire.
-        if kind == NodeKind.NK_STRUCT_LIT or kind == NodeKind.NK_ARRAY_LIT or kind == NodeKind.NK_MAP_LIT:
+        // A tuple literal is one too: `Box.new((view, 1))` put the view on the
+        // heap past its origin, as `Box.new(view)` would (§5.1).
+        if kind == NodeKind.NK_STRUCT_LIT or kind == NodeKind.NK_ARRAY_LIT or kind == NodeKind.NK_MAP_LIT or kind == NodeKind.NK_TUPLE:
             if self.type_is_ephemeral_value(self.cached_or_checked_expr_type(node)) != 0:
                 return 1
             // A literal holding an ephemeral VALUE (a non-`move` closure in a
