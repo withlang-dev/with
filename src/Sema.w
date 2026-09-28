@@ -1064,6 +1064,14 @@ pub type Sema {
     // #1847: a dyn method call whose method consumes its receiver (`move
     // self`), keyed by the call node.
     dyn_consuming_calls: HashMap[i32, i32],
+    // #1860: a typed binding pattern's view type (`c: &Circle`), keyed by
+    // the pattern node, and the symbols it binds (for the assign help).
+    dyn_downcast_binding_types: HashMap[i32, i32],
+    dyn_downcast_binding_syms: HashMap[i32, i32],
+    // The matches Sema proved exhaustive (a value position, a must-use
+    // subject), keyed by the match node: their last arm's failure edge is
+    // no path (MirLower.lower_match).
+    exhaustive_matches: HashMap[i32, i32],
 
     // Hot intrinsic symbols used in semantic dispatch paths.
     syms: SemaBuiltinSymbols,
@@ -2773,6 +2781,9 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         current_fn_bind_start: 0,
         global_user_drop_types: sema_new_map_i32_i32(),
         dyn_consuming_calls: sema_new_map_i32_i32(),
+        dyn_downcast_binding_types: sema_new_map_i32_i32(),
+        dyn_downcast_binding_syms: sema_new_map_i32_i32(),
+        exhaustive_matches: sema_new_map_i32_i32(),
         syms: sema_builtin_symbols_zero(),
         method_impl_nodes,
         method_decl_impl_nodes,

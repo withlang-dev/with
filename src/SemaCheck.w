@@ -13411,7 +13411,7 @@ impl Sema:
             if lhs_kind == PlaceKind.PK_NotPlace:
                 self.emit_warning("cannot assign to a non-place expression", node)
             else if lhs_mut_state == PlaceMut.PM_ReadOnly or lhs_via_ro_ref != 0:
-                self.emit_error("cannot assign through a read-only place (e.g., dereferenced &T or *const T) (§15.10)", node)
+                self.emit_read_only_place_assign(base_expr, node)
 
             self.reject_mutation_through_view_binding(self.place_root_sym(base_expr), node)
 
@@ -13499,7 +13499,7 @@ impl Sema:
                 else:
                     self.emit_warning("cannot assign to a non-place expression", node)
             else if lhs_mut_state == PlaceMut.PM_ReadOnly:
-                self.emit_error("cannot assign through a read-only place (e.g., dereferenced &T or *const T) (§15.10)", node)
+                self.emit_read_only_place_assign(target, node)
             // docs/completed/mut.md Rev 8 §15.17 — mutation through a view-bound
             // for-loop variable (e.g., `for u in xs.iter(): u.age += 1`).
             self.reject_mutation_through_view_binding(self.place_root_sym(target), node)
@@ -16191,6 +16191,10 @@ impl Sema:
     mut fn check_match_exhaustiveness(node: i32, subject_type: i32, extra_start: i32, arm_count: i32, require_exhaustive: i32, warn_partial_statement_match: i32):
         if subject_type == 0:
             return
+        // A match that must be exhaustive is, or this reports it and the
+        // compilation stops: MirLower gives its last arm no failure path.
+        if require_exhaustive != 0:
+            self.exhaustive_matches.insert(node, 1)
         let resolved = self.resolve_alias(subject_type)
         var tk = self.get_type_kind(resolved)
         var enum_resolved = resolved
@@ -16245,12 +16249,23 @@ impl Sema:
                     self.emit_partial_statement_match_warning("partial statement-position match on bool", node)
             return
 
-        // Sealed trait object exhaustiveness
-        if tk == TypeKind.TY_TRAIT_OBJ:
+        // Trait object exhaustiveness (#1860, Eric 2026-09-28 option (a)):
+        // a `@[sealed]` trait's implementor set makes the match exhaustive;
+        // a non-sealed trait's implementors are open, so it needs a `_` arm.
+        // The subject is the object through its reference (`&dyn T`).
+        let obj_shape = self.exh_shape_type(subject_type)
+        if self.get_type_kind(obj_shape as TypeId) == TypeKind.TY_TRAIT_OBJ:
             if require_exhaustive == 0 and warn_partial_statement_match == 0:
                 return
-            let trait_sym = self.get_type_d0(resolved)
-            if self.sealed_traits.contains(trait_sym) and self.sealed_impl_counts.contains(trait_sym):
+            let trait_sym = self.get_type_d0(obj_shape as TypeId)
+            if not self.sealed_traits.contains(trait_sym):
+                let trait_name: str = with_str_clone_ref(self.pool_resolve(trait_sym))
+                if require_exhaustive != 0:
+                    self.emit_error_with_help("non-exhaustive match on `dyn " ++ trait_name ++ "`: `" ++ trait_name ++ "` is not @[sealed], so its implementors are open", node, "add a `_` arm")
+                else:
+                    self.emit_partial_statement_match_warning("partial statement-position match on `dyn " ++ trait_name ++ "`: the trait is not @[sealed]", node)
+                return
+            if self.sealed_impl_counts.contains(trait_sym):
                 let si_count: i32 = self.sealed_impl_counts.get(trait_sym).unwrap()
                 let si_start = self.sealed_impl_starts.get(trait_sym).unwrap()
                 // Check that each implementor is covered by an arm
@@ -17653,6 +17668,17 @@ impl Sema:
             return self.pool_lookup_symbol(text.slice((dot + 1) as i64, text.len() as i64))
         variant_name
 
+    // A read-only place: a `&T`'s pointee, a `*const T`. A downcast binding
+    // (`c: Circle` over a `&dyn T`, #1860) is a view of the object; With has
+    // no `&mut T` (§15.1), so the help names where mutation goes.
+    mut fn emit_read_only_place_assign(place_expr: i32, node: i32):
+        let msg = "cannot assign through a read-only place (e.g., dereferenced &T or *const T) (§15.10)"
+        let root = self.place_root_sym(place_expr)
+        if root != 0 and self.dyn_downcast_binding_syms.contains(root):
+            self.emit_error_with_help(msg, node, "`" ++ self.pool_resolve(root) ++ "` is a view of the trait object its downcast pattern matched; With has no `&mut T` (§15.1): mutate through the trait's `mut fn` methods on the object's place")
+            return
+        self.emit_error(msg, node)
+
     fn pattern_subject_shape_type(subject_type: i32) -> i32:
         if subject_type == 0:
             return 0
@@ -17828,21 +17854,33 @@ impl Sema:
         if kind == NodeKind.NK_PAT_TYPED_BIND:
             let bind_sym = self.ast.get_data0(node)
             let type_sym = self.ast.get_data1(node)
-            // A type-annotated binding pattern `name: Type` is a dynamic
-            // downcast — only meaningful when the subject is a trait object.
-            // On a concrete subject (e.g. an i32 variant payload) it has no
-            // runtime meaning and used to reach the dyn-vtable-compare lowering
-            // with a null trait, crashing at runtime (#663). Reject it loudly.
+            // A typed binding pattern `name: Type` downcasts a trait object
+            // seen through a reference (Eric, 2026-09-28, option (a), #1860):
+            // on a `&dyn T` subject it binds `name: &Type`, a view of the
+            // object. A concrete subject has no runtime meaning (#663); a
+            // by-value dyn is no subject (#1852, owned matching waits on
+            // #724); a type that does not implement the trait never matches.
             let tb_subject_resolved = self.resolve_alias(subject_type as TypeId)
-            if subject_type != 0 and self.get_type_kind(tb_subject_resolved) != TypeKind.TY_TRAIT_OBJ:
+            let tb_ref_mut = self.pattern_subject_ref_mutability(subject_type)
+            let tb_object = if tb_ref_mut >= 0: self.resolve_alias(self.get_type_d0(tb_subject_resolved) as TypeId) else: tb_subject_resolved
+            if subject_type != 0 and self.get_type_kind(tb_object) != TypeKind.TY_TRAIT_OBJ:
                 self.emit_error("type-annotated binding pattern `name: Type` is only valid to downcast a trait object; bind the value with `name` instead", node)
                 return
-            var concrete_type = 0
-            concrete_type = self.lookup_named_type_visible(type_sym)
-            if concrete_type != 0:
-                self.scope_put_at(bind_sym, concrete_type, self.pattern_bind_mut, node)
-            else:
-                self.scope_put_at(bind_sym, subject_type, self.pattern_bind_mut, node)
+            if subject_type != 0 and tb_ref_mut < 0:
+                self.emit_error_with_help("a typed binding pattern `name: Type` downcasts a trait object through a reference; this subject is a `dyn` value", node, "match on `&dyn T`: the object's place, a `&dyn T` parameter, or a `Box[dyn T]`'s `.as_ref()`")
+                return
+            let concrete_type = self.lookup_named_type_visible(type_sym)
+            if concrete_type == 0:
+                self.emit_error(self.unknown_type_message(type_sym), node)
+                return
+            let tb_trait_sym = self.get_type_d0(tb_object)
+            if self.select_trait_impl(type_sym, tb_trait_sym) == 0:
+                self.emit_error("type '" ++ self.pool_resolve(type_sym) ++ "' does not implement trait '" ++ self.pool_resolve(tb_trait_sym) ++ "'; a downcast pattern names an implementor", node)
+                return
+            let tb_view_ty = self.ensure_exact_type(TypeKind.TY_REF, concrete_type, tb_ref_mut, 0) as i32
+            self.scope_put_at(bind_sym, tb_view_ty, self.pattern_bind_mut, node)
+            self.dyn_downcast_binding_types.insert(node, tb_view_ty)
+            self.dyn_downcast_binding_syms.insert(bind_sym, 1)
             return
 
         if kind == NodeKind.NK_PAT_VARIANT or kind == NodeKind.NK_PAT_ENUM_SHORTHAND:

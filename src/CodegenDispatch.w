@@ -11700,23 +11700,11 @@ impl Codegen:
         if intrinsic == MirIntrinsic.DYN_DOWNCAST:
             // Extract concrete value from dyn trait object.
             // Args: (fat_ptr, type_sym_as_int)
+            // The binding is a view `&Type` of the object (#1860): its value
+            // is the fat pointer's data word. Loading the object made a byte
+            // copy, a second owner of what it holds (§2.3).
             let dd_recv = self.mir_intrinsic_arg(body, args_id, 0)
-            let dd_type_sym_val = self.mir_intrinsic_arg(body, args_id, 1)
-            let dd_type_sym = wl_const_int_sext_val(dd_type_sym_val) as i32
-            // Translate AST pool sym to codegen intern pool sym
-            var dd_cg_type_sym = dd_type_sym
-            let dd_text = self.sema_symbol_text(dd_type_sym)
-            if dd_text.len() > 0:
-                dd_cg_type_sym = self.intern.intern(dd_text)
-            // Extract data_ptr from fat pointer (field 0)
-            let dd_data_ptr = wl_build_extract_value(self.builder, dd_recv, 0)
-            // Load concrete struct from data_ptr
-            let dd_st = self.struct_type_map.get(dd_cg_type_sym)
-            if dd_st.is_some():
-                let dd_concrete_ty = self.struct_llvm_types[dd_st.unwrap()]
-                result = wl_build_load(self.builder, dd_concrete_ty, dd_data_ptr)
-            else:
-                result = wl_build_load(self.builder, wl_i32_type(self.context), dd_data_ptr)
+            result = wl_build_extract_value(self.builder, dd_recv, 0)
 
         else if intrinsic == MirIntrinsic.DYN_VTABLE_CMP:
             // Compare vtable pointer of dyn trait object against expected vtable.
