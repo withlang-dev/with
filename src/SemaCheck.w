@@ -3380,6 +3380,7 @@ impl Sema:
         if self.fn_decl_has_c_export(node) != 0:
             self.record_global_concurrency_evidence(node, "@[c_export]")
             self.validate_c_export_signature(node, sig_idx, fn_name)
+            self.check_c_export_against_declarations(node, sig_idx, fn_name)
         let saved_no_alloc_depth: i32 = self.current_no_alloc_depth
         let saved_fn_may_alloc: i32 = self.current_fn_may_alloc
         let saved_current_fn_symbol: i32 = self.current_fn_symbol
@@ -4603,6 +4604,90 @@ impl Sema:
         let rt = self.sig_return_type(sig_idx)
         if self.type_is_c_abi_expressible(rt, 1) == 0:
             self.emit_error("@[c_export] function '" ++ fn_name ++ "' return type '" ++ self.type_name(rt) ++ "' is not C-ABI-expressible; use a scalar, a raw pointer, or a @[repr(C)] type", node)
+
+    // §16.5 (#1850): the C symbol a `@[c_export]` fn defines may also be
+    // declared — a c_imported header's prototype, a manual extern — and C
+    // code, like With code calling that extern, calls it through that
+    // declaration. The definition must be the function the declaration
+    // describes: the same C function type, or, for a declaration without a
+    // prototype (`int f();`), a definition whose parameters are what the
+    // default argument promotions pass (C11 6.7.6.3p15). Anything else is a
+    // conflicting definition, refused here with both types.
+    mut fn check_c_export_against_declarations(node: i32, sig_idx: i32, fn_sym: i32):
+        if sig_idx < 0:
+            return
+        let symbol = self.cheader_export_name(node)
+        for decl in self.extern_decls_of_c_symbol(symbol):
+            let ext_sig = self.extern_decl_sigs.get(decl) ?? -1
+            if ext_sig < 0 or ext_sig == sig_idx:
+                continue
+            let mismatch = self.c_export_declaration_mismatch(sig_idx, ext_sig)
+            if mismatch.len() > 0:
+                let fname: str = self.pool_resolve(fn_sym)
+                self.emit_error(f"@[c_export(\"{symbol}\")] fn '{fname}' is `{self.sig_c_fn_text(sig_idx, false)}`, but '{symbol}' is declared `{self.sig_c_fn_text(ext_sig, self.sig_is_unprototyped(ext_sig))}`, and C calls it through that declaration: {mismatch}; make the definition agree with the declaration (§16.5)", node)
+                return
+
+    // The extern declarations whose C symbol is `symbol`: the `@[link_name]`
+    // when there is one, else the declared name.
+    fn extern_decls_of_c_symbol(symbol: &str) -> Vec[i32]:
+        let out: Vec[i32] = Vec.new()
+        for di in 0..self.ast.decl_count():
+            let decl = self.ast.get_decl(di)
+            if self.ast.kind(decl) != NodeKind.NK_EXTERN_FN:
+                continue
+            let meta = self.ast.find_fn_meta(decl)
+            var linked = self.pool_resolve(self.ast.get_data0(decl)) == symbol
+            if meta >= 0 and self.ast.fn_meta_tp_start(meta) != 0:
+                let cc = self.pool_resolve(self.ast.fn_meta_tp_start(meta))
+                if cc.starts_with("link_name:"):
+                    linked = cc.slice(10, cc.len()) == symbol
+            if linked:
+                out.push(decl)
+        out
+
+    // Why a definition with signature `def_sig` is not the C function the
+    // declaration `ext_sig` describes; "" when it is.
+    fn c_export_declaration_mismatch(def_sig: i32, ext_sig: i32) -> str:
+        if not self.c_abi_same_type(self.sig_return_type(def_sig), self.sig_return_type(ext_sig)):
+            return "the result types differ"
+        let count = self.sig_get_param_count(def_sig)
+        if self.sig_is_unprototyped(ext_sig):
+            for pi in 0..count:
+                let p = self.sig_param_type(def_sig, pi)
+                if self.c_default_promoted_type(p) != self.resolve_alias(p as TypeId) as i32:
+                    return f"a declaration without a prototype is called with promoted arguments, and parameter {pi + 1} is '{self.type_name(p)}', which a promoted argument never is"
+            return ""
+        if (self.sig_is_variadic(def_sig) != 0) != (self.sig_is_variadic(ext_sig) != 0):
+            return "one is variadic and the other is not"
+        if count != self.sig_get_param_count(ext_sig):
+            return "the parameter counts differ"
+        for pi in 0..count:
+            if not self.c_abi_same_type(self.sig_param_type(def_sig, pi), self.sig_param_type(ext_sig, pi)):
+                return f"parameter {pi + 1} differs"
+        ""
+
+    // Whether two types are one C argument type: the same type, or any two
+    // pointers (a C prototype's `void *` against a definition's `*mut u8`).
+    fn c_abi_same_type(a: i32, b: i32) -> bool:
+        let ka = self.get_type_kind(self.resolve_alias(a as TypeId))
+        let kb = self.get_type_kind(self.resolve_alias(b as TypeId))
+        let a_ptr = ka == TypeKind.TY_PTR or ka == TypeKind.TY_REF or ka == TypeKind.TY_EXTERN_FN
+        let b_ptr = kb == TypeKind.TY_PTR or kb == TypeKind.TY_REF or kb == TypeKind.TY_EXTERN_FN
+        if a_ptr or b_ptr:
+            return a_ptr and b_ptr
+        self.types_identical(a, b)
+
+    // A signature spelled as the C function type it is.
+    fn sig_c_fn_text(sig: i32, unprototyped: bool) -> str:
+        if unprototyped:
+            return f"extern \"C\" fn(...) -> {self.type_name(self.sig_return_type(sig))}"
+        var out = "extern \"C\" fn("
+        let count = self.sig_get_param_count(sig)
+        for pi in 0..count:
+            out = out ++ (if pi > 0: ", " else: "") ++ self.type_name(self.sig_param_type(sig, pi))
+        if self.sig_is_variadic(sig) != 0:
+            out = out ++ (if count > 0: ", ..." else: "...")
+        out ++ ") -> " ++ self.type_name(self.sig_return_type(sig))
 
     // ── §16.5 C header generation for @[c_export] symbols ──────────────────
 
