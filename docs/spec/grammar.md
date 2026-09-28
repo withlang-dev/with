@@ -74,7 +74,7 @@ the first token of the statement and has no trailing colon of its own.
 ```
 FN_DECL     := [ PUB ] 'fn' IDENT [ TYPE_PARAMS ] [ '(' PARAMS ')' ] [ '->' TYPE ] BODY
 PARAMS      := PARAM { ',' PARAM } [ ',' ]
-PARAM       := IDENT ':' TYPE [ '=' EXPR ]
+PARAM       := IDENT ':' [ 'once' ] TYPE [ '=' EXPR ]
 TYPE_PARAMS := '[' IDENT { ',' IDENT } [ ':' BOUND ] ']'
 PUB         := 'pub'
 ```

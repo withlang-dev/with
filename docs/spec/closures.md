@@ -54,7 +54,7 @@ visible to the reader, so no signature is needed:
   read through a capture of a `Copy` value copies it. The closure
   observes, mutates or consumes the original place according to its
   body.
-- `move ||` transfers ownership, which for a `Copy` value is a copy.
+- `move () =>` transfers ownership, which for a `Copy` value is a copy.
 
 Closure bodies receive inferred effect summaries over their captures.
 Invoking a closure is checked exactly like invoking a function: if a
@@ -69,25 +69,25 @@ by its own scope.
 A non-`move` closure holds a view of each captured place while it is
 alive, under the ordinary exclusivity rules (§5): mutating a place in
 the enclosing scope while a closure holding a read capture of it is
-alive is an error. A snapshot is spelled `move ||`.
+alive is an error. A snapshot is spelled `move () =>`.
 
-A `move ||` closure owns its environment: it is an ordinary value that
+A `move () =>` closure owns its environment: it is an ordinary value that
 may be returned, stored, or sent across a channel when every capture
 is `Send`. A non-`move` closure is a view of its frame (§12.2) and may
 not be returned.
 
 **The callable type.** A callable value has type `fn(A) -> R` whether
-it is a function, a non-`move` closure, or a `move ||` closure. There
+it is a function, a non-`move` closure, or a `move () =>` closure. There
 is no second closure type and no trait split. The compiler tracks
 which kind a value is, as it tracks `may_suspend` (§14): a non-`move`
-closure is ephemeral (§5); a `move ||` closure owns its environment
+closure is ephemeral (§5); a `move () =>` closure owns its environment
 and drops it, so a struct holding one has `Drop` and cannot be `Copy`;
 a consuming closure may be invoked once.
 
 - `fn(A) -> R` is not `Copy`, including for a bare function: `let g =
   f` moves `f`. Calling through a binding or a field observes it and
   does not move. `.clone()` is free for a bare function or a non-`move`
-  closure and requires every capture `Clone` for a `move ||` closure.
+  closure and requires every capture `Clone` for a `move () =>` closure.
   A use of a moved callable is diagnosed with `.clone()` and
   calling through the original as the fix-its.
 - A consuming closure may only be handed to a callee that invokes it
@@ -100,7 +100,7 @@ a consuming closure may be invoked once.
   checked but never required.
 - A non-`move` closure passed as an argument is ephemeral in the callee
   (Rule 8, §22.1): it may be invoked and passed on, and may not be
-  stored, returned, or captured by a `move ||` closure.
+  stored, returned, or captured by a `move () =>` closure.
 - A call through `fn(A) -> R` is an indirect call through the pair.
   When a closure literal reaches a parameter within one compilation,
   the compiler specializes the callee and the call is direct. Only a
@@ -109,23 +109,23 @@ a consuming closure may be invoked once.
 
 ```with
 let xs = Vec.new()
-let f = || xs.push(1)   // capture effect on xs: {write}
+let f = () => xs.push(1)   // capture effect on xs: {write}
 f()                     // mutates xs
 
 var n = 42
-let g = || n += 1       // n is captured by place: {write}
+let g = () => n += 1       // n is captured by place: {write}
 g()                     // n is 43
 
 let k = 42
-let s = move || k + 1   // move: s holds its own copy of k
+let s = move () => k + 1   // move: s holds its own copy of k
 let m = s()             // k unchanged, m is 43
 
 let owned = Vec.from([1, 2, 3])
-let h = move || owned.len()
+let h = move () => owned.len()
 // owned is invalid after closure creation; h owns it
 
 let ys = Vec.from([1])
-let c = || take(ys)     // consuming view of ys
+let c = () => take(ys)     // consuming view of ys
 c()                     // moves ys; a second c() is an error
 ```
 
