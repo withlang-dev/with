@@ -16,6 +16,11 @@ use std.crypto.sha256
 extern fn with_str_clone_ref(s: &str) -> str
 
 var g_bundle_interface_texts: HashMap[str, str] = HashMap.new()
+// Which registered interface file each section came from: sections of one
+// `.wi` are one bundle (#1827, §9.1c: a bundle function writes the globals
+// its bundle exports).
+var g_bundle_interface_bundle_ids: HashMap[str, i32] = HashMap.new()
+var g_bundle_interface_bundle_count: i32 = 0
 
 // sha256 hex of a text — the manifest's `interface-sha` (the .wi bytes) and
 // the fingerprint (the canonical declaration rows).
@@ -82,6 +87,11 @@ fn bundle_interface_trim(s: &str) -> str:
 
 fn bundle_interfaces_register_section(path: &str, text: &str):
     g_bundle_interface_texts.insert(with_str_clone_ref(path), with_str_clone_ref(text))
+    g_bundle_interface_bundle_ids.insert(with_str_clone_ref(path), g_bundle_interface_bundle_count)
+
+// The bundle (one registered `.wi`) a bundle-provided module belongs to; -1
+// for a path no interface provides.
+pub fn bundle_interface_bundle_id(path: &str) -> i32: g_bundle_interface_bundle_ids.get(path) ?? -1
 
 // Register every `module <path>` section of an interface file. Returns the
 // section count so a file with none is a loud error at the caller.
@@ -106,4 +116,5 @@ pub fn bundle_interfaces_register_wi(wi_text: &str) -> i32:
         let tail = if section_start < wi_text.len(): wi_text.slice(section_start, wi_text.len()) else: ""
         bundle_interfaces_register_section(section_path, tail)
         count = count + 1
+    g_bundle_interface_bundle_count = g_bundle_interface_bundle_count + 1
     count
