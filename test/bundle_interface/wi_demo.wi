@@ -23,6 +23,8 @@ pub const K: i32 = 7
 pub var COUNTER: i32
 pub let TABLE: [4]u8
 pub fn add(p: &Pair) -> i32
+pub fn call_once(f: once fn() -> i32) -> i32
+pub fn call_twice(f: fn() -> i32) -> i32
 pub fn level_value(l: Level) -> u8
 pub fn packet_word(p: &Packet) -> i32
 pub unsafe fn set_first(p: *mut Pair, v: i32) -> Unit

@@ -442,6 +442,9 @@ pub const FN_PARAM_FLAG_MOVE_SELF: i32 = 16
 // This is distinct from its access mode so analysis and migrations can prove
 // that no source-level `self` parameter remains.
 pub const FN_PARAM_FLAG_SYNTH_RECEIVER: i32 = 32
+// §12.4 (D75): `f: once fn(A) -> R` — the body invokes `f` at most once, so
+// a consuming closure may cross a bundle boundary to it.
+pub const FN_PARAM_FLAG_ONCE: i32 = 64
 
 // Multi-index spec kind constants (stored in NK_INDEX_SPEC.d2 high bits)
 pub const INDEX_SCALAR: i32 = 0
@@ -479,6 +482,8 @@ pub fn fn_param_is_move_self(flags: i32) -> i32:
 
 pub fn fn_param_is_synth_receiver(flags: i32) -> i32:
     (flags / FN_PARAM_FLAG_SYNTH_RECEIVER) % 2
+
+pub fn fn_param_is_once(flags: i32) -> bool: (flags / FN_PARAM_FLAG_ONCE) % 2 != 0
 
 // docs/completed/mut.md Rev 8 §12 — module-level place declarations.
 // NK_LET_DECL flags layout:
