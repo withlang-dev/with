@@ -3,8 +3,7 @@
 fn apply(f: fn() -> i32) -> i32:
     f()
 
-fn apply_void(f: fn() -> i32):
-    f()
+fn apply_void(f: fn() -> Unit): f()
 
 fn main:
     // Capture a string
