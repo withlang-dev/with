@@ -5602,6 +5602,18 @@ impl Sema:
         if suffix == LiteralSuffix.F64: return self.ty_f64 as i32
         0
 
+    // The literal suffix that spells primitive numeric type `tid`, or
+    // LiteralSuffix.None for any other type (an enum, a distinct type).
+    fn literal_suffix_for_type(tid: i32) -> i32:
+        if tid == 0:
+            return LiteralSuffix.None
+        let resolved = self.resolve_alias(tid as TypeId)
+        for suffix in LiteralSuffix.I8 as i32..LiteralSuffix.F64 as i32 + 1:
+            let spelled = self.literal_suffix_type(suffix)
+            if spelled != 0 and self.resolve_alias(spelled as TypeId) == resolved:
+                return suffix
+        LiteralSuffix.None
+
     fn int_literal_fits_type(node: i32, tid: i32) -> bool:
         let resolved = self.resolve_alias(tid)
         let kind = self.get_type_kind(resolved)

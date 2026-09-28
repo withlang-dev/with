@@ -620,6 +620,19 @@ impl AstPool:
         0
 
 impl Sema:
+    // A binding's comptime value folded to a bare numeric literal keeps the
+    // type it was evaluated at (#1836): bare, it took the default ladder when
+    // the transformed program was checked, so an unannotated
+    // `const B = (0 as u32) -% 1` read as i64. The literal is the binding's
+    // whole value, so no context would type it; a literal inside a folded
+    // aggregate keeps its field's or element's context instead.
+    fn ct_keep_folded_literal_type(pool: AstPool, folded: i32, value_type: i32):
+        if folded == 0 or value_type == 0:
+            return
+        let kind = pool.kind(folded)
+        if (kind == NodeKind.NK_INT_LIT or kind == NodeKind.NK_FLOAT_LIT) and pool.literal_suffix(folded) == LiteralSuffix.None:
+            pool.set_literal_suffix(folded, self.literal_suffix_for_type(value_type))
+
     mut fn ct_sync_sema_ast(pool: AstPool):
         self.ast = pool
 
@@ -1075,6 +1088,10 @@ impl Sema:
         if folded == 0:
             self.ct_emit_error(source_ast, inner, "comptime value cannot be embedded yet")
             return node
+        // The scalar the fold made has the value's type (#1836); a binding
+        // whose whole value it is keeps it (ct_keep_folded_literal_type).
+        if value.type_id != 0 and (pool.kind(folded) == NodeKind.NK_INT_LIT or pool.kind(folded) == NodeKind.NK_FLOAT_LIT):
+            self.typed_expr_types.insert(folded, value.type_id)
         folded
 
     mut fn ct_transform_expr(source_ast: AstPool, pool: AstPool, intern: InternPool, node: i32) -> i32:
@@ -1173,7 +1190,11 @@ impl Sema:
                             let inner = pool.get_data0(value)
                             if inner != 0:
                                 self.typed_expr_types.insert(inner, ann_type as i32)
-                pool.set_data1(node, self.ct_transform_expr(source_ast, pool, intern, value))
+                let was_comptime = pool.kind(value) == NodeKind.NK_COMPTIME
+                let folded = self.ct_transform_expr(source_ast, pool, intern, value)
+                if was_comptime:
+                    self.ct_keep_folded_literal_type(pool, folded, self.typed_expr_types.get(folded) ?? 0)
+                pool.set_data1(node, folded)
             return node
 
         if kind == NodeKind.NK_IF_EXPR:
@@ -3194,7 +3215,11 @@ impl Sema:
                             let inner = pool.get_data0(value)
                             if inner != 0:
                                 self.typed_expr_types.insert(inner, ann_type as i32)
-                pool.set_data1(node, self.ct_transform_expr(source_ast, pool, intern, value))
+                let was_comptime = pool.kind(value) == NodeKind.NK_COMPTIME
+                let folded = self.ct_transform_expr(source_ast, pool, intern, value)
+                if was_comptime:
+                    self.ct_keep_folded_literal_type(pool, folded, self.typed_expr_types.get(folded) ?? 0)
+                pool.set_data1(node, folded)
             return
         if kind == NodeKind.NK_TYPE_DECL:
             self.ct_transform_type_decl(source_ast, pool, intern, node)

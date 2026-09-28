@@ -8316,9 +8316,12 @@ impl Sema:
         let value = unsafe { comptime_force_eval_expr(self as *mut Sema, self.ast, self.pool, node) }
         comptime_value_is_valid(value)
 
+    // Every global's initializer is checked and typed, whatever failed
+    // before it: a global left untyped after another's error made each later
+    // use of it a false diagnostic ("missing return", "bitwise operator
+    // requires integer operands"; #1836). A comptime value is evaluated only
+    // when its own check found no error.
     mut fn check_top_level_let_values():
-        if self.diags.has_errors():
-            return
         for di in 0..self.ast.decl_count():
             self.update_decl_source_context(di)
             let decl = self.ast.get_decl(di)
@@ -8338,6 +8341,7 @@ impl Sema:
                 let t_ak = if t_an != 0: self.ast.kind(t_an) as i32 else: -1
                 let t_asym = if t_an != 0 and t_ak == NodeKind.NK_TYPE_NAMED as i32: self.pool_resolve(self.ast.get_data0(t_an)) ++ "" else: "?".to_owned()
                 with_eprint(f"[tll] di={di} decl={decl} name='{self.pool_resolve(name)}' value={value} vkind={self.ast.kind(value) as i32} ann_extra={t_ae} ann_node={t_an} ann_kind={t_ak} ann_name='{t_asym}' resolved={self.resolve_type_expr(t_an) as i32}")
+            let errors_before = self.diags.count_by_severity(DiagSeverity.Error)
             let is_comptime_value = if self.ast.kind(value) == NodeKind.NK_COMPTIME: 1 else: 0
             // #643: every top-level initializer must be checked, including a
             // plain annotated `let`/`var`. Skipping an initializer merely
@@ -8369,9 +8373,5 @@ impl Sema:
                 // ordinary literal/identifier, data0 is a symbol, not a node.
                 if type_value != value:
                     self.typed_expr_types.insert(type_value, final_type as i32)
-            if self.diags.has_errors():
-                return
-            if is_comptime_value != 0:
+            if is_comptime_value != 0 and self.diags.count_by_severity(DiagSeverity.Error) == errors_before:
                 let _ = self.force_eval_comptime_expr(value)
-                if self.diags.has_errors():
-                    return
