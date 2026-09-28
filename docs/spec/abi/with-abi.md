@@ -1,6 +1,6 @@
-# The With ABI (version 4)
+# The With ABI (version 8)
 
-Status: DRAFT v4 (2026-09-12), the convention as the compiler implements
+Status: DRAFT v8 (2026-09-28), the convention as the compiler implements
 it today, written down so `.wo` bundles (decisions.md D38,
 `docs/spec/toolchain/wo_bundles.md`) can depend on it. Nothing here is a new rule. The
 sources named in §7 define the ABI; this document describes them, and at
@@ -27,7 +27,13 @@ a With value type, not as a contract With makes with another language.
   Named functions acquire an adapter thunk when converted to this representation.
 - A reference is a **value of pointer type**: it is passed as that pointer,
   never as the pointee (D5/D6: "an explicit `&T` is a reference value with
-  the ABI of that reference type").
+  the ABI of that reference type"). One reference is not a pointer: a
+  shared `&str` (or `&T` of a distinct type over str) is a **view value**
+  with str's own layout, `{ ptr: *const u8, len: i64 }` — the bytes it
+  observes, never the address of some str header — so a range view
+  `s[a..b]` exists without a header of its own (spec §4.8a, #1810). `&mut
+  str` names the caller's header and stays a pointer.
+  (`TypeLayout.type_layout_is_str_view`.)
 
 ## 2. Aggregates
 
@@ -65,11 +71,15 @@ generated code and `rt/rt_core.w`:
 | `Handle[T]` | `{ index: u32, generation: u32 }` | 8 |
 | `StringBuilder` / `FmtBuffer` | `{ buf: *mut u8, len: i64, cap: i64 }` | 24 |
 | slices `[]T`, `[]mut T` | fat: `{ ptr, len: i64 }` | 16 |
+| `&str` view (§1) | `{ ptr: *const u8, len: i64 }`, str's layout | 16 |
 
 `Option[&T]` and `Option[*T]` lower to a **nullable pointer**: null is
 `None`, a live address is `Some` (the D22 lookup representation shared by
-`HashMap.get` and `SlotMap.get`). Every other `Option[T]` and every
-`Result[T, E]` is an ordinary tagged enum under §2.
+`HashMap.get` and `SlotMap.get`). `Option[&str]` is not one of them: its
+payload is a view value, not an address, so it is an ordinary tagged enum,
+and a lookup that finds a str slot builds `Some` from the view read out of
+the slot. Every other `Option[T]` and every `Result[T, E]` is an ordinary
+tagged enum under §2.
 
 ## 4. Function calls
 
@@ -84,7 +94,7 @@ and every call site (D6; `docs/spec/abi/fn_abi_descriptor_design.md`):
 | plain `T`, not Copy | OWNED | the LLVM value of `T`; the callee owns it |
 | `&T` / `&mut T` (explicit reference) | reference value | pointer word |
 | receiver `mut self` (in-place), compiler-modeled borrowed places | IndirectPlace (`SHARE-PLACE` in `--dump-abi`) | pointer to the caller's place |
-| `[]T` slices | Fat | `{ ptr, len }` by value |
+| `[]T` slices, `&str` views | Fat | `{ ptr, len }` by value (indirect under the Windows x86_64 rule below) |
 
 Return values are returned by LLVM value of the return type. One target
 exception, applied by the compiler on both sides: on windows-x86_64 a
@@ -176,6 +186,13 @@ layout change there is caught by the `wo-drift` lane, not by this check.
 
 ## Version history
 
+- **v8** (2026-09-28): a shared `&str` is a view value, `{ ptr, len }` with
+  str's layout (16 bytes, align 8), passed and returned by value like a
+  slice; it had been a pointer to a str header (§1, §3; spec §4.8a, #1810).
+  `Option[&str]` is a tagged enum, no longer a nullable pointer. Every
+  runtime `with_*` / `wl_*` parameter of type `&str` changes physical form,
+  so objects built under v7 do not link with v8 code (#1815 keeps a stage
+  from linking another generation's runtime).
 - **v7** (2026-09-28): a function defined with a trailing `...` (D75, spec
   §16.2b.5) uses the target's C calling convention for its fixed
   parameters and its return (`fn_abi_definition_convention`); before, only
