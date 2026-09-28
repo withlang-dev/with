@@ -27362,6 +27362,24 @@ impl Sema:
                 if self.expr_uses_symbol(self.ast.get_extra(in_base + 1 + ii), sym) != 0:
                     return 1
             return 0
+        // A type in expression position — the type argument of a call such
+        // as `transmute[extern "C" fn(…)](p)` or `size_of[T]()`, which the
+        // callee's NK_INDEX carries — names no value, except through a
+        // `typeof(expr)` inside it.
+        if kind == NodeKind.NK_TYPE_TYPEOF or kind == NodeKind.NK_TYPE_REF or kind == NodeKind.NK_TYPE_PTR or kind == NodeKind.NK_TYPE_OPTIONAL or kind == NodeKind.NK_TYPE_ARRAY or kind == NodeKind.NK_TYPE_SLICE:
+            return self.expr_uses_symbol(self.ast.get_data0(node), sym)
+        if kind == NodeKind.NK_TYPE_GENERIC:
+            for ai in 0..self.ast.get_data2(node):
+                if self.expr_uses_symbol(self.ast.get_extra(self.ast.get_data1(node) + ai), sym) != 0:
+                    return 1
+            return 0
+        if kind == NodeKind.NK_TYPE_TUPLE or kind == NodeKind.NK_TYPE_FN or kind == NodeKind.NK_TYPE_EXTERN_FN:
+            for ti in 0..self.ast.get_data1(node):
+                if self.expr_uses_symbol(self.ast.get_extra(self.ast.get_data0(node) + ti), sym) != 0:
+                    return 1
+            return if kind == NodeKind.NK_TYPE_TUPLE: 0 else: self.expr_uses_symbol(self.ast.get_data2(node), sym)
+        if kind == NodeKind.NK_TYPE_NAMED or kind == NodeKind.NK_TYPE_TRAIT_OBJ or kind == NodeKind.NK_TYPE_INFERRED or kind == NodeKind.NK_TYPE_ASSOC:
+            return 0
         // Leaves: nothing below them can name a symbol. Every other kind is
         // an expression form this walk has no case for — a capture it would
         // silently miss (#1570, #1598), so it is a compiler bug, not a 0.
