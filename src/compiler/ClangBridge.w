@@ -2265,12 +2265,19 @@ pub fn with_cimport_param_is_restrict(session: i64, idx: i32, param: i32) -> i32
         let ty = clang_getCursorType(arg)
         clang_isRestrictQualifiedType(ty)
 
+// libclang calls every unprototyped function type variadic. A K&R
+// definition (`void stop() { ... }`, `int f(a) int a; { ... }`) takes
+// exactly the parameters it lists, so a function this unit defines is
+// variadic only when its prototype says `...` (D75: a `...` definition is
+// unsafe to call and has the C convention; `stop()` is neither).
 pub fn with_cimport_fn_is_variadic(session: i64, idx: i32) -> i32:
     unsafe:
         let s = session as *mut CImportSession
         if s as i64 == 0 or idx < 0 or idx >= (*s).decl_count: return 0
         let cursor = *(((*s).decls as i64 + idx as i64 * 32) as *const CXCursor)
         let ty = clang_getCursorType(cursor)
+        if ty.kind == CXType_FunctionNoProto and clang_Cursor_isNull(clang_getCursorDefinition(cursor)) == 0:
+            return 0
         clang_isFunctionTypeVariadic(ty)
 
 pub fn with_cimport_fn_storage_class(session: i64, idx: i32) -> i32:

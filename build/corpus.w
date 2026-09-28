@@ -279,7 +279,7 @@ fn corpus_permitted_externs() -> str:
     "|strlen|strcmp|strncmp|strchr|memchr|isalpha|isdigit|isalnum|isspace|isupper|islower|isxdigit|isprint|isgraph|ispunct|iscntrl|tolower|toupper|" ++
     "sqrt|pow|floor|ceil|round|sin|cos|tan|log|log10|exp|fabs|fmod|asin|acos|atan|atan2|abort|" ++
     "with_clz|with_ctz|with_popcount|with_bswap16|with_bswap32|with_bswap64|with_clzl|with_clzll|with_ctzl|with_ctzll|with_abs|" ++
-    "with_alloc|with_alloc_zeroed|with_realloc|with_free|with_memcpy|with_memmove|with_memset|with_memcmp|with_va_start|with_va_end|"
+    "with_alloc|with_alloc_zeroed|with_realloc|with_free|with_memcpy|with_memmove|with_memset|with_memcmp|"
 
 /// Host-only symbols std.libc no longer exports; a reference in generated
 /// source means the migrator emitted the host's spelling instead of the model.

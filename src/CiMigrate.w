@@ -288,6 +288,11 @@ fn ci_migrate_type_is_raw_pointer(ty: &str) -> bool:
     let t = ci_trim(ci_pointer_type_explicit_mut(ty))
     ci_starts_with(t, "*")
 
+// A migrated definition is `unsafe fn` when a raw pointer crosses it or
+// when it is defined with `...` (D75, §16.2b.5: unsafe to call).
+fn ci_migrate_fn_is_unsafe_to_call(session: i64, idx: i32) -> bool:
+    ci_migrate_fn_has_raw_pointer_param(session, idx) or with_cimport_fn_is_variadic(session, idx) != 0
+
 fn ci_migrate_fn_has_raw_pointer_param(session: i64, idx: i32) -> bool:
     let param_count = with_cimport_fn_param_count(session, idx)
     for pi in 0..param_count:
@@ -728,9 +733,7 @@ fn ci_migrate_preamble_text() -> str:
     p = p ++ "extern fn with_memcpy(dst: " ++ pm ++ ", src: " ++ pc ++ ", n: i64) -> " ++ pm ++ "\n"
     p = p ++ "extern fn with_memmove(dst: " ++ pm ++ ", src: " ++ pc ++ ", n: i64) -> " ++ pm ++ "\n"
     p = p ++ "extern fn with_memset(dst: " ++ pm ++ ", c: i32, n: i64) -> " ++ pm ++ "\n"
-    p = p ++ "extern fn with_memcmp(a: " ++ pc ++ ", b: " ++ pc ++ ", n: i64) -> i32\n"
-    p = p ++ "extern fn with_va_start(ap: *mut i8) -> Unit\n"
-    p = p ++ "extern fn with_va_end(ap: *mut i8) -> Unit\n\n"
+    p = p ++ "extern fn with_memcmp(a: " ++ pc ++ ", b: " ++ pc ++ ", n: i64) -> i32\n\n"
     p
 
 // The with_* runtime externs the preamble above declares. A C prototype for
@@ -743,7 +746,7 @@ fn ci_migrate_preamble_declares_runtime_extern(name: &str) -> bool:
     name == "with_ctzll" or name == "with_abs" or name == "with_alloc" or
     name == "with_alloc_zeroed" or name == "with_realloc" or name == "with_free" or
     name == "with_memcpy" or name == "with_memmove" or name == "with_memset" or
-    name == "with_memcmp" or name == "with_va_start" or name == "with_va_end"
+    name == "with_memcmp"
 
 fn ci_migrate_is_runtime_cabi_function(name: &str) -> bool:
     if ci_starts_with(name, "with_"):
@@ -1831,7 +1834,7 @@ fn ci_migrate_collect_unsafe_extern_fns(session: i64, count: i32, primary_path: 
             continue
         let owner_path = ci_migrate_project_fn_owner_path(project_active, project, name)
         let local_def = ci_find_fn_cursor(session, name)
-        if local_def >= 0 and (owner_path.len() == 0 or owner_path == primary_path) and ci_migrate_fn_has_raw_pointer_param(session, i):
+        if local_def >= 0 and (owner_path.len() == 0 or owner_path == primary_path) and ci_migrate_fn_is_unsafe_to_call(session, i):
             ci_migrate_note_unsafe_extern_fn(ci_migrate_c_function_name(name))
         // A static function stays local unless it is a header's inline
         // definition another unit publishes (owner_path): then its calls
@@ -1839,7 +1842,7 @@ fn ci_migrate_collect_unsafe_extern_fns(session: i64, count: i32, primary_path: 
         if with_cimport_fn_storage_class(session, i) == CX_SC_STATIC and owner_path.len() == 0:
             i = i + 1
             continue
-        if (owner_path.len() > 0 and owner_path != primary_path) and ci_migrate_fn_has_raw_pointer_param(session, i):
+        if (owner_path.len() > 0 and owner_path != primary_path) and ci_migrate_fn_is_unsafe_to_call(session, i):
             ci_migrate_note_unsafe_extern_fn(ci_migrate_c_function_name(name))
         if owner_path.len() == 0 and local_def < 0:
             ci_migrate_note_unsafe_extern_fn(ci_migrate_c_function_name(name))

@@ -1651,6 +1651,11 @@ fn ci_translate_function(session: i64, idx: i32, known_structs: &str, demoted_ty
                 si_raw = true
             let actual_pname = ci_param_signature_name(ci_escape_reserved(spname), spi)
             si_params = si_params ++ actual_pname ++ ": " ++ sptype
+        // D75 (§16.2b.5): a variadic inline definition is a `...` definition
+        // — its body reads the list — and unsafe to call.
+        if with_cimport_fn_is_variadic(session, idx) != 0:
+            si_params = si_params ++ (if si_param_count > 0: ", ..." else: "...")
+            si_raw = true
         let si_ret = with_cimport_fn_return_type_translated(session, idx)
         if ci_cimport_type_is_raw_abi(si_ret):
             si_raw = true
@@ -6670,6 +6675,18 @@ impl CiStmtPool:
             return 0 as CiStmtId
 
         if kind == CXK_CALL_EXPR:
+            // D75 (§16.2b.5): a list ends with its binding's scope, so
+            // va_end has nothing left to do; va_start declares its list as a
+            // statement of the block (lower_va_start_decl) and nowhere else.
+            let stdarg = ci_stdarg_call_name(session, cursor)
+            if stdarg == "va_end":
+                return self.empty_stmt_ir()
+            if stdarg == "va_start":
+                let _ = ci_va_bail(session, cursor, "va_start is translated as a statement of a block: `var ap = va_start()`; this one is nested in another statement")
+                return 0 as CiStmtId
+            if stdarg == "va_copy":
+                let _ = ci_va_bail(session, cursor, "va_copy is not supported: a With list starts only at va_start (D75)")
+                return 0 as CiStmtId
             let cfp = self.lower_cfprintf_effect_ir(session, cursor, exprs, types, scope)
             if (cfp as i32) != 0:
                 return cfp
@@ -7900,8 +7917,7 @@ impl CiExprPool:
         // if the cast handler bails.
         if kind == 100:
             if ci_unexposed_expr_is_va_arg(session, cursor):
-                ci_note_unsupported_va_arg(session, cursor)
-                return 0 as CiExprId
+                return self.va_arg_expr(session, cursor, types, scope)
             let nc = with_ci_num_children(session, cursor)
             if with_ci_eval_int_valid(session, cursor) != 0 and not ci_expr_children_need_rvalue_lowering(session, cursor):
                 let ival = with_ci_eval_int_value(session, cursor)
@@ -8906,13 +8922,43 @@ fn ci_unexposed_expr_is_va_arg(session: i64, cursor: i32) -> bool:
     let name = ci_call_name_from_source_text(with_ci_cursor_source_text(session, cursor))
     name == "va_arg" or name == "__builtin_va_arg"
 
-fn ci_note_unsupported_va_arg(session: i64, cursor: i32):
-    if g_ci_bail_message.len() == 0:
-        g_ci_bail_message = "va_arg is not supported"
-        g_ci_bail_location = with_ci_cursor_location(session, cursor)
-        g_ci_bail_kind = with_ci_cursor_kind(session, cursor)
+// The list a `va_arg(ap, T)` reads: its expression child (the other child
+// is T's TypeRef), peeled to the variable.
+fn ci_va_arg_list_operand(session: i64, cursor: i32) -> i32:
+    let nc = with_ci_num_children(session, cursor)
+    var i = 0
+    while i < nc:
+        let child = with_ci_child(session, cursor, i)
+        if with_ci_cursor_kind(session, child) != 43:  // CXCursor_TypeRef
+            return ci_peel_transparent(session, child)
+        i = i + 1
+    -1
 
 impl CiExprPool:
+    // D75 (§16.2b.5): `va_arg(ap, T)` is `ap.arg[T]()` — T as the C code
+    // names it (Sema refuses a type the default promotions never pass), the
+    // receiver the list's own place, which the read advances.
+    fn va_arg_expr(session: i64, cursor: i32, types: CiTypePool, scope: CiScope) -> CiExprId:
+        let list_cursor = ci_va_arg_list_operand(session, cursor)
+        if list_cursor < 0:
+            let _ = ci_va_bail(session, cursor, "va_arg names no list")
+            return 0 as CiExprId
+        let list = self.lower_expr_ir(session, list_cursor, types, scope)
+        if (list as i32) == 0:
+            return 0 as CiExprId
+        let arg_ty = types.type_from_libclang(session, with_ci_cursor_type(session, cursor))
+        if (arg_ty as i32) == 0:
+            return 0 as CiExprId
+        let arg_text = ci_print_type(types, arg_ty)
+        if ci_str_contains(arg_text, "fn("):
+            let _ = ci_va_bail(session, cursor, "va_arg of an unnamed function-pointer type; name the type with a typedef")
+            return 0 as CiExprId
+        let method = self.add(CiExprKind.CIE_FIELD, list as i32, self.add_string("arg[" ++ arg_text ++ "]"), 2, 0 as CiTypeId)
+        var call = self.add(CiExprKind.CIE_CALL, method as i32, self.extra_len() as i32, 0, arg_ty)
+        if not g_ci_migrate_in_unsafe_function_body:
+            call = self.unsafe_expr(call)
+        call
+
     fn coerce_value_expr_for_target(session: i64, target_ty_id: CiTypeId, value_cursor: i32, value_id: CiExprId, types: CiTypePool) -> CiExprId:
         if (target_ty_id as i32) == 0 or (value_id as i32) == 0:
             return value_id
@@ -10445,8 +10491,10 @@ impl CiStmtPool:
 
         if kind == 100:
             if ci_unexposed_expr_is_va_arg(session, cursor):
-                ci_note_unsupported_va_arg(session, cursor)
-                return ci_value_ir_invalid()
+                let va_value = exprs.va_arg_expr(session, cursor, types, scope)
+                if (va_value as i32) == 0:
+                    return ci_value_ir_invalid()
+                return ci_value_ir_plain(va_value)
             // #740 roundtrip class 1: C's implicit scalar→_Bool conversion
             // must materialize — With has no implicit int→bool, so peeling
             // this wrapper transparently silently retypes the value. All
@@ -10791,28 +10839,16 @@ impl CiStmtPool:
                 stdarg_name = direct_cursor_name
             if stdarg_name == "va_arg" or stdarg_name == "__builtin_va_arg":
                 if g_ci_bail_message.len() == 0:
-                    g_ci_bail_message = "va_arg is not supported"
+                    g_ci_bail_message = "va_arg spelled as a function call is not supported (only C's va_arg expression is)"
                     g_ci_bail_location = with_ci_cursor_location(session, cursor)
                     g_ci_bail_kind = kind
                 return ci_value_ir_invalid()
-            if stdarg_name == "va_start" or stdarg_name == "__builtin_va_start" or stdarg_name == "va_end" or stdarg_name == "__builtin_va_end":
-                let va_arg_index = if nc > 1: 1 else: 0
-                let va_arg_cursor = with_ci_child(session, cursor, va_arg_index)
-                let va_arg = self.lower_value_expr_ir(session, va_arg_cursor, exprs, types, scope)
-                if not ci_value_ir_valid(va_arg):
-                    return ci_value_ir_invalid()
-                let addr_e = exprs.add(CiExprKind.CIE_ADDR_OF, va_arg.value_expr as i32, 1, 0, 0 as CiTypeId)
-                let va_ptr_ty = types.type_from_translated_text("*mut i8")
-                if (va_ptr_ty as i32) == 0:
-                    return ci_value_ir_invalid()
-                let cast_e = exprs.cast(va_ptr_ty, addr_e)
-                let arg_ids: Vec[i32] = Vec.new()
-                arg_ids.push(cast_e as i32)
-                let with_name = if stdarg_name == "va_start" or stdarg_name == "__builtin_va_start": "with_va_start" else: "with_va_end"
-                return CiValueExprIR {
-                    setup_stmt: va_arg.setup_stmt,
-                    value_expr: exprs.build_named_call_expr(with_name, &arg_ids),
-                }
+            // D75: va_start and va_end are statements (lower_va_start_decl,
+            // lower_effect_expr_ir); as a value they have none to give.
+            let stdarg_operation = ci_stdarg_call_name(session, cursor)
+            if stdarg_operation.len() > 0:
+                let _ = ci_va_bail(session, cursor, stdarg_operation ++ " is used as a value; it is translated only as a statement")
+                return ci_value_ir_invalid()
             var callee = self.lower_value_expr_ir(session, with_ci_child(session, cursor, 0), exprs, types, scope)
             var callee_text = ""
             var setup: CiStmtId = 0 as CiStmtId
@@ -11783,6 +11819,14 @@ impl CiStmtPool:
                             g_ci_bail_location = with_ci_cursor_location(session, child)
                             g_ci_bail_kind = CXK_DECL_STMT
                         bailed = true
+                else if g_ci_va_started_decls.len() > 0 and ci_stdarg_call_name(session, ci_peel_transparent(session, child)) == "va_start":
+                    // D75: the list's declaration, at its start.
+                    let start_ir = self.lower_va_start_decl(session, ci_peel_transparent(session, child), block_scope, exprs, types)
+                    if (start_ir.stmt_id as i32) != 0:
+                        block_scope = start_ir.updated_scope
+                        child_ids.push(start_ir.stmt_id as i32)
+                    else:
+                        bailed = true
                 else:
                     let child_id = self.lower_stmt_ir(session, child, exprs, types, 0, block_scope)
                     if (child_id as i32) != 0:
@@ -12454,14 +12498,55 @@ fn ci_goto_switch_scope_after_case(session: i64, cursor: i32, scope: CiScope):
 // ci_lower_expr_ir and ci_lower_value_expr_ir. Type is built via
 // ci_type_from_libclang.
 impl CiStmtPool:
+    // D75 (§16.2b.5): `va_start(ap, last);` is where the list starts, so it
+    // is where `var ap = va_start()` declares it — the C declaration was
+    // deferred to here (lower_decl_stmt_structural). A later start of the
+    // same variable (after its va_end) declares a fresh binding, which the
+    // scope then names; `va_end` itself lowers to nothing, the list ending
+    // with its binding's scope.
+    fn lower_va_start_decl(session: i64, call: i32, scope: CiScope, exprs: CiExprPool, types: CiTypePool) -> CiDeclLoweringIR:
+        let failed = CiDeclLoweringIR { updated_scope: scope, stmt_id: 0 as CiStmtId }
+        let list = ci_va_list_operand(session, call)
+        if list < 0 or with_ci_cursor_kind(session, list) != CXK_DECL_REF:
+            let _ = ci_va_bail(session, call, "va_start's list is not a local va_list variable")
+            return failed
+        let key = "|" ++ with_ci_cursor_referenced_location(session, list) ++ "|"
+        if not ci_str_contains(g_ci_va_deferred_decls, key):
+            let _ = ci_va_bail(session, call, "va_start's list is not a va_list declared in an enclosing block of this function")
+            return failed
+        let list_ty = types.type_from_libclang(session, with_ci_cursor_type(session, list))
+        if (list_ty as i32) == 0:
+            return failed
+        let escaped = ci_escape_reserved(with_ci_cursor_spelling(session, list))
+        let base_name = ci_local_storage_name(escaped, list)
+        var storage_name = ci_scope_mangle(scope, base_name)
+        if storage_name == base_name and ci_fn_var_names_contains(base_name):
+            storage_name = ci_fn_var_names_unique(base_name)
+        let new_scope = ci_scope_add_mangled(scope, escaped, storage_name)
+        ci_fn_var_names_register(storage_name)
+        let no_args: Vec[i32] = Vec.new()
+        let start = exprs.build_named_call_expr_typed("va_start", &no_args, list_ty)
+        let decl_id = self.var_decl(self.add_string(storage_name), list_ty, start, 1)
+        CiDeclLoweringIR { updated_scope: new_scope, stmt_id: decl_id }
+
     fn lower_decl_stmt_structural(session: i64, cursor: i32, scope: CiScope, hoisted: bool, exprs: CiExprPool, types: CiTypePool) -> CiDeclLoweringIR:
         let nc = with_ci_num_children(session, cursor)
         var new_scope = scope
         var child_stmt_ids: Vec[i32] = Vec.new()
+        var deferred_va_list = false
         var i = 0
         while i < nc:
             let child = with_ci_child(session, cursor, i)
-            if with_ci_cursor_kind(session, child) == CXK_VAR_DECL:
+            let va_key = if g_ci_va_started_decls.len() > 0 and with_ci_cursor_kind(session, child) == CXK_VAR_DECL: "|" ++ with_ci_cursor_location(session, child) ++ "|" else: ""
+            if va_key.len() > 0 and ci_str_contains(g_ci_va_started_decls, va_key):
+                // D75: a list va_start starts is declared there, as
+                // `var ap = va_start()` (lower_va_start_decl).
+                if hoisted or with_ci_var_initializer(session, child) >= 0:
+                    let _ = ci_va_bail(session, child, "va_start's list is declared with an initializer or in a hoisted body")
+                    return CiDeclLoweringIR { updated_scope: scope, stmt_id: 0 as CiStmtId }
+                g_ci_va_deferred_decls = g_ci_va_deferred_decls ++ va_key
+                deferred_va_list = true
+            else if with_ci_cursor_kind(session, child) == CXK_VAR_DECL:
                 let raw_name = with_ci_cursor_spelling(session, child)
                 let escaped = ci_escape_reserved(raw_name)
                 let vty = with_ci_cursor_type(session, child)
@@ -12588,6 +12673,8 @@ impl CiStmtPool:
                 let _ = self.add_extra(child_stmt_ids.get(cj))
                 cj = cj + 1
             stmt_id = self.block(extra_start, count)
+        else if deferred_va_list:
+            stmt_id = self.empty_stmt_ir()
         CiDeclLoweringIR {
             updated_scope: new_scope,
             stmt_id,
@@ -12664,6 +12751,15 @@ fn ci_try_translate_fn_body_at(session: i64, decl_idx: i32, found_cursor: i32) -
         i = i + 1
 
     if body_cursor < 0:
+        return ""
+
+    // D75: the lists this body starts; each declaration moves to its start.
+    g_ci_va_started_decls = ""
+    g_ci_va_deferred_decls = ""
+    if not ci_collect_va_started_decls(session, body_cursor):
+        return ""
+    if g_ci_va_started_decls.len() > 0 and ci_has_goto(session, body_cursor):
+        let _ = ci_va_bail(session, body_cursor, "va_start in a function with goto is not supported: the list's declaration cannot move to its start in a hoisted body")
         return ""
 
     // Build initial scope from parameter names + return type.
@@ -15009,6 +15105,63 @@ var g_ci_fn_var_names: str = ""
 var g_ci_bail_location: str = ""
 var g_ci_bail_kind: i32 = 0
 var g_ci_bail_message: str = ""
+
+// ── D75 (§16.2b.5): variadic definitions ────────────────────────────
+// `va_list ap; ... va_start(ap, last);` becomes `var ap = va_start()` at the
+// start: the list lives in the variable from its start and ends with its
+// scope, so the C declaration moves to the va_start. Keys are the
+// declaration's location: every list the body starts, and those whose
+// declaration this body has reached and deferred.
+var g_ci_va_started_decls: str = ""
+var g_ci_va_deferred_decls: str = ""
+
+fn ci_va_bail(session: i64, cursor: i32, reason: &str) -> bool:
+    if g_ci_bail_message.len() == 0:
+        g_ci_bail_message = with_str_clone_ref(reason)
+        g_ci_bail_location = with_ci_cursor_location(session, cursor)
+        g_ci_bail_kind = with_ci_cursor_kind(session, cursor)
+    false
+
+// The <stdarg.h> operation a call spells — "va_start", "va_end" or
+// "va_copy" — written as the macro or as its __builtin_ expansion; "" for
+// any other call. (va_arg is an expression of its own, not a call.)
+fn ci_stdarg_call_name(session: i64, cursor: i32) -> str:
+    if cursor < 0 or with_ci_cursor_kind(session, cursor) != CXK_CALL_EXPR or with_ci_num_children(session, cursor) == 0:
+        return ""
+    let by_callee = ci_stdarg_operation(ci_call_callee_name(session, with_ci_child(session, cursor, 0)))
+    if by_callee.len() > 0:
+        return by_callee
+    ci_stdarg_operation(ci_call_name_from_source_text(with_ci_cursor_source_text(session, cursor)))
+
+fn ci_stdarg_operation(name: &str) -> str:
+    if name == "va_start" or name == "__builtin_va_start": return "va_start"
+    if name == "va_end" or name == "__builtin_va_end": return "va_end"
+    if name == "va_copy" or name == "__builtin_va_copy" or name == "__va_copy": return "va_copy"
+    ""
+
+// The list a va_start/va_end call names: its first argument, peeled.
+fn ci_va_list_operand(session: i64, call: i32) -> i32:
+    if with_ci_num_children(session, call) < 2:
+        return -1
+    ci_peel_transparent(session, with_ci_child(session, call, 1))
+
+// Before a body lowers: every va_start's list must be a local variable,
+// named directly; its declaration is keyed for deferral.
+fn ci_collect_va_started_decls(session: i64, cursor: i32) -> bool:
+    if ci_stdarg_call_name(session, cursor) == "va_start":
+        let list = ci_va_list_operand(session, cursor)
+        if list < 0 or with_ci_cursor_kind(session, list) != CXK_DECL_REF or with_ci_cursor_references_parameter(session, list):
+            return ci_va_bail(session, cursor, "va_start's list is not a local va_list variable")
+        let key = "|" ++ with_ci_cursor_referenced_location(session, list) ++ "|"
+        if not ci_str_contains(g_ci_va_started_decls, key):
+            g_ci_va_started_decls = g_ci_va_started_decls ++ key
+    let nc = with_ci_num_children(session, cursor)
+    var i = 0
+    while i < nc:
+        if not ci_collect_va_started_decls(session, with_ci_child(session, cursor, i)):
+            return false
+        i = i + 1
+    true
 
 pub fn ci_get_bail_location() -> str:
     g_ci_bail_location.clone()

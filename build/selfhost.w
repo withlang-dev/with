@@ -4453,11 +4453,16 @@ fn bs_check_migrate_variadic_stdarg(ctx: &ActionCtx, compiler_path: &str, case_d
     let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-variadic-stdarg", args)
     if result.rc != 0: return result.rc
     let out_text = ctx.fs().read_text(out_w)
-    rc = bs_assert_contains(ctx, out_text, "fn touch(__param_count: c_int, ...) -> c_int:", "variadic_stdarg")
+    // D75 (§16.2b.5): a `...` definition is unsafe to call; its list is
+    // declared where va_start starts it and ends with that scope, so
+    // va_end leaves nothing behind.
+    rc = bs_assert_contains(ctx, out_text, "unsafe fn touch(__param_count: c_int, ...) -> c_int:", "variadic_stdarg")
     if rc != 0: return rc
-    rc = bs_assert_contains(ctx, out_text, "with_va_start", "variadic_stdarg")
+    rc = bs_assert_contains(ctx, out_text, "var __local_ap: c_va_list = va_start()", "variadic_stdarg")
     if rc != 0: return rc
-    rc = bs_assert_contains(ctx, out_text, "with_va_end", "variadic_stdarg")
+    rc = bs_assert_not_contains(ctx, out_text, "with_va_", "variadic_stdarg")
+    if rc != 0: return rc
+    rc = bs_assert_not_contains(ctx, out_text, "va_end", "variadic_stdarg")
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, out_text, "fn mentions_va_arg()", "variadic_stdarg")
     if rc != 0: return rc
@@ -4485,14 +4490,19 @@ fn bs_check_migrate_variadic_stdarg(ctx: &ActionCtx, compiler_path: &str, case_d
     va_arg_args |> push("--no-c-export")
     va_arg_args |> push("-o")
     va_arg_args |> push(bs_abs(root, va_arg_out))
-    let va_arg_result = bs_run_cli_capture_cwd(ctx, compiler_path, "migrate-variadic-va-arg-rejected", va_arg_args, 180000, case_dir)
-    if va_arg_result.rc == 0:
-        return bs_fail(ctx, "va_arg migration unexpectedly succeeded")
-    rc = bs_assert_contains(ctx, va_arg_result.stderr, "migrate: untranslatable function 'total': va_arg is not supported", "variadic_va_arg_rejected")
+    // D75: `va_arg(ap, int)` is `ap.arg[c_int]()`.
+    let va_arg_result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-variadic-va-arg", va_arg_args)
+    if va_arg_result.rc != 0: return va_arg_result.rc
+    let va_arg_text_out = ctx.fs().read_text(va_arg_out)
+    rc = bs_assert_contains(ctx, va_arg_text_out, "var __local_ap: c_va_list = va_start()", "variadic_va_arg")
     if rc != 0: return rc
-    rc = bs_assert_contains(ctx, va_arg_result.stderr, "variadic_va_arg.c:", "variadic_va_arg_rejected")
+    rc = bs_assert_contains(ctx, va_arg_text_out, "__local_ap.arg[c_int]()", "variadic_va_arg")
     if rc != 0: return rc
-    bs_expect_absent(ctx, va_arg_out, "variadic va_arg rejected output")
+    var va_arg_check_args: Vec[str] = Vec.new()
+    va_arg_check_args |> push("check")
+    va_arg_check_args |> push(bs_abs(root, va_arg_out))
+    let va_arg_check = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-variadic-va-arg", va_arg_check_args)
+    va_arg_check.rc
 
 fn bs_check_migrate_setjmp_rejected(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
     let root = ctx.project_info().project_root()
