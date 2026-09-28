@@ -521,6 +521,17 @@ impl Zcu:
             self.diagnostics = move parser.diags
 
             let after = out.decl_count()
+            // #1831: a declaration c_import records as unprototyped (`int
+            // f();`) carries that on its node — flag bit 1 of NK_EXTERN_FN —
+            // so Sema gives its calls the fixed-argument convention. Only
+            // c_import's generated text states it; no source a person
+            // writes can.
+            let unprototyped = c_import_unprototyped_names(synthetic)
+            if unprototyped.len() > 0:
+                for ui in before..after:
+                    let udecl = out.get_decl(ui)
+                    if out.kind(udecl) == NodeKind.NK_EXTERN_FN and unprototyped.contains("|" ++ self.c_import_decl_bound_name_frontend(out, udecl) ++ "|"):
+                        out.set_data2(udecl, out.get_data2(udecl) | 2)
             // Mark all c_import-synthesized declarations
             let ci_owner_path = self.decl_source_path_frontend(i)
             let ci_owner_file_id = ci_file_id

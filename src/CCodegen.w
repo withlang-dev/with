@@ -9420,7 +9420,13 @@ impl CCodegen:
                 params = params ++ self.c_type(p_tid, 0) ++ f"* _{i + 1}"
             else:
                 params = params ++ self.c_decl(p_tid, f"_{i + 1}")
-        if self.sema.sig_is_variadic(sig_idx) != 0:
+        // #1831: an unprototyped declaration stays unprototyped, so the C
+        // compiler passes each call's promoted arguments with the
+        // fixed-argument convention. (A C23 compiler reads `()` as `(void)`
+        // and refuses a call with arguments — loud, never a wrong ABI.)
+        if self.sema.sig_is_unprototyped(sig_idx):
+            params = ""
+        else if self.sema.sig_is_variadic(sig_idx) != 0:
             if param_count > 0:
                 params = params ++ ", ..."
             else:
