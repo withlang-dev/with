@@ -415,7 +415,7 @@ unsafe fn convert_posix(__param_pattype: c_uint, __param_pattern: *const u8, __p
 
     '__ci_bb_8 {
         (__local_clength__goto_179_7 = ((1 as c_int)))
-        (__local_convlength__goto_158_12 = (__local_convlength__goto_158_12 +% ((((__local_p__goto_155_14 as usize) -% (__local_pp__goto_156_14 as usize)) / sizeof[u8]()) as c_ulong)))
+        (__local_convlength__goto_158_12 = (__local_convlength__goto_158_12 +% (((((__local_p__goto_155_14 as usize) -% (__local_pp__goto_156_14 as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong)))
         if (__param_dummyrun != 0) {
             goto '__ci_bb_10
         } else {
@@ -460,7 +460,7 @@ unsafe fn convert_posix(__param_pattype: c_uint, __param_pattern: *const u8, __p
 
     '__ci_bb_13 {
         (__local_posix__goto_154_12 = __local_posix__goto_154_12 + ((__local_clength__goto_179_7 as isize) as usize))
-        (__local_plength = (__local_plength -% __local_clength__goto_179_7))
+        (__local_plength = (__local_plength -% (__local_clength__goto_179_7 as c_ulong)))
         (__ci_expr_ternary_2 = 0)
         if (__local_nextisliteral__goto_164_6 != 0) {
             (__ci_expr_ternary_2 = ((0 as c_uint)))
@@ -1436,7 +1436,7 @@ unsafe fn convert_posix(__param_pattype: c_uint, __param_pattern: *const u8, __p
     }
 
     '__ci_bb_161 {
-        (__local_convlength__goto_158_12 = (__local_convlength__goto_158_12 +% ((((__local_p__goto_155_14 as usize) -% (__local_pp__goto_156_14 as usize)) / sizeof[u8]()) as c_ulong)))
+        (__local_convlength__goto_158_12 = (__local_convlength__goto_158_12 +% (((((__local_p__goto_155_14 as usize) -% (__local_pp__goto_156_14 as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong)))
         ((*__param_bufflenptr) = __local_convlength__goto_158_12)
         (__ci_expr_old_25 = __local_p__goto_155_14)
         (__local_p__goto_155_14 = __local_p__goto_155_14 + 1)
@@ -2756,7 +2756,7 @@ unsafe fn convert_glob(__param_options: c_uint, __param_pattern: *const u8, __pa
         var __ci_expr_logic_20: c_int = 0
 
         if ((if not (__param_dummyrun != 0): 1 else: 0) != 0) {
-            (__ci_expr_logic_20 = (if (if (*(&raw const __local_out as *const pcre2_output_context)).output_size != ((((((*(&raw const __local_out as *const pcre2_output_context)).output as usize) -% (__param_use_buffer as usize)) / sizeof[u8]()) as c_ulong)): 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_20 = (if (if (*(&raw const __local_out as *const pcre2_output_context)).output_size != (((((((*(&raw const __local_out as *const pcre2_output_context)).output as usize) -% (__param_use_buffer as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong)): 1 else: 0) != 0: 1 else: 0))
         }
 
         if (__ci_expr_logic_20 != 0) {
@@ -2767,7 +2767,7 @@ unsafe fn convert_glob(__param_options: c_uint, __param_pattern: *const u8, __pa
     }
 
     if ((if __local_result != 0: 1 else: 0) != 0) {
-        ((*__param_bufflenptr) = (((((__local_pattern as usize) -% (__local_pattern_start as usize)) / sizeof[u8]()) as c_ulong)))
+        ((*__param_bufflenptr) = ((((((__local_pattern as usize) -% (__local_pattern_start as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong)))
 
         return __local_result
 

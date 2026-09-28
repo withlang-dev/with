@@ -159,7 +159,7 @@ pub unsafe fn tommy_hash_u32(__param_init_val: c_uint, __param_void_key: *const 
 
                 (__local_c = (__local_c +% (((__local_key[9]) as c_uint) << (8 as c_uint))))
 
-                (__local_c = (__local_c +% ((__local_key[8]) as c_int)))
+                (__local_c = (__local_c +% ((__local_key[8]) as c_uint)))
 
                 (__local_b = (__local_b +% tommy_le_uint32_read(((__local_key + ((4 as isize) as usize)) as *const c_void))))
 
@@ -172,7 +172,7 @@ pub unsafe fn tommy_hash_u32(__param_init_val: c_uint, __param_void_key: *const 
             10 => {
                 (__local_c = (__local_c +% (((__local_key[9]) as c_uint) << (8 as c_uint))))
 
-                (__local_c = (__local_c +% ((__local_key[8]) as c_int)))
+                (__local_c = (__local_c +% ((__local_key[8]) as c_uint)))
 
                 (__local_b = (__local_b +% tommy_le_uint32_read(((__local_key + ((4 as isize) as usize)) as *const c_void))))
 
@@ -182,7 +182,7 @@ pub unsafe fn tommy_hash_u32(__param_init_val: c_uint, __param_void_key: *const 
 
             },
             9 => {
-                (__local_c = (__local_c +% ((__local_key[8]) as c_int)))
+                (__local_c = (__local_c +% ((__local_key[8]) as c_uint)))
 
                 (__local_b = (__local_b +% tommy_le_uint32_read(((__local_key + ((4 as isize) as usize)) as *const c_void))))
 
@@ -201,7 +201,7 @@ pub unsafe fn tommy_hash_u32(__param_init_val: c_uint, __param_void_key: *const 
 
                 (__local_b = (__local_b +% (((__local_key[5]) as c_uint) << (8 as c_uint))))
 
-                (__local_b = (__local_b +% ((__local_key[4]) as c_int)))
+                (__local_b = (__local_b +% ((__local_key[4]) as c_uint)))
 
                 (__local_a = (__local_a +% tommy_le_uint32_read(((__local_key + ((0 as isize) as usize)) as *const c_void))))
 
@@ -211,14 +211,14 @@ pub unsafe fn tommy_hash_u32(__param_init_val: c_uint, __param_void_key: *const 
             6 => {
                 (__local_b = (__local_b +% (((__local_key[5]) as c_uint) << (8 as c_uint))))
 
-                (__local_b = (__local_b +% ((__local_key[4]) as c_int)))
+                (__local_b = (__local_b +% ((__local_key[4]) as c_uint)))
 
                 (__local_a = (__local_a +% tommy_le_uint32_read(((__local_key + ((0 as isize) as usize)) as *const c_void))))
 
 
             },
             5 => {
-                (__local_b = (__local_b +% ((__local_key[4]) as c_int)))
+                (__local_b = (__local_b +% ((__local_key[4]) as c_uint)))
 
                 (__local_a = (__local_a +% tommy_le_uint32_read(((__local_key + ((0 as isize) as usize)) as *const c_void))))
 
@@ -231,18 +231,18 @@ pub unsafe fn tommy_hash_u32(__param_init_val: c_uint, __param_void_key: *const 
 
                 (__local_a = (__local_a +% (((__local_key[1]) as c_uint) << (8 as c_uint))))
 
-                (__local_a = (__local_a +% ((__local_key[0]) as c_int)))
+                (__local_a = (__local_a +% ((__local_key[0]) as c_uint)))
 
 
             },
             2 => {
                 (__local_a = (__local_a +% (((__local_key[1]) as c_uint) << (8 as c_uint))))
 
-                (__local_a = (__local_a +% ((__local_key[0]) as c_int)))
+                (__local_a = (__local_a +% ((__local_key[0]) as c_uint)))
 
             },
             1 => {
-                (__local_a = (__local_a +% ((__local_key[0]) as c_int)))
+                (__local_a = (__local_a +% ((__local_key[0]) as c_uint)))
             },
         }
 
@@ -381,7 +381,7 @@ pub unsafe fn tommy_hash_u64(__param_init_val: c_ulonglong, __param_void_key: *c
 
                 (__local_c = (__local_c +% (((__local_key[9]) as c_uint) << (8 as c_uint))))
 
-                (__local_c = (__local_c +% ((__local_key[8]) as c_int)))
+                (__local_c = (__local_c +% ((__local_key[8]) as c_uint)))
 
                 (__local_b = (__local_b +% tommy_le_uint32_read(((__local_key + ((4 as isize) as usize)) as *const c_void))))
 
@@ -394,7 +394,7 @@ pub unsafe fn tommy_hash_u64(__param_init_val: c_ulonglong, __param_void_key: *c
             10 => {
                 (__local_c = (__local_c +% (((__local_key[9]) as c_uint) << (8 as c_uint))))
 
-                (__local_c = (__local_c +% ((__local_key[8]) as c_int)))
+                (__local_c = (__local_c +% ((__local_key[8]) as c_uint)))
 
                 (__local_b = (__local_b +% tommy_le_uint32_read(((__local_key + ((4 as isize) as usize)) as *const c_void))))
 
@@ -404,7 +404,7 @@ pub unsafe fn tommy_hash_u64(__param_init_val: c_ulonglong, __param_void_key: *c
 
             },
             9 => {
-                (__local_c = (__local_c +% ((__local_key[8]) as c_int)))
+                (__local_c = (__local_c +% ((__local_key[8]) as c_uint)))
 
                 (__local_b = (__local_b +% tommy_le_uint32_read(((__local_key + ((4 as isize) as usize)) as *const c_void))))
 
@@ -423,7 +423,7 @@ pub unsafe fn tommy_hash_u64(__param_init_val: c_ulonglong, __param_void_key: *c
 
                 (__local_b = (__local_b +% (((__local_key[5]) as c_uint) << (8 as c_uint))))
 
-                (__local_b = (__local_b +% ((__local_key[4]) as c_int)))
+                (__local_b = (__local_b +% ((__local_key[4]) as c_uint)))
 
                 (__local_a = (__local_a +% tommy_le_uint32_read(((__local_key + ((0 as isize) as usize)) as *const c_void))))
 
@@ -433,14 +433,14 @@ pub unsafe fn tommy_hash_u64(__param_init_val: c_ulonglong, __param_void_key: *c
             6 => {
                 (__local_b = (__local_b +% (((__local_key[5]) as c_uint) << (8 as c_uint))))
 
-                (__local_b = (__local_b +% ((__local_key[4]) as c_int)))
+                (__local_b = (__local_b +% ((__local_key[4]) as c_uint)))
 
                 (__local_a = (__local_a +% tommy_le_uint32_read(((__local_key + ((0 as isize) as usize)) as *const c_void))))
 
 
             },
             5 => {
-                (__local_b = (__local_b +% ((__local_key[4]) as c_int)))
+                (__local_b = (__local_b +% ((__local_key[4]) as c_uint)))
 
                 (__local_a = (__local_a +% tommy_le_uint32_read(((__local_key + ((0 as isize) as usize)) as *const c_void))))
 
@@ -453,18 +453,18 @@ pub unsafe fn tommy_hash_u64(__param_init_val: c_ulonglong, __param_void_key: *c
 
                 (__local_a = (__local_a +% (((__local_key[1]) as c_uint) << (8 as c_uint))))
 
-                (__local_a = (__local_a +% ((__local_key[0]) as c_int)))
+                (__local_a = (__local_a +% ((__local_key[0]) as c_uint)))
 
 
             },
             2 => {
                 (__local_a = (__local_a +% (((__local_key[1]) as c_uint) << (8 as c_uint))))
 
-                (__local_a = (__local_a +% ((__local_key[0]) as c_int)))
+                (__local_a = (__local_a +% ((__local_key[0]) as c_uint)))
 
             },
             1 => {
-                (__local_a = (__local_a +% ((__local_key[0]) as c_int)))
+                (__local_a = (__local_a +% ((__local_key[0]) as c_uint)))
             },
         }
 

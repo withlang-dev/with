@@ -264,7 +264,7 @@ pub unsafe fn unzLocateFile(__param_file: *mut c_void, __param_szFileName: *cons
     while ((if __local_err == 0: 1 else: 0) != 0) {
         var __local_szCurrentFileName: [257]c_char
 
-        (__local_err = ((unzGetCurrentFileInfo64(__param_file, (null as *mut unz_file_info64_s), (&__local_szCurrentFileName[0] as *mut c_char), ((((257 * sizeof[c_char]()) as c_ulong) -% (1 as c_ulong)) as c_ulong), null, (0 as c_ulong), (null as *mut i8), (0 as c_ulong)) as c_int)))
+        (__local_err = ((unzGetCurrentFileInfo64(__param_file, (null as *mut unz_file_info64_s), (&__local_szCurrentFileName[0] as *mut c_char), ((((257 * (sizeof[c_char]() as usize)) as c_ulong) -% (1 as c_ulong)) as c_ulong), null, (0 as c_ulong), (null as *mut i8), (0 as c_ulong)) as c_int)))
 
         if ((if __local_err == 0: 1 else: 0) != 0) {
             if ((if unzStringFileNameCompare((&__local_szCurrentFileName[0] as *mut c_char), __param_szFileName, __param_iCaseSensitivity) == 0: 1 else: 0) != 0) {
@@ -1981,7 +1981,7 @@ unsafe fn unz64local_GetCurrentFileInfoInternal(__param_file: *mut c_void, __par
 
     (__local_file_info_internal.offset_curfile = __local_uL)
 
-    (__local_lSeek = (((__local_lSeek + (*(&raw const __local_file_info as *const unz_file_info64_s)).size_filename) as c_long)))
+    (__local_lSeek = ((((__local_lSeek as c_ulong) + (*(&raw const __local_file_info as *const unz_file_info64_s)).size_filename) as c_long)))
 
     var __ci_expr_logic_0: c_int = 0
 
@@ -2014,7 +2014,7 @@ unsafe fn unz64local_GetCurrentFileInfoInternal(__param_file: *mut c_void, __par
         }
 
 
-        (__local_lSeek = (((__local_lSeek - __local_uSizeRead) as c_long)))
+        (__local_lSeek = ((((__local_lSeek as c_ulong) - __local_uSizeRead) as c_long)))
 
     }
 
@@ -2056,10 +2056,10 @@ unsafe fn unz64local_GetCurrentFileInfoInternal(__param_file: *mut c_void, __par
         }
 
 
-        (__local_lSeek = (((__local_lSeek + (((*(&raw const __local_file_info as *const unz_file_info64_s)).size_file_extra as c_ulong) -% (__local_uSizeRead_1 as c_ulong))) as c_long)))
+        (__local_lSeek = ((((__local_lSeek as c_ulong) + (((*(&raw const __local_file_info as *const unz_file_info64_s)).size_file_extra as c_ulong) -% (__local_uSizeRead_1 as c_ulong))) as c_long)))
 
     } else {
-        (__local_lSeek = (((__local_lSeek + (*(&raw const __local_file_info as *const unz_file_info64_s)).size_file_extra) as c_long)))
+        (__local_lSeek = ((((__local_lSeek as c_ulong) + (*(&raw const __local_file_info as *const unz_file_info64_s)).size_file_extra) as c_long)))
     }
 
 
@@ -2072,7 +2072,7 @@ unsafe fn unz64local_GetCurrentFileInfoInternal(__param_file: *mut c_void, __par
     if (__ci_expr_logic_4 != 0) {
         var __local_acc: c_ulong = ((0 as c_ulong))
 
-        (__local_lSeek = (((__local_lSeek - (*(&raw const __local_file_info as *const unz_file_info64_s)).size_file_extra) as c_long)))
+        (__local_lSeek = ((((__local_lSeek as c_ulong) - (*(&raw const __local_file_info as *const unz_file_info64_s)).size_file_extra) as c_long)))
 
         if ((if __local_lSeek != 0: 1 else: 0) != 0) {
             if ((if call_zseek64((((&raw const (*__local_s).z_filefunc as *const zlib_filefunc64_32_def_s) as *mut zlib_filefunc64_32_def_s) as *const zlib_filefunc64_32_def_s), (*__local_s).filestream, (__local_lSeek as c_ulong), (1 as c_int)) == 0: 1 else: 0) != 0) {
@@ -2179,10 +2179,10 @@ unsafe fn unz64local_GetCurrentFileInfoInternal(__param_file: *mut c_void, __par
         }
 
 
-        (__local_lSeek = (((__local_lSeek + (((*(&raw const __local_file_info as *const unz_file_info64_s)).size_file_comment as c_ulong) -% (__local_uSizeRead_2 as c_ulong))) as c_long)))
+        (__local_lSeek = ((((__local_lSeek as c_ulong) + (((*(&raw const __local_file_info as *const unz_file_info64_s)).size_file_comment as c_ulong) -% (__local_uSizeRead_2 as c_ulong))) as c_long)))
 
     } else {
-        (__local_lSeek = (((__local_lSeek + (*(&raw const __local_file_info as *const unz_file_info64_s)).size_file_comment) as c_long)))
+        (__local_lSeek = ((((__local_lSeek as c_ulong) + (*(&raw const __local_file_info as *const unz_file_info64_s)).size_file_comment) as c_long)))
     }
 
 

@@ -238,7 +238,7 @@ pub unsafe fn _pcre2_compile_find_dupname_details8(__param_name: *const u8, __pa
 
         ((*__param_errorcodeptr) = ERR53)
 
-        ((*__param_cb).erroroffset = (((((__param_name as usize) -% ((*__param_cb).start_pattern as usize)) / sizeof[u8]()) as c_ulong)))
+        ((*__param_cb).erroroffset = ((((((__param_name as usize) -% ((*__param_cb).start_pattern as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong)))
 
         return 0
 
@@ -647,7 +647,7 @@ pub unsafe fn _pcre2_compile_parse_recurse_args8(__param_pptr_start: *mut c_uint
         }
     }
 
-    ((*__local_args).skip_size = (((((((__local_pptr as usize) -% (__param_pptr_start as usize)) / sizeof[c_uint]()) as c_ulong) -% (1 as c_ulong)) as c_ulong)))
+    ((*__local_args).skip_size = ((((((((__local_pptr as usize) -% (__param_pptr_start as usize)) as c_long) / (sizeof[c_uint]() as c_long)) as c_ulong) -% (1 as c_ulong)) as c_ulong)))
 
     if ((if __local_size == 1: 1 else: 0) != 0) {
         return 1
@@ -713,7 +713,7 @@ pub unsafe fn _pcre2_compile_parse_recurse_args8(__param_pptr_start: *mut c_uint
 
     }
 
-    ((*__local_args).size = (((((__local_captures as usize) -% (((__local_args + ((1 as isize) as usize)) as *mut c_ushort) as usize)) / sizeof[c_ushort]()) as c_ulong)))
+    ((*__local_args).size = ((((((__local_captures as usize) -% (((__local_args + ((1 as isize) as usize)) as *mut c_ushort) as usize)) as c_long) / (sizeof[c_ushort]() as c_long)) as c_ulong)))
 
     return 1
 
@@ -791,7 +791,7 @@ unsafe fn _pcre2_compile_process_capture_list(__param_pptr: *mut c_uint, __param
 
                     ((__local_pptr[-1]) = ((2149056512 as c_uint)))
 
-                    ((__local_pptr[0]) = (((((__local_ng as usize) -% ((*__param_cb).named_groups as usize)) / sizeof[named_group_8]()) as c_uint)))
+                    ((__local_pptr[0]) = ((((((__local_ng as usize) -% ((*__param_cb).named_groups as usize)) as c_long) / (sizeof[named_group_8]() as c_long)) as c_uint)))
 
                     (__local_size = (__local_size +% 1))
 

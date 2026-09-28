@@ -8923,21 +8923,26 @@ fn ci_classify_implicit_cast_safe(session: i64, cursor: i32, inner_cursor: i32) 
     CI_CAST_INT_WIDEN
 
 // True when C converts the value of `inner` to the type of `outer` where
-// With converts nothing implicitly (§4.2.6, #1803): a narrower integer, the
-// other signedness at equal width, integer and float either way, a narrower
-// float. With widens the rest itself, so they stay unspelled.
+// With converts nothing implicitly (§4.2.6, #1803): a narrower integer,
+// signed into unsigned, unsigned into a signed type no wider, integer and
+// float either way, a narrower float. With widens the rest itself, so they
+// stay unspelled.
 fn ci_implicit_conversion_needs_as(session: i64, outer: i32, inner: i32) -> bool:
     let out_bits = with_ci_scalar_type_bits(session, outer)
     let in_bits = with_ci_scalar_type_bits(session, inner)
     if out_bits == 0 or in_bits == 0:
         return false
-    let out_float = with_ci_type_is_float(session, outer) != 0
-    let in_float = with_ci_type_is_float(session, inner) != 0
+    ci_scalar_conversion_needs_as(out_bits, with_ci_type_is_float(session, outer) != 0, with_ci_type_is_unsigned(session, outer) != 0, in_bits, with_ci_type_is_float(session, inner) != 0, with_ci_type_is_unsigned(session, inner) != 0)
+
+// §4.2.6's implicit conversions, over C scalar shapes.
+fn ci_scalar_conversion_needs_as(out_bits: i32, out_float: bool, out_unsigned: bool, in_bits: i32, in_float: bool, in_unsigned: bool) -> bool:
     if out_float != in_float:
         return true
-    if out_bits < in_bits:
-        return true
-    not out_float and out_bits == in_bits and with_ci_type_is_unsigned(session, outer) != with_ci_type_is_unsigned(session, inner)
+    if out_float or out_unsigned == in_unsigned:
+        return out_bits < in_bits
+    if in_unsigned:
+        return out_bits <= in_bits
+    true
 
 impl CiExprPool:
     fn lower_implicit_cast(session: i64, cursor: i32, types: CiTypePool, scope: CiScope) -> CiExprId:
@@ -10035,7 +10040,13 @@ impl CiExprPool:
                 let rhs_usize = self.cast(usize_ty, rhs_ptr_value)
                 let diff = self.binary(CiBinOp.CIBO_SUB_WRAP, lhs_usize, rhs_usize, 0 as CiTypeId)
                 let sizeof_ty = self.add(CiExprKind.CIE_SIZEOF_TYPE, elem_ty as i32, 0, 0, 0 as CiTypeId)
-                return self.binary(CiBinOp.CIBO_DIV, diff, sizeof_ty, 0 as CiTypeId)
+                // C's pointer difference is a signed ptrdiff_t: the wrapped
+                // byte difference reads as signed, then divides by the size
+                // (#1803: a usize here met C's int and long operands).
+                let diff_ty = types.type_from_libclang(session, with_ci_cursor_type(session, cursor))
+                if (diff_ty as i32) == 0:
+                    return 0 as CiExprId
+                return self.binary(CiBinOp.CIBO_DIV, self.cast(diff_ty, diff), self.cast(diff_ty, sizeof_ty), 0 as CiTypeId)
             let rhs_index = self.cast_pointer_index_expr(session, rhs_cursor, rhs_id, types)
             if (rhs_index as i32) == 0:
                 return 0 as CiExprId
@@ -10950,7 +10961,20 @@ impl CiStmtPool:
                         if (promoted_lhs as i32) == 0:
                             return ci_value_ir_invalid()
                         converts_back = converts_back or promoted_lhs != lhs_operand
+                        // C computes `E1 op= E2` in the usual arithmetic
+                        // conversions' type, E2's here (clang converts E2 to
+                        // it); a left operand that does not widen into it
+                        // implicitly is converted (`int += unsigned`).
+                        let lhs_promoted = promoted_lhs != lhs_operand
+                        let lhs_bits = if lhs_promoted: 32 else: with_ci_scalar_type_bits(session, lhs_cursor)
+                        let rhs_bits = with_ci_scalar_type_bits(session, rhs_cursor)
                         lhs_operand = promoted_lhs
+                        if lhs_bits != 0 and rhs_bits != 0 and ci_scalar_conversion_needs_as(rhs_bits, with_ci_type_is_float(session, rhs_cursor) != 0, with_ci_type_is_unsigned(session, rhs_cursor) != 0, lhs_bits, with_ci_type_is_float(session, lhs_cursor) != 0, not lhs_promoted and with_ci_type_is_unsigned(session, lhs_cursor) != 0):
+                            let computation_ty = types.type_from_libclang(session, with_ci_cursor_type(session, rhs_cursor))
+                            if (computation_ty as i32) == 0:
+                                return ci_value_ir_invalid()
+                            lhs_operand = exprs.cast(computation_ty, lhs_operand)
+                        let unpromoted_rhs = rhs_value
                         rhs_value = exprs.promote_c_small_int_operand(session, rhs_cursor, ci_peel_transparent(session, rhs_cursor), rhs_value, types)
                         if (rhs_value as i32) == 0:
                             return ci_value_ir_invalid()
@@ -10959,7 +10983,11 @@ impl CiStmtPool:
                             if (result_ty as i32) == 0:
                                 return ci_value_ir_invalid()
                             lhs_operand = exprs.cast_if_needed(result_ty, lhs_operand, lhs_cursor, session, types)
-                            rhs_value = exprs.cast_if_needed(result_ty, rhs_value, rhs_cursor, session, types)
+                            // A promoted small operand is an int now; C converts
+                            // it on to the unsigned result type (`adler += buf[0]`
+                            // on an unsigned long), which the promotion's own
+                            // cursor type no longer shows.
+                            rhs_value = if rhs_value != unpromoted_rhs: exprs.cast(result_ty, unpromoted_rhs) else: exprs.cast_if_needed(result_ty, rhs_value, rhs_cursor, session, types)
                         else if binary_op == BO_AND or binary_op == BO_OR or binary_op == BO_XOR:
                             let result_ty = types.type_from_libclang(session, with_ci_cursor_type(session, cursor))
                             if (result_ty as i32) == 0:

@@ -92,10 +92,10 @@ pub unsafe fn unzRepair(__param_file: *const i8, __param_fileOut: *const i8, __p
                 }
 
                 if ((if __local_fnsize > 0: 1 else: 0) != 0) {
-                    if ((if __local_fnsize < (1024 * sizeof[c_char]()): 1 else: 0) != 0) {
+                    if ((if __local_fnsize < (1024 * (sizeof[c_char]() as usize)): 1 else: 0) != 0) {
                         if ((if fread((&__local_filename[0] as *mut c_char), (1 as c_ulong), (__local_fnsize as c_ulong), __local_fpZip) == __local_fnsize: 1 else: 0) != 0) {
                             if ((if fwrite((&__local_filename[0] as *mut c_char), (1 as c_ulong), (__local_fnsize as c_ulong), __local_fpOut) == __local_fnsize: 1 else: 0) != 0) {
-                                (__local_offset = (((__local_offset + __local_fnsize) as c_int)))
+                                (__local_offset = ((((__local_offset as c_uint) + __local_fnsize) as c_int)))
 
                             } else {
                                 (__local_err = ((-1 as c_int)))
@@ -126,10 +126,10 @@ pub unsafe fn unzRepair(__param_file: *const i8, __param_fileOut: *const i8, __p
                 }
 
                 if ((if __local_extsize > 0: 1 else: 0) != 0) {
-                    if ((if __local_extsize < (1024 * sizeof[c_char]()): 1 else: 0) != 0) {
+                    if ((if __local_extsize < (1024 * (sizeof[c_char]() as usize)): 1 else: 0) != 0) {
                         if ((if fread((&__local_extra[0] as *mut c_char), (1 as c_ulong), (__local_extsize as c_ulong), __local_fpZip) == __local_extsize: 1 else: 0) != 0) {
                             if ((if fwrite((&__local_extra[0] as *mut c_char), (1 as c_ulong), (__local_extsize as c_ulong), __local_fpOut) == __local_extsize: 1 else: 0) != 0) {
-                                (__local_offset = (((__local_offset + __local_extsize) as c_int)))
+                                (__local_offset = ((((__local_offset as c_uint) + __local_extsize) as c_int)))
 
                             } else {
                                 (__local_err = ((-1 as c_int)))
@@ -169,7 +169,7 @@ pub unsafe fn unzRepair(__param_file: *const i8, __param_fileOut: *const i8, __p
                             if ((if ((fwrite((__local_data as *const c_void), (1 as c_ulong), (__local_dataSize as c_ulong), __local_fpOut) as c_int)) == __local_dataSize: 1 else: 0) != 0) {
                                 (__local_offset = __local_offset + __local_dataSize)
 
-                                (__local_totalBytes = (__local_totalBytes +% __local_dataSize))
+                                (__local_totalBytes = (__local_totalBytes +% (__local_dataSize as c_ulong)))
 
                             } else {
                                 (__local_err = ((-1 as c_int)))
@@ -751,7 +751,7 @@ pub unsafe fn unzRepair(__param_file: *const i8, __param_fileOut: *const i8, __p
 
                     if ((if __local_fnsize > 0: 1 else: 0) != 0) {
                         if ((if fwrite((&__local_filename[0] as *mut c_char), (1 as c_ulong), (__local_fnsize as c_ulong), __local_fpOutCD) == __local_fnsize: 1 else: 0) != 0) {
-                            (__local_offsetCD = (((__local_offsetCD + __local_fnsize) as c_int)))
+                            (__local_offsetCD = ((((__local_offsetCD as c_uint) + __local_fnsize) as c_int)))
 
                         } else {
                             (__local_err = ((-1 as c_int)))
@@ -769,7 +769,7 @@ pub unsafe fn unzRepair(__param_file: *const i8, __param_fileOut: *const i8, __p
 
                     if ((if __local_extsize > 0: 1 else: 0) != 0) {
                         if ((if fwrite((&__local_extra[0] as *mut c_char), (1 as c_ulong), (__local_extsize as c_ulong), __local_fpOutCD) == __local_extsize: 1 else: 0) != 0) {
-                            (__local_offsetCD = (((__local_offsetCD + __local_extsize) as c_int)))
+                            (__local_offsetCD = ((((__local_offsetCD as c_uint) + __local_extsize) as c_int)))
 
                         } else {
                             (__local_err = ((-1 as c_int)))
@@ -1109,7 +1109,7 @@ pub unsafe fn unzRepair(__param_file: *const i8, __param_fileOut: *const i8, __p
                 var __local_buffer: [8192]c_char
 
                 while true {
-                    (__local_nRead = ((fread((&__local_buffer[0] as *mut c_char), (1 as c_ulong), ((8192 * sizeof[c_char]()) as c_ulong), __local_fpOutCD) as c_int)))
+                    (__local_nRead = ((fread((&__local_buffer[0] as *mut c_char), (1 as c_ulong), ((8192 * (sizeof[c_char]() as usize)) as c_ulong), __local_fpOutCD) as c_int)))
 
                     if (not ((if __local_nRead > 0: 1 else: 0) != 0)) {
                         break

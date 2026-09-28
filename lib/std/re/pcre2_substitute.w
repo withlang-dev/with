@@ -1459,7 +1459,7 @@ pub unsafe fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param
     }
 
     '__ci_bb_151 {
-        ((*__param_blength) = (((((__local_ptr__goto_757_12 as usize) -% (__local_replacement as usize)) / sizeof[u8]()) as c_ulong)))
+        ((*__param_blength) = ((((((__local_ptr__goto_757_12 as usize) -% (__local_replacement as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong)))
         goto '__ci_bb_48
     }
 
@@ -1852,7 +1852,7 @@ pub unsafe fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param
     }
 
     '__ci_bb_208 {
-        (__local_name_len__goto_1239_20 = (((((__local_ptr__goto_757_12 as usize) -% (__local_name_start__goto_1240_20 as usize)) / sizeof[u8]()) as c_ulong)))
+        (__local_name_len__goto_1239_20 = ((((((__local_ptr__goto_757_12 as usize) -% (__local_name_start__goto_1240_20 as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong)))
         with_memcpy(((&__local_name__goto_1061_17[0] as *mut u8) as *mut u8), ((__local_name_start__goto_1240_20 as *const c_void) as *const u8), ((((__local_name_len__goto_1239_20 as c_ulong) *% (1 as c_ulong)) as c_ulong) as i64))
         (__local_name__goto_1061_17[__local_name_len__goto_1239_20] = ((0 as u8)))
         goto '__ci_bb_193
@@ -2513,7 +2513,7 @@ pub unsafe fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param
     }
 
     '__ci_bb_308 {
-        (__local_chkcc_length__goto_1427_11 = (((((__local_subptrend__goto_1095_26 as usize) -% (__local_subptr__goto_1095_18 as usize)) / sizeof[u8]()) as c_ulong)))
+        (__local_chkcc_length__goto_1427_11 = ((((((__local_subptrend__goto_1095_26 as usize) -% (__local_subptr__goto_1095_18 as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong)))
         (__ci_expr_ternary_41 = 0)
         if (__local_overflowed__goto_750_6 != 0) {
             (__ci_expr_ternary_41 = ((0 as c_ulong)))
@@ -2594,7 +2594,7 @@ pub unsafe fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param
     }
 
     '__ci_bb_320 {
-        (__local_chkmc_length__goto_1429_11 = (((((__local_subptrend__goto_1095_26 as usize) -% (__local_subptr__goto_1095_18 as usize)) / sizeof[u8]()) as c_ulong)))
+        (__local_chkmc_length__goto_1429_11 = ((((((__local_subptrend__goto_1095_26 as usize) -% (__local_subptr__goto_1095_18 as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong)))
         if (__local_overflowed__goto_750_6 != 0) {
             goto '__ci_bb_323
         } else {
@@ -3271,7 +3271,7 @@ pub unsafe fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param
     }
 
     '__ci_bb_425 {
-        (__local_name_len__goto_1546_22 = (((((__local_ptr__goto_757_12 as usize) -% (__local_name_start__goto_1547_22 as usize)) / sizeof[u8]()) as c_ulong)))
+        (__local_name_len__goto_1546_22 = ((((((__local_ptr__goto_757_12 as usize) -% (__local_name_start__goto_1547_22 as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong)))
         if ((if __local_ptr__goto_757_12 >= __local_repend__goto_758_12: 1 else: 0) != 0) {
             (__ci_expr_logic_51 = (if true: 1 else: 0))
         } else {
@@ -3460,7 +3460,7 @@ pub unsafe fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param
     }
 
     '__ci_bb_453 {
-        (__local_chkcc_length__goto_1594_9 = (((((__local_ptr__goto_757_12 as usize) -% (__local_ch_start__goto_1585_18 as usize)) / sizeof[u8]()) as c_ulong)))
+        (__local_chkcc_length__goto_1594_9 = ((((((__local_ptr__goto_757_12 as usize) -% (__local_ch_start__goto_1585_18 as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong)))
         (__ci_expr_ternary_56 = 0)
         if (__local_overflowed__goto_750_6 != 0) {
             (__ci_expr_ternary_56 = ((0 as c_ulong)))
@@ -3541,7 +3541,7 @@ pub unsafe fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param
     }
 
     '__ci_bb_465 {
-        (__local_chkmc_length__goto_1596_9 = (((((__local_ptr__goto_757_12 as usize) -% (__local_ch_start__goto_1585_18 as usize)) / sizeof[u8]()) as c_ulong)))
+        (__local_chkmc_length__goto_1596_9 = ((((((__local_ptr__goto_757_12 as usize) -% (__local_ch_start__goto_1585_18 as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong)))
         if (__local_overflowed__goto_750_6 != 0) {
             goto '__ci_bb_468
         } else {
@@ -4603,7 +4603,7 @@ unsafe fn read_name_subst(__param_ptrptr: *mut *const u8, __param_ptrend: *const
     }
 
     '__ci_bb_6 {
-        if ((if (((__local_ptr__goto_200_12 as usize) -% (__local_nameptr__goto_201_12 as usize)) / sizeof[u8]()) > 128: 1 else: 0) != 0) {
+        if ((if ((((__local_ptr__goto_200_12 as usize) -% (__local_nameptr__goto_201_12 as usize)) as c_long) / (sizeof[u8]() as c_long)) > 128: 1 else: 0) != 0) {
             goto '__ci_bb_32
         } else {
             goto '__ci_bb_33
@@ -5048,7 +5048,7 @@ unsafe fn default_substitute_case_callout(__param_input: *const u8, __param_inpu
         (__local_next_to_upper = __local_rest_to_upper)
 
         if (__local_single_char != 0) {
-            var __local_rest_len: c_ulong = (((((__local_input_end as usize) -% (__local_input as usize)) / sizeof[u8]()) as c_ulong))
+            var __local_rest_len: c_ulong = ((((((__local_input_end as usize) -% (__local_input as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong))
 
             var __ci_expr_logic_10: c_int = 0
 
@@ -5252,7 +5252,7 @@ unsafe fn do_case_copy(__param_input_output: *mut u8, __param_input_len: c_ulong
         }
     }
 
-    (__local_ch1_len = (((((__local_ch_end as usize) -% (__local_input as usize)) / sizeof[u8]()) as c_ulong)))
+    (__local_ch1_len = ((((((__local_ch_end as usize) -% (__local_input as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong)))
 
     with_memcpy(((&__local_ch1[0] as *mut u8) as *mut u8), ((__local_input as *const c_void) as *const u8), ((((__local_ch1_len as c_ulong) *% (1 as c_ulong)) as c_ulong) as i64))
 

@@ -1072,7 +1072,7 @@ unsafe fn find_minlength(__param_re: *const pcre2_real_code_8, __param_code: *co
     }
 
     '__ci_bb_56 {
-        (__local_branchlength__goto_107_5 = (((__local_branchlength__goto_107_5 + ((((((__local_cc__goto_116_12[1]) as c_int) << (8 as c_uint)) as c_int) | ((__local_cc__goto_116_12[(1 + 1)]) as c_int)) as c_uint)) as c_int)))
+        (__local_branchlength__goto_107_5 = ((((__local_branchlength__goto_107_5 as c_uint) + ((((((__local_cc__goto_116_12[1]) as c_int) << (8 as c_uint)) as c_int) | ((__local_cc__goto_116_12[(1 + 1)]) as c_int)) as c_uint)) as c_int)))
         (__local_cc__goto_116_12 = __local_cc__goto_116_12 + (((2 + 2) as isize) as usize))
         (__ci_expr_logic_11 = 0)
         if (__param_utf != 0) {
@@ -1095,7 +1095,7 @@ unsafe fn find_minlength(__param_re: *const pcre2_real_code_8, __param_code: *co
     }
 
     '__ci_bb_59 {
-        (__local_branchlength__goto_107_5 = (((__local_branchlength__goto_107_5 + ((((((__local_cc__goto_116_12[1]) as c_int) << (8 as c_uint)) as c_int) | ((__local_cc__goto_116_12[(1 + 1)]) as c_int)) as c_uint)) as c_int)))
+        (__local_branchlength__goto_107_5 = ((((__local_branchlength__goto_107_5 as c_uint) + ((((((__local_cc__goto_116_12[1]) as c_int) << (8 as c_uint)) as c_int) | ((__local_cc__goto_116_12[(1 + 1)]) as c_int)) as c_uint)) as c_int)))
         (__ci_expr_ternary_13 = 0)
         if ((if (__local_cc__goto_116_12[(1 + 2)]) == OP_PROP: 1 else: 0) != 0) {
             (__ci_expr_logic_12 = (if true: 1 else: 0))
@@ -1242,7 +1242,7 @@ unsafe fn find_minlength(__param_re: *const pcre2_real_code_8, __param_code: *co
     }
 
     '__ci_bb_80 {
-        (__local_branchlength__goto_107_5 = (((__local_branchlength__goto_107_5 + ((((((__local_cc__goto_116_12[1]) as c_int) << (8 as c_uint)) as c_int) | ((__local_cc__goto_116_12[(1 + 1)]) as c_int)) as c_uint)) as c_int)))
+        (__local_branchlength__goto_107_5 = ((((__local_branchlength__goto_107_5 as c_uint) + ((((((__local_cc__goto_116_12[1]) as c_int) << (8 as c_uint)) as c_int) | ((__local_cc__goto_116_12[(1 + 1)]) as c_int)) as c_uint)) as c_int)))
         (__local_cc__goto_116_12 = __local_cc__goto_116_12 + (((1 + (2 * 2)) as isize) as usize))
         goto '__ci_bb_77
     }
@@ -4923,7 +4923,7 @@ unsafe fn set_start_bits(__param_re: *mut pcre2_real_code_8, __param_code: *cons
         (__local_p__goto_1750_20 = (((__local_tcode__goto_1111_14 + ((1 as isize) as usize)) + ((2 as isize) as usize)) + ((1 as isize) as usize)) + ((__ci_expr_ternary_10 as isize) as usize))
         (__local_tcode__goto_1111_14 = __local_tcode__goto_1111_14 + (((((((__local_tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) as c_int) | ((__local_tcode__goto_1111_14[(1 + 1)]) as c_int)) as c_uint) as usize))
         (__ci_expr_ternary_11 = 0)
-        if ((if sizeof[u8]() == 1: 1 else: 0) != 0) {
+        if ((if (sizeof[u8]() as usize) == 1: 1 else: 0) != 0) {
             (__ci_expr_ternary_11 = ((16 as c_int)))
         } else {
             (__ci_expr_ternary_11 = ((4096 as c_int)))

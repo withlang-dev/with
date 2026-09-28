@@ -250,7 +250,7 @@ pub unsafe fn pcre2_serialize_decode_8(__param_codes: *mut *mut pcre2_real_code_
 
         with_memcpy((((&raw mut __local_blocksize as *mut c_ulong) as *mut c_void) as *mut u8), (((__local_src_bytes + (72 as usize)) as *const c_void) as *const u8), ((sizeof[c_ulong]() as c_ulong) as i64))
 
-        if ((if __local_blocksize <= sizeof[pcre2_real_code_8](): 1 else: 0) != 0) {
+        if ((if __local_blocksize <= (sizeof[pcre2_real_code_8]() as usize): 1 else: 0) != 0) {
             return -62
         }
 

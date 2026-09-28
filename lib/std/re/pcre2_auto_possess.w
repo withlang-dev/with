@@ -1840,9 +1840,9 @@ unsafe fn get_chr_property_list(__param_code: *const u8, __param_utf: c_int, __p
 
             }
 
-            ((__param_list[2]) = (((((__local_end as usize) -% (__local_code as usize)) / sizeof[u8]()) as c_uint)))
+            ((__param_list[2]) = ((((((__local_end as usize) -% (__local_code as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_uint)))
 
-            ((__param_list[3]) = (((((__local_end as usize) -% (__local_class_end as usize)) / sizeof[u8]()) as c_uint)))
+            ((__param_list[3]) = ((((((__local_end as usize) -% (__local_class_end as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_uint)))
 
             return __local_end
 
@@ -1936,9 +1936,9 @@ unsafe fn get_chr_property_list(__param_code: *const u8, __param_utf: c_int, __p
 
             }
 
-            ((__param_list[2]) = (((((__local_end as usize) -% (__local_code as usize)) / sizeof[u8]()) as c_uint)))
+            ((__param_list[2]) = ((((((__local_end as usize) -% (__local_code as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_uint)))
 
-            ((__param_list[3]) = (((((__local_end as usize) -% (__local_class_end as usize)) / sizeof[u8]()) as c_uint)))
+            ((__param_list[3]) = ((((((__local_end as usize) -% (__local_class_end as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_uint)))
 
             return __local_end
 
@@ -2032,9 +2032,9 @@ unsafe fn get_chr_property_list(__param_code: *const u8, __param_utf: c_int, __p
 
             }
 
-            ((__param_list[2]) = (((((__local_end as usize) -% (__local_code as usize)) / sizeof[u8]()) as c_uint)))
+            ((__param_list[2]) = ((((((__local_end as usize) -% (__local_code as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_uint)))
 
-            ((__param_list[3]) = (((((__local_end as usize) -% (__local_class_end as usize)) / sizeof[u8]()) as c_uint)))
+            ((__param_list[3]) = ((((((__local_end as usize) -% (__local_class_end as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_uint)))
 
             return __local_end
 
@@ -2128,9 +2128,9 @@ unsafe fn get_chr_property_list(__param_code: *const u8, __param_utf: c_int, __p
 
             }
 
-            ((__param_list[2]) = (((((__local_end as usize) -% (__local_code as usize)) / sizeof[u8]()) as c_uint)))
+            ((__param_list[2]) = ((((((__local_end as usize) -% (__local_code as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_uint)))
 
-            ((__param_list[3]) = (((((__local_end as usize) -% (__local_class_end as usize)) / sizeof[u8]()) as c_uint)))
+            ((__param_list[3]) = ((((((__local_end as usize) -% (__local_class_end as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_uint)))
 
             return __local_end
 

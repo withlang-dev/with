@@ -414,7 +414,7 @@ pub unsafe fn inflate_table(__param_type_: i32, __param_lens: *mut c_ushort, __p
 
             (((*__param_table)[__local_low]).bits = ((__local_root as u8)))
 
-            (((*__param_table)[__local_low]).val = (((((__local_next as usize) -% ((*__param_table) as usize)) / sizeof[code]()) as c_ushort)))
+            (((*__param_table)[__local_low]).val = ((((((__local_next as usize) -% ((*__param_table) as usize)) as c_long) / (sizeof[code]() as c_long)) as c_ushort)))
 
         }
 

@@ -674,6 +674,10 @@ pub fn ci_print_expr(exprs: CiExprPool, types: CiTypePool, id: CiExprId, parent_
         // lowering may convert the same value again.
         if exprs.kind(operand) == CiExprKind.CIE_CAST and ci_print_type(types, (exprs.get_d0(operand)) as CiTypeId) == target_text:
             return ci_print_expr(exprs, types, operand, 0, 0)
+        // A converted `sizeof` converts once, from i64.
+        if exprs.kind(operand) == CiExprKind.CIE_SIZEOF_TYPE:
+            let sizeof_ty = (exprs.get_d0(operand)) as CiTypeId
+            return "(sizeof[" ++ ci_print_sizeof_type_text(ci_print_type(types, sizeof_ty)) ++ "]() as " ++ target_text ++ ")"
         return "(" ++ ci_print_expr(exprs, types, operand, 0, 0) ++ " as " ++ target_text ++ ")"
     if kind == CiExprKind.CIE_DEREF:
         let operand = (exprs.get_d0(id)) as CiExprId
@@ -759,9 +763,11 @@ pub fn ci_print_expr(exprs: CiExprPool, types: CiTypePool, id: CiExprId, parent_
 
     // Compile-time. With generic-call syntax `sizeof[T]()`;
     // the C-style `sizeof(T)` would be a plain call.
+    // C's `sizeof` is a size_t, c_import's usize; With's `sizeof` is i64
+    // (§16.12), so the value states its C type (#1803).
     if kind == CiExprKind.CIE_SIZEOF_TYPE:
         let t = (exprs.get_d0(id)) as CiTypeId
-        return "sizeof[" ++ ci_print_sizeof_type_text(ci_print_type(types, t)) ++ "]()"
+        return "(sizeof[" ++ ci_print_sizeof_type_text(ci_print_type(types, t)) ++ "]() as usize)"
     if kind == CiExprKind.CIE_SIZEOF_EXPR:
         return "<ci:unimpl:SIZEOF_EXPR>"
 

@@ -4,7 +4,7 @@ use std.c_algorithms.defs
 pub fn bloom_filter_new(__param_table_size: c_uint, __param_hash_func: unsafe extern "C" fn(*mut c_void) -> c_uint, __param_num_functions: c_uint) -> *mut _BloomFilter {
     var __local_filter: *mut _BloomFilter
 
-    if ((if __param_num_functions > (((64 * sizeof[c_uint]()) as c_ulong) / (sizeof[c_uint]() as c_ulong)): 1 else: 0) != 0) {
+    if ((if __param_num_functions > (((64 * (sizeof[c_uint]() as usize)) as c_ulong) / (sizeof[c_uint]() as c_ulong)): 1 else: 0) != 0) {
         return ((null as *mut _BloomFilter))
 
     }

@@ -351,7 +351,7 @@ pub unsafe fn gzputc(__param_file: *mut gzFile_s, __param_c: c_int) -> c_int {
             (__local_strm.next_in = __local_state.in_)
         }
 
-        (__local_have = ((((((__local_strm.next_in + (__local_strm.avail_in as usize)) as usize) -% (__local_state.in_ as usize)) / sizeof[u8]()) as c_uint)))
+        (__local_have = (((((((__local_strm.next_in + (__local_strm.avail_in as usize)) as usize) -% (__local_state.in_ as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_uint)))
 
         if ((if __local_have < __local_state.size: 1 else: 0) != 0) {
             ((__local_state.in_[__local_have]) = ((__param_c as u8)))
@@ -582,7 +582,7 @@ pub unsafe fn gzvprintf(__param_file: *mut gzFile_s, __param_format: *const i8, 
         (__local_strm.next_in = __local_state.in_)
     }
 
-    (__local_next = ((((__local_state.in_ + (((((__local_strm.next_in as usize) -% (__local_state.in_ as usize)) / sizeof[u8]()) as isize) as usize)) + (__local_strm.avail_in as usize)) as *mut c_char)))
+    (__local_next = ((((__local_state.in_ + ((((((__local_strm.next_in as usize) -% (__local_state.in_ as usize)) as c_long) / (sizeof[u8]() as c_long)) as isize) as usize)) + (__local_strm.avail_in as usize)) as *mut c_char)))
 
     ((__local_next[((__local_state.size as c_uint) -% (1 as c_uint))]) = ((0 as c_char)))
 
@@ -822,10 +822,10 @@ unsafe fn gz_comp(__param_state: *mut gz_state, __param_flush: c_int) -> c_int {
 
                 var __ci_expr_ternary_7: c_uint = 0
 
-                if ((if (((__local_strm.next_out as usize) -% ((*(&raw const (*__param_state).x as *const gzFile_s)).next as usize)) / sizeof[u8]()) > ((__local_max as c_int)): 1 else: 0) != 0) {
+                if ((if ((((__local_strm.next_out as usize) -% ((*(&raw const (*__param_state).x as *const gzFile_s)).next as usize)) as c_long) / (sizeof[u8]() as c_long)) > ((__local_max as c_int)): 1 else: 0) != 0) {
                     (__ci_expr_ternary_7 = __local_max)
                 } else {
-                    (__ci_expr_ternary_7 = (((((__local_strm.next_out as usize) -% ((*(&raw const (*__param_state).x as *const gzFile_s)).next as usize)) / sizeof[u8]()) as c_uint)))
+                    (__ci_expr_ternary_7 = ((((((__local_strm.next_out as usize) -% ((*(&raw const (*__param_state).x as *const gzFile_s)).next as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_uint)))
                 }
 
                 (__local_put = __ci_expr_ternary_7)
@@ -925,7 +925,7 @@ unsafe fn gz_zero(__param_state: *mut gz_state) -> c_int {
 
         var __ci_expr_logic_1: c_int = 0
 
-        if ((if 4 == sizeof[c_longlong](): 1 else: 0) != 0) {
+        if ((if 4 == (sizeof[c_longlong]() as usize): 1 else: 0) != 0) {
             (__ci_expr_logic_1 = (if (if (*__param_state).size > gz_intmax(): 1 else: 0) != 0: 1 else: 0))
         }
 
@@ -1020,7 +1020,7 @@ unsafe fn gz_write(__param_state: *mut gz_state, __param_buf: *const c_void, __p
                 ((*__param_state).strm.next_in = (*__param_state).in_)
             }
 
-            (__local_have = (((((((*(&raw const (*__param_state).strm as *const z_stream_s)).next_in + ((*(&raw const (*__param_state).strm as *const z_stream_s)).avail_in as usize)) as usize) -% ((*__param_state).in_ as usize)) / sizeof[u8]()) as c_uint)))
+            (__local_have = ((((((((*(&raw const (*__param_state).strm as *const z_stream_s)).next_in + ((*(&raw const (*__param_state).strm as *const z_stream_s)).avail_in as usize)) as usize) -% ((*__param_state).in_ as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_uint)))
 
             (__local_copy_ = (((((*__param_state).size as c_uint) -% (__local_have as c_uint)) as c_uint)))
 

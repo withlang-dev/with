@@ -35,7 +35,7 @@ pub unsafe fn pcre2_regcomp(__param_preg: *mut regex_t, __param_pattern: *const 
     var __ci_expr_ternary_0: c_ulong = 0
 
     if ((if ((__param_cflags as c_int) & (2048 as c_int)) != 0: 1 else: 0) != 0) {
-        (__ci_expr_ternary_0 = ((((((*__param_preg).re_endp as usize) -% (__param_pattern as usize)) / sizeof[c_char]()) as c_ulong)))
+        (__ci_expr_ternary_0 = (((((((*__param_preg).re_endp as usize) -% (__param_pattern as usize)) as c_long) / (sizeof[c_char]() as c_long)) as c_ulong)))
     } else {
         (__ci_expr_ternary_0 = (((~(0 as c_ulong)) as c_ulong)))
     }
@@ -86,13 +86,13 @@ pub unsafe fn pcre2_regcomp(__param_preg: *mut regex_t, __param_pattern: *const 
 
         (__local_errorcode = __local_errorcode - 100)
 
-        if ((if __local_errorcode < (((((24 * sizeof[c_int]()) as c_ulong) / (4 as c_ulong)) as c_int)): 1 else: 0) != 0) {
+        if ((if __local_errorcode < (((((24 * (sizeof[c_int]() as usize)) as c_ulong) / (4 as c_ulong)) as c_int)): 1 else: 0) != 0) {
             return eint1[__local_errorcode]
         }
 
         (__local_i = ((0 as c_uint)))
 
-        while ((if __local_i < (((16 * sizeof[c_int]()) as c_ulong) / (4 as c_ulong)): 1 else: 0) != 0) {
+        while ((if __local_i < (((16 * (sizeof[c_int]() as usize)) as c_ulong) / (4 as c_ulong)): 1 else: 0) != 0) {
             if ((if __local_errorcode == eint2[__local_i]: 1 else: 0) != 0) {
                 return eint2[((__local_i as c_uint) +% (1 as c_uint))]
             }
@@ -306,7 +306,7 @@ pub unsafe fn pcre2_regerror(__param_errcode: c_int, __param_preg: *const regex_
     if ((if __param_errcode <= 0: 1 else: 0) != 0) {
         (__ci_expr_logic_0 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_0 = (if (if __param_errcode >= (((((18 * sizeof[usize]()) as c_ulong) / (sizeof[usize]() as c_ulong)) as c_int)): 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_0 = (if (if __param_errcode >= (((((18 * (sizeof[usize]() as usize)) as c_ulong) / (sizeof[usize]() as c_ulong)) as c_int)): 1 else: 0) != 0: 1 else: 0))
     }
 
     if (__ci_expr_logic_0 != 0) {
@@ -329,20 +329,20 @@ pub unsafe fn pcre2_regerror(__param_errcode: c_int, __param_preg: *const regex_
     }
 
     if (__ci_expr_logic_2 != 0) {
-        (__local_snprintf_rc = ((snprintf((&__local_offset_buf[0] as *mut c_char), ((23 * sizeof[c_char]()) as c_ulong), c" at offset %d".ptr, ((*__param_preg).re_erroffset as c_int)) as c_int)))
+        (__local_snprintf_rc = ((snprintf((&__local_offset_buf[0] as *mut c_char), ((23 * (sizeof[c_char]() as usize)) as c_ulong), c" at offset %d".ptr, ((*__param_preg).re_erroffset as c_int)) as c_int)))
 
         (__ci_expr_logic_3 = (if (if __local_snprintf_rc > 0: 1 else: 0) != 0: 1 else: 0))
 
     }
 
     if (__ci_expr_logic_3 != 0) {
-        (__ci_expr_logic_4 = (if (if __local_snprintf_rc < (((23 * sizeof[c_char]()) as c_int)): 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_4 = (if (if __local_snprintf_rc < (((23 * (sizeof[c_char]() as usize)) as c_int)): 1 else: 0) != 0: 1 else: 0))
     }
 
     if (__ci_expr_logic_4 != 0) {
         (__local_have_offset = ((1 as c_int)))
 
-        (__local_offset_buf[(((23 * sizeof[c_char]()) as c_ulong) -% (1 as c_ulong))] = ((0 as c_char)))
+        (__local_offset_buf[(((23 * (sizeof[c_char]() as usize)) as c_ulong) -% (1 as c_ulong))] = ((0 as c_char)))
 
     }
 

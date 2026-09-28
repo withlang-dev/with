@@ -134,7 +134,7 @@ pub unsafe fn zcalloc(__param_opaque_: *mut c_void, __param_items: c_uint, __par
 
     var __ci_expr_ternary_0: *mut c_void = null
 
-    if ((if sizeof[c_uint]() > 2: 1 else: 0) != 0) {
+    if ((if (sizeof[c_uint]() as usize) > 2: 1 else: 0) != 0) {
         (__ci_expr_ternary_0 = ((with_alloc(((((__param_items as c_uint) *% (__param_size as c_uint)) as c_ulong) as i64)) as *mut c_void)))
     } else {
         (__ci_expr_ternary_0 = ((with_alloc_zeroed(((__param_items as c_ulong) as i64), ((__param_size as c_ulong) as i64)) as *mut c_void)))
