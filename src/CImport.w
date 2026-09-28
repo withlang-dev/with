@@ -2432,6 +2432,29 @@ pub fn ci_default_for_type(ty: &str) -> str:
 
 // ── Enum translation ────────────────────────────────────────
 
+fn ci_int_type_is_unsigned(ty: &str) -> bool: ci_starts_with(ty, "c_u") or ci_starts_with(ty, "u")
+
+// libclang reports an enumerator's value sign-extended from the enum's
+// width (clang_getEnumConstantDeclValue), so `0x80000000u` in an
+// `unsigned int` enum arrives as -2147483648: zero-extend it back.
+fn ci_enum_const_value(value: i64, int_type: &str) -> i64:
+    if value >= 0 or not ci_int_type_is_unsigned(int_type): return value
+    let bits = ci_estimate_type_size(int_type) * 8
+    if bits <= 0 or bits >= 64: return value
+    value + ((1 as i64) << (bits as u32))
+
+fn ci_value_fits_int(value: i64) -> bool: value >= -2147483648 and value <= 2147483647
+
+// C11 6.7.2.2p3: an enumeration constant has type `int`, whatever integer
+// type the implementation gives the enum itself — C's `-ESC_A` is int -1,
+// and typing the constant with the enum's `unsigned int` made pcre2's
+// escapes table a checked u32 underflow (#1774). Only an enum with a value
+// int cannot hold (the C23 / clang extension) gives its enumerators its own
+// type, every one of them: clang types `-ESC_B` unsigned in
+// `enum { ESC_B = 2, BIG = 0x80000000u }`, verified by compiling it.
+fn ci_enum_const_type(all_fit_int: bool, int_type: &str) -> str:
+    if all_fit_int: "c_int" else: int_type.clone()
+
 pub fn ci_translate_enum(session: i64, idx: i32) -> str:
     let const_count = with_cimport_enum_const_count(session, idx)
     if const_count == 0:
@@ -2465,9 +2488,15 @@ pub fn ci_translate_enum(session: i64, idx: i32) -> str:
             if not ci_migrate_shared_decl_add("type", enum_name, type_line):
                 output = output ++ type_line
 
+    var all_fit_int = true
+    for ci in 0..const_count:
+        if not ci_value_fits_int(ci_enum_const_value(with_cimport_enum_const_value(session, idx, ci), int_type)):
+            all_fit_int = false
+    let const_type = ci_enum_const_type(all_fit_int, int_type)
+
     for ci in 0..const_count:
         let cname = with_cimport_enum_const_name(session, idx, ci)
-        let cvalue = with_cimport_enum_const_value(session, idx, ci)
+        let cvalue = ci_enum_const_value(with_cimport_enum_const_value(session, idx, ci), int_type)
         if cname.len() == 0:
             continue
         // Skip internal names
@@ -2477,7 +2506,7 @@ pub fn ci_translate_enum(session: i64, idx: i32) -> str:
         let unique_cname = ci_unique_name(cname)
         with_cimport_mark_name_emitted(unique_cname)
         let safe_cname = ci_escape_reserved(unique_cname)
-        let let_line = f"let {safe_cname}: {int_type} = {cvalue}"
+        let let_line = f"let {safe_cname}: {const_type} = {cvalue}"
         if not ci_migrate_shared_decl_add("let", safe_cname, let_line):
             output = output ++ let_line ++ "\n"
     output

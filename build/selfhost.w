@@ -4148,6 +4148,45 @@ fn bs_check_migrate_compound_small_int_promotion(ctx: &ActionCtx, compiler_path:
     if run.rc != 0: return run.rc
     0
 
+// #1774: C11 6.7.2.2p3 types an enumeration constant `int`, whatever
+// integer type the enum itself takes; the migrator typed every enumerator
+// with the enum's type, so C's `-ESC_A` (int -1) became a c_uint underflow
+// (pcre2's escapes table). An enum with a value int cannot hold keeps its
+// own type for every enumerator (clang's rule), and libclang's
+// sign-extended value is read back as the C value.
+fn bs_check_migrate_enum_constants_are_int(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
+    let root = ctx.project_info().project_root()
+    let src = bs_join(case_dir, "enum_constants_are_int.c")
+    let out_w = bs_join(case_dir, "enum_constants_are_int.w")
+    let c_text = "enum { ESC_A = 1, ESC_B };\ntypedef enum { RED, GREEN = 5 } color;\nenum { SMALL = 2, BIG = 0x80000000u };\nstatic const short int escapes[] = { -ESC_A, -ESC_B };\n\nint pick(color c) { return c == GREEN ? -ESC_B : 0; }\nunsigned masked(unsigned flags) { return flags & GREEN; }\n\nint main(void) {\n  if (escapes[1] != -2) return 1;\n  if (pick(GREEN) != -2) return 2;\n  if (masked(7u) != 5u) return 3;\n  if (BIG != 2147483648u) return 4;\n  if (-SMALL < 0) return 5;\n  return 0;\n}\n"
+    var rc = bs_write_fixture(ctx, src, c_text, "migrate enum constants are int")
+    if rc != 0: return rc
+    var args: Vec[str] = Vec.new()
+    args |> push("migrate")
+    args |> push(bs_abs(root, src))
+    args |> push("--no-c-export")
+    args |> push("-o")
+    args |> push(bs_abs(root, out_w))
+    let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-enum-constants-are-int", args)
+    if result.rc != 0: return result.rc
+    let out_text = ctx.fs().read_text(out_w)
+    rc = bs_assert_contains(ctx, out_text, "let ESC_A: c_int = 1", "enum_constants_are_int")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, out_text, "let GREEN: c_int = 5", "enum_constants_are_int")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, out_text, "let SMALL: c_uint = 2", "enum_constants_are_int")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, out_text, "let BIG: c_uint = 2147483648", "enum_constants_are_int")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, out_text, "type color = c_uint", "enum_constants_are_int")
+    if rc != 0: return rc
+    var run_args: Vec[str] = Vec.new()
+    run_args |> push("run")
+    run_args |> push(bs_abs(root, out_w))
+    let run = bs_migrate_expect_success(ctx, compiler_path, case_dir, "run-enum-constants-are-int", run_args)
+    if run.rc != 0: return run.rc
+    0
+
 fn bs_check_migrate_rvalue_sequencing(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
     let root = ctx.project_info().project_root()
     let src = bs_join(case_dir, "rvalue_sequencing.c")
@@ -4638,6 +4677,8 @@ pub fn run_cli_selfhost_migrate_basic_action(ctx: ActionCtx) -> i32:
     rc = bs_check_migrate_assignment_compat(ctx, compiler_path, bs_join(output_dir, "assignment_compat"))
     if rc != 0: return rc
     rc = bs_check_migrate_compound_small_int_promotion(ctx, compiler_path, bs_join(output_dir, "compound_small_int_promotion"))
+    if rc != 0: return rc
+    rc = bs_check_migrate_enum_constants_are_int(ctx, compiler_path, bs_join(output_dir, "enum_constants_are_int"))
     if rc != 0: return rc
     rc = bs_check_migrate_rvalue_sequencing(ctx, compiler_path, bs_join(output_dir, "rvalue_sequencing"))
     if rc != 0: return rc
