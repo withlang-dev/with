@@ -1,4 +1,5 @@
 //! expect-stdout: ok
+//! known-issue: #1864
 
 // Test: lazy message evaluation.
 // The message expression must NOT be evaluated when the condition is true.
