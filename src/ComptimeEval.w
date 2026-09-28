@@ -8351,7 +8351,8 @@ impl Sema:
             let ann_extra = self.top_level_let_type_ann_extra(flags)
             let ann_type = if ann_extra >= 0: self.resolve_type_expr(self.ast.get_extra(ann_extra)) else: 0 as TypeId
             let val_type = if ann_type != 0: self.check_expr_with_expected(type_value, ann_type) else: self.check_expr(type_value)
-            if ann_type != 0 and val_type != 0:
+            // The annotation is an owned demand like a local one's (#1803).
+            if ann_type != 0 and val_type != 0 and not self.reject_implicit_numeric_narrowing(type_value, ann_type as i32, val_type as i32):
                 if self.types_compatible(ann_type as i32, val_type as i32) == 0:
                     if self.arithmetic_result_type(ann_type, val_type) == 0:
                         self.emit_error("type mismatch in binding", decl)
