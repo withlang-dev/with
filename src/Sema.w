@@ -7643,9 +7643,18 @@ impl Sema:
                 return pi
         -1
 
-    mut fn note_param_effect(sym: i32, eff: i32):
+    mut fn note_param_effect(sym: i32, eff0: i32):
         if self.current_fn_sig_idx < 0 or sym == 0:
             return
+        var eff = eff0
+        // §12.4 / D63 (#1698): a callable parameter carried out of the call —
+        // inside a returned value, or stored into the receiver — is the
+        // callable itself escaping: a non-`move` closure argument "may not be
+        // stored, returned, or captured by a `move ||` closure", which the
+        // call site refuses on EFF_ESCAPE_VALUE (finalize_closure_arg_checks),
+        // and the effect fixpoint carries to every caller that passes it on.
+        if (eff & (EFF_ESCAPE_VIEW | EFF_STORE_IN_RECEIVER)) != 0 and self.callable_param_is_view(sym, self.scope_lookup(sym)):
+            eff = eff | EFF_ESCAPE_VALUE
         let pi = self.param_index_for_sym(sym)
         if pi >= 0:
             let cur: i32 = self.current_fn_param_effs[pi]

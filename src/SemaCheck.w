@@ -5781,7 +5781,14 @@ impl Sema:
                 return 1
             let tid = self.scope_lookup(sym)
             if tid >= 0:
-                return self.type_is_ephemeral_value(tid)
+                if self.type_is_ephemeral_value(tid) != 0:
+                    return 1
+                // §12.4 / D63: a callable parameter may be a non-`move`
+                // closure — a view of the caller's frame — and the callee
+                // cannot tell, so it is ephemeral here exactly as a `&T`
+                // parameter is (#1698): its origin is the parameter itself.
+                if self.callable_param_is_view(sym, tid):
+                    return 1
             return 0
         if kind == NodeKind.NK_UNARY:
             let op = self.ast.get_data0(node)
@@ -5791,7 +5798,36 @@ impl Sema:
         if kind == NodeKind.NK_SLICE:
             return 1
         if kind == NodeKind.NK_CALL:
+            // A variant constructor call carrying an ephemeral payload
+            // (`Some(f)`, rule 10) recorded its payload's origins on the
+            // call; it is ephemeral as a value whatever its type says.
+            let call_ty = self.typed_expr_types.get(node) ?? 0
+            if call_ty != 0 and self.type_holds_callable(call_ty, 0) and (self.expr_view_dep_count(node) > 0 or self.expr_view_origin_mask(node) != 0):
+                return 1
             return self.expr_is_ephemeral_task(node)
+        // Rule 10 (§21.1): a tuple or variant is transparent to the views it
+        // carries; `Some(f)` of a callable parameter holds that view.
+        if kind == NodeKind.NK_TUPLE:
+            let tuple_start = self.ast.get_data0(node)
+            let tuple_count = self.ast.get_data1(node)
+            for ti in 0..tuple_count:
+                if self.expr_is_ephemeral_value(self.ast.get_extra(tuple_start + ti)) != 0:
+                    return 1
+            return 0
+        if kind == NodeKind.NK_ENUM_VARIANT:
+            let variant_start = self.ast.get_data2(node)
+            let variant_count = self.ast.get_extra(variant_start)
+            for vi in 0..variant_count:
+                if self.expr_is_ephemeral_value(self.ast.get_extra(variant_start + 1 + vi)) != 0:
+                    return 1
+            return 0
+        if kind == NodeKind.NK_VARIANT_SHORTHAND:
+            let shorthand_start = self.ast.get_data1(node)
+            let shorthand_count = self.ast.get_data2(node)
+            for vi in 0..shorthand_count:
+                if self.expr_is_ephemeral_value(self.ast.get_extra(shorthand_start + vi)) != 0:
+                    return 1
+            return 0
         // #625 (decisions.md D2): a container/struct literal of an ephemeral type is
         // an ephemeral value — needed so Box.new(View{…}) / heap-escape gates fire.
         // A tuple literal is one too: `Box.new((view, 1))` put the view on the
@@ -5823,7 +5859,66 @@ impl Sema:
                 if (self.closure_capture_summary_eff(node, ci) & EFF_CAPTURE_BY_PLACE) != 0:
                     return 1
             return 0
+        // A `move ||` closure owns its environment, but a capture that is
+        // itself a view (a callable parameter, a binding holding a non-move
+        // closure) makes the closure a carrier of that view (#1698).
+        if kind == NodeKind.NK_CLOSURE:
+            for ci in 0..self.closure_capture_summary_count(node):
+                let cap_sym = self.closure_capture_summary_sym(node, ci)
+                if self.scope_lookup_is_ephemeral_value(cap_sym) != 0 or self.callable_param_is_view(cap_sym, self.scope_lookup(cap_sym)):
+                    return 1
+            return 0
         0
+
+    // §12.4 / D63 (#1698): a callable parameter of the function being
+    // checked is a view whose origin is the parameter itself — the argument
+    // may be a non-`move` closure holding the caller's places, and the
+    // callee's summary must carry that possibility to every place the
+    // parameter flows. Inside a closure body the parameter frame is the
+    // capture frame, where a captured callable binding carries its own deps.
+    fn callable_param_is_view(sym: i32, tid: i32) -> bool:
+        if tid <= 0 or self.closure_body_depth != 0 or self.param_index_for_sym(sym) < 0:
+            return false
+        self.get_type_kind(self.resolve_alias(tid as TypeId)) == TypeKind.TY_FN
+
+    // Whether a value of this type can hold a callable — the one place a
+    // view hides behind a type that is not ephemeral (§12.4, D63): `fn(A) ->
+    // R`, or an aggregate, variant or collection with one inside. A binding
+    // of such a type that holds an ephemeral value records its origins
+    // (#1698); any other type's "ephemeral value" (a Copy read through a
+    // reference) owns what it holds.
+    mut fn type_holds_callable(tid: i32, depth: i32) -> bool:
+        if tid <= 0 or depth > 8:
+            return false
+        let resolved = self.resolve_alias(tid as TypeId)
+        let tk = self.get_type_kind(resolved)
+        if tk == TypeKind.TY_FN:
+            return true
+        if tk == TypeKind.TY_REF or tk == TypeKind.TY_PTR:
+            return false
+        if tk == TypeKind.TY_TUPLE:
+            let te_start = self.get_type_d0(resolved)
+            for ei in 0..self.get_type_d1(resolved):
+                if self.type_holds_callable(self.type_extra[(te_start + ei)], depth + 1):
+                    return true
+            return false
+        if tk == TypeKind.TY_ARRAY:
+            return self.type_holds_callable(self.get_type_d0(resolved), depth + 1)
+        if tk == TypeKind.TY_GENERIC_INST:
+            let arg_start = self.get_type_d1(resolved)
+            for ai in 0..self.get_type_d2(resolved):
+                if self.type_holds_callable(self.type_extra[(arg_start + ai)], depth + 1):
+                    return true
+        for fi in 0..self.type_reflection_field_count(resolved as i32):
+            let field_ty = self.type_reflection_field_type(resolved as i32, fi)
+            if self.type_holds_callable(field_ty, depth + 1):
+                return true
+        for vi in 0..self.type_reflection_variant_count(resolved as i32):
+            for pi in 0..self.type_reflection_variant_payload_count(resolved as i32, vi):
+                let payload_ty = self.type_reflection_variant_payload_type(resolved as i32, vi, pi)
+                if self.type_holds_callable(payload_ty, depth + 1):
+                    return true
+        false
 
     fn scope_body_tail_is_method_call(node: i32, scope_sym: i32, method_sym: i32) -> i32:
         if node == 0 or scope_sym == 0 or method_sym == 0:
@@ -10668,7 +10763,10 @@ impl Sema:
         let bind_kind = self.get_type_kind(self.resolve_alias(bind_type))
         if bind_kind == TypeKind.TY_REF or self.view_projection_exprs.contains(value) or self.view_projection_exprs.contains(value_core) or field_view_let != 0:
             self.scope_set_is_view_bound(name)
-        if self.scope_is_view_bound(name) != 0 or self.type_has_drop_impl(bind_type as i32) != 0 or self.type_is_ephemeral_value(bind_type as i32) != 0 or self.closure_expr_has_by_place_captures(value) != 0:
+        // An ephemeral VALUE of a non-ephemeral type — a callable parameter,
+        // a variant carrying one, a struct holding a non-move
+        // closure — carries its origins on the binding too (#1698).
+        if self.scope_is_view_bound(name) != 0 or self.type_has_drop_impl(bind_type as i32) != 0 or self.type_is_ephemeral_value(bind_type as i32) != 0 or self.closure_expr_has_by_place_captures(value) != 0 or (is_ephemeral_value != 0 and self.type_holds_callable(bind_type as i32, 0)):
             self.record_view_binding_from_expr(name, value)
         else:
             self.clear_binding_view_deps(name)
@@ -11040,25 +11138,31 @@ impl Sema:
             let ty = self.scope_lookup(sym)
             if ty > 0:
                 let tk = self.get_type_kind(self.resolve_alias(ty as TypeId))
-                if tk == TypeKind.TY_REF:
+                // A callable parameter is a view of itself (§12.4, #1698).
+                if tk == TypeKind.TY_REF or self.callable_param_is_view(sym, ty):
                     out = self.push_unique_i32(move out, sym)
             return out
         if kind == NodeKind.NK_CLOSURE:
             // §12.4: a non-move closure's non-Copy captures are views of their
             // places; a captured view binding contributes its own origins.
-            if self.ast.is_move_closure(node) == 0:
-                for ci in 0..self.closure_capture_summary_count(node):
-                    let cap_sym = self.closure_capture_summary_sym(node, ci)
-                    let cap_dep_count = self.binding_view_dep_count(cap_sym)
-                    for di in 0..cap_dep_count:
-                        out = self.push_unique_i32(move out, self.binding_view_dep_at(cap_sym, di))
-                    var is_view = (self.closure_capture_summary_eff(node, ci) & EFF_CAPTURE_BY_PLACE) != 0
-                    if not is_view:
-                        let cap_ty = self.scope_lookup(cap_sym)
-                        if cap_ty > 0 and self.get_type_kind(self.resolve_alias(cap_ty as TypeId)) == TypeKind.TY_REF:
-                            is_view = true
-                    if is_view:
-                        out = self.push_unique_i32(move out, cap_sym)
+            // A `move` closure carries the origins of a capture that is a
+            // view itself: a callable parameter, or a binding whose deps
+            // name what it views (#1698).
+            let is_move = self.ast.is_move_closure(node) != 0
+            for ci in 0..self.closure_capture_summary_count(node):
+                let cap_sym = self.closure_capture_summary_sym(node, ci)
+                let cap_dep_count = self.binding_view_dep_count(cap_sym)
+                for di in 0..cap_dep_count:
+                    out = self.push_unique_i32(move out, self.binding_view_dep_at(cap_sym, di))
+                var is_view = not is_move and (self.closure_capture_summary_eff(node, ci) & EFF_CAPTURE_BY_PLACE) != 0
+                let cap_ty = self.scope_lookup(cap_sym)
+                if not is_view and cap_ty > 0:
+                    if not is_move and self.get_type_kind(self.resolve_alias(cap_ty as TypeId)) == TypeKind.TY_REF:
+                        is_view = true
+                    else if self.callable_param_is_view(cap_sym, cap_ty):
+                        is_view = true
+                if is_view:
+                    out = self.push_unique_i32(move out, cap_sym)
             return out
         if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_CAST or kind == NodeKind.NK_COMPTIME or kind == NodeKind.NK_UNSAFE_BLOCK or kind == NodeKind.NK_NO_SUSPEND:
             out = self.collect_expr_view_deps(self.ast.get_data0(node), move out)
@@ -11194,10 +11298,10 @@ impl Sema:
                 // contained a genuine reference.
                 // An owned parameter that had a view stored into it
                 // (note_view_store_into_root) carries that origin on its
-                // binding.
+                // binding; a callable parameter is its own origin (§12.4).
                 let param_ty = self.scope_lookup(sym)
                 var param_mask = self.binding_view_origin_mask(sym)
-                if param_ty > 0 and self.type_is_ephemeral_value(param_ty) != 0:
+                if param_ty > 0 and (self.type_is_ephemeral_value(param_ty) != 0 or self.callable_param_is_view(sym, param_ty)):
                     param_mask = param_mask | sema_param_origin_bit(direct_pi)
                 return param_mask
             let binding_mask = self.binding_view_origin_mask(sym)
@@ -11276,6 +11380,14 @@ impl Sema:
         let temp_name = self.type_name(temp_ty)
         self.emit_error(what ++ " a view into a temporary `" ++ temp_name ++ "` that is freed when this statement ends (§21.1); bind the `" ++ temp_name ++ "` first, or take an owned value (`.clone()`)", node)
         1
+
+    // Rule 10: a variant whose type says nothing (`Option[fn() -> i32]`)
+    // still carries a payload that is a view as a value (#1698).
+    mut fn nodes_hold_ephemeral_value(nodes: &Vec[i32]) -> bool:
+        for i in 0..nodes.len() as i32:
+            if nodes[i] > 0 and self.expr_is_ephemeral_value(nodes[i]) != 0:
+                return true
+        false
 
     fn record_transparent_view_origins_from_nodes(result_node: i32, source_nodes: &Vec[i32]):
         if result_node == 0 or self.has_contextual_copy_adjustment(result_node) != 0:
@@ -11459,6 +11571,12 @@ impl Sema:
             if p_ty != 0:
                 let p_tk = self.get_type_kind(self.resolve_alias(p_ty as TypeId))
                 if p_tk == TypeKind.TY_REF or p_tk == TypeKind.TY_PTR:
+                    return 0
+                // §12.4 (#1698): a callable parameter as a view is a view
+                // of what the caller's argument views, never of this frame;
+                // the call site refuses a non-move closure argument to a
+                // parameter that escapes (finalize_closure_arg_checks).
+                if self.callable_param_is_view(sym, p_ty):
                     return 0
                 return 1
             return 0
@@ -12332,7 +12450,7 @@ impl Sema:
             else:
                 self.binding_closure_nodes.remove(target_sym)
             let tgt_kind = self.get_type_kind(self.resolve_alias(target_type as TypeId))
-            if tgt_kind == TypeKind.TY_REF or self.type_has_drop_impl(target_type as i32) != 0 or self.type_is_ephemeral_value(target_type as i32) != 0:
+            if tgt_kind == TypeKind.TY_REF or self.type_has_drop_impl(target_type as i32) != 0 or self.type_is_ephemeral_value(target_type as i32) != 0 or (assigned_ephemeral_value != 0 and self.type_holds_callable(target_type as i32, 0)):
                 self.record_view_binding_from_expr(target_sym, value)
             else:
                 self.clear_binding_view_deps(target_sym)
@@ -17056,6 +17174,16 @@ impl Sema:
                 else if bodiless != 0:
                     self.emit_error("this closure consumes its capture and may be invoked once, but `" ++ callee_name ++ "` has no body in this compilation (a bundle boundary), so it may invoke its parameter any number of times (§12.4; a `once` parameter annotation is #1604)", closure_node)
 
+    // Whether a binding's recorded origins name a stack local of this frame
+    // (a non-move closure over `xs`, a value holding one).
+    fn binding_views_stack_local(sym: i32) -> bool:
+        if self.scope_lookup_is_ephemeral_value(sym) == 0:
+            return false
+        for di in 0..self.binding_view_dep_count(sym):
+            if self.view_origin_is_stack_local(self.binding_view_dep_at(sym, di)) != 0:
+                return true
+        false
+
     // A non-move closure that captures a non-Copy local holds a view of that
     // local's place (§12.4); the binding that holds the closure carries those
     // origins like any view binding, so the container and return escape
@@ -17423,6 +17551,14 @@ impl Sema:
                     let cap_ty = self.bind_types[ebi]
                     if self.type_is_ephemeral_value(cap_ty) != 0:
                         self.emit_error("escaping closure cannot capture ephemeral references", node)
+                        break
+                    // §12.4 (#1698): a `move ||` closure may not capture a
+                    // non-move closure of this frame, nor any binding that
+                    // views a local of it — the environment it would own
+                    // holds a pointer into the frame it leaves.
+                    if self.ast.is_move_closure(node) != 0 and self.binding_views_stack_local(cap_sym):
+                        let cap_name: str = with_str_clone_ref(self.pool_resolve(cap_sym))
+                        self.emit_error("escaping `move` closure captures `" ++ cap_name ++ "`, which views a local of this frame (a non-move closure or a value holding one) and cannot leave it (§12.4)", node)
                         break
                 ebi = ebi + 1
             var emitted_capability_escape = 0
@@ -19653,7 +19789,7 @@ impl Sema:
             let resolved_variant_sym = self.qualified_enum_variant_sym(final_variant_ty as i32, fn_sym)
             self.comp_resolved.insert(node, resolved_variant_sym)
             self.typed_expr_types.insert(node, final_variant_ty as i32)
-            if self.type_is_ephemeral_value(final_variant_ty as i32) != 0:
+            if self.type_is_ephemeral_value(final_variant_ty as i32) != 0 or self.nodes_hold_ephemeral_value(&checked_arg_nodes):
                 self.record_transparent_view_origins_from_nodes(node, &checked_arg_nodes)
             return final_variant_ty as i32
 
@@ -25031,7 +25167,7 @@ impl Sema:
                             let owner_name = self.type_name(obj_type)
                             let variant_name: str = with_str_clone_ref(self.pool_resolve(field))
                             self.emit_argument_type_mismatch(owner_name ++ "." ++ variant_name, field, ai, ai, expected_ty, arg_ty, if static_payload_arg_node > 0: static_payload_arg_node else: node)
-            if self.type_is_ephemeral_value(mc_static_variant_ty) != 0:
+            if self.type_is_ephemeral_value(mc_static_variant_ty) != 0 or self.nodes_hold_ephemeral_value(&static_payload_nodes):
                 self.record_transparent_view_origins_from_nodes(node, &static_payload_nodes)
             return mc_static_variant_ty
 
