@@ -1,4 +1,4 @@
-//! expect-check-pass
+//! check-only
 
 const A: i32 = comptime 1 + 1
 

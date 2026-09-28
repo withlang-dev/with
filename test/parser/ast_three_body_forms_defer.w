@@ -1,4 +1,4 @@
-//! expect-check-pass
+//! check-only
 
 fn main:
     var x = 0

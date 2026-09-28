@@ -1,4 +1,4 @@
-//! expect-check-pass
+//! check-only
 
 fn classify(x: i32) -> str:
     match x:
