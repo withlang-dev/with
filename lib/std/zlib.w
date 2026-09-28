@@ -9,8 +9,7 @@ use std.zl.uncompr
 use std.zl.inflate
 
 const ZLIB_DEFAULT_MAX_OUTPUT: i64 = 64 * 1024 * 1024
-// Annotated until #1836: the const otherwise reads as i64.
-const ZLIB_MAX_CHUNK: c_uint = (0 as c_uint) -% 1
+const ZLIB_MAX_CHUNK = (0 as c_uint) -% 1
 
 pub type ZlibError {
     code: i32,
