@@ -558,6 +558,10 @@ pub type MirModule {
     // statement or a drop terminator): a place need not be moved for a
     // drop of it on a path where it holds no value to free garbage.
     sema_dropped_types: HashMap[i32, i32],
+    // #1814 (§2.3): the element types of every `array_fill` that are not
+    // Copy. A fill evaluates its operand once and copies it N times, so a
+    // non-Copy element is N owners of one value: invalid MIR.
+    sema_non_copy_fill_types: HashMap[i32, i32],
     // D65 (#1647, #1639): every symbol Sema accepts as a direct call target,
     // keyed by this module's pool: MirCallableClass.Signature for a declared
     // signature, Generic for a generic template, Intrinsic for a builtin
@@ -608,6 +612,7 @@ fn MirModule.init -> MirModule:
         sema_scoped_task_sym: 0,
         sema_moved_drop_types: HashMap.new(),
         sema_dropped_types: HashMap.new(),
+        sema_non_copy_fill_types: HashMap.new(),
         sema_callable_syms: HashMap.new(),
         sema_sig_param_starts: HashMap.new(),
         sema_sig_param_data: Vec.new(),
@@ -4132,6 +4137,17 @@ pub fn validate_typed_mir_body(mir_mod: &MirModule, body: &MirBody) -> MirValida
                     let unborrowed = mir_validate_aggregate_missing_borrow(mir_mod, body, dest_ty, rv_d2, rv_d1)
                     if unborrowed >= 0:
                         return mir_validation_fail(body.fn_sym, span, f"enum payload {unborrowed} is a value where the variant's payload is a reference to it (a missing borrow)")
+            else if rk == RvalueKind.RK_ARRAY_FILL:
+                // #1814 (§2.3): a fill copies ONE evaluation into N slots; for a
+                // non-Copy element that is N owners of one value. MirLower
+                // builds such a fill as a loop of evaluations; this verifier
+                // said ok while `[s.clone(); 65]` segfaulted.
+                let fill_arr = mir_mod.mir_resolve_alias(dest_ty)
+                if mir_mod.mir_get_type_kind(fill_arr) != TypeKind.TY_ARRAY:
+                    return mir_validation_fail(body.fn_sym, span, f"array_fill assigned to a non-array place (ty={dest_ty})")
+                let fill_elem = mir_mod.mir_get_type_d0(fill_arr)
+                if mir_mod.sema_non_copy_fill_types.contains(fill_elem):
+                    return mir_validation_fail(body.fn_sym, span, f"array_fill of a non-Copy element (ty={fill_elem}) copies one value into every slot: N owners of one value (§2.3); a non-Copy fill evaluates its value once per element")
             else if rk == RvalueKind.RK_REF:
                 if mir_validate_place_type(mir_mod, body, rv_d1) == 0:
                     return mir_validation_fail(body.fn_sym, span, "ref rvalue does not resolve to a concrete place type")

@@ -1118,3 +1118,35 @@ pub fn mir_test_body_params_match_signature:
     assert(body_params_verdict(0) == "")
     assert(body_params_verdict(1).contains("parameter 1 is local _2 of ty=3, but the signature's parameter 1 is ty=1"))
     assert(body_params_verdict(2).contains("the body has 1 parameter local(s), its signature 2 parameter(s)"))
+
+// #1814 (§2.3): `array_fill` evaluates its operand once and copies it into
+// every slot. For a non-Copy element that is N owners of one value
+// (`[s.clone(); 65]` segfaulted, and this verifier said ok). The element
+// type is `str`-like (ty 2, recorded as a non-Copy fill type the way
+// snapshot_moved_drop_types records it from Sema) or an int (Copy).
+fn array_fill_verdict(elem_is_copy: bool) -> str:
+    var mir_mod = MirModule.init()
+    for kind in [0, TypeKind.TY_INT, TypeKind.TY_STR, TypeKind.TY_ARRAY]:
+        mir_mod.sema_type_kinds.push(kind)
+        mir_mod.sema_type_d0.push(if kind == TypeKind.TY_ARRAY: (if elem_is_copy: 1 else: 2) else: 0)
+        mir_mod.sema_type_d1.push(if kind == TypeKind.TY_ARRAY: 65 else: 0)
+        mir_mod.sema_type_d2.push(0)
+    let int_ty = 1
+    let elem_ty = if elem_is_copy: int_ty else: 2
+    let array_ty = 3
+    if not elem_is_copy: mir_mod.sema_non_copy_fill_types.insert(elem_ty, 1)
+    var body = MirBody.init_for_fn(1)
+    let value_local = body.new_temp(elem_ty)
+    let dest_local = body.new_temp(array_ty)
+    let entry = body.new_block()
+    let value_place = body.new_place(value_local)
+    let value = body.new_operand(OperandKind.OK_COPY, value_place)
+    let fill = body.new_rvalue(RvalueKind.RK_ARRAY_FILL, value, 65, 0)
+    let dest = body.new_place(dest_local)
+    body.push_stmt(entry, StmtKind.Assign, dest, fill, 0)
+    body.set_terminator(entry, TermKind.TK_RETURN, 0, 0, 0, 0, 0)
+    with_str_clone_ref(validate_typed_mir_body(mir_mod, body).message)
+
+pub fn mir_test_non_copy_array_fill:
+    assert(array_fill_verdict(false).contains("array_fill of a non-Copy element (ty=2)"))
+    assert(array_fill_verdict(true) == "")

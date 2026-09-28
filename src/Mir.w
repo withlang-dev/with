@@ -125,6 +125,22 @@ impl MirModule:
             let ty = dropped[i]
             if ty > 0 and not self.sema_dropped_types.contains(ty) and sema.type_needs_drop_frozen(ty) != 0:
                 self.sema_dropped_types.insert(ty, 1)
+        // #1814: every non-Copy element type an `array_fill` copies.
+        var filled: Vec[i32] = Vec.new()
+        for bi in 0..self.bodies.len():
+            let body = &self.bodies[bi]
+            for si in 0..body.stmt_kinds.len():
+                if body.stmt_kinds[si] != StmtKind.Assign: continue
+                let rv = body.stmt_d1[si]
+                if rv < 0 or rv >= body.rval_kinds.len() or body.rval_kinds[rv] != RvalueKind.RK_ARRAY_FILL: continue
+                if body.stmt_d0[si] < 0 or body.stmt_d0[si] >= body.place_locals.len(): continue
+                let arr_ty = mir_validate_place_type(self, body, body.stmt_d0[si])
+                if arr_ty > 0 and sema.get_type_kind(sema.resolve_alias(arr_ty as TypeId)) == TypeKind.TY_ARRAY:
+                    filled.push(sema.get_type_d0(sema.resolve_alias(arr_ty as TypeId)))
+        for i in 0..filled.len():
+            let ty = filled[i]
+            if ty > 0 and not self.sema_non_copy_fill_types.contains(ty) and sema.is_copy_frozen(ty) == 0:
+                self.sema_non_copy_fill_types.insert(ty, 1)
 
 
 fn MirBody.init(fn_sym: i32, sema: &Sema) -> MirBody:

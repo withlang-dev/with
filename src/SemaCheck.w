@@ -14123,8 +14123,14 @@ impl Sema:
         let elem_origins: Vec[i32] = Vec.new()
         let elem_types: Vec[i32] = Vec.new()
         let elem_roles: Vec[i32] = Vec.new()
-        for i in 0..elem_count:
-            let elem = self.ast.get_extra(extra_start + i)
+        // §4.3a (#1814): a fill is its written form, one evaluation per
+        // element. A const-count fill holds its value once; checking it a
+        // second time is what refuses a moved place (`[s; N]`, "use of moved
+        // value"), as the literal-count desugar's N checks do. Checked once,
+        // `[s; N]` moved `s` into N elements.
+        let checks = if fill_count_node != 0 and array_len >= 2: 2 else: elem_count
+        for i in 0..checks:
+            let elem = self.ast.get_extra(extra_start + (if fill_count_node != 0: 0 else: i))
             let et = if expected_elem != 0:
                 self.check_expr_with_expected(elem, expected_elem as TypeId)
             else:

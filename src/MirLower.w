@@ -6313,6 +6313,69 @@ impl MirBuilder:
             self.expected_type = saved_expected
         self.lower_collection_literal_call(node, MirIntrinsic.COLLECTION_LITERAL, &args)
 
+    // §4.3a, §2.3 (#1814): `[v; N]` with a non-Copy v — the written form
+    // `[v, v, …]`, one evaluation per element, as a loop over the element
+    // places rather than N expanded statements:
+    //
+    //     StorageLive(arr, zero)          every element starts reset
+    //     i = 0
+    //   head: if i < N goto body else exit
+    //   body: arr[i] = move <v>; i = i + 1; goto head
+    //
+    // The array is a statement temp from the start, so an early exit out of
+    // <v> (`[f()?; N]`) drops the elements already built; the consumer that
+    // moves it cancels that. Temps <v> creates drop inside each iteration.
+    mut fn lower_non_copy_array_fill(node: i32, value_node: i32, count: i32) -> i32:
+        let span = self.ast.get_start(node)
+        var arr_ty = self.expr_type(node)
+        if arr_ty == 0 or arr_ty == self.sema.ty_void as i32:
+            arr_ty = self.expected_type
+        let arr_resolved = self.sema.resolve_alias(arr_ty as TypeId)
+        if self.sema.get_type_kind(arr_resolved) != TypeKind.TY_ARRAY:
+            sema_phase_bug(f"BUG: non-Copy array fill has no array type: node={node} ty={arr_ty}")
+        let elem_ty = self.sema.get_type_d0(arr_resolved)
+        let arr_local = self.new_temp(arr_ty)
+        let arr_place = self.place_for_local(arr_local)
+        self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, arr_local, arr_ty, span)
+        self.register_stmt_temp(arr_local, arr_ty)
+        let counter_local = self.new_temp(self.sema.ty_i64)
+        let counter_place = self.place_for_local(counter_local)
+        let start_rv = self.body.new_rvalue(RvalueKind.RK_USE, self.int_const_operand(0, self.sema.ty_i64), 0, 0)
+        self.body.push_stmt(self.cur_bb, StmtKind.Assign, counter_place, start_rv, span)
+
+        let header_bb = self.new_block()
+        let body_bb = self.new_block()
+        let exit_bb = self.new_block()
+        self.terminate(TermKind.TK_GOTO, header_bb, 0, 0, 0)
+
+        self.switch_to(header_bb)
+        let cmp_rv = self.body.new_rvalue(RvalueKind.RK_BIN_OP, BinaryOp.OP_LT, self.body.new_operand(OperandKind.OK_COPY, counter_place), self.int_const_operand(count as i64, self.sema.ty_i64))
+        let cmp_local = self.new_temp(self.sema.ty_bool)
+        let cmp_place = self.place_for_local(cmp_local)
+        self.body.push_stmt(self.cur_bb, StmtKind.Assign, cmp_place, cmp_rv, span)
+        let vals: Vec[i64] = Vec.new()
+        vals.push(1)
+        let targets: Vec[i32] = Vec.new()
+        targets.push(body_bb as i32)
+        let table = self.body.new_switch_table(vals, targets)
+        self.terminate(TermKind.TK_SWITCH_INT, self.body.new_operand(OperandKind.OK_COPY, cmp_place), table, exit_bb, 0)
+
+        self.switch_to(body_bb)
+        let iteration_frame = self.push_stmt_temp_frame()
+        let saved_expected = self.expected_type
+        self.expected_type = elem_ty
+        let value_op = self.lower_expr(value_node)
+        self.expected_type = saved_expected
+        let elem_place = self.body.new_index_place(arr_place, counter_local, 0)
+        self.assign_operand_to_place(elem_place, value_op, span)
+        self.finish_stmt_temp_frame(iteration_frame)
+        let add_rv = self.body.new_rvalue(RvalueKind.RK_BIN_OP, BinaryOp.OP_ADD, self.body.new_operand(OperandKind.OK_COPY, counter_place), self.int_const_operand(1, self.sema.ty_i64))
+        self.body.push_stmt(self.cur_bb, StmtKind.Assign, counter_place, add_rv, span)
+        self.terminate(TermKind.TK_GOTO, header_bb, 0, 0, 0)
+
+        self.switch_to(exit_bb)
+        self.body.new_operand(OperandKind.OK_MOVE, arr_place)
+
     mut fn lower_map_literal(node: i32) -> i32:
         let pair_start = self.ast.get_data0(node)
         let pair_count = self.ast.get_data1(node)
@@ -16513,17 +16576,24 @@ impl MirBuilder:
                     sema_phase_bug(f"BUG: array fill count was not resolved by Sema: node={node}")
                 elem_count = self.sema.array_fill_counts.get(node).unwrap()
             let first_node = self.ast.get_extra(extra_start)
+            // The parser desugars a literal-count fill into N extras naming
+            // one node; written elements are distinct nodes.
             var is_fill = fill_count_node != 0
-            if not is_fill and elem_count > 64:
+            if not is_fill and elem_count > 1:
                 is_fill = true
                 for fi in 1..elem_count:
                     if self.ast.get_extra(extra_start + fi) != first_node:
                         is_fill = false
                         break
-            // A Copy fill is one evaluation copied N times; a non-Copy value
-            // is evaluated once per element, as the written form is (over 64
-            // copies the fill rvalue stands, as before).
-            if is_fill and (elem_count > 64 or self.sema.is_copy_frozen(self.expr_type(first_node)) != 0):
+            let fill_value_is_copy = self.sema.is_copy_frozen(self.expr_type(first_node)) != 0
+            // §4.3a, §2.3 (#1814): a non-Copy fill evaluates its value once
+            // per element at every N, so each element owns its own value. It
+            // took the one-evaluation fill over 64 elements: one `s.clone()`
+            // in N slots was N owners of one buffer (SIGSEGV at 65).
+            if is_fill and not fill_value_is_copy:
+                return self.lower_non_copy_array_fill(node, first_node, elem_count)
+            // A Copy fill is one evaluation copied N times.
+            if is_fill and (elem_count > 64 or fill_count_node != 0):
                 let fill_op = self.lower_expr(first_node)
                 let fill_rv = self.body.new_rvalue(RvalueKind.RK_ARRAY_FILL, fill_op, elem_count, 0)
                 let fill_ty = self.expr_type(node)
