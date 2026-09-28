@@ -57,7 +57,7 @@ fn twice(n: i32) -> i32: n * 2
 fn grow_g():
     for i in 0..64: G.push(f"more{i}")
 
-fn run(g: dyn Grow):
+fn run(g: &dyn Grow):
     let r = G[0]
     g.grow()
     print(r)

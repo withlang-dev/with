@@ -19,7 +19,7 @@ impl Grow for W:
     fn grow(self: &Self):
         for i in 0..64: G.insert(f"k{i}", f"v{i}")
 
-fn run_dyn(g: dyn Grow): g.grow()
+fn run_dyn(g: &dyn Grow): g.grow()
 
 fn main:
     G.insert("k", "v" ++ "!")

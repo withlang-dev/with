@@ -21,7 +21,7 @@ impl Grow for W:
     fn grow(self: &Self):
         G.name = "wx" ++ "yz"
 
-fn run_dyn(g: dyn Grow): g.grow()
+fn run_dyn(g: &dyn Grow): g.grow()
 
 fn main:
     let r = &G
