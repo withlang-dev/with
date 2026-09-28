@@ -6459,6 +6459,48 @@ impl Codegen:
         let op_id = body.call_arg_operands[(arg_start + idx)]
         self.mir_eval_operand(body, op_id, 0)
 
+    // An intrinsic argument converted to its container's element, key or
+    // value type (`v.push(x)`, `m.insert(k, v)`, `[a, b]`).
+    mut fn mir_intrinsic_arg_as(body: &MirBody, args_id: i32, idx: i32, target_ty: i64):
+        let raw = self.mir_intrinsic_arg(body, args_id, idx)
+        self.mir_intrinsic_value_as(body, args_id, idx, raw, target_ty)
+
+    // The `T` of a `VecSlot[T]` / `VecRange[T]` receiver: the element a
+    // `set` writes, whatever narrower type its value argument had.
+    mut fn mir_recv_elem_sema_type(body: &MirBody, args_id: i32) -> i32:
+        let recv_sema = self.mir_operand_sema_type(body, body.call_arg_operands[body.call_arg_starts[args_id]])
+        if recv_sema <= 0:
+            return 0
+        let resolved = self.mir_unwrap_ref_like_sema_type(recv_sema)
+        if resolved >= self.mir_type_kinds_len() as i32:
+            return if self.sema.get_type_kind(resolved) == TypeKind.TY_GENERIC_INST: self.sema.get_generic_inst_arg(resolved, 0) else: 0
+        if self.mir_type_kind_at(resolved) != TypeKind.TY_GENERIC_INST or self.mir_type_d2_at(resolved) == 0:
+            return 0
+        self.mir_type_extra_at(self.mir_type_d1_at(resolved))
+
+    mut fn mir_recv_elem_llvm_type(body: &MirBody, args_id: i32, what: &str) -> i64:
+        let elem_sema = self.mir_recv_elem_sema_type(body, args_id)
+        let elem_ty = if elem_sema > 0: self.mir_sema_type_to_llvm(elem_sema) else: 0
+        if elem_ty == 0:
+            eprint(f"error: {what}: the receiver's element type did not resolve")
+            self.had_error = 1
+        elem_ty
+
+    // `raw` is `mir_intrinsic_arg(body, args_id, idx)`, already evaluated.
+    mut fn mir_intrinsic_value_as(body: &MirBody, args_id: i32, idx: i32, raw: i64, target_ty: i64):
+        if target_ty == 0 or wl_type_of(raw) == target_ty:
+            return raw
+        self.mir_operand_value_as(body, body.call_arg_operands[body.call_arg_starts[args_id] + idx], raw, target_ty)
+
+    // Integer widening takes its signedness from the operand's Sema type, as
+    // a call argument's does (#1017): the LLVM-level coercer has no type to
+    // ask and sign-extends, so a u8 200 pushed into a Vec[i16] read -56.
+    mut fn mir_operand_value_as(body: &MirBody, op_id: i32, raw: i64, target_ty: i64) -> i64:
+        if target_ty == 0 or wl_type_of(raw) == target_ty:
+            return raw
+        let src_unsigned = self.mir_operand_is_unsigned(body, op_id) or self.mir_operand_is_str_byte(body, op_id)
+        self.mir_coerce_value_to_sema_type(raw, target_ty, 0, src_unsigned)
+
     mut fn mir_intrinsic_arg_str_value(body: &MirBody, args_id: i32, idx: i32) -> i64:
         let arg_start = body.call_arg_starts[args_id]
         let op_id = body.call_arg_operands[(arg_start + idx)]
@@ -8697,19 +8739,19 @@ impl Codegen:
         else if intrinsic == MirIntrinsic.VEC_PUSH:
             let recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
             let elem_raw = self.mir_intrinsic_arg(body, args_id, 1)
-            // Coerce element to match Vec's element type (e.g. f64 literal → f32 for Vec[f32])
+            // Coerce element to match Vec's element type: a #1847 dyn target
+            // takes the fat pointer first; a narrower integer widens by its
+            // operand's signedness (§4.2.6, mir_intrinsic_value_as).
             var elem = elem_raw
             let push_arg_start = body.call_arg_starts[args_id]
             let push_recv_op = body.call_arg_operands[push_arg_start]
             let push_elem_ty = self.mir_vec_elem_type(body, push_recv_op)
             if push_elem_ty != 0 and wl_type_of(elem_raw) != push_elem_ty:
-                // #1847: a concrete value pushed onto a Vec[Box[dyn T]] takes
-                // the fat pointer (data, vtable), as a `let` of that type does.
                 let push_vec_ty = self.mir_unwrap_ref_like_sema_type(self.mir_operand_sema_type(body, push_recv_op))
                 let push_elem_sema = if push_vec_ty > 0 and self.mir_type_kind_at(push_vec_ty) == TypeKind.TY_GENERIC_INST and self.mir_type_d2_at(push_vec_ty) > 0: self.mir_type_extra_at(self.mir_type_d1_at(push_vec_ty)) else: 0
                 let push_elem_op = body.call_arg_operands[(push_arg_start + 1)]
                 let dyn_elem = self.mir_coerce_operand_to_dyn_trait_target(body, push_elem_op, elem_raw, push_elem_ty, push_elem_sema)
-                elem = self.coerce_value_to_type(dyn_elem, push_elem_ty)
+                elem = self.mir_intrinsic_value_as(body, args_id, 1, dyn_elem, push_elem_ty)
             self.mir_emit_vec_push(recv_ptr, elem, wl_type_of(elem))
 
         else if intrinsic == MirIntrinsic.VEC_GET:
@@ -8934,7 +8976,7 @@ impl Codegen:
             let map_ptr = self.mir_intrinsic_map_handle(body, args_id)
             let key_raw = self.mir_intrinsic_arg(body, args_id, 1)
             let key_ty = self.mir_hashmap_key_type(body, recv_op)
-            let key = if key_ty != 0 and wl_type_of(key_raw) != key_ty: self.coerce_value_to_type(key_raw, key_ty) else: key_raw
+            let key = self.mir_intrinsic_value_as(body, args_id, 1, key_raw, key_ty)
             let key_alloca = self.create_entry_alloca(wl_type_of(key))
             wl_build_store(self.builder, key, key_alloca)
             let val_alloca =
@@ -8946,7 +8988,7 @@ impl Codegen:
                 else:
                     let val_raw = self.mir_intrinsic_arg(body, args_id, 2)
                     let val_ty = self.mir_hashmap_value_type(body, recv_op)
-                    let val = if val_ty != 0 and wl_type_of(val_raw) != val_ty: self.coerce_value_to_type(val_raw, val_ty) else: val_raw
+                    let val = self.mir_intrinsic_value_as(body, args_id, 2, val_raw, val_ty)
                     let map_val_alloca = self.create_entry_alloca(wl_type_of(val))
                     wl_build_store(self.builder, val, map_val_alloca)
                     map_val_alloca
@@ -8975,7 +9017,7 @@ impl Codegen:
             let map_ptr = self.mir_intrinsic_map_handle(body, args_id)
             let key_raw = self.mir_intrinsic_arg(body, args_id, 1)
             let key_ty = self.mir_hashmap_key_type(body, recv_op)
-            let key = if key_ty != 0 and wl_type_of(key_raw) != key_ty: self.coerce_value_to_type(key_raw, key_ty) else: key_raw
+            let key = self.mir_intrinsic_value_as(body, args_id, 1, key_raw, key_ty)
             let key_alloca = self.create_entry_alloca(wl_type_of(key))
             wl_build_store(self.builder, key, key_alloca)
             let is_str_val = wl_const_int(i64_ty, if self.is_str_type(wl_type_of(key)): 1 else: 0, 0)
@@ -9002,7 +9044,7 @@ impl Codegen:
             let map_ptr = self.mir_intrinsic_map_handle(body, args_id)
             let key_raw = self.mir_intrinsic_arg(body, args_id, 1)
             let key_ty = self.mir_hashmap_key_type(body, recv_op)
-            let key = if key_ty != 0 and wl_type_of(key_raw) != key_ty: self.coerce_value_to_type(key_raw, key_ty) else: key_raw
+            let key = self.mir_intrinsic_value_as(body, args_id, 1, key_raw, key_ty)
             let key_alloca = self.create_entry_alloca(wl_type_of(key))
             wl_build_store(self.builder, key, key_alloca)
             let is_str_val = wl_const_int(i64_ty, if self.is_str_type(wl_type_of(key)): 1 else: 0, 0)
@@ -9069,7 +9111,7 @@ impl Codegen:
             let map_ptr = self.mir_intrinsic_map_handle(body, args_id)
             let key_raw = self.mir_intrinsic_arg(body, args_id, 1)
             let key_ty = self.mir_hashmap_key_type(body, recv_op)
-            let key = if key_ty != 0 and wl_type_of(key_raw) != key_ty: self.coerce_value_to_type(key_raw, key_ty) else: key_raw
+            let key = self.mir_intrinsic_value_as(body, args_id, 1, key_raw, key_ty)
             let key_alloca = self.create_entry_alloca(wl_type_of(key))
             wl_build_store(self.builder, key, key_alloca)
             let is_str_val = wl_const_int(i64_ty, if self.is_str_type(wl_type_of(key)): 1 else: 0, 0)
@@ -9295,7 +9337,7 @@ impl Codegen:
             let sm_map = self.mir_intrinsic_slotmap_handle(body, args_id)
             let sm_val_raw = self.mir_intrinsic_arg(body, args_id, 1)
             let sm_elem_ty = self.mir_slotmap_elem_type_from_recv(body, args_id)
-            let sm_val = if sm_elem_ty != 0 and wl_type_of(sm_val_raw) != sm_elem_ty: self.coerce_value_to_type(sm_val_raw, sm_elem_ty) else: sm_val_raw
+            let sm_val = self.mir_intrinsic_value_as(body, args_id, 1, sm_val_raw, sm_elem_ty)
             let sm_val_alloca = self.create_entry_alloca(wl_type_of(sm_val))
             wl_build_store(self.builder, sm_val, sm_val_alloca)
             var sm_h_ty = self.mir_sema_type_to_llvm(self.mir_intrinsic_dest_sema_type(body, dest_place))
@@ -9416,7 +9458,7 @@ impl Codegen:
                 sm_found = wl_build_call(self.builder, sm_remove_ty, sm_remove_fn, vec_data_i64(&sm_remove_args), 4)
             else:
                 let sm_val_raw = self.mir_intrinsic_arg(body, args_id, 2)
-                let sm_val = if wl_type_of(sm_val_raw) != sm_elem_ty: self.coerce_value_to_type(sm_val_raw, sm_elem_ty) else: sm_val_raw
+                let sm_val = self.mir_intrinsic_value_as(body, args_id, 2, sm_val_raw, sm_elem_ty)
                 let sm_val_alloca = self.create_entry_alloca(sm_elem_ty)
                 wl_build_store(self.builder, sm_val, sm_val_alloca)
                 let sm_replace_fn = self.ensure_c_fn("with_slotmap_replace", i32_ty, 5)
@@ -9550,7 +9592,7 @@ impl Codegen:
             let sms_val_raw = self.mir_intrinsic_arg(body, args_id, 1)
             let sms_elem_ty = self.mir_slotmapslot_elem_type_from_recv(body, args_id)
             let sms_elem_sema = self.mir_slotmapslot_elem_sema_type_from_recv(body, args_id)
-            let sms_val = if wl_type_of(sms_val_raw) != sms_elem_ty: self.coerce_value_to_type(sms_val_raw, sms_elem_ty) else: sms_val_raw
+            let sms_val = self.mir_intrinsic_value_as(body, args_id, 1, sms_val_raw, sms_elem_ty)
             let sms_val_alloca = self.create_entry_alloca(sms_elem_ty)
             wl_build_store(self.builder, sms_val, sms_val_alloca)
 
@@ -9606,7 +9648,7 @@ impl Codegen:
             var me_key_ty = self.mir_hashmap_key_type(body, me_recv_op)
             if me_key_ty == 0:
                 me_key_ty = wl_type_of(me_key_raw)
-            let me_key = if me_key_ty != 0 and wl_type_of(me_key_raw) != me_key_ty: self.coerce_value_to_type(me_key_raw, me_key_ty) else: me_key_raw
+            let me_key = self.mir_intrinsic_value_as(body, args_id, 1, me_key_raw, me_key_ty)
             let me_fields: Vec[i64] = Vec.new()
             me_fields.push(ptr_ty)
             me_fields.push(me_key_ty)
@@ -9670,7 +9712,7 @@ impl Codegen:
             // insert default
             wl_position_at_end(self.builder, oi_insert_bb)
             let oi_val_alloca = self.create_entry_alloca(oi_val_ty)
-            wl_build_store(self.builder, oi_default, oi_val_alloca)
+            wl_build_store(self.builder, self.mir_intrinsic_value_as(body, args_id, 1, oi_default, oi_val_ty), oi_val_alloca)
             let oi_ins_fn = self.ensure_hm_fn("with_hashmap_insert", void_ty)
             let oi_i_params: Vec[i64] = Vec.new()
             oi_i_params.push(ptr_ty)
@@ -9759,10 +9801,11 @@ impl Codegen:
         else if intrinsic == MirIntrinsic.ENTRY_SET:
             // HashMapEntry.set(value) → hashmap_insert(map_ptr, &key, &value)
             let es_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
-            let es_val = self.mir_intrinsic_arg(body, args_id, 1)
+            let es_val_raw = self.mir_intrinsic_arg(body, args_id, 1)
             let es_recv_op = body.call_arg_operands[arg_start]
             let es_recv_sema = self.mir_operand_sema_type(body, es_recv_op)
             var es_key_ty: i64 = i64_ty
+            var es_val_ty: i64 = 0
             if es_recv_sema > 0:
                 let es_resolved = self.mir_resolve_alias_at(es_recv_sema)
                 if self.mir_type_kind_at(es_resolved) == TypeKind.TY_GENERIC_INST:
@@ -9772,6 +9815,10 @@ impl Codegen:
                         let es_kt = self.mir_sema_type_to_llvm(es_key_tid)
                         if es_kt != 0:
                             es_key_ty = es_kt
+                    let es_val_tid = self.mir_type_extra_at(es_te_start + 1)
+                    if es_val_tid > 0:
+                        es_val_ty = self.mir_sema_type_to_llvm(es_val_tid)
+            let es_val = self.mir_intrinsic_value_as(body, args_id, 1, es_val_raw, es_val_ty)
             let es_entry_fields: Vec[i64] = Vec.new()
             es_entry_fields.push(ptr_ty)
             es_entry_fields.push(es_key_ty)
@@ -10387,7 +10434,8 @@ impl Codegen:
             // VecRange[T].set(i, value) — store value at data_ptr[offset + i]
             let vrs_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
             let vrs_idx = self.mir_intrinsic_arg(body, args_id, 1)
-            let vrs_val = self.mir_intrinsic_arg(body, args_id, 2)
+            let vrs_want = self.mir_recv_elem_llvm_type(body, args_id, "VecRange.set")
+            let vrs_val = self.mir_intrinsic_arg_as(body, args_id, 2, vrs_want)
             let vrs_idx64 = self.coerce_int(vrs_idx, i64_ty)
             let vrs_elem_ty = wl_type_of(vrs_val)
             let vrs_fields: Vec[i64] = Vec.new()
@@ -10551,10 +10599,10 @@ impl Codegen:
             // old owner before storing the consumed replacement; a raw store
             // duplicates/leaks non-Copy resources held by T.
             let ss_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
-            let ss_value_op = body.call_arg_operands[(arg_start + 1)]
-            let ss_val = self.mir_intrinsic_arg(body, args_id, 1)
+            let ss_elem_sema = self.mir_recv_elem_sema_type(body, args_id)
+            let ss_want = self.mir_recv_elem_llvm_type(body, args_id, "VecSlot.set")
+            let ss_val = self.mir_intrinsic_arg_as(body, args_id, 1, ss_want)
             let ss_elem_ty = wl_type_of(ss_val)
-            let ss_elem_sema = self.mir_operand_sema_type(body, ss_value_op)
             let ss_fields: Vec[i64] = Vec.new()
             ss_fields.push(i64_ty)
             ss_fields.push(i64_ty)
@@ -10606,7 +10654,7 @@ impl Codegen:
             let as_order_raw = self.mir_intrinsic_arg(body, args_id, 2)
             let as_recv_ty = self.mir_intrinsic_recv_storage_type(body, args_id, as_recv_ptr)
             let as_elem_ty = wl_struct_get_type_at(as_recv_ty, 0)
-            let as_val = if wl_type_of(as_val_raw) != as_elem_ty: self.coerce_value_to_type(as_val_raw, as_elem_ty) else: as_val_raw
+            let as_val = self.mir_intrinsic_value_as(body, args_id, 1, as_val_raw, as_elem_ty)
             let as_val_ptr = wl_build_struct_gep(self.builder, as_recv_ty, as_recv_ptr, 0)
             let as_order = if self.is_const_int_value(as_order_raw): wl_const_int_sext_val(as_order_raw) as i32 else: AtomicOrdering.SEQ_CST
             wl_build_atomic_store(self.builder, as_val, as_val_ptr, as_order)
@@ -10618,7 +10666,7 @@ impl Codegen:
             let ar_order_raw = self.mir_intrinsic_arg(body, args_id, 2)
             let ar_recv_ty = self.mir_intrinsic_recv_storage_type(body, args_id, ar_recv_ptr)
             let ar_elem_ty = wl_struct_get_type_at(ar_recv_ty, 0)
-            let ar_val = if wl_type_of(ar_val_raw) != ar_elem_ty: self.coerce_value_to_type(ar_val_raw, ar_elem_ty) else: ar_val_raw
+            let ar_val = self.mir_intrinsic_value_as(body, args_id, 1, ar_val_raw, ar_elem_ty)
             let ar_val_ptr = wl_build_struct_gep(self.builder, ar_recv_ty, ar_recv_ptr, 0)
             let ar_order = if self.is_const_int_value(ar_order_raw): wl_const_int_sext_val(ar_order_raw) as i32 else: AtomicOrdering.SEQ_CST
             let ar_recv_op = body.call_arg_operands[arg_start]
@@ -10659,8 +10707,8 @@ impl Codegen:
             let cas_failure_raw = self.mir_intrinsic_arg(body, args_id, 4)
             let cas_recv_ty = self.mir_intrinsic_recv_storage_type(body, args_id, cas_recv_ptr)
             let cas_elem_ty = wl_struct_get_type_at(cas_recv_ty, 0)
-            let cas_expected = if wl_type_of(cas_expected_raw) != cas_elem_ty: self.coerce_value_to_type(cas_expected_raw, cas_elem_ty) else: cas_expected_raw
-            let cas_desired = if wl_type_of(cas_desired_raw) != cas_elem_ty: self.coerce_value_to_type(cas_desired_raw, cas_elem_ty) else: cas_desired_raw
+            let cas_expected = self.mir_intrinsic_value_as(body, args_id, 1, cas_expected_raw, cas_elem_ty)
+            let cas_desired = self.mir_intrinsic_value_as(body, args_id, 2, cas_desired_raw, cas_elem_ty)
             let cas_val_ptr = wl_build_struct_gep(self.builder, cas_recv_ty, cas_recv_ptr, 0)
             let cas_success_order = if self.is_const_int_value(cas_success_raw): wl_const_int_sext_val(cas_success_raw) as i32 else: AtomicOrdering.SEQ_CST
             let cas_failure_order = if self.is_const_int_value(cas_failure_raw): wl_const_int_sext_val(cas_failure_raw) as i32 else: AtomicOrdering.SEQ_CST
@@ -11099,7 +11147,7 @@ impl Codegen:
             let push_ty = self.get_vec_fn_type("with_vec_push", void_ty, 2)
             for i in 0..arg_count:
                 let raw = self.mir_intrinsic_arg(body, args_id, i)
-                let elem = if wl_type_of(raw) != elem_ty: self.coerce_value_to_type(raw, elem_ty) else: raw
+                let elem = self.mir_intrinsic_value_as(body, args_id, i, raw, elem_ty)
                 let elem_alloca = self.create_entry_alloca(elem_ty)
                 wl_build_store(self.builder, elem, elem_alloca)
                 let push_args: Vec[i64] = Vec.new()
@@ -11136,9 +11184,9 @@ impl Codegen:
                 let key_arg_idx = if intrinsic == MirIntrinsic.MAP_LITERAL: i2 * 2 else: i2
                 let val_arg_idx = key_arg_idx + 1
                 let key_raw = self.mir_intrinsic_arg(body, args_id, key_arg_idx)
-                let key = if wl_type_of(key_raw) != key_ty: self.coerce_value_to_type(key_raw, key_ty) else: key_raw
+                let key = self.mir_intrinsic_value_as(body, args_id, key_arg_idx, key_raw, key_ty)
                 let val_raw = if intrinsic == MirIntrinsic.MAP_LITERAL: self.mir_intrinsic_arg(body, args_id, val_arg_idx) else: wl_const_int(byte_ty, 1, 0)
-                let val = if wl_type_of(val_raw) != val_ty: self.coerce_value_to_type(val_raw, val_ty) else: val_raw
+                let val = self.mir_intrinsic_value_as(body, args_id, val_arg_idx, val_raw, val_ty)
                 let key_alloca = self.create_entry_alloca(key_ty)
                 let val_alloca = self.create_entry_alloca(val_ty)
                 wl_build_store(self.builder, key, key_alloca)
@@ -11246,7 +11294,8 @@ impl Codegen:
         else if intrinsic == MirIntrinsic.MAP_INCREMENT or intrinsic == MirIntrinsic.MAP_DECREMENT:
             let r7 = self.mir_intrinsic_arg(body, args_id, 0)
             let mp7 = self.mir_extract_map_ptr(r7)
-            let k7 = self.mir_intrinsic_arg(body, args_id, 1)
+            let kt7 = self.mir_hashmap_key_type(body, body.call_arg_operands[arg_start])
+            let k7 = self.mir_intrinsic_arg_as(body, args_id, 1, kt7)
             let ka7 = self.create_entry_alloca(wl_type_of(k7))
             wl_build_store(self.builder, k7, ka7)
             let is7 = wl_const_int(i64_ty, if self.is_str_type(wl_type_of(k7)): 1 else: 0, 0)
@@ -11270,14 +11319,14 @@ impl Codegen:
             var upd_key_ty = self.mir_hashmap_key_type(body, upd_recv_op)
             if upd_key_ty == 0:
                 upd_key_ty = wl_type_of(upd_key_raw)
-            let upd_key = if wl_type_of(upd_key_raw) != upd_key_ty: self.coerce_value_to_type(upd_key_raw, upd_key_ty) else: upd_key_raw
+            let upd_key = self.mir_intrinsic_value_as(body, args_id, 1, upd_key_raw, upd_key_ty)
             let upd_key_alloca = self.create_entry_alloca(upd_key_ty)
             wl_build_store(self.builder, upd_key, upd_key_alloca)
             let upd_default_raw = self.mir_intrinsic_arg(body, args_id, 2)
             var upd_val_ty = self.mir_hashmap_value_type(body, upd_recv_op)
             if upd_val_ty == 0:
                 upd_val_ty = wl_type_of(upd_default_raw)
-            let upd_default = if wl_type_of(upd_default_raw) != upd_val_ty: self.coerce_value_to_type(upd_default_raw, upd_val_ty) else: upd_default_raw
+            let upd_default = self.mir_intrinsic_value_as(body, args_id, 2, upd_default_raw, upd_val_ty)
             let upd_val_alloca = self.create_entry_alloca(upd_val_ty)
             let upd_is_str = wl_const_int(i64_ty, if self.is_str_type(upd_key_ty): 1 else: 0, 0)
             let upd_get_fn = self.ensure_hm_fn("with_hashmap_get", wl_i32_type(self.context))
@@ -11880,7 +11929,8 @@ impl Codegen:
         if intrinsic == MirIntrinsic.CHAN_SEND:
             // Sender.send(value): extract handle, alloca value, store, call with_channel_send
             let send_recv = self.mir_intrinsic_arg(body, args_id, 0)
-            let send_val = self.mir_intrinsic_arg(body, args_id, 1)
+            let send_want = self.mir_recv_elem_llvm_type(body, args_id, "Sender.send")
+            let send_val = self.mir_intrinsic_arg_as(body, args_id, 1, send_want)
             let send_val_ty = wl_type_of(send_val)
             // Extract handle (field 0) from Sender struct
             let send_handle = wl_build_extract_value(self.builder, send_recv, 0)
@@ -14401,7 +14451,7 @@ impl Codegen:
             elem_ty = wl_type_of(needle_raw)
         if elem_ty == 0:
             elem_ty = i64_ty
-        let needle = if wl_type_of(needle_raw) != elem_ty: self.coerce_value_to_type(needle_raw, elem_ty) else: needle_raw
+        let needle = self.mir_intrinsic_value_as(body, args_id, 1, needle_raw, elem_ty)
         let len = wl_build_extract_value(self.builder, recv, 1)
         let sa = self.create_entry_alloca(wl_type_of(recv))
         wl_build_store(self.builder, recv, sa)
@@ -14733,7 +14783,7 @@ impl Codegen:
                         let gc_atomic_elem_ty = wl_struct_get_type_at(gc_atomic_ty, 0)
                         let gc_atomic_arg_op = body.call_arg_operands[gc_atomic_mir_start]
                         let gc_atomic_arg_raw = self.mir_eval_operand(body, gc_atomic_arg_op, 0)
-                        let gc_atomic_arg = if wl_type_of(gc_atomic_arg_raw) != gc_atomic_elem_ty: self.coerce_value_to_type(gc_atomic_arg_raw, gc_atomic_elem_ty) else: gc_atomic_arg_raw
+                        let gc_atomic_arg = self.mir_operand_value_as(body, gc_atomic_arg_op, gc_atomic_arg_raw, gc_atomic_elem_ty)
                         var gc_atomic_result = wl_get_undef(gc_atomic_ty)
                         gc_atomic_result = wl_build_insert_value(self.builder, gc_atomic_result, gc_atomic_arg, 0)
                         let gc_atomic_dst = self.mir_place_ptr(body, dest_place, true, gc_atomic_ty)
