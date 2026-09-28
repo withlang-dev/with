@@ -980,6 +980,12 @@ impl Sema:
                     if self.contextual_join_value_accepts(final_type, arm_ty) == 0:
                         self.emit_contextual_join_mismatch(join_name, final_type, arm_ty, report_node, arm_node)
                         return 0
+                    // Under an owned expectation every arm is that demand's
+                    // value (#1803): `let y: i32 = if c: 5 else: big` with
+                    // `big: i64` narrowed the arm silently.
+                    let arm_value_node = if arm_node > 0: self.join_arm_value_node(arm_node) else: origin_node
+                    if expected != 0 and final_type == expected and arm_value_node > 0:
+                        let _ = self.reject_implicit_numeric_narrowing(arm_value_node, final_type, arm_ty)
                     arm_kind = D22_JOIN_ARM_OWNED_ANCHOR
                     owned_anchor_count = owned_anchor_count + 1
 
@@ -1198,6 +1204,7 @@ impl Sema:
             // non-Copy field reached through a view cannot satisfy it. The
             // auto-ref path above already returned for &T parameters.
             self.reject_owned_demand_from_view_projection(arg_node, expected, "call argument")
+            let _ = self.reject_implicit_numeric_narrowing(arg_node, expected, actual)
             let _ = self.record_contextual_copy_adjustment(arg_node, expected, actual)
 
     // #1627 (§3.8, D22): an enum payload is a demand like a parameter. A
@@ -3716,6 +3723,11 @@ impl Sema:
                 self.note_returned_transparent_view_effects(body)
                 self.check_returned_ephemeral_value_origins(body, body)
             self.check_returned_closure_env(body, body)
+        // The declared return type is an owned demand on the tail (#1803),
+        // as on a `return` (check_return).
+        if body_expected_ret != 0 and body_expected_ret != self.ty_void and body_ty != 0 and body_ty != self.ty_void and body_ty != self.ty_never:
+            let tail_block = if self.ast.kind(source_body) == NodeKind.NK_BLOCK: self.ast.get_data2(source_body) else: source_body
+            let _ = self.reject_implicit_numeric_narrowing(if tail_block != 0: tail_block else: body, body_expected_ret as i32, body_ty as i32)
         if body_expected_ret != 0 and body_expected_ret != self.ty_void and body_ty != 0 and body_ty != self.ty_void and body_ty != self.ty_never and self.body_has_explicit_value_result(body, 1) != 0:
             if self.return_value_type_compatible(body_expected_ret as i32, body_ty as i32) == 0 and body_materializes_copy == 0:
                 self.emit_error("return type mismatch", body)
@@ -12112,12 +12124,12 @@ impl Sema:
     // aggregate cannot: no conversion reshapes a `(i32, i32)` into a
     // `(i64, i64)`, so a value whose element representation differs is a
     // mismatch here rather than an invalid-MIR failure (#1354).
+    // A numeric narrowing was refused by the owned demand that checked the
+    // value (reject_implicit_numeric_narrowing, #1803).
     mut fn check_binding_annotation(node: i32, value: i32, ann_type: TypeId, val_type: TypeId):
-        if val_type == 0:
+        if val_type == 0 or self.int_narrowing_requires_cast(ann_type, val_type) != 0:
             return
-        if self.int_narrowing_requires_cast(ann_type, val_type) != 0:
-            self.emit_error("implicit integer narrowing or sign change; use an explicit `as` cast", node)
-        else if self.types_compatible(ann_type as i32, val_type as i32) == 0 and self.has_contextual_copy_adjustment(value) == 0:
+        if self.types_compatible(ann_type as i32, val_type as i32) == 0 and self.has_contextual_copy_adjustment(value) == 0:
             if self.arithmetic_result_type(ann_type, val_type) == 0:
                 self.emit_error("type mismatch in binding", node)
         else if self.aggregate_repr_differs(ann_type, val_type, 0) != 0:
@@ -15923,6 +15935,9 @@ impl Sema:
                 self.check_expr_with_expected(elem, expected_elem as TypeId)
             else:
                 self.check_expr(elem)
+            // An element is an owned demand of the element type (#1803).
+            if expected_elem != 0 and et != 0:
+                let _ = self.reject_implicit_numeric_narrowing(elem, expected_elem, et as i32)
             self.check_ephemeral_task_storage(elem, "array")
             // #1368: an aggregate element's own elements do not convert.
             if expected_elem != 0 and self.value_aggregate_repr_differs(expected_elem, et as i32):
@@ -16091,12 +16106,11 @@ impl Sema:
                 let f_ty = self.resolve_type_expr(f_type_node)
                 if f_ty == 0 or self.get_type_kind(self.resolve_alias(f_ty)) == TypeKind.TY_ERR:
                     continue
+                // A numeric narrowing is refused by the owned demand (#1803).
                 let d_ty = self.check_expr_with_owned_demand(f_default, f_ty)
                 if d_ty == 0:
                     continue
-                if self.int_narrowing_requires_cast(f_ty, d_ty) != 0:
-                    self.emit_error("field default type mismatch for '" ++ self.pool_resolve(f_name) ++ "'; use an explicit `as` cast", f_default)
-                else if self.types_compatible(f_ty as i32, d_ty as i32) == 0 and self.arithmetic_result_type(f_ty, d_ty) == 0 and self.has_contextual_copy_adjustment(f_default) == 0:
+                if self.types_compatible(f_ty as i32, d_ty as i32) == 0 and self.arithmetic_result_type(f_ty, d_ty) == 0 and self.has_contextual_copy_adjustment(f_default) == 0:
                     self.emit_error("field default type mismatch for '" ++ self.pool_resolve(f_name) ++ "'", f_default)
 
     // #1739: a generic struct literal with no expected instance checks its
@@ -21767,6 +21781,9 @@ impl Sema:
                 let payload_arg_node = if has_resolved != 0: self.get_resolved_call_arg(node, ai) else: self.ast.get_extra(resolved_extra_start + ai)
                 self.check_ephemeral_task_storage(if payload_arg_node > 0: payload_arg_node else: node, "enum payload")
                 if expected_ty != 0 and arg_ty != 0:
+                    // A payload is an owned demand like a parameter (#1803).
+                    if payload_arg_node > 0:
+                        let _ = self.reject_implicit_numeric_narrowing(payload_arg_node, expected_ty, arg_ty)
                     let payload_materializes_copy = self.record_contextual_copy_adjustment(payload_arg_node, expected_ty, arg_ty)
                     // #1368: an aggregate payload's elements do not convert.
                     if self.value_aggregate_repr_differs(expected_ty, arg_ty) or (self.types_compatible(expected_ty, arg_ty) == 0 and payload_materializes_copy == 0):
@@ -22022,9 +22039,53 @@ impl Sema:
     mut fn check_expr_with_owned_demand(node: i32, expected: TypeId) -> TypeId:
         let exact = self.check_expr_with_expected(node, expected)
         if expected != 0 and exact != 0:
+            let _ = self.reject_implicit_numeric_narrowing(node, expected as i32, exact as i32)
             if self.record_contextual_copy_adjustment(node, expected as i32, exact as i32) == 0:
                 let _ = self.record_contextual_str_clone_adjustment(node, expected as i32, exact as i32)
         exact
+
+    // §4.2.6 (#1803): a numeric demand accepts only the value's own type or
+    // a lossless widening of it. A narrower integer, one of the other
+    // signedness at equal width, a float where an integer is demanded, an
+    // integer where a float is, or an f64 where an f32 is needs an explicit
+    // `as` — one rule for every owned demand (a binding, an element, a
+    // field, a call argument, a return, an assignment, a global), which
+    // every such position reaches through check_expr_with_owned_demand or
+    // note_call_arg_coercion. Unsuffixed literals took the demanded type
+    // already (§4.2.1), so only a typed value arrives here with another. A
+    // Copy view is read as the value its demand materializes.
+    // The expression a join arm's value comes from: a block's tail.
+    fn join_arm_value_node(node: i32) -> i32:
+        if node > 0 and self.ast.kind(node) == NodeKind.NK_BLOCK and self.ast.get_data2(node) != 0:
+            return self.join_arm_value_node(self.ast.get_data2(node))
+        node
+
+    mut fn reject_implicit_numeric_narrowing(node: i32, expected: i32, actual: i32) -> bool:
+        if node <= 0 or expected == 0 or actual == 0:
+            return false
+        let er = self.resolve_alias(expected as TypeId)
+        let ek = self.get_type_kind(er)
+        if ek != TypeKind.TY_INT and ek != TypeKind.TY_FLOAT:
+            return false
+        let pointee = self.shared_copy_pointee(actual)
+        let value = if pointee != 0: pointee else: actual
+        let vr = self.resolve_alias(value as TypeId)
+        let vk = self.get_type_kind(vr)
+        let want = self.type_name(expected)
+        let got = self.type_name(value)
+        if ek == TypeKind.TY_INT and vk == TypeKind.TY_FLOAT:
+            self.emit_error(f"a float where an integer is demanded needs an explicit conversion: `x as {want}` truncates, `x.round() as {want}` rounds (§4.2.6)", node)
+            return true
+        if ek == TypeKind.TY_INT and vk == TypeKind.TY_INT and self.int_narrowing_requires_cast(expected as TypeId, value as TypeId) != 0:
+            self.emit_error(f"implicit integer narrowing or sign change from `{got}` to `{want}`; use an explicit `as` cast (§4.2.6)", node)
+            return true
+        if ek == TypeKind.TY_FLOAT and vk == TypeKind.TY_INT:
+            self.emit_error(f"an integer where a float is demanded needs an explicit `as {want}` (§4.2.6: no implicit integer-to-float conversion)", node)
+            return true
+        if ek == TypeKind.TY_FLOAT and vk == TypeKind.TY_FLOAT and self.get_type_d0(er) < self.get_type_d0(vr):
+            self.emit_error(f"implicit float narrowing from `{got}` to `{want}`; use an explicit `as` cast (§4.2.6)", node)
+            return true
+        false
 
     // #781: an EXPLICIT owned demand (annotated let, assignment into an owned
     // place, return, comprehension element) materializes a &str view as an
@@ -27277,6 +27338,9 @@ impl Sema:
                 static_payload_nodes.push(static_payload_arg_node)
                 self.check_ephemeral_task_storage(if static_payload_arg_node > 0: static_payload_arg_node else: node, "enum payload")
                 if expected_ty != 0 and arg_ty != 0:
+                    // A payload is an owned demand like a parameter (#1803).
+                    if static_payload_arg_node > 0:
+                        let _ = self.reject_implicit_numeric_narrowing(static_payload_arg_node, expected_ty, arg_ty)
                     let static_payload_materializes_copy = self.record_contextual_copy_adjustment(static_payload_arg_node, expected_ty, arg_ty)
                     // #1368: an aggregate payload's elements do not convert.
                     if self.value_aggregate_repr_differs(expected_ty, arg_ty) or (self.types_compatible(expected_ty, arg_ty) == 0 and static_payload_materializes_copy == 0):
