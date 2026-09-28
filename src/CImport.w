@@ -1633,6 +1633,47 @@ fn ci_cursor_needs_demoted_layout(session: i64, cursor: i32, demoted: &str) -> s
             return inner
     ""
 
+// D51 (#1830): whether a call to C function `idx` is raw — its declaration
+// is variadic, or passes or returns a raw-ABI type — or,
+// for an inline function translated with its body, whether that body makes
+// a raw call. The same test the extern path (ci_translate_function) applies
+// to mark a function raw, asked of a callee. Past the depth bound (mutually
+// recursive inline functions) the answer is raw: at worst it removes the
+// safe surface, never grants one.
+fn ci_c_function_call_is_raw(session: i64, idx: i32, depth: i32) -> bool:
+    if with_cimport_fn_is_variadic(session, idx) != 0:
+        return true
+    for pi in 0..with_cimport_fn_param_count(session, idx):
+        if ci_cimport_param_type_requires_raw_abi(ci_pointer_type_explicit_mut(with_cimport_fn_param_type_translated(session, idx, pi))):
+            return true
+    if ci_cimport_type_is_raw_abi(ci_pointer_type_explicit_mut(with_cimport_fn_return_type_translated(session, idx))):
+        return true
+    if with_cimport_fn_is_inline(session, idx) == 0:
+        return false
+    if depth >= 8:
+        return true
+    let definition = ci_fn_definition_cursor(session, idx)
+    definition >= 0 and ci_cursor_calls_raw_function(session, definition, depth + 1)
+
+// Whether the code under `cursor` calls a raw C function directly (D51,
+// #1830). A call through a parameter's function pointer is decided by that
+// parameter's type, which the signature check already reads. A libc call
+// the body translator rewrites to its own With form (calloc to
+// with_alloc_zeroed, strlen, a libm function, a builtin) is not a call to
+// the C function: the translator states that form's context itself.
+fn ci_cursor_calls_raw_function(session: i64, cursor: i32, depth: i32) -> bool:
+    if with_ci_cursor_kind(session, cursor) == CXK_CALL_EXPR and with_ci_num_children(session, cursor) > 0:
+        let callee_ref = with_ci_child(session, cursor, 0)
+        let callee = ci_call_callee_name(session, callee_ref)
+        if callee.len() > 0 and not ci_has_value_libc_call_mapping(callee) and not with_ci_cursor_references_parameter(session, callee_ref):
+            ci_fn_decl_index_ensure(session)
+            if g_ci_fn_decl_by_raw.contains(callee) and ci_c_function_call_is_raw(session, g_ci_fn_decl_by_raw.get(callee).unwrap(), depth):
+                return true
+    for ci in 0..with_ci_num_children(session, cursor):
+        if ci_cursor_calls_raw_function(session, with_ci_child(session, cursor, ci), depth):
+            return true
+    false
+
 fn ci_translate_function(session: i64, idx: i32, known_structs: &str, demoted_types: &str) -> str:
     // B9: fresh per-function temp counter.
     ci_temp_reset()
@@ -1697,6 +1738,11 @@ fn ci_translate_function(session: i64, idx: i32, known_structs: &str, demoted_ty
             if opaque_record.len() > 0:
                 ci_record_omitted_symbol_cat(name, ci_get_decl_location(session, name), "inexpressible", "inline body needs the layout of '" ++ opaque_record ++ "', which c_import imports opaque (§16.9)")
                 return ""
+            // D51 (#1830): a body that calls a raw C function is raw
+            // itself. The wrapper does not become safe by inference: it is
+            // an `unsafe fn`, and the body is printed in that context.
+            if not si_raw and ci_cursor_calls_raw_function(session, definition, 0):
+                si_raw = true
         // #1678: a `static inline` function's only definition is its body
         // — no symbol exists for a manual extern to bind — so an omitted
         // body is inexpressible; a non-static inline may have an external
