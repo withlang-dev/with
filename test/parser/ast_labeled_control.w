@@ -1,5 +1,7 @@
 //! expect-exit: 5
 
+use std.process
+
 fn main:
     var count = 0
     'outer for i in 0..3:
@@ -15,4 +17,4 @@ fn main:
         count += 1
         break 'brace
     }
-    count
+    exit_code(count)

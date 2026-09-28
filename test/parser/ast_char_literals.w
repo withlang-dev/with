@@ -1,6 +1,8 @@
 //! expect-exit: 107
 
+use std.process
+
 fn main:
     let letter = 'a'
     let newline = '\n'
-    letter + newline
+    exit_code(letter + newline)

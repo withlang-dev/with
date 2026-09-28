@@ -1,5 +1,7 @@
 //! expect-exit: 11
 
+use std.process
+
 fn score(v: i32) -> i32:
     match v:
         0 => 1
@@ -12,4 +14,4 @@ fn main:
         acc = acc + i
     while acc < 10:
         acc = acc + 1
-    score(xs[0] + acc)
+    exit_code(score(xs[0] + acc))

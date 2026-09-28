@@ -1,5 +1,7 @@
 //! expect-exit: 12
 
+use std.process
+
 type Number = i32
 
 fn add(a: i32, b: i32) -> i32:
@@ -11,4 +13,4 @@ extern fn puts(msg: str) -> i32
 
 fn main:
     let total: i32 = add(seed, 5)
-    total
+    exit_code(total)
