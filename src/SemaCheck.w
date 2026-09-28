@@ -1886,6 +1886,7 @@ impl Sema:
             ci = ci + 4
         self.local_file_id = saved_file_id
         self.validate_global_data_race_accesses()
+        self.check_calls_against_live_global_views()
 
     // #1473 (§21.1 Rule 6): a function whose declared return is a view — a
     // reference, or a value carrying one (`Option[&T]`, an ephemeral value) —
@@ -2057,8 +2058,6 @@ impl Sema:
     mut fn record_global_data_race_access(sym: i32, node: i32, kind: i32):
         if sym == 0 or node == 0:
             return
-        if sema_path_is_std_implementation(self.current_module_path) != 0 or sema_path_is_runtime_implementation(self.current_module_path) != 0:
-            return
         if self.global_value_decl_kind(sym) == 0:
             return
         // A local that took the name of a global its module cannot see
@@ -2069,6 +2068,12 @@ impl Sema:
         if bound.is_some() and not self.binding_index_is_global(bound.unwrap(), sym):
             return
         if self.global_symbol_is_synchronized(sym) != 0:
+            return
+        // #1819: the write is a write of the body it is in — in std and the
+        // runtime too, whose bodies hold views of their own globals.
+        if kind == GLOBAL_RACE_ACCESS_WRITE:
+            self.record_body_global_write(sym, node)
+        if sema_path_is_std_implementation(self.current_module_path) != 0 or sema_path_is_runtime_implementation(self.current_module_path) != 0:
             return
         self.global_race_access_syms.push(sym)
         self.global_race_access_nodes.push(node)
@@ -2089,6 +2094,392 @@ impl Sema:
         if root == 0:
             return
         self.record_global_data_race_access(root, report_node, GLOBAL_RACE_ACCESS_WRITE)
+
+    // #1819 (§9.1c, §21.1 rule 1): the body a write or a call is in — the
+    // closure being checked (-2 - its node), else the function (its
+    // signature index); -1 outside both (a global's initializer).
+    fn global_effect_body() -> i32:
+        if self.current_effect_closure != 0: -2 - self.current_effect_closure else: self.current_fn_sig_idx
+
+    mut fn record_body_global_write(sym: i32, node: i32):
+        let body = self.global_effect_body()
+        if body == -1:
+            return
+        self.global_write_records.push(body)
+        self.global_write_records.push(sym)
+        self.global_write_records.push(node)
+        self.global_write_records.push(self.local_file_id)
+
+    // A name that denotes a global's place here: a module `let` or `var`,
+    // not a `const` (a value, §9.1c), and not a local that took its name.
+    fn names_global_place(sym: i32) -> bool:
+        if sym == 0 or self.global_value_decl_kind(sym) == 0 or self.const_global_syms.contains(sym):
+            return false
+        let bound = self.scope_name_map.get(sym)
+        bound.is_none() or self.binding_index_is_global(bound.unwrap(), sym)
+
+    // The callable an argument hands its callee, which may run it: a
+    // closure literal or a local bound to one (-2 - its node), or a callable
+    // parameter of the function being checked (callable_param_body) — also
+    // as `f.clone()` (D63). -1 for anything else.
+    fn arg_callable_body(arg: i32) -> i32:
+        var node = arg
+        while node > 0 and (self.ast.kind(node) == NodeKind.NK_GROUPED or self.ast.kind(node) == NodeKind.NK_MOVE_ARG or self.ast.kind(node) == NodeKind.NK_COPY_ARG):
+            node = self.ast.get_data0(node)
+        if node <= 0:
+            return -1
+        if self.ast.kind(node) == NodeKind.NK_CLOSURE:
+            return -2 - node
+        if self.ast.kind(node) == NodeKind.NK_CALL and self.ast.get_data2(node) == 0:
+            let callee = self.ast.get_data0(node)
+            if self.ast.kind(callee) == NodeKind.NK_FIELD_ACCESS and self.pool_resolve(self.ast.get_data1(callee)) == "clone":
+                node = self.ast.get_data0(callee)
+        if self.ast.kind(node) != NodeKind.NK_IDENT:
+            return -1
+        let sym = self.ast.get_data0(node)
+        if self.scope_binding_is_local(sym) and self.binding_closure_nodes.contains(sym):
+            let closure: i32 = self.binding_closure_nodes.get(sym).unwrap()
+            return -2 - closure
+        if self.fn_value_ident_sigs.contains(node):
+            let sig: i32 = self.fn_value_ident_sigs.get(node).unwrap()
+            return sig
+        self.callable_param_body(sym)
+
+    // The body a callable parameter of the function being checked stands
+    // for: whatever closure a call of the function binds to it (§12.4: a
+    // closure literal that reaches a parameter within one compilation makes
+    // the call through it direct). -1 when `sym` names no such parameter; a
+    // closure's own parameters are not the function's.
+    fn callable_param_body(sym: i32) -> i32:
+        let sig = self.current_fn_sig_idx
+        if self.current_effect_closure != 0 or sig < 0:
+            return -1
+        let pi = self.param_index_for_sym(sym)
+        if pi < 0 or pi >= 32 or pi >= self.sig_get_param_count(sig):
+            return -1
+        if self.callable_any_fn_type(self.sig_param_type(sig, pi) as TypeId) == 0:
+            return -1
+        GLOBAL_PARAM_BODY + sig * 32 + pi
+
+    fn type_takes_place(tid: i32) -> bool:
+        if tid <= 0:
+            return false
+        let kind = self.get_type_kind(self.resolve_alias(tid as TypeId))
+        kind == TypeKind.TY_REF or kind == TypeKind.TY_SLICE
+
+    // The globals an argument views for the whole call, onto `out` as
+    // [argument, global] pairs: its view origins (collect_expr_view_deps),
+    // and the place's own root when its parameter takes it by place (`&T`,
+    // `[]T`, a reading or mutating receiver). A `copy`/`move` argument is
+    // an independent value.
+    fn push_arg_global_views(out0: Vec[i32], arg: i32, by_place: bool) -> Vec[i32]:
+        var out = out0
+        if arg <= 0 or self.ast.kind(arg) == NodeKind.NK_MOVE_ARG or self.ast.kind(arg) == NodeKind.NK_COPY_ARG:
+            return out
+        var roots: Vec[i32] = Vec.new()
+        roots = self.collect_expr_view_deps(arg, move roots)
+        if by_place:
+            roots = self.push_unique_i32(move roots, self.borrow_root_place(arg))
+        for ri in 0..roots.len() as i32:
+            if self.names_global_place(roots[ri]):
+                out.push(arg)
+                out.push(roots[ri])
+        out
+
+    mut fn push_global_view_check(call: i32, sym: i32, view_sym: i32, view_node: i32, last_use: i32, flags: i32):
+        self.global_view_call_checks.push(call)
+        self.global_view_call_checks.push(sym)
+        self.global_view_call_checks.push(view_sym)
+        self.global_view_call_checks.push(view_node)
+        self.global_view_call_checks.push(last_use)
+        self.global_view_call_checks.push(flags)
+
+    // #1819 (§9.1c: globals are places; §21.1 rule 1): a call writes every
+    // global its callee writes — and every global a callable it hands the
+    // callee writes, since the callee may run it. Which globals those are
+    // is known once every body is checked
+    // (check_calls_against_live_global_views): the call is kept with each
+    // view of a global live across it — a named view used after the call
+    // or inside it (borrow_liveness_at, the rule a direct write is judged
+    // by), and an argument or receiver that views a global for the whole
+    // call. `callee` is the called body (-1 when none is known); `args[i]`
+    // is the argument for the callee's parameter `first_param + i`.
+    mut fn note_call_global_effects(call_node: i32, callee: i32, first_param: i32, recv_node: i32, recv_by_place: bool, args: &Vec[i32], args_by_place: &Vec[bool]):
+        if call_node <= 0:
+            return
+        let call = self.global_calls.len() as i32 / GLOBAL_CALL_STRIDE
+        let target_start = self.global_call_targets.len() as i32 / GLOBAL_TARGET_STRIDE
+        var target_count = 0
+        if callee != -1:
+            self.global_call_targets.push(callee)
+            self.global_call_targets.push(call)
+            self.global_call_targets.push(0)
+            target_count = target_count + 1
+        for ai in 0..args.len() as i32:
+            let bound = self.arg_callable_body(args[ai])
+            if bound != -1:
+                // A closure literal's body was checked right here, under the
+                // views live at this call (check_closure): its writes and
+                // calls met them there; it is kept for the caller's writes
+                // and for this call's argument views.
+                self.global_call_targets.push(bound)
+                self.global_call_targets.push(call)
+                self.global_call_targets.push(if self.ast.kind(args[ai]) == NodeKind.NK_CLOSURE: 1 else: 0)
+                target_count = target_count + 1
+                self.global_call_bindings.push(call)
+                self.global_call_bindings.push(first_param + ai)
+                self.global_call_bindings.push(bound)
+        self.global_calls.push(self.global_effect_body())
+        self.global_calls.push(call_node)
+        self.global_calls.push(self.local_file_id)
+        self.global_calls.push(target_start)
+        self.global_calls.push(target_count)
+        self.global_calls.push(callee)
+        if target_count == 0 or self.suppress_errors != 0:
+            return
+        for bi in 0..self.borrow_kinds.len() as i32:
+            let ref_sym: i32 = self.borrow_refs[bi]
+            let kind: i32 = self.borrow_kinds[bi]
+            if ref_sym == 0 or (kind != BorrowKind.SHARED and kind != BorrowKind.EXCLUSIVE) or not self.names_global_place(self.borrow_places[bi]):
+                continue
+            let live = self.borrow_liveness_at(bi, call_node)
+            if live.state != BORROW_LIVE:
+                continue
+            let decl = self.binding_decl_node(ref_sym)
+            let flags = (if live.loop_view: 1 else: 0) + (if live.gen_loop_view: 2 else: 0)
+            self.push_global_view_check(call, self.borrow_places[bi], ref_sym, if decl != 0: decl else: self.borrow_creation_nodes[bi], live.last_use, flags)
+        var views: Vec[i32] = Vec.new()
+        if recv_node > 0 and recv_by_place:
+            views = self.push_arg_global_views(move views, recv_node, true)
+        for ai in 0..args.len() as i32:
+            views = self.push_arg_global_views(move views, args[ai], args_by_place[ai])
+        var vi = 0
+        while vi + 1 < views.len() as i32:
+            self.push_global_view_check(call, views[vi + 1], 0, views[vi], 0, 0)
+            vi = vi + 2
+
+    // note_call_global_effects for a call Sema resolved to signature
+    // `sig_idx` (arguments as record_call_view_origins takes them).
+    mut fn note_sig_call_global_effects(call_node: i32, sig_idx: i32, param_offset: i32, recv_node: i32, extra_start: i32, arg_count: i32, has_resolved: i32):
+        if call_node <= 0 or sig_idx < 0:
+            return
+        let param_count = self.sig_get_param_count(sig_idx)
+        let args: Vec[i32] = Vec.new()
+        let by_place: Vec[bool] = Vec.new()
+        for ai in 0..arg_count:
+            args.push(if has_resolved != 0: self.get_resolved_call_arg(call_node, ai) else: self.ast.get_extra(extra_start + ai))
+            by_place.push(ai + param_offset < param_count and self.type_takes_place(self.sig_param_type(sig_idx, ai + param_offset)))
+        let mode = self.sig_receiver_mode(sig_idx)
+        let recv_by_place = param_offset == 1 and param_count > 0 and (mode == ReceiverMode.Read or mode == ReceiverMode.Mut)
+        self.note_call_global_effects(call_node, sig_idx, param_offset, recv_node, recv_by_place, args, by_place)
+
+    fn global_effect_body_name(body: i32) -> str:
+        if body <= -2:
+            return "a closure"
+        if body < 0 or body >= self.sig_names.len() as i32:
+            return "a callable"
+        // A specialization's symbol is its template's name, `__sema__` or
+        // `__receiver__`, then its key; an extension method's carries
+        // `$ext$` and its extension's key.
+        let full: str = with_str_clone_ref(self.pool_resolve(self.sig_names[body]))
+        let parts = full.split("__sema__")[0].split("__receiver__")[0].split("$ext$")
+        "`" ++ parts[0] ++ "`"
+
+    // A callable parameter's name (callable_param_body).
+    fn global_param_body_name(param_body: i32) -> str:
+        let sig = (param_body - GLOBAL_PARAM_BODY) / 32
+        let pi = (param_body - GLOBAL_PARAM_BODY) % 32
+        let fn_node = self.receiver_decl_node_for_sig(sig)
+        let meta = if fn_node != 0: self.ast.find_fn_meta(fn_node) else: -1
+        if meta < 0 or pi >= self.ast.fn_meta_param_count(meta):
+            return "its callable parameter"
+        "`" ++ with_str_clone_ref(self.pool_resolve(self.ast.fn_param_name(self.ast.fn_meta_param_start(meta), pi))) ++ "`"
+
+    // The callee a diagnostic names for a kept call: its signature, else the
+    // callable its callee expression names (`f()`).
+    fn global_call_callee_name(call: i32) -> str:
+        let callee: i32 = self.global_calls[call * GLOBAL_CALL_STRIDE + 5]
+        if callee >= 0 and callee < GLOBAL_PARAM_BODY:
+            return self.global_effect_body_name(callee)
+        let call_node: i32 = self.global_calls[call * GLOBAL_CALL_STRIDE + 1]
+        let callee_expr = self.ast.get_data0(call_node)
+        if self.ast.kind(callee_expr) == NodeKind.NK_IDENT:
+            return "`" ++ with_str_clone_ref(self.pool_resolve(self.ast.get_data0(callee_expr))) ++ "`"
+        "the callable"
+
+    // #1819 (§9.1c: globals are places; §21.1 rule 1): with every body
+    // checked, each call's writes are known — its targets' own, and those
+    // of every call they make, recursion included; a callable parameter
+    // runs whatever closure a call binds to it. A view of a global live
+    // across a call that writes that global is refused, as a direct write
+    // under it is (check_mutation_against_views).
+    mut fn check_calls_against_live_global_views():
+        let check_count = self.global_view_call_checks.len() as i32 / GLOBAL_VIEW_CHECK_STRIDE
+        if check_count == 0:
+            return
+        // The calls that run each body: its target entries, chained.
+        var runs_head: HashMap[i32, i32] = sema_new_map_i32_i32()
+        let runs_next: Vec[i32] = Vec.new()
+        let target_count = self.global_call_targets.len() as i32 / GLOBAL_TARGET_STRIDE
+        for ti in 0..target_count:
+            let body: i32 = self.global_call_targets[ti * GLOBAL_TARGET_STRIDE]
+            runs_next.push(runs_head.get(body) ?? -1)
+            runs_head.insert(body, ti)
+        // The callables bound to each callable parameter, chained.
+        var bound_head: HashMap[i32, i32] = sema_new_map_i32_i32()
+        let bound_next: Vec[i32] = Vec.new()
+        let binding_count = self.global_call_bindings.len() as i32 / GLOBAL_BINDING_STRIDE
+        for bi in 0..binding_count:
+            let call: i32 = self.global_call_bindings[bi * GLOBAL_BINDING_STRIDE]
+            let param: i32 = self.global_call_bindings[bi * GLOBAL_BINDING_STRIDE + 1]
+            let callee: i32 = self.global_calls[call * GLOBAL_CALL_STRIDE + 5]
+            if callee < 0 or callee >= GLOBAL_PARAM_BODY or param >= 32:
+                bound_next.push(-1)
+                continue
+            let key = GLOBAL_PARAM_BODY + callee * 32 + param
+            bound_next.push(bound_head.get(key) ?? -1)
+            bound_head.insert(key, bi)
+        let write_count = self.global_write_records.len() as i32 / GLOBAL_WRITE_STRIDE
+        var judged: HashMap[i32, i32] = sema_new_map_i32_i32()
+        let reported: Vec[i32] = Vec.new()
+        for ci in 0..check_count:
+            let sym: i32 = self.global_view_call_checks[ci * GLOBAL_VIEW_CHECK_STRIDE + 1]
+            if judged.contains(sym):
+                continue
+            judged.insert(sym, 1)
+            // Every body that writes `sym`, itself or through its calls:
+            // `via` holds, toward the write, the target entry of the call
+            // it makes next, or -1 - the write record where it writes.
+            var via: HashMap[i32, i32] = sema_new_map_i32_i32()
+            let work: Vec[i32] = Vec.new()
+            for wi in 0..write_count:
+                let writer: i32 = self.global_write_records[wi * GLOBAL_WRITE_STRIDE]
+                if self.global_write_records[wi * GLOBAL_WRITE_STRIDE + 1] == sym and not via.contains(writer):
+                    via.insert(writer, -1 - wi)
+                    work.push(writer)
+            var k = 0
+            while k < work.len() as i32:
+                var e: i32 = runs_head.get(work[k]) ?? -1
+                k = k + 1
+                while e >= 0:
+                    let caller: i32 = self.global_calls[self.global_call_targets[e * GLOBAL_TARGET_STRIDE + 1] * GLOBAL_CALL_STRIDE]
+                    if caller != -1 and not via.contains(caller):
+                        via.insert(caller, e)
+                        work.push(caller)
+                    e = runs_next[e]
+            for cj in ci..check_count:
+                if self.global_view_call_checks[cj * GLOBAL_VIEW_CHECK_STRIDE + 1] != sym:
+                    continue
+                let call_node: i32 = self.global_calls[self.global_view_call_checks[cj * GLOBAL_VIEW_CHECK_STRIDE] * GLOBAL_CALL_STRIDE + 1]
+                var seen = false
+                var ri = 0
+                while ri + 1 < reported.len() as i32:
+                    if reported[ri] == call_node and reported[ri + 1] == sym:
+                        seen = true
+                    ri = ri + 2
+                if not seen and self.report_global_view_call_check(cj, &via, &bound_head, &bound_next):
+                    reported.push(call_node)
+                    reported.push(sym)
+
+    // The binding through which callable parameter `param_body` runs a body
+    // that writes (is in `via`): a closure a call binds to it, directly or
+    // through a parameter of the caller that it forwards. -1 when none does.
+    fn param_binding_writer(param_body: i32, via: &HashMap[i32, i32], bound_head: &HashMap[i32, i32], bound_next: &Vec[i32]) -> i32:
+        var seen: HashMap[i32, i32] = sema_new_map_i32_i32()
+        let work: Vec[i32] = Vec.new()
+        seen.insert(param_body, 1)
+        work.push(param_body)
+        var k = 0
+        while k < work.len() as i32:
+            var b: i32 = bound_head.get(work[k]) ?? -1
+            k = k + 1
+            while b >= 0:
+                let bound: i32 = self.global_call_bindings[b * GLOBAL_BINDING_STRIDE + 2]
+                if bound >= GLOBAL_PARAM_BODY:
+                    if not seen.contains(bound):
+                        seen.insert(bound, 1)
+                        work.push(bound)
+                else if via.contains(bound):
+                    return b
+                b = bound_next[b]
+        -1
+
+    // One kept check against `via` (check_calls_against_live_global_views):
+    // reported when a body the call runs writes the global.
+    mut fn report_global_view_call_check(ci: i32, via: &HashMap[i32, i32], bound_head: &HashMap[i32, i32], bound_next: &Vec[i32]) -> bool:
+        let base = ci * GLOBAL_VIEW_CHECK_STRIDE
+        let call: i32 = self.global_view_call_checks[base]
+        let sym: i32 = self.global_view_call_checks[base + 1]
+        let view_sym: i32 = self.global_view_call_checks[base + 2]
+        let view_node: i32 = self.global_view_call_checks[base + 3]
+        let last_use: i32 = self.global_view_call_checks[base + 4]
+        let flags: i32 = self.global_view_call_checks[base + 5]
+        let call_node: i32 = self.global_calls[call * GLOBAL_CALL_STRIDE + 1]
+        let file: i32 = self.global_calls[call * GLOBAL_CALL_STRIDE + 2]
+        let target_start: i32 = self.global_calls[call * GLOBAL_CALL_STRIDE + 3]
+        let target_count: i32 = self.global_calls[call * GLOBAL_CALL_STRIDE + 4]
+        let callee: i32 = self.global_calls[call * GLOBAL_CALL_STRIDE + 5]
+        // The body the call runs that writes, and the binding that hands it
+        // over when the call runs a callable parameter.
+        var body = -1
+        var hit = -1
+        var binding = -1
+        for ti in target_start..target_start + target_count:
+            let target: i32 = self.global_call_targets[ti * GLOBAL_TARGET_STRIDE]
+            // A closure literal's body met the named views in place.
+            if hit >= 0 or (view_sym != 0 and self.global_call_targets[ti * GLOBAL_TARGET_STRIDE + 2] != 0):
+                continue
+            if target >= GLOBAL_PARAM_BODY:
+                let b = self.param_binding_writer(target, via, bound_head, bound_next)
+                if b >= 0:
+                    hit = ti
+                    binding = b
+                    body = self.global_call_bindings[b * GLOBAL_BINDING_STRIDE + 2]
+            else if via.contains(target):
+                hit = ti
+                body = target
+        if hit < 0:
+            return false
+        let name: str = with_str_clone_ref(self.pool_resolve(sym))
+        let callee_name = self.global_call_callee_name(call)
+        // The way from the call to the write: the body the call runs, each
+        // body it calls next, and the one that writes.
+        let hit_target: i32 = self.global_call_targets[hit * GLOBAL_TARGET_STRIDE]
+        var chain = if binding >= 0 and hit == target_start and callee != -1: callee_name ++ " runs the callable a caller passes for it"
+            else if binding >= 0: callee_name ++ " runs " ++ self.global_param_body_name(hit_target) ++ ", the callable a caller passes for it"
+            else if hit != target_start or callee == -1: callee_name ++ " runs " ++ self.global_effect_body_name(hit_target) ++ " it is handed"
+            else: self.global_effect_body_name(body)
+        var step: i32 = via.get(body) ?? -1
+        while step >= 0:
+            body = self.global_call_targets[step * GLOBAL_TARGET_STRIDE]
+            chain = chain ++ ", which calls " ++ self.global_effect_body_name(body)
+            step = via.get(body) ?? -1
+        let write = -1 - step
+        let call_span = Span { file, start: self.ast.get_start(call_node), end: self.ast.get_end(call_node) }
+        let what = if view_sym != 0: "`" ++ with_str_clone_ref(self.pool_resolve(view_sym)) ++ "` is a live view into it" else: "its argument is a live view into it"
+        var diag = Diagnostic.err("call to " ++ callee_name ++ " mutates global `" ++ name ++ "` while " ++ what, call_span)
+        if view_node != 0:
+            let view_label = if view_sym != 0: "`" ++ with_str_clone_ref(self.pool_resolve(view_sym)) ++ "` views a value stored in `" ++ name ++ "`" else: "this argument views `" ++ name ++ "` for the whole call"
+            diag.add_label(Span { file, start: self.ast.get_start(view_node), end: self.ast.get_end(view_node) }, view_label)
+        diag.add_label(call_span, "this call mutates `" ++ name ++ "`: " ++ chain ++ ", which writes it")
+        if binding >= 0:
+            let bind_call: i32 = self.global_call_bindings[binding * GLOBAL_BINDING_STRIDE]
+            let bind_node: i32 = self.global_calls[bind_call * GLOBAL_CALL_STRIDE + 1]
+            let bind_file: i32 = self.global_calls[bind_call * GLOBAL_CALL_STRIDE + 2]
+            diag.add_label(Span { file: bind_file, start: self.ast.get_start(bind_node), end: self.ast.get_end(bind_node) }, "the callable is passed here")
+        if write >= 0 and write < self.global_write_records.len() as i32 / GLOBAL_WRITE_STRIDE:
+            let write_node: i32 = self.global_write_records[write * GLOBAL_WRITE_STRIDE + 2]
+            let write_file: i32 = self.global_write_records[write * GLOBAL_WRITE_STRIDE + 3]
+            diag.add_label(Span { file: write_file, start: self.ast.get_start(write_node), end: self.ast.get_end(write_node) }, "`" ++ name ++ "` is written here")
+        if last_use != 0:
+            diag.add_label(Span { file, start: self.ast.get_start(last_use), end: self.ast.get_end(last_use) }, "view is used here after the call")
+        if (flags & 2) != 0:
+            diag.add_note("the generator `" ++ with_str_clone_ref(self.pool_resolve(view_sym)) ++ "` is still running while the loop body runs (§13.4); collect the changes and apply them after the loop")
+        else if (flags & 1) != 0:
+            diag.add_note("the loop reads `" ++ name ++ "` again on its next iteration; collect the changes and apply them after the loop")
+        diag.add_note("a call writes every global its callee writes, through every call it makes (§9.1c: globals are places; §21.1 rule 1)")
+        self.diags.emit(move diag)
+        true
 
     fn global_data_race_access_needs_proof(idx: i32) -> i32:
         let sym = self.global_race_access_syms[idx]
@@ -2458,6 +2849,10 @@ impl Sema:
         // Effect tracking: save outer state and populate for this function
         let saved_eff_sig_idx: i32 = self.current_fn_sig_idx
         let saved_fn_variadic: i32 = self.current_fn_variadic
+        // #1819: this body's writes and calls are its own, not those of a
+        // closure being checked when it was instantiated.
+        let saved_effect_closure: i32 = self.current_effect_closure
+        self.current_effect_closure = 0
         let saved_eff_param_syms = sema_clone_i32_vec(&self.current_fn_param_syms)
         let saved_eff_param_effs = sema_clone_i32_vec(&self.current_fn_param_effs)
         let saved_eff_param_direct_effs = sema_clone_i32_vec(&self.current_fn_param_direct_effs)
@@ -2793,6 +3188,7 @@ impl Sema:
         self.current_fn_variadic = saved_fn_variadic
         self.fn_param_invocations = saved_invocations
         self.fn_param_many_nodes = saved_many_nodes
+        self.current_effect_closure = saved_effect_closure
         while self.current_fn_param_syms.len() > 0:
             self.current_fn_param_syms.pop()
             self.current_fn_param_effs.pop()
@@ -6643,6 +7039,35 @@ type SemaLaterUse {
 
 impl Copy for SemaLaterUse
 
+// How a borrow row stands at a mutation (borrow_liveness_at): dead for good
+// (its last use is behind the mutation), dead for this mutation only (a
+// loop view whose loop ends right after it), or live — with the use after
+// the mutation, 0 when the view is used inside the mutating expression.
+const BORROW_DEAD: i32 = 0
+const BORROW_DEAD_HERE: i32 = 1
+const BORROW_LIVE: i32 = 2
+
+type SemaBorrowLiveness {
+    state: i32,
+    last_use: i32,
+    loop_view: bool,
+    gen_loop_view: bool,
+}
+
+impl Copy for SemaBorrowLiveness
+
+// #1819: record strides of Sema.global_write_records, global_calls,
+// global_call_targets, global_call_bindings and global_view_call_checks,
+// and the body a callable parameter stands for: GLOBAL_PARAM_BODY + its
+// function's signature index * 32 + the parameter's index. (A body is a
+// signature index, -2 - a closure node, or one of these.)
+const GLOBAL_WRITE_STRIDE: i32 = 4
+const GLOBAL_CALL_STRIDE: i32 = 6
+const GLOBAL_TARGET_STRIDE: i32 = 3
+const GLOBAL_BINDING_STRIDE: i32 = 3
+const GLOBAL_VIEW_CHECK_STRIDE: i32 = 6
+const GLOBAL_PARAM_BODY: i32 = 536870912
+
 impl Sema:
     fn int_literal_i64_value(node: i32) -> SemaIntLiteralValue:
         if node == 0 or self.ast.kind(node) != NodeKind.NK_INT_LIT:
@@ -8069,8 +8494,10 @@ impl Sema:
                         self.emit_error("cannot use unsafe fn where a safe function type is expected; mark the target type 'unsafe fn' or wrap the contract in a safe function", node)
                         return 0
                     self.typed_expr_types.insert(node, expected as i32)
+                    self.fn_value_ident_sigs.insert(node, sig_idx)
                     return expected as i32
             self.typed_expr_types.insert(node, fn_tid)
+            self.fn_value_ident_sigs.insert(node, sig_idx)
             return fn_tid
         if (sig_idx >= 0 or self.generic_fn_node_for_symbol(sym) != 0) and self.symbol_visible_from_current(sym) == 0:
             self.emit_private_symbol_error(sym, node)
@@ -9365,6 +9792,12 @@ impl Sema:
             self.emit_error("selected unary operator cannot accept the exact operand type", operand_node)
             return 0
         self.operator_method_calls.insert(node, candidate.fn_sym)
+        // #1819: the operator is a call of its method.
+        let args: Vec[i32] = Vec.new()
+        let by_place: Vec[bool] = Vec.new()
+        args.push(operand_node)
+        by_place.push(self.type_takes_place(expected_operand))
+        self.note_call_global_effects(node, candidate.sig, 0, 0, false, args, by_place)
         self.sig_return_type(candidate.sig)
 
     mut fn check_binary_operator_method(node: i32, op: i32, lhs: i32, rhs: i32) -> i32:
@@ -9430,6 +9863,14 @@ impl Sema:
                 return 0
         self.operator_method_calls.insert(node, selected.fn_sym)
         self.operator_method_reversed.insert(node, reversed)
+        // #1819: the operator is a call of its method.
+        let args: Vec[i32] = Vec.new()
+        let by_place: Vec[bool] = Vec.new()
+        args.push(selected_lhs_node)
+        args.push(selected_rhs_node)
+        by_place.push(self.type_takes_place(expected_lhs))
+        by_place.push(self.type_takes_place(expected_rhs))
+        self.note_call_global_effects(node, selected.sig, 0, 0, false, args, by_place)
         ret
 
     // For comparison, a `&str` behaves like the `str` it points at (string value
@@ -12648,6 +13089,23 @@ impl Sema:
                 return rhs
         lhs
 
+    // #1819: a `for` over an Iter[T] type calls its `next()` each time round
+    // (§13.5); a generic one's call is noted by demand_generic_iter_next.
+    mut fn note_iter_next_global_effects(iter_type: i32, iterable: i32, node: i32):
+        if iter_type == 0 or self.get_type_kind(self.resolve_alias(iter_type as TypeId)) == TypeKind.TY_GENERIC_INST:
+            return
+        let owner_sym = self.method_owner_symbol_for_type(self.resolve_alias(iter_type as TypeId) as i32)
+        let next_sym = self.pool_lookup_symbol("next")
+        if owner_sym == 0 or next_sym <= 0:
+            return
+        let sig = self.lookup_method_sig(owner_sym, next_sym)
+        if sig < 0:
+            return
+        let no_args: Vec[i32] = Vec.new()
+        let no_places: Vec[bool] = Vec.new()
+        let mode = self.sig_receiver_mode(sig)
+        self.note_call_global_effects(node, sig, 1, iterable, mode == ReceiverMode.Read or mode == ReceiverMode.Mut, no_args, no_places)
+
     // #912: an iteration desugar over a generic iterator IS a next() call,
     // but no spelled call ever demands the specialization. Register it via
     // the ordinary generic-method-call machinery, keyed so the lowering can
@@ -12728,6 +13186,7 @@ impl Sema:
             // no spelled call ever demands the specialization — register it here,
             // keyed by the for node, so MIR dispatches the concrete next().
             self.demand_generic_iter_next(iter_type, iterable, node)
+            self.note_iter_next_global_effects(iter_type as i32, iterable, node)
 
         // §13 implicit iteration: `for x in vec` borrows the collection (the
         // compiler-inserted .iter() form), so no consuming gate applies. Drop-
@@ -12917,6 +13376,11 @@ impl Sema:
         self.gen_for_each_sigs.insert(node, each_sig)
         if each_mono != 0:
             self.gen_for_each_monos.insert(node, each_mono)
+        // #1819: the loop is a call of `each` on the iterable.
+        let no_args: Vec[i32] = Vec.new()
+        let no_places: Vec[bool] = Vec.new()
+        let mode = self.sig_receiver_mode(each_sig)
+        self.note_call_global_effects(node, each_sig, 1, iterable, mode == ReceiverMode.Read or mode == ReceiverMode.Mut, no_args, no_places)
         elem
 
     // The concrete `each` of a generic Gen impl, demanded through the ordinary
@@ -17529,6 +17993,10 @@ impl Sema:
                 self.current_fn_param_origins.push(0)
                 self.current_fn_param_view_nodes.push(0)
         self.current_fn_sig_idx = if closure_capture_syms.len() > 0: 0 else: saved_capture_sig_idx
+        // #1819: the body's writes and calls are the closure's: they happen
+        // when it runs (note_call_global_effects).
+        let saved_effect_closure: i32 = self.current_effect_closure
+        self.current_effect_closure = node
 
         var expected_fn_tid = 0
         if self.has_expected_type != 0 and self.expected_expr_type != 0:
@@ -17755,6 +18223,7 @@ impl Sema:
             self.current_fn_param_view_nodes.push(saved_capture_view_nodes[i])
         self.current_fn_sig_idx = saved_capture_sig_idx
         self.current_fn_variadic = saved_capture_fn_variadic
+        self.current_effect_closure = saved_effect_closure
 
         // Restore borrow state — discard borrows created inside closure body.
         while self.borrow_kinds.len() as i32 > saved_borrow_len:
@@ -18978,6 +19447,21 @@ impl Sema:
             let eph_arg_node = if has_resolved != 0: self.get_resolved_call_arg(node, ai) else: self.ast.get_extra(extra_start + ai)
             self.check_ephemeral_task_arg_escape(eph_arg_node, expected_ty, 0, 0, param_i)
 
+        // #1819: a call of a closure binding runs that closure's body, and a
+        // call of a callable parameter whatever closure a caller binds to it
+        // (callable_param_body); another callable value's body is not known
+        // here.
+        let global_args: Vec[i32] = Vec.new()
+        let global_by_place: Vec[bool] = Vec.new()
+        for gai in 0..arg_count:
+            global_args.push(if has_resolved != 0: self.get_resolved_call_arg(node, gai) else: self.ast.get_extra(extra_start + gai))
+            global_by_place.push(self.type_takes_place(self.fn_type_param_type(fn_tid, gai + param_offset)))
+        let callee_expr = self.ast.get_data0(node)
+        let called_body = if closure_node > 0: -2 - closure_node
+            else if self.ast.kind(callee_expr) == NodeKind.NK_IDENT: self.callable_param_body(self.ast.get_data0(callee_expr))
+            else: -1
+        self.note_call_global_effects(node, called_body, param_offset, 0, false, global_args, global_by_place)
+
         if closure_node > 0:
             let capture_count = self.closure_capture_summary_count(closure_node)
             var closure_view_deps: Vec[i32] = Vec.new()
@@ -19248,6 +19732,7 @@ impl Sema:
         self.qualified_extension_call_nodes.insert(node, 1)
         self.propagate_method_call_param_effects(node, sig_idx, 0, 0, extra_start, arg_count, 0)
         self.record_call_view_origins(node, sig_idx, 0, 0, extra_start, arg_count, 0)
+        self.note_sig_call_global_effects(node, sig_idx, 0, 0, extra_start, arg_count, 0)
         let ret = self.sig_return_type(sig_idx)
         self.typed_expr_types.insert(node, ret)
         ret
@@ -20002,6 +20487,7 @@ impl Sema:
                 self.check_mut_slice_call_exclusivity(sc_mut_args, sc_all_args)
             self.check_dyn_trait_call_compat(fn_sym, resolved_extra_start, arg_types, resolved_arg_count, param_offset)
             self.record_call_view_origins(node, sig_idx, param_offset, 0, resolved_extra_start, resolved_arg_count, has_resolved)
+            self.note_sig_call_global_effects(node, sig_idx, param_offset, 0, resolved_extra_start, resolved_arg_count, has_resolved)
             self.record_generator_call_ref_origins(node, sig_idx, param_offset, 0, resolved_extra_start, resolved_arg_count, has_resolved)
             self.typed_expr_types.insert(node, ret)
             return ret
@@ -20789,6 +21275,13 @@ impl Sema:
                 self.facade_check_callback_arg(fn_sym, ai, actual_ty, arg_node)
         if slice_mut_args.len() > 0:
             self.check_mut_slice_call_exclusivity(slice_mut_args, arg_nodes)
+        // #1819: the specialization is the body the call runs.
+        let args: Vec[i32] = Vec.new()
+        let by_place: Vec[bool] = Vec.new()
+        for ai in 0..arg_count:
+            args.push(if ai < arg_nodes.len() as i32: arg_nodes[ai] else: 0)
+            by_place.push(ai < param_count and self.type_takes_place(self.sig_param_type(sig_idx, ai)))
+        self.note_call_global_effects(call_node, sig_idx, 0, 0, false, args, by_place)
 
     mut fn check_generic_call(fn_sym: i32, fn_node: i32, arg_types: &Vec[i32], arg_nodes: &Vec[i32], arg_count: i32, call_node: i32) -> i32:
         let meta = self.ast.find_fn_meta(fn_node)
@@ -22580,6 +23073,7 @@ impl Sema:
             // identical to effect propagation so Option[&T] retains its concrete
             // collection origin at the caller (D22 Rule 10).
             self.record_call_view_origins(node, concrete_sig, recv_param_offset, receiver, extra_start, arg_count, self.has_resolved_call_args(node))
+            self.note_sig_call_global_effects(node, concrete_sig, recv_param_offset, receiver, extra_start, arg_count, self.has_resolved_call_args(node))
             self.record_generator_call_ref_origins(node, concrete_sig, recv_param_offset, receiver, extra_start, arg_count, self.has_resolved_call_args(node))
         if ret_ty != 0:
             self.typed_expr_types.insert(node, ret_ty)
@@ -24691,6 +25185,8 @@ impl Sema:
         if self.fn_decl_nodes.contains(found_fn) or self.generic_fn_node_for_symbol(found_fn) != 0:
             self.emit_no_await_guard_may_suspend_call(node, found_fn)
             self.note_allocating_callee(node, found_fn)
+        // #1819: the impl method is the body the call runs.
+        self.note_sig_call_global_effects(node, self.get_sig(found_fn), 1, expr, extra_start, arg_count, has_resolved_args)
         let ret_ty = self.resolve_type_node_with_subst(found_info.ret_node, recv_type, found_subst_names, found_subst_types)
         if ret_ty != 0:
             self.typed_expr_types.insert(node, ret_ty)
@@ -25651,6 +26147,7 @@ impl Sema:
                     if mc_subst_ret != 0:
                         self.propagate_method_call_param_effects(node, sig_idx, call_param_offset, call_effect_recv, extra_start, mc_resolved_arg_count, mc_has_resolved_args)
                         self.record_call_view_origins(node, sig_idx, call_param_offset, call_effect_recv, extra_start, mc_resolved_arg_count, mc_has_resolved_args)
+                        self.note_sig_call_global_effects(node, sig_idx, call_param_offset, call_effect_recv, extra_start, mc_resolved_arg_count, mc_has_resolved_args)
                         self.record_generator_call_ref_origins(node, sig_idx, call_param_offset, call_effect_recv, extra_start, mc_resolved_arg_count, mc_has_resolved_args)
                         return mc_subst_ret
                 // A STATIC call has no receiver param: args pair with params from
@@ -25663,6 +26160,7 @@ impl Sema:
                 // mirrors mc_plain_poff in the #567 type-check loop above.
                 self.propagate_method_call_param_effects(node, sig_idx, call_param_offset, call_effect_recv, extra_start, mc_resolved_arg_count, mc_has_resolved_args)
                 self.record_call_view_origins(node, sig_idx, call_param_offset, call_effect_recv, extra_start, mc_resolved_arg_count, mc_has_resolved_args)
+                self.note_sig_call_global_effects(node, sig_idx, call_param_offset, call_effect_recv, extra_start, mc_resolved_arg_count, mc_has_resolved_args)
                 self.record_generator_call_ref_origins(node, sig_idx, call_param_offset, call_effect_recv, extra_start, mc_resolved_arg_count, mc_has_resolved_args)
                 return mc_ret
 
@@ -26331,6 +26829,7 @@ impl Sema:
                     if eg_arg > 0 and self.expr_is_ephemeral_value(eg_arg) != 0:
                         self.check_ephemeral_task_arg_escape(eg_arg, 0, 0, method_fn_sym, egi)
                 self.propagate_method_call_param_effects(node, sig_idx, 0, 0, extra_start, mc_resolved_arg_count, mc_has_resolved_args)
+                self.note_sig_call_global_effects(node, sig_idx, 0, 0, extra_start, mc_resolved_arg_count, mc_has_resolved_args)
                 return self.sig_return_type(sig_idx)
 
         let builtin_recv_type = if field == self.syms.unwrap or field == self.syms.is_some or field == self.syms.is_none:
@@ -27534,6 +28033,33 @@ impl Sema:
             self.diags.emit(move diag)
             return
 
+    // Whether borrow row `i` is live across a mutation at `err_node` — a
+    // write, or a call that writes (#1819). A view whose final use is
+    // already behind the mutation is dead. This also handles a mutation on
+    // a diverging arm: a lexical use after the enclosing branch is not
+    // reachable from that mutation. A use inside the mutating call itself
+    // remains a conflict because ordinary call checking does not permit the
+    // receiver mutation and an overlapping argument view to coexist. A `for`
+    // binding is read from the iterated place again on the next iteration,
+    // so its borrow lives until the loop ends (#1317) — it is not removed
+    // even when this mutation ends the loop, since other paths may not. A
+    // generator's view (#1734) stays live even when the loop ends right
+    // after the mutation: the stopped generator leaves at its `yield`
+    // through its own scopes and defers, which may read it.
+    fn borrow_liveness_at(i: i32, err_node: i32) -> SemaBorrowLiveness:
+        let ref_sym: i32 = self.borrow_refs[i]
+        let last_use = self.view_last_use(ref_sym, err_node, self.borrow_scope_depths[i])
+        let loop_body_depth = self.for_view_binding_depth(ref_sym)
+        let loop_view = loop_body_depth != 0
+        let gen_loop_view = loop_view and self.for_view_binding_is_gen_loop(ref_sym)
+        var state = BORROW_LIVE
+        if last_use == 0 and not self.view_used_in(err_node, ref_sym):
+            if not loop_view:
+                state = BORROW_DEAD
+            else if not gen_loop_view and self.loop_ends_after_current_stmt(loop_body_depth) != 0:
+                state = BORROW_DEAD_HERE
+        SemaBorrowLiveness { state, last_use, loop_view, gen_loop_view }
+
     mut fn check_mutation_against_views(place_node: i32, err_node: i32):
         let place = self.borrow_root_place(place_node)
         if place == 0:
@@ -27559,37 +28085,22 @@ impl Sema:
             if self.are_borrows_disjoint_paths(path_start, path_count, ex_path_start, ex_path_count) != 0:
                 i = i + 1
                 continue
+            let live = self.borrow_liveness_at(i, err_node)
+            if live.state == BORROW_DEAD:
+                self.remove_borrow_at(i)
+                continue
+            if live.state == BORROW_DEAD_HERE:
+                i = i + 1
+                continue
             let place_name = self.pool_resolve(place)
             let ref_name: str = with_str_clone_ref(self.pool_resolve(ref_sym))
-            let creation_node = self.borrow_creation_nodes[i]
             let binding_node = self.binding_decl_node(ref_sym)
-            let last_use = self.view_last_use(ref_sym, err_node, self.borrow_scope_depths[i])
-            // A view whose final use is already behind this mutation is dead.
-            // This also handles a mutation on a diverging arm: a lexical use
-            // after the enclosing branch is not reachable from that mutation.
-            // A use inside the mutating call itself remains a conflict because
-            // ordinary call checking does not permit the receiver mutation and
-            // an overlapping argument view to coexist. A `for` binding is read
-            // from the iterated place again on the next iteration, so its
-            // borrow lives until the loop ends (#1317) — it is not removed even
-            // when this mutation ends the loop, since other paths may not.
-            let loop_body_depth = self.for_view_binding_depth(ref_sym)
-            let is_loop_view = if loop_body_depth != 0: 1 else: 0
-            // A generator's view (#1734) stays live even when the loop ends
-            // right after the mutation: the stopped generator leaves at its
-            // `yield` through its own scopes and defers, which may read it.
-            let is_gen_loop_view = is_loop_view != 0 and self.for_view_binding_is_gen_loop(ref_sym)
-            if last_use == 0 and not self.view_used_in(err_node, ref_sym):
-                if is_loop_view == 0:
-                    self.remove_borrow_at(i)
-                    continue
-                if not is_gen_loop_view and self.loop_ends_after_current_stmt(loop_body_depth) != 0:
-                    i = i + 1
-                    continue
+            let last_use = live.last_use
+            let is_gen_loop_view = live.gen_loop_view
             let mutation_start = self.ast.get_start(err_node)
             let mutation_end = self.ast.get_end(err_node)
             let diag = Diagnostic.err("cannot mutate `" ++ place_name ++ "` while `" ++ ref_name ++ "` is a live view into it", Span { file: self.local_file_id, start: mutation_start, end: mutation_end })
-            let view_node = if binding_node != 0: binding_node else: creation_node
+            let view_node = if binding_node != 0: binding_node else: self.borrow_creation_nodes[i]
             if view_node != 0:
                 let cr_start = self.ast.get_start(view_node)
                 let cr_end = self.ast.get_end(view_node)
@@ -27601,7 +28112,7 @@ impl Sema:
                 diag.add_label(Span { file: self.local_file_id, start: lu_start, end: lu_end }, "view is used here after the mutation")
             if is_gen_loop_view:
                 diag.add_note("the generator `" ++ ref_name ++ "` is still running while the loop body runs (§13.4); collect the changes and apply them after the loop")
-            else if is_loop_view != 0:
+            else if live.loop_view:
                 diag.add_note("the loop reads `" ++ place_name ++ "` again on its next iteration; collect the changes and apply them after the loop")
             let fixed = self.with_copy_view_fixit(move diag, ref_sym, false)
             // §8, §57: a facade resource that depends on the place says why.
