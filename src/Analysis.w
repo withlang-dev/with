@@ -1278,7 +1278,6 @@ fn analysis_audit_phase(report: &AnalysisReport, sema: &Sema, mir_mod: &MirModul
         if not sema.is_copy_cache.contains(ti): report.fail(f"type {ti}: is-copy cache miss")
         if not sema.needs_drop_result_cache.contains(ti): report.fail(f"type {ti}: needs-drop cache miss")
         if not sema.unwrapped_type_cache.contains(ti): report.fail(f"type {ti}: unwrapped-type cache miss")
-        if not sema.for_element_type_cache.contains(ti): report.fail(f"type {ti}: for-element cache miss")
         let field_count = sema.type_reflection_field_count(ti)
         for fi in 0..field_count:
             if not sema.layout_field_offset_cache.contains(sema_pair_key(ti, fi)):

@@ -975,6 +975,10 @@ pub type Sema {
     gen_for_each_syms: HashMap[i32, i32],
     gen_for_each_sigs: HashMap[i32, i32],
     gen_for_each_monos: HashMap[i32, i32],
+    // D65 (§13.5): the element type Sema bound each loop's pattern to — keyed
+    // by the NK_FOR node, and a comprehension clause's by its iterable node.
+    // MIR reads it; it re-derived one from the iterable's type.
+    for_elem_types: HashMap[i32, i32],
     mutable_global_syms: HashMap[i32, i32],
     // docs/completed/mut.md Rev 8 §12 / §15.12 — symbols declared via `global X = ...`
     // (stable) recorded here. Used by check_assign to emit a specific
@@ -1570,7 +1574,6 @@ pub type Sema {
     is_copy_cache: HashMap[i32, i32],
     needs_drop_result_cache: HashMap[i32, i32],
     unwrapped_type_cache: HashMap[i32, i32],
-    for_element_type_cache: HashMap[i32, i32],
     generic_struct_field_type_cache: HashMap[i64, i32],
     generic_struct_field_index_type_cache: HashMap[i64, i32],
     generic_enum_payload_cache_starts: HashMap[i64, i32],
@@ -2224,7 +2227,6 @@ impl Sema:
         self.is_copy_cache = sema_new_map_i32_i32()
         self.needs_drop_result_cache = sema_new_map_i32_i32()
         self.unwrapped_type_cache = sema_new_map_i32_i32()
-        self.for_element_type_cache = sema_new_map_i32_i32()
         self.generic_struct_field_type_cache = sema_new_map_i64_i32()
         self.generic_struct_field_index_type_cache = sema_new_map_i64_i32()
         self.generic_enum_payload_cache_starts = sema_new_map_i64_i32()
@@ -2543,6 +2545,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
     let gen_for_each_syms = sema_new_map_i32_i32()
     let gen_for_each_sigs = sema_new_map_i32_i32()
     let gen_for_each_monos = sema_new_map_i32_i32()
+    let for_elem_types = sema_new_map_i32_i32()
     let mutable_global_syms = sema_new_map_i32_i32()
     let stable_global_syms = sema_new_map_i32_i32()
     let global_value_decl_kinds = sema_new_map_i32_i32()
@@ -2593,7 +2596,6 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
     let is_copy_cache = sema_new_map_i32_i32()
     let needs_drop_result_cache = sema_new_map_i32_i32()
     let unwrapped_type_cache = sema_new_map_i32_i32()
-    let for_element_type_cache = sema_new_map_i32_i32()
     let generic_struct_field_type_cache = sema_new_map_i64_i32()
     let generic_struct_field_index_type_cache = sema_new_map_i64_i32()
     let generic_enum_payload_cache_starts = sema_new_map_i64_i32()
@@ -2782,6 +2784,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         gen_for_each_syms,
         gen_for_each_sigs,
         gen_for_each_monos,
+        for_elem_types,
         mutable_global_syms,
         stable_global_syms,
         global_value_decl_kinds,
@@ -3100,7 +3103,6 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         is_copy_cache,
         needs_drop_result_cache,
         unwrapped_type_cache,
-        for_element_type_cache,
         generic_struct_field_type_cache,
         generic_struct_field_index_type_cache,
         generic_enum_payload_cache_starts,
@@ -5410,7 +5412,10 @@ impl Sema:
                     let lt_cp = self.is_copy(lti as TypeId)
                     let lt_nd = self.type_needs_drop(lti)
                     let lt_uw = self.try_unwrapped_type(lti)
-                    let lt_fe = self.infer_for_element_type(lti)
+                    // A loop over this type binds these element views (`&T`, a map
+                    // traversal tuple); build them while types are mutable. Each
+                    // loop's element type itself is for_elem_types (D65).
+                    self.infer_for_element_type(lti)
                     if self.type_kinds[lti] == TypeKind.TY_GENERIC_INST:
                         self.preregister_generic_struct_fields(lti)
                         self.preregister_generic_enum_payloads(lti)
@@ -5419,7 +5424,6 @@ impl Sema:
                     self.is_copy_cache.insert(lti, lt_cp)
                     self.needs_drop_result_cache.insert(lti, lt_nd)
                     self.unwrapped_type_cache.insert(lti, lt_uw)
-                    self.for_element_type_cache.insert(lti, lt_fe)
                     let field_count = self.type_reflection_field_count(lti)
                     for fi in 0..field_count:
                         self.layout_field_offset_cache.insert(sema_pair_key(lti, fi), self.type_layout_struct_field_offset(lti, fi))
