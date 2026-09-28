@@ -1911,6 +1911,10 @@ impl Sema:
                             return
                     break
 
+        // D75 (§16.2b.5): a `...` definition has the C calling convention —
+        // one C signature, never a template a caller instantiates.
+        if tp_count > 0 and (flags / FnFlags.VARIADIC) % 2 == 1:
+            self.emit_error("a function defined with `...` has the C calling convention, so it cannot be generic", node)
         // Generic functions: store for later monomorphization
         if tp_count > 0:
             self.register_generic_fn_node(fn_name, node)
