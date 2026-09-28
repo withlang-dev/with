@@ -7820,6 +7820,48 @@ impl ComptimeEvaluator:
         self.eval_fn_symbol_call_values_with_type_args(fn_sym, arg_values, node, empty_tp_syms, empty_tp_tys)
 
     mut fn eval_fn_symbol_call_values_with_type_args(fn_sym: i32, arg_values: &Vec[ComptimeValue], node: i32, tp_syms: &Vec[i32], tp_tys: &Vec[i32]) -> ComptimeControl:
+        if tp_syms.len() == 0:
+            let inferred = self.inferred_generic_type_args(fn_sym, arg_values, node)
+            if inferred.ok == 0:
+                return comptime_control_error()
+            if inferred.tp_syms.len() > 0:
+                return self.eval_fn_symbol_call_values_with_resolved_type_args(fn_sym, arg_values, node, inferred.tp_syms, inferred.tp_tys)
+        self.eval_fn_symbol_call_values_with_resolved_type_args(fn_sym, arg_values, node, tp_syms, tp_tys)
+
+    /// The type arguments of a generic function called without spelling them
+    /// (`print(x)` — D55's `print[T: Display]`, so every build action that
+    /// prints reaches here on the bootstrap path, #1866/#1804). Sema inferred
+    /// them from the arguments (check_generic_call) and recorded the concrete
+    /// specialization on the call node; read that, never re-derive it (D65).
+    /// `ok` with no type arguments when the callee is not generic.
+    mut fn inferred_generic_type_args(fn_sym: i32, arg_values: &Vec[ComptimeValue], node: i32) -> ComptimeGenericResolvedArgs:
+        let fn_node = self.find_fn_decl_node(fn_sym)
+        if fn_node == 0:
+            return ComptimeGenericResolvedArgs { ok: 1, tp_syms: Vec.new(), tp_tys: Vec.new() }
+        let meta = self.ast.find_fn_meta(fn_node)
+        if meta < 0 or self.ast.fn_meta_tp_count(meta) == 0:
+            return ComptimeGenericResolvedArgs { ok: 1, tp_syms: Vec.new(), tp_tys: Vec.new() }
+        var concrete_sig = -1
+        let recorded = self.sema.resolved_call_sigs.get(node)
+        if recorded.is_some():
+            concrete_sig = recorded.unwrap()
+        else:
+            // Fold-order evaluation can reach a call Sema has not checked yet:
+            // ask Sema now, as eval_user_method_value does for methods.
+            let arg_types: Vec[i32] = Vec.new()
+            let arg_nodes: Vec[i32] = Vec.new()
+            for i in 0..arg_values.len() as i32:
+                arg_types.push(self.comptime_value_semantic_type(arg_values[i]))
+            let ret_ty = self.sema.check_generic_call(fn_sym, fn_node, arg_types, arg_nodes, arg_values.len() as i32, node)
+            let checked = self.sema.resolved_call_sigs.get(node)
+            if ret_ty != 0 and checked.is_some():
+                concrete_sig = checked.unwrap()
+        if concrete_sig < 0:
+            let _ = self.fail(node, "generic comptime function '" ++ self.pool.resolve(fn_sym) ++ "' has no type arguments inferred for this call")
+            return ComptimeGenericResolvedArgs { ok: 0, tp_syms: Vec.new(), tp_tys: Vec.new() }
+        self.concrete_method_comptime_type_args(fn_sym, concrete_sig, node)
+
+    mut fn eval_fn_symbol_call_values_with_resolved_type_args(fn_sym: i32, arg_values: &Vec[ComptimeValue], node: i32, tp_syms: &Vec[i32], tp_tys: &Vec[i32]) -> ComptimeControl:
         self.last_call_has_mut_receiver = 0
         self.last_call_mut_receiver = comptime_value_invalid()
         let fn_name: str = with_str_clone_ref(self.pool.resolve(fn_sym))
