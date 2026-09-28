@@ -2289,6 +2289,15 @@ pub fn build(ctx: BuildCtx) -> Build:
     compiler_no_c_export = target_with_compiler_c_export_audit_inputs(move compiler_no_c_export, ctx)
     out = out.add_target(compiler_no_c_export)
 
+    // #1826: the SDK link probe on its own, for the canary lane. SDKROOT is
+    // its env_input, so a new SDK re-runs it.
+    var sdk_host_link_check = target_new(.Action, "sdk-host-link-check", "").output("out/.build-state/sdk-host-link-check.txt")
+    sdk_host_link_check.action = run_sdk_host_link_check_action
+    sdk_host_link_check = sdk_host_link_check.write_scope("out/.build-state")
+    sdk_host_link_check = sdk_host_link_check.write_scope("out/command/sdk-host-link-check")
+    sdk_host_link_check = sdk_host_link_check.input("build/compiler.w")
+    out = out.add_target(sdk_host_link_check)
+
     var spec_inventory = target_new(.Action, "spec-inventory-check", "").output("out/.build-state/spec-inventory-check.txt")
     spec_inventory.action = run_check_spec_inventory_action
     spec_inventory = spec_inventory.write_scope("out/.build-state")

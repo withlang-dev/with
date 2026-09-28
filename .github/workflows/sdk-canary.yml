@@ -1,0 +1,101 @@
+name: SDK canary (macOS)
+
+# #1826: Xcode 27's SDK listed a slice (arm64e.x1) that our ld64.lld's
+# TextAPI could not parse, and every stage link failed the day that SDK
+# became the default SDKROOT on the maintainer's Mac. This lane runs the
+# pre-stage SDK check (`with build :sdk-host-link-check`, the probe every
+# compiler build runs before its stage links) with SDKROOT pointed at the
+# newest Xcode SDK on the runner — the GA image and the Xcode preview image
+# — so the next new slice is known here first, with the rejected stub
+# target named, before it lands in every developer's shell. It is a canary,
+# not a merge signal (D56): nightly and on request, never on a push.
+
+on:
+  schedule:
+    - cron: "20 9 * * *"
+  workflow_dispatch:
+    inputs:
+      sdk:
+        description: An SDK path to check instead of the newest on the runner (SDKROOT)
+        required: false
+        type: string
+
+concurrency:
+  group: sdk-canary-${{ github.head_ref || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  sdk-canary:
+    name: ${{ matrix.image }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # macos-latest is the GA image; xcode-27 is GitHub's Xcode preview
+        # image (actions/runner-images#14404), the SDK that reaches
+        # developers next.
+        image: [macos-latest, xcode-27]
+    runs-on: ${{ matrix.image }}
+    timeout-minutes: 60
+    env:
+      WITH_OUT_DIR: ${{ github.workspace }}/out
+      WITH: ${{ github.workspace }}/src/main
+      LLVM_PREFIX: ${{ github.workspace }}/.deps/llvm-22.1.6-darwin-arm64
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Bootstrap seed
+        env:
+          WITH_SEED_REPO: withlang-dev/with
+          WITH_SEED_VERSION: nightly-20260927-local-1-99939352ffda
+          WITH_SEED_ASSET: with-darwin-aarch64
+          WITH_SEED_SHA256: cffa4a405beca2b88f6c05d216c43ea4b23c60bbe3278921571c584a152c38b8
+        run: |
+          set -euo pipefail
+          curl -fL --retry 5 --retry-delay 5 --retry-all-errors -o src/main \
+            "https://github.com/$WITH_SEED_REPO/releases/download/$WITH_SEED_VERSION/$WITH_SEED_ASSET"
+          printf '%s  %s\n' "$WITH_SEED_SHA256" src/main | shasum -a 256 -c -
+          chmod +x src/main
+          src/main version
+
+      # The pinned SDK asset: the lld this check speaks for is the one the
+      # compiler builds link with, never a system LLVM.
+      - name: Fetch SDK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: src/main build :deps
+
+      - name: Choose the newest Xcode SDK on the runner
+        env:
+          REQUESTED_SDK: ${{ inputs.sdk }}
+        run: |
+          set -euo pipefail
+          echo "Xcode installations:"
+          ls -d /Applications/Xcode*.app
+          if [ -n "$REQUESTED_SDK" ]; then
+            sdk="$REQUESTED_SDK"
+          else
+            # Every versioned MacOSX<ver>.sdk under every Xcode, newest
+            # version last; unversioned MacOSX.sdk links are the same trees.
+            sdk="$(for d in /Applications/Xcode*.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX[0-9]*.sdk; do
+              n="${d##*/}"; n="${n#MacOSX}"; n="${n%.sdk}"
+              printf '%s\t%s\n' "$n" "$d"
+            done | sort -t "$(printf '\t')" -k1,1V | tail -1 | cut -f2)"
+          fi
+          test -d "$sdk" || { echo "no macOS SDK found under /Applications/Xcode*.app" >&2; exit 1; }
+          echo "SDKROOT=$sdk" >> "$GITHUB_ENV"
+          echo "checking $sdk"
+          grep -m1 -A1 '^targets:' "$sdk/usr/lib/libSystem.tbd"
+
+      # Fails with the SDK, the linker and the stub entry TextAPI rejected
+      # (build/compiler.w comp_require_linkable_host_sdk), for example:
+      #   unreadable: …/MacOSX27.0.sdk/usr/lib/libSystem.tbd:4:20: unknown architecture 'arm64e.x1-macos'
+      - name: Pre-stage SDK link check
+        run: src/main build :sdk-host-link-check
+
+      - name: Upload the probe captures on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sdk-canary-${{ matrix.image }}-captures
+          path: out/command/sdk-host-link-check/**
