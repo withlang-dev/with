@@ -13880,6 +13880,18 @@ impl Sema:
         self.union_clear_last_written()
         // #1349: the iterable is a value (`for p in if c: xs else: ys`).
         let iter_type = self.check_expr_value_context(iterable)
+        // §13.6a: over an Option or Result the `for` is a one-clause
+        // comprehension, not a loop — the body runs once on Some/Ok, not at
+        // all on None/Err, and a body that is `yield E` makes it a value.
+        let carrier_match = self.ast.for_carrier_alt(node)
+        if carrier_match != 0 and self.option_result_carrier_family(iter_type) != 0:
+            self.for_carrier_matches.insert(node, carrier_match)
+            self.prechecked_match_subject = iterable
+            self.prechecked_match_subject_type = iter_type
+            let comprehension_ty = self.check_match_expr(carrier_match)
+            if comprehension_ty != 0:
+                self.typed_expr_types.insert(node, comprehension_ty)
+            return comprehension_ty
         // D69 (§13.4): a Gen[T] iterable runs the body as the closure its
         // `each` calls; the generator value is consumed by `each`.
         let gen_elem = self.resolve_gen_for(node, iterable, iter_type as i32)
@@ -14048,6 +14060,9 @@ impl Sema:
         if iter_type == 0 or self.get_type_kind(self.resolve_alias(iter_type as TypeId)) == TypeKind.TY_ERR:
             return
         let shown = self.type_name(iter_type)
+        if self.option_result_carrier_family(iter_type) != 0:
+            self.emit_error(f"cannot iterate over `{shown}`: a `for` over an Option or Result is a one-clause comprehension (§13.6a), which binds no index and is no collection clause", iterable)
+            return
         let owner = self.method_owner_symbol_for_type(self.resolve_alias(iter_type as TypeId) as i32)
         let next_sym = self.pool_lookup_symbol("next")
         let next_sig = if owner != 0 and next_sym > 0: self.lookup_method_sig(owner, next_sym) else: -1
@@ -16200,13 +16215,17 @@ impl Sema:
         // as `e == Ok(5)` applies: the construction is typed against the
         // carrier expectation that is present.
         let is_comprehension_lowering = self.match_is_for_comprehension_lowering(extra_start, arm_count)
-        let subject_type = if is_comprehension_lowering != 0 and self.has_expected_type != 0 and self.expected_expr_type != 0 and (self.ast.kind(subject) == NodeKind.NK_VARIANT_SHORTHAND or self.comparison_operand_is_variant_call(subject) != 0):
+        let prechecked = subject == self.prechecked_match_subject
+        self.prechecked_match_subject = 0
+        let subject_type = if prechecked:
+            self.prechecked_match_subject_type
+        else if is_comprehension_lowering != 0 and self.has_expected_type != 0 and self.expected_expr_type != 0 and (self.ast.kind(subject) == NodeKind.NK_VARIANT_SHORTHAND or self.comparison_operand_is_variant_call(subject) != 0):
             self.check_expr_with_expected(subject, self.expected_expr_type)
         else:
             self.check_expr_value_context(subject)
-        let comprehension_carrier = if is_comprehension_lowering != 0: self.option_result_carrier_family(subject_type as i32) else: 0
-        if comprehension_carrier != 0 and self.current_for_comprehension_carrier != 0 and comprehension_carrier != self.current_for_comprehension_carrier:
-            self.emit_error("for-comprehension clauses must use the same carrier family", node)
+        let comprehension_carrier = if is_comprehension_lowering != 0: self.option_result_carrier_family(subject_type) else: 0
+        if is_comprehension_lowering != 0:
+            self.enter_comprehension_clause(node, subject_type, comprehension_carrier)
         var result_type: TypeId = 0 as TypeId
         // D43: the tail of an unannotated function is a statement when an arm
         // is missing and an undemanded value join otherwise, in every body
@@ -16220,9 +16239,7 @@ impl Sema:
         let join_origin_nodes: Vec[i32] = Vec.new()
         let join_expr_types: Vec[i32] = Vec.new()
         let join_roles: Vec[i32] = Vec.new()
-        let saved_for_comprehension_carrier: i32 = self.current_for_comprehension_carrier
-        if comprehension_carrier != 0 and saved_for_comprehension_carrier == 0:
-            self.current_for_comprehension_carrier = comprehension_carrier
+        let failure_values: Vec[i32] = Vec.new()
 
         // Branch move-state join over the arms (docs/completed/branch-merge-soundness.md): seed
         // with the entry state (the implicit no-match/fallthrough path) and union each
@@ -16264,7 +16281,12 @@ impl Sema:
             let saved_drop_cf_arm: i32 = self.drop_control_flow_depth
             if self.current_drop_type_sym != 0:
                 self.drop_control_flow_depth = self.drop_control_flow_depth + 1
-            let arm_type = if not match_is_value:
+            // §13.6a: a clause's failure value is typed after the join, as the
+            // comprehension's result carrier (type_comprehension_failure).
+            let failure_value = match_is_value and is_comprehension_lowering != 0 and self.comprehension_failure_value(pat, arm_body)
+            let arm_type = if failure_value:
+                0
+            else if not match_is_value:
                 self.check_expr_statement_context(arm_body)
             else if match_expected != 0:
                 self.check_expr_with_expected(arm_body, match_expected)
@@ -16288,7 +16310,9 @@ impl Sema:
                 let arm_exit_states = self.save_scope_states()
                 match_merged_states = self.union_move_states(&match_merged_states, &arm_exit_states)
 
-            if match_is_value:
+            if failure_value:
+                failure_values.push(arm_body)
+            else if match_is_value:
                 join_expr_nodes.push(arm_body)
                 join_origin_nodes.push(arm_body)
                 join_expr_types.push(arm_type as i32)
@@ -16305,7 +16329,6 @@ impl Sema:
                 stmt_arms_mixed = true
 
         self.restore_scope_states(&match_merged_states)
-        self.current_for_comprehension_carrier = saved_for_comprehension_carrier
 
         if match_is_value:
             // #1754: at a `&T` parameter the arms decide the join (no anchor).
@@ -16318,6 +16341,8 @@ impl Sema:
             result_type = self.resolve_contextual_join(match_anchor as i32, &join_expr_nodes, &join_origin_nodes, &arm_types, &join_roles, node, "match") as TypeId
             self.infer_tail_join = saved_infer_join
             self.d32_check_owned_join_arms(result_type as i32, &join_expr_nodes, "match arm")
+            for failure in failure_values:
+                self.type_comprehension_failure(failure, result_type, subject_type, comprehension_carrier, node)
         else if is_infer_tail or stmt_arms_mixed:
             // D43: a missing arm made this inferred tail a statement above.
             // Even equal written-arm types cannot supply the absent arm's
@@ -16359,6 +16384,106 @@ impl Sema:
         if base == self.syms.result:
             return 2
         0
+
+    fn result_err_type(tid: i32): self.get_generic_inst_arg(self.resolve_alias(tid) as i32, 1)
+
+    // §13.6a: a clause match of one for-comprehension. The outermost (the
+    // root) registers the chain below it with its carrier family and, for
+    // Result, its Err type; an inner clause shares both, since a failure at
+    // any clause is the comprehension's.
+    mut fn enter_comprehension_clause(node: i32, subject_type: i32, carrier: i32):
+        let root = self.comprehension_chain_roots.get(node) ?? 0
+        if root == 0:
+            self.register_comprehension_chain(node)
+            if carrier != 0:
+                self.comprehension_root_carriers.insert(node, carrier)
+            if carrier == 2:
+                self.comprehension_root_err_types.insert(node, self.result_err_type(subject_type))
+            return
+        let root_carrier = self.comprehension_root_carriers.get(root) ?? 0
+        if carrier == 0 or root_carrier == 0:
+            return
+        if carrier != root_carrier:
+            self.emit_error("for-comprehension clauses must use the same carrier family", node)
+            return
+        let root_err = self.comprehension_root_err_types.get(root) ?? 0
+        if carrier == 2 and self.types_compatible(root_err, self.result_err_type(subject_type)) == 0:
+            self.emit_error(f"for-comprehension clauses must share one Err type: `{self.type_name(root_err)}` and `{self.type_name(self.result_err_type(subject_type))}` (§13.6a)", node)
+
+    // The inner clause matches and the yield wrap of the comprehension whose
+    // outermost clause is `root`, following each clause's success arm (and a
+    // guard's then-branch). build_comprehension_match gives every node of one
+    // desugar the root's start, which keeps a comprehension the user nested
+    // in a body out of this chain.
+    mut fn register_comprehension_chain(root: i32):
+        let start = self.ast.get_start(root)
+        var node = self.comprehension_success_body(root)
+        while node != 0 and self.ast.get_start(node) == start:
+            let kind = self.ast.kind(node)
+            if kind == NodeKind.NK_IF_EXPR:
+                node = self.ast.get_data1(node)
+            else if kind == NodeKind.NK_MATCH and self.match_is_for_comprehension_lowering(self.ast.get_data1(node), self.ast.get_data2(node)) != 0:
+                self.comprehension_chain_roots.insert(node, root)
+                node = self.comprehension_success_body(node)
+            else:
+                if kind == NodeKind.NK_CALL and self.comprehension_yield_wrap(node):
+                    self.comprehension_chain_roots.insert(node, root)
+                node = 0
+
+    fn comprehension_success_body(clause: i32): self.ast.get_data1(self.ast.get_extra(self.ast.get_data1(clause)))
+
+    fn comprehension_yield_wrap(call: i32) -> bool:
+        let callee = self.ast.get_data0(call)
+        self.ast.kind(callee) == NodeKind.NK_IDENT and self.pool_resolve(self.ast.get_data0(callee)) == "_Payload"
+
+    // A yield-form failure arm, `___fail_i @ _ => ___fail_i`.
+    fn comprehension_failure_value(pat: i32, body: i32) -> bool:
+        self.ast.kind(pat) == NodeKind.NK_PAT_AT_BINDING and self.ast.kind(self.ast.get_data1(pat)) == NodeKind.NK_PAT_WILDCARD and self.ast.kind(body) == NodeKind.NK_IDENT and self.ast.get_data0(body) == self.ast.get_data0(pat)
+
+    // §13.6a: a clause's failure — None, or Err carrying the clause's error —
+    // re-wrapped in the comprehension's result carrier (MirLower builds it).
+    // It was the clause's own value, which joined the result only when the
+    // yield kept the payload's type; the spec's `User` -> `str` example failed.
+    mut fn type_comprehension_failure(value: i32, result_type: i32, clause_type: i32, clause_carrier: i32, node: i32):
+        if result_type == 0 or clause_carrier == 0:
+            return
+        if self.option_result_carrier_family(result_type) != clause_carrier:
+            self.emit_error(f"this for-comprehension clause is `{self.type_name(clause_type)}` and the comprehension is `{self.type_name(result_type)}`: its failure re-wraps only in the same carrier family (§13.6a)", node)
+            return
+        if clause_carrier == 2 and self.types_compatible(self.result_err_type(result_type), self.result_err_type(clause_type)) == 0:
+            self.emit_error(f"this for-comprehension clause fails with `{self.type_name(self.result_err_type(clause_type))}` and the comprehension is `{self.type_name(result_type)}` (§13.6a)", node)
+            return
+        // An `Ok` the clause's pattern does not match reaches the failure arm
+        // with no Err to carry — the reason Result comprehensions take no guard.
+        let clause_pattern = self.ast.get_extra(self.ast.get_data1(self.ast.get_data0(self.ast.get_extra(self.ast.get_data1(node)))))
+        if clause_carrier == 2 and self.pattern_is_refutable_for(clause_pattern, self.get_generic_inst_arg(self.resolve_alias(clause_type) as i32, 0)) != 0:
+            self.emit_error("a Result for-comprehension clause binds with a refutable pattern: an `Ok` it does not match has no Err value (§13.6a); bind the payload and `match` it in the yield", node)
+            return
+        self.typed_expr_types.insert(value, result_type)
+        self.comprehension_failure_rewraps.insert(value, clause_carrier)
+
+    // §13.6a: the yield form re-wraps its value in the comprehension's own
+    // carrier: Some(E), or Ok(E) with the Err type its clauses share. Typed
+    // here, not as a constructor call: `Ok(E)` alone leaves the Err side
+    // unbound, and without an expectation `_Payload` became Some.
+    mut fn check_comprehension_yield(node: i32, carrier: i32) -> i32:
+        let root = self.comprehension_chain_roots.get(node) ?? 0
+        let value = self.ast.get_extra(self.ast.get_data1(node))
+        var value_expected = 0
+        if self.has_expected_type != 0 and self.option_result_carrier_family(self.expected_expr_type) == carrier:
+            value_expected = self.get_generic_inst_arg(self.resolve_alias(self.expected_expr_type) as i32, 0)
+        let value_ty = if value_expected != 0: self.check_expr_with_expected(value, value_expected) else: self.check_expr_value_context(value)
+        self.mark_moved_if_consumed(value)
+        let args: Vec[i32] = Vec.new()
+        args.push(value_ty)
+        if carrier == 2:
+            args.push(self.comprehension_root_err_types.get(root) ?? 0)
+        let wrapped = if carrier == 1: self.ensure_generic_inst_type(self.syms.option, args, 1) else: self.ensure_generic_inst_type(self.syms.result, args, 2)
+        self.comp_resolved.insert(node, if carrier == 1: self.syms.some else: self.syms.ok)
+        self.typed_expr_types.insert(node, wrapped)
+        wrapped
+
+    fn comprehension_carrier_of(node: i32): self.comprehension_root_carriers.get(self.comprehension_chain_roots.get(node) ?? 0) ?? 0
 
     fn pattern_is_for_comprehension_marker(pat: i32) -> i32:
         if pat == 0:
@@ -20644,6 +20769,9 @@ impl Sema:
             let call_name: str = with_str_clone_ref(self.pool_resolve(fn_sym))
             if self.require_std_tier_for_symbol(fn_sym, callee) == 0:
                 return self.ty_void as i32
+            let yield_carrier = if call_name == "_Payload": self.comprehension_carrier_of(node) else: 0
+            if yield_carrier != 0:
+                return self.check_comprehension_yield(node, yield_carrier)
             if call_name == "_Payload":
                 // Try expected type first, then fall back to Some (most common)
                 if self.has_expected_type != 0:

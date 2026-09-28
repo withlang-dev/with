@@ -7176,6 +7176,8 @@ impl MirBuilder:
             self.lower_if(self.ast.get_data0(node), self.ast.get_data1(node), self.ast.get_data2(node), node, 0)
         else if kind == NodeKind.NK_MATCH:
             self.lower_match(self.ast.get_data0(node), self.ast.get_data1(node), self.ast.get_data2(node), node, 0)
+        else if kind == NodeKind.NK_FOR and self.sema.for_carrier_matches.contains(node):
+            self.lower_for_carrier(node, 0)
         else if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_UNSAFE_BLOCK:
             self.lower_expr_discard(self.ast.get_data0(node))
         else if kind == NodeKind.NK_NO_SUSPEND:
@@ -7787,7 +7789,40 @@ impl MirBuilder:
         self.forget_string_flow_facts()
         self.unit_operand()
 
+    // §13.6a: a comprehension clause's failure (the `___fail_i` its failure
+    // arm bound, the whole clause value) re-wrapped in the comprehension's
+    // carrier, which Sema typed this node: None, or Err moving the clause's
+    // error out. The binding's payload is then gone; it is not dropped again.
+    mut fn lower_comprehension_failure(node: i32) -> i32:
+        let result_ty = self.expr_type(node)
+        let fields: Vec[i32] = Vec.new()
+        let names: Vec[i32] = Vec.new()
+        var variant = self.sema.syms.none
+        if (self.sema.comprehension_failure_rewraps.get(node) ?? 0) == 2:
+            variant = self.sema.syms.err
+            let fail_local = self.lookup_local(self.ast.get_data0(node))
+            let fail_ty = self.body.local_type_ids[fail_local]
+            let payload_tys = self.sema.enum_variant_payload_types_frozen(fail_ty, variant)
+            let err_place = self.body.new_field_place(self.body.new_downcast_place(self.place_for_local(fail_local), self.sema.enum_variant_index_for_type(fail_ty, variant)), 0, payload_tys[0])
+            fields.push(self.body.new_operand(if self.sema.is_copy_frozen(payload_tys[0]) != 0: OperandKind.OK_COPY else: OperandKind.OK_MOVE, err_place))
+            names.push(0)
+            self.cancel_scheduled_value_drop_for_local(fail_local)
+            self.mark_local_value_moved(fail_local)
+        let rv = self.body.new_rvalue(RvalueKind.RK_AGGREGATE, 1, self.body.new_agg_fields(fields, names), self.sema.enum_variant_index_for_type(result_ty, variant))
+        let tmp = self.new_temp(result_ty)
+        let place = self.place_for_local(tmp)
+        self.body.push_stmt(self.cur_bb, StmtKind.Assign, place, rv, self.ast.get_start(node))
+        self.body.new_operand(OperandKind.OK_COPY, place)
+
+    // §13.6a: a `for` Sema read as a one-clause comprehension lowers as the
+    // match Sema checked for it.
+    mut fn lower_for_carrier(for_node: i32, want_result: i32) -> i32:
+        let comprehension = self.sema.for_carrier_matches.get(for_node) ?? 0
+        self.lower_match(self.ast.get_data0(comprehension), self.ast.get_data1(comprehension), self.ast.get_data2(comprehension), comprehension, want_result)
+
     mut fn lower_for(for_node: i32) -> i32:
+        if self.sema.for_carrier_matches.contains(for_node):
+            return self.lower_for_carrier(for_node, 1)
         if self.sema.gen_for_elem_types.contains(for_node):
             return self.lower_for_gen(for_node)
         let pat_or_sym = self.ast.get_data0(for_node)
@@ -15839,6 +15874,9 @@ impl MirBuilder:
 
         if node == self.pipeline_receiver_override_node and self.pipeline_receiver_override_place >= 0:
             return self.body.new_operand(OperandKind.OK_COPY, self.pipeline_receiver_override_place)
+
+        if self.sema.comprehension_failure_rewraps.contains(node):
+            return self.lower_comprehension_failure(node)
 
         self.cur_node = node
         let kind = self.ast.kind(node)

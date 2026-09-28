@@ -961,6 +961,10 @@ pub type Sema {
     generator_fn_receiver_views: HashMap[i32, i32],
     generator_mir_only_fns: HashMap[i32, i32],
     generator_state_yield_types: HashMap[i32, i32],
+    // §13.6a: an NK_FOR whose iterable is an Option or Result is the
+    // one-clause comprehension the parser recorded beside it: the NK_FOR
+    // node -> that match node, which Sema checked and MIR lowers instead.
+    for_carrier_matches: HashMap[i32, i32],
     // D69 (§13.4): `for x in g` over a Gen[T] runs its body as the `body`
     // closure of `g.each(body)`. Keyed by the NK_FOR node: the element type
     // T, the closure's type fn(T) -> bool, and the `each` callee (its
@@ -1701,7 +1705,21 @@ pub type Sema {
     body_order_lower: Vec[i32],
     body_typed_decls: HashMap[i32, i32],
     body_typed_next: Vec[i32],
-    current_for_comprehension_carrier: i32,
+    // §13.6a: one for-comprehension's desugar (AstPool.build_comprehension_match)
+    // is a chain from its outermost clause match (the root): the inner clause
+    // matches and the yield wrap `_Payload(E)` map to the root, and the root to
+    // its carrier family (1 Option, 2 Result) and, for Result, the Err type
+    // every clause shares. A failure arm's `___fail_i` value re-wraps the
+    // clause's failure in the comprehension's carrier: that node -> family.
+    comprehension_chain_roots: HashMap[i32, i32],
+    comprehension_root_carriers: HashMap[i32, i32],
+    comprehension_root_err_types: HashMap[i32, i32],
+    comprehension_failure_rewraps: HashMap[i32, i32],
+    // §13.6a: check_for typed this match subject (the NK_FOR's iterable)
+    // before choosing the comprehension reading; check_match_expr takes the
+    // type instead of checking the node a second time.
+    prechecked_match_subject: i32,
+    prechecked_match_subject_type: i32,
     in_comptime_fn: i32,
     in_concrete_generic_body: i32,
     in_async_fn: i32,
@@ -2512,6 +2530,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
     let generator_fn_receiver_views = sema_new_map_i32_i32()
     let generator_mir_only_fns = sema_new_map_i32_i32()
     let generator_state_yield_types = sema_new_map_i32_i32()
+    let for_carrier_matches = sema_new_map_i32_i32()
     let gen_for_elem_types = sema_new_map_i32_i32()
     let gen_for_body_types = sema_new_map_i32_i32()
     let gen_for_each_syms = sema_new_map_i32_i32()
@@ -2749,6 +2768,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         generator_fn_receiver_views,
         generator_mir_only_fns,
         generator_state_yield_types,
+        for_carrier_matches,
         gen_for_elem_types,
         gen_for_body_types,
         gen_for_each_syms,
@@ -3133,7 +3153,12 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         body_order_lower: Vec.new(),
         body_typed_decls: sema_new_map_i32_i32(),
         body_typed_next: Vec.new(),
-        current_for_comprehension_carrier: 0,
+        comprehension_chain_roots: sema_new_map_i32_i32(),
+        comprehension_root_carriers: sema_new_map_i32_i32(),
+        comprehension_root_err_types: sema_new_map_i32_i32(),
+        comprehension_failure_rewraps: sema_new_map_i32_i32(),
+        prechecked_match_subject: 0,
+        prechecked_match_subject_type: 0,
         in_comptime_fn: 0,
         in_concrete_generic_body: 0,
         in_async_fn: 0,
