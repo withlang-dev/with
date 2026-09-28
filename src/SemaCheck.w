@@ -2181,10 +2181,12 @@ impl Sema:
         bound.is_none() or self.binding_index_is_global(bound.unwrap(), sym)
 
     // The callable an argument hands its callee, which may run it: a
-    // closure literal or a local bound to one (-2 - its node), or a callable
-    // parameter of the function being checked (callable_param_body) — also
-    // as `f.clone()` (D63). -1 for anything else.
-    fn arg_callable_body(arg: i32) -> i32:
+    // closure literal or a local bound to one (-2 - its node), a function
+    // named as a value (its signature), or a callable parameter of the
+    // function being checked (callable_param_body) — also as `f.clone()`
+    // (D63); any other callable value runs whatever its type admits
+    // (callable_type_body, #1827). -1 for a value that is not callable.
+    mut fn arg_callable_body(arg: i32) -> i32:
         var node = arg
         while node > 0 and (self.ast.kind(node) == NodeKind.NK_GROUPED or self.ast.kind(node) == NodeKind.NK_MOVE_ARG or self.ast.kind(node) == NodeKind.NK_COPY_ARG):
             node = self.ast.get_data0(node)
@@ -2192,20 +2194,24 @@ impl Sema:
             return -1
         if self.ast.kind(node) == NodeKind.NK_CLOSURE:
             return -2 - node
+        let value_node = node
         if self.ast.kind(node) == NodeKind.NK_CALL and self.ast.get_data2(node) == 0:
             let callee = self.ast.get_data0(node)
             if self.ast.kind(callee) == NodeKind.NK_FIELD_ACCESS and self.pool_resolve(self.ast.get_data1(callee)) == "clone":
                 node = self.ast.get_data0(callee)
-        if self.ast.kind(node) != NodeKind.NK_IDENT:
-            return -1
-        let sym = self.ast.get_data0(node)
-        if self.scope_binding_is_local(sym) and self.binding_closure_nodes.contains(sym):
-            let closure: i32 = self.binding_closure_nodes.get(sym).unwrap()
-            return -2 - closure
-        if self.fn_value_ident_sigs.contains(node):
-            let sig: i32 = self.fn_value_ident_sigs.get(node).unwrap()
-            return sig
-        self.callable_param_body(sym)
+        if self.ast.kind(node) == NodeKind.NK_IDENT:
+            let sym = self.ast.get_data0(node)
+            if self.scope_binding_is_local(sym) and self.binding_closure_nodes.contains(sym):
+                let closure: i32 = self.binding_closure_nodes.get(sym).unwrap()
+                return -2 - closure
+            if self.fn_value_ident_sigs.contains(node):
+                let sig: i32 = self.fn_value_ident_sigs.get(node).unwrap()
+                return sig
+            let param = self.callable_param_body(sym)
+            if param != -1:
+                return param
+        let value_ty: i32 = self.typed_expr_types.get(value_node) ?? 0
+        self.callable_type_body(value_ty)
 
     // The body a callable parameter of the function being checked stands
     // for: whatever closure a call of the function binds to it (§12.4: a
@@ -2309,7 +2315,35 @@ impl Sema:
                     let default_sig = self.lookup_method_sig(self.ast.get_data0(decl), b)
                     if default_sig >= 0:
                         out.push(default_sig)
+        else if kind == GLOBAL_DISPATCH_CALLABLE:
+            // Every callable value this compilation makes whose type the
+            // call's accepts (§12.4: a callable is a function or a closure):
+            // Sema tracks no value flow into a field or a container, so the
+            // callable's type is the tightest fact that names what is stored.
+            let value_count = self.global_callable_values.len() as i32 / 2
+            for vi in 0..value_count:
+                let value_ty = self.callable_any_fn_type(self.global_callable_values[vi * 2 + 1] as TypeId)
+                if value_ty != 0 and self.get_type_kind(value_ty as TypeId) == self.get_type_kind(a as TypeId) and self.fn_types_compatible(a, value_ty) != 0:
+                    out.push(self.global_callable_values[vi * 2])
         out
+
+    // #1827: a call through a callable value no binding names — a field, an
+    // element, a call's result, a local that is not a closure binding — runs
+    // any callable value of its type (dispatcher_bodies). -1 when `tid` is
+    // not callable.
+    mut fn callable_type_body(tid: i32) -> i32:
+        let fn_ty = if tid > 0: self.callable_any_fn_type(tid as TypeId) else: 0
+        if fn_ty == 0:
+            return -1
+        self.global_dispatcher(GLOBAL_DISPATCH_CALLABLE, fn_ty, 0)
+
+    // A callable value this compilation makes (a closure, or a function
+    // named as a value), for callable_type_body's dispatcher.
+    mut fn note_callable_value(body: i32, tid: i32):
+        if tid <= 0 or self.callable_any_fn_type(tid as TypeId) == 0:
+            return
+        self.global_callable_values.push(body)
+        self.global_callable_values.push(tid)
 
     // #1827: every dispatcher runs each of its bodies, as a call it makes;
     // a callable handed to a dispatcher's parameter is handed to each body's.
@@ -2435,6 +2469,8 @@ impl Sema:
             let b: i32 = self.global_dispatchers[index * GLOBAL_DISPATCH_STRIDE + 2]
             if kind == GLOBAL_DISPATCH_DYN:
                 return "`dyn " ++ with_str_clone_ref(self.pool_resolve(a)) ++ "." ++ with_str_clone_ref(self.pool_resolve(b)) ++ "`"
+            if kind == GLOBAL_DISPATCH_CALLABLE:
+                return "a callable of type `" ++ self.type_name(a) ++ "`"
             return "a callable"
         if body < 0 or body >= self.sig_names.len() as i32:
             return "a callable"
@@ -2460,12 +2496,18 @@ impl Sema:
     // callable its callee expression names (`f()`).
     fn global_call_callee_name(call: i32) -> str:
         let callee: i32 = self.global_calls[call * GLOBAL_CALL_STRIDE + 5]
-        if (callee >= 0 and callee < GLOBAL_PARAM_BODY) or self.is_dispatch_body(callee):
-            return self.global_effect_body_name(callee)
         let call_node: i32 = self.global_calls[call * GLOBAL_CALL_STRIDE + 1]
-        let callee_expr = self.ast.get_data0(call_node)
-        if self.ast.kind(callee_expr) == NodeKind.NK_IDENT:
+        let callee_expr = if call_node > 0 and self.ast.kind(call_node) == NodeKind.NK_CALL: self.ast.get_data0(call_node) else: 0
+        let through_value = self.is_dispatch_body(callee) and self.global_dispatchers[(callee - GLOBAL_DISPATCH_BODY) * GLOBAL_DISPATCH_STRIDE] == GLOBAL_DISPATCH_CALLABLE
+        if (callee >= 0 and callee < GLOBAL_PARAM_BODY) or (self.is_dispatch_body(callee) and not through_value):
+            return self.global_effect_body_name(callee)
+        // A callable value: the place it is called through.
+        if callee_expr != 0 and self.ast.kind(callee_expr) == NodeKind.NK_IDENT:
             return "`" ++ with_str_clone_ref(self.pool_resolve(self.ast.get_data0(callee_expr))) ++ "`"
+        if callee_expr != 0 and self.ast.kind(callee_expr) == NodeKind.NK_FIELD_ACCESS and self.ast.kind(self.ast.get_data0(callee_expr)) == NodeKind.NK_IDENT:
+            return "`" ++ with_str_clone_ref(self.pool_resolve(self.ast.get_data0(self.ast.get_data0(callee_expr)))) ++ "." ++ with_str_clone_ref(self.pool_resolve(self.ast.get_data1(callee_expr))) ++ "`"
+        if through_value:
+            return self.global_effect_body_name(callee)
         "the callable"
 
     // #1819 (§9.1c: globals are places; §21.1 rule 1): with every body
@@ -7250,8 +7292,10 @@ const GLOBAL_VIEW_CHECK_STRIDE: i32 = 6
 const GLOBAL_PARAM_BODY: i32 = 536870912
 const GLOBAL_DISPATCH_BODY: i32 = 1073741824
 const GLOBAL_DISPATCH_STRIDE: i32 = 3
-// A dispatcher runs every impl of a dyn method (a = trait, b = method).
+// A dispatcher runs every impl of a dyn method (a = trait, b = method), or
+// every callable value of a callable type (a = the type).
 const GLOBAL_DISPATCH_DYN: i32 = 1
+const GLOBAL_DISPATCH_CALLABLE: i32 = 2
 
 impl Sema:
     fn int_literal_i64_value(node: i32) -> SemaIntLiteralValue:
@@ -8680,9 +8724,11 @@ impl Sema:
                         return 0
                     self.typed_expr_types.insert(node, expected as i32)
                     self.fn_value_ident_sigs.insert(node, sig_idx)
+                    self.note_callable_value(sig_idx, expected as i32)
                     return expected as i32
             self.typed_expr_types.insert(node, fn_tid)
             self.fn_value_ident_sigs.insert(node, sig_idx)
+            self.note_callable_value(sig_idx, fn_tid)
             return fn_tid
         if (sig_idx >= 0 or self.generic_fn_node_for_symbol(sym) != 0) and self.symbol_visible_from_current(sym) == 0:
             self.emit_private_symbol_error(sym, node)
@@ -18521,6 +18567,8 @@ impl Sema:
         let closure_kind = if expected_extern_fn != 0: TypeKind.TY_EXTERN_FN else: TypeKind.TY_FN
         let closure_ty = self.add_type(closure_kind, te_start, param_count, closure_ret_ty) as i32
         self.typed_expr_types.insert(node, closure_ty)
+        // #1827: a callable value a call through its type may run.
+        self.note_callable_value(-2 - node, closure_ty)
         closure_ty
 
     // A closure literal with an unannotated parameter, passed to a generic
@@ -19635,17 +19683,20 @@ impl Sema:
 
         // #1819: a call of a closure binding runs that closure's body, and a
         // call of a callable parameter whatever closure a caller binds to it
-        // (callable_param_body); another callable value's body is not known
-        // here.
+        // (callable_param_body); a call through any other callable value — a
+        // field, an element, a call's result — runs any callable value of its
+        // type (callable_type_body, #1827).
         let global_args: Vec[i32] = Vec.new()
         let global_by_place: Vec[bool] = Vec.new()
         for gai in 0..arg_count:
             global_args.push(if has_resolved != 0: self.get_resolved_call_arg(node, gai) else: self.ast.get_extra(extra_start + gai))
             global_by_place.push(self.type_takes_place(self.fn_type_param_type(fn_tid, gai + param_offset)))
         let callee_expr = self.ast.get_data0(node)
-        let called_body = if closure_node > 0: -2 - closure_node
+        var called_body = if closure_node > 0: -2 - closure_node
             else if self.ast.kind(callee_expr) == NodeKind.NK_IDENT: self.callable_param_body(self.ast.get_data0(callee_expr))
             else: -1
+        if called_body == -1:
+            called_body = self.callable_type_body(fn_tid)
         self.note_call_global_effects(node, called_body, param_offset, 0, false, global_args, global_by_place)
 
         if closure_node > 0:

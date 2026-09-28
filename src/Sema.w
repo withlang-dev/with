@@ -1049,6 +1049,11 @@ pub type Sema {
     global_dispatchers: Vec[i32],
     global_dispatcher_heads: HashMap[i32, i32],
     global_dispatcher_next: Vec[i32],
+    // #1827: every callable value in this compilation — a closure (-2 - its
+    // node) or a function named as a value (its signature) — with its
+    // callable type, as [body, type]: what a call through a callable no
+    // binding names may run.
+    global_callable_values: Vec[i32],
 
     // Hot intrinsic symbols used in semantic dispatch paths.
     syms: SemaBuiltinSymbols,
@@ -2754,6 +2759,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         global_dispatchers: Vec.new(),
         global_dispatcher_heads: sema_new_map_i32_i32(),
         global_dispatcher_next: Vec.new(),
+        global_callable_values: Vec.new(),
         syms: sema_builtin_symbols_zero(),
         method_impl_nodes,
         method_decl_impl_nodes,
