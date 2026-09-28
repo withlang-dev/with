@@ -2790,6 +2790,16 @@ impl MirBuilder:
         let c = self.body.new_const(kind, d0, 0, 0, type_id)
         self.body.new_operand(OperandKind.OK_CONSTANT, c)
 
+    // D65 (§12): a function constant. Where Sema recorded the identifier as
+    // a function used as a With callable value (fn_callable_values), the
+    // constant says so (CK_FN d1 = 1) and codegen builds that adapter; a
+    // callee and an `extern "C" fn` value are the function itself. Codegen
+    // guessed it from a pointer meeting an LLVM `{ptr, ptr}`.
+    mut fn fn_const_operand(fn_sym: i32, const_ty: i32, node: i32) -> i32:
+        let callable = node != 0 and self.sema.fn_callable_values.contains(node)
+        let c = self.body.new_const(ConstKind.CK_FN, fn_sym, if callable: 1 else: 0, 0, const_ty)
+        self.body.new_operand(OperandKind.OK_CONSTANT, c)
+
     mut fn int_const_operand(value: i64, type_id: i32) -> i32:
         let c = self.body.new_const(ConstKind.CK_INT, ast_int_part0(value), ast_int_part1(value), ast_int_part2(value), type_id)
         self.body.new_operand(OperandKind.OK_CONSTANT, c)
@@ -4113,12 +4123,11 @@ impl MirBuilder:
                     let sema_fn_sym = self.sema.pool_lookup_symbol(fn_name)
                     if sema_fn_sym != 0 and self.sema.get_sig(sema_fn_sym) >= 0:
                         resolved_fn_sym = sema_fn_sym
-            let fn_ty = if type_id != 0: type_id else: self.sema.sig_type_ids[sig_idx]
-            return self.const_operand(ConstKind.CK_FN, resolved_fn_sym, fn_ty)
+            return self.fn_const_operand(resolved_fn_sym, if type_id != 0: type_id else: self.sema.sig_type_ids[sig_idx], node_id)
 
         // Generic function reference (monomorphized at codegen time)
         if self.sema.generic_fn_node_for_symbol(fn_sym) != 0:
-            return self.const_operand(ConstKind.CK_FN, fn_sym, type_id)
+            return self.fn_const_operand(fn_sym, type_id, node_id)
 
         let const_node = self.try_resolve_module_const_node(sym)
         if const_node != 0:
@@ -5563,12 +5572,15 @@ impl MirBuilder:
         self.terminate(TermKind.TK_CALL, mi_unit, mi_args_id, ret_place, mi_next_bb)
         self.switch_to(mi_next_bb)
 
-    mut fn lower_fn_address(expr: i32, type_id: i32) -> i32:
+    // `&f` on a function: its code address, or (`ref_to_callable`, #1603) the
+    // callable a reference points at — only that one is the callable value
+    // Sema recorded for the name (fn_const_operand).
+    mut fn lower_fn_address(expr: i32, type_id: i32, ref_to_callable: bool) -> i32:
         if expr == 0:
             return -1
         let kind = self.ast.kind(expr)
         if kind == NodeKind.NK_GROUPED:
-            return self.lower_fn_address(self.ast.get_data0(expr), type_id)
+            return self.lower_fn_address(self.ast.get_data0(expr), type_id, ref_to_callable)
         if kind != NodeKind.NK_IDENT:
             return -1
         let sym = self.ast.get_data0(expr)
@@ -5577,7 +5589,7 @@ impl MirBuilder:
         if self.lookup_alias_place(sym) >= 0:
             return -1
         if self.sema.get_sig(sym) >= 0 or self.sym_is_generic_fn(sym):
-            return self.lower_var(sym, type_id, expr)
+            return self.lower_var(sym, type_id, if ref_to_callable: expr else: 0)
         -1
 
     mut fn lower_un_op(op: i32, expr: i32, node: i32) -> i32:
@@ -5601,7 +5613,7 @@ impl MirBuilder:
             let expects_raw_fn_ptr = self.expected_type != 0 and self.sema.get_type_kind(expected_res) == TypeKind.TY_PTR
             let ref_to_fn = op == UnaryOp.UOP_REF and self.sema.get_type_kind(ref_res) == TypeKind.TY_REF and not expects_raw_fn_ptr
             let fn_ty = if ref_to_fn: self.sema.get_type_d0(ref_res) as i32 else: ref_ty
-            let fn_addr = self.lower_fn_address(expr, fn_ty)
+            let fn_addr = self.lower_fn_address(expr, fn_ty, ref_to_fn)
             if fn_addr >= 0:
                 if not ref_to_fn:
                     return fn_addr

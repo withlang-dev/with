@@ -1872,16 +1872,13 @@ impl Codegen:
         if (vk == wl_float_type_kind() or vk == wl_double_type_kind()) and (tk == wl_float_type_kind() or tk == wl_double_type_kind()):
             return wl_build_fp_cast(self.builder, val, target_ty)
 
-        // Function pointer → fat pointer coercion: create thunk wrapper
-        // Regular fn(params...) → closure fn(ctx, params...) with ctx ignored
-        if vk == wl_pointer_type_kind() and tk == wl_struct_type_kind():
-            let target_fields = wl_count_struct_elem_types(target_ty)
-            if target_fields == 2:
-                let f0 = wl_struct_get_type_at(target_ty, 0)
-                let f1 = wl_struct_get_type_at(target_ty, 1)
-                if f0 != 0 and f1 != 0:
-                    if wl_get_type_kind(f0) == wl_pointer_type_kind() and wl_get_type_kind(f1) == wl_pointer_type_kind():
-                        return self.gen_fn_to_fat_ptr_thunk(val, target_ty)
+        // D65: a pointer meeting a `{ptr, ptr}` pair is not evidence of a
+        // function becoming a callable value. That fact is Sema's (a function
+        // typed `fn(...)`, CK_FN d1), and the adapter is built where the
+        // constant is evaluated. Reading it off LLVM shapes turned a `&dyn`
+        // data pointer into a function thunk (#1818).
+        if vk == wl_pointer_type_kind() and self.llvm_type_is_dyn_fat_ptr(target_ty) != 0:
+            sema_phase_bug("BUG: a pointer value coerced to a {ptr, ptr} pair with no Sema fact naming the pair")
 
         val
 

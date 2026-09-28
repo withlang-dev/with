@@ -62,7 +62,10 @@ the routes.
    LLVM pipeline); `WITH_DUMP_LLIR_PRE=1` / `WITH_DUMP_LLIR_POST=1` on a
    `with build` print it to stdout either side of the pipeline, which is
    the only view of the attributes codegen attached (`captures(none)`,
-   `noalias`, `sret`) and of what the pipeline did with them; a
+   `noalias`, `sret`) and of what the pipeline did with them; neither runs
+   after a failed function verify, whose report shows only the invalid
+   function — `WITH_DUMP_LLIR_ON_INVALID=1` prints the module as it stands
+   then, with every callee's and thunk's declaration; a
    multi-unit build keeps each `<obj>.u<k>.gen.bc` under
    `WITH_KEEP_BITCODE=1` for `llvm-dis`. Or
    `otool -tV bin | awk '/^_fn:/,/^_next:/'`. (There is no `--emit-llvm`.) Two
