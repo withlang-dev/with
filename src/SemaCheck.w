@@ -2325,6 +2325,61 @@ impl Sema:
                 let value_ty = self.callable_any_fn_type(self.global_callable_values[vi * 2 + 1] as TypeId)
                 if value_ty != 0 and self.get_type_kind(value_ty as TypeId) == self.get_type_kind(a as TypeId) and self.fn_types_compatible(a, value_ty) != 0:
                     out.push(self.global_callable_values[vi * 2])
+        else if kind == GLOBAL_DISPATCH_DROP:
+            out = self.push_drop_glue_bodies(move out, a)
+        out
+
+    // The Drop impl bodies the drop of `tid` runs: the type's own `drop`
+    // (each specialization of a generic impl's), then its elements', fields'
+    // and payloads' — the walk type_carries_user_drop makes.
+    mut fn push_drop_glue_bodies(out0: Vec[i32], tid: i32) -> Vec[i32]:
+        var out = out0
+        var seen: HashMap[i32, i32] = sema_new_map_i32_i32()
+        let work: Vec[i32] = Vec.new()
+        work.push(self.resolve_alias(tid as TypeId) as i32)
+        var k = 0
+        while k < work.len() as i32:
+            let t: i32 = work[k]
+            k = k + 1
+            if t <= 0 or seen.contains(t):
+                continue
+            seen.insert(t, 1)
+            let tk = self.get_type_kind(t as TypeId)
+            if self.type_has_drop_impl(t) != 0:
+                // A generic type's drop is its impl specialized for the
+                // type, checked here if MIR lowering has not demanded it yet.
+                let sig = if tk == TypeKind.TY_GENERIC_INST: self.ensure_generic_drop_specialization(t) else: self.lookup_method_sig(self.method_owner_symbol_for_type(t), self.pool_lookup_symbol("drop"))
+                if sig >= 0:
+                    out.push(sig)
+            if tk == TypeKind.TY_GENERIC_INST:
+                for ai in 0..self.get_generic_inst_arg_count(t):
+                    work.push(self.resolve_alias(self.get_generic_inst_arg(t, ai) as TypeId) as i32)
+            else if tk == TypeKind.TY_TUPLE:
+                for ei in 0..self.get_type_d1(t as TypeId):
+                    work.push(self.resolve_alias(self.type_extra[(self.get_type_d0(t as TypeId) + ei)] as TypeId) as i32)
+            else if tk == TypeKind.TY_ARRAY or tk == TypeKind.TY_RANGE:
+                work.push(self.resolve_alias(self.get_type_d0(t as TypeId) as TypeId) as i32)
+            else if tk == TypeKind.TY_TRAIT_OBJ:
+                // A `dyn Trait` value is any implementor: its drop runs the
+                // implementor's (every generic instance of a generic one).
+                let trait_sym = self.get_type_d0(t as TypeId)
+                for di in 0..self.ast.decl_count():
+                    let decl = self.ast.get_decl(di)
+                    if self.ast.kind(decl) != NodeKind.NK_IMPL_DECL or self.ast.get_data2(decl) != trait_sym:
+                        continue
+                    let target_sym = self.ast.get_data0(decl)
+                    let target = self.lookup_named_type_visible(target_sym)
+                    if target > 0:
+                        work.push(self.resolve_alias(target as TypeId) as i32)
+                    for ti in 1..self.type_kinds.len() as i32:
+                        if self.get_type_kind(ti as TypeId) == TypeKind.TY_GENERIC_INST and self.get_generic_inst_base(ti) == target_sym:
+                            work.push(ti)
+            else:
+                for fi in 0..self.type_reflection_field_count(t):
+                    work.push(self.resolve_alias(self.type_reflection_field_type(t, fi) as TypeId) as i32)
+                for vi in 0..self.type_reflection_variant_count(t):
+                    for pi in 0..self.type_reflection_variant_payload_count(t, vi):
+                        work.push(self.resolve_alias(self.type_reflection_variant_payload_type(t, vi, pi) as TypeId) as i32)
         out
 
     // #1827: a call through a callable value no binding names — a field, an
@@ -2347,10 +2402,11 @@ impl Sema:
 
     // #1827: every dispatcher runs each of its bodies, as a call it makes;
     // a callable handed to a dispatcher's parameter is handed to each body's.
+    // A drop body checked here (ensure_generic_drop_specialization) may
+    // need dispatchers of its own: they are expanded in turn.
     mut fn expand_global_dispatchers():
-        let count = self.global_dispatchers.len() as i32 / GLOBAL_DISPATCH_STRIDE
-        let binding_count = self.global_call_bindings.len() as i32 / GLOBAL_BINDING_STRIDE
-        for di in 0..count:
+        var di = 0
+        while di < self.global_dispatchers.len() as i32 / GLOBAL_DISPATCH_STRIDE:
             let dispatcher = GLOBAL_DISPATCH_BODY + di
             let bodies = self.dispatcher_bodies(di)
             for bi in 0..bodies.len() as i32:
@@ -2358,13 +2414,8 @@ impl Sema:
                 self.global_call_targets.push(bodies[bi])
                 self.global_call_targets.push(call)
                 self.global_call_targets.push(0)
-                self.global_calls.push(dispatcher)
-                self.global_calls.push(0)
-                self.global_calls.push(0)
-                self.global_calls.push(self.global_call_targets.len() as i32 / GLOBAL_TARGET_STRIDE - 1)
-                self.global_calls.push(1)
-                self.global_calls.push(bodies[bi])
-            for gi in 0..binding_count:
+                self.push_global_call_record(dispatcher, 0, 0, self.global_call_targets.len() as i32 / GLOBAL_TARGET_STRIDE - 1, 1, bodies[bi], GLOBAL_SITE_CALL, 0)
+            for gi in 0..self.global_call_bindings.len() as i32 / GLOBAL_BINDING_STRIDE:
                 if self.global_call_bindings[gi * GLOBAL_BINDING_STRIDE] != dispatcher:
                     continue
                 let param: i32 = self.global_call_bindings[gi * GLOBAL_BINDING_STRIDE + 1]
@@ -2373,6 +2424,7 @@ impl Sema:
                 for bi in 0..bodies.len() as i32:
                     if bodies[bi] >= 0 and bodies[bi] < GLOBAL_PARAM_BODY:
                         self.push_global_call_binding(bodies[bi], param, bound, call)
+            di = di + 1
 
     mut fn push_global_view_check(call: i32, sym: i32, view_sym: i32, view_node: i32, last_use: i32, flags: i32):
         self.global_view_call_checks.push(call)
@@ -2415,25 +2467,16 @@ impl Sema:
                 self.global_call_targets.push(if self.ast.kind(args[ai]) == NodeKind.NK_CLOSURE: 1 else: 0)
                 target_count = target_count + 1
                 self.push_global_call_binding(callee, first_param + ai, bound, call)
-        self.global_calls.push(self.global_effect_body())
-        self.global_calls.push(call_node)
-        self.global_calls.push(self.local_file_id)
-        self.global_calls.push(target_start)
-        self.global_calls.push(target_count)
-        self.global_calls.push(callee)
+        self.push_global_call_record(self.global_effect_body(), call_node, self.local_file_id, target_start, target_count, callee, GLOBAL_SITE_CALL, 0)
+        // A by-value argument moves into the callee, which drops it (§2.4):
+        // it is no temporary of the caller's statement
+        // (collect_drop_temporaries).
+        for ai in 0..args.len() as i32:
+            if args[ai] > 0 and not args_by_place[ai]:
+                self.global_consumed_args.insert(args[ai], 1)
         if target_count == 0 or self.suppress_errors != 0:
             return
-        for bi in 0..self.borrow_kinds.len() as i32:
-            let ref_sym: i32 = self.borrow_refs[bi]
-            let kind: i32 = self.borrow_kinds[bi]
-            if ref_sym == 0 or (kind != BorrowKind.SHARED and kind != BorrowKind.EXCLUSIVE) or not self.names_global_place(self.borrow_places[bi]):
-                continue
-            let live = self.borrow_liveness_at(bi, call_node)
-            if live.state != BORROW_LIVE:
-                continue
-            let decl = self.binding_decl_node(ref_sym)
-            let flags = (if live.loop_view: 1 else: 0) + (if live.gen_loop_view: 2 else: 0)
-            self.push_global_view_check(call, self.borrow_places[bi], ref_sym, if decl != 0: decl else: self.borrow_creation_nodes[bi], live.last_use, flags)
+        self.keep_live_global_views(call, call_node, false)
         var views: Vec[i32] = Vec.new()
         if recv_node > 0 and recv_by_place:
             views = self.push_arg_global_views(move views, recv_node, true)
@@ -2443,6 +2486,189 @@ impl Sema:
         while vi + 1 < views.len() as i32:
             self.push_global_view_check(call, views[vi + 1], 0, views[vi], 0, 0)
             vi = vi + 2
+
+    mut fn push_global_call_record(caller: i32, node: i32, file: i32, target_start: i32, target_count: i32, callee: i32, kind: i32, subject: i32):
+        self.global_calls.push(caller)
+        self.global_calls.push(node)
+        self.global_calls.push(file)
+        self.global_calls.push(target_start)
+        self.global_calls.push(target_count)
+        self.global_calls.push(callee)
+        self.global_calls.push(kind)
+        self.global_calls.push(subject)
+
+    // Every named view of a global live across the kept site `call`, at
+    // `site_node` — the liveness a direct write is judged by
+    // (borrow_liveness_at). A drop `at_end` of `site_node` (a block, a
+    // statement) comes after every use inside it: only a later use, or a
+    // loop's next iteration, keeps a view live across it.
+    mut fn keep_live_global_views(call: i32, site_node: i32, at_end: bool):
+        for bi in 0..self.borrow_kinds.len() as i32:
+            let ref_sym: i32 = self.borrow_refs[bi]
+            let kind: i32 = self.borrow_kinds[bi]
+            if ref_sym == 0 or (kind != BorrowKind.SHARED and kind != BorrowKind.EXCLUSIVE) or not self.names_global_place(self.borrow_places[bi]):
+                continue
+            let live = self.borrow_liveness_at(bi, site_node)
+            if live.state != BORROW_LIVE or (at_end and live.last_use == 0 and not live.loop_view):
+                continue
+            let decl = self.binding_decl_node(ref_sym)
+            let flags = (if live.loop_view: 1 else: 0) + (if live.gen_loop_view: 2 else: 0)
+            self.push_global_view_check(call, self.borrow_places[bi], ref_sym, if decl != 0: decl else: self.borrow_creation_nodes[bi], live.last_use, flags)
+
+    // #1827: whether dropping a value of type `tid` runs a user Drop impl —
+    // its own, or a field's, element's or payload's (type_carries_user_drop).
+    mut fn type_has_user_drop_glue(tid: i32) -> bool:
+        if tid <= 0:
+            return false
+        let resolved = self.resolve_alias(tid as TypeId) as i32
+        let cached = self.global_user_drop_types.get(resolved)
+        if cached.is_some():
+            return cached.unwrap() != 0
+        let has = self.type_carries_user_drop(resolved)
+        self.global_user_drop_types.insert(resolved, has)
+        has != 0
+
+    // #1827 (§2.4, §21.1 rule 7): an implicit drop runs its type's drop —
+    // the type's Drop impl and its fields', elements' and payloads' — at a
+    // drop point the language fixes: the end of a binding's scope (reverse
+    // declaration order), a reassignment (the old value), the end of the
+    // statement for a temporary, a `return`. MIR places each drop on its
+    // paths (§2.4, conditional drop) and adds none elsewhere, so these
+    // points bound where it runs; Sema judges the views live across them as
+    // it judges a call's (keep_live_global_views), and `views` are values
+    // that outlive the drop (a block's tail, a returned value). `display`
+    // is where the diagnostic points; `subject` the dropped binding (0 for a
+    // temporary).
+    // `scan_rows` is false where no view can be used after the drop (a
+    // function's last block, a `return`).
+    mut fn note_drop_global_effects(site_node: i32, display: i32, kind: i32, subject: i32, tid: i32, views: &Vec[i32], scan_rows: bool):
+        if site_node <= 0 or not self.type_has_user_drop_glue(tid):
+            return
+        let drop_body = self.global_dispatcher(GLOBAL_DISPATCH_DROP, self.resolve_alias(tid as TypeId) as i32, 0)
+        let call = self.global_calls.len() as i32 / GLOBAL_CALL_STRIDE
+        let target_start = self.global_call_targets.len() as i32 / GLOBAL_TARGET_STRIDE
+        self.global_call_targets.push(drop_body)
+        self.global_call_targets.push(call)
+        self.global_call_targets.push(0)
+        self.push_global_call_record(self.global_effect_body(), display, self.local_file_id, target_start, 1, drop_body, kind, subject)
+        if self.suppress_errors != 0:
+            return
+        if scan_rows:
+            self.keep_live_global_views(call, site_node, true)
+        var kept: Vec[i32] = Vec.new()
+        for vi in 0..views.len() as i32:
+            kept = self.push_arg_global_views(move kept, views[vi], false)
+        var ki = 0
+        while ki + 1 < kept.len() as i32:
+            self.push_global_view_check(call, kept[ki + 1], 0, kept[ki], 0, 0)
+            ki = ki + 2
+
+    // The drops at the end of a scope whose bindings start at `bind_start`:
+    // each binding (in reverse declaration order) whose drop runs a user
+    // Drop impl, with `views` outliving them. A binding moved on every path
+    // is not dropped there (§2.4); Sema's move state joins paths (§21.1 rule
+    // 9), so every binding counts — the drop may run on a path that kept it.
+    mut fn note_scope_exit_drops(site_node: i32, kind: i32, bind_start: i32, views: &Vec[i32], scan_rows: bool):
+        var bi = self.bind_names.len() as i32 - 1
+        while bi >= bind_start:
+            let sym: i32 = self.bind_names[bi]
+            let tid: i32 = self.bind_types[bi]
+            if not self.binding_index_is_global(bi, sym) and self.type_has_user_drop_glue(tid):
+                let decl = self.binding_decl_node(sym)
+                self.note_drop_global_effects(site_node, if kind == GLOBAL_SITE_SCOPE_DROP and decl != 0: decl else: site_node, kind, sym, tid, views, scan_rows)
+            bi = bi - 1
+
+    // A value that outlives the drops at a scope's end or a `return` when
+    // it views a global (`views` of note_drop_global_effects): 0 otherwise.
+    fn expr_views_global(node: i32) -> bool:
+        if node <= 0:
+            return false
+        var roots: Vec[i32] = Vec.new()
+        roots = self.collect_expr_view_deps(node, move roots)
+        for ri in 0..roots.len() as i32:
+            if self.names_global_place(roots[ri]):
+                return true
+        false
+
+    // #1827 (§2.4: temporaries created within an expression are dropped at
+    // the end of the enclosing statement): the temporaries `node` makes
+    // whose drop runs a user Drop impl, onto `out`. A value `owned` by its
+    // parent — a binding's initializer, an assigned or returned value, a
+    // field, element or payload of an aggregate, an argument moved into its
+    // callee — is dropped by its new owner, not here. A nested block's
+    // statements drop their own at their ends; its tail is this statement's.
+    mut fn collect_drop_temporaries(node: i32, owned: bool, out0: Vec[i32]) -> Vec[i32]:
+        var out = out0
+        if node <= 0:
+            return out
+        let kind = self.ast.kind(node)
+        if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_NO_SUSPEND or kind == NodeKind.NK_MOVE_ARG or kind == NodeKind.NK_COPY_ARG or kind == NodeKind.NK_CAST:
+            return self.collect_drop_temporaries(self.ast.get_data0(node), owned, move out)
+        if kind == NodeKind.NK_LET_DECL or kind == NodeKind.NK_LET_BINDING:
+            return self.collect_drop_temporaries(self.ast.get_data1(node), self.is_discard_binding_symbol(self.ast.get_data0(node)) == 0, move out)
+        if kind == NodeKind.NK_ASSIGN:
+            out = self.collect_drop_temporaries(self.ast.get_data0(node), false, move out)
+            return self.collect_drop_temporaries(self.ast.get_data1(node), true, move out)
+        if kind == NodeKind.NK_RETURN:
+            return self.collect_drop_temporaries(self.ast.get_data0(node), true, move out)
+        if kind == NodeKind.NK_IF_EXPR:
+            out = self.collect_drop_temporaries(self.ast.get_data0(node), false, move out)
+            out = self.collect_drop_temporaries(self.ast.get_data1(node), owned, move out)
+            return self.collect_drop_temporaries(self.ast.get_data2(node), owned, move out)
+        if kind == NodeKind.NK_MATCH:
+            out = self.collect_drop_temporaries(self.ast.get_data0(node), false, move out)
+            for ai in 0..self.ast.get_data2(node):
+                let arm = self.ast.get_extra(self.ast.get_data1(node) + ai)
+                if arm > 0 and self.ast.kind(arm) == NodeKind.NK_MATCH_ARM:
+                    out = self.collect_drop_temporaries(self.ast.get_data1(arm), owned, move out)
+            return out
+        if kind == NodeKind.NK_BLOCK:
+            return self.collect_drop_temporaries(self.ast.get_data2(node), owned, move out)
+        if kind == NodeKind.NK_FIELD_ACCESS:
+            return self.collect_drop_temporaries(self.ast.get_data0(node), false, move out)
+        if kind == NodeKind.NK_INDEX:
+            out = self.collect_drop_temporaries(self.ast.get_data0(node), false, move out)
+            return self.collect_drop_temporaries(self.ast.get_data1(node), false, move out)
+        if kind == NodeKind.NK_BINARY:
+            out = self.collect_drop_temporaries(self.ast.get_data1(node), false, move out)
+            return self.collect_drop_temporaries(self.ast.get_data2(node), false, move out)
+        if kind == NodeKind.NK_UNARY:
+            return self.collect_drop_temporaries(self.ast.get_data1(node), false, move out)
+        if kind == NodeKind.NK_FOR:
+            return self.collect_drop_temporaries(self.ast.get_data1(node), false, move out)
+        var producer = false
+        if kind == NodeKind.NK_CALL:
+            out = self.collect_drop_temporaries(self.ast.get_data0(node), false, move out)
+            let has_resolved = self.has_resolved_call_args(node) != 0
+            let count = if has_resolved: self.get_resolved_call_arg_count(node) else: self.ast.get_data2(node)
+            for ai in 0..count:
+                let arg = if has_resolved: self.get_resolved_call_arg(node, ai) else: self.ast.get_extra(self.ast.get_data1(node) + ai)
+                out = self.collect_drop_temporaries(arg, self.global_consumed_args.contains(arg), move out)
+            producer = true
+        else if kind == NodeKind.NK_STRUCT_LIT:
+            for fi in 0..self.ast.get_data2(node):
+                out = self.collect_drop_temporaries(self.ast.get_extra(self.ast.get_data1(node) + fi * 2 + 1), true, move out)
+            producer = true
+        else if kind == NodeKind.NK_TUPLE or kind == NodeKind.NK_ARRAY_LIT:
+            for ei in 0..self.ast.get_data1(node):
+                out = self.collect_drop_temporaries(self.ast.get_extra(self.ast.get_data0(node) + ei), true, move out)
+            producer = true
+        if producer and not owned:
+            let tid: i32 = self.typed_expr_types.get(node) ?? 0
+            if self.type_has_user_drop_glue(tid):
+                out.push(node)
+        out
+
+    // The drops at the end of statement `stmt` of its temporaries; `owned`
+    // when its value is a body's returned value, after which no view is used
+    // (`scan_rows` false).
+    mut fn note_statement_temporary_drops(stmt: i32, owned: bool, scan_rows: bool):
+        var temps: Vec[i32] = Vec.new()
+        temps = self.collect_drop_temporaries(stmt, owned, move temps)
+        let no_views: Vec[i32] = Vec.new()
+        for ti in 0..temps.len() as i32:
+            let tid: i32 = self.typed_expr_types.get(temps[ti]) ?? 0
+            self.note_drop_global_effects(stmt, temps[ti], GLOBAL_SITE_TEMP_DROP, 0, tid, no_views, scan_rows)
 
     // note_call_global_effects for a call Sema resolved to signature
     // `sig_idx` (arguments as record_call_view_origins takes them).
@@ -2471,6 +2697,8 @@ impl Sema:
                 return "`dyn " ++ with_str_clone_ref(self.pool_resolve(a)) ++ "." ++ with_str_clone_ref(self.pool_resolve(b)) ++ "`"
             if kind == GLOBAL_DISPATCH_CALLABLE:
                 return "a callable of type `" ++ self.type_name(a) ++ "`"
+            if kind == GLOBAL_DISPATCH_DROP:
+                return "the drop of `" ++ self.type_name(a) ++ "`"
             return "a callable"
         if body < 0 or body >= self.sig_names.len() as i32:
             return "a callable"
@@ -2517,14 +2745,15 @@ impl Sema:
     // across a call that writes that global is refused, as a direct write
     // under it is (check_mutation_against_views).
     mut fn check_calls_against_live_global_views():
-        let check_count = self.global_view_call_checks.len() as i32 / GLOBAL_VIEW_CHECK_STRIDE
-        if check_count == 0:
+        if self.global_view_call_checks.len() == 0:
             return
+        // A body expansion checks (a generic drop) may keep checks of its own.
+        self.expand_global_dispatchers()
+        let check_count = self.global_view_call_checks.len() as i32 / GLOBAL_VIEW_CHECK_STRIDE
         var checked: HashMap[i32, i32] = sema_new_map_i32_i32()
         for ci in 0..check_count:
             checked.insert(self.global_view_call_checks[ci * GLOBAL_VIEW_CHECK_STRIDE + 1], 1)
         self.record_interface_fn_global_writes(&checked)
-        self.expand_global_dispatchers()
         // The calls that run each body: its target entries, chained.
         var runs_head: HashMap[i32, i32] = sema_new_map_i32_i32()
         let runs_next: Vec[i32] = Vec.new()
@@ -2658,19 +2887,30 @@ impl Sema:
             else: self.global_effect_body_name(body)
         var step: i32 = via.get(body) ?? -1
         while step >= 0:
-            // A dispatcher runs one of its bodies; a body calls the next.
-            let runs = if self.is_dispatch_body(body): ", which may be " else: ", which calls "
+            // A dispatcher runs one of its bodies (a drop runs all of
+            // them); a body calls the next.
+            let runs = if not self.is_dispatch_body(body): ", which calls "
+                else if self.global_dispatchers[(body - GLOBAL_DISPATCH_BODY) * GLOBAL_DISPATCH_STRIDE] == GLOBAL_DISPATCH_DROP: ", which runs "
+                else: ", which may be "
             body = self.global_call_targets[step * GLOBAL_TARGET_STRIDE]
             chain = chain ++ runs ++ self.global_effect_body_name(body)
             step = via.get(body) ?? -1
         let write = -1 - step
         let call_span = Span { file, start: self.ast.get_start(call_node), end: self.ast.get_end(call_node) }
-        let what = if view_sym != 0: "`" ++ with_str_clone_ref(self.pool_resolve(view_sym)) ++ "` is a live view into it" else: "its argument is a live view into it"
-        var diag = Diagnostic.err("call to " ++ callee_name ++ " mutates global `" ++ name ++ "` while " ++ what, call_span)
+        let site_kind: i32 = self.global_calls[call * GLOBAL_CALL_STRIDE + 6]
+        let subject: i32 = self.global_calls[call * GLOBAL_CALL_STRIDE + 7]
+        let subject_name = if subject != 0: "`" ++ with_str_clone_ref(self.pool_resolve(subject)) ++ "`" else: "the place"
+        let site = if site_kind == GLOBAL_SITE_SCOPE_DROP: "the drop of " ++ subject_name ++ " at the end of its scope"
+            else if site_kind == GLOBAL_SITE_REASSIGN_DROP: "the drop of " ++ subject_name ++ "'s old value at this assignment"
+            else if site_kind == GLOBAL_SITE_TEMP_DROP: "the drop of this temporary at the end of its statement"
+            else if site_kind == GLOBAL_SITE_RETURN_DROP: "the drop of " ++ subject_name ++ " at this `return`"
+            else: "call to " ++ callee_name
+        let what = if view_sym != 0: "`" ++ with_str_clone_ref(self.pool_resolve(view_sym)) ++ "` is a live view into it" else if site_kind == GLOBAL_SITE_CALL: "its argument is a live view into it" else: "a view into it outlives the drop"
+        var diag = Diagnostic.err(site ++ " mutates global `" ++ name ++ "` while " ++ what, call_span)
         if view_node != 0:
-            let view_label = if view_sym != 0: "`" ++ with_str_clone_ref(self.pool_resolve(view_sym)) ++ "` views a value stored in `" ++ name ++ "`" else: "this argument views `" ++ name ++ "` for the whole call"
+            let view_label = if view_sym != 0: "`" ++ with_str_clone_ref(self.pool_resolve(view_sym)) ++ "` views a value stored in `" ++ name ++ "`" else if site_kind == GLOBAL_SITE_CALL: "this argument views `" ++ name ++ "` for the whole call" else: "this value views `" ++ name ++ "` and outlives the drop"
             diag.add_label(Span { file, start: self.ast.get_start(view_node), end: self.ast.get_end(view_node) }, view_label)
-        diag.add_label(call_span, "this call mutates `" ++ name ++ "`: " ++ chain ++ ", which writes it")
+        diag.add_label(call_span, (if site_kind == GLOBAL_SITE_CALL: "this call mutates `" else: "this drop mutates `") ++ name ++ "`: " ++ chain ++ ", which writes it")
         if binding >= 0:
             let bind_call: i32 = self.global_call_bindings[binding * GLOBAL_BINDING_STRIDE + 3]
             let bind_node: i32 = self.global_calls[bind_call * GLOBAL_CALL_STRIDE + 1]
@@ -2683,12 +2923,15 @@ impl Sema:
             let write_label = if write_kind == GLOBAL_WRITE_BUNDLE: "a bundle function, declared here with no body in this program: it counts as writing every global its bundle exports, `" ++ name ++ "` among them (D39: its declaration states no effect on globals)" else: "`" ++ name ++ "` is written here"
             diag.add_label(Span { file: write_file, start: self.ast.get_start(write_node), end: self.ast.get_end(write_node) }, write_label)
         if last_use != 0:
-            diag.add_label(Span { file, start: self.ast.get_start(last_use), end: self.ast.get_end(last_use) }, "view is used here after the call")
+            diag.add_label(Span { file, start: self.ast.get_start(last_use), end: self.ast.get_end(last_use) }, if site_kind == GLOBAL_SITE_CALL: "view is used here after the call" else: "view is used here after the drop")
         if (flags & 2) != 0:
             diag.add_note("the generator `" ++ with_str_clone_ref(self.pool_resolve(view_sym)) ++ "` is still running while the loop body runs (§13.4); collect the changes and apply them after the loop")
         else if (flags & 1) != 0:
             diag.add_note("the loop reads `" ++ name ++ "` again on its next iteration; collect the changes and apply them after the loop")
-        diag.add_note("a call writes every global its callee writes, through every call it makes (§9.1c: globals are places; §21.1 rule 1)")
+        if site_kind == GLOBAL_SITE_CALL:
+            diag.add_note("a call writes every global its callee writes, through every call it makes (§9.1c: globals are places; §21.1 rule 1)")
+        else:
+            diag.add_note("an implicit drop runs its type's Drop impls, and writes every global they write (§2.4; §21.1 rules 1 and 7)")
         self.diags.emit(move diag)
         true
 
@@ -2981,6 +3224,9 @@ impl Sema:
 
         // Push function scope
         self.push_scope()
+        // #1827: a `return` drops every binding from here (§2.4).
+        let saved_fn_bind_start: i32 = self.current_fn_bind_start
+        self.current_fn_bind_start = self.bind_names.len() as i32
 
         // `Self` in the body is the method's own declaration, resolved from
         // the body's module: collect_fn_decl binds it for the signature and
@@ -3193,6 +3439,17 @@ impl Sema:
         // and an arm's else-less `if` was refused as an expression.
         let unit_body_stmt = body_expected_ret == self.ty_void and self.ast.kind(source_body) != NodeKind.NK_BLOCK
         let checked_body_ty = if unit_body_stmt: self.check_expr_statement_context(body) else: self.check_expr(body)
+        // #1827 (§2.4): the parameters drop when the body ends, its value
+        // outliving them; the value's temporaries drop there too, and the
+        // value itself unless the body returns it (not `-> Unit`, not an
+        // entry point's statement tail, D43).
+        let body_value = if self.ast.kind(source_body) == NodeKind.NK_BLOCK: self.ast.get_data2(source_body) else: source_body
+        self.note_statement_temporary_drops(body_value, body_expected_ret != self.ty_void as i32 and not body_tail_is_statement, false)
+        let body_views: Vec[i32] = Vec.new()
+        if body_value != 0 and self.expr_views_global(body_value):
+            body_views.push(body_value)
+        self.note_scope_exit_drops(source_body, GLOBAL_SITE_SCOPE_DROP, self.current_fn_bind_start, body_views, false)
+        self.current_fn_bind_start = saved_fn_bind_start
         self.body_tail_block = saved_body_tail_block
         self.body_tail_holder = saved_body_tail_holder
         self.body_tail_discards = saved_body_tail_discards
@@ -7285,7 +7542,15 @@ const GLOBAL_WRITE_STRIDE: i32 = 5
 // function's assumed write of a global its bundle exports (#1827).
 const GLOBAL_WRITE_PLACE: i32 = 0
 const GLOBAL_WRITE_BUNDLE: i32 = 1
-const GLOBAL_CALL_STRIDE: i32 = 6
+const GLOBAL_CALL_STRIDE: i32 = 8
+// What a kept call site is (#1827): a call, or an implicit drop (§2.4) at
+// the end of a binding's scope, of a reassigned place's old value, of a
+// statement's temporary, or of a binding at a `return`.
+const GLOBAL_SITE_CALL: i32 = 0
+const GLOBAL_SITE_SCOPE_DROP: i32 = 1
+const GLOBAL_SITE_REASSIGN_DROP: i32 = 2
+const GLOBAL_SITE_TEMP_DROP: i32 = 3
+const GLOBAL_SITE_RETURN_DROP: i32 = 4
 const GLOBAL_TARGET_STRIDE: i32 = 3
 const GLOBAL_BINDING_STRIDE: i32 = 4
 const GLOBAL_VIEW_CHECK_STRIDE: i32 = 6
@@ -7296,6 +7561,8 @@ const GLOBAL_DISPATCH_STRIDE: i32 = 3
 // every callable value of a callable type (a = the type).
 const GLOBAL_DISPATCH_DYN: i32 = 1
 const GLOBAL_DISPATCH_CALLABLE: i32 = 2
+// ... or every Drop impl the drop of a type runs (a = the type).
+const GLOBAL_DISPATCH_DROP: i32 = 3
 
 impl Sema:
     fn int_literal_i64_value(node: i32) -> SemaIntLiteralValue:
@@ -11082,6 +11349,8 @@ impl Sema:
             if stmt_kind == NodeKind.NK_RETURN or stmt_kind == NodeKind.NK_BREAK or stmt_kind == NodeKind.NK_CONTINUE or stmt_kind == NodeKind.NK_GOTO or (stmt_ty == self.ty_never and self.stmt_starts_reachable_region(stmt) == 0):
                 block_diverged = 1
             self.check_task_statement_disposition(stmt)
+            // #1827 (§2.4): the statement's temporaries drop at its end.
+            self.note_statement_temporary_drops(stmt, false, true)
             self.expire_dead_borrows_in_block(extra_start, stmt_count, i + 1, tail)
 
         var result: TypeId = if tail == 0 and last_stmt_ty == self.ty_never: self.ty_never else: self.ty_void
@@ -11176,6 +11445,12 @@ impl Sema:
             result = if blk_break_ty != 0: blk_break_ty as TypeId else: self.ty_void
         if block_label != 0:
             self.pop_label_frame()
+        // #1827 (§2.4): the drops at this block's end, its tail's value
+        // outliving them; nothing is used after a function's last block.
+        let tail_views: Vec[i32] = Vec.new()
+        if tail != 0 and self.expr_views_global(tail):
+            tail_views.push(tail)
+        self.note_scope_exit_drops(node, GLOBAL_SITE_SCOPE_DROP, block_scope_start, tail_views, node != self.body_tail_block)
         self.check_unused_task_bindings_since(block_scope_start)
         self.pop_scope()
         if result != 0 and result != self.ty_void:
@@ -12986,6 +13261,12 @@ impl Sema:
         let value = self.ast.get_data0(node)
         if value != 0:
             let val_type = if self.current_return_type != 0: self.check_expr_with_owned_demand(value, self.current_return_type) else: self.check_expr(value)
+            // #1827 (§2.4): the return drops every binding of the body, and
+            // the returned value outlives them.
+            if self.expr_views_global(value):
+                let returned: Vec[i32] = Vec.new()
+                returned.push(value)
+                self.note_scope_exit_drops(node, GLOBAL_SITE_RETURN_DROP, self.current_fn_bind_start, returned, false)
             // Record the return value's type at this single choke point so
             // return-type inference (body_return_type_info) sees it regardless
             // of the value's node kind. check_expr types bool literals and
@@ -13179,6 +13460,9 @@ impl Sema:
         // If assignment target's root is a parameter, record EFF_WRITE
         self.note_place_effect(target, EFF_WRITE)
         self.record_global_place_write(target, node)
+        // #1827 (§2.4): the assignment drops the place's old value first.
+        let reassign_views: Vec[i32] = Vec.new()
+        self.note_drop_global_effects(node, node, GLOBAL_SITE_REASSIGN_DROP, self.place_root_sym(target), target_type as i32, reassign_views, true)
 
         // Check mutability
         if self.ast.kind(target) == NodeKind.NK_IDENT:
@@ -18248,6 +18532,9 @@ impl Sema:
         let saved_borrow_len = self.borrow_kinds.len() as i32
 
         self.push_scope()
+        // #1827: a `return` in the closure drops the closure's bindings.
+        let saved_closure_bind_start: i32 = self.current_fn_bind_start
+        self.current_fn_bind_start = self.bind_names.len() as i32
         // The parameter types are collected first and written to type_extra
         // after the loop: resolving an annotation can itself append to
         // type_extra (a new generic instance records its arguments there), and
@@ -18350,6 +18637,14 @@ impl Sema:
         let body_ty = if body_discarded: self.ty_void else: checked_body_ty
         if body_discarded:
             self.typed_expr_types.insert(body, self.ty_void as i32)
+        // #1827 (§2.4): the closure's parameters and its value's temporaries
+        // drop when it returns; its value outlives them unless discarded.
+        let closure_value = if self.ast.kind(body) == NodeKind.NK_BLOCK: self.ast.get_data2(body) else: body
+        self.note_statement_temporary_drops(closure_value, body_ty != self.ty_void, false)
+        let closure_views: Vec[i32] = Vec.new()
+        if closure_value != 0 and self.expr_views_global(closure_value):
+            closure_views.push(closure_value)
+        self.note_scope_exit_drops(body, GLOBAL_SITE_SCOPE_DROP, self.current_fn_bind_start, closure_views, false)
         self.record_returned_tail_reads(body, if expected_ret_ty != 0: expected_ret_ty else: body_ty as i32, body_ty as i32)
         self.infer_tail_node = saved_infer_tail
         self.infer_tail_is_closure = saved_infer_closure
@@ -18456,6 +18751,7 @@ impl Sema:
         self.current_fn_variadic = saved_capture_fn_variadic
         self.current_effect_closure = saved_effect_closure
         self.current_effect_body = saved_effect_body
+        self.current_fn_bind_start = saved_closure_bind_start
 
         // Restore borrow state — discard borrows created inside closure body.
         while self.borrow_kinds.len() as i32 > saved_borrow_len:
@@ -23019,76 +23315,84 @@ impl ConcreteSubst:
 // semantic dispatch. Codegen then performs only a keyed lookup.
 impl Sema:
     mut fn register_generic_drop_specializations():
-        let drop_method = self.pool_lookup_symbol("drop")
         let type_count = self.type_kinds.len() as i32
         for tid in 1..type_count:
             let resolved = self.resolve_alias(tid as TypeId) as i32
             if resolved != tid or self.get_type_kind(resolved as TypeId) != TypeKind.TY_GENERIC_INST:
                 continue
-            if self.concrete_drop_sigs.contains(resolved):
+            self.ensure_generic_drop_specialization(resolved)
+
+    // The Drop.drop body of concrete generic type `resolved`, specialized
+    // and checked on first use (a drop has no call node to demand it); -1
+    // when no Drop impl applies. #1827 demands it when Sema judges a drop
+    // of the type (push_drop_glue_bodies); MIR lowering for every type.
+    mut fn ensure_generic_drop_specialization(resolved: i32) -> i32:
+        if self.concrete_drop_sigs.contains(resolved):
+            let known: i32 = self.concrete_drop_sigs.get(resolved).unwrap()
+            return known
+        let drop_method = self.pool_lookup_symbol("drop")
+        var method_fn = 0
+        var method_node = 0
+        var matched_subst_names: Vec[i32] = Vec.new()
+        var matched_subst_types: Vec[i32] = Vec.new()
+        for di in 0..self.ast.decl_count():
+            if self.decl_is_lazy_skipped(di):
                 continue
-
-            var method_fn = 0
-            var method_node = 0
-            var matched_subst_names: Vec[i32] = Vec.new()
-            var matched_subst_types: Vec[i32] = Vec.new()
-            for di in 0..self.ast.decl_count():
-                if self.decl_is_lazy_skipped(di):
-                    continue
-                let impl_node = self.ast.get_decl(di)
-                if self.ast.kind(impl_node) != NodeKind.NK_IMPL_DECL or self.ast.get_data2(impl_node) != self.syms.drop:
-                    continue
-                var target = self.impl_target_match(impl_node, resolved)
-                if target.ok == 0:
-                    continue
-                let candidate_node = self.impl_decl_method_node(impl_node, drop_method)
-                if candidate_node == 0:
-                    sema_phase_bug(f"BUG: applicable Drop impl has no drop method for type {resolved}")
-                let candidate_fn = self.fn_decl_semantic_symbol_at(candidate_node, self.ast.get_data0(candidate_node), self.find_decl_index(candidate_node))
-                if method_fn != 0 and method_fn != candidate_fn:
-                    sema_phase_bug(f"BUG: ambiguous Drop impls for concrete generic type {resolved}")
-                method_fn = candidate_fn
-                method_node = candidate_node
-                matched_subst_names = move target.subst_names
-                matched_subst_types = move target.subst_types
-
-            if method_fn == 0:
+            let impl_node = self.ast.get_decl(di)
+            if self.ast.kind(impl_node) != NodeKind.NK_IMPL_DECL or self.ast.get_data2(impl_node) != self.syms.drop:
                 continue
-            if method_node == 0:
-                sema_phase_bug(f"BUG: Drop.drop declaration is missing for concrete generic type {resolved}")
+            var target = self.impl_target_match(impl_node, resolved)
+            if target.ok == 0:
+                continue
+            let candidate_node = self.impl_decl_method_node(impl_node, drop_method)
+            if candidate_node == 0:
+                sema_phase_bug(f"BUG: applicable Drop impl has no drop method for type {resolved}")
+            let candidate_fn = self.fn_decl_semantic_symbol_at(candidate_node, self.ast.get_data0(candidate_node), self.find_decl_index(candidate_node))
+            if method_fn != 0 and method_fn != candidate_fn:
+                sema_phase_bug(f"BUG: ambiguous Drop impls for concrete generic type {resolved}")
+            method_fn = candidate_fn
+            method_node = candidate_node
+            matched_subst_names = move target.subst_names
+            matched_subst_types = move target.subst_types
 
-            var subst = ConcreteSubst.init()
-            for si in 0..matched_subst_names.len() as i32:
-                subst.push(matched_subst_names[si], matched_subst_types[si])
+        if method_fn == 0:
+            return -1
+        if method_node == 0:
+            sema_phase_bug(f"BUG: Drop.drop declaration is missing for concrete generic type {resolved}")
 
-            let owner_sym = self.get_generic_inst_base(resolved)
-            if self.type_decl_nodes.contains(owner_sym):
-                let owner_decl = self.type_decl_nodes.get(owner_sym).unwrap()
-                var tp_pos = self.type_decl_tp_start(owner_decl)
-                let owner_tp_count = self.type_decl_tp_count(owner_decl)
-                if owner_tp_count != self.get_generic_inst_arg_count(resolved):
-                    sema_phase_bug(f"BUG: generic Drop owner arity mismatch for type {resolved}")
-                for ti in 0..owner_tp_count:
-                    let tp_sym = self.ast.get_extra(tp_pos)
-                    let bound_count = self.ast.get_extra(tp_pos + 1)
-                    subst.push(tp_sym, self.get_generic_inst_arg(resolved, ti))
-                    tp_pos = tp_pos + 2 + bound_count
-            subst.push(self.syms.self_type, resolved)
+        var subst = ConcreteSubst.init()
+        for si in 0..matched_subst_names.len() as i32:
+            subst.push(matched_subst_names[si], matched_subst_types[si])
 
-            var mono_text = f"{self.pool_resolve(method_fn)}__receiver__{resolved}"
-            for ai in 0..self.get_generic_inst_arg_count(resolved):
-                mono_text = f"{mono_text}_{self.get_generic_inst_arg(resolved, ai)}"
-            let mono_sym = self.pool_intern(mono_text)
-            if with_getenv_str("WITH_DEBUG_SUBST").len() > 0:
-                with_eprint(f"[gdrop] tid={resolved} base={self.pool_resolve(self.get_generic_inst_base(resolved))} method_fn={self.pool_resolve(method_fn)} node={method_node} mono={mono_text}")
-            var sig_idx = self.get_sig(mono_sym)
-            if sig_idx < 0:
-                let concrete_params: Vec[i32] = Vec.new()
-                sig_idx = self.check_fn_body_concrete(method_node, subst.names, subst.types, mono_sym, concrete_params)
-            if sig_idx < 0:
-                sema_phase_bug(f"BUG: failed to specialize Drop.drop for concrete generic type {resolved}")
-            self.concrete_drop_sigs.insert(resolved, sig_idx)
-            self.concrete_drop_mono_syms.insert(resolved, mono_sym)
+        let owner_sym = self.get_generic_inst_base(resolved)
+        if self.type_decl_nodes.contains(owner_sym):
+            let owner_decl = self.type_decl_nodes.get(owner_sym).unwrap()
+            var tp_pos = self.type_decl_tp_start(owner_decl)
+            let owner_tp_count = self.type_decl_tp_count(owner_decl)
+            if owner_tp_count != self.get_generic_inst_arg_count(resolved):
+                sema_phase_bug(f"BUG: generic Drop owner arity mismatch for type {resolved}")
+            for ti in 0..owner_tp_count:
+                let tp_sym = self.ast.get_extra(tp_pos)
+                let bound_count = self.ast.get_extra(tp_pos + 1)
+                subst.push(tp_sym, self.get_generic_inst_arg(resolved, ti))
+                tp_pos = tp_pos + 2 + bound_count
+        subst.push(self.syms.self_type, resolved)
+
+        var mono_text = f"{self.pool_resolve(method_fn)}__receiver__{resolved}"
+        for ai in 0..self.get_generic_inst_arg_count(resolved):
+            mono_text = f"{mono_text}_{self.get_generic_inst_arg(resolved, ai)}"
+        let mono_sym = self.pool_intern(mono_text)
+        if with_getenv_str("WITH_DEBUG_SUBST").len() > 0:
+            with_eprint(f"[gdrop] tid={resolved} base={self.pool_resolve(self.get_generic_inst_base(resolved))} method_fn={self.pool_resolve(method_fn)} node={method_node} mono={mono_text}")
+        var sig_idx = self.get_sig(mono_sym)
+        if sig_idx < 0:
+            let concrete_params: Vec[i32] = Vec.new()
+            sig_idx = self.check_fn_body_concrete(method_node, subst.names, subst.types, mono_sym, concrete_params)
+        if sig_idx < 0:
+            sema_phase_bug(f"BUG: failed to specialize Drop.drop for concrete generic type {resolved}")
+        self.concrete_drop_sigs.insert(resolved, sig_idx)
+        self.concrete_drop_mono_syms.insert(resolved, mono_sym)
+        sig_idx
 
     // Autoderef's user-Deref dispatch: specialize deref for the concrete
     // receiver and RECORD the resolution on the base expression node —
@@ -25889,6 +26193,8 @@ impl Sema:
                     if (mc_recv_tk == TypeKind.TY_INT or mc_recv_tk == TypeKind.TY_FLOAT) and self.int_narrowing_requires_cast(mc_expected as TypeId, mc_arg_ty as TypeId) != 0:
                         self.emit_error("min/max operands must be the same type; use an explicit `as` cast", mc_arg_node)
             if self.method_arg_stores_value(obj_type as i32, field, ai) != 0:
+                // #1827: the container owns it now; it drops it (§2.4).
+                self.global_consumed_args.insert(mc_arg_node, 1)
                 self.check_ephemeral_task_storage(mc_arg_node, "generic container")
                 // Container stores take ownership of their element just like an
                 // owned function parameter. Builtins have no ordinary signature

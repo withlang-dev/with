@@ -1054,6 +1054,13 @@ pub type Sema {
     // callable type, as [body, type]: what a call through a callable no
     // binding names may run.
     global_callable_values: Vec[i32],
+    // #1827: an argument passed to a by-value parameter (moved into the
+    // callee, which drops it), keyed by the argument node; the first
+    // binding of the body being checked (a return drops every binding from
+    // here); and, per type, whether its drop runs a user Drop impl (1/0).
+    global_consumed_args: HashMap[i32, i32],
+    current_fn_bind_start: i32,
+    global_user_drop_types: HashMap[i32, i32],
 
     // Hot intrinsic symbols used in semantic dispatch paths.
     syms: SemaBuiltinSymbols,
@@ -2760,6 +2767,9 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         global_dispatcher_heads: sema_new_map_i32_i32(),
         global_dispatcher_next: Vec.new(),
         global_callable_values: Vec.new(),
+        global_consumed_args: sema_new_map_i32_i32(),
+        current_fn_bind_start: 0,
+        global_user_drop_types: sema_new_map_i32_i32(),
         syms: sema_builtin_symbols_zero(),
         method_impl_nodes,
         method_decl_impl_nodes,
