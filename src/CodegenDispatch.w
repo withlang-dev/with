@@ -5620,7 +5620,11 @@ impl Codegen:
                                 let mc_sym = self.intern.intern("llvm.memcpy.p0.p0.i64")
                                 let mc_func = self.ensure_llvm_memcpy_declared()
                                 let mc_ft = self.fn_fn_types.get(mc_sym).unwrap() as i64
-                                let mc_len = wl_const_int(wl_i64_type(self.context), wl_get_array_length(use_arr_ty), 0)
+                                // #1050: the length is the array's BYTE size. The
+                                // element count copied N / sizeof(T) elements and
+                                // left the tail garbage (and truncated every
+                                // `[v; N > 64]` fill copied into its binding, #1049).
+                                let mc_len = wl_const_int(wl_i64_type(self.context), wl_abi_size_of(wl_get_module_data_layout(self.llmod), use_arr_ty), 0)
                                 let mc_vol = wl_const_int(wl_i1_type(self.context), 0, 0)
                                 let mc_args: Vec[i64] = Vec.new()
                                 mc_args.push(dst_ptr)
