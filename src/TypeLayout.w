@@ -520,11 +520,3 @@ impl Sema:
             return self.unwrapped_type_cache.get(tid).unwrap()
         sema_phase_bug("BUG: try_unwrapped_type_frozen miss — type not preregistered")
 
-    // D7 frozen read twin of infer_for_element_type (for-loop element type). The query is a
-    // type producer, but by freeze time every element type it would build already exists
-    // (preregister filled the cache while types were still mutable), so this is a pure &Self
-    // lookup. Complete by construction; miss = loud BUG.
-    fn infer_for_element_type_frozen(iter_type: i32) -> i32:
-        if self.for_element_type_cache.contains(iter_type):
-            return self.for_element_type_cache.get(iter_type).unwrap()
-        sema_phase_bug("BUG: infer_for_element_type_frozen miss — type not preregistered")

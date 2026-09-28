@@ -14067,6 +14067,8 @@ impl Sema:
         let elem_type = if gen_elem != 0: gen_elem else: self.for_loop_element_type(iterable, iter_type as i32)
         if elem_type == 0:
             self.report_not_iterable(iterable, iter_type as i32)
+        else if gen_elem == 0:
+            self.for_elem_types.insert(node, elem_type)
         let outer_binding_count = self.bind_names.len() as i32
         if gen_elem != 0:
             self.mark_moved_if_consumed(iterable)
@@ -14219,6 +14221,8 @@ impl Sema:
         let elem = self.for_loop_element_type(iterable, iter_ty as i32)
         if elem == 0:
             self.report_not_iterable(iterable, iter_ty as i32)
+        else:
+            self.for_elem_types.insert(iterable, elem)
         elem
 
     // §13.5 (#1828): a `for` iterable is an Iter[T] (a `next()` returning
