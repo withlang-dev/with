@@ -1518,6 +1518,9 @@ impl CCodegen:
             let tid: i32 = self.fat_thunk_tids[i]
             i = i + 1
             let ret_tid = self.sema.get_type_d2(tid as TypeId)
+            if self.returns_array(ret_tid):
+                self.fail("emit-c: a fn value whose type returns an array has no C lowering (C returns no arrays; a named function takes an out-pointer, #1775)")
+                return ""
             let start = self.sema.get_type_d0(tid as TypeId)
             let count = self.sema.get_type_d1(tid as TypeId)
             var params = "void* __with_ctx"
@@ -2100,6 +2103,16 @@ impl CCodegen:
             return false
         let inner = self.sema.resolve_alias(self.sema.get_type_d0(resolved) as TypeId)
         self.sema.get_type_kind(inner) == TypeKind.TY_ARRAY
+
+    // C returns no arrays (#1775): a function whose With return type is an
+    // array takes the caller's destination as a leading `void* __with_ret`
+    // and its return copies `_0` into it. The C emitter had declared
+    // `uint16_t* arr()` returning `_0` — a pointer to its own dead frame —
+    // and assigned the result to an array, which no C compiler accepts.
+    fn returns_array(ret_tid: i32) -> bool:
+        if ret_tid <= 0 or ret_tid == CC_PSEUDO_TID_VEC or ret_tid == CC_PSEUDO_TID_FMT_BUF:
+            return false
+        self.sema.get_type_kind(self.sema.resolve_alias(ret_tid)) == TypeKind.TY_ARRAY
 
     fn vec_element_tid(tid: i32) -> i32:
         let resolved = self.sema.resolve_alias(tid)
@@ -8434,6 +8447,8 @@ impl CCodegen:
                 if body.local_type_ids.len() as i32 > 0: body.local_type_ids.get(0) else: self.sema.ty_void
             if self.is_void_tid(ret_tid) != 0:
                 return "    return;"
+            if self.returns_array(ret_tid):
+                return "    memcpy(__with_ret, _0, sizeof(_0));\n    return;"
             return "    return _0;"
         if tk == TermKind.TK_UNREACHABLE:
             return "    with_panic(WITH_STR_LIT(\"reached unreachable code\"), WITH_STR_LIT(\"\"), 0);\n    abort();"
@@ -8456,6 +8471,10 @@ impl CCodegen:
             var out = ""
             if self.is_void_tid(ret_tid) != 0:
                 out = out ++ "    " ++ callee ++ "(" ++ args ++ ");\n"
+            else if self.returns_array(ret_tid):
+                // The destination array decays to the callee's out-pointer.
+                let dest = self.place_text(body, d2)
+                out = out ++ "    " ++ callee ++ "(" ++ (if args.len() > 0: dest ++ ", " ++ args else: dest) ++ ");\n"
             else:
                 out = out ++ "    " ++ self.place_text(body, d2) ++ " = " ++ callee ++ "(" ++ args ++ ");\n"
             out = out ++ f"    goto bb{d3};"
@@ -8753,6 +8772,9 @@ impl CCodegen:
             if tid_kind != TypeKind.TY_FN and tid_kind != TypeKind.TY_EXTERN_FN:
                 continue
             let ret_tid = self.sema.get_type_d2(tid)
+            if self.returns_array(ret_tid):
+                self.fail("emit-c: a fn value whose type returns an array has no C lowering (C returns no arrays; a named function takes an out-pointer, #1775)")
+                return ""
             let start = self.sema.get_type_d0(tid)
             let count = self.sema.get_type_d1(tid)
             if tid_kind == TypeKind.TY_FN:
@@ -9227,6 +9249,8 @@ impl CCodegen:
                 params = params ++ self.c_type(p_tid, 0) ++ f"* _{i + 1}"
             else:
                 params = params ++ self.c_decl(p_tid, f"_{i + 1}")
+        if self.returns_array(ret_tid):
+            return "void " ++ fn_name ++ "(void* __with_ret" ++ (if params.len() > 0: ", " ++ params else: "") ++ ")"
         let name = fn_name ++ "(" ++ params ++ ")"
         if self.type_is_pointer_to_array(ret_tid):
             return self.c_decl(ret_tid, name)
