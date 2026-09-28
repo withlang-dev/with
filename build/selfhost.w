@@ -2373,7 +2373,7 @@ fn bs_check_build_cache_tracks_action_source(ctx: &ActionCtx, compiler_path: &st
         return bs_fail(ctx, "could not create build action module directory")
     rc = bs_write_fixture(ctx, bs_join(case_dir, "build.w"), "use std.build\nuse build.actions\n\ncomptime with BuildCtx as ctx:\npub fn build -> Build:\n    var out = ctx.new_build()\n    var stamp = target_new(.Action, \"stamp\", \"\").output(\"out/stamp.txt\")\n    stamp.action = write_stamp\n    stamp = stamp.write_scope(\"out\")\n    out = out.add_target(stamp)\n    out.default(\"stamp\")\n", "cache action build")
     if rc != 0: return rc
-    rc = bs_write_fixture(ctx, bs_join(build_dir, "actions.w"), "use std.build\n\npub fn write_stamp(ctx: &ActionCtx) -> i32:\n    let fs = ctx.fs()\n    if fs.mkdir_all(\"out\") != 0:\n        return 1\n    if fs.write_text(\"out/stamp.txt\", \"first\\n\") != 0:\n        return 1\n    0\n", "cache action source first")
+    rc = bs_write_fixture(ctx, bs_join(build_dir, "actions.w"), "use std.build\n\npub fn write_stamp(ctx: ActionCtx) -> i32:\n    let fs = ctx.fs()\n    if fs.mkdir_all(\"out\") != 0:\n        return 1\n    if fs.write_text(\"out/stamp.txt\", \"first\\n\") != 0:\n        return 1\n    0\n", "cache action source first")
     if rc != 0: return rc
 
     let first = bs_project_expect_success(ctx, compiler_path, case_dir, "build-cache-action-first", bs_project_args("build"))
@@ -2381,7 +2381,7 @@ fn bs_check_build_cache_tracks_action_source(ctx: &ActionCtx, compiler_path: &st
     rc = bs_expect_file_contains(ctx, bs_join(case_dir, "out/stamp.txt"), "first", "build cache action first output")
     if rc != 0: return rc
 
-    rc = bs_write_fixture(ctx, bs_join(build_dir, "actions.w"), "use std.build\n\npub fn write_stamp(ctx: &ActionCtx) -> i32:\n    let fs = ctx.fs()\n    if fs.mkdir_all(\"out\") != 0:\n        return 1\n    if fs.write_text(\"out/stamp.txt\", \"second\\n\") != 0:\n        return 1\n    0\n", "cache action source second")
+    rc = bs_write_fixture(ctx, bs_join(build_dir, "actions.w"), "use std.build\n\npub fn write_stamp(ctx: ActionCtx) -> i32:\n    let fs = ctx.fs()\n    if fs.mkdir_all(\"out\") != 0:\n        return 1\n    if fs.write_text(\"out/stamp.txt\", \"second\\n\") != 0:\n        return 1\n    0\n", "cache action source second")
     if rc != 0: return rc
     let second = bs_project_expect_success(ctx, compiler_path, case_dir, "build-cache-action-second", bs_project_args("build"))
     if second.rc != 0: return second.rc
@@ -2392,7 +2392,7 @@ fn bs_check_build_cache_tracks_declared_input(ctx: &ActionCtx, compiler_path: &s
     if rc != 0: return rc
     rc = bs_write_fixture(ctx, bs_join(case_dir, "src/input.txt"), "first", "cache input first")
     if rc != 0: return rc
-    rc = bs_write_fixture(ctx, bs_join(case_dir, "build.w"), "use std.build\n\nfn copy_input(ctx: &ActionCtx) -> i32:\n    let fs = ctx.fs()\n    if fs.mkdir_all(\"out\") != 0:\n        return 1\n    let text = fs.read_text(ctx.inputs().get(0))\n    if fs.write_text(ctx.output(), text) != 0:\n        return 1\n    0\n\ncomptime with BuildCtx as ctx:\npub fn build -> Build:\n    var out = ctx.new_build()\n    var stamp = target_new(.Action, \"stamp\", \"\").output(\"out/stamp.txt\")\n    stamp.action = copy_input\n    stamp = stamp.input(\"src/input.txt\")\n    stamp = stamp.write_scope(\"out\")\n    out = out.add_target(stamp)\n    out.default(\"stamp\")\n", "cache input build")
+    rc = bs_write_fixture(ctx, bs_join(case_dir, "build.w"), "use std.build\n\nfn copy_input(ctx: ActionCtx) -> i32:\n    let fs = ctx.fs()\n    if fs.mkdir_all(\"out\") != 0:\n        return 1\n    let text = fs.read_text(ctx.inputs().get(0))\n    if fs.write_text(ctx.output(), text) != 0:\n        return 1\n    0\n\ncomptime with BuildCtx as ctx:\npub fn build -> Build:\n    var out = ctx.new_build()\n    var stamp = target_new(.Action, \"stamp\", \"\").output(\"out/stamp.txt\")\n    stamp.action = copy_input\n    stamp = stamp.input(\"src/input.txt\")\n    stamp = stamp.write_scope(\"out\")\n    out = out.add_target(stamp)\n    out.default(\"stamp\")\n", "cache input build")
     if rc != 0: return rc
 
     let first = bs_project_expect_success(ctx, compiler_path, case_dir, "build-cache-input-first", bs_project_args("build"))
@@ -2491,7 +2491,7 @@ fn bs_check_imported_module_diag_location(ctx: &ActionCtx, compiler_path: &str, 
 fn bs_check_build_effects_audit(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
     var rc = bs_write_project_manifest(ctx, case_dir, "effectaudit")
     if rc != 0: return rc
-    rc = bs_write_fixture(ctx, bs_join(case_dir, "build.w"), "use std.build\n\nfn generate(ctx: &ActionCtx) -> i32:\n    let fs = ctx.fs()\n    if fs.mkdir_all(\"out\") != 0:\n        return 1\n    let value = ctx.env_input(\"WITH_EFFECT_FLAG\")\n    let graph_value = ctx.args().get(1)\n    if fs.write_text(\"out/effect.txt\", value ++ \"/\" ++ graph_value) != 0:\n        return 1\n    let argv: Vec[str] = Vec.new()\n    argv.push(ctx.args().get(0).clone())\n    argv.push(\"version\")\n    let result = ctx.process_runner().run_capture(argv, \"out/proc.stdout\", \"out/proc.stderr\", 120000)\n    result.rc\n\ncomptime with BuildCtx as ctx:\npub fn build -> Build:\n    let graph_value = ctx.env_input(\"WITH_GRAPH_FLAG\")\n    var out = ctx.new_build()\n    var target = target_new(.Action, \"effect\", \"\").output(\"out/effect.txt\")\n    target.action = generate\n    target = target.write_scope(\"out\")\n    target = target.arg(\"" ++ compiler_path ++ "\")\n    target = target.arg(graph_value)\n    out = out.add_target(target)\n    out.default(\"effect\")\n", "effect audit build")
+    rc = bs_write_fixture(ctx, bs_join(case_dir, "build.w"), "use std.build\n\nfn generate(ctx: ActionCtx) -> i32:\n    let fs = ctx.fs()\n    if fs.mkdir_all(\"out\") != 0:\n        return 1\n    let value = ctx.env_input(\"WITH_EFFECT_FLAG\")\n    let graph_value = ctx.args().get(1)\n    if fs.write_text(\"out/effect.txt\", value ++ \"/\" ++ graph_value) != 0:\n        return 1\n    let argv: Vec[str] = Vec.new()\n    argv.push(ctx.args().get(0).clone())\n    argv.push(\"version\")\n    let result = ctx.process_runner().run_capture(argv, \"out/proc.stdout\", \"out/proc.stderr\", 120000)\n    result.rc\n\ncomptime with BuildCtx as ctx:\npub fn build -> Build:\n    let graph_value = ctx.env_input(\"WITH_GRAPH_FLAG\")\n    var out = ctx.new_build()\n    var target = target_new(.Action, \"effect\", \"\").output(\"out/effect.txt\")\n    target.action = generate\n    target = target.write_scope(\"out\")\n    target = target.arg(\"" ++ compiler_path ++ "\")\n    target = target.arg(graph_value)\n    out = out.add_target(target)\n    out.default(\"effect\")\n", "effect audit build")
     if rc != 0: return rc
 
     var env_one = ProcessEnv { vars: Vec.new() }
@@ -6926,7 +6926,7 @@ fn bs_check_build_w_action_target(ctx: &ActionCtx, compiler_path: &str, case_dir
     if rc != 0: return rc
     let build_text =
         "use std.build\n\n" ++
-        "fn generate(ctx: &ActionCtx) -> i32:\n" ++
+        "fn generate(ctx: ActionCtx) -> i32:\n" ++
         "    assert(ctx.target_name() == \"generate\")\n" ++
         "    assert(ctx.project_info().package_name() == \"buildwaction\")\n" ++
         "    assert(ctx.inputs().get(0) == \"src/input.txt\")\n" ++
@@ -7046,10 +7046,10 @@ fn bs_check_build_w_action_no_deps(ctx: &ActionCtx, compiler_path: &str, case_di
     if rc != 0: return rc
     let build_text =
         "use std.build\n\n" ++
-        "fn prepare(ctx: &ActionCtx) -> i32:\n" ++
+        "fn prepare(ctx: ActionCtx) -> i32:\n" ++
         "    let _ = ctx\n" ++
         "    17\n\n" ++
-        "fn leaf(ctx: &ActionCtx) -> i32:\n" ++
+        "fn leaf(ctx: ActionCtx) -> i32:\n" ++
         "    assert(ctx.fs().write_text(ctx.output(), \"leaf\") == 0)\n" ++
         "    0\n\n" ++
         "pub fn build(ctx: BuildCtx) -> Build:\n" ++
@@ -7094,7 +7094,7 @@ fn bs_check_build_w_action_failures(ctx: &ActionCtx, compiler_path: &str, base_d
     if rc != 0: return rc
     let missing_build =
         "use std.build\n\n" ++
-        "fn generate(ctx: &ActionCtx) -> i32:\n" ++
+        "fn generate(ctx: ActionCtx) -> i32:\n" ++
         "    assert(ctx.fs().write_text(ctx.output(), \"should not run\") == 0)\n" ++
         "    0\n\n" ++
         "pub fn build(ctx: BuildCtx) -> Build:\n" ++
@@ -7119,7 +7119,7 @@ fn bs_check_build_w_action_failures(ctx: &ActionCtx, compiler_path: &str, base_d
     if rc != 0: return rc
     let failure_build =
         "use std.build\n\n" ++
-        "fn fail_action(ctx: &ActionCtx) -> i32:\n" ++
+        "fn fail_action(ctx: ActionCtx) -> i32:\n" ++
         "    7\n\n" ++
         "pub fn build(ctx: BuildCtx) -> Build:\n" ++
         "    var out = ctx.new_build()\n" ++
@@ -7142,7 +7142,7 @@ fn bs_check_build_w_action_failures(ctx: &ActionCtx, compiler_path: &str, base_d
     if rc != 0: return rc
     let undeclared_build =
         "use std.build\n\n" ++
-        "fn bad_write(ctx: &ActionCtx) -> i32:\n" ++
+        "fn bad_write(ctx: ActionCtx) -> i32:\n" ++
         "    assert(ctx.fs().write_text(\"out/action/other.txt\", \"bad\") == 0)\n" ++
         "    0\n\n" ++
         "pub fn build(ctx: BuildCtx) -> Build:\n" ++
@@ -7166,7 +7166,7 @@ fn bs_check_build_w_action_failures(ctx: &ActionCtx, compiler_path: &str, base_d
     if rc != 0: return rc
     let install_path_build =
         "use std.build\n\n" ++
-        "fn bad_install_write(ctx: &ActionCtx) -> i32:\n" ++
+        "fn bad_install_write(ctx: ActionCtx) -> i32:\n" ++
         "    assert(ctx.fs().write_text(\"$HOME/.local/bin/with-bad\", \"bad\") == 0)\n" ++
         "    0\n\n" ++
         "pub fn build(ctx: BuildCtx) -> Build:\n" ++
@@ -7190,7 +7190,7 @@ fn bs_check_build_w_action_failures(ctx: &ActionCtx, compiler_path: &str, base_d
     if rc != 0: return rc
     let escape_build =
         "use std.build\n\n" ++
-        "fn bad_escape(ctx: &ActionCtx) -> i32:\n" ++
+        "fn bad_escape(ctx: ActionCtx) -> i32:\n" ++
         "    assert(ctx.fs().write_text(\"../outside.txt\", \"bad\") == 0)\n" ++
         "    0\n\n" ++
         "pub fn build(ctx: BuildCtx) -> Build:\n" ++
@@ -7214,7 +7214,7 @@ fn bs_check_build_w_action_failures(ctx: &ActionCtx, compiler_path: &str, base_d
     if rc != 0: return rc
     let network_build =
         "use std.build\n\n" ++
-        "fn bad_network(ctx: &ActionCtx) -> i32:\n" ++
+        "fn bad_network(ctx: ActionCtx) -> i32:\n" ++
         "    let args: Vec[str] = Vec.new()\n" ++
         "    args.push(\"curl\")\n" ++
         "    args.push(\"--version\")\n" ++
@@ -7243,7 +7243,7 @@ fn bs_check_build_w_action_failures(ctx: &ActionCtx, compiler_path: &str, base_d
     if rc != 0: return rc
     let network_helper_build =
         "use std.build\n\n" ++
-        "fn bad_network(ctx: &ActionCtx) -> i32:\n" ++
+        "fn bad_network(ctx: ActionCtx) -> i32:\n" ++
         "    let args: Vec[str] = Vec.new()\n" ++
         "    args.push(\"out/tools/https_fetch\")\n" ++
         "    args.push(\"https://example.invalid/file\")\n" ++
@@ -7273,7 +7273,7 @@ fn bs_check_build_w_action_failures(ctx: &ActionCtx, compiler_path: &str, base_d
     if rc != 0: return rc
     let network_allowed_build =
         "use std.build\n\n" ++
-        "fn allowed_network(ctx: &ActionCtx) -> i32:\n" ++
+        "fn allowed_network(ctx: ActionCtx) -> i32:\n" ++
         "    let fs = ctx.fs()\n" ++
         "    assert(fs.mkdir_all(\"out/action\") == 0)\n" ++
         "    let args: Vec[str] = Vec.new()\n" ++
@@ -7307,7 +7307,7 @@ fn bs_check_build_w_action_failures(ctx: &ActionCtx, compiler_path: &str, base_d
     if rc != 0: return rc
     let capture_build =
         "use std.build\n\n" ++
-        "fn bad_capture(ctx: &ActionCtx) -> i32:\n" ++
+        "fn bad_capture(ctx: ActionCtx) -> i32:\n" ++
         "    let args: Vec[str] = Vec.new()\n" ++
         "    args.push(\"/bin/echo\")\n" ++
         "    args.push(\"bad\")\n" ++
@@ -7355,7 +7355,7 @@ fn bs_check_build_w_action_failures(ctx: &ActionCtx, compiler_path: &str, base_d
     if rc != 0: return rc
     let bad_spec_build =
         "use std.build\n\n" ++
-        "fn bad_spec(ctx: &ActionCtx) -> i32:\n" ++
+        "fn bad_spec(ctx: ActionCtx) -> i32:\n" ++
         "    let spec = process_spec(\"/bin/echo\").arg(\"unused\").capture(false, true)\n" ++
         "    let _ = ctx.process_runner().run_spec(spec, \"out/action/stdout.txt\", \"out/action/stderr.txt\")\n" ++
         "    0\n\n" ++
