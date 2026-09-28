@@ -845,6 +845,12 @@ fn sqlite3_value_int
     of Value
 ```
 
+A clause on the registering function may present a callback's argument
+vector as a slice of a callback-scope handle (`argv paired with argc as
+&[Value]`) and its registered user data as the value the facade boxed
+(`user_data as &U`). The compiler generates the wrapper; both are valid for
+the callback's invocation only.
+
 A callback used only during one foreign call needs no retained lifetime. A
 callback C keeps is modeled with `retains`, and its userdata likewise. A
 callback receives ownership only through explicit evidence (`callback
@@ -1005,6 +1011,12 @@ Runtime foreign calls are described by an internal facade or equivalent
 audited contract data. Hidden runtime behavior must not invalidate a foreign
 view that safe user code is permitted to hold; a runtime change that begins
 mutating a domain supporting live safe views is caught by audit.
+
+Process-global C state over which no safe view is presented (signal
+disposition and mask, the current directory, the file-descriptor table,
+resource limits, process groups and children, the stdio stream objects) is an
+effect the runtime audit records, not a domain. It becomes a domain the first
+time a facade presents a safe view whose validity it decides.
 
 
 ### 16.3 Manual Declarations

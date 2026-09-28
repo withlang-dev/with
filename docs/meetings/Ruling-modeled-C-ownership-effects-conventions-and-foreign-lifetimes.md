@@ -1982,3 +1982,24 @@ for a callback's invocation (`sqlite3_context`, `sqlite3_value`) is declared
 `Drop`, and it is borrowed for the callback's scope and cannot outlive it.
 Operations stated `of` the handle are its methods, so a callback body calls
 them safely.
+
+---
+
+# Amendment 2 (Eric, 2026-09-28)
+
+Blessed in the modeled-C close-out (D76). It settles two questions the
+issues left open; it does not change any rule above.
+
+**§52, process-global state that no view reaches (#1608).** Process-global
+C state over which no safe view is presented (signal disposition and mask,
+the current directory, the file-descriptor table, resource limits, process
+groups and children, the stdio stream objects) is an effect the runtime
+audit records, not a domain. It becomes a domain the first time a facade
+presents a safe view whose validity it decides.
+
+**§44, callback arguments and user data (#1779).** A clause on the
+registering function may present a callback's argument vector as a slice of
+a callback-scope handle (`argv paired with argc as &[Value]`) and its
+registered user data as the value the facade boxed (`user_data as &U`). The
+compiler generates the wrapper; both are valid for the callback's invocation
+only.

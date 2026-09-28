@@ -1,4 +1,4 @@
-# The With Programming Language — Specification v7.7
+# The With Programming Language — Specification v7.8
 
 **Author:** Eric Hartford
 **Status:** Reference specification for prototype implementation
@@ -11,6 +11,10 @@ implementation is still in progress.** The D22 rules are normative now. The
 compiler, comptime evaluator, backends, standard library, diagnostics, and
 tests are NON-COMPLIANT wherever they do not yet implement them. Existing
 implementation behavior must not be treated as precedent against D22.
+**Changelog v7.8:** Process-global C state no safe view reaches is an audited
+effect, not a domain (§16.2b.14, D76); a registering function may present a
+callback's `argv`/`argc` as `&[Value]` and its user data as `&U` (§16.2b.9,
+D76; modeled-C ruling Amendment 2).
 **Changelog v7.7:** A consuming closure crosses a bundle boundary only to a
 `once` parameter, and a non-`move` closure argument may not be returned
 (§12.4, D75); `[value; N]` evaluates `value` once per element with a

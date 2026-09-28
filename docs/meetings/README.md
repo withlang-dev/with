@@ -12,6 +12,7 @@ decision supersedes an earlier one, say so in both.
 
 ## Decisions
 
+- [D76 — Modeled-C Amendment 2: effects without views; callback arguments and user data](2026-09-28-D76-modeled-c-amendment-2-effects-without-views-callback-arguments.md)
 - [D75 — `once` parameters, fills, distinct casts, payload discriminants, variadic definitions](2026-09-28-D75-once-parameters-fills-distinct-casts-payload-discriminants-variadic-definitions.md)
 - [D74 — Entry sources, optional-chain field moves, and the field-view examples](2026-09-27-D74-entry-sources-optional-chain-field-moves-and-the-field-view.md)
 - [D73 — An assignment's value is a read of the place after the store (C's rule under With's view semantics)](2026-09-27-D73-an-assignment-s-value-is-a-read-of-the-place-after-the-store.md)
