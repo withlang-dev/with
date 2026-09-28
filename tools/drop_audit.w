@@ -147,6 +147,28 @@ fn shape_ty(shape: &str) -> str:
 fn sc_scope_exit(shape: &str) -> str:
     shape_decls(shape) ++ "fn go(slot: *mut i32):\n    let a" ++ shape_ann(shape) ++ " = " ++ shape_mk(shape, "1") ++ "\n    let _keep = 0\n"
 
+// #1851 (§2.4): a `{ }` block holding only the binding is its scope. The
+// sum counts drops but not when they run, so the scope's end is made
+// observable: a marker scales the slot right after the block (its own block
+// has two statements, so it drops there). Dropped at the `}`, the sum is
+// 10; dropped at the function's end (the parser returned the lone `let` in
+// place of the block), it is 1.
+fn sc_block_scope(shape: &str) -> str:
+    shape_decls(shape) ++
+    "type Scale { slot: *mut i32 }\n" ++
+    "impl Drop for Scale:\n" ++
+    "    fn drop(move self: Self):\n" ++
+    "        unsafe:\n" ++
+    "            *self.slot = *self.slot * 10\n" ++
+    "fn go(slot: *mut i32):\n" ++
+    "    {\n" ++
+    "        let a" ++ shape_ann(shape) ++ " = " ++ shape_mk(shape, "1") ++ "\n" ++
+    "    }\n" ++
+    "    {\n" ++
+    "        let s = Scale { slot }\n" ++
+    "        let _k = 0\n" ++
+    "    }\n"
+
 fn sc_branch(shape: &str, taken: bool) -> str:
     let flag = if taken: "true" else: "false"
     shape_decls(shape) ++
@@ -668,6 +690,7 @@ fn build_cells():
     cells.push(cell("slotmap_refill/slotmap", sc_slotmap("refill"), 8320))
     for sh in ["bare", "field", "tuple", "option", "enum", "boxbare", "rcbare", "boxfield", "boxdyn", "boxdynfield"]:
         cells.push(cell("scope_exit/" ++ sh, sc_scope_exit(sh), 1))
+        cells.push(cell("block_scope_exit/" ++ sh, sc_block_scope(sh), 10))
         cells.push(cell("branch_taken/" ++ sh, sc_branch(sh, true), 1))
         cells.push(cell("branch_untaken/" ++ sh, sc_branch(sh, false), 0))
         cells.push(cell("loop3/" ++ sh, sc_loop(sh), 3))

@@ -7975,14 +7975,27 @@ impl Parser:
 
         self.expect(TokenKind.TK_R_BRACE)
 
-        if stmts.len() == 0:
+        // A block of one expression is that expression's value. A block of
+        // one statement that binds a name or schedules work at the scope's
+        // end is still that scope (§2.4, #1851): returned bare, `{ let t = T
+        // {} }` put `t` in the enclosing scope, its drop at the function's
+        // end and its name in reach after the `}`.
+        if stmts.len() == 0 and not self.binds_into_scope(last_expr):
             return last_expr
 
         let extra_start = self.pool.extra_len()
         for i in 0..stmts.len() as i32:
             self.pool.add_extra(stmts[i])
         let stmt_count = stmts.len() as i32
-        self.pool.add_node(NodeKind.NK_BLOCK, self.pool.get_start(stmts.get(0)), self.pool.get_end(last_expr), extra_start, stmt_count, last_expr)
+        let first = if stmt_count > 0: stmts.get(0) else: last_expr as i32
+        self.pool.add_node(NodeKind.NK_BLOCK, self.pool.get_start(first), self.pool.get_end(last_expr), extra_start, stmt_count, last_expr)
+
+    // A statement whose effect belongs to its enclosing scope: a binding
+    // (`let`, `var`, `const`, a pattern `let`, `let ... else`) or a `defer` /
+    // `errdefer`, which runs at the scope's end.
+    fn binds_into_scope(node: NodeId) -> bool:
+        let k = self.pool.kind(node)
+        k == NodeKind.NK_LET_BINDING or k == NodeKind.NK_LET_ELSE or k == NodeKind.NK_DEFER or k == NodeKind.NK_ERRDEFER
 
     mut fn finish_record_update(start: i32, source: NodeId) -> NodeId:
         self.advance()  // consume 'with'
