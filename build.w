@@ -3605,6 +3605,10 @@ pub fn build(ctx: BuildCtx) -> Build:
     var seed = target_new(.Action, "seed", "").output("src/main")
     seed.action = run_seed_download_action
     seed = seed.input("build/https_fetch.w")
+    // The lock is what the download is made from: without it as an input a
+    // checkout that ever ran :seed stayed "fresh" after a seed.lock bump and
+    // kept the old seed (2026-09-28, main after #1801).
+    seed = seed.input("seed.lock")
     seed = seed.write_scope("out/tmp")
     seed = seed.allow_network()
     seed = seed.arg("withlang-dev/with")
