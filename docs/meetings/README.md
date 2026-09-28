@@ -12,6 +12,7 @@ decision supersedes an earlier one, say so in both.
 
 ## Decisions
 
+- [D75 — `once` parameters, fills, distinct casts, payload discriminants, variadic definitions](2026-09-28-D75-once-parameters-fills-distinct-casts-payload-discriminants-variadic-definitions.md)
 - [D74 — Entry sources, optional-chain field moves, and the field-view examples](2026-09-27-D74-entry-sources-optional-chain-field-moves-and-the-field-view.md)
 - [D73 — An assignment's value is a read of the place after the store (C's rule under With's view semantics)](2026-09-27-D73-an-assignment-s-value-is-a-read-of-the-place-after-the-store.md)
 - [D72 — A `Drop` type whose all-zero storage is a live value gets a hidden liveness byte](2026-09-27-D72-a-drop-type-whose-all-zero-storage-is-a-live-value-gets-a.md)

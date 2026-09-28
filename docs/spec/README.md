@@ -1,4 +1,4 @@
-# The With Programming Language — Specification v7.6
+# The With Programming Language — Specification v7.7
 
 **Author:** Eric Hartford
 **Status:** Reference specification for prototype implementation
@@ -11,6 +11,13 @@ implementation is still in progress.** The D22 rules are normative now. The
 compiler, comptime evaluator, backends, standard library, diagnostics, and
 tests are NON-COMPLIANT wherever they do not yet implement them. Existing
 implementation behavior must not be treated as precedent against D22.
+**Changelog v7.7:** A consuming closure crosses a bundle boundary only to a
+`once` parameter, and a non-`move` closure argument may not be returned
+(§12.4, D75); `[value; N]` evaluates `value` once per element with a
+compile-time `N` (§4.3a, D75); a cast into or out of a distinct type moves an
+owned value and borrows through a view (§4.5, D75); an explicit `= N` makes a
+backing-less payload enum a discriminant enum (§4.4a, D75); variadic
+definitions (§16.2b.5, D75).
 **Changelog v7.6:** A module file holds declarations; a file with top-level
 executable statements is an entry source whose statements are its `main`,
 and every command applies the same rule (§18.5b, D74). An optional chain on

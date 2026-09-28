@@ -692,10 +692,13 @@ b[2] = 3.14
 ```
 [T; N]           // type: array of N elements of type T
 [v0, v1, ..., vN] // literal: array from elements
-[value; N]       // repeat: array of N copies of value
+[value; N]       // repeat: array of N elements, value evaluated for each
 arr[i]           // index: access element i
 arr.len()        // length: returns N (compile-time constant)
 ```
+
+`[value; N]` is an array of N elements, `value` evaluated once for each
+element, in order; `N` is a compile-time constant (§9.1b).
 
 **Semantics:**
 
@@ -1074,6 +1077,10 @@ The type after the first colon is the **representation type** — an integer typ
 underlying storage. Each variant
 is assigned an explicit integer value with `= N`.
 
+An enum with no representation type and an explicit `= N` on any variant is a
+discriminant enum in the default integer representation, payload variants or
+not.
+
 **Auto-incrementing:** If a variant omits the `= N`, it defaults to the previous
 variant's value plus one (or zero for the first variant):
 
@@ -1163,6 +1170,11 @@ type Meters = distinct f64
 
 Zero-cost wrappers that prevent accidental mixing of semantically
 different values.
+
+Casting an owned value into or out of its distinct type (`s as Name`,
+`n as str`) moves it: the distinct type has its underlying type's
+destructor. A cast whose target is a view (`n as &str`), or any cast through
+a reference, borrows and yields a view.
 
 ### 4.6 Type Inference
 

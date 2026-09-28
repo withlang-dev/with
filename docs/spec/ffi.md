@@ -645,6 +645,13 @@ declaration states it — and the compiler reads a comparison of that status
 against the constant as the success or failure edge of the setter. Unlisted
 cases stay raw, as above.
 
+**Variadic definitions.** A function defined with a trailing `...` parameter
+has the C calling convention and is `unsafe` to call. Its body reads the
+variable arguments through `var ap = va_start()`, which yields the target's
+`c_va_list`, and `ap.arg[T]()`, which the compiler lowers for the target; the
+list ends with its scope. The C migrator translates a variadic C definition to
+this form.
+
 #### 16.2b.6 Borrowed returns, dependency and independence
 
 An operation may return a borrowed resource:

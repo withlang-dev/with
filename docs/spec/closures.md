@@ -92,14 +92,15 @@ a consuming closure may be invoked once.
   calling through the original as the fix-its.
 - A consuming closure may only be handed to a callee that invokes it
   at most once. Within one compilation the compiler proves this from
-  the callee's body. Across a bundle boundary (§3.4) a parameter may
-  be invoked any number of times, so a consuming closure passed across
-  a bundle is rejected until a `once` parameter annotation exists
-  (deferred).
+  the callee's body. Across a bundle boundary (§3.4) a consuming
+  closure may be passed only to a parameter declared `once`
+  (`f: once fn(A) -> R`). The compiler rejects a body that may invoke
+  a `once` parameter more than once, and the bundle interface records
+  the annotation. Within one compilation `once` is permitted and
+  checked but never required.
 - A non-`move` closure passed as an argument is ephemeral in the callee
-  exactly as a `&T` parameter is (Rule 8, §22.1): it may be invoked and
-  passed on, and may not be stored, returned, or captured by a
-  `move ||` closure.
+  (Rule 8, §22.1): it may be invoked and passed on, and may not be
+  stored, returned, or captured by a `move ||` closure.
 - A call through `fn(A) -> R` is an indirect call through the pair.
   When a closure literal reaches a parameter within one compilation,
   the compiler specializes the callee and the call is direct. Only a
