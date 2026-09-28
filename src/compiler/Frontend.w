@@ -86,9 +86,9 @@ fn interface_line_name(line: &str, kind: i32) -> str:
     ""
 
 // The dotted identifier starting at `start`.
-fn interface_name_token(line: &str, start: i32) -> str:
+fn interface_name_token(line: &str, start: i64) -> str:
     var end = start
-    while end < line.len() as i32:
+    while end < line.len():
         let ch = line[end]
         let is_name = (ch >= 'a' and ch <= 'z') or (ch >= 'A' and ch <= 'Z') or (ch >= '0' and ch <= '9') or ch == '_' or ch == '.'
         if not is_name:

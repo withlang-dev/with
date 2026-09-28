@@ -1385,7 +1385,7 @@ pub fn mir_drop_state_keys_new(body: &MirBody) -> MirDropStateKeys:
         names.push(name)
         base_local.push(li)
     var place_key: Vec[i32] = Vec.new()
-    for p in 0..body.place_locals.len():
+    for p in 0..body.place_locals.len() as i32:
         let base: i32 = body.place_locals[p]
         if body.place_proj_counts[p] == 0:
             place_key.push(base)
@@ -2190,7 +2190,7 @@ fn mir_place_projection_debug_list(mir_mod: &MirModule, body: &MirBody, place_id
 
 pub fn dump_place_map_body(mir_mod: &MirModule, body: &MirBody, pool: &InternPool) -> str:
     var out = "fn " ++ mir_debug_body_label(body, pool) ++ "\n"
-    for place_id in 0..body.place_locals.len():
+    for place_id in 0..body.place_locals.len() as i32:
         let local_id = body.place_locals[place_id]
         let ty = body.place_sema_types[place_id]
         out = out ++ f"  place#{place_id} path=" ++ mir_place_text(body, place_id) ++ f" base=_{local_id} ty=ty{ty} projections=" ++ mir_place_projection_debug_list(mir_mod, body, place_id) ++ "\n"
@@ -2251,7 +2251,7 @@ fn mir_drop_state_key_places(keys: &MirDropStateKeys) -> Vec[i32]:
     var out: Vec[i32] = Vec.new()
     for _ in 0..keys.len():
         out.push(-1)
-    for p in 0..keys.place_key.len():
+    for p in 0..keys.place_key.len() as i32:
         let k: i32 = keys.place_key[p]
         if out[k] < 0:
             out[k] = p
@@ -3358,7 +3358,7 @@ pub fn mir_validation_has_error(err: &MirValidationError) -> bool:
     err.message.len() > 0
 
 fn mir_validate_find_named_type(mir_mod: &MirModule, type_sym: i32) -> i32:
-    for ti in 0..mir_mod.sema_type_kinds.len():
+    for ti in 0..mir_mod.sema_type_kinds.len() as i32:
         let tk = mir_mod.sema_type_kinds[ti]
         // Only match TY_STRUCT and TY_ENUM — their d0 stores the name symbol.
         // TY_ALIAS d0 stores the alias TARGET, not the name.
@@ -3369,7 +3369,7 @@ fn mir_validate_find_named_type(mir_mod: &MirModule, type_sym: i32) -> i32:
     0
 
 fn mir_validate_find_int_type(mir_mod: &MirModule, bits: i32, signed: i32) -> i32:
-    for ti in 0..mir_mod.sema_type_kinds.len():
+    for ti in 0..mir_mod.sema_type_kinds.len() as i32:
         if mir_mod.sema_type_kinds[ti] != TypeKind.TY_INT:
             continue
         if mir_mod.sema_type_d0[ti] == bits and mir_mod.sema_type_d1[ti] == signed:

@@ -1516,15 +1516,15 @@ impl Codegen:
             if is_ptr_width != 0:
                 let name = if is_signed == 1: "isize" else: "usize"
                 let encoding = if is_signed == 1: wl_dwarf_ate_signed() else: wl_dwarf_ate_unsigned()
-                return wl_di_create_basic_type(self.di_builder, name, width as i64, encoding)
+                return wl_di_create_basic_type(self.di_builder, name, width, encoding)
             if is_signed == 1:
-                return wl_di_create_basic_type(self.di_builder, f"i{width}", width as i64, wl_dwarf_ate_signed())
+                return wl_di_create_basic_type(self.di_builder, f"i{width}", width, wl_dwarf_ate_signed())
             else:
-                return wl_di_create_basic_type(self.di_builder, f"u{width}", width as i64, wl_dwarf_ate_unsigned())
+                return wl_di_create_basic_type(self.di_builder, f"u{width}", width, wl_dwarf_ate_unsigned())
         if kind == 2:
             // TypeKind.TY_FLOAT: d0 = width
             let width = self.sema.get_type_d0(sema_tid)
-            return wl_di_create_basic_type(self.di_builder, f"f{width}", width as i64, wl_dwarf_ate_float())
+            return wl_di_create_basic_type(self.di_builder, f"f{width}", width, wl_dwarf_ate_float())
         if kind == 5:
             // TypeKind.TY_STR: { ptr, len }, so a debugger shows the bytes.
             let byte_ty = wl_di_create_basic_type(self.di_builder, "u8", 8, wl_dwarf_ate_unsigned_char())

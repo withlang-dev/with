@@ -483,7 +483,7 @@ impl Codegen:
     mut fn resolve_trait_method_type_for_impl_with_trait(type_node: i32, impl_type_sym: i32, trait_sym: i32, impl_node: i32) -> i64:
         if type_node == 0:
             return 0
-        var concrete_ty = 0
+        var concrete_ty: i64 = 0
         let st = self.struct_type_map.get(impl_type_sym)
         if st.is_some():
             concrete_ty = self.struct_llvm_types[st.unwrap()]

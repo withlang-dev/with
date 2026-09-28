@@ -652,7 +652,7 @@ impl MirBuilder:
             return 0
         let base_local = self.place_base_local(place)
         let path_start = self.body.place_proj_starts[place]
-        for i in 0..self.moved_field_base_locals.len():
+        for i in 0..self.moved_field_base_locals.len() as i32:
             if self.moved_field_path_matches(i, base_local, path_start, path_count) != 0:
                 return 1
         0
@@ -663,7 +663,7 @@ impl MirBuilder:
             return 0
         let base_local = self.place_base_local(place)
         let path_start = if path_count > 0: self.body.place_proj_starts[place] else: 0
-        for i in 0..self.moved_field_base_locals.len():
+        for i in 0..self.moved_field_base_locals.len() as i32:
             if self.moved_field_base_locals[i] != base_local:
                 continue
             let stored_count = self.moved_field_path_counts[i]
@@ -681,7 +681,7 @@ impl MirBuilder:
         if base_local < 0:
             return
         let path_start: i32 = self.body.place_proj_starts[place]
-        for i in 0..self.moved_field_base_locals.len():
+        for i in 0..self.moved_field_base_locals.len() as i32:
             if self.moved_field_path_matches(i, base_local, path_start, path_count) != 0:
                 return
         let stored_start = self.moved_field_path_syms.len() as i32
@@ -4304,7 +4304,7 @@ impl MirBuilder:
         self.type_id_is_str(self.sema.get_type_d0(resolved))
 
     fn string_alias_index(local_id: i32) -> i32:
-        for i in 0..self.string_alias_local_ids.len():
+        for i in 0..self.string_alias_local_ids.len() as i32:
             if self.string_alias_local_ids[i] == local_id:
                 return i
         -1
@@ -4389,7 +4389,7 @@ impl MirBuilder:
             return -1
         if self.place_field_projection_count(place) <= 0:
             return -1
-        for i in 0..self.string_field_alias_base_locals.len():
+        for i in 0..self.string_field_alias_base_locals.len() as i32:
             if self.string_field_alias_path_matches(i, place) != 0:
                 return i
         -1
@@ -11769,7 +11769,7 @@ impl MirBuilder:
         if recv_op >= 0:
             args.push(recv_op)
             arg_pos = 1
-        for i in 0..arg_node_vec.len():
+        for i in 0..arg_node_vec.len() as i32:
             let arg_node = arg_node_vec[i]
             if arg_node < 0:
                 args.push(self.lower_var(0 - arg_node, 0, 0))
@@ -15482,7 +15482,7 @@ impl MirBuilder:
             sig_idx = explicit_sig
         else if has_recorded_sig:
             sig_idx = recorded_sig
-        for ai in 0..args.len():
+        for ai in 0..args.len() as i32:
             if sig_idx < 0 or self.sema.sig_param_uses_value_ref_abi(sig_idx, ai) == 0:
                 self.consume_moved_operand(args[ai])
         let args_id = self.body.new_call_args(args)
@@ -15685,7 +15685,7 @@ impl MirBuilder:
         // elides the guard for a local never recorded as moved.
         if not is_async:
             let is_move = self.ast.is_move_closure(node) != 0
-            for ci in 0..captures.len():
+            for ci in 0..captures.len() as i32:
                 let consumed_local = self.lookup_local(captures[ci])
                 if consumed_local < 0 or self.sema.type_needs_drop_frozen(self.local_type(consumed_local)) == 0:
                     continue
@@ -15700,7 +15700,7 @@ impl MirBuilder:
         var child = MirBuilder.init(self.sema, self.ast, self.pool, body_sym)
         child.contextual_fact_sig_idx = if not is_async and captures.len() > 0: 0 else: self.contextual_fact_sig_idx
         child.body.anonymous_type = ty
-        child.body.anonymous_capture_count = captures.len()
+        child.body.anonymous_capture_count = captures.len() as i32
         child.body.local_type_ids[0] = ret_ty
         child.push_scope()
         for ci in 0..captures.len():
@@ -15729,7 +15729,7 @@ impl MirBuilder:
             // owned closure argument leaked).
             if self.sema.is_copy_frozen(param_ty) == 0:
                 child.schedule_drop(local, DropKind.DK_VALUE)
-        child.body.n_params = captures.len() + param_count
+        child.body.n_params = captures.len() as i32 + param_count
         child.expected_type = ret_ty
         let frame = child.push_stmt_temp_frame()
         let result = child.lower_tail_expr(body_node)
