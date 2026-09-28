@@ -597,20 +597,63 @@ impl Sema:
     // machinery a fixed Copy param uses (record_contextual_copy_adjustment
     // re-validates Copy-ness) — otherwise MIR lowers the view's address and the
     // callee reads a pointer instead of the value.
-    mut fn materialize_variadic_value_arg(arg_node: i32, arg_ty: i32):
+    // Returns the type the slot passes: the pointee when the view
+    // materializes, else `arg_ty`.
+    mut fn materialize_variadic_value_arg(arg_node: i32, arg_ty: i32) -> i32:
         if arg_node <= 0 or arg_ty == 0:
-            return
+            return arg_ty
         // An explicit `&x` at a variadic slot passes its address by intent
         // (e.g. `%p`); only implicit element/field Copy views materialize.
         if self.cast_operand_is_explicit_borrow(arg_node) != 0:
-            return
+            return arg_ty
         let resolved = self.resolve_alias(arg_ty as TypeId)
         if self.get_type_kind(resolved) != TypeKind.TY_REF or self.get_type_d1(resolved) != 0:
-            return
+            return arg_ty
         let pointee = self.get_type_d0(resolved)
         if pointee == 0:
-            return
-        let _ = self.record_contextual_copy_adjustment(arg_node, pointee, arg_ty)
+            return arg_ty
+        if self.record_contextual_copy_adjustment(arg_node, pointee, arg_ty) != 0: pointee else: arg_ty
+
+    // C11 6.5.2.2p6, the default argument promotions: the C type an argument
+    // of type `tid` is passed as to a function with no parameter type for it.
+    // An integer narrower than `int`, a `bool`, an enum of such a
+    // representation become `c_int`; `f32` becomes `f64`; a wider integer,
+    // `f64`, a pointer, a reference and a C function pointer pass as they
+    // are. 0 when the type has no C argument form.
+    fn c_default_promoted_type(tid: i32) -> i32:
+        let resolved = self.resolve_alias(tid as TypeId) as i32
+        let kind = self.get_type_kind(resolved)
+        if kind == TypeKind.TY_BOOL:
+            return self.ty_i32 as i32
+        if kind == TypeKind.TY_INT:
+            return if self.get_type_d0(resolved) < 32: self.ty_i32 as i32 else: resolved
+        if kind == TypeKind.TY_ENUM:
+            let repr = self.enum_repr_type(resolved)
+            return if repr != 0: self.c_default_promoted_type(repr) else: 0
+        if kind == TypeKind.TY_FLOAT:
+            let bits = self.get_type_d0(resolved)
+            return if bits == 32: self.ty_f64 as i32 else if bits == 64: resolved else: 0
+        if kind == TypeKind.TY_PTR or kind == TypeKind.TY_REF or kind == TypeKind.TY_EXTERN_FN:
+            return resolved
+        0
+
+    // #1831: a call to a function declared without a prototype passes every
+    // argument as its promoted type, with the fixed-argument convention.
+    // Sema states those types once, per call; codegen builds the call's
+    // FnAbi from them. An argument with no C form is refused here, loudly.
+    mut fn record_c_promoted_args(call_node: i32, fn_sym: i32, arg_nodes: &Vec[i32], arg_types: &Vec[i32], passed_types: &HashMap[i32, i32]):
+        let start = self.c_promoted_arg_data.len() as i32
+        self.c_promoted_arg_data.push(arg_types.len() as i32)
+        for ai in 0..arg_types.len() as i32:
+            let arg_node = if ai < arg_nodes.len() as i32: arg_nodes[ai] else: 0
+            // A Copy view the variadic slot materialized passes its pointee.
+            let value_ty = passed_types.get(ai) ?? arg_types[ai]
+            let promoted = if value_ty != 0: self.c_default_promoted_type(value_ty) else: 0
+            if promoted == 0 and value_ty != 0:
+                let fname: str = self.pool_resolve(fn_sym)
+                self.emit_error(f"'{fname}' is declared without a prototype, so C passes its arguments after the default argument promotions, and a value of type '{self.type_name(value_ty)}' has no C argument form; pass an integer, float, pointer or C function pointer, or declare '{fname}' with its parameters in a manual `extern \"C\"` block (§16.3)", if arg_node > 0: arg_node else: call_node)
+            self.c_promoted_arg_data.push(promoted)
+        self.c_promoted_arg_starts.insert(call_node, start)
 
     fn has_contextual_copy_adjustment(source_node: i32) -> i32:
         self.has_contextual_copy_adjustment_for_sig(self.current_fn_sig_idx, source_node)
@@ -9009,6 +9052,12 @@ impl Sema:
             // With has no variadic function-pointer type to give it.
             if self.fn_decl_is_variadic_definition(self.fn_symbol_decl_node(sym)):
                 self.emit_error("`" ++ self.pool_resolve(sym) ++ "` is defined with `...`: it is called directly (under `unsafe`), never used as a value", node)
+                return 0
+            // #1831: a function declared without a prototype has no With
+            // function type — each call passes its own promoted arguments —
+            // so it is called directly, never used as a value.
+            if self.sig_is_unprototyped(sig_idx):
+                self.emit_error("'" ++ self.pool_resolve(sym) ++ "' is declared without a prototype: each call passes its own promoted arguments, so it has no function type; call it directly (under unsafe), or declare it with its parameters in a manual `extern \"C\"` block to use it as a value (§16.3)", node)
                 return 0
             // §16.11: a function whose call needs `unsafe` is an unsafe
             // callable as a value too — its type carries the unsafety, so a
@@ -20709,6 +20758,8 @@ impl Sema:
             return 0
         var arg_types: Vec[i32] = Vec.new()
         let checked_arg_nodes: Vec[i32] = Vec.new()
+        // Argument index -> the pointee a variadic slot's Copy view passes.
+        var variadic_passed_types = sema_new_map_i32_i32()
         // docs/completed/mut.md Rev 8 §15.8 — borrow indices to remove after this call's
         // arg-loop completes. Iterator-of-self borrows live for the duration of
         // the enclosing call so sibling closures conflict with them.
@@ -20786,7 +20837,9 @@ impl Sema:
             // has no param type to drive materialization, so demand it here — else
             // MIR passes the view's address and the callee reads a pointer.
             if expected_ty == 0 and sig_idx >= 0 and self.sig_is_variadic(sig_idx) != 0 and (ai + param_offset) >= self.sig_get_param_count(sig_idx):
-                self.materialize_variadic_value_arg(arg_node, arg_ty as i32)
+                let passed_ty = self.materialize_variadic_value_arg(arg_node, arg_ty as i32)
+                if passed_ty != arg_ty as i32:
+                    variadic_passed_types.insert(ai, passed_ty)
             // §16.3c: a string literal that provably contains an interior NUL must
             // not coerce to a C string at an FFI boundary — C would truncate.
             if expected_ty != 0 and self.sema_type_is_c_char_pointer(expected_ty) != 0 and (self.extern_fn_names.contains(fn_sym) or self.ci_syms.contains(fn_sym)):
@@ -20824,6 +20877,9 @@ impl Sema:
             let iter_idx = self.maybe_register_iter_of_self_borrow(arg_node)
             if iter_idx >= 0:
                 iter_borrow_idxs.push(iter_idx)
+        // #1831: a call to a function declared without a prototype.
+        if sig_idx >= 0 and self.sig_is_unprototyped(sig_idx):
+            self.record_c_promoted_args(node, fn_sym, checked_arg_nodes, arg_types, variadic_passed_types)
         // Drop iter-of-self borrows in reverse insertion order so indices stay valid.
         var ibi = iter_borrow_idxs.len() as i32 - 1
         while ibi >= 0:

@@ -2295,6 +2295,20 @@ pub fn with_cimport_fn_is_variadic(session: i64, idx: i32) -> i32:
             return 0
         clang_isFunctionTypeVariadic(ty)
 
+// A declaration without a prototype (`int f();` before C23) whose
+// definition this unit does not show: its parameters are unknown. C calls
+// it with the default argument promotions and the fixed-argument
+// convention (C11 6.5.2.2p6), not the variadic one libclang's
+// clang_isFunctionTypeVariadic reports for every unprototyped type (#1831).
+pub fn with_cimport_fn_is_unprototyped(session: i64, idx: i32) -> i32:
+    unsafe:
+        let s = session as *mut CImportSession
+        if s as i64 == 0 or idx < 0 or idx >= (*s).decl_count: return 0
+        let cursor = *(((*s).decls as i64 + idx as i64 * 32) as *const CXCursor)
+        if clang_getCursorType(cursor).kind != CXType_FunctionNoProto: return 0
+        if clang_Cursor_isNull(clang_getCursorDefinition(cursor)) == 0: return 0
+        1
+
 pub fn with_cimport_fn_storage_class(session: i64, idx: i32) -> i32:
     unsafe:
         let s = session as *mut CImportSession

@@ -2114,6 +2114,9 @@ impl Sema:
         self.add_sig(name, fn_tid, ret_type, sig_param_start, param_count, is_variadic)
         let sig_idx = self.get_sig(name)
         if sig_idx >= 0:
+            // Flag bit 1: c_import declared it without a prototype (#1831).
+            if (flags / 2) % 2 != 0:
+                self.unprototyped_sigs.insert(sig_idx, 1)
             self.extern_decl_sigs.insert(node, sig_idx)
             self.apply_declared_effects_to_extern_sig(node, sig_idx, param_start, param_count)
             for pi in 0..param_count:

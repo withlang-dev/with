@@ -30,6 +30,9 @@ var g_cimport_omitted_symbol_locations: Vec[str] = Vec.new()
 var g_cimport_omitted_symbol_categories: Vec[str] = Vec.new()
 var g_cimport_included_files: str = ""
 var g_cimport_raw_function_names: str = ""
+// #1831: `|name|` for each declaration without a prototype this
+// translation emits; the manifest lines below carry it to the Frontend.
+var g_cimport_unprototyped_names: str = ""
 var g_cimport_report_untranslated_macros: i32 = 0
 var g_ci_migrate_in_unsafe_function_body: bool = false
 // §16.2a no_methods opt-out. Set per-import before translation.
@@ -484,6 +487,27 @@ fn ci_omitted_manifest_comments() -> str:
         out.push_str("\n")
     out.to_str()
 
+// #1831: one `// @with-cimport-unprototyped|name` line per declaration
+// without a prototype. The generated text states the fact, the Frontend
+// sets it on the parsed NK_EXTERN_FN (flag bit 1), and Sema reads it there:
+// no source a person writes can spell it.
+fn ci_unprototyped_manifest_comments() -> str:
+    var out = StringBuilder.new()
+    for name in g_cimport_unprototyped_names.split("|"):
+        if name.len() > 0:
+            out.push_str("// @with-cimport-unprototyped|" ++ name ++ "\n")
+    out.to_str()
+
+// `|name|` for each unprototyped-declaration manifest line of c_import's
+// generated `text` (fresh or cached).
+pub fn c_import_unprototyped_names(text: &str) -> str:
+    let prefix = "// @with-cimport-unprototyped|"
+    var out = ""
+    for line in text.split("\n"):
+        if line.starts_with(prefix):
+            out = out ++ "|" ++ line.slice(prefix.len(), line.len()) ++ "|"
+    out
+
 fn ci_record_untranslated_macro(name: &str):
     if g_cimport_report_untranslated_macros == 0:
         return
@@ -601,6 +625,7 @@ pub fn process_c_import_with_defines(header_spec: &str, defines: &Vec[str]) -> s
         g_cimport_last_error = "c_import is not supported with --target " ++ target_spec_name() ++ " yet: header parsing would use host headers, not the target's"
         return ""
     g_cimport_raw_function_names = ""
+    g_cimport_unprototyped_names = ""
     ci_record_field_caches_clear()
     g_cimport_report_untranslated_macros = ci_should_report_untranslated_macros(header_spec)
     if with_cimport_available() == 0:
@@ -789,7 +814,7 @@ pub fn process_c_import_with_defines(header_spec: &str, defines: &Vec[str]) -> s
     g_migrate_macro_miss_names = HashMap.new()
 
     let rendered = output.to_str()
-    ci_omitted_manifest_comments() ++ rendered
+    ci_omitted_manifest_comments() ++ ci_unprototyped_manifest_comments() ++ rendered
 
 // Mark all declaration names from cached text as emitted in the global dedup table.
 // This ensures that fs-cached c_import results don't conflict with subsequent c_imports.
@@ -1782,7 +1807,12 @@ fn ci_translate_function(session: i64, idx: i32, known_structs: &str, demoted_ty
             return bw
 
     let param_count = with_cimport_fn_param_count(session, idx)
-    let is_variadic = with_cimport_fn_is_variadic(session, idx)
+    // #1831: `int f();` names no parameters. It is spelled `(...)` — any
+    // arguments, a raw call — and recorded in the unprototyped manifest, so
+    // each call passes its promoted arguments with the fixed-argument
+    // convention.
+    let is_unprototyped = with_cimport_fn_is_unprototyped(session, idx) != 0
+    let is_variadic = if is_unprototyped: 1 else: with_cimport_fn_is_variadic(session, idx)
 
     // Check for unsupported types — omitted declarations are recorded in the
     // c_import manifest instead of emitted as callable failure stubs.
@@ -1852,6 +1882,8 @@ fn ci_translate_function(session: i64, idx: i32, known_structs: &str, demoted_ty
     // A renamed extern (keyword or prelude collision) keeps its C linkage
     // through the original symbol.
     let link_prefix = if safe_name != name: "@[link_name(\"" ++ name ++ "\")]\n" else: ""
+    if is_unprototyped:
+        g_cimport_unprototyped_names = g_cimport_unprototyped_names ++ "|" ++ safe_name ++ "|"
     let ret_render = ci_unsafe_fn_ptr_type(ret)
     link_prefix ++ cc_prefix ++ "extern fn " ++ safe_name ++ "(" ++ params ++ ") -> " ++ ret_render ++ "\n"
 

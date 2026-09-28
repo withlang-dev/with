@@ -2090,7 +2090,7 @@ impl AstPool:
 //                   value: initializer expression, 0 for zero-initialized `var x: T`,
 //                   or NK_INTERFACE_PROVIDED for a `.wi` storage declaration (D39)
 //
-// NodeKind.NK_EXTERN_FN:     d0=name(sym), d1=extra_start, d2=flags (bit0=variadic)
+// NodeKind.NK_EXTERN_FN:     d0=name(sym), d1=extra_start, d2=flags (bit0=variadic, bit1=c_import unprototyped)
 //                   extra: [return_type(node), param_count, [param_name, param_type, param_flags]*]
 //
 // NodeKind.NK_C_IMPORT:      d0=header_str_idx, d1=extra_start, d2=pack_c_import_counts(link_count, allow_untranslated_count)

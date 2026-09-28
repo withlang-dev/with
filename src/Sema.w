@@ -1390,6 +1390,16 @@ pub type Sema {
     // call and `audit:resolution` verifies the MIR callee and argument count
     // against this fact. Absent for a call Sema resolved to a function symbol.
     call_callable_types: HashMap[i32, i32],
+    // C11 6.5.2.2p6 (#1831): the type each argument of a call to an
+    // unprototyped C function is passed as after the default argument
+    // promotions, keyed by the call node: `[count, t0, t1, ...]` from the
+    // start. Codegen builds the call's FnAbi from exactly these types.
+    c_promoted_arg_starts: HashMap[i32, i32],
+    c_promoted_arg_data: Vec[i32],
+    // Signatures declared without a prototype (`int f();`, whose c_import
+    // NK_EXTERN_FN carries flag bit 1): C calls them with the promoted arguments
+    // and the fixed-argument convention, never the variadic one (#1831).
+    unprototyped_sigs: HashMap[i32, i32],
     // D51 stage 2: facade facts (SemaFacade.w).
     facade_resource_index: HashMap[i32, i32],   // resource sym -> facade_resources index
     facade_resources: Vec[FacadeResource],
@@ -2998,6 +3008,9 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         typed_expr_types,
         typed_binding_types,
         call_callable_types,
+        c_promoted_arg_starts: sema_new_map_i32_i32(),
+        c_promoted_arg_data: Vec.new(),
+        unprototyped_sigs: sema_new_map_i32_i32(),
         view_projection_exprs,
         join_field_view_arms,
         drop_consumed_binding_values,
@@ -8415,6 +8428,19 @@ impl Sema:
 
     fn sig_is_variadic(idx: i32) -> i32:
         self.sig_variadic[idx]
+
+    fn sig_is_unprototyped(idx: i32) -> bool: self.unprototyped_sigs.contains(idx)
+
+    // The promoted argument types Sema recorded for a call to an
+    // unprototyped C function (#1831); empty for any other call.
+    fn c_promoted_arg_types(call_node: i32) -> Vec[i32]:
+        let out: Vec[i32] = Vec.new()
+        let start = self.c_promoted_arg_starts.get(call_node) ?? -1
+        if start < 0:
+            return out
+        for i in 0..self.c_promoted_arg_data[start]:
+            out.push(self.c_promoted_arg_data[(start + 1 + i)])
+        out
 
     fn sig_idx_valid(idx: i32) -> i32:
         if idx < 0:
