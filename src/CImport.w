@@ -15758,8 +15758,10 @@ impl CiGotoCfgContext:
                 self.unreachable_current()
             return
         if not ci_is_null_like_stmt(session, cursor):
+            // `fail` records its message in the bail globals, so it is
+            // handed copies of theirs, not views of them (§9.1c, §21.1).
             if g_ci_bail_message.len() > 0:
-                self.fail(g_ci_bail_message, g_ci_bail_location)
+                self.fail(ci_get_bail_message(), ci_get_bail_location())
             else:
                 self.fail("unsupported statement in goto CFG", with_ci_cursor_location(session, cursor))
 
