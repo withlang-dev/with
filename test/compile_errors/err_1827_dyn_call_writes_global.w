@@ -20,7 +20,7 @@ type Quiet { x: i32 }
 impl Grow for Quiet:
     fn grow(self: &Self): print("quiet")
 
-fn run(g: dyn Grow):
+fn run(g: &dyn Grow):
     let r = G[0]
     g.grow()
     print(r)

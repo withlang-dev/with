@@ -15,7 +15,7 @@ type W { x: i32 }
 impl Grow for W:
     fn tag(self: &Self) -> i32: self.x
 
-fn run(g: dyn Grow):
+fn run(g: &dyn Grow):
     let r = G[0]
     g.grow()
     print(r)
