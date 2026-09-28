@@ -14,6 +14,18 @@ use tally
 // copied into With text here, explicitly, before anything invalidates it.
 fn message(db: &Database) -> str: db.errmsg().map(m => m.to_str_lossy()) ?? "(no message)"
 
+// An SQL function written in With. SQLite calls it with its context, its
+// arguments and the application data registered with it; the facade
+// presents them as a callback-scope `Context`, a slice of `Value` handles
+// and a view of the registered `Bonus` — each valid for this call only —
+// and the compiler generates the wrapper C actually invokes. The body reads
+// them and sets its result with no `unsafe`.
+type Bonus { points: i32 }
+fn boosted(ctx: Context, args: &[Value], bonus: &Bonus):
+    var sum = 0
+    for i in 0..args.len() as i32: sum = sum + args[i].int()
+    ctx.result_int(sum + bonus.points)
+
 fn scores -> i32:
     // An owned connection: closed when `db` leaves its scope, on every path.
     let Ok(db) = Database.open(":memory:") else:
@@ -31,12 +43,23 @@ fn scores -> i32:
         print(f"prepare failed: {message(&db)}")
         return 1
     ranked.bind_int(1, 80)
+    // The registration consumes the application data: SQLite owns it now,
+    // and destroys it — through the callback the compiler supplies — when the
+    // function is replaced or the connection closes.
+    if db.create_function_v2("boosted", 1, SQLITE_UTF8, Bonus { points: 5 }, boosted, null, null) != SQLITE_OK:
+        print(f"registering boosted() failed: {message(&db)}")
+        return 1
     while ranked.step() == SQLITE_ROW:
         // Columns are numbered from 0. A NULL column is `None`, not "".
         let score = ranked.column_int(2)
         let name = ranked.column_text(0).map(t => t.to_str_lossy()) ?? "?"
         let email = ranked.column_text(1).map(t => t.to_str_lossy()) ?? "no email"
         print(f"{name} ({email}): {score}")
+    // The With function, called by SQL.
+    let Ok(best) = db.prepare("SELECT boosted(MAX(score)) FROM users") else:
+        print(f"prepare failed: {message(&db)}")
+        return 1
+    if best.step() == SQLITE_ROW: print(f"boosted best score: {best.column_int(0)}")
 
     // What C reported, as With values: the status, and the message.
     if db.exec("SELECT * FROM nowhere", None, None) != SQLITE_OK:
