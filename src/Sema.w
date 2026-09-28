@@ -5969,6 +5969,21 @@ impl Sema:
             return 1
         0
 
+    // A reference views its pointee in place and cannot convert it (§4.2.6
+    // converts values): a `&i32` accepted as `&i64` read eight bytes of a
+    // four-byte place, and a `&u32` as `&i32` rereads the bits with the other
+    // sign. The numeric pointees of two references must have one layout.
+    fn ref_numeric_pointees_differ(exp_r: i32, act_r: i32) -> i32:
+        let ep = self.resolve_alias(self.get_type_d0(exp_r) as TypeId)
+        let ap = self.resolve_alias(self.get_type_d0(act_r) as TypeId)
+        let ek = self.get_type_kind(ep)
+        let ak = self.get_type_kind(ap)
+        if ek == TypeKind.TY_INT and ak == TypeKind.TY_INT:
+            return if self.get_type_d0(ep) != self.get_type_d0(ap) or self.get_type_d1(ep) != self.get_type_d1(ap): 1 else: 0
+        if ek == TypeKind.TY_FLOAT and ak == TypeKind.TY_FLOAT:
+            return if self.get_type_d0(ep) != self.get_type_d0(ap): 1 else: 0
+        if (ek == TypeKind.TY_INT and ak == TypeKind.TY_FLOAT) or (ek == TypeKind.TY_FLOAT and ak == TypeKind.TY_INT): 1 else: 0
+
     mut fn pointer_pointees_compatible(exp_r: i32, act_r: i32) -> i32:
         let exp_mut = self.get_type_d1(exp_r)
         let act_mut = self.get_type_d1(act_r)
@@ -8892,6 +8907,8 @@ impl Sema:
         if exp_k == TypeKind.TY_PTR and act_k == TypeKind.TY_REF:
             return self.pointer_pointees_compatible(exp_r, act_r)
         if exp_k == TypeKind.TY_REF and act_k == TypeKind.TY_REF:
+            if self.ref_numeric_pointees_differ(exp_r, act_r) != 0:
+                return 0
             if self.pointer_pointees_compatible(exp_r, act_r) != 0:
                 return 1
             return self.ref_to_dyn_pointee_coercible(exp_r, act_r)
@@ -9140,6 +9157,8 @@ impl Sema:
         if exp_k == TypeKind.TY_PTR and act_k == TypeKind.TY_REF:
             return self.pointer_pointees_compatible_frozen(exp_r, act_r)
         if exp_k == TypeKind.TY_REF and act_k == TypeKind.TY_REF:
+            if self.ref_numeric_pointees_differ(exp_r, act_r) != 0:
+                return 0
             if self.pointer_pointees_compatible_frozen(exp_r, act_r) != 0:
                 return 1
             // §10.6 ref-to-dyn coercion — mirrors the mut types_compatible arm.

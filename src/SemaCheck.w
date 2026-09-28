@@ -851,7 +851,11 @@ impl Sema:
                 continue
             reaching_count = reaching_count + 1
             if self.get_type_kind(resolved) == TypeKind.TY_REF:
+                let prior_reference = reference_candidate
                 reference_candidate = self.merge_contextual_reference_join_types(reference_candidate, arm_ty)
+                if reference_candidate == 0:
+                    self.emit_error(join_name ++ " arms view `" ++ self.type_name(prior_reference) ++ "` and `" ++ self.type_name(arm_ty) ++ "`; a reference cannot convert its pointee (§4.2.6), so every arm must view one type", report_node)
+                    return 0
             else:
                 let prior_candidate = owned_candidate
                 owned_candidate = self.merge_contextual_owned_join_types(owned_candidate, arm_ty)
