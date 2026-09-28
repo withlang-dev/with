@@ -9530,6 +9530,24 @@ impl Sema:
             return pointee as TypeId
         peer
 
+    // An expression whose type no operand decides: unsuffixed numeric
+    // literals, grouped, negated, or combined by arithmetic.
+    fn expr_is_untyped_literal_arith(node: i32) -> bool:
+        if node == 0:
+            return false
+        let kind = self.ast.kind(node)
+        if kind == NodeKind.NK_INT_LIT or kind == NodeKind.NK_FLOAT_LIT:
+            return self.literal_suffix_type(self.ast.literal_suffix(node)) == 0
+        if kind == NodeKind.NK_GROUPED:
+            return self.expr_is_untyped_literal_arith(self.ast.get_data0(node))
+        if kind == NodeKind.NK_UNARY and self.ast.get_data0(node) == UnaryOp.UOP_NEGATE:
+            return self.expr_is_untyped_literal_arith(self.ast.get_data1(node))
+        if kind == NodeKind.NK_BINARY:
+            let op = self.ast.get_data0(node)
+            if op == BinaryOp.OP_ADD or op == BinaryOp.OP_SUB or op == BinaryOp.OP_MUL or op == BinaryOp.OP_DIV or op == BinaryOp.OP_MOD:
+                return self.expr_is_untyped_literal_arith(self.ast.get_data1(node)) and self.expr_is_untyped_literal_arith(self.ast.get_data2(node))
+        false
+
     mut fn check_binary(node: i32) -> i32:
         let op = self.ast.get_data0(node)
         let lhs_node = self.ast.get_data1(node)
@@ -9773,6 +9791,19 @@ impl Sema:
                 return lhs as i32
             let result = self.arithmetic_result_type(lhs, rhs)
             if result != 0:
+                // Sema owns the type (D65): record it, so a downstream
+                // reader never derives it from context — the LLVM constant
+                // folder folded a global's `0 - K` (K: u32) at the
+                // destination element type i16 and read -1 where the same
+                // expression in a body panics (#1773). Only a type an
+                // operand decides: arithmetic of unsuffixed literals alone
+                // was typed from the literal defaults, without the
+                // destination's context (§4.2.1 rule 1 does not reach
+                // through an operator here yet, #1820) — limits.h's
+                // `ULONG_LONG_MAX` (`9223372036854775807 * 2 + 1` into
+                // c_ulonglong) is not an i64 overflow.
+                if not self.expr_is_untyped_literal_arith(node):
+                    self.typed_expr_types.insert(node, result as i32)
                 return result as i32
             self.emit_error("arithmetic operator requires numeric operands", node)
             return 0

@@ -2035,9 +2035,12 @@ impl Codegen:
             fields[live_idx] = wl_const_int(wl_i8_type(self.context), 1, 0)
         wl_const_named_struct(struct_ty, vec_data_i64(&fields), llvm_field_count)
 
+    // The type an arithmetic node's overflow is checked at: the node's own
+    // type (Sema's), and the context's expected type only for a node Sema
+    // left untyped. #1773: `let T: [2]i16 = [0, (0 - K)]` with `K: u32`
+    // folded `0 - K` at the element type i16 and read -1, while the same
+    // expression in a body panics at u32 (§4.2.3, §9.1c).
     fn try_eval_const_result_type(node: i32, expected_tid: i32) -> i32:
-        if expected_tid != 0:
-            return expected_tid
         let typed = self.sema_type_of_node(node)
         if typed != 0:
             return typed
