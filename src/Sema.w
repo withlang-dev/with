@@ -1390,10 +1390,12 @@ pub type Sema {
     // call and `audit:resolution` verifies the MIR callee and argument count
     // against this fact. Absent for a call Sema resolved to a function symbol.
     call_callable_types: HashMap[i32, i32],
-    // C11 6.5.2.2p6 (#1831): the type each argument of a call to an
-    // unprototyped C function is passed as after the default argument
-    // promotions, keyed by the call node: `[count, t0, t1, ...]` from the
-    // start. Codegen builds the call's FnAbi from exactly these types.
+    // C11 6.5.2.2p6-7: the type each argument of a call to a C function is
+    // passed as after the default argument promotions, keyed by the call
+    // node: `[count, t0, t1, ...]` from the start. Every argument of an
+    // unprototyped callee (#1831) — codegen builds the call's FnAbi from
+    // exactly these types; for a variadic callee, the `...` arguments the
+    // promotion changes, 0 elsewhere (#1849).
     c_promoted_arg_starts: HashMap[i32, i32],
     c_promoted_arg_data: Vec[i32],
     // Signatures declared without a prototype (`int f();`, whose c_import
@@ -8431,8 +8433,8 @@ impl Sema:
 
     fn sig_is_unprototyped(idx: i32) -> bool: self.unprototyped_sigs.contains(idx)
 
-    // The promoted argument types Sema recorded for a call to an
-    // unprototyped C function (#1831); empty for any other call.
+    // The promoted argument types Sema recorded for a call (#1831, #1849);
+    // empty for a call that has none.
     fn c_promoted_arg_types(call_node: i32) -> Vec[i32]:
         let out: Vec[i32] = Vec.new()
         let start = self.c_promoted_arg_starts.get(call_node) ?? -1

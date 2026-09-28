@@ -15920,17 +15920,19 @@ impl Codegen:
         // the promoted arguments Sema recorded for that call, with the
         // fixed-argument convention. compute_fn_abi gives that list its one
         // descriptor; the declaration's variadic one never reaches the call.
+        // #1849: a variadic callee's `...` arguments are converted to the
+        // promoted types Sema recorded (the fixed ones read 0).
         let unproto_sig = if callee_raw_fn_sym != 0: self.sema.get_sig(callee_raw_fn_sym) else: -1
-        let unproto_promoted = if unproto_sig >= 0 and self.sema.sig_is_unprototyped(unproto_sig): self.sema.c_promoted_arg_types(body.call_ast_node(args_id)) else: Vec.new()
+        let c_promoted = if callee_raw_fn_sym != 0: self.sema.c_promoted_arg_types(body.call_ast_node(args_id)) else: Vec.new()
         if unproto_sig >= 0 and self.sema.sig_is_unprototyped(unproto_sig):
-            if unproto_promoted.len() as i32 != arg_count:
-                with_eprint(f"error: call to unprototyped '{self.sema.pool_resolve(callee_raw_fn_sym)}' has {arg_count} argument(s) but Sema recorded {unproto_promoted.len()} promoted type(s): {call_context}")
+            if c_promoted.len() as i32 != arg_count:
+                with_eprint(f"error: call to unprototyped '{self.sema.pool_resolve(callee_raw_fn_sym)}' has {arg_count} argument(s) but Sema recorded {c_promoted.len()} promoted type(s): {call_context}")
                 self.had_error = 1
                 return false
             let promoted_sources: Vec[i64] = Vec.new()
             let promoted_places: Vec[i32] = Vec.new()
-            for pi in 0..unproto_promoted.len() as i32:
-                promoted_sources.push(self.sema_type_to_llvm(unproto_promoted[pi]))
+            for pi in 0..c_promoted.len() as i32:
+                promoted_sources.push(self.sema_type_to_llvm(c_promoted[pi]))
                 promoted_places.push(0)
             call_abi = self.compute_fn_abi(self.fn_abis[call_abi].ret.source_ty, promoted_sources, promoted_places, FN_ABI_C, 0)
         if self.analysis_enabled != 0:
@@ -15977,8 +15979,10 @@ impl Codegen:
             if abi_param_offset < param_count:
                 expected_ty = param_types[abi_param_offset]
             var expected_sema_ty = 0
-            if ai < unproto_promoted.len() as i32:
-                expected_sema_ty = unproto_promoted[ai]
+            if ai < c_promoted.len() as i32 and c_promoted[ai] != 0:
+                expected_sema_ty = c_promoted[ai]
+                if ai >= abi.arg_count:
+                    expected_ty = self.sema_type_to_llvm(c_promoted[ai])
             else if sema_sig_idx >= 0 and param_offset < self.sema.sig_get_param_count(sema_sig_idx):
                 expected_sema_ty = self.sema.sig_param_type(sema_sig_idx, param_offset)
             else:
