@@ -461,6 +461,30 @@ fn comp_require_linkable_host_sdk(ctx: &ActionCtx, llvm_ld: &str, sdk_path: &str
         message = message ++ "\n  Neither default SDK is readable by this linker; set SDKROOT to an SDK it reads (an older one under /Library/Developer/CommandLineTools/SDKs)."
     comp_fail(ctx, message)
 
+// The pre-stage SDK check on its own (`with build :sdk-host-link-check`):
+// the canary lane (.github/workflows/sdk-canary.yml) points SDKROOT at the
+// newest Xcode's SDK on the runner and runs this, so a slice this LLVM's
+// TextAPI cannot parse is known before that SDK reaches every developer's
+// shell, with the rejected stub target named (#1826).
+pub fn run_sdk_host_link_check_action(ctx: ActionCtx) -> i32:
+    if os() != "Macos":
+        return comp_fail(ctx, "a macOS check: the stage links read the macOS SDK's .tbd stubs")
+    let fs = ctx.fs()
+    let output_path = ctx.output()
+    if output_path.len() == 0:
+        return comp_fail(ctx, "requires an output path")
+    let llvm_ld = comp_llvm_lld_tool(comp_llvm_prefix_for_root(ctx.project_info().project_root()))
+    if not fs.host_exists(llvm_ld):
+        return comp_fail(ctx, "missing LLVM linker: " ++ llvm_ld)
+    let sdk_path = comp_host_sdk_path(ctx)
+    let rc = comp_require_linkable_host_sdk(ctx, llvm_ld, sdk_path)
+    if rc != 0:
+        return rc
+    print("sdk-host-link-check: " ++ llvm_ld ++ " (LLVM " ++ COMPILER_LLVM_VERSION ++ ") reads " ++ sdk_path)
+    if fs.write_text(output_path, sdk_path ++ "\n") != 0:
+        return comp_fail(ctx, "could not write: " ++ output_path)
+    0
+
 fn comp_arg_value(args: &Vec[str], prefix: &str) -> str:
     for i in 0..args.len() as i32:
         let arg = args[i]
