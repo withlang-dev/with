@@ -428,6 +428,10 @@ pub type MirBody {
     local_names: Vec[i32],
     local_is_user_var: Vec[i32],
     local_is_global: Vec[i32],   // 1: MirLower's proxy for module-level storage, never a user local that shares the name
+    // 1: a parameter naming the caller's place (a `mut self`/`&self` receiver,
+    // a share-place parameter, a Drop body's self). The callee writes through
+    // it and the caller drops it: MirLower schedules no drop for it (#1822).
+    local_is_caller_place: Vec[i32],
     n_params: i32,
     // Blocks ending in mutual tail calls (marked by mutual TCO pass).
     mutual_tail_bbs: Vec[i32],
@@ -718,6 +722,7 @@ fn MirBody.init_for_fn(fn_sym: i32) -> MirBody:
         local_names: Vec.new(),
         local_is_user_var: Vec.new(),
         local_is_global: Vec.new(),
+        local_is_caller_place: Vec.new(),
         n_params: 0,
         mutual_tail_bbs: Vec.new(),
         bb_stmt_starts: Vec.new(),
@@ -848,6 +853,7 @@ impl MirBody:
         self.local_names.push(name)
         self.local_is_user_var.push(is_user_var)
         self.local_is_global.push(0)
+        self.local_is_caller_place.push(0)
         id
 
     // A local that stands for module-level storage (ensure_global_local).
@@ -856,6 +862,9 @@ impl MirBody:
     // unseen-global shadow), and that local is its own storage.
     mut fn mark_global_local(local_id: i32):
         self.local_is_global[local_id] = 1
+
+    mut fn mark_caller_place_local(local_id: i32):
+        self.local_is_caller_place[local_id] = 1
 
     mut fn new_temp(type_id: i32) -> i32:
         self.new_local(type_id, 1, 0, 0)
@@ -2689,6 +2698,12 @@ pub fn validate_ownership_body(mir_mod: &MirModule, body: &MirBody) -> str:
                 // one to that owner.
                 if local_id <= body.anonymous_capture_count:
                     continue
+                // #1822: a parameter naming the caller's place (MirLower's
+                // decision, not re-derived here) is the caller's to drop. A
+                // body that replaces it whole — `mut fn bang(): self = self
+                // ++ "!"` — drops the old value and leaves it Init: the contract.
+                if body.local_is_caller_place[local_id] != 0:
+                    continue
                 if state.place(blocks.keys, place_id) != MirDropState.Init:
                     continue
                 var partial = false
@@ -3028,6 +3043,8 @@ fn validate_mir_body(body: &MirBody) -> str:
         return "locals/local_is_user_var length mismatch"
     if local_count != body.local_is_global.len():
         return "locals/local_is_global length mismatch"
+    if local_count != body.local_is_caller_place.len():
+        return "locals/local_is_caller_place length mismatch"
     if body.n_params < 0 or body.n_params > local_count:
         return "invalid n_params"
 
