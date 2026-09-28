@@ -5229,13 +5229,23 @@ impl Codegen:
         var ast_existing = wl_get_named_function(self.llmod, defined_symbol)
         if ast_existing != 0 and c_export_symbol.len() == 0 and not codegen_is_runtime_abi_symbol(effective_name):
             ast_existing = 0
+        var displaced_declaration: i64 = 0
         if ast_existing != 0 and wl_fn_is_declaration(ast_existing) != 0 and wl_global_get_value_type(ast_existing) != fn_type:
             wl_set_value_name(ast_existing, effective_name ++ "__stale_decl")
+            displaced_declaration = ast_existing
             ast_existing = 0
         let function = if ast_existing != 0 and wl_fn_is_declaration(ast_existing) != 0:
             ast_existing
         else:
             wl_add_function(self.llmod, effective_name, fn_type)
+        // #1850: a `@[c_export]` definition owns its C symbol. A prototype of
+        // another LLVM type (`int f();`, which Sema has proven this definition
+        // compatible with) keeps every reference it had, emitted or to come:
+        // each becomes a reference to the definition, never to a renamed
+        // declaration nothing defines.
+        if displaced_declaration != 0 and c_export_symbol.len() > 0:
+            wl_replace_all_uses_with(displaced_declaration, function)
+            self.redirect_fn_value(displaced_declaration, function)
         self.with_fn_link_names.insert(self.intern.intern(effective_name), 1)
         if has_sret != 0:
             wl_add_sret_attr(self.context, function, 0, sret_ty)
@@ -6200,6 +6210,16 @@ impl Codegen:
                 let expected = if ai < byval_types.len(): byval_types[ai] else: 0
                 if wl_get_byval_type(call_val, byval_offset + ai, true) != expected:
                     self.analysis_fail(f"call parameter {ai}: byval attribute disagrees with FnAbi")
+
+    // Every symbol bound to the function value `old_fn` is bound to `new_fn`
+    // (#1850). The result does not depend on the map's order.
+    mut fn redirect_fn_value(old_fn: i64, new_fn: i64):
+        let syms: Vec[i32] = Vec.new()
+        for (sym, value) in self.fn_values:
+            if value == old_fn:
+                syms.push(sym)
+        for sym in syms:
+            self.fn_values.insert(sym, new_fn)
 
     // ── Declare extern fn ─────────────────────────────────────────────
 

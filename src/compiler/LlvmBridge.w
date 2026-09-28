@@ -1197,6 +1197,11 @@ pub fn wl_lower_aggregate_copies(f: i64, ctx: i64, dl: i64, min_bytes: i64) -> i
         LLVMDisposeBuilder(builder)
     rewritten
 
+// Every use of `old_v` becomes a use of `new_v` (#1850: a definition takes
+// over the declaration of its symbol).
+pub fn wl_replace_all_uses_with(old_v: i64, new_v: i64):
+    unsafe { LLVMReplaceAllUsesWith(old_v as *mut u8, new_v as *mut u8) }
+
 // Mirror Function::deleteBody(): drop every reference held by the body
 // before erasing it. Instructions may be used across blocks (SSA dominance)
 // and terminators reference successor blocks, so blocks cannot simply be
