@@ -398,7 +398,13 @@ fn ci_object_macro_is_function_alias(type_session: i64, value: &str) -> bool:
 // cannot become a global: C re-evaluates it at each use. This also applies
 // when the callee is a successfully translated function-like macro.
 fn ci_object_macro_has_call_shape(value: &str):
-    let t = ci_strip_parens(ci_trim(value))
+    var t = ci_strip_parens(ci_trim(value))
+    // A unary operator applied to a call is still a call: SDL's
+    // `#define SDL_MIN_SINT64 ~SDL_SINT64_C(0x7FFFFFFFFFFFFFFF)` must not
+    // become a global that names the function-like macro.
+    while t.len() > 1 and (t[0] == 126 or t[0] == 45 or t[0] == 43 or t[0] == 33):
+        let operand = ci_strip_parens(ci_trim(t.slice(1, t.len())))
+        t = operand
     if t.len() < 3 or t[t.len() - 1] != 41:
         return false
     var open = 0
@@ -2418,7 +2424,6 @@ pub fn ci_default_for_type(ty: &str) -> str:
     // But NOT struct types — those need struct-literal defaults, not integer 0.
     // Check: if the type resolves to a primitive int alias, use 0.
     // Otherwise leave empty (no default) for struct/union/opaque types.
-    if ci_starts_with(ty, "Vector("): return ""
     // Array types [N]T → emit [0 as T; N]
     if ty.len() > 0 and ty[0] == 91:
         // Parse [N]T to get element type and count

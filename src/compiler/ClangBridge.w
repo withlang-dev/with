@@ -1126,19 +1126,11 @@ unsafe fn translate_type_recursive_mode(s: *mut CImportSession, ty: CXType, dept
         if sz <= 4: return session_strdup(s, "Complex32\0" as *const u8)
         return session_strdup(s, "Complex64\0" as *const u8)
 
+    // With has no SIMD vector type. A vector is passed in vector registers, so
+    // no array spelling is ABI-correct: a typedef of one is omitted, a record
+    // holding one is opaque, and a function using one is omitted (MSVC's
+    // <intrin.h> declares several, e.g. AMX's `_tile1024i`).
     if kind == CXType_Vector or kind == CXType_ExtVector:
-        let elem = clang_getElementType(canonical)
-        let num_elements = clang_getNumElements(canonical)
-        let elem_str = translate_type_recursive_mode(s, elem, depth + 1, 0, preserve_incomplete_arrays)
-        if elem_str as i64 != 0 and num_elements > 0:
-            var buf: [256]u8 = [0 as u8; 256]
-            var pos: i64 = 0
-            buf_append_str(&raw mut buf as *mut [256]u8 as *mut u8, &raw mut pos, 256, "Vector(\0" as *const u8)
-            buf_append_i64(&raw mut buf as *mut [256]u8 as *mut u8, &raw mut pos, 256, num_elements)
-            buf_append_str(&raw mut buf as *mut [256]u8 as *mut u8, &raw mut pos, 256, ", \0" as *const u8)
-            buf_append_str(&raw mut buf as *mut [256]u8 as *mut u8, &raw mut pos, 256, elem_str as *const u8)
-            buf_append_str(&raw mut buf as *mut [256]u8 as *mut u8, &raw mut pos, 256, ")\0" as *const u8)
-            return session_strdup(s, &buf as *const [256]u8 as *const u8)
         return session_strdup(s, "__UNSUPPORTED:vector type\0" as *const u8)
 
     if kind == CXType_VariableArray:
