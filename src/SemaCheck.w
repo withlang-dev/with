@@ -636,19 +636,27 @@ impl Sema:
             return resolved
         0
 
-    // #1831: a call to a function declared without a prototype passes every
-    // argument as its promoted type, with the fixed-argument convention.
-    // Sema states those types once, per call; codegen builds the call's
-    // FnAbi from them. An argument with no C form is refused here, loudly.
-    mut fn record_c_promoted_args(call_node: i32, fn_sym: i32, arg_nodes: &Vec[i32], arg_types: &Vec[i32], passed_types: &HashMap[i32, i32]):
+    // C passes an argument that has no parameter type after the default
+    // argument promotions. Sema states the promoted types once, per call,
+    // for codegen to pass:
+    // - #1831: every argument of a function declared without a prototype;
+    //   codegen builds the call's FnAbi from them (the fixed-argument
+    //   convention), and an argument with no C form is refused here, loudly.
+    // - #1849: each argument from `variadic_from` on that a `...` receives,
+    //   where the promotion changes its type (0 elsewhere); codegen converts
+    //   the argument (sign- or zero-extending by its own type).
+    mut fn record_c_promoted_args(call_node: i32, fn_sym: i32, arg_nodes: &Vec[i32], arg_types: &Vec[i32], passed_types: &HashMap[i32, i32], variadic_from: i32):
+        let unprototyped = variadic_from < 0
         let start = self.c_promoted_arg_data.len() as i32
         self.c_promoted_arg_data.push(arg_types.len() as i32)
         for ai in 0..arg_types.len() as i32:
             let arg_node = if ai < arg_nodes.len() as i32: arg_nodes[ai] else: 0
             // A Copy view the variadic slot materialized passes its pointee.
             let value_ty = passed_types.get(ai) ?? arg_types[ai]
-            let promoted = if value_ty != 0: self.c_default_promoted_type(value_ty) else: 0
-            if promoted == 0 and value_ty != 0:
+            var promoted = if value_ty != 0 and (unprototyped or ai >= variadic_from): self.c_default_promoted_type(value_ty) else: 0
+            if not unprototyped and promoted == self.resolve_alias(value_ty as TypeId) as i32:
+                promoted = 0
+            if unprototyped and promoted == 0 and value_ty != 0:
                 let fname: str = self.pool_resolve(fn_sym)
                 self.emit_error(f"'{fname}' is declared without a prototype, so C passes its arguments after the default argument promotions, and a value of type '{self.type_name(value_ty)}' has no C argument form; pass an integer, float, pointer or C function pointer, or declare '{fname}' with its parameters in a manual `extern \"C\"` block (§16.3)", if arg_node > 0: arg_node else: call_node)
             self.c_promoted_arg_data.push(promoted)
@@ -21067,9 +21075,12 @@ impl Sema:
             let iter_idx = self.maybe_register_iter_of_self_borrow(arg_node)
             if iter_idx >= 0:
                 iter_borrow_idxs.push(iter_idx)
-        // #1831: a call to a function declared without a prototype.
+        // #1831: a call to a function declared without a prototype; #1849:
+        // the arguments a variadic callee's `...` receives.
         if sig_idx >= 0 and self.sig_is_unprototyped(sig_idx):
-            self.record_c_promoted_args(node, fn_sym, checked_arg_nodes, arg_types, variadic_passed_types)
+            self.record_c_promoted_args(node, fn_sym, checked_arg_nodes, arg_types, variadic_passed_types, -1)
+        else if sig_idx >= 0 and self.sig_is_variadic(sig_idx) != 0:
+            self.record_c_promoted_args(node, fn_sym, checked_arg_nodes, arg_types, variadic_passed_types, self.sig_get_param_count(sig_idx) - param_offset)
         // Drop iter-of-self borrows in reverse insertion order so indices stay valid.
         var ibi = iter_borrow_idxs.len() as i32 - 1
         while ibi >= 0:
