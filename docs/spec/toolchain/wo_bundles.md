@@ -579,8 +579,9 @@ target pairs and the `regex_runtime.o` entries in `Link.w`,
 
 Stage2 and stage3 receive `out/stage/lib/embedded_objects.o` explicitly
 through the build action's `embedded-object=` input, forwarded to the
-linker as `WITH_COMPILER_EMBEDDED_OBJECT`. Its producer reuses the
-bootstrap runtime inputs and adds the tree's bundle blobs. Stage1 keeps
+linker as `WITH_COMPILER_EMBEDDED_OBJECT`. Its producer embeds the
+runtime stage1 compiled (`out/bootstrap/lib`, #1815: stage2's code is
+stage1's codegen) and adds the tree's bundle blobs. Stage1 keeps
 `out/bootstrap-lib/embedded_objects.o`, whose bundle slots are empty.
 These are separate graph outputs: linking a `.wo` with `--link-bundle`
 does not embed its object, interface, or manifest in the resulting
