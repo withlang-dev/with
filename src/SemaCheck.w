@@ -8536,7 +8536,13 @@ impl Sema:
             return self.check_tuple(node) as TypeId
 
         if kind == NodeKind.NK_RANGE:
-            return self.check_range(node) as TypeId
+            // Recorded so MIR reads the range's type rather than rebuilding it
+            // from its bounds: over `&i32` element views (`xs[a]..xs[b]`) the
+            // rebuild found no `&i32` range, answered void, and only the old
+            // i32 for-element fallback (#1828) typed the counter.
+            let range_ty = self.check_range(node)
+            self.typed_expr_types.insert(node, range_ty)
+            return range_ty as TypeId
 
         if kind == NodeKind.NK_VARIANT_SHORTHAND:
             var name = self.ast.get_data0(node)
@@ -13878,6 +13884,8 @@ impl Sema:
         // `each` calls; the generator value is consumed by `each`.
         let gen_elem = self.resolve_gen_for(node, iterable, iter_type as i32)
         let elem_type = if gen_elem != 0: gen_elem else: self.for_loop_element_type(iterable, iter_type as i32)
+        if elem_type == 0:
+            self.report_not_iterable(iterable, iter_type as i32)
         let outer_binding_count = self.bind_names.len() as i32
         if gen_elem != 0:
             self.mark_moved_if_consumed(iterable)
@@ -14027,7 +14035,30 @@ impl Sema:
             self.mark_moved_if_consumed(iterable)
             return gen_elem
         self.demand_generic_iter_next(iter_ty, iterable, iterable)
-        self.for_loop_element_type(iterable, iter_ty as i32)
+        let elem = self.for_loop_element_type(iterable, iter_ty as i32)
+        if elem == 0:
+            self.report_not_iterable(iterable, iter_ty as i32)
+        elem
+
+    // §13.5 (#1828): a `for` iterable is an Iter[T] (a `next()` returning
+    // Option[T]), a Gen[T], a range, an array or slice, or a collection the
+    // loop borrows. Anything else has no element type, and Sema refuses it:
+    // MIR lowering cannot, and a loop that passed check used to fail there.
+    mut fn report_not_iterable(iterable: i32, iter_type: i32):
+        if iter_type == 0 or self.get_type_kind(self.resolve_alias(iter_type as TypeId)) == TypeKind.TY_ERR:
+            return
+        let shown = self.type_name(iter_type)
+        let owner = self.method_owner_symbol_for_type(self.resolve_alias(iter_type as TypeId) as i32)
+        let next_sym = self.pool_lookup_symbol("next")
+        let next_sig = if owner != 0 and next_sym > 0: self.lookup_method_sig(owner, next_sym) else: -1
+        if next_sig >= 0:
+            self.emit_error(f"cannot iterate over `{shown}`: its `next()` returns `{self.type_name(self.sig_return_type(next_sig))}`, not `Option[T]` (§13.2)", iterable)
+            return
+        let iter_sym = self.pool_lookup_symbol("iter")
+        if owner != 0 and iter_sym > 0 and (self.lookup_method_fn(owner, iter_sym) != 0 or self.lookup_generic_method_fn(owner, iter_sym) != 0):
+            self.emit_error(f"`for` over `{shown}` needs the implicit `.iter()` of §13.5, which is not implemented yet for this type (#1837); write `.iter()`", iterable)
+            return
+        self.emit_error(f"cannot iterate over `{shown}`: a `for` iterable implements `Iter[T]` (a `next()` returning `Option[T]`), is a `Gen[T]`, a range, an array, a slice or a collection (§13.5)", iterable)
 
     // D69 (§13.4): when `iter_type` implements Gen[T] — a generator value, or
     // a type with `move fn each(body: fn(T) -> bool)` — record the loop's
@@ -30369,7 +30400,10 @@ impl Sema:
                         let ret_base = self.pool_resolve(self.get_type_d0(ret_resolved))
                         if ret_base == "Option" and self.get_generic_inst_arg_count(ret_resolved as i32) > 0:
                             return self.get_generic_inst_arg(ret_resolved as i32, 0)
-        self.ty_i32 as i32
+        // #1828: not iterable. An `i32` here typed `for r in s` over a `str`
+        // (or an integer, or a struct) and MIR lowering failed after check
+        // passed; a `next()` returning no Option stepped and printed nothing.
+        0
 
     // #747: the extern doctrine (check_call, §3.8/G1) as ONE queryable rule.
     // An extern/C parameter with no DECLARED consume/escape effect
