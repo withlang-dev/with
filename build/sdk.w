@@ -788,11 +788,39 @@ fn sdk_append_jobs(args: Vec[str], jobs: &str) -> Vec[str]:
         args.push(sdk_owned_text(jobs))
     args
 
+// The toolchain-flag variables a shell may carry (LDFLAGS=-L/opt/llvm-x/lib,
+// CPPFLAGS=-I…, from a package manager's LLVM). CMake folds them into every
+// compile and link line, so a system LLVM's libc++ was linked into the SDK's
+// ninja ahead of the sysroot's (2026-09-28). The SDK is built by the tools
+// the graph names and nothing else: every SDK subprocess sees these empty.
+fn sdk_scrubbed_env_names() -> Vec[str]:
+    // Pushed one by one: the build layer runs on the pinned seed (#1122).
+    var names: Vec[str] = Vec.new()
+    names.push("CPPFLAGS")
+    names.push("CFLAGS")
+    names.push("CXXFLAGS")
+    names.push("LDFLAGS")
+    names.push("CPATH")
+    names.push("C_INCLUDE_PATH")
+    names.push("CPLUS_INCLUDE_PATH")
+    names.push("LIBRARY_PATH")
+    names.push("CMAKE_PREFIX_PATH")
+    names.push("CMAKE_LIBRARY_PATH")
+    names.push("CMAKE_INCLUDE_PATH")
+    names
+
 fn sdk_run_capture(ctx: &ActionCtx, label: &str, argv: Vec[str], timeout_ms: i32) -> i32:
     let root = ctx.project_info().project_root()
     let command_dir = sdk_join("out/command", ctx.target_name())
     let _mkdir = ctx.fs().mkdir_all(command_dir)
-    let result = ctx.process_runner().run_capture(argv, sdk_abs(root, sdk_join(command_dir, label ++ ".stdout")), sdk_abs(root, sdk_join(command_dir, label ++ ".stderr")), timeout_ms)
+    if argv.len() == 0:
+        return sdk_fail(ctx, label ++ ": empty command")
+    var spec = process_spec(argv.get(0).clone()).timeout(timeout_ms)
+    for i in 1..argv.len() as i32:
+        spec = (move spec).arg(argv[i].clone())
+    for name in sdk_scrubbed_env_names():
+        spec = (move spec).env_var(name.clone(), "")
+    let result = ctx.process_runner().run_spec(move spec, sdk_abs(root, sdk_join(command_dir, label ++ ".stdout")), sdk_abs(root, sdk_join(command_dir, label ++ ".stderr")))
     if result.rc != 0:
         return sdk_fail(ctx, label ++ f" failed with exit code {result.rc}: " ++ result.stdout ++ result.stderr)
     0
