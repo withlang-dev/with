@@ -75,6 +75,53 @@ fn ex_dirname(path: &str) -> str:
         if path[i] == '/': last_slash = i
     path.slice(0, last_slash)
 
+/// A facade an example carries as its own copy of the toolchain's (spec
+/// §16.2b.1: a facade is the importing project's; ruling §66): the example
+/// demonstrates the mechanism, not divergence, so the copy is the toolchain's
+/// file byte for byte below a marker line that closes the example's own
+/// header. The check is what keeps the header's "diff clean" claim true; a
+/// copy that drifted (examples/c-interop missed Amendment 1 until D76) taught
+/// a stale contract.
+fn ex_facade_copies() -> Vec[str]:
+    var out = Vec.new()
+    out.push("examples/c-interop/src/facades/sqlite3.w")
+    out
+
+/// The toolchain file a copy is taken from.
+fn ex_facade_original(path: &str) -> str:
+    if path == "examples/c-interop/src/facades/sqlite3.w": return "lib/facades/sqlite3.w"
+    ""
+
+fn ex_facade_marker() -> str: "// ── verbatim: "
+
+/// The copy's text below its marker line, or "" when it has none.
+fn ex_below_marker(text: &str) -> str:
+    let marker = ex_facade_marker()
+    var start = 0
+    while start < text.len() as i32:
+        var end = start
+        while end < text.len() as i32 and text[end] != '\n': end = end + 1
+        if text.slice(start, end).starts_with(marker):
+            return if end < text.len() as i32: text.slice(end + 1, text.len()) else: ""
+        start = end + 1
+    ""
+
+/// One verdict per copy that is not the toolchain's file byte for byte.
+fn ex_facade_copy_failures(ctx: &ActionCtx) -> i32:
+    var failures = 0
+    let fs = ctx.fs()
+    for path in ex_facade_copies():
+        let original = ex_facade_original(path)
+        let text = fs.read_text(path)
+        let below = ex_below_marker(text)
+        if below.len() == 0:
+            print(f"examples-tests: {path} has no `{ex_facade_marker()}<path>` marker line closing its header; the toolchain's facade follows that line verbatim")
+            failures += 1
+        else if below != fs.read_text(original):
+            print(f"examples-tests: {path} differs from {original} below its marker line; the example's copy of the toolchain's facade is byte-identical (a project's own facade may diverge, an example's copy teaches the current contract) — refresh it: keep the header through the marker, then the toolchain's file verbatim")
+            failures += 1
+    failures
+
 /// Runs one lane step; a failure is printed (with the compiler's
 /// diagnostic lines) and counted, never fatal on its own, so one run
 /// reports every rotted example.
@@ -108,7 +155,7 @@ pub fn run_examples_tests_action(ctx: ActionCtx) -> i32:
     if not fs.exists(inputs.get(0)):
         ctx.diagnostics().error("examples-tests: missing compiler: " ++ inputs.get(0))
     let compiler = ex_abs(root, inputs.get(0))
-    var failures = 0
+    var failures = ex_facade_copy_failures(ctx)
 
     for source in ex_checked():
         var args: Vec[str] = Vec.new()

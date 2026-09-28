@@ -3455,7 +3455,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     examples_tests = examples_tests.allow_parallel()
     examples_tests.action = run_examples_tests_action
     examples_tests = examples_tests.input(release_compiler_bin("with"))
-    examples_tests = examples_tests.input("examples")
+    examples_tests = examples_tests.input("examples").input("lib/facades")
     examples_tests = examples_tests.dep("build")
     out = out.add_target(examples_tests)
 
