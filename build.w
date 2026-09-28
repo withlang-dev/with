@@ -2182,6 +2182,10 @@ fn run_deep_debug_tool_tests_action(ctx: ActionCtx) -> i32:
         ctx.diagnostics().error("deep-debug-tool-tests: could not write carrier fixture")
     if deep_debug_analyze_expect(ctx, root, compiler, build_project_abs(root, carrier_input), out_dir, "analyze-audit-carriers", "audit:all", "violations=0 ok") != 0:
         return 1
+    // #1822: a `mut fn` receiver replaced whole is the caller's place, left
+    // Init for the caller to drop; the ownership validator called it a leak.
+    if deep_debug_analyze_expect(ctx, root, compiler, build_project_abs(root, "test/behavior/behav_1822_mut_receiver_replaced_whole.w"), out_dir, "analyze-audit-receiver-replaced", "audit:all", "violations=0 ok") != 0:
+        return 1
     // #1323: `InternPool.resolve` hands out a view into `symbol_texts`; a
     // binding read after anything that interns is a use-after-free (the
     // release compiler segfaulted in ct_generate_debug_derive). The pool sits
@@ -3261,6 +3265,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     deep_debug_tool_tests = deep_debug_tool_tests.allow_parallel()
     deep_debug_tool_tests.action = run_deep_debug_tool_tests_action
     deep_debug_tool_tests = deep_debug_tool_tests.input(release_compiler_bin("with"))
+    deep_debug_tool_tests = deep_debug_tool_tests.input("test/behavior/behav_1822_mut_receiver_replaced_whole.w")
     deep_debug_tool_tests = deep_debug_tool_tests.dep("build")
     deep_debug_tool_tests = deep_debug_tool_tests.write_scope("out/deep-debug-tool-tests")
     out = out.add_target(deep_debug_tool_tests)

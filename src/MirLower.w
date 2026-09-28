@@ -17255,7 +17255,11 @@ fn lower_fn_with_sig(builder: MirBuilder, fn_node: i32, sig_idx: i32) -> Lowered
             // owned params (consume/escape_value → not value_ref_abi, and move-self
             // receivers) are dropped by the callee.
             let share_place_param = sig_idx >= 0 and builder.sema.sig_param_uses_value_ref_abi(sig_idx, i) != 0 and not move_self_receiver
-            if builder.sema.is_copy_frozen(p_ty) == 0 and drop_receiver_self == 0 and not borrowed_receiver and not share_place_param:
+            // #1822: the one decision that the callee does not own this
+            // parameter, recorded for the ownership validator to read.
+            if drop_receiver_self != 0 or borrowed_receiver or share_place_param:
+                builder.body.mark_caller_place_local(local_id)
+            else if builder.sema.is_copy_frozen(p_ty) == 0:
                 builder.schedule_drop(local_id, DropKind.DK_VALUE)
             param_locals.push(local_id)
         builder.body.n_params = param_count
