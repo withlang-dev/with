@@ -897,7 +897,7 @@ fn main:
     var failures = 0
     var regressions = 0
     print("cell\tcandidate" ++ (if baseline.len() > 0: "\tbaseline\tclass" else: ""))
-    for i in 0..cells.len():
+    for i in 0..cells.len() as i32:
         let c = cells[i]
         let cv = verdicts[i * sides].clone()
         var row = c.name ++ "\t" ++ cv
