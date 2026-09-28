@@ -192,10 +192,6 @@ type SemaBuiltinSymbols {
     debug_trait: i32,
     self_type: i32,
     vec: i32,
-    // #1587: the origin every str range view (`s[a..b]`, a `&str` whose
-    // header lives in this frame) carries besides its base's, so a return of
-    // it is refused (view_origin_escapes) until `&str` is its own {ptr, len}.
-    str_range_view: i32,
     fixed_string: i32,
     veciter: i32,
     mapiter: i32,
@@ -2321,7 +2317,6 @@ fn sema_builtin_symbols_zero -> SemaBuiltinSymbols:
         debug_trait: 0,
         self_type: 0,
         vec: 0,
-        str_range_view: 0,
         fixed_string: 0,
         veciter: 0,
         mapiter: 0,
@@ -4345,7 +4340,6 @@ impl Sema:
         self.syms.debug_trait = self.pool_intern("Debug")
         self.syms.self_type = self.pool_intern("Self")
         self.syms.vec = self.pool_intern("Vec")
-        self.syms.str_range_view = self.pool_intern("$str_range_view")
         self.syms.fixed_string = self.pool_intern("FixedString")
         self.syms.veciter = self.pool_intern("VecIter")
         self.syms.mapiter = self.pool_intern("MapIter")
