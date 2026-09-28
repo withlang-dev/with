@@ -966,6 +966,56 @@ fn drop_state_verdict(shape: i32, drops: bool) -> str:
     body.set_terminator(join, TermKind.TK_RETURN, 0, 0, 0, 0, 0)
     validate_ownership_body(mir_mod, body)
 
+// #1860: a value read at a join one predecessor never wrote (a sealed
+// match's result temp on its no-arm path). Types: 1 an int flag, 2 a
+// struct with no drop glue, so only the read is judged.
+fn uninit_read_verdict(other_writes: bool) -> str:
+    var mir_mod = MirModule.init()
+    for kind in [0, TypeKind.TY_INT, TypeKind.TY_STRUCT]:
+        mir_mod.sema_type_kinds.push(kind)
+        mir_mod.sema_type_d0.push(0)
+        mir_mod.sema_type_d1.push(0)
+        mir_mod.sema_type_d2.push(0)
+    let flag_ty = 1
+    let value_ty = 2
+    var body = MirBody.init_for_fn(1)
+    body.n_params = 1
+    let flag_local = body.new_temp(flag_ty)
+    let flag = body.new_place(flag_local)
+    let value_local = body.new_temp(value_ty)
+    let value = body.new_place(value_local)
+    let out_local = body.new_temp(value_ty)
+    let out = body.new_place(out_local)
+    let entry = body.new_block()
+    let arm = body.new_block()
+    let other = body.new_block()
+    let join = body.new_block()
+    let no_fields: Vec[i32] = Vec.new()
+    let no_field_table = body.new_agg_fields(&no_fields, &no_fields)
+    let init = body.new_rvalue(RvalueKind.RK_AGGREGATE, 0, no_field_table, 0)
+    let read_op = body.new_operand(OperandKind.OK_COPY, value)
+    let read = body.new_rvalue(RvalueKind.RK_USE, read_op, 0, 0)
+    body.push_stmt(entry, StmtKind.StorageLive, value_local, 0, 0)
+    let vals: Vec[i64] = Vec.new()
+    vals.push(1)
+    let targets: Vec[i32] = Vec.new()
+    targets.push(arm)
+    let table = body.new_switch_table(&vals, &targets)
+    let flag_op = body.new_operand(OperandKind.OK_COPY, flag)
+    body.set_terminator(entry, TermKind.TK_SWITCH_INT, flag_op, table, other, 0, 0)
+    body.push_stmt(arm, StmtKind.Assign, value, init, 0)
+    body.set_terminator(arm, TermKind.TK_GOTO, join, 0, 0, 0, 0)
+    if other_writes:
+        body.push_stmt(other, StmtKind.Assign, value, init, 0)
+    body.set_terminator(other, TermKind.TK_GOTO, join, 0, 0, 0, 0)
+    body.push_stmt(join, StmtKind.Assign, out, read, 0)
+    body.set_terminator(join, TermKind.TK_RETURN, 0, 0, 0, 0, 0)
+    validate_ownership_body(mir_mod, body)
+
+pub fn mir_test_uninit_read:
+    assert(uninit_read_verdict(false).contains("read of _2 reaches a path that never initialized it (Maybe)"))
+    assert(uninit_read_verdict(true) == "")
+
 pub fn mir_test_moved_drop:
     assert(drop_state_verdict(0, true).contains("drop of _2 after a path reaching it moved it out and before its reset (Moved)"))
     assert(drop_state_verdict(1, true) == "")

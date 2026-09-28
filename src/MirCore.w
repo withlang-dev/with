@@ -2439,6 +2439,33 @@ fn mir_whole_drop_verdict(mir_mod: &MirModule, body: &MirBody, place_id: i32, dr
         return f"drop of {drop_key} reaches a path where it holds no value — written on one path, never written, dead or already dropped on another ({state_name}); only a reset blank is safe to drop (§2.5.1)"
     ""
 
+// A read (a copy or move operand) of a whole local that some path reaching
+// it never initialized (Maybe, MaybeGarbage), or "". #1860: a
+// value-position match's join read the result temp its no-arm path never
+// wrote, and validate-all said ok. Uninit is not judged: StorageDead resets
+// a local to Uninit and the lowering moves a block's tail local out after
+// its scope's StorageDead by contract (`_23 = move _27` after
+// `StorageDead(_27)`; materialize_tail_field_move keeps whole-local moves
+// lazy). A projection is not judged: its key is Absent until touched.
+fn mir_read_of_uninit_place(body: &MirBody, keys: &MirDropStateKeys, state: &MirDropStateMap, ops: &Vec[i32]) -> str:
+    for oi in 0..ops.len():
+        let op: i32 = ops[oi]
+        if op < 0 or op >= body.operand_kinds.len():
+            continue
+        let k = body.operand_kinds[op]
+        if k != OperandKind.OK_COPY and k != OperandKind.OK_MOVE:
+            continue
+        let place = body.operand_d0[op]
+        if place < 0 or place >= body.place_locals.len() or body.place_proj_counts[place] != 0:
+            continue
+        let local = body.place_locals[place]
+        if local == 0 or body.local_is_global[local] != 0:
+            continue
+        let s = state.place(keys, place)
+        if s == MirDropState.MaybeGarbage or s == MirDropState.Maybe:
+            return f"read of {mir_place_text(body, place)} reaches a path that never initialized it ({mir_drop_state_name(s)})"
+    ""
+
 // The Sema signature snapshot of `sym` (sema_sig_param_starts): its
 // parameter count, or -1 when Sema has no signature by that name.
 pub fn mir_sig_param_count(mir_mod: &MirModule, sym: i32) -> i32:
@@ -2602,6 +2629,9 @@ pub fn validate_ownership_body(mir_mod: &MirModule, body: &MirBody) -> str:
                 let twice = mir_move_of_moved_place(mir_mod, body, blocks.keys, state, mir_rvalue_operands(body, body.stmt_data1(stmt_id)))
                 if twice.len() > 0:
                     return f"fn sym{body.fn_sym} stmt{stmt_id} span={span}: " ++ twice
+                let uninit_read = mir_read_of_uninit_place(body, blocks.keys, state, mir_rvalue_operands(body, body.stmt_data1(stmt_id)))
+                if uninit_read.len() > 0:
+                    return f"fn sym{body.fn_sym} stmt{stmt_id} span={span}: " ++ uninit_read
                 // #1487: a reset-on-move blank stores the sentinel over a
                 // place a move left behind. Over a place still Init — no path
                 // moved it — it overwrites a live value without a drop: the
@@ -2619,6 +2649,10 @@ pub fn validate_ownership_body(mir_mod: &MirModule, body: &MirBody) -> str:
             let copied = mir_copy_into_consuming_param(mir_mod, body, bb, dropped_local)
             if copied.len() > 0:
                 return f"fn sym{body.fn_sym} bb{bb}: " ++ copied
+        if blocks.computed[bb] != 0:
+            let uninit_term = mir_read_of_uninit_place(body, blocks.keys, state, mir_term_operands(body, bb))
+            if uninit_term.len() > 0:
+                return f"fn sym{body.fn_sym} bb{bb}: " ++ uninit_term
         if body.term_kind(bb) == TermKind.TK_CALL or body.term_kind(bb) == TermKind.TK_DROP_AND_GOTO:
             let place_id = if body.term_kind(bb) == TermKind.TK_CALL: body.term_data2(bb) else: body.term_data0(bb)
             if place_id < 0 or place_id >= body.place_locals.len():
