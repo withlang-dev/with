@@ -176,7 +176,13 @@ fn main:
 
 Supported directives:
 
-- `//! expect-stdout: <text>` — program output must match
+- `//! expect-stdout: <line>` — one line of the program's stdout. The
+  `expect-stdout` lines, in order, are the whole stdout: every printed line is
+  listed, exactly, as many times as it prints (`drop 1` does not match
+  `drop 10`). An empty line is `//! expect-stdout:`.
+- `//! expect-stdout-contains: <text>` — the text appears somewhere in stdout.
+  Only for output no run repeats (timings, addresses), with a comment saying
+  why; never beside `expect-stdout`.
 - `//! expect-check-fail` — `check` must fail (negative test)
 - `//! expect-build-fail` — `build` must fail
 - `//! check-only` — only type-check, don't build

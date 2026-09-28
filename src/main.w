@@ -156,7 +156,14 @@ type TestDiscovery {
 }
 
 type TestDirectives {
+    // The program's stdout, line for line (#1855): each `//! expect-stdout:`
+    // is one whole line, in order, and no other line prints. A substring
+    // match let `drop 1` pass on `drop 10`, a double drop's repeated line,
+    // and drops printed after `end`.
     expect_stdout: Vec[str],
+    // `//! expect-stdout-contains:` fragments, each somewhere in stdout: for
+    // output no run repeats (timings, addresses). Never beside expect-stdout.
+    expect_stdout_contains: Vec[str],
     expect_stderr: Vec[str],
     expect_check_stdout: Vec[str],
     expect_check_stdout_not: Vec[str],
@@ -203,6 +210,7 @@ fn empty_test_discovery -> TestDiscovery:
 fn empty_test_directives -> TestDirectives:
     TestDirectives {
         expect_stdout: Vec.new(),
+        expect_stdout_contains: Vec.new(),
         expect_stderr: Vec.new(),
         expect_check_stdout: Vec.new(),
         expect_check_stdout_not: Vec.new(),
@@ -3706,6 +3714,7 @@ fn parse_test_directives_for_target(target: &str) -> TestDirectives:
     let text_len = text.len() as i32
 
     let expect_stdout_prefix = "//! expect-stdout: "
+    let expect_stdout_contains_prefix = "//! expect-stdout-contains: "
     let expect_stderr_prefix = "//! expect-stderr: "
     let expect_exit_prefix = "//! expect-exit: "
     let expect_check_stdout_prefix = "//! expect-check-stdout: "
@@ -3721,6 +3730,8 @@ fn parse_test_directives_for_target(target: &str) -> TestDirectives:
     let skip_on_prefix = "//! skip-on: "
     let only_on_prefix = "//! only-on: "
     let known_issue_prefix = "//! known-issue: "
+    var unknown_line = ""
+    var unknown_line_no = 0
     var start = 0
     var i = 0
     while i <= text_len:
@@ -3733,6 +3744,15 @@ fn parse_test_directives_for_target(target: &str) -> TestDirectives:
                 line = line.slice(0, line.len() - 1)
             if line.starts_with(expect_stdout_prefix):
                 result.expect_stdout.push(line.slice(expect_stdout_prefix.len(), line.len()))
+            else if line == "//! expect-stdout:":
+                // An empty line whose trailing space an editor trimmed.
+                result.expect_stdout.push("")
+            else if line.starts_with(expect_stdout_contains_prefix):
+                let fragment = line.slice(expect_stdout_contains_prefix.len(), line.len())
+                if fragment.len() == 0:
+                    result.directive_error = f"expect-stdout-contains on line {nr_of_offset(text, i)} is empty, and an empty fragment is found in every output"
+                    return result
+                result.expect_stdout_contains.push(fragment)
             else if line.starts_with(expect_stderr_prefix):
                 result.expect_stderr.push(line.slice(expect_stderr_prefix.len(), line.len()))
             else if line.starts_with(expect_exit_prefix):
@@ -3806,9 +3826,18 @@ fn parse_test_directives_for_target(target: &str) -> TestDirectives:
                 result.check_only = true
             else if line.starts_with(known_issue_prefix):
                 result.known_issue = line.slice(known_issue_prefix.len(), line.len())
-            else if line.starts_with("//!"):
+            else if line.starts_with("//! expect-debug-alloc: ") or line.starts_with("//! debug-alloc-filter: "):
+                // tools/debug_drop.w's directives (the debug-alloc lane).
                 let _ = 0
+            else if line.starts_with("//!"):
+                if unknown_line.len() == 0:
+                    unknown_line = line.clone()
+                    unknown_line_no = nr_of_offset(text, i)
             else:
+                let header_error = test_header_error(unknown_line, unknown_line_no, result)
+                if header_error.len() > 0:
+                    result.directive_error = header_error
+                    return result
                 // #1529: the first line that is not `//!` ends the header. A
                 // directive below it was never read, and its fixture passed
                 // on expectations nobody checked; name it instead.
@@ -3816,7 +3845,26 @@ fn parse_test_directives_for_target(target: &str) -> TestDirectives:
                 return result
             start = i + 1
         i = i + 1
+    let header_error = test_header_error(unknown_line, unknown_line_no, result)
+    result.directive_error = header_error
     result
+
+// #1855: a `//!` header line the runner does not read is an expectation
+// nothing checks (`//! expect-stdout-not:`, `//! expect-run-output:`, a
+// `//! 65` that lost its `expect-stdout:`), and its fixture passed on it.
+// A header that holds a directive holds only directives; a lone `//!` doc
+// line is left alone unless it reads as an `expect` directive. The exact
+// lines and the fragments are two answers to one question; a header gives
+// one.
+fn test_header_error(unknown_line: &str, line_no: i32, directives: &TestDirectives) -> str:
+    if unknown_line.len() > 0 and (unknown_line.starts_with("//! expect") or test_directives_present(directives)):
+        return f"`{unknown_line}` on line {line_no} is not a directive the test runner reads, so nothing checks it; a test's `//!` header holds only directives"
+    if directives.expect_stdout.len() > 0 and directives.expect_stdout_contains.len() > 0:
+        return "expect-stdout lists the whole stdout, so expect-stdout-contains beside it has nothing to add; use one or the other"
+    ""
+
+fn test_directives_present(d: &TestDirectives) -> bool:
+    d.expect_stdout.len() > 0 or d.expect_stdout_contains.len() > 0 or d.expect_stderr.len() > 0 or d.has_expect_exit or d.expect_check_stdout.len() > 0 or d.expect_check_stdout_not.len() > 0 or d.expect_check_fail.len() > 0 or d.expect_check_fail_not.len() > 0 or d.expect_build_fail.len() > 0 or d.expect_build_stderr.len() > 0 or d.check_only or d.extra_args.len() > 0 or d.env_pairs.len() > 0 or d.known_issue.len() > 0
 
 fn nr_of_offset(text: &str, offset: i32) -> i32:
     var n = 1
@@ -3825,10 +3873,10 @@ fn nr_of_offset(text: &str, offset: i32) -> i32:
     n
 
 fn test_directive_line_is_known(line: &str) -> bool:
-    let prefixes = ["//! expect-stdout: ", "//! expect-stderr: ", "//! expect-exit: ", "//! expect-check-stdout: ", "//! expect-check-stdout-not: ", "//! expect-check-fail: ", "//! expect-check-fail-not: ", "//! expect-error: ", "//! expect-build-fail: ", "//! expect-build-stderr: ", "//! args: ", "//! env: ", "//! skip: ", "//! skip-on: ", "//! only-on: ", "//! known-issue: "]
+    let prefixes = ["//! expect-stdout: ", "//! expect-stdout-contains: ", "//! expect-stderr: ", "//! expect-exit: ", "//! expect-check-stdout: ", "//! expect-check-stdout-not: ", "//! expect-check-fail: ", "//! expect-check-fail-not: ", "//! expect-error: ", "//! expect-build-fail: ", "//! expect-build-stderr: ", "//! args: ", "//! env: ", "//! skip: ", "//! skip-on: ", "//! only-on: ", "//! known-issue: "]
     for p in prefixes:
         if line.starts_with(p): return true
-    line == "//! skip" or line == "//! check-only"
+    line == "//! skip" or line == "//! check-only" or line == "//! expect-stdout:"
 
 // The first directive the header parser would honor that sits after the
 // header ends (`from`, on line `line_no`), as a directive error; "" if none.
@@ -3850,8 +3898,8 @@ fn test_orphan_directive_error(text: &str, from: i32, line_no: i32) -> str:
         i = i + 1
     ""
 
-fn test_directives_have_run_expectations(directives: &TestDirectives) -> bool:
-    directives.has_expect_exit or directives.expect_stdout.len() > 0 or directives.expect_stderr.len() > 0
+fn test_directives_have_run_expectations(d: &TestDirectives) -> bool:
+    d.has_expect_exit or d.expect_stdout.len() > 0 or d.expect_stdout_contains.len() > 0 or d.expect_stderr.len() > 0
 
 fn test_append_extra_args(argv: &str, extra_args: &str) -> str:
     var out = with_str_clone_ref(argv)
@@ -4123,6 +4171,89 @@ fn test_validate_output(stream_name: &str, actual: &str, expected_values: &Vec[s
             return false
     true
 
+// The lines of a captured stream: `\n` ends a line, a `\r` before it is the
+// platform's, and a last line without `\n` still counts.
+fn test_output_lines(text: &str) -> Vec[str]:
+    var lines: Vec[str] = Vec.new()
+    let n = text.len() as i32
+    var start = 0
+    while start < n:
+        var end = start
+        while end < n and text[end] != '\n': end = end + 1
+        var stop = end
+        if stop > start and text[stop - 1] == '\r': stop = stop - 1
+        lines.push(text.slice(start, stop))
+        start = end + 1
+    lines
+
+fn test_line_count(lines: &Vec[str], wanted: &str) -> i32:
+    var n = 0
+    for i in 0..lines.len() as i32:
+        if lines[i] == wanted: n = n + 1
+    n
+
+fn test_line_containing(lines: &Vec[str], fragment: &str) -> str:
+    for i in 0..lines.len() as i32:
+        if lines[i].contains(fragment): return lines[i].clone()
+    ""
+
+// The number of leading lines the two agree on.
+fn test_lines_agree(expected: &Vec[str], actual: &Vec[str]) -> i32:
+    var k = 0
+    while k < expected.len() as i32 and k < actual.len() as i32 and expected[k] == actual[k]: k = k + 1
+    k
+
+fn test_lines_in_order(expected: &Vec[str], actual: &Vec[str]) -> bool:
+    var k = 0
+    for i in 0..actual.len() as i32:
+        if k < expected.len() as i32 and actual[i] == expected[k]: k = k + 1
+    k == expected.len() as i32
+
+// Why the printed lines are not the expected ones, from the class a
+// substring match also caught to the ones it hid (#1855): a line printed
+// nowhere, a line printed only inside a longer one (`drop 1` in `drop 10`),
+// a line printed more or fewer times than listed (a double drop), the lines
+// out of order, and lines the expectations do not list.
+fn test_stdout_mismatch(expected: &Vec[str], actual: &Vec[str], stdout: &str) -> str:
+    for i in 0..expected.len() as i32:
+        if not stdout.contains(expected[i]): return "missing expected output: " ++ expected[i]
+    for i in 0..expected.len() as i32:
+        if expected[i].len() > 0 and test_line_count(actual, expected[i]) == 0:
+            return "expected line `" ++ expected[i] ++ "` is printed only inside `" ++ test_line_containing(actual, expected[i]) ++ "`"
+    for i in 0..expected.len() as i32:
+        let listed = test_line_count(expected, expected[i])
+        let printed = test_line_count(actual, expected[i])
+        if listed != printed: return "line `" ++ expected[i] ++ f"` is expected {listed} times and printed {printed} times"
+    if not test_lines_in_order(expected, actual): return "the expected lines print in a different order"
+    "stdout has lines the expectations do not list"
+
+fn stdout_line_at(lines: &Vec[str], k: i32):
+    if k < lines.len() as i32: "`" ++ lines[k] ++ "`" else: "no more lines"
+
+// A window of `lines` from just before line `k`, numbered from 1.
+fn test_eprint_lines(label: &str, lines: &Vec[str], k: i32):
+    let total = lines.len() as i32
+    with_eprint(f" = {label} ({total} lines):")
+    var from = k - 3
+    if from < 0: from = 0
+    var to = from + 12
+    if to > total: to = total
+    if from > 0: with_eprint(" | ...")
+    for i in from..to: with_eprint(f" | {i + 1}: " ++ lines[i])
+    if to < total: with_eprint(f" | ... {total - to} more")
+
+// `//! expect-stdout:` lines are the program's stdout: every line, in order,
+// and nothing else (#1855).
+fn test_validate_stdout_lines(stdout: &str, expected: &Vec[str], target: &str, test_name: &str) -> bool:
+    let actual = test_output_lines(stdout)
+    let k = test_lines_agree(expected, actual)
+    if k == expected.len() as i32 and k == actual.len() as i32: return true
+    emit_test_stage_error("stdout mismatch; " ++ test_stdout_mismatch(expected, actual, stdout), target, "run", test_name)
+    with_eprint(f" = first difference at line {k + 1}: expected " ++ stdout_line_at(expected, k) ++ ", printed " ++ stdout_line_at(actual, k))
+    test_eprint_lines("expected", expected, k)
+    test_eprint_lines("printed", actual, k)
+    false
+
 fn validate_test_run(result: &TestRunResult, directives: &TestDirectives, target: &str, test_name: &str) -> bool:
     if directives.has_expect_exit:
         if result.rc != directives.expect_exit:
@@ -4131,7 +4262,9 @@ fn validate_test_run(result: &TestRunResult, directives: &TestDirectives, target
     else if result.rc != 0:
         emit_test_stage_error(f"exit code {result.rc}", target, "run", test_name)
         return false
-    if not test_validate_output("stdout", result.stdout, directives.expect_stdout, target, test_name):
+    if directives.expect_stdout.len() > 0 and not test_validate_stdout_lines(result.stdout, directives.expect_stdout, target, test_name):
+        return false
+    if not test_validate_output("stdout", result.stdout, directives.expect_stdout_contains, target, test_name):
         return false
     if not test_validate_output("stderr", result.stderr, directives.expect_stderr, target, test_name):
         return false

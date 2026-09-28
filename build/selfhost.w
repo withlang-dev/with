@@ -1080,7 +1080,65 @@ fn bs_check_test_directives(ctx: &ActionCtx, compiler_path: &str, test_dir: &str
     let bad_exit_result = bs_run_cli_capture(ctx, compiler_path, "test-directives-bad-exit", bs_test_args(bad_exit_src), 120000)
     if bad_exit_result.rc == 0:
         return bs_fail(ctx, "expected exit directive failure")
-    bs_assert_contains(ctx, bad_exit_result.stderr, "exit code 0, expected 7", "test_runtime_directives")
+    let exit_diag = bs_assert_contains(ctx, bad_exit_result.stderr, "exit code 0, expected 7", "test_runtime_directives")
+    if exit_diag != 0:
+        return exit_diag
+    bs_check_test_stdout_lines(ctx, compiler_path, test_dir)
+
+fn bs_write_test_fixture(ctx: &ActionCtx, test_dir: &str, name: &str, source: &str) -> str:
+    let src = bs_join(test_dir, name ++ ".w")
+    if ctx.fs().write_text(src, source) != 0:
+        return ""
+    src
+
+// A fixture the runner must pass.
+fn bs_expect_test_green(ctx: &ActionCtx, compiler_path: &str, test_dir: &str, name: &str, source: &str) -> i32:
+    let src = bs_write_test_fixture(ctx, test_dir, name, source)
+    if src.len() == 0:
+        return bs_fail(ctx, "could not write fixture " ++ name)
+    let result = bs_run_cli_capture(ctx, compiler_path, "test-directives-" ++ name, bs_test_args(src), 120000)
+    if result.rc != 0:
+        return bs_fail(ctx, name ++ f": the runner failed a test whose stdout matches its expectations (exit code {result.rc})" ++ bs_actual_excerpt(result.stderr))
+    0
+
+// A fixture the runner must fail, naming why.
+fn bs_expect_test_red(ctx: &ActionCtx, compiler_path: &str, test_dir: &str, name: &str, source: &str, diagnostic: &str) -> i32:
+    let src = bs_write_test_fixture(ctx, test_dir, name, source)
+    if src.len() == 0:
+        return bs_fail(ctx, "could not write fixture " ++ name)
+    let result = bs_run_cli_capture(ctx, compiler_path, "test-directives-" ++ name, bs_test_args(src), 120000)
+    if result.rc == 0:
+        return bs_fail(ctx, name ++ ": the runner passed a test it must fail: " ++ diagnostic)
+    bs_assert_contains(ctx, result.stderr, diagnostic, "test_stdout_" ++ name)
+
+// #1855: `//! expect-stdout:` lines are the program's whole stdout, in order.
+// Each case below passed while the runner matched every line as a substring
+// of the output: a subset of the lines, the lines out of order, `drop 1`
+// inside `drop 10`, and a double drop's repeated line.
+fn bs_check_test_stdout_lines(ctx: &ActionCtx, compiler_path: &str, test_dir: &str) -> i32:
+    var rc = bs_expect_test_red(ctx, compiler_path, test_dir, "stdout_subset", "//! expect-stdout: a\n\nfn main:\n    print(\"a\")\n    print(\"b\")\n", "stdout mismatch; stdout has lines the expectations do not list")
+    if rc != 0: return rc
+    rc = bs_expect_test_red(ctx, compiler_path, test_dir, "stdout_order", "//! expect-stdout: end\n//! expect-stdout: drop 1\n\nfn main:\n    print(\"drop 1\")\n    print(\"end\")\n", "stdout mismatch; the expected lines print in a different order")
+    if rc != 0: return rc
+    rc = bs_expect_test_red(ctx, compiler_path, test_dir, "stdout_line_prefix", "//! expect-stdout: drop 1\n\nfn main:\n    print(\"drop 10\")\n", "stdout mismatch; expected line `drop 1` is printed only inside `drop 10`")
+    if rc != 0: return rc
+    rc = bs_expect_test_red(ctx, compiler_path, test_dir, "stdout_duplicate", "//! expect-stdout: drop 1\n//! expect-stdout: end\n\nfn main:\n    print(\"drop 1\")\n    print(\"end\")\n    print(\"drop 1\")\n", "stdout mismatch; line `drop 1` is expected 1 times and printed 2 times")
+    if rc != 0: return rc
+    rc = bs_expect_test_red(ctx, compiler_path, test_dir, "stdout_fewer", "//! expect-stdout: ok\n//! expect-stdout: ok\n\nfn main:\n    print(\"ok\")\n", "stdout mismatch; line `ok` is expected 2 times and printed 1 times")
+    if rc != 0: return rc
+    // A `//!` line the runner does not read is an expectation nothing checks.
+    rc = bs_expect_test_red(ctx, compiler_path, test_dir, "stdout_unread_directive", "//! expect-stdout: ok\n//! expect-stdout-not: bad\n\nfn main:\n    print(\"ok\")\n", "`//! expect-stdout-not: bad` on line 2 is not a directive the test runner reads")
+    if rc != 0: return rc
+    rc = bs_expect_test_red(ctx, compiler_path, test_dir, "stdout_lost_prefix", "//! expect-stdout: 3\n//! 65\n\nfn main:\n    print(\"3\")\n", "`//! 65` on line 2 is not a directive the test runner reads")
+    if rc != 0: return rc
+    rc = bs_expect_test_red(ctx, compiler_path, test_dir, "stdout_both_forms", "//! expect-stdout: ok\n//! expect-stdout-contains: ok\n\nfn main:\n    print(\"ok\")\n", "use one or the other")
+    if rc != 0: return rc
+    rc = bs_expect_test_red(ctx, compiler_path, test_dir, "stdout_empty_fragment", "//! expect-stdout-contains: \n\nfn main:\n    print(\"ok\")\n", "an empty fragment is found in every output")
+    if rc != 0: return rc
+    // Blank lines are lines; an editor-trimmed `//! expect-stdout:` is one.
+    rc = bs_expect_test_green(ctx, compiler_path, test_dir, "stdout_exact", "//! expect-stdout: a\n//! expect-stdout: \n//! expect-stdout:\n//! expect-stdout: drop 10\n\nfn main:\n    print(\"a\")\n    print(\"\")\n    print(\"\")\n    print(\"drop 10\")\n")
+    if rc != 0: return rc
+    bs_expect_test_green(ctx, compiler_path, test_dir, "stdout_contains", "//! expect-stdout-contains: took\n\nfn main:\n    print(\"the run took 12 ms\")\n")
 
 // The runner's artifacts land under WITH_OUT_DIR, so kept test binaries stay
 // inside this action's output tree (removed at the next run).
