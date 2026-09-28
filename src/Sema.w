@@ -8568,10 +8568,7 @@ impl Sema:
 pub fn sema_str_has_data(text: &str) -> i32:
     if text.len() <= 0:
         return 0
-    let ptr_ptr = unsafe *(&text as *const *const *const u8)
-    if ptr_ptr as i64 == 0:
-        return 0
-    let data_ptr = unsafe *ptr_ptr
+    let data_ptr = unsafe *(text as *const str as *const *const u8)
     if data_ptr as i64 == 0:
         return 0
     1

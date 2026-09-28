@@ -26,7 +26,7 @@ pub fn Trie.new[V]() -> Trie[V]:
     Trie { trie: trie }
 
 fn trie_key_bytes(key: &str) -> *mut u8:
-    unsafe { **(&key as *const *const *mut u8) }
+    unsafe { *(key as *const str as *const *mut u8) }
 
 impl[V] Trie[V]:
     pub fn len() -> i64: unsafe { trie_num_entries(self.trie) } as i64

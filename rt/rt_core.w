@@ -506,7 +506,7 @@ type RawStr:
     len: i64
 
 fn str_data(s: &str) -> *const u8:
-    unsafe **(&s as *const *const *const u8)
+    unsafe *(s as *const str as *const *const u8)
 
 fn str_length(s: &str): s.len()
 
@@ -2644,8 +2644,8 @@ pub fn with_str_eq_ref(a: &str, b: &str) -> i32:
         return 0
     if al == 0:
         return 1
-    let ap = unsafe **(&a as *const *const *const u8)
-    let bp = unsafe **(&b as *const *const *const u8)
+    let ap = unsafe *(a as *const str as *const *const u8)
+    let bp = unsafe *(b as *const str as *const *const u8)
     if ap as i64 == bp as i64:
         return 1
     if rt_memcmp(ap, bp, al) == 0: 1 else: 0
@@ -2654,8 +2654,8 @@ pub fn with_str_cmp_ref(a: &str, b: &str) -> i32:
     let al = a.len()
     let bl = b.len()
     let n = if al < bl: al else: bl
-    let ap = unsafe **(&a as *const *const *const u8)
-    let bp = unsafe **(&b as *const *const *const u8)
+    let ap = unsafe *(a as *const str as *const *const u8)
+    let bp = unsafe *(b as *const str as *const *const u8)
     let cmp = rt_memcmp(ap, bp, n)
     if cmp != 0:
         return cmp
@@ -2958,7 +2958,7 @@ pub fn str_from_byte(b: i32) -> str:
 pub fn with_parse_i64_ref(s: &str) -> i64:
     let slen = s.len()
     if slen == 0: return 0
-    let sp = unsafe **(&s as *const *const *const u8)
+    let sp = unsafe *(s as *const str as *const *const u8)
     var result: i64 = 0
     var neg: i32 = 0
     var i: i64 = 0
@@ -4178,7 +4178,7 @@ fn with_lines_data_out(out: *mut u8, sp: *const u8, sl: i64) -> Unit:
         with_vec_push_str(out, move line)
 
 pub fn with_lines_out_ref(out: *mut u8, s: &str) -> Unit:
-    with_lines_data_out(out, unsafe **(&s as *const *const *const u8), s.len())
+    with_lines_data_out(out, unsafe *(s as *const str as *const *const u8), s.len())
 
 pub fn with_str_join(parts: *mut u8, sep: &str) -> str:
     let plen = vec_get_len(parts)

@@ -102,7 +102,7 @@ fn regex_cstr(s: &str) -> *const u8:
     out as *const u8
 
 fn regex_str_data(s: &str) -> *const u8:
-    unsafe { **(&s as *const *const *const u8) }
+    unsafe { *(s as *const str as *const *const u8) }
 
 unsafe fn regex_owned_cstr(s: *const u8) -> str:
     if s as i64 == 0:

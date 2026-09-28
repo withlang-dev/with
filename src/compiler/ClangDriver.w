@@ -34,7 +34,7 @@ pub fn with_cc_available() -> bool: embedded_clang_driver_linked()
 unsafe fn cc_c_string(s: &str) -> *mut u8:
     let out = with_alloc(s.len() + 1)
     if s.len() > 0:
-        with_memcpy(out, **(&s as *const *const *const u8), s.len())
+        with_memcpy(out, *(s as *const str as *const *const u8), s.len())
     *((out as i64 + s.len()) as *mut u8) = 0
     out
 

@@ -1073,7 +1073,7 @@ pub fn rt_getenv(name: *const u8) -> *const u8:
     0 as *const u8
 
 fn wasm_str_data(s: &str) -> *const u8:
-    unsafe **(&s as *const *const *const u8)
+    unsafe *(s as *const str as *const *const u8)
 
 pub fn rt_compat_setenv_str(name: &str, value: &str) -> i32:
     wasm_init_env()

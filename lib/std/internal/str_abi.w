@@ -9,7 +9,7 @@ extern fn with_free(ptr: *mut u8) -> Unit
 
 pub unsafe fn str_copy_bytes(s: &str) -> *mut u8:
     let out = with_alloc(s.len() + 1)
-    let data = **(&s as *const *const *const u8)
+    let data = *(s as *const str as *const *const u8)
     var i: i64 = 0
     while i < s.len():
         *((out as i64 + i) as *mut u8) = data[i]

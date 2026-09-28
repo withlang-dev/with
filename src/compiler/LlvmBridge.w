@@ -479,7 +479,7 @@ fn to_cstr(s: &str) -> *const u8:
             abort()
     let idx = cstr_slot_indices[slot]
     let n = if s.len() < 4095: s.len() else: 4095
-    let src = unsafe **(&s as *const *const *const u8)
+    let src = unsafe *(s as *const str as *const *const u8)
     let dst = &raw mut cstr_bufs[slot][idx] as *mut u8
     with_memcpy(dst, src, n)
     cstr_bufs[slot][idx][n] = 0 as u8
@@ -739,7 +739,7 @@ pub fn wl_get_undef(ty: i64) -> i64: unsafe { LLVMGetUndef(ty as *mut u8) as i64
 
 pub fn wl_const_string(ctx: i64, s: &str, dont_null: i32) -> i64:
     unsafe:
-        let sp = **(&s as *const *const *const u8)
+        let sp = *(s as *const str as *const *const u8)
         LLVMConstStringInContext(ctx as *mut u8, sp, s.len() as u32, dont_null) as i64
 
 pub fn wl_const_struct(ctx: i64, vals_ptr: i64, count: i32, packed: i32) -> i64:
@@ -998,7 +998,7 @@ pub fn wl_build_global_string_ptr(b: i64, s: &str) -> i64:
         let func = LLVMGetBasicBlockParent(bb)
         let mod = LLVMGetGlobalParent(func)
         let ctx = LLVMGetModuleContext(mod)
-        var sp = **(&s as *const *const *const u8)
+        var sp = *(s as *const str as *const *const u8)
         if sp as i64 == 0:
             sp = empty_cstr()
         // dont_null = 0: LLVM appends the trailing terminator itself.
@@ -1313,14 +1313,14 @@ pub fn wl_get_first_use(v: i64) -> i64: unsafe { LLVMGetFirstUse(v as *mut u8) a
 
 pub fn wl_set_value_name(v: i64, name: &str):
     unsafe:
-        let sp = **(&name as *const *const *const u8)
+        let sp = *(name as *const str as *const *const u8)
         LLVMSetValueName2(v as *mut u8, sp, name.len() as u64)
 
 // ── Intrinsics ──────────────────────────────────────────────────
 
 pub fn wl_lookup_intrinsic_id(name: &str) -> i32:
     unsafe:
-        let sp = **(&name as *const *const *const u8)
+        let sp = *(name as *const str as *const *const u8)
         LLVMLookupIntrinsicID(sp, name.len() as u64) as i32
 
 pub fn wl_get_intrinsic_decl(m: i64, id: i32, tys_ptr: i64, cnt: i32) -> i64:
@@ -1400,7 +1400,7 @@ pub fn wl_emit_object(tm: i64, m: i64, path: &str) -> i32:
             return 1
         var path_buf: [4096]u8 = [0 as u8; 4096]
         let n = if path.len() < 4095: path.len() else: 4095
-        let sp = **(&path as *const *const *const u8)
+        let sp = *(path as *const str as *const *const u8)
         with_memcpy(&path_buf as *mut u8, sp, n)
         path_buf[n] = 0
         var err: *mut u8 = 0 as *mut u8
@@ -1537,14 +1537,14 @@ pub fn wl_add_module_flag_int(mod_ref: i64, key: &str, val: i32):
 
 pub fn wl_di_create_file(builder: i64, filename: &str, directory: &str) -> i64:
     unsafe:
-        let fn_ptr = **(&filename as *const *const *const u8)
-        let dir_ptr = **(&directory as *const *const *const u8)
+        let fn_ptr = *(filename as *const str as *const *const u8)
+        let dir_ptr = *(directory as *const str as *const *const u8)
         LLVMDIBuilderCreateFile(builder as *mut u8, fn_ptr, filename.len() as u64, dir_ptr, directory.len() as u64) as i64
 
 pub fn wl_di_create_compile_unit(builder: i64, file: i64, producer: &str, is_optimized: i32, dwarf_version: i32, lang: i32) -> i64:
     unsafe:
         let _ = dwarf_version
-        let pp = **(&producer as *const *const *const u8)
+        let pp = *(producer as *const str as *const *const u8)
         LLVMDIBuilderCreateCompileUnit(builder as *mut u8, lang, file as *mut u8,
             pp, producer.len() as u64, is_optimized,
             empty_cstr(), 0, 0, empty_cstr(), 0,
@@ -1558,8 +1558,8 @@ pub fn wl_di_create_subroutine_type(builder: i64, file: i64, param_types_ptr: i6
 
 pub fn wl_di_create_function(builder: i64, scope: i64, name: &str, linkage_name: &str, file: i64, line: i32, ty: i64, is_definition: i32, scope_line: i32, is_optimized: i32) -> i64:
     unsafe:
-        let np = **(&name as *const *const *const u8)
-        let lp = **(&linkage_name as *const *const *const u8)
+        let np = *(name as *const str as *const *const u8)
+        let lp = *(linkage_name as *const str as *const *const u8)
         LLVMDIBuilderCreateFunction(builder as *mut u8, scope as *mut u8,
             np, name.len() as u64, lp, linkage_name.len() as u64,
             file as *mut u8, line as u32, ty as *mut u8,
@@ -1600,7 +1600,7 @@ pub fn wl_dwarf_ate_unsigned_char() -> i32: 8
 
 pub fn wl_di_create_basic_type(builder: i64, name: &str, size_in_bits: u64, encoding: i32) -> i64:
     unsafe:
-        let np = **(&name as *const *const *const u8)
+        let np = *(name as *const str as *const *const u8)
         LLVMDIBuilderCreateBasicType(builder as *mut u8, np, name.len() as u64, size_in_bits, encoding, LLVM_DIFlagZero) as i64
 
 pub fn wl_di_create_pointer_type(builder: i64, pointee_ty: i64, size_in_bits: u64) -> i64:
@@ -1610,7 +1610,7 @@ pub fn wl_di_create_pointer_type(builder: i64, pointee_ty: i64, size_in_bits: u6
 
 pub fn wl_di_create_struct_type(builder: i64, scope: i64, name: &str, file: i64, line: i32, size_in_bits: u64, align_in_bits: u32, elements_ptr: i64, num_elements: i32) -> i64:
     unsafe:
-        let np = **(&name as *const *const *const u8)
+        let np = *(name as *const str as *const *const u8)
         let sc = if scope != 0: scope as *mut u8 else: 0 as *mut u8
         let fi = if file != 0: file as *mut u8 else: 0 as *mut u8
         let elems = if num_elements > 0: elements_ptr as *const *mut u8 else: 0 as *const *mut u8
@@ -1618,24 +1618,24 @@ pub fn wl_di_create_struct_type(builder: i64, scope: i64, name: &str, file: i64,
 
 pub fn wl_di_create_member_type(builder: i64, scope: i64, name: &str, file: i64, line: i32, size_in_bits: u64, align_in_bits: u32, offset_in_bits: u64, ty: i64) -> i64:
     unsafe:
-        let np = **(&name as *const *const *const u8)
+        let np = *(name as *const str as *const *const u8)
         let sc = if scope != 0: scope as *mut u8 else: 0 as *mut u8
         let fi = if file != 0: file as *mut u8 else: 0 as *mut u8
         LLVMDIBuilderCreateMemberType(builder as *mut u8, sc, np, name.len() as u64, fi, line as u32, size_in_bits, align_in_bits, offset_in_bits, LLVM_DIFlagZero, ty as *mut u8) as i64
 
 pub fn wl_di_create_unspecified_type(builder: i64, name: &str) -> i64:
     unsafe:
-        let np = **(&name as *const *const *const u8)
+        let np = *(name as *const str as *const *const u8)
         LLVMDIBuilderCreateUnspecifiedType(builder as *mut u8, np, name.len() as u64) as i64
 
 pub fn wl_di_create_auto_variable(builder: i64, scope: i64, name: &str, file: i64, line: i32, ty: i64) -> i64:
     unsafe:
-        let np = **(&name as *const *const *const u8)
+        let np = *(name as *const str as *const *const u8)
         LLVMDIBuilderCreateAutoVariable(builder as *mut u8, scope as *mut u8, np, name.len() as u64, file as *mut u8, line as u32, ty as *mut u8, 1, LLVM_DIFlagZero, 0) as i64
 
 pub fn wl_di_create_parameter_variable(builder: i64, scope: i64, name: &str, arg_no: i32, file: i64, line: i32, ty: i64) -> i64:
     unsafe:
-        let np = **(&name as *const *const *const u8)
+        let np = *(name as *const str as *const *const u8)
         LLVMDIBuilderCreateParameterVariable(builder as *mut u8, scope as *mut u8, np, name.len() as u64, arg_no as u32, file as *mut u8, line as u32, ty as *mut u8, 1, LLVM_DIFlagZero) as i64
 
 pub fn wl_di_create_expression(builder: i64) -> i64:
@@ -1721,8 +1721,8 @@ pub fn wl_build_fence(b: i64, order: i32):
 
 pub fn wl_get_inline_asm(fn_ty: i64, asm_str: &str, constraints: &str, has_side_effects: i32, is_align_stack: i32) -> i64:
     unsafe:
-        let ap = **(&asm_str as *const *const *const u8)
-        let cp = **(&constraints as *const *const *const u8)
+        let ap = *(asm_str as *const str as *const *const u8)
+        let cp = *(constraints as *const str as *const *const u8)
         LLVMGetInlineAsm(fn_ty as *mut u8,
             ap, asm_str.len() as u64,
             cp, constraints.len() as u64,
@@ -1734,7 +1734,7 @@ pub fn wl_get_inline_asm(fn_ty: i64, asm_str: &str, constraints: &str, has_side_
 
 fn path_to_cstr(path: &str, buf: *mut u8) -> *const u8:
     let n = if path.len() < 4095: path.len() else: 4095
-    let src = unsafe **(&path as *const *const *const u8)
+    let src = unsafe *(path as *const str as *const *const u8)
     with_memcpy(buf, src, n)
     unsafe *((buf as i64 + n) as *mut u8) = 0
     buf as *const u8

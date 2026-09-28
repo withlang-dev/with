@@ -11,7 +11,7 @@ extern fn with_fiber_panic_capture(msg: *const u8, msg_len: i32) -> Unit
 extern fn rt_libc_exit(code: i32) -> Never
 
 pub fn str_data(s: &str) -> *const u8:
-    unsafe **(&s as *const *const *const u8)
+    unsafe *(s as *const str as *const *const u8)
 
 fn panic_render(msg: &str, file: &str, line: i32) -> str:
     if file.len() > 0:
