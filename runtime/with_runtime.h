@@ -17,10 +17,6 @@ typedef struct {
 } with_str;
 
 #define WITH_STR_LIT(s) ((with_str){(s), (int64_t)(sizeof(s) - 1)})
-// Address of any with_str expression (lvalue or not): array compound
-// literal, enclosing-block lifetime, decays to a pointer. Marshals a
-// str VALUE into the observing `_ref` runtime entry points.
-#define WITH_STR_REF(e) ((const with_str *)((with_str[]){ (e) }))
 #define with_len(v) ((v).len)
 #define with_is_empty(v) (((v).len == 0) ? 1 : 0)
 
@@ -29,30 +25,32 @@ with_str with_str_concat_n_move_first(const with_str *parts, int64_t count);
 with_str with_str_from_cstr(const char *s);
 with_str with_str_from_bytes(const uint8_t *s, int64_t len);
 with_str with_str_from_vec_u8(const void *bytes);
-int64_t with_str_len(const with_str* s);
-// #747 flip: reference-ABI runtime entry points (param = pointer to header).
-with_str with_str_concat_ref(const with_str* a, const with_str* b);
-with_str with_str_clone_ref(const with_str* s);
-int32_t with_str_eq_ref(const with_str* a, const with_str* b);
-int32_t with_str_cmp_ref(const with_str* a, const with_str* b);
-with_str with_str_slice_ref(const with_str* s, int64_t start, int64_t end);
-int64_t with_parse_i64_ref(const with_str* s);
-void with_panic_ref(const with_str* msg, const with_str* file, int32_t line);
-void with_fmt_buf_write_str_ref(uint8_t* b, const with_str* s);
-void with_lines_out_ref(uint8_t *out, const with_str *s);
-void with_print_str(const with_str* s);
-int32_t with_str_byte_at_ref(const with_str* s, int64_t index);
-int32_t with_str_starts_with_ref(const with_str* s, const with_str* prefix);
-int32_t with_str_ends_with_ref(const with_str* s, const with_str* suffix);
-int32_t with_str_contains_ref(const with_str* haystack, const with_str* needle);
-int32_t with_str_contains_char_ref(const with_str* haystack, int32_t ch);
-int64_t with_str_index_of_ref(const with_str* haystack, const with_str* needle);
-with_str with_str_replace_ref(const with_str* s, const with_str* old, const with_str* new_s);
-with_str with_str_trim_ref(const with_str* s);
-with_str with_str_to_upper_ref(const with_str* s);
-with_str with_str_to_lower_ref(const with_str* s);
-with_str with_str_repeat_ref(const with_str* s, int64_t count);
-double with_parse_float_ref(const with_str* s);
+int64_t with_str_len(with_str s);
+// #747 flip: the observing `_ref` runtime entry points. A With `&str`
+// parameter is a view, the str's own {ptr, len} by value (#1810), so
+// every such parameter below is a with_str.
+with_str with_str_concat_ref(with_str a, with_str b);
+with_str with_str_clone_ref(with_str s);
+int32_t with_str_eq_ref(with_str a, with_str b);
+int32_t with_str_cmp_ref(with_str a, with_str b);
+with_str with_str_slice_ref(with_str s, int64_t start, int64_t end);
+int64_t with_parse_i64_ref(with_str s);
+void with_panic_ref(with_str msg, with_str file, int32_t line);
+void with_fmt_buf_write_str_ref(uint8_t* b, with_str s);
+void with_lines_out_ref(uint8_t *out, with_str s);
+void with_print_str(with_str s);
+int32_t with_str_byte_at_ref(with_str s, int64_t index);
+int32_t with_str_starts_with_ref(with_str s, with_str prefix);
+int32_t with_str_ends_with_ref(with_str s, with_str suffix);
+int32_t with_str_contains_ref(with_str haystack, with_str needle);
+int32_t with_str_contains_char_ref(with_str haystack, int32_t ch);
+int64_t with_str_index_of_ref(with_str haystack, with_str needle);
+with_str with_str_replace_ref(with_str s, with_str old, with_str new_s);
+with_str with_str_trim_ref(with_str s);
+with_str with_str_to_upper_ref(with_str s);
+with_str with_str_to_lower_ref(with_str s);
+with_str with_str_repeat_ref(with_str s, int64_t count);
+double with_parse_float_ref(with_str s);
 with_str with_i32_to_str(int32_t n);
 with_str with_i64_to_str(int64_t n);
 with_str with_bool_to_str(bool b);
@@ -71,11 +69,11 @@ typedef struct {
 } with_vec;
 
 with_vec with_vec_new(int64_t elem_size);
-void with_str_split_vec_ref(with_vec *out, const with_str* s, const with_str* delim);
+void with_str_split_vec_ref(with_vec *out, with_str s, with_str delim);
 void with_vec_new_out(uint8_t *out, int64_t elem_size);
 void with_vec_new_with_capacity_out(with_vec *out, int64_t elem_size, int64_t cap);
 void with_vec_push(with_vec *v, const void *elem);
-void with_vec_append_bytes(uint8_t *v, const with_str *s);
+void with_vec_append_bytes(uint8_t *v, with_str s);
 void *with_vec_get_ptr(with_vec *v, int64_t index);
 int64_t with_vec_len(with_vec *v);
 void with_vec_clear(with_vec *v);
@@ -92,7 +90,7 @@ bool with_vec_get_bool(with_vec *v, int64_t index);
 void with_vec_set_i32(with_vec *v, int64_t index, int32_t val);
 void with_vec_set_i64(with_vec *v, int64_t index, int64_t val);
 void with_vec_remove(with_vec *v, int64_t index);
-with_str with_vec_str_join(with_vec *v, const with_str *sep);
+with_str with_vec_str_join(with_vec *v, with_str sep);
 void *with_slotmap_new(int64_t elem_size);
 void with_slotmap_insert_out(void *map, const void *val, void *out_handle);
 void *with_slotmap_get_ptr(void *map, uint32_t index, uint32_t generation);
@@ -158,26 +156,26 @@ with_str with_fmt_int_spec(int64_t val, int32_t is_unsigned,
 with_str with_fmt_f64(double n);
 with_str with_fmt_f64_spec(double val, int64_t flags, int32_t width,
                            int32_t precision, int32_t mode);
-with_str with_fmt_str_ref(const with_str* s);
-with_str with_fmt_str_spec_ref(const with_str* val, int64_t flags, int32_t width,
+with_str with_fmt_str_ref(with_str s);
+with_str with_fmt_str_spec_ref(with_str val, int64_t flags, int32_t width,
                                int32_t precision);
-void with_fmt_buf_write_str_spec_ref(uint8_t* b, const with_str* val, int64_t flags,
+void with_fmt_buf_write_str_spec_ref(uint8_t* b, with_str val, int64_t flags,
                                      int32_t width, int32_t precision);
 with_str with_fmt_bool(int32_t b);
-with_str with_fmt_str_debug_ref(const with_str* s);
+with_str with_fmt_str_debug_ref(with_str s);
 
 // ── I/O ────────────────────────────────────────────────────────────
 
-void with_println_str(const with_str* s);
+void with_println_str(with_str s);
 void with_println_i32(int32_t n);
 void with_println_i64(int64_t n);
 void with_println_bool(bool b);
-void with_eprint(const with_str* s);
-void with_write(const with_str* s);
-void with_ewrite(const with_str* s);
+void with_eprint(with_str s);
+void with_write(with_str s);
+void with_ewrite(with_str s);
 with_str with_read_line_stdin(void);
 with_str with_read_bytes_stdin(int32_t count);
-void with_write_stdout(const with_str *s);
+void with_write_stdout(with_str s);
 void with_flush_stdout(void);
 
 // ── Process ────────────────────────────────────────────────────────
@@ -191,26 +189,26 @@ int32_t with_interrupt_requested(void);
 
 // ── File I/O ───────────────────────────────────────────────────────
 
-with_str with_fs_read_file(const with_str *path);
-int32_t with_fs_file_exists(const with_str *path);
-int32_t with_fs_write_file(const with_str *path, const with_str *data);
-int32_t with_fs_mkdir_p(const with_str *path);
-int32_t with_fs_mkdir(const with_str *path);
-int32_t with_fs_is_dir(const with_str *path);
-int32_t with_fs_remove_file(const with_str *path);
-int32_t with_fs_chmod(const with_str *path, int32_t mode);
-int32_t with_fs_file_mode(const with_str *path);
-with_str with_fs_readlink(const with_str *path);
-int32_t with_fs_rename_file(const with_str *old_path, const with_str *new_path);
-int32_t with_fs_create_dir(const with_str *path);
-int32_t with_fs_remove_dir(const with_str *path);
-int32_t with_fs_remove_tree(const with_str *path);
-int32_t with_fs_copy_tree(const with_str *src, const with_str *dst);
-int32_t with_fs_symlink(const with_str *target, const with_str *link_path);
-with_str with_fs_list_files(const with_str *path);
-int64_t with_str_hash(const with_str *s);
-with_str with_getenv_str(const with_str *name);
-int32_t with_setenv_str(const with_str *name, const with_str *value);
+with_str with_fs_read_file(with_str path);
+int32_t with_fs_file_exists(with_str path);
+int32_t with_fs_write_file(with_str path, with_str data);
+int32_t with_fs_mkdir_p(with_str path);
+int32_t with_fs_mkdir(with_str path);
+int32_t with_fs_is_dir(with_str path);
+int32_t with_fs_remove_file(with_str path);
+int32_t with_fs_chmod(with_str path, int32_t mode);
+int32_t with_fs_file_mode(with_str path);
+with_str with_fs_readlink(with_str path);
+int32_t with_fs_rename_file(with_str old_path, with_str new_path);
+int32_t with_fs_create_dir(with_str path);
+int32_t with_fs_remove_dir(with_str path);
+int32_t with_fs_remove_tree(with_str path);
+int32_t with_fs_copy_tree(with_str src, with_str dst);
+int32_t with_fs_symlink(with_str target, with_str link_path);
+with_str with_fs_list_files(with_str path);
+int64_t with_str_hash(with_str s);
+with_str with_getenv_str(with_str name);
+int32_t with_setenv_str(with_str name, with_str value);
 int32_t with_getpid(void);
 int32_t with_sysinfo(uint8_t *out);
 int32_t with_process_alive(int32_t pid);
@@ -218,8 +216,8 @@ void with_fill_random(uint8_t *buf, int64_t len);
 
 int32_t with_net_tcp_listen(int32_t port, int32_t backlog);
 int32_t with_net_tcp_accept(int32_t listen_fd);
-int32_t with_net_tcp_connect(const with_str *host, int32_t port);
-int64_t with_net_send(int32_t fd, const with_str *data);
+int32_t with_net_tcp_connect(with_str host, int32_t port);
+int64_t with_net_send(int32_t fd, with_str data);
 with_str with_net_recv(int32_t fd, int64_t max_len);
 int32_t with_net_close(int32_t fd);
 int32_t with_net_udp_bind(int32_t port);
@@ -303,13 +301,13 @@ uint64_t with_bswap64(uint64_t x);
 
 // ── System ─────────────────────────────────────────────────────────
 
-int32_t with_exec_binary(const with_str *path);
-int32_t with_exec_argv(const with_str *args);
-int32_t with_exec_argv_cwd(const with_str *args, const with_str *cwd);
-int32_t with_exec_argv_capture(const with_str *args, const with_str *stdout_path, const with_str *stderr_path, int32_t timeout_ms);
-int32_t with_exec_argv_capture_input(const with_str *args, const with_str *stdout_path, const with_str *stderr_path, int32_t timeout_ms, const with_str *stdin_path);
-int32_t with_exec_argv_capture_cwd(const with_str *args, const with_str *stdout_path, const with_str *stderr_path, int32_t timeout_ms, const with_str *cwd);
-int32_t with_exec_argv_capture_spawn(const with_str *args, const with_str *stdout_path, const with_str *stderr_path);
+int32_t with_exec_binary(with_str path);
+int32_t with_exec_argv(with_str args);
+int32_t with_exec_argv_cwd(with_str args, with_str cwd);
+int32_t with_exec_argv_capture(with_str args, with_str stdout_path, with_str stderr_path, int32_t timeout_ms);
+int32_t with_exec_argv_capture_input(with_str args, with_str stdout_path, with_str stderr_path, int32_t timeout_ms, with_str stdin_path);
+int32_t with_exec_argv_capture_cwd(with_str args, with_str stdout_path, with_str stderr_path, int32_t timeout_ms, with_str cwd);
+int32_t with_exec_argv_capture_spawn(with_str args, with_str stdout_path, with_str stderr_path);
 int32_t with_exec_wait(int32_t pid, int32_t timeout_ms);
 int64_t with_thread_spawn(uint8_t *fn_ptr, uint8_t *ctx);
 int32_t with_thread_join(int64_t handle);

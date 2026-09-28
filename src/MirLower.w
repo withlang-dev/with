@@ -6501,22 +6501,10 @@ impl MirBuilder:
             self.body.push_stmt(self.cur_bb, StmtKind.Assign, len_place, len_rv, self.ast.get_start(node))
             end_op = self.body.new_operand(OperandKind.OK_COPY, len_place)
 
+        // A str range is a `&str` (D71 §4.8a), and a `&str` is its own
+        // `{ptr, len}` (#1810): the slice is the view itself, like `[]T`.
         let slice_rv = self.body.new_rvalue(RvalueKind.RK_SLICE, base_place, start_op, end_op)
         let slice_ty = self.expr_type(node)
-        // D71 (§4.8a, #1587): a str range is a `&str`. A `&str` points at a
-        // string header, so the range's {ptr, len} is built into a hidden
-        // str local of this frame — a header that owns nothing (no drop is
-        // scheduled) — and the view is a reference to it. Sema refuses to
-        // return such a view (its origin syms.str_range_view is frame-local).
-        if base_res != 0 and self.sema.get_type_kind(base_res) == TypeKind.TY_STR:
-            let header_local = self.new_temp(self.sema.ty_str as i32)
-            let header_place = self.place_for_local(header_local)
-            self.body.push_stmt(self.cur_bb, StmtKind.Assign, header_place, slice_rv, self.ast.get_start(node))
-            let ref_rv = self.body.new_rvalue(RvalueKind.RK_REF, BorrowKind.SHARED, header_place, 0)
-            let ref_local = self.new_temp(slice_ty)
-            let ref_place = self.place_for_local(ref_local)
-            self.body.push_stmt(self.cur_bb, StmtKind.Assign, ref_place, ref_rv, self.ast.get_start(node))
-            return self.body.new_operand(OperandKind.OK_COPY, ref_place)
         let slice_local = self.new_temp(slice_ty)
         let slice_place = self.place_for_local(slice_local)
         self.body.push_stmt(self.cur_bb, StmtKind.Assign, slice_place, slice_rv, self.ast.get_start(node))

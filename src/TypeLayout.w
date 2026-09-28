@@ -342,11 +342,41 @@ impl Sema:
         let enum_align = if tag_tid != 0: self.type_layout_align_of(tag_tid) else: 4
         type_layout_align_up(tag_size + max_payload_size, enum_align)
 
+    // #1810 (D71 §4.8a): a shared `&str` is a view VALUE with str's own
+    // layout, `{ptr, len}` — never a pointer to some str header. A range
+    // `s[a..b]` has no header of its own; as a value it carries only its
+    // base's origin and can be returned. `&mut str` names the caller's
+    // header (writes land there), so it stays a pointer. The one owner of
+    // this representation fact: layout, codegen, the C backend and FnAbi
+    // (through the LLVM type) all read it here.
+    fn type_layout_is_str_view(tid: i32) -> bool:
+        if tid <= 0:
+            return false
+        let resolved = self.resolve_alias(tid)
+        if self.get_type_kind(resolved) != TypeKind.TY_REF or self.get_type_d1(resolved) != 0:
+            return false
+        self.type_layout_repr_is_str(self.get_type_d0(resolved))
+
+    // A type laid out as str itself: str, or a distinct type over it (§4.5,
+    // transparent — its layout is its underlying type's).
+    fn type_layout_repr_is_str(tid: i32) -> bool:
+        if tid <= 0:
+            return false
+        let resolved = self.resolve_alias(tid)
+        let tk = self.get_type_kind(resolved)
+        if tk == TypeKind.TY_STR:
+            return true
+        if tk == TypeKind.TY_STRUCT and self.distinct_type_names.contains(self.get_type_d0(resolved)):
+            return self.type_layout_repr_is_str(self.type_extra[(self.get_type_d1(resolved) + 1)])
+        false
+
     mut fn type_layout_align_of(tid: i32) -> i64:
         if tid == 0:
             return 1
         let resolved = self.resolve_alias(tid)
         let tk = self.get_type_kind(resolved)
+        if self.type_layout_is_str_view(resolved as i32):
+            return 8
         if tk == TypeKind.TY_INT:
             return type_layout_int_bytes(self.get_type_d0(resolved))
         if tk == TypeKind.TY_FLOAT:
@@ -408,7 +438,7 @@ impl Sema:
             return 1
         if tk == TypeKind.TY_VOID or tk == TypeKind.TY_NEVER or tk == TypeKind.TY_ERR:
             return 0
-        if tk == TypeKind.TY_STR or tk == TypeKind.TY_SLICE:
+        if tk == TypeKind.TY_STR or tk == TypeKind.TY_SLICE or self.type_layout_is_str_view(resolved as i32):
             return 16
         if tk == TypeKind.TY_FN:
             return 2 * target_spec_ptr_bytes()

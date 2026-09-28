@@ -1540,6 +1540,10 @@ impl Codegen:
             // TypeKind.TY_PTR / TypeKind.TY_REF: d0 = pointee tid
             let pointee_tid = self.sema.get_type_d0(sema_tid)
             let pointee_di = self.debug_get_di_type(pointee_tid)
+            // A `&str` view is the str's own `{ptr, len}` (#1810): a debugger
+            // shows its bytes as it shows a str's.
+            if self.sema.type_layout_is_str_view(sema_tid):
+                return pointee_di
             return wl_di_create_pointer_type(self.di_builder, pointee_di, 64)
         if kind == 6 or kind == 7:
             // TypeKind.TY_STRUCT / TypeKind.TY_ENUM: d0 = name sym
@@ -2686,22 +2690,18 @@ impl Codegen:
             return wl_const_null(ty)
         wl_const_int(wl_i32_type(self.context), 0, 0)
 
-    fn get_with_str_eq_fn_type() -> i64:
-        let param_types: Vec[i64] = Vec.new()
-        param_types.push(wl_ptr_type(self.context))
-        param_types.push(wl_ptr_type(self.context))
-        wl_function_type(wl_i32_type(self.context), vec_data_i64(&param_types), 2, 0)
-
+    // with_str_eq_ref / with_str_cmp_ref take two `&str` views, `{ptr, len}`
+    // each by value (#1810).
     mut fn ensure_with_str_eq_declared() -> i64:
         let param_types: Vec[i64] = Vec.new()
-        param_types.push(wl_ptr_type(self.context))
-        param_types.push(wl_ptr_type(self.context))
+        param_types.push(self.str_llvm_type())
+        param_types.push(self.str_llvm_type())
         self.ensure_internal_runtime_fn("with_str_eq_ref", param_types, 2, wl_i32_type(self.context))
 
     mut fn ensure_with_str_cmp_declared() -> i64:
         let param_types: Vec[i64] = Vec.new()
-        param_types.push(wl_ptr_type(self.context))
-        param_types.push(wl_ptr_type(self.context))
+        param_types.push(self.str_llvm_type())
+        param_types.push(self.str_llvm_type())
         self.ensure_internal_runtime_fn("with_str_cmp_ref", param_types, 2, wl_i32_type(self.context))
 
     mut fn compare_str_eq(lhs: i64, rhs: i64, op: i32) -> i64:
@@ -2709,8 +2709,8 @@ impl Codegen:
         let fn_sym = self.intern.intern("with_str_eq_ref")
         let fn_ty = self.fn_fn_types.get(fn_sym).unwrap() as i64
         let args: Vec[i64] = Vec.new()
-        args.push(self.build_str_ref_from_value(lhs))
-        args.push(self.build_str_ref_from_value(rhs))
+        args.push(self.str_view_arg(lhs))
+        args.push(self.str_view_arg(rhs))
         let cmp = self.build_call_fn_value(fn_sym, fn_val, fn_ty, -1, 0, args, 2, "with_str_eq_ref", 0)
         let zero = wl_const_int(wl_i32_type(self.context), 0, 0)
         if op == BinaryOp.OP_EQ:
@@ -2722,8 +2722,8 @@ impl Codegen:
         let fn_sym = self.intern.intern("with_str_cmp_ref")
         let fn_ty = self.fn_fn_types.get(fn_sym).unwrap() as i64
         let args: Vec[i64] = Vec.new()
-        args.push(self.build_str_ref_from_value(lhs))
-        args.push(self.build_str_ref_from_value(rhs))
+        args.push(self.str_view_arg(lhs))
+        args.push(self.str_view_arg(rhs))
         let cmp = self.build_call_fn_value(fn_sym, fn_val, fn_ty, -1, 0, args, 2, "with_str_cmp_ref", 0)
         let zero = wl_const_int(wl_i32_type(self.context), 0, 0)
         if op == BinaryOp.OP_LT:
@@ -2956,6 +2956,12 @@ impl Codegen:
             let pointee = self.pool.get_data0(type_node)
             if self.pool.kind(pointee) == NodeKind.NK_TYPE_TRAIT_OBJ:
                 return self.get_dyn_fat_ptr_type()
+            // #1810: a shared `&T` whose T is laid out as str is a view,
+            // `{ptr, len}` by value (TypeLayout.type_layout_is_str_view). A
+            // type parameter of a monomorphized struct is known here only by
+            // its bound LLVM type, which is str's for exactly those T.
+            if self.pool.get_data1(type_node) == 0 and self.resolve_type(pointee) == self.str_llvm_type():
+                return self.str_llvm_type()
             return wl_ptr_type(self.context)
 
         if kind == NodeKind.NK_TYPE_FN:
@@ -3928,6 +3934,9 @@ impl Codegen:
             let pointee_resolved = self.sema.resolve_alias(pointee_tid)
             if self.sema.get_type_kind(pointee_resolved) == TypeKind.TY_TRAIT_OBJ:
                 return self.get_dyn_fat_ptr_type()
+            // #1810: a `&str` view is `{ptr, len}` by value (TypeLayout).
+            if self.sema.type_layout_is_str_view(resolved_tid as i32):
+                return self.resolve_named_type(self.intern.intern("str"))
             return wl_ptr_type(self.context)
         if tk == TypeKind.TY_FN:
             let ptr_ty = wl_ptr_type(self.context)
@@ -5316,6 +5325,9 @@ impl Codegen:
             p_ty = wl_i32_type(self.context)
         p_ty
 
+    // An explicit `&T` parameter passes a pointer to the caller's T. A `&str`
+    // is its own `{ptr, len}` value (#1810, TypeLayout) and passes as that
+    // value, not as a pointer to anything.
     fn sig_param_is_explicit_ref(sig_idx: i32, pi: i32):
         if sig_idx < 0 or pi < 0 or pi >= self.sema.sig_get_param_count(sig_idx):
             return false
@@ -5323,7 +5335,7 @@ impl Codegen:
         if ty <= 0:
             return false
         let resolved = self.sema.resolve_alias(ty)
-        self.sema.get_type_kind(resolved) == TypeKind.TY_REF
+        self.sema.get_type_kind(resolved) == TypeKind.TY_REF and not self.sema.type_layout_is_str_view(resolved as i32)
 
     fn sig_abi_param_flags(sig_idx: i32, pi: i32) -> i32:
         self.sema.sig_param_uses_value_ref_abi(sig_idx, pi) |
@@ -7206,7 +7218,7 @@ impl Codegen:
 
     // ── Wrap main for exit ────────────────────────────────────────────
 
-    fn emit_runtime_fiber_config(wrapper: i64) -> Unit:
+    mut fn emit_runtime_fiber_config(wrapper: i64) -> Unit:
         if not self.uses_async:
             return
         let stack_size = self.sema.runtime_fiber_stack_size

@@ -349,7 +349,6 @@ fn pkg_bootstrap_types_header() -> str:
     "    int64_t len;\n" ++
     "} with_str;\n\n" ++
     "#define WITH_STR_LIT(s) ((with_str){(s), (int64_t)(sizeof(s) - 1)})\n" ++
-    "#define WITH_STR_REF(e) ((const with_str *)((with_str[]){ (e) }))\n" ++
     "#define with_len(v) ((v).len)\n" ++
     "#define with_is_empty(v) (((v).len == 0) ? 1 : 0)\n\n" ++
     "typedef struct {\n" ++

@@ -285,6 +285,9 @@ impl Codegen:
             let pointee_resolved = self.mir_resolve_alias_at(pointee_tid)
             if self.mir_type_kind_at(pointee_resolved) == TypeKind.TY_TRAIT_OBJ:
                 return self.get_dyn_fat_ptr_type()
+            // #1810: a `&str` view is `{ptr, len}` by value (TypeLayout).
+            if self.sema.type_layout_is_str_view(resolved):
+                return self.resolve_named_type(self.intern.intern("str"))
             return wl_ptr_type(self.context)
         if tk == TypeKind.TY_FN:
             let ptr_ty = wl_ptr_type(self.context)
@@ -396,12 +399,13 @@ impl Codegen:
         let literal_ft = wl_global_get_value_type(literal_fn)
         let literal_args: Vec[i64] = Vec.new()
         literal_args.push(code_global)
-        // __literal_code takes `pattern: &str` (flipped decl): pass the
-        // ADDRESS of the constant str header (gen_string_literal_ref), not
-        // the %str value — the by-value push was a per-path ABI derivation
-        // (D6) and every regex-literal function failed LLVM verification
-        // against the pointer-ABI signature.
-        literal_args.push(self.gen_string_literal_ref(pattern))
+        // __literal_code takes `pattern: &str`, a view `{ptr, len}` (#1810):
+        // the literal's own value, passed as its FnAbi descriptor says (D6 —
+        // a by-value push chosen here per path once failed verification).
+        let literal_abi = self.fn_abi_values.get(literal_fn) ?? -1
+        if literal_abi < 0:
+            sema_phase_bug("BUG: Regex.__literal_code has no FnAbi descriptor")
+        literal_args.push(self.push_call_arg(literal_abi, 1, self.gen_string_literal_raw(pattern), 0))
         literal_args.push(wl_const_int(i32_ty, options as i64, 0))
         let code_ptr = wl_build_call(self.builder, literal_ft, literal_fn, vec_data_i64(&literal_args), 3)
         let cap_ft = wl_global_get_value_type(cap_fn)
@@ -1484,8 +1488,11 @@ impl Codegen:
                     let ref_cap_ptr = self.mir_indirect_value_local_ptr(base_local, cur_ptr)
                     if ref_cap_ptr != 0:
                         cur_ptr = ref_cap_ptr
-                // Load the pointer value, then use it as the new base
-                cur_ptr = wl_build_load(self.builder, wl_ptr_type(self.context), cur_ptr)
+                // Load the pointer value, then use it as the new base. A
+                // `&str` view (#1810) is itself `{ptr, len}` — the str it
+                // names is its own storage, so there is no pointer to load.
+                if not self.sema.type_layout_is_str_view(cur_sema_ty):
+                    cur_ptr = wl_build_load(self.builder, wl_ptr_type(self.context), cur_ptr)
                 // Resolve pointee type from base local's sema type (via snapshot)
                 var deref_ptr_ty: i64 = 0
                 if cur_sema_ty > 0:
@@ -1701,7 +1708,8 @@ impl Codegen:
         if ck == ConstKind.CK_STR:
             let text = self.str_const_text(cd)
             let const_sema_ty = if const_id >= 0 and const_id < body.const_types.len() as i32: body.const_types[const_id] else: 0
-            if self.mir_sema_type_is_ref_to_str(const_sema_ty) != 0:
+            // A `&str` constant is the literal's own `{ptr, len}` (#1810).
+            if self.mir_sema_type_is_ref_to_str(const_sema_ty) != 0 and not self.sema.type_layout_is_str_view(const_sema_ty):
                 return self.gen_string_literal_ref(text)
             return self.gen_string_literal_raw(text)
 
@@ -1981,8 +1989,6 @@ impl Codegen:
         let val_ty = wl_type_of(val)
         if val_ty == target_ty:
             return val
-        if self.mir_sema_type_is_ref_to_str(target_sema_ty) != 0 and self.is_str_type(val_ty):
-            return self.build_str_ref_from_value(val)
         let vk = wl_get_type_kind(val_ty)
         let tk = wl_get_type_kind(target_ty)
         if vk == wl_integer_type_kind() and tk == wl_integer_type_kind():
@@ -2116,10 +2122,14 @@ impl Codegen:
             return 0
         let resolved = self.mir_resolve_alias_at(sema_ty)
         let tk = self.mir_type_kind_at(resolved)
-        // A `&str` compares as the str it points at, not as a bare pointer (#293).
+        // A reference to a str — `&str`, or a reference to one (`&&str`, an
+        // element view of `[&str; N]`) — compares as the str it observes,
+        // never as a bare pointer (#293, §11.7).
         if tk == TypeKind.TY_REF:
             let ref_inner = self.mir_resolve_alias_at(self.mir_type_d0_at(resolved))
             if self.mir_type_kind_at(ref_inner) == TypeKind.TY_STR:
+                return 1
+            if self.mir_type_kind_at(ref_inner) == TypeKind.TY_REF and self.mir_compare_dispatch_kind(ref_inner) == 1:
                 return 1
         if tk == TypeKind.TY_STR:
             return 1
@@ -2136,15 +2146,17 @@ impl Codegen:
     mut fn mir_coerce_compare_operand(val: i64, sema_ty: i32) -> i64:
         if sema_ty <= 0:
             return val
-        // A `&str` operand is a pointer to the str aggregate; load it so it compares
-        // as a str value (#293).
+        // A reference to a str compares as the str (#293). A `&str` view is
+        // already the str's `{ptr, len}` (#1810); a pointer to one (`&&str`)
+        // loads the view; a `&mut str` points at the header itself.
         let cmp_resolved = self.mir_resolve_alias_at(sema_ty)
-        if self.mir_type_kind_at(cmp_resolved) == TypeKind.TY_REF:
+        if self.mir_type_kind_at(cmp_resolved) == TypeKind.TY_REF and not self.sema.type_layout_is_str_view(cmp_resolved) and wl_get_type_kind(wl_type_of(val)) == wl_pointer_type_kind():
             let cmp_inner = self.mir_type_d0_at(cmp_resolved)
-            if self.mir_type_kind_at(self.mir_resolve_alias_at(cmp_inner)) == TypeKind.TY_STR:
-                let cmp_str_ty = self.mir_sema_type_to_llvm(cmp_inner)
-                if cmp_str_ty != 0 and wl_get_type_kind(wl_type_of(val)) == wl_pointer_type_kind():
-                    return wl_build_load(self.builder, cmp_str_ty, val)
+            let cmp_inner_kind = self.mir_type_kind_at(self.mir_resolve_alias_at(cmp_inner))
+            if cmp_inner_kind == TypeKind.TY_STR or (cmp_inner_kind == TypeKind.TY_REF and self.mir_compare_dispatch_kind(cmp_inner) == 1):
+                let cmp_inner_ty = self.mir_sema_type_to_llvm(cmp_inner)
+                if cmp_inner_ty != 0:
+                    return self.mir_coerce_compare_operand(wl_build_load(self.builder, cmp_inner_ty, val), cmp_inner)
         let llvm_ty = self.mir_sema_type_to_llvm(sema_ty)
         if llvm_ty == 0 or wl_type_of(val) == llvm_ty:
             return val
@@ -2341,7 +2353,7 @@ impl Codegen:
         wl_position_at_end(self.builder, ok_bb)
         result
 
-    fn mir_build_checked_div_or_mod(op: i32, l: i64, r: i64, wider_ty: i64, is_unsigned: bool) -> i64:
+    mut fn mir_build_checked_div_or_mod(op: i32, l: i64, r: i64, wider_ty: i64, is_unsigned: bool) -> i64:
         let zero = wl_const_int(wider_ty, 0, 0)
         let div_zero = wl_build_icmp(self.builder, wl_int_eq(), r, zero)
         let zero_panic_bb = wl_append_bb(self.context, self.current_function, "arith.divzero")
@@ -2544,17 +2556,16 @@ impl Codegen:
         wl_get_undef(wl_i32_type(self.context))
 
     // #761: ++ lowers through the OBSERVING boundary form — operands are
-    // passed by header address, so a flip-built runtime body owns nothing
-    // and drops nothing.
+    // `&str` views (#1810: `{ptr, len}` by value), so a runtime body owns
+    // nothing and drops nothing.
     mut fn mir_str_concat(lhs: i64, rhs: i64) -> i64:
-        let str_ty = self.resolve_named_type(self.intern.intern("str"))
-        let ptr_ty = wl_ptr_type(self.context)
+        let str_ty = self.str_llvm_type()
         let param_types: Vec[i64] = Vec.new()
-        param_types.push(ptr_ty)
-        param_types.push(ptr_ty)
+        param_types.push(str_ty)
+        param_types.push(str_ty)
         let args: Vec[i64] = Vec.new()
-        args.push(self.build_str_ref_from_value(lhs))
-        args.push(self.build_str_ref_from_value(rhs))
+        args.push(self.str_view_arg(lhs))
+        args.push(self.str_view_arg(rhs))
         self.call_internal_runtime_fn("with_str_concat_ref", param_types, args, 2, str_ty)
 
     // A compound display (an enum variant's payloads, a struct's fields, an
@@ -2564,18 +2575,9 @@ impl Codegen:
     // leaked its pieces). with_str_free leaves a literal alone; its buffer is
     // not an owned payload.
     mut fn mir_fmt_join(lhs: i64, rhs: i64) -> i64:
-        let str_ty = self.resolve_named_type(self.intern.intern("str"))
-        let lhs_ref = self.build_str_ref_from_value(lhs)
-        let rhs_ref = self.build_str_ref_from_value(rhs)
-        let param_types: Vec[i64] = Vec.new()
-        param_types.push(wl_ptr_type(self.context))
-        param_types.push(wl_ptr_type(self.context))
-        let args: Vec[i64] = Vec.new()
-        args.push(lhs_ref)
-        args.push(rhs_ref)
-        let joined = self.call_internal_runtime_fn("with_str_concat_ref", param_types, args, 2, str_ty)
-        self.mir_emit_str_free_ptr(lhs_ref)
-        self.mir_emit_str_free_ptr(rhs_ref)
+        let joined = self.mir_str_concat(lhs, rhs)
+        self.mir_emit_str_free_ptr(self.str_header_slot(lhs))
+        self.mir_emit_str_free_ptr(self.str_header_slot(rhs))
         joined
 
     mut fn mir_str_concat_n(body: &MirBody, args_id: i32, move_first: i32) -> i64:
@@ -2864,17 +2866,14 @@ impl Codegen:
         a.push(coerced)
         self.call_internal_runtime_fn(fn_name, pts, a, 1, str_ty)
 
-    // #761: observing call — spill the operand and pass its ADDRESS (the
-    // callee takes &str). Spills unconditionally: the operand may carry a
-    // non-canonical str layout (the old identity-call was a bitcast trick),
-    // and the callee reads it as a header either way.
+    // #761: observing call — a runtime `fn(s: &str) -> str` over a str
+    // value, which it never owns. The `&str` is the value's own `{ptr, len}`
+    // (#1810), not the address of a spilled header.
     mut fn call_runtime_str_fn_ref(fn_name: &str, arg: i64, str_ty: i64) -> i64:
-        let slot = self.create_entry_alloca(wl_type_of(arg))
-        wl_build_store(self.builder, arg, slot)
         let pts: Vec[i64] = Vec.new()
-        pts.push(wl_ptr_type(self.context))
+        pts.push(self.str_llvm_type())
         let a: Vec[i64] = Vec.new()
-        a.push(slot)
+        a.push(self.str_view_arg(arg))
         self.call_internal_runtime_fn(fn_name, pts, a, 1, str_ty)
 
     mut fn call_runtime_str_fn(fn_name: &str, arg: i64, str_ty: i64) -> i64:
@@ -2937,6 +2936,10 @@ impl Codegen:
             // Unit has no storage to load (its LLVM type is void).
             if self.mir_display_type_kind(pointee) == TypeKind.TY_VOID:
                 return self.gen_string_literal_raw("()")
+            // A `&str` view is the str's own `{ptr, len}` (#1810): nothing
+            // to load through.
+            if self.sema.type_layout_is_str_view(resolved):
+                return self.coerce_typed_val_to_str(val, pointee, str_ty)
             let pointee_llvm = self.mir_sema_type_to_llvm(pointee)
             if pointee_llvm == 0 or wl_get_type_kind(pointee_llvm) == wl_void_type_kind():
                 sema_phase_bug(f"BUG: no loadable LLVM type for formatted reference pointee {pointee}")
@@ -2980,6 +2983,9 @@ impl Codegen:
             let pointee = self.mir_display_resolved_type(if resolved < self.mir_type_d0_len() as i32: self.mir_type_d0_at(resolved) else: self.sema.get_type_d0(resolved) as i32)
             if self.mir_display_type_kind(pointee) == TypeKind.TY_VOID:
                 return self.gen_string_literal_raw("()")
+            // A `&str` view is the str's own `{ptr, len}` (#1810).
+            if self.sema.type_layout_is_str_view(resolved):
+                return self.gen_debug_format(val, pointee, str_ty)
             let pointee_llvm = self.mir_sema_type_to_llvm(pointee)
             if pointee_llvm == 0 or wl_get_type_kind(pointee_llvm) == wl_void_type_kind():
                 sema_phase_bug(f"BUG: no loadable LLVM type for `:?` reference pointee {pointee}")
@@ -3200,14 +3206,14 @@ impl Codegen:
 
         // String spec: with_fmt_str_spec(val, flags, width, precision)
         if val_ty == str_ty:
-            // #761: observing form — pass the header address.
+            // #761: observing form — pass the `&str` view.
             let pts: Vec[i64] = Vec.new()
-            pts.push(wl_ptr_type(self.context))
+            pts.push(str_ty)
             pts.push(i64_ty)
             pts.push(i32_ty)
             pts.push(i32_ty)
             let a: Vec[i64] = Vec.new()
-            a.push(self.build_str_ref_from_value(val))
+            a.push(self.str_view_arg(val))
             a.push(wl_const_int(i64_ty, flags as i64, 0))
             a.push(wl_const_int(i32_ty, width as i64, 0))
             a.push(wl_const_int(i32_ty, precision as i64, 0))
@@ -3347,11 +3353,11 @@ impl Codegen:
         let args: Vec[i64] = Vec.new()
         self.build_call_fn_value(ft_sym, func, ft, -1, 0, args, 0, "with_fmt_buf_new", 0)
 
+    // `s` is a `&str` view, `{ptr, len}` (#1810).
     mut fn gen_fmt_buf_write_str_ref(buf: i64, s: i64):
-        let ptr_ty = wl_ptr_type(self.context)
         let pts: Vec[i64] = Vec.new()
-        pts.push(ptr_ty)
-        pts.push(ptr_ty)
+        pts.push(wl_ptr_type(self.context))
+        pts.push(self.str_llvm_type())
         let func = self.ensure_fmt_buf_fn("with_fmt_buf_write_str_ref", pts, 2, wl_void_type(self.context))
         let ft_sym = self.intern.intern("with_fmt_buf_write_str_ref")
         let ft = self.fn_fn_types.get(ft_sym).unwrap() as i64
@@ -3360,11 +3366,11 @@ impl Codegen:
         args.push(s)
         self.build_call_fn_value(ft_sym, func, ft, -1, 0, args, 2, "with_fmt_buf_write_str_ref", 0)
 
+    // `s` is a `&str` view, `{ptr, len}` (#1810); the result is an owned copy.
     mut fn gen_str_clone_ref(s: i64) -> i64:
-        let ptr_ty = wl_ptr_type(self.context)
-        let str_ty = self.resolve_named_type(self.intern.intern("str"))
+        let str_ty = self.str_llvm_type()
         let pts: Vec[i64] = Vec.new()
-        pts.push(ptr_ty)
+        pts.push(str_ty)
         let func = self.ensure_fmt_buf_fn("with_str_clone_ref", pts, 1, str_ty)
         let ft_sym = self.intern.intern("with_str_clone_ref")
         let ft = self.fn_fn_types.get(ft_sym).unwrap() as i64
@@ -3431,7 +3437,7 @@ impl Codegen:
             // #761: observing form — with_fmt_buf_write_str_spec_ref(buf, &val, ...)
             let pts: Vec[i64] = Vec.new()
             pts.push(ptr_ty)
-            pts.push(ptr_ty)
+            pts.push(self.str_llvm_type())
             pts.push(i64_ty)
             pts.push(i32_ty)
             pts.push(i32_ty)
@@ -3440,7 +3446,7 @@ impl Codegen:
             let ft = self.fn_fn_types.get(ft_sym).unwrap() as i64
             let args: Vec[i64] = Vec.new()
             args.push(buf)
-            args.push(self.build_str_ref_from_value(val))
+            args.push(self.str_view_arg(val))
             args.push(wl_const_int(i64_ty, flags as i64, 0))
             args.push(wl_const_int(i32_ty, width as i64, 0))
             args.push(wl_const_int(i32_ty, precision as i64, 0))
@@ -3606,6 +3612,12 @@ impl Codegen:
             let dyn_ref = self.mir_build_dyn_trait_value_from_ref_place(body, d1, ptr, dest_ty, dest_sema_ty)
             if wl_type_of(dyn_ref) == dest_ty:
                 return dyn_ref
+            // #1810: a shared reference to a str is the view `{ptr, len}` of
+            // the bytes the place holds, read out of it — not the place's
+            // address. A place whose view is taken is a str place, so its
+            // storage is a str header.
+            if self.mir_ref_rvalue_is_str_view(body, d0, d1, dest_sema_ty):
+                return wl_build_load(self.builder, self.mir_sema_type_to_llvm(self.sema.ty_str as i32), ptr)
             if dest_ty != 0 and wl_type_of(ptr) != dest_ty and wl_get_type_kind(dest_ty) == wl_pointer_type_kind():
                 return wl_build_bitcast(self.builder, ptr, dest_ty)
             return ptr
@@ -3858,6 +3870,23 @@ impl Codegen:
                 let resolved_cast_ty = self.mir_sema_type_to_llvm(d1)
                 if resolved_cast_ty != 0:
                     cast_ty = resolved_cast_ty
+            // #1810: `&str` is `{ptr, len}` by value. A raw pointer to a
+            // str header cast to `&str` reads the view out of that header;
+            // a view cast to a raw pointer names a header holding it — its
+            // own storage when it is a place, else a copy in this frame.
+            if d1 > 0 and self.sema.type_layout_is_str_view(d1):
+                let view_src = self.mir_eval_operand(body, d0, 0)
+                if wl_get_type_kind(wl_type_of(view_src)) == wl_pointer_type_kind():
+                    return wl_build_load(self.builder, cast_ty, view_src)
+                return view_src
+            if d2 > 0 and self.sema.type_layout_is_str_view(d2) and cast_ty != 0 and wl_get_type_kind(cast_ty) == wl_pointer_type_kind():
+                let view_place = self.mir_try_place_ptr_for_ref(body, d0)
+                if view_place != 0:
+                    return view_place
+                let view_val = self.mir_eval_operand(body, d0, 0)
+                let view_slot = self.create_entry_alloca(wl_type_of(view_val))
+                wl_build_store(self.builder, view_val, view_slot)
+                return view_slot
             if cast_ty != 0 and wl_get_type_kind(cast_ty) == wl_pointer_type_kind():
                 var src_tk = 0
                 if d2 > 0:
@@ -6202,20 +6231,6 @@ impl Codegen:
             return 0
         wl_build_load(self.builder, ptr_ty, storage_ptr)
 
-    fn sema_type_is_c_char_pointer(sema_ty: i32) -> i32:
-        if sema_ty <= 0:
-            return 0
-        let resolved = self.sema.resolve_alias(sema_ty as TypeId) as i32
-        let tk = self.sema.get_type_kind(resolved)
-        if tk != TypeKind.TY_PTR:
-            return 0
-        if self.sema.get_type_d1(resolved) != 0:
-            return 0
-        let pointee = self.sema.resolve_alias(self.sema.get_type_d0(resolved) as TypeId) as i32
-        if pointee == self.sema.ty_i8 as i32:
-            return 1
-        0
-
     fn sema_type_is_str_value_or_view(sema_ty: i32) -> i32:
         if sema_ty <= 0:
             return 0
@@ -6255,20 +6270,13 @@ impl Codegen:
         let str_ty = wl_type_of(str_val)
         if str_ty == 0:
             return str_val
-        // #761: observing form — pass the header address. The copy is lent
-        // from storage that stays readable after the call (§16.3c, D47).
-        var fn_val = wl_get_named_function(self.llmod, "with_cstr_lend")
-        if fn_val == 0:
-            let params: Vec[i64] = Vec.new()
-            params.push(wl_ptr_type(self.context))
-            let fn_ty = wl_function_type(wl_ptr_type(self.context), vec_data_i64(&params), 1, 0)
-            fn_val = wl_add_function(self.llmod, "with_cstr_lend", fn_ty)
-        if fn_val == 0:
-            return self.extract_str_ptr(str_val)
-        let fn_ty = wl_global_get_value_type(fn_val)
+        // #761: observing form — pass the `&str` view (#1810). The copy is
+        // lent from storage that stays readable after the call (§16.3c, D47).
+        let params: Vec[i64] = Vec.new()
+        params.push(str_ty)
         let args: Vec[i64] = Vec.new()
-        args.push(self.build_str_ref_from_value(str_val))
-        wl_build_call(self.builder, fn_ty, fn_val, vec_data_i64(&args), 1)
+        args.push(self.str_view_arg(str_val))
+        self.call_internal_runtime_fn("with_cstr_lend", params, args, 1, wl_ptr_type(self.context))
 
     fn free_call_temp_ptrs(ptrs: &Vec[i64]):
         if ptrs.len() == 0:
@@ -6297,10 +6305,10 @@ impl Codegen:
             let expected_kind = wl_get_type_kind(expected_ty)
             let actual_kind = wl_get_type_kind(wl_type_of(out))
             let literal_text = self.mir_operand_str_literal(body, operand_id)
-            if lends_c_strings != 0 and literal_text.found and expected_kind == wl_pointer_type_kind() and self.sema_type_is_c_char_pointer(expected_sema_ty) != 0:
+            if lends_c_strings != 0 and literal_text.found and expected_kind == wl_pointer_type_kind() and self.sema.sema_type_is_c_char_pointer(expected_sema_ty) != 0:
                 let direct = wl_build_global_string_ptr(self.builder, literal_text.text)
                 return CallArgValue { value: self.enforce_coerced_type(direct, expected_ty, "wrong argument type"), cleanup_ptr: 0 }
-            if lends_c_strings != 0 and expected_kind == wl_pointer_type_kind() and self.sema_type_is_c_char_pointer(expected_sema_ty) != 0 and self.sema_type_is_str_value_or_view(self.mir_operand_sema_type(body, operand_id)) != 0:
+            if lends_c_strings != 0 and expected_kind == wl_pointer_type_kind() and self.sema.sema_type_is_c_char_pointer(expected_sema_ty) != 0 and self.sema_type_is_str_value_or_view(self.mir_operand_sema_type(body, operand_id)) != 0:
                 var str_out = out
                 if actual_kind == wl_pointer_type_kind():
                     let str_ty = self.mir_sema_type_to_llvm(self.sema.ty_str as i32)
@@ -6582,7 +6590,7 @@ impl Codegen:
             return 0
         body.local_type_ids[local_id]
 
-    fn mir_convert_len_method_result(raw_len: i64, intrinsic: MirIntrinsic) -> i64:
+    mut fn mir_convert_len_method_result(raw_len: i64, intrinsic: MirIntrinsic) -> i64:
         let i64_ty = wl_i64_type(self.context)
         let i32_ty = wl_i32_type(self.context)
         let raw64 = self.coerce_int_ext(raw_len, i64_ty, true)
@@ -6617,6 +6625,51 @@ impl Codegen:
                         if elem_llvm != 0:
                             return self.abi_size_of(elem_llvm)
         8 // default for pointer-sized elements when sema data is unavailable
+
+    // #1810: the `&T` of a runtime slot's address. A thin reference is the
+    // address; a `&str` view is `{ptr, len}` read out of the slot.
+    mut fn mir_ref_from_slot_ptr(slot_ptr: i64, ref_sema_ty: i32) -> i64:
+        if self.sema.type_layout_is_str_view(ref_sema_ty):
+            return wl_build_load(self.builder, self.str_llvm_type(), slot_ptr)
+        slot_ptr
+
+    // #1810: the `Option[&T]` of a runtime lookup's slot address, null when
+    // absent. A thin `&T`'s Option is that nullable pointer (D22's niche);
+    // a `&str` view's Option is tagged, and its Some carries the view read
+    // out of the slot — a null address is never dereferenced.
+    mut fn mir_option_ref_from_slot_ptr(slot_ptr: i64, opt_sema_ty: i32) -> i64:
+        let opt_ty = self.mir_sema_type_to_llvm(opt_sema_ty)
+        self.option_ref_from_slot_ptr(slot_ptr, opt_ty)
+
+    mut fn option_ref_from_slot_ptr(slot_ptr: i64, opt_ty: i64) -> i64:
+        if opt_ty == 0 or wl_get_type_kind(opt_ty) == wl_pointer_type_kind():
+            return if opt_ty != 0: self.coerce_value_to_type(slot_ptr, opt_ty) else: slot_ptr
+        if wl_get_type_kind(opt_ty) != wl_struct_type_kind() or wl_count_struct_elem_types(opt_ty) < 2 or not self.is_str_type(wl_struct_get_type_at(opt_ty, 1)):
+            sema_phase_bug("BUG: a slot lookup's Option is tagged but does not carry a `&str` view")
+        let result_slot = self.create_entry_alloca(opt_ty)
+        let none_bb = wl_append_bb(self.context, self.current_function, "slot.opt.none")
+        let some_bb = wl_append_bb(self.context, self.current_function, "slot.opt.some")
+        let merge_bb = wl_append_bb(self.context, self.current_function, "slot.opt.merge")
+        let is_none = wl_build_icmp(self.builder, wl_int_eq(), slot_ptr, wl_const_null(wl_type_of(slot_ptr)))
+        wl_build_cond_br(self.builder, is_none, none_bb, some_bb)
+        wl_position_at_end(self.builder, none_bb)
+        wl_build_store(self.builder, self.build_option_none(opt_ty), result_slot)
+        wl_build_br(self.builder, merge_bb)
+        wl_position_at_end(self.builder, some_bb)
+        let view = wl_build_load(self.builder, wl_struct_get_type_at(opt_ty, 1), slot_ptr)
+        wl_build_store(self.builder, self.build_option_some(view, opt_ty), result_slot)
+        wl_build_br(self.builder, merge_bb)
+        wl_position_at_end(self.builder, merge_bb)
+        wl_build_load(self.builder, opt_ty, result_slot)
+
+    // #1810: whether `ref(borrow, place)` produces a `&str` view (a value
+    // read out of the str place) rather than a pointer to the place. The
+    // reference's own type decides; a destination MIR left untyped falls
+    // back to the rvalue's facts — a shared borrow of a str place.
+    mut fn mir_ref_rvalue_is_str_view(body: &MirBody, borrow: i32, place_id: i32, dest_sema_ty: i32) -> bool:
+        if dest_sema_ty > 0:
+            return self.sema.type_layout_is_str_view(dest_sema_ty)
+        borrow != BorrowKind.EXCLUSIVE and self.mir_type_kind_from_snapshot(self.mir_place_sema_type(body, place_id)) == TypeKind.TY_STR
 
     fn mir_type_kind_from_snapshot(sema_ty: i32) -> i32:
         if sema_ty <= 0:
@@ -6671,7 +6724,7 @@ impl Codegen:
             len_val = self.coerce_int(len_val, i64_ty)
         len_val
 
-    fn mir_emit_debug_index_bounds_check(idx_val: i64, idx_sema_ty: i32, len_val: i64):
+    mut fn mir_emit_debug_index_bounds_check(idx_val: i64, idx_sema_ty: i32, len_val: i64):
         if self.debug_info == 0 or len_val == 0:
             return
         let i64_ty = wl_i64_type(self.context)
@@ -6690,7 +6743,7 @@ impl Codegen:
         self.emit_runtime_panic("index out of bounds")
         wl_position_at_end(self.builder, ok_bb)
 
-    fn mir_emit_debug_slice_bounds_check(start_val: i64, end_val: i64, len_val: i64):
+    mut fn mir_emit_debug_slice_bounds_check(start_val: i64, end_val: i64, len_val: i64):
         if self.debug_info == 0 or len_val == 0:
             return
         let i64_ty = wl_i64_type(self.context)
@@ -6709,7 +6762,7 @@ impl Codegen:
     // D71 (§4.8a, #1587): a str range panics past the end or inside a UTF-8
     // character — in every build, not only with debug info: the view would
     // read outside the string or split a character.
-    fn mir_emit_str_slice_checks(start_val: i64, end_val: i64, len_val: i64, data_ptr: i64):
+    mut fn mir_emit_str_slice_checks(start_val: i64, end_val: i64, len_val: i64, data_ptr: i64):
         let i64_ty = wl_i64_type(self.context)
         let zero = wl_const_int(i64_ty, 0, 0)
         let bad_start = wl_build_icmp(self.builder, wl_int_slt(), start_val, zero)
@@ -6727,7 +6780,7 @@ impl Codegen:
 
     // A byte `10xxxxxx` continues a character, so an offset at one is inside
     // it; the offset equal to the length is the boundary after the last one.
-    fn mir_emit_str_char_boundary_check(off_val: i64, len_val: i64, data_ptr: i64):
+    mut fn mir_emit_str_char_boundary_check(off_val: i64, len_val: i64, data_ptr: i64):
         let i8_ty = wl_i8_type(self.context)
         let inside = wl_build_icmp(self.builder, wl_int_slt(), off_val, len_val)
         let byte_bb = wl_append_bb(self.context, self.current_function, "str.slice.byte")
@@ -8659,7 +8712,7 @@ impl Codegen:
             let gr_args: Vec[i64] = Vec.new()
             gr_args.push(gr_recv_ptr)
             gr_args.push(gr_idx64)
-            result = wl_build_call(self.builder, gr_ty, gr_fn, vec_data_i64(&gr_args), 2)
+            result = self.mir_ref_from_slot_ptr(wl_build_call(self.builder, gr_ty, gr_fn, vec_data_i64(&gr_args), 2), self.mir_intrinsic_dest_sema_type(body, dest_place))
 
         else if intrinsic == MirIntrinsic.VEC_LEN:
             let recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
@@ -8911,11 +8964,11 @@ impl Codegen:
             get_args.push(is_str_val)
             let value_ptr = wl_build_call(self.builder, fn_ty, fn_val, vec_data_i64(&get_args), 3)
             // D22: Option[&V] uses the same nullable-pointer niche representation
-            // as SlotMap.get: null is None, and a live value address is Some(&V).
-            // Any contextual Copy must already be explicit in MIR; codegen never
-            // chooses lookup ownership from V or the destination type.
-            let dest_llvm = self.mir_sema_type_to_llvm(self.mir_intrinsic_dest_sema_type(body, dest_place))
-            result = if dest_llvm != 0 and wl_get_type_kind(dest_llvm) == wl_pointer_type_kind(): self.coerce_value_to_type(value_ptr, dest_llvm) else: value_ptr
+            // as SlotMap.get: null is None, and a live value address is Some(&V)
+            // (a `&str` view's Option is tagged, #1810). Any contextual Copy
+            // must already be explicit in MIR; codegen never chooses lookup
+            // ownership from V or the destination type.
+            result = self.mir_option_ref_from_slot_ptr(value_ptr, self.mir_intrinsic_dest_sema_type(body, dest_place))
 
         else if intrinsic == MirIntrinsic.MAP_CONTAINS:
             let recv_op = body.call_arg_operands[arg_start]
@@ -8973,7 +9026,7 @@ impl Codegen:
                 let slot_ptr = wl_build_call(self.builder, self.hashmap_slot_runtime_fn_type(ptr_ty), at_fn, vec_data_i64(&slot_args), 2)
                 let dest_sema = self.mir_intrinsic_dest_sema_type(body, dest_place)
                 let dest_is_view = dest_sema > 0 and self.mir_type_kind_at(self.mir_resolve_alias_at(dest_sema)) == TypeKind.TY_REF
-                result = if dest_is_view: slot_ptr else: wl_build_load(self.builder, self.mir_dest_llvm_type(body, dest_place), slot_ptr)
+                result = if dest_is_view: self.mir_ref_from_slot_ptr(slot_ptr, dest_sema) else: wl_build_load(self.builder, self.mir_dest_llvm_type(body, dest_place), slot_ptr)
 
         else if intrinsic == MirIntrinsic.MAP_LEN32 or intrinsic == MirIntrinsic.MAP_LEN64 or intrinsic == MirIntrinsic.MAP_ULEN32:
             let map_ptr = self.mir_intrinsic_map_handle(body, args_id)
@@ -9254,8 +9307,7 @@ impl Codegen:
             sm_get_args.push(sm_idx)
             sm_get_args.push(sm_gen)
             let sm_ptr = wl_build_call(self.builder, sm_get_ty, sm_get_fn, vec_data_i64(&sm_get_args), 3)
-            let sm_dest_ty = self.mir_sema_type_to_llvm(self.mir_intrinsic_dest_sema_type(body, dest_place))
-            result = if sm_dest_ty != 0 and wl_get_type_kind(sm_dest_ty) == wl_pointer_type_kind(): self.coerce_value_to_type(sm_ptr, sm_dest_ty) else: sm_ptr
+            result = self.mir_option_ref_from_slot_ptr(sm_ptr, self.mir_intrinsic_dest_sema_type(body, dest_place))
 
         else if intrinsic == MirIntrinsic.SLOTMAP_SLOT:
             let sm_map = self.mir_intrinsic_slotmap_handle(body, args_id)
@@ -9813,7 +9865,8 @@ impl Codegen:
                             err_val = wl_build_load(self.builder, err_ty, wl_build_bitcast(self.builder, err_storage, wl_ptr_type(self.context)))
                         let str_ty = self.resolve_named_type(self.intern.intern("str"))
                         let prefix = if is_expect: user_msg else: self.gen_string_literal_raw("called unwrap on Err")
-                        self.emit_runtime_panic_value(self.gen_unwrap_err_message(prefix, err_val, err_sema, str_ty), loc)
+                        let err_msg = self.gen_unwrap_err_message(prefix, err_val, err_sema, str_ty)
+                        self.emit_runtime_panic_value(err_msg, loc)
                     else:
                         let msg = if is_expect: self.mir_str_concat(user_msg, self.gen_string_literal_raw(": None")) else: self.gen_string_literal_raw("called unwrap on None")
                         self.emit_runtime_panic_value(msg, loc)
@@ -9846,7 +9899,8 @@ impl Codegen:
                     let err_val = self.extract_result_payload(recv, err_ty)
                     let str_ty = self.resolve_named_type(self.intern.intern("str"))
                     let prefix = if is_expect: user_msg else: self.gen_string_literal_raw("called unwrap on Err")
-                    self.emit_runtime_panic_value(self.gen_unwrap_err_message(prefix, err_val, err_sema, str_ty), loc)
+                    let err_msg = self.gen_unwrap_err_message(prefix, err_val, err_sema, str_ty)
+                    self.emit_runtime_panic_value(err_msg, loc)
                 else:
                     let msg =
                         if is_expect:
@@ -9901,10 +9955,10 @@ impl Codegen:
             let index = self.mir_intrinsic_arg(body, args_id, 1)
             let index64 = self.coerce_int(index, i64_ty)
             let param_types: Vec[i64] = Vec.new()
-            param_types.push(wl_ptr_type(self.context))
+            param_types.push(self.str_llvm_type())
             param_types.push(i64_ty)
             let args: Vec[i64] = Vec.new()
-            args.push(self.build_str_ref_from_value(recv))
+            args.push(self.str_view_arg(recv))
             args.push(index64)
             result = self.call_internal_runtime_fn("with_str_byte_at_ref", param_types, args, 2, i32_ty)
 
@@ -9923,11 +9977,11 @@ impl Codegen:
             let end64 = self.coerce_int(end, i64_ty)
             let str_ty = self.resolve_named_type(self.intern.intern("str"))
             let param_types: Vec[i64] = Vec.new()
-            param_types.push(wl_ptr_type(self.context))
+            param_types.push(self.str_llvm_type())
             param_types.push(i64_ty)
             param_types.push(i64_ty)
             let args: Vec[i64] = Vec.new()
-            args.push(self.build_str_ref_from_value(recv))
+            args.push(self.str_view_arg(recv))
             args.push(start64)
             args.push(end64)
             result = self.call_internal_runtime_fn("with_str_slice_ref", param_types, args, 3, str_ty)
@@ -9936,11 +9990,11 @@ impl Codegen:
             let recv = self.mir_intrinsic_recv_str_value(body, args_id)
             let needle = self.mir_intrinsic_arg_str_value(body, args_id, 1)
             let param_types: Vec[i64] = Vec.new()
-            param_types.push(wl_ptr_type(self.context))
-            param_types.push(wl_ptr_type(self.context))
+            param_types.push(self.str_llvm_type())
+            param_types.push(self.str_llvm_type())
             let args: Vec[i64] = Vec.new()
-            args.push(self.build_str_ref_from_value(recv))
-            args.push(self.build_str_ref_from_value(needle))
+            args.push(self.str_view_arg(recv))
+            args.push(self.str_view_arg(needle))
             let raw = self.call_internal_runtime_fn("with_str_contains_ref", param_types, args, 2, i32_ty)
             result = wl_build_icmp(self.builder, wl_int_ne(), raw, wl_const_int(i32_ty, 0, 0))
 
@@ -9948,10 +10002,10 @@ impl Codegen:
             let recv = self.mir_intrinsic_recv_str_value(body, args_id)
             let ch = self.mir_intrinsic_arg(body, args_id, 1)
             let param_types: Vec[i64] = Vec.new()
-            param_types.push(wl_ptr_type(self.context))
+            param_types.push(self.str_llvm_type())
             param_types.push(i32_ty)
             let args: Vec[i64] = Vec.new()
-            args.push(self.build_str_ref_from_value(recv))
+            args.push(self.str_view_arg(recv))
             args.push(ch)
             let raw = self.call_internal_runtime_fn("with_str_contains_char_ref", param_types, args, 2, i32_ty)
             result = wl_build_icmp(self.builder, wl_int_ne(), raw, wl_const_int(i32_ty, 0, 0))
@@ -9960,11 +10014,11 @@ impl Codegen:
             let recv = self.mir_intrinsic_recv_str_value(body, args_id)
             let prefix = self.mir_intrinsic_arg_str_value(body, args_id, 1)
             let param_types: Vec[i64] = Vec.new()
-            param_types.push(wl_ptr_type(self.context))
-            param_types.push(wl_ptr_type(self.context))
+            param_types.push(self.str_llvm_type())
+            param_types.push(self.str_llvm_type())
             let args: Vec[i64] = Vec.new()
-            args.push(self.build_str_ref_from_value(recv))
-            args.push(self.build_str_ref_from_value(prefix))
+            args.push(self.str_view_arg(recv))
+            args.push(self.str_view_arg(prefix))
             let raw = self.call_internal_runtime_fn("with_str_starts_with_ref", param_types, args, 2, i32_ty)
             result = wl_build_icmp(self.builder, wl_int_ne(), raw, wl_const_int(i32_ty, 0, 0))
 
@@ -9972,11 +10026,11 @@ impl Codegen:
             let recv = self.mir_intrinsic_recv_str_value(body, args_id)
             let suffix = self.mir_intrinsic_arg_str_value(body, args_id, 1)
             let param_types: Vec[i64] = Vec.new()
-            param_types.push(wl_ptr_type(self.context))
-            param_types.push(wl_ptr_type(self.context))
+            param_types.push(self.str_llvm_type())
+            param_types.push(self.str_llvm_type())
             let args: Vec[i64] = Vec.new()
-            args.push(self.build_str_ref_from_value(recv))
-            args.push(self.build_str_ref_from_value(suffix))
+            args.push(self.str_view_arg(recv))
+            args.push(self.str_view_arg(suffix))
             let raw = self.call_internal_runtime_fn("with_str_ends_with_ref", param_types, args, 2, i32_ty)
             result = wl_build_icmp(self.builder, wl_int_ne(), raw, wl_const_int(i32_ty, 0, 0))
 
@@ -9984,11 +10038,11 @@ impl Codegen:
             let recv = self.mir_intrinsic_recv_str_value(body, args_id)
             let needle = self.mir_intrinsic_arg_str_value(body, args_id, 1)
             let param_types: Vec[i64] = Vec.new()
-            param_types.push(wl_ptr_type(self.context))
-            param_types.push(wl_ptr_type(self.context))
+            param_types.push(self.str_llvm_type())
+            param_types.push(self.str_llvm_type())
             let args: Vec[i64] = Vec.new()
-            args.push(self.build_str_ref_from_value(recv))
-            args.push(self.build_str_ref_from_value(needle))
+            args.push(self.str_view_arg(recv))
+            args.push(self.str_view_arg(needle))
             result = self.call_internal_runtime_fn("with_str_index_of_ref", param_types, args, 2, i64_ty)
 
         else if intrinsic == MirIntrinsic.VECITER_NEXT:
@@ -10148,7 +10202,7 @@ impl Codegen:
             irn_phi_bbs.push(irn_some_bb_end)
             irn_phi_bbs.push(irn_none_bb_end)
             wl_add_incoming(irn_phi, vec_data_i64(&irn_phi_vals), vec_data_i64(&irn_phi_bbs), 2)
-            result = irn_phi
+            result = self.mir_option_ref_from_slot_ptr(irn_phi, self.mir_intrinsic_dest_sema_type(body, dest_place))
 
         else if intrinsic == MirIntrinsic.VEC_SLOT:
             // Vec.slot(index) — create VecSlot[T] from Vec
@@ -11096,27 +11150,27 @@ impl Codegen:
             let r1 = self.mir_intrinsic_recv_str_value(body, args_id)
             let t1 = wl_type_of(r1)
             let p1: Vec[i64] = Vec.new()
-            p1.push(wl_ptr_type(self.context))
+            p1.push(self.str_llvm_type())
             let a1: Vec[i64] = Vec.new()
-            a1.push(self.build_str_ref_from_value(r1))
+            a1.push(self.str_view_arg(r1))
             result = self.call_internal_runtime_fn("with_str_trim_ref", p1, a1, 1, t1)
 
         else if intrinsic == MirIntrinsic.STR_TO_UPPER:
             let r2 = self.mir_intrinsic_recv_str_value(body, args_id)
             let t2 = wl_type_of(r2)
             let p2: Vec[i64] = Vec.new()
-            p2.push(wl_ptr_type(self.context))
+            p2.push(self.str_llvm_type())
             let a2: Vec[i64] = Vec.new()
-            a2.push(self.build_str_ref_from_value(r2))
+            a2.push(self.str_view_arg(r2))
             result = self.call_internal_runtime_fn("with_str_to_upper_ref", p2, a2, 1, t2)
 
         else if intrinsic == MirIntrinsic.STR_TO_LOWER:
             let r3 = self.mir_intrinsic_recv_str_value(body, args_id)
             let t3 = wl_type_of(r3)
             let p3: Vec[i64] = Vec.new()
-            p3.push(wl_ptr_type(self.context))
+            p3.push(self.str_llvm_type())
             let a3: Vec[i64] = Vec.new()
-            a3.push(self.build_str_ref_from_value(r3))
+            a3.push(self.str_view_arg(r3))
             result = self.call_internal_runtime_fn("with_str_to_lower_ref", p3, a3, 1, t3)
 
         else if intrinsic == MirIntrinsic.STR_REPLACE:
@@ -11125,13 +11179,13 @@ impl Codegen:
             let s4a = self.mir_intrinsic_arg_str_value(body, args_id, 1)
             let s4b = self.mir_intrinsic_arg_str_value(body, args_id, 2)
             let p4: Vec[i64] = Vec.new()
-            p4.push(wl_ptr_type(self.context))
-            p4.push(wl_ptr_type(self.context))
-            p4.push(wl_ptr_type(self.context))
+            p4.push(self.str_llvm_type())
+            p4.push(self.str_llvm_type())
+            p4.push(self.str_llvm_type())
             let a4: Vec[i64] = Vec.new()
-            a4.push(self.build_str_ref_from_value(r4))
-            a4.push(self.build_str_ref_from_value(s4a))
-            a4.push(self.build_str_ref_from_value(s4b))
+            a4.push(self.str_view_arg(r4))
+            a4.push(self.str_view_arg(s4a))
+            a4.push(self.str_view_arg(s4b))
             result = self.call_internal_runtime_fn("with_str_replace_ref", p4, a4, 3, t4)
 
         else if intrinsic == MirIntrinsic.STR_SPLIT:
@@ -11142,12 +11196,12 @@ impl Codegen:
             let out6 = self.create_entry_alloca(vt6)
             let p6: Vec[i64] = Vec.new()
             p6.push(wl_ptr_type(self.context))
-            p6.push(wl_ptr_type(self.context))
-            p6.push(wl_ptr_type(self.context))
+            p6.push(self.str_llvm_type())
+            p6.push(self.str_llvm_type())
             let a6: Vec[i64] = Vec.new()
             a6.push(out6)
-            a6.push(self.build_str_ref_from_value(r6))
-            a6.push(self.build_str_ref_from_value(d6))
+            a6.push(self.str_view_arg(r6))
+            a6.push(self.str_view_arg(d6))
             let _ = self.call_internal_runtime_fn("with_str_split_vec_ref", p6, a6, 3, wl_void_type(self.context))
             result = wl_build_load(self.builder, vt6, out6)
 
@@ -11155,11 +11209,11 @@ impl Codegen:
             let r5 = self.mir_intrinsic_recv_str_value(body, args_id)
             let n5 = self.mir_intrinsic_arg_str_value(body, args_id, 1)
             let p5: Vec[i64] = Vec.new()
-            p5.push(wl_ptr_type(self.context))
-            p5.push(wl_ptr_type(self.context))
+            p5.push(self.str_llvm_type())
+            p5.push(self.str_llvm_type())
             let a5: Vec[i64] = Vec.new()
-            a5.push(self.build_str_ref_from_value(r5))
-            a5.push(self.build_str_ref_from_value(n5))
+            a5.push(self.str_view_arg(r5))
+            a5.push(self.str_view_arg(n5))
             result = self.call_internal_runtime_fn("with_str_index_of_ref", p5, a5, 2, i64_ty)
 
         else if intrinsic == MirIntrinsic.MAP_INCREMENT or intrinsic == MirIntrinsic.MAP_DECREMENT:
@@ -11265,10 +11319,10 @@ impl Codegen:
             let sr_n64 = self.coerce_int(sr_n, i64_ty)
             let sr_ty = wl_type_of(sr_recv)
             let sr_params: Vec[i64] = Vec.new()
-            sr_params.push(wl_ptr_type(self.context))
+            sr_params.push(self.str_llvm_type())
             sr_params.push(i64_ty)
             let sr_args: Vec[i64] = Vec.new()
-            sr_args.push(self.build_str_ref_from_value(sr_recv))
+            sr_args.push(self.str_view_arg(sr_recv))
             sr_args.push(sr_n64)
             result = self.call_internal_runtime_fn("with_str_repeat_ref", sr_params, sr_args, 2, sr_ty)
 
@@ -11648,45 +11702,19 @@ impl Codegen:
         else if intrinsic == MirIntrinsic.VEC_JOIN:
             let vj_recv = self.mir_intrinsic_recv_vec_value(body, args_id)
             let vj_sep = self.mir_intrinsic_arg(body, args_id, 1)
-            let vj_str_sym = self.intern.intern("str")
-            let vj_str_ty = self.struct_llvm_types[self.struct_type_map.get(vj_str_sym).unwrap()]
-            let vj_ptr_ty = wl_ptr_type(self.context)
-            var vj_fn = wl_get_named_function(self.llmod, "with_vec_str_join")
+            let vj_str_ty = self.str_llvm_type()
             let vj_alloca = self.create_entry_alloca(wl_type_of(vj_recv))
             wl_build_store(self.builder, vj_recv, vj_alloca)
-            // sep is a &str parameter (D30 R1b): a plain pointer on every
-            // target, so only the str RETURN differs per ABI (sret on
-            // Windows x86_64, by-value on SysV).
-            let vj_sep_alloca = self.create_entry_alloca(vj_str_ty)
-            wl_build_store(self.builder, vj_sep, vj_sep_alloca)
-            if codegen_windows_x86_64():
-                let vj_ret = self.create_entry_alloca(vj_str_ty)
-                let vj_params: Vec[i64] = Vec.new()
-                vj_params.push(vj_ptr_ty)
-                vj_params.push(vj_ptr_ty)
-                vj_params.push(vj_ptr_ty)
-                let vj_ft = wl_function_type(wl_void_type(self.context), vec_data_i64(&vj_params), 3, 0)
-                if vj_fn == 0:
-                    vj_fn = wl_add_function(self.llmod, "with_vec_str_join", vj_ft)
-                    wl_add_sret_attr(self.context, vj_fn, 0, vj_str_ty)
-                let vj_args: Vec[i64] = Vec.new()
-                vj_args.push(vj_ret)
-                vj_args.push(vj_alloca)
-                vj_args.push(vj_sep_alloca)
-                let call = wl_build_call(self.builder, vj_ft, vj_fn, vec_data_i64(&vj_args), 3)
-                wl_add_call_sret_attr(self.context, call, 0, vj_str_ty)
-                result = wl_build_load(self.builder, vj_str_ty, vj_ret)
-            else:
-                let vj_params: Vec[i64] = Vec.new()
-                vj_params.push(vj_ptr_ty)
-                vj_params.push(vj_ptr_ty)
-                let vj_ft = wl_function_type(vj_str_ty, vec_data_i64(&vj_params), 2, 0)
-                if vj_fn == 0:
-                    vj_fn = wl_add_function(self.llmod, "with_vec_str_join", vj_ft)
-                let vj_args: Vec[i64] = Vec.new()
-                vj_args.push(vj_alloca)
-                vj_args.push(vj_sep_alloca)
-                result = wl_build_call(self.builder, vj_ft, vj_fn, vec_data_i64(&vj_args), 2)
+            // `with_vec_str_join(parts: *mut u8, sep: &str) -> str`: the
+            // separator is a `&str` view (#1810) and both it and the str
+            // result cross as the FnAbi descriptor says for this target.
+            let vj_params: Vec[i64] = Vec.new()
+            vj_params.push(wl_ptr_type(self.context))
+            vj_params.push(vj_str_ty)
+            let vj_args: Vec[i64] = Vec.new()
+            vj_args.push(vj_alloca)
+            vj_args.push(self.str_view_arg(vj_sep))
+            result = self.call_internal_runtime_fn("with_vec_str_join", vj_params, vj_args, 2, vj_str_ty)
 
         else:
             return false
@@ -11780,7 +11808,7 @@ impl Codegen:
             let fb_buf = self.mir_intrinsic_arg(body, args_id, 0)
             let fb_str = self.mir_intrinsic_arg(body, args_id, 1)
             // #761: observing form — pass the header address.
-            self.gen_fmt_buf_write_str_ref(fb_buf, self.build_str_ref_from_value(fb_str))
+            self.gen_fmt_buf_write_str_ref(fb_buf, self.str_view_arg(fb_str))
             result = wl_const_int(wl_i32_type(self.context), 0, 0)
 
         else if intrinsic == MirIntrinsic.FMT_BUF_WRITE_STR_REF:
@@ -12238,7 +12266,7 @@ impl Codegen:
                 indices.push(wl_const_int(i32_ty, ci as i64, 0))
                 let old_slot = wl_build_gep(self.builder, cap_struct_type, old_env, vec_data_i64(&indices), 2)
                 let new_slot = wl_build_gep(self.builder, cap_struct_type, new_env, vec_data_i64(&indices), 2)
-                wl_build_store(self.builder, self.gen_str_clone_ref(old_slot), new_slot)
+                wl_build_store(self.builder, self.gen_str_clone_ref(wl_build_load(self.builder, self.str_llvm_type(), old_slot)), new_slot)
         let _ = wl_build_ret(self.builder, new_cell)
         self.current_function = saved_fn
         self.current_function_name_sym = saved_fn_name_sym
@@ -12582,7 +12610,7 @@ impl Codegen:
             let raw_elem_tid = self.mir_generic_arg_tid(iter_sema, 0)
             let raw_elem_ty0 = self.mir_sema_type_to_llvm(raw_elem_tid)
             let raw_elem_ty = if raw_elem_ty0 != 0: raw_elem_ty0 else: self.type_fallback()
-            return self.mir_emit_veciterref_next_from_ptr(iter_ptr, raw_elem_ty)
+            return self.option_ref_from_slot_ptr(self.mir_emit_veciterref_next_from_ptr(iter_ptr, raw_elem_ty), opt_type)
         let iter_ty = self.mir_sema_type_to_llvm(iter_sema)
         if iter_ty == 0:
             with_eprint("error: iterator codegen missing LLVM type for iterator '" ++ name ++ "'")
@@ -18813,11 +18841,18 @@ impl Codegen:
         result = wl_build_insert_value(self.builder, result, len, 1)
         result
 
-    fn build_str_ref_from_value(value: i64) -> i64:
-        let str_ty = wl_type_of(value)
-        if not self.is_str_type(str_ty):
-            return value
-        let slot = self.create_entry_alloca(str_ty)
+    // #1810: the `&str` argument a runtime seam receives for a str value.
+    // A `&str` is `{ptr, len}` by value — the header's own bits — so the
+    // view of a str value is that value; no header address is taken.
+    fn str_view_arg(value: i64) -> i64:
+        if not self.is_str_type(wl_type_of(value)):
+            sema_phase_bug(f"BUG: a `&str` runtime argument is not a str value (LLVM type kind {wl_get_type_kind(wl_type_of(value))})")
+        value
+
+    // A str header in this frame's memory holding `value` — for the runtime
+    // entry points that take the header's address (with_str_free).
+    fn str_header_slot(value: i64) -> i64:
+        let slot = self.create_entry_alloca(wl_type_of(value))
         wl_build_store(self.builder, value, slot)
         slot
 
@@ -18891,65 +18926,40 @@ impl Codegen:
             sema_phase_bug(f"BUG: runtime helper '{name}' declared with {param_count} parameters; its prototype has {params.len()}")
         wl_function_type(ret_ty, vec_data_i64(&params), params.len() as i32, 0)
 
-    fn emit_runtime_panic(msg: &str) -> Unit:
+    mut fn emit_runtime_panic(msg: &str) -> Unit:
         self.emit_runtime_panic_value(self.gen_string_literal_raw(msg), self.gen_string_literal_raw(""))
 
     // Emit a call to the runtime panic surface from a compiler-generated check
     // (bounds, overflow, unwrap-None, …). `msg`/`loc` are str *values*.
     //
-    // We route through `with_panic_ref(&str, &str, i32)`, NOT `with_panic(str,
-    // str, i32)`: a `&str` parameter is a plain pointer (never a >8-byte
-    // aggregate), so its physical ABI is identical on every target. A by-value
-    // `str` is a 16-byte struct, and `internal_abi_needs_indirect_param` passes
-    // it INDIRECT on Windows x86_64 but by-value on SysV — so hand-rolling a
-    // by-value `with_panic` call here (declaring the params as by-value str and
-    // passing loaded struct values) diverged from the callee's real Windows ABI.
-    // The by-value caller splits the struct across two registers ({ptr in rcx,
-    // len in rdx}); the Windows callee expects ONE indirect pointer per str and
-    // loads the struct through it, so it dereferences rdx — the length — as an
-    // address. Observed under wine: `movups (%rdx),%xmm0` with rdx=0x15 (the
-    // length of "called unwrap on None") -> page fault / access violation
-    // (0xC0000005; exit 1 on native Windows, 5 under wine — never the intended
-    // 134). This is the same normal-path route the library `panic()` ->
-    // `with_panic_ref` already takes, which is why library panics work on
-    // Windows. Spill each str value to a slot and pass its address.
-    fn emit_runtime_panic_value(msg: i64, loc: i64) -> Unit:
+    // `with_panic_ref(msg: &str, file: &str, line: i32)`: its `&str`
+    // parameters are views, `{ptr, len}` (#1810), passed as the FnAbi
+    // descriptor call_internal_runtime_fn computes and reads says — a 16-byte
+    // aggregate by value, or indirect on Windows x86_64 — never a per-path
+    // choice (D6: a hand-rolled by-value `with_panic` call once split a str
+    // across two registers where the Windows callee loaded ONE indirect
+    // pointer, and dereferenced the length).
+    //
+    // A compiler-emitted panic can be lowered into a locally built wrapper
+    // (emit_runtime_fiber_config) while current_function is still the
+    // previous body; an alloca placed there would be referenced across
+    // functions. The builder's insert function is authoritative, so the call
+    // is emitted with it as the current function.
+    mut fn emit_runtime_panic_value(msg: i64, loc: i64) -> Unit:
         let str_ty = self.str_llvm_type()
-        // Spill into the function the builder is *actually* positioned in, not
-        // self.current_function: a compiler-emitted panic can be lowered into a
-        // locally-built wrapper (e.g. emit_runtime_fiber_config's config panic
-        // block) where current_function is still the previous body, and an
-        // alloca placed there would be referenced across functions ("instruction
-        // in another function" verify error). The builder's insert function is
-        // authoritative and equals current_function on the normal body path.
-        let host_fn = wl_get_insert_function(self.builder)
-        let msg_slot = wl_create_entry_alloca(self.builder, host_fn, str_ty)
-        wl_build_store(self.builder, msg, msg_slot)
-        let loc_slot = wl_create_entry_alloca(self.builder, host_fn, str_ty)
-        wl_build_store(self.builder, loc, loc_slot)
-        let panic_fn = self.ensure_panic_ref_fn()
-        let panic_ty = self.panic_ref_fn_type()
-        let args: Vec[i64] = Vec.new()
-        args.push(msg_slot)
-        args.push(loc_slot)
-        args.push(wl_const_int(wl_i32_type(self.context), 0, 0))
-        let _call = wl_build_call(self.builder, panic_ty, panic_fn, vec_data_i64(&args), 3)
-        let _unreachable = wl_build_unreachable(self.builder)
-
-    // `with_panic_ref(&str, &str, i32) -> void` — params are references, i.e.
-    // plain pointers, so the type is the same on every target (no indirect-
-    // aggregate ABI question). Declared once, reused by every emitted panic.
-    fn panic_ref_fn_type() -> i64:
+        let saved_fn: i64 = self.current_function
+        self.current_function = wl_get_insert_function(self.builder)
         let params: Vec[i64] = Vec.new()
-        params.push(wl_ptr_type(self.context))
-        params.push(wl_ptr_type(self.context))
+        params.push(str_ty)
+        params.push(str_ty)
         params.push(wl_i32_type(self.context))
-        wl_function_type(wl_void_type(self.context), vec_data_i64(&params), 3, 0)
-
-    fn ensure_panic_ref_fn() -> i64:
-        let existing = wl_get_named_function(self.llmod, "with_panic_ref")
-        if existing != 0: return existing
-        wl_add_function(self.llmod, "with_panic_ref", self.panic_ref_fn_type())
+        let args: Vec[i64] = Vec.new()
+        args.push(self.str_view_arg(msg))
+        args.push(self.str_view_arg(loc))
+        args.push(wl_const_int(wl_i32_type(self.context), 0, 0))
+        let _call = self.call_internal_runtime_fn("with_panic_ref", params, args, 3, wl_void_type(self.context))
+        let _unreachable = wl_build_unreachable(self.builder)
+        self.current_function = saved_fn
 
     // ── VecIter.next() codegen intrinsic ──────────────────────────────
     // VecIter[T] = { data_ptr: i64, len: i64, idx: i64 }
