@@ -772,7 +772,7 @@ fn sdk_insert_line_after(ctx: &ActionCtx, path: &str, anchor: &str, line: &str) 
         return sdk_fail(ctx, "arm64e.x1 backport (#1826): expected exactly one anchor line in " ++ path ++ f", found {anchors}: `" ++ anchor ++ "`")
     if fs.write_text(path, out.to_str()) != 0:
         return sdk_fail(ctx, "arm64e.x1 backport (#1826): could not write " ++ path)
-    print("sdk-llvm-source: applied the arm64e.x1 backport (#1826) to " ++ sdk_basename(path))
+
     0
 
 fn sdk_jobs_arg(jobs: &str) -> Vec[str]:

@@ -467,6 +467,9 @@ pub fn run_sdk_host_link_check_action(ctx: ActionCtx) -> i32:
     let output_path = ctx.output()
     if output_path.len() == 0:
         return comp_fail(ctx, "requires an output path")
+    // LLVM_PREFIX is this action's env_input: the check is about one linker,
+    // and a different SDK re-runs it.
+    let _llvm_prefix = ctx.env_input("LLVM_PREFIX")
     let llvm_ld = comp_llvm_lld_tool(comp_llvm_prefix_for_root(ctx.project_info().project_root()))
     if not fs.host_exists(llvm_ld):
         return comp_fail(ctx, "missing LLVM linker: " ++ llvm_ld)
@@ -474,8 +477,12 @@ pub fn run_sdk_host_link_check_action(ctx: ActionCtx) -> i32:
     let rc = comp_require_linkable_host_sdk(ctx, llvm_ld, sdk_path)
     if rc != 0:
         return rc
-    print("sdk-host-link-check: " ++ llvm_ld ++ " (LLVM " ++ COMPILER_LLVM_VERSION ++ ") reads " ++ sdk_path)
-    if fs.write_text(output_path, sdk_path ++ "\n") != 0:
+    // No print here: the pinned seed evaluates a standalone action in a
+    // built tree at comptime, where print (generic over Display) does not
+    // resolve; the output file is the verdict and the canary lane prints it.
+    let verdict = llvm_ld ++ " (LLVM " ++ COMPILER_LLVM_VERSION ++ ") reads " ++ sdk_path ++ "\n"
+
+    if fs.write_text(output_path, verdict) != 0:
         return comp_fail(ctx, "could not write: " ++ output_path)
     0
 

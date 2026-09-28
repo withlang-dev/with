@@ -91,7 +91,10 @@ jobs:
       # (build/compiler.w comp_require_linkable_host_sdk), for example:
       #   unreadable: …/MacOSX27.0.sdk/usr/lib/libSystem.tbd:4:20: unknown architecture 'arm64e.x1-macos'
       - name: Pre-stage SDK link check
-        run: src/main build :sdk-host-link-check
+        run: |
+          set -euo pipefail
+          src/main build :sdk-host-link-check
+          cat out/.build-state/sdk-host-link-check.txt
 
       - name: Upload the probe captures on failure
         if: failure()
