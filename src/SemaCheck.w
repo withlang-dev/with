@@ -5881,6 +5881,11 @@ impl Sema:
             return false
         self.get_type_kind(self.resolve_alias(tid as TypeId)) == TypeKind.TY_FN
 
+    // Whether a value of this type can hold a view: an ephemeral type
+    // (Rule 1-3, §22.1), or one that can hold a callable (below).
+    mut fn type_can_carry_view(tid: i32) -> bool:
+        tid > 0 and (self.type_is_ephemeral_value(tid) != 0 or self.type_holds_callable(tid, 0))
+
     // Whether a value of this type can hold a callable — the one place a
     // view hides behind a type that is not ephemeral (§12.4, D63): `fn(A) ->
     // R`, or an aggregate, variant or collection with one inside. A binding
@@ -12132,7 +12137,7 @@ impl Sema:
                 // argument views (D65: the callee's summary decides).
                 if param_i > 0 and store_target > 0 and (self.sig_param_effect(sig_idx, param_i) & EFF_STORE_IN_RECEIVER) != 0:
                     let stored_ty = self.typed_expr_types.get(arg_node) ?? 0
-                    self.note_view_store(store_target, arg_node, stored_ty, call_node, "this call")
+                    self.note_view_store(store_target, arg_node, stored_ty, self.sig_param_type(sig_idx, param_i), call_node, "this call")
                 // #D5/P0: record caller-param → callee-param edge (method path).
                 self.record_effect_edge(sig_idx, param_i, arg_node)
                 // D5/P1 §3.8: method arguments use the same deferred ownership
@@ -12459,8 +12464,8 @@ impl Sema:
         // #1783 (§21.1): a view written into a field or element (`h.r = x`,
         // `h.v[i] = x`) is stored into what the target's root reaches — the
         // same store as `h.v.push(x)`.
-        if self.ast.kind(target) != NodeKind.NK_IDENT and value_type != 0 and (self.type_is_ephemeral_value(value_type as i32) != 0 or self.expr_is_ephemeral_value(value) != 0):
-            self.note_view_store(target, value, value_type as i32, node, "this assignment")
+        if self.ast.kind(target) != NodeKind.NK_IDENT and value_type != 0:
+            self.note_view_store(target, value, value_type as i32, target_type as i32, node, "this assignment")
 
         // §9.1 / D73: in a value position the assignment yields a read of
         // `place` after the store, a view (assign_reads_view). A non-Copy
@@ -23906,13 +23911,31 @@ impl Sema:
     // its receiver (`h.keep(x)`). The storage is what the place's ROOT owns
     // or views, whatever the path's spelling (D65: the fact is the store,
     // not the receiver's syntax); `how` names the statement for the
-    // diagnostic ("this call", "this assignment").
-    mut fn note_view_store(target: i32, value: i32, value_ty: i32, node: i32, how: &str):
+    // diagnostic ("this call", "this assignment"). `slot_ty` is the type of
+    // the storage slot the value lands in (the element, the field, the
+    // parameter) — 0 when no slot type is known.
+    // Only a value that can hold a view stores one: its type, or the
+    // slot's, is a view or contains one, or can hold a callable (a
+    // non-`move` closure is a view behind `fn(A) -> R`, §12.4), or it is
+    // an ephemeral task. A Copy read through a reference (`seen[i] = *v`,
+    // `xs.push(*r)`) stores an independent value, whatever its expression
+    // was derived from.
+    mut fn note_view_store(target: i32, value: i32, value_ty: i32, slot_ty: i32, node: i32, how: &str):
         let root = self.place_root_sym(target)
         if root == 0 or self.scope_has(root) == 0:
             return
+        let value_carries = value_ty <= 0 or self.type_can_carry_view(value_ty) or self.expr_is_ephemeral_task(value) != 0
+        if not value_carries and not self.type_can_carry_view(slot_ty):
+            return
         var value_deps: Vec[i32] = Vec.new()
         value_deps = self.collect_expr_view_deps(value, move value_deps)
+        // §3.8 auto-referencing: a plain place reaching a `&T` slot
+        // (`h.keep(n)`, `h.v.push(n)` into `Vec[&i32]`) stores `&n`, so the
+        // place's storage is an origin, as `&n` spelled out would be.
+        if not value_carries and slot_ty > 0 and self.get_type_kind(self.resolve_alias(slot_ty as TypeId)) == TypeKind.TY_REF:
+            let place_root = self.ref_storage_root_sym(value)
+            if place_root != 0:
+                value_deps = self.push_unique_i32(move value_deps, place_root)
         self.note_view_store_into_root(root, value_deps, self.compute_expr_view_origin_mask(value), value_ty, node, how)
 
     // The store itself: a value with view origins `value_deps` (bindings)
@@ -24865,8 +24888,8 @@ impl Sema:
                 // #1783: the storage is what the receiver's ROOT reaches,
                 // whatever the path (`h.v.push(x)` stores into `h`; inside
                 // a method, `self.v.push(x)` into the caller's place).
-                if mc_arg_ty as i32 != 0 and (self.type_is_ephemeral_value(mc_arg_ty as i32) != 0 or self.expr_is_ephemeral_value(mc_arg_node) != 0):
-                    self.note_view_store(expr, mc_arg_node, mc_arg_ty as i32, node, "this call")
+                if mc_arg_ty as i32 != 0:
+                    self.note_view_store(expr, mc_arg_node, mc_arg_ty as i32, mc_expected as i32, node, "this call")
             let mc_sender_elem_ty = self.sender_send_element_type(obj_type as i32, field, ai)
             if mc_sender_elem_ty != 0:
                 if mc_arg_ty as i32 != 0 and self.types_compatible(mc_sender_elem_ty, mc_arg_ty as i32) == 0 and self.arithmetic_result_type(mc_sender_elem_ty, mc_arg_ty as i32) == 0:
