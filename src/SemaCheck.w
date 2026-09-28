@@ -353,6 +353,13 @@ impl Sema:
             return if self.get_type_d0(pointee_resolved) == self.get_type_d0(actual_resolved): 1 else: 0
         if pointee_kind == TypeKind.TY_ENUM and actual_kind == TypeKind.TY_ENUM:
             return if self.get_type_d0(pointee_resolved) == self.get_type_d0(actual_resolved): 1 else: 0
+        // §3.9: a value whose type implements the trait auto-references
+        // into a `&dyn T` parameter as it would into a `&T` one. Without
+        // this the argument went by value: codegen built the fat pointer
+        // from the moved value's address and nothing ever dropped it.
+        if pointee_kind == TypeKind.TY_TRAIT_OBJ and actual_kind != TypeKind.TY_REF and actual_kind != TypeKind.TY_PTR and actual_kind != TypeKind.TY_TRAIT_OBJ:
+            let impl_sym = self.type_symbol_for_bounds(actual_resolved as i32)
+            return if impl_sym != 0 and self.select_trait_impl(impl_sym, self.get_type_d0(pointee_resolved)) != 0: 1 else: 0
         if pointee_kind == TypeKind.TY_GENERIC_INST and actual_kind == TypeKind.TY_GENERIC_INST:
             return self.types_compatible(pointee, actual)
         0
@@ -378,6 +385,13 @@ impl Sema:
             return if self.get_type_d0(pointee_resolved) == self.get_type_d0(actual_resolved): 1 else: 0
         if pointee_kind == TypeKind.TY_ENUM and actual_kind == TypeKind.TY_ENUM:
             return if self.get_type_d0(pointee_resolved) == self.get_type_d0(actual_resolved): 1 else: 0
+        // §3.9: a value whose type implements the trait auto-references
+        // into a `&dyn T` parameter as it would into a `&T` one. Without
+        // this the argument went by value: codegen built the fat pointer
+        // from the moved value's address and nothing ever dropped it.
+        if pointee_kind == TypeKind.TY_TRAIT_OBJ and actual_kind != TypeKind.TY_REF and actual_kind != TypeKind.TY_PTR and actual_kind != TypeKind.TY_TRAIT_OBJ:
+            let impl_sym = self.type_symbol_for_bounds(actual_resolved as i32)
+            return if impl_sym != 0 and self.select_trait_impl(impl_sym, self.get_type_d0(pointee_resolved)) != 0: 1 else: 0
         if pointee_kind == TypeKind.TY_GENERIC_INST and actual_kind == TypeKind.TY_GENERIC_INST:
             return self.types_compatible_frozen(pointee, actual)
         0
