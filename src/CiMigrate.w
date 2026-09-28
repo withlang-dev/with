@@ -465,7 +465,22 @@ fn ci_migrate_render_preamble_fn(signature: &str, colon_expr: &str, brace_expr: 
         return signature ++ " {\n    " ++ brace_expr ++ "\n}\n"
     signature ++ ": " ++ colon_expr ++ "\n"
 
-fn ci_migrate_render_overflow_helper(op: &str, ty: &str, is_signed: bool):
+// The helper a `__builtin_<op>_overflow` call names. The migrator's preamble
+// defines `__with_builtin_<op>_overflow_<ty>` for every width; a c_import
+// translation defines `__c_import_<op>_overflow_<ty>` beside the bodies that
+// call it (#1877). The spellings differ on purpose: a c_import-origin name is
+// global (SemaDecl's c_import scoping), and the `.wo` bundles' shared defs
+// (lib/std/re/defs.w) reach every compilation over the prelude edge, so a
+// c_import definition of the bundle's name would capture the bundle's own
+// calls (#1882).
+pub fn ci_overflow_helper_name(op: &str, ty: &str) -> str:
+    let prefix = if ci_translate_in_migrate_mode(): "__with_builtin_" else: "__c_import_"
+    prefix ++ op ++ "_overflow_" ++ ty
+
+pub fn ci_u128_mul_helper_name() -> str:
+    if ci_translate_in_migrate_mode(): "u128_mul_would_overflow" else: "__c_import_u128_mul_would_overflow"
+
+fn ci_migrate_render_overflow_helper(name: &str, op: &str, ty: &str, is_signed: bool):
     let token = if op == "add": "+%" else if op == "sub": "-%" else: "*%"
     let overflow = if op == "add":
         if is_signed: "((result ^ a) & (result ^ b)) < 0" else: "result < a"
@@ -475,7 +490,7 @@ fn ci_migrate_render_overflow_helper(op: &str, ty: &str, is_signed: bool):
         "if a == 0 or b == 0: false else if a == -1: result == b else if b == -1: result == a else: result / b != a"
     else:
         "if b == 0: false else: result / b != a"
-    let signature = "unsafe fn __with_builtin_" ++ op ++ "_overflow_" ++ ty ++ "(a: " ++ ty ++ ", b: " ++ ty ++ ", out: *mut " ++ ty ++ ") -> bool"
+    let signature = "unsafe fn " ++ name ++ "(a: " ++ ty ++ ", b: " ++ ty ++ ", out: *mut " ++ ty ++ ") -> bool"
     let body = "    let result = a " ++ token ++ " b\n    unsafe { (*out = result) }\n    " ++ overflow ++ "\n"
     ci_migrate_render_fn_with_body(signature, body)
 
@@ -490,25 +505,37 @@ fn ci_migrate_render_fn_with_body(signature: &str, body: &str) -> str:
 // decomposition keeps the check to multiplies and shifts, inline on every
 // target at every -O level. The shared helper is emitted once, before the
 // i128 multiply that first needs it.
-fn ci_migrate_render_u128_mul_would_overflow() -> str:
+pub fn ci_migrate_render_u128_mul_would_overflow(name: &str) -> str:
     let comment = "// The 128-bit overflow checks stay division-free on purpose: `/` on i128/u128\n// lowers to the __divti3/__udivti3 compiler-rt libcalls, and this shim is\n// compiled into freestanding runtime objects whose COFF link has no builtins\n// library to resolve them from. Limb decomposition keeps the check to multiplies\n// and shifts, which lower inline on every target and at every -O level.\n"
     let body = "    let a_hi = (a >> 64) as u64\n    let b_hi = (b >> 64) as u64\n    if a_hi != 0 and b_hi != 0: return true\n    let a_lo = (a as u64) as u128\n    let b_lo = (b as u64) as u128\n    let cross = (a_hi as u128) *% b_lo +% (b_hi as u128) *% a_lo\n    if (cross >> 64) != 0: return true\n    let low = a_lo *% b_lo\n    ((low >> 64) +% cross) >> 64 != 0\n"
-    comment ++ ci_migrate_render_fn_with_body("fn u128_mul_would_overflow(a: u128, b: u128) -> bool", body)
+    comment ++ ci_migrate_render_fn_with_body("fn " ++ name ++ "(a: u128, b: u128) -> bool", body)
 
-fn ci_migrate_render_mul_overflow_128(ty: &str, is_signed: bool) -> str:
-    let signature = "unsafe fn __with_builtin_mul_overflow_" ++ ty ++ "(a: " ++ ty ++ ", b: " ++ ty ++ ", out: *mut " ++ ty ++ ") -> bool"
+fn ci_migrate_render_mul_overflow_128(name: &str, shared: &str, ty: &str, is_signed: bool) -> str:
+    let signature = "unsafe fn " ++ name ++ "(a: " ++ ty ++ ", b: " ++ ty ++ ", out: *mut " ++ ty ++ ") -> bool"
     let body = if is_signed:
-        "    unsafe { (*out = a *% b) }\n    if a == 0 or b == 0: return false\n    let neg = (a < 0) != (b < 0)\n    let ua = if a < 0: (0 as u128) -% (a as u128) else: a as u128\n    let ub = if b < 0: (0 as u128) -% (b as u128) else: b as u128\n    if u128_mul_would_overflow(ua, ub): return true\n    let limit = if neg: (1 as u128) << 127 else: ((1 as u128) << 127) -% 1\n    ua *% ub > limit\n"
+        "    unsafe { (*out = a *% b) }\n    if a == 0 or b == 0: return false\n    let neg = (a < 0) != (b < 0)\n    let ua = if a < 0: (0 as u128) -% (a as u128) else: a as u128\n    let ub = if b < 0: (0 as u128) -% (b as u128) else: b as u128\n    if " ++ shared ++ "(ua, ub): return true\n    let limit = if neg: (1 as u128) << 127 else: ((1 as u128) << 127) -% 1\n    ua *% ub > limit\n"
     else:
-        "    unsafe { (*out = a *% b) }\n    u128_mul_would_overflow(a, b)\n"
+        "    unsafe { (*out = a *% b) }\n    " ++ shared ++ "(a, b)\n"
     ci_migrate_render_fn_with_body(signature, body)
+
+// One overflow helper definition for a c_import translation that names it
+// (#1877): the migrator's preamble defines every width up front; a header
+// import defines only the ones its inline bodies call, under the c_import
+// spelling (ci_overflow_helper_name). The 128-bit multiply's shared limb
+// check is rendered once by the caller (ci_migrate_render_u128_mul_would_overflow).
+pub fn ci_migrate_render_overflow_helper_for(op: &str, ty: &str) -> str:
+    let is_signed = ty[0] == 'i'
+    let name = ci_overflow_helper_name(op, ty)
+    if op == "mul" and (ty == "i128" or ty == "u128"):
+        return ci_migrate_render_mul_overflow_128(name, ci_u128_mul_helper_name(), ty, is_signed)
+    ci_migrate_render_overflow_helper(name, op, ty, is_signed)
 
 fn ci_migrate_render_overflow_helpers(ty: &str, is_signed: bool):
     let wide = ty == "i128" or ty == "u128"
-    let shared = if ty == "i128": ci_migrate_render_u128_mul_would_overflow() else: ""
-    let mul = if wide: ci_migrate_render_mul_overflow_128(ty, is_signed) else: ci_migrate_render_overflow_helper("mul", ty, is_signed)
-    ci_migrate_render_overflow_helper("add", ty, is_signed) ++
-    ci_migrate_render_overflow_helper("sub", ty, is_signed) ++
+    let shared = if ty == "i128": ci_migrate_render_u128_mul_would_overflow("u128_mul_would_overflow") else: ""
+    let mul = if wide: ci_migrate_render_mul_overflow_128("__with_builtin_mul_overflow_" ++ ty, "u128_mul_would_overflow", ty, is_signed) else: ci_migrate_render_overflow_helper("__with_builtin_mul_overflow_" ++ ty, "mul", ty, is_signed)
+    ci_migrate_render_overflow_helper("__with_builtin_add_overflow_" ++ ty, "add", ty, is_signed) ++
+    ci_migrate_render_overflow_helper("__with_builtin_sub_overflow_" ++ ty, "sub", ty, is_signed) ++
     shared ++ mul
 
 // Write the shared defs module (defs.w) to output_dir.

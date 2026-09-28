@@ -312,6 +312,36 @@ fn c_import_included_files_clear():
 pub fn c_import_included_files() -> str:
     g_cimport_included_files ++ ""
 
+// #1877: the `__c_import_<op>_overflow_<ty>` helpers this import's
+// inline bodies call (`__builtin_mul_overflow` and kin). The migrator's
+// preamble defines every width; a header import defines each one it names,
+// once, in its own translation — a name nothing defines is a dangling
+// reference, never emitted.
+var g_ci_overflow_helpers_needed: Vec[str] = Vec.new()
+
+fn ci_note_overflow_helper_needed(helper: &str, op: &str, ty: &str):
+    let entry = helper ++ "|" ++ op ++ "|" ++ ty
+    for i in 0..g_ci_overflow_helpers_needed.len() as i32:
+        if g_ci_overflow_helpers_needed[i] == entry: return
+    g_ci_overflow_helpers_needed.push(entry)
+
+fn ci_render_overflow_helpers_needed() -> str:
+    var out = ""
+    for i in 0..g_ci_overflow_helpers_needed.len() as i32:
+        let parts = g_ci_overflow_helpers_needed[i].split("|")
+        let helper = parts[0]
+        if with_cimport_is_name_emitted(helper) != 0: continue
+        with_cimport_mark_name_emitted(helper)
+        let op = parts[1]
+        let ty = parts[2]
+        let shared = ci_u128_mul_helper_name()
+        if op == "mul" and (ty == "i128" or ty == "u128") and with_cimport_is_name_emitted(shared) == 0:
+            with_cimport_mark_name_emitted(shared)
+            out = out ++ ci_migrate_render_u128_mul_would_overflow(shared)
+        out = out ++ ci_migrate_render_overflow_helper_for(op, ty)
+    g_ci_overflow_helpers_needed = Vec.new()
+    out
+
 fn ci_record_raw_function_name(name: &str):
     if name.len() == 0:
         return
@@ -627,6 +657,7 @@ pub fn process_c_import_with_defines(header_spec: &str, defines: &Vec[str]) -> s
         return ""
     g_cimport_raw_function_names = ""
     g_cimport_unprototyped_names = ""
+    g_ci_overflow_helpers_needed = Vec.new()
     ci_record_field_caches_clear()
     g_cimport_report_untranslated_macros = ci_should_report_untranslated_macros(header_spec)
     if with_cimport_available() == 0:
@@ -807,6 +838,7 @@ pub fn process_c_import_with_defines(header_spec: &str, defines: &Vec[str]) -> s
     if macro_session != 0:
         output.push_str(ci_translate_macros(macro_session, session, include_text))
         with_cimport_dispose_macros(macro_session)
+    output.push_str(ci_render_overflow_helpers_needed())
     with_cimport_dispose(session)
     ci_fn_decl_index_reset()
     g_macro_type_names = ""
@@ -10407,7 +10439,9 @@ impl CiExprPool:
         args.push(self.cast(canonical_ptr_ty, (arg_ids.get(2)) as CiExprId) as i32)
         // The helpers return bool (C `_Bool`); typing the call is what lets an
         // `int f() { return __builtin_mul_overflow(...); }` coerce at the return.
-        let call = self.build_named_call_expr_typed("__with_builtin_" ++ op ++ "_overflow_" ++ out_ty, &args, types.named_type_from_text("bool"))
+        let helper = ci_overflow_helper_name(op, out_ty)
+        ci_note_overflow_helper_needed(helper, op, out_ty)
+        let call = self.build_named_call_expr_typed(helper, &args, types.named_type_from_text("bool"))
         self.unsafe_expr(call)
 
     fn build_libc_call_value_expr(session: i64, cursor: i32, callee_text: &str, arg_ids: &Vec[i32], types: CiTypePool) -> CiExprId:
