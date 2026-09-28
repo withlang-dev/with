@@ -10233,6 +10233,15 @@ impl MirBuilder:
         self.terminate(TermKind.TK_CALL, cleanup_unit, await_args_id, ignored_place, after_await_bb)
         self.switch_to(after_await_bb)
 
+    // A block no path reaches, for a terminator that needs a target.
+    mut fn new_unreachable_block() -> BlockId:
+        let saved = self.cur_bb
+        let dead = self.new_block()
+        self.switch_to(dead)
+        self.terminate(TermKind.TK_UNREACHABLE, 0, 0, 0, 0)
+        self.switch_to(saved)
+        dead
+
     mut fn lower_unreachable() -> i32:
         self.terminate(TermKind.TK_UNREACHABLE, 0, 0, 0, 0)
         let dead_bb = self.new_block()
@@ -10589,11 +10598,14 @@ impl MirBuilder:
         // Dyn trait typed-bind pattern: vtable comparison via intrinsic.
         if pk == NodeKind.NK_PAT_TYPED_BIND:
             let tb_type_sym = self.ast.get_data1(pat_node)
-            // Get trait_sym from scrutinee's sema type (TypeKind.TY_TRAIT_OBJ.d0)
-            let tb_scrutinee_ty = self.place_local_type(scrutinee_place)
+            // The subject is a `&dyn T` (Sema, #1860): the reference's
+            // pointee names the trait; the place's value is the fat pointer.
+            var tb_obj = self.sema.resolve_alias(self.place_local_type(scrutinee_place) as TypeId)
+            if self.sema.get_type_kind(tb_obj) == TypeKind.TY_REF:
+                tb_obj = self.sema.resolve_alias(self.sema.get_type_d0(tb_obj) as TypeId)
             var tb_trait_sym: i32 = 0
-            if self.sema.get_type_kind(tb_scrutinee_ty) == TypeKind.TY_TRAIT_OBJ:
-                tb_trait_sym = self.sema.get_type_d0(tb_scrutinee_ty)
+            if self.sema.get_type_kind(tb_obj) == TypeKind.TY_TRAIT_OBJ:
+                tb_trait_sym = self.sema.get_type_d0(tb_obj)
             // Emit MirIntrinsic.DYN_VTABLE_CMP(scrutinee, type_sym, trait_sym) → bool
             let tb_fn_op = self.const_operand(ConstKind.CK_FN, 0, self.sema.ty_void)
             let tb_scrutinee_op = self.body.new_operand(OperandKind.OK_COPY, scrutinee_place)
@@ -11189,12 +11201,12 @@ impl MirBuilder:
         if pk == NodeKind.NK_PAT_TYPED_BIND:
             let tb_bind_sym = self.ast.get_data0(pat_node)
             let tb_type_sym = self.ast.get_data1(pat_node)
-            // Look up concrete sema type for the type symbol
-            let tb_sema_sym = self.sema.pool_lookup_symbol(self.pool.resolve_symbol(tb_type_sym))
-            var tb_concrete_ty = self.sema.ty_i32 as i32
-            if self.sema.named_types.contains(tb_sema_sym):
-                tb_concrete_ty = self.sema.named_types.get(tb_sema_sym).unwrap()
-            // Emit MirIntrinsic.DYN_DOWNCAST(scrutinee, type_sym) → concrete value
+            // The binding is the view `&Type` Sema typed (#1860); MIR never
+            // re-derives it from the name (D65).
+            if not self.sema.dyn_downcast_binding_types.contains(pat_node):
+                sema_phase_bug("BUG: a typed binding pattern reached MIR without Sema's downcast type (#1860)")
+            let tb_concrete_ty: i32 = self.sema.dyn_downcast_binding_types.get(pat_node).unwrap()
+            // Emit MirIntrinsic.DYN_DOWNCAST(scrutinee, type_sym) → the object's address
             let dc_fn_op = self.const_operand(ConstKind.CK_FN, 0, self.sema.ty_void)
             let dc_scrutinee_op = self.body.new_operand(OperandKind.OK_COPY, scrutinee_place)
             let dc_type_const = self.int_const_operand(tb_type_sym, self.sema.ty_i32)
@@ -11370,7 +11382,12 @@ impl MirBuilder:
             let guard_node = self.ast.get_data2(arm_node)
 
             let arm_bb = self.new_block()
-            let fail_bb = if ai + 1 < arms_count: self.new_block() else: join_bb
+            // The last arm's failure edge: a match Sema proved exhaustive
+            // (a value position, a must-use subject) has no such path, and
+            // through the join it read a result no path wrote (#1860: a
+            // sealed match returned an uninitialized local). Unreachable,
+            // so the validators judge it as the dead path it is.
+            let fail_bb = if ai + 1 < arms_count: self.new_block() else if self.sema.exhaustive_matches.contains(node): self.new_unreachable_block() else: join_bb
 
             self.switch_to(dispatch_bb)
             // The observed flag covers only THIS match's pattern lowering: a

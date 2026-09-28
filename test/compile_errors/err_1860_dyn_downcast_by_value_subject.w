@@ -1,7 +1,7 @@
-//! expect-error: non-exhaustive match on sealed trait: missing implementor 'Rect'
+//! expect-check-fail: downcasts a trait object through a reference; this subject is a `dyn` value
 
-// #1860: a `@[sealed]` trait's implementor set is the match's domain; a
-// missing implementor is the ordinary non-exhaustive error.
+// #1860: the downcast pattern's subject is the object through a reference;
+// a by-value dyn is not defined (#1852, #724).
 
 @[sealed]
 trait Shape:
@@ -14,5 +14,6 @@ impl Shape for Rect:
     fn area(self: &Self) -> i32: 0
 
 fn describe(s: &dyn Shape) -> i32:
-    match s:
+    match *s:
         c: Circle => c.radius
+        r: Rect => r.width
