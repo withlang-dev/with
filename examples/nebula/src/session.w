@@ -131,7 +131,7 @@ async fn handle_priority(
 // Query sessions to compute aggregate statistics.
 
 pub type SessionStats {
-    active_count: i32,
+    active_count: i64,
     total_packets: i32,
 }
 

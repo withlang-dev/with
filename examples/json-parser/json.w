@@ -69,7 +69,7 @@ fn Tokenizer.new(input: str): Tokenizer { input }
 extend Tokenizer:
     fn peek() -> Option[u8]:
         if self.pos < self.input.len():
-            Some(self.input.byte_at(self.pos as i64))
+            Some(self.input.byte_at(self.pos as i64) as u8)
         else:
             None
 
@@ -182,7 +182,7 @@ fn parse_number_str(text: str, start: usize) -> Result[f64, JsonError]:
         i += 1
 
     // integer part
-    while i < text.len() and is_digit(text.byte_at(i as i64)):
+    while i < text.len() and is_digit(text.byte_at(i as i64) as u8):
         result = result * 10.0 + (text.byte_at(i as i64) - b'0') as f64
         i += 1
 
@@ -190,7 +190,7 @@ fn parse_number_str(text: str, start: usize) -> Result[f64, JsonError]:
     if i < text.len() and text.byte_at(i as i64) == b'.':
         i += 1
         var frac: f64 = 0.1
-        while i < text.len() and is_digit(text.byte_at(i as i64)):
+        while i < text.len() and is_digit(text.byte_at(i as i64) as u8):
             result = result + (text.byte_at(i as i64) - b'0') as f64 * frac
             frac = frac * 0.1
             i += 1

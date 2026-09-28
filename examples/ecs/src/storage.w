@@ -16,7 +16,7 @@ use components.Entity
 pub type DenseStorage[T] {
     dense_entities: Vec[i32],
     dense_data: Vec[T],
-    sparse: HashMap[i32, i32],
+    sparse: HashMap[i32, i64],
 }
 
 pub fn DenseStorage.new[T]() -> DenseStorage[T]:
@@ -34,7 +34,7 @@ extend[T] DenseStorage[T]:
         if entity.id in self.sparse:
             // An independent index, not a view into the map we are about
             // to mutate (D22 contextual Copy).
-            let idx: i32 = self.sparse.get(entity.id).unwrap()
+            let idx: i64 = self.sparse.get(entity.id).unwrap()
             self.dense_data[idx] = component
         else:
             self.sparse.insert(entity.id, self.dense_data.len())
@@ -48,7 +48,7 @@ extend[T] DenseStorage[T]:
     // Transfers the component out (`Vec.remove`, D27) and re-indexes the
     // entities that shifted down behind it.
     pub mut fn remove(entity: Entity) -> Option[T]:
-        let idx: i32 = self.sparse.remove(entity.id) ?? return None
+        let idx: i64 = self.sparse.remove(entity.id) ?? return None
         self.dense_entities.remove(idx)
         for i in idx..self.dense_entities.len():
             let eid: i32 = self.dense_entities[i]
@@ -57,7 +57,7 @@ extend[T] DenseStorage[T]:
 
     pub fn contains(entity: Entity) -> bool: entity.id in self.sparse
 
-    pub fn len() -> i32: self.dense_data.len()
+    pub fn len() -> i64: self.dense_data.len()
 
     pub mut fn clear():
         self.dense_entities.clear()

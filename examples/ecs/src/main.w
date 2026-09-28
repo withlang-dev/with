@@ -21,7 +21,7 @@ use systems.*
 
 fn main:
     var world = World.new()
-    let dt = 1.0 / 60.0
+    let dt: f32 = 1.0 / 60.0
     world.dt = dt
 
     // --- Spawn Entities ---
