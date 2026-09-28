@@ -1951,24 +1951,34 @@ impl PoolState:
 // targets still spawn (build_pool_spawn) because processes are what buy
 // their parallelism; this fn is also the pooled worker child's own
 // execution path (worker env set).
-unsafe fn run_build_action_from_build_w(root: &str, cfg: &ProjectConfig, target: &BuildGraphTarget, sema_ptr: *mut Sema, options: &BuildCommandOptions) -> BuildActionRunResult:
-    build_action_clear_worker_env_for_children()
+// An action target's declared contract, checked before it runs by every
+// worker (the scheduler before a native-runner dispatch, the comptime path
+// here): a declared output, valid process arguments, every declared input
+// present, and the output's directory. 0, or the exit code of the failure.
+fn build_action_preflight(root: &str, target: &BuildGraphTarget) -> i32:
     if target.output.len() == 0:
         with_eprint("error: action target '" ++ target.name ++ "' requires a declared output")
-        return build_action_run_result(1)
+        return 1
     let arg_rc = build_graph_validate_process_args(target)
     if arg_rc != 0:
-        return build_action_run_result(arg_rc)
+        return arg_rc
     for ii in 0..target.inputs.len() as i32:
         let input_path = build_graph_resolve_project_path(root, target.inputs[ii])
         if with_fs_file_exists(input_path) == 0:
             with_eprint("error: action target '" ++ target.name ++ "' missing declared input: " ++ input_path)
-            return build_action_run_result(1)
-    let output_path = build_graph_resolve_project_path(root, target.output)
-    let output_dir = build_graph_dirname(output_path)
+            return 1
+    let output_dir = build_graph_dirname(build_graph_resolve_project_path(root, target.output))
     if with_fs_mkdir_p(output_dir) != 0:
         with_eprint("error: action target '" ++ target.name ++ "' could not create output directory: " ++ output_dir)
-        return build_action_run_result(1)
+        return 1
+    0
+
+unsafe fn run_build_action_from_build_w(root: &str, cfg: &ProjectConfig, target: &BuildGraphTarget, sema_ptr: *mut Sema, options: &BuildCommandOptions) -> BuildActionRunResult:
+    build_action_clear_worker_env_for_children()
+    let preflight_rc = build_action_preflight(root, target)
+    if preflight_rc != 0:
+        return build_action_run_result(preflight_rc)
+    let output_path = build_graph_resolve_project_path(root, target.output)
     let scratch_dir = build_action_scratch_dir(target.name)
     let scratch_abs = build_graph_resolve_project_path(root, scratch_dir)
     let _remove_scratch = with_fs_remove_tree(scratch_abs)
@@ -2382,6 +2392,17 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
         cutoff_digests.push(build_cache_cutoff_digest(root, target))
         if build_cache_is_cacheable(target.kind):
             build_cache_snapshot_inputs(root, target)
+        // An action's declared contract is checked before it runs, whichever
+        // worker runs it: the native runner paths below dispatched without it,
+        // so an action whose declared input was missing ran and succeeded,
+        // and only the comptime fallback reported it.
+        if target.kind == 23 and not build_action_worker_env_enabled():
+            let preflight_rc = build_action_preflight(root, target)
+            if preflight_rc != 0:
+                if survey:
+                    survey_failed.push(with_str_clone_ref(target.name))
+                    continue
+                return preflight_rc
         var bootstrap_ready = bootstrap_root_scheduled and completed_targets.contains(bootstrap_root_target)
         if not bootstrap_ready and not runner_checked:
             bootstrap_ready = build_runner_runtime_dirs_are_this_generation(root)
