@@ -394,6 +394,10 @@ fn ci_object_macro_is_function_alias(type_session: i64, value: &str) -> bool:
         return false
     ci_lookup_c_function_return_type(type_session, t).len() > 0
 
+// C's unary prefix operators that keep a call a call: `~f(x)`, `-f(x)`,
+// `+f(x)`, `!f(x)`.
+fn ci_is_unary_prefix_op(c: u8) -> bool: c == '~' or c == '-' or c == '+' or c == '!'
+
 // After semantic constant translation has failed, a whole call expression
 // cannot become a global: C re-evaluates it at each use. This also applies
 // when the callee is a successfully translated function-like macro.
@@ -402,7 +406,7 @@ fn ci_object_macro_has_call_shape(value: &str):
     // A unary operator applied to a call is still a call: SDL's
     // `#define SDL_MIN_SINT64 ~SDL_SINT64_C(0x7FFFFFFFFFFFFFFF)` must not
     // become a global that names the function-like macro.
-    while t.len() > 1 and (t[0] == 126 or t[0] == 45 or t[0] == 43 or t[0] == 33):
+    while t.len() > 1 and ci_is_unary_prefix_op(t[0]):
         let operand = ci_strip_parens(ci_trim(t.slice(1, t.len())))
         t = operand
     if t.len() < 3 or t[t.len() - 1] != 41:
