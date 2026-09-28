@@ -13015,8 +13015,16 @@ impl MirBuilder:
             if not dyn_recv_is_static:
                 let dyn_fn_op = self.const_operand(ConstKind.CK_FN, method_sym, 0)
                 let dyn_args: Vec[i32] = Vec.new()
-                let dyn_recv_op = self.lower_expr(self_expr)
-                self.consume_moved_operand(dyn_recv_op)
+                // #1847: only a `move self` method consumes the receiver
+                // (Sema: dyn_consuming_calls); any other call observes the
+                // fat pointer in place. Moving it made the caller skip the
+                // Box[dyn T]'s drop: the value and its cell leaked.
+                var dyn_recv_op = -1
+                if self.sema.dyn_consuming_calls.contains(node):
+                    dyn_recv_op = self.lower_expr(self_expr)
+                    self.consume_moved_operand(dyn_recv_op)
+                else:
+                    dyn_recv_op = self.body.new_operand(OperandKind.OK_COPY, self.lower_expr_place(self_expr))
                 dyn_args.push(dyn_recv_op)
                 for dyn_ai in 0..arg_count:
                     let dyn_arg_op = self.lower_expr(self.ast.get_extra(arg_start + dyn_ai))

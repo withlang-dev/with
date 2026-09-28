@@ -89,6 +89,14 @@ fn cell(name: str, decls: str, expect_sum: i32) -> Cell:
 // Scenario builders compose these; not every shape × scenario pair is
 // meaningful — the matrix below curates the real cells.
 
+// #1847: the audit was blind to trait objects. A Box[dyn T] never ran its
+// payload's drop and leaked its cell, a dyn call moved its borrowed receiver,
+// and a box stored into a Vec or a field aborted codegen, with every cell
+// green. `boxdyn` / `boxdynfield` hold R behind `dyn Held`.
+fn dyn_held_decls() -> str:
+    "trait Held:\n    fn held(self: &Self) -> i32\n    fn yield_id(move self: Self) -> i32\n" ++
+    "impl Held for R:\n    fn held(self: &Self) -> i32: self.id\n    fn yield_id(move self: Self) -> i32: self.id\n"
+
 fn shape_decls(shape: &str) -> str:
     if shape == "field":
         // Non-zero sibling: a blanked `r` must NOT make the whole S the reset
@@ -98,17 +106,23 @@ fn shape_decls(shape: &str) -> str:
         return "type SB { b: Box[R], tag: i32 }\n"
     if shape == "enum":
         return "enum E:\n    Carry(R)\n    Empty\n"
+    if shape == "boxdyn":
+        return dyn_held_decls()
+    if shape == "boxdynfield":
+        return dyn_held_decls() ++ "type SD { b: Box[dyn Held], tag: i32 }\n"
     ""
 
 fn shape_ann(shape: &str) -> str:
     if shape == "option": return ": Option[R]"
+    if shape == "boxdyn": return ": Box[dyn Held]"
     ""
 
 fn shape_mk(shape: &str, id: &str) -> str:
     if shape == "bare": return "mk(" ++ id ++ ", slot)"
     if shape == "field": return "S { r: mk(" ++ id ++ ", slot), tag: 9 }"
     if shape == "boxfield": return "SB { b: Box.new(mk(" ++ id ++ ", slot)), tag: 9 }"
-    if shape == "boxbare": return "Box.new(mk(" ++ id ++ ", slot))"
+    if shape == "boxbare" or shape == "boxdyn": return "Box.new(mk(" ++ id ++ ", slot))"
+    if shape == "boxdynfield": return "SD { b: Box.new(mk(" ++ id ++ ", slot)), tag: 9 }"
     if shape == "rcbare": return "Rc.new(mk(" ++ id ++ ", slot))"
     if shape == "tuple": return "(mk(" ++ id ++ ", slot), 7)"
     if shape == "option": return ".Some(mk(" ++ id ++ ", slot))"
@@ -120,6 +134,8 @@ fn shape_ty(shape: &str) -> str:
     if shape == "field": return "S"
     if shape == "boxfield": return "SB"
     if shape == "boxbare": return "Box[R]"
+    if shape == "boxdyn": return "Box[dyn Held]"
+    if shape == "boxdynfield": return "SD"
     if shape == "rcbare": return "Rc[R]"
     if shape == "tuple": return "(R, i32)"
     if shape == "option": return "Option[R]"
@@ -361,6 +377,23 @@ fn sc_closure_consume(direct: bool) -> str:
     "fn go(slot: *mut i32):\n" ++
     "    let a = mk(1, slot)\n" ++
     (if direct: "    let b = run_r(() => a)\n" else: "    let f: fn() -> R = () => a\n    let b = f()\n") ++
+    "    let _k = 0\n"
+
+// #1847: a dyn method call borrows its receiver unless the method consumes
+// it; either way the value drops exactly once.
+fn sc_dyn_call(consume: bool) -> str:
+    dyn_held_decls() ++
+    "fn go(slot: *mut i32):\n" ++
+    "    let a: Box[dyn Held] = Box.new(mk(1, slot))\n" ++
+    (if consume: "    let _n = a.yield_id()\n" else: "    let _n = a.held()\n    let _m = a.held()\n") ++
+    "    let _k = 0\n"
+
+fn sc_vec_elem_dyn() -> str:
+    dyn_held_decls() ++
+    "fn go(slot: *mut i32):\n" ++
+    "    var v: Vec[Box[dyn Held]] = Vec.new()\n" ++
+    "    v.push(Box.new(mk(1, slot)))\n" ++
+    "    v.push(Box.new(mk(2, slot)))\n" ++
     "    let _k = 0\n"
 
 fn sc_vec_elem() -> str:
@@ -633,7 +666,7 @@ fn build_cells():
     cells.push(cell("slotmap_full/slotmap", sc_slotmap("full"), 8256))
     cells.push(cell("slotmap_partial/slotmap", sc_slotmap("partial"), 8256))
     cells.push(cell("slotmap_refill/slotmap", sc_slotmap("refill"), 8320))
-    for sh in ["bare", "field", "tuple", "option", "enum", "boxbare", "rcbare", "boxfield"]:
+    for sh in ["bare", "field", "tuple", "option", "enum", "boxbare", "rcbare", "boxfield", "boxdyn", "boxdynfield"]:
         cells.push(cell("scope_exit/" ++ sh, sc_scope_exit(sh), 1))
         cells.push(cell("branch_taken/" ++ sh, sc_branch(sh, true), 1))
         cells.push(cell("branch_untaken/" ++ sh, sc_branch(sh, false), 0))
@@ -651,6 +684,10 @@ fn build_cells():
     cells.push(cell("consume_call/field", sc_consume_call("field"), 1))
     cells.push(cell("consume_call/boxbare", sc_consume_call("boxbare"), 1))
     cells.push(cell("consume_call/rcbare", sc_consume_call("rcbare"), 1))
+    cells.push(cell("consume_call/boxdyn", sc_consume_call("boxdyn"), 1))
+    cells.push(cell("consume_call/boxdynfield", sc_consume_call("boxdynfield"), 1))
+    cells.push(cell("dyn_call_borrow/boxdyn", sc_dyn_call(false), 1))
+    cells.push(cell("dyn_call_consume/boxdyn", sc_dyn_call(true), 1))
     cells.push(cell("match_consume/enum", sc_match_consume(), 1))
     cells.push(cell("partial_move/field", sc_partial_move(), 1))
     cells.push(cell("branch_move_state_identity/field", sc_branch_move_state_identity(), 6))
@@ -666,11 +703,12 @@ fn build_cells():
     cells.push(cell("recv_move_consume/bare", sc_recv_move(), 1))
     cells.push(cell("recv_bare_self_replace/bare", sc_recv_replace(), 3))
     cells.push(cell("vec_elem_drop/vec", sc_vec_elem(), 3))
+    cells.push(cell("vec_elem_drop/vecdyn", sc_vec_elem_dyn(), 3))
     for form in ["field", "method", "concat", "slice", "spec"]:
         cells.push(cell("fstring_hole_temp_" ++ form ++ "/bare", sc_fstring_hole(form), 1))
     for form in ["enum", "nested", "struct"]:
         cells.push(cell("display_parts_" ++ form ++ "/" ++ form, sc_display(form), 1))
-    for sh in ["bare", "field", "tuple", "option", "enum", "boxbare", "rcbare", "boxfield"]:
+    for sh in ["bare", "field", "tuple", "option", "enum", "boxbare", "rcbare", "boxfield", "boxdyn", "boxdynfield"]:
         cells.push(cell("closure_assign/" ++ sh, sc_closure_assign(sh), 3))
     cells.push(cell("closure_assign_twice/bare", sc_closure_assign_twice(), 6))
     cells.push(cell("closure_let_bound_assign/bare", sc_closure_let_bound_assign(), 3))

@@ -420,6 +420,10 @@ pub type Codegen {
 
     // VTable globals: hash(type,trait) → global
     vtable_globals: HashMap[i32, i64],
+    // #1847: the vtables' drop slots (dyn_drop_slot) and the concrete Sema
+    // type each drops, their bodies emitted by define_dyn_drop_thunks.
+    dyn_drop_thunks: Vec[i64],
+    dyn_drop_thunk_types: Vec[i32],
 
     // Trait-typed locals
     trait_locals: HashMap[i32, i32],
@@ -1089,6 +1093,8 @@ fn Codegen.init_with_opt(module_name: &str, opt_level: i32) -> Codegen:
         trait_map: HashMap.new(),
         trait_idx_syms: Vec.new(),
         trait_vtable_types: Vec.new(),
+        dyn_drop_thunks: Vec.new(),
+        dyn_drop_thunk_types: Vec.new(),
         trait_method_starts: Vec.new(),
         trait_method_counts: Vec.new(),
         trait_method_names: Vec.new(),
@@ -7171,6 +7177,9 @@ impl Codegen:
         self.gen_owned_specializations()
         self.gen_mir_only_functions()
         self.gen_generator_functions_from_mir()
+        // #1847: every Drop fn is known now; the vtables' drop slots get their
+        // bodies.
+        self.define_dyn_drop_thunks()
 
         if self.had_error != 0:
             return 1

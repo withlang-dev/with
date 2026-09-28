@@ -66,8 +66,11 @@ impl Codegen:
             self.trait_method_param_counts.push(method_param_count)
             self.trait_method_default_bodies.push(method_default_body)
             vtable_fields.push(ptr_ty)
+        // #1847: the last slot drops the concrete value in place
+        // (dyn_drop_slot) — what a `Box[dyn Trait]` runs before it frees.
+        vtable_fields.push(ptr_ty)
 
-        let vtable_ty = wl_struct_type(self.context, vec_data_i64(&vtable_fields), method_count, 0)
+        let vtable_ty = wl_struct_type(self.context, vec_data_i64(&vtable_fields), method_count + 1, 0)
         let trait_idx = self.trait_vtable_types.len() as i32
         self.trait_vtable_types.push(vtable_ty)
         self.trait_method_starts.push(method_start)
@@ -173,8 +176,9 @@ impl Codegen:
                 self.analysis_fail(f"trait table {trait_name} index={trait_idx}: vtable type is not an LLVM struct")
             else:
                 vtable_slots = wl_count_struct_elem_types(vtable_ty)
-                if vtable_slots != ast_method_count:
-                    self.analysis_fail(f"trait table {trait_name} index={trait_idx}: vtable-slots={vtable_slots} AST methods={ast_method_count}")
+                // One slot per method, then the drop slot (#1847).
+                if vtable_slots != ast_method_count + 1:
+                    self.analysis_fail(f"trait table {trait_name} index={trait_idx}: vtable-slots={vtable_slots} AST methods={ast_method_count} (+1 drop slot)")
             let row_range_valid = collected_start >= 0 and collected_count >= 0 and collected_start + collected_count <= method_count
             if not row_range_valid:
                 self.analysis_fail(f"trait table {trait_name} index={trait_idx}: row range start={collected_start} count={collected_count} rows={method_count}")
@@ -978,12 +982,13 @@ impl Codegen:
         let key = codegen_hash_type_trait_key(impl_type_sym, trait_sym)
         if self.vtable_globals.get(key).is_some():
             return
+        entries.push(self.dyn_drop_slot(impl_type_sym, 0))
 
         let trait_name = self.intern.resolve(trait_sym)
         let type_name = self.intern.resolve(impl_type_sym)
         let global_name = "__vtable_" ++ type_name ++ "_" ++ trait_name
         let vg = wl_add_global(self.llmod, vtable_ty, global_name)
-        let vconst = wl_const_named_struct(vtable_ty, vec_data_i64(&entries), method_count)
+        let vconst = wl_const_named_struct(vtable_ty, vec_data_i64(&entries), method_count + 1)
         wl_set_initializer(vg, vconst)
         wl_set_global_constant(vg, 1)
         wl_set_linkage(vg, wl_internal_linkage())
@@ -1059,10 +1064,11 @@ impl Codegen:
                 dyn_ft = ft_val
             let wrapper = self.create_dyn_wrapper(impl_type_sym, concrete_sym, method_sym, fv_val, ft_val, dyn_ft, consumes_self)
             entries.push(wrapper)
+        entries.push(self.dyn_drop_slot(impl_type_sym, 0))
 
         let global_name = "__vtable_" ++ type_name ++ "_" ++ trait_name
         let vg = wl_add_global(self.llmod, vtable_ty, global_name)
-        let vconst = wl_const_named_struct(vtable_ty, vec_data_i64(&entries), method_count)
+        let vconst = wl_const_named_struct(vtable_ty, vec_data_i64(&entries), method_count + 1)
         wl_set_initializer(vg, vconst)
         wl_set_global_constant(vg, 1)
         wl_set_linkage(vg, wl_internal_linkage())
@@ -1127,14 +1133,90 @@ impl Codegen:
             entries.push(wrapper)
         if used_row == 0:
             return
+        entries.push(self.dyn_drop_slot(impl_type_sym, concrete_sema_ty))
         let key = codegen_hash_type_trait_key(impl_type_sym, trait_sym)
         let global_name = "__vtable_" ++ type_name ++ "_" ++ trait_text
         let vg = wl_add_global(self.llmod, vtable_ty, global_name)
-        let vconst = wl_const_named_struct(vtable_ty, vec_data_i64(&entries), method_count)
+        let vconst = wl_const_named_struct(vtable_ty, vec_data_i64(&entries), method_count + 1)
         wl_set_initializer(vg, vconst)
         wl_set_global_constant(vg, 1)
         wl_set_linkage(vg, wl_internal_linkage())
         self.vtable_globals.insert(key, vg)
+
+    // #1847: the vtable's drop slot for the concrete type behind a `dyn`: a
+    // `void(ptr)` that drops the value in place, null for a type with no
+    // drop. The concrete type is the impl's (`concrete_sema_ty` when the
+    // caller knows the generic instance). Its body is emitted once every
+    // Drop fn is known (define_dyn_drop_thunks): vtables are built first.
+    mut fn dyn_drop_slot(impl_type_sym: i32, concrete_sema_ty: i32) -> i64:
+        let null_slot = wl_const_null(wl_ptr_type(self.context))
+        var sema_ty = concrete_sema_ty
+        if sema_ty <= 0:
+            let sema_sym = self.codegen_sema_sym_for(impl_type_sym)
+            if sema_sym != 0:
+                sema_ty = self.sema.lookup_named_type_visible(sema_sym)
+        if sema_ty <= 0:
+            return null_slot
+        sema_ty = self.sema.resolve_alias(sema_ty as TypeId) as i32
+        if self.sema.type_needs_drop_frozen(sema_ty) == 0:
+            return null_slot
+        let fn_name = "__dyn_drop_" ++ f"{sema_ty}"
+        let existing = wl_get_named_function(self.llmod, fn_name)
+        if existing != 0:
+            return existing
+        let params: Vec[i64] = Vec.new()
+        params.push(wl_ptr_type(self.context))
+        let fn_ty = wl_function_type(wl_void_type(self.context), vec_data_i64(&params), 1, 0)
+        let thunk = wl_add_function(self.llmod, fn_name, fn_ty)
+        wl_set_linkage(thunk, wl_internal_linkage())
+        self.dyn_drop_thunks.push(thunk)
+        self.dyn_drop_thunk_types.push(sema_ty)
+        thunk
+
+    // The bodies of the drop slots (dyn_drop_slot): the concrete type's drop
+    // glue, run on the value the fat pointer's data word addresses.
+    mut fn define_dyn_drop_thunks():
+        var ti = 0
+        while ti < self.dyn_drop_thunks.len() as i32:
+            let thunk: i64 = self.dyn_drop_thunks[ti]
+            let sema_ty: i32 = self.dyn_drop_thunk_types[ti]
+            ti = ti + 1
+            if wl_is_declaration(thunk) == 0:
+                continue
+            let llvm_ty = self.sema_type_to_llvm(sema_ty)
+            let saved_fn: i64 = self.current_function
+            let saved_fn_name_sym: i32 = self.current_function_name_sym
+            let saved_fn_node: i32 = self.current_function_node
+            let saved_ret_ty: i64 = self.current_ret_type
+            let saved_bb = wl_get_insert_block(self.builder)
+            let saved_needs_guard: bool = self.current_drop_needs_guard
+            let saved_member_depth: i32 = self.member_drop_depth
+            let saved_origin_ptr: i64 = self.current_drop_origin_ptr
+            let saved_origin_len: i64 = self.current_drop_origin_len
+            self.current_function = thunk
+            self.current_function_name_sym = 0
+            self.current_function_node = 0
+            self.current_ret_type = wl_void_type(self.context)
+            self.current_drop_needs_guard = false
+            self.member_drop_depth = 0
+            let origin_text = "drop#dyn __dyn_drop_" ++ f"{sema_ty}"
+            self.current_drop_origin_ptr = self.const_c_string_pointer(origin_text, wl_ptr_type(self.context))
+            self.current_drop_origin_len = wl_const_int(wl_i64_type(self.context), origin_text.len(), 0)
+            let entry = wl_append_bb(self.context, thunk, "entry")
+            wl_position_at_end(self.builder, entry)
+            if llvm_ty != 0:
+                self.mir_emit_drop_ptr_for_sema_type(wl_get_param(thunk, 0), llvm_ty, sema_ty)
+            let _ = wl_build_ret_void(self.builder)
+            self.current_function = saved_fn
+            self.current_function_name_sym = saved_fn_name_sym
+            self.current_function_node = saved_fn_node
+            self.current_ret_type = saved_ret_ty
+            self.current_drop_needs_guard = saved_needs_guard
+            self.member_drop_depth = saved_member_depth
+            self.current_drop_origin_ptr = saved_origin_ptr
+            self.current_drop_origin_len = saved_origin_len
+            if saved_bb != 0:
+                wl_position_at_end(self.builder, saved_bb)
 
     mut fn generate_trait_vtables():
         for i in 0..self.pool.decl_count():
