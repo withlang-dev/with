@@ -1328,675 +1328,217 @@ pub fn rt_compat_self_maxrss() -> i64:
 //                       preserve it, every other call does.
 //   locale  (process) — C11 7.11.1.1: setlocale is the function that
 //                       changes the locale; the runtime never calls it.
-// The process state POSIX.1-2017 names beyond the C library's (#1608,
-// refinements under ruling §35): a row preserves each unless its function
-// is one of the interfaces POSIX names as altering it.
-//   signals     (process) — dispositions: sigaction; raise, kill and abort
-//                           deliver a signal, so they are counted too.
-//   signal_mask (thread)  — the calling thread's mask and alternate stack:
-//                           sigprocmask, sigaltstack.
-//   cwd         (process) — the working directory: chdir.
-//   fds         (process) — the descriptor table: open, close, dup2, fcntl,
-//                           socket, accept, mkstemp, opendir, closedir;
-//                           getaddrinfo and realpath may open descriptors
-//                           of their own, and exec closes close-on-exec ones.
-//   rlimits     (process) — setrlimit.
-//   children    (process) — the children and process group: fork, waitpid,
-//                           wait4, setpgid, exec.
-//   stdio       (process) — the streams' buffers and positions: fseeko
-//                           (fileno, ftello and isatty only read them).
-// No safe view depends on them yet; the rows make a runtime call that
-// begins altering one visible to the audit (§52).
+// The process-global state POSIX names beyond the C library's — signal
+// disposition and mask, the working directory, the descriptor table,
+// resource limits, process groups and children, the stdio streams — is no
+// domain: no safe view is presented over it, so it is "an effect the
+// runtime audit records, not a domain" (spec §16.2b.14, D76, ruling
+// Amendment 2). The runtime-domain-audit lane records each call's effect by
+// the C symbol it links (build/compiler.w comp_process_state_alterers:
+// chdir alters the working directory, setrlimit the limits, fork and exec
+// the children, …). One becomes a domain, with rows here, the first time a
+// facade presents a safe view whose validity it decides.
 c facade libc:
     domain errno thread
     domain environ process
     domain locale process
-    domain signals process
-    domain signal_mask thread
-    domain cwd process
-    domain fds process
-    domain rlimits process
-    domain children process
-    domain stdio process
     fn rt_libc_write
         preserves domain environ
         preserves domain locale
-        preserves domain signals
-        preserves domain signal_mask
-        preserves domain cwd
-        preserves domain fds
-        preserves domain rlimits
-        preserves domain children
-        preserves domain stdio
     fn rt_libc_read
         preserves domain environ
         preserves domain locale
-        preserves domain signals
-        preserves domain signal_mask
-        preserves domain cwd
-        preserves domain fds
-        preserves domain rlimits
-        preserves domain children
-        preserves domain stdio
     fn rt_libc_open
         preserves domain environ
         preserves domain locale
-        preserves domain signals
-        preserves domain signal_mask
-        preserves domain cwd
-        preserves domain rlimits
-        preserves domain children
-        preserves domain stdio
     fn rt_libc_close
         preserves domain environ
         preserves domain locale
-        preserves domain signals
-        preserves domain signal_mask
-        preserves domain cwd
-        preserves domain rlimits
-        preserves domain children
-        preserves domain stdio
     fn rt_libc_lseek
         preserves domain environ
         preserves domain locale
-        preserves domain signals
-        preserves domain signal_mask
-        preserves domain cwd
-        preserves domain fds
-        preserves domain rlimits
-        preserves domain children
-        preserves domain stdio
     fn rt_libc_fcntl
         preserves domain environ
         preserves domain locale
-        preserves domain signals
-        preserves domain signal_mask
-        preserves domain cwd
-        preserves domain rlimits
-        preserves domain children
-        preserves domain stdio
     fn rt_libc_getcwd
         preserves domain environ
         preserves domain locale
-        preserves domain signals
-        preserves domain signal_mask
-        preserves domain cwd
-        preserves domain fds
-        preserves domain rlimits
-        preserves domain children
-        preserves domain stdio
     fn rt_libc_mmap
         preserves domain environ
         preserves domain locale
-        preserves domain signals
-        preserves domain signal_mask
-        preserves domain cwd
-        preserves domain fds
-        preserves domain rlimits
-        preserves domain children
-        preserves domain stdio
     fn rt_libc_munmap
         preserves domain environ
         preserves domain locale
-        preserves domain signals
-        preserves domain signal_mask
-        preserves domain cwd
-        preserves domain fds
-        preserves domain rlimits
-        preserves domain children
-        preserves domain stdio
     fn rt_libc_getenv
         preserves domain locale
-        preserves domain signals
-        preserves domain signal_mask
-        preserves domain cwd
-        preserves domain fds
-        preserves domain rlimits
-        preserves domain children
-        preserves domain stdio
     fn rt_libc_stat
         preserves domain environ
         preserves domain locale
-        preserves domain signals
-        preserves domain signal_mask
-        preserves domain cwd
-        preserves domain fds
-        preserves domain rlimits
-        preserves domain children
-        preserves domain stdio
     fn rt_libc_chmod
         preserves domain environ
         preserves domain locale
-        preserves domain signals
-        preserves domain signal_mask
-        preserves domain cwd
-        preserves domain fds
-        preserves domain rlimits
-        preserves domain children
-        preserves domain stdio
     fn rt_libc_exit
         preserves domain environ
         preserves domain locale
-        preserves domain signals
-        preserves domain signal_mask
-        preserves domain cwd
-        preserves domain fds
-        preserves domain rlimits
-        preserves domain children
-        preserves domain stdio
     fn rt_libc_errno_location
         preserves domain errno
         preserves domain environ
         preserves domain locale
-        preserves domain signals
-        preserves domain signal_mask
-        preserves domain cwd
-        preserves domain fds
-        preserves domain rlimits
-        preserves domain children
-        preserves domain stdio
     fn rt_libc_getrandom
         preserves domain environ
         preserves domain locale
-        preserves domain signals
-        preserves domain signal_mask
-        preserves domain cwd
-        preserves domain fds
-        preserves domain rlimits
-        preserves domain children
-        preserves domain stdio
     fn rt_libc_sysconf
         preserves domain environ
         preserves domain locale
-        preserves domain signals
-        preserves domain signal_mask
-        preserves domain cwd
-        preserves domain fds
-        preserves domain rlimits
-        preserves domain children
-        preserves domain stdio
     fn rt_libc_gethostname
         preserves domain environ
         preserves domain locale
-        preserves domain signals
-        preserves domain signal_mask
-        preserves domain cwd
-        preserves domain fds
-        preserves domain rlimits
-        preserves domain children
-        preserves domain stdio
     fn rt_libc_sigaltstack
         preserves domain environ
         preserves domain locale
-        preserves domain signals
-        preserves domain cwd
-        preserves domain fds
-        preserves domain rlimits
-        preserves domain children
-        preserves domain stdio
     fn rt_libc_sigaction
         preserves domain environ
         preserves domain locale
-        preserves domain signal_mask
-        preserves domain cwd
-        preserves domain fds
-        preserves domain rlimits
-        preserves domain children
-        preserves domain stdio
     fn rt_libc_fileno
         preserves domain environ
         preserves domain locale
-        preserves domain signals
-        preserves domain signal_mask
-        preserves domain cwd
-        preserves domain fds
-        preserves domain rlimits
-        preserves domain children
-        preserves domain stdio
     fn rt_libc_fseeko
         preserves domain environ
         preserves domain locale
-        preserves domain signals
-        preserves domain signal_mask
-        preserves domain cwd
-        preserves domain fds
-        preserves domain rlimits
-        preserves domain children
     fn rt_libc_ftello
         preserves domain environ
         preserves domain locale
-        preserves domain signals
-        preserves domain signal_mask
-        preserves domain cwd
-        preserves domain fds
-        preserves domain rlimits
-        preserves domain children
-        preserves domain stdio
     fn rt_libc_isatty
         preserves domain environ
         preserves domain locale
-        preserves domain signals
-        preserves domain signal_mask
-        preserves domain cwd
-        preserves domain fds
-        preserves domain rlimits
-        preserves domain children
-        preserves domain stdio
     fn rt_libc_mkstemp
         preserves domain environ
         preserves domain locale
-        preserves domain signals
-        preserves domain signal_mask
-        preserves domain cwd
-        preserves domain rlimits
-        preserves domain children
-        preserves domain stdio
     fn rt_libc_realpath
         preserves domain environ
         preserves domain locale
-        preserves domain signals
-        preserves domain signal_mask
-        preserves domain cwd
-        preserves domain rlimits
-        preserves domain children
-        preserves domain stdio
     fn rt_libc_clock_gettime
         preserves domain environ
         preserves domain locale
-        preserves domain signals
-        preserves domain signal_mask
-        preserves domain cwd
-        preserves domain fds
-        preserves domain rlimits
-        preserves domain children
-        preserves domain stdio
     fn rt_libc_nanosleep
         preserves domain environ
         preserves domain locale
-        preserves domain signals
-        preserves domain signal_mask
-        preserves domain cwd
-        preserves domain fds
-        preserves domain rlimits
-        preserves domain children
-        preserves domain stdio
     fn rt_libc_getpid
         preserves domain environ
         preserves domain locale
-        preserves domain signals
-        preserves domain signal_mask
-        preserves domain cwd
-        preserves domain fds
-        preserves domain rlimits
-        preserves domain children
-        preserves domain stdio
     fn rt_libc_raise
         preserves domain environ
         preserves domain locale
-        preserves domain signal_mask
-        preserves domain cwd
-        preserves domain fds
-        preserves domain rlimits
-        preserves domain children
-        preserves domain stdio
     fn rt_libc_kill
         preserves domain environ
         preserves domain locale
-        preserves domain signal_mask
-        preserves domain cwd
-        preserves domain fds
-        preserves domain rlimits
-        preserves domain children
-        preserves domain stdio
     fn rt_libc_pthread_create
         preserves domain environ
         preserves domain locale
-        preserves domain signals
-        preserves domain signal_mask
-        preserves domain cwd
-        preserves domain fds
-        preserves domain rlimits
-        preserves domain children
-        preserves domain stdio
     fn rt_libc_pthread_join
         preserves domain environ
         preserves domain locale
-        preserves domain signals
-        preserves domain signal_mask
-        preserves domain cwd
-        preserves domain fds
-        preserves domain rlimits
-        preserves domain children
-        preserves domain stdio
     fn rt_libc_mkdir
         preserves domain environ
         preserves domain locale
-        preserves domain signals
-        preserves domain signal_mask
-        preserves domain cwd
-        preserves domain fds
-        preserves domain rlimits
-        preserves domain children
-        preserves domain stdio
     fn rt_libc_unlink
         preserves domain environ
         preserves domain locale
-        preserves domain signals
-        preserves domain signal_mask
-        preserves domain cwd
-        preserves domain fds
-        preserves domain rlimits
-        preserves domain children
-        preserves domain stdio
     fn rt_libc_rmdir
         preserves domain environ
         preserves domain locale
-        preserves domain signals
-        preserves domain signal_mask
-        preserves domain cwd
-        preserves domain fds
-        preserves domain rlimits
-        preserves domain children
-        preserves domain stdio
     fn rt_libc_rename
         preserves domain environ
         preserves domain locale
-        preserves domain signals
-        preserves domain signal_mask
-        preserves domain cwd
-        preserves domain fds
-        preserves domain rlimits
-        preserves domain children
-        preserves domain stdio
     fn rt_libc_symlink
         preserves domain environ
         preserves domain locale
-        preserves domain signals
-        preserves domain signal_mask
-        preserves domain cwd
-        preserves domain fds
-        preserves domain rlimits
-        preserves domain children
-        preserves domain stdio
     fn rt_libc_access
         preserves domain environ
         preserves domain locale
-        preserves domain signals
-        preserves domain signal_mask
-        preserves domain cwd
-        preserves domain fds
-        preserves domain rlimits
-        preserves domain children
-        preserves domain stdio
     fn rt_libc_lstat
         preserves domain environ
         preserves domain locale
-        preserves domain signals
-        preserves domain signal_mask
-        preserves domain cwd
-        preserves domain fds
-        preserves domain rlimits
-        preserves domain children
-        preserves domain stdio
     fn rt_libc_readlink
         preserves domain environ
         preserves domain locale
-        preserves domain signals
-        preserves domain signal_mask
-        preserves domain cwd
-        preserves domain fds
-        preserves domain rlimits
-        preserves domain children
-        preserves domain stdio
     fn rt_libc_opendir
         preserves domain environ
         preserves domain locale
-        preserves domain signals
-        preserves domain signal_mask
-        preserves domain cwd
-        preserves domain rlimits
-        preserves domain children
-        preserves domain stdio
     fn rt_libc_readdir
         preserves domain environ
         preserves domain locale
-        preserves domain signals
-        preserves domain signal_mask
-        preserves domain cwd
-        preserves domain fds
-        preserves domain rlimits
-        preserves domain children
-        preserves domain stdio
     fn rt_libc_closedir
         preserves domain environ
         preserves domain locale
-        preserves domain signals
-        preserves domain signal_mask
-        preserves domain cwd
-        preserves domain rlimits
-        preserves domain children
-        preserves domain stdio
     fn rt_libc_socket
         preserves domain environ
         preserves domain locale
-        preserves domain signals
-        preserves domain signal_mask
-        preserves domain cwd
-        preserves domain rlimits
-        preserves domain children
-        preserves domain stdio
     fn rt_libc_connect
         preserves domain environ
         preserves domain locale
-        preserves domain signals
-        preserves domain signal_mask
-        preserves domain cwd
-        preserves domain fds
-        preserves domain rlimits
-        preserves domain children
-        preserves domain stdio
     fn rt_libc_bind
         preserves domain environ
         preserves domain locale
-        preserves domain signals
-        preserves domain signal_mask
-        preserves domain cwd
-        preserves domain fds
-        preserves domain rlimits
-        preserves domain children
-        preserves domain stdio
     fn rt_libc_listen
         preserves domain environ
         preserves domain locale
-        preserves domain signals
-        preserves domain signal_mask
-        preserves domain cwd
-        preserves domain fds
-        preserves domain rlimits
-        preserves domain children
-        preserves domain stdio
     fn rt_libc_accept
         preserves domain environ
         preserves domain locale
-        preserves domain signals
-        preserves domain signal_mask
-        preserves domain cwd
-        preserves domain rlimits
-        preserves domain children
-        preserves domain stdio
     fn rt_libc_setsockopt
         preserves domain environ
         preserves domain locale
-        preserves domain signals
-        preserves domain signal_mask
-        preserves domain cwd
-        preserves domain fds
-        preserves domain rlimits
-        preserves domain children
-        preserves domain stdio
     fn rt_libc_getsockname
         preserves domain environ
         preserves domain locale
-        preserves domain signals
-        preserves domain signal_mask
-        preserves domain cwd
-        preserves domain fds
-        preserves domain rlimits
-        preserves domain children
-        preserves domain stdio
     fn rt_libc_send
         preserves domain environ
         preserves domain locale
-        preserves domain signals
-        preserves domain signal_mask
-        preserves domain cwd
-        preserves domain fds
-        preserves domain rlimits
-        preserves domain children
-        preserves domain stdio
     fn rt_libc_recv
         preserves domain environ
         preserves domain locale
-        preserves domain signals
-        preserves domain signal_mask
-        preserves domain cwd
-        preserves domain fds
-        preserves domain rlimits
-        preserves domain children
-        preserves domain stdio
     fn rt_libc_getaddrinfo
         preserves domain environ
         preserves domain locale
-        preserves domain signals
-        preserves domain signal_mask
-        preserves domain cwd
-        preserves domain rlimits
-        preserves domain children
-        preserves domain stdio
     fn rt_libc_freeaddrinfo
         preserves domain environ
         preserves domain locale
-        preserves domain signals
-        preserves domain signal_mask
-        preserves domain cwd
-        preserves domain fds
-        preserves domain rlimits
-        preserves domain children
-        preserves domain stdio
     fn rt_libc_setenv
         preserves domain locale
-        preserves domain signals
-        preserves domain signal_mask
-        preserves domain cwd
-        preserves domain fds
-        preserves domain rlimits
-        preserves domain children
-        preserves domain stdio
     fn rt_libc_sigprocmask
         preserves domain environ
         preserves domain locale
-        preserves domain signals
-        preserves domain cwd
-        preserves domain fds
-        preserves domain rlimits
-        preserves domain children
-        preserves domain stdio
     fn rt_libc_fork
         preserves domain environ
         preserves domain locale
-        preserves domain signals
-        preserves domain signal_mask
-        preserves domain cwd
-        preserves domain fds
-        preserves domain rlimits
-        preserves domain stdio
     fn rt_libc_setpgid
         preserves domain environ
         preserves domain locale
-        preserves domain signals
-        preserves domain signal_mask
-        preserves domain cwd
-        preserves domain fds
-        preserves domain rlimits
-        preserves domain stdio
     fn rt_libc_execv
         preserves domain environ
         preserves domain locale
-        preserves domain signals
-        preserves domain signal_mask
-        preserves domain cwd
-        preserves domain rlimits
-        preserves domain stdio
     fn rt_libc_execvp
         preserves domain environ
         preserves domain locale
-        preserves domain signals
-        preserves domain signal_mask
-        preserves domain cwd
-        preserves domain rlimits
-        preserves domain stdio
     fn rt_libc_waitpid
         preserves domain environ
         preserves domain locale
-        preserves domain signals
-        preserves domain signal_mask
-        preserves domain cwd
-        preserves domain fds
-        preserves domain rlimits
-        preserves domain stdio
     fn rt_libc_wait4
         preserves domain environ
         preserves domain locale
-        preserves domain signals
-        preserves domain signal_mask
-        preserves domain cwd
-        preserves domain fds
-        preserves domain rlimits
-        preserves domain stdio
     fn rt_libc_getrusage
         preserves domain environ
         preserves domain locale
-        preserves domain signals
-        preserves domain signal_mask
-        preserves domain cwd
-        preserves domain fds
-        preserves domain rlimits
-        preserves domain children
-        preserves domain stdio
     fn rt_libc_chdir
         preserves domain environ
         preserves domain locale
-        preserves domain signals
-        preserves domain signal_mask
-        preserves domain fds
-        preserves domain rlimits
-        preserves domain children
-        preserves domain stdio
     fn rt_libc_dup2
         preserves domain environ
         preserves domain locale
-        preserves domain signals
-        preserves domain signal_mask
-        preserves domain cwd
-        preserves domain rlimits
-        preserves domain children
-        preserves domain stdio
     fn rt_libc_getrlimit
         preserves domain environ
         preserves domain locale
-        preserves domain signals
-        preserves domain signal_mask
-        preserves domain cwd
-        preserves domain fds
-        preserves domain rlimits
-        preserves domain children
-        preserves domain stdio
     fn rt_libc_setrlimit
         preserves domain environ
         preserves domain locale
-        preserves domain signals
-        preserves domain signal_mask
-        preserves domain cwd
-        preserves domain fds
-        preserves domain children
-        preserves domain stdio

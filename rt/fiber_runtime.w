@@ -344,52 +344,23 @@ pub fn with_fiber_request_cancel_self():
 //                       preserve it, every other call does.
 //   locale  (process) — C11 7.11.1.1: setlocale is the function that
 //                       changes the locale; the runtime never calls it.
-// The process state POSIX.1-2017 names beyond the C library's (#1608,
-// refinements under ruling §35): a row preserves each unless its function
-// is one of the interfaces POSIX names as altering it.
-//   signals     (process) — dispositions: sigaction; raise, kill and abort
-//                           deliver a signal, so they are counted too.
-//   signal_mask (thread)  — the calling thread's mask and alternate stack:
-//                           sigprocmask, sigaltstack.
-//   cwd         (process) — the working directory: chdir.
-//   fds         (process) — the descriptor table: open, close, dup2, fcntl,
-//                           socket, accept, mkstemp, opendir, closedir;
-//                           getaddrinfo and realpath may open descriptors
-//                           of their own, and exec closes close-on-exec ones.
-//   rlimits     (process) — setrlimit.
-//   children    (process) — the children and process group: fork, waitpid,
-//                           wait4, setpgid, exec.
-//   stdio       (process) — the streams' buffers and positions: fseeko
-//                           (fileno, ftello and isatty only read them).
-// No safe view depends on them yet; the rows make a runtime call that
-// begins altering one visible to the audit (§52).
+// The process-global state POSIX names beyond the C library's — signal
+// disposition and mask, the working directory, the descriptor table,
+// resource limits, process groups and children, the stdio streams — is no
+// domain: no safe view is presented over it, so it is "an effect the
+// runtime audit records, not a domain" (spec §16.2b.14, D76, ruling
+// Amendment 2). The runtime-domain-audit lane records each call's effect by
+// the C symbol it links (build/compiler.w comp_process_state_alterers:
+// chdir alters the working directory, setrlimit the limits, fork and exec
+// the children, …). One becomes a domain, with rows here, the first time a
+// facade presents a safe view whose validity it decides.
 c facade libc:
     domain errno thread
     domain environ process
     domain locale process
-    domain signals process
-    domain signal_mask thread
-    domain cwd process
-    domain fds process
-    domain rlimits process
-    domain children process
-    domain stdio process
     fn rt_libc_exit
         preserves domain environ
         preserves domain locale
-        preserves domain signals
-        preserves domain signal_mask
-        preserves domain cwd
-        preserves domain fds
-        preserves domain rlimits
-        preserves domain children
-        preserves domain stdio
     fn rt_libc_abort
         preserves domain environ
         preserves domain locale
-        preserves domain signal_mask
-        preserves domain cwd
-        preserves domain fds
-        preserves domain rlimits
-        preserves domain children
-        preserves domain stdio

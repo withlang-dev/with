@@ -2319,11 +2319,13 @@ pub fn build(ctx: BuildCtx) -> Build:
 
     // The runtime's foreign calls are described by its internal facade rows
     // (ruling §52, spec §16.2b.14): every foreign extern in rt/*.w has a
-    // domain row, and the lane's own fixtures prove it sees (build/compiler.w).
+    // domain row, the process-global state a seam alters is recorded as an
+    // effect (D76) in the output, and the lane's own fixtures prove it sees
+    // (build/compiler.w). The libc facade is read for the views it presents.
     var runtime_domains = target_new(.Action, "runtime-domain-audit", "").output("out/.build-state/runtime-domain-audit.txt")
     runtime_domains.action = run_check_runtime_domain_audit_action
     runtime_domains = runtime_domains.write_scope("out/.build-state")
-    runtime_domains = runtime_domains.input("rt").input("test/runtime_domain_audit")
+    runtime_domains = runtime_domains.input("rt").input("test/runtime_domain_audit").input("src/compiler/LibcFacade.w")
     out = out.add_target(runtime_domains)
 
     out = out.add_target(with_object_target("bootstrap-llvm-bridge-object", "seed", "src/compiler/LlvmBridge.w", "out/bootstrap-lib/llvm_bridge.o", "-O1", ""))

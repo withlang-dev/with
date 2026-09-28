@@ -2,7 +2,9 @@
 // runtime-domain-audit positive fixture (ruling §52): every foreign extern
 // has a row, the runtime-internal externs (rt_*, with_*) need none, the
 // LLVM intrinsic is not a foreign call, and comments inside the block are
-// not rows.
+// not rows. The facade declares the three libc domains and no more: the
+// process-global state `abort` alters (signals) is an effect the audit
+// records, not a domain (spec §16.2b.14, D76).
 
 @[link_name("write")]
 extern fn rt_libc_write(fd: i32, buf: *const u8, len: u64) -> i64
@@ -15,17 +17,10 @@ extern fn rt_write(fd: i32, buf: *const u8, len: u64) -> i64
 extern fn with_alloc(size: i64) -> *mut u8
 
 c facade libc:
-    // the three libc domains (ruling §33-§36) and the process state (#1608)
+    // the three libc domains (ruling §33-§36)
     domain errno thread
     domain environ process
     domain locale process
-    domain signals process
-    domain signal_mask thread
-    domain cwd process
-    domain fds process
-    domain rlimits process
-    domain children process
-    domain stdio process
     fn rt_libc_write
         preserves domain environ
         preserves domain locale

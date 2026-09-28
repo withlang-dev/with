@@ -712,6 +712,24 @@ impl Sema:
                 let kind = self.ast.get_data0(self.ast.get_extra(self.ast.get_data1(rule) + 1))
                 self.emit_warning(f"use convention {profile}: rule {rname} ({template}) matches {cands.len() as i32} candidates for {what}: {self.facade_profile_names(&cands)}; a profile fact must resolve uniquely, so the rule contributes nothing (§16.2b.12) — state '{facade_clause_name(kind)} <fn>' on the resource to choose", item)
 
+    // The process-global C state the ruling names (spec §16.2b.14, D76):
+    // "an effect the runtime audit records, not a domain" until a facade
+    // presents a safe view whose validity it decides. The same six names
+    // key the runtime-domain-audit lane's record (build/compiler.w
+    // comp_process_states).
+    fn facade_process_state_name(dn: &str) -> bool:
+        dn == "signals" or dn == "cwd" or dn == "fds" or dn == "rlimits" or dn == "children" or dn == "stdio"
+
+    // An undeclared domain named by `returns borrow … from domain D` (a view,
+    // `view`) or `preserves domain D`.
+    fn facade_unknown_domain_message(fname: &str, dn: &str, view: bool) -> str:
+        let base = f"fn '{fname}': unknown domain '{dn}'; declare it with 'domain {dn} process|thread|resource|static' (§16.2b.7)"
+        if not self.facade_process_state_name(dn):
+            return base
+        if view:
+            return base ++ f" — '{dn}' is process-global state: an effect the runtime audit records, not a domain, until a facade presents a safe view whose validity it decides; this view does, so the facade declares it a domain (spec §16.2b.14, D76)"
+        base ++ f" — '{dn}' is process-global state no safe view reaches: an effect the runtime audit records, and no domain to preserve until a facade presents a view over it (spec §16.2b.14, D76)"
+
     mut fn collect_facade_domain(item: i32):
         let name = self.ast.get_data0(item)
         if self.facade_domains.contains(name):
@@ -1264,7 +1282,7 @@ impl Sema:
                 if domain != 0:
                     if not self.facade_domains.contains(domain):
                         let dn: str = self.pool_resolve(domain)
-                        self.emit_error(f"fn '{fname}': unknown domain '{dn}'; declare it with 'domain {dn} process|thread|resource|static' (§16.2b.7)", clause)
+                        self.emit_error(self.facade_unknown_domain_message(fname, dn, true), clause)
                         return c
                     c.returns_borrow_domain = domain
                 else:
@@ -1297,7 +1315,7 @@ impl Sema:
                 if domain != 0:
                     if not self.facade_domains.contains(domain):
                         let dn: str = self.pool_resolve(domain)
-                        self.emit_error(f"fn '{fname}': unknown domain '{dn}'; declare it with 'domain {dn} process|thread|resource|static' (§16.2b.7)", clause)
+                        self.emit_error(self.facade_unknown_domain_message(fname, dn, true), clause)
                         return c
                     c.returns_borrow_domain = domain
                 else:
@@ -1360,7 +1378,7 @@ impl Sema:
             let d = self.ast.get_extra(ops + 1)
             if not self.facade_domains.contains(d):
                 let dn: str = self.pool_resolve(d)
-                self.emit_error(f"fn '{fname}': unknown domain '{dn}'; declare it with 'domain {dn} process|thread|resource|static' (§16.2b.7)", clause)
+                self.emit_error(self.facade_unknown_domain_message(fname, dn, false), clause)
                 return c
             c.preserves_domains.push(d)
             return c

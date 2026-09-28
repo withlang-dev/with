@@ -1646,24 +1646,22 @@ pub fn with_net_close(sock: i32) -> i32:
 // Every foreign call above is described here; the `runtime-domain-audit`
 // lane (build/compiler.w) refuses a foreign extern without a row. "Unknown
 // effect means invalidate" (§38): a Win32 or Winsock row says nothing, so
-// it invalidates every declared domain — the three libc domains and the
-// process state (#1608) — the C standard does not describe those
-// calls, and a row it cannot justify is never `preserves`. The UCRT rows
-// follow the C standard as the POSIX backends do: C11 7.5p3 (errno: any
-// library function may set it; the `_errno` accessor is the macro's lvalue,
-// 7.5p2), C11 7.22.4.6 (environ: altered by _putenv/SetEnvironmentVariable
-// only), C11 7.11.1.1 (locale: setlocale only, never called here).
+// it invalidates every declared domain, the three libc domains: the C
+// standard does not describe those calls, and a row it cannot justify is
+// never `preserves`. The UCRT rows follow the C standard as the POSIX
+// backends do: C11 7.5p3 (errno: any library function may set it; the
+// `_errno` accessor is the macro's lvalue, 7.5p2), C11 7.22.4.6 (environ:
+// altered by _putenv/SetEnvironmentVariable only), C11 7.11.1.1 (locale:
+// setlocale only, never called here). The process-global state a Win32
+// call alters — the handle table, the working directory, the vectored
+// handlers, child processes — is no domain: no safe view is presented over
+// it, so the runtime-domain-audit lane records each call's effect by its C
+// symbol instead (build/compiler.w comp_process_state_alterers; spec
+// §16.2b.14, D76).
 c facade win32:
     domain errno thread
     domain environ process
     domain locale process
-    domain signals process
-    domain signal_mask thread
-    domain cwd process
-    domain fds process
-    domain rlimits process
-    domain children process
-    domain stdio process
     fn GetLastError
     fn GetStdHandle
     fn ReadFile

@@ -1384,20 +1384,16 @@ pub fn memset(dst: *mut u8, c: i32, n: i32) -> *mut u8:
 // lane (build/compiler.w) refuses a foreign extern without a row. WASI is
 // not the C library: the C standard justifies no `preserves` for these
 // calls, so each row says nothing and invalidates every domain the facade
-// declares — the three libc domains and the process state (#1608)
-// ("unknown effect means invalidate", §38). The memory.size/memory.grow
-// declarations are LLVM intrinsics, not foreign calls.
+// declares, the three libc domains ("unknown effect means invalidate",
+// §38). The process-global state a WASI call alters (the descriptor table:
+// path_open, fd_close) is no domain: no safe view is presented over it, so
+// the runtime-domain-audit lane records each call's effect by its C symbol
+// instead (spec §16.2b.14, D76). The memory.size/memory.grow declarations
+// are LLVM intrinsics, not foreign calls.
 c facade wasi:
     domain errno thread
     domain environ process
     domain locale process
-    domain signals process
-    domain signal_mask thread
-    domain cwd process
-    domain fds process
-    domain rlimits process
-    domain children process
-    domain stdio process
     fn args_sizes_get
     fn args_get
     fn environ_sizes_get
